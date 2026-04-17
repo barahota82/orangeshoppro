@@ -14,16 +14,37 @@ function cartLinesMatch(a, b) {
     return ca === cb && sa === sb;
 }
 
+function getCartStorageKey() {
+    if (typeof window.orangeSfCartKey === 'function') {
+        return window.orangeSfCartKey();
+    }
+    return 'orange_sf_cart_orange';
+}
+
 function getCart() {
     try {
-        return JSON.parse(localStorage.getItem('cart') || '[]');
+        const key = getCartStorageKey();
+        const raw = localStorage.getItem(key);
+        if (raw) {
+            return JSON.parse(raw);
+        }
+        const leg = localStorage.getItem('cart');
+        if (leg) {
+            const parsed = JSON.parse(leg);
+            if (Array.isArray(parsed)) {
+                localStorage.setItem(key, leg);
+                localStorage.removeItem('cart');
+                return parsed;
+            }
+        }
+        return [];
     } catch (e) {
         return [];
     }
 }
 
 function setCart(items) {
-    localStorage.setItem('cart', JSON.stringify(items));
+    localStorage.setItem(getCartStorageKey(), JSON.stringify(items));
 }
 
 function normalizeCartDuplicates() {
@@ -297,7 +318,10 @@ async function sendOrderNow() {
         return;
     }
 
-    localStorage.removeItem('cart');
+    localStorage.removeItem(getCartStorageKey());
+    try {
+        localStorage.removeItem('cart');
+    } catch (e) {}
     window.open(result.whatsapp_url, '_blank');
     alert((window.APP_T.order_number || 'Order Number') + ': ' + result.order_number);
     location.reload();

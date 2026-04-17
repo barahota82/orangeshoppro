@@ -1,12 +1,37 @@
 let selectedColor = '';
 let selectedSize = '';
 
+function orangeProductCartStorageKey() {
+    if (typeof window.orangeSfCartKey === 'function') {
+        return window.orangeSfCartKey();
+    }
+    return 'orange_sf_cart_orange';
+}
+
 function readCartJson() {
     try {
-        return JSON.parse(localStorage.getItem('cart') || '[]');
+        const key = orangeProductCartStorageKey();
+        const raw = localStorage.getItem(key);
+        if (raw) {
+            return JSON.parse(raw);
+        }
+        const leg = localStorage.getItem('cart');
+        if (leg) {
+            const parsed = JSON.parse(leg);
+            if (Array.isArray(parsed)) {
+                localStorage.setItem(key, leg);
+                localStorage.removeItem('cart');
+                return parsed;
+            }
+        }
+        return [];
     } catch (e) {
         return [];
     }
+}
+
+function writeCartJson(cart) {
+    localStorage.setItem(orangeProductCartStorageKey(), JSON.stringify(cart));
 }
 
 function openProductSizingDialog() {
@@ -286,7 +311,7 @@ function addCurrentProductToCart() {
     if (!merged) {
         cart.push(item);
     }
-    localStorage.setItem('cart', JSON.stringify(cart));
+    writeCartJson(cart);
     if (typeof normalizeCartDuplicates === 'function') {
         normalizeCartDuplicates();
     }

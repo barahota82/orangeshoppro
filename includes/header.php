@@ -28,6 +28,33 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+    <script>
+    (function orangeStorefrontApplySavedChannel() {
+        try {
+            var params = new URLSearchParams(window.location.search || '');
+            if (params.get('channel')) {
+                return;
+            }
+            var raw = localStorage.getItem('orange_storefront_channel') || '';
+            var savedCh = String(raw).replace(/[^a-z0-9\-]/gi, '').toLowerCase();
+            if (!savedCh || !{ orange: 1, blue: 1, black: 1 }[savedCh]) {
+                return;
+            }
+            var path = window.location.pathname || '';
+            if (path.indexOf('/pages/') === -1) {
+                return;
+            }
+            var lang = localStorage.getItem('orange_storefront_lang') || localStorage.getItem('site_lang') || 'en';
+            if (!/^(en|ar|fil|hi)$/.test(lang)) {
+                lang = 'en';
+            }
+            params.set('channel', savedCh);
+            params.set('lang', lang);
+            var qs = params.toString();
+            window.location.replace(path + (qs ? '?' + qs : ''));
+        } catch (e) {}
+    })();
+    </script>
     <title><?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?></title>
     <link rel="stylesheet" href="<?php echo htmlspecialchars(storefront_asset_url('/assets/css/main.css'), ENT_QUOTES, 'UTF-8'); ?>">
     <link rel="stylesheet" href="<?php echo htmlspecialchars(storefront_asset_url('/assets/css/theme-' . $theme . '.css'), ENT_QUOTES, 'UTF-8'); ?>">
@@ -35,7 +62,29 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
         window.APP_LANG = <?php echo json_encode($lang, JSON_UNESCAPED_UNICODE); ?>;
         window.APP_TAGLINE_CYCLE = <?php echo json_encode($taglineCycle, JSON_UNESCAPED_UNICODE); ?>;
         window.APP_CHANNEL_ID = <?php echo (int)($channel['id'] ?? 0); ?>;
+        window.APP_CHANNEL_SLUG = <?php echo json_encode($channelSlug, JSON_UNESCAPED_UNICODE); ?>;
         window.STOREFRONT_BASE = <?php echo json_encode(PUBLIC_BASE_PATH, JSON_UNESCAPED_UNICODE); ?>;
+        window.orangeSfCartKey = function () {
+            var ch = (typeof window.APP_CHANNEL_SLUG === 'string' && window.APP_CHANNEL_SLUG) ? window.APP_CHANNEL_SLUG : 'orange';
+            ch = String(ch).replace(/[^a-z0-9\-]/gi, '').toLowerCase();
+            if (!ch) {
+                ch = 'orange';
+            }
+            if (ch !== 'orange' && ch !== 'blue' && ch !== 'black') {
+                ch = 'orange';
+            }
+            return 'orange_sf_cart_' + ch;
+        };
+        (function orangeStorefrontPersistPrefs() {
+            try {
+                if (window.APP_CHANNEL_SLUG) {
+                    localStorage.setItem('orange_storefront_channel', String(window.APP_CHANNEL_SLUG));
+                }
+                if (window.APP_LANG) {
+                    localStorage.setItem('orange_storefront_lang', String(window.APP_LANG));
+                }
+            } catch (e) {}
+        })();
         window.APP_T = {
             empty_cart: <?php echo json_encode(t('empty_cart'), JSON_UNESCAPED_UNICODE); ?>,
             color: <?php echo json_encode(t('color'), JSON_UNESCAPED_UNICODE); ?>,
