@@ -146,6 +146,62 @@ function storefront_current_page_kind(): string {
 }
 
 /**
+ * Shared state for storefront header toolbar + mobile app dock.
+ *
+ * @return array{channel: array<string, mixed>, lang: string, channelSlug: string, pageKind: string, storefrontExtra: array, langOpts: array, currentLangLabel: string}
+ */
+function storefront_toolbar_state(): array {
+    $lang = current_lang();
+    $slug = current_channel_slug();
+    $channel = get_channel_by_slug($slug);
+    if (!$channel) {
+        $channel = [
+            'id' => 0,
+            'name' => 'Orange',
+            'slug' => $slug !== '' ? $slug : 'orange',
+            'logo' => 'logo-orange.png',
+            'whatsapp_number' => '',
+        ];
+    }
+    $channelSlug = (string)($channel['slug'] ?? 'orange');
+    $pageKind = storefront_current_page_kind();
+    $storefrontExtra = [];
+    if ($pageKind === 'product' && isset($_GET['id'])) {
+        $storefrontExtra['id'] = (int)$_GET['id'];
+    }
+    $langOpts = storefront_lang_options();
+    $currentLangLabel = (string)($langOpts[$lang]['label'] ?? $lang);
+
+    return [
+        'channel' => $channel,
+        'lang' => $lang,
+        'channelSlug' => $channelSlug,
+        'pageKind' => $pageKind,
+        'storefrontExtra' => $storefrontExtra,
+        'langOpts' => $langOpts,
+        'currentLangLabel' => $currentLangLabel,
+    ];
+}
+
+/** wa.me link for channel WhatsApp (digits only). */
+function storefront_whatsapp_href(array $channel, string $prefillText = ''): ?string {
+    $raw = trim((string)($channel['whatsapp_number'] ?? ''));
+    if ($raw === '') {
+        return null;
+    }
+    $digits = preg_replace('/\D+/', '', $raw);
+    if ($digits === '') {
+        return null;
+    }
+    $url = 'https://wa.me/' . $digits;
+    if ($prefillText !== '') {
+        $url .= '?text=' . rawurlencode($prefillText);
+    }
+
+    return $url;
+}
+
+/**
  * Storefront URL: short path when channel+lang match IIS rewrite (web.config on server), else query string.
  *
  * @param 'home'|'cart'|'track'|'product' $page
@@ -207,7 +263,8 @@ function get_translations(): array {
             'added' => 'Added to cart',
             'category_products' => 'Products',
             'language' => 'Language',
-            'storefront_brand' => 'Orange Company'
+            'storefront_brand' => 'Orange Company',
+            'whatsapp' => 'WhatsApp'
         ],
         'ar' => [
             'home' => 'الرئيسية',
@@ -234,7 +291,8 @@ function get_translations(): array {
             'added' => 'تمت الإضافة إلى السلة',
             'category_products' => 'المنتجات',
             'language' => 'اللغة',
-            'storefront_brand' => 'Orange Company'
+            'storefront_brand' => 'Orange Company',
+            'whatsapp' => 'واتساب'
         ],
         'fil' => [
             'home' => 'Home',
@@ -261,7 +319,8 @@ function get_translations(): array {
             'added' => 'Naidagdag sa cart',
             'category_products' => 'Mga Produkto',
             'language' => 'Wika',
-            'storefront_brand' => 'Orange Company'
+            'storefront_brand' => 'Orange Company',
+            'whatsapp' => 'WhatsApp'
         ],
         'hi' => [
             'home' => 'होम',
@@ -288,7 +347,8 @@ function get_translations(): array {
             'added' => 'कार्ट में जोड़ा गया',
             'category_products' => 'उत्पाद',
             'language' => 'भाषा',
-            'storefront_brand' => 'Orange Company'
+            'storefront_brand' => 'Orange Company',
+            'whatsapp' => 'WhatsApp'
         ],
     ];
 }

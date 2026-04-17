@@ -106,7 +106,7 @@
     border-color: rgba(248, 113, 113, 0.25);
 }
 
-.theme-black .bottom-nav {
+.theme-black .app-bottom-dock {
     background: var(--header-bg);
     border-top-color: var(--border);
 }

@@ -15,3 +15,10 @@ function generate_order_number(): string
 {
     return 'ORD-' . date('Ymd-His') . '-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
 }
+
+function clean_whatsapp_number(string $raw): string
+{
+    $digits = preg_replace('/\D+/', '', $raw);
+
+    return $digits !== null && $digits !== '' ? $digits : '';
+}
