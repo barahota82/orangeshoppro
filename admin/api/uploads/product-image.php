@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../includes/upload_paths.php';
 
 require_admin_api();
 
@@ -42,11 +43,13 @@ if (!isset($allowed[$mime])) {
 }
 
 $ext = $allowed[$mime];
-$dir = __DIR__ . '/../../../uploads/products';
-if (!is_dir($dir)) {
-    if (!mkdir($dir, 0755, true) && !is_dir($dir)) {
-        json_response(['success' => false, 'message' => 'تعذر إنشاء مجلد الصور'], 500);
-    }
+$dir = orange_ensure_products_upload_dir();
+if ($dir === null) {
+    $pathHint = orange_products_upload_dir();
+    json_response([
+        'success' => false,
+        'message' => 'تعذر إنشاء مجلد الصور أو الكتابة فيه. أنشئ المجلد يدوياً وامنح التطبيق صلاحية الكتابة: ' . $pathHint,
+    ], 500);
 }
 
 $name = 'p_' . date('Ymd') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;

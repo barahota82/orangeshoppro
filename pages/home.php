@@ -365,12 +365,14 @@ function scrollHomeCategoryTabs(direction) {
 }
 function applyGridFilter(filter) {
     document.querySelectorAll('.product-card').forEach(function (card) {
-        var filters = card.getAttribute('data-filter') || '';
+        var raw = card.getAttribute('data-filter') || '';
         if (filter === 'all') {
             card.style.display = '';
             return;
         }
-        card.style.display = filters.indexOf(filter) !== -1 ? '' : 'none';
+        // مطابقة الرموز كاملة (مثلاً cat-1 لا يطابق cat-11)
+        var tokens = raw.trim().split(/\s+/).filter(Boolean);
+        card.style.display = tokens.indexOf(filter) !== -1 ? '' : 'none';
     });
 }
 function filterProducts(filter, el) {

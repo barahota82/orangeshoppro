@@ -115,6 +115,15 @@ try {
         }
     }
 
+    [$subOk, $subcategoryId, $subErr] = orange_product_resolve_subcategory_id(
+        $pdo,
+        (int) $data['category_id'],
+        $data['subcategory_id'] ?? null
+    );
+    if (!$subOk) {
+        json_response(['success' => false, 'message' => $subErr], 422);
+    }
+
     $pdo->beginTransaction();
 
     $nextSort = (int)$pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM products')->fetchColumn();
@@ -131,9 +140,9 @@ try {
         'INSERT INTO products (
             name, name_en, name_fil, name_hi,
             description, description_en, description_fil, description_hi,
-            category_id, size_family_id, sizing_guide_scope, price, cost, main_image, has_sizes, has_colors, sort_order, is_active, created_at
+            category_id, subcategory_id, size_family_id, sizing_guide_scope, price, cost, main_image, has_sizes, has_colors, sort_order, is_active, created_at
         ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW()
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW()
         )'
     );
 
@@ -147,6 +156,7 @@ try {
         $descFil,
         $descHi,
         (int)$data['category_id'],
+        $subcategoryId,
         $sizeFamilyId,
         $scope,
         (float)$data['price'],

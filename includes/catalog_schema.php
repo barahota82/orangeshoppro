@@ -6,6 +6,23 @@ declare(strict_types=1);
  * Ensures catalog tables and columns for colors, size families, colorways, and variant FKs exist.
  * Safe to call multiple times per request (uses static guard).
  */
+function orange_table_exists(PDO $pdo, string $table): bool
+{
+    static $cache = [];
+    if (array_key_exists($table, $cache)) {
+        return $cache[$table];
+    }
+    $stmt = $pdo->prepare(
+        'SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?'
+    );
+    $stmt->execute([$table]);
+    $exists = (int) $stmt->fetchColumn() > 0;
+    $cache[$table] = $exists;
+
+    return $exists;
+}
+
 function orange_table_has_column(PDO $pdo, string $table, string $column): bool
 {
     static $cache = [];
@@ -153,5 +170,74 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         orange_catalog_safe_exec($pdo, 'ALTER TABLE stock_movements ADD COLUMN reference VARCHAR(100) NULL');
     }
 
+    /*
+     |--------------------------------------------------------------------------
+     | Departments + categories.department_id
+     |--------------------------------------------------------------------------
+     | المنتج يبقى مربوطاً بالفئة فقط؛ القسم يُستنتج من categories.department_id.
+     */
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE TABLE IF NOT EXISTS departments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name_en VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_ar VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_fil VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_hi VARCHAR(191) NOT NULL DEFAULT \'\',
+            slug VARCHAR(191) NOT NULL DEFAULT \'\',
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            sort_order INT NOT NULL DEFAULT 0,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_departments_slug (slug),
+            KEY idx_departments_sort (sort_order)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+
+    if (orange_table_exists($pdo, 'categories') && !orange_table_has_column($pdo, 'categories', 'department_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE categories ADD COLUMN department_id INT NULL');
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE categories ADD INDEX idx_categories_department (department_id)');
+    }
+
+    static $productSubOrphansCleaned = false;
+    if (
+        !$productSubOrphansCleaned
+        && orange_table_exists($pdo, 'subcategories')
+        && orange_table_has_column($pdo, 'products', 'subcategory_id')
+    ) {
+        $productSubOrphansCleaned = true;
+        orange_catalog_safe_exec(
+            $pdo,
+            'UPDATE products p
+             LEFT JOIN subcategories s ON s.id = p.subcategory_id
+             SET p.subcategory_id = NULL
+             WHERE p.subcategory_id IS NOT NULL AND s.id IS NULL'
+        );
+    }
+
     $done = true;
+}
+
+/**
+ * @param mixed $raw subcategory_id من الطلب (فارغ = NULL)
+ * @return array{0: bool, 1: int|null, 2: string} [نجح، القيمة أو null، رسالة خطأ عربية]
+ */
+function orange_product_resolve_subcategory_id(PDO $pdo, int $categoryId, $raw): array
+{
+    if ($categoryId <= 0) {
+        return [false, null, 'الفئة غير صالحة'];
+    }
+    $sid = ($raw === null || $raw === '') ? 0 : (int) $raw;
+    if ($sid <= 0) {
+        return [true, null, ''];
+    }
+    if (!orange_table_exists($pdo, 'subcategories')) {
+        return [false, null, 'جدول التصنيفات الفرعية غير متوفر'];
+    }
+    $st = $pdo->prepare('SELECT id FROM subcategories WHERE id = ? AND category_id = ? LIMIT 1');
+    $st->execute([$sid, $categoryId]);
+    if (!$st->fetch()) {
+        return [false, null, 'التصنيف الفرعي غير موجود أو لا يتبع الفئة المختارة'];
+    }
+
+    return [true, $sid, ''];
 }

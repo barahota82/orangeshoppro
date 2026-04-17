@@ -45,6 +45,15 @@ try {
     }
     $sortOrder = (int)($data['sort_order'] ?? 0);
 
+    [$subOk, $subcategoryId, $subErr] = orange_product_resolve_subcategory_id(
+        $pdo,
+        (int) $data['category_id'],
+        $data['subcategory_id'] ?? null
+    );
+    if (!$subOk) {
+        json_response(['success' => false, 'message' => $subErr], 422);
+    }
+
     $prodStmt = $pdo->prepare('SELECT id, name FROM products WHERE category_id = ?');
     $prodStmt->execute([(int)$data['category_id']]);
     $prodRows = $prodStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -56,7 +65,7 @@ try {
         UPDATE products
         SET name = ?, name_en = ?, name_fil = ?, name_hi = ?,
             description = ?, description_en = ?, description_fil = ?, description_hi = ?,
-            category_id = ?, size_family_id = ?, sizing_guide_scope = ?, price = ?, cost = ?,
+            category_id = ?, subcategory_id = ?, size_family_id = ?, sizing_guide_scope = ?, price = ?, cost = ?,
             main_image = ?, has_sizes = ?, has_colors = ?, sort_order = ?, is_active = ?, updated_at = NOW()
         WHERE id = ?
     ");
@@ -71,6 +80,7 @@ try {
         trim((string)($data['description_fil'] ?? '')),
         trim((string)($data['description_hi'] ?? '')),
         (int)$data['category_id'],
+        $subcategoryId,
         $sizeFamilyId,
         $scope,
         (float)$data['price'],

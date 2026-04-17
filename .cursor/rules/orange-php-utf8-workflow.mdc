@@ -22,8 +22,27 @@ alwaysApply: true
 ## Admin routing
 - New `admin/pages/{name}.php` must be listed in `$allowed` in `admin/index.php`.
 
-## Translation
-- Do not restore `admin/api/_shared/translator.php`. Use `admin/api/translate/names.php` + `admin/api/lib/translate_names_lib.php`.
+## SQL — جذر المشروع وسطح المكتب
+
+- **جذر المشروع (`orange/`)**: للكود فقط (PHP، أصول، إلخ). **لا** تُضاف مجلدات مثل `sql/` و**لا** ملفات dump كاملة (`orange_db.sql` وما شابه) كجزء من التحديثات — حتى لا يختلط المرجع مع مراجعة المخطط.
+- إذا وضع المستخدم ملف SQL داخل المشروع (أو نسخة للمراجعة)، **الغرض مراجعته فقط** ومقارنته بما يتوقعه الكود.
+- أي نواقص في المخطط (أعمدة، فهارس، جداول) يُخرجها الوكيل **كود SQL للتحديث فقط** في الملف على **سطح المكتب**: `orange_sql_updates.sql` (المسار النموذجي: `c:\Users\HP\Desktop\orange_sql_updates.sql`). يجب أن يكون الكود **آمناً لإعادة التشغيل** (التحقق عبر `INFORMATION_SCHEMA` قبل `ALTER`/`ADD INDEX`) حتى لا يحدث خطأ Duplicate column/key إن كان المخطط مكتملاً مسبقاً. **لا** تُلحق تلك الترقيات كملفات `.sql` جديدة داخل المستودع ما لم يطلب المستخدم صراحةً العكس.
+- الترقية التلقائية أثناء التشغيل تبقى في **`includes/catalog_schema.php`** (PHP) — هذا استثناء مقصود وليس بديلاً عن ملف سطح المكتب للتطبيق اليدوي على السيرفر.
+
+## Translation (إلزامي لأي حقول متعددة اللغات في الأدمن)
+
+**نمط واحد ثابت** — لا تختصره ولا تغيّر السلوك بين الشاشات:
+
+1. **عند إدخال/تعديل العربي** (`input` على حقل العربي): بعد توقف الكتابة (debounce ~600–800ms) استدعِ الترجمة **صامتاً** بحيث يُحدَّث **الإنجليزي** من العربي ثم **الفلبيني والهندي** من الإنجليزي (نفس سلسلة `translate_names_from_ar_en` في المكتبة). إذا أُفرغ العربي، امسح حقول اللغات المشتقة إن كان ذلك منطقياً لنفس النموذج (مثل الأسماء/الأوصاف).
+2. **عند تعديل الإنجليزي**: بعد debounce أقصر قليلاً (~550–750ms) استدعِ الترجمة **من الإنجليزي** (لا تُفرغ `name_en` / `description_en` في الطلب؛ `forceFromArabic: false`) ليُعاد توليد **الفلبيني والهندي** تلقائياً دائماً.
+3. **زر يدوي اختياري** (مثل «ترجمة تلقائية من العربي»): يجب أن يطبّق نفس السلسلة للعربي (أسماء + أوصاف إن وُجدت) مع إظهار الأخطاء للمستخدم (`silent: false`).
+
+**واجهات الـ API:**
+
+- أسماء قصيرة: `admin/api/translate/names.php` + `admin/api/lib/translate_names_lib.php`.
+- أوصاف/نصوط طويلة: `admin/api/translate/descriptions.php` (يقطّع النص داخلياً عند الحاجة).
+
+**ممنوع:** استرجاع `admin/api/_shared/translator.php`.
 
 ## Diagnose before blaming logic
 - encoding vs allowlist vs missing GET params vs DB permissions.

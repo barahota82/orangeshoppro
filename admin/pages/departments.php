@@ -101,7 +101,7 @@ if ($hasDepartmentsTable) {
                     <th>Slug</th>
                     <th>الترتيب</th>
                     <th>الحالة</th>
-                    <th class="dep-ops-col">إجراءات</th>
+                    <th class="admin-ops-col">إجراءات</th>
                 </tr>
             </thead>
             <tbody id="departmentsTbody">
@@ -115,13 +115,13 @@ if ($hasDepartmentsTable) {
                     <td><?php echo htmlspecialchars((string)$dep['slug']); ?></td>
                     <td><?php echo (int)$dep['sort_order']; ?></td>
                     <td><?php echo (int)$dep['is_active'] === 1 ? 'ظاهر' : 'مخفي'; ?></td>
-                    <td class="dep-row-ops">
-                        <div class="dep-ops-wrap">
-                            <div class="dep-ops-arrows">
-                                <button type="button" class="btn-secondary dep-btn-reorder" onclick="moveDepartmentRow(this,'up')">↑</button>
-                                <button type="button" class="btn-secondary dep-btn-reorder" onclick="moveDepartmentRow(this,'down')">↓</button>
+                    <td class="admin-ops-cell">
+                        <div class="admin-table-ops">
+                            <div class="admin-table-ops__arrows">
+                                <button type="button" class="btn-secondary admin-btn-reorder dep-btn-reorder" onclick="moveDepartmentRow(this,'up')" aria-label="أعلى">↑</button>
+                                <button type="button" class="btn-secondary admin-btn-reorder dep-btn-reorder" onclick="moveDepartmentRow(this,'down')" aria-label="أسفل">↓</button>
                             </div>
-                            <div class="dep-ops-main">
+                            <div class="admin-table-ops__main">
                                 <button type="button" class="btn-secondary dep-edit-btn" data-dep-json="<?php echo htmlspecialchars(json_encode([
                                     'id' => (int)$dep['id'],
                                     'name_ar' => (string)$dep['name_ar'],
@@ -131,7 +131,7 @@ if ($hasDepartmentsTable) {
                                     'slug' => (string)$dep['slug'],
                                     'sort_order' => (int)$dep['sort_order'],
                                 ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button>
-                                <button type="button" class="dep-btn-toggle" onclick="toggleDepartment(<?php echo (int)$dep['id']; ?>, <?php echo (int)$dep['is_active']; ?>)">
+                                <button type="button" class="btn dep-btn-toggle" onclick="toggleDepartment(<?php echo (int)$dep['id']; ?>, <?php echo (int)$dep['is_active']; ?>)">
                                     <?php echo (int)$dep['is_active'] === 1 ? 'إخفاء' : 'إظهار'; ?>
                                 </button>
                             </div>
@@ -405,64 +405,9 @@ if (translateBtnDep) {
         .cat-dep-list-wrap[data-list="departments"] > table td{
             vertical-align:middle;
         }
-        .cat-dep-list-wrap[data-list="departments"] table .dep-ops-col,
-        .cat-dep-list-wrap[data-list="departments"] table .dep-row-ops{
-            width:200px !important;
-            min-width:200px !important;
-            max-width:200px !important;
-            box-sizing:border-box !important;
-            text-align:center !important;
-            vertical-align:middle !important;
-            padding:6px 8px !important;
-        }
-        .dep-ops-wrap{
-            display:grid;
-            grid-template-columns:38px minmax(0,1fr);
-            gap:8px;
-            align-items:center;
-            margin:0 auto;
-            max-width:100%;
-            direction:rtl;
-        }
-        .dep-ops-arrows{
-            display:flex;
-            flex-direction:column;
-            gap:4px;
-            align-items:center;
-            justify-content:center;
-        }
-        .cat-dep-list-wrap[data-list="departments"] .dep-ops-wrap button.dep-btn-reorder{
-            width:32px !important;
-            min-width:32px !important;
-            height:28px !important;
-            margin:0 !important;
-            padding:0 !important;
-            font-size:13px !important;
-            line-height:1 !important;
-            border-radius:6px !important;
-            display:inline-flex !important;
-            align-items:center;
-            justify-content:center;
-        }
-        .dep-ops-main{
-            display:flex;
-            flex-direction:column;
-            gap:5px;
-            min-width:0;
-        }
-        .cat-dep-list-wrap[data-list="departments"] .dep-ops-main .btn-secondary,
-        .cat-dep-list-wrap[data-list="departments"] .dep-ops-main .dep-btn-toggle{
-            width:100% !important;
-            margin:0 !important;
-            padding:6px 8px !important;
-            font-size:12px !important;
-            line-height:1.2 !important;
-            border-radius:6px !important;
-            box-sizing:border-box !important;
-            min-height:30px !important;
-            white-space:nowrap;
-            overflow:hidden;
-            text-overflow:ellipsis;
+        .cat-dep-list-wrap[data-list="departments"] table .admin-ops-col,
+        .cat-dep-list-wrap[data-list="departments"] table .admin-ops-cell{
+            padding:10px 8px !important;
         }
     `;
     document.head.appendChild(style);

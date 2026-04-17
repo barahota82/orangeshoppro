@@ -119,7 +119,7 @@ try {
                     <th>Slug</th>
                     <th>الترتيب</th>
                     <th>الحالة</th>
-                    <th class="cat-ops-col">إجراءات</th>
+                    <th class="admin-ops-col">إجراءات</th>
                 </tr>
             </thead>
             <tbody id="categoriesTbody">
@@ -134,13 +134,13 @@ try {
                     <td><?php echo htmlspecialchars($cat['slug']); ?></td>
                     <td><?php echo (int)$cat['sort_order']; ?></td>
                     <td><?php echo (int)$cat['is_active'] === 1 ? 'ظاهر' : 'مخفي'; ?></td>
-                    <td class="cat-row-ops">
-                        <div class="cat-ops-wrap">
-                            <div class="cat-ops-arrows">
-                                <button type="button" class="btn-secondary cat-btn-reorder" onclick="moveCategoryRow(this,'up')">↑</button>
-                                <button type="button" class="btn-secondary cat-btn-reorder" onclick="moveCategoryRow(this,'down')">↓</button>
+                    <td class="admin-ops-cell">
+                        <div class="admin-table-ops">
+                            <div class="admin-table-ops__arrows">
+                                <button type="button" class="btn-secondary admin-btn-reorder cat-btn-reorder" onclick="moveCategoryRow(this,'up')" aria-label="أعلى">↑</button>
+                                <button type="button" class="btn-secondary admin-btn-reorder cat-btn-reorder" onclick="moveCategoryRow(this,'down')" aria-label="أسفل">↓</button>
                             </div>
-                            <div class="cat-ops-main">
+                            <div class="admin-table-ops__main">
                                 <button type="button" class="btn-secondary cat-edit-btn" data-cat-json="<?php echo htmlspecialchars(json_encode([
                                     'id' => (int)$cat['id'],
                                     'department_id' => (int)($cat['department_id'] ?? 0),
@@ -151,7 +151,7 @@ try {
                                     'slug' => (string)$cat['slug'],
                                     'sort_order' => (int)$cat['sort_order']
                                 ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button>
-                                <button type="button" class="cat-btn-toggle" onclick="toggleCategory(<?php echo (int)$cat['id']; ?>, <?php echo (int)$cat['is_active']; ?>)">
+                                <button type="button" class="btn cat-btn-toggle" onclick="toggleCategory(<?php echo (int)$cat['id']; ?>, <?php echo (int)$cat['is_active']; ?>)">
                                     <?php echo (int)$cat['is_active'] === 1 ? 'إخفاء' : 'إظهار'; ?>
                                 </button>
                             </div>
@@ -445,64 +445,9 @@ if (translateBtn) {
         .cat-dep-list-wrap[data-list="categories"] > table td{
             vertical-align:middle;
         }
-        .cat-dep-list-wrap[data-list="categories"] table .cat-ops-col,
-        .cat-dep-list-wrap[data-list="categories"] table .cat-row-ops{
-            width:200px !important;
-            min-width:200px !important;
-            max-width:200px !important;
-            box-sizing:border-box !important;
-            text-align:center !important;
-            vertical-align:middle !important;
-            padding:6px 8px !important;
-        }
-        .cat-ops-wrap{
-            display:grid;
-            grid-template-columns:38px minmax(0,1fr);
-            gap:8px;
-            align-items:center;
-            margin:0 auto;
-            max-width:100%;
-            direction:rtl;
-        }
-        .cat-ops-arrows{
-            display:flex;
-            flex-direction:column;
-            gap:4px;
-            align-items:center;
-            justify-content:center;
-        }
-        .cat-dep-list-wrap[data-list="categories"] .cat-ops-wrap button.cat-btn-reorder{
-            width:32px !important;
-            min-width:32px !important;
-            height:28px !important;
-            margin:0 !important;
-            padding:0 !important;
-            font-size:13px !important;
-            line-height:1 !important;
-            border-radius:6px !important;
-            display:inline-flex !important;
-            align-items:center;
-            justify-content:center;
-        }
-        .cat-ops-main{
-            display:flex;
-            flex-direction:column;
-            gap:5px;
-            min-width:0;
-        }
-        .cat-dep-list-wrap[data-list="categories"] .cat-ops-main .btn-secondary,
-        .cat-dep-list-wrap[data-list="categories"] .cat-ops-main .cat-btn-toggle{
-            width:100% !important;
-            margin:0 !important;
-            padding:6px 8px !important;
-            font-size:12px !important;
-            line-height:1.2 !important;
-            border-radius:6px !important;
-            box-sizing:border-box !important;
-            min-height:30px !important;
-            white-space:nowrap;
-            overflow:hidden;
-            text-overflow:ellipsis;
+        .cat-dep-list-wrap[data-list="categories"] table .admin-ops-col,
+        .cat-dep-list-wrap[data-list="categories"] table .admin-ops-cell{
+            padding:10px 8px !important;
         }
     `;
     document.head.appendChild(style);

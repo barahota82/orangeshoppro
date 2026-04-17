@@ -77,3 +77,66 @@ if (!function_exists('translate_names_from_ar_en')) {
         ];
     }
 }
+
+if (!function_exists('translate_text_chunked_gtr')) {
+    /**
+     * Long-text wrapper for Google translate helper (URL length limits).
+     */
+    function translate_text_chunked_gtr(string $text, string $to, string $from = 'auto'): string
+    {
+        $text = trim($text);
+        if ($text === '') {
+            return '';
+        }
+        $maxLen = 1000;
+        $len = function_exists('mb_strlen') ? mb_strlen($text, 'UTF-8') : strlen($text);
+        if ($len <= $maxLen) {
+            return translate_names_gtr($text, $to, $from);
+        }
+        $parts = [];
+        for ($i = 0; $i < $len; $i += $maxLen) {
+            $parts[] = function_exists('mb_substr')
+                ? mb_substr($text, $i, $maxLen, 'UTF-8')
+                : substr($text, $i, $maxLen);
+        }
+        $out = [];
+        foreach ($parts as $chunk) {
+            $out[] = translate_names_gtr($chunk, $to, $from);
+        }
+
+        return trim(implode('', $out));
+    }
+}
+
+if (!function_exists('translate_descriptions_from_ar_en')) {
+    /**
+     * Same strategy as names: EN from AR if needed; Filipino/Hindi from EN.
+     *
+     * @return array{description_en: string, description_fil: string, description_hi: string}
+     */
+    function translate_descriptions_from_ar_en($descAr, $descEn): array
+    {
+        $descAr = trim((string) $descAr);
+        $descEn = trim((string) $descEn);
+        if ($descEn === '' && $descAr !== '') {
+            $descEn = translate_text_chunked_gtr($descAr, 'en', 'ar');
+        }
+        if ($descEn === '') {
+            $descEn = $descAr;
+        }
+        $descFil = translate_text_chunked_gtr($descEn, 'tl', 'en');
+        $descHi = translate_text_chunked_gtr($descEn, 'hi', 'en');
+        if ($descFil === '') {
+            $descFil = $descEn;
+        }
+        if ($descHi === '') {
+            $descHi = $descEn;
+        }
+
+        return [
+            'description_en' => $descEn,
+            'description_fil' => $descFil,
+            'description_hi' => $descHi,
+        ];
+    }
+}

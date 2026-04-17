@@ -4,9 +4,12 @@
     --border: #e5e7eb;
     --text: #111827;
     --muted: #6b7280;
-    --primary: #2563eb;
+    /* برتقالي Orange — هوية اللوحة */
+    --primary: #ea580c;
+    --primary-hover: #c2410c;
     --danger: #dc2626;
     --success: #16a34a;
+    --sidebar-active: #ea580c;
 }
 * { box-sizing: border-box; }
 body {
@@ -30,6 +33,7 @@ a { text-decoration: none; color: inherit; }
     font-size: 22px;
     font-weight: bold;
     margin-bottom: 12px;
+    color: #fdba74;
 }
 .admin-sidebar .admin-user {
     color: #cbd5e1;
@@ -45,14 +49,29 @@ a { text-decoration: none; color: inherit; }
     padding: 10px 12px;
     border-radius: 10px;
     background: rgba(255,255,255,0.04);
+    font-size: 14px;
+    line-height: 1.3;
 }
 .admin-sidebar nav a:hover {
     background: rgba(255,255,255,0.1);
 }
+.admin-sidebar nav a.is-active {
+    background: var(--sidebar-active);
+    color: #fff;
+    font-weight: 600;
+}
+.admin-sidebar nav a.is-active:hover {
+    background: var(--primary-hover);
+    color: #fff;
+}
+/* روابط فرعية (تحت الطلبات): نفس حجم الخط والمساحة، تمييز بمسافة فقط */
 .admin-sidebar nav a.admin-nav-sub {
-    margin-inline-start: 12px;
-    font-size: 0.92em;
-    opacity: 0.92;
+    margin-inline-start: 14px;
+    border-inline-start: 3px solid rgba(255,255,255,0.2);
+    padding-inline-start: 14px;
+}
+.admin-sidebar nav a.admin-nav-sub.is-active {
+    border-inline-start-color: rgba(255,255,255,0.55);
 }
 .admin-main {
     padding: 24px;
@@ -141,8 +160,64 @@ button, .btn {
     cursor: pointer;
     background: var(--primary);
     color: #fff;
+    font-size: 14px;
+    line-height: 1.25;
+    min-height: 42px;
+}
+button:hover, .btn:hover {
+    filter: brightness(1.06);
 }
 .btn-secondary { background: #6b7280; }
+.btn-secondary:hover { filter: brightness(1.08); }
+
+/* صف «إجراءات» موحّد: ↑ ↓ | تعديل | إظهار/إخفاء */
+.admin-table-ops {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    direction: rtl;
+}
+.admin-table-ops__arrows {
+    display: inline-flex;
+    flex-direction: row;
+    gap: 8px;
+    align-items: center;
+}
+.admin-table-ops__main {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+button.admin-btn-reorder,
+.admin-table-ops__arrows .btn-secondary {
+    min-width: 42px;
+    width: 42px;
+    padding: 0;
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    line-height: 1;
+}
+.admin-table-ops__main .btn-secondary {
+    min-height: 42px;
+    padding: 10px 16px;
+}
+.admin-table-ops__main > .btn:not(.btn-secondary) {
+    min-height: 42px;
+    padding: 10px 16px;
+}
+th.admin-ops-col,
+td.admin-ops-cell {
+    width: 1%;
+    white-space: nowrap;
+    text-align: center !important;
+    vertical-align: middle !important;
+}
 .btn-danger { background: var(--danger); }
 .btn-success { background: var(--success); }
 .badge {
