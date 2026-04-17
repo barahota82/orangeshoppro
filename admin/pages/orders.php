@@ -51,7 +51,7 @@ $orangeOrderStatusAr = [
 ];
 
 /**
- * أزرار التحكم حسب حالة الطلب: pending → قبول/رفض | rejected → قبول فقط | approved → فاتورة+رفض+بالطريق | on_the_way → فاتورة+تم التوصيل | مكتمل/ملغي → فاتورة فقط.
+ * أزرار التحكم: زر «رفض» يظهر من قيد الانتظار حتى بالطريق، ويُخفى بعد «تم التوصيل» أو «ملغي». مرفوض → قبول فقط.
  *
  * @param array<string, mixed> $o
  */
@@ -88,6 +88,7 @@ function orange_admin_orders_action_buttons(array $o): void
     }
     if ($st === 'on_the_way') {
         echo '<a class="btn btn-secondary" href="' . $invoiceHref . '" target="_blank" rel="noopener">فاتورة</a>';
+        echo '<button type="button" class="btn-danger" onclick="updateOrderStatus(' . $id . ',\'rejected\')">رفض</button>';
         echo '<button type="button" class="btn-success" onclick="updateOrderStatus(' . $id . ',\'completed\')">تم التوصيل</button>';
 
         return;
