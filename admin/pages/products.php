@@ -1,12 +1,22 @@
 <?php
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/../../includes/catalog_schema.php';
+
 $pdo = db();
+orange_catalog_ensure_schema($pdo);
 $categories = $pdo->query('SELECT * FROM categories ORDER BY sort_order ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
 $products = $pdo->query(
     'SELECT p.*, c.name_ar AS category_name
     FROM products p
     LEFT JOIN categories c ON c.id = p.category_id
-    ORDER BY p.id DESC'
+    ORDER BY p.sort_order ASC, p.id ASC'
 )->fetchAll(PDO::FETCH_ASSOC);
+$nextProductSort = (int)$pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM products')->fetchColumn();
+if ($nextProductSort < 1) {
+    $nextProductSort = 1;
+}
 
 $colors = $pdo->query(
     'SELECT id, name_ar, name_en FROM color_dictionary WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
@@ -38,9 +48,23 @@ foreach ($families as $f) {
 </div>
 
 <div class="card">
-    <h3>إضافة منتج</h3>
+    <h3 id="productFormTitle">إضافة / تعديل منتج</h3>
+    <p id="productEditHint" style="display:none;margin:0 0 12px;color:#555;font-size:14px;">تعديل البيانات الأساسية والترتيب. كميات الألوان والمقاسات من <a href="/admin/index.php?page=stock">المخزون</a>.</p>
     <form id="productForm">
+        <input type="hidden" id="product_record_id" value="0">
         <div class="form-grid">
+            <div>
+                <label>الترتيب (في المتجر)</label>
+                <input type="number" id="product_sort_order" value="<?php echo (int)$nextProductSort; ?>" min="0" disabled style="max-width:140px;">
+                <small style="display:block;color:#666;margin-top:4px;">للمنتج الجديد يُحدَّد تلقائياً؛ عند التعديل يمكنك تغييره أو استخدام ↑↓ في الجدول ثم «حفظ الترتيب».</small>
+            </div>
+            <div>
+                <label>حالة العرض</label>
+                <select id="product_is_active">
+                    <option value="1">نشط</option>
+                    <option value="0">مخفي</option>
+                </select>
+            </div>
             <div>
                 <label>اسم المنتج (العربي)</label>
                 <input type="text" id="name" required>
@@ -150,9 +174,10 @@ foreach ($families as $f) {
         </div>
 
         <div class="actions" style="margin:14px 0;flex-wrap:wrap;gap:8px;">
-            <button type="button" class="btn-secondary" onclick="translateProductNames({ forceFromArabic: true })">ترجمة تلقائية من العربي</button>
-            <button type="button" onclick="generateVariants()">توليد المتغيرات</button>
-            <button type="button" class="btn-secondary" onclick="saveProduct()">حفظ المنتج</button>
+            <button type="button" class="btn-secondary" id="btnProductTranslate" onclick="translateProductNames({ forceFromArabic: true })">ترجمة تلقائية من العربي</button>
+            <button type="button" id="btnGenerateVariants" onclick="generateVariants()">توليد المتغيرات</button>
+            <button type="button" class="btn-secondary" id="btnSaveProduct" onclick="saveProduct()">حفظ المنتج</button>
+            <button type="button" class="btn-secondary" onclick="resetProductForm()">منتج جديد</button>
         </div>
 
         <div id="variantsBox"></div>
@@ -160,30 +185,49 @@ foreach ($families as $f) {
 </div>
 
 <div class="card">
-    <h3>قائمة المنتجات</h3>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+        <h3 style="margin:0;">قائمة المنتجات</h3>
+        <div class="actions">
+            <button type="button" class="btn-secondary" onclick="saveProductsOrder()">حفظ الترتيب</button>
+        </div>
+    </div>
+    <p style="margin:8px 0 12px;font-size:13px;color:#666;">الترتيب في المتجر: تصاعدي حسب «الترتيب» ثم رقم المنتج (مثل الفئات). استخدم ↑↓ ثم احفظ.</p>
     <div class="table-wrap">
         <table>
             <thead>
                 <tr>
                     <th>#</th>
+                    <th>الترتيب</th>
                     <th>الاسم</th>
                     <th>الفئة</th>
                     <th>دليل مقاس</th>
                     <th>السعر</th>
                     <th>التكلفة</th>
                     <th>الحالة</th>
+                    <th>إجراءات</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="productsTbody">
                 <?php foreach ($products as $p): ?>
-                <tr>
+                <tr data-id="<?php echo (int)$p['id']; ?>">
                     <td><?php echo (int)$p['id']; ?></td>
+                    <td><?php echo (int)($p['sort_order'] ?? 0); ?></td>
                     <td><?php echo htmlspecialchars($p['name']); ?></td>
                     <td><?php echo htmlspecialchars($p['category_name'] ?: '-'); ?></td>
                     <td><?php echo htmlspecialchars((string)($p['sizing_guide_scope'] ?? 'none')); ?></td>
                     <td><?php echo number_format((float)$p['price'], 2); ?></td>
                     <td><?php echo number_format((float)$p['cost'], 2); ?></td>
                     <td><?php echo (int)$p['is_active'] === 1 ? 'نشط' : 'مخفي'; ?></td>
+                    <td>
+                        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+                            <button type="button" class="btn-secondary" onclick="moveProductRow(this,'up')">↑</button>
+                            <button type="button" class="btn-secondary" onclick="moveProductRow(this,'down')">↓</button>
+                            <button type="button" class="btn-secondary" onclick="loadProductForEdit(<?php echo (int)$p['id']; ?>)">تعديل</button>
+                            <button type="button" onclick="toggleProductActive(<?php echo (int)$p['id']; ?>, <?php echo (int)$p['is_active']; ?>)">
+                                <?php echo (int)$p['is_active'] === 1 ? 'إخفاء' : 'إظهار'; ?>
+                            </button>
+                        </div>
+                    </td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -195,6 +239,13 @@ foreach ($families as $f) {
 window.ORANGE_COLORS = <?php echo json_encode($colors, JSON_UNESCAPED_UNICODE); ?>;
 window.ORANGE_FAMILIES = <?php echo json_encode($familiesOut, JSON_UNESCAPED_UNICODE); ?>;
 window.PRODUCT_EXTRA_IMAGES = [];
+window.PRODUCT_NEXT_SORT = <?php echo (int)$nextProductSort; ?>;
+
+const PRODUCT_MSG = {
+    E_REORDER: 'بيانات الترتيب غير صحيحة',
+    OK_REORDER: 'تم حفظ ترتيب المنتجات',
+    OK_TOG: 'تم تحديث الحالة'
+};
 
 let productTranslateTimer = null;
 let productEnTranslateTimer = null;
@@ -285,6 +336,165 @@ async function uploadMainProductImage() {
         inp.value = '';
     } catch (e) {
         alert('خطأ في الاتصال أثناء الرفع');
+    }
+}
+
+function setProductFormEditMode(isEdit) {
+    const hint = document.getElementById('productEditHint');
+    const btnGen = document.getElementById('btnGenerateVariants');
+    const sortEl = document.getElementById('product_sort_order');
+    const title = document.getElementById('productFormTitle');
+    const btnSave = document.getElementById('btnSaveProduct');
+    if (hint) {
+        hint.style.display = isEdit ? 'block' : 'none';
+    }
+    if (btnGen) {
+        btnGen.style.display = isEdit ? 'none' : '';
+    }
+    if (sortEl) {
+        sortEl.disabled = !isEdit;
+        if (!isEdit) {
+            sortEl.value = String(window.PRODUCT_NEXT_SORT || 1);
+        }
+    }
+    if (title) {
+        title.textContent = isEdit ? 'تعديل منتج' : 'إضافة / تعديل منتج';
+    }
+    if (btnSave) {
+        btnSave.textContent = isEdit ? 'تحديث المنتج' : 'حفظ المنتج';
+    }
+}
+
+function resetProductForm() {
+    document.getElementById('product_record_id').value = '0';
+    setProductFormEditMode(false);
+    document.getElementById('name').value = '';
+    document.getElementById('name_en').value = '';
+    document.getElementById('name_fil').value = '';
+    document.getElementById('name_hi').value = '';
+    document.getElementById('description').value = '';
+    document.getElementById('description_en').value = '';
+    document.getElementById('description_fil').value = '';
+    document.getElementById('description_hi').value = '';
+    document.getElementById('category_id').selectedIndex = 0;
+    document.getElementById('price').value = '';
+    document.getElementById('cost').value = '';
+    document.getElementById('main_image').value = '';
+    document.getElementById('main_image_file').value = '';
+    const prev = document.getElementById('main_image_preview');
+    if (prev) {
+        prev.src = '';
+        prev.style.display = 'none';
+    }
+    document.getElementById('has_sizes').value = '0';
+    document.getElementById('has_colors').value = '0';
+    document.getElementById('size_family_id').value = '';
+    document.getElementById('sizing_guide_scope').value = 'none';
+    document.getElementById('product_is_active').value = '1';
+    document.getElementById('colorwaysBox').innerHTML = '';
+    document.getElementById('variantsBox').innerHTML = '';
+    window.PRODUCT_EXTRA_IMAGES = [];
+    renderGalleryUploadList();
+    onHasFlagsChange();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function loadProductForEdit(id) {
+    try {
+        const res = await fetch('/admin/api/products/get.php?id=' + encodeURIComponent(id));
+        const j = await res.json();
+        if (!j.success || !j.product) {
+            alert(j.message || 'تعذر تحميل المنتج');
+            return;
+        }
+        const p = j.product;
+        document.getElementById('product_record_id').value = String(p.id);
+        setProductFormEditMode(true);
+        document.getElementById('product_sort_order').value = String(parseInt(p.sort_order, 10) || 0);
+        document.getElementById('product_is_active').value = String(parseInt(p.is_active, 10) === 0 ? 0 : 1);
+        document.getElementById('name').value = p.name || '';
+        document.getElementById('name_en').value = p.name_en || '';
+        document.getElementById('name_fil').value = p.name_fil || '';
+        document.getElementById('name_hi').value = p.name_hi || '';
+        document.getElementById('description').value = p.description || '';
+        document.getElementById('description_en').value = p.description_en || '';
+        document.getElementById('description_fil').value = p.description_fil || '';
+        document.getElementById('description_hi').value = p.description_hi || '';
+        document.getElementById('category_id').value = String(p.category_id || '');
+        document.getElementById('price').value = String(p.price != null ? p.price : '');
+        document.getElementById('cost').value = String(p.cost != null ? p.cost : '');
+        document.getElementById('main_image').value = p.main_image || '';
+        const prev = document.getElementById('main_image_preview');
+        if (p.main_image && prev) {
+            prev.src = '/uploads/products/' + p.main_image;
+            prev.style.display = 'block';
+        } else if (prev) {
+            prev.src = '';
+            prev.style.display = 'none';
+        }
+        document.getElementById('has_sizes').value = parseInt(p.has_sizes, 10) === 1 ? '1' : '0';
+        document.getElementById('has_colors').value = parseInt(p.has_colors, 10) === 1 ? '1' : '0';
+        document.getElementById('size_family_id').value = p.size_family_id ? String(p.size_family_id) : '';
+        document.getElementById('sizing_guide_scope').value = p.sizing_guide_scope || 'none';
+        document.getElementById('colorwaysBox').innerHTML = '';
+        document.getElementById('variantsBox').innerHTML =
+            '<p style="color:#555;margin:12px 0;">المتغيرات والمخزون: استخدم صفحة <a href="/admin/index.php?page=stock">المخزون</a>.</p>';
+        window.PRODUCT_EXTRA_IMAGES = [];
+        renderGalleryUploadList();
+        onHasFlagsChange();
+        document.getElementById('productForm').scrollIntoView({ behavior: 'smooth' });
+    } catch (e) {
+        alert('فشل التحميل');
+    }
+}
+
+function moveProductRow(btn, dir) {
+    const tr = btn.closest('tr');
+    if (!tr) {
+        return;
+    }
+    const tbody = document.getElementById('productsTbody');
+    if (!tbody) {
+        return;
+    }
+    if (dir === 'up') {
+        const prev = tr.previousElementSibling;
+        if (prev) {
+            tbody.insertBefore(tr, prev);
+        }
+    } else {
+        const next = tr.nextElementSibling;
+        if (next) {
+            tbody.insertBefore(next, tr);
+        }
+    }
+}
+
+async function saveProductsOrder() {
+    const tbody = document.getElementById('productsTbody');
+    if (!tbody) {
+        return;
+    }
+    const ids = Array.from(tbody.querySelectorAll('tr[data-id]'))
+        .map((tr) => parseInt(tr.getAttribute('data-id') || '0', 10))
+        .filter((id) => id > 0);
+    const res = await postJSON('/admin/api/products/reorder-save.php', { ordered_ids: ids });
+    const rawMsg = res.message || (res.success ? 'OK_REORDER' : 'فشل');
+    alert(PRODUCT_MSG[rawMsg] || rawMsg);
+    if (res.success) {
+        location.reload();
+    }
+}
+
+async function toggleProductActive(id, isActive) {
+    const res = await postJSON('/admin/api/products/toggle.php', {
+        id: id,
+        is_active: isActive ? 0 : 1,
+    });
+    const rawMsg = res.message || (res.success ? 'OK_TOG' : 'فشل');
+    alert(PRODUCT_MSG[rawMsg] || rawMsg);
+    if (res.success) {
+        location.reload();
     }
 }
 
@@ -449,13 +659,45 @@ async function saveProduct() {
         return;
     }
 
+    const recordId = parseInt(document.getElementById('product_record_id').value || '0', 10);
+
+    if (recordId > 0) {
+        const payload = {
+            id: recordId,
+            name: document.getElementById('name').value.trim(),
+            name_en: document.getElementById('name_en').value.trim(),
+            name_fil: document.getElementById('name_fil').value.trim(),
+            name_hi: document.getElementById('name_hi').value.trim(),
+            description: document.getElementById('description').value.trim(),
+            description_en: document.getElementById('description_en').value.trim(),
+            description_fil: document.getElementById('description_fil').value.trim(),
+            description_hi: document.getElementById('description_hi').value.trim(),
+            category_id: parseInt(document.getElementById('category_id').value, 10),
+            price: parseFloat(document.getElementById('price').value || '0'),
+            cost: parseFloat(document.getElementById('cost').value || '0'),
+            main_image: document.getElementById('main_image').value.trim(),
+            has_sizes: parseInt(document.getElementById('has_sizes').value, 10),
+            has_colors: parseInt(document.getElementById('has_colors').value, 10),
+            size_family_id: parseInt(document.getElementById('size_family_id').value, 10) || 0,
+            sizing_guide_scope: document.getElementById('sizing_guide_scope').value,
+            sort_order: parseInt(document.getElementById('product_sort_order').value || '0', 10),
+            is_active: parseInt(document.getElementById('product_is_active').value, 10)
+        };
+        const res = await postJSON('/admin/api/products/update.php', payload);
+        alert(res.message || (res.success ? 'تم التحديث' : 'فشل'));
+        if (res.success) {
+            location.reload();
+        }
+        return;
+    }
+
     const rows = Array.from(document.querySelectorAll('#variantsBox tbody tr'));
     if (!rows.length) {
         alert('ولّد المتغيرات أولاً');
         return;
     }
 
-    const variants = rows.map(tr => ({
+    const variants = rows.map((tr) => ({
         primary_color_id: parseInt(tr.querySelector('.v-p').value, 10) || 0,
         secondary_color_id: parseInt(tr.querySelector('.v-s').value, 10) || 0,
         size_family_size_id: parseInt(tr.querySelector('.v-zid').value, 10) || 0,
@@ -485,11 +727,14 @@ async function saveProduct() {
 
     const res = await postJSON('/admin/api/products/create.php', payload);
     alert(res.message || (res.success ? 'تم الحفظ' : 'فشل'));
-    if (res.success) location.reload();
+    if (res.success) {
+        location.reload();
+    }
 }
 
 document.getElementById('name').addEventListener('input', scheduleProductAutoTranslate);
 document.getElementById('name_en').addEventListener('input', scheduleProductTranslateFromEnglish);
 
+setProductFormEditMode(false);
 onHasFlagsChange();
 </script>

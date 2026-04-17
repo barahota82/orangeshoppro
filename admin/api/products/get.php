@@ -1,9 +1,14 @@
 <?php
+
+declare(strict_types=1);
+
 require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_admin_api('GET');
 
 try {
     $pdo = db();
+    orange_catalog_ensure_schema($pdo);
     $productId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
     if ($productId > 0) {
@@ -37,7 +42,7 @@ try {
         SELECT p.*, c.name_ar AS category_name_ar, c.name_en AS category_name_en
         FROM products p
         LEFT JOIN categories c ON c.id = p.category_id
-        ORDER BY p.id DESC
+        ORDER BY p.sort_order ASC, p.id ASC
     ")->fetchAll();
 
     json_response(['success' => true, 'products' => $rows]);

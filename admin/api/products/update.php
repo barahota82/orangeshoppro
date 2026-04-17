@@ -30,6 +30,21 @@ try {
     }
 
     $nameAr = trim((string)$data['name']);
+    $sizeFamilyId = isset($data['size_family_id']) ? (int)$data['size_family_id'] : 0;
+    if ($sizeFamilyId <= 0) {
+        $sizeFamilyId = null;
+    }
+    $scope = trim((string)($data['sizing_guide_scope'] ?? 'none'));
+    $allowedScopes = ['none', 'upper', 'lower', 'both'];
+    if (!in_array($scope, $allowedScopes, true)) {
+        $scope = 'none';
+    }
+    $hasSizes = (int)($data['has_sizes'] ?? 0) === 1;
+    if ($hasSizes && $sizeFamilyId === null) {
+        json_response(['success' => false, 'message' => 'يجب اختيار عائلة مقاسات عند تفعيل المقاسات'], 422);
+    }
+    $sortOrder = (int)($data['sort_order'] ?? 0);
+
     $prodStmt = $pdo->prepare('SELECT id, name FROM products WHERE category_id = ?');
     $prodStmt->execute([(int)$data['category_id']]);
     $prodRows = $prodStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -41,8 +56,8 @@ try {
         UPDATE products
         SET name = ?, name_en = ?, name_fil = ?, name_hi = ?,
             description = ?, description_en = ?, description_fil = ?, description_hi = ?,
-            category_id = ?, price = ?, cost = ?,
-            main_image = ?, has_sizes = ?, has_colors = ?, is_active = ?, updated_at = NOW()
+            category_id = ?, size_family_id = ?, sizing_guide_scope = ?, price = ?, cost = ?,
+            main_image = ?, has_sizes = ?, has_colors = ?, sort_order = ?, is_active = ?, updated_at = NOW()
         WHERE id = ?
     ");
 
@@ -56,11 +71,14 @@ try {
         trim((string)($data['description_fil'] ?? '')),
         trim((string)($data['description_hi'] ?? '')),
         (int)$data['category_id'],
+        $sizeFamilyId,
+        $scope,
         (float)$data['price'],
         (float)$data['cost'],
         trim((string)($data['main_image'] ?? '')),
         (int)($data['has_sizes'] ?? 0),
         (int)($data['has_colors'] ?? 0),
+        $sortOrder,
         isset($data['is_active']) ? (int)$data['is_active'] : 1,
         $productId
     ]);

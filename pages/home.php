@@ -148,7 +148,7 @@ $productsStmt = $pdo->query("
     SELECT p.*
     FROM products p
     WHERE p.is_active = 1
-    ORDER BY p.id DESC
+    ORDER BY p.sort_order ASC, p.id ASC
 ");
 $products = $productsStmt ? $productsStmt->fetchAll() : [];
 
@@ -157,7 +157,7 @@ $offersStmt = $pdo->query("
     FROM offers o
     INNER JOIN products p ON p.id = o.product_id
     WHERE o.is_active = 1 AND p.is_active = 1
-    ORDER BY o.id DESC
+    ORDER BY p.sort_order ASC, p.id ASC, o.id ASC
 ");
 $offers = $offersStmt ? $offersStmt->fetchAll() : [];
 

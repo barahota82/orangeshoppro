@@ -117,6 +117,11 @@ try {
 
     $pdo->beginTransaction();
 
+    $nextSort = (int)$pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM products')->fetchColumn();
+    if ($nextSort < 1) {
+        $nextSort = 1;
+    }
+
     $descAr = trim((string)($data['description'] ?? ''));
     $descEn = trim((string)($data['description_en'] ?? ''));
     $descFil = trim((string)($data['description_fil'] ?? ''));
@@ -126,7 +131,7 @@ try {
         'INSERT INTO products (
             name, name_en, name_fil, name_hi,
             description, description_en, description_fil, description_hi,
-            category_id, size_family_id, sizing_guide_scope, price, cost, main_image, has_sizes, has_colors, is_active, created_at
+            category_id, size_family_id, sizing_guide_scope, price, cost, main_image, has_sizes, has_colors, sort_order, is_active, created_at
         ) VALUES (
             ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW()
         )'
@@ -149,6 +154,7 @@ try {
         trim((string)($data['main_image'] ?? '')),
         $hasSizes ? 1 : 0,
         $hasColors ? 1 : 0,
+        $nextSort,
     ]);
 
     $productId = (int)$pdo->lastInsertId();

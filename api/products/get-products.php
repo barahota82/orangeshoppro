@@ -1,8 +1,13 @@
 <?php
+
+declare(strict_types=1);
+
 require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../includes/catalog_schema.php';
 
 try {
     $pdo = db();
+    orange_catalog_ensure_schema($pdo);
 
     $categoryId = isset($_GET['category_id']) ? (int)$_GET['category_id'] : 0;
 
@@ -19,7 +24,7 @@ try {
         $params[] = $categoryId;
     }
 
-    $sql .= " ORDER BY p.id DESC";
+    $sql .= ' ORDER BY p.sort_order ASC, p.id ASC';
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
