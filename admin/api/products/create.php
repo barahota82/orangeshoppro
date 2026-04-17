@@ -64,6 +64,13 @@ try {
         json_response(['success' => false, 'message' => 'أسماء المنتج بلغات English / Filipino / Hindi مطلوبة'], 422);
     }
 
+    $nameAr = trim((string)$data['name']);
+    $dupProd = $pdo->prepare('SELECT id FROM products WHERE category_id = ? AND name = ? LIMIT 1');
+    $dupProd->execute([(int)$data['category_id'], $nameAr]);
+    if ($dupProd->fetch()) {
+        json_response(['success' => false, 'message' => 'منتج بنفس الاسم العربي موجود في هذه الفئة'], 409);
+    }
+
     $hasSizes = (int)($data['has_sizes'] ?? 0) === 1;
     $hasColors = (int)($data['has_colors'] ?? 0) === 1;
 
@@ -116,7 +123,7 @@ try {
     );
 
     $stmt->execute([
-        trim((string)$data['name']),
+        $nameAr,
         $nameEn,
         $nameFil,
         $nameHi,

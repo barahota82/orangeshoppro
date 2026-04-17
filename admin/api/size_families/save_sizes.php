@@ -27,6 +27,50 @@ try {
         json_response(['success' => false, 'message' => 'sizes array required'], 422);
     }
 
+    $arSeenInPayload = [];
+    foreach ($rows as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $la = trim((string)($row['label_ar'] ?? ''));
+        if ($la === '') {
+            continue;
+        }
+        if (isset($arSeenInPayload[$la])) {
+            json_response(['success' => false, 'message' => 'اسم المقاس بالعربي مكرر في نفس القائمة'], 422);
+        }
+        $arSeenInPayload[$la] = true;
+    }
+
+    foreach ($rows as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $sid = (int)($row['id'] ?? 0);
+        $la = trim((string)($row['label_ar'] ?? ''));
+        $le = trim((string)($row['label_en'] ?? ''));
+        if ($la === '' && $le === '') {
+            continue;
+        }
+        if ($la === '') {
+            continue;
+        }
+        if ($sid > 0) {
+            $dup = $pdo->prepare(
+                'SELECT id FROM size_family_sizes WHERE size_family_id = ? AND label_ar = ? AND id <> ? LIMIT 1'
+            );
+            $dup->execute([$familyId, $la, $sid]);
+        } else {
+            $dup = $pdo->prepare(
+                'SELECT id FROM size_family_sizes WHERE size_family_id = ? AND label_ar = ? LIMIT 1'
+            );
+            $dup->execute([$familyId, $la]);
+        }
+        if ($dup->fetch()) {
+            json_response(['success' => false, 'message' => 'اسم المقاس بالعربي مُستخدم مسبقاً في هذه العائلة'], 409);
+        }
+    }
+
     $pdo->beginTransaction();
 
     $keepIds = [];

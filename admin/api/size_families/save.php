@@ -21,6 +21,20 @@ try {
         json_response(['success' => false, 'message' => 'يجب تعبئة الاسم العربي والإنجليزي'], 422);
     }
 
+    if ($id > 0) {
+        $dupAr = $pdo->prepare('SELECT id FROM size_families WHERE name_ar = ? AND id <> ? LIMIT 1');
+        $dupAr->execute([$nameAr, $id]);
+        if ($dupAr->fetch()) {
+            json_response(['success' => false, 'message' => 'الاسم العربي مكرر في عائلات المقاسات'], 409);
+        }
+    } else {
+        $dupAr = $pdo->prepare('SELECT id FROM size_families WHERE name_ar = ? LIMIT 1');
+        $dupAr->execute([$nameAr]);
+        if ($dupAr->fetch()) {
+            json_response(['success' => false, 'message' => 'الاسم العربي مكرر في عائلات المقاسات'], 409);
+        }
+    }
+
     if ($id <= 0 && $sort <= 0) {
         $sort = (int) $pdo->query('SELECT COALESCE(MAX(sort_order),0)+1 FROM size_families')->fetchColumn();
         if ($sort <= 0) {

@@ -38,7 +38,7 @@ try {
     $dup = $pdo->prepare("SELECT id FROM categories WHERE name_ar = ? AND department_id = ? AND id <> ? LIMIT 1");
     $dup->execute([$nameAr, $depId, $id]);
     if ($dup->fetch()) {
-        json_response(['success' => false, 'message' => 'هذه الفئة مسجلة بالفعل بنفس القسم'], 409);
+        json_response(['success' => false, 'message' => 'هذه الفئة مسجلة بالفعل بنفس القسم — الاسم العربي مكرر'], 409);
     }
 
     $slugBase = $slug;

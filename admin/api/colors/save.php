@@ -31,6 +31,20 @@ try {
         json_response(['success' => false, 'message' => 'عبّئ العربي والإنجليزي، واستخدم «ترجمة تلقائية» لباقي اللغات أو اكتبها يدوياً'], 422);
     }
 
+    if ($id > 0) {
+        $dupAr = $pdo->prepare('SELECT id FROM color_dictionary WHERE name_ar = ? AND id <> ? LIMIT 1');
+        $dupAr->execute([$nameAr, $id]);
+        if ($dupAr->fetch()) {
+            json_response(['success' => false, 'message' => 'الاسم العربي مكرر في قاموس الألوان'], 409);
+        }
+    } else {
+        $dupAr = $pdo->prepare('SELECT id FROM color_dictionary WHERE name_ar = ? LIMIT 1');
+        $dupAr->execute([$nameAr]);
+        if ($dupAr->fetch()) {
+            json_response(['success' => false, 'message' => 'الاسم العربي مكرر في قاموس الألوان'], 409);
+        }
+    }
+
     if ($id <= 0 && $sort <= 0) {
         $sort = (int) $pdo->query('SELECT COALESCE(MAX(sort_order),0)+1 FROM color_dictionary')->fetchColumn();
         if ($sort <= 0) {

@@ -152,7 +152,7 @@ const DEPT_API_MSG = {
     E_FIL: 'يجب إضافة خانة Filipino قبل الحفظ',
     E_HI: 'يجب إضافة خانة Hindi قبل الحفظ',
     E_SLUG: 'يجب إضافة خانة Slug قبل الحفظ',
-    E_DUP: 'هذا القسم مسجل بالفعل',
+    E_DUP: 'هذا القسم مسجل بالفعل — الاسم العربي مكرر',
     OK_UPD: 'تم تحديث القسم'
 };
 let isSavingDepartment = false;

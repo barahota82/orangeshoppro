@@ -43,7 +43,7 @@ try {
     $dup = $pdo->prepare('SELECT id FROM departments WHERE name_ar = ? LIMIT 1');
     $dup->execute([$nameAr]);
     if ($dup->fetch()) {
-        json_response(['success' => false, 'message' => 'هذا القسم مسجل بالفعل'], 409);
+        json_response(['success' => false, 'message' => 'هذا القسم مسجل بالفعل — الاسم العربي مكرر'], 409);
     }
 
     $slugBase = $slug;

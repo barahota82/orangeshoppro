@@ -49,6 +49,19 @@ try {
         json_response(['success' => false, 'message' => 'E_DUP'], 409);
     }
 
+    $slugBase = $slug;
+    $candidate = $slugBase;
+    $i = 2;
+    while (true) {
+        $s = $pdo->prepare('SELECT id FROM categories WHERE slug = ? LIMIT 1');
+        $s->execute([$candidate]);
+        if (!$s->fetch()) {
+            break;
+        }
+        $candidate = $slugBase . '-' . $i;
+        $i++;
+    }
+
     $stmt = $pdo->prepare("
         INSERT INTO categories (department_id, name_en, name_ar, name_fil, name_hi, slug, is_active, sort_order)
         VALUES (?, ?, ?, ?, ?, ?, 1, ?)
@@ -59,11 +72,11 @@ try {
         $nameAr,
         $nameFil,
         $nameHi,
-        $slug,
+        $candidate,
         $sort
     ]);
 
-    json_response(['success' => true, 'message' => 'OK_SAV']);
+    json_response(['success' => true, 'message' => 'OK_SAV', 'slug' => $candidate]);
 } catch (Throwable $e) {
     json_response(['success' => false, 'message' => $e->getMessage()], 500);
 }

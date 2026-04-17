@@ -24,6 +24,15 @@ try {
         json_response(['success' => false, 'message' => 'أسماء المنتج بلغات English / Filipino / Hindi مطلوبة'], 422);
     }
 
+    $nameAr = trim((string)$data['name']);
+    $dupProd = $pdo->prepare(
+        'SELECT id FROM products WHERE category_id = ? AND name = ? AND id <> ? LIMIT 1'
+    );
+    $dupProd->execute([(int)$data['category_id'], $nameAr, $productId]);
+    if ($dupProd->fetch()) {
+        json_response(['success' => false, 'message' => 'منتج آخر في نفس الفئة يستخدم نفس الاسم العربي'], 409);
+    }
+
     $stmt = $pdo->prepare("
         UPDATE products
         SET name = ?, name_en = ?, name_fil = ?, name_hi = ?, description = ?, category_id = ?, price = ?, cost = ?,
@@ -32,7 +41,7 @@ try {
     ");
 
     $stmt->execute([
-        trim((string)$data['name']),
+        $nameAr,
         $nameEn,
         $nameFil,
         $nameHi,
