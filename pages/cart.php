@@ -1,10 +1,15 @@
 <?php
+
+declare(strict_types=1);
+
 require_once __DIR__ . '/../config.php';
 include __DIR__ . '/../includes/header.php';
+$cartHomeUrl = storefront_url('home', $channelSlug, $lang);
 ?>
 <div class="container">
-    <div class="page-title-box">
+    <div class="page-title-box cart-page-head">
         <h2><?php echo htmlspecialchars(t('cart')); ?></h2>
+        <a class="cart-page-close" href="<?php echo htmlspecialchars($cartHomeUrl, ENT_QUOTES, 'UTF-8'); ?>" aria-label="<?php echo htmlspecialchars(t('cart_close'), ENT_QUOTES, 'UTF-8'); ?>"><span aria-hidden="true">&times;</span></a>
     </div>
 
     <div class="cart-layout">

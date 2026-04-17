@@ -34,6 +34,7 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
         window.APP_LANG = <?php echo json_encode($lang, JSON_UNESCAPED_UNICODE); ?>;
         window.APP_TAGLINE_CYCLE = <?php echo json_encode($taglineCycle, JSON_UNESCAPED_UNICODE); ?>;
         window.APP_CHANNEL_ID = <?php echo (int)($channel['id'] ?? 0); ?>;
+        window.STOREFRONT_BASE = <?php echo json_encode(PUBLIC_BASE_PATH, JSON_UNESCAPED_UNICODE); ?>;
         window.APP_T = {
             empty_cart: <?php echo json_encode(t('empty_cart'), JSON_UNESCAPED_UNICODE); ?>,
             color: <?php echo json_encode(t('color'), JSON_UNESCAPED_UNICODE); ?>,
@@ -46,7 +47,9 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             out_of_stock: <?php echo json_encode(t('out_of_stock'), JSON_UNESCAPED_UNICODE); ?>,
             low_stock: <?php echo json_encode(t('low_stock'), JSON_UNESCAPED_UNICODE); ?>,
             available_max_qty: <?php echo json_encode(t('available_max_qty'), JSON_UNESCAPED_UNICODE); ?>,
-            no_more_stock_for_cart: <?php echo json_encode(t('no_more_stock_for_cart'), JSON_UNESCAPED_UNICODE); ?>
+            no_more_stock_for_cart: <?php echo json_encode(t('no_more_stock_for_cart'), JSON_UNESCAPED_UNICODE); ?>,
+            cart_close: <?php echo json_encode(t('cart_close'), JSON_UNESCAPED_UNICODE); ?>,
+            cart_remove: <?php echo json_encode(t('cart_remove'), JSON_UNESCAPED_UNICODE); ?>
         };
     </script>
 </head>

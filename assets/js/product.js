@@ -274,8 +274,22 @@ function addCurrentProductToCart() {
     };
 
     let cart = readCartJson();
-    cart.push(item);
+    let merged = false;
+    for (let i = 0; i < cart.length; i++) {
+        if (typeof cartLinesMatch === 'function' && cartLinesMatch(cart[i], item)) {
+            const nextQty = parseInt(cart[i].qty, 10) + qty;
+            cart[i].qty = Math.min(stock, nextQty);
+            merged = true;
+            break;
+        }
+    }
+    if (!merged) {
+        cart.push(item);
+    }
     localStorage.setItem('cart', JSON.stringify(cart));
+    if (typeof normalizeCartDuplicates === 'function') {
+        normalizeCartDuplicates();
+    }
     alert(window.APP_T.added || 'Added');
     syncProductQtyLimits();
 }
