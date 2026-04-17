@@ -3,8 +3,8 @@ function formatMoney(v) {
 }
 
 /**
- * سلوجان الهيدر: تناوب بين اللغات الأربع.
- * setTimeout متسلسل + pageshow: يصلح توقف اللوب على موبايل (bfcache / تعطيل setInterval).
+ * سلوجان الهيدر: تناوب ثابت — عربي → إنجليزي → فلبيني → هندي (ar, en, fil, hi من config.php).
+ * setTimeout متسلسل + pageshow: يصلح توقف اللوب على موبايل (bfcache / تعطيل المؤقتات).
  */
 (function rotateStorefrontTagline() {
     const TAGLINE_MS = 5000;
