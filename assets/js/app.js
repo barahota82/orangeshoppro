@@ -4,6 +4,7 @@ function formatMoney(v) {
 
 /** سلوجان الهيدر: تناوب ثابت بين اللغات الأربع (مستقل عن لغة الواجهة) */
 (function rotateStorefrontTagline() {
+    const TAGLINE_MS = 5000;
     const msgs = window.APP_TAGLINE_CYCLE;
     if (!Array.isArray(msgs) || msgs.length < 2) return;
     const el = document.getElementById('brandTaglineText');
@@ -17,13 +18,10 @@ function formatMoney(v) {
     }
 
     show(i);
-    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        return;
-    }
     setInterval(() => {
         i = (i + 1) % msgs.length;
         show(i);
-    }, 4500);
+    }, TAGLINE_MS);
 })();
 
 function changeMainImage(src, btn) {
