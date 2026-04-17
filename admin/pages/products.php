@@ -1042,7 +1042,7 @@ updateProductCatalogHint();
 setProductFormEditMode(false);
 onHasFlagsChange();
 
-(() => {
+(function () {
     const style = document.createElement('style');
     style.textContent = `
         .cat-dep-list-wrap[data-list="products"]{
@@ -1051,7 +1051,7 @@ onHasFlagsChange();
             -webkit-overflow-scrolling:touch;
         }
         .cat-dep-list-wrap[data-list="products"] > table{
-            min-width:1100px;
+            min-width:1180px;
             width:100%;
             border-collapse:collapse;
             table-layout:fixed;
