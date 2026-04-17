@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/order_stock.php';
 require_admin_api();
 
 try {
@@ -27,6 +28,13 @@ try {
 
     if (!$order) {
         throw new RuntimeException('الطلب غير موجود');
+    }
+
+    if (
+        in_array($status, ['cancelled', 'rejected'], true)
+        && in_array((string)($order['status'] ?? ''), ['pending', 'approved', 'on_the_way'], true)
+    ) {
+        orange_order_release_pending_stock_reservation($pdo, $order);
     }
 
     $pdo->prepare("UPDATE orders SET status = ? WHERE id = ?")->execute([$status, $orderId]);

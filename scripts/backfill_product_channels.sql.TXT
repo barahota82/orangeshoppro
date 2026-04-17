@@ -1,0 +1,14 @@
+-- Orange: ربط كل المنتجات الحالية بكل القنوات النشطة (مخزن/كتالوج واحد يظهر على كل الواجهات)
+--
+-- آمن: يستخدم INSERT IGNORE فلا يكرر الصفوف الموجودة مسبقاً في product_channels.
+--
+-- التشغيل: phpMyAdmin → استيراد، أو:
+--   mysql -u USER -p DBNAME < backfill_product_channels.sql.TXT
+--
+-- ملاحظة: المنتجات الجديدة من لوحة التحكم تُربط تلقائياً بالقنوات عند الإنشاء/التحديث.
+
+INSERT IGNORE INTO product_channels (product_id, channel_id)
+SELECT p.id, c.id
+FROM products p
+CROSS JOIN channels c
+WHERE c.is_active = 1;

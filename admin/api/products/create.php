@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/product_channels.php';
 require_once __DIR__ . '/../../../includes/catalog_labels.php';
 require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
 require_admin_api();
@@ -205,6 +206,8 @@ try {
         $variantId = (int)$pdo->lastInsertId();
         $moveStmt->execute([$productId, $variantId, $stock, $stock]);
     }
+
+    orange_product_attach_all_active_channels($pdo, $productId);
 
     $pdo->commit();
 

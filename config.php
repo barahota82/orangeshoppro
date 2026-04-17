@@ -318,7 +318,9 @@ function get_translations(): array {
             'home_hero_line_1' => "Everything you're looking for ... in one place",
             'home_hero_line_2' => 'Shop with Peace of Mind • COD • Easy Returns',
             'home_hero_line_3' => 'Save More • Best Price • Fast Delivery',
-            'whatsapp' => 'WhatsApp'
+            'whatsapp' => 'WhatsApp',
+            'tabs_scroll_prev' => 'Scroll categories left',
+            'tabs_scroll_next' => 'Scroll categories right',
         ],
         'ar' => [
             'home' => 'الرئيسية',
@@ -350,7 +352,9 @@ function get_translations(): array {
             'home_hero_line_1' => 'كل ما تبحث عنه ... في مكان واحد',
             'home_hero_line_2' => 'تسوق براحة بال • دفع عند الاستلام • إرجاع سهل',
             'home_hero_line_3' => 'وفر أكثر • أقل سعر • أسرع توصيل',
-            'whatsapp' => 'واتساب'
+            'whatsapp' => 'واتساب',
+            'tabs_scroll_prev' => 'تحريك أقسام التصنيف لليسار',
+            'tabs_scroll_next' => 'تحريك أقسام التصنيف لليمين',
         ],
         'fil' => [
             'home' => 'Home',
@@ -369,7 +373,7 @@ function get_translations(): array {
             'area' => 'Lugar',
             'address' => 'Address',
             'notes' => 'Mga Tala',
-            'track_order' => 'Subaybayan ang Order',
+            'track_order' => 'I-track ang Order',
             'order_number' => 'Order Number',
             'empty_cart' => 'Walang laman ang cart.',
             'select_size' => 'Pumili ng sukat',
@@ -382,7 +386,9 @@ function get_translations(): array {
             'home_hero_line_1' => 'Lahat ng iyong hinahanap ... sa iisang lugar',
             'home_hero_line_2' => 'Kampanteng Pagbili • COD • Madaling Return',
             'home_hero_line_3' => 'Makatipid Pa • Murang Presyo • Mabilis na Delivery',
-            'whatsapp' => 'WhatsApp'
+            'whatsapp' => 'WhatsApp',
+            'tabs_scroll_prev' => 'I-scroll ang mga kategorya pakaliwa',
+            'tabs_scroll_next' => 'I-scroll ang mga kategorya pakanan',
         ],
         'hi' => [
             'home' => 'होम',
@@ -414,7 +420,9 @@ function get_translations(): array {
             'home_hero_line_1' => 'वह सब कुछ जो आप ढूंढ रहे हैं ... एक ही जगह पर।',
             'home_hero_line_2' => 'निश्चिंत होकर खरीदारी • कैश ऑन डिलीवरी • आसान रिटर्न',
             'home_hero_line_3' => 'अधिक बचत • सबसे कम दाम • तेज़ डिलीवरी',
-            'whatsapp' => 'WhatsApp'
+            'whatsapp' => 'WhatsApp',
+            'tabs_scroll_prev' => 'श्रेणियाँ बाईं ओर स्क्रॉल करें',
+            'tabs_scroll_next' => 'श्रेणियाँ दाईं ओर स्क्रॉल करें',
         ],
     ];
 }

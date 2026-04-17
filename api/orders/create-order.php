@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../includes/order_helpers.php';
+require_once __DIR__ . '/../../includes/order_stock.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 
 try {
@@ -48,19 +49,19 @@ try {
             $variant = null;
             if ($variantIdIn > 0) {
                 $vStmt = $pdo->prepare(
-                    'SELECT * FROM product_variants WHERE id = ? AND product_id = ? LIMIT 1'
+                    'SELECT * FROM product_variants WHERE id = ? AND product_id = ? LIMIT 1 FOR UPDATE'
                 );
                 $vStmt->execute([$variantIdIn, (int)$product['id']]);
-                $variant = $vStmt->fetch();
+                $variant = $vStmt->fetch(PDO::FETCH_ASSOC);
             }
             if (!$variant) {
                 $variantStmt = $pdo->prepare(
                     'SELECT * FROM product_variants
                     WHERE product_id = ? AND color = ? AND size = ?
-                    LIMIT 1'
+                    LIMIT 1 FOR UPDATE'
                 );
                 $variantStmt->execute([(int)$product['id'], $color, $size]);
-                $variant = $variantStmt->fetch();
+                $variant = $variantStmt->fetch(PDO::FETCH_ASSOC);
             }
 
             if (!$variant) {
@@ -71,7 +72,17 @@ try {
                 throw new RuntimeException('Insufficient stock for product: ' . $product['name']);
             }
         } else {
-            $variant = null;
+            $vStmt = $pdo->prepare(
+                'SELECT * FROM product_variants WHERE product_id = ? ORDER BY id ASC LIMIT 1 FOR UPDATE'
+            );
+            $vStmt->execute([(int)$product['id']]);
+            $variant = $vStmt->fetch(PDO::FETCH_ASSOC);
+            if (!$variant) {
+                throw new RuntimeException('Variant not found for product: ' . $product['name']);
+            }
+            if ((int)$variant['stock_quantity'] < $qty) {
+                throw new RuntimeException('Insufficient stock for product: ' . $product['name']);
+            }
         }
 
         $price = (float)$product['price'];
@@ -82,8 +93,8 @@ try {
         $validatedItems[] = [
             'product' => $product,
             'qty' => $qty,
-            'color' => $color,
-            'size' => $size,
+            'color' => $variant ? (string)$variant['color'] : $color,
+            'size' => $variant ? (string)$variant['size'] : $size,
             'variant_id' => $variant ? (int)$variant['id'] : 0,
             'price' => $price,
             'cost' => $cost
@@ -159,6 +170,8 @@ try {
             ]);
         }
     }
+
+    orange_order_apply_pending_stock_reservation($pdo, $orderNumber, $validatedItems);
 
     $pdo->commit();
 

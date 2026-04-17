@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/order_helpers.php';
+require_once __DIR__ . '/order_stock.php';
+
 /**
  * Stock + accounting when an order is marked completed (website or company manual).
  * Caller must have set orders.status = completed before calling.
@@ -24,31 +27,16 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
     $inventoryId = (int)$pdo->query("SELECT id FROM accounts WHERE name = 'Inventory' LIMIT 1")->fetchColumn();
     $cogsId = (int)$pdo->query("SELECT id FROM accounts WHERE name = 'COGS' LIMIT 1")->fetchColumn();
 
-    foreach ($items as $item) {
-        $variant = null;
-        $vid = isset($item['variant_id']) ? (int)$item['variant_id'] : 0;
-        if ($vid > 0) {
-            $vStmt = $pdo->prepare(
-                'SELECT * FROM product_variants WHERE id = ? AND product_id = ? LIMIT 1'
-            );
-            $vStmt->execute([$vid, (int)$item['product_id']]);
-            $variant = $vStmt->fetch(PDO::FETCH_ASSOC);
-        }
-        if (!$variant) {
-            $variantStmt = $pdo->prepare(
-                'SELECT * FROM product_variants
-                WHERE product_id = ? AND color = ? AND size = ?
-                LIMIT 1'
-            );
-            $variantStmt->execute([
-                (int)$item['product_id'],
-                (string)$item['color'],
-                (string)$item['size'],
-            ]);
-            $variant = $variantStmt->fetch(PDO::FETCH_ASSOC);
-        }
+    $orderNumber = (string)($order['order_number'] ?? '');
+    $ref = orange_order_stock_reference($orderNumber);
+    // Web checkout already decremented stock; do not deduct again on complete.
+    $stockAlreadyReserved = $orderNumber !== ''
+        && orange_order_has_pending_stock_reservation($pdo, $orderNumber);
 
-        if ($variant) {
+    foreach ($items as $item) {
+        $variant = orange_order_resolve_variant_from_item($pdo, $item);
+
+        if ($variant && !$stockAlreadyReserved) {
             $oldStock = (int)$variant['stock_quantity'];
             $newStock = max(0, $oldStock - (int)$item['qty']);
 
@@ -97,5 +85,12 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
             'ORDER-' . $order['order_number'],
             'COGS entry for delivered order',
         ]);
+    }
+
+    if ($stockAlreadyReserved) {
+        $pdo->prepare(
+            "UPDATE stock_movements SET type = 'pending_order_fulfilled'
+             WHERE reference = ? AND type = 'pending_order'"
+        )->execute([$ref]);
     }
 }

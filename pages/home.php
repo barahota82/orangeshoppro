@@ -8,45 +8,68 @@ $homeHeroFirst = (string)($homeHeroLines[0] ?? '');
 
 $pdo = db();
 $channel = get_channel_by_slug(current_channel_slug());
-$channelId = (int)($channel['id'] ?? 0);
 
-$categoriesSql = "
-    SELECT c.*
-    FROM categories c
-    WHERE c.is_active = 1
-      AND EXISTS (
-          SELECT 1 FROM products p
-          INNER JOIN product_channels pc ON pc.product_id = p.id
-          WHERE p.category_id = c.id
-            AND p.is_active = 1
-            AND pc.channel_id = ?
-      )
-    ORDER BY c.sort_order ASC, c.id ASC
-";
-$stmt = $pdo->prepare($categoriesSql);
-$stmt->execute([$channelId]);
-$categories = $stmt->fetchAll();
+/**
+ * مؤقت للتجربة: true = كل الأقسام النشطة تظهر حتى لو مفيش منتجات.
+ * ارجعها false عند الرجوع للسياسة: تبويب القسم يظهر فقط لو فيه منتج نشط في الفئة.
+ */
+$storefront_show_all_active_categories = true;
 
-$productsStmt = $pdo->prepare("
-    SELECT DISTINCT p.*
+$categoryProductFilter = $storefront_show_all_active_categories
+    ? ''
+    : '
+          AND EXISTS (
+              SELECT 1 FROM products p
+              WHERE p.category_id = c.id AND p.is_active = 1
+          )';
+
+$hasDepartmentsTable = (bool) $pdo->query("SHOW TABLES LIKE 'departments'")->fetchColumn();
+if ($hasDepartmentsTable) {
+    $categoriesStmt = $pdo->query(
+        "
+        SELECT c.*
+        FROM categories c
+        LEFT JOIN departments d ON d.id = c.department_id
+        WHERE c.is_active = 1
+          AND (c.department_id IS NULL OR d.is_active = 1)
+          " . $categoryProductFilter . "
+        ORDER BY c.sort_order ASC, c.id ASC
+    "
+    );
+} else {
+    $categoriesStmt = $pdo->query(
+        "
+        SELECT c.*
+        FROM categories c
+        WHERE c.is_active = 1
+          " . $categoryProductFilter . "
+        ORDER BY c.sort_order ASC, c.id ASC
+    "
+    );
+}
+$categories = $categoriesStmt ? $categoriesStmt->fetchAll() : [];
+
+$productsStmt = $pdo->query("
+    SELECT p.*
     FROM products p
-    INNER JOIN product_channels pc ON pc.product_id = p.id
-    WHERE p.is_active = 1 AND pc.channel_id = ?
+    WHERE p.is_active = 1
     ORDER BY p.id DESC
 ");
-$productsStmt->execute([$channelId]);
-$products = $productsStmt->fetchAll();
+$products = $productsStmt ? $productsStmt->fetchAll() : [];
 
-$offersStmt = $pdo->prepare("
+$offersStmt = $pdo->query("
     SELECT o.discount, p.*
     FROM offers o
     INNER JOIN products p ON p.id = o.product_id
-    INNER JOIN product_channels pc ON pc.product_id = p.id
-    WHERE o.is_active = 1 AND p.is_active = 1 AND pc.channel_id = ?
+    WHERE o.is_active = 1 AND p.is_active = 1
     ORDER BY o.id DESC
 ");
-$offersStmt->execute([$channelId]);
-$offers = $offersStmt->fetchAll();
+$offers = $offersStmt ? $offersStmt->fetchAll() : [];
+
+$offerProductIds = [];
+foreach ($offers as $op) {
+    $offerProductIds[(int)$op['id']] = true;
+}
 ?>
 <div class="container">
     <section class="hero-banner hero-banner--intro hero-banner--rotator" aria-label="<?php echo htmlspecialchars(t('home'), ENT_QUOTES, 'UTF-8'); ?>">
@@ -58,16 +81,30 @@ $offers = $offersStmt->fetchAll();
     </section>
     <textarea id="home-hero-lines-json" hidden readonly class="storefront-home-hero-json"><?php echo htmlspecialchars((string)$homeHeroJson, ENT_QUOTES, 'UTF-8'); ?></textarea>
 
-    <section class="tabs-section">
-        <div class="tabs-scroll">
-            <button class="tab-btn active" onclick="filterProducts('all', this)"><?php echo htmlspecialchars(t('all')); ?></button>
-            <button class="tab-btn" onclick="filterProducts('offers', this)"><?php echo htmlspecialchars(t('offers')); ?></button>
+    <section class="tabs-section" dir="ltr">
+        <button type="button" class="tabs-nav-btn tabs-nav-btn--prev" onclick="scrollHomeCategoryTabs(-1)" aria-label="<?php echo htmlspecialchars(t('tabs_scroll_prev'), ENT_QUOTES, 'UTF-8'); ?>">
+            <span class="tabs-nav-btn__icon" aria-hidden="true">‹</span>
+        </button>
+        <div class="tabs-scroll" id="homeCategoryTabs">
+            <button type="button" class="tab-btn active" onclick="filterProducts('all', this)"><?php echo htmlspecialchars(t('all')); ?></button>
+            <button type="button" class="tab-btn" onclick="filterProducts('offers', this)"><?php echo htmlspecialchars(t('offers')); ?></button>
             <?php foreach ($categories as $cat): ?>
-                <button class="tab-btn" onclick="filterProducts('cat-<?php echo (int)$cat['id']; ?>', this)">
-                    <?php echo htmlspecialchars($lang === 'ar' ? ($cat['name_ar'] ?: $cat['name_en']) : $cat['name_en']); ?>
+                <button type="button" class="tab-btn" onclick="filterProducts('cat-<?php echo (int)$cat['id']; ?>', this)">
+                    <?php
+                    $catLabel = match ($lang) {
+                        'ar' => (string)($cat['name_ar'] ?: $cat['name_en'] ?? ''),
+                        'fil' => (string)($cat['name_fil'] ?? $cat['name_en'] ?? ''),
+                        'hi' => (string)($cat['name_hi'] ?? $cat['name_en'] ?? ''),
+                        default => (string)($cat['name_en'] ?? $cat['name_ar'] ?? ''),
+                    };
+                    echo htmlspecialchars($catLabel, ENT_QUOTES, 'UTF-8');
+                    ?>
                 </button>
             <?php endforeach; ?>
         </div>
+        <button type="button" class="tabs-nav-btn tabs-nav-btn--next" onclick="scrollHomeCategoryTabs(1)" aria-label="<?php echo htmlspecialchars(t('tabs_scroll_next'), ENT_QUOTES, 'UTF-8'); ?>">
+            <span class="tabs-nav-btn__icon" aria-hidden="true">›</span>
+        </button>
     </section>
 
     <section id="productsGrid" class="products-grid">
@@ -91,6 +128,9 @@ $offers = $offersStmt->fetchAll();
         <?php endforeach; ?>
 
         <?php foreach ($products as $p): ?>
+            <?php if (isset($offerProductIds[(int)$p['id']])) {
+                continue;
+            } ?>
             <article class="product-card" data-filter="all cat-<?php echo (int)$p['category_id']; ?>">
                 <div class="product-image-wrap">
                     <img src="/uploads/products/<?php echo htmlspecialchars($p['main_image']); ?>" alt="<?php echo htmlspecialchars($p['name']); ?>">
@@ -110,6 +150,12 @@ $offers = $offersStmt->fetchAll();
 </div>
 
 <script>
+function scrollHomeCategoryTabs(direction) {
+    var el = document.getElementById('homeCategoryTabs');
+    if (!el) return;
+    var amount = Math.max(160, Math.round(el.clientWidth * 0.55));
+    el.scrollBy({ left: direction * amount, behavior: 'smooth' });
+}
 function filterProducts(filter, el) {
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     el.classList.add('active');
@@ -117,7 +163,7 @@ function filterProducts(filter, el) {
     document.querySelectorAll('.product-card').forEach(card => {
         const filters = card.dataset.filter || '';
         if (filter === 'all') {
-            card.style.display = filters.includes('offers') ? '' : '';
+            card.style.display = '';
             return;
         }
         card.style.display = filters.includes(filter) ? '' : 'none';

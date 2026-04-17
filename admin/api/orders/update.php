@@ -1,9 +1,13 @@
 <?php
 require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/order_stock.php';
+require_once __DIR__ . '/../../../includes/order_fulfillment.php';
 require_admin_api();
 
 try {
     $pdo = db();
+    orange_catalog_ensure_schema($pdo);
     $data = get_json_input();
     $id = (int)($data['id'] ?? 0);
     if ($id <= 0) {
@@ -23,6 +27,16 @@ try {
         json_response(['success' => false, 'message' => 'حالة الطلب غير صحيحة'], 422);
     }
 
+    $pdo->beginTransaction();
+
+    $prevStatus = (string)($order['status'] ?? '');
+    if (
+        in_array($status, ['cancelled', 'rejected'], true)
+        && in_array($prevStatus, ['pending', 'approved', 'on_the_way'], true)
+    ) {
+        orange_order_release_pending_stock_reservation($pdo, $order);
+    }
+
     $pdo->prepare("
         UPDATE orders
         SET customer_name = ?, phone = ?, area = ?, address = ?, notes = ?, channel_id = ?, status = ?, updated_at = NOW()
@@ -38,8 +52,17 @@ try {
         $id
     ]);
 
+    if ($status === 'completed' && $prevStatus !== 'completed') {
+        orange_complete_order_fulfillment($pdo, $id);
+    }
+
+    $pdo->commit();
+
     audit_log('order_update', 'تم تعديل الطلب رقم: ' . $order['order_number'], 'orders', $id);
     json_response(['success' => true, 'message' => 'تم تعديل الطلب']);
 } catch (Throwable $e) {
+    if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     api_error($e, 'تعذر تعديل الطلب');
 }

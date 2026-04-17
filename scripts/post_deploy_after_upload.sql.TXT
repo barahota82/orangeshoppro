@@ -1,0 +1,37 @@
+-- Orange — تشغيل مرة بعد رفع الملفات (آمن للتكرار قدر الإمكان)
+--
+-- الطريقة: phpMyAdmin → استيراد هذا الملف، أو من الطرفية:
+--   mysql -u USER -p DB_NAME < post_deploy_after_upload.sql.TXT
+--
+-- ملاحظة: الكود PHP يحدّث بعض الأعمدة تلقائياً عند أول زيارة (orange_catalog_ensure_schema).
+--    تشغيل هذا الملف يضمن أن قاعدة البيانات جاهزة حتى قبل أول طلب.
+
+SET NAMES utf8mb4;
+
+-- 1) عمود reference في stock_movements (مخزون الطلبات / الحجز) — يُضاف فقط إن لم يكن موجوداً
+SET @col_exists := (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'stock_movements'
+      AND COLUMN_NAME = 'reference'
+);
+SET @sql := IF(
+    @col_exists > 0,
+    'SELECT ''stock_movements.reference already exists'' AS msg',
+    'ALTER TABLE stock_movements ADD COLUMN reference VARCHAR(100) NULL'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 2) ربط كل المنتجات بكل القنوات النشطة (لا يكرر الصفوف الموجودة)
+INSERT IGNORE INTO product_channels (product_id, channel_id)
+SELECT p.id, c.id
+FROM products p
+CROSS JOIN channels c
+WHERE c.is_active = 1;
+
+-- للتحقق السريع (اختياري — يمكن حذف هذه الأسطر بعد المراجعة):
+-- SELECT COUNT(*) AS product_channel_links FROM product_channels;
+-- SELECT COUNT(*) AS active_channels FROM channels WHERE is_active = 1;
+-- SELECT COUNT(*) AS products FROM products;

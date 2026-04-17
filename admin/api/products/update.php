@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/product_channels.php';
 require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
 require_admin_api();
 
@@ -63,6 +64,8 @@ try {
             json_response(['success' => false, 'message' => 'المنتج غير موجود'], 404);
         }
     }
+
+    orange_product_attach_all_active_channels($pdo, $productId);
 
     audit_log('product_update', 'تم تحديث المنتج رقم: ' . $productId, 'products', $productId);
     json_response(['success' => true, 'message' => 'تم تحديث المنتج']);
