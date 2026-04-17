@@ -30,6 +30,25 @@ define('DB_PASS', (string)($env['DB_PASS'] ?? ''));
 
 /*
 |--------------------------------------------------------------------------
+| Public URL prefix (storefront)
+|--------------------------------------------------------------------------
+| If the site is not at domain root (e.g. https://domain.com/shop/), set
+| PUBLIC_BASE_PATH in .env.php to the folder URL segment: "/shop" or "shop".
+| IIS rewrite rules live in that folder's web.config.
+|
+| If short URLs 404, set STOREFRONT_FORCE_LONG_URLS to true until URL Rewrite
+| is fixed on the server — links will use /pages/...?channel=&lang=
+*/
+$__pub = trim((string)($env['PUBLIC_BASE_PATH'] ?? ''), '/');
+define('PUBLIC_BASE_PATH', $__pub === '' ? '' : '/' . $__pub);
+$__long = $env['STOREFRONT_FORCE_LONG_URLS'] ?? false;
+define(
+    'STOREFRONT_FORCE_LONG_URLS',
+    $__long === true || $__long === 1 || $__long === '1'
+);
+
+/*
+|--------------------------------------------------------------------------
 | PDO Connection
 |--------------------------------------------------------------------------
 */
@@ -123,21 +142,23 @@ function storefront_current_page_kind(): string {
  * @param array<string, mixed> $extra merged into query for long URLs (e.g. id for product)
  */
 function storefront_url(string $page, string $channelSlug, string $lang, array $extra = []): string {
+    $prefix = PUBLIC_BASE_PATH;
+    $pathPrefix = ($prefix === '' ? '' : $prefix);
+
     $seg = storefront_short_segment($channelSlug, $lang);
-    if ($seg !== null) {
-        if ($page === 'home') {
-            return '/' . $seg;
-        }
-        if ($page === 'cart') {
-            return '/' . $seg . '/cart';
-        }
-        if ($page === 'track') {
-            return '/' . $seg . '/track';
-        }
-        if ($page === 'product' && !empty($extra['id'])) {
-            return '/' . $seg . '/product/' . (int)$extra['id'];
+    if (!STOREFRONT_FORCE_LONG_URLS && $seg !== null) {
+        $tail = match ($page) {
+            'home' => $seg,
+            'cart' => $seg . '/cart',
+            'track' => $seg . '/track',
+            'product' => !empty($extra['id']) ? $seg . '/product/' . (int)$extra['id'] : null,
+            default => $seg,
+        };
+        if ($tail !== null) {
+            return ($pathPrefix === '' ? '' : $pathPrefix) . '/' . $tail;
         }
     }
+
     $q = array_merge(['channel' => $channelSlug, 'lang' => $lang], $extra);
     $path = match ($page) {
         'home' => '/pages/home.php',
@@ -146,7 +167,7 @@ function storefront_url(string $page, string $channelSlug, string $lang, array $
         'product' => '/pages/product.php',
         default => '/pages/home.php',
     };
-    return $path . '?' . http_build_query($q);
+    return $pathPrefix . $path . '?' . http_build_query($q);
 }
 
 function get_translations(): array {

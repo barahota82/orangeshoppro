@@ -8,7 +8,14 @@
   2) Keep Plesk httpErrors / tracing / system.web on the server — do not commit
      paths like C:\Inetpub\vhosts\...
 
-  Requires: IIS URL Rewrite module.
+  Requires: IIS URL Rewrite module (install "URL Rewrite" for IIS if /tiktok 404s).
+
+  If short URLs still 404:
+  - web.config must sit next to index.php / pages/ (site physical root).
+  - Subfolder site (e.g. /shop): put web.config in that folder; in .env.php set
+    PUBLIC_BASE_PATH to "/shop" (or "shop").
+  - nginx-only hosting: web.config is ignored — use nginx rewrite or long URLs
+    (set STOREFRONT_FORCE_LONG_URLS => true in .env.php).
 -->
 <configuration>
   <system.webServer>

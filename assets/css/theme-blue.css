@@ -1,2 +1,34 @@
-.theme-blue { --primary: #1d4ed8; }
-.theme-blue .hero-banner { background: linear-gradient(135deg, #1d4ed8, #60a5fa); }
+/**
+ * Blue channel — deep sapphire with ice & cyan highlights.
+ */
+.theme-blue {
+    --primary: #1d4ed8;
+    --primary-dark: #1e40af;
+    --primary-soft: rgba(29, 78, 216, 0.16);
+    --accent: #0ea5e9;
+    --bg: #f0f7ff;
+    --bg-soft: #e0f2fe;
+    --text: #0f172a;
+    --muted: #64748b;
+    --card: #ffffff;
+    --border: #bfdbfe;
+    --header-bg: rgba(240, 247, 255, 0.9);
+    --hero-shadow: 0 28px 56px -16px rgba(29, 78, 216, 0.32);
+    --card-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 14px 28px -10px rgba(29, 78, 216, 0.14);
+    --card-shadow-hover: 0 16px 40px -12px rgba(29, 78, 216, 0.2);
+}
+
+.theme-blue .hero-banner {
+    background: linear-gradient(
+        125deg,
+        #1e3a8a 0%,
+        #1d4ed8 42%,
+        #2563eb 72%,
+        #38bdf8 100%
+    );
+}
+
+.theme-blue .hero-banner::after {
+    background: radial-gradient(ellipse 85% 65% at 100% 0%, rgba(255, 255, 255, 0.2), transparent 52%),
+        radial-gradient(ellipse 55% 45% at 0% 100%, rgba(56, 189, 248, 0.35), transparent 48%);
+}

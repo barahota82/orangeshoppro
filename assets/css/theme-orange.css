@@ -1,2 +1,34 @@
-.theme-orange { --primary: #ff7a00; }
-.theme-orange .hero-banner { background: linear-gradient(135deg, #ff7a00, #ffb15c); }
+/**
+ * Orange channel — warm premium palette (amber, coral, cream).
+ */
+.theme-orange {
+    --primary: #ea580c;
+    --primary-dark: #c2410c;
+    --primary-soft: rgba(234, 88, 12, 0.18);
+    --accent: #f97316;
+    --bg: #fffbf7;
+    --bg-soft: #fff1e6;
+    --text: #1c1917;
+    --muted: #78716c;
+    --card: #ffffff;
+    --border: #fed7aa;
+    --header-bg: rgba(255, 251, 247, 0.9);
+    --hero-shadow: 0 28px 56px -16px rgba(234, 88, 12, 0.35);
+    --card-shadow: 0 4px 6px -1px rgba(28, 25, 23, 0.05), 0 14px 28px -10px rgba(234, 88, 12, 0.12);
+    --card-shadow-hover: 0 16px 40px -12px rgba(234, 88, 12, 0.22);
+}
+
+.theme-orange .hero-banner {
+    background: linear-gradient(
+        125deg,
+        #ea580c 0%,
+        #f97316 38%,
+        #fb923c 70%,
+        #fdba74 100%
+    );
+}
+
+.theme-orange .hero-banner::after {
+    background: radial-gradient(ellipse 90% 70% at 100% 0%, rgba(255, 255, 255, 0.22), transparent 50%),
+        radial-gradient(ellipse 60% 50% at 0% 100%, rgba(254, 243, 199, 0.35), transparent 45%);
+}

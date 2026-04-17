@@ -1,12 +1,112 @@
-.theme-black { --primary: #111827; }
-.theme-black .hero-banner { background: linear-gradient(135deg, #111827, #374151); }
-.theme-black .product-card,
-.theme-black .card-box,
-.theme-black .site-header,
-.theme-black .bottom-nav,
+/**
+ * Black channel — luxury dark with champagne gold accents.
+ */
+.theme-black {
+    --primary: #d4a574;
+    --primary-dark: #b8956a;
+    --primary-soft: rgba(212, 165, 116, 0.2);
+    --accent: #e8c9a8;
+    --bg: #0c0c0e;
+    --bg-soft: #141418;
+    --text: #f4f4f5;
+    --muted: #a1a1aa;
+    --card: #18181b;
+    --border: #27272a;
+    --header-bg: rgba(12, 12, 14, 0.88);
+    --hero-shadow: 0 28px 56px -12px rgba(0, 0, 0, 0.65);
+    --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 14px 32px -8px rgba(0, 0, 0, 0.55);
+    --card-shadow-hover: 0 20px 48px -12px rgba(212, 165, 116, 0.15);
+}
+
+.theme-black .hero-banner {
+    background: linear-gradient(
+        125deg,
+        #09090b 0%,
+        #18181b 35%,
+        #27272a 65%,
+        #3f3f46 100%
+    );
+    border: 1px solid rgba(212, 165, 116, 0.2);
+}
+
+.theme-black .hero-banner::after {
+    background: radial-gradient(ellipse 80% 60% at 100% 0%, rgba(212, 165, 116, 0.12), transparent 55%),
+        radial-gradient(ellipse 50% 40% at 0% 100%, rgba(228, 201, 168, 0.08), transparent 50%);
+}
+
+.theme-black .logo {
+    border-color: var(--border);
+    box-shadow: 0 0 0 1px rgba(212, 165, 116, 0.15);
+}
+
 .theme-black .lang-switch a,
-.theme-black .icon-btn,
-.theme-black .tab-btn,
+.theme-black .icon-btn {
+    background: var(--card);
+    border-color: var(--border);
+    color: var(--text);
+}
+
+.theme-black .lang-switch a:hover,
+.theme-black .icon-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.theme-black .tab-btn {
+    background: var(--card);
+    border-color: var(--border);
+    color: var(--text);
+}
+
+.theme-black .tab-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.theme-black .tab-btn.active {
+    color: #0c0c0e;
+}
+
+.theme-black .product-image-wrap {
+    background: var(--bg-soft);
+}
+
 .theme-black .chip {
-    background: #ffffff;
+    background: var(--card);
+    border-color: var(--border);
+    color: var(--text);
+}
+
+.theme-black .chip.active {
+    color: #0c0c0e;
+}
+
+.theme-black .qty-control input {
+    background: var(--card);
+    border-color: var(--border);
+    color: var(--text);
+}
+
+.theme-black .field input,
+.theme-black .field textarea {
+    background: var(--card);
+    border-color: var(--border);
+    color: var(--text);
+}
+
+.theme-black .btn-secondary {
+    background: var(--bg-soft);
+    border-color: var(--border);
+    color: var(--text);
+}
+
+.theme-black .stock-out {
+    background: rgba(127, 29, 29, 0.35);
+    color: #fecaca;
+    border-color: rgba(248, 113, 113, 0.25);
+}
+
+.theme-black .bottom-nav {
+    background: var(--header-bg);
+    border-top-color: var(--border);
 }
