@@ -64,14 +64,33 @@ a { text-decoration: none; color: inherit; }
     background: var(--primary-hover);
     color: #fff;
 }
-/* روابط فرعية (تحت الطلبات): نفس حجم الخط والمساحة، تمييز بمسافة فقط */
+/* روابط فرعية (تحت الطلبات): نفس مقاس الصندوق، وهوفر برتقالي */
 .admin-sidebar nav a.admin-nav-sub {
+    align-self: stretch;
+    width: calc(100% - 14px);
     margin-inline-start: 14px;
-    border-inline-start: 3px solid rgba(255,255,255,0.2);
-    padding-inline-start: 14px;
+    box-sizing: border-box;
+    border-inline-start: 3px solid rgba(255,255,255,0.22);
+    padding: 10px 12px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+}
+.admin-sidebar nav a.admin-nav-sub:hover {
+    background: rgba(234, 88, 12, 0.28);
+    color: #fff;
+    border-inline-start-color: var(--primary);
 }
 .admin-sidebar nav a.admin-nav-sub.is-active {
-    border-inline-start-color: rgba(255,255,255,0.55);
+    background: rgba(234, 88, 12, 0.35);
+    border-inline-start-color: #fdba74;
+    color: #fff;
+    font-weight: 600;
+}
+.admin-sidebar nav a.admin-nav-sub.is-active:hover {
+    background: var(--primary-hover);
+    border-inline-start-color: #fed7aa;
+    color: #fff;
 }
 .admin-main {
     padding: 24px;
@@ -170,31 +189,35 @@ button:hover, .btn:hover {
 .btn-secondary { background: #6b7280; }
 .btn-secondary:hover { filter: brightness(1.08); }
 
-/* صف «إجراءات» موحّد: ↑ ↓ | تعديل | إظهار/إخفاء */
+/* صف «إجراءات» موحّد: ↑ ↓ | تعديل | إظهار/إخفاء — سطر واحد بدون لفّ يخرب الأقسام/الفئات/المنتجات */
 .admin-table-ops {
-    display: inline-flex;
-    flex-wrap: wrap;
+    display: flex;
+    flex-wrap: nowrap;
     align-items: center;
     justify-content: center;
     gap: 8px;
     direction: rtl;
 }
 .admin-table-ops__arrows {
-    display: inline-flex;
+    display: flex;
     flex-direction: row;
+    flex-wrap: nowrap;
     gap: 8px;
     align-items: center;
+    flex-shrink: 0;
 }
 .admin-table-ops__main {
-    display: inline-flex;
-    flex-wrap: wrap;
+    display: flex;
+    flex-wrap: nowrap;
     gap: 8px;
     align-items: center;
+    flex-shrink: 0;
 }
 button.admin-btn-reorder,
 .admin-table-ops__arrows .btn-secondary {
     min-width: 42px;
     width: 42px;
+    max-width: 42px;
     padding: 0;
     min-height: 42px;
     display: inline-flex;
@@ -206,17 +229,32 @@ button.admin-btn-reorder,
 .admin-table-ops__main .btn-secondary {
     min-height: 42px;
     padding: 10px 16px;
+    white-space: nowrap;
 }
 .admin-table-ops__main > .btn:not(.btn-secondary) {
     min-height: 42px;
     padding: 10px 16px;
+    white-space: nowrap;
 }
 th.admin-ops-col,
 td.admin-ops-cell {
+    min-width: 260px;
     width: 1%;
     white-space: nowrap;
     text-align: center !important;
     vertical-align: middle !important;
+}
+/* هوفر برتقالي موحّد داخل عمود الإجراءات فقط */
+.admin-table-ops button.btn-secondary:hover,
+.admin-table-ops button.admin-btn-reorder:hover {
+    background: var(--primary);
+    color: #fff;
+    filter: none;
+}
+.admin-table-ops .btn:hover {
+    background: var(--primary-hover);
+    color: #fff;
+    filter: none;
 }
 .btn-danger { background: var(--danger); }
 .btn-success { background: var(--success); }
