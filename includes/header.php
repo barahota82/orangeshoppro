@@ -9,6 +9,7 @@ declare(strict_types=1);
 if (!function_exists('current_lang')) {
     require_once __DIR__ . '/../config.php';
 }
+orange_send_html_no_cache_headers();
 
 extract(storefront_toolbar_state());
 

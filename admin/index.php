@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../config.php';
+orange_send_html_no_cache_headers();
 $admin = require_admin_page();
 $page = $_GET['page'] ?? 'dashboard';
 

@@ -47,8 +47,18 @@ define(
     $__long === true || $__long === 1 || $__long === '1'
 );
 
-/** اختياري في .env.php: `ASSET_VERSION` نص ثابت؛ فارغ = تلقائي من تاريخ تعديل الملفات */
+/** اختياري في .env.php: `ASSET_VERSION` نص ثابت لكل الأصول؛ فارغ = تلقائي (انظر asset_url) */
 define('STOREFRONT_ASSET_VERSION', trim((string)($env['ASSET_VERSION'] ?? '')));
+
+/** اختياري في .env.php: `DISABLE_HTML_CACHE` = 1 يمنع كاش المتصفح/بروكسي لصفحات HTML (واجهة + أدمن) */
+$__noHtmlCache = $env['DISABLE_HTML_CACHE'] ?? false;
+define(
+    'ORANGE_HTML_NO_CACHE',
+    $__noHtmlCache === true
+    || $__noHtmlCache === 1
+    || $__noHtmlCache === '1'
+    || strtolower((string) $__noHtmlCache) === 'true'
+);
 
 /*
 |--------------------------------------------------------------------------
@@ -57,7 +67,38 @@ define('STOREFRONT_ASSET_VERSION', trim((string)($env['ASSET_VERSION'] ?? '')));
 */
 
 /**
- * نسخة لاستعلام ?v= على CSS/JS: يدوية عبر ASSET_VERSION أو أقصى filemtime لملفات الواجهة.
+ * رؤوس تمنع تخزين صفحات PHP في الكاش عند تفعيل DISABLE_HTML_CACHE في .env.php (على السيرفر فقط).
+ */
+function orange_send_html_no_cache_headers(): void
+{
+    if (!ORANGE_HTML_NO_CACHE || headers_sent()) {
+        return;
+    }
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: Thu, 01 Jan 1970 00:00:00 GMT');
+}
+
+/**
+ * نسخة ?v= لمسار ويب واحد: إن لم يُضبط ASSET_VERSION يُستخدم filemtime لذلك الملف فوراً عند كل تعديل.
+ *
+ * @param callable(): string $fallback أقصى filemtime لمجموعة معروفة إذا الملف غير موجود على القرص
+ */
+function orange_asset_url_version(string $normalizedWebPath, callable $fallback): string
+{
+    if (STOREFRONT_ASSET_VERSION !== '') {
+        return STOREFRONT_ASSET_VERSION;
+    }
+    $full = __DIR__ . $normalizedWebPath;
+    if (is_file($full)) {
+        return (string) filemtime($full);
+    }
+
+    return $fallback();
+}
+
+/**
+ * أقصى filemtime لملفات الواجهة المعروفة (احتياطي إذا المسار لا يطابق ملفاً).
  */
 function storefront_asset_version(): string
 {
@@ -93,18 +134,19 @@ function storefront_asset_version(): string
 function storefront_asset_url(string $path): string
 {
     $path = ($path !== '' && $path[0] === '/') ? $path : '/' . ltrim($path, '/');
+    $v = orange_asset_url_version($path, static fn (): string => storefront_asset_version());
 
-    return $path . '?v=' . rawurlencode(storefront_asset_version());
+    return $path . '?v=' . rawurlencode($v);
 }
 
 /*
 |--------------------------------------------------------------------------
-| Admin panel assets (cache bust — نفس ASSET_VERSION أو filemtime لـ admin.css/js)
+| Admin panel assets (cache bust — نفس ASSET_VERSION أو filemtime لكل ملف)
 |--------------------------------------------------------------------------
 */
 
 /**
- * نسخة ?v= لملفات لوحة التحكم. إن وُجد ASSET_VERSION في .env يُستخدم لكل الواجهة + الأدمن.
+ * أقصى filemtime لملفات الأدمن المعروفة (احتياطي).
  */
 function admin_asset_version(): string
 {
@@ -134,8 +176,9 @@ function admin_asset_version(): string
 function admin_asset_url(string $path): string
 {
     $path = ($path !== '' && $path[0] === '/') ? $path : '/' . ltrim($path, '/');
+    $v = orange_asset_url_version($path, static fn (): string => admin_asset_version());
 
-    return $path . '?v=' . rawurlencode(admin_asset_version());
+    return $path . '?v=' . rawurlencode($v);
 }
 
 /*
