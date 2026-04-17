@@ -4,10 +4,11 @@ function formatMoney(v) {
 
 /**
  * سلوجان الهيدر: تناوب بين اللغات الأربع.
- * يقرأ من data-taglines على العنصر (يعمل حتى لو CSP يمنع سكربت الهيدر و window.APP_TAGLINE_CYCLE).
+ * setTimeout متسلسل + pageshow: يصلح توقف اللوب على موبايل (bfcache / تعطيل setInterval).
  */
 (function rotateStorefrontTagline() {
     const TAGLINE_MS = 5000;
+    let taglineTimer = null;
 
     function parseList(jsonStr) {
         if (!jsonStr || typeof jsonStr !== 'string') {
@@ -46,33 +47,68 @@ function formatMoney(v) {
         return w.filter((t) => typeof t === 'string' && t.trim() !== '');
     }
 
-    function start() {
-        if (window.__sfTaglineRotationOn) {
-            return;
+    function stopTagline() {
+        if (taglineTimer !== null) {
+            clearTimeout(taglineTimer);
+            taglineTimer = null;
         }
+    }
+
+    function startTagline() {
+        stopTagline();
         const el = document.getElementById('brandTaglineText');
         const msgs = collectMessages(el);
         if (!el || msgs.length < 2) {
             return;
         }
-        window.__sfTaglineRotationOn = true;
         let i = 0;
         function show(idx) {
             el.textContent = msgs[idx];
         }
         show(i);
-        setInterval(() => {
-            i = (i + 1) % msgs.length;
-            show(i);
-        }, TAGLINE_MS);
+        function scheduleNext() {
+            taglineTimer = setTimeout(() => {
+                i = (i + 1) % msgs.length;
+                show(i);
+                scheduleNext();
+            }, TAGLINE_MS);
+        }
+        scheduleNext();
+    }
+
+    function bootTagline() {
+        startTagline();
+        if (taglineTimer === null) {
+            setTimeout(startTagline, 120);
+            setTimeout(startTagline, 600);
+        }
     }
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', start);
+        document.addEventListener('DOMContentLoaded', bootTagline);
     } else {
-        start();
+        bootTagline();
     }
-    window.addEventListener('load', start);
+    window.addEventListener('load', bootTagline);
+    window.addEventListener('pageshow', (ev) => {
+        if (ev.persisted) {
+            stopTagline();
+            startTagline();
+        }
+    });
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible') {
+            return;
+        }
+        if (!window.matchMedia('(max-width: 1023px)').matches) {
+            return;
+        }
+        if (!document.getElementById('brandTaglineText')) {
+            return;
+        }
+        stopTagline();
+        startTagline();
+    });
 })();
 
 function changeMainImage(src, btn) {
