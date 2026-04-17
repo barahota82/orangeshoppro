@@ -1,4 +1,7 @@
 .env.php
 
+# SQL dump: local reference only; migrations sent as snippets for manual apply
+orange_db.sql
+
 # IIS: keep real web.config (Plesk paths, httpErrors) on the server only — not in GitHub
 web.config

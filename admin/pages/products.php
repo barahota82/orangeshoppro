@@ -128,8 +128,17 @@ foreach ($categories as $cat) {
     <p id="productEditHint" style="display:none;margin:0 0 12px;color:#555;font-size:14px;">تعديل البيانات الأساسية. الترتيب في المتجر من الجدول فقط (↑↓ ثم حفظ الترتيب). كميات الألوان والمقاسات من <a href="/admin/index.php?page=stock">المخزون</a>.</p>
     <form id="productForm">
         <input type="hidden" id="product_record_id" value="0">
-        <p style="margin:0 0 16px;font-size:13px;color:#64748b;line-height:1.5;">نموذج واحد بمساحة كاملة للتمرير: البيانات الأساسية ثم المقاسات والألوان ثم (لاحقاً) جداول الربط، ثم الصور والمتغيرات. الحفظ في الأسفل يشمل كل الحقول.</p>
+        <p class="admin-product-form-intro">التنقل بين الأقسام عبر التبويبات أدناه (مثل برامج البطاقة). زر «حفظ المنتج» يحفظ كل الحقول في كل التبويبات.</p>
 
+        <div class="admin-product-tabs" role="tablist" aria-label="أقسام نموذج المنتج">
+            <button type="button" class="admin-product-tab is-active" role="tab" id="productTabBtnBasic" aria-controls="productTabPanelBasic" aria-selected="true" data-product-tab="basic">البيانات الأساسية</button>
+            <button type="button" class="admin-product-tab" role="tab" id="productTabBtnSizes" aria-controls="productTabPanelSizes" aria-selected="false" data-product-tab="sizes">المقاسات والألوان</button>
+            <button type="button" class="admin-product-tab" role="tab" id="productTabBtnImages" aria-controls="productTabPanelImages" aria-selected="false" data-product-tab="images">الصور</button>
+            <button type="button" class="admin-product-tab" role="tab" id="productTabBtnVariants" aria-controls="productTabPanelVariants" aria-selected="false" data-product-tab="variants">المتغيرات</button>
+        </div>
+
+        <div class="admin-product-tab-panels">
+        <div id="productTabPanelBasic" class="admin-product-tab-panel is-active" role="tabpanel" aria-labelledby="productTabBtnBasic">
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">البيانات الأساسية</h4>
         <div class="form-grid product-form-tab-basic-grid">
@@ -255,7 +264,9 @@ foreach ($categories as $cat) {
             </div>
         </div>
         </div>
+        </div>
 
+        <div id="productTabPanelSizes" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnSizes">
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">المقاسات والألوان</h4>
         <div class="form-grid">
@@ -301,10 +312,14 @@ foreach ($categories as $cat) {
 
         <div id="productAdvancedSizingSlot" class="card" style="margin:16px 0;padding:14px;background:#f8fafc;border:1px dashed #cbd5e1;">
             <h4 class="admin-product-subsection-title" style="margin-top:0;border:0;padding:0;">ربط مقاس × لون وأوصاف المقاس (تطوير لاحق)</h4>
-            <p style="margin:0;font-size:13px;color:#64748b;line-height:1.45;">مساحة جاهزة لجدول فرعي: كل مقاس مع لونه وعائلة المقاسات ونصوص الوصف الخاصة بالمنتج — دون إخفاء باقي النموذج في تبويبات.</p>
+            <p style="margin:0;font-size:13px;color:#64748b;line-height:1.45;">مساحة جاهزة لجدول فرعي: كل مقاس مع لونه وعائلة المقاسات ونصوص الوصف الخاصة بالمنتج.</p>
+        </div>
+        </div>
         </div>
 
-        <h4 class="admin-product-subsection-title" style="margin-top:18px;">الصور</h4>
+        <div id="productTabPanelImages" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnImages">
+        <div class="admin-product-section">
+        <h4 class="admin-product-subsection-title">الصور</h4>
         <div class="form-grid">
             <div style="grid-column:1/-1;">
                 <label>الصورة الرئيسية — رفع ملف</label>
@@ -323,9 +338,15 @@ foreach ($categories as $cat) {
                 <ul id="gallery_upload_list" style="margin:10px 0 0;padding-inline-start:20px;font-size:13px;"></ul>
             </div>
         </div>
+        </div>
+        </div>
 
-        <h4 class="admin-product-subsection-title" style="margin-top:18px;">المتغيرات</h4>
+        <div id="productTabPanelVariants" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnVariants">
+        <div class="admin-product-section">
+        <h4 class="admin-product-subsection-title">المتغيرات</h4>
         <div id="variantsBox"></div>
+        </div>
+        </div>
         </div>
 
         <div class="admin-product-form-actions card" style="margin-top:14px;padding:14px;">
@@ -700,8 +721,39 @@ function resetProductForm() {
     window.PRODUCT_EXTRA_IMAGES = [];
     renderGalleryUploadList();
     onHasFlagsChange();
+    productFormShowTab('basic');
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+function productFormShowTab(tab) {
+    const map = {
+        basic: 'productTabPanelBasic',
+        sizes: 'productTabPanelSizes',
+        images: 'productTabPanelImages',
+        variants: 'productTabPanelVariants'
+    };
+    const key = map[tab] ? tab : 'basic';
+    const panelId = map[key];
+    document.querySelectorAll('.admin-product-tab-panel').forEach(function (el) {
+        el.classList.toggle('is-active', el.id === panelId);
+    });
+    document.querySelectorAll('.admin-product-tab').forEach(function (btn) {
+        const on = btn.getAttribute('data-product-tab') === key;
+        btn.classList.toggle('is-active', on);
+        btn.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+}
+
+(function initProductFormTabs() {
+    document.querySelectorAll('.admin-product-tab').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const t = btn.getAttribute('data-product-tab');
+            if (t) {
+                productFormShowTab(t);
+            }
+        });
+    });
+})();
 
 async function loadProductForEdit(id) {
     try {
@@ -760,6 +812,7 @@ async function loadProductForEdit(id) {
             sortRO.setAttribute('readonly', 'readonly');
             sortRO.tabIndex = -1;
         }
+        productFormShowTab('basic');
         document.getElementById('productForm').scrollIntoView({ behavior: 'smooth' });
     } catch (e) {
         alert('فشل التحميل');
@@ -956,6 +1009,7 @@ function generateVariants() {
     });
     html += '</tbody></table></div>';
     box.innerHTML = html;
+    productFormShowTab('variants');
 }
 
 async function saveProduct() {
@@ -968,6 +1022,7 @@ async function saveProduct() {
     for (let i = 0; i < nameFields.length; i++) {
         const f = nameFields[i];
         if (!document.getElementById(f.id).value.trim()) {
+            productFormShowTab('basic');
             alert('يجب إضافة خانة ' + f.label + ' قبل الحفظ');
             return;
         }
@@ -977,6 +1032,7 @@ async function saveProduct() {
     const mainVal = document.getElementById('main_image').value.trim();
     const hasAnyImage = mainVal || (window.PRODUCT_EXTRA_IMAGES && window.PRODUCT_EXTRA_IMAGES.length);
     if (!hasAnyImage) {
+        productFormShowTab('images');
         alert('ارفع صورة واحدة على الأقل قبل الحفظ');
         return;
     }
@@ -1021,6 +1077,7 @@ async function saveProduct() {
 
     const rows = Array.from(document.querySelectorAll('#variantsBox tbody tr'));
     if (!rows.length) {
+        productFormShowTab('variants');
         alert('ولّد المتغيرات أولاً');
         return;
     }

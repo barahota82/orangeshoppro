@@ -373,14 +373,74 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     text-align: center;
 }
 
-/* نموذج المنتج: أقسام متتابعة (صفحة واحدة) */
+/* نموذج المنتج: تبويبات أفقية + لوحات محتوى */
+.admin-product-form-intro {
+    margin: 0 0 14px;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+}
+.admin-product-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    align-items: flex-end;
+    margin: 0 0 16px;
+    padding: 0 0 10px;
+    border-bottom: 1px solid var(--border);
+}
+.admin-product-tab {
+    appearance: none;
+    margin: 0;
+    padding: 10px 14px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+    background: #f3f4f6;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    line-height: 1.2;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.admin-product-tab:hover {
+    color: var(--text);
+    background: #e8eef5;
+}
+.admin-product-tab.is-active {
+    color: var(--text);
+    background: var(--card);
+    border-color: var(--border);
+    box-shadow: 0 -1px 0 0 var(--card);
+    margin-bottom: -1px;
+    padding-bottom: 11px;
+    position: relative;
+    z-index: 1;
+}
+.admin-product-tab:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+.admin-product-tab-panels {
+    min-height: 120px;
+}
+.admin-product-tab-panel {
+    display: none;
+}
+.admin-product-tab-panel.is-active {
+    display: block;
+}
 .admin-product-section {
     margin-bottom: 28px;
     padding-bottom: 8px;
     border-bottom: 1px solid var(--border);
 }
-.admin-product-section:last-of-type {
+.admin-product-tab-panel .admin-product-section:last-child {
     border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
 }
 .admin-product-form-actions .admin-product-save-hint {
     margin: 0 0 12px;
