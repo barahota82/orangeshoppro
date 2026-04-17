@@ -51,7 +51,7 @@ $orangeOrderStatusAr = [
 ];
 
 /**
- * أزرار التحكم: زر «رفض» يظهر من قيد الانتظار حتى بالطريق، ويُخفى بعد «تم التوصيل» أو «ملغي». مرفوض → قبول فقط.
+ * كل أزرار التحكم ظاهرة دائماً؛ السيرفر ما زال يحدّث الحالة حسب المنطق في update-status.php.
  *
  * @param array<string, mixed> $o
  */
@@ -61,44 +61,13 @@ function orange_admin_orders_action_buttons(array $o): void
     if ($id <= 0) {
         return;
     }
-    $st = strtolower(trim((string) ($o['status'] ?? '')));
-    if ($st === '') {
-        $st = 'pending';
-    }
     $invoicePath = '/admin/index.php?page=invoice&order_id=' . $id;
     $invoiceHref = htmlspecialchars($invoicePath, ENT_QUOTES, 'UTF-8');
 
-    if ($st === 'pending') {
-        echo '<button type="button" class="btn-success" onclick="updateOrderStatus(' . $id . ',\'approved\')">قبول</button>';
-        echo '<button type="button" class="btn-danger" onclick="updateOrderStatus(' . $id . ',\'rejected\')">رفض</button>';
-
-        return;
-    }
-    if ($st === 'rejected') {
-        echo '<button type="button" class="btn-success" onclick="updateOrderStatus(' . $id . ',\'approved\')">قبول</button>';
-
-        return;
-    }
-    if ($st === 'approved') {
-        echo '<a class="btn btn-secondary" href="' . $invoiceHref . '" target="_blank" rel="noopener">فاتورة</a>';
-        echo '<button type="button" class="btn-danger" onclick="updateOrderStatus(' . $id . ',\'rejected\')">رفض</button>';
-        echo '<button type="button" class="btn-secondary" onclick="updateOrderStatus(' . $id . ',\'on_the_way\')">بالطريق</button>';
-
-        return;
-    }
-    if ($st === 'on_the_way') {
-        echo '<a class="btn btn-secondary" href="' . $invoiceHref . '" target="_blank" rel="noopener">فاتورة</a>';
-        echo '<button type="button" class="btn-danger" onclick="updateOrderStatus(' . $id . ',\'rejected\')">رفض</button>';
-        echo '<button type="button" class="btn-success" onclick="updateOrderStatus(' . $id . ',\'completed\')">تم التوصيل</button>';
-
-        return;
-    }
-    if ($st === 'completed' || $st === 'cancelled') {
-        echo '<a class="btn btn-secondary" href="' . $invoiceHref . '" target="_blank" rel="noopener">فاتورة</a>';
-
-        return;
-    }
+    echo '<a class="btn btn-secondary" href="' . $invoiceHref . '" target="_blank" rel="noopener">فاتورة</a>';
     echo '<button type="button" class="btn-success" onclick="updateOrderStatus(' . $id . ',\'approved\')">قبول</button>';
+    echo '<button type="button" class="btn-secondary" onclick="updateOrderStatus(' . $id . ',\'on_the_way\')">بالطريق</button>';
+    echo '<button type="button" class="btn-success" onclick="updateOrderStatus(' . $id . ',\'completed\')">تم التوصيل</button>';
     echo '<button type="button" class="btn-danger" onclick="updateOrderStatus(' . $id . ',\'rejected\')">رفض</button>';
 }
 ?>
