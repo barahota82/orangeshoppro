@@ -1,6 +1,13 @@
 let selectedColor = '';
 let selectedSize = '';
 
+function openProductSizingDialog() {
+    const d = document.getElementById('productSizingDialog');
+    if (d && typeof d.showModal === 'function') {
+        d.showModal();
+    }
+}
+
 function selectColor(btn) {
     document.querySelectorAll('.color-chip').forEach(el => el.classList.remove('active'));
     btn.classList.add('active');

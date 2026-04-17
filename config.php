@@ -286,6 +286,78 @@ function storefront_url(string $page, string $channelSlug, string $lang, array $
     return $pathPrefix . $path . '?' . http_build_query($q);
 }
 
+/**
+ * Product title for current storefront language (DB: Arabic baseline in name/description; en/fil/hi in *_en etc.).
+ */
+function storefront_product_display_name(array $product): string
+{
+    $lang = current_lang();
+    if ($lang === 'ar') {
+        $v = trim((string)($product['name'] ?? ''));
+        if ($v !== '') {
+            return $v;
+        }
+        foreach (['name_en', 'name_fil', 'name_hi'] as $k) {
+            $v = trim((string)($product[$k] ?? ''));
+            if ($v !== '') {
+                return $v;
+            }
+        }
+
+        return '';
+    }
+    $try = match ($lang) {
+        'en' => ['name_en', 'name'],
+        'fil' => ['name_fil', 'name'],
+        'hi' => ['name_hi', 'name'],
+        default => ['name'],
+    };
+    foreach ($try as $k) {
+        $v = trim((string)($product[$k] ?? ''));
+        if ($v !== '') {
+            return $v;
+        }
+    }
+
+    return trim((string)($product['name'] ?? ''));
+}
+
+/**
+ * Product description for current storefront language.
+ */
+function storefront_product_display_description(array $product): string
+{
+    $lang = current_lang();
+    if ($lang === 'ar') {
+        $v = trim((string)($product['description'] ?? ''));
+        if ($v !== '') {
+            return $v;
+        }
+        foreach (['description_en', 'description_fil', 'description_hi'] as $k) {
+            $v = trim((string)($product[$k] ?? ''));
+            if ($v !== '') {
+                return $v;
+            }
+        }
+
+        return '';
+    }
+    $try = match ($lang) {
+        'en' => ['description_en', 'description'],
+        'fil' => ['description_fil', 'description'],
+        'hi' => ['description_hi', 'description'],
+        default => ['description'],
+    };
+    foreach ($try as $k) {
+        $v = trim((string)($product[$k] ?? ''));
+        if ($v !== '') {
+            return $v;
+        }
+    }
+
+    return trim((string)($product['description'] ?? ''));
+}
+
 function get_translations(): array {
     return [
         'en' => [
@@ -293,6 +365,14 @@ function get_translations(): array {
             'cart' => 'Cart',
             'offers' => 'Offers',
             'all' => 'All',
+            'currency_kd' => 'KD',
+            'product_not_found' => 'This product could not be found.',
+            'product_back_to_shop' => 'Back to shop',
+            'sizing_guide' => 'Size guide (indicative)',
+            'sizing_guide_close' => 'Close',
+            'sizing_hint_upper' => 'This product uses the upper-body size chart (indicative).',
+            'sizing_hint_lower' => 'This product uses the lower-body size chart (indicative).',
+            'sizing_hint_both' => 'This product uses both upper- and lower-body size charts (indicative).',
             'out_of_stock' => 'Out of Stock',
             'add_to_cart' => 'Add to Cart',
             'view_product' => 'View Product',
@@ -333,6 +413,14 @@ function get_translations(): array {
             'cart' => 'السلة',
             'offers' => 'العروض',
             'all' => 'الكل',
+            'currency_kd' => 'د.ك',
+            'product_not_found' => 'تعذّر العثور على هذا المنتج.',
+            'product_back_to_shop' => 'العودة إلى المتجر',
+            'sizing_guide' => 'جدول المقاسات (إرشادي)',
+            'sizing_guide_close' => 'إغلاق',
+            'sizing_hint_upper' => 'هذا المنتج: جدول مقاسات علوية (إرشادي).',
+            'sizing_hint_lower' => 'هذا المنتج: جدول مقاسات سفلية (إرشادي).',
+            'sizing_hint_both' => 'هذا المنتج: جداول علوية وسفلية (إرشادي).',
             'out_of_stock' => 'نفد المخزون',
             'add_to_cart' => 'أضف إلى السلة',
             'view_product' => 'عرض المنتج',
@@ -373,6 +461,14 @@ function get_translations(): array {
             'cart' => 'Cart',
             'offers' => 'Offers',
             'all' => 'Lahat',
+            'currency_kd' => 'KD',
+            'product_not_found' => 'Hindi mahanap ang produktong ito.',
+            'product_back_to_shop' => 'Bumalik sa tindahan',
+            'sizing_guide' => 'Gabay sa sukat (pang-reference)',
+            'sizing_guide_close' => 'Isara',
+            'sizing_hint_upper' => 'Ang produktong ito ay gumagamit ng tsart ng sukat sa itaas ng katawan (pang-reference).',
+            'sizing_hint_lower' => 'Ang produktong ito ay gumagamit ng tsart ng sukat sa ibaba ng katawan (pang-reference).',
+            'sizing_hint_both' => 'Ang produktong ito ay gumagamit ng tsart sa itaas at ibaba ng katawan (pang-reference).',
             'out_of_stock' => 'Ubos na ang stock',
             'add_to_cart' => 'Idagdag sa Cart',
             'view_product' => 'Tingnan ang Produkto',
@@ -413,6 +509,14 @@ function get_translations(): array {
             'cart' => 'कार्ट',
             'offers' => 'ऑफ़र',
             'all' => 'सभी',
+            'currency_kd' => 'KD',
+            'product_not_found' => 'यह उत्पाद नहीं मिला।',
+            'product_back_to_shop' => 'दुकान पर वापस जाएँ',
+            'sizing_guide' => 'साइज़ गाइड (संकेतक)',
+            'sizing_guide_close' => 'बंद करें',
+            'sizing_hint_upper' => 'यह उत्पाद ऊपरी शरीर के साइज़ चार्ट का उपयोग करता है (संकेतक)।',
+            'sizing_hint_lower' => 'यह उत्पाद निचले शरीर के साइज़ चार्ट का उपयोग करता है (संकेतक)।',
+            'sizing_hint_both' => 'यह उत्पाद ऊपरी और निचले शरीर दोनों के साइज़ चार्ट का उपयोग करता है (संकेतक)।',
             'out_of_stock' => 'स्टॉक समाप्त',
             'add_to_cart' => 'कार्ट में जोड़ें',
             'view_product' => 'उत्पाद देखें',

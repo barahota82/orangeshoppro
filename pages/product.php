@@ -15,7 +15,18 @@ $stmt->execute([$id]);
 $product = $stmt->fetch();
 
 if (!$product) {
-    echo '<div class="container"><div class="card-box">Product not found.</div></div>';
+    $homeUrl = storefront_url('home', $channelSlug, $lang);
+    ?>
+<div class="container">
+    <nav class="product-page-toolbar">
+        <a class="product-page__back" href="<?php echo htmlspecialchars($homeUrl, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(t('product_back_to_shop'), ENT_QUOTES, 'UTF-8'); ?></a>
+    </nav>
+    <div class="card-box product-page product-page--empty">
+        <p class="product-page__empty-msg"><?php echo htmlspecialchars(t('product_not_found'), ENT_QUOTES, 'UTF-8'); ?></p>
+        <a class="btn" href="<?php echo htmlspecialchars($homeUrl, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(t('product_back_to_shop'), ENT_QUOTES, 'UTF-8'); ?></a>
+    </div>
+</div>
+    <?php
     include __DIR__ . '/../includes/footer.php';
     exit;
 }
@@ -32,31 +43,43 @@ $colors = [];
 $sizes = [];
 $totalStock = 0;
 $scope = isset($product['sizing_guide_scope']) ? (string)$product['sizing_guide_scope'] : 'none';
-$sizingHint = [
+$sizingHintKeys = [
     'none' => '',
-    'upper' => 'هذا المنتج: جدول مقاسات علوية (إرشادي).',
-    'lower' => 'هذا المنتج: جدول مقاسات سفلية (إرشادي).',
-    'both' => 'هذا المنتج: جداول علوية وسفلية (إرشادي).',
+    'upper' => 'sizing_hint_upper',
+    'lower' => 'sizing_hint_lower',
+    'both' => 'sizing_hint_both',
 ];
-$sizingText = $sizingHint[$scope] ?? '';
+$sizingHintKey = $sizingHintKeys[$scope] ?? '';
+$sizingText = $sizingHintKey !== '' ? t($sizingHintKey) : '';
+
+$displayName = storefront_product_display_name($product);
+$displayDesc = storefront_product_display_description($product);
+$homeUrl = storefront_url('home', $channelSlug, $lang);
 
 foreach ($variants as $v) {
-    if ($v['color'] !== '' && !in_array($v['color'], $colors, true)) $colors[] = $v['color'];
-    if ($v['size'] !== '' && !in_array($v['size'], $sizes, true)) $sizes[] = $v['size'];
+    if ($v['color'] !== '' && !in_array($v['color'], $colors, true)) {
+        $colors[] = $v['color'];
+    }
+    if ($v['size'] !== '' && !in_array($v['size'], $sizes, true)) {
+        $sizes[] = $v['size'];
+    }
     $totalStock += (int)$v['stock_quantity'];
 }
 ?>
 <div class="container">
+    <nav class="product-page-toolbar" aria-label="<?php echo htmlspecialchars(t('product_back_to_shop'), ENT_QUOTES, 'UTF-8'); ?>">
+        <a class="product-page__back" href="<?php echo htmlspecialchars($homeUrl, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(t('product_back_to_shop'), ENT_QUOTES, 'UTF-8'); ?></a>
+    </nav>
     <div class="product-page card-box">
         <div class="product-gallery">
-            <img id="mainProductImage" class="main-product-image" src="/uploads/products/<?php echo htmlspecialchars($product['main_image']); ?>" alt="<?php echo htmlspecialchars($product['name']); ?>">
+            <img id="mainProductImage" class="main-product-image" src="/uploads/products/<?php echo htmlspecialchars($product['main_image']); ?>" alt="<?php echo htmlspecialchars($displayName); ?>">
             <?php if ($images): ?>
             <div class="thumbs">
-                <button class="thumb active" onclick="changeMainImage('/uploads/products/<?php echo htmlspecialchars($product['main_image']); ?>', this)">
+                <button type="button" class="thumb active" onclick="changeMainImage('/uploads/products/<?php echo htmlspecialchars($product['main_image']); ?>', this)">
                     <img src="/uploads/products/<?php echo htmlspecialchars($product['main_image']); ?>" alt="">
                 </button>
                 <?php foreach ($images as $img): ?>
-                    <button class="thumb" onclick="changeMainImage('/uploads/products/<?php echo htmlspecialchars($img['image_path']); ?>', this)">
+                    <button type="button" class="thumb" onclick="changeMainImage('/uploads/products/<?php echo htmlspecialchars($img['image_path']); ?>', this)">
                         <img src="/uploads/products/<?php echo htmlspecialchars($img['image_path']); ?>" alt="">
                     </button>
                 <?php endforeach; ?>
@@ -65,12 +88,15 @@ foreach ($variants as $v) {
         </div>
 
         <div class="product-info">
-            <h2><?php echo htmlspecialchars($product['name']); ?></h2>
-            <div class="price-row"><strong><?php echo number_format((float)$product['price'], 2); ?> KD</strong></div>
-            <p class="product-desc"><?php echo nl2br(htmlspecialchars((string)$product['description'])); ?></p>
+            <h2 class="product-info__title"><?php echo htmlspecialchars($displayName); ?></h2>
+            <div class="price-row product-info__price"><strong><?php echo number_format((float)$product['price'], 2); ?> <?php echo htmlspecialchars(t('currency_kd'), ENT_QUOTES, 'UTF-8'); ?></strong></div>
+
+            <?php if ($displayDesc !== ''): ?>
+            <p class="product-desc product-info__desc"><?php echo nl2br(htmlspecialchars($displayDesc)); ?></p>
+            <?php endif; ?>
 
             <?php if ($totalStock <= 0): ?>
-                <div class="stock-out"><?php echo htmlspecialchars(t('out_of_stock')); ?></div>
+                <div class="stock-out product-info__stock"><?php echo htmlspecialchars(t('out_of_stock')); ?></div>
             <?php endif; ?>
 
             <?php if ((int)$product['has_colors'] === 1): ?>
@@ -109,14 +135,14 @@ foreach ($variants as $v) {
             </div>
 
             <?php if ($scope !== 'none' && $sizingText !== ''): ?>
-                <div class="option-block">
-                    <button type="button" class="btn-secondary" onclick="alert(<?php echo json_encode($sizingText, JSON_UNESCAPED_UNICODE); ?>)">
-                        جدول المقاسات (إرشادي)
+                <div class="option-block product-info__sizing">
+                    <button type="button" class="btn-secondary" id="productSizingOpen" onclick="openProductSizingDialog()">
+                        <?php echo htmlspecialchars(t('sizing_guide')); ?>
                     </button>
                 </div>
             <?php endif; ?>
 
-            <div class="actions-row">
+            <div class="actions-row product-info__actions">
                 <button type="button" class="btn" onclick="addCurrentProductToCart()" <?php echo $totalStock <= 0 ? 'disabled' : ''; ?>>
                     <?php echo htmlspecialchars(t('add_to_cart')); ?>
                 </button>
@@ -125,11 +151,23 @@ foreach ($variants as $v) {
     </div>
 </div>
 
+<?php if ($scope !== 'none' && $sizingText !== ''): ?>
+<dialog id="productSizingDialog" class="product-sizing-dialog">
+    <div class="product-sizing-dialog__inner">
+        <h3 class="product-sizing-dialog__title"><?php echo htmlspecialchars(t('sizing_guide')); ?></h3>
+        <p class="product-sizing-dialog__body"><?php echo htmlspecialchars($sizingText); ?></p>
+        <form method="dialog">
+            <button type="submit" class="btn btn-secondary product-sizing-dialog__close"><?php echo htmlspecialchars(t('sizing_guide_close')); ?></button>
+        </form>
+    </div>
+</dialog>
+<?php endif; ?>
+
 <script src="<?php echo htmlspecialchars(storefront_asset_url('/assets/js/product.js'), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
 <script>
 window.CURRENT_PRODUCT = {
     id: <?php echo (int)$product['id']; ?>,
-    name: <?php echo json_encode($product['name'], JSON_UNESCAPED_UNICODE); ?>,
+    name: <?php echo json_encode($displayName, JSON_UNESCAPED_UNICODE); ?>,
     price: <?php echo json_encode((float)$product['price']); ?>,
     image: <?php echo json_encode($product['main_image'], JSON_UNESCAPED_UNICODE); ?>,
     has_colors: <?php echo (int)$product['has_colors']; ?>,
