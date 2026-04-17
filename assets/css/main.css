@@ -75,12 +75,31 @@ h1, h2, h3, .brand-text h1 {
 }
 
 .brand-text {
-    flex: 1;
+    flex: 0 1 auto;
     min-width: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+}
+
+/* اسم الشركة عادي بجانب الشعار؛ السلوج العربي متمركز تحت الاسم فقط */
+.brand-stack {
+    display: grid;
+    grid-template-columns: minmax(0, max-content);
+    justify-items: start;
+    gap: 4px;
+    width: max-content;
+    max-width: min(20rem, calc(100vw - 140px));
+}
+
+.brand-stack h1 {
+    margin: 0;
+    font-size: 1.25rem;
+    line-height: 1.2;
+    text-align: start;
+}
+
+.brand-stack .brand-tagline--ar {
+    justify-self: center;
     text-align: center;
+    width: 100%;
 }
 
 .logo {
@@ -91,13 +110,6 @@ h1, h2, h3, .brand-text h1 {
     background: var(--card);
     box-shadow: var(--card-shadow);
     border: 1px solid var(--border);
-}
-
-.brand-text h1 {
-    margin: 0;
-    font-size: 1.25rem;
-    line-height: 1.2;
-    width: 100%;
 }
 
 .brand-text small,

@@ -63,8 +63,10 @@ if ($pageKind === 'product' && isset($_GET['id'])) {
         <div class="brand-wrap">
             <img class="logo" src="/assets/images/<?php echo htmlspecialchars((string)($channel['logo'] ?? 'logo-orange.png'), ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?>">
             <div class="brand-text">
-                <h1><?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?></h1>
-                <small class="brand-tagline brand-tagline--ar" dir="rtl"><?php echo htmlspecialchars(storefront_tagline_ar(), ENT_QUOTES, 'UTF-8'); ?></small>
+                <div class="brand-stack">
+                    <h1><?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?></h1>
+                    <small class="brand-tagline brand-tagline--ar" dir="rtl"><?php echo htmlspecialchars(storefront_tagline_ar(), ENT_QUOTES, 'UTF-8'); ?></small>
+                </div>
             </div>
         </div>
         <div class="header-actions">
