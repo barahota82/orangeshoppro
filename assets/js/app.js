@@ -111,6 +111,91 @@ function formatMoney(v) {
     });
 })();
 
+/** الصفحة الرئيسية: تناوب 3 جمل في الـ hero حسب لغة الصفحة */
+(function rotateHomeHero() {
+    const HERO_MS = 5000;
+    let heroTimer = null;
+
+    function stopHero() {
+        if (heroTimer !== null) {
+            clearTimeout(heroTimer);
+            heroTimer = null;
+        }
+    }
+
+    function parseHeroLines(raw) {
+        if (!raw || typeof raw !== 'string') {
+            return [];
+        }
+        try {
+            const parsed = JSON.parse(raw.trim());
+            if (!Array.isArray(parsed)) {
+                return [];
+            }
+            return parsed.filter((s) => typeof s === 'string' && s.trim() !== '');
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function startHero() {
+        stopHero();
+        const el = document.getElementById('homeHeroRotator');
+        const ta = document.getElementById('home-hero-lines-json');
+        const msgs = ta && ta.value ? parseHeroLines(ta.value) : [];
+        if (!el || msgs.length < 2) {
+            return;
+        }
+        let i = 0;
+        function show(idx) {
+            el.textContent = msgs[idx];
+        }
+        show(i);
+        function scheduleNext() {
+            heroTimer = setTimeout(() => {
+                i = (i + 1) % msgs.length;
+                show(i);
+                scheduleNext();
+            }, HERO_MS);
+        }
+        scheduleNext();
+    }
+
+    function bootHero() {
+        if (!document.getElementById('homeHeroRotator')) {
+            return;
+        }
+        startHero();
+        if (heroTimer === null) {
+            setTimeout(startHero, 120);
+            setTimeout(startHero, 600);
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bootHero);
+    } else {
+        bootHero();
+    }
+    window.addEventListener('load', bootHero);
+    window.addEventListener('pageshow', (ev) => {
+        if (ev.persisted && document.getElementById('homeHeroRotator')) {
+            stopHero();
+            startHero();
+        }
+    });
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible' || !document.getElementById('homeHeroRotator')) {
+            return;
+        }
+        if (!window.matchMedia('(max-width: 1023px)').matches) {
+            return;
+        }
+        stopHero();
+        startHero();
+    });
+})();
+
 function changeMainImage(src, btn) {
     const main = document.getElementById('mainProductImage');
     if (main) main.src = src;

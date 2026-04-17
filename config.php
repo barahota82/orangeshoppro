@@ -265,6 +265,9 @@ function get_translations(): array {
             'language' => 'Language',
             'storefront_brand' => 'Orange Company',
             'storefront_tagline' => 'Everything you wish for—in one place.',
+            'home_hero_line_1' => "Everything you're looking for.. in one place",
+            'home_hero_line_2' => 'Shop with peace of mind.. Cash on delivery and flexible returns',
+            'home_hero_line_3' => 'Save more.. with lowest prices and fastest doorstep delivery',
             'whatsapp' => 'WhatsApp'
         ],
         'ar' => [
@@ -294,6 +297,9 @@ function get_translations(): array {
             'language' => 'اللغة',
             'storefront_brand' => 'Orange Company',
             'storefront_tagline' => 'كل ما تتمناه.. في مكان واحد.',
+            'home_hero_line_1' => 'كل ما تبحث عنه.. في مكان واحد',
+            'home_hero_line_2' => 'تسوق براحة بال.. دفع عند الاستلام وسياسة إرجاع مرنة',
+            'home_hero_line_3' => 'وفر أكثر.. مع أقل الأسعار وأسرع توصيل لباب بيتك',
             'whatsapp' => 'واتساب'
         ],
         'fil' => [
@@ -323,6 +329,9 @@ function get_translations(): array {
             'language' => 'Wika',
             'storefront_brand' => 'Orange Company',
             'storefront_tagline' => 'Lahat ng gusto mo… sa isang lugar.',
+            'home_hero_line_1' => 'Lahat ng iyong hinahanap.. sa iisang lugar',
+            'home_hero_line_2' => 'Mamili nang walang alalahanin.. COD at madaling pagbabalik',
+            'home_hero_line_3' => 'Makatipid pa.. sa pinakamababang presyo at mabilis na delivery',
             'whatsapp' => 'WhatsApp'
         ],
         'hi' => [
@@ -352,6 +361,9 @@ function get_translations(): array {
             'language' => 'भाषा',
             'storefront_brand' => 'Orange Company',
             'storefront_tagline' => 'जो कुछ भी आप चाहें… एक ही जगह पर।',
+            'home_hero_line_1' => 'वह सब कुछ जो आप ढूंढ रहे हैं.. एक ही जगह पर।',
+            'home_hero_line_2' => 'मन की शांति के साथ खरीदारी करें.. कैश ऑन डिलीवरी और आसान रिटर्न।',
+            'home_hero_line_3' => 'अधिक बचत करें.. सबसे कम कीमतों और सबसे तेज़ डिलीवरी के साथ।',
             'whatsapp' => 'WhatsApp'
         ],
     ];
@@ -361,6 +373,22 @@ function t(string $key): string {
     $lang = current_lang();
     $translations = get_translations();
     return $translations[$lang][$key] ?? $key;
+}
+
+/**
+ * جمل الـ hero في الصفحة الرئيسية (3 جمل بالتناوب حسب لغة الواجهة).
+ *
+ * @return list<string>
+ */
+function storefront_home_hero_lines(): array {
+    $lang = current_lang();
+    $translations = get_translations();
+    $b = $translations[$lang] ?? $translations['en'];
+    return [
+        (string)($b['home_hero_line_1'] ?? ''),
+        (string)($b['home_hero_line_2'] ?? ''),
+        (string)($b['home_hero_line_3'] ?? ''),
+    ];
 }
 
 /**

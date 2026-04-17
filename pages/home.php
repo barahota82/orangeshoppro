@@ -2,6 +2,10 @@
 require_once __DIR__ . '/../config.php';
 include __DIR__ . '/../includes/header.php';
 
+$homeHeroLines = storefront_home_hero_lines();
+$homeHeroJson = json_encode($homeHeroLines, JSON_UNESCAPED_UNICODE);
+$homeHeroFirst = (string)($homeHeroLines[0] ?? '');
+
 $pdo = db();
 $channel = get_channel_by_slug(current_channel_slug());
 $channelId = (int)($channel['id'] ?? 0);
@@ -45,12 +49,14 @@ $offersStmt->execute([$channelId]);
 $offers = $offersStmt->fetchAll();
 ?>
 <div class="container">
-    <section class="hero-banner hero-banner--intro">
+    <section class="hero-banner hero-banner--intro hero-banner--rotator" aria-label="<?php echo htmlspecialchars(t('home'), ENT_QUOTES, 'UTF-8'); ?>">
         <div class="hero-content">
-            <h2><?php echo htmlspecialchars(t('category_products')); ?></h2>
-            <p><?php echo htmlspecialchars(t('offers')); ?> · <?php echo htmlspecialchars(t('all')); ?></p>
+            <p class="hero-rotator-wrap" aria-live="polite">
+                <span class="hero-rotator-text" id="homeHeroRotator" dir="auto"><?php echo htmlspecialchars($homeHeroFirst, ENT_QUOTES, 'UTF-8'); ?></span>
+            </p>
         </div>
     </section>
+    <textarea id="home-hero-lines-json" hidden readonly class="storefront-home-hero-json"><?php echo htmlspecialchars((string)$homeHeroJson, ENT_QUOTES, 'UTF-8'); ?></textarea>
 
     <section class="tabs-section">
         <div class="tabs-scroll">
