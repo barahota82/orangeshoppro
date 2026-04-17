@@ -197,8 +197,7 @@ function get_translations(): array {
             'added' => 'Added to cart',
             'category_products' => 'Products',
             'language' => 'Language',
-            'storefront_brand' => 'Orange Company',
-            'storefront_tagline' => 'Quality you can trust'
+            'storefront_brand' => 'Orange Company'
         ],
         'ar' => [
             'home' => 'الرئيسية',
@@ -225,8 +224,7 @@ function get_translations(): array {
             'added' => 'تمت الإضافة إلى السلة',
             'category_products' => 'المنتجات',
             'language' => 'اللغة',
-            'storefront_brand' => 'Orange Company',
-            'storefront_tagline' => 'جودة وثقة في كل طلب'
+            'storefront_brand' => 'Orange Company'
         ],
         'fil' => [
             'home' => 'Home',
@@ -253,8 +251,7 @@ function get_translations(): array {
             'added' => 'Naidagdag sa cart',
             'category_products' => 'Mga Produkto',
             'language' => 'Wika',
-            'storefront_brand' => 'Orange Company',
-            'storefront_tagline' => 'Tiwala at de-kalidad na shopping'
+            'storefront_brand' => 'Orange Company'
         ],
         'hi' => [
             'home' => 'होम',
@@ -281,8 +278,7 @@ function get_translations(): array {
             'added' => 'कार्ट में जोड़ा गया',
             'category_products' => 'उत्पाद',
             'language' => 'भाषा',
-            'storefront_brand' => 'Orange Company',
-            'storefront_tagline' => 'भरोसेमंद गुणवत्ता, आसान ऑर्डर'
+            'storefront_brand' => 'Orange Company'
         ],
     ];
 }
@@ -291,6 +287,16 @@ function t(string $key): string {
     $lang = current_lang();
     $translations = get_translations();
     return $translations[$lang][$key] ?? $key;
+}
+
+/** Storefront hero/header tagline rotation: ar → en → fil → hi (5s interval in footer script). */
+function storefront_tagline_rotate_messages(): array {
+    return [
+        'كل ما تتمناه.. في مكان واحد.',
+        'Everything you desire.. in one place.',
+        'Lahat ng gusto mo.. sa iisang lugar.',
+        'सब कुछ जो आप चाहते हैं.. एक ही जगह पर।',
+    ];
 }
 
 function json_response($data, int $httpCode = 200): void {

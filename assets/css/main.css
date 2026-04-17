@@ -175,6 +175,10 @@ h1, h2, h3, .brand-text h1 {
     font-size: 1rem;
 }
 
+.hero-rotating-tagline {
+    min-height: 1.6em;
+}
+
 .tabs-scroll {
     display: flex;
     overflow-x: auto;

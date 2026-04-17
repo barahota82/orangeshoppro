@@ -34,6 +34,8 @@ $storefrontExtra = [];
 if ($pageKind === 'product' && isset($_GET['id'])) {
     $storefrontExtra['id'] = (int)$_GET['id'];
 }
+$taglineRotate = storefront_tagline_rotate_messages();
+$taglineFirst = (string)($taglineRotate[0] ?? '');
 
 ?><!DOCTYPE html>
 <html lang="<?php echo htmlspecialchars($lang, ENT_QUOTES, 'UTF-8'); ?>" dir="<?php echo $dir === 'rtl' ? 'rtl' : 'ltr'; ?>">
@@ -65,7 +67,7 @@ if ($pageKind === 'product' && isset($_GET['id'])) {
             <img class="logo" src="/assets/images/<?php echo htmlspecialchars((string)($channel['logo'] ?? 'logo-orange.png'), ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?>">
             <div class="brand-text">
                 <h1><?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?></h1>
-                <small class="brand-tagline"><?php echo htmlspecialchars(t('storefront_tagline'), ENT_QUOTES, 'UTF-8'); ?></small>
+                <small class="brand-tagline storefront-rotating-tagline" dir="auto"><?php echo htmlspecialchars($taglineFirst, ENT_QUOTES, 'UTF-8'); ?></small>
             </div>
         </div>
         <div class="header-actions">
