@@ -92,6 +92,27 @@ try {
     $subcategoriesForJs = [];
     $hasProductSubcategoryColumn = false;
 }
+
+/** @var array<int, array{dept_id: int, dept_label: string, ref: string}> */
+$categoryCatalogMeta = [];
+foreach ($categories as $cat) {
+    $cid = (int) $cat['id'];
+    $did = isset($cat['department_id']) && $cat['department_id'] !== null ? (int) $cat['department_id'] : 0;
+    $deptLabel = '';
+    if ($hasDepartmentsTable && $did > 0 && $departmentsForProducts !== []) {
+        foreach ($departmentsForProducts as $d) {
+            if ((int) $d['id'] === $did) {
+                $deptLabel = (string) ($d['name_ar'] ?: $d['name_en'] ?: '');
+                break;
+            }
+        }
+    }
+    $categoryCatalogMeta[$cid] = [
+        'dept_id' => $did,
+        'dept_label' => $deptLabel,
+        'ref' => $did . '-' . $cid,
+    ];
+}
 ?>
 <div class="page-title">
     <h1>المنتجات</h1>
@@ -184,6 +205,11 @@ try {
                 <?php elseif (!$hasDepartmentsTable || !$hasCategoryDepartment): ?>
                     <small style="display:block;color:#f59e0b;margin-top:4px;">لربط الفئات بالأقسام: فعّل جدول الأقسام وعمود <code>department_id</code> في الفئات من صفحة <a href="/admin/index.php?page=categories">الفئات</a>.</small>
                 <?php endif; ?>
+            </div>
+            <div>
+                <label>القسم (يُستنتج من الفئة)</label>
+                <div id="product_department_hint" style="padding:8px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;min-height:20px;">—</div>
+                <small style="display:block;color:#666;margin-top:4px;">مرجع قسم-فئة (نفس عمود الجدول): <code id="product_dept_cat_ref" style="font-size:13px;">—</code></small>
             </div>
             <?php if ($hasSubcategoriesTable && $hasProductSubcategoryColumn): ?>
             <div>
@@ -375,6 +401,7 @@ try {
 window.ORANGE_COLORS = <?php echo json_encode($colors, JSON_UNESCAPED_UNICODE); ?>;
 window.ORANGE_FAMILIES = <?php echo json_encode($familiesOut, JSON_UNESCAPED_UNICODE); ?>;
 window.ORANGE_SUBCATEGORIES = <?php echo json_encode($subcategoriesForJs, JSON_UNESCAPED_UNICODE); ?>;
+window.ORANGE_CATEGORY_META = <?php echo json_encode($categoryCatalogMeta, JSON_UNESCAPED_UNICODE); ?>;
 window.PRODUCT_EXTRA_IMAGES = [];
 window.PRODUCT_NEXT_SORT = <?php echo (int)$nextProductSort; ?>;
 
@@ -598,6 +625,7 @@ function resetProductForm() {
     document.getElementById('description_hi').value = '';
     document.getElementById('category_id').selectedIndex = 0;
     rebuildSubcategoryOptions(null);
+    updateProductCatalogHint();
     document.getElementById('price').value = '';
     document.getElementById('cost').value = '';
     document.getElementById('main_image').value = '';
@@ -644,6 +672,7 @@ async function loadProductForEdit(id) {
         document.getElementById('category_id').value = String(p.category_id || '');
         const sid = parseInt(p.subcategory_id, 10) || 0;
         rebuildSubcategoryOptions(sid > 0 ? sid : null);
+        updateProductCatalogHint();
         document.getElementById('price').value = String(p.price != null ? p.price : '');
         document.getElementById('cost').value = String(p.cost != null ? p.cost : '');
         document.getElementById('main_image').value = p.main_image || '';
@@ -976,13 +1005,39 @@ document.getElementById('name_en').addEventListener('input', scheduleProductTran
 document.getElementById('description').addEventListener('input', scheduleProductDescriptionAutoTranslate);
 document.getElementById('description_en').addEventListener('input', scheduleProductDescriptionFromEnglish);
 
+function updateProductCatalogHint() {
+    const hint = document.getElementById('product_department_hint');
+    const refEl = document.getElementById('product_dept_cat_ref');
+    const sel = document.getElementById('category_id');
+    if (!hint || !refEl || !sel) {
+        return;
+    }
+    const id = parseInt(sel.value, 10) || 0;
+    const meta = window.ORANGE_CATEGORY_META && window.ORANGE_CATEGORY_META[id];
+    if (!meta) {
+        hint.textContent = '—';
+        refEl.textContent = '—';
+        return;
+    }
+    if (meta.dept_id > 0 && meta.dept_label) {
+        hint.textContent = meta.dept_label + ' (#' + meta.dept_id + ')';
+    } else if (meta.dept_id > 0) {
+        hint.textContent = 'قسم #' + meta.dept_id;
+    } else {
+        hint.textContent = 'بدون قسم — عيّن القسم من صفحة الفئات إن لزم';
+    }
+    refEl.textContent = meta.ref;
+}
+
 const categorySelectEl = document.getElementById('category_id');
 if (categorySelectEl) {
     categorySelectEl.addEventListener('change', function () {
         rebuildSubcategoryOptions(null);
+        updateProductCatalogHint();
     });
 }
 rebuildSubcategoryOptions(null);
+updateProductCatalogHint();
 
 setProductFormEditMode(false);
 onHasFlagsChange();
