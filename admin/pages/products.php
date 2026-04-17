@@ -42,8 +42,20 @@ foreach ($families as $f) {
     <form id="productForm">
         <div class="form-grid">
             <div>
-                <label>اسم المنتج</label>
+                <label>اسم المنتج (العربي)</label>
                 <input type="text" id="name" required>
+            </div>
+            <div>
+                <label>English</label>
+                <input type="text" id="name_en" required>
+            </div>
+            <div>
+                <label>Filipino</label>
+                <input type="text" id="name_fil" required>
+            </div>
+            <div>
+                <label>Hindi</label>
+                <input type="text" id="name_hi" required>
             </div>
             <div>
                 <label>الفئة</label>
@@ -113,7 +125,8 @@ foreach ($families as $f) {
             <button type="button" class="btn-secondary" onclick="addColorwayRow()">+ صف لون</button>
         </div>
 
-        <div class="actions" style="margin:14px 0;">
+        <div class="actions" style="margin:14px 0;flex-wrap:wrap;gap:8px;">
+            <button type="button" class="btn-secondary" onclick="translateProductNames({ forceFromArabic: true })">ترجمة تلقائية من العربي</button>
             <button type="button" onclick="generateVariants()">توليد المتغيرات</button>
             <button type="button" class="btn-secondary" onclick="saveProduct()">حفظ المنتج</button>
         </div>
@@ -157,6 +170,52 @@ foreach ($families as $f) {
 <script>
 window.ORANGE_COLORS = <?php echo json_encode($colors, JSON_UNESCAPED_UNICODE); ?>;
 window.ORANGE_FAMILIES = <?php echo json_encode($familiesOut, JSON_UNESCAPED_UNICODE); ?>;
+
+let productTranslateTimer = null;
+let productEnTranslateTimer = null;
+
+async function translateProductNames(opts = {}) {
+    const silent = !!opts.silent;
+    const forceFromArabic = !!opts.forceFromArabic;
+    try {
+        const payload = {
+            name_ar: document.getElementById('name').value.trim(),
+            name_en: forceFromArabic ? '' : document.getElementById('name_en').value.trim()
+        };
+        const res = await postJSON('/admin/api/translate/names.php', payload);
+        if (!res || !res.success) {
+            if (!silent) alert((res && res.message) ? res.message : 'فشل الترجمة');
+            return;
+        }
+        const t = res.translations || {};
+        if (t.name_en) document.getElementById('name_en').value = t.name_en;
+        if (t.name_fil) document.getElementById('name_fil').value = t.name_fil;
+        if (t.name_hi) document.getElementById('name_hi').value = t.name_hi;
+    } catch (e) {
+        if (!silent) alert('فشل طلب الترجمة من السيرفر');
+    }
+}
+
+function scheduleProductAutoTranslate() {
+    const nameAr = document.getElementById('name').value.trim();
+    if (!nameAr) {
+        document.getElementById('name_en').value = '';
+        document.getElementById('name_fil').value = '';
+        document.getElementById('name_hi').value = '';
+        return;
+    }
+    clearTimeout(productTranslateTimer);
+    productTranslateTimer = setTimeout(() => translateProductNames({ silent: true, forceFromArabic: true }), 600);
+}
+
+function scheduleProductTranslateFromEnglish() {
+    const nameEn = document.getElementById('name_en').value.trim();
+    if (!nameEn) {
+        return;
+    }
+    clearTimeout(productEnTranslateTimer);
+    productEnTranslateTimer = setTimeout(() => translateProductNames({ silent: true, forceFromArabic: false }), 550);
+}
 
 function onHasFlagsChange() {
     const hs = document.getElementById('has_sizes').value === '1';
@@ -274,6 +333,20 @@ function generateVariants() {
 }
 
 async function saveProduct() {
+    const nameFields = [
+        { id: 'name', label: 'الاسم العربي' },
+        { id: 'name_en', label: 'English' },
+        { id: 'name_fil', label: 'Filipino' },
+        { id: 'name_hi', label: 'Hindi' }
+    ];
+    for (let i = 0; i < nameFields.length; i++) {
+        const f = nameFields[i];
+        if (!document.getElementById(f.id).value.trim()) {
+            alert('يجب إضافة خانة ' + f.label + ' قبل الحفظ');
+            return;
+        }
+    }
+
     const rows = Array.from(document.querySelectorAll('#variantsBox tbody tr'));
     if (!rows.length) {
         alert('ولّد المتغيرات أولاً');
@@ -289,6 +362,9 @@ async function saveProduct() {
 
     const payload = {
         name: document.getElementById('name').value.trim(),
+        name_en: document.getElementById('name_en').value.trim(),
+        name_fil: document.getElementById('name_fil').value.trim(),
+        name_hi: document.getElementById('name_hi').value.trim(),
         description: document.getElementById('description').value.trim(),
         category_id: parseInt(document.getElementById('category_id').value, 10),
         price: parseFloat(document.getElementById('price').value || '0'),
@@ -305,6 +381,9 @@ async function saveProduct() {
     alert(res.message || (res.success ? 'تم الحفظ' : 'فشل'));
     if (res.success) location.reload();
 }
+
+document.getElementById('name').addEventListener('input', scheduleProductAutoTranslate);
+document.getElementById('name_en').addEventListener('input', scheduleProductTranslateFromEnglish);
 
 onHasFlagsChange();
 </script>

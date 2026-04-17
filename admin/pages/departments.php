@@ -158,6 +158,7 @@ const DEPT_API_MSG = {
 let isSavingDepartment = false;
 let autoSlugTouched = false;
 let translateTimer = null;
+let deptEnTranslateTimer = null;
 const defaultNextSort = <?php echo (int)$nextSort; ?>;
 
 function resetDepartmentForm() {
@@ -233,6 +234,20 @@ function scheduleAutoTranslate() {
     }
     clearTimeout(translateTimer);
     translateTimer = setTimeout(() => translateDepartment({ silent: true, forceFromArabic: true }), 600);
+}
+
+function scheduleDepartmentTranslateFromEnglish() {
+    const nameEn = document.getElementById('name_en').value.trim();
+    if (!nameEn) {
+        return;
+    }
+    clearTimeout(deptEnTranslateTimer);
+    deptEnTranslateTimer = setTimeout(() => translateDepartment({ silent: true, forceFromArabic: false }), 550);
+}
+
+function onDepartmentNameEnInput() {
+    refreshSlugIfAuto();
+    scheduleDepartmentTranslateFromEnglish();
 }
 
 async function saveDepartment() {
@@ -322,7 +337,7 @@ async function saveDepartmentsOrder() {
 }
 
 document.getElementById('slug').addEventListener('input', () => { autoSlugTouched = true; });
-document.getElementById('name_en').addEventListener('input', refreshSlugIfAuto);
+document.getElementById('name_en').addEventListener('input', onDepartmentNameEnInput);
 document.getElementById('name_ar').addEventListener('input', scheduleAutoTranslate);
 document.getElementById('name_ar').addEventListener('change', () => {
     const ar = document.getElementById('name_ar').value.trim();

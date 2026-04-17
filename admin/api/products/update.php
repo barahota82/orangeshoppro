@@ -1,9 +1,11 @@
 <?php
 require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_admin_api();
 
 try {
     $pdo = db();
+    orange_catalog_ensure_schema($pdo);
     $data = get_json_input();
 
     $productId = (int)($data['id'] ?? 0);
@@ -15,15 +17,25 @@ try {
         json_response(['success' => false, 'message' => 'البيانات الأساسية مطلوبة'], 422);
     }
 
+    $nameEn = trim((string)($data['name_en'] ?? ''));
+    $nameFil = trim((string)($data['name_fil'] ?? ''));
+    $nameHi = trim((string)($data['name_hi'] ?? ''));
+    if ($nameEn === '' || $nameFil === '' || $nameHi === '') {
+        json_response(['success' => false, 'message' => 'أسماء المنتج بلغات English / Filipino / Hindi مطلوبة'], 422);
+    }
+
     $stmt = $pdo->prepare("
         UPDATE products
-        SET name = ?, description = ?, category_id = ?, price = ?, cost = ?,
+        SET name = ?, name_en = ?, name_fil = ?, name_hi = ?, description = ?, category_id = ?, price = ?, cost = ?,
             main_image = ?, has_sizes = ?, has_colors = ?, is_active = ?, updated_at = NOW()
         WHERE id = ?
     ");
 
     $stmt->execute([
         trim((string)$data['name']),
+        $nameEn,
+        $nameFil,
+        $nameHi,
         trim((string)($data['description'] ?? '')),
         (int)$data['category_id'],
         (float)$data['price'],

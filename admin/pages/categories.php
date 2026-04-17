@@ -185,6 +185,7 @@ let isSavingCategory = false;
 let autoSlugTouched = false;
 const defaultNextSort = <?php echo (int)$nextSort; ?>;
 let translateTimer = null;
+let catEnTranslateTimer = null;
 
 function resetCategoryForm() {
     document.getElementById('cat_record_id').value = '0';
@@ -355,8 +356,22 @@ function scheduleAutoTranslate() {
     }, 600);
 }
 
+function scheduleCategoryTranslateFromEnglish() {
+    const nameEn = document.getElementById('name_en').value.trim();
+    if (!nameEn) {
+        return;
+    }
+    clearTimeout(catEnTranslateTimer);
+    catEnTranslateTimer = setTimeout(() => translateCategory({ silent: true, forceFromArabic: false }), 550);
+}
+
+function onCategoryNameEnInput() {
+    refreshSlugIfAuto();
+    scheduleCategoryTranslateFromEnglish();
+}
+
 document.getElementById('slug').addEventListener('input', () => { autoSlugTouched = true; });
-document.getElementById('name_en').addEventListener('input', refreshSlugIfAuto);
+document.getElementById('name_en').addEventListener('input', onCategoryNameEnInput);
 document.getElementById('name_ar').addEventListener('input', scheduleAutoTranslate);
 document.getElementById('name_ar').addEventListener('change', async () => {
     // عند الانتهاء من تعديل العربي، أعد الترجمة من العربي مباشرة

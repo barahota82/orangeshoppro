@@ -57,6 +57,13 @@ try {
         json_response(['success' => false, 'message' => 'البيانات الأساسية مطلوبة'], 422);
     }
 
+    $nameEn = trim((string)($data['name_en'] ?? ''));
+    $nameFil = trim((string)($data['name_fil'] ?? ''));
+    $nameHi = trim((string)($data['name_hi'] ?? ''));
+    if ($nameEn === '' || $nameFil === '' || $nameHi === '') {
+        json_response(['success' => false, 'message' => 'أسماء المنتج بلغات English / Filipino / Hindi مطلوبة'], 422);
+    }
+
     $hasSizes = (int)($data['has_sizes'] ?? 0) === 1;
     $hasColors = (int)($data['has_colors'] ?? 0) === 1;
 
@@ -102,14 +109,17 @@ try {
 
     $stmt = $pdo->prepare(
         'INSERT INTO products (
-            name, description, category_id, size_family_id, sizing_guide_scope, price, cost, main_image, has_sizes, has_colors, is_active, created_at
+            name, name_en, name_fil, name_hi, description, category_id, size_family_id, sizing_guide_scope, price, cost, main_image, has_sizes, has_colors, is_active, created_at
         ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW()
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW()
         )'
     );
 
     $stmt->execute([
         trim((string)$data['name']),
+        $nameEn,
+        $nameFil,
+        $nameHi,
         trim((string)($data['description'] ?? '')),
         (int)$data['category_id'],
         $sizeFamilyId,

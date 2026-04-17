@@ -128,6 +128,15 @@ function orange_catalog_ensure_schema(PDO $pdo): void
     if (!orange_table_has_column($pdo, 'size_family_sizes', 'foot_length_cm')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE size_family_sizes ADD COLUMN foot_length_cm DECIMAL(6,2) NULL');
     }
+    if (!orange_table_has_column($pdo, 'products', 'name_en')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN name_en VARCHAR(191) NOT NULL DEFAULT \'\'');
+    }
+    if (!orange_table_has_column($pdo, 'products', 'name_fil')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN name_fil VARCHAR(191) NOT NULL DEFAULT \'\'');
+    }
+    if (!orange_table_has_column($pdo, 'products', 'name_hi')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN name_hi VARCHAR(191) NOT NULL DEFAULT \'\'');
+    }
 
     $done = true;
 }

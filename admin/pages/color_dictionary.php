@@ -143,6 +143,7 @@ if ($hasTable) {
 <script>
 const defaultNextColorSort = <?php echo (int) $nextSort; ?>;
 let colorTranslateTimer = null;
+let colorEnTranslateTimer = null;
 let isSavingColor = false;
 
 function resetColorForm() {
@@ -203,6 +204,18 @@ function scheduleColorAutoTranslate() {
     colorTranslateTimer = setTimeout(function () {
         translateColor({ silent: true, forceFromArabic: true });
     }, 600);
+}
+
+/** بعد تعديل الإنجليزي يدويًا: حدّث الفلبيني والهندي من الإنجليزي (بدون إعادة ترجمة EN من العربي). */
+function scheduleColorTranslateFromEnglish() {
+    const nameEn = document.getElementById('c_name_en').value.trim();
+    if (!nameEn) {
+        return;
+    }
+    clearTimeout(colorEnTranslateTimer);
+    colorEnTranslateTimer = setTimeout(function () {
+        translateColor({ silent: true, forceFromArabic: false });
+    }, 550);
 }
 
 async function saveColor() {
@@ -285,6 +298,7 @@ document.getElementById('c_name_ar').addEventListener('change', function () {
         translateColor({ silent: true, forceFromArabic: true });
     }
 });
+document.getElementById('c_name_en').addEventListener('input', scheduleColorTranslateFromEnglish);
 
 (function () {
     var style = document.createElement('style');

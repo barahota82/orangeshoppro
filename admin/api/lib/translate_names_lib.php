@@ -47,6 +47,11 @@ if (!function_exists('translate_names_gtr')) {
 }
 
 if (!function_exists('translate_names_from_ar_en')) {
+    /**
+     * @param string $nameAr Arabic name (optional if $nameEn is set)
+     * @param string $nameEn English name; if empty and $nameAr set, EN is translated from AR.
+     *        If EN is non-empty, it is kept and Filipino/Hindi are derived from EN (fix literal EN).
+     */
     function translate_names_from_ar_en($nameAr, $nameEn)
     {
         $nameAr = trim((string) $nameAr);
