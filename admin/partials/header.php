@@ -13,8 +13,8 @@ $orangeAdminPage = isset($page) ? (string) $page : 'dashboard';
     <meta charset="UTF-8">
     <title>لوحة الإدارة</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="/admin/assets/admin.css">
-    <script src="/admin/assets/admin.js" defer></script>
+    <link rel="stylesheet" href="<?php echo htmlspecialchars(admin_asset_url('/admin/assets/admin.css'), ENT_QUOTES, 'UTF-8'); ?>">
+    <script src="<?php echo htmlspecialchars(admin_asset_url('/admin/assets/admin.js'), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
 </head>
 <body>
 <div class="admin-layout">

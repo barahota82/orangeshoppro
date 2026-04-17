@@ -99,6 +99,47 @@ function storefront_asset_url(string $path): string
 
 /*
 |--------------------------------------------------------------------------
+| Admin panel assets (cache bust — نفس ASSET_VERSION أو filemtime لـ admin.css/js)
+|--------------------------------------------------------------------------
+*/
+
+/**
+ * نسخة ?v= لملفات لوحة التحكم. إن وُجد ASSET_VERSION في .env يُستخدم لكل الواجهة + الأدمن.
+ */
+function admin_asset_version(): string
+{
+    if (STOREFRONT_ASSET_VERSION !== '') {
+        return STOREFRONT_ASSET_VERSION;
+    }
+    static $computed = null;
+    if ($computed !== null) {
+        return $computed;
+    }
+    $files = [
+        __DIR__ . '/admin/assets/admin.css',
+        __DIR__ . '/admin/assets/admin.js',
+    ];
+    $mt = 0;
+    foreach ($files as $f) {
+        if (is_file($f)) {
+            $mt = max($mt, (int) filemtime($f));
+        }
+    }
+    $computed = $mt > 0 ? (string) $mt : '1';
+
+    return $computed;
+}
+
+/** مسار أصل الأدمن مع ?v= (مثال: admin_asset_url('/admin/assets/admin.css')) */
+function admin_asset_url(string $path): string
+{
+    $path = ($path !== '' && $path[0] === '/') ? $path : '/' . ltrim($path, '/');
+
+    return $path . '?v=' . rawurlencode(admin_asset_version());
+}
+
+/*
+|--------------------------------------------------------------------------
 | PDO Connection
 |--------------------------------------------------------------------------
 */
