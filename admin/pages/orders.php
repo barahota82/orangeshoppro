@@ -40,6 +40,66 @@ try {
 $ordersIndex = (isset($_SERVER['SCRIPT_NAME']) && is_string($_SERVER['SCRIPT_NAME']) && $_SERVER['SCRIPT_NAME'] !== '')
     ? $_SERVER['SCRIPT_NAME']
     : '/admin/index.php';
+
+$orangeOrderStatusAr = [
+    'pending' => 'قيد الانتظار',
+    'approved' => 'مقبول',
+    'rejected' => 'مرفوض',
+    'on_the_way' => 'بالطريق',
+    'completed' => 'تم التوصيل',
+    'cancelled' => 'ملغي',
+];
+
+/**
+ * أزرار التحكم حسب حالة الطلب: pending → قبول/رفض | rejected → قبول فقط | approved → فاتورة+رفض+بالطريق | on_the_way → فاتورة+تم التوصيل | مكتمل/ملغي → فاتورة فقط.
+ *
+ * @param array<string, mixed> $o
+ */
+function orange_admin_orders_action_buttons(array $o): void
+{
+    $id = (int) ($o['id'] ?? 0);
+    if ($id <= 0) {
+        return;
+    }
+    $st = strtolower(trim((string) ($o['status'] ?? '')));
+    if ($st === '') {
+        $st = 'pending';
+    }
+    $invoicePath = '/admin/index.php?page=invoice&order_id=' . $id;
+    $invoiceHref = htmlspecialchars($invoicePath, ENT_QUOTES, 'UTF-8');
+
+    if ($st === 'pending') {
+        echo '<button type="button" class="btn-success" onclick="updateOrderStatus(' . $id . ',\'approved\')">قبول</button>';
+        echo '<button type="button" class="btn-danger" onclick="updateOrderStatus(' . $id . ',\'rejected\')">رفض</button>';
+
+        return;
+    }
+    if ($st === 'rejected') {
+        echo '<button type="button" class="btn-success" onclick="updateOrderStatus(' . $id . ',\'approved\')">قبول</button>';
+
+        return;
+    }
+    if ($st === 'approved') {
+        echo '<a class="btn btn-secondary" href="' . $invoiceHref . '" target="_blank" rel="noopener">فاتورة</a>';
+        echo '<button type="button" class="btn-danger" onclick="updateOrderStatus(' . $id . ',\'rejected\')">رفض</button>';
+        echo '<button type="button" class="btn-secondary" onclick="updateOrderStatus(' . $id . ',\'on_the_way\')">بالطريق</button>';
+
+        return;
+    }
+    if ($st === 'on_the_way') {
+        echo '<a class="btn btn-secondary" href="' . $invoiceHref . '" target="_blank" rel="noopener">فاتورة</a>';
+        echo '<button type="button" class="btn-success" onclick="updateOrderStatus(' . $id . ',\'completed\')">تم التوصيل</button>';
+
+        return;
+    }
+    if ($st === 'completed' || $st === 'cancelled') {
+        echo '<a class="btn btn-secondary" href="' . $invoiceHref . '" target="_blank" rel="noopener">فاتورة</a>';
+
+        return;
+    }
+    echo '<button type="button" class="btn-success" onclick="updateOrderStatus(' . $id . ',\'approved\')">قبول</button>';
+    echo '<button type="button" class="btn-danger" onclick="updateOrderStatus(' . $id . ',\'rejected\')">رفض</button>';
+}
 ?>
 <div class="page-title">
     <h1>الطلبات</h1>
@@ -85,13 +145,15 @@ $ordersIndex = (isset($_SERVER['SCRIPT_NAME']) && is_string($_SERVER['SCRIPT_NAM
                     <td><?php echo htmlspecialchars((string)($o['phone'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo htmlspecialchars((string)($o['channel_name'] ?: '-'), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo number_format((float)($o['total'] ?? 0), 2); ?> KD</td>
-                    <td><span class="badge <?php echo htmlspecialchars((string)($o['status'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string)($o['status'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></span></td>
+                    <td><?php
+                        $stBadge = strtolower(trim((string)($o['status'] ?? '')));
+                        if ($stBadge === '') {
+                            $stBadge = 'pending';
+                        }
+                        $stLabel = $orangeOrderStatusAr[$stBadge] ?? $stBadge;
+                    ?><span class="badge <?php echo htmlspecialchars($stBadge, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($stLabel, ENT_QUOTES, 'UTF-8'); ?></span></td>
                     <td class="actions">
-                        <a class="btn btn-secondary" href="/admin/index.php?page=invoice&order_id=<?php echo (int)$o['id']; ?>" target="_blank">فاتورة</a>
-                        <button type="button" onclick="updateOrderStatus(<?php echo (int)$o['id']; ?>,'approved')">Approve</button>
-                        <button type="button" class="btn-secondary" onclick="updateOrderStatus(<?php echo (int)$o['id']; ?>,'on_the_way')">On The Way</button>
-                        <button type="button" class="btn-success" onclick="updateOrderStatus(<?php echo (int)$o['id']; ?>,'completed')">Delivered</button>
-                        <button type="button" class="btn-danger" onclick="updateOrderStatus(<?php echo (int)$o['id']; ?>,'rejected')">Reject</button>
+                        <?php orange_admin_orders_action_buttons($o); ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -112,6 +174,12 @@ $ordersIndex = (isset($_SERVER['SCRIPT_NAME']) && is_string($_SERVER['SCRIPT_NAM
     });
 })();
 async function updateOrderStatus(orderId, status) {
+    if (status === 'rejected' && !confirm('تأكيد رفض هذا الطلب؟')) {
+        return;
+    }
+    if (status === 'completed' && !confirm('تأكيد تم التوصيل؟')) {
+        return;
+    }
     const res = await postJSON('/admin/api/orders/update-status.php', {
         order_id: orderId,
         status: status
