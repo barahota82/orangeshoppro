@@ -13,10 +13,7 @@ if (!function_exists('current_lang')) {
 extract(storefront_toolbar_state());
 
 $taglineCycle = storefront_tagline_cycle_messages();
-$taglineOrder = ['en', 'ar', 'fil', 'hi'];
-$taglineStart = array_search($lang, $taglineOrder, true);
-$taglineStart = $taglineStart === false ? 0 : (int)$taglineStart;
-$taglineInitial = $taglineCycle[$taglineStart] ?? ($taglineCycle[0] ?? '');
+$taglineInitial = $taglineCycle[0] ?? '';
 
 $theme = preg_replace('/[^a-z0-9\-]/i', '', (string)($channel['slug'] ?? 'orange'));
 if ($theme === '' || !is_file(__DIR__ . '/../assets/css/theme-' . $theme . '.css')) {
@@ -34,6 +31,7 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
     <link rel="stylesheet" href="/assets/css/theme-<?php echo htmlspecialchars($theme, ENT_QUOTES, 'UTF-8'); ?>.css">
     <script>
         window.APP_LANG = <?php echo json_encode($lang, JSON_UNESCAPED_UNICODE); ?>;
+        window.APP_TAGLINE_CYCLE = <?php echo json_encode($taglineCycle, JSON_UNESCAPED_UNICODE); ?>;
         window.APP_CHANNEL_ID = <?php echo (int)($channel['id'] ?? 0); ?>;
         window.APP_T = {
             empty_cart: <?php echo json_encode(t('empty_cart'), JSON_UNESCAPED_UNICODE); ?>,

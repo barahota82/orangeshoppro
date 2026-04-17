@@ -364,12 +364,13 @@ function t(string $key): string {
 }
 
 /**
- * Taglines under brand name for the rotating header (fixed order: en → ar → fil → hi).
+ * Taglines under brand name for the rotating header (ثابتة؛ لا تتبع لغة الواجهة).
+ * الترتيب: عربي → إنجليزي → فلبيني → هندي.
  *
  * @return list<string>
  */
 function storefront_tagline_cycle_messages(): array {
-    $order = ['en', 'ar', 'fil', 'hi'];
+    $order = ['ar', 'en', 'fil', 'hi'];
     $tr = get_translations();
     $out = [];
     foreach ($order as $code) {

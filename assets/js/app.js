@@ -2,14 +2,13 @@ function formatMoney(v) {
     return Number(v).toFixed(2) + ' KD';
 }
 
-/** سلوجان الهيدر: تناوب بين en → ar → fil → hi */
+/** سلوجان الهيدر: تناوب ثابت بين اللغات الأربع (مستقل عن لغة الواجهة) */
 (function rotateStorefrontTagline() {
     const msgs = window.APP_TAGLINE_CYCLE;
     if (!Array.isArray(msgs) || msgs.length < 2) return;
     const el = document.getElementById('brandTaglineText');
     if (!el) return;
-    let i = typeof window.APP_TAGLINE_START === 'number' ? window.APP_TAGLINE_START : 0;
-    if (i < 0 || i >= msgs.length) i = 0;
+    let i = 0;
 
     function show(idx) {
         const t = msgs[idx];
