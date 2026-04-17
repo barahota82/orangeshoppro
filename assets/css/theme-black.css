@@ -1,32 +1,32 @@
 /**
- * Black channel — luxury dark with champagne gold accents.
+ * Black channel (رمادي داكن) — نفس لمسات الذهب/الشامبانيا بدون أسود صلب.
  */
 .theme-black {
     --primary: #d4a574;
     --primary-dark: #b8956a;
     --primary-soft: rgba(212, 165, 116, 0.2);
     --accent: #e8c9a8;
-    --bg: #0c0c0e;
-    --bg-soft: #141418;
+    --bg: #34343a;
+    --bg-soft: #3f3f46;
     --text: #f4f4f5;
-    --muted: #a1a1aa;
-    --card: #18181b;
-    --border: #27272a;
-    --header-bg: rgba(12, 12, 14, 0.88);
-    --hero-shadow: 0 28px 56px -12px rgba(0, 0, 0, 0.65);
-    --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 14px 32px -8px rgba(0, 0, 0, 0.55);
+    --muted: #b0b0b8;
+    --card: #4a4a52;
+    --border: #5a5a64;
+    --header-bg: rgba(52, 52, 58, 0.92);
+    --hero-shadow: 0 28px 56px -12px rgba(20, 20, 24, 0.45);
+    --card-shadow: 0 4px 6px -1px rgba(20, 20, 24, 0.28), 0 14px 32px -8px rgba(20, 20, 24, 0.38);
     --card-shadow-hover: 0 20px 48px -12px rgba(212, 165, 116, 0.15);
 }
 
 .theme-black .hero-banner {
     background: linear-gradient(
         125deg,
-        #09090b 0%,
-        #18181b 35%,
-        #27272a 65%,
-        #3f3f46 100%
+        #4f4f57 0%,
+        #3f3f46 32%,
+        #52525b 62%,
+        #63636e 100%
     );
-    border: 1px solid rgba(212, 165, 116, 0.2);
+    border: 1px solid rgba(212, 165, 116, 0.22);
 }
 
 .theme-black .hero-banner::after {
@@ -64,7 +64,7 @@
 }
 
 .theme-black .tab-btn.active {
-    color: #0c0c0e;
+    color: #2d2d32;
 }
 
 .theme-black .product-image-wrap {
@@ -78,7 +78,7 @@
 }
 
 .theme-black .chip.active {
-    color: #0c0c0e;
+    color: #2d2d32;
 }
 
 .theme-black .qty-control input {
@@ -114,7 +114,7 @@
 .theme-black .lang-dropdown__list {
     background: var(--card);
     border-color: var(--border);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 16px 40px rgba(20, 20, 24, 0.35);
 }
 
 .theme-black .lang-dropdown__option.is-active {
