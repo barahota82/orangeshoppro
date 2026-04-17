@@ -55,6 +55,7 @@ $sizingText = $sizingHintKey !== '' ? t($sizingHintKey) : '';
 $displayName = storefront_product_display_name($product);
 $displayDesc = storefront_product_display_description($product);
 $homeUrl = storefront_url('home', $channelSlug, $lang);
+$needsVariantPick = ((int)$product['has_colors'] === 1 || (int)$product['has_sizes'] === 1);
 
 foreach ($variants as $v) {
     if ($v['color'] !== '' && !in_array($v['color'], $colors, true)) {
@@ -90,6 +91,10 @@ foreach ($variants as $v) {
         <div class="product-info">
             <h2 class="product-info__title"><?php echo htmlspecialchars($displayName); ?></h2>
             <div class="price-row product-info__price"><strong><?php echo number_format((float)$product['price'], 2); ?> <?php echo htmlspecialchars(t('currency_kd'), ENT_QUOTES, 'UTF-8'); ?></strong></div>
+
+            <?php if ($totalStock > 0): ?>
+            <div id="productStockBanner" class="stock-banner" role="status" aria-live="polite" hidden></div>
+            <?php endif; ?>
 
             <?php if ($displayDesc !== ''): ?>
             <p class="product-desc product-info__desc"><?php echo nl2br(htmlspecialchars($displayDesc)); ?></p>
@@ -143,7 +148,7 @@ foreach ($variants as $v) {
             <?php endif; ?>
 
             <div class="actions-row product-info__actions">
-                <button type="button" class="btn" onclick="addCurrentProductToCart()" <?php echo $totalStock <= 0 ? 'disabled' : ''; ?>>
+                <button type="button" class="btn product-add-cart-btn" onclick="addCurrentProductToCart()" <?php echo ($totalStock <= 0 || $needsVariantPick) ? 'disabled' : ''; ?>>
                     <?php echo htmlspecialchars(t('add_to_cart')); ?>
                 </button>
             </div>
@@ -173,7 +178,9 @@ window.CURRENT_PRODUCT = {
     has_colors: <?php echo (int)$product['has_colors']; ?>,
     has_sizes: <?php echo (int)$product['has_sizes']; ?>,
     sizing_guide_scope: <?php echo json_encode($scope, JSON_UNESCAPED_UNICODE); ?>,
-    variants: <?php echo json_encode($variants, JSON_UNESCAPED_UNICODE); ?>
+    variants: <?php echo json_encode($variants, JSON_UNESCAPED_UNICODE); ?>,
+    total_stock_sum: <?php echo (int)$totalStock; ?>,
+    low_stock_threshold: 5
 };
 </script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

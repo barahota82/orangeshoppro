@@ -28,6 +28,9 @@ try {
     $orderNumber = generate_order_number();
     $total = 0.0;
 
+    /** @var array<int,int> */
+    $variantQtyAccumulated = [];
+
     $validatedItems = [];
     foreach ($data['items'] as $item) {
         require_fields($item, ['id', 'qty']);
@@ -68,9 +71,12 @@ try {
                 throw new RuntimeException('Variant not found for product: ' . $product['name']);
             }
 
-            if ((int)$variant['stock_quantity'] < $qty) {
+            $vId = (int)$variant['id'];
+            $alreadyRequested = $variantQtyAccumulated[$vId] ?? 0;
+            if ((int)$variant['stock_quantity'] < $alreadyRequested + $qty) {
                 throw new RuntimeException('Insufficient stock for product: ' . $product['name']);
             }
+            $variantQtyAccumulated[$vId] = $alreadyRequested + $qty;
         } else {
             $vStmt = $pdo->prepare(
                 'SELECT * FROM product_variants WHERE product_id = ? ORDER BY id ASC LIMIT 1 FOR UPDATE'
@@ -80,9 +86,12 @@ try {
             if (!$variant) {
                 throw new RuntimeException('Variant not found for product: ' . $product['name']);
             }
-            if ((int)$variant['stock_quantity'] < $qty) {
+            $vId = (int)$variant['id'];
+            $alreadyRequested = $variantQtyAccumulated[$vId] ?? 0;
+            if ((int)$variant['stock_quantity'] < $alreadyRequested + $qty) {
                 throw new RuntimeException('Insufficient stock for product: ' . $product['name']);
             }
+            $variantQtyAccumulated[$vId] = $alreadyRequested + $qty;
         }
 
         $price = (float)$product['price'];

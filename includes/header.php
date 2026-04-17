@@ -42,7 +42,11 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             order_number: <?php echo json_encode(t('order_number'), JSON_UNESCAPED_UNICODE); ?>,
             select_color: <?php echo json_encode(t('select_color'), JSON_UNESCAPED_UNICODE); ?>,
             select_size: <?php echo json_encode(t('select_size'), JSON_UNESCAPED_UNICODE); ?>,
-            added: <?php echo json_encode(t('added'), JSON_UNESCAPED_UNICODE); ?>
+            added: <?php echo json_encode(t('added'), JSON_UNESCAPED_UNICODE); ?>,
+            out_of_stock: <?php echo json_encode(t('out_of_stock'), JSON_UNESCAPED_UNICODE); ?>,
+            low_stock: <?php echo json_encode(t('low_stock'), JSON_UNESCAPED_UNICODE); ?>,
+            available_max_qty: <?php echo json_encode(t('available_max_qty'), JSON_UNESCAPED_UNICODE); ?>,
+            no_more_stock_for_cart: <?php echo json_encode(t('no_more_stock_for_cart'), JSON_UNESCAPED_UNICODE); ?>
         };
     </script>
 </head>

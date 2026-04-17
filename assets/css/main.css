@@ -1056,6 +1056,38 @@ body.storefront-browse-menu-lock {
     font-weight: 600;
 }
 
+.stock-banner {
+    margin-top: 12px;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.45;
+}
+
+.stock-banner[hidden] {
+    display: none !important;
+}
+
+.stock-banner--low {
+    background: color-mix(in srgb, #f59e0b 14%, var(--card));
+    color: #92400e;
+    border: 1px solid color-mix(in srgb, #f59e0b 28%, transparent);
+}
+
+.stock-banner--out {
+    background: color-mix(in srgb, #ef4444 12%, var(--card));
+    color: #991b1b;
+    border: 1px solid color-mix(in srgb, #ef4444 25%, transparent);
+}
+
+.stock-banner--cart {
+    background: color-mix(in srgb, var(--primary) 10%, var(--card));
+    color: var(--text);
+    border: 1px solid var(--border);
+    font-weight: 500;
+}
+
 .page-title-box h2 {
     margin: 0;
     font-size: 1.5rem;
