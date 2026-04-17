@@ -24,6 +24,16 @@ $categoryProductFilter = $storefront_show_all_active_categories
           )';
 
 $hasDepartmentsTable = (bool) $pdo->query("SHOW TABLES LIKE 'departments'")->fetchColumn();
+$departmentActiveFilter = '';
+if ($hasDepartmentsTable && !$storefront_show_all_active_categories) {
+    $departmentActiveFilter = '
+          AND (
+              c.department_id IS NULL
+              OR d.id IS NULL
+              OR d.is_active = 1
+          )';
+}
+
 if ($hasDepartmentsTable) {
     $categoriesStmt = $pdo->query(
         "
@@ -31,7 +41,7 @@ if ($hasDepartmentsTable) {
         FROM categories c
         LEFT JOIN departments d ON d.id = c.department_id
         WHERE c.is_active = 1
-          AND (c.department_id IS NULL OR d.is_active = 1)
+          " . $departmentActiveFilter . "
           " . $categoryProductFilter . "
         ORDER BY c.sort_order ASC, c.id ASC
     "

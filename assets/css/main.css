@@ -384,12 +384,15 @@ h1, h2, h3, .brand-text h1 {
     align-items: center;
     gap: 8px;
     margin-bottom: 22px;
+    width: 100%;
+    max-width: 100%;
 }
 
 .tabs-scroll {
     display: flex;
-    flex: 1;
+    flex: 1 1 0%;
     min-width: 0;
+    max-width: 100%;
     overflow-x: auto;
     gap: 10px;
     padding-bottom: 8px;
@@ -440,6 +443,7 @@ h1, h2, h3, .brand-text h1 {
 }
 
 .tab-btn {
+    flex-shrink: 0;
     border: 1px solid var(--border);
     background: var(--card);
     border-radius: var(--radius-pill);
@@ -1076,6 +1080,16 @@ h1, h2, h3, .brand-text h1 {
     body.storefront {
         overflow-x: hidden;
         padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* تمرير أفقي لشريط الأقسام بالإصبع (لا يُقطع بسبب overflow-x على body) */
+    body.storefront .tabs-section {
+        position: relative;
+        z-index: 1;
+    }
+
+    body.storefront .tabs-scroll {
+        transform: translateZ(0);
     }
 }
 
