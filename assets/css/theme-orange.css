@@ -1,34 +1,36 @@
 /**
- * Orange channel — warm premium palette (amber, coral, cream).
+ * Orange channel — كهرمان دافئ، تدرج ناري ناعم، بريق كريمي.
  */
 .theme-orange {
     --primary: #ea580c;
     --primary-dark: #c2410c;
-    --primary-soft: rgba(234, 88, 12, 0.18);
-    --accent: #f97316;
-    --bg: #fffbf7;
-    --bg-soft: #fff1e6;
+    --primary-soft: rgba(234, 88, 12, 0.2);
+    --accent: #fb923c;
+    --bg: #fff9f4;
+    --bg-soft: #ffeedd;
     --text: #1c1917;
-    --muted: #78716c;
+    --muted: #6b645c;
     --card: #ffffff;
-    --border: #fed7aa;
-    --header-bg: rgba(255, 251, 247, 0.9);
-    --hero-shadow: 0 28px 56px -16px rgba(234, 88, 12, 0.35);
-    --card-shadow: 0 4px 6px -1px rgba(28, 25, 23, 0.05), 0 14px 28px -10px rgba(234, 88, 12, 0.12);
-    --card-shadow-hover: 0 16px 40px -12px rgba(234, 88, 12, 0.22);
+    --border: #ffd7b5;
+    --header-bg: rgba(255, 249, 244, 0.92);
+    --hero-shadow: 0 32px 64px -20px rgba(194, 65, 12, 0.38), 0 12px 24px -12px rgba(234, 88, 12, 0.18);
+    --card-shadow: 0 2px 8px -2px rgba(28, 25, 23, 0.06), 0 16px 32px -14px rgba(234, 88, 12, 0.1);
+    --card-shadow-hover: 0 20px 48px -16px rgba(234, 88, 12, 0.28), 0 8px 16px -8px rgba(194, 65, 12, 0.12);
 }
 
 .theme-orange .hero-banner {
     background: linear-gradient(
-        125deg,
-        #ea580c 0%,
-        #f97316 38%,
-        #fb923c 70%,
+        128deg,
+        #9a3412 0%,
+        #c2410c 22%,
+        #ea580c 48%,
+        #f97316 72%,
         #fdba74 100%
     );
 }
 
 .theme-orange .hero-banner::after {
-    background: radial-gradient(ellipse 90% 70% at 100% 0%, rgba(255, 255, 255, 0.22), transparent 50%),
-        radial-gradient(ellipse 60% 50% at 0% 100%, rgba(254, 243, 199, 0.35), transparent 45%);
+    background: radial-gradient(ellipse 95% 75% at 92% 8%, rgba(255, 255, 255, 0.28), transparent 52%),
+        radial-gradient(ellipse 70% 55% at 8% 92%, rgba(254, 243, 199, 0.45), transparent 48%),
+        radial-gradient(ellipse 50% 40% at 50% 50%, rgba(255, 255, 255, 0.06), transparent 70%);
 }

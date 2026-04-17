@@ -1,34 +1,36 @@
 /**
- * Blue channel — deep sapphire with ice & cyan highlights.
+ * Blue channel — ياقوت عميق، جليدي، توهج سماوي.
  */
 .theme-blue {
-    --primary: #1d4ed8;
-    --primary-dark: #1e40af;
-    --primary-soft: rgba(29, 78, 216, 0.16);
-    --accent: #0ea5e9;
-    --bg: #f0f7ff;
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --primary-soft: rgba(37, 99, 235, 0.2);
+    --accent: #22d3ee;
+    --bg: #f4f9ff;
     --bg-soft: #e0f2fe;
     --text: #0f172a;
-    --muted: #64748b;
+    --muted: #5c6b82;
     --card: #ffffff;
-    --border: #bfdbfe;
-    --header-bg: rgba(240, 247, 255, 0.9);
-    --hero-shadow: 0 28px 56px -16px rgba(29, 78, 216, 0.32);
-    --card-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 14px 28px -10px rgba(29, 78, 216, 0.14);
-    --card-shadow-hover: 0 16px 40px -12px rgba(29, 78, 216, 0.2);
+    --border: #b8d4f8;
+    --header-bg: rgba(244, 249, 255, 0.92);
+    --hero-shadow: 0 32px 64px -20px rgba(30, 64, 175, 0.38), 0 12px 24px -12px rgba(37, 99, 235, 0.2);
+    --card-shadow: 0 2px 8px -2px rgba(15, 23, 42, 0.07), 0 16px 32px -14px rgba(37, 99, 235, 0.12);
+    --card-shadow-hover: 0 20px 48px -16px rgba(37, 99, 235, 0.28), 0 8px 16px -8px rgba(14, 165, 233, 0.15);
 }
 
 .theme-blue .hero-banner {
     background: linear-gradient(
-        125deg,
-        #1e3a8a 0%,
-        #1d4ed8 42%,
-        #2563eb 72%,
-        #38bdf8 100%
+        128deg,
+        #172554 0%,
+        #1e40af 24%,
+        #2563eb 48%,
+        #0ea5e9 74%,
+        #67e8f9 100%
     );
 }
 
 .theme-blue .hero-banner::after {
-    background: radial-gradient(ellipse 85% 65% at 100% 0%, rgba(255, 255, 255, 0.2), transparent 52%),
-        radial-gradient(ellipse 55% 45% at 0% 100%, rgba(56, 189, 248, 0.35), transparent 48%);
+    background: radial-gradient(ellipse 95% 72% at 90% 10%, rgba(255, 255, 255, 0.26), transparent 52%),
+        radial-gradient(ellipse 65% 50% at 10% 88%, rgba(103, 232, 249, 0.4), transparent 50%),
+        radial-gradient(ellipse 45% 35% at 55% 45%, rgba(255, 255, 255, 0.08), transparent 65%);
 }

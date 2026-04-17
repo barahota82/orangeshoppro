@@ -1,123 +1,36 @@
 /**
- * Black channel (رمادي داكن) — نفس لمسات الذهب/الشامبانيا بدون أسود صلب.
+ * Black channel — شامبانيا فاخرة، رمادي دافئ، ذهب نحاسي متوهج.
  */
 .theme-black {
-    --primary: #d4a574;
-    --primary-dark: #b8956a;
-    --primary-soft: rgba(212, 165, 116, 0.2);
-    --accent: #e8c9a8;
-    --bg: #34343a;
-    --bg-soft: #3f3f46;
-    --text: #f4f4f5;
-    --muted: #b0b0b8;
-    --card: #4a4a52;
-    --border: #5a5a64;
-    --header-bg: rgba(52, 52, 58, 0.92);
-    --hero-shadow: 0 28px 56px -12px rgba(20, 20, 24, 0.45);
-    --card-shadow: 0 4px 6px -1px rgba(20, 20, 24, 0.28), 0 14px 32px -8px rgba(20, 20, 24, 0.38);
-    --card-shadow-hover: 0 20px 48px -12px rgba(212, 165, 116, 0.15);
+    --primary: #c9a227;
+    --primary-dark: #9a7b2c;
+    --primary-soft: rgba(201, 162, 39, 0.22);
+    --accent: #e8d48a;
+    --bg: #f7f5f1;
+    --bg-soft: #ebe6de;
+    --text: #1c1917;
+    --muted: #65605a;
+    --card: #ffffff;
+    --border: #e5dccf;
+    --header-bg: rgba(247, 245, 241, 0.92);
+    --hero-shadow: 0 32px 64px -20px rgba(74, 58, 32, 0.35), 0 12px 24px -12px rgba(201, 162, 39, 0.2);
+    --card-shadow: 0 2px 8px -2px rgba(28, 25, 23, 0.06), 0 16px 32px -14px rgba(154, 123, 44, 0.1);
+    --card-shadow-hover: 0 20px 48px -16px rgba(201, 162, 39, 0.26), 0 8px 16px -8px rgba(74, 58, 32, 0.1);
 }
 
 .theme-black .hero-banner {
     background: linear-gradient(
-        125deg,
-        #4f4f57 0%,
-        #3f3f46 32%,
-        #52525b 62%,
-        #63636e 100%
+        128deg,
+        #4a3d28 0%,
+        #6b5230 20%,
+        #8f6f2d 42%,
+        #b8922a 66%,
+        #d4b04a 100%
     );
-    border: 1px solid rgba(212, 165, 116, 0.22);
 }
 
 .theme-black .hero-banner::after {
-    background: radial-gradient(ellipse 80% 60% at 100% 0%, rgba(212, 165, 116, 0.12), transparent 55%),
-        radial-gradient(ellipse 50% 40% at 0% 100%, rgba(228, 201, 168, 0.08), transparent 50%);
-}
-
-.theme-black .logo {
-    border-color: var(--border);
-    box-shadow: 0 0 0 1px rgba(212, 165, 116, 0.15);
-}
-
-.theme-black .lang-switch a,
-.theme-black .icon-btn {
-    background: var(--card);
-    border-color: var(--border);
-    color: var(--text);
-}
-
-.theme-black .lang-switch a:hover,
-.theme-black .icon-btn:hover {
-    border-color: var(--primary);
-    color: var(--primary);
-}
-
-.theme-black .tab-btn {
-    background: var(--card);
-    border-color: var(--border);
-    color: var(--text);
-}
-
-.theme-black .tab-btn:hover {
-    border-color: var(--primary);
-    color: var(--primary);
-}
-
-.theme-black .tab-btn.active {
-    color: #2d2d32;
-}
-
-.theme-black .product-image-wrap {
-    background: var(--bg-soft);
-}
-
-.theme-black .chip {
-    background: var(--card);
-    border-color: var(--border);
-    color: var(--text);
-}
-
-.theme-black .chip.active {
-    color: #2d2d32;
-}
-
-.theme-black .qty-control input {
-    background: var(--card);
-    border-color: var(--border);
-    color: var(--text);
-}
-
-.theme-black .field input,
-.theme-black .field textarea {
-    background: var(--card);
-    border-color: var(--border);
-    color: var(--text);
-}
-
-.theme-black .btn-secondary {
-    background: var(--bg-soft);
-    border-color: var(--border);
-    color: var(--text);
-}
-
-.theme-black .stock-out {
-    background: rgba(127, 29, 29, 0.35);
-    color: #fecaca;
-    border-color: rgba(248, 113, 113, 0.25);
-}
-
-.theme-black .app-bottom-dock {
-    background: var(--header-bg);
-    border-top-color: var(--border);
-}
-
-.theme-black .lang-dropdown__list {
-    background: var(--card);
-    border-color: var(--border);
-    box-shadow: 0 16px 40px rgba(20, 20, 24, 0.35);
-}
-
-.theme-black .lang-dropdown__option.is-active {
-    background: rgba(212, 165, 116, 0.12);
-    color: var(--primary);
+    background: radial-gradient(ellipse 95% 75% at 92% 8%, rgba(255, 255, 255, 0.24), transparent 52%),
+        radial-gradient(ellipse 70% 52% at 8% 90%, rgba(232, 212, 138, 0.38), transparent 48%),
+        radial-gradient(ellipse 48% 38% at 48% 48%, rgba(255, 255, 255, 0.07), transparent 68%);
 }
