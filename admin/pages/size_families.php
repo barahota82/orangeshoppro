@@ -86,32 +86,6 @@ $tablesReady = $hasFamilies && $hasSizes;
 </div>
 
 <div class="card">
-    <h3>مرجع طول القدم للأحذية (تقريبي — سم)</h3>
-    <p style="margin:0 0 12px;color:#666;font-size:14px;">للمساعدة عند تعبئة «طول القدم (سم)» في مقاسات عائلات الأحذية. القيم إرشادية؛ اضبطها حسب موديلاتك وعلامتك.</p>
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>مقاس أوروبي (مثال)</th>
-                    <th>طول القدم تقريبي (سم)</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php
-                $shoeRef = [
-                    ['35', '22.5'], ['36', '23.0'], ['37', '23.5'], ['38', '24.0'], ['39', '24.5'],
-                    ['40', '25.0'], ['41', '25.5'], ['42', '26.0'], ['43', '26.5'], ['44', '27.0'], ['45', '27.5'], ['46', '28.0'],
-                ];
-                foreach ($shoeRef as $row) {
-                    echo '<tr><td>EU ' . htmlspecialchars($row[0], ENT_QUOTES, 'UTF-8') . '</td><td>' . htmlspecialchars($row[1], ENT_QUOTES, 'UTF-8') . '</td></tr>';
-                }
-                ?>
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<div class="card">
     <h3>مقاسات داخل العائلة</h3>
     <div class="form-grid">
         <div style="grid-column:1/-1;">
