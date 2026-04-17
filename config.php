@@ -500,6 +500,9 @@ function get_translations(): array {
             'storefront_menu_whole_department' => 'Entire department',
             'storefront_menu_whole_category' => 'Entire category',
             'storefront_menu_other_categories' => 'Other categories',
+            'cart_tab_basket' => 'Cart',
+            'cart_tab_my_orders' => 'My orders',
+            'my_orders_intro' => 'Enter your order number and phone (same as when you placed the order).',
         ],
         'ar' => [
             'home' => 'الرئيسية',
@@ -557,6 +560,9 @@ function get_translations(): array {
             'storefront_menu_whole_department' => 'القسم بالكامل',
             'storefront_menu_whole_category' => 'الفئة بالكامل',
             'storefront_menu_other_categories' => 'فئات أخرى',
+            'cart_tab_basket' => 'العربة',
+            'cart_tab_my_orders' => 'طلباتي',
+            'my_orders_intro' => 'أدخل رقم الطلب ورقم الهاتف اللي استخدمتهم عند تأكيد الطلب.',
         ],
         'fil' => [
             'home' => 'Home',
@@ -614,6 +620,9 @@ function get_translations(): array {
             'storefront_menu_whole_department' => 'Buong department',
             'storefront_menu_whole_category' => 'Buong kategorya',
             'storefront_menu_other_categories' => 'Iba pang kategorya',
+            'cart_tab_basket' => 'Cart',
+            'cart_tab_my_orders' => 'Mga order ko',
+            'my_orders_intro' => 'Ilagay ang order number at telepono na ginamit mo nung nag-order.',
         ],
         'hi' => [
             'home' => 'होम',
@@ -671,6 +680,9 @@ function get_translations(): array {
             'storefront_menu_whole_department' => 'पूरा विभाग',
             'storefront_menu_whole_category' => 'पूरी श्रेणी',
             'storefront_menu_other_categories' => 'अन्य श्रेणियाँ',
+            'cart_tab_basket' => 'कार्ट',
+            'cart_tab_my_orders' => 'मेरे ऑर्डर',
+            'my_orders_intro' => 'ऑर्डर नंबर और वह फ़ोन दर्ज करें जो ऑर्डर करते समय दिया था।',
         ],
     ];
 }
