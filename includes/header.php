@@ -1,15 +1,86 @@
 <?php
 
-function input() {
-    return json_decode(file_get_contents("php://input"), true);
+declare(strict_types=1);
+
+/**
+ * Storefront HTML header (home, product, cart, track).
+ * Requires config.php already loaded by the page.
+ */
+if (!function_exists('current_lang')) {
+    require_once __DIR__ . '/../config.php';
 }
 
-function success($data=[]) {
-    echo json_encode(['success'=>true,'data'=>$data]);
-    exit;
+$lang = current_lang();
+$slug = current_channel_slug();
+$channel = get_channel_by_slug($slug);
+if (!$channel) {
+    $channel = [
+        'id' => 0,
+        'name' => 'Orange',
+        'slug' => $slug !== '' ? $slug : 'orange',
+        'logo' => 'logo-orange.png',
+    ];
 }
 
-function error($msg) {
-    echo json_encode(['success'=>false,'message'=>$msg]);
-    exit;
+$theme = preg_replace('/[^a-z0-9\-]/i', '', (string)($channel['slug'] ?? 'orange'));
+if ($theme === '' || !is_file(__DIR__ . '/../assets/css/theme-' . $theme . '.css')) {
+    $theme = 'orange';
 }
+
+$dir = $lang === 'ar' ? 'rtl' : 'ltr';
+$channelSlug = (string)($channel['slug']);
+$pageKind = storefront_current_page_kind();
+$storefrontExtra = [];
+if ($pageKind === 'product' && isset($_GET['id'])) {
+    $storefrontExtra['id'] = (int)$_GET['id'];
+}
+
+?><!DOCTYPE html>
+<html lang="<?php echo htmlspecialchars($lang, ENT_QUOTES, 'UTF-8'); ?>" dir="<?php echo $dir === 'rtl' ? 'rtl' : 'ltr'; ?>">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><?php echo htmlspecialchars((string)($channel['name'] ?? 'Store'), ENT_QUOTES, 'UTF-8'); ?></title>
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <link rel="stylesheet" href="/assets/css/theme-<?php echo htmlspecialchars($theme, ENT_QUOTES, 'UTF-8'); ?>.css">
+    <script>
+        window.APP_LANG = <?php echo json_encode($lang, JSON_UNESCAPED_UNICODE); ?>;
+        window.APP_CHANNEL_ID = <?php echo (int)($channel['id'] ?? 0); ?>;
+        window.APP_T = {
+            empty_cart: <?php echo json_encode(t('empty_cart'), JSON_UNESCAPED_UNICODE); ?>,
+            color: <?php echo json_encode(t('color'), JSON_UNESCAPED_UNICODE); ?>,
+            size: <?php echo json_encode(t('size'), JSON_UNESCAPED_UNICODE); ?>,
+            quantity: <?php echo json_encode(t('quantity'), JSON_UNESCAPED_UNICODE); ?>,
+            order_number: <?php echo json_encode(t('order_number'), JSON_UNESCAPED_UNICODE); ?>,
+            select_color: <?php echo json_encode(t('select_color'), JSON_UNESCAPED_UNICODE); ?>,
+            select_size: <?php echo json_encode(t('select_size'), JSON_UNESCAPED_UNICODE); ?>,
+            added: <?php echo json_encode(t('added'), JSON_UNESCAPED_UNICODE); ?>
+        };
+    </script>
+</head>
+<body class="theme-<?php echo htmlspecialchars($theme, ENT_QUOTES, 'UTF-8'); ?>">
+<header class="site-header">
+    <div class="container header-inner">
+        <a href="<?php echo htmlspecialchars(storefront_url('home', $channelSlug, $lang), ENT_QUOTES, 'UTF-8'); ?>" class="brand-wrap" style="text-decoration:none;color:inherit;">
+            <img class="logo" src="/assets/images/<?php echo htmlspecialchars((string)($channel['logo'] ?? 'logo-orange.png'), ENT_QUOTES, 'UTF-8'); ?>" alt="">
+            <div class="brand-text">
+                <h1><?php echo htmlspecialchars((string)($channel['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></h1>
+                <small><?php echo htmlspecialchars(t('home'), ENT_QUOTES, 'UTF-8'); ?></small>
+            </div>
+        </a>
+        <div class="header-actions">
+            <nav class="lang-switch" aria-label="<?php echo htmlspecialchars(t('language'), ENT_QUOTES, 'UTF-8'); ?>">
+                <?php
+                $labels = ['ar' => 'ع', 'en' => 'EN', 'fil' => 'FIL', 'hi' => 'HI'];
+                foreach ($labels as $lc => $lab) {
+                    $href = storefront_url($pageKind, $channelSlug, $lc, $storefrontExtra);
+                    ?>
+                <a href="<?php echo htmlspecialchars($href, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($lab, ENT_QUOTES, 'UTF-8'); ?></a>
+                <?php } ?>
+            </nav>
+            <a class="icon-btn" href="<?php echo htmlspecialchars(storefront_url('cart', $channelSlug, $lang), ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(t('cart'), ENT_QUOTES, 'UTF-8'); ?></a>
+            <a class="icon-btn" href="<?php echo htmlspecialchars(storefront_url('track', $channelSlug, $lang), ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(t('track_order'), ENT_QUOTES, 'UTF-8'); ?></a>
+        </div>
+    </div>
+</header>
+<main class="site-main">

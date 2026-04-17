@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Safe template for GitHub: URL Rewrite rules only (no host paths).
+
+  On IIS/Plesk:
+  1) Copy this file to web.config in the site root (or merge the <rewrite> block
+     into your existing web.config under <system.webServer>).
+  2) Keep Plesk httpErrors / tracing / system.web on the server — do not commit
+     paths like C:\Inetpub\vhosts\...
+
+  Requires: IIS URL Rewrite module.
+-->
+<configuration>
+  <system.webServer>
+    <rewrite>
+      <rules>
+        <!-- product: /web/product/123 → pages/product.php?id=123&channel=black&lang=en -->
+        <rule name="StoreWebProductEN" stopProcessing="true">
+          <match url="^web/product/([0-9]+)$" />
+          <action type="Rewrite" url="pages/product.php?id={R:1}&amp;channel=black&amp;lang=en" />
+        </rule>
+        <rule name="StoreOnlineProductEN" stopProcessing="true">
+          <match url="^online/product/([0-9]+)$" />
+          <action type="Rewrite" url="pages/product.php?id={R:1}&amp;channel=blue&amp;lang=en" />
+        </rule>
+        <rule name="StoreTiktokProductEN" stopProcessing="true">
+          <match url="^tiktok/product/([0-9]+)$" />
+          <action type="Rewrite" url="pages/product.php?id={R:1}&amp;channel=orange&amp;lang=en" />
+        </rule>
+        <rule name="StoreWebProductAR" stopProcessing="true">
+          <match url="^web-ar/product/([0-9]+)$" />
+          <action type="Rewrite" url="pages/product.php?id={R:1}&amp;channel=black&amp;lang=ar" />
+        </rule>
+        <rule name="StoreOnlineProductAR" stopProcessing="true">
+          <match url="^online-ar/product/([0-9]+)$" />
+          <action type="Rewrite" url="pages/product.php?id={R:1}&amp;channel=blue&amp;lang=ar" />
+        </rule>
+        <rule name="StoreTiktokProductAR" stopProcessing="true">
+          <match url="^tiktok-ar/product/([0-9]+)$" />
+          <action type="Rewrite" url="pages/product.php?id={R:1}&amp;channel=orange&amp;lang=ar" />
+        </rule>
+        <rule name="StoreWebProductHI" stopProcessing="true">
+          <match url="^web-hi/product/([0-9]+)$" />
+          <action type="Rewrite" url="pages/product.php?id={R:1}&amp;channel=black&amp;lang=hi" />
+        </rule>
+        <rule name="StoreOnlineProductHI" stopProcessing="true">
+          <match url="^online-hi/product/([0-9]+)$" />
+          <action type="Rewrite" url="pages/product.php?id={R:1}&amp;channel=blue&amp;lang=hi" />
+        </rule>
+        <rule name="StoreTiktokProductHI" stopProcessing="true">
+          <match url="^tiktok-hi/product/([0-9]+)$" />
+          <action type="Rewrite" url="pages/product.php?id={R:1}&amp;channel=orange&amp;lang=hi" />
+        </rule>
+        <rule name="StoreWebProductPH" stopProcessing="true">
+          <match url="^web-ph/product/([0-9]+)$" />
+          <action type="Rewrite" url="pages/product.php?id={R:1}&amp;channel=black&amp;lang=fil" />
+        </rule>
+        <rule name="StoreOnlineProductPH" stopProcessing="true">
+          <match url="^online-ph/product/([0-9]+)$" />
+          <action type="Rewrite" url="pages/product.php?id={R:1}&amp;channel=blue&amp;lang=fil" />
+        </rule>
+        <rule name="StoreTiktokProductPH" stopProcessing="true">
+          <match url="^tiktok-ph/product/([0-9]+)$" />
+          <action type="Rewrite" url="pages/product.php?id={R:1}&amp;channel=orange&amp;lang=fil" />
+        </rule>
+
+        <!-- cart -->
+        <rule name="StoreWebCartEN" stopProcessing="true">
+          <match url="^web/cart$" />
+          <action type="Rewrite" url="pages/cart.php?channel=black&amp;lang=en" />
+        </rule>
+        <rule name="StoreOnlineCartEN" stopProcessing="true">
+          <match url="^online/cart$" />
+          <action type="Rewrite" url="pages/cart.php?channel=blue&amp;lang=en" />
+        </rule>
+        <rule name="StoreTiktokCartEN" stopProcessing="true">
+          <match url="^tiktok/cart$" />
+          <action type="Rewrite" url="pages/cart.php?channel=orange&amp;lang=en" />
+        </rule>
+        <rule name="StoreWebCartAR" stopProcessing="true">
+          <match url="^web-ar/cart$" />
+          <action type="Rewrite" url="pages/cart.php?channel=black&amp;lang=ar" />
+        </rule>
+        <rule name="StoreOnlineCartAR" stopProcessing="true">
+          <match url="^online-ar/cart$" />
+          <action type="Rewrite" url="pages/cart.php?channel=blue&amp;lang=ar" />
+        </rule>
+        <rule name="StoreTiktokCartAR" stopProcessing="true">
+          <match url="^tiktok-ar/cart$" />
+          <action type="Rewrite" url="pages/cart.php?channel=orange&amp;lang=ar" />
+        </rule>
+        <rule name="StoreWebCartHI" stopProcessing="true">
+          <match url="^web-hi/cart$" />
+          <action type="Rewrite" url="pages/cart.php?channel=black&amp;lang=hi" />
+        </rule>
+        <rule name="StoreOnlineCartHI" stopProcessing="true">
+          <match url="^online-hi/cart$" />
+          <action type="Rewrite" url="pages/cart.php?channel=blue&amp;lang=hi" />
+        </rule>
+        <rule name="StoreTiktokCartHI" stopProcessing="true">
+          <match url="^tiktok-hi/cart$" />
+          <action type="Rewrite" url="pages/cart.php?channel=orange&amp;lang=hi" />
+        </rule>
+        <rule name="StoreWebCartPH" stopProcessing="true">
+          <match url="^web-ph/cart$" />
+          <action type="Rewrite" url="pages/cart.php?channel=black&amp;lang=fil" />
+        </rule>
+        <rule name="StoreOnlineCartPH" stopProcessing="true">
+          <match url="^online-ph/cart$" />
+          <action type="Rewrite" url="pages/cart.php?channel=blue&amp;lang=fil" />
+        </rule>
+        <rule name="StoreTiktokCartPH" stopProcessing="true">
+          <match url="^tiktok-ph/cart$" />
+          <action type="Rewrite" url="pages/cart.php?channel=orange&amp;lang=fil" />
+        </rule>
+
+        <!-- track -->
+        <rule name="StoreWebTrackEN" stopProcessing="true">
+          <match url="^web/track$" />
+          <action type="Rewrite" url="pages/track.php?channel=black&amp;lang=en" />
+        </rule>
+        <rule name="StoreOnlineTrackEN" stopProcessing="true">
+          <match url="^online/track$" />
+          <action type="Rewrite" url="pages/track.php?channel=blue&amp;lang=en" />
+        </rule>
+        <rule name="StoreTiktokTrackEN" stopProcessing="true">
+          <match url="^tiktok/track$" />
+          <action type="Rewrite" url="pages/track.php?channel=orange&amp;lang=en" />
+        </rule>
+        <rule name="StoreWebTrackAR" stopProcessing="true">
+          <match url="^web-ar/track$" />
+          <action type="Rewrite" url="pages/track.php?channel=black&amp;lang=ar" />
+        </rule>
+        <rule name="StoreOnlineTrackAR" stopProcessing="true">
+          <match url="^online-ar/track$" />
+          <action type="Rewrite" url="pages/track.php?channel=blue&amp;lang=ar" />
+        </rule>
+        <rule name="StoreTiktokTrackAR" stopProcessing="true">
+          <match url="^tiktok-ar/track$" />
+          <action type="Rewrite" url="pages/track.php?channel=orange&amp;lang=ar" />
+        </rule>
+        <rule name="StoreWebTrackHI" stopProcessing="true">
+          <match url="^web-hi/track$" />
+          <action type="Rewrite" url="pages/track.php?channel=black&amp;lang=hi" />
+        </rule>
+        <rule name="StoreOnlineTrackHI" stopProcessing="true">
+          <match url="^online-hi/track$" />
+          <action type="Rewrite" url="pages/track.php?channel=blue&amp;lang=hi" />
+        </rule>
+        <rule name="StoreTiktokTrackHI" stopProcessing="true">
+          <match url="^tiktok-hi/track$" />
+          <action type="Rewrite" url="pages/track.php?channel=orange&amp;lang=hi" />
+        </rule>
+        <rule name="StoreWebTrackPH" stopProcessing="true">
+          <match url="^web-ph/track$" />
+          <action type="Rewrite" url="pages/track.php?channel=black&amp;lang=fil" />
+        </rule>
+        <rule name="StoreOnlineTrackPH" stopProcessing="true">
+          <match url="^online-ph/track$" />
+          <action type="Rewrite" url="pages/track.php?channel=blue&amp;lang=fil" />
+        </rule>
+        <rule name="StoreTiktokTrackPH" stopProcessing="true">
+          <match url="^tiktok-ph/track$" />
+          <action type="Rewrite" url="pages/track.php?channel=orange&amp;lang=fil" />
+        </rule>
+
+        <!-- home (short entry URLs) -->
+        <rule name="WebEN" stopProcessing="true">
+          <match url="^web$" />
+          <action type="Rewrite" url="pages/home.php?channel=black&amp;lang=en" />
+        </rule>
+        <rule name="OnlineEN" stopProcessing="true">
+          <match url="^online$" />
+          <action type="Rewrite" url="pages/home.php?channel=blue&amp;lang=en" />
+        </rule>
+        <rule name="TiktokEN" stopProcessing="true">
+          <match url="^tiktok$" />
+          <action type="Rewrite" url="pages/home.php?channel=orange&amp;lang=en" />
+        </rule>
+        <rule name="WebAR" stopProcessing="true">
+          <match url="^web-ar$" />
+          <action type="Rewrite" url="pages/home.php?channel=black&amp;lang=ar" />
+        </rule>
+        <rule name="OnlineAR" stopProcessing="true">
+          <match url="^online-ar$" />
+          <action type="Rewrite" url="pages/home.php?channel=blue&amp;lang=ar" />
+        </rule>
+        <rule name="TiktokAR" stopProcessing="true">
+          <match url="^tiktok-ar$" />
+          <action type="Rewrite" url="pages/home.php?channel=orange&amp;lang=ar" />
+        </rule>
+        <rule name="WebHI" stopProcessing="true">
+          <match url="^web-hi$" />
+          <action type="Rewrite" url="pages/home.php?channel=black&amp;lang=hi" />
+        </rule>
+        <rule name="OnlineHI" stopProcessing="true">
+          <match url="^online-hi$" />
+          <action type="Rewrite" url="pages/home.php?channel=blue&amp;lang=hi" />
+        </rule>
+        <rule name="TiktokHI" stopProcessing="true">
+          <match url="^tiktok-hi$" />
+          <action type="Rewrite" url="pages/home.php?channel=orange&amp;lang=hi" />
+        </rule>
+        <rule name="WebPH" stopProcessing="true">
+          <match url="^web-ph$" />
+          <action type="Rewrite" url="pages/home.php?channel=black&amp;lang=fil" />
+        </rule>
+        <rule name="OnlinePH" stopProcessing="true">
+          <match url="^online-ph$" />
+          <action type="Rewrite" url="pages/home.php?channel=blue&amp;lang=fil" />
+        </rule>
+        <rule name="TiktokPH" stopProcessing="true">
+          <match url="^tiktok-ph$" />
+          <action type="Rewrite" url="pages/home.php?channel=orange&amp;lang=fil" />
+        </rule>
+      </rules>
+    </rewrite>
+  </system.webServer>
+</configuration>

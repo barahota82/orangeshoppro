@@ -1,1 +1,4 @@
 .env.php
+
+# IIS: keep real web.config (Plesk paths, httpErrors) on the server only — not in GitHub
+web.config

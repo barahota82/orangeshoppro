@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/catalog_labels.php';
+require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
 require_admin_api();
 
 /**
@@ -65,10 +66,11 @@ try {
     }
 
     $nameAr = trim((string)$data['name']);
-    $dupProd = $pdo->prepare('SELECT id FROM products WHERE category_id = ? AND name = ? LIMIT 1');
-    $dupProd->execute([(int)$data['category_id'], $nameAr]);
-    if ($dupProd->fetch()) {
-        json_response(['success' => false, 'message' => 'منتج بنفس الاسم العربي موجود في هذه الفئة'], 409);
+    $prodStmt = $pdo->prepare('SELECT id, name FROM products WHERE category_id = ?');
+    $prodStmt->execute([(int)$data['category_id']]);
+    $prodRows = $prodStmt->fetchAll(PDO::FETCH_ASSOC);
+    if (orange_rows_normalized_arabic_conflict(is_array($prodRows) ? $prodRows : [], 'id', 'name', $nameAr, null)) {
+        json_response(['success' => false, 'message' => orange_arabic_duplicate_blocked_message()], 409);
     }
 
     $hasSizes = (int)($data['has_sizes'] ?? 0) === 1;

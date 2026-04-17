@@ -77,7 +77,7 @@ $offers = $offersStmt->fetchAll();
                         <strong><?php echo number_format((float)$p['price'] - (float)$p['discount'], 2); ?> KD</strong>
                         <span class="old-price"><?php echo number_format((float)$p['price'], 2); ?> KD</span>
                     </div>
-                    <a class="btn" href="/pages/product.php?id=<?php echo (int)$p['id']; ?>&channel=<?php echo urlencode($channel['slug']); ?>&lang=<?php echo urlencode($lang); ?>">
+                    <a class="btn" href="<?php echo htmlspecialchars(storefront_url('product', (string)$channel['slug'], $lang, ['id' => (int)$p['id']])); ?>">
                         <?php echo htmlspecialchars(t('view_product')); ?>
                     </a>
                 </div>
@@ -94,7 +94,7 @@ $offers = $offersStmt->fetchAll();
                     <div class="price-row">
                         <strong><?php echo number_format((float)$p['price'], 2); ?> KD</strong>
                     </div>
-                    <a class="btn" href="/pages/product.php?id=<?php echo (int)$p['id']; ?>&channel=<?php echo urlencode($channel['slug']); ?>&lang=<?php echo urlencode($lang); ?>">
+                    <a class="btn" href="<?php echo htmlspecialchars(storefront_url('product', (string)$channel['slug'], $lang, ['id' => (int)$p['id']])); ?>">
                         <?php echo htmlspecialchars(t('view_product')); ?>
                     </a>
                 </div>

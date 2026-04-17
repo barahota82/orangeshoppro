@@ -1,5 +1,6 @@
 ﻿<?php
 require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
 require_admin_api();
 
 try {
@@ -43,9 +44,10 @@ try {
         json_response(['success' => false, 'message' => 'E_SLUG'], 422);
     }
 
-    $dup = $pdo->prepare("SELECT id FROM categories WHERE name_ar = ? AND department_id = ? LIMIT 1");
-    $dup->execute([$nameAr, $depId]);
-    if ($dup->fetch()) {
+    $catStmt = $pdo->prepare('SELECT id, name_ar FROM categories WHERE department_id = ?');
+    $catStmt->execute([$depId]);
+    $catRows = $catStmt->fetchAll(PDO::FETCH_ASSOC);
+    if (orange_rows_normalized_arabic_conflict(is_array($catRows) ? $catRows : [], 'id', 'name_ar', $nameAr, null)) {
         json_response(['success' => false, 'message' => 'E_DUP'], 409);
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
 require_admin_api();
 
 try {
@@ -36,11 +37,20 @@ try {
         if ($la === '') {
             continue;
         }
-        if (isset($arSeenInPayload[$la])) {
-            json_response(['success' => false, 'message' => 'اسم المقاس بالعربي مكرر في نفس القائمة'], 422);
+        $normKey = orange_normalize_arabic_name($la);
+        if ($normKey === '') {
+            continue;
         }
-        $arSeenInPayload[$la] = true;
+        if (isset($arSeenInPayload[$normKey])) {
+            json_response(['success' => false, 'message' => orange_arabic_duplicate_blocked_message()], 422);
+        }
+        $arSeenInPayload[$normKey] = true;
     }
+
+    $existingStmt = $pdo->prepare('SELECT id, label_ar FROM size_family_sizes WHERE size_family_id = ?');
+    $existingStmt->execute([$familyId]);
+    $dbSizeRows = $existingStmt->fetchAll(PDO::FETCH_ASSOC);
+    $dbSizeRows = is_array($dbSizeRows) ? $dbSizeRows : [];
 
     foreach ($rows as $row) {
         if (!is_array($row)) {
@@ -55,19 +65,9 @@ try {
         if ($la === '') {
             continue;
         }
-        if ($sid > 0) {
-            $dup = $pdo->prepare(
-                'SELECT id FROM size_family_sizes WHERE size_family_id = ? AND label_ar = ? AND id <> ? LIMIT 1'
-            );
-            $dup->execute([$familyId, $la, $sid]);
-        } else {
-            $dup = $pdo->prepare(
-                'SELECT id FROM size_family_sizes WHERE size_family_id = ? AND label_ar = ? LIMIT 1'
-            );
-            $dup->execute([$familyId, $la]);
-        }
-        if ($dup->fetch()) {
-            json_response(['success' => false, 'message' => 'اسم المقاس بالعربي مُستخدم مسبقاً في هذه العائلة'], 409);
+        $excludeSid = $sid > 0 ? $sid : null;
+        if (orange_rows_normalized_arabic_conflict($dbSizeRows, 'id', 'label_ar', $la, $excludeSid)) {
+            json_response(['success' => false, 'message' => orange_arabic_duplicate_blocked_message()], 409);
         }
     }
 

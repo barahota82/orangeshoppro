@@ -79,6 +79,76 @@ function get_channel_by_slug(string $slug): ?array {
     return $row ?: null;
 }
 
+/**
+ * IIS short path segment for black/blue/orange + lang (see web.config.example rewrite rules).
+ */
+function storefront_short_segment(string $channelSlug, string $lang): ?string {
+    $suffix = match ($lang) {
+        'en' => '',
+        'ar' => '-ar',
+        'hi' => '-hi',
+        'fil' => '-ph',
+        default => null,
+    };
+    if ($suffix === null) {
+        return null;
+    }
+    $base = match ($channelSlug) {
+        'black' => 'web',
+        'blue' => 'online',
+        'orange' => 'tiktok',
+        default => null,
+    };
+    if ($base === null) {
+        return null;
+    }
+    return $base . $suffix;
+}
+
+/** @return 'home'|'cart'|'track'|'product' */
+function storefront_current_page_kind(): string {
+    $base = basename((string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    return match ($base) {
+        'cart.php' => 'cart',
+        'track.php' => 'track',
+        'product.php' => 'product',
+        default => 'home',
+    };
+}
+
+/**
+ * Storefront URL: short path when channel+lang match IIS rewrite (web.config on server), else query string.
+ *
+ * @param 'home'|'cart'|'track'|'product' $page
+ * @param array<string, mixed> $extra merged into query for long URLs (e.g. id for product)
+ */
+function storefront_url(string $page, string $channelSlug, string $lang, array $extra = []): string {
+    $seg = storefront_short_segment($channelSlug, $lang);
+    if ($seg !== null) {
+        if ($page === 'home') {
+            return '/' . $seg;
+        }
+        if ($page === 'cart') {
+            return '/' . $seg . '/cart';
+        }
+        if ($page === 'track') {
+            return '/' . $seg . '/track';
+        }
+        if ($page === 'product' && !empty($extra['id'])) {
+            return '/' . $seg . '/product/' . (int)$extra['id'];
+        }
+    }
+    $q = array_merge(['channel' => $channelSlug, 'lang' => $lang], $extra);
+    $path = match ($page) {
+        'home' => '/pages/home.php',
+        'cart' => '/pages/cart.php',
+        'track' => '/pages/track.php',
+        'product' => '/pages/product.php',
+        default => '/pages/home.php',
+    };
+    return $path . '?' . http_build_query($q);
+}
+
 function get_translations(): array {
     return [
         'en' => [

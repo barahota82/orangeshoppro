@@ -1,5 +1,6 @@
 ﻿<?php
 require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
 require_admin_api();
 
 try {
@@ -35,10 +36,11 @@ try {
         json_response(['success' => false, 'message' => 'E_SLUG'], 422);
     }
 
-    $dup = $pdo->prepare("SELECT id FROM categories WHERE name_ar = ? AND department_id = ? AND id <> ? LIMIT 1");
-    $dup->execute([$nameAr, $depId, $id]);
-    if ($dup->fetch()) {
-        json_response(['success' => false, 'message' => 'هذه الفئة مسجلة بالفعل بنفس القسم — الاسم العربي مكرر'], 409);
+    $catStmt = $pdo->prepare('SELECT id, name_ar FROM categories WHERE department_id = ?');
+    $catStmt->execute([$depId]);
+    $catRows = $catStmt->fetchAll(PDO::FETCH_ASSOC);
+    if (orange_rows_normalized_arabic_conflict(is_array($catRows) ? $catRows : [], 'id', 'name_ar', $nameAr, $id)) {
+        json_response(['success' => false, 'message' => orange_arabic_duplicate_blocked_message()], 409);
     }
 
     $slugBase = $slug;

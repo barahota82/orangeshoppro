@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
 require_admin_api();
 
 try {
@@ -21,18 +22,10 @@ try {
         json_response(['success' => false, 'message' => 'يجب تعبئة الاسم العربي والإنجليزي'], 422);
     }
 
-    if ($id > 0) {
-        $dupAr = $pdo->prepare('SELECT id FROM size_families WHERE name_ar = ? AND id <> ? LIMIT 1');
-        $dupAr->execute([$nameAr, $id]);
-        if ($dupAr->fetch()) {
-            json_response(['success' => false, 'message' => 'الاسم العربي مكرر في عائلات المقاسات'], 409);
-        }
-    } else {
-        $dupAr = $pdo->prepare('SELECT id FROM size_families WHERE name_ar = ? LIMIT 1');
-        $dupAr->execute([$nameAr]);
-        if ($dupAr->fetch()) {
-            json_response(['success' => false, 'message' => 'الاسم العربي مكرر في عائلات المقاسات'], 409);
-        }
+    $famRows = $pdo->query('SELECT id, name_ar FROM size_families')->fetchAll(PDO::FETCH_ASSOC);
+    $excludeFamId = $id > 0 ? $id : null;
+    if (orange_rows_normalized_arabic_conflict(is_array($famRows) ? $famRows : [], 'id', 'name_ar', $nameAr, $excludeFamId)) {
+        json_response(['success' => false, 'message' => orange_arabic_duplicate_blocked_message()], 409);
     }
 
     if ($id <= 0 && $sort <= 0) {

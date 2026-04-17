@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
 require_admin_api();
 
 try {
@@ -40,10 +41,9 @@ try {
         json_response(['success' => false, 'message' => 'يجب إضافة خانة Slug قبل الحفظ'], 422);
     }
 
-    $dup = $pdo->prepare('SELECT id FROM departments WHERE name_ar = ? LIMIT 1');
-    $dup->execute([$nameAr]);
-    if ($dup->fetch()) {
-        json_response(['success' => false, 'message' => 'هذا القسم مسجل بالفعل — الاسم العربي مكرر'], 409);
+    $depRows = $pdo->query('SELECT id, name_ar FROM departments')->fetchAll(PDO::FETCH_ASSOC);
+    if (orange_rows_normalized_arabic_conflict(is_array($depRows) ? $depRows : [], 'id', 'name_ar', $nameAr, null)) {
+        json_response(['success' => false, 'message' => orange_arabic_duplicate_blocked_message()], 409);
     }
 
     $slugBase = $slug;
