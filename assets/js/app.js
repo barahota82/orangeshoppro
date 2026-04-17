@@ -9,16 +9,34 @@ function formatMoney(v) {
 (function rotateStorefrontTagline() {
     const TAGLINE_MS = 5000;
 
+    function parseList(jsonStr) {
+        if (!jsonStr || typeof jsonStr !== 'string') {
+            return [];
+        }
+        try {
+            const parsed = JSON.parse(jsonStr.trim());
+            if (!Array.isArray(parsed)) {
+                return [];
+            }
+            return parsed.filter((t) => typeof t === 'string' && t.trim() !== '');
+        } catch (e) {
+            return [];
+        }
+    }
+
     function collectMessages(el) {
+        const ta = document.getElementById('storefront-tagline-json');
+        if (ta && ta.value) {
+            const fromTa = parseList(ta.value);
+            if (fromTa.length >= 2) {
+                return fromTa;
+            }
+        }
         const raw = el && el.dataset ? el.dataset.taglines : '';
         if (raw) {
-            try {
-                const parsed = JSON.parse(raw);
-                if (Array.isArray(parsed)) {
-                    return parsed.filter((t) => typeof t === 'string' && t.trim() !== '');
-                }
-            } catch (e) {
-                /* fall through */
+            const fromData = parseList(raw);
+            if (fromData.length >= 2) {
+                return fromData;
             }
         }
         const w = window.APP_TAGLINE_CYCLE;
@@ -29,11 +47,15 @@ function formatMoney(v) {
     }
 
     function start() {
+        if (window.__sfTaglineRotationOn) {
+            return;
+        }
         const el = document.getElementById('brandTaglineText');
         const msgs = collectMessages(el);
         if (!el || msgs.length < 2) {
             return;
         }
+        window.__sfTaglineRotationOn = true;
         let i = 0;
         function show(idx) {
             el.textContent = msgs[idx];
@@ -50,6 +72,7 @@ function formatMoney(v) {
     } else {
         start();
     }
+    window.addEventListener('load', start);
 })();
 
 function changeMainImage(src, btn) {

@@ -1006,10 +1006,22 @@ body.storefront .product-page {
     grid-template-columns: 1fr;
 }
 
-@media (min-width: 768px) {
+/* لابتوب/ديسكتوب: عرض المتجر مثل باقي الموقع (حتى 1180px) — لا نفرض 720px */
+@media (min-width: 1024px) {
     body.storefront .site-header .container,
     body.storefront .site-main > .container {
-        max-width: 720px;
+        max-width: none;
+        width: min(1180px, calc(100% - 24px));
+    }
+}
+
+/* موبايل/تابلت صغير: عمود مريح ومركزي */
+@media (max-width: 1023px) {
+    body.storefront .site-header .container,
+    body.storefront .site-main > .container {
+        max-width: min(720px, calc(100% - 24px));
+        margin-left: auto;
+        margin-right: auto;
     }
 }
 
