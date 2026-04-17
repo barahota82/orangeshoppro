@@ -83,7 +83,7 @@ h1, h2, h3, .brand-text h1 {
     min-width: 0;
 }
 
-/* اسم الشركة عادي بجانب الشعار؛ السلوج العربي متمركز تحت الاسم فقط */
+/* الهيدر dir=ltr: الشعار والاسم والسلوجان يبقوا يسار دائماً */
 .brand-stack {
     display: grid;
     grid-template-columns: minmax(0, max-content);
@@ -100,10 +100,11 @@ h1, h2, h3, .brand-text h1 {
     text-align: start;
 }
 
-.brand-stack .brand-tagline--ar {
-    justify-self: center;
-    text-align: center;
+.brand-stack .brand-tagline--cycle {
+    justify-self: start;
+    text-align: start;
     width: 100%;
+    margin-inline: 0;
 }
 
 .logo {
@@ -127,9 +128,14 @@ h1, h2, h3, .brand-text h1 {
     margin-inline: auto;
 }
 
-.brand-tagline--ar {
+.brand-tagline--cycle {
     font-size: 0.78rem;
     letter-spacing: 0.01em;
+}
+
+.brand-tagline__text {
+    display: block;
+    min-height: 1.35em;
 }
 
 .header-actions {

@@ -12,6 +12,12 @@ if (!function_exists('current_lang')) {
 
 extract(storefront_toolbar_state());
 
+$taglineCycle = storefront_tagline_cycle_messages();
+$taglineOrder = ['en', 'ar', 'fil', 'hi'];
+$taglineStart = array_search($lang, $taglineOrder, true);
+$taglineStart = $taglineStart === false ? 0 : (int)$taglineStart;
+$taglineInitial = $taglineCycle[$taglineStart] ?? ($taglineCycle[0] ?? '');
+
 $theme = preg_replace('/[^a-z0-9\-]/i', '', (string)($channel['slug'] ?? 'orange'));
 if ($theme === '' || !is_file(__DIR__ . '/../assets/css/theme-' . $theme . '.css')) {
     $theme = 'orange';
@@ -42,14 +48,14 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
     </script>
 </head>
 <body class="theme-<?php echo htmlspecialchars($theme, ENT_QUOTES, 'UTF-8'); ?> storefront">
-<header class="site-header">
+<header class="site-header" dir="ltr">
     <div class="container header-inner">
         <div class="brand-wrap">
             <img class="logo" src="/assets/images/<?php echo htmlspecialchars((string)($channel['logo'] ?? 'logo-orange.png'), ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?>">
             <div class="brand-text">
                 <div class="brand-stack">
                     <h1><?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?></h1>
-                    <small class="brand-tagline brand-tagline--ar" dir="rtl"><?php echo htmlspecialchars(storefront_tagline_ar(), ENT_QUOTES, 'UTF-8'); ?></small>
+                    <small class="brand-tagline brand-tagline--cycle" aria-live="polite"><span class="brand-tagline__text" id="brandTaglineText" dir="auto"><?php echo htmlspecialchars($taglineInitial, ENT_QUOTES, 'UTF-8'); ?></span></small>
                 </div>
             </div>
         </div>

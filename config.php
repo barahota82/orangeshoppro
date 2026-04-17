@@ -264,6 +264,7 @@ function get_translations(): array {
             'category_products' => 'Products',
             'language' => 'Language',
             'storefront_brand' => 'Orange Company',
+            'storefront_tagline' => 'Everything you wish for—in one place.',
             'whatsapp' => 'WhatsApp'
         ],
         'ar' => [
@@ -292,6 +293,7 @@ function get_translations(): array {
             'category_products' => 'المنتجات',
             'language' => 'اللغة',
             'storefront_brand' => 'Orange Company',
+            'storefront_tagline' => 'كل ما تتمناه.. في مكان واحد.',
             'whatsapp' => 'واتساب'
         ],
         'fil' => [
@@ -320,6 +322,7 @@ function get_translations(): array {
             'category_products' => 'Mga Produkto',
             'language' => 'Wika',
             'storefront_brand' => 'Orange Company',
+            'storefront_tagline' => 'Lahat ng gusto mo… sa isang lugar.',
             'whatsapp' => 'WhatsApp'
         ],
         'hi' => [
@@ -348,6 +351,7 @@ function get_translations(): array {
             'category_products' => 'उत्पाद',
             'language' => 'भाषा',
             'storefront_brand' => 'Orange Company',
+            'storefront_tagline' => 'जो कुछ भी आप चाहें… एक ही जगह पर।',
             'whatsapp' => 'WhatsApp'
         ],
     ];
@@ -359,9 +363,19 @@ function t(string $key): string {
     return $translations[$lang][$key] ?? $key;
 }
 
-/** Arabic tagline under company name (fixed; all UI languages). */
-function storefront_tagline_ar(): string {
-    return 'كل ما تتمناه.. في مكان واحد.';
+/**
+ * Taglines under brand name for the rotating header (fixed order: en → ar → fil → hi).
+ *
+ * @return list<string>
+ */
+function storefront_tagline_cycle_messages(): array {
+    $order = ['en', 'ar', 'fil', 'hi'];
+    $tr = get_translations();
+    $out = [];
+    foreach ($order as $code) {
+        $out[] = (string)($tr[$code]['storefront_tagline'] ?? '');
+    }
+    return $out;
 }
 
 function json_response($data, int $httpCode = 200): void {

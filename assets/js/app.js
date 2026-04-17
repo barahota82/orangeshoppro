@@ -2,6 +2,31 @@ function formatMoney(v) {
     return Number(v).toFixed(2) + ' KD';
 }
 
+/** سلوجان الهيدر: تناوب بين en → ar → fil → hi */
+(function rotateStorefrontTagline() {
+    const msgs = window.APP_TAGLINE_CYCLE;
+    if (!Array.isArray(msgs) || msgs.length < 2) return;
+    const el = document.getElementById('brandTaglineText');
+    if (!el) return;
+    let i = typeof window.APP_TAGLINE_START === 'number' ? window.APP_TAGLINE_START : 0;
+    if (i < 0 || i >= msgs.length) i = 0;
+
+    function show(idx) {
+        const t = msgs[idx];
+        if (typeof t !== 'string') return;
+        el.textContent = t;
+    }
+
+    show(i);
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        return;
+    }
+    setInterval(() => {
+        i = (i + 1) % msgs.length;
+        show(i);
+    }, 4500);
+})();
+
 function changeMainImage(src, btn) {
     const main = document.getElementById('mainProductImage');
     if (main) main.src = src;
