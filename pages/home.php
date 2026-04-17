@@ -182,6 +182,9 @@ $storefrontExtraFilterSuffix = function (array $row) use ($categoryToDepartment)
 
     return $parts === [] ? '' : ' ' . implode(' ', $parts);
 };
+
+/** اتجاه القائمة والشريط: عربي = يمين لليسار */
+$storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
 ?>
 <div class="container">
     <section class="hero-banner hero-banner--intro hero-banner--rotator" aria-label="<?php echo htmlspecialchars(t('home'), ENT_QUOTES, 'UTF-8'); ?>">
@@ -193,9 +196,9 @@ $storefrontExtraFilterSuffix = function (array $row) use ($categoryToDepartment)
     </section>
     <textarea id="home-hero-lines-json" hidden readonly class="storefront-home-hero-json"><?php echo htmlspecialchars((string) $homeHeroJson, ENT_QUOTES, 'UTF-8'); ?></textarea>
 
-    <div class="storefront-browse-menu" id="storefrontBrowseMenu" aria-hidden="true">
+    <div class="storefront-browse-menu" id="storefrontBrowseMenu" aria-hidden="true" dir="<?php echo htmlspecialchars($storefrontListDir, ENT_QUOTES, 'UTF-8'); ?>">
         <div class="storefront-browse-menu__backdrop" data-browse-menu-close tabindex="-1" aria-hidden="true"></div>
-        <div class="storefront-browse-menu__panel" id="storefrontBrowseMenuPanel" role="dialog" aria-modal="true" aria-label="<?php echo htmlspecialchars(t('storefront_menu'), ENT_QUOTES, 'UTF-8'); ?>">
+        <div class="storefront-browse-menu__panel" id="storefrontBrowseMenuPanel" role="dialog" aria-modal="true" aria-label="<?php echo htmlspecialchars(t('storefront_menu'), ENT_QUOTES, 'UTF-8'); ?>" dir="<?php echo htmlspecialchars($storefrontListDir, ENT_QUOTES, 'UTF-8'); ?>">
             <div class="storefront-browse-menu__head">
                 <h2 class="storefront-browse-menu__title"><?php echo htmlspecialchars(t('storefront_menu'), ENT_QUOTES, 'UTF-8'); ?></h2>
                 <button type="button" class="storefront-browse-menu__close" data-browse-menu-close aria-label="<?php echo htmlspecialchars(t('storefront_menu_close'), ENT_QUOTES, 'UTF-8'); ?>">×</button>
@@ -286,7 +289,7 @@ $storefrontExtraFilterSuffix = function (array $row) use ($categoryToDepartment)
         </div>
     </div>
 
-    <section class="tabs-section" dir="ltr">
+    <section class="tabs-section" dir="<?php echo htmlspecialchars($storefrontListDir, ENT_QUOTES, 'UTF-8'); ?>">
         <button type="button" class="tabs-menu-open storefront-browse-menu-open" aria-expanded="false" aria-controls="storefrontBrowseMenuPanel" aria-haspopup="dialog">
             <span class="tabs-menu-open__icon" aria-hidden="true">☰</span>
             <span class="tabs-menu-open__text"><?php echo htmlspecialchars(t('storefront_menu'), ENT_QUOTES, 'UTF-8'); ?></span>
@@ -354,8 +357,11 @@ $storefrontExtraFilterSuffix = function (array $row) use ($categoryToDepartment)
 function scrollHomeCategoryTabs(direction) {
     var el = document.getElementById('homeCategoryTabs');
     if (!el) return;
+    var section = el.closest('.tabs-section');
+    var rtl = section && section.getAttribute('dir') === 'rtl';
     var amount = Math.max(160, Math.round(el.clientWidth * 0.55));
-    el.scrollBy({ left: direction * amount, behavior: 'smooth' });
+    var delta = direction * amount * (rtl ? -1 : 1);
+    el.scrollBy({ left: delta, behavior: 'smooth' });
 }
 function applyGridFilter(filter) {
     document.querySelectorAll('.product-card').forEach(function (card) {
