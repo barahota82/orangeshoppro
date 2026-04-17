@@ -89,10 +89,14 @@ h1, h2, h3, .brand-text h1 {
     line-height: 1.2;
 }
 
-.brand-text small {
+.brand-text small,
+.brand-tagline {
     color: var(--muted);
     font-size: 0.8rem;
     font-weight: 500;
+    line-height: 1.35;
+    display: block;
+    max-width: 22rem;
 }
 
 .header-actions {

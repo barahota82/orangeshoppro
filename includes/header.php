@@ -40,7 +40,7 @@ if ($pageKind === 'product' && isset($_GET['id'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><?php echo htmlspecialchars((string)($channel['name'] ?? 'Store'), ENT_QUOTES, 'UTF-8'); ?></title>
+    <title><?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?></title>
     <link rel="stylesheet" href="/assets/css/main.css">
     <link rel="stylesheet" href="/assets/css/theme-<?php echo htmlspecialchars($theme, ENT_QUOTES, 'UTF-8'); ?>.css">
     <script>
@@ -61,13 +61,13 @@ if ($pageKind === 'product' && isset($_GET['id'])) {
 <body class="theme-<?php echo htmlspecialchars($theme, ENT_QUOTES, 'UTF-8'); ?>">
 <header class="site-header">
     <div class="container header-inner">
-        <a href="<?php echo htmlspecialchars(storefront_url('home', $channelSlug, $lang), ENT_QUOTES, 'UTF-8'); ?>" class="brand-wrap" style="text-decoration:none;color:inherit;">
-            <img class="logo" src="/assets/images/<?php echo htmlspecialchars((string)($channel['logo'] ?? 'logo-orange.png'), ENT_QUOTES, 'UTF-8'); ?>" alt="">
+        <div class="brand-wrap">
+            <img class="logo" src="/assets/images/<?php echo htmlspecialchars((string)($channel['logo'] ?? 'logo-orange.png'), ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?>">
             <div class="brand-text">
-                <h1><?php echo htmlspecialchars((string)($channel['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></h1>
-                <small><?php echo htmlspecialchars(t('home'), ENT_QUOTES, 'UTF-8'); ?></small>
+                <h1><?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?></h1>
+                <small class="brand-tagline"><?php echo htmlspecialchars(t('storefront_tagline'), ENT_QUOTES, 'UTF-8'); ?></small>
             </div>
-        </a>
+        </div>
         <div class="header-actions">
             <nav class="lang-switch" aria-label="<?php echo htmlspecialchars(t('language'), ENT_QUOTES, 'UTF-8'); ?>">
                 <?php

@@ -47,8 +47,8 @@ $offers = $offersStmt->fetchAll();
 <div class="container">
     <section class="hero-banner">
         <div class="hero-content">
-            <h2><?php echo htmlspecialchars($channel['name']); ?></h2>
-            <p><?php echo htmlspecialchars(t('offers')); ?> / <?php echo htmlspecialchars(t('category_products')); ?></p>
+            <h2><?php echo htmlspecialchars(t('storefront_brand')); ?></h2>
+            <p><?php echo htmlspecialchars(t('storefront_tagline')); ?></p>
         </div>
     </section>
 

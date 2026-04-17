@@ -196,7 +196,9 @@ function get_translations(): array {
             'select_color' => 'Please select a color',
             'added' => 'Added to cart',
             'category_products' => 'Products',
-            'language' => 'Language'
+            'language' => 'Language',
+            'storefront_brand' => 'Orange Company',
+            'storefront_tagline' => 'Quality you can trust'
         ],
         'ar' => [
             'home' => 'الرئيسية',
@@ -222,7 +224,9 @@ function get_translations(): array {
             'select_color' => 'يرجى اختيار اللون',
             'added' => 'تمت الإضافة إلى السلة',
             'category_products' => 'المنتجات',
-            'language' => 'اللغة'
+            'language' => 'اللغة',
+            'storefront_brand' => 'Orange Company',
+            'storefront_tagline' => 'جودة وثقة في كل طلب'
         ],
         'fil' => [
             'home' => 'Home',
@@ -248,7 +252,9 @@ function get_translations(): array {
             'select_color' => 'Pumili ng kulay',
             'added' => 'Naidagdag sa cart',
             'category_products' => 'Mga Produkto',
-            'language' => 'Wika'
+            'language' => 'Wika',
+            'storefront_brand' => 'Orange Company',
+            'storefront_tagline' => 'Tiwala at de-kalidad na shopping'
         ],
         'hi' => [
             'home' => 'होम',
@@ -274,7 +280,9 @@ function get_translations(): array {
             'select_color' => 'कृपया रंग चुनें',
             'added' => 'कार्ट में जोड़ा गया',
             'category_products' => 'उत्पाद',
-            'language' => 'भाषा'
+            'language' => 'भाषा',
+            'storefront_brand' => 'Orange Company',
+            'storefront_tagline' => 'भरोसेमंद गुणवत्ता, आसान ऑर्डर'
         ],
     ];
 }
