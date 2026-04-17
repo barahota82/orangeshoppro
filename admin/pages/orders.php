@@ -64,8 +64,9 @@ function orange_admin_orders_action_buttons(array $o): void
     $invoicePath = '/admin/index.php?page=invoice&order_id=' . $id;
     $invoiceHref = htmlspecialchars($invoicePath, ENT_QUOTES, 'UTF-8');
 
+    /* ترتيب التنفيذ: قبول → فاتورة → بالطريق → تم التوصيل → رفض */
+    echo '<button type="button" onclick="updateOrderStatus(' . $id . ',\'approved\')">قبول</button>';
     echo '<a class="btn btn-secondary" href="' . $invoiceHref . '" target="_blank" rel="noopener">فاتورة</a>';
-    echo '<button type="button" class="btn-success" onclick="updateOrderStatus(' . $id . ',\'approved\')">قبول</button>';
     echo '<button type="button" class="btn-secondary" onclick="updateOrderStatus(' . $id . ',\'on_the_way\')">بالطريق</button>';
     echo '<button type="button" class="btn-success" onclick="updateOrderStatus(' . $id . ',\'completed\')">تم التوصيل</button>';
     echo '<button type="button" class="btn-danger" onclick="updateOrderStatus(' . $id . ',\'rejected\')">رفض</button>';
@@ -98,7 +99,7 @@ function orange_admin_orders_action_buttons(array $o): void
                     <th>القناة</th>
                     <th>الإجمالي</th>
                     <th>الحالة</th>
-                    <th>التحكم</th>
+                    <th class="col-orders-actions">التحكم</th>
                 </tr>
             </thead>
             <tbody>

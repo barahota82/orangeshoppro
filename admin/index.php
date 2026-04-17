@@ -9,6 +9,7 @@ $allowed = [
     'company_settings',
     'departments',
     'categories',
+    'subcategories',
     'color_dictionary',
     'size_families',
     'products',

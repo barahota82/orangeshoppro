@@ -75,7 +75,7 @@ $cartHref = htmlspecialchars(storefront_url('cart', $channelSlug, $lang), ENT_QU
 $trackHref = htmlspecialchars(storefront_url('track', $channelSlug, $lang), ENT_QUOTES, 'UTF-8');
 if ($navPlace === 'dock') {
     ?>
-<a class="app-dock-btn" href="<?php echo $cartHref; ?>">
+<a class="app-dock-btn" data-orange-cart-link href="<?php echo $cartHref; ?>">
     <span class="app-dock-btn__icon" aria-hidden="true">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" focusable="false"><path d="M6 6h14l-1.3 8H7.7L6 6Zm0 0L5 3H2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="19" r="1.35" fill="currentColor"/><circle cx="17" cy="19" r="1.35" fill="currentColor"/></svg>
     </span>
@@ -84,7 +84,7 @@ if ($navPlace === 'dock') {
 <?php
 } else {
     ?>
-            <a class="icon-btn" href="<?php echo $cartHref; ?>"><?php echo htmlspecialchars(t('cart'), ENT_QUOTES, 'UTF-8'); ?></a>
+            <a class="icon-btn" data-orange-cart-link href="<?php echo $cartHref; ?>"><?php echo htmlspecialchars(t('cart'), ENT_QUOTES, 'UTF-8'); ?></a>
 <?php
 }
 $closeDockCell();

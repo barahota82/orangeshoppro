@@ -136,6 +136,19 @@ try {
     $descFil = trim((string)($data['description_fil'] ?? ''));
     $descHi = trim((string)($data['description_hi'] ?? ''));
 
+    $mainImage = trim((string)($data['main_image'] ?? ''));
+    $extraImagesForMain = $data['extra_images'] ?? null;
+    if ($mainImage === '' && is_array($extraImagesForMain)) {
+        foreach ($extraImagesForMain as $raw) {
+            $fn = basename((string)$raw);
+            $fn = preg_replace('/[^a-zA-Z0-9._-]/', '', $fn);
+            if ($fn !== '' && $fn !== '.' && $fn !== '..') {
+                $mainImage = $fn;
+                break;
+            }
+        }
+    }
+
     $stmt = $pdo->prepare(
         'INSERT INTO products (
             name, name_en, name_fil, name_hi,
@@ -161,7 +174,7 @@ try {
         $scope,
         (float)$data['price'],
         (float)$data['cost'],
-        trim((string)($data['main_image'] ?? '')),
+        $mainImage,
         $hasSizes ? 1 : 0,
         $hasColors ? 1 : 0,
         $nextSort,
@@ -236,7 +249,7 @@ try {
     $extraImages = $data['extra_images'] ?? null;
     if (is_array($extraImages)) {
         $imgIns = $pdo->prepare('INSERT INTO product_images (product_id, image_path) VALUES (?, ?)');
-        $mainBasename = trim(basename((string)($data['main_image'] ?? '')));
+        $mainBasename = $mainImage !== '' ? basename($mainImage) : '';
         foreach ($extraImages as $raw) {
             $fn = basename((string)$raw);
             $fn = preg_replace('/[^a-zA-Z0-9._-]/', '', $fn);

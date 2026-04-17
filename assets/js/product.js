@@ -1,6 +1,14 @@
 let selectedColor = '';
 let selectedSize = '';
 
+function orangeProductToast(message, durationMs) {
+    if (typeof window.orangeShowToast === 'function') {
+        window.orangeShowToast(message, durationMs);
+    } else {
+        alert(message);
+    }
+}
+
 function orangeProductCartStorageKey() {
     if (typeof window.orangeSfCartKey === 'function') {
         return window.orangeSfCartKey();
@@ -261,12 +269,12 @@ function addCurrentProductToCart() {
     }
 
     if (p.has_colors === 1 && !selectedColor) {
-        alert(window.APP_T.select_color || 'Please select a color');
+        orangeProductToast(window.APP_T.select_color || 'Please select a color', 2800);
         return;
     }
 
     if (p.has_sizes === 1 && !selectedSize) {
-        alert(window.APP_T.select_size || 'Please select a size');
+        orangeProductToast(window.APP_T.select_size || 'Please select a size', 2800);
         return;
     }
 
@@ -279,7 +287,7 @@ function addCurrentProductToCart() {
 
     if (qty > avail) {
         const tpl = window.APP_T.available_max_qty || 'Max: {n}';
-        alert(tpl.replace(/\{n\}/g, String(avail)));
+        orangeProductToast(tpl.replace(/\{n\}/g, String(avail)), 3200);
         syncProductQtyLimits();
         return;
     }
@@ -315,7 +323,10 @@ function addCurrentProductToCart() {
     if (typeof normalizeCartDuplicates === 'function') {
         normalizeCartDuplicates();
     }
-    alert(window.APP_T.added || 'Added');
+    if (typeof window.orangeAnimateCartPulse === 'function') {
+        window.orangeAnimateCartPulse();
+    }
+    orangeProductToast(window.APP_T.added || 'Added', 2400);
     syncProductQtyLimits();
 }
 

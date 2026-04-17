@@ -25,6 +25,7 @@ $orangeAdminPage = isset($page) ? (string) $page : 'dashboard';
             <a href="/admin/index.php?page=dashboard" class="<?php echo $orangeAdminPage === 'dashboard' ? 'is-active' : ''; ?>">الرئيسية</a>
             <a href="/admin/index.php?page=departments" class="<?php echo $orangeAdminPage === 'departments' ? 'is-active' : ''; ?>">الأقسام</a>
             <a href="/admin/index.php?page=categories" class="<?php echo $orangeAdminPage === 'categories' ? 'is-active' : ''; ?>">الفئات</a>
+            <a href="/admin/index.php?page=subcategories" class="<?php echo $orangeAdminPage === 'subcategories' ? 'is-active' : ''; ?>">فئات فرعية</a>
             <a href="/admin/index.php?page=color_dictionary" class="<?php echo $orangeAdminPage === 'color_dictionary' ? 'is-active' : ''; ?>">قاموس الألوان</a>
             <a href="/admin/index.php?page=size_families" class="<?php echo $orangeAdminPage === 'size_families' ? 'is-active' : ''; ?>">عائلات المقاسات</a>
             <a href="/admin/index.php?page=products" class="<?php echo $orangeAdminPage === 'products' ? 'is-active' : ''; ?>">المنتجات</a>

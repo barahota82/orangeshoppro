@@ -128,36 +128,33 @@ foreach ($categories as $cat) {
     <p id="productEditHint" style="display:none;margin:0 0 12px;color:#555;font-size:14px;">تعديل البيانات الأساسية. الترتيب في المتجر من الجدول فقط (↑↓ ثم حفظ الترتيب). كميات الألوان والمقاسات من <a href="/admin/index.php?page=stock">المخزون</a>.</p>
     <form id="productForm">
         <input type="hidden" id="product_record_id" value="0">
-        <div class="form-grid">
-            <div>
-                <label>الترتيب (في المتجر)</label>
-                <input type="text" id="product_sort_order" value="<?php echo (int)$nextProductSort; ?>" readonly tabindex="-1" autocomplete="off" inputmode="numeric" style="max-width:140px;background:#f1f3f5;cursor:default;color:#444;">
-                <small style="display:block;color:#666;margin-top:4px;">يُعرض للمراجعة فقط ولا يُقبل التعديل هنا. غيّر ترتيب الظهور من أزرار ↑↓ في الجدول ثم «حفظ الترتيب».</small>
+        <p style="margin:0 0 16px;font-size:13px;color:#64748b;line-height:1.5;">نموذج واحد بمساحة كاملة للتمرير: البيانات الأساسية ثم المقاسات والألوان ثم (لاحقاً) جداول الربط، ثم الصور والمتغيرات. الحفظ في الأسفل يشمل كل الحقول.</p>
+
+        <div class="admin-product-section">
+        <h4 class="admin-product-subsection-title">البيانات الأساسية</h4>
+        <div class="form-grid product-form-tab-basic-grid">
+            <div class="product-form-basic-top3">
+                <div class="form-grid-3 product-form-basic-top3-inner">
+                    <div>
+                        <label>الترتيب (في المتجر)</label>
+                        <input type="text" id="product_sort_order" value="<?php echo (int)$nextProductSort; ?>" readonly tabindex="-1" autocomplete="off" inputmode="numeric" style="max-width:140px;background:#f1f3f5;cursor:default;color:#444;">
+                        <small style="display:block;color:#666;margin-top:4px;">يُعرض للمراجعة فقط. الترتيب من ↑↓ في الجدول ثم «حفظ الترتيب».</small>
+                    </div>
+                    <div>
+                        <label>حالة العرض</label>
+                        <select id="product_is_active">
+                            <option value="1">نشط</option>
+                            <option value="0">مخفي</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>القسم (يُستنتج من الفئة)</label>
+                        <div id="product_department_hint" style="padding:8px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;min-height:20px;">—</div>
+                        <small style="display:block;color:#666;margin-top:4px;">مرجع قسم-فئة: <code id="product_dept_cat_ref" style="font-size:13px;">—</code></small>
+                    </div>
+                </div>
             </div>
-            <div>
-                <label>حالة العرض</label>
-                <select id="product_is_active">
-                    <option value="1">نشط</option>
-                    <option value="0">مخفي</option>
-                </select>
-            </div>
-            <div>
-                <label>اسم المنتج (العربي)</label>
-                <input type="text" id="name" required>
-            </div>
-            <div>
-                <label>English</label>
-                <input type="text" id="name_en" required>
-            </div>
-            <div>
-                <label>Filipino</label>
-                <input type="text" id="name_fil" required>
-            </div>
-            <div>
-                <label>Hindi</label>
-                <input type="text" id="name_hi" required>
-            </div>
-            <div>
+            <div <?php echo ($hasSubcategoriesTable && $hasProductSubcategoryColumn) ? '' : 'style="grid-column:1/-1;"'; ?>>
                 <label>الفئة (ضمن القسم)</label>
                 <select id="category_id" required>
                     <option value="">اختر الفئة</option>
@@ -201,25 +198,37 @@ foreach ($categories as $cat) {
                     <?php endif; ?>
                 </select>
                 <?php if ($hasDepartmentsTable && $hasCategoryDepartment): ?>
-                    <small style="display:block;color:#666;margin-top:4px;">كل فئة تظهر تحت قسمها لتفادي الخلط (مثل فساتين قسم عن فساتين قسم آخر).</small>
+                    <small style="display:block;color:#666;margin-top:4px;">كل فئة تحت قسمها لتفادي الخلط بين فئات متشابهة.</small>
                 <?php elseif (!$hasDepartmentsTable || !$hasCategoryDepartment): ?>
-                    <small style="display:block;color:#f59e0b;margin-top:4px;">لربط الفئات بالأقسام: فعّل جدول الأقسام وعمود <code>department_id</code> في الفئات من صفحة <a href="/admin/index.php?page=categories">الفئات</a>.</small>
+                    <small style="display:block;color:#f59e0b;margin-top:4px;">لربط الفئات بالأقسام: من صفحة <a href="/admin/index.php?page=categories">الفئات</a>.</small>
                 <?php endif; ?>
-            </div>
-            <div>
-                <label>القسم (يُستنتج من الفئة)</label>
-                <div id="product_department_hint" style="padding:8px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;min-height:20px;">—</div>
-                <small style="display:block;color:#666;margin-top:4px;">مرجع قسم-فئة (نفس عمود الجدول): <code id="product_dept_cat_ref" style="font-size:13px;">—</code></small>
             </div>
             <?php if ($hasSubcategoriesTable && $hasProductSubcategoryColumn): ?>
             <div>
-                <label for="subcategory_id">تصنيف فرعي (اختياري)</label>
+                <label for="subcategory_id">فئة فرعية (اختياري)</label>
                 <select id="subcategory_id">
                     <option value="">— بدون —</option>
                 </select>
-                <small style="display:block;color:#666;margin-top:4px;">يُحدَّث حسب الفئة. لا تخترع رقماً يدوياً: يجب أن يوجد الصف في <code>subcategories</code> ويتبع نفس <code>category_id</code> (وإلا خطأ القيد الأجنبي في phpMyAdmin).</small>
+                <small style="display:block;color:#666;margin-top:4px;">يُحدَّث حسب الفئة المختارة. أضف التصنيفات من
+                    <a href="/admin/index.php?page=subcategories">فئات فرعية</a>.</small>
             </div>
             <?php endif; ?>
+            <div>
+                <label>اسم المنتج (العربي)</label>
+                <input type="text" id="name" required>
+            </div>
+            <div>
+                <label>English</label>
+                <input type="text" id="name_en" required>
+            </div>
+            <div>
+                <label>Filipino</label>
+                <input type="text" id="name_fil" required>
+            </div>
+            <div>
+                <label>Hindi</label>
+                <input type="text" id="name_hi" required>
+            </div>
             <div>
                 <label>السعر</label>
                 <input type="number" id="price" step="0.01" required>
@@ -244,24 +253,11 @@ foreach ($categories as $cat) {
                 <label>Description (Hindi)</label>
                 <textarea id="description_hi" rows="3"></textarea>
             </div>
-            <div style="grid-column:1/-1;">
-                <label>الصورة الرئيسية — رفع ملف</label>
-                <input type="hidden" id="main_image" value="">
-                <input type="file" id="main_image_file" accept="image/jpeg,image/png,image/webp,image/gif">
-                <button type="button" class="btn-secondary" style="margin-top:8px;" onclick="uploadMainProductImage()">رفع الصورة الرئيسية</button>
-                <div style="margin-top:10px;">
-                    <img id="main_image_preview" alt="" style="display:none;max-height:140px;border-radius:8px;border:1px solid #ddd;">
-                </div>
-                <p style="margin:8px 0 0;font-size:12px;color:#666;">يُحفظ اسم الملف تلقائياً بعد الرفع الناجح.</p>
-            </div>
-            <div style="grid-column:1/-1;">
-                <label>صور إضافية للمعرض (عدة ملفات)</label>
-                <input type="file" id="gallery_files" accept="image/jpeg,image/png,image/webp,image/gif" multiple>
-                <button type="button" class="btn-secondary" style="margin-top:8px;" onclick="uploadGalleryProductImages()">رفع صور المعرض</button>
-                <ul id="gallery_upload_list" style="margin:10px 0 0;padding-inline-start:20px;font-size:13px;"></ul>
-            </div>
+        </div>
         </div>
 
+        <div class="admin-product-section">
+        <h4 class="admin-product-subsection-title">المقاسات والألوان</h4>
         <div class="form-grid">
             <div>
                 <label>له مقاسات؟</label>
@@ -303,14 +299,44 @@ foreach ($categories as $cat) {
             <button type="button" class="btn-secondary" onclick="addColorwayRow()">+ صف لون</button>
         </div>
 
-        <div class="actions" style="margin:14px 0;flex-wrap:wrap;gap:8px;">
-            <button type="button" class="btn-secondary" id="btnProductTranslate" onclick="translateProductLocalesFromArabic()">ترجمة تلقائية من العربي</button>
-            <button type="button" id="btnGenerateVariants" onclick="generateVariants()">توليد المتغيرات</button>
-            <button type="button" class="btn-secondary" id="btnSaveProduct" onclick="saveProduct()">حفظ المنتج</button>
-            <button type="button" class="btn-secondary" onclick="resetProductForm()">منتج جديد</button>
+        <div id="productAdvancedSizingSlot" class="card" style="margin:16px 0;padding:14px;background:#f8fafc;border:1px dashed #cbd5e1;">
+            <h4 class="admin-product-subsection-title" style="margin-top:0;border:0;padding:0;">ربط مقاس × لون وأوصاف المقاس (تطوير لاحق)</h4>
+            <p style="margin:0;font-size:13px;color:#64748b;line-height:1.45;">مساحة جاهزة لجدول فرعي: كل مقاس مع لونه وعائلة المقاسات ونصوص الوصف الخاصة بالمنتج — دون إخفاء باقي النموذج في تبويبات.</p>
         </div>
 
+        <h4 class="admin-product-subsection-title" style="margin-top:18px;">الصور</h4>
+        <div class="form-grid">
+            <div style="grid-column:1/-1;">
+                <label>الصورة الرئيسية — رفع ملف</label>
+                <input type="hidden" id="main_image" value="">
+                <input type="file" id="main_image_file" accept="image/jpeg,image/png,image/webp,image/gif">
+                <button type="button" class="btn-secondary" style="margin-top:8px;" onclick="uploadMainProductImage()">رفع الصورة الرئيسية</button>
+                <div style="margin-top:10px;">
+                    <img id="main_image_preview" alt="" style="display:none;max-height:140px;border-radius:8px;border:1px solid #ddd;">
+                </div>
+                <p style="margin:8px 0 0;font-size:12px;color:#666;">لا يوجد ربط تلقائي بين كل لون/مقاس وصورة منفصلة؛ الصورة تمثل المنتج ككل. <strong>أول صورة تُرفع</strong> (معرض أو رئيسية) تُعتبر الصورة الرئيسية ما لم تغيّرها يدوياً. يُثبت الربط في قاعدة البيانات عند «حفظ المنتج».</p>
+            </div>
+            <div style="grid-column:1/-1;">
+                <label>صور إضافية للمعرض (عدة ملفات)</label>
+                <input type="file" id="gallery_files" accept="image/jpeg,image/png,image/webp,image/gif" multiple>
+                <button type="button" class="btn-secondary" style="margin-top:8px;" onclick="uploadGalleryProductImages()">رفع صور المعرض</button>
+                <ul id="gallery_upload_list" style="margin:10px 0 0;padding-inline-start:20px;font-size:13px;"></ul>
+            </div>
+        </div>
+
+        <h4 class="admin-product-subsection-title" style="margin-top:18px;">المتغيرات</h4>
         <div id="variantsBox"></div>
+        </div>
+
+        <div class="admin-product-form-actions card" style="margin-top:14px;padding:14px;">
+            <p class="admin-product-save-hint">حفظ واحد لكل الحقول أعلاه.</p>
+            <div class="actions" style="margin:0;flex-wrap:wrap;gap:8px;">
+                <button type="button" class="btn-secondary" id="btnProductTranslate" onclick="translateProductLocalesFromArabic()">ترجمة تلقائية من العربي</button>
+                <button type="button" id="btnGenerateVariants" onclick="generateVariants()">توليد المتغيرات</button>
+                <button type="button" class="btn-secondary" id="btnSaveProduct" onclick="saveProduct()">حفظ المنتج</button>
+                <button type="button" class="btn-secondary" onclick="resetProductForm()">منتج جديد</button>
+            </div>
+        </div>
     </form>
 </div>
 
@@ -538,6 +564,21 @@ function rebuildSubcategoryOptions(preserveId) {
     }
 }
 
+function assignMainImageFromGalleryIfEmpty() {
+    const mainEl = document.getElementById('main_image');
+    const list = window.PRODUCT_EXTRA_IMAGES || [];
+    if (!mainEl || mainEl.value.trim() || !list.length) {
+        return;
+    }
+    const fn = list[0];
+    mainEl.value = fn;
+    const prev = document.getElementById('main_image_preview');
+    if (prev) {
+        prev.src = '/uploads/products/' + fn;
+        prev.style.display = 'block';
+    }
+}
+
 function renderGalleryUploadList() {
     const ul = document.getElementById('gallery_upload_list');
     if (!ul) return;
@@ -551,7 +592,21 @@ function renderGalleryUploadList() {
         rm.className = 'btn-secondary';
         rm.style.marginInlineStart = '8px';
         rm.onclick = () => {
+            const mainEl = document.getElementById('main_image');
+            const removed = window.PRODUCT_EXTRA_IMAGES[i];
+            const wasMain = mainEl && mainEl.value.trim() === removed;
             window.PRODUCT_EXTRA_IMAGES.splice(i, 1);
+            if (wasMain) {
+                mainEl.value = '';
+                assignMainImageFromGalleryIfEmpty();
+                if (!mainEl.value.trim()) {
+                    const pv = document.getElementById('main_image_preview');
+                    if (pv) {
+                        pv.src = '';
+                        pv.style.display = 'none';
+                    }
+                }
+            }
             renderGalleryUploadList();
         };
         li.appendChild(rm);
@@ -675,10 +730,15 @@ async function loadProductForEdit(id) {
         updateProductCatalogHint();
         document.getElementById('price').value = String(p.price != null ? p.price : '');
         document.getElementById('cost').value = String(p.cost != null ? p.cost : '');
-        document.getElementById('main_image').value = p.main_image || '';
+        const extrasEarly = Array.isArray(p.extra_images) ? p.extra_images.slice() : [];
+        let mainFn = (p.main_image || '').trim();
+        if (!mainFn && extrasEarly.length) {
+            mainFn = extrasEarly[0];
+        }
+        document.getElementById('main_image').value = mainFn;
         const prev = document.getElementById('main_image_preview');
-        if (p.main_image && prev) {
-            prev.src = '/uploads/products/' + p.main_image;
+        if (mainFn && prev) {
+            prev.src = '/uploads/products/' + mainFn;
             prev.style.display = 'block';
         } else if (prev) {
             prev.src = '';
@@ -691,7 +751,7 @@ async function loadProductForEdit(id) {
         document.getElementById('colorwaysBox').innerHTML = '';
         document.getElementById('variantsBox').innerHTML =
             '<p style="color:#555;margin:12px 0;">المتغيرات والمخزون: استخدم صفحة <a href="/admin/index.php?page=stock">المخزون</a>.</p>';
-        window.PRODUCT_EXTRA_IMAGES = [];
+        window.PRODUCT_EXTRA_IMAGES = extrasEarly;
         renderGalleryUploadList();
         onHasFlagsChange();
         const sortRO = document.getElementById('product_sort_order');
@@ -779,6 +839,7 @@ async function uploadGalleryProductImages() {
         }
     }
     inp.value = '';
+    assignMainImageFromGalleryIfEmpty();
     renderGalleryUploadList();
 }
 
@@ -912,8 +973,11 @@ async function saveProduct() {
         }
     }
 
-    if (!document.getElementById('main_image').value.trim()) {
-        alert('ارفع الصورة الرئيسية قبل الحفظ');
+    assignMainImageFromGalleryIfEmpty();
+    const mainVal = document.getElementById('main_image').value.trim();
+    const hasAnyImage = mainVal || (window.PRODUCT_EXTRA_IMAGES && window.PRODUCT_EXTRA_IMAGES.length);
+    if (!hasAnyImage) {
+        alert('ارفع صورة واحدة على الأقل قبل الحفظ');
         return;
     }
 
@@ -933,7 +997,7 @@ async function saveProduct() {
             category_id: parseInt(document.getElementById('category_id').value, 10),
             price: parseFloat(document.getElementById('price').value || '0'),
             cost: parseFloat(document.getElementById('cost').value || '0'),
-            main_image: document.getElementById('main_image').value.trim(),
+            main_image: document.getElementById('main_image').value.trim() || (window.PRODUCT_EXTRA_IMAGES && window.PRODUCT_EXTRA_IMAGES[0] ? window.PRODUCT_EXTRA_IMAGES[0] : ''),
             has_sizes: parseInt(document.getElementById('has_sizes').value, 10),
             has_colors: parseInt(document.getElementById('has_colors').value, 10),
             size_family_id: parseInt(document.getElementById('size_family_id').value, 10) || 0,
@@ -946,6 +1010,7 @@ async function saveProduct() {
             const sv = subEl.value.trim();
             payload.subcategory_id = sv === '' ? null : parseInt(sv, 10);
         }
+        payload.extra_images = window.PRODUCT_EXTRA_IMAGES || [];
         const res = await postJSON('/admin/api/products/update.php', payload);
         alert(res.message || (res.success ? 'تم التحديث' : 'فشل'));
         if (res.success) {
@@ -979,7 +1044,7 @@ async function saveProduct() {
         category_id: parseInt(document.getElementById('category_id').value, 10),
         price: parseFloat(document.getElementById('price').value || '0'),
         cost: parseFloat(document.getElementById('cost').value || '0'),
-        main_image: document.getElementById('main_image').value.trim(),
+        main_image: document.getElementById('main_image').value.trim() || (window.PRODUCT_EXTRA_IMAGES && window.PRODUCT_EXTRA_IMAGES[0] ? window.PRODUCT_EXTRA_IMAGES[0] : ''),
         has_sizes: parseInt(document.getElementById('has_sizes').value, 10),
         has_colors: parseInt(document.getElementById('has_colors').value, 10),
         size_family_id: parseInt(document.getElementById('size_family_id').value, 10) || 0,

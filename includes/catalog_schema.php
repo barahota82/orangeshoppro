@@ -231,7 +231,7 @@ function orange_product_resolve_subcategory_id(PDO $pdo, int $categoryId, $raw):
         return [true, null, ''];
     }
     if (!orange_table_exists($pdo, 'subcategories')) {
-        return [false, null, 'جدول التصنيفات الفرعية غير متوفر'];
+        return [false, null, 'جدول الفئات الفرعية غير متوفر'];
     }
     $st = $pdo->prepare('SELECT id FROM subcategories WHERE id = ? AND category_id = ? LIMIT 1');
     $st->execute([$sid, $categoryId]);

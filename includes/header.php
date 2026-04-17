@@ -87,10 +87,15 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
         })();
         window.APP_T = {
             empty_cart: <?php echo json_encode(t('empty_cart'), JSON_UNESCAPED_UNICODE); ?>,
+            cart_empty_subtitle: <?php echo json_encode(t('cart_empty_subtitle'), JSON_UNESCAPED_UNICODE); ?>,
+            cart_remove_confirm: <?php echo json_encode(t('cart_remove_confirm'), JSON_UNESCAPED_UNICODE); ?>,
+            item_removed_from_cart: <?php echo json_encode(t('item_removed_from_cart'), JSON_UNESCAPED_UNICODE); ?>,
             color: <?php echo json_encode(t('color'), JSON_UNESCAPED_UNICODE); ?>,
             size: <?php echo json_encode(t('size'), JSON_UNESCAPED_UNICODE); ?>,
             quantity: <?php echo json_encode(t('quantity'), JSON_UNESCAPED_UNICODE); ?>,
             order_number: <?php echo json_encode(t('order_number'), JSON_UNESCAPED_UNICODE); ?>,
+            track_missing_fields: <?php echo json_encode(t('track_missing_fields'), JSON_UNESCAPED_UNICODE); ?>,
+            checkout_required_fields: <?php echo json_encode(t('checkout_required_fields'), JSON_UNESCAPED_UNICODE); ?>,
             select_color: <?php echo json_encode(t('select_color'), JSON_UNESCAPED_UNICODE); ?>,
             select_size: <?php echo json_encode(t('select_size'), JSON_UNESCAPED_UNICODE); ?>,
             added: <?php echo json_encode(t('added'), JSON_UNESCAPED_UNICODE); ?>,
@@ -99,7 +104,15 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             available_max_qty: <?php echo json_encode(t('available_max_qty'), JSON_UNESCAPED_UNICODE); ?>,
             no_more_stock_for_cart: <?php echo json_encode(t('no_more_stock_for_cart'), JSON_UNESCAPED_UNICODE); ?>,
             cart_close: <?php echo json_encode(t('cart_close'), JSON_UNESCAPED_UNICODE); ?>,
-            cart_remove: <?php echo json_encode(t('cart_remove'), JSON_UNESCAPED_UNICODE); ?>
+            cart_remove: <?php echo json_encode(t('cart_remove'), JSON_UNESCAPED_UNICODE); ?>,
+            cart_total_label: <?php echo json_encode(t('cart_total_label'), JSON_UNESCAPED_UNICODE); ?>,
+            cart_items_count: <?php echo json_encode(t('cart_items_count'), JSON_UNESCAPED_UNICODE); ?>,
+            cart_unit_price: <?php echo json_encode(t('cart_unit_price'), JSON_UNESCAPED_UNICODE); ?>,
+            cart_line_subtotal: <?php echo json_encode(t('cart_line_subtotal'), JSON_UNESCAPED_UNICODE); ?>,
+            cart_max_available_short: <?php echo json_encode(t('cart_max_available_short'), JSON_UNESCAPED_UNICODE); ?>,
+            cart_continue_shopping: <?php echo json_encode(t('cart_continue_shopping'), JSON_UNESCAPED_UNICODE); ?>,
+            cart_mini_summary_title: <?php echo json_encode(t('cart_mini_summary_title'), JSON_UNESCAPED_UNICODE); ?>,
+            cart_mini_more: <?php echo json_encode(t('cart_mini_more'), JSON_UNESCAPED_UNICODE); ?>
         };
     </script>
 </head>

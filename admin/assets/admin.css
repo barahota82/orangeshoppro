@@ -347,8 +347,70 @@ table.admin-orders-list-table td.col-orders-phone {
     word-break: break-word;
 }
 
+/* عمود تحكم الطلبات: عمودي حسب خطوات التنفيذ، بدون لفّ عشوائي */
+table.admin-orders-list-table th.col-orders-actions,
+table.admin-orders-list-table td.col-orders-actions {
+    min-width: 9.25rem;
+    width: 9.75rem;
+    max-width: 11rem;
+    vertical-align: top;
+    padding: 10px 8px;
+}
+table.admin-orders-list-table .orders-row-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: stretch;
+}
+table.admin-orders-list-table .orders-row-actions > .btn,
+table.admin-orders-list-table .orders-row-actions > button,
+table.admin-orders-list-table .orders-row-actions > a.btn {
+    width: 100%;
+    margin: 0;
+    min-height: 38px;
+    box-sizing: border-box;
+    justify-content: center;
+    text-align: center;
+}
+
+/* نموذج المنتج: أقسام متتابعة (صفحة واحدة) */
+.admin-product-section {
+    margin-bottom: 28px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+.admin-product-section:last-of-type {
+    border-bottom: none;
+}
+.admin-product-form-actions .admin-product-save-hint {
+    margin: 0 0 12px;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.45;
+}
+
+/* تبويب المنتج — الصف الأول ثلاثي الأعمدة كما في التصميم */
+.product-form-tab-basic-grid > .product-form-basic-top3 {
+    grid-column: 1 / -1;
+}
+.product-form-basic-top3 .product-form-basic-top3-inner {
+    width: 100%;
+}
+
+.admin-product-subsection-title {
+    margin: 0 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+}
+
 @media (max-width: 1024px) {
     .admin-layout { grid-template-columns: 1fr; }
     .admin-sidebar { padding-bottom: 12px; }
     .grid-4, .grid-2, .form-grid, .form-grid-3 { grid-template-columns: 1fr; }
+    .product-form-basic-top3 .form-grid-3 {
+        grid-template-columns: 1fr;
+    }
 }

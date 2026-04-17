@@ -35,6 +35,19 @@ try {
         $variantStmt->execute([$productId]);
         $product['variants'] = $variantStmt->fetchAll();
 
+        $imgStmt = $pdo->prepare(
+            'SELECT image_path FROM product_images WHERE product_id = ? ORDER BY id ASC'
+        );
+        $imgStmt->execute([$productId]);
+        $imgRows = $imgStmt->fetchAll(PDO::FETCH_ASSOC);
+        $product['extra_images'] = [];
+        foreach (is_array($imgRows) ? $imgRows : [] as $row) {
+            $p = isset($row['image_path']) ? trim((string)$row['image_path']) : '';
+            if ($p !== '') {
+                $product['extra_images'][] = $p;
+            }
+        }
+
         json_response(['success' => true, 'product' => $product]);
     }
 

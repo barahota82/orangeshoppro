@@ -61,6 +61,21 @@ try {
         json_response(['success' => false, 'message' => orange_arabic_duplicate_blocked_message()], 409);
     }
 
+    $mainImage = trim((string)($data['main_image'] ?? ''));
+    $extraImagesIn = $data['extra_images'] ?? null;
+    if ($mainImage === '' && is_array($extraImagesIn)) {
+        foreach ($extraImagesIn as $raw) {
+            $fn = basename((string)$raw);
+            $fn = preg_replace('/[^a-zA-Z0-9._-]/', '', $fn);
+            if ($fn !== '' && $fn !== '.' && $fn !== '..') {
+                $mainImage = $fn;
+                break;
+            }
+        }
+    }
+
+    $pdo->beginTransaction();
+
     $stmt = $pdo->prepare("
         UPDATE products
         SET name = ?, name_en = ?, name_fil = ?, name_hi = ?,
@@ -85,7 +100,7 @@ try {
         $scope,
         (float)$data['price'],
         (float)$data['cost'],
-        trim((string)($data['main_image'] ?? '')),
+        $mainImage,
         (int)($data['has_sizes'] ?? 0),
         (int)($data['has_colors'] ?? 0),
         $sortOrder,
@@ -97,14 +112,37 @@ try {
         $checkStmt = $pdo->prepare("SELECT id FROM products WHERE id = ? LIMIT 1");
         $checkStmt->execute([$productId]);
         if (!$checkStmt->fetch()) {
+            $pdo->rollBack();
             json_response(['success' => false, 'message' => 'المنتج غير موجود'], 404);
         }
     }
+
+    if (is_array($extraImagesIn)) {
+        $pdo->prepare('DELETE FROM product_images WHERE product_id = ?')->execute([$productId]);
+        $imgIns = $pdo->prepare('INSERT INTO product_images (product_id, image_path) VALUES (?, ?)');
+        $mainBasename = $mainImage !== '' ? basename($mainImage) : '';
+        foreach ($extraImagesIn as $raw) {
+            $fn = basename((string)$raw);
+            $fn = preg_replace('/[^a-zA-Z0-9._-]/', '', $fn);
+            if ($fn === '' || $fn === '.' || $fn === '..') {
+                continue;
+            }
+            if ($mainBasename !== '' && $fn === $mainBasename) {
+                continue;
+            }
+            $imgIns->execute([$productId, $fn]);
+        }
+    }
+
+    $pdo->commit();
 
     orange_product_attach_all_active_channels($pdo, $productId);
 
     audit_log('product_update', 'تم تحديث المنتج رقم: ' . $productId, 'products', $productId);
     json_response(['success' => true, 'message' => 'تم تحديث المنتج']);
 } catch (Throwable $e) {
+    if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     api_error($e, 'تعذر تحديث المنتج');
 }
