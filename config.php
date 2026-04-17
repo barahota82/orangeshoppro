@@ -47,6 +47,56 @@ define(
     $__long === true || $__long === 1 || $__long === '1'
 );
 
+/** اختياري في .env.php: `ASSET_VERSION` نص ثابت؛ فارغ = تلقائي من تاريخ تعديل الملفات */
+define('STOREFRONT_ASSET_VERSION', trim((string)($env['ASSET_VERSION'] ?? '')));
+
+/*
+|--------------------------------------------------------------------------
+| Storefront static assets (cache bust)
+|--------------------------------------------------------------------------
+*/
+
+/**
+ * نسخة لاستعلام ?v= على CSS/JS: يدوية عبر ASSET_VERSION أو أقصى filemtime لملفات الواجهة.
+ */
+function storefront_asset_version(): string
+{
+    if (STOREFRONT_ASSET_VERSION !== '') {
+        return STOREFRONT_ASSET_VERSION;
+    }
+    static $computed = null;
+    if ($computed !== null) {
+        return $computed;
+    }
+    $files = [
+        __DIR__ . '/assets/css/main.css',
+        __DIR__ . '/assets/css/theme-orange.css',
+        __DIR__ . '/assets/css/theme-blue.css',
+        __DIR__ . '/assets/css/theme-black.css',
+        __DIR__ . '/assets/js/app.js',
+        __DIR__ . '/assets/js/cart.js',
+        __DIR__ . '/assets/js/lang.js',
+        __DIR__ . '/assets/js/product.js',
+    ];
+    $mt = 0;
+    foreach ($files as $f) {
+        if (is_file($f)) {
+            $mt = max($mt, (int) filemtime($f));
+        }
+    }
+    $computed = $mt > 0 ? (string) $mt : '1';
+
+    return $computed;
+}
+
+/** مسار أصل مع ?v= (مثال: storefront_asset_url('/assets/css/main.css')) */
+function storefront_asset_url(string $path): string
+{
+    $path = ($path !== '' && $path[0] === '/') ? $path : '/' . ltrim($path, '/');
+
+    return $path . '?v=' . rawurlencode(storefront_asset_version());
+}
+
 /*
 |--------------------------------------------------------------------------
 | PDO Connection

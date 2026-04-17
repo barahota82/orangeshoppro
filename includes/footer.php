@@ -10,8 +10,8 @@ if (function_exists('storefront_tagline_cycle_messages')) {
     ?>
 <textarea id="storefront-tagline-json" hidden readonly class="storefront-tagline-json"><?php echo htmlspecialchars((string)$sfTaglineJson, ENT_QUOTES, 'UTF-8'); ?></textarea>
 <?php } ?>
-<script src="/assets/js/lang.js" defer></script>
-<script src="/assets/js/app.js" defer></script>
-<script src="/assets/js/cart.js" defer></script>
+<script src="<?php echo htmlspecialchars(storefront_asset_url('/assets/js/lang.js'), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+<script src="<?php echo htmlspecialchars(storefront_asset_url('/assets/js/app.js'), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+<script src="<?php echo htmlspecialchars(storefront_asset_url('/assets/js/cart.js'), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
 </body>
 </html>

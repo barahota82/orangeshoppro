@@ -125,7 +125,7 @@ foreach ($variants as $v) {
     </div>
 </div>
 
-<script src="/assets/js/product.js" defer></script>
+<script src="<?php echo htmlspecialchars(storefront_asset_url('/assets/js/product.js'), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
 <script>
 window.CURRENT_PRODUCT = {
     id: <?php echo (int)$product['id']; ?>,
