@@ -43,14 +43,12 @@ $offersStmt = $pdo->prepare("
 ");
 $offersStmt->execute([$channelId]);
 $offers = $offersStmt->fetchAll();
-$taglineRotate = storefront_tagline_rotate_messages();
-$taglineFirst = (string)($taglineRotate[0] ?? '');
 ?>
 <div class="container">
-    <section class="hero-banner">
+    <section class="hero-banner hero-banner--intro">
         <div class="hero-content">
-            <h2><?php echo htmlspecialchars(t('storefront_brand')); ?></h2>
-            <p class="hero-rotating-tagline storefront-rotating-tagline" dir="auto"><?php echo htmlspecialchars($taglineFirst); ?></p>
+            <h2><?php echo htmlspecialchars(t('category_products')); ?></h2>
+            <p><?php echo htmlspecialchars(t('offers')); ?> · <?php echo htmlspecialchars(t('all')); ?></p>
         </div>
     </section>
 

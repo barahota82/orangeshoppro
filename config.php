@@ -289,14 +289,9 @@ function t(string $key): string {
     return $translations[$lang][$key] ?? $key;
 }
 
-/** Storefront hero/header tagline rotation: ar → en → fil → hi (5s interval in footer script). */
-function storefront_tagline_rotate_messages(): array {
-    return [
-        'كل ما تتمناه.. في مكان واحد.',
-        'Everything you desire.. in one place.',
-        'Lahat ng gusto mo.. sa iisang lugar.',
-        'सब कुछ जो आप चाहते हैं.. एक ही जगह पर।',
-    ];
+/** Arabic tagline under company name (fixed; all UI languages). */
+function storefront_tagline_ar(): string {
+    return 'كل ما تتمناه.. في مكان واحد.';
 }
 
 function json_response($data, int $httpCode = 200): void {
