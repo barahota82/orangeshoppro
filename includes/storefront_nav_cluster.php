@@ -76,7 +76,9 @@ $trackHref = htmlspecialchars(storefront_url('track', $channelSlug, $lang), ENT_
 if ($navPlace === 'dock') {
     ?>
 <a class="app-dock-btn" href="<?php echo $cartHref; ?>">
-    <span class="app-dock-btn__icon app-dock-btn__icon--cart" aria-hidden="true"></span>
+    <span class="app-dock-btn__icon" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" focusable="false"><path d="M6 6h14l-1.3 8H7.7L6 6Zm0 0L5 3H2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="19" r="1.35" fill="currentColor"/><circle cx="17" cy="19" r="1.35" fill="currentColor"/></svg>
+    </span>
     <span class="app-dock-btn__label"><?php echo htmlspecialchars(t('cart'), ENT_QUOTES, 'UTF-8'); ?></span>
 </a>
 <?php
@@ -91,7 +93,9 @@ $openDockCell();
 if ($navPlace === 'dock') {
     ?>
 <a class="app-dock-btn" href="<?php echo $trackHref; ?>">
-    <span class="app-dock-btn__icon app-dock-btn__icon--track" aria-hidden="true"></span>
+    <span class="app-dock-btn__icon" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" focusable="false"><path d="M12 21c-3.9-3.2-6-6.7-6-10a6 6 0 1 1 12 0c0 3.3-2.1 6.8-6 10Z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><circle cx="12" cy="11" r="2.25" fill="currentColor"/></svg>
+    </span>
     <span class="app-dock-btn__label"><?php echo htmlspecialchars(t('track_order'), ENT_QUOTES, 'UTF-8'); ?></span>
 </a>
 <?php
@@ -108,7 +112,9 @@ if ($waHref !== null) {
     if ($navPlace === 'dock') {
         ?>
 <a class="app-dock-btn app-dock-btn--whatsapp" href="<?php echo $waEsc; ?>" target="_blank" rel="noopener noreferrer">
-    <span class="app-dock-btn__icon app-dock-btn__icon--wa" aria-hidden="true"></span>
+    <span class="app-dock-btn__icon app-dock-btn__icon--wa" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" focusable="false"><path fill="#25d366" d="M17.5 14.2c-.3-.15-1.7-.9-2-1-.2-.1-.5-.15-.7.15-.2.3-.8 1-1 1.2-.2.2-.3.22-.6.07-.3-.15-1.2-.45-2.3-1.4-1-.85-1.6-1.7-1.8-2-.2-.3 0-.45.15-.6.15-.15.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.7-1.6-.95-2.2-.25-.58-.5-.5-.65-.51h-.55c-.2 0-.52.07-.8.37-.27.3-1 1-1 2.5s1 2.9 1.2 3.1c.15.2 2 3.1 5 4.4.7.3 1.3.5 1.7.6.7.23 1.4.2 1.9.12.6-.09 1.7-.7 2-1.4.2-.7.2-1.3.15-1.4-.1-.12-.25-.2-.55-.35z"/><path fill="#25d366" d="M12.1 21.9h-.01a9.8 9.8 0 0 1-5-1.4l-.36-.2-3.7 1 .99-3.6-.24-.38a9.9 9.9 0 0 1-1.5-5.2c0-5.4 4.4-9.8 9.9-9.8 2.6 0 5.1 1 7 2.9a9.8 9.8 0 0 1 2.9 7c0 5.5-4.4 9.9-9.9 9.9z"/></svg>
+    </span>
     <span class="app-dock-btn__label"><?php echo htmlspecialchars(t('whatsapp'), ENT_QUOTES, 'UTF-8'); ?></span>
 </a>
 <?php
@@ -120,7 +126,9 @@ if ($waHref !== null) {
 } elseif ($navPlace === 'dock') {
     ?>
 <span class="app-dock-btn app-dock-btn--disabled" aria-disabled="true">
-    <span class="app-dock-btn__icon app-dock-btn__icon--wa" aria-hidden="true"></span>
+    <span class="app-dock-btn__icon app-dock-btn__icon--wa" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" focusable="false"><path fill="currentColor" opacity="0.35" d="M17.5 14.2c-.3-.15-1.7-.9-2-1-.2-.1-.5-.15-.7.15-.2.3-.8 1-1 1.2-.2.2-.3.22-.6.07-.3-.15-1.2-.45-2.3-1.4-1-.85-1.6-1.7-1.8-2-.2-.3 0-.45.15-.6.15-.15.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.7-1.6-.95-2.2-.25-.58-.5-.5-.65-.51h-.55c-.2 0-.52.07-.8.37-.27.3-1 1-1 2.5s1 2.9 1.2 3.1c.15.2 2 3.1 5 4.4.7.3 1.3.5 1.7.6.7.23 1.4.2 1.9.12.6-.09 1.7-.7 2-1.4.2-.7.2-1.3.15-1.4-.1-.12-.25-.2-.55-.35z"/><path fill="currentColor" opacity="0.35" d="M12.1 21.9h-.01a9.8 9.8 0 0 1-5-1.4l-.36-.2-3.7 1 .99-3.6-.24-.38a9.9 9.9 0 0 1-1.5-5.2c0-5.4 4.4-9.8 9.9-9.8 2.6 0 5.1 1 7 2.9a9.8 9.8 0 0 1 2.9 7c0 5.5-4.4 9.9-9.9 9.9z"/></svg>
+    </span>
     <span class="app-dock-btn__label"><?php echo htmlspecialchars(t('whatsapp'), ENT_QUOTES, 'UTF-8'); ?></span>
 </span>
 <?php

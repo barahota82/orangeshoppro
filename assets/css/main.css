@@ -724,6 +724,7 @@ h1, h2, h3, .brand-text h1 {
 /* Mobile app-style bottom dock (storefront only) */
 .app-bottom-dock {
     display: none;
+    overflow: visible;
 }
 
 .app-bottom-dock__grid {
@@ -732,6 +733,7 @@ h1, h2, h3, .brand-text h1 {
     align-items: stretch;
     gap: 0;
     min-height: 56px;
+    overflow: visible;
 }
 
 .app-bottom-dock__cell {
@@ -739,13 +741,16 @@ h1, h2, h3, .brand-text h1 {
     display: flex;
     align-items: stretch;
     justify-content: center;
+    overflow: visible;
+    position: relative;
 }
 
 .app-bottom-dock__cell > .lang-dropdown,
 .app-bottom-dock__cell > details.lang-dropdown--dock {
     flex: 1;
-    display: flex;
-    justify-content: center;
+    width: 100%;
+    min-width: 0;
+    position: relative;
 }
 
 .app-bottom-dock__cell .lang-dropdown__summary--dock {
@@ -799,6 +804,16 @@ h1, h2, h3, .brand-text h1 {
     max-width: min(92vw, 260px);
     max-height: min(70vh, 320px);
     overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.15);
+}
+
+.app-bottom-dock__cell:has(.lang-dropdown--dock[open]) {
+    z-index: 1001;
+}
+
+.lang-dropdown--dock[open] {
+    z-index: 1001;
 }
 
 .app-dock-btn {
@@ -843,29 +858,26 @@ h1, h2, h3, .brand-text h1 {
     pointer-events: none;
 }
 
+/* Inline SVGs in PHP — no CSS masks (masks often fail on mobile / stroke SVGs) */
 .app-dock-btn__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 22px;
     height: 22px;
     flex-shrink: 0;
-    background: currentColor;
-    opacity: 0.9;
+    background: none;
+    opacity: 1;
 }
 
-.app-dock-btn__icon--cart {
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='black' stroke-width='2'%3E%3Cpath d='M6 6h15l-1.5 9h-12z'/%3E%3Cpath d='M6 6 5 3H2'/%3E%3Ccircle cx='9' cy='20' r='1'/%3E%3Ccircle cx='18' cy='20' r='1'/%3E%3C/svg%3E") center / contain no-repeat;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='black' stroke-width='2'%3E%3Cpath d='M6 6h15l-1.5 9h-12z'/%3E%3Cpath d='M6 6 5 3H2'/%3E%3Ccircle cx='9' cy='20' r='1'/%3E%3Ccircle cx='18' cy='20' r='1'/%3E%3C/svg%3E") center / contain no-repeat;
-}
-
-.app-dock-btn__icon--track {
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='black' stroke-width='2'%3E%3Cpath d='M12 21s-6-5.3-6-10a6 6 0 1 1 12 0c0 4.7-6 10-6 10z'/%3E%3Ccircle cx='12' cy='11' r='2.5'/%3E%3C/svg%3E") center / contain no-repeat;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='black' stroke-width='2'%3E%3Cpath d='M12 21s-6-5.3-6-10a6 6 0 1 1 12 0c0 4.7-6 10-6 10z'/%3E%3Ccircle cx='12' cy='11' r='2.5'/%3E%3C/svg%3E") center / contain no-repeat;
+.app-dock-btn__icon svg {
+    display: block;
+    width: 22px;
+    height: 22px;
 }
 
 .app-dock-btn__icon--wa {
-    background: #25d366;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z'/%3E%3C/svg%3E") center / contain no-repeat;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z'/%3E%3C/svg%3E") center / contain no-repeat;
-    opacity: 1;
+    background: none;
 }
 
 .app-dock-btn--whatsapp .app-dock-btn__label {
@@ -923,25 +935,58 @@ h1, h2, h3, .brand-text h1 {
     }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 1023px) {
+    /* هيدر ثابت فوق المحتوى (نفس منطق الشريط السفلي على الموبايل) */
+    body.storefront .site-header {
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: 0;
+        width: 100%;
+        max-width: 100%;
+        z-index: 9998;
+        margin: 0;
+        background: var(--header-bg);
+        border-bottom: 1px solid var(--border);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-left: env(safe-area-inset-left, 0px);
+        padding-right: env(safe-area-inset-right, 0px);
+        touch-action: manipulation;
+    }
+
+    body.storefront .site-main {
+        padding-top: calc(22px + var(--sf-fixed-header-h, 88px));
+    }
+
     body.storefront .app-bottom-dock {
         display: block;
         position: fixed;
-        inset-inline: 0;
+        left: 0;
+        right: 0;
         bottom: 0;
-        z-index: 40;
+        width: 100%;
+        max-width: 100%;
+        z-index: 9999;
+        margin: 0;
+        /* بدون backdrop-filter: أقل وميض/انزلاق مع السكرول على iOS */
         background: var(--header-bg);
         border-top: 1px solid var(--border);
-        backdrop-filter: blur(14px);
-        -webkit-backdrop-filter: blur(14px);
         padding-bottom: env(safe-area-inset-bottom, 0px);
+        padding-left: env(safe-area-inset-left, 0px);
+        padding-right: env(safe-area-inset-right, 0px);
+        touch-action: manipulation;
+        -webkit-touch-callout: none;
     }
 
     body.storefront .header-actions--toolbar {
         display: none !important;
     }
 
+    /* منع السحب الأفقي + مساحة للشريط السفلي */
     body.storefront {
+        overflow-x: hidden;
         padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
     }
 }
