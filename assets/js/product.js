@@ -294,6 +294,108 @@ function addCurrentProductToCart() {
     syncProductQtyLimits();
 }
 
+function initProductGallery() {
+    const root = document.getElementById('productGallery');
+    const track = document.getElementById('productGalleryTrack');
+    const viewport = document.getElementById('productGalleryViewport');
+    if (!root || !track || !viewport) {
+        return;
+    }
+    const n =
+        parseInt(root.getAttribute('data-gallery-count') || '0', 10) ||
+        track.querySelectorAll('.product-gallery__slide').length;
+    if (n <= 1) {
+        return;
+    }
+
+    let index = 0;
+
+    function setIndex(i) {
+        index = Math.max(0, Math.min(n - 1, i));
+        track.style.transform = 'translateX(-' + index * 100 + '%)';
+        document.querySelectorAll('.product-gallery__dot').forEach((d, di) => {
+            const on = di === index;
+            d.classList.toggle('is-active', on);
+            d.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        document.querySelectorAll('.product-gallery__thumbs .thumb').forEach((t, ti) => {
+            t.classList.toggle('active', ti === index);
+        });
+    }
+
+    function next() {
+        setIndex(index + 1 >= n ? 0 : index + 1);
+    }
+
+    function prev() {
+        setIndex(index - 1 < 0 ? n - 1 : index - 1);
+    }
+
+    const btnP = document.getElementById('productGalleryPrev');
+    const btnN = document.getElementById('productGalleryNext');
+    if (btnP) {
+        btnP.addEventListener('click', prev);
+    }
+    if (btnN) {
+        btnN.addEventListener('click', next);
+    }
+
+    document.querySelectorAll('.product-gallery__dot').forEach((d) => {
+        d.addEventListener('click', () => setIndex(parseInt(d.getAttribute('data-index') || '0', 10)));
+    });
+    document.querySelectorAll('.product-gallery__thumbs .thumb').forEach((t) => {
+        t.addEventListener('click', () => setIndex(parseInt(t.getAttribute('data-gallery-index') || '0', 10)));
+    });
+
+    let touchStartX = null;
+    viewport.addEventListener(
+        'touchstart',
+        (e) => {
+            if (e.touches && e.touches[0]) {
+                touchStartX = e.touches[0].clientX;
+            }
+        },
+        { passive: true }
+    );
+    viewport.addEventListener(
+        'touchend',
+        (e) => {
+            if (touchStartX == null) {
+                return;
+            }
+            const x = e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientX : touchStartX;
+            const dx = x - touchStartX;
+            touchStartX = null;
+            if (dx > 55) {
+                prev();
+            } else if (dx < -55) {
+                next();
+            }
+        },
+        { passive: true }
+    );
+
+    function onDocKey(e) {
+        if (!document.getElementById('productGalleryTrack')) {
+            return;
+        }
+        const tag = e.target && e.target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+            return;
+        }
+        if (e.key === 'ArrowLeft') {
+            prev();
+            e.preventDefault();
+        } else if (e.key === 'ArrowRight') {
+            next();
+            e.preventDefault();
+        }
+    }
+    document.addEventListener('keydown', onDocKey);
+
+    setIndex(0);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const input = document.getElementById('qtyInput');
     if (input) {
@@ -301,4 +403,5 @@ document.addEventListener('DOMContentLoaded', () => {
         input.addEventListener('blur', clampQtyInput);
     }
     syncProductQtyLimits();
+    initProductGallery();
 });

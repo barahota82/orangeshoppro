@@ -10,10 +10,10 @@ require_once __DIR__ . '/../config.php';
 function storefront_catalog_label(array $row, string $lang): string
 {
     return match ($lang) {
-        'ar' => (string)($row['name_ar'] ?? $row['name_en'] ?? ''),
-        'fil' => (string)($row['name_fil'] ?? $row['name_en'] ?? ''),
-        'hi' => (string)($row['name_hi'] ?? $row['name_en'] ?? ''),
-        default => (string)($row['name_en'] ?? $row['name_ar'] ?? ''),
+        'ar' => (string)($row['name_ar'] ?? $row['name'] ?? $row['name_en'] ?? ''),
+        'fil' => (string)($row['name_fil'] ?? $row['name_en'] ?? $row['name'] ?? ''),
+        'hi' => (string)($row['name_hi'] ?? $row['name_en'] ?? $row['name'] ?? ''),
+        default => (string)($row['name_en'] ?? $row['name'] ?? $row['name_ar'] ?? ''),
     };
 }
 
@@ -315,11 +315,11 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
         <?php foreach ($offers as $p): ?>
             <article class="product-card" data-filter="offers cat-<?php echo (int) $p['category_id']; ?><?php echo $storefrontExtraFilterSuffix($p); ?>">
                 <div class="product-image-wrap">
-                    <img src="/uploads/products/<?php echo htmlspecialchars($p['main_image']); ?>" alt="<?php echo htmlspecialchars($p['name']); ?>">
+                    <img src="/uploads/products/<?php echo htmlspecialchars($p['main_image']); ?>" alt="<?php echo htmlspecialchars(storefront_product_display_name($p)); ?>">
                     <span class="offer-badge"><?php echo htmlspecialchars(t('offers')); ?></span>
                 </div>
                 <div class="product-body">
-                    <h3><?php echo htmlspecialchars($p['name']); ?></h3>
+                    <h3><?php echo htmlspecialchars(storefront_product_display_name($p)); ?></h3>
                     <div class="price-row">
                         <strong><?php echo number_format((float) $p['price'] - (float) $p['discount'], 2); ?> KD</strong>
                         <span class="old-price"><?php echo number_format((float) $p['price'], 2); ?> KD</span>
@@ -337,10 +337,10 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
             } ?>
             <article class="product-card" data-filter="all cat-<?php echo (int) $p['category_id']; ?><?php echo $storefrontExtraFilterSuffix($p); ?>">
                 <div class="product-image-wrap">
-                    <img src="/uploads/products/<?php echo htmlspecialchars($p['main_image']); ?>" alt="<?php echo htmlspecialchars($p['name']); ?>">
+                    <img src="/uploads/products/<?php echo htmlspecialchars($p['main_image']); ?>" alt="<?php echo htmlspecialchars(storefront_product_display_name($p)); ?>">
                 </div>
                 <div class="product-body">
-                    <h3><?php echo htmlspecialchars($p['name']); ?></h3>
+                    <h3><?php echo htmlspecialchars(storefront_product_display_name($p)); ?></h3>
                     <div class="price-row">
                         <strong><?php echo number_format((float) $p['price'], 2); ?> KD</strong>
                     </div>

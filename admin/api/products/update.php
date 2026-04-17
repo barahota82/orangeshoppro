@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/product_channels.php';
@@ -36,7 +39,9 @@ try {
 
     $stmt = $pdo->prepare("
         UPDATE products
-        SET name = ?, name_en = ?, name_fil = ?, name_hi = ?, description = ?, category_id = ?, price = ?, cost = ?,
+        SET name = ?, name_en = ?, name_fil = ?, name_hi = ?,
+            description = ?, description_en = ?, description_fil = ?, description_hi = ?,
+            category_id = ?, price = ?, cost = ?,
             main_image = ?, has_sizes = ?, has_colors = ?, is_active = ?, updated_at = NOW()
         WHERE id = ?
     ");
@@ -47,6 +52,9 @@ try {
         $nameFil,
         $nameHi,
         trim((string)($data['description'] ?? '')),
+        trim((string)($data['description_en'] ?? '')),
+        trim((string)($data['description_fil'] ?? '')),
+        trim((string)($data['description_hi'] ?? '')),
         (int)$data['category_id'],
         (float)$data['price'],
         (float)$data['cost'],

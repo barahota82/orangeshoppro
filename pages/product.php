@@ -18,8 +18,9 @@ if (!$product) {
     $homeUrl = storefront_url('home', $channelSlug, $lang);
     ?>
 <div class="container">
-    <nav class="product-page-toolbar">
+    <nav class="product-page-toolbar product-page-toolbar--dual">
         <a class="product-page__back" href="<?php echo htmlspecialchars($homeUrl, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(t('product_back_to_shop'), ENT_QUOTES, 'UTF-8'); ?></a>
+        <a class="product-page__close" href="<?php echo htmlspecialchars($homeUrl, ENT_QUOTES, 'UTF-8'); ?>" aria-label="<?php echo htmlspecialchars(t('product_back_to_shop'), ENT_QUOTES, 'UTF-8'); ?>"><span aria-hidden="true">&times;</span></a>
     </nav>
     <div class="card-box product-page product-page--empty">
         <p class="product-page__empty-msg"><?php echo htmlspecialchars(t('product_not_found'), ENT_QUOTES, 'UTF-8'); ?></p>
@@ -66,23 +67,59 @@ foreach ($variants as $v) {
     }
     $totalStock += (int)$v['stock_quantity'];
 }
+
+$mainFile = trim((string)($product['main_image'] ?? ''));
+$galleryUrls = [];
+if ($mainFile !== '') {
+    $galleryUrls[] = '/uploads/products/' . $mainFile;
+}
+foreach ($images as $img) {
+    $rel = trim((string)($img['image_path'] ?? ''));
+    if ($rel === '' || $rel === $mainFile) {
+        continue;
+    }
+    $galleryUrls[] = '/uploads/products/' . $rel;
+}
+$galleryCount = count($galleryUrls);
+$glPrevLabel = htmlspecialchars(t('product_gallery_prev'), ENT_QUOTES, 'UTF-8');
+$glNextLabel = htmlspecialchars(t('product_gallery_next'), ENT_QUOTES, 'UTF-8');
+$glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
 ?>
 <div class="container">
-    <nav class="product-page-toolbar" aria-label="<?php echo htmlspecialchars(t('product_back_to_shop'), ENT_QUOTES, 'UTF-8'); ?>">
+    <nav class="product-page-toolbar product-page-toolbar--dual" aria-label="<?php echo htmlspecialchars(t('product_back_to_shop'), ENT_QUOTES, 'UTF-8'); ?>">
         <a class="product-page__back" href="<?php echo htmlspecialchars($homeUrl, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(t('product_back_to_shop'), ENT_QUOTES, 'UTF-8'); ?></a>
+        <a class="product-page__close" href="<?php echo htmlspecialchars($homeUrl, ENT_QUOTES, 'UTF-8'); ?>" aria-label="<?php echo htmlspecialchars(t('product_back_to_shop'), ENT_QUOTES, 'UTF-8'); ?>"><span aria-hidden="true">&times;</span></a>
     </nav>
     <div class="product-page card-box">
-        <div class="product-gallery">
-            <img id="mainProductImage" class="main-product-image" src="/uploads/products/<?php echo htmlspecialchars($product['main_image']); ?>" alt="<?php echo htmlspecialchars($displayName); ?>">
-            <?php if ($images): ?>
-            <div class="thumbs">
-                <button type="button" class="thumb active" onclick="changeMainImage('/uploads/products/<?php echo htmlspecialchars($product['main_image']); ?>', this)">
-                    <img src="/uploads/products/<?php echo htmlspecialchars($product['main_image']); ?>" alt="">
+        <div class="product-gallery" id="productGallery" data-gallery-count="<?php echo (int)$galleryCount; ?>">
+            <div class="product-gallery__stage">
+                <?php if ($galleryCount > 1): ?>
+                <button type="button" class="product-gallery__nav product-gallery__nav--prev" id="productGalleryPrev" aria-label="<?php echo $glPrevLabel; ?>"><span aria-hidden="true">‹</span></button>
+                <?php endif; ?>
+                <div class="product-gallery__viewport" id="productGalleryViewport" <?php echo $galleryCount > 1 ? 'tabindex="0"' : ''; ?>>
+                    <div class="product-gallery__track" id="productGalleryTrack">
+                        <?php foreach ($galleryUrls as $url): ?>
+                        <div class="product-gallery__slide">
+                            <img class="product-gallery__img" src="<?php echo htmlspecialchars($url, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8'); ?>" loading="lazy">
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php if ($galleryCount > 1): ?>
+                <button type="button" class="product-gallery__nav product-gallery__nav--next" id="productGalleryNext" aria-label="<?php echo $glNextLabel; ?>"><span aria-hidden="true">›</span></button>
+                <?php endif; ?>
+            </div>
+            <?php if ($galleryCount > 1): ?>
+            <div class="product-gallery__dots" id="productGalleryDots" role="tablist" aria-label="<?php echo $glDotsLabel; ?>">
+                <?php for ($di = 0; $di < $galleryCount; $di++): ?>
+                <button type="button" class="product-gallery__dot<?php echo $di === 0 ? ' is-active' : ''; ?>" role="tab" aria-selected="<?php echo $di === 0 ? 'true' : 'false'; ?>" data-index="<?php echo (int)$di; ?>" aria-label="<?php echo (int)($di + 1); ?> / <?php echo (int)$galleryCount; ?>"></button>
+                <?php endfor; ?>
+            </div>
+            <div class="thumbs product-gallery__thumbs">
+                <?php foreach ($galleryUrls as $ti => $turl): ?>
+                <button type="button" class="thumb<?php echo $ti === 0 ? ' active' : ''; ?>" data-gallery-index="<?php echo (int)$ti; ?>">
+                    <img src="<?php echo htmlspecialchars($turl, ENT_QUOTES, 'UTF-8'); ?>" alt="">
                 </button>
-                <?php foreach ($images as $img): ?>
-                    <button type="button" class="thumb" onclick="changeMainImage('/uploads/products/<?php echo htmlspecialchars($img['image_path']); ?>', this)">
-                        <img src="/uploads/products/<?php echo htmlspecialchars($img['image_path']); ?>" alt="">
-                    </button>
                 <?php endforeach; ?>
             </div>
             <?php endif; ?>

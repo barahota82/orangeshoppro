@@ -137,6 +137,15 @@ function orange_catalog_ensure_schema(PDO $pdo): void
     if (!orange_table_has_column($pdo, 'products', 'name_hi')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN name_hi VARCHAR(191) NOT NULL DEFAULT \'\'');
     }
+    if (!orange_table_has_column($pdo, 'products', 'description_en')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN description_en TEXT NULL');
+    }
+    if (!orange_table_has_column($pdo, 'products', 'description_fil')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN description_fil TEXT NULL');
+    }
+    if (!orange_table_has_column($pdo, 'products', 'description_hi')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN description_hi TEXT NULL');
+    }
     if (!orange_table_has_column($pdo, 'stock_movements', 'reference')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE stock_movements ADD COLUMN reference VARCHAR(100) NULL');
     }

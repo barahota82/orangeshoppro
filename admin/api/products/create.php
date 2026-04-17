@@ -117,11 +117,18 @@ try {
 
     $pdo->beginTransaction();
 
+    $descAr = trim((string)($data['description'] ?? ''));
+    $descEn = trim((string)($data['description_en'] ?? ''));
+    $descFil = trim((string)($data['description_fil'] ?? ''));
+    $descHi = trim((string)($data['description_hi'] ?? ''));
+
     $stmt = $pdo->prepare(
         'INSERT INTO products (
-            name, name_en, name_fil, name_hi, description, category_id, size_family_id, sizing_guide_scope, price, cost, main_image, has_sizes, has_colors, is_active, created_at
+            name, name_en, name_fil, name_hi,
+            description, description_en, description_fil, description_hi,
+            category_id, size_family_id, sizing_guide_scope, price, cost, main_image, has_sizes, has_colors, is_active, created_at
         ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW()
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW()
         )'
     );
 
@@ -130,7 +137,10 @@ try {
         $nameEn,
         $nameFil,
         $nameHi,
-        trim((string)($data['description'] ?? '')),
+        $descAr,
+        $descEn,
+        $descFil,
+        $descHi,
         (int)$data['category_id'],
         $sizeFamilyId,
         $scope,
@@ -205,6 +215,23 @@ try {
 
         $variantId = (int)$pdo->lastInsertId();
         $moveStmt->execute([$productId, $variantId, $stock, $stock]);
+    }
+
+    $extraImages = $data['extra_images'] ?? null;
+    if (is_array($extraImages)) {
+        $imgIns = $pdo->prepare('INSERT INTO product_images (product_id, image_path) VALUES (?, ?)');
+        $mainBasename = trim(basename((string)($data['main_image'] ?? '')));
+        foreach ($extraImages as $raw) {
+            $fn = basename((string)$raw);
+            $fn = preg_replace('/[^a-zA-Z0-9._-]/', '', $fn);
+            if ($fn === '' || $fn === '.' || $fn === '..') {
+                continue;
+            }
+            if ($mainBasename !== '' && $fn === $mainBasename) {
+                continue;
+            }
+            $imgIns->execute([$productId, $fn]);
+        }
     }
 
     orange_product_attach_all_active_channels($pdo, $productId);

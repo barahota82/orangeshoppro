@@ -75,12 +75,36 @@ foreach ($families as $f) {
                 <input type="number" id="cost" step="0.01" required>
             </div>
             <div style="grid-column:1/-1;">
-                <label>الوصف</label>
-                <textarea id="description"></textarea>
+                <label>الوصف (عربي)</label>
+                <textarea id="description" rows="3"></textarea>
             </div>
-            <div>
-                <label>الصورة الرئيسية (اسم الملف)</label>
-                <input type="text" id="main_image" placeholder="example.jpg">
+            <div style="grid-column:1/-1;">
+                <label>Description (English)</label>
+                <textarea id="description_en" rows="3"></textarea>
+            </div>
+            <div style="grid-column:1/-1;">
+                <label>Description (Filipino)</label>
+                <textarea id="description_fil" rows="3"></textarea>
+            </div>
+            <div style="grid-column:1/-1;">
+                <label>Description (Hindi)</label>
+                <textarea id="description_hi" rows="3"></textarea>
+            </div>
+            <div style="grid-column:1/-1;">
+                <label>الصورة الرئيسية — رفع ملف</label>
+                <input type="hidden" id="main_image" value="">
+                <input type="file" id="main_image_file" accept="image/jpeg,image/png,image/webp,image/gif">
+                <button type="button" class="btn-secondary" style="margin-top:8px;" onclick="uploadMainProductImage()">رفع الصورة الرئيسية</button>
+                <div style="margin-top:10px;">
+                    <img id="main_image_preview" alt="" style="display:none;max-height:140px;border-radius:8px;border:1px solid #ddd;">
+                </div>
+                <p style="margin:8px 0 0;font-size:12px;color:#666;">يُحفظ اسم الملف تلقائياً بعد الرفع الناجح.</p>
+            </div>
+            <div style="grid-column:1/-1;">
+                <label>صور إضافية للمعرض (عدة ملفات)</label>
+                <input type="file" id="gallery_files" accept="image/jpeg,image/png,image/webp,image/gif" multiple>
+                <button type="button" class="btn-secondary" style="margin-top:8px;" onclick="uploadGalleryProductImages()">رفع صور المعرض</button>
+                <ul id="gallery_upload_list" style="margin:10px 0 0;padding-inline-start:20px;font-size:13px;"></ul>
             </div>
         </div>
 
@@ -170,6 +194,7 @@ foreach ($families as $f) {
 <script>
 window.ORANGE_COLORS = <?php echo json_encode($colors, JSON_UNESCAPED_UNICODE); ?>;
 window.ORANGE_FAMILIES = <?php echo json_encode($familiesOut, JSON_UNESCAPED_UNICODE); ?>;
+window.PRODUCT_EXTRA_IMAGES = [];
 
 let productTranslateTimer = null;
 let productEnTranslateTimer = null;
@@ -215,6 +240,78 @@ function scheduleProductTranslateFromEnglish() {
     }
     clearTimeout(productEnTranslateTimer);
     productEnTranslateTimer = setTimeout(() => translateProductNames({ silent: true, forceFromArabic: false }), 550);
+}
+
+function renderGalleryUploadList() {
+    const ul = document.getElementById('gallery_upload_list');
+    if (!ul) return;
+    ul.innerHTML = '';
+    (window.PRODUCT_EXTRA_IMAGES || []).forEach((name, i) => {
+        const li = document.createElement('li');
+        li.textContent = name + ' ';
+        const rm = document.createElement('button');
+        rm.type = 'button';
+        rm.textContent = 'حذف';
+        rm.className = 'btn-secondary';
+        rm.style.marginInlineStart = '8px';
+        rm.onclick = () => {
+            window.PRODUCT_EXTRA_IMAGES.splice(i, 1);
+            renderGalleryUploadList();
+        };
+        li.appendChild(rm);
+        ul.appendChild(li);
+    });
+}
+
+async function uploadMainProductImage() {
+    const inp = document.getElementById('main_image_file');
+    if (!inp || !inp.files || !inp.files[0]) {
+        alert('اختر ملف صورة');
+        return;
+    }
+    const fd = new FormData();
+    fd.append('image', inp.files[0]);
+    try {
+        const r = await fetch('/admin/api/uploads/product-image.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+        const j = await r.json();
+        if (!j.success) {
+            alert(j.message || 'فشل الرفع');
+            return;
+        }
+        document.getElementById('main_image').value = j.filename;
+        const prev = document.getElementById('main_image_preview');
+        prev.src = '/uploads/products/' + j.filename;
+        prev.style.display = 'block';
+        inp.value = '';
+    } catch (e) {
+        alert('خطأ في الاتصال أثناء الرفع');
+    }
+}
+
+async function uploadGalleryProductImages() {
+    const inp = document.getElementById('gallery_files');
+    if (!inp || !inp.files || !inp.files.length) {
+        alert('اختر ملفات الصور');
+        return;
+    }
+    for (let i = 0; i < inp.files.length; i++) {
+        const fd = new FormData();
+        fd.append('image', inp.files[i]);
+        try {
+            const r = await fetch('/admin/api/uploads/product-image.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+            const j = await r.json();
+            if (j.success && j.filename) {
+                window.PRODUCT_EXTRA_IMAGES.push(j.filename);
+            } else if (j.message) {
+                alert(j.message);
+            }
+        } catch (e) {
+            alert('خطأ في الاتصال أثناء الرفع');
+            return;
+        }
+    }
+    inp.value = '';
+    renderGalleryUploadList();
 }
 
 function onHasFlagsChange() {
@@ -347,6 +444,11 @@ async function saveProduct() {
         }
     }
 
+    if (!document.getElementById('main_image').value.trim()) {
+        alert('ارفع الصورة الرئيسية قبل الحفظ');
+        return;
+    }
+
     const rows = Array.from(document.querySelectorAll('#variantsBox tbody tr'));
     if (!rows.length) {
         alert('ولّد المتغيرات أولاً');
@@ -366,6 +468,9 @@ async function saveProduct() {
         name_fil: document.getElementById('name_fil').value.trim(),
         name_hi: document.getElementById('name_hi').value.trim(),
         description: document.getElementById('description').value.trim(),
+        description_en: document.getElementById('description_en').value.trim(),
+        description_fil: document.getElementById('description_fil').value.trim(),
+        description_hi: document.getElementById('description_hi').value.trim(),
         category_id: parseInt(document.getElementById('category_id').value, 10),
         price: parseFloat(document.getElementById('price').value || '0'),
         cost: parseFloat(document.getElementById('cost').value || '0'),
@@ -374,6 +479,7 @@ async function saveProduct() {
         has_colors: parseInt(document.getElementById('has_colors').value, 10),
         size_family_id: parseInt(document.getElementById('size_family_id').value, 10) || 0,
         sizing_guide_scope: document.getElementById('sizing_guide_scope').value,
+        extra_images: window.PRODUCT_EXTRA_IMAGES || [],
         variants
     };
 
