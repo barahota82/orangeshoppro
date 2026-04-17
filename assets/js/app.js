@@ -3,12 +3,69 @@ function formatMoney(v) {
 }
 
 /**
- * سلوجان الهيدر: تناوب ثابت — عربي → إنجليزي → فلبيني → هندي (ar, en, fil, hi من config.php).
- * setTimeout متسلسل + pageshow: يصلح توقف اللوب على موبايل (bfcache / تعطيل المؤقتات).
+ * تناوب نص مع تلاشي — نفس آلية https://clickstorekw.com/ (setInterval + opacity + setTimeout).
+ */
+function storefrontOpacityTextLoop(opts) {
+    const intervalMs = opts.intervalMs || 5000;
+    const fadeMs = opts.fadeMs || 400;
+    let intervalId = null;
+    let fadeId = null;
+    let idx = 0;
+
+    function stop() {
+        if (intervalId !== null) {
+            clearInterval(intervalId);
+            intervalId = null;
+        }
+        if (fadeId !== null) {
+            clearTimeout(fadeId);
+            fadeId = null;
+        }
+    }
+
+    function start() {
+        stop();
+        const el = opts.getEl();
+        const msgs = opts.getMsgs();
+        if (!el || msgs.length < 2) {
+            return;
+        }
+        el.style.opacity = '1';
+        idx = 0;
+        el.textContent = msgs[idx % msgs.length];
+
+        intervalId = setInterval(() => {
+            const currentEl = opts.getEl();
+            if (!currentEl) {
+                return;
+            }
+            const currentMsgs = opts.getMsgs();
+            if (currentMsgs.length < 2) {
+                return;
+            }
+            currentEl.style.opacity = '0';
+            fadeId = setTimeout(() => {
+                idx = (idx + 1) % currentMsgs.length;
+                currentEl.textContent = currentMsgs[idx];
+                currentEl.style.opacity = '1';
+                fadeId = null;
+            }, fadeMs);
+        }, intervalMs);
+    }
+
+    function isActive() {
+        return intervalId !== null;
+    }
+
+    return { start, stop, isActive };
+}
+
+/**
+ * سلوجان الهيدر: عربي → إنجليزي → فلبيني → هندي (مصدر النصوص من config / textarea).
  */
 (function rotateStorefrontTagline() {
     const TAGLINE_MS = 5000;
-    let taglineTimer = null;
+    const FADE_MS = 400;
 
     function parseList(jsonStr) {
         if (!jsonStr || typeof jsonStr !== 'string') {
@@ -47,40 +104,18 @@ function formatMoney(v) {
         return w.filter((t) => typeof t === 'string' && t.trim() !== '');
     }
 
-    function stopTagline() {
-        if (taglineTimer !== null) {
-            clearTimeout(taglineTimer);
-            taglineTimer = null;
-        }
-    }
-
-    function startTagline() {
-        stopTagline();
-        const el = document.getElementById('brandTaglineText');
-        const msgs = collectMessages(el);
-        if (!el || msgs.length < 2) {
-            return;
-        }
-        let i = 0;
-        function show(idx) {
-            el.textContent = msgs[idx];
-        }
-        show(i);
-        function scheduleNext() {
-            taglineTimer = setTimeout(() => {
-                i = (i + 1) % msgs.length;
-                show(i);
-                scheduleNext();
-            }, TAGLINE_MS);
-        }
-        scheduleNext();
-    }
+    const loop = storefrontOpacityTextLoop({
+        intervalMs: TAGLINE_MS,
+        fadeMs: FADE_MS,
+        getEl: () => document.getElementById('brandTaglineText'),
+        getMsgs: () => collectMessages(document.getElementById('brandTaglineText')),
+    });
 
     function bootTagline() {
-        startTagline();
-        if (taglineTimer === null) {
-            setTimeout(startTagline, 120);
-            setTimeout(startTagline, 600);
+        loop.start();
+        if (!loop.isActive()) {
+            setTimeout(() => loop.start(), 120);
+            setTimeout(() => loop.start(), 600);
         }
     }
 
@@ -92,8 +127,8 @@ function formatMoney(v) {
     window.addEventListener('load', bootTagline);
     window.addEventListener('pageshow', (ev) => {
         if (ev.persisted) {
-            stopTagline();
-            startTagline();
+            loop.stop();
+            loop.start();
         }
     });
     document.addEventListener('visibilitychange', () => {
@@ -106,22 +141,14 @@ function formatMoney(v) {
         if (!document.getElementById('brandTaglineText')) {
             return;
         }
-        stopTagline();
-        startTagline();
+        loop.stop();
+        loop.start();
     });
 })();
 
-/** الصفحة الرئيسية: تناوب 3 جمل في الـ hero حسب لغة الصفحة */
+/** الصفحة الرئيسية: 3 جمل بالتناوب حسب لغة الواجهة */
 (function rotateHomeHero() {
     const HERO_MS = 5000;
-    let heroTimer = null;
-
-    function stopHero() {
-        if (heroTimer !== null) {
-            clearTimeout(heroTimer);
-            heroTimer = null;
-        }
-    }
 
     function parseHeroLines(raw) {
         if (!raw || typeof raw !== 'string') {
@@ -138,37 +165,24 @@ function formatMoney(v) {
         }
     }
 
-    function startHero() {
-        stopHero();
-        const el = document.getElementById('homeHeroRotator');
-        const ta = document.getElementById('home-hero-lines-json');
-        const msgs = ta && ta.value ? parseHeroLines(ta.value) : [];
-        if (!el || msgs.length < 2) {
-            return;
-        }
-        let i = 0;
-        function show(idx) {
-            el.textContent = msgs[idx];
-        }
-        show(i);
-        function scheduleNext() {
-            heroTimer = setTimeout(() => {
-                i = (i + 1) % msgs.length;
-                show(i);
-                scheduleNext();
-            }, HERO_MS);
-        }
-        scheduleNext();
-    }
+    const loop = storefrontOpacityTextLoop({
+        intervalMs: HERO_MS,
+        fadeMs: 400,
+        getEl: () => document.getElementById('homeHeroRotator'),
+        getMsgs: () => {
+            const ta = document.getElementById('home-hero-lines-json');
+            return ta && ta.value ? parseHeroLines(ta.value) : [];
+        },
+    });
 
     function bootHero() {
         if (!document.getElementById('homeHeroRotator')) {
             return;
         }
-        startHero();
-        if (heroTimer === null) {
-            setTimeout(startHero, 120);
-            setTimeout(startHero, 600);
+        loop.start();
+        if (!loop.isActive()) {
+            setTimeout(() => loop.start(), 120);
+            setTimeout(() => loop.start(), 600);
         }
     }
 
@@ -180,8 +194,8 @@ function formatMoney(v) {
     window.addEventListener('load', bootHero);
     window.addEventListener('pageshow', (ev) => {
         if (ev.persisted && document.getElementById('homeHeroRotator')) {
-            stopHero();
-            startHero();
+            loop.stop();
+            loop.start();
         }
     });
     document.addEventListener('visibilitychange', () => {
@@ -191,8 +205,8 @@ function formatMoney(v) {
         if (!window.matchMedia('(max-width: 1023px)').matches) {
             return;
         }
-        stopHero();
-        startHero();
+        loop.stop();
+        loop.start();
     });
 })();
 

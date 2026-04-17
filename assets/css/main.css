@@ -136,6 +136,8 @@ h1, h2, h3, .brand-text h1 {
 .brand-tagline__text {
     display: block;
     min-height: 1.35em;
+    opacity: 1;
+    transition: opacity 0.35s ease;
 }
 
 .header-actions {
@@ -371,6 +373,8 @@ h1, h2, h3, .brand-text h1 {
     line-height: 1.45;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
     min-height: 0;
+    opacity: 1;
+    transition: opacity 0.35s ease;
 }
 
 .tabs-scroll {
