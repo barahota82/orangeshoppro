@@ -46,7 +46,7 @@ foreach ($variants as $v) {
     <div class="actions" style="margin-top:12px;">
         <button type="button" class="btn-secondary" onclick="moAddLine()">+ سطر</button>
         <button type="button" onclick="moSubmit()">حفظ وتسجيل الفاتورة</button>
-        <a class="btn-secondary" href="/admin/index.php?page=orders">الطلبات</a>
+        <a class="btn btn-secondary" href="/admin/index.php?page=orders">الطلبات</a>
     </div>
 </div>
 

@@ -84,7 +84,7 @@ if (!$order) {
         </label>
         <button type="submit">عرض</button>
     </form>
-    <p style="margin:0 0 12px;"><a class="btn-secondary" href="/admin/index.php?page=orders">← كل الطلبات</a></p>
+    <p style="margin:0 0 12px;"><a class="btn btn-secondary" href="/admin/index.php?page=orders">← كل الطلبات</a></p>
     <?php if ($recentForPicker): ?>
     <div class="table-wrap">
         <table>
@@ -111,7 +111,7 @@ if (!$order) {
                     <td><?php echo htmlspecialchars((string)$r['customer_name'], ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo number_format((float)$r['total'], 2); ?> KD</td>
                     <td><?php echo htmlspecialchars((string)$r['status'], ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><a class="btn-secondary" href="/admin/index.php?page=invoice&amp;order_id=<?php echo (int)$r['id']; ?>">فتح</a></td>
+                    <td><a class="btn btn-secondary" href="/admin/index.php?page=invoice&amp;order_id=<?php echo (int)$r['id']; ?>">فتح</a></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -170,7 +170,7 @@ if (!$order) {
     </table>
 
     <div class="invoice-actions">
-        <a class="btn-secondary" href="/admin/index.php?page=invoice">فواتير أخرى</a>
+        <a class="btn btn-secondary" href="/admin/index.php?page=invoice">فواتير أخرى</a>
         <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
     </div>
 </div>

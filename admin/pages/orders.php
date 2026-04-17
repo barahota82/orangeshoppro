@@ -87,7 +87,7 @@ $ordersIndex = (isset($_SERVER['SCRIPT_NAME']) && is_string($_SERVER['SCRIPT_NAM
                     <td><?php echo number_format((float)($o['total'] ?? 0), 2); ?> KD</td>
                     <td><span class="badge <?php echo htmlspecialchars((string)($o['status'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string)($o['status'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></span></td>
                     <td class="actions">
-                        <a class="btn-secondary" href="/admin/index.php?page=invoice&order_id=<?php echo (int)$o['id']; ?>" target="_blank">فاتورة</a>
+                        <a class="btn btn-secondary" href="/admin/index.php?page=invoice&order_id=<?php echo (int)$o['id']; ?>" target="_blank">فاتورة</a>
                         <button type="button" onclick="updateOrderStatus(<?php echo (int)$o['id']; ?>,'approved')">Approve</button>
                         <button type="button" class="btn-secondary" onclick="updateOrderStatus(<?php echo (int)$o['id']; ?>,'on_the_way')">On The Way</button>
                         <button type="button" class="btn-success" onclick="updateOrderStatus(<?php echo (int)$o['id']; ?>,'completed')">Delivered</button>

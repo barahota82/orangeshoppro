@@ -185,6 +185,14 @@ button, .btn {
     line-height: 1.25;
     min-height: 42px;
 }
+/* روابط تُعرض كأزرار (مثل فاتورة في جدول الطلبات) */
+a.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    text-align: center;
+}
 .btn-secondary {
     background: #6b7280;
 }
