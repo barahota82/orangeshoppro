@@ -2,26 +2,54 @@ function formatMoney(v) {
     return Number(v).toFixed(2) + ' KD';
 }
 
-/** سلوجان الهيدر: تناوب ثابت بين اللغات الأربع (مستقل عن لغة الواجهة) */
+/**
+ * سلوجان الهيدر: تناوب بين اللغات الأربع.
+ * يقرأ من data-taglines على العنصر (يعمل حتى لو CSP يمنع سكربت الهيدر و window.APP_TAGLINE_CYCLE).
+ */
 (function rotateStorefrontTagline() {
     const TAGLINE_MS = 5000;
-    const msgs = window.APP_TAGLINE_CYCLE;
-    if (!Array.isArray(msgs) || msgs.length < 2) return;
-    const el = document.getElementById('brandTaglineText');
-    if (!el) return;
-    let i = 0;
 
-    function show(idx) {
-        const t = msgs[idx];
-        if (typeof t !== 'string') return;
-        el.textContent = t;
+    function collectMessages(el) {
+        const raw = el && el.dataset ? el.dataset.taglines : '';
+        if (raw) {
+            try {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                    return parsed.filter((t) => typeof t === 'string' && t.trim() !== '');
+                }
+            } catch (e) {
+                /* fall through */
+            }
+        }
+        const w = window.APP_TAGLINE_CYCLE;
+        if (!Array.isArray(w)) {
+            return [];
+        }
+        return w.filter((t) => typeof t === 'string' && t.trim() !== '');
     }
 
-    show(i);
-    setInterval(() => {
-        i = (i + 1) % msgs.length;
+    function start() {
+        const el = document.getElementById('brandTaglineText');
+        const msgs = collectMessages(el);
+        if (!el || msgs.length < 2) {
+            return;
+        }
+        let i = 0;
+        function show(idx) {
+            el.textContent = msgs[idx];
+        }
         show(i);
-    }, TAGLINE_MS);
+        setInterval(() => {
+            i = (i + 1) % msgs.length;
+            show(i);
+        }, TAGLINE_MS);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start);
+    } else {
+        start();
+    }
 })();
 
 function changeMainImage(src, btn) {
