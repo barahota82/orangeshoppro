@@ -1,0 +1,34 @@
+
+<?php
+require_once '../../../config.php';
+require_admin_api();
+
+$pdo = db();
+$data = get_json_input();
+
+$pdo->beginTransaction();
+
+$stmt = $pdo->prepare("INSERT INTO purchases (supplier_id, total, type) VALUES (?,?,?)");
+$stmt->execute([$data['supplier_id'], $data['total'], $data['type']]);
+$purchase_id = $pdo->lastInsertId();
+
+foreach ($data['items'] as $item) {
+    $pdo->prepare("INSERT INTO purchase_items (purchase_id, product_id, qty, cost) VALUES (?,?,?,?)")
+        ->execute([$purchase_id, $item['product_id'], $item['qty'], $item['cost']]);
+
+    // Increase stock
+    $pdo->prepare("UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE product_id = ?")
+        ->execute([$item['qty'], $item['product_id']]);
+}
+
+// Accounting
+if ($data['type'] === 'cash') {
+    $pdo->prepare("INSERT INTO journal_entries (date, account_debit, account_credit, amount, reference) VALUES (NOW(),1,3,?,?)")
+        ->execute([$data['total'], 'PUR-'.$purchase_id]);
+} else {
+    $pdo->prepare("INSERT INTO journal_entries (date, account_debit, account_credit, amount, reference) VALUES (NOW(),3,5,?,?)")
+        ->execute([$data['total'], 'PUR-'.$purchase_id]);
+}
+
+$pdo->commit();
+echo json_encode(['success'=>true]);

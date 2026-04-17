@@ -1,0 +1,12 @@
+.theme-black { --primary: #111827; }
+.theme-black .hero-banner { background: linear-gradient(135deg, #111827, #374151); }
+.theme-black .product-card,
+.theme-black .card-box,
+.theme-black .site-header,
+.theme-black .bottom-nav,
+.theme-black .lang-switch a,
+.theme-black .icon-btn,
+.theme-black .tab-btn,
+.theme-black .chip {
+    background: #ffffff;
+}

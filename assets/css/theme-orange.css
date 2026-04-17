@@ -1,0 +1,2 @@
+.theme-orange { --primary: #ff7a00; }
+.theme-orange .hero-banner { background: linear-gradient(135deg, #ff7a00, #ffb15c); }

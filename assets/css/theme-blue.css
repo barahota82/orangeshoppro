@@ -1,0 +1,2 @@
+.theme-blue { --primary: #1d4ed8; }
+.theme-blue .hero-banner { background: linear-gradient(135deg, #1d4ed8, #60a5fa); }

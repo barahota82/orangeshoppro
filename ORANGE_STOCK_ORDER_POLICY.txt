@@ -1,0 +1,17 @@
+﻿Orange - Stock / Orders / Purchases policy (implementation reference)
+
+1) Stock unit = VARIANT (color x size). Each variant has its own qty.
+   Cart, orders, purchases must reference variant_id.
+
+2) Orders: RESERVE on create/confirm (exact trigger TBD in code), then DEDUCT on ship.
+   Partial ship allowed: deduct per order line when that line ships.
+
+3) Cancel / edit after reserve:
+   - Cancel before ship: release all reservations.
+   - Edit line qty/color/size: validate stock, release old reserve + create new reserve for updated line.
+
+4) Purchases: increase stock on RECEIPT. Partial receipt allowed per purchase line.
+
+5) Safety: no final deduct without ship (or explicit equivalent event). No reserve without availability check.
+
+Agreed with project owner for Orange implementation.
