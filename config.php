@@ -315,9 +315,9 @@ function get_translations(): array {
             'language' => 'Language',
             'storefront_brand' => 'Orange Company',
             'storefront_tagline' => 'Everything you wish for—in one place.',
-            'home_hero_line_1' => "Everything you're looking for.. in one place",
-            'home_hero_line_2' => 'Shop with peace of mind.. Cash on delivery and flexible returns',
-            'home_hero_line_3' => 'Save more.. with lowest prices and fastest doorstep delivery',
+            'home_hero_line_1' => "Everything you're looking for ... in one place",
+            'home_hero_line_2' => 'Shop with Peace of Mind • COD • Easy Returns',
+            'home_hero_line_3' => 'Save More • Best Price • Fast Delivery',
             'whatsapp' => 'WhatsApp'
         ],
         'ar' => [
@@ -347,9 +347,9 @@ function get_translations(): array {
             'language' => 'اللغة',
             'storefront_brand' => 'Orange Company',
             'storefront_tagline' => 'كل ما تتمناه.. في مكان واحد.',
-            'home_hero_line_1' => 'كل ما تبحث عنه.. في مكان واحد',
-            'home_hero_line_2' => 'تسوق براحة بال.. دفع عند الاستلام وسياسة إرجاع مرنة',
-            'home_hero_line_3' => 'وفر أكثر.. مع أقل الأسعار وأسرع توصيل لباب بيتك',
+            'home_hero_line_1' => 'كل ما تبحث عنه ... في مكان واحد',
+            'home_hero_line_2' => 'تسوق براحة بال • دفع عند الاستلام • إرجاع سهل',
+            'home_hero_line_3' => 'وفر أكثر • أقل سعر • أسرع توصيل',
             'whatsapp' => 'واتساب'
         ],
         'fil' => [
@@ -379,9 +379,9 @@ function get_translations(): array {
             'language' => 'Wika',
             'storefront_brand' => 'Orange Company',
             'storefront_tagline' => 'Lahat ng gusto mo… sa isang lugar.',
-            'home_hero_line_1' => 'Lahat ng iyong hinahanap.. sa iisang lugar',
-            'home_hero_line_2' => 'Mamili nang walang alalahanin.. COD at madaling pagbabalik',
-            'home_hero_line_3' => 'Makatipid pa.. sa pinakamababang presyo at mabilis na delivery',
+            'home_hero_line_1' => 'Lahat ng iyong hinahanap ... sa iisang lugar',
+            'home_hero_line_2' => 'Kampanteng Pagbili • COD • Madaling Return',
+            'home_hero_line_3' => 'Makatipid Pa • Murang Presyo • Mabilis na Delivery',
             'whatsapp' => 'WhatsApp'
         ],
         'hi' => [
@@ -411,9 +411,9 @@ function get_translations(): array {
             'language' => 'भाषा',
             'storefront_brand' => 'Orange Company',
             'storefront_tagline' => 'जो कुछ भी आप चाहें… एक ही जगह पर।',
-            'home_hero_line_1' => 'वह सब कुछ जो आप ढूंढ रहे हैं.. एक ही जगह पर।',
-            'home_hero_line_2' => 'मन की शांति के साथ खरीदारी करें.. कैश ऑन डिलीवरी और आसान रिटर्न।',
-            'home_hero_line_3' => 'अधिक बचत करें.. सबसे कम कीमतों और सबसे तेज़ डिलीवरी के साथ।',
+            'home_hero_line_1' => 'वह सब कुछ जो आप ढूंढ रहे हैं ... एक ही जगह पर।',
+            'home_hero_line_2' => 'निश्चिंत होकर खरीदारी • कैश ऑन डिलीवरी • आसान रिटर्न',
+            'home_hero_line_3' => 'अधिक बचत • सबसे कम दाम • तेज़ डिलीवरी',
             'whatsapp' => 'WhatsApp'
         ],
     ];

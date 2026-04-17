@@ -368,9 +368,10 @@ h1, h2, h3, .brand-text h1 {
 
 .hero-banner--rotator .hero-rotator-text {
     display: block;
-    font-size: clamp(0.95rem, 2.75vw, 1.35rem);
+    font-size: clamp(0.82rem, 2.35vw, 1.2rem);
     font-weight: 700;
-    line-height: 1.45;
+    line-height: 1.28;
+    letter-spacing: 0.01em;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
     min-height: 0;
     opacity: 1;
