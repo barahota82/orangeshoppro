@@ -149,7 +149,7 @@ $tablesReady = $hasFamilies && $hasSizes;
                     <th>عدد المقاسات</th>
                     <th>الترتيب</th>
                     <th>الحالة</th>
-                    <th class="admin-ops-col">إجراءات</th>
+                    <th class="sf-ops-col">إجراءات</th>
                 </tr>
             </thead>
             <tbody id="orange-families-list-tbody">
@@ -161,13 +161,13 @@ $tablesReady = $hasFamilies && $hasSizes;
                     <td><?php echo isset($sizesByFamily[(int) $f['id']]) ? count($sizesByFamily[(int) $f['id']]) : 0; ?></td>
                     <td><?php echo (int) $f['sort_order']; ?></td>
                     <td><?php echo (int) $f['is_active'] === 1 ? 'ظاهر' : 'مخفي'; ?></td>
-                    <td class="admin-ops-cell">
-                        <div class="admin-table-ops">
-                            <div class="admin-table-ops__arrows">
-                                <button type="button" class="btn-secondary admin-btn-reorder sf-btn-reorder" onclick="moveFamilyRow(this,'up')" aria-label="أعلى">↑</button>
-                                <button type="button" class="btn-secondary admin-btn-reorder sf-btn-reorder" onclick="moveFamilyRow(this,'down')" aria-label="أسفل">↓</button>
+                    <td class="sf-row-ops">
+                        <div class="sf-ops-wrap">
+                            <div class="sf-ops-arrows">
+                                <button type="button" class="btn-secondary sf-btn-reorder" onclick="moveFamilyRow(this,'up')" aria-label="أعلى">↑</button>
+                                <button type="button" class="btn-secondary sf-btn-reorder" onclick="moveFamilyRow(this,'down')" aria-label="أسفل">↓</button>
                             </div>
-                            <div class="admin-table-ops__main">
+                            <div class="sf-ops-main">
                                 <button type="button" class="btn-secondary sf-edit-btn" data-family-json="<?php echo htmlspecialchars(json_encode([
                                     'id' => (int) $f['id'],
                                     'name_ar' => (string) $f['name_ar'],
@@ -175,7 +175,7 @@ $tablesReady = $hasFamilies && $hasSizes;
                                     'sort_order' => (int) $f['sort_order'],
                                     'is_active' => (int) $f['is_active'],
                                 ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button>
-                                <button type="button" class="btn sf-btn-toggle" onclick="toggleFamily(<?php echo (int) $f['id']; ?>, <?php echo (int) $f['is_active']; ?>)">
+                                <button type="button" class="sf-btn-toggle" onclick="toggleFamily(<?php echo (int) $f['id']; ?>, <?php echo (int) $f['is_active']; ?>)">
                                     <?php echo (int) $f['is_active'] === 1 ? 'إخفاء' : 'إظهار'; ?>
                                 </button>
                             </div>
@@ -438,9 +438,64 @@ document.getElementById('fam_name_ar').addEventListener('change', function () {
         .cat-dep-list-wrap[data-list="size-families"] > table td{
             vertical-align:middle;
         }
-        .cat-dep-list-wrap[data-list="size-families"] table .admin-ops-col,
-        .cat-dep-list-wrap[data-list="size-families"] table .admin-ops-cell{
-            padding:10px 8px !important;
+        .cat-dep-list-wrap[data-list="size-families"] table .sf-ops-col,
+        .cat-dep-list-wrap[data-list="size-families"] table .sf-row-ops{
+            width:200px !important;
+            min-width:200px !important;
+            max-width:200px !important;
+            box-sizing:border-box !important;
+            text-align:center !important;
+            vertical-align:middle !important;
+            padding:6px 8px !important;
+        }
+        .cat-dep-list-wrap[data-list="size-families"] .sf-ops-wrap{
+            display:grid;
+            grid-template-columns:38px minmax(0,1fr);
+            gap:8px;
+            align-items:center;
+            margin:0 auto;
+            max-width:100%;
+            direction:rtl;
+        }
+        .cat-dep-list-wrap[data-list="size-families"] .sf-ops-arrows{
+            display:flex;
+            flex-direction:column;
+            gap:4px;
+            align-items:center;
+            justify-content:center;
+        }
+        .cat-dep-list-wrap[data-list="size-families"] .sf-ops-wrap button.sf-btn-reorder{
+            width:32px !important;
+            min-width:32px !important;
+            height:28px !important;
+            margin:0 !important;
+            padding:0 !important;
+            font-size:13px !important;
+            line-height:1 !important;
+            border-radius:6px !important;
+            display:inline-flex !important;
+            align-items:center;
+            justify-content:center;
+        }
+        .cat-dep-list-wrap[data-list="size-families"] .sf-ops-main{
+            display:flex;
+            flex-direction:column;
+            gap:5px;
+            min-width:0;
+        }
+        .cat-dep-list-wrap[data-list="size-families"] .sf-ops-main .btn-secondary,
+        .cat-dep-list-wrap[data-list="size-families"] .sf-ops-main .sf-btn-toggle{
+            width:100% !important;
+            margin:0 !important;
+            padding:6px 8px !important;
+            font-size:12px !important;
+            line-height:1.2 !important;
+            border-radius:6px !important;
+            box-sizing:border-box !important;
+            min-height:30px !important;
+            white-space:nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis;
         }
     `;
     document.head.appendChild(style);
