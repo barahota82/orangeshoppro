@@ -88,13 +88,13 @@ function orange_admin_orders_action_buttons(array $o): void
         </label>
     </div>
     <div class="table-wrap">
-        <table>
+        <table class="admin-orders-list-table">
             <thead>
                 <tr>
                     <th>رقم الطلب</th>
                     <th>المصدر</th>
-                    <th>العميل</th>
-                    <th>الهاتف</th>
+                    <th class="col-orders-customer">العميل</th>
+                    <th class="col-orders-phone">الهاتف</th>
                     <th>القناة</th>
                     <th>الإجمالي</th>
                     <th>الحالة</th>
@@ -111,8 +111,8 @@ function orange_admin_orders_action_buttons(array $o): void
                             ? '<span class="badge" title="طلب خارج الموقع">شركة</span>'
                             : '<span class="badge" title="من المتجر">موقع</span>';
                     ?></td>
-                    <td><?php echo htmlspecialchars((string)($o['customer_name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo htmlspecialchars((string)($o['phone'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td class="col-orders-customer"><?php echo htmlspecialchars((string)($o['customer_name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td class="col-orders-phone"><?php echo htmlspecialchars((string)($o['phone'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo htmlspecialchars((string)($o['channel_name'] ?: '-'), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo number_format((float)($o['total'] ?? 0), 2); ?> KD</td>
                     <td><?php
