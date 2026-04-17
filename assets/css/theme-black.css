@@ -110,3 +110,14 @@
     background: var(--header-bg);
     border-top-color: var(--border);
 }
+
+.theme-black .lang-dropdown__list {
+    background: var(--card);
+    border-color: var(--border);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+.theme-black .lang-dropdown__option.is-active {
+    background: rgba(212, 165, 116, 0.12);
+    color: var(--primary);
+}

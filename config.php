@@ -84,6 +84,16 @@ function current_lang(): string {
     return in_array($lang, $allowed, true) ? $lang : 'en';
 }
 
+/** Storefront language picker labels (native name per language). */
+function storefront_lang_options(): array {
+    return [
+        'ar' => ['label' => 'العربية'],
+        'en' => ['label' => 'English'],
+        'fil' => ['label' => 'PH'],
+        'hi' => ['label' => 'हिन्दी'],
+    ];
+}
+
 function current_channel_slug(): string {
     return isset($_GET['channel']) && $_GET['channel'] !== ''
         ? preg_replace('/[^a-z0-9\-]/i', '', (string)$_GET['channel'])
