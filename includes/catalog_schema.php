@@ -142,6 +142,12 @@ function orange_catalog_ensure_schema(PDO $pdo): void
             "ALTER TABLE orders ADD COLUMN order_source VARCHAR(32) NOT NULL DEFAULT 'website'"
         );
     }
+    if (!orange_table_has_column($pdo, 'orders', 'payment_terms')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            "ALTER TABLE orders ADD COLUMN payment_terms VARCHAR(16) NOT NULL DEFAULT 'cash'"
+        );
+    }
     if (!orange_table_has_column($pdo, 'size_family_sizes', 'foot_length_cm')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE size_family_sizes ADD COLUMN foot_length_cm DECIMAL(6,2) NULL');
     }
@@ -212,6 +218,365 @@ function orange_catalog_ensure_schema(PDO $pdo): void
              SET p.subcategory_id = NULL
              WHERE p.subcategory_id IS NOT NULL AND s.id IS NULL'
         );
+    }
+
+    /*
+     |--------------------------------------------------------------------------
+     | كود الحساب في الشجرة + ربط الحسابات الأساسية للقيود التلقائية
+     |--------------------------------------------------------------------------
+     */
+    if (orange_table_exists($pdo, 'accounts') && !orange_table_has_column($pdo, 'accounts', 'code')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE accounts ADD COLUMN code VARCHAR(64) NULL');
+        orange_catalog_safe_exec($pdo, 'CREATE UNIQUE INDEX uq_accounts_code ON accounts (code)');
+    }
+
+    if (!orange_table_exists($pdo, 'orange_gl_account_settings')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE orange_gl_account_settings (
+                setting_key VARCHAR(64) NOT NULL,
+                account_id INT NOT NULL,
+                updated_at DATETIME NULL DEFAULT NULL ON UPDATE current_timestamp(),
+                PRIMARY KEY (setting_key),
+                KEY idx_gl_set_account (account_id),
+                CONSTRAINT orange_fk_gl_setting_account FOREIGN KEY (account_id) REFERENCES accounts (id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'
+        );
+    }
+
+    /*
+     |--------------------------------------------------------------------------
+     | السنوات المالية — إغلاق سنة / فتح سنة جديدة / ربط القيود
+     |--------------------------------------------------------------------------
+     */
+    if (!orange_table_exists($pdo, 'fiscal_years')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE fiscal_years (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                label_ar VARCHAR(160) NOT NULL DEFAULT \'\',
+                start_date DATE NOT NULL,
+                end_date DATE NOT NULL,
+                is_closed TINYINT(1) NOT NULL DEFAULT 0,
+                closed_at DATETIME NULL,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_fiscal_years_range (start_date, end_date)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
+    if (orange_table_exists($pdo, 'journal_entries') && !orange_table_has_column($pdo, 'journal_entries', 'fiscal_year_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE journal_entries ADD COLUMN fiscal_year_id INT NULL');
+        orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_journal_entries_fiscal_year ON journal_entries (fiscal_year_id)');
+    }
+
+    static $fiscalYearsSeeded = false;
+    if (!$fiscalYearsSeeded && orange_table_exists($pdo, 'fiscal_years')) {
+        $fiscalYearsSeeded = true;
+        try {
+            $cnt = (int) $pdo->query('SELECT COUNT(*) FROM fiscal_years')->fetchColumn();
+            if ($cnt === 0) {
+                $y = (int) date('Y');
+                $ins = $pdo->prepare('INSERT INTO fiscal_years (label_ar, start_date, end_date, is_closed) VALUES (?, ?, ?, 0)');
+                $ins->execute(['سنة مالية ' . $y, sprintf('%04d-01-01', $y), sprintf('%04d-12-31', $y)]);
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] fiscal_years seed: ' . $e->getMessage());
+            }
+        }
+    }
+
+    static $fiscalYearBackfillDone = false;
+    if (
+        !$fiscalYearBackfillDone
+        && orange_table_exists($pdo, 'journal_entries')
+        && orange_table_has_column($pdo, 'journal_entries', 'fiscal_year_id')
+        && orange_table_exists($pdo, 'fiscal_years')
+    ) {
+        $fiscalYearBackfillDone = true;
+        try {
+            $nulls = (int) $pdo->query('SELECT COUNT(*) FROM journal_entries WHERE fiscal_year_id IS NULL')->fetchColumn();
+            if ($nulls > 0) {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'UPDATE journal_entries je
+                     INNER JOIN fiscal_years fy ON DATE(je.date) BETWEEN fy.start_date AND fy.end_date
+                     SET je.fiscal_year_id = fy.id
+                     WHERE je.fiscal_year_id IS NULL'
+                );
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] fiscal_year backfill: ' . $e->getMessage());
+            }
+        }
+    }
+
+    /*
+     |--------------------------------------------------------------------------
+     | تصنيف الحسابات + سندات متعددة الأسطر (journal_vouchers / journal_lines)
+     |--------------------------------------------------------------------------
+     */
+    if (orange_table_exists($pdo, 'accounts') && !orange_table_has_column($pdo, 'accounts', 'account_class')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            "ALTER TABLE accounts ADD COLUMN account_class VARCHAR(32) NOT NULL DEFAULT 'unclassified'"
+        );
+    }
+
+    static $accountClassHeuristicDone = false;
+    if (!$accountClassHeuristicDone && orange_table_exists($pdo, 'accounts') && orange_table_has_column($pdo, 'accounts', 'account_class')) {
+        $accountClassHeuristicDone = true;
+        try {
+            orange_catalog_safe_exec(
+                $pdo,
+                "UPDATE accounts SET account_class = 'asset' WHERE name IN ('Cash','Inventory') AND account_class = 'unclassified'"
+            );
+            orange_catalog_safe_exec(
+                $pdo,
+                "UPDATE accounts SET account_class = 'liability' WHERE name = 'Accounts Payable' AND account_class = 'unclassified'"
+            );
+            orange_catalog_safe_exec(
+                $pdo,
+                "UPDATE accounts SET account_class = 'revenue' WHERE name = 'Sales' AND account_class = 'unclassified'"
+            );
+            orange_catalog_safe_exec(
+                $pdo,
+                "UPDATE accounts SET account_class = 'expense' WHERE name IN ('COGS','Expenses') AND account_class = 'unclassified'"
+            );
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] account_class heuristic: ' . $e->getMessage());
+            }
+        }
+    }
+
+    if (!orange_table_exists($pdo, 'journal_vouchers')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE journal_vouchers (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                voucher_date DATETIME NOT NULL,
+                reference VARCHAR(100) NULL,
+                description TEXT NULL,
+                entry_type VARCHAR(64) NOT NULL DEFAULT \'general\',
+                fiscal_year_id INT NULL,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NULL,
+                INDEX idx_jv_reference (reference),
+                INDEX idx_jv_fiscal_year (fiscal_year_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
+    if (!orange_table_exists($pdo, 'journal_lines')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE journal_lines (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                voucher_id INT NOT NULL,
+                line_no SMALLINT NOT NULL DEFAULT 0,
+                account_id INT NOT NULL,
+                debit DECIMAL(18,4) NOT NULL DEFAULT 0,
+                credit DECIMAL(18,4) NOT NULL DEFAULT 0,
+                memo VARCHAR(255) NULL,
+                INDEX idx_jl_voucher (voucher_id),
+                INDEX idx_jl_account (account_id),
+                CONSTRAINT orange_fk_jl_voucher FOREIGN KEY (voucher_id) REFERENCES journal_vouchers (id) ON DELETE CASCADE,
+                CONSTRAINT orange_fk_jl_account FOREIGN KEY (account_id) REFERENCES accounts (id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
+    static $journalLegacyMigrated = false;
+    if (
+        !$journalLegacyMigrated
+        && orange_table_exists($pdo, 'journal_entries')
+        && orange_table_exists($pdo, 'journal_vouchers')
+        && orange_table_exists($pdo, 'journal_lines')
+    ) {
+        $journalLegacyMigrated = true;
+        try {
+            $lc = (int) $pdo->query('SELECT COUNT(*) FROM journal_lines')->fetchColumn();
+            $ec = (int) $pdo->query('SELECT COUNT(*) FROM journal_entries')->fetchColumn();
+            if ($lc === 0 && $ec > 0) {
+                $hasJeEt = orange_table_has_column($pdo, 'journal_entries', 'entry_type');
+                $hasJeFy = orange_table_has_column($pdo, 'journal_entries', 'fiscal_year_id');
+                $rows = $pdo->query('SELECT * FROM journal_entries ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+                $vIns = $pdo->prepare(
+                    'INSERT INTO journal_vouchers (voucher_date, reference, description, entry_type, fiscal_year_id)
+                     VALUES (?,?,?,?,?)'
+                );
+                $lIns = $pdo->prepare(
+                    'INSERT INTO journal_lines (voucher_id, line_no, account_id, debit, credit, memo) VALUES (?,?,?,?,?,?)'
+                );
+                $migrated = 0;
+                $pdo->beginTransaction();
+                try {
+                    foreach ($rows as $je) {
+                        $d = (string) ($je['date'] ?? date('Y-m-d H:i:s'));
+                        $ref = isset($je['reference']) ? (string) $je['reference'] : null;
+                        if ($ref === '') {
+                            $ref = null;
+                        }
+                        $desc = (string) ($je['description'] ?? '');
+                        $et = ($hasJeEt && isset($je['entry_type'])) ? (string) $je['entry_type'] : 'migrated';
+                        if ($et === '') {
+                            $et = 'migrated';
+                        }
+                        $fy = ($hasJeFy && isset($je['fiscal_year_id'])) ? (int) $je['fiscal_year_id'] : null;
+                        if ($fy <= 0) {
+                            $fy = null;
+                        }
+                        $amt = (float) ($je['amount'] ?? 0);
+                        $ad = (int) ($je['account_debit'] ?? 0);
+                        $ac = (int) ($je['account_credit'] ?? 0);
+                        if ($ad <= 0 || $ac <= 0 || $amt <= 0) {
+                            continue;
+                        }
+                        $vIns->execute([$d, $ref, $desc, $et, $fy]);
+                        $vid = (int) $pdo->lastInsertId();
+                        $lIns->execute([$vid, 1, $ad, $amt, 0, null]);
+                        $lIns->execute([$vid, 2, $ac, 0, $amt, null]);
+                        ++$migrated;
+                    }
+                    if ($migrated > 0) {
+                        $pdo->exec('DELETE FROM journal_entries');
+                    }
+                    $pdo->commit();
+                } catch (Throwable $e) {
+                    if ($pdo->inTransaction()) {
+                        $pdo->rollBack();
+                    }
+                    throw $e;
+                }
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] journal legacy migrate: ' . $e->getMessage());
+            }
+        }
+    }
+
+    /*
+     |--------------------------------------------------------------------------
+     | العملاء + الذمم الفرعية (ذمم مدينة / دائنة لكل طرف)
+     |--------------------------------------------------------------------------
+     */
+    if (!orange_table_exists($pdo, 'customers')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE customers (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name_ar VARCHAR(160) NOT NULL DEFAULT \'\',
+                phone VARCHAR(40) NOT NULL DEFAULT \'\',
+                notes VARCHAR(255) NULL,
+                credit_limit DECIMAL(18,4) NULL DEFAULT NULL,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_customers_phone (phone)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+    if (orange_table_exists($pdo, 'customers') && !orange_table_has_column($pdo, 'customers', 'credit_limit')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE customers ADD COLUMN credit_limit DECIMAL(18,4) NULL DEFAULT NULL');
+    }
+
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'customer_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE orders ADD COLUMN customer_id INT NULL');
+        orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_orders_customer_id ON orders (customer_id)');
+    }
+
+    if (!orange_table_exists($pdo, 'party_subledger')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE party_subledger (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                party_kind VARCHAR(20) NOT NULL,
+                party_id INT NOT NULL,
+                voucher_id INT NOT NULL,
+                debit DECIMAL(18,4) NOT NULL DEFAULT 0,
+                credit DECIMAL(18,4) NOT NULL DEFAULT 0,
+                ref_type VARCHAR(32) NULL,
+                ref_id INT NULL,
+                memo VARCHAR(255) NULL,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY idx_ps_party (party_kind, party_id),
+                KEY idx_ps_voucher (voucher_id),
+                CONSTRAINT orange_fk_ps_voucher FOREIGN KEY (voucher_id) REFERENCES journal_vouchers (id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
+    if (!orange_table_exists($pdo, 'party_subledger_allocations')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE party_subledger_allocations (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                party_kind VARCHAR(20) NOT NULL,
+                party_id INT NOT NULL,
+                payment_voucher_id INT NOT NULL,
+                target_ref_type VARCHAR(32) NOT NULL,
+                target_ref_id INT NOT NULL,
+                amount DECIMAL(18,4) NOT NULL,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY idx_psa_party (party_kind, party_id),
+                KEY idx_psa_payment (payment_voucher_id),
+                KEY idx_psa_target (target_ref_type, target_ref_id),
+                CONSTRAINT orange_fk_psa_voucher FOREIGN KEY (payment_voucher_id) REFERENCES journal_vouchers (id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
+    if (orange_table_exists($pdo, 'accounts') && !orange_table_has_column($pdo, 'accounts', 'parent_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE accounts ADD COLUMN parent_id INT NULL');
+        orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_accounts_parent_id ON accounts (parent_id)');
+    }
+    if (orange_table_exists($pdo, 'accounts') && !orange_table_has_column($pdo, 'accounts', 'is_group')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE accounts ADD COLUMN is_group TINYINT(1) NOT NULL DEFAULT 0'
+        );
+    }
+
+    if (orange_table_exists($pdo, 'admins') && !orange_table_has_column($pdo, 'admins', 'is_superuser')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE admins ADD COLUMN is_superuser TINYINT(1) NOT NULL DEFAULT 0'
+        );
+        orange_catalog_safe_exec($pdo, 'UPDATE admins SET is_superuser = 1');
+    }
+
+    if (!orange_table_exists($pdo, 'admin_permissions')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE admin_permissions (
+                admin_id INT NOT NULL,
+                resource_key VARCHAR(80) NOT NULL,
+                can_view TINYINT(1) NOT NULL DEFAULT 0,
+                can_edit TINYINT(1) NOT NULL DEFAULT 0,
+                can_delete TINYINT(1) NOT NULL DEFAULT 0,
+                PRIMARY KEY (admin_id, resource_key),
+                KEY idx_admin_permissions_admin (admin_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
+    if (!orange_table_exists($pdo, 'document_sequences')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE document_sequences (
+                scope VARCHAR(64) NOT NULL,
+                last_value BIGINT NOT NULL DEFAULT 0,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (scope)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
+    if (orange_table_exists($pdo, 'purchase_items') && !orange_table_has_column($pdo, 'purchase_items', 'variant_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE purchase_items ADD COLUMN variant_id INT NULL');
+        orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_purchase_items_variant ON purchase_items (variant_id)');
     }
 
     $done = true;

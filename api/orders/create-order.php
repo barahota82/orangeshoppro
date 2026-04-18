@@ -110,15 +110,14 @@ try {
         ];
     }
 
-    $orderStmt = $pdo->prepare("
-        INSERT INTO orders (
-            order_number, customer_name, phone, area, address, notes, channel_id, status, total, created_at
-        ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, 'pending', ?, NOW()
-        )
-    ");
+    // طلبات المتجر الإلكتروني تُسجَّل دائمًا كبيع نقدي (سياسة المشروع).
+    $paymentTerms = 'cash';
+    $hasSource = orange_table_has_column($pdo, 'orders', 'order_source');
+    $hasPay = orange_table_has_column($pdo, 'orders', 'payment_terms');
 
-    $orderStmt->execute([
+    $cols = 'order_number, customer_name, phone, area, address, notes, channel_id, status, total';
+    $ph = '?, ?, ?, ?, ?, ?, ?, \'pending\', ?';
+    $params = [
         $orderNumber,
         trim((string)$data['name']),
         trim((string)$data['phone']),
@@ -126,8 +125,23 @@ try {
         trim((string)$data['address']),
         isset($data['notes']) ? trim((string)$data['notes']) : '',
         (int)$data['channel_id'],
-        $total
-    ]);
+        $total,
+    ];
+    if ($hasSource) {
+        $cols .= ', order_source';
+        $ph .= ', ?';
+        $params[] = 'website';
+    }
+    if ($hasPay) {
+        $cols .= ', payment_terms';
+        $ph .= ', ?';
+        $params[] = $paymentTerms;
+    }
+    $cols .= ', created_at';
+    $ph .= ', NOW()';
+
+    $orderStmt = $pdo->prepare("INSERT INTO orders ($cols) VALUES ($ph)");
+    $orderStmt->execute($params);
 
     $orderId = (int)$pdo->lastInsertId();
 
@@ -207,6 +221,7 @@ try {
         $messageLines[] = "   Price: " . number_format($row['price'], 2) . " KD";
     }
     $messageLines[] = "";
+    $messageLines[] = 'Payment: ' . ($paymentTerms === 'credit' ? 'Credit / آجل' : 'Cash / نقدي');
     $messageLines[] = "Total: " . number_format($total, 2) . " KD";
 
     $whatsAppNumber = clean_whatsapp_number((string)$channel['whatsapp_number']);

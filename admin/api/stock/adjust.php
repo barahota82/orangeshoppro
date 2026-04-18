@@ -8,6 +8,15 @@ try {
 
     $variantId = (int)($data['variant_id'] ?? 0);
     $newStock = (int)($data['stock'] ?? 0);
+    $movementType = (string)($data['movement_type'] ?? 'manual_adjustment');
+    $allowedTypes = ['manual_adjustment', 'opening_balance'];
+    if (!in_array($movementType, $allowedTypes, true)) {
+        $movementType = 'manual_adjustment';
+    }
+    $reasonIn = trim((string)($data['reason'] ?? ''));
+    $reason = $reasonIn !== ''
+        ? $reasonIn
+        : ($movementType === 'opening_balance' ? 'رصيد افتتاحي' : 'تعديل يدوي للمخزون');
 
     $stmt = $pdo->prepare("SELECT * FROM product_variants WHERE id = ? LIMIT 1");
     $stmt->execute([$variantId]);
@@ -28,15 +37,17 @@ try {
         INSERT INTO stock_movements (
             product_id, variant_id, type, qty, old_stock, new_stock, reason, created_at
         ) VALUES (
-            ?, ?, 'manual_adjustment', ?, ?, ?, 'Manual stock adjustment', NOW()
+            ?, ?, ?, ?, ?, ?, ?, NOW()
         )
     ");
     $moveStmt->execute([
         (int)$variant['product_id'],
         $variantId,
+        $movementType,
         abs($newStock - $oldStock),
         $oldStock,
-        $newStock
+        $newStock,
+        $reason
     ]);
 
     $pdo->commit();

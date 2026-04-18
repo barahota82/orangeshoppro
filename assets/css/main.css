@@ -1566,6 +1566,16 @@ body.storefront .product-gallery__img {
     line-height: 1.45;
 }
 
+.cart-checkout-cash-note {
+    margin: 0 0 16px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--primary-soft, rgba(255, 122, 0, 0.12));
+    color: var(--text);
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
 .cart-checkout-card--highlight {
     animation: cartCheckoutNudge 1.1s ease;
     outline: 2px solid var(--primary-soft);

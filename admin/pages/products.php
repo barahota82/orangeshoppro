@@ -49,8 +49,12 @@ if ($nextProductSort < 1) {
     $nextProductSort = 1;
 }
 
+$colorSelectCols = 'id, name_ar, name_en';
+if (orange_table_has_column($pdo, 'color_dictionary', 'hex_code')) {
+    $colorSelectCols .= ', hex_code';
+}
 $colors = $pdo->query(
-    'SELECT id, name_ar, name_en FROM color_dictionary WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
+    'SELECT ' . $colorSelectCols . ' FROM color_dictionary WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
 )->fetchAll(PDO::FETCH_ASSOC);
 
 $families = $pdo->query('SELECT * FROM size_families WHERE is_active = 1 ORDER BY sort_order ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
@@ -128,7 +132,7 @@ foreach ($categories as $cat) {
     <p id="productEditHint" style="display:none;margin:0 0 12px;color:#555;font-size:14px;">تعديل البيانات الأساسية. الترتيب في المتجر من الجدول فقط (↑↓ ثم حفظ الترتيب). كميات الألوان والمقاسات من <a href="/admin/index.php?page=stock">المخزون</a>.</p>
     <form id="productForm">
         <input type="hidden" id="product_record_id" value="0">
-        <p class="admin-product-form-intro">التنقل بين الأقسام عبر التبويبات أدناه (مثل برامج البطاقة). زر «حفظ المنتج» يحفظ كل الحقول في كل التبويبات.</p>
+        <p class="admin-product-form-intro">مسار العمل: <strong>البيانات الأساسية</strong> ← <strong>المقاسات والألوان</strong> ← <strong>الصور</strong> (صورة مرجعية للصنف) ← <strong>المتغيرات</strong> ثم «توليد المتغيرات». زر «حفظ المنتج» يطبّق كل التبويبات دفعة واحدة.</p>
 
         <div class="admin-product-tabs" role="tablist" aria-label="أقسام نموذج المنتج">
             <button type="button" class="admin-product-tab is-active" role="tab" id="productTabBtnBasic" aria-controls="productTabPanelBasic" aria-selected="true" data-product-tab="basic">البيانات الأساسية</button>
@@ -304,15 +308,15 @@ foreach ($categories as $cat) {
             </div>
         </div>
 
-        <div id="colorwaysSection" class="card" style="display:none;margin:14px 0;padding:12px;">
-            <h4 style="margin-top:0;">Colorways (لون أساسي / ثانوي اختياري)</h4>
+        <div id="colorwaysSection" class="card admin-nested-panel" style="display:none;">
+            <h4 class="admin-nested-panel__title">تركيبات اللون (أساسي / ثانوي اختياري)</h4>
             <div id="colorwaysBox"></div>
             <button type="button" class="btn-secondary" onclick="addColorwayRow()">+ صف لون</button>
         </div>
 
-        <div id="productAdvancedSizingSlot" class="card" style="margin:16px 0;padding:14px;background:#f8fafc;border:1px dashed #cbd5e1;">
-            <h4 class="admin-product-subsection-title" style="margin-top:0;border:0;padding:0;">ربط مقاس × لون وأوصاف المقاس (تطوير لاحق)</h4>
-            <p style="margin:0;font-size:13px;color:#64748b;line-height:1.45;">مساحة جاهزة لجدول فرعي: كل مقاس مع لونه وعائلة المقاسات ونصوص الوصف الخاصة بالمنتج.</p>
+        <div id="productAdvancedSizingSlot" class="card admin-placeholder-panel">
+            <h4 class="admin-product-subsection-title admin-placeholder-panel__title">ربط مقاس × لون وأوصاف المقاس (تطوير لاحق)</h4>
+            <p class="admin-placeholder-panel__text">مساحة جاهزة لجدول فرعي: كل مقاس مع لونه وعائلة المقاسات ونصوص الوصف الخاصة بالمنتج.</p>
         </div>
         </div>
         </div>
@@ -329,7 +333,7 @@ foreach ($categories as $cat) {
                 <div style="margin-top:10px;">
                     <img id="main_image_preview" alt="" style="display:none;max-height:140px;border-radius:8px;border:1px solid #ddd;">
                 </div>
-                <p style="margin:8px 0 0;font-size:12px;color:#666;">لا يوجد ربط تلقائي بين كل لون/مقاس وصورة منفصلة؛ الصورة تمثل المنتج ككل. <strong>أول صورة تُرفع</strong> (معرض أو رئيسية) تُعتبر الصورة الرئيسية ما لم تغيّرها يدوياً. يُثبت الربط في قاعدة البيانات عند «حفظ المنتج».</p>
+                <p class="admin-product-image-hint">الصورة هنا <strong>مرجع للصنف</strong> (ما يظهر للعميل). المتغيرات (لون × مقاس) تُربط بنفس الصنف؛ صورة لكل لون يمكن إضافتها لاحقاً في التطوير. <strong>أول صورة تُرفع</strong> تُعتبر الرئيسية ما لم تغيّرها. يُثبت الربط عند «حفظ المنتج».</p>
             </div>
             <div style="grid-column:1/-1;">
                 <label>صور إضافية للمعرض (عدة ملفات)</label>
@@ -349,9 +353,9 @@ foreach ($categories as $cat) {
         </div>
         </div>
 
-        <div class="admin-product-form-actions card" style="margin-top:14px;padding:14px;">
+        <div class="admin-product-form-actions admin-product-form-actions--bar">
             <p class="admin-product-save-hint">حفظ واحد لكل الحقول أعلاه.</p>
-            <div class="actions" style="margin:0;flex-wrap:wrap;gap:8px;">
+            <div class="actions admin-product-form-actions__buttons">
                 <button type="button" class="btn-secondary" id="btnProductTranslate" onclick="translateProductLocalesFromArabic()">ترجمة تلقائية من العربي</button>
                 <button type="button" id="btnGenerateVariants" onclick="generateVariants()">توليد المتغيرات</button>
                 <button type="button" class="btn-secondary" id="btnSaveProduct" onclick="saveProduct()">حفظ المنتج</button>
@@ -802,7 +806,7 @@ async function loadProductForEdit(id) {
         document.getElementById('sizing_guide_scope').value = p.sizing_guide_scope || 'none';
         document.getElementById('colorwaysBox').innerHTML = '';
         document.getElementById('variantsBox').innerHTML =
-            '<p style="color:#555;margin:12px 0;">المتغيرات والمخزون: استخدم صفحة <a href="/admin/index.php?page=stock">المخزون</a>.</p>';
+            '<p class="admin-variants-edit-note">المتغيرات والمخزون الحالي: من صفحة <a href="/admin/index.php?page=stock">المستودع / المخزون</a>.</p>';
         window.PRODUCT_EXTRA_IMAGES = extrasEarly;
         renderGalleryUploadList();
         onHasFlagsChange();
@@ -915,11 +919,33 @@ function colorOptionsHtml() {
     return h;
 }
 
+function adminColorSwatchHtml(col) {
+    if (!col) {
+        return '';
+    }
+    let hex = String(col.hex_code || '').trim();
+    if (hex && hex.charAt(0) !== '#') {
+        hex = '#' + hex;
+    }
+    const valid = /^#[0-9A-Fa-f]{3,8}$/.test(hex);
+    const bg = valid ? hex : '#e5e7eb';
+    const name = String(col.name_ar || col.name_en || '').replace(/"/g, '&quot;');
+    return '<span class="admin-color-swatch" style="background:' + bg + '" title="' + name + '"></span>';
+}
+
+function adminVariantReferenceThumbHtml() {
+    const mainImg = (document.getElementById('main_image') && document.getElementById('main_image').value || '').trim();
+    if (!mainImg) {
+        return '<span class="admin-variant-thumb-placeholder" title="ارفع صورة من تبويب الصور">؟</span>';
+    }
+    const safe = mainImg.replace(/"/g, '');
+    return '<img src="/uploads/products/' + safe + '" alt="" class="admin-variant-thumb" width="48" height="48" loading="lazy">';
+}
+
 function addColorwayRow() {
     const box = document.getElementById('colorwaysBox');
     const div = document.createElement('div');
-    div.className = 'cw-row form-grid';
-    div.style.marginBottom = '8px';
+    div.className = 'cw-row form-grid cw-row--compact';
     div.innerHTML = `
         <div><label>أساسي</label><select class="cw-p">${colorOptionsHtml()}</select></div>
         <div><label>ثانوي (اختياري)</label><select class="cw-s">${colorOptionsHtml()}</select></div>
@@ -991,7 +1017,11 @@ function generateVariants() {
         return;
     }
 
-    let html = '<h4>المتغيرات والمخزون</h4><div class="table-wrap"><table><thead><tr><th>لون (عرض)</th><th>مقاس</th><th>المخزون</th></tr></thead><tbody>';
+    const thumbCell = adminVariantReferenceThumbHtml();
+    let html = '<p class="admin-variants-lead">كل صف يمثل <strong>نفس الصنف</strong> مع دمج لون × مقاس. عمود «صورة المرجع» يعكس الصورة الرئيسية الحالية (من تبويب الصور).</p>';
+    html += '<div class="table-wrap admin-table-wrap-elevated"><table class="admin-table admin-variants-matrix"><thead><tr>';
+    html += '<th class="col-ref-img">صورة المرجع</th><th>اللون</th><th>المقاس</th><th class="col-stock">مخزون أولي</th>';
+    html += '</tr></thead><tbody>';
     combos.forEach((c, idx) => {
         const sz = sizes.find(x => String(x.id) === String(c.size_family_size_id));
         const szLabel = sz ? (sz.label_ar || sz.label_en || ('#' + sz.id)) : '-';
@@ -999,12 +1029,16 @@ function generateVariants() {
         const s = (window.ORANGE_COLORS || []).find(x => String(x.id) === String(c.secondary_color_id));
         let colorLabel = '';
         if (p) colorLabel += (p.name_ar || p.name_en);
-        if (s) colorLabel += (colorLabel ? ' / ' : '') + (s.name_ar || s.name_en);
-        if (!colorLabel) colorLabel = '-';
+        if (s) colorLabel += (colorLabel ? ' + ' : '') + (s.name_ar || s.name_en);
+        if (!colorLabel) colorLabel = '—';
+        const dots = [adminColorSwatchHtml(p), adminColorSwatchHtml(s && (!p || String(s.id) !== String(p.id)) ? s : null)].filter(Boolean).join('');
+        const colorCell = '<div class="admin-variant-color-cell">' + dots + '<span class="admin-variant-color-names">' + colorLabel + '</span></div>' +
+            `<input type="hidden" class="v-p" value="${c.primary_color_id}"><input type="hidden" class="v-s" value="${c.secondary_color_id}">`;
         html += `<tr>
-            <td>${colorLabel}<input type="hidden" class="v-p" value="${c.primary_color_id}"><input type="hidden" class="v-s" value="${c.secondary_color_id}"></td>
-            <td>${szLabel}<input type="hidden" class="v-zid" value="${c.size_family_size_id}"></td>
-            <td><input type="number" class="v-stock" min="0" value="0" data-idx="${idx}"></td>
+            <td class="td-ref-img">${thumbCell}</td>
+            <td>${colorCell}</td>
+            <td><span class="admin-variant-size-pill">${szLabel}</span><input type="hidden" class="v-zid" value="${c.size_family_size_id}"></td>
+            <td class="td-stock"><input type="number" class="v-stock admin-input-narrow" min="0" value="0" data-idx="${idx}"></td>
         </tr>`;
     });
     html += '</tbody></table></div>';

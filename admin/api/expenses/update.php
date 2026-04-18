@@ -1,9 +1,12 @@
 <?php
 require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/journal_write.php';
 require_admin_api();
 
 try {
     $pdo = db();
+    orange_catalog_ensure_schema($pdo);
     $data = get_json_input();
     $id = (int)($data['id'] ?? 0);
     $action = trim((string)($data['action'] ?? 'update'));
@@ -24,10 +27,15 @@ try {
     if ($action === 'delete') {
         $oldAmount = (float)$old['amount'];
         $pdo->prepare("DELETE FROM expenses WHERE id = ?")->execute([$id]);
-        $pdo->prepare("
-            INSERT INTO journal_entries (date, account_debit, account_credit, amount, reference, description, entry_type)
-            VALUES (NOW(), 1, 6, ?, ?, ?, 'expense_reversal')
-        ")->execute([$oldAmount, 'EXP-DEL-' . $id, 'Expense deleted - reversal entry']);
+        orange_journal_insert_line($pdo, [
+            'date' => date('Y-m-d H:i:s'),
+            'account_debit' => 1,
+            'account_credit' => 6,
+            'amount' => $oldAmount,
+            'reference' => 'EXP-DEL-' . $id,
+            'description' => 'عكس مصروف — حذف السجل',
+            'entry_type' => 'expense_reversal',
+        ]);
         $pdo->commit();
         audit_log('expense_delete', 'تم حذف المصروف رقم: ' . $id, 'expenses', $id);
         json_response(['success' => true, 'message' => 'تم حذف المصروف']);
@@ -44,15 +52,25 @@ try {
 
     if (abs($delta) > 0.0001) {
         if ($delta > 0) {
-            $pdo->prepare("
-                INSERT INTO journal_entries (date, account_debit, account_credit, amount, reference, description, entry_type)
-                VALUES (NOW(), 6, 1, ?, ?, ?, 'expense_adjustment')
-            ")->execute([$delta, 'EXP-ADJ-' . $id, 'Expense increased by adjustment']);
+            orange_journal_insert_line($pdo, [
+                'date' => date('Y-m-d H:i:s'),
+                'account_debit' => 6,
+                'account_credit' => 1,
+                'amount' => $delta,
+                'reference' => 'EXP-ADJ-' . $id,
+                'description' => 'تعديل مصروف — زيادة',
+                'entry_type' => 'expense_adjustment',
+            ]);
         } else {
-            $pdo->prepare("
-                INSERT INTO journal_entries (date, account_debit, account_credit, amount, reference, description, entry_type)
-                VALUES (NOW(), 1, 6, ?, ?, ?, 'expense_adjustment')
-            ")->execute([abs($delta), 'EXP-ADJ-' . $id, 'Expense decreased by adjustment']);
+            orange_journal_insert_line($pdo, [
+                'date' => date('Y-m-d H:i:s'),
+                'account_debit' => 1,
+                'account_credit' => 6,
+                'amount' => abs($delta),
+                'reference' => 'EXP-ADJ-' . $id,
+                'description' => 'تعديل مصروف — نقصان',
+                'entry_type' => 'expense_adjustment',
+            ]);
         }
     }
 

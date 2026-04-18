@@ -32,6 +32,9 @@ $orangeMyOrderUi = [
     'cancel_not_allowed' => t('customer_cancel_not_allowed'),
     'whatsapp_help' => t('customer_whatsapp_help'),
     'whatsapp_prefill' => t('whatsapp_order_prefill'),
+    'payment_label' => t('order_payment_terms_label'),
+    'payment_cash' => t('payment_cash'),
+    'payment_credit' => t('payment_credit'),
 ];
 ?>
 <div class="container">
@@ -87,6 +90,7 @@ $orangeMyOrderUi = [
                     <label><?php echo htmlspecialchars(t('notes'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <textarea id="customer_notes"></textarea>
                 </div>
+                <p class="cart-checkout-cash-note"><?php echo htmlspecialchars(t('checkout_online_cash_only'), ENT_QUOTES, 'UTF-8'); ?></p>
                 <button type="button" class="btn" onclick="sendOrderNow()"><?php echo htmlspecialchars(t('send_order'), ENT_QUOTES, 'UTF-8'); ?></button>
             </div>
 
@@ -187,6 +191,11 @@ function cartRenderTrackedOrder(resultBox, order, orderNumber, phone) {
         html += '<p><strong>' + escCartHtmlMy(lblPhone) + ':</strong> ' + escCartHtmlMy(String(order.phone)) + '</p>';
     }
     html += '<p><strong>' + escCartHtmlMy(UI.order_total_label || '') + ':</strong> ' + escCartHtmlMy(String(order.total)) + ' ' + escCartHtmlMy(UI.currency || 'KD') + '</p>';
+    var pt = String(order.payment_terms || 'cash').toLowerCase();
+    var ptLabel = pt === 'credit' ? (UI.payment_credit || '') : (UI.payment_cash || '');
+    if (UI.payment_label && ptLabel) {
+        html += '<p><strong>' + escCartHtmlMy(UI.payment_label) + ':</strong> ' + escCartHtmlMy(ptLabel) + '</p>';
+    }
     html += '<div class="customer-order-actions">';
 
     html += '<button type="button" class="btn btn-danger customer-order-cancel"';

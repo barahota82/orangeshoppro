@@ -1,10 +1,19 @@
 
 <?php
+
+declare(strict_types=1);
+
 require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/gl_settings.php';
+require_once __DIR__ . '/../../../includes/journal_write.php';
+require_once __DIR__ . '/../../../includes/party_subledger.php';
+require_once __DIR__ . '/../../../includes/purchase_helpers.php';
 require_admin_api();
 
 try {
     $pdo = db();
+    orange_catalog_ensure_schema($pdo);
     $data = get_json_input();
 
     $supplierId = (int)($data['supplier_id'] ?? 0);
@@ -32,6 +41,8 @@ try {
     $stmt->execute([$supplierId > 0 ? $supplierId : null, $computedTotal, $type, $notes]);
     $purchaseId = (int)$pdo->lastInsertId();
 
+    $hasPiVariant = orange_table_has_column($pdo, 'purchase_items', 'variant_id');
+
     foreach ($items as $item) {
         $productId = (int)($item['product_id'] ?? 0);
         $qty = (int)($item['qty'] ?? 0);
@@ -40,25 +51,54 @@ try {
             throw new RuntimeException('عنصر شراء غير مكتمل');
         }
 
-        $pdo->prepare("INSERT INTO purchase_items (purchase_id, product_id, qty, cost) VALUES (?, ?, ?, ?)")
-            ->execute([$purchaseId, $productId, $qty, $cost]);
+        $variantId = orange_purchase_resolve_variant_id(
+            $pdo,
+            $productId,
+            (int)($item['variant_id'] ?? 0)
+        );
 
-        // Increase stock on matching variants for this product.
-        $pdo->prepare("UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE product_id = ?")
-            ->execute([$qty, $productId]);
+        if ($hasPiVariant) {
+            $pdo->prepare(
+                'INSERT INTO purchase_items (purchase_id, product_id, variant_id, qty, cost) VALUES (?, ?, ?, ?, ?)'
+            )->execute([$purchaseId, $productId, $variantId, $qty, $cost]);
+        } else {
+            $pdo->prepare("INSERT INTO purchase_items (purchase_id, product_id, qty, cost) VALUES (?, ?, ?, ?)")
+                ->execute([$purchaseId, $productId, $qty, $cost]);
+        }
+
+        $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ?')
+            ->execute([$qty, $variantId]);
     }
 
+    $inventoryId = orange_gl_account_id($pdo, 'inventory');
+    $cashId = orange_gl_account_id($pdo, 'cash');
+    $apId = orange_gl_account_id($pdo, 'accounts_payable');
+
+    $purRef = 'PUR-' . $purchaseId;
+    $now = date('Y-m-d H:i:s');
     if ($type === 'cash') {
-        $pdo->prepare("
-            INSERT INTO journal_entries (date, account_debit, account_credit, amount, reference, description, entry_type)
-            VALUES (NOW(), 1, 3, ?, ?, ?, 'purchase')
-        ")->execute([$computedTotal, 'PUR-' . $purchaseId, 'Cash purchase']);
+        orange_journal_insert_line($pdo, [
+            'date' => $now,
+            'account_debit' => $inventoryId,
+            'account_credit' => $cashId,
+            'amount' => $computedTotal,
+            'reference' => $purRef,
+            'description' => 'شراء نقدي',
+            'entry_type' => 'purchase',
+        ]);
     } else {
-        $pdo->prepare("
-            INSERT INTO journal_entries (date, account_debit, account_credit, amount, reference, description, entry_type)
-            VALUES (NOW(), 3, 5, ?, ?, ?, 'purchase')
-        ")->execute([$computedTotal, 'PUR-' . $purchaseId, 'Credit purchase']);
+        orange_journal_insert_line($pdo, [
+            'date' => $now,
+            'account_debit' => $inventoryId,
+            'account_credit' => $apId,
+            'amount' => $computedTotal,
+            'reference' => $purRef,
+            'description' => 'شراء آجل — ذمم موردين',
+            'entry_type' => 'purchase',
+        ]);
     }
+
+    orange_purchase_record_ap_subledger($pdo, $purchaseId, $supplierId, $type, $computedTotal);
 
     $pdo->commit();
     audit_log('purchase_create', 'تم إنشاء فاتورة شراء رقم: ' . $purchaseId, 'purchases', $purchaseId);

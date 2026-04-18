@@ -24,6 +24,16 @@ function clean_whatsapp_number(string $raw): string
 }
 
 /**
+ * Sales payment mode for orders: cash (نقدي) or credit (آجل).
+ */
+function orange_normalize_payment_terms(mixed $raw): string
+{
+    $v = strtolower(trim((string)$raw));
+
+    return $v === 'credit' ? 'credit' : 'cash';
+}
+
+/**
  * Resolve a catalog variant row for an order line (variant_id preferred, else color/size).
  *
  * @param array<string,mixed> $item

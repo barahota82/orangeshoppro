@@ -140,6 +140,11 @@ if (!$order) {
             <div><strong>القناة:</strong> <?php echo htmlspecialchars($channelName, ENT_QUOTES, 'UTF-8'); ?></div>
         <?php endif; ?>
         <div><strong>الحالة:</strong> <?php echo htmlspecialchars((string)$order['status'], ENT_QUOTES, 'UTF-8'); ?></div>
+        <?php
+        $pt = strtolower(trim((string)($order['payment_terms'] ?? 'cash')));
+        $ptAr = $pt === 'credit' ? 'بيع آجل' : 'بيع نقدي';
+        ?>
+        <div><strong>نوع البيع:</strong> <?php echo htmlspecialchars($ptAr, ENT_QUOTES, 'UTF-8'); ?></div>
         <div><strong>الإجمالي:</strong> <?php echo number_format((float)$order['total'], 2); ?> KD</div>
     </div>
 

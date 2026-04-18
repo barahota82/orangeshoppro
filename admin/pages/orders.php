@@ -6,6 +6,11 @@ if (!in_array($sourceFilter, ['all', 'website', 'company'], true)) {
     $sourceFilter = 'all';
 }
 
+$payFilter = isset($_GET['pay']) ? trim((string)$_GET['pay']) : 'all';
+if (!in_array($payFilter, ['all', 'cash', 'credit'], true)) {
+    $payFilter = 'all';
+}
+
 $sql = '
     SELECT o.*, c.name AS channel_name
     FROM orders o
@@ -17,13 +22,18 @@ if ($sourceFilter === 'website') {
 } elseif ($sourceFilter === 'company') {
     $sql .= " AND o.order_source = 'company'";
 }
+if ($payFilter === 'cash') {
+    $sql .= " AND (o.payment_terms IS NULL OR o.payment_terms = '' OR o.payment_terms = 'cash')";
+} elseif ($payFilter === 'credit') {
+    $sql .= " AND o.payment_terms = 'credit'";
+}
 
 $sql .= ' ORDER BY o.id DESC';
 
 try {
     $orders = $pdo->query($sql)->fetchAll();
 } catch (Throwable $e) {
-    if ($sourceFilter !== 'all') {
+    if ($sourceFilter !== 'all' || $payFilter !== 'all') {
         $sql = '
             SELECT o.*, c.name AS channel_name
             FROM orders o
@@ -40,6 +50,19 @@ try {
 $ordersIndex = (isset($_SERVER['SCRIPT_NAME']) && is_string($_SERVER['SCRIPT_NAME']) && $_SERVER['SCRIPT_NAME'] !== '')
     ? $_SERVER['SCRIPT_NAME']
     : '/admin/index.php';
+
+/**
+ * @param array<string, mixed> $o
+ */
+function orange_admin_order_payment_label(array $o): string
+{
+    $pt = strtolower(trim((string)($o['payment_terms'] ?? 'cash')));
+    if ($pt === 'credit') {
+        return 'آجل';
+    }
+
+    return 'نقدي';
+}
 
 $orangeOrderStatusAr = [
     'pending' => 'قيد الانتظار',
@@ -87,6 +110,14 @@ function orange_admin_orders_action_buttons(array $o): void
                 <option value="company" <?php echo $sourceFilter === 'company' ? 'selected' : ''; ?>>شركة (خارج الموقع)</option>
             </select>
         </label>
+        <label style="display:flex;align-items:center;gap:8px;margin:0;">
+            <span>نوع البيع</span>
+            <select id="orders-pay-filter" aria-label="تصفية نقدي أو آجل">
+                <option value="all" <?php echo $payFilter === 'all' ? 'selected' : ''; ?>>الكل</option>
+                <option value="cash" <?php echo $payFilter === 'cash' ? 'selected' : ''; ?>>نقدي</option>
+                <option value="credit" <?php echo $payFilter === 'credit' ? 'selected' : ''; ?>>آجل</option>
+            </select>
+        </label>
     </div>
     <div class="table-wrap">
         <table class="admin-orders-list-table">
@@ -94,6 +125,7 @@ function orange_admin_orders_action_buttons(array $o): void
                 <tr>
                     <th>رقم الطلب</th>
                     <th>المصدر</th>
+                    <th>البيع</th>
                     <th class="col-orders-customer">العميل</th>
                     <th class="col-orders-phone">الهاتف</th>
                     <th>القناة</th>
@@ -111,6 +143,12 @@ function orange_admin_orders_action_buttons(array $o): void
                         echo $src === 'company'
                             ? '<span class="badge" title="طلب خارج الموقع">شركة</span>'
                             : '<span class="badge" title="من المتجر">موقع</span>';
+                    ?></td>
+                    <td><?php
+                        $pl = orange_admin_order_payment_label($o);
+                        echo $pl === 'آجل'
+                            ? '<span class="badge" title="مبيعات آجل">آجل</span>'
+                            : '<span class="badge" title="مبيعات نقدي">نقدي</span>';
                     ?></td>
                     <td class="col-orders-customer"><?php echo htmlspecialchars((string)($o['customer_name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td class="col-orders-phone"><?php echo htmlspecialchars((string)($o['phone'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
@@ -135,14 +173,20 @@ function orange_admin_orders_action_buttons(array $o): void
 
 <script>
 (function () {
-    var sel = document.getElementById('orders-source-filter');
-    if (!sel) return;
+    var srcSel = document.getElementById('orders-source-filter');
+    var paySel = document.getElementById('orders-pay-filter');
+    if (!srcSel || !paySel) return;
     var base = <?php echo json_encode($ordersIndex, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
-    sel.addEventListener('change', function () {
-        var v = this.value;
-        var q = 'page=orders' + (v === 'all' ? '' : '&source=' + encodeURIComponent(v));
+    function go() {
+        var src = srcSel.value;
+        var pay = paySel.value;
+        var q = 'page=orders';
+        if (src !== 'all') q += '&source=' + encodeURIComponent(src);
+        if (pay !== 'all') q += '&pay=' + encodeURIComponent(pay);
         window.location.href = base + (base.indexOf('?') === -1 ? '?' : '&') + q;
-    });
+    }
+    srcSel.addEventListener('change', go);
+    paySel.addEventListener('change', go);
 })();
 async function updateOrderStatus(orderId, status) {
     if (status === 'rejected' && !confirm('تأكيد رفض هذا الطلب؟')) {

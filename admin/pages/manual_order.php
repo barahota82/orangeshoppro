@@ -37,6 +37,13 @@ foreach ($variants as $v) {
                 <?php endforeach; ?>
             </select>
         </div>
+        <div style="grid-column:1/-1;">
+            <label>نوع البيع</label>
+            <select id="mo_payment_terms">
+                <option value="cash" selected>نقدي</option>
+                <option value="credit">آجل</option>
+            </select>
+        </div>
     </div>
 </div>
 
@@ -131,6 +138,7 @@ function moSubmit() {
         address: document.getElementById('mo_address').value.trim(),
         notes: document.getElementById('mo_notes').value.trim(),
         channel_id: channel,
+        payment_terms: document.getElementById('mo_payment_terms').value || 'cash',
         items: items
     }).then(function (res) {
         alert(res.message || (res.success ? 'تم' : 'فشل'));

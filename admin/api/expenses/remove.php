@@ -1,9 +1,12 @@
 <?php
 require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/journal_write.php';
 require_admin_api();
 
 try {
     $pdo = db();
+    orange_catalog_ensure_schema($pdo);
     $data = get_json_input();
     $id = (int)($data['id'] ?? 0);
     if ($id <= 0) {
@@ -21,10 +24,15 @@ try {
 
     $pdo->beginTransaction();
     $pdo->prepare("DELETE FROM expenses WHERE id = ?")->execute([$id]);
-    $pdo->prepare("
-        INSERT INTO journal_entries (date, account_debit, account_credit, amount, reference, description, entry_type)
-        VALUES (NOW(), 1, 6, ?, ?, ?, 'expense_reversal')
-    ")->execute([$amount, 'EXP-DEL-' . $id, 'Expense deleted - reversal entry']);
+    orange_journal_insert_line($pdo, [
+        'date' => date('Y-m-d H:i:s'),
+        'account_debit' => 1,
+        'account_credit' => 6,
+        'amount' => $amount,
+        'reference' => 'EXP-DEL-' . $id,
+        'description' => 'عكس مصروف — حذف السجل',
+        'entry_type' => 'expense_reversal',
+    ]);
 
     $pdo->commit();
     audit_log('expense_delete', 'تم حذف المصروف رقم: ' . $id, 'expenses', $id);

@@ -87,26 +87,13 @@ try {
         ];
     }
 
+    $paymentTerms = orange_normalize_payment_terms($data['payment_terms'] ?? 'cash');
     $hasSource = orange_table_has_column($pdo, 'orders', 'order_source');
-    if ($hasSource) {
-        $orderStmt = $pdo->prepare("
-            INSERT INTO orders (
-                order_number, customer_name, phone, area, address, notes, channel_id, status, total, order_source, created_at
-            ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, 'completed', ?, 'company', NOW()
-            )
-        ");
-    } else {
-        $orderStmt = $pdo->prepare("
-            INSERT INTO orders (
-                order_number, customer_name, phone, area, address, notes, channel_id, status, total, created_at
-            ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, 'completed', ?, NOW()
-            )
-        ");
-    }
+    $hasPay = orange_table_has_column($pdo, 'orders', 'payment_terms');
 
-    $orderStmt->execute([
+    $cols = 'order_number, customer_name, phone, area, address, notes, channel_id, status, total';
+    $ph = '?, ?, ?, ?, ?, ?, ?, \'completed\', ?';
+    $params = [
         $orderNumber,
         trim((string)$data['customer_name']),
         trim((string)$data['phone']),
@@ -115,7 +102,22 @@ try {
         trim((string)($data['notes'] ?? '')),
         (int)$data['channel_id'],
         $total,
-    ]);
+    ];
+    if ($hasSource) {
+        $cols .= ', order_source';
+        $ph .= ', ?';
+        $params[] = 'company';
+    }
+    if ($hasPay) {
+        $cols .= ', payment_terms';
+        $ph .= ', ?';
+        $params[] = $paymentTerms;
+    }
+    $cols .= ', created_at';
+    $ph .= ', NOW()';
+
+    $orderStmt = $pdo->prepare("INSERT INTO orders ($cols) VALUES ($ph)");
+    $orderStmt->execute($params);
 
     $orderId = (int)$pdo->lastInsertId();
 

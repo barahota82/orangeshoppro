@@ -518,6 +518,11 @@ function get_translations(): array {
             'cart_continue_shopping' => 'Continue shopping',
             'cart_mini_summary_title' => 'Order summary',
             'cart_mini_more' => '+{n} more',
+            'payment_terms_label' => 'Payment',
+            'payment_cash' => 'Cash',
+            'payment_credit' => 'Credit (pay later)',
+            'order_payment_terms_label' => 'Payment type',
+            'checkout_online_cash_only' => 'Online orders are recorded as cash sales. Credit sales are entered from the admin panel (company invoice).',
             'my_orders_intro' => 'Enter your order number and phone (same as when you placed the order).',
             'order_status_label' => 'Status',
             'order_status_pending' => 'Pending',
@@ -609,6 +614,11 @@ function get_translations(): array {
             'cart_continue_shopping' => 'متابعة التسوق',
             'cart_mini_summary_title' => 'ملخص الطلب',
             'cart_mini_more' => '+{n} منتجات أخرى',
+            'payment_terms_label' => 'نوع البيع',
+            'payment_cash' => 'نقدي',
+            'payment_credit' => 'آجل',
+            'order_payment_terms_label' => 'نوع البيع',
+            'checkout_online_cash_only' => 'طلبات الموقع تُسجَّل كمبيعات نقدي. البيع الآجل يُدخل من لوحة الإدارة (فاتورة شركة).',
             'my_orders_intro' => 'أدخل رقم الطلب ورقم الهاتف اللي استخدمتهم عند تأكيد الطلب.',
             'order_status_label' => 'الحالة',
             'order_status_pending' => 'قيد الانتظار',
@@ -700,6 +710,11 @@ function get_translations(): array {
             'cart_continue_shopping' => 'Mag-shopping pa',
             'cart_mini_summary_title' => 'Buod ng order',
             'cart_mini_more' => '+{n} pa',
+            'payment_terms_label' => 'Bayad',
+            'payment_cash' => 'Cash',
+            'payment_credit' => 'Utang / hulugan',
+            'order_payment_terms_label' => 'Uri ng bayad',
+            'checkout_online_cash_only' => 'Ang online order ay cash sale. Ang credit sale ay sa admin (company invoice).',
             'my_orders_intro' => 'Ilagay ang order number at telepono na ginamit mo nung nag-order.',
             'order_status_label' => 'Status',
             'order_status_pending' => 'Pending',
@@ -791,6 +806,11 @@ function get_translations(): array {
             'cart_continue_shopping' => 'खरीदारी जारी रखें',
             'cart_mini_summary_title' => 'ऑर्डर सारांश',
             'cart_mini_more' => '+{n} और',
+            'payment_terms_label' => 'भुगतान',
+            'payment_cash' => 'नकद',
+            'payment_credit' => 'उधार / बाद में',
+            'order_payment_terms_label' => 'भुगतान प्रकार',
+            'checkout_online_cash_only' => 'ऑनलाइन ऑर्डर नकद बिक्री के रूप में दर्ज होते हैं। उधार बिक्री एडमिन (कंपनी इनवॉइस) से।',
             'my_orders_intro' => 'ऑर्डर नंबर और वह फ़ोन दर्ज करें जो ऑर्डर करते समय दिया था।',
             'order_status_label' => 'स्थिति',
             'order_status_pending' => 'लंबित',
@@ -893,9 +913,9 @@ function require_admin_page(): array {
         exit;
     }
     $pdo = db();
-    $stmt = $pdo->prepare("SELECT * FROM admins WHERE id = ? AND is_active = 1 LIMIT 1");
-    $stmt->execute([(int)$_SESSION['admin_id']]);
-    $admin = $stmt->fetch();
+    $stmt = $pdo->prepare('SELECT * FROM admins WHERE id = ? AND is_active = 1 LIMIT 1');
+    $stmt->execute([(int) $_SESSION['admin_id']]);
+    $admin = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$admin) {
         admin_logout();
         header('Location: /admin/login.php');
@@ -909,9 +929,14 @@ function require_admin_api(): void {
         json_response(['success' => false, 'message' => 'غير مصرح'], 401);
     }
     $pdo = db();
-    $stmt = $pdo->prepare("SELECT id FROM admins WHERE id = ? AND is_active = 1 LIMIT 1");
-    $stmt->execute([(int)$_SESSION['admin_id']]);
-    if (!$stmt->fetch()) {
+    $stmt = $pdo->prepare('SELECT * FROM admins WHERE id = ? AND is_active = 1 LIMIT 1');
+    $stmt->execute([(int) $_SESSION['admin_id']]);
+    $admin = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$admin) {
         json_response(['success' => false, 'message' => 'غير مصرح'], 401);
     }
+    require_once __DIR__ . '/includes/catalog_schema.php';
+    require_once __DIR__ . '/includes/admin_permissions.php';
+    orange_catalog_ensure_schema($pdo);
+    orange_admin_enforce_api($admin, $pdo);
 }

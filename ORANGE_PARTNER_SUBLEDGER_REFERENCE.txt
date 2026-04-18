@@ -1,0 +1,105 @@
+ORANGE — مرجع ذمم العملاء والموردين (Partner subledger / AR–AP)
+آخر تحديث: 2026-04-17
+الغرض: أي مطوّر أو وكيل Cursor جديد يقرأ هذا الملف ليفهم ما بُني في وحدة الذمم ويكمّل دون إعادة شرح المحادثة.
+
+قبل القراءة هنا
+- اقرأ أولاً: ORANGE_PROJECT_CONTINUITY.txt ثم ORANGE_TECH_REFERENCE.txt (استضافة، مسار D:\orange، عدم وجود .env.php في Git).
+- القيود المحاسبية العامة: includes/journal_voucher.php + includes/fiscal_years.php (سنة مغلقة = لا قيود جديدة على تواريخها).
+
+================================================================================
+1) ماذا تفعل الوحدة؟
+================================================================================
+- دفتر ذمم فرعي (subledger) لكل عميل ومورد، مربوط بسندات اليومية journal_vouchers.
+- تسجيل تلقائي:
+  • مبيعات آجل عند اكتمال الطلب (تسليم): مدين عميل في الذمة، مع ربط ref_type=order و ref_id=معرف الطلب.
+  • شراء آجل: دائن مورد في الذمة، مع ref_type=purchase و ref_id=معرف الشراء (بعد قيد PUR-{id}).
+- سندات يدوية من لوحة الإدارة:
+  • قبض عميل: GL مدين نقد / دائن عملاء آجل + دائن ذمة عميل في subledger.
+  • دفع مورد: GL مدين ذمم موردين / دائن نقد + مدين ذمة مورد في subledger.
+- تخصيص اختياري: جدول party_subledger_allocations يربط مبلغاً من سند القبض/الدفع بطلب أو فاتورة شراء (للمتابعة وليس استبدال القيد المحاسبي).
+- حد ائتمان اختياري لكل عميل: يمنع تسليم طلب آجل إذا (الرصيد الحالي + قيمة التسليم) يتجاوز الحد.
+- تقارير: كشف حساب، أعمار ذمة FIFO، ملخص كل الأطراف، مطابقة أرصدة الدليل مع مجموع الذمم، تصدير CSV، ترحيل ربط الطلبات بالعميل بالهاتف.
+
+================================================================================
+2) الجداول والمخطط (يُنشأ/يُحدَّث عبر includes/catalog_schema.php)
+================================================================================
+- customers: name_ar, phone (فريد), notes, credit_limit (NULL = بلا حد), created_at.
+- orders.customer_id: يربط الطلب بعميل مسجّل (يُملأ عند التسليم الآجل إن وُجد هاتف ويُنشأ/يُطابق العميل).
+- party_subledger:
+  party_kind: supplier | customer
+  party_id, voucher_id (FK → journal_vouchers ON DELETE CASCADE)
+  debit, credit, ref_type, ref_id, memo
+- party_subledger_allocations:
+  party_kind, party_id, payment_voucher_id (FK → journal_vouchers ON DELETE CASCADE)
+  target_ref_type: order | purchase, target_ref_id, amount
+
+ملاحظة: حذف سند يحذف أسطر الذمة والتخصيصات المرتبطة به (CASCADE).
+
+================================================================================
+3) ملفات المنطق الأساسية
+================================================================================
+- includes/party_subledger.php
+  تسجيل أسطر الذمة، أرصدة العميل/المورد، كشف الحساب، أعمار FIFO، ترحيل ذمة شراء، orange_ensure_customer.
+- includes/party_allocations.php
+  تخصيص القبض/الدفع، المستندات المفتوحة، حد الائتمان، orange_partner_summary_report، orange_partner_gl_reconcile.
+- includes/order_fulfillment.php
+  عند اكتمال طلب آجل: قيود إيراد/تكلفة + تسجيل ذمة عميل إن وُجد customer_id/هاتف؛ فحص credit_limit قبل القيود.
+- admin/api/purchases/create.php و update.php
+  بعد القيد: orange_purchase_record_ap_subledger للشراء الآجل مع supplier_id > 0.
+
+================================================================================
+4) مفاتيح الحسابات في «حسابات القيود التلقائية»
+================================================================================
+يجب ربطها من لوحة الإدارة (gl_account_settings) حتى تعمل القيود:
+- cash — الخزينة
+- ar_credit — عملاء آجل (مدين عند البيع الآجل)
+- accounts_payable — ذمم الموردين
+- sales_revenue_credit / sales_revenue_cash — حسب نوع الطلب
+- cogs_credit / cogs_cash — تكلفة المبيعات
+- inventory — للشراء والتسليم
+
+================================================================================
+5) واجهات برمجية (admin/api)
+================================================================================
+الشركاء / الذمم:
+- partners/customer-receipt.php  — POST JSON: customer_id, amount, date, description, allow_excess?, allocations?
+- partners/supplier-payment.php   — POST JSON: supplier_id, amount, date, description, allow_excess?, allocations?
+- partners/statement.php        — party_kind, party_id
+- partners/aging.php             — party_kind, party_id, as_of?
+- partners/open-items.php        — party_kind, party_id (مستندات ذات رصيد مفتوح)
+- partners/summary.php           — include_aging? (ملخص الجميع)
+- partners/gl-reconcile.php      — fiscal_year_id? (مطابقة دليل vs ذمم)
+
+عملاء:
+- customers/save.php             — name_ar, phone, credit_limit? (يحدّث الحد فقط إذا وُجد المفتاح في الطلب)
+- customers/backfill-orders.php — POST {} يربط طلبات آجل (هاتف غير فارغ، customer_id فارغ) بجدول customers
+
+allocations شكل JSON:
+[ { "ref_type": "order"|"purchase", "ref_id": int, "amount": float }, ... ]
+مجموع التخصيصات ≤ مبلغ السند؛ كل مبلغ ≤ الرصيد المفتوح للمستند.
+
+================================================================================
+6) صفحات الإدارة
+================================================================================
+- admin/pages/partner_ledger.php — قبض/دفع، تخصيص، كشف، أعمار، إضافة عميل + حد ائتمان.
+- admin/pages/partner_reports.php — جداول شاملة، مطابقة GL، CSV، ترحيل ربط الطلبات، ?aging=1 لإظهار أعمدة أعمار مختصرة.
+
+التسجيل في admin/index.php: partner_ledger, partner_reports
+الروابط في admin/partials/header.php تحت المحاسبة.
+
+================================================================================
+7) سلوك مهم للصيانة
+================================================================================
+- القبض لا يُقبل بمبلغ أكبر من رصيد الذمة إلا إذا allow_excess=true (سلفة).
+- الدفع لا يُقبل بدون ذمة مستحقة إلا عبر السماح بالزيادة في الواجهة (مورد).
+- أعمار الذمة: افتراض تسوية FIFO على حركات subledger (ليس تواريخ استحقاق منفصلة بعد).
+- مطابقة GL: فرق variance يعني قيوداً على ar_credit / accounts_payable بدون حركة مقابلة في subledger أو العكس.
+
+================================================================================
+8) متابعة التطوير (أفكار تقنية فقط — بدون أولوية من هذا الملف)
+================================================================================
+- طباعة PDF لكشف الحساب أو الملخص.
+- استحقاق صريح per-document (حقل due_date) لأعمار أدق.
+- صلاحيات أدق على سندات القبض/الدفع.
+
+نهاية المرجع.

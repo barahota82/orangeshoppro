@@ -1,20 +1,47 @@
 <?php
+
+declare(strict_types=1);
+
 require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/gl_settings.php';
+require_once __DIR__ . '/../../../includes/journal_write.php';
+require_once __DIR__ . '/../../../includes/journal_voucher.php';
+require_once __DIR__ . '/../../../includes/party_subledger.php';
+require_once __DIR__ . '/../../../includes/purchase_helpers.php';
 require_admin_api();
 
 function reverse_purchase_stock(PDO $pdo, int $purchaseId): void
 {
-    $itemsStmt = $pdo->prepare("SELECT product_id, qty FROM purchase_items WHERE purchase_id = ?");
+    $hasV = orange_table_has_column($pdo, 'purchase_items', 'variant_id');
+    $sql = $hasV
+        ? 'SELECT product_id, variant_id, qty FROM purchase_items WHERE purchase_id = ?'
+        : 'SELECT product_id, qty FROM purchase_items WHERE purchase_id = ?';
+    $itemsStmt = $pdo->prepare($sql);
     $itemsStmt->execute([$purchaseId]);
-    $items = $itemsStmt->fetchAll();
+    $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
     foreach ($items as $item) {
-        $pdo->prepare("UPDATE product_variants SET stock_quantity = GREATEST(stock_quantity - ?, 0) WHERE product_id = ?")
-            ->execute([(int)$item['qty'], (int)$item['product_id']]);
+        $qty = (int) ($item['qty'] ?? 0);
+        $pid = (int) ($item['product_id'] ?? 0);
+        if ($qty <= 0 || $pid <= 0) {
+            continue;
+        }
+        $vid = $hasV ? (int) ($item['variant_id'] ?? 0) : 0;
+        if ($vid > 0) {
+            $pdo->prepare(
+                'UPDATE product_variants SET stock_quantity = GREATEST(stock_quantity - ?, 0) WHERE id = ? AND product_id = ?'
+            )->execute([$qty, $vid, $pid]);
+        } else {
+            $pdo->prepare(
+                'UPDATE product_variants SET stock_quantity = GREATEST(stock_quantity - ?, 0) WHERE product_id = ?'
+            )->execute([$qty, $pid]);
+        }
     }
 }
 
 function apply_purchase_items(PDO $pdo, int $purchaseId, array $items): float
 {
+    $hasV = orange_table_has_column($pdo, 'purchase_items', 'variant_id');
     $total = 0.0;
     foreach ($items as $item) {
         $productId = (int)($item['product_id'] ?? 0);
@@ -24,16 +51,29 @@ function apply_purchase_items(PDO $pdo, int $purchaseId, array $items): float
             throw new RuntimeException('عنصر شراء غير صحيح');
         }
         $total += $qty * $cost;
-        $pdo->prepare("INSERT INTO purchase_items (purchase_id, product_id, qty, cost) VALUES (?, ?, ?, ?)")
-            ->execute([$purchaseId, $productId, $qty, $cost]);
-        $pdo->prepare("UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE product_id = ?")
-            ->execute([$qty, $productId]);
+        $variantId = orange_purchase_resolve_variant_id(
+            $pdo,
+            $productId,
+            (int)($item['variant_id'] ?? 0)
+        );
+        if ($hasV) {
+            $pdo->prepare(
+                'INSERT INTO purchase_items (purchase_id, product_id, variant_id, qty, cost) VALUES (?, ?, ?, ?, ?)'
+            )->execute([$purchaseId, $productId, $variantId, $qty, $cost]);
+        } else {
+            $pdo->prepare("INSERT INTO purchase_items (purchase_id, product_id, qty, cost) VALUES (?, ?, ?, ?)")
+                ->execute([$purchaseId, $productId, $qty, $cost]);
+        }
+        $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ?')
+            ->execute([$qty, $variantId]);
     }
+
     return $total;
 }
 
 try {
     $pdo = db();
+    orange_catalog_ensure_schema($pdo);
     $data = get_json_input();
     $purchaseId = (int)($data['id'] ?? 0);
     $action = trim((string)($data['action'] ?? 'update'));
@@ -46,6 +86,12 @@ try {
     $purchase = $stmt->fetch();
     if (!$purchase) {
         json_response(['success' => false, 'message' => 'عملية الشراء غير موجودة'], 404);
+    }
+
+    $purRef = 'PUR-' . $purchaseId;
+    $accRow = orange_accounting_row_by_reference($pdo, $purRef);
+    if (orange_accounting_is_locked($pdo, $accRow)) {
+        json_response(['success' => false, 'message' => 'لا يمكن تعديل أو حذف شراء مرتبط بسنة مالية مغلقة'], 422);
     }
 
     $pdo->beginTransaction();
@@ -72,16 +118,36 @@ try {
     $pdo->prepare("UPDATE purchases SET supplier_id = ?, total = ?, type = ?, notes = ?, updated_at = NOW() WHERE id = ?")
         ->execute([$supplierId > 0 ? $supplierId : null, $newTotal, $type, $notes, $purchaseId]);
 
-    $pdo->prepare("DELETE FROM journal_entries WHERE reference = ?")->execute(['PUR-' . $purchaseId]);
+    orange_purchase_remove_accounting($pdo, $purRef);
+
+    $inventoryId = orange_gl_account_id($pdo, 'inventory');
+    $cashId = orange_gl_account_id($pdo, 'cash');
+    $apId = orange_gl_account_id($pdo, 'accounts_payable');
+    $purRef = 'PUR-' . $purchaseId;
+    $now = date('Y-m-d H:i:s');
     if ($type === 'cash') {
-        $pdo->prepare("INSERT INTO journal_entries (date, account_debit, account_credit, amount, reference, description, entry_type)
-            VALUES (NOW(), 1, 3, ?, ?, ?, 'purchase')")
-            ->execute([$newTotal, 'PUR-' . $purchaseId, 'Cash purchase']);
+        orange_journal_insert_line($pdo, [
+            'date' => $now,
+            'account_debit' => $inventoryId,
+            'account_credit' => $cashId,
+            'amount' => $newTotal,
+            'reference' => $purRef,
+            'description' => 'شراء نقدي',
+            'entry_type' => 'purchase',
+        ]);
     } else {
-        $pdo->prepare("INSERT INTO journal_entries (date, account_debit, account_credit, amount, reference, description, entry_type)
-            VALUES (NOW(), 3, 5, ?, ?, ?, 'purchase')")
-            ->execute([$newTotal, 'PUR-' . $purchaseId, 'Credit purchase']);
+        orange_journal_insert_line($pdo, [
+            'date' => $now,
+            'account_debit' => $inventoryId,
+            'account_credit' => $apId,
+            'amount' => $newTotal,
+            'reference' => $purRef,
+            'description' => 'شراء آجل — ذمم موردين',
+            'entry_type' => 'purchase',
+        ]);
     }
+
+    orange_purchase_record_ap_subledger($pdo, $purchaseId, $supplierId, $type, $newTotal);
 
     $pdo->commit();
     audit_log('purchase_update', 'تم تعديل فاتورة شراء رقم: ' . $purchaseId, 'purchases', $purchaseId);
