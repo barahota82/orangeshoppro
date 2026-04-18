@@ -10,6 +10,12 @@ alwaysApply: true
 - Never UTF-16 LE for PHP (bad start bytes like 3C 00 3F 00).
 - Keep on-disk project UTF-8 before upload.
 
+## رفع الملفات / النشر (مهم — لا لصق PHP في لوحة الاستضافة)
+- **المفضّل:** `git push` محلياً ثم `git pull` على السيرفر — نفس البايتات، بدون نسخ يدوي.
+- قبل commit: `powershell -NoProfile -File scripts/verify-php-utf8.ps1`؛ إن فشل: `-Fix` ثم إعادة فحص بدون `-Fix`.
+- تفعيل hook (مرة/clone): `powershell -NoProfile -File scripts/install-hooks.ps1`.
+- تفاصيل أوامر وFTP: **`ORANGE_CHAT_CONTINUITY.md`** قسم «Deploy / upload».
+
 ## config.php policy
 - **Do not** add feature helpers to `config.php` unless the user explicitly asks.
 - **Do not** add `PDO::MYSQL_ATTR_INIT_COMMAND` unless explicitly approved.
