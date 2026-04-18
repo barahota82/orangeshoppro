@@ -891,6 +891,20 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     flex-direction: column;
     min-width: 0;
     background: #f3f4f6;
+    padding: 14px 16px 16px;
+    gap: 0;
+}
+/* لوحة «بيانات الحساب» + شريط الأزرار (مطابقة الشكل المرجعي) */
+.coa-shell__panel {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+    overflow: hidden;
 }
 .coa-form-card--classic {
     margin: 0;
@@ -898,21 +912,32 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     border: none;
     flex: 1;
     box-shadow: none;
-    background: #f9fafb;
+    background: #fff;
+    padding: 18px 20px 20px;
 }
 .coa-form-card__title {
-    margin-bottom: 12px;
-    padding-bottom: 8px;
+    margin: 0 0 14px;
+    padding-bottom: 10px;
     border-bottom: 1px solid var(--border, #e5e7eb);
+    font-size: 1.12rem;
+    font-weight: 700;
+    color: #111827;
 }
 .coa-form-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px 20px;
+    grid-template-columns: 1fr;
+    gap: 14px;
     align-items: start;
 }
 .coa-field--span2 {
-    grid-column: 1 / -1;
+    grid-column: 1;
+}
+.coa-field > label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--text-muted, #4b5563);
 }
 .coa-root-hint {
     margin: 8px 0 0;
@@ -976,12 +1001,13 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
 .coa-level-display {
     margin: 0;
     min-height: 38px;
-    padding: 8px 10px;
-    background: #e5e7eb;
+    padding: 8px 12px;
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
     border-radius: 6px;
     font-size: 14px;
-    font-weight: 600;
-    color: #1f2937;
+    font-weight: 500;
+    color: #4b5563;
 }
 .coa-tabs-placeholder {
     margin-top: 16px;
@@ -1015,9 +1041,10 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     flex-wrap: wrap;
     gap: 8px;
     justify-content: flex-start;
-    padding: 12px 14px;
-    background: linear-gradient(180deg, #e8e8e8 0%, #dcdcdc 100%);
-    border-top: 1px solid #b0b0b0;
+    padding: 12px 16px;
+    margin: 0;
+    background: linear-gradient(180deg, #f1f3f5 0%, #e8eaed 100%);
+    border-top: 1px solid #d8dce0;
 }
 .coa-shell__footer .btn,
 .coa-shell__footer .btn-secondary,

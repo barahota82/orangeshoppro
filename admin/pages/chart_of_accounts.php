@@ -39,6 +39,7 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
         </aside>
 
         <div class="coa-shell__main" dir="rtl">
+            <div class="coa-shell__panel">
             <div class="card coa-form-card coa-form-card--classic">
                 <h3 class="card-title coa-form-card__title">بيانات الحساب</h3>
                 <input type="hidden" id="coa_id" value="0">
@@ -109,6 +110,7 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
                 <button type="button" class="btn-secondary" id="coa_btn_print">طباعة</button>
                 <a class="btn-secondary" href="/admin/index.php">خروج</a>
             </footer>
+            </div>
         </div>
     </div>
 </div>
