@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# يمنع commit لو فيه ملف PHP بـ UTF-8 BOM أو UTF-16 (يسبب صفحة بيضاء).
+# التفعيل مرة واحدة من جذر المشروع:
+#   git config core.hooksPath scripts/git-hooks
+# (أو شغّل scripts/install-hooks.ps1 / install-hooks.sh)
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+if [[ -z "$ROOT" ]]; then
+  exit 0
+fi
+cd "$ROOT"
+if [[ ! -x "scripts/verify-php-utf8.sh" ]]; then
+  chmod +x scripts/verify-php-utf8.sh 2>/dev/null || true
+fi
+if ! command -v xxd >/dev/null 2>&1; then
+  echo "pre-commit: xxd غير متوفر — تخطّي الفحص محلياً (GitHub Actions ما زال يفحص)."
+  exit 0
+fi
+exec ./scripts/verify-php-utf8.sh
