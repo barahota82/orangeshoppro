@@ -18,6 +18,7 @@ function orange_accounts_flat(PDO $pdo): array
     $hasGrp = orange_table_has_column($pdo, 'accounts', 'is_group');
     $hasNameEn = orange_table_has_column($pdo, 'accounts', 'name_en');
     $hasSuspended = orange_table_has_column($pdo, 'accounts', 'is_suspended');
+    $hasNb = orange_table_has_column($pdo, 'accounts', 'normal_balance');
     $cols = 'id, name, code, updated_at';
     if ($hasClass) {
         $cols .= ', account_class';
@@ -33,6 +34,9 @@ function orange_accounts_flat(PDO $pdo): array
     }
     if ($hasSuspended) {
         $cols .= ', is_suspended';
+    }
+    if ($hasNb) {
+        $cols .= ', normal_balance';
     }
     $rows = $pdo->query('SELECT ' . $cols . ' FROM accounts ORDER BY COALESCE(code, \'\'), id')->fetchAll(PDO::FETCH_ASSOC);
 
@@ -182,4 +186,32 @@ function orange_accounts_depth_by_id(array $flat): array
     }
 
     return $memo;
+}
+
+/**
+ * أسماء الجذر والمستوى الثاني في مسار الحساب (للعرض في الدليل).
+ *
+ * @param list<array<string, mixed>> $flat
+ * @return array{root: string, category: string}
+ */
+function orange_coa_root_category_names(array $flat, int $nodeId): array
+{
+    $byId = [];
+    foreach ($flat as $r) {
+        $byId[(int) $r['id']] = $r;
+    }
+    $names = [];
+    $cur = $nodeId;
+    $guard = 0;
+    while ($cur > 0 && isset($byId[$cur]) && $guard < 500) {
+        array_unshift($names, (string) ($byId[$cur]['name'] ?? ''));
+        $p = (int) ($byId[$cur]['parent_id'] ?? 0);
+        $cur = $p;
+        ++$guard;
+    }
+
+    return [
+        'root' => $names[0] ?? '',
+        'category' => $names[1] ?? '',
+    ];
 }

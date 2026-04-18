@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
@@ -15,7 +15,9 @@ if ($fyId <= 0 && $years !== []) {
     $fyId = (int)$years[0]['id'];
 }
 
-$accounts = $pdo->query('SELECT id, name, code FROM accounts ORDER BY COALESCE(code, \'\'), name')->fetchAll(PDO::FETCH_ASSOC);
+$hasGrp = orange_table_has_column($pdo, 'accounts', 'is_group');
+$accCols = $hasGrp ? 'id, name, code, is_group' : 'id, name, code';
+$accounts = $pdo->query('SELECT ' . $accCols . ' FROM accounts ORDER BY COALESCE(code, \'\'), name')->fetchAll(PDO::FETCH_ASSOC);
 $accMap = [];
 foreach ($accounts as $a) {
     $accMap[(int)$a['id']] = trim((string)($a['code'] ?? '')) !== '' ? $a['code'] . ' — ' . $a['name'] : $a['name'];
@@ -48,6 +50,9 @@ if ($vouchers !== []) {
 
 $acctOpts = '';
 foreach ($accounts as $a) {
+    if ($hasGrp && !empty($a['is_group'])) {
+        continue;
+    }
     $acctOpts .= '<option value="' . (int)$a['id'] . '">' . htmlspecialchars($accMap[(int)$a['id']], ENT_QUOTES, 'UTF-8') . '</option>';
 }
 ?>

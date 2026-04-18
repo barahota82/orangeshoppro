@@ -31,6 +31,38 @@ foreach ($accounts as $a) {
 
 $useVouchers = orange_journal_vouchers_ready($pdo);
 
+$stmtAccountId = isset($_GET['account']) ? (int) $_GET['account'] : 0;
+$statementRows = [];
+$statementAccLabel = '';
+$statementClosing = 0.0;
+$doAutoPrint = isset($_GET['print']) && (string) $_GET['print'] === '1';
+
+if ($stmtAccountId > 0 && $useVouchers && $fyId > 0) {
+    foreach ($accounts as $a) {
+        if ((int) $a['id'] === $stmtAccountId) {
+            $statementAccLabel = (trim((string) ($a['code'] ?? '')) !== '' ? $a['code'] . ' — ' : '') . $a['name'];
+            break;
+        }
+    }
+    $stL = $pdo->prepare(
+        'SELECT jl.debit, jl.credit, jl.memo, jl.line_no, jv.voucher_date, jv.reference, jv.description, jv.id AS voucher_id
+         FROM journal_lines jl
+         INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
+         WHERE jl.account_id = ? AND jv.fiscal_year_id = ?
+         ORDER BY jv.voucher_date ASC, jv.id ASC, jl.line_no ASC'
+    );
+    $stL->execute([$stmtAccountId, $fyId]);
+    $bal = 0.0;
+    foreach ($stL->fetchAll(PDO::FETCH_ASSOC) as $ln) {
+        $d = (float) $ln['debit'];
+        $c = (float) $ln['credit'];
+        $bal += ($d - $c);
+        $ln['balance'] = $bal;
+        $statementRows[] = $ln;
+    }
+    $statementClosing = $bal;
+}
+
 $tbAll = [];
 $sumDebit = 0.0;
 $sumCredit = 0.0;
@@ -125,6 +157,9 @@ $bsCheck = round($bsAssets - ($bsLiab + $bsEquity), 2);
     <?php else: ?>
     <form method="get" action="" class="form-grid" style="align-items:end;">
         <input type="hidden" name="page" value="financial_report">
+        <?php if ($stmtAccountId > 0): ?>
+            <input type="hidden" name="account" value="<?php echo $stmtAccountId; ?>">
+        <?php endif; ?>
         <div>
             <label for="fy_rep">السنة المالية</label>
             <select id="fy_rep" name="fy" onchange="this.form.submit()">
@@ -144,6 +179,75 @@ $bsCheck = round($bsAssets - ($bsLiab + $bsEquity), 2);
         </p>
     <?php endif; ?>
 </div>
+
+<?php if ($stmtAccountId > 0): ?>
+<div class="card account-statement-print" id="account_statement_card">
+    <h3 class="card-title">كشف حساب</h3>
+    <?php if ($statementAccLabel !== ''): ?>
+        <p class="page-subtitle"><strong><?php echo htmlspecialchars($statementAccLabel, ENT_QUOTES, 'UTF-8'); ?></strong>
+        <?php if ($fyRow): ?>
+            — السنة: <?php echo htmlspecialchars($fyRow['label_ar'] ?? '', ENT_QUOTES, 'UTF-8'); ?>
+        <?php endif; ?>
+        </p>
+    <?php endif; ?>
+    <?php if (!$useVouchers || $fyId <= 0): ?>
+        <p class="card-hint">حدد سنة مالية أو فعّل سندات اليومية لعرض الكشف.</p>
+    <?php elseif ($statementAccLabel === ''): ?>
+        <p class="card-hint">الحساب غير موجود.</p>
+    <?php else: ?>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>التاريخ</th>
+                        <th>السند</th>
+                        <th>البيان</th>
+                        <th>مدين</th>
+                        <th>دائن</th>
+                        <th>الرصيد</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($statementRows as $sr): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars(substr((string) ($sr['voucher_date'] ?? ''), 0, 10), ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td><?php echo htmlspecialchars((string) ($sr['reference'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td><?php echo htmlspecialchars((string) ($sr['description'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>
+                                <?php if (trim((string) ($sr['memo'] ?? '')) !== ''): ?>
+                                    <br><small class="muted"><?php echo htmlspecialchars($sr['memo'], ENT_QUOTES, 'UTF-8'); ?></small>
+                                <?php endif; ?>
+                            </td>
+                            <td><?php echo number_format((float) ($sr['debit'] ?? 0), 4); ?></td>
+                            <td><?php echo number_format((float) ($sr['credit'] ?? 0), 4); ?></td>
+                            <td><?php echo number_format((float) ($sr['balance'] ?? 0), 4); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th colspan="5">رصيد نهاية الفترة</th>
+                        <th><?php echo number_format($statementClosing, 4); ?></th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <?php if ($statementRows === []): ?>
+            <p class="page-subtitle">لا حركة على هذا الحساب في هذه السنة.</p>
+        <?php endif; ?>
+        <p class="actions" style="margin-top:12px;">
+            <button type="button" class="btn-secondary" onclick="window.print()">طباعة الكشف</button>
+            <a class="btn-secondary" href="/admin/index.php?page=financial_report&amp;fy=<?php echo (int) $fyId; ?>">العودة للتقارير</a>
+        </p>
+    <?php endif; ?>
+</div>
+<?php if ($doAutoPrint && $stmtAccountId > 0 && $statementAccLabel !== '' && $useVouchers && $fyId > 0): ?>
+<script>
+window.addEventListener('load', function () {
+    setTimeout(function () { window.print(); }, 300);
+});
+</script>
+<?php endif; ?>
+<?php endif; ?>
 
 <?php if (!$useVouchers): ?>
 <div class="card">

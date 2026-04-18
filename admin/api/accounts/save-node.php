@@ -22,10 +22,11 @@ try {
         $parentId = null;
     }
     $isGroup = !empty($data['is_group']) ? 1 : 0;
-    $accountClass = trim((string) ($data['account_class'] ?? 'unclassified'));
-    $code = trim((string) ($data['code'] ?? ''));
     $nameEn = trim((string) ($data['name_en'] ?? ''));
     $isSuspended = !empty($data['is_suspended']) ? 1 : 0;
+    $nbRaw = strtolower(trim((string) ($data['normal_balance'] ?? 'debit')));
+    $normalBalance = $nbRaw === 'credit' ? 'credit' : 'debit';
+
     if ($name === '') {
         json_response(['success' => false, 'message' => 'اسم الحساب مطلوب'], 422);
     }
@@ -46,21 +47,21 @@ try {
         json_response(['success' => false, 'message' => 'تعذر قفل الشجرة — أعد المحاولة'], 423);
     }
     try {
-        if ($code === '') {
-            $code = orange_accounts_suggest_child_code($pdo, $parentId);
-        }
         $hasClass = orange_table_has_column($pdo, 'accounts', 'account_class');
         $hasPar = orange_table_has_column($pdo, 'accounts', 'parent_id');
         $hasGrp = orange_table_has_column($pdo, 'accounts', 'is_group');
         $hasNameEn = orange_table_has_column($pdo, 'accounts', 'name_en');
         $hasSuspended = orange_table_has_column($pdo, 'accounts', 'is_suspended');
+        $hasNb = orange_table_has_column($pdo, 'accounts', 'normal_balance');
 
         if ($id <= 0) {
+            $code = orange_accounts_suggest_child_code($pdo, $parentId);
             $dup = $pdo->prepare('SELECT id FROM accounts WHERE code = ? LIMIT 1');
             $dup->execute([$code]);
             if ($dup->fetch()) {
-                json_response(['success' => false, 'message' => 'الكود مستخدم — اضغط «اقتراح كود» ثم أعد المحاولة'], 409);
+                json_response(['success' => false, 'message' => 'تعذر توليد كود فريد — أعد المحاولة'], 409);
             }
+            $accountClass = 'unclassified';
             $cols = ['name', 'code'];
             $vals = [$name, $code];
             if ($hasClass) {
@@ -83,6 +84,10 @@ try {
                 $cols[] = 'is_suspended';
                 $vals[] = $isSuspended;
             }
+            if ($hasNb) {
+                $cols[] = 'normal_balance';
+                $vals[] = $normalBalance;
+            }
             $ph = implode(',', array_fill(0, count($cols), '?'));
             $pdo->prepare('INSERT INTO accounts (' . implode(',', $cols) . ') VALUES (' . $ph . ')')->execute($vals);
             $newId = (int) $pdo->lastInsertId();
@@ -90,17 +95,25 @@ try {
             json_response(['success' => true, 'message' => 'تم إنشاء الحساب', 'id' => $newId, 'code' => $code]);
         }
 
+        $exSt = $pdo->prepare('SELECT code FROM accounts WHERE id = ? LIMIT 1');
+        $exSt->execute([$id]);
+        $exRow = $exSt->fetch(PDO::FETCH_ASSOC);
+        if (!$exRow) {
+            json_response(['success' => false, 'message' => 'الحساب غير موجود'], 404);
+        }
+        $code = trim((string) ($exRow['code'] ?? ''));
+        if ($code === '') {
+            $code = orange_accounts_suggest_child_code($pdo, $parentId);
+        }
+
         $dup = $pdo->prepare('SELECT id FROM accounts WHERE code = ? AND id <> ? LIMIT 1');
         $dup->execute([$code, $id]);
         if ($dup->fetch()) {
             json_response(['success' => false, 'message' => 'الكود مستخدم لحساب آخر'], 409);
         }
+
         $sets = ['name = ?', 'code = ?'];
         $vals = [$name, $code];
-        if ($hasClass) {
-            $sets[] = 'account_class = ?';
-            $vals[] = $accountClass;
-        }
         if ($hasPar) {
             $sets[] = 'parent_id = ?';
             $vals[] = $parentId;
@@ -116,6 +129,10 @@ try {
         if ($hasSuspended) {
             $sets[] = 'is_suspended = ?';
             $vals[] = $isSuspended;
+        }
+        if ($hasNb) {
+            $sets[] = 'normal_balance = ?';
+            $vals[] = $normalBalance;
         }
         $vals[] = $id;
         $pdo->prepare('UPDATE accounts SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($vals);

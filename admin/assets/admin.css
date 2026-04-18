@@ -902,6 +902,16 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     font-size: 13px;
     line-height: 1.45;
 }
+.coa-field-hint {
+    margin: 4px 0 0;
+    font-size: 12px;
+    line-height: 1.4;
+}
+.coa-footer-link--disabled {
+    pointer-events: none;
+    opacity: 0.45;
+    cursor: not-allowed;
+}
 .coa-field__label {
     display: block;
     font-size: 13px;

@@ -40,6 +40,19 @@ try {
                     'memo' => trim((string)($ln['memo'] ?? '')),
                 ];
             }
+            if (orange_table_has_column($pdo, 'accounts', 'is_group')) {
+                foreach ($norm as $ln) {
+                    $aid = (int) $ln['account_id'];
+                    if ($aid <= 0) {
+                        continue;
+                    }
+                    $chk = $pdo->prepare('SELECT is_group FROM accounts WHERE id = ? LIMIT 1');
+                    $chk->execute([$aid]);
+                    if ((int) $chk->fetchColumn() === 1) {
+                        json_response(['success' => false, 'message' => 'لا يُسجَّل على حساب رئيسي — اختر حساباً فرعياً من الدليل'], 422);
+                    }
+                }
+            }
             try {
                 $vid = orange_voucher_post($pdo, [
                     'voucher_date' => $date,
@@ -61,6 +74,15 @@ try {
         $amount = (float)($data['amount'] ?? 0);
         if ($accountDebit <= 0 || $accountCredit <= 0 || $amount <= 0) {
             json_response(['success' => false, 'message' => 'بيانات القيد اليدوي غير مكتملة'], 422);
+        }
+        if (orange_table_has_column($pdo, 'accounts', 'is_group')) {
+            foreach ([$accountDebit, $accountCredit] as $aid) {
+                $chk = $pdo->prepare('SELECT is_group FROM accounts WHERE id = ? LIMIT 1');
+                $chk->execute([$aid]);
+                if ((int) $chk->fetchColumn() === 1) {
+                    json_response(['success' => false, 'message' => 'لا يُسجَّل على حساب رئيسي — اختر حساباً فرعياً'], 422);
+                }
+            }
         }
         try {
             $vid = orange_voucher_post($pdo, [

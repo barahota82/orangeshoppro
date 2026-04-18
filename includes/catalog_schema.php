@@ -523,6 +523,12 @@ function orange_catalog_ensure_schema(PDO $pdo): void
             'ALTER TABLE accounts ADD COLUMN is_suspended TINYINT(1) NOT NULL DEFAULT 0'
         );
     }
+    if (orange_table_exists($pdo, 'accounts') && !orange_table_has_column($pdo, 'accounts', 'normal_balance')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            "ALTER TABLE accounts ADD COLUMN normal_balance VARCHAR(16) NOT NULL DEFAULT 'debit'"
+        );
+    }
 
     if (orange_table_exists($pdo, 'admins') && !orange_table_has_column($pdo, 'admins', 'is_superuser')) {
         orange_catalog_safe_exec(

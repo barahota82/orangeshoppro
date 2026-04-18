@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
+require_once __DIR__ . '/../../includes/fiscal_years.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -11,24 +12,17 @@ orange_catalog_ensure_schema($pdo);
 $flat = orange_accounts_flat($pdo);
 $tree = orange_accounts_build_tree($flat);
 $depths = orange_accounts_depth_by_id($flat);
-$hasClass = orange_table_has_column($pdo, 'accounts', 'account_class');
 $hasNameEn = orange_table_has_column($pdo, 'accounts', 'name_en');
 $hasSuspended = orange_table_has_column($pdo, 'accounts', 'is_suspended');
+$hasNb = orange_table_has_column($pdo, 'accounts', 'normal_balance');
 
-$classLabels = [
-    'unclassified' => 'غير مصنف',
-    'asset' => 'أصول',
-    'liability' => 'خصوم',
-    'equity' => 'حقوق الملكية',
-    'revenue' => 'إيرادات',
-    'expense' => 'مصروفات',
-    'cogs' => 'تكلفة مبيعات',
-];
+$fyList = orange_fiscal_years_list($pdo);
+$fyDefault = $fyList !== [] ? (int) $fyList[0]['id'] : 0;
 
 /**
  * @param list<array<string, mixed>> $nodes
  */
-function orange_render_coa_tree(array $nodes, int $activeId, int $depth = 0): void
+function orange_render_coa_tree(array $nodes, int $activeId, array $flat, int $depth = 0): void
 {
     echo '<ul class="coa-tree-list">';
     foreach ($nodes as $n) {
@@ -38,15 +32,18 @@ function orange_render_coa_tree(array $nodes, int $activeId, int $depth = 0): vo
         $nameEn = htmlspecialchars((string) ($n['name_en'] ?? ''), ENT_QUOTES, 'UTF-8');
         $isG = !empty($n['is_group']);
         $susp = !empty($n['is_suspended']);
+        $nb = htmlspecialchars((string) ($n['normal_balance'] ?? 'debit'), ENT_QUOTES, 'UTF-8');
+        $rc = orange_coa_root_category_names($flat, $id);
+        $rootN = htmlspecialchars($rc['root'], ENT_QUOTES, 'UTF-8');
+        $catN = htmlspecialchars($rc['category'], ENT_QUOTES, 'UTF-8');
         $cls = $activeId === $id ? 'coa-tree-node is-active' : 'coa-tree-node';
         if ($susp) {
             $cls .= ' coa-tree-node--suspended';
         }
-        $ac = htmlspecialchars((string) ($n['account_class'] ?? 'unclassified'), ENT_QUOTES, 'UTF-8');
-        echo '<li class="' . $cls . '" role="treeitem" data-id="' . $id . '" data-code="' . $code . '" data-name="' . $name . '" data-name-en="' . $nameEn . '" data-is-group="' . ($isG ? '1' : '0') . '" data-class="' . $ac . '" data-parent="' . (int) ($n['parent_id'] ?? 0) . '" data-suspended="' . ($susp ? '1' : '0') . '" data-depth="' . $depth . '">';
+        echo '<li class="' . $cls . '" role="treeitem" data-id="' . $id . '" data-code="' . $code . '" data-name="' . $name . '" data-name-en="' . $nameEn . '" data-is-group="' . ($isG ? '1' : '0') . '" data-parent="' . (int) ($n['parent_id'] ?? 0) . '" data-suspended="' . ($susp ? '1' : '0') . '" data-depth="' . $depth . '" data-root-name="' . $rootN . '" data-category-name="' . $catN . '" data-normal-balance="' . $nb . '">';
         echo '<span class="coa-tree-label">' . $code . ' — ' . $name . ($isG ? ' <small>(رئيسي)</small>' : '') . ($susp ? ' <small class="coa-tree-suspended-tag">موقوف</small>' : '') . '</span>';
         if (!empty($n['children'])) {
-            orange_render_coa_tree($n['children'], $activeId, $depth + 1);
+            orange_render_coa_tree($n['children'], $activeId, $flat, $depth + 1);
         }
         echo '</li>';
     }
@@ -55,13 +52,12 @@ function orange_render_coa_tree(array $nodes, int $activeId, int $depth = 0): vo
 
 $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
 ?>
-<div class="coa-shell" dir="rtl">
+<div class="coa-shell" dir="rtl" data-fy-default="<?php echo (int) $fyDefault; ?>">
     <div class="coa-shell__title">
         <h1 class="coa-shell__heading">الدليل المحاسبي</h1>
         <p class="coa-shell__subtitle muted">
-            <strong>هيكل الجذور يحدده أنت هنا:</strong> أي حساب تضيفه مع اختيار «جذر (بدون أب)» يصبح في <strong>المستوى الأول</strong> — لا توجد قائمة جذور ثابتة من النظام.
-            اقتراح الكود والتصنيف يساعدانك؛ ثم اربط ما يلزم من
-            <a href="/admin/index.php?page=gl_account_settings">حسابات القيود التلقائية</a>.
+            الشجرة تبدأ فارغة وتبنيها أنت. كود الحساب يُولَّد تلقائياً عند الحفظ ولا يُعدَّل يدوياً.
+            <strong>الحساب الرئيسي</strong> لا يظهر في بحث القيود؛ <strong>الفرعي</strong> للتسجيل في السندات.
         </p>
     </div>
 
@@ -74,9 +70,9 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
             </div>
             <div class="coa-tree-scroll" id="coa_tree_root" role="tree">
                 <?php if ($tree === []): ?>
-                    <p class="muted">لا توجد حسابات بعد. اضغط «إضافة»، اترك الأب على «جذر (بدون أب)»، ثم احفظ — هكذا تُنشئ أول مستوى في الشجرة بنفسك.</p>
+                    <p class="muted">لا توجد حسابات بعد. اضغط «إضافة» ثم املأ البيانات واحفظ.</p>
                 <?php else: ?>
-                    <?php orange_render_coa_tree($tree, $firstId, 0); ?>
+                    <?php orange_render_coa_tree($tree, $firstId, $flat, 0); ?>
                 <?php endif; ?>
             </div>
         </aside>
@@ -89,21 +85,42 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
                 <div class="coa-form-grid">
                     <div class="coa-field coa-field--code">
                         <label for="coa_code">كود الحساب</label>
-                        <div class="coa-field__row">
-                            <input type="text" id="coa_code" maxlength="64" class="coa-input-wide">
-                            <button type="button" id="coa_btn_suggest" class="btn-secondary">اقتراح كود</button>
-                        </div>
+                        <input type="text" id="coa_code" maxlength="64" class="coa-input-wide coa-input-readonly" readonly placeholder="يُولَّد تلقائياً عند الحفظ">
                     </div>
-                    <div class="coa-field coa-field--kind">
-                        <span class="coa-field__label">نوع الحساب في الشجرة</span>
-                        <div class="coa-radio-row">
-                            <label class="coa-radio"><input type="radio" name="coa_kind" value="1"> رئيسي</label>
-                            <label class="coa-radio"><input type="radio" name="coa_kind" value="0" checked> فرعي</label>
-                        </div>
+
+                    <div class="coa-field coa-field--span2">
+                        <label for="coa_name">اسم الحساب بالعربية</label>
+                        <input type="text" id="coa_name" class="coa-input-wide" autocomplete="off">
                     </div>
-                    <?php if ($hasSuspended): ?>
-                    <div class="coa-field coa-field--suspend">
-                        <label class="coa-check"><input type="checkbox" id="coa_suspended"> موقوف</label>
+                    <?php if ($hasNameEn): ?>
+                    <div class="coa-field coa-field--span2">
+                        <label for="coa_name_en">اسم الحساب بالإنجليزية</label>
+                        <input type="text" id="coa_name_en" class="coa-input-wide" lang="en" dir="ltr" autocomplete="off">
+                    </div>
+                    <?php endif; ?>
+
+                    <div class="coa-field">
+                        <span class="coa-field__label">مستوى الحساب</span>
+                        <p class="coa-level-display" id="coa_level">—</p>
+                    </div>
+                    <div class="coa-field">
+                        <span class="coa-field__label">نوع الحساب</span>
+                        <p class="coa-level-display" id="coa_type_display">—</p>
+                        <p class="coa-field-hint muted">يُحدَّد من <strong>جذر الشجرة</strong> للحساب المحدد.</p>
+                    </div>
+                    <div class="coa-field coa-field--span2">
+                        <span class="coa-field__label">فئة الحساب</span>
+                        <p class="coa-level-display" id="coa_category_display">—</p>
+                        <p class="coa-field-hint muted">يُحدَّد من <strong>المستوى الثاني</strong> في مسار الحساب.</p>
+                    </div>
+
+                    <?php if ($hasNb): ?>
+                    <div class="coa-field coa-field--span2">
+                        <label for="coa_normal_balance">طبيعة الحساب</label>
+                        <select id="coa_normal_balance">
+                            <option value="debit">مدين</option>
+                            <option value="credit">دائن</option>
+                        </select>
                     </div>
                     <?php endif; ?>
 
@@ -112,9 +129,9 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
                         <input type="text" id="coa_parent_code" readonly class="coa-input-readonly" tabindex="-1" placeholder="—">
                     </div>
                     <div class="coa-field coa-field--span2">
-                        <label for="coa_parent">الحساب الأب (اختيار)</label>
+                        <label for="coa_parent">الحساب الأب</label>
                         <select id="coa_parent">
-                            <option value="" data-code="">— مستوى أول: جذر (بدون أب) — أنت تُنشئ الجذر —</option>
+                            <option value="" data-code="" data-root="" data-category="" data-depth="" data-pname="">— جذر (بدون أب) —</option>
                             <?php
                             usort($flat, static function ($a, $b) use ($depths): int {
                                 $da = $depths[(int) $a['id']] ?? 0;
@@ -131,56 +148,37 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
                                 $cid = (int) $r['id'];
                                 $cc = htmlspecialchars((string) ($r['code'] ?? ''), ENT_QUOTES, 'UTF-8');
                                 $nm = htmlspecialchars((string) $r['name'], ENT_QUOTES, 'UTF-8');
-                                echo '<option value="' . $cid . '" data-code="' . $cc . '">' . $pad . $cc . ' — ' . $nm . '</option>';
+                                $rcOpt = orange_coa_root_category_names($flat, $cid);
+                                $dr = htmlspecialchars($rcOpt['root'], ENT_QUOTES, 'UTF-8');
+                                $dcat = htmlspecialchars($rcOpt['category'], ENT_QUOTES, 'UTF-8');
+                                echo '<option value="' . $cid . '" data-code="' . $cc . '" data-root="' . $dr . '" data-category="' . $dcat . '" data-depth="' . (int) $d . '" data-pname="' . $nm . '">' . $pad . $cc . ' — ' . $nm . '</option>';
                             }
                             ?>
                         </select>
-                        <p class="coa-root-hint muted">لإضافة حساب في <strong>أعلى الشجرة</strong> اختر هذا الخيار. لإضافة فرع تحت حساب موجود، اختر ذلك الحساب من القائمة.</p>
                     </div>
 
-                    <div class="coa-field coa-field--span2">
-                        <label for="coa_name">اسم الحساب عربي</label>
-                        <input type="text" id="coa_name" class="coa-input-wide">
-                    </div>
-                    <?php if ($hasNameEn): ?>
-                    <div class="coa-field coa-field--span2">
-                        <label for="coa_name_en">اسم الحساب لاتيني / English</label>
-                        <input type="text" id="coa_name_en" class="coa-input-wide" lang="en" dir="ltr">
+                    <?php if ($hasSuspended): ?>
+                    <div class="coa-field coa-field--suspend">
+                        <label class="coa-check"><input type="checkbox" id="coa_suspended"> حساب موقوف</label>
                     </div>
                     <?php endif; ?>
 
-                    <div class="coa-field">
-                        <span class="coa-field__label">مستوى الحساب</span>
-                        <p class="coa-level-display" id="coa_level">—</p>
+                    <div class="coa-field coa-field--kind coa-field--span2">
+                        <span class="coa-field__label">الحساب في القيود</span>
+                        <div class="coa-radio-row">
+                            <label class="coa-radio"><input type="radio" name="coa_kind" value="1"> حساب رئيسي <span class="muted">(لا يظهر في بحث القيود)</span></label>
+                            <label class="coa-radio"><input type="radio" name="coa_kind" value="0" checked> حساب فرعي <span class="muted">(للتسجيل في السندات)</span></label>
+                        </div>
                     </div>
-                    <?php if ($hasClass): ?>
-                    <div class="coa-field">
-                        <label for="coa_class">نوع الحساب (تصنيف)</label>
-                        <select id="coa_class">
-                            <?php foreach ($classLabels as $k => $lab): ?>
-                                <option value="<?php echo htmlspecialchars($k, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($lab, ENT_QUOTES, 'UTF-8'); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <?php endif; ?>
-                </div>
-
-                <div class="coa-tabs-placeholder" aria-hidden="true">
-                    <div class="coa-tabs-placeholder__tabs">
-                        <span class="coa-tabs-placeholder__tab is-disabled">حسابات التوزيع المتغير</span>
-                        <span class="coa-tabs-placeholder__tab is-disabled">حسابات التوزيع الثابت</span>
-                    </div>
-                    <div class="coa-tabs-placeholder__body muted">غير مستخدم حالياً — يمكن إضافته لاحقاً عند الحاجة.</div>
                 </div>
             </div>
 
             <footer class="coa-shell__footer">
-                <button type="button" class="btn-secondary" id="coa_btn_print">طباعة</button>
-                <button type="button" class="btn-secondary" id="coa_btn_cost_stub" disabled title="قريباً">تحليل مراكز تكلفة</button>
-                <a class="btn-secondary" id="coa_btn_report" href="/admin/index.php?page=financial_report">كشف حساب / تقارير</a>
                 <button type="button" class="btn-secondary" id="coa_btn_new">إضافة</button>
                 <button type="button" class="btn-danger" id="coa_btn_delete">حذف</button>
                 <button type="button" id="coa_btn_save">حفظ</button>
+                <a class="btn-secondary coa-footer-link coa-footer-link--disabled" id="coa_btn_statement" href="#">كشف حساب</a>
+                <button type="button" class="btn-secondary" id="coa_btn_print">طباعة</button>
                 <a class="btn-secondary" href="/admin/index.php">خروج</a>
             </footer>
         </div>
@@ -192,8 +190,7 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
     var treeEl = document.getElementById('coa_tree_root');
     var hasNameEn = <?php echo $hasNameEn ? 'true' : 'false'; ?>;
     var hasSuspended = <?php echo $hasSuspended ? 'true' : 'false'; ?>;
-    var coaArTimer = null;
-    var coaEnTimer = null;
+    var hasNb = <?php echo $hasNb ? 'true' : 'false'; ?>;
 
     var levelOrds = ['', 'الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر'];
 
@@ -232,6 +229,50 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
         }
     }
 
+    function updateStatementLink() {
+        var id = parseInt(document.getElementById('coa_id').value, 10) || 0;
+        var a = document.getElementById('coa_btn_statement');
+        var shell = document.querySelector('.coa-shell');
+        var fy = shell ? (shell.getAttribute('data-fy-default') || '0') : '0';
+        if (!a) {
+            return;
+        }
+        if (id <= 0 || parseInt(fy, 10) <= 0) {
+            a.href = '#';
+            a.classList.add('coa-footer-link--disabled');
+            return;
+        }
+        a.href = '/admin/index.php?page=financial_report&fy=' + encodeURIComponent(fy) + '&account=' + id;
+        a.classList.remove('coa-footer-link--disabled');
+    }
+
+    function updatePreviewFromParent() {
+        var id = parseInt(document.getElementById('coa_id').value, 10) || 0;
+        if (id > 0) {
+            return;
+        }
+        var opt = document.getElementById('coa_parent').selectedOptions[0];
+        var rootEl = document.getElementById('coa_type_display');
+        var catEl = document.getElementById('coa_category_display');
+        var nameInp = document.getElementById('coa_name');
+        if (!opt || !opt.value) {
+            rootEl.textContent = '—';
+            catEl.textContent = '—';
+            return;
+        }
+        var root = opt.getAttribute('data-root') || '';
+        var depth = parseInt(opt.getAttribute('data-depth'), 10);
+        if (isNaN(depth)) {
+            depth = 0;
+        }
+        rootEl.textContent = root || '—';
+        if (depth === 0) {
+            catEl.textContent = (nameInp.value || '').trim() || '—';
+        } else {
+            catEl.textContent = opt.getAttribute('data-category') || '—';
+        }
+    }
+
     function fillForm(li) {
         if (!li || !li.dataset) {
             return;
@@ -245,19 +286,28 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
         if (hasSuspended) {
             document.getElementById('coa_suspended').checked = li.dataset.suspended === '1';
         }
+        if (hasNb) {
+            var nb = li.dataset.normalBalance || 'debit';
+            document.getElementById('coa_normal_balance').value = nb === 'credit' ? 'credit' : 'debit';
+        }
         setKindRadios(li.dataset.isGroup === '1');
         var p = parseInt(li.dataset.parent, 10) || 0;
         var sel = document.getElementById('coa_parent');
         sel.value = p > 0 ? String(p) : '';
-        var cl = document.getElementById('coa_class');
-        if (cl && li.dataset.class) {
-            cl.value = li.dataset.class;
-        }
         var lev = document.getElementById('coa_level');
         if (lev) {
             lev.textContent = coaHumanLevel(li.dataset.depth);
         }
+        var tDisp = document.getElementById('coa_type_display');
+        var cDisp = document.getElementById('coa_category_display');
+        if (tDisp) {
+            tDisp.textContent = li.dataset.rootName || '—';
+        }
+        if (cDisp) {
+            cDisp.textContent = li.dataset.categoryName || '—';
+        }
         updateParentCodeDisplay();
+        updateStatementLink();
     }
 
     function bindTreeClicks(root) {
@@ -309,17 +359,22 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
         updateParentCodeDisplay();
         var id = parseInt(document.getElementById('coa_id').value, 10) || 0;
         var lev = document.getElementById('coa_level');
-        if (!lev || id > 0) {
-            return;
+        if (lev && id <= 0) {
+            var opt = this.selectedOptions && this.selectedOptions[0];
+            if (!opt || !opt.value) {
+                lev.textContent = '—';
+            } else {
+                var pd = parseInt(opt.getAttribute('data-depth'), 10);
+                lev.textContent = isNaN(pd) ? '—' : coaHumanLevel(String(pd + 1));
+            }
         }
-        var sel = document.getElementById('coa_parent');
-        var opt = sel && sel.selectedOptions && sel.selectedOptions[0];
-        if (!opt || !opt.value) {
-            lev.textContent = '—';
-            return;
+        updatePreviewFromParent();
+    });
+
+    document.getElementById('coa_name').addEventListener('input', function () {
+        if (parseInt(document.getElementById('coa_id').value, 10) <= 0) {
+            updatePreviewFromParent();
         }
-        var pd = parseInt(opt.getAttribute('data-depth'), 10);
-        lev.textContent = isNaN(pd) ? '—' : coaHumanLevel(String(pd + 1));
     });
 
     bindTreeClicks(treeEl);
@@ -334,52 +389,6 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
         inp.focus();
     });
 
-    function coaTranslate(silent, forceFromArabic) {
-        if (!hasNameEn) {
-            return;
-        }
-        var nameAr = document.getElementById('coa_name').value.trim();
-        var payload = {
-            name_ar: nameAr,
-            name_en: forceFromArabic ? '' : document.getElementById('coa_name_en').value.trim()
-        };
-        postJSON('/admin/api/translate/names.php', payload).then(function (res) {
-            if (!res || !res.success) {
-                if (!silent) {
-                    alert((res && res.message) ? res.message : 'فشل الترجمة');
-                }
-                return;
-            }
-            var t = res.translations || {};
-            if (t.name_en) {
-                document.getElementById('coa_name_en').value = t.name_en;
-            }
-        }).catch(function () {
-            if (!silent) {
-                alert('فشل طلب الترجمة');
-            }
-        });
-    }
-
-    if (hasNameEn) {
-        document.getElementById('coa_name').addEventListener('input', function () {
-            var v = this.value.trim();
-            if (!v) {
-                document.getElementById('coa_name_en').value = '';
-                return;
-            }
-            clearTimeout(coaArTimer);
-            coaArTimer = setTimeout(function () { coaTranslate(true, true); }, 700);
-        });
-        document.getElementById('coa_name_en').addEventListener('input', function () {
-            if (!this.value.trim()) {
-                return;
-            }
-            clearTimeout(coaEnTimer);
-            coaEnTimer = setTimeout(function () { coaTranslate(true, false); }, 600);
-        });
-    }
-
     document.getElementById('coa_btn_new').addEventListener('click', function () {
         document.getElementById('coa_id').value = '0';
         document.getElementById('coa_code').value = '';
@@ -390,30 +399,21 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
         if (hasSuspended) {
             document.getElementById('coa_suspended').checked = false;
         }
+        if (hasNb) {
+            document.getElementById('coa_normal_balance').value = 'debit';
+        }
         document.getElementById('coa_parent').value = '';
         setKindRadios(false);
-        var cl = document.getElementById('coa_class');
-        if (cl) {
-            cl.value = 'unclassified';
-        }
         var lev = document.getElementById('coa_level');
         if (lev) {
             lev.textContent = '—';
         }
+        document.getElementById('coa_type_display').textContent = '—';
+        document.getElementById('coa_category_display').textContent = '—';
         treeEl.querySelectorAll('.coa-tree-node.is-active').forEach(function (x) { x.classList.remove('is-active'); });
         updateParentCodeDisplay();
-    });
-
-    document.getElementById('coa_btn_suggest').addEventListener('click', function () {
-        var p = document.getElementById('coa_parent').value.trim();
-        var parentId = p === '' ? null : parseInt(p, 10);
-        postJSON('/admin/api/accounts/suggest-code.php', { parent_id: parentId }).then(function (r) {
-            if (!r.success) {
-                alert(r.message || 'فشل');
-                return;
-            }
-            document.getElementById('coa_code').value = r.suggested_code || '';
-        }).catch(function (e) { alert(e.message || String(e)); });
+        updatePreviewFromParent();
+        updateStatementLink();
     });
 
     document.getElementById('coa_btn_save').addEventListener('click', function () {
@@ -423,10 +423,8 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
         var payload = {
             id: id,
             name: document.getElementById('coa_name').value.trim(),
-            code: document.getElementById('coa_code').value.trim(),
             parent_id: p === '' ? null : parseInt(p, 10),
-            is_group: kindEl && kindEl.value === '1',
-            account_class: document.getElementById('coa_class') ? document.getElementById('coa_class').value : 'unclassified'
+            is_group: kindEl && kindEl.value === '1'
         };
         if (hasNameEn) {
             payload.name_en = document.getElementById('coa_name_en').value.trim();
@@ -434,8 +432,11 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
         if (hasSuspended) {
             payload.is_suspended = document.getElementById('coa_suspended').checked;
         }
+        if (hasNb) {
+            payload.normal_balance = document.getElementById('coa_normal_balance').value;
+        }
         if (!payload.name) {
-            alert('اسم الحساب مطلوب');
+            alert('اسم الحساب بالعربية مطلوب');
             return;
         }
         postJSON('/admin/api/accounts/save-node.php', payload).then(function (r) {
@@ -464,38 +465,42 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
     });
 
     document.getElementById('coa_btn_print').addEventListener('click', function () {
-        window.print();
+        var id = parseInt(document.getElementById('coa_id').value, 10) || 0;
+        var shell = document.querySelector('.coa-shell');
+        var fy = shell ? (shell.getAttribute('data-fy-default') || '0') : '0';
+        if (id <= 0) {
+            alert('اختر حساباً من الشجرة أولاً');
+            return;
+        }
+        if (parseInt(fy, 10) <= 0) {
+            alert('عرّف سنة مالية أولاً من «السنوات المالية»');
+            return;
+        }
+        window.open('/admin/index.php?page=financial_report&fy=' + encodeURIComponent(fy) + '&account=' + id + '&print=1', '_blank');
     });
 
-    var first = treeEl.querySelector('.coa-tree-node');
+    document.getElementById('coa_btn_statement').addEventListener('click', function (e) {
+        if (this.classList.contains('coa-footer-link--disabled')) {
+            e.preventDefault();
+            alert('اختر حساباً محفوظاً من الشجرة (بعد الحفظ يظهر الكود).');
+        }
+    });
+
+    var preSelectId = <?php echo (int) $firstId; ?>;
+    var first = null;
+    if (preSelectId > 0) {
+        first = treeEl.querySelector('.coa-tree-node[data-id="' + preSelectId + '"]');
+    }
+    if (!first) {
+        first = treeEl.querySelector('.coa-tree-node');
+    }
     if (first) {
         first.classList.add('is-active');
         fillForm(first);
     } else {
         updateParentCodeDisplay();
+        updatePreviewFromParent();
+        updateStatementLink();
     }
-
-    (function addDepthToParentOptions() {
-        var depthMap = <?php
-            $jsonMap = [];
-            foreach ($flat as $r) {
-                $jsonMap[(string) ((int) $r['id'])] = (int) ($depths[(int) $r['id']] ?? 0);
-            }
-            echo json_encode($jsonMap, JSON_UNESCAPED_UNICODE);
-        ?>;
-        var sel = document.getElementById('coa_parent');
-        if (!sel) {
-            return;
-        }
-        Array.prototype.forEach.call(sel.options, function (opt) {
-            if (!opt.value) {
-                return;
-            }
-            var d = depthMap[opt.value];
-            if (typeof d === 'number') {
-                opt.setAttribute('data-depth', String(d));
-            }
-        });
-    })();
 })();
 </script>
