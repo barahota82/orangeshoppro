@@ -189,6 +189,52 @@ function orange_accounts_depth_by_id(array $flat): array
 }
 
 /**
+ * حسابات الجذر مرتبة لشاشة «إعداد الدليل»: الترتيب يحدد رقم الصف؛ أول أربعة لا تُحذف.
+ *
+ * @return list<array<string, mixed>>
+ */
+function orange_accounts_roots_ordered(PDO $pdo): array
+{
+    orange_catalog_ensure_schema($pdo);
+    if (!orange_table_exists($pdo, 'accounts') || !orange_table_has_column($pdo, 'accounts', 'parent_id')) {
+        return [];
+    }
+    $hasNameEn = orange_table_has_column($pdo, 'accounts', 'name_en');
+    $cols = 'id, name, code';
+    if ($hasNameEn) {
+        $cols .= ', name_en';
+    }
+    $sql = 'SELECT ' . $cols . ' FROM accounts WHERE (parent_id IS NULL OR parent_id = 0)'
+        . " ORDER BY CASE WHEN code REGEXP '^[0-9]+$' THEN 0 ELSE 1 END, CAST(code AS UNSIGNED), code, id";
+    $stmt = $pdo->query($sql);
+    if ($stmt === false) {
+        return [];
+    }
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $rank = 1;
+    $out = [];
+    foreach ($rows as $r) {
+        $r['rank'] = $rank;
+        $r['can_delete'] = $rank > 4;
+        ++$rank;
+        $out[] = $r;
+    }
+
+    return $out;
+}
+
+function orange_accounts_root_rank(PDO $pdo, int $accountId): int
+{
+    foreach (orange_accounts_roots_ordered($pdo) as $r) {
+        if ((int) $r['id'] === $accountId) {
+            return (int) $r['rank'];
+        }
+    }
+
+    return 0;
+}
+
+/**
  * أسماء الجذر والمستوى الثاني في مسار الحساب (للعرض في الدليل).
  *
  * @param list<array<string, mixed>> $flat
@@ -222,8 +268,14 @@ if (!function_exists('orange_render_coa_tree')) {
      *
      * @param list<array<string, mixed>> $nodes
      */
-    function orange_render_coa_tree(array $nodes, int $activeId, array $flat, int $depth = 0): void
+    function orange_render_coa_tree(array $nodes, int $activeId, array $flat, int $depth = 0, ?array $byId = null): void
     {
+        if ($byId === null) {
+            $byId = [];
+            foreach ($flat as $fr) {
+                $byId[(int) $fr['id']] = $fr;
+            }
+        }
         echo '<ul class="coa-tree-list">';
         foreach ($nodes as $n) {
             $id = (int) $n['id'];
@@ -236,14 +288,20 @@ if (!function_exists('orange_render_coa_tree')) {
             $rc = orange_coa_root_category_names($flat, $id);
             $rootN = htmlspecialchars($rc['root'], ENT_QUOTES, 'UTF-8');
             $catN = htmlspecialchars($rc['category'], ENT_QUOTES, 'UTF-8');
+            $pId = (int) ($n['parent_id'] ?? 0);
+            $pCodeRaw = '';
+            if ($pId > 0 && isset($byId[$pId])) {
+                $pCodeRaw = (string) ($byId[$pId]['code'] ?? '');
+            }
+            $pCode = htmlspecialchars($pCodeRaw, ENT_QUOTES, 'UTF-8');
             $cls = $activeId === $id ? 'coa-tree-node is-active' : 'coa-tree-node';
             if ($susp) {
                 $cls .= ' coa-tree-node--suspended';
             }
-            echo '<li class="' . $cls . '" role="treeitem" data-id="' . $id . '" data-code="' . $code . '" data-name="' . $name . '" data-name-en="' . $nameEn . '" data-is-group="' . ($isG ? '1' : '0') . '" data-parent="' . (int) ($n['parent_id'] ?? 0) . '" data-suspended="' . ($susp ? '1' : '0') . '" data-depth="' . $depth . '" data-root-name="' . $rootN . '" data-category-name="' . $catN . '" data-normal-balance="' . $nb . '">';
+            echo '<li class="' . $cls . '" role="treeitem" data-id="' . $id . '" data-code="' . $code . '" data-name="' . $name . '" data-name-en="' . $nameEn . '" data-is-group="' . ($isG ? '1' : '0') . '" data-parent="' . $pId . '" data-parent-code="' . $pCode . '" data-suspended="' . ($susp ? '1' : '0') . '" data-depth="' . $depth . '" data-root-name="' . $rootN . '" data-category-name="' . $catN . '" data-normal-balance="' . $nb . '">';
             echo '<span class="coa-tree-label">' . $code . ' — ' . $name . ($isG ? ' <small>(رئيسي)</small>' : '') . ($susp ? ' <small class="coa-tree-suspended-tag">موقوف</small>' : '') . '</span>';
             if (!empty($n['children'])) {
-                orange_render_coa_tree($n['children'], $activeId, $flat, $depth + 1);
+                orange_render_coa_tree($n['children'], $activeId, $flat, $depth + 1, $byId);
             }
             echo '</li>';
         }

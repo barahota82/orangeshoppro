@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/account_tree.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
 require_admin_api();
 
@@ -20,7 +21,7 @@ try {
         json_response(['success' => false, 'message' => 'معرّف الحساب غير صالح'], 422);
     }
 
-    $st = $pdo->prepare('SELECT id, name, code FROM accounts WHERE id = ? LIMIT 1');
+    $st = $pdo->prepare('SELECT id, name, code, parent_id FROM accounts WHERE id = ? LIMIT 1');
     $st->execute([$id]);
     $row = $st->fetch(PDO::FETCH_ASSOC);
     if (!$row) {
@@ -32,6 +33,16 @@ try {
         : (string) $row['name'];
 
     if (orange_table_has_column($pdo, 'accounts', 'parent_id')) {
+        $pid = isset($row['parent_id']) ? (int) $row['parent_id'] : 0;
+        if ($pid <= 0) {
+            $rk = orange_accounts_root_rank($pdo, $id);
+            if ($rk >= 1 && $rk <= 4) {
+                json_response([
+                    'success' => false,
+                    'message' => 'أول أربعة حسابات في الدليل (الحد الأدنى) لا يمكن حذفها.',
+                ], 422);
+            }
+        }
         $ch = $pdo->prepare('SELECT COUNT(*) FROM accounts WHERE parent_id = ?');
         $ch->execute([$id]);
         if ((int) $ch->fetchColumn() > 0) {

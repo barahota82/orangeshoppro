@@ -851,6 +851,23 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
 .coa-tree-card__title {
     margin-bottom: 8px;
 }
+.btn-coa-guide {
+    display: block;
+    width: 100%;
+    margin: 0 0 10px;
+    padding: 10px 12px;
+    border: 1px solid #c2410c;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #fb923c 0%, #ea580c 100%);
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    box-shadow: 1px 1px 0 rgba(255, 255, 255, 0.35) inset, 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+.btn-coa-guide:hover {
+    filter: brightness(1.05);
+}
 .coa-tree-search {
     display: flex;
     gap: 8px;
@@ -1060,6 +1077,166 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     background: #e0e7ff;
     color: #312e81;
     font-weight: 600;
+}
+
+/* نافذة إعداد الدليل */
+body.coa-modal-open {
+    overflow: hidden;
+}
+.coa-setup-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+}
+.coa-setup-modal[hidden] {
+    display: none !important;
+}
+.coa-setup-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+}
+.coa-setup-modal__dialog {
+    position: relative;
+    z-index: 1;
+    width: min(720px, 100%);
+    max-height: min(90vh, 900px);
+    display: flex;
+    flex-direction: column;
+    background: #e8eef5;
+    border: 1px solid #94a3b8;
+    border-radius: 8px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+}
+.coa-setup-modal__head {
+    padding: 10px 14px;
+    background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%);
+    border-bottom: 1px solid #94a3b8;
+}
+.coa-setup-modal__title {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+.coa-setup-modal__body {
+    padding: 12px 14px;
+    overflow: auto;
+    flex: 1;
+    min-height: 0;
+}
+.coa-setup-table-wrap {
+    overflow: auto;
+    max-height: 40vh;
+    border: 1px solid #94a3b8;
+    border-radius: 6px;
+    background: #fff;
+    margin-bottom: 12px;
+}
+.coa-setup-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+.coa-setup-table th,
+.coa-setup-table td {
+    border-bottom: 1px solid #e2e8f0;
+    padding: 8px 10px;
+    text-align: right;
+}
+.coa-setup-table th {
+    background: #f1f5f9;
+    font-weight: 700;
+}
+.coa-setup-table__del {
+    width: 2.5rem;
+    text-align: center;
+}
+.coa-setup-table tbody tr {
+    cursor: pointer;
+}
+.coa-setup-table tbody tr:hover {
+    background: #f8fafc;
+}
+.coa-setup-table tbody tr.is-selected {
+    background: #dbeafe;
+}
+.coa-setup-del {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 2px 4px;
+    opacity: 0.85;
+}
+.coa-setup-del:hover {
+    opacity: 1;
+}
+.coa-setup-form__row {
+    margin-bottom: 10px;
+}
+.coa-setup-form__label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--text-muted, #4b5563);
+}
+.coa-required {
+    color: #dc2626;
+    font-weight: 700;
+}
+.coa-setup-modal__footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 14px;
+    background: linear-gradient(180deg, #e8e8e8 0%, #d4d4d4 100%);
+    border-top: 1px solid #94a3b8;
+}
+.coa-setup-modal__footer .btn-secondary,
+.coa-setup-modal__footer button#coa_setup_btn_save {
+    box-shadow: 1px 1px 0 rgba(255, 255, 255, 0.7) inset, 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.coa-setup-modal__footer button#coa_setup_btn_save {
+    background: linear-gradient(180deg, #fb923c 0%, #ea580c 100%);
+    color: #fff;
+    border: 1px solid #c2410c;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    .coa-setup-print-area,
+    .coa-setup-print-area * {
+        visibility: visible;
+    }
+    .coa-setup-print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        max-height: none;
+        border: none;
+        box-shadow: none;
+    }
+    .coa-setup-modal__backdrop {
+        display: none !important;
+    }
+    .coa-setup-modal__footer {
+        display: none !important;
+    }
 }
 
 @media (max-width: 1024px) {
