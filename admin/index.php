@@ -25,6 +25,7 @@ $allowed = [
     'chart_of_accounts',
     'fiscal_years',
     'opening_balances',
+    'opening_stock_balances',
     'partner_ledger',
     'partner_reports',
     'gl_account_settings',

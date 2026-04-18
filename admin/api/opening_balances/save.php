@@ -17,9 +17,13 @@ try {
 
     $data = get_json_input();
     $fyId = (int)($data['fiscal_year_id'] ?? 0);
+    $statement = trim((string)($data['statement'] ?? ''));
     $linesIn = isset($data['lines']) && is_array($data['lines']) ? $data['lines'] : [];
     if ($fyId <= 0 || count($linesIn) < 2) {
         json_response(['success' => false, 'message' => 'السنة وأسطر الأرصدة (سطران على الأقل) مطلوبة'], 422);
+    }
+    if ($statement === '') {
+        json_response(['success' => false, 'message' => 'البيان مطلوب لقيد رصيد الافتتاح'], 422);
     }
 
     $fySt = $pdo->prepare('SELECT * FROM fiscal_years WHERE id = ? LIMIT 1');
@@ -41,7 +45,7 @@ try {
             'account_id' => (int)($ln['account_id'] ?? 0),
             'debit' => (float)($ln['debit'] ?? 0),
             'credit' => (float)($ln['credit'] ?? 0),
-            'memo' => trim((string)($ln['memo'] ?? '')),
+            'memo' => $statement,
         ];
     }
 
@@ -72,7 +76,7 @@ try {
         orange_voucher_post($pdo, [
             'voucher_date' => $fy['start_date'] . ' 10:00:00',
             'reference' => 'OB-' . $fyId,
-            'description' => 'أرصدة أول المدة المالية — ' . ($fy['label_ar'] ?: ('#' . $fyId)),
+            'description' => $statement,
             'entry_type' => 'opening_balance',
         ], $norm);
 

@@ -40,6 +40,17 @@ try {
                     'memo' => trim((string)($ln['memo'] ?? '')),
                 ];
             }
+            foreach ($norm as $ln) {
+                $aid = (int) ($ln['account_id'] ?? 0);
+                $d = (float) ($ln['debit'] ?? 0);
+                $c = (float) ($ln['credit'] ?? 0);
+                if ($aid <= 0 || ($d <= 0 && $c <= 0)) {
+                    continue;
+                }
+                if (($ln['memo'] ?? '') === '') {
+                    json_response(['success' => false, 'message' => 'بيان كل سطر مطلوب'], 422);
+                }
+            }
             if (orange_table_has_column($pdo, 'accounts', 'is_group')) {
                 foreach ($norm as $ln) {
                     $aid = (int) $ln['account_id'];
@@ -91,8 +102,8 @@ try {
                 'description' => $description,
                 'entry_type' => $entryType !== '' ? $entryType : 'manual',
             ], [
-                ['account_id' => $accountDebit, 'debit' => $amount, 'credit' => 0, 'memo' => ''],
-                ['account_id' => $accountCredit, 'debit' => 0, 'credit' => $amount, 'memo' => ''],
+                ['account_id' => $accountDebit, 'debit' => $amount, 'credit' => 0, 'memo' => $description],
+                ['account_id' => $accountCredit, 'debit' => 0, 'credit' => $amount, 'memo' => $description],
             ]);
         } catch (Throwable $e) {
             json_response(['success' => false, 'message' => $e->getMessage()], 422);

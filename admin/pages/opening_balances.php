@@ -30,13 +30,17 @@ if ($fyId <= 0 && $years !== []) {
 }
 
 $obInitial = [];
+$obStatement = '';
 if ($fyId > 0 && orange_journal_vouchers_ready($pdo)) {
     $vst = $pdo->prepare(
         'SELECT id FROM journal_vouchers WHERE fiscal_year_id = ? AND entry_type = ? ORDER BY id DESC LIMIT 1'
     );
     $vst->execute([$fyId, 'opening_balance']);
-    $vid = (int) $vst->fetchColumn();
-    if ($vid > 0) {
+    $obVid = (int) $vst->fetchColumn();
+    if ($obVid > 0) {
+        $vd = $pdo->prepare('SELECT description FROM journal_vouchers WHERE id = ? LIMIT 1');
+        $vd->execute([$obVid]);
+        $obStatement = trim((string) $vd->fetchColumn());
         $lst = $pdo->prepare(
             'SELECT jl.account_id, jl.debit, jl.credit, a.code, a.name
              FROM journal_lines jl
@@ -44,7 +48,7 @@ if ($fyId > 0 && orange_journal_vouchers_ready($pdo)) {
              WHERE jl.voucher_id = ?
              ORDER BY jl.line_no ASC'
         );
-        $lst->execute([$vid]);
+        $lst->execute([$obVid]);
         foreach ($lst->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $obInitial[] = [
                 'account_id' => (int) $r['account_id'],
@@ -57,17 +61,8 @@ if ($fyId > 0 && orange_journal_vouchers_ready($pdo)) {
     }
 }
 ?>
-<div class="page-title page-title--stacked">
-    <div>
-        <h1>أرصدة أول المدة المالية</h1>
-        <p class="page-subtitle">
-            هذه الشاشة مخصّصة لسيناريو <strong>نقل من نظام محاسبي قديم إلى نظام جديد</strong> عندما لا يمكن استيراد الأرصدة تلقائياً:
-            تُسجَّل هنا أرصدة الافتتاح <strong>مرة</strong> كسند متوازن في أول يوم من أول سنة مالية مفتوحة (التاريخ في القائمة بصيغة <strong>يوم/شهر/سنة</strong>).
-            <strong>ليست شاشة تُستخدم كل عام:</strong> عند إقفال السنوات المالية وترحيل الأرصدة يتم ذلك آلياً ضمن الإقفال.
-            شاشة منفصلة مرتقبة لـ <strong>أرصدة أول المدة المخزنية</strong> (مخزون افتتاحي). كل سطر: <strong>كود حساب فرعي</strong> (أو بحث)، ومبلغ إما <strong>مدين</strong> أو <strong>دائن</strong> فقط.
-            يُستبدل سند الافتتاح السابق لنفس السنة عند كل حفظ.
-        </p>
-    </div>
+<div class="page-title">
+    <h1>أرصدة أول المدة المالية</h1>
 </div>
 
 <div class="card">
@@ -97,11 +92,13 @@ if ($fyId > 0 && orange_journal_vouchers_ready($pdo)) {
 <?php if ($fyId > 0 && $years !== []): ?>
 <div class="card ob-opening-card">
     <h3 class="card-title">أسطر الأرصدة المالية</h3>
-    <p class="muted" style="margin:0 0 10px;">
-        أدخل <strong>كود الحساب</strong> فيُكمّل الاسم تلقائياً، أو اضغط <strong>البحث</strong> لعرض <strong>الحسابات الفرعية فقط</strong>.
-        المبالغ: <strong>لا سالب</strong>؛ عند الخروج من الخانة يُقبل المبلغ الموجب فقط ويُنسّق بثلاثة مرات عشرية (مثل <strong>1.000</strong>)، والطرف الآخر يصبح <strong>0.000</strong>.
-    </p>
-    <p class="card-hint" id="ob_hint">مجموع المدين: 0 — مجموع الدائن: 0</p>
+    <div class="ob-opening-summary" style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:0 0 12px;">
+        <span class="card-hint" id="ob_hint_totals" style="margin:0;">مجموع المدين: 0 — مجموع الدائن: 0</span>
+        <label for="ob_statement" style="display:inline-flex;align-items:center;gap:8px;margin:0;">
+            <span>البيان</span>
+            <input type="text" id="ob_statement" class="gl-inp-code" style="min-width:18rem;max-width:32rem;" dir="rtl" autocomplete="off" value="<?php echo htmlspecialchars($obStatement, ENT_QUOTES, 'UTF-8'); ?>" aria-required="true">
+        </label>
+    </div>
     <div class="table-wrap ob-opening-table-wrap">
         <table class="ob-opening-table">
             <thead>
@@ -147,6 +144,17 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
     var obPickSeq = 0;
     var searchTimer = null;
 
+    /** عند ربط حساب: اسم الحساب معطّل؛ عند مسح الكود يُفعَّل لإعادة الاختيار (مع بقاء الحقل للعرض فقط — لا إدخال يدوي للاسم). */
+    function obSyncNameFieldState(tr) {
+        var n = tr.querySelector('.ob-inp-name');
+        if (!n) {
+            return;
+        }
+        var id = parseInt(tr.getAttribute('data-account-id'), 10) || 0;
+        n.readOnly = true;
+        n.disabled = id > 0;
+        n.setAttribute('tabindex', id > 0 ? '-1' : '0');
+    }
     function obFillAccount(tr, acc) {
         if (!tr || !acc) {
             return;
@@ -160,6 +168,7 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
         if (n) {
             n.value = acc.name || '';
         }
+        obSyncNameFieldState(tr);
     }
     function obClearAccount(tr) {
         if (!tr) {
@@ -174,6 +183,7 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
         if (n) {
             n.value = '';
         }
+        obSyncNameFieldState(tr);
     }
     function obStripInvalid(tr) {
         obClearAccount(tr);
@@ -246,6 +256,11 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
             return;
         }
         var glLookupInFlight = false;
+        codeInp.addEventListener('input', function () {
+            if (!String(codeInp.value || '').trim()) {
+                obClearAccount(tr);
+            }
+        });
         codeInp.addEventListener('change', function () {
             var raw = codeInp.value.trim();
             if (!raw) {
@@ -301,7 +316,7 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
             '<td><input type="text" class="gl-inp-code ob-inp-code" dir="ltr" autocomplete="off" value="" aria-label="كود الحساب"></td>' +
             '<td><div class="gl-name-row">' +
             '<button type="button" class="gl-search-btn ob-search-btn" title="بحث — حسابات فرعية فقط" aria-label="بحث">🔍</button>' +
-            '<input type="text" class="gl-inp-name ob-inp-name" readonly tabindex="-1" value="" aria-label="اسم الحساب">' +
+            '<input type="text" class="gl-inp-name ob-inp-name" readonly value="" aria-label="اسم الحساب">' +
             '</div></td>' +
             '<td><input type="number" class="ob-d admin-inp-money" step="any" min="0" value="" inputmode="decimal" lang="en" dir="ltr" aria-label="مدين" placeholder="0.000"></td>' +
             '<td><input type="number" class="ob-c admin-inp-money" step="any" min="0" value="" inputmode="decimal" lang="en" dir="ltr" aria-label="دائن" placeholder="0.000"></td>' +
@@ -312,6 +327,7 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
             obRecalc();
         });
         obWireCodeRow(tr);
+        obSyncNameFieldState(tr);
         if (preset && preset.account_id > 0) {
             obFillAccount(tr, {
                 id: preset.account_id,
@@ -344,7 +360,7 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
         obRecalc();
     };
     window.obRecalc = function () {
-        var el = document.getElementById('ob_hint');
+        var el = document.getElementById('ob_hint_totals');
         if (!el) {
             return;
         }
@@ -362,6 +378,15 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
             alert('اختر سنة');
             return;
         }
+        var stEl = document.getElementById('ob_statement');
+        var statement = stEl ? String(stEl.value || '').trim() : '';
+        if (!statement) {
+            alert('البيان مطلوب قبل الحفظ');
+            if (stEl) {
+                stEl.focus();
+            }
+            return;
+        }
         var lines = [];
         document.querySelectorAll('#ob_body tr').forEach(function (tr) {
             var acc = parseInt(tr.getAttribute('data-account-id'), 10) || 0;
@@ -376,7 +401,7 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
             if (deb <= 0 && cre <= 0) {
                 return;
             }
-            lines.push({ account_id: acc, debit: deb, credit: cre, memo: '' });
+            lines.push({ account_id: acc, debit: deb, credit: cre, memo: statement });
         });
         if (lines.length < 2) {
             alert('سطران على الأقل بأرصدة صحيحة وحساب فرعي مربوط');
@@ -388,7 +413,7 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
             alert('السند غير متوازن');
             return;
         }
-        postJSON('/admin/api/opening_balances/save.php', { fiscal_year_id: OB_FY, lines: lines })
+        postJSON('/admin/api/opening_balances/save.php', { fiscal_year_id: OB_FY, statement: statement, lines: lines })
             .then(function (r) {
                 alert(r.message || (r.success ? 'تم' : 'فشل'));
                 if (r.success) {

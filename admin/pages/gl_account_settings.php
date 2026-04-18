@@ -65,7 +65,7 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
                         <td class="gl-td-name">
                             <div class="gl-name-row">
                                 <button type="button" class="gl-search-btn" title="بحث — حسابات فرعية فقط" aria-label="بحث">🔍</button>
-                                <input type="text" class="gl-inp-name" readonly tabindex="-1" value="<?php echo htmlspecialchars($name, ENT_QUOTES, 'UTF-8'); ?>" aria-label="اسم الحساب">
+                                <input type="text" class="gl-inp-name" readonly value="<?php echo htmlspecialchars($name, ENT_QUOTES, 'UTF-8'); ?>" aria-label="اسم الحساب"<?php echo $aid > 0 ? ' disabled' : ''; ?> tabindex="<?php echo $aid > 0 ? '-1' : '0'; ?>">
                             </div>
                         </td>
                     </tr>
@@ -100,6 +100,16 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
     var searchTimer = null;
     var glPickSeq = 0;
 
+    function glSyncNameFieldState(tr) {
+        var n = tr.querySelector('.gl-inp-name');
+        if (!n) {
+            return;
+        }
+        var id = parseInt(tr.getAttribute('data-account-id'), 10) || 0;
+        n.readOnly = true;
+        n.disabled = id > 0;
+        n.setAttribute('tabindex', id > 0 ? '-1' : '0');
+    }
     function glFillRow(tr, acc) {
         if (!tr || !acc) {
             return;
@@ -113,6 +123,7 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
         if (n) {
             n.value = acc.name || '';
         }
+        glSyncNameFieldState(tr);
     }
     function glClearRow(tr) {
         tr.setAttribute('data-account-id', '0');
@@ -124,6 +135,7 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
         if (n) {
             n.value = '';
         }
+        glSyncNameFieldState(tr);
     }
     /** كود غير صالح أو ليس ورقة ترحيل: يُفرّغ الكود والاسم ولا يُربط معرّف (سلوك احترافي عند الخروج من الحقل). */
     function glStripResolvedRow(tr) {
@@ -203,6 +215,11 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
         var codeInp = tr.querySelector('.gl-inp-code');
         if (codeInp) {
             var glLookupInFlight = false;
+            codeInp.addEventListener('input', function () {
+                if (!String(codeInp.value || '').trim()) {
+                    glClearRow(tr);
+                }
+            });
             codeInp.addEventListener('change', function () {
                 var raw = codeInp.value.trim();
                 if (!raw) {
@@ -251,6 +268,7 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
                 }
             });
         }
+        glSyncNameFieldState(tr);
     });
 
     pickQ.addEventListener('input', function () {

@@ -172,6 +172,9 @@ function orange_voucher_post(PDO $pdo, array $header, array $lines): int
             continue;
         }
         $memo = trim((string) ($ln['memo'] ?? ''));
+        if ($memo === '') {
+            throw new InvalidArgumentException('بيان السطر مطلوب لكل بند في السند.');
+        }
         $norm[] = ['account_id' => $aid, 'debit' => $d, 'credit' => $c, 'memo' => $memo, 'line_no' => ++$lineNo];
         $totalD += $d;
         $totalC += $c;
@@ -244,8 +247,8 @@ function orange_journal_insert_line(PDO $pdo, array $row): int
         'description' => $description,
         'entry_type' => $entryType !== '' ? $entryType : 'general',
     ], [
-        ['account_id' => $debit, 'debit' => $amount, 'credit' => 0, 'memo' => ''],
-        ['account_id' => $credit, 'debit' => 0, 'credit' => $amount, 'memo' => ''],
+        ['account_id' => $debit, 'debit' => $amount, 'credit' => 0, 'memo' => $description],
+        ['account_id' => $credit, 'debit' => 0, 'credit' => $amount, 'memo' => $description],
     ]);
 }
 

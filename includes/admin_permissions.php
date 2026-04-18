@@ -45,6 +45,7 @@ function orange_admin_page_resource(string $page): string
         'manual_order' => 'sales',
         'purchases' => 'warehouse',
         'stock' => 'warehouse',
+        'opening_stock_balances' => 'warehouse',
         'item_card' => 'warehouse',
         'chart_of_accounts' => 'accounting',
         'fiscal_years' => 'accounting',

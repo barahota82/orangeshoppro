@@ -107,7 +107,7 @@ foreach ($accounts as $a) {
                     <th>الحساب</th>
                     <th>مدين</th>
                     <th>دائن</th>
-                    <th>ملاحظة</th>
+                    <th>البيان</th>
                     <th></th>
                 </tr>
             </thead>
@@ -148,11 +148,20 @@ foreach ($accounts as $a) {
                     }
                     $et = (string)($v['entry_type'] ?? '');
                     $lockDel = in_array($et, ['year_end_close', 'opening_balance'], true);
+                    $etLabels = [
+                        'manual' => 'سند يدوي',
+                        'opening_balance' => 'قيد رصيد افتتاحي',
+                        'year_end_close' => 'إقفال سنة مالية',
+                        'customer_receipt' => 'قبض عميل',
+                        'supplier_payment' => 'دفع مورد',
+                        'purchase' => 'شراء',
+                    ];
+                    $etAr = $etLabels[$et] ?? $et;
                     ?>
                     <tr>
                         <td><?php echo $vid; ?></td>
                         <td><?php echo htmlspecialchars(substr((string)$v['voucher_date'], 0, 19), ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars($et, ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars($etAr, ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars((string)($v['reference'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars((string)($v['description'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td style="font-size:12px;max-width:22rem;"><?php echo implode(' | ', $det); ?></td>
@@ -182,7 +191,7 @@ function jvAddRow() {
     tr.innerHTML = '<td><select class="jv-acc">' + JV_ACCT_OPTS + '</select></td>' +
         '<td><input type="number" class="jv-d admin-inp-money" step="any" min="0" value="" placeholder="0.000" inputmode="decimal" lang="en" dir="ltr"></td>' +
         '<td><input type="number" class="jv-c admin-inp-money" step="any" min="0" value="" placeholder="0.000" inputmode="decimal" lang="en" dir="ltr"></td>' +
-        '<td><input type="text" class="jv-m" value="" placeholder=""></td>' +
+        '<td><input type="text" class="jv-m" value="" placeholder="البيان"></td>' +
         '<td><button type="button" class="btn-secondary" onclick="this.closest(\'tr\').remove();jvRecalc();">حذف</button></td>';
     tb.appendChild(tr);
     jvRecalc();
@@ -207,6 +216,7 @@ function jvSubmit() {
         return;
     }
     var lines = [];
+    var memoAbort = false;
     document.querySelectorAll('#jv_lines_body tr').forEach(function (tr) {
         var acc = parseInt(tr.querySelector('.jv-acc').value, 10) || 0;
         var deb = parseFloat(String(tr.querySelector('.jv-d').value || '0').replace(',', '.'));
@@ -217,8 +227,16 @@ function jvSubmit() {
             cre = 0;
         }
         if (deb <= 0 && cre <= 0) return;
+        if (memo === '') {
+            alert('البيان مطلوب لكل سطر يحتوي مبلغاً');
+            memoAbort = true;
+            return;
+        }
         lines.push({ account_id: acc, debit: deb, credit: cre, memo: memo });
     });
+    if (memoAbort) {
+        return;
+    }
     if (lines.length < 2) {
         alert('أضف سطرين على الأقل بمبالغ صحيحة');
         return;
