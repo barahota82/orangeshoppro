@@ -24,13 +24,19 @@ function clean_whatsapp_number(string $raw): string
 }
 
 /**
- * Sales payment mode for orders: cash (نقدي) or credit (آجل).
+ * Sales payment mode for orders: cash (نقدي), credit (آجل), or online (أونلاين).
  */
 function orange_normalize_payment_terms(mixed $raw): string
 {
-    $v = strtolower(trim((string)$raw));
+    $v = strtolower(trim((string) $raw));
+    if ($v === 'credit') {
+        return 'credit';
+    }
+    if ($v === 'online') {
+        return 'online';
+    }
 
-    return $v === 'credit' ? 'credit' : 'cash';
+    return 'cash';
 }
 
 /**

@@ -31,12 +31,17 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
 
     $paymentTerms = 'cash';
     if (orange_table_has_column($pdo, 'orders', 'payment_terms')) {
-        $paymentTerms = strtolower(trim((string)($order['payment_terms'] ?? 'cash')));
+        $paymentTerms = orange_normalize_payment_terms($order['payment_terms'] ?? 'cash');
     }
     $isCredit = ($paymentTerms === 'credit');
+    $isOnline = ($paymentTerms === 'online');
 
     $inventoryId = orange_gl_account_id($pdo, 'inventory');
-    if ($isCredit) {
+    if ($isOnline) {
+        $debitReceivable = orange_gl_account_id($pdo, 'cash');
+        $salesId = orange_gl_account_id($pdo, 'sales_revenue_online');
+        $cogsId = orange_gl_account_id($pdo, 'cogs_online');
+    } elseif ($isCredit) {
         $debitReceivable = orange_gl_account_id($pdo, 'ar_credit');
         $salesId = orange_gl_account_id($pdo, 'sales_revenue_credit');
         $cogsId = orange_gl_account_id($pdo, 'cogs_credit');
@@ -124,7 +129,9 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
             'account_credit' => $salesId,
             'amount' => $salesAmount,
             'reference' => $saleRef,
-            'description' => $isCredit ? 'قيد مبيعات آجل — تسليم' : 'قيد مبيعات نقدي — تسليم',
+            'description' => $isOnline
+                ? 'قيد مبيعات أونلاين — تسليم'
+                : ($isCredit ? 'قيد مبيعات آجل — تسليم' : 'قيد مبيعات نقدي — تسليم'),
             'entry_type' => 'order_delivery_sale',
         ]);
         if ($isCredit && $customerIdForAr > 0) {
@@ -146,7 +153,9 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
             'account_credit' => $inventoryId,
             'amount' => $costAmount,
             'reference' => $cogsRef,
-            'description' => $isCredit ? 'قيد تكلفة مبيعات آجل — تسليم' : 'قيد تكلفة مبيعات نقدي — تسليم',
+            'description' => $isOnline
+                ? 'قيد تكلفة مبيعات أونلاين — تسليم'
+                : ($isCredit ? 'قيد تكلفة مبيعات آجل — تسليم' : 'قيد تكلفة مبيعات نقدي — تسليم'),
             'entry_type' => 'order_delivery_cogs',
         ]);
     }
