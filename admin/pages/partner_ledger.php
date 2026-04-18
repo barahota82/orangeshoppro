@@ -60,13 +60,13 @@ if ($stmtPartyJson === false) {
         <p class="page-subtitle">
             تُسجَّل الذمم تلقائياً عند <strong>تسليم طلب آجل</strong> (إن وُجد هاتف للعميل) وعند <strong>شراء آجل</strong> مع اختيار مورد.
             استخدم سندات القبض/الدفع أدناه لتحريك النقدية مقابل ذمم العملاء والموردين — مع قيود محاسبية متزامنة.
-            <a href="/admin/index.php?page=partner_reports">تقارير الذمم الشاملة ومطابقة الدليل</a>
+            <a href="/admin/index.php?page=partner_reports">تقارير الذمم المالية ومطابقة الدليل</a>
         </p>
     </div>
 </div>
 
 <div class="grid-2">
-    <div class="card">
+    <div class="card" id="partner-receipt-voucher">
         <h3 class="card-title">سند قبض من عميل</h3>
         <div class="form-grid">
             <div style="grid-column:1/-1;">
@@ -113,7 +113,7 @@ if ($stmtPartyJson === false) {
             <button type="button" onclick="doReceipt()">تسجيل القبض</button>
         </div>
     </div>
-    <div class="card">
+    <div class="card" id="partner-payment-voucher">
         <h3 class="card-title">سند دفع لمورد</h3>
         <div class="form-grid">
             <div style="grid-column:1/-1;">
@@ -162,7 +162,7 @@ if ($stmtPartyJson === false) {
     </div>
 </div>
 
-<div class="card">
+<div class="card" id="partner-account-statement">
     <h3 class="card-title">كشف حساب طرف</h3>
     <p class="card-hint">حركات الذمم المرتبطة بالعميل أو المورد مع الرصيد الجاري بعد كل سند.</p>
     <div class="form-grid">

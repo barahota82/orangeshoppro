@@ -52,13 +52,18 @@ orange_catalog_ensure_schema($pdoNav);
 
             $navAccounting = [
                 ['page' => 'chart_of_accounts', 'href' => '/admin/index.php?page=chart_of_accounts', 'label' => 'الدليل المحاسبي', 'class' => '', 'sub' => false],
+                ['page' => 'journal_types', 'href' => '/admin/index.php?page=journal_types', 'label' => 'جديد أنواع اليوميات', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'fiscal_years', 'href' => '/admin/index.php?page=fiscal_years', 'label' => 'السنوات المالية', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'opening_balances', 'href' => '/admin/index.php?page=opening_balances', 'label' => 'أرصدة أول المدة المالية', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'gl_account_settings', 'href' => '/admin/index.php?page=gl_account_settings', 'label' => 'حسابات القيود التلقائية', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger', 'label' => 'ذمم العملاء والموردين', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'partner_reports', 'href' => '/admin/index.php?page=partner_reports', 'label' => 'تقارير الذمم الشاملة', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'expenses', 'href' => '/admin/index.php?page=expenses', 'label' => 'المصروفات', 'class' => '', 'sub' => false],
+                ['page' => 'gl_posting', 'href' => '/admin/index.php?page=gl_posting', 'label' => 'جديد الترحيل إلى الحسابات', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'opening_balances', 'href' => '/admin/index.php?page=opening_balances', 'label' => 'أرصدة أول المدة المالية', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'journal_entries', 'href' => '/admin/index.php?page=journal_entries', 'label' => 'القيود المحاسبية', 'class' => '', 'sub' => false],
+                ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger#partner-receipt-voucher', 'label' => 'جديد سندات القبض', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger#partner-payment-voucher', 'label' => 'جديد سندات الصرف', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger', 'label' => 'ذمم العملاء والموردين', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'expenses', 'href' => '/admin/index.php?page=expenses', 'label' => 'المصروفات', 'class' => '', 'sub' => false],
+                ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger#partner-account-statement', 'label' => 'جديد كشف حساب', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'partner_reports', 'href' => '/admin/index.php?page=partner_reports', 'label' => 'تقارير الذمم المالية', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report', 'label' => 'التقارير المالية', 'class' => '', 'sub' => false],
                 ['page' => 'logs', 'href' => '/admin/index.php?page=logs', 'label' => 'سجل النشاط', 'class' => 'admin-nav-sub', 'sub' => true],
             ];

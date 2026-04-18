@@ -31,6 +31,8 @@ $allowed = [
     'gl_account_settings',
     'expenses',
     'journal_entries',
+    'journal_types',
+    'gl_posting',
     'reports',
     'financial_report',
     'logs',

@@ -51,6 +51,8 @@ function orange_admin_page_resource(string $page): string
         'fiscal_years' => 'accounting',
         'opening_balances' => 'accounting',
         'journal_entries' => 'accounting',
+        'journal_types' => 'accounting',
+        'gl_posting' => 'accounting',
         'financial_report' => 'accounting',
         'gl_account_settings' => 'accounting',
         'partner_ledger' => 'partners',
