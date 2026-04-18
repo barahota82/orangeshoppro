@@ -463,7 +463,7 @@ function loadAllocReceipt() {
             var tr = document.createElement('tr');
             tr.setAttribute('data-ref-type', it.ref_type);
             tr.setAttribute('data-ref-id', String(it.ref_id));
-            tr.innerHTML = '<td>' + escapeHtml(it.label) + '</td><td>' + Number(it.open).toFixed(3) + '</td><td><input type="number" class="alloc-amt admin-inp-money" step="any" min="0" placeholder="0" inputmode="decimal" lang="en" dir="ltr"></td>';
+            tr.innerHTML = '<td>' + escapeHtml(it.label) + '</td><td>' + Number(it.open).toFixed(3) + '</td><td><input type="number" class="alloc-amt admin-inp-money" step="any" min="0" placeholder="0.000" inputmode="decimal" lang="en" dir="ltr"></td>';
             tb.appendChild(tr);
         });
         if (!items.length) {
@@ -490,7 +490,7 @@ function loadAllocPay() {
             var tr = document.createElement('tr');
             tr.setAttribute('data-ref-type', it.ref_type);
             tr.setAttribute('data-ref-id', String(it.ref_id));
-            tr.innerHTML = '<td>' + escapeHtml(it.label) + '</td><td>' + Number(it.open).toFixed(3) + '</td><td><input type="number" class="alloc-amt admin-inp-money" step="any" min="0" placeholder="0" inputmode="decimal" lang="en" dir="ltr"></td>';
+            tr.innerHTML = '<td>' + escapeHtml(it.label) + '</td><td>' + Number(it.open).toFixed(3) + '</td><td><input type="number" class="alloc-amt admin-inp-money" step="any" min="0" placeholder="0.000" inputmode="decimal" lang="en" dir="ltr"></td>';
             tb.appendChild(tr);
         });
         if (!items.length) {

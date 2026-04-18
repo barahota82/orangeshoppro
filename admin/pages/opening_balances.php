@@ -59,11 +59,13 @@ if ($fyId > 0 && orange_journal_vouchers_ready($pdo)) {
 ?>
 <div class="page-title page-title--stacked">
     <div>
-        <h1>أرصدة أول المدة</h1>
+        <h1>أرصدة أول المدة المالية</h1>
         <p class="page-subtitle">
-            لكل <strong>سنة مالية مفتوحة</strong>، سجّل أرصدة الافتتاح كسند متوازن في أول يوم من السنة (يُعرض التاريخ بصيغة <strong>يوم/شهر/سنة</strong>).
-            أدخل <strong>كود حساب فرعي</strong> ليُكمّل الاسم، أو استخدم البحث. كل سطر إما <strong>مدين</strong> أو <strong>دائن</strong> فقط.
-            يُستبدل السند السابق لنفس السنة عند كل حفظ.
+            هذه الشاشة مخصّصة لسيناريو <strong>نقل من نظام محاسبي قديم إلى نظام جديد</strong> عندما لا يمكن استيراد الأرصدة تلقائياً:
+            تُسجَّل هنا أرصدة الافتتاح <strong>مرة</strong> كسند متوازن في أول يوم من أول سنة مالية مفتوحة (التاريخ في القائمة بصيغة <strong>يوم/شهر/سنة</strong>).
+            <strong>ليست شاشة تُستخدم كل عام:</strong> عند إقفال السنوات المالية وترحيل الأرصدة يتم ذلك آلياً ضمن الإقفال.
+            شاشة منفصلة مرتقبة لـ <strong>أرصدة أول المدة المخزنية</strong> (مخزون افتتاحي). كل سطر: <strong>كود حساب فرعي</strong> (أو بحث)، ومبلغ إما <strong>مدين</strong> أو <strong>دائن</strong> فقط.
+            يُستبدل سند الافتتاح السابق لنفس السنة عند كل حفظ.
         </p>
     </div>
 </div>
@@ -94,9 +96,10 @@ if ($fyId > 0 && orange_journal_vouchers_ready($pdo)) {
 
 <?php if ($fyId > 0 && $years !== []): ?>
 <div class="card ob-opening-card">
-    <h3 class="card-title">أسطر الأرصدة</h3>
+    <h3 class="card-title">أسطر الأرصدة المالية</h3>
     <p class="muted" style="margin:0 0 10px;">
         أدخل <strong>كود الحساب</strong> فيُكمّل الاسم تلقائياً، أو اضغط <strong>البحث</strong> لعرض <strong>الحسابات الفرعية فقط</strong>.
+        المبالغ: <strong>لا سالب</strong>؛ عند الخروج من الخانة يُقبل المبلغ الموجب فقط ويُنسّق بثلاثة مرات عشرية (مثل <strong>1.000</strong>)، والطرف الآخر يصبح <strong>0.000</strong>.
     </p>
     <p class="card-hint" id="ob_hint">مجموع المدين: 0 — مجموع الدائن: 0</p>
     <div class="table-wrap ob-opening-table-wrap">
@@ -236,33 +239,7 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
                 pickList.innerHTML = '<li class="gl-pick-empty">' + (e.message || String(e)) + '</li>';
             });
     }
-    function obWireDebitCredit(tr) {
-        var dEl = tr.querySelector('.ob-d');
-        var cEl = tr.querySelector('.ob-c');
-        if (!dEl || !cEl) {
-            return;
-        }
-        function syncD() {
-            var raw = String(dEl.value || '').trim().replace(',', '.');
-            var v = parseFloat(raw || '0');
-            if (raw !== '' && !isNaN(v) && v > 0) {
-                cEl.value = '0';
-            }
-            obRecalc();
-        }
-        function syncC() {
-            var raw = String(cEl.value || '').trim().replace(',', '.');
-            var v = parseFloat(raw || '0');
-            if (raw !== '' && !isNaN(v) && v > 0) {
-                dEl.value = '0';
-            }
-            obRecalc();
-        }
-        dEl.addEventListener('input', syncD);
-        cEl.addEventListener('input', syncC);
-        dEl.addEventListener('change', syncD);
-        cEl.addEventListener('change', syncC);
-    }
+
     function obWireCodeRow(tr) {
         var codeInp = tr.querySelector('.ob-inp-code');
         if (!codeInp) {
@@ -326,15 +303,14 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
             '<button type="button" class="gl-search-btn ob-search-btn" title="بحث — حسابات فرعية فقط" aria-label="بحث">🔍</button>' +
             '<input type="text" class="gl-inp-name ob-inp-name" readonly tabindex="-1" value="" aria-label="اسم الحساب">' +
             '</div></td>' +
-            '<td><input type="number" class="ob-d admin-inp-money" step="any" min="0" value="" inputmode="decimal" lang="en" dir="ltr" aria-label="مدين" placeholder="0"></td>' +
-            '<td><input type="number" class="ob-c admin-inp-money" step="any" min="0" value="" inputmode="decimal" lang="en" dir="ltr" aria-label="دائن" placeholder="0"></td>' +
+            '<td><input type="number" class="ob-d admin-inp-money" step="any" min="0" value="" inputmode="decimal" lang="en" dir="ltr" aria-label="مدين" placeholder="0.000"></td>' +
+            '<td><input type="number" class="ob-c admin-inp-money" step="any" min="0" value="" inputmode="decimal" lang="en" dir="ltr" aria-label="دائن" placeholder="0.000"></td>' +
             '<td><button type="button" class="btn-secondary ob-row-del">حذف</button></td>';
         tb.appendChild(tr);
         tr.querySelector('.ob-row-del').addEventListener('click', function () {
             tr.remove();
             obRecalc();
         });
-        obWireDebitCredit(tr);
         obWireCodeRow(tr);
         if (preset && preset.account_id > 0) {
             obFillAccount(tr, {
@@ -346,19 +322,22 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
             var c = tr.querySelector('.ob-c');
             var deb = parseFloat(preset.debit) || 0;
             var cre = parseFloat(preset.credit) || 0;
+            var OM = window.OrangeMoney;
+            var dec = OM ? OM.DECIMALS : 3;
+            var cz = OM ? OM.companionZero() : '0.000';
             if (deb > 0) {
                 if (d) {
-                    d.value = String(deb);
+                    d.value = deb.toFixed(dec);
                 }
                 if (c) {
-                    c.value = '0';
+                    c.value = cz;
                 }
             } else if (cre > 0) {
                 if (c) {
-                    c.value = String(cre);
+                    c.value = cre.toFixed(dec);
                 }
                 if (d) {
-                    d.value = '0';
+                    d.value = cz;
                 }
             }
         }
@@ -375,7 +354,8 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
             sd += parseFloat(String((tr.querySelector('.ob-d') || {}).value || '0').replace(',', '.'));
             sc += parseFloat(String((tr.querySelector('.ob-c') || {}).value || '0').replace(',', '.'));
         });
-        el.textContent = 'مجموع المدين: ' + sd.toFixed(4) + ' — مجموع الدائن: ' + sc.toFixed(4);
+        var dec = window.OrangeMoney ? window.OrangeMoney.DECIMALS : 3;
+        el.textContent = 'مجموع المدين: ' + sd.toFixed(dec) + ' — مجموع الدائن: ' + sc.toFixed(dec);
     };
     window.obSave = function () {
         if (OB_FY <= 0) {

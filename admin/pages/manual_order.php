@@ -75,7 +75,7 @@ function moAddLine() {
     wrap.innerHTML =
         '<div><label>منتج</label><select class="mo-p" onchange="moSyncVariant(this)">' + opts + '</select></div>' +
         '<div class="mo-v-wrap"><label>المتغير (لون/مقاس)</label><select class="mo-v"><option value="">—</option></select></div>' +
-        '<div><label>الكمية</label><input type="number" class="mo-q" min="1" value="1"></div>';
+        '<div><label>الكمية</label><input type="number" class="mo-q admin-inp-qty" min="1" step="1" value="1" inputmode="numeric" lang="en" dir="ltr"></div>';
     box.appendChild(wrap);
     if (pid) moSyncVariant(wrap.querySelector('.mo-p'));
 }

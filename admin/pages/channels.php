@@ -31,7 +31,7 @@ $channels = $pdo->query("SELECT * FROM channels ORDER BY id ASC")->fetchAll();
         </div>
         <div>
             <label>رقم المخزن (1–3)</label>
-            <input type="number" id="channel_warehouse" min="1" max="3" value="1">
+            <input type="number" id="channel_warehouse" class="admin-inp-qty" min="1" max="3" step="1" value="1" inputmode="numeric" lang="en" dir="ltr">
         </div>
     </div>
     <div class="actions" style="margin-top:14px;">

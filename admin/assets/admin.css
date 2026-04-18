@@ -1673,6 +1673,26 @@ input.admin-inp-money[type='number']::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
 }
+.ob-opening-table input.admin-inp-money[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+.ob-opening-table input.admin-inp-money[type='number']::-webkit-outer-spin-button,
+.ob-opening-table input.admin-inp-money[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* كميات (مخزون، مشتريات، …): أعداد صحيحة، بدون أسهم spinner */
+input.admin-inp-qty[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+input.admin-inp-qty[type='number']::-webkit-outer-spin-button,
+input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
 
 @media print {
     body * {

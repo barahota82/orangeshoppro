@@ -95,7 +95,7 @@ $img = $product['main_image'] ? '/uploads/products/' . rawurlencode($product['ma
                     <td><?php echo htmlspecialchars($v['size'] ?: '—'); ?></td>
                     <td><?php echo (int)$v['stock_quantity']; ?></td>
                     <td>
-                        <input type="number" min="0" class="input-stock" id="card_stock_<?php echo (int)$v['id']; ?>" value="<?php echo (int)$v['stock_quantity']; ?>">
+                        <input type="number" min="0" step="1" class="input-stock admin-inp-qty" inputmode="numeric" lang="en" dir="ltr" id="card_stock_<?php echo (int)$v['id']; ?>" value="<?php echo (int)$v['stock_quantity']; ?>">
                     </td>
                     <td class="stock-actions">
                         <button type="button" class="btn btn-secondary" onclick="cardAdjustStock(<?php echo (int)$v['id']; ?>, 'manual_adjustment')">تعديل رصيد</button>

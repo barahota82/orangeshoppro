@@ -31,7 +31,10 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
             <button type="button" class="btn-coa-guide" id="coa_btn_open_guide">اضافة الدليل المحاسبي</button>
             <div class="coa-tree-scroll" id="coa_tree_root" role="tree">
                 <?php if ($tree === []): ?>
-                    <p class="muted">لا توجد حسابات بعد. افتح «إعداد الدليل» أو اضغط «إضافة» ثم احفظ.</p>
+                    <p class="muted">
+                        لا توجد حسابات في القاعدة. عند أول تشغيل على قاعدة فارغة يُنشأ النظام تلقائياً ستة جذور (أصول، خصوم، حقوق ملكية، إيرادات، مصروفات، تكلفة مبيعات) بترميز UTF-8.
+                        إن بقيت الشجرة فارغة فتحقق من الاتصال بقاعدة البيانات أو افتح «اضافة الدليل المحاسبي» لإضافة الجذور يدوياً.
+                    </p>
                 <?php else: ?>
                     <?php orange_render_coa_tree($tree, $firstId, $flat, 0); ?>
                 <?php endif; ?>

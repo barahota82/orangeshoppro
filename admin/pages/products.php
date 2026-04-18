@@ -1038,7 +1038,7 @@ function generateVariants() {
             <td class="td-ref-img">${thumbCell}</td>
             <td>${colorCell}</td>
             <td><span class="admin-variant-size-pill">${szLabel}</span><input type="hidden" class="v-zid" value="${c.size_family_size_id}"></td>
-            <td class="td-stock"><input type="number" class="v-stock admin-input-narrow" min="0" value="0" data-idx="${idx}"></td>
+            <td class="td-stock"><input type="number" class="v-stock admin-inp-qty admin-input-narrow" min="0" step="1" value="0" inputmode="numeric" lang="en" dir="ltr" data-idx="${idx}"></td>
         </tr>`;
     });
     html += '</tbody></table></div>';

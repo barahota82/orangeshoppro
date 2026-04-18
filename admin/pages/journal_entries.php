@@ -176,44 +176,15 @@ foreach ($accounts as $a) {
 <script>
 var JV_ACCT_OPTS = <?php echo json_encode($acctOpts, JSON_UNESCAPED_UNICODE); ?>;
 
-function jvWireDebitCredit(tr) {
-    var dEl = tr.querySelector('.jv-d');
-    var cEl = tr.querySelector('.jv-c');
-    if (!dEl || !cEl) {
-        return;
-    }
-    function syncD() {
-        var raw = String(dEl.value || '').trim().replace(',', '.');
-        var v = parseFloat(raw || '0');
-        if (raw !== '' && !isNaN(v) && v > 0) {
-            cEl.value = '0';
-        }
-        jvRecalc();
-    }
-    function syncC() {
-        var raw = String(cEl.value || '').trim().replace(',', '.');
-        var v = parseFloat(raw || '0');
-        if (raw !== '' && !isNaN(v) && v > 0) {
-            dEl.value = '0';
-        }
-        jvRecalc();
-    }
-    dEl.addEventListener('input', syncD);
-    cEl.addEventListener('input', syncC);
-    dEl.addEventListener('change', syncD);
-    cEl.addEventListener('change', syncC);
-}
-
 function jvAddRow() {
     var tb = document.getElementById('jv_lines_body');
     var tr = document.createElement('tr');
     tr.innerHTML = '<td><select class="jv-acc">' + JV_ACCT_OPTS + '</select></td>' +
-        '<td><input type="number" class="jv-d admin-inp-money" step="any" min="0" value="" placeholder="0" inputmode="decimal" lang="en" dir="ltr"></td>' +
-        '<td><input type="number" class="jv-c admin-inp-money" step="any" min="0" value="" placeholder="0" inputmode="decimal" lang="en" dir="ltr"></td>' +
+        '<td><input type="number" class="jv-d admin-inp-money" step="any" min="0" value="" placeholder="0.000" inputmode="decimal" lang="en" dir="ltr"></td>' +
+        '<td><input type="number" class="jv-c admin-inp-money" step="any" min="0" value="" placeholder="0.000" inputmode="decimal" lang="en" dir="ltr"></td>' +
         '<td><input type="text" class="jv-m" value="" placeholder=""></td>' +
         '<td><button type="button" class="btn-secondary" onclick="this.closest(\'tr\').remove();jvRecalc();">حذف</button></td>';
     tb.appendChild(tr);
-    jvWireDebitCredit(tr);
     jvRecalc();
 }
 
@@ -224,7 +195,7 @@ function jvRecalc() {
         var c = parseFloat(String(tr.querySelector('.jv-c').value || '0').replace(',', '.'));
         sd += d; sc += c;
     });
-    document.getElementById('jv_balance_hint').textContent = 'مجموع المدين: ' + sd.toFixed(4) + ' — مجموع الدائن: ' + sc.toFixed(4);
+    document.getElementById('jv_balance_hint').textContent = 'مجموع المدين: ' + sd.toFixed(3) + ' — مجموع الدائن: ' + sc.toFixed(3);
 }
 
 function jvSubmit() {

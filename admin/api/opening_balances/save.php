@@ -56,7 +56,7 @@ try {
         if (! orange_accounts_account_is_posting_leaf($pdo, $aid)) {
             json_response([
                 'success' => false,
-                'message' => 'يُقبل في أرصدة أول المدة حساب فرعي (ورقة ترحيل) فقط — لا جذراً ولا مجلداً.',
+                'message' => 'يُقبل في أرصدة أول المدة المالية حساب فرعي (ورقة ترحيل) فقط — لا جذراً ولا مجلداً.',
             ], 422);
         }
     }
@@ -72,7 +72,7 @@ try {
         orange_voucher_post($pdo, [
             'voucher_date' => $fy['start_date'] . ' 10:00:00',
             'reference' => 'OB-' . $fyId,
-            'description' => 'أرصدة أول المدة — ' . ($fy['label_ar'] ?: ('#' . $fyId)),
+            'description' => 'أرصدة أول المدة المالية — ' . ($fy['label_ar'] ?: ('#' . $fyId)),
             'entry_type' => 'opening_balance',
         ], $norm);
 
@@ -85,7 +85,7 @@ try {
     }
 
     audit_log('opening_balance_save', 'تم حفظ أرصدة افتتاحية للسنة ' . $fyId, 'journal_vouchers', $fyId);
-    json_response(['success' => true, 'message' => 'تم حفظ أرصدة أول المدة']);
+    json_response(['success' => true, 'message' => 'تم حفظ أرصدة أول المدة المالية']);
 } catch (Throwable $e) {
     api_error($e, 'تعذر حفظ الأرصدة الافتتاحية');
 }

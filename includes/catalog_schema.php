@@ -66,6 +66,94 @@ function orange_catalog_safe_exec(PDO $pdo, string $sql): void
     }
 }
 
+/**
+ * عند نشر قاعدة جديدة أو جدول accounts فارغ: إدراج جذور دليل محاسبي افتراضية (عربي/إنجليزي) بترميز utf8mb4.
+ * لا يعمل إن وُجدت أي صفوف — لن يستبدل دليلاً قائماً.
+ */
+function orange_catalog_seed_default_accounts_if_empty(PDO $pdo): void
+{
+    if (!orange_table_exists($pdo, 'accounts')) {
+        return;
+    }
+    try {
+        $cnt = (int) $pdo->query('SELECT COUNT(*) FROM accounts')->fetchColumn();
+        if ($cnt > 0) {
+            return;
+        }
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] accounts seed count: ' . $e->getMessage());
+        }
+
+        return;
+    }
+
+    $hasGrp = orange_table_has_column($pdo, 'accounts', 'is_group');
+    $hasNameEn = orange_table_has_column($pdo, 'accounts', 'name_en');
+    $hasSuspended = orange_table_has_column($pdo, 'accounts', 'is_suspended');
+    $hasNb = orange_table_has_column($pdo, 'accounts', 'normal_balance');
+    $hasPar = orange_table_has_column($pdo, 'accounts', 'parent_id');
+    $hasCode = orange_table_has_column($pdo, 'accounts', 'code');
+    if (!$hasCode) {
+        return;
+    }
+
+    $roots = [
+        ['code' => '1', 'name' => 'الأصول', 'name_en' => 'Assets', 'nb' => 'debit'],
+        ['code' => '2', 'name' => 'الخصوم', 'name_en' => 'Liabilities', 'nb' => 'credit'],
+        ['code' => '3', 'name' => 'حقوق الملكية', 'name_en' => 'Equity', 'nb' => 'credit'],
+        ['code' => '4', 'name' => 'الإيرادات', 'name_en' => 'Revenue', 'nb' => 'credit'],
+        ['code' => '5', 'name' => 'المصروفات', 'name_en' => 'Expenses', 'nb' => 'debit'],
+        ['code' => '6', 'name' => 'تكلفة المبيعات', 'name_en' => 'Cost of sales', 'nb' => 'debit'],
+    ];
+
+    $lock = 'orange_seed_coa';
+    $lk = $pdo->query('SELECT GET_LOCK(' . $pdo->quote($lock) . ', 10)')->fetchColumn();
+    if ((int) $lk !== 1) {
+        return;
+    }
+    try {
+        $cnt2 = (int) $pdo->query('SELECT COUNT(*) FROM accounts')->fetchColumn();
+        if ($cnt2 > 0) {
+            return;
+        }
+        foreach ($roots as $r) {
+            $cols = ['name'];
+            $vals = [$r['name']];
+            $cols[] = 'code';
+            $vals[] = $r['code'];
+            if ($hasPar) {
+                $cols[] = 'parent_id';
+                $vals[] = null;
+            }
+            if ($hasGrp) {
+                $cols[] = 'is_group';
+                $vals[] = 1;
+            }
+            if ($hasNameEn) {
+                $cols[] = 'name_en';
+                $vals[] = $r['name_en'];
+            }
+            if ($hasSuspended) {
+                $cols[] = 'is_suspended';
+                $vals[] = 0;
+            }
+            if ($hasNb) {
+                $cols[] = 'normal_balance';
+                $vals[] = $r['nb'];
+            }
+            $ph = implode(',', array_fill(0, count($cols), '?'));
+            $pdo->prepare('INSERT INTO accounts (' . implode(',', $cols) . ') VALUES (' . $ph . ')')->execute($vals);
+        }
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] accounts seed: ' . $e->getMessage());
+        }
+    } finally {
+        $pdo->query('SELECT RELEASE_LOCK(' . $pdo->quote($lock) . ')');
+    }
+}
+
 function orange_catalog_ensure_schema(PDO $pdo): void
 {
     // Per-connection charset (avoids editing config.php; some hosts break PDO::MYSQL_ATTR_INIT_COMMAND).
@@ -238,6 +326,25 @@ function orange_catalog_ensure_schema(PDO $pdo): void
      | كود الحساب في الشجرة + ربط الحسابات الأساسية للقيود التلقائية
      |--------------------------------------------------------------------------
      */
+    if (!orange_table_exists($pdo, 'accounts')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE accounts (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(191) NOT NULL,
+                code VARCHAR(64) NULL,
+                parent_id INT NULL,
+                is_group TINYINT(1) NOT NULL DEFAULT 0,
+                name_en VARCHAR(191) NOT NULL DEFAULT \'\',
+                is_suspended TINYINT(1) NOT NULL DEFAULT 0,
+                normal_balance VARCHAR(16) NOT NULL DEFAULT \'debit\',
+                updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_accounts_code (code),
+                KEY idx_accounts_parent_id (parent_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
     if (orange_table_exists($pdo, 'accounts') && !orange_table_has_column($pdo, 'accounts', 'code')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE accounts ADD COLUMN code VARCHAR(64) NULL');
         orange_catalog_safe_exec($pdo, 'CREATE UNIQUE INDEX uq_accounts_code ON accounts (code)');
@@ -546,6 +653,12 @@ function orange_catalog_ensure_schema(PDO $pdo): void
             $pdo,
             "ALTER TABLE accounts ADD COLUMN normal_balance VARCHAR(16) NOT NULL DEFAULT 'debit'"
         );
+    }
+
+    static $accountsDefaultSeeded = false;
+    if (!$accountsDefaultSeeded && orange_table_exists($pdo, 'accounts')) {
+        $accountsDefaultSeeded = true;
+        orange_catalog_seed_default_accounts_if_empty($pdo);
     }
 
     if (orange_table_exists($pdo, 'admins') && !orange_table_has_column($pdo, 'admins', 'is_superuser')) {
