@@ -125,16 +125,12 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
             n.value = '';
         }
     }
-    /** كود رئيسي أو غير صالح: يبقى الكود المكتوب، يُفرّغ الاسم ولا يُربط معرّف — لا يُحفَظ الربط حتى يُكمّل المستخدم بحساب فرعي. */
+    /** كود غير صالح أو ليس ورقة ترحيل: يُفرّغ الكود والاسم ولا يُربط معرّف (سلوك احترافي عند الخروج من الحقل). */
     function glStripResolvedRow(tr) {
         if (!tr) {
             return;
         }
-        tr.setAttribute('data-account-id', '0');
-        var n = tr.querySelector('.gl-inp-name');
-        if (n) {
-            n.value = '';
-        }
+        glClearRow(tr);
     }
     function openPick(key) {
         activePickKey = key;
@@ -206,12 +202,14 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
     document.querySelectorAll('tr[data-gl-key]').forEach(function (tr) {
         var codeInp = tr.querySelector('.gl-inp-code');
         if (codeInp) {
+            var glLookupInFlight = false;
             codeInp.addEventListener('change', function () {
                 var raw = codeInp.value.trim();
                 if (!raw) {
                     glClearRow(tr);
                     return;
                 }
+                glLookupInFlight = true;
                 fetch('/admin/api/accounts/lookup-by-code.php?code=' + encodeURIComponent(raw), { credentials: 'same-origin' })
                     .then(function (r) { return r.json(); })
                     .then(function (data) {
@@ -224,7 +222,24 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
                     .catch(function (e) {
                         glStripResolvedRow(tr);
                         alert(e.message || String(e));
+                    })
+                    .finally(function () {
+                        glLookupInFlight = false;
                     });
+            });
+            codeInp.addEventListener('blur', function () {
+                window.setTimeout(function () {
+                    if (glLookupInFlight) {
+                        return;
+                    }
+                    var raw = String(codeInp.value || '').trim();
+                    var id = parseInt(tr.getAttribute('data-account-id'), 10) || 0;
+                    var nameEl = tr.querySelector('.gl-inp-name');
+                    var nameTxt = nameEl ? String(nameEl.value || '').trim() : '';
+                    if (raw !== '' && id <= 0 && nameTxt === '') {
+                        glClearRow(tr);
+                    }
+                }, 0);
             });
         }
         var btn = tr.querySelector('.gl-search-btn');
