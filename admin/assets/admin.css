@@ -1415,8 +1415,51 @@ body.coa-modal-open {
 .fy-col-closed {
     width: 3.75rem;
 }
+.fy-col-acct-close {
+    width: 6.75rem;
+}
 .fy-col-del {
     width: 4.25rem;
+}
+.fy-btn-acct-close {
+    padding: 4px 8px;
+    min-height: 32px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+.fy-close-acc-label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+.fy-close-acc-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+.fy-close-acc-row .fy-close-code {
+    flex: 0 0 7rem;
+    width: 7rem;
+    min-height: 34px;
+    padding: 4px 6px;
+    font-size: 13px;
+}
+.fy-close-acc-row .fy-close-search {
+    min-height: 34px;
+    padding: 4px 10px;
+    font-size: 12px;
+}
+.fy-close-acc-row .fy-close-name {
+    flex: 1 1 120px;
+    min-width: 0;
+    min-height: 34px;
+    padding: 4px 6px;
+    font-size: 13px;
+}
+.fy-close-main-modal .gl-pick-modal__dialog {
+    max-width: 440px;
 }
 .fy-col-center {
     text-align: center;

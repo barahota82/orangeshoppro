@@ -75,7 +75,6 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
         </div>
         <div class="gl-auto-actions">
             <button type="button" id="gl_btn_save">حفظ الربط</button>
-            <a class="btn-secondary" href="/admin/index.php?page=chart_of_accounts">الدليل المحاسبي</a>
         </div>
     </div>
 </div>
@@ -99,6 +98,7 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
     var pickClose = document.getElementById('gl_pick_close');
     var activePickKey = null;
     var searchTimer = null;
+    var glPickSeq = 0;
 
     function glFillRow(tr, acc) {
         if (!tr || !acc) {
@@ -125,6 +125,17 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
             n.value = '';
         }
     }
+    /** كود رئيسي أو غير صالح: يبقى الكود المكتوب، يُفرّغ الاسم ولا يُربط معرّف — لا يُحفَظ الربط حتى يُكمّل المستخدم بحساب فرعي. */
+    function glStripResolvedRow(tr) {
+        if (!tr) {
+            return;
+        }
+        tr.setAttribute('data-account-id', '0');
+        var n = tr.querySelector('.gl-inp-name');
+        if (n) {
+            n.value = '';
+        }
+    }
     function openPick(key) {
         activePickKey = key;
         pickModal.hidden = false;
@@ -142,10 +153,14 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
         document.body.classList.remove('gl-pick-open');
     }
     function glPickLoad(q) {
+        var mySeq = ++glPickSeq;
         var url = '/admin/api/accounts/search-leaves.php?q=' + encodeURIComponent(q || '');
-        fetch(url, { credentials: 'same-origin' })
+        fetch(url, { credentials: 'same-origin', cache: 'no-store' })
             .then(function (r) { return r.json(); })
             .then(function (data) {
+                if (mySeq !== glPickSeq) {
+                    return;
+                }
                 if (!data.success) {
                     pickList.innerHTML = '<li class="gl-pick-empty">' + (data.message || 'تعذر التحميل') + '</li>';
                     return;
@@ -201,13 +216,15 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
                     .then(function (r) { return r.json(); })
                     .then(function (data) {
                         if (!data.success) {
-                            alert(data.message || 'الكود غير صالح');
-                            glClearRow(tr);
+                            glStripResolvedRow(tr);
                             return;
                         }
                         glFillRow(tr, data.account);
                     })
-                    .catch(function (e) { alert(e.message || String(e)); });
+                    .catch(function (e) {
+                        glStripResolvedRow(tr);
+                        alert(e.message || String(e));
+                    });
             });
         }
         var btn = tr.querySelector('.gl-search-btn');
@@ -233,6 +250,19 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
     pickClose.addEventListener('click', closePick);
 
     document.getElementById('gl_btn_save').addEventListener('click', function () {
+        var incomplete = false;
+        document.querySelectorAll('tr[data-gl-key]').forEach(function (tr) {
+            var codeEl = tr.querySelector('.gl-inp-code');
+            var codeTxt = codeEl ? String(codeEl.value || '').trim() : '';
+            var id = parseInt(tr.getAttribute('data-account-id'), 10) || 0;
+            if (codeTxt !== '' && id <= 0) {
+                incomplete = true;
+            }
+        });
+        if (incomplete) {
+            alert('يوجد كود مكتوب دون حساب فرعي — لن يُحفظ الربط. إمّا اختر حساباً فرعياً (يظهر الاسم) أو امسح الكود.');
+            return;
+        }
         var settings = {};
         document.querySelectorAll('tr[data-gl-key]').forEach(function (tr) {
             var k = tr.getAttribute('data-gl-key');

@@ -14,7 +14,7 @@ function orange_table_exists(PDO $pdo, string $table): bool
     }
     $stmt = $pdo->prepare(
         'SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
-         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?'
+         WHERE TABLE_SCHEMA = DATABASE() AND LOWER(TABLE_NAME) = LOWER(?)'
     );
     $stmt->execute([$table]);
     $exists = (int) $stmt->fetchColumn() > 0;
@@ -23,22 +23,35 @@ function orange_table_exists(PDO $pdo, string $table): bool
     return $exists;
 }
 
+/**
+ * إبطال كاش وجود عمود (بعد ALTER DROP/ADD في نفس الطلب أو عند الاشتباه بخلل INFORMATION_SCHEMA).
+ */
+function orange_schema_invalidate_column_check(string $table, string $column): void
+{
+    if (! isset($GLOBALS['orange_schema_column_cache']) || ! is_array($GLOBALS['orange_schema_column_cache'])) {
+        return;
+    }
+    unset($GLOBALS['orange_schema_column_cache'][$table . '.' . $column]);
+}
+
 function orange_table_has_column(PDO $pdo, string $table, string $column): bool
 {
-    static $cache = [];
+    if (! isset($GLOBALS['orange_schema_column_cache']) || ! is_array($GLOBALS['orange_schema_column_cache'])) {
+        $GLOBALS['orange_schema_column_cache'] = [];
+    }
+    $cache = &$GLOBALS['orange_schema_column_cache'];
     $k = $table . '.' . $column;
     if (array_key_exists($k, $cache)) {
         return $cache[$k];
     }
     $stmt = $pdo->prepare(
         'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
-         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+         WHERE TABLE_SCHEMA = DATABASE() AND LOWER(TABLE_NAME) = LOWER(?) AND COLUMN_NAME = ?'
     );
     $stmt->execute([$table, $column]);
-    $exists = (int)$stmt->fetchColumn() > 0;
-    if ($exists) {
-        $cache[$k] = true;
-    }
+    $exists = (int) $stmt->fetchColumn() > 0;
+    $cache[$k] = $exists;
+
     return $exists;
 }
 
@@ -315,14 +328,19 @@ function orange_catalog_ensure_schema(PDO $pdo): void
 
     /*
      |--------------------------------------------------------------------------
-     | تصنيف الحسابات + سندات متعددة الأسطر (journal_vouchers / journal_lines)
+     | سندات متعددة الأسطر (journal_vouchers / journal_lines)
      |--------------------------------------------------------------------------
+     | تصنيف قائمة الدخل يُشتق من كود/ترتيب الجذر في includes/account_tree.php (لا عمود account_class).
      */
-    if (orange_table_exists($pdo, 'accounts') && !orange_table_has_column($pdo, 'accounts', 'account_class')) {
-        orange_catalog_safe_exec(
-            $pdo,
-            "ALTER TABLE accounts ADD COLUMN account_class VARCHAR(32) NOT NULL DEFAULT 'unclassified'"
-        );
+    if (orange_table_exists($pdo, 'accounts') && orange_table_has_column($pdo, 'accounts', 'account_class')) {
+        try {
+            $pdo->exec('ALTER TABLE accounts DROP COLUMN account_class');
+            orange_schema_invalidate_column_check('accounts', 'account_class');
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] DROP account_class: ' . $e->getMessage());
+            }
+        }
     }
 
     if (!orange_table_exists($pdo, 'journal_vouchers')) {

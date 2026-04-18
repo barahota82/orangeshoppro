@@ -30,6 +30,13 @@ try {
     if ($name === '') {
         json_response(['success' => false, 'message' => 'اسم الحساب مطلوب'], 422);
     }
+    // الجذور تُنشأ فقط من «إعداد الدليل» (save-root-setup) — لا إنشاء جذر من نموذج الشجرة الرئيسي.
+    if ($id <= 0 && ($parentId === null || $parentId <= 0)) {
+        json_response([
+            'success' => false,
+            'message' => 'لا يُنشأ حساب جذر من هنا. افتح «اضافة الدليل المحاسبي» ثم أضف الجذر، أو اختر حساباً أباً من الشجرة واضغط «إضافة».',
+        ], 422);
+    }
     if ($parentId !== null) {
         $chk = $pdo->prepare('SELECT id FROM accounts WHERE id = ? LIMIT 1');
         $chk->execute([$parentId]);
@@ -50,7 +57,6 @@ try {
         json_response(['success' => false, 'message' => 'تعذر قفل الشجرة — أعد المحاولة'], 423);
     }
     try {
-        $hasClass = orange_table_has_column($pdo, 'accounts', 'account_class');
         $hasPar = orange_table_has_column($pdo, 'accounts', 'parent_id');
         $hasGrp = orange_table_has_column($pdo, 'accounts', 'is_group');
         $hasNameEn = orange_table_has_column($pdo, 'accounts', 'name_en');
@@ -64,13 +70,8 @@ try {
             if ($dup->fetch()) {
                 json_response(['success' => false, 'message' => 'تعذر توليد كود فريد — أعد المحاولة'], 409);
             }
-            $accountClass = 'unclassified';
             $cols = ['name', 'code'];
             $vals = [$name, $code];
-            if ($hasClass) {
-                $cols[] = 'account_class';
-                $vals[] = $accountClass;
-            }
             if ($hasPar) {
                 $cols[] = 'parent_id';
                 $vals[] = $parentId;

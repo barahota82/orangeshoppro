@@ -29,7 +29,6 @@ try {
         json_response(['success' => false, 'message' => 'تعذر قفل الشجرة — أعد المحاولة'], 423);
     }
     try {
-        $hasClass = orange_table_has_column($pdo, 'accounts', 'account_class');
         $hasGrp = orange_table_has_column($pdo, 'accounts', 'is_group');
         $hasNameEn = orange_table_has_column($pdo, 'accounts', 'name_en');
         $hasSuspended = orange_table_has_column($pdo, 'accounts', 'is_suspended');
@@ -45,10 +44,6 @@ try {
             }
             $cols = ['name', 'code'];
             $vals = [$name, $code];
-            if ($hasClass) {
-                $cols[] = 'account_class';
-                $vals[] = 'unclassified';
-            }
             $cols[] = 'parent_id';
             $vals[] = null;
             if ($hasGrp) {

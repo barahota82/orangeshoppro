@@ -15,7 +15,7 @@ if ($fyId <= 0 && $years !== []) {
     $fyId = (int)$years[0]['id'];
 }
 
-$accounts = $pdo->query('SELECT id, name, code, account_class FROM accounts ORDER BY COALESCE(code, \'\'), name')->fetchAll(PDO::FETCH_ASSOC);
+$accounts = $pdo->query('SELECT id, name, code FROM accounts ORDER BY COALESCE(code, \'\'), name')->fetchAll(PDO::FETCH_ASSOC);
 $accMap = [];
 foreach ($accounts as $a) {
     $accMap[(int)$a['id']] = trim((string)($a['code'] ?? '')) !== '' ? $a['code'] . ' — ' . $a['name'] : $a['name'];

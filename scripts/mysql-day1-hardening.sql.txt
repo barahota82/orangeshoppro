@@ -1,0 +1,134 @@
+-- orange: تهيئة قاعدة البيانات للتشغيل الفعلي (نزاهة + توافق مع المشروع)
+-- نفّذ على نسخة تجريبية أولاً. خذ نسخة احتياطية كاملة قبل التشغيل.
+-- MariaDB / MySQL 8.x
+
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ---------------------------------------------------------------------------
+-- 1) الحسابات: السماح بأسماء مكررة (الفريدة منطقياً عبر `code`)
+--    التطبيق يعتمد على الكود؛ قيد الاسم الفريد يعطّل سيناريوهات حقيقية.
+-- ---------------------------------------------------------------------------
+ALTER TABLE `accounts` DROP INDEX `uq_accounts_name`;
+
+-- ---------------------------------------------------------------------------
+-- 2) الأقسام: مواءمة أطوال الحقول مع includes/catalog_schema.php (191)
+-- ---------------------------------------------------------------------------
+ALTER TABLE `departments`
+  MODIFY `name_ar` varchar(191) NOT NULL,
+  MODIFY `name_en` varchar(191) NULL DEFAULT NULL,
+  MODIFY `name_fil` varchar(191) NULL DEFAULT NULL,
+  MODIFY `name_hi` varchar(191) NULL DEFAULT NULL,
+  MODIFY `slug` varchar(191) NOT NULL;
+
+-- ---------------------------------------------------------------------------
+-- 3) تنظيف بيانات قبل إضافة مفاتيح أجنبية (تجنّب فشل ALTER)
+-- ---------------------------------------------------------------------------
+
+-- طلبات: customer_id يشير لسجل موجود أو يصبح NULL
+UPDATE `orders` o
+LEFT JOIN `customers` c ON c.id = o.customer_id
+SET o.customer_id = NULL
+WHERE o.customer_id IS NOT NULL AND c.id IS NULL;
+
+-- سندات: fiscal_year_id إما سنة موجودة أو NULL
+UPDATE `journal_vouchers` jv
+LEFT JOIN `fiscal_years` fy ON fy.id = jv.fiscal_year_id
+SET jv.fiscal_year_id = NULL
+WHERE jv.fiscal_year_id IS NOT NULL AND fy.id IS NULL;
+
+-- شجرة الحسابات: parent_id إما حساب موجود أو NULL
+UPDATE `accounts` a
+LEFT JOIN `accounts` p ON p.id = a.parent_id
+SET a.parent_id = NULL
+WHERE a.parent_id IS NOT NULL AND p.id IS NULL;
+
+-- متغيرات: روابط اختيارية لكتالوج الألوان/المقاسات
+UPDATE `product_variants` v
+LEFT JOIN `product_colorways` cw ON cw.id = v.product_colorway_id
+SET v.product_colorway_id = NULL
+WHERE v.product_colorway_id IS NOT NULL AND cw.id IS NULL;
+
+UPDATE `product_variants` v
+LEFT JOIN `size_family_sizes` sfs ON sfs.id = v.size_family_size_id
+SET v.size_family_size_id = NULL
+WHERE v.size_family_size_id IS NOT NULL AND sfs.id IS NULL;
+
+UPDATE `product_colorways` cw
+LEFT JOIN `color_dictionary` c1 ON c1.id = cw.primary_color_id
+SET cw.primary_color_id = NULL
+WHERE cw.primary_color_id IS NOT NULL AND c1.id IS NULL;
+
+UPDATE `product_colorways` cw
+LEFT JOIN `color_dictionary` c2 ON c2.id = cw.secondary_color_id
+SET cw.secondary_color_id = NULL
+WHERE cw.secondary_color_id IS NOT NULL AND c2.id IS NULL;
+
+-- ---------------------------------------------------------------------------
+-- 4) مفاتيح أجنبية إضافية (سلوك آمن للتشغيل اليومي)
+-- ---------------------------------------------------------------------------
+
+ALTER TABLE `accounts`
+  ADD CONSTRAINT `fk_accounts_parent`
+  FOREIGN KEY (`parent_id`) REFERENCES `accounts` (`id`)
+  ON DELETE SET NULL ON UPDATE CASCADE;
+
+ALTER TABLE `orders`
+  ADD CONSTRAINT `fk_orders_customer`
+  FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`)
+  ON DELETE SET NULL ON UPDATE CASCADE;
+
+ALTER TABLE `journal_vouchers`
+  ADD CONSTRAINT `fk_journal_vouchers_fiscal_year`
+  FOREIGN KEY (`fiscal_year_id`) REFERENCES `fiscal_years` (`id`)
+  ON DELETE SET NULL ON UPDATE CASCADE;
+
+ALTER TABLE `product_variants`
+  ADD CONSTRAINT `fk_pv_colorway`
+  FOREIGN KEY (`product_colorway_id`) REFERENCES `product_colorways` (`id`)
+  ON DELETE SET NULL ON UPDATE CASCADE;
+
+ALTER TABLE `product_variants`
+  ADD CONSTRAINT `fk_pv_size_family_size`
+  FOREIGN KEY (`size_family_size_id`) REFERENCES `size_family_sizes` (`id`)
+  ON DELETE SET NULL ON UPDATE CASCADE;
+
+ALTER TABLE `product_colorways`
+  ADD CONSTRAINT `fk_pcw_primary_color`
+  FOREIGN KEY (`primary_color_id`) REFERENCES `color_dictionary` (`id`)
+  ON DELETE SET NULL ON UPDATE CASCADE;
+
+ALTER TABLE `product_colorways`
+  ADD CONSTRAINT `fk_pcw_secondary_color`
+  FOREIGN KEY (`secondary_color_id`) REFERENCES `color_dictionary` (`id`)
+  ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- اختياري: ربط بند الطلب بالمتغير عند وجود variant_id
+-- (يتطلب أن تكون كل القيم إما NULL أو id صالح في product_variants)
+UPDATE `order_items` oi
+LEFT JOIN `product_variants` pv ON pv.id = oi.variant_id
+SET oi.variant_id = NULL
+WHERE oi.variant_id IS NOT NULL AND pv.id IS NULL;
+
+UPDATE `purchase_items` pi
+LEFT JOIN `product_variants` pv ON pv.id = pi.variant_id
+SET pi.variant_id = NULL
+WHERE pi.variant_id IS NOT NULL AND pv.id IS NULL;
+
+ALTER TABLE `order_items`
+  ADD CONSTRAINT `fk_order_items_variant`
+  FOREIGN KEY (`variant_id`) REFERENCES `product_variants` (`id`)
+  ON DELETE SET NULL ON UPDATE CASCADE;
+
+ALTER TABLE `purchase_items`
+  ADD CONSTRAINT `fk_purchase_items_variant`
+  FOREIGN KEY (`variant_id`) REFERENCES `product_variants` (`id`)
+  ON DELETE SET NULL ON UPDATE CASCADE;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- ---------------------------------------------------------------------------
+-- ملاحظات:
+-- * journal_entries: جدول تراثي؛ احذفه أو ادمجه يدوياً بعد التأكد من عدم الحاجة.
+-- * إن فشل أي ADD CONSTRAINT لوجود اسم قيد قديم، احذف القيد بنفس الاسم أولاً.
+-- ---------------------------------------------------------------------------

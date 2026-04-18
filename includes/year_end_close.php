@@ -5,13 +5,17 @@ declare(strict_types=1);
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/gl_settings.php';
 require_once __DIR__ . '/journal_voucher.php';
+require_once __DIR__ . '/account_tree.php';
 
 /**
  * قيود إقفال الإيرادات والمصروفات إلى ملخص الدخل ثم إلى الأرباح المحتجزة.
  *
+ * @param ?int $incomeSummaryAccountId معرف حساب ملخص الدخل (وسيط)؛ إن مرّر > 0 يُستخدم بدل الربط الاختياري في الجدول.
+ * @param ?int $retainedEarningsAccountId معرف حساب الأرباح المحتجزة؛ إن مرّر > 0 يُستخدم بدل الربط الاختياري.
+ *
  * @throws RuntimeException|InvalidArgumentException
  */
-function orange_fiscal_year_end_accounting_close(PDO $pdo, int $fiscalYearId): void
+function orange_fiscal_year_end_accounting_close(PDO $pdo, int $fiscalYearId, ?int $incomeSummaryAccountId = null, ?int $retainedEarningsAccountId = null): void
 {
     orange_catalog_ensure_schema($pdo);
     if (!orange_journal_vouchers_ready($pdo)) {
@@ -33,18 +37,66 @@ function orange_fiscal_year_end_accounting_close(PDO $pdo, int $fiscalYearId): v
         throw new RuntimeException('السنة مغلقة — لا يمكن تشغيل الإقفال المحاسبي.');
     }
 
-    $incomeSummaryId = orange_gl_account_id($pdo, 'income_summary');
-    $retainedId = orange_gl_account_id($pdo, 'retained_earnings');
-
     $tb = orange_voucher_account_totals($pdo, $fiscalYearId, ['year_end_close', 'opening_balance']);
 
-    $acctStmt = $pdo->query('SELECT id, account_class FROM accounts');
     $classes = [];
-    while ($r = $acctStmt->fetch(PDO::FETCH_ASSOC)) {
-        $classes[(int) $r['id']] = strtolower(trim((string) ($r['account_class'] ?? 'unclassified')));
+    foreach (array_keys($tb) as $aid) {
+        $aid = (int) $aid;
+        $classes[$aid] = orange_accounts_account_pl_role($pdo, $aid);
     }
 
     $eps = 0.0001;
+    $needsIncomeClose = false;
+    foreach ($tb as $aid => $t) {
+        $class = $classes[$aid] ?? 'unclassified';
+        $deb = (float) $t['debit'];
+        $cred = (float) $t['credit'];
+        if ($class === 'revenue') {
+            $b = round($cred - $deb, 4);
+            if (abs($b) >= $eps) {
+                $needsIncomeClose = true;
+                break;
+            }
+        } elseif ($class === 'expense' || $class === 'cogs') {
+            $b = round($deb - $cred, 4);
+            if (abs($b) >= $eps) {
+                $needsIncomeClose = true;
+                break;
+            }
+        }
+    }
+
+    if (! $needsIncomeClose) {
+        return;
+    }
+
+    $incomeSummaryId = ($incomeSummaryAccountId !== null && $incomeSummaryAccountId > 0)
+        ? $incomeSummaryAccountId
+        : (orange_gl_account_id_optional($pdo, 'income_summary') ?? 0);
+    $retainedId = ($retainedEarningsAccountId !== null && $retainedEarningsAccountId > 0)
+        ? $retainedEarningsAccountId
+        : (orange_gl_account_id_optional($pdo, 'retained_earnings') ?? 0);
+
+    if ($incomeSummaryId <= 0 || $retainedId <= 0) {
+        throw new RuntimeException(
+            'قيود إقفال الإيرادات والمصروفات تتطلب حساب ملخص الدخل (وسيط) وحساب الأرباح المحتجزة. '
+            . 'حدّدهما في نافذة «إقفال محاسبي» عند إغلاق السنة، أو اربطهما مسبقاً في قاعدة البيانات (مفاتيح income_summary و retained_earnings).'
+        );
+    }
+
+    $chk = $pdo->prepare('SELECT id FROM accounts WHERE id = ? LIMIT 1');
+    foreach ([$incomeSummaryId, $retainedId] as $aid) {
+        $chk->execute([$aid]);
+        if (! $chk->fetch()) {
+            throw new RuntimeException('أحد حسابات الإقفال المحددة غير موجود في الدليل المحاسبي.');
+        }
+        if (! orange_accounts_account_is_posting_leaf($pdo, $aid)) {
+            throw new RuntimeException(
+                'حسابات الإقفال يجب أن تكون حسابات فرعية (أوراق ترحيل) — لا يُستخدم جذر الدليل أو حساب له أبناء.'
+            );
+        }
+    }
+
     $lines = [];
     $summaryDr = 0.0;
     $summaryCr = 0.0;

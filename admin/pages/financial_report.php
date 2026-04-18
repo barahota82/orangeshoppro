@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
+require_once __DIR__ . '/../../includes/account_tree.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -23,10 +24,13 @@ foreach ($years as $y) {
     }
 }
 
-$accounts = $pdo->query('SELECT id, name, code, account_class FROM accounts ORDER BY COALESCE(code, \'\'), name')->fetchAll(PDO::FETCH_ASSOC);
-$classById = [];
+$accounts = $pdo->query('SELECT id, name, code FROM accounts ORDER BY COALESCE(code, \'\'), name')->fetchAll(PDO::FETCH_ASSOC);
+$plRoleById = [];
+$bsRoleById = [];
 foreach ($accounts as $a) {
-    $classById[(int)$a['id']] = strtolower(trim((string)($a['account_class'] ?? 'unclassified')));
+    $aid = (int) $a['id'];
+    $plRoleById[$aid] = orange_accounts_account_pl_role($pdo, $aid);
+    $bsRoleById[$aid] = orange_accounts_account_bs_role($pdo, $aid);
 }
 
 $useVouchers = orange_journal_vouchers_ready($pdo);
@@ -108,7 +112,7 @@ $plExpense = 0.0;
 if ($useVouchers && $fyId > 0) {
     $tbPl = orange_voucher_account_totals($pdo, $fyId, ['opening_balance', 'year_end_close']);
     foreach ($tbPl as $aid => $t) {
-        $cls = $classById[$aid] ?? 'unclassified';
+        $cls = $plRoleById[$aid] ?? 'other';
         $deb = (float)$t['debit'];
         $cred = (float)$t['credit'];
         if ($cls === 'revenue') {
@@ -126,7 +130,7 @@ $bsLiab = 0.0;
 $bsEquity = 0.0;
 if ($useVouchers && $fyId > 0) {
     foreach ($tbAll as $aid => $t) {
-        $cls = $classById[$aid] ?? 'unclassified';
+        $cls = $bsRoleById[$aid] ?? 'other';
         $deb = (float)$t['debit'];
         $cred = (float)$t['credit'];
         if ($cls === 'asset') {
@@ -144,9 +148,8 @@ $bsCheck = round($bsAssets - ($bsLiab + $bsEquity), 2);
     <div>
         <h1>التقارير المالية</h1>
         <p class="page-subtitle">
-            ميزان مراجعة، قائمة دخل، وميزانية عمومية مبسطة حسب <strong>تصنيف الحساب</strong> في
-            <a href="/admin/index.php?page=chart_of_accounts">الدليل المحاسبي</a>.
-            بدون تصنيف صحيح لن تُحسب الميزانية والدخل بمعنىها المحاسبي.
+            ميزان مراجعة، قائمة دخل، وميزانية عمومية مبسطة حسب <strong>جذر الحساب</strong>
+            (كود الجذر وترتيبه في «إعداد الدليل» — مطابقة الجذور مع الأدوار في المشروع داخل account_tree.php).
         </p>
     </div>
 </div>

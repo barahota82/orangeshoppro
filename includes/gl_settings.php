@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
+require_once __DIR__ . '/account_tree.php';
 
 /**
  * ربط الحسابات الأساسية (مفاتيح ثابتة) بحسابات الدليل — يُضبط من لوحة الإدارة.
@@ -30,8 +31,9 @@ function orange_gl_setting_key_labels(): array
         'cogs_credit' => 'تكلفة مبيعات آجل — مدين عند التسليم',
         'cogs_returns_cash' => 'تكلفة مردود مبيعات نقدي — دائن عند إثبات تكلفة المرتجع النقدي',
         'cogs_returns_credit' => 'تكلفة مردود مبيعات آجل — دائن عند إثبات تكلفة المرتجع الآجل',
-        'income_summary' => 'ملخص الدخل (مؤقت) — يُستخدم في قيود إقفال السنة فقط',
-        'retained_earnings' => 'الأرباح المحتجزة / حقوق ملكية — يُنقل إليه صافي الدخل عند الإقفال',
+        /** مفتاحان اختياريان: لا يُعرضان في «حسابات القيود التلقائية»؛ يُربطان عند الإقفال أو يُمرَّران في طلب الإقفال. */
+        'income_summary' => 'ملخص الدخل (مؤقت) — قيود إقفال السنة',
+        'retained_earnings' => 'الأرباح المحتجزة — صافي الدخل عند الإقفال',
     ];
 }
 
@@ -56,8 +58,6 @@ function orange_gl_setting_row_short_labels(): array
         'cogs_returns_cash' => 'تكلفة مردود المبيعات النقدي',
         'cogs_returns_credit' => 'تكلفة مردود المبيعات الآجلة',
         'accounts_payable' => 'ذمم الموردين',
-        'income_summary' => 'ملخص الدخل (إقفال)',
-        'retained_earnings' => 'الأرباح المحتجزة (إقفال)',
     ];
 }
 
@@ -82,8 +82,6 @@ function orange_gl_settings_form_key_order(): array
         'cogs_returns_cash',
         'cogs_returns_credit',
         'accounts_payable',
-        'income_summary',
-        'retained_earnings',
     ];
 }
 
@@ -128,7 +126,9 @@ function orange_gl_resolve_legacy_account_id(PDO $pdo, string $key): int
     if ($code === '') {
         return 0;
     }
-    $stmt = $pdo->prepare('SELECT id FROM accounts WHERE code = ? LIMIT 1');
+    $stmt = $pdo->prepare(
+        'SELECT a.id FROM accounts a WHERE a.code = ? AND ' . orange_accounts_posting_leaf_where_sql($pdo, 'a') . ' LIMIT 1'
+    );
     $stmt->execute([$code]);
     $id = (int) $stmt->fetchColumn();
 
@@ -140,16 +140,88 @@ function orange_gl_resolve_legacy_account_id(PDO $pdo, string $key): int
  *
  * @throws RuntimeException إذا تعذر إيجاد حساب (بعد ضبط الشجرة اربط من شاشة «الحسابات الأساسية»)
  */
-function orange_gl_account_id(PDO $pdo, string $key): int
+/**
+ * نفس منطق orange_gl_account_id لكن بدون استثناء — إن لم يُربط المفتاح يُعاد null.
+ */
+function orange_gl_account_id_optional(PDO $pdo, string $key): ?int
 {
     static $cache = [];
-    if (isset($cache[$key])) {
+    $assertLeaf = static function (int $accountId) use ($pdo, $key): void {
+        if ($accountId <= 0 || !orange_accounts_account_is_posting_leaf($pdo, $accountId)) {
+            $labels = orange_gl_setting_key_labels();
+            $lab = $labels[$key] ?? $key;
+            throw new RuntimeException(
+                'الحساب المربوط لـ ' . $lab . ' يجب أن يكون فرعياً (ورقة ترحيل). حدّث الربط من «حسابات القيود التلقائية».'
+            );
+        }
+    };
+    if (array_key_exists($key, $cache)) {
+        $v = $cache[$key];
+        if ($v !== null && $v > 0) {
+            $assertLeaf((int) $v);
+        }
+
         return $cache[$key];
     }
 
     if (!orange_table_exists($pdo, 'orange_gl_account_settings')) {
         $legacy = orange_gl_resolve_legacy_account_id($pdo, $key);
         if ($legacy > 0) {
+            $assertLeaf($legacy);
+            $cache[$key] = $legacy;
+
+            return $legacy;
+        }
+        $cache[$key] = null;
+
+        return null;
+    }
+
+    $stmt = $pdo->prepare('SELECT account_id FROM orange_gl_account_settings WHERE setting_key = ? LIMIT 1');
+    $stmt->execute([$key]);
+    $id = (int) $stmt->fetchColumn();
+    if ($id > 0) {
+        $assertLeaf($id);
+        $cache[$key] = $id;
+
+        return $id;
+    }
+
+    $legacy = orange_gl_resolve_legacy_account_id($pdo, $key);
+    if ($legacy > 0) {
+        $assertLeaf($legacy);
+        $cache[$key] = $legacy;
+
+        return $legacy;
+    }
+
+    $cache[$key] = null;
+
+    return null;
+}
+
+function orange_gl_account_id(PDO $pdo, string $key): int
+{
+    static $cache = [];
+    $assertLeaf = static function (int $accountId) use ($pdo, $key): void {
+        if ($accountId <= 0 || !orange_accounts_account_is_posting_leaf($pdo, $accountId)) {
+            $labels = orange_gl_setting_key_labels();
+            $lab = $labels[$key] ?? $key;
+            throw new RuntimeException(
+                'الحساب المربوط لـ ' . $lab . ' يجب أن يكون فرعياً (ورقة ترحيل). حدّث الربط من «حسابات القيود التلقائية».'
+            );
+        }
+    };
+    if (isset($cache[$key])) {
+        $assertLeaf($cache[$key]);
+
+        return $cache[$key];
+    }
+
+    if (!orange_table_exists($pdo, 'orange_gl_account_settings')) {
+        $legacy = orange_gl_resolve_legacy_account_id($pdo, $key);
+        if ($legacy > 0) {
+            $assertLeaf($legacy);
             $cache[$key] = $legacy;
 
             return $legacy;
@@ -163,6 +235,7 @@ function orange_gl_account_id(PDO $pdo, string $key): int
     $stmt->execute([$key]);
     $id = (int)$stmt->fetchColumn();
     if ($id > 0) {
+        $assertLeaf($id);
         $cache[$key] = $id;
 
         return $id;
@@ -170,6 +243,7 @@ function orange_gl_account_id(PDO $pdo, string $key): int
 
     $legacy = orange_gl_resolve_legacy_account_id($pdo, $key);
     if ($legacy > 0) {
+        $assertLeaf($legacy);
         $cache[$key] = $legacy;
 
         return $legacy;

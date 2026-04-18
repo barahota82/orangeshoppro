@@ -182,10 +182,15 @@ try {
             }
         }
 
+        $incomeSummaryAccountId = (isset($data['income_summary_account_id']) && (int) $data['income_summary_account_id'] > 0)
+            ? (int) $data['income_summary_account_id'] : null;
+        $retainedEarningsAccountId = (isset($data['retained_earnings_account_id']) && (int) $data['retained_earnings_account_id'] > 0)
+            ? (int) $data['retained_earnings_account_id'] : null;
+
         $pdo->beginTransaction();
         try {
             if ($accountingClose) {
-                orange_fiscal_year_end_accounting_close($pdo, $id);
+                orange_fiscal_year_end_accounting_close($pdo, $id, $incomeSummaryAccountId, $retainedEarningsAccountId);
             }
             $u = $pdo->prepare('UPDATE fiscal_years SET is_closed = 1, closed_at = NOW() WHERE id = ? AND is_closed = 0');
             $u->execute([$id]);

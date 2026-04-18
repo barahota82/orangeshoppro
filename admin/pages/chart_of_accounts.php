@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
@@ -472,6 +472,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         if (!payload.name) {
             alert('اسم الحساب بالعربية مطلوب');
+            return;
+        }
+        if (id <= 0 && (payload.parent_id === null || payload.parent_id <= 0)) {
+            alert('لا يُنشأ حساب جذر من هذه الشاشة. استخدم زر «اضافة الدليل المحاسبي» لإضافة الجذور، أو اختر حساباً أباً في الشجرة ثم «إضافة».');
             return;
         }
         if (id <= 0 && payload.parent_id !== null && payload.parent_id > 0) {
