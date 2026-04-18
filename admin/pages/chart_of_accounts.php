@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
@@ -477,27 +477,36 @@ document.addEventListener('DOMContentLoaded', function () {
         modal.hidden = false;
         modal.setAttribute('aria-hidden', 'false');
         document.body.classList.add('coa-modal-open');
-        loadSetupRoots();
+        loadSetupRoots().catch(function (e) {
+            alert(e.message || String(e));
+        });
+    }
+
+    function resetSetupModalUi() {
+        document.getElementById('coa_setup_row_id').value = '0';
+        document.getElementById('coa_setup_code').value = '';
+        document.getElementById('coa_setup_name').value = '';
+        document.getElementById('coa_setup_name_en').value = '';
+        tbody.querySelectorAll('tr.is-selected').forEach(function (x) { x.classList.remove('is-selected'); });
     }
 
     function closeGuideModal() {
         modal.hidden = true;
         modal.setAttribute('aria-hidden', 'true');
         document.body.classList.remove('coa-modal-open');
+        resetSetupModalUi();
     }
 
     function loadSetupRoots() {
-        fetch('/admin/api/accounts/list-roots.php', { credentials: 'same-origin' })
+        return fetch('/admin/api/accounts/list-roots.php', { credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
             .then(function (data) {
                 if (!data.success) {
-                    alert(data.message || 'تعذر تحميل الجذور');
-                    return;
+                    return Promise.reject(new Error(data.message || 'تعذر تحميل الجذور'));
                 }
                 renderSetupTable(data.roots || []);
                 clearSetupForm();
-            })
-            .catch(function (e) { alert(e.message || String(e)); });
+            });
     }
 
     function setupNextNumericCodePreview() {
@@ -535,10 +544,15 @@ document.addEventListener('DOMContentLoaded', function () {
                         return;
                     }
                     postJSON('/admin/api/accounts/delete-node.php', { id: row.id }).then(function (r) {
-                        alert(r.message || (r.success ? 'تم' : 'فشل'));
-                        if (r.success) {
-                            location.reload();
+                        if (!r.success) {
+                            alert(r.message || 'فشل الحذف');
+                            return;
                         }
+                        loadSetupRoots().then(function () {
+                            alert(r.message || 'تم الحذف');
+                        }).catch(function (e) {
+                            alert((r.message || 'تم الحذف') + '\n— تعذر تحديث الجدول: ' + (e.message || e));
+                        });
                     }).catch(function (e) { alert(e.message || String(e)); });
                 });
                 delTd.appendChild(delBtn);
@@ -590,10 +604,15 @@ document.addEventListener('DOMContentLoaded', function () {
             name_en: document.getElementById('coa_setup_name_en').value.trim()
         };
         postJSON('/admin/api/accounts/save-root-setup.php', payload).then(function (r) {
-            alert(r.message || (r.success ? 'تم' : 'فشل'));
-            if (r.success) {
-                location.reload();
+            if (!r.success) {
+                alert(r.message || 'فشل الحفظ');
+                return;
             }
+            loadSetupRoots().then(function () {
+                alert(r.message || 'تم الحفظ');
+            }).catch(function (e) {
+                alert((r.message || 'تم الحفظ') + '\n— تعذر تحديث الجدول: ' + (e.message || e));
+            });
         }).catch(function (e) { alert(e.message || String(e)); });
     });
     document.getElementById('coa_setup_btn_print').addEventListener('click', function () {

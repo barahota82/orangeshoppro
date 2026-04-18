@@ -872,8 +872,47 @@ function storefront_tagline_cycle_messages(): array {
 function json_response($data, int $httpCode = 200): void {
     http_response_code($httpCode);
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode($data, JSON_UNESCAPED_UNICODE);
+    $flags = JSON_UNESCAPED_UNICODE;
+    if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+        $flags |= JSON_INVALID_UTF8_SUBSTITUTE;
+    }
+    echo json_encode($data, $flags);
     exit;
+}
+
+/**
+ * تسجيل نشاط إداري (اختياري). لا يُعطّل العملية إن لم يُربط بجدول لاحقاً.
+ *
+ * @param int|string|null $entityId
+ */
+function audit_log(string $action, string $message, string $entityTable = '', $entityId = null): void
+{
+    // يمكن لاحقاً: INSERT في جدول سجل. تجنّب fatal إن الدالة غير مُعرّفة على نسخ قديمة.
+    if (function_exists('error_log') && filter_var(getenv('ORANGE_AUDIT_LOG') ?: '', FILTER_VALIDATE_BOOLEAN)) {
+        error_log('[orange audit] ' . $action . ' | ' . $message . ' | ' . $entityTable . ' | ' . (string) $entityId);
+    }
+}
+
+/**
+ * رد موحّد للأخطاء في واجهات JSON (لا يترك جسم الاستجابة فارغاً).
+ */
+function api_error(Throwable $e, string $userMessage): void
+{
+    if (function_exists('error_log')) {
+        error_log(
+            '[orange] API: ' . $userMessage . ' | ' . $e->getMessage()
+            . ' @ ' . $e->getFile() . ':' . $e->getLine()
+        );
+    }
+    $payload = [
+        'success' => false,
+        'message' => $userMessage,
+    ];
+    $debug = getenv('ORANGE_API_DEBUG');
+    if ($debug === '1' || $debug === 'true') {
+        $payload['debug'] = $e->getMessage();
+    }
+    json_response($payload, 500);
 }
 
 function get_json_input(): array {
