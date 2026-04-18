@@ -77,7 +77,6 @@ $fySuggestYear = $maxEndY + 1;
             <button type="button" class="btn-secondary" id="fy_btn_add">إضافة</button>
             <button type="button" id="fy_btn_save">حفظ</button>
             <button type="button" class="btn-secondary" id="fy_btn_print">طباعة</button>
-            <a class="btn-secondary" href="/admin/index.php">خروج</a>
         </div>
     </div>
 </div>

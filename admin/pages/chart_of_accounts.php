@@ -108,7 +108,6 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
                 <button type="button" id="coa_btn_save">حفظ</button>
                 <a class="btn-secondary coa-footer-link coa-footer-link--disabled" id="coa_btn_statement" href="#">كشف حساب</a>
                 <button type="button" class="btn-secondary" id="coa_btn_print">طباعة</button>
-                <a class="btn-secondary" href="/admin/index.php">خروج</a>
             </footer>
             </div>
         </div>
@@ -156,7 +155,7 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
             <button type="button" class="btn-secondary" id="coa_setup_btn_new">إضافة</button>
             <button type="button" id="coa_setup_btn_save">حفظ</button>
             <button type="button" class="btn-secondary" id="coa_setup_btn_print">طباعة</button>
-            <button type="button" class="btn-secondary" id="coa_setup_btn_close">خروج</button>
+            <button type="button" class="btn-secondary" id="coa_setup_btn_close">إغلاق</button>
         </footer>
     </div>
 </div>
