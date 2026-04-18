@@ -1,2 +1,2 @@
 <?php
-echo password_hash('admin@kh2026', PASSWORD_DEFAULT);
+echo password_hash('ضع الباسورد هنا', PASSWORD_DEFAULT);
