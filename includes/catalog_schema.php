@@ -538,6 +538,18 @@ function orange_catalog_ensure_schema(PDO $pdo): void
             'ALTER TABLE accounts ADD COLUMN is_group TINYINT(1) NOT NULL DEFAULT 0'
         );
     }
+    if (orange_table_exists($pdo, 'accounts') && !orange_table_has_column($pdo, 'accounts', 'name_en')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            "ALTER TABLE accounts ADD COLUMN name_en VARCHAR(191) NOT NULL DEFAULT ''"
+        );
+    }
+    if (orange_table_exists($pdo, 'accounts') && !orange_table_has_column($pdo, 'accounts', 'is_suspended')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE accounts ADD COLUMN is_suspended TINYINT(1) NOT NULL DEFAULT 0'
+        );
+    }
 
     if (orange_table_exists($pdo, 'admins') && !orange_table_has_column($pdo, 'admins', 'is_superuser')) {
         orange_catalog_safe_exec(

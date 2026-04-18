@@ -16,6 +16,8 @@ function orange_accounts_flat(PDO $pdo): array
     $hasClass = orange_table_has_column($pdo, 'accounts', 'account_class');
     $hasPar = orange_table_has_column($pdo, 'accounts', 'parent_id');
     $hasGrp = orange_table_has_column($pdo, 'accounts', 'is_group');
+    $hasNameEn = orange_table_has_column($pdo, 'accounts', 'name_en');
+    $hasSuspended = orange_table_has_column($pdo, 'accounts', 'is_suspended');
     $cols = 'id, name, code, updated_at';
     if ($hasClass) {
         $cols .= ', account_class';
@@ -25,6 +27,12 @@ function orange_accounts_flat(PDO $pdo): array
     }
     if ($hasGrp) {
         $cols .= ', is_group';
+    }
+    if ($hasNameEn) {
+        $cols .= ', name_en';
+    }
+    if ($hasSuspended) {
+        $cols .= ', is_suspended';
     }
     $rows = $pdo->query('SELECT ' . $cols . ' FROM accounts ORDER BY COALESCE(code, \'\'), id')->fetchAll(PDO::FETCH_ASSOC);
 

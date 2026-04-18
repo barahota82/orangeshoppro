@@ -24,6 +24,8 @@ try {
     $isGroup = !empty($data['is_group']) ? 1 : 0;
     $accountClass = trim((string) ($data['account_class'] ?? 'unclassified'));
     $code = trim((string) ($data['code'] ?? ''));
+    $nameEn = trim((string) ($data['name_en'] ?? ''));
+    $isSuspended = !empty($data['is_suspended']) ? 1 : 0;
     if ($name === '') {
         json_response(['success' => false, 'message' => 'اسم الحساب مطلوب'], 422);
     }
@@ -50,6 +52,8 @@ try {
         $hasClass = orange_table_has_column($pdo, 'accounts', 'account_class');
         $hasPar = orange_table_has_column($pdo, 'accounts', 'parent_id');
         $hasGrp = orange_table_has_column($pdo, 'accounts', 'is_group');
+        $hasNameEn = orange_table_has_column($pdo, 'accounts', 'name_en');
+        $hasSuspended = orange_table_has_column($pdo, 'accounts', 'is_suspended');
 
         if ($id <= 0) {
             $dup = $pdo->prepare('SELECT id FROM accounts WHERE code = ? LIMIT 1');
@@ -57,17 +61,30 @@ try {
             if ($dup->fetch()) {
                 json_response(['success' => false, 'message' => 'الكود مستخدم — اضغط «اقتراح كود» ثم أعد المحاولة'], 409);
             }
-            if ($hasPar && $hasGrp && $hasClass) {
-                $pdo->prepare(
-                    'INSERT INTO accounts (name, code, account_class, parent_id, is_group) VALUES (?,?,?,?,?)'
-                )->execute([$name, $code, $accountClass, $parentId, $isGroup]);
-            } elseif ($hasPar && $hasGrp) {
-                $pdo->prepare(
-                    'INSERT INTO accounts (name, code, parent_id, is_group) VALUES (?,?,?,?)'
-                )->execute([$name, $code, $parentId, $isGroup]);
-            } else {
-                $pdo->prepare('INSERT INTO accounts (name, code) VALUES (?,?)')->execute([$name, $code]);
+            $cols = ['name', 'code'];
+            $vals = [$name, $code];
+            if ($hasClass) {
+                $cols[] = 'account_class';
+                $vals[] = $accountClass;
             }
+            if ($hasPar) {
+                $cols[] = 'parent_id';
+                $vals[] = $parentId;
+            }
+            if ($hasGrp) {
+                $cols[] = 'is_group';
+                $vals[] = $isGroup;
+            }
+            if ($hasNameEn) {
+                $cols[] = 'name_en';
+                $vals[] = $nameEn;
+            }
+            if ($hasSuspended) {
+                $cols[] = 'is_suspended';
+                $vals[] = $isSuspended;
+            }
+            $ph = implode(',', array_fill(0, count($cols), '?'));
+            $pdo->prepare('INSERT INTO accounts (' . implode(',', $cols) . ') VALUES (' . $ph . ')')->execute($vals);
             $newId = (int) $pdo->lastInsertId();
             audit_log('account_create', 'حساب جديد: ' . $code . ' ' . $name, 'accounts', $newId);
             json_response(['success' => true, 'message' => 'تم إنشاء الحساب', 'id' => $newId, 'code' => $code]);
@@ -78,17 +95,30 @@ try {
         if ($dup->fetch()) {
             json_response(['success' => false, 'message' => 'الكود مستخدم لحساب آخر'], 409);
         }
-        if ($hasPar && $hasGrp && $hasClass) {
-            $pdo->prepare(
-                'UPDATE accounts SET name = ?, code = ?, account_class = ?, parent_id = ?, is_group = ? WHERE id = ?'
-            )->execute([$name, $code, $accountClass, $parentId, $isGroup, $id]);
-        } elseif ($hasPar && $hasGrp) {
-            $pdo->prepare(
-                'UPDATE accounts SET name = ?, code = ?, parent_id = ?, is_group = ? WHERE id = ?'
-            )->execute([$name, $code, $parentId, $isGroup, $id]);
-        } else {
-            $pdo->prepare('UPDATE accounts SET name = ?, code = ? WHERE id = ?')->execute([$name, $code, $id]);
+        $sets = ['name = ?', 'code = ?'];
+        $vals = [$name, $code];
+        if ($hasClass) {
+            $sets[] = 'account_class = ?';
+            $vals[] = $accountClass;
         }
+        if ($hasPar) {
+            $sets[] = 'parent_id = ?';
+            $vals[] = $parentId;
+        }
+        if ($hasGrp) {
+            $sets[] = 'is_group = ?';
+            $vals[] = $isGroup;
+        }
+        if ($hasNameEn) {
+            $sets[] = 'name_en = ?';
+            $vals[] = $nameEn;
+        }
+        if ($hasSuspended) {
+            $sets[] = 'is_suspended = ?';
+            $vals[] = $isSuspended;
+        }
+        $vals[] = $id;
+        $pdo->prepare('UPDATE accounts SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($vals);
         audit_log('account_update', 'تحديث حساب #' . $id, 'accounts', $id);
         json_response(['success' => true, 'message' => 'تم حفظ الحساب', 'id' => $id, 'code' => $code]);
     } finally {
