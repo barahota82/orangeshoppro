@@ -1,6 +1,8 @@
 # Orange project - conversation continuity and technical decisions
 
-This document records work on **Orange** (`Desktop/orange`): encoding, catalog, `config.php` constraints, translator removal, invoice behavior.
+> **IBRAHIM — للمحادثات الجديدة:** ابدأ من **`IBRAHIM_ORANGE_MASTER.txt`** في جذر المشروع (ورقة دخول موحّدة + تسلسل أسبقية الوثائق). هذا الملف (`ORANGE_CHAT_CONTINUITY.md`) يبقى **أرشيفاً تقنياً** (ترميز، نشر، فاتورة، قرارات قديمة). المسار المعتمد للمشروع: **D:\orange** — انظر `ORANGE_PROJECT_CONTINUITY.txt` §8.
+
+This document records work on **Orange**: encoding, catalog, `config.php` constraints, translator removal, invoice behavior.
 
 **Cursor rule (always on):** `.cursor/rules/orange-php-utf8-workflow.mdc`  
 **This file:** human-readable log + Arabic summary below.
@@ -88,10 +90,10 @@ scripts\install-hooks.ps1
 ## User expectations for future AI sessions
 
 1. Verify **UTF-8 / not UTF-16** before finishing PHP with Arabic.
-2. Do not say "no context in chat" without reading **this file** and **`.cursor/rules/orange-php-utf8-workflow.mdc`**.
+2. Do not say "no context in chat" without reading **`IBRAHIM_ORANGE_MASTER.txt`**, **`ORANGE_PROJECT_CONTINUITY.txt`**, and **`.cursor/rules/orange-php-utf8-workflow.mdc`** (this `.md` file is archive detail only).
 3. **`config.php`:** user policy is **do not modify** for helpers/features unless they explicitly ask. Order helpers (`require_fields`, `generate_order_number`) are in **`includes/order_helpers.php`**, not `config.php`.
 
-**Project path:** `C:\Users\HP\Desktop\orange`
+**Project path (canonical):** `D:\orange` — see `IBRAHIM_ORANGE_MASTER.txt` and `ORANGE_PROJECT_CONTINUITY.txt` §8 (do not rely on older Desktop-only notes).
 
 ---
 
@@ -105,10 +107,11 @@ scripts\install-hooks.ps1
 - `inv_test` أُزيل؛ الفاتورة تُحسَّن عند فتحها بدون طلب محدد.
 
 ### أين تُثبَّت طريقة العمل؟
-1. `.cursor/rules/orange-php-utf8-workflow.mdc` — قاعدة Cursor دائمة.
-2. هذا الملف `ORANGE_CHAT_CONTINUITY.md`.
-3. `.cursor/rules/orange-continuity.mdc` — يوجّه لقراءة الملفات أعلاه.
-4. `ORANGE_PROJECT_CONTINUITY.txt` — مؤشر سريع.
+1. **`IBRAHIM_ORANGE_MASTER.txt`** — دخول موحّد لأي جلسة جديدة.
+2. `.cursor/rules/orange-php-utf8-workflow.mdc` — قاعدة Cursor دائمة.
+3. `ORANGE_PROJECT_CONTINUITY.txt` — مؤشر المشروع والمسار.
+4. `.cursor/rules/orange-continuity.mdc` — يوجّه لقراءة الملفات أعلاه.
+5. هذا الملف `ORANGE_CHAT_CONTINUITY.md` — أرشيف تقني وتفاصيل نشر/ترميز.
 
 ### رفع الملفات بدون كسر الترميز (تلخيص)
 - **الأفضل:** `git push` من الجهاز ثم `git pull` على السيرفر — **ممنوع** لصق PHP في محرر الاستضافة كعادة يومية.

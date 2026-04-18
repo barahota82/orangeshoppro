@@ -14,7 +14,7 @@ alwaysApply: true
 - **المفضّل:** `git push` محلياً ثم `git pull` على السيرفر — نفس البايتات، بدون نسخ يدوي.
 - قبل commit: `powershell -NoProfile -File scripts/verify-php-utf8.ps1`؛ إن فشل: `-Fix` ثم إعادة فحص بدون `-Fix`.
 - تفعيل hook (مرة/clone): `powershell -NoProfile -File scripts/install-hooks.ps1`.
-- تفاصيل أوامر وFTP: **`ORANGE_CHAT_CONTINUITY.md`** قسم «Deploy / upload».
+- تفاصيل أوامر وFTP: **`IBRAHIM_ORANGE_MASTER.txt`** (ملخص) + **`ORANGE_CHAT_CONTINUITY.md`** قسم «Deploy / upload» (تفصيل أرشيفي).
 
 ## config.php policy
 - **Do not** add feature helpers to `config.php` unless the user explicitly asks.
