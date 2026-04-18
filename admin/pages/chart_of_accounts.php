@@ -126,8 +126,9 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
         <div class="actions" style="margin-top:12px; flex-wrap:wrap; gap:8px;">
             <button type="button" id="coa_btn_suggest" class="btn-secondary">اقتراح كود</button>
             <button type="button" id="coa_btn_save">حفظ</button>
+            <button type="button" id="coa_btn_delete" class="btn-danger">حذف الحساب</button>
         </div>
-        <p class="card-hint">عند الحفظ بدون كود، يُولَّد كود تلقائياً تحت الأب المختار.</p>
+        <p class="card-hint">عند الحفظ بدون كود، يُولَّد كود تلقائياً تحت الأب المختار. الحذف مسموح فقط إن لم يكن للحساب فروع، ولا حركات في السندات، ولا ربط في «حسابات القيود التلقائية»؛ يتطلب صلاحية حذف على المحاسبة.</p>
     </div>
 </div>
 
@@ -191,6 +192,20 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
         if (!payload.name) { alert('اسم الحساب مطلوب'); return; }
         postJSON('/admin/api/accounts/save-node.php', payload).then(function (r) {
             alert(r.message || (r.success ? 'تم' : 'فشل'));
+            if (r.success) location.reload();
+        }).catch(function (e) { alert(e.message || String(e)); });
+    });
+    document.getElementById('coa_btn_delete').addEventListener('click', function () {
+        var id = parseInt(document.getElementById('coa_id').value, 10) || 0;
+        if (id <= 0) {
+            alert('اختر حساباً من الشجرة أولاً (أو أنشئ واحداً ثم احفظه قبل الحذف).');
+            return;
+        }
+        if (!confirm('حذف هذا الحساب نهائياً؟ لا يمكن التراجع إن نجح الحذف.')) {
+            return;
+        }
+        postJSON('/admin/api/accounts/delete-node.php', { id: id }).then(function (r) {
+            alert(r.message || (r.success ? 'تم الحذف' : 'فشل'));
             if (r.success) location.reload();
         }).catch(function (e) { alert(e.message || String(e)); });
     });
