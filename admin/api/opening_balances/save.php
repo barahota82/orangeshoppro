@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/account_tree.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_admin_api();
 
@@ -42,6 +43,22 @@ try {
             'credit' => (float)($ln['credit'] ?? 0),
             'memo' => trim((string)($ln['memo'] ?? '')),
         ];
+    }
+
+    foreach ($norm as $ln) {
+        $aid = (int) ($ln['account_id'] ?? 0);
+        if ($aid <= 0) {
+            continue;
+        }
+        if (($ln['debit'] ?? 0) <= 0 && ($ln['credit'] ?? 0) <= 0) {
+            continue;
+        }
+        if (! orange_accounts_account_is_posting_leaf($pdo, $aid)) {
+            json_response([
+                'success' => false,
+                'message' => 'يُقبل في أرصدة أول المدة حساب فرعي (ورقة ترحيل) فقط — لا جذراً ولا مجلداً.',
+            ], 422);
+        }
     }
 
     $pdo->beginTransaction();

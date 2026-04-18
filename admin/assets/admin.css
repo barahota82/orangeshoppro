@@ -1646,6 +1646,20 @@ body.coa-modal-open {
 body.gl-pick-open {
     overflow: hidden;
 }
+body.ob-pick-open {
+    overflow: hidden;
+}
+
+/* أرصدة أول المدة — شبكة الحساب */
+.ob-opening-table-wrap {
+    overflow-x: auto;
+}
+.ob-opening-table .ob-th-code {
+    min-width: 7rem;
+}
+.ob-opening-table .ob-th-name {
+    min-width: 14rem;
+}
 
 @media print {
     body * {
