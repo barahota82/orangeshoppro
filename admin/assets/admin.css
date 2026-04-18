@@ -1651,6 +1651,38 @@ body.ob-pick-open {
 }
 
 /* أرصدة أول المدة — شبكة الحساب */
+.ob-opening-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 0 0 12px;
+}
+.ob-opening-summary__totals {
+    margin: 0;
+}
+.ob-opening-summary__statement {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+}
+.ob-opening-summary__statement-label {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+.ob-statement-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font: inherit;
+    box-sizing: border-box;
+}
 .ob-opening-table-wrap {
     overflow-x: auto;
 }

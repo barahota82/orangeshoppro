@@ -91,12 +91,12 @@ if ($fyId > 0 && orange_journal_vouchers_ready($pdo)) {
 
 <?php if ($fyId > 0 && $years !== []): ?>
 <div class="card ob-opening-card">
-    <h3 class="card-title">أسطر الأرصدة المالية</h3>
-    <div class="ob-opening-summary" style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:0 0 12px;">
-        <span class="card-hint" id="ob_hint_totals" style="margin:0;">مجموع المدين: 0 — مجموع الدائن: 0</span>
-        <label for="ob_statement" style="display:inline-flex;align-items:center;gap:8px;margin:0;">
-            <span>البيان</span>
-            <input type="text" id="ob_statement" class="gl-inp-code" style="min-width:18rem;max-width:32rem;" dir="rtl" autocomplete="off" value="<?php echo htmlspecialchars($obStatement, ENT_QUOTES, 'UTF-8'); ?>" aria-required="true">
+    <h3 class="card-title">سند رصيد افتتاحي</h3>
+    <div class="ob-opening-summary">
+        <span class="card-hint ob-opening-summary__totals" id="ob_hint_totals">مجموع المدين: 0 — مجموع الدائن: 0</span>
+        <label class="ob-opening-summary__statement" for="ob_statement">
+            <span class="ob-opening-summary__statement-label">البيان</span>
+            <input type="text" id="ob_statement" class="ob-statement-input" dir="rtl" autocomplete="off" value="<?php echo htmlspecialchars($obStatement, ENT_QUOTES, 'UTF-8'); ?>" aria-required="true">
         </label>
     </div>
     <div class="table-wrap ob-opening-table-wrap">
