@@ -2,9 +2,13 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/catalog_schema.php';
+
 /**
  * ربط الحسابات الأساسية (مفاتيح ثابتة) بحسابات الدليل — يُضبط من لوحة الإدارة.
- * يدعم عمود accounts.code لمطابقة كود الشجرة في العرض فقط؛ القيود تستخدم account_id.
+ *
+ * في البرمجة يُعتمد على account_id المحفوظ في orange_gl_account_settings؛ الأسماء عربية للعرض فقط.
+ * أي احتياط قديم يطابق الحساب بـ accounts.code (وليس بالاسم).
  */
 
 /**
@@ -36,42 +40,47 @@ function orange_gl_allowed_setting_keys(): array
 }
 
 /**
- * أسماء الحسابات الإنجليزية القديمة في Orange (قبل شجرة كليك) كاحتياط.
+ * احتياط اختياري: مفتاح الإعداد => كود الحساب في الدليل (يطابق accounts.code).
+ * افتراضياً فارغ — الربط الصحيح من شاشة «حسابات القيود التلقائية» (account_id).
  *
+ * @return array<string, string>
+ */
+function orange_gl_legacy_code_fallbacks(): array
+{
+    return [];
+}
+
+/**
+ * @deprecated استخدم orange_gl_legacy_code_fallbacks()
  * @return array<string, string>
  */
 function orange_gl_legacy_name_fallbacks(): array
 {
-    return [
-        'cash' => 'Cash',
-        'inventory' => 'Inventory',
-        'accounts_payable' => 'Accounts Payable',
-        'sales_revenue_cash' => 'Sales',
-        'sales_revenue_credit' => 'Sales',
-        'ar_cash' => 'Cash',
-        'ar_credit' => 'Sales',
-        'cogs_cash' => 'COGS',
-        'cogs_credit' => 'COGS',
-        'income_summary' => 'Income Summary',
-        'retained_earnings' => 'Retained Earnings',
-    ];
+    return orange_gl_legacy_code_fallbacks();
 }
 
 function orange_gl_resolve_legacy_account_id(PDO $pdo, string $key): int
 {
-    $fb = orange_gl_legacy_name_fallbacks();
+    if (!orange_table_exists($pdo, 'accounts') || !orange_table_has_column($pdo, 'accounts', 'code')) {
+        return 0;
+    }
+    $fb = orange_gl_legacy_code_fallbacks();
     if (!isset($fb[$key])) {
         return 0;
     }
-    $stmt = $pdo->prepare('SELECT id FROM accounts WHERE name = ? LIMIT 1');
-    $stmt->execute([$fb[$key]]);
-    $id = (int)$stmt->fetchColumn();
+    $code = trim((string) $fb[$key]);
+    if ($code === '') {
+        return 0;
+    }
+    $stmt = $pdo->prepare('SELECT id FROM accounts WHERE code = ? LIMIT 1');
+    $stmt->execute([$code]);
+    $id = (int) $stmt->fetchColumn();
 
     return $id > 0 ? $id : 0;
 }
 
 /**
- * معرف الحساب المرتبط بمفتاح القيد التلقائي، أو الاحتياط القديم بالاسم.
+ * معرف الحساب لقيد تلقائي: من الجدول أولاً، ثم احتياط بالكود إن وُجد في orange_gl_legacy_code_fallbacks.
  *
  * @throws RuntimeException إذا تعذر إيجاد حساب (بعد ضبط الشجرة اربط من شاشة «الحسابات الأساسية»)
  */

@@ -37,7 +37,7 @@ if (orange_table_exists($pdo, 'orange_gl_account_settings')) {
 
 <div class="card">
     <p class="card-hint">
-        إن تركت حقلًا فارغًا ولم يوجد ربط، يُستخدم الاحتياط القديم (حسابات Cash / Sales / Inventory …) إن وُجدت بالاسم.
+        يجب ربط كل بند بحساب من الدليل؛ لا يوجد احتياط بأسماء إنجليزية جاهزة.
         لبيع <strong>آجل</strong> يجب ربط <strong>عملاء آجل</strong> و<strong>إيراد مبيعات آجل</strong> و<strong>تكلفة مبيعات آجل</strong> بشكل صحيح.
         لإغلاق السنة محاسبياً: اربط <strong>income_summary</strong> و<strong>retained_earnings</strong> بحسابات حقيقية في الدليل (وصنّفها في «الدليل المحاسبي»).
     </p>
@@ -51,7 +51,7 @@ if (orange_table_exists($pdo, 'orange_gl_account_settings')) {
             <div>
                 <label>الحساب من الدليل</label>
                 <select class="gl-sel" data-key="<?php echo htmlspecialchars($key, ENT_QUOTES, 'UTF-8'); ?>">
-                    <option value="">— بدون ربط (احتياط بالاسم القديم إن وُجد) —</option>
+                    <option value="">— بدون ربط —</option>
                     <?php foreach ($accounts as $a): ?>
                         <?php
                         $aid = (int)$a['id'];

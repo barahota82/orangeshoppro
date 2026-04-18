@@ -325,33 +325,6 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         );
     }
 
-    static $accountClassHeuristicDone = false;
-    if (!$accountClassHeuristicDone && orange_table_exists($pdo, 'accounts') && orange_table_has_column($pdo, 'accounts', 'account_class')) {
-        $accountClassHeuristicDone = true;
-        try {
-            orange_catalog_safe_exec(
-                $pdo,
-                "UPDATE accounts SET account_class = 'asset' WHERE name IN ('Cash','Inventory') AND account_class = 'unclassified'"
-            );
-            orange_catalog_safe_exec(
-                $pdo,
-                "UPDATE accounts SET account_class = 'liability' WHERE name = 'Accounts Payable' AND account_class = 'unclassified'"
-            );
-            orange_catalog_safe_exec(
-                $pdo,
-                "UPDATE accounts SET account_class = 'revenue' WHERE name = 'Sales' AND account_class = 'unclassified'"
-            );
-            orange_catalog_safe_exec(
-                $pdo,
-                "UPDATE accounts SET account_class = 'expense' WHERE name IN ('COGS','Expenses') AND account_class = 'unclassified'"
-            );
-        } catch (Throwable $e) {
-            if (function_exists('error_log')) {
-                error_log('[orange] account_class heuristic: ' . $e->getMessage());
-            }
-        }
-    }
-
     if (!orange_table_exists($pdo, 'journal_vouchers')) {
         orange_catalog_safe_exec(
             $pdo,
