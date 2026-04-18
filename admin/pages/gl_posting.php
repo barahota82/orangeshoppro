@@ -17,21 +17,18 @@ $monthStartDt = date('Y-m-01\T00:00');
         <span class="gl-posting-appbar__title">ترحيل الحركات</span>
     </header>
 
-    <p class="gl-posting-scope-note">
-        <strong>نوع الحركة:</strong> القائمة تعرض فقط أنواع اليومية المربوطة (حساب + نوع يومية) من
-        <a href="/admin/index.php?page=gl_account_settings">حسابات القيود التلقائية</a>.
-        أعمدة القيود مطابقة لسندات النظام (مدين / دائن / بيان) وليس نموذج عملات متعددة.
-    </p>
-
     <div class="gl-posting-workbench">
         <!-- في RTL العمود الأول يظهر يمين الشاشة: مصدر الحركات -->
         <section class="gl-posting-pane gl-posting-pane--source" aria-labelledby="gl_post_movements_table_title">
             <div class="gl-posting-pane__toolbar gl-posting-pane__toolbar--filters">
                 <div class="gl-posting-field">
                     <span class="gl-posting-field__label" id="gl_post_movement_type_label">نوع الحركة :</span>
-                    <div class="gl-posting-field__row">
-                        <select id="gl_post_movement_type" class="gl-posting-select" aria-labelledby="gl_post_movement_type_label"<?php echo $linkedJournalTypes === [] ? ' disabled' : ''; ?>>
+                    <div class="gl-posting-field__row gl-posting-field__row--movement">
+                        <select id="gl_post_movement_type" class="gl-posting-select gl-posting-select--movement-type" aria-labelledby="gl_post_movement_type_label"<?php echo $linkedJournalTypes === [] ? ' disabled' : ''; ?>>
                             <option value="">— اختر نوع اليومية —</option>
+                            <?php if ($linkedJournalTypes !== []): ?>
+                            <option value="all">الكل</option>
+                            <?php endif; ?>
                             <?php foreach ($linkedJournalTypes as $jt):
                                 $jid = (int) ($jt['id'] ?? 0);
                                 $jname = trim((string) ($jt['name_ar'] ?? ''));
@@ -117,14 +114,24 @@ $monthStartDt = date('Y-m-01\T00:00');
 (function () {
     var sel = document.getElementById('gl_post_movement_type');
     var chkAll = document.getElementById('gl_post_all_movements');
+    var VAL_ALL = 'all';
     if (chkAll && sel) {
         function syncAllMovements() {
-            sel.disabled = chkAll.checked;
             if (chkAll.checked) {
-                sel.value = '';
+                sel.disabled = true;
+                sel.value = VAL_ALL;
+            } else {
+                sel.disabled = false;
+                if (sel.value === VAL_ALL) {
+                    sel.value = '';
+                }
             }
         }
         chkAll.addEventListener('change', syncAllMovements);
+        sel.addEventListener('change', function () {
+            chkAll.checked = (sel.value === VAL_ALL);
+            syncAllMovements();
+        });
         syncAllMovements();
     }
     function stub(msg) {

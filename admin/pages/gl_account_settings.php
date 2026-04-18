@@ -47,9 +47,6 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
 
     <div class="card gl-auto-form-card">
         <h3 class="card-title">الحساب من الدليل المحاسبي</h3>
-        <p class="muted gl-auto-hint">
-            اختر <strong>نوع اليومية</strong> (من أنواع اليوميات المعرّفة)، ثم أدخل <strong>كود الحساب</strong> فيُكمّل الاسم تلقائياً، أو اضغط <strong>البحث</strong> لعرض <strong>الحسابات الفرعية فقط</strong>.
-        </p>
         <div class="table-wrap gl-settings-table-wrap">
             <table class="gl-settings-table">
                 <thead>

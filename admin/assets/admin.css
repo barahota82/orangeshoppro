@@ -1558,11 +1558,6 @@ body.coa-modal-open {
 .gl-auto-form-card {
     padding: 14px 14px 16px;
 }
-.gl-auto-hint {
-    margin: 0 0 12px;
-    font-size: 13px;
-    line-height: 1.45;
-}
 .gl-settings-table-wrap {
     overflow-x: auto;
     margin-bottom: 8px;
@@ -1694,21 +1689,6 @@ body.coa-modal-open {
 .gl-posting-appbar__title {
     letter-spacing: -0.02em;
 }
-.gl-posting-scope-note {
-    margin: 0;
-    padding: 10px 14px;
-    font-size: 13px;
-    line-height: 1.45;
-    color: var(--muted);
-    background: var(--bg);
-    border-inline: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-}
-.gl-posting-scope-note a {
-    color: var(--primary);
-    text-decoration: underline;
-    text-underline-offset: 2px;
-}
 .gl-posting-workbench {
     display: grid;
     grid-template-columns: minmax(300px, 38%) minmax(0, 1fr);
@@ -1772,6 +1752,17 @@ body.coa-modal-open {
     flex-wrap: wrap;
     align-items: center;
     gap: 10px;
+}
+.gl-posting-field__row--movement {
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 12px;
+}
+.gl-posting-select--movement-type {
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 7.5rem;
+    max-width: 11rem;
 }
 .gl-posting-dates {
     display: flex;
