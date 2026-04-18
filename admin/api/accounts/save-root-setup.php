@@ -18,7 +18,6 @@ try {
     $id = (int) ($data['id'] ?? 0);
     $name = trim((string) ($data['name'] ?? ''));
     $nameEn = trim((string) ($data['name_en'] ?? ''));
-    $codeIn = trim((string) ($data['code'] ?? ''));
 
     if ($name === '') {
         json_response(['success' => false, 'message' => 'الاسم بالعربية مطلوب'], 422);
@@ -37,7 +36,8 @@ try {
         $hasNb = orange_table_has_column($pdo, 'accounts', 'normal_balance');
 
         if ($id <= 0) {
-            $code = $codeIn !== '' ? $codeIn : orange_accounts_suggest_child_code($pdo, null);
+            // كود الجذر الجديد دائماً من النظام: أكبر كود رقمي للجذور + 1 (لا إدخال يدوي).
+            $code = orange_accounts_suggest_child_code($pdo, null);
             $dup = $pdo->prepare('SELECT id FROM accounts WHERE code = ? LIMIT 1');
             $dup->execute([$code]);
             if ($dup->fetch()) {
@@ -86,21 +86,8 @@ try {
         }
 
         $oldCode = trim((string) ($ex['code'] ?? ''));
-        $code = $codeIn !== '' ? $codeIn : $oldCode;
-        if ($code === '') {
-            $code = orange_accounts_suggest_child_code($pdo, null);
-        }
-
-        if ($code !== $oldCode) {
-            $ch = $pdo->prepare('SELECT COUNT(*) FROM accounts WHERE parent_id = ?');
-            $ch->execute([$id]);
-            if ((int) $ch->fetchColumn() > 0) {
-                json_response([
-                    'success' => false,
-                    'message' => 'لا يمكن تغيير كود حساب له فروع. احذف أو انقل الفروع أولاً.',
-                ], 422);
-            }
-        }
+        // الكود لا يُعدَّل من شاشة الإعداد: يبقى كما في القاعدة، أو يُولَّد لو كان فارغاً.
+        $code = $oldCode !== '' ? $oldCode : orange_accounts_suggest_child_code($pdo, null);
 
         $dup = $pdo->prepare('SELECT id FROM accounts WHERE code = ? AND id <> ? LIMIT 1');
         $dup->execute([$code, $id]);

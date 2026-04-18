@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
@@ -124,7 +124,7 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
                 <table class="coa-setup-table">
                     <thead>
                         <tr>
-                            <th class="coa-setup-table__del"></th>
+                            <th class="coa-setup-table__del" aria-label="حذف"></th>
                             <th>الكود</th>
                             <th>الاسم — عربي</th>
                             <th>الاسم — إنجليزي</th>
@@ -133,19 +133,20 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
                     <tbody id="coa_setup_tbody"></tbody>
                 </table>
             </div>
-            <div class="coa-setup-form">
+            <div class="coa-setup-form coa-setup-form--compact">
                 <input type="hidden" id="coa_setup_row_id" value="0">
-                <div class="coa-setup-form__row">
-                    <label class="coa-setup-form__label" for="coa_setup_code">الكود</label>
-                    <input type="text" id="coa_setup_code" class="admin-input-narrow" maxlength="32" autocomplete="off" dir="ltr">
+                <div class="coa-setup-form__row coa-setup-form__row--inline coa-setup-form__row--code">
+                    <label class="coa-setup-form__label-inline" for="coa_setup_code">الكود</label>
+                    <input type="text" id="coa_setup_code" class="coa-setup-code-display" readonly tabindex="-1" dir="ltr" autocomplete="off" title="يُحدَّد تلقائياً عند الحفظ">
+                    <span class="muted coa-setup-code-hint">تلقائي (أكبر رقم + 1)</span>
                 </div>
-                <div class="coa-setup-form__row">
-                    <label class="coa-setup-form__label" for="coa_setup_name"><span class="coa-required">*</span> الاسم — عربي</label>
-                    <input type="text" id="coa_setup_name" class="coa-input-wide" autocomplete="off">
+                <div class="coa-setup-form__row coa-setup-form__row--inline">
+                    <label class="coa-setup-form__label-inline" for="coa_setup_name"><span class="coa-required">*</span> الاسم — عربي</label>
+                    <input type="text" id="coa_setup_name" class="coa-setup-input-flex" autocomplete="off">
                 </div>
-                <div class="coa-setup-form__row">
-                    <label class="coa-setup-form__label" for="coa_setup_name_en">الاسم — إنجليزي</label>
-                    <input type="text" id="coa_setup_name_en" class="coa-input-wide" lang="en" dir="ltr" autocomplete="off">
+                <div class="coa-setup-form__row coa-setup-form__row--inline">
+                    <label class="coa-setup-form__label-inline" for="coa_setup_name_en">الاسم — إنجليزي</label>
+                    <input type="text" id="coa_setup_name_en" class="coa-setup-input-flex" lang="en" dir="ltr" autocomplete="off">
                 </div>
             </div>
         </div>
@@ -494,8 +495,21 @@ document.addEventListener('DOMContentLoaded', function () {
                     return;
                 }
                 renderSetupTable(data.roots || []);
+                clearSetupForm();
             })
             .catch(function (e) { alert(e.message || String(e)); });
+    }
+
+    function setupNextNumericCodePreview() {
+        var roots = tbody.querySelectorAll('tr');
+        var maxNum = 0;
+        roots.forEach(function (tr) {
+            var c = String(tr.dataset.code || '').trim();
+            if (/^[0-9]+$/.test(c)) {
+                maxNum = Math.max(maxNum, parseInt(c, 10));
+            }
+        });
+        return roots.length ? String(maxNum + 1) : '1';
     }
 
     function renderSetupTable(roots) {
@@ -508,13 +522,14 @@ document.addEventListener('DOMContentLoaded', function () {
             tr.dataset.nameEn = row.name_en || '';
             tr.dataset.canDelete = row.can_delete ? '1' : '0';
             var delTd = document.createElement('td');
+            delTd.className = 'coa-setup-table__del';
             if (row.can_delete) {
-                var btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'coa-setup-del';
-                btn.setAttribute('aria-label', 'حذف');
-                btn.textContent = '\uD83D\uDDD1';
-                btn.addEventListener('click', function (ev) {
+                var delBtn = document.createElement('button');
+                delBtn.type = 'button';
+                delBtn.className = 'coa-setup-del';
+                delBtn.setAttribute('aria-label', 'حذف الصف');
+                delBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14zM10 11v6M14 11v6"/></svg>';
+                delBtn.addEventListener('click', function (ev) {
                     ev.stopPropagation();
                     if (!confirm('حذف هذا الحساب الجذر؟')) {
                         return;
@@ -522,13 +537,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     postJSON('/admin/api/accounts/delete-node.php', { id: row.id }).then(function (r) {
                         alert(r.message || (r.success ? 'تم' : 'فشل'));
                         if (r.success) {
-                            loadSetupRoots();
+                            location.reload();
                         }
                     }).catch(function (e) { alert(e.message || String(e)); });
                 });
-                delTd.appendChild(btn);
-            } else {
-                delTd.innerHTML = '';
+                delTd.appendChild(delBtn);
             }
             var c1 = document.createElement('td');
             c1.textContent = row.code || '';
@@ -555,15 +568,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function clearSetupForm() {
         document.getElementById('coa_setup_row_id').value = '0';
         tbody.querySelectorAll('tr.is-selected').forEach(function (x) { x.classList.remove('is-selected'); });
-        var roots = tbody.querySelectorAll('tr');
-        var maxNum = 0;
-        roots.forEach(function (tr) {
-            var c = String(tr.dataset.code || '').trim();
-            if (/^[0-9]+$/.test(c)) {
-                maxNum = Math.max(maxNum, parseInt(c, 10));
-            }
-        });
-        document.getElementById('coa_setup_code').value = roots.length ? String(maxNum + 1) : '1';
+        document.getElementById('coa_setup_code').value = setupNextNumericCodePreview();
         document.getElementById('coa_setup_name').value = '';
         document.getElementById('coa_setup_name_en').value = '';
     }
@@ -578,9 +583,9 @@ document.addEventListener('DOMContentLoaded', function () {
             alert('الاسم بالعربية مطلوب');
             return;
         }
+        var sid = parseInt(document.getElementById('coa_setup_row_id').value, 10) || 0;
         var payload = {
-            id: parseInt(document.getElementById('coa_setup_row_id').value, 10) || 0,
-            code: document.getElementById('coa_setup_code').value.trim(),
+            id: sid,
             name: name,
             name_en: document.getElementById('coa_setup_name_en').value.trim()
         };
