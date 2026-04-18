@@ -22,6 +22,9 @@ try {
         if (!$chk->fetch()) {
             json_response(['success' => false, 'message' => 'الحساب الأب غير موجود'], 404);
         }
+        if (orange_accounts_node_depth($pdo, $parentId) >= orange_accounts_max_tree_depth()) {
+            json_response(['success' => false, 'message' => 'لا يمكن إضافة فرع تحت المستوى الخامس — أقصى عمق خمسة مستويات'], 422);
+        }
     }
     $lock = orange_accounts_lock_name($parentId);
     $lk = $pdo->query('SELECT GET_LOCK(' . $pdo->quote($lock) . ', 15)')->fetchColumn();

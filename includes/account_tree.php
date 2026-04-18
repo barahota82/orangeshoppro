@@ -95,8 +95,41 @@ function orange_accounts_is_descendant(PDO $pdo, int $ancestorId, int $nodeId): 
     return false;
 }
 
+/** أعمق عمق مسموح (0 = جذر … 4 = المستوى الخامس) — خمسة مستويات إجمالاً. */
+function orange_accounts_max_tree_depth(): int
+{
+    return 4;
+}
+
 /**
- * اقتراح كود فرعي تحت أب (نمط: كود_الأب + لاحقة رقمية، مثل 110201 تحت 1102).
+ * عمق الحساب في الشجرة: 0 للجذر، 1 للابن المباشر للجذر، …
+ */
+function orange_accounts_node_depth(PDO $pdo, int $accountId): int
+{
+    if ($accountId <= 0) {
+        return -1;
+    }
+    $depth = 0;
+    $cur = $accountId;
+    for ($g = 0; $g < 500; ++$g) {
+        $st = $pdo->prepare('SELECT parent_id FROM accounts WHERE id = ? LIMIT 1');
+        $st->execute([$cur]);
+        $pid = $st->fetchColumn();
+        if ($pid === false || $pid === null || (int) $pid <= 0) {
+            return $depth;
+        }
+        ++$depth;
+        $cur = (int) $pid;
+    }
+
+    return $depth;
+}
+
+/**
+ * اقتراح كود فرعي تحت أب — مخطط ثابت لطول اللاحقة:
+ * - تحت الجذر (المستوى 2): كود الأب + رقم بدون أصفار أمامية (11، 12… ثم 110… إن لزم).
+ * - المستوى 3 و 4: لاحقة رقمان 01–99 (1101، 110101).
+ * - المستوى 5 (الأخير): لاحقة 5 أرقام (…00001).
  * يُستدعى داخل معاملة بعد GET_LOCK عند الحاجة.
  */
 function orange_accounts_suggest_child_code(PDO $pdo, ?int $parentId): string
@@ -122,6 +155,11 @@ function orange_accounts_suggest_child_code(PDO $pdo, ?int $parentId): string
     $pst->execute([$parentId]);
     $pc = $pst->fetchColumn();
     $prefix = $pc !== false && $pc !== null && $pc !== '' ? (string) $pc : (string) $parentId;
+    $parentDepth = orange_accounts_node_depth($pdo, $parentId);
+    $newDepth = $parentDepth + 1;
+    if ($newDepth > orange_accounts_max_tree_depth()) {
+        throw new RuntimeException('تجاوز أقصى عمق للدليل (خمسة مستويات)');
+    }
 
     $st = $pdo->prepare(
         'SELECT code FROM accounts WHERE parent_id = ? AND code IS NOT NULL AND code <> \'\''
@@ -130,19 +168,48 @@ function orange_accounts_suggest_child_code(PDO $pdo, ?int $parentId): string
     $maxSuffix = 0;
     foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $c) {
         $c = (string) $c;
-        if ($prefix !== '' && str_starts_with($c, $prefix) && strlen($c) > strlen($prefix)) {
-            $rest = substr($c, strlen($prefix));
-            if ($rest !== '' && ctype_digit($rest)) {
-                $maxSuffix = max($maxSuffix, (int) $rest);
+        if ($prefix === '' || ! str_starts_with($c, $prefix) || strlen($c) <= strlen($prefix)) {
+            continue;
+        }
+        $rest = substr($c, strlen($prefix));
+        if ($rest === '' || ! ctype_digit($rest)) {
+            continue;
+        }
+        if ($newDepth === 2 || $newDepth === 3) {
+            if (strlen($rest) !== 2) {
+                continue;
             }
+            $maxSuffix = max($maxSuffix, (int) $rest);
+        } elseif ($newDepth === 4) {
+            if (strlen($rest) !== 5) {
+                continue;
+            }
+            $maxSuffix = max($maxSuffix, (int) $rest);
+        } else {
+            $maxSuffix = max($maxSuffix, (int) $rest);
         }
     }
 
-    if ($maxSuffix === 0) {
-        return $prefix . '01';
+    $next = $maxSuffix + 1;
+    if ($newDepth === 1) {
+        return $prefix . (string) $next;
+    }
+    if ($newDepth === 2 || $newDepth === 3) {
+        if ($next > 99) {
+            throw new RuntimeException('نفدت الأكواد في هذا المستوى (الحد 99)');
+        }
+
+        return $prefix . str_pad((string) $next, 2, '0', STR_PAD_LEFT);
+    }
+    if ($newDepth === 4) {
+        if ($next > 99999) {
+            throw new RuntimeException('نفدت الأكواد في هذا المستوى (الحد 99999)');
+        }
+
+        return $prefix . str_pad((string) $next, 5, '0', STR_PAD_LEFT);
     }
 
-    return $prefix . (string) ($maxSuffix + 1);
+    throw new LogicException('orange_accounts_suggest_child_code: depth out of range');
 }
 
 /**

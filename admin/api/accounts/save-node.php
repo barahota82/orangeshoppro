@@ -40,6 +40,9 @@ try {
     if ($parentId !== null && $id > 0 && ($parentId === $id || orange_accounts_is_descendant($pdo, $id, $parentId))) {
         json_response(['success' => false, 'message' => 'لا يمكن جعل الحساب تحت نفسه أو تحت أحد فروعه'], 422);
     }
+    if ($parentId !== null && orange_accounts_node_depth($pdo, $parentId) >= orange_accounts_max_tree_depth()) {
+        json_response(['success' => false, 'message' => 'لا يمكن إضافة فرع تحت المستوى الخامس — أقصى عمق للدليل خمسة مستويات'], 422);
+    }
 
     $lock = orange_accounts_lock_name($parentId);
     $lk = $pdo->query('SELECT GET_LOCK(' . $pdo->quote($lock) . ', 20)')->fetchColumn();
