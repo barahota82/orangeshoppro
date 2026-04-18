@@ -9,6 +9,7 @@ $page = $_GET['page'] ?? 'dashboard';
 $allowed = [
     'dashboard',
     'admin_users',
+    'password_hash_tool',
     'company_settings',
     'departments',
     'categories',

@@ -60,6 +60,7 @@ function orange_admin_page_resource(string $page): string
         'company_settings' => 'settings',
         'channels' => 'settings',
         'admin_users' => 'admin_users',
+        'password_hash_tool' => 'admin_users',
     ];
 
     return $map[$page] ?? 'dashboard';
@@ -225,7 +226,7 @@ function orange_admin_enforce_api(array $admin, PDO $pdo): void
 
 function orange_admin_nav_visible(array $admin, PDO $pdo, string $page): bool
 {
-    if ($page === 'admin_users') {
+    if ($page === 'admin_users' || $page === 'password_hash_tool') {
         return orange_admin_is_superuser($admin);
     }
     $res = orange_admin_page_resource($page);
