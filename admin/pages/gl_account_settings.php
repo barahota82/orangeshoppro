@@ -324,16 +324,44 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
         }
         var settings = {};
         var journalTypeIds = {};
-        document.querySelectorAll('tr[data-gl-key]').forEach(function (tr) {
+        var anyFullPair = false;
+        var anyEmptyBoth = false;
+        var trList = document.querySelectorAll('tr[data-gl-key]');
+        for (var i = 0; i < trList.length; i++) {
+            var tr = trList[i];
             var k = tr.getAttribute('data-gl-key');
             if (!k) {
-                return;
+                continue;
             }
             var id = parseInt(tr.getAttribute('data-account-id'), 10) || 0;
-            settings[k] = id;
             var sel = tr.querySelector('.gl-sel-journal-type');
-            journalTypeIds[k] = sel ? parseInt(sel.value, 10) || 0 : 0;
-        });
+            var jt = sel ? parseInt(sel.value, 10) || 0 : 0;
+            var lblEl = tr.querySelector('.gl-td-label');
+            var labelTxt = lblEl ? String(lblEl.textContent || '').trim() : k;
+            if (id > 0 && jt <= 0) {
+                alert('يجب اختيار «نوع اليومية» للبند: ' + labelTxt + '.\nلا يُحفظ ربط حساب بدون نوع يومية.');
+                return;
+            }
+            if (jt > 0 && id <= 0) {
+                alert('يجب ربط حساب من الدليل للبند: ' + labelTxt + '.\nلا يُحفظ نوع يومية بدون حساب.');
+                return;
+            }
+            if (id > 0 && jt > 0) {
+                anyFullPair = true;
+            }
+            if (id <= 0 && jt <= 0) {
+                anyEmptyBoth = true;
+            }
+            settings[k] = id;
+            journalTypeIds[k] = jt;
+        }
+        if (anyFullPair && anyEmptyBoth) {
+            if (!window.confirm(
+                'توجد بنود أخرى لم يُربط لها حساب ولا نوع يومية بعد.\nهل تريد حفظ الربط الحالي فقط؟\n(مناسب إن كان العمل يقتصر مثلاً على بيع نقدي أو أونلاين فقط.)'
+            )) {
+                return;
+            }
+        }
         postJSON('/admin/api/settings/gl-accounts.php', {
             action: 'save',
             settings: settings,

@@ -74,7 +74,26 @@ try {
         if (!array_key_exists($key, $settings)) {
             continue;
         }
-        $aid = (int)$settings[$key];
+        $aid = (int) $settings[$key];
+        $jtId = isset($jtMap[$key]) ? (int) $jtMap[$key] : 0;
+
+        if ($hasJtCol) {
+            if ($aid > 0 && $jtId <= 0) {
+                $pdo->rollBack();
+                json_response([
+                    'success' => false,
+                    'message' => 'لا يُحفظ حساب دون اختيار نوع يومية للبند: ' . $key,
+                ], 422);
+            }
+            if ($aid <= 0 && $jtId > 0) {
+                $pdo->rollBack();
+                json_response([
+                    'success' => false,
+                    'message' => 'لا يُحفظ نوع يومية دون ربط حساب للبند: ' . $key,
+                ], 422);
+            }
+        }
+
         if ($aid <= 0) {
             $del->execute([$key]);
             continue;
@@ -92,8 +111,7 @@ try {
                 'message' => 'يُقبل ربط القيود التلقائية مع حساب فرعي (ورقة ترحيل) فقط — ليس جذراً أو مجلداً: ' . $key,
             ], 422);
         }
-        $jtId = isset($jtMap[$key]) ? (int) $jtMap[$key] : 0;
-        if ($jtId > 0) {
+        if ($hasJtCol && $jtId > 0) {
             if (!$chkJt) {
                 $pdo->rollBack();
                 json_response(['success' => false, 'message' => 'جدول أنواع اليوميات غير متوفر'], 422);
