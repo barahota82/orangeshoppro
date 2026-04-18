@@ -1582,15 +1582,44 @@ body.coa-modal-open {
     background: #f1f5f9;
     font-weight: 700;
 }
-.gl-th-label { min-width: 9rem; }
-.gl-th-code { width: 7.5rem; }
-.gl-th-name { min-width: 10rem; }
+/* عمود البند بعرض المحتوى فقط؛ كود أوسع؛ نوع اليومية قائمة */
+.gl-th-label,
+.gl-td-label {
+    width: 1%;
+    max-width: max-content;
+    white-space: nowrap;
+}
+.gl-th-journal-type,
+.gl-td-journal-type {
+    min-width: 12rem;
+    width: 14rem;
+}
+.gl-th-code {
+    min-width: 11rem;
+    width: 28%;
+}
+.gl-th-name {
+    min-width: 10rem;
+    width: auto;
+}
 .gl-td-label {
     font-weight: 600;
     color: #374151;
 }
+.gl-sel-journal-type {
+    width: 100%;
+    max-width: 100%;
+    min-height: 34px;
+    padding: 5px 8px;
+    font-size: 13px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #fff;
+    box-sizing: border-box;
+}
 .gl-inp-code {
     width: 100%;
+    min-width: 9rem;
     min-height: 34px;
     padding: 6px 8px;
     font-size: 13px;

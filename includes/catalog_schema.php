@@ -356,12 +356,19 @@ function orange_catalog_ensure_schema(PDO $pdo): void
             'CREATE TABLE orange_gl_account_settings (
                 setting_key VARCHAR(64) NOT NULL,
                 account_id INT NOT NULL,
+                journal_type_id INT NULL,
                 updated_at DATETIME NULL DEFAULT NULL ON UPDATE current_timestamp(),
                 PRIMARY KEY (setting_key),
                 KEY idx_gl_set_account (account_id),
+                KEY idx_gl_set_jt (journal_type_id),
                 CONSTRAINT orange_fk_gl_setting_account FOREIGN KEY (account_id) REFERENCES accounts (id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'
         );
+    }
+    if (orange_table_exists($pdo, 'orange_gl_account_settings')
+        && !orange_table_has_column($pdo, 'orange_gl_account_settings', 'journal_type_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE orange_gl_account_settings ADD COLUMN journal_type_id INT NULL');
+        orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_gl_set_jt ON orange_gl_account_settings (journal_type_id)');
     }
 
     /*

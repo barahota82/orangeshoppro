@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
+require_once __DIR__ . '/../../includes/journal_types.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -17,12 +18,21 @@ foreach ($accountsRows as $a) {
 }
 
 $current = [];
+$currentJournalType = [];
 if (orange_table_exists($pdo, 'orange_gl_account_settings')) {
-    $rows = $pdo->query('SELECT setting_key, account_id FROM orange_gl_account_settings')->fetchAll(PDO::FETCH_ASSOC);
+    $hasJt = orange_table_has_column($pdo, 'orange_gl_account_settings', 'journal_type_id');
+    $sql = $hasJt
+        ? 'SELECT setting_key, account_id, journal_type_id FROM orange_gl_account_settings'
+        : 'SELECT setting_key, account_id FROM orange_gl_account_settings';
+    $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     foreach ($rows as $r) {
-        $current[(string) $r['setting_key']] = (int) $r['account_id'];
+        $k = (string) $r['setting_key'];
+        $current[$k] = (int) $r['account_id'];
+        $currentJournalType[$k] = $hasJt ? (int) ($r['journal_type_id'] ?? 0) : 0;
     }
 }
+
+$journalTypesList = orange_journal_types_list($pdo);
 
 $rowTitles = orange_gl_setting_row_short_labels();
 $keyHints = orange_gl_setting_key_labels();
@@ -38,13 +48,14 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
     <div class="card gl-auto-form-card">
         <h3 class="card-title">الحساب من الدليل المحاسبي</h3>
         <p class="muted gl-auto-hint">
-            أدخل <strong>كود الحساب</strong> فيُكمّل الاسم تلقائياً، أو اضغط <strong>البحث</strong> لعرض <strong>الحسابات الفرعية فقط</strong> واختر من القائمة.
+            اختر <strong>نوع اليومية</strong> (من أنواع اليوميات المعرّفة)، ثم أدخل <strong>كود الحساب</strong> فيُكمّل الاسم تلقائياً، أو اضغط <strong>البحث</strong> لعرض <strong>الحسابات الفرعية فقط</strong>.
         </p>
         <div class="table-wrap gl-settings-table-wrap">
             <table class="gl-settings-table">
                 <thead>
                     <tr>
                         <th class="gl-th-label">البند</th>
+                        <th class="gl-th-journal-type">نوع اليومية</th>
                         <th class="gl-th-code">كود الحساب</th>
                         <th class="gl-th-name">اسم الحساب</th>
                     </tr>
@@ -52,6 +63,7 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
                 <tbody>
                     <?php foreach ($orderedKeys as $key):
                         $aid = (int) ($current[$key] ?? 0);
+                        $jtId = (int) ($currentJournalType[$key] ?? 0);
                         $code = $aid > 0 ? (string) ($byId[$aid]['code'] ?? '') : '';
                         $name = $aid > 0 ? (string) ($byId[$aid]['name'] ?? '') : '';
                         $title = htmlspecialchars($keyHints[$key] ?? '', ENT_QUOTES, 'UTF-8');
@@ -59,6 +71,17 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
                         ?>
                     <tr data-gl-key="<?php echo htmlspecialchars($key, ENT_QUOTES, 'UTF-8'); ?>" data-account-id="<?php echo $aid; ?>" title="<?php echo $title; ?>">
                         <td class="gl-td-label"><?php echo $short; ?></td>
+                        <td class="gl-td-journal-type">
+                            <select class="gl-sel-journal-type" aria-label="نوع اليومية">
+                                <option value="0">— اختر —</option>
+                                <?php foreach ($journalTypesList as $jt):
+                                    $jid = (int) ($jt['id'] ?? 0);
+                                    $jlab = trim((string) ($jt['code'] ?? '')) . ' — ' . trim((string) ($jt['name_ar'] ?? ''));
+                                    ?>
+                                <option value="<?php echo $jid; ?>"<?php echo $jid === $jtId ? ' selected' : ''; ?>><?php echo htmlspecialchars($jlab, ENT_QUOTES, 'UTF-8'); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </td>
                         <td class="gl-td-code">
                             <input type="text" class="gl-inp-code" dir="ltr" autocomplete="off" value="<?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?>" aria-label="كود الحساب">
                         </td>
@@ -297,6 +320,7 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
             return;
         }
         var settings = {};
+        var journalTypeIds = {};
         document.querySelectorAll('tr[data-gl-key]').forEach(function (tr) {
             var k = tr.getAttribute('data-gl-key');
             if (!k) {
@@ -304,8 +328,14 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
             }
             var id = parseInt(tr.getAttribute('data-account-id'), 10) || 0;
             settings[k] = id;
+            var sel = tr.querySelector('.gl-sel-journal-type');
+            journalTypeIds[k] = sel ? parseInt(sel.value, 10) || 0 : 0;
         });
-        postJSON('/admin/api/settings/gl-accounts.php', { action: 'save', settings: settings }).then(function (res) {
+        postJSON('/admin/api/settings/gl-accounts.php', {
+            action: 'save',
+            settings: settings,
+            journal_type_ids: journalTypeIds
+        }).then(function (res) {
             alert(res.message || (res.success ? 'تم' : 'فشل'));
             if (res.success) {
                 location.reload();
