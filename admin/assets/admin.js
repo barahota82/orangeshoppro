@@ -103,3 +103,75 @@ function postJSON(url, payload) {
             message: e.message || 'تعذر الاتصال بالخادم'
         }));
 }
+
+(function initAdminSidebarSections() {
+    const STORAGE_KEY = 'orangeAdminNavCollapsed';
+
+    function readStored() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw == null || raw === '') {
+                return null;
+            }
+            const o = JSON.parse(raw);
+            return o !== null && typeof o === 'object' ? o : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function applySectionState(section, collapsed) {
+        const btn = section.querySelector('.admin-nav-section-toggle');
+        section.classList.toggle('admin-nav-section--collapsed', collapsed);
+        if (btn) {
+            btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        }
+    }
+
+    function run() {
+        const sections = document.querySelectorAll('.admin-nav-section');
+        if (!sections.length) {
+            return;
+        }
+
+        const stored = readStored();
+        const anyActiveOpen = document.querySelector('.admin-nav-section[data-default-open="1"]');
+
+        sections.forEach(function (section) {
+            const id = section.dataset.navSection;
+            const btn = section.querySelector('.admin-nav-section-toggle');
+            if (!id || !btn) {
+                return;
+            }
+
+            if (stored && Object.prototype.hasOwnProperty.call(stored, id)) {
+                applySectionState(section, stored[id] === true);
+            } else if (!stored && anyActiveOpen) {
+                applySectionState(section, section.getAttribute('data-default-open') !== '1');
+            } else {
+                applySectionState(section, false);
+            }
+
+            btn.addEventListener('click', function () {
+                const collapsed = !section.classList.contains('admin-nav-section--collapsed');
+                applySectionState(section, collapsed);
+                const next = {};
+                document.querySelectorAll('.admin-nav-section').forEach(function (s) {
+                    const sid = s.dataset.navSection;
+                    if (sid) {
+                        next[sid] = s.classList.contains('admin-nav-section--collapsed');
+                    }
+                });
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+                } catch (e) { /* */ }
+            });
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', run);
+    } else {
+        run();
+    }
+})();

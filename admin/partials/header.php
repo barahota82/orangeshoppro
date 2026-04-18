@@ -32,18 +32,61 @@ orange_catalog_ensure_schema($pdoNav);
         <nav>
             <?php
             /**
-             * تقسيم القائمة: ١ المحاسبة والذمم — ٢ المخازن والمبيعات والمشتريات — إعدادات عامة.
-             *
              * @param array{page:string,href:string,label:string,class:string,sub:bool} $nl
              */
-            $orangeRenderNavLink = static function (array $nl) use ($admin, $pdoNav, $orangeAdminPage): void {
+            $orangeNavLinkActive = static function (array $nl) use ($orangeAdminPage): bool {
+                return ($nl['page'] === 'stock' && ($orangeAdminPage === 'stock' || $orangeAdminPage === 'item_card'))
+                    || $orangeAdminPage === $nl['page'];
+            };
+
+            $orangeRenderNavLink = static function (array $nl) use ($admin, $pdoNav, $orangeAdminPage, $orangeNavLinkActive): void {
                 if (!orange_admin_nav_visible($admin, $pdoNav, $nl['page'])) {
                     return;
                 }
-                $active = ($nl['page'] === 'stock' && ($orangeAdminPage === 'stock' || $orangeAdminPage === 'item_card'))
-                    || $orangeAdminPage === $nl['page'];
+                $active = $orangeNavLinkActive($nl);
                 $cls = trim($nl['class'] . ($active ? ' is-active' : ''));
                 echo '<a href="' . htmlspecialchars($nl['href'], ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($nl['label'], ENT_QUOTES, 'UTF-8') . '</a>';
+            };
+
+            /** @param array<int, array{page:string,href:string,label:string,class:string,sub:bool}> $items */
+            $orangeRenderNavSection = static function (string $sectionId, string $title, array $items) use ($admin, $pdoNav, $orangeRenderNavLink, $orangeNavLinkActive): void {
+                $anyVisible = false;
+                foreach ($items as $nl) {
+                    if (orange_admin_nav_visible($admin, $pdoNav, $nl['page'])) {
+                        $anyVisible = true;
+                        break;
+                    }
+                }
+                if (!$anyVisible) {
+                    return;
+                }
+                $hasActive = false;
+                foreach ($items as $nl) {
+                    if (!orange_admin_nav_visible($admin, $pdoNav, $nl['page'])) {
+                        continue;
+                    }
+                    if ($orangeNavLinkActive($nl)) {
+                        $hasActive = true;
+                        break;
+                    }
+                }
+                $sid = htmlspecialchars($sectionId, ENT_QUOTES, 'UTF-8');
+                $panelId = 'nav-section-' . $sid;
+                $btnId = $panelId . '-btn';
+                $wrapClass = 'admin-nav-section';
+                if ($sectionId === 'settings') {
+                    $wrapClass .= ' admin-nav-section--muted';
+                }
+                echo '<div class="' . $wrapClass . '" data-nav-section="' . $sid . '" data-default-open="' . ($hasActive ? '1' : '0') . '">';
+                echo '<button type="button" class="admin-nav-section-toggle" id="' . $btnId . '" aria-expanded="true" aria-controls="' . $panelId . '">';
+                echo '<span class="admin-nav-section-toggle-label">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</span>';
+                echo '<span class="admin-nav-section-chevron" aria-hidden="true">▼</span>';
+                echo '</button>';
+                echo '<div class="admin-nav-section-panel" id="' . $panelId . '" role="region" aria-labelledby="' . $btnId . '">';
+                foreach ($items as $nl) {
+                    $orangeRenderNavLink($nl);
+                }
+                echo '</div></div>';
             };
 
             $navDashboard = [
@@ -95,20 +138,9 @@ orange_catalog_ensure_schema($pdoNav);
                 $orangeRenderNavLink($nl);
             }
 
-            echo '<div class="admin-nav-section-title" role="presentation">١ — المحاسبة والذمم</div>';
-            foreach ($navAccounting as $nl) {
-                $orangeRenderNavLink($nl);
-            }
-
-            echo '<div class="admin-nav-section-title" role="presentation">٢ — المخازن والمبيعات والمشتريات</div>';
-            foreach ($navOps as $nl) {
-                $orangeRenderNavLink($nl);
-            }
-
-            echo '<div class="admin-nav-section-title admin-nav-section-title--muted" role="presentation">إعدادات عامة</div>';
-            foreach ($navSettings as $nl) {
-                $orangeRenderNavLink($nl);
-            }
+            $orangeRenderNavSection('accounting', 'المحاسبة والذمم', $navAccounting);
+            $orangeRenderNavSection('ops', 'المخازن والمبيعات والمشتريات', $navOps);
+            $orangeRenderNavSection('settings', 'إعدادات عامة', $navSettings);
             ?>
             <a href="/admin/logout.php">تسجيل الخروج</a>
         </nav>

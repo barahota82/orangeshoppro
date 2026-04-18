@@ -57,24 +57,72 @@ a { text-decoration: none; color: inherit; }
     flex-direction: column;
     gap: 8px;
 }
-.admin-sidebar nav .admin-nav-section-title {
-    margin: 14px 0 4px;
-    padding: 6px 10px 2px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    text-transform: none;
-    color: #94a3b8;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-    pointer-events: none;
+.admin-sidebar nav .admin-nav-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
 }
-.admin-sidebar nav .admin-nav-section-title:first-of-type {
-    margin-top: 4px;
+.admin-sidebar nav .admin-nav-section:first-of-type {
+    margin-top: 14px;
 }
-.admin-sidebar nav .admin-nav-section-title--muted {
+.admin-sidebar nav .admin-nav-section--muted .admin-nav-section-toggle {
     opacity: 0.92;
     border-bottom-color: rgba(255, 255, 255, 0.08);
-    margin-top: 18px;
+}
+.admin-nav-section-toggle {
+    margin: 0;
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #94a3b8;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    text-align: start;
+    font-family: inherit;
+    border-radius: 0;
+    line-height: 1.3;
+}
+.admin-nav-section-toggle:hover {
+    color: #e2e8f0;
+    border-bottom-color: rgba(255, 255, 255, 0.2);
+}
+.admin-nav-section-toggle:focus {
+    outline: none;
+}
+.admin-nav-section-toggle:focus-visible {
+    outline: 2px solid #fdba74;
+    outline-offset: 2px;
+}
+.admin-nav-section-toggle-label {
+    flex: 1;
+    min-width: 0;
+}
+.admin-nav-section-chevron {
+    flex-shrink: 0;
+    font-size: 9px;
+    line-height: 1;
+    opacity: 0.85;
+    transition: transform 0.15s ease;
+}
+.admin-nav-section--collapsed .admin-nav-section-chevron {
+    transform: rotate(-90deg);
+}
+.admin-nav-section-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.admin-nav-section--collapsed .admin-nav-section-panel {
+    display: none;
 }
 .admin-sidebar nav a {
     padding: 10px 12px;
