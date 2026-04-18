@@ -504,20 +504,27 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         try {
             $cnt = (int) $pdo->query('SELECT COUNT(*) FROM journal_types')->fetchColumn();
             if ($cnt === 0) {
+                /* ترتيب التسجيل كجدول أنواع اليوميات (بادئات الصفوف الفارغة في المرجع اقتراح نظامي فريد). */
                 $defaults = [
                     ['OBV', 'سند رصيد افتتاحي', 'Opening balance voucher'],
-                    ['PIN', 'فاتورة مشتريات', 'Purchase invoice'],
-                    ['PDN', 'مردود مشتريات', 'Purchase return'],
-                    ['CSI', 'مبيعات نقدي', 'Cash sales invoice'],
-                    ['SIN', 'مبيعات أجل', 'Sales invoice (credit)'],
-                    ['CGC', 'تكلفة مبيعات نقدي', 'COGS — cash sales'],
-                    ['CGT', 'تكلفة مبيعات أجل', 'COGS — credit sales'],
-                    ['CSR', 'مردود مبيعات نقدي', 'Cash sales return'],
-                    ['CGR', 'تكلفة مردود مبيعات أجل', 'COGS — credit sales return'],
                     ['JE', 'سند قيد', 'Journal entry'],
                     ['RV', 'سند قبض', 'Receipt voucher'],
                     ['PV', 'سند صرف', 'Payment voucher'],
                     ['YEC', 'قيد الإقفال السنوي', 'Year-end closing entry'],
+                    ['PIN', 'فاتورة مشتريات', 'Purchase invoice'],
+                    ['PDN', 'مردود مشتريات', 'Purchase return'],
+                    ['CSI', 'مبيعات نقدي', 'Cash sales'],
+                    ['CGC', 'تكلفة مبيعات نقدي', 'Cost of cash sales'],
+                    ['SCR', 'مردود مبيعات نقدي', 'Cash sales return'],
+                    ['CSR', 'تكلفة مردود مبيعات نقدي', 'Cost of cash sales return'],
+                    ['SIN', 'مبيعات أجل', 'Credit sales'],
+                    ['CGT', 'تكلفة مبيعات أجل', 'Cost of credit sales'],
+                    ['SRR', 'مردود مبيعات أجل', 'Credit sales return'],
+                    ['CGR', 'تكلفة مردود مبيعات أجل', 'Cost of credit sales return'],
+                    ['OSI', 'مبيعات الاونلاين', 'Online sales'],
+                    ['CGO', 'تكلفة مبيعات الاونلاين', 'Cost of online sales'],
+                    ['OSR', 'مردود مبيعات الاونلاين', 'Online sales return'],
+                    ['COR', 'تكلفة مردود مبيعات الاونلاين', 'Cost of online sales return'],
                 ];
                 $ins = $pdo->prepare(
                     'INSERT INTO journal_types (code, name_ar, name_en, sort_order) VALUES (?,?,?,?)'
