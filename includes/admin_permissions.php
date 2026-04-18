@@ -162,7 +162,8 @@ function orange_admin_permissions_matrix(PDO $pdo, int $adminId): array
 
 function orange_admin_is_superuser(array $admin): bool
 {
-    return !empty($admin['is_superuser']);
+    // صراحةً 1 فقط (تجنباً لسلوك PHP empty مع قيم غير متوقعة من PDO)
+    return (int) ($admin['is_superuser'] ?? 0) === 1;
 }
 
 function orange_admin_may(array $admin, PDO $pdo, string $resource, string $action): bool
@@ -172,7 +173,8 @@ function orange_admin_may(array $admin, PDO $pdo, string $resource, string $acti
     }
     $matrix = orange_admin_permissions_matrix($pdo, (int) $admin['id']);
     if ($matrix === []) {
-        return false;
+        // بدون صفوف في admin_permissions: السماح بعرض الرئيسية فقط حتى يضيف المشرف العام صلاحيات
+        return $resource === 'dashboard' && $action === 'view';
     }
     $row = $matrix[$resource] ?? null;
     if (!$row) {

@@ -3,7 +3,7 @@ require_once __DIR__ . '/../config.php';
 orange_send_html_no_cache_headers();
 
 if (current_admin()) {
-    header('Location: /admin/index.php');
+    header('Location: /admin/index.php?page=dashboard');
     exit;
 }
 
@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_login'])) {
         $hash = isset($admin['password_hash']) ? (string) $admin['password_hash'] : '';
         if ($admin && $hash !== '' && password_verify($password, $hash)) {
             admin_login((int)$admin['id']);
-            header('Location: /admin/index.php');
+            header('Location: /admin/index.php?page=dashboard');
             exit;
         }
 
