@@ -22,12 +22,68 @@ function orange_gl_setting_key_labels(): array
         'accounts_payable' => 'ذمم الموردين — دائن شراء آجل',
         'sales_revenue_cash' => 'إيراد مبيعات نقدي — دائن عند تسليم طلب نقدي',
         'sales_revenue_credit' => 'إيراد مبيعات آجل — دائن عند تسليم طلب آجل',
-        'ar_cash' => 'عملاء نقدي (اختياري لاحقًا للتحصيل)',
+        'ar_cash' => 'عملاء نقدي — ذمم أو وسيط تحصيل للمبيعات النقدية (حسب هيكل الدليل)',
         'ar_credit' => 'عملاء آجل — مدين عند تسليم طلب آجل',
+        'sales_returns_cash' => 'مردود مبيعات نقدي — يُستخدم عند تسجيل مرتجعات المبيعات النقدية',
+        'sales_returns_credit' => 'مردود مبيعات آجل — يُستخدم عند تسجيل مرتجعات المبيعات الآجلة',
         'cogs_cash' => 'تكلفة مبيعات نقدي — مدين عند التسليم',
         'cogs_credit' => 'تكلفة مبيعات آجل — مدين عند التسليم',
+        'cogs_returns_cash' => 'تكلفة مردود مبيعات نقدي — دائن عند إثبات تكلفة المرتجع النقدي',
+        'cogs_returns_credit' => 'تكلفة مردود مبيعات آجل — دائن عند إثبات تكلفة المرتجع الآجل',
         'income_summary' => 'ملخص الدخل (مؤقت) — يُستخدم في قيود إقفال السنة فقط',
         'retained_earnings' => 'الأرباح المحتجزة / حقوق ملكية — يُنقل إليه صافي الدخل عند الإقفال',
+    ];
+}
+
+/**
+ * تسمية الصف القصيرة في جدول «حسابات القيود التلقائية» (عمود يمين).
+ *
+ * @return array<string, string>
+ */
+function orange_gl_setting_row_short_labels(): array
+{
+    return [
+        'cash' => 'الخزينة',
+        'inventory' => 'المخزن',
+        'ar_cash' => 'العملاء النقدي',
+        'ar_credit' => 'العملاء الاجل',
+        'sales_revenue_cash' => 'المبيعات النقدية',
+        'sales_revenue_credit' => 'المبيعات الآجل',
+        'sales_returns_cash' => 'مردود المبيعات النقدي',
+        'sales_returns_credit' => 'مردود المبيعات الاجل',
+        'cogs_cash' => 'تكلفة المبيعات النقدي',
+        'cogs_credit' => 'تكلفة المبيعات الآجلة',
+        'cogs_returns_cash' => 'تكلفة مردود المبيعات النقدي',
+        'cogs_returns_credit' => 'تكلفة مردود المبيعات الآجلة',
+        'accounts_payable' => 'ذمم الموردين',
+        'income_summary' => 'ملخص الدخل (إقفال)',
+        'retained_earnings' => 'الأرباح المحتجزة (إقفال)',
+    ];
+}
+
+/**
+ * ترتيب الصفوف في الشاشة (مطابق المرجع ثم باقي البنود).
+ *
+ * @return list<string>
+ */
+function orange_gl_settings_form_key_order(): array
+{
+    return [
+        'cash',
+        'inventory',
+        'ar_cash',
+        'ar_credit',
+        'sales_revenue_cash',
+        'sales_revenue_credit',
+        'sales_returns_cash',
+        'sales_returns_credit',
+        'cogs_cash',
+        'cogs_credit',
+        'cogs_returns_cash',
+        'cogs_returns_credit',
+        'accounts_payable',
+        'income_summary',
+        'retained_earnings',
     ];
 }
 
