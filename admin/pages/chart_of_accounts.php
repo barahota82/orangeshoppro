@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
@@ -59,7 +59,8 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
     <div class="coa-shell__title">
         <h1 class="coa-shell__heading">الدليل المحاسبي</h1>
         <p class="coa-shell__subtitle muted">
-            شجرة الحسابات مع اقتراح كود تلقائي. التصنيف يُستخدم في التقارير و
+            <strong>هيكل الجذور يحدده أنت هنا:</strong> أي حساب تضيفه مع اختيار «جذر (بدون أب)» يصبح في <strong>المستوى الأول</strong> — لا توجد قائمة جذور ثابتة من النظام.
+            اقتراح الكود والتصنيف يساعدانك؛ ثم اربط ما يلزم من
             <a href="/admin/index.php?page=gl_account_settings">حسابات القيود التلقائية</a>.
         </p>
     </div>
@@ -73,7 +74,7 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
             </div>
             <div class="coa-tree-scroll" id="coa_tree_root" role="tree">
                 <?php if ($tree === []): ?>
-                    <p class="muted">لا توجد حسابات — استخدم «إضافة» ثم احفظ حساباً جذرياً.</p>
+                    <p class="muted">لا توجد حسابات بعد. اضغط «إضافة»، اترك الأب على «جذر (بدون أب)»، ثم احفظ — هكذا تُنشئ أول مستوى في الشجرة بنفسك.</p>
                 <?php else: ?>
                     <?php orange_render_coa_tree($tree, $firstId, 0); ?>
                 <?php endif; ?>
@@ -113,7 +114,7 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
                     <div class="coa-field coa-field--span2">
                         <label for="coa_parent">الحساب الأب (اختيار)</label>
                         <select id="coa_parent">
-                            <option value="" data-code="">— جذر (بدون أب) —</option>
+                            <option value="" data-code="">— مستوى أول: جذر (بدون أب) — أنت تُنشئ الجذر —</option>
                             <?php
                             usort($flat, static function ($a, $b) use ($depths): int {
                                 $da = $depths[(int) $a['id']] ?? 0;
@@ -134,6 +135,7 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
                             }
                             ?>
                         </select>
+                        <p class="coa-root-hint muted">لإضافة حساب في <strong>أعلى الشجرة</strong> اختر هذا الخيار. لإضافة فرع تحت حساب موجود، اختر ذلك الحساب من القائمة.</p>
                     </div>
 
                     <div class="coa-field coa-field--span2">

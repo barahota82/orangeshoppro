@@ -897,6 +897,11 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
 .coa-field--span2 {
     grid-column: 1 / -1;
 }
+.coa-root-hint {
+    margin: 8px 0 0;
+    font-size: 13px;
+    line-height: 1.45;
+}
 .coa-field__label {
     display: block;
     font-size: 13px;
