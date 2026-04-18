@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../../../config.php';
 require_admin_api();
 require_once __DIR__ . '/../lib/translate_names_lib.php';

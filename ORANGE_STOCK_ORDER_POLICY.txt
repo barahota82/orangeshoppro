@@ -1,4 +1,4 @@
-﻿Orange - Stock / Orders / Purchases policy (implementation reference)
+Orange - Stock / Orders / Purchases policy (implementation reference)
 
 1) Stock unit = VARIANT (color x size). Each variant has its own qty.
    Cart, orders, purchases must reference variant_id.
