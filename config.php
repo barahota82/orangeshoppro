@@ -881,15 +881,51 @@ function json_response($data, int $httpCode = 200): void {
 }
 
 /**
- * تسجيل نشاط إداري (اختياري). لا يُعطّل العملية إن لم يُربط بجدول لاحقاً.
+ * تسجيل نشاط إداري في الجدول orange_admin_audit_log (يُنشأ تلقائياً مع المخطط).
+ * لا يرمي استثناءً للأعلى حتى لا تتعطل عمليات الـ API.
  *
  * @param int|string|null $entityId
  */
 function audit_log(string $action, string $message, string $entityTable = '', $entityId = null): void
 {
-    // يمكن لاحقاً: INSERT في جدول سجل. تجنّب fatal إن الدالة غير مُعرّفة على نسخ قديمة.
     if (function_exists('error_log') && filter_var(getenv('ORANGE_AUDIT_LOG') ?: '', FILTER_VALIDATE_BOOLEAN)) {
         error_log('[orange audit] ' . $action . ' | ' . $message . ' | ' . $entityTable . ' | ' . (string) $entityId);
+    }
+    try {
+        if (!function_exists('db')) {
+            return;
+        }
+        $pdo = db();
+        require_once __DIR__ . '/includes/catalog_schema.php';
+        orange_catalog_ensure_schema($pdo);
+        if (!orange_table_exists($pdo, 'orange_admin_audit_log')) {
+            return;
+        }
+        $adminId = null;
+        if (function_exists('current_admin')) {
+            $c = current_admin();
+            if ($c && !empty($c['id'])) {
+                $adminId = (int) $c['id'];
+                if ($adminId <= 0) {
+                    $adminId = null;
+                }
+            }
+        }
+        $eid = $entityId === null || $entityId === '' ? '' : (string) $entityId;
+        $st = $pdo->prepare(
+            'INSERT INTO orange_admin_audit_log (admin_id, action, message, entity_table, entity_id) VALUES (?, ?, ?, ?, ?)'
+        );
+        $st->execute([
+            $adminId,
+            $action,
+            $message,
+            $entityTable,
+            $eid,
+        ]);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange audit_log] ' . $e->getMessage());
+        }
     }
 }
 

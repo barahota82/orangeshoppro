@@ -570,6 +570,24 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_purchase_items_variant ON purchase_items (variant_id)');
     }
 
+    if (!orange_table_exists($pdo, 'orange_admin_audit_log')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE orange_admin_audit_log (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                admin_id INT NULL,
+                action VARCHAR(80) NOT NULL,
+                message TEXT NOT NULL,
+                entity_table VARCHAR(80) NOT NULL DEFAULT \'\',
+                entity_id VARCHAR(64) NOT NULL DEFAULT \'\',
+                PRIMARY KEY (id),
+                KEY idx_orange_audit_created (created_at),
+                KEY idx_orange_audit_admin (admin_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
     $done = true;
 }
 
