@@ -243,16 +243,18 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
             return;
         }
         function syncD() {
-            var v = parseFloat(dEl.value || '0');
-            if (v > 0) {
-                cEl.value = '';
+            var raw = String(dEl.value || '').trim().replace(',', '.');
+            var v = parseFloat(raw || '0');
+            if (raw !== '' && !isNaN(v) && v > 0) {
+                cEl.value = '0';
             }
             obRecalc();
         }
         function syncC() {
-            var v = parseFloat(cEl.value || '0');
-            if (v > 0) {
-                dEl.value = '';
+            var raw = String(cEl.value || '').trim().replace(',', '.');
+            var v = parseFloat(raw || '0');
+            if (raw !== '' && !isNaN(v) && v > 0) {
+                dEl.value = '0';
             }
             obRecalc();
         }
@@ -324,8 +326,8 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
             '<button type="button" class="gl-search-btn ob-search-btn" title="بحث — حسابات فرعية فقط" aria-label="بحث">🔍</button>' +
             '<input type="text" class="gl-inp-name ob-inp-name" readonly tabindex="-1" value="" aria-label="اسم الحساب">' +
             '</div></td>' +
-            '<td><input type="number" class="ob-d" step="0.0001" min="0" value="" aria-label="مدين"></td>' +
-            '<td><input type="number" class="ob-c" step="0.0001" min="0" value="" aria-label="دائن"></td>' +
+            '<td><input type="number" class="ob-d admin-inp-money" step="any" min="0" value="" inputmode="decimal" lang="en" dir="ltr" aria-label="مدين" placeholder="0"></td>' +
+            '<td><input type="number" class="ob-c admin-inp-money" step="any" min="0" value="" inputmode="decimal" lang="en" dir="ltr" aria-label="دائن" placeholder="0"></td>' +
             '<td><button type="button" class="btn-secondary ob-row-del">حذف</button></td>';
         tb.appendChild(tr);
         tr.querySelector('.ob-row-del').addEventListener('click', function () {
@@ -349,14 +351,14 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
                     d.value = String(deb);
                 }
                 if (c) {
-                    c.value = '';
+                    c.value = '0';
                 }
             } else if (cre > 0) {
                 if (c) {
                     c.value = String(cre);
                 }
                 if (d) {
-                    d.value = '';
+                    d.value = '0';
                 }
             }
         }
@@ -370,8 +372,8 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
         var sd = 0;
         var sc = 0;
         document.querySelectorAll('#ob_body tr').forEach(function (tr) {
-            sd += parseFloat((tr.querySelector('.ob-d') || {}).value || '0');
-            sc += parseFloat((tr.querySelector('.ob-c') || {}).value || '0');
+            sd += parseFloat(String((tr.querySelector('.ob-d') || {}).value || '0').replace(',', '.'));
+            sc += parseFloat(String((tr.querySelector('.ob-c') || {}).value || '0').replace(',', '.'));
         });
         el.textContent = 'مجموع المدين: ' + sd.toFixed(4) + ' — مجموع الدائن: ' + sc.toFixed(4);
     };
@@ -383,8 +385,8 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
         var lines = [];
         document.querySelectorAll('#ob_body tr').forEach(function (tr) {
             var acc = parseInt(tr.getAttribute('data-account-id'), 10) || 0;
-            var deb = parseFloat((tr.querySelector('.ob-d') || {}).value || '0');
-            var cre = parseFloat((tr.querySelector('.ob-c') || {}).value || '0');
+            var deb = parseFloat(String((tr.querySelector('.ob-d') || {}).value || '0').replace(',', '.'));
+            var cre = parseFloat(String((tr.querySelector('.ob-c') || {}).value || '0').replace(',', '.'));
             if (deb > 0 && cre > 0) {
                 cre = 0;
             }

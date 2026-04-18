@@ -137,7 +137,7 @@ function purAddLine() {
         '<div><label>الصنف</label><select class="pur-p" onchange="purLineChanged(this)">' + opts + '</select></div>' +
         '<div><label>المتغير (لون / مقاس)</label><select class="pur-v"></select></div>' +
         '<div><label>الكمية</label><input type="number" class="pur-q" min="1" value="1"></div>' +
-        '<div><label>تكلفة الوحدة</label><input type="number" class="pur-c" min="0" step="0.01" value="0"></div>';
+        '<div><label>تكلفة الوحدة</label><input type="number" class="pur-c admin-inp-money" min="0" step="any" value="0" inputmode="decimal" lang="en" dir="ltr"></div>';
     box.appendChild(wrap);
     var sel = wrap.querySelector('.pur-p');
     if (sel) purLineChanged(sel);

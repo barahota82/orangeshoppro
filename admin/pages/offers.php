@@ -26,7 +26,7 @@ $offers = $pdo->query("
         </div>
         <div>
             <label>قيمة الخصم</label>
-            <input type="number" id="discount" step="0.01">
+            <input type="number" id="discount" class="admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr">
         </div>
     </div>
     <div class="actions" style="margin-top:14px;">

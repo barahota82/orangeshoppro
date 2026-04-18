@@ -1661,6 +1661,19 @@ body.ob-pick-open {
     min-width: 14rem;
 }
 
+/*
+ * مبالغ مالية: كسور حرة (step=any)، بدون أسهم spinner — يُفضّل lang="en" وinputmode="decimal" في HTML.
+ */
+input.admin-inp-money[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+input.admin-inp-money[type='number']::-webkit-outer-spin-button,
+input.admin-inp-money[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
 @media print {
     body * {
         visibility: hidden;

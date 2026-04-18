@@ -85,7 +85,7 @@ if ($stmtPartyJson === false) {
             </div>
             <div>
                 <label for="rec_amt">المبلغ</label>
-                <input type="number" id="rec_amt" step="0.01" min="0.01" value="">
+                <input type="number" id="rec_amt" class="admin-inp-money" step="any" min="0.01" value="" inputmode="decimal" lang="en" dir="ltr">
             </div>
             <div>
                 <label for="rec_date">التاريخ</label>
@@ -132,7 +132,7 @@ if ($stmtPartyJson === false) {
             </div>
             <div>
                 <label for="pay_amt">المبلغ</label>
-                <input type="number" id="pay_amt" step="0.01" min="0.01" value="">
+                <input type="number" id="pay_amt" class="admin-inp-money" step="any" min="0.01" value="" inputmode="decimal" lang="en" dir="ltr">
             </div>
             <div>
                 <label for="pay_date">التاريخ</label>
@@ -245,7 +245,7 @@ if ($stmtPartyJson === false) {
         </div>
         <div>
             <label for="new_c_limit">حد ائتمان (اختياري)</label>
-            <input type="number" id="new_c_limit" step="0.01" min="0" placeholder="فارغ = بلا حد">
+            <input type="number" id="new_c_limit" class="admin-inp-money" step="any" min="0" placeholder="فارغ = بلا حد" inputmode="decimal" lang="en" dir="ltr">
         </div>
     </div>
     <div class="actions" style="margin-top:10px;">
@@ -463,7 +463,7 @@ function loadAllocReceipt() {
             var tr = document.createElement('tr');
             tr.setAttribute('data-ref-type', it.ref_type);
             tr.setAttribute('data-ref-id', String(it.ref_id));
-            tr.innerHTML = '<td>' + escapeHtml(it.label) + '</td><td>' + Number(it.open).toFixed(3) + '</td><td><input type="number" class="alloc-amt" step="0.01" min="0" placeholder="0"></td>';
+            tr.innerHTML = '<td>' + escapeHtml(it.label) + '</td><td>' + Number(it.open).toFixed(3) + '</td><td><input type="number" class="alloc-amt admin-inp-money" step="any" min="0" placeholder="0" inputmode="decimal" lang="en" dir="ltr"></td>';
             tb.appendChild(tr);
         });
         if (!items.length) {
@@ -490,7 +490,7 @@ function loadAllocPay() {
             var tr = document.createElement('tr');
             tr.setAttribute('data-ref-type', it.ref_type);
             tr.setAttribute('data-ref-id', String(it.ref_id));
-            tr.innerHTML = '<td>' + escapeHtml(it.label) + '</td><td>' + Number(it.open).toFixed(3) + '</td><td><input type="number" class="alloc-amt" step="0.01" min="0" placeholder="0"></td>';
+            tr.innerHTML = '<td>' + escapeHtml(it.label) + '</td><td>' + Number(it.open).toFixed(3) + '</td><td><input type="number" class="alloc-amt admin-inp-money" step="any" min="0" placeholder="0" inputmode="decimal" lang="en" dir="ltr"></td>';
             tb.appendChild(tr);
         });
         if (!items.length) {

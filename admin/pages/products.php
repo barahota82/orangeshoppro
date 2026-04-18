@@ -244,11 +244,11 @@ foreach ($categories as $cat) {
             </div>
             <div>
                 <label>السعر</label>
-                <input type="number" id="price" step="0.01" required>
+                <input type="number" id="price" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr">
             </div>
             <div>
                 <label>التكلفة</label>
-                <input type="number" id="cost" step="0.01" required>
+                <input type="number" id="cost" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr">
             </div>
             <div style="grid-column:1/-1;">
                 <label>الوصف (عربي)</label>

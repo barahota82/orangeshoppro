@@ -176,25 +176,52 @@ foreach ($accounts as $a) {
 <script>
 var JV_ACCT_OPTS = <?php echo json_encode($acctOpts, JSON_UNESCAPED_UNICODE); ?>;
 
+function jvWireDebitCredit(tr) {
+    var dEl = tr.querySelector('.jv-d');
+    var cEl = tr.querySelector('.jv-c');
+    if (!dEl || !cEl) {
+        return;
+    }
+    function syncD() {
+        var raw = String(dEl.value || '').trim().replace(',', '.');
+        var v = parseFloat(raw || '0');
+        if (raw !== '' && !isNaN(v) && v > 0) {
+            cEl.value = '0';
+        }
+        jvRecalc();
+    }
+    function syncC() {
+        var raw = String(cEl.value || '').trim().replace(',', '.');
+        var v = parseFloat(raw || '0');
+        if (raw !== '' && !isNaN(v) && v > 0) {
+            dEl.value = '0';
+        }
+        jvRecalc();
+    }
+    dEl.addEventListener('input', syncD);
+    cEl.addEventListener('input', syncC);
+    dEl.addEventListener('change', syncD);
+    cEl.addEventListener('change', syncC);
+}
+
 function jvAddRow() {
     var tb = document.getElementById('jv_lines_body');
     var tr = document.createElement('tr');
     tr.innerHTML = '<td><select class="jv-acc">' + JV_ACCT_OPTS + '</select></td>' +
-        '<td><input type="number" class="jv-d" step="0.0001" min="0" value="" placeholder="0"></td>' +
-        '<td><input type="number" class="jv-c" step="0.0001" min="0" value="" placeholder="0"></td>' +
+        '<td><input type="number" class="jv-d admin-inp-money" step="any" min="0" value="" placeholder="0" inputmode="decimal" lang="en" dir="ltr"></td>' +
+        '<td><input type="number" class="jv-c admin-inp-money" step="any" min="0" value="" placeholder="0" inputmode="decimal" lang="en" dir="ltr"></td>' +
         '<td><input type="text" class="jv-m" value="" placeholder=""></td>' +
         '<td><button type="button" class="btn-secondary" onclick="this.closest(\'tr\').remove();jvRecalc();">حذف</button></td>';
     tb.appendChild(tr);
-    tr.querySelector('.jv-d').addEventListener('input', jvRecalc);
-    tr.querySelector('.jv-c').addEventListener('input', jvRecalc);
+    jvWireDebitCredit(tr);
     jvRecalc();
 }
 
 function jvRecalc() {
     var sd = 0, sc = 0;
     document.querySelectorAll('#jv_lines_body tr').forEach(function (tr) {
-        var d = parseFloat(tr.querySelector('.jv-d').value || '0');
-        var c = parseFloat(tr.querySelector('.jv-c').value || '0');
+        var d = parseFloat(String(tr.querySelector('.jv-d').value || '0').replace(',', '.'));
+        var c = parseFloat(String(tr.querySelector('.jv-c').value || '0').replace(',', '.'));
         sd += d; sc += c;
     });
     document.getElementById('jv_balance_hint').textContent = 'مجموع المدين: ' + sd.toFixed(4) + ' — مجموع الدائن: ' + sc.toFixed(4);
@@ -211,10 +238,13 @@ function jvSubmit() {
     var lines = [];
     document.querySelectorAll('#jv_lines_body tr').forEach(function (tr) {
         var acc = parseInt(tr.querySelector('.jv-acc').value, 10) || 0;
-        var deb = parseFloat(tr.querySelector('.jv-d').value || '0');
-        var cre = parseFloat(tr.querySelector('.jv-c').value || '0');
+        var deb = parseFloat(String(tr.querySelector('.jv-d').value || '0').replace(',', '.'));
+        var cre = parseFloat(String(tr.querySelector('.jv-c').value || '0').replace(',', '.'));
         var memo = tr.querySelector('.jv-m').value.trim();
         if (acc <= 0) return;
+        if (deb > 0 && cre > 0) {
+            cre = 0;
+        }
         if (deb <= 0 && cre <= 0) return;
         lines.push({ account_id: acc, debit: deb, credit: cre, memo: memo });
     });
