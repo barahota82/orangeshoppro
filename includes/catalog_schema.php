@@ -487,6 +487,52 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         );
     }
 
+    if (!orange_table_exists($pdo, 'journal_types')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE journal_types (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                code VARCHAR(32) NOT NULL,
+                name_ar VARCHAR(255) NOT NULL DEFAULT \'\',
+                name_en VARCHAR(255) NOT NULL DEFAULT \'\',
+                sort_order INT NOT NULL DEFAULT 0,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NULL,
+                UNIQUE KEY uq_journal_types_code (code)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+        try {
+            $cnt = (int) $pdo->query('SELECT COUNT(*) FROM journal_types')->fetchColumn();
+            if ($cnt === 0) {
+                $defaults = [
+                    ['OBV', 'سند رصيد افتتاحي', 'Opening balance voucher'],
+                    ['PIN', 'فاتورة مشتريات', 'Purchase invoice'],
+                    ['PDN', 'مردود مشتريات', 'Purchase return'],
+                    ['CSI', 'مبيعات نقدي', 'Cash sales invoice'],
+                    ['SIN', 'مبيعات أجل', 'Sales invoice (credit)'],
+                    ['CGC', 'تكلفة مبيعات نقدي', 'COGS — cash sales'],
+                    ['CGT', 'تكلفة مبيعات أجل', 'COGS — credit sales'],
+                    ['CSR', 'مردود مبيعات نقدي', 'Cash sales return'],
+                    ['CGR', 'تكلفة مردود مبيعات أجل', 'COGS — credit sales return'],
+                    ['JE', 'سند قيد', 'Journal entry'],
+                    ['RV', 'سند قبض', 'Receipt voucher'],
+                    ['PV', 'سند صرف', 'Payment voucher'],
+                    ['YEC', 'قيد الإقفال السنوي', 'Year-end closing entry'],
+                ];
+                $ins = $pdo->prepare(
+                    'INSERT INTO journal_types (code, name_ar, name_en, sort_order) VALUES (?,?,?,?)'
+                );
+                $ord = 1;
+                foreach ($defaults as $row) {
+                    $ins->execute([$row[0], $row[1], $row[2], $ord]);
+                    ++$ord;
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('[orange] journal_types seed: ' . $e->getMessage());
+        }
+    }
+
     static $journalLegacyMigrated = false;
     if (
         !$journalLegacyMigrated

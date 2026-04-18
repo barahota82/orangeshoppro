@@ -1443,6 +1443,27 @@ body.coa-modal-open {
     width: 3.5rem;
     text-align: center;
 }
+.fy-col-jt-code {
+    width: 7.5rem;
+}
+.fy-col-jt-name-ar {
+    min-width: 10rem;
+}
+.fy-col-jt-name-en {
+    min-width: 10rem;
+}
+.fy-years-table .jt-inp-code,
+.fy-years-table .jt-inp-name-ar,
+.fy-years-table .jt-inp-name-en {
+    width: 100%;
+    min-height: 34px;
+    padding: 4px 6px;
+    font-size: 13px;
+    box-sizing: border-box;
+}
+.fy-years-table .jt-inp-code {
+    font-variant-numeric: tabular-nums;
+}
 .fy-col-year {
     width: 6.25rem;
 }
