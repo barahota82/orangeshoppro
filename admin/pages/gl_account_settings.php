@@ -3,18 +3,16 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
-require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
-$flat = orange_accounts_flat($pdo);
-$tree = orange_accounts_build_tree($flat);
-$firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
-
+$accountsRows = $pdo->query(
+    'SELECT id, name, code FROM accounts ORDER BY COALESCE(code, \'\'), name ASC'
+)->fetchAll(PDO::FETCH_ASSOC);
 $byId = [];
-foreach ($flat as $a) {
+foreach ($accountsRows as $a) {
     $byId[(int) $a['id']] = $a;
 }
 
@@ -37,66 +35,47 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
 <div class="gl-auto-page" dir="rtl">
     <h1 class="gl-auto-page__title">حسابات القيود التلقائية</h1>
 
-    <div class="gl-auto-shell__body" dir="ltr">
-        <aside class="coa-shell__tree card coa-tree-card gl-auto-tree">
-            <h3 class="card-title coa-tree-card__title">شجرة الحسابات</h3>
-            <div class="coa-tree-search">
-                <input type="search" id="gl_coa_tree_search" class="coa-tree-search__input" placeholder="بحث في الشجرة…" autocomplete="off" dir="rtl">
-            </div>
-            <a class="btn-secondary gl-auto-link-coa" href="/admin/index.php?page=chart_of_accounts">فتح الدليل المحاسبي</a>
-            <div class="coa-tree-scroll" id="gl_coa_tree_root" role="tree">
-                <?php if ($tree === []): ?>
-                    <p class="muted">لا توجد حسابات. عرّف الدليل أولاً.</p>
-                <?php else: ?>
-                    <?php orange_render_coa_tree($tree, 0, $flat, 0); ?>
-                <?php endif; ?>
-            </div>
-        </aside>
-
-        <div class="gl-auto-main" dir="rtl">
-            <div class="card gl-auto-form-card">
-                <h3 class="card-title">الحساب من الدليل المحاسبي</h3>
-                <p class="muted gl-auto-hint">
-                    أدخل <strong>كود الحساب</strong> فيُكمّل الاسم تلقائياً، أو اضغط <strong>البحث</strong> لعرض <strong>الحسابات الفرعية فقط</strong> واختر من القائمة.
-                </p>
-                <div class="table-wrap gl-settings-table-wrap">
-                    <table class="gl-settings-table">
-                        <thead>
-                            <tr>
-                                <th class="gl-th-label">البند</th>
-                                <th class="gl-th-code">كود الحساب</th>
-                                <th class="gl-th-name">اسم الحساب</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($orderedKeys as $key):
-                                $aid = (int) ($current[$key] ?? 0);
-                                $code = $aid > 0 ? (string) ($byId[$aid]['code'] ?? '') : '';
-                                $name = $aid > 0 ? (string) ($byId[$aid]['name'] ?? '') : '';
-                                $title = htmlspecialchars($keyHints[$key] ?? '', ENT_QUOTES, 'UTF-8');
-                                $short = htmlspecialchars($rowTitles[$key] ?? $key, ENT_QUOTES, 'UTF-8');
-                                ?>
-                            <tr data-gl-key="<?php echo htmlspecialchars($key, ENT_QUOTES, 'UTF-8'); ?>" data-account-id="<?php echo $aid; ?>" title="<?php echo $title; ?>">
-                                <td class="gl-td-label"><?php echo $short; ?></td>
-                                <td class="gl-td-code">
-                                    <input type="text" class="gl-inp-code" dir="ltr" autocomplete="off" value="<?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?>" aria-label="كود الحساب">
-                                </td>
-                                <td class="gl-td-name">
-                                    <div class="gl-name-row">
-                                        <button type="button" class="gl-search-btn" title="بحث — حسابات فرعية فقط" aria-label="بحث">🔍</button>
-                                        <input type="text" class="gl-inp-name" readonly tabindex="-1" value="<?php echo htmlspecialchars($name, ENT_QUOTES, 'UTF-8'); ?>" aria-label="اسم الحساب">
-                                    </div>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="gl-auto-actions">
-                    <button type="button" id="gl_btn_save">حفظ الربط</button>
-                    <a class="btn-secondary" href="/admin/index.php?page=chart_of_accounts">الدليل المحاسبي</a>
-                </div>
-            </div>
+    <div class="card gl-auto-form-card">
+        <h3 class="card-title">الحساب من الدليل المحاسبي</h3>
+        <p class="muted gl-auto-hint">
+            أدخل <strong>كود الحساب</strong> فيُكمّل الاسم تلقائياً، أو اضغط <strong>البحث</strong> لعرض <strong>الحسابات الفرعية فقط</strong> واختر من القائمة.
+        </p>
+        <div class="table-wrap gl-settings-table-wrap">
+            <table class="gl-settings-table">
+                <thead>
+                    <tr>
+                        <th class="gl-th-label">البند</th>
+                        <th class="gl-th-code">كود الحساب</th>
+                        <th class="gl-th-name">اسم الحساب</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($orderedKeys as $key):
+                        $aid = (int) ($current[$key] ?? 0);
+                        $code = $aid > 0 ? (string) ($byId[$aid]['code'] ?? '') : '';
+                        $name = $aid > 0 ? (string) ($byId[$aid]['name'] ?? '') : '';
+                        $title = htmlspecialchars($keyHints[$key] ?? '', ENT_QUOTES, 'UTF-8');
+                        $short = htmlspecialchars($rowTitles[$key] ?? $key, ENT_QUOTES, 'UTF-8');
+                        ?>
+                    <tr data-gl-key="<?php echo htmlspecialchars($key, ENT_QUOTES, 'UTF-8'); ?>" data-account-id="<?php echo $aid; ?>" title="<?php echo $title; ?>">
+                        <td class="gl-td-label"><?php echo $short; ?></td>
+                        <td class="gl-td-code">
+                            <input type="text" class="gl-inp-code" dir="ltr" autocomplete="off" value="<?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?>" aria-label="كود الحساب">
+                        </td>
+                        <td class="gl-td-name">
+                            <div class="gl-name-row">
+                                <button type="button" class="gl-search-btn" title="بحث — حسابات فرعية فقط" aria-label="بحث">🔍</button>
+                                <input type="text" class="gl-inp-name" readonly tabindex="-1" value="<?php echo htmlspecialchars($name, ENT_QUOTES, 'UTF-8'); ?>" aria-label="اسم الحساب">
+                            </div>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <div class="gl-auto-actions">
+            <button type="button" id="gl_btn_save">حفظ الربط</button>
+            <a class="btn-secondary" href="/admin/index.php?page=chart_of_accounts">الدليل المحاسبي</a>
         </div>
     </div>
 </div>
@@ -270,42 +249,5 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
             }
         }).catch(function (e) { alert(e.message || String(e)); });
     });
-
-    /* بحث الشجرة (نفس منطق الدليل) */
-    var treeEl = document.getElementById('gl_coa_tree_root');
-    var searchInp = document.getElementById('gl_coa_tree_search');
-    if (treeEl && searchInp) {
-        function liHasMatchingDescendant(li, q) {
-            var lab = li.querySelector(':scope > .coa-tree-label');
-            if (lab && lab.textContent.toLowerCase().indexOf(q) >= 0) {
-                return true;
-            }
-            var ul = li.querySelector(':scope > .coa-tree-list');
-            if (!ul) {
-                return false;
-            }
-            var children = ul.querySelectorAll(':scope > .coa-tree-node');
-            for (var i = 0; i < children.length; i++) {
-                if (liHasMatchingDescendant(children[i], q)) {
-                    return true;
-                }
-            }
-            return false;
-        }
-        function applyTreeFilter(raw) {
-            var q = (raw || '').trim().toLowerCase();
-            var nodes = treeEl.querySelectorAll('.coa-tree-node');
-            if (!q) {
-                nodes.forEach(function (li) { li.style.display = ''; });
-                return;
-            }
-            nodes.forEach(function (li) {
-                li.style.display = liHasMatchingDescendant(li, q) ? '' : 'none';
-            });
-        }
-        searchInp.addEventListener('input', function () {
-            applyTreeFilter(this.value);
-        });
-    }
 })();
 </script>
