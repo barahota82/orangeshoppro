@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
@@ -325,6 +325,57 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function getActiveCoaTreeId() {
+        var a = treeEl.querySelector('.coa-tree-node.is-active');
+        return a ? parseInt(a.dataset.id, 10) || 0 : 0;
+    }
+
+    function refreshCoaMainTree() {
+        var keepId = getActiveCoaTreeId();
+        return fetch('/admin/api/accounts/tree-html.php', { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.success) {
+                    return Promise.reject(new Error(data.message || 'تعذر تحديث الشجرة'));
+                }
+                treeEl.innerHTML = data.html || '';
+                bindTreeClicks(treeEl);
+                var q = document.getElementById('coa_tree_search').value;
+                applyCoaTreeFilter(q);
+                var pick = keepId > 0 ? treeEl.querySelector('.coa-tree-node[data-id="' + keepId + '"]') : null;
+                if (!pick) {
+                    pick = treeEl.querySelector('.coa-tree-node');
+                }
+                if (pick) {
+                    treeEl.querySelectorAll('.coa-tree-node.is-active').forEach(function (x) { x.classList.remove('is-active'); });
+                    pick.classList.add('is-active');
+                    fillForm(pick);
+                } else {
+                    document.getElementById('coa_id').value = '0';
+                    document.getElementById('coa_code').value = '';
+                    document.getElementById('coa_name').value = '';
+                    if (hasNameEn) {
+                        document.getElementById('coa_name_en').value = '';
+                    }
+                    setStateRadios(false, false);
+                    document.getElementById('coa_parent_id').value = '';
+                    document.getElementById('coa_parent_code').value = '';
+                    var lev = document.getElementById('coa_level');
+                    if (lev) {
+                        lev.textContent = '—';
+                    }
+                    document.getElementById('coa_type_display').textContent = '—';
+                    document.getElementById('coa_category_display').textContent = '—';
+                    if (hasNb) {
+                        document.getElementById('coa_normal_balance').value = 'debit';
+                    }
+                    updateParentFieldsFromContext();
+                    updatePreviewFromParent();
+                    updateStatementLink();
+                }
+            });
+    }
+
     function liHasMatchingDescendant(li, q) {
         var lab = li.querySelector(':scope > .coa-tree-label');
         if (lab && lab.textContent.toLowerCase().indexOf(q) >= 0) {
@@ -548,10 +599,13 @@ document.addEventListener('DOMContentLoaded', function () {
                             alert(r.message || 'فشل الحذف');
                             return;
                         }
+                        var msg = r.message || 'تم الحذف';
                         loadSetupRoots().then(function () {
-                            alert(r.message || 'تم الحذف');
+                            return refreshCoaMainTree();
+                        }).then(function () {
+                            alert(msg);
                         }).catch(function (e) {
-                            alert((r.message || 'تم الحذف') + '\n— تعذر تحديث الجدول: ' + (e.message || e));
+                            alert(msg + '\n— تعذر تحديث العرض: ' + (e.message || e));
                         });
                     }).catch(function (e) { alert(e.message || String(e)); });
                 });
@@ -608,10 +662,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 alert(r.message || 'فشل الحفظ');
                 return;
             }
+            var msg = r.message || 'تم الحفظ';
             loadSetupRoots().then(function () {
-                alert(r.message || 'تم الحفظ');
+                return refreshCoaMainTree();
+            }).then(function () {
+                alert(msg);
             }).catch(function (e) {
-                alert((r.message || 'تم الحفظ') + '\n— تعذر تحديث الجدول: ' + (e.message || e));
+                alert(msg + '\n— تعذر تحديث العرض: ' + (e.message || e));
             });
         }).catch(function (e) { alert(e.message || String(e)); });
     });
