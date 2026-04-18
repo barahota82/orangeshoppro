@@ -1405,11 +1405,12 @@ body.coa-modal-open {
     padding: 4px 6px;
     font-size: 13px;
 }
-.fy-col-date input[type="date"] {
+.fy-col-date .fy-inp-dmy {
     width: 100%;
     min-width: 9rem;
     min-height: 34px;
     font-size: 13px;
+    font-variant-numeric: tabular-nums;
 }
 .fy-col-closed {
     width: 3.75rem;
