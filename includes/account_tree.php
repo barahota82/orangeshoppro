@@ -215,3 +215,38 @@ function orange_coa_root_category_names(array $flat, int $nodeId): array
         'category' => $names[1] ?? '',
     ];
 }
+
+if (!function_exists('orange_render_coa_tree')) {
+    /**
+     * شجرة الدليل المحاسبي لواجهة الأدمن (مع بيانات للعرض والـ JS).
+     *
+     * @param list<array<string, mixed>> $nodes
+     */
+    function orange_render_coa_tree(array $nodes, int $activeId, array $flat, int $depth = 0): void
+    {
+        echo '<ul class="coa-tree-list">';
+        foreach ($nodes as $n) {
+            $id = (int) $n['id'];
+            $code = htmlspecialchars((string) ($n['code'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $name = htmlspecialchars((string) ($n['name'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $nameEn = htmlspecialchars((string) ($n['name_en'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $isG = (int) ($n['is_group'] ?? 0) === 1;
+            $susp = (int) ($n['is_suspended'] ?? 0) === 1;
+            $nb = htmlspecialchars((string) ($n['normal_balance'] ?? 'debit'), ENT_QUOTES, 'UTF-8');
+            $rc = orange_coa_root_category_names($flat, $id);
+            $rootN = htmlspecialchars($rc['root'], ENT_QUOTES, 'UTF-8');
+            $catN = htmlspecialchars($rc['category'], ENT_QUOTES, 'UTF-8');
+            $cls = $activeId === $id ? 'coa-tree-node is-active' : 'coa-tree-node';
+            if ($susp) {
+                $cls .= ' coa-tree-node--suspended';
+            }
+            echo '<li class="' . $cls . '" role="treeitem" data-id="' . $id . '" data-code="' . $code . '" data-name="' . $name . '" data-name-en="' . $nameEn . '" data-is-group="' . ($isG ? '1' : '0') . '" data-parent="' . (int) ($n['parent_id'] ?? 0) . '" data-suspended="' . ($susp ? '1' : '0') . '" data-depth="' . $depth . '" data-root-name="' . $rootN . '" data-category-name="' . $catN . '" data-normal-balance="' . $nb . '">';
+            echo '<span class="coa-tree-label">' . $code . ' — ' . $name . ($isG ? ' <small>(رئيسي)</small>' : '') . ($susp ? ' <small class="coa-tree-suspended-tag">موقوف</small>' : '') . '</span>';
+            if (!empty($n['children'])) {
+                orange_render_coa_tree($n['children'], $activeId, $flat, $depth + 1);
+            }
+            echo '</li>';
+        }
+        echo '</ul>';
+    }
+}
