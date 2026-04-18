@@ -8,7 +8,7 @@ $pdo = db();
 orange_catalog_ensure_schema($pdo);
 ?>
 <div class="page-title">
-    <h1>جديد أنواع اليوميات</h1>
+    <h1>أنواع اليوميات</h1>
 </div>
 <div class="card">
     <p class="card-hint" style="margin:0;">
