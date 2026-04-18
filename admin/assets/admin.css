@@ -1594,13 +1594,14 @@ body.coa-modal-open {
     min-width: 12rem;
     width: 14rem;
 }
+/* كود الحساب ~70% من العرض السابق (تصغير 30%)؛ اسم الحساب يستفيد من المساحة */
 .gl-th-code {
-    min-width: 11rem;
-    width: 28%;
+    min-width: 7.7rem;
+    width: 19.6%;
 }
 .gl-th-name {
-    min-width: 10rem;
-    width: auto;
+    min-width: 13rem;
+    width: 36.4%;
 }
 .gl-td-label {
     font-weight: 600;
@@ -1619,7 +1620,7 @@ body.coa-modal-open {
 }
 .gl-inp-code {
     width: 100%;
-    min-width: 9rem;
+    min-width: 6.3rem;
     min-height: 34px;
     padding: 6px 8px;
     font-size: 13px;

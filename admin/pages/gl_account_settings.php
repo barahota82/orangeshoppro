@@ -76,7 +76,10 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
                                 <option value="0">— اختر —</option>
                                 <?php foreach ($journalTypesList as $jt):
                                     $jid = (int) ($jt['id'] ?? 0);
-                                    $jlab = trim((string) ($jt['code'] ?? '')) . ' — ' . trim((string) ($jt['name_ar'] ?? ''));
+                                    $jlab = trim((string) ($jt['name_ar'] ?? ''));
+                                    if ($jlab === '') {
+                                        $jlab = trim((string) ($jt['name_en'] ?? ''));
+                                    }
                                     ?>
                                 <option value="<?php echo $jid; ?>"<?php echo $jid === $jtId ? ' selected' : ''; ?>><?php echo htmlspecialchars($jlab, ENT_QUOTES, 'UTF-8'); ?></option>
                                 <?php endforeach; ?>
