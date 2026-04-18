@@ -9,26 +9,28 @@ $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
 $linkedJournalTypes = orange_gl_posting_linked_journal_types($pdo);
-$today = date('Y-m-d');
-$monthStart = date('Y-m-01');
+$todayEnd = date('Y-m-d\T23:59');
+$monthStartDt = date('Y-m-01\T00:00');
 ?>
 <div class="gl-posting-page" dir="rtl">
-    <h1 class="gl-posting-page__title">ترحيل الحركات</h1>
-    <p class="muted gl-posting-page__hint">
-        <strong>نوع الحركة:</strong> تظهر هنا فقط أنواع اليومية التي تم ربطها (حساب + نوع يومية) من
+    <header class="gl-posting-appbar">
+        <span class="gl-posting-appbar__title">ترحيل الحركات</span>
+    </header>
+
+    <p class="gl-posting-scope-note">
+        <strong>نوع الحركة:</strong> القائمة تعرض فقط أنواع اليومية المربوطة (حساب + نوع يومية) من
         <a href="/admin/index.php?page=gl_account_settings">حسابات القيود التلقائية</a>.
-        استرجاع الحركات والترحيل الفعلي يُربط لاحقًا بمصدر الحركات في النظام.
+        أعمدة القيود مطابقة لسندات النظام (مدين / دائن / بيان) وليس نموذج عملات متعددة.
     </p>
 
-    <div class="gl-posting-grid">
-        <section class="card gl-posting-panel gl-posting-panel--movements" aria-labelledby="gl_post_movements_title">
-            <h2 id="gl_post_movements_title" class="gl-posting-panel__title">الحركات</h2>
-
-            <div class="gl-posting-filters">
-                <div class="gl-posting-filter-row">
-                    <label class="gl-posting-label" for="gl_post_movement_type">نوع الحركة</label>
-                    <div class="gl-posting-filter-inline">
-                        <select id="gl_post_movement_type" class="gl-posting-select"<?php echo $linkedJournalTypes === [] ? ' disabled' : ''; ?>>
+    <div class="gl-posting-workbench">
+        <!-- في RTL العمود الأول يظهر يمين الشاشة: مصدر الحركات -->
+        <section class="gl-posting-pane gl-posting-pane--source" aria-labelledby="gl_post_movements_table_title">
+            <div class="gl-posting-pane__toolbar gl-posting-pane__toolbar--filters">
+                <div class="gl-posting-field">
+                    <span class="gl-posting-field__label" id="gl_post_movement_type_label">نوع الحركة :</span>
+                    <div class="gl-posting-field__row">
+                        <select id="gl_post_movement_type" class="gl-posting-select" aria-labelledby="gl_post_movement_type_label"<?php echo $linkedJournalTypes === [] ? ' disabled' : ''; ?>>
                             <option value="">— اختر نوع اليومية —</option>
                             <?php foreach ($linkedJournalTypes as $jt):
                                 $jid = (int) ($jt['id'] ?? 0);
@@ -43,70 +45,66 @@ $monthStart = date('Y-m-01');
                         </label>
                     </div>
                 </div>
-                <div class="gl-posting-filter-row gl-posting-filter-row--dates">
-                    <div>
-                        <label class="gl-posting-label" for="gl_post_date_from">تاريخ الحركة من</label>
-                        <input type="date" id="gl_post_date_from" class="gl-posting-inp-date" value="<?php echo htmlspecialchars($monthStart, ENT_QUOTES, 'UTF-8'); ?>">
+                <div class="gl-posting-dates">
+                    <div class="gl-posting-field">
+                        <label class="gl-posting-field__label" for="gl_post_date_from">تاريخ الحركة من</label>
+                        <input type="datetime-local" id="gl_post_date_from" class="gl-posting-inp-datetime" value="<?php echo htmlspecialchars($monthStartDt, ENT_QUOTES, 'UTF-8'); ?>">
                     </div>
-                    <div>
-                        <label class="gl-posting-label" for="gl_post_date_to">إلى تاريخ</label>
-                        <input type="date" id="gl_post_date_to" class="gl-posting-inp-date" value="<?php echo htmlspecialchars($today, ENT_QUOTES, 'UTF-8'); ?>">
+                    <div class="gl-posting-field">
+                        <label class="gl-posting-field__label" for="gl_post_date_to">إلى تاريخ</label>
+                        <input type="datetime-local" id="gl_post_date_to" class="gl-posting-inp-datetime" value="<?php echo htmlspecialchars($todayEnd, ENT_QUOTES, 'UTF-8'); ?>">
                     </div>
                 </div>
             </div>
 
-            <div class="gl-posting-toolbar">
-                <button type="button" class="btn-secondary" id="gl_post_btn_unposted">استرجاع الحركات غير المرحّلة</button>
-                <button type="button" class="btn-secondary" id="gl_post_btn_posted">استرجاع الحركات المرحّلة</button>
+            <div class="gl-posting-pane__toolbar gl-posting-pane__toolbar--actions">
+                <button type="button" class="btn-secondary" id="gl_post_btn_unposted">إسترجاع الحركات الغير مرحلة</button>
+                <button type="button" class="btn-secondary" id="gl_post_btn_posted">إسترجاع الحركات المرحلة</button>
             </div>
 
-            <div class="table-wrap gl-posting-table-wrap">
-                <table class="gl-posting-table">
+            <h2 id="gl_post_movements_table_title" class="gl-posting-subcap">حركات غير مرحلة</h2>
+            <div class="gl-posting-table-frame gl-posting-table-frame--scroll">
+                <table class="gl-posting-gridtable">
                     <thead>
                         <tr>
                             <th class="gl-posting-col-chk" aria-label="اختيار"></th>
                             <th>رقم الحركة</th>
                             <th>الفرع / العميل / المورد</th>
                             <th>القيمة</th>
-                            <th>رقم المستند</th>
                             <th>تاريخ الحركة</th>
                         </tr>
                     </thead>
                     <tbody id="gl_post_movements_tbody">
                         <tr>
-                            <td colspan="6" class="gl-posting-empty-cell">لا توجد حركات — اضغط «استرجاع…» عند تفعيل الربط الخلفي.</td>
+                            <td colspan="5" class="gl-posting-empty-cell">لا توجد حركات — اضغط «إسترجاع…» عند تفعيل الربط الخلفي.</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
 
-            <div class="gl-posting-toolbar gl-posting-toolbar--bottom">
-                <button type="button" id="gl_post_btn_do_post">ترحيل</button>
+            <div class="gl-posting-pane__footer">
+                <button type="button" class="btn" id="gl_post_btn_do_post">ترحيل</button>
                 <button type="button" class="btn-secondary" id="gl_post_btn_undo">إلغاء الترحيل</button>
             </div>
         </section>
 
-        <section class="card gl-posting-panel gl-posting-panel--entries" aria-labelledby="gl_post_entries_title">
-            <h2 id="gl_post_entries_title" class="gl-posting-panel__title">قيود الترحيل</h2>
-            <p class="muted gl-posting-entries-hint">هنا تظهر بنود القيود بعد تنفيذ الترحيل (معاينة).</p>
-            <div class="table-wrap gl-posting-table-wrap">
-                <table class="gl-posting-table gl-posting-table--entries">
+        <section class="gl-posting-pane gl-posting-pane--ledger" aria-labelledby="gl_post_entries_cap">
+            <h2 id="gl_post_entries_cap" class="gl-posting-subcap gl-posting-subcap--ledger">قيود الترحيل</h2>
+            <div class="gl-posting-table-frame gl-posting-table-frame--grow">
+                <table class="gl-posting-gridtable gl-posting-gridtable--ledger">
                     <thead>
                         <tr>
                             <th class="gl-posting-col-num">م</th>
                             <th>كود الحساب</th>
                             <th>اسم الحساب</th>
-                            <th>مدين أجنبي</th>
-                            <th>دائن أجنبي</th>
-                            <th>العملة</th>
-                            <th>معامل التحويل</th>
-                            <th>مدين محلي</th>
-                            <th>دائن محلي</th>
+                            <th>مدين</th>
+                            <th>دائن</th>
+                            <th>البيان</th>
                         </tr>
                     </thead>
                     <tbody id="gl_post_entries_tbody">
-                        <tr>
-                            <td colspan="9" class="gl-posting-empty-cell">لم يُرحَّل بعد — ستظهر الأسطر هنا بعد الترحيل.</td>
+                        <tr class="gl-posting-placeholder-row">
+                            <td colspan="6" class="gl-posting-empty-cell gl-posting-empty-cell--ledger">هنا تظهر القيود بعد ان تم ترحيلها</td>
                         </tr>
                     </tbody>
                 </table>
