@@ -1,5 +1,5 @@
 ORANGE — سياسة الحركات المحاسبية وإقفالها وشاشة الترحيل
-Last updated: 2026-04-18
+Last updated: 2026-04-18 (section 8: implementation handoff list)
 Canonical for: تصميم وتنفيذ «إقفال/ترحيل الحركات»، إعدادات القيود التلقائية، والربط مع الفواتير.
 
 عند استئناف العمل: اقرأ هذا الملف مع ORANGE_PROJECT_CONTINUITY.txt.
@@ -105,3 +105,47 @@ ARABIC
 
 ENGLISH
 - This document is **policy**; full implementation is **not** claimed complete in the codebase at file date.
+
+================================================================================
+8) قائمة التنفيذ — الشاشات والمسارات المتأثرة (للاستئناف من أي جلسة)
+================================================================================
+Last handoff note: 2026-04-18 — مُشتق من السياسة أعلاه؛ ليس وصفاً لما هو منجز بالكامل في الكود.
+
+ARABIC — لوحة الإدارة (`admin/pages/`)
+- `gl_account_settings` — إعادة بناء: قسم علوي (حسابات فقط، بدون نوع يومية)، قسم سفلي ديناميكي (نوع يومية + مدين + دائن من الأعلى، إضافة، بدون تكرار نوع يومية، حفظ موحّد).
+- `gl_posting` — بوابة إقفال/ترحيل موحّدة: قوائم معلّق/مثبت، ترحيل، فك ترحيل انتقائي؛ تحديث التسمية في `header.php` عند الاعتماد.
+- `journal_entries` — توضيح الدور مقابل الحركات المعلّقة (مسودة vs بعد التثبيت) وتعديل النصوص/التدفق حسب القرار.
+- `journal_types` — غالباً بقاء التعريف؛ الربط التفصيلي في `gl_account_settings` السفلي.
+- `fiscal_years` — ربط منطق الترحيل بسنة مفتوحة (غالباً موجود؛ يُراجع مع جداول الحركات الجديدة).
+- `partner_ledger` — قبض/صرف: إن أصبحت حركة معلّقة قبل الإقفال، تعديل مسار الحفظ والربط بالمخزن الموحّد.
+- `invoice` / `orders` / `manual_order` — تسجيل أثر محاسبي كحركة معلّقة + طابع زمني؛ عرض حالة التثبيت إن لزم.
+- `purchases` — مواءمة إثبات الشراء/الاستلام مع الحركات المعلّقة.
+- `stock` / `opening_stock_balances` — حركات مخزون ذات أثر محاسبي حسب السياسة.
+- `expenses` — مواءمة مع المعلّق ثم الإقفال إن كان يولّد قيداً.
+- شاشة جديدة محتملة — خريطة أدوار / ربط بنود فاتورة (ضريبة، شحن، …) إن لم تُدمج في منتجات/فئات/إعدادات.
+
+ARABIC — واجهات (`admin/api/` و `api/`)
+- `settings/gl-accounts.php` — إعادة عقد الحفظ ليطابق القسمين (علوي بدون إلزام journal_type لكل بند؛ سفلي جدول قواعد).
+- جديد متوقع — API حركات معلّقة: عرض، ترحيل، فك ترحيل، تفاصيل أسطر مقترحة.
+- مراجعة أي مسار ينشئ `journal_vouchers` مباشرة اليوم (مبيعات، مشتريات، شركاء، مصروفات، …) ليكتب حركة معلّقة أو ينتظر الإقفال حسب التصميم.
+
+ARABIC — includes
+- `gl_settings.php` / `journal_voucher.php` / `order_fulfillment.php` وملفات القيود — ربط بمحرّك الحركات ثم الترحيل.
+- `catalog_schema.php` (أو migration) — جداول حركات غير مثبتة، ربط `journal_vouchers` بعد الإقفال، حالة وتسلسل.
+
+ARABIC — تنقل وصلاحيات
+- `admin/partials/header.php` — تسمية رابط الترحيل/الإقفال.
+- `admin/index.php` — إن أُضيف `page` جديد.
+- `includes/admin_permissions.php` — موارد/إجراءات فرعية (ترحيل مقابل إلغاء ترحيل) إن طُبّقت.
+
+ARABIC — متجر / طلبات
+- مسارات إنشاء الطلب أو الفاتورة أونلاين — عدم تثبيت الأثر المحاسبي قبل الإقفال إن السياسة تشملها.
+
+ENGLISH — Suggested implementation phases (optional order)
+1. Schema: unposted movements store + statuses + link to source document + proposed lines or generator hooks.
+2. Admin API: list/post/unpost selective; enforce open fiscal year; voucher date = movement timestamp.
+3. UI: rebuild `gl_posting` as closing hub; then `gl_account_settings` two-part layout.
+4. Rewire fulfillment/purchases/partners/expenses to enqueue movements instead of immediate vouchers (incremental by module).
+5. Dynamic mapping UI/API for invoice ancillaries if not folded into catalog.
+
+================================================================================
