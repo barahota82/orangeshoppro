@@ -14,7 +14,7 @@ Push-Location $root
 try {
     git config core.hooksPath $hooksGit
     Write-Host "OK: core.hooksPath = $hooksGit" -ForegroundColor Green
-    Write-Host "pre-commit سيشغّل scripts/verify-php-utf8.sh عند كل commit (إن وُجد xxd في PATH)." -ForegroundColor Cyan
+    Write-Host "pre-commit: إن وُجد xxd يشغّل .sh؛ وإلا يشغّل verify-php-utf8.ps1 (ويندوز)." -ForegroundColor Cyan
 }
 finally {
     Pop-Location

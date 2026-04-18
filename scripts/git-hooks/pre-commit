@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# يمنع commit لو فيه ملف PHP بـ UTF-8 BOM أو UTF-16 (يسبب صفحة بيضاء).
-# التفعيل مرة واحدة من جذر المشروع:
-#   git config core.hooksPath scripts/git-hooks
-# (أو شغّل scripts/install-hooks.ps1 / install-hooks.sh)
+# يمنع commit إن وُجد UTF-8 BOM أو UTF-16 في ملفات PHP.
+# التفعيل (مرة واحدة):  git config core.hooksPath scripts/git-hooks
+# أو:  powershell -File scripts/install-hooks.ps1
 set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 if [[ -z "$ROOT" ]]; then
@@ -12,8 +11,30 @@ cd "$ROOT"
 if [[ ! -x "scripts/verify-php-utf8.sh" ]]; then
   chmod +x scripts/verify-php-utf8.sh 2>/dev/null || true
 fi
-if ! command -v xxd >/dev/null 2>&1; then
-  echo "pre-commit: xxd غير متوفر — تخطّي الفحص محلياً (GitHub Actions ما زال يفحص)."
+
+run_ps1() {
+  local ps1="$ROOT/scripts/verify-php-utf8.ps1"
+  if command -v pwsh >/dev/null 2>&1; then
+    exec pwsh -NoProfile -ExecutionPolicy Bypass -File "$ps1"
+  fi
+  if command -v powershell.exe >/dev/null 2>&1; then
+    exec powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$ps1"
+  fi
+  # Git Bash على ويندوز غالباً
+  if [[ -x "/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" ]]; then
+    exec "/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$ps1"
+  fi
+  return 1
+}
+
+if command -v xxd >/dev/null 2>&1; then
+  exec ./scripts/verify-php-utf8.sh
+fi
+
+echo "pre-commit: لا يوجد xxd — جارٍ الفحص عبر PowerShell…"
+if run_ps1; then
   exit 0
 fi
-exec ./scripts/verify-php-utf8.sh
+
+echo "pre-commit: فشل — ثبّت xxd (Git Bash) أو PowerShell، أو استخدم: pwsh -File scripts/verify-php-utf8.ps1" >&2
+exit 1
