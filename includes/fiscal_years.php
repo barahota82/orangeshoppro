@@ -95,3 +95,27 @@ function orange_fiscal_range_overlaps_existing(PDO $pdo, string $start, string $
 
     return (int) $st->fetchColumn() > 0;
 }
+
+/** هل توجد قيود/مستندات مرتبطة بهذه السنة؟ (يمنع الحذف) */
+function orange_fiscal_year_has_journal_activity(PDO $pdo, int $fiscalYearId): bool
+{
+    if ($fiscalYearId <= 0) {
+        return false;
+    }
+    if (orange_table_exists($pdo, 'journal_vouchers')) {
+        $st = $pdo->prepare('SELECT 1 FROM journal_vouchers WHERE fiscal_year_id = ? LIMIT 1');
+        $st->execute([$fiscalYearId]);
+        if ($st->fetchColumn()) {
+            return true;
+        }
+    }
+    if (orange_table_exists($pdo, 'journal_entries')) {
+        $st = $pdo->prepare('SELECT 1 FROM journal_entries WHERE fiscal_year_id = ? LIMIT 1');
+        $st->execute([$fiscalYearId]);
+        if ($st->fetchColumn()) {
+            return true;
+        }
+    }
+
+    return false;
+}

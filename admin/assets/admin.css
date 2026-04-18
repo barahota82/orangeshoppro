@@ -1364,6 +1364,79 @@ body.coa-modal-open {
     cursor: pointer;
 }
 
+/* السنوات المالية — جدول بسيط */
+.fy-years-page__title {
+    margin: 0 0 14px;
+    font-size: 1.35rem;
+}
+.fy-years-card {
+    margin-bottom: 0;
+}
+.fy-years-table-wrap {
+    overflow-x: auto;
+    margin-bottom: 4px;
+}
+.fy-years-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.fy-years-table th,
+.fy-years-table td {
+    border: 1px solid var(--border, #cbd5e1);
+    padding: 6px 8px;
+    vertical-align: middle;
+}
+.fy-years-table th {
+    background: #f1f5f9;
+    font-weight: 700;
+}
+.fy-col-num {
+    width: 3.5rem;
+    text-align: center;
+}
+.fy-col-year {
+    width: 6.25rem;
+}
+.fy-col-year .fy-inp-year {
+    width: 100%;
+    min-width: 4.25rem;
+    min-height: 34px;
+    padding: 4px 6px;
+    font-size: 13px;
+}
+.fy-col-date input[type="date"] {
+    width: 100%;
+    min-width: 9rem;
+    min-height: 34px;
+    font-size: 13px;
+}
+.fy-col-closed {
+    width: 3.75rem;
+}
+.fy-col-del {
+    width: 4.25rem;
+}
+.fy-col-center {
+    text-align: center;
+}
+.fy-btn-del {
+    padding: 4px 10px;
+    min-height: 32px;
+    font-size: 12px;
+}
+.fy-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 12px;
+    margin-top: 8px;
+    border-top: 1px solid var(--border, #e5e7eb);
+}
+.fy-empty-hint {
+    margin: 8px 0 0;
+}
+
 @media print {
     body * {
         visibility: hidden;
@@ -1380,6 +1453,22 @@ body.coa-modal-open {
         max-height: none;
         border: none;
         box-shadow: none;
+    }
+    .fy-print-area,
+    .fy-print-area * {
+        visibility: visible;
+    }
+    .fy-print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        border: none;
+        box-shadow: none;
+    }
+    .fy-actions,
+    .fy-btn-del {
+        display: none !important;
     }
     .coa-setup-modal__backdrop {
         display: none !important;
