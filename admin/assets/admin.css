@@ -1670,6 +1670,138 @@ body.coa-modal-open {
     padding-top: 12px;
     border-top: 1px solid var(--border, #e5e7eb);
 }
+
+/* ترحيل الحركات — لوحة ثنائية (يمين: حركات، يسار: قيود) في RTL */
+.gl-posting-page__title {
+    margin: 0 0 8px;
+    font-size: 1.35rem;
+}
+.gl-posting-page__hint {
+    margin: 0 0 16px;
+    font-size: 13px;
+    line-height: 1.5;
+    max-width: 960px;
+}
+.gl-posting-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+}
+@media (max-width: 1100px) {
+    .gl-posting-grid {
+        grid-template-columns: 1fr;
+    }
+}
+.gl-posting-panel {
+    margin-bottom: 0;
+    padding: 14px 16px 16px;
+}
+.gl-posting-panel__title {
+    margin: 0 0 12px;
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+.gl-posting-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.gl-posting-filter-row--dates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-end;
+}
+.gl-posting-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #475569;
+}
+.gl-posting-filter-inline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+.gl-posting-select {
+    min-width: 14rem;
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: 13px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #fff;
+}
+.gl-posting-check-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.gl-posting-inp-date {
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: 13px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+}
+.gl-posting-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.gl-posting-toolbar--bottom {
+    margin-top: 12px;
+    margin-bottom: 0;
+    padding-top: 12px;
+    border-top: 1px solid var(--border, #e5e7eb);
+}
+.gl-posting-table-wrap {
+    overflow-x: auto;
+    margin-bottom: 4px;
+}
+.gl-posting-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+.gl-posting-table th,
+.gl-posting-table td {
+    border: 1px solid var(--border, #cbd5e1);
+    padding: 6px 8px;
+    vertical-align: middle;
+    text-align: right;
+}
+.gl-posting-table th {
+    background: #f1f5f9;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.gl-posting-col-chk {
+    width: 2.25rem;
+    text-align: center;
+}
+.gl-posting-col-num {
+    width: 2.5rem;
+    text-align: center;
+}
+.gl-posting-empty-cell {
+    text-align: center;
+    color: #64748b;
+    padding: 16px 10px !important;
+}
+.gl-posting-entries-hint {
+    margin: -4px 0 10px;
+    font-size: 12px;
+}
+
 .gl-pick-modal {
     position: fixed;
     inset: 0;

@@ -97,6 +97,38 @@ function orange_gl_settings_form_key_order(): array
 }
 
 /**
+ * أنواع اليومية المربوطة في «حسابات القيود التلقائية» — لشاشة الترحيل (قائمة نوع الحركة).
+ *
+ * @return list<array<string, mixed>>
+ */
+function orange_gl_posting_linked_journal_types(PDO $pdo): array
+{
+    orange_catalog_ensure_schema($pdo);
+    if (!orange_table_exists($pdo, 'orange_gl_account_settings')
+        || !orange_table_has_column($pdo, 'orange_gl_account_settings', 'journal_type_id')
+        || !orange_table_exists($pdo, 'journal_types')) {
+        return [];
+    }
+    try {
+        $st = $pdo->query(
+            'SELECT DISTINCT jt.id, jt.code, jt.name_ar, jt.sort_order
+             FROM orange_gl_account_settings g
+             INNER JOIN journal_types jt ON jt.id = g.journal_type_id
+             WHERE g.journal_type_id IS NOT NULL AND g.journal_type_id > 0
+             ORDER BY jt.sort_order ASC, jt.id ASC'
+        );
+
+        return $st ? $st->fetchAll(PDO::FETCH_ASSOC) : [];
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] orange_gl_posting_linked_journal_types: ' . $e->getMessage());
+        }
+
+        return [];
+    }
+}
+
+/**
  * @return list<string>
  */
 function orange_gl_allowed_setting_keys(): array
