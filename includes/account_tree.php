@@ -108,10 +108,7 @@ function orange_accounts_suggest_child_code(PDO $pdo, ?int $parentId): string
             $max = max($max, (int) $c);
         }
         if ($max === 0) {
-            $st2 = $pdo->query('SELECT MAX(id) FROM accounts');
-            $max = (int) $st2->fetchColumn();
-
-            return (string) max(1, $max + 1);
+            return '1';
         }
 
         return (string) ($max + 1);
