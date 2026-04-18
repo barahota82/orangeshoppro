@@ -501,42 +501,16 @@ function orange_catalog_ensure_schema(PDO $pdo): void
                 UNIQUE KEY uq_journal_types_code (code)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
+    }
+
+    if (orange_table_exists($pdo, 'journal_types')) {
+        require_once __DIR__ . '/journal_types.php';
         try {
-            $cnt = (int) $pdo->query('SELECT COUNT(*) FROM journal_types')->fetchColumn();
-            if ($cnt === 0) {
-                /* ترتيب التسجيل كجدول أنواع اليوميات (بادئات الصفوف الفارغة في المرجع اقتراح نظامي فريد). */
-                $defaults = [
-                    ['OBV', 'سند رصيد افتتاحي', 'Opening balance voucher'],
-                    ['JE', 'سند قيد', 'Journal entry'],
-                    ['RV', 'سند قبض', 'Receipt voucher'],
-                    ['PV', 'سند صرف', 'Payment voucher'],
-                    ['YEC', 'قيد الإقفال السنوي', 'Year-end closing entry'],
-                    ['PIN', 'فاتورة مشتريات', 'Purchase invoice'],
-                    ['PDN', 'مردود مشتريات', 'Purchase return'],
-                    ['CSI', 'مبيعات نقدي', 'Cash sales'],
-                    ['CGC', 'تكلفة مبيعات نقدي', 'Cost of cash sales'],
-                    ['SCR', 'مردود مبيعات نقدي', 'Cash sales return'],
-                    ['CSR', 'تكلفة مردود مبيعات نقدي', 'Cost of cash sales return'],
-                    ['SIN', 'مبيعات أجل', 'Credit sales'],
-                    ['CGT', 'تكلفة مبيعات أجل', 'Cost of credit sales'],
-                    ['SRR', 'مردود مبيعات أجل', 'Credit sales return'],
-                    ['CGR', 'تكلفة مردود مبيعات أجل', 'Cost of credit sales return'],
-                    ['OSI', 'مبيعات الاونلاين', 'Online sales'],
-                    ['CGO', 'تكلفة مبيعات الاونلاين', 'Cost of online sales'],
-                    ['OSR', 'مردود مبيعات الاونلاين', 'Online sales return'],
-                    ['COR', 'تكلفة مردود مبيعات الاونلاين', 'Cost of online sales return'],
-                ];
-                $ins = $pdo->prepare(
-                    'INSERT INTO journal_types (code, name_ar, name_en, sort_order) VALUES (?,?,?,?)'
-                );
-                $ord = 1;
-                foreach ($defaults as $row) {
-                    $ins->execute([$row[0], $row[1], $row[2], $ord]);
-                    ++$ord;
-                }
-            }
+            orange_journal_types_sync_canonical_defaults($pdo);
         } catch (Throwable $e) {
-            error_log('[orange] journal_types seed: ' . $e->getMessage());
+            if (function_exists('error_log')) {
+                error_log('[orange] journal_types sync: ' . $e->getMessage());
+            }
         }
     }
 
