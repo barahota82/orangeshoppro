@@ -60,6 +60,12 @@ define(
     || strtolower((string) $__noHtmlCache) === 'true'
 );
 
+/**
+ * مفتاح اختياري في .env.php: توليد هاش كلمة سر بدون تسجيل دخول عبر admin/hash-generator.php?key=...
+ * اتركه فارغاً في التشغيل العادي؛ عيّن نصاً عشوائياً طويلاً مؤقتاً عند استعادة الوصول ثم احذفه.
+ */
+define('ORANGE_HASH_GENERATOR_KEY', trim((string)($env['ORANGE_HASH_GENERATOR_KEY'] ?? '')));
+
 /*
 |--------------------------------------------------------------------------
 | Storefront static assets (cache bust)

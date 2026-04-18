@@ -22,4 +22,8 @@ return [
 
     // اختياري: إجبار روابط طويلة /pages/... إذا الـ rewrite لا يعمل
     // 'STOREFRONT_FORCE_LONG_URLS' => true,
+
+    // مؤقت فقط: توليد هاش كلمة سر بدون دخول أدمن — /admin/hash-generator.php?key=نفس_النص
+    // ثم احذف هذا السطر من .env.php على السيرفر
+    // 'ORANGE_HASH_GENERATOR_KEY' => 'غيّر_هذا_لنص_عشوائي_طويل_وسِرّي',
 ];
