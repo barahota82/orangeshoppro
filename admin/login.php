@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_login'])) {
         }
 
         if ($admin && ($hash === '' || !str_starts_with($hash, '$2'))) {
-            $error = 'حساب المشرف غير مهيأ: عمود password_hash فارغ أو ليس بصيغة bcrypt. حدّث الهاش من أداة «توليد هاش كلمة السر» أو من phpMyAdmin.';
+            $error = 'حساب المشرف غير مهيأ: عمود password_hash فارغ أو ليس بصيغة bcrypt. حدّثه من phpMyAdmin (قيمة password_hash من PHP) أو من شاشة المستخدمين بعد دخول مشرف عام.';
         } else {
             $error = 'اسم المستخدم أو كلمة المرور غير صحيحة';
         }

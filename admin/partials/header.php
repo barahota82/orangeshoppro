@@ -82,7 +82,6 @@ orange_catalog_ensure_schema($pdoNav);
                 ['page' => 'company_settings', 'href' => '/admin/index.php?page=company_settings', 'label' => 'بيانات الشركة', 'class' => '', 'sub' => false],
                 ['page' => 'channels', 'href' => '/admin/index.php?page=channels', 'label' => 'الواجهات (المتجر)', 'class' => '', 'sub' => false],
                 ['page' => 'admin_users', 'href' => '/admin/index.php?page=admin_users', 'label' => 'المستخدمون والصلاحيات', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'password_hash_tool', 'href' => '/admin/index.php?page=password_hash_tool', 'label' => 'توليد هاش كلمة السر', 'class' => 'admin-nav-sub', 'sub' => true],
             ];
 
             foreach ($navDashboard as $nl) {
