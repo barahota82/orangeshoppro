@@ -8,6 +8,17 @@ require_once __DIR__ . '/../../includes/journal_types.php';
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 $types = orange_journal_types_list($pdo);
+if ($types === []) {
+    $types = [
+        [
+            'id' => 0,
+            'code' => 'OBV',
+            'name_ar' => 'سند رصيد افتتاحي',
+            'name_en' => 'Opening balance voucher',
+            'sort_order' => 1,
+        ],
+    ];
+}
 ?>
 <div class="fy-years-page" dir="rtl">
     <h1 class="fy-years-page__title">أنواع اليوميات</h1>
@@ -53,7 +64,6 @@ $types = orange_journal_types_list($pdo);
                 </tbody>
             </table>
         </div>
-        <p class="muted fy-empty-hint" id="jt_empty_hint"<?php echo $types !== [] ? ' hidden' : ''; ?>>لا توجد أنواع — اضغط «إضافة» ثم «حفظ».</p>
 
         <div class="fy-actions">
             <button type="button" class="btn-secondary" id="jt_btn_add">إضافة</button>
@@ -78,17 +88,30 @@ $types = orange_journal_types_list($pdo);
             return;
         }
 
+        function jtAddDefaultOpeningRow() {
+            var tr = document.createElement('tr');
+            tr.setAttribute('data-jt-row', '');
+            tr.setAttribute('data-id', '0');
+            tr.innerHTML =
+                '<td class="fy-col-num"><span class="jt-serial"></span></td>' +
+                '<td class="fy-col-jt-code"><input type="text" class="jt-inp-code" dir="ltr" maxlength="32" autocomplete="off" value="OBV" aria-label="ترميز الكود"></td>' +
+                '<td class="fy-col-jt-name-ar"><input type="text" class="jt-inp-name-ar" maxlength="255" value="سند رصيد افتتاحي" aria-label="الاسم عربي"></td>' +
+                '<td class="fy-col-jt-name-en"><input type="text" class="jt-inp-name-en" dir="ltr" maxlength="255" value="Opening balance voucher" aria-label="الاسم إنجليزي"></td>' +
+                '<td class="fy-col-del fy-col-center"><button type="button" class="jt-btn-del fy-btn-del btn-secondary" title="حذف">حذف</button></td>';
+            tbody.appendChild(tr);
+        }
+
         function renumberRows() {
             var rows = tbody.querySelectorAll('tr[data-jt-row]');
+            if (rows.length === 0) {
+                jtAddDefaultOpeningRow();
+                rows = tbody.querySelectorAll('tr[data-jt-row]');
+            }
             for (var i = 0; i < rows.length; i++) {
                 var sp = rows[i].querySelector('.jt-serial');
                 if (sp) {
                     sp.textContent = String(i + 1);
                 }
-            }
-            var hint = document.getElementById('jt_empty_hint');
-            if (hint) {
-                hint.hidden = rows.length > 0;
             }
         }
 
