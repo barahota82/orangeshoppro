@@ -9,7 +9,8 @@ if (current_admin()) {
 
 $error = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// يُقبل فقط إرسال النموذج عبر زر «دخول» لتجنب اعتبار أي POST فارغ/عشوائي محاولة تسجيل (بعض الاستضافات/الوكلاء).
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_login'])) {
     $username = trim((string)($_POST['username'] ?? ''));
     $password = (string)($_POST['password'] ?? '');
 
@@ -19,13 +20,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$username]);
         $admin = $stmt->fetch();
 
-        if ($admin && password_verify($password, $admin['password_hash'])) {
+        $hash = isset($admin['password_hash']) ? (string) $admin['password_hash'] : '';
+        if ($admin && $hash !== '' && password_verify($password, $hash)) {
             admin_login((int)$admin['id']);
             header('Location: /admin/index.php');
             exit;
         }
 
-        $error = 'اسم المستخدم أو كلمة المرور غير صحيحة';
+        if ($admin && ($hash === '' || !str_starts_with($hash, '$2'))) {
+            $error = 'حساب المشرف غير مهيأ: عمود password_hash فارغ أو ليس بصيغة bcrypt. حدّث الهاش من أداة «توليد هاش كلمة السر» أو من phpMyAdmin.';
+        } else {
+            $error = 'اسم المستخدم أو كلمة المرور غير صحيحة';
+        }
     } else {
         $error = 'يرجى إدخال البيانات';
     }
@@ -44,14 +50,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php if ($error): ?>
             <div class="alert-error"><?php echo htmlspecialchars($error); ?></div>
         <?php endif; ?>
-        <form method="post">
+        <form method="post" action="" autocomplete="off">
             <label>اسم المستخدم</label>
-            <input type="text" name="username" required>
+            <input type="text" name="username" required autocomplete="username">
 
             <label>كلمة المرور</label>
-            <input type="password" name="password" required>
+            <input type="password" name="password" required autocomplete="current-password">
 
-            <button type="submit">دخول</button>
+            <button type="submit" name="admin_login" value="1">دخول</button>
         </form>
     </div>
 </body>
