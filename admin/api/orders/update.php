@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/order_stock.php';
 require_once __DIR__ . '/../../../includes/order_fulfillment.php';
+require_once __DIR__ . '/../../../includes/gl_settings.php';
 require_admin_api();
 
 try {
@@ -68,5 +69,5 @@ try {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    api_error($e, 'تعذر تعديل الطلب');
+    orange_gl_api_catch_json($e, 'تعذر تعديل الطلب');
 }

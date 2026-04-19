@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
+require_once __DIR__ . '/../../../includes/expense_gl.php';
 require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_write.php';
 require_admin_api();
@@ -20,12 +21,15 @@ try {
 
     $stmt = $pdo->prepare('SELECT * FROM expenses WHERE id = ? LIMIT 1');
     $stmt->execute([$id]);
-    $expense = $stmt->fetch();
+    $expense = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$expense) {
         json_response(['success' => false, 'message' => 'المصروف غير موجود'], 404);
     }
 
     $amount = (float)$expense['amount'];
+    $oid = (int)($expense['expense_account_id'] ?? 0);
+    $pair = orange_expense_gl_accounts($pdo, $oid > 0 ? $oid : null);
+    $revPair = orange_expense_gl_reversal_pair($pair);
 
     $pdo->beginTransaction();
     $pdo->prepare('DELETE FROM expenses WHERE id = ?')->execute([$id]);
@@ -37,8 +41,8 @@ try {
         'source_label' => $refDel,
         'movement_at' => $now,
         'voucher_date' => $now,
-        'account_debit' => 1,
-        'account_credit' => 6,
+        'account_debit' => $revPair['debit'],
+        'account_credit' => $revPair['credit'],
         'amount' => $amount,
         'description' => 'عكس مصروف — حذف السجل',
         'entry_type' => 'expense_reversal',
@@ -48,8 +52,8 @@ try {
     } else {
         orange_journal_insert_line($pdo, [
             'date' => $now,
-            'account_debit' => 1,
-            'account_credit' => 6,
+            'account_debit' => $revPair['debit'],
+            'account_credit' => $revPair['credit'],
             'amount' => $amount,
             'reference' => $refDel,
             'description' => 'عكس مصروف — حذف السجل',

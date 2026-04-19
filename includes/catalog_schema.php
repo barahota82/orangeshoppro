@@ -839,6 +839,35 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         );
     }
 
+    if (!orange_table_exists($pdo, 'expenses')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE expenses (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(255) NOT NULL DEFAULT \'\',
+                amount DECIMAL(18,4) NOT NULL DEFAULT 0,
+                expense_account_id INT NULL,
+                notes VARCHAR(512) NOT NULL DEFAULT \'\',
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+                KEY idx_expenses_expense_account (expense_account_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+    if (orange_table_exists($pdo, 'expenses') && !orange_table_has_column($pdo, 'expenses', 'expense_account_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE expenses ADD COLUMN expense_account_id INT NULL');
+        orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_expenses_expense_account ON expenses (expense_account_id)');
+    }
+    if (orange_table_exists($pdo, 'expenses') && !orange_table_has_column($pdo, 'expenses', 'notes')) {
+        orange_catalog_safe_exec($pdo, "ALTER TABLE expenses ADD COLUMN notes VARCHAR(512) NOT NULL DEFAULT ''");
+    }
+    if (orange_table_exists($pdo, 'expenses') && !orange_table_has_column($pdo, 'expenses', 'updated_at')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE expenses ADD COLUMN updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP'
+        );
+    }
+
     if (!orange_table_exists($pdo, 'orange_admin_audit_log')) {
         orange_catalog_safe_exec(
             $pdo,

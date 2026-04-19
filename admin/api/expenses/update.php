@@ -5,9 +5,21 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
+require_once __DIR__ . '/../../../includes/expense_gl.php';
 require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_write.php';
 require_admin_api();
+
+/**
+ * @param array<string, mixed> $row
+ * @return array{debit: int, credit: int}
+ */
+function orange_expense_pair_from_expense_row(PDO $pdo, array $row): array
+{
+    $oid = (int) ($row['expense_account_id'] ?? 0);
+
+    return orange_expense_gl_accounts($pdo, $oid > 0 ? $oid : null);
+}
 
 try {
     $pdo = db();
@@ -17,20 +29,23 @@ try {
     $action = trim((string)($data['action'] ?? 'update'));
     $name = trim((string)($data['name'] ?? ''));
     $amount = (float)($data['amount'] ?? 0);
+    $notes = trim((string)($data['notes'] ?? ''));
     if ($id <= 0) {
         json_response(['success' => false, 'message' => 'معرف المصروف مطلوب'], 422);
     }
 
-    $stmt = $pdo->prepare('SELECT id, amount FROM expenses WHERE id = ? LIMIT 1');
+    $stmt = $pdo->prepare('SELECT * FROM expenses WHERE id = ? LIMIT 1');
     $stmt->execute([$id]);
-    $old = $stmt->fetch();
-    if (!$old) {
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
         json_response(['success' => false, 'message' => 'المصروف غير موجود'], 404);
     }
 
     $pdo->beginTransaction();
     if ($action === 'delete') {
-        $oldAmount = (float)$old['amount'];
+        $oldAmount = (float) $row['amount'];
+        $pair = orange_expense_pair_from_expense_row($pdo, $row);
+        $revPair = orange_expense_gl_reversal_pair($pair);
         $pdo->prepare('DELETE FROM expenses WHERE id = ?')->execute([$id]);
         orange_gl_pending_remove_by_reference($pdo, 'EXP-' . $id);
         $now = date('Y-m-d H:i:s');
@@ -40,8 +55,8 @@ try {
             'source_label' => $refDel,
             'movement_at' => $now,
             'voucher_date' => $now,
-            'account_debit' => 1,
-            'account_credit' => 6,
+            'account_debit' => $revPair['debit'],
+            'account_credit' => $revPair['credit'],
             'amount' => $oldAmount,
             'description' => 'عكس مصروف — حذف السجل',
             'entry_type' => 'expense_reversal',
@@ -51,8 +66,8 @@ try {
         } else {
             orange_journal_insert_line($pdo, [
                 'date' => $now,
-                'account_debit' => 1,
-                'account_credit' => 6,
+                'account_debit' => $revPair['debit'],
+                'account_credit' => $revPair['credit'],
                 'amount' => $oldAmount,
                 'reference' => $refDel,
                 'description' => 'عكس مصروف — حذف السجل',
@@ -65,13 +80,22 @@ try {
     }
 
     if ($name === '' || $amount <= 0) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         json_response(['success' => false, 'message' => 'بيانات المصروف غير صحيحة'], 422);
     }
-    $oldAmount = (float)$old['amount'];
+    $oldAmount = (float) $row['amount'];
     $delta = $amount - $oldAmount;
+    $pair = orange_expense_pair_from_expense_row($pdo, $row);
 
-    $pdo->prepare('UPDATE expenses SET name = ?, amount = ?, updated_at = NOW() WHERE id = ?')
-        ->execute([$name, $amount, $id]);
+    if (orange_table_has_column($pdo, 'expenses', 'notes')) {
+        $pdo->prepare('UPDATE expenses SET name = ?, amount = ?, notes = ?, updated_at = NOW() WHERE id = ?')
+            ->execute([$name, $amount, $notes, $id]);
+    } else {
+        $pdo->prepare('UPDATE expenses SET name = ?, amount = ?, updated_at = NOW() WHERE id = ?')
+            ->execute([$name, $amount, $id]);
+    }
 
     if (abs($delta) > 0.0001) {
         $now = date('Y-m-d H:i:s');
@@ -88,8 +112,8 @@ try {
                     'source_label' => 'EXP-' . $id,
                     'movement_at' => $now,
                     'voucher_date' => $now,
-                    'account_debit' => 6,
-                    'account_credit' => 1,
+                    'account_debit' => $pair['debit'],
+                    'account_credit' => $pair['credit'],
                     'amount' => $amount,
                     'description' => 'تسجيل مصروف — بعد تعديل (لم يُرحَّل بعد)',
                     'entry_type' => 'expense',
@@ -102,20 +126,21 @@ try {
                         'source_label' => 'EXP-' . $id,
                         'movement_at' => $now,
                         'voucher_date' => $now,
-                        'account_debit' => 6,
-                        'account_credit' => 1,
+                        'account_debit' => $pair['debit'],
+                        'account_credit' => $pair['credit'],
                         'amount' => $delta,
                         'description' => 'تعديل مصروف — زيادة',
                         'entry_type' => 'expense_adjustment',
                     ]);
                 } else {
+                    $revPair = orange_expense_gl_reversal_pair($pair);
                     orange_gl_pending_enqueue_simple($pdo, [
                         'reference' => $refAdj,
                         'source_label' => 'EXP-' . $id,
                         'movement_at' => $now,
                         'voucher_date' => $now,
-                        'account_debit' => 1,
-                        'account_credit' => 6,
+                        'account_debit' => $revPair['debit'],
+                        'account_credit' => $revPair['credit'],
                         'amount' => abs($delta),
                         'description' => 'تعديل مصروف — نقصان',
                         'entry_type' => 'expense_adjustment',
@@ -127,18 +152,19 @@ try {
             if ($delta > 0) {
                 orange_journal_insert_line($pdo, [
                     'date' => $now,
-                    'account_debit' => 6,
-                    'account_credit' => 1,
+                    'account_debit' => $pair['debit'],
+                    'account_credit' => $pair['credit'],
                     'amount' => $delta,
                     'reference' => $refAdj,
                     'description' => 'تعديل مصروف — زيادة',
                     'entry_type' => 'expense_adjustment',
                 ]);
             } else {
+                $revPair = orange_expense_gl_reversal_pair($pair);
                 orange_journal_insert_line($pdo, [
                     'date' => $now,
-                    'account_debit' => 1,
-                    'account_credit' => 6,
+                    'account_debit' => $revPair['debit'],
+                    'account_credit' => $revPair['credit'],
                     'amount' => abs($delta),
                     'reference' => $refAdj,
                     'description' => 'تعديل مصروف — نقصان',

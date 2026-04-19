@@ -19,6 +19,7 @@ function orange_gl_setting_key_labels(): array
 {
     return [
         'cash' => 'الخزينة / النقدية — دائن شراء نقدي؛ مدين تحصيل مبيعات نقدي',
+        'general_expense' => 'مصروف عام (لوحة المصروفات) — مدين عند تسجيل مصروف إداري من شاشة المصروفات',
         'inventory' => 'المخزون — مدين شراء؛ دائن تكلفة البضاعة المباعة',
         /** لا يُعرض في شاشة «حسابات القيود التلقائية»؛ يُستخدم في مشتريات آجل وسندات الموردين. */
         'accounts_payable' => 'ذمم الموردين — دائن شراء آجل',
@@ -51,6 +52,7 @@ function orange_gl_setting_row_short_labels(): array
 {
     return [
         'cash' => 'الخزينة',
+        'general_expense' => 'مصروف عام',
         'inventory' => 'المخزن',
         'accounts_payable' => 'ذمم الموردين',
         'ar_cash' => 'العملاء النقدي',
@@ -79,6 +81,7 @@ function orange_gl_settings_form_key_order(): array
 {
     return [
         'cash',
+        'general_expense',
         'inventory',
         'accounts_payable',
         'ar_cash',

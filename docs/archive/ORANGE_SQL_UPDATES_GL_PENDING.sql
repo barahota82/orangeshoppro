@@ -182,3 +182,50 @@ SET @s := IF(@c = 0,
   'CREATE UNIQUE INDEX uq_orders_invoice_number ON orders (invoice_number)',
   'SELECT 1');
 PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ---------------------------------------------------------------------------
+-- جدول expenses + أعمدة محاسبة (مرجع: includes/catalog_schema.php)
+-- ---------------------------------------------------------------------------
+SELECT COUNT(*) INTO @c FROM information_schema.TABLES
+  WHERE TABLE_SCHEMA = @orange_schema AND TABLE_NAME = 'expenses';
+SET @s := IF(@c = 0,
+  'CREATE TABLE expenses (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL DEFAULT \'\',
+    amount DECIMAL(18,4) NOT NULL DEFAULT 0,
+    expense_account_id INT NULL,
+    notes VARCHAR(512) NOT NULL DEFAULT \'\',
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_expenses_expense_account (expense_account_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci',
+  'SELECT 1');
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SELECT COUNT(*) INTO @c FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = @orange_schema AND TABLE_NAME = 'expenses' AND COLUMN_NAME = 'expense_account_id';
+SET @s := IF(@c = 0,
+  'ALTER TABLE expenses ADD COLUMN expense_account_id INT NULL',
+  'SELECT 1');
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SELECT COUNT(*) INTO @c FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = @orange_schema AND TABLE_NAME = 'expenses' AND INDEX_NAME = 'idx_expenses_expense_account';
+SET @s := IF(@c = 0,
+  'CREATE INDEX idx_expenses_expense_account ON expenses (expense_account_id)',
+  'SELECT 1');
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SELECT COUNT(*) INTO @c FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = @orange_schema AND TABLE_NAME = 'expenses' AND COLUMN_NAME = 'notes';
+SET @s := IF(@c = 0,
+  'ALTER TABLE expenses ADD COLUMN notes VARCHAR(512) NOT NULL DEFAULT \'\'',
+  'SELECT 1');
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SELECT COUNT(*) INTO @c FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = @orange_schema AND TABLE_NAME = 'expenses' AND COLUMN_NAME = 'updated_at';
+SET @s := IF(@c = 0,
+  'ALTER TABLE expenses ADD COLUMN updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP',
+  'SELECT 1');
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;

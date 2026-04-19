@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../../includes/year_end_close.php';
+require_once __DIR__ . '/../../../includes/gl_settings.php';
 require_admin_api();
 
 /**
@@ -236,5 +237,5 @@ try {
 
     json_response(['success' => false, 'message' => 'إجراء غير معروف'], 422);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر حفظ السنة المالية');
+    orange_gl_api_catch_json($e, 'تعذر حفظ السنة المالية');
 }
