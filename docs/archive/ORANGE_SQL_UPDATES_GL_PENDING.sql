@@ -151,3 +151,34 @@ SET @s := IF(@jtexists > 0 AND @c = 0,
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci',
   'SELECT 1');
 PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ---------------------------------------------------------------------------
+-- فواتير مبيعات + بيانات شركة (مرجع: includes/catalog_schema.php)
+-- ---------------------------------------------------------------------------
+SELECT COUNT(*) INTO @c FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = @orange_schema AND TABLE_NAME = 'company_settings' AND COLUMN_NAME = 'vat_number';
+SET @s := IF(@c = 0,
+  'ALTER TABLE company_settings ADD COLUMN vat_number VARCHAR(191) NOT NULL DEFAULT \'\'',
+  'SELECT 1');
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SELECT COUNT(*) INTO @c FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = @orange_schema AND TABLE_NAME = 'company_settings' AND COLUMN_NAME = 'invoice_footer';
+SET @s := IF(@c = 0,
+  'ALTER TABLE company_settings ADD COLUMN invoice_footer TEXT NULL',
+  'SELECT 1');
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SELECT COUNT(*) INTO @c FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = @orange_schema AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'invoice_number';
+SET @s := IF(@c = 0,
+  'ALTER TABLE orders ADD COLUMN invoice_number VARCHAR(32) NULL DEFAULT NULL',
+  'SELECT 1');
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SELECT COUNT(*) INTO @c FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = @orange_schema AND TABLE_NAME = 'orders' AND INDEX_NAME = 'uq_orders_invoice_number';
+SET @s := IF(@c = 0,
+  'CREATE UNIQUE INDEX uq_orders_invoice_number ON orders (invoice_number)',
+  'SELECT 1');
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;

@@ -1,8 +1,10 @@
 <?php
 
 require_once __DIR__ . '/../../includes/order_helpers.php';
+require_once __DIR__ . '/../../includes/catalog_schema.php';
 
 $pdo = db();
+$hasOrderInvoiceCol = orange_table_has_column($pdo, 'orders', 'invoice_number');
 
 $sourceFilter = isset($_GET['source']) ? trim((string)$_GET['source']) : 'all';
 if (!in_array($sourceFilter, ['all', 'website', 'company'], true)) {
@@ -127,6 +129,7 @@ function orange_admin_orders_action_buttons(array $o): void
             <thead>
                 <tr>
                     <th>رقم الطلب</th>
+                    <?php if ($hasOrderInvoiceCol): ?><th>رقم الفاتورة</th><?php endif; ?>
                     <th>المصدر</th>
                     <th>البيع</th>
                     <th class="col-orders-customer">العميل</th>
@@ -141,6 +144,12 @@ function orange_admin_orders_action_buttons(array $o): void
                 <?php foreach ($orders as $o): ?>
                 <tr>
                     <td><?php echo htmlspecialchars((string)($o['order_number'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <?php if ($hasOrderInvoiceCol): ?>
+                    <td><?php
+                        $inv = trim((string)($o['invoice_number'] ?? ''));
+                        echo $inv !== '' ? htmlspecialchars($inv, ENT_QUOTES, 'UTF-8') : '—';
+                    ?></td>
+                    <?php endif; ?>
                     <td><?php
                         $src = (string)($o['order_source'] ?? 'website');
                         echo $src === 'company'

@@ -818,6 +818,27 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_purchase_items_variant ON purchase_items (variant_id)');
     }
 
+    if (orange_table_exists($pdo, 'company_settings') && !orange_table_has_column($pdo, 'company_settings', 'vat_number')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            "ALTER TABLE company_settings ADD COLUMN vat_number VARCHAR(191) NOT NULL DEFAULT ''"
+        );
+    }
+    if (orange_table_exists($pdo, 'company_settings') && !orange_table_has_column($pdo, 'company_settings', 'invoice_footer')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE company_settings ADD COLUMN invoice_footer TEXT NULL');
+    }
+
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'invoice_number')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            "ALTER TABLE orders ADD COLUMN invoice_number VARCHAR(32) NULL DEFAULT NULL"
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE UNIQUE INDEX uq_orders_invoice_number ON orders (invoice_number)'
+        );
+    }
+
     if (!orange_table_exists($pdo, 'orange_admin_audit_log')) {
         orange_catalog_safe_exec(
             $pdo,
