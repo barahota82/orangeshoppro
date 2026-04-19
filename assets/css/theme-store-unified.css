@@ -21,31 +21,34 @@ body.storefront .product-body h3 {
     color: var(--text);
 }
 
-/* هيرو: تدرج داكن مع توهج برتقالي */
+/* هيرو: تدرج أسود-برتقالي (سيطرة السواد ~70%)، لمعان داخلي، بدون ظل خارجي قوي */
 .theme-orange .hero-banner,
 .theme-blue .hero-banner,
 .theme-black .hero-banner {
     background: linear-gradient(
-        128deg,
-        #121212 0%,
-        #1a0f08 28%,
-        #5c2800 55%,
-        #ff4d00 78%,
-        #ff6a00 92%,
-        #ff7a1a 100%
+        118deg,
+        #140a06 0%,
+        #140a06 32%,
+        #1a0d08 48%,
+        #3d1805 62%,
+        #5a2206 74%,
+        #9a3a00 86%,
+        #ff6a00 100%
     );
     color: var(--text);
-    border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
-    box-shadow: var(--hero-shadow);
+    border: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 122, 26, 0.12),
+        inset 0 -28px 44px -10px rgba(0, 0, 0, 0.52),
+        inset 0 0 72px rgba(0, 0, 0, 0.32);
 }
 
 .theme-orange .hero-banner::after,
 .theme-blue .hero-banner::after,
 .theme-black .hero-banner::after {
     background:
-        radial-gradient(ellipse 90% 70% at 85% 15%, rgba(255, 106, 0, 0.22), transparent 55%),
-        radial-gradient(ellipse 55% 45% at 12% 88%, rgba(255, 77, 0, 0.14), transparent 50%),
-        radial-gradient(ellipse 40% 35% at 50% 50%, rgba(255, 255, 255, 0.04), transparent 65%);
+        radial-gradient(ellipse 72% 52% at 90% 16%, rgba(255, 106, 0, 0.1), transparent 58%),
+        radial-gradient(ellipse 48% 42% at 10% 88%, rgba(20, 10, 6, 0.45), transparent 55%);
 }
 
 .theme-orange .hero-banner h2,
@@ -76,6 +79,21 @@ body.storefront .btn:hover:not([disabled]) {
 body.storefront .btn-secondary:hover:not([disabled]) {
     border-color: var(--border-hover);
     background: var(--surface-elevated);
+}
+
+/* تبويب القسم النشط (مثل «All»): قريب من اللوجو، أقل سطوعاً، لمعة ضيقة #FF7A1A — بدون glow خارجي */
+body.storefront .tab-btn.active {
+    background: linear-gradient(
+        135deg,
+        #c75100 0%,
+        #e85b00 38%,
+        #ff7a1a 49%,
+        #e85b00 56%,
+        #b84800 100%
+    );
+    color: var(--text);
+    border-color: transparent;
+    box-shadow: inset 0 1px 0 rgba(255, 122, 26, 0.28);
 }
 
 /* رقاقات الاختيار (لون/مقاس) */
