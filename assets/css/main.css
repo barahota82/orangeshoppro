@@ -2000,6 +2000,7 @@ body.storefront .product-gallery__img {
     gap: 0;
     min-height: 56px;
     overflow: visible;
+    box-sizing: border-box;
 }
 
 .app-bottom-dock__cell {
@@ -2029,7 +2030,6 @@ body.storefront .product-gallery__img {
     padding: 8px 4px;
     border-radius: 0;
     border: 0;
-    border-inline-end: 1px solid var(--border);
     background: transparent;
 }
 
@@ -2098,9 +2098,8 @@ body.storefront .product-gallery__img {
     font-family: var(--font-display);
     line-height: 1.15;
     text-align: center;
-    /* حد 1px ثابت على كل الجهات ثم لون الفاصل فقط — يمنع قفز المربع عند :active على الموبايل */
+    /* حد شفاف ثابت — بدون خطوط تقسيم بين الأزرار (المسافة من gap على الشبكة في الموبايل) */
     border: 1px solid transparent;
-    border-inline-end-color: var(--border);
     background: transparent;
     box-shadow: none;
     transition:
@@ -2117,7 +2116,6 @@ body.storefront .product-gallery__img {
 .app-dock-btn--whatsapp {
     color: #128c7e;
     border: 1px solid transparent;
-    border-inline-end-color: transparent;
 }
 
 .app-dock-btn--whatsapp:hover {
@@ -2252,6 +2250,13 @@ body.storefront .product-gallery__img {
         padding-right: env(safe-area-inset-right, 0px);
         touch-action: manipulation;
         -webkit-touch-callout: none;
+    }
+
+    /* شريط موحّد: بدون خطوط رأسية بين الخلايا — المسافة من column-gap فقط (الـ safe-area على الـ nav أصلًا) */
+    body.storefront .app-bottom-dock__grid {
+        column-gap: 10px;
+        row-gap: 0;
+        padding-inline: 4px;
     }
 
     /*
