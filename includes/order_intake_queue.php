@@ -16,10 +16,19 @@ function orange_order_intake_snip_message(string $msg, int $max = 500): string
 }
 
 /**
- * Upsert customer by phone for storefront checkout (links to customers registry).
+ * Upsert customer by phone for storefront checkout (phone = unique key for the customer row).
+ * Updates name, area, address, email from the latest order; appends order notes to customer notes.
  */
-function orange_storefront_upsert_customer_from_checkout(PDO $pdo, string $name, string $phone): ?int
-{
+function orange_storefront_upsert_customer_from_checkout(
+    PDO $pdo,
+    string $name,
+    string $phone,
+    string $area,
+    string $address,
+    string $emailRaw,
+    string $orderNotes,
+    string $orderNumber
+): ?int {
     if (!orange_table_exists($pdo, 'customers')) {
         return null;
     }
@@ -28,28 +37,124 @@ function orange_storefront_upsert_customer_from_checkout(PDO $pdo, string $name,
         return null;
     }
     $nameAr = trim($name) !== '' ? trim($name) : 'عميل';
+    $area = trim($area);
+    $address = trim($address);
+    $email = trim($emailRaw);
+    if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $email = '';
+    }
+    $emailSql = $email !== '' ? $email : null;
 
-    $find = $pdo->prepare('SELECT id FROM customers WHERE phone = ? LIMIT 1');
+    $snippet = preg_replace('/\s+/u', ' ', trim($orderNotes));
+    if (function_exists('mb_substr')) {
+        $snippet = $snippet !== '' ? mb_substr($snippet, 0, 500, 'UTF-8') : '—';
+    } else {
+        $snippet = $snippet !== '' ? substr($snippet, 0, 500) : '—';
+    }
+    $appendLine = '[' . date('Y-m-d H:i') . '] ' . $orderNumber . ': ' . $snippet;
+
+    $hasArea = orange_table_has_column($pdo, 'customers', 'area');
+    $hasAddress = orange_table_has_column($pdo, 'customers', 'address');
+    $hasEmail = orange_table_has_column($pdo, 'customers', 'email');
+
+    $find = $pdo->prepare('SELECT id, notes FROM customers WHERE phone = ? LIMIT 1');
     $find->execute([$phone]);
-    $ex = $find->fetchColumn();
-    if ($ex !== false && $ex !== null) {
-        $id = (int) $ex;
-        $pdo->prepare('UPDATE customers SET name_ar = ? WHERE id = ?')->execute([$nameAr, $id]);
+    $existing = $find->fetch(PDO::FETCH_ASSOC);
+
+    $mergeNotes = static function (?string $prev, string $line): string {
+        $base = trim((string) $prev);
+        $add = trim($line);
+        $out = $base === '' ? $add : ($base . "\n" . $add);
+        if (function_exists('mb_strlen') && mb_strlen($out, 'UTF-8') > 60000) {
+            $out = mb_substr($out, -60000, null, 'UTF-8');
+        } elseif (strlen($out) > 60000) {
+            $out = substr($out, -60000);
+        }
+
+        return $out;
+    };
+
+    if ($existing !== false && $existing !== null) {
+        $id = (int) $existing['id'];
+        $newNotes = $mergeNotes($existing['notes'] ?? null, $appendLine);
+
+        $set = ['name_ar = ?'];
+        $params = [$nameAr];
+        if ($hasArea) {
+            $set[] = 'area = ?';
+            $params[] = $area;
+        }
+        if ($hasAddress) {
+            $set[] = 'address = ?';
+            $params[] = $address;
+        }
+        if ($hasEmail && $emailSql !== null) {
+            $set[] = 'email = ?';
+            $params[] = $emailSql;
+        }
+        $set[] = 'notes = ?';
+        $params[] = $newNotes;
+        $params[] = $id;
+        $pdo->prepare('UPDATE customers SET ' . implode(', ', $set) . ' WHERE id = ?')->execute($params);
 
         return $id;
     }
+
+    $newNotes = $mergeNotes(null, $appendLine);
+    $cols = ['name_ar', 'phone'];
+    $placeholders = ['?', '?'];
+    $params = [$nameAr, $phone];
+    if ($hasArea) {
+        $cols[] = 'area';
+        $placeholders[] = '?';
+        $params[] = $area;
+    }
+    if ($hasAddress) {
+        $cols[] = 'address';
+        $placeholders[] = '?';
+        $params[] = $address;
+    }
+    if ($hasEmail) {
+        $cols[] = 'email';
+        $placeholders[] = '?';
+        $params[] = $emailSql;
+    }
+    $cols[] = 'notes';
+    $placeholders[] = '?';
+    $params[] = $newNotes;
+
     try {
-        $pdo->prepare('INSERT INTO customers (name_ar, phone) VALUES (?, ?)')->execute([$nameAr, $phone]);
+        $sql = 'INSERT INTO customers (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $placeholders) . ')';
+        $pdo->prepare($sql)->execute($params);
 
         return (int) $pdo->lastInsertId();
     } catch (PDOException $e) {
         $dup = (int) (($e->errorInfo[1] ?? 0));
         if ($dup === 1062 || str_contains($e->getMessage(), 'Duplicate')) {
-            $find->execute([$phone]);
-            $ex2 = $find->fetchColumn();
+            $find2 = $pdo->prepare('SELECT id, notes FROM customers WHERE phone = ? LIMIT 1');
+            $find2->execute([$phone]);
+            $ex2 = $find2->fetch(PDO::FETCH_ASSOC);
             if ($ex2 !== false && $ex2 !== null) {
-                $id = (int) $ex2;
-                $pdo->prepare('UPDATE customers SET name_ar = ? WHERE id = ?')->execute([$nameAr, $id]);
+                $id = (int) $ex2['id'];
+                $newNotes2 = $mergeNotes($ex2['notes'] ?? null, $appendLine);
+                $set = ['name_ar = ?'];
+                $params2 = [$nameAr];
+                if ($hasArea) {
+                    $set[] = 'area = ?';
+                    $params2[] = $area;
+                }
+                if ($hasAddress) {
+                    $set[] = 'address = ?';
+                    $params2[] = $address;
+                }
+                if ($hasEmail && $emailSql !== null) {
+                    $set[] = 'email = ?';
+                    $params2[] = $emailSql;
+                }
+                $set[] = 'notes = ?';
+                $params2[] = $newNotes2;
+                $params2[] = $id;
+                $pdo->prepare('UPDATE customers SET ' . implode(', ', $set) . ' WHERE id = ?')->execute($params2);
 
                 return $id;
             }
@@ -66,7 +171,12 @@ function orange_storefront_upsert_customer_from_checkout(PDO $pdo, string $name,
  */
 function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): array
 {
-    require_fields($data, ['name', 'phone', 'area', 'address', 'channel_id', 'items']);
+    require_fields($data, ['name', 'phone', 'area', 'address', 'email', 'channel_id', 'items']);
+
+    $emailCheck = trim((string) ($data['email'] ?? ''));
+    if ($emailCheck === '' || !filter_var($emailCheck, FILTER_VALIDATE_EMAIL)) {
+        throw new RuntimeException(function_exists('t') ? t('checkout_invalid_email') : 'Invalid email.');
+    }
 
     if (!is_array($data['items']) || count($data['items']) === 0) {
         throw new RuntimeException('Cart items are required');
@@ -176,7 +286,12 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     $customerRowId = orange_storefront_upsert_customer_from_checkout(
         $pdo,
         trim((string) $data['name']),
-        trim((string) $data['phone'])
+        trim((string) $data['phone']),
+        trim((string) $data['area']),
+        trim((string) $data['address']),
+        trim((string) $data['email']),
+        isset($data['notes']) ? trim((string) $data['notes']) : '',
+        $orderNumber
     );
 
     $cols = 'order_number, customer_name, phone, area, address, notes, channel_id, status, total';
@@ -263,6 +378,7 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     $messageLines[] = "Order Number: {$orderNumber}";
     $messageLines[] = 'Customer: ' . trim((string) $data['name']);
     $messageLines[] = 'Phone: ' . trim((string) $data['phone']);
+    $messageLines[] = 'Email: ' . trim((string) $data['email']);
     $messageLines[] = 'Area: ' . trim((string) $data['area']);
     $messageLines[] = 'Address: ' . trim((string) $data['address']);
     if (!empty($data['notes'])) {

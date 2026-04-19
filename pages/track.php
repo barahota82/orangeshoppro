@@ -6,6 +6,7 @@ require_once __DIR__ . '/../config.php';
 include __DIR__ . '/../includes/header.php';
 
 $trackHomeUrl = storefront_url('home', $channelSlug, $lang);
+$registerUrl = htmlspecialchars(storefront_url('register', $channelSlug, $lang), ENT_QUOTES, 'UTF-8');
 $waHref = storefront_whatsapp_href($channel, '');
 $orangeOrderStatusLabels = [
     'pending' => t('order_status_pending'),
@@ -38,21 +39,34 @@ $orangeMyOrderUi = [
         <a class="cart-page-close" href="<?php echo htmlspecialchars($trackHomeUrl, ENT_QUOTES, 'UTF-8'); ?>" aria-label="<?php echo htmlspecialchars(t('product_back_to_shop'), ENT_QUOTES, 'UTF-8'); ?>"><span aria-hidden="true">&times;</span></a>
     </div>
 
-    <div class="card-box">
-        <div class="form-grid">
-            <div>
-                <label><?php echo htmlspecialchars(t('order_number'), ENT_QUOTES, 'UTF-8'); ?></label>
-                <input id="track_order_number" autocomplete="off">
+    <div class="track-signup-cta card-box" role="region" aria-label="<?php echo htmlspecialchars(t('track_signup_cta_aria'), ENT_QUOTES, 'UTF-8'); ?>">
+        <div class="track-signup-cta__inner">
+            <div class="track-signup-cta__copy">
+                <p class="track-signup-cta__title"><?php echo htmlspecialchars(t('track_signup_cta_title'), ENT_QUOTES, 'UTF-8'); ?></p>
+                <p class="track-signup-cta__text"><?php echo htmlspecialchars(t('track_signup_cta_text'), ENT_QUOTES, 'UTF-8'); ?></p>
             </div>
-            <div>
-                <label><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
-                <input id="track_phone" autocomplete="tel">
+            <a class="btn track-signup-cta__btn" href="<?php echo $registerUrl; ?>"><?php echo htmlspecialchars(t('storefront_register'), ENT_QUOTES, 'UTF-8'); ?></a>
+        </div>
+    </div>
+
+    <div class="card-box track-page-card">
+        <h3 class="cart-section-title track-page-card__title"><?php echo htmlspecialchars(t('track_form_section_title'), ENT_QUOTES, 'UTF-8'); ?></h3>
+        <p class="track-form-intro"><?php echo htmlspecialchars(t('track_order_howto'), ENT_QUOTES, 'UTF-8'); ?></p>
+        <hr class="track-form-divider" aria-hidden="true">
+        <form class="track-page-form" id="track-page-form" action="#" method="get" novalidate>
+            <div class="field">
+                <label for="track_order_number"><?php echo htmlspecialchars(t('order_number'), ENT_QUOTES, 'UTF-8'); ?></label>
+                <input id="track_order_number" name="order_number" autocomplete="off" inputmode="text">
             </div>
-        </div>
-        <div class="actions-row" style="margin-top:14px;">
-            <button type="button" class="btn" onclick="pageTrackOrderNow()"><?php echo htmlspecialchars(t('track_order'), ENT_QUOTES, 'UTF-8'); ?></button>
-        </div>
-        <div id="trackResult" class="cart-track-result" style="margin-top:18px;"></div>
+            <div class="field">
+                <label for="track_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
+                <input id="track_phone" name="phone" autocomplete="tel" inputmode="tel">
+            </div>
+            <div class="actions-row track-page-actions">
+                <button type="submit" class="btn btn--track-submit"><?php echo htmlspecialchars(t('track_order'), ENT_QUOTES, 'UTF-8'); ?></button>
+            </div>
+        </form>
+        <div id="trackResult" class="cart-track-result track-page-result" style="margin-top:18px;" tabindex="-1"></div>
     </div>
 </div>
 
@@ -62,8 +76,19 @@ window.ORANGE_ORDER_STATUS_LABELS = <?php echo json_encode($orangeOrderStatusLab
 window.ORANGE_MY_ORDER_UI = <?php echo json_encode($orangeMyOrderUi, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_TRACK_LABELS = {
     order_number: <?php echo json_encode(t('order_number'), JSON_UNESCAPED_UNICODE); ?>,
-    phone: <?php echo json_encode(t('phone'), JSON_UNESCAPED_UNICODE); ?>
+    phone: <?php echo json_encode(t('phone'), JSON_UNESCAPED_UNICODE); ?>,
+    items_title: <?php echo json_encode(t('track_order_items'), JSON_UNESCAPED_UNICODE); ?>
 };
+
+(function () {
+    var tf = document.getElementById('track-page-form');
+    if (tf) {
+        tf.addEventListener('submit', function (e) {
+            e.preventDefault();
+            pageTrackOrderNow();
+        });
+    }
+})();
 
 async function pageTrackOrderNow() {
     var msgMissing = <?php echo json_encode(t('track_missing_fields'), JSON_UNESCAPED_UNICODE); ?>;

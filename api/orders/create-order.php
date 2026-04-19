@@ -12,7 +12,7 @@ try {
     orange_catalog_ensure_schema($pdo);
     $data = get_json_input();
 
-    require_fields($data, ['name', 'phone', 'area', 'address', 'channel_id', 'items']);
+    require_fields($data, ['name', 'phone', 'area', 'address', 'email', 'channel_id', 'items']);
 
     if (!is_array($data['items']) || count($data['items']) === 0) {
         json_response(['success' => false, 'message' => 'Cart items are required'], 422);

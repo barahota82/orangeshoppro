@@ -42,7 +42,21 @@ try {
     $hasLimit = orange_table_has_column($pdo, 'customers', 'credit_limit');
     $hasNotes = orange_table_has_column($pdo, 'customers', 'notes');
     $hasCode = orange_table_has_column($pdo, 'customers', 'code');
+    $hasArea = orange_table_has_column($pdo, 'customers', 'area');
+    $hasAddress = orange_table_has_column($pdo, 'customers', 'address');
+    $hasEmail = orange_table_has_column($pdo, 'customers', 'email');
     $codeSql = orange_customer_normalize_code($pdo, $data['code'] ?? '');
+
+    $area = trim((string) ($data['area'] ?? ''));
+    $address = trim((string) ($data['address'] ?? ''));
+    $emailIn = trim((string) ($data['email'] ?? ''));
+    $emailSql = null;
+    if ($emailIn !== '') {
+        if (!filter_var($emailIn, FILTER_VALIDATE_EMAIL)) {
+            json_response(['success' => false, 'message' => 'بريد إلكتروني غير صالح'], 422);
+        }
+        $emailSql = $emailIn;
+    }
 
     $creditLimitSql = null;
     if ($hasLimit && array_key_exists('credit_limit', $data)) {
@@ -55,7 +69,7 @@ try {
         }
     }
     $notesRaw = trim((string) ($data['notes'] ?? ''));
-    $notesSql = $notesRaw === '' ? null : (function_exists('mb_substr') ? mb_substr($notesRaw, 0, 255, 'UTF-8') : substr($notesRaw, 0, 255));
+    $notesSql = $notesRaw === '' ? null : (function_exists('mb_substr') ? mb_substr($notesRaw, 0, 60000, 'UTF-8') : substr($notesRaw, 0, 60000));
 
     $assertCodeUnique = static function (int $excludeId) use ($pdo, $codeSql, $hasCode): void {
         if (!$hasCode || $codeSql === null) {
@@ -88,6 +102,18 @@ try {
 
         $fields = ['name_ar = ?', 'phone = ?'];
         $params = [$name, $phone];
+        if ($hasArea) {
+            $fields[] = 'area = ?';
+            $params[] = $area;
+        }
+        if ($hasAddress) {
+            $fields[] = 'address = ?';
+            $params[] = $address;
+        }
+        if ($hasEmail) {
+            $fields[] = 'email = ?';
+            $params[] = $emailSql;
+        }
         if ($hasLimit) {
             $fields[] = 'credit_limit = ?';
             $params[] = $creditLimitSql;
@@ -116,6 +142,18 @@ try {
         $assertCodeUnique($id);
         $fields = ['name_ar = ?'];
         $params = [$name];
+        if ($hasArea) {
+            $fields[] = 'area = ?';
+            $params[] = $area;
+        }
+        if ($hasAddress) {
+            $fields[] = 'address = ?';
+            $params[] = $address;
+        }
+        if ($hasEmail) {
+            $fields[] = 'email = ?';
+            $params[] = $emailSql;
+        }
         if ($hasLimit && array_key_exists('credit_limit', $data)) {
             $fields[] = 'credit_limit = ?';
             $params[] = $creditLimitSql;
@@ -140,6 +178,21 @@ try {
     $cols = ['name_ar', 'phone'];
     $placeholders = ['?', '?'];
     $params = [$name, $phone];
+    if ($hasArea) {
+        $cols[] = 'area';
+        $placeholders[] = '?';
+        $params[] = $area;
+    }
+    if ($hasAddress) {
+        $cols[] = 'address';
+        $placeholders[] = '?';
+        $params[] = $address;
+    }
+    if ($hasEmail) {
+        $cols[] = 'email';
+        $placeholders[] = '?';
+        $params[] = $emailSql;
+    }
     if ($hasLimit) {
         $cols[] = 'credit_limit';
         $placeholders[] = '?';

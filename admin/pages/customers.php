@@ -30,8 +30,7 @@ $count = count($rows);
     <div>
         <h1>العملاء</h1>
         <p class="page-subtitle">
-            سجل موحّد لكل العملاء: <strong>كود العميل</strong> (فريد اختياري)، البيانات، حد الائتمان، رصيد الذمة، وعدد الطلبات.
-            مستقبلاً: ربط <strong>مردود المبيعات</strong> بجدول <code dir="ltr">sales_returns</code> (العميل + الطلب الأصلي).
+            سجل العملاء: <strong>الهاتف</strong> معرّف فريد للعميل (مثل الكود). الحقول: الاسم، المنطقة، العنوان، البريد، الملاحظات (تُحدَّث تلقائياً من ملاحظات كل طلب ويب)، حد الائتمان، والذمم.
             الذمم والقبض من <a href="/admin/index.php?page=partner_ledger">ذمم العملاء والموردين</a>.
         </p>
     </div>
@@ -55,7 +54,7 @@ $count = count($rows);
 
 <div class="card">
     <h3>عميل جديد أو تعديل</h3>
-    <p class="card-hint" style="margin-top:0;">الهاتف معرّف فريد للربط مع الطلبات. <strong>كود العميل</strong> اختياري ويُستخدم في التقارير والربط مع مردود المبيعات. اضغط «تعديل» من الجدول لتحميل عميل قائم.</p>
+    <p class="card-hint" style="margin-top:0;">الهاتف هو المعرّف الأساسي للعميل. <strong>كود العميل</strong> اختياري للتقارير. ملاحظات الطلبات من المتجر تُضاف تلقائياً إلى حقل الملاحظات مع رقم الطلب والوقت.</p>
     <input type="hidden" id="cust_id" value="0">
     <div class="form-grid">
         <div>
@@ -67,16 +66,28 @@ $count = count($rows);
             <input type="text" id="cust_name" autocomplete="off" placeholder="اسم العميل">
         </div>
         <div>
-            <label for="cust_phone">الهاتف</label>
+            <label for="cust_phone">الهاتف <span style="color:#b45309;">*</span></label>
             <input type="text" id="cust_phone" autocomplete="off" dir="ltr" lang="en" placeholder="مثال: 5xxxxxxxx">
+        </div>
+        <div>
+            <label for="cust_email">البريد الإلكتروني</label>
+            <input type="email" id="cust_email" autocomplete="off" dir="ltr" lang="en" placeholder="اختياري">
+        </div>
+        <div>
+            <label for="cust_area">المنطقة</label>
+            <input type="text" id="cust_area" autocomplete="off" placeholder="المنطقة">
+        </div>
+        <div style="grid-column:1/-1;">
+            <label for="cust_address">العنوان</label>
+            <textarea id="cust_address" rows="2" autocomplete="off" placeholder="عنوان التوصيل"></textarea>
         </div>
         <div>
             <label for="cust_limit">حد ائتمان (اختياري)</label>
             <input type="number" id="cust_limit" class="admin-inp-money" step="any" min="0" value="" placeholder="فارغ = بلا حد" inputmode="decimal" lang="en" dir="ltr">
         </div>
         <div style="grid-column:1/-1;">
-            <label for="cust_notes">ملاحظات</label>
-            <input type="text" id="cust_notes" autocomplete="off" placeholder="اختياري">
+            <label for="cust_notes">ملاحظات (يشمل سجل ملاحظات الطلبات)</label>
+            <textarea id="cust_notes" rows="5" autocomplete="off" placeholder="ملاحظات يدوية + أسطر تلقائية من كل طلب ويب"></textarea>
         </div>
     </div>
     <div class="actions" style="margin-top:12px;">
@@ -90,7 +101,7 @@ $count = count($rows);
     <div class="party-registry-toolbar">
         <div class="party-registry-search-wrap">
             <label for="cust_filter" class="party-registry-search-label">بحث</label>
-            <input type="search" id="cust_filter" class="party-registry-search" placeholder="اسم، هاتف، ملاحظات…" autocomplete="off" lang="ar" dir="rtl" oninput="custFilterRows()">
+            <input type="search" id="cust_filter" class="party-registry-search" placeholder="اسم، هاتف، بريد، منطقة…" autocomplete="off" lang="ar" dir="rtl" oninput="custFilterRows()">
         </div>
     </div>
     <?php if ($rows === []): ?>
@@ -104,6 +115,8 @@ $count = count($rows);
                         <th>الكود</th>
                         <th>الاسم</th>
                         <th>الهاتف</th>
+                        <th>المنطقة</th>
+                        <th>البريد</th>
                         <th>حد الائتمان</th>
                         <th>رصيد الذمة</th>
                         <th>طلبات</th>
@@ -117,22 +130,44 @@ $count = count($rows);
                         $bal = orange_party_balance_customer($pdo, $cid);
                         $lim = isset($c['credit_limit']) && $c['credit_limit'] !== null && (float) $c['credit_limit'] > 0
                             ? number_format((float) $c['credit_limit'], 3) : '—';
-                        $hayRaw = trim((string) ($c['name_ar'] ?? '') . ' ' . ($c['phone'] ?? '') . ' ' . ($c['notes'] ?? ''));
+                        $codeDisp = (string) ($c['code'] ?? '');
+                        $areaDisp = (string) ($c['area'] ?? '');
+                        $emailDisp = (string) ($c['email'] ?? '');
+                        $hayRaw = trim(
+                            (string) ($c['name_ar'] ?? '')
+                            . ' ' . ($c['phone'] ?? '')
+                            . ' ' . $codeDisp
+                            . ' ' . $areaDisp
+                            . ' ' . $emailDisp
+                            . ' ' . ($c['notes'] ?? '')
+                        );
                         $hay = function_exists('mb_strtolower') ? mb_strtolower($hayRaw, 'UTF-8') : strtolower($hayRaw);
+                        $emailShort = $emailDisp;
+                        if (function_exists('mb_strlen') && mb_strlen($emailShort, 'UTF-8') > 28) {
+                            $emailShort = mb_substr($emailShort, 0, 26, 'UTF-8') . '…';
+                        } elseif (strlen($emailShort) > 28) {
+                            $emailShort = substr($emailShort, 0, 26) . '…';
+                        }
                         ?>
                         <tr data-cust-search="<?php echo htmlspecialchars($hay, ENT_QUOTES, 'UTF-8'); ?>">
                             <td><?php echo $cid; ?></td>
+                            <td dir="ltr"><?php echo htmlspecialchars($codeDisp, ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><?php echo htmlspecialchars((string) ($c['name_ar'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td dir="ltr"><?php echo htmlspecialchars((string) ($c['phone'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td><?php echo htmlspecialchars($areaDisp, ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td dir="ltr"><?php echo htmlspecialchars($emailShort, ENT_QUOTES, 'UTF-8'); ?></td>
                             <td dir="ltr"><?php echo htmlspecialchars($lim, ENT_QUOTES, 'UTF-8'); ?></td>
                             <td dir="ltr"><?php echo number_format($bal, 3); ?></td>
                             <td><?php echo (int) ($c['order_cnt'] ?? 0); ?></td>
                             <td class="party-registry-actions">
                                 <button type="button" class="btn-secondary party-registry-btn" onclick='custEdit(<?php echo json_encode([
                                     'id' => $cid,
-                                    'code' => (string) ($c['code'] ?? ''),
+                                    'code' => $codeDisp,
                                     'name_ar' => (string) ($c['name_ar'] ?? ''),
                                     'phone' => (string) ($c['phone'] ?? ''),
+                                    'area' => $areaDisp,
+                                    'address' => (string) ($c['address'] ?? ''),
+                                    'email' => $emailDisp,
                                     'credit_limit' => $c['credit_limit'] ?? null,
                                     'notes' => (string) ($c['notes'] ?? ''),
                                 ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>)'>تعديل</button>
@@ -152,6 +187,9 @@ function custResetForm() {
     document.getElementById('cust_code').value = '';
     document.getElementById('cust_name').value = '';
     document.getElementById('cust_phone').value = '';
+    document.getElementById('cust_email').value = '';
+    document.getElementById('cust_area').value = '';
+    document.getElementById('cust_address').value = '';
     document.getElementById('cust_limit').value = '';
     document.getElementById('cust_notes').value = '';
 }
@@ -160,6 +198,9 @@ function custEdit(row) {
     document.getElementById('cust_code').value = row.code || '';
     document.getElementById('cust_name').value = row.name_ar || '';
     document.getElementById('cust_phone').value = row.phone || '';
+    document.getElementById('cust_email').value = row.email || '';
+    document.getElementById('cust_area').value = row.area || '';
+    document.getElementById('cust_address').value = row.address || '';
     var lim = row.credit_limit;
     document.getElementById('cust_limit').value =
         lim != null && lim !== '' && Number(lim) > 0 ? String(lim) : '';
@@ -170,15 +211,25 @@ function custSave() {
     var id = parseInt(document.getElementById('cust_id').value, 10) || 0;
     var name = document.getElementById('cust_name').value.trim();
     var phone = document.getElementById('cust_phone').value.trim();
+    var email = document.getElementById('cust_email').value.trim();
+    var area = document.getElementById('cust_area').value.trim();
+    var address = document.getElementById('cust_address').value.trim();
     var limRaw = document.getElementById('cust_limit').value.trim();
     var notes = document.getElementById('cust_notes').value.trim();
     if (!phone) {
         alert('الهاتف مطلوب');
         return;
     }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        alert('بريد إلكتروني غير صالح');
+        return;
+    }
     var payload = {
         name_ar: name || 'عميل',
         phone: phone,
+        area: area,
+        address: address,
+        email: email || null,
         notes: notes || null,
         code: (document.getElementById('cust_code') && document.getElementById('cust_code').value.trim()) || null
     };

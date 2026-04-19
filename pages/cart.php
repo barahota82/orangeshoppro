@@ -7,7 +7,6 @@ include __DIR__ . '/../includes/header.php';
 $cartHomeUrl = storefront_url('home', $channelSlug, $lang);
 $tabBasketLabel = t('cart_tab_basket');
 $tabOrdersLabel = t('cart_tab_my_orders');
-$myOrdersIntro = t('my_orders_intro');
 $checkoutTitle = t('cart_checkout_title');
 $checkoutIntro = t('cart_checkout_intro');
 $trackSectionTitle = t('cart_track_section_title');
@@ -73,23 +72,27 @@ $orangeMyOrderUi = [
                 <p class="cart-checkout-intro"><?php echo htmlspecialchars(t('storefront_guest_checkout_note'), ENT_QUOTES, 'UTF-8'); ?></p>
                 <div id="cartOrderMiniSummary" class="cart-mini-summary" hidden></div>
                 <div class="field">
-                    <label><?php echo htmlspecialchars(t('customer_name'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <label for="customer_name"><?php echo htmlspecialchars(t('customer_name'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <input id="customer_name" autocomplete="name">
                 </div>
                 <div class="field">
-                    <label><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <label for="customer_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <input id="customer_phone" autocomplete="tel">
                 </div>
                 <div class="field">
-                    <label><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <label for="customer_email"><?php echo htmlspecialchars(t('customer_email'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <input id="customer_email" type="email" autocomplete="email" inputmode="email">
+                </div>
+                <div class="field">
+                    <label for="customer_area"><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <input id="customer_area" autocomplete="address-level1">
                 </div>
                 <div class="field">
-                    <label><?php echo htmlspecialchars(t('address'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <label for="customer_address"><?php echo htmlspecialchars(t('address'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <textarea id="customer_address" autocomplete="street-address"></textarea>
                 </div>
                 <div class="field">
-                    <label><?php echo htmlspecialchars(t('notes'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <label for="customer_notes"><?php echo htmlspecialchars(t('notes'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <textarea id="customer_notes"></textarea>
                 </div>
                 <div class="field cart-checkout-payment-radios" role="group" aria-labelledby="cart_pay_method_legend">
@@ -111,16 +114,15 @@ $orangeMyOrderUi = [
 
             <div class="card-box cart-track-card cart-my-orders-box">
                 <h3 class="cart-section-title"><?php echo htmlspecialchars($trackSectionTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
-                <p class="my-orders-intro"><?php echo htmlspecialchars($myOrdersIntro, ENT_QUOTES, 'UTF-8'); ?></p>
-                <div class="form-grid">
-                    <div>
-                        <label><?php echo htmlspecialchars(t('order_number'), ENT_QUOTES, 'UTF-8'); ?></label>
-                        <input id="cart_track_order_number" autocomplete="off">
-                    </div>
-                    <div>
-                        <label><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
-                        <input id="cart_track_phone" autocomplete="tel">
-                    </div>
+                <p class="track-form-intro"><?php echo htmlspecialchars(t('track_order_howto'), ENT_QUOTES, 'UTF-8'); ?></p>
+                <hr class="track-form-divider" aria-hidden="true">
+                <div class="field">
+                    <label for="cart_track_order_number"><?php echo htmlspecialchars(t('order_number'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <input id="cart_track_order_number" name="cart_track_order_number" autocomplete="off" inputmode="text">
+                </div>
+                <div class="field">
+                    <label for="cart_track_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <input id="cart_track_phone" name="cart_track_phone" autocomplete="tel" inputmode="tel">
                 </div>
                 <div class="actions-row" style="margin-top:14px;">
                     <button type="button" class="btn btn-secondary" onclick="cartTrackOrderNow()"><?php echo htmlspecialchars(t('track_order'), ENT_QUOTES, 'UTF-8'); ?></button>
@@ -175,7 +177,8 @@ window.ORANGE_ORDER_STATUS_LABELS = <?php echo json_encode($orangeOrderStatusLab
 window.ORANGE_MY_ORDER_UI = <?php echo json_encode($orangeMyOrderUi, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_TRACK_LABELS = {
     order_number: <?php echo json_encode(t('order_number'), JSON_UNESCAPED_UNICODE); ?>,
-    phone: <?php echo json_encode(t('phone'), JSON_UNESCAPED_UNICODE); ?>
+    phone: <?php echo json_encode(t('phone'), JSON_UNESCAPED_UNICODE); ?>,
+    items_title: <?php echo json_encode(t('track_order_items'), JSON_UNESCAPED_UNICODE); ?>
 };
 
 async function cartTrackOrderNow() {

@@ -699,7 +699,10 @@ function orange_catalog_ensure_schema(PDO $pdo): void
                 code VARCHAR(32) NULL,
                 name_ar VARCHAR(160) NOT NULL DEFAULT \'\',
                 phone VARCHAR(40) NOT NULL DEFAULT \'\',
-                notes VARCHAR(255) NULL,
+                area VARCHAR(160) NOT NULL DEFAULT \'\',
+                address VARCHAR(600) NOT NULL DEFAULT \'\',
+                email VARCHAR(255) NULL,
+                notes TEXT NULL,
                 credit_limit DECIMAL(18,4) NULL DEFAULT NULL,
                 created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE KEY uq_customers_phone (phone),
@@ -713,6 +716,18 @@ function orange_catalog_ensure_schema(PDO $pdo): void
     if (orange_table_exists($pdo, 'customers') && !orange_table_has_column($pdo, 'customers', 'code')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE customers ADD COLUMN code VARCHAR(32) NULL');
         orange_catalog_safe_exec($pdo, 'CREATE UNIQUE INDEX uq_customers_code ON customers (code)');
+    }
+    if (orange_table_exists($pdo, 'customers') && !orange_table_has_column($pdo, 'customers', 'area')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE customers ADD COLUMN area VARCHAR(160) NOT NULL DEFAULT \'\'');
+    }
+    if (orange_table_exists($pdo, 'customers') && !orange_table_has_column($pdo, 'customers', 'address')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE customers ADD COLUMN address VARCHAR(600) NOT NULL DEFAULT \'\'');
+    }
+    if (orange_table_exists($pdo, 'customers') && !orange_table_has_column($pdo, 'customers', 'email')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE customers ADD COLUMN email VARCHAR(255) NULL DEFAULT NULL');
+    }
+    if (orange_table_exists($pdo, 'customers') && orange_table_has_column($pdo, 'customers', 'notes')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE customers MODIFY COLUMN notes TEXT NULL');
     }
 
     if (!orange_table_exists($pdo, 'suppliers')) {
