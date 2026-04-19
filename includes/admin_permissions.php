@@ -84,6 +84,7 @@ function orange_admin_api_folder_resource(string $folder): string
         'purchases' => 'warehouse',
         'stock' => 'warehouse',
         'journal' => 'accounting',
+        'system' => 'accounting',
         'gl' => 'accounting',
         'fiscal_years' => 'accounting',
         'opening_balances' => 'accounting',

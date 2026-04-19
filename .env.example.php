@@ -17,6 +17,9 @@ return [
     // اختياري: نسخة ثابتة لكل CSS/JS (بدل filemtime)
     // 'ASSET_VERSION' => '20260417',
 
+    // اختياري: مرجع يدوي أو من الـ CI يظهر في /admin/api/system/deploy-check.php
+    // 'ORANGE_BUILD_REF' => 'main-abc1234',
+
     // اختياري: تقليل كاش HTML أثناء التطوير (1 أو true)
     // 'DISABLE_HTML_CACHE' => true,
 

@@ -39,6 +39,14 @@ $productsCount = (int)$pdo->query("SELECT COUNT(*) FROM products")->fetchColumn(
     </div>
 </div>
 
+<?php if (orange_admin_is_superuser($admin)): ?>
+<div class="card">
+    <h3>التحقق من نشر الكود</h3>
+    <p class="small">إذا كان النشر أوتوماتيكياً ولا ترى تغييرات في الشاشات، افتح الرابط التالي — يجب أن يظهر JSON وكل عناصر <code>markers</code> تكون <code>true</code>. (اختياري: عرّف <code>ORANGE_BUILD_REF</code> في <code>.env.php</code> ليظهر مرجع البناء.)</p>
+    <p style="margin:0;"><a href="/admin/api/system/deploy-check.php" target="_blank" rel="noopener">فتح فحص النشر</a></p>
+</div>
+<?php endif; ?>
+
 <div class="card">
     <h3>ملاحظات</h3>
     <p class="small">هذه المرحلة تضيف لوحة إدارة كاملة: تسجيل دخول، منتجات، فئات، طلبات، مخزون، عروض، تقارير، وواجهات.</p>
