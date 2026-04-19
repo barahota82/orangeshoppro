@@ -227,8 +227,10 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             <img class="logo" src="<?php echo htmlspecialchars($orangeChannelLogoUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="" width="52" height="52" decoding="async" role="presentation">
             <div class="brand-text">
                 <div class="brand-stack">
-                    <h1 class="brand-title-heading"><img class="brand-wordmark" src="<?php echo htmlspecialchars($orangeWordmarkUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?>" decoding="async"></h1>
-                    <small class="brand-tagline brand-tagline--cycle" aria-live="polite"><span class="brand-tagline__text" id="brandTaglineText" dir="auto" data-taglines="<?php echo $taglineJsonAttr; ?>"><?php echo htmlspecialchars($taglineInitial, ENT_QUOTES, 'UTF-8'); ?></span></small>
+                    <div class="brand-wordmark-anchor">
+                        <h1 class="brand-title-heading"><img class="brand-wordmark" src="<?php echo htmlspecialchars($orangeWordmarkUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?>" decoding="async"></h1>
+                        <small class="brand-tagline brand-tagline--cycle" aria-live="polite"><span class="brand-tagline__text" id="brandTaglineText" dir="auto" data-taglines="<?php echo $taglineJsonAttr; ?>"><?php echo htmlspecialchars($taglineInitial, ENT_QUOTES, 'UTF-8'); ?></span></small>
+                    </div>
                 </div>
             </div>
         </div>

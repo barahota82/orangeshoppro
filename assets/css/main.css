@@ -79,6 +79,7 @@ h1, h2, h3, .brand-text h1 {
     z-index: 10;
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
+    overflow: visible;
 }
 
 .header-inner {
@@ -87,6 +88,7 @@ h1, h2, h3, .brand-text h1 {
     justify-content: space-between;
     padding: 14px 0;
     gap: 16px;
+    overflow: visible;
 }
 
 .brand-wrap {
@@ -94,22 +96,35 @@ h1, h2, h3, .brand-text h1 {
     align-items: center;
     gap: 14px;
     min-width: 0;
+    overflow: visible;
 }
 
 .brand-text {
     flex: 0 1 auto;
     min-width: 0;
+    overflow: visible;
 }
 
-/* الهيدر dir=ltr: الأيقونة يسار؛ كتلة الاسم + سلوجان متمركزة نسبة لبعضها */
+/* كتلة العلامة: لا توسّع العرض حسب السلوجان (يمنع تحرك صورة الاسم) */
 .brand-stack {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 5px;
-    width: max-content;
-    /* ضيّق مساحة الكتلة لتقارب عرض السلوجان (~0.78rem) */
-    max-width: min(17rem, calc(100vw - 130px));
+    display: block;
+    /* عرض يتسع لسلوجان إنجليزي أطول + شعار أوضح */
+    max-width: min(20rem, calc(100vw - 120px));
+    overflow: visible;
+}
+
+/*
+ * مرساة بعرض صورة الاسم فقط؛ السلوجان position:absolute ومتمركز تحت منتصف الصورة.
+ * طول السلوجان يتغيّر دون إزاحة مكان الشعار.
+ */
+.brand-wordmark-anchor {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+    vertical-align: top;
+    /* مساحة تحت الصورة لسطرين تقريباً (يتناسب مع شعار أوضح) */
+    padding-bottom: clamp(2.5em, 7vw, 3.05em);
+    overflow: visible;
 }
 
 /* اسم العلامة كصورة شعار أفقية؛ السلوجان يبقى تحتها */
@@ -122,19 +137,26 @@ h1, h2, h3, .brand-text h1 {
 .brand-wordmark {
     display: block;
     width: auto;
-    /* حدّ أقصى للعرض حتى لا يستهلك الشعار الأفقي مساحة الهيدر */
-    max-width: min(12rem, 58vw);
+    /* أكبر قليلاً ليتماشى بصرياً مع السلوجان (خصوصاً الإنجليزي الأطول) */
+    max-width: min(15.5rem, 72vw);
     height: auto;
-    /* ارتفاع نسبي لسلوجان ~0.78rem: تدرّج هادئ مع الشاشة */
-    max-height: clamp(1.02rem, 2.9vw, 1.28rem);
+    max-height: clamp(1.38rem, 4.1vw, 1.92rem);
     object-fit: contain;
     object-position: center;
 }
 
-.brand-stack .brand-tagline--cycle {
-    text-align: center;
-    width: 100%;
+.brand-wordmark-anchor .brand-tagline--cycle {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 5px;
     margin-inline: 0;
+    text-align: center;
+    width: max-content;
+    max-width: min(20rem, calc(100vw - 100px));
+    box-sizing: border-box;
+    white-space: normal;
 }
 
 .logo {
@@ -158,7 +180,7 @@ h1, h2, h3, .brand-text h1 {
     font-weight: 500;
     line-height: 1.35;
     display: block;
-    max-width: min(17rem, 100%);
+    max-width: min(20rem, 100%);
     margin-inline: auto;
     text-align: center;
 }
