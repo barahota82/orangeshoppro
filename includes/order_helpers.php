@@ -63,12 +63,17 @@ function orange_order_payment_terms_label_ar(mixed $raw): string
  */
 function orange_order_resolve_variant_from_item(PDO $pdo, array $item): ?array
 {
+    $pid = isset($item['product_id']) ? (int) $item['product_id'] : 0;
+    if ($pid <= 0) {
+        return null;
+    }
+
     $vid = isset($item['variant_id']) ? (int)$item['variant_id'] : 0;
     if ($vid > 0) {
         $vStmt = $pdo->prepare(
             'SELECT * FROM product_variants WHERE id = ? AND product_id = ? LIMIT 1'
         );
-        $vStmt->execute([$vid, (int)$item['product_id']]);
+        $vStmt->execute([$vid, $pid]);
         $v = $vStmt->fetch(PDO::FETCH_ASSOC);
         if (is_array($v)) {
             return $v;
@@ -80,7 +85,7 @@ function orange_order_resolve_variant_from_item(PDO $pdo, array $item): ?array
         LIMIT 1'
     );
     $variantStmt->execute([
-        (int)$item['product_id'],
+        $pid,
         (string)$item['color'],
         (string)$item['size'],
     ]);
@@ -91,7 +96,36 @@ function orange_order_resolve_variant_from_item(PDO $pdo, array $item): ?array
     $one = $pdo->prepare(
         'SELECT * FROM product_variants WHERE product_id = ? ORDER BY id ASC LIMIT 1'
     );
-    $one->execute([(int)$item['product_id']]);
+    $one->execute([$pid]);
     $v = $one->fetch(PDO::FETCH_ASSOC);
     return is_array($v) ? $v : null;
+}
+
+/**
+ * خصم البند بالدينار (لا يتجاوز إجمالي السطر قبل الخصم).
+ *
+ * @param array<string, mixed> $item
+ */
+function orange_order_item_line_discount(array $item): float
+{
+    $v = isset($item['line_discount']) ? (float) $item['line_discount'] : 0.0;
+
+    return round(max(0.0, $v), 4);
+}
+
+/**
+ * صافي سطر الطلب بعد الخصم.
+ *
+ * @param array<string, mixed> $item
+ */
+function orange_order_item_line_net(array $item): float
+{
+    $qty = (int) ($item['qty'] ?? 0);
+    $gross = round((float) ($item['price'] ?? 0) * $qty, 4);
+    $disc = orange_order_item_line_discount($item);
+    if ($disc > $gross + 0.0001) {
+        return 0.0;
+    }
+
+    return max(0.0, round($gross - $disc, 4));
 }

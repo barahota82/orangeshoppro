@@ -15,7 +15,7 @@ try {
 
     require_fields($data, ['customer_name', 'phone', 'channel_id', 'items']);
     if (!is_array($data['items']) || count($data['items']) === 0) {
-        json_response(['success' => false, 'message' => 'أضف سطرًا واحدًا على الأقل للمنتجات'], 422);
+        json_response(['success' => false, 'message' => 'أضف سطرًا واحدًا على الأقل (منتج أو بند نصي)'], 422);
     }
 
     $channelStmt = $pdo->prepare('SELECT id FROM channels WHERE id = ? AND is_active = 1 LIMIT 1');
@@ -31,12 +31,39 @@ try {
     $validatedItems = [];
 
     foreach ($data['items'] as $item) {
-        require_fields($item, ['product_id', 'qty']);
+        $lineDiscount = max(0.0, (float) ($item['line_discount'] ?? 0));
+        $pid = isset($item['product_id']) ? (int) $item['product_id'] : 0;
+
+        if ($pid <= 0) {
+            $freeName = trim((string) ($item['product_name'] ?? $item['description'] ?? ''));
+            if ($freeName === '') {
+                continue;
+            }
+            $qty = max(1, (int) ($item['qty'] ?? 1));
+            $price = max(0.0, (float) ($item['unit_price'] ?? $item['price'] ?? 0));
+            $lineNet = max(0.0, round($price * $qty - $lineDiscount, 4));
+            $total += $lineNet;
+            $validatedItems[] = [
+                'kind' => 'free',
+                'product_name' => $freeName,
+                'qty' => $qty,
+                'price' => $price,
+                'cost' => 0.0,
+                'color' => '',
+                'size' => '',
+                'variant_id' => 0,
+                'line_discount' => $lineDiscount,
+            ];
+
+            continue;
+        }
+
+        require_fields($item, ['qty']);
         $productStmt = $pdo->prepare('SELECT * FROM products WHERE id = ? AND is_active = 1 LIMIT 1');
-        $productStmt->execute([(int)$item['product_id']]);
+        $productStmt->execute([$pid]);
         $product = $productStmt->fetch(PDO::FETCH_ASSOC);
         if (!$product) {
-            throw new RuntimeException('منتج غير موجود: ' . (int)$item['product_id']);
+            throw new RuntimeException('منتج غير موجود: ' . $pid);
         }
 
         $qty = max(1, (int)$item['qty']);
@@ -74,9 +101,11 @@ try {
 
         $price = (float)$product['price'];
         $cost = (float)$product['cost'];
-        $total += $price * $qty;
+        $lineNet = max(0.0, round($price * $qty - $lineDiscount, 4));
+        $total += $lineNet;
 
         $validatedItems[] = [
+            'kind' => 'product',
             'product' => $product,
             'qty' => $qty,
             'color' => $variant ? (string)$variant['color'] : $color,
@@ -84,12 +113,20 @@ try {
             'variant_id' => $variant ? (int)$variant['id'] : 0,
             'price' => $price,
             'cost' => $cost,
+            'line_discount' => $lineDiscount,
         ];
+    }
+
+    if ($validatedItems === []) {
+        json_response(['success' => false, 'message' => 'أضف سطرًا واحدًا على الأقل (منتج أو بند نصي)'], 422);
     }
 
     $paymentTerms = orange_normalize_payment_terms($data['payment_terms'] ?? 'cash');
     $hasSource = orange_table_has_column($pdo, 'orders', 'order_source');
     $hasPay = orange_table_has_column($pdo, 'orders', 'payment_terms');
+    $hasAmountPaidCol = orange_table_has_column($pdo, 'orders', 'amount_paid');
+    $amountPaidIn = max(0.0, (float) ($data['amount_paid'] ?? 0));
+    $amountPaidIn = min($amountPaidIn, $total);
 
     $cols = 'order_number, customer_name, phone, area, address, notes, channel_id, status, total';
     $ph = '?, ?, ?, ?, ?, ?, ?, \'completed\', ?';
@@ -113,6 +150,11 @@ try {
         $ph .= ', ?';
         $params[] = $paymentTerms;
     }
+    if ($hasAmountPaidCol) {
+        $cols .= ', amount_paid';
+        $ph .= ', ?';
+        $params[] = $amountPaidIn;
+    }
     $cols .= ', created_at';
     $ph .= ', NOW()';
 
@@ -128,46 +170,50 @@ try {
     $oiCols = $colsStmt ? $colsStmt->fetchAll(PDO::FETCH_COLUMN) : [];
     $oiCols = is_array($oiCols) ? $oiCols : [];
     $hasVariantCol = in_array('variant_id', $oiCols, true);
+    $hasLineDiscountCol = in_array('line_discount', $oiCols, true);
 
+    $insertCols = ['order_id', 'product_id'];
     if ($hasVariantCol) {
-        $itemStmt = $pdo->prepare(
-            'INSERT INTO order_items (
-                order_id, product_id, variant_id, product_name, color, size, qty, price, cost
-            ) VALUES (?,?,?,?,?,?,?,?,?)'
-        );
-    } else {
-        $itemStmt = $pdo->prepare(
-            'INSERT INTO order_items (
-                order_id, product_id, product_name, color, size, qty, price, cost
-            ) VALUES (?,?,?,?,?,?,?,?)'
-        );
+        $insertCols[] = 'variant_id';
     }
+    $insertCols = array_merge($insertCols, ['product_name', 'color', 'size', 'qty', 'price', 'cost']);
+    if ($hasLineDiscountCol) {
+        $insertCols[] = 'line_discount';
+    }
+    $placeholders = implode(',', array_fill(0, count($insertCols), '?'));
+    $itemStmt = $pdo->prepare(
+        'INSERT INTO order_items (' . implode(',', $insertCols) . ') VALUES (' . $placeholders . ')'
+    );
 
     foreach ($validatedItems as $row) {
-        if ($hasVariantCol) {
-            $itemStmt->execute([
-                $orderId,
-                (int)$row['product']['id'],
-                (int)($row['variant_id'] ?? 0) ?: null,
-                $row['product']['name'],
-                $row['color'],
-                $row['size'],
-                $row['qty'],
-                $row['price'],
-                $row['cost'],
-            ]);
+        $bind = [$orderId];
+        if (($row['kind'] ?? '') === 'free') {
+            $bind[] = null;
+            if ($hasVariantCol) {
+                $bind[] = null;
+            }
+            $bind[] = $row['product_name'];
+            $bind[] = '';
+            $bind[] = '';
+            $bind[] = $row['qty'];
+            $bind[] = $row['price'];
+            $bind[] = $row['cost'];
         } else {
-            $itemStmt->execute([
-                $orderId,
-                (int)$row['product']['id'],
-                $row['product']['name'],
-                $row['color'],
-                $row['size'],
-                $row['qty'],
-                $row['price'],
-                $row['cost'],
-            ]);
+            $bind[] = (int) $row['product']['id'];
+            if ($hasVariantCol) {
+                $bind[] = (int) ($row['variant_id'] ?? 0) ?: null;
+            }
+            $bind[] = $row['product']['name'];
+            $bind[] = $row['color'];
+            $bind[] = $row['size'];
+            $bind[] = $row['qty'];
+            $bind[] = $row['price'];
+            $bind[] = $row['cost'];
         }
+        if ($hasLineDiscountCol) {
+            $bind[] = (float) ($row['line_discount'] ?? 0);
+        }
+        $itemStmt->execute($bind);
     }
 
     orange_complete_order_fulfillment($pdo, $orderId);

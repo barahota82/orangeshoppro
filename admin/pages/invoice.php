@@ -147,7 +147,7 @@ if ($orderId > 0) {
         $companyProfile = orange_invoice_load_company($pdo);
         orange_invoice_assign_number_if_needed($pdo, $order, $orderId);
         foreach ($items as $row) {
-            $linesSubtotal += (float)$row['price'] * (int)$row['qty'];
+            $linesSubtotal += orange_order_item_line_net($row);
         }
     }
 }
@@ -168,6 +168,11 @@ if (!$order) {
 
 $orderTotalVal = $order ? (float)$order['total'] : 0.0;
 $linesMismatch = $order && abs($linesSubtotal - $orderTotalVal) > 0.009;
+$amountPaidVal = 0.0;
+if ($order && orange_table_has_column($pdo, 'orders', 'amount_paid')) {
+    $amountPaidVal = max(0.0, (float) ($order['amount_paid'] ?? 0));
+}
+$balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 0.0;
 ?>
 <div class="page-title page-title--stacked">
     <h1>فاتورة مبيعات</h1>
@@ -345,8 +350,19 @@ $linesMismatch = $order && abs($linesSubtotal - $orderTotalVal) > 0.009;
         color: #9a3412;
         font-size: 0.85rem;
     }
+    .invoice-payment-box {
+        margin-top: 1.1rem;
+        padding: 0.9rem 1rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        background: #f8fafc;
+        max-width: 420px;
+    }
+    .invoice-payment-box h3 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+    .invoice-payment-box .row-pay { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+    .invoice-payment-box input[type="number"] { min-width: 8rem; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; }
     @media print {
-        .invoice-workflow-bar, .invoice-actions, .invoice-picker, .page-title, .admin-sidebar, .admin-user, .brand { display: none !important; }
+        .invoice-workflow-bar, .invoice-payment-box, .invoice-actions, .invoice-picker, .page-title, .admin-sidebar, .admin-user, .brand { display: none !important; }
         .admin-main { margin: 0 !important; padding: 0 !important; }
         body { background: #fff !important; }
         .invoice-doc { box-shadow: none; border: none; max-width: none; }
@@ -570,14 +586,16 @@ $linesMismatch = $order && abs($linesSubtotal - $orderTotalVal) > 0.009;
                     <th>المقاس</th>
                     <th class="num">الكمية</th>
                     <th class="num">سعر الوحدة</th>
-                    <th class="num">الإجمالي</th>
+                    <th class="num">خصم</th>
+                    <th class="num">الصافي</th>
                 </tr>
             </thead>
             <tbody>
                 <?php $ln = 0; foreach ($items as $row): ?>
                     <?php
                     ++$ln;
-                    $line = (float)$row['price'] * (int)$row['qty'];
+                    $disc = orange_order_item_line_discount($row);
+                    $lineNet = orange_order_item_line_net($row);
                     ?>
                     <tr>
                         <td class="num"><?php echo (int)$ln; ?></td>
@@ -586,7 +604,8 @@ $linesMismatch = $order && abs($linesSubtotal - $orderTotalVal) > 0.009;
                         <td><?php echo htmlspecialchars((string)($row['size'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td class="num"><?php echo (int)$row['qty']; ?></td>
                         <td class="num"><?php echo number_format((float)$row['price'], 3); ?> KD</td>
-                        <td class="num"><?php echo number_format($line, 3); ?> KD</td>
+                        <td class="num"><?php echo $disc > 0.0001 ? number_format($disc, 3) . ' KD' : '—'; ?></td>
+                        <td class="num"><?php echo number_format($lineNet, 3); ?> KD</td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -595,15 +614,71 @@ $linesMismatch = $order && abs($linesSubtotal - $orderTotalVal) > 0.009;
         <div class="invoice-totals">
             <div class="invoice-totals-inner">
                 <div class="invoice-totals-row">
-                    <span>مجموع البنود</span>
+                    <span>صافي البنود</span>
                     <span><?php echo number_format($linesSubtotal, 3); ?> KD</span>
                 </div>
                 <div class="invoice-totals-row grand">
-                    <span>الإجمالي</span>
+                    <span>إجمالي الفاتورة</span>
                     <span><?php echo number_format($orderTotalVal, 3); ?> KD</span>
                 </div>
+                <?php if (orange_table_has_column($pdo, 'orders', 'amount_paid')): ?>
+                <div class="invoice-totals-row">
+                    <span>مدفوع</span>
+                    <span><?php echo number_format($amountPaidVal, 3); ?> KD</span>
+                </div>
+                <div class="invoice-totals-row grand" style="border-top:1px dashed #cbd5e1;margin-top:0.35rem;padding-top:0.45rem;">
+                    <span>الباقي</span>
+                    <span><?php echo number_format($balanceDueVal, 3); ?> KD</span>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
+
+        <?php if (orange_table_has_column($pdo, 'orders', 'amount_paid')): ?>
+        <div class="invoice-payment-box invoice-actions">
+            <h3>تحديث المدفوع</h3>
+            <p style="margin:0;font-size:0.85rem;color:#64748b;">لتسجيل ما دفعه العميل (لا يغيّر إجمالي الفاتورة).</p>
+            <div class="row-pay">
+                <label for="inv_amount_paid_inp" style="font-weight:600;">مدفوع (KD)</label>
+                <input type="number" id="inv_amount_paid_inp" step="0.001" min="0" lang="en" dir="ltr"
+                    value="<?php echo htmlspecialchars((string) $amountPaidVal, ENT_QUOTES, 'UTF-8'); ?>">
+                <button type="button" class="btn-secondary" onclick="invSaveAmountPaid()">حفظ</button>
+            </div>
+            <p class="card-hint" style="margin:8px 0 0;font-size:0.82rem;">الباقي بعد التعديل: <strong id="inv_balance_live"><?php echo number_format($balanceDueVal, 3); ?></strong> KD</p>
+        </div>
+        <script>
+        (function () {
+            var total = <?php echo json_encode($orderTotalVal); ?>;
+            var inp = document.getElementById('inv_amount_paid_inp');
+            var live = document.getElementById('inv_balance_live');
+            function syncLive() {
+                if (!inp || !live) return;
+                var p = parseFloat(String(inp.value || '0').replace(',', '.')) || 0;
+                if (p < 0) p = 0;
+                if (p > total) p = total;
+                var bal = Math.max(0, Math.round((total - p) * 1000) / 1000);
+                live.textContent = bal.toFixed(3);
+            }
+            if (inp) {
+                inp.addEventListener('input', syncLive);
+            }
+            window.invSaveAmountPaid = function () {
+                var p = parseFloat(String((inp && inp.value) || '0').replace(',', '.')) || 0;
+                postJSON('/admin/api/orders/update-payment.php', {
+                    order_id: <?php echo (int) $orderId; ?>,
+                    amount_paid: p
+                }).then(function (r) {
+                    if (r.success) {
+                        alert(r.message || 'تم الحفظ');
+                        location.reload();
+                        return;
+                    }
+                    alert(r.message || 'فشل');
+                }).catch(function (e) { alert(e.message || String(e)); });
+            };
+        })();
+        </script>
+        <?php endif; ?>
 
         <?php if ($footerLegal !== ''): ?>
             <div class="invoice-footer-legal"><?php echo nl2br(htmlspecialchars($footerLegal, ENT_QUOTES, 'UTF-8')); ?></div>

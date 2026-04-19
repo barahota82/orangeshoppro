@@ -86,7 +86,7 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
 
     $creditSaleTotal = 0.0;
     foreach ($items as $item) {
-        $creditSaleTotal = round($creditSaleTotal + (float) $item['price'] * (int) $item['qty'], 4);
+        $creditSaleTotal = round($creditSaleTotal + orange_order_item_line_net($item), 4);
     }
     if ($isCredit && $customerIdForAr > 0 && $creditSaleTotal > 0.0001) {
         $lim = orange_party_customer_credit_limit($pdo, $customerIdForAr);
@@ -108,6 +108,7 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
         if ($variant && !$stockAlreadyReserved) {
             $oldStock = (int)$variant['stock_quantity'];
             $newStock = max(0, $oldStock - (int)$item['qty']);
+            $pidForStock = isset($item['product_id']) ? (int) $item['product_id'] : 0;
 
             $pdo->prepare('UPDATE product_variants SET stock_quantity = ? WHERE id = ?')
                 ->execute([$newStock, (int)$variant['id']]);
@@ -121,7 +122,7 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
                     )
                 ");
                 $moveStmt->execute([
-                    (int) $item['product_id'],
+                    $pidForStock,
                     (int) $variant['id'],
                     (int) $item['qty'],
                     $oldStock,
@@ -137,7 +138,7 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
                     )
                 ");
                 $moveStmt->execute([
-                    (int) $item['product_id'],
+                    $pidForStock,
                     (int) $variant['id'],
                     (int) $item['qty'],
                     $oldStock,
@@ -146,8 +147,8 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
             }
         }
 
-        $salesAmount = (float)$item['price'] * (int)$item['qty'];
-        $costAmount = (float)$item['cost'] * (int)$item['qty'];
+        $salesAmount = orange_order_item_line_net($item);
+        $costAmount = $variant ? round((float) $item['cost'] * (int) $item['qty'], 4) : 0.0;
 
         $now = date('Y-m-d H:i:s');
         $lineKey = isset($item['id']) ? (string) (int) $item['id'] : (string) $idx;
@@ -161,76 +162,84 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
             : ($isCredit ? 'قيد تكلفة مبيعات آجل — تسليم' : 'قيد تكلفة مبيعات نقدي — تسليم');
         $srcLabel = 'ORDER-' . $order['order_number'];
 
-        if (orange_gl_use_pending_queue($pdo)) {
-            $afterJson = null;
-            if ($isCredit && $customerIdForAr > 0 && $salesAmount > 0.0001) {
-                $afterJson = json_encode([
-                    'party_subledger' => [
-                        'party_kind' => 'customer',
-                        'party_id' => $customerIdForAr,
-                        'debit' => $salesAmount,
-                        'credit' => 0.0,
-                        'ref_type' => 'order',
-                        'ref_id' => (int) $order['id'],
-                        'memo' => 'مبيعات آجل — تسليم',
-                    ],
-                ], JSON_UNESCAPED_UNICODE);
+        if ($salesAmount > 0.0001) {
+            if (orange_gl_use_pending_queue($pdo)) {
+                $afterJson = null;
+                if ($isCredit && $customerIdForAr > 0) {
+                    $afterJson = json_encode([
+                        'party_subledger' => [
+                            'party_kind' => 'customer',
+                            'party_id' => $customerIdForAr,
+                            'debit' => $salesAmount,
+                            'credit' => 0.0,
+                            'ref_type' => 'order',
+                            'ref_id' => (int) $order['id'],
+                            'memo' => 'مبيعات آجل — تسليم',
+                        ],
+                    ], JSON_UNESCAPED_UNICODE);
+                }
+                orange_gl_pending_enqueue_simple($pdo, [
+                    'reference' => $saleRef,
+                    'source_label' => $srcLabel,
+                    'movement_at' => $now,
+                    'voucher_date' => $now,
+                    'account_debit' => $debitReceivable,
+                    'account_credit' => $salesId,
+                    'amount' => $salesAmount,
+                    'description' => $saleDesc,
+                    'entry_type' => 'order_delivery_sale',
+                    'after_post_json' => $afterJson,
+                ]);
+            } else {
+                $vSale = orange_journal_insert_line($pdo, [
+                    'date' => $now,
+                    'account_debit' => $debitReceivable,
+                    'account_credit' => $salesId,
+                    'amount' => $salesAmount,
+                    'reference' => $saleRef,
+                    'description' => $saleDesc,
+                    'entry_type' => 'order_delivery_sale',
+                ]);
+                if ($isCredit && $customerIdForAr > 0) {
+                    orange_party_subledger_record(
+                        $pdo,
+                        'customer',
+                        $customerIdForAr,
+                        $vSale,
+                        $salesAmount,
+                        0,
+                        'order',
+                        (int) $order['id'],
+                        'مبيعات آجل — تسليم'
+                    );
+                }
             }
-            orange_gl_pending_enqueue_simple($pdo, [
-                'reference' => $saleRef,
-                'source_label' => $srcLabel,
-                'movement_at' => $now,
-                'voucher_date' => $now,
-                'account_debit' => $debitReceivable,
-                'account_credit' => $salesId,
-                'amount' => $salesAmount,
-                'description' => $saleDesc,
-                'entry_type' => 'order_delivery_sale',
-                'after_post_json' => $afterJson,
-            ]);
-            orange_gl_pending_enqueue_simple($pdo, [
-                'reference' => $cogsRef,
-                'source_label' => $srcLabel,
-                'movement_at' => $now,
-                'voucher_date' => $now,
-                'account_debit' => $cogsId,
-                'account_credit' => $inventoryId,
-                'amount' => $costAmount,
-                'description' => $cogsDesc,
-                'entry_type' => 'order_delivery_cogs',
-            ]);
-        } else {
-            $vSale = orange_journal_insert_line($pdo, [
-                'date' => $now,
-                'account_debit' => $debitReceivable,
-                'account_credit' => $salesId,
-                'amount' => $salesAmount,
-                'reference' => $saleRef,
-                'description' => $saleDesc,
-                'entry_type' => 'order_delivery_sale',
-            ]);
-            if ($isCredit && $customerIdForAr > 0) {
-                orange_party_subledger_record(
-                    $pdo,
-                    'customer',
-                    $customerIdForAr,
-                    $vSale,
-                    $salesAmount,
-                    0,
-                    'order',
-                    (int) $order['id'],
-                    'مبيعات آجل — تسليم'
-                );
+        }
+
+        if ($costAmount > 0.0001) {
+            if (orange_gl_use_pending_queue($pdo)) {
+                orange_gl_pending_enqueue_simple($pdo, [
+                    'reference' => $cogsRef,
+                    'source_label' => $srcLabel,
+                    'movement_at' => $now,
+                    'voucher_date' => $now,
+                    'account_debit' => $cogsId,
+                    'account_credit' => $inventoryId,
+                    'amount' => $costAmount,
+                    'description' => $cogsDesc,
+                    'entry_type' => 'order_delivery_cogs',
+                ]);
+            } else {
+                orange_journal_insert_line($pdo, [
+                    'date' => $now,
+                    'account_debit' => $cogsId,
+                    'account_credit' => $inventoryId,
+                    'amount' => $costAmount,
+                    'reference' => $cogsRef,
+                    'description' => $cogsDesc,
+                    'entry_type' => 'order_delivery_cogs',
+                ]);
             }
-            orange_journal_insert_line($pdo, [
-                'date' => $now,
-                'account_debit' => $cogsId,
-                'account_credit' => $inventoryId,
-                'amount' => $costAmount,
-                'reference' => $cogsRef,
-                'description' => $cogsDesc,
-                'entry_type' => 'order_delivery_cogs',
-            ]);
         }
     }
 
@@ -430,7 +439,7 @@ function orange_order_reverse_completed_fulfillment(PDO $pdo, int $orderId, stri
                     )
                 ");
                 $moveStmt->execute([
-                    (int) $item['product_id'],
+                    isset($item['product_id']) ? (int) $item['product_id'] : 0,
                     (int) $variant['id'],
                     $qty,
                     $oldStock,
@@ -446,7 +455,7 @@ function orange_order_reverse_completed_fulfillment(PDO $pdo, int $orderId, stri
                     )
                 ");
                 $moveStmt->execute([
-                    (int) $item['product_id'],
+                    isset($item['product_id']) ? (int) $item['product_id'] : 0,
                     (int) $variant['id'],
                     $qty,
                     $oldStock,
@@ -455,8 +464,8 @@ function orange_order_reverse_completed_fulfillment(PDO $pdo, int $orderId, stri
             }
         }
 
-        $salesAmount = round((float) $item['price'] * $qty, 4);
-        $costAmount = round((float) $item['cost'] * $qty, 4);
+        $salesAmount = orange_order_item_line_net($item);
+        $costAmount = $variant ? round((float) $item['cost'] * $qty, 4) : 0.0;
         $lineKey = isset($item['id']) ? (string) (int) $item['id'] : (string) $idx;
         $saleRetRef = 'ORDER-' . $orderNumber . '-RS-' . $lineKey;
         $cogsRetRef = 'ORDER-' . $orderNumber . '-RC-' . $lineKey;

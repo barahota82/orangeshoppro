@@ -839,6 +839,22 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         );
     }
 
+    if (orange_table_exists($pdo, 'order_items') && !orange_table_has_column($pdo, 'order_items', 'line_discount')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE order_items ADD COLUMN line_discount DECIMAL(18,4) NOT NULL DEFAULT 0'
+        );
+    }
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'amount_paid')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE orders ADD COLUMN amount_paid DECIMAL(18,4) NOT NULL DEFAULT 0'
+        );
+    }
+    if (orange_table_exists($pdo, 'order_items')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE order_items MODIFY COLUMN product_id INT NULL');
+    }
+
     if (!orange_table_exists($pdo, 'expenses')) {
         orange_catalog_safe_exec(
             $pdo,
