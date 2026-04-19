@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
+require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_write.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
@@ -91,7 +92,11 @@ try {
     $purRef = 'PUR-' . $purchaseId;
     $accRow = orange_accounting_row_by_reference($pdo, $purRef);
     if (orange_accounting_is_locked($pdo, $accRow)) {
-        json_response(['success' => false, 'message' => 'لا يمكن تعديل أو حذف شراء مرتبط بسنة مالية مغلقة'], 422);
+        json_response([
+            'success' => false,
+            'message' => 'لا يمكن تعديل أو حذف شراء مرتبط بسنة مالية مغلقة',
+            'suggest_admin' => orange_gl_suggest_admin_fiscal_years_screen(),
+        ], 422);
     }
 
     $pdo->beginTransaction();
@@ -99,7 +104,8 @@ try {
     $pdo->prepare("DELETE FROM purchase_items WHERE purchase_id = ?")->execute([$purchaseId]);
 
     if ($action === 'delete') {
-        $pdo->prepare("DELETE FROM journal_entries WHERE reference = ?")->execute(['PUR-' . $purchaseId]);
+        orange_purchase_remove_accounting($pdo, $purRef);
+        orange_gl_pending_remove_by_reference($pdo, $purRef);
         $pdo->prepare("DELETE FROM purchases WHERE id = ?")->execute([$purchaseId]);
         $pdo->commit();
         audit_log('purchase_delete', 'تم حذف فاتورة شراء رقم: ' . $purchaseId, 'purchases', $purchaseId);
@@ -119,35 +125,80 @@ try {
         ->execute([$supplierId > 0 ? $supplierId : null, $newTotal, $type, $notes, $purchaseId]);
 
     orange_purchase_remove_accounting($pdo, $purRef);
+    orange_gl_pending_remove_by_reference($pdo, $purRef);
 
     $inventoryId = orange_gl_account_id($pdo, 'inventory');
     $cashId = orange_gl_account_id($pdo, 'cash');
     $apId = orange_gl_account_id($pdo, 'accounts_payable');
     $purRef = 'PUR-' . $purchaseId;
     $now = date('Y-m-d H:i:s');
-    if ($type === 'cash') {
-        orange_journal_insert_line($pdo, [
-            'date' => $now,
-            'account_debit' => $inventoryId,
-            'account_credit' => $cashId,
-            'amount' => $newTotal,
-            'reference' => $purRef,
-            'description' => 'شراء نقدي',
-            'entry_type' => 'purchase',
-        ]);
+    if (orange_gl_use_pending_queue($pdo)) {
+        $afterJson = null;
+        if ($type === 'credit' && $supplierId > 0 && $newTotal > 0.0001) {
+            $afterJson = json_encode([
+                'party_subledger' => [
+                    'party_kind' => 'supplier',
+                    'party_id' => $supplierId,
+                    'debit' => 0.0,
+                    'credit' => $newTotal,
+                    'ref_type' => 'purchase',
+                    'ref_id' => $purchaseId,
+                    'memo' => 'شراء آجل',
+                ],
+            ], JSON_UNESCAPED_UNICODE);
+        }
+        if ($type === 'cash') {
+            orange_gl_pending_enqueue_simple($pdo, [
+                'reference' => $purRef,
+                'source_label' => $purRef,
+                'movement_at' => $now,
+                'voucher_date' => $now,
+                'account_debit' => $inventoryId,
+                'account_credit' => $cashId,
+                'amount' => $newTotal,
+                'description' => 'شراء نقدي',
+                'entry_type' => 'purchase',
+                'after_post_json' => $afterJson,
+            ]);
+        } else {
+            orange_gl_pending_enqueue_simple($pdo, [
+                'reference' => $purRef,
+                'source_label' => $purRef,
+                'movement_at' => $now,
+                'voucher_date' => $now,
+                'account_debit' => $inventoryId,
+                'account_credit' => $apId,
+                'amount' => $newTotal,
+                'description' => 'شراء آجل — ذمم موردين',
+                'entry_type' => 'purchase',
+                'after_post_json' => $afterJson,
+            ]);
+        }
     } else {
-        orange_journal_insert_line($pdo, [
-            'date' => $now,
-            'account_debit' => $inventoryId,
-            'account_credit' => $apId,
-            'amount' => $newTotal,
-            'reference' => $purRef,
-            'description' => 'شراء آجل — ذمم موردين',
-            'entry_type' => 'purchase',
-        ]);
-    }
+        if ($type === 'cash') {
+            orange_journal_insert_line($pdo, [
+                'date' => $now,
+                'account_debit' => $inventoryId,
+                'account_credit' => $cashId,
+                'amount' => $newTotal,
+                'reference' => $purRef,
+                'description' => 'شراء نقدي',
+                'entry_type' => 'purchase',
+            ]);
+        } else {
+            orange_journal_insert_line($pdo, [
+                'date' => $now,
+                'account_debit' => $inventoryId,
+                'account_credit' => $apId,
+                'amount' => $newTotal,
+                'reference' => $purRef,
+                'description' => 'شراء آجل — ذمم موردين',
+                'entry_type' => 'purchase',
+            ]);
+        }
 
-    orange_purchase_record_ap_subledger($pdo, $purchaseId, $supplierId, $type, $newTotal);
+        orange_purchase_record_ap_subledger($pdo, $purchaseId, $supplierId, $type, $newTotal);
+    }
 
     $pdo->commit();
     audit_log('purchase_update', 'تم تعديل فاتورة شراء رقم: ' . $purchaseId, 'purchases', $purchaseId);
@@ -156,5 +207,5 @@ try {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    api_error($e, 'تعذر معالجة عملية الشراء');
+    orange_gl_api_catch_json($e, 'تعذر معالجة عملية الشراء');
 }

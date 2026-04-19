@@ -270,6 +270,30 @@ function orange_catalog_ensure_schema(PDO $pdo): void
     if (!orange_table_has_column($pdo, 'products', 'description_hi')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN description_hi TEXT NULL');
     }
+    if (!orange_table_has_column($pdo, 'products', 'seo_meta_title_ar')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN seo_meta_title_ar VARCHAR(191) NOT NULL DEFAULT \'\'');
+    }
+    if (!orange_table_has_column($pdo, 'products', 'seo_meta_title_en')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN seo_meta_title_en VARCHAR(191) NOT NULL DEFAULT \'\'');
+    }
+    if (!orange_table_has_column($pdo, 'products', 'seo_meta_title_fil')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN seo_meta_title_fil VARCHAR(191) NOT NULL DEFAULT \'\'');
+    }
+    if (!orange_table_has_column($pdo, 'products', 'seo_meta_title_hi')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN seo_meta_title_hi VARCHAR(191) NOT NULL DEFAULT \'\'');
+    }
+    if (!orange_table_has_column($pdo, 'products', 'seo_meta_description_ar')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN seo_meta_description_ar TEXT NULL');
+    }
+    if (!orange_table_has_column($pdo, 'products', 'seo_meta_description_en')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN seo_meta_description_en TEXT NULL');
+    }
+    if (!orange_table_has_column($pdo, 'products', 'seo_meta_description_fil')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN seo_meta_description_fil TEXT NULL');
+    }
+    if (!orange_table_has_column($pdo, 'products', 'seo_meta_description_hi')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN seo_meta_description_hi TEXT NULL');
+    }
     if (!orange_table_has_column($pdo, 'products', 'sort_order')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN sort_order INT NOT NULL DEFAULT 0');
     }
@@ -494,6 +518,48 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         );
     }
 
+    if (!orange_table_exists($pdo, 'orange_gl_pending_movements')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE orange_gl_pending_movements (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                reference VARCHAR(100) NOT NULL,
+                source_label VARCHAR(128) NOT NULL DEFAULT \'\',
+                movement_at DATETIME NOT NULL,
+                voucher_date DATETIME NOT NULL,
+                account_debit INT NOT NULL,
+                account_credit INT NOT NULL,
+                amount DECIMAL(18,4) NOT NULL,
+                description VARCHAR(512) NOT NULL,
+                entry_type VARCHAR(64) NOT NULL DEFAULT \'general\',
+                status VARCHAR(16) NOT NULL DEFAULT \'pending\',
+                journal_voucher_id INT NULL,
+                after_post_json TEXT NULL,
+                multi_line TINYINT(1) NOT NULL DEFAULT 0,
+                voucher_lines_json TEXT NULL,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                posted_at DATETIME NULL,
+                UNIQUE KEY uq_gl_pending_ref (reference),
+                KEY idx_gl_pending_status (status),
+                KEY idx_gl_pending_movement_at (movement_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+    if (orange_table_exists($pdo, 'orange_gl_pending_movements')
+        && !orange_table_has_column($pdo, 'orange_gl_pending_movements', 'multi_line')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE orange_gl_pending_movements ADD COLUMN multi_line TINYINT(1) NOT NULL DEFAULT 0'
+        );
+    }
+    if (orange_table_exists($pdo, 'orange_gl_pending_movements')
+        && !orange_table_has_column($pdo, 'orange_gl_pending_movements', 'voucher_lines_json')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE orange_gl_pending_movements ADD COLUMN voucher_lines_json TEXT NULL'
+        );
+    }
+
     if (!orange_table_exists($pdo, 'journal_types')) {
         orange_catalog_safe_exec(
             $pdo,
@@ -519,6 +585,23 @@ function orange_catalog_ensure_schema(PDO $pdo): void
                 error_log('[orange] journal_types sync: ' . $e->getMessage());
             }
         }
+    }
+
+    if (orange_table_exists($pdo, 'journal_types') && !orange_table_exists($pdo, 'orange_gl_journal_type_rules')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE orange_gl_journal_type_rules (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                journal_type_id INT NOT NULL,
+                debit_setting_key VARCHAR(64) NOT NULL,
+                credit_setting_key VARCHAR(64) NOT NULL,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_ojtr_journal_type (journal_type_id),
+                KEY idx_ojtr_debit (debit_setting_key),
+                KEY idx_ojtr_credit (credit_setting_key),
+                CONSTRAINT orange_fk_ojtr_jt FOREIGN KEY (journal_type_id) REFERENCES journal_types (id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
     }
 
     static $journalLegacyMigrated = false;

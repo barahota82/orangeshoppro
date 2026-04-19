@@ -137,3 +137,24 @@ function orange_order_release_pending_stock_reservation(PDO $pdo, array $order):
         "UPDATE stock_movements SET type = 'pending_order_void' WHERE reference = ? AND type = 'pending_order'"
     )->execute([$ref]);
 }
+
+/**
+ * تسمية عربية لنوع حركة المخزون (للعرض في الواجهات).
+ */
+function orange_stock_movement_type_label_ar(string $type): string
+{
+    static $map = [
+        'pending_order' => 'حجز مخزون (طلب ويب)',
+        'pending_order_fulfilled' => 'إغلاق حجز بعد التسليم',
+        'pending_order_void' => 'إلغاء حجز طلب',
+        'delivered_order' => 'تسليم طلب — صرف مخزون',
+        'delivered_order_void' => 'عكس تسليم يدوي',
+        'order_return' => 'إرجاع مخزون — إلغاء تسليم',
+        'order_release' => 'إرجاع كمية محجوزة',
+        'manual_adjustment' => 'تعديل يدوي',
+        'opening_balance' => 'رصيد افتتاحي',
+    ];
+    $type = trim($type);
+
+    return $map[$type] ?? $type;
+}

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/party_subledger.php';
+require_once __DIR__ . '/../../includes/gl_settings.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -315,7 +316,7 @@ if ($stmtPartyJson === false) {
                 <?php foreach ($recent as $r): ?>
                     <tr>
                         <td><?php echo htmlspecialchars(substr((string)$r['voucher_date'], 0, 10), ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars((string)$r['entry_type'], ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td title="<?php echo htmlspecialchars((string) $r['entry_type'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(orange_gl_entry_type_label_ar((string) ($r['entry_type'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars($r['party_kind'] . ' #' . $r['party_id'], ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo number_format((float)$r['debit'], 3); ?></td>
                         <td><?php echo number_format((float)$r['credit'], 3); ?></td>
@@ -330,6 +331,11 @@ if ($stmtPartyJson === false) {
 
 <script>
 var ORANGE_STMT_PARTIES = <?php echo $stmtPartyJson; ?>;
+var GL_ENTRY_LABELS = <?php echo json_encode(orange_gl_entry_type_labels_map(), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+function glEntryTypeLabel(et) {
+    et = String(et == null ? '' : et);
+    return GL_ENTRY_LABELS[et] || et || '';
+}
 
 function stmtRefreshSelect() {
     var k = document.querySelector('input[name="stmt_kind"]:checked');
@@ -429,7 +435,7 @@ function loadStatement() {
             tr.innerHTML =
                 '<td>' + d + '</td>' +
                 '<td>' + escapeHtml(row.reference || '') + '</td>' +
-                '<td>' + escapeHtml(row.entry_type || '') + '</td>' +
+                '<td title="' + escapeHtml(row.entry_type || '') + '">' + escapeHtml(glEntryTypeLabel(row.entry_type)) + '</td>' +
                 '<td>' + Number(row.debit).toFixed(3) + '</td>' +
                 '<td>' + Number(row.credit).toFixed(3) + '</td>' +
                 '<td>' + Number(row.balance).toFixed(3) + '</td>' +
@@ -538,8 +544,14 @@ function doReceipt() {
         allow_excess: document.getElementById('rec_allow_excess').checked,
         allocations: collectAllocTbody('alloc_receipt_tbody')
     }).then(function (r) {
-        alert(r.message || (r.success ? 'تم' : 'فشل'));
-        if (r.success) location.reload();
+        if (r.success) {
+            alert(r.message || 'تم');
+            location.reload();
+            return;
+        }
+        if (!orangeAdminOfferSuggestOnFailure(r, 'فشل')) {
+            alert(r.message || 'فشل');
+        }
     }).catch(function (e) { alert(e.message || String(e)); });
 }
 function doPay() {
@@ -556,8 +568,14 @@ function doPay() {
         allow_excess: document.getElementById('pay_allow_excess').checked,
         allocations: collectAllocTbody('alloc_pay_tbody')
     }).then(function (r) {
-        alert(r.message || (r.success ? 'تم' : 'فشل'));
-        if (r.success) location.reload();
+        if (r.success) {
+            alert(r.message || 'تم');
+            location.reload();
+            return;
+        }
+        if (!orangeAdminOfferSuggestOnFailure(r, 'فشل')) {
+            alert(r.message || 'فشل');
+        }
     }).catch(function (e) { alert(e.message || String(e)); });
 }
 function saveCustomer() {

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/catalog_schema.php';
-include __DIR__ . '/../includes/header.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -14,7 +13,14 @@ $stmt = $pdo->prepare("SELECT * FROM products WHERE id = ? AND is_active = 1 LIM
 $stmt->execute([$id]);
 $product = $stmt->fetch();
 
+$tbState = storefront_toolbar_state();
+$channelSlug = $tbState['channelSlug'];
+$lang = $tbState['lang'];
+
 if (!$product) {
+    $ORANGE_STOREFRONT_PAGE_TITLE = t('product_not_found') . ' | ' . t('storefront_brand');
+    $ORANGE_STOREFRONT_META_DESCRIPTION = '';
+    include __DIR__ . '/../includes/header.php';
     $homeUrl = storefront_url('home', $channelSlug, $lang);
     ?>
 <div class="container">
@@ -31,6 +37,23 @@ if (!$product) {
     include __DIR__ . '/../includes/footer.php';
     exit;
 }
+
+$seoTitlePart = storefront_product_seo_meta_title($product);
+$ORANGE_STOREFRONT_PAGE_TITLE = ($seoTitlePart !== '' ? $seoTitlePart . ' | ' : '') . t('storefront_brand');
+$ORANGE_STOREFRONT_META_DESCRIPTION = storefront_product_seo_meta_description($product);
+$ORANGE_STOREFRONT_CANONICAL_URL = storefront_absolute_url(
+    storefront_url('product', $channelSlug, $lang, ['id' => $id])
+);
+$ORANGE_STOREFRONT_OG_TYPE = 'product';
+$mainForOg = trim((string) ($product['main_image'] ?? ''));
+if ($mainForOg !== '') {
+    $fnOg = basename(str_replace('\\', '/', $mainForOg));
+    if ($fnOg !== '' && $fnOg !== '.' && $fnOg !== '..') {
+        $ORANGE_STOREFRONT_OG_IMAGE = storefront_absolute_url('/uploads/products/' . rawurlencode($fnOg));
+    }
+}
+
+include __DIR__ . '/../includes/header.php';
 
 $imagesStmt = $pdo->prepare("SELECT * FROM product_images WHERE product_id = ? ORDER BY id ASC");
 $imagesStmt->execute([$id]);

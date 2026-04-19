@@ -47,6 +47,10 @@ define(
     $__long === true || $__long === 1 || $__long === '1'
 );
 
+/** اختياري: أصل الموقع العام بدون شرطة مثلاً `https://example.com` — لروابط canonical وOpen Graph عند غياب Host في CLI */
+$__siteOrigin = trim((string)($env['SITE_PUBLIC_URL'] ?? ''), " \t\n\r\0\x0B/");
+define('ORANGE_SITE_PUBLIC_ORIGIN', $__siteOrigin);
+
 /** اختياري في .env.php: `ASSET_VERSION` نص ثابت لكل الأصول؛ فارغ = تلقائي (انظر asset_url) */
 define('STOREFRONT_ASSET_VERSION', trim((string)($env['ASSET_VERSION'] ?? '')));
 
@@ -341,6 +345,36 @@ function storefront_whatsapp_href(array $channel, string $prefillText = ''): ?st
  * @param 'home'|'cart'|'track'|'product' $page
  * @param array<string, mixed> $extra merged into query for long URLs (e.g. id for product)
  */
+/**
+ * أصل الموقع (https://النطاق) — من SITE_PUBLIC_URL أو من طلب HTTP الحالي.
+ */
+function orange_site_public_origin(): string
+{
+    if (ORANGE_SITE_PUBLIC_ORIGIN !== '') {
+        return rtrim(ORANGE_SITE_PUBLIC_ORIGIN, '/');
+    }
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+        || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
+    $scheme = $https ? 'https' : 'http';
+    $host = (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
+
+    return $scheme . '://' . $host;
+}
+
+/**
+ * رابط مطلق لمسار الواجهة (كما يعيده storefront_url أو مسار يبدأ بـ /).
+ */
+function storefront_absolute_url(string $relativePath): string
+{
+    $path = $relativePath;
+    if ($path !== '' && $path[0] !== '/') {
+        $path = '/' . $path;
+    }
+
+    return orange_site_public_origin() . $path;
+}
+
 function storefront_url(string $page, string $channelSlug, string $lang, array $extra = []): string {
     $prefix = PUBLIC_BASE_PATH;
     $pathPrefix = ($prefix === '' ? '' : $prefix);
@@ -442,6 +476,57 @@ function storefront_product_display_description(array $product): string
     return trim((string)($product['description'] ?? ''));
 }
 
+/**
+ * عنوان SEO للمنتج بلغة الواجهة الحالية؛ إن وُجد حقل seo_meta_title_* يُستخدم وإلا اسم العرض.
+ */
+function storefront_product_seo_meta_title(array $product): string
+{
+    $lang = current_lang();
+    $key = match ($lang) {
+        'ar' => 'seo_meta_title_ar',
+        'en' => 'seo_meta_title_en',
+        'fil' => 'seo_meta_title_fil',
+        'hi' => 'seo_meta_title_hi',
+        default => 'seo_meta_title_en',
+    };
+    $v = trim((string) ($product[$key] ?? ''));
+    if ($v !== '') {
+        return $v;
+    }
+
+    return storefront_product_display_name($product);
+}
+
+/**
+ * وصف SEO (ميتا) — من seo_meta_description_* أو اقتطاع من وصف المنتج بعد إزالة وسوم HTML.
+ */
+function storefront_product_seo_meta_description(array $product): string
+{
+    $lang = current_lang();
+    $key = match ($lang) {
+        'ar' => 'seo_meta_description_ar',
+        'en' => 'seo_meta_description_en',
+        'fil' => 'seo_meta_description_fil',
+        'hi' => 'seo_meta_description_hi',
+        default => 'seo_meta_description_en',
+    };
+    $v = trim((string) ($product[$key] ?? ''));
+    if ($v !== '') {
+        return $v;
+    }
+    $plain = storefront_product_display_description($product);
+    $plain = preg_replace('/\s+/u', ' ', strip_tags($plain));
+    $plain = trim((string) $plain);
+    if ($plain === '') {
+        return '';
+    }
+    if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+        return mb_strlen($plain) > 160 ? mb_substr($plain, 0, 157) . '...' : $plain;
+    }
+
+    return strlen($plain) > 160 ? substr($plain, 0, 157) . '...' : $plain;
+}
+
 function get_translations(): array {
     return [
         'en' => [
@@ -521,8 +606,9 @@ function get_translations(): array {
             'payment_terms_label' => 'Payment',
             'payment_cash' => 'Cash',
             'payment_credit' => 'Credit (pay later)',
+            'payment_online' => 'Online',
             'order_payment_terms_label' => 'Payment type',
-            'checkout_online_cash_only' => 'Online orders are recorded as cash sales. Credit sales are entered from the admin panel (company invoice).',
+            'checkout_online_cash_only' => 'Choose cash (e.g. pay on delivery) or online above. Credit (pay later) is only available through the admin company invoice.',
             'my_orders_intro' => 'Enter your order number and phone (same as when you placed the order).',
             'order_status_label' => 'Status',
             'order_status_pending' => 'Pending',
@@ -617,8 +703,9 @@ function get_translations(): array {
             'payment_terms_label' => 'نوع البيع',
             'payment_cash' => 'نقدي',
             'payment_credit' => 'آجل',
+            'payment_online' => 'أونلاين',
             'order_payment_terms_label' => 'نوع البيع',
-            'checkout_online_cash_only' => 'طلبات الموقع تُسجَّل كمبيعات نقدي. البيع الآجل يُدخل من لوحة الإدارة (فاتورة شركة).',
+            'checkout_online_cash_only' => 'اختر أعلاه نقدي (مثل الدفع عند الاستلام) أو أونلاين. البيع الآجل يُسجَّل من لوحة الإدارة فقط (فاتورة شركة).',
             'my_orders_intro' => 'أدخل رقم الطلب ورقم الهاتف اللي استخدمتهم عند تأكيد الطلب.',
             'order_status_label' => 'الحالة',
             'order_status_pending' => 'قيد الانتظار',
@@ -713,8 +800,9 @@ function get_translations(): array {
             'payment_terms_label' => 'Bayad',
             'payment_cash' => 'Cash',
             'payment_credit' => 'Utang / hulugan',
+            'payment_online' => 'Online',
             'order_payment_terms_label' => 'Uri ng bayad',
-            'checkout_online_cash_only' => 'Ang online order ay cash sale. Ang credit sale ay sa admin (company invoice).',
+            'checkout_online_cash_only' => 'Pumili ng cash o online sa itaas. Ang credit (utang) ay sa admin (company invoice) lang.',
             'my_orders_intro' => 'Ilagay ang order number at telepono na ginamit mo nung nag-order.',
             'order_status_label' => 'Status',
             'order_status_pending' => 'Pending',
@@ -809,8 +897,9 @@ function get_translations(): array {
             'payment_terms_label' => 'भुगतान',
             'payment_cash' => 'नकद',
             'payment_credit' => 'उधार / बाद में',
+            'payment_online' => 'ऑनलाइन',
             'order_payment_terms_label' => 'भुगतान प्रकार',
-            'checkout_online_cash_only' => 'ऑनलाइन ऑर्डर नकद बिक्री के रूप में दर्ज होते हैं। उधार बिक्री एडमिन (कंपनी इनवॉइस) से।',
+            'checkout_online_cash_only' => 'ऊपर नकद या ऑनलाइन चुनें। उधार (क्रेडिट) केवल एडमिन (कंपनी इनवॉइस) से।',
             'my_orders_intro' => 'ऑर्डर नंबर और वह फ़ोन दर्ज करें जो ऑर्डर करते समय दिया था।',
             'order_status_label' => 'स्थिति',
             'order_status_pending' => 'लंबित',

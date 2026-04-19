@@ -55,7 +55,35 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
         } catch (e) {}
     })();
     </script>
-    <title><?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?></title>
+    <?php
+    $orangeHeadTitle = isset($ORANGE_STOREFRONT_PAGE_TITLE) && (string) $ORANGE_STOREFRONT_PAGE_TITLE !== ''
+        ? (string) $ORANGE_STOREFRONT_PAGE_TITLE
+        : t('storefront_brand');
+    $orangeHeadDesc = isset($ORANGE_STOREFRONT_META_DESCRIPTION) ? trim((string) $ORANGE_STOREFRONT_META_DESCRIPTION) : '';
+    $orangeCanonical = isset($ORANGE_STOREFRONT_CANONICAL_URL) ? trim((string) $ORANGE_STOREFRONT_CANONICAL_URL) : '';
+    $orangeOgImage = isset($ORANGE_STOREFRONT_OG_IMAGE) ? trim((string) $ORANGE_STOREFRONT_OG_IMAGE) : '';
+    $orangeOgType = isset($ORANGE_STOREFRONT_OG_TYPE) && (string) $ORANGE_STOREFRONT_OG_TYPE !== ''
+        ? (string) $ORANGE_STOREFRONT_OG_TYPE
+        : 'website';
+    ?>
+    <title><?php echo htmlspecialchars($orangeHeadTitle, ENT_QUOTES, 'UTF-8'); ?></title>
+    <?php if ($orangeHeadDesc !== ''): ?>
+    <meta name="description" content="<?php echo htmlspecialchars($orangeHeadDesc, ENT_QUOTES, 'UTF-8'); ?>">
+    <?php endif; ?>
+    <?php if ($orangeCanonical !== ''): ?>
+    <link rel="canonical" href="<?php echo htmlspecialchars($orangeCanonical, ENT_QUOTES, 'UTF-8'); ?>">
+    <?php endif; ?>
+    <meta property="og:title" content="<?php echo htmlspecialchars($orangeHeadTitle, ENT_QUOTES, 'UTF-8'); ?>">
+    <?php if ($orangeHeadDesc !== ''): ?>
+    <meta property="og:description" content="<?php echo htmlspecialchars($orangeHeadDesc, ENT_QUOTES, 'UTF-8'); ?>">
+    <?php endif; ?>
+    <meta property="og:type" content="<?php echo htmlspecialchars($orangeOgType, ENT_QUOTES, 'UTF-8'); ?>">
+    <?php if ($orangeCanonical !== ''): ?>
+    <meta property="og:url" content="<?php echo htmlspecialchars($orangeCanonical, ENT_QUOTES, 'UTF-8'); ?>">
+    <?php endif; ?>
+    <?php if ($orangeOgImage !== ''): ?>
+    <meta property="og:image" content="<?php echo htmlspecialchars($orangeOgImage, ENT_QUOTES, 'UTF-8'); ?>">
+    <?php endif; ?>
     <link rel="stylesheet" href="<?php echo htmlspecialchars(storefront_asset_url('/assets/css/main.css'), ENT_QUOTES, 'UTF-8'); ?>">
     <link rel="stylesheet" href="<?php echo htmlspecialchars(storefront_asset_url('/assets/css/theme-' . $theme . '.css'), ENT_QUOTES, 'UTF-8'); ?>">
     <script>

@@ -522,6 +522,9 @@ async function sendOrderNow() {
         return;
     }
 
+    const payRadio = document.querySelector('input[name="checkout_payment_terms"]:checked');
+    const paymentTerms = payRadio && payRadio.value === 'online' ? 'online' : 'cash';
+
     const payload = {
         name: document.getElementById('customer_name').value.trim(),
         phone: document.getElementById('customer_phone').value.trim(),
@@ -530,6 +533,7 @@ async function sendOrderNow() {
         notes: document.getElementById('customer_notes').value.trim(),
         channel_id: window.APP_CHANNEL_ID || 0,
         items: items,
+        payment_terms: paymentTerms,
     };
 
     if (!payload.name || !payload.phone || !payload.area || !payload.address) {

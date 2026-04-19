@@ -415,9 +415,13 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
         }
         postJSON('/admin/api/opening_balances/save.php', { fiscal_year_id: OB_FY, statement: statement, lines: lines })
             .then(function (r) {
-                alert(r.message || (r.success ? 'تم' : 'فشل'));
                 if (r.success) {
+                    alert(r.message || 'تم');
                     location.reload();
+                    return;
+                }
+                if (!orangeAdminOfferSuggestOnFailure(r, 'فشل')) {
+                    alert(r.message || 'فشل');
                 }
             })
             .catch(function (e) { alert(e.message || String(e)); });

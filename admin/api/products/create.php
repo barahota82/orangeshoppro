@@ -136,6 +136,15 @@ try {
     $descFil = trim((string)($data['description_fil'] ?? ''));
     $descHi = trim((string)($data['description_hi'] ?? ''));
 
+    $seoTitleAr = trim((string)($data['seo_meta_title_ar'] ?? ''));
+    $seoTitleEn = trim((string)($data['seo_meta_title_en'] ?? ''));
+    $seoTitleFil = trim((string)($data['seo_meta_title_fil'] ?? ''));
+    $seoTitleHi = trim((string)($data['seo_meta_title_hi'] ?? ''));
+    $seoDescAr = trim((string)($data['seo_meta_description_ar'] ?? ''));
+    $seoDescEn = trim((string)($data['seo_meta_description_en'] ?? ''));
+    $seoDescFil = trim((string)($data['seo_meta_description_fil'] ?? ''));
+    $seoDescHi = trim((string)($data['seo_meta_description_hi'] ?? ''));
+
     $mainImage = trim((string)($data['main_image'] ?? ''));
     $extraImagesForMain = $data['extra_images'] ?? null;
     if ($mainImage === '' && is_array($extraImagesForMain)) {
@@ -153,9 +162,11 @@ try {
         'INSERT INTO products (
             name, name_en, name_fil, name_hi,
             description, description_en, description_fil, description_hi,
+            seo_meta_title_ar, seo_meta_title_en, seo_meta_title_fil, seo_meta_title_hi,
+            seo_meta_description_ar, seo_meta_description_en, seo_meta_description_fil, seo_meta_description_hi,
             category_id, subcategory_id, size_family_id, sizing_guide_scope, price, cost, main_image, has_sizes, has_colors, sort_order, is_active, created_at
         ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW()
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW()
         )'
     );
 
@@ -168,6 +179,14 @@ try {
         $descEn,
         $descFil,
         $descHi,
+        $seoTitleAr,
+        $seoTitleEn,
+        $seoTitleFil,
+        $seoTitleHi,
+        $seoDescAr,
+        $seoDescEn,
+        $seoDescFil,
+        $seoDescHi,
         (int)$data['category_id'],
         $subcategoryId,
         $sizeFamilyId,

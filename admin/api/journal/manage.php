@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/gl_settings.php';
+require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_admin_api();
 
@@ -40,6 +42,7 @@ try {
                     'memo' => trim((string)($ln['memo'] ?? '')),
                 ];
             }
+            $postLines = [];
             foreach ($norm as $ln) {
                 $aid = (int) ($ln['account_id'] ?? 0);
                 $d = (float) ($ln['debit'] ?? 0);
@@ -50,13 +53,14 @@ try {
                 if (($ln['memo'] ?? '') === '') {
                     json_response(['success' => false, 'message' => 'بيان كل سطر مطلوب'], 422);
                 }
+                $postLines[] = $ln;
+            }
+            if (count($postLines) < 2) {
+                json_response(['success' => false, 'message' => 'يُشترط سطران صالحان على الأقل في السند'], 422);
             }
             if (orange_table_has_column($pdo, 'accounts', 'is_group')) {
-                foreach ($norm as $ln) {
+                foreach ($postLines as $ln) {
                     $aid = (int) $ln['account_id'];
-                    if ($aid <= 0) {
-                        continue;
-                    }
                     $chk = $pdo->prepare('SELECT is_group FROM accounts WHERE id = ? LIMIT 1');
                     $chk->execute([$aid]);
                     if ((int) $chk->fetchColumn() === 1) {
@@ -64,13 +68,43 @@ try {
                     }
                 }
             }
+            $entryTypeNorm = $entryType !== '' ? $entryType : 'manual';
+            if (orange_gl_use_pending_queue($pdo)) {
+                $refOut = $reference !== '' ? $reference : ('JM-' . str_replace(['.', ' '], '', uniqid('', true)));
+                try {
+                    $pendingId = orange_gl_pending_enqueue_multi(
+                        $pdo,
+                        $postLines,
+                        $refOut,
+                        $refOut,
+                        $date,
+                        $date,
+                        $description,
+                        $entryTypeNorm
+                    );
+                } catch (Throwable $e) {
+                    json_response(['success' => false, 'message' => $e->getMessage()], 422);
+                }
+                if ($pendingId <= 0 && $reference !== '') {
+                    json_response(['success' => false, 'message' => 'المرجع مسجّل مسبقاً في طابور الترحيل أو غير صالح'], 422);
+                }
+                audit_log('journal_create', 'سند يدوي متعدد الأسطر (معلّق) مرجع: ' . $refOut, 'orange_gl_pending_movements', $pendingId);
+                json_response([
+                    'success' => true,
+                    'message' => 'تم إضافة السند إلى طابور الترحيل — أكمل من «إقفال الحركات»',
+                    'id' => null,
+                    'pending_movement_id' => $pendingId,
+                ]);
+
+                return;
+            }
             try {
                 $vid = orange_voucher_post($pdo, [
                     'voucher_date' => $date,
                     'reference' => $reference !== '' ? $reference : null,
                     'description' => $description,
-                    'entry_type' => $entryType !== '' ? $entryType : 'manual',
-                ], $norm);
+                    'entry_type' => $entryTypeNorm,
+                ], $postLines);
             } catch (Throwable $e) {
                 json_response(['success' => false, 'message' => $e->getMessage()], 422);
             }
@@ -95,12 +129,43 @@ try {
                 }
             }
         }
+        $entryTypeNorm = $entryType !== '' ? $entryType : 'manual';
+        if (orange_gl_use_pending_queue($pdo)) {
+            $refOut = $reference !== '' ? $reference : ('JM-' . str_replace(['.', ' '], '', uniqid('', true)));
+            try {
+                $pendingId = orange_gl_pending_enqueue_simple($pdo, [
+                    'reference' => $refOut,
+                    'source_label' => $refOut,
+                    'movement_at' => $date,
+                    'voucher_date' => $date,
+                    'account_debit' => $accountDebit,
+                    'account_credit' => $accountCredit,
+                    'amount' => $amount,
+                    'description' => $description,
+                    'entry_type' => $entryTypeNorm,
+                ]);
+            } catch (Throwable $e) {
+                json_response(['success' => false, 'message' => $e->getMessage()], 422);
+            }
+            if ($pendingId <= 0 && $reference !== '') {
+                json_response(['success' => false, 'message' => 'المرجع مسجّل مسبقاً في طابور الترحيل أو غير صالح'], 422);
+            }
+            audit_log('journal_create', 'سند يدوي (معلّق) مرجع: ' . $refOut, 'orange_gl_pending_movements', $pendingId);
+            json_response([
+                'success' => true,
+                'message' => 'تم إضافة السند إلى طابور الترحيل — أكمل من «إقفال الحركات»',
+                'id' => null,
+                'pending_movement_id' => $pendingId,
+            ]);
+
+            return;
+        }
         try {
             $vid = orange_voucher_post($pdo, [
                 'voucher_date' => $date,
                 'reference' => $reference !== '' ? $reference : null,
                 'description' => $description,
-                'entry_type' => $entryType !== '' ? $entryType : 'manual',
+                'entry_type' => $entryTypeNorm,
             ], [
                 ['account_id' => $accountDebit, 'debit' => $amount, 'credit' => 0, 'memo' => $description],
                 ['account_id' => $accountCredit, 'debit' => 0, 'credit' => $amount, 'memo' => $description],
@@ -127,12 +192,25 @@ try {
     }
 
     if (orange_fiscal_is_closed_for_voucher($pdo, $v)) {
-        json_response(['success' => false, 'message' => 'لا يمكن تعديل أو حذف سند ضمن سنة مالية مغلقة'], 422);
+        json_response([
+            'success' => false,
+            'message' => 'لا يمكن تعديل أو حذف سند ضمن سنة مالية مغلقة',
+            'suggest_admin' => orange_gl_suggest_admin_fiscal_years_screen(),
+        ], 422);
     }
 
-    $lockTypes = ['year_end_close', 'opening_balance'];
-    if (in_array((string)($v['entry_type'] ?? ''), $lockTypes, true)) {
-        json_response(['success' => false, 'message' => 'لا يمكن حذف سند إقفال أو أرصدة افتتاحية من هنا'], 422);
+    $lockTypes = orange_gl_entry_types_delete_locked_from_journal_ui();
+    $entryTypeV = (string) ($v['entry_type'] ?? '');
+    if (in_array($entryTypeV, $lockTypes, true)) {
+        $blocked = [
+            'success' => false,
+            'message' => orange_gl_journal_delete_blocked_message_ar($entryTypeV),
+        ];
+        $suggest = orange_gl_journal_delete_blocked_admin_link($entryTypeV);
+        if ($suggest !== null) {
+            $blocked['suggest_admin'] = $suggest;
+        }
+        json_response($blocked, 422);
     }
 
     if ($action === 'delete') {
@@ -145,5 +223,5 @@ try {
 
     json_response(['success' => false, 'message' => 'التعديل غير مدعوم — احذف السند وأعد إدخاله'], 422);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر معالجة السند');
+    orange_gl_api_catch_json($e, 'تعذر معالجة السند');
 }

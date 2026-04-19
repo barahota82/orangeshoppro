@@ -104,6 +104,45 @@ function postJSON(url, payload) {
         }));
 }
 
+/**
+ * فشل API مع suggest_admin: يعرض confirm واختياري الانتقال لشاشة الإدارة.
+ * @param {object} r ناتج JSON (يجب أن يحتوي success === false)
+ * @param {string} [fallbackMsg]
+ * @returns {boolean} true إذا وُجد suggest وعُرض الحوار
+ */
+function orangeAdminOfferSuggestOnFailure(r, fallbackMsg) {
+    if (!r || r.success) {
+        return false;
+    }
+    var msg = r.message || fallbackMsg || 'فشل';
+    var s = r.suggest_admin;
+    if (s && s.href && s.label) {
+        if (window.confirm(msg + '\n\nفتح «' + s.label + '»؟')) {
+            window.location.href = s.href;
+        }
+        return true;
+    }
+    return false;
+}
+
+/**
+ * بعد نجاح مع تنبيهات (errors): اختيار فتح شاشة الإدارة المقترحة.
+ * @returns {boolean} true إذا اختار المستخدم الانتقال (تُتخطى إعادة التحميل الفورية)
+ */
+function orangeAdminOfferSuggestAfterWarnings(r) {
+    if (!r || !r.suggest_admin || !r.suggest_admin.href || !r.suggest_admin.label) {
+        return false;
+    }
+    if (!r.errors || !r.errors.length) {
+        return false;
+    }
+    if (!window.confirm('هناك تنبيهات على بعض البنود. فتح «' + r.suggest_admin.label + '»؟')) {
+        return false;
+    }
+    window.location.href = r.suggest_admin.href;
+    return true;
+}
+
 (function initAdminSidebarSections() {
     const STORAGE_KEY = 'orangeAdminNavCollapsed';
 

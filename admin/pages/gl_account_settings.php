@@ -18,41 +18,38 @@ foreach ($accountsRows as $a) {
 }
 
 $current = [];
-$currentJournalType = [];
 if (orange_table_exists($pdo, 'orange_gl_account_settings')) {
-    $hasJt = orange_table_has_column($pdo, 'orange_gl_account_settings', 'journal_type_id');
-    $sql = $hasJt
-        ? 'SELECT setting_key, account_id, journal_type_id FROM orange_gl_account_settings'
-        : 'SELECT setting_key, account_id FROM orange_gl_account_settings';
-    $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    $rows = $pdo->query('SELECT setting_key, account_id FROM orange_gl_account_settings')->fetchAll(PDO::FETCH_ASSOC);
     foreach ($rows as $r) {
-        $k = (string) $r['setting_key'];
-        $current[$k] = (int) $r['account_id'];
-        $currentJournalType[$k] = $hasJt ? (int) ($r['journal_type_id'] ?? 0) : 0;
+        $current[(string) $r['setting_key']] = (int) $r['account_id'];
     }
 }
 
 $journalTypesList = orange_journal_types_list($pdo);
-
 $rowTitles = orange_gl_setting_row_short_labels();
 $keyHints = orange_gl_setting_key_labels();
-$orderedKeys = orange_gl_settings_form_key_order();
-$labelsKeys = array_keys($keyHints);
-$orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use ($labelsKeys) {
-    return in_array($k, $labelsKeys, true);
-}));
+$orderedKeys = orange_gl_settings_ui_key_order();
+$journalRules = orange_gl_journal_type_rules_list($pdo);
+
+$jtJson = json_encode($journalTypesList, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+$keysJson = json_encode($orderedKeys, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+$shortJson = json_encode($rowTitles, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+$rulesJson = json_encode($journalRules, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 ?>
 <div class="gl-auto-page" dir="rtl">
     <h1 class="gl-auto-page__title">حسابات القيود التلقائية</h1>
+    <p class="gl-auto-page__hint" style="margin:0 0 1rem; color:#555; font-size:0.95rem;">
+        <strong>الجزء الأول:</strong> ربط كل بند بحساب فرعي من الدليل (بدون نوع يومية هنا).
+        <strong>الجزء الثاني:</strong> لكل نوع يومية اختر بنداً للمدين وبنداً للدائن من نفس البنود أعلاه — كل نوع يومية مرة واحدة فقط.
+    </p>
 
     <div class="card gl-auto-form-card">
-        <h3 class="card-title">الحساب من الدليل المحاسبي</h3>
+        <h3 class="card-title">١ — البنود والحسابات من الدليل</h3>
         <div class="table-wrap gl-settings-table-wrap">
             <table class="gl-settings-table">
                 <thead>
                     <tr>
                         <th class="gl-th-label">البند</th>
-                        <th class="gl-th-journal-type">نوع اليومية</th>
                         <th class="gl-th-code">كود الحساب</th>
                         <th class="gl-th-name">اسم الحساب</th>
                     </tr>
@@ -60,7 +57,6 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
                 <tbody>
                     <?php foreach ($orderedKeys as $key):
                         $aid = (int) ($current[$key] ?? 0);
-                        $jtId = (int) ($currentJournalType[$key] ?? 0);
                         $code = $aid > 0 ? (string) ($byId[$aid]['code'] ?? '') : '';
                         $name = $aid > 0 ? (string) ($byId[$aid]['name'] ?? '') : '';
                         $title = htmlspecialchars($keyHints[$key] ?? '', ENT_QUOTES, 'UTF-8');
@@ -68,20 +64,6 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
                         ?>
                     <tr data-gl-key="<?php echo htmlspecialchars($key, ENT_QUOTES, 'UTF-8'); ?>" data-account-id="<?php echo $aid; ?>" title="<?php echo $title; ?>">
                         <td class="gl-td-label"><?php echo $short; ?></td>
-                        <td class="gl-td-journal-type">
-                            <select class="gl-sel-journal-type" aria-label="نوع اليومية">
-                                <option value="0">— اختر —</option>
-                                <?php foreach ($journalTypesList as $jt):
-                                    $jid = (int) ($jt['id'] ?? 0);
-                                    $jlab = trim((string) ($jt['name_ar'] ?? ''));
-                                    if ($jlab === '') {
-                                        $jlab = trim((string) ($jt['name_en'] ?? ''));
-                                    }
-                                    ?>
-                                <option value="<?php echo $jid; ?>"<?php echo $jid === $jtId ? ' selected' : ''; ?>><?php echo htmlspecialchars($jlab, ENT_QUOTES, 'UTF-8'); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </td>
                         <td class="gl-td-code">
                             <input type="text" class="gl-inp-code" dir="ltr" autocomplete="off" value="<?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?>" aria-label="كود الحساب">
                         </td>
@@ -96,8 +78,26 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
                 </tbody>
             </table>
         </div>
-        <div class="gl-auto-actions">
-            <button type="button" id="gl_btn_save">حفظ الربط</button>
+    </div>
+
+    <div class="card gl-auto-form-card" style="margin-top:1rem;">
+        <h3 class="card-title">٢ — ربط نوع اليومية ببند مدين وبند دائن</h3>
+        <div class="table-wrap gl-settings-table-wrap">
+            <table class="gl-settings-table" id="gl_jt_rules_table">
+                <thead>
+                    <tr>
+                        <th>نوع اليومية</th>
+                        <th>بند المدين</th>
+                        <th>بند الدائن</th>
+                        <th class="gl-th-actions" aria-label="إزالة"></th>
+                    </tr>
+                </thead>
+                <tbody id="gl_jt_rules_body"></tbody>
+            </table>
+        </div>
+        <div class="gl-auto-actions" style="margin-top:0.75rem;">
+            <button type="button" class="btn-secondary" id="gl_btn_add_rule">إضافة قاعدة</button>
+            <button type="button" id="gl_btn_save">حفظ الكل</button>
         </div>
     </div>
 </div>
@@ -114,6 +114,117 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
 
 <script>
 (function () {
+    var glJournalTypes = <?php echo $jtJson; ?>;
+    var glUiKeyOrder = <?php echo $keysJson; ?>;
+    var glKeyShort = <?php echo $shortJson; ?>;
+    var glInitialRules = <?php echo $rulesJson; ?>;
+
+    function esc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function keyOptionsHtml(selected) {
+        var h = '<option value="">— بند —</option>';
+        for (var i = 0; i < glUiKeyOrder.length; i++) {
+            var k = glUiKeyOrder[i];
+            var lab = glKeyShort[k] || k;
+            h += '<option value="' + esc(k) + '"' + (k === selected ? ' selected' : '') + '>' + esc(lab) + '</option>';
+        }
+        return h;
+    }
+
+    function journalTypeOptionsHtml(selectedId, excludeIds) {
+        var ex = excludeIds || {};
+        var h = '<option value="0">— نوع يومية —</option>';
+        for (var i = 0; i < glJournalTypes.length; i++) {
+            var jt = glJournalTypes[i];
+            var id = parseInt(jt.id, 10) || 0;
+            if (id <= 0) {
+                continue;
+            }
+            if (ex[id] && id !== selectedId) {
+                continue;
+            }
+            var lab = (jt.name_ar || jt.name_en || jt.code || '').trim();
+            h += '<option value="' + id + '"' + (id === selectedId ? ' selected' : '') + '>' + esc(lab) + '</option>';
+        }
+        return h;
+    }
+
+    function collectUsedJournalTypeIds(exceptTr) {
+        var u = {};
+        document.querySelectorAll('#gl_jt_rules_body tr[data-jt-rule]').forEach(function (tr) {
+            if (tr === exceptTr) {
+                return;
+            }
+            var s = tr.querySelector('.gl-sel-jt-id');
+            var id = s ? parseInt(s.value, 10) || 0 : 0;
+            if (id > 0) {
+                u[id] = true;
+            }
+        });
+        return u;
+    }
+
+    function refreshJournalTypeOptions(exceptTr) {
+        var used = collectUsedJournalTypeIds(exceptTr);
+        document.querySelectorAll('#gl_jt_rules_body tr[data-jt-rule]').forEach(function (tr) {
+            var sel = tr.querySelector('.gl-sel-jt-id');
+            if (!sel) {
+                return;
+            }
+            var cur = parseInt(sel.value, 10) || 0;
+            sel.innerHTML = journalTypeOptionsHtml(cur, used);
+        });
+    }
+
+    function addRuleRow(jtId, dk, ck) {
+        jtId = jtId || 0;
+        dk = dk || '';
+        ck = ck || '';
+        var tbody = document.getElementById('gl_jt_rules_body');
+        if (!tbody) {
+            return;
+        }
+        var tr = document.createElement('tr');
+        tr.setAttribute('data-jt-rule', '1');
+        var used = collectUsedJournalTypeIds(null);
+        tr.innerHTML =
+            '<td><select class="gl-sel-jt-id" aria-label="نوع اليومية">' + journalTypeOptionsHtml(jtId, used) + '</select></td>' +
+            '<td><select class="gl-sel-debit-key" aria-label="بند المدين">' + keyOptionsHtml(dk) + '</select></td>' +
+            '<td><select class="gl-sel-credit-key" aria-label="بند الدائن">' + keyOptionsHtml(ck) + '</select></td>' +
+            '<td><button type="button" class="btn-secondary gl-btn-remove-rule">حذف</button></td>';
+        tbody.appendChild(tr);
+        var jtSel = tr.querySelector('.gl-sel-jt-id');
+        if (jtSel) {
+            jtSel.addEventListener('change', function () {
+                refreshJournalTypeOptions(null);
+            });
+        }
+        tr.querySelector('.gl-btn-remove-rule').addEventListener('click', function () {
+            tr.remove();
+            refreshJournalTypeOptions(null);
+        });
+        refreshJournalTypeOptions(null);
+    }
+
+    if (glInitialRules && glInitialRules.length) {
+        glInitialRules.forEach(function (r) {
+            addRuleRow(
+                parseInt(r.journal_type_id, 10) || 0,
+                String(r.debit_setting_key || ''),
+                String(r.credit_setting_key || '')
+            );
+        });
+    }
+
+    document.getElementById('gl_btn_add_rule').addEventListener('click', function () {
+        addRuleRow(0, '', '');
+    });
+
     var pickModal = document.getElementById('gl_pick_modal');
     var pickList = document.getElementById('gl_pick_list');
     var pickQ = document.getElementById('gl_pick_q');
@@ -160,11 +271,7 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
         }
         glSyncNameFieldState(tr);
     }
-    /** كود غير صالح أو ليس ورقة ترحيل: يُفرّغ الكود والاسم ولا يُربط معرّف (سلوك احترافي عند الخروج من الحقل). */
     function glStripResolvedRow(tr) {
-        if (!tr) {
-            return;
-        }
         glClearRow(tr);
     }
     function openPick(key) {
@@ -259,9 +366,8 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
                         }
                         glFillRow(tr, data.account);
                     })
-                    .catch(function (e) {
+                    .catch(function () {
                         glStripResolvedRow(tr);
-                        alert(e.message || String(e));
                     })
                     .finally(function () {
                         glLookupInFlight = false;
@@ -316,53 +422,35 @@ $orderedKeys = array_values(array_filter($orderedKeys, static function ($k) use 
             }
         });
         if (incomplete) {
-            alert('يوجد كود مكتوب دون حساب فرعي — لن يُحفظ الربط. إمّا اختر حساباً فرعياً (يظهر الاسم) أو امسح الكود.');
+            alert('يوجد كود مكتوب دون حساب فرعي — إمّا اختر حساباً فرعياً (يظهر الاسم) أو امسح الكود.');
             return;
         }
         var settings = {};
-        var journalTypeIds = {};
-        var anyFullPair = false;
-        var anyEmptyBoth = false;
-        var trList = document.querySelectorAll('tr[data-gl-key]');
-        for (var i = 0; i < trList.length; i++) {
-            var tr = trList[i];
+        document.querySelectorAll('tr[data-gl-key]').forEach(function (tr) {
             var k = tr.getAttribute('data-gl-key');
             if (!k) {
-                continue;
-            }
-            var id = parseInt(tr.getAttribute('data-account-id'), 10) || 0;
-            var sel = tr.querySelector('.gl-sel-journal-type');
-            var jt = sel ? parseInt(sel.value, 10) || 0 : 0;
-            var lblEl = tr.querySelector('.gl-td-label');
-            var labelTxt = lblEl ? String(lblEl.textContent || '').trim() : k;
-            if (id > 0 && jt <= 0) {
-                alert('يجب اختيار «نوع اليومية» للبند: ' + labelTxt + '.\nلا يُحفظ ربط حساب بدون نوع يومية.');
                 return;
             }
-            if (jt > 0 && id <= 0) {
-                alert('يجب ربط حساب من الدليل للبند: ' + labelTxt + '.\nلا يُحفظ نوع يومية بدون حساب.');
+            settings[k] = parseInt(tr.getAttribute('data-account-id'), 10) || 0;
+        });
+        var journalRules = [];
+        document.querySelectorAll('#gl_jt_rules_body tr[data-jt-rule]').forEach(function (tr) {
+            var jt = parseInt((tr.querySelector('.gl-sel-jt-id') || {}).value, 10) || 0;
+            var dk = String((tr.querySelector('.gl-sel-debit-key') || {}).value || '').trim();
+            var ck = String((tr.querySelector('.gl-sel-credit-key') || {}).value || '').trim();
+            if (jt <= 0 && dk === '' && ck === '') {
                 return;
             }
-            if (id > 0 && jt > 0) {
-                anyFullPair = true;
-            }
-            if (id <= 0 && jt <= 0) {
-                anyEmptyBoth = true;
-            }
-            settings[k] = id;
-            journalTypeIds[k] = jt;
-        }
-        if (anyFullPair && anyEmptyBoth) {
-            if (!window.confirm(
-                'توجد بنود أخرى لم يُربط لها حساب ولا نوع يومية بعد.\nهل تريد حفظ الربط الحالي فقط؟\n(مناسب إن كان العمل يقتصر مثلاً على بيع نقدي أو أونلاين فقط.)'
-            )) {
-                return;
-            }
-        }
+            journalRules.push({
+                journal_type_id: jt,
+                debit_setting_key: dk,
+                credit_setting_key: ck
+            });
+        });
         postJSON('/admin/api/settings/gl-accounts.php', {
             action: 'save',
             settings: settings,
-            journal_type_ids: journalTypeIds
+            journal_rules: journalRules
         }).then(function (res) {
             alert(res.message || (res.success ? 'تم' : 'فشل'));
             if (res.success) {

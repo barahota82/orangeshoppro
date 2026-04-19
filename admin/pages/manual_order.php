@@ -42,6 +42,7 @@ foreach ($variants as $v) {
             <select id="mo_payment_terms">
                 <option value="cash" selected>نقدي</option>
                 <option value="credit">آجل</option>
+                <option value="online">أونلاين</option>
             </select>
         </div>
     </div>

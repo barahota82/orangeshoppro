@@ -1566,6 +1566,32 @@ body.storefront .product-gallery__img {
     line-height: 1.45;
 }
 
+.cart-checkout-payment-radios {
+    margin: 0 0 14px;
+}
+
+.cart-payment-legend {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+    color: var(--text);
+}
+
+.cart-pay-opts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.cart-pay-opt {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+
 .cart-checkout-cash-note {
     margin: 0 0 16px;
     padding: 10px 12px;

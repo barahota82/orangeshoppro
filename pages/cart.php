@@ -35,6 +35,7 @@ $orangeMyOrderUi = [
     'payment_label' => t('order_payment_terms_label'),
     'payment_cash' => t('payment_cash'),
     'payment_credit' => t('payment_credit'),
+    'payment_online' => t('payment_online'),
 ];
 ?>
 <div class="container">
@@ -89,6 +90,19 @@ $orangeMyOrderUi = [
                 <div class="field">
                     <label><?php echo htmlspecialchars(t('notes'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <textarea id="customer_notes"></textarea>
+                </div>
+                <div class="field cart-checkout-payment-radios" role="group" aria-labelledby="cart_pay_method_legend">
+                    <span id="cart_pay_method_legend" class="cart-payment-legend"><?php echo htmlspecialchars(t('payment_terms_label'), ENT_QUOTES, 'UTF-8'); ?></span>
+                    <div class="cart-pay-opts">
+                        <label class="cart-pay-opt">
+                            <input type="radio" name="checkout_payment_terms" value="cash" checked>
+                            <?php echo htmlspecialchars(t('payment_cash'), ENT_QUOTES, 'UTF-8'); ?>
+                        </label>
+                        <label class="cart-pay-opt">
+                            <input type="radio" name="checkout_payment_terms" value="online">
+                            <?php echo htmlspecialchars(t('payment_online'), ENT_QUOTES, 'UTF-8'); ?>
+                        </label>
+                    </div>
                 </div>
                 <p class="cart-checkout-cash-note"><?php echo htmlspecialchars(t('checkout_online_cash_only'), ENT_QUOTES, 'UTF-8'); ?></p>
                 <button type="button" class="btn" onclick="sendOrderNow()"><?php echo htmlspecialchars(t('send_order'), ENT_QUOTES, 'UTF-8'); ?></button>
@@ -192,7 +206,7 @@ function cartRenderTrackedOrder(resultBox, order, orderNumber, phone) {
     }
     html += '<p><strong>' + escCartHtmlMy(UI.order_total_label || '') + ':</strong> ' + escCartHtmlMy(String(order.total)) + ' ' + escCartHtmlMy(UI.currency || 'KD') + '</p>';
     var pt = String(order.payment_terms || 'cash').toLowerCase();
-    var ptLabel = pt === 'credit' ? (UI.payment_credit || '') : (UI.payment_cash || '');
+    var ptLabel = pt === 'credit' ? (UI.payment_credit || '') : (pt === 'online' ? (UI.payment_online || '') : (UI.payment_cash || ''));
     if (UI.payment_label && ptLabel) {
         html += '<p><strong>' + escCartHtmlMy(UI.payment_label) + ':</strong> ' + escCartHtmlMy(ptLabel) + '</p>';
     }

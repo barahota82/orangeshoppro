@@ -56,6 +56,10 @@ try {
         orange_complete_order_fulfillment($pdo, $id);
     }
 
+    if ($prevStatus === 'completed' && in_array($status, ['cancelled', 'rejected'], true)) {
+        orange_order_reverse_completed_fulfillment($pdo, $id, $prevStatus, $status);
+    }
+
     $pdo->commit();
 
     audit_log('order_update', 'تم تعديل الطلب رقم: ' . $order['order_number'], 'orders', $id);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/order_stock.php';
+require_once __DIR__ . '/../../../includes/order_fulfillment.php';
 require_admin_api();
 
 try {
@@ -30,18 +31,23 @@ try {
         throw new RuntimeException('الطلب غير موجود');
     }
 
+    $prevStatus = (string) ($order['status'] ?? '');
+
     if (
         in_array($status, ['cancelled', 'rejected'], true)
-        && in_array((string)($order['status'] ?? ''), ['pending', 'approved', 'on_the_way'], true)
+        && in_array($prevStatus, ['pending', 'approved', 'on_the_way'], true)
     ) {
         orange_order_release_pending_stock_reservation($pdo, $order);
     }
 
     $pdo->prepare("UPDATE orders SET status = ? WHERE id = ?")->execute([$status, $orderId]);
 
-    if ($status === 'completed' && $order['status'] !== 'completed') {
-        require_once __DIR__ . '/../../../includes/order_fulfillment.php';
+    if ($status === 'completed' && $prevStatus !== 'completed') {
         orange_complete_order_fulfillment($pdo, $orderId);
+    }
+
+    if ($prevStatus === 'completed' && in_array($status, ['cancelled', 'rejected'], true)) {
+        orange_order_reverse_completed_fulfillment($pdo, $orderId, $prevStatus, $status);
     }
 
     $pdo->commit();

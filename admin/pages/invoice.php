@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/../../includes/order_helpers.php';
+
 $pdo = db();
 
 $orderId = isset($_GET['order_id']) ? (int)$_GET['order_id'] : 0;
@@ -13,6 +16,15 @@ if ($orderId <= 0 && $orderNumberLookup !== '') {
 $order = null;
 $items = [];
 $channelName = '';
+
+$orderStatusAr = [
+    'pending' => 'قيد الانتظار',
+    'approved' => 'مقبول',
+    'rejected' => 'مرفوض',
+    'on_the_way' => 'بالطريق',
+    'completed' => 'تم التوصيل',
+    'cancelled' => 'ملغي',
+];
 
 if ($orderId > 0) {
     $stmt = $pdo->prepare('
@@ -94,6 +106,7 @@ if (!$order) {
                     <th>رقم الطلب</th>
                     <th>المصدر</th>
                     <th>العميل</th>
+                    <th>نوع البيع</th>
                     <th>الإجمالي</th>
                     <th>الحالة</th>
                     <th></th>
@@ -109,8 +122,12 @@ if (!$order) {
                         echo $rs === 'company' ? 'شركة' : 'موقع';
                     ?></td>
                     <td><?php echo htmlspecialchars((string)$r['customer_name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo htmlspecialchars(orange_order_payment_terms_label_ar($r['payment_terms'] ?? 'cash'), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo number_format((float)$r['total'], 2); ?> KD</td>
-                    <td><?php echo htmlspecialchars((string)$r['status'], ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php
+                        $rst = strtolower(trim((string) ($r['status'] ?? '')));
+                        echo htmlspecialchars($orderStatusAr[$rst] ?? (string) ($r['status'] ?? ''), ENT_QUOTES, 'UTF-8');
+                    ?></td>
                     <td><a class="btn btn-secondary" href="/admin/index.php?page=invoice&amp;order_id=<?php echo (int)$r['id']; ?>">فتح</a></td>
                 </tr>
                 <?php endforeach; ?>
@@ -139,11 +156,11 @@ if (!$order) {
         <?php if ($channelName !== ''): ?>
             <div><strong>القناة:</strong> <?php echo htmlspecialchars($channelName, ENT_QUOTES, 'UTF-8'); ?></div>
         <?php endif; ?>
-        <div><strong>الحالة:</strong> <?php echo htmlspecialchars((string)$order['status'], ENT_QUOTES, 'UTF-8'); ?></div>
-        <?php
-        $pt = strtolower(trim((string)($order['payment_terms'] ?? 'cash')));
-        $ptAr = $pt === 'credit' ? 'بيع آجل' : 'بيع نقدي';
-        ?>
+        <div><strong>الحالة:</strong> <?php
+            $ost = strtolower(trim((string) ($order['status'] ?? '')));
+            echo htmlspecialchars($orderStatusAr[$ost] ?? (string) ($order['status'] ?? ''), ENT_QUOTES, 'UTF-8');
+        ?></div>
+        <?php $ptAr = 'بيع ' . orange_order_payment_terms_label_ar($order['payment_terms'] ?? 'cash'); ?>
         <div><strong>نوع البيع:</strong> <?php echo htmlspecialchars($ptAr, ENT_QUOTES, 'UTF-8'); ?></div>
         <div><strong>الإجمالي:</strong> <?php echo number_format((float)$order['total'], 2); ?> KD</div>
     </div>

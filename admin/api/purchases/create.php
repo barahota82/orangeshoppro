@@ -6,6 +6,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
+require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_write.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/purchase_helpers.php';
@@ -76,29 +77,73 @@ try {
 
     $purRef = 'PUR-' . $purchaseId;
     $now = date('Y-m-d H:i:s');
-    if ($type === 'cash') {
-        orange_journal_insert_line($pdo, [
-            'date' => $now,
-            'account_debit' => $inventoryId,
-            'account_credit' => $cashId,
-            'amount' => $computedTotal,
-            'reference' => $purRef,
-            'description' => 'شراء نقدي',
-            'entry_type' => 'purchase',
-        ]);
+    if (orange_gl_use_pending_queue($pdo)) {
+        $afterJson = null;
+        if ($type === 'credit' && $supplierId > 0 && $computedTotal > 0.0001) {
+            $afterJson = json_encode([
+                'party_subledger' => [
+                    'party_kind' => 'supplier',
+                    'party_id' => $supplierId,
+                    'debit' => 0.0,
+                    'credit' => $computedTotal,
+                    'ref_type' => 'purchase',
+                    'ref_id' => $purchaseId,
+                    'memo' => 'شراء آجل',
+                ],
+            ], JSON_UNESCAPED_UNICODE);
+        }
+        if ($type === 'cash') {
+            orange_gl_pending_enqueue_simple($pdo, [
+                'reference' => $purRef,
+                'source_label' => $purRef,
+                'movement_at' => $now,
+                'voucher_date' => $now,
+                'account_debit' => $inventoryId,
+                'account_credit' => $cashId,
+                'amount' => $computedTotal,
+                'description' => 'شراء نقدي',
+                'entry_type' => 'purchase',
+                'after_post_json' => $afterJson,
+            ]);
+        } else {
+            orange_gl_pending_enqueue_simple($pdo, [
+                'reference' => $purRef,
+                'source_label' => $purRef,
+                'movement_at' => $now,
+                'voucher_date' => $now,
+                'account_debit' => $inventoryId,
+                'account_credit' => $apId,
+                'amount' => $computedTotal,
+                'description' => 'شراء آجل — ذمم موردين',
+                'entry_type' => 'purchase',
+                'after_post_json' => $afterJson,
+            ]);
+        }
     } else {
-        orange_journal_insert_line($pdo, [
-            'date' => $now,
-            'account_debit' => $inventoryId,
-            'account_credit' => $apId,
-            'amount' => $computedTotal,
-            'reference' => $purRef,
-            'description' => 'شراء آجل — ذمم موردين',
-            'entry_type' => 'purchase',
-        ]);
-    }
+        if ($type === 'cash') {
+            orange_journal_insert_line($pdo, [
+                'date' => $now,
+                'account_debit' => $inventoryId,
+                'account_credit' => $cashId,
+                'amount' => $computedTotal,
+                'reference' => $purRef,
+                'description' => 'شراء نقدي',
+                'entry_type' => 'purchase',
+            ]);
+        } else {
+            orange_journal_insert_line($pdo, [
+                'date' => $now,
+                'account_debit' => $inventoryId,
+                'account_credit' => $apId,
+                'amount' => $computedTotal,
+                'reference' => $purRef,
+                'description' => 'شراء آجل — ذمم موردين',
+                'entry_type' => 'purchase',
+            ]);
+        }
 
-    orange_purchase_record_ap_subledger($pdo, $purchaseId, $supplierId, $type, $computedTotal);
+        orange_purchase_record_ap_subledger($pdo, $purchaseId, $supplierId, $type, $computedTotal);
+    }
 
     $pdo->commit();
     audit_log('purchase_create', 'تم إنشاء فاتورة شراء رقم: ' . $purchaseId, 'purchases', $purchaseId);
@@ -107,5 +152,5 @@ try {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    api_error($e, 'تعذر حفظ عملية الشراء');
+    orange_gl_api_catch_json($e, 'تعذر حفظ عملية الشراء');
 }

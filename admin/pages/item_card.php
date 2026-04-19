@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../includes/order_stock.php';
+
 $productId = (int)($_GET['product_id'] ?? 0);
 if ($productId < 1) {
     echo '<div class="card"><p class="alert-error">صنف غير صالح.</p><a href="/admin/index.php?page=stock">العودة للمستودع</a></div>';
@@ -119,6 +121,7 @@ $img = $product['main_image'] ? '/uploads/products/' . rawurlencode($product['ma
                     <th>لون/مقاس</th>
                     <th>كمية</th>
                     <th>قبل → بعد</th>
+                    <th>مرجع الطلب</th>
                     <th>السبب</th>
                 </tr>
             </thead>
@@ -126,10 +129,13 @@ $img = $product['main_image'] ? '/uploads/products/' . rawurlencode($product['ma
                 <?php foreach ($movements as $m): ?>
                 <tr>
                     <td><?php echo htmlspecialchars((string)$m['created_at']); ?></td>
-                    <td><code><?php echo htmlspecialchars((string)$m['type']); ?></code></td>
+                    <td>
+                        <code title="<?php echo htmlspecialchars((string) $m['type'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(orange_stock_movement_type_label_ar((string) ($m['type'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></code>
+                    </td>
                     <td><?php echo htmlspecialchars(trim(($m['variant_color'] ?: '') . ' / ' . ($m['variant_size'] ?: '')) ?: '—'); ?></td>
                     <td><?php echo (int)$m['qty']; ?></td>
                     <td><?php echo (int)$m['old_stock']; ?> → <?php echo (int)$m['new_stock']; ?></td>
+                    <td dir="ltr"><code><?php echo htmlspecialchars(trim((string)($m['reference'] ?? '')) ?: '—'); ?></code></td>
                     <td><?php echo htmlspecialchars((string)($m['reason'] ?? '')); ?></td>
                 </tr>
                 <?php endforeach; ?>

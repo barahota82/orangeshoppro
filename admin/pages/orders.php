@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/../../includes/order_helpers.php';
+
 $pdo = db();
 
 $sourceFilter = isset($_GET['source']) ? trim((string)$_GET['source']) : 'all';
@@ -7,7 +10,7 @@ if (!in_array($sourceFilter, ['all', 'website', 'company'], true)) {
 }
 
 $payFilter = isset($_GET['pay']) ? trim((string)$_GET['pay']) : 'all';
-if (!in_array($payFilter, ['all', 'cash', 'credit'], true)) {
+if (!in_array($payFilter, ['all', 'cash', 'credit', 'online'], true)) {
     $payFilter = 'all';
 }
 
@@ -23,9 +26,11 @@ if ($sourceFilter === 'website') {
     $sql .= " AND o.order_source = 'company'";
 }
 if ($payFilter === 'cash') {
-    $sql .= " AND (o.payment_terms IS NULL OR o.payment_terms = '' OR o.payment_terms = 'cash')";
+    $sql .= " AND (o.payment_terms IS NULL OR TRIM(o.payment_terms) = '' OR o.payment_terms IN ('cash', 'online'))";
 } elseif ($payFilter === 'credit') {
     $sql .= " AND o.payment_terms = 'credit'";
+} elseif ($payFilter === 'online') {
+    $sql .= " AND o.payment_terms = 'online'";
 }
 
 $sql .= ' ORDER BY o.id DESC';
@@ -56,12 +61,7 @@ $ordersIndex = (isset($_SERVER['SCRIPT_NAME']) && is_string($_SERVER['SCRIPT_NAM
  */
 function orange_admin_order_payment_label(array $o): string
 {
-    $pt = strtolower(trim((string)($o['payment_terms'] ?? 'cash')));
-    if ($pt === 'credit') {
-        return 'آجل';
-    }
-
-    return 'نقدي';
+    return orange_order_payment_terms_label_ar($o['payment_terms'] ?? 'cash');
 }
 
 $orangeOrderStatusAr = [
@@ -84,15 +84,17 @@ function orange_admin_orders_action_buttons(array $o): void
     if ($id <= 0) {
         return;
     }
+    $stNow = strtolower(trim((string) ($o['status'] ?? '')));
+    $stJs = json_encode($stNow, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     $invoicePath = '/admin/index.php?page=invoice&order_id=' . $id;
     $invoiceHref = htmlspecialchars($invoicePath, ENT_QUOTES, 'UTF-8');
 
-    /* ترتيب التنفيذ: قبول → فاتورة → بالطريق → تم التوصيل → رفض */
-    echo '<button type="button" onclick="updateOrderStatus(' . $id . ',\'approved\')">قبول</button>';
+    /* ترتيب التنفيذ: قبول → فاتورة → بالطريق → تم التوصيل → رفض — onclick بعلامات اقتباس مفردة حول السمة لتمرير json_encode بأمان */
+    echo '<button type="button" onclick=\'updateOrderStatus(' . $id . ', "approved", ' . $stJs . ')\'>قبول</button>';
     echo '<a class="btn btn-secondary" href="' . $invoiceHref . '" target="_blank" rel="noopener">فاتورة</a>';
-    echo '<button type="button" class="btn-secondary" onclick="updateOrderStatus(' . $id . ',\'on_the_way\')">بالطريق</button>';
-    echo '<button type="button" class="btn-success" onclick="updateOrderStatus(' . $id . ',\'completed\')">تم التوصيل</button>';
-    echo '<button type="button" class="btn-danger" onclick="updateOrderStatus(' . $id . ',\'rejected\')">رفض</button>';
+    echo '<button type="button" class="btn-secondary" onclick=\'updateOrderStatus(' . $id . ', "on_the_way", ' . $stJs . ')\'>بالطريق</button>';
+    echo '<button type="button" class="btn-success" onclick=\'updateOrderStatus(' . $id . ', "completed", ' . $stJs . ')\'>تم التوصيل</button>';
+    echo '<button type="button" class="btn-danger" onclick=\'updateOrderStatus(' . $id . ', "rejected", ' . $stJs . ')\'>رفض</button>';
 }
 ?>
 <div class="page-title">
@@ -112,10 +114,11 @@ function orange_admin_orders_action_buttons(array $o): void
         </label>
         <label style="display:flex;align-items:center;gap:8px;margin:0;">
             <span>نوع البيع</span>
-            <select id="orders-pay-filter" aria-label="تصفية نقدي أو آجل">
+            <select id="orders-pay-filter" aria-label="تصفية نوع البيع">
                 <option value="all" <?php echo $payFilter === 'all' ? 'selected' : ''; ?>>الكل</option>
-                <option value="cash" <?php echo $payFilter === 'cash' ? 'selected' : ''; ?>>نقدي</option>
+                <option value="cash" <?php echo $payFilter === 'cash' ? 'selected' : ''; ?> title="يشمل نقدي وأونلاين — يستثني الآجل">نقدي</option>
                 <option value="credit" <?php echo $payFilter === 'credit' ? 'selected' : ''; ?>>آجل</option>
+                <option value="online" <?php echo $payFilter === 'online' ? 'selected' : ''; ?>>أونلاين</option>
             </select>
         </label>
     </div>
@@ -146,9 +149,13 @@ function orange_admin_orders_action_buttons(array $o): void
                     ?></td>
                     <td><?php
                         $pl = orange_admin_order_payment_label($o);
-                        echo $pl === 'آجل'
-                            ? '<span class="badge" title="مبيعات آجل">آجل</span>'
-                            : '<span class="badge" title="مبيعات نقدي">نقدي</span>';
+                        if ($pl === 'آجل') {
+                            echo '<span class="badge" title="مبيعات آجل">آجل</span>';
+                        } elseif ($pl === 'أونلاين') {
+                            echo '<span class="badge" title="مبيعات أونلاين">أونلاين</span>';
+                        } else {
+                            echo '<span class="badge" title="مبيعات نقدي">نقدي</span>';
+                        }
                     ?></td>
                     <td class="col-orders-customer"><?php echo htmlspecialchars((string)($o['customer_name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td class="col-orders-phone"><?php echo htmlspecialchars((string)($o['phone'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
@@ -188,9 +195,18 @@ function orange_admin_orders_action_buttons(array $o): void
     srcSel.addEventListener('change', go);
     paySel.addEventListener('change', go);
 })();
-async function updateOrderStatus(orderId, status) {
-    if (status === 'rejected' && !confirm('تأكيد رفض هذا الطلب؟')) {
-        return;
+async function updateOrderStatus(orderId, status, currentStatus) {
+    if (currentStatus === undefined || currentStatus === null) {
+        currentStatus = '';
+    }
+    if (status === 'rejected') {
+        if (currentStatus === 'completed') {
+            if (!confirm('الطلب مكتمل: سيتم إرجاع المخزون وعكس قيود التسليم المرحّلة أو حذف المعلّق، وتعليم حجز الويب/التسليم كملغى عند الانطباق. المتابعة؟')) {
+                return;
+            }
+        } else if (!confirm('تأكيد رفض هذا الطلب؟')) {
+            return;
+        }
     }
     if (status === 'completed' && !confirm('تأكيد تم التوصيل؟')) {
         return;

@@ -203,16 +203,28 @@ function purSubmit() {
         notes: notes,
         items: items
     }).then(function (res) {
-        alert(res.message || (res.success ? 'تم حفظ فاتورة الشراء' : 'فشل'));
-        if (res.success) location.reload();
+        if (res.success) {
+            alert(res.message || 'تم حفظ فاتورة الشراء');
+            location.reload();
+            return;
+        }
+        if (!orangeAdminOfferSuggestOnFailure(res, 'فشل')) {
+            alert(res.message || 'فشل');
+        }
     });
 }
 
 function purDelete(id) {
     if (!confirm('حذف فاتورة الشراء هذه؟ سيتم عكس المخزون وحذف القيد المحاسبي المرتبط بمرجع PUR-' + id + '.')) return;
     postJSON('/admin/api/purchases/update.php', { id: id, action: 'delete' }).then(function (res) {
-        alert(res.message || (res.success ? 'تم الحذف' : 'فشل'));
-        if (res.success) location.reload();
+        if (res.success) {
+            alert(res.message || 'تم الحذف');
+            location.reload();
+            return;
+        }
+        if (!orangeAdminOfferSuggestOnFailure(res, 'فشل')) {
+            alert(res.message || 'فشل');
+        }
     });
 }
 

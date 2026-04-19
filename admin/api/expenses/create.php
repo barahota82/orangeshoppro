@@ -1,7 +1,10 @@
-
 <?php
+
+declare(strict_types=1);
+
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_write.php';
 require_admin_api();
 
@@ -18,18 +21,36 @@ try {
 
     $pdo->beginTransaction();
 
-    $pdo->prepare("INSERT INTO expenses (name, amount) VALUES (?, ?)")
+    $pdo->prepare('INSERT INTO expenses (name, amount) VALUES (?, ?)')
         ->execute([$name, $amount]);
+    $expenseId = (int) $pdo->lastInsertId();
 
-    orange_journal_insert_line($pdo, [
-        'date' => date('Y-m-d H:i:s'),
+    $now = date('Y-m-d H:i:s');
+    $purRef = 'EXP-' . $expenseId;
+    $row = [
+        'reference' => $purRef,
+        'source_label' => $purRef,
+        'movement_at' => $now,
+        'voucher_date' => $now,
         'account_debit' => 6,
         'account_credit' => 1,
         'amount' => $amount,
-        'reference' => 'EXP-' . date('YmdHis'),
         'description' => 'تسجيل مصروف من لوحة الإدارة',
         'entry_type' => 'expense',
-    ]);
+    ];
+    if (orange_gl_use_pending_queue($pdo)) {
+        orange_gl_pending_enqueue_simple($pdo, $row);
+    } else {
+        orange_journal_insert_line($pdo, [
+            'date' => $now,
+            'account_debit' => 6,
+            'account_credit' => 1,
+            'amount' => $amount,
+            'reference' => $purRef,
+            'description' => 'تسجيل مصروف من لوحة الإدارة',
+            'entry_type' => 'expense',
+        ]);
+    }
 
     $pdo->commit();
     audit_log('expense_create', 'تم تسجيل مصروف: ' . $name, 'expenses');

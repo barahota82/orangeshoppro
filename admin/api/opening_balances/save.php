@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/gl_settings.php';
 require_once __DIR__ . '/../../../includes/account_tree.php';
+require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_admin_api();
 
@@ -33,7 +35,11 @@ try {
         json_response(['success' => false, 'message' => 'السنة غير موجودة'], 404);
     }
     if ((int)$fy['is_closed'] === 1) {
-        json_response(['success' => false, 'message' => 'لا يمكن تعديل أرصدة افتتاحية لسنة مغلقة'], 422);
+        json_response([
+            'success' => false,
+            'message' => 'لا يمكن تعديل أرصدة افتتاحية لسنة مغلقة',
+            'suggest_admin' => orange_gl_suggest_admin_fiscal_years_screen(),
+        ], 422);
     }
 
     $norm = [];
@@ -67,18 +73,39 @@ try {
 
     $pdo->beginTransaction();
     try {
+        $useQueue = orange_gl_use_pending_queue($pdo);
         $ex = $pdo->prepare('SELECT id FROM journal_vouchers WHERE fiscal_year_id = ? AND entry_type = ?');
         $ex->execute([$fyId, 'opening_balance']);
         foreach ($ex->fetchAll(PDO::FETCH_COLUMN) as $oldId) {
             $pdo->prepare('DELETE FROM journal_vouchers WHERE id = ?')->execute([(int)$oldId]);
         }
 
-        orange_voucher_post($pdo, [
-            'voucher_date' => $fy['start_date'] . ' 10:00:00',
-            'reference' => 'OB-' . $fyId,
-            'description' => $statement,
-            'entry_type' => 'opening_balance',
-        ], $norm);
+        orange_gl_pending_remove_by_reference($pdo, 'OB-' . $fyId);
+
+        $obDate = $fy['start_date'] . ' 10:00:00';
+        $obRef = 'OB-' . $fyId;
+        if ($useQueue) {
+            $pendingOb = orange_gl_pending_enqueue_multi(
+                $pdo,
+                $norm,
+                $obRef,
+                $obRef,
+                $obDate,
+                $obDate,
+                $statement,
+                'opening_balance'
+            );
+            if ($pendingOb <= 0) {
+                throw new RuntimeException('تعذر إدراج أرصدة أول المدة في طابور الترحيل.');
+            }
+        } else {
+            orange_voucher_post($pdo, [
+                'voucher_date' => $obDate,
+                'reference' => $obRef,
+                'description' => $statement,
+                'entry_type' => 'opening_balance',
+            ], $norm);
+        }
 
         $pdo->commit();
     } catch (Throwable $e) {
@@ -89,7 +116,13 @@ try {
     }
 
     audit_log('opening_balance_save', 'تم حفظ أرصدة افتتاحية للسنة ' . $fyId, 'journal_vouchers', $fyId);
-    json_response(['success' => true, 'message' => 'تم حفظ أرصدة أول المدة المالية']);
+    $msg = isset($useQueue) && $useQueue
+        ? 'تم حفظ أرصدة أول المدة في طابور الترحيل — أكمل من «إقفال الحركات»'
+        : 'تم حفظ أرصدة أول المدة المالية';
+    json_response(['success' => true, 'message' => $msg]);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر حفظ الأرصدة الافتتاحية');
+    if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    orange_gl_api_catch_json($e, 'تعذر حفظ الأرصدة الافتتاحية');
 }

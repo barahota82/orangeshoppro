@@ -39,6 +39,7 @@ function orange_journal_types_canonical_rows(): array
         ['JE', 'سند قيد', 'Journal entry'],
         ['RV', 'سند قبض', 'Receipt voucher'],
         ['PV', 'سند صرف', 'Payment voucher'],
+        ['EXP', 'قيد مصروف', 'Expense voucher'],
         ['YEC', 'قيد الإقفال السنوي', 'Year-end closing entry'],
         ['PIN', 'فاتورة مشتريات', 'Purchase invoice'],
         ['PDN', 'مردود مشتريات', 'Purchase return'],
@@ -98,4 +99,55 @@ function orange_journal_types_sync_canonical_defaults(PDO $pdo): void
         }
         throw $e;
     }
+}
+
+/**
+ * Map journal_types.code (canonical) to orange_gl_pending_movements.entry_type values.
+ * Unknown or unmapped codes return [] (caller should not apply entry_type filter).
+ *
+ * @return list<string>
+ */
+function orange_gl_entry_types_for_journal_type_code(string $code): array
+{
+    $code = orange_journal_type_normalize_code($code);
+    static $map = [
+        'OBV' => ['opening_balance'],
+        'JE' => ['manual', 'general'],
+        'RV' => ['customer_receipt'],
+        'PV' => ['supplier_payment'],
+        'EXP' => ['expense', 'expense_adjustment', 'expense_reversal'],
+        'YEC' => ['year_end_close'],
+        'PIN' => ['purchase'],
+        'PDN' => ['purchase'],
+        'CSI' => ['order_delivery_sale'],
+        'SIN' => ['order_delivery_sale'],
+        'OSI' => ['order_delivery_sale'],
+        'CGC' => ['order_delivery_cogs'],
+        'CGT' => ['order_delivery_cogs'],
+        'CGO' => ['order_delivery_cogs'],
+        'SCR' => ['order_return_sale'],
+        'SRR' => ['order_return_sale'],
+        'OSR' => ['order_return_sale'],
+        'CSR' => ['order_return_cogs'],
+        'CGR' => ['order_return_cogs'],
+        'COR' => ['order_return_cogs'],
+    ];
+    return $map[$code] ?? [];
+}
+
+/**
+ * @return list<string>
+ */
+function orange_gl_entry_types_for_journal_type_id(PDO $pdo, int $journalTypeId): array
+{
+    if ($journalTypeId <= 0 || !orange_table_exists($pdo, 'journal_types')) {
+        return [];
+    }
+    $st = $pdo->prepare('SELECT code FROM journal_types WHERE id = ? LIMIT 1');
+    $st->execute([$journalTypeId]);
+    $code = (string) $st->fetchColumn();
+    if ($code === '') {
+        return [];
+    }
+    return orange_gl_entry_types_for_journal_type_code($code);
 }

@@ -52,6 +52,7 @@ function orange_gl_setting_row_short_labels(): array
     return [
         'cash' => 'الخزينة',
         'inventory' => 'المخزن',
+        'accounts_payable' => 'ذمم الموردين',
         'ar_cash' => 'العملاء النقدي',
         'ar_credit' => 'العملاء الاجل',
         'sales_revenue_cash' => 'المبيعات النقدية',
@@ -79,6 +80,7 @@ function orange_gl_settings_form_key_order(): array
     return [
         'cash',
         'inventory',
+        'accounts_payable',
         'ar_cash',
         'ar_credit',
         'sales_revenue_cash',
@@ -97,19 +99,61 @@ function orange_gl_settings_form_key_order(): array
 }
 
 /**
- * أنواع اليومية المربوطة في «حسابات القيود التلقائية» — لشاشة الترحيل (قائمة نوع الحركة).
+ * قواعد ربط نوع اليومية ببند مدين وبند دائن (مفاتيح من القسم العلوي).
+ *
+ * @return list<array<string, mixed>>
+ */
+function orange_gl_journal_type_rules_list(PDO $pdo): array
+{
+    orange_catalog_ensure_schema($pdo);
+    if (!orange_table_exists($pdo, 'orange_gl_journal_type_rules')) {
+        return [];
+    }
+    try {
+        $st = $pdo->query(
+            'SELECT journal_type_id, debit_setting_key, credit_setting_key
+             FROM orange_gl_journal_type_rules
+             ORDER BY journal_type_id ASC'
+        );
+
+        return $st ? $st->fetchAll(PDO::FETCH_ASSOC) : [];
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] orange_gl_journal_type_rules_list: ' . $e->getMessage());
+        }
+
+        return [];
+    }
+}
+
+/**
+ * أنواع اليومية لشاشة الترحيل: من جدول القواعد إن وُجد، وإلا من الربط القديم في orange_gl_account_settings.
  *
  * @return list<array<string, mixed>>
  */
 function orange_gl_posting_linked_journal_types(PDO $pdo): array
 {
     orange_catalog_ensure_schema($pdo);
-    if (!orange_table_exists($pdo, 'orange_gl_account_settings')
-        || !orange_table_has_column($pdo, 'orange_gl_account_settings', 'journal_type_id')
-        || !orange_table_exists($pdo, 'journal_types')) {
+    if (!orange_table_exists($pdo, 'journal_types')) {
         return [];
     }
     try {
+        if (orange_table_exists($pdo, 'orange_gl_journal_type_rules')) {
+            $st = $pdo->query(
+                'SELECT jt.id, jt.code, jt.name_ar, jt.sort_order
+                 FROM orange_gl_journal_type_rules r
+                 INNER JOIN journal_types jt ON jt.id = r.journal_type_id
+                 ORDER BY jt.sort_order ASC, jt.id ASC'
+            );
+            $fromRules = $st ? $st->fetchAll(PDO::FETCH_ASSOC) : [];
+            if ($fromRules !== []) {
+                return $fromRules;
+            }
+        }
+        if (!orange_table_exists($pdo, 'orange_gl_account_settings')
+            || !orange_table_has_column($pdo, 'orange_gl_account_settings', 'journal_type_id')) {
+            return [];
+        }
         $st = $pdo->query(
             'SELECT DISTINCT jt.id, jt.code, jt.name_ar, jt.sort_order
              FROM orange_gl_account_settings g
@@ -126,6 +170,21 @@ function orange_gl_posting_linked_journal_types(PDO $pdo): array
 
         return [];
     }
+}
+
+/**
+ * مفاتيح البنود الظاهرة في نموذج «حسابات القيود التلقائية» (علوي وسفلي).
+ *
+ * @return list<string>
+ */
+function orange_gl_settings_ui_key_order(): array
+{
+    $labelsKeys = array_keys(orange_gl_setting_key_labels());
+    $ordered = orange_gl_settings_form_key_order();
+
+    return array_values(array_filter($ordered, static function ($k) use ($labelsKeys) {
+        return in_array($k, $labelsKeys, true);
+    }));
 }
 
 /**
@@ -297,4 +356,258 @@ function orange_gl_account_id(PDO $pdo, string $key): int
     throw new RuntimeException(
         'حساب أساسي غير مربوط: ' . $lab . ' — افتح «الحسابات الأساسية للقيود التلقائية» واختر الحساب من الشجرة.'
     );
+}
+
+/**
+ * تسميات عربية لحقل journal_vouchers.entry_type / طابور المحاسبة (للعرض فقط).
+ *
+ * @return array<string, string>
+ */
+function orange_gl_entry_type_labels_map(): array
+{
+    return [
+        'manual' => 'سند يدوي',
+        'general' => 'قيد عام',
+        'opening_balance' => 'قيد رصيد افتتاحي',
+        'year_end_close' => 'إقفال سنة مالية',
+        'customer_receipt' => 'قبض عميل',
+        'supplier_payment' => 'دفع مورد',
+        'purchase' => 'شراء / مردود مشتريات',
+        'expense' => 'مصروف',
+        'expense_adjustment' => 'تعديل مصروف',
+        'expense_reversal' => 'عكس مصروف',
+        'order_delivery_sale' => 'تسليم طلب — إيراد',
+        'order_delivery_cogs' => 'تسليم طلب — تكلفة',
+        'order_return_sale' => 'إلغاء تسليم — مردود إيراد',
+        'order_return_cogs' => 'إلغاء تسليم — مردود تكلفة',
+        'migrated' => 'مرحّل من نظام سابق',
+    ];
+}
+
+function orange_gl_entry_type_label_ar(string $entryType): string
+{
+    $entryType = trim($entryType);
+    if ($entryType === '') {
+        return '';
+    }
+    $map = orange_gl_entry_type_labels_map();
+
+    return $map[$entryType] ?? $entryType;
+}
+
+/**
+ * أنواع سندات لا تُحذف من شاشة «سندات القيود» اليدوية — تُدار من مسارات الطلبات/الترحيل أو شاشات مخصصة.
+ *
+ * @return list<string>
+ */
+function orange_gl_entry_types_delete_locked_from_journal_ui(): array
+{
+    return [
+        'year_end_close',
+        'opening_balance',
+        'order_delivery_sale',
+        'order_delivery_cogs',
+        'order_return_sale',
+        'order_return_cogs',
+        'purchase',
+        'customer_receipt',
+        'supplier_payment',
+        'expense',
+        'expense_adjustment',
+        'expense_reversal',
+    ];
+}
+
+/**
+ * رسالة للمستخدم عند محاولة حذف سند نظامي من شاشة القيود اليدوية.
+ */
+function orange_gl_journal_delete_blocked_message_ar(string $entryType): string
+{
+    $et = trim($entryType);
+    $label = orange_gl_entry_type_label_ar($et);
+    if ($label === '') {
+        $label = $et !== '' ? $et : 'سند نظامي';
+    }
+    $hints = [
+        'year_end_close' => 'يُدار من مسار إقفال السنة المالية.',
+        'opening_balance' => 'عدّل من شاشة «الأرصدة الافتتاحية».',
+        'order_delivery_sale' => 'للتصحيح: «ترحيل الحركات» (فك ترحيل) أو مسار الطلب.',
+        'order_delivery_cogs' => 'كما سبق — تكلفة التسليم مرتبطة بالطابور أو الطلب.',
+        'order_return_sale' => 'كما سبق — مردود الإيراد من إلغاء التسليم.',
+        'order_return_cogs' => 'كما سبق — مردود التكلفة من إلغاء التسليم.',
+        'purchase' => 'عدّل أو ألغِ من شاشة المشتريات.',
+        'customer_receipt' => 'عدّل من مسار قبض العملاء / الذمم.',
+        'supplier_payment' => 'عدّل من مسار دفع الموردين / الذمم.',
+        'expense' => 'عدّل من شاشة المصروفات.',
+        'expense_adjustment' => 'عدّل من شاشة المصروفات.',
+        'expense_reversal' => 'يُدار من شاشة المصروفات (إلغاء/عكس).',
+    ];
+    $hint = $hints[$et] ?? 'استخدم الشاشة أو المسار الذي أنشأ السند، أو فك الترحيل من «ترحيل الحركات» إن وُجد في الطابور.';
+
+    return 'لا يمكن حذف «' . $label . '» من هنا. ' . $hint;
+}
+
+/**
+ * رابط لوحة إدارة مقترح لتصحيح السند (عرض واجهة فقط — الـ API يبقى برسالة نصية).
+ *
+ * @return array{href:string,label:string}|null
+ */
+function orange_gl_journal_delete_blocked_admin_link(string $entryType): ?array
+{
+    $et = trim($entryType);
+    $map = [
+        'opening_balance' => ['page' => 'opening_balances', 'label' => 'الأرصدة الافتتاحية'],
+        'year_end_close' => ['page' => 'fiscal_years', 'label' => 'السنوات المالية / الإقفال'],
+        'purchase' => ['page' => 'purchases', 'label' => 'المشتريات'],
+        'customer_receipt' => ['page' => 'partner_ledger', 'label' => 'ذمم العملاء والموردين'],
+        'supplier_payment' => ['page' => 'partner_ledger', 'label' => 'ذمم العملاء والموردين'],
+        'expense' => ['page' => 'expenses', 'label' => 'المصروفات'],
+        'expense_adjustment' => ['page' => 'expenses', 'label' => 'المصروفات'],
+        'expense_reversal' => ['page' => 'expenses', 'label' => 'المصروفات'],
+        'order_delivery_sale' => ['page' => 'gl_posting', 'label' => 'ترحيل الحركات'],
+        'order_delivery_cogs' => ['page' => 'gl_posting', 'label' => 'ترحيل الحركات'],
+        'order_return_sale' => ['page' => 'gl_posting', 'label' => 'ترحيل الحركات'],
+        'order_return_cogs' => ['page' => 'gl_posting', 'label' => 'ترحيل الحركات'],
+    ];
+    if (!isset($map[$et])) {
+        return null;
+    }
+    $page = $map[$et]['page'];
+
+    return [
+        'href' => '/admin/index.php?page=' . rawurlencode($page),
+        'label' => $map[$et]['label'],
+    ];
+}
+
+/**
+ * عند فشل فك الترحيل من الطابور: اقتراح شاشة إدارية من نصوص الأخطاء المعروفة.
+ *
+ * @param list<string> $errors
+ * @return array{href:string,label:string}|null
+ */
+function orange_gl_unpost_errors_suggest_admin_link(array $errors): ?array
+{
+    foreach ($errors as $err) {
+        $e = (string) $err;
+        if (str_contains($e, 'أرصدة افتتاحية')) {
+            return [
+                'href' => '/admin/index.php?page=opening_balances',
+                'label' => 'الأرصدة الافتتاحية',
+            ];
+        }
+        if (str_contains($e, 'إقفال سنوي')) {
+            return [
+                'href' => '/admin/index.php?page=fiscal_years',
+                'label' => 'السنوات المالية / الإقفال',
+            ];
+        }
+        if (str_contains($e, 'سنة مالية مغلقة')) {
+            return orange_gl_suggest_admin_fiscal_years_screen();
+        }
+    }
+
+    return null;
+}
+
+/**
+ * عند فشل ترحيل الطابور: اقتراح شاشة من نصوص الأخطاء (إعدادات GL أو السنة المالية).
+ *
+ * @param list<string> $errors
+ * @return array{href:string,label:string}|null
+ */
+function orange_gl_post_errors_suggest_admin_link(array $errors): ?array
+{
+    foreach ($errors as $err) {
+        $e = (string) $err;
+        if (
+            str_contains($e, 'حسابات القيود التلقائية')
+            || str_contains($e, 'حساب أساسي غير مربوط')
+            || str_contains($e, 'لم يُضبط الدليل المحاسبي')
+        ) {
+            return [
+                'href' => '/admin/index.php?page=gl_account_settings',
+                'label' => 'حسابات القيود التلقائية',
+            ];
+        }
+    }
+    foreach ($errors as $err) {
+        $e = (string) $err;
+        if (str_contains($e, 'سنة مالية')) {
+            return [
+                'href' => '/admin/index.php?page=fiscal_years',
+                'label' => 'السنوات المالية',
+            ];
+        }
+    }
+
+    return null;
+}
+
+/**
+ * شاشة السنوات المالية — للإرشاد عند رفض عملية بسبب إقفال السنة.
+ *
+ * @return array{href:string,label:string}
+ */
+function orange_gl_suggest_admin_fiscal_years_screen(): array
+{
+    return [
+        'href' => '/admin/index.php?page=fiscal_years',
+        'label' => 'السنوات المالية',
+    ];
+}
+
+/**
+ * اقتراح شاشة إدارية من نص استثناء (مساعد قبض/شراء/قيد عند الفشل).
+ *
+ * @return array{href:string,label:string}|null
+ */
+function orange_gl_exception_suggest_admin(Throwable $e): ?array
+{
+    $m = $e->getMessage();
+    if ($m === '') {
+        return null;
+    }
+    if (str_contains($m, 'سنة مالية')) {
+        return orange_gl_suggest_admin_fiscal_years_screen();
+    }
+    if (
+        str_contains($m, 'حسابات القيود التلقائية')
+        || str_contains($m, 'حساب أساسي غير مربوط')
+        || str_contains($m, 'لم يُضبط الدليل المحاسبي')
+        || str_contains($m, 'الحساب المربوط لـ')
+    ) {
+        return [
+            'href' => '/admin/index.php?page=gl_account_settings',
+            'label' => 'حسابات القيود التلقائية',
+        ];
+    }
+
+    return null;
+}
+
+/**
+ * رد JSON عند خطأ API مع نفس أسلوب api_error + suggest عند امتثال نص الاستثناء.
+ */
+function orange_gl_api_catch_json(Throwable $e, string $userMessage): void
+{
+    if (function_exists('error_log')) {
+        error_log(
+            '[orange] API: ' . $userMessage . ' | ' . $e->getMessage()
+            . ' @ ' . $e->getFile() . ':' . $e->getLine()
+        );
+    }
+    $payload = [
+        'success' => false,
+        'message' => $userMessage,
+    ];
+    $s = orange_gl_exception_suggest_admin($e);
+    if ($s !== null) {
+        $payload['suggest_admin'] = $s;
+    }
+    $debug = getenv('ORANGE_API_DEBUG');
+    if ($debug === '1' || $debug === 'true') {
+        $payload['debug'] = $e->getMessage();
+    }
+    json_response($payload, 500);
 }

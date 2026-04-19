@@ -266,6 +266,42 @@ foreach ($categories as $cat) {
                 <label>Description (Hindi)</label>
                 <textarea id="description_hi" rows="3"></textarea>
             </div>
+            <div style="grid-column:1/-1;">
+                <h4 class="admin-product-subsection-title" style="margin:8px 0 4px;">SEO — عناوين ووصف الميتا (اختياري)</h4>
+                <p style="margin:0 0 10px;color:#666;font-size:13px;line-height:1.45;">إذا تُركت فارغة، يُستخدم عنوان المنتج ووصف مختصر من نص الوصف في المتجر (وميتا Open Graph).</p>
+            </div>
+            <div>
+                <label for="seo_meta_title_ar">عنوان الميتا (عربي)</label>
+                <input type="text" id="seo_meta_title_ar" maxlength="191">
+            </div>
+            <div>
+                <label for="seo_meta_title_en">Meta title (English)</label>
+                <input type="text" id="seo_meta_title_en" maxlength="191" lang="en" dir="ltr">
+            </div>
+            <div>
+                <label for="seo_meta_title_fil">Meta title (Filipino)</label>
+                <input type="text" id="seo_meta_title_fil" maxlength="191" lang="en" dir="ltr">
+            </div>
+            <div>
+                <label for="seo_meta_title_hi">Meta title (Hindi)</label>
+                <input type="text" id="seo_meta_title_hi" maxlength="191" lang="hi" dir="ltr">
+            </div>
+            <div style="grid-column:1/-1;">
+                <label for="seo_meta_description_ar">وصف الميتا (عربي)</label>
+                <textarea id="seo_meta_description_ar" rows="2"></textarea>
+            </div>
+            <div style="grid-column:1/-1;">
+                <label for="seo_meta_description_en">Meta description (English)</label>
+                <textarea id="seo_meta_description_en" rows="2" lang="en" dir="ltr"></textarea>
+            </div>
+            <div style="grid-column:1/-1;">
+                <label for="seo_meta_description_fil">Meta description (Filipino)</label>
+                <textarea id="seo_meta_description_fil" rows="2" lang="en" dir="ltr"></textarea>
+            </div>
+            <div style="grid-column:1/-1;">
+                <label for="seo_meta_description_hi">Meta description (Hindi)</label>
+                <textarea id="seo_meta_description_hi" rows="2" lang="hi" dir="ltr"></textarea>
+            </div>
         </div>
         </div>
         </div>
@@ -703,6 +739,14 @@ function resetProductForm() {
     document.getElementById('description_en').value = '';
     document.getElementById('description_fil').value = '';
     document.getElementById('description_hi').value = '';
+    document.getElementById('seo_meta_title_ar').value = '';
+    document.getElementById('seo_meta_title_en').value = '';
+    document.getElementById('seo_meta_title_fil').value = '';
+    document.getElementById('seo_meta_title_hi').value = '';
+    document.getElementById('seo_meta_description_ar').value = '';
+    document.getElementById('seo_meta_description_en').value = '';
+    document.getElementById('seo_meta_description_fil').value = '';
+    document.getElementById('seo_meta_description_hi').value = '';
     document.getElementById('category_id').selectedIndex = 0;
     rebuildSubcategoryOptions(null);
     updateProductCatalogHint();
@@ -780,6 +824,14 @@ async function loadProductForEdit(id) {
         document.getElementById('description_en').value = p.description_en || '';
         document.getElementById('description_fil').value = p.description_fil || '';
         document.getElementById('description_hi').value = p.description_hi || '';
+        document.getElementById('seo_meta_title_ar').value = p.seo_meta_title_ar || '';
+        document.getElementById('seo_meta_title_en').value = p.seo_meta_title_en || '';
+        document.getElementById('seo_meta_title_fil').value = p.seo_meta_title_fil || '';
+        document.getElementById('seo_meta_title_hi').value = p.seo_meta_title_hi || '';
+        document.getElementById('seo_meta_description_ar').value = p.seo_meta_description_ar || '';
+        document.getElementById('seo_meta_description_en').value = p.seo_meta_description_en || '';
+        document.getElementById('seo_meta_description_fil').value = p.seo_meta_description_fil || '';
+        document.getElementById('seo_meta_description_hi').value = p.seo_meta_description_hi || '';
         document.getElementById('category_id').value = String(p.category_id || '');
         const sid = parseInt(p.subcategory_id, 10) || 0;
         rebuildSubcategoryOptions(sid > 0 ? sid : null);
@@ -1084,6 +1136,14 @@ async function saveProduct() {
             description_en: document.getElementById('description_en').value.trim(),
             description_fil: document.getElementById('description_fil').value.trim(),
             description_hi: document.getElementById('description_hi').value.trim(),
+            seo_meta_title_ar: document.getElementById('seo_meta_title_ar').value.trim(),
+            seo_meta_title_en: document.getElementById('seo_meta_title_en').value.trim(),
+            seo_meta_title_fil: document.getElementById('seo_meta_title_fil').value.trim(),
+            seo_meta_title_hi: document.getElementById('seo_meta_title_hi').value.trim(),
+            seo_meta_description_ar: document.getElementById('seo_meta_description_ar').value.trim(),
+            seo_meta_description_en: document.getElementById('seo_meta_description_en').value.trim(),
+            seo_meta_description_fil: document.getElementById('seo_meta_description_fil').value.trim(),
+            seo_meta_description_hi: document.getElementById('seo_meta_description_hi').value.trim(),
             category_id: parseInt(document.getElementById('category_id').value, 10),
             price: parseFloat(document.getElementById('price').value || '0'),
             cost: parseFloat(document.getElementById('cost').value || '0'),
@@ -1132,6 +1192,14 @@ async function saveProduct() {
         description_en: document.getElementById('description_en').value.trim(),
         description_fil: document.getElementById('description_fil').value.trim(),
         description_hi: document.getElementById('description_hi').value.trim(),
+        seo_meta_title_ar: document.getElementById('seo_meta_title_ar').value.trim(),
+        seo_meta_title_en: document.getElementById('seo_meta_title_en').value.trim(),
+        seo_meta_title_fil: document.getElementById('seo_meta_title_fil').value.trim(),
+        seo_meta_title_hi: document.getElementById('seo_meta_title_hi').value.trim(),
+        seo_meta_description_ar: document.getElementById('seo_meta_description_ar').value.trim(),
+        seo_meta_description_en: document.getElementById('seo_meta_description_en').value.trim(),
+        seo_meta_description_fil: document.getElementById('seo_meta_description_fil').value.trim(),
+        seo_meta_description_hi: document.getElementById('seo_meta_description_hi').value.trim(),
         category_id: parseInt(document.getElementById('category_id').value, 10),
         price: parseFloat(document.getElementById('price').value || '0'),
         cost: parseFloat(document.getElementById('cost').value || '0'),

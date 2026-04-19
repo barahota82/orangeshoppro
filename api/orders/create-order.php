@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../includes/order_helpers.php';
 require_once __DIR__ . '/../../includes/order_stock.php';
@@ -110,8 +113,12 @@ try {
         ];
     }
 
-    // طلبات المتجر الإلكتروني تُسجَّل دائمًا كبيع نقدي (سياسة المشروع).
+    // طلبات الموقع: نقدي أو أونلاين فقط — البيع الآجل من لوحة الإدارة (فاتورة شركة).
     $paymentTerms = 'cash';
+    if (isset($data['payment_terms'])) {
+        $pt = orange_normalize_payment_terms($data['payment_terms']);
+        $paymentTerms = ($pt === 'online') ? 'online' : 'cash';
+    }
     $hasSource = orange_table_has_column($pdo, 'orders', 'order_source');
     $hasPay = orange_table_has_column($pdo, 'orders', 'payment_terms');
 
@@ -221,7 +228,9 @@ try {
         $messageLines[] = "   Price: " . number_format($row['price'], 2) . " KD";
     }
     $messageLines[] = "";
-    $messageLines[] = 'Payment: ' . ($paymentTerms === 'credit' ? 'Credit / آجل' : 'Cash / نقدي');
+    $payAr = orange_order_payment_terms_label_ar($paymentTerms);
+    $payEn = $paymentTerms === 'online' ? 'Online' : 'Cash';
+    $messageLines[] = 'Payment: ' . $payEn . ' / ' . $payAr;
     $messageLines[] = "Total: " . number_format($total, 2) . " KD";
 
     $whatsAppNumber = clean_whatsapp_number((string)$channel['whatsapp_number']);

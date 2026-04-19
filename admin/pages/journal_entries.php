@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
+require_once __DIR__ . '/../../includes/gl_settings.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -63,6 +64,13 @@ foreach ($accounts as $a) {
             كل سند يضم عدة أسطر؛ مجموع المدين يجب أن يساوي مجموع الدائن.
             سندات <strong>الافتتاح</strong> و<strong>الإقفال</strong> تُدار من شاشات السنة المالية والإقفال.
         </p>
+        <p class="page-subtitle" style="margin-top:0.5rem;">
+            <strong>الطابور مقابل السند الظاهر هنا:</strong> كثير من الحركات (تسليم طلبات، مشتريات، مصروفات، قبض/دفع، قيود يدوية من هذه الشاشة، أرصدة افتتاحية…) تُسجَّل أولاً في
+            <strong>طابور المحاسبة</strong> ثم تتحول إلى سند فعلي من شاشة
+            <a href="/admin/index.php?page=gl_posting">ترحيل الحركات</a>.
+            ما تراه في الجدول أدناه هو <strong>سندات مُرحَّلة</strong> فقط (أو سندات أُنشئت بترحيل فوري إن وُجد).
+            إن ظهرت رسالة «تم الإضافة إلى طابور الترحيل» فالسند لم يُنشأ بعد هنا حتى تُرحّل من الشاشة المذكورة.
+        </p>
     </div>
 </div>
 
@@ -114,6 +122,7 @@ foreach ($accounts as $a) {
             <tbody id="jv_lines_body"></tbody>
         </table>
     </div>
+    <p class="card-hint" style="margin-top:0.75rem;">إن كان الترحيل غير فوري للقيود اليدوية، سيُخزَّن الطلب في الطابور وستصلك رسالة للتوجيه إلى «ترحيل الحركات».</p>
     <div class="actions" style="margin-top:10px;flex-wrap:wrap;gap:8px;">
         <button type="button" class="btn-secondary" onclick="jvAddRow()">+ سطر</button>
         <button type="button" onclick="jvSubmit()">حفظ السند</button>
@@ -147,16 +156,8 @@ foreach ($accounts as $a) {
                             . ' م:' . $ln['debit'] . ' د:' . $ln['credit'];
                     }
                     $et = (string)($v['entry_type'] ?? '');
-                    $lockDel = in_array($et, ['year_end_close', 'opening_balance'], true);
-                    $etLabels = [
-                        'manual' => 'سند يدوي',
-                        'opening_balance' => 'قيد رصيد افتتاحي',
-                        'year_end_close' => 'إقفال سنة مالية',
-                        'customer_receipt' => 'قبض عميل',
-                        'supplier_payment' => 'دفع مورد',
-                        'purchase' => 'شراء',
-                    ];
-                    $etAr = $etLabels[$et] ?? $et;
+                    $lockDel = in_array($et, orange_gl_entry_types_delete_locked_from_journal_ui(), true);
+                    $etAr = orange_gl_entry_type_label_ar($et);
                     ?>
                     <tr>
                         <td><?php echo $vid; ?></td>
@@ -168,8 +169,13 @@ foreach ($accounts as $a) {
                         <td>
                             <?php if (!$lockDel): ?>
                                 <button type="button" class="btn-secondary" onclick="jvDelete(<?php echo $vid; ?>)">حذف</button>
-                            <?php else: ?>
-                                —
+                            <?php else:
+                                $blk = orange_gl_journal_delete_blocked_admin_link($et);
+                                ?>
+                                <span class="muted" title="<?php echo htmlspecialchars(orange_gl_journal_delete_blocked_message_ar($et), ENT_QUOTES, 'UTF-8'); ?>">—</span>
+                                <?php if ($blk !== null): ?>
+                                    <br><a class="muted" style="font-size:11px;white-space:normal;" href="<?php echo htmlspecialchars($blk['href'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($blk['label'], ENT_QUOTES, 'UTF-8'); ?></a>
+                                <?php endif; ?>
                             <?php endif; ?>
                         </td>
                     </tr>
@@ -255,8 +261,14 @@ function jvSubmit() {
         entry_type: 'manual',
         lines: lines
     }).then(function (r) {
-        alert(r.message || (r.success ? 'تم' : 'فشل'));
-        if (r.success) location.reload();
+        if (r.success) {
+            alert(r.message || 'تم');
+            location.reload();
+            return;
+        }
+        if (!orangeAdminOfferSuggestOnFailure(r, 'فشل')) {
+            alert(r.message || 'فشل');
+        }
     }).catch(function (e) { alert(e.message || String(e)); });
 }
 
@@ -264,8 +276,14 @@ function jvDelete(id) {
     if (!confirm('حذف السند #' + id + '؟')) return;
     postJSON('/admin/api/journal/manage.php', { action: 'delete', id: id })
         .then(function (r) {
-            alert(r.message || (r.success ? 'تم' : 'فشل'));
-            if (r.success) location.reload();
+            if (r.success) {
+                alert(r.message || 'تم');
+                location.reload();
+                return;
+            }
+            if (!orangeAdminOfferSuggestOnFailure(r, 'فشل')) {
+                alert(r.message || 'فشل');
+            }
         })
         .catch(function (e) { alert(e.message || String(e)); });
 }

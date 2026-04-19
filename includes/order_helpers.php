@@ -40,6 +40,22 @@ function orange_normalize_payment_terms(mixed $raw): string
 }
 
 /**
+ * تسمية عربية لنوع بيع الطلب (نقدي / آجل / أونلاين) للواجهات.
+ */
+function orange_order_payment_terms_label_ar(mixed $raw): string
+{
+    $pt = orange_normalize_payment_terms($raw);
+    if ($pt === 'credit') {
+        return 'آجل';
+    }
+    if ($pt === 'online') {
+        return 'أونلاين';
+    }
+
+    return 'نقدي';
+}
+
+/**
  * Resolve a catalog variant row for an order line (variant_id preferred, else color/size).
  *
  * @param array<string,mixed> $item

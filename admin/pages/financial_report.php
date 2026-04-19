@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
+require_once __DIR__ . '/../../includes/gl_settings.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -204,6 +205,7 @@ $bsCheck = round($bsAssets - ($bsLiab + $bsEquity), 2);
                     <tr>
                         <th>التاريخ</th>
                         <th>السند</th>
+                        <th>نوع القيد</th>
                         <th>البيان</th>
                         <th>مدين</th>
                         <th>دائن</th>
@@ -215,6 +217,7 @@ $bsCheck = round($bsAssets - ($bsLiab + $bsEquity), 2);
                         <tr>
                             <td><?php echo htmlspecialchars(substr((string) ($sr['voucher_date'] ?? ''), 0, 10), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><?php echo htmlspecialchars((string) ($sr['reference'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td><small title="<?php echo htmlspecialchars(trim((string) ($sr['entry_type'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(orange_gl_entry_type_label_ar((string) ($sr['entry_type'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></small></td>
                             <td><?php echo htmlspecialchars((string) ($sr['description'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>
                                 <?php if (trim((string) ($sr['memo'] ?? '')) !== ''): ?>
                                     <br><small class="muted"><?php echo htmlspecialchars($sr['memo'], ENT_QUOTES, 'UTF-8'); ?></small>
@@ -228,7 +231,7 @@ $bsCheck = round($bsAssets - ($bsLiab + $bsEquity), 2);
                 </tbody>
                 <tfoot>
                     <tr>
-                        <th colspan="5">رصيد نهاية الفترة</th>
+                        <th colspan="6">رصيد نهاية الفترة</th>
                         <th><?php echo number_format($statementClosing, 4); ?></th>
                     </tr>
                 </tfoot>

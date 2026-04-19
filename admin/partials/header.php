@@ -98,7 +98,7 @@ orange_catalog_ensure_schema($pdoNav);
                 ['page' => 'journal_types', 'href' => '/admin/index.php?page=journal_types', 'label' => 'أنواع اليوميات', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'fiscal_years', 'href' => '/admin/index.php?page=fiscal_years', 'label' => 'السنوات المالية', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'gl_account_settings', 'href' => '/admin/index.php?page=gl_account_settings', 'label' => 'حسابات القيود التلقائية', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'gl_posting', 'href' => '/admin/index.php?page=gl_posting', 'label' => 'الترحيل إلى الحسابات', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'gl_posting', 'href' => '/admin/index.php?page=gl_posting', 'label' => 'إقفال الحركات (ترحيل)', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'opening_balances', 'href' => '/admin/index.php?page=opening_balances', 'label' => 'أرصدة أول المدة المالية', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'journal_entries', 'href' => '/admin/index.php?page=journal_entries', 'label' => 'القيود المحاسبية', 'class' => '', 'sub' => false],
                 ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger#partner-receipt-voucher', 'label' => 'سندات القبض', 'class' => 'admin-nav-sub', 'sub' => true],

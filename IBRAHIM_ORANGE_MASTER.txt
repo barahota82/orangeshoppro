@@ -94,7 +94,9 @@ Last updated: 2026-04-19
 
 - **الترجمة:** النمط الموحد `translate_names_lib.php` + `translate/names.php`؛ لا استرجاع `admin/api/_shared/translator.php`.
 
-- **SQL يدوي للسيرفر:** ملف **`D:\orange_sql_updates.sql`** (أو نفس المبدأ على قرص **D:**) حسب `orange-php-utf8-workflow.mdc` — لا تكديس dumps داخل الريبو.
+- **SQL يدوي للسيرفر:** ملف **`D:\orange_sql_updates.sql`** على قرص **D:** (قابل لإعادة التشغيل) — يُحدَّث من نسخة المراجعة **`docs/archive/ORANGE_SQL_UPDATES_GL_PENDING.sql`** عند إضافة ترقيات مخطط؛ لا تكديس dumps كاملة داخل الريبو.
+
+- **محاسبة الطابور (معلّق ثم ترحيل):** تسليم الطلبات، المشتريات، المصروفات، **قبض العملاء**، **دفع الموردين**، **القيود اليدوية** (`journal/manage`)، **أرصدة الافتتاح** (`OB-{سنة}`) → **`orange_gl_pending_movements`** ثم **إقفال الحركات** (`gl_posting` + **`pending-unpost.php`** لفك ترحيل انتقائي باستثناء إقفال سنوي/سنة مغلقة). طوارئ: `.env.php` **`ORANGE_GL_IMMEDIATE_POSTING`** = `1` أو `true`.
 
 
 

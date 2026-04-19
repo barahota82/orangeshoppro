@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
+require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/party_allocations.php';
@@ -59,6 +60,47 @@ try {
 
     $pdo->beginTransaction();
     try {
+        if (orange_gl_use_pending_queue($pdo)) {
+            $after = [
+                'party_subledger' => [
+                    'party_kind' => 'supplier',
+                    'party_id' => $supplierId,
+                    'debit' => $amount,
+                    'credit' => 0.0,
+                    'ref_type' => 'payment_ap',
+                    'memo' => $description,
+                ],
+            ];
+            if ($allocLines !== []) {
+                $after['party_payment_allocations'] = [
+                    'party_kind' => 'supplier',
+                    'party_id' => $supplierId,
+                    'amount' => $amount,
+                    'lines' => $allocLines,
+                ];
+            }
+            $pendingId = orange_gl_pending_enqueue_simple($pdo, [
+                'reference' => $ref,
+                'source_label' => 'SPAY-' . $supplierId,
+                'movement_at' => $date,
+                'voucher_date' => $date,
+                'account_debit' => $apId,
+                'account_credit' => $cashId,
+                'amount' => $amount,
+                'description' => $description,
+                'entry_type' => 'supplier_payment',
+                'after_post_json' => json_encode($after, JSON_UNESCAPED_UNICODE),
+            ]);
+            $pdo->commit();
+            audit_log('supplier_payment', 'دفع مورد (معلّق) #' . $supplierId . ' مبلغ ' . $amount, 'party_subledger', $supplierId);
+            json_response([
+                'success' => true,
+                'message' => 'تم تسجيل الدفع في طابور الترحيل — أكمل من «إقفال الحركات»',
+                'voucher_id' => null,
+                'pending_movement_id' => $pendingId,
+            ]);
+        }
+
         $vid = orange_voucher_post($pdo, [
             'voucher_date' => $date,
             'reference' => $ref,
@@ -84,5 +126,8 @@ try {
     audit_log('supplier_payment', 'دفع مورد #' . $supplierId . ' مبلغ ' . $amount, 'party_subledger', $supplierId);
     json_response(['success' => true, 'message' => 'تم تسجيل الدفع', 'voucher_id' => $vid]);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر تسجيل الدفع');
+    if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    orange_gl_api_catch_json($e, 'تعذر تسجيل الدفع');
 }
