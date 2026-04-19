@@ -555,6 +555,117 @@ a { text-decoration: none; color: inherit; }
     display: none;
 }
 
+/* فاتورة يدوية — هيكل أوضح + ملخص مباشر */
+.mo-invoice-card {
+    padding: 24px 26px 26px;
+}
+.mo-invoice-doc-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 16px;
+    margin: 0 0 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+}
+.mo-invoice-doc-head__title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.12rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+.mo-invoice-doc-head__badge {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748b;
+    background: #f1f5f9;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 5px 12px;
+}
+.mo-invoice-alert {
+    margin: 0 0 14px;
+    padding: 12px 14px;
+    border-radius: var(--radius);
+    border: 1px solid rgba(234, 88, 12, 0.35);
+    background: rgba(255, 122, 0, 0.08);
+    color: #9a3412;
+    font-size: 13px;
+    line-height: 1.45;
+}
+.admin-doc-frame.mo-invoice-frame {
+    min-height: 140px;
+}
+.mo-invoice-summary {
+    margin-top: 16px;
+    padding: 16px 18px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+.mo-invoice-summary__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 14px 20px;
+    align-items: end;
+}
+.mo-invoice-summary__cell {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 8px;
+}
+.mo-invoice-summary__cell--net {
+    padding-top: 4px;
+    margin-top: 4px;
+    border-top: 1px dashed var(--border);
+    grid-column: 1 / -1;
+}
+@media (min-width: 720px) {
+    .mo-invoice-summary__cell--net {
+        grid-column: auto;
+        border-top: none;
+        margin-top: 0;
+        padding-top: 0;
+        padding-inline-start: 12px;
+        border-inline-start: 1px solid var(--border);
+    }
+}
+.mo-invoice-summary__label {
+    width: 100%;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--muted);
+}
+.mo-invoice-summary__val {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: #0f172a;
+}
+.mo-invoice-summary__val--net {
+    font-size: 1.2rem;
+    color: var(--primary);
+}
+.mo-invoice-summary__unit {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+}
+.mo-invoice-summary__hint {
+    margin: 12px 0 0;
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.45;
+}
+
 /* جداول بيانات موحّدة (صفوف أوضح، أرقام جدولية) */
 table.admin-table {
     font-size: 14px;

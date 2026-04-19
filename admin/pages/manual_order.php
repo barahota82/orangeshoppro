@@ -14,11 +14,9 @@ foreach ($variants as $v) {
     $variantsByProduct[$pid][] = $v;
 }
 ?>
-<div class="page-title">
-    <h1>فاتورة / طلب شركة (خارج الموقع)</h1>
-    <p style="margin:0.35rem 0 0;font-size:0.95rem;opacity:0.9;">
-        يُسجَّل كمصدر «شركة» وليس طلبًا من المتجر الإلكتروني. المخزون <strong>موحّد</strong> للشركة؛ اختيار القناة أدناه لتتبّع العميل ومصدر الطلب فقط. عند الحفظ يُخصم المخزون الرئيسي ويُطبَّق نفس محاسبة «تم التسليم».
-    </p>
+<div class="page-title page-title--stacked">
+    <h1>فاتورة مبيعات — طلب شركة</h1>
+    <p class="page-subtitle">مستند بيع داخلي مرتبط بالعميل والقناة. البنود من الكتالوج تخصم المخزون تلقائياً؛ <strong>البند النصي</strong> (بدون منتج) يظهر في الفاتورة ولا يغيّر المخزون. بعد الحفظ تفتح صفحة الفاتورة الرسمية مع التسلسل والمدفوع والباقي.</p>
 </div>
 
 <div class="card">
@@ -53,13 +51,16 @@ foreach ($variants as $v) {
     </div>
 </div>
 
-<div class="card">
-    <h3>الأصناف</h3>
-    <p class="card-hint" style="margin-top:0;">اختر <strong>منتجاً من الكتالوج</strong> أو اترك المنتج فارغاً واكتب <strong>وصف البند</strong> (فاتورة بدون صنف محفوظ — لا يخصم مخزون). لكل سطر: كمية، سعر الوحدة، خصم بالدينار، ثم الصافي يُحسب في الفاتورة. <kbd class="admin-kbd">Tab</kbd> من خانة الخصم لسطر جديد؛ أسهم للتنقل بين الخلايا.</p>
+<div class="card mo-invoice-card">
+    <div class="mo-invoice-doc-head">
+        <h3 class="mo-invoice-doc-head__title">بنود الفاتورة</h3>
+        <span class="mo-invoice-doc-head__badge">مسودة قبل الحفظ</span>
+    </div>
+    <p class="card-hint" style="margin-top:0;">اختر <strong>منتجاً</strong> أو <strong>بنداً نصياً</strong> (حقل الوصف يظهر عند اختيار «بدون منتج»). الأعمدة: كمية، سعر الوحدة، خصم بالدينار — <strong>الصافي</strong> يُحسب في الملخص أسفل الجدول وفي الفاتورة المطبوعة. <kbd class="admin-kbd">Tab</kbd> من «خصم» لسطر جديد؛ الأسهم للتنقل.</p>
     <?php if ($products === []): ?>
-        <p class="card-hint"><strong>لا توجد منتجات نشطة</strong> — يمكنك إدخال <strong>بنود نصية فقط</strong>؛ أو أضف منتجات من «المنتجات» لربط المخزون.</p>
+        <p class="mo-invoice-alert">لا توجد منتجات نشطة في الكتالوج — يمكنك العمل الآن بـ <strong>بنود نصية وأسعار يدوية</strong> فقط، أو إضافة منتجات من «المنتجات» لربط المخزون.</p>
     <?php endif; ?>
-    <div class="admin-doc-frame">
+    <div class="admin-doc-frame mo-invoice-frame">
         <div class="table-wrap">
             <table class="admin-table admin-doc-lines-table mo-lines-table">
                 <thead>
@@ -76,6 +77,30 @@ foreach ($variants as $v) {
                 <tbody id="mo_lines_body"></tbody>
             </table>
         </div>
+    </div>
+    <div class="mo-invoice-summary" id="mo_invoice_summary" aria-live="polite">
+        <div class="mo-invoice-summary__grid">
+            <div class="mo-invoice-summary__cell">
+                <span class="mo-invoice-summary__label">بنود مُدخَلة</span>
+                <span class="mo-invoice-summary__val" id="mo_live_count">0</span>
+            </div>
+            <div class="mo-invoice-summary__cell">
+                <span class="mo-invoice-summary__label">المجموع قبل الخصم</span>
+                <span class="mo-invoice-summary__val" id="mo_live_gross">0.000</span>
+                <span class="mo-invoice-summary__unit">KD</span>
+            </div>
+            <div class="mo-invoice-summary__cell">
+                <span class="mo-invoice-summary__label">مجموع الخصومات</span>
+                <span class="mo-invoice-summary__val" id="mo_live_discsum">0.000</span>
+                <span class="mo-invoice-summary__unit">KD</span>
+            </div>
+            <div class="mo-invoice-summary__cell mo-invoice-summary__cell--net">
+                <span class="mo-invoice-summary__label">صافي الفاتورة</span>
+                <span class="mo-invoice-summary__val mo-invoice-summary__val--net" id="mo_live_net">0.000</span>
+                <span class="mo-invoice-summary__unit">KD</span>
+            </div>
+        </div>
+        <p class="mo-invoice-summary__hint" id="mo_live_paid_hint"></p>
     </div>
     <div class="actions admin-doc-lines-toolbar" style="margin-top:12px;">
         <button type="button" class="btn-secondary" onclick="moAddLine()">+ سطر</button>
@@ -147,6 +172,106 @@ function moSyncVariant(sel) {
     }).join('');
 }
 
+function moFmtKd(n) {
+    var x = Number(n);
+    if (!isFinite(x)) {
+        x = 0;
+    }
+    return x.toFixed(3);
+}
+
+function moParseMoneyEl(el) {
+    if (!el) {
+        return 0;
+    }
+    return parseFloat(String(el.value || '0').replace(',', '.')) || 0;
+}
+
+function moRecalcTotals() {
+    var tb = document.getElementById('mo_lines_body');
+    var gross = 0;
+    var discsum = 0;
+    var net = 0;
+    var count = 0;
+    if (tb) {
+        var rows = tb.querySelectorAll('tr');
+        for (var i = 0; i < rows.length; i++) {
+            var r = rows[i];
+            var pid = parseInt(r.querySelector('.mo-p').value, 10) || 0;
+            var q = parseInt(r.querySelector('.mo-q').value, 10) || 0;
+            var disc = moParseMoneyEl(r.querySelector('.mo-disc'));
+            if (disc < 0) {
+                disc = 0;
+            }
+            if (pid <= 0) {
+                var free = (r.querySelector('.mo-free') && r.querySelector('.mo-free').value || '').trim();
+                if (free === '' || q < 1) {
+                    continue;
+                }
+                var up = moParseMoneyEl(r.querySelector('.mo-price'));
+                var lg = q * up;
+                gross += lg;
+                discsum += disc;
+                var ln = lg - disc;
+                if (ln < 0) {
+                    ln = 0;
+                }
+                net += ln;
+                count++;
+                continue;
+            }
+            if (q < 1) {
+                continue;
+            }
+            var up2 = moParseMoneyEl(r.querySelector('.mo-price'));
+            var lg2 = q * up2;
+            gross += lg2;
+            discsum += disc;
+            var ln2 = lg2 - disc;
+            if (ln2 < 0) {
+                ln2 = 0;
+            }
+            net += ln2;
+            count++;
+        }
+    }
+    var elG = document.getElementById('mo_live_gross');
+    var elD = document.getElementById('mo_live_discsum');
+    var elN = document.getElementById('mo_live_net');
+    var elC = document.getElementById('mo_live_count');
+    if (elG) {
+        elG.textContent = moFmtKd(gross);
+    }
+    if (elD) {
+        elD.textContent = moFmtKd(discsum);
+    }
+    if (elN) {
+        elN.textContent = moFmtKd(net);
+    }
+    if (elC) {
+        elC.textContent = String(count);
+    }
+    var hint = document.getElementById('mo_live_paid_hint');
+    var paidEl = document.getElementById('mo_paid');
+    var paid = paidEl ? moParseMoneyEl(paidEl) : 0;
+    if (paid < 0) {
+        paid = 0;
+    }
+    if (hint) {
+        if (paid > 0) {
+            var bal = net - paid;
+            hint.textContent =
+                'المدفوع الآن: ' +
+                moFmtKd(paid) +
+                ' KD — الباقي بعد المدفوع: ' +
+                moFmtKd(bal) +
+                ' KD (يُثبَّت رسمياً عند الحفظ).';
+        } else {
+            hint.textContent = '';
+        }
+    }
+}
+
 function moSyncRowMode(tr) {
     var sel = tr.querySelector('.mo-p');
     var pid = sel ? parseInt(sel.value, 10) || 0 : 0;
@@ -201,6 +326,7 @@ function moAddLine() {
     if (sel) {
         moSyncRowMode(tr);
     }
+    moRecalcTotals();
 }
 
 function moRemoveRow(btn) {
@@ -295,9 +421,11 @@ function moBindLinesBody() {
             moSyncRowMode(e.target.closest('tr'));
         }
         moSyncTrailingRows();
+        moRecalcTotals();
     });
     tb.addEventListener('input', function () {
         moSyncTrailingRows();
+        moRecalcTotals();
     });
     tb.addEventListener('keydown', function (e) {
         if (e.key !== 'Tab' || e.shiftKey) {
@@ -409,4 +537,11 @@ function moSubmit() {
 moAddLine();
 moBindLinesBody();
 moSyncTrailingRows();
+(function () {
+    var mp = document.getElementById('mo_paid');
+    if (mp) {
+        mp.addEventListener('input', moRecalcTotals);
+        mp.addEventListener('change', moRecalcTotals);
+    }
+})();
 </script>
