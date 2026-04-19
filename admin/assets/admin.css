@@ -481,6 +481,80 @@ a { text-decoration: none; color: inherit; }
     border-top: 1px solid var(--border);
 }
 
+/* إطار مستند (فاتورة / سند) لجدول بنود متصلة */
+.admin-doc-frame {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: linear-gradient(180deg, #fafbfc 0%, #ffffff 48%);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+    margin-top: 8px;
+}
+.admin-doc-frame > .table-wrap {
+    margin: 0;
+    width: 100%;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+.admin-doc-frame .admin-doc-lines-table {
+    margin: 0;
+    font-size: 14px;
+}
+.admin-doc-frame .admin-doc-lines-table thead th {
+    background: linear-gradient(180deg, #f1f5f9 0%, #e8edf3 100%);
+    color: #334155;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+}
+.admin-doc-frame .admin-doc-lines-table tbody td {
+    padding: 10px 12px;
+    vertical-align: middle;
+    background: #fff;
+}
+.admin-doc-frame .admin-doc-lines-table tbody tr:nth-child(even) td {
+    background: #fafbfc;
+}
+.admin-doc-frame .admin-doc-lines-table .admin-doc-line-remove {
+    padding: 6px 10px;
+    min-height: 36px;
+    font-size: 12px;
+}
+.admin-doc-frame + .admin-doc-lines-toolbar,
+.admin-doc-lines-toolbar {
+    margin-top: 12px;
+}
+.admin-doc-col-actions {
+    width: 4.5rem;
+    text-align: center !important;
+    white-space: nowrap;
+}
+.admin-kbd {
+    display: inline-block;
+    padding: 2px 7px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #f1f5f9;
+    font-size: 12px;
+    font-family: ui-monospace, monospace;
+    font-weight: 600;
+    color: #475569;
+}
+.mo-col-idx,
+.pur-col-idx {
+    width: 2.5rem;
+    text-align: center !important;
+    color: var(--muted);
+    font-weight: 600;
+}
+.mo-lines-table .mo-v-cell[hidden],
+.pur-lines-table .pur-v-cell[hidden] {
+    display: none;
+}
+
 /* جداول بيانات موحّدة (صفوف أوضح، أرقام جدولية) */
 table.admin-table {
     font-size: 14px;

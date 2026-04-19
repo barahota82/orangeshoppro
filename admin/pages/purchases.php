@@ -73,8 +73,29 @@ $recent = $pdo->query(
 
 <div class="card">
     <h2 class="card-title">أسطر الأصناف</h2>
-    <div id="pur_lines"></div>
-    <div class="actions" style="margin-top:12px;">
+    <?php if ($products === []): ?>
+        <p class="card-hint">لا توجد منتجات نشطة لإضافتها. أنشئ منتجات من «المنتجات» أولًا.</p>
+    <?php else: ?>
+    <p class="card-hint" style="margin-top:0;">بنود الفاتورة في جدول داخل إطار واحد؛ بعد اختيار صنف وكمية يُفتح سطر جديد تلقائياً. <kbd class="admin-kbd">Tab</kbd> من خانة «تكلفة الوحدة» ينقلك لسطر جديد.</p>
+    <div class="admin-doc-frame">
+        <div class="table-wrap">
+            <table class="admin-table admin-doc-lines-table pur-lines-table">
+                <thead>
+                    <tr>
+                        <th class="pur-col-idx">#</th>
+                        <th>الصنف</th>
+                        <th>المتغير (لون / مقاس)</th>
+                        <th>الكمية</th>
+                        <th>تكلفة الوحدة</th>
+                        <th class="admin-doc-col-actions" aria-label="حذف السطر"></th>
+                    </tr>
+                </thead>
+                <tbody id="pur_lines_body"></tbody>
+            </table>
+        </div>
+    </div>
+    <?php endif; ?>
+    <div class="actions admin-doc-lines-toolbar" style="margin-top:12px;">
         <button type="button" class="btn-secondary" onclick="purAddLine()">+ سطر</button>
         <button type="button" onclick="purSubmit()">حفظ فاتورة الشراء</button>
     </div>
@@ -123,37 +144,130 @@ function purEsc(s) {
     return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 }
 
-function purAddLine() {
-    var box = document.getElementById('pur_lines');
-    var wrap = document.createElement('div');
-    wrap.className = 'form-grid pur-line';
-    wrap.style.marginBottom = '12px';
-    wrap.style.paddingBottom = '12px';
-    wrap.style.borderBottom = '1px solid var(--border, #e5e7eb)';
-    var opts = PUR_PRODUCTS.map(function (p) {
+function purProductOptionsHtml() {
+    var o = '<option value="" data-cost="0">' + purEsc('— اختر صنفاً —') + '</option>';
+    return o + PUR_PRODUCTS.map(function (p) {
         return '<option value="' + p.id + '" data-cost="' + String(parseFloat(p.cost) || 0) + '">' + purEsc(p.name) + '</option>';
     }).join('');
-    wrap.innerHTML =
-        '<div><label>الصنف</label><select class="pur-p" onchange="purLineChanged(this)">' + opts + '</select></div>' +
-        '<div><label>المتغير (لون / مقاس)</label><select class="pur-v"></select></div>' +
-        '<div><label>الكمية</label><input type="number" class="pur-q admin-inp-qty" min="1" step="1" value="1" inputmode="numeric" lang="en" dir="ltr"></div>' +
-        '<div><label>تكلفة الوحدة</label><input type="number" class="pur-c admin-inp-money" min="0" step="any" value="0" inputmode="decimal" lang="en" dir="ltr"></div>';
-    box.appendChild(wrap);
-    var sel = wrap.querySelector('.pur-p');
-    if (sel) purLineChanged(sel);
+}
+
+function purRenumberRows() {
+    var tb = document.getElementById('pur_lines_body');
+    if (!tb) {
+        return;
+    }
+    var rows = tb.querySelectorAll('tr');
+    for (var i = 0; i < rows.length; i++) {
+        var c = rows[i].querySelector('.pur-col-idx');
+        if (c) {
+            c.textContent = String(i + 1);
+        }
+    }
+}
+
+function purAddLine() {
+    var tb = document.getElementById('pur_lines_body');
+    if (!tb) {
+        return;
+    }
+    var tr = document.createElement('tr');
+    tr.className = 'pur-line';
+    tr.innerHTML =
+        '<td class="pur-col-idx"></td>' +
+        '<td><select class="pur-p" style="min-width:12rem;">' + purProductOptionsHtml() + '</select></td>' +
+        '<td class="pur-v-cell"><select class="pur-v"></select></td>' +
+        '<td><input type="number" class="pur-q admin-inp-qty" min="1" step="1" value="1" inputmode="numeric" lang="en" dir="ltr"></td>' +
+        '<td><input type="number" class="pur-c admin-inp-money" min="0" step="any" value="0" inputmode="decimal" lang="en" dir="ltr"></td>' +
+        '<td><button type="button" class="btn-secondary admin-doc-line-remove" onclick="purRemoveRow(this)">حذف</button></td>';
+    tb.appendChild(tr);
+    purRenumberRows();
+    var sel = tr.querySelector('.pur-p');
+    if (sel) {
+        purLineChanged(sel);
+    }
     purRecalcPreview();
-    wrap.querySelector('.pur-q').addEventListener('input', purRecalcPreview);
-    wrap.querySelector('.pur-c').addEventListener('input', purRecalcPreview);
+}
+
+function purRemoveRow(btn) {
+    var tb = document.getElementById('pur_lines_body');
+    if (!tb) {
+        return;
+    }
+    if (tb.querySelectorAll('tr').length <= 1) {
+        var tr = btn.closest('tr');
+        tr.querySelector('.pur-p').value = '';
+        tr.querySelector('.pur-q').value = '1';
+        tr.querySelector('.pur-c').value = '0';
+        purLineChanged(tr.querySelector('.pur-p'));
+        purSyncTrailingRows();
+        purRecalcPreview();
+        return;
+    }
+    btn.closest('tr').remove();
+    purRenumberRows();
+    purSyncTrailingRows();
+    purRecalcPreview();
+}
+
+function purRowIsBlank(tr) {
+    var pid = parseInt(tr.querySelector('.pur-p').value, 10) || 0;
+    var q = parseInt(tr.querySelector('.pur-q').value, 10) || 0;
+    return pid <= 0 || q < 1;
+}
+
+function purTrimExtraTrailingBlanks() {
+    var tb = document.getElementById('pur_lines_body');
+    if (!tb) {
+        return;
+    }
+    for (;;) {
+        var rows = tb.querySelectorAll('tr');
+        if (rows.length < 2) {
+            return;
+        }
+        var a = rows[rows.length - 2];
+        var b = rows[rows.length - 1];
+        if (purRowIsBlank(a) && purRowIsBlank(b)) {
+            a.remove();
+            purRenumberRows();
+        } else {
+            return;
+        }
+    }
+}
+
+function purSyncTrailingRows() {
+    purTrimExtraTrailingBlanks();
+    var tb = document.getElementById('pur_lines_body');
+    if (!tb) {
+        return;
+    }
+    var rows = tb.querySelectorAll('tr');
+    if (rows.length === 0) {
+        purAddLine();
+        return;
+    }
+    var last = rows[rows.length - 1];
+    if (!purRowIsBlank(last)) {
+        purAddLine();
+    }
 }
 
 function purLineChanged(sel) {
-    var row = sel.closest('.pur-line');
+    var row = sel.closest('tr');
     var pid = parseInt(sel.value, 10) || 0;
     var opt = sel.options[sel.selectedIndex];
     var c = opt ? parseFloat(opt.getAttribute('data-cost') || '0') : 0;
     var inp = row.querySelector('.pur-c');
-    if (inp && !isNaN(c)) inp.value = String(c);
+    if (inp) {
+        if (pid > 0 && !isNaN(c)) {
+            inp.value = String(c);
+        } else if (pid <= 0) {
+            inp.value = '0';
+        }
+    }
     var vsel = row.querySelector('.pur-v');
+    var vcell = row.querySelector('.pur-v-cell');
     if (vsel) {
         var list = (PUR_VARIANTS_BY_PID && PUR_VARIANTS_BY_PID[pid]) ? PUR_VARIANTS_BY_PID[pid] : [];
         vsel.innerHTML = list.length
@@ -162,11 +276,22 @@ function purLineChanged(sel) {
             }).join('')
             : '<option value="0">— لا متغيرات —</option>';
     }
+    if (vcell) {
+        if (!pid || (PUR_VARIANTS_BY_PID[pid] || []).length === 0) {
+            vcell.setAttribute('hidden', '');
+        } else {
+            vcell.removeAttribute('hidden');
+        }
+    }
     purRecalcPreview();
 }
 
 function purRecalcPreview() {
-    var rows = document.querySelectorAll('#pur_lines .pur-line');
+    var tb = document.getElementById('pur_lines_body');
+    if (!tb) {
+        return;
+    }
+    var rows = tb.querySelectorAll('tr.pur-line');
     var sum = 0;
     for (var i = 0; i < rows.length; i++) {
         var r = rows[i];
@@ -175,14 +300,65 @@ function purRecalcPreview() {
         sum += q * c;
     }
     var el = document.getElementById('pur_total_preview');
-    if (el) el.textContent = sum.toFixed(2);
+    if (el) {
+        el.textContent = sum.toFixed(2);
+    }
+}
+
+function purBindLinesBody() {
+    var tb = document.getElementById('pur_lines_body');
+    if (!tb || tb.getAttribute('data-pur-bound') === '1') {
+        return;
+    }
+    tb.setAttribute('data-pur-bound', '1');
+    tb.addEventListener('change', function (e) {
+        if (e.target && e.target.classList && e.target.classList.contains('pur-p')) {
+            purLineChanged(e.target);
+        }
+        purSyncTrailingRows();
+        purRecalcPreview();
+    });
+    tb.addEventListener('input', function () {
+        purSyncTrailingRows();
+        purRecalcPreview();
+    });
+    tb.addEventListener('keydown', function (e) {
+        if (e.key !== 'Tab' || e.shiftKey) {
+            return;
+        }
+        var ta = e.target;
+        if (!ta || !ta.classList || !ta.classList.contains('pur-c')) {
+            return;
+        }
+        var tr = ta.closest('tr');
+        if (!tr || tr.parentElement !== tb) {
+            return;
+        }
+        var rows = tb.querySelectorAll('tr');
+        if (tr !== rows[rows.length - 1]) {
+            return;
+        }
+        e.preventDefault();
+        purSyncTrailingRows();
+        var rows2 = tb.querySelectorAll('tr');
+        var next = rows2[rows2.length - 1];
+        var sel = next && next.querySelector('.pur-p');
+        if (sel) {
+            sel.focus();
+        }
+    });
 }
 
 function purSubmit() {
     var supplier = parseInt(document.getElementById('pur_supplier').value, 10) || 0;
     var type = document.getElementById('pur_type').value;
     var notes = document.getElementById('pur_notes').value.trim();
-    var rows = document.querySelectorAll('#pur_lines .pur-line');
+    var tb = document.getElementById('pur_lines_body');
+    if (!tb) {
+        alert('لا توجد أصناف');
+        return;
+    }
+    var rows = tb.querySelectorAll('tr.pur-line');
     var items = [];
     for (var i = 0; i < rows.length; i++) {
         var r = rows[i];
@@ -190,7 +366,9 @@ function purSubmit() {
         var vid = parseInt(r.querySelector('.pur-v').value, 10) || 0;
         var q = parseInt(r.querySelector('.pur-q').value, 10) || 0;
         var c = parseFloat(r.querySelector('.pur-c').value) || 0;
-        if (!pid || q < 1) continue;
+        if (!pid || q < 1) {
+            continue;
+        }
         items.push({ product_id: pid, variant_id: vid, qty: q, cost: c });
     }
     if (!items.length) {
@@ -228,9 +406,9 @@ function purDelete(id) {
     });
 }
 
-if (!PUR_PRODUCTS.length) {
-    document.getElementById('pur_lines').innerHTML = '<p class="card-hint">لا توجد منتجات نشطة لإضافتها. أنشئ منتجات من «المنتجات» أولًا.</p>';
-} else {
+if (document.getElementById('pur_lines_body')) {
     purAddLine();
+    purBindLinesBody();
+    purSyncTrailingRows();
 }
 </script>

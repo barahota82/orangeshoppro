@@ -108,23 +108,26 @@ foreach ($accounts as $a) {
         </div>
     </div>
     <p class="card-hint" id="jv_balance_hint">مجموع المدين: 0 — مجموع الدائن: 0</p>
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>الحساب</th>
-                    <th>مدين</th>
-                    <th>دائن</th>
-                    <th>البيان</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody id="jv_lines_body"></tbody>
-        </table>
+    <p class="card-hint" style="margin-top:0;margin-bottom:10px;">أسطر السند داخل إطار واحد؛ عند إدخال مبلغ في آخر سطر يُفتح سطر جديد تلقائياً، أو اضغط <kbd class="admin-kbd">Tab</kbd> من خانة البيان للانتقال لسطر جديد.</p>
+    <div class="admin-doc-frame">
+        <div class="table-wrap">
+            <table class="admin-table admin-doc-lines-table">
+                <thead>
+                    <tr>
+                        <th>الحساب</th>
+                        <th>مدين</th>
+                        <th>دائن</th>
+                        <th>البيان</th>
+                        <th class="admin-doc-col-actions" aria-label="حذف السطر"></th>
+                    </tr>
+                </thead>
+                <tbody id="jv_lines_body"></tbody>
+            </table>
+        </div>
     </div>
     <p class="card-hint" style="margin-top:0.75rem;">إن كان الترحيل غير فوري للقيود اليدوية، سيُخزَّن الطلب في الطابور وستصلك رسالة للتوجيه إلى «ترحيل الحركات».</p>
-    <div class="actions" style="margin-top:10px;flex-wrap:wrap;gap:8px;">
-        <button type="button" class="btn-secondary" onclick="jvAddRow()">+ سطر</button>
+    <div class="actions admin-doc-lines-toolbar" style="margin-top:10px;flex-wrap:wrap;gap:8px;">
+        <button type="button" class="btn-secondary" onclick="jvAddRow()">+ سطر يدوي</button>
         <button type="button" onclick="jvSubmit()">حفظ السند</button>
     </div>
 </div>
@@ -197,10 +200,107 @@ function jvAddRow() {
     tr.innerHTML = '<td><select class="jv-acc">' + JV_ACCT_OPTS + '</select></td>' +
         '<td><input type="number" class="jv-d admin-inp-money" step="any" min="0" value="" placeholder="0.000" inputmode="decimal" lang="en" dir="ltr"></td>' +
         '<td><input type="number" class="jv-c admin-inp-money" step="any" min="0" value="" placeholder="0.000" inputmode="decimal" lang="en" dir="ltr"></td>' +
-        '<td><input type="text" class="jv-m" value="" placeholder="البيان"></td>' +
-        '<td><button type="button" class="btn-secondary" onclick="this.closest(\'tr\').remove();jvRecalc();">حذف</button></td>';
+        '<td><input type="text" class="jv-m" value="" placeholder="البيان" autocomplete="off"></td>' +
+        '<td><button type="button" class="btn-secondary admin-doc-line-remove" onclick="jvRemoveRow(this)">حذف</button></td>';
     tb.appendChild(tr);
     jvRecalc();
+}
+
+function jvRemoveRow(btn) {
+    var tb = document.getElementById('jv_lines_body');
+    if (tb.querySelectorAll('tr').length <= 1) {
+        var tr = btn.closest('tr');
+        tr.querySelectorAll('.jv-d,.jv-c,.jv-m').forEach(function (el) { el.value = ''; });
+        jvSyncTrailingRows();
+        jvRecalc();
+        return;
+    }
+    btn.closest('tr').remove();
+    jvSyncTrailingRows();
+    jvRecalc();
+}
+
+function jvRowIsBlank(tr) {
+    var deb = parseFloat(String(tr.querySelector('.jv-d').value || '0').replace(',', '.')) || 0;
+    var cre = parseFloat(String(tr.querySelector('.jv-c').value || '0').replace(',', '.')) || 0;
+    var memo = tr.querySelector('.jv-m').value.trim();
+    return deb <= 0 && cre <= 0 && memo === '';
+}
+
+function jvTrimExtraTrailingBlanks() {
+    var tb = document.getElementById('jv_lines_body');
+    var rows;
+    for (;;) {
+        rows = tb.querySelectorAll('tr');
+        if (rows.length < 2) {
+            return;
+        }
+        var a = rows[rows.length - 2];
+        var b = rows[rows.length - 1];
+        if (jvRowIsBlank(a) && jvRowIsBlank(b)) {
+            a.remove();
+        } else {
+            return;
+        }
+    }
+}
+
+function jvSyncTrailingRows() {
+    jvTrimExtraTrailingBlanks();
+    var tb = document.getElementById('jv_lines_body');
+    var rows = tb.querySelectorAll('tr');
+    if (rows.length === 0) {
+        jvAddRow();
+        return;
+    }
+    var last = rows[rows.length - 1];
+    if (!jvRowIsBlank(last)) {
+        jvAddRow();
+    }
+}
+
+function jvBindLinesBody() {
+    var tb = document.getElementById('jv_lines_body');
+    if (!tb || tb.getAttribute('data-jv-bound') === '1') {
+        return;
+    }
+    tb.setAttribute('data-jv-bound', '1');
+    tb.addEventListener('input', function () {
+        jvSyncTrailingRows();
+        jvRecalc();
+    });
+    tb.addEventListener('change', function () {
+        jvSyncTrailingRows();
+        jvRecalc();
+    });
+    tb.addEventListener('keydown', function (e) {
+        if (e.key !== 'Tab' || e.shiftKey) {
+            return;
+        }
+        var ta = e.target;
+        if (!ta || !ta.closest) {
+            return;
+        }
+        var tr = ta.closest('tr');
+        if (!tr || tr.parentElement !== tb) {
+            return;
+        }
+        var rows = tb.querySelectorAll('tr');
+        if (tr !== rows[rows.length - 1]) {
+            return;
+        }
+        if (!ta.classList || !ta.classList.contains('jv-m')) {
+            return;
+        }
+        e.preventDefault();
+        jvSyncTrailingRows();
+        var rows2 = tb.querySelectorAll('tr');
+        var next = rows2[rows2.length - 1];
+        var sel = next && next.querySelector('.jv-acc');
+        if (sel) {
+            sel.focus();
+        }
+    });
 }
 
 function jvRecalc() {
@@ -289,5 +389,6 @@ function jvDelete(id) {
 }
 
 jvAddRow();
-jvAddRow();
+jvBindLinesBody();
+jvSyncTrailingRows();
 </script>

@@ -51,8 +51,28 @@ foreach ($variants as $v) {
 
 <div class="card">
     <h3>الأصناف</h3>
-    <div id="mo_lines"></div>
-    <div class="actions" style="margin-top:12px;">
+    <p class="card-hint" style="margin-top:0;">جدول بنود داخل إطار واحد؛ اختر منتجاً والكمية — يُضاف سطر فارغ تلقائياً. من خانة الكمية اضغط <kbd class="admin-kbd">Tab</kbd> للانتقال لسطر جديد.</p>
+    <?php if ($products === []): ?>
+        <p class="card-hint">لا توجد منتجات نشطة. أضف منتجات من «المنتجات» أولاً.</p>
+    <?php else: ?>
+    <div class="admin-doc-frame">
+        <div class="table-wrap">
+            <table class="admin-table admin-doc-lines-table mo-lines-table">
+                <thead>
+                    <tr>
+                        <th class="mo-col-idx">#</th>
+                        <th>المنتج</th>
+                        <th>المتغير (لون/مقاس)</th>
+                        <th>الكمية</th>
+                        <th class="admin-doc-col-actions" aria-label="حذف السطر"></th>
+                    </tr>
+                </thead>
+                <tbody id="mo_lines_body"></tbody>
+            </table>
+        </div>
+    </div>
+    <?php endif; ?>
+    <div class="actions admin-doc-lines-toolbar" style="margin-top:12px;">
         <button type="button" class="btn-secondary" onclick="moAddLine()">+ سطر</button>
         <button type="button" onclick="moSubmit()">حفظ وتسجيل الفاتورة</button>
         <a class="btn btn-secondary" href="/admin/index.php?page=orders">الطلبات</a>
@@ -63,45 +83,175 @@ foreach ($variants as $v) {
 var MO_PRODUCTS = <?php echo json_encode($products, JSON_UNESCAPED_UNICODE); ?>;
 var MO_VARIANTS = <?php echo json_encode($variantsByProduct, JSON_UNESCAPED_UNICODE); ?>;
 
-function moAddLine() {
-    var box = document.getElementById('mo_lines');
-    var wrap = document.createElement('div');
-    wrap.className = 'form-grid';
-    wrap.style.marginBottom = '12px';
-    wrap.style.borderBottom = '1px solid #eee';
-    wrap.style.paddingBottom = '12px';
-    var pid = MO_PRODUCTS.length ? String(MO_PRODUCTS[0].id) : '';
-    var opts = MO_PRODUCTS.map(function (p) {
-        return '<option value="' + p.id + '">' + moEsc(p.name) + '</option>';
-    }).join('');
-    wrap.innerHTML =
-        '<div><label>منتج</label><select class="mo-p" onchange="moSyncVariant(this)">' + opts + '</select></div>' +
-        '<div class="mo-v-wrap"><label>المتغير (لون/مقاس)</label><select class="mo-v"><option value="">—</option></select></div>' +
-        '<div><label>الكمية</label><input type="number" class="mo-q admin-inp-qty" min="1" step="1" value="1" inputmode="numeric" lang="en" dir="ltr"></div>';
-    box.appendChild(wrap);
-    if (pid) moSyncVariant(wrap.querySelector('.mo-p'));
-}
-
 function moEsc(s) {
     return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 }
 
+function moProductOptionsHtml() {
+    var o = '<option value="">' + moEsc('— اختر منتجاً —') + '</option>';
+    return o + MO_PRODUCTS.map(function (p) {
+        return '<option value="' + p.id + '">' + moEsc(p.name) + '</option>';
+    }).join('');
+}
+
+function moRenumberRows() {
+    var tb = document.getElementById('mo_lines_body');
+    if (!tb) {
+        return;
+    }
+    var rows = tb.querySelectorAll('tr');
+    for (var i = 0; i < rows.length; i++) {
+        var c = rows[i].querySelector('.mo-col-idx');
+        if (c) {
+            c.textContent = String(i + 1);
+        }
+    }
+}
+
+function moAddLine() {
+    var tb = document.getElementById('mo_lines_body');
+    if (!tb) {
+        return;
+    }
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+        '<td class="mo-col-idx"></td>' +
+        '<td><select class="mo-p" style="min-width:12rem;">' + moProductOptionsHtml() + '</select></td>' +
+        '<td class="mo-v-cell"><select class="mo-v"><option value="">—</option></select></td>' +
+        '<td><input type="number" class="mo-q admin-inp-qty" min="1" step="1" value="1" inputmode="numeric" lang="en" dir="ltr"></td>' +
+        '<td><button type="button" class="btn-secondary admin-doc-line-remove" onclick="moRemoveRow(this)">حذف</button></td>';
+    tb.appendChild(tr);
+    moRenumberRows();
+    var sel = tr.querySelector('.mo-p');
+    if (sel) {
+        moSyncVariant(sel);
+    }
+}
+
+function moRemoveRow(btn) {
+    var tb = document.getElementById('mo_lines_body');
+    if (!tb) {
+        return;
+    }
+    if (tb.querySelectorAll('tr').length <= 1) {
+        var tr = btn.closest('tr');
+        tr.querySelector('.mo-p').value = '';
+        tr.querySelector('.mo-q').value = '1';
+        moSyncVariant(tr.querySelector('.mo-p'));
+        moSyncTrailingRows();
+        return;
+    }
+    btn.closest('tr').remove();
+    moRenumberRows();
+    moSyncTrailingRows();
+}
+
+function moRowIsBlank(tr) {
+    var pid = parseInt(tr.querySelector('.mo-p').value, 10) || 0;
+    var q = parseInt(tr.querySelector('.mo-q').value, 10) || 0;
+    return pid <= 0 || q < 1;
+}
+
+function moTrimExtraTrailingBlanks() {
+    var tb = document.getElementById('mo_lines_body');
+    if (!tb) {
+        return;
+    }
+    for (;;) {
+        var rows = tb.querySelectorAll('tr');
+        if (rows.length < 2) {
+            return;
+        }
+        var a = rows[rows.length - 2];
+        var b = rows[rows.length - 1];
+        if (moRowIsBlank(a) && moRowIsBlank(b)) {
+            a.remove();
+            moRenumberRows();
+        } else {
+            return;
+        }
+    }
+}
+
+function moSyncTrailingRows() {
+    moTrimExtraTrailingBlanks();
+    var tb = document.getElementById('mo_lines_body');
+    if (!tb) {
+        return;
+    }
+    var rows = tb.querySelectorAll('tr');
+    if (rows.length === 0) {
+        moAddLine();
+        return;
+    }
+    var last = rows[rows.length - 1];
+    if (!moRowIsBlank(last)) {
+        moAddLine();
+    }
+}
+
 function moSyncVariant(sel) {
-    var row = sel.closest('.form-grid');
+    var row = sel.closest('tr');
     var pid = parseInt(sel.value, 10) || 0;
     var vsel = row.querySelector('.mo-v');
-    var vwrap = row.querySelector('.mo-v-wrap');
+    var vcell = row.querySelector('.mo-v-cell');
     var list = MO_VARIANTS[String(pid)] || MO_VARIANTS[pid] || [];
     if (!list.length) {
-        vwrap.style.display = 'none';
+        if (vcell) {
+            vcell.setAttribute('hidden', '');
+        }
         vsel.innerHTML = '<option value="">—</option>';
         return;
     }
-    vwrap.style.display = '';
+    if (vcell) {
+        vcell.removeAttribute('hidden');
+    }
     vsel.innerHTML = list.map(function (v) {
         var lab = (v.color || '') + ' / ' + (v.size || '');
         return '<option value="' + v.id + '">' + moEsc(lab) + ' (مخزون ' + (v.stock_quantity || 0) + ')</option>';
     }).join('');
+}
+
+function moBindLinesBody() {
+    var tb = document.getElementById('mo_lines_body');
+    if (!tb || tb.getAttribute('data-mo-bound') === '1') {
+        return;
+    }
+    tb.setAttribute('data-mo-bound', '1');
+    tb.addEventListener('change', function (e) {
+        if (e.target && e.target.classList && e.target.classList.contains('mo-p')) {
+            moSyncVariant(e.target);
+        }
+        moSyncTrailingRows();
+    });
+    tb.addEventListener('input', function () {
+        moSyncTrailingRows();
+    });
+    tb.addEventListener('keydown', function (e) {
+        if (e.key !== 'Tab' || e.shiftKey) {
+            return;
+        }
+        var ta = e.target;
+        if (!ta || !ta.classList || !ta.classList.contains('mo-q')) {
+            return;
+        }
+        var tr = ta.closest('tr');
+        if (!tr || tr.parentElement !== tb) {
+            return;
+        }
+        var rows = tb.querySelectorAll('tr');
+        if (tr !== rows[rows.length - 1]) {
+            return;
+        }
+        e.preventDefault();
+        moSyncTrailingRows();
+        var rows2 = tb.querySelectorAll('tr');
+        var next = rows2[rows2.length - 1];
+        var sel = next && next.querySelector('.mo-p');
+        if (sel) {
+            sel.focus();
+        }
+    });
 }
 
 function moSubmit() {
@@ -116,7 +266,12 @@ function moSubmit() {
         alert('اختر قناة');
         return;
     }
-    var rows = document.querySelectorAll('#mo_lines .form-grid');
+    var tb = document.getElementById('mo_lines_body');
+    if (!tb) {
+        alert('لا توجد منتجات');
+        return;
+    }
+    var rows = tb.querySelectorAll('tr');
     var items = [];
     for (var i = 0; i < rows.length; i++) {
         var r = rows[i];
@@ -124,9 +279,13 @@ function moSubmit() {
         var q = parseInt(r.querySelector('.mo-q').value, 10) || 0;
         var vsel = r.querySelector('.mo-v');
         var vid = vsel && vsel.value ? parseInt(vsel.value, 10) : 0;
-        if (!pid || q < 1) continue;
+        if (!pid || q < 1) {
+            continue;
+        }
         var o = { product_id: pid, qty: q };
-        if (vid) o.variant_id = vid;
+        if (vid) {
+            o.variant_id = vid;
+        }
         items.push(o);
     }
     if (!items.length) {
@@ -150,5 +309,9 @@ function moSubmit() {
     });
 }
 
-moAddLine();
+if (document.getElementById('mo_lines_body')) {
+    moAddLine();
+    moBindLinesBody();
+    moSyncTrailingRows();
+}
 </script>
