@@ -106,9 +106,10 @@ h1, h2, h3, .brand-text h1 {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     width: max-content;
-    max-width: min(28rem, calc(100vw - 140px));
+    /* ضيّق مساحة الكتلة لتقارب عرض السلوجان (~0.78rem) */
+    max-width: min(17rem, calc(100vw - 130px));
 }
 
 /* اسم العلامة كصورة شعار أفقية؛ السلوجان يبقى تحتها */
@@ -121,9 +122,11 @@ h1, h2, h3, .brand-text h1 {
 .brand-wordmark {
     display: block;
     width: auto;
-    max-width: 100%;
+    /* حدّ أقصى للعرض حتى لا يستهلك الشعار الأفقي مساحة الهيدر */
+    max-width: min(12rem, 58vw);
     height: auto;
-    max-height: clamp(1.55rem, 5.2vw, 2.45rem);
+    /* ارتفاع نسبي لسلوجان ~0.78rem: تدرّج هادئ مع الشاشة */
+    max-height: clamp(1.02rem, 2.9vw, 1.28rem);
     object-fit: contain;
     object-position: center;
 }
@@ -155,7 +158,7 @@ h1, h2, h3, .brand-text h1 {
     font-weight: 500;
     line-height: 1.35;
     display: block;
-    max-width: min(22rem, 100%);
+    max-width: min(17rem, 100%);
     margin-inline: auto;
     text-align: center;
 }
