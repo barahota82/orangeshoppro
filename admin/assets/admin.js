@@ -381,6 +381,9 @@ function orangeAdminOfferSuggestAfterWarnings(r) {
         return Array.prototype.slice
             .call(td.querySelectorAll('select, input:not([type="hidden"]):not([disabled]), textarea:not([disabled])'))
             .filter(function (el) {
+                if (el.getAttribute('tabindex') === '-1') {
+                    return false;
+                }
                 return el.offsetParent !== null || document.activeElement === el;
             });
     }

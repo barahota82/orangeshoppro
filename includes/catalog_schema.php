@@ -234,6 +234,12 @@ function orange_catalog_ensure_schema(PDO $pdo): void
     if (!orange_table_has_column($pdo, 'product_variants', 'size_family_size_id')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE product_variants ADD COLUMN size_family_size_id INT NULL');
     }
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'item_code')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN item_code VARCHAR(64) NULL');
+    }
+    if (orange_table_exists($pdo, 'product_variants') && !orange_table_has_column($pdo, 'product_variants', 'item_code')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE product_variants ADD COLUMN item_code VARCHAR(64) NULL');
+    }
     if (!orange_table_has_column($pdo, 'order_items', 'variant_id')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE order_items ADD COLUMN variant_id INT NULL');
     }
