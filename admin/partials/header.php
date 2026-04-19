@@ -132,6 +132,7 @@ orange_catalog_ensure_schema($pdoNav);
             $navSettings = [
                 ['page' => 'company_settings', 'href' => '/admin/index.php?page=company_settings', 'label' => 'بيانات الشركة', 'class' => '', 'sub' => false],
                 ['page' => 'channels', 'href' => '/admin/index.php?page=channels', 'label' => 'قنوات العملاء', 'class' => '', 'sub' => false],
+                ['page' => 'company_documents', 'href' => '/admin/index.php?page=company_documents', 'label' => 'أرشيف المستندات', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'admin_users', 'href' => '/admin/index.php?page=admin_users', 'label' => 'المستخدمون والصلاحيات', 'class' => 'admin-nav-sub', 'sub' => true],
             ];
 

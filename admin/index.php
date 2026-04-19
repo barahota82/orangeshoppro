@@ -37,6 +37,7 @@ $allowed = [
     'financial_report',
     'logs',
     'channels',
+    'company_documents',
     'channel_analytics',
     'invoice'
 ];

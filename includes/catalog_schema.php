@@ -868,6 +868,33 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         );
     }
 
+    if (!orange_table_exists($pdo, 'orange_company_documents')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE orange_company_documents (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                title_ar VARCHAR(255) NOT NULL DEFAULT \'\',
+                doc_type VARCHAR(48) NOT NULL DEFAULT \'other\',
+                reference_number VARCHAR(128) NOT NULL DEFAULT \'\',
+                doc_date DATE NULL DEFAULT NULL,
+                entity_table VARCHAR(64) NOT NULL DEFAULT \'\',
+                entity_id VARCHAR(64) NOT NULL DEFAULT \'\',
+                notes TEXT NULL,
+                storage_path VARCHAR(512) NOT NULL,
+                original_filename VARCHAR(255) NOT NULL DEFAULT \'\',
+                mime_type VARCHAR(128) NOT NULL DEFAULT \'\',
+                file_size BIGINT UNSIGNED NOT NULL DEFAULT 0,
+                created_by_admin_id INT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY idx_ocd_type (doc_type),
+                KEY idx_ocd_entity (entity_table, entity_id),
+                KEY idx_ocd_created (created_at),
+                KEY idx_ocd_ref (reference_number)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
     if (!orange_table_exists($pdo, 'orange_admin_audit_log')) {
         orange_catalog_safe_exec(
             $pdo,

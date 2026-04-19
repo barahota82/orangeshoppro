@@ -229,3 +229,33 @@ SET @s := IF(@c = 0,
   'ALTER TABLE expenses ADD COLUMN updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP',
   'SELECT 1');
 PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ---------------------------------------------------------------------------
+-- أرشيف مستندات الشركة (مرجع: includes/catalog_schema.php)
+-- ---------------------------------------------------------------------------
+SELECT COUNT(*) INTO @c FROM information_schema.TABLES
+  WHERE TABLE_SCHEMA = @orange_schema AND TABLE_NAME = 'orange_company_documents';
+SET @s := IF(@c = 0,
+  'CREATE TABLE orange_company_documents (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    title_ar VARCHAR(255) NOT NULL DEFAULT \'\',
+    doc_type VARCHAR(48) NOT NULL DEFAULT \'other\',
+    reference_number VARCHAR(128) NOT NULL DEFAULT \'\',
+    doc_date DATE NULL DEFAULT NULL,
+    entity_table VARCHAR(64) NOT NULL DEFAULT \'\',
+    entity_id VARCHAR(64) NOT NULL DEFAULT \'\',
+    notes TEXT NULL,
+    storage_path VARCHAR(512) NOT NULL,
+    original_filename VARCHAR(255) NOT NULL DEFAULT \'\',
+    mime_type VARCHAR(128) NOT NULL DEFAULT \'\',
+    file_size BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    created_by_admin_id INT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_ocd_type (doc_type),
+    KEY idx_ocd_entity (entity_table, entity_id),
+    KEY idx_ocd_created (created_at),
+    KEY idx_ocd_ref (reference_number)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci',
+  'SELECT 1');
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;

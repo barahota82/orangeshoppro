@@ -63,6 +63,7 @@ function orange_admin_page_resource(string $page): string
         'logs' => 'reports',
         'company_settings' => 'settings',
         'channels' => 'settings',
+        'company_documents' => 'settings',
         'admin_users' => 'admin_users',
     ];
 
@@ -96,6 +97,7 @@ function orange_admin_api_folder_resource(string $folder): string
         'expenses' => 'expenses',
         'reports' => 'reports',
         'channels' => 'settings',
+        'company_documents' => 'settings',
         'admins' => 'admin_users',
     ];
 
@@ -119,6 +121,9 @@ function orange_admin_api_action_from_request(): string
 {
     $path = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_FILENAME'] ?? ''));
     $base = basename($path);
+    if ($base === 'list.php') {
+        return 'view';
+    }
     if ($base === 'delete.php' || $base === 'remove.php') {
         return 'delete';
     }

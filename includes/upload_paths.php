@@ -62,3 +62,53 @@ function orange_ensure_products_upload_dir(): ?string
 
     return $dir;
 }
+
+/**
+ * أرشيف مستندات الشركة (غير عام — التنزيل عبر سكربت يتحقق من الجلسة).
+ * مسار الويب المباشر لا يُفضَّل؛ استخدم API التنزيل.
+ */
+function orange_company_docs_upload_root(): string
+{
+    return orange_project_root_path() . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'company_docs';
+}
+
+/**
+ * @return string|null المسار المطلق لمجلد الشهر أو null عند الفشل
+ */
+function orange_ensure_company_docs_month_dir(): ?string
+{
+    $base = orange_company_docs_upload_root();
+    $ym = date('Y') . DIRECTORY_SEPARATOR . date('m');
+    $dir = $base . DIRECTORY_SEPARATOR . $ym;
+    $uploadsDir = dirname($base);
+
+    if (is_file($uploadsDir)) {
+        return null;
+    }
+    if (!is_dir($uploadsDir)) {
+        if (!@mkdir($uploadsDir, 0755, false) && !is_dir($uploadsDir)) {
+            @mkdir($uploadsDir, 0775, false);
+        }
+    }
+    if (!is_dir($uploadsDir) || !is_writable($uploadsDir)) {
+        return null;
+    }
+    if (!is_dir($base)) {
+        if (!@mkdir($base, 0755, false) && !is_dir($base)) {
+            @mkdir($base, 0775, false);
+        }
+    }
+    if (!is_dir($base) || !is_writable($base)) {
+        return null;
+    }
+    if (!is_dir($dir)) {
+        if (!@mkdir($dir, 0755, true) && !is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+    }
+    if (!is_dir($dir) || !is_writable($dir)) {
+        return null;
+    }
+
+    return $dir;
+}
