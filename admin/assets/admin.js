@@ -215,6 +215,67 @@ function orangeAdminOfferSuggestAfterWarnings(r) {
     }
 })();
 
+(function initAdminTopNavDrawer() {
+    function run() {
+        var toggle = document.getElementById('admin-menu-toggle');
+        var drawer = document.getElementById('admin-nav-drawer');
+        var backdrop = document.getElementById('admin-nav-backdrop');
+        if (!toggle || !drawer || !backdrop) {
+            return;
+        }
+
+        function isOpen() {
+            return !drawer.hasAttribute('hidden');
+        }
+
+        function setOpen(open) {
+            if (open) {
+                drawer.removeAttribute('hidden');
+                backdrop.removeAttribute('hidden');
+                backdrop.setAttribute('aria-hidden', 'false');
+            } else {
+                drawer.setAttribute('hidden', '');
+                backdrop.setAttribute('hidden', '');
+                backdrop.setAttribute('aria-hidden', 'true');
+            }
+            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+
+        function close() {
+            if (isOpen()) {
+                setOpen(false);
+            }
+        }
+
+        toggle.addEventListener('click', function () {
+            setOpen(!isOpen());
+        });
+
+        backdrop.addEventListener('click', function () {
+            close();
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && isOpen()) {
+                close();
+                toggle.focus();
+            }
+        });
+
+        drawer.querySelectorAll('a[href]').forEach(function (a) {
+            a.addEventListener('click', function () {
+                close();
+            });
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', run);
+    } else {
+        run();
+    }
+})();
+
 /**
  * تنقّل لوحة مفاتيح بين خلايا جداول البنود (أسهم) — يشبه سلوك شبكة الإدخال.
  * يُفعّل تلقائياً لأي tbody داخل table.admin-doc-lines-table

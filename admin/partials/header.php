@@ -41,19 +41,29 @@ try {
 </head>
 <body>
 <div class="admin-layout">
-    <aside class="admin-sidebar">
-        <div class="admin-sidebar-inner">
-        <header class="admin-sidebar-brand" role="banner">
-            <div class="admin-sidebar-brand__mark" aria-hidden="true"></div>
-            <div class="admin-sidebar-brand__text">
-                <div class="admin-sidebar-brand__title"><?php echo htmlspecialchars($orangeAdminCompanyTitle !== '' ? $orangeAdminCompanyTitle : 'Orange', ENT_QUOTES, 'UTF-8'); ?></div>
-                <div class="admin-sidebar-brand__subtitle">لوحة التحكم المؤسسية</div>
+    <header class="admin-topbar">
+        <div class="admin-topbar-strip">
+            <button type="button" class="admin-menu-toggle" id="admin-menu-toggle" aria-expanded="false" aria-controls="admin-nav-drawer" aria-label="فتح وإغلاق قائمة لوحة التحكم">
+                <span class="admin-menu-toggle__icon" aria-hidden="true">☰</span>
+                <span class="admin-menu-toggle__text">القائمة</span>
+            </button>
+            <div class="admin-topbar-brand" role="banner">
+                <div class="admin-sidebar-brand__mark" aria-hidden="true"></div>
+                <div class="admin-sidebar-brand__text">
+                    <div class="admin-sidebar-brand__title"><?php echo htmlspecialchars($orangeAdminCompanyTitle !== '' ? $orangeAdminCompanyTitle : 'Orange', ENT_QUOTES, 'UTF-8'); ?></div>
+                    <div class="admin-sidebar-brand__subtitle">لوحة التحكم المؤسسية</div>
+                </div>
             </div>
-        </header>
-        <div class="admin-user">
-            <span class="admin-user__label">المستخدم</span>
-            <span class="admin-user__name"><?php echo htmlspecialchars($admin['display_name'] ?: $admin['username'], ENT_QUOTES, 'UTF-8'); ?></span>
+            <div class="admin-topbar-actions">
+                <div class="admin-user">
+                    <span class="admin-user__label">المستخدم</span>
+                    <span class="admin-user__name"><?php echo htmlspecialchars($admin['display_name'] ?: $admin['username'], ENT_QUOTES, 'UTF-8'); ?></span>
+                </div>
+                <a href="/admin/logout.php" class="admin-topbar-logout"><?php echo htmlspecialchars('تسجيل الخروج', ENT_QUOTES, 'UTF-8'); ?></a>
+            </div>
         </div>
+        <div id="admin-nav-drawer" class="admin-nav-drawer" hidden>
+            <div class="admin-nav-drawer-inner">
         <nav class="admin-sidebar-nav" aria-label="القائمة الرئيسية">
             <?php
             /**
@@ -170,9 +180,8 @@ try {
             $orangeRenderNavSection('settings', 'إعدادات عامة', $navSettings);
             ?>
         </nav>
-        <footer class="admin-sidebar-footer">
-            <a href="/admin/logout.php" class="admin-sidebar-logout">تسجيل الخروج</a>
-        </footer>
+            </div>
         </div>
-    </aside>
+    </header>
+    <div class="admin-nav-backdrop" id="admin-nav-backdrop" hidden aria-hidden="true"></div>
     <main class="admin-main">
