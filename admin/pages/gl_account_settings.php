@@ -36,14 +36,15 @@ $keysJson = json_encode($orderedKeys, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERR
 $shortJson = json_encode($rowTitles, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 $rulesJson = json_encode($journalRules, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 ?>
-<div class="gl-auto-page" dir="rtl">
-    <h1 class="gl-auto-page__title">حسابات القيود التلقائية</h1>
-    <p class="gl-auto-page__hint" style="margin:0 0 1rem; color:#555; font-size:0.95rem;">
+<div class="page-title page-title--stacked">
+    <h1>حسابات القيود التلقائية</h1>
+    <p class="page-subtitle">
         <strong>الجزء الأول:</strong> ربط كل بند بحساب فرعي من الدليل (بدون نوع يومية هنا).
         <strong>الجزء الثاني:</strong> لكل نوع يومية اختر بنداً للمدين وبنداً للدائن من نفس البنود أعلاه — كل نوع يومية مرة واحدة فقط.
     </p>
+</div>
 
-    <div class="card gl-auto-form-card">
+<div class="card gl-auto-form-card">
         <h3 class="card-title">١ — البنود والحسابات من الدليل</h3>
         <div class="table-wrap gl-settings-table-wrap">
             <table class="gl-settings-table">
@@ -78,9 +79,9 @@ $rulesJson = json_encode($journalRules, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_E
                 </tbody>
             </table>
         </div>
-    </div>
+</div>
 
-    <div class="card gl-auto-form-card" style="margin-top:1rem;">
+<div class="card gl-auto-form-card" style="margin-top:1rem;">
         <h3 class="card-title">٢ — ربط نوع اليومية ببند مدين وبند دائن</h3>
         <div class="table-wrap gl-settings-table-wrap">
             <table class="gl-settings-table" id="gl_jt_rules_table">
@@ -99,7 +100,6 @@ $rulesJson = json_encode($journalRules, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_E
             <button type="button" class="btn-secondary" id="gl_btn_add_rule">إضافة قاعدة</button>
             <button type="button" id="gl_btn_save">حفظ الكل</button>
         </div>
-    </div>
 </div>
 
 <div class="gl-pick-modal" id="gl_pick_modal" hidden aria-hidden="true">

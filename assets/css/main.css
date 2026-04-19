@@ -40,6 +40,8 @@ body {
 
 body.storefront {
     padding-bottom: 28px;
+    background: linear-gradient(165deg, var(--bg) 0%, var(--bg-soft) 42%, var(--bg) 100%);
+    background-attachment: fixed;
 }
 
 h1, h2, h3, .brand-text h1 {
@@ -1240,6 +1242,15 @@ body.storefront .product-gallery__img {
     color: var(--text);
     border: 1px solid var(--border);
     font-weight: 500;
+}
+
+.page-title-box {
+    margin-bottom: 1.25rem;
+    padding: 16px 18px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--card-shadow);
 }
 
 .page-title-box h2 {

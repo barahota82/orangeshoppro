@@ -99,15 +99,15 @@ function orange_admin_orders_action_buttons(array $o): void
     echo '<button type="button" class="btn-danger" onclick=\'updateOrderStatus(' . $id . ', "rejected", ' . $stJs . ')\'>رفض</button>';
 }
 ?>
-<div class="page-title">
+<div class="page-title page-title--stacked">
     <h1>الطلبات</h1>
-    <p class="card-hint" style="margin:0.35rem 0 0;">المخزن <strong>موحّد للشركة</strong> — الطلب من أي قناة يخصم نفس المخزون لتفادي البيع رغم النفاد. عمود «قناة العملاء» لتتبّع المصدر وتجميع العملاء (تيك توك، واتساب، …) وليس لمخزون منفصل.</p>
+    <p class="page-subtitle">المخزن <strong>موحّد للشركة</strong> — الطلب من أي قناة يخصم نفس المخزون لتفادي البيع رغم النفاد. عمود «قناة العملاء» لتتبّع المصدر وتجميع العملاء (تيك توك، واتساب، …) وليس لمخزون منفصل.</p>
 </div>
 
 <div class="card">
     <h3>قائمة الطلبات</h3>
-    <div style="margin-bottom:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;">
-        <label style="display:flex;align-items:center;gap:8px;margin:0;">
+    <div class="admin-toolbar" role="region" aria-label="تصفية الطلبات">
+        <label class="admin-toolbar__field">
             <span>تصفية حسب المصدر</span>
             <select id="orders-source-filter" aria-label="تصفية حسب المصدر">
                 <option value="all" <?php echo $sourceFilter === 'all' ? 'selected' : ''; ?>>الكل</option>
@@ -115,7 +115,7 @@ function orange_admin_orders_action_buttons(array $o): void
                 <option value="company" <?php echo $sourceFilter === 'company' ? 'selected' : ''; ?>>شركة (خارج الموقع)</option>
             </select>
         </label>
-        <label style="display:flex;align-items:center;gap:8px;margin:0;">
+        <label class="admin-toolbar__field">
             <span>نوع البيع</span>
             <select id="orders-pay-filter" aria-label="تصفية نوع البيع">
                 <option value="all" <?php echo $payFilter === 'all' ? 'selected' : ''; ?>>الكل</option>

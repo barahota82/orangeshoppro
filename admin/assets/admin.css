@@ -415,6 +415,94 @@ a { text-decoration: none; color: inherit; }
 .table-wrap {
     overflow-x: auto;
 }
+
+/* شريط تصفية/إجراءات فوق الجداول — بدل تنسيقات مضمنة */
+.admin-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 20px;
+    margin-bottom: 16px;
+}
+.admin-toolbar:last-child {
+    margin-bottom: 0;
+}
+.admin-toolbar__field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+.admin-toolbar__field > span {
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+    white-space: nowrap;
+}
+.admin-toolbar__field select {
+    min-width: 11rem;
+    max-width: 100%;
+}
+
+/* جداول بعرض البطاقة — حواف نظيفة بدل «إطار داخل إطار» */
+.card > .table-wrap {
+    margin-inline: -24px;
+    width: calc(100% + 48px);
+    max-width: none;
+    border-top: 1px solid var(--border);
+    background: #fff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+.gl-auto-form-card > .table-wrap,
+.card.gl-auto-form-card > .table-wrap {
+    margin-inline: -14px;
+    width: calc(100% + 28px);
+}
+.card:has(> .table-wrap:last-child) {
+    padding-bottom: 0;
+}
+.card:has(> .table-wrap:last-child) > .table-wrap {
+    border-radius: 0 0 var(--radius) var(--radius);
+    overflow: hidden;
+}
+.card > h3 + .table-wrap,
+.card > h3 + .admin-toolbar + .table-wrap {
+    margin-top: 2px;
+}
+
+/* صف أزرار نهاية النموذج */
+.admin-form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+/* جداول بيانات موحّدة (صفوف أوضح، أرقام جدولية) */
+table.admin-table {
+    font-size: 14px;
+}
+table.admin-table tbody tr:nth-child(even) {
+    background: rgba(248, 250, 252, 0.65);
+}
+table.admin-table tbody tr:hover {
+    background: rgba(234, 88, 12, 0.06);
+}
+table.admin-table td,
+table.admin-table th {
+    padding: 11px 14px;
+}
+
+table.admin-orders-list-table tbody tr:nth-child(even) {
+    background: rgba(248, 250, 252, 0.65);
+}
+table.admin-orders-list-table tbody tr:hover {
+    background: rgba(234, 88, 12, 0.06);
+}
+
 table {
     width: 100%;
     border-collapse: collapse;
@@ -1708,11 +1796,7 @@ body.coa-modal-open {
     margin: 8px 0 0;
 }
 
-/* حسابات القيود التلقائية — جدول فقط */
-.gl-auto-page__title {
-    margin: 0 0 14px;
-    font-size: 1.35rem;
-}
+/* حسابات القيود التلقائية */
 .gl-auto-form-card {
     padding: 14px 14px 16px;
 }

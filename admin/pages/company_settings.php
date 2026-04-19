@@ -2,8 +2,9 @@
 $pdo = db();
 $hasTable = (bool)$pdo->query("SHOW TABLES LIKE 'company_settings'")->fetchColumn();
 ?>
-<div class="page-title">
+<div class="page-title page-title--stacked">
     <h1>بيانات الشركة</h1>
+    <p class="page-subtitle">الهوية والعنوان وبيانات الفاتورة الضريبية تظهر للعملاء والمستندات الرسمية.</p>
 </div>
 
 <?php if (!$hasTable): ?>
@@ -24,7 +25,7 @@ $hasTable = (bool)$pdo->query("SHOW TABLES LIKE 'company_settings'")->fetchColum
         <div><label>الرقم الضريبي (للفواتير)</label><input type="text" id="vat_number" placeholder="إن وُجد"></div>
         <div style="grid-column:1/-1;"><label>نص قانوني أسفل الفاتورة (اختياري)</label><textarea id="invoice_footer" rows="2" placeholder="مثال: سداد خلال ٣٠ يوم — البضاعة تُسلّم بحالة جيدة"></textarea></div>
     </div>
-    <div class="actions" style="margin-top:14px;">
+    <div class="admin-form-actions">
         <button type="button" onclick="saveCompanySettings()">حفظ</button>
     </div>
 </div>

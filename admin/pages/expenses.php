@@ -16,9 +16,9 @@ if (orange_table_exists($pdo, 'expenses')) {
 }
 $glHint = '/admin/index.php?page=gl_account_settings';
 ?>
-<div class="page-title">
+<div class="page-title page-title--stacked">
     <h1>المصروفات</h1>
-    <p class="card-hint" style="margin:0.35rem 0 0;">القيد: مدين <strong>مصروف عام</strong> (أو حساب تختاره) / دائن <strong>الخزينة</strong> — اربطهما من
+    <p class="page-subtitle">القيد: مدين <strong>مصروف عام</strong> (أو حساب تختاره) / دائن <strong>الخزينة</strong> — اربطهما من
         <a href="<?php echo htmlspecialchars($glHint, ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a>.
         يُرحَّل المصروف عبر الطابور أو مباشرة حسب إعداد النظام.</p>
 </div>
