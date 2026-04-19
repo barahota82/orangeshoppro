@@ -41,6 +41,7 @@ try {
 </head>
 <body>
 <div class="admin-layout">
+    <div class="admin-header-wrap">
     <header class="admin-topbar">
         <div class="admin-topbar-strip">
             <button type="button" class="admin-menu-toggle" id="admin-menu-toggle" aria-expanded="false" aria-controls="admin-nav-drawer" aria-label="فتح وإغلاق قائمة لوحة التحكم">
@@ -54,17 +55,6 @@ try {
                     <div class="admin-sidebar-brand__subtitle">لوحة التحكم المؤسسية</div>
                 </div>
             </div>
-            <div class="admin-topbar-actions">
-                <div class="admin-user">
-                    <span class="admin-user__label">المستخدم</span>
-                    <span class="admin-user__name"><?php echo htmlspecialchars($admin['display_name'] ?: $admin['username'], ENT_QUOTES, 'UTF-8'); ?></span>
-                </div>
-                <a href="/admin/logout.php" class="admin-topbar-logout"><?php echo htmlspecialchars('تسجيل الخروج', ENT_QUOTES, 'UTF-8'); ?></a>
-            </div>
-        </div>
-        <div id="admin-nav-drawer" class="admin-nav-drawer" hidden>
-            <div class="admin-nav-drawer-inner">
-        <nav class="admin-sidebar-nav" aria-label="القائمة الرئيسية">
             <?php
             /**
              * @param array{page:string,href:string,label:string,class:string,sub:bool} $nl
@@ -74,13 +64,41 @@ try {
                     || $orangeAdminPage === $nl['page'];
             };
 
-            $orangeRenderNavLink = static function (array $nl) use ($admin, $pdoNav, $orangeAdminPage, $orangeNavLinkActive): void {
+            $orangeRenderNavLink = static function (array $nl) use ($admin, $pdoNav, $orangeNavLinkActive): void {
                 if (!orange_admin_nav_visible($admin, $pdoNav, $nl['page'])) {
                     return;
                 }
                 $active = $orangeNavLinkActive($nl);
                 $cls = trim($nl['class'] . ($active ? ' is-active' : ''));
                 echo '<a href="' . htmlspecialchars($nl['href'], ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($nl['label'], ENT_QUOTES, 'UTF-8') . '</a>';
+            };
+
+            $orangeRenderNavLinkMega = static function (array $nl) use ($admin, $pdoNav, $orangeNavLinkActive): void {
+                if (!orange_admin_nav_visible($admin, $pdoNav, $nl['page'])) {
+                    return;
+                }
+                $active = $orangeNavLinkActive($nl);
+                $cls = trim($nl['class'] . ' admin-mega-link' . ($active ? ' is-active' : ''));
+                echo '<a href="' . htmlspecialchars($nl['href'], ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($nl['label'], ENT_QUOTES, 'UTF-8') . '</a>';
+            };
+
+            /**
+             * @param array<int, array{page:string,href:string,label:string,class:string,sub:bool}> $items
+             * @return array{0:bool,1:bool}
+             */
+            $orangeNavSectionMeta = static function (array $items) use ($admin, $pdoNav, $orangeNavLinkActive): array {
+                $anyVisible = false;
+                $hasActive = false;
+                foreach ($items as $nl) {
+                    if (!orange_admin_nav_visible($admin, $pdoNav, $nl['page'])) {
+                        continue;
+                    }
+                    $anyVisible = true;
+                    if ($orangeNavLinkActive($nl)) {
+                        $hasActive = true;
+                    }
+                }
+                return [$anyVisible, $hasActive];
             };
 
             /** @param array<int, array{page:string,href:string,label:string,class:string,sub:bool}> $items */
@@ -171,17 +189,81 @@ try {
                 ['page' => 'admin_users', 'href' => '/admin/index.php?page=admin_users', 'label' => 'المستخدمون والصلاحيات', 'class' => 'admin-nav-sub', 'sub' => true],
             ];
 
-            foreach ($navDashboard as $nl) {
-                $orangeRenderNavLink($nl);
-            }
+            $orangeNavMegaSections = [
+                ['id' => 'accounting', 'title' => 'المحاسبة والذمم', 'muted' => false, 'items' => $navAccounting],
+                ['id' => 'ops', 'title' => 'المخازن والمبيعات والمشتريات', 'muted' => false, 'items' => $navOps],
+                ['id' => 'settings', 'title' => 'إعدادات عامة', 'muted' => true, 'items' => $navSettings],
+            ];
 
-            $orangeRenderNavSection('accounting', 'المحاسبة والذمم', $navAccounting);
-            $orangeRenderNavSection('ops', 'المخازن والمبيعات والمشتريات', $navOps);
-            $orangeRenderNavSection('settings', 'إعدادات عامة', $navSettings);
+            echo '<nav class="admin-topbar-mega" aria-label="التنقل السريع">';
+            foreach ($navDashboard as $nl) {
+                if (!orange_admin_nav_visible($admin, $pdoNav, $nl['page'])) {
+                    continue;
+                }
+                $active = $orangeNavLinkActive($nl);
+                $cls = 'admin-topbar-mega-home' . ($active ? ' is-active' : '');
+                echo '<a href="' . htmlspecialchars($nl['href'], ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($nl['label'], ENT_QUOTES, 'UTF-8') . '</a>';
+            }
+            foreach ($orangeNavMegaSections as $sec) {
+                [$anyVis, $hasAct] = $orangeNavSectionMeta($sec['items']);
+                if (!$anyVis) {
+                    continue;
+                }
+                $sid = htmlspecialchars((string) $sec['id'], ENT_QUOTES, 'UTF-8');
+                $pid = 'mega-panel-' . $sid;
+                $bid = $pid . '-btn';
+                $tcls = 'admin-mega-trigger' . ($hasAct ? ' is-active' : '') . (!empty($sec['muted']) ? ' admin-mega-trigger--muted' : '');
+                echo '<div class="admin-mega-dropdown">';
+                echo '<button type="button" class="' . htmlspecialchars($tcls, ENT_QUOTES, 'UTF-8') . '" id="' . htmlspecialchars($bid, ENT_QUOTES, 'UTF-8') . '" data-mega-panel="' . $sid . '" aria-expanded="false" aria-controls="' . htmlspecialchars($pid, ENT_QUOTES, 'UTF-8') . '">';
+                echo '<span class="admin-mega-trigger__label">' . htmlspecialchars((string) $sec['title'], ENT_QUOTES, 'UTF-8') . '</span>';
+                echo '<span class="admin-mega-trigger__chev" aria-hidden="true">▼</span>';
+                echo '</button></div>';
+            }
+            echo '</nav>';
             ?>
-        </nav>
+            <div class="admin-topbar-actions">
+                <div class="admin-user">
+                    <span class="admin-user__label">المستخدم</span>
+                    <span class="admin-user__name"><?php echo htmlspecialchars($admin['display_name'] ?: $admin['username'], ENT_QUOTES, 'UTF-8'); ?></span>
+                </div>
+                <a href="/admin/logout.php" class="admin-topbar-logout"><?php echo htmlspecialchars('تسجيل الخروج', ENT_QUOTES, 'UTF-8'); ?></a>
             </div>
         </div>
+        <div class="admin-mega-layer">
+            <div class="admin-mega-backdrop" id="admin-mega-backdrop" hidden aria-hidden="true"></div>
+            <?php
+            foreach ($orangeNavMegaSections as $sec) {
+                [$anyVisMega, ] = $orangeNavSectionMeta($sec['items']);
+                if (!$anyVisMega) {
+                    continue;
+                }
+                $sidMega = htmlspecialchars((string) $sec['id'], ENT_QUOTES, 'UTF-8');
+                $pidMega = 'mega-panel-' . $sidMega;
+                $bidMega = $pidMega . '-btn';
+                echo '<div id="' . $pidMega . '" class="admin-mega-panel" role="region" hidden aria-labelledby="' . $bidMega . '">';
+                echo '<div class="admin-mega-grid">';
+                foreach ($sec['items'] as $nlMega) {
+                    $orangeRenderNavLinkMega($nlMega);
+                }
+                echo '</div></div>';
+            }
+            ?>
+        </div>
     </header>
+    <div id="admin-nav-drawer" class="admin-nav-drawer" hidden>
+        <div class="admin-nav-drawer-inner">
+            <nav class="admin-sidebar-nav" aria-label="القائمة — جوال">
+                <?php
+                foreach ($navDashboard as $nl) {
+                    $orangeRenderNavLink($nl);
+                }
+                $orangeRenderNavSection('accounting', 'المحاسبة والذمم', $navAccounting);
+                $orangeRenderNavSection('ops', 'المخازن والمبيعات والمشتريات', $navOps);
+                $orangeRenderNavSection('settings', 'إعدادات عامة', $navSettings);
+                ?>
+            </nav>
+        </div>
+    </div>
+    </div>
     <div class="admin-nav-backdrop" id="admin-nav-backdrop" hidden aria-hidden="true"></div>
     <main class="admin-main">

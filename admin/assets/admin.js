@@ -168,13 +168,13 @@ function orangeAdminOfferSuggestAfterWarnings(r) {
     }
 
     function run() {
-        const sections = document.querySelectorAll('.admin-nav-section');
+        const sections = document.querySelectorAll('#admin-nav-drawer .admin-nav-section');
         if (!sections.length) {
             return;
         }
 
         const stored = readStored();
-        const anyActiveOpen = document.querySelector('.admin-nav-section[data-default-open="1"]');
+        const anyActiveOpen = document.querySelector('#admin-nav-drawer .admin-nav-section[data-default-open="1"]');
 
         sections.forEach(function (section) {
             const id = section.dataset.navSection;
@@ -195,7 +195,7 @@ function orangeAdminOfferSuggestAfterWarnings(r) {
                 const collapsed = !section.classList.contains('admin-nav-section--collapsed');
                 applySectionState(section, collapsed);
                 const next = {};
-                document.querySelectorAll('.admin-nav-section').forEach(function (s) {
+                document.querySelectorAll('#admin-nav-drawer .admin-nav-section').forEach(function (s) {
                     const sid = s.dataset.navSection;
                     if (sid) {
                         next[sid] = s.classList.contains('admin-nav-section--collapsed');
@@ -204,6 +204,98 @@ function orangeAdminOfferSuggestAfterWarnings(r) {
                 try {
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
                 } catch (e) { /* */ }
+            });
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', run);
+    } else {
+        run();
+    }
+})();
+
+(function initAdminMegaDropdowns() {
+    function run() {
+        var layer = document.querySelector('.admin-mega-layer');
+        if (!layer) {
+            return;
+        }
+        var backdrop = document.getElementById('admin-mega-backdrop');
+        var triggers = layer.querySelectorAll('.admin-mega-trigger[data-mega-panel]');
+        var panels = layer.querySelectorAll('.admin-mega-panel');
+        if (!triggers.length || !panels.length) {
+            return;
+        }
+
+        function closeAll() {
+            triggers.forEach(function (t) {
+                t.setAttribute('aria-expanded', 'false');
+            });
+            panels.forEach(function (p) {
+                p.setAttribute('hidden', '');
+            });
+            if (backdrop) {
+                backdrop.setAttribute('hidden', '');
+                backdrop.setAttribute('aria-hidden', 'true');
+            }
+        }
+
+        function openPanel(id) {
+            closeAll();
+            var panel = document.getElementById('mega-panel-' + id);
+            var trig = layer.querySelector('.admin-mega-trigger[data-mega-panel="' + id + '"]');
+            if (panel && trig) {
+                panel.removeAttribute('hidden');
+                trig.setAttribute('aria-expanded', 'true');
+                if (backdrop) {
+                    backdrop.removeAttribute('hidden');
+                    backdrop.setAttribute('aria-hidden', 'false');
+                }
+            }
+        }
+
+        triggers.forEach(function (tr) {
+            tr.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var id = tr.getAttribute('data-mega-panel');
+                if (!id) {
+                    return;
+                }
+                var panel = document.getElementById('mega-panel-' + id);
+                var open = panel && !panel.hasAttribute('hidden');
+                if (open) {
+                    closeAll();
+                } else {
+                    openPanel(id);
+                }
+            });
+        });
+
+        if (backdrop) {
+            backdrop.addEventListener('click', function () {
+                closeAll();
+            });
+        }
+
+        document.addEventListener('click', function (e) {
+            if (e.target.closest('.admin-topbar-mega') || e.target.closest('.admin-mega-panel')) {
+                return;
+            }
+            closeAll();
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                closeAll();
+            }
+        });
+
+        panels.forEach(function (panel) {
+            panel.querySelectorAll('a[href]').forEach(function (a) {
+                a.addEventListener('click', function () {
+                    closeAll();
+                });
             });
         });
     }

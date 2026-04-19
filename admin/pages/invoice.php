@@ -362,7 +362,7 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
     .invoice-payment-box .row-pay { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
     .invoice-payment-box input[type="number"] { min-width: 8rem; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; }
     @media print {
-        .invoice-workflow-bar, .invoice-payment-box, .invoice-actions, .invoice-picker, .page-title, .admin-topbar, .admin-nav-backdrop, .admin-user, .brand { display: none !important; }
+        .invoice-workflow-bar, .invoice-payment-box, .invoice-actions, .invoice-picker, .page-title, .admin-header-wrap, .admin-topbar, .admin-nav-backdrop, .admin-nav-drawer, .admin-mega-backdrop, .admin-mega-panel, .admin-user, .brand { display: none !important; }
         .admin-main { margin: 0 !important; padding: 0 !important; }
         body { background: #fff !important; }
         .invoice-doc { box-shadow: none; border: none; max-width: none; }
