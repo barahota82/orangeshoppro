@@ -3,6 +3,7 @@
 if (function_exists('storefront_toolbar_state')) {
     extract(storefront_toolbar_state());
     $SF_NAV_PLACEMENT = 'dock';
+    $SF_NAV_CLUSTER_PART = 'dock';
     include __DIR__ . '/storefront_nav_cluster.php';
 }
 if (function_exists('storefront_tagline_cycle_messages')) {

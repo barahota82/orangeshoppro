@@ -213,6 +213,17 @@ h1, h2, h3, .brand-text h1 {
     flex-wrap: wrap;
 }
 
+/* لغة + أزرار في صف واحد يمين الهيدر؛ على الموبايل يظهر اللغة فقط هنا */
+.header-actions-cluster {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    min-width: 0;
+}
+
 .lang-dropdown-nav {
     position: relative;
 }
@@ -2236,6 +2247,17 @@ body.storefront .product-gallery__img {
 
     body.storefront .header-actions--toolbar {
         display: none !important;
+    }
+
+    /* اللغة في الهيدر بجانب العلامة: أيقونة فقط لتوفير عرض */
+    body.storefront .header-actions--lang .lang-dropdown__current,
+    body.storefront .header-actions--lang .lang-dropdown__chev {
+        display: none;
+    }
+
+    body.storefront .header-actions--lang .lang-dropdown__summary {
+        gap: 0;
+        padding-inline: 9px;
     }
 
     /* منع السحب الأفقي + مساحة للشريط السفلي */

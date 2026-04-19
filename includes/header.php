@@ -233,11 +233,21 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
                 </div>
             </div>
         </div>
-        <div class="header-actions header-actions--toolbar">
-            <?php
-            $SF_NAV_PLACEMENT = 'header';
-            include __DIR__ . '/storefront_nav_cluster.php';
-            ?>
+        <div class="header-actions-cluster">
+            <div class="header-actions header-actions--lang">
+                <?php
+                $SF_NAV_PLACEMENT = 'header';
+                $SF_NAV_CLUSTER_PART = 'lang';
+                include __DIR__ . '/storefront_nav_cluster.php';
+                ?>
+            </div>
+            <div class="header-actions header-actions--toolbar">
+                <?php
+                $SF_NAV_PLACEMENT = 'header';
+                $SF_NAV_CLUSTER_PART = 'actions';
+                include __DIR__ . '/storefront_nav_cluster.php';
+                ?>
+            </div>
         </div>
     </div>
 </header>
