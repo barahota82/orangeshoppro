@@ -2249,17 +2249,6 @@ body.storefront .product-gallery__img {
         display: none !important;
     }
 
-    /* اللغة في الهيدر بجانب العلامة: أيقونة فقط لتوفير عرض */
-    body.storefront .header-actions--lang .lang-dropdown__current,
-    body.storefront .header-actions--lang .lang-dropdown__chev {
-        display: none;
-    }
-
-    body.storefront .header-actions--lang .lang-dropdown__summary {
-        gap: 0;
-        padding-inline: 9px;
-    }
-
     /* منع السحب الأفقي + مساحة للشريط السفلي */
     body.storefront {
         overflow-x: hidden;
