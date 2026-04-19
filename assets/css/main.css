@@ -2098,21 +2098,23 @@ body.storefront .product-gallery__img {
     font-family: var(--font-display);
     line-height: 1.15;
     text-align: center;
-    border: 1px solid transparent;
-    border-inline-end-color: var(--border);
+    border: 0;
+    border-inline-end: 1px solid var(--border);
     background: transparent;
+    box-shadow: none;
     transition:
         background 0.2s ease,
         color 0.2s ease,
-        border-color 0.2s ease,
-        box-shadow 0.2s ease;
+        border 0.2s ease,
+        box-shadow 0.2s ease,
+        border-radius 0.2s ease;
     box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
 }
 
 .app-dock-btn--whatsapp {
     color: #128c7e;
-    border-inline-end: 0;
+    border-inline-end: none;
 }
 
 .app-dock-btn--whatsapp:hover {
@@ -2248,18 +2250,28 @@ body.storefront .product-gallery__img {
     }
 
     /*
-     * أزرار العربة / التتبع / التسجيل — نفس أسلوب زر اللغة عند التمرير أو الضغط أو التركيز:
-     * حد primary + هالة primary-soft + نص وأيقونة برتقالية
+     * شريط سفلي (عربة / تتبع / تسجيل): نفس منطق زر اللغة — حد + هالة فقط، بدون خلفية بطاقة فوق الشريط.
+     * :hover يُقيَّد بأجهزة بها مؤشر لتفادي «لزق» اللون على اللمس.
      */
-    body.storefront .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):hover,
-    body.storefront .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):active,
-    body.storefront .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):focus-visible {
-        border-color: var(--primary);
+    body.storefront .app-bottom-dock .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):active,
+    body.storefront .app-bottom-dock .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):focus-visible {
+        border: 1px solid var(--primary);
         border-radius: var(--radius-sm);
         color: var(--primary);
         box-shadow: 0 0 0 3px var(--primary-soft);
-        background: var(--card);
+        background: transparent;
         outline: none;
+    }
+
+    @media (hover: hover) {
+        body.storefront .app-bottom-dock .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):hover {
+            border: 1px solid var(--primary);
+            border-radius: var(--radius-sm);
+            color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-soft);
+            background: transparent;
+            outline: none;
+        }
     }
 
     body.storefront .header-actions--toolbar {
