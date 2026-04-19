@@ -2098,27 +2098,16 @@ body.storefront .product-gallery__img {
     font-family: var(--font-display);
     line-height: 1.15;
     text-align: center;
-    border-inline-end: 1px solid var(--border);
+    border: 1px solid transparent;
+    border-inline-end-color: var(--border);
     background: transparent;
-    transition: background 0.2s ease, color 0.2s ease;
+    transition:
+        background 0.2s ease,
+        color 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
     box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
-}
-
-/* Cart / Track / Sign up — عند اللمس أو التمرير: خلفية برتقالية خفيفة مثل أسلوب واتساب */
-.app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):hover {
-    background: rgba(255, 106, 0, 0.14);
-    color: var(--primary);
-}
-
-.app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):active {
-    background: rgba(255, 106, 0, 0.22);
-    color: var(--primary);
-}
-
-.app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):focus-visible {
-    outline: 2px solid var(--primary);
-    outline-offset: -2px;
 }
 
 .app-dock-btn--whatsapp {
@@ -2256,6 +2245,21 @@ body.storefront .product-gallery__img {
         padding-right: env(safe-area-inset-right, 0px);
         touch-action: manipulation;
         -webkit-touch-callout: none;
+    }
+
+    /*
+     * أزرار العربة / التتبع / التسجيل — نفس أسلوب زر اللغة عند التمرير أو الضغط أو التركيز:
+     * حد primary + هالة primary-soft + نص وأيقونة برتقالية
+     */
+    body.storefront .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):hover,
+    body.storefront .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):active,
+    body.storefront .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):focus-visible {
+        border-color: var(--primary);
+        border-radius: var(--radius-sm);
+        color: var(--primary);
+        box-shadow: 0 0 0 3px var(--primary-soft);
+        background: var(--card);
+        outline: none;
     }
 
     body.storefront .header-actions--toolbar {
