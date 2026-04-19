@@ -5,6 +5,7 @@ $channels = $pdo->query("SELECT * FROM channels ORDER BY id ASC")->fetchAll();
 <div class="page-title">
     <h1>الواجهات (قنوات العملاء)</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;">كل قناة تمثّل واجهة أو مصدراً لتجميع <strong>العملاء وطلباتهم</strong>. المخزون والمبيعات المحاسبية <strong>للشركة موحّدة</strong> — الطلب من أي قناة يسحب من نفس المخزن الرئيسي.</p>
+    <p style="margin:0.6rem 0 0;"><a class="btn btn-secondary" href="/admin/index.php?page=channel_analytics">تحليل أداء القنوات (مبيعات، أكثر منتج، ترتيب النشاط)</a></p>
 </div>
 
 <div class="card">

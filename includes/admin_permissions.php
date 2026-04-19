@@ -59,6 +59,7 @@ function orange_admin_page_resource(string $page): string
         'partner_reports' => 'partners',
         'expenses' => 'expenses',
         'reports' => 'reports',
+        'channel_analytics' => 'reports',
         'logs' => 'reports',
         'company_settings' => 'settings',
         'channels' => 'settings',

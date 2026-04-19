@@ -126,6 +126,7 @@ orange_catalog_ensure_schema($pdoNav);
                 ['page' => 'stock', 'href' => '/admin/index.php?page=stock', 'label' => 'المستودع', 'class' => '', 'sub' => false],
                 ['page' => 'opening_stock_balances', 'href' => '/admin/index.php?page=opening_stock_balances', 'label' => 'أرصدة أول المدة المخزنية', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'reports', 'href' => '/admin/index.php?page=reports', 'label' => 'تقارير المبيعات', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'channel_analytics', 'href' => '/admin/index.php?page=channel_analytics', 'label' => 'تحليل قنوات العملاء', 'class' => 'admin-nav-sub', 'sub' => true],
             ];
 
             $navSettings = [

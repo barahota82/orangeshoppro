@@ -17,6 +17,8 @@ $topProducts = $pdo->query("
 ?>
 <div class="page-title">
     <h1>التقارير</h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;">لتحليل <strong>كل قناة على حدة</strong> (طلبات، إيراد، أكثر منتج، ترتيب النشاط) استخدم
+        <a href="/admin/index.php?page=channel_analytics">تحليل قنوات العملاء</a>.</p>
 </div>
 
 <div class="grid-4">

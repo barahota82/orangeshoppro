@@ -37,6 +37,7 @@ $allowed = [
     'financial_report',
     'logs',
     'channels',
+    'channel_analytics',
     'invoice'
 ];
 if (!in_array($page, $allowed, true)) {
