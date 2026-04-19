@@ -3,11 +3,16 @@ function formatMoney(v) {
 }
 
 /**
- * تناوب نص مع تلاشي — نفس آلية https://clickstorekw.com/ (setInterval + opacity + setTimeout).
+ * تناوب نص: fade (البانر) أو slide (السلوجان). يدعم advanceOne يدويًا وربطًا بـ onFullCycle بعد دورة كاملة.
  */
 function storefrontOpacityTextLoop(opts) {
     const intervalMs = opts.intervalMs || 5000;
     const fadeMs = opts.fadeMs || 400;
+    const variantRaw = opts.variant || 'fade';
+    const prefersReduce =
+        typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const variant = prefersReduce ? 'fade' : variantRaw;
+    const autoInterval = opts.autoInterval !== false;
     let intervalId = null;
     let fadeId = null;
     let idx = 0;
@@ -23,6 +28,73 @@ function storefrontOpacityTextLoop(opts) {
         }
     }
 
+    function resetElStyles(el) {
+        el.style.transition = '';
+        el.style.opacity = '1';
+        el.style.transform = variant === 'slide' ? 'translateY(0)' : '';
+    }
+
+    function tick() {
+        const currentEl = opts.getEl();
+        if (!currentEl) {
+            return;
+        }
+        const currentMsgs = opts.getMsgs();
+        if (currentMsgs.length < 2) {
+            return;
+        }
+
+        const len = currentMsgs.length;
+        const prevIdx = idx;
+        const ease = 'cubic-bezier(0.4, 0, 0.2, 1)';
+        const tFade = `opacity ${fadeMs}ms ${ease}`;
+        const tSlide = variant === 'slide' ? `, transform ${fadeMs}ms ${ease}` : '';
+
+        function afterStep(newIdx) {
+            idx = newIdx;
+            if (typeof opts.onFullCycle === 'function' && prevIdx === len - 1 && newIdx === 0) {
+                try {
+                    opts.onFullCycle();
+                } catch (e) {
+                    /* ignore */
+                }
+            }
+        }
+
+        if (variant === 'slide') {
+            currentEl.style.transition = tFade + tSlide;
+            currentEl.style.opacity = '0';
+            currentEl.style.transform = 'translateY(-0.35rem)';
+            fadeId = setTimeout(() => {
+                const newIdx = (idx + 1) % len;
+                afterStep(newIdx);
+                currentEl.textContent = currentMsgs[newIdx];
+                currentEl.style.transition = 'none';
+                currentEl.style.opacity = '0';
+                currentEl.style.transform = 'translateY(0.35rem)';
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        currentEl.style.transition = tFade + tSlide;
+                        currentEl.style.opacity = '1';
+                        currentEl.style.transform = 'translateY(0)';
+                        fadeId = null;
+                    });
+                });
+            }, fadeMs);
+        } else {
+            currentEl.style.transition = tFade;
+            currentEl.style.opacity = '0';
+            fadeId = setTimeout(() => {
+                const newIdx = (idx + 1) % len;
+                afterStep(newIdx);
+                currentEl.textContent = currentMsgs[newIdx];
+                currentEl.style.opacity = '1';
+                currentEl.style.transform = '';
+                fadeId = null;
+            }, fadeMs);
+        }
+    }
+
     function start() {
         stop();
         const el = opts.getEl();
@@ -30,42 +102,53 @@ function storefrontOpacityTextLoop(opts) {
         if (!el || msgs.length < 2) {
             return;
         }
-        el.style.opacity = '1';
         idx = 0;
         el.textContent = msgs[idx % msgs.length];
+        resetElStyles(el);
 
-        intervalId = setInterval(() => {
-            const currentEl = opts.getEl();
-            if (!currentEl) {
-                return;
-            }
-            const currentMsgs = opts.getMsgs();
-            if (currentMsgs.length < 2) {
-                return;
-            }
-            currentEl.style.opacity = '0';
-            fadeId = setTimeout(() => {
-                idx = (idx + 1) % currentMsgs.length;
-                currentEl.textContent = currentMsgs[idx];
-                currentEl.style.opacity = '1';
-                fadeId = null;
-            }, fadeMs);
-        }, intervalMs);
+        if (autoInterval) {
+            intervalId = setInterval(tick, intervalMs);
+        }
     }
 
     function isActive() {
         return intervalId !== null;
     }
 
-    return { start, stop, isActive };
+    return { start, stop, isActive, advanceOne: tick };
 }
 
 /**
- * سلوجان الهيدر: عربي → إنجليزي → فلبيني → هندي (مصدر النصوص من config / textarea).
+ * سلوجان الهيدر: على الصفحة الرئيسية يتقدّم مرة واحدة بعد كل دورة كاملة لجمل البانر (ثم الإعادة).
+ * على باقي الصفحات: تناوب تلقائي بمدة أطول.
  */
 (function rotateStorefrontTagline() {
-    const TAGLINE_MS = 5000;
-    const FADE_MS = 400;
+    const TAGLINE_FALLBACK_MS = 10000;
+    const FADE_MS = 550;
+
+    function parseHeroLineCount(raw) {
+        if (!raw || typeof raw !== 'string') {
+            return 0;
+        }
+        try {
+            const parsed = JSON.parse(raw.trim());
+            if (!Array.isArray(parsed)) {
+                return 0;
+            }
+            return parsed.filter((s) => typeof s === 'string' && s.trim() !== '').length;
+        } catch (e) {
+            return 0;
+        }
+    }
+
+    function syncTaglineToHomeHero() {
+        const heroRot = document.getElementById('homeHeroRotator');
+        const ta = document.getElementById('home-hero-lines-json');
+        const n = ta && ta.value ? parseHeroLineCount(ta.value) : 0;
+        return !!(heroRot && n >= 2);
+    }
+
+    const syncToHero = syncTaglineToHomeHero();
 
     function parseList(jsonStr) {
         if (!jsonStr || typeof jsonStr !== 'string') {
@@ -105,14 +188,23 @@ function storefrontOpacityTextLoop(opts) {
     }
 
     const loop = storefrontOpacityTextLoop({
-        intervalMs: TAGLINE_MS,
+        intervalMs: TAGLINE_FALLBACK_MS,
         fadeMs: FADE_MS,
+        variant: 'slide',
+        autoInterval: !syncToHero,
         getEl: () => document.getElementById('brandTaglineText'),
         getMsgs: () => collectMessages(document.getElementById('brandTaglineText')),
     });
 
+    if (syncToHero) {
+        window.addEventListener('orange:home-hero-full-cycle', () => loop.advanceOne());
+    }
+
     function bootTagline() {
         loop.start();
+        if (syncToHero) {
+            return;
+        }
         if (!loop.isActive()) {
             setTimeout(() => loop.start(), 120);
             setTimeout(() => loop.start(), 600);
@@ -168,6 +260,9 @@ function storefrontOpacityTextLoop(opts) {
     const loop = storefrontOpacityTextLoop({
         intervalMs: HERO_MS,
         fadeMs: 400,
+        onFullCycle: () => {
+            window.dispatchEvent(new CustomEvent('orange:home-hero-full-cycle'));
+        },
         getEl: () => document.getElementById('homeHeroRotator'),
         getMsgs: () => {
             const ta = document.getElementById('home-hero-lines-json');

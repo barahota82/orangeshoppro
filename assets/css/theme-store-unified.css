@@ -21,13 +21,13 @@ body.storefront .product-body h3 {
     color: var(--text);
 }
 
-/* هيرو: برتقالي مسطح هادئ — بدون تدرجات/طبقات/ظلال داخلية على الصندوق */
+/* هيرو: برتقالي سادة بنفس عائلة اللوجو/أزرار CTA — ليس بنيًا */
 .theme-orange .hero-banner,
 .theme-blue .hero-banner,
 .theme-black .hero-banner {
-    background: #6f3510;
+    background: #ff6a00;
     color: var(--text);
-    border: 1px solid rgba(255, 106, 0, 0.14);
+    border: 1px solid rgba(255, 106, 0, 0.22);
     box-shadow: none;
 }
 
@@ -68,8 +68,8 @@ body.storefront .btn-secondary:hover:not([disabled]) {
 }
 
 /*
- * تبويب الشريط الخارجي النشط — التنسيق السابق (لمعة ضيقة، بدون glow خارجي قوي)
- * لا يمس زر «العروض» الثانوي داخل درج Browse.
+ * تبويب الشريط النشط (All / الفئات): لمعة معدنية خفيفة
+ * «Offers» النشط فقط: نفس أسلوب أزرار الموقع (.btn) — مثل Place order / إرسال رابط
  */
 body.storefront .tabs-section .tab-btn.active {
     background: linear-gradient(
@@ -83,6 +83,18 @@ body.storefront .tabs-section .tab-btn.active {
     color: var(--text);
     border-color: transparent;
     box-shadow: inset 0 1px 0 rgba(255, 122, 26, 0.28);
+}
+
+body.storefront .tabs-section .tab-btn[data-tab-filter="offers"].active {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    box-shadow: 0 4px 14px -2px var(--primary-glow-strong);
+    border-color: transparent;
+}
+
+/* أزرار أساسية في المتجر = نفس تدرج Offers (سلة: متابعة الطلب / إرسال الطلب، إلخ) — لا يشمل ثانوي/شبح/خطر */
+body.storefront .btn:not(.btn-secondary):not(.btn-danger):not(.btn-ghost):not([disabled]) {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    box-shadow: 0 4px 14px -2px var(--primary-glow-strong);
 }
 
 /* «All products» داخل المينيو: نفس تنسيق التبويب النشط السابق؛ بقية عناصر القائمة كما هي */
@@ -152,4 +164,13 @@ body.storefront .stock-out {
 /* زر شبح السلة */
 body.storefront .btn-ghost:hover:not([disabled]) {
     color: var(--primary-hover);
+}
+
+/*
+ * إخفاء مؤقت — خيارات «نقدي / أونلاين» في صفحة السلة: الدفع نقدي فقط حتى تجهيز شروط أونلاين.
+ * HTML كما هو؛ لإعادة الإظهار احذف القواعد التالية أو علّقها.
+ */
+body.storefront .cart-checkout-payment-radios,
+body.storefront .cart-checkout-cash-note {
+    display: none !important;
 }

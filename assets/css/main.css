@@ -203,7 +203,8 @@ h1, h2, h3, .brand-text h1 {
     display: block;
     min-height: 1.35em;
     opacity: 1;
-    transition: opacity 0.35s ease;
+    transform: translateY(0);
+    /* مدة/نوع الانتقال أثناء التناوب تُحدَّد من app.js (سلوجان ≠ بانر) */
 }
 
 .header-actions {
@@ -2099,13 +2100,25 @@ body.storefront .product-gallery__img {
     text-align: center;
     border-inline-end: 1px solid var(--border);
     background: transparent;
-    transition: background 0.15s, color 0.15s;
+    transition: background 0.2s ease, color 0.2s ease;
     box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
 }
 
-.app-dock-btn:hover {
-    background: var(--primary-soft);
+/* Cart / Track / Sign up — عند اللمس أو التمرير: خلفية برتقالية خفيفة مثل أسلوب واتساب */
+.app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):hover {
+    background: rgba(255, 106, 0, 0.14);
     color: var(--primary);
+}
+
+.app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):active {
+    background: rgba(255, 106, 0, 0.22);
+    color: var(--primary);
+}
+
+.app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
 }
 
 .app-dock-btn--whatsapp {
