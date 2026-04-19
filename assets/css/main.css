@@ -119,9 +119,16 @@ h1, h2, h3, .brand-text h1 {
  */
 .brand-wordmark-anchor {
     position: relative;
-    display: inline-block;
+    /* inline-flex: عرض المرساة = صورة الاسم فقط (بدون عُقد نصية بيضاء بين h1 و small) */
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
     max-width: 100%;
     vertical-align: top;
+    direction: ltr;
+    unicode-bidi: isolate;
+    font-size: 0;
+    line-height: 0;
     /* مساحة تحت الصورة لسطرين تقريباً (يتناسب مع شعار أوضح) */
     padding-bottom: clamp(2.5em, 7vw, 3.05em);
     overflow: visible;
@@ -150,13 +157,15 @@ h1, h2, h3, .brand-text h1 {
     top: 100%;
     left: 50%;
     transform: translateX(-50%);
+    width: max-content;
+    max-width: min(20rem, calc(100vw - 100px));
     margin-top: 5px;
     margin-inline: 0;
     text-align: center;
-    width: max-content;
-    max-width: min(20rem, calc(100vw - 100px));
     box-sizing: border-box;
     white-space: normal;
+    font-size: 0.78rem;
+    line-height: 1.35;
 }
 
 .logo {
