@@ -93,7 +93,7 @@ scripts\install-hooks.ps1
 2. Do not say "no context in chat" without reading **`IBRAHIM_ORANGE_MASTER.txt`**, **`docs/archive/ORANGE_PROJECT_CONTINUITY.txt`**, and **`.cursor/rules/orange-php-utf8-workflow.mdc`** (this `.md` file is archive detail only).
 3. **`config.php`:** user policy is **do not modify** for helpers/features unless they explicitly ask. Order helpers (`require_fields`, `generate_order_number`) are in **`includes/order_helpers.php`**, not `config.php`.
 
-**Project path (canonical):** `D:\orange` — see `IBRAHIM_ORANGE_MASTER.txt` and `docs/archive/ORANGE_PROJECT_CONTINUITY.txt` §8 (do not rely on older Desktop-only notes).
+**Project path (canonical):** `D:\orange` — see `IBRAHIM_ORANGE_MASTER.txt` and `docs/archive/ORANGE_PROJECT_CONTINUITY.txt` §8. **Agents:** do not infer workspace location from old chat paths; only `D:\orange` is documented as canonical.
 
 ---
 
