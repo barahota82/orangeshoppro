@@ -10,16 +10,31 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 $pdoNav = db();
 orange_catalog_ensure_schema($pdoNav);
+
+$orangeAdminCompanyTitle = '';
+try {
+    if (orange_table_exists($pdoNav, 'company_settings')) {
+        $br = $pdoNav->query('SELECT company_name_ar, company_name_en FROM company_settings ORDER BY id ASC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
+        if ($br) {
+            $orangeAdminCompanyTitle = trim((string) ($br['company_name_ar'] ?? ''));
+            if ($orangeAdminCompanyTitle === '') {
+                $orangeAdminCompanyTitle = trim((string) ($br['company_name_en'] ?? ''));
+            }
+        }
+    }
+} catch (Throwable $e) {
+    $orangeAdminCompanyTitle = '';
+}
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>لوحة الإدارة</title>
+    <title><?php echo htmlspecialchars($orangeAdminCompanyTitle !== '' ? $orangeAdminCompanyTitle . ' — لوحة التحكم' : 'لوحة التحكم', ENT_QUOTES, 'UTF-8'); ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?php echo htmlspecialchars(admin_asset_url('/admin/assets/admin.css'), ENT_QUOTES, 'UTF-8'); ?>">
     <script src="<?php echo htmlspecialchars(admin_asset_url('/admin/assets/admin.js'), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?php echo htmlspecialchars(admin_asset_url('/admin/assets/admin-money-fields.js'), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
@@ -27,9 +42,19 @@ orange_catalog_ensure_schema($pdoNav);
 <body>
 <div class="admin-layout">
     <aside class="admin-sidebar">
-        <div class="brand">Orange Admin</div>
-        <div class="admin-user">مرحباً، <?php echo htmlspecialchars($admin['display_name'] ?: $admin['username']); ?></div>
-        <nav>
+        <div class="admin-sidebar-inner">
+        <header class="admin-sidebar-brand" role="banner">
+            <div class="admin-sidebar-brand__mark" aria-hidden="true"></div>
+            <div class="admin-sidebar-brand__text">
+                <div class="admin-sidebar-brand__title"><?php echo htmlspecialchars($orangeAdminCompanyTitle !== '' ? $orangeAdminCompanyTitle : 'Orange', ENT_QUOTES, 'UTF-8'); ?></div>
+                <div class="admin-sidebar-brand__subtitle">لوحة التحكم المؤسسية</div>
+            </div>
+        </header>
+        <div class="admin-user">
+            <span class="admin-user__label">المستخدم</span>
+            <span class="admin-user__name"><?php echo htmlspecialchars($admin['display_name'] ?: $admin['username'], ENT_QUOTES, 'UTF-8'); ?></span>
+        </div>
+        <nav class="admin-sidebar-nav" aria-label="القائمة الرئيسية">
             <?php
             /**
              * @param array{page:string,href:string,label:string,class:string,sub:bool} $nl
@@ -144,7 +169,10 @@ orange_catalog_ensure_schema($pdoNav);
             $orangeRenderNavSection('ops', 'المخازن والمبيعات والمشتريات', $navOps);
             $orangeRenderNavSection('settings', 'إعدادات عامة', $navSettings);
             ?>
-            <a href="/admin/logout.php">تسجيل الخروج</a>
         </nav>
+        <footer class="admin-sidebar-footer">
+            <a href="/admin/logout.php" class="admin-sidebar-logout">تسجيل الخروج</a>
+        </footer>
+        </div>
     </aside>
     <main class="admin-main">

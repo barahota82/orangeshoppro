@@ -41,12 +41,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_login'])) {
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>دخول الأدمن</title>
+    <title>دخول لوحة التحكم</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?php echo htmlspecialchars(admin_asset_url('/admin/assets/admin.css'), ENT_QUOTES, 'UTF-8'); ?>">
 </head>
 <body class="admin-login-page">
     <div class="login-card">
-        <h1>لوحة الإدارة</h1>
+        <h1>تسجيل الدخول</h1>
+        <p class="login-card__hint">لوحة التحكم المؤسسية — مساحة آمنة للفريق الداخلي فقط.</p>
         <?php if ($error): ?>
             <div class="alert-error"><?php echo htmlspecialchars($error); ?></div>
         <?php endif; ?>

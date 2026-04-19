@@ -16,8 +16,9 @@ $salesToday = (float)$pdo->query("SELECT COALESCE(SUM(total),0) FROM orders WHER
 $pendingOrders = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'pending'")->fetchColumn();
 $productsCount = (int)$pdo->query("SELECT COUNT(*) FROM products")->fetchColumn();
 ?>
-<div class="page-title">
+<div class="page-title page-title--stacked">
     <h1>الرئيسية</h1>
+    <p class="page-subtitle">نظرة سريعة على نشاط اليوم — بيانات فورية من قاعدة الطلبات والمنتجات.</p>
 </div>
 
 <div class="grid-4">
@@ -30,7 +31,7 @@ $productsCount = (int)$pdo->query("SELECT COUNT(*) FROM products")->fetchColumn(
         <div class="value"><?php echo number_format($salesToday, 2); ?> KD</div>
     </div>
     <div class="card stat-card">
-        <h3>طلبات pending</h3>
+        <h3>طلبات قيد الانتظار</h3>
         <div class="value"><?php echo $pendingOrders; ?></div>
     </div>
     <div class="card stat-card">
@@ -48,6 +49,6 @@ $productsCount = (int)$pdo->query("SELECT COUNT(*) FROM products")->fetchColumn(
 <?php endif; ?>
 
 <div class="card">
-    <h3>ملاحظات</h3>
-    <p class="small">هذه المرحلة تضيف لوحة إدارة كاملة: تسجيل دخول، منتجات، فئات، طلبات، مخزون، عروض، تقارير، وواجهات.</p>
+    <h3>عن هذه اللوحة</h3>
+    <p class="card-hint" style="margin:0;">واجهة موحّدة للمخزون، المبيعات، المشتريات، المحاسبة، الذمم، وأرشيف المستندات. يُنصح بضبط <strong>بيانات الشركة</strong> و<strong>قنوات العملاء</strong> و<strong>حسابات القيود التلقائية</strong> قبل التوسع في الفريق.</p>
 </div>

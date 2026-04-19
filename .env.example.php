@@ -14,8 +14,8 @@ return [
     // اختياري: إن كان الموقع داخل مجلد فرعي في الرابط، مثل https://domain.com/shop/
     // 'PUBLIC_BASE_PATH' => 'shop',
 
-    // اختياري: نسخة ثابتة لكل CSS/JS (بدل filemtime)
-    // 'ASSET_VERSION' => '20260417',
+    // اختياري: نسخة ثابتة لكل CSS/JS (مُفضّل بعد نشر واجهة — يحدّث كاش المتصفح/الـ CDN)
+    // 'ASSET_VERSION' => '20260419',
 
     // اختياري: مرجع يدوي أو من الـ CI يظهر في /admin/api/system/deploy-check.php
     // 'ORANGE_BUILD_REF' => 'main-abc1234',

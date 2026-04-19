@@ -2317,3 +2317,16 @@ body.storefront .site-main > .container {
         transform: none;
     }
 }
+
+/* صقل عرض المتجر — ظل هادئ، شبكة أوضح */
+.site-header {
+    box-shadow: 0 4px 24px rgba(17, 24, 39, 0.07);
+}
+.products-grid {
+    gap: 22px;
+}
+@media (min-width: 900px) {
+    .product-image-wrap img {
+        height: 280px;
+    }
+}
