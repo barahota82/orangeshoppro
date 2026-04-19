@@ -222,7 +222,8 @@ function orangeAdminOfferSuggestAfterWarnings(r) {
             return;
         }
         var backdrop = document.getElementById('admin-mega-backdrop');
-        var triggers = layer.querySelectorAll('.admin-mega-trigger[data-mega-panel]');
+        /* الأزرار داخل الشريط (.admin-topbar-mega) وليست داخل .admin-mega-layer */
+        var triggers = document.querySelectorAll('.admin-topbar-mega .admin-mega-trigger[data-mega-panel]');
         var panels = layer.querySelectorAll('.admin-mega-panel');
         if (!triggers.length || !panels.length) {
             return;
@@ -244,7 +245,7 @@ function orangeAdminOfferSuggestAfterWarnings(r) {
         function openPanel(id) {
             closeAll();
             var panel = document.getElementById('mega-panel-' + id);
-            var trig = layer.querySelector('.admin-mega-trigger[data-mega-panel="' + id + '"]');
+            var trig = document.querySelector('.admin-mega-trigger[data-mega-panel="' + id + '"]');
             if (panel && trig) {
                 panel.removeAttribute('hidden');
                 trig.setAttribute('aria-expanded', 'true');
