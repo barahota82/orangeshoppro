@@ -128,14 +128,25 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
     var already = <?php echo json_encode(t('storefront_register_already_verified'), JSON_UNESCAPED_UNICODE); ?>;
     var err = <?php echo json_encode(t('storefront_register_error'), JSON_UNESCAPED_UNICODE); ?>;
 
+    function setHidden(el, on) {
+        if (!el) {
+            return;
+        }
+        if (on) {
+            el.setAttribute('hidden', '');
+        } else {
+            el.removeAttribute('hidden');
+        }
+    }
+
     function expandPanel() {
         cta.classList.add('is-expanded');
         cta.setAttribute('aria-expanded', 'true');
-        expand.hidden = false;
-        closeBtn.hidden = false;
-        openBtn.hidden = true;
-        sendBtn.hidden = false;
-        msgEl.hidden = true;
+        setHidden(expand, false);
+        setHidden(closeBtn, false);
+        setHidden(openBtn, true);
+        setHidden(sendBtn, false);
+        setHidden(msgEl, true);
         msgEl.textContent = '';
         requestAnimationFrame(function () {
             emailInp.focus();
@@ -145,21 +156,24 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
     function collapsePanel() {
         cta.classList.remove('is-expanded');
         cta.setAttribute('aria-expanded', 'false');
-        expand.hidden = true;
-        closeBtn.hidden = true;
-        openBtn.hidden = false;
-        sendBtn.hidden = true;
-        msgEl.hidden = true;
+        setHidden(expand, true);
+        setHidden(closeBtn, true);
+        setHidden(openBtn, false);
+        setHidden(sendBtn, true);
+        setHidden(msgEl, true);
         msgEl.textContent = '';
         emailInp.value = '';
     }
+
+    /* حالة أولية صريحة — يظهر فقط «تسجيل» */
+    collapsePanel();
 
     openBtn.addEventListener('click', expandPanel);
     closeBtn.addEventListener('click', collapsePanel);
 
     sendBtn.addEventListener('click', function () {
         var email = emailInp.value.trim();
-        msgEl.hidden = false;
+        setHidden(msgEl, false);
         msgEl.textContent = '';
         if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             msgEl.textContent =

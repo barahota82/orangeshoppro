@@ -1810,14 +1810,17 @@ body.storefront .product-gallery__img {
     padding-top: 36px;
 }
 
+.track-signup-cta__close:not([hidden]) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .track-signup-cta__close {
     position: absolute;
     top: 10px;
     inset-inline-end: 10px;
     z-index: 2;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
     width: 38px;
     height: 38px;
     padding: 0;
@@ -1960,6 +1963,14 @@ body.storefront .product-gallery__img {
         width: auto;
         min-width: 200px;
     }
+}
+
+/* يفرض إخفاء العناصر ذات hidden — قواعد .btn و display تتجاوز سمة hidden في بعض المتصفحات */
+.track-signup-cta__close[hidden],
+.track-signup-cta__expand[hidden],
+.track-signup-cta__feedback[hidden],
+button.track-signup-cta__btn[hidden] {
+    display: none !important;
 }
 
 .track-page-result:focus {
