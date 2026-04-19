@@ -17,7 +17,7 @@ foreach ($variants as $v) {
 <div class="page-title">
     <h1>فاتورة / طلب شركة (خارج الموقع)</h1>
     <p style="margin:0.35rem 0 0;font-size:0.95rem;opacity:0.9;">
-        يُسجَّل كمصدر «شركة» وليس طلبًا من المتجر الإلكتروني. عند الحفظ يُخصم المخزون ويُطبَّق نفس محاسبة «تم التسليم».
+        يُسجَّل كمصدر «شركة» وليس طلبًا من المتجر الإلكتروني. المخزون <strong>موحّد</strong> للشركة؛ اختيار القناة أدناه لتتبّع العميل ومصدر الطلب فقط. عند الحفظ يُخصم المخزون الرئيسي ويُطبَّق نفس محاسبة «تم التسليم».
     </p>
 </div>
 
@@ -30,12 +30,13 @@ foreach ($variants as $v) {
         <div><label>العنوان</label><input type="text" id="mo_address"></div>
         <div style="grid-column:1/-1;"><label>ملاحظات</label><input type="text" id="mo_notes"></div>
         <div style="grid-column:1/-1;">
-            <label>القناة / نقطة البيع</label>
-            <select id="mo_channel">
+            <label>قناة العملاء (تتبّع المصدر — المخزن واحد)</label>
+            <select id="mo_channel" aria-describedby="mo_channel_hint">
                 <?php foreach ($channels as $ch): ?>
                     <option value="<?php echo (int)$ch['id']; ?>"><?php echo htmlspecialchars((string)$ch['name'], ENT_QUOTES, 'UTF-8'); ?></option>
                 <?php endforeach; ?>
             </select>
+            <p id="mo_channel_hint" class="card-hint" style="margin:0.35rem 0 0;">لتنظيم عملاء تيك توك وغيرها؛ لا يغيّر مخزوناً منفصلاً.</p>
         </div>
         <div style="grid-column:1/-1;">
             <label>نوع البيع</label>

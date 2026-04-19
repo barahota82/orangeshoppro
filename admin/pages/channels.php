@@ -3,7 +3,8 @@ $pdo = db();
 $channels = $pdo->query("SELECT * FROM channels ORDER BY id ASC")->fetchAll();
 ?>
 <div class="page-title">
-    <h1>الواجهات</h1>
+    <h1>الواجهات (قنوات العملاء)</h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;">كل قناة تمثّل واجهة أو مصدراً لتجميع <strong>العملاء وطلباتهم</strong>. المخزون والمبيعات المحاسبية <strong>للشركة موحّدة</strong> — الطلب من أي قناة يسحب من نفس المخزن الرئيسي.</p>
 </div>
 
 <div class="card">
@@ -28,10 +29,6 @@ $channels = $pdo->query("SELECT * FROM channels ORDER BY id ASC")->fetchAll();
         <div>
             <label>رقم الواتساب</label>
             <input type="text" id="channel_whatsapp">
-        </div>
-        <div>
-            <label>رقم المخزن (1–3)</label>
-            <input type="number" id="channel_warehouse" class="admin-inp-qty" min="1" max="3" step="1" value="1" inputmode="numeric" lang="en" dir="ltr">
         </div>
     </div>
     <div class="actions" style="margin-top:14px;">
@@ -62,7 +59,6 @@ $channels = $pdo->query("SELECT * FROM channels ORDER BY id ASC")->fetchAll();
                     <td><?php echo htmlspecialchars($ch['slug']); ?></td>
                     <td><?php echo htmlspecialchars($ch['primary_color']); ?></td>
                     <td><?php echo htmlspecialchars($ch['whatsapp_number']); ?></td>
-                    <td><?php echo (int)($ch['warehouse_number'] ?? 1); ?></td>
                     <td><?php echo (int)$ch['is_active'] === 1 ? 'نشط' : 'مخفي'; ?></td>
                 </tr>
                 <?php endforeach; ?>
@@ -73,16 +69,12 @@ $channels = $pdo->query("SELECT * FROM channels ORDER BY id ASC")->fetchAll();
 
 <script>
 async function saveChannel() {
-    let wh = parseInt(document.getElementById('channel_warehouse').value || '1', 10);
-    if (wh < 1) wh = 1;
-    if (wh > 3) wh = 3;
     const payload = {
         name: document.getElementById('channel_name').value.trim(),
         slug: document.getElementById('channel_slug').value.trim(),
         logo: document.getElementById('channel_logo').value.trim(),
         primary_color: document.getElementById('channel_color').value.trim(),
-        whatsapp_number: document.getElementById('channel_whatsapp').value.trim(),
-        warehouse_number: wh
+        whatsapp_number: document.getElementById('channel_whatsapp').value.trim()
     };
     const res = await postJSON('/admin/api/channels/save.php', payload);
     alert(res.message || (res.success ? 'تم حفظ الواجهة' : 'فشل الحفظ'));

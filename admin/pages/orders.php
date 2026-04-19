@@ -101,6 +101,7 @@ function orange_admin_orders_action_buttons(array $o): void
 ?>
 <div class="page-title">
     <h1>الطلبات</h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;">المخزن <strong>موحّد للشركة</strong> — الطلب من أي قناة يخصم نفس المخزون لتفادي البيع رغم النفاد. عمود «قناة العملاء» لتتبّع المصدر وتجميع العملاء (تيك توك، واتساب، …) وليس لمخزون منفصل.</p>
 </div>
 
 <div class="card">
@@ -134,7 +135,7 @@ function orange_admin_orders_action_buttons(array $o): void
                     <th>البيع</th>
                     <th class="col-orders-customer">العميل</th>
                     <th class="col-orders-phone">الهاتف</th>
-                    <th>القناة</th>
+                    <th title="تتبّع مصدر الطلب فقط — المخزون للشركة واحد">قناة العملاء</th>
                     <th>الإجمالي</th>
                     <th>الحالة</th>
                     <th class="col-orders-actions">التحكم</th>

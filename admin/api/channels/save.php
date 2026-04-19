@@ -23,13 +23,8 @@ try {
         json_response(['success' => false, 'message' => 'بيانات الواجهة مطلوبة'], 422);
     }
 
-    $wh = (int)($data['warehouse_number'] ?? 1);
-    if ($wh < 1) {
-        $wh = 1;
-    }
-    if ($wh > 3) {
-        $wh = 3;
-    }
+    /* مخزن الشركة موحّد — الحقل القديم warehouse_number يُثبَّت على 1 ولا يُعرَض في الواجهة. */
+    $wh = 1;
 
     $stmt = $pdo->prepare("
         INSERT INTO channels (name, slug, logo, primary_color, whatsapp_number, warehouse_number, is_active)

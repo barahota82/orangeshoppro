@@ -171,7 +171,7 @@ $linesMismatch = $order && abs($linesSubtotal - $orderTotalVal) > 0.009;
 ?>
 <div class="page-title">
     <h1>فاتورة مبيعات</h1>
-    <p style="margin:0.35rem 0 0;font-size:0.95rem;opacity:0.9;">مستند رسمي للعميل — يُخصَّص من «بيانات الشركة». افتح الفاتورة من الطلبات أو أدخل رقم الطلب.</p>
+    <p style="margin:0.35rem 0 0;font-size:0.95rem;opacity:0.9;">مستند رسمي للعميل — يُخصَّص من «بيانات الشركة». المبيعات والمخزون <strong>موحّدان للشركة</strong>؛ أي «قناة» مذكورة هي لتتبّع العملاء ومصدر الطلب فقط.</p>
 </div>
 
 <style>
@@ -355,8 +355,8 @@ $linesMismatch = $order && abs($linesSubtotal - $orderTotalVal) > 0.009;
     $formalInv = trim((string)($order['invoice_number'] ?? ''));
     $orderSrc = (string)($order['order_source'] ?? 'website');
     $orderSrcAr = $orderSrc === 'company'
-        ? 'فاتورة شركة (طلب داخلي)'
-        : 'طلب وارد من الموقع';
+        ? 'طلب مسجّل كمصدر شركة (داخلي)'
+        : 'طلب وارد من واجهة المتجر';
     $ost = strtolower(trim((string) ($order['status'] ?? '')));
     $statusLabel = $orderStatusAr[$ost] ?? (string) ($order['status'] ?? '');
     $ptAr = 'بيع ' . orange_order_payment_terms_label_ar($order['payment_terms'] ?? 'cash');
@@ -373,7 +373,7 @@ $linesMismatch = $order && abs($linesSubtotal - $orderTotalVal) > 0.009;
                 <?php if ($nameEn !== ''): ?>
                     <p class="invoice-doc-sub-en"><?php echo htmlspecialchars($nameEn, ENT_QUOTES, 'UTF-8'); ?></p>
                 <?php endif; ?>
-                <p class="invoice-doc-sub">مستند مطابق لطلب التوريد — <?php echo htmlspecialchars($orderSrcAr, ENT_QUOTES, 'UTF-8'); ?></p>
+                <p class="invoice-doc-sub">بيع للشركة (مخزن موحّد) — <?php echo htmlspecialchars($orderSrcAr, ENT_QUOTES, 'UTF-8'); ?></p>
             </div>
         </div>
         <div class="invoice-doc-meta-box">
@@ -400,6 +400,14 @@ $linesMismatch = $order && abs($linesSubtotal - $orderTotalVal) > 0.009;
         </div>
         <?php endif; ?>
 
+        <?php if ($channelName !== ''): ?>
+        <div class="invoice-panel" style="margin-bottom:1rem;background:#f8fafc;border-style:dashed;">
+            <h3 style="margin-top:0;">تتبّع مصدر الطلب</h3>
+            <p style="margin:0 0 0.65rem;font-size:0.88rem;color:#64748b;line-height:1.5;">القناة هنا لمعرفة أين وصلك العميل (مثل تيك توك أو واتساب) وتنظيم ملفّه — <strong>لا</strong> تعني مخزناً أو بيعاً منفصلاً؛ المخزون الرئيسي للشركة واحد لكل القنوات.</p>
+            <div><strong>قناة العملاء:</strong> <?php echo htmlspecialchars($channelName, ENT_QUOTES, 'UTF-8'); ?></div>
+        </div>
+        <?php endif; ?>
+
         <div class="invoice-grid-2">
             <div class="invoice-panel">
                 <h3>بيانات العميل</h3>
@@ -407,9 +415,6 @@ $linesMismatch = $order && abs($linesSubtotal - $orderTotalVal) > 0.009;
                 <div><strong>الهاتف:</strong> <?php echo htmlspecialchars((string)$order['phone'], ENT_QUOTES, 'UTF-8'); ?></div>
                 <div><strong>المنطقة:</strong> <?php echo htmlspecialchars((string)$order['area'], ENT_QUOTES, 'UTF-8'); ?></div>
                 <div><strong>العنوان:</strong> <?php echo htmlspecialchars((string)$order['address'], ENT_QUOTES, 'UTF-8'); ?></div>
-                <?php if ($channelName !== ''): ?>
-                    <div><strong>القناة:</strong> <?php echo htmlspecialchars($channelName, ENT_QUOTES, 'UTF-8'); ?></div>
-                <?php endif; ?>
             </div>
             <div class="invoice-panel">
                 <h3>حالة المستند</h3>
