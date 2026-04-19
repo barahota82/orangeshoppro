@@ -2249,7 +2249,7 @@ body.storefront .product-gallery__img {
         display: none !important;
     }
 
-    /* زر لغة مضغوط (أيقونة فقط) — يوفر عرضاً لاسم الشركة؛ الاسم الكامل في القائمة */
+    /* موبايل: زر اللغة في الهيدر — أيقونة فقط (الأسماء داخل القائمة) */
     body.storefront .header-actions--lang .lang-dropdown__current,
     body.storefront .header-actions--lang .lang-dropdown__chev {
         display: none;

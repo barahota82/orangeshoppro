@@ -226,12 +226,12 @@ function current_lang(): string {
     return in_array($lang, $allowed, true) ? $lang : 'en';
 }
 
-/** Storefront language picker labels (native name per language). */
+/** Storefront language picker labels (اسم كامل يظهر في القائمة المنسدلة وفي زر اللغة على سطح المكتب). */
 function storefront_lang_options(): array {
     return [
         'ar' => ['label' => 'العربية'],
         'en' => ['label' => 'English'],
-        'fil' => ['label' => 'PH'],
+        'fil' => ['label' => 'Filipino'],
         'hi' => ['label' => 'हिन्दी'],
     ];
 }
