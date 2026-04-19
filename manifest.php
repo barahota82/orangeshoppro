@@ -35,7 +35,7 @@ $scope = PUBLIC_BASE_PATH === '' ? '/' : rtrim(PUBLIC_BASE_PATH, '/') . '/';
 $themeColor = '#ff6a00';
 
 $pub = PUBLIC_BASE_PATH === '' ? '' : PUBLIC_BASE_PATH;
-$iconSrc = $pub . '/assets/images/' . $logoFile;
+$iconSrc = $pub . storefront_asset_url('/assets/images/' . $logoFile);
 
 $manifest = [
     'name' => $name . ' — Orange',

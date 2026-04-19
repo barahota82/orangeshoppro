@@ -1,20 +1,35 @@
 @import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap");
 
 :root {
+    /* Brand — مواءمة هوية Orange الموحّدة */
     --primary: #ff6a00;
-    --primary-dark: #e85a00;
-    --primary-soft: rgba(255, 106, 0, 0.12);
-    --accent: #ff8c33;
-    --bg: #f8f8fb;
-    --bg-soft: #f3f4f6;
-    --text: #111827;
-    --muted: #6b7280;
-    --card: #ffffff;
-    --border: #e5e7eb;
-    --header-bg: rgba(255, 255, 255, 0.82);
-    --hero-shadow: 0 24px 48px -12px rgba(255, 122, 0, 0.28);
-    --card-shadow: 0 4px 6px -1px rgba(17, 24, 39, 0.06), 0 10px 24px -8px rgba(17, 24, 39, 0.08);
-    --card-shadow-hover: 0 12px 32px -8px rgba(17, 24, 39, 0.12);
+    --primary-hover: #ff7a1a;
+    --primary-dark: #ff4d00;
+    --primary-soft: rgba(255, 106, 0, 0.18);
+    --primary-glow-strong: rgba(255, 106, 0, 0.28);
+    --accent: #ff7a1a;
+    --bg: #050505;
+    --bg-soft: #0b0b0b;
+    --bg-section: #121212;
+    --card: #181818;
+    --surface-elevated: #202020;
+    --text: #ffffff;
+    --text-near: #eaeaea;
+    --muted: #b8b8b8;
+    --faint: #7a7a7a;
+    --border: #2a2a2a;
+    --border-hover: #343434;
+    --line-subtle: rgba(255, 255, 255, 0.06);
+    --header-bg: rgba(5, 5, 5, 0.94);
+    --hero-shadow:
+        0 32px 64px -16px rgba(0, 0, 0, 0.65),
+        0 0 48px rgba(255, 106, 0, 0.12);
+    --card-shadow:
+        0 4px 12px rgba(0, 0, 0, 0.45),
+        0 1px 0 var(--line-subtle);
+    --card-shadow-hover:
+        0 16px 40px rgba(0, 0, 0, 0.55),
+        0 0 32px rgba(255, 106, 0, 0.1);
     --radius-sm: 12px;
     --radius-md: 16px;
     --radius-lg: 22px;
@@ -33,7 +48,7 @@ body {
     font-size: 16px;
     line-height: 1.55;
     background: var(--bg);
-    color: var(--text);
+    color: var(--text-near);
     padding-bottom: 70px;
     -webkit-font-smoothing: antialiased;
 }
@@ -48,6 +63,7 @@ h1, h2, h3, .brand-text h1 {
     font-family: var(--font-display);
     font-weight: 700;
     letter-spacing: -0.02em;
+    color: var(--text);
 }
 
 .container {
@@ -113,7 +129,11 @@ h1, h2, h3, .brand-text h1 {
     width: 52px;
     height: 52px;
     border-radius: var(--radius-sm);
-    object-fit: cover;
+    /* contain: الشعار غير المربع لا يُقصّ كما مع cover (فرق ملحوظ بين الجوال والكمبيوتر غالباً من الكاش أو القص) */
+    object-fit: contain;
+    object-position: center;
+    padding: 4px;
+    box-sizing: border-box;
     background: var(--card);
     box-shadow: var(--card-shadow);
     border: 1px solid var(--border);
@@ -309,7 +329,7 @@ h1, h2, h3, .brand-text h1 {
 .hero-banner {
     position: relative;
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 55%, var(--accent) 100%);
-    color: #fff;
+    color: var(--text);
     border-radius: var(--radius-lg);
     padding: clamp(28px, 5vw, 44px);
     margin-bottom: 22px;
@@ -493,7 +513,7 @@ h1, h2, h3, .brand-text h1 {
 .storefront-browse-menu__backdrop {
     position: absolute;
     inset: 0;
-    background: rgba(17, 24, 39, 0.45);
+    background: rgba(0, 0, 0, 0.55);
     border: 0;
     padding: 0;
     cursor: pointer;
@@ -582,7 +602,7 @@ html[dir="rtl"] .storefront-browse-menu.is-open .storefront-browse-menu__panel {
     border: 1px solid var(--primary);
     border-radius: var(--radius-md);
     background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    color: #fff;
+    color: var(--text);
     font-family: var(--font-display);
     font-weight: 600;
     font-size: 0.9rem;
@@ -628,7 +648,7 @@ html[dir="rtl"] .storefront-browse-menu.is-open .storefront-browse-menu__panel {
 .browse-accordion__summary--nested {
     font-weight: 500;
     font-size: 0.86rem;
-    background: rgba(255, 255, 255, 0.5);
+    background: color-mix(in srgb, var(--text) 6%, var(--bg-soft));
 }
 
 .browse-accordion__content {
@@ -697,9 +717,9 @@ body.storefront-browse-menu-lock {
 
 .tab-btn.active {
     background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    color: #fff;
+    color: var(--text);
     border-color: transparent;
-    box-shadow: 0 4px 14px -2px var(--primary-soft);
+    box-shadow: 0 4px 14px -2px var(--primary-glow-strong);
 }
 
 .products-grid {
@@ -741,7 +761,7 @@ body.storefront-browse-menu-lock {
     top: 12px;
     inset-inline-start: 12px;
     background: linear-gradient(135deg, #dc2626, #ef4444);
-    color: #fff;
+    color: var(--text);
     padding: 7px 12px;
     border-radius: var(--radius-pill);
     font-size: 0.75rem;
@@ -788,7 +808,7 @@ body.storefront-browse-menu-lock {
     text-align: center;
     text-decoration: none;
     background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    color: #fff;
+    color: var(--text);
     border: 0;
     border-radius: var(--radius-sm);
     padding: 12px 16px;
@@ -796,13 +816,13 @@ body.storefront-browse-menu-lock {
     font-family: var(--font-display);
     font-weight: 600;
     font-size: 0.95rem;
-    box-shadow: 0 4px 14px -2px var(--primary-soft);
+    box-shadow: 0 4px 14px -2px var(--primary-glow-strong);
     transition: transform 0.15s, box-shadow 0.2s, filter 0.2s;
 }
 
 .btn:hover:not([disabled]) {
     filter: brightness(1.05);
-    box-shadow: 0 8px 22px -4px var(--primary-soft);
+    box-shadow: 0 8px 22px -4px var(--primary-glow-strong);
 }
 
 .btn:active:not([disabled]) {
@@ -1161,7 +1181,7 @@ body.storefront .product-gallery__img {
 
 .chip.active {
     background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    color: #fff;
+    color: var(--text);
     border-color: transparent;
 }
 
@@ -1177,7 +1197,7 @@ body.storefront .product-gallery__img {
     border: 0;
     border-radius: var(--radius-sm);
     background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    color: #fff;
+    color: var(--text);
     cursor: pointer;
     font-size: 1.1rem;
     font-weight: 600;
@@ -1346,7 +1366,8 @@ body.storefront .product-gallery__img {
 }
 
 .cart-page-tab[aria-selected="true"] .cart-page-tab__count {
-    background: rgba(255, 122, 0, 0.22);
+    background: color-mix(in srgb, var(--primary) 26%, transparent);
+    color: var(--text);
 }
 
 .cart-page-panel[hidden] {
@@ -1608,8 +1629,8 @@ body.storefront .product-gallery__img {
     margin: 0 0 16px;
     padding: 10px 12px;
     border-radius: 10px;
-    background: var(--primary-soft, rgba(255, 122, 0, 0.12));
-    color: var(--text);
+    background: var(--primary-soft);
+    color: var(--text-near);
     font-size: 0.9rem;
     line-height: 1.45;
 }
@@ -1622,10 +1643,10 @@ body.storefront .product-gallery__img {
 
 @keyframes cartCheckoutNudge {
     0% {
-        box-shadow: 0 0 0 0 rgba(255, 122, 0, 0.35);
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 50%, transparent);
     }
     40% {
-        box-shadow: 0 0 0 6px rgba(255, 122, 0, 0.12);
+        box-shadow: 0 0 0 6px var(--primary-soft);
     }
     100% {
         box-shadow: none;
@@ -2233,14 +2254,16 @@ body.storefront .site-main > .container {
     max-width: min(92vw, 380px);
     padding: 12px 18px;
     border-radius: var(--radius-pill);
-    background: rgba(5, 5, 5, 0.94);
-    color: #fff;
+    background: var(--header-bg);
+    color: var(--text-near);
     font-size: 0.9rem;
     font-weight: 600;
     line-height: 1.4;
     text-align: center;
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow:
+        0 10px 28px rgba(0, 0, 0, 0.45),
+        0 0 32px var(--primary-soft);
+    border: 1px solid var(--line-subtle);
     z-index: 10050;
     opacity: 0;
     pointer-events: none;
@@ -2335,7 +2358,7 @@ body.storefront .site-main > .container {
 
 /* صقل عرض المتجر — ظل هادئ، شبكة أوضح */
 .site-header {
-    box-shadow: 0 4px 24px rgba(17, 24, 39, 0.07);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.38);
 }
 .products-grid {
     gap: 22px;

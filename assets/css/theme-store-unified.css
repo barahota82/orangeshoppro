@@ -3,48 +3,7 @@
  * Primary #FF6A00 · Hover #FF7A1A · Highlight #FF4D00
  * خلفيات/نصوص/حدود حسب مواصفات المالك.
  */
-.theme-orange,
-.theme-blue,
-.theme-black {
-    /* Brand */
-    --primary: #ff6a00;
-    --primary-hover: #ff7a1a;
-    --primary-dark: #ff4d00;
-    --primary-soft: rgba(255, 106, 0, 0.18);
-    --primary-glow-strong: rgba(255, 106, 0, 0.28);
-    --accent: #ff7a1a;
-
-    /* Backgrounds */
-    --bg: #050505;
-    --bg-soft: #0b0b0b;
-    --bg-section: #121212;
-    --card: #181818;
-    --surface-elevated: #202020;
-
-    /* Text */
-    --text: #ffffff;
-    --text-near: #eaeaea;
-    --muted: #b8b8b8;
-    --faint: #7a7a7a;
-
-    /* Borders */
-    --border: #2a2a2a;
-    --border-hover: #343434;
-    --line-subtle: rgba(255, 255, 255, 0.06);
-
-    /* Chrome */
-    --header-bg: rgba(5, 5, 5, 0.94);
-
-    --hero-shadow:
-        0 32px 64px -16px rgba(0, 0, 0, 0.65),
-        0 0 48px rgba(255, 106, 0, 0.12);
-    --card-shadow:
-        0 4px 12px rgba(0, 0, 0, 0.45),
-        0 1px 0 var(--line-subtle);
-    --card-shadow-hover:
-        0 16px 40px rgba(0, 0, 0, 0.55),
-        0 0 32px rgba(255, 106, 0, 0.1);
-}
+/* رموز الألوان في main.css :root — القنوات الثلاث تتشارك نفس الهوية */
 
 /* نصوص عامة: أساسي أبيض، فقرات أوضح قليلاً */
 body.storefront {
@@ -75,8 +34,8 @@ body.storefront .product-body h3 {
         #ff6a00 92%,
         #ff7a1a 100%
     );
-    color: #ffffff;
-    border: 1px solid rgba(255, 106, 0, 0.22);
+    color: var(--text);
+    border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
     box-shadow: var(--hero-shadow);
 }
 
@@ -98,37 +57,29 @@ body.storefront .product-body h3 {
 .theme-orange .hero-banner--rotator .hero-rotator-text,
 .theme-blue .hero-banner--rotator .hero-rotator-text,
 .theme-black .hero-banner--rotator .hero-rotator-text {
-    color: #ffffff;
+    color: var(--text);
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
 }
 
 /* صور المنتجات على خلفية قسم */
-body.storefront.theme-orange .product-image-wrap,
-body.storefront.theme-blue .product-image-wrap,
-body.storefront.theme-black .product-image-wrap {
+body.storefront .product-image-wrap {
     background: var(--bg-section);
 }
 
 /* أزرار أساسية: hover بلون العلامة */
-body.storefront.theme-orange .btn:hover:not([disabled]),
-body.storefront.theme-blue .btn:hover:not([disabled]),
-body.storefront.theme-black .btn:hover:not([disabled]) {
+body.storefront .btn:hover:not([disabled]) {
     background: linear-gradient(135deg, var(--primary-hover), var(--primary));
     filter: none;
     box-shadow: 0 8px 28px -4px var(--primary-glow-strong);
 }
 
-body.storefront.theme-orange .btn-secondary:hover:not([disabled]),
-body.storefront.theme-blue .btn-secondary:hover:not([disabled]),
-body.storefront.theme-black .btn-secondary:hover:not([disabled]) {
+body.storefront .btn-secondary:hover:not([disabled]) {
     border-color: var(--border-hover);
     background: var(--surface-elevated);
 }
 
 /* رقاقات الاختيار (لون/مقاس) */
-body.storefront.theme-orange .chip,
-body.storefront.theme-blue .chip,
-body.storefront.theme-black .chip {
+body.storefront .chip {
     color: var(--text-near);
 }
 

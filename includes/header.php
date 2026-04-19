@@ -43,7 +43,8 @@ $orangeChannelLogoFile = preg_replace(
     '',
     (string) ($channel['logo'] ?? 'logo-orange.png')
 ) ?: 'logo-orange.png';
-$orangeTouchIconHref = $orangePubBase . '/assets/images/' . $orangeChannelLogoFile;
+/* نفس منطق CSS/JS: ?v=filemtime حتى لا يبقى الكمبيوتر على شعار PNG قديم بعد التحديث */
+$orangeChannelLogoUrl = $orangePubBase . storefront_asset_url('/assets/images/' . $orangeChannelLogoFile);
 $orangeManifestHref = $orangePubBase . '/manifest.php?' . http_build_query(['channel' => $channelSlug, 'lang' => $lang]);
 
 $dir = $lang === 'ar' ? 'rtl' : 'ltr';
@@ -55,7 +56,7 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
     <meta name="theme-color" content="<?php echo htmlspecialchars($sfThemeColor, ENT_QUOTES, 'UTF-8'); ?>">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="manifest" href="<?php echo htmlspecialchars($orangeManifestHref, ENT_QUOTES, 'UTF-8'); ?>">
-    <link rel="apple-touch-icon" href="<?php echo htmlspecialchars($orangeTouchIconHref, ENT_QUOTES, 'UTF-8'); ?>">
+    <link rel="apple-touch-icon" href="<?php echo htmlspecialchars($orangeChannelLogoUrl, ENT_QUOTES, 'UTF-8'); ?>">
     <script>
     (function orangeStorefrontApplySavedChannel() {
         try {
@@ -222,7 +223,7 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
 <header class="site-header" dir="ltr">
     <div class="container header-inner">
         <div class="brand-wrap">
-            <img class="logo" src="/assets/images/<?php echo htmlspecialchars((string)($channel['logo'] ?? 'logo-orange.png'), ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?>">
+            <img class="logo" src="<?php echo htmlspecialchars($orangeChannelLogoUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?>" width="52" height="52" decoding="async">
             <div class="brand-text">
                 <div class="brand-stack">
                     <h1><?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?></h1>
