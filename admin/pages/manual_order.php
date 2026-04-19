@@ -133,9 +133,9 @@ foreach ($products as $p) {
     <p class="page-subtitle">مستند بيع داخلي مرتبط بالعميل والقناة. <strong>كل بند</strong> يُربَط بصنف مسجّل: <strong>كود الصنف</strong> أو <strong>الباركود</strong> (حقلا <code dir="ltr">item_code</code> و<code dir="ltr">barcode</code> في قاعدة البيانات، أو كود تلقائي مثل P12) مع اللون/المقاس عند وجود متغيرات. حقول <strong>سعر الوحدة</strong> و<strong>الخصم</strong> تتبع تنسيق المبالغ (ثلاث خانات عشرية، ويسمح الخصم بالقيم السالبة كزيادة). بعد الحفظ تفتح الفاتورة الرسمية.</p>
 </div>
 
-<div class="card">
+<div class="card mo-customer-card">
     <h3>بيانات العميل</h3>
-    <div class="form-grid">
+    <div class="form-grid mo-customer-form">
         <div><label>الاسم</label><input type="text" id="mo_name" required></div>
         <div><label>الهاتف</label><input type="text" id="mo_phone" required></div>
         <div><label>المنطقة</label><input type="text" id="mo_area"></div>
@@ -220,7 +220,7 @@ foreach ($products as $p) {
     </div>
     <div class="actions admin-doc-lines-toolbar" style="margin-top:12px;">
         <button type="button" class="btn-secondary" id="mo_btn_addline" onclick="moAddLine()" <?php echo $products === [] ? 'disabled' : ''; ?>>+ سطر</button>
-        <button type="button" id="mo_btn_save" onclick="moSubmit()" <?php echo $products === [] ? 'disabled' : ''; ?>>حفظ وتسجيل الفاتورة</button>
+        <button type="button" class="btn" id="mo_btn_save" onclick="moSubmit()" <?php echo $products === [] ? 'disabled' : ''; ?>>حفظ وتسجيل الفاتورة</button>
         <a class="btn btn-secondary" href="/admin/index.php?page=orders">الطلبات</a>
     </div>
 </div>

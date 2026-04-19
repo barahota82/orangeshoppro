@@ -829,7 +829,16 @@ a { text-decoration: none; color: inherit; }
 
 /* فاتورة يدوية — هيكل أوضح + ملخص مباشر */
 .mo-invoice-card {
-    padding: 24px 26px 26px;
+    padding: 16px 18px 18px;
+}
+.mo-invoice-card .admin-doc-lines-toolbar {
+    position: relative;
+    z-index: 2;
+    margin-top: 10px;
+}
+.mo-invoice-card .admin-doc-lines-toolbar .btn,
+.mo-invoice-card .admin-doc-lines-toolbar button {
+    flex-shrink: 0;
 }
 .mo-invoice-doc-head {
     display: flex;
@@ -1251,6 +1260,40 @@ label {
     grid-template-columns: 1fr 1fr 1fr;
     gap: 12px 16px;
 }
+
+/* فاتورة شركة — بيانات عميل مضغوطة (بدون خانات عملاقة) */
+.mo-customer-card {
+    padding: 14px 18px 16px;
+    margin-bottom: 14px;
+    max-width: 56rem;
+}
+.mo-customer-card > h3:first-child {
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+    font-size: 1rem;
+}
+.mo-customer-form {
+    gap: 8px 14px;
+}
+.mo-customer-form label {
+    margin-bottom: 3px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+}
+.mo-customer-form input,
+.mo-customer-form select {
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: 13px;
+    line-height: 1.35;
+}
+.mo-customer-form .card-hint {
+    margin: 6px 0 0;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
 .actions {
     display: flex;
     gap: 8px;
@@ -1263,7 +1306,7 @@ button:disabled {
 }
 button:disabled:hover {
     filter: grayscale(0.25);
-    background: inherit;
+    /* لا نستخدم background: inherit — يصير لون البطاقة (#fff) مع color: #fff فيختفي الزر عند hover */
 }
 button, .btn {
     border: 0;
