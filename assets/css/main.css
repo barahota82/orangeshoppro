@@ -1788,9 +1788,14 @@ body.storefront .product-gallery__img {
     margin-top: 0;
 }
 
+.track-signup-cta.card-box,
+.track-page-card.card-box {
+    overflow: visible;
+    padding: 16px 18px;
+}
+
 .track-signup-cta {
     margin-bottom: 1rem;
-    padding: 16px 18px;
     background: linear-gradient(
         135deg,
         color-mix(in srgb, var(--primary-soft) 85%, var(--card)),
@@ -1818,6 +1823,7 @@ body.storefront .product-gallery__img {
     font-weight: 700;
     color: var(--text);
     line-height: 1.35;
+    text-align: start;
 }
 
 .track-signup-cta__text {
@@ -1825,14 +1831,7 @@ body.storefront .product-gallery__img {
     font-size: 0.9rem;
     line-height: 1.5;
     color: var(--muted);
-}
-
-.track-signup-cta__btn {
-    flex-shrink: 0;
-    width: 100%;
-    text-align: center;
-    text-decoration: none;
-    box-sizing: border-box;
+    text-align: start;
 }
 
 @media (min-width: 560px) {
@@ -1842,30 +1841,52 @@ body.storefront .product-gallery__img {
         justify-content: space-between;
         gap: 18px;
     }
-
-    .track-signup-cta__btn {
-        width: auto;
-        min-width: 160px;
-    }
 }
 
 .track-page-card__title {
     margin-top: 0;
+    font-size: 1.05rem;
+    line-height: 1.35;
+    text-align: start;
+}
+
+.track-page-card .track-form-intro {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    text-align: start;
+}
+
+.track-page-form .field label {
+    text-align: start;
+}
+
+.track-page-form .field input {
+    min-height: 48px;
+    box-sizing: border-box;
 }
 
 .track-page-actions {
     margin-top: 4px;
 }
 
+.track-signup-cta__btn,
 .track-page-actions .btn--track-submit {
+    flex-shrink: 0;
     width: 100%;
     max-width: 100%;
+    box-sizing: border-box;
+    min-height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    text-decoration: none;
 }
 
-@media (min-width: 480px) {
+@media (min-width: 560px) {
+    .track-signup-cta__btn,
     .track-page-actions .btn--track-submit {
         width: auto;
-        max-width: none;
         min-width: 200px;
     }
 }
