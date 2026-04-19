@@ -85,6 +85,17 @@ try {
 
     $pdo->beginTransaction();
 
+    $normSku = static function ($raw): ?string {
+        $s = trim((string) $raw);
+        if ($s === '') {
+            return null;
+        }
+
+        return function_exists('mb_substr') ? mb_substr($s, 0, 64, 'UTF-8') : substr($s, 0, 64);
+    };
+    $itemCodeUp = $normSku($data['item_code'] ?? '');
+    $barcodeUp = $normSku($data['barcode'] ?? '');
+
     $stmt = $pdo->prepare("
         UPDATE products
         SET name = ?, name_en = ?, name_fil = ?, name_hi = ?,
@@ -92,7 +103,7 @@ try {
             seo_meta_title_ar = ?, seo_meta_title_en = ?, seo_meta_title_fil = ?, seo_meta_title_hi = ?,
             seo_meta_description_ar = ?, seo_meta_description_en = ?, seo_meta_description_fil = ?, seo_meta_description_hi = ?,
             category_id = ?, subcategory_id = ?, size_family_id = ?, sizing_guide_scope = ?, price = ?, cost = ?,
-            main_image = ?, has_sizes = ?, has_colors = ?, sort_order = ?, is_active = ?, updated_at = NOW()
+            main_image = ?, has_sizes = ?, has_colors = ?, sort_order = ?, item_code = ?, barcode = ?, is_active = ?, updated_at = NOW()
         WHERE id = ?
     ");
 
@@ -123,6 +134,8 @@ try {
         (int)($data['has_sizes'] ?? 0),
         (int)($data['has_colors'] ?? 0),
         $sortOrder,
+        $itemCodeUp,
+        $barcodeUp,
         isset($data['is_active']) ? (int)$data['is_active'] : 1,
         $productId
     ]);

@@ -250,6 +250,14 @@ foreach ($categories as $cat) {
                 <label>التكلفة</label>
                 <input type="number" id="cost" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr">
             </div>
+            <div>
+                <label for="product_item_code">كود الصنف (اختياري)</label>
+                <input type="text" id="product_item_code" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="SKU">
+            </div>
+            <div>
+                <label for="product_barcode">الباركود (اختياري)</label>
+                <input type="text" id="product_barcode" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="EAN / UPC">
+            </div>
             <div style="grid-column:1/-1;">
                 <label>الوصف (عربي)</label>
                 <textarea id="description" rows="3"></textarea>
@@ -752,6 +760,14 @@ function resetProductForm() {
     updateProductCatalogHint();
     document.getElementById('price').value = '';
     document.getElementById('cost').value = '';
+    const pic = document.getElementById('product_item_code');
+    const pbc = document.getElementById('product_barcode');
+    if (pic) {
+        pic.value = '';
+    }
+    if (pbc) {
+        pbc.value = '';
+    }
     document.getElementById('main_image').value = '';
     document.getElementById('main_image_file').value = '';
     const prev = document.getElementById('main_image_preview');
@@ -838,6 +854,14 @@ async function loadProductForEdit(id) {
         updateProductCatalogHint();
         document.getElementById('price').value = String(p.price != null ? p.price : '');
         document.getElementById('cost').value = String(p.cost != null ? p.cost : '');
+        const picEl = document.getElementById('product_item_code');
+        const pbcEl = document.getElementById('product_barcode');
+        if (picEl) {
+            picEl.value = p.item_code != null && String(p.item_code) !== '' ? String(p.item_code) : '';
+        }
+        if (pbcEl) {
+            pbcEl.value = p.barcode != null && String(p.barcode) !== '' ? String(p.barcode) : '';
+        }
         const extrasEarly = Array.isArray(p.extra_images) ? p.extra_images.slice() : [];
         let mainFn = (p.main_image || '').trim();
         if (!mainFn && extrasEarly.length) {
@@ -1153,7 +1177,9 @@ async function saveProduct() {
             size_family_id: parseInt(document.getElementById('size_family_id').value, 10) || 0,
             sizing_guide_scope: document.getElementById('sizing_guide_scope').value,
             sort_order: parseInt(document.getElementById('product_sort_order').value || '0', 10),
-            is_active: parseInt(document.getElementById('product_is_active').value, 10)
+            is_active: parseInt(document.getElementById('product_is_active').value, 10),
+            item_code: (document.getElementById('product_item_code') && document.getElementById('product_item_code').value.trim()) || '',
+            barcode: (document.getElementById('product_barcode') && document.getElementById('product_barcode').value.trim()) || ''
         };
         const subEl = document.getElementById('subcategory_id');
         if (subEl) {
@@ -1209,6 +1235,8 @@ async function saveProduct() {
         size_family_id: parseInt(document.getElementById('size_family_id').value, 10) || 0,
         sizing_guide_scope: document.getElementById('sizing_guide_scope').value,
         extra_images: window.PRODUCT_EXTRA_IMAGES || [],
+        item_code: (document.getElementById('product_item_code') && document.getElementById('product_item_code').value.trim()) || '',
+        barcode: (document.getElementById('product_barcode') && document.getElementById('product_barcode').value.trim()) || '',
         variants
     };
     const subElNew = document.getElementById('subcategory_id');

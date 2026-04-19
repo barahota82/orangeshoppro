@@ -13,6 +13,9 @@ $prodCols = 'id, name, price, cost, has_colors, has_sizes';
 if (orange_table_has_column($pdo, 'products', 'item_code')) {
     $prodCols .= ', item_code';
 }
+if (orange_table_has_column($pdo, 'products', 'barcode')) {
+    $prodCols .= ', barcode';
+}
 $products = $pdo->query(
     "SELECT $prodCols FROM products WHERE is_active = 1 ORDER BY name ASC"
 )->fetchAll(PDO::FETCH_ASSOC);
@@ -25,6 +28,29 @@ foreach ($variants as $v) {
         $variantsByProduct[$pid] = [];
     }
     $variantsByProduct[$pid][] = $v;
+}
+
+/** @var array<int,int> */
+$moPendingReservedByVariant = [];
+if (orange_table_exists($pdo, 'stock_movements') && orange_table_has_column($pdo, 'stock_movements', 'variant_id')) {
+    $vidsAll = [];
+    foreach ($variants as $v) {
+        $vidsAll[] = (int) $v['id'];
+    }
+    $vidsAll = array_values(array_unique(array_filter($vidsAll)));
+    foreach (array_chunk($vidsAll, 400) as $chunk) {
+        if ($chunk === []) {
+            continue;
+        }
+        $ph = implode(',', array_fill(0, count($chunk), '?'));
+        $q = $pdo->prepare(
+            "SELECT variant_id, COALESCE(SUM(qty), 0) AS q FROM stock_movements WHERE type = 'pending_order' AND variant_id IN ($ph) GROUP BY variant_id"
+        );
+        $q->execute($chunk);
+        while ($row = $q->fetch(PDO::FETCH_ASSOC)) {
+            $moPendingReservedByVariant[(int) $row['variant_id']] = (int) $row['q'];
+        }
+    }
 }
 
 $allocPickCode = static function (string $base, array &$usedLower): string {
@@ -52,23 +78,30 @@ foreach ($products as $p) {
     $pid = (int) $p['id'];
     $pcode = trim((string) ($p['item_code'] ?? ''));
     $vlist = $variantsByProduct[$pid] ?? [];
+    $pbarcode = trim((string) ($p['barcode'] ?? ''));
     if ($vlist === []) {
         $base = $pcode !== '' ? $pcode : ('P' . $pid);
         $code = $allocPickCode($base, $codesLower);
         $pickRows[] = [
             'code' => $code,
+            'barcode' => $pbarcode,
             'product_id' => $pid,
             'variant_id' => 0,
             'name' => (string) $p['name'],
             'color' => '',
             'size' => '',
             'price' => (float) $p['price'],
+            'stock_available' => 0,
+            'stock_reserved' => 0,
+            'stock_total' => 0,
         ];
         continue;
     }
     foreach ($vlist as $v) {
         $vid = (int) $v['id'];
         $vcode = trim((string) ($v['item_code'] ?? ''));
+        $vbarcode = trim((string) ($v['barcode'] ?? ''));
+        $rowBarcode = $vbarcode !== '' ? $vbarcode : $pbarcode;
         if ($vcode !== '') {
             $base = $vcode;
         } elseif ($pcode !== '') {
@@ -77,21 +110,27 @@ foreach ($products as $p) {
             $base = 'P' . $pid . '-V' . $vid;
         }
         $code = $allocPickCode($base, $codesLower);
+        $avail = (int) ($v['stock_quantity'] ?? 0);
+        $res = (int) ($moPendingReservedByVariant[$vid] ?? 0);
         $pickRows[] = [
             'code' => $code,
+            'barcode' => $rowBarcode,
             'product_id' => $pid,
             'variant_id' => $vid,
             'name' => (string) $p['name'],
             'color' => (string) ($v['color'] ?? ''),
             'size' => (string) ($v['size'] ?? ''),
             'price' => (float) $p['price'],
+            'stock_available' => $avail,
+            'stock_reserved' => $res,
+            'stock_total' => $avail + $res,
         ];
     }
 }
 ?>
 <div class="page-title page-title--stacked">
     <h1>فاتورة مبيعات — طلب شركة</h1>
-    <p class="page-subtitle">مستند بيع داخلي مرتبط بالعميل والقناة. <strong>كل بند</strong> يُربَط بصنف مسجّل: <strong>كود الصنف</strong> (من «المنتجات» أو تلقائي مثل P12) مع اللون/المقاس عند وجود متغيرات. السعر من الكتالوج؛ خصم السطر يحدّث <strong>صافي السطر</strong> فوراً. بعد الحفظ تفتح الفاتورة الرسمية.</p>
+    <p class="page-subtitle">مستند بيع داخلي مرتبط بالعميل والقناة. <strong>كل بند</strong> يُربَط بصنف مسجّل: <strong>كود الصنف</strong> أو <strong>الباركود</strong> (حقلا <code dir="ltr">item_code</code> و<code dir="ltr">barcode</code> في قاعدة البيانات، أو كود تلقائي مثل P12) مع اللون/المقاس عند وجود متغيرات. حقول <strong>سعر الوحدة</strong> و<strong>الخصم</strong> تتبع تنسيق المبالغ (ثلاث خانات عشرية، ويسمح الخصم بالقيم السالبة كزيادة). بعد الحفظ تفتح الفاتورة الرسمية.</p>
 </div>
 
 <div class="card">
@@ -131,7 +170,7 @@ foreach ($products as $p) {
         <h3 class="mo-invoice-doc-head__title">بنود الفاتورة</h3>
         <span class="mo-invoice-doc-head__badge">مسودة قبل الحفظ</span>
     </div>
-    <p class="card-hint" style="margin-top:0;">أدخل <strong>كود الصنف</strong> واضغط Enter أو استخدم <strong>بحث</strong> ثم <strong>دبل كليك</strong> على الصف. عدّل الكمية أو الخصم — <strong>صافي سعر الصنف</strong> يتحدّث تلقائياً. يمكن تعبئة حقل «كود الصنف» في «المنتجات» (item_code) لكل منتج/متغير؛ وإلا يُستخدم كود تلقائي.</p>
+    <p class="card-hint" style="margin-top:0;">أدخل <strong>كود الصنف أو الباركود</strong> واضغط Enter أو استخدم أيقونة <strong>البحث</strong> ثم <strong>دبل كليك</strong> على الصف. في نافذة البحث تظهر <strong>إجمالي المخزون</strong> و<strong>المحجوز</strong> (طلبات ويب معلّقة) و<strong>الصافي المتاح</strong>. عدّل الكمية أو الخصم — <strong>صافي سعر الصنف</strong> يتحدّث تلقائياً.</p>
     <?php if ($products === []): ?>
         <p class="mo-invoice-alert">لا توجد منتجات نشطة — <strong>لا يمكن حفظ فاتورة شركة</strong> حتى تُضاف منتجات من شاشة «المنتجات».</p>
     <?php endif; ?>
@@ -141,14 +180,14 @@ foreach ($products as $p) {
                 <thead>
                     <tr>
                         <th class="mo-col-idx">#</th>
-                        <th class="mo-th-code">كود الصنف</th>
-                        <th>اسم الصنف</th>
-                        <th>اللون / المقاس</th>
-                        <th>الكمية</th>
-                        <th>سعر الوحدة</th>
-                        <th>الخصم</th>
-                        <th>صافي سعر الصنف</th>
-                        <th class="admin-doc-col-actions" aria-label="حذف السطر"></th>
+                        <th class="mo-th-code">كود / باركود</th>
+                        <th class="mo-th-name">اسم الصنف</th>
+                        <th class="mo-th-var">اللون / المقاس</th>
+                        <th class="mo-col-qty-h">الكمية</th>
+                        <th class="mo-col-money-h">سعر الوحدة</th>
+                        <th class="mo-col-money-h">الخصم</th>
+                        <th class="mo-col-net-h">صافي السطر</th>
+                        <th class="mo-col-del-h" aria-label="حذف السطر"></th>
                     </tr>
                 </thead>
                 <tbody id="mo_lines_body"></tbody>
@@ -196,10 +235,14 @@ foreach ($products as $p) {
                 <thead>
                     <tr>
                         <th>الكود</th>
+                        <th>الباركود</th>
                         <th>الاسم</th>
                         <th>اللون</th>
                         <th>المقاس</th>
-                        <th>سعر الوحدة</th>
+                        <th class="mo-pick-num-h">إجمالي</th>
+                        <th class="mo-pick-num-h">محجوز</th>
+                        <th class="mo-pick-num-h">صافي</th>
+                        <th class="mo-pick-num-h">سعر</th>
                     </tr>
                 </thead>
                 <tbody id="mo_pick_body"></tbody>
@@ -221,11 +264,18 @@ function moNormCodeKey(s) {
 
 var MO_PICK_BY_CODE = {};
 (function () {
+    function reg(row, rawKey) {
+        var k = moNormCodeKey(rawKey);
+        if (!k || MO_PICK_BY_CODE[k]) {
+            return;
+        }
+        MO_PICK_BY_CODE[k] = row;
+    }
     for (var i = 0; i < MO_PICK_ROWS.length; i++) {
         var r = MO_PICK_ROWS[i];
-        var k = moNormCodeKey(r.code);
-        if (k && !MO_PICK_BY_CODE[k]) {
-            MO_PICK_BY_CODE[k] = r;
+        reg(r, r.code);
+        if (r.barcode) {
+            reg(r, r.barcode);
         }
     }
 })();
@@ -266,8 +316,8 @@ function moClearLine(tr) {
     tr.querySelector('.mo-variant-id').value = '';
     tr.querySelector('.mo-name').value = '';
     tr.querySelector('.mo-var-label').value = '';
-    tr.querySelector('.mo-price').value = '0';
-    tr.querySelector('.mo-disc').value = '0';
+    tr.querySelector('.mo-price').value = moFmtKd(0);
+    tr.querySelector('.mo-disc').value = moFmtKd(0);
     tr.querySelector('.mo-line-net').value = moFmtKd(0);
 }
 
@@ -277,7 +327,7 @@ function moApplyPick(tr, row) {
     tr.querySelector('.mo-variant-id').value = String(row.variant_id || '');
     tr.querySelector('.mo-name').value = row.name;
     tr.querySelector('.mo-var-label').value = moVarLabel(row);
-    tr.querySelector('.mo-price').value = String(parseFloat(row.price) || 0);
+    tr.querySelector('.mo-price').value = moFmtKd(row.price);
     moUpdateLineNet(tr);
 }
 
@@ -316,7 +366,7 @@ function moResolveCodeForRow(tr) {
         moRecalcTotals();
         return;
     }
-    alert('كود غير معروف: ' + raw);
+    alert('كود أو باركود غير معروف: ' + raw);
 }
 
 function moRenumberRows() {
@@ -347,9 +397,6 @@ function moRecalcTotals() {
             var pid = parseInt(r.querySelector('.mo-product-id').value, 10) || 0;
             var q = parseInt(r.querySelector('.mo-q').value, 10) || 0;
             var disc = moParseMoneyEl(r.querySelector('.mo-disc'));
-            if (disc < 0) {
-                disc = 0;
-            }
             if (pid <= 0 || q < 1) {
                 continue;
             }
@@ -404,19 +451,23 @@ function moLineRowHtml() {
         '<td class="mo-col-idx"></td>' +
         '<td class="mo-cell-code">' +
         '<div class="mo-code-wrap">' +
-        '<input type="text" class="mo-code admin-inp" autocomplete="off" placeholder="الكود" dir="ltr" lang="en">' +
-        '<button type="button" class="mo-code-search btn-secondary" title="بحث عن صنف" aria-label="بحث عن صنف">🔍</button>' +
+        '<input type="text" class="mo-code admin-inp" autocomplete="off" placeholder="كود أو باركود" dir="ltr" lang="en">' +
+        '<button type="button" class="mo-code-search" title="بحث عن صنف" aria-label="بحث عن صنف">' +
+        '<svg class="mo-icon mo-icon--search" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>' +
+        '</button>' +
         '</div>' +
         '<input type="hidden" class="mo-product-id" value="">' +
         '<input type="hidden" class="mo-variant-id" value="">' +
         '</td>' +
-        '<td><input type="text" class="mo-name admin-inp" readonly tabindex="-1" placeholder="—"></td>' +
-        '<td><input type="text" class="mo-var-label admin-inp" readonly tabindex="-1" placeholder="—"></td>' +
-        '<td><input type="number" class="mo-q admin-inp-qty" min="1" step="1" value="1" inputmode="numeric" lang="en" dir="ltr"></td>' +
-        '<td><input type="number" class="mo-price admin-inp-money" step="any" min="0" value="0" readonly tabindex="-1" lang="en" dir="ltr"></td>' +
-        '<td><input type="number" class="mo-disc admin-inp-money" step="any" min="0" value="0" lang="en" dir="ltr"></td>' +
-        '<td><input type="text" class="mo-line-net admin-inp-money" readonly tabindex="-1" value="0.000" lang="en" dir="ltr"></td>' +
-        '<td><button type="button" class="btn-secondary admin-doc-line-remove" onclick="moRemoveRow(this)">حذف</button></td>'
+        '<td class="mo-cell-name"><input type="text" class="mo-name admin-inp" readonly tabindex="-1" placeholder="—"></td>' +
+        '<td class="mo-cell-var"><input type="text" class="mo-var-label admin-inp" readonly tabindex="-1" placeholder="—"></td>' +
+        '<td class="mo-col-qty"><input type="number" class="mo-q admin-inp-qty" min="1" step="1" value="1" inputmode="numeric" lang="en" dir="ltr"></td>' +
+        '<td class="mo-col-money"><input type="text" class="mo-price admin-inp-money" data-money-allow-zero readonly tabindex="-1" inputmode="decimal" lang="en" dir="ltr" placeholder="0.000" value="0.000"></td>' +
+        '<td class="mo-col-money"><input type="text" class="mo-disc admin-inp-money" data-money-allow-zero data-money-allow-negative inputmode="decimal" lang="en" dir="ltr" placeholder="0.000" value="0.000"></td>' +
+        '<td class="mo-col-net"><input type="text" class="mo-line-net" readonly tabindex="-1" value="0.000" lang="en" dir="ltr"></td>' +
+        '<td class="mo-col-del"><button type="button" class="mo-row-delete" onclick="moRemoveRow(this)" title="حذف السطر" aria-label="حذف السطر">' +
+        '<svg class="mo-icon mo-icon--trash" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>' +
+        '</button></td>'
     );
 }
 
@@ -506,7 +557,17 @@ function moRenderPickTable(filterText) {
     for (var i = 0; i < MO_PICK_ROWS.length; i++) {
         var r = MO_PICK_ROWS[i];
         if (t) {
-            var hay = (r.code + ' ' + r.name + ' ' + (r.color || '') + ' ' + (r.size || '')).toLowerCase();
+            var hay = (
+                r.code +
+                ' ' +
+                (r.barcode || '') +
+                ' ' +
+                r.name +
+                ' ' +
+                (r.color || '') +
+                ' ' +
+                (r.size || '')
+            ).toLowerCase();
             if (hay.indexOf(t) === -1) {
                 continue;
             }
@@ -514,12 +575,28 @@ function moRenderPickTable(filterText) {
         var tr = document.createElement('tr');
         tr.className = 'mo-pick-row';
         tr.setAttribute('data-pick-idx', String(i));
+        var bc = r.barcode ? moEsc(r.barcode) : '—';
+        var st = typeof r.stock_total === 'number' ? r.stock_total : 0;
+        var sr = typeof r.stock_reserved === 'number' ? r.stock_reserved : 0;
+        var sa = typeof r.stock_available === 'number' ? r.stock_available : 0;
         tr.innerHTML =
             '<td>' + moEsc(r.code) + '</td>' +
+            '<td dir="ltr">' + bc + '</td>' +
             '<td>' + moEsc(r.name) + '</td>' +
             '<td>' + moEsc(r.color || '') + '</td>' +
             '<td>' + moEsc(r.size || '') + '</td>' +
-            '<td dir="ltr">' + moFmtKd(r.price) + '</td>';
+            '<td class="mo-pick-num" dir="ltr">' +
+            st +
+            '</td>' +
+            '<td class="mo-pick-num" dir="ltr">' +
+            sr +
+            '</td>' +
+            '<td class="mo-pick-num" dir="ltr">' +
+            sa +
+            '</td>' +
+            '<td class="mo-pick-num" dir="ltr">' +
+            moFmtKd(r.price) +
+            '</td>';
         body.appendChild(tr);
     }
 }
@@ -674,9 +751,6 @@ function moSubmit() {
         var pid = parseInt(r.querySelector('.mo-product-id').value, 10) || 0;
         var q = parseInt(r.querySelector('.mo-q').value, 10) || 0;
         var disc = parseFloat(String((r.querySelector('.mo-disc') && r.querySelector('.mo-disc').value) || '0').replace(',', '.')) || 0;
-        if (disc < 0) {
-            disc = 0;
-        }
         var vid = parseInt(r.querySelector('.mo-variant-id').value, 10) || 0;
         if (pid <= 0 || q < 1) {
             continue;

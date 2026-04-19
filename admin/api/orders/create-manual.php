@@ -38,7 +38,7 @@ try {
     $validatedItems = [];
 
     foreach ($data['items'] as $item) {
-        $lineDiscount = max(0.0, (float) ($item['line_discount'] ?? 0));
+        $lineDiscount = (float) ($item['line_discount'] ?? 0);
         $pid = isset($item['product_id']) ? (int) $item['product_id'] : 0;
 
         require_fields($item, ['qty']);

@@ -936,42 +936,145 @@ a { text-decoration: none; color: inherit; }
     line-height: 1.45;
 }
 
-/* فاتورة شركة — كود الصنف + منتقي البحث */
+/* فاتورة شركة — كود/باركود، أعمدة ضيقة للأرقام، أيقونات */
 .mo-th-code {
+    width: 7.25rem;
+    min-width: 6.5rem;
+    max-width: 8rem;
+}
+.mo-th-name {
     min-width: 9rem;
+    width: 28%;
+}
+.mo-th-var {
+    min-width: 7rem;
+    width: 18%;
+}
+.mo-col-qty-h,
+.mo-col-qty {
+    width: 3.75rem;
+    min-width: 3.25rem;
+    max-width: 4.25rem;
+    text-align: center;
+}
+.mo-col-money-h,
+.mo-col-money {
+    width: 5.5rem;
+    min-width: 4.75rem;
+    max-width: 6rem;
+}
+.mo-col-net-h,
+.mo-col-net {
+    width: 5.75rem;
+    min-width: 5rem;
+    max-width: 6.5rem;
+}
+.mo-col-del-h,
+.mo-col-del {
+    width: 2.25rem;
+    min-width: 2rem;
+    max-width: 2.5rem;
+    text-align: center;
+    padding-inline: 4px !important;
 }
 .mo-cell-code {
-    min-width: 11rem;
+    min-width: 6.5rem;
+    max-width: 8.5rem;
     vertical-align: middle;
 }
 .mo-code-wrap {
     display: flex;
     align-items: stretch;
-    gap: 6px;
+    gap: 4px;
 }
 .mo-code-wrap .mo-code {
     flex: 1;
     min-width: 0;
     min-height: var(--input-min-h, 42px);
+    font-size: 13px;
+    padding-inline: 8px;
 }
 .mo-code-search {
     flex-shrink: 0;
-    padding: 0 10px !important;
-    min-width: 42px;
-    font-size: 1rem;
-    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    min-width: 28px;
+    max-width: 28px;
+    height: auto;
+    min-height: var(--input-min-h, 42px);
+    padding: 0 !important;
+    margin: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius, 6px);
+    background: #f8fafc;
+    color: #64748b;
+    cursor: pointer;
+    line-height: 0;
+}
+.mo-code-search:hover {
+    background: #e2e8f0;
+    color: var(--primary, #ea580c);
+}
+.mo-icon {
+    display: block;
+    flex-shrink: 0;
+}
+.mo-lines-table .mo-col-qty .admin-inp-qty,
+.mo-lines-table .mo-col-money .admin-inp-money {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    font-size: 13px;
+    padding: 6px 8px;
+    text-align: end;
 }
 .mo-lines-table .mo-name,
 .mo-lines-table .mo-var-label {
-    min-width: 8rem;
+    min-width: 0;
     background: #f8fafc;
     color: #334155;
+    font-size: 13px;
 }
 .mo-lines-table .mo-line-net {
     font-variant-numeric: tabular-nums;
     font-weight: 600;
     background: #fffbeb;
     color: #9a3412;
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: var(--radius, 6px);
+    padding: 6px 8px;
+    font-size: 13px;
+    text-align: end;
+}
+.mo-row-delete {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 36px;
+    padding: 4px;
+    border: none;
+    border-radius: var(--radius, 6px);
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    line-height: 0;
+}
+.mo-row-delete:hover {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+.mo-pick-num-h,
+.mo-pick-num {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    font-size: 12px;
 }
 .mo-pick-modal {
     position: fixed;
@@ -993,7 +1096,7 @@ a { text-decoration: none; color: inherit; }
 .mo-pick-modal__dialog {
     position: relative;
     z-index: 1;
-    width: min(920px, 100%);
+    width: min(1120px, 100%);
     max-height: min(88vh, 720px);
     display: flex;
     flex-direction: column;
@@ -1023,7 +1126,7 @@ a { text-decoration: none; color: inherit; }
 }
 .mo-pick-table {
     margin: 0;
-    font-size: 13px;
+    font-size: 12px;
 }
 .mo-pick-table tbody tr {
     cursor: pointer;
@@ -2821,6 +2924,9 @@ input.admin-inp-money[type='number']::-webkit-outer-spin-button,
 input.admin-inp-money[type='number']::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
+}
+input.admin-inp-money[type='text'] {
+    font-variant-numeric: tabular-nums;
 }
 .ob-opening-table input.admin-inp-money[type='number'] {
     -moz-appearance: textfield;

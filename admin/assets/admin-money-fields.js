@@ -98,6 +98,7 @@
     function cleanMoneyInput(el, options) {
         options = options || {};
         var allowZero = !!options.allowZero;
+        var allowNegative = !!options.allowNegative;
         var decimals = typeof options.decimals === 'number' ? options.decimals : DECIMALS;
         var raw = parseRaw(el);
         if (raw === '' || raw === '-' || raw === '.' || raw === '-.') {
@@ -105,7 +106,11 @@
             return null;
         }
         var n = parseFloat(raw);
-        if (isNaN(n) || n < 0) {
+        if (isNaN(n)) {
+            el.value = '';
+            return null;
+        }
+        if (!allowNegative && n < 0) {
             el.value = '';
             return null;
         }
@@ -212,8 +217,13 @@
         options = options || {};
         var decimals = typeof options.decimals === 'number' ? options.decimals : DECIMALS;
         var allowZero = el.hasAttribute('data-money-allow-zero') ? true : !!options.allowZero;
+        var allowNegative = el.hasAttribute('data-money-allow-negative') ? true : !!options.allowNegative;
         el.addEventListener('blur', function () {
-            cleanMoneyInput(el, { decimals: decimals, allowZero: allowZero });
+            cleanMoneyInput(el, {
+                decimals: decimals,
+                allowZero: allowZero,
+                allowNegative: allowNegative
+            });
         });
         el.setAttribute('data-orange-money-wired', 'single');
     }
