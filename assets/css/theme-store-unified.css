@@ -1,44 +1,182 @@
 /**
- * هوية موحّدة لجميع قنوات المتجر (نفس الشركة — فروق تشغيلية فقط).
- * ألوان أساسية من حزمة البراند: Primary #FF6A00 (راجع assets/branding/orange_advanced).
- * الواجهة تبقى فاتحة ومريحة للتسوق؛ ملف ui_style يذكر Dark UI كخيار مستقبلي.
+ * هوية موحّدة — واجهة داكنة (لوحة العلامة).
+ * Primary #FF6A00 · Hover #FF7A1A · Highlight #FF4D00
+ * خلفيات/نصوص/حدود حسب مواصفات المالك.
  */
 .theme-orange,
 .theme-blue,
 .theme-black {
+    /* Brand */
     --primary: #ff6a00;
-    --primary-dark: #e85a00;
+    --primary-hover: #ff7a1a;
+    --primary-dark: #ff4d00;
     --primary-soft: rgba(255, 106, 0, 0.18);
-    --accent: #ff8c33;
-    --bg: #fffaf6;
-    --bg-soft: #ffeee4;
-    --text: #1c1917;
-    --muted: #6b645c;
-    --card: #ffffff;
-    --border: #ffd4b8;
-    --header-bg: rgba(255, 250, 246, 0.92);
-    --hero-shadow: 0 32px 64px -20px rgba(232, 90, 0, 0.35), 0 12px 24px -12px rgba(255, 106, 0, 0.2);
-    --card-shadow: 0 2px 8px -2px rgba(28, 25, 23, 0.06), 0 16px 32px -14px rgba(255, 106, 0, 0.12);
-    --card-shadow-hover: 0 20px 48px -16px rgba(255, 106, 0, 0.26), 0 8px 16px -8px rgba(232, 90, 0, 0.14);
+    --primary-glow-strong: rgba(255, 106, 0, 0.28);
+    --accent: #ff7a1a;
+
+    /* Backgrounds */
+    --bg: #050505;
+    --bg-soft: #0b0b0b;
+    --bg-section: #121212;
+    --card: #181818;
+    --surface-elevated: #202020;
+
+    /* Text */
+    --text: #ffffff;
+    --text-near: #eaeaea;
+    --muted: #b8b8b8;
+    --faint: #7a7a7a;
+
+    /* Borders */
+    --border: #2a2a2a;
+    --border-hover: #343434;
+    --line-subtle: rgba(255, 255, 255, 0.06);
+
+    /* Chrome */
+    --header-bg: rgba(5, 5, 5, 0.94);
+
+    --hero-shadow:
+        0 32px 64px -16px rgba(0, 0, 0, 0.65),
+        0 0 48px rgba(255, 106, 0, 0.12);
+    --card-shadow:
+        0 4px 12px rgba(0, 0, 0, 0.45),
+        0 1px 0 var(--line-subtle);
+    --card-shadow-hover:
+        0 16px 40px rgba(0, 0, 0, 0.55),
+        0 0 32px rgba(255, 106, 0, 0.1);
 }
 
+/* نصوص عامة: أساسي أبيض، فقرات أوضح قليلاً */
+body.storefront {
+    color: var(--text-near);
+}
+
+body.storefront h1,
+body.storefront h2,
+body.storefront h3,
+body.storefront .brand-text h1 {
+    color: var(--text);
+}
+
+body.storefront .product-body h3 {
+    color: var(--text);
+}
+
+/* هيرو: تدرج داكن مع توهج برتقالي */
 .theme-orange .hero-banner,
 .theme-blue .hero-banner,
 .theme-black .hero-banner {
     background: linear-gradient(
         128deg,
-        #c2410c 0%,
-        #ea580c 22%,
-        #ff6a00 48%,
-        #ff8533 72%,
-        #ffc999 100%
+        #121212 0%,
+        #1a0f08 28%,
+        #5c2800 55%,
+        #ff4d00 78%,
+        #ff6a00 92%,
+        #ff7a1a 100%
     );
+    color: #ffffff;
+    border: 1px solid rgba(255, 106, 0, 0.22);
+    box-shadow: var(--hero-shadow);
 }
 
 .theme-orange .hero-banner::after,
 .theme-blue .hero-banner::after,
 .theme-black .hero-banner::after {
-    background: radial-gradient(ellipse 95% 75% at 92% 8%, rgba(255, 255, 255, 0.28), transparent 52%),
-        radial-gradient(ellipse 70% 55% at 8% 92%, rgba(255, 243, 224, 0.45), transparent 48%),
-        radial-gradient(ellipse 50% 40% at 50% 50%, rgba(255, 255, 255, 0.06), transparent 70%);
+    background:
+        radial-gradient(ellipse 90% 70% at 85% 15%, rgba(255, 106, 0, 0.22), transparent 55%),
+        radial-gradient(ellipse 55% 45% at 12% 88%, rgba(255, 77, 0, 0.14), transparent 50%),
+        radial-gradient(ellipse 40% 35% at 50% 50%, rgba(255, 255, 255, 0.04), transparent 65%);
+}
+
+.theme-orange .hero-banner h2,
+.theme-blue .hero-banner h2,
+.theme-black .hero-banner h2,
+.theme-orange .hero-banner p,
+.theme-blue .hero-banner p,
+.theme-black .hero-banner p,
+.theme-orange .hero-banner--rotator .hero-rotator-text,
+.theme-blue .hero-banner--rotator .hero-rotator-text,
+.theme-black .hero-banner--rotator .hero-rotator-text {
+    color: #ffffff;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+/* صور المنتجات على خلفية قسم */
+body.storefront.theme-orange .product-image-wrap,
+body.storefront.theme-blue .product-image-wrap,
+body.storefront.theme-black .product-image-wrap {
+    background: var(--bg-section);
+}
+
+/* أزرار أساسية: hover بلون العلامة */
+body.storefront.theme-orange .btn:hover:not([disabled]),
+body.storefront.theme-blue .btn:hover:not([disabled]),
+body.storefront.theme-black .btn:hover:not([disabled]) {
+    background: linear-gradient(135deg, var(--primary-hover), var(--primary));
+    filter: none;
+    box-shadow: 0 8px 28px -4px var(--primary-glow-strong);
+}
+
+body.storefront.theme-orange .btn-secondary:hover:not([disabled]),
+body.storefront.theme-blue .btn-secondary:hover:not([disabled]),
+body.storefront.theme-black .btn-secondary:hover:not([disabled]) {
+    border-color: var(--border-hover);
+    background: var(--surface-elevated);
+}
+
+/* رقاقات الاختيار (لون/مقاس) */
+body.storefront.theme-orange .chip,
+body.storefront.theme-blue .chip,
+body.storefront.theme-black .chip {
+    color: var(--text-near);
+}
+
+/* حبوب حالة الطلب — نسخ داكنة */
+body.storefront .order-status-pill--pending {
+    background: rgba(251, 191, 36, 0.14);
+    color: #fcd34d;
+    border: 1px solid rgba(251, 191, 36, 0.28);
+}
+
+body.storefront .order-status-pill--approved {
+    background: rgba(96, 165, 250, 0.14);
+    color: #93c5fd;
+    border: 1px solid rgba(96, 165, 250, 0.28);
+}
+
+body.storefront .order-status-pill--on_the_way {
+    background: rgba(129, 140, 248, 0.14);
+    color: #a5b4fc;
+    border: 1px solid rgba(129, 140, 248, 0.28);
+}
+
+body.storefront .order-status-pill--completed {
+    background: rgba(52, 211, 153, 0.14);
+    color: #6ee7b7;
+    border: 1px solid rgba(52, 211, 153, 0.28);
+}
+
+body.storefront .order-status-pill--cancelled {
+    background: var(--bg-soft);
+    color: var(--muted);
+    border: 1px solid var(--border);
+}
+
+body.storefront .order-status-pill--rejected {
+    background: rgba(248, 113, 113, 0.12);
+    color: #fca5a5;
+    border: 1px solid rgba(248, 113, 113, 0.28);
+}
+
+/* تنبيه نفاد / خطأ ناعم */
+body.storefront .stock-out {
+    background: rgba(248, 113, 113, 0.1);
+    color: #fecaca;
+    border: 1px solid rgba(248, 113, 113, 0.28);
+}
+
+/* زر شبح السلة */
+body.storefront .btn-ghost:hover:not([disabled]) {
+    color: var(--primary-hover);
 }

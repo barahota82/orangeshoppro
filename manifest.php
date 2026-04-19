@@ -45,7 +45,7 @@ $manifest = [
     'scope' => $scope,
     'display' => 'standalone',
     'orientation' => 'portrait-primary',
-    'background_color' => '#ffffff',
+    'background_color' => '#050505',
     'theme_color' => $themeColor,
     'icons' => [
         [
