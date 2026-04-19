@@ -2098,23 +2098,26 @@ body.storefront .product-gallery__img {
     font-family: var(--font-display);
     line-height: 1.15;
     text-align: center;
-    border: 0;
-    border-inline-end: 1px solid var(--border);
+    /* حد 1px ثابت على كل الجهات ثم لون الفاصل فقط — يمنع قفز المربع عند :active على الموبايل */
+    border: 1px solid transparent;
+    border-inline-end-color: var(--border);
     background: transparent;
     box-shadow: none;
     transition:
         background 0.2s ease,
         color 0.2s ease,
-        border 0.2s ease,
+        border-color 0.2s ease,
         box-shadow 0.2s ease,
         border-radius 0.2s ease;
     box-sizing: border-box;
+    cursor: pointer;
     -webkit-tap-highlight-color: transparent;
 }
 
 .app-dock-btn--whatsapp {
     color: #128c7e;
-    border-inline-end: none;
+    border: 1px solid transparent;
+    border-inline-end-color: transparent;
 }
 
 .app-dock-btn--whatsapp:hover {
@@ -2137,6 +2140,7 @@ body.storefront .product-gallery__img {
     flex-shrink: 0;
     background: none;
     opacity: 1;
+    color: inherit;
 }
 
 .app-dock-btn__icon svg {
@@ -2159,6 +2163,7 @@ body.storefront .product-gallery__img {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
+    color: inherit;
 }
 
 .icon-btn--whatsapp {
@@ -2250,12 +2255,11 @@ body.storefront .product-gallery__img {
     }
 
     /*
-     * شريط سفلي (عربة / تتبع / تسجيل): نفس منطق زر اللغة — حد + هالة فقط، بدون خلفية بطاقة فوق الشريط.
-     * :hover يُقيَّد بأجهزة بها مؤشر لتفادي «لزق» اللون على اللمس.
+     * شريط سفلي (عربة / تتبع / تسجيل): حد برتقالي + هالة؛ لون النص والأيقونة (SVG currentColor) صراحةً لأن بعض الموبايل لا يورّث للأبناء.
      */
     body.storefront .app-bottom-dock .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):active,
     body.storefront .app-bottom-dock .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):focus-visible {
-        border: 1px solid var(--primary);
+        border-color: var(--primary);
         border-radius: var(--radius-sm);
         color: var(--primary);
         box-shadow: 0 0 0 3px var(--primary-soft);
@@ -2263,14 +2267,32 @@ body.storefront .product-gallery__img {
         outline: none;
     }
 
+    body.storefront .app-bottom-dock .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):active .app-dock-btn__label,
+    body.storefront .app-bottom-dock .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):focus-visible .app-dock-btn__label,
+    body.storefront .app-bottom-dock .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):active .app-dock-btn__icon,
+    body.storefront .app-bottom-dock .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):focus-visible .app-dock-btn__icon {
+        color: var(--primary);
+    }
+
+    body.storefront .app-bottom-dock .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):active .app-dock-btn__icon svg,
+    body.storefront .app-bottom-dock .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):focus-visible .app-dock-btn__icon svg {
+        color: var(--primary);
+    }
+
     @media (hover: hover) {
         body.storefront .app-bottom-dock .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):hover {
-            border: 1px solid var(--primary);
+            border-color: var(--primary);
             border-radius: var(--radius-sm);
             color: var(--primary);
             box-shadow: 0 0 0 3px var(--primary-soft);
             background: transparent;
             outline: none;
+        }
+
+        body.storefront .app-bottom-dock .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):hover .app-dock-btn__label,
+        body.storefront .app-bottom-dock .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):hover .app-dock-btn__icon,
+        body.storefront .app-bottom-dock .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):hover .app-dock-btn__icon svg {
+            color: var(--primary);
         }
     }
 
