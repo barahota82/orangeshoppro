@@ -22,11 +22,8 @@ if ($theme === '' || !is_file(__DIR__ . '/../assets/css/theme-' . $theme . '.css
     $theme = 'orange';
 }
 
-$sfThemeColor = match ($theme) {
-    'blue' => '#2563eb',
-    'black' => '#c9a227',
-    default => '#ea580c',
-};
+/* لون شريط المتصفح/PWA — موحّد مع حزمة البراند (#FF6A00) لكل القنوات */
+$sfThemeColor = '#ff6a00';
 
 $orangeAccountChannelForJs = '';
 try {

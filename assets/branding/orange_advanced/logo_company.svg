@@ -1,0 +1,6 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 250">
+<rect width="600" height="250" fill="black"/>
+<text x="50%" y="55%" font-size="70" fill="#FF6A00" text-anchor="middle" font-family="Arial">ORANGE</text>
+<text x="50%" y="85%" font-size="30" fill="#FF6A00" text-anchor="middle" font-family="Arial" letter-spacing="8">COMPANY</text>
+</svg>

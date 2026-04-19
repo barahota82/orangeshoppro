@@ -1,0 +1,44 @@
+/**
+ * هوية موحّدة لجميع قنوات المتجر (نفس الشركة — فروق تشغيلية فقط).
+ * ألوان أساسية من حزمة البراند: Primary #FF6A00 (راجع assets/branding/orange_advanced).
+ * الواجهة تبقى فاتحة ومريحة للتسوق؛ ملف ui_style يذكر Dark UI كخيار مستقبلي.
+ */
+.theme-orange,
+.theme-blue,
+.theme-black {
+    --primary: #ff6a00;
+    --primary-dark: #e85a00;
+    --primary-soft: rgba(255, 106, 0, 0.18);
+    --accent: #ff8c33;
+    --bg: #fffaf6;
+    --bg-soft: #ffeee4;
+    --text: #1c1917;
+    --muted: #6b645c;
+    --card: #ffffff;
+    --border: #ffd4b8;
+    --header-bg: rgba(255, 250, 246, 0.92);
+    --hero-shadow: 0 32px 64px -20px rgba(232, 90, 0, 0.35), 0 12px 24px -12px rgba(255, 106, 0, 0.2);
+    --card-shadow: 0 2px 8px -2px rgba(28, 25, 23, 0.06), 0 16px 32px -14px rgba(255, 106, 0, 0.12);
+    --card-shadow-hover: 0 20px 48px -16px rgba(255, 106, 0, 0.26), 0 8px 16px -8px rgba(232, 90, 0, 0.14);
+}
+
+.theme-orange .hero-banner,
+.theme-blue .hero-banner,
+.theme-black .hero-banner {
+    background: linear-gradient(
+        128deg,
+        #c2410c 0%,
+        #ea580c 22%,
+        #ff6a00 48%,
+        #ff8533 72%,
+        #ffc999 100%
+    );
+}
+
+.theme-orange .hero-banner::after,
+.theme-blue .hero-banner::after,
+.theme-black .hero-banner::after {
+    background: radial-gradient(ellipse 95% 75% at 92% 8%, rgba(255, 255, 255, 0.28), transparent 52%),
+        radial-gradient(ellipse 70% 55% at 8% 92%, rgba(255, 243, 224, 0.45), transparent 48%),
+        radial-gradient(ellipse 50% 40% at 50% 50%, rgba(255, 255, 255, 0.06), transparent 70%);
+}

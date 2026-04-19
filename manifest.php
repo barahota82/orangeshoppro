@@ -32,11 +32,7 @@ $logoFile = preg_replace('/[^a-z0-9._\-]/i', '', (string) ($ch['logo'] ?? 'logo-
 $startUrl = storefront_url('home', $slug, $lang);
 $scope = PUBLIC_BASE_PATH === '' ? '/' : rtrim(PUBLIC_BASE_PATH, '/') . '/';
 
-$themeColor = match ($slug) {
-    'blue' => '#2563eb',
-    'black' => '#c9a227',
-    default => '#ea580c',
-};
+$themeColor = '#ff6a00';
 
 $pub = PUBLIC_BASE_PATH === '' ? '' : PUBLIC_BASE_PATH;
 $iconSrc = $pub . '/assets/images/' . $logoFile;

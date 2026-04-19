@@ -1,36 +1,4 @@
 /**
- * Black channel — شامبانيا فاخرة، رمادي دافئ، ذهب نحاسي متوهج.
+ * قناة black — نفس الهوية البصرية لكل القنوات (انظر theme-store-unified.css).
  */
-.theme-black {
-    --primary: #c9a227;
-    --primary-dark: #9a7b2c;
-    --primary-soft: rgba(201, 162, 39, 0.22);
-    --accent: #e8d48a;
-    --bg: #f7f5f1;
-    --bg-soft: #ebe6de;
-    --text: #1c1917;
-    --muted: #65605a;
-    --card: #ffffff;
-    --border: #e5dccf;
-    --header-bg: rgba(247, 245, 241, 0.92);
-    --hero-shadow: 0 32px 64px -20px rgba(74, 58, 32, 0.35), 0 12px 24px -12px rgba(201, 162, 39, 0.2);
-    --card-shadow: 0 2px 8px -2px rgba(28, 25, 23, 0.06), 0 16px 32px -14px rgba(154, 123, 44, 0.1);
-    --card-shadow-hover: 0 20px 48px -16px rgba(201, 162, 39, 0.26), 0 8px 16px -8px rgba(74, 58, 32, 0.1);
-}
-
-.theme-black .hero-banner {
-    background: linear-gradient(
-        128deg,
-        #4a3d28 0%,
-        #6b5230 20%,
-        #8f6f2d 42%,
-        #b8922a 66%,
-        #d4b04a 100%
-    );
-}
-
-.theme-black .hero-banner::after {
-    background: radial-gradient(ellipse 95% 75% at 92% 8%, rgba(255, 255, 255, 0.24), transparent 52%),
-        radial-gradient(ellipse 70% 52% at 8% 90%, rgba(232, 212, 138, 0.38), transparent 48%),
-        radial-gradient(ellipse 48% 38% at 48% 48%, rgba(255, 255, 255, 0.07), transparent 68%);
-}
+@import url("theme-store-unified.css");
