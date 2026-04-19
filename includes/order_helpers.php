@@ -24,6 +24,35 @@ function clean_whatsapp_number(string $raw): string
 }
 
 /**
+ * مطابقة رقم هاتف العميل مع المخزّن في الطلب (مسافات، شرطات، اختلاف بسيط في البادئة).
+ */
+function orange_order_phones_match_for_lookup(string $input, string $stored): bool
+{
+    $input = trim($input);
+    $stored = trim($stored);
+    if ($input === '' || $stored === '') {
+        return false;
+    }
+    if (strcasecmp($input, $stored) === 0) {
+        return true;
+    }
+    $di = preg_replace('/\D+/', '', $input);
+    $ds = preg_replace('/\D+/', '', $stored);
+    if ($di === '' || $ds === '') {
+        return false;
+    }
+    if ($di === $ds) {
+        return true;
+    }
+    $minLen = 8;
+    if (strlen($di) >= $minLen && strlen($ds) >= $minLen && substr($di, -$minLen) === substr($ds, -$minLen)) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
  * Sales payment mode for orders: cash (نقدي), credit (آجل), or online (أونلاين).
  */
 function orange_normalize_payment_terms(mixed $raw): string

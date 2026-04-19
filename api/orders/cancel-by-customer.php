@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/order_helpers.php';
 require_once __DIR__ . '/../../includes/order_stock.php';
 
 try {
@@ -18,11 +19,11 @@ try {
         json_response(['success' => false, 'code' => 'invalid_input'], 422);
     }
 
-    $stmt = $pdo->prepare('SELECT * FROM orders WHERE order_number = ? AND phone = ? LIMIT 1');
-    $stmt->execute([$orderNumber, $phone]);
+    $stmt = $pdo->prepare('SELECT * FROM orders WHERE order_number = ? LIMIT 1');
+    $stmt->execute([$orderNumber]);
     $order = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$order) {
+    if (!$order || !orange_order_phones_match_for_lookup($phone, (string) ($order['phone'] ?? ''))) {
         json_response(['success' => false, 'code' => 'not_found'], 404);
     }
 

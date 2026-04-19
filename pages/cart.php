@@ -173,137 +173,22 @@ window.ORANGE_CART_HOME = <?php echo json_encode(storefront_url('home', $channel
 window.ORANGE_STOREFRONT_WA = <?php echo json_encode($waHref, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_ORDER_STATUS_LABELS = <?php echo json_encode($orangeOrderStatusLabels, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_MY_ORDER_UI = <?php echo json_encode($orangeMyOrderUi, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
-
-function orangeBuildCustomerWaUrl(prefillText) {
-    var base = window.ORANGE_STOREFRONT_WA;
-    if (!base || typeof base !== 'string') {
-        return null;
-    }
-    var q = base.indexOf('?');
-    var path = q >= 0 ? base.substring(0, q) : base;
-    return path + '?text=' + encodeURIComponent(prefillText);
-}
-
-function cartRenderTrackedOrder(resultBox, order, orderNumber, phone) {
-    var UI = window.ORANGE_MY_ORDER_UI || {};
-    var labels = window.ORANGE_ORDER_STATUS_LABELS || {};
-    var st = String(order.status || '').toLowerCase().trim();
-    var statusText = labels[st] || order.status || '—';
-    var lblOrder = <?php echo json_encode(t('order_number'), JSON_UNESCAPED_UNICODE); ?>;
-    var lblPhone = <?php echo json_encode(t('phone'), JSON_UNESCAPED_UNICODE); ?>;
-
-    var canCancel = st === 'pending' || st === 'approved';
-    var prefill = String(UI.whatsapp_prefill || '').replace(/\{order\}/g, String(order.order_number || orderNumber));
-    var waUrl = orangeBuildCustomerWaUrl(prefill);
-
-    window.__orangeCartTrack = { orderNumber: orderNumber, phone: phone };
-
-    var html = '<div class="track-box track-box--order">';
-    html += '<p class="order-status-row"><strong>' + escCartHtmlMy(UI.status_label || '') + ':</strong> ';
-    html += '<span class="order-status-pill order-status-pill--' + escCartHtmlMy(st) + '">' + escCartHtmlMy(statusText) + '</span></p>';
-    html += '<p><strong>' + escCartHtmlMy(lblOrder) + ':</strong> ' + escCartHtmlMy(String(order.order_number || '')) + '</p>';
-    if (order.phone) {
-        html += '<p><strong>' + escCartHtmlMy(lblPhone) + ':</strong> ' + escCartHtmlMy(String(order.phone)) + '</p>';
-    }
-    html += '<p><strong>' + escCartHtmlMy(UI.order_total_label || '') + ':</strong> ' + escCartHtmlMy(String(order.total)) + ' ' + escCartHtmlMy(UI.currency || 'KD') + '</p>';
-    var pt = String(order.payment_terms || 'cash').toLowerCase();
-    var ptLabel = pt === 'credit' ? (UI.payment_credit || '') : (pt === 'online' ? (UI.payment_online || '') : (UI.payment_cash || ''));
-    if (UI.payment_label && ptLabel) {
-        html += '<p><strong>' + escCartHtmlMy(UI.payment_label) + ':</strong> ' + escCartHtmlMy(ptLabel) + '</p>';
-    }
-    html += '<div class="customer-order-actions">';
-
-    html += '<button type="button" class="btn btn-danger customer-order-cancel"';
-    if (!canCancel) {
-        html += ' disabled title="' + escAttrMy(UI.cancel_not_allowed || '') + '"';
-    }
-    html += ' onclick="cartCustomerCancelOrder()">' + escCartHtmlMy(UI.cancel || '') + '</button>';
-
-    if (waUrl) {
-        html += '<a class="btn btn-secondary customer-order-wa" href="' + escAttrMy(waUrl) + '" target="_blank" rel="noopener noreferrer">';
-        html += escCartHtmlMy(UI.whatsapp_help || 'WhatsApp') + '</a>';
-    }
-
-    html += '</div>';
-    if (!canCancel && st !== 'cancelled' && st !== 'rejected') {
-        html += '<p class="cart-cancel-hint">' + escCartHtmlMy(UI.cancel_not_allowed || '') + '</p>';
-    }
-    html += '</div>';
-    resultBox.innerHTML = html;
-}
-
-function escCartHtmlMy(s) {
-    return String(s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/"/g, '&quot;');
-}
-
-function escAttrMy(s) {
-    return escCartHtmlMy(s).replace(/'/g, '&#39;');
-}
+window.ORANGE_TRACK_LABELS = {
+    order_number: <?php echo json_encode(t('order_number'), JSON_UNESCAPED_UNICODE); ?>,
+    phone: <?php echo json_encode(t('phone'), JSON_UNESCAPED_UNICODE); ?>
+};
 
 async function cartTrackOrderNow() {
-    var orderNumber = document.getElementById('cart_track_order_number').value.trim();
-    var phone = document.getElementById('cart_track_phone').value.trim();
-    var resultBox = document.getElementById('cartTrackResult');
     var msgMissing = <?php echo json_encode(t('track_missing_fields'), JSON_UNESCAPED_UNICODE); ?>;
-
-    if (!orderNumber || !phone) {
-        resultBox.innerHTML = '<div class="stock-out">' + msgMissing + '</div>';
-        window.__orangeCartTrack = null;
-        return;
-    }
-
-    var url = (typeof storefrontApiUrl === 'function')
-        ? storefrontApiUrl('/api/orders/get-order.php?order_number=' + encodeURIComponent(orderNumber) + '&phone=' + encodeURIComponent(phone))
-        : '/api/orders/get-order.php?order_number=' + encodeURIComponent(orderNumber) + '&phone=' + encodeURIComponent(phone);
-
-    var response = await fetch(url);
-    var result = await response.json();
-
-    if (!result.success) {
-        resultBox.innerHTML = '<div class="stock-out">' + (result.message || '—') + '</div>';
-        window.__orangeCartTrack = null;
-        return;
-    }
-
-    cartRenderTrackedOrder(resultBox, result.order, orderNumber, phone);
+    var msgNotFound = <?php echo json_encode(t('track_order_not_found'), JSON_UNESCAPED_UNICODE); ?>;
+    await orangeTrackOrderFetchAndRender(
+        document.getElementById('cartTrackResult'),
+        document.getElementById('cart_track_order_number').value.trim(),
+        document.getElementById('cart_track_phone').value.trim(),
+        msgMissing,
+        msgNotFound
+    );
 }
-
-async function cartCustomerCancelOrder() {
-    var ctx = window.__orangeCartTrack;
-    var UI = window.ORANGE_MY_ORDER_UI || {};
-    if (!ctx || !ctx.orderNumber || !ctx.phone) {
-        return;
-    }
-    if (!confirm(UI.cancel_confirm || '')) {
-        return;
-    }
-    var api = (typeof storefrontApiUrl === 'function')
-        ? storefrontApiUrl('/api/orders/cancel-by-customer.php')
-        : '/api/orders/cancel-by-customer.php';
-    try {
-        var res = await fetch(api, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ order_number: ctx.orderNumber, phone: ctx.phone }),
-        });
-        var data = await res.json();
-        if (data.success) {
-            alert(UI.cancel_ok || '');
-            await cartTrackOrderNow();
-            return;
-        }
-        var code = data.code || '';
-        if (code === 'cancel_not_allowed') {
-            alert(UI.cancel_not_allowed || UI.cancel_err || '');
-        } else {
-            alert(UI.cancel_err || '');
-        }
-    } catch (e) {
-        alert(UI.cancel_err || '');
-    }
-}
+window.__orangeCartTrackRefresh = cartTrackOrderNow;
 </script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
