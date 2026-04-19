@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/admin_permissions.php';
+require_once __DIR__ . '/../../includes/catalog_schema.php';
 
 /** @var array<string, mixed> $admin — من admin/index.php */
 $pdo = db();
@@ -15,6 +16,24 @@ $ordersToday = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE DATE(created_
 $salesToday = (float)$pdo->query("SELECT COALESCE(SUM(total),0) FROM orders WHERE DATE(created_at) = CURDATE()")->fetchColumn();
 $pendingOrders = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'pending'")->fetchColumn();
 $productsCount = (int)$pdo->query("SELECT COUNT(*) FROM products")->fetchColumn();
+
+$intakePending = 0;
+$intakeFailed = 0;
+$intakeQueueVisible = orange_admin_may($admin, $pdo, 'sales', 'view')
+    && orange_table_exists($pdo, 'order_intake_queue');
+if ($intakeQueueVisible) {
+    try {
+        $intakePending = (int) $pdo->query(
+            "SELECT COUNT(*) FROM order_intake_queue WHERE status = 'pending'"
+        )->fetchColumn();
+        $intakeFailed = (int) $pdo->query(
+            "SELECT COUNT(*) FROM order_intake_queue WHERE status = 'failed'"
+        )->fetchColumn();
+    } catch (Throwable $e) {
+        $intakePending = 0;
+        $intakeFailed = 0;
+    }
+}
 ?>
 <div class="page-title page-title--stacked">
     <h1>الرئيسية</h1>
@@ -39,6 +58,23 @@ $productsCount = (int)$pdo->query("SELECT COUNT(*) FROM products")->fetchColumn(
         <div class="value"><?php echo $productsCount; ?></div>
     </div>
 </div>
+
+<?php if ($intakeQueueVisible): ?>
+<div class="card" style="margin-bottom:16px;">
+    <h3>طابور طلبات الموقع (واجهة الزوار)</h3>
+    <p class="card-hint" style="margin:0 0 10px;">
+        طلبات السلة تُسجَّل هنا قبل إنشاء سجل الطلب بالتسلسل.
+        معلّق: <strong><?php echo (int) $intakePending; ?></strong>
+        — فاشل: <strong><?php echo (int) $intakeFailed; ?></strong>
+    </p>
+    <p style="margin:0;">
+        <a class="btn btn-secondary" href="/admin/index.php?page=order_intake_queue">إدارة الطابور</a>
+        <?php if ($intakePending > 0 || $intakeFailed > 0): ?>
+            <span class="muted" style="margin-inline-start:8px;">راجع الفاشل أو شغّل «معالجة يدوية» عند الحاجة.</span>
+        <?php endif; ?>
+    </p>
+</div>
+<?php endif; ?>
 
 <?php if (orange_admin_is_superuser($admin)): ?>
 <div class="card">

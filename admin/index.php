@@ -41,7 +41,8 @@ $allowed = [
     'channels',
     'company_documents',
     'channel_analytics',
-    'invoice'
+    'invoice',
+    'order_intake_queue'
 ];
 if (!in_array($page, $allowed, true)) {
     $page = 'dashboard';

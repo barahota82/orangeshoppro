@@ -696,17 +696,23 @@ function orange_catalog_ensure_schema(PDO $pdo): void
             $pdo,
             'CREATE TABLE customers (
                 id INT AUTO_INCREMENT PRIMARY KEY,
+                code VARCHAR(32) NULL,
                 name_ar VARCHAR(160) NOT NULL DEFAULT \'\',
                 phone VARCHAR(40) NOT NULL DEFAULT \'\',
                 notes VARCHAR(255) NULL,
                 credit_limit DECIMAL(18,4) NULL DEFAULT NULL,
                 created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE KEY uq_customers_phone (phone)
+                UNIQUE KEY uq_customers_phone (phone),
+                UNIQUE KEY uq_customers_code (code)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
     }
     if (orange_table_exists($pdo, 'customers') && !orange_table_has_column($pdo, 'customers', 'credit_limit')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE customers ADD COLUMN credit_limit DECIMAL(18,4) NULL DEFAULT NULL');
+    }
+    if (orange_table_exists($pdo, 'customers') && !orange_table_has_column($pdo, 'customers', 'code')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE customers ADD COLUMN code VARCHAR(32) NULL');
+        orange_catalog_safe_exec($pdo, 'CREATE UNIQUE INDEX uq_customers_code ON customers (code)');
     }
 
     if (!orange_table_exists($pdo, 'suppliers')) {
@@ -714,11 +720,118 @@ function orange_catalog_ensure_schema(PDO $pdo): void
             $pdo,
             'CREATE TABLE suppliers (
                 id INT AUTO_INCREMENT PRIMARY KEY,
+                code VARCHAR(32) NULL,
                 name VARCHAR(160) NOT NULL DEFAULT \'\',
                 phone VARCHAR(40) NULL,
                 notes VARCHAR(255) NULL,
                 created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE KEY uq_suppliers_phone (phone)
+                UNIQUE KEY uq_suppliers_phone (phone),
+                UNIQUE KEY uq_suppliers_code (code)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'code')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE suppliers ADD COLUMN code VARCHAR(32) NULL');
+        orange_catalog_safe_exec($pdo, 'CREATE UNIQUE INDEX uq_suppliers_code ON suppliers (code)');
+    }
+
+    /*
+     |--------------------------------------------------------------------------
+     | مردود المشتريات + مردود المبيعات (ربط بالمورد/العميل ومستندات الشراء/البيع)
+     |--------------------------------------------------------------------------
+     */
+    if (!orange_table_exists($pdo, 'purchase_returns')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE purchase_returns (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                return_number VARCHAR(32) NOT NULL,
+                purchase_id INT NULL,
+                supplier_id INT NULL,
+                type VARCHAR(16) NOT NULL DEFAULT \'credit\',
+                total DECIMAL(18,4) NOT NULL DEFAULT 0,
+                notes VARCHAR(512) NULL,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_purchase_returns_number (return_number),
+                KEY idx_purchase_returns_supplier (supplier_id),
+                KEY idx_purchase_returns_purchase (purchase_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+    if (!orange_table_exists($pdo, 'purchase_return_items')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE purchase_return_items (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                purchase_return_id INT NOT NULL,
+                product_id INT NOT NULL,
+                variant_id INT NULL,
+                qty INT NOT NULL,
+                cost DECIMAL(18,4) NOT NULL DEFAULT 0,
+                KEY idx_pri_return (purchase_return_id),
+                KEY idx_pri_product (product_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+    if (!orange_table_exists($pdo, 'sales_returns')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE sales_returns (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                return_number VARCHAR(32) NOT NULL,
+                order_id INT NULL,
+                customer_id INT NULL,
+                channel_id INT NULL,
+                type VARCHAR(16) NOT NULL DEFAULT \'credit\',
+                total DECIMAL(18,4) NOT NULL DEFAULT 0,
+                notes VARCHAR(512) NULL,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_sales_returns_number (return_number),
+                KEY idx_sales_returns_order (order_id),
+                KEY idx_sales_returns_customer (customer_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+    if (!orange_table_exists($pdo, 'sales_return_items')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE sales_return_items (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                sales_return_id INT NOT NULL,
+                product_id INT NOT NULL,
+                variant_id INT NULL,
+                qty INT NOT NULL,
+                price DECIMAL(18,4) NOT NULL DEFAULT 0,
+                line_discount DECIMAL(18,4) NOT NULL DEFAULT 0,
+                KEY idx_sri_return (sales_return_id),
+                KEY idx_sri_product (product_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
+    /*
+     |--------------------------------------------------------------------------
+     | طابور استلام طلبات الواجهة (FIFO) — تسلسل كتابة الطلبات وتسجيل العملاء
+     |--------------------------------------------------------------------------
+     */
+    if (!orange_table_exists($pdo, 'order_intake_queue')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE order_intake_queue (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                public_token CHAR(32) NOT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT \'pending\',
+                payload_json MEDIUMTEXT NOT NULL,
+                order_id INT NULL,
+                order_number VARCHAR(64) NULL,
+                whatsapp_number VARCHAR(40) NULL,
+                whatsapp_url TEXT NULL,
+                error_message VARCHAR(512) NULL,
+                attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_order_intake_token (public_token),
+                KEY idx_order_intake_status_id (status, id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
     }
@@ -952,6 +1065,42 @@ function orange_catalog_ensure_schema(PDO $pdo): void
                 KEY idx_orange_audit_created (created_at),
                 KEY idx_orange_audit_admin (admin_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
+    if (!orange_table_exists($pdo, 'storefront_accounts')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE storefront_accounts (
+                id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                email VARCHAR(255) NOT NULL,
+                registered_channel_slug VARCHAR(32) NULL DEFAULT NULL,
+                email_verified_at DATETIME NULL DEFAULT NULL,
+                verify_token_hash CHAR(64) NOT NULL DEFAULT \'\',
+                verify_token_expires_at DATETIME NULL DEFAULT NULL,
+                verify_email_sent_at DATETIME NULL DEFAULT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                UNIQUE KEY uq_storefront_accounts_email (email),
+                KEY idx_storefront_accounts_verified (email_verified_at),
+                KEY idx_storefront_accounts_channel (registered_channel_slug)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
+    if (orange_table_exists($pdo, 'storefront_accounts') && !orange_table_has_column($pdo, 'storefront_accounts', 'registered_channel_slug')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE storefront_accounts ADD COLUMN registered_channel_slug VARCHAR(32) NULL DEFAULT NULL'
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE INDEX idx_storefront_accounts_channel ON storefront_accounts (registered_channel_slug)'
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            "UPDATE storefront_accounts SET registered_channel_slug = 'orange' WHERE registered_channel_slug IS NULL AND email_verified_at IS NOT NULL"
         );
     }
 

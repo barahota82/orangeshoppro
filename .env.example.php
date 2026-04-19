@@ -25,4 +25,8 @@ return [
 
     // اختياري: إجبار روابط طويلة /pages/... إذا الـ rewrite لا يعمل
     // 'STOREFRONT_FORCE_LONG_URLS' => true,
+
+    // اختياري: بريد «من» لإرسال روابط تأكيد التسجيل (صفحة التسجيل بالإيميل). بدونها لن يُرسل البريد.
+    // 'MAIL_FROM' => 'noreply@your-domain.com',
+    // 'MAIL_FROM_NAME' => 'Orange',
 ];

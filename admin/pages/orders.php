@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../../includes/order_helpers.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/admin_permissions.php';
 
 $pdo = db();
 $hasOrderInvoiceCol = orange_table_has_column($pdo, 'orders', 'invoice_number');
@@ -101,7 +102,13 @@ function orange_admin_orders_action_buttons(array $o): void
 ?>
 <div class="page-title page-title--stacked">
     <h1>الطلبات</h1>
-    <p class="page-subtitle">المخزن <strong>موحّد للشركة</strong> — الطلب من أي قناة يخصم نفس المخزون لتفادي البيع رغم النفاد. عمود «قناة العملاء» لتتبّع المصدر وتجميع العملاء (تيك توك، واتساب، …) وليس لمخزون منفصل.</p>
+    <p class="page-subtitle">المخزن <strong>موحّد للشركة</strong> — الطلب من أي قناة يخصم نفس المخزون لتفادي البيع رغم النفاد. عمود «قناة العملاء» لتتبّع المصدر وتجميع العملاء (تيك توك، واتساب، …) وليس لمخزون منفصل.
+        <?php
+        if (orange_admin_may($admin, $pdo, 'sales', 'view') && orange_table_exists($pdo, 'order_intake_queue')) {
+            echo ' — <a href="/admin/index.php?page=order_intake_queue">طابور طلبات الموقع (قبل إنشاء الطلب)</a>';
+        }
+        ?>
+    </p>
 </div>
 
 <div class="card">

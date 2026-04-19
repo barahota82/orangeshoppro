@@ -515,6 +515,44 @@ function removeCartItem(index) {
     renderCart();
 }
 
+function orangeFinishCheckoutSuccess(result) {
+    localStorage.removeItem(getCartStorageKey());
+    try {
+        localStorage.removeItem('cart');
+    } catch (e) {}
+    window.open(result.whatsapp_url, '_blank');
+    const okMsg =
+        (window.APP_T.order_number || 'Order Number') + ': ' + String(result.order_number || '');
+    orangeShowToast(okMsg, 3400);
+    setTimeout(() => {
+        location.reload();
+    }, 3000);
+}
+
+async function orangePollIntakeUntilDone(token) {
+    const maxMs = 90000;
+    const start = Date.now();
+    while (Date.now() - start < maxMs) {
+        const r = await fetch(
+            storefrontApiUrl('/api/orders/intake-status.php?token=' + encodeURIComponent(token))
+        );
+        const j = await r.json();
+        if (j && j.status === 'completed' && j.whatsapp_url) {
+            return j;
+        }
+        if (j && j.status === 'failed') {
+            throw new Error(j.message || 'Checkout failed');
+        }
+        if (j && j.success === false && j.message && j.status !== 'pending') {
+            throw new Error(j.message);
+        }
+        await new Promise(function (res) {
+            setTimeout(res, 450);
+        });
+    }
+    throw new Error(window.APP_T.checkout_queue_timeout || 'Order queue timeout. Try again.');
+}
+
 async function sendOrderNow() {
     const items = getCart();
     if (!items.length) {
@@ -549,22 +587,23 @@ async function sendOrderNow() {
 
     const result = await response.json();
 
+    if (response.status === 503 && result && result.intake_token) {
+        orangeShowToast(window.APP_T.checkout_queue_wait || 'Processing order…', 2600);
+        try {
+            const done = await orangePollIntakeUntilDone(result.intake_token);
+            orangeFinishCheckoutSuccess(done);
+        } catch (e) {
+            orangeShowToast((e && e.message) || 'Checkout failed', 4200);
+        }
+        return;
+    }
+
     if (!result.success) {
         orangeShowToast(result.message || 'Failed to create order', 3600);
         return;
     }
 
-    localStorage.removeItem(getCartStorageKey());
-    try {
-        localStorage.removeItem('cart');
-    } catch (e) {}
-    window.open(result.whatsapp_url, '_blank');
-    const okMsg =
-        (window.APP_T.order_number || 'Order Number') + ': ' + String(result.order_number || '');
-    orangeShowToast(okMsg, 3400);
-    setTimeout(() => {
-        location.reload();
-    }, 3000);
+    orangeFinishCheckoutSuccess(result);
 }
 
 document.addEventListener('DOMContentLoaded', () => {

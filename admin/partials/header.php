@@ -173,6 +173,7 @@ try {
                 ['page' => 'products', 'href' => '/admin/index.php?page=products', 'label' => 'المنتجات', 'class' => '', 'sub' => false],
                 ['page' => 'offers', 'href' => '/admin/index.php?page=offers', 'label' => 'العروض', 'class' => '', 'sub' => false],
                 ['page' => 'orders', 'href' => '/admin/index.php?page=orders', 'label' => 'الطلبات', 'class' => '', 'sub' => false],
+                ['page' => 'order_intake_queue', 'href' => '/admin/index.php?page=order_intake_queue', 'label' => 'طابور طلبات الموقع', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'invoice', 'href' => '/admin/index.php?page=invoice', 'label' => 'فاتورة مبيعات', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'manual_order', 'href' => '/admin/index.php?page=manual_order', 'label' => 'فاتورة شركة', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'customers', 'href' => '/admin/index.php?page=customers', 'label' => 'العملاء', 'class' => 'admin-nav-sub', 'sub' => true],

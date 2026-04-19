@@ -507,3 +507,35 @@ function orangeAdminOfferSuggestAfterWarnings(r) {
 
     document.addEventListener('keydown', onKeydown, true);
 })();
+
+/**
+ * إشعار سريع في لوحة الإدارة (بديل أنظف عن alert للعمليات البسيطة).
+ * @param {string} message
+ * @param {'ok'|'err'|'info'} [kind]
+ */
+function orangeAdminFlash(message, kind) {
+    kind = kind || 'info';
+    var ex = document.getElementById('orange-admin-flash');
+    if (ex) {
+        ex.remove();
+    }
+    var el = document.createElement('div');
+    el.id = 'orange-admin-flash';
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-live', 'polite');
+    el.className = 'orange-admin-flash orange-admin-flash--' + kind;
+    el.textContent = message || '';
+    document.body.appendChild(el);
+    requestAnimationFrame(function () {
+        el.classList.add('orange-admin-flash--show');
+    });
+    clearTimeout(window.__orangeAdminFlashT);
+    window.__orangeAdminFlashT = setTimeout(function () {
+        el.classList.remove('orange-admin-flash--show');
+        setTimeout(function () {
+            if (el.parentNode) {
+                el.parentNode.removeChild(el);
+            }
+        }, 280);
+    }, 4200);
+}

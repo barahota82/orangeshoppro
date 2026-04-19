@@ -6,6 +6,22 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_admin_api();
 
+/**
+ * @return string|null كود نظيف أو NULL
+ */
+function orange_customer_normalize_code(PDO $pdo, $raw): ?string
+{
+    if (!orange_table_has_column($pdo, 'customers', 'code')) {
+        return null;
+    }
+    $s = trim((string) $raw);
+    if ($s === '') {
+        return null;
+    }
+
+    return function_exists('mb_substr') ? mb_substr($s, 0, 32, 'UTF-8') : substr($s, 0, 32);
+}
+
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
@@ -25,6 +41,9 @@ try {
 
     $hasLimit = orange_table_has_column($pdo, 'customers', 'credit_limit');
     $hasNotes = orange_table_has_column($pdo, 'customers', 'notes');
+    $hasCode = orange_table_has_column($pdo, 'customers', 'code');
+    $codeSql = orange_customer_normalize_code($pdo, $data['code'] ?? '');
+
     $creditLimitSql = null;
     if ($hasLimit && array_key_exists('credit_limit', $data)) {
         $rawLim = $data['credit_limit'];
@@ -38,6 +57,22 @@ try {
     $notesRaw = trim((string) ($data['notes'] ?? ''));
     $notesSql = $notesRaw === '' ? null : (function_exists('mb_substr') ? mb_substr($notesRaw, 0, 255, 'UTF-8') : substr($notesRaw, 0, 255));
 
+    $assertCodeUnique = static function (int $excludeId) use ($pdo, $codeSql, $hasCode): void {
+        if (!$hasCode || $codeSql === null) {
+            return;
+        }
+        if ($excludeId > 0) {
+            $cd = $pdo->prepare('SELECT id FROM customers WHERE code = ? AND id != ? LIMIT 1');
+            $cd->execute([$codeSql, $excludeId]);
+        } else {
+            $cd = $pdo->prepare('SELECT id FROM customers WHERE code = ? LIMIT 1');
+            $cd->execute([$codeSql]);
+        }
+        if ($cd->fetchColumn()) {
+            json_response(['success' => false, 'message' => 'كود العميل مستخدم بالفعل'], 409);
+        }
+    };
+
     if ($idIn > 0) {
         $exRow = $pdo->prepare('SELECT id FROM customers WHERE id = ? LIMIT 1');
         $exRow->execute([$idIn]);
@@ -49,15 +84,24 @@ try {
         if ($dup->fetchColumn()) {
             json_response(['success' => false, 'message' => 'هاتف مسجّل لعميل آخر'], 409);
         }
-        if ($hasLimit && $hasNotes) {
-            $pdo->prepare('UPDATE customers SET name_ar = ?, phone = ?, credit_limit = ?, notes = ? WHERE id = ?')->execute([$name, $phone, $creditLimitSql, $notesSql, $idIn]);
-        } elseif ($hasLimit) {
-            $pdo->prepare('UPDATE customers SET name_ar = ?, phone = ?, credit_limit = ? WHERE id = ?')->execute([$name, $phone, $creditLimitSql, $idIn]);
-        } elseif ($hasNotes) {
-            $pdo->prepare('UPDATE customers SET name_ar = ?, phone = ?, notes = ? WHERE id = ?')->execute([$name, $phone, $notesSql, $idIn]);
-        } else {
-            $pdo->prepare('UPDATE customers SET name_ar = ?, phone = ? WHERE id = ?')->execute([$name, $phone, $idIn]);
+        $assertCodeUnique($idIn);
+
+        $fields = ['name_ar = ?', 'phone = ?'];
+        $params = [$name, $phone];
+        if ($hasLimit) {
+            $fields[] = 'credit_limit = ?';
+            $params[] = $creditLimitSql;
         }
+        if ($hasNotes) {
+            $fields[] = 'notes = ?';
+            $params[] = $notesSql;
+        }
+        if ($hasCode) {
+            $fields[] = 'code = ?';
+            $params[] = $codeSql;
+        }
+        $params[] = $idIn;
+        $pdo->prepare('UPDATE customers SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
         audit_log('customer_update', 'تحديث عميل #' . $idIn . ' — ' . $phone, 'customers', $idIn);
         json_response(['success' => true, 'message' => 'تم تحديث بيانات العميل', 'id' => $idIn]);
 
@@ -69,30 +113,50 @@ try {
     $ex = $st->fetchColumn();
     if ($ex) {
         $id = (int) $ex;
-        if ($hasLimit && $hasNotes) {
-            $pdo->prepare('UPDATE customers SET name_ar = ?, credit_limit = ?, notes = ? WHERE id = ?')->execute([$name, $creditLimitSql, $notesSql, $id]);
-        } elseif ($hasLimit && array_key_exists('credit_limit', $data)) {
-            $pdo->prepare('UPDATE customers SET name_ar = ?, credit_limit = ? WHERE id = ?')->execute([$name, $creditLimitSql, $id]);
-        } elseif ($hasNotes) {
-            $pdo->prepare('UPDATE customers SET name_ar = ?, notes = ? WHERE id = ?')->execute([$name, $notesSql, $id]);
-        } else {
-            $pdo->prepare('UPDATE customers SET name_ar = ? WHERE id = ?')->execute([$name, $id]);
+        $assertCodeUnique($id);
+        $fields = ['name_ar = ?'];
+        $params = [$name];
+        if ($hasLimit && array_key_exists('credit_limit', $data)) {
+            $fields[] = 'credit_limit = ?';
+            $params[] = $creditLimitSql;
         }
+        if ($hasNotes) {
+            $fields[] = 'notes = ?';
+            $params[] = $notesSql;
+        }
+        if ($hasCode) {
+            $fields[] = 'code = ?';
+            $params[] = $codeSql;
+        }
+        $params[] = $id;
+        $pdo->prepare('UPDATE customers SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
         audit_log('customer_update', 'تحديث عميل: ' . $phone, 'customers', $id);
         json_response(['success' => true, 'message' => 'تم تحديث بيانات العميل', 'id' => $id]);
 
         return;
     }
 
-    if ($hasLimit && $hasNotes) {
-        $pdo->prepare('INSERT INTO customers (name_ar, phone, credit_limit, notes) VALUES (?, ?, ?, ?)')->execute([$name, $phone, $creditLimitSql, $notesSql]);
-    } elseif ($hasLimit) {
-        $pdo->prepare('INSERT INTO customers (name_ar, phone, credit_limit) VALUES (?, ?, ?)')->execute([$name, $phone, $creditLimitSql]);
-    } elseif ($hasNotes) {
-        $pdo->prepare('INSERT INTO customers (name_ar, phone, notes) VALUES (?, ?, ?)')->execute([$name, $phone, $notesSql]);
-    } else {
-        $pdo->prepare('INSERT INTO customers (name_ar, phone) VALUES (?, ?)')->execute([$name, $phone]);
+    $assertCodeUnique(0);
+    $cols = ['name_ar', 'phone'];
+    $placeholders = ['?', '?'];
+    $params = [$name, $phone];
+    if ($hasLimit) {
+        $cols[] = 'credit_limit';
+        $placeholders[] = '?';
+        $params[] = $creditLimitSql;
     }
+    if ($hasNotes) {
+        $cols[] = 'notes';
+        $placeholders[] = '?';
+        $params[] = $notesSql;
+    }
+    if ($hasCode) {
+        $cols[] = 'code';
+        $placeholders[] = '?';
+        $params[] = $codeSql;
+    }
+    $sql = 'INSERT INTO customers (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $placeholders) . ')';
+    $pdo->prepare($sql)->execute($params);
     $newId = (int) $pdo->lastInsertId();
     audit_log('customer_create', 'عميل جديد: ' . $phone, 'customers', $newId);
     json_response(['success' => true, 'message' => 'تم إضافة العميل', 'id' => $newId]);

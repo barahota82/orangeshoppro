@@ -70,6 +70,7 @@ $orangeMyOrderUi = [
             <div class="card-box cart-checkout-card" id="cartCheckoutCard">
                 <h3 class="cart-section-title"><?php echo htmlspecialchars($checkoutTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
                 <p class="cart-checkout-intro"><?php echo htmlspecialchars($checkoutIntro, ENT_QUOTES, 'UTF-8'); ?></p>
+                <p class="cart-checkout-intro"><?php echo htmlspecialchars(t('storefront_guest_checkout_note'), ENT_QUOTES, 'UTF-8'); ?></p>
                 <div id="cartOrderMiniSummary" class="cart-mini-summary" hidden></div>
                 <div class="field">
                     <label><?php echo htmlspecialchars(t('customer_name'), ENT_QUOTES, 'UTF-8'); ?></label>

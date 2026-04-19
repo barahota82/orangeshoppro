@@ -22,12 +22,43 @@ if ($theme === '' || !is_file(__DIR__ . '/../assets/css/theme-' . $theme . '.css
     $theme = 'orange';
 }
 
+$sfThemeColor = match ($theme) {
+    'blue' => '#2563eb',
+    'black' => '#c9a227',
+    default => '#ea580c',
+};
+
+$orangeAccountChannelForJs = '';
+try {
+    require_once __DIR__ . '/storefront_account.php';
+    $pdoNavAcc = db();
+    $accNav = current_storefront_account($pdoNavAcc);
+    if ($accNav && ($accNav['registered_channel_slug'] ?? '') !== '') {
+        $orangeAccountChannelForJs = (string) $accNav['registered_channel_slug'];
+    }
+} catch (Throwable $e) {
+    $orangeAccountChannelForJs = '';
+}
+
+$orangePubBase = PUBLIC_BASE_PATH === '' ? '' : PUBLIC_BASE_PATH;
+$orangeChannelLogoFile = preg_replace(
+    '/[^a-z0-9._\-]/i',
+    '',
+    (string) ($channel['logo'] ?? 'logo-orange.png')
+) ?: 'logo-orange.png';
+$orangeTouchIconHref = $orangePubBase . '/assets/images/' . $orangeChannelLogoFile;
+$orangeManifestHref = $orangePubBase . '/manifest.php?' . http_build_query(['channel' => $channelSlug, 'lang' => $lang]);
+
 $dir = $lang === 'ar' ? 'rtl' : 'ltr';
 ?><!DOCTYPE html>
 <html lang="<?php echo htmlspecialchars($lang, ENT_QUOTES, 'UTF-8'); ?>" dir="<?php echo $dir === 'rtl' ? 'rtl' : 'ltr'; ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+    <meta name="theme-color" content="<?php echo htmlspecialchars($sfThemeColor, ENT_QUOTES, 'UTF-8'); ?>">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="<?php echo htmlspecialchars($orangeManifestHref, ENT_QUOTES, 'UTF-8'); ?>">
+    <link rel="apple-touch-icon" href="<?php echo htmlspecialchars($orangeTouchIconHref, ENT_QUOTES, 'UTF-8'); ?>">
     <script>
     (function orangeStorefrontApplySavedChannel() {
         try {
@@ -35,23 +66,64 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             if (params.get('channel')) {
                 return;
             }
-            var raw = localStorage.getItem('orange_storefront_channel') || '';
-            var savedCh = String(raw).replace(/[^a-z0-9\-]/gi, '').toLowerCase();
-            if (!savedCh || !{ orange: 1, blue: 1, black: 1 }[savedCh]) {
+            var allowed = { orange: 1, blue: 1, black: 1 };
+            var accountCh = <?php echo json_encode($orangeAccountChannelForJs, JSON_UNESCAPED_UNICODE); ?>;
+            var savedCh = '';
+            if (accountCh && allowed[String(accountCh).toLowerCase()]) {
+                savedCh = String(accountCh).replace(/[^a-z0-9\-]/gi, '').toLowerCase();
+            } else {
+                var raw = localStorage.getItem('orange_storefront_channel') || '';
+                savedCh = String(raw).replace(/[^a-z0-9\-]/gi, '').toLowerCase();
+            }
+            if (!savedCh || !allowed[savedCh]) {
                 return;
             }
-            var path = window.location.pathname || '';
-            if (path.indexOf('/pages/') === -1) {
+            var __sfBase = <?php echo json_encode(PUBLIC_BASE_PATH, JSON_UNESCAPED_UNICODE); ?> || '';
+            var rawPath = window.location.pathname || '';
+            var path = rawPath;
+            if (__sfBase && path.indexOf(__sfBase) === 0) {
+                path = path.slice(__sfBase.length) || '/';
+            }
+            if (!path || path.charAt(0) !== '/') {
+                path = '/' + (path || '');
+            }
+            var navLang = localStorage.getItem('orange_storefront_lang') || localStorage.getItem('site_lang') || 'en';
+            if (!/^(en|ar|fil|hi)$/.test(navLang)) {
+                navLang = 'en';
+            }
+            function orangeSegForChannel(ch) {
+                if (ch === 'black') { return 'web'; }
+                if (ch === 'blue') { return 'online'; }
+                return 'tiktok';
+            }
+            function orangeSuffixForLang(lang) {
+                if (lang === 'ar') { return '-ar'; }
+                if (lang === 'hi') { return '-hi'; }
+                if (lang === 'fil') { return '-ph'; }
+                return '';
+            }
+            function orangeParseShortStorePath(pathname) {
+                var m = String(pathname).match(/^\/(web|online|tiktok)(-ar|-hi|-ph)?(\/.*)?$/i);
+                if (!m) { return null; }
+                var seg = m[1].toLowerCase();
+                var ch = seg === 'web' ? 'black' : (seg === 'online' ? 'blue' : 'orange');
+                var suff = m[2] || '';
+                var tail = m[3] || '';
+                return { ch: ch, tail: tail };
+            }
+            if (path.indexOf('/pages/') !== -1) {
+                params.set('channel', savedCh);
+                params.set('lang', navLang);
+                var qs = params.toString();
+                window.location.replace(rawPath + (qs ? '?' + qs : ''));
                 return;
             }
-            var lang = localStorage.getItem('orange_storefront_lang') || localStorage.getItem('site_lang') || 'en';
-            if (!/^(en|ar|fil|hi)$/.test(lang)) {
-                lang = 'en';
+            var short = orangeParseShortStorePath(path);
+            if (short && short.ch !== savedCh) {
+                var np = __sfBase + '/' + orangeSegForChannel(savedCh) + orangeSuffixForLang(navLang) + (short.tail || '');
+                np = np.replace(/\/{2,}/g, '/');
+                window.location.replace(np + (window.location.search || ''));
             }
-            params.set('channel', savedCh);
-            params.set('lang', lang);
-            var qs = params.toString();
-            window.location.replace(path + (qs ? '?' + qs : ''));
         } catch (e) {}
     })();
     </script>
@@ -91,6 +163,7 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
         window.APP_TAGLINE_CYCLE = <?php echo json_encode($taglineCycle, JSON_UNESCAPED_UNICODE); ?>;
         window.APP_CHANNEL_ID = <?php echo (int)($channel['id'] ?? 0); ?>;
         window.APP_CHANNEL_SLUG = <?php echo json_encode($channelSlug, JSON_UNESCAPED_UNICODE); ?>;
+        window.ORANGE_ACCOUNT_CHANNEL = <?php echo json_encode($orangeAccountChannelForJs, JSON_UNESCAPED_UNICODE); ?>;
         window.STOREFRONT_BASE = <?php echo json_encode(PUBLIC_BASE_PATH, JSON_UNESCAPED_UNICODE); ?>;
         window.orangeSfCartKey = function () {
             var ch = (typeof window.APP_CHANNEL_SLUG === 'string' && window.APP_CHANNEL_SLUG) ? window.APP_CHANNEL_SLUG : 'orange';
@@ -105,8 +178,10 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
         };
         (function orangeStorefrontPersistPrefs() {
             try {
-                if (window.APP_CHANNEL_SLUG) {
-                    localStorage.setItem('orange_storefront_channel', String(window.APP_CHANNEL_SLUG));
+                var accCh = (typeof window.ORANGE_ACCOUNT_CHANNEL === 'string') ? window.ORANGE_ACCOUNT_CHANNEL : '';
+                var ch = (accCh && /^[a-z0-9\-]+$/i.test(accCh)) ? accCh : window.APP_CHANNEL_SLUG;
+                if (ch) {
+                    localStorage.setItem('orange_storefront_channel', String(ch).replace(/[^a-z0-9\-]/gi, '').toLowerCase());
                 }
                 if (window.APP_LANG) {
                     localStorage.setItem('orange_storefront_lang', String(window.APP_LANG));
@@ -122,6 +197,8 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             size: <?php echo json_encode(t('size'), JSON_UNESCAPED_UNICODE); ?>,
             quantity: <?php echo json_encode(t('quantity'), JSON_UNESCAPED_UNICODE); ?>,
             order_number: <?php echo json_encode(t('order_number'), JSON_UNESCAPED_UNICODE); ?>,
+            checkout_queue_wait: <?php echo json_encode(t('checkout_queue_wait'), JSON_UNESCAPED_UNICODE); ?>,
+            checkout_queue_timeout: <?php echo json_encode(t('checkout_queue_timeout'), JSON_UNESCAPED_UNICODE); ?>,
             track_missing_fields: <?php echo json_encode(t('track_missing_fields'), JSON_UNESCAPED_UNICODE); ?>,
             checkout_required_fields: <?php echo json_encode(t('checkout_required_fields'), JSON_UNESCAPED_UNICODE); ?>,
             select_color: <?php echo json_encode(t('select_color'), JSON_UNESCAPED_UNICODE); ?>,

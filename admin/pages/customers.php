@@ -30,8 +30,9 @@ $count = count($rows);
     <div>
         <h1>العملاء</h1>
         <p class="page-subtitle">
-            سجل موحّد لكل العملاء المسجّلين: البيانات، حد الائتمان، رصيد الذمة، وعدد الطلبات المرتبطة.
-            الحركات المحاسبية والقبض من <a href="/admin/index.php?page=partner_ledger">ذمم العملاء والموردين</a>.
+            سجل موحّد لكل العملاء: <strong>كود العميل</strong> (فريد اختياري)، البيانات، حد الائتمان، رصيد الذمة، وعدد الطلبات.
+            مستقبلاً: ربط <strong>مردود المبيعات</strong> بجدول <code dir="ltr">sales_returns</code> (العميل + الطلب الأصلي).
+            الذمم والقبض من <a href="/admin/index.php?page=partner_ledger">ذمم العملاء والموردين</a>.
         </p>
     </div>
     <div class="actions">
@@ -54,9 +55,13 @@ $count = count($rows);
 
 <div class="card">
     <h3>عميل جديد أو تعديل</h3>
-    <p class="card-hint" style="margin-top:0;">الهاتف هو المعرّف الفريد ويُستخدم لربط الطلبات. اضغط «تعديل» من الجدول أدناه لتحميل بيانات عميل قائم.</p>
+    <p class="card-hint" style="margin-top:0;">الهاتف معرّف فريد للربط مع الطلبات. <strong>كود العميل</strong> اختياري ويُستخدم في التقارير والربط مع مردود المبيعات. اضغط «تعديل» من الجدول لتحميل عميل قائم.</p>
     <input type="hidden" id="cust_id" value="0">
     <div class="form-grid">
+        <div>
+            <label for="cust_code">كود العميل (اختياري)</label>
+            <input type="text" id="cust_code" maxlength="32" autocomplete="off" dir="ltr" lang="en" placeholder="مثال: C-1001">
+        </div>
         <div>
             <label for="cust_name">الاسم</label>
             <input type="text" id="cust_name" autocomplete="off" placeholder="اسم العميل">
@@ -96,6 +101,7 @@ $count = count($rows);
                 <thead>
                     <tr>
                         <th>#</th>
+                        <th>الكود</th>
                         <th>الاسم</th>
                         <th>الهاتف</th>
                         <th>حد الائتمان</th>
@@ -124,6 +130,7 @@ $count = count($rows);
                             <td class="party-registry-actions">
                                 <button type="button" class="btn-secondary party-registry-btn" onclick='custEdit(<?php echo json_encode([
                                     'id' => $cid,
+                                    'code' => (string) ($c['code'] ?? ''),
                                     'name_ar' => (string) ($c['name_ar'] ?? ''),
                                     'phone' => (string) ($c['phone'] ?? ''),
                                     'credit_limit' => $c['credit_limit'] ?? null,
@@ -142,6 +149,7 @@ $count = count($rows);
 <script>
 function custResetForm() {
     document.getElementById('cust_id').value = '0';
+    document.getElementById('cust_code').value = '';
     document.getElementById('cust_name').value = '';
     document.getElementById('cust_phone').value = '';
     document.getElementById('cust_limit').value = '';
@@ -149,6 +157,7 @@ function custResetForm() {
 }
 function custEdit(row) {
     document.getElementById('cust_id').value = String(row.id || 0);
+    document.getElementById('cust_code').value = row.code || '';
     document.getElementById('cust_name').value = row.name_ar || '';
     document.getElementById('cust_phone').value = row.phone || '';
     var lim = row.credit_limit;
@@ -170,7 +179,8 @@ function custSave() {
     var payload = {
         name_ar: name || 'عميل',
         phone: phone,
-        notes: notes || null
+        notes: notes || null,
+        code: (document.getElementById('cust_code') && document.getElementById('cust_code').value.trim()) || null
     };
     if (id > 0) {
         payload.id = id;

@@ -23,8 +23,9 @@ $count = count($rows);
     <div>
         <h1>الموردين</h1>
         <p class="page-subtitle">
-            إدارة موردي المشتريات ورصيد الذمم الدائنة لكل مورد. تسجيل مشتريات آجلة من
-            <a href="/admin/index.php?page=purchases">المشتريات</a>؛ السداد والكشوف من
+            إدارة موردي المشتريات: <strong>كود المورد</strong> (فريد اختياري)، الذمم الدائنة، وعدد مستندات الشراء.
+            مستقبلاً: ربط <strong>مردود المشتريات</strong> بجدول <code dir="ltr">purchase_returns</code> (المورد + مستند الشراء الأصلي).
+            المشتريات من <a href="/admin/index.php?page=purchases">المشتريات</a>؛ السداد والكشوف من
             <a href="/admin/index.php?page=partner_ledger">ذمم العملاء والموردين</a>.
         </p>
     </div>
@@ -48,9 +49,13 @@ $count = count($rows);
 
 <div class="card">
     <h3>مورد جديد أو تعديل</h3>
-    <p class="card-hint" style="margin-top:0;">الاسم إلزامي. الهاتف اختياري؛ إن وُجد يجب ألا يتكرر مع مورد آخر.</p>
+    <p class="card-hint" style="margin-top:0;">الاسم إلزامي. <strong>كود المورد</strong> اختياري وفريد. الهاتف اختياري؛ إن وُجد يجب ألا يتكرر مع مورد آخر.</p>
     <input type="hidden" id="sup_id" value="0">
     <div class="form-grid">
+        <div>
+            <label for="sup_code">كود المورد (اختياري)</label>
+            <input type="text" id="sup_code" maxlength="32" autocomplete="off" dir="ltr" lang="en" placeholder="مثال: V-2001">
+        </div>
         <div>
             <label for="sup_name">اسم المورد</label>
             <input type="text" id="sup_name" autocomplete="off" placeholder="اسم المورد أو الشركة">
@@ -86,6 +91,7 @@ $count = count($rows);
                 <thead>
                     <tr>
                         <th>#</th>
+                        <th>الكود</th>
                         <th>الاسم</th>
                         <th>الهاتف</th>
                         <th>ذمة المورد</th>
@@ -99,11 +105,13 @@ $count = count($rows);
                         $sid = (int) $s['id'];
                         $bal = orange_party_balance_supplier($pdo, $sid);
                         $phone = (string) ($s['phone'] ?? '');
-                        $hayRaw = trim((string) ($s['name'] ?? '') . ' ' . $phone . ' ' . ($s['notes'] ?? ''));
+                        $codeDisp = isset($s['code']) && (string) $s['code'] !== '' ? (string) $s['code'] : '—';
+                        $hayRaw = trim((string) ($s['code'] ?? '') . ' ' . ($s['name'] ?? '') . ' ' . $phone . ' ' . ($s['notes'] ?? ''));
                         $hay = function_exists('mb_strtolower') ? mb_strtolower($hayRaw, 'UTF-8') : strtolower($hayRaw);
                         ?>
                         <tr data-sup-search="<?php echo htmlspecialchars($hay, ENT_QUOTES, 'UTF-8'); ?>">
                             <td><?php echo $sid; ?></td>
+                            <td dir="ltr"><?php echo htmlspecialchars($codeDisp, ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><?php echo htmlspecialchars((string) ($s['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td dir="ltr"><?php echo $phone !== '' ? htmlspecialchars($phone, ENT_QUOTES, 'UTF-8') : '—'; ?></td>
                             <td dir="ltr"><?php echo number_format($bal, 3); ?></td>
@@ -111,6 +119,7 @@ $count = count($rows);
                             <td class="party-registry-actions">
                                 <button type="button" class="btn-secondary party-registry-btn" onclick='supEdit(<?php echo json_encode([
                                     'id' => $sid,
+                                    'code' => (string) ($s['code'] ?? ''),
                                     'name' => (string) ($s['name'] ?? ''),
                                     'phone' => $phone,
                                     'notes' => (string) ($s['notes'] ?? ''),
@@ -128,12 +137,14 @@ $count = count($rows);
 <script>
 function supResetForm() {
     document.getElementById('sup_id').value = '0';
+    document.getElementById('sup_code').value = '';
     document.getElementById('sup_name').value = '';
     document.getElementById('sup_phone').value = '';
     document.getElementById('sup_notes').value = '';
 }
 function supEdit(row) {
     document.getElementById('sup_id').value = String(row.id || 0);
+    document.getElementById('sup_code').value = row.code || '';
     document.getElementById('sup_name').value = row.name || '';
     document.getElementById('sup_phone').value = row.phone || '';
     document.getElementById('sup_notes').value = row.notes || '';
@@ -148,7 +159,12 @@ function supSave() {
         alert('اسم المورد مطلوب');
         return;
     }
-    var payload = { name: name, phone: phone || null, notes: notes || null };
+    var payload = {
+        name: name,
+        phone: phone || null,
+        notes: notes || null,
+        code: (document.getElementById('sup_code') && document.getElementById('sup_code').value.trim()) || null
+    };
     if (id > 0) {
         payload.id = id;
     }

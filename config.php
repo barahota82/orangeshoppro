@@ -51,6 +51,10 @@ define(
 $__siteOrigin = trim((string)($env['SITE_PUBLIC_URL'] ?? ''), " \t\n\r\0\x0B/");
 define('ORANGE_SITE_PUBLIC_ORIGIN', $__siteOrigin);
 
+/** مرسل البريد (تسجيل اختياري بالإيميل). فارغ = لا يُرسل بريد حتى يُضبط في .env.php */
+define('ORANGE_MAIL_FROM', trim((string)($env['MAIL_FROM'] ?? '')));
+define('ORANGE_MAIL_FROM_NAME', trim((string)($env['MAIL_FROM_NAME'] ?? 'Orange')));
+
 /** اختياري في .env.php: `ASSET_VERSION` نص ثابت لكل الأصول؛ فارغ = تلقائي (انظر asset_url) */
 define('STOREFRONT_ASSET_VERSION', trim((string)($env['ASSET_VERSION'] ?? '')));
 
@@ -272,13 +276,15 @@ function storefront_short_segment(string $channelSlug, string $lang): ?string {
     return $base . $suffix;
 }
 
-/** @return 'home'|'cart'|'track'|'product' */
+/** @return 'home'|'cart'|'track'|'product'|'register'|'verify_email' */
 function storefront_current_page_kind(): string {
     $base = basename((string)($_SERVER['SCRIPT_NAME'] ?? ''));
     return match ($base) {
         'cart.php' => 'cart',
         'track.php' => 'track',
         'product.php' => 'product',
+        'register.php' => 'register',
+        'verify-email.php' => 'verify_email',
         default => 'home',
     };
 }
@@ -286,7 +292,7 @@ function storefront_current_page_kind(): string {
 /**
  * Shared state for storefront header toolbar + mobile app dock.
  *
- * @return array{channel: array<string, mixed>, lang: string, channelSlug: string, pageKind: string, storefrontExtra: array, langOpts: array, currentLangLabel: string}
+ * @return array{channel: array<string, mixed>, lang: string, channelSlug: string, pageKind: 'home'|'cart'|'track'|'product'|'register'|'verify_email', storefrontExtra: array, langOpts: array, currentLangLabel: string}
  */
 function storefront_toolbar_state(): array {
     $lang = current_lang();
@@ -306,6 +312,9 @@ function storefront_toolbar_state(): array {
     $storefrontExtra = [];
     if ($pageKind === 'product' && isset($_GET['id'])) {
         $storefrontExtra['id'] = (int)$_GET['id'];
+    }
+    if ($pageKind === 'verify_email' && isset($_GET['token']) && (string) $_GET['token'] !== '') {
+        $storefrontExtra['token'] = (string) $_GET['token'];
     }
     $langOpts = storefront_lang_options();
     $currentLangLabel = (string)($langOpts[$lang]['label'] ?? $lang);
@@ -342,8 +351,8 @@ function storefront_whatsapp_href(array $channel, string $prefillText = ''): ?st
 /**
  * Storefront URL: short path when channel+lang match IIS rewrite (web.config on server), else query string.
  *
- * @param 'home'|'cart'|'track'|'product' $page
- * @param array<string, mixed> $extra merged into query for long URLs (e.g. id for product)
+ * @param 'home'|'cart'|'track'|'product'|'register'|'verify_email' $page
+ * @param array<string, mixed> $extra merged into query for long URLs (e.g. id for product, token for verify)
  */
 /**
  * أصل الموقع (https://النطاق) — من SITE_PUBLIC_URL أو من طلب HTTP الحالي.
@@ -386,6 +395,7 @@ function storefront_url(string $page, string $channelSlug, string $lang, array $
             'cart' => $seg . '/cart',
             'track' => $seg . '/track',
             'product' => !empty($extra['id']) ? $seg . '/product/' . (int)$extra['id'] : null,
+            'register', 'verify_email' => null,
             default => $seg,
         };
         if ($tail !== null) {
@@ -399,6 +409,8 @@ function storefront_url(string $page, string $channelSlug, string $lang, array $
         'cart' => '/pages/cart.php',
         'track' => '/pages/track.php',
         'product' => '/pages/product.php',
+        'register' => '/pages/register.php',
+        'verify_email' => '/pages/verify-email.php',
         default => '/pages/home.php',
     };
     return $pathPrefix . $path . '?' . http_build_query($q);
@@ -564,6 +576,8 @@ function get_translations(): array {
             'track_missing_fields' => 'Please enter the order number and phone.',
             'checkout_required_fields' => 'Please fill in all required fields (name, phone, area, address).',
             'order_number' => 'Order Number',
+            'checkout_queue_wait' => 'Processing your order…',
+            'checkout_queue_timeout' => 'Order queue timeout. Try again.',
             'empty_cart' => 'Cart is empty.',
             'cart_empty_subtitle' => 'Browse the store and add products to place your order.',
             'cart_remove_confirm' => 'Remove this product from your cart?',
@@ -625,6 +639,24 @@ function get_translations(): array {
             'customer_whatsapp_help' => 'WhatsApp — questions or cancel request',
             'whatsapp_order_prefill' => 'Hello, I need help with order {order}.',
             'order_total_label' => 'Total',
+            'storefront_register' => 'Sign up',
+            'storefront_register_title' => 'Email sign-up',
+            'storefront_register_intro' => 'Optional: register with your email. We will send you a link to confirm.',
+            'storefront_guest_checkout_note' => 'You do not need an account to buy — guest checkout stays available.',
+            'storefront_register_email_label' => 'Email',
+            'storefront_register_submit' => 'Send confirmation link',
+            'storefront_register_sent' => 'Check your inbox and open the confirmation link (check spam too).',
+            'storefront_register_already_verified' => 'This email is already confirmed. You can continue shopping.',
+            'storefront_register_error' => 'Something went wrong. Try again later.',
+            'storefront_account_signed_in' => 'Signed in as',
+            'storefront_logout' => 'Sign out',
+            'storefront_verify_title' => 'Email confirmation',
+            'storefront_verify_ok' => 'Your email is confirmed. You are signed in.',
+            'storefront_verify_already' => 'This email was already confirmed.',
+            'storefront_verify_bad_token' => 'This confirmation link is invalid or was already used.',
+            'storefront_verify_expired' => 'This link expired. Request a new link from the sign-up page.',
+            'storefront_your_channel' => 'Your registered store channel:',
+            'storefront_pwa_install_hint' => 'On your phone: use the browser menu «Add to Home Screen». Save this page while you are on this channel so the shortcut opens the same store.',
         ],
         'ar' => [
             'home' => 'الرئيسية',
@@ -661,6 +693,8 @@ function get_translations(): array {
             'track_missing_fields' => 'يرجى إدخال رقم الطلب ورقم الهاتف.',
             'checkout_required_fields' => 'يرجى تعبئة جميع الحقول المطلوبة (الاسم، الهاتف، المنطقة، العنوان).',
             'order_number' => 'رقم الطلب',
+            'checkout_queue_wait' => 'جاري معالجة طلبك…',
+            'checkout_queue_timeout' => 'انتهت مهلة طابور الطلبات. أعد المحاولة.',
             'empty_cart' => 'السلة فارغة',
             'cart_empty_subtitle' => 'تصفّح المتجر وأضف منتجاتك ثم أرسل الطلب.',
             'cart_remove_confirm' => 'إزالة هذا المنتج من السلة؟',
@@ -722,6 +756,24 @@ function get_translations(): array {
             'customer_whatsapp_help' => 'واتساب — استفسار أو طلب إلغاء',
             'whatsapp_order_prefill' => 'السلام عليكم، أستفسر عن الطلب رقم {order}.',
             'order_total_label' => 'الإجمالي',
+            'storefront_register' => 'تسجيل',
+            'storefront_register_title' => 'تسجيل بالبريد',
+            'storefront_register_intro' => 'اختياري: سجّل ببريدك الإلكتروني؛ سنرسل رابطاً للتأكيد.',
+            'storefront_guest_checkout_note' => 'الشراء لا يتطلّب تسجيلاً — يمكنك الطلب كضيف كالعادة.',
+            'storefront_register_email_label' => 'البريد الإلكتروني',
+            'storefront_register_submit' => 'إرسال رابط التأكيد',
+            'storefront_register_sent' => 'تحقّق من بريدك وافتح رابط التأكيد (وراجع البريد غير الهام).',
+            'storefront_register_already_verified' => 'هذا البريد مؤكَّد مسبقاً — يمكنك متابعة التسوق.',
+            'storefront_register_error' => 'تعذّر الإكمال. حاول لاحقاً.',
+            'storefront_account_signed_in' => 'مسجّل الدخول كـ',
+            'storefront_logout' => 'تسجيل الخروج',
+            'storefront_verify_title' => 'تأكيد البريد',
+            'storefront_verify_ok' => 'تم تأكيد بريدك وتم تسجيل دخولك.',
+            'storefront_verify_already' => 'هذا البريد مؤكَّد مسبقاً.',
+            'storefront_verify_bad_token' => 'رابط التأكيد غير صالح أو تم استخدامه.',
+            'storefront_verify_expired' => 'انتهت صلاحية الرابط. اطلب رابطاً جديداً من صفحة التسجيل.',
+            'storefront_your_channel' => 'قناة المتجر المسجّلة لحسابك:',
+            'storefront_pwa_install_hint' => 'على الجوال: من قائمة المتصفح اختر «إضافة إلى الشاشة الرئيسية». احفظ الصفحة وأنت على نفس القناة لتفتح الاختصار نفس المتجر.',
         ],
         'fil' => [
             'home' => 'Home',
@@ -758,6 +810,8 @@ function get_translations(): array {
             'track_missing_fields' => 'Ilagay ang order number at telepono.',
             'checkout_required_fields' => 'Punan ang lahat ng kinakailangang field (pangalan, telepono, lugar, address).',
             'order_number' => 'Order Number',
+            'checkout_queue_wait' => 'Pinoproseso ang order…',
+            'checkout_queue_timeout' => 'Timeout sa pila ng order. Subukan ulit.',
             'empty_cart' => 'Walang laman ang cart.',
             'cart_empty_subtitle' => 'Mag-browse at magdagdag ng produkto para mag-order.',
             'cart_remove_confirm' => 'Alisin ang produktong ito sa cart?',
@@ -819,6 +873,24 @@ function get_translations(): array {
             'customer_whatsapp_help' => 'WhatsApp — tanong o cancel',
             'whatsapp_order_prefill' => 'Hello, tungkol sa order {order}.',
             'order_total_label' => 'Total',
+            'storefront_register' => 'Sign up',
+            'storefront_register_title' => 'Email sign-up',
+            'storefront_register_intro' => 'Optional: register with your email. We will send a confirmation link.',
+            'storefront_guest_checkout_note' => 'Hindi kailangan ng account para bumili — guest checkout pa rin.',
+            'storefront_register_email_label' => 'Email',
+            'storefront_register_submit' => 'Send confirmation link',
+            'storefront_register_sent' => 'Tingnan ang inbox mo at buksan ang link (spam folder rin).',
+            'storefront_register_already_verified' => 'Na-confirm na ang email na ito. Puwede ka nang mag-shopping.',
+            'storefront_register_error' => 'May mali. Subukan ulit mamaya.',
+            'storefront_account_signed_in' => 'Naka-sign in bilang',
+            'storefront_logout' => 'Sign out',
+            'storefront_verify_title' => 'Email confirmation',
+            'storefront_verify_ok' => 'Na-confirm ang email. Naka-sign in ka na.',
+            'storefront_verify_already' => 'Na-confirm na ang email na ito.',
+            'storefront_verify_bad_token' => 'Hindi wasto ang link o nagamit na.',
+            'storefront_verify_expired' => 'Expired ang link. Humingi ng bago sa sign-up page.',
+            'storefront_your_channel' => 'Ang naka-register na channel ng tindahan:',
+            'storefront_pwa_install_hint' => 'Sa phone: gamitin ang browser menu → «Add to Home Screen». I-save ang page habang nasa channel na ito para pareho ang bubuksan ng shortcut.',
         ],
         'hi' => [
             'home' => 'होम',
@@ -855,6 +927,8 @@ function get_translations(): array {
             'track_missing_fields' => 'कृपया ऑर्डर नंबर और फ़ोन दर्ज करें।',
             'checkout_required_fields' => 'कृपया सभी आवश्यक फ़ील्ड भरें (नाम, फ़ोन, क्षेत्र, पता)।',
             'order_number' => 'ऑर्डर नंबर',
+            'checkout_queue_wait' => 'ऑर्डर प्रोसेस हो रहा है…',
+            'checkout_queue_timeout' => 'ऑर्डर कतार का समय समाप्त। पुनः प्रयास करें।',
             'empty_cart' => 'कार्ट खाली है।',
             'cart_empty_subtitle' => 'स्टोर ब्राउज़ करें और ऑर्डर के लिए उत्पाद जोड़ें।',
             'cart_remove_confirm' => 'इस उत्पाद को कार्ट से हटाएं?',
@@ -916,6 +990,24 @@ function get_translations(): array {
             'customer_whatsapp_help' => 'व्हाट्सऐप — सवाल या रद्द अनुरोध',
             'whatsapp_order_prefill' => 'नमस्ते, ऑर्डर {order} के बारे में।',
             'order_total_label' => 'कुल',
+            'storefront_register' => 'साइन अप',
+            'storefront_register_title' => 'ईमेल से साइन अप',
+            'storefront_register_intro' => 'वैकल्पिक: अपने ईमेल से पंजीकरण करें; हम पुष्टि लिंक भेजेंगे।',
+            'storefront_guest_checkout_note' => 'खरीदारी के लिए खाता ज़रूरी नहीं — अतिथि चेकआउट पहले जैसा।',
+            'storefront_register_email_label' => 'ईमेल',
+            'storefront_register_submit' => 'पुष्टि लिंक भेजें',
+            'storefront_register_sent' => 'अपना इनबॉक्स देखें और लिंक खोलें (स्पैम भी देखें)।',
+            'storefront_register_already_verified' => 'यह ईमेल पहले से पुष्ट है — खरीदारी जारी रख सकते हैं।',
+            'storefront_register_error' => 'कुछ गलत हुआ। बाद में कोशिश करें।',
+            'storefront_account_signed_in' => 'साइन इन:',
+            'storefront_logout' => 'साइन आउट',
+            'storefront_verify_title' => 'ईमेल पुष्टि',
+            'storefront_verify_ok' => 'आपका ईमेल पुष्ट हो गया। आप साइन इन हैं।',
+            'storefront_verify_already' => 'यह ईमेल पहले ही पुष्ट है।',
+            'storefront_verify_bad_token' => 'लिंक अमान्य है या उपयोग हो चुका है।',
+            'storefront_verify_expired' => 'लिंक की समय सीमा समाप्त। साइन अप पेज से नया लिंक माँगें।',
+            'storefront_your_channel' => 'आपका पंजीकृत स्टोर चैनल:',
+            'storefront_pwa_install_hint' => 'फ़ोन पर: ब्राउज़र मेनू से «Add to Home Screen»। इसी चैनल वाले पेज पर रहकर सेव करें ताकि शॉर्टकट वही स्टोर खोले।',
         ],
     ];
 }

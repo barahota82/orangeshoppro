@@ -12,7 +12,7 @@ $ddCls = $navPlace === 'dock' ? 'lang-dropdown lang-dropdown--dock' : 'lang-drop
 $wrapCls = $navPlace === 'dock' ? 'app-bottom-dock__cell' : '';
 
 if ($navPlace === 'dock') {
-    echo '<nav class="app-bottom-dock" role="navigation" aria-label="' . htmlspecialchars(t('language') . ' · ' . t('cart') . ' · ' . t('track_order') . ' · ' . t('whatsapp'), ENT_QUOTES, 'UTF-8') . '">';
+    echo '<nav class="app-bottom-dock" role="navigation" aria-label="' . htmlspecialchars(t('language') . ' · ' . t('cart') . ' · ' . t('track_order') . ' · ' . t('storefront_register') . ' · ' . t('whatsapp'), ENT_QUOTES, 'UTF-8') . '">';
     echo '<div class="app-bottom-dock__grid">';
 }
 
@@ -73,6 +73,7 @@ if ($navPlace === 'header') {
 $openDockCell();
 $cartHref = htmlspecialchars(storefront_url('cart', $channelSlug, $lang), ENT_QUOTES, 'UTF-8');
 $trackHref = htmlspecialchars(storefront_url('track', $channelSlug, $lang), ENT_QUOTES, 'UTF-8');
+$registerHref = htmlspecialchars(storefront_url('register', $channelSlug, $lang), ENT_QUOTES, 'UTF-8');
 if ($navPlace === 'dock') {
     ?>
 <a class="app-dock-btn" data-orange-cart-link href="<?php echo $cartHref; ?>">
@@ -102,6 +103,23 @@ if ($navPlace === 'dock') {
 } else {
     ?>
             <a class="icon-btn" href="<?php echo $trackHref; ?>"><?php echo htmlspecialchars(t('track_order'), ENT_QUOTES, 'UTF-8'); ?></a>
+<?php
+}
+$closeDockCell();
+
+$openDockCell();
+if ($navPlace === 'dock') {
+    ?>
+<a class="app-dock-btn" href="<?php echo $registerHref; ?>">
+    <span class="app-dock-btn__icon" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" focusable="false"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" stroke="currentColor" stroke-width="1.75"/><path d="M4 21a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+    </span>
+    <span class="app-dock-btn__label"><?php echo htmlspecialchars(t('storefront_register'), ENT_QUOTES, 'UTF-8'); ?></span>
+</a>
+<?php
+} else {
+    ?>
+            <a class="icon-btn" href="<?php echo $registerHref; ?>"><?php echo htmlspecialchars(t('storefront_register'), ENT_QUOTES, 'UTF-8'); ?></a>
 <?php
 }
 $closeDockCell();
