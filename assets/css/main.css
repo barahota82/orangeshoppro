@@ -1795,6 +1795,7 @@ body.storefront .product-gallery__img {
 }
 
 .track-signup-cta {
+    position: relative;
     margin-bottom: 1rem;
     background: linear-gradient(
         135deg,
@@ -1803,6 +1804,37 @@ body.storefront .product-gallery__img {
     );
     border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
     box-shadow: var(--card-shadow);
+}
+
+.track-signup-cta.is-expanded .track-signup-cta__inner {
+    padding-top: 36px;
+}
+
+.track-signup-cta__close {
+    position: absolute;
+    top: 10px;
+    inset-inline-end: 10px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    font-size: 1.45rem;
+    line-height: 1;
+    font-weight: 300;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.track-signup-cta__close:hover {
+    border-color: var(--primary);
+    color: var(--primary);
 }
 
 .track-signup-cta__inner {
@@ -1834,12 +1866,51 @@ body.storefront .product-gallery__img {
     text-align: start;
 }
 
+.track-signup-cta__expand {
+    margin: 0;
+}
+
+.track-signup-cta__field {
+    margin-bottom: 0;
+}
+
+.track-signup-cta__field input {
+    min-height: 48px;
+    box-sizing: border-box;
+}
+
+.track-signup-cta__feedback {
+    margin: 0;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    color: var(--muted);
+    min-height: 1.25em;
+}
+
+.track-signup-cta__actions {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+}
+
 @media (min-width: 560px) {
-    .track-signup-cta__inner {
+    .track-signup-cta:not(.is-expanded) .track-signup-cta__inner {
         flex-direction: row;
         align-items: center;
         justify-content: space-between;
         gap: 18px;
+    }
+
+    .track-signup-cta:not(.is-expanded) .track-signup-cta__copy {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .track-signup-cta:not(.is-expanded) .track-signup-cta__actions {
+        flex-direction: row;
+        flex-shrink: 0;
+        justify-content: flex-end;
     }
 }
 

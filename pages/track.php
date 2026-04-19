@@ -6,7 +6,6 @@ require_once __DIR__ . '/../config.php';
 include __DIR__ . '/../includes/header.php';
 
 $trackHomeUrl = storefront_url('home', $channelSlug, $lang);
-$registerUrl = htmlspecialchars(storefront_url('register', $channelSlug, $lang), ENT_QUOTES, 'UTF-8');
 $waHref = storefront_whatsapp_href($channel, '');
 $orangeOrderStatusLabels = [
     'pending' => t('order_status_pending'),
@@ -39,13 +38,24 @@ $orangeMyOrderUi = [
         <a class="cart-page-close" href="<?php echo htmlspecialchars($trackHomeUrl, ENT_QUOTES, 'UTF-8'); ?>" aria-label="<?php echo htmlspecialchars(t('product_back_to_shop'), ENT_QUOTES, 'UTF-8'); ?>"><span aria-hidden="true">&times;</span></a>
     </div>
 
-    <div class="track-signup-cta card-box" role="region" aria-label="<?php echo htmlspecialchars(t('track_signup_cta_aria'), ENT_QUOTES, 'UTF-8'); ?>">
+    <div class="track-signup-cta card-box" id="trackSignupCta" role="region" aria-label="<?php echo htmlspecialchars(t('track_signup_cta_aria'), ENT_QUOTES, 'UTF-8'); ?>" aria-expanded="false">
+        <button type="button" class="track-signup-cta__close" id="trackSignupClose" hidden aria-label="<?php echo htmlspecialchars(t('track_signup_close'), ENT_QUOTES, 'UTF-8'); ?>"><span aria-hidden="true">&times;</span></button>
         <div class="track-signup-cta__inner">
             <div class="track-signup-cta__copy">
                 <p class="track-signup-cta__title"><?php echo htmlspecialchars(t('track_signup_cta_title'), ENT_QUOTES, 'UTF-8'); ?></p>
                 <p class="track-signup-cta__text"><?php echo htmlspecialchars(t('track_signup_cta_text'), ENT_QUOTES, 'UTF-8'); ?></p>
             </div>
-            <a class="btn track-signup-cta__btn" href="<?php echo $registerUrl; ?>"><?php echo htmlspecialchars(t('storefront_register'), ENT_QUOTES, 'UTF-8'); ?></a>
+            <div class="track-signup-cta__expand" id="trackSignupExpand" hidden>
+                <div class="field track-signup-cta__field">
+                    <label for="trackSignupEmail"><?php echo htmlspecialchars(t('storefront_register_email_label'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <input id="trackSignupEmail" type="email" name="email" autocomplete="email" inputmode="email" dir="ltr">
+                </div>
+                <p class="track-signup-cta__feedback" id="trackSignupMsg" role="status" aria-live="polite" hidden></p>
+            </div>
+            <div class="track-signup-cta__actions">
+                <button type="button" class="btn track-signup-cta__btn track-signup-cta__btn-open" id="trackSignupOpenBtn"><?php echo htmlspecialchars(t('storefront_register'), ENT_QUOTES, 'UTF-8'); ?></button>
+                <button type="button" class="btn track-signup-cta__btn track-signup-cta__btn-send" id="trackSignupSendBtn" hidden><?php echo htmlspecialchars(t('storefront_register_submit'), ENT_QUOTES, 'UTF-8'); ?></button>
+            </div>
         </div>
     </div>
 
@@ -102,5 +112,95 @@ async function pageTrackOrderNow() {
     );
 }
 window.__orangeCartTrackRefresh = pageTrackOrderNow;
+
+(function () {
+    var cta = document.getElementById('trackSignupCta');
+    var expand = document.getElementById('trackSignupExpand');
+    var closeBtn = document.getElementById('trackSignupClose');
+    var openBtn = document.getElementById('trackSignupOpenBtn');
+    var sendBtn = document.getElementById('trackSignupSendBtn');
+    var emailInp = document.getElementById('trackSignupEmail');
+    var msgEl = document.getElementById('trackSignupMsg');
+    if (!cta || !expand || !closeBtn || !openBtn || !sendBtn || !emailInp || !msgEl) {
+        return;
+    }
+    var sent = <?php echo json_encode(t('storefront_register_sent'), JSON_UNESCAPED_UNICODE); ?>;
+    var already = <?php echo json_encode(t('storefront_register_already_verified'), JSON_UNESCAPED_UNICODE); ?>;
+    var err = <?php echo json_encode(t('storefront_register_error'), JSON_UNESCAPED_UNICODE); ?>;
+
+    function expandPanel() {
+        cta.classList.add('is-expanded');
+        cta.setAttribute('aria-expanded', 'true');
+        expand.hidden = false;
+        closeBtn.hidden = false;
+        openBtn.hidden = true;
+        sendBtn.hidden = false;
+        msgEl.hidden = true;
+        msgEl.textContent = '';
+        requestAnimationFrame(function () {
+            emailInp.focus();
+        });
+    }
+
+    function collapsePanel() {
+        cta.classList.remove('is-expanded');
+        cta.setAttribute('aria-expanded', 'false');
+        expand.hidden = true;
+        closeBtn.hidden = true;
+        openBtn.hidden = false;
+        sendBtn.hidden = true;
+        msgEl.hidden = true;
+        msgEl.textContent = '';
+        emailInp.value = '';
+    }
+
+    openBtn.addEventListener('click', expandPanel);
+    closeBtn.addEventListener('click', collapsePanel);
+
+    sendBtn.addEventListener('click', function () {
+        var email = emailInp.value.trim();
+        msgEl.hidden = false;
+        msgEl.textContent = '';
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            msgEl.textContent =
+                (window.APP_T && window.APP_T.checkout_invalid_email) || 'Invalid email.';
+            return;
+        }
+        var apiUrl =
+            typeof storefrontApiUrl === 'function'
+                ? storefrontApiUrl('/api/auth/request-email-verify.php')
+                : (String(window.STOREFRONT_BASE || '').replace(/\/+$/, '') || '') +
+                  '/api/auth/request-email-verify.php';
+        fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: email,
+                channel: typeof window.APP_CHANNEL_SLUG === 'string' ? window.APP_CHANNEL_SLUG : 'orange',
+                lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
+            }),
+        })
+            .then(function (r) {
+                return r.json().then(function (j) {
+                    return { ok: r.ok, j: j };
+                });
+            })
+            .then(function (x) {
+                if (x.ok && x.j && x.j.success) {
+                    if (x.j.channel && /^(orange|blue|black)$/i.test(String(x.j.channel))) {
+                        try {
+                            localStorage.setItem('orange_storefront_channel', String(x.j.channel).toLowerCase());
+                        } catch (e1) {}
+                    }
+                    msgEl.textContent = x.j.already_verified ? already : sent;
+                    return;
+                }
+                msgEl.textContent = x.j && x.j.message ? String(x.j.message) : err;
+            })
+            .catch(function () {
+                msgEl.textContent = err;
+            });
+    });
+})();
 </script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
