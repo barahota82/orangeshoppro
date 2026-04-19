@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/gl_settings.php';
 require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_admin_api();
 
@@ -20,5 +21,5 @@ try {
 } catch (InvalidArgumentException $e) {
     json_response(['success' => false, 'message' => $e->getMessage()], 404);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر معاينة الحركة');
+    orange_gl_api_catch_json($e, 'تعذر معاينة الحركة');
 }

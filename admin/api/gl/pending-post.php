@@ -37,5 +37,5 @@ try {
     }
     json_response($out);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر ترحيل الحركات');
+    orange_gl_api_catch_json($e, 'تعذر ترحيل الحركات');
 }

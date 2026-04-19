@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/gl_settings.php';
 require_once __DIR__ . '/../../../includes/journal_types.php';
 require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_admin_api();
@@ -42,5 +43,5 @@ try {
     $rows = orange_gl_pending_list($pdo, $status, $df !== '' ? $df : null, $dt !== '' ? $dt : null, $entryTypes);
     json_response(['success' => true, 'movements' => $rows, 'status' => $status, 'filter' => $filter]);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر تحميل الحركات المعلّقة');
+    orange_gl_api_catch_json($e, 'تعذر تحميل الحركات المعلّقة');
 }
