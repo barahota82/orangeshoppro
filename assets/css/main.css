@@ -101,11 +101,11 @@ h1, h2, h3, .brand-text h1 {
     min-width: 0;
 }
 
-/* الهيدر dir=ltr: الشعار والاسم والسلوجان يبقوا يسار دائماً */
+/* الهيدر dir=ltr: الأيقونة يسار؛ كتلة الاسم + سلوجان متمركزة نسبة لبعضها */
 .brand-stack {
-    display: grid;
-    grid-template-columns: minmax(0, max-content);
-    justify-items: start;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     gap: 6px;
     width: max-content;
     max-width: min(28rem, calc(100vw - 140px));
@@ -125,12 +125,11 @@ h1, h2, h3, .brand-text h1 {
     height: auto;
     max-height: clamp(1.55rem, 5.2vw, 2.45rem);
     object-fit: contain;
-    object-position: left center;
+    object-position: center;
 }
 
 .brand-stack .brand-tagline--cycle {
-    justify-self: start;
-    text-align: start;
+    text-align: center;
     width: 100%;
     margin-inline: 0;
 }
@@ -158,6 +157,7 @@ h1, h2, h3, .brand-text h1 {
     display: block;
     max-width: min(22rem, 100%);
     margin-inline: auto;
+    text-align: center;
 }
 
 .brand-tagline--cycle {
