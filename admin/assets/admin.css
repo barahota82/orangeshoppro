@@ -829,16 +829,7 @@ a { text-decoration: none; color: inherit; }
 
 /* فاتورة يدوية — هيكل أوضح + ملخص مباشر */
 .mo-invoice-card {
-    padding: 16px 18px 18px;
-}
-.mo-invoice-card .admin-doc-lines-toolbar {
-    position: relative;
-    z-index: 2;
-    margin-top: 10px;
-}
-.mo-invoice-card .admin-doc-lines-toolbar .btn,
-.mo-invoice-card .admin-doc-lines-toolbar button {
-    flex-shrink: 0;
+    padding: 24px 26px 26px;
 }
 .mo-invoice-doc-head {
     display: flex;
@@ -1261,37 +1252,75 @@ label {
     gap: 12px 16px;
 }
 
-/* فاتورة شركة — بيانات عميل مضغوطة (بدون خانات عملاقة) */
-.mo-customer-card {
-    padding: 14px 18px 16px;
-    margin-bottom: 14px;
-    max-width: 56rem;
+/* سجلات العملاء / الموردين */
+.party-registry-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px 16px;
+    margin-bottom: 18px;
 }
-.mo-customer-card > h3:first-child {
-    padding-bottom: 8px;
-    margin-bottom: 10px;
-    font-size: 1rem;
+.party-registry-stat {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    box-shadow: var(--shadow-card);
 }
-.mo-customer-form {
-    gap: 8px 14px;
+.party-registry-stat__label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    margin-bottom: 6px;
+    letter-spacing: 0.02em;
 }
-.mo-customer-form label {
-    margin-bottom: 3px;
+.party-registry-stat__val {
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+}
+.party-registry-stat__unit {
     font-size: 12px;
     font-weight: 600;
+    color: var(--muted);
+    margin-inline-start: 6px;
+}
+.party-registry-toolbar {
+    margin-bottom: 14px;
+}
+.party-registry-search-wrap {
+    max-width: 28rem;
+}
+.party-registry-search-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 4px;
     color: #475569;
 }
-.mo-customer-form input,
-.mo-customer-form select {
-    min-height: 36px;
-    padding: 6px 10px;
-    font-size: 13px;
-    line-height: 1.35;
+.party-registry-search {
+    width: 100%;
 }
-.mo-customer-form .card-hint {
-    margin: 6px 0 0;
-    font-size: 12px;
-    line-height: 1.4;
+.party-registry-table tbody td {
+    vertical-align: middle;
+}
+.party-registry-actions {
+    white-space: normal;
+}
+.party-registry-actions .party-registry-btn {
+    display: inline-flex;
+    margin-inline-end: 6px;
+    margin-bottom: 6px;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    padding: 7px 12px;
+    min-height: 36px;
+}
+.party-registry-col-actions {
+    min-width: 11rem;
 }
 
 .actions {
@@ -1306,7 +1335,6 @@ button:disabled {
 }
 button:disabled:hover {
     filter: grayscale(0.25);
-    /* لا نستخدم background: inherit — يصير لون البطاقة (#fff) مع color: #fff فيختفي الزر عند hover */
 }
 button, .btn {
     border: 0;

@@ -9,6 +9,11 @@ require_once __DIR__ . '/../../includes/gl_settings.php';
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
+$prefillStmtKind = in_array((string) ($_GET['stmt_party_kind'] ?? ''), ['customer', 'supplier'], true)
+    ? (string) $_GET['stmt_party_kind']
+    : '';
+$prefillStmtId = (int) ($_GET['stmt_party_id'] ?? 0);
+
 $suppliers = orange_table_exists($pdo, 'suppliers')
     ? $pdo->query('SELECT id, name, phone FROM suppliers ORDER BY name ASC')->fetchAll(PDO::FETCH_ASSOC)
     : [];
@@ -294,7 +299,7 @@ if ($stmtPartyJson === false) {
             </tbody>
         </table>
     </div>
-    <p class="card-hint">إضافة مورد من صفحة <a href="/admin/index.php?page=purchases">المشتريات</a>.</p>
+    <p class="card-hint">إدارة الموردين من <a href="/admin/index.php?page=suppliers">شاشة الموردين</a> أو عند إنشاء <a href="/admin/index.php?page=purchases">مستند شراء</a>.</p>
 </div>
 
 <div class="card">
@@ -331,6 +336,7 @@ if ($stmtPartyJson === false) {
 
 <script>
 var ORANGE_STMT_PARTIES = <?php echo $stmtPartyJson; ?>;
+var ORANGE_STMT_PREFILL = <?php echo json_encode(['kind' => $prefillStmtKind, 'id' => $prefillStmtId], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var GL_ENTRY_LABELS = <?php echo json_encode(orange_gl_entry_type_labels_map(), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 function glEntryTypeLabel(et) {
     et = String(et == null ? '' : et);
@@ -524,10 +530,37 @@ function collectAllocTbody(tbodyId) {
     return out;
 }
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', stmtRefreshSelect);
-} else {
+function orangePartnerStmtInit() {
     stmtRefreshSelect();
+    if (!ORANGE_STMT_PREFILL || !ORANGE_STMT_PREFILL.kind || !ORANGE_STMT_PREFILL.id) {
+        return;
+    }
+    var k = String(ORANGE_STMT_PREFILL.kind);
+    var id = parseInt(ORANGE_STMT_PREFILL.id, 10) || 0;
+    if (id <= 0 || (k !== 'customer' && k !== 'supplier')) {
+        return;
+    }
+    var rad = document.querySelector('input[name="stmt_kind"][value="' + k + '"]');
+    if (rad) {
+        rad.checked = true;
+    }
+    stmtRefreshSelect();
+    var sel = document.getElementById('stmt_party');
+    if (sel && sel.querySelector('option[value="' + id + '"]')) {
+        sel.value = String(id);
+        loadStatement();
+    }
+    var sec = document.getElementById('partner-account-statement');
+    if (sec) {
+        setTimeout(function () {
+            sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 250);
+    }
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', orangePartnerStmtInit);
+} else {
+    orangePartnerStmtInit();
 }
 
 function doReceipt() {
