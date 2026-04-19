@@ -15,7 +15,14 @@ try {
 
     require_fields($data, ['customer_name', 'phone', 'channel_id', 'items']);
     if (!is_array($data['items']) || count($data['items']) === 0) {
-        json_response(['success' => false, 'message' => 'أضف سطرًا واحدًا على الأقل (منتج أو بند نصي)'], 422);
+        json_response(['success' => false, 'message' => 'أضف سطرًا واحدًا على الأقل من المنتجات المسجّلة'], 422);
+    }
+
+    foreach ($data['items'] as $item) {
+        $pidCheck = isset($item['product_id']) ? (int) $item['product_id'] : 0;
+        if ($pidCheck <= 0) {
+            json_response(['success' => false, 'message' => 'يُقبل فقط بيع منتجات مسجّلة في «المنتجات» — لا بند نصي أو سعر يدوي بدون صنف'], 422);
+        }
     }
 
     $channelStmt = $pdo->prepare('SELECT id FROM channels WHERE id = ? AND is_active = 1 LIMIT 1');
@@ -33,30 +40,6 @@ try {
     foreach ($data['items'] as $item) {
         $lineDiscount = max(0.0, (float) ($item['line_discount'] ?? 0));
         $pid = isset($item['product_id']) ? (int) $item['product_id'] : 0;
-
-        if ($pid <= 0) {
-            $freeName = trim((string) ($item['product_name'] ?? $item['description'] ?? ''));
-            if ($freeName === '') {
-                continue;
-            }
-            $qty = max(1, (int) ($item['qty'] ?? 1));
-            $price = max(0.0, (float) ($item['unit_price'] ?? $item['price'] ?? 0));
-            $lineNet = max(0.0, round($price * $qty - $lineDiscount, 4));
-            $total += $lineNet;
-            $validatedItems[] = [
-                'kind' => 'free',
-                'product_name' => $freeName,
-                'qty' => $qty,
-                'price' => $price,
-                'cost' => 0.0,
-                'color' => '',
-                'size' => '',
-                'variant_id' => 0,
-                'line_discount' => $lineDiscount,
-            ];
-
-            continue;
-        }
 
         require_fields($item, ['qty']);
         $productStmt = $pdo->prepare('SELECT * FROM products WHERE id = ? AND is_active = 1 LIMIT 1');
@@ -118,7 +101,7 @@ try {
     }
 
     if ($validatedItems === []) {
-        json_response(['success' => false, 'message' => 'أضف سطرًا واحدًا على الأقل (منتج أو بند نصي)'], 422);
+        json_response(['success' => false, 'message' => 'أضف سطرًا واحدًا على الأقل من المنتجات المسجّلة'], 422);
     }
 
     $paymentTerms = orange_normalize_payment_terms($data['payment_terms'] ?? 'cash');
@@ -187,29 +170,16 @@ try {
 
     foreach ($validatedItems as $row) {
         $bind = [$orderId];
-        if (($row['kind'] ?? '') === 'free') {
-            $bind[] = null;
-            if ($hasVariantCol) {
-                $bind[] = null;
-            }
-            $bind[] = $row['product_name'];
-            $bind[] = '';
-            $bind[] = '';
-            $bind[] = $row['qty'];
-            $bind[] = $row['price'];
-            $bind[] = $row['cost'];
-        } else {
-            $bind[] = (int) $row['product']['id'];
-            if ($hasVariantCol) {
-                $bind[] = (int) ($row['variant_id'] ?? 0) ?: null;
-            }
-            $bind[] = $row['product']['name'];
-            $bind[] = $row['color'];
-            $bind[] = $row['size'];
-            $bind[] = $row['qty'];
-            $bind[] = $row['price'];
-            $bind[] = $row['cost'];
+        $bind[] = (int) $row['product']['id'];
+        if ($hasVariantCol) {
+            $bind[] = (int) ($row['variant_id'] ?? 0) ?: null;
         }
+        $bind[] = $row['product']['name'];
+        $bind[] = $row['color'];
+        $bind[] = $row['size'];
+        $bind[] = $row['qty'];
+        $bind[] = $row['price'];
+        $bind[] = $row['cost'];
         if ($hasLineDiscountCol) {
             $bind[] = (float) ($row['line_discount'] ?? 0);
         }

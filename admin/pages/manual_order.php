@@ -16,7 +16,7 @@ foreach ($variants as $v) {
 ?>
 <div class="page-title page-title--stacked">
     <h1>فاتورة مبيعات — طلب شركة</h1>
-    <p class="page-subtitle">مستند بيع داخلي مرتبط بالعميل والقناة. البنود من الكتالوج تخصم المخزون تلقائياً؛ <strong>البند النصي</strong> (بدون منتج) يظهر في الفاتورة ولا يغيّر المخزون. بعد الحفظ تفتح صفحة الفاتورة الرسمية مع التسلسل والمدفوع والباقي.</p>
+    <p class="page-subtitle">مستند بيع داخلي مرتبط بالعميل والقناة. <strong>كل بنود الفاتورة</strong> يجب أن تكون <strong>منتجات مسجّلة</strong> في «المنتجات» (سعر الكتالوج والمخزون والمتغيرات كما في النظام). بعد الحفظ تفتح صفحة الفاتورة الرسمية مع التسلسل والمدفوع والباقي.</p>
 </div>
 
 <div class="card">
@@ -56,9 +56,9 @@ foreach ($variants as $v) {
         <h3 class="mo-invoice-doc-head__title">بنود الفاتورة</h3>
         <span class="mo-invoice-doc-head__badge">مسودة قبل الحفظ</span>
     </div>
-    <p class="card-hint" style="margin-top:0;">اختر <strong>منتجاً</strong> أو <strong>بنداً نصياً</strong> (حقل الوصف يظهر عند اختيار «بدون منتج»). الأعمدة: كمية، سعر الوحدة، خصم بالدينار — <strong>الصافي</strong> يُحسب في الملخص أسفل الجدول وفي الفاتورة المطبوعة. <kbd class="admin-kbd">Tab</kbd> من «خصم» لسطر جديد؛ الأسهم للتنقل.</p>
+    <p class="card-hint" style="margin-top:0;">لكل سطر اختر <strong>منتجاً</strong> من القائمة، ثم المتغير إن وُجد، والكمية و<strong>خصم السطر</strong> بالدينار إن لزم — سعر الوحدة من الكتالوج (غير قابل للتعديل هنا). <strong>الصافي</strong> في الملخص وفي الفاتورة المطبوعة. <kbd class="admin-kbd">Tab</kbd> من «خصم» لسطر جديد؛ الأسهم للتنقل.</p>
     <?php if ($products === []): ?>
-        <p class="mo-invoice-alert">لا توجد منتجات نشطة في الكتالوج — يمكنك العمل الآن بـ <strong>بنود نصية وأسعار يدوية</strong> فقط، أو إضافة منتجات من «المنتجات» لربط المخزون.</p>
+        <p class="mo-invoice-alert">لا توجد منتجات نشطة — <strong>لا يمكن حفظ فاتورة شركة</strong> حتى تُضاف منتجات من شاشة «المنتجات».</p>
     <?php endif; ?>
     <div class="admin-doc-frame mo-invoice-frame">
         <div class="table-wrap">
@@ -66,7 +66,7 @@ foreach ($variants as $v) {
                 <thead>
                     <tr>
                         <th class="mo-col-idx">#</th>
-                        <th>منتج / وصف</th>
+                        <th>المنتج</th>
                         <th>المتغير (لون/مقاس)</th>
                         <th>الكمية</th>
                         <th>سعر الوحدة</th>
@@ -103,8 +103,8 @@ foreach ($variants as $v) {
         <p class="mo-invoice-summary__hint" id="mo_live_paid_hint"></p>
     </div>
     <div class="actions admin-doc-lines-toolbar" style="margin-top:12px;">
-        <button type="button" class="btn-secondary" onclick="moAddLine()">+ سطر</button>
-        <button type="button" onclick="moSubmit()">حفظ وتسجيل الفاتورة</button>
+        <button type="button" class="btn-secondary" id="mo_btn_addline" onclick="moAddLine()" <?php echo $products === [] ? 'disabled' : ''; ?>>+ سطر</button>
+        <button type="button" id="mo_btn_save" onclick="moSubmit()" <?php echo $products === [] ? 'disabled' : ''; ?>>حفظ وتسجيل الفاتورة</button>
         <a class="btn btn-secondary" href="/admin/index.php?page=orders">الطلبات</a>
     </div>
 </div>
@@ -127,11 +127,11 @@ function moFindProduct(id) {
 }
 
 function moProductOptionsHtml() {
-    var o = '<option value="">' + moEsc('— بند نصي (بدون منتج) —') + '</option>';
     if (!MO_PRODUCTS.length) {
-        return o;
+        return '<option value="">' + moEsc('— لا توجد منتجات —') + '</option>';
     }
-    return o + MO_PRODUCTS.map(function (p) {
+    return '<option value="" selected disabled>' + moEsc('اختر المنتج') + '</option>' +
+        MO_PRODUCTS.map(function (p) {
         return '<option value="' + p.id + '">' + moEsc(p.name) + '</option>';
     }).join('');
 }
@@ -203,24 +203,7 @@ function moRecalcTotals() {
             if (disc < 0) {
                 disc = 0;
             }
-            if (pid <= 0) {
-                var free = (r.querySelector('.mo-free') && r.querySelector('.mo-free').value || '').trim();
-                if (free === '' || q < 1) {
-                    continue;
-                }
-                var up = moParseMoneyEl(r.querySelector('.mo-price'));
-                var lg = q * up;
-                gross += lg;
-                discsum += disc;
-                var ln = lg - disc;
-                if (ln < 0) {
-                    ln = 0;
-                }
-                net += ln;
-                count++;
-                continue;
-            }
-            if (q < 1) {
+            if (pid <= 0 || q < 1) {
                 continue;
             }
             var up2 = moParseMoneyEl(r.querySelector('.mo-price'));
@@ -275,24 +258,17 @@ function moRecalcTotals() {
 function moSyncRowMode(tr) {
     var sel = tr.querySelector('.mo-p');
     var pid = sel ? parseInt(sel.value, 10) || 0 : 0;
-    var freeInp = tr.querySelector('.mo-free');
     var priceInp = tr.querySelector('.mo-price');
-    if (freeInp) {
-        freeInp.style.display = pid > 0 ? 'none' : 'block';
-        if (pid > 0) {
-            freeInp.value = '';
-        }
-    }
     if (priceInp) {
+        priceInp.readOnly = true;
         if (pid > 0) {
-            priceInp.readOnly = true;
             var pr = moFindProduct(pid);
             if (pr) {
                 priceInp.value = String(parseFloat(pr.price) || 0);
             }
             moSyncVariant(sel);
         } else {
-            priceInp.readOnly = false;
+            priceInp.value = '0';
             var vcell = tr.querySelector('.mo-v-cell');
             if (vcell) {
                 vcell.setAttribute('hidden', '');
@@ -313,8 +289,7 @@ function moAddLine() {
     var tr = document.createElement('tr');
     tr.innerHTML =
         '<td class="mo-col-idx"></td>' +
-        '<td><select class="mo-p" style="min-width:10rem;">' + moProductOptionsHtml() + '</select>' +
-        '<input type="text" class="mo-free" style="display:none;width:100%;min-width:10rem;margin-top:6px;" placeholder="وصف البند (بدون منتج بالكتالوج)"></td>' +
+        '<td><select class="mo-p" style="min-width:10rem;">' + moProductOptionsHtml() + '</select></td>' +
         '<td class="mo-v-cell"><select class="mo-v"><option value="">—</option></select></td>' +
         '<td><input type="number" class="mo-q admin-inp-qty" min="1" step="1" value="1" inputmode="numeric" lang="en" dir="ltr"></td>' +
         '<td><input type="number" class="mo-price admin-inp-money" step="any" min="0" value="0" lang="en" dir="ltr"></td>' +
@@ -336,12 +311,11 @@ function moRemoveRow(btn) {
     }
     if (tb.querySelectorAll('tr').length <= 1) {
         var tr = btn.closest('tr');
-        tr.querySelector('.mo-p').value = '';
-        tr.querySelector('.mo-q').value = '1';
-        var fr = tr.querySelector('.mo-free');
-        if (fr) {
-            fr.value = '';
+        var psel = tr.querySelector('.mo-p');
+        if (psel) {
+            psel.selectedIndex = 0;
         }
+        tr.querySelector('.mo-q').value = '1';
         var pr = tr.querySelector('.mo-price');
         if (pr) {
             pr.value = '0';
@@ -362,14 +336,10 @@ function moRemoveRow(btn) {
 function moRowIsBlank(tr) {
     var pid = parseInt(tr.querySelector('.mo-p').value, 10) || 0;
     var q = parseInt(tr.querySelector('.mo-q').value, 10) || 0;
-    var free = (tr.querySelector('.mo-free') && tr.querySelector('.mo-free').value || '').trim();
     if (q < 1) {
         return true;
     }
-    if (pid > 0) {
-        return false;
-    }
-    return free === '';
+    return pid <= 0;
 }
 
 function moTrimExtraTrailingBlanks() {
@@ -483,22 +453,7 @@ function moSubmit() {
         }
         var vsel = r.querySelector('.mo-v');
         var vid = vsel && vsel.value ? parseInt(vsel.value, 10) : 0;
-        if (pid <= 0) {
-            var free = (r.querySelector('.mo-free') && r.querySelector('.mo-free').value || '').trim();
-            if (free === '' || q < 1) {
-                continue;
-            }
-            var up = parseFloat(String((r.querySelector('.mo-price') && r.querySelector('.mo-price').value) || '0').replace(',', '.')) || 0;
-            items.push({
-                product_id: null,
-                product_name: free,
-                qty: q,
-                unit_price: up,
-                line_discount: disc
-            });
-            continue;
-        }
-        if (q < 1) {
+        if (pid <= 0 || q < 1) {
             continue;
         }
         var o = { product_id: pid, qty: q, line_discount: disc };
@@ -508,7 +463,7 @@ function moSubmit() {
         items.push(o);
     }
     if (!items.length) {
-        alert('أضف سطراً واحداً على الأقل (منتج أو وصف نصي)');
+        alert('أضف سطراً واحداً على الأقل واختر منتجاً مسجّلاً لكل سطر');
         return;
     }
     var paidEl = document.getElementById('mo_paid');
