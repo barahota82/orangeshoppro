@@ -21,31 +21,20 @@ body.storefront .product-body h3 {
     color: var(--text);
 }
 
-/* هيرو: عائلة برتقالي واحدة — #1A0A03 → #FF6A00، أهدى في الوسط، لمعة داخلية خفيفة، بدون glow خارجي */
+/* هيرو: برتقالي مسطح هادئ — بدون تدرجات/طبقات/ظلال داخلية على الصندوق */
 .theme-orange .hero-banner,
 .theme-blue .hero-banner,
 .theme-black .hero-banner {
-    background: linear-gradient(
-        100deg,
-        #1a0a03 0%,
-        #4a1a04 34%,
-        #a33a05 68%,
-        #ff6a00 100%
-    );
+    background: #6f3510;
     color: var(--text);
-    border: 1px solid rgba(255, 106, 0, 0.2);
-    box-shadow:
-        inset 0 1px 0 rgba(255, 106, 0, 0.05),
-        inset 0 -22px 40px -10px rgba(0, 0, 0, 0.5),
-        inset 0 0 48px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 106, 0, 0.14);
+    box-shadow: none;
 }
 
 .theme-orange .hero-banner::after,
 .theme-blue .hero-banner::after,
 .theme-black .hero-banner::after {
-    background:
-        radial-gradient(ellipse 68% 48% at 88% 28%, rgba(255, 106, 0, 0.035), transparent 58%),
-        radial-gradient(ellipse 52% 44% at 12% 82%, rgba(0, 0, 0, 0.32), transparent 56%);
+    display: none;
 }
 
 .theme-orange .hero-banner h2,
@@ -58,7 +47,7 @@ body.storefront .product-body h3 {
 .theme-blue .hero-banner--rotator .hero-rotator-text,
 .theme-black .hero-banner--rotator .hero-rotator-text {
     color: var(--text);
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+    text-shadow: none;
 }
 
 /* صور المنتجات على خلفية قسم */
@@ -79,14 +68,36 @@ body.storefront .btn-secondary:hover:not([disabled]) {
 }
 
 /*
- * تبويب القسم النشط (الشريط الخارجي فقط — مثل «Offers» / «All»): أهدى من اللوجو
- * لا يمس أزرار درج Browse (مثل «All products» داخل القائمة).
+ * تبويب الشريط الخارجي النشط — التنسيق السابق (لمعة ضيقة، بدون glow خارجي قوي)
+ * لا يمس زر «العروض» الثانوي داخل درج Browse.
  */
 body.storefront .tabs-section .tab-btn.active {
-    background: linear-gradient(135deg, #ff6a00 0%, #e85b00 100%);
+    background: linear-gradient(
+        135deg,
+        #c75100 0%,
+        #e85b00 38%,
+        #ff7a1a 49%,
+        #e85b00 56%,
+        #b84800 100%
+    );
     color: var(--text);
-    border-color: rgba(255, 106, 0, 0.22);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    border-color: transparent;
+    box-shadow: inset 0 1px 0 rgba(255, 122, 26, 0.28);
+}
+
+/* «All products» داخل المينيو: نفس تنسيق التبويب النشط السابق؛ بقية عناصر القائمة كما هي */
+body.storefront .storefront-browse-menu__cta[data-apply-filter="all"] {
+    background: linear-gradient(
+        135deg,
+        #c75100 0%,
+        #e85b00 38%,
+        #ff7a1a 49%,
+        #e85b00 56%,
+        #b84800 100%
+    );
+    color: var(--text);
+    border-color: transparent;
+    box-shadow: inset 0 1px 0 rgba(255, 122, 26, 0.28);
 }
 
 /* رقاقات الاختيار (لون/مقاس) */
