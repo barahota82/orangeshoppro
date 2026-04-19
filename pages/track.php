@@ -48,27 +48,27 @@ $orangeMyOrderUi = [
             <div class="track-signup-cta__expand" id="trackSignupExpand" hidden>
                 <div class="field track-signup-cta__field">
                     <label for="trackSignupEmail"><?php echo htmlspecialchars(t('customer_email'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="trackSignupEmail" type="email" name="email" autocomplete="email" inputmode="email" dir="ltr">
+                    <input id="trackSignupEmail" type="email" name="email" autocomplete="email" inputmode="email" dir="ltr" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_email'), ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="trackSignupName"><?php echo htmlspecialchars(t('customer_name'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="trackSignupName" type="text" name="name" autocomplete="name">
+                    <input id="trackSignupName" type="text" name="name" autocomplete="name" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_name'), ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="trackSignupPhone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="trackSignupPhone" type="tel" name="phone" autocomplete="tel" inputmode="tel">
+                    <input id="trackSignupPhone" type="tel" name="phone" autocomplete="tel" inputmode="tel" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_phone'), ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="trackSignupArea"><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="trackSignupArea" name="area" autocomplete="address-level1">
+                    <input id="trackSignupArea" name="area" autocomplete="address-level1" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_area'), ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="trackSignupAddress"><?php echo htmlspecialchars(t('address'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <textarea id="trackSignupAddress" name="address" autocomplete="street-address" rows="2"></textarea>
+                    <textarea id="trackSignupAddress" name="address" autocomplete="street-address" rows="2" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_address'), ENT_QUOTES, 'UTF-8'); ?>"></textarea>
                 </div>
                 <div class="field track-signup-cta__field">
-                    <label for="trackSignupNotes"><?php echo htmlspecialchars(t('notes'), ENT_QUOTES, 'UTF-8'); ?> <span class="form-optional-hint">(<?php echo htmlspecialchars(t('field_optional_short'), ENT_QUOTES, 'UTF-8'); ?>)</span></label>
-                    <textarea id="trackSignupNotes" name="notes" rows="2"></textarea>
+                    <label for="trackSignupNotes"><?php echo htmlspecialchars(t('notes'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <textarea id="trackSignupNotes" name="notes" rows="2" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_notes'), ENT_QUOTES, 'UTF-8'); ?>"></textarea>
                 </div>
                 <p class="track-signup-cta__feedback" id="trackSignupMsg" role="status" aria-live="polite" hidden></p>
             </div>
@@ -108,6 +108,10 @@ window.ORANGE_TRACK_LABELS = {
     order_number: <?php echo json_encode(t('order_number'), JSON_UNESCAPED_UNICODE); ?>,
     phone: <?php echo json_encode(t('phone'), JSON_UNESCAPED_UNICODE); ?>,
     items_title: <?php echo json_encode(t('track_order_items'), JSON_UNESCAPED_UNICODE); ?>
+};
+window.ORANGE_TRACK_SIGNUP = {
+    order_required: <?php echo json_encode(t('track_signup_order_required'), JSON_UNESCAPED_UNICODE); ?>,
+    order_mismatch: <?php echo json_encode(t('track_signup_order_mismatch'), JSON_UNESCAPED_UNICODE); ?>
 };
 
 (function () {
@@ -152,6 +156,9 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
     var sent = <?php echo json_encode(t('storefront_register_sent'), JSON_UNESCAPED_UNICODE); ?>;
     var already = <?php echo json_encode(t('storefront_register_already_verified'), JSON_UNESCAPED_UNICODE); ?>;
     var err = <?php echo json_encode(t('storefront_register_error'), JSON_UNESCAPED_UNICODE); ?>;
+    var trackSignupT = window.ORANGE_TRACK_SIGNUP || {};
+    var trackOnumEl = document.getElementById('track_order_number');
+    var trackPhoneEl = document.getElementById('track_phone');
 
     function setHidden(el, on) {
         if (!el) {
@@ -173,6 +180,29 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
         setHidden(sendBtn, false);
         setHidden(msgEl, true);
         msgEl.textContent = '';
+        var ton = trackOnumEl ? trackOnumEl.value.trim() : '';
+        var ctx = window.__orangeCartTrack;
+        if (ctx && ctx.order && String(ctx.order.order_number || '') === ton) {
+            var o = ctx.order;
+            if (!emailInp.value.trim() && o.customer_email) {
+                emailInp.value = String(o.customer_email);
+            }
+            if (!nameInp.value.trim() && o.customer_name) {
+                nameInp.value = String(o.customer_name);
+            }
+            if (!phoneInp.value.trim() && o.phone) {
+                phoneInp.value = String(o.phone);
+            }
+            if (!areaInp.value.trim() && o.area) {
+                areaInp.value = String(o.area);
+            }
+            if (!addressInp.value.trim() && o.address) {
+                addressInp.value = String(o.address);
+            }
+            if (!notesInp.value.trim() && o.notes) {
+                notesInp.value = String(o.notes);
+            }
+        }
         requestAnimationFrame(function () {
             emailInp.focus();
         });
@@ -208,20 +238,25 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
         var area = areaInp.value.trim();
         var address = addressInp.value.trim();
         var notes = notesInp.value.trim();
+        var orderNumber = trackOnumEl ? trackOnumEl.value.trim() : '';
+        var orderVerifyPhone = trackPhoneEl ? trackPhoneEl.value.trim() : '';
         setHidden(msgEl, false);
         msgEl.textContent = '';
-        var reqMsg = (window.APP_T && window.APP_T.checkout_required_fields) || '';
         var badEmail = (window.APP_T && window.APP_T.checkout_invalid_email) || '';
-        if (!name || !phone || !email || !area || !address) {
-            msgEl.textContent = reqMsg;
+        if (!orderNumber || !orderVerifyPhone) {
+            msgEl.textContent = trackSignupT.order_required || '';
+            return;
+        }
+        if (orderVerifyPhone.replace(/\D/g, '').length < 5) {
+            msgEl.textContent = trackSignupT.order_required || '';
             return;
         }
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             msgEl.textContent = badEmail;
             return;
         }
-        if (phone.replace(/\D/g, '').length < 5) {
-            msgEl.textContent = reqMsg;
+        if (phone && phone.replace(/\D/g, '').length < 5) {
+            msgEl.textContent = trackSignupT.order_mismatch || '';
             return;
         }
         var apiUrl =
@@ -239,13 +274,15 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
                 area: area,
                 address: address,
                 notes: notes,
+                order_number: orderNumber,
+                order_verify_phone: orderVerifyPhone,
                 channel: typeof window.APP_CHANNEL_SLUG === 'string' ? window.APP_CHANNEL_SLUG : 'orange',
                 lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
             }),
         })
             .then(function (r) {
                 return r.json().then(function (j) {
-                    return { ok: r.ok, j: j };
+                    return { ok: r.ok, j: j, status: r.status };
                 });
             })
             .then(function (x) {
@@ -256,6 +293,11 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
                         } catch (e1) {}
                     }
                     msgEl.textContent = x.j.already_verified ? already : sent;
+                    return;
+                }
+                var c = x.j && x.j.code ? String(x.j.code) : '';
+                if (c === 'order_not_found' || c === 'order_link_mismatch' || c === 'signup_phone_mismatch' || x.status === 404) {
+                    msgEl.textContent = trackSignupT.order_mismatch || (x.j && x.j.message ? String(x.j.message) : err);
                     return;
                 }
                 msgEl.textContent = x.j && x.j.message ? String(x.j.message) : err;

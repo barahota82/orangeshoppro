@@ -88,27 +88,27 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
             <form id="orangeRegisterForm" style="margin-top: 1rem;">
                 <div class="field">
                     <label for="reg_email"><?php echo htmlspecialchars(t('customer_email'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="reg_email" name="email" type="email" autocomplete="email" required dir="ltr">
+                    <input id="reg_email" name="email" type="email" autocomplete="email" required dir="ltr" placeholder="<?php echo htmlspecialchars(t('register_placeholder_email'), ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
                 <div class="field">
                     <label for="reg_name"><?php echo htmlspecialchars(t('customer_name'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="reg_name" name="name" type="text" autocomplete="name" required>
+                    <input id="reg_name" name="name" type="text" autocomplete="name" required placeholder="<?php echo htmlspecialchars(t('register_placeholder_name'), ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
                 <div class="field">
                     <label for="reg_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="reg_phone" name="phone" type="tel" autocomplete="tel" required inputmode="tel">
+                    <input id="reg_phone" name="phone" type="tel" autocomplete="tel" required inputmode="tel" placeholder="<?php echo htmlspecialchars(t('register_placeholder_phone'), ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
                 <div class="field">
                     <label for="reg_area"><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="reg_area" name="area" autocomplete="address-level1" required>
+                    <input id="reg_area" name="area" autocomplete="address-level1" required placeholder="<?php echo htmlspecialchars(t('register_placeholder_area'), ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
                 <div class="field">
                     <label for="reg_address"><?php echo htmlspecialchars(t('address'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <textarea id="reg_address" name="address" autocomplete="street-address" required rows="3"></textarea>
+                    <textarea id="reg_address" name="address" autocomplete="street-address" required rows="3" placeholder="<?php echo htmlspecialchars(t('register_placeholder_address'), ENT_QUOTES, 'UTF-8'); ?>"></textarea>
                 </div>
                 <div class="field">
-                    <label for="reg_notes"><?php echo htmlspecialchars(t('notes'), ENT_QUOTES, 'UTF-8'); ?> <span class="form-optional-hint">(<?php echo htmlspecialchars(t('field_optional_short'), ENT_QUOTES, 'UTF-8'); ?>)</span></label>
-                    <textarea id="reg_notes" name="notes" rows="2"></textarea>
+                    <label for="reg_notes"><?php echo htmlspecialchars(t('notes'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <textarea id="reg_notes" name="notes" rows="2" placeholder="<?php echo htmlspecialchars(t('register_placeholder_notes'), ENT_QUOTES, 'UTF-8'); ?>"></textarea>
                 </div>
                 <p id="orangeRegisterMsg" class="cart-checkout-intro" style="margin-top: 0.75rem; min-height: 1.25em;" hidden></p>
                 <button type="submit" class="btn" style="margin-top: 1rem;"><?php echo htmlspecialchars(t('storefront_register_submit'), ENT_QUOTES, 'UTF-8'); ?></button>

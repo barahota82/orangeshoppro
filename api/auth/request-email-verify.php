@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/order_helpers.php';
 require_once __DIR__ . '/../../includes/storefront_account.php';
 require_once __DIR__ . '/../../includes/orange_mail.php';
 
@@ -21,24 +22,87 @@ try {
         json_response(['success' => false, 'message' => 'Invalid email'], 422);
     }
 
+    $orderNumberLink = isset($data['order_number']) ? trim((string) $data['order_number']) : '';
+    $orderVerifyPhone = isset($data['order_verify_phone']) ? trim((string) $data['order_verify_phone']) : '';
+    $hasOrderNum = $orderNumberLink !== '';
+    $hasVerifyPh = $orderVerifyPhone !== '';
+    if ($hasOrderNum !== $hasVerifyPh) {
+        json_response(['success' => false, 'code' => 'order_link_incomplete', 'message' => 'order_number and order_verify_phone required together'], 422);
+    }
+    $trackCtx = $hasOrderNum && $hasVerifyPh;
+
     $nameRaw = isset($data['name']) ? trim((string) $data['name']) : '';
     $phoneRaw = isset($data['phone']) ? trim((string) $data['phone']) : '';
     $areaRaw = isset($data['area']) ? trim((string) $data['area']) : '';
     $addressRaw = isset($data['address']) ? trim((string) $data['address']) : '';
     $notesRaw = isset($data['notes']) ? trim((string) $data['notes']) : '';
-    if ($nameRaw === '' || $phoneRaw === '' || $areaRaw === '' || $addressRaw === '') {
-        json_response(['success' => false, 'message' => 'Missing required fields'], 422);
-    }
-    $digits = preg_replace('/\D+/', '', $phoneRaw) ?? '';
-    if (strlen($digits) < 5) {
-        json_response(['success' => false, 'message' => 'Invalid phone'], 422);
-    }
 
-    $customerName = orange_storefront_clip_utf8($nameRaw, 255);
-    $customerPhone = orange_storefront_clip_utf8($phoneRaw, 64);
-    $customerArea = orange_storefront_clip_utf8($areaRaw, 255);
-    $customerAddress = orange_storefront_clip_utf8($addressRaw, 4000);
-    $customerNotes = $notesRaw === '' ? '' : orange_storefront_clip_utf8($notesRaw, 4000);
+    $channelSlug = isset($data['channel']) ? (string) $data['channel'] : '';
+    $channelSlug = orange_storefront_valid_channel_slug($pdo, $channelSlug);
+
+    if ($trackCtx) {
+        $ost = $pdo->prepare('SELECT * FROM orders WHERE order_number = ? LIMIT 1');
+        $ost->execute([$orderNumberLink]);
+        $orderRow = $ost->fetch(PDO::FETCH_ASSOC);
+        if (!$orderRow) {
+            json_response(['success' => false, 'code' => 'order_not_found', 'message' => 'Order not found'], 404);
+        }
+        if (!orange_order_phones_match_for_lookup($orderVerifyPhone, (string) ($orderRow['phone'] ?? ''))) {
+            json_response(['success' => false, 'code' => 'order_link_mismatch', 'message' => 'Phone does not match order'], 404);
+        }
+        if ($phoneRaw !== '' && !orange_order_phones_match_for_lookup($phoneRaw, (string) ($orderRow['phone'] ?? ''))) {
+            json_response(['success' => false, 'code' => 'signup_phone_mismatch', 'message' => 'Phone field must match the order phone'], 422);
+        }
+
+        $oName = trim((string) ($orderRow['customer_name'] ?? ''));
+        $oArea = trim((string) ($orderRow['area'] ?? ''));
+        $oAddress = trim((string) ($orderRow['address'] ?? ''));
+        $oNotes = trim((string) ($orderRow['notes'] ?? ''));
+
+        $customerName = $nameRaw !== '' ? orange_storefront_clip_utf8($nameRaw, 255) : orange_storefront_clip_utf8($oName, 255);
+        $customerArea = $areaRaw !== '' ? orange_storefront_clip_utf8($areaRaw, 255) : orange_storefront_clip_utf8($oArea, 255);
+        $customerAddress = $addressRaw !== '' ? orange_storefront_clip_utf8($addressRaw, 4000) : orange_storefront_clip_utf8($oAddress, 4000);
+        $customerNotes = $notesRaw !== '' ? orange_storefront_clip_utf8($notesRaw, 4000) : orange_storefront_clip_utf8($oNotes, 4000);
+        $customerPhone = orange_storefront_clip_utf8(trim((string) ($orderRow['phone'] ?? '')), 64);
+
+        if ($customerName === '' || $customerArea === '' || $customerAddress === '' || $customerPhone === '') {
+            json_response(['success' => false, 'message' => 'Missing required fields'], 422);
+        }
+
+        orange_storefront_sync_order_and_customer_after_track_signup(
+            $pdo,
+            $orderRow,
+            $email,
+            $customerName,
+            $customerArea,
+            $customerAddress,
+            $customerNotes
+        );
+
+        $chId = (int) ($orderRow['channel_id'] ?? 0);
+        if ($chId > 0) {
+            $cst = $pdo->prepare('SELECT slug FROM channels WHERE id = ? AND is_active = 1 LIMIT 1');
+            $cst->execute([$chId]);
+            $slugRow = $cst->fetch(PDO::FETCH_ASSOC);
+            if ($slugRow && !empty($slugRow['slug'])) {
+                $channelSlug = orange_storefront_valid_channel_slug($pdo, (string) $slugRow['slug']);
+            }
+        }
+    } else {
+        if ($nameRaw === '' || $phoneRaw === '' || $areaRaw === '' || $addressRaw === '') {
+            json_response(['success' => false, 'message' => 'Missing required fields'], 422);
+        }
+        $digits = preg_replace('/\D+/', '', $phoneRaw) ?? '';
+        if (strlen($digits) < 5) {
+            json_response(['success' => false, 'message' => 'Invalid phone'], 422);
+        }
+
+        $customerName = orange_storefront_clip_utf8($nameRaw, 255);
+        $customerPhone = orange_storefront_clip_utf8($phoneRaw, 64);
+        $customerArea = orange_storefront_clip_utf8($areaRaw, 255);
+        $customerAddress = orange_storefront_clip_utf8($addressRaw, 4000);
+        $customerNotes = $notesRaw === '' ? '' : orange_storefront_clip_utf8($notesRaw, 4000);
+    }
 
     $st = $pdo->prepare(
         'SELECT id, email_verified_at, verify_email_sent_at, registered_channel_slug FROM storefront_accounts WHERE email = ? LIMIT 1'
@@ -64,8 +128,6 @@ try {
         json_response(['success' => true, 'message' => 'ok', 'cooldown' => true]);
     }
 
-    $channelSlug = isset($data['channel']) ? (string) $data['channel'] : '';
-    $channelSlug = orange_storefront_valid_channel_slug($pdo, $channelSlug);
     $lang = isset($data['lang']) ? (string) $data['lang'] : 'en';
     if (!preg_match('/^(en|ar|fil|hi)$/', $lang)) {
         $lang = 'en';

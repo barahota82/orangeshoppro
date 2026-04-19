@@ -158,3 +158,62 @@ function orange_order_item_line_net(array $item): float
 
     return max(0.0, round($gross - $disc, 4));
 }
+
+/**
+ * بعد ربط التسجيل بالبريد من شاشة التتبع: تحديث صف الطلب (وبيانات العميل المرتبط إن وُجد).
+ *
+ * @param array<string, mixed> $order صف orders كما من قاعدة البيانات
+ */
+function orange_storefront_sync_order_and_customer_after_track_signup(
+    PDO $pdo,
+    array $order,
+    string $email,
+    string $name,
+    string $area,
+    string $address,
+    string $notes
+): void {
+    require_once __DIR__ . '/catalog_schema.php';
+
+    $orderId = (int) ($order['id'] ?? 0);
+    if ($orderId <= 0 || !orange_table_exists($pdo, 'orders')) {
+        return;
+    }
+
+    $hasOrderEmail = orange_table_has_column($pdo, 'orders', 'customer_email');
+    $setOrder = ['customer_name = ?', 'area = ?', 'address = ?', 'notes = ?'];
+    $paramsOrder = [
+        $name,
+        $area,
+        $address,
+        $notes,
+    ];
+    if ($hasOrderEmail) {
+        $setOrder[] = 'customer_email = ?';
+        $paramsOrder[] = $email;
+    }
+    $paramsOrder[] = $orderId;
+    $pdo->prepare('UPDATE orders SET ' . implode(', ', $setOrder) . ' WHERE id = ?')->execute($paramsOrder);
+
+    $cid = isset($order['customer_id']) ? (int) $order['customer_id'] : 0;
+    if ($cid <= 0 || !orange_table_exists($pdo, 'customers')) {
+        return;
+    }
+
+    $setCust = ['name_ar = ?'];
+    $paramsCust = [$name];
+    if (orange_table_has_column($pdo, 'customers', 'email')) {
+        $setCust[] = 'email = ?';
+        $paramsCust[] = $email;
+    }
+    if (orange_table_has_column($pdo, 'customers', 'area')) {
+        $setCust[] = 'area = ?';
+        $paramsCust[] = $area;
+    }
+    if (orange_table_has_column($pdo, 'customers', 'address')) {
+        $setCust[] = 'address = ?';
+        $paramsCust[] = $address;
+    }
+    $paramsCust[] = $cid;
+    $pdo->prepare('UPDATE customers SET ' . implode(', ', $setCust) . ' WHERE id = ?')->execute($paramsCust);
+}

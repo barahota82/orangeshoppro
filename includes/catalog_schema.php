@@ -261,6 +261,12 @@ function orange_catalog_ensure_schema(PDO $pdo): void
             "ALTER TABLE orders ADD COLUMN payment_terms VARCHAR(16) NOT NULL DEFAULT 'cash'"
         );
     }
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'customer_email')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE orders ADD COLUMN customer_email VARCHAR(255) NULL DEFAULT NULL'
+        );
+    }
     if (!orange_table_has_column($pdo, 'size_family_sizes', 'foot_length_cm')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE size_family_sizes ADD COLUMN foot_length_cm DECIMAL(6,2) NULL');
     }

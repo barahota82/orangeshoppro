@@ -647,7 +647,7 @@ function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, 
         waUrl = path + '?text=' + encodeURIComponent(prefillRaw);
     }
 
-    window.__orangeCartTrack = { orderNumber: orderNumber, phone: phoneTyped };
+    window.__orangeCartTrack = { orderNumber: orderNumber, phone: phoneTyped, order: order };
 
     let html = '<div class="track-box track-box--order">';
     html += '<p class="order-status-row"><strong>' + orangeEscDomText(UI.status_label || '') + ':</strong> ';

@@ -2305,6 +2305,12 @@ button.track-signup-cta__btn[hidden] {
     box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
+.field input::placeholder,
+.field textarea::placeholder {
+    color: var(--muted);
+    opacity: 0.88;
+}
+
 /* Mobile app-style bottom dock (storefront only) */
 .app-bottom-dock {
     display: none;
