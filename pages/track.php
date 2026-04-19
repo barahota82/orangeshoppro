@@ -46,6 +46,7 @@ $orangeMyOrderUi = [
                 <p class="track-signup-cta__text"><?php echo htmlspecialchars(t('track_signup_cta_text'), ENT_QUOTES, 'UTF-8'); ?></p>
             </div>
             <div class="track-signup-cta__expand" id="trackSignupExpand" hidden>
+                <p class="track-signup-cta__verify-note"><?php echo htmlspecialchars(t('track_signup_identity_note'), ENT_QUOTES, 'UTF-8'); ?></p>
                 <div class="field track-signup-cta__field">
                     <label for="trackSignupEmail"><?php echo htmlspecialchars(t('customer_email'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <input id="trackSignupEmail" type="email" name="email" autocomplete="email" inputmode="email" dir="ltr" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_email'), ENT_QUOTES, 'UTF-8'); ?>">
@@ -82,6 +83,7 @@ $orangeMyOrderUi = [
     <div class="card-box track-page-card">
         <h3 class="cart-section-title track-page-card__title"><?php echo htmlspecialchars(t('track_form_section_title'), ENT_QUOTES, 'UTF-8'); ?></h3>
         <p class="track-form-intro"><?php echo htmlspecialchars(t('track_order_howto'), ENT_QUOTES, 'UTF-8'); ?></p>
+        <p class="track-form-intro track-identity-explain"><?php echo htmlspecialchars(t('track_identity_explain'), ENT_QUOTES, 'UTF-8'); ?></p>
         <hr class="track-form-divider" aria-hidden="true">
         <form class="track-page-form" id="track-page-form" action="#" method="get" novalidate>
             <div class="field">
