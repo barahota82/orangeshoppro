@@ -199,6 +199,8 @@ a { text-decoration: none; color: inherit; }
     left: 8px;
     right: 8px;
     top: 0;
+    /* فوق admin-mega-backdrop (170) وإلا النقرات تُلتقط كلها بالخلفية المعتمة */
+    z-index: 180;
     pointer-events: auto;
     padding: 14px 16px 18px;
     border-radius: 0 0 var(--radius) var(--radius);
