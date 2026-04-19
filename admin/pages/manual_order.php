@@ -51,7 +51,7 @@ foreach ($variants as $v) {
 
 <div class="card">
     <h3>الأصناف</h3>
-    <p class="card-hint" style="margin-top:0;">جدول بنود داخل إطار واحد؛ اختر منتجاً والكمية — يُضاف سطر فارغ تلقائياً. من خانة الكمية اضغط <kbd class="admin-kbd">Tab</kbd> للانتقال لسطر جديد.</p>
+    <p class="card-hint" style="margin-top:0;">جدول بنود داخل إطار واحد؛ اختر منتجاً والكمية — يُضاف سطر فارغ تلقائياً. <kbd class="admin-kbd">Tab</kbd> من الكمية لسطر جديد؛ <kbd class="admin-kbd">←</kbd> <kbd class="admin-kbd">→</kbd> <kbd class="admin-kbd">↑</kbd> <kbd class="admin-kbd">↓</kbd> للتنقل بين الخلايا.</p>
     <?php if ($products === []): ?>
         <p class="card-hint">لا توجد منتجات نشطة. أضف منتجات من «المنتجات» أولاً.</p>
     <?php else: ?>

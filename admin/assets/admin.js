@@ -214,3 +214,139 @@ function orangeAdminOfferSuggestAfterWarnings(r) {
         run();
     }
 })();
+
+/**
+ * تنقّل لوحة مفاتيح بين خلايا جداول البنود (أسهم) — يشبه سلوك شبكة الإدخال.
+ * يُفعّل تلقائياً لأي tbody داخل table.admin-doc-lines-table
+ */
+(function initAdminDocLinesArrowNav() {
+    function focusablesInCell(td) {
+        if (!td || td.closest('[hidden]')) {
+            return [];
+        }
+        return Array.prototype.slice
+            .call(td.querySelectorAll('select, input:not([type="hidden"]):not([disabled]), textarea:not([disabled])'))
+            .filter(function (el) {
+                return el.offsetParent !== null || document.activeElement === el;
+            });
+    }
+
+    function firstFocusableInCell(td) {
+        var list = focusablesInCell(td);
+        return list.length ? list[0] : null;
+    }
+
+    function cellPosition(tbody, el) {
+        var tr = el.closest('tr');
+        if (!tr || tr.parentElement !== tbody) {
+            return null;
+        }
+        var td = el.closest('td');
+        if (!td || td.parentElement !== tr) {
+            return null;
+        }
+        var r = Array.prototype.indexOf.call(tbody.rows, tr);
+        if (r < 0) {
+            return null;
+        }
+        return { r: r, c: td.cellIndex, tr: tr, td: td };
+    }
+
+    function focusAt(tbody, r, c) {
+        var tr = tbody.rows[r];
+        if (!tr) {
+            return null;
+        }
+        var td = tr.cells[c];
+        if (!td) {
+            return null;
+        }
+        var el = firstFocusableInCell(td);
+        if (el) {
+            el.focus();
+            if (typeof el.select === 'function' && el.type !== 'number') {
+                try {
+                    el.select();
+                } catch (e) { /* */ }
+            }
+            return el;
+        }
+        return null;
+    }
+
+    function walkCol(tbody, r, c, delta) {
+        var tr = tbody.rows[r];
+        if (!tr) {
+            return null;
+        }
+        var nc = c + delta;
+        while (nc >= 0 && nc < tr.cells.length) {
+            if (focusAt(tbody, r, nc)) {
+                return true;
+            }
+            nc += delta;
+        }
+        return false;
+    }
+
+    function walkRow(tbody, r, c, delta) {
+        var nr = r + delta;
+        while (nr >= 0 && nr < tbody.rows.length) {
+            if (focusAt(tbody, nr, c)) {
+                return true;
+            }
+            var tr = tbody.rows[nr];
+            if (tr) {
+                for (var k = 0; k < tr.cells.length; k++) {
+                    if (focusAt(tbody, nr, k)) {
+                        return true;
+                    }
+                }
+            }
+            nr += delta;
+        }
+        return false;
+    }
+
+    function onKeydown(e) {
+        var key = e.key;
+        if (key !== 'ArrowUp' && key !== 'ArrowDown' && key !== 'ArrowLeft' && key !== 'ArrowRight') {
+            return;
+        }
+        if (e.altKey || e.ctrlKey || e.metaKey) {
+            return;
+        }
+        var el = e.target;
+        if (!el || !el.closest) {
+            return;
+        }
+        var tag = (el.tagName || '').toLowerCase();
+        if (tag !== 'input' && tag !== 'select' && tag !== 'textarea') {
+            return;
+        }
+        var tbody = el.closest('table.admin-doc-lines-table tbody');
+        if (!tbody) {
+            return;
+        }
+        var pos = cellPosition(tbody, el);
+        if (!pos) {
+            return;
+        }
+        var moved = false;
+        if (key === 'ArrowLeft') {
+            moved = walkCol(tbody, pos.r, pos.c, -1);
+        } else if (key === 'ArrowRight') {
+            moved = walkCol(tbody, pos.r, pos.c, 1);
+        } else if (key === 'ArrowUp') {
+            moved = walkRow(tbody, pos.r, pos.c, -1);
+        } else if (key === 'ArrowDown') {
+            moved = walkRow(tbody, pos.r, pos.c, 1);
+        }
+        if (moved) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    }
+
+    document.addEventListener('keydown', onKeydown, true);
+})();

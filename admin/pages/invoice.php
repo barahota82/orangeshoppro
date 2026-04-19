@@ -156,7 +156,7 @@ $recentForPicker = [];
 if (!$order) {
     try {
         $recentForPicker = $pdo->query(
-            'SELECT o.id, o.order_number, o.customer_name, o.total, o.status, o.created_at, o.order_source
+            'SELECT o.id, o.order_number, o.customer_name, o.total, o.status, o.created_at, o.order_source, o.payment_terms
              FROM orders o
              ORDER BY o.id DESC
              LIMIT 30'
@@ -169,9 +169,9 @@ if (!$order) {
 $orderTotalVal = $order ? (float)$order['total'] : 0.0;
 $linesMismatch = $order && abs($linesSubtotal - $orderTotalVal) > 0.009;
 ?>
-<div class="page-title">
+<div class="page-title page-title--stacked">
     <h1>فاتورة مبيعات</h1>
-    <p style="margin:0.35rem 0 0;font-size:0.95rem;opacity:0.9;">مستند رسمي للعميل — يُخصَّص من «بيانات الشركة». المبيعات والمخزون <strong>موحّدان للشركة</strong>؛ أي «قناة» مذكورة هي لتتبّع العملاء ومصدر الطلب فقط.</p>
+    <p class="page-subtitle">مستند للعميل من <strong>طلب محفوظ</strong> — رقم فاتورة مسلسل (<code>INV-</code>) يُخصَّص تلقائياً في النظام عند أول فتح لهذه الصفحة (لا زر «حفظ» منفصل). بعدها: <strong>طباعة / PDF</strong> من الشريط أعلاه أو <kbd class="admin-kbd">Ctrl</kbd>+<kbd class="admin-kbd">P</kbd>.</p>
 </div>
 
 <style>
@@ -268,6 +268,71 @@ $linesMismatch = $order && abs($linesSubtotal - $orderTotalVal) > 0.009;
         line-height: 1.6;
     }
     .invoice-actions { margin-top: 1.25rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .invoice-workflow-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 18px;
+        padding: 14px 18px;
+        background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        box-shadow: 0 4px 18px rgba(15, 23, 42, 0.07);
+        position: sticky;
+        top: 6px;
+        z-index: 6;
+    }
+    .invoice-workflow-bar__meta {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 0.9rem;
+        line-height: 1.45;
+        color: #334155;
+        min-width: min(100%, 22rem);
+    }
+    .invoice-workflow-bar__number strong {
+        font-size: 1.15rem;
+        color: #0f172a;
+        letter-spacing: 0.02em;
+    }
+    .invoice-workflow-bar__saved {
+        display: inline-block;
+        margin-inline-start: 8px;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        background: #dcfce7;
+        color: #166534;
+    }
+    .invoice-workflow-bar__pending {
+        display: inline-block;
+        margin-inline-start: 8px;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        background: #ffedd5;
+        color: #9a3412;
+    }
+    .invoice-workflow-bar__order { font-size: 0.85rem; color: #64748b; }
+    .invoice-workflow-bar__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+    }
+    table.invoice-recent-picker tbody tr {
+        cursor: pointer;
+    }
+    table.invoice-recent-picker tbody tr:focus {
+        outline: 2px solid #ea580c;
+        outline-offset: -2px;
+        background: rgba(234, 88, 12, 0.07);
+    }
     .invoice-picker { margin-bottom: 1rem; display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
     .invoice-picker label { display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; }
     .invoice-picker input[type="text"] { min-width: 200px; padding: 8px; }
@@ -281,7 +346,7 @@ $linesMismatch = $order && abs($linesSubtotal - $orderTotalVal) > 0.009;
         font-size: 0.85rem;
     }
     @media print {
-        .invoice-actions, .invoice-picker, .page-title, .admin-sidebar, .admin-user, .brand { display: none !important; }
+        .invoice-workflow-bar, .invoice-actions, .invoice-picker, .page-title, .admin-sidebar, .admin-user, .brand { display: none !important; }
         .admin-main { margin: 0 !important; padding: 0 !important; }
         body { background: #fff !important; }
         .invoice-doc { box-shadow: none; border: none; max-width: none; }
@@ -304,8 +369,9 @@ $linesMismatch = $order && abs($linesSubtotal - $orderTotalVal) > 0.009;
     </form>
     <p style="margin:0 0 12px;"><a class="btn btn-secondary" href="/admin/index.php?page=orders">← كل الطلبات</a></p>
     <?php if ($recentForPicker): ?>
+    <p class="card-hint" style="margin:0 0 10px;">انقر صفاً داخل الجدول ثم استخدم <kbd class="admin-kbd">↑</kbd> <kbd class="admin-kbd">↓</kbd> للتنقل و <kbd class="admin-kbd">Enter</kbd> لفتح الفاتورة.</p>
     <div class="table-wrap">
-        <table>
+        <table class="invoice-recent-picker admin-table">
             <thead>
                 <tr>
                     <th>#</th>
@@ -342,6 +408,50 @@ $linesMismatch = $order && abs($linesSubtotal - $orderTotalVal) > 0.009;
     </div>
     <?php endif; ?>
 </div>
+<script>
+(function () {
+    var tb = document.querySelector('table.invoice-recent-picker tbody');
+    if (!tb) {
+        return;
+    }
+    function rows() {
+        return Array.prototype.slice.call(tb.querySelectorAll('tr'));
+    }
+    rows().forEach(function (tr) {
+        tr.setAttribute('tabindex', '-1');
+    });
+    tb.addEventListener('click', function (e) {
+        var tr = e.target.closest('tr');
+        if (tr && tr.parentElement === tb) {
+            tr.focus();
+        }
+    });
+    tb.addEventListener('keydown', function (e) {
+        var tr = e.target.closest('tr');
+        if (!tr || tr.parentElement !== tb) {
+            return;
+        }
+        var list = rows();
+        var i = list.indexOf(tr);
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (i >= 0 && i < list.length - 1) {
+                list[i + 1].focus();
+            }
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (i > 0) {
+                list[i - 1].focus();
+            }
+        } else if (e.key === 'Enter') {
+            var a = tr.querySelector('a[href]');
+            if (a) {
+                window.location.href = a.getAttribute('href');
+            }
+        }
+    });
+})();
+</script>
 <?php else: ?>
 <?php
     $logoSrc = orange_invoice_logo_url((string)($companyProfile['company_logo'] ?? ''));
@@ -361,6 +471,30 @@ $linesMismatch = $order && abs($linesSubtotal - $orderTotalVal) > 0.009;
     $statusLabel = $orderStatusAr[$ost] ?? (string) ($order['status'] ?? '');
     $ptAr = 'بيع ' . orange_order_payment_terms_label_ar($order['payment_terms'] ?? 'cash');
 ?>
+
+<div class="invoice-workflow-bar" role="region" aria-label="إجراءات الفاتورة">
+    <div class="invoice-workflow-bar__meta">
+        <?php if ($formalInv !== ''): ?>
+            <div>
+                <span class="invoice-workflow-bar__number">رقم الفاتورة: <strong><?php echo htmlspecialchars($formalInv, ENT_QUOTES, 'UTF-8'); ?></strong></span>
+                <span class="invoice-workflow-bar__saved">مسلسل محفوظ</span>
+            </div>
+            <div class="invoice-workflow-bar__order">مرتبط بالطلب: <strong><?php echo htmlspecialchars((string)$order['order_number'], ENT_QUOTES, 'UTF-8'); ?></strong> — لا يتغيّر الرقم بعد التخصيص.</div>
+        <?php else: ?>
+            <div>
+                <span class="invoice-workflow-bar__number">رقم الفاتورة: <strong style="color:#94a3b8;font-weight:600;">سيُخصَّص الآن…</strong></span>
+                <span class="invoice-workflow-bar__pending">أول عرض للصفحة</span>
+            </div>
+            <div class="invoice-workflow-bar__order">بعد التحميل يظهر <code>INV-</code> تلقائياً ويُحفظ على الطلب <?php echo htmlspecialchars((string)$order['order_number'], ENT_QUOTES, 'UTF-8'); ?>.</div>
+        <?php endif; ?>
+    </div>
+    <div class="invoice-workflow-bar__actions">
+        <button type="button" class="btn" onclick="window.print()">طباعة / PDF</button>
+        <a class="btn btn-secondary" href="/admin/index.php?page=manual_order">+ طلب شركة</a>
+        <a class="btn btn-secondary" href="/admin/index.php?page=orders">الطلبات</a>
+        <a class="btn btn-secondary" href="/admin/index.php?page=invoice">فاتورة أخرى</a>
+    </div>
+</div>
 
 <div class="invoice-doc">
     <div class="invoice-doc-header">
@@ -476,9 +610,9 @@ $linesMismatch = $order && abs($linesSubtotal - $orderTotalVal) > 0.009;
         <?php endif; ?>
 
         <div class="invoice-actions">
-            <a class="btn btn-secondary" href="/admin/index.php?page=invoice">فواتير أخرى</a>
+            <a class="btn btn-secondary" href="/admin/index.php?page=invoice">فاتورة أخرى</a>
             <a class="btn btn-secondary" href="/admin/index.php?page=orders">الطلبات</a>
-            <button type="button" class="btn-secondary" onclick="window.print()">طباعة / PDF</button>
+            <button type="button" class="btn" onclick="window.print()">طباعة / PDF</button>
         </div>
     </div>
 </div>

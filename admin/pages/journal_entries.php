@@ -108,7 +108,7 @@ foreach ($accounts as $a) {
         </div>
     </div>
     <p class="card-hint" id="jv_balance_hint">مجموع المدين: 0 — مجموع الدائن: 0</p>
-    <p class="card-hint" style="margin-top:0;margin-bottom:10px;">أسطر السند داخل إطار واحد؛ عند إدخال مبلغ في آخر سطر يُفتح سطر جديد تلقائياً، أو اضغط <kbd class="admin-kbd">Tab</kbd> من خانة البيان للانتقال لسطر جديد.</p>
+    <p class="card-hint" style="margin-top:0;margin-bottom:10px;">أسطر السند داخل إطار واحد؛ عند إدخال مبلغ في آخر سطر يُفتح سطر جديد تلقائياً، أو <kbd class="admin-kbd">Tab</kbd> من خانة البيان لسطر جديد. داخل الجدول: <kbd class="admin-kbd">←</kbd> <kbd class="admin-kbd">→</kbd> <kbd class="admin-kbd">↑</kbd> <kbd class="admin-kbd">↓</kbd> للتنقل بين الخلايا.</p>
     <div class="admin-doc-frame">
         <div class="table-wrap">
             <table class="admin-table admin-doc-lines-table">

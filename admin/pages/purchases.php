@@ -76,7 +76,7 @@ $recent = $pdo->query(
     <?php if ($products === []): ?>
         <p class="card-hint">لا توجد منتجات نشطة لإضافتها. أنشئ منتجات من «المنتجات» أولًا.</p>
     <?php else: ?>
-    <p class="card-hint" style="margin-top:0;">بنود الفاتورة في جدول داخل إطار واحد؛ بعد اختيار صنف وكمية يُفتح سطر جديد تلقائياً. <kbd class="admin-kbd">Tab</kbd> من خانة «تكلفة الوحدة» ينقلك لسطر جديد.</p>
+    <p class="card-hint" style="margin-top:0;">بنود الفاتورة في جدول داخل إطار واحد؛ بعد اختيار صنف وكمية يُفتح سطر جديد تلقائياً. <kbd class="admin-kbd">Tab</kbd> من «تكلفة الوحدة» لسطر جديد؛ <kbd class="admin-kbd">←</kbd> <kbd class="admin-kbd">→</kbd> <kbd class="admin-kbd">↑</kbd> <kbd class="admin-kbd">↓</kbd> للتنقل بين الخلايا.</p>
     <div class="admin-doc-frame">
         <div class="table-wrap">
             <table class="admin-table admin-doc-lines-table pur-lines-table">
