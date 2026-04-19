@@ -44,6 +44,37 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                 <?php echo htmlspecialchars(t('storefront_account_signed_in'), ENT_QUOTES, 'UTF-8'); ?>
                 <strong dir="ltr"><?php echo htmlspecialchars($acc['email'], ENT_QUOTES, 'UTF-8'); ?></strong>
             </p>
+            <?php
+            $profBits = [];
+            if (!empty($acc['customer_name'])) {
+                $profBits[] = [t('customer_name'), (string) $acc['customer_name']];
+            }
+            if (!empty($acc['customer_phone'])) {
+                $profBits[] = [t('phone'), (string) $acc['customer_phone']];
+            }
+            if (!empty($acc['customer_area'])) {
+                $profBits[] = [t('area'), (string) $acc['customer_area']];
+            }
+            if (!empty($acc['customer_address'])) {
+                $profBits[] = [t('address'), (string) $acc['customer_address']];
+            }
+            if (!empty($acc['customer_notes'])) {
+                $profBits[] = [t('notes'), (string) $acc['customer_notes']];
+            }
+            ?>
+            <?php if ($profBits !== []): ?>
+                <div class="register-profile card-box" style="margin-top: 1rem; padding: 12px 14px; text-align: start;">
+                    <p class="cart-checkout-intro" style="margin: 0 0 8px; font-weight: 600;"><?php echo htmlspecialchars(t('cart_checkout_title'), ENT_QUOTES, 'UTF-8'); ?></p>
+                    <dl style="margin: 0; font-size: 0.9rem; line-height: 1.5;">
+                        <?php foreach ($profBits as $pair): ?>
+                            <div style="margin-top: 6px;">
+                                <dt style="margin: 0; color: var(--muted); font-weight: 600;"><?php echo htmlspecialchars($pair[0], ENT_QUOTES, 'UTF-8'); ?></dt>
+                                <dd style="margin: 2px 0 0; white-space: pre-wrap;"><?php echo htmlspecialchars($pair[1], ENT_QUOTES, 'UTF-8'); ?></dd>
+                            </div>
+                        <?php endforeach; ?>
+                    </dl>
+                </div>
+            <?php endif; ?>
             <p class="cart-checkout-intro" style="margin-top: 0.5rem;">
                 <?php echo htmlspecialchars(t('storefront_your_channel'), ENT_QUOTES, 'UTF-8'); ?>
                 <strong><?php echo htmlspecialchars($accChLabel, ENT_QUOTES, 'UTF-8'); ?></strong>
@@ -56,8 +87,28 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
         <?php else: ?>
             <form id="orangeRegisterForm" style="margin-top: 1rem;">
                 <div class="field">
-                    <label for="reg_email"><?php echo htmlspecialchars(t('storefront_register_email_label'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <label for="reg_email"><?php echo htmlspecialchars(t('customer_email'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <input id="reg_email" name="email" type="email" autocomplete="email" required dir="ltr">
+                </div>
+                <div class="field">
+                    <label for="reg_name"><?php echo htmlspecialchars(t('customer_name'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <input id="reg_name" name="name" type="text" autocomplete="name" required>
+                </div>
+                <div class="field">
+                    <label for="reg_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <input id="reg_phone" name="phone" type="tel" autocomplete="tel" required inputmode="tel">
+                </div>
+                <div class="field">
+                    <label for="reg_area"><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <input id="reg_area" name="area" autocomplete="address-level1" required>
+                </div>
+                <div class="field">
+                    <label for="reg_address"><?php echo htmlspecialchars(t('address'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <textarea id="reg_address" name="address" autocomplete="street-address" required rows="3"></textarea>
+                </div>
+                <div class="field">
+                    <label for="reg_notes"><?php echo htmlspecialchars(t('notes'), ENT_QUOTES, 'UTF-8'); ?> <span class="form-optional-hint">(<?php echo htmlspecialchars(t('field_optional_short'), ENT_QUOTES, 'UTF-8'); ?>)</span></label>
+                    <textarea id="reg_notes" name="notes" rows="2"></textarea>
                 </div>
                 <p id="orangeRegisterMsg" class="cart-checkout-intro" style="margin-top: 0.75rem; min-height: 1.25em;" hidden></p>
                 <button type="submit" class="btn" style="margin-top: 1rem;"><?php echo htmlspecialchars(t('storefront_register_submit'), ENT_QUOTES, 'UTF-8'); ?></button>
@@ -70,17 +121,42 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                 var sent = <?php echo json_encode(t('storefront_register_sent'), JSON_UNESCAPED_UNICODE); ?>;
                 var already = <?php echo json_encode(t('storefront_register_already_verified'), JSON_UNESCAPED_UNICODE); ?>;
                 var err = <?php echo json_encode(t('storefront_register_error'), JSON_UNESCAPED_UNICODE); ?>;
+                var reqMsg = (window.APP_T && window.APP_T.checkout_required_fields) || '';
+                var badEmail = (window.APP_T && window.APP_T.checkout_invalid_email) || '';
                 form.addEventListener('submit', function (e) {
                     e.preventDefault();
                     msg.hidden = false;
                     msg.textContent = '';
-                    var email = (document.getElementById('reg_email') || {}).value || '';
+                    var email = (document.getElementById('reg_email') || {}).value.trim() || '';
+                    var name = (document.getElementById('reg_name') || {}).value.trim() || '';
+                    var phone = (document.getElementById('reg_phone') || {}).value.trim() || '';
+                    var area = (document.getElementById('reg_area') || {}).value.trim() || '';
+                    var address = (document.getElementById('reg_address') || {}).value.trim() || '';
+                    var notes = (document.getElementById('reg_notes') || {}).value.trim() || '';
+                    if (!name || !phone || !email || !area || !address) {
+                        msg.textContent = reqMsg;
+                        return;
+                    }
+                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                        msg.textContent = badEmail;
+                        return;
+                    }
+                    var digits = phone.replace(/\D/g, '');
+                    if (digits.length < 5) {
+                        msg.textContent = reqMsg;
+                        return;
+                    }
                     var base = typeof window.STOREFRONT_BASE === 'string' ? window.STOREFRONT_BASE : '';
                     fetch(base + '/api/auth/request-email-verify.php', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             email: email,
+                            name: name,
+                            phone: phone,
+                            area: area,
+                            address: address,
+                            notes: notes,
                             channel: typeof window.APP_CHANNEL_SLUG === 'string' ? window.APP_CHANNEL_SLUG : 'orange',
                             lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en'
                         })

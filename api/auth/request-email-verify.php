@@ -21,6 +21,25 @@ try {
         json_response(['success' => false, 'message' => 'Invalid email'], 422);
     }
 
+    $nameRaw = isset($data['name']) ? trim((string) $data['name']) : '';
+    $phoneRaw = isset($data['phone']) ? trim((string) $data['phone']) : '';
+    $areaRaw = isset($data['area']) ? trim((string) $data['area']) : '';
+    $addressRaw = isset($data['address']) ? trim((string) $data['address']) : '';
+    $notesRaw = isset($data['notes']) ? trim((string) $data['notes']) : '';
+    if ($nameRaw === '' || $phoneRaw === '' || $areaRaw === '' || $addressRaw === '') {
+        json_response(['success' => false, 'message' => 'Missing required fields'], 422);
+    }
+    $digits = preg_replace('/\D+/', '', $phoneRaw) ?? '';
+    if (strlen($digits) < 5) {
+        json_response(['success' => false, 'message' => 'Invalid phone'], 422);
+    }
+
+    $customerName = orange_storefront_clip_utf8($nameRaw, 255);
+    $customerPhone = orange_storefront_clip_utf8($phoneRaw, 64);
+    $customerArea = orange_storefront_clip_utf8($areaRaw, 255);
+    $customerAddress = orange_storefront_clip_utf8($addressRaw, 4000);
+    $customerNotes = $notesRaw === '' ? '' : orange_storefront_clip_utf8($notesRaw, 4000);
+
     $st = $pdo->prepare(
         'SELECT id, email_verified_at, verify_email_sent_at, registered_channel_slug FROM storefront_accounts WHERE email = ? LIMIT 1'
     );
@@ -57,17 +76,36 @@ try {
 
     if (!$row) {
         $ins = $pdo->prepare(
-            'INSERT INTO storefront_accounts (email, registered_channel_slug, verify_token_hash, verify_token_expires_at, verify_email_sent_at)
-             VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 48 HOUR), NOW())'
+            'INSERT INTO storefront_accounts (email, registered_channel_slug, customer_name, customer_phone, customer_area, customer_address, customer_notes, verify_token_hash, verify_token_expires_at, verify_email_sent_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 48 HOUR), NOW())'
         );
-        $ins->execute([$email, $channelSlug, $hash]);
+        $ins->execute([
+            $email,
+            $channelSlug,
+            $customerName,
+            $customerPhone,
+            $customerArea,
+            $customerAddress,
+            $customerNotes,
+            $hash,
+        ]);
     } else {
         $upd = $pdo->prepare(
             'UPDATE storefront_accounts SET verify_token_hash = ?, verify_token_expires_at = DATE_ADD(NOW(), INTERVAL 48 HOUR), verify_email_sent_at = NOW(),
-             registered_channel_slug = COALESCE(registered_channel_slug, ?)
+             registered_channel_slug = COALESCE(registered_channel_slug, ?),
+             customer_name = ?, customer_phone = ?, customer_area = ?, customer_address = ?, customer_notes = ?
              WHERE id = ? AND email_verified_at IS NULL'
         );
-        $upd->execute([$hash, $channelSlug, (int) $row['id']]);
+        $upd->execute([
+            $hash,
+            $channelSlug,
+            $customerName,
+            $customerPhone,
+            $customerArea,
+            $customerAddress,
+            $customerNotes,
+            (int) $row['id'],
+        ]);
     }
 
     $rel = storefront_url('verify_email', $channelSlug, $lang, ['token' => $token]);

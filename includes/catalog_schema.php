@@ -1119,6 +1119,37 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         );
     }
 
+    if (orange_table_exists($pdo, 'storefront_accounts') && !orange_table_has_column($pdo, 'storefront_accounts', 'customer_name')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE storefront_accounts ADD COLUMN customer_name VARCHAR(255) NULL DEFAULT NULL'
+        );
+    }
+    if (orange_table_exists($pdo, 'storefront_accounts') && !orange_table_has_column($pdo, 'storefront_accounts', 'customer_phone')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE storefront_accounts ADD COLUMN customer_phone VARCHAR(64) NULL DEFAULT NULL'
+        );
+    }
+    if (orange_table_exists($pdo, 'storefront_accounts') && !orange_table_has_column($pdo, 'storefront_accounts', 'customer_area')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE storefront_accounts ADD COLUMN customer_area VARCHAR(255) NULL DEFAULT NULL'
+        );
+    }
+    if (orange_table_exists($pdo, 'storefront_accounts') && !orange_table_has_column($pdo, 'storefront_accounts', 'customer_address')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE storefront_accounts ADD COLUMN customer_address TEXT NULL DEFAULT NULL'
+        );
+    }
+    if (orange_table_exists($pdo, 'storefront_accounts') && !orange_table_has_column($pdo, 'storefront_accounts', 'customer_notes')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE storefront_accounts ADD COLUMN customer_notes TEXT NULL DEFAULT NULL'
+        );
+    }
+
     $done = true;
 }
 

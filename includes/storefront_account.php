@@ -12,6 +12,31 @@ function orange_storefront_normalize_email(string $raw): ?string
     return $e;
 }
 
+/** قصّ آمن لحقول الملف التعريفي (UTF-8 عند توفر mbstring). */
+function orange_storefront_clip_utf8(string $s, int $maxLen): string
+{
+    if ($maxLen <= 0) {
+        return '';
+    }
+    $collapsed = preg_replace('/\s+/u', ' ', $s);
+    $t = trim((string) ($collapsed ?? ''));
+    if ($t === '') {
+        return '';
+    }
+    if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+        if (mb_strlen($t, 'UTF-8') > $maxLen) {
+            return mb_substr($t, 0, $maxLen, 'UTF-8');
+        }
+
+        return $t;
+    }
+    if (strlen($t) > $maxLen) {
+        return substr($t, 0, $maxLen);
+    }
+
+    return $t;
+}
+
 /**
  * قناة نشطة من جدول channels أو orange الافتراضية.
  */
@@ -68,7 +93,17 @@ function storefront_account_login(PDO $pdo, int $accountId): void
 }
 
 /**
- * @return array{id: int, email: string, email_verified_at: string|null, registered_channel_slug: string}|null
+ * @return array{
+ *   id: int,
+ *   email: string,
+ *   email_verified_at: string|null,
+ *   registered_channel_slug: string,
+ *   customer_name?: string|null,
+ *   customer_phone?: string|null,
+ *   customer_area?: string|null,
+ *   customer_address?: string|null,
+ *   customer_notes?: string|null
+ * }|null
  */
 function current_storefront_account(PDO $pdo): ?array
 {
@@ -85,8 +120,15 @@ function current_storefront_account(PDO $pdo): ?array
         return null;
     }
     $hasCh = orange_table_has_column($pdo, 'storefront_accounts', 'registered_channel_slug');
-    $cols = $hasCh ? 'id, email, email_verified_at, registered_channel_slug' : 'id, email, email_verified_at';
-    $st = $pdo->prepare('SELECT ' . $cols . ' FROM storefront_accounts WHERE id = ? LIMIT 1');
+    $hasProfile = orange_table_has_column($pdo, 'storefront_accounts', 'customer_name');
+    $cols = ['id', 'email', 'email_verified_at'];
+    if ($hasCh) {
+        $cols[] = 'registered_channel_slug';
+    }
+    if ($hasProfile) {
+        array_push($cols, 'customer_name', 'customer_phone', 'customer_area', 'customer_address', 'customer_notes');
+    }
+    $st = $pdo->prepare('SELECT ' . implode(', ', $cols) . ' FROM storefront_accounts WHERE id = ? LIMIT 1');
     $st->execute([$id]);
     $row = $st->fetch(PDO::FETCH_ASSOC);
     if (!$row || empty($row['email_verified_at'])) {
@@ -99,12 +141,26 @@ function current_storefront_account(PDO $pdo): ?array
         $regSlug = orange_storefront_valid_channel_slug($pdo, (string) $row['registered_channel_slug']);
     }
 
-    return [
+    $out = [
         'id' => (int) $row['id'],
         'email' => (string) $row['email'],
         'email_verified_at' => $row['email_verified_at'] !== null ? (string) $row['email_verified_at'] : null,
         'registered_channel_slug' => $regSlug,
     ];
+    if ($hasProfile) {
+        $out['customer_name'] = isset($row['customer_name']) && $row['customer_name'] !== null && (string) $row['customer_name'] !== ''
+            ? (string) $row['customer_name'] : null;
+        $out['customer_phone'] = isset($row['customer_phone']) && $row['customer_phone'] !== null && (string) $row['customer_phone'] !== ''
+            ? (string) $row['customer_phone'] : null;
+        $out['customer_area'] = isset($row['customer_area']) && $row['customer_area'] !== null && (string) $row['customer_area'] !== ''
+            ? (string) $row['customer_area'] : null;
+        $out['customer_address'] = isset($row['customer_address']) && $row['customer_address'] !== null && (string) $row['customer_address'] !== ''
+            ? (string) $row['customer_address'] : null;
+        $out['customer_notes'] = isset($row['customer_notes']) && $row['customer_notes'] !== null && (string) $row['customer_notes'] !== ''
+            ? (string) $row['customer_notes'] : null;
+    }
+
+    return $out;
 }
 
 /**

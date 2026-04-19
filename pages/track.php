@@ -47,8 +47,28 @@ $orangeMyOrderUi = [
             </div>
             <div class="track-signup-cta__expand" id="trackSignupExpand" hidden>
                 <div class="field track-signup-cta__field">
-                    <label for="trackSignupEmail"><?php echo htmlspecialchars(t('storefront_register_email_label'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <label for="trackSignupEmail"><?php echo htmlspecialchars(t('customer_email'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <input id="trackSignupEmail" type="email" name="email" autocomplete="email" inputmode="email" dir="ltr">
+                </div>
+                <div class="field track-signup-cta__field">
+                    <label for="trackSignupName"><?php echo htmlspecialchars(t('customer_name'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <input id="trackSignupName" type="text" name="name" autocomplete="name">
+                </div>
+                <div class="field track-signup-cta__field">
+                    <label for="trackSignupPhone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <input id="trackSignupPhone" type="tel" name="phone" autocomplete="tel" inputmode="tel">
+                </div>
+                <div class="field track-signup-cta__field">
+                    <label for="trackSignupArea"><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <input id="trackSignupArea" name="area" autocomplete="address-level1">
+                </div>
+                <div class="field track-signup-cta__field">
+                    <label for="trackSignupAddress"><?php echo htmlspecialchars(t('address'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <textarea id="trackSignupAddress" name="address" autocomplete="street-address" rows="2"></textarea>
+                </div>
+                <div class="field track-signup-cta__field">
+                    <label for="trackSignupNotes"><?php echo htmlspecialchars(t('notes'), ENT_QUOTES, 'UTF-8'); ?> <span class="form-optional-hint">(<?php echo htmlspecialchars(t('field_optional_short'), ENT_QUOTES, 'UTF-8'); ?>)</span></label>
+                    <textarea id="trackSignupNotes" name="notes" rows="2"></textarea>
                 </div>
                 <p class="track-signup-cta__feedback" id="trackSignupMsg" role="status" aria-live="polite" hidden></p>
             </div>
@@ -120,8 +140,13 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
     var openBtn = document.getElementById('trackSignupOpenBtn');
     var sendBtn = document.getElementById('trackSignupSendBtn');
     var emailInp = document.getElementById('trackSignupEmail');
+    var nameInp = document.getElementById('trackSignupName');
+    var phoneInp = document.getElementById('trackSignupPhone');
+    var areaInp = document.getElementById('trackSignupArea');
+    var addressInp = document.getElementById('trackSignupAddress');
+    var notesInp = document.getElementById('trackSignupNotes');
     var msgEl = document.getElementById('trackSignupMsg');
-    if (!cta || !expand || !closeBtn || !openBtn || !sendBtn || !emailInp || !msgEl) {
+    if (!cta || !expand || !closeBtn || !openBtn || !sendBtn || !emailInp || !nameInp || !phoneInp || !areaInp || !addressInp || !notesInp || !msgEl) {
         return;
     }
     var sent = <?php echo json_encode(t('storefront_register_sent'), JSON_UNESCAPED_UNICODE); ?>;
@@ -163,6 +188,11 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
         setHidden(msgEl, true);
         msgEl.textContent = '';
         emailInp.value = '';
+        nameInp.value = '';
+        phoneInp.value = '';
+        areaInp.value = '';
+        addressInp.value = '';
+        notesInp.value = '';
     }
 
     /* حالة أولية صريحة — يظهر فقط «تسجيل» */
@@ -173,11 +203,25 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
 
     sendBtn.addEventListener('click', function () {
         var email = emailInp.value.trim();
+        var name = nameInp.value.trim();
+        var phone = phoneInp.value.trim();
+        var area = areaInp.value.trim();
+        var address = addressInp.value.trim();
+        var notes = notesInp.value.trim();
         setHidden(msgEl, false);
         msgEl.textContent = '';
-        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            msgEl.textContent =
-                (window.APP_T && window.APP_T.checkout_invalid_email) || 'Invalid email.';
+        var reqMsg = (window.APP_T && window.APP_T.checkout_required_fields) || '';
+        var badEmail = (window.APP_T && window.APP_T.checkout_invalid_email) || '';
+        if (!name || !phone || !email || !area || !address) {
+            msgEl.textContent = reqMsg;
+            return;
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            msgEl.textContent = badEmail;
+            return;
+        }
+        if (phone.replace(/\D/g, '').length < 5) {
+            msgEl.textContent = reqMsg;
             return;
         }
         var apiUrl =
@@ -190,6 +234,11 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 email: email,
+                name: name,
+                phone: phone,
+                area: area,
+                address: address,
+                notes: notes,
                 channel: typeof window.APP_CHANNEL_SLUG === 'string' ? window.APP_CHANNEL_SLUG : 'orange',
                 lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
             }),
