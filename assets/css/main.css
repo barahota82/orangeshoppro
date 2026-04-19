@@ -2029,7 +2029,8 @@ body.storefront .product-gallery__img {
     min-height: 56px;
     padding: 8px 4px;
     border-radius: 0;
-    border: 0;
+    border: 1px solid transparent;
+    border-inline-end-color: var(--border);
     background: transparent;
 }
 
@@ -2098,8 +2099,9 @@ body.storefront .product-gallery__img {
     font-family: var(--font-display);
     line-height: 1.15;
     text-align: center;
-    /* حد شفاف ثابت — بدون خطوط تقسيم بين الأزرار (المسافة من gap على الشبكة في الموبايل) */
+    /* حد شفاف + فاصل رأسي بين الخلايا (لون اليمين فقط) */
     border: 1px solid transparent;
+    border-inline-end-color: var(--border);
     background: transparent;
     box-shadow: none;
     transition:
@@ -2111,6 +2113,10 @@ body.storefront .product-gallery__img {
     box-sizing: border-box;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+}
+
+.app-bottom-dock__cell:last-child .app-dock-btn {
+    border-inline-end: none;
 }
 
 .app-dock-btn--whatsapp {
@@ -2126,6 +2132,20 @@ body.storefront .product-gallery__img {
 .app-dock-btn--disabled {
     opacity: 0.45;
     pointer-events: none;
+}
+
+/* الصفحة الحالية في الشريط السفلي — يبقى البرتقالي حتى الانتقال (مثل حالة اللغة المفتوحة) */
+body.storefront .app-bottom-dock .app-dock-btn--current:not(.app-dock-btn--whatsapp) {
+    border-color: var(--primary);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 0 0 3px var(--primary-soft);
+    color: var(--primary);
+}
+
+body.storefront .app-bottom-dock .app-dock-btn--current:not(.app-dock-btn--whatsapp) .app-dock-btn__label,
+body.storefront .app-bottom-dock .app-dock-btn--current:not(.app-dock-btn--whatsapp) .app-dock-btn__icon,
+body.storefront .app-bottom-dock .app-dock-btn--current:not(.app-dock-btn--whatsapp) .app-dock-btn__icon svg {
+    color: var(--primary);
 }
 
 /* Inline SVGs in PHP — no CSS masks (masks often fail on mobile / stroke SVGs) */
@@ -2252,15 +2272,8 @@ body.storefront .product-gallery__img {
         -webkit-touch-callout: none;
     }
 
-    /* شريط موحّد: بدون خطوط رأسية بين الخلايا — المسافة من column-gap فقط (الـ safe-area على الـ nav أصلًا) */
-    body.storefront .app-bottom-dock__grid {
-        column-gap: 10px;
-        row-gap: 0;
-        padding-inline: 4px;
-    }
-
     /*
-     * شريط سفلي (عربة / تتبع / تسجيل): حد برتقالي + هالة؛ لون النص والأيقونة (SVG currentColor) صراحةً لأن بعض الموبايل لا يورّث للأبناء.
+     * شريط سفلي (عربة / تتبع / تسجيل): حد برتقالي + هالة عند اللمس/التركيز؛ الصفحة الحالية عبر .app-dock-btn--current.
      */
     body.storefront .app-bottom-dock .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):active,
     body.storefront .app-bottom-dock .app-dock-btn:not(.app-dock-btn--whatsapp):not(.app-dock-btn--disabled):focus-visible {

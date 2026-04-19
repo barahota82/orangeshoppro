@@ -13,6 +13,10 @@ $cartHref = htmlspecialchars(storefront_url('cart', $channelSlug, $lang), ENT_QU
 $trackHref = htmlspecialchars(storefront_url('track', $channelSlug, $lang), ENT_QUOTES, 'UTF-8');
 $registerHref = htmlspecialchars(storefront_url('register', $channelSlug, $lang), ENT_QUOTES, 'UTF-8');
 
+$dockCartCurrent = $pageKind === 'cart';
+$dockTrackCurrent = $pageKind === 'track';
+$dockRegisterCurrent = \in_array($pageKind, ['register', 'verify_email'], true);
+
 $langAria = htmlspecialchars(t('language'), ENT_QUOTES, 'UTF-8');
 
 /** قائمة اللغات — نمط الهيدر (ليس dock) */
@@ -79,7 +83,7 @@ if ($clusterPart === 'dock') {
     echo '<div class="app-bottom-dock__grid">';
     ?>
 <div class="app-bottom-dock__cell">
-<a class="app-dock-btn" data-orange-cart-link href="<?php echo $cartHref; ?>">
+<a class="app-dock-btn<?php echo $dockCartCurrent ? ' app-dock-btn--current' : ''; ?>"<?php echo $dockCartCurrent ? ' aria-current="page"' : ''; ?> data-orange-cart-link href="<?php echo $cartHref; ?>">
     <span class="app-dock-btn__icon" aria-hidden="true">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" focusable="false"><path d="M6 6h14l-1.3 8H7.7L6 6Zm0 0L5 3H2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="19" r="1.35" fill="currentColor"/><circle cx="17" cy="19" r="1.35" fill="currentColor"/></svg>
     </span>
@@ -87,7 +91,7 @@ if ($clusterPart === 'dock') {
 </a>
 </div>
 <div class="app-bottom-dock__cell">
-<a class="app-dock-btn" href="<?php echo $trackHref; ?>">
+<a class="app-dock-btn<?php echo $dockTrackCurrent ? ' app-dock-btn--current' : ''; ?>"<?php echo $dockTrackCurrent ? ' aria-current="page"' : ''; ?> href="<?php echo $trackHref; ?>">
     <span class="app-dock-btn__icon" aria-hidden="true">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" focusable="false"><path d="M12 21c-3.9-3.2-6-6.7-6-10a6 6 0 1 1 12 0c0 3.3-2.1 6.8-6 10Z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><circle cx="12" cy="11" r="2.25" fill="currentColor"/></svg>
     </span>
@@ -95,7 +99,7 @@ if ($clusterPart === 'dock') {
 </a>
 </div>
 <div class="app-bottom-dock__cell">
-<a class="app-dock-btn" href="<?php echo $registerHref; ?>">
+<a class="app-dock-btn<?php echo $dockRegisterCurrent ? ' app-dock-btn--current' : ''; ?>"<?php echo $dockRegisterCurrent ? ' aria-current="page"' : ''; ?> href="<?php echo $registerHref; ?>">
     <span class="app-dock-btn__icon" aria-hidden="true">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" focusable="false"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" stroke="currentColor" stroke-width="1.75"/><path d="M4 21a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
     </span>
