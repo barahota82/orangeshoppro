@@ -45,6 +45,7 @@ $orangeChannelLogoFile = preg_replace(
 ) ?: 'logo-orange.png';
 /* نفس منطق CSS/JS: ?v=filemtime حتى لا يبقى الكمبيوتر على شعار PNG قديم بعد التحديث */
 $orangeChannelLogoUrl = $orangePubBase . storefront_asset_url('/assets/images/' . $orangeChannelLogoFile);
+$orangeWordmarkUrl = $orangePubBase . storefront_asset_url('/assets/images/orange-company-wordmark.png');
 $orangeManifestHref = $orangePubBase . '/manifest.php?' . http_build_query(['channel' => $channelSlug, 'lang' => $lang]);
 
 $dir = $lang === 'ar' ? 'rtl' : 'ltr';
@@ -223,10 +224,10 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
 <header class="site-header" dir="ltr">
     <div class="container header-inner">
         <div class="brand-wrap">
-            <img class="logo" src="<?php echo htmlspecialchars($orangeChannelLogoUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?>" width="52" height="52" decoding="async">
+            <img class="logo" src="<?php echo htmlspecialchars($orangeChannelLogoUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="" width="52" height="52" decoding="async" role="presentation">
             <div class="brand-text">
                 <div class="brand-stack">
-                    <h1><?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?></h1>
+                    <h1 class="brand-title-heading"><img class="brand-wordmark" src="<?php echo htmlspecialchars($orangeWordmarkUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?>" decoding="async"></h1>
                     <small class="brand-tagline brand-tagline--cycle" aria-live="polite"><span class="brand-tagline__text" id="brandTaglineText" dir="auto" data-taglines="<?php echo $taglineJsonAttr; ?>"><?php echo htmlspecialchars($taglineInitial, ENT_QUOTES, 'UTF-8'); ?></span></small>
                 </div>
             </div>

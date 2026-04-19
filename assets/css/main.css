@@ -106,16 +106,26 @@ h1, h2, h3, .brand-text h1 {
     display: grid;
     grid-template-columns: minmax(0, max-content);
     justify-items: start;
-    gap: 4px;
+    gap: 6px;
     width: max-content;
-    max-width: min(20rem, calc(100vw - 140px));
+    max-width: min(28rem, calc(100vw - 140px));
 }
 
-.brand-stack h1 {
+/* اسم العلامة كصورة شعار أفقية؛ السلوجان يبقى تحتها */
+.brand-title-heading {
     margin: 0;
-    font-size: 1.25rem;
-    line-height: 1.2;
-    text-align: start;
+    line-height: 0;
+    font-size: 0;
+}
+
+.brand-wordmark {
+    display: block;
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    max-height: clamp(1.55rem, 5.2vw, 2.45rem);
+    object-fit: contain;
+    object-position: left center;
 }
 
 .brand-stack .brand-tagline--cycle {
