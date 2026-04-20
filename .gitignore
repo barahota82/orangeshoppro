@@ -2,6 +2,7 @@
 
 # Local backup extract for diffing; do not commit
 _compare_old_copy/
+_compare_zip_old/
 
 # SQL dump: local reference only; migrations sent as snippets for manual apply
 orange_db.sql
