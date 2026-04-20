@@ -87,7 +87,8 @@ try {
              * @return array{0:bool,1:bool}
              */
             $orangeNavSectionMeta = static function (array $items) use ($admin, $pdoNav, $orangeNavLinkActive): array {
-                $scan = static function (array $nodes) use ($admin, $pdoNav, $orangeNavLinkActive): array {
+                $scan = null;
+                $scan = static function (array $nodes) use (&$scan, $admin, $pdoNav, $orangeNavLinkActive): array {
                     $anyVisible = false;
                     $hasActive = false;
                     foreach ($nodes as $nl) {
