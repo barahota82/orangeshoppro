@@ -369,12 +369,10 @@ function changeMainImage(src, btn) {
         dock.style.bottom = gap ? `${gap}px` : '';
     }
 
-    function syncSoon() {
+    /** مزامنة ثانية بعد إطار رسم واحد فقط (استقرار visualViewport دون إرهاق أثناء السكرول) */
+    function syncAfterFrame() {
         sync();
-        requestAnimationFrame(() => {
-            sync();
-            requestAnimationFrame(sync);
-        });
+        requestAnimationFrame(sync);
     }
 
     vv.addEventListener('resize', sync, { passive: true });
@@ -384,26 +382,23 @@ function changeMainImage(src, btn) {
     } else if (typeof mq.addListener === 'function') {
         mq.addListener(sync);
     }
-    window.addEventListener('orientationchange', syncSoon, { passive: true });
-    window.addEventListener('scroll', sync, { passive: true });
+    window.addEventListener('orientationchange', syncAfterFrame, { passive: true });
     window.addEventListener('load', () => {
         setHeaderHeightVar();
-        syncSoon();
+        syncAfterFrame();
     }, { passive: true });
     window.addEventListener('pageshow', (ev) => {
         setHeaderHeightVar();
-        syncSoon();
+        syncAfterFrame();
         if (ev.persisted) {
-            syncSoon();
+            requestAnimationFrame(sync);
         }
     });
-    document.addEventListener('focusin', sync, true);
-    document.addEventListener('focusout', sync, true);
     if (typeof ResizeObserver !== 'undefined') {
         const ro = new ResizeObserver(setHeaderHeightVar);
         ro.observe(header);
     }
-    syncSoon();
+    syncAfterFrame();
 })();
 
 /** أزرار «تثبيت» (هيدر + شريط سفلي): Chrome/Android يعرض مطالبة التثبيت؛ iOS يعرض خطوات يدوية. */
