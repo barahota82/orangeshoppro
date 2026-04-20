@@ -1,5 +1,8 @@
 .env.php
 
+# Local backup extract for diffing; do not commit
+_compare_old_copy/
+
 # SQL dump: local reference only; migrations sent as snippets for manual apply
 orange_db.sql
 

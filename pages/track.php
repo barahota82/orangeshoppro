@@ -44,6 +44,30 @@ $orangeMyOrderUi = [
         <a class="cart-page-close" href="<?php echo htmlspecialchars($trackHomeUrl, ENT_QUOTES, 'UTF-8'); ?>" aria-label="<?php echo htmlspecialchars(t('product_back_to_shop'), ENT_QUOTES, 'UTF-8'); ?>"><span aria-hidden="true">&times;</span></a>
     </div>
 
+    <div class="card-box track-page-card" id="track-no-signup-section">
+        <h3 class="cart-section-title track-page-card__title"><?php echo htmlspecialchars(t('track_form_section_title'), ENT_QUOTES, 'UTF-8'); ?></h3>
+        <p class="track-form-intro"><?php echo htmlspecialchars(t('track_order_howto'), ENT_QUOTES, 'UTF-8'); ?></p>
+        <hr class="track-form-divider" aria-hidden="true">
+        <form class="track-page-form" id="track-page-form" action="#" method="get" novalidate>
+            <div class="field">
+                <label for="track_order_number"><?php echo htmlspecialchars(t('order_number'), ENT_QUOTES, 'UTF-8'); ?></label>
+                <input id="track_order_number" name="order_number" autocomplete="off" inputmode="text">
+            </div>
+            <div class="field">
+                <label for="track_phone_country"><?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?></label>
+                <?php orange_storefront_render_phone_country_select('track_phone_country'); ?>
+            </div>
+            <div class="field">
+                <label for="track_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
+                <input id="track_phone" class="js-orange-phone-input" name="phone" autocomplete="tel" inputmode="tel" maxlength="22" placeholder="<?php echo htmlspecialchars(t('phone_field_hint'), ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
+            </div>
+            <div class="actions-row track-page-actions">
+                <button type="submit" class="btn btn--track-submit"><?php echo htmlspecialchars(t('track_order'), ENT_QUOTES, 'UTF-8'); ?></button>
+            </div>
+        </form>
+        <div id="trackResult" class="cart-track-result track-page-result" style="margin-top:18px;" tabindex="-1"></div>
+    </div>
+
     <div class="track-signup-cta card-box" id="trackSignupCta" role="region" aria-label="<?php echo htmlspecialchars(t('track_signup_cta_aria'), ENT_QUOTES, 'UTF-8'); ?>" aria-expanded="false">
         <button type="button" class="track-signup-cta__close" id="trackSignupClose" hidden aria-label="<?php echo htmlspecialchars(t('track_signup_close'), ENT_QUOTES, 'UTF-8'); ?>"><span aria-hidden="true">&times;</span></button>
         <div class="track-signup-cta__inner">
@@ -99,30 +123,6 @@ $orangeMyOrderUi = [
                 <button type="button" class="btn track-signup-cta__btn track-signup-cta__btn-send" id="trackSignupSendBtn" hidden><?php echo htmlspecialchars(t('storefront_register_submit'), ENT_QUOTES, 'UTF-8'); ?></button>
             </div>
         </div>
-    </div>
-
-    <div class="card-box track-page-card" id="track-no-signup-section">
-        <h3 class="cart-section-title track-page-card__title"><?php echo htmlspecialchars(t('track_form_section_title'), ENT_QUOTES, 'UTF-8'); ?></h3>
-        <p class="track-form-intro"><?php echo htmlspecialchars(t('track_order_howto'), ENT_QUOTES, 'UTF-8'); ?></p>
-        <hr class="track-form-divider" aria-hidden="true">
-        <form class="track-page-form" id="track-page-form" action="#" method="get" novalidate>
-            <div class="field">
-                <label for="track_order_number"><?php echo htmlspecialchars(t('order_number'), ENT_QUOTES, 'UTF-8'); ?></label>
-                <input id="track_order_number" name="order_number" autocomplete="off" inputmode="text">
-            </div>
-            <div class="field">
-                <label for="track_phone_country"><?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?></label>
-                <?php orange_storefront_render_phone_country_select('track_phone_country'); ?>
-            </div>
-            <div class="field">
-                <label for="track_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
-                <input id="track_phone" class="js-orange-phone-input" name="phone" autocomplete="tel" inputmode="tel" maxlength="22" placeholder="<?php echo htmlspecialchars(t('phone_field_hint'), ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
-            </div>
-            <div class="actions-row track-page-actions">
-                <button type="submit" class="btn btn--track-submit"><?php echo htmlspecialchars(t('track_order'), ENT_QUOTES, 'UTF-8'); ?></button>
-        </div>
-        </form>
-        <div id="trackResult" class="cart-track-result track-page-result" style="margin-top:18px;" tabindex="-1"></div>
     </div>
 </div>
 
