@@ -87,7 +87,6 @@ try {
     }
 
     $logo = trim((string) ($data['logo'] ?? ''));
-    $color = trim((string) ($data['primary_color'] ?? ''));
     $name = trim((string) $data['name']);
     $wa = trim((string) $data['whatsapp_number']);
     $wh = 1;
@@ -120,9 +119,9 @@ try {
         }
 
         $upd = $pdo->prepare(
-            'UPDATE channels SET name = ?, slug = ?, path_segment = ?, logo = ?, primary_color = ?, whatsapp_number = ?, warehouse_number = ?, is_active = ? WHERE id = ?'
+            'UPDATE channels SET name = ?, slug = ?, path_segment = ?, logo = ?, whatsapp_number = ?, warehouse_number = ?, is_active = ? WHERE id = ?'
         );
-        $upd->execute([$name, $newSlug, $pathSeg, $logo, $color, $wa, $wh, $isActive, $id]);
+        $upd->execute([$name, $newSlug, $pathSeg, $logo, $wa, $wh, $isActive, $id]);
 
         if ($newSlug !== $oldSlug) {
             channels_sync_storefront_accounts_slug($pdo, $oldSlug, $newSlug);
@@ -145,10 +144,10 @@ try {
     $slug = channels_next_unique_slug($pdo, $pathSeg);
 
     $stmt = $pdo->prepare(
-        'INSERT INTO channels (name, slug, path_segment, logo, primary_color, whatsapp_number, warehouse_number, is_active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO channels (name, slug, path_segment, logo, whatsapp_number, warehouse_number, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?)'
     );
-    $stmt->execute([$name, $slug, $pathSeg, $logo, $color, $wa, $wh, $isActive]);
+    $stmt->execute([$name, $slug, $pathSeg, $logo, $wa, $wh, $isActive]);
 
     json_response(['success' => true, 'message' => 'تم حفظ الواجهة', 'slug' => $slug, 'path_segment' => $pathSeg]);
 } catch (Throwable $e) {

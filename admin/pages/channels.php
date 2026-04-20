@@ -31,7 +31,6 @@ $editIsActive = $editRow ? (int) ($editRow['is_active'] ?? 1) : 1;
 <div class="card">
     <h3><?php echo $editRow ? 'تعديل واجهة' : 'إضافة واجهة'; ?></h3>
     <p class="card-hint" style="margin:0 0 0.75rem;">اختصار الرابط يظهر في عنوان الموقع مثل <code>/tiktok</code> — عند <strong>تغييره</strong> يُحدَّث تلقائياً الـ <strong>slug الداخلي</strong> (لـ <code>?channel=</code> والكوكي). اسم الواجهة فقط لا يغيّر الـ slug.</p>
-    <p class="card-hint" style="margin:0 0 0.75rem;"><strong>اللون الأساسي:</strong> يُستخدم حالياً كلون شريط المتصفح (<code dir="ltr">theme-color</code>) في واجهة المتجر عندما يكون بصيغة hex صالحة مثل <code dir="ltr">#ff6600</code>.</p>
     <p class="card-hint" style="margin:0 0 0.75rem;"><strong>حالة الظهور:</strong> الواجهة <strong>غير النشطة</strong> لا يعمل لها مسار الاختصار العام ولا تُقبل في كوكي/خرائط المتجر للزوار. رابط <strong>معاينة الواجهة</strong> من الجدول يفتحها للمراجعة (بعد تسجيل دخول الأدمن) حتى وهي متوقفة.</p>
     <input type="hidden" id="channel_id" value="<?php echo $editRow ? (int) $editRow['id'] : ''; ?>">
     <input type="hidden" id="channel_logo" value="<?php echo htmlspecialchars($initialLogo, ENT_QUOTES, 'UTF-8'); ?>">
@@ -51,10 +50,6 @@ $editIsActive = $editRow ? (int) ($editRow['is_active'] ?? 1) : 1;
             <div id="channel_logo_preview_wrap" style="margin-top:0.5rem;display:none;">
                 <img id="channel_logo_preview" alt="" style="max-height:72px;max-width:200px;object-fit:contain;border-radius:6px;border:1px solid #e5e7eb;">
             </div>
-        </div>
-        <div>
-            <label>اللون الأساسي</label>
-            <input type="text" id="channel_color" placeholder="#ff6600" dir="ltr" value="<?php echo $editRow ? htmlspecialchars((string) ($editRow['primary_color'] ?? ''), ENT_QUOTES, 'UTF-8') : ''; ?>">
         </div>
         <div>
             <label>رقم الواتساب</label>
@@ -100,7 +95,6 @@ $editIsActive = $editRow ? (int) ($editRow['is_active'] ?? 1) : 1;
                     <td><?php echo htmlspecialchars($ch['name']); ?></td>
                     <td><code dir="ltr"><?php echo htmlspecialchars((string) ($ch['path_segment'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
                     <td><code dir="ltr"><?php echo htmlspecialchars($ch['slug']); ?></code></td>
-                    <td><?php echo htmlspecialchars($ch['primary_color']); ?></td>
                     <td><?php echo htmlspecialchars($ch['whatsapp_number']); ?></td>
                     <td dir="ltr"><?php
                     $ps = trim((string) ($ch['path_segment'] ?? ''));
@@ -201,7 +195,6 @@ async function saveChannel() {
         name: document.getElementById('channel_name').value.trim(),
         path_segment: document.getElementById('channel_path_segment').value.trim(),
         logo: document.getElementById('channel_logo').value.trim(),
-        primary_color: document.getElementById('channel_color').value.trim(),
         whatsapp_number: document.getElementById('channel_whatsapp').value.trim(),
         is_active: actSel && actSel.value === '0' ? 0 : 1
     };

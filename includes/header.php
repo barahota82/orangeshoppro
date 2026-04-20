@@ -23,14 +23,10 @@ $taglineJsonAttr = htmlspecialchars(json_encode($taglineCycle, JSON_UNESCAPED_UN
 
 require_once __DIR__ . '/upload_paths.php';
 
-/* ثيم ولون شريط المتصفح من القناة إن وُجد؛ الشعار من uploads/channels إن وُجد ملف مرفوع */
+/* ثيم موحّد؛ لون شريط المتصفح من الهوية الافتراضية؛ الشعار من uploads/channels إن وُجد ملف مرفوع */
 $theme = 'orange';
 $sfDisplayName = storefront_channel_display_name($channel, $channelSlug);
 $sfThemeColor = '#ff6a00';
-$chColor = trim((string) ($channel['primary_color'] ?? ''));
-if ($chColor !== '' && preg_match('/^#[0-9A-Fa-f]{3,8}$/', $chColor)) {
-    $sfThemeColor = $chColor;
-}
 
 $orangeAccountChannelForJs = '';
 try {

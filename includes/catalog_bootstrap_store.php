@@ -92,7 +92,6 @@ CREATE TABLE IF NOT EXISTS channels (
   slug VARCHAR(50) NOT NULL,
   path_segment VARCHAR(64) DEFAULT NULL,
   logo VARCHAR(255) DEFAULT NULL,
-  primary_color VARCHAR(20) DEFAULT NULL,
   whatsapp_number VARCHAR(20) DEFAULT NULL,
   warehouse_number TINYINT UNSIGNED NOT NULL DEFAULT 1,
   is_active TINYINT DEFAULT 1,
@@ -436,13 +435,13 @@ function orange_catalog_seed_default_channels_if_empty(PDO $pdo): void
             return;
         }
         $st = $pdo->prepare(
-            'INSERT INTO channels (name, slug, path_segment, logo, primary_color, whatsapp_number, warehouse_number, is_active)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO channels (name, slug, path_segment, logo, whatsapp_number, warehouse_number, is_active)
+             VALUES (?, ?, ?, ?, ?, ?, ?)'
         );
         $rows = [
-            ['Orange Store', 'tiktok', 'tiktok', 'logo-orange.png', '#ff7a00', '96500000000', 1, 1],
-            ['Blue Store', 'online', 'online', 'logo-blue.png', '#1d4ed8', '96500000001', 1, 1],
-            ['Black Store', 'web', 'web', 'logo-black.png', '#111827', '96500000002', 1, 1],
+            ['Orange Store', 'tiktok', 'tiktok', 'logo-orange.png', '96500000000', 1, 1],
+            ['Blue Store', 'online', 'online', 'logo-blue.png', '96500000001', 1, 1],
+            ['Black Store', 'web', 'web', 'logo-black.png', '96500000002', 1, 1],
         ];
         foreach ($rows as $r) {
             $st->execute($r);

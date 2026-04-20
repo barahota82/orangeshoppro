@@ -336,6 +336,9 @@ function orange_catalog_ensure_schema(PDO $pdo): void
             "UPDATE channels SET path_segment = 'web' WHERE slug = 'black' AND (path_segment IS NULL OR path_segment = '')"
         );
         orange_catalog_migrate_channel_slugs_align_path_segment_v1($pdo);
+        if (orange_table_has_column($pdo, 'channels', 'primary_color')) {
+            orange_catalog_safe_exec($pdo, 'ALTER TABLE channels DROP COLUMN primary_color');
+        }
     }
 
     orange_catalog_safe_exec($pdo,
