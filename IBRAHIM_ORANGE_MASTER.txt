@@ -1,7 +1,7 @@
 IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
 ============================================
 النسخة المعتمدة: جذر المستودع — IBRAHIM_ORANGE_MASTER.txt (مثلاً D:\orange)
-آخر تحديث: 2026-04-22
+آخر تحديث: 2026-04-23
 
 الغرض
 -------
@@ -19,25 +19,36 @@ IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
 
 2) قاعدة البيانات — كيف يُبنى المخطط
 ------------------------------------
-أ) الملف البرمجي includes/catalog_schema.php — الدالة orange_catalog_ensure_schema()
+أ) مراجعة «الحقيقة» (المخطط الفعلي على السيرفر كما يُصدَّر محلياً):
+   - المسار المعتمد دائماً للمراجعة والمقارنة مع الكود:
+     D:\orange\scripts\orange_db.sql
+   - هذا الملف هو لقطة mysqldump/phpMyAdmin من القاعدة الحقيقية؛ يُحدَّثه المالك عند
+     الحاجة (بعد تغييرات على السيرفر) حتى يبقى المرجع مطابقاً للواقع.
+   - عند مراجعة المخطط أو الانحرافات: ابدأ من هذا الملف، وليس افتراضاً من الملفات
+     الأخرى وحدها.
+
+ب) الملف البرمجي includes/catalog_schema.php — الدالة orange_catalog_ensure_schema()
    - تُستدعى من نقاط كثيرة (متجر، أدمن، طابور الطلبات، …).
    - تضيف/تعدّل جدايلاً وأعمدة (ألوان، مقاسات، طابور الطلبات، حسابات، قيود، عملاء،
      storefront_accounts، …) لكنها لا تنشئ «هيكل المتجر الكامل من الصفر».
 
-ب) الجداول الأساسية للمتجر (مثال: channels, categories, products, orders, …)
+ج) الجداول الأساسية للمتجر (مثال: channels, categories, products, orders, …)
    تُفترض موجودة من تثبيت أولي أو من استيراد SQL كامل.
 
-ج) المرجع لقاعدة جديدة تقريباً كاملة في المستودع:
+د) قالب قاعدة جديدة تقريباً كاملة في المستودع (للاستيراد على قاعدة فارغة — ليس
+   بديلاً عن لقطة الحقيقة أعلاه):
    scripts/mysql-create-orange-database-full.sql
    (يستخدم اسم القاعدة الافتراضي orange_db — يجب مواءمته مع config.php: DB_NAME)
 
-د) ملف orange_db.sql مذكور في .gitignore — أي dump محلي/إنتاج لن يكون في Git.
+هـ) ملف scripts/orange_db.sql مذكور في .gitignore — dump الحقيقة يبقى محلياً على
+   الجهاز وقد لا يظهر في Git؛ المسار D:\orange\scripts\orange_db.sql ثابت كاتفاق مراجعة.
 
 
 3) جدول product_channels
 --------------------------
 - الكود يستخدمه: includes/product_channels.php، حذف/إنشاء منتج في الأدمن، إلخ.
-- المرجع في SQL: mysql-create-orange-database-full.sql.
+- مراجعة الحقيقة على الجهاز: D:\orange\scripts\orange_db.sql — قالب Git:
+  mysql-create-orange-database-full.sql.
 - تمت إضافة إنشاء الجدول (ومحاولة قيود FK بأسماء orange_fk_pc_* عند غياب أي FK)
   داخل orange_catalog_ensure_schema() في includes/catalog_schema.php — قواعد قديمة
   تُحدَّث تلقائياً عند أول طلب يستدعي ensure_schema (مع وجود جدولي products و channels).

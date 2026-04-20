@@ -1,4 +1,5 @@
 -- Orange — فحص سريع للمخطط مقابل توقعات المشروع (MariaDB / MySQL 8+)
+-- مراجعة لقطة الحقيقة المحلية: D:\orange\scripts\orange_db.sql (اتفاق المالك).
 -- نفّذ على قاعدتك بعد: USE orange_db; (أو اسم DB في config.php)
 --
 -- تفسير مختصر:
