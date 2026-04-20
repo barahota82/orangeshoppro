@@ -146,6 +146,7 @@ try {
                 ['page' => 'dashboard', 'href' => '/admin/index.php?page=dashboard', 'label' => 'الرئيسية', 'class' => '', 'sub' => false],
             ];
 
+            /* ترتيب المحاسبة كما كان: سند قيد بعد أرصدة أول المدة وقبل سندات القبض/الذمم */
             $navAccounting = [
                 ['page' => 'chart_of_accounts', 'href' => '/admin/index.php?page=chart_of_accounts', 'label' => 'الدليل المحاسبي', 'class' => '', 'sub' => false],
                 ['page' => 'journal_types', 'href' => '/admin/index.php?page=journal_types', 'label' => 'أنواع اليوميات', 'class' => 'admin-nav-sub', 'sub' => true],
@@ -153,18 +154,17 @@ try {
                 ['page' => 'gl_account_settings', 'href' => '/admin/index.php?page=gl_account_settings', 'label' => 'حسابات القيود التلقائية', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'gl_posting', 'href' => '/admin/index.php?page=gl_posting', 'label' => 'إقفال الحركات (ترحيل)', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'opening_balances', 'href' => '/admin/index.php?page=opening_balances', 'label' => 'أرصدة أول المدة المالية', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger', 'label' => 'ذمم العملاء والموردين', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'journal_entries', 'href' => '/admin/index.php?page=journal_entries', 'label' => 'سند قيد', 'class' => '', 'sub' => false],
                 ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger#partner-receipt-voucher', 'label' => 'سندات القبض', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger#partner-payment-voucher', 'label' => 'سندات الصرف', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger#partner-account-statement', 'label' => 'كشف حساب', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger', 'label' => 'ذمم العملاء والموردين', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'expenses', 'href' => '/admin/index.php?page=expenses', 'label' => 'المصروفات', 'class' => '', 'sub' => false],
-                ['page' => 'journal_entries', 'href' => '/admin/index.php?page=journal_entries', 'label' => 'القيود المحاسبية', 'class' => '', 'sub' => false],
+                ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger#partner-account-statement', 'label' => 'كشف حساب', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'partner_reports', 'href' => '/admin/index.php?page=partner_reports', 'label' => 'تقارير الذمم المالية', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report', 'label' => 'التقارير المالية', 'class' => '', 'sub' => false],
                 ['page' => 'logs', 'href' => '/admin/index.php?page=logs', 'label' => 'سجل النشاط', 'class' => 'admin-nav-sub', 'sub' => true],
             ];
 
-            /* مخازن ثم مشتريات ثم مبيعات */
             $navOps = [
                 ['page' => 'departments', 'href' => '/admin/index.php?page=departments', 'label' => 'الأقسام', 'class' => '', 'sub' => false],
                 ['page' => 'categories', 'href' => '/admin/index.php?page=categories', 'label' => 'الفئات', 'class' => '', 'sub' => false],
@@ -173,15 +173,15 @@ try {
                 ['page' => 'size_families', 'href' => '/admin/index.php?page=size_families', 'label' => 'عائلات المقاسات', 'class' => '', 'sub' => false],
                 ['page' => 'products', 'href' => '/admin/index.php?page=products', 'label' => 'المنتجات', 'class' => '', 'sub' => false],
                 ['page' => 'offers', 'href' => '/admin/index.php?page=offers', 'label' => 'العروض', 'class' => '', 'sub' => false],
-                ['page' => 'stock', 'href' => '/admin/index.php?page=stock', 'label' => 'المستودع', 'class' => '', 'sub' => false],
-                ['page' => 'opening_stock_balances', 'href' => '/admin/index.php?page=opening_stock_balances', 'label' => 'أرصدة أول المدة المخزنية', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'suppliers', 'href' => '/admin/index.php?page=suppliers', 'label' => 'الموردين', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'purchases', 'href' => '/admin/index.php?page=purchases', 'label' => 'المشتريات', 'class' => '', 'sub' => false],
-                ['page' => 'customers', 'href' => '/admin/index.php?page=customers', 'label' => 'العملاء', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'orders', 'href' => '/admin/index.php?page=orders', 'label' => 'الطلبات', 'class' => '', 'sub' => false],
                 ['page' => 'order_intake_queue', 'href' => '/admin/index.php?page=order_intake_queue', 'label' => 'طابور طلبات الموقع', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'invoice', 'href' => '/admin/index.php?page=invoice', 'label' => 'فاتورة مبيعات', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'manual_order', 'href' => '/admin/index.php?page=manual_order', 'label' => 'فاتورة شركة', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'customers', 'href' => '/admin/index.php?page=customers', 'label' => 'العملاء', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'suppliers', 'href' => '/admin/index.php?page=suppliers', 'label' => 'الموردين', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'purchases', 'href' => '/admin/index.php?page=purchases', 'label' => 'المشتريات', 'class' => '', 'sub' => false],
+                ['page' => 'stock', 'href' => '/admin/index.php?page=stock', 'label' => 'المستودع', 'class' => '', 'sub' => false],
+                ['page' => 'opening_stock_balances', 'href' => '/admin/index.php?page=opening_stock_balances', 'label' => 'أرصدة أول المدة المخزنية', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'reports', 'href' => '/admin/index.php?page=reports', 'label' => 'تقارير المبيعات', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'channel_analytics', 'href' => '/admin/index.php?page=channel_analytics', 'label' => 'تحليل قنوات العملاء', 'class' => 'admin-nav-sub', 'sub' => true],
             ];

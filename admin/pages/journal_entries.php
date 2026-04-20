@@ -59,7 +59,7 @@ foreach ($accounts as $a) {
 ?>
 <div class="page-title page-title--stacked">
     <div>
-        <h1>القيود المحاسبية (سندات)</h1>
+        <h1>سند قيد</h1>
         <p class="page-subtitle">
             كل سند يضم عدة أسطر؛ مجموع المدين يجب أن يساوي مجموع الدائن.
             سندات <strong>الافتتاح</strong> و<strong>الإقفال</strong> تُدار من شاشات السنة المالية والإقفال.

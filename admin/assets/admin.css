@@ -109,8 +109,18 @@ a { text-decoration: none; color: inherit; }
     display: flex;
     align-items: center;
     gap: 12px;
-    flex: 1;
+    /* لا تأخذ كل عرض الشريط — وإلا تختفي أزرار «الحسابات العامة / المخازن» على شاشات متوسطة */
+    flex: 0 1 auto;
     min-width: 0;
+    max-width: min(42vw, 420px);
+}
+.admin-topbar-brand .admin-sidebar-brand__text {
+    min-width: 0;
+}
+.admin-topbar-brand .admin-sidebar-brand__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .admin-topbar-actions {
     display: flex;
@@ -224,11 +234,12 @@ a { text-decoration: none; color: inherit; }
 }
 .admin-topbar-mega {
     display: none;
-    flex: 1 1 160px;
+    flex: 1 1 auto;
     align-items: center;
     flex-wrap: wrap;
     gap: 6px 8px;
     min-width: 0;
+    justify-content: flex-start;
 }
 .admin-topbar-mega-home {
     display: inline-flex;
@@ -334,7 +345,8 @@ a { text-decoration: none; color: inherit; }
     border-inline-start: 3px solid rgba(255, 255, 255, 0.22);
     padding-inline-start: 16px;
 }
-@media (min-width: 1025px) {
+/* 992 بدل 1025: نوافذ 1024px (شائعة مع شريط أدوات) كانت تخفي القائمة العلوية بالكامل */
+@media (min-width: 992px) {
     .admin-topbar-mega {
         display: flex;
     }
@@ -345,7 +357,7 @@ a { text-decoration: none; color: inherit; }
         display: block;
     }
 }
-@media (max-width: 1024px) {
+@media (max-width: 991px) {
     .admin-topbar-mega {
         display: none !important;
     }
@@ -3138,7 +3150,7 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     }
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 991px) {
     .admin-topbar-strip {
         padding-inline: 12px;
     }
