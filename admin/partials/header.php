@@ -210,6 +210,7 @@ try {
                 ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report', 'label' => 'التقارير المالية', 'class' => '', 'sub' => false],
             ];
 
+            /* الحسابات العامة: الدليل والسنوات والترحيل — سجل النشاط تحت الإعدادات العامة */
             $navAccounting = [
                 ['page' => 'chart_of_accounts', 'href' => '/admin/index.php?page=chart_of_accounts', 'label' => 'الدليل المحاسبي', 'class' => '', 'sub' => false],
                 ['page' => 'journal_types', 'href' => '/admin/index.php?page=journal_types', 'label' => 'أنواع اليوميات', 'class' => 'admin-nav-sub', 'sub' => true],
@@ -217,17 +218,6 @@ try {
                 ['page' => 'gl_account_settings', 'href' => '/admin/index.php?page=gl_account_settings', 'label' => 'حسابات القيود التلقائية', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'gl_posting', 'href' => '/admin/index.php?page=gl_posting', 'label' => 'إقفال الحركات (ترحيل)', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'opening_balances', 'href' => '/admin/index.php?page=opening_balances', 'label' => 'أرصدة أول المدة المالية', 'class' => 'admin-nav-sub', 'sub' => true],
-                [
-                    'group' => true,
-                    'title' => 'القيود المحاسبية',
-                    'items' => $navAccountingVouchers,
-                ],
-                [
-                    'group' => true,
-                    'title' => 'التقارير',
-                    'items' => $navAccountingReports,
-                ],
-                ['page' => 'logs', 'href' => '/admin/index.php?page=logs', 'label' => 'سجل النشاط', 'class' => 'admin-nav-sub', 'sub' => true],
             ];
 
             $navOps = [
@@ -256,10 +246,13 @@ try {
                 ['page' => 'channels', 'href' => '/admin/index.php?page=channels', 'label' => 'قنوات العملاء', 'class' => '', 'sub' => false],
                 ['page' => 'company_documents', 'href' => '/admin/index.php?page=company_documents', 'label' => 'أرشيف المستندات', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'admin_users', 'href' => '/admin/index.php?page=admin_users', 'label' => 'المستخدمون والصلاحيات', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'logs', 'href' => '/admin/index.php?page=logs', 'label' => 'سجل النشاط', 'class' => 'admin-nav-sub', 'sub' => true],
             ];
 
             $orangeNavMegaSections = [
                 ['id' => 'accounting', 'title' => 'الحسابات العامة', 'muted' => false, 'items' => $navAccounting],
+                ['id' => 'acct_vouchers', 'title' => 'القيود المحاسبية', 'muted' => false, 'items' => $navAccountingVouchers],
+                ['id' => 'acct_reports', 'title' => 'التقارير', 'muted' => false, 'items' => $navAccountingReports],
                 ['id' => 'ops', 'title' => 'المخازن', 'muted' => false, 'items' => $navOps],
                 ['id' => 'settings', 'title' => 'الإعدادات العامة', 'muted' => true, 'items' => $navSettings],
             ];
@@ -333,6 +326,8 @@ try {
                     $orangeRenderNavLink($nl);
                 }
                 $orangeRenderNavSection('accounting', 'الحسابات العامة', $navAccounting);
+                $orangeRenderNavSection('acct_vouchers', 'القيود المحاسبية', $navAccountingVouchers);
+                $orangeRenderNavSection('acct_reports', 'التقارير', $navAccountingReports);
                 $orangeRenderNavSection('ops', 'المخازن', $navOps);
                 $orangeRenderNavSection('settings', 'الإعدادات العامة', $navSettings);
                 ?>
