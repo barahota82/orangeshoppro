@@ -312,17 +312,15 @@ function changeMainImage(src, btn) {
     if (btn) btn.classList.add('active');
 }
 
-/** موبايل: هيدر ثابت + شريط سفلي يلتصق بـ visual viewport (سحب iOS / شريط العنوان / لوحة المفاتيح) */
+/** موبايل: هيدر ثابت + مسافة site-main؛ الشريط السفلي يبقى على bottom:0 من CSS فقط.
+ *  ضبط bottom عبر visualViewport كان يسبب قيماً كبيرة على بعض المتصفحات فيخفي الشريط بالكامل. */
 (function pinStorefrontChrome() {
     if (!document.body.classList.contains('storefront')) return;
     const header = document.querySelector('.site-header');
     const dock = document.querySelector('.app-bottom-dock');
-    const vv = window.visualViewport;
-    if (!header || !dock || !vv) return;
+    if (!header || !dock) return;
 
     const mq = window.matchMedia('(max-width: 1023px)');
-    /** فوق هذا (بدون تركيز حقل إدخال) غالباً قيمة شاذة من visualViewport قبل استقرار السكرول/شريط العنوان */
-    const MAX_TOOLBAR_GAP_PX = 148;
 
     function setHeaderHeightVar() {
         if (!mq.matches) {
@@ -332,21 +330,6 @@ function changeMainImage(src, btn) {
         document.documentElement.style.setProperty('--sf-fixed-header-h', `${header.offsetHeight}px`);
     }
 
-    function isLikelyKeyboardOpen() {
-        const el = document.activeElement;
-        if (!el || el === document.body) {
-            return false;
-        }
-        const tag = el.tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
-            return true;
-        }
-        if (el.isContentEditable) {
-            return true;
-        }
-        return false;
-    }
-
     function sync() {
         if (!mq.matches) {
             dock.style.removeProperty('bottom');
@@ -354,51 +337,22 @@ function changeMainImage(src, btn) {
             return;
         }
         setHeaderHeightVar();
-        const innerH = window.innerHeight;
-        const vvH = vv.height;
-        const vvTop = vv.offsetTop;
-        if (!Number.isFinite(vvH) || vvH < 40) {
-            dock.style.removeProperty('bottom');
-            return;
-        }
-        let gap = Math.max(0, innerH - vvTop - vvH);
-        const probablyKeyboard = vvH < innerH * 0.62;
-        if (!isLikelyKeyboardOpen() && !probablyKeyboard && gap > MAX_TOOLBAR_GAP_PX) {
-            gap = 0;
-        }
-        dock.style.bottom = gap ? `${gap}px` : '';
+        dock.style.removeProperty('bottom');
     }
 
-    /** مزامنة ثانية بعد إطار رسم واحد فقط (استقرار visualViewport دون إرهاق أثناء السكرول) */
-    function syncAfterFrame() {
-        sync();
-        requestAnimationFrame(sync);
-    }
-
-    vv.addEventListener('resize', sync, { passive: true });
-    vv.addEventListener('scroll', sync, { passive: true });
     if (typeof mq.addEventListener === 'function') {
         mq.addEventListener('change', sync);
     } else if (typeof mq.addListener === 'function') {
         mq.addListener(sync);
     }
-    window.addEventListener('orientationchange', syncAfterFrame, { passive: true });
-    window.addEventListener('load', () => {
-        setHeaderHeightVar();
-        syncAfterFrame();
-    }, { passive: true });
-    window.addEventListener('pageshow', (ev) => {
-        setHeaderHeightVar();
-        syncAfterFrame();
-        if (ev.persisted) {
-            requestAnimationFrame(sync);
-        }
-    });
+    window.addEventListener('orientationchange', sync, { passive: true });
+    window.addEventListener('load', sync, { passive: true });
+    window.addEventListener('pageshow', sync);
     if (typeof ResizeObserver !== 'undefined') {
         const ro = new ResizeObserver(setHeaderHeightVar);
         ro.observe(header);
     }
-    syncAfterFrame();
+    sync();
 })();
 
 /** أزرار «تثبيت» (هيدر + شريط سفلي): Chrome/Android يعرض مطالبة التثبيت؛ iOS يعرض خطوات يدوية. */
