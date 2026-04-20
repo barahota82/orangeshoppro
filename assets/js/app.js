@@ -498,3 +498,17 @@ function changeMainImage(src, btn) {
         }
     });
 })();
+
+/** كاش CSS/JS للواجهة — يخفّف بطء التنقل في نافذة PWA مقارنةً بتبويب المتصفح */
+(function orangeStorefrontRegisterServiceWorker() {
+    if (!document.body || !document.body.classList.contains('storefront')) {
+        return;
+    }
+    if (!('serviceWorker' in navigator)) {
+        return;
+    }
+    const base = typeof window.STOREFRONT_BASE === 'string' ? window.STOREFRONT_BASE : '';
+    const url = `${base}/service-worker.php`;
+    const scope = base === '' ? '/' : `${base}/`;
+    navigator.serviceWorker.register(url, { scope }).catch(() => {});
+})();
