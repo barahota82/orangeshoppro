@@ -215,7 +215,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                         continue;
                     }
                     ?>
-                    <details class="browse-accordion browse-accordion--dept">
+                    <details class="browse-accordion browse-accordion--dept" id="browse-dept-<?php echo $deptId; ?>">
                         <summary class="browse-accordion__summary"><?php echo htmlspecialchars(storefront_catalog_label($dep, $lang), ENT_QUOTES, 'UTF-8'); ?></summary>
                         <div class="browse-accordion__content">
                             <button type="button" class="browse-accordion__action" data-apply-filter="dept-<?php echo $deptId; ?>">
@@ -227,7 +227,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                                 $subs = $subcategoriesByCategory[$catId] ?? [];
                                 ?>
                                 <?php if ($subs !== []): ?>
-                                    <details class="browse-accordion browse-accordion--cat">
+                                    <details class="browse-accordion browse-accordion--cat" id="browse-cat-<?php echo $catId; ?>">
                                         <summary class="browse-accordion__summary browse-accordion__summary--nested"><?php echo htmlspecialchars(storefront_catalog_label($cat, $lang), ENT_QUOTES, 'UTF-8'); ?></summary>
                                         <div class="browse-accordion__content browse-accordion__content--nested">
                                             <button type="button" class="browse-accordion__action" data-apply-filter="cat-<?php echo $catId; ?>">
@@ -254,7 +254,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                 $orphanCats = $catsByDept[0] ?? [];
                 if ($orphanCats !== []) {
                     ?>
-                    <details class="browse-accordion browse-accordion--dept">
+                    <details class="browse-accordion browse-accordion--dept" id="browse-dept-other">
                         <summary class="browse-accordion__summary"><?php echo htmlspecialchars(t('storefront_menu_other_categories'), ENT_QUOTES, 'UTF-8'); ?></summary>
                         <div class="browse-accordion__content">
                             <?php foreach ($orphanCats as $cat): ?>
@@ -263,7 +263,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                                 $subs = $subcategoriesByCategory[$catId] ?? [];
                                 ?>
                                 <?php if ($subs !== []): ?>
-                                    <details class="browse-accordion browse-accordion--cat">
+                                    <details class="browse-accordion browse-accordion--cat" id="browse-cat-<?php echo $catId; ?>">
                                         <summary class="browse-accordion__summary browse-accordion__summary--nested"><?php echo htmlspecialchars(storefront_catalog_label($cat, $lang), ENT_QUOTES, 'UTF-8'); ?></summary>
                                         <div class="browse-accordion__content browse-accordion__content--nested">
                                             <button type="button" class="browse-accordion__action" data-apply-filter="cat-<?php echo $catId; ?>">
@@ -354,6 +354,109 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
 </div>
 
 <script>
+var ORANGE_SF_GRID_FILTER_KEY = 'orange_sf_grid_filter';
+var ORANGE_BROWSE_DETAILS_OPEN_KEY = 'orange_browse_details_open';
+
+function orangePersistGridFilter(filter) {
+    try {
+        if (filter) {
+            sessionStorage.setItem(ORANGE_SF_GRID_FILTER_KEY, filter);
+        }
+    } catch (e) {}
+}
+function orangeGetActiveGridFilter() {
+    var a = document.querySelector('.tab-btn.active');
+    if (a) {
+        var f = a.getAttribute('data-tab-filter');
+        if (f) {
+            return f;
+        }
+    }
+    try {
+        var s = sessionStorage.getItem(ORANGE_SF_GRID_FILTER_KEY);
+        if (s) {
+            return s;
+        }
+    } catch (e) {}
+    return 'all';
+}
+function orangeExpandBrowseMenuForFilter(filter) {
+    var root = document.getElementById('storefrontBrowseMenu');
+    if (!root || !filter || filter === 'all' || filter === 'offers') {
+        return;
+    }
+    var m = /^dept-(\d+)$/.exec(filter);
+    if (m) {
+        var dDept = document.getElementById('browse-dept-' + m[1]);
+        if (dDept) {
+            dDept.open = true;
+        }
+        return;
+    }
+    m = /^cat-(\d+)$/.exec(filter);
+    if (m) {
+        var dCat = document.getElementById('browse-cat-' + m[1]);
+        if (dCat) {
+            dCat.open = true;
+            var p = dCat.closest('details.browse-accordion--dept');
+            if (p) {
+                p.open = true;
+            }
+        }
+        return;
+    }
+    m = /^sub-(\d+)$/.exec(filter);
+    if (m) {
+        var subBtn = root.querySelector('[data-apply-filter="sub-' + m[1] + '"]');
+        if (subBtn) {
+            var catDet = subBtn.closest('details.browse-accordion--cat');
+            if (catDet) {
+                catDet.open = true;
+            }
+            var deptDet = catDet ? catDet.closest('details.browse-accordion--dept') : null;
+            if (deptDet) {
+                deptDet.open = true;
+            }
+        }
+    }
+}
+function orangePersistBrowseDetailsOpen() {
+    var root = document.getElementById('storefrontBrowseMenu');
+    if (!root) {
+        return;
+    }
+    var ids = [];
+    root.querySelectorAll('details[id]').forEach(function (d) {
+        if (d.open && d.id) {
+            ids.push(d.id);
+        }
+    });
+    try {
+        sessionStorage.setItem(ORANGE_BROWSE_DETAILS_OPEN_KEY, JSON.stringify(ids));
+    } catch (e) {}
+}
+function orangeRestoreBrowseDetailsOpen() {
+    var root = document.getElementById('storefrontBrowseMenu');
+    if (!root) {
+        return;
+    }
+    var ids = [];
+    try {
+        var raw = sessionStorage.getItem(ORANGE_BROWSE_DETAILS_OPEN_KEY);
+        if (raw) {
+            ids = JSON.parse(raw);
+        }
+    } catch (e) {}
+    if (!Array.isArray(ids)) {
+        return;
+    }
+    ids.forEach(function (id) {
+        var d = document.getElementById(id);
+        if (d) {
+            d.open = true;
+        }
+    });
+}
 function scrollHomeCategoryTabs(direction) {
     var el = document.getElementById('homeCategoryTabs');
     if (!el) return;
@@ -378,6 +481,7 @@ function applyGridFilter(filter) {
 function filterProducts(filter, el) {
     document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
     if (el) el.classList.add('active');
+    orangePersistGridFilter(filter);
     applyGridFilter(filter);
 }
 function filterFromBrowseMenu(filter) {
@@ -391,7 +495,10 @@ function filterFromBrowseMenu(filter) {
         var allBtn = document.querySelector('.tab-btn[data-tab-filter="all"]');
         if (allBtn) allBtn.classList.add('active');
     }
+    orangePersistGridFilter(filter);
     applyGridFilter(filter);
+    orangeExpandBrowseMenuForFilter(filter);
+    orangePersistBrowseDetailsOpen();
     closeStorefrontBrowseMenu();
 }
 function openStorefrontBrowseMenu() {
@@ -402,6 +509,9 @@ function openStorefrontBrowseMenu() {
     root.setAttribute('aria-hidden', 'false');
     if (btn) btn.setAttribute('aria-expanded', 'true');
     document.body.classList.add('storefront-browse-menu-lock');
+    orangeRestoreBrowseDetailsOpen();
+    orangeExpandBrowseMenuForFilter(orangeGetActiveGridFilter());
+    orangePersistBrowseDetailsOpen();
 }
 function closeStorefrontBrowseMenu() {
     var root = document.getElementById('storefrontBrowseMenu');
@@ -434,6 +544,12 @@ function closeStorefrontBrowseMenu() {
             var f = t.getAttribute('data-apply-filter');
             if (f) filterFromBrowseMenu(f);
         });
+        menuRoot.addEventListener('toggle', function (e) {
+            var t = e.target;
+            if (t && t.tagName === 'DETAILS' && menuRoot.contains(t)) {
+                orangePersistBrowseDetailsOpen();
+            }
+        }, true);
     }
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') closeStorefrontBrowseMenu();
