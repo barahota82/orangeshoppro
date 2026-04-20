@@ -34,10 +34,12 @@ if ($first === '') {
 }
 
 $previewQ = isset($_GET['sf_preview']) ? (string) $_GET['sf_preview'] : '';
-$previewOk = ORANGE_STOREFRONT_PREVIEW_TOKEN !== ''
+$tokenPreview = ORANGE_STOREFRONT_PREVIEW_TOKEN !== ''
     && $previewQ !== ''
     && hash_equals(ORANGE_STOREFRONT_PREVIEW_TOKEN, $previewQ);
-/* للزوار: قناة غير نشطة = 404. معاينة الإدمن (?sf_preview=) تسمح بفتح المسار رغم الإيقاف */
+$sessionPreview = orange_storefront_preview_session_valid_for_segment($first);
+$previewOk = $tokenPreview || $sessionPreview;
+/* للزوار: قناة غير نشطة = 404. معاينة الإدمن (جلسة أو ?sf_preview=) تسمح بفتح المسار رغم الإيقاف */
 $channelSlug = orange_channel_slug_for_path_segment($pdo, $first, !$previewOk);
 if ($channelSlug === null || $channelSlug === '') {
     http_response_code(404);

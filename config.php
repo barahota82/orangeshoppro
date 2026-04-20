@@ -526,21 +526,71 @@ function get_channel_by_slug(string $slug): ?array {
 }
 
 /**
- * رابط الصفحة الرئيسية للواجهة بمعامل معاينة الإدمن (?sf_preview=…) — يعطّل فرض إعادة التوجيه للقناة المثبتة.
- * يتطلّب ORANGE_STOREFRONT_PREVIEW_TOKEN في .env.php؛ وإلا يُرجع سلسلة فارغة.
+ * أول مقطع مسار قصير للواجهة من الطلب الحالي (مثل tiktok من ‎/tiktok-ar/cart‎) أو null.
+ */
+function orange_storefront_request_primary_path_segment(): ?string
+{
+    $uri = (string) ($_SERVER['REQUEST_URI'] ?? '');
+    $path = parse_url($uri, PHP_URL_PATH) ?? '';
+    $path = str_replace('\\', '/', $path);
+    $base = PUBLIC_BASE_PATH;
+    if ($base !== '' && str_starts_with($path, $base)) {
+        $path = substr($path, strlen($base)) ?: '/';
+    }
+    if ($path === '' || ($path[0] ?? '') !== '/') {
+        $path = '/' . ltrim($path, '/');
+    }
+    if (preg_match('#^/([a-z0-9\-]+)(?:-(ar|hi|ph))?(?:/|$)#i', $path, $m)) {
+        return strtolower($m[1]);
+    }
+
+    return null;
+}
+
+/**
+ * معاينة عبر جلسة الأدمن: لا يُعرض سر في رابط المتجر (يُضبط من ‎admin/preview-storefront.php‎).
+ */
+function orange_storefront_preview_session_valid_for_segment(string $pathSegmentFirst): bool
+{
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        return false;
+    }
+    $pv = $_SESSION['orange_sf_preview'] ?? null;
+    if (!is_array($pv)) {
+        return false;
+    }
+    if ((int) ($pv['exp'] ?? 0) < time()) {
+        unset($_SESSION['orange_sf_preview']);
+
+        return false;
+    }
+    $want = strtolower((string) ($pv['path_segment'] ?? ''));
+    $got = strtolower((string) preg_replace('/[^a-z0-9\-]/i', '', $pathSegmentFirst));
+
+    return $want !== '' && $got !== '' && $want === $got;
+}
+
+function orange_storefront_preview_session_matches_request(): bool
+{
+    $seg = orange_storefront_request_primary_path_segment();
+    if ($seg === null) {
+        return false;
+    }
+
+    return orange_storefront_preview_session_valid_for_segment($seg);
+}
+
+/**
+ * رابط «فتح الرئيسية» من شاشة الواجهات: يمرّ بالأدمن ويضبط جلسة معاينة قصيرة ثم يوجّه لمسار نظيف بلا ‎sf_preview‎.
  */
 function orange_storefront_admin_preview_home_url(string $pathSegment): string
 {
-    if (ORANGE_STOREFRONT_PREVIEW_TOKEN === '') {
-        return '';
-    }
     $seg = strtolower((string) (preg_replace('/[^a-z0-9\-]/i', '', $pathSegment) ?? ''));
     if ($seg === '') {
         return '';
     }
-    $q = 'sf_preview=' . rawurlencode(ORANGE_STOREFRONT_PREVIEW_TOKEN);
     $pathPrefix = PUBLIC_BASE_PATH === '' ? '' : rtrim(PUBLIC_BASE_PATH, '/');
-    $rel = ($pathPrefix === '' ? '' : $pathPrefix) . '/' . $seg . '?' . $q;
+    $rel = ($pathPrefix === '' ? '' : $pathPrefix) . '/admin/preview-storefront.php?' . http_build_query(['ps' => $seg]);
     if (ORANGE_SITE_PUBLIC_ORIGIN !== '') {
         return rtrim(ORANGE_SITE_PUBLIC_ORIGIN, '/') . $rel;
     }

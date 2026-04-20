@@ -8,7 +8,6 @@ require_once __DIR__ . '/../../includes/upload_paths.php';
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 $channels = $pdo->query('SELECT * FROM channels ORDER BY id ASC')->fetchAll();
-$sfPreviewConfigured = ORANGE_STOREFRONT_PREVIEW_TOKEN !== '';
 
 $editId = isset($_GET['edit']) ? (int) $_GET['edit'] : 0;
 $editRow = null;
@@ -26,16 +25,14 @@ $editIsActive = $editRow ? (int) ($editRow['is_active'] ?? 1) : 1;
     <h1>الواجهات (قنوات العملاء)</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;">كل قناة تمثّل واجهة أو مصدراً لتجميع <strong>العملاء وطلباتهم</strong>. المخزون والمبيعات المحاسبية <strong>للشركة موحّدة</strong> — الطلب من أي قناة يسحب من نفس المخزن الرئيسي.</p>
     <p style="margin:0.6rem 0 0;"><a class="btn btn-secondary" href="/admin/index.php?page=channel_analytics">تحليل أداء القنوات (مبيعات، أكثر منتج، ترتيب النشاط)</a></p>
-    <?php if (!$sfPreviewConfigured): ?>
-        <p class="card-hint" style="margin:0.75rem 0 0;color:#b45309;">لتفعيل روابط «معاينة الواجهة» من هذا الجدول، عيّن <code dir="ltr">ORANGE_STOREFRONT_PREVIEW_TOKEN</code> في ملف <code dir="ltr">.env.php</code> (سلسلة عشوائية طويلة)، ثم أعد تحميل الصفحة.</p>
-    <?php endif; ?>
+    <p class="card-hint" style="margin:0.75rem 0 0;">روابط <strong>معاينة الواجهة</strong> تمرّ بصفحة أدمن ثم تفتح المتجر <strong>بدون إظهار سر في عنوان المتجر</strong> (جلسة معاينة ~15 دقيقة). اختياري: <code dir="ltr">ORANGE_STOREFRONT_PREVIEW_TOKEN</code> في <code dir="ltr">.env.php</code> لروابط قديمة بـ <code dir="ltr">?sf_preview=</code>.</p>
 </div>
 
 <div class="card">
     <h3><?php echo $editRow ? 'تعديل واجهة' : 'إضافة واجهة'; ?></h3>
     <p class="card-hint" style="margin:0 0 0.75rem;">اختصار الرابط يظهر في عنوان الموقع مثل <code>/tiktok</code> — عند <strong>تغييره</strong> يُحدَّث تلقائياً الـ <strong>slug الداخلي</strong> (لـ <code>?channel=</code> والكوكي). اسم الواجهة فقط لا يغيّر الـ slug.</p>
     <p class="card-hint" style="margin:0 0 0.75rem;"><strong>اللون الأساسي:</strong> يُستخدم حالياً كلون شريط المتصفح (<code dir="ltr">theme-color</code>) في واجهة المتجر عندما يكون بصيغة hex صالحة مثل <code dir="ltr">#ff6600</code>.</p>
-    <p class="card-hint" style="margin:0 0 0.75rem;"><strong>حالة الظهور:</strong> الواجهة <strong>غير النشطة</strong> لا يعمل لها مسار الاختصار العام ولا تُقبل في كوكي/خرائط المتجر للزوار. رابط <strong>معاينة الواجهة</strong> من الجدول يفتحها للمراجعة (مع <code dir="ltr">sf_preview</code>) حتى وهي متوقفة.</p>
+    <p class="card-hint" style="margin:0 0 0.75rem;"><strong>حالة الظهور:</strong> الواجهة <strong>غير النشطة</strong> لا يعمل لها مسار الاختصار العام ولا تُقبل في كوكي/خرائط المتجر للزوار. رابط <strong>معاينة الواجهة</strong> من الجدول يفتحها للمراجعة (بعد تسجيل دخول الأدمن) حتى وهي متوقفة.</p>
     <input type="hidden" id="channel_id" value="<?php echo $editRow ? (int) $editRow['id'] : ''; ?>">
     <input type="hidden" id="channel_logo" value="<?php echo htmlspecialchars($initialLogo, ENT_QUOTES, 'UTF-8'); ?>">
     <div class="form-grid">
@@ -109,8 +106,6 @@ $editIsActive = $editRow ? (int) ($editRow['is_active'] ?? 1) : 1;
                     $ps = trim((string) ($ch['path_segment'] ?? ''));
                     if ($ps === '') {
                         echo '—';
-                    } elseif (!$sfPreviewConfigured) {
-                        echo '<span class="card-hint">أضف المفتاح في .env.php</span>';
                     } else {
                         $prevUrl = orange_storefront_admin_preview_home_url($ps);
                         echo $prevUrl !== ''

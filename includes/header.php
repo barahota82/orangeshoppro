@@ -62,6 +62,7 @@ $orangeManifestHref = $orangePubBase . '/manifest.php?' . http_build_query(['cha
 $pdoSfHdr = db();
 [$_sfPathToSlug, $_sfSlugToPath, $_sfValidSlugs, $_sfPathAlt] = orange_storefront_path_maps_for_js($pdoSfHdr);
 $orangeSfDefaultCh = orange_storefront_default_channel_slug($pdoSfHdr);
+$orangeSfSessionPreviewBypass = orange_storefront_preview_session_matches_request();
 
 $dir = $lang === 'ar' ? 'rtl' : 'ltr';
 ?><!DOCTYPE html>
@@ -92,6 +93,9 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             var previewTok = <?php echo json_encode(ORANGE_STOREFRONT_PREVIEW_TOKEN, JSON_UNESCAPED_UNICODE); ?>;
             var previewQ = params.get('sf_preview');
             if (previewTok !== '' && previewQ !== null && previewQ === previewTok) {
+                return;
+            }
+            if (<?php echo $orangeSfSessionPreviewBypass ? 'true' : 'false'; ?>) {
                 return;
             }
             var allowed = window.ORANGE_SF_VALID_SLUGS || {};
