@@ -233,12 +233,15 @@ try {
                 ['page' => 'invoice', 'href' => '/admin/index.php?page=invoice', 'label' => 'فاتورة مبيعات', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'manual_order', 'href' => '/admin/index.php?page=manual_order', 'label' => 'فاتورة شركة', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'customers', 'href' => '/admin/index.php?page=customers', 'label' => 'العملاء', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'suppliers', 'href' => '/admin/index.php?page=suppliers', 'label' => 'الموردين', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'purchases', 'href' => '/admin/index.php?page=purchases', 'label' => 'المشتريات', 'class' => '', 'sub' => false],
                 ['page' => 'stock', 'href' => '/admin/index.php?page=stock', 'label' => 'المستودع', 'class' => '', 'sub' => false],
                 ['page' => 'opening_stock_balances', 'href' => '/admin/index.php?page=opening_stock_balances', 'label' => 'أرصدة أول المدة المخزنية', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'reports', 'href' => '/admin/index.php?page=reports', 'label' => 'تقارير المبيعات', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'channel_analytics', 'href' => '/admin/index.php?page=channel_analytics', 'label' => 'تحليل قنوات العملاء', 'class' => 'admin-nav-sub', 'sub' => true],
+            ];
+
+            $navPurchasing = [
+                ['page' => 'suppliers', 'href' => '/admin/index.php?page=suppliers', 'label' => 'الموردين', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'purchases', 'href' => '/admin/index.php?page=purchases', 'label' => 'المشتريات', 'class' => '', 'sub' => false],
             ];
 
             $navSettings = [
@@ -254,6 +257,7 @@ try {
                 ['id' => 'acct_vouchers', 'title' => 'القيود المحاسبية', 'muted' => false, 'items' => $navAccountingVouchers],
                 ['id' => 'acct_reports', 'title' => 'التقارير', 'muted' => false, 'items' => $navAccountingReports],
                 ['id' => 'ops', 'title' => 'المخازن', 'muted' => false, 'items' => $navOps],
+                ['id' => 'purchasing', 'title' => 'المشتريات', 'muted' => false, 'items' => $navPurchasing],
                 ['id' => 'settings', 'title' => 'الإعدادات العامة', 'muted' => true, 'items' => $navSettings],
             ];
 
@@ -329,6 +333,7 @@ try {
                 $orangeRenderNavSection('acct_vouchers', 'القيود المحاسبية', $navAccountingVouchers);
                 $orangeRenderNavSection('acct_reports', 'التقارير', $navAccountingReports);
                 $orangeRenderNavSection('ops', 'المخازن', $navOps);
+                $orangeRenderNavSection('purchasing', 'المشتريات', $navPurchasing);
                 $orangeRenderNavSection('settings', 'الإعدادات العامة', $navSettings);
                 ?>
             </nav>
