@@ -2674,6 +2674,15 @@ html[dir="rtl"] .field input[autocomplete="tel"] {
     box-sizing: border-box;
 }
 
+/* PWA مفتوح من أيقونة الشاشة: شبكة 4 أعمدة بدل عمود فارغ لزر التثبيت */
+html.orange-standalone-pwa body.storefront .app-bottom-dock__grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+html.orange-standalone-pwa body.storefront .app-bottom-dock__cell:has([data-orange-install-app]) {
+    display: none;
+}
+
 .app-bottom-dock__cell {
     min-width: 0;
     min-height: var(--sf-app-dock-h, 72px);

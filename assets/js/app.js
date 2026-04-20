@@ -376,11 +376,38 @@ function changeMainImage(src, btn) {
     let deferredPrompt = null;
     let lastInstallBtn = null;
 
+    /** PWA مفتوح من أيقونة الشاشة: إخفاء التثبيت. نوسّع الفحص لأن بعض المتصفحات لا تُبلغ standalone فقط. */
     function isStandalone() {
-        return (
-            (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
-            window.navigator.standalone === true
-        );
+        try {
+            if (window.navigator.standalone === true) {
+                return true;
+            }
+        } catch (err) {
+            /* ignore */
+        }
+        if (!window.matchMedia) {
+            return false;
+        }
+        const modes = ['standalone', 'fullscreen', 'minimal-ui', 'window-controls-overlay'];
+        for (let i = 0; i < modes.length; i += 1) {
+            try {
+                if (window.matchMedia(`(display-mode: ${modes[i]})`).matches) {
+                    return true;
+                }
+            } catch (err) {
+                /* قديم لا يدعم القيمة */
+            }
+        }
+        return false;
+    }
+
+    function syncInstallButtonVisibility() {
+        const hide = isStandalone();
+        btns.forEach((b) => {
+            b.hidden = hide;
+        });
+        document.documentElement.classList.toggle('orange-standalone-pwa', hide);
+        return hide;
     }
 
     function isAppleMobile() {
@@ -427,21 +454,23 @@ function changeMainImage(src, btn) {
         }
     }
 
-    if (isStandalone()) {
-        return;
-    }
-
-    btns.forEach((b) => {
-        b.hidden = false;
-    });
+    syncInstallButtonVisibility();
+    window.addEventListener('load', syncInstallButtonVisibility, { passive: true });
+    window.addEventListener('pageshow', syncInstallButtonVisibility, { passive: true });
 
     window.addEventListener('beforeinstallprompt', (e) => {
+        if (isStandalone()) {
+            return;
+        }
         e.preventDefault();
         deferredPrompt = e;
     });
 
     btns.forEach((btn) => {
         btn.addEventListener('click', async () => {
+            if (isStandalone()) {
+                return;
+            }
             lastInstallBtn = btn;
             if (deferredPrompt) {
                 try {

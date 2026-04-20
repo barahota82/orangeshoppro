@@ -34,8 +34,11 @@ $scope = PUBLIC_BASE_PATH === '' ? '/' : rtrim(PUBLIC_BASE_PATH, '/') . '/';
 $themeColor = '#ff6a00';
 
 $pub = PUBLIC_BASE_PATH === '' ? '' : PUBLIC_BASE_PATH;
+/** روابط مطلقة: Chrome/Edge على الويندوز يعتمدون عليها لأيقونة التثبيت والاختصار */
 $pwaIconSrc = static function (string $file) use ($pub): string {
-    return $pub . storefront_asset_url('/assets/images/' . $file);
+    $rel = $pub . storefront_asset_url('/assets/images/' . $file);
+
+    return storefront_absolute_url($rel);
 };
 
 $manifest = [

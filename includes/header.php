@@ -47,6 +47,8 @@ $orangeChannelLogoFile = preg_replace(
 $orangeChannelLogoUrl = $orangePubBase . storefront_asset_url('/assets/images/' . $orangeChannelLogoFile);
 $orangePwaApple180Url = $orangePubBase . storefront_asset_url('/assets/images/pwa-apple-180.png');
 $orangePwaApple120Url = $orangePubBase . storefront_asset_url('/assets/images/pwa-apple-120.png');
+$orangePwaIcon192Url = $orangePubBase . storefront_asset_url('/assets/images/pwa-icon-192.png');
+$orangePwaIcon512Url = $orangePubBase . storefront_asset_url('/assets/images/pwa-icon-512.png');
 $orangeWordmarkUrl = $orangePubBase . storefront_asset_url('/assets/images/orange-company-wordmark.png');
 $orangeManifestHref = $orangePubBase . '/manifest.php?' . http_build_query(['channel' => $channelSlug, 'lang' => $lang]);
 
@@ -59,6 +61,8 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
     <meta name="theme-color" content="<?php echo htmlspecialchars($sfThemeColor, ENT_QUOTES, 'UTF-8'); ?>">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="manifest" href="<?php echo htmlspecialchars($orangeManifestHref, ENT_QUOTES, 'UTF-8'); ?>">
+    <link rel="icon" type="image/png" sizes="192x192" href="<?php echo htmlspecialchars($orangePwaIcon192Url, ENT_QUOTES, 'UTF-8'); ?>">
+    <link rel="icon" type="image/png" sizes="512x512" href="<?php echo htmlspecialchars($orangePwaIcon512Url, ENT_QUOTES, 'UTF-8'); ?>">
     <link rel="apple-touch-icon" sizes="180x180" href="<?php echo htmlspecialchars($orangePwaApple180Url, ENT_QUOTES, 'UTF-8'); ?>">
     <link rel="apple-touch-icon" sizes="120x120" href="<?php echo htmlspecialchars($orangePwaApple120Url, ENT_QUOTES, 'UTF-8'); ?>">
     <script>
