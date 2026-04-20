@@ -31,6 +31,8 @@ $orangeMyOrderUi = [
     'payment_credit' => t('payment_credit'),
     'payment_online' => t('payment_online'),
 ];
+$trackSignupFieldRtl = $lang === 'ar' ? ' track-signup-cta__field--rtl-inputs' : '';
+$trackSignupEmailLtr = $lang === 'ar' ? 'track-signup-email-input-ltr' : '';
 ?>
 <div class="container">
     <div class="page-title-box cart-page-head">
@@ -46,36 +48,39 @@ $orangeMyOrderUi = [
                 <p class="track-signup-cta__text"><?php echo htmlspecialchars(t('track_signup_cta_text'), ENT_QUOTES, 'UTF-8'); ?></p>
             </div>
             <div class="track-signup-cta__expand" id="trackSignupExpand" hidden>
-                <p class="track-signup-cta__verify-note"><?php echo htmlspecialchars(t('track_signup_identity_note'), ENT_QUOTES, 'UTF-8'); ?></p>
-                <div class="field track-signup-cta__field">
-                    <label for="trackSignupOrderNumber"><?php echo htmlspecialchars(t('order_number'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="trackSignupOrderNumber" name="signup_order_number" autocomplete="off" inputmode="text" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_order_number'), ENT_QUOTES, 'UTF-8'); ?>">
+                <div id="trackSignupPreVerify">
+                    <p class="track-signup-cta__verify-note"><?php echo htmlspecialchars(t('track_signup_identity_note'), ENT_QUOTES, 'UTF-8'); ?></p>
+                    <div class="field track-signup-cta__field">
+                        <label for="trackSignupOrderNumber"><?php echo htmlspecialchars(t('order_number'), ENT_QUOTES, 'UTF-8'); ?></label>
+                        <input id="trackSignupOrderNumber" name="signup_order_number" autocomplete="off" inputmode="text" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_order_number'), ENT_QUOTES, 'UTF-8'); ?>">
+                    </div>
+                    <div class="field track-signup-cta__field">
+                        <label for="trackSignupVerifyPhone"><?php echo htmlspecialchars(t('track_signup_verify_phone_label'), ENT_QUOTES, 'UTF-8'); ?></label>
+                        <input id="trackSignupVerifyPhone" name="signup_verify_phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_verify_phone'), ENT_QUOTES, 'UTF-8'); ?>">
+                    </div>
+                    <div class="track-signup-cta__verify-row">
+                        <button type="button" class="btn btn-secondary track-signup-cta__verify-btn" id="trackSignupVerifyOrderBtn"><?php echo htmlspecialchars(t('track_signup_verify_order_btn'), ENT_QUOTES, 'UTF-8'); ?></button>
+                    </div>
+                    <p class="track-signup-cta__verify-feedback" id="trackSignupVerifyFeedback" role="status" aria-live="polite" hidden></p>
                 </div>
-                <div class="field track-signup-cta__field">
-                    <label for="trackSignupVerifyPhone"><?php echo htmlspecialchars(t('track_signup_verify_phone_label'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="trackSignupVerifyPhone" name="signup_verify_phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_verify_phone'), ENT_QUOTES, 'UTF-8'); ?>">
-                </div>
-                <div class="track-signup-cta__verify-row">
-                    <button type="button" class="btn btn-secondary track-signup-cta__verify-btn" id="trackSignupVerifyOrderBtn"><?php echo htmlspecialchars(t('track_signup_verify_order_btn'), ENT_QUOTES, 'UTF-8'); ?></button>
-                </div>
-                <p class="track-signup-cta__verify-feedback" id="trackSignupVerifyFeedback" role="status" aria-live="polite" hidden></p>
-                <div class="field track-signup-cta__field">
+                <div class="track-signup-order-summary" id="trackSignupOrderSummary" hidden></div>
+                <div class="field track-signup-cta__field<?php echo htmlspecialchars($trackSignupFieldRtl, ENT_QUOTES, 'UTF-8'); ?>">
                     <label for="trackSignupEmail"><?php echo htmlspecialchars(t('customer_email'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="trackSignupEmail" type="email" name="email" autocomplete="email" inputmode="email" dir="ltr" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_email'), ENT_QUOTES, 'UTF-8'); ?>">
+                    <input id="trackSignupEmail"<?php echo $trackSignupEmailLtr !== '' ? ' class="' . htmlspecialchars($trackSignupEmailLtr, ENT_QUOTES, 'UTF-8') . '"' : ''; ?> type="email" name="email" autocomplete="email" inputmode="email" dir="ltr" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_email'), ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="trackSignupName"><?php echo htmlspecialchars(t('customer_name'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="trackSignupName" type="text" name="name" autocomplete="name" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_name'), ENT_QUOTES, 'UTF-8'); ?>">
+                    <input id="trackSignupName" type="text" name="name" autocomplete="name">
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="trackSignupArea"><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="trackSignupArea" name="area" autocomplete="address-level1" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_area'), ENT_QUOTES, 'UTF-8'); ?>">
+                    <input id="trackSignupArea" name="area" autocomplete="address-level1">
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="trackSignupAddress"><?php echo htmlspecialchars(t('address'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <textarea id="trackSignupAddress" name="address" autocomplete="street-address" rows="2" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_address'), ENT_QUOTES, 'UTF-8'); ?>"></textarea>
+                    <textarea id="trackSignupAddress" name="address" autocomplete="street-address" rows="2"></textarea>
                 </div>
-                <div class="field track-signup-cta__field">
+                <div class="field track-signup-cta__field<?php echo htmlspecialchars($trackSignupFieldRtl, ENT_QUOTES, 'UTF-8'); ?>">
                     <label for="trackSignupNotes"><?php echo htmlspecialchars(t('notes'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <textarea id="trackSignupNotes" name="notes" rows="2" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_notes'), ENT_QUOTES, 'UTF-8'); ?>"></textarea>
                 </div>
@@ -88,7 +93,7 @@ $orangeMyOrderUi = [
         </div>
     </div>
 
-    <div class="card-box track-page-card">
+    <div class="card-box track-page-card" id="track-no-signup-section">
         <h3 class="cart-section-title track-page-card__title"><?php echo htmlspecialchars(t('track_form_section_title'), ENT_QUOTES, 'UTF-8'); ?></h3>
         <p class="track-form-intro"><?php echo htmlspecialchars(t('track_order_howto'), ENT_QUOTES, 'UTF-8'); ?></p>
         <hr class="track-form-divider" aria-hidden="true">
@@ -123,7 +128,12 @@ window.ORANGE_TRACK_SIGNUP = {
     order_mismatch: <?php echo json_encode(t('track_signup_order_mismatch'), JSON_UNESCAPED_UNICODE); ?>,
     verify_ok: <?php echo json_encode(t('track_signup_verify_ok'), JSON_UNESCAPED_UNICODE); ?>,
     verify_fail: <?php echo json_encode(t('track_signup_verify_fail'), JSON_UNESCAPED_UNICODE); ?>,
-    missing: <?php echo json_encode(t('track_missing_fields'), JSON_UNESCAPED_UNICODE); ?>
+    missing: <?php echo json_encode(t('track_missing_fields'), JSON_UNESCAPED_UNICODE); ?>,
+    nudge_merge: <?php echo json_encode(t('track_signup_nudge_merge'), JSON_UNESCAPED_UNICODE); ?>
+};
+window.ORANGE_TRACK_BELOW = {
+    ok: <?php echo json_encode(t('track_tracked_ok_below'), JSON_UNESCAPED_UNICODE); ?>,
+    another: <?php echo json_encode(t('track_track_another'), JSON_UNESCAPED_UNICODE); ?>
 };
 
 (function () {
@@ -144,7 +154,8 @@ async function pageTrackOrderNow() {
         document.getElementById('track_order_number').value.trim(),
         document.getElementById('track_phone').value.trim(),
         msgMissing,
-        msgNotFound
+        msgNotFound,
+        { minimalBelow: true }
     );
 }
 window.__orangeCartTrackRefresh = pageTrackOrderNow;
@@ -155,6 +166,12 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
     var closeBtn = document.getElementById('trackSignupClose');
     var openBtn = document.getElementById('trackSignupOpenBtn');
     var sendBtn = document.getElementById('trackSignupSendBtn');
+    var preVerify = document.getElementById('trackSignupPreVerify');
+    var orderSummaryEl = document.getElementById('trackSignupOrderSummary');
+    var copyTitle = cta ? cta.querySelector('.track-signup-cta__title') : null;
+    var copyText = cta ? cta.querySelector('.track-signup-cta__text') : null;
+    var copyTitleDefault = copyTitle ? copyTitle.textContent : '';
+    var copyTextDefault = copyText ? copyText.textContent : '';
     var signupOrderInp = document.getElementById('trackSignupOrderNumber');
     var verifyPhoneInp = document.getElementById('trackSignupVerifyPhone');
     var emailInp = document.getElementById('trackSignupEmail');
@@ -167,7 +184,25 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
     var verifyFeedbackEl = document.getElementById('trackSignupVerifyFeedback');
     var trackOrderNumLower = document.getElementById('track_order_number');
     var trackPhoneLower = document.getElementById('track_phone');
-    if (!cta || !expand || !closeBtn || !openBtn || !sendBtn || !signupOrderInp || !verifyPhoneInp || !emailInp || !nameInp || !areaInp || !addressInp || !notesInp || !msgEl || !verifyOrderBtn || !verifyFeedbackEl) {
+    if (
+        !cta ||
+        !expand ||
+        !closeBtn ||
+        !openBtn ||
+        !sendBtn ||
+        !preVerify ||
+        !orderSummaryEl ||
+        !signupOrderInp ||
+        !verifyPhoneInp ||
+        !emailInp ||
+        !nameInp ||
+        !areaInp ||
+        !addressInp ||
+        !notesInp ||
+        !msgEl ||
+        !verifyOrderBtn ||
+        !verifyFeedbackEl
+    ) {
         return;
     }
     var sent = <?php echo json_encode(t('storefront_register_sent'), JSON_UNESCAPED_UNICODE); ?>;
@@ -196,6 +231,56 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
         }
     }
 
+    function fillSignupFieldsFromOrderForce(o) {
+        if (!o) {
+            return;
+        }
+        emailInp.value = o.customer_email != null && String(o.customer_email).trim() !== '' ? String(o.customer_email) : '';
+        nameInp.value = o.customer_name != null ? String(o.customer_name) : '';
+        areaInp.value = o.area != null ? String(o.area) : '';
+        addressInp.value = o.address != null ? String(o.address) : '';
+        notesInp.value = o.notes != null ? String(o.notes) : '';
+    }
+
+    function enterPostTrackFromLower(order, orderNumber, phone, items) {
+        cta.classList.add('is-expanded', 'is-post-track');
+        cta.setAttribute('aria-expanded', 'true');
+        setHidden(expand, false);
+        setHidden(closeBtn, false);
+        setHidden(preVerify, true);
+        setHidden(orderSummaryEl, false);
+        if (typeof orangeRenderTrackSignupSummary === 'function') {
+            orangeRenderTrackSignupSummary(orderSummaryEl, order, orderNumber, phone, items || []);
+        } else {
+            orderSummaryEl.innerHTML = '';
+        }
+        var merge = trackSignupT.nudge_merge;
+        if (copyText) {
+            copyText.textContent = merge ? copyTextDefault + ' ' + merge : copyTextDefault;
+        }
+        if (copyTitle) {
+            copyTitle.textContent = copyTitleDefault;
+        }
+        setHidden(openBtn, false);
+        setHidden(sendBtn, true);
+        setHidden(msgEl, true);
+        msgEl.textContent = '';
+        verifyFeedbackEl.textContent = '';
+        setHidden(verifyFeedbackEl, true);
+        signupOrderInp.value = orderNumber != null ? String(orderNumber) : '';
+        verifyPhoneInp.value = phone != null ? String(phone) : '';
+        fillSignupFieldsFromOrderForce(order);
+        syncLowerTrackInputs(orderNumber, phone);
+        requestAnimationFrame(function () {
+            try {
+                cta.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } catch (eScroll) {}
+            try {
+                emailInp.focus();
+            } catch (eF) {}
+        });
+    }
+
     function syncLowerTrackInputs(orderNumber, phoneTyped) {
         if (trackOrderNumLower) {
             trackOrderNumLower.value = orderNumber;
@@ -217,6 +302,16 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
     }
 
     function expandPanel() {
+        cta.classList.remove('is-post-track');
+        setHidden(preVerify, false);
+        setHidden(orderSummaryEl, true);
+        orderSummaryEl.innerHTML = '';
+        if (copyText) {
+            copyText.textContent = copyTextDefault;
+        }
+        if (copyTitle) {
+            copyTitle.textContent = copyTitleDefault;
+        }
         cta.classList.add('is-expanded');
         cta.setAttribute('aria-expanded', 'true');
         setHidden(expand, false);
@@ -252,12 +347,21 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
     }
 
     function collapsePanel() {
-        cta.classList.remove('is-expanded');
+        cta.classList.remove('is-expanded', 'is-post-track');
         cta.setAttribute('aria-expanded', 'false');
         setHidden(expand, true);
         setHidden(closeBtn, true);
         setHidden(openBtn, false);
         setHidden(sendBtn, true);
+        setHidden(preVerify, false);
+        setHidden(orderSummaryEl, true);
+        orderSummaryEl.innerHTML = '';
+        if (copyText) {
+            copyText.textContent = copyTextDefault;
+        }
+        if (copyTitle) {
+            copyTitle.textContent = copyTitleDefault;
+        }
         setHidden(msgEl, true);
         msgEl.textContent = '';
         signupOrderInp.value = '';
@@ -274,7 +378,13 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
     /* حالة أولية صريحة — يظهر فقط «تسجيل» */
     collapsePanel();
 
-    openBtn.addEventListener('click', expandPanel);
+    openBtn.addEventListener('click', function () {
+        if (cta.classList.contains('is-post-track')) {
+            submitTrackSignupEmail();
+            return;
+        }
+        expandPanel();
+    });
     closeBtn.addEventListener('click', collapsePanel);
 
     verifyOrderBtn.addEventListener('click', function () {
@@ -327,7 +437,7 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
             });
     });
 
-    sendBtn.addEventListener('click', function () {
+    function submitTrackSignupEmail() {
         var email = emailInp.value.trim();
         var name = nameInp.value.trim();
         var orderNumber = signupOrderInp.value.trim();
@@ -396,7 +506,19 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
             .catch(function () {
                 msgEl.textContent = err;
             });
-    });
+    }
+
+    sendBtn.addEventListener('click', submitTrackSignupEmail);
+
+    window.__orangeApplyLowerTrackToSignup = function (orderNumber, phone, order, items) {
+        enterPostTrackFromLower(order, orderNumber, phone, items);
+    };
+    window.__orangeOnTrackSuccess = function (payload) {
+        if (!payload || !payload.order) {
+            return;
+        }
+        window.__orangeApplyLowerTrackToSignup(payload.orderNumber, payload.phone, payload.order, payload.items || []);
+    };
 })();
 </script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

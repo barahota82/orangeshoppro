@@ -1903,8 +1903,156 @@ body.storefront .product-gallery__img {
     color: var(--text);
 }
 
+.track-signup-cta__field--rtl-inputs textarea {
+    text-align: right;
+    direction: rtl;
+}
+
+.track-signup-cta__field--rtl-inputs input.track-signup-email-input-ltr {
+    direction: ltr;
+    text-align: right;
+}
+
+.track-signup-order-summary {
+    margin: 0 0 14px;
+    padding: 14px 16px;
+    border-radius: var(--radius-sm);
+    border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
+    background: color-mix(in srgb, var(--card) 88%, var(--primary-soft));
+}
+
+.track-signup-order-summary__inner {
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
+.track-signup-order-summary__status {
+    margin: 0 0 10px;
+}
+
+.track-signup-order-summary__line {
+    margin: 0 0 6px;
+}
+
+.track-signup-order-summary__items {
+    margin-top: 12px;
+}
+
+.track-signup-order-summary__items-title {
+    margin: 0 0 8px;
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.track-signup-order-summary__item-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.track-signup-order-summary__item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 12px;
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+    font-size: 0.88rem;
+}
+
+.track-signup-order-summary__item:first-child {
+    border-top: none;
+    padding-top: 0;
+}
+
+.track-signup-order-summary__item-main {
+    flex: 1 1 140px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.track-signup-order-summary__item-name {
+    font-weight: 600;
+    color: var(--text);
+}
+
+.track-signup-order-summary__item-meta {
+    font-size: 0.82rem;
+    color: var(--muted);
+}
+
+.track-signup-order-summary__item-qty,
+.track-signup-order-summary__item-sub {
+    white-space: nowrap;
+    color: var(--muted);
+}
+
+.track-signup-order-summary__actions {
+    margin-top: 14px;
+}
+
+.track-signup-order-summary__hint {
+    margin: 8px 0 0;
+}
+
+.track-page-track-mini {
+    margin-top: 14px;
+    padding: 14px 16px;
+    text-align: start;
+}
+
+.track-page-track-mini__ok {
+    margin: 0 0 12px;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    color: var(--text);
+}
+
+.track-page-track-mini__another {
+    width: 100%;
+    box-sizing: border-box;
+}
+
 @media (min-width: 560px) {
     .track-signup-cta__verify-btn {
+        width: auto;
+        min-width: 200px;
+    }
+
+    .track-page-track-mini__another {
+        width: auto;
+        min-width: 200px;
+    }
+}
+
+.track-signup-nudge {
+    margin-top: 1rem;
+    padding: 14px 16px;
+    text-align: start;
+    background: linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--primary-soft) 75%, var(--card)),
+        var(--card)
+    );
+    border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border));
+}
+
+.track-signup-nudge__text {
+    margin: 0 0 12px;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    color: var(--text);
+}
+
+.track-signup-nudge__btn {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+@media (min-width: 560px) {
+    .track-signup-nudge__btn {
         width: auto;
         min-width: 200px;
     }

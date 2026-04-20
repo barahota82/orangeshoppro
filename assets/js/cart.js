@@ -723,7 +723,141 @@ function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, 
     resultBox.innerHTML = html;
 }
 
-async function orangeTrackOrderFetchAndRender(resultBox, orderNumber, phone, msgMissing, msgNotFound) {
+function orangeRenderTrackSignupSummary(el, order, orderNumber, phoneTyped, items) {
+    if (!el) {
+        return;
+    }
+    const UI = window.ORANGE_MY_ORDER_UI || {};
+    const labels = window.ORANGE_ORDER_STATUS_LABELS || {};
+    const L = window.ORANGE_TRACK_LABELS || {};
+    const T = window.APP_T || {};
+    const st = String(order.status || '').toLowerCase().trim();
+    const statusText = labels[st] || order.status || '—';
+    const lblOrder = L.order_number || 'Order #';
+    const lblPhone = L.phone || 'Phone';
+    const cur = String(UI.currency || 'KD');
+    const itemRows = Array.isArray(items) ? items : [];
+
+    const canCancel = st === 'pending' || st === 'approved';
+    let waUrl = null;
+    const prefillRaw = String(UI.whatsapp_prefill || '').replace(/\{order\}/g, String(order.order_number || orderNumber));
+    const waBase = window.ORANGE_STOREFRONT_WA;
+    if (waBase && typeof waBase === 'string') {
+        const q = waBase.indexOf('?');
+        const path = q >= 0 ? waBase.substring(0, q) : waBase;
+        waUrl = path + '?text=' + encodeURIComponent(prefillRaw);
+    }
+
+    let html = '<div class="track-signup-order-summary__inner">';
+    html += '<p class="track-signup-order-summary__status"><strong>' + orangeEscDomText(UI.status_label || '') + ':</strong> ';
+    html += '<span class="order-status-pill order-status-pill--' + orangeEscDomText(st) + '">' + orangeEscDomText(statusText) + '</span></p>';
+    html += '<p class="track-signup-order-summary__line"><strong>' + orangeEscDomText(lblOrder) + ':</strong> ';
+    html += orangeEscDomText(String(order.order_number || '')) + '</p>';
+    if (order.phone) {
+        html += '<p class="track-signup-order-summary__line"><strong>' + orangeEscDomText(lblPhone) + ':</strong> ';
+        html += orangeEscDomText(String(order.phone)) + '</p>';
+    }
+    html += '<p class="track-signup-order-summary__line"><strong>' + orangeEscDomText(UI.order_total_label || '') + ':</strong> ';
+    html += orangeEscDomText(String(order.total)) + ' ' + orangeEscDomText(cur) + '</p>';
+    const pt = String(order.payment_terms || 'cash').toLowerCase();
+    const ptLabel = pt === 'credit' ? (UI.payment_credit || '') : (pt === 'online' ? (UI.payment_online || '') : (UI.payment_cash || ''));
+    if (UI.payment_label && ptLabel) {
+        html += '<p class="track-signup-order-summary__line"><strong>' + orangeEscDomText(UI.payment_label) + ':</strong> ';
+        html += orangeEscDomText(ptLabel) + '</p>';
+    }
+
+    if (itemRows.length > 0) {
+        const itemsTitle = L.items_title || 'Items';
+        const qtyLbl = T.quantity || 'Qty';
+        html += '<div class="track-signup-order-summary__items">';
+        html += '<h4 class="track-signup-order-summary__items-title">' + orangeEscDomText(itemsTitle) + '</h4>';
+        html += '<ul class="track-signup-order-summary__item-list">';
+        for (let i = 0; i < itemRows.length; i++) {
+            const it = itemRows[i];
+            const qty = Math.max(0, parseInt(String(it.qty || 0), 10) || 0);
+            const price = parseFloat(String(it.price || 0)) || 0;
+            const line = qty * price;
+            html += '<li class="track-signup-order-summary__item">';
+            html += '<span class="track-signup-order-summary__item-main">';
+            html += '<span class="track-signup-order-summary__item-name">' + orangeEscDomText(String(it.product_name || '')) + '</span>';
+            const meta = [];
+            if (it.color) {
+                meta.push(orangeEscDomText(String(it.color)));
+            }
+            if (it.size) {
+                meta.push(orangeEscDomText(String(it.size)));
+            }
+            if (meta.length) {
+                html += '<span class="track-signup-order-summary__item-meta">' + meta.join(' · ') + '</span>';
+            }
+            html += '</span>';
+            html +=
+                '<span class="track-signup-order-summary__item-qty">' +
+                orangeEscDomText(qtyLbl) +
+                ' × ' +
+                qty +
+                '</span>';
+            html +=
+                '<span class="track-signup-order-summary__item-sub">' +
+                line.toFixed(3) +
+                ' ' +
+                orangeEscDomText(cur) +
+                '</span>';
+            html += '</li>';
+        }
+        html += '</ul></div>';
+    }
+
+    html += '<div class="track-signup-order-summary__actions customer-order-actions">';
+    html += '<button type="button" class="btn btn-danger customer-order-cancel"';
+    if (!canCancel) {
+        html += ' disabled title="' + orangeEscDomAttr(UI.cancel_not_allowed || '') + '"';
+    }
+    html += ' onclick="orangeCustomerCancelOrder()">' + orangeEscDomText(UI.cancel || '') + '</button>';
+    if (waUrl) {
+        html += '<a class="btn btn-secondary customer-order-wa" href="' + orangeEscDomAttr(waUrl) + '" target="_blank" rel="noopener noreferrer">';
+        html += orangeEscDomText(UI.whatsapp_help || 'WhatsApp') + '</a>';
+    }
+    html += '</div>';
+    if (!canCancel && st !== 'cancelled' && st !== 'rejected') {
+        html += '<p class="track-signup-order-summary__hint cart-cancel-hint">' + orangeEscDomText(UI.cancel_not_allowed || '') + '</p>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+function orangeRenderTrackMinimalBelow(resultBox) {
+    if (!resultBox) {
+        return;
+    }
+    const T = window.ORANGE_TRACK_BELOW || {};
+    const ok = T.ok || '';
+    const another = T.another || '';
+    resultBox.innerHTML =
+        '<div class="track-page-track-mini card-box">' +
+        '<p class="track-page-track-mini__ok">' +
+        orangeEscDomText(ok) +
+        '</p>' +
+        '<button type="button" class="btn btn-secondary track-page-track-mini__another" id="orangeTrackAnotherBtn">' +
+        orangeEscDomText(another) +
+        '</button>' +
+        '</div>';
+    const btn = resultBox.querySelector('#orangeTrackAnotherBtn');
+    if (btn) {
+        btn.addEventListener('click', function () {
+            const target = document.getElementById('track-no-signup-section');
+            if (target && typeof target.scrollIntoView === 'function') {
+                try {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } catch (e) {
+                    target.scrollIntoView(true);
+                }
+            }
+        });
+    }
+}
+
+async function orangeTrackOrderFetchAndRender(resultBox, orderNumber, phone, msgMissing, msgNotFound, options) {
     if (!resultBox) {
         return;
     }
@@ -756,8 +890,28 @@ async function orangeTrackOrderFetchAndRender(resultBox, orderNumber, phone, msg
         orangeScrollTrackResultIntoView(resultBox);
         return;
     }
-    orangeRenderTrackedOrderBox(resultBox, result.order, onum, ph, result.items || []);
+    window.__orangeCartTrack = { orderNumber: onum, phone: ph, order: result.order };
+    const items = result.items || [];
+    const minimal = options && options.minimalBelow === true;
+    if (minimal) {
+        orangeRenderTrackMinimalBelow(resultBox);
+    } else {
+        orangeRenderTrackedOrderBox(resultBox, result.order, onum, ph, items);
+    }
     orangeScrollTrackResultIntoView(resultBox);
+    if (typeof window.__orangeOnTrackSuccess === 'function') {
+        try {
+            window.__orangeOnTrackSuccess({
+                resultBox,
+                order: result.order,
+                orderNumber: onum,
+                phone: ph,
+                items: items,
+            });
+        } catch (e) {
+            /* optional storefront hook */
+        }
+    }
 }
 
 function orangeScrollTrackResultIntoView(el) {
