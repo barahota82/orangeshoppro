@@ -64,6 +64,9 @@ if ($clusterPart === 'lang') {
 
 if ($clusterPart === 'actions') {
     ?>
+            <button type="button" class="icon-btn icon-btn--install" data-orange-install-app hidden aria-label="<?php echo htmlspecialchars(t('storefront_install_app_aria'), ENT_QUOTES, 'UTF-8'); ?>">
+                <?php echo htmlspecialchars(t('storefront_install_app_btn'), ENT_QUOTES, 'UTF-8'); ?>
+            </button>
             <a class="icon-btn" data-orange-cart-link href="<?php echo $cartHref; ?>"><?php echo htmlspecialchars(t('cart'), ENT_QUOTES, 'UTF-8'); ?></a>
             <a class="icon-btn" href="<?php echo $trackHref; ?>"><?php echo htmlspecialchars(t('track_order'), ENT_QUOTES, 'UTF-8'); ?></a>
             <a class="icon-btn" href="<?php echo $registerHref; ?>"><?php echo htmlspecialchars(t('storefront_register'), ENT_QUOTES, 'UTF-8'); ?></a>
@@ -79,7 +82,8 @@ if ($clusterPart === 'actions') {
 }
 
 if ($clusterPart === 'dock') {
-    echo '<nav class="app-bottom-dock" role="navigation" aria-label="' . htmlspecialchars(t('cart') . ' · ' . t('track_order') . ' · ' . t('storefront_register') . ' · ' . t('whatsapp'), ENT_QUOTES, 'UTF-8') . '">';
+    $dockAria = t('cart') . ' · ' . t('track_order') . ' · ' . t('storefront_register') . ' · ' . t('storefront_install_app_btn') . ' · ' . t('whatsapp');
+    echo '<nav class="app-bottom-dock" role="navigation" aria-label="' . htmlspecialchars($dockAria, ENT_QUOTES, 'UTF-8') . '">';
     echo '<div class="app-bottom-dock__grid">';
     ?>
 <div class="app-bottom-dock__cell">
@@ -105,6 +109,14 @@ if ($clusterPart === 'dock') {
     </span>
     <span class="app-dock-btn__label"><?php echo htmlspecialchars(t('storefront_register'), ENT_QUOTES, 'UTF-8'); ?></span>
 </a>
+</div>
+<div class="app-bottom-dock__cell">
+<button type="button" class="app-dock-btn app-dock-btn--install" data-orange-install-app hidden aria-label="<?php echo htmlspecialchars(t('storefront_install_app_aria'), ENT_QUOTES, 'UTF-8'); ?>">
+    <span class="app-dock-btn__icon" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" focusable="false"><path d="M12 3v10m0 0 3.5-3.5M12 13 8.5 9.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 19h14a2 2 0 0 0 2-2v-3H3v3a2 2 0 0 0 2 2Z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/></svg>
+    </span>
+    <span class="app-dock-btn__label"><?php echo htmlspecialchars(t('storefront_install_app_btn'), ENT_QUOTES, 'UTF-8'); ?></span>
+</button>
 </div>
 <div class="app-bottom-dock__cell">
     <?php

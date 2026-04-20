@@ -356,3 +356,116 @@ function changeMainImage(src, btn) {
     }
     sync();
 })();
+
+/** أزرار «تثبيت» (هيدر + شريط سفلي): Chrome/Android يعرض مطالبة التثبيت؛ iOS يعرض خطوات يدوية. */
+(function orangeStorefrontInstallPrompt() {
+    if (!document.body.classList.contains('storefront')) {
+        return;
+    }
+    const btns = document.querySelectorAll('[data-orange-install-app]');
+    const modal = document.getElementById('orangeInstallModal');
+    if (!btns.length || !modal) {
+        return;
+    }
+    const T = window.APP_T || {};
+    const titleEl = document.getElementById('orangeInstallModalTitle');
+    const introEl = document.getElementById('orangeInstallModalIntro');
+    const stepsEl = document.getElementById('orangeInstallModalSteps');
+    const okEl = document.getElementById('orangeInstallModalOk');
+    const backdrop = modal.querySelector('.orange-install-modal__backdrop');
+    let deferredPrompt = null;
+    let lastInstallBtn = null;
+
+    function isStandalone() {
+        return (
+            (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+            window.navigator.standalone === true
+        );
+    }
+
+    function isAppleMobile() {
+        const ua = navigator.userAgent || '';
+        if (/iPad|iPhone|iPod/i.test(ua)) {
+            return true;
+        }
+        return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+    }
+
+    function fillModal() {
+        if (titleEl) {
+            titleEl.textContent = T.storefront_install_modal_title || '';
+        }
+        if (introEl) {
+            introEl.textContent = T.storefront_install_modal_intro || '';
+        }
+        if (stepsEl) {
+            const steps = isAppleMobile()
+                ? T.storefront_install_ios_steps || ''
+                : T.storefront_install_other_steps || '';
+            stepsEl.textContent = steps;
+        }
+        if (okEl) {
+            okEl.textContent = T.storefront_install_close || 'OK';
+        }
+    }
+
+    function openModal() {
+        fillModal();
+        modal.hidden = false;
+        document.documentElement.classList.add('orange-install-modal-open');
+        if (okEl) {
+            okEl.focus();
+        }
+    }
+
+    function closeModal() {
+        modal.hidden = true;
+        document.documentElement.classList.remove('orange-install-modal-open');
+        const back = lastInstallBtn && document.contains(lastInstallBtn) ? lastInstallBtn : btns[0];
+        if (back && !back.hidden) {
+            back.focus();
+        }
+    }
+
+    if (isStandalone()) {
+        return;
+    }
+
+    btns.forEach((b) => {
+        b.hidden = false;
+    });
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+    });
+
+    btns.forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            lastInstallBtn = btn;
+            if (deferredPrompt) {
+                try {
+                    deferredPrompt.prompt();
+                    await deferredPrompt.userChoice;
+                } catch (err) {
+                    /* ignore */
+                }
+                deferredPrompt = null;
+                return;
+            }
+            openModal();
+        });
+    });
+
+    if (okEl) {
+        okEl.addEventListener('click', closeModal);
+    }
+    if (backdrop) {
+        backdrop.addEventListener('click', closeModal);
+    }
+    modal.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeModal();
+        }
+    });
+})();

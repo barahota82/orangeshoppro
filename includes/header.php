@@ -217,7 +217,12 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             cart_max_available_short: <?php echo json_encode(t('cart_max_available_short'), JSON_UNESCAPED_UNICODE); ?>,
             cart_continue_shopping: <?php echo json_encode(t('cart_continue_shopping'), JSON_UNESCAPED_UNICODE); ?>,
             cart_mini_summary_title: <?php echo json_encode(t('cart_mini_summary_title'), JSON_UNESCAPED_UNICODE); ?>,
-            cart_mini_more: <?php echo json_encode(t('cart_mini_more'), JSON_UNESCAPED_UNICODE); ?>
+            cart_mini_more: <?php echo json_encode(t('cart_mini_more'), JSON_UNESCAPED_UNICODE); ?>,
+            storefront_install_modal_title: <?php echo json_encode(t('storefront_install_modal_title'), JSON_UNESCAPED_UNICODE); ?>,
+            storefront_install_modal_intro: <?php echo json_encode(t('storefront_install_modal_intro'), JSON_UNESCAPED_UNICODE); ?>,
+            storefront_install_ios_steps: <?php echo json_encode(t('storefront_install_ios_steps'), JSON_UNESCAPED_UNICODE); ?>,
+            storefront_install_other_steps: <?php echo json_encode(t('storefront_install_other_steps'), JSON_UNESCAPED_UNICODE); ?>,
+            storefront_install_close: <?php echo json_encode(t('storefront_install_close'), JSON_UNESCAPED_UNICODE); ?>
         };
     </script>
 </head>
