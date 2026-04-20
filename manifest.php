@@ -27,7 +27,6 @@ if (!$ch) {
 }
 
 $name = trim((string) ($ch['name'] ?? 'Orange'));
-$logoFile = preg_replace('/[^a-z0-9._\-]/i', '', (string) ($ch['logo'] ?? 'logo-orange.png')) ?: 'logo-orange.png';
 
 $startUrl = storefront_url('home', $slug, $lang);
 $scope = PUBLIC_BASE_PATH === '' ? '/' : rtrim(PUBLIC_BASE_PATH, '/') . '/';
@@ -35,7 +34,9 @@ $scope = PUBLIC_BASE_PATH === '' ? '/' : rtrim(PUBLIC_BASE_PATH, '/') . '/';
 $themeColor = '#ff6a00';
 
 $pub = PUBLIC_BASE_PATH === '' ? '' : PUBLIC_BASE_PATH;
-$iconSrc = $pub . storefront_asset_url('/assets/images/' . $logoFile);
+$pwaIconSrc = static function (string $file) use ($pub): string {
+    return $pub . storefront_asset_url('/assets/images/' . $file);
+};
 
 $manifest = [
     'name' => $name . ' — Orange',
@@ -49,14 +50,26 @@ $manifest = [
     'theme_color' => $themeColor,
     'icons' => [
         [
-            'src' => $iconSrc,
+            'src' => $pwaIconSrc('pwa-icon-144.png'),
+            'sizes' => '144x144',
+            'type' => 'image/png',
+            'purpose' => 'any',
+        ],
+        [
+            'src' => $pwaIconSrc('pwa-icon-192.png'),
             'sizes' => '192x192',
             'type' => 'image/png',
             'purpose' => 'any',
         ],
         [
-            'src' => $iconSrc,
+            'src' => $pwaIconSrc('pwa-icon-512.png'),
             'sizes' => '512x512',
+            'type' => 'image/png',
+            'purpose' => 'any',
+        ],
+        [
+            'src' => $pwaIconSrc('pwa-icon-1024.png'),
+            'sizes' => '1024x1024',
             'type' => 'image/png',
             'purpose' => 'any',
         ],

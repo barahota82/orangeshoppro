@@ -45,6 +45,8 @@ $orangeChannelLogoFile = preg_replace(
 ) ?: 'logo-orange.png';
 /* نفس منطق CSS/JS: ?v=filemtime حتى لا يبقى الكمبيوتر على شعار PNG قديم بعد التحديث */
 $orangeChannelLogoUrl = $orangePubBase . storefront_asset_url('/assets/images/' . $orangeChannelLogoFile);
+$orangePwaApple180Url = $orangePubBase . storefront_asset_url('/assets/images/pwa-apple-180.png');
+$orangePwaApple120Url = $orangePubBase . storefront_asset_url('/assets/images/pwa-apple-120.png');
 $orangeWordmarkUrl = $orangePubBase . storefront_asset_url('/assets/images/orange-company-wordmark.png');
 $orangeManifestHref = $orangePubBase . '/manifest.php?' . http_build_query(['channel' => $channelSlug, 'lang' => $lang]);
 
@@ -57,7 +59,8 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
     <meta name="theme-color" content="<?php echo htmlspecialchars($sfThemeColor, ENT_QUOTES, 'UTF-8'); ?>">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="manifest" href="<?php echo htmlspecialchars($orangeManifestHref, ENT_QUOTES, 'UTF-8'); ?>">
-    <link rel="apple-touch-icon" href="<?php echo htmlspecialchars($orangeChannelLogoUrl, ENT_QUOTES, 'UTF-8'); ?>">
+    <link rel="apple-touch-icon" sizes="180x180" href="<?php echo htmlspecialchars($orangePwaApple180Url, ENT_QUOTES, 'UTF-8'); ?>">
+    <link rel="apple-touch-icon" sizes="120x120" href="<?php echo htmlspecialchars($orangePwaApple120Url, ENT_QUOTES, 'UTF-8'); ?>">
     <script>
     (function orangeStorefrontApplySavedChannel() {
         try {
