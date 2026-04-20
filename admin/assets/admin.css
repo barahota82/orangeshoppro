@@ -2570,6 +2570,20 @@ body.coa-modal-open {
     outline: 2px solid #dc2626;
     outline-offset: 2px;
 }
+.coa-setup-del--disabled,
+.coa-setup-del:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background: #f1f5f9;
+    color: #64748b;
+    border-color: #cbd5e1;
+}
+.coa-setup-del--disabled:hover,
+.coa-setup-del:disabled:hover {
+    background: #f1f5f9;
+    color: #64748b;
+    border-color: #cbd5e1;
+}
 .coa-setup-form--compact {
     flex: 0 0 auto;
     padding-top: 2px;

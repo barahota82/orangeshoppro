@@ -22,6 +22,7 @@ try {
             'name' => (string) ($r['name'] ?? ''),
             'rank' => (int) $r['rank'],
             'can_delete' => !empty($r['can_delete']),
+            'delete_block_hint' => (string) ($r['delete_block_hint'] ?? ''),
         ];
         if (array_key_exists('name_en', $r)) {
             $row['name_en'] = (string) ($r['name_en'] ?? '');

@@ -569,7 +569,63 @@ function orange_accounts_depth_by_id(array $flat): array
 }
 
 /**
- * حسابات الجذر مرتبة لشاشة «إعداد الدليل»: الترتيب يحدد رقم الصف؛ أول أربعة لا تُحذف.
+ * سبب منع حذف الحساب أو null إن كان مسموحاً (جذر أو فرع).
+ * لا يُطبَّق حظرٌ على «أول أربعة جذور» — يكفي خلو الحساب من الفروع والحركات والربط في الإعدادات.
+ *
+ * @param array<string, mixed> $accountRow صف يحتوي على id على الأقل
+ */
+function orange_account_delete_block_reason(PDO $pdo, array $accountRow): ?string
+{
+    $id = (int) ($accountRow['id'] ?? 0);
+    if ($id <= 0) {
+        return 'معرّف الحساب غير صالح';
+    }
+    if (orange_table_has_column($pdo, 'accounts', 'parent_id')) {
+        $ch = $pdo->prepare('SELECT COUNT(*) FROM accounts WHERE parent_id = ?');
+        $ch->execute([$id]);
+        if ((int) $ch->fetchColumn() > 0) {
+            return 'لا يمكن الحذف: يوجد حسابات فرعية تحت هذا الحساب. انقلها أو احذفها أولاً.';
+        }
+    }
+    if (orange_table_exists($pdo, 'orange_gl_account_settings')) {
+        $gk = $pdo->prepare('SELECT setting_key FROM orange_gl_account_settings WHERE account_id = ?');
+        $gk->execute([$id]);
+        $keys = $gk->fetchAll(PDO::FETCH_COLUMN);
+        if (is_array($keys) && $keys !== []) {
+            require_once __DIR__ . '/gl_settings.php';
+            $labMap = orange_gl_setting_key_labels();
+            $parts = [];
+            foreach ($keys as $k) {
+                $k = (string) $k;
+                $parts[] = $labMap[$k] ?? $k;
+            }
+
+            return 'الحساب مربوط بإعدادات القيود التلقائية: ' . implode('، ', $parts)
+                . ' — غيّر الربط من «حسابات القيود التلقائية» ثم أعد المحاولة.';
+        }
+    }
+    if (orange_table_exists($pdo, 'journal_lines')) {
+        $jl = $pdo->prepare('SELECT COUNT(*) FROM journal_lines WHERE account_id = ?');
+        $jl->execute([$id]);
+        if ((int) $jl->fetchColumn() > 0) {
+            return 'لا يمكن الحذف: يوجد حركات في سندات محاسبية على هذا الحساب.';
+        }
+    }
+    if (orange_table_exists($pdo, 'journal_entries')) {
+        $je = $pdo->prepare(
+            'SELECT COUNT(*) FROM journal_entries WHERE account_debit = ? OR account_credit = ?'
+        );
+        $je->execute([$id, $id]);
+        if ((int) $je->fetchColumn() > 0) {
+            return 'لا يمكن الحذف: يوجد قيود قديمة (journal_entries) تستخدم هذا الحساب.';
+        }
+    }
+
+    return null;
+}
+
+/**
+ * حسابات الجذر مرتبة لشاشة «إعداد الدليل»: الترتيب يحدد رقم الصف؛ إمكانية الحذف تُشتق من القواعد الفعلية وليس من ترتيب الصف.
  *
  * @return list<array<string, mixed>>
  */
@@ -595,7 +651,9 @@ function orange_accounts_roots_ordered(PDO $pdo): array
     $out = [];
     foreach ($rows as $r) {
         $r['rank'] = $rank;
-        $r['can_delete'] = $rank > 4;
+        $why = orange_account_delete_block_reason($pdo, $r);
+        $r['can_delete'] = $why === null;
+        $r['delete_block_hint'] = $why ?? '';
         ++$rank;
         $out[] = $r;
     }

@@ -647,12 +647,22 @@ document.addEventListener('DOMContentLoaded', function () {
             tr.dataset.canDelete = row.can_delete ? '1' : '0';
             var delTd = document.createElement('td');
             delTd.className = 'coa-setup-table__del';
-            if (row.can_delete) {
-                var delBtn = document.createElement('button');
-                delBtn.type = 'button';
-                delBtn.className = 'coa-setup-del';
-                delBtn.setAttribute('aria-label', 'حذف الصف');
-                delBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14zM10 11v6M14 11v6"/></svg>';
+            var delSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14zM10 11v6M14 11v6"/></svg>';
+            var delBtn = document.createElement('button');
+            delBtn.type = 'button';
+            delBtn.className = 'coa-setup-del' + (row.can_delete ? '' : ' coa-setup-del--disabled');
+            delBtn.setAttribute('aria-label', row.can_delete ? 'حذف هذا الجذر' : 'حذف غير متاح');
+            delBtn.innerHTML = delSvg;
+            var hint = (row.delete_block_hint || '').trim();
+            if (!row.can_delete && hint) {
+                delBtn.title = hint;
+                delBtn.setAttribute('aria-description', hint);
+            } else if (!row.can_delete) {
+                delBtn.title = 'لا يمكن حذف هذا الحساب حالياً';
+            }
+            if (!row.can_delete) {
+                delBtn.disabled = true;
+            } else {
                 delBtn.addEventListener('click', function (ev) {
                     ev.stopPropagation();
                     if (!confirm('حذف هذا الحساب الجذر؟')) {
@@ -673,8 +683,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         });
                     }).catch(function (e) { alert(e.message || String(e)); });
                 });
-                delTd.appendChild(delBtn);
             }
+            delTd.appendChild(delBtn);
             var c1 = document.createElement('td');
             c1.textContent = row.code || '';
             var c2 = document.createElement('td');
