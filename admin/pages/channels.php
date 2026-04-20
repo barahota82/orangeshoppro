@@ -7,11 +7,15 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 $channels = $pdo->query('SELECT * FROM channels ORDER BY id ASC')->fetchAll();
+$sfPreviewConfigured = ORANGE_STOREFRONT_PREVIEW_TOKEN !== '';
 ?>
 <div class="page-title">
     <h1>الواجهات (قنوات العملاء)</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;">كل قناة تمثّل واجهة أو مصدراً لتجميع <strong>العملاء وطلباتهم</strong>. المخزون والمبيعات المحاسبية <strong>للشركة موحّدة</strong> — الطلب من أي قناة يسحب من نفس المخزن الرئيسي.</p>
     <p style="margin:0.6rem 0 0;"><a class="btn btn-secondary" href="/admin/index.php?page=channel_analytics">تحليل أداء القنوات (مبيعات، أكثر منتج، ترتيب النشاط)</a></p>
+    <?php if (!$sfPreviewConfigured): ?>
+        <p class="card-hint" style="margin:0.75rem 0 0;color:#b45309;">لتفعيل روابط «معاينة الواجهة» من هذا الجدول، عيّن <code dir="ltr">ORANGE_STOREFRONT_PREVIEW_TOKEN</code> في ملف <code dir="ltr">.env.php</code> (سلسلة عشوائية طويلة)، ثم أعد تحميل الصفحة.</p>
+    <?php endif; ?>
 </div>
 
 <div class="card">
@@ -56,6 +60,7 @@ $channels = $pdo->query('SELECT * FROM channels ORDER BY id ASC')->fetchAll();
                     <th>Slug داخلي</th>
                     <th>اللون</th>
                     <th>الواتساب</th>
+                    <th>معاينة الواجهة</th>
                     <th>الحالة</th>
                 </tr>
             </thead>
@@ -68,6 +73,19 @@ $channels = $pdo->query('SELECT * FROM channels ORDER BY id ASC')->fetchAll();
                     <td><code dir="ltr"><?php echo htmlspecialchars($ch['slug']); ?></code></td>
                     <td><?php echo htmlspecialchars($ch['primary_color']); ?></td>
                     <td><?php echo htmlspecialchars($ch['whatsapp_number']); ?></td>
+                    <td dir="ltr"><?php
+                    $ps = trim((string) ($ch['path_segment'] ?? ''));
+                    if ($ps === '') {
+                        echo '—';
+                    } elseif (!$sfPreviewConfigured) {
+                        echo '<span class="card-hint">أضف المفتاح في .env.php</span>';
+                    } else {
+                        $prevUrl = orange_storefront_admin_preview_home_url($ps);
+                        echo $prevUrl !== ''
+                            ? '<a href="' . htmlspecialchars($prevUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener">فتح الرئيسية</a>'
+                            : '—';
+                    }
+                    ?></td>
                     <td><?php echo (int)$ch['is_active'] === 1 ? 'نشط' : 'مخفي'; ?></td>
                 </tr>
                 <?php endforeach; ?>

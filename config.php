@@ -80,6 +80,12 @@ define(
     || strtolower((string) $__noHtmlCache) === 'true'
 );
 
+/**
+ * اختياري: نفس القيمة في query ‎?sf_preview=…‎ لتعطيل إعادة توجيه «الواجهة المثبتة» في المتجر (روابط المعاينة من شاشة الواجهات في الأدمن).
+ * فارغ = لا يوجد تجاوز (أكثر أماناً).
+ */
+define('ORANGE_STOREFRONT_PREVIEW_TOKEN', trim((string) ($env['ORANGE_STOREFRONT_PREVIEW_TOKEN'] ?? '')));
+
 /*
 |--------------------------------------------------------------------------
 | Storefront static assets (cache bust)
@@ -455,6 +461,29 @@ function get_channel_by_slug(string $slug): ?array {
     $stmt->execute([$slug]);
     $row = $stmt->fetch();
     return $row ?: null;
+}
+
+/**
+ * رابط الصفحة الرئيسية للواجهة بمعامل معاينة الإدمن (?sf_preview=…) — يعطّل فرض إعادة التوجيه للقناة المثبتة.
+ * يتطلّب ORANGE_STOREFRONT_PREVIEW_TOKEN في .env.php؛ وإلا يُرجع سلسلة فارغة.
+ */
+function orange_storefront_admin_preview_home_url(string $pathSegment): string
+{
+    if (ORANGE_STOREFRONT_PREVIEW_TOKEN === '') {
+        return '';
+    }
+    $seg = strtolower((string) (preg_replace('/[^a-z0-9\-]/i', '', $pathSegment) ?? ''));
+    if ($seg === '') {
+        return '';
+    }
+    $q = 'sf_preview=' . rawurlencode(ORANGE_STOREFRONT_PREVIEW_TOKEN);
+    $pathPrefix = PUBLIC_BASE_PATH === '' ? '' : rtrim(PUBLIC_BASE_PATH, '/');
+    $rel = ($pathPrefix === '' ? '' : $pathPrefix) . '/' . $seg . '?' . $q;
+    if (ORANGE_SITE_PUBLIC_ORIGIN !== '') {
+        return rtrim(ORANGE_SITE_PUBLIC_ORIGIN, '/') . $rel;
+    }
+
+    return $rel;
 }
 
 /**

@@ -78,6 +78,11 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             if (params.get('channel')) {
                 return;
             }
+            var previewTok = <?php echo json_encode(ORANGE_STOREFRONT_PREVIEW_TOKEN, JSON_UNESCAPED_UNICODE); ?>;
+            var previewQ = params.get('sf_preview');
+            if (previewTok !== '' && previewQ !== null && previewQ === previewTok) {
+                return;
+            }
             var allowed = window.ORANGE_SF_VALID_SLUGS || {};
             var shortPathRe = new RegExp('^\\/(' + <?php echo json_encode($_sfPathAlt, JSON_UNESCAPED_UNICODE); ?> + ')(-ar|-hi|-ph)?(\\/.*)?$', 'i');
             var accountCh = <?php echo json_encode($orangeAccountChannelForJs, JSON_UNESCAPED_UNICODE); ?>;
