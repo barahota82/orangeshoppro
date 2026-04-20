@@ -42,6 +42,12 @@
     box-sizing: border-box;
 }
 
+/* Mobile: block double-tap zoom (viewport meta is primary; this reinforces on WebKit/Chromium) */
+html {
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+}
+
 body {
     margin: 0;
     font-family: var(--font-body);
