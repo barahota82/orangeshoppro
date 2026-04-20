@@ -386,7 +386,7 @@ h1, h2, h3, .brand-text h1 {
 
 button.icon-btn {
     cursor: pointer;
-    font: inherit;
+    /* لا تستخدم font: inherit — يُلغي حجم خط .icon-btn */
 }
 
 /* Add to home screen — مساعد بعد زر التثبيت في الهيدر */
@@ -2761,8 +2761,8 @@ html[dir="rtl"] .field input[autocomplete="tel"] {
 button.app-dock-btn {
     appearance: none;
     -webkit-appearance: none;
-    font: inherit;
     margin: 0;
+    /* لا تستخدم font: inherit — يُلغي font-size: 0.65rem من .app-dock-btn */
 }
 
 .app-dock-btn {
