@@ -14,7 +14,12 @@ try {
     $data = get_json_input();
     orange_storefront_apply_lang_from_payload($data);
 
-    require_fields($data, ['name', 'phone', 'area', 'address', 'email', 'channel_id', 'items']);
+    if (!\array_key_exists('email', $data)) {
+        $data['email'] = '';
+    }
+    $data['email'] = trim((string) $data['email']);
+
+    require_fields($data, ['name', 'phone', 'area', 'address', 'channel_id', 'items']);
 
     $phoneCc = trim((string) ($data['phone_country'] ?? ''));
     $phoneCc = $phoneCc === '' ? null : $phoneCc;

@@ -192,12 +192,13 @@ function orange_storefront_upsert_customer_from_checkout(
  */
 function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): array
 {
-    require_fields($data, ['name', 'phone', 'area', 'address', 'email', 'channel_id', 'items']);
+    require_fields($data, ['name', 'phone', 'area', 'address', 'channel_id', 'items']);
 
     $emailCheck = trim((string) ($data['email'] ?? ''));
-    if ($emailCheck === '' || !filter_var($emailCheck, FILTER_VALIDATE_EMAIL)) {
+    if ($emailCheck !== '' && !filter_var($emailCheck, FILTER_VALIDATE_EMAIL)) {
         throw new RuntimeException(function_exists('t') ? t('checkout_invalid_email') : 'Invalid email.');
     }
+    $data['email'] = $emailCheck;
 
     $phoneCc = trim((string) ($data['phone_country'] ?? ''));
     $phoneCc = $phoneCc === '' ? null : $phoneCc;
@@ -407,7 +408,9 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     $messageLines[] = "Order Number: {$orderNumber}";
     $messageLines[] = 'Customer: ' . trim((string) $data['name']);
     $messageLines[] = 'Phone: ' . trim((string) $data['phone']);
-    $messageLines[] = 'Email: ' . trim((string) $data['email']);
+    if (trim((string) $data['email']) !== '') {
+        $messageLines[] = 'Email: ' . trim((string) $data['email']);
+    }
     $messageLines[] = 'Area: ' . trim((string) $data['area']);
     $messageLines[] = 'Address: ' . trim((string) $data['address']);
     if (!empty($data['notes'])) {

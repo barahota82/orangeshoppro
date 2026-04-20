@@ -673,9 +673,8 @@ async function sendOrderNow() {
     const payRadio = document.querySelector('input[name="checkout_payment_terms"]:checked');
     const paymentTerms = payRadio && payRadio.value === 'online' ? 'online' : 'cash';
 
-    const emailRaw = document.getElementById('customer_email')
-        ? document.getElementById('customer_email').value.trim()
-        : '';
+    const emailEl = document.getElementById('customer_email');
+    const emailRaw = emailEl ? emailEl.value.trim() : '';
     const ccEl = document.getElementById('customer_phone_country');
     const ccVal = ccEl && ccEl.value ? String(ccEl.value) : '';
     const phoneRaw = document.getElementById('customer_phone')
@@ -699,7 +698,7 @@ async function sendOrderNow() {
         lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
     };
 
-    if (!payload.name || !phoneRaw || !payload.email || !payload.area || !payload.address) {
+    if (!payload.name || !phoneRaw || !payload.area || !payload.address) {
         orangeShowToast(window.APP_T.checkout_required_fields || 'Please fill all required fields.', 3200);
         return;
     }
@@ -708,7 +707,7 @@ async function sendOrderNow() {
         return;
     }
     payload.phone = phoneNorm;
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
+    if (emailRaw !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) {
         orangeShowToast(window.APP_T.checkout_invalid_email || 'Invalid email.', 3200);
         return;
     }
