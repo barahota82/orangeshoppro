@@ -60,6 +60,8 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
     <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
     <meta name="theme-color" content="<?php echo htmlspecialchars($sfThemeColor, ENT_QUOTES, 'UTF-8'); ?>">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Orange Store">
+    <meta name="application-name" content="Orange Store">
     <link rel="manifest" href="<?php echo htmlspecialchars($orangeManifestHref, ENT_QUOTES, 'UTF-8'); ?>">
     <link rel="icon" type="image/png" sizes="192x192" href="<?php echo htmlspecialchars($orangePwaIcon192Url, ENT_QUOTES, 'UTF-8'); ?>">
     <link rel="icon" type="image/png" sizes="512x512" href="<?php echo htmlspecialchars($orangePwaIcon512Url, ENT_QUOTES, 'UTF-8'); ?>">

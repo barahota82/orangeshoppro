@@ -17,17 +17,6 @@ if (!in_array($lang, ['en', 'ar', 'fil', 'hi'], true)) {
     $lang = 'en';
 }
 
-$ch = get_channel_by_slug($slug);
-if (!$ch) {
-    $ch = get_channel_by_slug('orange') ?: [
-        'name' => 'Orange',
-        'slug' => 'orange',
-        'logo' => 'logo-orange.png',
-    ];
-}
-
-$name = trim((string) ($ch['name'] ?? 'Orange'));
-
 $startUrl = storefront_url('home', $slug, $lang);
 $scope = PUBLIC_BASE_PATH === '' ? '/' : rtrim(PUBLIC_BASE_PATH, '/') . '/';
 
@@ -42,9 +31,9 @@ $pwaIconSrc = static function (string $file) use ($pub): string {
 };
 
 $manifest = [
-    'name' => $name . ' — Orange',
-    'short_name' => $name !== '' ? $name : 'Orange',
-    'description' => $name,
+    'name' => 'Orange Store',
+    'short_name' => 'Orange Store',
+    'description' => 'Orange Store',
     'start_url' => $startUrl,
     'scope' => $scope,
     'display' => 'standalone',

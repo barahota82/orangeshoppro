@@ -1904,13 +1904,7 @@ body.storefront .product-gallery__img {
     box-shadow: var(--card-shadow);
 }
 
-/* Register page: same CTA card as track; always full-width column (no collapsed desktop row) */
-.register-signup-cta.track-signup-cta {
-    max-width: 32rem;
-    margin-left: auto;
-    margin-right: auto;
-}
-
+/* Register page: نفس عرض بطاقات التتبع؛ عمود واحد (لا صف أفقي مضغوط على سطح المكتب) */
 .register-signup-cta.track-signup-cta .track-signup-cta__inner {
     flex-direction: column;
     align-items: stretch;
