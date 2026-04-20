@@ -316,7 +316,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function bindTreeClicks(root) {
         root.querySelectorAll('.coa-tree-node').forEach(function (li) {
-            var label = li.querySelector('.coa-tree-label');
+            var label = li.querySelector('.coa-tree-row .coa-tree-label');
             if (!label) {
                 return;
             }
@@ -326,6 +326,49 @@ document.addEventListener('DOMContentLoaded', function () {
                 li.classList.add('is-active');
                 fillForm(li);
             });
+        });
+    }
+
+    function bindTreeToggles(root) {
+        root.querySelectorAll('.coa-tree-toggle:not(.coa-tree-toggle--leaf)').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var li = btn.closest('.coa-tree-node');
+                if (!li || !li.classList.contains('coa-tree-node--has-children')) {
+                    return;
+                }
+                var collapsed = li.classList.toggle('coa-tree-node--collapsed');
+                btn.textContent = collapsed ? '+' : '\u2212';
+                btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                li.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            });
+        });
+    }
+
+    function coaExpandAncestorsForVisible() {
+        treeEl.querySelectorAll('.coa-tree-node').forEach(function (li) {
+            if (li.style.display === 'none') {
+                return;
+            }
+            var el = li.parentElement;
+            while (el && el !== treeEl) {
+                if (el.classList && el.classList.contains('coa-tree-list')) {
+                    var parentLi = el.parentElement;
+                    if (parentLi && parentLi.classList.contains('coa-tree-node')) {
+                        parentLi.classList.remove('coa-tree-node--collapsed');
+                        parentLi.setAttribute('aria-expanded', 'true');
+                        var tb = parentLi.querySelector(':scope > .coa-tree-row > .coa-tree-toggle:not(.coa-tree-toggle--leaf)');
+                        if (tb) {
+                            tb.textContent = '\u2212';
+                            tb.setAttribute('aria-expanded', 'true');
+                        }
+                    }
+                    el = parentLi ? parentLi.parentElement : null;
+                } else {
+                    el = el.parentElement;
+                }
+            }
         });
     }
 
@@ -344,6 +387,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 treeEl.innerHTML = data.html || '';
                 bindTreeClicks(treeEl);
+                bindTreeToggles(treeEl);
                 var q = document.getElementById('coa_tree_search').value;
                 applyCoaTreeFilter(q);
                 var pick = keepId > 0 ? treeEl.querySelector('.coa-tree-node[data-id="' + keepId + '"]') : null;
@@ -381,7 +425,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function liHasMatchingDescendant(li, q) {
-        var lab = li.querySelector(':scope > .coa-tree-label');
+        var lab = li.querySelector(':scope > .coa-tree-row .coa-tree-label');
         if (lab && lab.textContent.toLowerCase().indexOf(q) >= 0) {
             return true;
         }
@@ -408,6 +452,7 @@ document.addEventListener('DOMContentLoaded', function () {
         nodes.forEach(function (li) {
             li.style.display = liHasMatchingDescendant(li, q) ? '' : 'none';
         });
+        coaExpandAncestorsForVisible();
     }
 
     document.getElementById('coa_name').addEventListener('input', function () {
@@ -417,6 +462,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     bindTreeClicks(treeEl);
+    bindTreeToggles(treeEl);
 
     document.getElementById('coa_tree_search').addEventListener('input', function () {
         applyCoaTreeFilter(this.value);

@@ -674,13 +674,29 @@ if (!function_exists('orange_render_coa_tree')) {
                 $pCodeRaw = (string) ($byId[$pId]['code'] ?? '');
             }
             $pCode = htmlspecialchars($pCodeRaw, ENT_QUOTES, 'UTF-8');
+            $hasKids = !empty($n['children']);
             $cls = $activeId === $id ? 'coa-tree-node is-active' : 'coa-tree-node';
             if ($susp) {
                 $cls .= ' coa-tree-node--suspended';
             }
-            echo '<li class="' . $cls . '" role="treeitem" data-id="' . $id . '" data-code="' . $code . '" data-name="' . $name . '" data-name-en="' . $nameEn . '" data-is-group="' . ($isG ? '1' : '0') . '" data-parent="' . $pId . '" data-parent-code="' . $pCode . '" data-suspended="' . ($susp ? '1' : '0') . '" data-depth="' . $depth . '" data-root-name="' . $rootN . '" data-category-name="' . $catN . '" data-normal-balance="' . $nb . '">';
+            if ($hasKids) {
+                $cls .= ' coa-tree-node--has-children';
+            }
+            if ($isG) {
+                $cls .= ' coa-tree-node--is-group';
+            }
+            echo '<li class="' . $cls . '" role="treeitem" aria-expanded="' . ($hasKids ? 'true' : 'false') . '" data-id="' . $id . '" data-code="' . $code . '" data-name="' . $name . '" data-name-en="' . $nameEn . '" data-is-group="' . ($isG ? '1' : '0') . '" data-parent="' . $pId . '" data-parent-code="' . $pCode . '" data-suspended="' . ($susp ? '1' : '0') . '" data-depth="' . $depth . '" data-root-name="' . $rootN . '" data-category-name="' . $catN . '" data-normal-balance="' . $nb . '">';
+            echo '<div class="coa-tree-row">';
+            if ($hasKids) {
+                echo '<button type="button" class="coa-tree-toggle" aria-label="طي أو توسيع الفرع" title="طي / توسيع" aria-expanded="true">−</button>';
+            } else {
+                echo '<span class="coa-tree-toggle coa-tree-toggle--leaf" aria-hidden="true"></span>';
+            }
+            $iconCls = $isG ? 'coa-tree-icon coa-tree-icon--folder' : 'coa-tree-icon coa-tree-icon--account';
+            echo '<span class="' . $iconCls . '" aria-hidden="true"></span>';
             echo '<span class="coa-tree-label">' . $code . ' — ' . $name . ($isG ? ' <small>(رئيسي)</small>' : '') . ($susp ? ' <small class="coa-tree-suspended-tag">موقوف</small>' : '') . '</span>';
-            if (!empty($n['children'])) {
+            echo '</div>';
+            if ($hasKids) {
                 orange_render_coa_tree($n['children'], $activeId, $flat, $depth + 1, $byId);
             }
             echo '</li>';
