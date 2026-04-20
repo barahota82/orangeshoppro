@@ -2256,6 +2256,20 @@ body.storefront .product-gallery__img {
     }
 }
 
+/* صفحة التسجيل: لا تعاملها كبلوك التتبع المطوي (صف) — القاعدة أعلاه كانت تتجاوز flex:column بسبب الترتيب */
+@media (min-width: 560px) {
+    body.storefront .register-signup-cta.track-signup-cta .track-signup-cta__inner {
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: flex-start;
+    }
+
+    body.storefront .register-signup-cta.track-signup-cta .track-signup-cta__copy {
+        flex: none;
+        min-width: 0;
+    }
+}
+
 .track-page-card__title {
     margin-top: 0;
     font-size: 1.05rem;
