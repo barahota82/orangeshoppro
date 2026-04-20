@@ -312,16 +312,19 @@ function orange_storefront_channel_slug_is_active(PDO $pdo, string $slug): bool
     }
 }
 
-function orange_channel_slug_for_path_segment(PDO $pdo, string $pathSegment): ?string
+function orange_channel_slug_for_path_segment(PDO $pdo, string $pathSegment, bool $requireActive = true): ?string
 {
     $s = strtolower((string) (preg_replace('/[^a-z0-9\-]/i', '', $pathSegment) ?? ''));
     if ($s === '') {
         return null;
     }
     try {
-        $st = $pdo->prepare(
-            'SELECT slug FROM channels WHERE path_segment = ? AND is_active = 1 LIMIT 1'
-        );
+        $sql = 'SELECT slug FROM channels WHERE path_segment = ?';
+        if ($requireActive) {
+            $sql .= ' AND is_active = 1';
+        }
+        $sql .= ' LIMIT 1';
+        $st = $pdo->prepare($sql);
         $st->execute([$s]);
         $row = $st->fetchColumn();
         if ($row !== false && $row !== null && (string) $row !== '') {

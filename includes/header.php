@@ -21,10 +21,16 @@ $taglineCycle = storefront_tagline_cycle_messages();
 $taglineInitial = $taglineCycle[0] ?? '';
 $taglineJsonAttr = htmlspecialchars(json_encode($taglineCycle, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8');
 
-/* هوية بصرية موحّدة (ثيم/شعار) — الاسم الظاهر فقط يتبع القناة: WEB / ONLINE / TIKTOK */
+require_once __DIR__ . '/upload_paths.php';
+
+/* ثيم ولون شريط المتصفح من القناة إن وُجد؛ الشعار من uploads/channels إن وُجد ملف مرفوع */
 $theme = 'orange';
 $sfDisplayName = storefront_channel_display_name($channel, $channelSlug);
 $sfThemeColor = '#ff6a00';
+$chColor = trim((string) ($channel['primary_color'] ?? ''));
+if ($chColor !== '' && preg_match('/^#[0-9A-Fa-f]{3,8}$/', $chColor)) {
+    $sfThemeColor = $chColor;
+}
 
 $orangeAccountChannelForJs = '';
 try {
@@ -39,10 +45,13 @@ try {
 }
 
 $orangePubBase = PUBLIC_BASE_PATH === '' ? '' : PUBLIC_BASE_PATH;
-/* شعار الهيدر ثابت لكل القنوات — بيانات logo في الجدول للإدارة/أغراض أخرى فقط */
 $orangeChannelLogoFile = 'logo-orange.png';
-/* نفس منطق CSS/JS: ?v=filemtime حتى لا يبقى الكمبيوتر على شعار PNG قديم بعد التحديث */
-$orangeChannelLogoUrl = $orangePubBase . storefront_asset_url('/assets/images/' . $orangeChannelLogoFile);
+$chLogoFn = trim((string) ($channel['logo'] ?? ''));
+if ($chLogoFn !== '' && is_file(orange_channels_upload_dir() . DIRECTORY_SEPARATOR . $chLogoFn)) {
+    $orangeChannelLogoUrl = $orangePubBase . '/uploads/channels/' . rawurlencode($chLogoFn);
+} else {
+    $orangeChannelLogoUrl = $orangePubBase . storefront_asset_url('/assets/images/' . $orangeChannelLogoFile);
+}
 $orangePwaApple180Url = $orangePubBase . storefront_asset_url('/assets/images/pwa-apple-180.png');
 $orangePwaApple120Url = $orangePubBase . storefront_asset_url('/assets/images/pwa-apple-120.png');
 $orangePwaIcon192Url = $orangePubBase . storefront_asset_url('/assets/images/pwa-icon-192.png');

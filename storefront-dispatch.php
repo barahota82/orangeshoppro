@@ -33,7 +33,12 @@ if ($first === '') {
     exit;
 }
 
-$channelSlug = orange_channel_slug_for_path_segment($pdo, $first);
+$previewQ = isset($_GET['sf_preview']) ? (string) $_GET['sf_preview'] : '';
+$previewOk = ORANGE_STOREFRONT_PREVIEW_TOKEN !== ''
+    && $previewQ !== ''
+    && hash_equals(ORANGE_STOREFRONT_PREVIEW_TOKEN, $previewQ);
+/* للزوار: قناة غير نشطة = 404. معاينة الإدمن (?sf_preview=) تسمح بفتح المسار رغم الإيقاف */
+$channelSlug = orange_channel_slug_for_path_segment($pdo, $first, !$previewOk);
 if ($channelSlug === null || $channelSlug === '') {
     http_response_code(404);
     header('Content-Type: text/plain; charset=utf-8');
