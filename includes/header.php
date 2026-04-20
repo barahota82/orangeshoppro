@@ -66,6 +66,11 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&amp;family=Outfit:wght@400;500;600;700&amp;display=swap">
+    <link rel="preload" as="image" href="<?php echo htmlspecialchars(storefront_absolute_url($orangeChannelLogoUrl), ENT_QUOTES, 'UTF-8'); ?>">
+    <link rel="preload" as="image" href="<?php echo htmlspecialchars(storefront_absolute_url($orangeWordmarkUrl), ENT_QUOTES, 'UTF-8'); ?>">
     <meta name="theme-color" content="<?php echo htmlspecialchars($sfThemeColor, ENT_QUOTES, 'UTF-8'); ?>">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="<?php echo htmlspecialchars($sfDisplayName, ENT_QUOTES, 'UTF-8'); ?>">
@@ -327,7 +332,7 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             <div class="brand-text">
                 <div class="brand-stack">
                     <div class="brand-wordmark-anchor">
-                        <h1 class="brand-title-heading"><img class="brand-wordmark" src="<?php echo htmlspecialchars($orangeWordmarkUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?>" decoding="async"></h1><small class="brand-tagline brand-tagline--cycle" aria-live="polite"><span class="brand-tagline__text" id="brandTaglineText" dir="auto" data-taglines="<?php echo $taglineJsonAttr; ?>"><?php echo htmlspecialchars($taglineInitial, ENT_QUOTES, 'UTF-8'); ?></span></small>
+                        <h1 class="brand-title-heading"><img class="brand-wordmark" src="<?php echo htmlspecialchars($orangeWordmarkUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(t('storefront_brand'), ENT_QUOTES, 'UTF-8'); ?>" width="248" height="32" decoding="async"></h1><small class="brand-tagline brand-tagline--cycle" aria-live="polite"><span class="brand-tagline__text" id="brandTaglineText" dir="auto" data-taglines="<?php echo $taglineJsonAttr; ?>"><?php echo htmlspecialchars($taglineInitial, ENT_QUOTES, 'UTF-8'); ?></span></small>
                     </div>
                 </div>
             </div>

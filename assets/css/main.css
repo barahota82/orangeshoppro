@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap");
+/* الخطوط تُحمَّل من includes/header.php (أسرع من @import داخل CSS) */
 
 :root {
     /* Brand — مواءمة هوية Orange الموحّدة */

@@ -148,9 +148,15 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
                 <?php endif; ?>
                 <div class="product-gallery__viewport" id="productGalleryViewport" <?php echo $galleryCount > 1 ? 'tabindex="0"' : ''; ?>>
                     <div class="product-gallery__track" id="productGalleryTrack">
-                        <?php foreach ($galleryUrls as $url): ?>
+                        <?php foreach ($galleryUrls as $gi => $url): ?>
                         <div class="product-gallery__slide">
-                            <img class="product-gallery__img" src="<?php echo htmlspecialchars($url, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8'); ?>" loading="lazy">
+                            <img class="product-gallery__img" src="<?php echo htmlspecialchars($url, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8'); ?>" width="800" height="400" decoding="async"<?php
+                            if ($gi === 0) {
+                                echo ' loading="eager" fetchpriority="high"';
+                            } else {
+                                echo ' loading="lazy"';
+                            }
+                            ?>>
                         </div>
                         <?php endforeach; ?>
                     </div>
@@ -168,7 +174,7 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
             <div class="thumbs product-gallery__thumbs">
                 <?php foreach ($galleryUrls as $ti => $turl): ?>
                 <button type="button" class="thumb<?php echo $ti === 0 ? ' active' : ''; ?>" data-gallery-index="<?php echo (int)$ti; ?>">
-                    <img src="<?php echo htmlspecialchars($turl, ENT_QUOTES, 'UTF-8'); ?>" alt="">
+                    <img src="<?php echo htmlspecialchars($turl, ENT_QUOTES, 'UTF-8'); ?>" alt="" width="74" height="74" decoding="async" loading="<?php echo $ti === 0 ? 'eager' : 'lazy'; ?>">
                 </button>
                 <?php endforeach; ?>
             </div>
