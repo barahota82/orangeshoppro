@@ -66,8 +66,11 @@ $lang = match ($langTokNorm) {
     '-ar' => 'ar',
     '-hi' => 'hi',
     '-ph' => 'fil',
-    default => 'en',
+    default => '',
 };
+if ($lang === '') {
+    $lang = orange_lang_from_accept_language_header($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? null);
+}
 
 if ($first === '') {
     http_response_code(404);

@@ -238,10 +238,83 @@ function db(): PDO
     return $pdo;
 }
 
-function current_lang(): string {
+/**
+ * Preferred storefront language from Accept-Language (first supported tag by q-value).
+ * Unsupported tags fall through to en.
+ */
+function orange_lang_from_accept_language_header(?string $header): string
+{
+    if ($header === null || trim($header) === '') {
+        return 'en';
+    }
+    $parsed = [];
+    foreach (preg_split('/\s*,\s*/', $header) as $part) {
+        $part = trim($part);
+        if ($part === '') {
+            continue;
+        }
+        $q = 1.0;
+        if (preg_match('/;\s*q\s*=\s*([0-9.]+)/i', $part, $qm)) {
+            $q = (float) $qm[1];
+        }
+        $tag = strtolower(trim(preg_replace('/;\s*q\s*=\s*[0-9.]+/i', '', $part)));
+        if ($tag === '' || $tag === '*') {
+            continue;
+        }
+        $parsed[] = ['tag' => str_replace('_', '-', $tag), 'q' => $q];
+    }
+    usort($parsed, static fn (array $a, array $b): int => $b['q'] <=> $a['q']);
+    foreach ($parsed as $row) {
+        $primary = explode('-', $row['tag'])[0];
+        if ($primary === 'ar') {
+            return 'ar';
+        }
+        if ($primary === 'hi') {
+            return 'hi';
+        }
+        if (in_array($primary, ['fil', 'tl'], true)) {
+            return 'fil';
+        }
+        if ($primary === 'en') {
+            return 'en';
+        }
+    }
+
+    return 'en';
+}
+
+/** True when request should not use browser language (admin UI, CLI). */
+function orange_is_admin_request_context(): bool
+{
+    if (PHP_SAPI === 'cli') {
+        return true;
+    }
+    $uri = strtolower((string) ($_SERVER['REQUEST_URI'] ?? ''));
+    $script = strtolower((string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    if (str_contains($script, '/admin/') || str_contains($uri, '/admin/')) {
+        return true;
+    }
+
+    return false;
+}
+
+function current_lang(): string
+{
     $allowed = ['en', 'ar', 'fil', 'hi'];
-    $lang = isset($_GET['lang']) ? strtolower(trim((string)$_GET['lang'])) : 'en';
-    return in_array($lang, $allowed, true) ? $lang : 'en';
+    if (isset($_GET['lang'])) {
+        $raw = strtolower(trim((string) $_GET['lang']));
+        if ($raw !== '' && in_array($raw, $allowed, true)) {
+            return $raw;
+        }
+        if ($raw !== '') {
+            return 'en';
+        }
+    }
+    if (orange_is_admin_request_context()) {
+        return 'en';
+    }
+
+    return orange_lang_from_accept_language_header($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? null);
 }
 
 /**

@@ -14,10 +14,7 @@ $slug = isset($_GET['channel']) && (string) $_GET['channel'] !== ''
     : (orange_storefront_read_saved_channel_slug() ?? orange_storefront_default_channel_slug($pdo));
 $slug = orange_storefront_valid_channel_slug($pdo, $slug);
 
-$lang = isset($_GET['lang']) ? strtolower(trim((string) $_GET['lang'])) : 'en';
-if (!in_array($lang, ['en', 'ar', 'fil', 'hi'], true)) {
-    $lang = 'en';
-}
+$lang = current_lang();
 
 $startUrl = storefront_url('home', $slug, $lang);
 $scope = PUBLIC_BASE_PATH === '' ? '/' : rtrim(PUBLIC_BASE_PATH, '/') . '/';
