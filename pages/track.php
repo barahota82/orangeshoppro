@@ -3,7 +3,12 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/catalog_schema.php';
 require_once __DIR__ . '/../includes/storefront_phone_country_select.php';
+
+$pdoTrack = db();
+orange_catalog_ensure_schema($pdoTrack);
+
 include __DIR__ . '/../includes/header.php';
 
 $trackHomeUrl = storefront_url('home', $channelSlug, $lang);
@@ -553,7 +558,7 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
                 notes: notes,
                 order_number: orderNumber,
                 order_verify_phone: orderVerifyPhone,
-                channel: typeof window.APP_CHANNEL_SLUG === 'string' ? window.APP_CHANNEL_SLUG : 'orange',
+                channel: typeof window.APP_CHANNEL_SLUG === 'string' ? window.APP_CHANNEL_SLUG : <?php echo json_encode(orange_storefront_default_channel_slug($pdoTrack), JSON_UNESCAPED_UNICODE); ?>,
                 lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
             }),
         })
@@ -564,7 +569,7 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
             })
             .then(function (x) {
                 if (x.ok && x.j && x.j.success) {
-                    if (x.j.channel && /^(orange|blue|black)$/i.test(String(x.j.channel))) {
+                    if (x.j.channel && /^[a-z0-9\-]+$/i.test(String(x.j.channel))) {
                         try {
                             if (typeof window.orangeSfPersistChannel === 'function') {
                                 window.orangeSfPersistChannel(String(x.j.channel).toLowerCase());

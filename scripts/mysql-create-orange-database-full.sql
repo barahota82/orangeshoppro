@@ -83,6 +83,7 @@ CREATE TABLE `channels` (
   `id` int NOT NULL AUTO_INCREMENT,
   `name` varchar(100) NOT NULL,
   `slug` varchar(50) NOT NULL,
+  `path_segment` varchar(64) DEFAULT NULL,
   `logo` varchar(255) DEFAULT NULL,
   `primary_color` varchar(20) DEFAULT NULL,
   `whatsapp_number` varchar(20) DEFAULT NULL,
@@ -90,7 +91,8 @@ CREATE TABLE `channels` (
   `is_active` tinyint DEFAULT 1,
   `updated_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_channels_slug` (`slug`)
+  UNIQUE KEY `uq_channels_slug` (`slug`),
+  UNIQUE KEY `uq_channels_path_segment` (`path_segment`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `color_dictionary` (
@@ -969,10 +971,10 @@ INSERT INTO `journal_types` (`code`, `name_ar`, `name_en`, `sort_order`) VALUES
 ('OSR', 'مردود مبيعات الاونلاين', 'Online sales return', 19),
 ('COR', 'تكلفة مردود مبيعات الاونلاين', 'Cost of online sales return', 20);
 
-INSERT INTO `channels` (`name`, `slug`, `logo`, `primary_color`, `whatsapp_number`, `warehouse_number`, `is_active`) VALUES
-('Orange Store', 'orange', 'logo-orange.png', '#ff7a00', '96500000000', 1, 1),
-('Blue Store', 'blue', 'logo-blue.png', '#1d4ed8', '96500000001', 1, 1),
-('Black Store', 'black', 'logo-black.png', '#111827', '96500000002', 1, 1);
+INSERT INTO `channels` (`name`, `slug`, `path_segment`, `logo`, `primary_color`, `whatsapp_number`, `warehouse_number`, `is_active`) VALUES
+('Orange Store', 'tiktok', 'tiktok', 'logo-orange.png', '#ff7a00', '96500000000', 1, 1),
+('Blue Store', 'online', 'online', 'logo-blue.png', '#1d4ed8', '96500000001', 1, 1),
+('Black Store', 'web', 'web', 'logo-black.png', '#111827', '96500000002', 1, 1);
 
 SET FOREIGN_KEY_CHECKS = 1;
 SET UNIQUE_CHECKS = 1;

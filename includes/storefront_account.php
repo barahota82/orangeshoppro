@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../config.php';
+
 function orange_storefront_normalize_email(string $raw): ?string
 {
     $e = strtolower(trim($raw));
@@ -38,19 +40,11 @@ function orange_storefront_clip_utf8(string $s, int $maxLen): string
 }
 
 /**
- * قناة نشطة من جدول channels أو orange الافتراضية.
+ * قناة نشطة من جدول channels (مع إعادة توجيه orange/blue/black → path slug بعد الترحيل).
  */
 function orange_storefront_valid_channel_slug(PDO $pdo, string $raw): string
 {
-    $slug = preg_replace('/[^a-z0-9\-]/i', '', strtolower(trim($raw)));
-    if ($slug === '') {
-        $slug = 'orange';
-    }
-    $st = $pdo->prepare('SELECT slug FROM channels WHERE slug = ? AND is_active = 1 LIMIT 1');
-    $st->execute([$slug]);
-    $found = $st->fetchColumn();
-
-    return $found ? (string) $found : 'orange';
+    return orange_storefront_normalize_channel_slug($pdo, $raw);
 }
 
 function orange_storefront_account_session_key(): string
@@ -88,7 +82,7 @@ function storefront_account_login(PDO $pdo, int $accountId): void
     $_SESSION[orange_storefront_account_session_key()] = $accountId;
     $ch = ($slug !== false && $slug !== null && (string) $slug !== '')
         ? orange_storefront_valid_channel_slug($pdo, (string) $slug)
-        : 'orange';
+        : orange_storefront_valid_channel_slug($pdo, '');
     $_SESSION[orange_storefront_account_channel_session_key()] = $ch;
 }
 
@@ -136,7 +130,7 @@ function current_storefront_account(PDO $pdo): ?array
 
         return null;
     }
-    $regSlug = 'orange';
+    $regSlug = orange_storefront_valid_channel_slug($pdo, '');
     if ($hasCh && isset($row['registered_channel_slug']) && (string) $row['registered_channel_slug'] !== '') {
         $regSlug = orange_storefront_valid_channel_slug($pdo, (string) $row['registered_channel_slug']);
     }

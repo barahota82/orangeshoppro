@@ -297,6 +297,62 @@ function orange_storefront_reserved_path_segments(): array
     ];
 }
 
+/**
+ * بعد ترحيل القنوات: slug يطابق path_segment (tiktok / online / web).
+ * يُحوَّل طلبات الكوكي أو ?channel= القديمة (orange / blue / black) للقيم الجديدة إن وُجدت في الجدول.
+ *
+ * @return array<string, string>
+ */
+function orange_storefront_legacy_slug_aliases(): array
+{
+    return ['orange' => 'tiktok', 'blue' => 'online', 'black' => 'web'];
+}
+
+/** أول قناة نشطة حسب id — افتراضي للمتجر عند غياب كوكي/قناة. */
+function orange_storefront_default_channel_slug(PDO $pdo): string
+{
+    try {
+        $v = $pdo->query('SELECT slug FROM channels WHERE is_active = 1 ORDER BY id ASC LIMIT 1')->fetchColumn();
+        if ($v !== false && $v !== null && (string) $v !== '') {
+            return (string) $v;
+        }
+    } catch (Throwable $e) {
+    }
+
+    return 'tiktok';
+}
+
+/**
+ * يضمن slug نشطاً في الجدول؛ يطبّق aliases القديمة ثم الافتراضي.
+ */
+function orange_storefront_normalize_channel_slug(PDO $pdo, string $raw): string
+{
+    $slug = strtolower((string) (preg_replace('/[^a-z0-9\-]/i', '', trim($raw)) ?? ''));
+    if ($slug === '') {
+        return orange_storefront_default_channel_slug($pdo);
+    }
+    try {
+        $st = $pdo->prepare('SELECT slug FROM channels WHERE slug = ? AND is_active = 1 LIMIT 1');
+        $st->execute([$slug]);
+        $found = $st->fetchColumn();
+        if ($found !== false && $found !== null && (string) $found !== '') {
+            return (string) $found;
+        }
+        $aliases = orange_storefront_legacy_slug_aliases();
+        if (isset($aliases[$slug])) {
+            $cand = $aliases[$slug];
+            $st->execute([$cand]);
+            $found2 = $st->fetchColumn();
+            if ($found2 !== false && $found2 !== null && (string) $found2 !== '') {
+                return (string) $found2;
+            }
+        }
+    } catch (Throwable $e) {
+    }
+
+    return orange_storefront_default_channel_slug($pdo);
+}
+
 function orange_storefront_channel_slug_is_active(PDO $pdo, string $slug): bool
 {
     if ($slug === '') {
@@ -385,10 +441,10 @@ function orange_storefront_path_maps_for_js(PDO $pdo): array
     } catch (Throwable $e) {
     }
     if ($pathToSlug === []) {
-        $pathToSlug = ['tiktok' => 'orange', 'online' => 'blue', 'web' => 'black'];
-        $slugToPath = ['orange' => 'tiktok', 'blue' => 'online', 'black' => 'web'];
+        $pathToSlug = ['tiktok' => 'tiktok', 'online' => 'online', 'web' => 'web'];
+        $slugToPath = ['tiktok' => 'tiktok', 'online' => 'online', 'web' => 'web'];
     }
-    foreach (['orange', 'blue', 'black'] as $legacy) {
+    foreach (orange_storefront_legacy_slug_aliases() as $legacy => $_) {
         $validSlugs[$legacy] = true;
     }
     $keys = array_keys($pathToSlug);
@@ -408,8 +464,9 @@ function orange_storefront_read_saved_channel_slug(): ?string
     }
     try {
         $pdo = db();
-        if (orange_storefront_channel_slug_is_active($pdo, $slug)) {
-            return $slug;
+        $resolved = orange_storefront_normalize_channel_slug($pdo, $slug);
+        if (orange_storefront_channel_slug_is_active($pdo, $resolved)) {
+            return $resolved;
         }
     } catch (Throwable $e) {
     }
@@ -445,17 +502,19 @@ function orange_storefront_send_channel_cookie(string $slug): void
 
 function current_channel_slug(): string
 {
+    $pdo = db();
+    $def = orange_storefront_default_channel_slug($pdo);
     if (isset($_GET['channel']) && (string) $_GET['channel'] !== '') {
         $s = preg_replace('/[^a-z0-9\-]/i', '', (string) $_GET['channel']);
 
-        return $s !== '' ? $s : 'orange';
+        return $s !== '' ? orange_storefront_normalize_channel_slug($pdo, $s) : $def;
     }
     $fromCookie = orange_storefront_read_saved_channel_slug();
     if ($fromCookie !== null) {
         return $fromCookie;
     }
 
-    return 'orange';
+    return $def;
 }
 
 function get_channel_by_slug(string $slug): ?array {
@@ -501,9 +560,9 @@ function storefront_channel_display_name(array $channel, string $channelSlug): s
     }
     $slug = strtolower((string) (preg_replace('/[^a-z0-9\-]/i', '', $channelSlug) ?? ''));
     return match ($slug) {
-        'black' => 'WEB',
-        'blue' => 'ONLINE',
-        'orange' => 'TIKTOK',
+        'black', 'web' => 'WEB',
+        'blue', 'online' => 'ONLINE',
+        'orange', 'tiktok' => 'TIKTOK',
         default => t('storefront_brand'),
     };
 }
@@ -532,9 +591,9 @@ function storefront_short_segment(string $channelSlug, string $lang): ?string {
     } catch (Throwable $e) {
     }
     $base = match ($slug) {
-        'black' => 'web',
-        'blue' => 'online',
-        'orange' => 'tiktok',
+        'black', 'web' => 'web',
+        'blue', 'online' => 'online',
+        'orange', 'tiktok' => 'tiktok',
         default => null,
     };
     if ($base === null) {
@@ -566,16 +625,18 @@ function storefront_toolbar_state(): array {
     $lang = current_lang();
     $slug = current_channel_slug();
     $channel = get_channel_by_slug($slug);
+    $pdoTb = db();
+    $defSlug = orange_storefront_default_channel_slug($pdoTb);
     if (!$channel) {
         $channel = [
             'id' => 0,
             'name' => 'Orange',
-            'slug' => $slug !== '' ? $slug : 'orange',
+            'slug' => $slug !== '' ? $slug : $defSlug,
             'logo' => 'logo-orange.png',
             'whatsapp_number' => '',
         ];
     }
-    $channelSlug = (string)($channel['slug'] ?? 'orange');
+    $channelSlug = (string) ($channel['slug'] ?? $defSlug);
     $pageKind = storefront_current_page_kind();
     $storefrontExtra = [];
     if ($pageKind === 'product' && isset($_GET['id'])) {

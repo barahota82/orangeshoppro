@@ -200,13 +200,13 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                             area: area,
                             address: address,
                             notes: notes,
-                            channel: typeof window.APP_CHANNEL_SLUG === 'string' ? window.APP_CHANNEL_SLUG : 'orange',
+                            channel: typeof window.APP_CHANNEL_SLUG === 'string' ? window.APP_CHANNEL_SLUG : <?php echo json_encode(orange_storefront_default_channel_slug($pdo), JSON_UNESCAPED_UNICODE); ?>,
                             lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en'
                         })
                     }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
                     .then(function (x) {
                         if (x.ok && x.j && x.j.success) {
-                            if (x.j.channel && /^(orange|blue|black)$/i.test(String(x.j.channel))) {
+                            if (x.j.channel && /^[a-z0-9\-]+$/i.test(String(x.j.channel))) {
                                 try {
                                     if (typeof window.orangeSfPersistChannel === 'function') {
                                         window.orangeSfPersistChannel(String(x.j.channel).toLowerCase());

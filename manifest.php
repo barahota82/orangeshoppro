@@ -11,7 +11,7 @@ orange_catalog_ensure_schema($pdo);
 
 $slug = isset($_GET['channel']) && (string) $_GET['channel'] !== ''
     ? (string) $_GET['channel']
-    : (orange_storefront_read_saved_channel_slug() ?? 'orange');
+    : (orange_storefront_read_saved_channel_slug() ?? orange_storefront_default_channel_slug($pdo));
 $slug = orange_storefront_valid_channel_slug($pdo, $slug);
 
 $lang = isset($_GET['lang']) ? strtolower(trim((string) $_GET['lang'])) : 'en';

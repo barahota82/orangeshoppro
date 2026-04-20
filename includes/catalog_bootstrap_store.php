@@ -440,9 +440,9 @@ function orange_catalog_seed_default_channels_if_empty(PDO $pdo): void
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $rows = [
-            ['Orange Store', 'orange', 'tiktok', 'logo-orange.png', '#ff7a00', '96500000000', 1, 1],
-            ['Blue Store', 'blue', 'online', 'logo-blue.png', '#1d4ed8', '96500000001', 1, 1],
-            ['Black Store', 'black', 'web', 'logo-black.png', '#111827', '96500000002', 1, 1],
+            ['Orange Store', 'tiktok', 'tiktok', 'logo-orange.png', '#ff7a00', '96500000000', 1, 1],
+            ['Blue Store', 'online', 'online', 'logo-blue.png', '#1d4ed8', '96500000001', 1, 1],
+            ['Black Store', 'web', 'web', 'logo-black.png', '#111827', '96500000002', 1, 1],
         ];
         foreach ($rows as $r) {
             $st->execute($r);

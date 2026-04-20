@@ -67,6 +67,127 @@ function orange_catalog_safe_exec(PDO $pdo, string $sql): void
 }
 
 /**
+ * توحيد slug مع path_segment (نفس مبدأ حفظ القناة الجديدة) — لمرة واحدة لكل قاعدة.
+ */
+function orange_catalog_allocate_unique_slug_from_base(string $base, array &$usedSlugs): string
+{
+    $b = strtolower((string) preg_replace('/[^a-z0-9\-]/i', '', $base));
+    if ($b === '') {
+        $b = 'channel';
+    }
+    for ($i = 0; $i < 500; $i++) {
+        $try = $i === 0 ? $b : $b . '-' . $i;
+        if (!isset($usedSlugs[$try])) {
+            $usedSlugs[$try] = true;
+
+            return $try;
+        }
+    }
+
+    return $b . '-' . bin2hex(random_bytes(3));
+}
+
+function orange_catalog_migrate_storefront_accounts_slug(PDO $pdo, string $oldSlug, string $newSlug): void
+{
+    if ($oldSlug === $newSlug || $oldSlug === '' || $newSlug === '') {
+        return;
+    }
+    if (!function_exists('orange_table_exists') || !orange_table_exists($pdo, 'storefront_accounts')) {
+        return;
+    }
+    if (!orange_table_has_column($pdo, 'storefront_accounts', 'registered_channel_slug')) {
+        return;
+    }
+    try {
+        $st = $pdo->prepare(
+            'UPDATE storefront_accounts SET registered_channel_slug = ? WHERE registered_channel_slug = ?'
+        );
+        $st->execute([$newSlug, $oldSlug]);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] migrate accounts slug: ' . $e->getMessage());
+        }
+    }
+}
+
+function orange_catalog_migrate_channel_slugs_align_path_segment_v1(PDO $pdo): void
+{
+    if (!orange_table_exists($pdo, 'channels')) {
+        return;
+    }
+    require_once __DIR__ . '/schema_migrations.php';
+    orange_schema_migrations_ensure_table($pdo);
+    $marker = 'php_channel_slugs_align_path_segment_v1';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    try {
+        $rows = $pdo->query('SELECT id, slug, path_segment FROM channels ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+        if (!$rows) {
+            $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+            $ins->execute([$marker]);
+
+            return;
+        }
+        $toChange = [];
+        foreach ($rows as $r) {
+            $ps = strtolower((string) preg_replace('/[^a-z0-9\-]/i', '', (string) ($r['path_segment'] ?? '')));
+            if ($ps === '') {
+                continue;
+            }
+            $old = strtolower((string) preg_replace('/[^a-z0-9\-]/i', '', (string) ($r['slug'] ?? '')));
+            if ($old === $ps) {
+                continue;
+            }
+            $toChange[] = [
+                'id' => (int) $r['id'],
+                'old' => (string) ($r['slug'] ?? ''),
+                'base' => $ps,
+            ];
+        }
+        if ($toChange === []) {
+            $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+            $ins->execute([$marker]);
+
+            return;
+        }
+
+        $pdo->beginTransaction();
+        foreach ($toChange as $c) {
+            $tmp = '__mig_' . $c['id'] . '_' . bin2hex(random_bytes(4));
+            $st = $pdo->prepare('UPDATE channels SET slug = ? WHERE id = ?');
+            $st->execute([$tmp, $c['id']]);
+        }
+        $used = [];
+        $idToNew = [];
+        foreach ($toChange as $c) {
+            $newSlug = orange_catalog_allocate_unique_slug_from_base($c['base'], $used);
+            $idToNew[$c['id']] = $newSlug;
+            $st = $pdo->prepare('UPDATE channels SET slug = ? WHERE id = ?');
+            $st->execute([$newSlug, $c['id']]);
+        }
+        foreach ($toChange as $c) {
+            $oldS = $c['old'];
+            $newS = $idToNew[$c['id']] ?? '';
+            if ($oldS !== '' && $newS !== '' && $oldS !== $newS) {
+                orange_catalog_migrate_storefront_accounts_slug($pdo, $oldS, $newS);
+            }
+        }
+        $pdo->commit();
+        $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+        $ins->execute([$marker]);
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        if (function_exists('error_log')) {
+            error_log('[orange] channel slug align migration: ' . $e->getMessage());
+        }
+    }
+}
+
+/**
  * طول CHARACTER_MAXIMUM_LENGTH لعمود varchar/char، أو 0 إن لم يوجد / غير قابل للتطبيق.
  */
 function orange_schema_varchar_max_length(PDO $pdo, string $table, string $column): int
@@ -214,6 +335,7 @@ function orange_catalog_ensure_schema(PDO $pdo): void
             $pdo,
             "UPDATE channels SET path_segment = 'web' WHERE slug = 'black' AND (path_segment IS NULL OR path_segment = '')"
         );
+        orange_catalog_migrate_channel_slugs_align_path_segment_v1($pdo);
     }
 
     orange_catalog_safe_exec($pdo,
@@ -1401,10 +1523,19 @@ function orange_catalog_ensure_schema(PDO $pdo): void
             $pdo,
             'CREATE INDEX idx_storefront_accounts_channel ON storefront_accounts (registered_channel_slug)'
         );
-        orange_catalog_safe_exec(
-            $pdo,
-            "UPDATE storefront_accounts SET registered_channel_slug = 'orange' WHERE registered_channel_slug IS NULL AND email_verified_at IS NOT NULL"
-        );
+        try {
+            $defCh = $pdo->query('SELECT slug FROM channels WHERE is_active = 1 ORDER BY id ASC LIMIT 1')->fetchColumn();
+            if ($defCh !== false && $defCh !== null && (string) $defCh !== '') {
+                $u = $pdo->prepare(
+                    'UPDATE storefront_accounts SET registered_channel_slug = ? WHERE registered_channel_slug IS NULL AND email_verified_at IS NOT NULL'
+                );
+                $u->execute([(string) $defCh]);
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] storefront_accounts default channel slug: ' . $e->getMessage());
+            }
+        }
     }
 
     if (orange_table_exists($pdo, 'storefront_accounts') && !orange_table_has_column($pdo, 'storefront_accounts', 'customer_name')) {

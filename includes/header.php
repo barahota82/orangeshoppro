@@ -61,6 +61,7 @@ $orangeManifestHref = $orangePubBase . '/manifest.php?' . http_build_query(['cha
 
 $pdoSfHdr = db();
 [$_sfPathToSlug, $_sfSlugToPath, $_sfValidSlugs, $_sfPathAlt] = orange_storefront_path_maps_for_js($pdoSfHdr);
+$orangeSfDefaultCh = orange_storefront_default_channel_slug($pdoSfHdr);
 
 $dir = $lang === 'ar' ? 'rtl' : 'ltr';
 ?><!DOCTYPE html>
@@ -81,6 +82,7 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
     window.ORANGE_SF_PATH_TO_SLUG = <?php echo json_encode($_sfPathToSlug, JSON_UNESCAPED_UNICODE); ?>;
     window.ORANGE_SF_SLUG_TO_PATH = <?php echo json_encode($_sfSlugToPath, JSON_UNESCAPED_UNICODE); ?>;
     window.ORANGE_SF_VALID_SLUGS = <?php echo json_encode($_sfValidSlugs, JSON_UNESCAPED_UNICODE); ?>;
+    window.ORANGE_SF_DEFAULT_CHANNEL_SLUG = <?php echo json_encode($orangeSfDefaultCh, JSON_UNESCAPED_UNICODE); ?>;
     (function orangeStorefrontApplySavedChannel() {
         try {
             var params = new URLSearchParams(window.location.search || '');
@@ -138,6 +140,8 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
                 var map = window.ORANGE_SF_SLUG_TO_PATH || {};
                 var s = String(ch || '').toLowerCase();
                 if (map[s]) { return map[s]; }
+                var def = String(window.ORANGE_SF_DEFAULT_CHANNEL_SLUG || 'tiktok').toLowerCase();
+                if (map[def]) { return map[def]; }
                 return 'tiktok';
             }
             function orangeSuffixForLang(lang) {
@@ -212,10 +216,11 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
         window.STOREFRONT_BASE = <?php echo json_encode(PUBLIC_BASE_PATH, JSON_UNESCAPED_UNICODE); ?>;
         window.orangeSfCartKey = function () {
             var allowed = window.ORANGE_SF_VALID_SLUGS || {};
-            var ch = (typeof window.APP_CHANNEL_SLUG === 'string' && window.APP_CHANNEL_SLUG) ? window.APP_CHANNEL_SLUG : 'orange';
+            var def = String(window.ORANGE_SF_DEFAULT_CHANNEL_SLUG || 'tiktok').toLowerCase();
+            var ch = (typeof window.APP_CHANNEL_SLUG === 'string' && window.APP_CHANNEL_SLUG) ? window.APP_CHANNEL_SLUG : def;
             ch = String(ch).replace(/[^a-z0-9\-]/gi, '').toLowerCase();
             if (!ch || !allowed[ch]) {
-                ch = allowed['orange'] ? 'orange' : (Object.keys(allowed)[0] || 'orange');
+                ch = allowed[def] ? def : (Object.keys(allowed)[0] || def);
             }
             return 'orange_sf_cart_' + ch;
         };
