@@ -148,15 +148,9 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
                 <?php endif; ?>
                 <div class="product-gallery__viewport" id="productGalleryViewport" <?php echo $galleryCount > 1 ? 'tabindex="0"' : ''; ?>>
                     <div class="product-gallery__track" id="productGalleryTrack">
-                        <?php foreach ($galleryUrls as $gi => $url): ?>
+                        <?php foreach ($galleryUrls as $url): ?>
                         <div class="product-gallery__slide">
-                            <img class="product-gallery__img" src="<?php echo htmlspecialchars($url, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8'); ?>" width="800" height="400" decoding="async"<?php
-                            if ($gi === 0) {
-                                echo ' loading="eager" fetchpriority="high"';
-                            } else {
-                                echo ' loading="lazy"';
-                            }
-                            ?>>
+                            <img class="product-gallery__img" src="<?php echo htmlspecialchars($url, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8'); ?>" loading="lazy">
                         </div>
                         <?php endforeach; ?>
                     </div>
@@ -174,7 +168,7 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
             <div class="thumbs product-gallery__thumbs">
                 <?php foreach ($galleryUrls as $ti => $turl): ?>
                 <button type="button" class="thumb<?php echo $ti === 0 ? ' active' : ''; ?>" data-gallery-index="<?php echo (int)$ti; ?>">
-                    <img src="<?php echo htmlspecialchars($turl, ENT_QUOTES, 'UTF-8'); ?>" alt="" width="74" height="74" decoding="async" loading="<?php echo $ti === 0 ? 'eager' : 'lazy'; ?>">
+                    <img src="<?php echo htmlspecialchars($turl, ENT_QUOTES, 'UTF-8'); ?>" alt="">
                 </button>
                 <?php endforeach; ?>
             </div>
@@ -182,7 +176,7 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
         </div>
 
         <div class="product-info">
-            <h2 class="product-info__title"><?php echo htmlspecialchars($displayName); ?></h2>
+            <h2 class="product-info__title"><?php echo htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8'); ?></h2>
             <div class="price-row product-info__price"><strong><?php echo number_format((float)$product['price'], 2); ?> <?php echo htmlspecialchars(t('currency_kd'), ENT_QUOTES, 'UTF-8'); ?></strong></div>
 
             <?php if ($totalStock > 0): ?>
@@ -190,20 +184,20 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
             <?php endif; ?>
 
             <?php if ($displayDesc !== ''): ?>
-            <p class="product-desc product-info__desc"><?php echo nl2br(htmlspecialchars($displayDesc)); ?></p>
+            <p class="product-desc product-info__desc"><?php echo nl2br(htmlspecialchars($displayDesc, ENT_QUOTES, 'UTF-8')); ?></p>
             <?php endif; ?>
 
             <?php if ($totalStock <= 0): ?>
-                <div class="stock-out product-info__stock"><?php echo htmlspecialchars(t('out_of_stock')); ?></div>
+                <div class="stock-out product-info__stock"><?php echo htmlspecialchars(t('out_of_stock'), ENT_QUOTES, 'UTF-8'); ?></div>
             <?php endif; ?>
 
             <?php if ((int)$product['has_colors'] === 1): ?>
                 <div class="option-block">
-                    <label><?php echo htmlspecialchars(t('color')); ?></label>
+                    <label><?php echo htmlspecialchars(t('color'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <div class="chips">
                         <?php foreach ($colors as $color): ?>
-                            <button type="button" class="chip color-chip" data-color="<?php echo htmlspecialchars($color); ?>" onclick="selectColor(this)">
-                                <?php echo htmlspecialchars($color); ?>
+                            <button type="button" class="chip color-chip" data-color="<?php echo htmlspecialchars($color, ENT_QUOTES, 'UTF-8'); ?>" onclick="selectColor(this)">
+                                <?php echo htmlspecialchars($color, ENT_QUOTES, 'UTF-8'); ?>
                             </button>
                         <?php endforeach; ?>
                     </div>
@@ -212,11 +206,11 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
 
             <?php if ((int)$product['has_sizes'] === 1): ?>
                 <div class="option-block">
-                    <label><?php echo htmlspecialchars(t('size')); ?></label>
+                    <label><?php echo htmlspecialchars(t('size'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <div class="chips">
                         <?php foreach ($sizes as $size): ?>
-                            <button type="button" class="chip size-chip" data-size="<?php echo htmlspecialchars($size); ?>" onclick="selectSize(this)">
-                                <?php echo htmlspecialchars($size); ?>
+                            <button type="button" class="chip size-chip" data-size="<?php echo htmlspecialchars($size, ENT_QUOTES, 'UTF-8'); ?>" onclick="selectSize(this)">
+                                <?php echo htmlspecialchars($size, ENT_QUOTES, 'UTF-8'); ?>
                             </button>
                         <?php endforeach; ?>
                     </div>
@@ -224,7 +218,7 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
             <?php endif; ?>
 
             <div class="option-block qty-block">
-                <label><?php echo htmlspecialchars(t('quantity')); ?></label>
+                <label><?php echo htmlspecialchars(t('quantity'), ENT_QUOTES, 'UTF-8'); ?></label>
                 <div class="qty-control">
                     <button type="button" onclick="decreaseQty()">-</button>
                     <input type="number" id="qtyInput" value="1" min="1">
@@ -235,14 +229,14 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
             <?php if ($showSizingGuide): ?>
                 <div class="option-block product-info__sizing">
                     <button type="button" class="btn-secondary" id="productSizingOpen" onclick="openProductSizingDialog()">
-                        <?php echo htmlspecialchars(t('sizing_guide')); ?>
+                        <?php echo htmlspecialchars(t('sizing_guide'), ENT_QUOTES, 'UTF-8'); ?>
                     </button>
                 </div>
             <?php endif; ?>
 
             <div class="actions-row product-info__actions">
                 <button type="button" class="btn product-add-cart-btn" onclick="addCurrentProductToCart()" <?php echo ($totalStock <= 0 || $needsVariantPick) ? 'disabled' : ''; ?>>
-                    <?php echo htmlspecialchars(t('add_to_cart')); ?>
+                    <?php echo htmlspecialchars(t('add_to_cart'), ENT_QUOTES, 'UTF-8'); ?>
                 </button>
             </div>
         </div>
@@ -252,9 +246,9 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
 <?php if ($showSizingGuide): ?>
 <dialog id="productSizingDialog" class="product-sizing-dialog">
     <div class="product-sizing-dialog__inner">
-        <h3 class="product-sizing-dialog__title"><?php echo htmlspecialchars(t('sizing_guide')); ?></h3>
+        <h3 class="product-sizing-dialog__title"><?php echo htmlspecialchars(t('sizing_guide'), ENT_QUOTES, 'UTF-8'); ?></h3>
         <?php if ($sizingText !== ''): ?>
-            <p class="product-sizing-dialog__body"><?php echo htmlspecialchars($sizingText); ?></p>
+            <p class="product-sizing-dialog__body"><?php echo htmlspecialchars($sizingText, ENT_QUOTES, 'UTF-8'); ?></p>
         <?php endif; ?>
         <?php if ($sizingChartRows !== []): ?>
             <div class="product-sizing-table-wrap" role="region" aria-label="<?php echo htmlspecialchars(t('sizing_guide'), ENT_QUOTES, 'UTF-8'); ?>">
@@ -286,7 +280,7 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
             </div>
         <?php endif; ?>
         <form method="dialog">
-            <button type="submit" class="btn btn-secondary product-sizing-dialog__close"><?php echo htmlspecialchars(t('sizing_guide_close')); ?></button>
+            <button type="submit" class="btn btn-secondary product-sizing-dialog__close"><?php echo htmlspecialchars(t('sizing_guide_close'), ENT_QUOTES, 'UTF-8'); ?></button>
         </form>
     </div>
 </dialog>
