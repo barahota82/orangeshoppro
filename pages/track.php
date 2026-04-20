@@ -48,16 +48,20 @@ $orangeMyOrderUi = [
             <div class="track-signup-cta__expand" id="trackSignupExpand" hidden>
                 <p class="track-signup-cta__verify-note"><?php echo htmlspecialchars(t('track_signup_identity_note'), ENT_QUOTES, 'UTF-8'); ?></p>
                 <div class="field track-signup-cta__field">
+                    <label for="trackSignupOrderNumber"><?php echo htmlspecialchars(t('order_number'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <input id="trackSignupOrderNumber" name="signup_order_number" autocomplete="off" inputmode="text" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_order_number'), ENT_QUOTES, 'UTF-8'); ?>">
+                </div>
+                <div class="field track-signup-cta__field">
+                    <label for="trackSignupVerifyPhone"><?php echo htmlspecialchars(t('track_signup_verify_phone_label'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <input id="trackSignupVerifyPhone" name="signup_verify_phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_verify_phone'), ENT_QUOTES, 'UTF-8'); ?>">
+                </div>
+                <div class="field track-signup-cta__field">
                     <label for="trackSignupEmail"><?php echo htmlspecialchars(t('customer_email'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <input id="trackSignupEmail" type="email" name="email" autocomplete="email" inputmode="email" dir="ltr" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_email'), ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="trackSignupName"><?php echo htmlspecialchars(t('customer_name'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <input id="trackSignupName" type="text" name="name" autocomplete="name" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_name'), ENT_QUOTES, 'UTF-8'); ?>">
-                </div>
-                <div class="field track-signup-cta__field">
-                    <label for="trackSignupPhone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="trackSignupPhone" type="tel" name="phone" autocomplete="tel" inputmode="tel" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_phone'), ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="trackSignupArea"><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
@@ -145,22 +149,21 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
     var closeBtn = document.getElementById('trackSignupClose');
     var openBtn = document.getElementById('trackSignupOpenBtn');
     var sendBtn = document.getElementById('trackSignupSendBtn');
+    var signupOrderInp = document.getElementById('trackSignupOrderNumber');
+    var verifyPhoneInp = document.getElementById('trackSignupVerifyPhone');
     var emailInp = document.getElementById('trackSignupEmail');
     var nameInp = document.getElementById('trackSignupName');
-    var phoneInp = document.getElementById('trackSignupPhone');
     var areaInp = document.getElementById('trackSignupArea');
     var addressInp = document.getElementById('trackSignupAddress');
     var notesInp = document.getElementById('trackSignupNotes');
     var msgEl = document.getElementById('trackSignupMsg');
-    if (!cta || !expand || !closeBtn || !openBtn || !sendBtn || !emailInp || !nameInp || !phoneInp || !areaInp || !addressInp || !notesInp || !msgEl) {
+    if (!cta || !expand || !closeBtn || !openBtn || !sendBtn || !signupOrderInp || !verifyPhoneInp || !emailInp || !nameInp || !areaInp || !addressInp || !notesInp || !msgEl) {
         return;
     }
     var sent = <?php echo json_encode(t('storefront_register_sent'), JSON_UNESCAPED_UNICODE); ?>;
     var already = <?php echo json_encode(t('storefront_register_already_verified'), JSON_UNESCAPED_UNICODE); ?>;
     var err = <?php echo json_encode(t('storefront_register_error'), JSON_UNESCAPED_UNICODE); ?>;
     var trackSignupT = window.ORANGE_TRACK_SIGNUP || {};
-    var trackOnumEl = document.getElementById('track_order_number');
-    var trackPhoneEl = document.getElementById('track_phone');
 
     function setHidden(el, on) {
         if (!el) {
@@ -182,31 +185,42 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
         setHidden(sendBtn, false);
         setHidden(msgEl, true);
         msgEl.textContent = '';
-        var ton = trackOnumEl ? trackOnumEl.value.trim() : '';
         var ctx = window.__orangeCartTrack;
-        if (ctx && ctx.order && String(ctx.order.order_number || '') === ton) {
-            var o = ctx.order;
-            if (!emailInp.value.trim() && o.customer_email) {
-                emailInp.value = String(o.customer_email);
+        if (ctx && ctx.order) {
+            if (!signupOrderInp.value.trim() && ctx.orderNumber) {
+                signupOrderInp.value = String(ctx.orderNumber);
             }
-            if (!nameInp.value.trim() && o.customer_name) {
-                nameInp.value = String(o.customer_name);
+            if (!verifyPhoneInp.value.trim() && ctx.phone) {
+                verifyPhoneInp.value = String(ctx.phone);
             }
-            if (!phoneInp.value.trim() && o.phone) {
-                phoneInp.value = String(o.phone);
-            }
-            if (!areaInp.value.trim() && o.area) {
-                areaInp.value = String(o.area);
-            }
-            if (!addressInp.value.trim() && o.address) {
-                addressInp.value = String(o.address);
-            }
-            if (!notesInp.value.trim() && o.notes) {
-                notesInp.value = String(o.notes);
+            var ton = signupOrderInp.value.trim();
+            if (String(ctx.order.order_number || '') === ton) {
+                var o = ctx.order;
+                if (!emailInp.value.trim() && o.customer_email) {
+                    emailInp.value = String(o.customer_email);
+                }
+                if (!nameInp.value.trim() && o.customer_name) {
+                    nameInp.value = String(o.customer_name);
+                }
+                if (!areaInp.value.trim() && o.area) {
+                    areaInp.value = String(o.area);
+                }
+                if (!addressInp.value.trim() && o.address) {
+                    addressInp.value = String(o.address);
+                }
+                if (!notesInp.value.trim() && o.notes) {
+                    notesInp.value = String(o.notes);
+                }
             }
         }
         requestAnimationFrame(function () {
-            emailInp.focus();
+            if (!signupOrderInp.value.trim()) {
+                signupOrderInp.focus();
+            } else if (!verifyPhoneInp.value.trim()) {
+                verifyPhoneInp.focus();
+            } else {
+                emailInp.focus();
+            }
         });
     }
 
@@ -219,9 +233,10 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
         setHidden(sendBtn, true);
         setHidden(msgEl, true);
         msgEl.textContent = '';
+        signupOrderInp.value = '';
+        verifyPhoneInp.value = '';
         emailInp.value = '';
         nameInp.value = '';
-        phoneInp.value = '';
         areaInp.value = '';
         addressInp.value = '';
         notesInp.value = '';
@@ -236,12 +251,11 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
     sendBtn.addEventListener('click', function () {
         var email = emailInp.value.trim();
         var name = nameInp.value.trim();
-        var phone = phoneInp.value.trim();
+        var orderNumber = signupOrderInp.value.trim();
+        var orderVerifyPhone = verifyPhoneInp.value.trim();
         var area = areaInp.value.trim();
         var address = addressInp.value.trim();
         var notes = notesInp.value.trim();
-        var orderNumber = trackOnumEl ? trackOnumEl.value.trim() : '';
-        var orderVerifyPhone = trackPhoneEl ? trackPhoneEl.value.trim() : '';
         setHidden(msgEl, false);
         msgEl.textContent = '';
         var badEmail = (window.APP_T && window.APP_T.checkout_invalid_email) || '';
@@ -257,10 +271,6 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
             msgEl.textContent = badEmail;
             return;
         }
-        if (phone && phone.replace(/\D/g, '').length < 5) {
-            msgEl.textContent = trackSignupT.order_mismatch || '';
-            return;
-        }
         var apiUrl =
             typeof storefrontApiUrl === 'function'
                 ? storefrontApiUrl('/api/auth/request-email-verify.php')
@@ -272,7 +282,7 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
             body: JSON.stringify({
                 email: email,
                 name: name,
-                phone: phone,
+                phone: orderVerifyPhone,
                 area: area,
                 address: address,
                 notes: notes,
