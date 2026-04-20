@@ -175,7 +175,7 @@ if ($order && orange_table_has_column($pdo, 'orders', 'amount_paid')) {
 $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 0.0;
 ?>
 <div class="page-title page-title--stacked">
-    <h1>فاتورة مبيعات</h1>
+    <h1>فاتورة أونلاين</h1>
     <p class="page-subtitle">مستند للعميل من <strong>طلب محفوظ</strong> — رقم فاتورة مسلسل (<code>INV-</code>) يُخصَّص تلقائياً في النظام عند أول فتح لهذه الصفحة (لا زر «حفظ» منفصل). بعدها: <strong>طباعة / PDF</strong> من الشريط أعلاه أو <kbd class="admin-kbd">Ctrl</kbd>+<kbd class="admin-kbd">P</kbd>.</p>
 </div>
 
@@ -506,7 +506,7 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
     </div>
     <div class="invoice-workflow-bar__actions">
         <button type="button" class="btn" onclick="window.print()">طباعة / PDF</button>
-        <a class="btn btn-secondary" href="/admin/index.php?page=manual_order">+ طلب شركة</a>
+        <a class="btn btn-secondary" href="/admin/index.php?page=manual_order">+ فاتورة مبيعات</a>
         <a class="btn btn-secondary" href="/admin/index.php?page=orders">الطلبات</a>
         <a class="btn btn-secondary" href="/admin/index.php?page=invoice">فاتورة أخرى</a>
     </div>

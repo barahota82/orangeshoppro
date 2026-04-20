@@ -36,7 +36,7 @@ $count = count($rows);
     </div>
     <div class="actions">
         <a class="btn btn-secondary" href="/admin/index.php?page=partner_ledger">الذمم وسندات القبض</a>
-        <a class="btn btn-secondary" href="/admin/index.php?page=manual_order">فاتورة شركة</a>
+        <a class="btn btn-secondary" href="/admin/index.php?page=manual_order">فاتورة مبيعات</a>
     </div>
 </div>
 

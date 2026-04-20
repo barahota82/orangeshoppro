@@ -996,7 +996,7 @@ a { text-decoration: none; color: inherit; }
     line-height: 1.45;
 }
 
-/* فاتورة شركة — كود/باركود، أعمدة ضيقة للأرقام، أيقونات */
+/* فاتورة مبيعات (manual_order) — كود/باركود، أعمدة ضيقة للأرقام، أيقونات */
 .mo-th-code {
     width: 7.25rem;
     min-width: 6.5rem;

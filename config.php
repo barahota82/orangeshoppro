@@ -818,7 +818,7 @@ function get_translations(): array {
             'payment_credit' => 'آجل',
             'payment_online' => 'أونلاين',
             'order_payment_terms_label' => 'نوع البيع',
-            'checkout_online_cash_only' => 'اختر أعلاه نقدي (مثل الدفع عند الاستلام) أو أونلاين. البيع الآجل يُسجَّل من لوحة الإدارة فقط (فاتورة شركة).',
+            'checkout_online_cash_only' => 'اختر أعلاه نقدي (مثل الدفع عند الاستلام) أو أونلاين. البيع الآجل يُسجَّل من لوحة الإدارة فقط (فاتورة مبيعات).',
             'order_status_label' => 'الحالة',
             'order_status_pending' => 'قيد الانتظار',
             'order_status_approved' => 'مقبول',

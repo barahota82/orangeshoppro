@@ -124,7 +124,7 @@ $channelsUrl = '/admin/index.php?page=channels';
 $ordersUrl = '/admin/index.php?page=orders';
 ?>
 <div class="page-title">
-    <h1>تحليل أداء قنوات العملاء</h1>
+    <h1>تحليل القنوات</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;max-width:900px;line-height:1.55;">
         القنوات عندكم تمثّل <strong>واجهات البيع</strong> (مثل تيك توك / واتساب / …) وتوزيع العملاء — بحسب مذكرة النظام: مسارات منفصلة و<code>channel_id</code> على الطلب، مع <strong>مخزون ومبيعات شركة واحدة</strong>.
         هذا التقرير يقيّس «شغل» كل قناة: عدد الطلبات، التسليمات، الإيراد، وأكثر منتج حركةً داخل القناة.

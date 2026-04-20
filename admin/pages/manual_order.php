@@ -129,7 +129,7 @@ foreach ($products as $p) {
 }
 ?>
 <div class="page-title page-title--stacked">
-    <h1>فاتورة مبيعات — طلب شركة</h1>
+    <h1>فاتورة مبيعات</h1>
     <p class="page-subtitle">مستند بيع داخلي مرتبط بالعميل والقناة. <strong>كل بند</strong> يُربَط بصنف مسجّل: <strong>كود الصنف</strong> أو <strong>الباركود</strong> (حقلا <code dir="ltr">item_code</code> و<code dir="ltr">barcode</code> في قاعدة البيانات، أو كود تلقائي مثل P12) مع اللون/المقاس عند وجود متغيرات. حقول <strong>سعر الوحدة</strong> و<strong>الخصم</strong> تتبع تنسيق المبالغ (ثلاث خانات عشرية، ويسمح الخصم بالقيم السالبة كزيادة). بعد الحفظ تفتح الفاتورة الرسمية.</p>
 </div>
 
@@ -172,7 +172,7 @@ foreach ($products as $p) {
     </div>
     <p class="card-hint" style="margin-top:0;">أدخل <strong>كود الصنف أو الباركود</strong> واضغط Enter أو استخدم أيقونة <strong>البحث</strong> ثم <strong>دبل كليك</strong> على الصف. في نافذة البحث تظهر <strong>إجمالي المخزون</strong> و<strong>المحجوز</strong> (طلبات ويب معلّقة) و<strong>الصافي المتاح</strong>. عدّل الكمية أو الخصم — <strong>صافي سعر الصنف</strong> يتحدّث تلقائياً.</p>
     <?php if ($products === []): ?>
-        <p class="mo-invoice-alert">لا توجد منتجات نشطة — <strong>لا يمكن حفظ فاتورة شركة</strong> حتى تُضاف منتجات من شاشة «المنتجات».</p>
+        <p class="mo-invoice-alert">لا توجد منتجات نشطة — <strong>لا يمكن حفظ فاتورة المبيعات</strong> حتى تُضاف منتجات من شاشة «المنتجات».</p>
     <?php endif; ?>
     <div class="admin-doc-frame mo-invoice-frame">
         <div class="table-wrap">
