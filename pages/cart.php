@@ -78,7 +78,7 @@ $orangeMyOrderUi = [
                 </div>
                 <div class="field">
                     <label for="customer_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="customer_phone" autocomplete="tel">
+                    <input id="customer_phone" type="tel" autocomplete="tel" inputmode="tel">
                 </div>
                 <div class="field">
                     <label for="customer_email"><?php echo htmlspecialchars(t('customer_email'), ENT_QUOTES, 'UTF-8'); ?></label>

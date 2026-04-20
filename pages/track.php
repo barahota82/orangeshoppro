@@ -31,8 +31,6 @@ $orangeMyOrderUi = [
     'payment_credit' => t('payment_credit'),
     'payment_online' => t('payment_online'),
 ];
-$trackSignupFieldRtl = $lang === 'ar' ? ' track-signup-cta__field--rtl-inputs' : '';
-$trackSignupEmailLtr = $lang === 'ar' ? 'track-signup-email-input-ltr' : '';
 ?>
 <div class="container">
     <div class="page-title-box cart-page-head">
@@ -64,9 +62,9 @@ $trackSignupEmailLtr = $lang === 'ar' ? 'track-signup-email-input-ltr' : '';
                     <p class="track-signup-cta__verify-feedback" id="trackSignupVerifyFeedback" role="status" aria-live="polite" hidden></p>
                 </div>
                 <div class="track-signup-order-summary" id="trackSignupOrderSummary" hidden></div>
-                <div class="field track-signup-cta__field<?php echo htmlspecialchars($trackSignupFieldRtl, ENT_QUOTES, 'UTF-8'); ?>">
+                <div class="field track-signup-cta__field">
                     <label for="trackSignupEmail"><?php echo htmlspecialchars(t('customer_email'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="trackSignupEmail"<?php echo $trackSignupEmailLtr !== '' ? ' class="' . htmlspecialchars($trackSignupEmailLtr, ENT_QUOTES, 'UTF-8') . '"' : ''; ?> type="email" name="email" autocomplete="email" inputmode="email" dir="ltr" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_email'), ENT_QUOTES, 'UTF-8'); ?>">
+                    <input id="trackSignupEmail" type="email" name="email" autocomplete="email" inputmode="email" dir="ltr" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_email'), ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="trackSignupName"><?php echo htmlspecialchars(t('customer_name'), ENT_QUOTES, 'UTF-8'); ?></label>
@@ -80,7 +78,7 @@ $trackSignupEmailLtr = $lang === 'ar' ? 'track-signup-email-input-ltr' : '';
                     <label for="trackSignupAddress"><?php echo htmlspecialchars(t('address'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <textarea id="trackSignupAddress" name="address" autocomplete="street-address" rows="2"></textarea>
                 </div>
-                <div class="field track-signup-cta__field<?php echo htmlspecialchars($trackSignupFieldRtl, ENT_QUOTES, 'UTF-8'); ?>">
+                <div class="field track-signup-cta__field">
                     <label for="trackSignupNotes"><?php echo htmlspecialchars(t('notes'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <textarea id="trackSignupNotes" name="notes" rows="2" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_notes'), ENT_QUOTES, 'UTF-8'); ?>"></textarea>
                 </div>

@@ -1806,6 +1806,58 @@ body.storefront .product-gallery__img {
     box-shadow: var(--card-shadow);
 }
 
+/* Register page: same CTA card as track; always full-width column (no collapsed desktop row) */
+.register-signup-cta.track-signup-cta {
+    max-width: 32rem;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.register-signup-cta.track-signup-cta .track-signup-cta__inner {
+    flex-direction: column;
+    align-items: stretch;
+    padding-top: 0;
+}
+
+@media (min-width: 560px) {
+    .register-signup-cta.track-signup-cta .track-signup-cta__inner {
+        flex-direction: column;
+    }
+}
+
+.register-signup-cta .track-signup-cta__copy .track-signup-cta__text + .track-signup-cta__text {
+    margin-top: 0.65rem;
+}
+
+.register-signup-cta__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.register-signup-cta__form-wrap {
+    margin: 0;
+}
+
+.register-signup-cta__form-wrap form {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.register-signup-cta__btn-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+@media (min-width: 560px) {
+    .register-signup-cta__btn-row .track-signup-cta__btn {
+        width: auto;
+        min-width: 140px;
+    }
+}
+
 .track-signup-cta.is-expanded .track-signup-cta__inner {
     padding-top: 36px;
 }
@@ -1901,16 +1953,6 @@ body.storefront .product-gallery__img {
 
 .track-signup-cta__verify-feedback:not([hidden]) {
     color: var(--text);
-}
-
-.track-signup-cta__field--rtl-inputs textarea {
-    text-align: right;
-    direction: rtl;
-}
-
-.track-signup-cta__field--rtl-inputs input.track-signup-email-input-ltr {
-    direction: ltr;
-    text-align: right;
 }
 
 .track-signup-order-summary {
@@ -2494,6 +2536,26 @@ button.track-signup-cta__btn[hidden] {
 .field textarea::placeholder {
     color: var(--muted);
     opacity: 0.88;
+}
+
+/* RTL storefront: right-align text in customer forms (register, checkout, track) */
+html[dir="rtl"] .field input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="file"]):not([type="image"]):not([type="reset"]),
+html[dir="rtl"] .field textarea {
+    text-align: right;
+    direction: rtl;
+}
+
+/* Email / phone / numeric: LTR typing with visual alignment to the right */
+html[dir="rtl"] .field input[type="email"],
+html[dir="rtl"] .field input[type="tel"],
+html[dir="rtl"] .field input[type="number"],
+html[dir="rtl"] .field input[inputmode="email"],
+html[dir="rtl"] .field input[inputmode="tel"],
+html[dir="rtl"] .field input[autocomplete="email"],
+html[dir="rtl"] .field input[autocomplete="tel"] {
+    direction: ltr;
+    text-align: right;
+    unicode-bidi: plaintext;
 }
 
 /* Mobile app-style bottom dock (storefront only) */

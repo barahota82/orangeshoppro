@@ -31,19 +31,21 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
         <h2><?php echo htmlspecialchars(t('storefront_register_title'), ENT_QUOTES, 'UTF-8'); ?></h2>
     </div>
 
-    <div class="card-box" style="max-width: 32rem; margin: 0 auto;">
-        <p class="cart-checkout-intro"><?php echo htmlspecialchars(t('storefront_register_intro'), ENT_QUOTES, 'UTF-8'); ?></p>
-        <p class="cart-checkout-intro" style="margin-top: 0.75rem;"><?php echo htmlspecialchars(t('storefront_guest_checkout_note'), ENT_QUOTES, 'UTF-8'); ?></p>
-
+    <div class="track-signup-cta card-box register-signup-cta" role="region" aria-label="<?php echo htmlspecialchars(t('track_signup_cta_aria'), ENT_QUOTES, 'UTF-8'); ?>">
+        <div class="track-signup-cta__inner">
         <?php if ($acc): ?>
             <?php
             $accChMeta = get_channel_by_slug($acc['registered_channel_slug']);
             $accChLabel = $accChMeta ? (string) ($accChMeta['name'] ?? $acc['registered_channel_slug']) : $acc['registered_channel_slug'];
             ?>
-            <p style="margin-top: 1rem;">
-                <?php echo htmlspecialchars(t('storefront_account_signed_in'), ENT_QUOTES, 'UTF-8'); ?>
-                <strong dir="ltr"><?php echo htmlspecialchars($acc['email'], ENT_QUOTES, 'UTF-8'); ?></strong>
-            </p>
+            <div class="track-signup-cta__copy">
+                <p class="track-signup-cta__title"><?php echo htmlspecialchars(t('storefront_register_title'), ENT_QUOTES, 'UTF-8'); ?></p>
+                <p class="track-signup-cta__text">
+                    <?php echo htmlspecialchars(t('storefront_account_signed_in'), ENT_QUOTES, 'UTF-8'); ?>
+                    <strong dir="ltr"><?php echo htmlspecialchars($acc['email'], ENT_QUOTES, 'UTF-8'); ?></strong>
+                </p>
+            </div>
+            <div class="register-signup-cta__body">
             <?php
             $profBits = [];
             if (!empty($acc['customer_name'])) {
@@ -63,7 +65,7 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
             }
             ?>
             <?php if ($profBits !== []): ?>
-                <div class="register-profile card-box" style="margin-top: 1rem; padding: 12px 14px; text-align: start;">
+                <div class="register-profile card-box" style="padding: 12px 14px; text-align: start;">
                     <p class="cart-checkout-intro" style="margin: 0 0 8px; font-weight: 600;"><?php echo htmlspecialchars(t('cart_checkout_title'), ENT_QUOTES, 'UTF-8'); ?></p>
                     <dl style="margin: 0; font-size: 0.9rem; line-height: 1.5;">
                         <?php foreach ($profBits as $pair): ?>
@@ -75,44 +77,54 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                     </dl>
                 </div>
             <?php endif; ?>
-            <p class="cart-checkout-intro" style="margin-top: 0.5rem;">
+            <p class="cart-checkout-intro" style="margin: 0;">
                 <?php echo htmlspecialchars(t('storefront_your_channel'), ENT_QUOTES, 'UTF-8'); ?>
                 <strong><?php echo htmlspecialchars($accChLabel, ENT_QUOTES, 'UTF-8'); ?></strong>
             </p>
-            <p class="cart-checkout-intro" style="margin-top: 0.75rem;"><?php echo htmlspecialchars(t('storefront_pwa_install_hint'), ENT_QUOTES, 'UTF-8'); ?></p>
-            <p style="margin-top: 0.75rem;">
-                <a class="btn" href="<?php echo htmlspecialchars($registerHref . (str_contains($registerHref, '?') ? '&' : '?') . 'logout=1', ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(t('storefront_logout'), ENT_QUOTES, 'UTF-8'); ?></a>
-                <a class="btn" href="<?php echo htmlspecialchars($homeHref, ENT_QUOTES, 'UTF-8'); ?>" style="opacity:0.9"><?php echo htmlspecialchars(t('home'), ENT_QUOTES, 'UTF-8'); ?></a>
-            </p>
+            <p class="cart-checkout-intro" style="margin: 0;"><?php echo htmlspecialchars(t('storefront_pwa_install_hint'), ENT_QUOTES, 'UTF-8'); ?></p>
+            <div class="track-signup-cta__actions register-signup-cta__btn-row">
+                <a class="btn track-signup-cta__btn" href="<?php echo htmlspecialchars($registerHref . (str_contains($registerHref, '?') ? '&' : '?') . 'logout=1', ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(t('storefront_logout'), ENT_QUOTES, 'UTF-8'); ?></a>
+                <a class="btn track-signup-cta__btn" href="<?php echo htmlspecialchars($homeHref, ENT_QUOTES, 'UTF-8'); ?>" style="opacity:0.9"><?php echo htmlspecialchars(t('home'), ENT_QUOTES, 'UTF-8'); ?></a>
+            </div>
+            </div>
         <?php else: ?>
-            <form id="orangeRegisterForm" style="margin-top: 1rem;">
-                <div class="field">
+            <div class="track-signup-cta__copy">
+                <p class="track-signup-cta__title"><?php echo htmlspecialchars(t('track_signup_cta_title'), ENT_QUOTES, 'UTF-8'); ?></p>
+                <p class="track-signup-cta__text"><?php echo htmlspecialchars(t('track_signup_cta_text'), ENT_QUOTES, 'UTF-8'); ?></p>
+                <p class="track-signup-cta__text"><?php echo htmlspecialchars(t('storefront_guest_checkout_note'), ENT_QUOTES, 'UTF-8'); ?></p>
+            </div>
+            <div class="track-signup-cta__expand register-signup-cta__form-wrap">
+            <form id="orangeRegisterForm">
+                <div class="field track-signup-cta__field">
                     <label for="reg_email"><?php echo htmlspecialchars(t('customer_email'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <input id="reg_email" name="email" type="email" autocomplete="email" required dir="ltr" placeholder="<?php echo htmlspecialchars(t('register_placeholder_email'), ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
-                <div class="field">
+                <div class="field track-signup-cta__field">
                     <label for="reg_name"><?php echo htmlspecialchars(t('customer_name'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <input id="reg_name" name="name" type="text" autocomplete="name" required placeholder="<?php echo htmlspecialchars(t('register_placeholder_name'), ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
-                <div class="field">
+                <div class="field track-signup-cta__field">
                     <label for="reg_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <input id="reg_phone" name="phone" type="tel" autocomplete="tel" required inputmode="tel" placeholder="<?php echo htmlspecialchars(t('register_placeholder_phone'), ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
-                <div class="field">
+                <div class="field track-signup-cta__field">
                     <label for="reg_area"><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <input id="reg_area" name="area" autocomplete="address-level1" required placeholder="<?php echo htmlspecialchars(t('register_placeholder_area'), ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
-                <div class="field">
+                <div class="field track-signup-cta__field">
                     <label for="reg_address"><?php echo htmlspecialchars(t('address'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <textarea id="reg_address" name="address" autocomplete="street-address" required rows="3" placeholder="<?php echo htmlspecialchars(t('register_placeholder_address'), ENT_QUOTES, 'UTF-8'); ?>"></textarea>
                 </div>
-                <div class="field">
+                <div class="field track-signup-cta__field">
                     <label for="reg_notes"><?php echo htmlspecialchars(t('notes'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <textarea id="reg_notes" name="notes" rows="2" placeholder="<?php echo htmlspecialchars(t('register_placeholder_notes'), ENT_QUOTES, 'UTF-8'); ?>"></textarea>
                 </div>
-                <p id="orangeRegisterMsg" class="cart-checkout-intro" style="margin-top: 0.75rem; min-height: 1.25em;" hidden></p>
-                <button type="submit" class="btn" style="margin-top: 1rem;"><?php echo htmlspecialchars(t('storefront_register_submit'), ENT_QUOTES, 'UTF-8'); ?></button>
+                <p id="orangeRegisterMsg" class="track-signup-cta__feedback" style="margin-top: 0.75rem;" hidden></p>
+                <div class="track-signup-cta__actions">
+                    <button type="submit" class="btn track-signup-cta__btn"><?php echo htmlspecialchars(t('storefront_register_submit'), ENT_QUOTES, 'UTF-8'); ?></button>
+                </div>
             </form>
+            </div>
             <script>
             (function () {
                 var form = document.getElementById('orangeRegisterForm');
@@ -179,6 +191,7 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
             })();
             </script>
         <?php endif; ?>
+        </div>
     </div>
 </div>
 <?php
