@@ -17,6 +17,7 @@ $precacheRel = [
     storefront_asset_url('/assets/css/main.css'),
     storefront_asset_url('/assets/css/theme-orange.css'),
     storefront_asset_url('/assets/js/lang.js'),
+    storefront_asset_url('/assets/js/input-constraints.js'),
     storefront_asset_url('/assets/js/app.js'),
     storefront_asset_url('/assets/js/cart.js'),
     storefront_asset_url('/assets/js/product.js'),
