@@ -34,5 +34,5 @@ try {
     $report = orange_party_aging_buckets($pdo, $partyKind, $partyId, $asOfNorm);
     json_response(['success' => true, 'aging' => $report]);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر حساب أعمار الذمم');
+    orange_admin_api_catch($e, 'تعذر حساب أعمار الذمم');
 }

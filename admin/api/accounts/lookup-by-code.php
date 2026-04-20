@@ -50,5 +50,5 @@ try {
         ],
     ]);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر البحث عن الحساب');
+    orange_admin_api_catch($e, 'تعذر البحث عن الحساب');
 }

@@ -36,5 +36,5 @@ try {
         'resource_labels' => orange_admin_resource_labels(),
     ]);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر جلب المستخدمين');
+    orange_admin_api_catch($e, 'تعذر جلب المستخدمين');
 }

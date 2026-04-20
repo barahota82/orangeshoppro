@@ -33,5 +33,5 @@ try {
     }
     json_response(['success' => true, 'roots' => $out]);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر قراءة جذور الدليل');
+    orange_admin_api_catch($e, 'تعذر قراءة جذور الدليل');
 }

@@ -34,5 +34,5 @@ try {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    api_error($e, 'تعذر حذف المنتج');
+    orange_admin_api_catch($e, 'تعذر حذف المنتج');
 }

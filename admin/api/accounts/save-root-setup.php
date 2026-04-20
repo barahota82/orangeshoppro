@@ -104,5 +104,5 @@ try {
         $pdo->query('SELECT RELEASE_LOCK(' . $pdo->quote($lock) . ')');
     }
 } catch (Throwable $e) {
-    api_error($e, 'تعذر حفظ جذر الدليل');
+    orange_admin_api_catch($e, 'تعذر حفظ جذر الدليل');
 }

@@ -11,11 +11,12 @@ try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
     $data = get_json_input();
+    orange_storefront_apply_lang_from_payload($data);
 
     require_fields($data, ['name', 'phone', 'area', 'address', 'email', 'channel_id', 'items']);
 
     if (!is_array($data['items']) || count($data['items']) === 0) {
-        json_response(['success' => false, 'message' => 'Cart items are required'], 422);
+        json_response(['success' => false, 'code' => 'cart_items_required', 'message' => t('checkout_cart_items_required')], 422);
     }
 
     $channelStmt = $pdo->prepare('SELECT * FROM channels WHERE id = ? AND is_active = 1 LIMIT 1');
@@ -23,7 +24,7 @@ try {
     $channel = $channelStmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$channel) {
-        json_response(['success' => false, 'message' => 'Invalid channel'], 422);
+        json_response(['success' => false, 'code' => 'invalid_channel', 'message' => t('checkout_invalid_channel')], 422);
     }
 
     $enq = orange_order_intake_enqueue($pdo, $data);
@@ -39,7 +40,7 @@ try {
         $st->execute([$queueId]);
         $me = $st->fetch(PDO::FETCH_ASSOC);
         if (!$me) {
-            json_response(['success' => false, 'message' => 'Queue row missing'], 500);
+            json_response(['success' => false, 'code' => 'queue_row_missing', 'message' => t('checkout_internal_error')], 500);
         }
         if ($me['status'] === 'completed') {
             $totalVal = 0.0;
@@ -60,9 +61,11 @@ try {
             ]);
         }
         if ($me['status'] === 'failed') {
+            $failMsg = trim((string) ($me['error_message'] ?? ''));
             json_response([
                 'success' => false,
-                'message' => (string) ($me['error_message'] ?? 'Checkout failed'),
+                'code' => 'processing_failed',
+                'message' => $failMsg !== '' ? $failMsg : t('checkout_failed_generic'),
                 'intake_token' => $publicToken,
             ], 500);
         }
@@ -80,13 +83,11 @@ try {
 
     json_response([
         'success' => false,
-        'message' => 'Queue busy; retry with intake-status',
+        'code' => 'checkout_busy',
+        'message' => t('checkout_queue_busy'),
         'intake_token' => $publicToken,
         'intake_status_url' => '/api/orders/intake-status.php?token=' . rawurlencode($publicToken),
     ], 503);
 } catch (Throwable $e) {
-    json_response([
-        'success' => false,
-        'message' => $e->getMessage(),
-    ], 500);
+    api_error($e, t('checkout_failed_generic'));
 }

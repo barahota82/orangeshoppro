@@ -11,12 +11,13 @@ try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
     $data = get_json_input();
+    orange_storefront_apply_lang_from_payload($data);
 
     $orderNumber = trim((string)($data['order_number'] ?? ''));
     $phone = trim((string)($data['phone'] ?? ''));
 
     if ($orderNumber === '' || $phone === '') {
-        json_response(['success' => false, 'code' => 'invalid_input'], 422);
+        json_response(['success' => false, 'code' => 'invalid_input', 'message' => t('track_missing_fields')], 422);
     }
 
     $stmt = $pdo->prepare('SELECT * FROM orders WHERE order_number = ? LIMIT 1');
@@ -24,7 +25,7 @@ try {
     $order = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$order || !orange_order_phones_match_for_lookup($phone, (string) ($order['phone'] ?? ''))) {
-        json_response(['success' => false, 'code' => 'not_found'], 404);
+        json_response(['success' => false, 'code' => 'not_found', 'message' => t('track_order_not_found')], 404);
     }
 
     $st = strtolower(trim((string)($order['status'] ?? '')));
@@ -33,12 +34,13 @@ try {
         json_response([
             'success' => true,
             'code' => 'already_cancelled',
+            'message' => t('customer_cancel_ok'),
             'order' => $order,
         ]);
     }
 
     if (!in_array($st, ['pending', 'approved'], true)) {
-        json_response(['success' => false, 'code' => 'cancel_not_allowed'], 403);
+        json_response(['success' => false, 'code' => 'cancel_not_allowed', 'message' => t('customer_cancel_not_allowed')], 403);
     }
 
     $pdo->beginTransaction();
@@ -55,11 +57,12 @@ try {
     json_response([
         'success' => true,
         'code' => 'cancelled',
+        'message' => t('customer_cancel_ok'),
         'order' => $order,
     ]);
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    json_response(['success' => false, 'code' => 'server_error', 'message' => $e->getMessage()], 500);
+    api_error($e, t('customer_cancel_err'));
 }

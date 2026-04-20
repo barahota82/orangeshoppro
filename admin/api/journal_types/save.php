@@ -135,5 +135,5 @@ try {
 
     json_response(['success' => false, 'message' => 'إجراء غير معروف'], 422);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر حفظ أنواع اليوميات');
+    orange_admin_api_catch($e, 'تعذر حفظ أنواع اليوميات');
 }

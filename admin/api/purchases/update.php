@@ -28,15 +28,12 @@ function reverse_purchase_stock(PDO $pdo, int $purchaseId): void
             continue;
         }
         $vid = $hasV ? (int) ($item['variant_id'] ?? 0) : 0;
-        if ($vid > 0) {
-            $pdo->prepare(
-                'UPDATE product_variants SET stock_quantity = GREATEST(stock_quantity - ?, 0) WHERE id = ? AND product_id = ?'
-            )->execute([$qty, $vid, $pid]);
-        } else {
-            $pdo->prepare(
-                'UPDATE product_variants SET stock_quantity = GREATEST(stock_quantity - ?, 0) WHERE product_id = ?'
-            )->execute([$qty, $pid]);
+        if ($vid <= 0) {
+            $vid = orange_purchase_resolve_variant_id($pdo, $pid, 0);
         }
+        $pdo->prepare(
+            'UPDATE product_variants SET stock_quantity = GREATEST(stock_quantity - ?, 0) WHERE id = ? AND product_id = ?'
+        )->execute([$qty, $vid, $pid]);
     }
 }
 

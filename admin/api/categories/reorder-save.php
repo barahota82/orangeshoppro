@@ -23,6 +23,8 @@ try {
     $pdo->commit();
     json_response(['success' => true, 'message' => 'OK_REORDER']);
 } catch (Throwable $e) {
-    if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) $pdo->rollBack();
-    json_response(['success'=>false,'message'=>$e->getMessage()],500);
+    if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    orange_admin_api_catch($e, 'تعذر حفظ ترتيب الفئات');
 }

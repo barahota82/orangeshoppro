@@ -91,7 +91,12 @@ function storefrontApiUrl(path) {
     const raw = typeof window.STOREFRONT_BASE === 'string' ? window.STOREFRONT_BASE : '';
     const base = raw.replace(/\/+$/, '');
     const p = path.startsWith('/') ? path : '/' + path;
-    return base + p;
+    let url = base + p;
+    const lang = typeof window.APP_LANG === 'string' ? window.APP_LANG.trim().toLowerCase() : '';
+    if (lang && ['en', 'ar', 'fil', 'hi'].indexOf(lang) !== -1) {
+        url += (url.indexOf('?') !== -1 ? '&' : '?') + 'lang=' + encodeURIComponent(lang);
+    }
+    return url;
 }
 
 function ensureOrangeToast() {
@@ -124,6 +129,96 @@ function orangeShowToast(message, durationMs) {
 }
 
 window.orangeShowToast = orangeShowToast;
+
+function orangeCheckoutApiMessage(result) {
+    const T = window.APP_T || {};
+    if (!result || typeof result !== 'object') {
+        return '';
+    }
+    const c = result.code ? String(result.code) : '';
+    if (c === 'mail_failed' && T.storefront_register_mail_failed) {
+        return T.storefront_register_mail_failed;
+    }
+    if (c === 'service_unavailable' && T.storefront_register_service_unavailable) {
+        return T.storefront_register_service_unavailable;
+    }
+    if (c === 'invalid_email' && T.checkout_invalid_email) {
+        return T.checkout_invalid_email;
+    }
+    if (c === 'missing_fields' && T.checkout_required_fields) {
+        return T.checkout_required_fields;
+    }
+    if (c === 'invalid_phone' && T.storefront_register_invalid_phone) {
+        return T.storefront_register_invalid_phone;
+    }
+    if (c === 'order_link_incomplete' && T.track_signup_order_required) {
+        return T.track_signup_order_required;
+    }
+    if (c === 'cart_items_required' && T.checkout_cart_items_required) {
+        return T.checkout_cart_items_required;
+    }
+    if (c === 'invalid_channel' && T.checkout_invalid_channel) {
+        return T.checkout_invalid_channel;
+    }
+    if (c === 'queue_row_missing' && T.checkout_internal_error) {
+        return T.checkout_internal_error;
+    }
+    if (c === 'checkout_busy' && T.checkout_queue_busy) {
+        return T.checkout_queue_busy;
+    }
+    if (c === 'intake_invalid_token' && T.intake_invalid_token) {
+        return T.intake_invalid_token;
+    }
+    if (c === 'intake_queue_unavailable' && T.intake_queue_unavailable) {
+        return T.intake_queue_unavailable;
+    }
+    if (c === 'intake_not_found' && T.intake_not_found) {
+        return T.intake_not_found;
+    }
+    if (c === 'queue_timeout' && T.checkout_queue_timeout) {
+        return T.checkout_queue_timeout;
+    }
+    if (c === 'processing_failed') {
+        if (result.message && String(result.message).trim() !== '') {
+            return String(result.message);
+        }
+        return T.checkout_failed_generic || '';
+    }
+    if ((c === 'invalid_input' || c === 'order_lookup_required') && T.track_missing_fields) {
+        return T.track_missing_fields;
+    }
+    if (
+        (c === 'not_found' ||
+            c === 'order_lookup_not_found' ||
+            c === 'order_not_found' ||
+            c === 'order_link_mismatch' ||
+            c === 'signup_phone_mismatch') &&
+        T.track_signup_order_mismatch
+    ) {
+        return T.track_signup_order_mismatch;
+    }
+    if (c === 'cancel_not_allowed' && T.customer_cancel_not_allowed) {
+        return T.customer_cancel_not_allowed;
+    }
+    if (c === 'product_invalid_id' && T.product_invalid_id) {
+        return T.product_invalid_id;
+    }
+    if (c === 'product_not_found' && T.product_not_found) {
+        return T.product_not_found;
+    }
+    if (c === 'server_error') {
+        if (result.message && String(result.message).trim() !== '') {
+            return String(result.message);
+        }
+        return T.api_request_failed || T.checkout_internal_error || T.checkout_failed_generic || '';
+    }
+    if (result.message && String(result.message).trim() !== '') {
+        return String(result.message);
+    }
+    return '';
+}
+
+window.orangeCheckoutApiMessage = orangeCheckoutApiMessage;
 
 function orangeAnimateCartPulse() {
     document.querySelectorAll('[data-orange-cart-link]').forEach((el) => {
@@ -275,6 +370,7 @@ async function fetchCartStockLimits(items) {
             color: i.color,
             size: i.size,
         })),
+        lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
     };
     try {
         const response = await fetch(storefrontApiUrl('/api/cart/stock-limits.php'), {
@@ -536,21 +632,32 @@ async function orangePollIntakeUntilDone(token) {
         const r = await fetch(
             storefrontApiUrl('/api/orders/intake-status.php?token=' + encodeURIComponent(token))
         );
-        const j = await r.json();
+        let j = null;
+        try {
+            j = await r.json();
+        } catch (e) {
+            j = null;
+        }
+        if (!r.ok && (!j || typeof j !== 'object')) {
+            throw { checkoutResult: { code: 'server_error' } };
+        }
+        if (!r.ok && j && typeof j === 'object') {
+            throw { checkoutResult: j };
+        }
         if (j && j.status === 'completed' && j.whatsapp_url) {
             return j;
         }
         if (j && j.status === 'failed') {
-            throw new Error(j.message || 'Checkout failed');
+            throw { checkoutResult: j };
         }
         if (j && j.success === false && j.message && j.status !== 'pending') {
-            throw new Error(j.message);
+            throw { checkoutResult: j };
         }
         await new Promise(function (res) {
             setTimeout(res, 450);
         });
     }
-    throw new Error(window.APP_T.checkout_queue_timeout || 'Order queue timeout. Try again.');
+    throw { checkoutResult: { code: 'queue_timeout' } };
 }
 
 async function sendOrderNow() {
@@ -576,6 +683,7 @@ async function sendOrderNow() {
         channel_id: window.APP_CHANNEL_ID || 0,
         items: items,
         payment_terms: paymentTerms,
+        lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
     };
 
     if (!payload.name || !payload.phone || !payload.email || !payload.area || !payload.address) {
@@ -587,13 +695,33 @@ async function sendOrderNow() {
         return;
     }
 
-    const response = await fetch(storefrontApiUrl('/api/orders/create-order.php'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-    });
-
-    const result = await response.json();
+    let response;
+    let result;
+    try {
+        response = await fetch(storefrontApiUrl('/api/orders/create-order.php'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        result = await response.json();
+    } catch (e) {
+        orangeShowToast(
+            (window.APP_T && window.APP_T.api_request_failed) ||
+                (window.APP_T && window.APP_T.checkout_failed_generic) ||
+                '',
+            3800
+        );
+        return;
+    }
+    if (!result || typeof result !== 'object') {
+        orangeShowToast(
+            (window.APP_T && window.APP_T.api_request_failed) ||
+                (window.APP_T && window.APP_T.checkout_failed_generic) ||
+                '',
+            3800
+        );
+        return;
+    }
 
     if (response.status === 503 && result && result.intake_token) {
         orangeShowToast(window.APP_T.checkout_queue_wait || 'Processing order…', 2600);
@@ -601,13 +729,14 @@ async function sendOrderNow() {
             const done = await orangePollIntakeUntilDone(result.intake_token);
             orangeFinishCheckoutSuccess(done);
         } catch (e) {
-            orangeShowToast((e && e.message) || 'Checkout failed', 4200);
+            const wrap = e && e.checkoutResult ? e.checkoutResult : { message: e && e.message ? String(e.message) : '' };
+            orangeShowToast(orangeCheckoutApiMessage(wrap) || (window.APP_T.checkout_failed_generic || 'Checkout failed'), 4200);
         }
         return;
     }
 
     if (!result.success) {
-        orangeShowToast(result.message || 'Failed to create order', 3600);
+        orangeShowToast(orangeCheckoutApiMessage(result) || (window.APP_T.checkout_failed_generic || 'Failed to create order'), 3600);
         return;
     }
 
@@ -877,14 +1006,29 @@ async function orangeTrackOrderFetchAndRender(resultBox, orderNumber, phone, msg
         resStatus = response.status;
         result = await response.json();
     } catch (e) {
-        resultBox.innerHTML = '<div class="stock-out">' + orangeEscDomText(msgNotFound || '') + '</div>';
+        const T = window.APP_T || {};
+        const net = T.api_request_failed || msgNotFound || '';
+        resultBox.innerHTML = '<div class="stock-out">' + orangeEscDomText(net) + '</div>';
+        window.__orangeCartTrack = null;
+        orangeScrollTrackResultIntoView(resultBox);
+        return;
+    }
+    if (!result || typeof result !== 'object') {
+        const T = window.APP_T || {};
+        const net = T.api_request_failed || msgNotFound || '';
+        resultBox.innerHTML = '<div class="stock-out">' + orangeEscDomText(net) + '</div>';
         window.__orangeCartTrack = null;
         orangeScrollTrackResultIntoView(resultBox);
         return;
     }
     if (!result.success) {
+        const mapped = orangeCheckoutApiMessage(result);
         const show =
-            resStatus === 404 && msgNotFound ? msgNotFound : (result.message || msgNotFound || '');
+            mapped ||
+            (resStatus === 404 && msgNotFound ? msgNotFound : '') ||
+            (result.message || '') ||
+            msgNotFound ||
+            '';
         resultBox.innerHTML = '<div class="stock-out">' + orangeEscDomText(show) + '</div>';
         window.__orangeCartTrack = null;
         orangeScrollTrackResultIntoView(resultBox);
@@ -942,24 +1086,35 @@ async function orangeCustomerCancelOrder() {
         const res = await fetch(api, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ order_number: ctx.orderNumber, phone: ctx.phone }),
+            body: JSON.stringify({
+                order_number: ctx.orderNumber,
+                phone: ctx.phone,
+                lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
+            }),
         });
-        const data = await res.json();
-        if (data.success) {
-            alert(UI.cancel_ok || '');
+        let data;
+        try {
+            data = await res.json();
+        } catch (e2) {
+            data = null;
+        }
+        const T = window.APP_T || {};
+        if (data && data.success) {
+            orangeShowToast(UI.cancel_ok || T.customer_cancel_ok || '', 3400);
             if (typeof window.__orangeCartTrackRefresh === 'function') {
                 await window.__orangeCartTrackRefresh();
             }
             return;
         }
-        const code = data.code || '';
-        if (code === 'cancel_not_allowed') {
-            alert(UI.cancel_not_allowed || UI.cancel_err || '');
-        } else {
-            alert(UI.cancel_err || '');
-        }
+        const msg =
+            orangeCheckoutApiMessage(data || {}) || UI.cancel_err || T.customer_cancel_err || '';
+        orangeShowToast(msg, 3800);
     } catch (e) {
-        alert(UI.cancel_err || '');
+        const T = window.APP_T || {};
+        orangeShowToast(
+            (T.api_request_failed || T.customer_cancel_err || UI.cancel_err || '').trim() || '',
+            3800
+        );
     }
 }
 

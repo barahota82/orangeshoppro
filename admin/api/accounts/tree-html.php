@@ -32,5 +32,5 @@ try {
         'first_id' => $firstId,
     ]);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر بناء شجرة الحسابات');
+    orange_admin_api_catch($e, 'تعذر بناء شجرة الحسابات');
 }

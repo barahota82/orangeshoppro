@@ -24,5 +24,5 @@ try {
         ]
     ]);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر تحميل الإحصائيات');
+    orange_admin_api_catch($e, 'تعذر تحميل الإحصائيات');
 }

@@ -32,5 +32,5 @@ try {
     $items = orange_party_open_documents($pdo, $partyKind, $partyId);
     json_response(['success' => true, 'items' => $items]);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر جلب المستندات المفتوحة');
+    orange_admin_api_catch($e, 'تعذر جلب المستندات المفتوحة');
 }

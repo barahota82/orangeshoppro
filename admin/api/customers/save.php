@@ -214,5 +214,5 @@ try {
     audit_log('customer_create', 'عميل جديد: ' . $phone, 'customers', $newId);
     json_response(['success' => true, 'message' => 'تم إضافة العميل', 'id' => $newId]);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر حفظ العميل');
+    orange_admin_api_catch($e, 'تعذر حفظ العميل');
 }

@@ -47,5 +47,5 @@ try {
     audit_log('order_intake_delete_row', 'حذف صف فاشل من طابور طلبات الموقع #' . $id, 'order_intake_queue', $id);
     json_response(['success' => true, 'message' => 'تم حذف الصف']);
 } catch (Throwable $e) {
-    json_response(['success' => false, 'message' => $e->getMessage()], 500);
+    orange_admin_api_catch($e, 'تعذر حذف السجل');
 }

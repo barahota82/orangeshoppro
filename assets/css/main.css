@@ -1129,6 +1129,39 @@ body.storefront-browse-menu-lock {
     font-size: 0.98rem;
 }
 
+.product-sizing-dialog:has(.product-sizing-table) {
+    max-width: min(96vw, 520px);
+}
+
+.product-sizing-table-wrap {
+    margin: 0 0 18px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.product-sizing-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+}
+
+.product-sizing-table th,
+.product-sizing-table td {
+    border: 1px solid var(--border);
+    padding: 8px 10px;
+    text-align: start;
+}
+
+.product-sizing-table th {
+    background: color-mix(in srgb, var(--card) 88%, var(--muted));
+    font-weight: 600;
+    font-size: 0.88rem;
+}
+
+.product-sizing-table tbody tr:nth-child(even) {
+    background: color-mix(in srgb, var(--card) 94%, var(--muted));
+}
+
 .product-sizing-dialog__close {
     width: 100%;
     justify-content: center;

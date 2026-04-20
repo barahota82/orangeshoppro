@@ -36,8 +36,9 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
         <div class="track-signup-cta__inner">
         <?php if ($acc): ?>
             <?php
-            $accChMeta = get_channel_by_slug($acc['registered_channel_slug']);
-            $accChLabel = $accChMeta ? (string) ($accChMeta['name'] ?? $acc['registered_channel_slug']) : $acc['registered_channel_slug'];
+            $accRegSlug = preg_replace('/[^a-z0-9\-]/i', '', (string) ($acc['registered_channel_slug'] ?? ''));
+            $accChMeta = $accRegSlug !== '' ? get_channel_by_slug($accRegSlug) : null;
+            $accChLabel = storefront_channel_display_name($accChMeta ?? ['name' => ''], $accRegSlug !== '' ? $accRegSlug : (string) $channelSlug);
             ?>
             <div class="track-signup-cta__copy">
                 <p class="track-signup-cta__title"><?php echo htmlspecialchars(t('storefront_register_title'), ENT_QUOTES, 'UTF-8'); ?></p>
@@ -132,6 +133,7 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                 var msg = document.getElementById('orangeRegisterMsg');
                 if (!form || !msg) return;
                 var sent = <?php echo json_encode(t('storefront_register_sent'), JSON_UNESCAPED_UNICODE); ?>;
+                var cooldown = <?php echo json_encode(t('storefront_register_cooldown'), JSON_UNESCAPED_UNICODE); ?>;
                 var already = <?php echo json_encode(t('storefront_register_already_verified'), JSON_UNESCAPED_UNICODE); ?>;
                 var err = <?php echo json_encode(t('storefront_register_error'), JSON_UNESCAPED_UNICODE); ?>;
                 var reqMsg = (window.APP_T && window.APP_T.checkout_required_fields) || '';
@@ -160,7 +162,23 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                         return;
                     }
                     var base = typeof window.STOREFRONT_BASE === 'string' ? window.STOREFRONT_BASE : '';
-                    fetch(base + '/api/auth/request-email-verify.php', {
+                    var verifyUrl =
+                        typeof storefrontApiUrl === 'function'
+                            ? storefrontApiUrl('/api/auth/request-email-verify.php')
+                            : (function () {
+                                  var u =
+                                      String(base || '')
+                                          .replace(/\/+$/, '') + '/api/auth/request-email-verify.php';
+                                  var L =
+                                      typeof window.APP_LANG === 'string'
+                                          ? window.APP_LANG.trim().toLowerCase()
+                                          : '';
+                                  if (L && ['en', 'ar', 'fil', 'hi'].indexOf(L) !== -1) {
+                                      u += '?lang=' + encodeURIComponent(L);
+                                  }
+                                  return u;
+                              })();
+                    fetch(verifyUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -178,15 +196,21 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                         if (x.ok && x.j && x.j.success) {
                             if (x.j.channel && /^(orange|blue|black)$/i.test(String(x.j.channel))) {
                                 try {
-                                    localStorage.setItem('orange_storefront_channel', String(x.j.channel).toLowerCase());
+                                    if (typeof window.orangeSfPersistChannel === 'function') {
+                                        window.orangeSfPersistChannel(String(x.j.channel).toLowerCase());
+                                    } else {
+                                        localStorage.setItem('orange_storefront_channel', String(x.j.channel).toLowerCase());
+                                    }
                                 } catch (e1) {}
                             }
-                            msg.textContent = x.j.already_verified ? already : sent;
+                            msg.textContent = x.j.already_verified ? already : (x.j.cooldown ? cooldown : sent);
                             return;
                         }
-                        msg.textContent = (x.j && x.j.message) ? String(x.j.message) : err;
+                        msg.textContent = typeof window.orangeStorefrontRegisterApiError === 'function'
+                            ? window.orangeStorefrontRegisterApiError(x.j, err)
+                            : ((x.j && x.j.message) ? String(x.j.message) : err);
                     }).catch(function () {
-                        msg.textContent = err;
+                        msg.textContent = (window.APP_T && window.APP_T.api_request_failed) || err;
                     });
                 });
             })();

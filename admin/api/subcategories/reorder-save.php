@@ -36,5 +36,5 @@ try {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    json_response(['success' => false, 'message' => $e->getMessage()], 500);
+    orange_admin_api_catch($e, 'تعذر حفظ ترتيب الفئات الفرعية');
 }

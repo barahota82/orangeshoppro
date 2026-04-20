@@ -41,5 +41,5 @@ try {
         'candidates' => count($rows),
     ]);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر تنفيذ الربط');
+    orange_admin_api_catch($e, 'تعذر تنفيذ الربط');
 }

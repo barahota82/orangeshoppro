@@ -40,5 +40,5 @@ try {
         'lines' => $lines,
     ]);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر جلب كشف الحساب');
+    orange_admin_api_catch($e, 'تعذر جلب كشف الحساب');
 }

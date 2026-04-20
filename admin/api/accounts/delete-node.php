@@ -56,5 +56,5 @@ try {
     audit_log('account_delete', 'حذف حساب: ' . $label, 'accounts', $id);
     json_response(['success' => true, 'message' => 'تم حذف الحساب']);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر حذف الحساب');
+    orange_admin_api_catch($e, 'تعذر حذف الحساب');
 }

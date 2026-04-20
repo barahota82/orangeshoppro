@@ -60,5 +60,5 @@ try {
 
     json_response(['success' => true, 'products' => $rows]);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر تحميل المنتجات');
+    orange_admin_api_catch($e, 'تعذر تحميل المنتجات');
 }

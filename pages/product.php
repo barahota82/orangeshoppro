@@ -76,6 +76,33 @@ $sizingHintKeys = [
 $sizingHintKey = $sizingHintKeys[$scope] ?? '';
 $sizingText = $sizingHintKey !== '' ? t($sizingHintKey) : '';
 
+$sizingChartRows = [];
+$sizingShowFoot = false;
+$sfId = isset($product['size_family_id']) ? (int) $product['size_family_id'] : 0;
+if ($sfId > 0 && orange_table_exists($pdo, 'size_family_sizes')) {
+    $hasFootCol = orange_table_has_column($pdo, 'size_family_sizes', 'foot_length_cm');
+    $cols = 'label_ar, label_en';
+    if ($hasFootCol) {
+        $cols .= ', foot_length_cm';
+    }
+    $sst = $pdo->prepare(
+        "SELECT {$cols} FROM size_family_sizes
+         WHERE size_family_id = ? AND is_active = 1
+         ORDER BY sort_order ASC, id ASC"
+    );
+    $sst->execute([$sfId]);
+    $sizingChartRows = $sst->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    if ($hasFootCol) {
+        foreach ($sizingChartRows as $r) {
+            if (isset($r['foot_length_cm']) && $r['foot_length_cm'] !== null && trim((string) $r['foot_length_cm']) !== '') {
+                $sizingShowFoot = true;
+                break;
+            }
+        }
+    }
+}
+$showSizingGuide = $scope !== 'none' && ($sizingText !== '' || $sizingChartRows !== []);
+
 $displayName = storefront_product_display_name($product);
 $displayDesc = storefront_product_display_description($product);
 $homeUrl = storefront_url('home', $channelSlug, $lang);
@@ -199,7 +226,7 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
                 </div>
             </div>
 
-            <?php if ($scope !== 'none' && $sizingText !== ''): ?>
+            <?php if ($showSizingGuide): ?>
                 <div class="option-block product-info__sizing">
                     <button type="button" class="btn-secondary" id="productSizingOpen" onclick="openProductSizingDialog()">
                         <?php echo htmlspecialchars(t('sizing_guide')); ?>
@@ -216,11 +243,42 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
     </div>
 </div>
 
-<?php if ($scope !== 'none' && $sizingText !== ''): ?>
+<?php if ($showSizingGuide): ?>
 <dialog id="productSizingDialog" class="product-sizing-dialog">
     <div class="product-sizing-dialog__inner">
         <h3 class="product-sizing-dialog__title"><?php echo htmlspecialchars(t('sizing_guide')); ?></h3>
-        <p class="product-sizing-dialog__body"><?php echo htmlspecialchars($sizingText); ?></p>
+        <?php if ($sizingText !== ''): ?>
+            <p class="product-sizing-dialog__body"><?php echo htmlspecialchars($sizingText); ?></p>
+        <?php endif; ?>
+        <?php if ($sizingChartRows !== []): ?>
+            <div class="product-sizing-table-wrap" role="region" aria-label="<?php echo htmlspecialchars(t('sizing_guide'), ENT_QUOTES, 'UTF-8'); ?>">
+                <table class="product-sizing-table">
+                    <thead>
+                        <tr>
+                            <th scope="col"><?php echo htmlspecialchars(t('sizing_col_size'), ENT_QUOTES, 'UTF-8'); ?></th>
+                            <?php if ($sizingShowFoot): ?>
+                                <th scope="col"><?php echo htmlspecialchars(t('sizing_col_foot_cm'), ENT_QUOTES, 'UTF-8'); ?></th>
+                            <?php endif; ?>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($sizingChartRows as $srow): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars(storefront_size_chart_cell_label($srow), ENT_QUOTES, 'UTF-8'); ?></td>
+                                <?php if ($sizingShowFoot): ?>
+                                    <td><?php
+                                    $fc = $srow['foot_length_cm'] ?? null;
+                                    echo $fc !== null && trim((string) $fc) !== ''
+                                        ? htmlspecialchars((string) $fc, ENT_QUOTES, 'UTF-8')
+                                        : '—';
+                                    ?></td>
+                                <?php endif; ?>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
         <form method="dialog">
             <button type="submit" class="btn btn-secondary product-sizing-dialog__close"><?php echo htmlspecialchars(t('sizing_guide_close')); ?></button>
         </form>

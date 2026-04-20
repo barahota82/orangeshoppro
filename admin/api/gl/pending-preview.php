@@ -19,7 +19,10 @@ try {
         'lines' => $result['lines'],
     ]);
 } catch (InvalidArgumentException $e) {
-    json_response(['success' => false, 'message' => $e->getMessage()], 404);
+    if (function_exists('error_log')) {
+        error_log('[orange] gl pending-preview: ' . $e->getMessage());
+    }
+    json_response(['success' => false, 'message' => 'الحركة غير موجودة أو غير صالحة'], 404);
 } catch (Throwable $e) {
     orange_gl_api_catch_json($e, 'تعذر معاينة الحركة');
 }

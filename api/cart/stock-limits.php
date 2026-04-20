@@ -9,8 +9,9 @@ try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
     $data = get_json_input();
+    orange_storefront_apply_lang_from_payload($data);
     if (!isset($data['items']) || !is_array($data['items'])) {
-        json_response(['success' => false, 'message' => 'items required'], 422);
+        json_response(['success' => false, 'code' => 'cart_items_required', 'message' => t('checkout_cart_items_required')], 422);
     }
 
     $limits = [];
@@ -65,8 +66,5 @@ try {
 
     json_response(['success' => true, 'limits' => $limits]);
 } catch (Throwable $e) {
-    json_response([
-        'success' => false,
-        'message' => $e->getMessage(),
-    ], 500);
+    api_error($e, t('api_request_failed'));
 }

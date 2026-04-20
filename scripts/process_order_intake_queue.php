@@ -19,9 +19,13 @@ if (!orange_table_exists($pdo, 'order_intake_queue')) {
     exit(1);
 }
 
-$n = 0;
-while (orange_order_intake_process_next($pdo)) {
-    ++$n;
+try {
+    $n = 0;
+    while (orange_order_intake_process_next($pdo)) {
+        ++$n;
+    }
+    echo 'Processed ' . $n . " intake job(s).\n";
+} catch (Throwable $e) {
+    fwrite(STDERR, 'order_intake queue fatal: ' . $e->getMessage() . "\n");
+    exit(1);
 }
-
-echo 'Processed ' . $n . " intake job(s).\n";

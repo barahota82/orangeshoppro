@@ -13,14 +13,14 @@ require_once __DIR__ . '/../../includes/order_intake_queue.php';
 try {
     $token = trim((string) ($_GET['token'] ?? ''));
     if (strlen($token) !== 32 || !ctype_xdigit($token)) {
-        json_response(['success' => false, 'message' => 'Invalid token'], 400);
+        json_response(['success' => false, 'code' => 'intake_invalid_token', 'message' => t('intake_invalid_token')], 400);
     }
 
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
 
     if (!orange_table_exists($pdo, 'order_intake_queue')) {
-        json_response(['success' => false, 'message' => 'Queue not available'], 503);
+        json_response(['success' => false, 'code' => 'intake_queue_unavailable', 'message' => t('intake_queue_unavailable')], 503);
     }
 
     $st = $pdo->prepare(
@@ -30,7 +30,7 @@ try {
     $st->execute([$token]);
     $row = $st->fetch(PDO::FETCH_ASSOC);
     if (!$row) {
-        json_response(['success' => false, 'message' => 'Not found'], 404);
+        json_response(['success' => false, 'code' => 'intake_not_found', 'message' => t('intake_not_found')], 404);
     }
 
     if ($row['status'] === 'pending') {
@@ -51,7 +51,7 @@ try {
     }
 
     if (!$row) {
-        json_response(['success' => false, 'message' => 'Not found'], 404);
+        json_response(['success' => false, 'code' => 'intake_not_found', 'message' => t('intake_not_found')], 404);
     }
 
     $out = [
@@ -75,10 +75,12 @@ try {
         $out['whatsapp_url'] = (string) $row['whatsapp_url'];
     } elseif ($row['status'] === 'failed') {
         $out['success'] = false;
-        $out['message'] = (string) ($row['error_message'] ?? 'Checkout failed');
+        $out['code'] = 'processing_failed';
+        $failMsg = trim((string) ($row['error_message'] ?? ''));
+        $out['message'] = $failMsg !== '' ? $failMsg : t('checkout_failed_generic');
     }
 
     json_response($out);
 } catch (Throwable $e) {
-    json_response(['success' => false, 'message' => $e->getMessage()], 500);
+    api_error($e, t('api_request_failed'));
 }

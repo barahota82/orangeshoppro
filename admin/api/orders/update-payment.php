@@ -31,5 +31,5 @@ try {
     $pdo->prepare('UPDATE orders SET amount_paid = ? WHERE id = ?')->execute([$paid, $orderId]);
     json_response(['success' => true, 'message' => 'تم حفظ المدفوع']);
 } catch (Throwable $e) {
-    json_response(['success' => false, 'message' => $e->getMessage()], 500);
+    orange_admin_api_catch($e, 'تعذر تحديث الدفع');
 }

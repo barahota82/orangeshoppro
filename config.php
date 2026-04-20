@@ -12,6 +12,16 @@ if (!is_array($env)) {
 }
 
 if (session_status() === PHP_SESSION_NONE) {
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (string) ($_SERVER['SERVER_PORT'] ?? '') === '443';
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'domain' => '',
+        'secure' => $https,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
     session_start();
 }
 
@@ -122,8 +132,7 @@ function storefront_asset_version(): string
     $files = [
         __DIR__ . '/assets/css/main.css',
         __DIR__ . '/assets/css/theme-orange.css',
-        __DIR__ . '/assets/css/theme-blue.css',
-        __DIR__ . '/assets/css/theme-black.css',
+        __DIR__ . '/assets/css/theme-store-unified.css',
         __DIR__ . '/assets/js/app.js',
         __DIR__ . '/assets/js/cart.js',
         __DIR__ . '/assets/js/lang.js',
@@ -228,6 +237,17 @@ function current_lang(): string {
     return in_array($lang, $allowed, true) ? $lang : 'en';
 }
 
+/**
+ * يضبط $_GET['lang'] من حقل lang في جسم طلب JSON حتى تُترجم رسائل t() حتى بدون ?lang= في الرابط.
+ */
+function orange_storefront_apply_lang_from_payload(array $data): void
+{
+    $lb = isset($data['lang']) ? strtolower(trim((string) $data['lang'])) : '';
+    if (in_array($lb, ['en', 'ar', 'fil', 'hi'], true)) {
+        $_GET['lang'] = $lb;
+    }
+}
+
 /** Storefront language picker labels (اسم كامل يظهر في القائمة المنسدلة وفي زر اللغة على سطح المكتب). */
 function storefront_lang_options(): array {
     return [
@@ -238,10 +258,70 @@ function storefront_lang_options(): array {
     ];
 }
 
-function current_channel_slug(): string {
-    return isset($_GET['channel']) && $_GET['channel'] !== ''
-        ? preg_replace('/[^a-z0-9\-]/i', '', (string)$_GET['channel'])
-        : 'orange';
+/**
+ * آخر قناة واجهة — كوكي يُكمّل localStorage ليعمل إعادة التوجيه من index.php وروابط بدون ?channel=.
+ */
+function orange_storefront_channel_cookie_name(): string
+{
+    return 'orange_sf_ch';
+}
+
+function orange_storefront_channel_cookie_path(): string
+{
+    $p = PUBLIC_BASE_PATH;
+    if ($p === '' || $p === '/') {
+        return '/';
+    }
+
+    return rtrim($p, '/') . '/';
+}
+
+function orange_storefront_read_saved_channel_slug(): ?string
+{
+    $name = orange_storefront_channel_cookie_name();
+    $raw = isset($_COOKIE[$name]) ? (string) $_COOKIE[$name] : '';
+    $slug = strtolower((string) (preg_replace('/[^a-z0-9\-]/i', '', $raw) ?? ''));
+    if (in_array($slug, ['orange', 'blue', 'black'], true)) {
+        return $slug;
+    }
+
+    return null;
+}
+
+function orange_storefront_send_channel_cookie(string $slug): void
+{
+    if (headers_sent()) {
+        return;
+    }
+    $slug = strtolower((string) (preg_replace('/[^a-z0-9\-]/i', '', $slug) ?? ''));
+    if (!in_array($slug, ['orange', 'blue', 'black'], true)) {
+        return;
+    }
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+        || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
+    setcookie(orange_storefront_channel_cookie_name(), $slug, [
+        'expires' => time() + 3600 * 24 * 400,
+        'path' => orange_storefront_channel_cookie_path(),
+        'secure' => $https,
+        'httponly' => false,
+        'samesite' => 'Lax',
+    ]);
+}
+
+function current_channel_slug(): string
+{
+    if (isset($_GET['channel']) && (string) $_GET['channel'] !== '') {
+        $s = preg_replace('/[^a-z0-9\-]/i', '', (string) $_GET['channel']);
+
+        return $s !== '' ? $s : 'orange';
+    }
+    $fromCookie = orange_storefront_read_saved_channel_slug();
+    if ($fromCookie !== null) {
+        return $fromCookie;
+    }
+
+    return 'orange';
 }
 
 function get_channel_by_slug(string $slug): ?array {
@@ -250,6 +330,25 @@ function get_channel_by_slug(string $slug): ?array {
     $stmt->execute([$slug]);
     $row = $stmt->fetch();
     return $row ?: null;
+}
+
+/**
+ * الاسم الظاهر للقناة فقط (يختلف بين WEB / ONLINE / TIKTOK): من حقل name أو من slug إن كان فارغاً.
+ *
+ * @param array<string,mixed> $channel
+ */
+function storefront_channel_display_name(array $channel, string $channelSlug): string {
+    $n = trim((string) ($channel['name'] ?? ''));
+    if ($n !== '') {
+        return $n;
+    }
+    $slug = strtolower((string) (preg_replace('/[^a-z0-9\-]/i', '', $channelSlug) ?? ''));
+    return match ($slug) {
+        'black' => 'WEB',
+        'blue' => 'ONLINE',
+        'orange' => 'TIKTOK',
+        default => t('storefront_brand'),
+    };
 }
 
 /**
@@ -491,6 +590,26 @@ function storefront_product_display_description(array $product): string
 }
 
 /**
+ * تسمية صف مقاس في جدول عائلة المقاسات حسب لغة الواجهة (أعمدة label_ar / label_en).
+ *
+ * @param array<string,mixed> $row
+ */
+function storefront_size_chart_cell_label(array $row): string
+{
+    $lang = current_lang();
+    $ar = trim((string) ($row['label_ar'] ?? ''));
+    $en = trim((string) ($row['label_en'] ?? ''));
+    if ($lang === 'ar') {
+        return $ar !== '' ? $ar : $en;
+    }
+    if ($lang === 'en') {
+        return $en !== '' ? $en : $ar;
+    }
+
+    return $en !== '' ? $en : $ar;
+}
+
+/**
  * عنوان SEO للمنتج بلغة الواجهة الحالية؛ إن وُجد حقل seo_meta_title_* يُستخدم وإلا اسم العرض.
  */
 function storefront_product_seo_meta_title(array $product): string
@@ -550,12 +669,15 @@ function get_translations(): array {
             'all' => 'All',
             'currency_kd' => 'KD',
             'product_not_found' => 'This product could not be found.',
+            'product_invalid_id' => 'This product link is not valid.',
             'product_back_to_shop' => 'Back to shop',
             'product_gallery_prev' => 'Previous image',
             'product_gallery_next' => 'Next image',
             'product_gallery_dots' => 'Gallery images',
             'sizing_guide' => 'Size guide (indicative)',
             'sizing_guide_close' => 'Close',
+            'sizing_col_size' => 'Size',
+            'sizing_col_foot_cm' => 'Foot length (cm)',
             'sizing_hint_upper' => 'This product uses the upper-body size chart (indicative).',
             'sizing_hint_lower' => 'This product uses the lower-body size chart (indicative).',
             'sizing_hint_both' => 'This product uses both upper- and lower-body size charts (indicative).',
@@ -617,6 +739,14 @@ function get_translations(): array {
             'order_number' => 'Order Number',
             'checkout_queue_wait' => 'Processing your order…',
             'checkout_queue_timeout' => 'Order queue timeout. Try again.',
+            'checkout_cart_items_required' => 'Your cart has no items to order.',
+            'checkout_invalid_channel' => 'This store channel is not available. Refresh the page and try again.',
+            'checkout_internal_error' => 'We could not process your order. Please try again or contact the store.',
+            'checkout_queue_busy' => 'The order queue is busy. Please wait…',
+            'checkout_failed_generic' => 'We could not complete your order. Please try again or contact the store.',
+            'intake_invalid_token' => 'This order link is invalid.',
+            'intake_queue_unavailable' => 'Order processing is temporarily unavailable. Try again later.',
+            'intake_not_found' => 'This order could not be found. Start a new checkout or contact the store.',
             'empty_cart' => 'Cart is empty.',
             'cart_empty_subtitle' => 'Browse the store and add products to place your order.',
             'cart_remove_confirm' => 'Remove this product from your cart?',
@@ -684,8 +814,14 @@ function get_translations(): array {
             'storefront_register_email_label' => 'Email',
             'storefront_register_submit' => 'Send confirmation link',
             'storefront_register_sent' => 'Check your inbox and open the confirmation link (check spam too).',
+            'storefront_register_cooldown' => 'You requested a link just now. Wait about a minute before trying again, or check your inbox and spam folder.',
             'storefront_register_already_verified' => 'This email is already confirmed. You can continue shopping.',
+            'storefront_register_mail_failed' => 'The confirmation email could not be sent. The store may need to configure outgoing mail. Try again later or contact support.',
+            'storefront_register_service_unavailable' => 'Sign-up is temporarily unavailable. Try again later.',
+            'storefront_register_invalid_phone' => 'Enter a valid phone number.',
             'storefront_register_error' => 'Something went wrong. Try again later.',
+            'api_request_failed' => 'We could not complete this request. Please try again later.',
+            'api_ok' => 'OK',
             'storefront_account_signed_in' => 'Signed in as',
             'storefront_logout' => 'Sign out',
             'storefront_verify_title' => 'Email confirmation',
@@ -694,7 +830,7 @@ function get_translations(): array {
             'storefront_verify_bad_token' => 'This confirmation link is invalid or was already used.',
             'storefront_verify_expired' => 'This link expired. Request a new link from the sign-up page.',
             'storefront_your_channel' => 'Your registered store channel:',
-            'storefront_pwa_install_hint' => 'On your phone: use the browser menu «Add to Home Screen». Save this page while you are on this channel so the shortcut opens the same store.',
+            'storefront_pwa_install_hint' => 'On your phone: use the browser menu «Add to Home Screen» to add this store to your home screen.',
             'storefront_install_app_btn' => 'Install',
             'storefront_install_app_aria' => 'Add this store to your home screen',
             'storefront_install_modal_title' => 'Add to home screen',
@@ -710,12 +846,15 @@ function get_translations(): array {
             'all' => 'الكل',
             'currency_kd' => 'د.ك',
             'product_not_found' => 'تعذّر العثور على هذا المنتج.',
+            'product_invalid_id' => 'رابط المنتج غير صالح.',
             'product_back_to_shop' => 'العودة إلى المتجر',
             'product_gallery_prev' => 'الصورة السابقة',
             'product_gallery_next' => 'الصورة التالية',
             'product_gallery_dots' => 'صور المنتج',
             'sizing_guide' => 'جدول المقاسات (إرشادي)',
             'sizing_guide_close' => 'إغلاق',
+            'sizing_col_size' => 'المقاس',
+            'sizing_col_foot_cm' => 'طول القدم (سم)',
             'sizing_hint_upper' => 'هذا المنتج: جدول مقاسات علوية (إرشادي).',
             'sizing_hint_lower' => 'هذا المنتج: جدول مقاسات سفلية (إرشادي).',
             'sizing_hint_both' => 'هذا المنتج: جداول علوية وسفلية (إرشادي).',
@@ -777,6 +916,14 @@ function get_translations(): array {
             'order_number' => 'رقم الطلب',
             'checkout_queue_wait' => 'جاري معالجة طلبك…',
             'checkout_queue_timeout' => 'انتهت مهلة طابور الطلبات. أعد المحاولة.',
+            'checkout_cart_items_required' => 'لا توجد أصناف في السلة لإتمام الطلب.',
+            'checkout_invalid_channel' => 'قناة المتجر غير متاحة. حدّث الصفحة وأعد المحاولة.',
+            'checkout_internal_error' => 'تعذّر معالجة الطلب. أعد المحاولة أو تواصل مع المتجر.',
+            'checkout_queue_busy' => 'طابور الطلبات مشغول. يرجى الانتظار…',
+            'checkout_failed_generic' => 'تعذّر إتمام الطلب. أعد المحاولة أو تواصل مع المتجر.',
+            'intake_invalid_token' => 'رابط الطلب غير صالح.',
+            'intake_queue_unavailable' => 'معالجة الطلبات غير متاحة مؤقتاً. حاول لاحقاً.',
+            'intake_not_found' => 'تعذّر العثور على هذا الطلب. أعد الطلب أو تواصل مع المتجر.',
             'empty_cart' => 'السلة فارغة',
             'cart_empty_subtitle' => 'تصفّح المتجر وأضف منتجاتك ثم أرسل الطلب.',
             'cart_remove_confirm' => 'إزالة هذا المنتج من السلة؟',
@@ -844,8 +991,13 @@ function get_translations(): array {
             'storefront_register_email_label' => 'البريد الإلكتروني',
             'storefront_register_submit' => 'إرسال رابط التأكيد',
             'storefront_register_sent' => 'تحقّق من بريدك وافتح رابط التأكيد (وراجع البريد غير الهام).',
+            'storefront_register_cooldown' => 'طلبت الرابط للتو. انتظر نحو دقيقة ثم أعد المحاولة، أو راجع بريدك والبريد غير الهام.',
             'storefront_register_already_verified' => 'هذا البريد مؤكَّد مسبقاً — يمكنك متابعة التسوق.',
+            'storefront_register_mail_failed' => 'تعذّر إرسال بريد التأكيد. قد يحتاج المتجر لضبط البريد الصادر. حاول لاحقاً أو تواصل مع الدعم.',
+            'storefront_register_service_unavailable' => 'التسجيل غير متاح مؤقتاً. حاول لاحقاً.',
+            'storefront_register_invalid_phone' => 'أدخل رقم هاتف صالحاً.',
             'storefront_register_error' => 'تعذّر الإكمال. حاول لاحقاً.',
+            'api_request_failed' => 'تعذّر إكمال الطلب. حاول لاحقاً.',
             'storefront_account_signed_in' => 'مسجّل الدخول كـ',
             'storefront_logout' => 'تسجيل الخروج',
             'storefront_verify_title' => 'تأكيد البريد',
@@ -854,7 +1006,7 @@ function get_translations(): array {
             'storefront_verify_bad_token' => 'رابط التأكيد غير صالح أو تم استخدامه.',
             'storefront_verify_expired' => 'انتهت صلاحية الرابط. اطلب رابطاً جديداً من صفحة التسجيل.',
             'storefront_your_channel' => 'قناة المتجر المسجّلة لحسابك:',
-            'storefront_pwa_install_hint' => 'على الجوال: من قائمة المتصفح اختر «إضافة إلى الشاشة الرئيسية». احفظ الصفحة وأنت على نفس القناة لتفتح الاختصار نفس المتجر.',
+            'storefront_pwa_install_hint' => 'على الجوال: من قائمة المتصفح اختر «إضافة إلى الشاشة الرئيسية» لإضافة نفس واجهة المتجر إلى الشاشة الرئيسية.',
             'storefront_install_app_btn' => 'تثبيت',
             'storefront_install_app_aria' => 'إضافة المتجر إلى الشاشة الرئيسية',
             'storefront_install_modal_title' => 'إضافة إلى الشاشة الرئيسية',
@@ -870,12 +1022,15 @@ function get_translations(): array {
             'all' => 'Lahat',
             'currency_kd' => 'KD',
             'product_not_found' => 'Hindi mahanap ang produktong ito.',
+            'product_invalid_id' => 'Hindi wasto ang link ng produkto.',
             'product_back_to_shop' => 'Bumalik sa tindahan',
             'product_gallery_prev' => 'Nakaraang larawan',
             'product_gallery_next' => 'Susunod na larawan',
             'product_gallery_dots' => 'Mga larawan ng produkto',
             'sizing_guide' => 'Gabay sa sukat (pang-reference)',
             'sizing_guide_close' => 'Isara',
+            'sizing_col_size' => 'Sukat',
+            'sizing_col_foot_cm' => 'Haba ng paa (cm)',
             'sizing_hint_upper' => 'Ang produktong ito ay gumagamit ng tsart ng sukat sa itaas ng katawan (pang-reference).',
             'sizing_hint_lower' => 'Ang produktong ito ay gumagamit ng tsart ng sukat sa ibaba ng katawan (pang-reference).',
             'sizing_hint_both' => 'Ang produktong ito ay gumagamit ng tsart sa itaas at ibaba ng katawan (pang-reference).',
@@ -937,6 +1092,14 @@ function get_translations(): array {
             'order_number' => 'Order Number',
             'checkout_queue_wait' => 'Pinoproseso ang order…',
             'checkout_queue_timeout' => 'Timeout sa pila ng order. Subukan ulit.',
+            'checkout_cart_items_required' => 'Walang item sa cart para i-order.',
+            'checkout_invalid_channel' => 'Hindi available ang channel ng tindahan. I-refresh ang page at subukan ulit.',
+            'checkout_internal_error' => 'Hindi naproseso ang order. Subukan ulit o makipag-ugnayan sa tindahan.',
+            'checkout_queue_busy' => 'Abala ang pila ng order. Maghintay…',
+            'checkout_failed_generic' => 'Hindi natapos ang order. Subukan ulit o makipag-ugnayan sa tindahan.',
+            'intake_invalid_token' => 'Hindi wasto ang link ng order.',
+            'intake_queue_unavailable' => 'Hindi pansamantala available ang pagproseso ng order. Subukan mamaya.',
+            'intake_not_found' => 'Hindi mahanap ang order. Magsimula ng bagong checkout o makipag-ugnayan.',
             'empty_cart' => 'Walang laman ang cart.',
             'cart_empty_subtitle' => 'Mag-browse at magdagdag ng produkto para mag-order.',
             'cart_remove_confirm' => 'Alisin ang produktong ito sa cart?',
@@ -1004,8 +1167,14 @@ function get_translations(): array {
             'storefront_register_email_label' => 'Email',
             'storefront_register_submit' => 'Send confirmation link',
             'storefront_register_sent' => 'Tingnan ang inbox mo at buksan ang link (spam folder rin).',
+            'storefront_register_cooldown' => 'Kaka-request mo lang ng link. Maghintay ng halos isang minuto bago ulitin, o tingnan ang inbox at spam.',
             'storefront_register_already_verified' => 'Na-confirm na ang email na ito. Puwede ka nang mag-shopping.',
+            'storefront_register_mail_failed' => 'Hindi naipadala ang confirmation email. Baka kailangan i-set up ng tindahan ang outgoing mail. Subukan mamaya o makipag-ugnayan.',
+            'storefront_register_service_unavailable' => 'Hindi pansamantala available ang sign-up. Subukan mamaya.',
+            'storefront_register_invalid_phone' => 'Maglagay ng wastong numero ng telepono.',
             'storefront_register_error' => 'May mali. Subukan ulit mamaya.',
+            'api_request_failed' => 'Hindi natapos ang hiling. Subukan ulit mamaya.',
+            'api_ok' => 'OK',
             'storefront_account_signed_in' => 'Naka-sign in bilang',
             'storefront_logout' => 'Sign out',
             'storefront_verify_title' => 'Email confirmation',
@@ -1014,7 +1183,7 @@ function get_translations(): array {
             'storefront_verify_bad_token' => 'Hindi wasto ang link o nagamit na.',
             'storefront_verify_expired' => 'Expired ang link. Humingi ng bago sa sign-up page.',
             'storefront_your_channel' => 'Ang naka-register na channel ng tindahan:',
-            'storefront_pwa_install_hint' => 'Sa phone: gamitin ang browser menu → «Add to Home Screen». I-save ang page habang nasa channel na ito para pareho ang bubuksan ng shortcut.',
+            'storefront_pwa_install_hint' => 'Sa phone: gamitin ang browser menu → «Add to Home Screen» para idagdag ang tindahan sa home screen.',
             'storefront_install_app_btn' => 'Install',
             'storefront_install_app_aria' => 'Idagdag ang tindahan sa home screen',
             'storefront_install_modal_title' => 'Idagdag sa home screen',
@@ -1030,12 +1199,15 @@ function get_translations(): array {
             'all' => 'सभी',
             'currency_kd' => 'KD',
             'product_not_found' => 'यह उत्पाद नहीं मिला।',
+            'product_invalid_id' => 'उत्पाद लिंक अमान्य है।',
             'product_back_to_shop' => 'दुकान पर वापस जाएँ',
             'product_gallery_prev' => 'पिछली छवि',
             'product_gallery_next' => 'अगली छवि',
             'product_gallery_dots' => 'उत्पाद छवियाँ',
             'sizing_guide' => 'साइज़ गाइड (संकेतक)',
             'sizing_guide_close' => 'बंद करें',
+            'sizing_col_size' => 'साइज़',
+            'sizing_col_foot_cm' => 'पैर की लंबाई (सेमी)',
             'sizing_hint_upper' => 'यह उत्पाद ऊपरी शरीर के साइज़ चार्ट का उपयोग करता है (संकेतक)।',
             'sizing_hint_lower' => 'यह उत्पाद निचले शरीर के साइज़ चार्ट का उपयोग करता है (संकेतक)।',
             'sizing_hint_both' => 'यह उत्पाद ऊपरी और निचले शरीर दोनों के साइज़ चार्ट का उपयोग करता है (संकेतक)।',
@@ -1097,6 +1269,14 @@ function get_translations(): array {
             'order_number' => 'ऑर्डर नंबर',
             'checkout_queue_wait' => 'ऑर्डर प्रोसेस हो रहा है…',
             'checkout_queue_timeout' => 'ऑर्डर कतार का समय समाप्त। पुनः प्रयास करें।',
+            'checkout_cart_items_required' => 'कार्ट में ऑर्डर के लिए कोई वस्तु नहीं है।',
+            'checkout_invalid_channel' => 'यह स्टोर चैनल उपलब्ध नहीं है। पेज रीफ़्रेश करके पुनः प्रयास करें।',
+            'checkout_internal_error' => 'ऑर्डर प्रोसेस नहीं हो सका। पुनः प्रयास करें या स्टोर से संपर्क करें।',
+            'checkout_queue_busy' => 'ऑर्डर कतार व्यस्त है। कृपया प्रतीक्षा करें…',
+            'checkout_failed_generic' => 'ऑर्डर पूरा नहीं हो सका। पुनः प्रयास करें या संपर्क करें।',
+            'intake_invalid_token' => 'ऑर्डर लिंक अमान्य है।',
+            'intake_queue_unavailable' => 'ऑर्डर प्रोसेसिंग अभी उपलब्ध नहीं है। बाद में कोशिश करें।',
+            'intake_not_found' => 'यह ऑर्डर नहीं मिला। नया चेकआउट शुरू करें या संपर्क करें।',
             'empty_cart' => 'कार्ट खाली है।',
             'cart_empty_subtitle' => 'स्टोर ब्राउज़ करें और ऑर्डर के लिए उत्पाद जोड़ें।',
             'cart_remove_confirm' => 'इस उत्पाद को कार्ट से हटाएं?',
@@ -1164,8 +1344,14 @@ function get_translations(): array {
             'storefront_register_email_label' => 'ईमेल',
             'storefront_register_submit' => 'पुष्टि लिंक भेजें',
             'storefront_register_sent' => 'अपना इनबॉक्स देखें और लिंक खोलें (स्पैम भी देखें)।',
+            'storefront_register_cooldown' => 'अभी-अभी आपने लिंक माँगा है। लगभग एक मिनट बाद फिर कोशिश करें, या इनबॉक्स/स्पैम देखें।',
             'storefront_register_already_verified' => 'यह ईमेल पहले से पुष्ट है — खरीदारी जारी रख सकते हैं।',
+            'storefront_register_mail_failed' => 'पुष्टि ईमेल नहीं भेजा जा सका। स्टोर को आउटगोइंग मेल सेट करना पड़ सकता है। बाद में कोशिश करें या संपर्क करें।',
+            'storefront_register_service_unavailable' => 'साइन-अप अभी उपलब्ध नहीं है। बाद में कोशिश करें।',
+            'storefront_register_invalid_phone' => 'वैध फ़ोन नंबर दर्ज करें।',
             'storefront_register_error' => 'कुछ गलत हुआ। बाद में कोशिश करें।',
+            'api_request_failed' => 'अनुरोध पूरा नहीं हो सका। बाद में कोशिश करें।',
+            'api_ok' => 'ठीक',
             'storefront_account_signed_in' => 'साइन इन:',
             'storefront_logout' => 'साइन आउट',
             'storefront_verify_title' => 'ईमेल पुष्टि',
@@ -1174,7 +1360,7 @@ function get_translations(): array {
             'storefront_verify_bad_token' => 'लिंक अमान्य है या उपयोग हो चुका है।',
             'storefront_verify_expired' => 'लिंक की समय सीमा समाप्त। साइन अप पेज से नया लिंक माँगें।',
             'storefront_your_channel' => 'आपका पंजीकृत स्टोर चैनल:',
-            'storefront_pwa_install_hint' => 'फ़ोन पर: ब्राउज़र मेनू से «Add to Home Screen»। इसी चैनल वाले पेज पर रहकर सेव करें ताकि शॉर्टकट वही स्टोर खोले।',
+            'storefront_pwa_install_hint' => 'फ़ोन पर: ब्राउज़र मेनू से «Add to Home Screen» चुनकर यही स्टोर होम स्क्रीन पर जोड़ें।',
             'storefront_install_app_btn' => 'इंस्टॉल',
             'storefront_install_app_aria' => 'स्टोर को होम स्क्रीन पर जोड़ें',
             'storefront_install_modal_title' => 'होम स्क्रीन पर जोड़ें',
@@ -1297,6 +1483,7 @@ function api_error(Throwable $e, string $userMessage): void
     }
     $payload = [
         'success' => false,
+        'code' => 'server_error',
         'message' => $userMessage,
     ];
     $debug = getenv('ORANGE_API_DEBUG');
@@ -1304,6 +1491,17 @@ function api_error(Throwable $e, string $userMessage): void
         $payload['debug'] = $e->getMessage();
     }
     json_response($payload, 500);
+}
+
+/**
+ * واجهات الأدمن: أخطاء منطق الأعمال (RuntimeException) تُعرض للمستخدم؛ غير ذلك api_error (بدون تسريب تقني).
+ */
+function orange_admin_api_catch(Throwable $e, string $genericMessage, int $businessHttpCode = 422): void
+{
+    if ($e instanceof RuntimeException) {
+        json_response(['success' => false, 'message' => $e->getMessage()], $businessHttpCode);
+    }
+    api_error($e, $genericMessage);
 }
 
 function get_json_input(): array {
@@ -1323,6 +1521,9 @@ function current_admin(): ?array {
 }
 
 function admin_login(int $adminId): void {
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_regenerate_id(true);
+    }
     $_SESSION['admin_id'] = $adminId;
 }
 

@@ -40,5 +40,5 @@ try {
         : ('تمت معالجة ' . $processed . ' ' . ($processed === 1 ? 'مهمة' : 'مهام'));
     json_response(['success' => true, 'processed' => $processed, 'message' => $msg]);
 } catch (Throwable $e) {
-    json_response(['success' => false, 'message' => $e->getMessage()], 500);
+    orange_admin_api_catch($e, 'تعذر معالجة الطابور');
 }

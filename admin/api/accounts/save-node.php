@@ -146,5 +146,5 @@ try {
         $pdo->query('SELECT RELEASE_LOCK(' . $pdo->quote($lock) . ')');
     }
 } catch (Throwable $e) {
-    api_error($e, 'تعذر حفظ الحساب');
+    orange_admin_api_catch($e, 'تعذر حفظ الحساب');
 }

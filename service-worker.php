@@ -16,8 +16,6 @@ $pub = PUBLIC_BASE_PATH === '' ? '' : PUBLIC_BASE_PATH;
 $precacheRel = [
     storefront_asset_url('/assets/css/main.css'),
     storefront_asset_url('/assets/css/theme-orange.css'),
-    storefront_asset_url('/assets/css/theme-blue.css'),
-    storefront_asset_url('/assets/css/theme-black.css'),
     storefront_asset_url('/assets/js/lang.js'),
     storefront_asset_url('/assets/js/app.js'),
     storefront_asset_url('/assets/js/cart.js'),

@@ -33,5 +33,5 @@ try {
     audit_log('order_intake_retry', 'إعادة طلب ويب إلى طابور الانتظار #' . $id, 'order_intake_queue', $id);
     json_response(['success' => true, 'message' => 'أُعيد الصف إلى قيد الانتظار']);
 } catch (Throwable $e) {
-    json_response(['success' => false, 'message' => $e->getMessage()], 500);
+    orange_admin_api_catch($e, 'تعذر إعادة المحاولة');
 }

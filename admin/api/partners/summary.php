@@ -15,5 +15,5 @@ try {
     $rep = orange_partner_summary_report($pdo, $includeAging);
     json_response(array_merge(['success' => true], $rep));
 } catch (Throwable $e) {
-    api_error($e, 'تعذر بناء ملخص الذمم');
+    orange_admin_api_catch($e, 'تعذر بناء ملخص الذمم');
 }

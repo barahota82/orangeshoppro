@@ -56,5 +56,5 @@ try {
 
     json_response(['success' => true, 'accounts' => $out]);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر البحث في الحسابات');
+    orange_admin_api_catch($e, 'تعذر البحث في الحسابات');
 }

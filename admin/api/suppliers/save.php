@@ -95,5 +95,5 @@ try {
     audit_log('supplier_create', 'مورد جديد: ' . $name, 'suppliers', $newId);
     json_response(['success' => true, 'message' => 'تم إضافة المورد', 'id' => $newId]);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر حفظ المورد');
+    orange_admin_api_catch($e, 'تعذر حفظ المورد');
 }

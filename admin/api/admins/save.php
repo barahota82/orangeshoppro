@@ -77,5 +77,5 @@ try {
     audit_log('admin_update', 'تحديث مستخدم إدارة #' . $id, 'admins', $id);
     json_response(['success' => true, 'message' => 'تم حفظ المستخدم']);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر حفظ المستخدم');
+    orange_admin_api_catch($e, 'تعذر حفظ المستخدم');
 }

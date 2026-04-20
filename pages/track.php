@@ -204,6 +204,7 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
         return;
     }
     var sent = <?php echo json_encode(t('storefront_register_sent'), JSON_UNESCAPED_UNICODE); ?>;
+    var cooldown = <?php echo json_encode(t('storefront_register_cooldown'), JSON_UNESCAPED_UNICODE); ?>;
     var already = <?php echo json_encode(t('storefront_register_already_verified'), JSON_UNESCAPED_UNICODE); ?>;
     var err = <?php echo json_encode(t('storefront_register_error'), JSON_UNESCAPED_UNICODE); ?>;
     var trackSignupT = window.ORANGE_TRACK_SIGNUP || {};
@@ -406,11 +407,23 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
                           '&phone=' +
                           encodeURIComponent(vph)
                   )
-                : (String(window.STOREFRONT_BASE || '').replace(/\/+$/, '') || '') +
-                  '/api/orders/get-order.php?order_number=' +
-                  encodeURIComponent(onum) +
-                  '&phone=' +
-                  encodeURIComponent(vph);
+                : (function () {
+                      var b = String(window.STOREFRONT_BASE || '').replace(/\/+$/, '') || '';
+                      var u =
+                          b +
+                          '/api/orders/get-order.php?order_number=' +
+                          encodeURIComponent(onum) +
+                          '&phone=' +
+                          encodeURIComponent(vph);
+                      var L =
+                          typeof window.APP_LANG === 'string'
+                              ? window.APP_LANG.trim().toLowerCase()
+                              : '';
+                      if (L && ['en', 'ar', 'fil', 'hi'].indexOf(L) !== -1) {
+                          u += '&lang=' + encodeURIComponent(L);
+                      }
+                      return u;
+                  })();
         verifyOrderBtn.disabled = true;
         fetch(urlBase)
             .then(function (r) {
@@ -427,11 +440,19 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
                     verifyFeedbackEl.textContent = trackSignupT.verify_ok || '';
                     return;
                 }
-                verifyFeedbackEl.textContent = trackSignupT.verify_fail || trackSignupT.order_mismatch || '';
+                var mappedVerify =
+                    typeof window.orangeCheckoutApiMessage === 'function'
+                        ? window.orangeCheckoutApiMessage(x.j || {})
+                        : '';
+                verifyFeedbackEl.textContent =
+                    mappedVerify || trackSignupT.verify_fail || trackSignupT.order_mismatch || '';
             })
             .catch(function () {
                 verifyOrderBtn.disabled = false;
-                verifyFeedbackEl.textContent = trackSignupT.verify_fail || '';
+                verifyFeedbackEl.textContent =
+                    (window.APP_T && window.APP_T.api_request_failed) ||
+                    trackSignupT.verify_fail ||
+                    '';
             });
     });
 
@@ -461,8 +482,18 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
         var apiUrl =
             typeof storefrontApiUrl === 'function'
                 ? storefrontApiUrl('/api/auth/request-email-verify.php')
-                : (String(window.STOREFRONT_BASE || '').replace(/\/+$/, '') || '') +
-                  '/api/auth/request-email-verify.php';
+                : (function () {
+                      var b = String(window.STOREFRONT_BASE || '').replace(/\/+$/, '') || '';
+                      var u = b + '/api/auth/request-email-verify.php';
+                      var L =
+                          typeof window.APP_LANG === 'string'
+                              ? window.APP_LANG.trim().toLowerCase()
+                              : '';
+                      if (L && ['en', 'ar', 'fil', 'hi'].indexOf(L) !== -1) {
+                          u += '?lang=' + encodeURIComponent(L);
+                      }
+                      return u;
+                  })();
         fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -488,21 +519,22 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
                 if (x.ok && x.j && x.j.success) {
                     if (x.j.channel && /^(orange|blue|black)$/i.test(String(x.j.channel))) {
                         try {
-                            localStorage.setItem('orange_storefront_channel', String(x.j.channel).toLowerCase());
+                            if (typeof window.orangeSfPersistChannel === 'function') {
+                                window.orangeSfPersistChannel(String(x.j.channel).toLowerCase());
+                            } else {
+                                localStorage.setItem('orange_storefront_channel', String(x.j.channel).toLowerCase());
+                            }
                         } catch (e1) {}
                     }
-                    msgEl.textContent = x.j.already_verified ? already : sent;
+                    msgEl.textContent = x.j.already_verified ? already : (x.j.cooldown ? cooldown : sent);
                     return;
                 }
-                var c = x.j && x.j.code ? String(x.j.code) : '';
-                if (c === 'order_not_found' || c === 'order_link_mismatch' || c === 'signup_phone_mismatch' || x.status === 404) {
-                    msgEl.textContent = trackSignupT.order_mismatch || (x.j && x.j.message ? String(x.j.message) : err);
-                    return;
-                }
-                msgEl.textContent = x.j && x.j.message ? String(x.j.message) : err;
+                msgEl.textContent = typeof window.orangeStorefrontRegisterApiError === 'function'
+                    ? window.orangeStorefrontRegisterApiError(x.j, err)
+                    : (x.j && x.j.message ? String(x.j.message) : err);
             })
             .catch(function () {
-                msgEl.textContent = err;
+                msgEl.textContent = (window.APP_T && window.APP_T.api_request_failed) || err;
             });
     }
 

@@ -24,8 +24,5 @@ try {
         'categories' => $categories
     ]);
 } catch (Throwable $e) {
-    json_response([
-        'success' => false,
-        'message' => $e->getMessage()
-    ], 500);
+    api_error($e, t('api_request_failed'));
 }

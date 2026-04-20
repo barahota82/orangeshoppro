@@ -28,5 +28,5 @@ try {
     }
     json_response(array_merge(['success' => true], $rep));
 } catch (Throwable $e) {
-    api_error($e, 'تعذر حساب مطابقة الدليل');
+    orange_admin_api_catch($e, 'تعذر حساب مطابقة الدليل');
 }

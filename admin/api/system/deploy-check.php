@@ -52,9 +52,5 @@ try {
         'hint' => 'بعد النشر: يجب أن تكون markers الثلاثة true. Optional: ضع ORANGE_BUILD_REF في .env.php (نص مرجعي من الـ CI) ليظهر هنا.',
     ]);
 } catch (Throwable $e) {
-    json_response([
-        'success' => false,
-        'message' => 'تعذر فحص النشر',
-        'error' => $e->getMessage(),
-    ], 500);
+    orange_admin_api_catch($e, 'تعذر فحص النشر');
 }

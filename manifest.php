@@ -9,7 +9,9 @@ require_once __DIR__ . '/includes/storefront_account.php';
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
-$slug = isset($_GET['channel']) ? (string) $_GET['channel'] : 'orange';
+$slug = isset($_GET['channel']) && (string) $_GET['channel'] !== ''
+    ? (string) $_GET['channel']
+    : (orange_storefront_read_saved_channel_slug() ?? 'orange');
 $slug = orange_storefront_valid_channel_slug($pdo, $slug);
 
 $lang = isset($_GET['lang']) ? strtolower(trim((string) $_GET['lang'])) : 'en';
@@ -20,7 +22,19 @@ if (!in_array($lang, ['en', 'ar', 'fil', 'hi'], true)) {
 $startUrl = storefront_url('home', $slug, $lang);
 $scope = PUBLIC_BASE_PATH === '' ? '/' : rtrim(PUBLIC_BASE_PATH, '/') . '/';
 
+/* لون PWA موحّد — اسم التطبيق يتبع القناة (WEB / ONLINE / TIKTOK) */
 $themeColor = '#ff6a00';
+$ch = get_channel_by_slug($slug);
+$fullName = storefront_channel_display_name($ch ?? ['name' => ''], $slug);
+
+$shortName = $fullName;
+if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+    if (mb_strlen($shortName, 'UTF-8') > 12) {
+        $shortName = mb_substr($shortName, 0, 12, 'UTF-8') . '…';
+    }
+} elseif (strlen($shortName) > 12) {
+    $shortName = substr($shortName, 0, 12) . '…';
+}
 
 $pub = PUBLIC_BASE_PATH === '' ? '' : PUBLIC_BASE_PATH;
 /** روابط مطلقة: Chrome/Edge على الويندوز يعتمدون عليها لأيقونة التثبيت والاختصار */
@@ -31,9 +45,9 @@ $pwaIconSrc = static function (string $file) use ($pub): string {
 };
 
 $manifest = [
-    'name' => 'Orange Store',
-    'short_name' => 'Orange Store',
-    'description' => 'Orange Store',
+    'name' => $fullName,
+    'short_name' => $shortName,
+    'description' => $fullName,
     'start_url' => $startUrl,
     'scope' => $scope,
     'display' => 'standalone',

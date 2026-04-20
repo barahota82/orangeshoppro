@@ -16,6 +16,24 @@ function orange_order_intake_snip_message(string $msg, int $max = 500): string
 }
 
 /**
+ * نص خطأ آمن لحقل order_intake_queue.error_message (لا يُخزَّن نص PDO/SQL).
+ */
+function orange_order_intake_error_for_queue(Throwable $e): string
+{
+    if ($e instanceof RuntimeException) {
+        return orange_order_intake_snip_message($e->getMessage());
+    }
+    if (function_exists('error_log')) {
+        error_log(
+            '[orange] order_intake checkout: ' . $e->getMessage()
+            . ' @ ' . $e->getFile() . ':' . $e->getLine()
+        );
+    }
+
+    return 'تعذر إتمام الطلب. يرجى المحاولة لاحقاً أو التواصل مع المتجر.';
+}
+
+/**
  * Upsert customer by phone for storefront checkout (phone = unique key for the customer row).
  * Updates name, area, address, email from the latest order; appends order notes to customer notes.
  */
@@ -164,7 +182,10 @@ function orange_storefront_upsert_customer_from_checkout(
 }
 
 /**
- * Core checkout: validate cart, insert order + lines, reserve stock. Must run inside caller transaction (no begin/commit).
+ * Core checkout: validate cart, insert order + lines, then reserve variant stock for the web queue.
+ * Stock: orange_order_apply_pending_stock_reservation() inserts pending_order movements and decrements
+ * product_variants.stock_quantity; release on cancel/reject via orange_order_release_pending_stock_reservation().
+ * Must run inside caller transaction (no begin/commit).
  *
  * @param array<string,mixed> $data
  * @return array{order_id:int,order_number:string,total:float,whatsapp_number:string,whatsapp_url:string}
@@ -445,7 +466,7 @@ function orange_order_intake_process_next(PDO $pdo): bool
             $pdo->exec('RELEASE SAVEPOINT orange_intake_sp');
         } catch (Throwable $e) {
             $pdo->exec('ROLLBACK TO SAVEPOINT orange_intake_sp');
-            $errText = orange_order_intake_snip_message($e->getMessage());
+            $errText = orange_order_intake_error_for_queue($e);
             $pdo->prepare(
                 'UPDATE order_intake_queue SET status = ?, error_message = ?, attempts = attempts + 1 WHERE id = ?'
             )->execute(['failed', $errText, $qid]);

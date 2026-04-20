@@ -12,17 +12,15 @@ if (!function_exists('current_lang')) {
 orange_send_html_no_cache_headers();
 
 extract(storefront_toolbar_state());
+orange_storefront_send_channel_cookie($channelSlug);
 
 $taglineCycle = storefront_tagline_cycle_messages();
 $taglineInitial = $taglineCycle[0] ?? '';
 $taglineJsonAttr = htmlspecialchars(json_encode($taglineCycle, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8');
 
-$theme = preg_replace('/[^a-z0-9\-]/i', '', (string)($channel['slug'] ?? 'orange'));
-if ($theme === '' || !is_file(__DIR__ . '/../assets/css/theme-' . $theme . '.css')) {
-    $theme = 'orange';
-}
-
-/* لون شريط المتصفح/PWA — موحّد مع حزمة البراند (#FF6A00) لكل القنوات */
+/* هوية بصرية موحّدة (ثيم/شعار) — الاسم الظاهر فقط يتبع القناة: WEB / ONLINE / TIKTOK */
+$theme = 'orange';
+$sfDisplayName = storefront_channel_display_name($channel, $channelSlug);
 $sfThemeColor = '#ff6a00';
 
 $orangeAccountChannelForJs = '';
@@ -38,11 +36,8 @@ try {
 }
 
 $orangePubBase = PUBLIC_BASE_PATH === '' ? '' : PUBLIC_BASE_PATH;
-$orangeChannelLogoFile = preg_replace(
-    '/[^a-z0-9._\-]/i',
-    '',
-    (string) ($channel['logo'] ?? 'logo-orange.png')
-) ?: 'logo-orange.png';
+/* شعار الهيدر ثابت لكل القنوات — بيانات logo في الجدول للإدارة/أغراض أخرى فقط */
+$orangeChannelLogoFile = 'logo-orange.png';
 /* نفس منطق CSS/JS: ?v=filemtime حتى لا يبقى الكمبيوتر على شعار PNG قديم بعد التحديث */
 $orangeChannelLogoUrl = $orangePubBase . storefront_asset_url('/assets/images/' . $orangeChannelLogoFile);
 $orangePwaApple180Url = $orangePubBase . storefront_asset_url('/assets/images/pwa-apple-180.png');
@@ -60,8 +55,8 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
     <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
     <meta name="theme-color" content="<?php echo htmlspecialchars($sfThemeColor, ENT_QUOTES, 'UTF-8'); ?>">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="Orange Store">
-    <meta name="application-name" content="Orange Store">
+    <meta name="apple-mobile-web-app-title" content="<?php echo htmlspecialchars($sfDisplayName, ENT_QUOTES, 'UTF-8'); ?>">
+    <meta name="application-name" content="<?php echo htmlspecialchars($sfDisplayName, ENT_QUOTES, 'UTF-8'); ?>">
     <link rel="manifest" href="<?php echo htmlspecialchars($orangeManifestHref, ENT_QUOTES, 'UTF-8'); ?>">
     <link rel="icon" type="image/png" sizes="192x192" href="<?php echo htmlspecialchars($orangePwaIcon192Url, ENT_QUOTES, 'UTF-8'); ?>">
     <link rel="icon" type="image/png" sizes="512x512" href="<?php echo htmlspecialchars($orangePwaIcon512Url, ENT_QUOTES, 'UTF-8'); ?>">
@@ -76,12 +71,27 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             }
             var allowed = { orange: 1, blue: 1, black: 1 };
             var accountCh = <?php echo json_encode($orangeAccountChannelForJs, JSON_UNESCAPED_UNICODE); ?>;
+            function orangeReadSfChannelCookie() {
+                var name = '<?php echo htmlspecialchars(orange_storefront_channel_cookie_name(), ENT_QUOTES, 'UTF-8'); ?>=';
+                var parts = (document.cookie || '').split(';');
+                for (var i = 0; i < parts.length; i++) {
+                    var p = parts[i].replace(/^\s+/, '');
+                    if (p.indexOf(name) === 0) {
+                        return p.slice(name.length).replace(/[^a-z0-9\-]/gi, '').toLowerCase();
+                    }
+                }
+                return '';
+            }
             var savedCh = '';
             if (accountCh && allowed[String(accountCh).toLowerCase()]) {
                 savedCh = String(accountCh).replace(/[^a-z0-9\-]/gi, '').toLowerCase();
             } else {
-                var raw = localStorage.getItem('orange_storefront_channel') || '';
-                savedCh = String(raw).replace(/[^a-z0-9\-]/gi, '').toLowerCase();
+                var rawLs = localStorage.getItem('orange_storefront_channel') || '';
+                savedCh = String(rawLs).replace(/[^a-z0-9\-]/gi, '').toLowerCase();
+                if (!savedCh || !allowed[savedCh]) {
+                    var rawCk = orangeReadSfChannelCookie();
+                    savedCh = String(rawCk).replace(/[^a-z0-9\-]/gi, '').toLowerCase();
+                }
             }
             if (!savedCh || !allowed[savedCh]) {
                 return;
@@ -184,12 +194,26 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             }
             return 'orange_sf_cart_' + ch;
         };
+        window.orangeSfPersistChannel = function (rawCh) {
+            try {
+                var ch = String(rawCh || '').replace(/[^a-z0-9\-]/gi, '').toLowerCase();
+                if (!ch || (ch !== 'orange' && ch !== 'blue' && ch !== 'black')) {
+                    return;
+                }
+                localStorage.setItem('orange_storefront_channel', ch);
+                var ckName = <?php echo json_encode(orange_storefront_channel_cookie_name(), JSON_UNESCAPED_UNICODE); ?>;
+                var ckPath = <?php echo json_encode(orange_storefront_channel_cookie_path(), JSON_UNESCAPED_UNICODE); ?>;
+                var maxAge = 3600 * 24 * 400;
+                var secure = (typeof window.location !== 'undefined' && window.location.protocol === 'https:') ? '; Secure' : '';
+                document.cookie = ckName + '=' + encodeURIComponent(ch) + '; Path=' + ckPath + '; Max-Age=' + maxAge + '; SameSite=Lax' + secure;
+            } catch (e) {}
+        };
         (function orangeStorefrontPersistPrefs() {
             try {
                 var accCh = (typeof window.ORANGE_ACCOUNT_CHANNEL === 'string') ? window.ORANGE_ACCOUNT_CHANNEL : '';
                 var ch = (accCh && /^[a-z0-9\-]+$/i.test(accCh)) ? accCh : window.APP_CHANNEL_SLUG;
                 if (ch) {
-                    localStorage.setItem('orange_storefront_channel', String(ch).replace(/[^a-z0-9\-]/gi, '').toLowerCase());
+                    window.orangeSfPersistChannel(ch);
                 }
                 if (window.APP_LANG) {
                     localStorage.setItem('orange_storefront_lang', String(window.APP_LANG));
@@ -231,7 +255,35 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             storefront_install_modal_intro: <?php echo json_encode(t('storefront_install_modal_intro'), JSON_UNESCAPED_UNICODE); ?>,
             storefront_install_ios_steps: <?php echo json_encode(t('storefront_install_ios_steps'), JSON_UNESCAPED_UNICODE); ?>,
             storefront_install_other_steps: <?php echo json_encode(t('storefront_install_other_steps'), JSON_UNESCAPED_UNICODE); ?>,
-            storefront_install_close: <?php echo json_encode(t('storefront_install_close'), JSON_UNESCAPED_UNICODE); ?>
+            storefront_install_close: <?php echo json_encode(t('storefront_install_close'), JSON_UNESCAPED_UNICODE); ?>,
+            storefront_register_mail_failed: <?php echo json_encode(t('storefront_register_mail_failed'), JSON_UNESCAPED_UNICODE); ?>,
+            storefront_register_service_unavailable: <?php echo json_encode(t('storefront_register_service_unavailable'), JSON_UNESCAPED_UNICODE); ?>,
+            storefront_register_invalid_phone: <?php echo json_encode(t('storefront_register_invalid_phone'), JSON_UNESCAPED_UNICODE); ?>,
+            track_signup_order_required: <?php echo json_encode(t('track_signup_order_required'), JSON_UNESCAPED_UNICODE); ?>,
+            track_signup_order_mismatch: <?php echo json_encode(t('track_signup_order_mismatch'), JSON_UNESCAPED_UNICODE); ?>,
+            checkout_cart_items_required: <?php echo json_encode(t('checkout_cart_items_required'), JSON_UNESCAPED_UNICODE); ?>,
+            checkout_invalid_channel: <?php echo json_encode(t('checkout_invalid_channel'), JSON_UNESCAPED_UNICODE); ?>,
+            checkout_internal_error: <?php echo json_encode(t('checkout_internal_error'), JSON_UNESCAPED_UNICODE); ?>,
+            checkout_queue_busy: <?php echo json_encode(t('checkout_queue_busy'), JSON_UNESCAPED_UNICODE); ?>,
+            checkout_failed_generic: <?php echo json_encode(t('checkout_failed_generic'), JSON_UNESCAPED_UNICODE); ?>,
+            intake_invalid_token: <?php echo json_encode(t('intake_invalid_token'), JSON_UNESCAPED_UNICODE); ?>,
+            intake_queue_unavailable: <?php echo json_encode(t('intake_queue_unavailable'), JSON_UNESCAPED_UNICODE); ?>,
+            intake_not_found: <?php echo json_encode(t('intake_not_found'), JSON_UNESCAPED_UNICODE); ?>,
+            customer_cancel_ok: <?php echo json_encode(t('customer_cancel_ok'), JSON_UNESCAPED_UNICODE); ?>,
+            customer_cancel_err: <?php echo json_encode(t('customer_cancel_err'), JSON_UNESCAPED_UNICODE); ?>,
+            customer_cancel_not_allowed: <?php echo json_encode(t('customer_cancel_not_allowed'), JSON_UNESCAPED_UNICODE); ?>,
+            product_invalid_id: <?php echo json_encode(t('product_invalid_id'), JSON_UNESCAPED_UNICODE); ?>,
+            product_not_found: <?php echo json_encode(t('product_not_found'), JSON_UNESCAPED_UNICODE); ?>,
+            api_request_failed: <?php echo json_encode(t('api_request_failed'), JSON_UNESCAPED_UNICODE); ?>
+        };
+        window.orangeStorefrontRegisterApiError = function (j, fallback) {
+            if (typeof window.orangeCheckoutApiMessage === 'function') {
+                var mapped = window.orangeCheckoutApiMessage(j || {});
+                if (mapped) {
+                    return mapped;
+                }
+            }
+            return (j && j.message) ? String(j.message) : (fallback || '');
         };
     </script>
 </head>

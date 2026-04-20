@@ -55,5 +55,5 @@ try {
     audit_log('admin_permissions', 'تحديث صلاحيات مستخدم #' . $adminId, 'admins', $adminId);
     json_response(['success' => true, 'message' => 'تم حفظ الصلاحيات']);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر حفظ الصلاحيات');
+    orange_admin_api_catch($e, 'تعذر حفظ الصلاحيات');
 }

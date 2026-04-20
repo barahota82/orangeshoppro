@@ -260,6 +260,24 @@ function orange_gl_pending_list(PDO $pdo, string $status, ?string $dateFrom, ?st
 }
 
 /**
+ * سطر خطأ لعرض الأدمن عند ترحيل/فك دفعي — لا يُعرض نص أخطاء تقنية (مثل PDO) للمستخدم.
+ */
+function orange_gl_pending_batch_error_user_line(int $id, Throwable $e): string
+{
+    if ($e instanceof RuntimeException) {
+        return '#' . $id . ': ' . $e->getMessage();
+    }
+    if (function_exists('error_log')) {
+        error_log(
+            '[orange] gl_pending_batch id=' . $id . ': ' . $e->getMessage()
+            . ' @ ' . $e->getFile() . ':' . $e->getLine()
+        );
+    }
+
+    return '#' . $id . ': تعذر المعالجة';
+}
+
+/**
  * @param list<int|string> $ids
  * @return array{posted:list<int>,errors:list<string>}
  */
@@ -354,7 +372,7 @@ function orange_gl_pending_post_by_ids(PDO $pdo, array $ids): array
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            $errors[] = '#' . $id . ': ' . $e->getMessage();
+            $errors[] = orange_gl_pending_batch_error_user_line($id, $e);
         }
     }
 
@@ -434,7 +452,7 @@ function orange_gl_pending_unpost_by_ids(PDO $pdo, array $ids): array
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            $errors[] = '#' . $id . ': ' . $e->getMessage();
+            $errors[] = orange_gl_pending_batch_error_user_line($id, $e);
         }
     }
 

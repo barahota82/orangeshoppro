@@ -38,5 +38,5 @@ try {
     }
     json_response(['success' => true, 'suggested_code' => $code, 'parent_id' => $parentId]);
 } catch (Throwable $e) {
-    api_error($e, 'تعذر اقتراح الكود');
+    orange_admin_api_catch($e, 'تعذر اقتراح الكود');
 }

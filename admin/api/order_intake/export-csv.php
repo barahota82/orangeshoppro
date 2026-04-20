@@ -110,7 +110,7 @@ try {
     exit;
 } catch (Throwable $e) {
     if (!headers_sent()) {
-        json_response(['success' => false, 'message' => $e->getMessage()], 500);
+        orange_admin_api_catch($e, 'تعذر تصدير الملف');
     }
     exit;
 }

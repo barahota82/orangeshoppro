@@ -11,7 +11,7 @@ try {
 
     $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
     if ($id <= 0) {
-        json_response(['success' => false, 'message' => 'Invalid product id'], 422);
+        json_response(['success' => false, 'code' => 'product_invalid_id', 'message' => t('product_invalid_id')], 422);
     }
 
     $stmt = $pdo->prepare("SELECT * FROM products WHERE id = ? LIMIT 1");
@@ -19,7 +19,7 @@ try {
     $product = $stmt->fetch();
 
     if (!$product) {
-        json_response(['success' => false, 'message' => 'Product not found'], 404);
+        json_response(['success' => false, 'code' => 'product_not_found', 'message' => t('product_not_found')], 404);
     }
 
     $imagesStmt = $pdo->prepare("SELECT * FROM product_images WHERE product_id = ? ORDER BY id ASC");
@@ -37,8 +37,5 @@ try {
         'variants' => $variants
     ]);
 } catch (Throwable $e) {
-    json_response([
-        'success' => false,
-        'message' => $e->getMessage()
-    ], 500);
+    api_error($e, t('api_request_failed'));
 }

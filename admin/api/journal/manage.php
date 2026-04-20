@@ -83,7 +83,7 @@ try {
                         $entryTypeNorm
                     );
                 } catch (Throwable $e) {
-                    json_response(['success' => false, 'message' => $e->getMessage()], 422);
+                    orange_admin_api_catch($e, 'تعذر إضافة السند', 422);
                 }
                 if ($pendingId <= 0 && $reference !== '') {
                     json_response(['success' => false, 'message' => 'المرجع مسجّل مسبقاً في طابور الترحيل أو غير صالح'], 422);
@@ -106,7 +106,7 @@ try {
                     'entry_type' => $entryTypeNorm,
                 ], $postLines);
             } catch (Throwable $e) {
-                json_response(['success' => false, 'message' => $e->getMessage()], 422);
+                orange_admin_api_catch($e, 'تعذر إضافة السند', 422);
             }
             audit_log('journal_create', 'تم إنشاء سند محاسبي رقم: ' . $vid, 'journal_vouchers', $vid);
             json_response(['success' => true, 'message' => 'تم إضافة السند', 'id' => $vid]);
@@ -145,7 +145,7 @@ try {
                     'entry_type' => $entryTypeNorm,
                 ]);
             } catch (Throwable $e) {
-                json_response(['success' => false, 'message' => $e->getMessage()], 422);
+                orange_admin_api_catch($e, 'تعذر إضافة السند', 422);
             }
             if ($pendingId <= 0 && $reference !== '') {
                 json_response(['success' => false, 'message' => 'المرجع مسجّل مسبقاً في طابور الترحيل أو غير صالح'], 422);
@@ -171,7 +171,7 @@ try {
                 ['account_id' => $accountCredit, 'debit' => 0, 'credit' => $amount, 'memo' => $description],
             ]);
         } catch (Throwable $e) {
-            json_response(['success' => false, 'message' => $e->getMessage()], 422);
+            orange_admin_api_catch($e, 'تعذر إضافة السند', 422);
         }
         audit_log('journal_create', 'تم إنشاء سند محاسبي رقم: ' . $vid, 'journal_vouchers', $vid);
         json_response(['success' => true, 'message' => 'تم إضافة السند', 'id' => $vid]);
