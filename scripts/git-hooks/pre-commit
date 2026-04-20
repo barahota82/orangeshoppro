@@ -36,5 +36,5 @@ if run_ps1; then
   exit 0
 fi
 
-echo "pre-commit: فشل — ثبّت xxd (Git Bash) أو PowerShell، أو استخدم: pwsh -NoProfile -File scripts/verify-php-utf8.ps1" >&2
+echo "pre-commit: فشل — ثبّت xxd (Git Bash) أو PowerShell، أو استخدم: pwsh -File scripts/verify-php-utf8.ps1" >&2
 exit 1
