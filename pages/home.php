@@ -196,104 +196,105 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
     </section>
     <textarea id="home-hero-lines-json" hidden readonly class="storefront-home-hero-json"><?php echo htmlspecialchars((string) $homeHeroJson, ENT_QUOTES, 'UTF-8'); ?></textarea>
 
-    <div class="storefront-browse-menu" id="storefrontBrowseMenu" aria-hidden="true" dir="<?php echo htmlspecialchars($storefrontListDir, ENT_QUOTES, 'UTF-8'); ?>">
-        <div class="storefront-browse-menu__backdrop" data-browse-menu-close tabindex="-1" aria-hidden="true"></div>
-        <div class="storefront-browse-menu__panel" id="storefrontBrowseMenuPanel" role="dialog" aria-modal="true" aria-label="<?php echo htmlspecialchars(t('storefront_menu'), ENT_QUOTES, 'UTF-8'); ?>" dir="<?php echo htmlspecialchars($storefrontListDir, ENT_QUOTES, 'UTF-8'); ?>">
-            <div class="storefront-browse-menu__head">
-                <h2 class="storefront-browse-menu__title"><?php echo htmlspecialchars(t('storefront_menu'), ENT_QUOTES, 'UTF-8'); ?></h2>
-                <button type="button" class="storefront-browse-menu__close" data-browse-menu-close aria-label="<?php echo htmlspecialchars(t('storefront_menu_close'), ENT_QUOTES, 'UTF-8'); ?>">×</button>
-            </div>
-            <div class="storefront-browse-menu__body">
-                <button type="button" class="storefront-browse-menu__cta" data-apply-filter="all"><?php echo htmlspecialchars(t('storefront_menu_all_products'), ENT_QUOTES, 'UTF-8'); ?></button>
-                <button type="button" class="storefront-browse-menu__cta storefront-browse-menu__cta--secondary" data-apply-filter="offers"><?php echo htmlspecialchars(t('offers'), ENT_QUOTES, 'UTF-8'); ?></button>
-
-                <?php foreach ($departments as $dep): ?>
-                    <?php
-                    $deptId = (int) $dep['id'];
-                    $deptCats = $catsByDept[$deptId] ?? [];
-                    if ($deptCats === []) {
-                        continue;
-                    }
-                    ?>
-                    <details class="browse-accordion browse-accordion--dept" id="browse-dept-<?php echo $deptId; ?>">
-                        <summary class="browse-accordion__summary"><?php echo htmlspecialchars(storefront_catalog_label($dep, $lang), ENT_QUOTES, 'UTF-8'); ?></summary>
-                        <div class="browse-accordion__content">
-                            <button type="button" class="browse-accordion__action" data-apply-filter="dept-<?php echo $deptId; ?>">
-                                <?php echo htmlspecialchars(t('storefront_menu_whole_department'), ENT_QUOTES, 'UTF-8'); ?>
-                            </button>
-                            <?php foreach ($deptCats as $cat): ?>
-                                <?php
-                                $catId = (int) $cat['id'];
-                                $subs = $subcategoriesByCategory[$catId] ?? [];
-                                ?>
-                                <?php if ($subs !== []): ?>
-                                    <details class="browse-accordion browse-accordion--cat" id="browse-cat-<?php echo $catId; ?>">
-                                        <summary class="browse-accordion__summary browse-accordion__summary--nested"><?php echo htmlspecialchars(storefront_catalog_label($cat, $lang), ENT_QUOTES, 'UTF-8'); ?></summary>
-                                        <div class="browse-accordion__content browse-accordion__content--nested">
-                                            <button type="button" class="browse-accordion__action" data-apply-filter="cat-<?php echo $catId; ?>">
-                                                <?php echo htmlspecialchars(t('storefront_menu_whole_category'), ENT_QUOTES, 'UTF-8'); ?>
-                                            </button>
-                                            <?php foreach ($subs as $sub): ?>
-                                                <button type="button" class="browse-accordion__action browse-accordion__action--sub" data-apply-filter="sub-<?php echo (int) $sub['id']; ?>">
-                                                    <?php echo htmlspecialchars(storefront_catalog_label($sub, $lang), ENT_QUOTES, 'UTF-8'); ?>
-                                                </button>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    </details>
-                                <?php else: ?>
-                                    <button type="button" class="browse-accordion__action browse-accordion__action--flat" data-apply-filter="cat-<?php echo $catId; ?>">
-                                        <?php echo htmlspecialchars(storefront_catalog_label($cat, $lang), ENT_QUOTES, 'UTF-8'); ?>
-                                    </button>
-                                <?php endif; ?>
-                            <?php endforeach; ?>
-                        </div>
-                    </details>
-                <?php endforeach; ?>
-
-                <?php
-                $orphanCats = $catsByDept[0] ?? [];
-                if ($orphanCats !== []) {
-                    ?>
-                    <details class="browse-accordion browse-accordion--dept" id="browse-dept-other">
-                        <summary class="browse-accordion__summary"><?php echo htmlspecialchars(t('storefront_menu_other_categories'), ENT_QUOTES, 'UTF-8'); ?></summary>
-                        <div class="browse-accordion__content">
-                            <?php foreach ($orphanCats as $cat): ?>
-                                <?php
-                                $catId = (int) $cat['id'];
-                                $subs = $subcategoriesByCategory[$catId] ?? [];
-                                ?>
-                                <?php if ($subs !== []): ?>
-                                    <details class="browse-accordion browse-accordion--cat" id="browse-cat-<?php echo $catId; ?>">
-                                        <summary class="browse-accordion__summary browse-accordion__summary--nested"><?php echo htmlspecialchars(storefront_catalog_label($cat, $lang), ENT_QUOTES, 'UTF-8'); ?></summary>
-                                        <div class="browse-accordion__content browse-accordion__content--nested">
-                                            <button type="button" class="browse-accordion__action" data-apply-filter="cat-<?php echo $catId; ?>">
-                                                <?php echo htmlspecialchars(t('storefront_menu_whole_category'), ENT_QUOTES, 'UTF-8'); ?>
-                                            </button>
-                                            <?php foreach ($subs as $sub): ?>
-                                                <button type="button" class="browse-accordion__action browse-accordion__action--sub" data-apply-filter="sub-<?php echo (int) $sub['id']; ?>">
-                                                    <?php echo htmlspecialchars(storefront_catalog_label($sub, $lang), ENT_QUOTES, 'UTF-8'); ?>
-                                                </button>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    </details>
-                                <?php else: ?>
-                                    <button type="button" class="browse-accordion__action browse-accordion__action--flat" data-apply-filter="cat-<?php echo $catId; ?>">
-                                        <?php echo htmlspecialchars(storefront_catalog_label($cat, $lang), ENT_QUOTES, 'UTF-8'); ?>
-                                    </button>
-                                <?php endif; ?>
-                            <?php endforeach; ?>
-                        </div>
-                    </details>
-                <?php } ?>
-            </div>
-        </div>
-    </div>
-
     <section class="tabs-section" dir="<?php echo htmlspecialchars($storefrontListDir, ENT_QUOTES, 'UTF-8'); ?>">
-        <button type="button" class="tabs-menu-open storefront-browse-menu-open" aria-expanded="false" aria-controls="storefrontBrowseMenuPanel" aria-haspopup="dialog">
+        <div class="storefront-browse-wrap">
+        <button type="button" class="tabs-menu-open storefront-browse-menu-open" aria-expanded="false" aria-controls="storefrontBrowseMenuPanel" aria-haspopup="true">
             <span class="tabs-menu-open__icon" aria-hidden="true">☰</span>
             <span class="tabs-menu-open__text"><?php echo htmlspecialchars(t('storefront_menu'), ENT_QUOTES, 'UTF-8'); ?></span>
         </button>
+        <div class="storefront-browse-menu" id="storefrontBrowseMenu" aria-hidden="true" dir="<?php echo htmlspecialchars($storefrontListDir, ENT_QUOTES, 'UTF-8'); ?>">
+            <div class="storefront-browse-menu__backdrop" data-browse-menu-close tabindex="-1" aria-hidden="true"></div>
+            <div class="storefront-browse-menu__panel" id="storefrontBrowseMenuPanel" role="region" aria-label="<?php echo htmlspecialchars(t('storefront_menu'), ENT_QUOTES, 'UTF-8'); ?>" dir="<?php echo htmlspecialchars($storefrontListDir, ENT_QUOTES, 'UTF-8'); ?>">
+                <div class="storefront-browse-menu__head">
+                    <h2 class="storefront-browse-menu__title"><?php echo htmlspecialchars(t('storefront_menu'), ENT_QUOTES, 'UTF-8'); ?></h2>
+                    <button type="button" class="storefront-browse-menu__close" data-browse-menu-close aria-label="<?php echo htmlspecialchars(t('storefront_menu_close'), ENT_QUOTES, 'UTF-8'); ?>">×</button>
+                </div>
+                <div class="storefront-browse-menu__body">
+                    <button type="button" class="storefront-browse-menu__cta" data-apply-filter="all"><?php echo htmlspecialchars(t('storefront_menu_all_products'), ENT_QUOTES, 'UTF-8'); ?></button>
+                    <button type="button" class="storefront-browse-menu__cta storefront-browse-menu__cta--secondary" data-apply-filter="offers"><?php echo htmlspecialchars(t('offers'), ENT_QUOTES, 'UTF-8'); ?></button>
+
+                    <?php foreach ($departments as $dep): ?>
+                        <?php
+                        $deptId = (int) $dep['id'];
+                        $deptCats = $catsByDept[$deptId] ?? [];
+                        if ($deptCats === []) {
+                            continue;
+                        }
+                        ?>
+                        <details class="browse-accordion browse-accordion--dept" id="browse-dept-<?php echo $deptId; ?>">
+                            <summary class="browse-accordion__summary"><?php echo htmlspecialchars(storefront_catalog_label($dep, $lang), ENT_QUOTES, 'UTF-8'); ?></summary>
+                            <div class="browse-accordion__content">
+                                <button type="button" class="browse-accordion__action" data-apply-filter="dept-<?php echo $deptId; ?>">
+                                    <?php echo htmlspecialchars(t('storefront_menu_whole_department'), ENT_QUOTES, 'UTF-8'); ?>
+                                </button>
+                                <?php foreach ($deptCats as $cat): ?>
+                                    <?php
+                                    $catId = (int) $cat['id'];
+                                    $subs = $subcategoriesByCategory[$catId] ?? [];
+                                    ?>
+                                    <?php if ($subs !== []): ?>
+                                        <details class="browse-accordion browse-accordion--cat" id="browse-cat-<?php echo $catId; ?>">
+                                            <summary class="browse-accordion__summary browse-accordion__summary--nested"><?php echo htmlspecialchars(storefront_catalog_label($cat, $lang), ENT_QUOTES, 'UTF-8'); ?></summary>
+                                            <div class="browse-accordion__content browse-accordion__content--nested">
+                                                <button type="button" class="browse-accordion__action" data-apply-filter="cat-<?php echo $catId; ?>">
+                                                    <?php echo htmlspecialchars(t('storefront_menu_whole_category'), ENT_QUOTES, 'UTF-8'); ?>
+                                                </button>
+                                                <?php foreach ($subs as $sub): ?>
+                                                    <button type="button" class="browse-accordion__action browse-accordion__action--sub" data-apply-filter="sub-<?php echo (int) $sub['id']; ?>">
+                                                        <?php echo htmlspecialchars(storefront_catalog_label($sub, $lang), ENT_QUOTES, 'UTF-8'); ?>
+                                                    </button>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        </details>
+                                    <?php else: ?>
+                                        <button type="button" class="browse-accordion__action browse-accordion__action--flat" data-apply-filter="cat-<?php echo $catId; ?>">
+                                            <?php echo htmlspecialchars(storefront_catalog_label($cat, $lang), ENT_QUOTES, 'UTF-8'); ?>
+                                        </button>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </div>
+                        </details>
+                    <?php endforeach; ?>
+
+                    <?php
+                    $orphanCats = $catsByDept[0] ?? [];
+                    if ($orphanCats !== []) {
+                        ?>
+                        <details class="browse-accordion browse-accordion--dept" id="browse-dept-other">
+                            <summary class="browse-accordion__summary"><?php echo htmlspecialchars(t('storefront_menu_other_categories'), ENT_QUOTES, 'UTF-8'); ?></summary>
+                            <div class="browse-accordion__content">
+                                <?php foreach ($orphanCats as $cat): ?>
+                                    <?php
+                                    $catId = (int) $cat['id'];
+                                    $subs = $subcategoriesByCategory[$catId] ?? [];
+                                    ?>
+                                    <?php if ($subs !== []): ?>
+                                        <details class="browse-accordion browse-accordion--cat" id="browse-cat-<?php echo $catId; ?>">
+                                            <summary class="browse-accordion__summary browse-accordion__summary--nested"><?php echo htmlspecialchars(storefront_catalog_label($cat, $lang), ENT_QUOTES, 'UTF-8'); ?></summary>
+                                            <div class="browse-accordion__content browse-accordion__content--nested">
+                                                <button type="button" class="browse-accordion__action" data-apply-filter="cat-<?php echo $catId; ?>">
+                                                    <?php echo htmlspecialchars(t('storefront_menu_whole_category'), ENT_QUOTES, 'UTF-8'); ?>
+                                                </button>
+                                                <?php foreach ($subs as $sub): ?>
+                                                    <button type="button" class="browse-accordion__action browse-accordion__action--sub" data-apply-filter="sub-<?php echo (int) $sub['id']; ?>">
+                                                        <?php echo htmlspecialchars(storefront_catalog_label($sub, $lang), ENT_QUOTES, 'UTF-8'); ?>
+                                                    </button>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        </details>
+                                    <?php else: ?>
+                                        <button type="button" class="browse-accordion__action browse-accordion__action--flat" data-apply-filter="cat-<?php echo $catId; ?>">
+                                            <?php echo htmlspecialchars(storefront_catalog_label($cat, $lang), ENT_QUOTES, 'UTF-8'); ?>
+                                        </button>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </div>
+                        </details>
+                    <?php } ?>
+                </div>
+            </div>
+        </div>
+        </div>
         <button type="button" class="tabs-nav-btn tabs-nav-btn--prev" onclick="scrollHomeCategoryTabs(-1)" aria-label="<?php echo htmlspecialchars(t('tabs_scroll_prev'), ENT_QUOTES, 'UTF-8'); ?>">
             <span class="tabs-nav-btn__icon" aria-hidden="true">‹</span>
         </button>
@@ -504,11 +505,12 @@ function filterFromBrowseMenu(filter) {
 function openStorefrontBrowseMenu() {
     var root = document.getElementById('storefrontBrowseMenu');
     var btn = document.querySelector('.storefront-browse-menu-open');
+    var wrap = document.querySelector('.storefront-browse-wrap');
     if (!root) return;
     root.classList.add('is-open');
     root.setAttribute('aria-hidden', 'false');
     if (btn) btn.setAttribute('aria-expanded', 'true');
-    document.body.classList.add('storefront-browse-menu-lock');
+    if (wrap) wrap.classList.add('storefront-browse-wrap--open');
     orangeRestoreBrowseDetailsOpen();
     orangeExpandBrowseMenuForFilter(orangeGetActiveGridFilter());
     orangePersistBrowseDetailsOpen();
@@ -516,11 +518,12 @@ function openStorefrontBrowseMenu() {
 function closeStorefrontBrowseMenu() {
     var root = document.getElementById('storefrontBrowseMenu');
     var btn = document.querySelector('.storefront-browse-menu-open');
+    var wrap = document.querySelector('.storefront-browse-wrap');
     if (!root) return;
     root.classList.remove('is-open');
     root.setAttribute('aria-hidden', 'true');
     if (btn) btn.setAttribute('aria-expanded', 'false');
-    document.body.classList.remove('storefront-browse-menu-lock');
+    if (wrap) wrap.classList.remove('storefront-browse-wrap--open');
 }
 (function () {
     var openBtn = document.querySelector('.storefront-browse-menu-open');
@@ -554,6 +557,21 @@ function closeStorefrontBrowseMenu() {
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') closeStorefrontBrowseMenu();
     });
+    document.addEventListener(
+        'pointerdown',
+        function (e) {
+            var root = document.getElementById('storefrontBrowseMenu');
+            var wrap = document.querySelector('.storefront-browse-wrap');
+            if (!root || !root.classList.contains('is-open')) {
+                return;
+            }
+            if (wrap && e.target instanceof Node && wrap.contains(e.target)) {
+                return;
+            }
+            closeStorefrontBrowseMenu();
+        },
+        true
+    );
 })();
 </script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

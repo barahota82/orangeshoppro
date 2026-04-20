@@ -648,16 +648,37 @@ html.orange-install-modal-open {
     line-height: 1;
 }
 
+/* قائمة الأقسام: منسدلة تحت زر «القائمة» (وليست درجاً بملء الشاشة) */
+.storefront-browse-wrap {
+    position: relative;
+    flex: 0 0 auto;
+    align-self: flex-start;
+    z-index: 1;
+}
+
+.storefront-browse-wrap--open {
+    z-index: 10060;
+}
+
 .storefront-browse-menu {
     display: none;
 }
 
 .storefront-browse-menu.is-open {
     display: block;
-    position: fixed;
-    inset: 0;
-    z-index: 10050;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: auto;
+    width: min(22.5rem, calc(100vw - 1.5rem));
+    max-width: none;
+    z-index: 2;
     pointer-events: none;
+}
+
+html[dir="rtl"] .storefront-browse-menu.is-open {
+    left: auto;
+    right: 0;
 }
 
 .storefront-browse-menu.is-open .storefront-browse-menu__backdrop,
@@ -666,45 +687,24 @@ html.orange-install-modal-open {
 }
 
 .storefront-browse-menu__backdrop {
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.55);
-    border: 0;
-    padding: 0;
-    cursor: pointer;
+    display: none;
 }
 
 .storefront-browse-menu__panel {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: min(22.5rem, 92vw);
-    max-width: 100%;
+    position: relative;
+    top: auto;
+    bottom: auto;
+    left: auto;
+    right: auto;
+    width: 100%;
+    max-height: min(70vh, 520px);
     background: var(--card);
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: 0 14px 40px -8px rgba(0, 0, 0, 0.22);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-}
-
-html[dir="ltr"] .storefront-browse-menu__panel {
-    left: 0;
-    transform: translateX(-100%);
-    transition: transform 0.28s ease;
-}
-
-html[dir="ltr"] .storefront-browse-menu.is-open .storefront-browse-menu__panel {
-    transform: translateX(0);
-}
-
-html[dir="rtl"] .storefront-browse-menu__panel {
-    right: 0;
-    transform: translateX(100%);
-    transition: transform 0.28s ease;
-}
-
-html[dir="rtl"] .storefront-browse-menu.is-open .storefront-browse-menu__panel {
-    transform: translateX(0);
 }
 
 .storefront-browse-menu__head {
