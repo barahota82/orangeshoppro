@@ -68,7 +68,6 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
     <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&amp;family=Outfit:wght@400;500;600;700&amp;display=swap">
     <link rel="preload" as="image" href="<?php echo htmlspecialchars(storefront_absolute_url($orangeChannelLogoUrl), ENT_QUOTES, 'UTF-8'); ?>">
     <link rel="preload" as="image" href="<?php echo htmlspecialchars(storefront_absolute_url($orangeWordmarkUrl), ENT_QUOTES, 'UTF-8'); ?>">
     <meta name="theme-color" content="<?php echo htmlspecialchars($sfThemeColor, ENT_QUOTES, 'UTF-8'); ?>">

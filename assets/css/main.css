@@ -1,4 +1,4 @@
-/* الخطوط تُحمَّل من includes/header.php (أسرع من @import داخل CSS) */
+@import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap");
 
 :root {
     /* Brand — مواءمة هوية Orange الموحّدة */
@@ -325,7 +325,8 @@ h1, h2, h3, .brand-text h1 {
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     box-shadow: var(--card-shadow-hover);
-    z-index: 50;
+    /* فوق الشريط السفلي المثبت (9999) حتى لا تُقص القائمة */
+    z-index: 10020;
 }
 
 .lang-dropdown__option {
@@ -2975,7 +2976,8 @@ body.storefront .app-bottom-dock .app-dock-btn--current:not(.app-dock-btn--whats
         top: 0;
         width: 100%;
         max-width: 100%;
-        z-index: 9998;
+        /* أعلى من الشريط السفلي حتى القوائم المنسدلة من الهيدر لا تُرسم تحته */
+        z-index: 10000;
         margin: 0;
         background: var(--header-bg);
         border-bottom: 1px solid var(--border);
@@ -3002,8 +3004,6 @@ body.storefront .app-bottom-dock .app-dock-btn--current:not(.app-dock-btn--whats
         max-width: 100%;
         z-index: 9999;
         margin: 0;
-        transform: translateZ(0);
-        -webkit-transform: translateZ(0);
         /* بدون backdrop-filter: أقل وميض/انزلاق مع السكرول على iOS */
         background: var(--header-bg);
         border-top: 1px solid var(--border);
