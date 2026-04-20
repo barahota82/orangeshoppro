@@ -83,45 +83,43 @@ try {
             };
 
             /**
-             * @param array<int, array{page:string,href:string,label:string,class:string,sub:bool}> $items
+             * @param array<int, array<string, mixed>> $items روابط أو مجموعات ['group'=>true,'title'=>'...','items'=>[...]]
              * @return array{0:bool,1:bool}
              */
             $orangeNavSectionMeta = static function (array $items) use ($admin, $pdoNav, $orangeNavLinkActive): array {
-                $anyVisible = false;
-                $hasActive = false;
-                foreach ($items as $nl) {
-                    if (!orange_admin_nav_visible($admin, $pdoNav, $nl['page'])) {
-                        continue;
+                $scan = static function (array $nodes) use ($admin, $pdoNav, $orangeNavLinkActive): array {
+                    $anyVisible = false;
+                    $hasActive = false;
+                    foreach ($nodes as $nl) {
+                        if (!empty($nl['group']) && !empty($nl['items']) && is_array($nl['items'])) {
+                            [$a, $b] = $scan($nl['items']);
+                            $anyVisible = $anyVisible || $a;
+                            $hasActive = $hasActive || $b;
+                            continue;
+                        }
+                        if (!is_array($nl) || !isset($nl['page'])) {
+                            continue;
+                        }
+                        if (!orange_admin_nav_visible($admin, $pdoNav, (string) $nl['page'])) {
+                            continue;
+                        }
+                        $anyVisible = true;
+                        if ($orangeNavLinkActive($nl)) {
+                            $hasActive = true;
+                        }
                     }
-                    $anyVisible = true;
-                    if ($orangeNavLinkActive($nl)) {
-                        $hasActive = true;
-                    }
-                }
-                return [$anyVisible, $hasActive];
+
+                    return [$anyVisible, $hasActive];
+                };
+
+                return $scan($items);
             };
 
-            /** @param array<int, array{page:string,href:string,label:string,class:string,sub:bool}> $items */
-            $orangeRenderNavSection = static function (string $sectionId, string $title, array $items) use ($admin, $pdoNav, $orangeRenderNavLink, $orangeNavLinkActive): void {
-                $anyVisible = false;
-                foreach ($items as $nl) {
-                    if (orange_admin_nav_visible($admin, $pdoNav, $nl['page'])) {
-                        $anyVisible = true;
-                        break;
-                    }
-                }
+            /** @param array<int, array<string, mixed>> $items */
+            $orangeRenderNavSection = static function (string $sectionId, string $title, array $items) use ($admin, $pdoNav, $orangeRenderNavLink, $orangeNavLinkActive, $orangeNavSectionMeta): void {
+                [$anyVisible, $hasActive] = $orangeNavSectionMeta($items);
                 if (!$anyVisible) {
                     return;
-                }
-                $hasActive = false;
-                foreach ($items as $nl) {
-                    if (!orange_admin_nav_visible($admin, $pdoNav, $nl['page'])) {
-                        continue;
-                    }
-                    if ($orangeNavLinkActive($nl)) {
-                        $hasActive = true;
-                        break;
-                    }
                 }
                 $sid = htmlspecialchars($sectionId, ENT_QUOTES, 'UTF-8');
                 $panelId = 'nav-section-' . $sid;
@@ -137,7 +135,58 @@ try {
                 echo '</button>';
                 echo '<div class="admin-nav-section-panel" id="' . $panelId . '" role="region" aria-labelledby="' . $btnId . '">';
                 foreach ($items as $nl) {
-                    $orangeRenderNavLink($nl);
+                    if (!empty($nl['group']) && !empty($nl['items']) && is_array($nl['items'])) {
+                        $subAny = false;
+                        foreach ($nl['items'] as $c) {
+                            if (is_array($c) && isset($c['page']) && orange_admin_nav_visible($admin, $pdoNav, (string) $c['page'])) {
+                                $subAny = true;
+                                break;
+                            }
+                        }
+                        if (!$subAny) {
+                            continue;
+                        }
+                        $gtitle = htmlspecialchars((string) ($nl['title'] ?? ''), ENT_QUOTES, 'UTF-8');
+                        echo '<div class="admin-nav-subgroup" role="group" aria-label="' . $gtitle . '">';
+                        echo '<div class="admin-nav-subgroup__title">' . $gtitle . '</div>';
+                        foreach ($nl['items'] as $c) {
+                            if (is_array($c)) {
+                                $orangeRenderNavLink($c);
+                            }
+                        }
+                        echo '</div>';
+                        continue;
+                    }
+                    if (is_array($nl)) {
+                        $orangeRenderNavLink($nl);
+                    }
+                }
+                echo '</div></div>';
+            };
+
+            /** مجموعة داخل لوحة الميجا */
+            $orangeRenderNavMegaGroup = static function (array $group) use ($admin, $pdoNav, $orangeRenderNavLinkMega): void {
+                if (empty($group['items']) || !is_array($group['items'])) {
+                    return;
+                }
+                $subAny = false;
+                foreach ($group['items'] as $c) {
+                    if (is_array($c) && isset($c['page']) && orange_admin_nav_visible($admin, $pdoNav, (string) $c['page'])) {
+                        $subAny = true;
+                        break;
+                    }
+                }
+                if (!$subAny) {
+                    return;
+                }
+                $gtitle = htmlspecialchars((string) ($group['title'] ?? ''), ENT_QUOTES, 'UTF-8');
+                echo '<div class="admin-mega-group" role="group" aria-label="' . $gtitle . '">';
+                echo '<div class="admin-mega-group__title">' . $gtitle . '</div>';
+                echo '<div class="admin-mega-group__links">';
+                foreach ($group['items'] as $c) {
+                    if (is_array($c)) {
+                        $orangeRenderNavLinkMega($c);
+                    }
                 }
                 echo '</div></div>';
             };
@@ -146,7 +195,20 @@ try {
                 ['page' => 'dashboard', 'href' => '/admin/index.php?page=dashboard', 'label' => 'الرئيسية', 'class' => '', 'sub' => false],
             ];
 
-            /* ترتيب المحاسبة كما كان: سند قيد بعد أرصدة أول المدة وقبل سندات القبض/الذمم */
+            $navAccountingVouchers = [
+                ['page' => 'journal_entries', 'href' => '/admin/index.php?page=journal_entries', 'label' => 'سند قيد', 'class' => '', 'sub' => false],
+                ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger#partner-receipt-voucher', 'label' => 'سند قبض', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger#partner-payment-voucher', 'label' => 'سند صرف', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'expenses', 'href' => '/admin/index.php?page=expenses', 'label' => 'المصروفات', 'class' => '', 'sub' => false],
+                ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger', 'label' => 'ذمم العملاء', 'class' => 'admin-nav-sub', 'sub' => true],
+            ];
+
+            $navAccountingReports = [
+                ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger#partner-account-statement', 'label' => 'كشف حساب', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'partner_reports', 'href' => '/admin/index.php?page=partner_reports', 'label' => 'تقارير الذمم المالية', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report', 'label' => 'التقارير المالية', 'class' => '', 'sub' => false],
+            ];
+
             $navAccounting = [
                 ['page' => 'chart_of_accounts', 'href' => '/admin/index.php?page=chart_of_accounts', 'label' => 'الدليل المحاسبي', 'class' => '', 'sub' => false],
                 ['page' => 'journal_types', 'href' => '/admin/index.php?page=journal_types', 'label' => 'أنواع اليوميات', 'class' => 'admin-nav-sub', 'sub' => true],
@@ -154,14 +216,16 @@ try {
                 ['page' => 'gl_account_settings', 'href' => '/admin/index.php?page=gl_account_settings', 'label' => 'حسابات القيود التلقائية', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'gl_posting', 'href' => '/admin/index.php?page=gl_posting', 'label' => 'إقفال الحركات (ترحيل)', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'opening_balances', 'href' => '/admin/index.php?page=opening_balances', 'label' => 'أرصدة أول المدة المالية', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'journal_entries', 'href' => '/admin/index.php?page=journal_entries', 'label' => 'سند قيد', 'class' => '', 'sub' => false],
-                ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger#partner-receipt-voucher', 'label' => 'سندات القبض', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger#partner-payment-voucher', 'label' => 'سندات الصرف', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger', 'label' => 'ذمم العملاء والموردين', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'expenses', 'href' => '/admin/index.php?page=expenses', 'label' => 'المصروفات', 'class' => '', 'sub' => false],
-                ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger#partner-account-statement', 'label' => 'كشف حساب', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'partner_reports', 'href' => '/admin/index.php?page=partner_reports', 'label' => 'تقارير الذمم المالية', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report', 'label' => 'التقارير المالية', 'class' => '', 'sub' => false],
+                [
+                    'group' => true,
+                    'title' => 'القيود المحاسبية',
+                    'items' => $navAccountingVouchers,
+                ],
+                [
+                    'group' => true,
+                    'title' => 'التقارير',
+                    'items' => $navAccountingReports,
+                ],
                 ['page' => 'logs', 'href' => '/admin/index.php?page=logs', 'label' => 'سجل النشاط', 'class' => 'admin-nav-sub', 'sub' => true],
             ];
 
@@ -247,7 +311,13 @@ try {
                 echo '<div id="' . $pidMega . '" class="admin-mega-panel" role="region" hidden aria-labelledby="' . $bidMega . '">';
                 echo '<div class="admin-mega-grid">';
                 foreach ($sec['items'] as $nlMega) {
-                    $orangeRenderNavLinkMega($nlMega);
+                    if (!empty($nlMega['group']) && !empty($nlMega['items']) && is_array($nlMega['items'])) {
+                        $orangeRenderNavMegaGroup($nlMega);
+                        continue;
+                    }
+                    if (is_array($nlMega)) {
+                        $orangeRenderNavLinkMega($nlMega);
+                    }
                 }
                 echo '</div></div>';
             }

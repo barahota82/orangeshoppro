@@ -232,6 +232,36 @@ a { text-decoration: none; color: inherit; }
     grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
     gap: 8px;
 }
+/* مجموعة فرعية داخل لوحة «الحسابات العامة» (مثل القيود المحاسبية) */
+.admin-mega-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    min-width: 200px;
+    align-self: start;
+}
+.admin-mega-group__title {
+    margin: 0 0 2px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #94a3b8;
+    line-height: 1.3;
+}
+.admin-mega-group__links {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.admin-mega-group__links .admin-mega-link {
+    width: 100%;
+    box-sizing: border-box;
+}
 .admin-topbar-mega {
     display: none;
     flex: 1 1 auto;
@@ -428,6 +458,22 @@ a { text-decoration: none; color: inherit; }
     flex-direction: column;
     gap: 8px;
     padding-bottom: 4px;
+}
+.admin-nav-subgroup {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 4px 0 12px;
+    padding: 10px 0 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.admin-nav-subgroup__title {
+    margin: 0;
+    padding: 0 2px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #94a3b8;
+    letter-spacing: 0.02em;
 }
 .admin-nav-drawer nav .admin-nav-section {
     display: flex;
