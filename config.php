@@ -294,6 +294,7 @@ function orange_storefront_reserved_path_segments(): array
         'admin', 'api', 'assets', 'pages', 'includes', 'vendor', 'scripts',
         'storefront-dispatch', 'index', 'manifest', 'robots', 'favicon',
         'cgi-bin', 'pwa', 'webhook', 'hooks', 'static', 'uploads', 'well-known',
+        'signup', 'signin', 'verify-email',
     ];
 }
 
@@ -774,11 +775,17 @@ function storefront_url(string $page, string $channelSlug, string $lang, array $
             'cart' => $seg . '/cart',
             'track' => $seg . '/track',
             'product' => !empty($extra['id']) ? $seg . '/product/' . (int)$extra['id'] : null,
-            'register', 'verify_email' => null,
+            'register' => $seg . '/signup',
+            'verify_email' => !empty($extra['token']) ? $seg . '/verify-email' : null,
             default => $seg,
         };
         if ($tail !== null) {
-            return ($pathPrefix === '' ? '' : $pathPrefix) . '/' . $tail;
+            $base = ($pathPrefix === '' ? '' : $pathPrefix) . '/' . $tail;
+            if ($page === 'verify_email' && !empty($extra['token'])) {
+                return $base . '?' . http_build_query(['token' => (string) $extra['token']]);
+            }
+
+            return $base;
         }
     }
 
