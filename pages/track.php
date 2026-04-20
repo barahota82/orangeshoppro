@@ -8,9 +8,6 @@ require_once __DIR__ . '/../includes/catalog_schema.php';
 $pdoTrack = db();
 orange_catalog_ensure_schema($pdoTrack);
 
-$ORANGE_STOREFRONT_PAGE_TITLE = t('track_order') . ' | ' . t('storefront_brand');
-$ORANGE_STOREFRONT_META_DESCRIPTION = t('track_order_howto');
-
 include __DIR__ . '/../includes/header.php';
 
 $trackHomeUrl = storefront_url('home', $channelSlug, $lang);

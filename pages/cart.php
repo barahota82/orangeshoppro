@@ -3,10 +3,6 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
-
-$ORANGE_STOREFRONT_PAGE_TITLE = t('cart') . ' | ' . t('storefront_brand');
-$ORANGE_STOREFRONT_META_DESCRIPTION = t('cart_checkout_intro');
-
 include __DIR__ . '/../includes/header.php';
 $cartHomeUrl = storefront_url('home', $channelSlug, $lang);
 $tabBasketLabel = t('cart_tab_basket');

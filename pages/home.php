@@ -17,9 +17,6 @@ function storefront_catalog_label(array $row, string $lang): string
     };
 }
 
-$ORANGE_STOREFRONT_PAGE_TITLE = t('home') . ' | ' . t('storefront_brand');
-$ORANGE_STOREFRONT_META_DESCRIPTION = t('storefront_tagline');
-
 include __DIR__ . '/../includes/header.php';
 
 $homeHeroLines = storefront_home_hero_lines();

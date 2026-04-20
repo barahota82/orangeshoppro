@@ -21,7 +21,6 @@ if (!empty($result['ok']) && !empty($result['account_id'])) {
 }
 
 $ORANGE_STOREFRONT_PAGE_TITLE = t('storefront_verify_title');
-$ORANGE_STOREFRONT_META_DESCRIPTION = t('storefront_verify_title');
 
 include __DIR__ . '/../includes/header.php';
 
@@ -38,9 +37,8 @@ if (!empty($result['ok'])) {
 }
 ?>
 <div class="container">
-    <div class="page-title-box cart-page-head">
+    <div class="page-title-box">
         <h2><?php echo htmlspecialchars(t('storefront_verify_title'), ENT_QUOTES, 'UTF-8'); ?></h2>
-        <a class="cart-page-close" href="<?php echo htmlspecialchars($homeHref, ENT_QUOTES, 'UTF-8'); ?>" aria-label="<?php echo htmlspecialchars(t('product_back_to_shop'), ENT_QUOTES, 'UTF-8'); ?>"><span aria-hidden="true">&times;</span></a>
     </div>
     <div class="card-box" style="max-width: 32rem; margin: 0 auto;">
         <p class="cart-checkout-intro"><?php echo htmlspecialchars(t($msgKey), ENT_QUOTES, 'UTF-8'); ?></p>
