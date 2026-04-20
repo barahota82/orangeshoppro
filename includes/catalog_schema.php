@@ -67,7 +67,7 @@ function orange_catalog_safe_exec(PDO $pdo, string $sql): void
 }
 
 /**
- * عند نشر قاعدة جديدة أو جدول accounts فارغ: إدراج جذور دليل محاسبي افتراضية (عربي/إنجليزي) بترميز utf8mb4.
+ * عند نشر قاعدة جديدة أو جدول accounts فارغ: إدراج جذور دليل افتراضية (1–7) بترميز utf8mb4.
  * لا يعمل إن وُجدت أي صفوف — لن يستبدل دليلاً قائماً.
  */
 function orange_catalog_seed_default_accounts_if_empty(PDO $pdo): void
@@ -103,8 +103,9 @@ function orange_catalog_seed_default_accounts_if_empty(PDO $pdo): void
         ['code' => '2', 'name' => 'الخصوم', 'name_en' => 'Liabilities', 'nb' => 'credit'],
         ['code' => '3', 'name' => 'حقوق الملكية', 'name_en' => 'Equity', 'nb' => 'credit'],
         ['code' => '4', 'name' => 'الإيرادات', 'name_en' => 'Revenue', 'nb' => 'credit'],
-        ['code' => '5', 'name' => 'المصروفات', 'name_en' => 'Expenses', 'nb' => 'debit'],
-        ['code' => '6', 'name' => 'تكلفة المبيعات', 'name_en' => 'Cost of sales', 'nb' => 'debit'],
+        ['code' => '5', 'name' => 'تكلفة المبيعات', 'name_en' => 'Cost of sales', 'nb' => 'debit'],
+        ['code' => '6', 'name' => 'المصروفات', 'name_en' => 'Expenses', 'nb' => 'debit'],
+        ['code' => '7', 'name' => 'الحسابات التحليلية', 'name_en' => 'Analytical accounts', 'nb' => 'debit'],
     ];
 
     $lock = 'orange_seed_coa';
