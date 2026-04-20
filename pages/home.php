@@ -17,11 +17,11 @@ function storefront_catalog_label(array $row, string $lang): string
     };
 }
 
+include __DIR__ . '/../includes/header.php';
+
 $homeHeroLines = storefront_home_hero_lines();
 $homeHeroJson = json_encode($homeHeroLines, JSON_UNESCAPED_UNICODE);
 $homeHeroFirst = (string)($homeHeroLines[0] ?? '');
-
-include __DIR__ . '/../includes/header.php';
 
 $pdo = db();
 $channel = get_channel_by_slug(current_channel_slug());
@@ -298,8 +298,8 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
             <span class="tabs-nav-btn__icon" aria-hidden="true">‹</span>
         </button>
         <div class="tabs-scroll" id="homeCategoryTabs">
-            <button type="button" class="tab-btn active" data-tab-filter="all" onclick="filterProducts('all', this)"><?php echo htmlspecialchars(t('all')); ?></button>
-            <button type="button" class="tab-btn" data-tab-filter="offers" onclick="filterProducts('offers', this)"><?php echo htmlspecialchars(t('offers')); ?></button>
+            <button type="button" class="tab-btn active" data-tab-filter="all" onclick="filterProducts('all', this)"><?php echo htmlspecialchars(t('all'), ENT_QUOTES, 'UTF-8'); ?></button>
+            <button type="button" class="tab-btn" data-tab-filter="offers" onclick="filterProducts('offers', this)"><?php echo htmlspecialchars(t('offers'), ENT_QUOTES, 'UTF-8'); ?></button>
             <?php foreach ($categories as $cat): ?>
                 <button type="button" class="tab-btn" data-tab-filter="cat-<?php echo (int) $cat['id']; ?>" onclick="filterProducts('cat-<?php echo (int) $cat['id']; ?>', this)">
                     <?php echo htmlspecialchars(storefront_catalog_label($cat, $lang), ENT_QUOTES, 'UTF-8'); ?>
@@ -312,25 +312,23 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
     </section>
 
     <section id="productsGrid" class="products-grid">
-        <?php $homeGridImgIndex = 0; ?>
         <?php foreach ($offers as $p): ?>
             <article class="product-card" data-filter="offers cat-<?php echo (int) $p['category_id']; ?><?php echo $storefrontExtraFilterSuffix($p); ?>">
                 <div class="product-image-wrap">
-                    <img src="/uploads/products/<?php echo htmlspecialchars($p['main_image']); ?>" alt="<?php echo htmlspecialchars(storefront_product_display_name($p)); ?>" width="600" height="260" decoding="async" loading="<?php echo $homeGridImgIndex === 0 ? 'eager' : 'lazy'; ?>"<?php echo $homeGridImgIndex === 0 ? ' fetchpriority="high"' : ''; ?>>
-                    <span class="offer-badge"><?php echo htmlspecialchars(t('offers')); ?></span>
+                    <img src="/uploads/products/<?php echo htmlspecialchars($p['main_image'], ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?>">
+                    <span class="offer-badge"><?php echo htmlspecialchars(t('offers'), ENT_QUOTES, 'UTF-8'); ?></span>
                 </div>
                 <div class="product-body">
-                    <h3><?php echo htmlspecialchars(storefront_product_display_name($p)); ?></h3>
+                    <h3><?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?></h3>
                     <div class="price-row">
                         <strong><?php echo number_format((float) $p['price'] - (float) $p['discount'], 2); ?> KD</strong>
                         <span class="old-price"><?php echo number_format((float) $p['price'], 2); ?> KD</span>
                     </div>
-                    <a class="btn" href="<?php echo htmlspecialchars(storefront_url('product', (string) $channel['slug'], $lang, ['id' => (int) $p['id']])); ?>">
-                        <?php echo htmlspecialchars(t('view_product')); ?>
+                    <a class="btn" href="<?php echo htmlspecialchars(storefront_url('product', (string) $channel['slug'], $lang, ['id' => (int) $p['id']]), ENT_QUOTES, 'UTF-8'); ?>">
+                        <?php echo htmlspecialchars(t('view_product'), ENT_QUOTES, 'UTF-8'); ?>
                     </a>
                 </div>
             </article>
-        <?php $homeGridImgIndex++; ?>
         <?php endforeach; ?>
 
         <?php foreach ($products as $p): ?>
@@ -339,19 +337,18 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
             } ?>
             <article class="product-card" data-filter="all cat-<?php echo (int) $p['category_id']; ?><?php echo $storefrontExtraFilterSuffix($p); ?>">
                 <div class="product-image-wrap">
-                    <img src="/uploads/products/<?php echo htmlspecialchars($p['main_image']); ?>" alt="<?php echo htmlspecialchars(storefront_product_display_name($p)); ?>" width="600" height="260" decoding="async" loading="<?php echo $homeGridImgIndex === 0 ? 'eager' : 'lazy'; ?>"<?php echo $homeGridImgIndex === 0 ? ' fetchpriority="high"' : ''; ?>>
+                    <img src="/uploads/products/<?php echo htmlspecialchars($p['main_image'], ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
                 <div class="product-body">
-                    <h3><?php echo htmlspecialchars(storefront_product_display_name($p)); ?></h3>
+                    <h3><?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?></h3>
                     <div class="price-row">
                         <strong><?php echo number_format((float) $p['price'], 2); ?> KD</strong>
                     </div>
-                    <a class="btn" href="<?php echo htmlspecialchars(storefront_url('product', (string) $channel['slug'], $lang, ['id' => (int) $p['id']])); ?>">
-                        <?php echo htmlspecialchars(t('view_product')); ?>
+                    <a class="btn" href="<?php echo htmlspecialchars(storefront_url('product', (string) $channel['slug'], $lang, ['id' => (int) $p['id']]), ENT_QUOTES, 'UTF-8'); ?>">
+                        <?php echo htmlspecialchars(t('view_product'), ENT_QUOTES, 'UTF-8'); ?>
                     </a>
                 </div>
             </article>
-        <?php $homeGridImgIndex++; ?>
         <?php endforeach; ?>
     </section>
 </div>
