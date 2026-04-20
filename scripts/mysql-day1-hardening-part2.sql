@@ -1,8 +1,12 @@
--- orange: تحسينات إضافية (1) journal_entries + السنة المالية
---            (2) تنظيف stock_movements (القيود غالباً موجودة من الاستيراد)
---            (4) ربط orange_admin_audit_log بـ admins
---        (3) product_colorways → products — مؤجّل حسب طلبك
--- نفّذ بعد نسخة احتياطية؛ مرّة واحدة.
+-- orange: تحسينات إضافية — نفّذ بعد نسخة احتياطية؛ مرّة واحدة حيث يلزم.
+--
+-- (1) journal_entries — جدول تراثي؛ المصدر القياسي للقيود هو journal_vouchers +
+--     journal_lines. هذا القسم يصلح fiscal_year_id اليتيم فقط على قواعد لم تُرحَّل
+--     بعد (راجع includes/catalog_schema.php: ترحيل تلقائي عند journal_lines فارغ).
+--     إن كان الجدول فارغاً بعد الترحيل، لا ضرر من تشغيل UPDATE/ALTER (قد يكون no-op).
+-- (2) تنظيف stock_movements (القيود غالباً موجودة من الاستيراد)
+-- (4) ربط orange_admin_audit_log بـ admins
+-- (3) product_colorways → products — كان مؤجّلاً
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;

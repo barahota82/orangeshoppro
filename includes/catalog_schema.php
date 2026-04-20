@@ -348,6 +348,22 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         orange_catalog_safe_exec($pdo, 'ALTER TABLE categories ADD INDEX idx_categories_department (department_id)');
     }
 
+    /* مواءمة أطوال أسماء الفئات مع departments / الكتالوج (utf8mb4 — 191) */
+    if (orange_table_exists($pdo, 'categories')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE categories MODIFY COLUMN name_en VARCHAR(191) NULL DEFAULT NULL');
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE categories MODIFY COLUMN name_ar VARCHAR(191) NULL DEFAULT NULL');
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE categories MODIFY COLUMN name_fil VARCHAR(191) NULL DEFAULT NULL');
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE categories MODIFY COLUMN name_hi VARCHAR(191) NULL DEFAULT NULL');
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE categories MODIFY COLUMN slug VARCHAR(191) NOT NULL');
+    }
+    if (orange_table_exists($pdo, 'subcategories')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE subcategories MODIFY COLUMN name_ar VARCHAR(191) NOT NULL');
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE subcategories MODIFY COLUMN name_en VARCHAR(191) NULL DEFAULT NULL');
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE subcategories MODIFY COLUMN name_fil VARCHAR(191) NULL DEFAULT NULL');
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE subcategories MODIFY COLUMN name_hi VARCHAR(191) NULL DEFAULT NULL');
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE subcategories MODIFY COLUMN slug VARCHAR(191) NOT NULL');
+    }
+
     static $productSubOrphansCleaned = false;
     if (
         !$productSubOrphansCleaned
@@ -623,6 +639,16 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         );
     }
 
+    /*
+     |--------------------------------------------------------------------------
+     | ترحيل journal_entries (تراثي) → journal_vouchers / journal_lines
+     |--------------------------------------------------------------------------
+     | القرار: القيود الحديثة تُخزَّن في journal_vouchers + journal_lines. جدول
+     | journal_entries (مدين/دائن في صف واحد) تراثي. إن كان journal_lines فارغاً
+     | وjournal_entries يحتوي صفوفاً صالحة، يُستورد هنا ثم يُفرَّغ journal_entries.
+     | صفحة الأدمن journal_entries.php تستخدم السندات الحديثة رغم اسم الملف.
+     |--------------------------------------------------------------------------
+     */
     static $journalLegacyMigrated = false;
     if (
         !$journalLegacyMigrated
@@ -856,6 +882,60 @@ function orange_catalog_ensure_schema(PDO $pdo): void
                 KEY idx_order_intake_status_id (status, id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
+    }
+
+    /*
+     |--------------------------------------------------------------------------
+     | ربط المنتجات بالقنوات — يُستخدم من includes/product_channels.php وواجهات المنتجات
+     |--------------------------------------------------------------------------
+     */
+    if (
+        orange_table_exists($pdo, 'products')
+        && orange_table_exists($pdo, 'channels')
+        && !orange_table_exists($pdo, 'product_channels')
+    ) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE product_channels (
+                product_id INT NOT NULL,
+                channel_id INT NOT NULL,
+                PRIMARY KEY (product_id, channel_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+    if (orange_table_exists($pdo, 'product_channels')
+        && orange_table_exists($pdo, 'products')
+        && orange_table_exists($pdo, 'channels')
+    ) {
+        try {
+            $fkCntStmt = $pdo->query(
+                "SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'product_channels'
+                   AND CONSTRAINT_TYPE = 'FOREIGN KEY'"
+            );
+            $fkCnt = $fkCntStmt ? (int) $fkCntStmt->fetchColumn() : 2;
+            if ($fkCnt === 0) {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'ALTER TABLE product_channels
+                     ADD CONSTRAINT orange_fk_pc_product
+                     FOREIGN KEY (product_id) REFERENCES products (id)
+                     ON DELETE CASCADE ON UPDATE CASCADE'
+                );
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'ALTER TABLE product_channels
+                     ADD CONSTRAINT orange_fk_pc_channel
+                     FOREIGN KEY (channel_id) REFERENCES channels (id)
+                     ON DELETE CASCADE ON UPDATE CASCADE'
+                );
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] product_channels FK check: ' . $e->getMessage());
+            }
+        }
     }
 
     if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'customer_id')) {
