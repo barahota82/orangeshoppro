@@ -9,6 +9,9 @@ declare(strict_types=1);
 if (!function_exists('current_lang')) {
     require_once __DIR__ . '/../config.php';
 }
+require_once __DIR__ . '/catalog_schema.php';
+orange_catalog_ensure_schema(db());
+
 orange_send_html_no_cache_headers();
 
 extract(storefront_toolbar_state());
@@ -47,6 +50,9 @@ $orangePwaIcon512Url = $orangePubBase . storefront_asset_url('/assets/images/pwa
 $orangeWordmarkUrl = $orangePubBase . storefront_asset_url('/assets/images/orange-company-wordmark.png');
 $orangeManifestHref = $orangePubBase . '/manifest.php?' . http_build_query(['channel' => $channelSlug, 'lang' => $lang]);
 
+$pdoSfHdr = db();
+[$_sfPathToSlug, $_sfSlugToPath, $_sfValidSlugs, $_sfPathAlt] = orange_storefront_path_maps_for_js($pdoSfHdr);
+
 $dir = $lang === 'ar' ? 'rtl' : 'ltr';
 ?><!DOCTYPE html>
 <html lang="<?php echo htmlspecialchars($lang, ENT_QUOTES, 'UTF-8'); ?>" dir="<?php echo $dir === 'rtl' ? 'rtl' : 'ltr'; ?>">
@@ -63,13 +69,17 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
     <link rel="apple-touch-icon" sizes="180x180" href="<?php echo htmlspecialchars($orangePwaApple180Url, ENT_QUOTES, 'UTF-8'); ?>">
     <link rel="apple-touch-icon" sizes="120x120" href="<?php echo htmlspecialchars($orangePwaApple120Url, ENT_QUOTES, 'UTF-8'); ?>">
     <script>
+    window.ORANGE_SF_PATH_TO_SLUG = <?php echo json_encode($_sfPathToSlug, JSON_UNESCAPED_UNICODE); ?>;
+    window.ORANGE_SF_SLUG_TO_PATH = <?php echo json_encode($_sfSlugToPath, JSON_UNESCAPED_UNICODE); ?>;
+    window.ORANGE_SF_VALID_SLUGS = <?php echo json_encode($_sfValidSlugs, JSON_UNESCAPED_UNICODE); ?>;
     (function orangeStorefrontApplySavedChannel() {
         try {
             var params = new URLSearchParams(window.location.search || '');
             if (params.get('channel')) {
                 return;
             }
-            var allowed = { orange: 1, blue: 1, black: 1 };
+            var allowed = window.ORANGE_SF_VALID_SLUGS || {};
+            var shortPathRe = new RegExp('^\\/(' + <?php echo json_encode($_sfPathAlt, JSON_UNESCAPED_UNICODE); ?> + ')(-ar|-hi|-ph)?(\\/.*)?$', 'i');
             var accountCh = <?php echo json_encode($orangeAccountChannelForJs, JSON_UNESCAPED_UNICODE); ?>;
             function orangeReadSfChannelCookie() {
                 var name = '<?php echo htmlspecialchars(orange_storefront_channel_cookie_name(), ENT_QUOTES, 'UTF-8'); ?>=';
@@ -83,7 +93,8 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
                 return '';
             }
             var savedCh = '';
-            if (accountCh && allowed[String(accountCh).toLowerCase()]) {
+            var accKey = accountCh ? String(accountCh).toLowerCase() : '';
+            if (accKey && allowed[accKey]) {
                 savedCh = String(accountCh).replace(/[^a-z0-9\-]/gi, '').toLowerCase();
             } else {
                 var rawLs = localStorage.getItem('orange_storefront_channel') || '';
@@ -110,8 +121,9 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
                 navLang = 'en';
             }
             function orangeSegForChannel(ch) {
-                if (ch === 'black') { return 'web'; }
-                if (ch === 'blue') { return 'online'; }
+                var map = window.ORANGE_SF_SLUG_TO_PATH || {};
+                var s = String(ch || '').toLowerCase();
+                if (map[s]) { return map[s]; }
                 return 'tiktok';
             }
             function orangeSuffixForLang(lang) {
@@ -121,11 +133,12 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
                 return '';
             }
             function orangeParseShortStorePath(pathname) {
-                var m = String(pathname).match(/^\/(web|online|tiktok)(-ar|-hi|-ph)?(\/.*)?$/i);
+                var m = String(pathname).match(shortPathRe);
                 if (!m) { return null; }
                 var seg = m[1].toLowerCase();
-                var ch = seg === 'web' ? 'black' : (seg === 'online' ? 'blue' : 'orange');
-                var suff = m[2] || '';
+                var pmap = window.ORANGE_SF_PATH_TO_SLUG || {};
+                var ch = pmap[seg];
+                if (!ch) { return null; }
                 var tail = m[3] || '';
                 return { ch: ch, tail: tail };
             }
@@ -184,20 +197,19 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
         window.ORANGE_ACCOUNT_CHANNEL = <?php echo json_encode($orangeAccountChannelForJs, JSON_UNESCAPED_UNICODE); ?>;
         window.STOREFRONT_BASE = <?php echo json_encode(PUBLIC_BASE_PATH, JSON_UNESCAPED_UNICODE); ?>;
         window.orangeSfCartKey = function () {
+            var allowed = window.ORANGE_SF_VALID_SLUGS || {};
             var ch = (typeof window.APP_CHANNEL_SLUG === 'string' && window.APP_CHANNEL_SLUG) ? window.APP_CHANNEL_SLUG : 'orange';
             ch = String(ch).replace(/[^a-z0-9\-]/gi, '').toLowerCase();
-            if (!ch) {
-                ch = 'orange';
-            }
-            if (ch !== 'orange' && ch !== 'blue' && ch !== 'black') {
-                ch = 'orange';
+            if (!ch || !allowed[ch]) {
+                ch = allowed['orange'] ? 'orange' : (Object.keys(allowed)[0] || 'orange');
             }
             return 'orange_sf_cart_' + ch;
         };
         window.orangeSfPersistChannel = function (rawCh) {
             try {
+                var allowed = window.ORANGE_SF_VALID_SLUGS || {};
                 var ch = String(rawCh || '').replace(/[^a-z0-9\-]/gi, '').toLowerCase();
-                if (!ch || (ch !== 'orange' && ch !== 'blue' && ch !== 'black')) {
+                if (!ch || !allowed[ch]) {
                     return;
                 }
                 localStorage.setItem('orange_storefront_channel', ch);
@@ -234,6 +246,7 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             track_missing_fields: <?php echo json_encode(t('track_missing_fields'), JSON_UNESCAPED_UNICODE); ?>,
             checkout_required_fields: <?php echo json_encode(t('checkout_required_fields'), JSON_UNESCAPED_UNICODE); ?>,
             checkout_invalid_email: <?php echo json_encode(t('checkout_invalid_email'), JSON_UNESCAPED_UNICODE); ?>,
+            checkout_invalid_phone: <?php echo json_encode(t('checkout_invalid_phone'), JSON_UNESCAPED_UNICODE); ?>,
             select_color: <?php echo json_encode(t('select_color'), JSON_UNESCAPED_UNICODE); ?>,
             select_size: <?php echo json_encode(t('select_size'), JSON_UNESCAPED_UNICODE); ?>,
             added: <?php echo json_encode(t('added'), JSON_UNESCAPED_UNICODE); ?>,

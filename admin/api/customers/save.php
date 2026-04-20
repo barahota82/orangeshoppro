@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/phone_validation.php';
 require_admin_api();
 
 /**
@@ -31,13 +32,20 @@ try {
     $data = get_json_input();
     $idIn = (int) ($data['id'] ?? 0);
     $name = trim((string) ($data['name_ar'] ?? ''));
-    $phone = trim((string) ($data['phone'] ?? ''));
-    if ($phone === '') {
+    $phoneRaw = trim((string) ($data['phone'] ?? ''));
+    if ($phoneRaw === '') {
         json_response(['success' => false, 'message' => 'رقم الهاتف مطلوب كمعرّف للعميل'], 422);
+    }
+    $admCc = trim((string) ($data['phone_country'] ?? ''));
+    $admCc = $admCc === '' ? null : $admCc;
+    $phone = orange_normalize_customer_phone($phoneRaw, $admCc);
+    if ($phone === null) {
+        json_response(['success' => false, 'message' => 'رقم الهاتف غير صالح. استخدم + أو 00 مع كود الدولة، أو اختر الدولة وأدخل الرقم الوطني (8–14 رقماً مع الكود).'], 422);
     }
     if ($name === '') {
         $name = 'عميل';
     }
+    $name = function_exists('mb_substr') ? mb_substr($name, 0, 255, 'UTF-8') : substr($name, 0, 255);
 
     $hasLimit = orange_table_has_column($pdo, 'customers', 'credit_limit');
     $hasNotes = orange_table_has_column($pdo, 'customers', 'notes');
@@ -48,7 +56,9 @@ try {
     $codeSql = orange_customer_normalize_code($pdo, $data['code'] ?? '');
 
     $area = trim((string) ($data['area'] ?? ''));
+    $area = function_exists('mb_substr') ? mb_substr($area, 0, 255, 'UTF-8') : substr($area, 0, 255);
     $address = trim((string) ($data['address'] ?? ''));
+    $address = function_exists('mb_substr') ? mb_substr($address, 0, 2000, 'UTF-8') : substr($address, 0, 2000);
     $emailIn = trim((string) ($data['email'] ?? ''));
     $emailSql = null;
     if ($emailIn !== '') {

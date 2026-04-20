@@ -1,38 +1,66 @@
 -- orange: تحسينات إضافية — نفّذ بعد نسخة احتياطية؛ مرّة واحدة حيث يلزم.
 --
--- (1) journal_entries — جدول تراثي؛ المصدر القياسي للقيود هو journal_vouchers +
---     journal_lines. شغّل هذا القسم فقط إن وُجد الجدول (قواعد قديمة أو dump).
---     قواعد أُنشئت من mysql-create-orange-database-full.sql الحالي لا تحتوي journal_entries —
---     في هذه الحالة علّق القسم (1) بالكامل وإلا يفشل UPDATE/ALTER.
---     إن وُجد الجدول وفارغاً بعد الترحيل، لا ضرر غالباً من تشغيل البنود (قد يكون no-op
---     أو فشل ADD CONSTRAINT إن وُجد القيد — راجع تذييل الملف).
--- (2) تنظيف stock_movements (القيود غالباً موجودة من الاستيراد)
+-- (1) journal_entries — تراثي فقط. القرار والتفاصيل: IBRAHIM_ORANGE_MASTER.txt قسم (6).
+--     يُنفَّذ فقط إن وُجد الجدول (قواعد من mysql-create الحالي بلا journal_entries تتخطاه تلقائياً).
+-- (2) تنظيف stock_movements
 -- (4) ربط orange_admin_audit_log بـ admins
--- (3) product_colorways → products — كان مؤجّلاً
 
-SET NAMES utf8mb4;
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- ===========================================================================
--- (1) journal_entries: سنة مالية صالحة أو NULL
+-- (1) journal_entries: تصحيح fiscal_year_id اليتيم + FK (إن لم يكن موجوداً) + فهرس
 -- ===========================================================================
-UPDATE `journal_entries` je
-LEFT JOIN `fiscal_years` fy ON fy.id = je.fiscal_year_id
-SET je.fiscal_year_id = NULL
-WHERE je.fiscal_year_id IS NOT NULL AND fy.id IS NULL;
+DELIMITER $$
 
-ALTER TABLE `journal_entries`
-  ADD CONSTRAINT `fk_journal_entries_fiscal_year`
-  FOREIGN KEY (`fiscal_year_id`) REFERENCES `fiscal_years` (`id`)
-  ON DELETE SET NULL ON UPDATE CASCADE;
+DROP PROCEDURE IF EXISTS `orange_legacy_journal_entries_hardening`$$
 
--- فهرس للاستعلامات (آمن إن وُجد مسبقاً في MariaDB 10.5.2+ / MySQL 8)
-CREATE INDEX IF NOT EXISTS `idx_journal_entries_fiscal_year` ON `journal_entries` (`fiscal_year_id`);
+CREATE PROCEDURE `orange_legacy_journal_entries_hardening`()
+orange_je: BEGIN
+    DECLARE je_cnt INT DEFAULT 0;
+    DECLARE fk_cnt INT DEFAULT 0;
+
+    SELECT COUNT(*) INTO je_cnt
+    FROM information_schema.tables
+    WHERE table_schema = DATABASE()
+      AND table_name = 'journal_entries';
+
+    IF je_cnt = 0 THEN
+        LEAVE orange_je;
+    END IF;
+
+    UPDATE `journal_entries` je
+    LEFT JOIN `fiscal_years` fy ON fy.id = je.fiscal_year_id
+    SET je.fiscal_year_id = NULL
+    WHERE je.fiscal_year_id IS NOT NULL AND fy.id IS NULL;
+
+    SELECT COUNT(*) INTO fk_cnt
+    FROM information_schema.table_constraints
+    WHERE table_schema = DATABASE()
+      AND table_name = 'journal_entries'
+      AND constraint_name = 'fk_journal_entries_fiscal_year'
+      AND constraint_type = 'FOREIGN KEY';
+
+    IF fk_cnt = 0 THEN
+        ALTER TABLE `journal_entries`
+            ADD CONSTRAINT `fk_journal_entries_fiscal_year`
+            FOREIGN KEY (`fiscal_year_id`) REFERENCES `fiscal_years` (`id`)
+            ON DELETE SET NULL ON UPDATE CASCADE;
+    END IF;
+
+    SET @__orange_idx := 'CREATE INDEX IF NOT EXISTS `idx_journal_entries_fiscal_year` ON `journal_entries` (`fiscal_year_id`)';
+    PREPARE __orange_stmt FROM @__orange_idx;
+    EXECUTE __orange_stmt;
+    DEALLOCATE PREPARE __orange_stmt;
+END$$
+
+DELIMITER ;
+
+CALL `orange_legacy_journal_entries_hardening`();
+DROP PROCEDURE IF EXISTS `orange_legacy_journal_entries_hardening`;
 
 -- ===========================================================================
--- (2) stock_movements: إزالة مراجع يتيمة (product_id / variant_id قابلان لـ NULL)
---     جداولك الأصلية غالباً فيها بالفعل stock_movements_ibfk_1 / _2؛
---     لا نضيف قيوداً مكررة هنا — فقط تنظيف البيانات.
+-- (2) stock_movements: إزالة مراجع يتيمة
 -- ===========================================================================
 UPDATE `stock_movements` sm
 LEFT JOIN `products` p ON p.id = sm.product_id
@@ -45,7 +73,7 @@ SET sm.variant_id = NULL
 WHERE sm.variant_id IS NOT NULL AND pv.id IS NULL;
 
 -- ===========================================================================
--- (4) orange_admin_audit_log: admin_id يشير لمسؤول موجود أو NULL
+-- (4) orange_admin_audit_log
 -- ===========================================================================
 UPDATE `orange_admin_audit_log` al
 LEFT JOIN `admins` ad ON ad.id = al.admin_id
@@ -60,8 +88,7 @@ ALTER TABLE `orange_admin_audit_log`
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ===========================================================================
--- إن فشل أحد البنود:
--- * CREATE INDEX IF NOT EXISTS: إن نسخة MySQL أقدم، احذف السطر أو أنشئ الفهرس يدوياً
---   بعد التأكد بعدم وجود idx_journal_entries_fiscal_year.
--- * ADD CONSTRAINT مكرر: القيد موجود — احذف سطر ALTER المناسب.
+-- استكشاف الأخطاء:
+-- * fk_orange_audit_admin مكرر: احذف سطر ALTER المناسب أو أسقط القيد القديم أولاً.
+-- * CREATE INDEX IF NOT EXISTS: يتطلب MariaDB 10.5.2+ / إصدار MySQL يدعم الصيغة؛ وإلا أنشئ الفهرس يدوياً.
 -- ===========================================================================

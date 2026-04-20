@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/catalog_schema.php';
 require_once __DIR__ . '/../includes/storefront_account.php';
+require_once __DIR__ . '/../includes/storefront_phone_country_select.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -103,23 +104,27 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="reg_name"><?php echo htmlspecialchars(t('customer_name'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="reg_name" name="name" type="text" autocomplete="name" required placeholder="<?php echo htmlspecialchars(t('register_placeholder_name'), ENT_QUOTES, 'UTF-8'); ?>">
+                    <input id="reg_name" name="name" type="text" autocomplete="name" required maxlength="500" placeholder="<?php echo htmlspecialchars(t('register_placeholder_name'), ENT_QUOTES, 'UTF-8'); ?>">
+                </div>
+                <div class="field track-signup-cta__field">
+                    <label for="reg_phone_country"><?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <?php orange_storefront_render_phone_country_select('reg_phone_country'); ?>
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="reg_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="reg_phone" name="phone" type="tel" autocomplete="tel" required inputmode="tel" placeholder="<?php echo htmlspecialchars(t('register_placeholder_phone'), ENT_QUOTES, 'UTF-8'); ?>">
+                    <input id="reg_phone" class="js-orange-phone-input" name="phone" type="tel" autocomplete="tel" required inputmode="tel" maxlength="22" placeholder="<?php echo htmlspecialchars(t('phone_field_hint'), ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="reg_area"><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="reg_area" name="area" autocomplete="address-level1" required placeholder="<?php echo htmlspecialchars(t('register_placeholder_area'), ENT_QUOTES, 'UTF-8'); ?>">
+                    <input id="reg_area" name="area" autocomplete="address-level1" required maxlength="500" placeholder="<?php echo htmlspecialchars(t('register_placeholder_area'), ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="reg_address"><?php echo htmlspecialchars(t('address'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <textarea id="reg_address" name="address" autocomplete="street-address" required rows="3" placeholder="<?php echo htmlspecialchars(t('register_placeholder_address'), ENT_QUOTES, 'UTF-8'); ?>"></textarea>
+                    <textarea id="reg_address" name="address" autocomplete="street-address" required rows="3" maxlength="8000" placeholder="<?php echo htmlspecialchars(t('register_placeholder_address'), ENT_QUOTES, 'UTF-8'); ?>"></textarea>
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="reg_notes"><?php echo htmlspecialchars(t('notes'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <textarea id="reg_notes" name="notes" rows="2" placeholder="<?php echo htmlspecialchars(t('register_placeholder_notes'), ENT_QUOTES, 'UTF-8'); ?>"></textarea>
+                    <textarea id="reg_notes" name="notes" rows="2" maxlength="4000" placeholder="<?php echo htmlspecialchars(t('register_placeholder_notes'), ENT_QUOTES, 'UTF-8'); ?>"></textarea>
                 </div>
                 <p id="orangeRegisterMsg" class="track-signup-cta__feedback" style="margin-top: 0.75rem;" hidden></p>
                 <div class="track-signup-cta__actions">
@@ -138,27 +143,33 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                 var err = <?php echo json_encode(t('storefront_register_error'), JSON_UNESCAPED_UNICODE); ?>;
                 var reqMsg = (window.APP_T && window.APP_T.checkout_required_fields) || '';
                 var badEmail = (window.APP_T && window.APP_T.checkout_invalid_email) || '';
+                var badPhone = (window.APP_T && window.APP_T.checkout_invalid_phone) || '';
                 form.addEventListener('submit', function (e) {
                     e.preventDefault();
                     msg.hidden = false;
                     msg.textContent = '';
                     var email = (document.getElementById('reg_email') || {}).value.trim() || '';
                     var name = (document.getElementById('reg_name') || {}).value.trim() || '';
-                    var phone = (document.getElementById('reg_phone') || {}).value.trim() || '';
+                    var phoneRaw = (document.getElementById('reg_phone') || {}).value.trim() || '';
+                    var ccEl = document.getElementById('reg_phone_country');
+                    var cc = ccEl && ccEl.value ? String(ccEl.value) : '';
+                    var phone =
+                        typeof window.orangeNormalizeCustomerPhone === 'function'
+                            ? window.orangeNormalizeCustomerPhone(phoneRaw, cc || null)
+                            : null;
                     var area = (document.getElementById('reg_area') || {}).value.trim() || '';
                     var address = (document.getElementById('reg_address') || {}).value.trim() || '';
                     var notes = (document.getElementById('reg_notes') || {}).value.trim() || '';
-                    if (!name || !phone || !email || !area || !address) {
+                    if (!name || !phoneRaw || !email || !area || !address) {
                         msg.textContent = reqMsg;
+                        return;
+                    }
+                    if (!phone) {
+                        msg.textContent = badPhone || reqMsg;
                         return;
                     }
                     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
                         msg.textContent = badEmail;
-                        return;
-                    }
-                    var digits = phone.replace(/\D/g, '');
-                    if (digits.length < 5) {
-                        msg.textContent = reqMsg;
                         return;
                     }
                     var base = typeof window.STOREFRONT_BASE === 'string' ? window.STOREFRONT_BASE : '';
@@ -185,6 +196,7 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                             email: email,
                             name: name,
                             phone: phone,
+                            phone_country: cc,
                             area: area,
                             address: address,
                             notes: notes,

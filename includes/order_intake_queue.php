@@ -199,6 +199,14 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         throw new RuntimeException(function_exists('t') ? t('checkout_invalid_email') : 'Invalid email.');
     }
 
+    $phoneCc = trim((string) ($data['phone_country'] ?? ''));
+    $phoneCc = $phoneCc === '' ? null : $phoneCc;
+    $phoneNorm = orange_normalize_customer_phone(trim((string) ($data['phone'] ?? '')), $phoneCc);
+    if ($phoneNorm === null) {
+        throw new RuntimeException(function_exists('t') ? t('checkout_invalid_phone') : 'Invalid phone.');
+    }
+    $data['phone'] = $phoneNorm;
+
     if (!is_array($data['items']) || count($data['items']) === 0) {
         throw new RuntimeException('Cart items are required');
     }

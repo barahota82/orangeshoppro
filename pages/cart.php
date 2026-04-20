@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/storefront_phone_country_select.php';
 include __DIR__ . '/../includes/header.php';
 $cartHomeUrl = storefront_url('home', $channelSlug, $lang);
 $tabBasketLabel = t('cart_tab_basket');
@@ -48,27 +49,31 @@ $proceedLabel = t('cart_proceed_to_order');
                 <div id="cartOrderMiniSummary" class="cart-mini-summary" hidden></div>
                 <div class="field">
                     <label for="customer_name"><?php echo htmlspecialchars(t('customer_name'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="customer_name" autocomplete="name">
+                    <input id="customer_name" autocomplete="name" maxlength="500">
+                </div>
+                <div class="field">
+                    <label for="customer_phone_country"><?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <?php orange_storefront_render_phone_country_select('customer_phone_country'); ?>
                 </div>
                 <div class="field">
                     <label for="customer_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="customer_phone" type="tel" autocomplete="tel" inputmode="tel">
+                    <input id="customer_phone" class="js-orange-phone-input" type="tel" autocomplete="tel" inputmode="tel" maxlength="22" placeholder="<?php echo htmlspecialchars(t('phone_field_hint'), ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
                 </div>
                 <div class="field">
                     <label for="customer_email"><?php echo htmlspecialchars(t('customer_email'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="customer_email" type="email" autocomplete="email" inputmode="email">
+                    <input id="customer_email" type="email" autocomplete="email" inputmode="email" maxlength="255">
                 </div>
                 <div class="field">
                     <label for="customer_area"><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="customer_area" autocomplete="address-level1">
+                    <input id="customer_area" autocomplete="address-level1" maxlength="500">
                 </div>
                 <div class="field">
                     <label for="customer_address"><?php echo htmlspecialchars(t('address'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <textarea id="customer_address" autocomplete="street-address"></textarea>
+                    <textarea id="customer_address" autocomplete="street-address" maxlength="8000"></textarea>
                 </div>
                 <div class="field">
                     <label for="customer_notes"><?php echo htmlspecialchars(t('notes'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <textarea id="customer_notes"></textarea>
+                    <textarea id="customer_notes" maxlength="4000"></textarea>
                 </div>
                 <div class="field cart-checkout-payment-radios" role="group" aria-labelledby="cart_pay_method_legend">
                     <span id="cart_pay_method_legend" class="cart-payment-legend"><?php echo htmlspecialchars(t('payment_terms_label'), ENT_QUOTES, 'UTF-8'); ?></span>

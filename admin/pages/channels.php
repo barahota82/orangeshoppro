@@ -1,6 +1,12 @@
 <?php
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/../../includes/catalog_schema.php';
+
 $pdo = db();
-$channels = $pdo->query("SELECT * FROM channels ORDER BY id ASC")->fetchAll();
+orange_catalog_ensure_schema($pdo);
+$channels = $pdo->query('SELECT * FROM channels ORDER BY id ASC')->fetchAll();
 ?>
 <div class="page-title">
     <h1>الواجهات (قنوات العملاء)</h1>
@@ -10,14 +16,15 @@ $channels = $pdo->query("SELECT * FROM channels ORDER BY id ASC")->fetchAll();
 
 <div class="card">
     <h3>إضافة واجهة</h3>
+    <p class="card-hint" style="margin:0 0 0.75rem;">اختصار الرابط يظهر في عنوان الموقع مثل <code>/tiktok</code> أو <code>/instagram</code> — يُربط تلقائياً بالمخزن الموحّد. يُنشأ معرّف داخلي (slug) تلقائياً للنظام.</p>
     <div class="form-grid">
         <div>
-            <label>الاسم</label>
-            <input type="text" id="channel_name">
+            <label>اسم الواجهة</label>
+            <input type="text" id="channel_name" placeholder="مثال: متجر إنستغرام">
         </div>
         <div>
-            <label>Slug</label>
-            <input type="text" id="channel_slug">
+            <label>اختصار الرابط (بالإنجليزية)</label>
+            <input type="text" id="channel_path_segment" placeholder="مثل: instagram أو sale" dir="ltr" lang="en" autocomplete="off">
         </div>
         <div>
             <label>الشعار (اسم الملف)</label>
@@ -45,10 +52,10 @@ $channels = $pdo->query("SELECT * FROM channels ORDER BY id ASC")->fetchAll();
                 <tr>
                     <th>#</th>
                     <th>الاسم</th>
-                    <th>Slug</th>
+                    <th>اختصار URL</th>
+                    <th>Slug داخلي</th>
                     <th>اللون</th>
                     <th>الواتساب</th>
-                    <th>المخزن</th>
                     <th>الحالة</th>
                 </tr>
             </thead>
@@ -57,7 +64,8 @@ $channels = $pdo->query("SELECT * FROM channels ORDER BY id ASC")->fetchAll();
                 <tr>
                     <td><?php echo (int)$ch['id']; ?></td>
                     <td><?php echo htmlspecialchars($ch['name']); ?></td>
-                    <td><?php echo htmlspecialchars($ch['slug']); ?></td>
+                    <td><code dir="ltr"><?php echo htmlspecialchars((string)($ch['path_segment'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
+                    <td><code dir="ltr"><?php echo htmlspecialchars($ch['slug']); ?></code></td>
                     <td><?php echo htmlspecialchars($ch['primary_color']); ?></td>
                     <td><?php echo htmlspecialchars($ch['whatsapp_number']); ?></td>
                     <td><?php echo (int)$ch['is_active'] === 1 ? 'نشط' : 'مخفي'; ?></td>
@@ -72,7 +80,7 @@ $channels = $pdo->query("SELECT * FROM channels ORDER BY id ASC")->fetchAll();
 async function saveChannel() {
     const payload = {
         name: document.getElementById('channel_name').value.trim(),
-        slug: document.getElementById('channel_slug').value.trim(),
+        path_segment: document.getElementById('channel_path_segment').value.trim(),
         logo: document.getElementById('channel_logo').value.trim(),
         primary_color: document.getElementById('channel_color').value.trim(),
         whatsapp_number: document.getElementById('channel_whatsapp').value.trim()

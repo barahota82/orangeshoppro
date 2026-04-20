@@ -148,6 +148,9 @@ function orangeCheckoutApiMessage(result) {
     if (c === 'missing_fields' && T.checkout_required_fields) {
         return T.checkout_required_fields;
     }
+    if (c === 'invalid_phone' && T.checkout_invalid_phone) {
+        return T.checkout_invalid_phone;
+    }
     if (c === 'invalid_phone' && T.storefront_register_invalid_phone) {
         return T.storefront_register_invalid_phone;
     }
@@ -673,9 +676,19 @@ async function sendOrderNow() {
     const emailRaw = document.getElementById('customer_email')
         ? document.getElementById('customer_email').value.trim()
         : '';
+    const ccEl = document.getElementById('customer_phone_country');
+    const ccVal = ccEl && ccEl.value ? String(ccEl.value) : '';
+    const phoneRaw = document.getElementById('customer_phone')
+        ? document.getElementById('customer_phone').value.trim()
+        : '';
+    const phoneNorm =
+        typeof window.orangeNormalizeCustomerPhone === 'function'
+            ? window.orangeNormalizeCustomerPhone(phoneRaw, ccVal || null)
+            : null;
     const payload = {
         name: document.getElementById('customer_name').value.trim(),
-        phone: document.getElementById('customer_phone').value.trim(),
+        phone: phoneNorm || phoneRaw,
+        phone_country: ccVal,
         email: emailRaw,
         area: document.getElementById('customer_area').value.trim(),
         address: document.getElementById('customer_address').value.trim(),
@@ -686,10 +699,15 @@ async function sendOrderNow() {
         lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
     };
 
-    if (!payload.name || !payload.phone || !payload.email || !payload.area || !payload.address) {
+    if (!payload.name || !phoneRaw || !payload.email || !payload.area || !payload.address) {
         orangeShowToast(window.APP_T.checkout_required_fields || 'Please fill all required fields.', 3200);
         return;
     }
+    if (!phoneNorm) {
+        orangeShowToast(window.APP_T.checkout_invalid_phone || window.APP_T.storefront_register_invalid_phone || '', 3600);
+        return;
+    }
+    payload.phone = phoneNorm;
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
         orangeShowToast(window.APP_T.checkout_invalid_email || 'Invalid email.', 3200);
         return;
@@ -699,10 +717,10 @@ async function sendOrderNow() {
     let result;
     try {
         response = await fetch(storefrontApiUrl('/api/orders/create-order.php'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
         result = await response.json();
     } catch (e) {
         orangeShowToast(

@@ -327,14 +327,16 @@ function orange_party_aging_buckets(PDO $pdo, string $partyKind, int $partyId, ?
 
 function orange_ensure_customer(PDO $pdo, string $nameAr, string $phone): int
 {
+    require_once __DIR__ . '/phone_validation.php';
     orange_catalog_ensure_schema($pdo);
     if (!orange_table_exists($pdo, 'customers')) {
         return 0;
     }
-    $phone = trim($phone);
-    if ($phone === '') {
+    $phoneNorm = orange_normalize_customer_phone(trim($phone), null);
+    if ($phoneNorm === null) {
         return 0;
     }
+    $phone = $phoneNorm;
     $nameAr = trim($nameAr);
     $st = $pdo->prepare('SELECT id FROM customers WHERE phone = ? LIMIT 1');
     $st->execute([$phone]);

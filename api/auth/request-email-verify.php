@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/order_helpers.php';
 require_once __DIR__ . '/../../includes/storefront_account.php';
 require_once __DIR__ . '/../../includes/orange_mail.php';
+require_once __DIR__ . '/../../includes/phone_validation.php';
 
 try {
     $pdo = db();
@@ -42,6 +43,11 @@ try {
     $channelSlug = orange_storefront_valid_channel_slug($pdo, $channelSlug);
 
     if ($trackCtx) {
+        $vphNorm = orange_normalize_customer_phone($orderVerifyPhone, null);
+        if ($vphNorm === null) {
+            json_response(['success' => false, 'code' => 'invalid_phone', 'message' => t('checkout_invalid_phone')], 422);
+        }
+        $orderVerifyPhone = $vphNorm;
         $ost = $pdo->prepare('SELECT * FROM orders WHERE order_number = ? LIMIT 1');
         $ost->execute([$orderNumberLink]);
         $orderRow = $ost->fetch(PDO::FETCH_ASSOC);
@@ -51,8 +57,13 @@ try {
         if (!orange_order_phones_match_for_lookup($orderVerifyPhone, (string) ($orderRow['phone'] ?? ''))) {
             json_response(['success' => false, 'code' => 'order_link_mismatch', 'message' => t('track_signup_order_mismatch')], 404);
         }
-        if ($phoneRaw !== '' && !orange_order_phones_match_for_lookup($phoneRaw, (string) ($orderRow['phone'] ?? ''))) {
-            json_response(['success' => false, 'code' => 'signup_phone_mismatch', 'message' => t('track_signup_order_mismatch')], 422);
+        if ($phoneRaw !== '') {
+            $regCc2 = trim((string) ($data['phone_country'] ?? ''));
+            $regCc2 = $regCc2 === '' ? null : $regCc2;
+            $prNorm = orange_normalize_customer_phone($phoneRaw, $regCc2);
+            if ($prNorm === null || !orange_order_phones_match_for_lookup($prNorm, (string) ($orderRow['phone'] ?? ''))) {
+                json_response(['success' => false, 'code' => 'signup_phone_mismatch', 'message' => t('track_signup_order_mismatch')], 422);
+            }
         }
 
         $oName = trim((string) ($orderRow['customer_name'] ?? ''));
@@ -93,13 +104,15 @@ try {
         if ($nameRaw === '' || $phoneRaw === '' || $areaRaw === '' || $addressRaw === '') {
             json_response(['success' => false, 'code' => 'missing_fields', 'message' => t('checkout_required_fields')], 422);
         }
-        $digits = preg_replace('/\D+/', '', $phoneRaw) ?? '';
-        if (strlen($digits) < 5) {
-            json_response(['success' => false, 'code' => 'invalid_phone', 'message' => t('storefront_register_invalid_phone')], 422);
+        $regCc = trim((string) ($data['phone_country'] ?? ''));
+        $regCc = $regCc === '' ? null : $regCc;
+        $phoneNormReg = orange_normalize_customer_phone($phoneRaw, $regCc);
+        if ($phoneNormReg === null) {
+            json_response(['success' => false, 'code' => 'invalid_phone', 'message' => t('checkout_invalid_phone')], 422);
         }
 
         $customerName = orange_storefront_clip_utf8($nameRaw, 255);
-        $customerPhone = orange_storefront_clip_utf8($phoneRaw, 64);
+        $customerPhone = orange_storefront_clip_utf8($phoneNormReg, 64);
         $customerArea = orange_storefront_clip_utf8($areaRaw, 255);
         $customerAddress = orange_storefront_clip_utf8($addressRaw, 4000);
         $customerNotes = $notesRaw === '' ? '' : orange_storefront_clip_utf8($notesRaw, 4000);

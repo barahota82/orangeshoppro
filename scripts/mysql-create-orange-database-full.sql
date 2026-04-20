@@ -252,13 +252,21 @@ CREATE TABLE `document_sequences` (
   PRIMARY KEY (`scope`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE `orange_schema_migrations` (
+  `id` int UNSIGNED NOT NULL AUTO_INCREMENT,
+  `filename` varchar(191) NOT NULL,
+  `applied_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_orange_migration` (`filename`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `customers` (
   `id` int NOT NULL AUTO_INCREMENT,
   `code` varchar(32) DEFAULT NULL,
-  `name_ar` varchar(160) NOT NULL DEFAULT '',
-  `phone` varchar(40) NOT NULL DEFAULT '',
-  `area` varchar(160) NOT NULL DEFAULT '',
-  `address` varchar(600) NOT NULL DEFAULT '',
+  `name_ar` varchar(255) NOT NULL DEFAULT '',
+  `phone` varchar(32) NOT NULL DEFAULT '',
+  `area` varchar(255) NOT NULL DEFAULT '',
+  `address` varchar(2000) NOT NULL DEFAULT '',
   `email` varchar(255) DEFAULT NULL,
   `notes` text,
   `credit_limit` decimal(18,4) DEFAULT NULL,
@@ -422,9 +430,9 @@ CREATE TABLE `offers` (
 CREATE TABLE `orders` (
   `id` int NOT NULL AUTO_INCREMENT,
   `order_number` varchar(50) NOT NULL,
-  `customer_name` varchar(100) NOT NULL,
-  `phone` varchar(20) NOT NULL,
-  `area` varchar(100) DEFAULT NULL,
+  `customer_name` varchar(255) NOT NULL,
+  `phone` varchar(32) NOT NULL,
+  `area` varchar(255) DEFAULT NULL,
   `address` text,
   `notes` text,
   `channel_id` int DEFAULT NULL,

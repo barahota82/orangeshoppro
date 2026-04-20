@@ -114,7 +114,8 @@ Last handoff note: 2026-04-19 — **`gl_posting`**: معاينة أسطر الح
 ARABIC — لوحة الإدارة (`admin/pages/`)
 - `gl_account_settings` — مُنفَّذ: قسمان + **`orange_gl_journal_type_rules`**؛ API **`settings/gl-accounts.php`** (`journal_rules` في الحفظ).
 - `gl_posting` — بوابة إقفال/ترحيل موحّدة: قوائم معلّق/مثبت، ترحيل، فك ترحيل انتقائي؛ تحديث التسمية في `header.php` عند الاعتماد.
-- `journal_entries` — توضيح الدور مقابل الحركات المعلّقة (مسودة vs بعد التثبيت) وتعديل النصوص/التدفق حسب القرار.
+- `journal_entries` — اسم ملف/قائمة تراثي؛ القرار المُثبَّت: IBRAHIM_ORANGE_MASTER.txt قسم (6).
+  الواجهة تستخدم journal_vouchers / journal_lines. جدول journal_entries تراثي فقط إن وُجد في قديمة.
 - `journal_types` — غالباً بقاء التعريف؛ الربط التفصيلي في `gl_account_settings` السفلي.
 - `fiscal_years` — ربط منطق الترحيل بسنة مفتوحة (غالباً موجود؛ يُراجع مع جداول الحركات الجديدة).
 - `partner_ledger` — قبض/صرف: إن أصبحت حركة معلّقة قبل الإقفال، تعديل مسار الحفظ والربط بالمخزن الموحّد.

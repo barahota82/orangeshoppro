@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/phone_validation.php';
+
 function require_fields(array $data, array $keys): void
 {
     foreach ($keys as $key) {
@@ -34,6 +36,11 @@ function orange_order_phones_match_for_lookup(string $input, string $stored): bo
         return false;
     }
     if (strcasecmp($input, $stored) === 0) {
+        return true;
+    }
+    $ni = orange_normalize_customer_phone($input, null);
+    $ns = orange_normalize_customer_phone($stored, null);
+    if ($ni !== null && $ns !== null && strcasecmp($ni, $ns) === 0) {
         return true;
     }
     $di = preg_replace('/\D+/', '', $input);

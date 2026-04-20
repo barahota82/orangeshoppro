@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/order_helpers.php';
 require_once __DIR__ . '/../../includes/order_stock.php';
+require_once __DIR__ . '/../../includes/phone_validation.php';
 
 try {
     $pdo = db();
@@ -20,11 +21,16 @@ try {
         json_response(['success' => false, 'code' => 'invalid_input', 'message' => t('track_missing_fields')], 422);
     }
 
+    $phoneNorm = orange_normalize_customer_phone($phone, null);
+    if ($phoneNorm === null) {
+        json_response(['success' => false, 'code' => 'invalid_phone', 'message' => t('checkout_invalid_phone')], 422);
+    }
+
     $stmt = $pdo->prepare('SELECT * FROM orders WHERE order_number = ? LIMIT 1');
     $stmt->execute([$orderNumber]);
     $order = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$order || !orange_order_phones_match_for_lookup($phone, (string) ($order['phone'] ?? ''))) {
+    if (!$order || !orange_order_phones_match_for_lookup($phoneNorm, (string) ($order['phone'] ?? ''))) {
         json_response(['success' => false, 'code' => 'not_found', 'message' => t('track_order_not_found')], 404);
     }
 

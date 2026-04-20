@@ -6,6 +6,7 @@
 --
 -- يصلح:
 --   • categories / subcategories: أطوال name_* و slug → VARCHAR(191)
+--     (نفس منطق orange_catalog_ensure_schema في includes/catalog_schema.php؛ MODIFY عند الطول < 191)
 --   • product_channels: إزالة قيود FK المكررة وتوحيد الاسم إلى orange_fk_pc_*
 --   • product_channels: COLLATE utf8mb4_unicode_ci مثل ensure_schema
 --

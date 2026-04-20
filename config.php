@@ -137,6 +137,7 @@ function storefront_asset_version(): string
         __DIR__ . '/assets/js/cart.js',
         __DIR__ . '/assets/js/lang.js',
         __DIR__ . '/assets/js/product.js',
+        __DIR__ . '/assets/js/input-constraints.js',
     ];
     $mt = 0;
     foreach ($files as $f) {
@@ -276,13 +277,132 @@ function orange_storefront_channel_cookie_path(): string
     return rtrim($p, '/') . '/';
 }
 
+/**
+ * مقاطع لا تُستخدم كاختصار URL لقناة (تعارض مسارات التطبيق).
+ *
+ * @return list<string>
+ */
+function orange_storefront_reserved_path_segments(): array
+{
+    return [
+        'admin', 'api', 'assets', 'pages', 'includes', 'vendor', 'scripts',
+        'storefront-dispatch', 'index', 'manifest', 'robots', 'favicon',
+        'cgi-bin', 'pwa', 'webhook', 'hooks', 'static', 'uploads', 'well-known',
+    ];
+}
+
+function orange_storefront_channel_slug_is_active(PDO $pdo, string $slug): bool
+{
+    if ($slug === '') {
+        return false;
+    }
+    try {
+        $st = $pdo->prepare('SELECT 1 FROM channels WHERE slug = ? AND is_active = 1 LIMIT 1');
+        $st->execute([$slug]);
+
+        return (bool) $st->fetchColumn();
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+function orange_channel_slug_for_path_segment(PDO $pdo, string $pathSegment): ?string
+{
+    $s = strtolower((string) (preg_replace('/[^a-z0-9\-]/i', '', $pathSegment) ?? ''));
+    if ($s === '') {
+        return null;
+    }
+    try {
+        $st = $pdo->prepare(
+            'SELECT slug FROM channels WHERE path_segment = ? AND is_active = 1 LIMIT 1'
+        );
+        $st->execute([$s]);
+        $row = $st->fetchColumn();
+        if ($row !== false && $row !== null && (string) $row !== '') {
+            return (string) $row;
+        }
+    } catch (Throwable $e) {
+    }
+
+    return null;
+}
+
+function orange_channel_path_segment_for_slug(PDO $pdo, string $slug): ?string
+{
+    $s = strtolower((string) (preg_replace('/[^a-z0-9\-]/i', '', $slug) ?? ''));
+    if ($s === '') {
+        return null;
+    }
+    try {
+        $st = $pdo->prepare(
+            "SELECT path_segment FROM channels WHERE slug = ? AND is_active = 1 AND path_segment IS NOT NULL AND path_segment <> '' LIMIT 1"
+        );
+        $st->execute([$s]);
+        $row = $st->fetchColumn();
+        if ($row !== false && $row !== null && (string) $row !== '') {
+            return (string) $row;
+        }
+    } catch (Throwable $e) {
+    }
+
+    return null;
+}
+
+/**
+ * خرائط مسار الاختصار ↔ slug للواجهة + قائمة slugs النشطة + نمط regex للمسار القصير.
+ *
+ * @return array{0: array<string,string>, 1: array<string,string>, 2: array<string,bool>, 3: non-falsy-string}
+ */
+function orange_storefront_path_maps_for_js(PDO $pdo): array
+{
+    $pathToSlug = [];
+    $slugToPath = [];
+    $validSlugs = [];
+    try {
+        $q = $pdo->query('SELECT slug, path_segment FROM channels WHERE is_active = 1');
+        if ($q) {
+            while ($row = $q->fetch(PDO::FETCH_ASSOC)) {
+                $sl = strtolower((string) ($row['slug'] ?? ''));
+                if ($sl !== '') {
+                    $validSlugs[$sl] = true;
+                }
+                $ps = strtolower(trim((string) ($row['path_segment'] ?? '')));
+                if ($ps !== '' && $sl !== '') {
+                    $pathToSlug[$ps] = $sl;
+                    $slugToPath[$sl] = $ps;
+                }
+            }
+        }
+    } catch (Throwable $e) {
+    }
+    if ($pathToSlug === []) {
+        $pathToSlug = ['tiktok' => 'orange', 'online' => 'blue', 'web' => 'black'];
+        $slugToPath = ['orange' => 'tiktok', 'blue' => 'online', 'black' => 'web'];
+    }
+    foreach (['orange', 'blue', 'black'] as $legacy) {
+        $validSlugs[$legacy] = true;
+    }
+    $keys = array_keys($pathToSlug);
+    usort($keys, static fn ($a, $b) => strlen((string) $b) <=> strlen((string) $a));
+    $alt = $keys === [] ? 'web|online|tiktok' : implode('|', array_map(static fn ($k) => preg_quote((string) $k, '/'), $keys));
+
+    return [$pathToSlug, $slugToPath, $validSlugs, $alt];
+}
+
 function orange_storefront_read_saved_channel_slug(): ?string
 {
     $name = orange_storefront_channel_cookie_name();
     $raw = isset($_COOKIE[$name]) ? (string) $_COOKIE[$name] : '';
     $slug = strtolower((string) (preg_replace('/[^a-z0-9\-]/i', '', $raw) ?? ''));
-    if (in_array($slug, ['orange', 'blue', 'black'], true)) {
-        return $slug;
+    if ($slug === '') {
+        return null;
+    }
+    try {
+        $pdo = db();
+        if (orange_storefront_channel_slug_is_active($pdo, $slug)) {
+            return $slug;
+        }
+    } catch (Throwable $e) {
     }
 
     return null;
@@ -294,7 +414,12 @@ function orange_storefront_send_channel_cookie(string $slug): void
         return;
     }
     $slug = strtolower((string) (preg_replace('/[^a-z0-9\-]/i', '', $slug) ?? ''));
-    if (!in_array($slug, ['orange', 'blue', 'black'], true)) {
+    try {
+        $pdo = db();
+        if (!orange_storefront_channel_slug_is_active($pdo, $slug)) {
+            return;
+        }
+    } catch (Throwable $e) {
         return;
     }
     $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
@@ -352,7 +477,7 @@ function storefront_channel_display_name(array $channel, string $channelSlug): s
 }
 
 /**
- * IIS short path segment for black/blue/orange + lang (see web.config.example rewrite rules).
+ * مسار الواجهة القصير (مثل tiktok-ar) من جدول channels.path_segment أو القيم الافتراضية القديمة.
  */
 function storefront_short_segment(string $channelSlug, string $lang): ?string {
     $suffix = match ($lang) {
@@ -365,7 +490,16 @@ function storefront_short_segment(string $channelSlug, string $lang): ?string {
     if ($suffix === null) {
         return null;
     }
-    $base = match ($channelSlug) {
+    $slug = strtolower((string) (preg_replace('/[^a-z0-9\-]/i', '', $channelSlug) ?? ''));
+    try {
+        $pdo = db();
+        $base = orange_channel_path_segment_for_slug($pdo, $slug);
+        if ($base !== null && $base !== '') {
+            return $base . $suffix;
+        }
+    } catch (Throwable $e) {
+    }
+    $base = match ($slug) {
         'black' => 'web',
         'blue' => 'online',
         'orange' => 'tiktok',
@@ -374,6 +508,7 @@ function storefront_short_segment(string $channelSlug, string $lang): ?string {
     if ($base === null) {
         return null;
     }
+
     return $base . $suffix;
 }
 
@@ -729,12 +864,20 @@ function get_translations(): array {
             'track_track_another' => 'Track another order',
             'register_placeholder_email' => 'your@email.com',
             'register_placeholder_name' => 'Your name as you want it saved',
-            'register_placeholder_phone' => 'Mobile or phone number',
+            'register_placeholder_phone' => '+country code and number, or 00…',
             'register_placeholder_area' => 'Area or region',
             'register_placeholder_address' => 'Full delivery address',
             'register_placeholder_notes' => 'Notes (optional)',
             'checkout_required_fields' => 'Please fill in all required fields (name, phone, email, area, address).',
             'checkout_invalid_email' => 'Please enter a valid email address.',
+            'checkout_invalid_phone' => 'Enter a valid phone: international with + or 00 and country code, or choose your country and enter the national number (8–14 digits including country code).',
+            'phone_country_label' => 'Country (for national number)',
+            'phone_country_full_international' => 'International — full number with + or 00',
+            'phone_country_kw' => 'Kuwait +965 (8-digit mobile)',
+            'phone_country_ph' => 'Philippines +63',
+            'phone_country_in' => 'India +91',
+            'phone_country_pk' => 'Pakistan +92',
+            'phone_field_hint' => 'Example: +96551234567, 0096512345678, or pick country and type national digits.',
             'customer_email' => 'Email',
             'order_number' => 'Order Number',
             'checkout_queue_wait' => 'Processing your order…',
@@ -906,12 +1049,20 @@ function get_translations(): array {
             'track_track_another' => 'تتبع رقم آخر',
             'register_placeholder_email' => 'your@email.com',
             'register_placeholder_name' => 'اسمك كما تريد حفظه',
-            'register_placeholder_phone' => 'رقم الجوال أو الهاتف',
+            'register_placeholder_phone' => '+كود الدولة والرقم أو 00…',
             'register_placeholder_area' => 'المنطقة',
             'register_placeholder_address' => 'عنوان التوصيل كاملاً',
             'register_placeholder_notes' => 'ملاحظات (اختياري)',
             'checkout_required_fields' => 'يرجى تعبئة جميع الحقول المطلوبة (الاسم، الهاتف، البريد، المنطقة، العنوان).',
             'checkout_invalid_email' => 'يرجى إدخال بريد إلكتروني صالح.',
+            'checkout_invalid_phone' => 'أدخل هاتفاً صالحاً: دولي بـ + أو 00 مع كود الدولة، أو اختر الدولة ثم الرقم الوطني (من 8 إلى 14 رقماً مع كود الدولة).',
+            'phone_country_label' => 'الدولة (للرقم الوطني)',
+            'phone_country_full_international' => 'دولي — الرقم كاملاً بـ + أو 00',
+            'phone_country_kw' => 'الكويت +965 (جوال 8 أرقام)',
+            'phone_country_ph' => 'الفلبين +63',
+            'phone_country_in' => 'الهند +91',
+            'phone_country_pk' => 'باكستان +92',
+            'phone_field_hint' => 'مثال: +96551234567 أو 0096512345678 أو اختر الدولة ثم أدخل الرقم.',
             'customer_email' => 'البريد الإلكتروني',
             'order_number' => 'رقم الطلب',
             'checkout_queue_wait' => 'جاري معالجة طلبك…',
@@ -1082,12 +1233,20 @@ function get_translations(): array {
             'track_track_another' => 'Mag-track ng ibang order',
             'register_placeholder_email' => 'your@email.com',
             'register_placeholder_name' => 'Pangalan mo',
-            'register_placeholder_phone' => 'Telepono',
+            'register_placeholder_phone' => '+country code o 00…',
             'register_placeholder_area' => 'Lugar',
             'register_placeholder_address' => 'Buong address',
             'register_placeholder_notes' => 'Mga tala (opsyonal)',
             'checkout_required_fields' => 'Punan ang lahat ng kinakailangang field (pangalan, telepono, email, lugar, address).',
             'checkout_invalid_email' => 'Maglagay ng wastong email.',
+            'checkout_invalid_phone' => 'Maglagay ng wastong numero: international gamit ang + o 00 at country code, o piliin ang bansa at ang pambansang numero (8–14 digit kasama ang country code).',
+            'phone_country_label' => 'Bansa (para sa pambansang numero)',
+            'phone_country_full_international' => 'International — buong numero na may + o 00',
+            'phone_country_kw' => 'Kuwait +965 (8 digit mobile)',
+            'phone_country_ph' => 'Pilipinas +63',
+            'phone_country_in' => 'India +91',
+            'phone_country_pk' => 'Pakistan +92',
+            'phone_field_hint' => 'Halimbawa: +96551234567 o pumili ng bansa at ilagay ang numero.',
             'customer_email' => 'Email',
             'order_number' => 'Order Number',
             'checkout_queue_wait' => 'Pinoproseso ang order…',
@@ -1259,12 +1418,20 @@ function get_translations(): array {
             'track_track_another' => 'दूसरा ऑर्डर ट्रैक करें',
             'register_placeholder_email' => 'your@email.com',
             'register_placeholder_name' => 'आपका नाम',
-            'register_placeholder_phone' => 'फ़ोन नंबर',
+            'register_placeholder_phone' => '+देश कोड या 00…',
             'register_placeholder_area' => 'क्षेत्र',
             'register_placeholder_address' => 'पूरा पता',
             'register_placeholder_notes' => 'नोट्स (वैकल्पिक)',
             'checkout_required_fields' => 'कृपया सभी आवश्यक फ़ील्ड भरें (नाम, फ़ोन, ईमेल, क्षेत्र, पता)।',
             'checkout_invalid_email' => 'कृपया वैध ईमेल दर्ज करें।',
+            'checkout_invalid_phone' => 'वैध फ़ोन दर्ज करें: + या 00 के साथ अंतर्राष्ट्रीय, या देश चुनकर राष्ट्रीय नंबर (देश कोड सहित 8–14 अंक)।',
+            'phone_country_label' => 'देश (राष्ट्रीय नंबर के लिए)',
+            'phone_country_full_international' => 'अंतर्राष्ट्रीय — + या 00 के साथ पूरा नंबर',
+            'phone_country_kw' => 'कुवैत +965 (8 अंक मोबाइल)',
+            'phone_country_ph' => 'फ़िलीपीन्स +63',
+            'phone_country_in' => 'भारत +91',
+            'phone_country_pk' => 'पाकिस्तान +92',
+            'phone_field_hint' => 'उदाहरण: +96551234567 या देश चुनकर नंबर दर्ज करें।',
             'customer_email' => 'ईमेल',
             'order_number' => 'ऑर्डर नंबर',
             'checkout_queue_wait' => 'ऑर्डर प्रोसेस हो रहा है…',

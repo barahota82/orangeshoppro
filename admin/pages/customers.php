@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/party_subledger.php';
+require_once __DIR__ . '/../../includes/storefront_phone_country_select.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -63,11 +64,16 @@ $count = count($rows);
         </div>
         <div>
             <label for="cust_name">الاسم</label>
-            <input type="text" id="cust_name" autocomplete="off" placeholder="اسم العميل">
+            <input type="text" id="cust_name" maxlength="255" autocomplete="off" placeholder="اسم العميل">
+        </div>
+        <div>
+            <label for="cust_phone_country">كود الدولة (اختياري)</label>
+            <?php orange_storefront_render_phone_country_select('cust_phone_country'); ?>
+            <p class="card-hint" style="margin:6px 0 0;">إن لم تختر دولة، أدخل الرقم كاملاً بصيغة دولية (<span dir="ltr">+</span> أو <span dir="ltr">00</span>).</p>
         </div>
         <div>
             <label for="cust_phone">الهاتف <span style="color:#b45309;">*</span></label>
-            <input type="text" id="cust_phone" autocomplete="off" dir="ltr" lang="en" placeholder="مثال: 5xxxxxxxx">
+            <input type="text" id="cust_phone" class="js-orange-phone-input" maxlength="24" autocomplete="off" dir="ltr" lang="en" placeholder="+965… أو 00… أو رقم وطني مع اختيار الدولة">
         </div>
         <div>
             <label for="cust_email">البريد الإلكتروني</label>
@@ -75,11 +81,11 @@ $count = count($rows);
         </div>
         <div>
             <label for="cust_area">المنطقة</label>
-            <input type="text" id="cust_area" autocomplete="off" placeholder="المنطقة">
+            <input type="text" id="cust_area" maxlength="255" autocomplete="off" placeholder="المنطقة">
         </div>
         <div style="grid-column:1/-1;">
             <label for="cust_address">العنوان</label>
-            <textarea id="cust_address" rows="2" autocomplete="off" placeholder="عنوان التوصيل"></textarea>
+            <textarea id="cust_address" rows="2" maxlength="2000" autocomplete="off" placeholder="عنوان التوصيل"></textarea>
         </div>
         <div>
             <label for="cust_limit">حد ائتمان (اختياري)</label>
@@ -181,12 +187,48 @@ $count = count($rows);
     <?php endif; ?>
 </div>
 
+<script src="<?php echo htmlspecialchars(storefront_asset_url('/assets/js/input-constraints.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
+function custPhoneCountryEl() {
+    return document.getElementById('cust_phone_country');
+}
+/** يملأ حقل الدولة والرقم عند التعديل إن وُجد بادئة معروفة. */
+function custSplitPhoneForForm(stored) {
+    var raw = String(stored || '').trim();
+    if (!raw) {
+        return { country: '', phone: '' };
+    }
+    var normFn = window.orangeNormalizeCustomerPhone;
+    var norm = normFn ? normFn(raw, null) : null;
+    if (!norm) {
+        return { country: '', phone: raw };
+    }
+    var digits = norm.replace(/\D/g, '');
+    var prefs = ['965', '92', '91', '63'];
+    for (var i = 0; i < prefs.length; i++) {
+        var cc = prefs[i];
+        if (digits.indexOf(cc) !== 0) {
+            continue;
+        }
+        var nat = digits.slice(cc.length);
+        if (nat.length < 8) {
+            continue;
+        }
+        if (normFn && normFn(nat, cc) === norm) {
+            return { country: cc, phone: nat };
+        }
+    }
+    return { country: '', phone: norm.charAt(0) === '+' ? norm.slice(1) : norm };
+}
 function custResetForm() {
     document.getElementById('cust_id').value = '0';
     document.getElementById('cust_code').value = '';
     document.getElementById('cust_name').value = '';
     document.getElementById('cust_phone').value = '';
+    var cc = custPhoneCountryEl();
+    if (cc) {
+        cc.value = '';
+    }
     document.getElementById('cust_email').value = '';
     document.getElementById('cust_area').value = '';
     document.getElementById('cust_address').value = '';
@@ -197,7 +239,12 @@ function custEdit(row) {
     document.getElementById('cust_id').value = String(row.id || 0);
     document.getElementById('cust_code').value = row.code || '';
     document.getElementById('cust_name').value = row.name_ar || '';
-    document.getElementById('cust_phone').value = row.phone || '';
+    var split = custSplitPhoneForForm(row.phone || '');
+    var ccEl = custPhoneCountryEl();
+    if (ccEl) {
+        ccEl.value = split.country || '';
+    }
+    document.getElementById('cust_phone').value = split.phone || '';
     document.getElementById('cust_email').value = row.email || '';
     document.getElementById('cust_area').value = row.area || '';
     document.getElementById('cust_address').value = row.address || '';
@@ -211,6 +258,8 @@ function custSave() {
     var id = parseInt(document.getElementById('cust_id').value, 10) || 0;
     var name = document.getElementById('cust_name').value.trim();
     var phone = document.getElementById('cust_phone').value.trim();
+    var ccEl = custPhoneCountryEl();
+    var phoneCountry = ccEl && ccEl.value ? String(ccEl.value).trim() : '';
     var email = document.getElementById('cust_email').value.trim();
     var area = document.getElementById('cust_area').value.trim();
     var address = document.getElementById('cust_address').value.trim();
@@ -220,6 +269,13 @@ function custSave() {
         alert('الهاتف مطلوب');
         return;
     }
+    if (window.orangeNormalizeCustomerPhone) {
+        var ok = window.orangeNormalizeCustomerPhone(phone, phoneCountry || null);
+        if (!ok) {
+            alert('رقم الهاتف غير صالح. استخدم + أو 00 مع كود الدولة، أو اختر الدولة وأدخل الرقم الوطني (8–14 رقماً مع الكود).');
+            return;
+        }
+    }
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         alert('بريد إلكتروني غير صالح');
         return;
@@ -227,6 +283,7 @@ function custSave() {
     var payload = {
         name_ar: name || 'عميل',
         phone: phone,
+        phone_country: phoneCountry || null,
         area: area,
         address: address,
         email: email || null,

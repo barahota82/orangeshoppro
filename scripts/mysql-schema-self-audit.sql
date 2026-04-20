@@ -3,8 +3,8 @@
 -- نفّذ على قاعدتك بعد: USE orange_db; (أو اسم DB في config.php)
 --
 -- تفسير مختصر:
---   • journal_entries: إن ظهر COUNT=0 للجدول = قاعدة «نظيفة» كما في mysql-create الحالي.
---     إن وُجد صف >0 = تراثي؛ الترحيل من catalog_schema عند الشروط المناسبة.
+--   • journal_entries: غياب الجدول = متوقع في قاعدة من mysql-create الحالي (لا يُنشأ).
+--     وجود الجدول = تراث؛ الترحيل/الصيانة: catalog_schema + IBRAHIM_ORANGE_MASTER.txt قسم (6).
 --   • product_channels: يُفضّل قيدان FK فقط باسمي orange_fk_pc_*.
 --   • categories.slug: يُفضّل varchar(191) utf8mb4.
 

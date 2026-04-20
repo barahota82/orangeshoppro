@@ -67,6 +67,28 @@ function orange_catalog_safe_exec(PDO $pdo, string $sql): void
 }
 
 /**
+ * طول CHARACTER_MAXIMUM_LENGTH لعمود varchar/char، أو 0 إن لم يوجد / غير قابل للتطبيق.
+ */
+function orange_schema_varchar_max_length(PDO $pdo, string $table, string $column): int
+{
+    try {
+        $stmt = $pdo->prepare(
+            "SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1"
+        );
+        $stmt->execute([$table, $column]);
+        $raw = $stmt->fetchColumn();
+        if ($raw === false || $raw === null) {
+            return 0;
+        }
+
+        return (int) $raw;
+    } catch (Throwable $e) {
+        return 0;
+    }
+}
+
+/**
  * عند نشر قاعدة جديدة أو جدول accounts فارغ: إدراج جذور دليل افتراضية (1–7) بترميز utf8mb4.
  * لا يعمل إن وُجدت أي صفوف — لن يستبدل دليلاً قائماً.
  */
@@ -169,6 +191,31 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         return;
     }
 
+    require_once __DIR__ . '/catalog_bootstrap_store.php';
+    orange_catalog_bootstrap_store_tables($pdo);
+
+    if (orange_table_exists($pdo, 'channels')) {
+        if (!orange_table_has_column($pdo, 'channels', 'path_segment')) {
+            orange_catalog_safe_exec($pdo, 'ALTER TABLE channels ADD COLUMN path_segment VARCHAR(64) NULL DEFAULT NULL AFTER slug');
+            orange_catalog_safe_exec(
+                $pdo,
+                'CREATE UNIQUE INDEX uq_channels_path_segment ON channels (path_segment)'
+            );
+        }
+        orange_catalog_safe_exec(
+            $pdo,
+            "UPDATE channels SET path_segment = 'tiktok' WHERE slug = 'orange' AND (path_segment IS NULL OR path_segment = '')"
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            "UPDATE channels SET path_segment = 'online' WHERE slug = 'blue' AND (path_segment IS NULL OR path_segment = '')"
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            "UPDATE channels SET path_segment = 'web' WHERE slug = 'black' AND (path_segment IS NULL OR path_segment = '')"
+        );
+    }
+
     orange_catalog_safe_exec($pdo,
         'CREATE TABLE IF NOT EXISTS color_dictionary (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -220,19 +267,19 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
 
-    if (!orange_table_has_column($pdo, 'products', 'size_family_id')) {
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'size_family_id')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN size_family_id INT NULL');
     }
-    if (!orange_table_has_column($pdo, 'products', 'sizing_guide_scope')) {
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'sizing_guide_scope')) {
         orange_catalog_safe_exec(
             $pdo,
             "ALTER TABLE products ADD COLUMN sizing_guide_scope VARCHAR(16) NOT NULL DEFAULT 'none'"
         );
     }
-    if (!orange_table_has_column($pdo, 'product_variants', 'product_colorway_id')) {
+    if (orange_table_exists($pdo, 'product_variants') && !orange_table_has_column($pdo, 'product_variants', 'product_colorway_id')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE product_variants ADD COLUMN product_colorway_id INT NULL');
     }
-    if (!orange_table_has_column($pdo, 'product_variants', 'size_family_size_id')) {
+    if (orange_table_exists($pdo, 'product_variants') && !orange_table_has_column($pdo, 'product_variants', 'size_family_size_id')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE product_variants ADD COLUMN size_family_size_id INT NULL');
     }
     if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'item_code')) {
@@ -247,16 +294,16 @@ function orange_catalog_ensure_schema(PDO $pdo): void
     if (orange_table_exists($pdo, 'product_variants') && !orange_table_has_column($pdo, 'product_variants', 'barcode')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE product_variants ADD COLUMN barcode VARCHAR(64) NULL');
     }
-    if (!orange_table_has_column($pdo, 'order_items', 'variant_id')) {
+    if (orange_table_exists($pdo, 'order_items') && !orange_table_has_column($pdo, 'order_items', 'variant_id')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE order_items ADD COLUMN variant_id INT NULL');
     }
-    if (!orange_table_has_column($pdo, 'orders', 'order_source')) {
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'order_source')) {
         orange_catalog_safe_exec(
             $pdo,
             "ALTER TABLE orders ADD COLUMN order_source VARCHAR(32) NOT NULL DEFAULT 'website'"
         );
     }
-    if (!orange_table_has_column($pdo, 'orders', 'payment_terms')) {
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'payment_terms')) {
         orange_catalog_safe_exec(
             $pdo,
             "ALTER TABLE orders ADD COLUMN payment_terms VARCHAR(16) NOT NULL DEFAULT 'cash'"
@@ -268,55 +315,103 @@ function orange_catalog_ensure_schema(PDO $pdo): void
             'ALTER TABLE orders ADD COLUMN customer_email VARCHAR(255) NULL DEFAULT NULL'
         );
     }
+    if (orange_table_exists($pdo, 'orders') && orange_table_has_column($pdo, 'orders', 'phone')) {
+        try {
+            $mlStmt = $pdo->query(
+                "SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'phone' LIMIT 1"
+            );
+            $ml = $mlStmt ? (int) $mlStmt->fetchColumn() : 0;
+            if ($ml > 0 && $ml < 32) {
+                orange_catalog_safe_exec($pdo, 'ALTER TABLE orders MODIFY COLUMN phone VARCHAR(32) NOT NULL');
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] orders.phone widen: ' . $e->getMessage());
+            }
+        }
+    }
+    if (orange_table_exists($pdo, 'orders') && orange_table_has_column($pdo, 'orders', 'customer_name')) {
+        try {
+            $mlStmt = $pdo->query(
+                "SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'customer_name' LIMIT 1"
+            );
+            $ml = $mlStmt ? (int) $mlStmt->fetchColumn() : 0;
+            if ($ml > 0 && $ml < 255) {
+                orange_catalog_safe_exec($pdo, 'ALTER TABLE orders MODIFY COLUMN customer_name VARCHAR(255) NOT NULL');
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] orders.customer_name widen: ' . $e->getMessage());
+            }
+        }
+    }
+    if (orange_table_exists($pdo, 'orders') && orange_table_has_column($pdo, 'orders', 'area')) {
+        try {
+            $mlStmt = $pdo->query(
+                "SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'area' LIMIT 1"
+            );
+            $ml = $mlStmt ? (int) $mlStmt->fetchColumn() : 0;
+            if ($ml > 0 && $ml < 255) {
+                orange_catalog_safe_exec($pdo, 'ALTER TABLE orders MODIFY COLUMN area VARCHAR(255) NULL DEFAULT NULL');
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] orders.area widen: ' . $e->getMessage());
+            }
+        }
+    }
     if (!orange_table_has_column($pdo, 'size_family_sizes', 'foot_length_cm')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE size_family_sizes ADD COLUMN foot_length_cm DECIMAL(6,2) NULL');
     }
-    if (!orange_table_has_column($pdo, 'products', 'name_en')) {
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'name_en')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN name_en VARCHAR(191) NOT NULL DEFAULT \'\'');
     }
-    if (!orange_table_has_column($pdo, 'products', 'name_fil')) {
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'name_fil')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN name_fil VARCHAR(191) NOT NULL DEFAULT \'\'');
     }
-    if (!orange_table_has_column($pdo, 'products', 'name_hi')) {
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'name_hi')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN name_hi VARCHAR(191) NOT NULL DEFAULT \'\'');
     }
-    if (!orange_table_has_column($pdo, 'products', 'description_en')) {
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'description_en')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN description_en TEXT NULL');
     }
-    if (!orange_table_has_column($pdo, 'products', 'description_fil')) {
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'description_fil')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN description_fil TEXT NULL');
     }
-    if (!orange_table_has_column($pdo, 'products', 'description_hi')) {
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'description_hi')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN description_hi TEXT NULL');
     }
-    if (!orange_table_has_column($pdo, 'products', 'seo_meta_title_ar')) {
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'seo_meta_title_ar')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN seo_meta_title_ar VARCHAR(191) NOT NULL DEFAULT \'\'');
     }
-    if (!orange_table_has_column($pdo, 'products', 'seo_meta_title_en')) {
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'seo_meta_title_en')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN seo_meta_title_en VARCHAR(191) NOT NULL DEFAULT \'\'');
     }
-    if (!orange_table_has_column($pdo, 'products', 'seo_meta_title_fil')) {
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'seo_meta_title_fil')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN seo_meta_title_fil VARCHAR(191) NOT NULL DEFAULT \'\'');
     }
-    if (!orange_table_has_column($pdo, 'products', 'seo_meta_title_hi')) {
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'seo_meta_title_hi')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN seo_meta_title_hi VARCHAR(191) NOT NULL DEFAULT \'\'');
     }
-    if (!orange_table_has_column($pdo, 'products', 'seo_meta_description_ar')) {
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'seo_meta_description_ar')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN seo_meta_description_ar TEXT NULL');
     }
-    if (!orange_table_has_column($pdo, 'products', 'seo_meta_description_en')) {
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'seo_meta_description_en')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN seo_meta_description_en TEXT NULL');
     }
-    if (!orange_table_has_column($pdo, 'products', 'seo_meta_description_fil')) {
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'seo_meta_description_fil')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN seo_meta_description_fil TEXT NULL');
     }
-    if (!orange_table_has_column($pdo, 'products', 'seo_meta_description_hi')) {
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'seo_meta_description_hi')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN seo_meta_description_hi TEXT NULL');
     }
-    if (!orange_table_has_column($pdo, 'products', 'sort_order')) {
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'sort_order')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN sort_order INT NOT NULL DEFAULT 0');
     }
-    if (!orange_table_has_column($pdo, 'stock_movements', 'reference')) {
+    if (orange_table_exists($pdo, 'stock_movements') && !orange_table_has_column($pdo, 'stock_movements', 'reference')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE stock_movements ADD COLUMN reference VARCHAR(100) NULL');
     }
 
@@ -348,20 +443,57 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         orange_catalog_safe_exec($pdo, 'ALTER TABLE categories ADD INDEX idx_categories_department (department_id)');
     }
 
-    /* مواءمة أطوال أسماء الفئات مع departments / الكتالوج (utf8mb4 — 191) */
+    /*
+     |--------------------------------------------------------------------------
+     | Categories / subcategories: ترقية أطوال varchar القديمة (مثلاً 100) → 191
+     |--------------------------------------------------------------------------
+     | يطابق scripts/mysql-create-orange-database-full.sql (تثبيت من الصفر).
+     | قواعد قديمة بدون استيراد كامل: نفس أعمدة scripts/mysql-fix-drift-match-catalog-schema.sql (قسم 1).
+     | MODIFY يُنفَّذ فقط عندما يكون الطول الحالي أقل من 191 (لا إعادة ALTER في كل طلب).
+     */
     if (orange_table_exists($pdo, 'categories')) {
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE categories MODIFY COLUMN name_en VARCHAR(191) NULL DEFAULT NULL');
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE categories MODIFY COLUMN name_ar VARCHAR(191) NULL DEFAULT NULL');
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE categories MODIFY COLUMN name_fil VARCHAR(191) NULL DEFAULT NULL');
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE categories MODIFY COLUMN name_hi VARCHAR(191) NULL DEFAULT NULL');
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE categories MODIFY COLUMN slug VARCHAR(191) NOT NULL');
+        $widenCat = static function (PDO $pdo, string $column, string $alterSql): void {
+            if (!orange_table_has_column($pdo, 'categories', $column)) {
+                return;
+            }
+            try {
+                $ml = orange_schema_varchar_max_length($pdo, 'categories', $column);
+                if ($ml > 0 && $ml < 191) {
+                    orange_catalog_safe_exec($pdo, $alterSql);
+                }
+            } catch (Throwable $e) {
+                if (function_exists('error_log')) {
+                    error_log('[orange] categories.' . $column . ' widen: ' . $e->getMessage());
+                }
+            }
+        };
+        $widenCat($pdo, 'name_en', 'ALTER TABLE categories MODIFY COLUMN name_en VARCHAR(191) NULL DEFAULT NULL');
+        $widenCat($pdo, 'name_ar', 'ALTER TABLE categories MODIFY COLUMN name_ar VARCHAR(191) NULL DEFAULT NULL');
+        $widenCat($pdo, 'name_fil', 'ALTER TABLE categories MODIFY COLUMN name_fil VARCHAR(191) NULL DEFAULT NULL');
+        $widenCat($pdo, 'name_hi', 'ALTER TABLE categories MODIFY COLUMN name_hi VARCHAR(191) NULL DEFAULT NULL');
+        $widenCat($pdo, 'slug', 'ALTER TABLE categories MODIFY COLUMN slug VARCHAR(191) NOT NULL');
     }
     if (orange_table_exists($pdo, 'subcategories')) {
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE subcategories MODIFY COLUMN name_ar VARCHAR(191) NOT NULL');
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE subcategories MODIFY COLUMN name_en VARCHAR(191) NULL DEFAULT NULL');
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE subcategories MODIFY COLUMN name_fil VARCHAR(191) NULL DEFAULT NULL');
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE subcategories MODIFY COLUMN name_hi VARCHAR(191) NULL DEFAULT NULL');
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE subcategories MODIFY COLUMN slug VARCHAR(191) NOT NULL');
+        $widenSub = static function (PDO $pdo, string $column, string $alterSql): void {
+            if (!orange_table_has_column($pdo, 'subcategories', $column)) {
+                return;
+            }
+            try {
+                $ml = orange_schema_varchar_max_length($pdo, 'subcategories', $column);
+                if ($ml > 0 && $ml < 191) {
+                    orange_catalog_safe_exec($pdo, $alterSql);
+                }
+            } catch (Throwable $e) {
+                if (function_exists('error_log')) {
+                    error_log('[orange] subcategories.' . $column . ' widen: ' . $e->getMessage());
+                }
+            }
+        };
+        $widenSub($pdo, 'name_ar', 'ALTER TABLE subcategories MODIFY COLUMN name_ar VARCHAR(191) NOT NULL');
+        $widenSub($pdo, 'name_en', 'ALTER TABLE subcategories MODIFY COLUMN name_en VARCHAR(191) NULL DEFAULT NULL');
+        $widenSub($pdo, 'name_fil', 'ALTER TABLE subcategories MODIFY COLUMN name_fil VARCHAR(191) NULL DEFAULT NULL');
+        $widenSub($pdo, 'name_hi', 'ALTER TABLE subcategories MODIFY COLUMN name_hi VARCHAR(191) NULL DEFAULT NULL');
+        $widenSub($pdo, 'slug', 'ALTER TABLE subcategories MODIFY COLUMN slug VARCHAR(191) NOT NULL');
     }
 
     static $productSubOrphansCleaned = false;
@@ -732,10 +864,10 @@ function orange_catalog_ensure_schema(PDO $pdo): void
             'CREATE TABLE customers (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 code VARCHAR(32) NULL,
-                name_ar VARCHAR(160) NOT NULL DEFAULT \'\',
-                phone VARCHAR(40) NOT NULL DEFAULT \'\',
-                area VARCHAR(160) NOT NULL DEFAULT \'\',
-                address VARCHAR(600) NOT NULL DEFAULT \'\',
+                name_ar VARCHAR(255) NOT NULL DEFAULT \'\',
+                phone VARCHAR(32) NOT NULL DEFAULT \'\',
+                area VARCHAR(255) NOT NULL DEFAULT \'\',
+                address VARCHAR(2000) NOT NULL DEFAULT \'\',
                 email VARCHAR(255) NULL,
                 notes TEXT NULL,
                 credit_limit DECIMAL(18,4) NULL DEFAULT NULL,
@@ -763,6 +895,70 @@ function orange_catalog_ensure_schema(PDO $pdo): void
     }
     if (orange_table_exists($pdo, 'customers') && orange_table_has_column($pdo, 'customers', 'notes')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE customers MODIFY COLUMN notes TEXT NULL');
+    }
+    if (orange_table_exists($pdo, 'customers') && orange_table_has_column($pdo, 'customers', 'name_ar')) {
+        try {
+            $mlStmt = $pdo->query(
+                "SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'customers' AND COLUMN_NAME = 'name_ar' LIMIT 1"
+            );
+            $ml = $mlStmt ? (int) $mlStmt->fetchColumn() : 0;
+            if ($ml > 0 && $ml < 255) {
+                orange_catalog_safe_exec($pdo, 'ALTER TABLE customers MODIFY COLUMN name_ar VARCHAR(255) NOT NULL');
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] customers.name_ar widen: ' . $e->getMessage());
+            }
+        }
+    }
+    if (orange_table_exists($pdo, 'customers') && orange_table_has_column($pdo, 'customers', 'area')) {
+        try {
+            $mlStmt = $pdo->query(
+                "SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'customers' AND COLUMN_NAME = 'area' LIMIT 1"
+            );
+            $ml = $mlStmt ? (int) $mlStmt->fetchColumn() : 0;
+            if ($ml > 0 && $ml < 255) {
+                orange_catalog_safe_exec($pdo, 'ALTER TABLE customers MODIFY COLUMN area VARCHAR(255) NOT NULL');
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] customers.area widen: ' . $e->getMessage());
+            }
+        }
+    }
+    if (orange_table_exists($pdo, 'customers') && orange_table_has_column($pdo, 'customers', 'address')) {
+        try {
+            $mlStmt = $pdo->query(
+                "SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'customers' AND COLUMN_NAME = 'address' LIMIT 1"
+            );
+            $ml = $mlStmt ? (int) $mlStmt->fetchColumn() : 0;
+            if ($ml > 0 && $ml < 2000) {
+                orange_catalog_safe_exec($pdo, 'ALTER TABLE customers MODIFY COLUMN address VARCHAR(2000) NOT NULL');
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] customers.address widen: ' . $e->getMessage());
+            }
+        }
+    }
+    if (orange_table_exists($pdo, 'customers') && orange_table_has_column($pdo, 'customers', 'phone')) {
+        try {
+            $mlStmt = $pdo->query(
+                "SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'customers' AND COLUMN_NAME = 'phone' LIMIT 1"
+            );
+            $ml = $mlStmt ? (int) $mlStmt->fetchColumn() : 0;
+            if ($ml > 0 && $ml < 32) {
+                orange_catalog_safe_exec($pdo, 'ALTER TABLE customers MODIFY COLUMN phone VARCHAR(32) NOT NULL');
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] customers.phone widen: ' . $e->getMessage());
+            }
+        }
     }
 
     if (!orange_table_exists($pdo, 'suppliers')) {
@@ -910,14 +1106,15 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         && orange_table_exists($pdo, 'channels')
     ) {
         try {
-            $fkCntStmt = $pdo->query(
-                "SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+            $fkNameStmt = $pdo->query(
+                "SELECT CONSTRAINT_NAME FROM information_schema.TABLE_CONSTRAINTS
                  WHERE TABLE_SCHEMA = DATABASE()
                    AND TABLE_NAME = 'product_channels'
                    AND CONSTRAINT_TYPE = 'FOREIGN KEY'"
             );
-            $fkCnt = $fkCntStmt ? (int) $fkCntStmt->fetchColumn() : 2;
-            if ($fkCnt === 0) {
+            $fkNames = $fkNameStmt ? ($fkNameStmt->fetchAll(PDO::FETCH_COLUMN) ?: []) : [];
+            $fkSet = array_fill_keys(array_map('strtolower', array_map('strval', $fkNames)), true);
+            if (!isset($fkSet['orange_fk_pc_product'])) {
                 orange_catalog_safe_exec(
                     $pdo,
                     'ALTER TABLE product_channels
@@ -925,6 +1122,8 @@ function orange_catalog_ensure_schema(PDO $pdo): void
                      FOREIGN KEY (product_id) REFERENCES products (id)
                      ON DELETE CASCADE ON UPDATE CASCADE'
                 );
+            }
+            if (!isset($fkSet['orange_fk_pc_channel'])) {
                 orange_catalog_safe_exec(
                     $pdo,
                     'ALTER TABLE product_channels
@@ -945,7 +1144,7 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_orders_customer_id ON orders (customer_id)');
     }
 
-    if (!orange_table_exists($pdo, 'party_subledger')) {
+    if (!orange_table_exists($pdo, 'party_subledger') && orange_table_exists($pdo, 'journal_vouchers')) {
         orange_catalog_safe_exec(
             $pdo,
             'CREATE TABLE party_subledger (
@@ -966,7 +1165,7 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         );
     }
 
-    if (!orange_table_exists($pdo, 'party_subledger_allocations')) {
+    if (!orange_table_exists($pdo, 'party_subledger_allocations') && orange_table_exists($pdo, 'journal_vouchers')) {
         orange_catalog_safe_exec(
             $pdo,
             'CREATE TABLE party_subledger_allocations (
@@ -1238,6 +1437,9 @@ function orange_catalog_ensure_schema(PDO $pdo): void
             'ALTER TABLE storefront_accounts ADD COLUMN customer_notes TEXT NULL DEFAULT NULL'
         );
     }
+
+    require_once __DIR__ . '/schema_migrations.php';
+    orange_schema_run_pending_migrations($pdo);
 
     $done = true;
 }

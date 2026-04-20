@@ -76,9 +76,11 @@ IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
 
 ملخص الملفات:
   - mysql-day1-hardening.sql.txt — فهارس/أطوال/تنظيف يتامى/قيود جزئية.
-  - mysql-day1-hardening-part2.sql — (قسم تراثي journal_entries إن وُجد الجدول) + audit + stock_movements.
+  - mysql-day1-hardening-part2.sql — journal_entries (إجراء يتخطاه إن لم يوجد الجدول) + audit + stock_movements.
   - mysql-strong-integrity.sql — FK وتنظيف أوسع (بعد 1 و 2 عادة).
   - mysql-create-orange-database-full.sql — هيكل تقريباً كامل لقاعدة جديدة.
+  - scripts/migrations/*.sql — ترحيلات مرقّمة تُنفَّذ تلقائياً مرة واحدة (جدول orange_schema_migrations)؛
+    التفاصيل scripts/migrations/README.txt. الهيكل الأول يبقى من mysql-create؛ الترحيلات للاحق.
 
 هذا القسم يغطي «التوثيق/الإجراء الواحد» لترتيب التنفيذ وتجنب تكرار القيود والنسخ الاحتياطي.
 
@@ -110,9 +112,11 @@ IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
 هـ) صفحة الأدمن «سند قيد»: admin/pages/journal_entries.php (اسم ملف تراثي) تعرض
    وتُدخل عبر journal_vouchers / journal_lines وليس عبر إدراج مباشر في journal_entries.
 
-و) scripts/mysql-day1-hardening-part2.sql — القسم (1) يخص journal_entries فقط:
-   شغّله إن وُجد الجدول (قواعد تراثية). إن أُنشئت القاعدة من mysql-create الحالي
-   فلا جدول journal_entries؛ علّق أو تخطَّ القسم (1) حتى لا يفشل الاستعلام.
+و) scripts/mysql-day1-hardening-part2.sql — القسم (1) لـ journal_entries يُنفَّذ داخل
+   `orange_legacy_journal_entries_hardening`: إن لم يوجد الجدول لا يُنفَّذ UPDATE/ALTER
+   (قواعد جديدة من mysql-create). إن وُجد: تصحيح fiscal_year_id اليتيم، إضافة FK إن ناقص، فهرس.
+
+ز) حالة الإغلاق: لا مزيد من «تعليق القسم (1) يدوياً» — السكربت آمن على قاعدة بلا journal_entries.
 
 
 7) تشغيل إنتاجي — قائمة تحقق سريعة

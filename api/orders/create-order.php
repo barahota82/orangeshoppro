@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../includes/order_helpers.php';
 require_once __DIR__ . '/../../includes/order_intake_queue.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/phone_validation.php';
 
 try {
     $pdo = db();
@@ -14,6 +15,14 @@ try {
     orange_storefront_apply_lang_from_payload($data);
 
     require_fields($data, ['name', 'phone', 'area', 'address', 'email', 'channel_id', 'items']);
+
+    $phoneCc = trim((string) ($data['phone_country'] ?? ''));
+    $phoneCc = $phoneCc === '' ? null : $phoneCc;
+    $phoneNorm = orange_normalize_customer_phone(trim((string) $data['phone']), $phoneCc);
+    if ($phoneNorm === null) {
+        json_response(['success' => false, 'code' => 'invalid_phone', 'message' => t('checkout_invalid_phone')], 422);
+    }
+    $data['phone'] = $phoneNorm;
 
     if (!is_array($data['items']) || count($data['items']) === 0) {
         json_response(['success' => false, 'code' => 'cart_items_required', 'message' => t('checkout_cart_items_required')], 422);
