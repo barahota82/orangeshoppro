@@ -320,7 +320,7 @@ if ($stmtPartyJson === false) {
             <tbody>
                 <?php foreach ($recent as $r): ?>
                     <tr>
-                        <td><?php echo htmlspecialchars(substr((string)$r['voucher_date'], 0, 10), ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars(orange_format_date_dmY((string) ($r['voucher_date'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td title="<?php echo htmlspecialchars((string) $r['entry_type'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(orange_gl_entry_type_label_ar((string) ($r['entry_type'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars($r['party_kind'] . ' #' . $r['party_id'], ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo number_format((float)$r['debit'], 3); ?></td>
@@ -437,9 +437,9 @@ function loadStatement() {
         tb.innerHTML = '';
         lines.forEach(function (row) {
             var tr = document.createElement('tr');
-            var d = (row.voucher_date || '').toString().slice(0, 10);
+            var d = (row.voucher_date_display || '').toString() || (row.voucher_date || '').toString().slice(0, 10);
             tr.innerHTML =
-                '<td>' + d + '</td>' +
+                '<td>' + escapeHtml(d) + '</td>' +
                 '<td>' + escapeHtml(row.reference || '') + '</td>' +
                 '<td title="' + escapeHtml(row.entry_type || '') + '">' + escapeHtml(glEntryTypeLabel(row.entry_type)) + '</td>' +
                 '<td>' + Number(row.debit).toFixed(3) + '</td>' +

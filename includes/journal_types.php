@@ -59,13 +59,14 @@ function orange_journal_types_canonical_rows(): array
 }
 
 /**
- * يضمن وجود الصفوف المرجعية وترتيبها في القواعد التي أُنشئت قبل تحديث الزرع.
- * يُستدعى مرة واحدة لكل طلب HTTP كحد أقصى.
+ * دمج قائمة الأنواع المرجعية في الجدول: يحدّث الأسماء والترتيب للأكواد الموجودة ويُدخل الناقص.
+ * يُستدعى عند الحاجة أكثر من مرة في نفس الطلب (مثلاً استعادة بعد جدول فارغ).
+ *
+ * @throws Throwable عند فشل المعاملة
  */
-function orange_journal_types_sync_canonical_defaults(PDO $pdo): void
+function orange_journal_types_merge_canonical_defaults(PDO $pdo): void
 {
-    static $done = false;
-    if ($done || !orange_table_exists($pdo, 'journal_types')) {
+    if (!orange_table_exists($pdo, 'journal_types')) {
         return;
     }
 
@@ -92,13 +93,27 @@ function orange_journal_types_sync_canonical_defaults(PDO $pdo): void
             }
         }
         $pdo->commit();
-        $done = true;
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
         throw $e;
     }
+}
+
+/**
+ * يضمن وجود الصفوف المرجعية وترتيبها (يُستدعى من catalog_schema).
+ * مرة واحدة لكل طلب HTTP كحد أقصى لتفادي تكرار المعاملة عند عدة استدعاءات ensure_schema.
+ */
+function orange_journal_types_sync_canonical_defaults(PDO $pdo): void
+{
+    static $done = false;
+    if ($done || !orange_table_exists($pdo, 'journal_types')) {
+        return;
+    }
+
+    orange_journal_types_merge_canonical_defaults($pdo);
+    $done = true;
 }
 
 /**

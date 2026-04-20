@@ -61,7 +61,7 @@ if (orange_table_exists($pdo, 'orange_admin_audit_log')) {
                     <?php foreach ($rows as $r): ?>
                         <tr>
                             <td><?php echo (int) $r['id']; ?></td>
-                            <td dir="ltr" style="white-space:nowrap;"><?php echo htmlspecialchars((string) ($r['created_at'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td dir="ltr" style="white-space:nowrap;"><?php echo htmlspecialchars(orange_format_datetime_dmY_hi((string) ($r['created_at'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td>
                                 <?php
                                 $u = trim((string) ($r['admin_username'] ?? ''));

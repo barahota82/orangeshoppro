@@ -121,7 +121,7 @@ $recent = $pdo->query(
                 <?php foreach ($recent as $r): ?>
                 <tr>
                     <td><?php echo (int)$r['id']; ?></td>
-                    <td><?php echo htmlspecialchars((string)($r['created_at'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo htmlspecialchars(orange_format_datetime_dmY_hi((string) ($r['created_at'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo htmlspecialchars((string)($r['supplier_name'] ?: '—'), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo ($r['type'] ?? '') === 'credit' ? 'آجل' : 'نقدي'; ?></td>
                     <td><?php echo number_format((float)($r['total'] ?? 0), 2); ?> KD</td>

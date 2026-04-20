@@ -9,20 +9,6 @@ require_once __DIR__ . '/../../includes/journal_voucher.php';
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
-/**
- * عرض تاريخ السنة المالية بصيغة يوم/شهر/سنة.
- */
-function orange_opening_balance_format_dmY(string $ymd): string
-{
-    $ymd = trim($ymd);
-    if ($ymd === '') {
-        return '';
-    }
-    $t = strtotime($ymd);
-
-    return $t !== false ? date('d/m/Y', $t) : $ymd;
-}
-
 $years = array_values(array_filter(orange_fiscal_years_list($pdo), static fn ($y) => (int) ($y['is_closed'] ?? 0) === 0));
 $fyId = isset($_GET['fy']) ? (int) $_GET['fy'] : 0;
 if ($fyId <= 0 && $years !== []) {
@@ -73,8 +59,8 @@ if ($fyId > 0 && orange_journal_vouchers_ready($pdo)) {
             <select id="ob_fy" name="fy" onchange="this.form.submit()">
                 <?php foreach ($years as $y): ?>
                     <?php
-                    $sd = orange_opening_balance_format_dmY((string) ($y['start_date'] ?? ''));
-                    $ed = orange_opening_balance_format_dmY((string) ($y['end_date'] ?? ''));
+                    $sd = orange_format_date_dmY((string) ($y['start_date'] ?? ''));
+                    $ed = orange_format_date_dmY((string) ($y['end_date'] ?? ''));
                     $range = $sd !== '' && $ed !== '' ? $sd . ' — ' . $ed : '';
                     ?>
                     <option value="<?php echo (int) $y['id']; ?>" <?php echo ((int) $y['id'] === $fyId) ? 'selected' : ''; ?>>

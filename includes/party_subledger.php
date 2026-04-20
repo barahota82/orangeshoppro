@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/journal_voucher.php';
+require_once __DIR__ . '/date_format.php';
 
 function orange_party_subledger_ready(PDO $pdo): bool
 {
@@ -144,8 +145,10 @@ function orange_party_statement_lines(PDO $pdo, string $partyKind, int $partyId)
         } else {
             $run = round($run + $c - $d, 4);
         }
+        $vdRaw = (string) ($r['voucher_date'] ?? '');
         $out[] = [
             'voucher_date' => $r['voucher_date'],
+            'voucher_date_display' => orange_format_date_dmY($vdRaw),
             'reference' => $r['reference'],
             'entry_type' => $r['entry_type'],
             'debit' => $d,

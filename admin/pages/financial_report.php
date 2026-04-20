@@ -215,7 +215,7 @@ $bsCheck = round($bsAssets - ($bsLiab + $bsEquity), 2);
                 <tbody>
                     <?php foreach ($statementRows as $sr): ?>
                         <tr>
-                            <td><?php echo htmlspecialchars(substr((string) ($sr['voucher_date'] ?? ''), 0, 10), ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td><?php echo htmlspecialchars(orange_format_date_dmY((string) ($sr['voucher_date'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><?php echo htmlspecialchars((string) ($sr['reference'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><small title="<?php echo htmlspecialchars(trim((string) ($sr['entry_type'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(orange_gl_entry_type_label_ar((string) ($sr['entry_type'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></small></td>
                             <td><?php echo htmlspecialchars((string) ($sr['description'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>

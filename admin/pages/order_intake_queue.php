@@ -269,8 +269,8 @@ $statusLabel = [
                                 ?>
                             </td>
                             <td><?php echo (int) ($r['attempts'] ?? 0); ?></td>
-                            <td dir="ltr" style="white-space:nowrap;"><?php echo htmlspecialchars((string) ($r['created_at'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                            <td dir="ltr" style="white-space:nowrap;"><?php echo htmlspecialchars((string) ($r['updated_at'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td dir="ltr" style="white-space:nowrap;"><?php echo htmlspecialchars(orange_format_datetime_dmY_hi((string) ($r['created_at'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td dir="ltr" style="white-space:nowrap;"><?php echo htmlspecialchars(orange_format_datetime_dmY_hi((string) ($r['updated_at'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td style="max-width:220px;">
                                 <?php if ($st === 'failed' && trim((string) ($r['error_message'] ?? '')) !== ''): ?>
                                     <?php

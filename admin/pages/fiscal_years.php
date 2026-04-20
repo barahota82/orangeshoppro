@@ -5,18 +5,6 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/fiscal_years.php';
 
-/**
- * عرض تاريخ قاعدة Y-m-d كيوم/شهر/سنة في الواجهة.
- */
-function orange_fy_display_dmy(?string $ymd): string
-{
-    if ($ymd !== null && $ymd !== '' && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $ymd, $m)) {
-        return $m[3] . '/' . $m[2] . '/' . $m[1];
-    }
-
-    return '';
-}
-
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 $years = orange_fiscal_years_list($pdo);
@@ -59,8 +47,8 @@ $fySuggestYear = $maxEndY + 1;
                         $sd = (string) ($y['start_date'] ?? '');
                         $ed = (string) ($y['end_date'] ?? '');
                         $yr = preg_match('/^(\d{4})-\d{2}-\d{2}$/', $sd, $mm) ? (int) $mm[1] : '';
-                        $sdDisp = orange_fy_display_dmy($sd);
-                        $edDisp = orange_fy_display_dmy($ed);
+                        $sdDisp = orange_format_date_dmY($sd);
+                        $edDisp = orange_format_date_dmY($ed);
                         ?>
                     <tr data-fy-row data-id="<?php echo $id; ?>">
                         <td class="fy-col-num"><span class="fy-serial"><?php echo $serial; ?></span></td>

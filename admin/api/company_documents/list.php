@@ -77,6 +77,8 @@ try {
         $r['doc_type_label'] = $typeLabels[$dt] ?? $dt;
         $et = (string) ($r['entity_table'] ?? '');
         $r['entity_label'] = $entityPresets[$et] ?? ($et !== '' ? $et : 'عام');
+        $r['doc_date_display'] = orange_format_date_dmY((string) ($r['doc_date'] ?? ''));
+        $r['created_at_display'] = orange_format_datetime_dmY_hi((string) ($r['created_at'] ?? ''));
     }
     unset($r);
 

@@ -164,7 +164,7 @@ foreach ($accounts as $a) {
                     ?>
                     <tr>
                         <td><?php echo $vid; ?></td>
-                        <td><?php echo htmlspecialchars(substr((string)$v['voucher_date'], 0, 19), ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars(orange_format_datetime_dmY_hi((string) ($v['voucher_date'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars($etAr, ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars((string)($v['reference'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars((string)($v['description'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>

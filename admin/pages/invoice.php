@@ -44,16 +44,6 @@ function orange_invoice_assign_number_if_needed(PDO $pdo, array &$order, int $or
     }
 }
 
-function orange_invoice_format_datetime_display(?string $dt): string
-{
-    if ($dt === null || trim($dt) === '') {
-        return '—';
-    }
-    $t = strtotime($dt);
-
-    return $t !== false ? date('d/m/Y H:i', $t) : $dt;
-}
-
 function orange_invoice_logo_url(string $raw): string
 {
     $raw = trim($raw);
@@ -533,8 +523,8 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
                 <div><strong>رقم الفاتورة:</strong> <span style="color:#94a3b8;">يُخصص تلقائياً عند أول عرض</span></div>
             <?php endif; ?>
             <div><strong>رقم الطلب:</strong> <?php echo htmlspecialchars((string)$order['order_number'], ENT_QUOTES, 'UTF-8'); ?></div>
-            <div><strong>تاريخ الطلب:</strong> <?php echo htmlspecialchars(orange_invoice_format_datetime_display((string)($order['created_at'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></div>
-            <div><strong>طباعة:</strong> <?php echo htmlspecialchars(date('d/m/Y H:i'), ENT_QUOTES, 'UTF-8'); ?></div>
+            <div><strong>تاريخ الطلب:</strong> <?php echo htmlspecialchars(orange_format_datetime_dmY_hi((string)($order['created_at'] ?? '')) ?: '—', ENT_QUOTES, 'UTF-8'); ?></div>
+            <div><strong>طباعة:</strong> <?php echo htmlspecialchars(orange_format_datetime_dmY_hi(date('Y-m-d H:i:s')), ENT_QUOTES, 'UTF-8'); ?></div>
             <?php if ($vat !== ''): ?>
                 <div class="invoice-doc-badge">الرقم الضريبي: <?php echo htmlspecialchars($vat, ENT_QUOTES, 'UTF-8'); ?></div>
             <?php endif; ?>

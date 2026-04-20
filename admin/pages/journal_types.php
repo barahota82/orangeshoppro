@@ -8,22 +8,34 @@ require_once __DIR__ . '/../../includes/journal_types.php';
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 $types = orange_journal_types_list($pdo);
+/*
+ * عادةً تملأ الأنواع المرجعية عبر orange_journal_types_sync_canonical_defaults داخل ensure_schema.
+ * إن بقي الجدول فارغاً (فشل سابق نادر، أو قاعدة قديمة)، نُعيد دمج القائمة المرجعية هنا صراحةً
+ * حتى تظهر صفوف بمعرّفات حقيقية — دون الاعتماد على صف واجهي بـ id=0.
+ */
 if ($types === []) {
-    $types = [
-        [
-            'id' => 0,
-            'code' => 'OBV',
-            'name_ar' => 'سند رصيد افتتاحي',
-            'name_en' => 'Opening balance voucher',
-            'sort_order' => 1,
-        ],
-    ];
+    try {
+        orange_journal_types_merge_canonical_defaults($pdo);
+        $types = orange_journal_types_list($pdo);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] journal_types page merge: ' . $e->getMessage());
+        }
+    }
 }
+$jtShowEmptyHint = ($types === []);
 ?>
 <div class="fy-years-page" dir="rtl">
     <h1 class="fy-years-page__title">أنواع اليوميات</h1>
 
     <div class="card fy-years-card fy-print-area">
+        <?php if ($jtShowEmptyHint): ?>
+            <p class="card-hint" style="margin:0 0 0.75rem;">
+                لا توجد صفوف في القاعدة بعد — أضف نوعاً واضغط <strong>حفظ</strong> لإنشاء السجلات،
+                أو أعد <strong>تحميل الصفحة</strong> لإعادة محاولة استيراد الأنواع المرجعية تلقائياً.
+                عند الحفظ، الصفوف ذات المعرف 0 تُدرج كسجلات جديدة في الجدول ثم تُحدَّث الصفحة.
+            </p>
+        <?php endif; ?>
         <div class="table-wrap fy-years-table-wrap">
             <table class="fy-years-table">
                 <thead>
@@ -88,6 +100,7 @@ if ($types === []) {
             return;
         }
 
+        /** صف مساعد في المتصفح فقط (data-id=0) حتى يضغط المستخدم «حفظ» فيُنشئ السيرفر السجل الحقيقي. */
         function jtAddDefaultOpeningRow() {
             var tr = document.createElement('tr');
             tr.setAttribute('data-jt-row', '');

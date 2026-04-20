@@ -128,7 +128,7 @@ $img = $product['main_image'] ? '/uploads/products/' . rawurlencode($product['ma
             <tbody>
                 <?php foreach ($movements as $m): ?>
                 <tr>
-                    <td><?php echo htmlspecialchars((string)$m['created_at']); ?></td>
+                    <td><?php echo htmlspecialchars(orange_format_datetime_dmY_hi((string) $m['created_at'])); ?></td>
                     <td>
                         <code title="<?php echo htmlspecialchars((string) $m['type'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(orange_stock_movement_type_label_ar((string) ($m['type'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></code>
                     </td>

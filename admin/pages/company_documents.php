@@ -160,9 +160,9 @@ $entityPresets = orange_company_document_entity_presets();
         tb.innerHTML = rows.map(function (r) {
             var id = parseInt(r.id, 10);
             var ent = (r.entity_table && String(r.entity_table)) ? (r.entity_label + ' — ' + String(r.entity_id)) : 'عام';
-            var d = r.doc_date ? String(r.doc_date) : '—';
+            var d = (r.doc_date_display && String(r.doc_date_display)) || (r.doc_date ? String(r.doc_date) : '—');
             var who = r.created_by_username ? String(r.created_by_username) : '—';
-            var ca = r.created_at ? String(r.created_at) : '—';
+            var ca = (r.created_at_display && String(r.created_at_display)) || (r.created_at ? String(r.created_at) : '—');
             return '<tr>' +
                 '<td>' + id + '</td>' +
                 '<td>' + escapeHtml(String(r.title_ar || '')) + '</td>' +
