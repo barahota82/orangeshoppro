@@ -27,8 +27,9 @@ $registerHref = storefront_url('register', $channelSlug, $lang);
 $homeHref = storefront_url('home', $channelSlug, $lang);
 ?>
 <div class="container">
-    <div class="page-title-box">
+    <div class="page-title-box cart-page-head">
         <h2><?php echo htmlspecialchars(t('storefront_register_title'), ENT_QUOTES, 'UTF-8'); ?></h2>
+        <a class="cart-page-close" href="<?php echo htmlspecialchars($homeHref, ENT_QUOTES, 'UTF-8'); ?>" aria-label="<?php echo htmlspecialchars(t('product_back_to_shop'), ENT_QUOTES, 'UTF-8'); ?>"><span aria-hidden="true">&times;</span></a>
     </div>
 
     <div class="track-signup-cta card-box register-signup-cta" role="region" aria-label="<?php echo htmlspecialchars(t('track_signup_cta_aria'), ENT_QUOTES, 'UTF-8'); ?>">
