@@ -321,6 +321,8 @@ function changeMainImage(src, btn) {
     if (!header || !dock || !vv) return;
 
     const mq = window.matchMedia('(max-width: 1023px)');
+    /** فوق هذا (بدون تركيز حقل إدخال) غالباً قيمة شاذة من visualViewport قبل استقرار السكرول/شريط العنوان */
+    const MAX_TOOLBAR_GAP_PX = 148;
 
     function setHeaderHeightVar() {
         if (!mq.matches) {
@@ -330,6 +332,21 @@ function changeMainImage(src, btn) {
         document.documentElement.style.setProperty('--sf-fixed-header-h', `${header.offsetHeight}px`);
     }
 
+    function isLikelyKeyboardOpen() {
+        const el = document.activeElement;
+        if (!el || el === document.body) {
+            return false;
+        }
+        const tag = el.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+            return true;
+        }
+        if (el.isContentEditable) {
+            return true;
+        }
+        return false;
+    }
+
     function sync() {
         if (!mq.matches) {
             dock.style.removeProperty('bottom');
@@ -337,8 +354,27 @@ function changeMainImage(src, btn) {
             return;
         }
         setHeaderHeightVar();
-        const gap = Math.max(0, window.innerHeight - vv.offsetTop - vv.height);
+        const innerH = window.innerHeight;
+        const vvH = vv.height;
+        const vvTop = vv.offsetTop;
+        if (!Number.isFinite(vvH) || vvH < 40) {
+            dock.style.removeProperty('bottom');
+            return;
+        }
+        let gap = Math.max(0, innerH - vvTop - vvH);
+        const probablyKeyboard = vvH < innerH * 0.62;
+        if (!isLikelyKeyboardOpen() && !probablyKeyboard && gap > MAX_TOOLBAR_GAP_PX) {
+            gap = 0;
+        }
         dock.style.bottom = gap ? `${gap}px` : '';
+    }
+
+    function syncSoon() {
+        sync();
+        requestAnimationFrame(() => {
+            sync();
+            requestAnimationFrame(sync);
+        });
     }
 
     vv.addEventListener('resize', sync, { passive: true });
@@ -348,13 +384,26 @@ function changeMainImage(src, btn) {
     } else if (typeof mq.addListener === 'function') {
         mq.addListener(sync);
     }
-    window.addEventListener('orientationchange', sync, { passive: true });
-    window.addEventListener('load', setHeaderHeightVar, { passive: true });
+    window.addEventListener('orientationchange', syncSoon, { passive: true });
+    window.addEventListener('scroll', sync, { passive: true });
+    window.addEventListener('load', () => {
+        setHeaderHeightVar();
+        syncSoon();
+    }, { passive: true });
+    window.addEventListener('pageshow', (ev) => {
+        setHeaderHeightVar();
+        syncSoon();
+        if (ev.persisted) {
+            syncSoon();
+        }
+    });
+    document.addEventListener('focusin', sync, true);
+    document.addEventListener('focusout', sync, true);
     if (typeof ResizeObserver !== 'undefined') {
         const ro = new ResizeObserver(setHeaderHeightVar);
         ro.observe(header);
     }
-    sync();
+    syncSoon();
 })();
 
 /** أزرار «تثبيت» (هيدر + شريط سفلي): Chrome/Android يعرض مطالبة التثبيت؛ iOS يعرض خطوات يدوية. */
