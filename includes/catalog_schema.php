@@ -644,8 +644,10 @@ function orange_catalog_ensure_schema(PDO $pdo): void
      | ترحيل journal_entries (تراثي) → journal_vouchers / journal_lines
      |--------------------------------------------------------------------------
      | القرار: القيود الحديثة تُخزَّن في journal_vouchers + journal_lines. جدول
-     | journal_entries (مدين/دائن في صف واحد) تراثي. إن كان journal_lines فارغاً
-     | وjournal_entries يحتوي صفوفاً صالحة، يُستورد هنا ثم يُفرَّغ journal_entries.
+     | journal_entries (مدين/دائن في صف واحد) تراثي. قواعد أُنشئت من
+     | mysql-create-orange-database-full.sql الحالي لا تضم هذا الجدول — الكتلة تُستبعد
+     | تلقائياً عبر orange_table_exists. إن وُجد journal_entries وكان journal_lines
+     | فارغاً وفيه صفوف صالحة، يُرحَّل هنا ثم يُفرَّغ journal_entries.
      | صفحة الأدمن journal_entries.php تستخدم السندات الحديثة رغم اسم الملف.
      |--------------------------------------------------------------------------
      */

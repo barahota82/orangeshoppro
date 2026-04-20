@@ -1,7 +1,7 @@
 IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
 ============================================
 النسخة المعتمدة: جذر المستودع — IBRAHIM_ORANGE_MASTER.txt (مثلاً D:\orange)
-آخر تحديث: 2026-04-21
+آخر تحديث: 2026-04-22
 
 الغرض
 -------
@@ -65,7 +65,7 @@ IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
 
 ملخص الملفات:
   - mysql-day1-hardening.sql.txt — فهارس/أطوال/تنظيف يتامى/قيود جزئية.
-  - mysql-day1-hardening-part2.sql — صيانة journal_entries التراثي + audit + stock_movements.
+  - mysql-day1-hardening-part2.sql — (قسم تراثي journal_entries إن وُجد الجدول) + audit + stock_movements.
   - mysql-strong-integrity.sql — FK وتنظيف أوسع (بعد 1 و 2 عادة).
   - mysql-create-orange-database-full.sql — هيكل تقريباً كامل لقاعدة جديدة.
 
@@ -79,30 +79,29 @@ IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
   وباقي الكتالوج utf8mb4.
 
 
-6) journal_entries مقابل journal_vouchers — قرار مُثبَّت
---------------------------------------------------------
-قرار المشروع (لا يحتاج «مزيد قرار» إلا لإزالة الجدول نهائياً من مخطط قواعد جديدة):
+6) journal_entries مقابل journal_vouchers — قرار مُثبَّت + مخطط جديد نظيف
+------------------------------------------------------------------------
+قرار المشروع:
 
 أ) المصدر القياسي لقيود الدفتر: journal_vouchers + journal_lines (الترحيل من
    gl_posting، السندات متعددة الأسطر، الطابور orange_gl_pending_movements، …).
 
-ب) جدول journal_entries: نموذج تراثي (مدين/دائن في صف واحد). ما زال في المخطط
-   وفي بعض التقارير/الفحوص كمسار احتياطي للبيانات القديمة فقط.
+ب) قواعد جديدة من scripts/mysql-create-orange-database-full.sql: لا يُنشأ جدول
+   journal_entries — القيود تُسجَّل فقط في journal_vouchers / journal_lines.
 
-ج) الترحيل التلقائي: includes/catalog_schema.php — إذا كان journal_lines فارغاً
-   وjournal_entries يحتوي صفوفاً صالحة، يُحوَّل إلى سندات+أسطر ثم يُفرَّغ
-   journal_entries (مرة واحدة لكل اتصال ضمن الحارس static).
+ج) جدول journal_entries: نموذج تراثي (مدين/دائن في صف واحد). يظل ممكناً في قواعد
+   قديمة أو نسخ احتياطية؛ الكود يتعامل معه عبر orange_table_exists (تقارير/فحوص/ترحيل).
 
-د) صفحة الأدمن «سند قيد»: الملف admin/pages/journal_entries.php (اسم تراثي) يعرض
-   ويُدخل عبر journal_vouchers / journal_lines وليس عبر جدول journal_entries.
+د) الترحيل التلقائي: includes/catalog_schema.php — إذا وُجد journal_entries وكان
+   journal_lines فارغاً وjournal_entries يحتوي صفوفاً صالحة، يُحوَّل إلى سندات+أسطر
+   ثم يُفرَّغ journal_entries (مرة واحدة لكل اتصال ضمن الحارس static).
 
-هـ) scripts/mysql-day1-hardening-part2.sql: صيانة اختيارية لـ fiscal_year_id على
-   journal_entries في قواعد لم تُرحَّل بعد؛ بعد الترحيل قد يبقى الجدول فارغاً —
-   لا حاجة لحذفه فوراً من SQL الكامل إلا كتنظيف مخطط لاحق.
+هـ) صفحة الأدمن «سند قيد»: admin/pages/journal_entries.php (اسم ملف تراثي) تعرض
+   وتُدخل عبر journal_vouchers / journal_lines وليس عبر إدراج مباشر في journal_entries.
 
-و) حذف الجدول journal_entries من قواعد جديدة بالكامل: اختياري؛ حالياً الملف الكامل
-   ما زال ينشئه للتوافق؛ يمكن حذفه من نسخ مستقبلية من mysql-create بعد توحيد كل
-   البيئات على الترحيل.
+و) scripts/mysql-day1-hardening-part2.sql — القسم (1) يخص journal_entries فقط:
+   شغّله إن وُجد الجدول (قواعد تراثية). إن أُنشئت القاعدة من mysql-create الحالي
+   فلا جدول journal_entries؛ علّق أو تخطَّ القسم (1) حتى لا يفشل الاستعلام.
 
 
 7) تشغيل إنتاجي — قائمة تحقق سريعة

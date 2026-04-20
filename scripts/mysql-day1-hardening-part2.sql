@@ -1,9 +1,11 @@
 -- orange: تحسينات إضافية — نفّذ بعد نسخة احتياطية؛ مرّة واحدة حيث يلزم.
 --
 -- (1) journal_entries — جدول تراثي؛ المصدر القياسي للقيود هو journal_vouchers +
---     journal_lines. هذا القسم يصلح fiscal_year_id اليتيم فقط على قواعد لم تُرحَّل
---     بعد (راجع includes/catalog_schema.php: ترحيل تلقائي عند journal_lines فارغ).
---     إن كان الجدول فارغاً بعد الترحيل، لا ضرر من تشغيل UPDATE/ALTER (قد يكون no-op).
+--     journal_lines. شغّل هذا القسم فقط إن وُجد الجدول (قواعد قديمة أو dump).
+--     قواعد أُنشئت من mysql-create-orange-database-full.sql الحالي لا تحتوي journal_entries —
+--     في هذه الحالة علّق القسم (1) بالكامل وإلا يفشل UPDATE/ALTER.
+--     إن وُجد الجدول وفارغاً بعد الترحيل، لا ضرر غالباً من تشغيل البنود (قد يكون no-op
+--     أو فشل ADD CONSTRAINT إن وُجد القيد — راجع تذييل الملف).
 -- (2) تنظيف stock_movements (القيود غالباً موجودة من الاستيراد)
 -- (4) ربط orange_admin_audit_log بـ admins
 -- (3) product_colorways → products — كان مؤجّلاً

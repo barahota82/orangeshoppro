@@ -10,6 +10,7 @@
 --
 -- لا يُنشئ مستخدماً افتراضياً — أضف مشرفاً من لوحة التحكم أو من نسخة احتياطية.
 -- الترميز: utf8mb4_unicode_ci — متوافق مع includes/catalog_schema.php
+-- القيود المحاسبية في القاعدة الجديدة: journal_vouchers + journal_lines فقط (لا جدول journal_entries).
 -- =============================================================================
 
 CREATE DATABASE IF NOT EXISTS `orange_db`
@@ -194,24 +195,9 @@ CREATE TABLE `journal_lines` (
   KEY `idx_jl_account` (`account_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE `journal_entries` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `date` datetime NOT NULL,
-  `account_debit` int NOT NULL,
-  `account_credit` int NOT NULL,
-  `amount` decimal(10,2) NOT NULL,
-  `reference` varchar(100) DEFAULT NULL,
-  `description` text,
-  `entry_type` varchar(50) NOT NULL,
-  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` datetime DEFAULT NULL,
-  `fiscal_year_id` int DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `idx_journal_entry_type` (`entry_type`),
-  KEY `idx_journal_reference` (`reference`),
-  KEY `idx_journal_date` (`date`),
-  KEY `idx_journal_entries_fiscal_year` (`fiscal_year_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- journal_entries — لا يُنشأ في قواعد جديدة. المصدر القياسي للقيود: journal_vouchers +
+-- journal_lines فقط. قواعد تراثية قد تحتوي الجدول؛ الترحيل التلقائي في
+-- includes/catalog_schema.php، والصيانة الاختيارية في mysql-day1-hardening-part2.sql.
 
 CREATE TABLE `orange_gl_account_settings` (
   `setting_key` varchar(64) NOT NULL,
@@ -736,16 +722,6 @@ ALTER TABLE `journal_lines`
 ALTER TABLE `journal_lines`
   ADD CONSTRAINT `orange_fk_jl_account` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`)
   ON DELETE RESTRICT ON UPDATE CASCADE;
-
-ALTER TABLE `journal_entries`
-  ADD CONSTRAINT `journal_entries_ibfk_1` FOREIGN KEY (`account_debit`) REFERENCES `accounts` (`id`);
-
-ALTER TABLE `journal_entries`
-  ADD CONSTRAINT `journal_entries_ibfk_2` FOREIGN KEY (`account_credit`) REFERENCES `accounts` (`id`);
-
-ALTER TABLE `journal_entries`
-  ADD CONSTRAINT `fk_journal_entries_fiscal_year` FOREIGN KEY (`fiscal_year_id`) REFERENCES `fiscal_years` (`id`)
-  ON DELETE SET NULL ON UPDATE CASCADE;
 
 ALTER TABLE `orange_gl_account_settings`
   ADD CONSTRAINT `orange_fk_gl_setting_account` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`);
