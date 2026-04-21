@@ -1587,38 +1587,7 @@ function orangeRenderTrackSignupSummary(el, order, orderNumber, phoneTyped, item
     el.innerHTML = html;
 }
 
-function orangeRenderTrackMinimalBelow(resultBox) {
-    if (!resultBox) {
-        return;
-    }
-    const T = window.ORANGE_TRACK_BELOW || {};
-    const ok = T.ok || '';
-    const another = T.another || '';
-    resultBox.innerHTML =
-        '<div class="track-page-track-mini card-box">' +
-        '<p class="track-page-track-mini__ok">' +
-        orangeEscDomText(ok) +
-        '</p>' +
-        '<button type="button" class="btn btn-secondary track-page-track-mini__another" id="orangeTrackAnotherBtn">' +
-        orangeEscDomText(another) +
-        '</button>' +
-        '</div>';
-    const btn = resultBox.querySelector('#orangeTrackAnotherBtn');
-    if (btn) {
-        btn.addEventListener('click', function () {
-            const target = document.getElementById('track-no-signup-section');
-            if (target && typeof target.scrollIntoView === 'function') {
-                try {
-                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                } catch (e) {
-                    target.scrollIntoView(true);
-                }
-            }
-        });
-    }
-}
-
-async function orangeTrackOrderFetchAndRender(resultBox, orderNumber, phone, msgMissing, msgNotFound, options) {
+async function orangeTrackOrderFetchAndRender(resultBox, orderNumber, phone, msgMissing, msgNotFound) {
     if (!resultBox) {
         return;
     }
@@ -1677,12 +1646,7 @@ async function orangeTrackOrderFetchAndRender(resultBox, orderNumber, phone, msg
     }
     window.__orangeCartTrack = { orderNumber: onum, phone: ph, order: result.order };
     const items = result.items || [];
-    const minimal = options && options.minimalBelow === true;
-    if (minimal) {
-        orangeRenderTrackMinimalBelow(resultBox);
-    } else {
-        orangeRenderTrackedOrderBox(resultBox, result.order, onum, ph, items);
-    }
+    orangeRenderTrackedOrderBox(resultBox, result.order, onum, ph, items);
     orangeScrollTrackResultIntoView(resultBox);
     if (typeof window.__orangeOnTrackSuccess === 'function') {
         try {

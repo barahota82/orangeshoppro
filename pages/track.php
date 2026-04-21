@@ -139,10 +139,6 @@ window.ORANGE_TRACK_SIGNUP = {
     missing: <?php echo json_encode(t('track_missing_fields'), JSON_UNESCAPED_UNICODE); ?>,
     nudge_merge: <?php echo json_encode(t('track_signup_nudge_merge'), JSON_UNESCAPED_UNICODE); ?>
 };
-window.ORANGE_TRACK_BELOW = {
-    ok: <?php echo json_encode(t('track_tracked_ok_below'), JSON_UNESCAPED_UNICODE); ?>,
-    another: <?php echo json_encode(t('track_track_another'), JSON_UNESCAPED_UNICODE); ?>
-};
 
 /** س27: إزالة أي معرّفات حساسة من شريط العنوان إن وُجدت (روابط قديمة أو أخطاء). */
 (function () {
