@@ -81,10 +81,10 @@ $editIsActive = $editRow ? (int) ($editRow['is_active'] ?? 1) : 1;
                     <th>الاسم</th>
                     <th>اختصار URL</th>
                     <th>Slug داخلي</th>
-                    <th>اللون</th>
                     <th>الواتساب</th>
                     <th>معاينة الواجهة</th>
-                    <th>النشاط</th>
+                    <th>الحالة</th>
+                    <th>إخفاء / تفعيل</th>
                     <th>تعديل</th>
                 </tr>
             </thead>
@@ -107,10 +107,9 @@ $editIsActive = $editRow ? (int) ($editRow['is_active'] ?? 1) : 1;
                             : '—';
                     }
                     ?></td>
+                    <td><?php echo (int) $ch['is_active'] === 1 ? 'نشط' : 'مخفي'; ?></td>
                     <td>
-                        <?php echo (int) $ch['is_active'] === 1 ? 'نشط' : 'غير نشط'; ?>
-                        <br>
-                        <button type="button" class="btn btn-secondary" style="margin-top:6px;font-size:0.85rem;padding:0.25rem 0.5rem;" onclick="toggleChannelActive(<?php echo (int) $ch['id']; ?>, <?php echo (int) $ch['is_active']; ?>)"><?php echo (int) $ch['is_active'] === 1 ? 'إيقاف الظهور' : 'تفعيل'; ?></button>
+                        <button type="button" class="btn btn-secondary" style="font-size:0.85rem;padding:0.25rem 0.5rem;" onclick="toggleChannelActive(<?php echo (int) $ch['id']; ?>, <?php echo (int) $ch['is_active']; ?>)"><?php echo (int) $ch['is_active'] === 1 ? 'إخفاء' : 'تفعيل'; ?></button>
                     </td>
                     <td><a href="/admin/index.php?page=channels&amp;edit=<?php echo (int) $ch['id']; ?>">تعديل</a></td>
                 </tr>
