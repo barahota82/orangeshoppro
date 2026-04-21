@@ -2291,7 +2291,17 @@ body.storefront .product-gallery__img {
     margin: 8px 0 0;
 }
 
+.track-order-another-wrap {
+    margin: 14px 0 0;
+}
+
+.track-order-another-btn {
+    width: 100%;
+    box-sizing: border-box;
+}
+
 @media (min-width: 560px) {
+    .track-order-another-btn,
     .track-signup-cta__verify-btn {
         width: auto;
         min-width: 200px;

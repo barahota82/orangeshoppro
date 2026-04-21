@@ -129,7 +129,8 @@ window.ORANGE_MY_ORDER_UI = <?php echo json_encode($orangeMyOrderUi, JSON_UNESCA
 window.ORANGE_TRACK_LABELS = {
     order_number: <?php echo json_encode(t('order_number'), JSON_UNESCAPED_UNICODE); ?>,
     phone: <?php echo json_encode(t('phone'), JSON_UNESCAPED_UNICODE); ?>,
-    items_title: <?php echo json_encode(t('track_order_items'), JSON_UNESCAPED_UNICODE); ?>
+    items_title: <?php echo json_encode(t('track_order_items'), JSON_UNESCAPED_UNICODE); ?>,
+    track_another_order: <?php echo json_encode(t('track_another_order'), JSON_UNESCAPED_UNICODE); ?>
 };
 window.ORANGE_TRACK_SIGNUP = {
     order_required: <?php echo json_encode(t('track_signup_order_required'), JSON_UNESCAPED_UNICODE); ?>,

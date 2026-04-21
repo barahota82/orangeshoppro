@@ -144,7 +144,8 @@ window.ORANGE_MY_ORDER_UI = <?php echo json_encode($orangeMyOrderUiCart, JSON_UN
 window.ORANGE_TRACK_LABELS = window.ORANGE_TRACK_LABELS || {
     order_number: <?php echo json_encode(t('order_number'), JSON_UNESCAPED_UNICODE); ?>,
     phone: <?php echo json_encode(t('phone'), JSON_UNESCAPED_UNICODE); ?>,
-    items_title: <?php echo json_encode(t('track_order_items'), JSON_UNESCAPED_UNICODE); ?>
+    items_title: <?php echo json_encode(t('track_order_items'), JSON_UNESCAPED_UNICODE); ?>,
+    track_another_order: <?php echo json_encode(t('track_another_order'), JSON_UNESCAPED_UNICODE); ?>
 };
 (function () {
     var TAB_KEY = 'orange_cart_ui_tab';

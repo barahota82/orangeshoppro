@@ -1448,9 +1448,38 @@ function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, 
     if (!canCancel && st !== 'cancelled' && st !== 'rejected') {
         html += '<p class="cart-cancel-hint">' + orangeEscDomText(UI.cancel_not_allowed || '') + '</p>';
     }
+    if (document.getElementById('track-no-signup-section')) {
+        const anotherLbl = L.track_another_order || '';
+        if (anotherLbl) {
+            html += '<p class="track-order-another-wrap">';
+            html +=
+                '<button type="button" class="btn btn-ghost track-order-another-btn" onclick="orangeScrollTrackAnotherOrder()">';
+            html += orangeEscDomText(anotherLbl);
+            html += '</button></p>';
+        }
+    }
     html += '</div>';
     resultBox.innerHTML = html;
 }
+
+function orangeScrollTrackAnotherOrder() {
+    const target = document.getElementById('track-no-signup-section');
+    if (target && typeof target.scrollIntoView === 'function') {
+        try {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch (e) {
+            target.scrollIntoView(true);
+        }
+    }
+    const numEl = document.getElementById('track_order_number');
+    if (numEl && typeof numEl.focus === 'function') {
+        try {
+            numEl.focus();
+        } catch (e2) {}
+    }
+}
+
+window.orangeScrollTrackAnotherOrder = orangeScrollTrackAnotherOrder;
 
 function orangeRenderTrackSignupSummary(el, order, orderNumber, phoneTyped, items) {
     if (!el) {
