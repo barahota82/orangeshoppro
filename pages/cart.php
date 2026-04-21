@@ -113,16 +113,10 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
                     <input id="customer_name" autocomplete="name" maxlength="500">
                 </div>
                 <div class="field cart-checkout-phone-field">
-                    <div class="cart-phone-field__grid" role="group" aria-label="<?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?>">
-                        <span class="cart-phone-field__legend"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></span>
-                        <div class="cart-phone-field__cell">
-                            <label for="customer_phone_country" class="cart-phone-field__sublabel"><?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?></label>
-                            <?php orange_storefront_render_phone_country_select('customer_phone_country'); ?>
-                        </div>
-                        <div class="cart-phone-field__cell cart-phone-field__cell--number">
-                            <label for="customer_phone" class="cart-phone-field__sublabel"><?php echo htmlspecialchars(t('phone_number_label'), ENT_QUOTES, 'UTF-8'); ?></label>
-                            <input id="customer_phone" class="cart-phone-field__input" type="tel" autocomplete="tel" inputmode="tel" maxlength="22" placeholder="<?php echo htmlspecialchars(t('phone_field_hint'), ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
-                        </div>
+                    <label for="customer_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <div class="cart-phone-field__row">
+                        <?php orange_storefront_render_phone_country_select('customer_phone_country'); ?>
+                        <input id="customer_phone" class="cart-phone-field__input" type="tel" autocomplete="tel" inputmode="tel" maxlength="22" placeholder="<?php echo htmlspecialchars(t('phone_field_hint'), ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
                     </div>
                 </div>
                 <div class="field">
