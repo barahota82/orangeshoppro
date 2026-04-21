@@ -1414,6 +1414,19 @@ function orangeCartRenderAccountOrderCard(row) {
     if (ph) {
         html += '<p class="cart-account-order-card__row"><strong>' + orangeEscDomText(lblPhone) + ':</strong> ' + orangeEscDomText(ph) + '</p>';
     }
+    const Tcard = window.APP_T || {};
+    const linesSubRaw = row.lines_subtotal != null && row.lines_subtotal !== '' ? parseFloat(String(row.lines_subtotal)) : NaN;
+    const linesSubNum = Number.isFinite(linesSubRaw) ? linesSubRaw : 0;
+    if (orangeOrderCartPromoDiscountAmount(row) > 1e-9 && linesSubNum > 1e-9) {
+        html +=
+            '<p class="cart-account-order-card__row order-items-subtotal-line"><strong>' +
+            orangeEscDomText(Tcard.cart_subtotal_label || '') +
+            ':</strong> ' +
+            linesSubNum.toFixed(3) +
+            ' ' +
+            orangeEscDomText(cur) +
+            '</p>';
+    }
     html += orangeHtmlOrderPromoParagraph(
         row,
         cur,
