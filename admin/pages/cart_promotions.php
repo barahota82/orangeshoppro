@@ -8,7 +8,8 @@ $hasTable = orange_table_exists($pdo, 'cart_promotions');
 ?>
 <div class="page-title page-title--stacked">
     <h1>عروض مجموع السلة</h1>
-    <p class="page-subtitle">خصم تلقائي عند تجاوز حد أدنى لمجموع السلة (مثال: 10 د.ك → خصم 2 د.ك). يُحسب على السيرفر عند الطلب. يمكن تقييد عرض بأن يكون للمسجّلين فقط.</p>
+    <p class="page-subtitle">خصم تلقائي عند تجاوز حد أدنى لمجموع السلة (مثال: 10 د.ك → خصم 2 د.ك). يُحسب على السيرفر عند الطلب.
+        <strong>نطاق كل قاعدة:</strong> إمّا <strong>لجميع زوّار الموقع</strong> (ضيف ومسجّل) أو <strong>للمسجّلين فقط</strong> — يحددها الأدمن لكل صف بالأسفل.</p>
 </div>
 
 <?php if (!$hasTable): ?>
@@ -24,9 +25,10 @@ $hasTable = orange_table_exists($pdo, 'cart_promotions');
         <div><label>الحد الأدنى لمجموع السلة (د.ك)</label><input type="text" id="cp_min" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="10"></div>
         <div><label>مبلغ الخصم (د.ك)</label><input type="text" id="cp_disc" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="2"></div>
         <div><label>الترتيب</label><input type="number" id="cp_sort" value="0" style="max-width:120px;"></div>
-        <div style="display:flex;align-items:flex-end;gap:8px;">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="checkbox" id="cp_reg"> للمسجّلين فقط
+        <div style="grid-column:1/-1;">
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;max-width:52rem;line-height:1.45;">
+                <input type="checkbox" id="cp_reg" style="margin-top:4px;flex-shrink:0;">
+                <span><strong>للمسجّلين فقط</strong> — عند تفعيلها لا يُطبَّق الخصم إلا لحساب مفعّل (بريد مؤكد). عند <strong>عدم</strong> التفعيل يكون العرض <strong>لجميع الزوّار</strong> (ضيف ومسجّل).</span>
             </label>
         </div>
         <div style="display:flex;align-items:flex-end;gap:8px;">
@@ -51,7 +53,7 @@ $hasTable = orange_table_exists($pdo, 'cart_promotions');
                     <th>#</th>
                     <th>حد أدنى</th>
                     <th>خصم</th>
-                    <th>مسجّل فقط</th>
+                    <th>نطاق العرض</th>
                     <th>ترتيب</th>
                     <th>نشط</th>
                     <th></th>
@@ -104,7 +106,7 @@ async function loadCartPromotions() {
             '<td>' + escCp(String(r.id)) + '</td>' +
             '<td dir="ltr">' + escCp(String(r.min_subtotal)) + '</td>' +
             '<td dir="ltr">' + escCp(String(r.discount_amount)) + '</td>' +
-            '<td>' + (parseInt(r.requires_registered_account, 10) === 1 ? 'نعم' : 'لا') + '</td>' +
+            '<td>' + (parseInt(r.requires_registered_account, 10) === 1 ? 'مسجّل فقط' : 'جميع الزوّار') + '</td>' +
             '<td>' + escCp(String(r.sort_order)) + '</td>' +
             '<td>' + (parseInt(r.is_active, 10) === 1 ? 'نعم' : 'لا') + '</td>' +
             '<td><button type="button" class="btn-secondary" data-cp-edit="' + escCp(String(r.id)) + '">تعديل</button></td>';
