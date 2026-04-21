@@ -183,6 +183,9 @@ function orangeCheckoutApiMessage(result) {
     if (c === 'mail_failed' && T.storefront_register_mail_failed) {
         return T.storefront_register_mail_failed;
     }
+    if ((c === 'rate_limited' || c === 'cooldown') && T.track_email_summary_rate_limit) {
+        return T.track_email_summary_rate_limit;
+    }
     if (c === 'service_unavailable' && T.storefront_register_service_unavailable) {
         return T.storefront_register_service_unavailable;
     }
@@ -1482,6 +1485,27 @@ function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, 
         html += '</ul></div>';
     }
 
+    const emailIntro = T.track_email_summary_intro || '';
+    const emailPh = T.track_email_summary_placeholder || '';
+    const emailSend = T.track_email_summary_send || '';
+    if (emailIntro && emailSend) {
+        html += '<div class="track-email-summary">';
+        html += '<p class="track-email-summary__intro">' + orangeEscDomText(emailIntro) + '</p>';
+        html += '<div class="track-email-summary__row">';
+        html +=
+            '<input type="email" id="trackOrderEmailSummaryInput" class="track-email-summary__input" autocomplete="email" inputmode="email" dir="ltr" placeholder="' +
+            orangeEscDomAttr(emailPh) +
+            '">';
+        html +=
+            '<button type="button" class="btn btn-secondary track-email-summary__btn" id="trackOrderEmailSummaryBtn" onclick="orangeSendTrackOrderEmailSummary()">' +
+            orangeEscDomText(emailSend) +
+            '</button>';
+        html += '</div>';
+        html +=
+            '<p class="track-email-summary__feedback" id="trackOrderEmailSummaryFeedback" role="status" aria-live="polite" hidden></p>';
+        html += '</div>';
+    }
+
     html += '<div class="customer-order-actions">';
     html += '<button type="button" class="btn btn-secondary customer-order-amend"';
     if (!canCancel) {
@@ -1774,6 +1798,73 @@ async function orangeTrackOrderFetchAndRender(resultBox, orderNumber, phone, msg
         } catch (e) {
             /* optional storefront hook */
         }
+    }
+}
+
+async function orangeSendTrackOrderEmailSummary() {
+    const ctx = window.__orangeCartTrack;
+    const inp = document.getElementById('trackOrderEmailSummaryInput');
+    const fb = document.getElementById('trackOrderEmailSummaryFeedback');
+    const btn = document.getElementById('trackOrderEmailSummaryBtn');
+    const T = window.APP_T || {};
+    if (!ctx || !ctx.orderNumber || !ctx.phone || !inp) {
+        return;
+    }
+    const email = String(inp.value || '').trim();
+    if (fb) {
+        fb.hidden = false;
+        fb.textContent = '';
+    }
+    if (!email) {
+        if (fb) {
+            fb.textContent = T.checkout_invalid_email || '';
+        }
+        return;
+    }
+    const lang =
+        typeof window.APP_LANG === 'string' && window.APP_LANG.trim() !== ''
+            ? window.APP_LANG.trim().toLowerCase()
+            : 'en';
+    if (btn) {
+        btn.disabled = true;
+    }
+    let data = null;
+    try {
+        const res = await fetch(storefrontApiUrl('/api/orders/email-track-order-summary.php'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                order_number: String(ctx.orderNumber || '').trim(),
+                phone: String(ctx.phone || '').trim(),
+                email: email,
+                lang: lang,
+            }),
+        });
+        try {
+            data = await res.json();
+        } catch (e1) {
+            data = null;
+        }
+    } catch (e2) {
+        data = null;
+    }
+    if (btn) {
+        btn.disabled = false;
+    }
+    if (data && data.success) {
+        if (fb) {
+            fb.textContent = T.track_email_summary_ok || '';
+        }
+        return;
+    }
+    const msg =
+        orangeCheckoutApiMessage(data || {}) ||
+        T.track_email_summary_err ||
+        T.api_request_failed ||
+        '';
+    if (fb) {
+        fb.textContent = msg;
     }
 }
 

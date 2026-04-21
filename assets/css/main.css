@@ -2500,6 +2500,50 @@ button.track-signup-cta__btn[hidden] {
     outline-offset: 4px;
 }
 
+.track-email-summary {
+    margin-top: 16px;
+    padding: 14px 14px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px dashed color-mix(in srgb, var(--border) 80%, var(--primary-soft));
+    background: color-mix(in srgb, var(--card) 92%, var(--primary-soft));
+}
+
+.track-email-summary__intro {
+    margin: 0 0 12px;
+    font-size: 0.9rem;
+    line-height: 1.45;
+    color: var(--text);
+}
+
+.track-email-summary__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.track-email-summary__input {
+    flex: 1 1 200px;
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    font-size: 0.95rem;
+    background: var(--card);
+    color: var(--text);
+}
+
+.track-email-summary__feedback {
+    margin: 10px 0 0;
+    font-size: 0.86rem;
+    line-height: 1.4;
+    color: var(--muted);
+}
+
+.track-email-summary__feedback:not([hidden]):empty {
+    display: none;
+}
+
 .track-order-items-wrap {
     margin-top: 16px;
     padding-top: 14px;

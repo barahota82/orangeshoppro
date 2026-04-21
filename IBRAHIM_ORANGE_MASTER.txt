@@ -1,7 +1,7 @@
 IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
 ============================================
 النسخة المعتمدة: جذر المستودع — IBRAHIM_ORANGE_MASTER.txt (مثلاً D:\orange)
-آخر تحديث: 2026-04-23 (§10: س25/س26؛ س13؛ س8؛ س7؛ س28؛ س4 نطاق العرض في `cart_promotions.php`)
+آخر تحديث: 2026-04-23 (§10: س25/س26؛ س13 + بريد التتبع؛ س8؛ س7؛ س28؛ س4)
 
 الغرض
 -------
@@ -162,6 +162,7 @@ IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
 - تاب «طلباتي» للضيف (س13): جلسة `orange_sf_guest_recent_phone` في `includes/storefront_account.php`؛
   API `api/orders/list-guest-storefront-orders.php`؛ تعبئة الجلسة من `create-order.php`، `intake-status.php`، `amend-order-items.php`؛
   واجهة `pages/cart.php` + `assets/js/cart.js`.
+- بريد تفاصيل الطلب بعد التتبع (س13): `api/orders/email-track-order-summary.php` + عرض في `assets/js/cart.js` (`orangeSendTrackOrderEmailSummary`).
 - تقرير مبيعات حسب منطقة التوصيل (س8): `admin/pages/reports.php` — طلبات مكتملة مجمّعة حسب المنطقة.
 - تحفيز التسجيل عبر العروض (س7): `includes/cart_promotions.php` (`orange_cart_promotion_register_incentive_teaser`)؛ استجابة `api/cart/checkout-preview.php` (`register_promo_teaser`)؛ عرض في `assets/js/cart.js` + `pages/cart.php` (`ORANGE_REGISTER_URL`).
 - نطاق العرض مسجّل/الكل (س4): شاشة `admin/pages/cart_promotions.php` — عمود «نطاق العرض»: «جميع الزوّار» أو «مسجّل فقط» (`requires_registered_account`).
