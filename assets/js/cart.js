@@ -1125,6 +1125,18 @@ function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, 
             if (meta.length) {
                 html += '<span class="track-order-item__meta">' + meta.join(' · ') + '</span>';
             }
+            const ldTrk = parseFloat(String(it.line_discount != null ? it.line_discount : 0)) || 0;
+            if (ldTrk > 1e-6) {
+                const ldR = Math.round(ldTrk * 10000) / 10000;
+                html +=
+                    '<span class="track-order-item__line-disc">' +
+                    orangeEscDomText(T.track_line_discount_label || '') +
+                    ' −' +
+                    ldR.toFixed(3) +
+                    ' ' +
+                    orangeEscDomText(cur) +
+                    '</span>';
+            }
             html += '</span>';
             html +=
                 '<span class="track-order-item__qty">' +
@@ -1242,6 +1254,18 @@ function orangeRenderTrackSignupSummary(el, order, orderNumber, phoneTyped, item
             }
             if (meta.length) {
                 html += '<span class="track-signup-order-summary__item-meta">' + meta.join(' · ') + '</span>';
+            }
+            const ldSu = parseFloat(String(it.line_discount != null ? it.line_discount : 0)) || 0;
+            if (ldSu > 1e-6) {
+                const ldR = Math.round(ldSu * 10000) / 10000;
+                html +=
+                    '<span class="track-signup-order-summary__item-disc">' +
+                    orangeEscDomText(T.track_line_discount_label || '') +
+                    ' −' +
+                    ldR.toFixed(3) +
+                    ' ' +
+                    orangeEscDomText(cur) +
+                    '</span>';
             }
             html += '</span>';
             html +=

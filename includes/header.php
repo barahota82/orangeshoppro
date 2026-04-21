@@ -305,6 +305,7 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             storefront_register_invalid_phone: <?php echo json_encode(t('storefront_register_invalid_phone'), JSON_UNESCAPED_UNICODE); ?>,
             track_signup_order_required: <?php echo json_encode(t('track_signup_order_required'), JSON_UNESCAPED_UNICODE); ?>,
             track_signup_order_mismatch: <?php echo json_encode(t('track_signup_order_mismatch'), JSON_UNESCAPED_UNICODE); ?>,
+            track_line_discount_label: <?php echo json_encode(t('track_line_discount_label'), JSON_UNESCAPED_UNICODE); ?>,
             checkout_cart_items_required: <?php echo json_encode(t('checkout_cart_items_required'), JSON_UNESCAPED_UNICODE); ?>,
             checkout_invalid_channel: <?php echo json_encode(t('checkout_invalid_channel'), JSON_UNESCAPED_UNICODE); ?>,
             checkout_internal_error: <?php echo json_encode(t('checkout_internal_error'), JSON_UNESCAPED_UNICODE); ?>,

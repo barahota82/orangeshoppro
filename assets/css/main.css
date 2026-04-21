@@ -1770,6 +1770,15 @@ body.storefront .product-gallery__img {
     font-size: 0.95rem;
 }
 
+.track-order-item__line-disc,
+.track-signup-order-summary__item-disc {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.82rem;
+    color: var(--muted);
+    line-height: 1.35;
+}
+
 .cart-mini-total {
     display: flex;
     align-items: center;
