@@ -186,6 +186,55 @@ function orange_storefront_upsert_customer_from_checkout(
 }
 
 /**
+ * إدراج أسطر order_items من ناتج orange_storefront_validate_cart_items_core (داخل معاملة).
+ *
+ * @param list<array{product:array<string,mixed>,qty:int,color:string,size:string,variant_id:int,price:float,cost:float}> $validatedItems
+ */
+function orange_storefront_insert_order_items_for_order(PDO $pdo, int $orderId, array $validatedItems): void
+{
+    $hasVariantCol = orange_table_has_column($pdo, 'order_items', 'variant_id');
+    if ($hasVariantCol) {
+        $itemStmt = $pdo->prepare(
+            'INSERT INTO order_items (
+                order_id, product_id, variant_id, product_name, color, size, qty, price, cost
+            ) VALUES (?,?,?,?,?,?,?,?,?)'
+        );
+    } else {
+        $itemStmt = $pdo->prepare(
+            'INSERT INTO order_items (
+                order_id, product_id, product_name, color, size, qty, price, cost
+            ) VALUES (?,?,?,?,?,?,?,?)'
+        );
+    }
+    foreach ($validatedItems as $row) {
+        if ($hasVariantCol) {
+            $itemStmt->execute([
+                $orderId,
+                (int) $row['product']['id'],
+                (int) ($row['variant_id'] ?? 0) ?: null,
+                $row['product']['name'],
+                $row['color'],
+                $row['size'],
+                $row['qty'],
+                $row['price'],
+                $row['cost'],
+            ]);
+        } else {
+            $itemStmt->execute([
+                $orderId,
+                (int) $row['product']['id'],
+                $row['product']['name'],
+                $row['color'],
+                $row['size'],
+                $row['qty'],
+                $row['price'],
+                $row['cost'],
+            ]);
+        }
+    }
+}
+
+/**
  * Core checkout: validate cart, insert order + lines, then reserve variant stock for the web queue.
  * Stock: orange_order_apply_pending_stock_reservation() inserts pending_order movements and decrements
  * product_variants.stock_quantity; release on cancel/reject via orange_order_release_pending_stock_reservation().
@@ -319,48 +368,7 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
 
     $orderId = (int) $pdo->lastInsertId();
 
-    $hasVariantCol = orange_table_has_column($pdo, 'order_items', 'variant_id');
-
-    if ($hasVariantCol) {
-        $itemStmt = $pdo->prepare(
-            'INSERT INTO order_items (
-                order_id, product_id, variant_id, product_name, color, size, qty, price, cost
-            ) VALUES (?,?,?,?,?,?,?,?,?)'
-        );
-    } else {
-        $itemStmt = $pdo->prepare(
-            'INSERT INTO order_items (
-                order_id, product_id, product_name, color, size, qty, price, cost
-            ) VALUES (?,?,?,?,?,?,?,?)'
-        );
-    }
-
-    foreach ($validatedItems as $row) {
-        if ($hasVariantCol) {
-            $itemStmt->execute([
-                $orderId,
-                (int) $row['product']['id'],
-                (int) ($row['variant_id'] ?? 0) ?: null,
-                $row['product']['name'],
-                $row['color'],
-                $row['size'],
-                $row['qty'],
-                $row['price'],
-                $row['cost'],
-            ]);
-        } else {
-            $itemStmt->execute([
-                $orderId,
-                (int) $row['product']['id'],
-                $row['product']['name'],
-                $row['color'],
-                $row['size'],
-                $row['qty'],
-                $row['price'],
-                $row['cost'],
-            ]);
-        }
-    }
+    orange_storefront_insert_order_items_for_order($pdo, $orderId, $validatedItems);
 
     orange_order_apply_pending_stock_reservation($pdo, $orderNumber, $validatedItems);
 

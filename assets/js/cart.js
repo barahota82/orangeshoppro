@@ -206,6 +206,15 @@ function orangeCheckoutApiMessage(result) {
     if (c === 'cancel_not_allowed' && T.customer_cancel_not_allowed) {
         return T.customer_cancel_not_allowed;
     }
+    if (c === 'amend_not_allowed' && T.customer_amend_not_allowed) {
+        return T.customer_amend_not_allowed;
+    }
+    if (c === 'amend_failed') {
+        if (result.message && String(result.message).trim() !== '') {
+            return String(result.message);
+        }
+        return T.checkout_failed_generic || '';
+    }
     if (c === 'product_invalid_id' && T.product_invalid_id) {
         return T.product_invalid_id;
     }
@@ -775,6 +784,9 @@ function removeCartItem(index) {
 }
 
 function orangeFinishCheckoutSuccess(result) {
+    try {
+        window.__orangePendingAmend = null;
+    } catch (e0) {}
     localStorage.removeItem(getCartStorageKey());
     try {
         localStorage.removeItem('cart');
@@ -834,6 +846,74 @@ async function sendOrderNow() {
     const items = getCart();
     if (!items.length) {
         orangeShowToast(window.APP_T.empty_cart || 'Cart is empty.', 2800);
+        return;
+    }
+
+    const amend = window.__orangePendingAmend;
+    if (amend && amend.order_number) {
+        const ccElAm = document.getElementById('customer_phone_country');
+        const ccValAm = ccElAm && ccElAm.value ? String(ccElAm.value) : '';
+        const phoneRawAm = document.getElementById('customer_phone')
+            ? document.getElementById('customer_phone').value.trim()
+            : '';
+        const phoneNormAm =
+            typeof window.orangeNormalizeCustomerPhone === 'function'
+                ? window.orangeNormalizeCustomerPhone(phoneRawAm, ccValAm || null)
+                : null;
+        const amendNorm =
+            typeof window.orangeNormalizeCustomerPhone === 'function'
+                ? window.orangeNormalizeCustomerPhone(String(amend.phone || '').trim(), null)
+                : null;
+        if (!phoneNormAm || !amendNorm || phoneNormAm !== amendNorm) {
+            orangeShowToast(
+                (window.APP_T && window.APP_T.customer_amend_phone_mismatch) ||
+                    (window.APP_T && window.APP_T.checkout_invalid_phone) ||
+                    '',
+                3600
+            );
+            return;
+        }
+        const payloadAm = {
+            order_number: String(amend.order_number).trim(),
+            phone: phoneNormAm,
+            items: items,
+            lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
+        };
+        let responseAm;
+        let resultAm;
+        try {
+            responseAm = await fetch(storefrontApiUrl('/api/orders/amend-order-items.php'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payloadAm),
+            });
+            resultAm = await responseAm.json();
+        } catch (eAm) {
+            orangeShowToast(
+                (window.APP_T && window.APP_T.api_request_failed) ||
+                    (window.APP_T && window.APP_T.checkout_failed_generic) ||
+                    '',
+                3800
+            );
+            return;
+        }
+        if (!resultAm || typeof resultAm !== 'object') {
+            orangeShowToast(
+                (window.APP_T && window.APP_T.api_request_failed) ||
+                    (window.APP_T && window.APP_T.checkout_failed_generic) ||
+                    '',
+                3800
+            );
+            return;
+        }
+        if (!resultAm.success) {
+            orangeShowToast(
+                orangeCheckoutApiMessage(resultAm) || (window.APP_T && window.APP_T.checkout_failed_generic) || '',
+                3800
+            );
+            return;
+        }
+        orangeFinishCheckoutSuccess(resultAm);
         return;
     }
 
@@ -975,6 +1055,110 @@ function orangeCustomerCanCancelByStatus(st) {
     }
     return false;
 }
+
+function orangeCartItemsFromOrderItemRows(rows) {
+    const out = [];
+    if (!Array.isArray(rows)) {
+        return out;
+    }
+    for (let i = 0; i < rows.length; i++) {
+        const it = rows[i];
+        const pid = parseInt(String(it.product_id || 0), 10);
+        if (!pid) {
+            continue;
+        }
+        const o = { id: pid, qty: Math.max(1, parseInt(String(it.qty || 1), 10) || 1) };
+        if (it.color != null && String(it.color).trim() !== '') {
+            o.color = String(it.color);
+        }
+        if (it.size != null && String(it.size).trim() !== '') {
+            o.size = String(it.size);
+        }
+        const vid = parseInt(String(it.variant_id || 0), 10);
+        if (vid > 0) {
+            o.variant_id = vid;
+        }
+        out.push(o);
+    }
+    return out;
+}
+
+async function orangeCartStartAmendOrder(onum, ph) {
+    const on = String(onum || '').trim();
+    const p = String(ph || '').trim();
+    const T = window.APP_T || {};
+    if (!on || !p) {
+        return;
+    }
+    const lang =
+        typeof window.APP_LANG === 'string' && window.APP_LANG.trim() !== ''
+            ? window.APP_LANG.trim().toLowerCase()
+            : 'en';
+    let result;
+    try {
+        const response = await fetch(storefrontApiUrl('/api/orders/get-order.php'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ order_number: on, phone: p, lang: lang }),
+        });
+        result = await response.json();
+    } catch (e) {
+        orangeShowToast(T.api_request_failed || '', 3800);
+        return;
+    }
+    if (!result || !result.success || !result.order) {
+        orangeShowToast(orangeCheckoutApiMessage(result || {}) || T.api_request_failed || '', 3600);
+        return;
+    }
+    const st = String(result.order.status || '')
+        .toLowerCase()
+        .trim();
+    if (!orangeCustomerCanCancelByStatus(st)) {
+        orangeShowToast(T.customer_amend_not_allowed || '', 3600);
+        return;
+    }
+    const cartLines = orangeCartItemsFromOrderItemRows(result.items || []);
+    if (!cartLines.length) {
+        orangeShowToast(T.checkout_cart_items_required || '', 3200);
+        return;
+    }
+    setCart(cartLines);
+    normalizeCartDuplicates();
+    window.__orangePendingAmend = {
+        order_number: on,
+        phone: String(result.order.phone || p).trim(),
+    };
+    renderCart();
+    orangeSyncCartProceedBtn();
+    orangeSyncCartTabCount();
+    orangeRenderCheckoutMiniSummary();
+    orangeShowToast(T.customer_amend_loaded || '', 4200);
+    if (typeof window.orangeCartUiShowTab === 'function') {
+        window.orangeCartUiShowTab('basket');
+    }
+    requestAnimationFrame(() => {
+        const list = document.getElementById('cartItems');
+        if (list && typeof list.scrollIntoView === 'function') {
+            try {
+                list.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } catch (e2) {
+                list.scrollIntoView(true);
+            }
+        }
+    });
+}
+
+function orangeCustomerAmendOrderFromTrack() {
+    const ctx = window.__orangeCartTrack;
+    if (!ctx || !ctx.orderNumber || !ctx.phone) {
+        return;
+    }
+    orangeCartStartAmendOrder(ctx.orderNumber, ctx.phone);
+}
+
+window.orangeCartStartAmendOrder = orangeCartStartAmendOrder;
+window.orangeCustomerAmendOrderFromTrack = orangeCustomerAmendOrderFromTrack;
 
 function orangeOrderCartPromoDiscountAmount(order) {
     if (!order || order.cart_promotion_discount == null) {
@@ -1156,6 +1340,11 @@ function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, 
     }
 
     html += '<div class="customer-order-actions">';
+    html += '<button type="button" class="btn btn-secondary customer-order-amend"';
+    if (!canCancel) {
+        html += ' disabled title="' + orangeEscDomAttr(UI.amend_not_allowed || '') + '"';
+    }
+    html += ' onclick="orangeCustomerAmendOrderFromTrack()">' + orangeEscDomText(UI.amend || '') + '</button>';
     html += '<button type="button" class="btn btn-danger customer-order-cancel"';
     if (!canCancel) {
         html += ' disabled title="' + orangeEscDomAttr(UI.cancel_not_allowed || '') + '"';
@@ -1286,6 +1475,11 @@ function orangeRenderTrackSignupSummary(el, order, orderNumber, phoneTyped, item
     }
 
     html += '<div class="track-signup-order-summary__actions customer-order-actions">';
+    html += '<button type="button" class="btn btn-secondary customer-order-amend"';
+    if (!canCancel) {
+        html += ' disabled title="' + orangeEscDomAttr(UI.amend_not_allowed || '') + '"';
+    }
+    html += ' onclick="orangeCustomerAmendOrderFromTrack()">' + orangeEscDomText(UI.amend || '') + '</button>';
     html += '<button type="button" class="btn btn-danger customer-order-cancel"';
     if (!canCancel) {
         html += ' disabled title="' + orangeEscDomAttr(UI.cancel_not_allowed || '') + '"';
@@ -1498,6 +1692,18 @@ function orangeCartRenderAccountOrderCard(row) {
             '</p>';
     }
     html += '<div class="cart-account-order-card__actions customer-order-actions">';
+    html += '<button type="button" class="btn btn-secondary customer-order-amend"';
+    if (!canCancel) {
+        html += ' disabled title="' + orangeEscDomAttr(UI.amend_not_allowed || '') + '"';
+    }
+    html +=
+        ' data-orange-cart-amend-order="' +
+        orangeEscDomAttr(onum) +
+        '" data-orange-cart-amend-phone="' +
+        orangeEscDomAttr(ph) +
+        '">' +
+        orangeEscDomText(UI.amend || '') +
+        '</button>';
     html += '<button type="button" class="btn btn-danger customer-order-cancel"';
     if (!canCancel) {
         html += ' disabled title="' + orangeEscDomAttr(UI.cancel_not_allowed || '') + '"';
@@ -1649,6 +1855,17 @@ document.addEventListener('DOMContentLoaded', () => {
         document.addEventListener('click', function (ev) {
             const t = ev.target;
             if (!t || !t.getAttribute) {
+                return;
+            }
+            const btnAmend = t.closest ? t.closest('[data-orange-cart-amend-order]') : null;
+            if (btnAmend) {
+                const onumA = btnAmend.getAttribute('data-orange-cart-amend-order') || '';
+                const phA = btnAmend.getAttribute('data-orange-cart-amend-phone') || '';
+                if (!onumA || !phA) {
+                    return;
+                }
+                ev.preventDefault();
+                orangeCartStartAmendOrder(onumA, phA);
                 return;
             }
             const btn = t.closest ? t.closest('[data-orange-cart-cancel-order]') : null;

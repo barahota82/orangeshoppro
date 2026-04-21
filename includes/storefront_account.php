@@ -294,3 +294,9 @@ function orange_storefront_customer_may_cancel_order(PDO $pdo, array $order, ?ar
 
     return false;
 }
+
+/** س22: تعديل بنود الطلب — نفس نافذة الإلغاء (قبل الشحن). */
+function orange_storefront_customer_may_amend_order_items(PDO $pdo, array $order, ?array $account, string $phoneNorm): bool
+{
+    return orange_storefront_customer_may_cancel_order($pdo, $order, $account, $phoneNorm);
+}
