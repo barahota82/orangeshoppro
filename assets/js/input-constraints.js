@@ -58,6 +58,21 @@ function orangeNormalizeCustomerPhone(raw, countryDialDigits) {
 
 window.orangeNormalizeCustomerPhone = orangeNormalizeCustomerPhone;
 
+/** @param {string|HTMLSelectElement|null|undefined} selectIdOrEl */
+function orangeStorefrontPhoneCountryDigits(selectIdOrEl) {
+    var el =
+        typeof selectIdOrEl === 'string'
+            ? document.getElementById(selectIdOrEl)
+            : selectIdOrEl;
+    if (!el || el.tagName !== 'SELECT') {
+        return null;
+    }
+    var v = String(el.value || '').trim();
+    return v === '' ? null : v;
+}
+
+window.orangeStorefrontPhoneCountryDigits = orangeStorefrontPhoneCountryDigits;
+
 function orangeSanitizePhoneInput(el) {
     if (!el || el.readOnly) {
         return;

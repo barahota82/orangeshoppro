@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/catalog_schema.php';
 require_once __DIR__ . '/../includes/delivery_areas.php';
+require_once __DIR__ . '/../includes/storefront_phone_country_select.php';
 
 $pdoTrack = db();
 orange_catalog_ensure_schema($pdoTrack);
@@ -111,7 +112,10 @@ $orangeMyOrderUi = [
             </div>
             <div class="field">
                 <label for="track_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
-                <input id="track_phone" name="phone" autocomplete="tel" inputmode="tel">
+                <div class="cart-phone-inline">
+                    <?php orange_storefront_render_phone_country_select('track_phone_country'); ?>
+                    <input id="track_phone" name="phone" class="cart-phone-inline__input js-orange-phone-input" autocomplete="tel" inputmode="tel">
+                </div>
             </div>
             <div class="actions-row track-page-actions">
                 <button type="submit" class="btn btn--track-submit"><?php echo htmlspecialchars(t('track_order'), ENT_QUOTES, 'UTF-8'); ?></button>
@@ -170,13 +174,17 @@ window.ORANGE_TRACK_SIGNUP = {
     }
 })();
 
-function orangeTrackPhoneForApi(raw) {
+function orangeTrackPhoneForApi(raw, countrySelectId) {
     var s = String(raw || '').trim();
     if (!s) {
         return '';
     }
+    var cc =
+        countrySelectId && typeof window.orangeStorefrontPhoneCountryDigits === 'function'
+            ? window.orangeStorefrontPhoneCountryDigits(countrySelectId)
+            : null;
     if (typeof window.orangeNormalizeCustomerPhone === 'function') {
-        var n = window.orangeNormalizeCustomerPhone(s, null);
+        var n = window.orangeNormalizeCustomerPhone(s, cc);
         if (n) {
             return n;
         }
@@ -189,7 +197,7 @@ async function pageTrackOrderNow() {
     var msgNotFound = <?php echo json_encode(t('track_order_not_found'), JSON_UNESCAPED_UNICODE); ?>;
     var onum = document.getElementById('track_order_number').value.trim();
     var phRaw = document.getElementById('track_phone').value.trim();
-    var ph = orangeTrackPhoneForApi(phRaw);
+    var ph = orangeTrackPhoneForApi(phRaw, 'track_phone_country');
     if (!onum || !phRaw) {
         if (typeof window.orangeShowToast === 'function') {
             window.orangeShowToast(msgMissing, 3200);
@@ -438,6 +446,14 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
         msgEl.textContent = '';
         signupOrderInp.value = '';
         verifyPhoneInp.value = '';
+        var verifyCcClear = document.getElementById('trackSignupVerifyPhone_country');
+        if (verifyCcClear && verifyCcClear.tagName === 'SELECT') {
+            verifyCcClear.value = '';
+        }
+        var lowerCcClear = document.getElementById('track_phone_country');
+        if (lowerCcClear && lowerCcClear.tagName === 'SELECT') {
+            lowerCcClear.value = '';
+        }
         emailInp.value = '';
         nameInp.value = '';
         var aClear = getTrackSignupAreaEl();
@@ -470,7 +486,7 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
     verifyOrderBtn.addEventListener('click', function () {
         var onum = signupOrderInp.value.trim();
         var vphRaw = verifyPhoneInp.value.trim();
-        var vph = orangeTrackPhoneForApi(vphRaw);
+        var vph = orangeTrackPhoneForApi(vphRaw, 'trackSignupVerifyPhone_country');
         verifyFeedbackEl.textContent = '';
         setHidden(verifyFeedbackEl, false);
         if (!onum || !vphRaw) {
@@ -550,7 +566,7 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
         var name = nameInp.value.trim();
         var orderNumber = signupOrderInp.value.trim();
         var orderVerifyPhoneRaw = verifyPhoneInp.value.trim();
-        var orderVerifyPhone = orangeTrackPhoneForApi(orderVerifyPhoneRaw);
+        var orderVerifyPhone = orangeTrackPhoneForApi(orderVerifyPhoneRaw, 'trackSignupVerifyPhone_country');
         var areaElSubmit = getTrackSignupAreaEl();
         var area = '';
         var deliveryAreaId = 0;
@@ -617,6 +633,10 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
                 email: email,
                 name: name,
                 phone: orderVerifyPhone,
+                phone_country:
+                    typeof window.orangeStorefrontPhoneCountryDigits === 'function'
+                        ? window.orangeStorefrontPhoneCountryDigits('trackSignupVerifyPhone_country') || ''
+                        : '',
                 area: area,
                 delivery_area_id: deliveryAreaId,
                 address: address,
