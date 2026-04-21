@@ -1141,16 +1141,12 @@ async function sendOrderNow() {
 
     const amend = window.__orangePendingAmend;
     if (amend && amend.order_number) {
-        const ccAm =
-            typeof window.orangeStorefrontPhoneCountryDigits === 'function'
-                ? window.orangeStorefrontPhoneCountryDigits('customer_phone_country')
-                : null;
         const phoneRawAm = document.getElementById('customer_phone')
             ? document.getElementById('customer_phone').value.trim()
             : '';
         const phoneNormAm =
             typeof window.orangeNormalizeCustomerPhone === 'function'
-                ? window.orangeNormalizeCustomerPhone(phoneRawAm, ccAm)
+                ? window.orangeNormalizeCustomerPhone(phoneRawAm, null)
                 : null;
         const amendNorm =
             typeof window.orangeNormalizeCustomerPhone === 'function'
@@ -1234,16 +1230,12 @@ async function sendOrderNow() {
 
     const emailEl = document.getElementById('customer_email');
     const emailRaw = emailEl ? emailEl.value.trim() : '';
-    const checkoutCc =
-        typeof window.orangeStorefrontPhoneCountryDigits === 'function'
-            ? window.orangeStorefrontPhoneCountryDigits('customer_phone_country')
-            : null;
     const phoneRaw = document.getElementById('customer_phone')
         ? document.getElementById('customer_phone').value.trim()
         : '';
     const phoneNorm =
         typeof window.orangeNormalizeCustomerPhone === 'function'
-            ? window.orangeNormalizeCustomerPhone(phoneRaw, checkoutCc)
+            ? window.orangeNormalizeCustomerPhone(phoneRaw, null)
             : null;
     const areaEl = document.getElementById('customer_area');
     let deliveryAreaId = 0;
@@ -1258,7 +1250,6 @@ async function sendOrderNow() {
     const payload = {
         name: document.getElementById('customer_name').value.trim(),
         phone: phoneNorm || phoneRaw,
-        phone_country: checkoutCc || '',
         email: emailRaw,
         area: areaVal,
         delivery_area_id: deliveryAreaId,

@@ -6,7 +6,6 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/catalog_schema.php';
 require_once __DIR__ . '/../includes/storefront_account.php';
 require_once __DIR__ . '/../includes/delivery_areas.php';
-require_once __DIR__ . '/../includes/storefront_phone_country_select.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -110,10 +109,7 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="reg_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <div class="cart-phone-inline">
-                        <?php orange_storefront_render_phone_country_select('reg_phone_country'); ?>
-                        <input id="reg_phone" name="phone" class="cart-phone-inline__input js-orange-phone-input" type="tel" autocomplete="tel" required inputmode="tel" placeholder="<?php echo htmlspecialchars(t('register_placeholder_phone'), ENT_QUOTES, 'UTF-8'); ?>">
-                    </div>
+                    <input id="reg_phone" name="phone" type="tel" autocomplete="tel" required inputmode="tel" placeholder="<?php echo htmlspecialchars(t('register_placeholder_phone'), ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="reg_area"><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
@@ -195,13 +191,9 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                         msg.textContent = reqMsg;
                         return;
                     }
-                    var regCc =
-                        typeof window.orangeStorefrontPhoneCountryDigits === 'function'
-                            ? window.orangeStorefrontPhoneCountryDigits('reg_phone_country')
-                            : null;
                     var phoneNorm =
                         typeof window.orangeNormalizeCustomerPhone === 'function'
-                            ? window.orangeNormalizeCustomerPhone(phoneRaw, regCc)
+                            ? window.orangeNormalizeCustomerPhone(phoneRaw, null)
                             : null;
                     if (!phoneNorm) {
                         msg.textContent = badPhone || reqMsg;
@@ -231,7 +223,6 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                             email: email,
                             name: name,
                             phone: phoneNorm,
-                            phone_country: regCc || '',
                             area: area,
                             delivery_area_id: deliveryAreaId,
                             address: address,
