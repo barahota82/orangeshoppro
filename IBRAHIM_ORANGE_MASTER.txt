@@ -1,7 +1,7 @@
 IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
 ============================================
 النسخة المعتمدة: جذر المستودع — IBRAHIM_ORANGE_MASTER.txt (مثلاً D:\orange)
-آخر تحديث: 2026-04-23 (س3 أرشيف الواجهة + إشارة البانر في §9)
+آخر تحديث: 2026-04-23 (§10: مرجع كود س25/س26 للقنوات)
 
 الغرض
 -------
@@ -166,6 +166,11 @@ IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
   **docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt**
 - **س25 وس26** (قنوات، روابط، توجيه عند فتح النطاق فقط): مُحدَّدة في قسم **«سادساً»**
   داخل **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`**.
+  **مرجع التنفيذ في الكود:** `config.php` — `current_channel_slug()` (ترتيب الأسبقية:
+  معامل ‎`?channel=`‎ ثم مقطع مسار قناة من الـ URL ثم كوكي **`orange_sf_ch`**
+  (`orange_storefront_read_saved_channel_slug`) ثم القناة الافتراضية)؛ **`index.php`**
+  يوجّه إلى الرئيسية بالقناة المحسوبة؛ **`orange_storefront_send_channel_cookie()`**
+  يُستدعى من واجهة المتجر (مثل `includes/header.php`) لحفظ آخر قناة نشطة.
 - **إشعار نهاية الجلسة للمالك (Cursor):** الوكلاء يلتزمون بـ
   **`.cursor/rules/orange-session-handoff.mdc`** — عند انتهاء عمل تنفيذي يُخبر المالك صراحة
   بـ «تم انتهاء الجلسة التنفيذية» ويتذكّر الوكيل التالي بالثلاثة الإلزامية قبل أي تنفيذ
