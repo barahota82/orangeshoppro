@@ -102,6 +102,10 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
                 return;
             }
             var allowed = window.ORANGE_SF_VALID_SLUGS || {};
+            var ssrLang = <?php echo json_encode(in_array($lang, ['en', 'ar', 'fil', 'hi'], true) ? $lang : 'en', JSON_UNESCAPED_UNICODE); ?>;
+            if (!/^(en|ar|fil|hi)$/.test(ssrLang)) {
+                ssrLang = 'en';
+            }
             var shortPathRe = new RegExp('^\\/(' + <?php echo json_encode($_sfPathAlt, JSON_UNESCAPED_UNICODE); ?> + ')(-ar|-hi|-ph)?(\\/.*)?$', 'i');
             var accountCh = <?php echo json_encode($orangeAccountChannelForJs, JSON_UNESCAPED_UNICODE); ?>;
             function orangeReadSfChannelCookie() {
@@ -139,10 +143,6 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             if (!path || path.charAt(0) !== '/') {
                 path = '/' + (path || '');
             }
-            var navLang = localStorage.getItem('orange_storefront_lang') || localStorage.getItem('site_lang') || 'en';
-            if (!/^(en|ar|fil|hi)$/.test(navLang)) {
-                navLang = 'en';
-            }
             function orangeParseShortStorePath(pathname) {
                 var m = String(pathname).match(shortPathRe);
                 if (!m) { return null; }
@@ -159,7 +159,7 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             }
             if (path.indexOf('/pages/') !== -1) {
                 params.set('channel', savedCh);
-                params.set('lang', navLang);
+                params.set('lang', ssrLang);
                 var qs = params.toString();
                 window.location.replace(rawPath + (qs ? '?' + qs : ''));
                 return;
