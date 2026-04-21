@@ -11,6 +11,7 @@ $allowed = [
     'admin_users',
     'company_settings',
     'storefront_hero',
+    'delivery_areas',
     'departments',
     'categories',
     'subcategories',

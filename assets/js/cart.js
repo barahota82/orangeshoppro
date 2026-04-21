@@ -154,6 +154,9 @@ function orangeCheckoutApiMessage(result) {
     if (c === 'invalid_phone' && T.storefront_register_invalid_phone) {
         return T.storefront_register_invalid_phone;
     }
+    if (c === 'invalid_delivery_area' && T.checkout_delivery_area_required) {
+        return T.checkout_delivery_area_required;
+    }
     if (c === 'order_link_incomplete' && T.track_signup_order_required) {
         return T.track_signup_order_required;
     }
@@ -684,12 +687,23 @@ async function sendOrderNow() {
         typeof window.orangeNormalizeCustomerPhone === 'function'
             ? window.orangeNormalizeCustomerPhone(phoneRaw, ccVal || null)
             : null;
+    const areaEl = document.getElementById('customer_area');
+    let deliveryAreaId = 0;
+    let areaVal = '';
+    if (areaEl && areaEl.tagName === 'SELECT') {
+        deliveryAreaId = parseInt(areaEl.value, 10) || 0;
+        const opt = areaEl.options[areaEl.selectedIndex];
+        areaVal = opt ? String(opt.textContent || '').trim() : '';
+    } else if (areaEl) {
+        areaVal = areaEl.value.trim();
+    }
     const payload = {
         name: document.getElementById('customer_name').value.trim(),
         phone: phoneNorm || phoneRaw,
         phone_country: ccVal,
         email: emailRaw,
-        area: document.getElementById('customer_area').value.trim(),
+        area: areaVal,
+        delivery_area_id: deliveryAreaId,
         address: document.getElementById('customer_address').value.trim(),
         notes: document.getElementById('customer_notes').value.trim(),
         channel_id: window.APP_CHANNEL_ID || 0,
@@ -698,7 +712,19 @@ async function sendOrderNow() {
         lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
     };
 
-    if (!payload.name || !phoneRaw || !payload.area || !payload.address) {
+    if (!payload.name || !phoneRaw || !payload.address) {
+        orangeShowToast(window.APP_T.checkout_required_fields || 'Please fill all required fields.', 3200);
+        return;
+    }
+    if (areaEl && areaEl.tagName === 'SELECT') {
+        if (!deliveryAreaId) {
+            orangeShowToast(
+                window.APP_T.checkout_delivery_area_required || window.APP_T.checkout_required_fields || '',
+                3200
+            );
+            return;
+        }
+    } else if (!areaVal) {
         orangeShowToast(window.APP_T.checkout_required_fields || 'Please fill all required fields.', 3200);
         return;
     }

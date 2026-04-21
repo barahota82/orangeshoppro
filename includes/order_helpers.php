@@ -178,7 +178,8 @@ function orange_storefront_sync_order_and_customer_after_track_signup(
     string $name,
     string $area,
     string $address,
-    string $notes
+    string $notes,
+    ?int $deliveryAreaId = null
 ): void {
     require_once __DIR__ . '/catalog_schema.php';
 
@@ -198,6 +199,10 @@ function orange_storefront_sync_order_and_customer_after_track_signup(
     if ($hasOrderEmail) {
         $setOrder[] = 'customer_email = ?';
         $paramsOrder[] = $email;
+    }
+    if ($deliveryAreaId !== null && $deliveryAreaId > 0 && orange_table_has_column($pdo, 'orders', 'delivery_area_id')) {
+        $setOrder[] = 'delivery_area_id = ?';
+        $paramsOrder[] = $deliveryAreaId;
     }
     $paramsOrder[] = $orderId;
     $pdo->prepare('UPDATE orders SET ' . implode(', ', $setOrder) . ' WHERE id = ?')->execute($paramsOrder);

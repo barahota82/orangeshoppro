@@ -1423,6 +1423,32 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         orange_catalog_safe_exec($pdo, 'INSERT INTO storefront_home_hero (id) VALUES (1)');
     }
 
+    if (!orange_table_exists($pdo, 'delivery_areas')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE IF NOT EXISTS delivery_areas (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                name_ar VARCHAR(191) NOT NULL DEFAULT \'\',
+                name_en VARCHAR(191) NOT NULL DEFAULT \'\',
+                sort_order INT NOT NULL DEFAULT 0,
+                is_active TINYINT(1) NOT NULL DEFAULT 1,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'delivery_area_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE orders ADD COLUMN delivery_area_id INT UNSIGNED NULL DEFAULT NULL');
+        orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_orders_delivery_area_id ON orders (delivery_area_id)');
+    }
+
+    if (orange_table_exists($pdo, 'storefront_accounts') && !orange_table_has_column($pdo, 'storefront_accounts', 'customer_delivery_area_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE storefront_accounts ADD COLUMN customer_delivery_area_id INT UNSIGNED NULL DEFAULT NULL'
+        );
+    }
+
     if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'invoice_number')) {
         orange_catalog_safe_exec(
             $pdo,

@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/catalog_schema.php';
+require_once __DIR__ . '/../includes/delivery_areas.php';
 
 $pdoTrack = db();
 orange_catalog_ensure_schema($pdoTrack);
 
 include __DIR__ . '/../includes/header.php';
+$trackDeliveryAreas = orange_delivery_areas_storefront_payload($pdoTrack, $lang);
 
 $trackHomeUrl = storefront_url('home', $channelSlug, $lang);
 $waHref = storefront_whatsapp_href($channel, '');
@@ -118,6 +120,7 @@ $orangeMyOrderUi = [
 </div>
 
 <script>
+window.ORANGE_DELIVERY_AREAS = <?php echo json_encode($trackDeliveryAreas, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_STOREFRONT_WA = <?php echo json_encode($waHref, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_ORDER_STATUS_LABELS = <?php echo json_encode($orangeOrderStatusLabels, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_MY_ORDER_UI = <?php echo json_encode($orangeMyOrderUi, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
@@ -232,7 +235,9 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
     var verifyPhoneInp = document.getElementById('trackSignupVerifyPhone');
     var emailInp = document.getElementById('trackSignupEmail');
     var nameInp = document.getElementById('trackSignupName');
-    var areaInp = document.getElementById('trackSignupArea');
+    function getTrackSignupAreaEl() {
+        return document.getElementById('trackSignupArea');
+    }
     var addressInp = document.getElementById('trackSignupAddress');
     var notesInp = document.getElementById('trackSignupNotes');
     var msgEl = document.getElementById('trackSignupMsg');
@@ -252,7 +257,7 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
         !verifyPhoneInp ||
         !emailInp ||
         !nameInp ||
-        !areaInp ||
+        !getTrackSignupAreaEl() ||
         !addressInp ||
         !notesInp ||
         !msgEl ||
@@ -271,14 +276,19 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
         if (!o) {
             return;
         }
+        var aEl = getTrackSignupAreaEl();
         if (!emailInp.value.trim() && o.customer_email) {
             emailInp.value = String(o.customer_email);
         }
         if (!nameInp.value.trim() && o.customer_name) {
             nameInp.value = String(o.customer_name);
         }
-        if (!areaInp.value.trim() && o.area) {
-            areaInp.value = String(o.area);
+        if (aEl) {
+            if (aEl.tagName === 'SELECT' && o.delivery_area_id) {
+                aEl.value = String(o.delivery_area_id);
+            } else if (!aEl.value.trim() && o.area) {
+                aEl.value = String(o.area);
+            }
         }
         if (!addressInp.value.trim() && o.address) {
             addressInp.value = String(o.address);
@@ -292,9 +302,16 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
         if (!o) {
             return;
         }
+        var aElF = getTrackSignupAreaEl();
         emailInp.value = o.customer_email != null && String(o.customer_email).trim() !== '' ? String(o.customer_email) : '';
         nameInp.value = o.customer_name != null ? String(o.customer_name) : '';
-        areaInp.value = o.area != null ? String(o.area) : '';
+        if (aElF) {
+            if (aElF.tagName === 'SELECT' && o.delivery_area_id) {
+                aElF.value = String(o.delivery_area_id);
+            } else {
+                aElF.value = o.area != null ? String(o.area) : '';
+            }
+        }
         addressInp.value = o.address != null ? String(o.address) : '';
         notesInp.value = o.notes != null ? String(o.notes) : '';
     }
@@ -425,7 +442,10 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
         verifyPhoneInp.value = '';
         emailInp.value = '';
         nameInp.value = '';
-        areaInp.value = '';
+        var aClear = getTrackSignupAreaEl();
+        if (aClear) {
+            aClear.value = '';
+        }
         addressInp.value = '';
         notesInp.value = '';
         verifyFeedbackEl.textContent = '';
@@ -527,7 +547,16 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
         var orderNumber = signupOrderInp.value.trim();
         var orderVerifyPhoneRaw = verifyPhoneInp.value.trim();
         var orderVerifyPhone = orangeTrackPhoneForApi(orderVerifyPhoneRaw);
-        var area = areaInp.value.trim();
+        var areaElSubmit = getTrackSignupAreaEl();
+        var area = '';
+        var deliveryAreaId = 0;
+        if (areaElSubmit && areaElSubmit.tagName === 'SELECT') {
+            deliveryAreaId = parseInt(areaElSubmit.value, 10) || 0;
+            var optS = areaElSubmit.options[areaElSubmit.selectedIndex];
+            area = optS ? String(optS.textContent || '').trim() : '';
+        } else if (areaElSubmit) {
+            area = areaElSubmit.value.trim();
+        }
         var address = addressInp.value.trim();
         var notes = notesInp.value.trim();
         setHidden(msgEl, false);
@@ -548,6 +577,18 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
         }
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             msgEl.textContent = badEmail;
+            return;
+        }
+        if (areaElSubmit && areaElSubmit.tagName === 'SELECT') {
+            if (!deliveryAreaId) {
+                msgEl.textContent =
+                    (window.APP_T && window.APP_T.checkout_delivery_area_required) ||
+                    trackSignupT.order_required ||
+                    '';
+                return;
+            }
+        } else if (!area) {
+            msgEl.textContent = trackSignupT.order_required || '';
             return;
         }
         var apiUrl =
@@ -573,6 +614,7 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
                 name: name,
                 phone: orderVerifyPhone,
                 area: area,
+                delivery_area_id: deliveryAreaId,
                 address: address,
                 notes: notes,
                 order_number: orderNumber,
@@ -631,6 +673,16 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
         }
         window.__orangeApplyLowerTrackToSignup(payload.orderNumber, payload.phone, payload.order, payload.items || []);
     };
+
+    document.addEventListener('DOMContentLoaded', function () {
+        if (
+            typeof window.orangeReplaceInputWithDeliveryAreaSelect === 'function' &&
+            window.ORANGE_DELIVERY_AREAS &&
+            window.ORANGE_DELIVERY_AREAS.length
+        ) {
+            window.orangeReplaceInputWithDeliveryAreaSelect('trackSignupArea', window.ORANGE_DELIVERY_AREAS);
+        }
+    });
 })();
 </script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

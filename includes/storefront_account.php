@@ -115,12 +115,16 @@ function current_storefront_account(PDO $pdo): ?array
     }
     $hasCh = orange_table_has_column($pdo, 'storefront_accounts', 'registered_channel_slug');
     $hasProfile = orange_table_has_column($pdo, 'storefront_accounts', 'customer_name');
+    $hasDa = orange_table_has_column($pdo, 'storefront_accounts', 'customer_delivery_area_id');
     $cols = ['id', 'email', 'email_verified_at'];
     if ($hasCh) {
         $cols[] = 'registered_channel_slug';
     }
     if ($hasProfile) {
         array_push($cols, 'customer_name', 'customer_phone', 'customer_area', 'customer_address', 'customer_notes');
+        if ($hasDa) {
+            $cols[] = 'customer_delivery_area_id';
+        }
     }
     $st = $pdo->prepare('SELECT ' . implode(', ', $cols) . ' FROM storefront_accounts WHERE id = ? LIMIT 1');
     $st->execute([$id]);
@@ -152,6 +156,10 @@ function current_storefront_account(PDO $pdo): ?array
             ? (string) $row['customer_address'] : null;
         $out['customer_notes'] = isset($row['customer_notes']) && $row['customer_notes'] !== null && (string) $row['customer_notes'] !== ''
             ? (string) $row['customer_notes'] : null;
+        if ($hasDa) {
+            $da = isset($row['customer_delivery_area_id']) ? (int) $row['customer_delivery_area_id'] : 0;
+            $out['customer_delivery_area_id'] = $da > 0 ? $da : null;
+        }
     }
 
     return $out;

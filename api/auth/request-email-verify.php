@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../includes/order_helpers.php';
 require_once __DIR__ . '/../../includes/storefront_account.php';
 require_once __DIR__ . '/../../includes/orange_mail.php';
 require_once __DIR__ . '/../../includes/phone_validation.php';
+require_once __DIR__ . '/../../includes/delivery_areas.php';
 
 try {
     $pdo = db();
@@ -18,6 +19,12 @@ try {
 
     $data = get_json_input();
     orange_storefront_apply_lang_from_payload($data);
+    $lang = isset($data['lang']) ? (string) $data['lang'] : 'en';
+    if (!preg_match('/^(en|ar|fil|hi)$/', $lang)) {
+        $lang = 'en';
+    }
+
+    $customerDaId = null;
     $rawEmail = isset($data['email']) ? (string) $data['email'] : '';
     $email = orange_storefront_normalize_email($rawEmail);
     if ($email === null || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -70,9 +77,23 @@ try {
         $oArea = trim((string) ($orderRow['area'] ?? ''));
         $oAddress = trim((string) ($orderRow['address'] ?? ''));
         $oNotes = trim((string) ($orderRow['notes'] ?? ''));
+        $oDaId = isset($orderRow['delivery_area_id']) ? (int) $orderRow['delivery_area_id'] : 0;
+
+        try {
+            $resAr = orange_storefront_resolve_registration_area(
+                $pdo,
+                $data,
+                $lang,
+                $areaRaw !== '' ? $areaRaw : $oArea,
+                $oDaId > 0 ? $oDaId : null
+            );
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'code' => 'invalid_delivery_area', 'message' => $e->getMessage()], 422);
+        }
+        $customerArea = orange_storefront_clip_utf8($resAr['area'], 255);
+        $customerDaId = $resAr['delivery_area_id'];
 
         $customerName = $nameRaw !== '' ? orange_storefront_clip_utf8($nameRaw, 255) : orange_storefront_clip_utf8($oName, 255);
-        $customerArea = $areaRaw !== '' ? orange_storefront_clip_utf8($areaRaw, 255) : orange_storefront_clip_utf8($oArea, 255);
         $customerAddress = $addressRaw !== '' ? orange_storefront_clip_utf8($addressRaw, 4000) : orange_storefront_clip_utf8($oAddress, 4000);
         $customerNotes = $notesRaw !== '' ? orange_storefront_clip_utf8($notesRaw, 4000) : orange_storefront_clip_utf8($oNotes, 4000);
         $customerPhone = orange_storefront_clip_utf8(trim((string) ($orderRow['phone'] ?? '')), 64);
@@ -88,7 +109,8 @@ try {
             $customerName,
             $customerArea,
             $customerAddress,
-            $customerNotes
+            $customerNotes,
+            $customerDaId
         );
 
         $chId = (int) ($orderRow['channel_id'] ?? 0);
@@ -101,7 +123,7 @@ try {
             }
         }
     } else {
-        if ($nameRaw === '' || $phoneRaw === '' || $areaRaw === '' || $addressRaw === '') {
+        if ($nameRaw === '' || $phoneRaw === '' || $addressRaw === '') {
             json_response(['success' => false, 'code' => 'missing_fields', 'message' => t('checkout_required_fields')], 422);
         }
         $regCc = trim((string) ($data['phone_country'] ?? ''));
@@ -111,9 +133,19 @@ try {
             json_response(['success' => false, 'code' => 'invalid_phone', 'message' => t('checkout_invalid_phone')], 422);
         }
 
+        try {
+            $resAr = orange_storefront_resolve_registration_area($pdo, $data, $lang, $areaRaw, null);
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'code' => 'invalid_delivery_area', 'message' => $e->getMessage()], 422);
+        }
+        $customerArea = orange_storefront_clip_utf8($resAr['area'], 255);
+        $customerDaId = $resAr['delivery_area_id'];
+        if ($customerArea === '') {
+            json_response(['success' => false, 'code' => 'missing_fields', 'message' => t('checkout_required_fields')], 422);
+        }
+
         $customerName = orange_storefront_clip_utf8($nameRaw, 255);
         $customerPhone = orange_storefront_clip_utf8($phoneNormReg, 64);
-        $customerArea = orange_storefront_clip_utf8($areaRaw, 255);
         $customerAddress = orange_storefront_clip_utf8($addressRaw, 4000);
         $customerNotes = $notesRaw === '' ? '' : orange_storefront_clip_utf8($notesRaw, 4000);
     }
@@ -142,48 +174,82 @@ try {
         json_response(['success' => true, 'message' => t('api_ok'), 'cooldown' => true, 'channel' => $channelSlug]);
     }
 
-    $lang = isset($data['lang']) ? (string) $data['lang'] : 'en';
-    if (!preg_match('/^(en|ar|fil|hi)$/', $lang)) {
-        $lang = 'en';
-    }
-
     $token = bin2hex(random_bytes(32));
     $hash = hash('sha256', $token);
 
     $accountIdAfter = 0;
+    $hasDaCol = orange_table_has_column($pdo, 'storefront_accounts', 'customer_delivery_area_id');
     if (!$row) {
-        $ins = $pdo->prepare(
-            'INSERT INTO storefront_accounts (email, registered_channel_slug, customer_name, customer_phone, customer_area, customer_address, customer_notes, verify_token_hash, verify_token_expires_at, verify_email_sent_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 48 HOUR), NOW())'
-        );
-        $ins->execute([
-            $email,
-            $channelSlug,
-            $customerName,
-            $customerPhone,
-            $customerArea,
-            $customerAddress,
-            $customerNotes,
-            $hash,
-        ]);
+        if ($hasDaCol) {
+            $ins = $pdo->prepare(
+                'INSERT INTO storefront_accounts (email, registered_channel_slug, customer_name, customer_phone, customer_delivery_area_id, customer_area, customer_address, customer_notes, verify_token_hash, verify_token_expires_at, verify_email_sent_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 48 HOUR), NOW())'
+            );
+            $ins->execute([
+                $email,
+                $channelSlug,
+                $customerName,
+                $customerPhone,
+                $customerDaId !== null && $customerDaId > 0 ? $customerDaId : null,
+                $customerArea,
+                $customerAddress,
+                $customerNotes,
+                $hash,
+            ]);
+        } else {
+            $ins = $pdo->prepare(
+                'INSERT INTO storefront_accounts (email, registered_channel_slug, customer_name, customer_phone, customer_area, customer_address, customer_notes, verify_token_hash, verify_token_expires_at, verify_email_sent_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 48 HOUR), NOW())'
+            );
+            $ins->execute([
+                $email,
+                $channelSlug,
+                $customerName,
+                $customerPhone,
+                $customerArea,
+                $customerAddress,
+                $customerNotes,
+                $hash,
+            ]);
+        }
         $accountIdAfter = (int) $pdo->lastInsertId();
     } else {
-        $upd = $pdo->prepare(
-            'UPDATE storefront_accounts SET verify_token_hash = ?, verify_token_expires_at = DATE_ADD(NOW(), INTERVAL 48 HOUR), verify_email_sent_at = NOW(),
-             registered_channel_slug = COALESCE(registered_channel_slug, ?),
-             customer_name = ?, customer_phone = ?, customer_area = ?, customer_address = ?, customer_notes = ?
-             WHERE id = ? AND email_verified_at IS NULL'
-        );
-        $upd->execute([
-            $hash,
-            $channelSlug,
-            $customerName,
-            $customerPhone,
-            $customerArea,
-            $customerAddress,
-            $customerNotes,
-            (int) $row['id'],
-        ]);
+        if ($hasDaCol) {
+            $upd = $pdo->prepare(
+                'UPDATE storefront_accounts SET verify_token_hash = ?, verify_token_expires_at = DATE_ADD(NOW(), INTERVAL 48 HOUR), verify_email_sent_at = NOW(),
+                 registered_channel_slug = COALESCE(registered_channel_slug, ?),
+                 customer_name = ?, customer_phone = ?, customer_delivery_area_id = ?, customer_area = ?, customer_address = ?, customer_notes = ?
+                 WHERE id = ? AND email_verified_at IS NULL'
+            );
+            $upd->execute([
+                $hash,
+                $channelSlug,
+                $customerName,
+                $customerPhone,
+                $customerDaId !== null && $customerDaId > 0 ? $customerDaId : null,
+                $customerArea,
+                $customerAddress,
+                $customerNotes,
+                (int) $row['id'],
+            ]);
+        } else {
+            $upd = $pdo->prepare(
+                'UPDATE storefront_accounts SET verify_token_hash = ?, verify_token_expires_at = DATE_ADD(NOW(), INTERVAL 48 HOUR), verify_email_sent_at = NOW(),
+                 registered_channel_slug = COALESCE(registered_channel_slug, ?),
+                 customer_name = ?, customer_phone = ?, customer_area = ?, customer_address = ?, customer_notes = ?
+                 WHERE id = ? AND email_verified_at IS NULL'
+            );
+            $upd->execute([
+                $hash,
+                $channelSlug,
+                $customerName,
+                $customerPhone,
+                $customerArea,
+                $customerAddress,
+                $customerNotes,
+                (int) $row['id'],
+            ]);
+        }
         $accountIdAfter = (int) $row['id'];
     }
 

@@ -497,6 +497,39 @@ function changeMainImage(src, btn) {
     });
 })();
 
+/**
+ * قائمة مناطق التوصيل (س8): يستبدل حقل النص بـ select عند توفر مناطق من الأدمن.
+ */
+function orangeReplaceInputWithDeliveryAreaSelect(inputId, areasList) {
+    if (!inputId || !Array.isArray(areasList) || areasList.length === 0) {
+        return;
+    }
+    const input = document.getElementById(inputId);
+    if (!input || input.tagName === 'SELECT') {
+        return;
+    }
+    const sel = document.createElement('select');
+    sel.id = inputId;
+    sel.setAttribute('autocomplete', 'address-level1');
+    const ph = document.createElement('option');
+    ph.value = '';
+    ph.textContent =
+        (typeof window.APP_T === 'object' && window.APP_T && window.APP_T.checkout_select_area) || '';
+    sel.appendChild(ph);
+    for (let i = 0; i < areasList.length; i++) {
+        const a = areasList[i];
+        if (!a || a.id == null) {
+            continue;
+        }
+        const o = document.createElement('option');
+        o.value = String(a.id);
+        o.textContent = a.name != null ? String(a.name) : '';
+        sel.appendChild(o);
+    }
+    input.parentNode.replaceChild(sel, input);
+}
+window.orangeReplaceInputWithDeliveryAreaSelect = orangeReplaceInputWithDeliveryAreaSelect;
+
 /** كاش CSS/JS للواجهة — يخفّف بطء التنقل في نافذة PWA مقارنةً بتبويب المتصفح */
 (function orangeStorefrontRegisterServiceWorker() {
     if (!document.body || !document.body.classList.contains('storefront')) {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/catalog_schema.php';
 require_once __DIR__ . '/../includes/storefront_account.php';
+require_once __DIR__ . '/../includes/delivery_areas.php';
 
 $pdoCartAcc = db();
 orange_catalog_ensure_schema($pdoCartAcc);
@@ -12,6 +13,7 @@ $cartSfAccount = current_storefront_account($pdoCartAcc);
 $cartSfLoggedIn = $cartSfAccount !== null;
 
 include __DIR__ . '/../includes/header.php';
+$orangeDeliveryAreasStorefront = orange_delivery_areas_storefront_payload($pdoCartAcc, $lang);
 $cartHomeUrl = storefront_url('home', $channelSlug, $lang);
 $tabBasketLabel = t('cart_tab_basket');
 $tabOrdersLabel = t('cart_tab_my_orders');
@@ -130,6 +132,7 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
 </div>
 
 <script>
+window.ORANGE_DELIVERY_AREAS = <?php echo json_encode($orangeDeliveryAreasStorefront, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_CART_HOME = <?php echo json_encode(storefront_url('home', $channelSlug, $lang), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_STOREFRONT_WA = <?php echo json_encode($cartWaHref, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_CART_SF_ACCOUNT = <?php echo json_encode(['logged_in' => $cartSfLoggedIn], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
@@ -201,5 +204,15 @@ window.ORANGE_TRACK_LABELS = window.ORANGE_TRACK_LABELS || {
         }
     } catch (e) {}
 })();
+
+document.addEventListener('DOMContentLoaded', function () {
+    if (
+        typeof window.orangeReplaceInputWithDeliveryAreaSelect === 'function' &&
+        window.ORANGE_DELIVERY_AREAS &&
+        window.ORANGE_DELIVERY_AREAS.length
+    ) {
+        window.orangeReplaceInputWithDeliveryAreaSelect('customer_area', window.ORANGE_DELIVERY_AREAS);
+    }
+});
 </script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../includes/order_intake_queue.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/phone_validation.php';
 require_once __DIR__ . '/../../includes/storefront_account.php';
+require_once __DIR__ . '/../../includes/delivery_areas.php';
 
 try {
     $pdo = db();
@@ -19,6 +20,20 @@ try {
         $data['email'] = '';
     }
     $data['email'] = trim((string) $data['email']);
+
+    $langCo = isset($data['lang']) ? (string) $data['lang'] : (function_exists('current_lang') ? current_lang() : 'en');
+    if (!preg_match('/^(ar|en|fil|hi)$/', $langCo)) {
+        $langCo = 'en';
+    }
+    try {
+        orange_storefront_normalize_delivery_area_payload($pdo, $data, $langCo);
+    } catch (RuntimeException $e) {
+        json_response([
+            'success' => false,
+            'code' => 'invalid_delivery_area',
+            'message' => $e->getMessage(),
+        ], 422);
+    }
 
     require_fields($data, ['name', 'phone', 'area', 'address', 'channel_id', 'items']);
 

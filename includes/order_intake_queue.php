@@ -6,6 +6,7 @@ require_once __DIR__ . '/order_helpers.php';
 require_once __DIR__ . '/order_stock.php';
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/storefront_account.php';
+require_once __DIR__ . '/delivery_areas.php';
 
 function orange_order_intake_snip_message(string $msg, int $max = 500): string
 {
@@ -193,6 +194,12 @@ function orange_storefront_upsert_customer_from_checkout(
  */
 function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): array
 {
+    $langCheckout = isset($data['lang']) ? (string) $data['lang'] : 'en';
+    if (!preg_match('/^(ar|en|fil|hi)$/', $langCheckout)) {
+        $langCheckout = 'en';
+    }
+    orange_storefront_normalize_delivery_area_payload($pdo, $data, $langCheckout);
+
     require_fields($data, ['name', 'phone', 'area', 'address', 'channel_id', 'items']);
 
     $emailCheck = trim((string) ($data['email'] ?? ''));
@@ -361,6 +368,13 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         $cols .= ', storefront_account_id';
         $ph .= ', ?';
         $params[] = $sfaLink;
+    }
+    $hasDeliveryArea = orange_table_has_column($pdo, 'orders', 'delivery_area_id');
+    if ($hasDeliveryArea) {
+        $cols .= ', delivery_area_id';
+        $ph .= ', ?';
+        $daIns = isset($data['delivery_area_id']) ? (int) $data['delivery_area_id'] : 0;
+        $params[] = $daIns > 0 ? $daIns : null;
     }
     $cols .= ', created_at';
     $ph .= ', NOW()';

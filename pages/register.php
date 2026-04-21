@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/catalog_schema.php';
 require_once __DIR__ . '/../includes/storefront_account.php';
+require_once __DIR__ . '/../includes/delivery_areas.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -22,6 +23,7 @@ $ORANGE_STOREFRONT_META_DESCRIPTION = t('storefront_register_intro');
 
 include __DIR__ . '/../includes/header.php';
 
+$registerDeliveryAreas = orange_delivery_areas_storefront_payload($pdo, $lang);
 $acc = current_storefront_account($pdo);
 $registerHref = storefront_url('register', $channelSlug, $lang);
 $homeHref = storefront_url('home', $channelSlug, $lang);
@@ -128,10 +130,19 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
             </form>
             </div>
             <script>
+            window.ORANGE_DELIVERY_AREAS = <?php echo json_encode($registerDeliveryAreas, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
             (function () {
-                var form = document.getElementById('orangeRegisterForm');
-                var msg = document.getElementById('orangeRegisterMsg');
-                if (!form || !msg) return;
+                document.addEventListener('DOMContentLoaded', function () {
+                    if (
+                        typeof window.orangeReplaceInputWithDeliveryAreaSelect === 'function' &&
+                        window.ORANGE_DELIVERY_AREAS &&
+                        window.ORANGE_DELIVERY_AREAS.length
+                    ) {
+                        window.orangeReplaceInputWithDeliveryAreaSelect('reg_area', window.ORANGE_DELIVERY_AREAS);
+                    }
+                    var form = document.getElementById('orangeRegisterForm');
+                    var msg = document.getElementById('orangeRegisterMsg');
+                    if (!form || !msg) return;
                 var sent = <?php echo json_encode(t('storefront_register_sent'), JSON_UNESCAPED_UNICODE); ?>;
                 var cooldown = <?php echo json_encode(t('storefront_register_cooldown'), JSON_UNESCAPED_UNICODE); ?>;
                 var already = <?php echo json_encode(t('storefront_register_already_verified'), JSON_UNESCAPED_UNICODE); ?>;
@@ -146,10 +157,28 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                     var email = (document.getElementById('reg_email') || {}).value.trim() || '';
                     var name = (document.getElementById('reg_name') || {}).value.trim() || '';
                     var phoneRaw = (document.getElementById('reg_phone') || {}).value.trim() || '';
-                    var area = (document.getElementById('reg_area') || {}).value.trim() || '';
+                    var areaEl = document.getElementById('reg_area');
+                    var area = '';
+                    var deliveryAreaId = 0;
+                    if (areaEl && areaEl.tagName === 'SELECT') {
+                        deliveryAreaId = parseInt(areaEl.value, 10) || 0;
+                        var optA = areaEl.options[areaEl.selectedIndex];
+                        area = optA ? String(optA.textContent || '').trim() : '';
+                    } else if (areaEl) {
+                        area = areaEl.value.trim() || '';
+                    }
                     var address = (document.getElementById('reg_address') || {}).value.trim() || '';
                     var notes = (document.getElementById('reg_notes') || {}).value.trim() || '';
-                    if (!name || !phoneRaw || !email || !area || !address) {
+                    if (!name || !phoneRaw || !email || !address) {
+                        msg.textContent = reqMsg;
+                        return;
+                    }
+                    if (areaEl && areaEl.tagName === 'SELECT') {
+                        if (!deliveryAreaId) {
+                            msg.textContent = (window.APP_T && window.APP_T.checkout_delivery_area_required) || reqMsg;
+                            return;
+                        }
+                    } else if (!area) {
                         msg.textContent = reqMsg;
                         return;
                     }
@@ -195,6 +224,7 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                             name: name,
                             phone: phoneNorm,
                             area: area,
+                            delivery_area_id: deliveryAreaId,
                             address: address,
                             notes: notes,
                             channel: typeof window.APP_CHANNEL_SLUG === 'string' ? window.APP_CHANNEL_SLUG : <?php echo json_encode(orange_storefront_default_channel_slug($pdo), JSON_UNESCAPED_UNICODE); ?>,
@@ -221,6 +251,7 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                     }).catch(function () {
                         msg.textContent = (window.APP_T && window.APP_T.api_request_failed) || err;
                     });
+                });
                 });
             })();
             </script>
