@@ -9,8 +9,14 @@ require_once __DIR__ . '/../../includes/phone_validation.php';
 try {
     $pdo = db();
 
-    $orderNumber = isset($_GET['order_number']) ? trim((string) $_GET['order_number']) : '';
-    $phone = isset($_GET['phone']) ? trim((string) $_GET['phone']) : '';
+    /** س27: تفضيل POST JSON حتى لا يظهر رقم الطلب والهاتف في سلسلة الاستعلام أو سجل الخادم للرابط. */
+    $postPayload = [];
+    if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? '')) === 'POST') {
+        $postPayload = get_json_input();
+        orange_storefront_apply_lang_from_payload($postPayload);
+    }
+    $orderNumber = trim((string) ($postPayload['order_number'] ?? $_GET['order_number'] ?? ''));
+    $phone = trim((string) ($postPayload['phone'] ?? $_GET['phone'] ?? ''));
 
     if ($orderNumber === '' || $phone === '') {
         json_response(['success' => false, 'code' => 'order_lookup_required', 'message' => t('track_missing_fields')], 422);

@@ -1030,11 +1030,20 @@ async function orangeTrackOrderFetchAndRender(resultBox, orderNumber, phone, msg
         orangeScrollTrackResultIntoView(resultBox);
         return;
     }
-    const url = storefrontApiUrl('/api/orders/get-order.php?order_number=' + encodeURIComponent(onum) + '&phone=' + encodeURIComponent(ph));
+    const url = storefrontApiUrl('/api/orders/get-order.php');
+    const lang =
+        typeof window.APP_LANG === 'string' && window.APP_LANG.trim() !== ''
+            ? window.APP_LANG.trim().toLowerCase()
+            : 'en';
     let result;
     let resStatus = 0;
     try {
-        const response = await fetch(url);
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ order_number: onum, phone: ph, lang: lang }),
+        });
         resStatus = response.status;
         result = await response.json();
     } catch (e) {

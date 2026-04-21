@@ -139,6 +139,25 @@ window.ORANGE_TRACK_BELOW = {
     another: <?php echo json_encode(t('track_track_another'), JSON_UNESCAPED_UNICODE); ?>
 };
 
+/** س27: إزالة أي معرّفات حساسة من شريط العنوان إن وُجدت (روابط قديمة أو أخطاء). */
+(function () {
+    try {
+        var params = new URLSearchParams(window.location.search || '');
+        var dirty = false;
+        ['order_number', 'phone', 'onum', 'tel', 'mobile'].forEach(function (k) {
+            if (params.has(k)) {
+                params.delete(k);
+                dirty = true;
+            }
+        });
+        if (dirty) {
+            var qs = params.toString();
+            var path = window.location.pathname + (qs ? '?' + qs : '') + (window.location.hash || '');
+            window.history.replaceState(null, '', path);
+        }
+    } catch (e) {}
+})();
+
 (function () {
     var tf = document.getElementById('track-page-form');
     if (tf) {
@@ -444,31 +463,34 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
         }
         var urlBase =
             typeof storefrontApiUrl === 'function'
-                ? storefrontApiUrl(
-                      '/api/orders/get-order.php?order_number=' +
-                          encodeURIComponent(onum) +
-                          '&phone=' +
-                          encodeURIComponent(vph)
-                  )
+                ? storefrontApiUrl('/api/orders/get-order.php')
                 : (function () {
                       var b = String(window.STOREFRONT_BASE || '').replace(/\/+$/, '') || '';
-                      var u =
-                          b +
-                          '/api/orders/get-order.php?order_number=' +
-                          encodeURIComponent(onum) +
-                          '&phone=' +
-                          encodeURIComponent(vph);
+                      var u = b + '/api/orders/get-order.php';
                       var L =
                           typeof window.APP_LANG === 'string'
                               ? window.APP_LANG.trim().toLowerCase()
                               : '';
                       if (L && ['en', 'ar', 'fil', 'hi'].indexOf(L) !== -1) {
-                          u += '&lang=' + encodeURIComponent(L);
+                          u += (u.indexOf('?') !== -1 ? '&' : '?') + 'lang=' + encodeURIComponent(L);
                       }
                       return u;
                   })();
+        var langPost =
+            typeof window.APP_LANG === 'string' && window.APP_LANG.trim() !== ''
+                ? window.APP_LANG.trim().toLowerCase()
+                : 'en';
         verifyOrderBtn.disabled = true;
-        fetch(urlBase)
+        fetch(urlBase, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                order_number: onum,
+                phone: vph,
+                lang: langPost,
+            }),
+        })
             .then(function (r) {
                 return r.json().then(function (j) {
                     return { ok: r.ok, j: j, status: r.status };
