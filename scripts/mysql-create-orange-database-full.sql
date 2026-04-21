@@ -428,6 +428,18 @@ CREATE TABLE `offers` (
   KEY `offers_ibfk_1` (`product_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+CREATE TABLE `cart_promotions` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `min_subtotal` decimal(18,4) NOT NULL DEFAULT 0.0000,
+  `discount_amount` decimal(18,4) NOT NULL DEFAULT 0.0000,
+  `requires_registered_account` tinyint(1) NOT NULL DEFAULT 0,
+  `sort_order` int NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_cart_promotions_active_min` (`is_active`,`min_subtotal`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 CREATE TABLE `orders` (
   `id` int NOT NULL AUTO_INCREMENT,
   `order_number` varchar(50) NOT NULL,
@@ -445,6 +457,10 @@ CREATE TABLE `orders` (
   `order_source` varchar(32) NOT NULL DEFAULT 'website',
   `payment_terms` varchar(16) NOT NULL DEFAULT 'cash',
   `customer_id` int DEFAULT NULL,
+  `storefront_account_id` int unsigned DEFAULT NULL,
+  `delivery_area_id` int unsigned DEFAULT NULL,
+  `cart_promotion_id` int unsigned DEFAULT NULL,
+  `cart_promotion_discount` decimal(18,4) NOT NULL DEFAULT 0.0000,
   `invoice_number` varchar(32) DEFAULT NULL,
   `amount_paid` decimal(18,4) NOT NULL DEFAULT 0.0000,
   `customer_email` varchar(255) DEFAULT NULL,
@@ -452,7 +468,9 @@ CREATE TABLE `orders` (
   UNIQUE KEY `uq_orders_order_number` (`order_number`),
   UNIQUE KEY `uq_orders_invoice_number` (`invoice_number`),
   KEY `idx_orders_channel` (`channel_id`),
-  KEY `idx_orders_customer_id` (`customer_id`)
+  KEY `idx_orders_customer_id` (`customer_id`),
+  KEY `idx_orders_storefront_account_id` (`storefront_account_id`),
+  KEY `idx_orders_delivery_area_id` (`delivery_area_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `order_items` (

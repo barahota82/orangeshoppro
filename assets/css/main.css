@@ -1765,6 +1765,11 @@ body.storefront .product-gallery__img {
     font-size: 0.95rem;
 }
 
+.order-items-subtotal-line {
+    color: var(--muted);
+    font-size: 0.95rem;
+}
+
 .cart-mini-total {
     display: flex;
     align-items: center;

@@ -990,6 +990,20 @@ function orangeOrderCartPromoDiscountAmount(order) {
     return n;
 }
 
+function orangeOrderItemsLinesSum(itemRows) {
+    if (!Array.isArray(itemRows)) {
+        return 0;
+    }
+    let s = 0;
+    for (let i = 0; i < itemRows.length; i++) {
+        const it = itemRows[i];
+        const qty = Math.max(0, parseInt(String(it.qty || 0), 10) || 0);
+        const price = parseFloat(String(it.price || 0)) || 0;
+        s += qty * price;
+    }
+    return s;
+}
+
 function orangeHtmlOrderPromoParagraph(order, cur, paragraphClass) {
     const d = orangeOrderCartPromoDiscountAmount(order);
     if (d <= 1e-9) {
@@ -1041,6 +1055,17 @@ function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, 
     html += '<p><strong>' + orangeEscDomText(lblOrder) + ':</strong> ' + orangeEscDomText(String(order.order_number || '')) + '</p>';
     if (order.phone) {
         html += '<p><strong>' + orangeEscDomText(lblPhone) + ':</strong> ' + orangeEscDomText(String(order.phone)) + '</p>';
+    }
+    const itemsLinesSum = orangeOrderItemsLinesSum(itemRows);
+    if (orangeOrderCartPromoDiscountAmount(order) > 1e-9 && itemsLinesSum > 1e-9) {
+        html +=
+            '<p class="order-items-subtotal-line"><strong>' +
+            orangeEscDomText(T.cart_subtotal_label || '') +
+            ':</strong> ' +
+            itemsLinesSum.toFixed(3) +
+            ' ' +
+            orangeEscDomText(cur) +
+            '</p>';
     }
     html += orangeHtmlOrderPromoParagraph(order, cur, 'order-cart-promo-line');
     html += '<p><strong>' + orangeEscDomText(UI.order_total_label || '') + ':</strong> ' + orangeEscDomText(String(order.total)) + ' ' + orangeEscDomText(cur) + '</p>';
@@ -1143,6 +1168,17 @@ function orangeRenderTrackSignupSummary(el, order, orderNumber, phoneTyped, item
     if (order.phone) {
         html += '<p class="track-signup-order-summary__line"><strong>' + orangeEscDomText(lblPhone) + ':</strong> ';
         html += orangeEscDomText(String(order.phone)) + '</p>';
+    }
+    const itemsLinesSumSu = orangeOrderItemsLinesSum(itemRows);
+    if (orangeOrderCartPromoDiscountAmount(order) > 1e-9 && itemsLinesSumSu > 1e-9) {
+        html +=
+            '<p class="track-signup-order-summary__line order-items-subtotal-line"><strong>' +
+            orangeEscDomText(T.cart_subtotal_label || '') +
+            ':</strong> ' +
+            itemsLinesSumSu.toFixed(3) +
+            ' ' +
+            orangeEscDomText(cur) +
+            '</p>';
     }
     html += orangeHtmlOrderPromoParagraph(
         order,
