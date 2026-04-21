@@ -1901,7 +1901,7 @@ function t(string $key): string {
 }
 
 /**
- * جمل الـ hero في الصفحة الرئيسية (3 جمل بالتناوب حسب لغة الواجهة).
+ * جمل الـ hero في الصفحة الرئيسية (بالتناوب حسب لغة الزائر؛ عدد غير محدود من الأدمن).
  *
  * @return list<string>
  */
@@ -1912,15 +1912,14 @@ function storefront_home_hero_lines(): array {
 }
 
 /**
- * Taglines under brand name for the rotating header (من الأدمن إن عُيّنت؛ وإلا من الترجمة).
- * الترتيب: عربي → إنجليزي → فلبيني → هندي.
+ * جمل التناوب تحت الشعار في الهيدر: صفوف نشطة من الأدمن حسب لغة الواجهة؛ وإلا من البيانات القديمة أو الترجمة.
  *
  * @return list<string>
  */
 function storefront_tagline_cycle_messages(): array {
     require_once __DIR__ . '/includes/storefront_hero.php';
 
-    return orange_storefront_header_tagline_cycle_resolved(db());
+    return orange_storefront_header_tagline_cycle_resolved(db(), current_lang());
 }
 
 function json_response($data, int $httpCode = 200): void {

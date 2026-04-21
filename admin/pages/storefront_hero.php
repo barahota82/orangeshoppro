@@ -1,75 +1,239 @@
 <?php
 
+declare(strict_types=1);
+
+require_once __DIR__ . '/../../includes/catalog_schema.php';
+
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
-$hasTable = orange_table_exists($pdo, 'storefront_home_hero');
+$hasTable = orange_table_exists($pdo, 'storefront_copy_lines');
+
+/** @var list<array<string, mixed>> $heroLines */
+$heroLines = [];
+/** @var list<array<string, mixed>> $headerLines */
+$headerLines = [];
+if ($hasTable) {
+    $qh = $pdo->query(
+        "SELECT * FROM storefront_copy_lines WHERE scope = 'home_hero' ORDER BY sort_order ASC, id ASC"
+    );
+    $heroLines = $qh ? ($qh->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+    $qt = $pdo->query(
+        "SELECT * FROM storefront_copy_lines WHERE scope = 'header_tagline' ORDER BY sort_order ASC, id ASC"
+    );
+    $headerLines = $qt ? ($qt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+}
+
+$editId = isset($_GET['edit']) ? (int) $_GET['edit'] : 0;
+/** @var array<string, mixed>|null $heroEdit */
+$heroEdit = null;
+/** @var array<string, mixed>|null $headerEdit */
+$headerEdit = null;
+if ($editId > 0 && $hasTable) {
+    $st = $pdo->prepare('SELECT * FROM storefront_copy_lines WHERE id = ? LIMIT 1');
+    $st->execute([$editId]);
+    $er = $st->fetch(PDO::FETCH_ASSOC);
+    if (is_array($er)) {
+        if (($er['scope'] ?? '') === 'home_hero') {
+            $heroEdit = $er;
+        } elseif (($er['scope'] ?? '') === 'header_tagline') {
+            $headerEdit = $er;
+        }
+    }
+}
+
+$maxHeroSort = 0;
+foreach ($heroLines as $r) {
+    $maxHeroSort = max($maxHeroSort, (int) ($r['sort_order'] ?? 0));
+}
+$maxHeaderSort = 0;
+foreach ($headerLines as $r) {
+    $maxHeaderSort = max($maxHeaderSort, (int) ($r['sort_order'] ?? 0));
+}
+
+$heroDefaultSort = $heroEdit ? (int) ($heroEdit['sort_order'] ?? 0) : ($maxHeroSort + 1);
+$headerDefaultSort = $headerEdit ? (int) ($headerEdit['sort_order'] ?? 0) : ($maxHeaderSort + 1);
+$heroEditActive = $heroEdit ? (int) ($heroEdit['is_active'] ?? 1) : 1;
+$headerEditActive = $headerEdit ? (int) ($headerEdit['is_active'] ?? 1) : 1;
+
+require_once __DIR__ . '/../../includes/storefront_hero.php';
 ?>
 <div class="page-title page-title--stacked">
     <h1>بانر الصفحة الرئيسية</h1>
-    <p class="page-subtitle">ثلاث جمل تتناوب في الـ hero حسب لغة الزائر؛ وتحتها جمل التناوب تحت الشعار في شريط الهيدر (أربع لغات). إن تركت حقول لغة فارغة يُستبدل نصها من الترجمة الافتراضية.</p>
+    <p class="page-subtitle">أضف جمل الـ hero والتناوب تحت الشعار في الهيدر كما تفعل مع القنوات: جدول في الأسفل، تعديل، حذف، وإخفاء/تفعيل. الترتيب المعروض للزائر حسب <strong>ترتيب العرض</strong> ثم رقم السجل. النص الظاهر للزائر حسب <strong>لغة واجهته</strong>؛ اترك لغة فارغة إن لم تُستخدم.</p>
 </div>
 
 <?php if (!$hasTable): ?>
 <div class="card">
-    <div class="alert-error">جدول <code>storefront_home_hero</code> غير موجود. حدّث المخطط عبر تشغيل الموقع أو لوحة الإدارة.</div>
+    <div class="alert-error">جدول <code>storefront_copy_lines</code> غير موجود. حدّث المخطط عبر تشغيل الموقع أو لوحة الإدارة.</div>
 </div>
 <?php endif; ?>
 
 <div class="card">
-    <h3>شعار الهيدر — تناوب تحت الشعار (الترتيب: عربي → English → Filipino → Hindi)</h3>
-    <p class="page-subtitle" style="margin-top:0.35rem;">يظهر في جميع صفحات المتجر تحت الشعار. اترك الحقل فارغاً لاستخدام النص الافتراضي من الترجمة لتلك اللغة.</p>
+    <h3>شعار الهيدر — جمل التناوب تحت الشعار</h3>
+    <p class="card-hint" style="margin:0 0 0.75rem;">يظهر في شريط الهيدر تحت اسم المتجر. إن لم تُضف جمل نشطة يُستعاد النص من الإعداد القديم أو من الترجمة.</p>
+    <input type="hidden" id="header_line_id" value="<?php echo $headerEdit ? (int) $headerEdit['id'] : ''; ?>">
     <div class="form-grid" style="margin-top:1rem;">
-        <div><label>عربي</label><input type="text" id="header_tagline_ar" maxlength="500" autocomplete="off"></div>
-        <div><label>English</label><input type="text" id="header_tagline_en" maxlength="500" autocomplete="off"></div>
-        <div><label>Filipino</label><input type="text" id="header_tagline_fil" maxlength="500" autocomplete="off"></div>
-        <div><label>Hindi</label><input type="text" id="header_tagline_hi" maxlength="500" autocomplete="off"></div>
+        <div>
+            <label>ترتيب العرض</label>
+            <input type="number" id="header_sort_order" step="1" value="<?php echo (int) $headerDefaultSort; ?>">
+        </div>
+        <div>
+            <label>حالة الظهور</label>
+            <select id="header_is_active">
+                <option value="1" <?php echo $headerEditActive === 1 ? ' selected' : ''; ?>>ظاهر للزوار</option>
+                <option value="0" <?php echo $headerEditActive === 0 ? ' selected' : ''; ?>>مخفي (لا يُعرض في المتجر)</option>
+            </select>
+        </div>
+        <div><label>عربي</label><input type="text" id="header_text_ar" maxlength="500" autocomplete="off" value="<?php echo $headerEdit ? htmlspecialchars((string) ($headerEdit['text_ar'] ?? ''), ENT_QUOTES, 'UTF-8') : ''; ?>"></div>
+        <div><label>English</label><input type="text" id="header_text_en" maxlength="500" autocomplete="off" value="<?php echo $headerEdit ? htmlspecialchars((string) ($headerEdit['text_en'] ?? ''), ENT_QUOTES, 'UTF-8') : ''; ?>"></div>
+        <div><label>Filipino</label><input type="text" id="header_text_fil" maxlength="500" autocomplete="off" value="<?php echo $headerEdit ? htmlspecialchars((string) ($headerEdit['text_fil'] ?? ''), ENT_QUOTES, 'UTF-8') : ''; ?>"></div>
+        <div><label>Hindi</label><input type="text" id="header_text_hi" maxlength="500" autocomplete="off" value="<?php echo $headerEdit ? htmlspecialchars((string) ($headerEdit['text_hi'] ?? ''), ENT_QUOTES, 'UTF-8') : ''; ?>"></div>
     </div>
-    <div class="admin-form-actions" style="margin-top:0.75rem;display:flex;flex-wrap:wrap;gap:10px;">
-        <button type="button" class="btn-secondary" onclick="translateHeaderTaglinesFromArabic()" <?php echo !$hasTable ? 'disabled' : ''; ?>>ترجمة شعار الهيدر من العربي</button>
+    <div class="actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+        <button type="button" onclick="saveHeaderCopyLine()" <?php echo !$hasTable ? 'disabled' : ''; ?>><?php echo $headerEdit ? 'حفظ التعديلات' : 'إضافة جملة'; ?></button>
+        <button type="button" class="btn btn-secondary" onclick="translateHeaderFromArabic()" <?php echo !$hasTable ? 'disabled' : ''; ?>>ترجمة من العربي</button>
+        <?php if ($headerEdit): ?>
+            <a class="btn btn-secondary" href="/admin/index.php?page=storefront_hero">إلغاء التعديل</a>
+        <?php endif; ?>
     </div>
 </div>
 
 <div class="card">
-    <h3>الجمل الثلاث (عربي، English، Filipino، Hindi)</h3>
-    <?php for ($line = 1; $line <= 3; $line++): ?>
-    <div class="form-grid" style="margin-top:1rem;padding-top:1rem;border-top:<?php echo $line === 1 ? 'none' : '1px solid var(--admin-border, #e8e8e8)'; ?>;">
-        <div style="grid-column:1/-1;"><strong>الجملة <?php echo (int) $line; ?></strong></div>
-        <div><label>عربي</label><input type="text" id="line<?php echo $line; ?>_ar" maxlength="500" autocomplete="off"></div>
-        <div><label>English</label><input type="text" id="line<?php echo $line; ?>_en" maxlength="500" autocomplete="off"></div>
-        <div><label>Filipino</label><input type="text" id="line<?php echo $line; ?>_fil" maxlength="500" autocomplete="off"></div>
-        <div><label>Hindi</label><input type="text" id="line<?php echo $line; ?>_hi" maxlength="500" autocomplete="off"></div>
+    <h3>قائمة جمل الهيدر</h3>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>ترتيب</th>
+                    <th>معاينة نص</th>
+                    <th>الحالة</th>
+                    <th>إخفاء / تفعيل</th>
+                    <th>تعديل</th>
+                    <th>حذف</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($headerLines as $row): ?>
+                <tr>
+                    <td><?php echo (int) $row['id']; ?></td>
+                    <td><?php echo (int) ($row['sort_order'] ?? 0); ?></td>
+                    <td><?php echo htmlspecialchars(orange_storefront_copy_preview_snippet($row), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo (int) ($row['is_active'] ?? 0) === 1 ? 'نشط' : 'مخفي'; ?></td>
+                    <td>
+                        <button type="button" class="btn btn-secondary" style="font-size:0.85rem;padding:0.25rem 0.5rem;" onclick="toggleCopyLine('header_tagline', <?php echo (int) $row['id']; ?>, <?php echo (int) ($row['is_active'] ?? 0); ?>)"><?php echo (int) ($row['is_active'] ?? 0) === 1 ? 'إخفاء' : 'تفعيل'; ?></button>
+                    </td>
+                    <td><a href="/admin/index.php?page=storefront_hero&amp;edit=<?php echo (int) $row['id']; ?>">تعديل</a></td>
+                    <td><button type="button" class="btn btn-secondary" style="font-size:0.85rem;padding:0.25rem 0.5rem;" onclick="deleteCopyLine('header_tagline', <?php echo (int) $row['id']; ?>)">حذف</button></td>
+                </tr>
+                <?php endforeach; ?>
+                <?php if ($headerLines === []): ?>
+                <tr><td colspan="7" class="card-hint">لا توجد جمل بعد. أضف جملة من النموذج أعلاه.</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
     </div>
-    <?php endfor; ?>
-    <div class="admin-form-actions" style="margin-top:1rem;display:flex;flex-wrap:wrap;gap:10px;">
-        <button type="button" onclick="saveStorefrontHero()" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ</button>
-        <button type="button" class="btn-secondary" onclick="translateAllHeroFromArabic()" <?php echo !$hasTable ? 'disabled' : ''; ?>>ترجمة تلقائية من العربي لكل الجمل</button>
+</div>
+
+<div class="card">
+    <h3>جمل الـ hero — الصفحة الرئيسية</h3>
+    <p class="card-hint" style="margin:0 0 0.75rem;">الجمل تتناوب في بانر الرئيسية حسب لغة الزائر. يُفضّل وجود جملتين على الأقل للتناوب السلس.</p>
+    <input type="hidden" id="hero_line_id" value="<?php echo $heroEdit ? (int) $heroEdit['id'] : ''; ?>">
+    <div class="form-grid" style="margin-top:1rem;">
+        <div>
+            <label>ترتيب العرض</label>
+            <input type="number" id="hero_sort_order" step="1" value="<?php echo (int) $heroDefaultSort; ?>">
+        </div>
+        <div>
+            <label>حالة الظهور</label>
+            <select id="hero_is_active">
+                <option value="1" <?php echo $heroEditActive === 1 ? ' selected' : ''; ?>>ظاهر للزوار</option>
+                <option value="0" <?php echo $heroEditActive === 0 ? ' selected' : ''; ?>>مخفي (لا يُعرض في المتجر)</option>
+            </select>
+        </div>
+        <div><label>عربي</label><input type="text" id="hero_text_ar" maxlength="500" autocomplete="off" value="<?php echo $heroEdit ? htmlspecialchars((string) ($heroEdit['text_ar'] ?? ''), ENT_QUOTES, 'UTF-8') : ''; ?>"></div>
+        <div><label>English</label><input type="text" id="hero_text_en" maxlength="500" autocomplete="off" value="<?php echo $heroEdit ? htmlspecialchars((string) ($heroEdit['text_en'] ?? ''), ENT_QUOTES, 'UTF-8') : ''; ?>"></div>
+        <div><label>Filipino</label><input type="text" id="hero_text_fil" maxlength="500" autocomplete="off" value="<?php echo $heroEdit ? htmlspecialchars((string) ($heroEdit['text_fil'] ?? ''), ENT_QUOTES, 'UTF-8') : ''; ?>"></div>
+        <div><label>Hindi</label><input type="text" id="hero_text_hi" maxlength="500" autocomplete="off" value="<?php echo $heroEdit ? htmlspecialchars((string) ($heroEdit['text_hi'] ?? ''), ENT_QUOTES, 'UTF-8') : ''; ?>"></div>
+    </div>
+    <div class="actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+        <button type="button" onclick="saveHeroCopyLine()" <?php echo !$hasTable ? 'disabled' : ''; ?>><?php echo $heroEdit ? 'حفظ التعديلات' : 'إضافة جملة'; ?></button>
+        <button type="button" class="btn btn-secondary" onclick="translateHeroFromArabic()" <?php echo !$hasTable ? 'disabled' : ''; ?>>ترجمة من العربي</button>
+        <?php if ($heroEdit): ?>
+            <a class="btn btn-secondary" href="/admin/index.php?page=storefront_hero">إلغاء التعديل</a>
+        <?php endif; ?>
+    </div>
+</div>
+
+<div class="card">
+    <h3>قائمة جمل الـ hero</h3>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>ترتيب</th>
+                    <th>معاينة نص</th>
+                    <th>الحالة</th>
+                    <th>إخفاء / تفعيل</th>
+                    <th>تعديل</th>
+                    <th>حذف</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($heroLines as $row): ?>
+                <tr>
+                    <td><?php echo (int) $row['id']; ?></td>
+                    <td><?php echo (int) ($row['sort_order'] ?? 0); ?></td>
+                    <td><?php echo htmlspecialchars(orange_storefront_copy_preview_snippet($row), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo (int) ($row['is_active'] ?? 0) === 1 ? 'نشط' : 'مخفي'; ?></td>
+                    <td>
+                        <button type="button" class="btn btn-secondary" style="font-size:0.85rem;padding:0.25rem 0.5rem;" onclick="toggleCopyLine('home_hero', <?php echo (int) $row['id']; ?>, <?php echo (int) ($row['is_active'] ?? 0); ?>)"><?php echo (int) ($row['is_active'] ?? 0) === 1 ? 'إخفاء' : 'تفعيل'; ?></button>
+                    </td>
+                    <td><a href="/admin/index.php?page=storefront_hero&amp;edit=<?php echo (int) $row['id']; ?>">تعديل</a></td>
+                    <td><button type="button" class="btn btn-secondary" style="font-size:0.85rem;padding:0.25rem 0.5rem;" onclick="deleteCopyLine('home_hero', <?php echo (int) $row['id']; ?>)">حذف</button></td>
+                </tr>
+                <?php endforeach; ?>
+                <?php if ($heroLines === []): ?>
+                <tr><td colspan="7" class="card-hint">لا توجد جمل بعد. أضف جملة من النموذج أعلاه.</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
     </div>
 </div>
 
 <script>
-const heroArTimers = { 1: null, 2: null, 3: null };
-const heroEnTimers = { 1: null, 2: null, 3: null };
 let headerArTimer = null;
 let headerEnTimer = null;
+let heroArTimer = null;
+let heroEnTimer = null;
 
-async function translateHeroLine(line, opts = {}) {
-    const silent = !!opts.silent;
-    const forceFromArabic = !!opts.forceFromArabic;
-    const prefix = 'line' + line + '_';
+async function translateNamesPayload(nameAr, nameEn, forceFromArabic) {
+    const payload = {
+        name_ar: nameAr,
+        name_en: forceFromArabic ? '' : nameEn
+    };
+    const res = await postJSON('/admin/api/translate/names.php', payload);
+    return res;
+}
+
+async function translateHeaderFromArabic(opts) {
+    const silent = !!(opts && opts.silent);
+    const forceFromArabic = !!(opts && opts.forceFromArabic);
     try {
-        const payload = {
-            name_ar: document.getElementById(prefix + 'ar').value.trim(),
-            name_en: forceFromArabic ? '' : document.getElementById(prefix + 'en').value.trim()
-        };
-        const res = await postJSON('/admin/api/translate/names.php', payload);
+        const res = await translateNamesPayload(
+            document.getElementById('header_text_ar').value.trim(),
+            document.getElementById('header_text_en').value.trim(),
+            forceFromArabic
+        );
         if (!res || !res.success) {
             if (!silent) alert((res && res.message) ? res.message : 'فشل الترجمة');
             return false;
         }
         const t = res.translations || {};
-        if (t.name_en) document.getElementById(prefix + 'en').value = t.name_en;
-        if (t.name_fil) document.getElementById(prefix + 'fil').value = t.name_fil;
-        if (t.name_hi) document.getElementById(prefix + 'hi').value = t.name_hi;
+        if (t.name_en) document.getElementById('header_text_en').value = t.name_en;
+        if (t.name_fil) document.getElementById('header_text_fil').value = t.name_fil;
+        if (t.name_hi) document.getElementById('header_text_hi').value = t.name_hi;
         return true;
     } catch (e) {
         if (!silent) alert('فشل طلب الترجمة من السيرفر');
@@ -77,136 +241,142 @@ async function translateHeroLine(line, opts = {}) {
     }
 }
 
-function scheduleHeroLineFromAr(line) {
-    const arEl = document.getElementById('line' + line + '_ar');
-    const nameAr = arEl.value.trim();
+function scheduleHeaderFromAr() {
+    const nameAr = document.getElementById('header_text_ar').value.trim();
     if (!nameAr) {
-        document.getElementById('line' + line + '_en').value = '';
-        document.getElementById('line' + line + '_fil').value = '';
-        document.getElementById('line' + line + '_hi').value = '';
-        return;
-    }
-    clearTimeout(heroArTimers[line]);
-    heroArTimers[line] = setTimeout(() => translateHeroLine(line, { silent: true, forceFromArabic: true }), 700);
-}
-
-function scheduleHeroLineFromEn(line) {
-    const nameEn = document.getElementById('line' + line + '_en').value.trim();
-    if (!nameEn) {
-        return;
-    }
-    clearTimeout(heroEnTimers[line]);
-    heroEnTimers[line] = setTimeout(() => translateHeroLine(line, { silent: true, forceFromArabic: false }), 600);
-}
-
-async function translateAllHeroFromArabic() {
-    for (let line = 1; line <= 3; line++) {
-        const ar = document.getElementById('line' + line + '_ar').value.trim();
-        if (ar) {
-            await translateHeroLine(line, { silent: false, forceFromArabic: true });
-        }
-    }
-}
-
-async function translateHeaderTaglineFromArabic(opts = {}) {
-    const silent = !!opts.silent;
-    const forceFromArabic = !!opts.forceFromArabic;
-    try {
-        const payload = {
-            name_ar: document.getElementById('header_tagline_ar').value.trim(),
-            name_en: forceFromArabic ? '' : document.getElementById('header_tagline_en').value.trim()
-        };
-        const res = await postJSON('/admin/api/translate/names.php', payload);
-        if (!res || !res.success) {
-            if (!silent) alert((res && res.message) ? res.message : 'فشل الترجمة');
-            return false;
-        }
-        const t = res.translations || {};
-        if (t.name_en) document.getElementById('header_tagline_en').value = t.name_en;
-        if (t.name_fil) document.getElementById('header_tagline_fil').value = t.name_fil;
-        if (t.name_hi) document.getElementById('header_tagline_hi').value = t.name_hi;
-        return true;
-    } catch (e) {
-        if (!silent) alert('فشل طلب الترجمة من السيرفر');
-        return false;
-    }
-}
-
-function scheduleHeaderTaglineFromAr() {
-    const arEl = document.getElementById('header_tagline_ar');
-    const nameAr = arEl.value.trim();
-    if (!nameAr) {
-        document.getElementById('header_tagline_en').value = '';
-        document.getElementById('header_tagline_fil').value = '';
-        document.getElementById('header_tagline_hi').value = '';
+        document.getElementById('header_text_en').value = '';
+        document.getElementById('header_text_fil').value = '';
+        document.getElementById('header_text_hi').value = '';
         return;
     }
     clearTimeout(headerArTimer);
-    headerArTimer = setTimeout(() => translateHeaderTaglineFromArabic({ silent: true, forceFromArabic: true }), 700);
+    headerArTimer = setTimeout(function () { translateHeaderFromArabic({ silent: true, forceFromArabic: true }); }, 700);
 }
 
-function scheduleHeaderTaglineFromEn() {
-    const nameEn = document.getElementById('header_tagline_en').value.trim();
-    if (!nameEn) {
-        return;
-    }
+function scheduleHeaderFromEn() {
+    const nameEn = document.getElementById('header_text_en').value.trim();
+    if (!nameEn) return;
     clearTimeout(headerEnTimer);
-    headerEnTimer = setTimeout(() => translateHeaderTaglineFromArabic({ silent: true, forceFromArabic: false }), 600);
+    headerEnTimer = setTimeout(function () { translateHeaderFromArabic({ silent: true, forceFromArabic: false }); }, 600);
 }
 
-async function translateHeaderTaglinesFromArabic() {
-    const ar = document.getElementById('header_tagline_ar').value.trim();
-    if (ar) {
-        await translateHeaderTaglineFromArabic({ silent: false, forceFromArabic: true });
+async function translateHeroFromArabic(opts) {
+    const silent = !!(opts && opts.silent);
+    const forceFromArabic = !!(opts && opts.forceFromArabic);
+    try {
+        const res = await translateNamesPayload(
+            document.getElementById('hero_text_ar').value.trim(),
+            document.getElementById('hero_text_en').value.trim(),
+            forceFromArabic
+        );
+        if (!res || !res.success) {
+            if (!silent) alert((res && res.message) ? res.message : 'فشل الترجمة');
+            return false;
+        }
+        const t = res.translations || {};
+        if (t.name_en) document.getElementById('hero_text_en').value = t.name_en;
+        if (t.name_fil) document.getElementById('hero_text_fil').value = t.name_fil;
+        if (t.name_hi) document.getElementById('hero_text_hi').value = t.name_hi;
+        return true;
+    } catch (e) {
+        if (!silent) alert('فشل طلب الترجمة من السيرفر');
+        return false;
     }
 }
 
-async function loadStorefrontHero() {
-    const res = await postJSON('/admin/api/settings/storefront_hero.php', { action: 'get' });
-    if (!res.success) {
-        alert(res.message || 'خطأ');
+function scheduleHeroFromAr() {
+    const nameAr = document.getElementById('hero_text_ar').value.trim();
+    if (!nameAr) {
+        document.getElementById('hero_text_en').value = '';
+        document.getElementById('hero_text_fil').value = '';
+        document.getElementById('hero_text_hi').value = '';
         return;
     }
-    const d = res.data || {};
-    ['ar', 'en', 'fil', 'hi'].forEach(function (lang) {
-        const hid = 'header_tagline_' + lang;
-        const el = document.getElementById(hid);
-        if (el) {
-            el.value = d[hid] || '';
-        }
+    clearTimeout(heroArTimer);
+    heroArTimer = setTimeout(function () { translateHeroFromArabic({ silent: true, forceFromArabic: true }); }, 700);
+}
+
+function scheduleHeroFromEn() {
+    const nameEn = document.getElementById('hero_text_en').value.trim();
+    if (!nameEn) return;
+    clearTimeout(heroEnTimer);
+    heroEnTimer = setTimeout(function () { translateHeroFromArabic({ silent: true, forceFromArabic: false }); }, 600);
+}
+
+function parseSort(id) {
+    var el = document.getElementById(id);
+    var v = el ? parseInt(el.value, 10) : 0;
+    return isNaN(v) ? 0 : v;
+}
+
+function parseActive(id) {
+    var el = document.getElementById(id);
+    return el && el.value === '0' ? 0 : 1;
+}
+
+async function saveHeaderCopyLine() {
+    var idEl = document.getElementById('header_line_id');
+    var id = idEl && idEl.value ? parseInt(idEl.value, 10) : 0;
+    var payload = {
+        action: 'save',
+        scope: 'header_tagline',
+        id: id > 0 ? id : 0,
+        sort_order: parseSort('header_sort_order'),
+        is_active: parseActive('header_is_active'),
+        text_ar: document.getElementById('header_text_ar').value.trim(),
+        text_en: document.getElementById('header_text_en').value.trim(),
+        text_fil: document.getElementById('header_text_fil').value.trim(),
+        text_hi: document.getElementById('header_text_hi').value.trim()
+    };
+    var res = await postJSON('/admin/api/settings/storefront_copy_lines.php', payload);
+    alert(res.message || (res.success ? 'تم' : 'فشل'));
+    if (res.success) location.reload();
+}
+
+async function saveHeroCopyLine() {
+    var idEl = document.getElementById('hero_line_id');
+    var id = idEl && idEl.value ? parseInt(idEl.value, 10) : 0;
+    var payload = {
+        action: 'save',
+        scope: 'home_hero',
+        id: id > 0 ? id : 0,
+        sort_order: parseSort('hero_sort_order'),
+        is_active: parseActive('hero_is_active'),
+        text_ar: document.getElementById('hero_text_ar').value.trim(),
+        text_en: document.getElementById('hero_text_en').value.trim(),
+        text_fil: document.getElementById('hero_text_fil').value.trim(),
+        text_hi: document.getElementById('hero_text_hi').value.trim()
+    };
+    var res = await postJSON('/admin/api/settings/storefront_copy_lines.php', payload);
+    alert(res.message || (res.success ? 'تم' : 'فشل'));
+    if (res.success) location.reload();
+}
+
+async function toggleCopyLine(scope, id, currentlyActive) {
+    var next = currentlyActive ? 0 : 1;
+    var res = await postJSON('/admin/api/settings/storefront_copy_lines.php', {
+        action: 'toggle',
+        scope: scope,
+        id: id,
+        is_active: next
     });
-    for (let line = 1; line <= 3; line++) {
-        ['ar', 'en', 'fil', 'hi'].forEach(function (lang) {
-            const id = 'line' + line + '_' + lang;
-            const col = 'line_' + line + '_' + lang;
-            document.getElementById(id).value = d[col] || '';
-        });
-    }
+    alert(res.message || (res.success ? 'تم' : 'فشل'));
+    if (res.success) location.reload();
 }
 
-async function saveStorefrontHero() {
-    const payload = { action: 'save' };
-    ['ar', 'en', 'fil', 'hi'].forEach(function (lang) {
-        const hid = 'header_tagline_' + lang;
-        payload[hid] = document.getElementById(hid).value.trim();
+async function deleteCopyLine(scope, id) {
+    if (!confirm('حذف هذه الجملة نهائياً؟')) return;
+    var res = await postJSON('/admin/api/settings/storefront_copy_lines.php', {
+        action: 'delete',
+        scope: scope,
+        id: id
     });
-    for (let line = 1; line <= 3; line++) {
-        ['ar', 'en', 'fil', 'hi'].forEach(function (lang) {
-            const id = 'line' + line + '_' + lang;
-            payload['line_' + line + '_' + lang] = document.getElementById(id).value.trim();
-        });
-    }
-    const res = await postJSON('/admin/api/settings/storefront_hero.php', payload);
-    alert(res.message || (res.success ? 'تم الحفظ' : 'فشل الحفظ'));
+    alert(res.message || (res.success ? 'تم' : 'فشل'));
+    if (res.success) location.reload();
 }
 
-document.getElementById('header_tagline_ar').addEventListener('input', scheduleHeaderTaglineFromAr);
-document.getElementById('header_tagline_en').addEventListener('input', scheduleHeaderTaglineFromEn);
-
-for (let line = 1; line <= 3; line++) {
-    document.getElementById('line' + line + '_ar').addEventListener('input', function () { scheduleHeroLineFromAr(line); });
-    document.getElementById('line' + line + '_en').addEventListener('input', function () { scheduleHeroLineFromEn(line); });
-}
-
-loadStorefrontHero();
+document.getElementById('header_text_ar').addEventListener('input', scheduleHeaderFromAr);
+document.getElementById('header_text_en').addEventListener('input', scheduleHeaderFromEn);
+document.getElementById('hero_text_ar').addEventListener('input', scheduleHeroFromAr);
+document.getElementById('hero_text_en').addEventListener('input', scheduleHeroFromEn);
 </script>

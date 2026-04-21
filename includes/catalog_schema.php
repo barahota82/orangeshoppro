@@ -1440,6 +1440,26 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         }
     }
 
+    if (!orange_table_exists($pdo, 'storefront_copy_lines')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE IF NOT EXISTS storefront_copy_lines (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                scope VARCHAR(32) NOT NULL,
+                sort_order INT NOT NULL DEFAULT 0,
+                is_active TINYINT(1) NOT NULL DEFAULT 1,
+                text_ar VARCHAR(500) NOT NULL DEFAULT \'\',
+                text_en VARCHAR(500) NOT NULL DEFAULT \'\',
+                text_fil VARCHAR(500) NOT NULL DEFAULT \'\',
+                text_hi VARCHAR(500) NOT NULL DEFAULT \'\',
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                KEY idx_storefront_copy_scope (scope, is_active, sort_order)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+    orange_catalog_migrate_legacy_storefront_copy_lines($pdo);
+
     if (!orange_table_exists($pdo, 'delivery_areas')) {
         orange_catalog_safe_exec(
             $pdo,
@@ -1698,4 +1718,56 @@ function orange_product_resolve_subcategory_id(PDO $pdo, int $categoryId, $raw):
     }
 
     return [true, $sid, ''];
+}
+
+/**
+ * ترحيل لمرة واحدة: من storefront_home_hero (صف واحد) إلى storefront_copy_lines (صفوف متعددة).
+ */
+function orange_catalog_migrate_legacy_storefront_copy_lines(PDO $pdo): void
+{
+    if (!orange_table_exists($pdo, 'storefront_copy_lines')) {
+        return;
+    }
+    try {
+        $n = (int) $pdo->query('SELECT COUNT(*) FROM storefront_copy_lines')->fetchColumn();
+        if ($n > 0) {
+            return;
+        }
+    } catch (Throwable $e) {
+        return;
+    }
+    if (!orange_table_exists($pdo, 'storefront_home_hero')) {
+        return;
+    }
+    $row = $pdo->query('SELECT * FROM storefront_home_hero WHERE id = 1 LIMIT 1')->fetch(PDO::FETCH_ASSOC);
+    if (!is_array($row)) {
+        return;
+    }
+    try {
+        $ins = $pdo->prepare(
+            'INSERT INTO storefront_copy_lines (scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi)
+             VALUES (?, ?, 1, ?, ?, ?, ?)'
+        );
+        for ($i = 1; $i <= 3; ++$i) {
+            $ar = trim((string) ($row['line_' . $i . '_ar'] ?? ''));
+            $en = trim((string) ($row['line_' . $i . '_en'] ?? ''));
+            $fil = trim((string) ($row['line_' . $i . '_fil'] ?? ''));
+            $hi = trim((string) ($row['line_' . $i . '_hi'] ?? ''));
+            if ($ar === '' && $en === '' && $fil === '' && $hi === '') {
+                continue;
+            }
+            $ins->execute(['home_hero', $i, $ar, $en, $fil, $hi]);
+        }
+        $har = trim((string) ($row['header_tagline_ar'] ?? ''));
+        $hen = trim((string) ($row['header_tagline_en'] ?? ''));
+        $hfil = trim((string) ($row['header_tagline_fil'] ?? ''));
+        $hhi = trim((string) ($row['header_tagline_hi'] ?? ''));
+        if ($har !== '' || $hen !== '' || $hfil !== '' || $hhi !== '') {
+            $ins->execute(['header_tagline', 1, $har, $hen, $hfil, $hhi]);
+        }
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] migrate storefront_copy_lines: ' . $e->getMessage());
+        }
+    }
 }
