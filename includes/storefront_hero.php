@@ -115,18 +115,6 @@ function orange_storefront_home_hero_lines_resolved(PDO $pdo, string $lang): arr
         }
     }
 
-    if ($out === []) {
-        $translations = get_translations();
-        $b = $translations[$lang] ?? $translations['en'];
-        $fallback = array_values(array_filter([
-            (string) ($b['home_hero_line_1'] ?? ''),
-            (string) ($b['home_hero_line_2'] ?? ''),
-            (string) ($b['home_hero_line_3'] ?? ''),
-        ], static fn ($s) => trim((string) $s) !== ''));
-
-        return orange_storefront_copy_pad_rotation($fallback);
-    }
-
     return orange_storefront_copy_pad_rotation($out);
 }
 
@@ -184,12 +172,6 @@ function orange_storefront_header_tagline_cycle_resolved(PDO $pdo, string $lang)
     }
 
     if ($out === []) {
-        $tr = get_translations();
-        $one = (string) ($tr[$lang]['storefront_tagline'] ?? '');
-        if ($one !== '') {
-            return [$one, $one];
-        }
-
         return ['', ''];
     }
 

@@ -1721,50 +1721,151 @@ function orange_product_resolve_subcategory_id(PDO $pdo, int $categoryId, $raw):
 }
 
 /**
- * ترحيل لمرة واحدة: من storefront_home_hero (صف واحد) إلى storefront_copy_lines (صفوف متعددة).
+ * عدد صفوف نطاق معيّن في storefront_copy_lines.
+ */
+function orange_catalog_count_storefront_copy_scope(PDO $pdo, string $scope): int
+{
+    try {
+        $st = $pdo->prepare('SELECT COUNT(*) FROM storefront_copy_lines WHERE scope = ?');
+        $st->execute([$scope]);
+
+        return (int) $st->fetchColumn();
+    } catch (Throwable $e) {
+        return PHP_INT_MAX;
+    }
+}
+
+/**
+ * قيم أولية لـ storefront_copy_lines (مصدر واحد للتثبيت؛ العرض من الجدول فقط).
+ *
+ * @return array{home_hero: list<array{ar:string,en:string,fil:string,hi:string}>, header_tagline: array{ar:string,en:string,fil:string,hi:string}}
+ */
+function orange_catalog_builtin_storefront_copy_defaults(): array
+{
+    return [
+        'home_hero' => [
+            [
+                'ar' => 'كل ما تبحث عنه ... في مكان واحد',
+                'en' => "Everything you're looking for ... in one place",
+                'fil' => 'Lahat ng iyong hinahanap ... sa iisang lugar',
+                'hi' => 'वह सब कुछ जो आप ढूंढ रहे हैं ... एक ही जगह पर।',
+            ],
+            [
+                'ar' => 'تسوق براحة بال • دفع عند الاستلام • إرجاع سهل',
+                'en' => 'Shop with Peace of Mind • COD • Easy Returns',
+                'fil' => 'Kampanteng Pagbili • COD • Madaling Return',
+                'hi' => 'निश्चिंत होकर खरीदारी • कैश ऑन डिलीवरी • आसान रिटर्न',
+            ],
+            [
+                'ar' => 'وفر أكثر • أقل سعر • أسرع توصيل',
+                'en' => 'Save More • Best Price • Fast Delivery',
+                'fil' => 'Makatipid Pa • Murang Presyo • Mabilis na Delivery',
+                'hi' => 'अधिक बचत • सबसे कम दाम • तेज़ डिलीवरी',
+            ],
+        ],
+        'header_tagline' => [
+            'ar' => 'كل ما تتمناه ... في مكان واحد.',
+            'en' => 'Everything you wish for ... in one place.',
+            'fil' => 'Lahat ng gusto mo ... sa isang lugar.',
+            'hi' => 'जो कुछ भी आप चाहें ... एक ही जगह पर।',
+        ],
+    ];
+}
+
+/**
+ * إن بقي النطاق فارغاً بعد الترحيل من الجدول القديم، نملأ القيم المدمجة (مرة واحدة عند أول تشغيل).
+ */
+function orange_catalog_seed_storefront_copy_defaults_if_empty(PDO $pdo): void
+{
+    if (!orange_table_exists($pdo, 'storefront_copy_lines')) {
+        return;
+    }
+
+    $defaults = orange_catalog_builtin_storefront_copy_defaults();
+
+    try {
+        if (orange_catalog_count_storefront_copy_scope($pdo, 'home_hero') === 0) {
+            $ins = $pdo->prepare(
+                'INSERT INTO storefront_copy_lines (scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi)
+                 VALUES (?, ?, 1, ?, ?, ?, ?)'
+            );
+            foreach ($defaults['home_hero'] as $idx => $line) {
+                $ins->execute([
+                    'home_hero',
+                    $idx + 1,
+                    $line['ar'],
+                    $line['en'],
+                    $line['fil'],
+                    $line['hi'],
+                ]);
+            }
+        }
+
+        if (orange_catalog_count_storefront_copy_scope($pdo, 'header_tagline') === 0) {
+            $t = $defaults['header_tagline'];
+            $ins = $pdo->prepare(
+                'INSERT INTO storefront_copy_lines (scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi)
+                 VALUES (?, ?, 1, ?, ?, ?, ?)'
+            );
+            $ins->execute(['header_tagline', 1, $t['ar'], $t['en'], $t['fil'], $t['hi']]);
+        }
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] seed storefront_copy_lines: ' . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * ترحيل من storefront_home_hero إلى storefront_copy_lines — لكل نطاق على حدة (لا يتوقف إن وُجدت صفوف لنطاق آخر).
  */
 function orange_catalog_migrate_legacy_storefront_copy_lines(PDO $pdo): void
 {
     if (!orange_table_exists($pdo, 'storefront_copy_lines')) {
         return;
     }
+
     try {
-        $n = (int) $pdo->query('SELECT COUNT(*) FROM storefront_copy_lines')->fetchColumn();
-        if ($n > 0) {
-            return;
-        }
-    } catch (Throwable $e) {
-        return;
-    }
-    if (!orange_table_exists($pdo, 'storefront_home_hero')) {
-        return;
-    }
-    $row = $pdo->query('SELECT * FROM storefront_home_hero WHERE id = 1 LIMIT 1')->fetch(PDO::FETCH_ASSOC);
-    if (!is_array($row)) {
-        return;
-    }
-    try {
-        $ins = $pdo->prepare(
-            'INSERT INTO storefront_copy_lines (scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi)
-             VALUES (?, ?, 1, ?, ?, ?, ?)'
-        );
-        for ($i = 1; $i <= 3; ++$i) {
-            $ar = trim((string) ($row['line_' . $i . '_ar'] ?? ''));
-            $en = trim((string) ($row['line_' . $i . '_en'] ?? ''));
-            $fil = trim((string) ($row['line_' . $i . '_fil'] ?? ''));
-            $hi = trim((string) ($row['line_' . $i . '_hi'] ?? ''));
-            if ($ar === '' && $en === '' && $fil === '' && $hi === '') {
-                continue;
+        if (orange_catalog_count_storefront_copy_scope($pdo, 'home_hero') === 0
+            && orange_table_exists($pdo, 'storefront_home_hero')) {
+            $row = $pdo->query('SELECT * FROM storefront_home_hero WHERE id = 1 LIMIT 1')->fetch(PDO::FETCH_ASSOC);
+            if (is_array($row)) {
+                $ins = $pdo->prepare(
+                    'INSERT INTO storefront_copy_lines (scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi)
+                     VALUES (?, ?, 1, ?, ?, ?, ?)'
+                );
+                for ($i = 1; $i <= 3; ++$i) {
+                    $ar = trim((string) ($row['line_' . $i . '_ar'] ?? ''));
+                    $en = trim((string) ($row['line_' . $i . '_en'] ?? ''));
+                    $fil = trim((string) ($row['line_' . $i . '_fil'] ?? ''));
+                    $hi = trim((string) ($row['line_' . $i . '_hi'] ?? ''));
+                    if ($ar === '' && $en === '' && $fil === '' && $hi === '') {
+                        continue;
+                    }
+                    $ins->execute(['home_hero', $i, $ar, $en, $fil, $hi]);
+                }
             }
-            $ins->execute(['home_hero', $i, $ar, $en, $fil, $hi]);
         }
-        $har = trim((string) ($row['header_tagline_ar'] ?? ''));
-        $hen = trim((string) ($row['header_tagline_en'] ?? ''));
-        $hfil = trim((string) ($row['header_tagline_fil'] ?? ''));
-        $hhi = trim((string) ($row['header_tagline_hi'] ?? ''));
-        if ($har !== '' || $hen !== '' || $hfil !== '' || $hhi !== '') {
-            $ins->execute(['header_tagline', 1, $har, $hen, $hfil, $hhi]);
+
+        if (orange_catalog_count_storefront_copy_scope($pdo, 'header_tagline') === 0
+            && orange_table_exists($pdo, 'storefront_home_hero')) {
+            $row = $pdo->query('SELECT * FROM storefront_home_hero WHERE id = 1 LIMIT 1')->fetch(PDO::FETCH_ASSOC);
+            if (is_array($row)) {
+                $har = trim((string) ($row['header_tagline_ar'] ?? ''));
+                $hen = trim((string) ($row['header_tagline_en'] ?? ''));
+                $hfil = trim((string) ($row['header_tagline_fil'] ?? ''));
+                $hhi = trim((string) ($row['header_tagline_hi'] ?? ''));
+                if ($har !== '' || $hen !== '' || $hfil !== '' || $hhi !== '') {
+                    $ins = $pdo->prepare(
+                        'INSERT INTO storefront_copy_lines (scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi)
+                         VALUES (?, ?, 1, ?, ?, ?, ?)'
+                    );
+                    $ins->execute(['header_tagline', 1, $har, $hen, $hfil, $hhi]);
+                }
+            }
         }
+
+        orange_catalog_seed_storefront_copy_defaults_if_empty($pdo);
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] migrate storefront_copy_lines: ' . $e->getMessage());
