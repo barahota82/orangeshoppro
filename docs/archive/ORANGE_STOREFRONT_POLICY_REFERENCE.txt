@@ -2,7 +2,7 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 ================================================================
 المسار: docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt
 تاريخ حفظ الأرشيف: 2026-04-19
-آخر تحديث (س4 + س5–س8 تسجيل + س13 تابات + س30 بنود الطلب + س13 بريد بعد التتبع + س18 كود الدولة عربة/تسجيل + س19 بريد الضيف في العربة + س25–س26 + س7 + س28 + أدمن العروض): 2026-04-19
+آخر تحديث (س4 + س5–س8 تسجيل + س13 تابات + س30 بنود الطلب + س13 بريد بعد التتبع + س19 بريد الضيف في العربة + س25–س26 + س7 + س28 + أدمن العروض): 2026-04-19
 
 الغرض
 -------
@@ -78,7 +78,6 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 حرة) لتوحيد التسجيل؛ شاشة أدمن لإضافة المناطق؛ تقارير مبيعات بالمنطقة. في الواجهة
 العربية تظهر المنطقة عربياً؛ في باقي اللغات الثلاث تظهر إنجليزي؛ في الأدمن تسجيل عربي
 وترجمة تلقائية إنجليزي فقط. العنوان يسجله العميل.
-**تنفيذ (نموذج التسجيل):** `pages/register.php` — `#reg_phone_country` عبر `orange_storefront_render_phone_country_select()` و`#reg_phone`؛ التطبيع `orangeNormalizeCustomerPhone` ثم إرسال `phone` و`phone_country` إلى `api/auth/request-email-verify.php`؛ استبدال `#reg_area` بقائمة مناطق عند توفر `window.ORANGE_DELIVERY_AREAS` (كما في العربة).
 **تنفيذ (تقارير المناطق):** صفحة **التقارير** في الأدمن (`admin/pages/reports.php`) — جدول «مبيعات مكتملة حسب منطقة التوصيل»
 (طلبات `completed`؛ تسمية المنطقة من `delivery_areas.name_ar` عند وجود `orders.delivery_area_id`، وإلا من نص `orders.area`).
 
@@ -136,7 +135,6 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 
 س18. الهاتف إلزامي؟ تطبيع؟
 إلزامي بصيغة دولية؛ اختيار كود الدولة من القائمة.
-**تنفيذ:** نموذج الطلب في `pages/cart.php` (`#customer_phone_country` + `#customer_phone`)؛ نموذج التسجيل في `pages/register.php` (`#reg_phone_country` + `#reg_phone`)؛ المكوّن `includes/storefront_phone_country_select.php`؛ التطبيع `assets/js/input-constraints.js` (`orangeNormalizeCustomerPhone`)؛ إرسال `phone_country` من الواجهة حيث ينطبق (مثل `assets/js/cart.js` و`request-email-verify.php`).
 
 س19. البريد في الطلب كضيف؟
 اختياري.
