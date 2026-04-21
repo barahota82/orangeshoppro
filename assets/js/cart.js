@@ -1628,6 +1628,16 @@ function orangeRenderTrackSignupSummary(el, order, orderNumber, phoneTyped, item
     if (!canCancel && st !== 'cancelled' && st !== 'rejected') {
         html += '<p class="track-signup-order-summary__hint cart-cancel-hint">' + orangeEscDomText(UI.cancel_not_allowed || '') + '</p>';
     }
+    if (document.getElementById('track-no-signup-section')) {
+        const anotherLblSu = L.track_another_order || '';
+        if (anotherLblSu) {
+            html += '<p class="track-order-another-wrap">';
+            html +=
+                '<button type="button" class="btn btn-ghost track-order-another-btn" onclick="orangeScrollTrackAnotherOrder()">';
+            html += orangeEscDomText(anotherLblSu);
+            html += '</button></p>';
+        }
+    }
     html += '</div>';
     el.innerHTML = html;
 }
