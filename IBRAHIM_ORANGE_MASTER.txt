@@ -1,7 +1,7 @@
 IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
 ============================================
 النسخة المعتمدة: جذر المستودع — IBRAHIM_ORANGE_MASTER.txt (مثلاً D:\orange)
-آخر تحديث: 2026-04-23 (§10: مرجع كود س25/س26؛ س13: قائمة طلبات الضيف في العربة)
+آخر تحديث: 2026-04-23 (§10: مرجع كود س25/س26؛ س13: طلبات الضيف؛ س8: تقرير مبيعات بالمنطقة في التقارير)
 
 الغرض
 -------
@@ -162,6 +162,7 @@ IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
 - تاب «طلباتي» للضيف (س13): جلسة `orange_sf_guest_recent_phone` في `includes/storefront_account.php`؛
   API `api/orders/list-guest-storefront-orders.php`؛ تعبئة الجلسة من `create-order.php`، `intake-status.php`، `amend-order-items.php`؛
   واجهة `pages/cart.php` + `assets/js/cart.js`.
+- تقرير مبيعات حسب منطقة التوصيل (س8): `admin/pages/reports.php` — طلبات مكتملة مجمّعة حسب المنطقة.
 
 
 10) سياسات الواجهة والطلب أونلاين — مرجع إجابات المالك (إلزامي قبل التنفيذ)

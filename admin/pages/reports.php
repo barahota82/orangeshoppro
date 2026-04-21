@@ -1,9 +1,36 @@
 <?php
+
+declare(strict_types=1);
+
 $pdo = db();
 $totalOrders = (int)$pdo->query("SELECT COUNT(*) FROM orders")->fetchColumn();
 $totalSales = (float)$pdo->query("SELECT COALESCE(SUM(total),0) FROM orders WHERE status = 'completed'")->fetchColumn();
 $pending = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'pending'")->fetchColumn();
 $completed = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'completed'")->fetchColumn();
+
+/** @var list<array{area_label: string, order_count: int, revenue_kd: float}> */
+$salesByArea = [];
+if (orange_table_exists($pdo, 'orders')) {
+    $joinDa = orange_table_exists($pdo, 'delivery_areas') && orange_table_has_column($pdo, 'orders', 'delivery_area_id');
+    if ($joinDa) {
+        $areaExpr = "COALESCE(NULLIF(TRIM(da.name_ar), ''), NULLIF(TRIM(o.area), ''), '—')";
+        $sqlArea = "SELECT {$areaExpr} AS area_label, COUNT(*) AS order_count, COALESCE(SUM(o.total), 0) AS revenue_kd
+            FROM orders o
+            LEFT JOIN delivery_areas da ON da.id = o.delivery_area_id
+            WHERE o.status = 'completed'
+            GROUP BY {$areaExpr}
+            ORDER BY revenue_kd DESC";
+        $salesByArea = $pdo->query($sqlArea)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } else {
+        $areaExpr = "COALESCE(NULLIF(TRIM(o.area), ''), '—')";
+        $sqlArea = "SELECT {$areaExpr} AS area_label, COUNT(*) AS order_count, COALESCE(SUM(o.total), 0) AS revenue_kd
+            FROM orders o
+            WHERE o.status = 'completed'
+            GROUP BY {$areaExpr}
+            ORDER BY revenue_kd DESC";
+        $salesByArea = $pdo->query($sqlArea)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+}
 
 $topProducts = $pdo->query("
     SELECT oi.product_name, SUM(oi.qty) AS total_qty
@@ -25,8 +52,39 @@ $topProducts = $pdo->query("
     <div class="card stat-card"><h3>إجمالي الطلبات</h3><div class="value"><?php echo $totalOrders; ?></div></div>
     <div class="card stat-card"><h3>إجمالي المبيعات</h3><div class="value"><?php echo number_format($totalSales,2); ?> KD</div></div>
     <div class="card stat-card"><h3>Pending</h3><div class="value"><?php echo $pending; ?></div></div>
-    <div class="card stat-card"><h3>Delivered</h3><div class="value"><?php echo $completed; ?></div></div>
+    <div class="card stat-card"><h3>Delivered</h3><div class="value"><?php echo $completed; ?></div>    </div>
 </div>
+
+<?php if (orange_table_exists($pdo, 'orders')): ?>
+<div class="card">
+    <h3>مبيعات مكتملة حسب منطقة التوصيل</h3>
+    <p class="card-hint" style="margin:0 0 0.75rem;">حسب سياسة التسجيل: تجميع الطلبات المسلّمة (<code>completed</code>) — الاسم من جدول المناطق عند توفر <code>delivery_area_id</code>، وإلا نص المنطقة المحفوظ على الطلب.</p>
+    <?php if ($salesByArea === []): ?>
+        <p class="page-subtitle" style="margin-top:0;">لا توجد طلبات مكتملة بعد لعرض تفصيل المناطق.</p>
+    <?php else: ?>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>المنطقة</th>
+                    <th>عدد الطلبات</th>
+                    <th>إجمالي الإيراد (KD)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($salesByArea as $ar): ?>
+                <tr>
+                    <td><?php echo htmlspecialchars((string)($ar['area_label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo (int)($ar['order_count'] ?? 0); ?></td>
+                    <td><?php echo number_format((float)($ar['revenue_kd'] ?? 0), 3); ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
 
 <div class="card">
     <h3>أكثر المنتجات مبيعًا</h3>
