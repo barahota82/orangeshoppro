@@ -81,17 +81,27 @@ try {
         }
         if ($me['status'] === 'completed') {
             $totalVal = 0.0;
+            $promoDisc = 0.0;
             $oid = (int) ($me['order_id'] ?? 0);
             if ($oid > 0) {
-                $totSt = $pdo->prepare('SELECT total FROM orders WHERE id = ? LIMIT 1');
+                if (orange_table_has_column($pdo, 'orders', 'cart_promotion_discount')) {
+                    $totSt = $pdo->prepare('SELECT total, cart_promotion_discount FROM orders WHERE id = ? LIMIT 1');
+                } else {
+                    $totSt = $pdo->prepare('SELECT total FROM orders WHERE id = ? LIMIT 1');
+                }
                 $totSt->execute([$oid]);
-                $totalVal = (float) $totSt->fetchColumn();
+                $rowTot = $totSt->fetch(PDO::FETCH_ASSOC);
+                if ($rowTot) {
+                    $totalVal = (float) ($rowTot['total'] ?? 0);
+                    $promoDisc = (float) ($rowTot['cart_promotion_discount'] ?? 0);
+                }
             }
             json_response([
                 'success' => true,
                 'order_id' => $oid,
                 'order_number' => (string) $me['order_number'],
                 'total' => $totalVal,
+                'promotion_discount' => $promoDisc,
                 'whatsapp_number' => (string) $me['whatsapp_number'],
                 'whatsapp_url' => (string) $me['whatsapp_url'],
                 'intake_token' => $publicToken,

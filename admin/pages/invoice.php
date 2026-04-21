@@ -157,7 +157,12 @@ if (!$order) {
 }
 
 $orderTotalVal = $order ? (float)$order['total'] : 0.0;
-$linesMismatch = $order && abs($linesSubtotal - $orderTotalVal) > 0.009;
+$cartPromoDisc = 0.0;
+if ($order && orange_table_has_column($pdo, 'orders', 'cart_promotion_discount')) {
+    $cartPromoDisc = max(0.0, (float)($order['cart_promotion_discount'] ?? 0));
+}
+$linesExpectedNet = round($linesSubtotal - $cartPromoDisc, 4);
+$linesMismatch = $order && abs($linesExpectedNet - $orderTotalVal) > 0.009;
 $amountPaidVal = 0.0;
 if ($order && orange_table_has_column($pdo, 'orders', 'amount_paid')) {
     $amountPaidVal = max(0.0, (float) ($order['amount_paid'] ?? 0));
@@ -254,6 +259,7 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
     }
     .invoice-totals-row { display: flex; justify-content: space-between; gap: 1rem; padding: 0.25rem 0; }
     .invoice-totals-row.grand { font-weight: 700; font-size: 1.05rem; border-top: 1px solid #e2e8f0; margin-top: 0.35rem; padding-top: 0.5rem; }
+    .invoice-totals-row--cart-promo { color: #0f766e; font-weight: 600; }
     .invoice-footer-legal {
         margin-top: 1.25rem;
         padding-top: 1rem;
@@ -564,7 +570,13 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
         </div>
 
         <?php if ($linesMismatch): ?>
-            <div class="invoice-warn">تنبيه: مجموع بنود الفاتورة (<?php echo number_format($linesSubtotal, 2); ?> KD) يختلف عن إجمالي الطلب المحفوظ (<?php echo number_format($orderTotalVal, 2); ?> KD). راجع الطلب أو الخصومات.</div>
+            <div class="invoice-warn">تنبيه: <?php
+            if ($cartPromoDisc > 0.00001) {
+                echo 'المتوقع من البنود بعد خصم عرض السلة: ' . number_format($linesSubtotal, 2) . ' − ' . number_format($cartPromoDisc, 2) . ' = ' . number_format($linesExpectedNet, 2) . ' KD — ';
+            } else {
+                echo 'صافي البنود ' . number_format($linesSubtotal, 2) . ' KD — ';
+            }
+            ?>لا يطابق إجمالي الطلب المحفوظ (<?php echo number_format($orderTotalVal, 2); ?> KD). راجع الطلب أو الخصومات.</div>
         <?php endif; ?>
 
         <table class="invoice-table">
@@ -607,6 +619,12 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
                     <span>صافي البنود</span>
                     <span><?php echo number_format($linesSubtotal, 3); ?> KD</span>
                 </div>
+                <?php if ($cartPromoDisc > 0.00001): ?>
+                <div class="invoice-totals-row invoice-totals-row--cart-promo">
+                    <span>خصم عرض السلة</span>
+                    <span>−<?php echo number_format($cartPromoDisc, 3); ?> KD</span>
+                </div>
+                <?php endif; ?>
                 <div class="invoice-totals-row grand">
                     <span>إجمالي الفاتورة</span>
                     <span><?php echo number_format($orderTotalVal, 3); ?> KD</span>

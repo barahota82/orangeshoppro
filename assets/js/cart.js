@@ -780,9 +780,16 @@ function orangeFinishCheckoutSuccess(result) {
         localStorage.removeItem('cart');
     } catch (e) {}
     window.open(result.whatsapp_url, '_blank');
-    const okMsg =
-        (window.APP_T.order_number || 'Order Number') + ': ' + String(result.order_number || '');
-    orangeShowToast(okMsg, 3400);
+    const T = window.APP_T || {};
+    let okMsg = (T.order_number || 'Order Number') + ': ' + String(result.order_number || '');
+    if (typeof result.total === 'number' && Number.isFinite(result.total)) {
+        okMsg += ' · ' + (T.cart_total_label || 'Total') + ' ' + formatMoney(result.total);
+    }
+    const pd = typeof result.promotion_discount === 'number' ? result.promotion_discount : 0;
+    if (pd > 1e-6) {
+        okMsg += ' · ' + (T.cart_promotion_discount_label || '') + ' −' + Number(pd).toFixed(2) + ' KD';
+    }
+    orangeShowToast(okMsg, Math.max(3400, okMsg.length > 72 ? 4800 : 3400));
     setTimeout(() => {
         location.reload();
     }, 3000);
