@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../includes/storefront_account.php';
 require_once __DIR__ . '/../../includes/orange_mail.php';
 require_once __DIR__ . '/../../includes/phone_validation.php';
 require_once __DIR__ . '/../../includes/delivery_areas.php';
+require_once __DIR__ . '/../../includes/storefront_order_email.php';
 
 try {
     $pdo = db();
@@ -49,6 +50,9 @@ try {
     $channelSlug = isset($data['channel']) ? (string) $data['channel'] : '';
     $channelSlug = orange_storefront_valid_channel_slug($pdo, $channelSlug);
 
+    /** @var list<array<string, mixed>>|null */
+    $trackSignupItemsForMail = null;
+
     if ($trackCtx) {
         $vphNorm = orange_normalize_customer_phone($orderVerifyPhone, null);
         if ($vphNorm === null) {
@@ -64,6 +68,9 @@ try {
         if (!orange_order_phones_match_for_lookup($orderVerifyPhone, (string) ($orderRow['phone'] ?? ''))) {
             json_response(['success' => false, 'code' => 'order_link_mismatch', 'message' => t('track_signup_order_mismatch')], 404);
         }
+        $itemsMailStmt = $pdo->prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY id ASC');
+        $itemsMailStmt->execute([(int) ($orderRow['id'] ?? 0)]);
+        $trackSignupItemsForMail = $itemsMailStmt->fetchAll(PDO::FETCH_ASSOC);
         if ($phoneRaw !== '') {
             $regCc2 = trim((string) ($data['phone_country'] ?? ''));
             $regCc2 = $regCc2 === '' ? null : $regCc2;
@@ -263,6 +270,15 @@ try {
     $subjEn = 'Confirm your registration — Orange';
     $subjAr = 'تأكيد التسجيل — Orange';
     $body = "English:\nConfirm your email by opening this link (valid 48 hours):\n{$link}\n\n---\nالعربية:\nلتأكيد بريدك افتح الرابط (صالح 48 ساعة):\n{$link}\n";
+
+    if ($trackCtx && $trackSignupItemsForMail !== null && $orderNumberLink !== '') {
+        $ordM = $pdo->prepare('SELECT * FROM orders WHERE order_number = ? LIMIT 1');
+        $ordM->execute([$orderNumberLink]);
+        $orderMailRow = $ordM->fetch(PDO::FETCH_ASSOC);
+        if (is_array($orderMailRow)) {
+            $body .= orange_storefront_order_details_bilingual_email_appendix($orderMailRow, $trackSignupItemsForMail);
+        }
+    }
 
     if (!orange_mail_send_text($email, $subjEn . ' / ' . $subjAr, $body)) {
         if (function_exists('error_log')) {
