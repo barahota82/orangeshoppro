@@ -1479,6 +1479,14 @@ function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, 
 }
 
 function orangeScrollTrackAnotherOrder() {
+    const resultBox = document.getElementById('trackResult');
+    if (resultBox) {
+        resultBox.innerHTML = '';
+    }
+    try {
+        window.__orangeCartTrack = null;
+    } catch (e0) {}
+
     const target = document.getElementById('track-no-signup-section');
     if (target && typeof target.scrollIntoView === 'function') {
         try {
@@ -1491,6 +1499,9 @@ function orangeScrollTrackAnotherOrder() {
     if (numEl && typeof numEl.focus === 'function') {
         try {
             numEl.focus();
+            if (typeof numEl.select === 'function') {
+                numEl.select();
+            }
         } catch (e2) {}
     }
 }
