@@ -1141,14 +1141,12 @@ async function sendOrderNow() {
 
     const amend = window.__orangePendingAmend;
     if (amend && amend.order_number) {
-        const ccElAm = document.getElementById('customer_phone_country');
-        const ccValAm = ccElAm && ccElAm.value ? String(ccElAm.value) : '';
         const phoneRawAm = document.getElementById('customer_phone')
             ? document.getElementById('customer_phone').value.trim()
             : '';
         const phoneNormAm =
             typeof window.orangeNormalizeCustomerPhone === 'function'
-                ? window.orangeNormalizeCustomerPhone(phoneRawAm, ccValAm || null)
+                ? window.orangeNormalizeCustomerPhone(phoneRawAm, null)
                 : null;
         const amendNorm =
             typeof window.orangeNormalizeCustomerPhone === 'function'
@@ -1232,14 +1230,12 @@ async function sendOrderNow() {
 
     const emailEl = document.getElementById('customer_email');
     const emailRaw = emailEl ? emailEl.value.trim() : '';
-    const ccEl = document.getElementById('customer_phone_country');
-    const ccVal = ccEl && ccEl.value ? String(ccEl.value) : '';
     const phoneRaw = document.getElementById('customer_phone')
         ? document.getElementById('customer_phone').value.trim()
         : '';
     const phoneNorm =
         typeof window.orangeNormalizeCustomerPhone === 'function'
-            ? window.orangeNormalizeCustomerPhone(phoneRaw, ccVal || null)
+            ? window.orangeNormalizeCustomerPhone(phoneRaw, null)
             : null;
     const areaEl = document.getElementById('customer_area');
     let deliveryAreaId = 0;
@@ -1254,7 +1250,6 @@ async function sendOrderNow() {
     const payload = {
         name: document.getElementById('customer_name').value.trim(),
         phone: phoneNorm || phoneRaw,
-        phone_country: ccVal,
         email: emailRaw,
         area: areaVal,
         delivery_area_id: deliveryAreaId,
@@ -1735,15 +1730,11 @@ function orangeScrollTrackAnotherOrder() {
 
     const numEl = document.getElementById('track_order_number');
     const phEl = document.getElementById('track_phone');
-    const phCcEl = document.getElementById('track_phone_country');
     if (numEl) {
         numEl.value = '';
     }
     if (phEl) {
         phEl.value = '';
-    }
-    if (phCcEl) {
-        phCcEl.value = '';
     }
 
     const target = document.getElementById('track-no-signup-section');
