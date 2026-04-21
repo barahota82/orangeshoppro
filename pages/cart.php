@@ -114,6 +114,10 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
                     <input id="customer_phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="22" placeholder="<?php echo htmlspecialchars(t('phone_field_hint'), ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
                 </div>
                 <div class="field">
+                    <label for="customer_email"><?php echo htmlspecialchars(t('customer_email'), ENT_QUOTES, 'UTF-8'); ?> <span class="form-optional-hint">(<?php echo htmlspecialchars(t('field_optional_short'), ENT_QUOTES, 'UTF-8'); ?>)</span></label>
+                    <input id="customer_email" type="email" autocomplete="email" maxlength="255" dir="ltr" lang="en">
+                </div>
+                <div class="field">
                     <label for="customer_area"><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <input id="customer_area" autocomplete="address-level1" maxlength="500">
                 </div>
