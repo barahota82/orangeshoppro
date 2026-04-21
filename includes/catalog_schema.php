@@ -1269,6 +1269,11 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_orders_customer_id ON orders (customer_id)');
     }
 
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'storefront_account_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE orders ADD COLUMN storefront_account_id INT UNSIGNED NULL DEFAULT NULL');
+        orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_orders_storefront_account_id ON orders (storefront_account_id)');
+    }
+
     if (!orange_table_exists($pdo, 'party_subledger') && orange_table_exists($pdo, 'journal_vouchers')) {
         orange_catalog_safe_exec(
             $pdo,

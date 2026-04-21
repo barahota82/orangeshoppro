@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/order_helpers.php';
 require_once __DIR__ . '/../../includes/order_intake_queue.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/phone_validation.php';
+require_once __DIR__ . '/../../includes/storefront_account.php';
 
 try {
     $pdo = db();
@@ -28,6 +29,13 @@ try {
         json_response(['success' => false, 'code' => 'invalid_phone', 'message' => t('checkout_invalid_phone')], 422);
     }
     $data['phone'] = $phoneNorm;
+
+    $accSf = current_storefront_account($pdo);
+    if ($accSf && !empty($accSf['customer_phone'])) {
+        if (orange_order_phones_match_for_lookup($data['phone'], (string) $accSf['customer_phone'])) {
+            $data['storefront_account_id'] = (int) $accSf['id'];
+        }
+    }
 
     if (!is_array($data['items']) || count($data['items']) === 0) {
         json_response(['success' => false, 'code' => 'cart_items_required', 'message' => t('checkout_cart_items_required')], 422);

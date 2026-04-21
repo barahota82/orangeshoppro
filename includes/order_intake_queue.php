@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/order_helpers.php';
 require_once __DIR__ . '/order_stock.php';
 require_once __DIR__ . '/catalog_schema.php';
+require_once __DIR__ . '/storefront_account.php';
 
 function orange_order_intake_snip_message(string $msg, int $max = 500): string
 {
@@ -312,6 +313,11 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     $hasSource = orange_table_has_column($pdo, 'orders', 'order_source');
     $hasPay = orange_table_has_column($pdo, 'orders', 'payment_terms');
     $hasCustomerId = orange_table_has_column($pdo, 'orders', 'customer_id');
+    $hasSfa = orange_table_has_column($pdo, 'orders', 'storefront_account_id');
+    $sfaLink = null;
+    if ($hasSfa && isset($data['storefront_account_id'])) {
+        $sfaLink = orange_storefront_resolve_order_account_link($pdo, (int) $data['storefront_account_id'], $data['phone']);
+    }
 
     $customerRowId = orange_storefront_upsert_customer_from_checkout(
         $pdo,
@@ -350,6 +356,11 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         $cols .= ', customer_id';
         $ph .= ', ?';
         $params[] = $customerRowId;
+    }
+    if ($hasSfa && $sfaLink !== null && $sfaLink > 0) {
+        $cols .= ', storefront_account_id';
+        $ph .= ', ?';
+        $params[] = $sfaLink;
     }
     $cols .= ', created_at';
     $ph .= ', NOW()';

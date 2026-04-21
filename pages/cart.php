@@ -3,13 +3,51 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/catalog_schema.php';
+require_once __DIR__ . '/../includes/storefront_account.php';
+
+$pdoCartAcc = db();
+orange_catalog_ensure_schema($pdoCartAcc);
+$cartSfAccount = current_storefront_account($pdoCartAcc);
+$cartSfLoggedIn = $cartSfAccount !== null;
+
 include __DIR__ . '/../includes/header.php';
 $cartHomeUrl = storefront_url('home', $channelSlug, $lang);
 $tabBasketLabel = t('cart_tab_basket');
 $tabOrdersLabel = t('cart_tab_my_orders');
+$tabDeliveredLabel = t('cart_tab_delivered');
 $checkoutTitle = t('cart_checkout_title');
 $checkoutIntro = t('cart_checkout_intro');
 $proceedLabel = t('cart_proceed_to_order');
+
+$orangeOrderStatusLabelsCart = [
+    'pending' => t('order_status_pending'),
+    'approved' => t('order_status_approved'),
+    'on_the_way' => t('order_status_on_the_way'),
+    'completed' => t('order_status_completed'),
+    'rejected' => t('order_status_rejected'),
+    'cancelled' => t('order_status_cancelled'),
+];
+$orangeMyOrderUiCart = [
+    'status_label' => t('order_status_label'),
+    'order_total_label' => t('order_total_label'),
+    'currency' => t('currency_kd'),
+    'cancel' => t('customer_cancel_order'),
+    'cancel_confirm' => t('customer_cancel_confirm'),
+    'cancel_ok' => t('customer_cancel_ok'),
+    'cancel_err' => t('customer_cancel_err'),
+    'cancel_not_allowed' => t('customer_cancel_not_allowed'),
+    'whatsapp_help' => t('customer_whatsapp_help'),
+    'whatsapp_prefill' => t('whatsapp_order_prefill'),
+    'payment_label' => t('order_payment_terms_label'),
+    'payment_cash' => t('payment_cash'),
+    'payment_credit' => t('payment_credit'),
+    'payment_online' => t('payment_online'),
+];
+$cartTabAria = $cartSfLoggedIn
+    ? ($tabBasketLabel . ' / ' . $tabOrdersLabel . ' / ' . $tabDeliveredLabel)
+    : ($tabBasketLabel . ' / ' . $tabOrdersLabel);
+$cartWaHref = storefront_whatsapp_href($channel, '');
 ?>
 <div class="container">
     <div class="page-title-box cart-page-head">
@@ -17,7 +55,7 @@ $proceedLabel = t('cart_proceed_to_order');
         <a class="cart-page-close" href="<?php echo htmlspecialchars($cartHomeUrl, ENT_QUOTES, 'UTF-8'); ?>" aria-label="<?php echo htmlspecialchars(t('cart_close'), ENT_QUOTES, 'UTF-8'); ?>"><span aria-hidden="true">&times;</span></a>
     </div>
 
-    <div class="cart-page-tabs" role="tablist" aria-label="<?php echo htmlspecialchars($tabBasketLabel . ' / ' . $tabOrdersLabel, ENT_QUOTES, 'UTF-8'); ?>">
+    <div class="cart-page-tabs" role="tablist" aria-label="<?php echo htmlspecialchars($cartTabAria, ENT_QUOTES, 'UTF-8'); ?>">
         <button type="button" class="cart-page-tab" role="tab" id="cart-tab-basket" aria-selected="true" aria-controls="cart-panel-basket">
             <span class="cart-page-tab__label"><?php echo htmlspecialchars($tabBasketLabel, ENT_QUOTES, 'UTF-8'); ?></span>
             <span class="cart-page-tab__count" id="cartTabBasketCount" hidden>0</span>
@@ -25,6 +63,11 @@ $proceedLabel = t('cart_proceed_to_order');
         <button type="button" class="cart-page-tab" role="tab" id="cart-tab-orders" aria-selected="false" aria-controls="cart-panel-orders" tabindex="-1">
             <?php echo htmlspecialchars($tabOrdersLabel, ENT_QUOTES, 'UTF-8'); ?>
         </button>
+        <?php if ($cartSfLoggedIn): ?>
+        <button type="button" class="cart-page-tab" role="tab" id="cart-tab-delivered" aria-selected="false" aria-controls="cart-panel-delivered" tabindex="-1">
+            <?php echo htmlspecialchars($tabDeliveredLabel, ENT_QUOTES, 'UTF-8'); ?>
+        </button>
+        <?php endif; ?>
     </div>
 
     <div id="cart-panel-basket" role="tabpanel" aria-labelledby="cart-tab-basket" class="cart-page-panel cart-page-panel--basket">
@@ -40,6 +83,12 @@ $proceedLabel = t('cart_proceed_to_order');
 
     <div id="cart-panel-orders" role="tabpanel" aria-labelledby="cart-tab-orders" class="cart-page-panel cart-page-panel--orders" hidden>
         <div class="cart-orders-stack">
+            <?php if ($cartSfLoggedIn): ?>
+            <div class="card-box cart-account-orders-card">
+                <h3 class="cart-account-orders-title"><?php echo htmlspecialchars(t('cart_account_orders_heading_active'), ENT_QUOTES, 'UTF-8'); ?></h3>
+                <div id="cartAccountOrdersActiveMount" class="cart-account-orders-mount" data-bucket="active"></div>
+            </div>
+            <?php endif; ?>
             <div class="card-box cart-checkout-card" id="cartCheckoutCard">
                 <h3 class="cart-section-title"><?php echo htmlspecialchars($checkoutTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
                 <p class="cart-checkout-intro"><?php echo htmlspecialchars($checkoutIntro, ENT_QUOTES, 'UTF-8'); ?></p>
@@ -69,31 +118,69 @@ $proceedLabel = t('cart_proceed_to_order');
             </div>
         </div>
     </div>
+
+    <?php if ($cartSfLoggedIn): ?>
+    <div id="cart-panel-delivered" role="tabpanel" aria-labelledby="cart-tab-delivered" class="cart-page-panel cart-page-panel--delivered" hidden>
+        <div class="card-box cart-account-orders-card">
+            <h3 class="cart-account-orders-title"><?php echo htmlspecialchars(t('cart_account_orders_heading_delivered'), ENT_QUOTES, 'UTF-8'); ?></h3>
+            <div id="cartAccountOrdersDeliveredMount" class="cart-account-orders-mount" data-bucket="delivered"></div>
+        </div>
+    </div>
+    <?php endif; ?>
 </div>
 
 <script>
 window.ORANGE_CART_HOME = <?php echo json_encode(storefront_url('home', $channelSlug, $lang), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.ORANGE_STOREFRONT_WA = <?php echo json_encode($cartWaHref, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.ORANGE_CART_SF_ACCOUNT = <?php echo json_encode(['logged_in' => $cartSfLoggedIn], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.ORANGE_ORDER_STATUS_LABELS = <?php echo json_encode($orangeOrderStatusLabelsCart, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.ORANGE_MY_ORDER_UI = <?php echo json_encode($orangeMyOrderUiCart, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.ORANGE_TRACK_LABELS = window.ORANGE_TRACK_LABELS || {
+    order_number: <?php echo json_encode(t('order_number'), JSON_UNESCAPED_UNICODE); ?>,
+    phone: <?php echo json_encode(t('phone'), JSON_UNESCAPED_UNICODE); ?>,
+    items_title: <?php echo json_encode(t('track_order_items'), JSON_UNESCAPED_UNICODE); ?>
+};
 (function () {
     var TAB_KEY = 'orange_cart_ui_tab';
     var tabBasket = document.getElementById('cart-tab-basket');
     var tabOrders = document.getElementById('cart-tab-orders');
+    var tabDelivered = document.getElementById('cart-tab-delivered');
     var panelBasket = document.getElementById('cart-panel-basket');
     var panelOrders = document.getElementById('cart-panel-orders');
+    var panelDelivered = document.getElementById('cart-panel-delivered');
     if (!tabBasket || !tabOrders || !panelBasket || !panelOrders) return;
 
+    var threeTabs = !!(tabDelivered && panelDelivered);
+
     function showTab(which) {
+        var isBasket = which === 'basket';
         var isOrders = which === 'orders';
-        tabBasket.setAttribute('aria-selected', isOrders ? 'false' : 'true');
+        var isDel = threeTabs && which === 'delivered';
+        tabBasket.setAttribute('aria-selected', isBasket ? 'true' : 'false');
         tabOrders.setAttribute('aria-selected', isOrders ? 'true' : 'false');
-        tabBasket.tabIndex = isOrders ? -1 : 0;
+        if (tabDelivered) {
+            tabDelivered.setAttribute('aria-selected', isDel ? 'true' : 'false');
+        }
+        tabBasket.tabIndex = isBasket ? 0 : -1;
         tabOrders.tabIndex = isOrders ? 0 : -1;
-        panelBasket.hidden = isOrders;
+        if (tabDelivered) {
+            tabDelivered.tabIndex = isDel ? 0 : -1;
+        }
+        panelBasket.hidden = !isBasket;
         panelOrders.hidden = !isOrders;
+        if (panelDelivered) {
+            panelDelivered.hidden = !isDel;
+        }
         try {
             sessionStorage.setItem(TAB_KEY, which);
         } catch (e) {}
-        if (typeof renderCart === 'function' && !isOrders) {
+        if (typeof renderCart === 'function' && isBasket) {
             renderCart();
+        }
+        if (typeof window.orangeCartOnTabShown === 'function') {
+            try {
+                window.orangeCartOnTabShown(which);
+            } catch (e) {}
         }
     }
 
@@ -101,11 +188,16 @@ window.ORANGE_CART_HOME = <?php echo json_encode(storefront_url('home', $channel
 
     tabBasket.addEventListener('click', function () { showTab('basket'); });
     tabOrders.addEventListener('click', function () { showTab('orders'); });
+    if (tabDelivered) {
+        tabDelivered.addEventListener('click', function () { showTab('delivered'); });
+    }
 
     try {
         var saved = sessionStorage.getItem(TAB_KEY);
         if (saved === 'orders') {
             showTab('orders');
+        } else if (saved === 'delivered' && threeTabs) {
+            showTab('delivered');
         }
     } catch (e) {}
 })();

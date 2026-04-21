@@ -150,6 +150,7 @@ try {
     $token = bin2hex(random_bytes(32));
     $hash = hash('sha256', $token);
 
+    $accountIdAfter = 0;
     if (!$row) {
         $ins = $pdo->prepare(
             'INSERT INTO storefront_accounts (email, registered_channel_slug, customer_name, customer_phone, customer_area, customer_address, customer_notes, verify_token_hash, verify_token_expires_at, verify_email_sent_at)
@@ -165,6 +166,7 @@ try {
             $customerNotes,
             $hash,
         ]);
+        $accountIdAfter = (int) $pdo->lastInsertId();
     } else {
         $upd = $pdo->prepare(
             'UPDATE storefront_accounts SET verify_token_hash = ?, verify_token_expires_at = DATE_ADD(NOW(), INTERVAL 48 HOUR), verify_email_sent_at = NOW(),
@@ -182,6 +184,11 @@ try {
             $customerNotes,
             (int) $row['id'],
         ]);
+        $accountIdAfter = (int) $row['id'];
+    }
+
+    if ($trackCtx && $accountIdAfter > 0) {
+        orange_storefront_link_order_to_account_row($pdo, $orderNumberLink, $accountIdAfter);
     }
 
     $rel = storefront_url('verify_email', $channelSlug, $lang, ['token' => $token]);

@@ -1089,6 +1089,140 @@ function orangeScrollTrackResultIntoView(el) {
     }
 }
 
+function orangeCartAccountOrdersListUrl(bucket) {
+    const b = bucket === 'delivered' ? 'delivered' : 'active';
+    return storefrontApiUrl('/api/orders/list-storefront-orders.php?bucket=' + encodeURIComponent(b));
+}
+
+function orangeCartRenderAccountOrderCard(row) {
+    const labels = window.ORANGE_ORDER_STATUS_LABELS || {};
+    const UI = window.ORANGE_MY_ORDER_UI || {};
+    const L = window.ORANGE_TRACK_LABELS || {};
+    const st = String(row.status || '').toLowerCase().trim();
+    const statusText = labels[st] || row.status || '—';
+    const canCancel = st === 'pending' || st === 'approved';
+    const cur = String(UI.currency || 'KD');
+    const lblOrder = L.order_number || 'Order #';
+    const lblPhone = L.phone || 'Phone';
+    const onum = String(row.order_number || '');
+    const ph = String(row.phone || '');
+    let waUrl = '';
+    const prefillRaw = String(UI.whatsapp_prefill || '').replace(/\{order\}/g, onum);
+    const waBase = window.ORANGE_STOREFRONT_WA;
+    if (waBase && typeof waBase === 'string') {
+        const q = waBase.indexOf('?');
+        const path = q >= 0 ? waBase.substring(0, q) : waBase;
+        waUrl = path + '?text=' + encodeURIComponent(prefillRaw);
+    }
+    const pt = String(row.payment_terms || 'cash').toLowerCase();
+    const ptLabel = pt === 'credit' ? (UI.payment_credit || '') : pt === 'online' ? (UI.payment_online || '') : (UI.payment_cash || '');
+    let html = '<div class="cart-account-order-card" data-cart-order="' + orangeEscDomAttr(onum) + '">';
+    html += '<p class="cart-account-order-card__row order-status-row"><strong>' + orangeEscDomText(UI.status_label || '') + ':</strong> ';
+    html += '<span class="order-status-pill order-status-pill--' + orangeEscDomText(st) + '">' + orangeEscDomText(statusText) + '</span></p>';
+    html += '<p class="cart-account-order-card__row"><strong>' + orangeEscDomText(lblOrder) + ':</strong> ' + orangeEscDomText(onum) + '</p>';
+    if (ph) {
+        html += '<p class="cart-account-order-card__row"><strong>' + orangeEscDomText(lblPhone) + ':</strong> ' + orangeEscDomText(ph) + '</p>';
+    }
+    html +=
+        '<p class="cart-account-order-card__row"><strong>' +
+        orangeEscDomText(UI.order_total_label || '') +
+        ':</strong> ' +
+        orangeEscDomText(String(row.total)) +
+        ' ' +
+        orangeEscDomText(cur) +
+        '</p>';
+    if (UI.payment_label && ptLabel) {
+        html +=
+            '<p class="cart-account-order-card__row"><strong>' +
+            orangeEscDomText(UI.payment_label) +
+            ':</strong> ' +
+            orangeEscDomText(ptLabel) +
+            '</p>';
+    }
+    html += '<div class="cart-account-order-card__actions customer-order-actions">';
+    html += '<button type="button" class="btn btn-danger customer-order-cancel"';
+    if (!canCancel) {
+        html += ' disabled title="' + orangeEscDomAttr(UI.cancel_not_allowed || '') + '"';
+    }
+    html +=
+        ' data-orange-cart-cancel-order="' +
+        orangeEscDomAttr(onum) +
+        '" data-orange-cart-cancel-phone="' +
+        orangeEscDomAttr(ph) +
+        '">' +
+        orangeEscDomText(UI.cancel || '') +
+        '</button>';
+    if (waUrl) {
+        html +=
+            '<a class="btn btn-secondary customer-order-wa" href="' +
+            orangeEscDomAttr(waUrl) +
+            '" target="_blank" rel="noopener noreferrer">' +
+            orangeEscDomText(UI.whatsapp_help || 'WhatsApp') +
+            '</a>';
+    }
+    html += '</div>';
+    if (!canCancel && st !== 'cancelled' && st !== 'rejected') {
+        html += '<p class="cart-cancel-hint">' + orangeEscDomText(UI.cancel_not_allowed || '') + '</p>';
+    }
+    html += '</div>';
+    return html;
+}
+
+async function orangeCartFetchAccountOrdersIntoMount(mountEl, bucket) {
+    if (!mountEl) {
+        return;
+    }
+    const emptyMsg = (window.APP_T && window.APP_T.cart_account_orders_empty) || '';
+    const errMsg = (window.APP_T && window.APP_T.api_request_failed) || '';
+    mountEl.innerHTML = '<p class="cart-account-orders-empty">' + orangeEscDomText(emptyMsg) + '</p>';
+    let res;
+    let data;
+    try {
+        res = await fetch(orangeCartAccountOrdersListUrl(bucket), { credentials: 'same-origin' });
+        try {
+            data = await res.json();
+        } catch (e) {
+            data = null;
+        }
+    } catch (e) {
+        mountEl.innerHTML = '<p class="cart-account-orders-err">' + orangeEscDomText(errMsg) + '</p>';
+        return;
+    }
+    if (res.status === 401) {
+        mountEl.innerHTML =
+            '<p class="cart-account-orders-err">' +
+            orangeEscDomText((data && data.message) || (window.APP_T && window.APP_T.cart_account_auth_required) || '') +
+            '</p>';
+        return;
+    }
+    if (!data || !data.success || !Array.isArray(data.orders)) {
+        mountEl.innerHTML = '<p class="cart-account-orders-err">' + orangeEscDomText(errMsg) + '</p>';
+        return;
+    }
+    if (data.orders.length === 0) {
+        mountEl.innerHTML = '<p class="cart-account-orders-empty">' + orangeEscDomText(emptyMsg) + '</p>';
+        return;
+    }
+    let html = '';
+    for (let i = 0; i < data.orders.length; i++) {
+        html += orangeCartRenderAccountOrderCard(data.orders[i]);
+    }
+    mountEl.innerHTML = html;
+}
+
+async function orangeCartRefreshAccountOrderLists() {
+    const a = document.getElementById('cartAccountOrdersActiveMount');
+    const d = document.getElementById('cartAccountOrdersDeliveredMount');
+    const jobs = [];
+    if (a) {
+        jobs.push(orangeCartFetchAccountOrdersIntoMount(a, 'active'));
+    }
+    if (d) {
+        jobs.push(orangeCartFetchAccountOrdersIntoMount(d, 'delivered'));
+    }
+    await Promise.all(jobs);
+}
+
 async function orangeCustomerCancelOrder() {
     const ctx = window.__orangeCartTrack;
     const UI = window.ORANGE_MY_ORDER_UI || {};
@@ -1121,6 +1255,13 @@ async function orangeCustomerCancelOrder() {
             if (typeof window.__orangeCartTrackRefresh === 'function') {
                 await window.__orangeCartTrackRefresh();
             }
+            if (typeof window.orangeCartRefreshAccountOrderLists === 'function') {
+                try {
+                    await window.orangeCartRefreshAccountOrderLists();
+                } catch (e) {
+                    /* ignore */
+                }
+            }
             return;
         }
         const msg =
@@ -1141,4 +1282,39 @@ document.addEventListener('DOMContentLoaded', () => {
     orangeSyncCartProceedBtn();
     orangeSyncCartTabCount();
     orangeRenderCheckoutMiniSummary();
+
+    window.orangeCartRefreshAccountOrderLists = orangeCartRefreshAccountOrderLists;
+
+    const accMountA = document.getElementById('cartAccountOrdersActiveMount');
+    const accMountD = document.getElementById('cartAccountOrdersDeliveredMount');
+    if (accMountA || accMountD) {
+        document.addEventListener('click', function (ev) {
+            const t = ev.target;
+            if (!t || !t.getAttribute) {
+                return;
+            }
+            const btn = t.closest ? t.closest('[data-orange-cart-cancel-order]') : null;
+            if (!btn) {
+                return;
+            }
+            const onum = btn.getAttribute('data-orange-cart-cancel-order') || '';
+            const ph = btn.getAttribute('data-orange-cart-cancel-phone') || '';
+            if (!onum || !ph) {
+                return;
+            }
+            ev.preventDefault();
+            window.__orangeCartTrack = { orderNumber: onum, phone: ph, order: {} };
+            orangeCustomerCancelOrder();
+        });
+        window.orangeCartOnTabShown = function (which) {
+            if (which === 'orders' && accMountA && accMountA.getAttribute('data-loaded') !== '1') {
+                accMountA.setAttribute('data-loaded', '1');
+                orangeCartFetchAccountOrdersIntoMount(accMountA, 'active');
+            }
+            if (which === 'delivered' && accMountD && accMountD.getAttribute('data-loaded') !== '1') {
+                accMountD.setAttribute('data-loaded', '1');
+                orangeCartFetchAccountOrdersIntoMount(accMountD, 'delivered');
+            }
+        };
+    }
 });

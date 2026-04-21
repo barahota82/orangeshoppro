@@ -310,7 +310,9 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             customer_cancel_not_allowed: <?php echo json_encode(t('customer_cancel_not_allowed'), JSON_UNESCAPED_UNICODE); ?>,
             product_invalid_id: <?php echo json_encode(t('product_invalid_id'), JSON_UNESCAPED_UNICODE); ?>,
             product_not_found: <?php echo json_encode(t('product_not_found'), JSON_UNESCAPED_UNICODE); ?>,
-            api_request_failed: <?php echo json_encode(t('api_request_failed'), JSON_UNESCAPED_UNICODE); ?>
+            api_request_failed: <?php echo json_encode(t('api_request_failed'), JSON_UNESCAPED_UNICODE); ?>,
+            cart_account_orders_empty: <?php echo json_encode(t('cart_account_orders_empty'), JSON_UNESCAPED_UNICODE); ?>,
+            cart_account_auth_required: <?php echo json_encode(t('cart_account_auth_required'), JSON_UNESCAPED_UNICODE); ?>
         };
         window.orangeStorefrontRegisterApiError = function (j, fallback) {
             if (typeof window.orangeCheckoutApiMessage === 'function') {

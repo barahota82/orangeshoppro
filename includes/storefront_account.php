@@ -190,3 +190,66 @@ function orange_storefront_verify_email_token(PDO $pdo, string $token): array
 
     return ['ok' => true, 'reason' => 'fresh', 'account_id' => $aid];
 }
+
+/**
+ * يثبّط معرّف الحساب على الطلب عند الدفع فقط إذا كان الحساب مفعّلاً بالبريد والهاتف يطابق الطلب.
+ */
+function orange_storefront_resolve_order_account_link(PDO $pdo, int $claimedAccountId, string $checkoutPhoneNorm): ?int
+{
+    if ($claimedAccountId <= 0 || trim($checkoutPhoneNorm) === '') {
+        return null;
+    }
+    require_once __DIR__ . '/catalog_schema.php';
+    if (!orange_table_exists($pdo, 'storefront_accounts')) {
+        return null;
+    }
+    $st = $pdo->prepare(
+        'SELECT id, customer_phone FROM storefront_accounts WHERE id = ? AND email_verified_at IS NOT NULL LIMIT 1'
+    );
+    $st->execute([$claimedAccountId]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$row || empty($row['customer_phone'])) {
+        return null;
+    }
+    require_once __DIR__ . '/order_helpers.php';
+    if (!orange_order_phones_match_for_lookup($checkoutPhoneNorm, (string) $row['customer_phone'])) {
+        return null;
+    }
+
+    return (int) $row['id'];
+}
+
+/**
+ * بعد التسجيل من التتبع: ربط الطلب بصف الحساب (قبل أو بعد تأكيد البريد) إن تطابق الهاتف.
+ */
+function orange_storefront_link_order_to_account_row(PDO $pdo, string $orderNumber, int $accountId): void
+{
+    $orderNumber = trim($orderNumber);
+    if ($orderNumber === '' || $accountId <= 0) {
+        return;
+    }
+    require_once __DIR__ . '/catalog_schema.php';
+    if (!orange_table_exists($pdo, 'orders') || !orange_table_has_column($pdo, 'orders', 'storefront_account_id')) {
+        return;
+    }
+    if (!orange_table_exists($pdo, 'storefront_accounts')) {
+        return;
+    }
+    $oSt = $pdo->prepare('SELECT id, phone FROM orders WHERE order_number = ? LIMIT 1');
+    $oSt->execute([$orderNumber]);
+    $ord = $oSt->fetch(PDO::FETCH_ASSOC);
+    if (!$ord) {
+        return;
+    }
+    $aSt = $pdo->prepare('SELECT customer_phone FROM storefront_accounts WHERE id = ? LIMIT 1');
+    $aSt->execute([$accountId]);
+    $aph = $aSt->fetchColumn();
+    if ($aph === false || $aph === null || trim((string) $aph) === '') {
+        return;
+    }
+    require_once __DIR__ . '/order_helpers.php';
+    if (!orange_order_phones_match_for_lookup((string) ($ord['phone'] ?? ''), (string) $aph)) {
+        return;
+    }
+    $pdo->prepare('UPDATE orders SET storefront_account_id = ? WHERE id = ?')->execute([$accountId, (int) $ord['id']]);
+}
