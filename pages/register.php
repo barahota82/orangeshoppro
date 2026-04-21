@@ -6,6 +6,7 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/catalog_schema.php';
 require_once __DIR__ . '/../includes/storefront_account.php';
 require_once __DIR__ . '/../includes/delivery_areas.php';
+require_once __DIR__ . '/../includes/storefront_phone_country_select.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -107,9 +108,12 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                     <label for="reg_name"><?php echo htmlspecialchars(t('customer_name'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <input id="reg_name" name="name" type="text" autocomplete="name" required placeholder="<?php echo htmlspecialchars(t('register_placeholder_name'), ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
-                <div class="field track-signup-cta__field">
+                <div class="field track-signup-cta__field cart-checkout-phone-field">
                     <label for="reg_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="reg_phone" name="phone" type="tel" autocomplete="tel" required inputmode="tel" placeholder="<?php echo htmlspecialchars(t('register_placeholder_phone'), ENT_QUOTES, 'UTF-8'); ?>">
+                    <div class="cart-phone-field__row">
+                        <?php orange_storefront_render_phone_country_select('reg_phone_country'); ?>
+                        <input id="reg_phone" class="cart-phone-field__input" name="phone" type="tel" autocomplete="tel" required inputmode="tel" placeholder="<?php echo htmlspecialchars(t('register_placeholder_phone'), ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
+                    </div>
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="reg_area"><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
@@ -157,6 +161,8 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                     var email = (document.getElementById('reg_email') || {}).value.trim() || '';
                     var name = (document.getElementById('reg_name') || {}).value.trim() || '';
                     var phoneRaw = (document.getElementById('reg_phone') || {}).value.trim() || '';
+                    var ccEl = document.getElementById('reg_phone_country');
+                    var ccVal = ccEl && ccEl.value ? String(ccEl.value) : '';
                     var areaEl = document.getElementById('reg_area');
                     var area = '';
                     var deliveryAreaId = 0;
@@ -193,7 +199,7 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                     }
                     var phoneNorm =
                         typeof window.orangeNormalizeCustomerPhone === 'function'
-                            ? window.orangeNormalizeCustomerPhone(phoneRaw, null)
+                            ? window.orangeNormalizeCustomerPhone(phoneRaw, ccVal || null)
                             : null;
                     if (!phoneNorm) {
                         msg.textContent = badPhone || reqMsg;
@@ -223,6 +229,7 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                             email: email,
                             name: name,
                             phone: phoneNorm,
+                            phone_country: ccVal,
                             area: area,
                             delivery_area_id: deliveryAreaId,
                             address: address,
