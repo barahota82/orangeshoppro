@@ -1487,6 +1487,21 @@ function orangeScrollTrackAnotherOrder() {
         window.__orangeCartTrack = null;
     } catch (e0) {}
 
+    if (typeof window.__orangeOnTrackAnotherOrder === 'function') {
+        try {
+            window.__orangeOnTrackAnotherOrder();
+        } catch (eHook) {}
+    }
+
+    const numEl = document.getElementById('track_order_number');
+    const phEl = document.getElementById('track_phone');
+    if (numEl) {
+        numEl.value = '';
+    }
+    if (phEl) {
+        phEl.value = '';
+    }
+
     const target = document.getElementById('track-no-signup-section');
     if (target && typeof target.scrollIntoView === 'function') {
         try {
@@ -1495,13 +1510,9 @@ function orangeScrollTrackAnotherOrder() {
             target.scrollIntoView(true);
         }
     }
-    const numEl = document.getElementById('track_order_number');
     if (numEl && typeof numEl.focus === 'function') {
         try {
             numEl.focus();
-            if (typeof numEl.select === 'function') {
-                numEl.select();
-            }
         } catch (e2) {}
     }
 }

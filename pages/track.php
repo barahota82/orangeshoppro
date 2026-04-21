@@ -450,6 +450,12 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
         setHidden(verifyFeedbackEl, true);
     }
 
+    window.__orangeOnTrackAnotherOrder = function () {
+        try {
+            collapsePanel();
+        } catch (eAnother) {}
+    };
+
     collapsePanel();
 
     openBtn.addEventListener('click', function () {
