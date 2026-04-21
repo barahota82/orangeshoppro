@@ -1467,11 +1467,11 @@ function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, 
     if (document.getElementById('track-no-signup-section')) {
         const anotherLbl = L.track_another_order || '';
         if (anotherLbl) {
-            html += '<p class="track-order-another-wrap">';
+            html += '<div class="track-order-another-wrap">';
             html +=
                 '<button type="button" class="btn btn-ghost track-order-another-btn" onclick="orangeScrollTrackAnotherOrder()">';
             html += orangeEscDomText(anotherLbl);
-            html += '</button></p>';
+            html += '</button></div>';
         }
     }
     html += '</div>';
@@ -1653,11 +1653,11 @@ function orangeRenderTrackSignupSummary(el, order, orderNumber, phoneTyped, item
     if (document.getElementById('track-no-signup-section')) {
         const anotherLblSu = L.track_another_order || '';
         if (anotherLblSu) {
-            html += '<p class="track-order-another-wrap">';
+            html += '<div class="track-order-another-wrap">';
             html +=
                 '<button type="button" class="btn btn-ghost track-order-another-btn" onclick="orangeScrollTrackAnotherOrder()">';
             html += orangeEscDomText(anotherLblSu);
-            html += '</button></p>';
+            html += '</button></div>';
         }
     }
     html += '</div>';
