@@ -46,6 +46,7 @@ try {
             'line_1_ar', 'line_1_en', 'line_1_fil', 'line_1_hi',
             'line_2_ar', 'line_2_en', 'line_2_fil', 'line_2_hi',
             'line_3_ar', 'line_3_en', 'line_3_fil', 'line_3_hi',
+            'header_tagline_ar', 'header_tagline_en', 'header_tagline_fil', 'header_tagline_hi',
         ];
         $vals = [];
         foreach ($fields as $f) {

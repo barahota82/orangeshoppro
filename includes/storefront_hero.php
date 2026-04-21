@@ -55,3 +55,39 @@ function orange_storefront_home_hero_lines_resolved(PDO $pdo, string $lang): arr
 
     return $fromDb;
 }
+
+/**
+ * جمل التناوب تحت الشعار في الهيدر (عربي → إنجليزي → فلبيني → هندي): من الأدمن إن وُجدت، وإلا من الترجمة.
+ *
+ * @return list<string>
+ */
+function orange_storefront_header_tagline_cycle_resolved(PDO $pdo): array
+{
+    $order = ['ar', 'en', 'fil', 'hi'];
+    $fromRow = ['ar' => '', 'en' => '', 'fil' => '', 'hi' => ''];
+    try {
+        if (orange_table_exists($pdo, 'storefront_home_hero')
+            && orange_table_has_column($pdo, 'storefront_home_hero', 'header_tagline_ar')) {
+            $st = $pdo->query(
+                'SELECT header_tagline_ar, header_tagline_en, header_tagline_fil, header_tagline_hi
+                 FROM storefront_home_hero WHERE id = 1 LIMIT 1'
+            );
+            $row = $st ? $st->fetch(PDO::FETCH_ASSOC) : false;
+            if (is_array($row)) {
+                foreach ($order as $code) {
+                    $fromRow[$code] = trim((string) ($row['header_tagline_' . $code] ?? ''));
+                }
+            }
+        }
+    } catch (Throwable $e) {
+        $fromRow = ['ar' => '', 'en' => '', 'fil' => '', 'hi' => ''];
+    }
+    $tr = get_translations();
+    $out = [];
+    foreach ($order as $code) {
+        $db = $fromRow[$code] ?? '';
+        $out[] = $db !== '' ? $db : (string) ($tr[$code]['storefront_tagline'] ?? '');
+    }
+
+    return $out;
+}

@@ -1912,19 +1912,15 @@ function storefront_home_hero_lines(): array {
 }
 
 /**
- * Taglines under brand name for the rotating header (ثابتة؛ لا تتبع لغة الواجهة).
+ * Taglines under brand name for the rotating header (من الأدمن إن عُيّنت؛ وإلا من الترجمة).
  * الترتيب: عربي → إنجليزي → فلبيني → هندي.
  *
  * @return list<string>
  */
 function storefront_tagline_cycle_messages(): array {
-    $order = ['ar', 'en', 'fil', 'hi'];
-    $tr = get_translations();
-    $out = [];
-    foreach ($order as $code) {
-        $out[] = (string)($tr[$code]['storefront_tagline'] ?? '');
-    }
-    return $out;
+    require_once __DIR__ . '/includes/storefront_hero.php';
+
+    return orange_storefront_header_tagline_cycle_resolved(db());
 }
 
 function json_response($data, int $httpCode = 200): void {

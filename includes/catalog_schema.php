@@ -1417,10 +1417,27 @@ function orange_catalog_ensure_schema(PDO $pdo): void
                 line_3_en VARCHAR(500) NOT NULL DEFAULT \'\',
                 line_3_fil VARCHAR(500) NOT NULL DEFAULT \'\',
                 line_3_hi VARCHAR(500) NOT NULL DEFAULT \'\',
+                header_tagline_ar VARCHAR(500) NOT NULL DEFAULT \'\',
+                header_tagline_en VARCHAR(500) NOT NULL DEFAULT \'\',
+                header_tagline_fil VARCHAR(500) NOT NULL DEFAULT \'\',
+                header_tagline_hi VARCHAR(500) NOT NULL DEFAULT \'\',
                 updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
         orange_catalog_safe_exec($pdo, 'INSERT INTO storefront_home_hero (id) VALUES (1)');
+    }
+    if (orange_table_exists($pdo, 'storefront_home_hero')) {
+        $htMigrations = [
+            'header_tagline_ar' => "ADD COLUMN header_tagline_ar VARCHAR(500) NOT NULL DEFAULT ''",
+            'header_tagline_en' => "ADD COLUMN header_tagline_en VARCHAR(500) NOT NULL DEFAULT ''",
+            'header_tagline_fil' => "ADD COLUMN header_tagline_fil VARCHAR(500) NOT NULL DEFAULT ''",
+            'header_tagline_hi' => "ADD COLUMN header_tagline_hi VARCHAR(500) NOT NULL DEFAULT ''",
+        ];
+        foreach ($htMigrations as $col => $fragment) {
+            if (!orange_table_has_column($pdo, 'storefront_home_hero', $col)) {
+                orange_catalog_safe_exec($pdo, 'ALTER TABLE storefront_home_hero ' . $fragment);
+            }
+        }
     }
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
