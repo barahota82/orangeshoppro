@@ -119,7 +119,7 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
                     <label for="customer_notes"><?php echo htmlspecialchars(t('notes'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <textarea id="customer_notes" maxlength="4000"></textarea>
                 </div>
-                <button type="button" class="btn" onclick="sendOrderNow()"><?php echo htmlspecialchars(t('send_order'), ENT_QUOTES, 'UTF-8'); ?></button>
+                <button type="button" class="btn" id="cartCheckoutSendBtn" onclick="sendOrderNow()"><?php echo htmlspecialchars(t('send_order'), ENT_QUOTES, 'UTF-8'); ?></button>
             </div>
         </div>
     </div>

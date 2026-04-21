@@ -328,18 +328,34 @@ function orangeSyncCartProceedBtn() {
 /** س22: يظهر في صفحة العربة عند تعديل طلب قائم؛ يُمسح مع إفراغ السلة. */
 function orangeSyncAmendModeBanner() {
     const el = document.getElementById('cartAmendModeBanner');
-    if (!el) {
+    if (el) {
+        const amend = window.__orangePendingAmend;
+        const T = window.APP_T || {};
+        const tpl = T.customer_amend_mode_banner || '';
+        if (amend && amend.order_number && tpl) {
+            el.textContent = tpl.replace(/\{order\}/g, String(amend.order_number));
+            el.removeAttribute('hidden');
+        } else {
+            el.textContent = '';
+            el.setAttribute('hidden', '');
+        }
+    }
+    orangeSyncAmendCheckoutSendLabel();
+}
+
+function orangeSyncAmendCheckoutSendLabel() {
+    const btn = document.getElementById('cartCheckoutSendBtn');
+    if (!btn) {
         return;
     }
-    const amend = window.__orangePendingAmend;
     const T = window.APP_T || {};
-    const tpl = T.customer_amend_mode_banner || '';
-    if (amend && amend.order_number && tpl) {
-        el.textContent = tpl.replace(/\{order\}/g, String(amend.order_number));
-        el.removeAttribute('hidden');
-    } else {
-        el.textContent = '';
-        el.setAttribute('hidden', '');
+    const def = T.send_order || '';
+    const am = T.customer_amend_send_order || '';
+    const amend = window.__orangePendingAmend;
+    if (amend && amend.order_number && am) {
+        btn.textContent = am;
+    } else if (def) {
+        btn.textContent = def;
     }
 }
 

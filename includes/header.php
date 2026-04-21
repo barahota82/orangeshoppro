@@ -322,6 +322,8 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             customer_amend_not_allowed: <?php echo json_encode(t('customer_amend_not_allowed'), JSON_UNESCAPED_UNICODE); ?>,
             customer_amend_phone_mismatch: <?php echo json_encode(t('customer_amend_phone_mismatch'), JSON_UNESCAPED_UNICODE); ?>,
             customer_amend_mode_banner: <?php echo json_encode(t('customer_amend_mode_banner'), JSON_UNESCAPED_UNICODE); ?>,
+            customer_amend_send_order: <?php echo json_encode(t('customer_amend_send_order'), JSON_UNESCAPED_UNICODE); ?>,
+            send_order: <?php echo json_encode(t('send_order'), JSON_UNESCAPED_UNICODE); ?>,
             product_invalid_id: <?php echo json_encode(t('product_invalid_id'), JSON_UNESCAPED_UNICODE); ?>,
             product_not_found: <?php echo json_encode(t('product_not_found'), JSON_UNESCAPED_UNICODE); ?>,
             api_request_failed: <?php echo json_encode(t('api_request_failed'), JSON_UNESCAPED_UNICODE); ?>,
