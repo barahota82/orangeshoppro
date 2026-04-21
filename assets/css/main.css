@@ -1895,6 +1895,17 @@ body.storefront .product-gallery__img {
     color: var(--text);
 }
 
+.cart-amend-mode-banner {
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 0.92rem;
+    line-height: 1.4;
+    color: var(--text);
+    background: color-mix(in srgb, var(--accent, #c45c26) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent, #c45c26) 35%, transparent);
+}
+
 .cart-checkout-intro {
     margin: 0 0 16px;
     color: var(--muted);

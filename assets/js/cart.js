@@ -281,6 +281,24 @@ function orangeSyncCartProceedBtn() {
     btn.disabled = !getCart().length;
 }
 
+/** س22: يظهر في صفحة العربة عند تعديل طلب قائم؛ يُمسح مع إفراغ السلة. */
+function orangeSyncAmendModeBanner() {
+    const el = document.getElementById('cartAmendModeBanner');
+    if (!el) {
+        return;
+    }
+    const amend = window.__orangePendingAmend;
+    const T = window.APP_T || {};
+    const tpl = T.customer_amend_mode_banner || '';
+    if (amend && amend.order_number && tpl) {
+        el.textContent = tpl.replace(/\{order\}/g, String(amend.order_number));
+        el.removeAttribute('hidden');
+    } else {
+        el.textContent = '';
+        el.setAttribute('hidden', '');
+    }
+}
+
 function cartEmptyStateHtml() {
     const T = window.APP_T || {};
     const title = T.empty_cart || '';
@@ -574,7 +592,11 @@ async function renderCart() {
     let items = getCart();
 
     if (!items.length) {
+        try {
+            window.__orangePendingAmend = null;
+        } catch (eClr) {}
         box.innerHTML = cartEmptyStateHtml();
+        orangeSyncAmendModeBanner();
         orangeSyncCartProceedBtn();
         orangeSyncCartTabCount();
         orangeCancelCheckoutPreview();
@@ -615,7 +637,11 @@ async function renderCart() {
     }
 
     if (!items.length) {
+        try {
+            window.__orangePendingAmend = null;
+        } catch (eClr2) {}
         box.innerHTML = cartEmptyStateHtml();
+        orangeSyncAmendModeBanner();
         orangeSyncCartProceedBtn();
         orangeSyncCartTabCount();
         orangeCancelCheckoutPreview();
@@ -692,6 +718,7 @@ async function renderCart() {
     orangeSyncCartProceedBtn();
     orangeSyncCartTabCount();
     orangeRenderCheckoutMiniSummary();
+    orangeSyncAmendModeBanner();
 }
 
 function clampCartLineQty(idx, rawQty) {
@@ -787,6 +814,7 @@ function orangeFinishCheckoutSuccess(result) {
     try {
         window.__orangePendingAmend = null;
     } catch (e0) {}
+    orangeSyncAmendModeBanner();
     localStorage.removeItem(getCartStorageKey());
     try {
         localStorage.removeItem('cart');

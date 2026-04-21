@@ -95,6 +95,7 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
             <?php endif; ?>
             <div class="card-box cart-checkout-card" id="cartCheckoutCard">
                 <h3 class="cart-section-title"><?php echo htmlspecialchars($checkoutTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
+                <p id="cartAmendModeBanner" class="cart-amend-mode-banner" role="status" aria-live="polite" hidden></p>
                 <p class="cart-checkout-intro"><?php echo htmlspecialchars($checkoutIntro, ENT_QUOTES, 'UTF-8'); ?></p>
                 <p class="cart-checkout-intro"><?php echo htmlspecialchars(t('storefront_guest_checkout_note'), ENT_QUOTES, 'UTF-8'); ?></p>
                 <div id="cartOrderMiniSummary" class="cart-mini-summary" hidden></div>
