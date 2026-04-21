@@ -136,7 +136,7 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 
 س18. الهاتف إلزامي؟ تطبيع؟
 إلزامي بصيغة دولية؛ اختيار كود الدولة من القائمة.
-**تنفيذ:** نموذج الطلب في `pages/cart.php` (`#customer_phone_country` + `#customer_phone`)؛ نموذج التسجيل في `pages/register.php` (`#reg_phone_country` + `#reg_phone`)؛ صفحة التتبع في `pages/track.php` (`#track_phone_country` + `#track_phone`، و`#track_signup_verify_phone_country` + `#trackSignupVerifyPhone` مع `phone_country` في طلب التسجيل من التتبع)؛ المكوّن `includes/storefront_phone_country_select.php`؛ التطبيع `assets/js/input-constraints.js` (`orangeNormalizeCustomerPhone`)؛ إرسال `phone_country` من الواجهة حيث ينطبق (مثل `assets/js/cart.js` و`request-email-verify.php`).
+**تنفيذ:** نموذج الطلب في `pages/cart.php` (`#customer_phone_country` + `#customer_phone`)؛ نموذج التسجيل في `pages/register.php` (`#reg_phone_country` + `#reg_phone`)؛ المكوّن `includes/storefront_phone_country_select.php`؛ التطبيع `assets/js/input-constraints.js` (`orangeNormalizeCustomerPhone`)؛ إرسال `phone_country` من الواجهة حيث ينطبق (مثل `assets/js/cart.js` و`request-email-verify.php`).
 
 س19. البريد في الطلب كضيف؟
 اختياري.
