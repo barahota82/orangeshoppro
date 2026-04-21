@@ -990,16 +990,29 @@ function orangeOrderCartPromoDiscountAmount(order) {
     return n;
 }
 
+/** صافي سطر الطلب بعد خصم السطر — مطابقة تقريبية لـ orange_order_item_line_net في PHP. */
+function orangeOrderItemLineNetJs(it) {
+    const qty = Math.max(0, parseInt(String(it.qty || 0), 10) || 0);
+    const price = parseFloat(String(it.price || 0)) || 0;
+    const gross = Math.round(price * qty * 10000) / 10000;
+    let disc = parseFloat(String(it.line_discount != null ? it.line_discount : 0)) || 0;
+    if (disc < 0) {
+        disc = 0;
+    }
+    disc = Math.round(disc * 10000) / 10000;
+    if (disc > gross + 0.0001) {
+        return 0;
+    }
+    return Math.max(0, Math.round((gross - disc) * 10000) / 10000);
+}
+
 function orangeOrderItemsLinesSum(itemRows) {
     if (!Array.isArray(itemRows)) {
         return 0;
     }
     let s = 0;
     for (let i = 0; i < itemRows.length; i++) {
-        const it = itemRows[i];
-        const qty = Math.max(0, parseInt(String(it.qty || 0), 10) || 0);
-        const price = parseFloat(String(it.price || 0)) || 0;
-        s += qty * price;
+        s += orangeOrderItemLineNetJs(itemRows[i]);
     }
     return s;
 }
@@ -1098,8 +1111,7 @@ function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, 
         for (let i = 0; i < itemRows.length; i++) {
             const it = itemRows[i];
             const qty = Math.max(0, parseInt(String(it.qty || 0), 10) || 0);
-            const price = parseFloat(String(it.price || 0)) || 0;
-            const line = qty * price;
+            const line = orangeOrderItemLineNetJs(it);
             html += '<li class="track-order-item">';
             html += '<span class="track-order-item__main">';
             html += '<span class="track-order-item__name">' + orangeEscDomText(String(it.product_name || '')) + '</span>';
@@ -1217,8 +1229,7 @@ function orangeRenderTrackSignupSummary(el, order, orderNumber, phoneTyped, item
         for (let i = 0; i < itemRows.length; i++) {
             const it = itemRows[i];
             const qty = Math.max(0, parseInt(String(it.qty || 0), 10) || 0);
-            const price = parseFloat(String(it.price || 0)) || 0;
-            const line = qty * price;
+            const line = orangeOrderItemLineNetJs(it);
             html += '<li class="track-signup-order-summary__item">';
             html += '<span class="track-signup-order-summary__item-main">';
             html += '<span class="track-signup-order-summary__item-name">' + orangeEscDomText(String(it.product_name || '')) + '</span>';
