@@ -63,10 +63,16 @@ $orangeMyOrderUi = [
                         <input id="trackSignupOrderNumber" name="signup_order_number" autocomplete="off" inputmode="text" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_order_number'), ENT_QUOTES, 'UTF-8'); ?>">
                     </div>
                     <div class="field track-signup-cta__field cart-checkout-phone-field">
-                        <label for="trackSignupVerifyPhone"><?php echo htmlspecialchars(t('track_signup_verify_phone_label'), ENT_QUOTES, 'UTF-8'); ?></label>
-                        <div class="cart-phone-field__row">
-                            <?php orange_storefront_render_phone_country_select('track_signup_verify_phone_country'); ?>
-                            <input id="trackSignupVerifyPhone" class="cart-phone-field__input" name="signup_verify_phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_verify_phone'), ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
+                        <div class="cart-phone-field__grid" role="group" aria-label="<?php echo htmlspecialchars(t('track_signup_verify_phone_label'), ENT_QUOTES, 'UTF-8'); ?>">
+                            <span class="cart-phone-field__legend"><?php echo htmlspecialchars(t('track_signup_verify_phone_label'), ENT_QUOTES, 'UTF-8'); ?></span>
+                            <div class="cart-phone-field__cell">
+                                <label for="track_signup_verify_phone_country" class="cart-phone-field__sublabel"><?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?></label>
+                                <?php orange_storefront_render_phone_country_select('track_signup_verify_phone_country'); ?>
+                            </div>
+                            <div class="cart-phone-field__cell cart-phone-field__cell--number">
+                                <label for="trackSignupVerifyPhone" class="cart-phone-field__sublabel"><?php echo htmlspecialchars(t('phone_number_label'), ENT_QUOTES, 'UTF-8'); ?></label>
+                                <input id="trackSignupVerifyPhone" class="cart-phone-field__input" name="signup_verify_phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_verify_phone'), ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
+                            </div>
                         </div>
                     </div>
                     <div class="track-signup-cta__verify-row">
@@ -114,10 +120,16 @@ $orangeMyOrderUi = [
                 <input id="track_order_number" name="order_number" autocomplete="off" inputmode="text">
             </div>
             <div class="field cart-checkout-phone-field">
-                <label for="track_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
-                <div class="cart-phone-field__row">
-                    <?php orange_storefront_render_phone_country_select('track_phone_country'); ?>
-                    <input id="track_phone" class="cart-phone-field__input" name="phone" autocomplete="tel" inputmode="tel" dir="ltr" lang="en">
+                <div class="cart-phone-field__grid" role="group" aria-label="<?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?>">
+                    <span class="cart-phone-field__legend"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></span>
+                    <div class="cart-phone-field__cell">
+                        <label for="track_phone_country" class="cart-phone-field__sublabel"><?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?></label>
+                        <?php orange_storefront_render_phone_country_select('track_phone_country'); ?>
+                    </div>
+                    <div class="cart-phone-field__cell cart-phone-field__cell--number">
+                        <label for="track_phone" class="cart-phone-field__sublabel"><?php echo htmlspecialchars(t('phone_number_label'), ENT_QUOTES, 'UTF-8'); ?></label>
+                        <input id="track_phone" class="cart-phone-field__input" name="phone" autocomplete="tel" inputmode="tel" dir="ltr" lang="en">
+                    </div>
                 </div>
             </div>
             <div class="actions-row track-page-actions">
