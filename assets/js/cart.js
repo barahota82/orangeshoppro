@@ -47,6 +47,50 @@ function setCart(items) {
     localStorage.setItem(getCartStorageKey(), JSON.stringify(items));
 }
 
+/** يبقى وضع تعديل الطلب (س22) عبر تحميل صفحة — مثلاً من التتبع إلى العربة. */
+var ORANGE_SF_PENDING_AMEND_KEY = 'orange_sf_pending_amend';
+
+function orangePendingAmendToStorage(obj) {
+    try {
+        if (obj && obj.order_number) {
+            sessionStorage.setItem(
+                ORANGE_SF_PENDING_AMEND_KEY,
+                JSON.stringify({
+                    order_number: String(obj.order_number),
+                    phone: String(obj.phone || ''),
+                })
+            );
+        }
+    } catch (e) {}
+}
+
+function orangeClearPendingAmendStorage() {
+    try {
+        sessionStorage.removeItem(ORANGE_SF_PENDING_AMEND_KEY);
+    } catch (e) {}
+}
+
+function orangeRestorePendingAmendFromStorage() {
+    try {
+        if (window.__orangePendingAmend && window.__orangePendingAmend.order_number) {
+            return;
+        }
+        const raw = sessionStorage.getItem(ORANGE_SF_PENDING_AMEND_KEY);
+        if (!raw) {
+            return;
+        }
+        const o = JSON.parse(raw);
+        if (o && o.order_number) {
+            window.__orangePendingAmend = {
+                order_number: String(o.order_number),
+                phone: String(o.phone || ''),
+            };
+        }
+    } catch (e) {
+        orangeClearPendingAmendStorage();
+    }
+}
+
 function normalizeCartDuplicates() {
     const items = getCart();
     if (items.length < 2) {
@@ -595,6 +639,7 @@ async function renderCart() {
         try {
             window.__orangePendingAmend = null;
         } catch (eClr) {}
+        orangeClearPendingAmendStorage();
         box.innerHTML = cartEmptyStateHtml();
         orangeSyncAmendModeBanner();
         orangeSyncCartProceedBtn();
@@ -640,6 +685,7 @@ async function renderCart() {
         try {
             window.__orangePendingAmend = null;
         } catch (eClr2) {}
+        orangeClearPendingAmendStorage();
         box.innerHTML = cartEmptyStateHtml();
         orangeSyncAmendModeBanner();
         orangeSyncCartProceedBtn();
@@ -814,6 +860,7 @@ function orangeFinishCheckoutSuccess(result) {
     try {
         window.__orangePendingAmend = null;
     } catch (e0) {}
+    orangeClearPendingAmendStorage();
     orangeSyncAmendModeBanner();
     localStorage.removeItem(getCartStorageKey());
     try {
@@ -1157,6 +1204,21 @@ async function orangeCartStartAmendOrder(onum, ph) {
         order_number: on,
         phone: String(result.order.phone || p).trim(),
     };
+    orangePendingAmendToStorage(window.__orangePendingAmend);
+
+    const onCartPage = !!document.getElementById('cartProceedBtn');
+    if (!onCartPage) {
+        const cartUrl =
+            typeof window.ORANGE_STOREFRONT_CART_URL === 'string' ? window.ORANGE_STOREFRONT_CART_URL.trim() : '';
+        if (cartUrl) {
+            try {
+                sessionStorage.setItem('orange_cart_ui_tab', 'basket');
+            } catch (eTab) {}
+            window.location.href = cartUrl;
+            return;
+        }
+    }
+
     renderCart();
     orangeSyncCartProceedBtn();
     orangeSyncCartTabCount();
@@ -1870,6 +1932,7 @@ async function orangeCustomerCancelOrder() {
 
 document.addEventListener('DOMContentLoaded', () => {
     ensureOrangeToast();
+    orangeRestorePendingAmendFromStorage();
     renderCart();
     orangeSyncCartProceedBtn();
     orangeSyncCartTabCount();

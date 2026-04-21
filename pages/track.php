@@ -143,6 +143,7 @@ window.ORANGE_TRACK_BELOW = {
     ok: <?php echo json_encode(t('track_tracked_ok_below'), JSON_UNESCAPED_UNICODE); ?>,
     another: <?php echo json_encode(t('track_track_another'), JSON_UNESCAPED_UNICODE); ?>
 };
+window.ORANGE_STOREFRONT_CART_URL = <?php echo json_encode(storefront_url('cart', $channelSlug, $lang), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 
 /** س27: إزالة أي معرّفات حساسة من شريط العنوان إن وُجدت (روابط قديمة أو أخطاء). */
 (function () {
