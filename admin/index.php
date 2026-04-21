@@ -12,6 +12,7 @@ $allowed = [
     'company_settings',
     'storefront_hero',
     'delivery_areas',
+    'cart_promotions',
     'departments',
     'categories',
     'subcategories',

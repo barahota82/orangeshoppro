@@ -286,6 +286,8 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             cart_close: <?php echo json_encode(t('cart_close'), JSON_UNESCAPED_UNICODE); ?>,
             cart_remove: <?php echo json_encode(t('cart_remove'), JSON_UNESCAPED_UNICODE); ?>,
             cart_total_label: <?php echo json_encode(t('cart_total_label'), JSON_UNESCAPED_UNICODE); ?>,
+            cart_subtotal_label: <?php echo json_encode(t('cart_subtotal_label'), JSON_UNESCAPED_UNICODE); ?>,
+            cart_promotion_discount_label: <?php echo json_encode(t('cart_promotion_discount_label'), JSON_UNESCAPED_UNICODE); ?>,
             cart_items_count: <?php echo json_encode(t('cart_items_count'), JSON_UNESCAPED_UNICODE); ?>,
             cart_unit_price: <?php echo json_encode(t('cart_unit_price'), JSON_UNESCAPED_UNICODE); ?>,
             cart_line_subtotal: <?php echo json_encode(t('cart_line_subtotal'), JSON_UNESCAPED_UNICODE); ?>,

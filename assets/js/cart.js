@@ -314,6 +314,170 @@ function orangeSyncCartTabCount() {
     }
 }
 
+let __orangeCartPreviewTimer = null;
+let __orangeCartPreviewSeq = 0;
+
+function orangeCancelCheckoutPreview() {
+    if (__orangeCartPreviewTimer) {
+        clearTimeout(__orangeCartPreviewTimer);
+        __orangeCartPreviewTimer = null;
+    }
+    __orangeCartPreviewSeq += 1;
+}
+
+function orangeCartClientSubtotalFromItems(items) {
+    let s = 0;
+    items.forEach((it) => {
+        const q = Math.max(1, parseInt(it.qty, 10) || 1);
+        s += q * Number(it.price);
+    });
+    return s;
+}
+
+function cartItemsForCheckoutPreview(items) {
+    return items.map((i) => ({
+        id: i.id,
+        qty: Math.max(1, parseInt(i.qty, 10) || 1),
+        variant_id: i.variant_id ? parseInt(i.variant_id, 10) || 0 : 0,
+        color: i.color != null ? String(i.color) : '',
+        size: i.size != null ? String(i.size) : '',
+    }));
+}
+
+function orangeCartTotalsEpsilon() {
+    return 1e-6;
+}
+
+function orangeHtmlCartMainTotals(subtotal, promoDiscount, total) {
+    const T = window.APP_T || {};
+    const totalLbl = T.cart_total_label || 'Total';
+    const subLbl = T.cart_subtotal_label || 'Subtotal';
+    const promoLbl = T.cart_promotion_discount_label || 'Cart offer';
+    const eps = orangeCartTotalsEpsilon();
+    const showBreakdown = promoDiscount > eps;
+    let html =
+        '<div class="cart-summary-totals" id="cartMainTotals">';
+    if (showBreakdown) {
+        html +=
+            '<div class="cart-summary-line"><span>' +
+            escCartHtml(subLbl) +
+            '</span><span>' +
+            formatMoney(subtotal) +
+            '</span></div>';
+        html +=
+            '<div class="cart-summary-line cart-summary-line--promo"><span>' +
+            escCartHtml(promoLbl) +
+            '</span><span>−' +
+            formatMoney(promoDiscount) +
+            '</span></div>';
+    }
+    html +=
+        '<div class="cart-total-box"><strong>' +
+        escCartHtml(totalLbl) +
+        '</strong><span class="cart-total-amount">' +
+        formatMoney(total) +
+        '</span></div></div>';
+    return html;
+}
+
+function orangeHtmlCartMiniTotals(subtotal, promoDiscount, total) {
+    const T = window.APP_T || {};
+    const totalLbl = T.cart_total_label || 'Total';
+    const subLbl = T.cart_subtotal_label || 'Subtotal';
+    const promoLbl = T.cart_promotion_discount_label || 'Cart offer';
+    const eps = orangeCartTotalsEpsilon();
+    const showBreakdown = promoDiscount > eps;
+    let html =
+        '<div class="cart-mini-totals-breakdown" id="cartMiniTotals">';
+    if (showBreakdown) {
+        html +=
+            '<div class="cart-mini-total-line"><span>' +
+            escCartHtml(subLbl) +
+            '</span><span>' +
+            formatMoney(subtotal) +
+            '</span></div>';
+        html +=
+            '<div class="cart-mini-total-line cart-mini-total-line--promo"><span>' +
+            escCartHtml(promoLbl) +
+            '</span><span>−' +
+            formatMoney(promoDiscount) +
+            '</span></div>';
+    }
+    html +=
+        '<div class="cart-mini-total"><span>' +
+        escCartHtml(totalLbl) +
+        '</span><strong>' +
+        formatMoney(total) +
+        '</strong></div></div>';
+    return html;
+}
+
+function orangePatchCartTotalsFromServer(subtotal, promoDiscount, total) {
+    const main = document.getElementById('cartMainTotals');
+    if (main && main.parentNode) {
+        const wrap = document.createElement('div');
+        wrap.innerHTML = orangeHtmlCartMainTotals(subtotal, promoDiscount, total);
+        const next = wrap.firstElementChild;
+        if (next) {
+            main.parentNode.replaceChild(next, main);
+        }
+    }
+    const mini = document.getElementById('cartMiniTotals');
+    if (mini && mini.parentNode) {
+        const wrap = document.createElement('div');
+        wrap.innerHTML = orangeHtmlCartMiniTotals(subtotal, promoDiscount, total);
+        const next = wrap.firstElementChild;
+        if (next) {
+            mini.parentNode.replaceChild(next, mini);
+        }
+    }
+}
+
+function orangeScheduleCheckoutPreview() {
+    if (__orangeCartPreviewTimer) {
+        clearTimeout(__orangeCartPreviewTimer);
+    }
+    __orangeCartPreviewTimer = setTimeout(() => {
+        __orangeCartPreviewTimer = null;
+        orangeRunCheckoutPreview();
+    }, 400);
+}
+
+async function orangeRunCheckoutPreview() {
+    const items = getCart();
+    if (!items.length) {
+        return;
+    }
+    const seq = ++__orangeCartPreviewSeq;
+    const payload = {
+        items: cartItemsForCheckoutPreview(items),
+        lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
+    };
+    try {
+        const response = await fetch(storefrontApiUrl('/api/cart/checkout-preview.php'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        if (seq !== __orangeCartPreviewSeq) {
+            return;
+        }
+        if (
+            data &&
+            data.success &&
+            typeof data.subtotal === 'number' &&
+            typeof data.total === 'number'
+        ) {
+            const promo =
+                typeof data.promotion_discount === 'number' ? data.promotion_discount : 0;
+            orangePatchCartTotalsFromServer(data.subtotal, promo, data.total);
+        }
+    } catch (e) {
+        /* keep client-rendered totals */
+    }
+}
+
 function orangeRenderCheckoutMiniSummary() {
     const el = document.getElementById('cartOrderMiniSummary');
     if (!el) {
@@ -325,13 +489,13 @@ function orangeRenderCheckoutMiniSummary() {
     if (!items.length) {
         el.hidden = true;
         el.innerHTML = '';
+        orangeCancelCheckoutPreview();
         return;
     }
-    let total = 0;
+    const clientSub = orangeCartClientSubtotalFromItems(items);
     const rows = [];
     items.forEach((it) => {
         const q = Math.max(1, parseInt(it.qty, 10) || 1);
-        total += q * Number(it.price);
         rows.push({ name: it.name || '', q });
     });
     const title = T.cart_mini_summary_title || '';
@@ -352,7 +516,6 @@ function orangeRenderCheckoutMiniSummary() {
         moreHtml =
             '<p class="cart-mini-more">' + escCartHtml(tpl.replace(/\{n\}/g, String(more))) + '</p>';
     }
-    const totalLbl = T.cart_total_label || 'Total';
     el.hidden = false;
     el.innerHTML =
         '<div class="cart-mini-summary__inner">' +
@@ -361,11 +524,9 @@ function orangeRenderCheckoutMiniSummary() {
         listHtml +
         '</ul>' +
         moreHtml +
-        '<div class="cart-mini-total"><span>' +
-        escCartHtml(totalLbl) +
-        '</span><strong>' +
-        formatMoney(total) +
-        '</strong></div></div>';
+        orangeHtmlCartMiniTotals(clientSub, 0, clientSub) +
+        '</div>';
+    orangeScheduleCheckoutPreview();
 }
 
 async function fetchCartStockLimits(items) {
@@ -407,6 +568,7 @@ async function renderCart() {
         box.innerHTML = cartEmptyStateHtml();
         orangeSyncCartProceedBtn();
         orangeSyncCartTabCount();
+        orangeCancelCheckoutPreview();
         orangeRenderCheckoutMiniSummary();
         return;
     }
@@ -447,6 +609,7 @@ async function renderCart() {
         box.innerHTML = cartEmptyStateHtml();
         orangeSyncCartProceedBtn();
         orangeSyncCartTabCount();
+        orangeCancelCheckoutPreview();
         orangeRenderCheckoutMiniSummary();
         return;
     }
@@ -513,13 +676,7 @@ async function renderCart() {
     });
 
     html += '</div>';
-    const totalLbl = T.cart_total_label || 'Total';
-    html +=
-        '<div class="cart-summary-bar"><div class="cart-total-box"><strong>' +
-        escCartHtml(totalLbl) +
-        '</strong><span class="cart-total-amount">' +
-        formatMoney(total) +
-        '</span></div></div>';
+    html += '<div class="cart-summary-bar">' + orangeHtmlCartMainTotals(total, 0, total) + '</div>';
     html += '</div>';
 
     box.innerHTML = html;

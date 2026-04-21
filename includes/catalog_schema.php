@@ -1449,6 +1449,32 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         );
     }
 
+    if (!orange_table_exists($pdo, 'cart_promotions')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE IF NOT EXISTS cart_promotions (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                min_subtotal DECIMAL(18,4) NOT NULL DEFAULT 0,
+                discount_amount DECIMAL(18,4) NOT NULL DEFAULT 0,
+                requires_registered_account TINYINT(1) NOT NULL DEFAULT 0,
+                sort_order INT NOT NULL DEFAULT 0,
+                is_active TINYINT(1) NOT NULL DEFAULT 1,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                KEY idx_cart_promotions_active_min (is_active, min_subtotal)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'cart_promotion_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE orders ADD COLUMN cart_promotion_id INT UNSIGNED NULL DEFAULT NULL');
+    }
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'cart_promotion_discount')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE orders ADD COLUMN cart_promotion_discount DECIMAL(18,4) NOT NULL DEFAULT 0'
+        );
+    }
+
     if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'invoice_number')) {
         orange_catalog_safe_exec(
             $pdo,
