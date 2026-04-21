@@ -1932,13 +1932,10 @@ body.storefront .product-gallery__img {
     line-height: 1.45;
 }
 
-/* هاتف العميل: قائمة الدولة + الرقم (واضحة ولا تنهار بعرض الصف)
-   — direction: ltr على الشبكة حتى في صفحات RTL: دائماً «الدولة» ثم «الرقم» كما يُقرأ الرقم، ويظهر عمود الدولة على سطح المكتب */
+/* هاتف العميل: قائمة الدولة + الرقم (واضحة ولا تنهار بعرض الصف) */
 .cart-phone-field__grid {
     display: grid;
-    direction: ltr;
-    unicode-bidi: isolate;
-    grid-template-columns: minmax(11rem, 36%) minmax(0, 1fr);
+    grid-template-columns: minmax(12rem, 1.1fr) minmax(12rem, 1.4fr);
     gap: 12px 16px;
     align-items: end;
 }
@@ -1949,12 +1946,6 @@ body.storefront .product-gallery__img {
     font-size: 0.9rem;
     color: var(--text);
     margin: 0 0 2px;
-}
-
-html[dir="rtl"] .cart-phone-field__grid .cart-phone-field__legend,
-html[dir="rtl"] .cart-phone-field__grid .cart-phone-field__sublabel {
-    direction: rtl;
-    text-align: right;
 }
 
 .cart-phone-field__sublabel {
@@ -1983,7 +1974,6 @@ html[dir="rtl"] .cart-phone-field__grid .cart-phone-field__sublabel {
     -webkit-appearance: menulist;
     appearance: menulist;
     min-height: 46px;
-    cursor: pointer;
 }
 
 .cart-phone-field__cell .orange-phone-country-select:focus {
@@ -2000,13 +1990,8 @@ html[dir="rtl"] .cart-phone-field__grid .cart-phone-field__sublabel {
 
 @media (max-width: 520px) {
     .cart-phone-field__grid {
-        grid-template-columns: minmax(0, 1fr);
+        grid-template-columns: 1fr;
     }
-}
-
-/* نموذج الدفع في العربة: لا تقصّ قائمة الدولة أو حوافها داخل .card-box */
-.card-box.cart-checkout-card {
-    overflow: visible;
 }
 
 /* صف قديم (إن وُجد في قوالب أخرى) */
