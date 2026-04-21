@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/stock_alerts.php';
 
 /** @var array<string, mixed> $admin — من admin/index.php */
 $pdo = db();
@@ -57,6 +58,14 @@ if ($intakeQueueVisible) {
         <h3>عدد المنتجات</h3>
         <div class="value"><?php echo $productsCount; ?></div>
     </div>
+    <?php if (orange_admin_may($admin, $pdo, 'warehouse', 'view')): ?>
+    <div class="card stat-card" style="<?php echo $lowStockVariantsDash > 0 ? 'border:1px solid #f59e0b;' : ''; ?>">
+        <h3>قارب على النفاذ</h3>
+        <div class="value"><?php echo $lowStockVariantsDash; ?></div>
+        <p class="card-hint" style="margin:8px 0 0;font-size:0.88rem;">متغيرات ≤ <?php echo (int) $lowStockThDash; ?> — نشطة</p>
+        <p style="margin:10px 0 0;"><a class="btn btn-secondary" href="/admin/index.php?page=stock#low-stock-variants">المستودع</a></p>
+    </div>
+    <?php endif; ?>
 </div>
 
 <?php if ($intakeQueueVisible): ?>

@@ -157,6 +157,8 @@ IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
   (`admin/pages/storefront_hero.php`)، جدول `storefront_copy_lines`، منطق العرض
   `includes/storefront_hero.php`؛ مرجع سياسة الواجهة يحدّث حقل س3 في
   `docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`.
+- تنبيه «قارب على النفاذ» (س5): `includes/stock_alerts.php` (`orange_stock_low_alert_threshold`)،
+  عرض في `admin/pages/stock.php` ولوحة `dashboard.php`؛ إحصاءات API `admin/api/reports/stats.php`.
 
 
 10) سياسات الواجهة والطلب أونلاين — مرجع إجابات المالك (إلزامي قبل التنفيذ)
