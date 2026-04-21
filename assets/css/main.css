@@ -1931,6 +1931,39 @@ body.storefront .product-gallery__img {
     line-height: 1.45;
 }
 
+.cart-phone-field__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: stretch;
+}
+
+.cart-checkout-card .cart-phone-field__row .orange-phone-country-select {
+    flex: 0 1 240px;
+    min-width: min(100%, 9rem);
+    margin: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    font-size: 1rem;
+    background: var(--card);
+    color: var(--text);
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.cart-checkout-card .cart-phone-field__row .orange-phone-country-select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.cart-phone-field__row .cart-phone-field__input {
+    flex: 1 1 12rem;
+    min-width: 0;
+    width: auto;
+}
+
 .cart-checkout-payment-radios {
     margin: 0 0 14px;
 }

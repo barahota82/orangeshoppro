@@ -6,6 +6,7 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/catalog_schema.php';
 require_once __DIR__ . '/../includes/storefront_account.php';
 require_once __DIR__ . '/../includes/delivery_areas.php';
+require_once __DIR__ . '/../includes/storefront_phone_country_select.php';
 
 $pdoCartAcc = db();
 orange_catalog_ensure_schema($pdoCartAcc);
@@ -109,9 +110,12 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
                     <label for="customer_name"><?php echo htmlspecialchars(t('customer_name'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <input id="customer_name" autocomplete="name" maxlength="500">
                 </div>
-                <div class="field">
+                <div class="field cart-checkout-phone-field">
                     <label for="customer_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="customer_phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="22" placeholder="<?php echo htmlspecialchars(t('phone_field_hint'), ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
+                    <div class="cart-phone-field__row">
+                        <?php orange_storefront_render_phone_country_select('customer_phone_country'); ?>
+                        <input id="customer_phone" class="cart-phone-field__input" type="tel" autocomplete="tel" inputmode="tel" maxlength="22" placeholder="<?php echo htmlspecialchars(t('phone_field_hint'), ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
+                    </div>
                 </div>
                 <div class="field">
                     <label for="customer_email"><?php echo htmlspecialchars(t('customer_email'), ENT_QUOTES, 'UTF-8'); ?> <span class="form-optional-hint">(<?php echo htmlspecialchars(t('field_optional_short'), ENT_QUOTES, 'UTF-8'); ?>)</span></label>
