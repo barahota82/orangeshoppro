@@ -1794,6 +1794,24 @@ body.storefront .product-gallery__img {
     font-size: 1.12rem;
 }
 
+.cart-register-promo-teaser {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed color-mix(in srgb, var(--border) 75%, transparent);
+    font-size: 0.88rem;
+    line-height: 1.45;
+    color: var(--text);
+}
+
+.cart-register-promo-teaser__text {
+    margin: 0;
+}
+
+.cart-register-promo-teaser__link {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
 .cart-checkout-card > .btn:last-of-type {
     width: 100%;
     margin-top: 6px;

@@ -143,6 +143,7 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
 <script>
 window.ORANGE_DELIVERY_AREAS = <?php echo json_encode($orangeDeliveryAreasStorefront, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_CART_HOME = <?php echo json_encode(storefront_url('home', $channelSlug, $lang), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.ORANGE_REGISTER_URL = <?php echo json_encode(storefront_url('register', $channelSlug, $lang), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_STOREFRONT_WA = <?php echo json_encode($cartWaHref, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_CART_SF_ACCOUNT = <?php echo json_encode(['logged_in' => $cartSfLoggedIn], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_ORDER_STATUS_LABELS = <?php echo json_encode($orangeOrderStatusLabelsCart, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;

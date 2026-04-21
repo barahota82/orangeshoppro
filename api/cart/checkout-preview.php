@@ -26,6 +26,7 @@ try {
     $promo = orange_cart_promotion_resolve($pdo, $subtotal, $buyerReg);
     $promoDiscount = $promo !== null ? (float) $promo['discount'] : 0.0;
     $total = max(0.0, round($subtotal - $promoDiscount, 4));
+    $regTeaser = orange_cart_promotion_register_incentive_teaser($pdo, $subtotal, $buyerReg);
 
     json_response([
         'success' => true,
@@ -33,6 +34,7 @@ try {
         'promotion_id' => $promo !== null ? (int) $promo['id'] : null,
         'promotion_discount' => $promoDiscount,
         'total' => $total,
+        'register_promo_teaser' => $regTeaser,
     ]);
 } catch (RuntimeException $e) {
     json_response(['success' => false, 'code' => 'preview_failed', 'message' => $e->getMessage()], 422);

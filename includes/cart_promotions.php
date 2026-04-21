@@ -63,3 +63,69 @@ function orange_cart_promotion_resolve(PDO $pdo, float $subtotal, bool $buyerIsR
 
     return null;
 }
+
+/**
+ * أفضل عرض نشط «للمسجّلين فقط» يحققه المجموع (س7 — تحفيز التسجيل).
+ *
+ * @return array{min_subtotal: float, discount_amount: float}|null
+ */
+function orange_cart_promotion_best_registered_only_match(PDO $pdo, float $subtotal): ?array
+{
+    if (!orange_table_exists($pdo, 'cart_promotions')) {
+        return null;
+    }
+    $st = $pdo->query(
+        "SELECT min_subtotal, discount_amount
+         FROM cart_promotions
+         WHERE is_active = 1 AND requires_registered_account = 1
+         ORDER BY min_subtotal DESC, discount_amount DESC, id DESC"
+    );
+    if (!$st) {
+        return null;
+    }
+    while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+        $min = (float) ($row['min_subtotal'] ?? 0);
+        if ($subtotal + 0.00001 < $min) {
+            continue;
+        }
+        $disc = (float) ($row['discount_amount'] ?? 0);
+        if ($disc <= 0) {
+            continue;
+        }
+
+        return [
+            'min_subtotal' => $min,
+            'discount_amount' => round(min($disc, $subtotal), 4),
+        ];
+    }
+
+    return null;
+}
+
+/**
+ * فرق الخصم الإضافي للضيف إن سجّل — يُعرض فقط إن كان أوفر من عرض الضيف الحالي.
+ *
+ * @return array{you_save_extra: float, discount_amount: float, min_subtotal: float}|null
+ */
+function orange_cart_promotion_register_incentive_teaser(PDO $pdo, float $subtotal, bool $buyerIsRegistered): ?array
+{
+    if ($buyerIsRegistered || $subtotal <= 0) {
+        return null;
+    }
+    $guestPromo = orange_cart_promotion_resolve($pdo, $subtotal, false);
+    $guestDisc = $guestPromo !== null ? (float) $guestPromo['discount'] : 0.0;
+    $regOnly = orange_cart_promotion_best_registered_only_match($pdo, $subtotal);
+    if ($regOnly === null) {
+        return null;
+    }
+    $regDisc = (float) $regOnly['discount_amount'];
+    if ($regDisc <= $guestDisc + 1e-6) {
+        return null;
+    }
+
+    return [
+        'you_save_extra' => round($regDisc - $guestDisc, 4),
+        'discount_amount' => $regDisc,
+        'min_subtotal' => (float) $regOnly['min_subtotal'],
+    ];
+}

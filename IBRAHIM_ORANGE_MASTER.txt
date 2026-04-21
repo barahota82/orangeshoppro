@@ -1,7 +1,7 @@
 IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
 ============================================
 النسخة المعتمدة: جذر المستودع — IBRAHIM_ORANGE_MASTER.txt (مثلاً D:\orange)
-آخر تحديث: 2026-04-23 (§10: مرجع كود س25/س26؛ س13: طلبات الضيف؛ س8: تقرير مبيعات بالمنطقة في التقارير)
+آخر تحديث: 2026-04-23 (§10: س25/س26؛ س13: طلبات الضيف؛ س8: تقرير المناطق؛ س7: تحفيز تسجيل من checkout-preview؛ س28: reserved_orders)
 
 الغرض
 -------
@@ -163,6 +163,8 @@ IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
   API `api/orders/list-guest-storefront-orders.php`؛ تعبئة الجلسة من `create-order.php`، `intake-status.php`، `amend-order-items.php`؛
   واجهة `pages/cart.php` + `assets/js/cart.js`.
 - تقرير مبيعات حسب منطقة التوصيل (س8): `admin/pages/reports.php` — طلبات مكتملة مجمّعة حسب المنطقة.
+- تحفيز التسجيل عبر العروض (س7): `includes/cart_promotions.php` (`orange_cart_promotion_register_incentive_teaser`)؛ استجابة `api/cart/checkout-preview.php` (`register_promo_teaser`)؛ عرض في `assets/js/cart.js` + `pages/cart.php` (`ORANGE_REGISTER_URL`).
+- الطلبات المحجوزة (س28): `admin/pages/reserved_orders.php`.
 
 
 10) سياسات الواجهة والطلب أونلاين — مرجع إجابات المالك (إلزامي قبل التنفيذ)

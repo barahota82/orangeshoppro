@@ -410,6 +410,7 @@ function orangeCancelCheckoutPreview() {
         __orangeCartPreviewTimer = null;
     }
     __orangeCartPreviewSeq += 1;
+    orangeUpdateRegisterPromoTeaser(null);
 }
 
 function orangeCartClientSubtotalFromItems(items) {
@@ -499,7 +500,39 @@ function orangeHtmlCartMiniTotals(subtotal, promoDiscount, total) {
     return html;
 }
 
-function orangePatchCartTotalsFromServer(subtotal, promoDiscount, total) {
+function orangeUpdateRegisterPromoTeaser(teaser) {
+    const el = document.getElementById('cartRegisterPromoTeaser');
+    if (!el) {
+        return;
+    }
+    const acc = window.ORANGE_CART_SF_ACCOUNT || {};
+    if (acc.logged_in) {
+        el.hidden = true;
+        el.innerHTML = '';
+        return;
+    }
+    if (!teaser || typeof teaser.you_save_extra !== 'number' || !(teaser.you_save_extra > 1e-9)) {
+        el.hidden = true;
+        el.innerHTML = '';
+        return;
+    }
+    const T = window.APP_T || {};
+    const msg = String(T.cart_register_promo_teaser || '')
+        .replace(/\{extra\}/g, formatMoney(teaser.you_save_extra));
+    const action = T.cart_register_promo_teaser_action || '';
+    const url = typeof window.ORANGE_REGISTER_URL === 'string' ? window.ORANGE_REGISTER_URL.trim() : '';
+    const safeMsg = escCartHtml(msg);
+    const safeAct = escCartHtml(action);
+    let linkHtml = '';
+    if (url && action) {
+        linkHtml =
+            ' <a class="cart-register-promo-teaser__link" href="' + escCartAttr(url) + '">' + safeAct + '</a>';
+    }
+    el.hidden = false;
+    el.innerHTML = '<p class="cart-register-promo-teaser__text">' + safeMsg + linkHtml + '</p>';
+}
+
+function orangePatchCartTotalsFromServer(subtotal, promoDiscount, total, registerTeaser) {
     const main = document.getElementById('cartMainTotals');
     if (main && main.parentNode) {
         const wrap = document.createElement('div');
@@ -518,6 +551,7 @@ function orangePatchCartTotalsFromServer(subtotal, promoDiscount, total) {
             mini.parentNode.replaceChild(next, mini);
         }
     }
+    orangeUpdateRegisterPromoTeaser(registerTeaser);
 }
 
 function orangeScheduleCheckoutPreview() {
@@ -558,10 +592,12 @@ async function orangeRunCheckoutPreview() {
         ) {
             const promo =
                 typeof data.promotion_discount === 'number' ? data.promotion_discount : 0;
-            orangePatchCartTotalsFromServer(data.subtotal, promo, data.total);
+            orangePatchCartTotalsFromServer(data.subtotal, promo, data.total, data.register_promo_teaser || null);
+        } else {
+            orangeUpdateRegisterPromoTeaser(null);
         }
     } catch (e) {
-        /* keep client-rendered totals */
+        orangeUpdateRegisterPromoTeaser(null);
     }
 }
 
@@ -612,6 +648,7 @@ function orangeRenderCheckoutMiniSummary() {
         '</ul>' +
         moreHtml +
         orangeHtmlCartMiniTotals(clientSub, 0, clientSub) +
+        '<div class="cart-register-promo-teaser" id="cartRegisterPromoTeaser" hidden></div>' +
         '</div>';
     orangeScheduleCheckoutPreview();
 }
