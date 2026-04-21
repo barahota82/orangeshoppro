@@ -969,6 +969,41 @@ function orangeCustomerCanCancelByStatus(st) {
     return false;
 }
 
+function orangeOrderCartPromoDiscountAmount(order) {
+    if (!order || order.cart_promotion_discount == null) {
+        return 0;
+    }
+    const n =
+        typeof order.cart_promotion_discount === 'number'
+            ? order.cart_promotion_discount
+            : parseFloat(String(order.cart_promotion_discount));
+    if (!Number.isFinite(n) || n <= 0) {
+        return 0;
+    }
+    return n;
+}
+
+function orangeHtmlOrderPromoParagraph(order, cur, paragraphClass) {
+    const d = orangeOrderCartPromoDiscountAmount(order);
+    if (d <= 1e-9) {
+        return '';
+    }
+    const T = window.APP_T || {};
+    const lbl = T.cart_promotion_discount_label || '';
+    const cls = paragraphClass ? ' class="' + orangeEscDomAttr(paragraphClass) + '"' : '';
+    return (
+        '<p' +
+        cls +
+        '><strong>' +
+        orangeEscDomText(lbl) +
+        ':</strong> −' +
+        orangeEscDomText(d.toFixed(3)) +
+        ' ' +
+        orangeEscDomText(String(cur || '')) +
+        '</p>'
+    );
+}
+
 function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, items) {
     const UI = window.ORANGE_MY_ORDER_UI || {};
     const labels = window.ORANGE_ORDER_STATUS_LABELS || {};
@@ -1000,6 +1035,7 @@ function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, 
     if (order.phone) {
         html += '<p><strong>' + orangeEscDomText(lblPhone) + ':</strong> ' + orangeEscDomText(String(order.phone)) + '</p>';
     }
+    html += orangeHtmlOrderPromoParagraph(order, cur, 'order-cart-promo-line');
     html += '<p><strong>' + orangeEscDomText(UI.order_total_label || '') + ':</strong> ' + orangeEscDomText(String(order.total)) + ' ' + orangeEscDomText(cur) + '</p>';
     const pt = String(order.payment_terms || 'cash').toLowerCase();
     const ptLabel = pt === 'credit' ? (UI.payment_credit || '') : (pt === 'online' ? (UI.payment_online || '') : (UI.payment_cash || ''));
@@ -1101,6 +1137,11 @@ function orangeRenderTrackSignupSummary(el, order, orderNumber, phoneTyped, item
         html += '<p class="track-signup-order-summary__line"><strong>' + orangeEscDomText(lblPhone) + ':</strong> ';
         html += orangeEscDomText(String(order.phone)) + '</p>';
     }
+    html += orangeHtmlOrderPromoParagraph(
+        order,
+        cur,
+        'track-signup-order-summary__line order-cart-promo-line'
+    );
     html += '<p class="track-signup-order-summary__line"><strong>' + orangeEscDomText(UI.order_total_label || '') + ':</strong> ';
     html += orangeEscDomText(String(order.total)) + ' ' + orangeEscDomText(cur) + '</p>';
     const pt = String(order.payment_terms || 'cash').toLowerCase();
@@ -1330,6 +1371,11 @@ function orangeCartRenderAccountOrderCard(row) {
     if (ph) {
         html += '<p class="cart-account-order-card__row"><strong>' + orangeEscDomText(lblPhone) + ':</strong> ' + orangeEscDomText(ph) + '</p>';
     }
+    html += orangeHtmlOrderPromoParagraph(
+        row,
+        cur,
+        'cart-account-order-card__row order-cart-promo-line'
+    );
     html +=
         '<p class="cart-account-order-card__row"><strong>' +
         orangeEscDomText(UI.order_total_label || '') +

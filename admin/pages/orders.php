@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../includes/admin_permissions.php';
 
 $pdo = db();
 $hasOrderInvoiceCol = orange_table_has_column($pdo, 'orders', 'invoice_number');
+$hasCartPromoDiscountCol = orange_table_has_column($pdo, 'orders', 'cart_promotion_discount');
 
 $sourceFilter = isset($_GET['source']) ? trim((string)$_GET['source']) : 'all';
 if (!in_array($sourceFilter, ['all', 'website', 'company'], true)) {
@@ -180,7 +181,15 @@ function orange_admin_orders_action_buttons(array $o): void
                     <td class="col-orders-customer"><?php echo htmlspecialchars((string)($o['customer_name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td class="col-orders-phone"><?php echo htmlspecialchars((string)($o['phone'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo htmlspecialchars((string)($o['channel_name'] ?: '-'), ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo number_format((float)($o['total'] ?? 0), 2); ?> KD</td>
+                    <td><?php
+                        echo number_format((float)($o['total'] ?? 0), 2) . ' KD';
+                        if ($hasCartPromoDiscountCol) {
+                            $pd = (float)($o['cart_promotion_discount'] ?? 0);
+                            if ($pd > 0.00001) {
+                                echo '<br><span class="small" title="خصم عرض مجموع السلة">عرض: −' . htmlspecialchars(number_format($pd, 2), ENT_QUOTES, 'UTF-8') . '</span>';
+                            }
+                        }
+                    ?></td>
                     <td><?php
                         $stBadge = strtolower(trim((string)($o['status'] ?? '')));
                         if ($stBadge === '') {

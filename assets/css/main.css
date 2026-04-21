@@ -1760,6 +1760,11 @@ body.storefront .product-gallery__img {
     font-weight: 600;
 }
 
+.order-cart-promo-line {
+    color: color-mix(in srgb, var(--primary) 72%, var(--text));
+    font-size: 0.95rem;
+}
+
 .cart-mini-total {
     display: flex;
     align-items: center;
