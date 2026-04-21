@@ -48,7 +48,7 @@ require_once __DIR__ . '/../../includes/storefront_hero.php';
 ?>
 <div class="page-title page-title--stacked">
     <h1>بانر الصفحة الرئيسية</h1>
-    <p class="page-subtitle">أضف جمل الـ hero والتناوب تحت الشعار في الهيدر: جدول في الأسفل، تعديل، حذف، وإخفاء/تفعيل. <strong>ترتيب العرض</strong> يُضبط تلقائياً عند الإضافة؛ لإعادة الترتيب استخدم «أعلى / أسفل» في الجدول. النص الظاهر للزائر حسب <strong>لغة واجهته</strong>.</p>
+    <p class="page-subtitle">أضف جمل الـ hero والتناوب تحت الشعار في الهيدر: جدول في الأسفل، تعديل، حذف، وإخفاء/تفعيل. <strong>ترتيب العرض</strong> يُضبط تلقائياً عند الإضافة؛ لإعادة الترتيب استخدم «أعلى / أسفل» في الجدول. جمل <strong>الـ hero</strong> تظهر للزائر حسب <strong>لغة واجهته</strong>؛ جمل <strong>الهيدر</strong> تتناوب للجميع بترتيب اللغات في كل صف: عربي ثم إنجليزي ثم فلبيني ثم هندي (الحقول الفارغة تُستبعد من الدورة).</p>
 </div>
 
 <?php if (!$hasTable): ?>
@@ -59,7 +59,7 @@ require_once __DIR__ . '/../../includes/storefront_hero.php';
 
 <div class="card">
     <h3>شعار الهيدر — جمل التناوب تحت الشعار</h3>
-    <p class="card-hint" style="margin:0 0 0.75rem;">يظهر في شريط الهيدر تحت اسم المتجر. إن لم تُضف جمل نشطة يُستعاد النص من الإعداد القديم أو من الترجمة.</p>
+    <p class="card-hint" style="margin:0 0 0.75rem;">يظهر في شريط الهيدر تحت اسم المتجر. التناوب يمرّ بالصفوف النشطة ثم بكل لغة غير فارغة في الصف بالترتيب: عربي → English → Filipino → Hindi. إن لم تُضف جمل نشطة يُستعاد من الجدول القديم <code>storefront_home_hero</code> إن وُجد.</p>
     <input type="hidden" id="header_line_id" value="<?php echo $headerEdit ? (int) $headerEdit['id'] : ''; ?>">
     <div class="form-grid" style="margin-top:1rem;">
         <div>

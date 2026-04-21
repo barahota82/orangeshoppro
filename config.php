@@ -1896,14 +1896,14 @@ function storefront_home_hero_lines(): array {
 }
 
 /**
- * جمل التناوب تحت الشعار في الهيدر: صفوف نشطة من الأدمن حسب لغة الواجهة؛ وإلا من البيانات القديمة أو الترجمة.
+ * جمل التناوب تحت الشعار في الهيدر: لكل صف نشط، الترتيب عربي → إنجليزي → فلبيني → هندي (غير الفارغ فقط).
  *
  * @return list<string>
  */
 function storefront_tagline_cycle_messages(): array {
     require_once __DIR__ . '/includes/storefront_hero.php';
 
-    return orange_storefront_header_tagline_cycle_resolved(db(), current_lang());
+    return orange_storefront_header_tagline_cycle_resolved(db());
 }
 
 function json_response($data, int $httpCode = 200): void {

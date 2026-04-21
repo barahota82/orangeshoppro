@@ -119,11 +119,39 @@ function orange_storefront_home_hero_lines_resolved(PDO $pdo, string $lang): arr
 }
 
 /**
- * جمل التناوب تحت الشعار: صفوف نشطة header_tagline، النص حسب لغة الواجهة الحالية.
+ * استخراج نصوص تناوب الهيدر من صف واحد بترتيث ثابت: عربي → إنجليزي → فلبيني → هندي (تخطي الفارغ).
+ *
+ * @param array<string, mixed> $row صف storefront_copy_lines أو أعمدة legacy للهيدر
  *
  * @return list<string>
  */
-function orange_storefront_header_tagline_cycle_resolved(PDO $pdo, string $lang): array
+function orange_storefront_header_tagline_row_lang_cycle(array $row): array
+{
+    if (array_key_exists('text_ar', $row)) {
+        $cols = ['text_ar', 'text_en', 'text_fil', 'text_hi'];
+    } elseif (array_key_exists('header_tagline_ar', $row)) {
+        $cols = ['header_tagline_ar', 'header_tagline_en', 'header_tagline_fil', 'header_tagline_hi'];
+    } else {
+        return [];
+    }
+    $out = [];
+    foreach ($cols as $col) {
+        $t = trim((string) ($row[$col] ?? ''));
+        if ($t !== '') {
+            $out[] = $t;
+        }
+    }
+
+    return $out;
+}
+
+/**
+ * جمل التناوب تحت الشعار: لكل صف نشط header_tagline يُعرض التناوب بكل اللغات غير الفارغة
+ * بالترتيب عربي → إنجليزي → فلبيني → هندي (ثم الصف التالي بنفس المنطق).
+ *
+ * @return list<string>
+ */
+function orange_storefront_header_tagline_cycle_resolved(PDO $pdo): array
 {
     $out = [];
     try {
@@ -136,8 +164,7 @@ function orange_storefront_header_tagline_cycle_resolved(PDO $pdo, string $lang)
                 if (!is_array($row)) {
                     break;
                 }
-                $t = orange_storefront_copy_text_for_lang($row, $lang);
-                if ($t !== '') {
+                foreach (orange_storefront_header_tagline_row_lang_cycle($row) as $t) {
                     $out[] = $t;
                 }
             }
@@ -155,14 +182,7 @@ function orange_storefront_header_tagline_cycle_resolved(PDO $pdo, string $lang)
             );
             $legacy = $st ? $st->fetch(PDO::FETCH_ASSOC) : false;
             if (is_array($legacy)) {
-                $col = match ($lang) {
-                    'ar' => 'header_tagline_ar',
-                    'fil' => 'header_tagline_fil',
-                    'hi' => 'header_tagline_hi',
-                    default => 'header_tagline_en',
-                };
-                $t = trim((string) ($legacy[$col] ?? ''));
-                if ($t !== '') {
+                foreach (orange_storefront_header_tagline_row_lang_cycle($legacy) as $t) {
                     $out[] = $t;
                 }
             }
