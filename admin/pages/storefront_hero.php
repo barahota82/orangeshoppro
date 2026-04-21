@@ -41,17 +41,6 @@ if ($editId > 0 && $hasTable) {
     }
 }
 
-$maxHeroSort = 0;
-foreach ($heroLines as $r) {
-    $maxHeroSort = max($maxHeroSort, (int) ($r['sort_order'] ?? 0));
-}
-$maxHeaderSort = 0;
-foreach ($headerLines as $r) {
-    $maxHeaderSort = max($maxHeaderSort, (int) ($r['sort_order'] ?? 0));
-}
-
-$heroDefaultSort = $heroEdit ? (int) ($heroEdit['sort_order'] ?? 0) : ($maxHeroSort + 1);
-$headerDefaultSort = $headerEdit ? (int) ($headerEdit['sort_order'] ?? 0) : ($maxHeaderSort + 1);
 $heroEditActive = $heroEdit ? (int) ($heroEdit['is_active'] ?? 1) : 1;
 $headerEditActive = $headerEdit ? (int) ($headerEdit['is_active'] ?? 1) : 1;
 
@@ -59,7 +48,7 @@ require_once __DIR__ . '/../../includes/storefront_hero.php';
 ?>
 <div class="page-title page-title--stacked">
     <h1>بانر الصفحة الرئيسية</h1>
-    <p class="page-subtitle">أضف جمل الـ hero والتناوب تحت الشعار في الهيدر كما تفعل مع القنوات: جدول في الأسفل، تعديل، حذف، وإخفاء/تفعيل. الترتيب المعروض للزائر حسب <strong>ترتيب العرض</strong> ثم رقم السجل. النص الظاهر للزائر حسب <strong>لغة واجهته</strong>؛ اترك لغة فارغة إن لم تُستخدم.</p>
+    <p class="page-subtitle">أضف جمل الـ hero والتناوب تحت الشعار في الهيدر: جدول في الأسفل، تعديل، حذف، وإخفاء/تفعيل. <strong>ترتيب العرض</strong> يُضبط تلقائياً عند الإضافة؛ لإعادة الترتيب استخدم «أعلى / أسفل» في الجدول. النص الظاهر للزائر حسب <strong>لغة واجهته</strong>.</p>
 </div>
 
 <?php if (!$hasTable): ?>
@@ -75,7 +64,11 @@ require_once __DIR__ . '/../../includes/storefront_hero.php';
     <div class="form-grid" style="margin-top:1rem;">
         <div>
             <label>ترتيب العرض</label>
-            <input type="number" id="header_sort_order" step="1" value="<?php echo (int) $headerDefaultSort; ?>">
+            <?php if ($headerEdit): ?>
+                <input type="number" value="<?php echo (int) ($headerEdit['sort_order'] ?? 0); ?>" disabled title="لتغيير الترتيب استخدم أزرار أعلى/أسفل في الجدول" style="opacity:0.85;">
+            <?php else: ?>
+                <input type="text" value="تلقائي — تُضاف في نهاية القائمة" disabled style="opacity:0.85;">
+            <?php endif; ?>
         </div>
         <div>
             <label>حالة الظهور</label>
@@ -106,6 +99,7 @@ require_once __DIR__ . '/../../includes/storefront_hero.php';
                 <tr>
                     <th>#</th>
                     <th>ترتيب</th>
+                    <th>أعلى / أسفل</th>
                     <th>معاينة نص</th>
                     <th>الحالة</th>
                     <th>إخفاء / تفعيل</th>
@@ -114,10 +108,14 @@ require_once __DIR__ . '/../../includes/storefront_hero.php';
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($headerLines as $row): ?>
+                <?php foreach ($headerLines as $hi => $row): ?>
                 <tr>
                     <td><?php echo (int) $row['id']; ?></td>
                     <td><?php echo (int) ($row['sort_order'] ?? 0); ?></td>
+                    <td style="white-space:nowrap;">
+                        <button type="button" class="btn btn-secondary" style="font-size:0.8rem;padding:0.2rem 0.45rem;" onclick="moveCopyLine('header_tagline', <?php echo (int) $row['id']; ?>, 'up')" <?php echo $hi === 0 ? 'disabled' : ''; ?>>أعلى</button>
+                        <button type="button" class="btn btn-secondary" style="font-size:0.8rem;padding:0.2rem 0.45rem;" onclick="moveCopyLine('header_tagline', <?php echo (int) $row['id']; ?>, 'down')" <?php echo $hi === count($headerLines) - 1 ? 'disabled' : ''; ?>>أسفل</button>
+                    </td>
                     <td><?php echo htmlspecialchars(orange_storefront_copy_preview_snippet($row), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo (int) ($row['is_active'] ?? 0) === 1 ? 'نشط' : 'مخفي'; ?></td>
                     <td>
@@ -128,7 +126,7 @@ require_once __DIR__ . '/../../includes/storefront_hero.php';
                 </tr>
                 <?php endforeach; ?>
                 <?php if ($headerLines === []): ?>
-                <tr><td colspan="7" class="card-hint">لا توجد جمل بعد. أضف جملة من النموذج أعلاه.</td></tr>
+                <tr><td colspan="8" class="card-hint">لا توجد جمل بعد. أضف جملة من النموذج أعلاه.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
@@ -142,7 +140,11 @@ require_once __DIR__ . '/../../includes/storefront_hero.php';
     <div class="form-grid" style="margin-top:1rem;">
         <div>
             <label>ترتيب العرض</label>
-            <input type="number" id="hero_sort_order" step="1" value="<?php echo (int) $heroDefaultSort; ?>">
+            <?php if ($heroEdit): ?>
+                <input type="number" value="<?php echo (int) ($heroEdit['sort_order'] ?? 0); ?>" disabled title="لتغيير الترتيب استخدم أزرار أعلى/أسفل في الجدول" style="opacity:0.85;">
+            <?php else: ?>
+                <input type="text" value="تلقائي — تُضاف في نهاية القائمة" disabled style="opacity:0.85;">
+            <?php endif; ?>
         </div>
         <div>
             <label>حالة الظهور</label>
@@ -173,6 +175,7 @@ require_once __DIR__ . '/../../includes/storefront_hero.php';
                 <tr>
                     <th>#</th>
                     <th>ترتيب</th>
+                    <th>أعلى / أسفل</th>
                     <th>معاينة نص</th>
                     <th>الحالة</th>
                     <th>إخفاء / تفعيل</th>
@@ -181,10 +184,14 @@ require_once __DIR__ . '/../../includes/storefront_hero.php';
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($heroLines as $row): ?>
+                <?php foreach ($heroLines as $gi => $row): ?>
                 <tr>
                     <td><?php echo (int) $row['id']; ?></td>
                     <td><?php echo (int) ($row['sort_order'] ?? 0); ?></td>
+                    <td style="white-space:nowrap;">
+                        <button type="button" class="btn btn-secondary" style="font-size:0.8rem;padding:0.2rem 0.45rem;" onclick="moveCopyLine('home_hero', <?php echo (int) $row['id']; ?>, 'up')" <?php echo $gi === 0 ? 'disabled' : ''; ?>>أعلى</button>
+                        <button type="button" class="btn btn-secondary" style="font-size:0.8rem;padding:0.2rem 0.45rem;" onclick="moveCopyLine('home_hero', <?php echo (int) $row['id']; ?>, 'down')" <?php echo $gi === count($heroLines) - 1 ? 'disabled' : ''; ?>>أسفل</button>
+                    </td>
                     <td><?php echo htmlspecialchars(orange_storefront_copy_preview_snippet($row), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo (int) ($row['is_active'] ?? 0) === 1 ? 'نشط' : 'مخفي'; ?></td>
                     <td>
@@ -195,7 +202,7 @@ require_once __DIR__ . '/../../includes/storefront_hero.php';
                 </tr>
                 <?php endforeach; ?>
                 <?php if ($heroLines === []): ?>
-                <tr><td colspan="7" class="card-hint">لا توجد جمل بعد. أضف جملة من النموذج أعلاه.</td></tr>
+                <tr><td colspan="8" class="card-hint">لا توجد جمل بعد. أضف جملة من النموذج أعلاه.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
@@ -303,12 +310,6 @@ function scheduleHeroFromEn() {
     heroEnTimer = setTimeout(function () { translateHeroFromArabic({ silent: true, forceFromArabic: false }); }, 600);
 }
 
-function parseSort(id) {
-    var el = document.getElementById(id);
-    var v = el ? parseInt(el.value, 10) : 0;
-    return isNaN(v) ? 0 : v;
-}
-
 function parseActive(id) {
     var el = document.getElementById(id);
     return el && el.value === '0' ? 0 : 1;
@@ -321,7 +322,6 @@ async function saveHeaderCopyLine() {
         action: 'save',
         scope: 'header_tagline',
         id: id > 0 ? id : 0,
-        sort_order: parseSort('header_sort_order'),
         is_active: parseActive('header_is_active'),
         text_ar: document.getElementById('header_text_ar').value.trim(),
         text_en: document.getElementById('header_text_en').value.trim(),
@@ -340,7 +340,6 @@ async function saveHeroCopyLine() {
         action: 'save',
         scope: 'home_hero',
         id: id > 0 ? id : 0,
-        sort_order: parseSort('hero_sort_order'),
         is_active: parseActive('hero_is_active'),
         text_ar: document.getElementById('hero_text_ar').value.trim(),
         text_en: document.getElementById('hero_text_en').value.trim(),
@@ -373,6 +372,23 @@ async function deleteCopyLine(scope, id) {
     });
     alert(res.message || (res.success ? 'تم' : 'فشل'));
     if (res.success) location.reload();
+}
+
+async function moveCopyLine(scope, id, direction) {
+    var res = await postJSON('/admin/api/settings/storefront_copy_lines.php', {
+        action: 'move',
+        scope: scope,
+        id: id,
+        direction: direction
+    });
+    if (res.success) {
+        location.reload();
+        return;
+    }
+    if (res.message === 'لا يمكن النقل في هذا الاتجاه') {
+        return;
+    }
+    alert(res.message || 'فشل تحديث الترتيب');
 }
 
 document.getElementById('header_text_ar').addEventListener('input', scheduleHeaderFromAr);
