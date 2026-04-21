@@ -253,3 +253,36 @@ function orange_storefront_link_order_to_account_row(PDO $pdo, string $orderNumb
     }
     $pdo->prepare('UPDATE orders SET storefront_account_id = ? WHERE id = ?')->execute([$accountId, (int) $ord['id']]);
 }
+
+/**
+ * س14: ضيف — إلغاء قبل موافقة الشركة فقط (pending). مسجّل داخل جلسة — قبل الشحن: pending أو approved.
+ *
+ * @param array<string,mixed>|null $account ناتج current_storefront_account() أو null
+ */
+function orange_storefront_customer_may_cancel_order(PDO $pdo, array $order, ?array $account, string $phoneNorm): bool
+{
+    $st = strtolower(trim((string) ($order['status'] ?? '')));
+    if ($st === 'pending') {
+        return true;
+    }
+    if ($st !== 'approved') {
+        return false;
+    }
+    if ($account === null || empty($account['id'])) {
+        return false;
+    }
+    require_once __DIR__ . '/catalog_schema.php';
+    require_once __DIR__ . '/order_helpers.php';
+    if (orange_table_exists($pdo, 'orders') && orange_table_has_column($pdo, 'orders', 'storefront_account_id')) {
+        $oid = (int) ($order['storefront_account_id'] ?? 0);
+        if ($oid > 0 && $oid === (int) $account['id']) {
+            return true;
+        }
+    }
+    $cp = isset($account['customer_phone']) ? trim((string) $account['customer_phone']) : '';
+    if ($cp !== '' && orange_order_phones_match_for_lookup($phoneNorm, $cp)) {
+        return true;
+    }
+
+    return false;
+}

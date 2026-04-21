@@ -771,6 +771,21 @@ function orangeEscDomAttr(s) {
     return orangeEscDomText(s).replace(/'/g, '&#39;');
 }
 
+/** س14: ضيف يُلغي في pending فقط؛ مسجّل من الجلسة يُلغي pending أو approved (قبل الشحن). */
+function orangeCustomerCanCancelByStatus(st) {
+    const s = String(st || '')
+        .toLowerCase()
+        .trim();
+    const loggedIn = typeof window.ORANGE_SF_LOGGED_IN !== 'undefined' && window.ORANGE_SF_LOGGED_IN === true;
+    if (s === 'pending') {
+        return true;
+    }
+    if (s === 'approved') {
+        return loggedIn;
+    }
+    return false;
+}
+
 function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, items) {
     const UI = window.ORANGE_MY_ORDER_UI || {};
     const labels = window.ORANGE_ORDER_STATUS_LABELS || {};
@@ -783,7 +798,7 @@ function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, 
     const cur = String(UI.currency || 'KD');
     const itemRows = Array.isArray(items) ? items : [];
 
-    const canCancel = st === 'pending' || st === 'approved';
+    const canCancel = orangeCustomerCanCancelByStatus(st);
     let waUrl = null;
     const prefillRaw = String(UI.whatsapp_prefill || '').replace(/\{order\}/g, String(order.order_number || orderNumber));
     const waBase = window.ORANGE_STOREFRONT_WA;
@@ -884,7 +899,7 @@ function orangeRenderTrackSignupSummary(el, order, orderNumber, phoneTyped, item
     const cur = String(UI.currency || 'KD');
     const itemRows = Array.isArray(items) ? items : [];
 
-    const canCancel = st === 'pending' || st === 'approved';
+    const canCancel = orangeCustomerCanCancelByStatus(st);
     let waUrl = null;
     const prefillRaw = String(UI.whatsapp_prefill || '').replace(/\{order\}/g, String(order.order_number || orderNumber));
     const waBase = window.ORANGE_STOREFRONT_WA;
@@ -1100,7 +1115,7 @@ function orangeCartRenderAccountOrderCard(row) {
     const L = window.ORANGE_TRACK_LABELS || {};
     const st = String(row.status || '').toLowerCase().trim();
     const statusText = labels[st] || row.status || '—';
-    const canCancel = st === 'pending' || st === 'approved';
+    const canCancel = orangeCustomerCanCancelByStatus(st);
     const cur = String(UI.currency || 'KD');
     const lblOrder = L.order_number || 'Order #';
     const lblPhone = L.phone || 'Phone';

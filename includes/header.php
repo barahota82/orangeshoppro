@@ -29,15 +29,18 @@ $sfDisplayName = storefront_channel_display_name($channel, $channelSlug);
 $sfThemeColor = '#ff6a00';
 
 $orangeAccountChannelForJs = '';
+$orangeSfLoggedInForJs = false;
 try {
     require_once __DIR__ . '/storefront_account.php';
     $pdoNavAcc = db();
     $accNav = current_storefront_account($pdoNavAcc);
+    $orangeSfLoggedInForJs = $accNav !== null;
     if ($accNav && ($accNav['registered_channel_slug'] ?? '') !== '') {
         $orangeAccountChannelForJs = (string) $accNav['registered_channel_slug'];
     }
 } catch (Throwable $e) {
     $orangeAccountChannelForJs = '';
+    $orangeSfLoggedInForJs = false;
 }
 
 $orangePubBase = PUBLIC_BASE_PATH === '' ? '' : PUBLIC_BASE_PATH;
@@ -217,6 +220,7 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
         window.APP_CHANNEL_ID = <?php echo (int)($channel['id'] ?? 0); ?>;
         window.APP_CHANNEL_SLUG = <?php echo json_encode($channelSlug, JSON_UNESCAPED_UNICODE); ?>;
         window.ORANGE_ACCOUNT_CHANNEL = <?php echo json_encode($orangeAccountChannelForJs, JSON_UNESCAPED_UNICODE); ?>;
+        window.ORANGE_SF_LOGGED_IN = <?php echo $orangeSfLoggedInForJs ? 'true' : 'false'; ?>;
         window.STOREFRONT_BASE = <?php echo json_encode(PUBLIC_BASE_PATH, JSON_UNESCAPED_UNICODE); ?>;
         window.orangeSfCartKey = function () {
             var allowed = window.ORANGE_SF_VALID_SLUGS || {};

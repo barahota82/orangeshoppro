@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/order_helpers.php';
 require_once __DIR__ . '/../../includes/order_stock.php';
 require_once __DIR__ . '/../../includes/phone_validation.php';
+require_once __DIR__ . '/../../includes/storefront_account.php';
 
 try {
     $pdo = db();
@@ -45,7 +46,8 @@ try {
         ]);
     }
 
-    if (!in_array($st, ['pending', 'approved'], true)) {
+    $accCaller = current_storefront_account($pdo);
+    if (!orange_storefront_customer_may_cancel_order($pdo, $order, $accCaller, $phoneNorm)) {
         json_response(['success' => false, 'code' => 'cancel_not_allowed', 'message' => t('customer_cancel_not_allowed')], 403);
     }
 
