@@ -222,6 +222,7 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
         window.ORANGE_ACCOUNT_CHANNEL = <?php echo json_encode($orangeAccountChannelForJs, JSON_UNESCAPED_UNICODE); ?>;
         window.ORANGE_SF_LOGGED_IN = <?php echo $orangeSfLoggedInForJs ? 'true' : 'false'; ?>;
         window.STOREFRONT_BASE = <?php echo json_encode(PUBLIC_BASE_PATH, JSON_UNESCAPED_UNICODE); ?>;
+        window.ORANGE_STOREFRONT_CART_URL = <?php echo json_encode(storefront_url('cart', $channelSlug, $lang), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
         window.orangeSfCartKey = function () {
             var allowed = window.ORANGE_SF_VALID_SLUGS || {};
             var def = String(window.ORANGE_SF_DEFAULT_CHANNEL_SLUG || 'tiktok').toLowerCase();
