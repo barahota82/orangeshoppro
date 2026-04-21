@@ -1,7 +1,7 @@
 IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
 ============================================
 النسخة المعتمدة: جذر المستودع — IBRAHIM_ORANGE_MASTER.txt (مثلاً D:\orange)
-آخر تحديث: 2026-04-19 (§10: س25/س26؛ س13 + بريد التتبع؛ س8/س18 كود الدولة عربة + تسجيل؛ س19 بريد الضيف في العربة؛ س7؛ س28؛ س4)
+آخر تحديث: 2026-04-19 (§10: س25/س26؛ س13 + بريد التتبع؛ س30 بنود الطلب الجزئي؛ س8/س18 كود الدولة عربة + تسجيل؛ س19 بريد الضيف في العربة؛ س7؛ س28؛ س4)
 
 الغرض
 -------
@@ -162,6 +162,7 @@ IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
 - تاب «طلباتي» للضيف (س13): جلسة `orange_sf_guest_recent_phone` في `includes/storefront_account.php`؛
   API `api/orders/list-guest-storefront-orders.php`؛ تعبئة الجلسة من `create-order.php`، `intake-status.php`، `amend-order-items.php`؛
   واجهة `pages/cart.php` + `assets/js/cart.js`.
+- طلب جزئي من العربة (س30): عند أكثر من سطر وليس وضع تعديل طلب، اختيار البنود المُرسَلة في `assets/js/cart.js`؛ الباقي يبقى في `localStorage`؛ الإرسال `sendOrderNow` → `create-order.php`؛ وضع التعديل `amend` يُرسل كامل السلة كسابق.
 - بريد تفاصيل الطلب بعد التتبع (س13): `api/orders/email-track-order-summary.php` + عرض في `assets/js/cart.js` (`orangeSendTrackOrderEmailSummary`).
 - تقرير مبيعات حسب منطقة التوصيل (س8): `admin/pages/reports.php` — طلبات مكتملة مجمّعة حسب المنطقة.
 - كود دولة الهاتف (س8/س18): `#customer_phone_country` + `#customer_phone` في `pages/cart.php`؛ `#reg_phone_country` + `#reg_phone` في `pages/register.php` (`includes/storefront_phone_country_select.php`)؛ التطبيع `assets/js/input-constraints.js`؛ الإرسال من `assets/js/cart.js` و`request-email-verify.php` (حقل `phone_country` في JSON).

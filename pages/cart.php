@@ -77,6 +77,7 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
 
     <div id="cart-panel-basket" role="tabpanel" aria-labelledby="cart-tab-basket" class="cart-page-panel cart-page-panel--basket">
         <div class="card-box cart-basket-card">
+            <p class="cart-checkout-intro cart-basket-tab-intro"><?php echo htmlspecialchars(t('cart_basket_tab_intro'), ENT_QUOTES, 'UTF-8'); ?></p>
             <div id="cartItems"></div>
             <div class="cart-basket-footer">
                 <button type="button" class="btn cart-proceed-btn" id="cartProceedBtn" onclick="orangeCartProceedToCheckout()" disabled>
@@ -88,6 +89,7 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
 
     <div id="cart-panel-orders" role="tabpanel" aria-labelledby="cart-tab-orders" class="cart-page-panel cart-page-panel--orders" hidden>
         <div class="cart-orders-stack">
+            <p class="cart-checkout-intro cart-orders-tab-intro"><?php echo htmlspecialchars(t('cart_orders_tab_intro'), ENT_QUOTES, 'UTF-8'); ?></p>
             <?php if ($cartSfLoggedIn): ?>
             <div class="card-box cart-account-orders-card">
                 <h3 class="cart-account-orders-title"><?php echo htmlspecialchars(t('cart_account_orders_heading_active'), ENT_QUOTES, 'UTF-8'); ?></h3>

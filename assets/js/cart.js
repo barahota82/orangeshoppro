@@ -1,3 +1,92 @@
+/** تضمين بند في الطلب الحالي عند وجود أكثر من سطر في العربة (سياسة س30). */
+var orangeCartLineIncluded = Object.create(null);
+
+function orangeCartLineKey(it) {
+    return [
+        parseInt(it.id, 10) || 0,
+        parseInt(it.variant_id || 0, 10) || 0,
+        it.color != null ? String(it.color) : '',
+        it.size != null ? String(it.size) : '',
+    ].join('\x1e');
+}
+
+function orangeCartAmendActive() {
+    const a = window.__orangePendingAmend;
+    return !!(a && a.order_number);
+}
+
+function orangeCartLineChoiceApplies(items) {
+    return Array.isArray(items) && items.length > 1 && !orangeCartAmendActive();
+}
+
+function orangeCartLineIsIncluded(it) {
+    const k = orangeCartLineKey(it);
+    if (!Object.prototype.hasOwnProperty.call(orangeCartLineIncluded, k)) {
+        return true;
+    }
+    return orangeCartLineIncluded[k] !== false;
+}
+
+function orangeCartGetSelectedItems(items) {
+    return items.filter(orangeCartLineIsIncluded);
+}
+
+function orangeCartClearLineChoiceState() {
+    Object.keys(orangeCartLineIncluded).forEach((k) => delete orangeCartLineIncluded[k]);
+}
+
+function orangeCartRefreshBasketTotalsClientAndPreview() {
+    const items = getCart();
+    const mainEl = document.getElementById('cartMainTotals');
+    if (!mainEl || !mainEl.parentNode) {
+        orangeRenderCheckoutMiniSummary();
+        return;
+    }
+    const choice = orangeCartLineChoiceApplies(items);
+    const sel = choice ? orangeCartGetSelectedItems(items) : items;
+    if (choice && !sel.length) {
+        const wrap0 = document.createElement('div');
+        wrap0.innerHTML = orangeHtmlCartMainTotals(0, 0, 0);
+        const next0 = wrap0.firstElementChild;
+        if (next0) {
+            mainEl.parentNode.replaceChild(next0, mainEl);
+        }
+        orangeCancelCheckoutPreview();
+        orangeRenderCheckoutMiniSummary();
+        return;
+    }
+    const sub = orangeCartClientSubtotalFromItems(sel);
+    const wrap = document.createElement('div');
+    wrap.innerHTML = orangeHtmlCartMainTotals(sub, 0, sub);
+    const next = wrap.firstElementChild;
+    if (next) {
+        mainEl.parentNode.replaceChild(next, mainEl);
+    }
+    orangeRenderCheckoutMiniSummary();
+}
+
+function orangeCartSetLineIncluded(idx, checked) {
+    const items = getCart();
+    const it = items[idx];
+    if (!it) {
+        return;
+    }
+    orangeCartLineIncluded[orangeCartLineKey(it)] = !!checked;
+    orangeCartRefreshBasketTotalsClientAndPreview();
+    orangeSyncCartProceedBtn();
+}
+
+function orangeCartSelectAllLines(flag) {
+    const items = getCart();
+    items.forEach((it) => {
+        orangeCartLineIncluded[orangeCartLineKey(it)] = !!flag;
+    });
+    renderCart();
+}
+
+window.orangeCartSetLineIncluded = orangeCartSetLineIncluded;
+window.orangeCartSelectAllLines = orangeCartSelectAllLines;
+
 function cartLinesMatch(a, b) {
     if (parseInt(a.id, 10) !== parseInt(b.id, 10)) {
         return false;
@@ -295,8 +384,13 @@ window.orangeAnimateCartPulse = orangeAnimateCartPulse;
 function orangeCartProceedToCheckout() {
     normalizeCartDuplicates();
     const items = getCart();
+    const T = window.APP_T || {};
     if (!items.length) {
-        orangeShowToast(window.APP_T.empty_cart || '', 2800);
+        orangeShowToast(T.empty_cart || '', 2800);
+        return;
+    }
+    if (orangeCartLineChoiceApplies(items) && !orangeCartGetSelectedItems(items).length) {
+        orangeShowToast(T.cart_no_lines_selected_for_order || T.checkout_cart_items_required || '', 3200);
         return;
     }
     if (typeof window.orangeCartUiShowTab === 'function') {
@@ -325,7 +419,11 @@ function orangeSyncCartProceedBtn() {
     if (!btn) {
         return;
     }
-    btn.disabled = !getCart().length;
+    const items = getCart();
+    const ok =
+        items.length > 0 &&
+        (!orangeCartLineChoiceApplies(items) || orangeCartGetSelectedItems(items).length > 0);
+    btn.disabled = !ok;
 }
 
 /** س22: يظهر في صفحة العربة عند تعديل طلب قائم؛ يُمسح مع إفراغ السلة. */
@@ -572,9 +670,14 @@ async function orangeRunCheckoutPreview() {
     if (!items.length) {
         return;
     }
+    const previewLines = orangeCartLineChoiceApplies(items) ? orangeCartGetSelectedItems(items) : items;
+    if (!previewLines.length) {
+        orangeUpdateRegisterPromoTeaser(null);
+        return;
+    }
     const seq = ++__orangeCartPreviewSeq;
     const payload = {
-        items: cartItemsForCheckoutPreview(items),
+        items: cartItemsForCheckoutPreview(previewLines),
         lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
     };
     try {
@@ -618,9 +721,11 @@ function orangeRenderCheckoutMiniSummary() {
         orangeCancelCheckoutPreview();
         return;
     }
-    const clientSub = orangeCartClientSubtotalFromItems(items);
+    const choice = orangeCartLineChoiceApplies(items);
+    const summaryItems = choice ? orangeCartGetSelectedItems(items) : items;
+    const clientSub = orangeCartClientSubtotalFromItems(summaryItems);
     const rows = [];
-    items.forEach((it) => {
+    summaryItems.forEach((it) => {
         const q = Math.max(1, parseInt(it.qty, 10) || 1);
         rows.push({ name: it.name || '', q });
     });
@@ -653,6 +758,10 @@ function orangeRenderCheckoutMiniSummary() {
         orangeHtmlCartMiniTotals(clientSub, 0, clientSub) +
         '<div class="cart-register-promo-teaser" id="cartRegisterPromoTeaser" hidden></div>' +
         '</div>';
+    if (choice && !summaryItems.length) {
+        orangeCancelCheckoutPreview();
+        return;
+    }
     orangeScheduleCheckoutPreview();
 }
 
@@ -760,18 +869,44 @@ async function renderCart() {
     const unitLbl = T.cart_unit_price || '';
     const subLbl = T.cart_line_subtotal || '';
     const maxShortTpl = T.cart_max_available_short || '';
+    const choiceOn = orangeCartLineChoiceApplies(items);
+
+    items.forEach((itInit) => {
+        const k0 = orangeCartLineKey(itInit);
+        if (!Object.prototype.hasOwnProperty.call(orangeCartLineIncluded, k0)) {
+            orangeCartLineIncluded[k0] = true;
+        }
+    });
 
     html += '<div class="cart-items-shell">';
     html +=
         '<div class="cart-list-head"><span class="cart-list-head__count">' +
         escCartHtml(countStr) +
-        '</span></div>';
+        '</span>';
+    if (choiceOn) {
+        html +=
+            '<div class="cart-list-selection-tools">' +
+            '<span class="cart-list-selection-hint">' +
+            escCartHtml(T.cart_order_line_choice_hint || '') +
+            '</span>' +
+            '<span class="cart-list-selection-actions">' +
+            '<button type="button" class="btn btn-ghost cart-select-all-btn" onclick="orangeCartSelectAllLines(true)">' +
+            escCartHtml(T.cart_select_all_lines || '') +
+            '</button>' +
+            '<button type="button" class="btn btn-ghost cart-deselect-all-btn" onclick="orangeCartSelectAllLines(false)">' +
+            escCartHtml(T.cart_deselect_all_lines || '') +
+            '</button>' +
+            '</span></div>';
+    }
+    html += '</div>';
     html += '<div class="cart-items-list">';
 
     items.forEach((item, idx) => {
         const qty = Math.max(1, parseInt(item.qty, 10) || 1);
         const lineTotal = qty * Number(item.price);
-        total += lineTotal;
+        if (!choiceOn || orangeCartLineIsIncluded(item)) {
+            total += lineTotal;
+        }
         const maxStock =
             limits && limits[idx] != null && !Number.isNaN(limits[idx])
                 ? Math.max(0, parseInt(limits[idx], 10))
@@ -784,12 +919,22 @@ async function renderCart() {
                   '</p>'
                 : '';
 
+        const incl = orangeCartLineIsIncluded(item);
+        const lineChoiceHtml = choiceOn
+            ? '<div class="cart-line-include"><label class="cart-line-include-label"><input type="checkbox" class="cart-line-include-cb" ' +
+              (incl ? 'checked ' : '') +
+              `onchange="orangeCartSetLineIncluded(${idx}, this.checked)"> <span class="cart-line-include-text">${escCartHtml(
+                  T.cart_include_in_this_order || ''
+              )}</span></label></div>`
+            : '';
+
         html += `
             <div class="cart-item-card" data-cart-idx="${idx}">
                 <div class="cart-item-left">
                     <img src="/uploads/products/${String(item.image || '').replace(/"/g, '')}" alt="${escCartHtml(item.name || '')}">
                 </div>
                 <div class="cart-item-right">
+                    ${lineChoiceHtml}
                     <h4>${escCartHtml(item.name || '')}</h4>
                     ${item.color ? `<p class="cart-item-variant">${escCartHtml(T.color || '')}: ${escCartHtml(item.color)}</p>` : ''}
                     ${item.size ? `<p class="cart-item-variant">${escCartHtml(T.size || '')}: ${escCartHtml(item.size)}</p>` : ''}
@@ -906,22 +1051,36 @@ function setCartQtyFromInput(idx) {
 
 function removeCartItem(index) {
     const items = getCart();
+    const victim = items[index];
+    if (victim) {
+        delete orangeCartLineIncluded[orangeCartLineKey(victim)];
+    }
     items.splice(index, 1);
     setCart(items);
     orangeShowToast(window.APP_T.item_removed_from_cart || '', 2200);
     renderCart();
 }
 
-function orangeFinishCheckoutSuccess(result) {
+function orangeFinishCheckoutSuccess(result, opts) {
+    opts = opts || {};
     try {
         window.__orangePendingAmend = null;
     } catch (e0) {}
     orangeClearPendingAmendStorage();
     orangeSyncAmendModeBanner();
-    localStorage.removeItem(getCartStorageKey());
-    try {
-        localStorage.removeItem('cart');
-    } catch (e) {}
+    const orderedKeys = opts.orderedLineKeys;
+    if (orderedKeys && orderedKeys.size > 0) {
+        const cartNow = getCart();
+        const next = cartNow.filter((it) => !orderedKeys.has(orangeCartLineKey(it)));
+        setCart(next);
+        orderedKeys.forEach((k) => delete orangeCartLineIncluded[k]);
+    } else {
+        localStorage.removeItem(getCartStorageKey());
+        try {
+            localStorage.removeItem('cart');
+        } catch (e) {}
+        orangeCartClearLineChoiceState();
+    }
     window.open(result.whatsapp_url, '_blank');
     const T = window.APP_T || {};
     let okMsg = (T.order_number || 'Order Number') + ': ' + String(result.order_number || '');
@@ -1048,6 +1207,26 @@ async function sendOrderNow() {
         return;
     }
 
+    const allCart = getCart();
+    let itemsForOrder = allCart;
+    let orderedLineKeys = null;
+    if (orangeCartLineChoiceApplies(allCart)) {
+        itemsForOrder = orangeCartGetSelectedItems(allCart);
+        if (!itemsForOrder.length) {
+            orangeShowToast(
+                (window.APP_T && window.APP_T.cart_no_lines_selected_for_order) ||
+                    (window.APP_T && window.APP_T.checkout_cart_items_required) ||
+                    '',
+                3200
+            );
+            return;
+        }
+        orderedLineKeys = new Set();
+        itemsForOrder.forEach((it) => orderedLineKeys.add(orangeCartLineKey(it)));
+    }
+    const checkoutFinishOpts =
+        orderedLineKeys && orderedLineKeys.size > 0 ? { orderedLineKeys: orderedLineKeys } : {};
+
     const payRadio = document.querySelector('input[name="checkout_payment_terms"]:checked');
     const paymentTerms = payRadio && payRadio.value === 'online' ? 'online' : 'cash';
 
@@ -1082,7 +1261,7 @@ async function sendOrderNow() {
         address: document.getElementById('customer_address').value.trim(),
         notes: document.getElementById('customer_notes').value.trim(),
         channel_id: window.APP_CHANNEL_ID || 0,
-        items: items,
+        items: itemsForOrder,
         payment_terms: paymentTerms,
         lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
     };
@@ -1145,7 +1324,7 @@ async function sendOrderNow() {
         orangeShowToast(window.APP_T.checkout_queue_wait || 'Processing order…', 2600);
         try {
             const done = await orangePollIntakeUntilDone(result.intake_token);
-            orangeFinishCheckoutSuccess(done);
+            orangeFinishCheckoutSuccess(done, checkoutFinishOpts);
         } catch (e) {
             const wrap = e && e.checkoutResult ? e.checkoutResult : { message: e && e.message ? String(e.message) : '' };
             orangeShowToast(orangeCheckoutApiMessage(wrap) || (window.APP_T.checkout_failed_generic || 'Checkout failed'), 4200);
@@ -1158,7 +1337,7 @@ async function sendOrderNow() {
         return;
     }
 
-    orangeFinishCheckoutSuccess(result);
+    orangeFinishCheckoutSuccess(result, checkoutFinishOpts);
 }
 
 function orangeEscDomText(s) {
