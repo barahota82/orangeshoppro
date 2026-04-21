@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/order_helpers.php';
+require_once __DIR__ . '/catalog_schema.php';
 
 /**
  * Stock reference key shared by reservation / fulfillment / release (matches journal ref prefix).
@@ -141,6 +142,46 @@ function orange_order_release_pending_stock_reservation(PDO $pdo, array $order):
 /**
  * تسمية عربية لنوع حركة المخزون (للعرض في الواجهات).
  */
+/**
+ * طلبات لديها حركات مخزون type = pending_order (حجز نشط) — س28.
+ *
+ * @return list<array<string,mixed>>
+ */
+function orange_admin_orders_with_pending_stock_reservations(PDO $pdo): array
+{
+    if (!orange_table_exists($pdo, 'stock_movements') || !orange_table_exists($pdo, 'orders')) {
+        return [];
+    }
+    try {
+        $sql = '
+            SELECT o.*, c.name AS channel_name,
+                (
+                    SELECT COALESCE(SUM(s.qty), 0)
+                    FROM stock_movements s
+                    WHERE s.reference = CONCAT(\'ORDER-\', o.order_number)
+                      AND s.type = \'pending_order\'
+                ) AS reserved_qty
+            FROM orders o
+            LEFT JOIN channels c ON c.id = o.channel_id
+            WHERE EXISTS (
+                SELECT 1 FROM stock_movements sm
+                WHERE sm.reference = CONCAT(\'ORDER-\', o.order_number)
+                  AND sm.type = \'pending_order\'
+                LIMIT 1
+            )
+            ORDER BY o.created_at DESC, o.id DESC
+        ';
+
+        return $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] orange_admin_orders_with_pending_stock_reservations: ' . $e->getMessage());
+        }
+
+        return [];
+    }
+}
+
 function orange_stock_movement_type_label_ar(string $type): string
 {
     static $map = [

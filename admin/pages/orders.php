@@ -104,6 +104,9 @@ function orange_admin_orders_action_buttons(array $o): void
     <h1>الطلبات</h1>
     <p class="page-subtitle">المخزن <strong>موحّد للشركة</strong> — الطلب من أي قناة يخصم نفس المخزون لتفادي البيع رغم النفاد. عمود «قناة العملاء» لتتبّع المصدر وتجميع العملاء (تيك توك، واتساب، …) وليس لمخزون منفصل.
         <?php
+        if (orange_admin_may($admin, $pdo, 'sales', 'view')) {
+            echo ' — <a href="/admin/index.php?page=reserved_orders">طلبات محجوزة (مخزون)</a>';
+        }
         if (orange_admin_may($admin, $pdo, 'sales', 'view') && orange_table_exists($pdo, 'order_intake_queue')) {
             echo ' — <a href="/admin/index.php?page=order_intake_queue">طابور طلبات الموقع (قبل إنشاء الطلب)</a>';
         }

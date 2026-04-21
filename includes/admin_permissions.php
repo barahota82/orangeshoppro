@@ -41,6 +41,7 @@ function orange_admin_page_resource(string $page): string
         'products' => 'products',
         'offers' => 'products',
         'orders' => 'sales',
+        'reserved_orders' => 'sales',
         'order_intake_queue' => 'sales',
         'invoice' => 'sales',
         'manual_order' => 'sales',

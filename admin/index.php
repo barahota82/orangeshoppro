@@ -18,6 +18,7 @@ $allowed = [
     'products',
     'offers',
     'orders',
+    'reserved_orders',
     'manual_order',
     'customers',
     'suppliers',
