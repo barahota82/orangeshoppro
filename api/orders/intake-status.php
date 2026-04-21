@@ -9,6 +9,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/order_intake_queue.php';
+require_once __DIR__ . '/../../includes/storefront_account.php';
 
 try {
     $token = trim((string) ($_GET['token'] ?? ''));
@@ -83,6 +84,14 @@ try {
         $out['promotion_discount'] = $promoDisc;
         $out['whatsapp_number'] = (string) $row['whatsapp_number'];
         $out['whatsapp_url'] = (string) $row['whatsapp_url'];
+        if ($oid > 0) {
+            $phSt = $pdo->prepare('SELECT phone FROM orders WHERE id = ? LIMIT 1');
+            $phSt->execute([$oid]);
+            $phRow = $phSt->fetchColumn();
+            if ($phRow !== false && $phRow !== null && trim((string) $phRow) !== '') {
+                orange_storefront_set_guest_orders_phone((string) $phRow);
+            }
+        }
     } elseif ($row['status'] === 'failed') {
         $out['success'] = false;
         $out['code'] = 'processing_failed';

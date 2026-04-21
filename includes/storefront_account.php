@@ -57,6 +57,37 @@ function orange_storefront_account_channel_session_key(): string
     return 'orange_storefront_account_channel';
 }
 
+/** س13: هاتف آخر طلب ضيف في الجلسة — لعرض «طلباتي» (pending/approved) دون تسجيل كامل. */
+function orange_storefront_guest_orders_phone_session_key(): string
+{
+    return 'orange_sf_guest_recent_phone';
+}
+
+function orange_storefront_set_guest_orders_phone(string $phoneNorm): void
+{
+    $p = trim($phoneNorm);
+    if ($p === '') {
+        return;
+    }
+    $_SESSION[orange_storefront_guest_orders_phone_session_key()] = $p;
+}
+
+function orange_storefront_clear_guest_orders_phone(): void
+{
+    unset($_SESSION[orange_storefront_guest_orders_phone_session_key()]);
+}
+
+function orange_storefront_guest_orders_phone_from_session(): ?string
+{
+    $k = orange_storefront_guest_orders_phone_session_key();
+    if (empty($_SESSION[$k])) {
+        return null;
+    }
+    $p = trim((string) $_SESSION[$k]);
+
+    return $p !== '' ? $p : null;
+}
+
 function storefront_account_logout(): void
 {
     unset(
@@ -70,6 +101,7 @@ function storefront_account_login(PDO $pdo, int $accountId): void
     if ($accountId <= 0) {
         return;
     }
+    orange_storefront_clear_guest_orders_phone();
     require_once __DIR__ . '/catalog_schema.php';
     if (!orange_table_exists($pdo, 'storefront_accounts')) {
         return;

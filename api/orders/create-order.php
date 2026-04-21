@@ -96,6 +96,8 @@ try {
                     $promoDisc = (float) ($rowTot['cart_promotion_discount'] ?? 0);
                 }
             }
+            orange_storefront_set_guest_orders_phone((string) $data['phone']);
+
             json_response([
                 'success' => true,
                 'order_id' => $oid,

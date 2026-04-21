@@ -1759,6 +1759,10 @@ function orangeCartAccountOrdersListUrl(bucket) {
     return storefrontApiUrl('/api/orders/list-storefront-orders.php?bucket=' + encodeURIComponent(b));
 }
 
+function orangeCartGuestOrdersListUrl() {
+    return storefrontApiUrl('/api/orders/list-guest-storefront-orders.php');
+}
+
 function orangeCartRenderAccountOrderCard(row) {
     const labels = window.ORANGE_ORDER_STATUS_LABELS || {};
     const UI = window.ORANGE_MY_ORDER_UI || {};
@@ -1905,15 +1909,54 @@ async function orangeCartFetchAccountOrdersIntoMount(mountEl, bucket) {
     mountEl.innerHTML = html;
 }
 
+async function orangeCartFetchGuestOrdersIntoMount(mountEl) {
+    if (!mountEl) {
+        return;
+    }
+    const emptyMsg = (window.APP_T && window.APP_T.cart_guest_orders_empty) || '';
+    const errMsg = (window.APP_T && window.APP_T.api_request_failed) || '';
+    mountEl.innerHTML = '<p class="cart-account-orders-empty">' + orangeEscDomText(emptyMsg) + '</p>';
+    let res;
+    let data;
+    try {
+        res = await fetch(orangeCartGuestOrdersListUrl(), { credentials: 'same-origin' });
+        try {
+            data = await res.json();
+        } catch (e) {
+            data = null;
+        }
+    } catch (e) {
+        mountEl.innerHTML = '<p class="cart-account-orders-err">' + orangeEscDomText(errMsg) + '</p>';
+        return;
+    }
+    if (!data || !data.success || !Array.isArray(data.orders)) {
+        mountEl.innerHTML = '<p class="cart-account-orders-err">' + orangeEscDomText(errMsg) + '</p>';
+        return;
+    }
+    if (data.orders.length === 0) {
+        mountEl.innerHTML = '<p class="cart-account-orders-empty">' + orangeEscDomText(emptyMsg) + '</p>';
+        return;
+    }
+    let html = '';
+    for (let i = 0; i < data.orders.length; i++) {
+        html += orangeCartRenderAccountOrderCard(data.orders[i]);
+    }
+    mountEl.innerHTML = html;
+}
+
 async function orangeCartRefreshAccountOrderLists() {
     const a = document.getElementById('cartAccountOrdersActiveMount');
     const d = document.getElementById('cartAccountOrdersDeliveredMount');
+    const g = document.getElementById('cartGuestOrdersMount');
     const jobs = [];
     if (a) {
         jobs.push(orangeCartFetchAccountOrdersIntoMount(a, 'active'));
     }
     if (d) {
         jobs.push(orangeCartFetchAccountOrdersIntoMount(d, 'delivered'));
+    }
+    if (g) {
+        jobs.push(orangeCartFetchGuestOrdersIntoMount(g));
     }
     await Promise.all(jobs);
 }
@@ -1983,7 +2026,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const accMountA = document.getElementById('cartAccountOrdersActiveMount');
     const accMountD = document.getElementById('cartAccountOrdersDeliveredMount');
-    if (accMountA || accMountD) {
+    const guestMount = document.getElementById('cartGuestOrdersMount');
+    if (accMountA || accMountD || guestMount) {
         document.addEventListener('click', function (ev) {
             const t = ev.target;
             if (!t || !t.getAttribute) {
@@ -2021,6 +2065,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (which === 'delivered' && accMountD && accMountD.getAttribute('data-loaded') !== '1') {
                 accMountD.setAttribute('data-loaded', '1');
                 orangeCartFetchAccountOrdersIntoMount(accMountD, 'delivered');
+            }
+            if (which === 'orders' && guestMount && guestMount.getAttribute('data-loaded') !== '1') {
+                guestMount.setAttribute('data-loaded', '1');
+                orangeCartFetchGuestOrdersIntoMount(guestMount);
             }
         };
     }

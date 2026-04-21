@@ -130,6 +130,8 @@ try {
     $whatsAppNumber = clean_whatsapp_number((string) ($channel['whatsapp_number'] ?? ''));
     $whatsAppUrl = 'https://wa.me/' . $whatsAppNumber . '?text=' . rawurlencode(implode("\n", $messageLines));
 
+    orange_storefront_set_guest_orders_phone($phoneNorm);
+
     json_response([
         'success' => true,
         'order_number' => $orderNumber,

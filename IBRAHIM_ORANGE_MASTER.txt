@@ -1,7 +1,7 @@
 IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
 ============================================
 النسخة المعتمدة: جذر المستودع — IBRAHIM_ORANGE_MASTER.txt (مثلاً D:\orange)
-آخر تحديث: 2026-04-23 (§10: مرجع كود س25/س26 للقنوات)
+آخر تحديث: 2026-04-23 (§10: مرجع كود س25/س26؛ س13: قائمة طلبات الضيف في العربة)
 
 الغرض
 -------
@@ -159,6 +159,9 @@ IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
   `docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`.
 - تنبيه «قارب على النفاذ» (س5): `includes/stock_alerts.php` (`orange_stock_low_alert_threshold`)،
   عرض في `admin/pages/stock.php` ولوحة `dashboard.php`؛ إحصاءات API `admin/api/reports/stats.php`.
+- تاب «طلباتي» للضيف (س13): جلسة `orange_sf_guest_recent_phone` في `includes/storefront_account.php`؛
+  API `api/orders/list-guest-storefront-orders.php`؛ تعبئة الجلسة من `create-order.php`، `intake-status.php`، `amend-order-items.php`؛
+  واجهة `pages/cart.php` + `assets/js/cart.js`.
 
 
 10) سياسات الواجهة والطلب أونلاين — مرجع إجابات المالك (إلزامي قبل التنفيذ)
