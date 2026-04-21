@@ -1004,6 +1004,20 @@ function orangeOrderItemsLinesSum(itemRows) {
     return s;
 }
 
+/** يفضّل مجموع البنود من السيرفر (نفس منطق الفاتورة) وإلا يحسب من الصفوف. */
+function orangeOrderLinesSubtotalPreferServer(order, itemRows) {
+    if (order && order.lines_subtotal != null && order.lines_subtotal !== '') {
+        const n =
+            typeof order.lines_subtotal === 'number'
+                ? order.lines_subtotal
+                : parseFloat(String(order.lines_subtotal));
+        if (Number.isFinite(n) && n >= 0) {
+            return n;
+        }
+    }
+    return orangeOrderItemsLinesSum(itemRows);
+}
+
 function orangeHtmlOrderPromoParagraph(order, cur, paragraphClass) {
     const d = orangeOrderCartPromoDiscountAmount(order);
     if (d <= 1e-9) {
@@ -1056,7 +1070,7 @@ function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, 
     if (order.phone) {
         html += '<p><strong>' + orangeEscDomText(lblPhone) + ':</strong> ' + orangeEscDomText(String(order.phone)) + '</p>';
     }
-    const itemsLinesSum = orangeOrderItemsLinesSum(itemRows);
+    const itemsLinesSum = orangeOrderLinesSubtotalPreferServer(order, itemRows);
     if (orangeOrderCartPromoDiscountAmount(order) > 1e-9 && itemsLinesSum > 1e-9) {
         html +=
             '<p class="order-items-subtotal-line"><strong>' +
@@ -1169,7 +1183,7 @@ function orangeRenderTrackSignupSummary(el, order, orderNumber, phoneTyped, item
         html += '<p class="track-signup-order-summary__line"><strong>' + orangeEscDomText(lblPhone) + ':</strong> ';
         html += orangeEscDomText(String(order.phone)) + '</p>';
     }
-    const itemsLinesSumSu = orangeOrderItemsLinesSum(itemRows);
+    const itemsLinesSumSu = orangeOrderLinesSubtotalPreferServer(order, itemRows);
     if (orangeOrderCartPromoDiscountAmount(order) > 1e-9 && itemsLinesSumSu > 1e-9) {
         html +=
             '<p class="track-signup-order-summary__line order-items-subtotal-line"><strong>' +

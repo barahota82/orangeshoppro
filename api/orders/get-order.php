@@ -39,6 +39,12 @@ try {
     $itemsStmt->execute([(int) $order['id']]);
     $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
 
+    $linesSubtotal = 0.0;
+    foreach ($items as $it) {
+        $linesSubtotal += orange_order_item_line_net($it);
+    }
+    $order['lines_subtotal'] = round($linesSubtotal, 4);
+
     json_response([
         'success' => true,
         'order' => $order,
