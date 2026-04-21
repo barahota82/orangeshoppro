@@ -442,6 +442,25 @@ function orange_storefront_channel_slug_is_active(PDO $pdo, string $slug): bool
     }
 }
 
+/**
+ * قناة من أول مقطع مسار قصير (مثل web من ‎/web-ar/cart‎) — بلا كوكي؛ يُستثنى المسار المحجوز (pages، api، …).
+ */
+function orange_storefront_channel_slug_from_request_path(PDO $pdo): ?string
+{
+    $primary = orange_storefront_request_primary_path_segment();
+    if ($primary === null || $primary === '') {
+        return null;
+    }
+    $seg = strtolower($primary);
+    foreach (orange_storefront_reserved_path_segments() as $rs) {
+        if ($seg === strtolower((string) $rs)) {
+            return null;
+        }
+    }
+
+    return orange_channel_slug_for_path_segment($pdo, $seg, true);
+}
+
 function orange_channel_slug_for_path_segment(PDO $pdo, string $pathSegment, bool $requireActive = true): ?string
 {
     $s = strtolower((string) (preg_replace('/[^a-z0-9\-]/i', '', $pathSegment) ?? ''));
@@ -582,6 +601,10 @@ function current_channel_slug(): string
         $s = preg_replace('/[^a-z0-9\-]/i', '', (string) $_GET['channel']);
 
         return $s !== '' ? orange_storefront_normalize_channel_slug($pdo, $s) : $def;
+    }
+    $fromPath = orange_storefront_channel_slug_from_request_path($pdo);
+    if ($fromPath !== null && $fromPath !== '') {
+        return orange_storefront_normalize_channel_slug($pdo, $fromPath);
     }
     $fromCookie = orange_storefront_read_saved_channel_slug();
     if ($fromCookie !== null) {

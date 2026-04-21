@@ -143,20 +143,6 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             if (!/^(en|ar|fil|hi)$/.test(navLang)) {
                 navLang = 'en';
             }
-            function orangeSegForChannel(ch) {
-                var map = window.ORANGE_SF_SLUG_TO_PATH || {};
-                var s = String(ch || '').toLowerCase();
-                if (map[s]) { return map[s]; }
-                var def = String(window.ORANGE_SF_DEFAULT_CHANNEL_SLUG || 'tiktok').toLowerCase();
-                if (map[def]) { return map[def]; }
-                return 'tiktok';
-            }
-            function orangeSuffixForLang(lang) {
-                if (lang === 'ar') { return '-ar'; }
-                if (lang === 'hi') { return '-hi'; }
-                if (lang === 'fil') { return '-ph'; }
-                return '';
-            }
             function orangeParseShortStorePath(pathname) {
                 var m = String(pathname).match(shortPathRe);
                 if (!m) { return null; }
@@ -167,18 +153,16 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
                 var tail = m[3] || '';
                 return { ch: ch, tail: tail };
             }
+            var short = orangeParseShortStorePath(path);
+            if (short && short.ch && allowed[short.ch]) {
+                return;
+            }
             if (path.indexOf('/pages/') !== -1) {
                 params.set('channel', savedCh);
                 params.set('lang', navLang);
                 var qs = params.toString();
                 window.location.replace(rawPath + (qs ? '?' + qs : ''));
                 return;
-            }
-            var short = orangeParseShortStorePath(path);
-            if (short && short.ch !== savedCh) {
-                var np = __sfBase + '/' + orangeSegForChannel(savedCh) + orangeSuffixForLang(navLang) + (short.tail || '');
-                np = np.replace(/\/{2,}/g, '/');
-                window.location.replace(np + (window.location.search || ''));
             }
         } catch (e) {}
     })();
