@@ -66,6 +66,7 @@ function orange_admin_page_resource(string $page): string
         'channel_analytics' => 'reports',
         'logs' => 'reports',
         'company_settings' => 'settings',
+        'storefront_hero' => 'settings',
         'channels' => 'settings',
         'company_documents' => 'settings',
         'admin_users' => 'admin_users',

@@ -1794,14 +1794,9 @@ function t(string $key): string {
  * @return list<string>
  */
 function storefront_home_hero_lines(): array {
-    $lang = current_lang();
-    $translations = get_translations();
-    $b = $translations[$lang] ?? $translations['en'];
-    return [
-        (string)($b['home_hero_line_1'] ?? ''),
-        (string)($b['home_hero_line_2'] ?? ''),
-        (string)($b['home_hero_line_3'] ?? ''),
-    ];
+    require_once __DIR__ . '/includes/storefront_hero.php';
+
+    return orange_storefront_home_hero_lines_resolved(db(), current_lang());
 }
 
 /**

@@ -10,6 +10,7 @@ $allowed = [
     'dashboard',
     'admin_users',
     'company_settings',
+    'storefront_hero',
     'departments',
     'categories',
     'subcategories',

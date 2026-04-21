@@ -1400,6 +1400,29 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         orange_catalog_safe_exec($pdo, 'ALTER TABLE company_settings ADD COLUMN invoice_footer TEXT NULL');
     }
 
+    if (!orange_table_exists($pdo, 'storefront_home_hero')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE IF NOT EXISTS storefront_home_hero (
+                id INT NOT NULL PRIMARY KEY,
+                line_1_ar VARCHAR(500) NOT NULL DEFAULT \'\',
+                line_1_en VARCHAR(500) NOT NULL DEFAULT \'\',
+                line_1_fil VARCHAR(500) NOT NULL DEFAULT \'\',
+                line_1_hi VARCHAR(500) NOT NULL DEFAULT \'\',
+                line_2_ar VARCHAR(500) NOT NULL DEFAULT \'\',
+                line_2_en VARCHAR(500) NOT NULL DEFAULT \'\',
+                line_2_fil VARCHAR(500) NOT NULL DEFAULT \'\',
+                line_2_hi VARCHAR(500) NOT NULL DEFAULT \'\',
+                line_3_ar VARCHAR(500) NOT NULL DEFAULT \'\',
+                line_3_en VARCHAR(500) NOT NULL DEFAULT \'\',
+                line_3_fil VARCHAR(500) NOT NULL DEFAULT \'\',
+                line_3_hi VARCHAR(500) NOT NULL DEFAULT \'\',
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+        orange_catalog_safe_exec($pdo, 'INSERT INTO storefront_home_hero (id) VALUES (1)');
+    }
+
     if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'invoice_number')) {
         orange_catalog_safe_exec(
             $pdo,
