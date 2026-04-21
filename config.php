@@ -313,6 +313,10 @@ function current_lang(): string
     if (orange_is_admin_request_context()) {
         return 'en';
     }
+    $fromShort = orange_storefront_lang_from_short_url_path();
+    if ($fromShort !== null && in_array($fromShort, $allowed, true)) {
+        return $fromShort;
+    }
 
     return orange_lang_from_accept_language_header($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? null);
 }
@@ -622,10 +626,8 @@ function get_channel_by_slug(string $slug): ?array {
     return $row ?: null;
 }
 
-/**
- * أول مقطع مسار قصير للواجهة من الطلب الحالي (مثل tiktok من ‎/tiktok-ar/cart‎) أو null.
- */
-function orange_storefront_request_primary_path_segment(): ?string
+/** مسار الطلب العام بعد ‎PUBLIC_BASE_PATH‎ وبادئة ‎/‎. */
+function orange_storefront_normalized_public_path(): string
 {
     $uri = (string) ($_SERVER['REQUEST_URI'] ?? '');
     $path = parse_url($uri, PHP_URL_PATH) ?? '';
@@ -637,6 +639,49 @@ function orange_storefront_request_primary_path_segment(): ?string
     if ($path === '' || ($path[0] ?? '') !== '/') {
         $path = '/' . ltrim($path, '/');
     }
+
+    return $path;
+}
+
+/**
+ * لغة الواجهة من لاحقة المسار القصير ‎-ar / -hi / -ph‎ (بدون ‎?lang=‎).
+ *
+ * @return 'ar'|'fil'|'hi'|null
+ */
+function orange_storefront_lang_from_short_url_path(): ?string
+{
+    if (orange_is_admin_request_context()) {
+        return null;
+    }
+    $path = orange_storefront_normalized_public_path();
+    if (!preg_match('#^/([a-z0-9\-]+)(?:-(ar|hi|ph))?(?:/|$)#i', $path, $m)) {
+        return null;
+    }
+    $first = strtolower($m[1]);
+    foreach (orange_storefront_reserved_path_segments() as $rs) {
+        if ($first === strtolower((string) $rs)) {
+            return null;
+        }
+    }
+    if (empty($m[2])) {
+        return null;
+    }
+    $suf = strtolower((string) $m[2]);
+
+    return match ($suf) {
+        'ar' => 'ar',
+        'hi' => 'hi',
+        'ph' => 'fil',
+        default => null,
+    };
+}
+
+/**
+ * أول مقطع مسار قصير للواجهة من الطلب الحالي (مثل tiktok من ‎/tiktok-ar/cart‎) أو null.
+ */
+function orange_storefront_request_primary_path_segment(): ?string
+{
+    $path = orange_storefront_normalized_public_path();
     if (preg_match('#^/([a-z0-9\-]+)(?:-(ar|hi|ph))?(?:/|$)#i', $path, $m)) {
         return strtolower($m[1]);
     }
