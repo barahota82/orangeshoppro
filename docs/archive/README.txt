@@ -15,6 +15,7 @@ Contents (same filenames as before; path changed only)
 - ORANGE_STOCK_ORDER_POLICY.txt
 - ORANGE_PARTNER_SUBLEDGER_REFERENCE.txt
 - ORANGE_TECH_REFERENCE.txt
+- ORANGE_AGENT_QA_REFERENCE.txt  (أسئلة وأجوبة تشغيلية: وكلاء، نشر، مخطط القاعدة)
 - ORANGE_CHAT_CONTINUITY.md  (technical archive: encoding, deploy, invoice)
 
 Cross-references between these files use bare filenames — they sit in this folder.

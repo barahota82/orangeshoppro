@@ -21,6 +21,7 @@ ORANGE — أرشيف خطة أداء الواجهة وترحيل المخطط (
 3. **.cursor/rules/orange-session-handoff.mdc** و **orange-continuity.mdc** و **orange-php-utf8-workflow.mdc**.
 4. **هذا الملف** — ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt.
 5. **`scripts/orange_db.sql`** — عند العمل على مخطط/جداول/ترحيل: لقطة «الحقيقة» (IBRAHIM §2أ)؛ راجع الأجزاء المعنية فقط؛ قد لا يُرفع في Git.
+6. **`docs/archive/ORANGE_AGENT_QA_REFERENCE.txt`** — أسئلة وأجوبة تشغيلية (وكلاء، نشر، مخطط القاعدة) عند الحاجة.
 
 
 --------------------------------------------------------------------

@@ -10,7 +10,7 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 التتبع، الطلب أونلاين، المخزون/الحجز، الخصوصية، وارتباط المحاسبة عالي المستوى بالتسليم،
 والقنوات/المسارات التقنية.
 
-**ملحق إلزامي للوكلاء (أداء الواجهة وترحيل المخطط):** أي عمل يمس **سرعة تحميل المتجر العام** أو **orange_catalog_ensure_schema** على مسار الواجهة — اطلع فعلياً على **docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt** و **.cursor/rules/orange-session-handoff.mdc** (قائمة القراءات الأربعة).
+**ملحق إلزامي للوكلاء (أداء الواجهة وترحيل المخطط):** أي عمل يمس **سرعة تحميل المتجر العام** أو **orange_catalog_ensure_schema** على مسار الواجهة — اطلع فعلياً على **docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt** و **.cursor/rules/orange-session-handoff.mdc** (قائمة القراءات الأربعة). **أسئلة وأجوبة تشغيلية مختصرة:** **docs/archive/ORANGE_AGENT_QA_REFERENCE.txt**.
 
 
 --------------------------------------------------------------------
