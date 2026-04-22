@@ -298,6 +298,29 @@ function orange_catalog_seed_default_accounts_if_empty(PDO $pdo): void
     }
 }
 
+/**
+ * للمسارات القراءة فقط التي تحتاج اتصالاً آمناً وجداول المتجر الأساسية (مثل manifest.json)
+ * دون تشغيل كامل orange_catalog_ensure_schema() (الترحيلات الثقيلة).
+ * آمن لاستدعائه عدة مرات لكل طلب (حارس static).
+ */
+function orange_catalog_ensure_storefront_read_bootstrap(PDO $pdo): void
+{
+    static $charsetApplied = false;
+    if (!$charsetApplied) {
+        orange_catalog_safe_exec($pdo, 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci');
+        $charsetApplied = true;
+    }
+
+    static $bootDone = false;
+    if ($bootDone) {
+        return;
+    }
+
+    require_once __DIR__ . '/catalog_bootstrap_store.php';
+    orange_catalog_bootstrap_store_tables($pdo);
+    $bootDone = true;
+}
+
 function orange_catalog_ensure_schema(PDO $pdo): void
 {
     // Per-connection charset (avoids editing config.php; some hosts break PDO::MYSQL_ATTR_INIT_COMMAND).

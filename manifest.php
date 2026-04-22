@@ -7,7 +7,7 @@ require_once __DIR__ . '/includes/catalog_schema.php';
 require_once __DIR__ . '/includes/storefront_account.php';
 
 $pdo = db();
-orange_catalog_ensure_schema($pdo);
+orange_catalog_ensure_storefront_read_bootstrap($pdo);
 
 $slug = isset($_GET['channel']) && (string) $_GET['channel'] !== ''
     ? (string) $_GET['channel']
