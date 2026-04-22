@@ -414,15 +414,22 @@ function orange_storefront_legacy_slug_aliases(): array
 /** أول قناة نشطة حسب id — افتراضي للمتجر عند غياب كوكي/قناة. */
 function orange_storefront_default_channel_slug(PDO $pdo): string
 {
+    static $memo = null;
+    if ($memo !== null) {
+        return $memo;
+    }
     try {
         $v = $pdo->query('SELECT slug FROM channels WHERE is_active = 1 ORDER BY id ASC LIMIT 1')->fetchColumn();
         if ($v !== false && $v !== null && (string) $v !== '') {
-            return (string) $v;
+            $memo = (string) $v;
+
+            return $memo;
         }
     } catch (Throwable $e) {
     }
+    $memo = 'tiktok';
 
-    return 'tiktok';
+    return $memo;
 }
 
 /**
@@ -542,6 +549,10 @@ function orange_channel_path_segment_for_slug(PDO $pdo, string $slug): ?string
  */
 function orange_storefront_path_maps_for_js(PDO $pdo): array
 {
+    static $memo = null;
+    if ($memo !== null) {
+        return $memo;
+    }
     $pathToSlug = [];
     $slugToPath = [];
     $validSlugs = [];
@@ -573,7 +584,9 @@ function orange_storefront_path_maps_for_js(PDO $pdo): array
     usort($keys, static fn ($a, $b) => strlen((string) $b) <=> strlen((string) $a));
     $alt = $keys === [] ? 'web|online|tiktok' : implode('|', array_map(static fn ($k) => preg_quote((string) $k, '/'), $keys));
 
-    return [$pathToSlug, $slugToPath, $validSlugs, $alt];
+    $memo = [$pathToSlug, $slugToPath, $validSlugs, $alt];
+
+    return $memo;
 }
 
 function orange_storefront_read_saved_channel_slug(): ?string

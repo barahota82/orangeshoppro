@@ -26,8 +26,8 @@ $homeHeroLines = storefront_home_hero_lines();
 $homeHeroJson = json_encode($homeHeroLines, JSON_UNESCAPED_UNICODE);
 $homeHeroFirst = (string)($homeHeroLines[0] ?? '');
 
+/* $channel و $lang و $channelSlug مُعرَّفة من includes/header.php عبر storefront_toolbar_state() — يُجنَّب تكرار استعلام channels */
 $pdo = db();
-$channel = get_channel_by_slug(current_channel_slug());
 
 /*
  * سياسة التبويبات (الشريط الأفقي): فئات بها منتج نشط فقط — عرض فئة كاملة.
@@ -106,10 +106,10 @@ if ($hasDepartmentsTable) {
     '
     );
     $departments = $depListStmt ? $depListStmt->fetchAll() : [];
-    $mapStmt = $pdo->query('SELECT id, department_id FROM categories');
-    foreach (($mapStmt ? $mapStmt->fetchAll() : []) as $row) {
-        $categoryToDepartment[(int) $row['id']] = isset($row['department_id']) && $row['department_id'] !== null
-            ? (int) $row['department_id']
+    foreach ($categories as $cat) {
+        $cid = (int) $cat['id'];
+        $categoryToDepartment[$cid] = isset($cat['department_id']) && $cat['department_id'] !== null
+            ? (int) $cat['department_id']
             : 0;
     }
 }
@@ -176,6 +176,36 @@ $offers = $offersStmt ? $offersStmt->fetchAll() : [];
 $offerProductIds = [];
 foreach ($offers as $op) {
     $offerProductIds[(int) $op['id']] = true;
+}
+
+if ($hasDepartmentsTable) {
+    $needDeptLookup = [];
+    foreach ($products as $p) {
+        $cid = (int) ($p['category_id'] ?? 0);
+        if ($cid > 0 && !array_key_exists($cid, $categoryToDepartment)) {
+            $needDeptLookup[$cid] = true;
+        }
+    }
+    foreach ($offers as $op) {
+        $cid = (int) ($op['category_id'] ?? 0);
+        if ($cid > 0 && !array_key_exists($cid, $categoryToDepartment)) {
+            $needDeptLookup[$cid] = true;
+        }
+    }
+    if ($needDeptLookup !== []) {
+        $ids = array_keys($needDeptLookup);
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $st = $pdo->prepare('SELECT id, department_id FROM categories WHERE id IN (' . $ph . ')');
+        $st->execute($ids);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $categoryToDepartment[(int) $row['id']] = isset($row['department_id']) && $row['department_id'] !== null
+                ? (int) $row['department_id']
+                : 0;
+        }
+    }
 }
 
 $storefrontExtraFilterSuffix = function (array $row) use ($categoryToDepartment): string {
