@@ -7,11 +7,12 @@ alwaysApply: true
 
 ## قبل أي تنفيذ (إلزامي)
 
-**لا تستخدم أدواتاً ولا تعدّل المستودع ولا تنفّذ أوامراً ولا commit حتى تطلع — فعلياً — على الثلاثة التالية:**
+**لا تستخدم أدواتاً ولا تعدّل المستودع ولا تنفّذ أوامراً ولا commit حتى تطلع — فعلياً — على التالية:**
 
 1. **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`**
 2. **`IBRAHIM_ORANGE_MASTER.txt`** (جذر المستودع)
 3. **هذا الملف:** `.cursor/rules/orange-session-handoff.mdc`
+4. **`docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt`** — خطة أداء الواجهة والترحيل وتقليل المخاطر
 
 بعدها التزم بـ **`orange-continuity.mdc`** و **`orange-php-utf8-workflow.mdc`** وباقي القواعد حسب النطاق.
 
@@ -25,7 +26,7 @@ alwaysApply: true
 
 1. الجملة الصريحة: **`تم انتهاء الجلسة التنفيذية.`**
 2. تذكير للمالك: **المحادثة التالية قد تكون مع وكيل آخر دون سياق هذه الدردشة.**
-3. تذكير: الوكيل التالي **إلزامياً** يطلع قبل أي تنفيذ على **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** و **`IBRAHIM_ORANGE_MASTER.txt`** و **`.cursor/rules/orange-session-handoff.mdc`** (ثم باقي الاستمرارية).
+3. تذكير: الوكيل التالي **إلزامياً** يطلع قبل أي تنفيذ على **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** و **`IBRAHIM_ORANGE_MASTER.txt`** و **`.cursor/rules/orange-session-handoff.mdc`** و **`docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt`** (ثم باقي الاستمرارية).
 
 **لا تُغلق مهمة تنفيذية** (بعد أدوات أو تغييرات في المشروع) **دون هذه الفقرة**.
 
