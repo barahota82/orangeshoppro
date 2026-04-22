@@ -2937,6 +2937,133 @@ button.track-signup-cta__btn[hidden] {
     }
 }
 
+/* Searchable country code combobox (storefront phone fields) */
+.field .orange-country-combobox {
+    position: relative;
+    width: 100%;
+}
+
+.field .orange-country-combobox__control {
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--card);
+    overflow: hidden;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+}
+
+.field .orange-country-combobox__control:focus-within {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.field .orange-country-combobox__input {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    padding: 12px 10px 12px 14px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    font-family: inherit;
+    font-size: inherit;
+    color: var(--text);
+    box-shadow: none;
+    transition: none;
+}
+
+.field .orange-country-combobox__input:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+.field .orange-country-combobox__toggle {
+    flex-shrink: 0;
+    width: 44px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-inline-start: 1px solid var(--border);
+    border-radius: 0;
+    background: var(--card);
+    color: var(--text);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+}
+
+.field .orange-country-combobox__toggle:hover {
+    background: var(--primary-soft);
+}
+
+.field .orange-country-combobox__caret {
+    display: block;
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid var(--muted);
+}
+
+.field .orange-country-combobox__list {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: 80;
+    max-height: min(52vh, 280px);
+    overflow-y: auto;
+    margin: 0;
+    padding: 4px 0;
+    list-style: none;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    box-sizing: border-box;
+}
+
+.field .orange-country-combobox__option {
+    padding: 9px 14px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    line-height: 1.35;
+}
+
+.field .orange-country-combobox__option:hover,
+.field .orange-country-combobox__option.is-active {
+    background: var(--primary-soft);
+}
+
+.orange-country-combobox__native {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    clip-path: inset(50%) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+.track-page-form .field .orange-country-combobox__control {
+    min-height: 48px;
+    box-sizing: border-box;
+}
+
+.track-page-form .field .orange-country-combobox__input {
+    min-height: 46px;
+    box-sizing: border-box;
+}
+
 .field input::placeholder,
 .field textarea::placeholder {
     color: var(--muted);

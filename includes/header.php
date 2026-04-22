@@ -262,6 +262,7 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             phone_country_full_international: <?php echo json_encode(t('phone_country_full_international'), JSON_UNESCAPED_UNICODE); ?>,
             phone_country_label: <?php echo json_encode(t('phone_country_label'), JSON_UNESCAPED_UNICODE); ?>,
             phone_country_select_placeholder: <?php echo json_encode(t('phone_country_select_placeholder'), JSON_UNESCAPED_UNICODE); ?>,
+            phone_country_open_list: <?php echo json_encode(t('phone_country_open_list'), JSON_UNESCAPED_UNICODE); ?>,
             phone_country_required: <?php echo json_encode(t('phone_country_required'), JSON_UNESCAPED_UNICODE); ?>,
             validation_value_missing: <?php echo json_encode(t('validation_value_missing'), JSON_UNESCAPED_UNICODE); ?>,
             checkout_select_area: <?php echo json_encode(t('checkout_select_area'), JSON_UNESCAPED_UNICODE); ?>,

@@ -1,5 +1,6 @@
 /**
- * Fills <select data-orange-country-codes> from window.COUNTRY_CODES (assets/js/country-codes.js).
+ * Fills <select data-orange-country-codes> from window.COUNTRY_CODES (assets/js/country-codes.js),
+ * then wraps each in a searchable combobox (type to filter, button to open list).
  */
 (function () {
     function orangePopulateCountryCodeSelect(selectEl) {
@@ -26,15 +27,394 @@
             .sort(function (a, b) {
                 return String(a.c.country).localeCompare(String(b.c.country));
             });
+        var rowsForCombo = [];
         sorted.forEach(function (row) {
             var c = row.c;
             var i = row.i;
+            var label = (c.flag ? c.flag + ' ' : '') + c.country + ' (' + c.code + ')';
+            rowsForCombo.push({
+                value: String(i),
+                label: label,
+                country: c.country,
+                codeDigits: String(c.code).replace(/\D/g, ''),
+            });
             var opt = document.createElement('option');
             opt.value = String(i);
-            opt.textContent = (c.flag ? c.flag + ' ' : '') + c.country + ' (' + c.code + ')';
+            opt.textContent = label;
             selectEl.appendChild(opt);
         });
+        selectEl._orangeCountryRows = rowsForCombo;
         selectEl.dataset.orangeCountryCodesDone = '1';
+        orangeAttachCountryCombobox(selectEl);
+    }
+
+    function orangeAttachCountryCombobox(selectEl) {
+        if (!selectEl || selectEl.tagName !== 'SELECT' || selectEl.dataset.orangeCountryCombobox === '1') {
+            return;
+        }
+        var rows = selectEl._orangeCountryRows;
+        if (!rows || !rows.length) {
+            return;
+        }
+        var T = window.APP_T || {};
+        selectEl.dataset.orangeCountryCombobox = '1';
+        selectEl.setAttribute('tabindex', '-1');
+
+        var box = document.createElement('div');
+        box.className = 'orange-country-combobox';
+
+        var control = document.createElement('div');
+        control.className = 'orange-country-combobox__control';
+
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'orange-country-combobox__input';
+        input.setAttribute('autocomplete', 'off');
+        input.setAttribute('spellcheck', 'false');
+        input.setAttribute('role', 'combobox');
+        input.setAttribute('aria-autocomplete', 'list');
+        input.setAttribute('aria-haspopup', 'listbox');
+        input.setAttribute('dir', 'ltr');
+
+        var listId = (selectEl.id || 'orange_cc') + '_listbox';
+        input.setAttribute('aria-controls', listId);
+        input.setAttribute('aria-expanded', 'false');
+        var ph = T.phone_country_select_placeholder || T.phone_country_label || '';
+        input.placeholder = ph;
+
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'orange-country-combobox__toggle';
+        btn.setAttribute('aria-label', T.phone_country_open_list || 'Open list');
+        btn.innerHTML = '<span class="orange-country-combobox__caret" aria-hidden="true"></span>';
+
+        var ul = document.createElement('ul');
+        ul.id = listId;
+        ul.className = 'orange-country-combobox__list';
+        ul.setAttribute('role', 'listbox');
+        ul.hidden = true;
+
+        selectEl.classList.add('orange-country-combobox__native');
+
+        var parent = selectEl.parentNode;
+        parent.insertBefore(box, selectEl);
+        box.appendChild(control);
+        control.appendChild(input);
+        control.appendChild(btn);
+        box.appendChild(ul);
+        box.appendChild(selectEl);
+
+        var open = false;
+        var activeIndex = -1;
+        var closeTimer = null;
+        var docCloser = null;
+
+        function escForAttr(s) {
+            return String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        }
+
+        var lid = selectEl.id;
+        if (lid) {
+            var lb = null;
+            try {
+                lb = (parent.ownerDocument || document).querySelector('label[for="' + escForAttr(lid) + '"]');
+            } catch (eL) {}
+            if (!lb && parent.closest) {
+                var field = parent.closest('.field');
+                if (field) {
+                    lb = field.querySelector('label');
+                }
+            }
+            if (lb) {
+                lb.addEventListener('click', function (ev) {
+                    if (document.activeElement !== input && document.activeElement !== btn) {
+                        ev.preventDefault();
+                        input.focus();
+                    }
+                });
+            }
+        }
+
+        function normalizeNeedle(s) {
+            return String(s || '').trim().toLowerCase();
+        }
+
+        function rowMatches(row, needle) {
+            if (!needle) {
+                return true;
+            }
+            var c = String(row.country || '').toLowerCase();
+            if (c.indexOf(needle) === 0) {
+                return true;
+            }
+            var parts = c.split(/[\s\-–—']+/);
+            for (var i = 0; i < parts.length; i++) {
+                if (parts[i] && parts[i].indexOf(needle) === 0) {
+                    return true;
+                }
+            }
+            if (/^\d+$/.test(needle) && row.codeDigits.indexOf(needle) === 0) {
+                return true;
+            }
+            return false;
+        }
+
+        function getFiltered() {
+            var v = selectEl.value;
+            if (v) {
+                var optSel = selectEl.options[selectEl.selectedIndex];
+                if (
+                    optSel &&
+                    String(optSel.textContent || '').trim() === String(input.value || '').trim()
+                ) {
+                    return rows.slice();
+                }
+            }
+            var n = normalizeNeedle(input.value);
+            return rows.filter(function (r) {
+                return rowMatches(r, n);
+            });
+        }
+
+        function renderList(items) {
+            ul.innerHTML = '';
+            items.forEach(function (r) {
+                var li = document.createElement('li');
+                li.className = 'orange-country-combobox__option';
+                li.setAttribute('role', 'option');
+                li.dataset.value = r.value;
+                li.textContent = r.label;
+                li.addEventListener('mousedown', function (e) {
+                    e.preventDefault();
+                    pick(r);
+                });
+                ul.appendChild(li);
+            });
+        }
+
+        function highlight() {
+            var lis = ul.querySelectorAll('.orange-country-combobox__option');
+            var n = lis.length;
+            if (activeIndex >= n) {
+                activeIndex = n - 1;
+            }
+            for (var i = 0; i < n; i++) {
+                lis[i].classList.toggle('is-active', i === activeIndex);
+                if (i === activeIndex) {
+                    lis[i].setAttribute('aria-selected', 'true');
+                    try {
+                        lis[i].scrollIntoView({ block: 'nearest' });
+                    } catch (eSc) {}
+                } else {
+                    lis[i].removeAttribute('aria-selected');
+                }
+            }
+        }
+
+        function dispatchChange(el) {
+            try {
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            } catch (eCh) {
+                var ev;
+                if (document.createEvent) {
+                    ev = document.createEvent('HTMLEvents');
+                    ev.initEvent('change', true, true);
+                    el.dispatchEvent(ev);
+                }
+            }
+        }
+
+        function pick(r) {
+            selectEl.value = r.value;
+            dispatchChange(selectEl);
+            input.value = r.label;
+            input.classList.add('is-filled');
+            closeList(true);
+            activeIndex = -1;
+        }
+
+        function detachDocCloser() {
+            if (docCloser) {
+                document.removeEventListener('mousedown', docCloser);
+                docCloser = null;
+            }
+        }
+
+        function attachDocCloser() {
+            detachDocCloser();
+            docCloser = function (e) {
+                if (!box.contains(e.target)) {
+                    closeList(false);
+                }
+            };
+            setTimeout(function () {
+                document.addEventListener('mousedown', docCloser);
+            }, 0);
+        }
+
+        function openList() {
+            if (closeTimer) {
+                clearTimeout(closeTimer);
+                closeTimer = null;
+            }
+            var items = getFiltered();
+            renderList(items);
+            ul.hidden = false;
+            open = true;
+            input.setAttribute('aria-expanded', 'true');
+            activeIndex = items.length ? 0 : -1;
+            highlight();
+            attachDocCloser();
+        }
+
+        function closeList(fromPick) {
+            if (closeTimer) {
+                clearTimeout(closeTimer);
+                closeTimer = null;
+            }
+            detachDocCloser();
+            ul.hidden = true;
+            open = false;
+            input.setAttribute('aria-expanded', 'false');
+            activeIndex = -1;
+            if (!fromPick) {
+                syncInputFromSelect();
+            }
+        }
+
+        function syncInputFromSelect() {
+            var v = selectEl.value;
+            if (!v) {
+                input.value = '';
+                input.classList.remove('is-filled');
+                input.placeholder = ph;
+                return;
+            }
+            var opt = selectEl.options[selectEl.selectedIndex];
+            if (opt && opt.value) {
+                input.value = opt.textContent;
+                input.classList.add('is-filled');
+            } else {
+                input.value = '';
+                input.classList.remove('is-filled');
+            }
+        }
+
+        btn.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+        });
+        btn.addEventListener('click', function () {
+            if (open) {
+                closeList(false);
+            } else {
+                input.focus();
+                openList();
+            }
+        });
+
+        input.addEventListener('focus', function () {
+            syncInputFromSelect();
+            requestAnimationFrame(function () {
+                try {
+                    input.select();
+                } catch (eSel) {}
+            });
+            openList();
+        });
+
+        input.addEventListener('input', function () {
+            if (normalizeNeedle(input.value) === '') {
+                selectEl.value = '';
+                input.classList.remove('is-filled');
+                dispatchChange(selectEl);
+            }
+            var items = getFiltered();
+            renderList(items);
+            if (!open) {
+                ul.hidden = false;
+                open = true;
+                input.setAttribute('aria-expanded', 'true');
+                attachDocCloser();
+            }
+            activeIndex = items.length ? 0 : -1;
+            highlight();
+        });
+
+        input.addEventListener('blur', function () {
+            closeTimer = setTimeout(function () {
+                if (!box.contains(document.activeElement)) {
+                    closeList(false);
+                }
+            }, 160);
+        });
+
+        input.addEventListener('keydown', function (e) {
+            var key = e.key;
+            if (key === 'Escape') {
+                if (open) {
+                    e.preventDefault();
+                    closeList(false);
+                }
+                return;
+            }
+            if (key === 'ArrowDown') {
+                e.preventDefault();
+                if (!open) {
+                    openList();
+                } else {
+                    var lis = ul.querySelectorAll('.orange-country-combobox__option');
+                    if (!lis.length) {
+                        return;
+                    }
+                    activeIndex = Math.min(activeIndex + 1, lis.length - 1);
+                    if (activeIndex < 0) {
+                        activeIndex = 0;
+                    }
+                    highlight();
+                }
+                return;
+            }
+            if (key === 'ArrowUp') {
+                e.preventDefault();
+                if (!open) {
+                    openList();
+                } else {
+                    var lisUp = ul.querySelectorAll('.orange-country-combobox__option');
+                    if (!lisUp.length) {
+                        return;
+                    }
+                    activeIndex = Math.max((activeIndex < 0 ? 0 : activeIndex) - 1, 0);
+                    highlight();
+                }
+                return;
+            }
+            if (key === 'Enter') {
+                if (open && activeIndex >= 0) {
+                    var lisE = ul.querySelectorAll('.orange-country-combobox__option');
+                    if (lisE[activeIndex]) {
+                        var val = lisE[activeIndex].dataset.value;
+                        var picked = null;
+                        for (var ri = 0; ri < rows.length; ri++) {
+                            if (rows[ri].value === val) {
+                                picked = rows[ri];
+                                break;
+                            }
+                        }
+                        if (picked) {
+                            e.preventDefault();
+                            pick(picked);
+                        }
+                    }
+                }
+                return;
+            }
+        });
+
+        selectEl.addEventListener('change', function () {
+            syncInputFromSelect();
+        });
+
+        syncInputFromSelect();
     }
 
     /**
