@@ -5,6 +5,10 @@ Orange — ترحيلات مخطط قاعدة البيانات (اختياري �
 الاسم: NNN_وصف_قصير.sql  (ثلاثة أرقام بادئة، مثال 001_add_column_x.sql)
          أو NNN.sql فقط (مثال 002.sql) — يُفضّل وصف بعد الشرطة السفلية لتفادي التعارض.
 
+سلسلة صارمة اختيارية Final Architecture: ملفات **حصراً** ‎001.sql‎، ‎002.sql‎، … حتى رقم ‎ORANGE_SCHEMA_CODE_VERSION‎:
+  • الافتراضي (ORANGE_STRICT_NUMBERED_SQL_MIGRATIONS=false): تُنفَّذ إن وُجدت **دون** رفع orange_schema_meta بين الملفات؛ ثم يكمّل ترحيل PHP.
+  • الوضع الصارم (=true في .env.php): يجب وجود **كل** الملفات في النطاق؛ يُحدَّث meta بعد كل ملف (كل DDL يجب أن يكون في SQL).
+
 التنفيذ:
   • يتم تلقائياً في نهاية orange_catalog_ensure_schema() (كل طلب يمرّ على التحقق من الملفات الجديدة).
   • كل ملف يُنفَّذ مرة واحدة فقط؛ السجل في الجدول orange_schema_migrations.

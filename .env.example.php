@@ -36,4 +36,11 @@ return [
 
     // اختياري (قديم): رابط يدوي بـ ?sf_preview= — روابط الجدول في الأدمن تستخدم جلسة بدون إظهار سر في عنوان المتجر
     // 'ORANGE_STOREFRONT_PREVIEW_TOKEN' => 'غيّر_إلى_سلسلة_عشوائية_طويلة_لا_تشاركها_علناً',
+
+    // اختياري — ترحيل المخطط (راجع docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt):
+    // سلسلة صارمة 001.sql…NNN.sql مع تحديث orange_schema_meta بعد كل ملف (كل DDL في SQL). الافتراضي false.
+    // 'ORANGE_STRICT_NUMBERED_SQL_MIGRATIONS' => true,
+    // عند true: فشل البوابة يعرّف ORANGE_SCHEMA_DEGRADED بدلاً من إيقاف الطلب (سياسة المالك).
+    // 'ORANGE_SCHEMA_CATCH_BOOTSTRAP_FAILURE' => true,
+    // ثوانٍ APCu لتخطي بوابة الترحيل بعد نجاح (0 أو عدم التعيين = معطّل). متغير بيئة السيرفر ORANGE_SCHEMA_APCU_GATE_SECONDS
 ];

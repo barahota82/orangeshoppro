@@ -35,16 +35,18 @@ ORANGE — أرشيف خطة أداء الواجهة وترحيل المخطط (
 --------------------------------------------------------------------
 ثالثاً: الوضع التقني المرجعي في المستودع (ملخص)
 --------------------------------------------------------------------
-- **orange_catalog_ensure_schema()** في includes/catalog_schema.php: ترحيل PHP + فحوص؛ موثّق في IBRAHIM كمسار تشغيل لقواعد قد تحتاج تحديثاً تلقائياً.
-- **scripts/migrations/*.sql** مع جدول **orange_schema_migrations**: ترحيلات ملفية.
-- **orange_catalog_schema_checkpoint** و **ORANGE_CATALOG_SCHEMA_PHP_REVISION**: مسار سريع عند تطابق الإصدار مع القاعدة؛ يُرفع الرقم عند إضافة خطوات ترحيل PHP جديدة في ensure_schema (راجع تعليق الملف).
-- **orange_schema_meta** (جدول version + updated_at) و **ORANGE_SCHEMA_CODE_VERSION** (مرادف لرقم المراجعة أعلاه): بوابة إصدار موازية؛ المسار السريع إذا تطابق **أي** من checkpoint أو meta مع رقم الكود؛ يُزامَن الصف الناقص تلقائياً عند أول طلب سريع.
-- **orange_schema_check_and_bootstrap($pdo)**: غلاف يستدعي **orange_catalog_ensure_schema** — للتوافق مع تسميات خطط النشر؛ لا يحذف جسم الترحيل PHP.
-- **includes/schema_manager.php**: تضمين موحّد يحمّل **catalog_schema.php** (مسار واحد لخطط «schema manager» دون تكرار المنطق).
-- **scripts/run_migrations.php**: تشغيل CLI لـ **orange_run_migrations** (غلاف النشر؛ نفس **orange_catalog_ensure_schema**) بعد **git pull** (اختياري لتخفيف أول زيارة واجهة)؛ يحمّل **schema_manager.php**.
-- **index.php** و **manifest.php** و **storefront-dispatch.php**: تخفيف جزئي على مسارات معيّنة؛ الترحيل الكامل لصفحات الواجهة يمر عبر استدعاءات الصفحات/الهيدر حسب التصميم الحالي للمشروع.
+- **orange_catalog_ensure_schema_core()** في includes/catalog_schema.php: النواة الداخلية (ترحيل PHP + فحوص + مسار سريع)؛ موثّق في IBRAHIM.
+- **orange_catalog_ensure_schema()**: تستدعي **orange_schema_check_and_bootstrap** (بوابة الويب الافتراضية لكل الاستدعاءات).
+- **scripts/migrations/*.sql** مع جدول **orange_schema_migrations**: ترحيلات ملفية؛ إضافةً إلى سلسلة اختيارية **###.sql** (انظر README و«ثامناً»).
+- **orange_catalog_schema_checkpoint** و **ORANGE_CATALOG_SCHEMA_PHP_REVISION**: مسار سريع عند تطابق الإصدار مع القاعدة؛ يُرفع الرقم عند إضافة خطوات ترحيل PHP جديدة في النواة (راجع تعليق الملف).
+- **orange_schema_meta** و **ORANGE_SCHEMA_CODE_VERSION**: بوابة إصدار؛ المسار السريع إذا تطابق checkpoint أو meta مع رقم الكود.
+- **orange_schema_check_and_bootstrap($pdo)**: بوابة (إصدار القاعدة، ###.sql، APCu، التقاط فحل اختياري).
+- **orange_run_migrations($pdo, ?$version)**: سلسلة ###.sql + النواة — يُفضّل لـ CLI.
+- **includes/schema_manager.php**: تضمين موحّد يحمّل **catalog_schema.php**.
+- **scripts/run_migrations.php**: **orange_run_migrations** بعد **git pull** (اختياري)؛ يحمّل **schema_manager.php**.
+- **index.php** و **manifest.php** و **storefront-dispatch.php**: تخفيف جزئي على مسارات معيّنة؛ صفحات الواجهة تستدعي **orange_catalog_ensure_schema** (= البوابة) قبل الهيدر حسب التصميم الحالي.
 
-**ملاحظة:** استبدال **كامل** جسم ensure_schema بملفات SQL مرقمة فقط (001..N) **لم يُنفَّذ** — يتطلب هجرة منفصلة وموافقة مالك؛ الخطوات أعلاه تضيف **بوابة إصدار + CLI** دون إسقاط IBRAHIM.
+**ملاحظة:** الوضع **الصارم** لسلسلة **###.sql** فقط (بدون جسم PHP) يتطلّب `ORANGE_STRICT_NUMBERED_SQL_MIGRATIONS=true` وملفات كاملة — قرار مالك؛ الافتراضي هجين آمن مع جسم PHP.
 
 
 --------------------------------------------------------------------
@@ -83,14 +85,14 @@ ORANGE — أرشيف خطة أداء الواجهة وترحيل المخطط (
 مرجع للمقارنة مع مقترحات «معماريّة نهائية» (بوابة إصدار، ترحيل ملفي، وضع متدهور، كاش):
 
 - **إصدار مخطط في القاعدة (`orange_schema_meta` + رقم في الكود):** منفّذ؛ **ORANGE_SCHEMA_CODE_VERSION** مرادف لـ **ORANGE_CATALOG_SCHEMA_PHP_REVISION** (رقم واحد مصدر الحقيقة).
-- **مسار سريع بعد التطابق:** إن تطابق **checkpoint** أو **meta** مع رقم المراجعة → يُشغَّل **فقط** `orange_schema_run_pending_migrations` (ملفات SQL المسجّلة) ثم إنهاء؛ دون إعادة جسم PHP الكامل.
-- **غلاف `orange_schema_check_and_bootstrap`:** منفّذ؛ يستدعي **نفس** `orange_catalog_ensure_schema` (مبدأ IBRAHIM: الترحيل التلقائي ما زال موجوداً؛ تغيّر **أسلوب التنفيذ** عبر البوابة والـ CLI لا يلغي المبدأ).
-- **`orange_run_migrations($pdo, ?$_currentDbVersion)`:** منفّذ؛ المعامل الثاني **اختياري ويُتجاهل** (توافق مقتطفات نشر؛ الإصدار يُقرأ من القاعدة داخل `orange_catalog_ensure_schema`). **includes/schema_manager.php** يحمّل `catalog_schema.php` كتضمين موحّد لخطط النشر.
-- **ترحيل حصري بملفات `001.sql`…`NNN.sql` وحلقة صارمة تحل محل جسم PHP:** غير منفّذ في هذا المستودع — الترحيل الفعلي ما زال **PHP + `scripts/migrations/*` + جدول `orange_schema_migrations`**؛ استبدال كامل يحتاج مشروع هجرة وموافقة مالك.
-- **وضع متدهور على الواجهة العامة (`ORANGE_SCHEMA_DEGRADED` + إخفاء ميزات):** غير معتمد هنا — مسارات السلة والطلب والتتبع لا يجب أن تخفي فشل ترحيل دون سياسة مكتوبة (راجع «ثانياً» أعلاه).
-- **كاش APCu / Redis / ملف tmp لتخطي فحص الإصدار:** غير مضاف — مخاطرة بيانات قديمة أو بيئات بلا APCu.
+- **النواة الداخلية `orange_catalog_ensure_schema_core`:** تحتوي مسار التطابق السريع (checkpoint أو meta) ثم `orange_schema_run_pending_migrations` أو جسم PHP الكامل.
+- **`orange_catalog_ensure_schema` (العامة):** تستدعي **`orange_schema_check_and_bootstrap`** — كل الاستدعاءات القائمة تمر بالبوابة (إصدار القاعدة، سلسلة ###.sql عند الحاجة، APCu اختياري، التقاط فشل اختياري).
+- **`orange_schema_check_and_bootstrap`:** حارس نجاح لكل طلب؛ قراءة `orange_schema_meta`؛ إن **أقل** من رقم الكود → **`orange_run_migrations`**؛ وإلا → ترحيلات `NNN_*.sql` المعلّقة + النواة. متغير بيئة **`ORANGE_SCHEMA_APCU_GATE_SECONDS`**: عند >0 وAPCu يُخزَّن مفتاح `orange_schema_gate_{CODE_VERSION}` بعد النجاح لتخطي البوابة (يُستخدم بحذر؛ TTL منخفض).
+- **`orange_run_migrations`:** يشغّل **`orange_schema_run_numbered_sql_chain`** ثم **`orange_catalog_ensure_schema_core`** (لا يمرّ بحارس البوابة — مناسب لـ CLI).
+- **سلسلة `001.sql`…`NNN.sql`:** منفّذة. **الافتراضي** (`ORANGE_STRICT_NUMBERED_SQL_MIGRATIONS=false` في `.env.php`): تُنفَّذ الملفات الموجودة **دون** تحديث meta بين الخطوات (تفادي مسار سريع خاطئ) ثم تكمّل النواة. **الوضع الصارم** (=true): يجب وجود كل الملفات في النطاق؛ يُحدَّث meta بعد كل ملف (كل DDL في SQL — مسؤولية المالك).
+- **`ORANGE_SCHEMA_CATCH_BOOTSTRAP_FAILURE` في `.env.php`:** عند true يُعرَّف **`ORANGE_SCHEMA_DEGRADED`** عند فشل البوابة بدلاً من رمي الاستثناء — **قرار مالك**؛ راجع «ثانياً» (لا تُخفَى أعطال مسارات إلزامية دون سياسة). الواجهة: سمة **`data-orange-schema-degraded="1"`** على `<html>` في `includes/header.php` للتمييز في CSS/JS.
 - **س25/س26 والقنوات:** لم تُغيّر ذريعة هذا المسار.
-- **نشر مسبق:** `php scripts/run_migrations.php` (CLI) يكمّل «أول زيارة» عند تشغيله صراحةً على السيرفر.
+- **نشر مسبق:** `php scripts/run_migrations.php` يكمّل «أول زيارة» عند تشغيله صراحةً على السيرفر.
 
 
 نهاية الأرشيف

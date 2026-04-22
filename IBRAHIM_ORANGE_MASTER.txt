@@ -93,8 +93,9 @@ IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
   - scripts/migrations/*.sql — ترحيلات مرقّمة تُنفَّذ تلقائياً مرة واحدة (جدول orange_schema_migrations)؛
     التفاصيل scripts/migrations/README.txt. الهيكل الأول يبقى من mysql-create؛ الترحيلات للاحق.
   - includes/schema_manager.php — تضمين موحّد يحمّل **catalog_schema.php** (نقطة دخول اختيارية لخطط النشر؛ يستخدمه scripts/run_migrations.php).
-  - scripts/run_migrations.php — اختياري بعد النشر: `php scripts/run_migrations.php` يستدعي **orange_run_migrations** (نفس مسار orange_schema_check_and_bootstrap / orange_catalog_ensure_schema) من CLI؛
-    التفاصيل docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt (بوابة الإصدار orange_schema_meta / checkpoint).
+  - scripts/run_migrations.php — اختياري بعد النشر: `php scripts/run_migrations.php` يستدعي **orange_run_migrations** (سلسلة ###.sql اختيارية + **orange_catalog_ensure_schema_core**) من CLI؛
+    الواجهة تمر عادةً بـ **orange_catalog_ensure_schema** = **orange_schema_check_and_bootstrap** (بوابة + APCu/التقاط اختياري). التفاصيل ROLLOUT.
+  - .env.php (اختياري): **ORANGE_STRICT_NUMBERED_SQL_MIGRATIONS**، **ORANGE_SCHEMA_CATCH_BOOTSTRAP_FAILURE**؛ متغير بيئة **ORANGE_SCHEMA_APCU_GATE_SECONDS** — انظر `.env.example.php` و ROLLOUT «ثامناً».
 
 هذا القسم يغطي «التوثيق/الإجراء الواحد» لترتيب التنفيذ وتجنب تكرار القيود والنسخ الاحتياطي.
 

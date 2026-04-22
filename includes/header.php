@@ -66,8 +66,11 @@ $orangeSfDefaultCh = orange_storefront_default_channel_slug($pdoSfHdr);
 $orangeSfSessionPreviewBypass = orange_storefront_preview_session_matches_request();
 
 $dir = $lang === 'ar' ? 'rtl' : 'ltr';
+$orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_DEGRADED)
+    ? ' data-orange-schema-degraded="1"'
+    : '';
 ?><!DOCTYPE html>
-<html lang="<?php echo htmlspecialchars($lang, ENT_QUOTES, 'UTF-8'); ?>" dir="<?php echo $dir === 'rtl' ? 'rtl' : 'ltr'; ?>">
+<html lang="<?php echo htmlspecialchars($lang, ENT_QUOTES, 'UTF-8'); ?>" dir="<?php echo $dir === 'rtl' ? 'rtl' : 'ltr'; ?>"<?php echo $orangeSchemaDegradedAttr; ?>>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">

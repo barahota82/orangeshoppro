@@ -173,27 +173,6 @@ function orange_schema_meta_save(PDO $pdo, int $version): void
 }
 
 /**
- * غلاف موصى به لخطط النشر: يستدعي نفس منطق orange_catalog_ensure_schema (ترحيل PHP + scripts/migrations).
- * لا يستبدل جسم الترحيل الضخم — يبقى في catalog_schema.php حتى تكتمل هجرة SQL منفصلة (IBRAHIM §2).
- */
-function orange_schema_check_and_bootstrap(PDO $pdo): void
-{
-    orange_catalog_ensure_schema($pdo);
-}
-
-/**
- * نقطة دخول نشر/CLI باسم «run migrations»: نفس مسار orange_schema_check_and_bootstrap
- * (بوابة إصدار + ترحيل PHP عند الحاجة + scripts/migrations/* — ROLLOUT).
- *
- * @param int|null $_currentDbVersion محجوز للتوافق مع مقتطفات «Final Architecture»؛ **يُتجاهل**.
- *        الإصدار الفعلي يُستنتج من orange_schema_meta / checkpoint داخل orange_catalog_ensure_schema().
- */
-function orange_run_migrations(PDO $pdo, ?int $_currentDbVersion = null): void
-{
-    orange_schema_check_and_bootstrap($pdo);
-}
-
-/**
  * توحيد slug مع path_segment (نفس مبدأ حفظ القناة الجديدة) — لمرة واحدة لكل قاعدة.
  */
 function orange_catalog_allocate_unique_slug_from_base(string $base, array &$usedSlugs): string
@@ -448,7 +427,7 @@ function orange_catalog_ensure_storefront_read_bootstrap(PDO $pdo): void
     $bootDone = true;
 }
 
-function orange_catalog_ensure_schema(PDO $pdo): void
+function orange_catalog_ensure_schema_core(PDO $pdo): void
 {
     // Per-connection charset (avoids editing config.php; some hosts break PDO::MYSQL_ATTR_INIT_COMMAND).
     static $charsetApplied = false;
@@ -1899,6 +1878,82 @@ function orange_catalog_ensure_schema(PDO $pdo): void
     orange_schema_meta_save($pdo, ORANGE_CATALOG_SCHEMA_PHP_REVISION);
 
     $done = true;
+}
+
+/**
+ * ترحيل مرقّم اختياري: scripts/migrations/001.sql … NNN.sql ثم النواة الكاملة (انظر ORANGE_STRICT_NUMBERED_SQL_MIGRATIONS في config / .env.php).
+ *
+ * @param int|null $_currentDbVersion إصدار orange_schema_meta الحالي (صف id=1)؛ null يعيد القراءة من القاعدة.
+ */
+function orange_run_migrations(PDO $pdo, ?int $_currentDbVersion = null): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    orange_schema_run_numbered_sql_chain($pdo, $_currentDbVersion);
+    orange_catalog_ensure_schema_core($pdo);
+}
+
+/**
+ * بوابة نشر الويب: قراءة إصدار القاعدة، سلسلة ###.sql عند الحاجة، ثم النواة؛ اختياري APCu ووضع متدهور عند الفشل (إعدادات).
+ */
+function orange_schema_check_and_bootstrap(PDO $pdo): void
+{
+    static $gateOk = false;
+    if ($gateOk) {
+        return;
+    }
+    static $bootstrapFailedDegraded = false;
+    if ($bootstrapFailedDegraded) {
+        return;
+    }
+
+    $apcuTtl = (int) (getenv('ORANGE_SCHEMA_APCU_GATE_SECONDS') ?: '0');
+    $apcuKey = 'orange_schema_gate_' . (string) ORANGE_SCHEMA_CODE_VERSION;
+    if ($apcuTtl > 0 && function_exists('apcu_fetch') && apcu_fetch($apcuKey)) {
+        $gateOk = true;
+
+        return;
+    }
+
+    $catch = defined('ORANGE_SCHEMA_CATCH_BOOTSTRAP_FAILURE') && ORANGE_SCHEMA_CATCH_BOOTSTRAP_FAILURE;
+
+    try {
+        orange_schema_meta_ensure_table($pdo);
+        $st = $pdo->query('SELECT version FROM orange_schema_meta WHERE id = 1 LIMIT 1');
+        $row = $st ? $st->fetch(PDO::FETCH_ASSOC) : false;
+        $dbVersion = $row ? (int) ($row['version'] ?? 0) : 0;
+
+        if ($dbVersion < ORANGE_SCHEMA_CODE_VERSION) {
+            orange_run_migrations($pdo, $dbVersion);
+        } else {
+            require_once __DIR__ . '/schema_migrations.php';
+            orange_schema_run_pending_migrations($pdo);
+            orange_catalog_ensure_schema_core($pdo);
+        }
+
+        if ($apcuTtl > 0 && function_exists('apcu_store')) {
+            @apcu_store($apcuKey, 1, $apcuTtl);
+        }
+        $gateOk = true;
+    } catch (Throwable $e) {
+        if ($catch) {
+            if (function_exists('error_log')) {
+                error_log('[orange] schema bootstrap: ' . $e->getMessage());
+            }
+            if (!defined('ORANGE_SCHEMA_DEGRADED')) {
+                define('ORANGE_SCHEMA_DEGRADED', true);
+            }
+            $bootstrapFailedDegraded = true;
+
+            return;
+        }
+        throw $e;
+    }
+}
+
+/** @see orange_schema_check_and_bootstrap — نقطة الدخول العامة لكل الاستدعاءات القائمة. */
+function orange_catalog_ensure_schema(PDO $pdo): void
+{
+    orange_schema_check_and_bootstrap($pdo);
 }
 
 /**

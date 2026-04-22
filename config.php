@@ -86,6 +86,26 @@ define(
  */
 define('ORANGE_STOREFRONT_PREVIEW_TOKEN', trim((string) ($env['ORANGE_STOREFRONT_PREVIEW_TOKEN'] ?? '')));
 
+/** ترحيل المخطط: سلسلة صارمة 001.sql…NNN.sql تُحدّث orange_schema_meta خطوة بخطوة (كل DDL في SQL) — الافتراضي false (آمن مع جسم PHP). */
+$__strictNum = $env['ORANGE_STRICT_NUMBERED_SQL_MIGRATIONS'] ?? false;
+define(
+    'ORANGE_STRICT_NUMBERED_SQL_MIGRATIONS',
+    $__strictNum === true
+    || $__strictNum === 1
+    || $__strictNum === '1'
+    || strtolower((string) $__strictNum) === 'true'
+);
+
+/** عند true: فشل orange_schema_check_and_bootstrap يُسجَّل ويُعرّف ORANGE_SCHEMA_DEGRADED بدلاً من إيقاف الطلب (راجع ROLLOUT). */
+$__catchBoot = $env['ORANGE_SCHEMA_CATCH_BOOTSTRAP_FAILURE'] ?? false;
+define(
+    'ORANGE_SCHEMA_CATCH_BOOTSTRAP_FAILURE',
+    $__catchBoot === true
+    || $__catchBoot === 1
+    || $__catchBoot === '1'
+    || strtolower((string) $__catchBoot) === 'true'
+);
+
 /*
 |--------------------------------------------------------------------------
 | Storefront static assets (cache bust)
