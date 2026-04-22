@@ -16,6 +16,7 @@ orange_send_html_no_cache_headers();
 
 extract(storefront_toolbar_state());
 orange_storefront_send_channel_cookie($channelSlug);
+orange_storefront_send_lang_cookie($lang);
 
 $taglineCycle = storefront_tagline_cycle_messages();
 $taglineInitial = $taglineCycle[0] ?? '';
@@ -71,6 +72,8 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
     <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <?php /* خطوط من HTML وليس @import داخل main.css — يقلّل حظر التصيير وسلسلة الطلبات على أول زيارة */ ?>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&amp;family=Outfit:wght@400;500;600;700&amp;display=swap">
     <link rel="preload" as="image" href="<?php echo htmlspecialchars(storefront_absolute_url($orangeChannelLogoUrl), ENT_QUOTES, 'UTF-8'); ?>">
     <link rel="preload" as="image" href="<?php echo htmlspecialchars(storefront_absolute_url($orangeWordmarkUrl), ENT_QUOTES, 'UTF-8'); ?>">
     <meta name="theme-color" content="<?php echo htmlspecialchars($sfThemeColor, ENT_QUOTES, 'UTF-8'); ?>">

@@ -318,6 +318,11 @@ function current_lang(): string
         return $fromShort;
     }
 
+    $fromCookie = orange_storefront_read_saved_lang();
+    if ($fromCookie !== null) {
+        return $fromCookie;
+    }
+
     return orange_lang_from_accept_language_header($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? null);
 }
 
@@ -589,6 +594,50 @@ function orange_storefront_send_channel_cookie(string $slug): void
         || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
         || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
     setcookie(orange_storefront_channel_cookie_name(), $slug, [
+        'expires' => time() + 3600 * 24 * 400,
+        'path' => orange_storefront_channel_cookie_path(),
+        'secure' => $https,
+        'httponly' => false,
+        'samesite' => 'Lax',
+    ]);
+}
+
+/**
+ * آخر لغة واجهة للمتجر — كوكي يُكمّل ‎?lang=‎ والمسار القصير (قبل ‎Accept-Language‎ فقط).
+ */
+function orange_storefront_lang_cookie_name(): string
+{
+    return 'orange_sf_lang';
+}
+
+/** @return 'en'|'ar'|'fil'|'hi'|null */
+function orange_storefront_read_saved_lang(): ?string
+{
+    $allowed = ['en', 'ar', 'fil', 'hi'];
+    $raw = isset($_COOKIE[orange_storefront_lang_cookie_name()])
+        ? strtolower(trim((string) $_COOKIE[orange_storefront_lang_cookie_name()]))
+        : '';
+    if ($raw === '' || ! in_array($raw, $allowed, true)) {
+        return null;
+    }
+
+    return $raw;
+}
+
+function orange_storefront_send_lang_cookie(string $lang): void
+{
+    if (headers_sent()) {
+        return;
+    }
+    $allowed = ['en', 'ar', 'fil', 'hi'];
+    $lang = strtolower(trim($lang));
+    if (! in_array($lang, $allowed, true)) {
+        return;
+    }
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+        || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
+    setcookie(orange_storefront_lang_cookie_name(), $lang, [
         'expires' => time() + 3600 * 24 * 400,
         'path' => orange_storefront_channel_cookie_path(),
         'secure' => $https,

@@ -69,7 +69,12 @@ $lang = match ($langTokNorm) {
     default => '',
 };
 if ($lang === '') {
-    $lang = orange_lang_from_accept_language_header($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? null);
+    $fromCookie = orange_storefront_read_saved_lang();
+    if ($fromCookie !== null) {
+        $lang = $fromCookie;
+    } else {
+        $lang = orange_lang_from_accept_language_header($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? null);
+    }
 }
 
 if ($first === '') {
