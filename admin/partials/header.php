@@ -25,9 +25,12 @@ try {
 } catch (Throwable $e) {
     $orangeAdminCompanyTitle = '';
 }
+$orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_DEGRADED)
+    ? ' data-orange-schema-degraded="1"'
+    : '';
 ?>
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl"<?php echo $orangeSchemaDegradedAttr; ?>>
 <head>
     <meta charset="UTF-8">
     <title><?php echo htmlspecialchars($orangeAdminCompanyTitle !== '' ? $orangeAdminCompanyTitle . ' — لوحة التحكم' : 'لوحة التحكم', ENT_QUOTES, 'UTF-8'); ?></title>

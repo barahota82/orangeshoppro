@@ -43,4 +43,5 @@ return [
     // عند true: فشل البوابة يعرّف ORANGE_SCHEMA_DEGRADED بدلاً من إيقاف الطلب (سياسة المالك).
     // 'ORANGE_SCHEMA_CATCH_BOOTSTRAP_FAILURE' => true,
     // ثوانٍ APCu لتخطي بوابة الترحيل بعد نجاح (0 أو عدم التعيين = معطّل). متغير بيئة السيرفر ORANGE_SCHEMA_APCU_GATE_SECONDS
+    // علم ملف اختياري: المسار في متغير بيئة ORANGE_SCHEMA_OK_FLAG_PATH؛ السطر الأول = رقم ORANGE_SCHEMA_CODE_VERSION بعد نشر ناجح.
 ];

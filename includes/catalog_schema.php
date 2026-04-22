@@ -1914,6 +1914,20 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
         return;
     }
 
+    $okFlagPath = trim((string) (getenv('ORANGE_SCHEMA_OK_FLAG_PATH') ?: ''));
+    if ($okFlagPath !== '' && is_readable($okFlagPath)) {
+        $fc = @file_get_contents($okFlagPath);
+        if ($fc !== false) {
+            $parts = preg_split("/\R/", $fc, 2);
+            $line = trim((string) ($parts[0] ?? ''));
+            if ($line === (string) ORANGE_SCHEMA_CODE_VERSION) {
+                $gateOk = true;
+
+                return;
+            }
+        }
+    }
+
     $catch = defined('ORANGE_SCHEMA_CATCH_BOOTSTRAP_FAILURE') && ORANGE_SCHEMA_CATCH_BOOTSTRAP_FAILURE;
 
     try {
