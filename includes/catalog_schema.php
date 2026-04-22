@@ -12,6 +12,11 @@ if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
     define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 1);
 }
 
+/** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
+if (! defined('ORANGE_SCHEMA_CODE_VERSION')) {
+    define('ORANGE_SCHEMA_CODE_VERSION', ORANGE_CATALOG_SCHEMA_PHP_REVISION);
+}
+
 /**
  * Ensures catalog tables and columns for colors, size families, colorways, and variant FKs exist.
  * Safe to call multiple times per request (uses static guard).
@@ -117,6 +122,63 @@ function orange_catalog_schema_checkpoint_save(PDO $pdo, int $revision): void
             error_log('[orange] catalog_schema checkpoint: ' . $e->getMessage());
         }
     }
+}
+
+/**
+ * بوابة إصدار المخطط (مرادف لـ orange_catalog_schema_checkpoint): صف واحد id=1.
+ * يُزامَن مع ORANGE_SCHEMA_CODE_VERSION عند اكتمال ترحيل PHP الكامل أو عند المسار السريع.
+ */
+function orange_schema_meta_ensure_table(PDO $pdo): void
+{
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE TABLE IF NOT EXISTS orange_schema_meta (
+            id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+            version INT UNSIGNED NOT NULL DEFAULT 0,
+            updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+}
+
+function orange_schema_meta_matches(PDO $pdo, int $expectedRevision): bool
+{
+    try {
+        orange_schema_meta_ensure_table($pdo);
+        $st = $pdo->query('SELECT version FROM orange_schema_meta WHERE id = 1 LIMIT 1');
+        $row = $st ? $st->fetch(PDO::FETCH_ASSOC) : false;
+        if ($row === false || ! is_array($row)) {
+            return false;
+        }
+
+        return (int) ($row['version'] ?? 0) === $expectedRevision;
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+function orange_schema_meta_save(PDO $pdo, int $version): void
+{
+    try {
+        orange_schema_meta_ensure_table($pdo);
+        $ins = $pdo->prepare(
+            'INSERT INTO orange_schema_meta (id, version) VALUES (1, ?)
+             ON DUPLICATE KEY UPDATE version = VALUES(version), updated_at = CURRENT_TIMESTAMP'
+        );
+        $ins->execute([$version]);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] orange_schema_meta: ' . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * غلاف موصى به لخطط النشر: يستدعي نفس منطق orange_catalog_ensure_schema (ترحيل PHP + scripts/migrations).
+ * لا يستبدل جسم الترحيل الضخم — يبقى في catalog_schema.php حتى تكتمل هجرة SQL منفصلة (IBRAHIM §2).
+ */
+function orange_schema_check_and_bootstrap(PDO $pdo): void
+{
+    orange_catalog_ensure_schema($pdo);
 }
 
 /**
@@ -388,9 +450,18 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         return;
     }
 
-    if (orange_catalog_schema_checkpoint_matches($pdo, ORANGE_CATALOG_SCHEMA_PHP_REVISION)) {
+    $schemaRev = ORANGE_CATALOG_SCHEMA_PHP_REVISION;
+    $metaOk = orange_schema_meta_matches($pdo, $schemaRev);
+    $ckOk = orange_catalog_schema_checkpoint_matches($pdo, $schemaRev);
+    if ($metaOk || $ckOk) {
         require_once __DIR__ . '/schema_migrations.php';
         orange_schema_run_pending_migrations($pdo);
+        if (! $metaOk && $ckOk) {
+            orange_schema_meta_save($pdo, $schemaRev);
+        }
+        if (! $ckOk && $metaOk) {
+            orange_catalog_schema_checkpoint_save($pdo, $schemaRev);
+        }
         $done = true;
 
         return;
@@ -1813,6 +1884,7 @@ function orange_catalog_ensure_schema(PDO $pdo): void
     orange_schema_run_pending_migrations($pdo);
 
     orange_catalog_schema_checkpoint_save($pdo, ORANGE_CATALOG_SCHEMA_PHP_REVISION);
+    orange_schema_meta_save($pdo, ORANGE_CATALOG_SCHEMA_PHP_REVISION);
 
     $done = true;
 }

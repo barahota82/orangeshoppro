@@ -91,6 +91,8 @@ IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
   - mysql-create-orange-database-full.sql — هيكل تقريباً كامل لقاعدة جديدة.
   - scripts/migrations/*.sql — ترحيلات مرقّمة تُنفَّذ تلقائياً مرة واحدة (جدول orange_schema_migrations)؛
     التفاصيل scripts/migrations/README.txt. الهيكل الأول يبقى من mysql-create؛ الترحيلات للاحق.
+  - scripts/run_migrations.php — اختياري بعد النشر: `php scripts/run_migrations.php` يستدعي orange_catalog_ensure_schema من CLI؛
+    التفاصيل docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt (بوابة الإصدار orange_schema_meta / checkpoint).
 
 هذا القسم يغطي «التوثيق/الإجراء الواحد» لترتيب التنفيذ وتجنب تكرار القيود والنسخ الاحتياطي.
 

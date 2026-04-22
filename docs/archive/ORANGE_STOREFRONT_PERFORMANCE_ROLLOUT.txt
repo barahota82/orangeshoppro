@@ -37,7 +37,12 @@ ORANGE — أرشيف خطة أداء الواجهة وترحيل المخطط (
 - **orange_catalog_ensure_schema()** في includes/catalog_schema.php: ترحيل PHP + فحوص؛ موثّق في IBRAHIM كمسار تشغيل لقواعد قد تحتاج تحديثاً تلقائياً.
 - **scripts/migrations/*.sql** مع جدول **orange_schema_migrations**: ترحيلات ملفية.
 - **orange_catalog_schema_checkpoint** و **ORANGE_CATALOG_SCHEMA_PHP_REVISION**: مسار سريع عند تطابق الإصدار مع القاعدة؛ يُرفع الرقم عند إضافة خطوات ترحيل PHP جديدة في ensure_schema (راجع تعليق الملف).
+- **orange_schema_meta** (جدول version + updated_at) و **ORANGE_SCHEMA_CODE_VERSION** (مرادف لرقم المراجعة أعلاه): بوابة إصدار موازية؛ المسار السريع إذا تطابق **أي** من checkpoint أو meta مع رقم الكود؛ يُزامَن الصف الناقص تلقائياً عند أول طلب سريع.
+- **orange_schema_check_and_bootstrap($pdo)**: غلاف يستدعي **orange_catalog_ensure_schema** — للتوافق مع تسميات خطط النشر؛ لا يحذف جسم الترحيل PHP.
+- **scripts/run_migrations.php**: تشغيل CLI لـ **orange_catalog_ensure_schema** بعد **git pull** (اختياري لتخفيف أول زيارة واجهة).
 - **index.php** و **manifest.php** و **storefront-dispatch.php**: تخفيف جزئي على مسارات معيّنة؛ الترحيل الكامل لصفحات الواجهة يمر عبر استدعاءات الصفحات/الهيدر حسب التصميم الحالي للمشروع.
+
+**ملاحظة:** استبدال **كامل** جسم ensure_schema بملفات SQL مرقمة فقط (001..N) **لم يُنفَّذ** — يتطلب هجرة منفصلة وموافقة مالك؛ الخطوات أعلاه تضيف **بوابة إصدار + CLI** دون إسقاط IBRAHIM.
 
 
 --------------------------------------------------------------------
