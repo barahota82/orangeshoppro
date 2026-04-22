@@ -1,63 +1,45 @@
 /**
- * Fills <select data-orange-country-codes> from window.COUNTRY_CODES (assets/js/country-codes.js),
- * then wraps each in a searchable combobox (type to filter, button to open list).
+ * Searchable select combobox (shared): country codes + delivery areas.
+ * Country: fills <select data-orange-country-codes> from window.COUNTRY_CODES.
+ * Delivery: app.js calls orangeAttachSearchableCombobox after building the select.
  */
 (function () {
-    function orangePopulateCountryCodeSelect(selectEl) {
-        if (!selectEl || selectEl.tagName !== 'SELECT' || selectEl.dataset.orangeCountryCodesDone === '1') {
-            return;
+    function defaultMatchRow(row, needle) {
+        if (!needle) {
+            return true;
         }
-        var list = window.COUNTRY_CODES;
-        if (!list || !list.length) {
-            return;
+        var ft = String(row.filterText || row.label || '').trim().toLowerCase();
+        if (ft.indexOf(needle) === 0) {
+            return true;
         }
-        var T = window.APP_T || {};
-        var emptyLabel = T.phone_country_select_placeholder || T.phone_country_label || '—';
-        selectEl.innerHTML = '';
-        var opt0 = document.createElement('option');
-        opt0.value = '';
-        opt0.textContent = emptyLabel;
-        opt0.disabled = true;
-        opt0.selected = true;
-        selectEl.appendChild(opt0);
-        var sorted = list
-            .map(function (c, i) {
-                return { c: c, i: i };
-            })
-            .sort(function (a, b) {
-                return String(a.c.country).localeCompare(String(b.c.country));
-            });
-        var rowsForCombo = [];
-        sorted.forEach(function (row) {
-            var c = row.c;
-            var i = row.i;
-            var label = (c.flag ? c.flag + ' ' : '') + c.country + ' (' + c.code + ')';
-            rowsForCombo.push({
-                value: String(i),
-                label: label,
-                country: c.country,
-                codeDigits: String(c.code).replace(/\D/g, ''),
-            });
-            var opt = document.createElement('option');
-            opt.value = String(i);
-            opt.textContent = label;
-            selectEl.appendChild(opt);
-        });
-        selectEl._orangeCountryRows = rowsForCombo;
-        selectEl.dataset.orangeCountryCodesDone = '1';
-        orangeAttachCountryCombobox(selectEl);
+        var parts = ft.split(/[\s\-–—'،,]+/);
+        for (var i = 0; i < parts.length; i++) {
+            if (parts[i] && parts[i].indexOf(needle) === 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    function orangeAttachCountryCombobox(selectEl) {
-        if (!selectEl || selectEl.tagName !== 'SELECT' || selectEl.dataset.orangeCountryCombobox === '1') {
+    /**
+     * @param {HTMLSelectElement} selectEl
+     * @param {Array<{value: string, label: string, filterText?: string}>} rows
+     * @param {{placeholder?: string, openListAria?: string, inputDir?: string, matchRow?: function(Object, string): boolean}} [opts]
+     */
+    function orangeAttachSearchableCombobox(selectEl, rows, opts) {
+        opts = opts || {};
+        if (!selectEl || selectEl.tagName !== 'SELECT' || selectEl.dataset.orangeSearchableCombobox === '1') {
             return;
         }
-        var rows = selectEl._orangeCountryRows;
         if (!rows || !rows.length) {
             return;
         }
-        var T = window.APP_T || {};
-        selectEl.dataset.orangeCountryCombobox = '1';
+        var matchRow = typeof opts.matchRow === 'function' ? opts.matchRow : defaultMatchRow;
+        var ph = opts.placeholder != null ? String(opts.placeholder) : '';
+        var openAria = opts.openListAria != null ? String(opts.openListAria) : 'Open list';
+        var inputDir = opts.inputDir || 'auto';
+
+        selectEl.dataset.orangeSearchableCombobox = '1';
         selectEl.setAttribute('tabindex', '-1');
 
         var box = document.createElement('div');
@@ -74,18 +56,21 @@
         input.setAttribute('role', 'combobox');
         input.setAttribute('aria-autocomplete', 'list');
         input.setAttribute('aria-haspopup', 'listbox');
-        input.setAttribute('dir', 'ltr');
+        if (inputDir === 'ltr' || inputDir === 'rtl') {
+            input.setAttribute('dir', inputDir);
+        } else {
+            input.setAttribute('dir', 'auto');
+        }
 
-        var listId = (selectEl.id || 'orange_cc') + '_listbox';
+        var listId = (selectEl.id || 'orange_ss') + '_listbox';
         input.setAttribute('aria-controls', listId);
         input.setAttribute('aria-expanded', 'false');
-        var ph = T.phone_country_select_placeholder || T.phone_country_label || '';
         input.placeholder = ph;
 
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'orange-country-combobox__toggle';
-        btn.setAttribute('aria-label', T.phone_country_open_list || 'Open list');
+        btn.setAttribute('aria-label', openAria);
         btn.innerHTML = '<span class="orange-country-combobox__caret" aria-hidden="true"></span>';
 
         var ul = document.createElement('ul');
@@ -139,26 +124,6 @@
             return String(s || '').trim().toLowerCase();
         }
 
-        function rowMatches(row, needle) {
-            if (!needle) {
-                return true;
-            }
-            var c = String(row.country || '').toLowerCase();
-            if (c.indexOf(needle) === 0) {
-                return true;
-            }
-            var parts = c.split(/[\s\-–—']+/);
-            for (var i = 0; i < parts.length; i++) {
-                if (parts[i] && parts[i].indexOf(needle) === 0) {
-                    return true;
-                }
-            }
-            if (/^\d+$/.test(needle) && row.codeDigits.indexOf(needle) === 0) {
-                return true;
-            }
-            return false;
-        }
-
         function getFiltered() {
             var v = selectEl.value;
             if (v) {
@@ -172,7 +137,7 @@
             }
             var n = normalizeNeedle(input.value);
             return rows.filter(function (r) {
-                return rowMatches(r, n);
+                return matchRow(r, n);
             });
         }
 
@@ -215,9 +180,8 @@
             try {
                 el.dispatchEvent(new Event('change', { bubbles: true }));
             } catch (eCh) {
-                var ev;
                 if (document.createEvent) {
-                    ev = document.createEvent('HTMLEvents');
+                    var ev = document.createEvent('HTMLEvents');
                     ev.initEvent('change', true, true);
                     el.dispatchEvent(ev);
                 }
@@ -417,6 +381,90 @@
         syncInputFromSelect();
     }
 
+    function orangeAttachCountryCombobox(selectEl) {
+        if (!selectEl || selectEl.tagName !== 'SELECT' || selectEl.dataset.orangeCountryCombobox === '1') {
+            return;
+        }
+        var rows = selectEl._orangeCountryRows;
+        if (!rows || !rows.length) {
+            return;
+        }
+        var T = window.APP_T || {};
+        selectEl.dataset.orangeCountryCombobox = '1';
+
+        function countryMatch(row, needle) {
+            if (!needle) {
+                return true;
+            }
+            var c = String(row.country || '').toLowerCase();
+            if (c.indexOf(needle) === 0) {
+                return true;
+            }
+            var parts = c.split(/[\s\-–—']+/);
+            for (var i = 0; i < parts.length; i++) {
+                if (parts[i] && parts[i].indexOf(needle) === 0) {
+                    return true;
+                }
+            }
+            if (/^\d+$/.test(needle) && row.codeDigits.indexOf(needle) === 0) {
+                return true;
+            }
+            return false;
+        }
+
+        orangeAttachSearchableCombobox(selectEl, rows, {
+            placeholder: T.phone_country_select_placeholder || T.phone_country_label || '',
+            openListAria: T.phone_country_open_list || 'Open list',
+            inputDir: 'ltr',
+            matchRow: countryMatch,
+        });
+    }
+
+    function orangePopulateCountryCodeSelect(selectEl) {
+        if (!selectEl || selectEl.tagName !== 'SELECT' || selectEl.dataset.orangeCountryCodesDone === '1') {
+            return;
+        }
+        var list = window.COUNTRY_CODES;
+        if (!list || !list.length) {
+            return;
+        }
+        var T = window.APP_T || {};
+        var emptyLabel = T.phone_country_select_placeholder || T.phone_country_label || '—';
+        selectEl.innerHTML = '';
+        var opt0 = document.createElement('option');
+        opt0.value = '';
+        opt0.textContent = emptyLabel;
+        opt0.disabled = true;
+        opt0.selected = true;
+        selectEl.appendChild(opt0);
+        var sorted = list
+            .map(function (c, i) {
+                return { c: c, i: i };
+            })
+            .sort(function (a, b) {
+                return String(a.c.country).localeCompare(String(b.c.country));
+            });
+        var rowsForCombo = [];
+        sorted.forEach(function (row) {
+            var c = row.c;
+            var i = row.i;
+            var label = (c.flag ? c.flag + ' ' : '') + c.country + ' (' + c.code + ')';
+            rowsForCombo.push({
+                value: String(i),
+                label: label,
+                country: c.country,
+                codeDigits: String(c.code).replace(/\D/g, ''),
+            });
+            var opt = document.createElement('option');
+            opt.value = String(i);
+            opt.textContent = label;
+            selectEl.appendChild(opt);
+        });
+        selectEl._orangeCountryRows = rowsForCombo;
+        selectEl.dataset.orangeCountryCodesDone = '1';
+        orangeAttachCountryCombobox(selectEl);
+    }
+
     /**
      * @param {string|HTMLSelectElement|null|undefined} selectIdOrEl
      * @returns {string|null} digits only, e.g. "965", or null if international / invalid
@@ -440,6 +488,7 @@
         return digits || null;
     }
 
+    window.orangeAttachSearchableCombobox = orangeAttachSearchableCombobox;
     window.orangePopulateCountryCodeSelect = orangePopulateCountryCodeSelect;
     window.orangeStorefrontPhoneCountryDigits = orangeStorefrontPhoneCountryDigits;
 

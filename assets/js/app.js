@@ -511,22 +511,46 @@ function orangeReplaceInputWithDeliveryAreaSelect(inputId, areasList) {
     const sel = document.createElement('select');
     sel.id = inputId;
     sel.setAttribute('autocomplete', 'address-level1');
+    if (input.name) {
+        sel.name = input.name;
+    }
+    if (input.required) {
+        sel.required = true;
+    }
+    if (input.className) {
+        sel.className = input.className;
+    }
+    const ariaLbl = input.getAttribute('aria-label');
+    if (ariaLbl) {
+        sel.setAttribute('aria-label', ariaLbl);
+    }
     const ph = document.createElement('option');
     ph.value = '';
     ph.textContent =
         (typeof window.APP_T === 'object' && window.APP_T && window.APP_T.checkout_select_area) || '';
     sel.appendChild(ph);
+    const comboRows = [];
     for (let i = 0; i < areasList.length; i++) {
         const a = areasList[i];
         if (!a || a.id == null) {
             continue;
         }
+        const label = a.name != null ? String(a.name) : '';
         const o = document.createElement('option');
         o.value = String(a.id);
-        o.textContent = a.name != null ? String(a.name) : '';
+        o.textContent = label;
         sel.appendChild(o);
+        comboRows.push({ value: String(a.id), label: label, filterText: label });
     }
     input.parentNode.replaceChild(sel, input);
+    const T = typeof window.APP_T === 'object' && window.APP_T ? window.APP_T : {};
+    if (typeof window.orangeAttachSearchableCombobox === 'function' && comboRows.length > 0) {
+        window.orangeAttachSearchableCombobox(sel, comboRows, {
+            placeholder: T.checkout_select_area || '',
+            openListAria: T.delivery_area_open_list || T.phone_country_open_list || 'Open list',
+            inputDir: 'auto',
+        });
+    }
 }
 window.orangeReplaceInputWithDeliveryAreaSelect = orangeReplaceInputWithDeliveryAreaSelect;
 
