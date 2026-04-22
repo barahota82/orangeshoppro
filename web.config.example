@@ -1,30 +1,45 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Safe template for GitHub: URL Rewrite rules only (no host paths).
+  Safe template for GitHub: URL Rewrite + static asset caching (no host paths).
 
   On IIS/Plesk:
-  1) Copy this file to web.config in the site root (or merge the <rewrite> block
-     into your existing web.config under <system.webServer>).
+  1) Copy this file to web.config in the site root (or merge blocks into your existing web.config).
   2) Keep Plesk httpErrors / tracing / system.web on the server — do not commit
      paths like C:\Inetpub\vhosts\...
 
-  Requires: IIS URL Rewrite module (install "URL Rewrite" for IIS if /tiktok 404s).
+  Requires: IIS URL Rewrite module.
 
-  Storefront short URLs are handled by ONE dynamic rule → storefront-dispatch.php.
-  New channels: set path_segment in Admin (e.g. instagram) — no web.config edit.
-  Legacy per-channel rules were removed; see git history if you need them.
+  Static caching (browser):
+  - CSS/JS: public, max-age=604800 (7 days)
+  - Images + fonts (png jpg jpeg gif svg webp woff woff2 ttf otf): public, max-age=2592000 (30 days)
+  PHP/HTML are not matched; app may still send Cache-Control: no-store for HTML — those responses win.
 
-  If short URLs still 404:
-  - web.config must sit next to index.php / pages/ (site physical root).
-  - Subfolder site (e.g. /shop): put web.config in that folder; in .env.php set
-    PUBLIC_BASE_PATH to "/shop" (or "shop").
-  - nginx-only hosting: web.config is ignored — use nginx rewrite or long URLs
-    (set STOREFRONT_FORCE_LONG_URLS => true in .env.php).
+  If static Cache-Control does not appear: IIS → site → URL Rewrite → View Server Variables → allow RESPONSE_Cache-Control.
+
+  Storefront short URLs: ONE dynamic rule → storefront-dispatch.php (channel policy unchanged).
 -->
 <configuration>
   <system.webServer>
+    <urlCompression doStaticCompression="true" doDynamicCompression="true" />
     <rewrite>
+      <allowedServerVariables>
+        <add name="RESPONSE_Cache-Control" />
+      </allowedServerVariables>
       <rules>
+        <rule name="OrangeStaticCacheCssJs" stopProcessing="true">
+          <match url=".*\.(css|js)$" ignoreCase="true" />
+          <action type="None" />
+          <serverVariables>
+            <set name="RESPONSE_Cache-Control" value="public, max-age=604800" />
+          </serverVariables>
+        </rule>
+        <rule name="OrangeStaticCacheImagesFonts" stopProcessing="true">
+          <match url=".*\.(png|jpg|jpeg|gif|svg|webp|woff|woff2|ttf|otf)$" ignoreCase="true" />
+          <action type="None" />
+          <serverVariables>
+            <set name="RESPONSE_Cache-Control" value="public, max-age=2592000" />
+          </serverVariables>
+        </rule>
         <!--
           /{path_segment} / {path_segment}-ar / … /cart /track /signup /signin /verify-email /product/123
           يُحل path_segment من قاعدة البيانات (لوحة الإدارة → الواجهات).
