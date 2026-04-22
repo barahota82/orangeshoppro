@@ -16,7 +16,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require_once dirname(__DIR__) . '/config.php';
-require_once dirname(__DIR__) . '/includes/catalog_schema.php';
+require_once dirname(__DIR__) . '/includes/schema_manager.php';
 
 try {
     $pdo = db();

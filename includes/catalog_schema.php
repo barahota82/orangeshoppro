@@ -184,8 +184,11 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
 /**
  * نقطة دخول نشر/CLI باسم «run migrations»: نفس مسار orange_schema_check_and_bootstrap
  * (بوابة إصدار + ترحيل PHP عند الحاجة + scripts/migrations/* — ROLLOUT).
+ *
+ * @param int|null $_currentDbVersion محجوز للتوافق مع مقتطفات «Final Architecture»؛ **يُتجاهل**.
+ *        الإصدار الفعلي يُستنتج من orange_schema_meta / checkpoint داخل orange_catalog_ensure_schema().
  */
-function orange_run_migrations(PDO $pdo): void
+function orange_run_migrations(PDO $pdo, ?int $_currentDbVersion = null): void
 {
     orange_schema_check_and_bootstrap($pdo);
 }
