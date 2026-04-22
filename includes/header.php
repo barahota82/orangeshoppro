@@ -10,7 +10,8 @@ if (!function_exists('current_lang')) {
     require_once __DIR__ . '/../config.php';
 }
 require_once __DIR__ . '/catalog_schema.php';
-orange_catalog_ensure_schema(db());
+/* الترحيل الكامل orange_catalog_ensure_schema() يُستدعى من صفحة الواجهة قبل تضمين هذا الملف (IBRAHIM §2)؛ الهيدر يبقي SET NAMES + bootstrap المتجر الأساسي فقط */
+orange_catalog_ensure_storefront_read_bootstrap(db());
 
 orange_send_html_no_cache_headers();
 

@@ -17,6 +17,9 @@ function storefront_catalog_label(array $row, string $lang): string
     };
 }
 
+require_once __DIR__ . '/../includes/catalog_schema.php';
+orange_catalog_ensure_schema(db());
+
 include __DIR__ . '/../includes/header.php';
 
 $homeHeroLines = storefront_home_hero_lines();
