@@ -45,6 +45,8 @@ function orange_storefront_upsert_customer_from_checkout(
     PDO $pdo,
     string $name,
     string $phone,
+    ?string $phoneCountryDial,
+    ?string $phoneNational,
     string $area,
     string $address,
     string $emailRaw,
@@ -78,6 +80,12 @@ function orange_storefront_upsert_customer_from_checkout(
     $hasArea = orange_table_has_column($pdo, 'customers', 'area');
     $hasAddress = orange_table_has_column($pdo, 'customers', 'address');
     $hasEmail = orange_table_has_column($pdo, 'customers', 'email');
+    $hasCustDial = orange_table_has_column($pdo, 'customers', 'phone_country_dial');
+    $hasCustNat = orange_table_has_column($pdo, 'customers', 'phone_national');
+    $dialSql = ($phoneCountryDial !== null && $phoneCountryDial !== '') ? substr(preg_replace('/\D+/', '', $phoneCountryDial), 0, 8) : null;
+    $dialSql = ($dialSql !== null && $dialSql !== '') ? $dialSql : null;
+    $natSql = ($phoneNational !== null && $phoneNational !== '') ? substr(preg_replace('/\D+/', '', $phoneNational), 0, 32) : null;
+    $natSql = ($natSql !== null && $natSql !== '') ? $natSql : null;
 
     $find = $pdo->prepare('SELECT id, notes FROM customers WHERE phone = ? LIMIT 1');
     $find->execute([$phone]);
@@ -114,6 +122,14 @@ function orange_storefront_upsert_customer_from_checkout(
             $set[] = 'email = ?';
             $params[] = $emailSql;
         }
+        if ($hasCustDial) {
+            $set[] = 'phone_country_dial = ?';
+            $params[] = $dialSql;
+        }
+        if ($hasCustNat) {
+            $set[] = 'phone_national = ?';
+            $params[] = $natSql;
+        }
         $set[] = 'notes = ?';
         $params[] = $newNotes;
         $params[] = $id;
@@ -140,6 +156,16 @@ function orange_storefront_upsert_customer_from_checkout(
         $cols[] = 'email';
         $placeholders[] = '?';
         $params[] = $emailSql;
+    }
+    if ($hasCustDial) {
+        $cols[] = 'phone_country_dial';
+        $placeholders[] = '?';
+        $params[] = $dialSql;
+    }
+    if ($hasCustNat) {
+        $cols[] = 'phone_national';
+        $placeholders[] = '?';
+        $params[] = $natSql;
     }
     $cols[] = 'notes';
     $placeholders[] = '?';
@@ -172,6 +198,14 @@ function orange_storefront_upsert_customer_from_checkout(
                 if ($hasEmail && $emailSql !== null) {
                     $set[] = 'email = ?';
                     $params2[] = $emailSql;
+                }
+                if ($hasCustDial) {
+                    $set[] = 'phone_country_dial = ?';
+                    $params2[] = $dialSql;
+                }
+                if ($hasCustNat) {
+                    $set[] = 'phone_national = ?';
+                    $params2[] = $natSql;
                 }
                 $set[] = 'notes = ?';
                 $params2[] = $newNotes2;
@@ -267,6 +301,23 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     }
     $data['phone'] = $phoneNorm;
 
+    $dialStore = $data['phone_country_dial'] ?? null;
+    $natStore = $data['phone_national'] ?? null;
+    if ($dialStore === null || $dialStore === '') {
+        if ($phoneCc !== null) {
+            $d = preg_replace('/\D+/', '', (string) $phoneCc);
+            $dialStore = ($d !== '') ? substr($d, 0, 8) : null;
+        }
+    }
+    if (($natStore === null || $natStore === '') && $dialStore !== null && $dialStore !== '') {
+        $rec = orange_storefront_national_from_e164($phoneNorm, (string) $dialStore);
+        if ($rec !== null) {
+            $natStore = $rec;
+        }
+    }
+    $data['phone_country_dial'] = ($dialStore !== null && (string) $dialStore !== '') ? (string) $dialStore : null;
+    $data['phone_national'] = ($natStore !== null && (string) $natStore !== '') ? (string) $natStore : null;
+
     if (!is_array($data['items']) || count($data['items']) === 0) {
         throw new RuntimeException('Cart items are required');
     }
@@ -306,6 +357,8 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         $pdo,
         trim((string) $data['name']),
         trim((string) $data['phone']),
+        $data['phone_country_dial'] ?? null,
+        $data['phone_national'] ?? null,
         trim((string) $data['area']),
         trim((string) $data['address']),
         trim((string) $data['email']),
@@ -313,18 +366,35 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         $orderNumber
     );
 
-    $cols = 'order_number, customer_name, phone, area, address, notes, channel_id, status, total';
-    $ph = '?, ?, ?, ?, ?, ?, ?, \'pending\', ?';
+    $hasOrdDial = orange_table_has_column($pdo, 'orders', 'phone_country_dial');
+    $hasOrdNat = orange_table_has_column($pdo, 'orders', 'phone_national');
+    $cols = 'order_number, customer_name';
+    $ph = '?, ?';
     $params = [
         $orderNumber,
         trim((string) $data['name']),
+    ];
+    if ($hasOrdDial) {
+        $cols .= ', phone_country_dial';
+        $ph .= ', ?';
+        $params[] = $data['phone_country_dial'] ?? null;
+    }
+    if ($hasOrdNat) {
+        $cols .= ', phone_national';
+        $ph .= ', ?';
+        $params[] = $data['phone_national'] ?? null;
+    }
+    $cols .= ', phone, area, address, notes, channel_id, status, total';
+    $ph .= ', ?, ?, ?, ?, ?, ?, \'pending\', ?';
+    array_push(
+        $params,
         trim((string) $data['phone']),
         trim((string) $data['area']),
         trim((string) $data['address']),
         isset($data['notes']) ? trim((string) $data['notes']) : '',
         (int) $data['channel_id'],
-        $orderTotal,
-    ];
+        $orderTotal
+    );
     if ($hasSource) {
         $cols .= ', order_source';
         $ph .= ', ?';

@@ -41,6 +41,9 @@ try {
     }
     $trackCtx = $hasOrderNum && $hasVerifyPh;
 
+    $customerPhoneCountryDial = null;
+    $customerPhoneNational = null;
+
     $nameRaw = isset($data['name']) ? trim((string) $data['name']) : '';
     $phoneRaw = isset($data['phone']) ? trim((string) $data['phone']) : '';
     $areaRaw = isset($data['area']) ? trim((string) $data['area']) : '';
@@ -105,6 +108,21 @@ try {
         $customerNotes = $notesRaw !== '' ? orange_storefront_clip_utf8($notesRaw, 4000) : orange_storefront_clip_utf8($oNotes, 4000);
         $customerPhone = orange_storefront_clip_utf8(trim((string) ($orderRow['phone'] ?? '')), 64);
 
+        if (orange_table_has_column($pdo, 'orders', 'phone_country_dial')) {
+            $v = $orderRow['phone_country_dial'] ?? null;
+            if ($v !== null && (string) $v !== '') {
+                $d = preg_replace('/\D+/', '', (string) $v);
+                $customerPhoneCountryDial = ($d !== '') ? substr($d, 0, 8) : null;
+            }
+        }
+        if (orange_table_has_column($pdo, 'orders', 'phone_national')) {
+            $v = $orderRow['phone_national'] ?? null;
+            if ($v !== null && (string) $v !== '') {
+                $n = preg_replace('/\D+/', '', (string) $v);
+                $customerPhoneNational = ($n !== '') ? substr($n, 0, 32) : null;
+            }
+        }
+
         if ($customerName === '' || $customerArea === '' || $customerAddress === '' || $customerPhone === '') {
             json_response(['success' => false, 'code' => 'missing_fields', 'message' => t('checkout_required_fields')], 422);
         }
@@ -153,6 +171,9 @@ try {
 
         $customerName = orange_storefront_clip_utf8($nameRaw, 255);
         $customerPhone = orange_storefront_clip_utf8($phoneNormReg, 64);
+        $regParts = orange_storefront_phone_storage_parts($phoneRaw, $regCc);
+        $customerPhoneCountryDial = $regParts['country_dial'];
+        $customerPhoneNational = $regParts['national'];
         $customerAddress = orange_storefront_clip_utf8($addressRaw, 4000);
         $customerNotes = $notesRaw === '' ? '' : orange_storefront_clip_utf8($notesRaw, 4000);
     }
@@ -186,76 +207,100 @@ try {
 
     $accountIdAfter = 0;
     $hasDaCol = orange_table_has_column($pdo, 'storefront_accounts', 'customer_delivery_area_id');
+    $hasSfaDial = orange_table_has_column($pdo, 'storefront_accounts', 'customer_phone_country_dial');
+    $hasSfaNat = orange_table_has_column($pdo, 'storefront_accounts', 'customer_phone_national');
     if (!$row) {
         if ($hasDaCol) {
-            $ins = $pdo->prepare(
-                'INSERT INTO storefront_accounts (email, registered_channel_slug, customer_name, customer_phone, customer_delivery_area_id, customer_area, customer_address, customer_notes, verify_token_hash, verify_token_expires_at, verify_email_sent_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 48 HOUR), NOW())'
-            );
-            $ins->execute([
-                $email,
-                $channelSlug,
-                $customerName,
-                $customerPhone,
+            $ic = 'email, registered_channel_slug, customer_name, customer_phone';
+            $iv = '?, ?, ?, ?';
+            $ip = [$email, $channelSlug, $customerName, $customerPhone];
+            if ($hasSfaDial) {
+                $ic .= ', customer_phone_country_dial';
+                $iv .= ', ?';
+                $ip[] = $customerPhoneCountryDial;
+            }
+            if ($hasSfaNat) {
+                $ic .= ', customer_phone_national';
+                $iv .= ', ?';
+                $ip[] = $customerPhoneNational;
+            }
+            $ic .= ', customer_delivery_area_id, customer_area, customer_address, customer_notes, verify_token_hash, verify_token_expires_at, verify_email_sent_at';
+            $iv .= ', ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 48 HOUR), NOW()';
+            array_push(
+                $ip,
                 $customerDaId !== null && $customerDaId > 0 ? $customerDaId : null,
                 $customerArea,
                 $customerAddress,
                 $customerNotes,
-                $hash,
-            ]);
-        } else {
-            $ins = $pdo->prepare(
-                'INSERT INTO storefront_accounts (email, registered_channel_slug, customer_name, customer_phone, customer_area, customer_address, customer_notes, verify_token_hash, verify_token_expires_at, verify_email_sent_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 48 HOUR), NOW())'
+                $hash
             );
-            $ins->execute([
-                $email,
-                $channelSlug,
-                $customerName,
-                $customerPhone,
-                $customerArea,
-                $customerAddress,
-                $customerNotes,
-                $hash,
-            ]);
+            $ins = $pdo->prepare('INSERT INTO storefront_accounts (' . $ic . ') VALUES (' . $iv . ')');
+            $ins->execute($ip);
+        } else {
+            $ic = 'email, registered_channel_slug, customer_name, customer_phone';
+            $iv = '?, ?, ?, ?';
+            $ip = [$email, $channelSlug, $customerName, $customerPhone];
+            if ($hasSfaDial) {
+                $ic .= ', customer_phone_country_dial';
+                $iv .= ', ?';
+                $ip[] = $customerPhoneCountryDial;
+            }
+            if ($hasSfaNat) {
+                $ic .= ', customer_phone_national';
+                $iv .= ', ?';
+                $ip[] = $customerPhoneNational;
+            }
+            $ic .= ', customer_area, customer_address, customer_notes, verify_token_hash, verify_token_expires_at, verify_email_sent_at';
+            $iv .= ', ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 48 HOUR), NOW()';
+            array_push($ip, $customerArea, $customerAddress, $customerNotes, $hash);
+            $ins = $pdo->prepare('INSERT INTO storefront_accounts (' . $ic . ') VALUES (' . $iv . ')');
+            $ins->execute($ip);
         }
         $accountIdAfter = (int) $pdo->lastInsertId();
     } else {
         if ($hasDaCol) {
-            $upd = $pdo->prepare(
-                'UPDATE storefront_accounts SET verify_token_hash = ?, verify_token_expires_at = DATE_ADD(NOW(), INTERVAL 48 HOUR), verify_email_sent_at = NOW(),
+            $setSql = 'verify_token_hash = ?, verify_token_expires_at = DATE_ADD(NOW(), INTERVAL 48 HOUR), verify_email_sent_at = NOW(),
                  registered_channel_slug = COALESCE(registered_channel_slug, ?),
-                 customer_name = ?, customer_phone = ?, customer_delivery_area_id = ?, customer_area = ?, customer_address = ?, customer_notes = ?
-                 WHERE id = ? AND email_verified_at IS NULL'
-            );
-            $upd->execute([
-                $hash,
-                $channelSlug,
-                $customerName,
-                $customerPhone,
+                 customer_name = ?, customer_phone = ?';
+            $up = [$hash, $channelSlug, $customerName, $customerPhone];
+            if ($hasSfaDial) {
+                $setSql .= ', customer_phone_country_dial = ?';
+                $up[] = $customerPhoneCountryDial;
+            }
+            if ($hasSfaNat) {
+                $setSql .= ', customer_phone_national = ?';
+                $up[] = $customerPhoneNational;
+            }
+            $setSql .= ', customer_delivery_area_id = ?, customer_area = ?, customer_address = ?, customer_notes = ?
+                 WHERE id = ? AND email_verified_at IS NULL';
+            array_push(
+                $up,
                 $customerDaId !== null && $customerDaId > 0 ? $customerDaId : null,
                 $customerArea,
                 $customerAddress,
                 $customerNotes,
-                (int) $row['id'],
-            ]);
-        } else {
-            $upd = $pdo->prepare(
-                'UPDATE storefront_accounts SET verify_token_hash = ?, verify_token_expires_at = DATE_ADD(NOW(), INTERVAL 48 HOUR), verify_email_sent_at = NOW(),
-                 registered_channel_slug = COALESCE(registered_channel_slug, ?),
-                 customer_name = ?, customer_phone = ?, customer_area = ?, customer_address = ?, customer_notes = ?
-                 WHERE id = ? AND email_verified_at IS NULL'
+                (int) $row['id']
             );
-            $upd->execute([
-                $hash,
-                $channelSlug,
-                $customerName,
-                $customerPhone,
-                $customerArea,
-                $customerAddress,
-                $customerNotes,
-                (int) $row['id'],
-            ]);
+            $upd = $pdo->prepare('UPDATE storefront_accounts SET ' . $setSql);
+            $upd->execute($up);
+        } else {
+            $setSql = 'verify_token_hash = ?, verify_token_expires_at = DATE_ADD(NOW(), INTERVAL 48 HOUR), verify_email_sent_at = NOW(),
+                 registered_channel_slug = COALESCE(registered_channel_slug, ?),
+                 customer_name = ?, customer_phone = ?';
+            $up = [$hash, $channelSlug, $customerName, $customerPhone];
+            if ($hasSfaDial) {
+                $setSql .= ', customer_phone_country_dial = ?';
+                $up[] = $customerPhoneCountryDial;
+            }
+            if ($hasSfaNat) {
+                $setSql .= ', customer_phone_national = ?';
+                $up[] = $customerPhoneNational;
+            }
+            $setSql .= ', customer_area = ?, customer_address = ?, customer_notes = ?
+                 WHERE id = ? AND email_verified_at IS NULL';
+            array_push($up, $customerArea, $customerAddress, $customerNotes, (int) $row['id']);
+            $upd = $pdo->prepare('UPDATE storefront_accounts SET ' . $setSql);
+            $upd->execute($up);
         }
         $accountIdAfter = (int) $row['id'];
     }

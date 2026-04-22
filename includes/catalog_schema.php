@@ -456,6 +456,18 @@ function orange_catalog_ensure_schema(PDO $pdo): void
             }
         }
     }
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'phone_country_dial')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE orders ADD COLUMN phone_country_dial VARCHAR(8) NULL DEFAULT NULL AFTER customer_name'
+        );
+    }
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'phone_national')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE orders ADD COLUMN phone_national VARCHAR(32) NULL DEFAULT NULL AFTER phone_country_dial'
+        );
+    }
     if (orange_table_exists($pdo, 'orders') && orange_table_has_column($pdo, 'orders', 'customer_name')) {
         try {
             $mlStmt = $pdo->query(
@@ -1085,6 +1097,18 @@ function orange_catalog_ensure_schema(PDO $pdo): void
             }
         }
     }
+    if (orange_table_exists($pdo, 'customers') && !orange_table_has_column($pdo, 'customers', 'phone_country_dial')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE customers ADD COLUMN phone_country_dial VARCHAR(8) NULL DEFAULT NULL AFTER name_ar'
+        );
+    }
+    if (orange_table_exists($pdo, 'customers') && !orange_table_has_column($pdo, 'customers', 'phone_national')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE customers ADD COLUMN phone_national VARCHAR(32) NULL DEFAULT NULL AFTER phone_country_dial'
+        );
+    }
 
     if (!orange_table_exists($pdo, 'suppliers')) {
         orange_catalog_safe_exec(
@@ -1668,6 +1692,18 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         orange_catalog_safe_exec(
             $pdo,
             'ALTER TABLE storefront_accounts ADD COLUMN customer_phone VARCHAR(64) NULL DEFAULT NULL'
+        );
+    }
+    if (orange_table_exists($pdo, 'storefront_accounts') && !orange_table_has_column($pdo, 'storefront_accounts', 'customer_phone_country_dial')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE storefront_accounts ADD COLUMN customer_phone_country_dial VARCHAR(8) NULL DEFAULT NULL AFTER customer_phone'
+        );
+    }
+    if (orange_table_exists($pdo, 'storefront_accounts') && !orange_table_has_column($pdo, 'storefront_accounts', 'customer_phone_national')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE storefront_accounts ADD COLUMN customer_phone_national VARCHAR(32) NULL DEFAULT NULL AFTER customer_phone_country_dial'
         );
     }
     if (orange_table_exists($pdo, 'storefront_accounts') && !orange_table_has_column($pdo, 'storefront_accounts', 'customer_area')) {

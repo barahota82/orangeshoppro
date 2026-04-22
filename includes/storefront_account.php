@@ -126,6 +126,8 @@ function storefront_account_login(PDO $pdo, int $accountId): void
  *   registered_channel_slug: string,
  *   customer_name?: string|null,
  *   customer_phone?: string|null,
+ *   customer_phone_country_dial?: string|null,
+ *   customer_phone_national?: string|null,
  *   customer_area?: string|null,
  *   customer_address?: string|null,
  *   customer_notes?: string|null
@@ -154,6 +156,12 @@ function current_storefront_account(PDO $pdo): ?array
     }
     if ($hasProfile) {
         array_push($cols, 'customer_name', 'customer_phone', 'customer_area', 'customer_address', 'customer_notes');
+        if (orange_table_has_column($pdo, 'storefront_accounts', 'customer_phone_country_dial')) {
+            $cols[] = 'customer_phone_country_dial';
+        }
+        if (orange_table_has_column($pdo, 'storefront_accounts', 'customer_phone_national')) {
+            $cols[] = 'customer_phone_national';
+        }
         if ($hasDa) {
             $cols[] = 'customer_delivery_area_id';
         }
@@ -182,6 +190,14 @@ function current_storefront_account(PDO $pdo): ?array
             ? (string) $row['customer_name'] : null;
         $out['customer_phone'] = isset($row['customer_phone']) && $row['customer_phone'] !== null && (string) $row['customer_phone'] !== ''
             ? (string) $row['customer_phone'] : null;
+        if (isset($row['customer_phone_country_dial'])) {
+            $out['customer_phone_country_dial'] = $row['customer_phone_country_dial'] !== null && (string) $row['customer_phone_country_dial'] !== ''
+                ? (string) $row['customer_phone_country_dial'] : null;
+        }
+        if (isset($row['customer_phone_national'])) {
+            $out['customer_phone_national'] = $row['customer_phone_national'] !== null && (string) $row['customer_phone_national'] !== ''
+                ? (string) $row['customer_phone_national'] : null;
+        }
         $out['customer_area'] = isset($row['customer_area']) && $row['customer_area'] !== null && (string) $row['customer_area'] !== ''
             ? (string) $row['customer_area'] : null;
         $out['customer_address'] = isset($row['customer_address']) && $row['customer_address'] !== null && (string) $row['customer_address'] !== ''

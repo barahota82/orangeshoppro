@@ -37,13 +37,17 @@ try {
 
     require_fields($data, ['name', 'phone', 'area', 'address', 'channel_id', 'items']);
 
+    $phoneRawIn = trim((string) $data['phone']);
     $phoneCc = trim((string) ($data['phone_country'] ?? ''));
     $phoneCc = $phoneCc === '' ? null : $phoneCc;
-    $phoneNorm = orange_normalize_customer_phone(trim((string) $data['phone']), $phoneCc);
+    $phoneParts = orange_storefront_phone_storage_parts($phoneRawIn, $phoneCc);
+    $phoneNorm = orange_normalize_customer_phone($phoneRawIn, $phoneCc);
     if ($phoneNorm === null) {
         json_response(['success' => false, 'code' => 'invalid_phone', 'message' => t('checkout_invalid_phone')], 422);
     }
     $data['phone'] = $phoneNorm;
+    $data['phone_country_dial'] = $phoneParts['country_dial'];
+    $data['phone_national'] = $phoneParts['national'];
 
     $accSf = current_storefront_account($pdo);
     if ($accSf && !empty($accSf['customer_phone'])) {

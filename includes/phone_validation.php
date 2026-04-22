@@ -76,3 +76,42 @@ function orange_normalize_customer_phone(string $raw, ?string $countryDialDigits
 
     return null;
 }
+
+/**
+ * Parts to store alongside canonical E.164 in `phone`: country dial (digits) and national digits from the number field.
+ *
+ * @return array{country_dial: ?string, national: ?string}
+ */
+function orange_storefront_phone_storage_parts(string $rawInput, ?string $countryDialDigits): array
+{
+    $cc = null;
+    if ($countryDialDigits !== null && $countryDialDigits !== '') {
+        $d = preg_replace('/\D+/', '', $countryDialDigits);
+        $cc = ($d !== '') ? $d : null;
+    }
+    $national = null;
+    if ($cc !== null) {
+        $national = preg_replace('/\D+/', '', $rawInput);
+        $national = $national !== '' ? $national : null;
+    }
+
+    return ['country_dial' => $cc, 'national' => $national];
+}
+
+/**
+ * Derive national digits from stored E.164 when national was not saved (e.g. legacy queue payload).
+ */
+function orange_storefront_national_from_e164(string $e164, string $countryDialDigits): ?string
+{
+    $digits = preg_replace('/\D+/', '', $e164);
+    $cc = preg_replace('/\D+/', '', $countryDialDigits);
+    if ($digits === '' || $cc === '') {
+        return null;
+    }
+    if (!str_starts_with($digits, $cc)) {
+        return null;
+    }
+    $n = substr($digits, strlen($cc));
+
+    return $n !== '' ? $n : null;
+}

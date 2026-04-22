@@ -259,6 +259,8 @@ $dir = $lang === 'ar' ? 'rtl' : 'ltr';
             checkout_required_fields: <?php echo json_encode(t('checkout_required_fields'), JSON_UNESCAPED_UNICODE); ?>,
             checkout_invalid_email: <?php echo json_encode(t('checkout_invalid_email'), JSON_UNESCAPED_UNICODE); ?>,
             checkout_invalid_phone: <?php echo json_encode(t('checkout_invalid_phone'), JSON_UNESCAPED_UNICODE); ?>,
+            phone_country_full_international: <?php echo json_encode(t('phone_country_full_international'), JSON_UNESCAPED_UNICODE); ?>,
+            phone_country_label: <?php echo json_encode(t('phone_country_label'), JSON_UNESCAPED_UNICODE); ?>,
             checkout_select_area: <?php echo json_encode(t('checkout_select_area'), JSON_UNESCAPED_UNICODE); ?>,
             checkout_delivery_area_required: <?php echo json_encode(t('checkout_delivery_area_required'), JSON_UNESCAPED_UNICODE); ?>,
             select_color: <?php echo json_encode(t('select_color'), JSON_UNESCAPED_UNICODE); ?>,

@@ -107,9 +107,15 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                     <label for="reg_name"><?php echo htmlspecialchars(t('customer_name'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <input id="reg_name" name="name" type="text" autocomplete="name" required placeholder="<?php echo htmlspecialchars(t('register_placeholder_name'), ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
-                <div class="field track-signup-cta__field">
-                    <label for="reg_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="reg_phone" name="phone" type="tel" autocomplete="tel" required inputmode="tel" placeholder="<?php echo htmlspecialchars(t('register_placeholder_phone'), ENT_QUOTES, 'UTF-8'); ?>">
+                <div class="field-phone-row">
+                    <div class="field track-signup-cta__field field-phone-row__country">
+                        <label for="reg_phone_country"><?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?></label>
+                        <select id="reg_phone_country" class="field-phone-row__select" data-orange-country-codes autocomplete="tel-country-code" dir="ltr" aria-label="<?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?>"></select>
+                    </div>
+                    <div class="field track-signup-cta__field field-phone-row__number">
+                        <label for="reg_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
+                        <input id="reg_phone" name="phone" class="js-orange-phone-input" type="tel" autocomplete="tel" required inputmode="tel" placeholder="<?php echo htmlspecialchars(t('register_placeholder_phone'), ENT_QUOTES, 'UTF-8'); ?>">
+                    </div>
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="reg_area"><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
@@ -191,9 +197,13 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                         msg.textContent = reqMsg;
                         return;
                     }
+                    var regCc =
+                        typeof window.orangeStorefrontPhoneCountryDigits === 'function'
+                            ? window.orangeStorefrontPhoneCountryDigits('reg_phone_country')
+                            : null;
                     var phoneNorm =
                         typeof window.orangeNormalizeCustomerPhone === 'function'
-                            ? window.orangeNormalizeCustomerPhone(phoneRaw, null)
+                            ? window.orangeNormalizeCustomerPhone(phoneRaw, regCc)
                             : null;
                     if (!phoneNorm) {
                         msg.textContent = badPhone || reqMsg;
@@ -223,6 +233,7 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                             email: email,
                             name: name,
                             phone: phoneNorm,
+                            phone_country: regCc || '',
                             area: area,
                             delivery_area_id: deliveryAreaId,
                             address: address,

@@ -111,9 +111,15 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
                     <label for="customer_name"><?php echo htmlspecialchars(t('customer_name'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <input id="customer_name" autocomplete="name" maxlength="500">
                 </div>
-                <div class="field">
-                    <label for="customer_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="customer_phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="22" placeholder="<?php echo htmlspecialchars(t('phone_field_hint'), ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
+                <div class="field-phone-row">
+                    <div class="field field-phone-row__country">
+                        <label for="customer_phone_country"><?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?></label>
+                        <select id="customer_phone_country" class="field-phone-row__select" data-orange-country-codes autocomplete="tel-country-code" dir="ltr" aria-label="<?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?>"></select>
+                    </div>
+                    <div class="field field-phone-row__number">
+                        <label for="customer_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
+                        <input id="customer_phone" class="js-orange-phone-input" type="tel" autocomplete="tel" inputmode="tel" maxlength="22" placeholder="<?php echo htmlspecialchars(t('phone_field_hint'), ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
+                    </div>
                 </div>
                 <div class="field">
                     <label for="customer_email"><?php echo htmlspecialchars(t('customer_email'), ENT_QUOTES, 'UTF-8'); ?> <span class="form-optional-hint">(<?php echo htmlspecialchars(t('field_optional_short'), ENT_QUOTES, 'UTF-8'); ?>)</span></label>
