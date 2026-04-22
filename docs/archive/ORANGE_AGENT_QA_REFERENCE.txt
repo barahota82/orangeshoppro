@@ -14,10 +14,11 @@ ORANGE — أسئلة وأجوبة تشغيلية (وكلاء Cursor / نشر / 
 --------------------------------------------------------------------
 - **docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt**
 - **IBRAHIM_ORANGE_MASTER.txt** (جذر المستودع)
-- **.cursor/rules/orange-session-handoff.mdc**
+- **.cursor/rules/orange-session-handoff.mdc** (قائمة مرقّمة تتضمن **هذا الملف** كبند 6 عند الحاجة)
 - **docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt**
 ثم **orange-continuity.mdc** و **orange-php-utf8-workflow.mdc** حسب المهمة.
 عند العمل على **مخطط/جداول/ترحيل:** راجع **scripts/orange_db.sql** محلياً إن وُجد (§2أ في IBRAHIM).
+**ملخص سريع:** يمكن البدء من **هذا الملف** ثم الرجوع للمراجع التفصيلية — لا العكس.
 
 
 --------------------------------------------------------------------
