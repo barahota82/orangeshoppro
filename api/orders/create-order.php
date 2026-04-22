@@ -37,15 +37,20 @@ try {
 
     require_fields($data, ['name', 'phone', 'area', 'address', 'channel_id', 'items']);
 
+    $phoneCcRaw = trim((string) ($data['phone_country'] ?? ''));
+    $phoneCc = preg_replace('/\D+/', '', $phoneCcRaw);
+    if ($phoneCc === '') {
+        json_response(['success' => false, 'code' => 'phone_country_required', 'message' => t('phone_country_required')], 422);
+    }
+
     $phoneRawIn = trim((string) $data['phone']);
-    $phoneCc = trim((string) ($data['phone_country'] ?? ''));
-    $phoneCc = $phoneCc === '' ? null : $phoneCc;
     $phoneParts = orange_storefront_phone_storage_parts($phoneRawIn, $phoneCc);
     $phoneNorm = orange_normalize_customer_phone($phoneRawIn, $phoneCc);
     if ($phoneNorm === null) {
         json_response(['success' => false, 'code' => 'invalid_phone', 'message' => t('checkout_invalid_phone')], 422);
     }
     $data['phone'] = $phoneNorm;
+    $data['phone_country'] = $phoneCc;
     $data['phone_country_dial'] = $phoneParts['country_dial'];
     $data['phone_national'] = $phoneParts['national'];
 

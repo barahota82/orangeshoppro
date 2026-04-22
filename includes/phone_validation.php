@@ -14,22 +14,10 @@ function orange_normalize_customer_phone(string $raw, ?string $countryDialDigits
     if ($s === '') {
         return null;
     }
-    if (str_starts_with($s, '00')) {
-        $s = '+' . substr($s, 2);
-    }
     if (preg_match('/[a-zA-Z\x{0600}-\x{06FF}]/u', $s)) {
         return null;
     }
     if (preg_match('/[^\d\+\s\-\(\)\.]/u', $s)) {
-        return null;
-    }
-
-    $hasPlus = str_starts_with($s, '+');
-    $digits = preg_replace('/\D+/', '', $s);
-    if ($digits === '' || strlen($digits) > 14) {
-        return null;
-    }
-    if ($digits[0] === '0') {
         return null;
     }
 
@@ -41,16 +29,30 @@ function orange_normalize_customer_phone(string $raw, ?string $countryDialDigits
         }
     }
 
-    if ($hasPlus) {
-        $len = strlen($digits);
-        if ($len < 8 || $len > 14) {
+    if ($cc !== null) {
+        if (str_starts_with($s, '+') || str_starts_with($s, '00')) {
             return null;
         }
+    } elseif (str_starts_with($s, '00')) {
+        $s = '+' . substr($s, 2);
+    }
 
-        return '+' . $digits;
+    $hasPlus = str_starts_with($s, '+');
+    $digits = preg_replace('/\D+/', '', $s);
+    if ($digits === '' || strlen($digits) > 14) {
+        return null;
+    }
+    if ($digits[0] === '0') {
+        return null;
     }
 
     if ($cc !== null) {
+        if (str_starts_with($digits, $cc)) {
+            $digits = substr($digits, strlen($cc));
+        }
+        if ($digits === '') {
+            return null;
+        }
         $full = $cc . $digits;
         $fLen = strlen($full);
         if ($fLen < 8 || $fLen > 14) {
@@ -58,6 +60,15 @@ function orange_normalize_customer_phone(string $raw, ?string $countryDialDigits
         }
 
         return '+' . $full;
+    }
+
+    if ($hasPlus) {
+        $len = strlen($digits);
+        if ($len < 8 || $len > 14) {
+            return null;
+        }
+
+        return '+' . $digits;
     }
 
     $len = strlen($digits);
@@ -92,6 +103,9 @@ function orange_storefront_phone_storage_parts(string $rawInput, ?string $countr
     $national = null;
     if ($cc !== null) {
         $national = preg_replace('/\D+/', '', $rawInput);
+        if ($national !== '' && str_starts_with($national, $cc)) {
+            $national = substr($national, strlen($cc));
+        }
         $national = $national !== '' ? $national : null;
     }
 

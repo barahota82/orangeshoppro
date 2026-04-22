@@ -75,8 +75,11 @@ try {
         $itemsMailStmt->execute([(int) ($orderRow['id'] ?? 0)]);
         $trackSignupItemsForMail = $itemsMailStmt->fetchAll(PDO::FETCH_ASSOC);
         if ($phoneRaw !== '') {
-            $regCc2 = trim((string) ($data['phone_country'] ?? ''));
-            $regCc2 = $regCc2 === '' ? null : $regCc2;
+            $regCc2Raw = trim((string) ($data['phone_country'] ?? ''));
+            $regCc2 = preg_replace('/\D+/', '', $regCc2Raw);
+            if ($regCc2 === '') {
+                json_response(['success' => false, 'code' => 'phone_country_required', 'message' => t('phone_country_required')], 422);
+            }
             $prNorm = orange_normalize_customer_phone($phoneRaw, $regCc2);
             if ($prNorm === null || !orange_order_phones_match_for_lookup($prNorm, (string) ($orderRow['phone'] ?? ''))) {
                 json_response(['success' => false, 'code' => 'signup_phone_mismatch', 'message' => t('track_signup_order_mismatch')], 422);
@@ -151,8 +154,11 @@ try {
         if ($nameRaw === '' || $phoneRaw === '' || $addressRaw === '') {
             json_response(['success' => false, 'code' => 'missing_fields', 'message' => t('checkout_required_fields')], 422);
         }
-        $regCc = trim((string) ($data['phone_country'] ?? ''));
-        $regCc = $regCc === '' ? null : $regCc;
+        $regCcRaw = trim((string) ($data['phone_country'] ?? ''));
+        $regCc = preg_replace('/\D+/', '', $regCcRaw);
+        if ($regCc === '') {
+            json_response(['success' => false, 'code' => 'phone_country_required', 'message' => t('phone_country_required')], 422);
+        }
         $phoneNormReg = orange_normalize_customer_phone($phoneRaw, $regCc);
         if ($phoneNormReg === null) {
             json_response(['success' => false, 'code' => 'invalid_phone', 'message' => t('checkout_invalid_phone')], 422);

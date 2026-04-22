@@ -110,11 +110,11 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                 <div class="field-phone-row">
                     <div class="field track-signup-cta__field field-phone-row__country">
                         <label for="reg_phone_country"><?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?></label>
-                        <select id="reg_phone_country" class="field-phone-row__select" data-orange-country-codes autocomplete="tel-country-code" dir="ltr" aria-label="<?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?>"></select>
+                        <select id="reg_phone_country" name="phone_country" class="field-phone-row__select" data-orange-country-codes autocomplete="tel-country-code" dir="ltr" required aria-label="<?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?>"></select>
                     </div>
                     <div class="field track-signup-cta__field field-phone-row__number">
                         <label for="reg_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
-                        <input id="reg_phone" name="phone" class="js-orange-phone-input" type="tel" autocomplete="tel" required inputmode="tel" placeholder="<?php echo htmlspecialchars(t('register_placeholder_phone'), ENT_QUOTES, 'UTF-8'); ?>">
+                        <input id="reg_phone" name="phone" class="js-orange-phone-input" type="tel" autocomplete="tel" required inputmode="numeric" maxlength="16" data-orange-national-phone="reg_phone_country" placeholder="<?php echo htmlspecialchars(t('register_placeholder_phone'), ENT_QUOTES, 'UTF-8'); ?>">
                     </div>
                 </div>
                 <div class="field track-signup-cta__field">
@@ -163,6 +163,14 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                     var email = (document.getElementById('reg_email') || {}).value.trim() || '';
                     var name = (document.getElementById('reg_name') || {}).value.trim() || '';
                     var phoneRaw = (document.getElementById('reg_phone') || {}).value.trim() || '';
+                    var regCcEarly =
+                        typeof window.orangeStorefrontPhoneCountryDigits === 'function'
+                            ? window.orangeStorefrontPhoneCountryDigits('reg_phone_country')
+                            : null;
+                    if (!regCcEarly) {
+                        msg.textContent = (window.APP_T && window.APP_T.phone_country_required) || reqMsg;
+                        return;
+                    }
                     var areaEl = document.getElementById('reg_area');
                     var area = '';
                     var deliveryAreaId = 0;

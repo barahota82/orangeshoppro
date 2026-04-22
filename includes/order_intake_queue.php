@@ -293,30 +293,21 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     }
     $data['email'] = $emailCheck;
 
-    $phoneCc = trim((string) ($data['phone_country'] ?? ''));
-    $phoneCc = $phoneCc === '' ? null : $phoneCc;
-    $phoneNorm = orange_normalize_customer_phone(trim((string) ($data['phone'] ?? '')), $phoneCc);
+    $phoneCcRaw = trim((string) ($data['phone_country'] ?? ''));
+    $phoneCc = preg_replace('/\D+/', '', $phoneCcRaw);
+    if ($phoneCc === '') {
+        throw new RuntimeException(function_exists('t') ? t('phone_country_required') : 'Country code required.');
+    }
+    $phoneRawIn = trim((string) ($data['phone'] ?? ''));
+    $phoneNorm = orange_normalize_customer_phone($phoneRawIn, $phoneCc);
     if ($phoneNorm === null) {
         throw new RuntimeException(function_exists('t') ? t('checkout_invalid_phone') : 'Invalid phone.');
     }
     $data['phone'] = $phoneNorm;
-
-    $dialStore = $data['phone_country_dial'] ?? null;
-    $natStore = $data['phone_national'] ?? null;
-    if ($dialStore === null || $dialStore === '') {
-        if ($phoneCc !== null) {
-            $d = preg_replace('/\D+/', '', (string) $phoneCc);
-            $dialStore = ($d !== '') ? substr($d, 0, 8) : null;
-        }
-    }
-    if (($natStore === null || $natStore === '') && $dialStore !== null && $dialStore !== '') {
-        $rec = orange_storefront_national_from_e164($phoneNorm, (string) $dialStore);
-        if ($rec !== null) {
-            $natStore = $rec;
-        }
-    }
-    $data['phone_country_dial'] = ($dialStore !== null && (string) $dialStore !== '') ? (string) $dialStore : null;
-    $data['phone_national'] = ($natStore !== null && (string) $natStore !== '') ? (string) $natStore : null;
+    $data['phone_country'] = $phoneCc;
+    $partsStore = orange_storefront_phone_storage_parts($phoneRawIn, $phoneCc);
+    $data['phone_country_dial'] = $partsStore['country_dial'];
+    $data['phone_national'] = $partsStore['national'];
 
     if (!is_array($data['items']) || count($data['items']) === 0) {
         throw new RuntimeException('Cart items are required');

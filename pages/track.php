@@ -64,11 +64,11 @@ $orangeMyOrderUi = [
                     <div class="field-phone-row">
                         <div class="field track-signup-cta__field field-phone-row__country">
                             <label for="trackSignupVerifyPhone_country"><?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?></label>
-                            <select id="trackSignupVerifyPhone_country" class="field-phone-row__select" data-orange-country-codes autocomplete="tel-country-code" dir="ltr" aria-label="<?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?>"></select>
+                            <select id="trackSignupVerifyPhone_country" name="signup_verify_phone_country" class="field-phone-row__select" data-orange-country-codes autocomplete="tel-country-code" dir="ltr" required aria-label="<?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?>"></select>
                         </div>
                         <div class="field track-signup-cta__field field-phone-row__number">
                             <label for="trackSignupVerifyPhone"><?php echo htmlspecialchars(t('track_signup_verify_phone_label'), ENT_QUOTES, 'UTF-8'); ?></label>
-                            <input id="trackSignupVerifyPhone" name="signup_verify_phone" class="js-orange-phone-input" type="tel" autocomplete="tel" inputmode="tel" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_verify_phone'), ENT_QUOTES, 'UTF-8'); ?>">
+                            <input id="trackSignupVerifyPhone" name="signup_verify_phone" class="js-orange-phone-input" type="tel" autocomplete="tel" inputmode="numeric" maxlength="16" data-orange-national-phone="trackSignupVerifyPhone_country" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_verify_phone'), ENT_QUOTES, 'UTF-8'); ?>" required>
                         </div>
                     </div>
                     <div class="track-signup-cta__verify-row">
@@ -118,11 +118,11 @@ $orangeMyOrderUi = [
             <div class="field-phone-row">
                 <div class="field field-phone-row__country">
                     <label for="track_phone_country"><?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <select id="track_phone_country" class="field-phone-row__select" data-orange-country-codes autocomplete="tel-country-code" dir="ltr" aria-label="<?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?>"></select>
+                    <select id="track_phone_country" name="phone_country" class="field-phone-row__select" data-orange-country-codes autocomplete="tel-country-code" dir="ltr" required aria-label="<?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?>"></select>
                 </div>
                 <div class="field field-phone-row__number">
                     <label for="track_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="track_phone" class="js-orange-phone-input" name="phone" autocomplete="tel" inputmode="tel">
+                    <input id="track_phone" class="js-orange-phone-input" name="phone" autocomplete="tel" inputmode="numeric" maxlength="16" data-orange-national-phone="track_phone_country" placeholder="<?php echo htmlspecialchars(t('phone_field_hint'), ENT_QUOTES, 'UTF-8'); ?>" required>
                 </div>
             </div>
             <div class="actions-row track-page-actions">
@@ -203,9 +203,9 @@ function orangeTrackPhoneForApi(raw, countrySelectId) {
 async function pageTrackOrderNow() {
     var msgMissing = <?php echo json_encode(t('track_missing_fields'), JSON_UNESCAPED_UNICODE); ?>;
     var msgNotFound = <?php echo json_encode(t('track_order_not_found'), JSON_UNESCAPED_UNICODE); ?>;
+    var msgCc = (window.APP_T && window.APP_T.phone_country_required) || msgMissing;
     var onum = document.getElementById('track_order_number').value.trim();
     var phRaw = document.getElementById('track_phone').value.trim();
-    var ph = orangeTrackPhoneForApi(phRaw, 'track_phone_country');
     if (!onum || !phRaw) {
         if (typeof window.orangeShowToast === 'function') {
             window.orangeShowToast(msgMissing, 3200);
@@ -214,6 +214,19 @@ async function pageTrackOrderNow() {
         }
         return;
     }
+    var trackCc =
+        typeof window.orangeStorefrontPhoneCountryDigits === 'function'
+            ? window.orangeStorefrontPhoneCountryDigits('track_phone_country')
+            : null;
+    if (!trackCc) {
+        if (typeof window.orangeShowToast === 'function') {
+            window.orangeShowToast(msgCc, 3800);
+        } else {
+            alert(msgCc);
+        }
+        return;
+    }
+    var ph = orangeTrackPhoneForApi(phRaw, 'track_phone_country');
     if (!ph) {
         var bad = (window.APP_T && window.APP_T.checkout_invalid_phone) || msgMissing;
         if (typeof window.orangeShowToast === 'function') {
@@ -501,6 +514,14 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
             verifyFeedbackEl.textContent = trackSignupT.missing || '';
             return;
         }
+        var verifyCc =
+            typeof window.orangeStorefrontPhoneCountryDigits === 'function'
+                ? window.orangeStorefrontPhoneCountryDigits('trackSignupVerifyPhone_country')
+                : null;
+        if (!verifyCc) {
+            verifyFeedbackEl.textContent = (window.APP_T && window.APP_T.phone_country_required) || trackSignupT.missing || '';
+            return;
+        }
         if (vphRaw.replace(/\D/g, '').length < 5) {
             verifyFeedbackEl.textContent = trackSignupT.order_required || '';
             return;
@@ -593,6 +614,14 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
         var badPh = (window.APP_T && window.APP_T.checkout_invalid_phone) || '';
         if (!orderNumber || !orderVerifyPhoneRaw) {
             msgEl.textContent = trackSignupT.order_required || '';
+            return;
+        }
+        var signupVerifyCc =
+            typeof window.orangeStorefrontPhoneCountryDigits === 'function'
+                ? window.orangeStorefrontPhoneCountryDigits('trackSignupVerifyPhone_country')
+                : null;
+        if (!signupVerifyCc) {
+            msgEl.textContent = (window.APP_T && window.APP_T.phone_country_required) || trackSignupT.order_required || '';
             return;
         }
         if (orderVerifyPhoneRaw.replace(/\D/g, '').length < 5) {

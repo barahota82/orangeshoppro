@@ -284,6 +284,9 @@ function orangeCheckoutApiMessage(result) {
     if (c === 'missing_fields' && T.checkout_required_fields) {
         return T.checkout_required_fields;
     }
+    if (c === 'phone_country_required' && T.phone_country_required) {
+        return T.phone_country_required;
+    }
     if (c === 'invalid_phone' && T.checkout_invalid_phone) {
         return T.checkout_invalid_phone;
     }
@@ -1145,6 +1148,15 @@ async function sendOrderNow() {
             typeof window.orangeStorefrontPhoneCountryDigits === 'function'
                 ? window.orangeStorefrontPhoneCountryDigits('customer_phone_country')
                 : null;
+        if (!ccAm) {
+            orangeShowToast(
+                (window.APP_T && window.APP_T.phone_country_required) ||
+                    (window.APP_T && window.APP_T.checkout_required_fields) ||
+                    '',
+                3600
+            );
+            return;
+        }
         const phoneRawAm = document.getElementById('customer_phone')
             ? document.getElementById('customer_phone').value.trim()
             : '';
@@ -1238,6 +1250,15 @@ async function sendOrderNow() {
         typeof window.orangeStorefrontPhoneCountryDigits === 'function'
             ? window.orangeStorefrontPhoneCountryDigits('customer_phone_country')
             : null;
+    if (!checkoutCc) {
+        orangeShowToast(
+            (window.APP_T && window.APP_T.phone_country_required) ||
+                (window.APP_T && window.APP_T.checkout_required_fields) ||
+                '',
+            3600
+        );
+        return;
+    }
     const phoneRaw = document.getElementById('customer_phone')
         ? document.getElementById('customer_phone').value.trim()
         : '';

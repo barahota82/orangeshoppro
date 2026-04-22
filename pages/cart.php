@@ -114,11 +114,11 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
                 <div class="field-phone-row">
                     <div class="field field-phone-row__country">
                         <label for="customer_phone_country"><?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?></label>
-                        <select id="customer_phone_country" class="field-phone-row__select" data-orange-country-codes autocomplete="tel-country-code" dir="ltr" aria-label="<?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?>"></select>
+                        <select id="customer_phone_country" name="phone_country" class="field-phone-row__select" data-orange-country-codes autocomplete="tel-country-code" dir="ltr" required aria-label="<?php echo htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8'); ?>"></select>
                     </div>
                     <div class="field field-phone-row__number">
                         <label for="customer_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
-                        <input id="customer_phone" class="js-orange-phone-input" type="tel" autocomplete="tel" inputmode="tel" maxlength="22" placeholder="<?php echo htmlspecialchars(t('phone_field_hint'), ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
+                        <input id="customer_phone" class="js-orange-phone-input" type="tel" autocomplete="tel" inputmode="numeric" maxlength="16" data-orange-national-phone="customer_phone_country" placeholder="<?php echo htmlspecialchars(t('phone_field_hint'), ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" required>
                     </div>
                 </div>
                 <div class="field">

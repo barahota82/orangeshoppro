@@ -11,11 +11,13 @@
             return;
         }
         var T = window.APP_T || {};
-        var emptyLabel = T.phone_country_full_international || '—';
+        var emptyLabel = T.phone_country_select_placeholder || T.phone_country_label || '—';
         selectEl.innerHTML = '';
         var opt0 = document.createElement('option');
         opt0.value = '';
         opt0.textContent = emptyLabel;
+        opt0.disabled = true;
+        opt0.selected = true;
         selectEl.appendChild(opt0);
         var sorted = list
             .map(function (c, i) {
