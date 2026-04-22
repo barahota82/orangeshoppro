@@ -36,8 +36,8 @@ $categoryProductFilter = '
               WHERE p.category_id = c.id AND p.is_active = 1
           )';
 
-$hasDepartmentsTable = (bool) $pdo->query("SHOW TABLES LIKE 'departments'")->fetchColumn();
-$hasSubcategoriesTable = (bool) $pdo->query("SHOW TABLES LIKE 'subcategories'")->fetchColumn();
+$hasDepartmentsTable = orange_table_exists($pdo, 'departments');
+$hasSubcategoriesTable = orange_table_exists($pdo, 'subcategories');
 
 $departmentActiveFilter = '';
 if ($hasDepartmentsTable) {

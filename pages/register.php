@@ -8,7 +8,7 @@ require_once __DIR__ . '/../includes/storefront_account.php';
 require_once __DIR__ . '/../includes/delivery_areas.php';
 
 $pdo = db();
-orange_catalog_ensure_schema($pdo);
+orange_catalog_ensure_storefront_read_bootstrap($pdo);
 
 if (!empty($_GET['logout'])) {
     storefront_account_logout();

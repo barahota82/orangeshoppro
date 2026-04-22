@@ -8,7 +8,7 @@ require_once __DIR__ . '/../includes/storefront_account.php';
 require_once __DIR__ . '/../includes/delivery_areas.php';
 
 $pdoCartAcc = db();
-orange_catalog_ensure_schema($pdoCartAcc);
+orange_catalog_ensure_storefront_read_bootstrap($pdoCartAcc);
 $cartSfAccount = current_storefront_account($pdoCartAcc);
 $cartSfLoggedIn = $cartSfAccount !== null;
 

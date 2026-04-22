@@ -10,7 +10,8 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/catalog_schema.php';
 
 $pdo = db();
-orange_catalog_ensure_schema($pdo);
+/* ترحيل كامل يحدث في includes/header.php أو صفحات تستدعي ensure_schema قبل الاستعلام؛ هنا فقط تهيئة القنوات/الجداول الأساسية لتقليل تكرار العمل الثقيل */
+orange_catalog_ensure_storefront_read_bootstrap($pdo);
 
 $first = isset($_GET['sf_first'])
     ? strtolower((string) preg_replace('/[^a-z0-9\-]/i', '', (string) $_GET['sf_first']))
