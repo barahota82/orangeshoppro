@@ -182,6 +182,15 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
 }
 
 /**
+ * نقطة دخول نشر/CLI باسم «run migrations»: نفس مسار orange_schema_check_and_bootstrap
+ * (بوابة إصدار + ترحيل PHP عند الحاجة + scripts/migrations/* — ROLLOUT).
+ */
+function orange_run_migrations(PDO $pdo): void
+{
+    orange_schema_check_and_bootstrap($pdo);
+}
+
+/**
  * توحيد slug مع path_segment (نفس مبدأ حفظ القناة الجديدة) — لمرة واحدة لكل قاعدة.
  */
 function orange_catalog_allocate_unique_slug_from_base(string $base, array &$usedSlugs): string

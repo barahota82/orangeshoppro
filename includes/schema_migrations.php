@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * ترحيلات مخطط مرقّمة: scripts/migrations/NNN_وصف.sql
+ * ترحيلات مخطط مرقّمة: scripts/migrations/NNN_وصف.sql أو NNN.sql
  * تُسجَّل في orange_schema_migrations وتُنفَّذ مرة واحدة لكل ملف.
  *
  * القاعدة الأولى للهيكل الكامل تبقى mysql-create-orange-database-full.sql؛
@@ -78,12 +78,14 @@ function orange_schema_run_pending_migrations(PDO $pdo): void
 
     orange_schema_migrations_ensure_table($pdo);
 
-    $files = glob($dir . DIRECTORY_SEPARATOR . '[0-9][0-9][0-9]_*.sql') ?: [];
+    $filesUnderscore = glob($dir . DIRECTORY_SEPARATOR . '[0-9][0-9][0-9]_*.sql') ?: [];
+    $filesPlain = glob($dir . DIRECTORY_SEPARATOR . '[0-9][0-9][0-9].sql') ?: [];
+    $files = array_values(array_unique(array_merge($filesPlain, $filesUnderscore)));
     usort($files, static fn (string $a, string $b): int => strnatcasecmp(basename($a), basename($b)));
 
     foreach ($files as $fullPath) {
         $base = basename($fullPath);
-        if (!preg_match('/^\d{3}_.+\.sql$/', $base)) {
+        if (!preg_match('/^\d{3}(?:_.+)?\.sql$/', $base)) {
             continue;
         }
         if (orange_schema_migration_already_applied($pdo, $base)) {

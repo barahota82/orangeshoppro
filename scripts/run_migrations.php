@@ -20,7 +20,7 @@ require_once dirname(__DIR__) . '/includes/catalog_schema.php';
 
 try {
     $pdo = db();
-    orange_catalog_ensure_schema($pdo);
+    orange_run_migrations($pdo);
 } catch (Throwable $e) {
     if (function_exists('error_log')) {
         error_log('[orange] run_migrations: ' . $e->getMessage());
@@ -30,6 +30,7 @@ try {
     exit(1);
 }
 
-echo 'orange_catalog_ensure_schema OK (revision ' . (string) ORANGE_CATALOG_SCHEMA_PHP_REVISION . ')' . PHP_EOL;
+echo 'orange_run_migrations OK (php_revision=' . (string) ORANGE_CATALOG_SCHEMA_PHP_REVISION
+    . ', schema_code_version=' . (string) ORANGE_SCHEMA_CODE_VERSION . ')' . PHP_EOL;
 
 exit(0);
