@@ -2962,8 +2962,11 @@ button.track-signup-cta__btn[hidden] {
 }
 
 .field .orange-country-combobox__input {
-    flex: 1;
+    /* Override .field input { width: 100% } so the flex row keeps room for the toggle (delivery area is full-width). */
+    flex: 1 1 0%;
     min-width: 0;
+    width: auto;
+    max-width: 100%;
     margin: 0;
     padding: 12px 10px 12px 14px;
     border: 0;
