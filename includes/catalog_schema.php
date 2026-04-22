@@ -3,6 +3,16 @@
 declare(strict_types=1);
 
 /**
+ * يُرفع عند إضافة أو تعديل خطوات ترحيل PHP داخل orange_catalog_ensure_schema() حتى تُعاد مزامنة القواعد القائمة.
+ * لإجبار تشغيل الجسم الكامل يدوياً: احذف الصف من orange_catalog_schema_checkpoint أو ارفع هذا الرقم.
+ *
+ * @see IBRAHIM_ORANGE_MASTER.txt §2
+ */
+if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 1);
+}
+
+/**
  * Ensures catalog tables and columns for colors, size families, colorways, and variant FKs exist.
  * Safe to call multiple times per request (uses static guard).
  */
@@ -62,6 +72,49 @@ function orange_catalog_safe_exec(PDO $pdo, string $sql): void
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] catalog_schema: ' . $e->getMessage());
+        }
+    }
+}
+
+function orange_catalog_schema_checkpoint_ensure_table(PDO $pdo): void
+{
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE TABLE IF NOT EXISTS orange_catalog_schema_checkpoint (
+            id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+            php_revision INT UNSIGNED NOT NULL DEFAULT 0
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+}
+
+function orange_catalog_schema_checkpoint_matches(PDO $pdo, int $expectedRevision): bool
+{
+    try {
+        orange_catalog_schema_checkpoint_ensure_table($pdo);
+        $st = $pdo->query('SELECT php_revision FROM orange_catalog_schema_checkpoint WHERE id = 1 LIMIT 1');
+        $row = $st ? $st->fetch(PDO::FETCH_ASSOC) : false;
+        if ($row === false || ! is_array($row)) {
+            return false;
+        }
+
+        return (int) ($row['php_revision'] ?? 0) === $expectedRevision;
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+function orange_catalog_schema_checkpoint_save(PDO $pdo, int $revision): void
+{
+    try {
+        orange_catalog_schema_checkpoint_ensure_table($pdo);
+        $ins = $pdo->prepare(
+            'INSERT INTO orange_catalog_schema_checkpoint (id, php_revision) VALUES (1, ?)
+             ON DUPLICATE KEY UPDATE php_revision = VALUES(php_revision)'
+        );
+        $ins->execute([$revision]);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] catalog_schema checkpoint: ' . $e->getMessage());
         }
     }
 }
@@ -332,6 +385,14 @@ function orange_catalog_ensure_schema(PDO $pdo): void
 
     static $done = false;
     if ($done) {
+        return;
+    }
+
+    if (orange_catalog_schema_checkpoint_matches($pdo, ORANGE_CATALOG_SCHEMA_PHP_REVISION)) {
+        require_once __DIR__ . '/schema_migrations.php';
+        orange_schema_run_pending_migrations($pdo);
+        $done = true;
+
         return;
     }
 
@@ -1750,6 +1811,8 @@ function orange_catalog_ensure_schema(PDO $pdo): void
 
     require_once __DIR__ . '/schema_migrations.php';
     orange_schema_run_pending_migrations($pdo);
+
+    orange_catalog_schema_checkpoint_save($pdo, ORANGE_CATALOG_SCHEMA_PHP_REVISION);
 
     $done = true;
 }

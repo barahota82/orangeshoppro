@@ -39,8 +39,17 @@ $categoryProductFilter = '
               WHERE p.category_id = c.id AND p.is_active = 1
           )';
 
-$hasDepartmentsTable = orange_table_exists($pdo, 'departments');
-$hasSubcategoriesTable = orange_table_exists($pdo, 'subcategories');
+$navTableRows = $pdo->query(
+    "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('departments','subcategories')"
+);
+$navTableNames = $navTableRows ? $navTableRows->fetchAll(PDO::FETCH_COLUMN) : [];
+$navLower = [];
+foreach ($navTableNames as $tn) {
+    $navLower[strtolower((string) $tn)] = true;
+}
+$hasDepartmentsTable = isset($navLower['departments']);
+$hasSubcategoriesTable = isset($navLower['subcategories']);
 
 $departmentActiveFilter = '';
 if ($hasDepartmentsTable) {
