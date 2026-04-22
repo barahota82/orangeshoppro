@@ -80,4 +80,10 @@ ORANGE — أسئلة وأجوبة تشغيلية (وكلاء Cursor / نشر / 
 **ORANGE_STRICT_NUMBERED_SQL_MIGRATIONS**، **ORANGE_SCHEMA_CATCH_BOOTSTRAP_FAILURE**، ومتغيرات بيئة السيرفر **ORANGE_SCHEMA_APCU_GATE_SECONDS**، **ORANGE_SCHEMA_OK_FLAG_PATH** — انظر **.env.example.php** و ROLLOUT «ثامناً».
 
 
+--------------------------------------------------------------------
+س11. من أين يأتي Cache-Control: no-store, no-cache, must-revalidate؟
+--------------------------------------------------------------------
+**PHP** عندما تكون **DISABLE_HTML_CACHE** في **.env.php** مفعّلة: **orange_send_html_no_cache_headers()** في **config.php** (تُستدعى من **includes/header.php** و**admin/index.php** و**admin/login.php** و**admin/preview-storefront.php**) — للـ **HTML** فقط. **أصول ثابتة** (.css، .js، صور، خطوط): قالب **web.config.example** — قاعدة **OrangeStaticCacheAssets** تضبط **public, max-age=2592000** لطلبات الملفات المطابقة فقط؛ **allowedServerVariables** لـ **RESPONSE_Cache-Control** على IIS.
+
+
 نهاية الملف.
