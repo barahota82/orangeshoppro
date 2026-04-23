@@ -59,4 +59,6 @@ if (!move_uploaded_file($tmp, $dest)) {
     json_response(['success' => false, 'message' => 'تعذر حفظ الملف'], 500);
 }
 
+orange_image_write_webp_beside($dest);
+
 json_response(['success' => true, 'filename' => $name]);

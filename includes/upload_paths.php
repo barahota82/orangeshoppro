@@ -105,6 +105,51 @@ function orange_ensure_products_upload_dir(): ?string
 }
 
 /**
+ * يحاول إنشاء ‎{نفس_الاسم}.webp‎ بجانب ملف الصورة المرفوع (jpg/png/gif). لا يفعل شيئاً لـ webp أو لأنواع غير مدعومة؛ يتجاهل الفشل بصمت.
+ */
+function orange_image_write_webp_beside(string $absolutePath): void
+{
+    if (!is_file($absolutePath) || !is_readable($absolutePath) || !function_exists('imagewebp')) {
+        return;
+    }
+    $ext = strtolower((string) pathinfo($absolutePath, PATHINFO_EXTENSION));
+    if ($ext === 'webp') {
+        return;
+    }
+    $loader = match ($ext) {
+        'jpg', 'jpeg' => 'imagecreatefromjpeg',
+        'png' => 'imagecreatefrompng',
+        'gif' => 'imagecreatefromgif',
+        default => null,
+    };
+    if ($loader === null || !function_exists($loader)) {
+        return;
+    }
+    $im = @$loader($absolutePath);
+    if ($im === false) {
+        return;
+    }
+    if (function_exists('imagepalettetotruecolor')) {
+        @imagepalettetotruecolor($im);
+    }
+    if (function_exists('imagealphablending')) {
+        @imagealphablending($im, true);
+    }
+    if (function_exists('imagesavealpha')) {
+        @imagesavealpha($im, true);
+    }
+    $stem = pathinfo($absolutePath, PATHINFO_FILENAME);
+    if ($stem === '' || $stem === '.' || $stem === '..') {
+        imagedestroy($im);
+
+        return;
+    }
+    $webpPath = dirname($absolutePath) . DIRECTORY_SEPARATOR . $stem . '.webp';
+    @imagewebp($im, $webpPath, 82);
+    imagedestroy($im);
+}
+
+/**
  * مسار URL تحت ‎/uploads/products/‎ لصورة منتج كما في قاعدة البيانات (اسم ملف في الجذر).
  * إن وُجد ملف ‎{نفس_الاسم_بدون_امتداد}.webp‎ بجانب الملف الأصلي على القرص يُفضَّل WebP؛ وإلا يُعاد المسار للملف الأصلي.
  *
@@ -130,6 +175,33 @@ function storefront_product_image_web_path(?string $mainImageFromDb): string
     }
 
     return '/uploads/products/' . rawurlencode($base);
+}
+
+/**
+ * مسار URL تحت ‎/uploads/channels/‎ لشعار مرفوع (اسم ملف في الجذر). يفضّل ‎.webp‎ المرافق إن وُجد.
+ *
+ * @return string مثل ‎/uploads/channels/x.webp‎ أو المسار للأصل، أو ‎''‎ إن المدخل غير صالح
+ */
+function storefront_channel_logo_web_path(?string $filenameFromDb): string
+{
+    $raw = trim(str_replace('\\', '/', (string) $filenameFromDb));
+    if ($raw === '') {
+        return '';
+    }
+    $base = basename($raw);
+    if ($base === '' || $base === '.' || $base === '..') {
+        return '';
+    }
+    $dir = orange_channels_upload_dir();
+    $stem = pathinfo($base, PATHINFO_FILENAME);
+    if ($stem !== '' && $stem !== '.' && $stem !== '..') {
+        $webp = $stem . '.webp';
+        if (is_file($dir . DIRECTORY_SEPARATOR . $webp)) {
+            return '/uploads/channels/' . rawurlencode($webp);
+        }
+    }
+
+    return '/uploads/channels/' . rawurlencode($base);
 }
 
 /**

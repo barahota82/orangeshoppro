@@ -49,7 +49,10 @@ $orangePubBase = PUBLIC_BASE_PATH === '' ? '' : PUBLIC_BASE_PATH;
 $orangeChannelLogoFile = 'logo-orange.png';
 $chLogoFn = trim((string) ($channel['logo'] ?? ''));
 if ($chLogoFn !== '' && is_file(orange_channels_upload_dir() . DIRECTORY_SEPARATOR . $chLogoFn)) {
-    $orangeChannelLogoUrl = $orangePubBase . '/uploads/channels/' . rawurlencode($chLogoFn);
+    $chLogoRel = storefront_channel_logo_web_path($chLogoFn);
+    $orangeChannelLogoUrl = ($chLogoRel !== '')
+        ? ($orangePubBase . $chLogoRel)
+        : ($orangePubBase . '/uploads/channels/' . rawurlencode($chLogoFn));
 } else {
     $orangeChannelLogoUrl = $orangePubBase . storefront_asset_url('/assets/images/' . $orangeChannelLogoFile);
 }
