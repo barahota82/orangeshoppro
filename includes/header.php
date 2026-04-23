@@ -45,7 +45,6 @@ try {
     $orangeSfLoggedInForJs = false;
 }
 
-$orangePubBase = PUBLIC_BASE_PATH === '' ? '' : PUBLIC_BASE_PATH;
 $chLogoFn = trim((string) ($channel['logo'] ?? ''));
 if ($chLogoFn !== '' && orange_channels_logo_file_resolved_exists($chLogoFn)) {
     $orangeChannelLogoUrl = storefront_channel_logo_href($chLogoFn);
@@ -54,18 +53,18 @@ if ($chLogoFn !== '' && orange_channels_logo_file_resolved_exists($chLogoFn)) {
     }
 } else {
     $fallbackLogoFile = $chLogoFn !== '' ? basename($chLogoFn) : 'logo-orange.png';
-    $orangeChannelLogoUrl = $orangePubBase . storefront_asset_url(
+    $orangeChannelLogoUrl = storefront_public_path(storefront_asset_url(
         storefront_asset_image_preferred_path('/assets/images/' . $fallbackLogoFile)
-    );
+    ));
 }
-$orangePwaApple180Url = $orangePubBase . storefront_asset_url('/assets/images/pwa-apple-180.png');
-$orangePwaApple120Url = $orangePubBase . storefront_asset_url('/assets/images/pwa-apple-120.png');
-$orangePwaIcon192Url = $orangePubBase . storefront_asset_url('/assets/images/pwa-icon-192.png');
-$orangePwaIcon512Url = $orangePubBase . storefront_asset_url('/assets/images/pwa-icon-512.png');
-$orangeWordmarkUrl = $orangePubBase . storefront_asset_url(
+$orangePwaApple180Url = storefront_public_path(storefront_asset_url('/assets/images/pwa-apple-180.png'));
+$orangePwaApple120Url = storefront_public_path(storefront_asset_url('/assets/images/pwa-apple-120.png'));
+$orangePwaIcon192Url = storefront_public_path(storefront_asset_url('/assets/images/pwa-icon-192.png'));
+$orangePwaIcon512Url = storefront_public_path(storefront_asset_url('/assets/images/pwa-icon-512.png'));
+$orangeWordmarkUrl = storefront_public_path(storefront_asset_url(
     storefront_asset_image_preferred_path('/assets/images/orange-company-wordmark.png')
-);
-$orangeManifestHref = $orangePubBase . '/manifest.php?' . http_build_query(['channel' => $channelSlug, 'lang' => $lang]);
+));
+$orangeManifestHref = storefront_public_path('/manifest.php?' . http_build_query(['channel' => $channelSlug, 'lang' => $lang]));
 
 $pdoSfHdr = db();
 [$_sfPathToSlug, $_sfSlugToPath, $_sfValidSlugs, $_sfPathAlt] = orange_storefront_path_maps_for_js($pdoSfHdr);
