@@ -2,7 +2,7 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 ================================================================
 المسار: docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt
 تاريخ حفظ الأرشيف: 2026-04-19
-آخر تحديث (صفر تعريف كود الدولة + س4 بما فيها كومبو الأدمن + س5–س8 تسجيل + س13 تابات + س30 بنود الطلب + س13 بريد بعد التتبع + س18 هاتف الطلب + س19 بريد الضيف في العربة + س25–س26 + س7 + س27 POST-only لـ get-order + مرجع مشاركة نصي في التتبع + س28 + أدمن العروض + ملحق وكلاء أداء الواجهة/الترحيل + س15 تنفيذ دمج هاتف التسجيل من صفحة register + إلزام أرشيفي عدم المساس بسرعة التحميل + س4 تسعير جزئي هدية BOGO وهدية مجموع السلة + س22 تعديل الطلب يشمل الكومبو + س8/س20 لا إدخال منطقة حرّ عند غياب مناطق نشطة): 2026-04-26
+آخر تحديث (صفر تعريف كود الدولة + س4 بما فيها كومبو الأدمن + س5–س8 تسجيل + س13 تابات + س30 بنود الطلب + س13 بريد بعد التتبع + س18 هاتف الطلب + س19 بريد الضيف في العربة + س25–س26 + س7 + س27 POST-only لـ get-order + مرجع مشاركة نصي في التتبع + س28 + أدمن العروض + ملحق وكلاء أداء الواجهة/الترحيل + س15 تنفيذ دمج هاتف التسجيل من صفحة register + إلزام أرشيفي عدم المساس بسرعة التحميل + س4 تسعير جزئي هدية BOGO وهدية مجموع السلة + س22 تعديل الطلب يشمل الكومبو + س8/س20 لا إدخال منطقة حرّ عند غياب مناطق نشطة + س9–س11 وس14 فقرات تنفيذ أرشيفية + صفر أدمن توحيد هاتف): 2026-04-26
 
 الغرض
 -------
@@ -38,6 +38,7 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 (إن وُجد تحقق بالهاتف)، وأي نموذج واجهة يطلب هاتف العميل بنفس المنطق. تنفيذ الكود قد
 يتقدم أو يتأخر عن النص؛ **مرجع المعنى للمالك هو هذا القسم وس8 وس18**.
 **تنفيذ (حالي — بند 4):** خيار القائمة ‎`__intl__`‎ في `assets/js/storefront-country-codes.js`؛ الواجهة ترسل `phone_country: "__intl__"` أو أرقام بادئة؛ `orange_storefront_parse_api_phone_country` ووسيط `internationalSingleField` في `orange_normalize_customer_phone` داخل `includes/phone_validation.php`؛ تخطي افتراض الكويت لثمانية أرقام وطنية عند الوضع الدولي في `assets/js/input-constraints.js`؛ مسارات الطلب/الطابور `api/orders/create-order.php` و`includes/order_intake_queue.php`؛ التسجيل والبريد `api/auth/request-email-verify.php`؛ العربة `assets/js/cart.js`؛ التسجيل والتتبع `pages/register.php` و`pages/track.php`.
+**تنفيذ (أدمن — هاتف يوافق صفر):** توحيد التخزين بصيغة دولية موحّدة حيث ينطبق: `admin/api/customers/save.php` و`admin/pages/customers.php` مع `includes/storefront_phone_country_select.php` (قيمة ‎`__intl__`‎ للدولي الكامل)؛ فاتورة مبيعات يدوية `admin/api/orders/create-manual.php`؛ تحديث طلب `admin/api/orders/update.php` عند تمرير الحقل `phone`؛ مورد `admin/api/suppliers/save.php` — عبر `orange_storefront_parse_api_phone_country` و`orange_normalize_customer_phone` في `includes/phone_validation.php`.
 
 
 --------------------------------------------------------------------
@@ -126,6 +127,10 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 س11. هل يُسمح بنفس البريد على أكثر من قناة كحسابات منفصلة، أم حساب واحد؟
 حساب واحد.
 
+**تنفيذ (س9):** لا يُعتبر الحساب «مفعّلاً» إلا بعد تعبئة `storefront_accounts.email_verified_at`؛ الرابط في البريد يُعالَج في `pages/verify-email.php` عبر `orange_storefront_verify_email_token` في `includes/storefront_account.php`؛ تسجيل الدخول للواجهة بعد التحقق عبر `storefront_account_login` (يقتصر على حسابات مُحقَّقة).
+**تنفيذ (س10):** عند طلب التحقق من البريد يُخزَّن `registered_channel_slug` لقناة الواجهة الحالية في `api/auth/request-email-verify.php` (`INSERT` / `UPDATE` مع `COALESCE(registered_channel_slug, ?)` للاحتفاظ بأول قناة مُثبَّتة إن وُجدت)؛ الجدول `storefront_accounts` والعمود `registered_channel_slug`.
+**تنفيذ (س11):** بريد واحد = حساب واحد: قيد `UNIQUE` على `storefront_accounts.email` في ترحيل `includes/catalog_schema.php`؛ منطق `api/auth/request-email-verify.php` يبحث بالبريد ويحدّث الصف أو ينشئ صفاً جديداً دون ازدواج.
+
 
 --------------------------------------------------------------------
 ثالثاً: سياسة التتبع (حالة الطلب)
@@ -152,6 +157,7 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 س14. هل إلغاء الطلب من العميل مسموح؟
 مسجّل: يلغي من العربة تاب طلباتي قبل الشحن. غير مسجّل: يلغي قبل موافقة الشركة على الطلب؛
 بعد الموافقة لا يلغي. عند إلغاء العملاء تُلغى المنتجات المحجوزة.
+**تنفيذ (س14):** `api/orders/cancel-by-customer.php`؛ نافذة الإلغاء المسموحة عبر `orange_storefront_customer_may_cancel_order` في `includes/storefront_account.php` (ضيف: حالة `pending` فقط؛ مسجّل داخل الجلسة: `pending` أو `approved` مع تطابق `storefront_account_id` أو الهاتف مع الطلب — قبل `on_the_way` / `completed`).
 
 س15. ربط الطلب بحساب (دمج بيانات)؟
 التسجيل بعد التحقق من شاشة التتبع يعزّز حساباً واحداً. من شاشة التسجيل: إن الهاتف جديد
