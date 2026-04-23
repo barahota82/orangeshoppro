@@ -173,6 +173,11 @@ $offersStmt = $pdo->query("
 ");
 $offers = $offersStmt ? $offersStmt->fetchAll() : [];
 
+$sfHomeGridInitial = 24;
+$sfHomeGridScrollBatch = 24;
+$offersInitial = array_slice($offers, 0, $sfHomeGridInitial);
+$offersLazyRows = array_slice($offers, $sfHomeGridInitial);
+
 $offerProductIds = [];
 foreach ($offers as $op) {
     $offerProductIds[(int) $op['id']] = true;
@@ -186,8 +191,6 @@ foreach ($products as $p) {
     }
     $productsNonOffer[] = $p;
 }
-$sfHomeGridInitial = 24;
-$sfHomeGridScrollBatch = 24;
 $productsInitial = array_slice($productsNonOffer, 0, $sfHomeGridInitial);
 $productsLazyRows = array_slice($productsNonOffer, $sfHomeGridInitial);
 
@@ -247,6 +250,20 @@ foreach ($productsLazyRows as $p) {
         'img' => (string) ($p['main_image'] ?? ''),
         'title' => storefront_product_display_name($p),
         'price' => number_format((float) $p['price'], 2),
+        'href' => storefront_url('product', (string) $channel['slug'], $lang, ['id' => (int) $p['id']]),
+    ];
+}
+
+/** @var list<array{id:int,df:string,img:string,title:string,oldPrice:string,salePrice:string,href:string}> */
+$lazyOffersForJs = [];
+foreach ($offersLazyRows as $p) {
+    $lazyOffersForJs[] = [
+        'id' => (int) $p['id'],
+        'df' => 'offers cat-' . (int) $p['category_id'] . $storefrontExtraFilterSuffix($p),
+        'img' => (string) ($p['main_image'] ?? ''),
+        'title' => storefront_product_display_name($p),
+        'oldPrice' => number_format((float) $p['price'], 2),
+        'salePrice' => number_format((float) $p['price'] - (float) $p['discount'], 2),
         'href' => storefront_url('product', (string) $channel['slug'], $lang, ['id' => (int) $p['id']]),
     ];
 }
@@ -381,7 +398,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
     </section>
 
     <section id="productsGrid" class="products-grid">
-        <?php foreach ($offers as $p): ?>
+        <?php foreach ($offersInitial as $p): ?>
             <article class="product-card" data-product-id="<?php echo (int) $p['id']; ?>" data-filter="offers cat-<?php echo (int) $p['category_id']; ?><?php echo $storefrontExtraFilterSuffix($p); ?>">
                 <div class="product-image-wrap">
                     <img src="/uploads/products/<?php echo htmlspecialchars($p['main_image'], ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" decoding="async">
@@ -428,8 +445,10 @@ if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
 }
 ?>
 window.ORANGE_SF_GRID_LAZY_PRODUCTS = <?php echo json_encode($lazyForJs, $orangeSfGridJsonFlags); ?>;
+window.ORANGE_SF_GRID_LAZY_OFFERS = <?php echo json_encode($lazyOffersForJs, $orangeSfGridJsonFlags); ?>;
 window.ORANGE_SF_GRID_BATCH = <?php echo (int) $sfHomeGridScrollBatch; ?>;
 window.ORANGE_SF_GRID_VIEW_LABEL = <?php echo json_encode(t('view_product'), $orangeSfGridJsonFlags); ?>;
+window.ORANGE_SF_OFFERS_BADGE = <?php echo json_encode(t('offers'), $orangeSfGridJsonFlags); ?>;
 var ORANGE_SF_GRID_FILTER_KEY = 'orange_sf_grid_filter';
 var ORANGE_BROWSE_DETAILS_OPEN_KEY = 'orange_browse_details_open';
 var orangeSfLazyRenderedIds = new Set();
@@ -445,9 +464,91 @@ function orangeSfImgSrcFromMainImage(img) {
     var seg = String(img || '').split('/').map(function (s) { return encodeURIComponent(s); }).join('/');
     return '/uploads/products/' + seg;
 }
+function orangeSfGridSentinelEl() {
+    return document.getElementById('orangeSfGridSentinel');
+}
+function orangeSfLastCardMatchingOfferToken(wantOffer) {
+    var cards = document.querySelectorAll('#productsGrid .product-card[data-product-id]');
+    var last = null;
+    cards.forEach(function (c) {
+        var tokens = (c.getAttribute('data-filter') || '').trim().split(/\s+/).filter(Boolean);
+        var isOffer = tokens.indexOf('offers') !== -1;
+        if (wantOffer ? isOffer : !isOffer) {
+            last = c;
+        }
+    });
+    return last;
+}
+function orangeSfInsertAfter(parent, el, ref) {
+    if (!parent || !el) {
+        return;
+    }
+    if (!ref) {
+        parent.insertBefore(el, parent.firstChild);
+        return;
+    }
+    if (ref.nextSibling) {
+        parent.insertBefore(el, ref.nextSibling);
+    } else {
+        parent.appendChild(el);
+    }
+}
+function orangeSfKeepSentinelLast() {
+    var grid = document.getElementById('productsGrid');
+    var sent = orangeSfGridSentinelEl();
+    if (grid && sent && sent.parentNode === grid) {
+        grid.appendChild(sent);
+    }
+}
+function orangeSfAppendOfferCard(item) {
+    var grid = document.getElementById('productsGrid');
+    if (!grid || !item) {
+        return;
+    }
+    var art = document.createElement('article');
+    art.className = 'product-card';
+    art.setAttribute('data-product-id', String(item.id));
+    art.setAttribute('data-filter', item.df);
+    var wrap = document.createElement('div');
+    wrap.className = 'product-image-wrap';
+    var img = document.createElement('img');
+    img.setAttribute('src', orangeSfImgSrcFromMainImage(item.img));
+    img.setAttribute('alt', item.title);
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    wrap.appendChild(img);
+    var badge = document.createElement('span');
+    badge.className = 'offer-badge';
+    badge.textContent = window.ORANGE_SF_OFFERS_BADGE || '';
+    wrap.appendChild(badge);
+    var body = document.createElement('div');
+    body.className = 'product-body';
+    var h3 = document.createElement('h3');
+    h3.textContent = item.title;
+    var pr = document.createElement('div');
+    pr.className = 'price-row';
+    var strong = document.createElement('strong');
+    strong.textContent = item.salePrice + ' KD';
+    var oldSpan = document.createElement('span');
+    oldSpan.className = 'old-price';
+    oldSpan.textContent = item.oldPrice + ' KD';
+    pr.appendChild(strong);
+    pr.appendChild(oldSpan);
+    var a = document.createElement('a');
+    a.className = 'btn';
+    a.setAttribute('href', item.href);
+    a.textContent = window.ORANGE_SF_GRID_VIEW_LABEL || '';
+    body.appendChild(h3);
+    body.appendChild(pr);
+    body.appendChild(a);
+    art.appendChild(wrap);
+    art.appendChild(body);
+    var refOff = orangeSfLastCardMatchingOfferToken(true);
+    orangeSfInsertAfter(grid, art, refOff);
+    orangeSfKeepSentinelLast();
+}
 function orangeSfAppendRegularCard(item) {
     var grid = document.getElementById('productsGrid');
-    var sent = document.getElementById('orangeSfGridSentinel');
     if (!grid || !item) {
         return;
     }
@@ -481,20 +582,45 @@ function orangeSfAppendRegularCard(item) {
     body.appendChild(a);
     art.appendChild(wrap);
     art.appendChild(body);
-    if (sent && sent.parentNode === grid) {
-        grid.insertBefore(art, sent);
+    var refReg = orangeSfLastCardMatchingOfferToken(false);
+    var lastOff = orangeSfLastCardMatchingOfferToken(true);
+    var anchor = refReg || lastOff;
+    if (anchor) {
+        orangeSfInsertAfter(grid, art, anchor);
     } else {
-        grid.appendChild(art);
+        var sent = orangeSfGridSentinelEl();
+        if (sent && sent.parentNode === grid) {
+            grid.insertBefore(art, sent);
+        } else {
+            grid.appendChild(art);
+        }
     }
+    orangeSfKeepSentinelLast();
 }
 function orangeSfEnsureLazyForFilter(filter) {
+    if (filter === 'all') {
+        return;
+    }
+    var off = window.ORANGE_SF_GRID_LAZY_OFFERS || [];
     var pool = window.ORANGE_SF_GRID_LAZY_PRODUCTS || [];
-    if (filter === 'all' || !pool.length) {
+    if (!off.length && !pool.length) {
         return;
     }
     var grid = document.getElementById('productsGrid');
     var sent = document.getElementById('orangeSfGridSentinel');
-    for (var i = 0; i < pool.length; i++) {
+    var i;
+    for (i = 0; i < off.length; i++) {
+        var oi = off[i];
+        if (orangeSfLazyRenderedIds.has(oi.id)) {
+            continue;
+        }
+        if (!orangeSfLazyTokenMatch(oi.df, filter)) {
+            continue;
+        }
+        orangeSfAppendOfferCard(oi);
+        orangeSfLazyRenderedIds.add(oi.id);
+    }
+    for (i = 0; i < pool.length; i++) {
         var item = pool[i];
         if (orangeSfLazyRenderedIds.has(item.id)) {
             continue;
@@ -510,9 +636,16 @@ function orangeSfEnsureLazyForFilter(filter) {
     }
 }
 function orangeSfGridLazyRemainingCount() {
+    var off = window.ORANGE_SF_GRID_LAZY_OFFERS || [];
     var pool = window.ORANGE_SF_GRID_LAZY_PRODUCTS || [];
     var n = 0;
-    for (var i = 0; i < pool.length; i++) {
+    var i;
+    for (i = 0; i < off.length; i++) {
+        if (!orangeSfLazyRenderedIds.has(off[i].id)) {
+            n++;
+        }
+    }
+    for (i = 0; i < pool.length; i++) {
         if (!orangeSfLazyRenderedIds.has(pool[i].id)) {
             n++;
         }
@@ -520,13 +653,27 @@ function orangeSfGridLazyRemainingCount() {
     return n;
 }
 function orangeSfLoadNextScrollBatch() {
+    var off = window.ORANGE_SF_GRID_LAZY_OFFERS || [];
     var pool = window.ORANGE_SF_GRID_LAZY_PRODUCTS || [];
     var batch = window.ORANGE_SF_GRID_BATCH || 24;
-    if (!pool.length || orangeGetActiveGridFilter() !== 'all') {
+    if (orangeGetActiveGridFilter() !== 'all') {
+        return;
+    }
+    if (!off.length && !pool.length) {
         return;
     }
     var loaded = 0;
-    for (var i = 0; i < pool.length && loaded < batch; i++) {
+    var i;
+    for (i = 0; i < off.length && loaded < batch; i++) {
+        var oi = off[i];
+        if (orangeSfLazyRenderedIds.has(oi.id)) {
+            continue;
+        }
+        orangeSfAppendOfferCard(oi);
+        orangeSfLazyRenderedIds.add(oi.id);
+        loaded++;
+    }
+    for (i = 0; i < pool.length && loaded < batch; i++) {
         var item = pool[i];
         if (orangeSfLazyRenderedIds.has(item.id)) {
             continue;
@@ -550,8 +697,9 @@ function orangeSfInitGridInfiniteScroll() {
         }
     });
     var pool = window.ORANGE_SF_GRID_LAZY_PRODUCTS || [];
+    var off = window.ORANGE_SF_GRID_LAZY_OFFERS || [];
     var sent = document.getElementById('orangeSfGridSentinel');
-    if (!pool.length || !sent || typeof IntersectionObserver === 'undefined') {
+    if ((!pool.length && !off.length) || !sent || typeof IntersectionObserver === 'undefined') {
         orangeSfMaybeDisconnectObserver();
         return;
     }
