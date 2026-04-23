@@ -92,10 +92,17 @@ try {
         if ($me['status'] === 'completed') {
             $totalVal = 0.0;
             $promoDisc = 0.0;
+            $comboDisc = 0.0;
             $oid = (int) ($me['order_id'] ?? 0);
             if ($oid > 0) {
-                if (orange_table_has_column($pdo, 'orders', 'cart_promotion_discount')) {
+                $hasPromoC = orange_table_has_column($pdo, 'orders', 'cart_promotion_discount');
+                $hasComboC = orange_table_has_column($pdo, 'orders', 'cart_combo_discount');
+                if ($hasPromoC && $hasComboC) {
+                    $totSt = $pdo->prepare('SELECT total, cart_promotion_discount, cart_combo_discount FROM orders WHERE id = ? LIMIT 1');
+                } elseif ($hasPromoC) {
                     $totSt = $pdo->prepare('SELECT total, cart_promotion_discount FROM orders WHERE id = ? LIMIT 1');
+                } elseif ($hasComboC) {
+                    $totSt = $pdo->prepare('SELECT total, cart_combo_discount FROM orders WHERE id = ? LIMIT 1');
                 } else {
                     $totSt = $pdo->prepare('SELECT total FROM orders WHERE id = ? LIMIT 1');
                 }
@@ -104,6 +111,7 @@ try {
                 if ($rowTot) {
                     $totalVal = (float) ($rowTot['total'] ?? 0);
                     $promoDisc = (float) ($rowTot['cart_promotion_discount'] ?? 0);
+                    $comboDisc = (float) ($rowTot['cart_combo_discount'] ?? 0);
                 }
             }
             orange_storefront_set_guest_orders_phone((string) $data['phone']);
@@ -114,6 +122,7 @@ try {
                 'order_number' => (string) $me['order_number'],
                 'total' => $totalVal,
                 'promotion_discount' => $promoDisc,
+                'combo_discount' => $comboDisc,
                 'whatsapp_number' => (string) $me['whatsapp_number'],
                 'whatsapp_url' => (string) $me['whatsapp_url'],
                 'intake_token' => $publicToken,

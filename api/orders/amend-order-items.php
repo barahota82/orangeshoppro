@@ -10,6 +10,8 @@ require_once __DIR__ . '/../../includes/phone_validation.php';
 require_once __DIR__ . '/../../includes/storefront_account.php';
 require_once __DIR__ . '/../../includes/storefront_cart_items.php';
 require_once __DIR__ . '/../../includes/cart_promotions.php';
+require_once __DIR__ . '/../../includes/cart_combo_promotions.php';
+require_once __DIR__ . '/../../includes/storefront_checkout_promo_lines.php';
 require_once __DIR__ . '/../../includes/order_intake_queue.php';
 
 try {
@@ -61,31 +63,64 @@ try {
 
         [$subtotal, $validatedItems] = orange_storefront_validate_cart_items_core($pdo, $items, true);
 
-        $promoPick = orange_cart_promotion_resolve($pdo, $subtotal, $buyerRegistered);
+        $comboPick = orange_cart_combo_best_match($pdo, $validatedItems, $buyerRegistered);
+        $comboDiscount = $comboPick !== null ? (float) $comboPick['discount'] : 0.0;
+        $comboId = $comboPick !== null ? (int) $comboPick['id'] : null;
+        $netAfterCombo = max(0.0, round($subtotal - $comboDiscount, 4));
+        $promoPick = orange_cart_promotion_resolve($pdo, $netAfterCombo, $buyerRegistered);
         $promoDiscount = $promoPick !== null ? (float) $promoPick['discount'] : 0.0;
         $promoId = $promoPick !== null ? (int) $promoPick['id'] : null;
-        $orderTotal = max(0.0, round($subtotal - $promoDiscount, 4));
+        $orderTotal = max(0.0, round($netAfterCombo - $promoDiscount, 4));
+
+        $promoBundle = orange_storefront_build_promotional_gift_lines($pdo, $data, $validatedItems, $subtotal, $buyerRegistered);
+        $giftPromoId = $promoBundle['giftPromoId'];
+        $giftVariantId = $promoBundle['giftVariantId'];
+        $bogoPromoId = $promoBundle['bogoPromoId'];
+        $bogoGiftVariantId = $promoBundle['bogoGiftVariantId'];
+        $linesForStock = $promoBundle['linesForStock'];
 
         $orderId = (int) $order['id'];
         $hasCartPromo = orange_table_has_column($pdo, 'orders', 'cart_promotion_id')
             && orange_table_has_column($pdo, 'orders', 'cart_promotion_discount');
+        $hasComboCols = orange_table_has_column($pdo, 'orders', 'cart_combo_promotion_id')
+            && orange_table_has_column($pdo, 'orders', 'cart_combo_discount');
+        $hasGiftCols = orange_table_has_column($pdo, 'orders', 'cart_gift_promotion_id')
+            && orange_table_has_column($pdo, 'orders', 'cart_gift_variant_id');
+        $hasBogoCols = orange_table_has_column($pdo, 'orders', 'cart_bogo_promotion_id')
+            && orange_table_has_column($pdo, 'orders', 'cart_bogo_gift_variant_id');
 
-        if ($hasCartPromo) {
-            $pdo->prepare(
-                'UPDATE orders SET total = ?, cart_promotion_id = ?, cart_promotion_discount = ? WHERE id = ?'
-            )->execute([
-                $orderTotal,
-                $promoId !== null && $promoId > 0 ? $promoId : null,
-                $promoDiscount > 0 ? $promoDiscount : 0.0,
-                $orderId,
-            ]);
-        } else {
-            $pdo->prepare('UPDATE orders SET total = ? WHERE id = ?')->execute([$orderTotal, $orderId]);
+        $setParts = ['total = ?'];
+        $updParams = [$orderTotal];
+        if ($hasComboCols) {
+            $setParts[] = 'cart_combo_promotion_id = ?';
+            $setParts[] = 'cart_combo_discount = ?';
+            $updParams[] = $comboId !== null && $comboId > 0 ? $comboId : null;
+            $updParams[] = $comboDiscount > 0 ? $comboDiscount : 0.0;
         }
+        if ($hasCartPromo) {
+            $setParts[] = 'cart_promotion_id = ?';
+            $setParts[] = 'cart_promotion_discount = ?';
+            $updParams[] = $promoId !== null && $promoId > 0 ? $promoId : null;
+            $updParams[] = $promoDiscount > 0 ? $promoDiscount : 0.0;
+        }
+        if ($hasGiftCols) {
+            $setParts[] = 'cart_gift_promotion_id = ?';
+            $setParts[] = 'cart_gift_variant_id = ?';
+            $updParams[] = $giftPromoId !== null && $giftPromoId > 0 ? $giftPromoId : null;
+            $updParams[] = $giftVariantId !== null && $giftVariantId > 0 ? $giftVariantId : null;
+        }
+        if ($hasBogoCols) {
+            $setParts[] = 'cart_bogo_promotion_id = ?';
+            $setParts[] = 'cart_bogo_gift_variant_id = ?';
+            $updParams[] = $bogoPromoId !== null && $bogoPromoId > 0 ? $bogoPromoId : null;
+            $updParams[] = $bogoGiftVariantId !== null && $bogoGiftVariantId > 0 ? $bogoGiftVariantId : null;
+        }
+        $updParams[] = $orderId;
+        $pdo->prepare('UPDATE orders SET ' . implode(', ', $setParts) . ' WHERE id = ?')->execute($updParams);
 
-        orange_storefront_insert_order_items_for_order($pdo, $orderId, $validatedItems);
+        orange_storefront_insert_order_items_for_order($pdo, $orderId, $linesForStock);
 
-        orange_order_apply_pending_stock_reservation($pdo, $orderNumber, $validatedItems);
+        orange_order_apply_pending_stock_reservation($pdo, $orderNumber, $linesForStock);
 
         $pdo->commit();
     } catch (Throwable $e) {
@@ -108,8 +143,14 @@ try {
     $messageLines[] = 'Order Number: ' . $orderNumber;
     $messageLines[] = '';
     $messageLines[] = 'Items:';
-    foreach ($validatedItems as $idx => $row) {
-        $messageLines[] = ($idx + 1) . ') ' . $row['product']['name'];
+    foreach ($linesForStock as $idx => $row) {
+        $tag = '';
+        if (!empty($row['is_bogo_gift'])) {
+            $tag = ' (BOGO GIFT)';
+        } elseif (!empty($row['is_gift'])) {
+            $tag = ' (FREE GIFT)';
+        }
+        $messageLines[] = ($idx + 1) . ') ' . $row['product']['name'] . $tag;
         if ($row['color'] !== '') {
             $messageLines[] = '   Color: ' . $row['color'];
         }
@@ -122,6 +163,9 @@ try {
     $messageLines[] = '';
     $messageLines[] = 'Payment: ' . $payEn . ' / ' . $payAr;
     $messageLines[] = 'Subtotal: ' . number_format($subtotal, 2) . ' KD';
+    if ($comboDiscount > 0.00001) {
+        $messageLines[] = 'Combo bundle: -' . number_format($comboDiscount, 2) . ' KD';
+    }
     if ($promoDiscount > 0.00001) {
         $messageLines[] = 'Cart promotion: -' . number_format($promoDiscount, 2) . ' KD';
     }
@@ -137,6 +181,7 @@ try {
         'order_number' => $orderNumber,
         'total' => $orderTotal,
         'promotion_discount' => $promoDiscount,
+        'combo_discount' => $comboDiscount,
         'lines_subtotal' => round($subtotal, 4),
         'whatsapp_url' => $whatsAppUrl,
         'whatsapp_number' => $whatsAppNumber,

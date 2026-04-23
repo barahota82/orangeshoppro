@@ -69,6 +69,10 @@ function orange_storefront_order_details_plain_language(array $order, array $ite
     $out[] = $lines === [] ? '  —' : implode("\n", $lines);
     $out[] = '';
     $out[] = ($T['cart_subtotal_label'] ?? 'Subtotal') . ': ' . number_format($linesSub, 3) . ' ' . $cur;
+    $combo = isset($order['cart_combo_discount']) ? (float) $order['cart_combo_discount'] : 0.0;
+    if ($combo > 1e-9) {
+        $out[] = ($T['cart_combo_discount_label'] ?? 'Combo') . ': -' . number_format($combo, 3) . ' ' . $cur;
+    }
     $promo = isset($order['cart_promotion_discount']) ? (float) $order['cart_promotion_discount'] : 0.0;
     if ($promo > 1e-9) {
         $out[] = ($T['cart_promotion_discount_label'] ?? 'Promo') . ': -' . number_format($promo, 3) . ' ' . $cur;

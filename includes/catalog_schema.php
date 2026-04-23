@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 2);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 5);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -1679,6 +1679,86 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         orange_catalog_safe_exec(
             $pdo,
             'ALTER TABLE orders ADD COLUMN cart_promotion_discount DECIMAL(18,4) NOT NULL DEFAULT 0'
+        );
+    }
+
+    if (!orange_table_exists($pdo, 'cart_gift_promotions')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            "CREATE TABLE IF NOT EXISTS cart_gift_promotions (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                min_subtotal DECIMAL(18,4) NOT NULL DEFAULT 0,
+                requires_registered_account TINYINT(1) NOT NULL DEFAULT 0,
+                gift_kind VARCHAR(16) NOT NULL DEFAULT 'choice',
+                fixed_variant_id INT UNSIGNED NULL DEFAULT NULL,
+                pool_variant_ids TEXT NULL,
+                sort_order INT NOT NULL DEFAULT 0,
+                is_active TINYINT(1) NOT NULL DEFAULT 1,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                KEY idx_cart_gift_promo_active_min (is_active, min_subtotal)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+    }
+
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'cart_gift_promotion_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE orders ADD COLUMN cart_gift_promotion_id INT UNSIGNED NULL DEFAULT NULL');
+    }
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'cart_gift_variant_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE orders ADD COLUMN cart_gift_variant_id INT UNSIGNED NULL DEFAULT NULL');
+    }
+
+    if (!orange_table_exists($pdo, 'cart_bogo_promotions')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            "CREATE TABLE IF NOT EXISTS cart_bogo_promotions (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                bogo_kind VARCHAR(24) NOT NULL DEFAULT 'same_variant',
+                category_id INT UNSIGNED NULL DEFAULT NULL,
+                min_buy_qty INT UNSIGNED NOT NULL DEFAULT 2,
+                requires_registered_account TINYINT(1) NOT NULL DEFAULT 0,
+                gift_kind VARCHAR(16) NOT NULL DEFAULT 'choice',
+                fixed_variant_id INT UNSIGNED NULL DEFAULT NULL,
+                pool_variant_ids TEXT NULL,
+                sort_order INT NOT NULL DEFAULT 0,
+                is_active TINYINT(1) NOT NULL DEFAULT 1,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                KEY idx_cart_bogo_active_sort (is_active, sort_order)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+    }
+
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'cart_bogo_promotion_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE orders ADD COLUMN cart_bogo_promotion_id INT UNSIGNED NULL DEFAULT NULL');
+    }
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'cart_bogo_gift_variant_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE orders ADD COLUMN cart_bogo_gift_variant_id INT UNSIGNED NULL DEFAULT NULL');
+    }
+
+    if (!orange_table_exists($pdo, 'cart_combo_promotions')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            "CREATE TABLE IF NOT EXISTS cart_combo_promotions (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                title_ar VARCHAR(191) NOT NULL DEFAULT '',
+                title_en VARCHAR(191) NOT NULL DEFAULT '',
+                components_json TEXT NOT NULL,
+                combo_price DECIMAL(18,4) NOT NULL DEFAULT 0,
+                requires_registered_account TINYINT(1) NOT NULL DEFAULT 0,
+                sort_order INT NOT NULL DEFAULT 0,
+                is_active TINYINT(1) NOT NULL DEFAULT 1,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                KEY idx_cart_combo_active_sort (is_active, sort_order)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+    }
+
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'cart_combo_promotion_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE orders ADD COLUMN cart_combo_promotion_id INT UNSIGNED NULL DEFAULT NULL');
+    }
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'cart_combo_discount')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE orders ADD COLUMN cart_combo_discount DECIMAL(18,4) NOT NULL DEFAULT 0'
         );
     }
 

@@ -162,7 +162,11 @@ $cartPromoDisc = 0.0;
 if ($order && orange_table_has_column($pdo, 'orders', 'cart_promotion_discount')) {
     $cartPromoDisc = max(0.0, (float)($order['cart_promotion_discount'] ?? 0));
 }
-$linesExpectedNet = round($linesSubtotal - $cartPromoDisc, 4);
+$cartComboDisc = 0.0;
+if ($order && orange_table_has_column($pdo, 'orders', 'cart_combo_discount')) {
+    $cartComboDisc = max(0.0, (float)($order['cart_combo_discount'] ?? 0));
+}
+$linesExpectedNet = round($linesSubtotal - $cartComboDisc - $cartPromoDisc, 4);
 $linesMismatch = $order && abs($linesExpectedNet - $orderTotalVal) > 0.009;
 $amountPaidVal = 0.0;
 if ($order && orange_table_has_column($pdo, 'orders', 'amount_paid')) {
@@ -572,8 +576,15 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
 
         <?php if ($linesMismatch): ?>
             <div class="invoice-warn">تنبيه: <?php
-            if ($cartPromoDisc > 0.00001) {
-                echo 'المتوقع من البنود بعد خصم عرض السلة: ' . number_format($linesSubtotal, 2) . ' − ' . number_format($cartPromoDisc, 2) . ' = ' . number_format($linesExpectedNet, 2) . ' KD — ';
+            if ($cartComboDisc > 0.00001 || $cartPromoDisc > 0.00001) {
+                echo 'المتوقع من البنود بعد الخصومات: ' . number_format($linesSubtotal, 2);
+                if ($cartComboDisc > 0.00001) {
+                    echo ' − كومبو ' . number_format($cartComboDisc, 2);
+                }
+                if ($cartPromoDisc > 0.00001) {
+                    echo ' − عرض السلة ' . number_format($cartPromoDisc, 2);
+                }
+                echo ' = ' . number_format($linesExpectedNet, 2) . ' KD — ';
             } else {
                 echo 'صافي البنود ' . number_format($linesSubtotal, 2) . ' KD — ';
             }
@@ -620,6 +631,12 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
                     <span>صافي البنود</span>
                     <span><?php echo number_format($linesSubtotal, 3); ?> KD</span>
                 </div>
+                <?php if ($cartComboDisc > 0.00001): ?>
+                <div class="invoice-totals-row invoice-totals-row--cart-promo">
+                    <span>خصم كومبو</span>
+                    <span>−<?php echo number_format($cartComboDisc, 3); ?> KD</span>
+                </div>
+                <?php endif; ?>
                 <?php if ($cartPromoDisc > 0.00001): ?>
                 <div class="invoice-totals-row invoice-totals-row--cart-promo">
                     <span>خصم عرض السلة</span>

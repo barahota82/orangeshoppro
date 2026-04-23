@@ -46,7 +46,7 @@ function orangeCartRefreshBasketTotalsClientAndPreview() {
     const sel = choice ? orangeCartGetSelectedItems(items) : items;
     if (choice && !sel.length) {
         const wrap0 = document.createElement('div');
-        wrap0.innerHTML = orangeHtmlCartMainTotals(0, 0, 0);
+        wrap0.innerHTML = orangeHtmlCartMainTotals(0, 0, 0, 0);
         const next0 = wrap0.firstElementChild;
         if (next0) {
             mainEl.parentNode.replaceChild(next0, mainEl);
@@ -57,7 +57,7 @@ function orangeCartRefreshBasketTotalsClientAndPreview() {
     }
     const sub = orangeCartClientSubtotalFromItems(sel);
     const wrap = document.createElement('div');
-    wrap.innerHTML = orangeHtmlCartMainTotals(sub, 0, sub);
+    wrap.innerHTML = orangeHtmlCartMainTotals(sub, 0, 0, sub);
     const next = wrap.firstElementChild;
     if (next) {
         mainEl.parentNode.replaceChild(next, mainEl);
@@ -579,6 +579,229 @@ function orangeCancelCheckoutPreview() {
     }
     __orangeCartPreviewSeq += 1;
     orangeUpdateRegisterPromoTeaser(null);
+    orangeUpdateGiftBogoRegisterUnlockTeaser(false, false, false);
+    orangeUpdateCartGiftPromotionUI(null);
+    orangeUpdateCartBogoPromotionUI(null);
+}
+
+function orangeUpdateCartGiftPromotionUI(gift) {
+    const wrap = document.getElementById('cartGiftPromoHost');
+    const inner = document.getElementById('cartGiftPromoInner');
+    if (!wrap || !inner) {
+        return;
+    }
+    try {
+        window.__orangeLastGiftPromotion = gift && typeof gift === 'object' ? gift : null;
+    } catch (eG) {
+        window.__orangeLastGiftPromotion = null;
+    }
+    if (!gift || typeof gift !== 'object' || gift.id == null) {
+        wrap.hidden = true;
+        inner.innerHTML = '';
+        try {
+            window.__orangeCheckoutGiftVariantId = 0;
+        } catch (eZ) {}
+        return;
+    }
+    const T = window.APP_T || {};
+    const title = T.cart_gift_promo_title || '';
+    if (gift.gift_kind === 'fixed' && gift.fixed_variant_id) {
+        try {
+            window.__orangeCheckoutGiftVariantId = parseInt(String(gift.fixed_variant_id), 10) || 0;
+        } catch (eF) {
+            window.__orangeCheckoutGiftVariantId = 0;
+        }
+        const note = T.cart_gift_included_fixed || '';
+        wrap.hidden = false;
+        inner.innerHTML =
+            '<div class="cart-gift-promo__title">' +
+            escCartHtml(title) +
+            '</div><p class="cart-gift-promo__note">' +
+            escCartHtml(note) +
+            '</p>';
+        return;
+    }
+    const pool = Array.isArray(gift.pool) ? gift.pool : [];
+    if (!pool.length) {
+        wrap.hidden = true;
+        inner.innerHTML = '';
+        try {
+            window.__orangeCheckoutGiftVariantId = 0;
+        } catch (eP) {}
+        return;
+    }
+    let opts = '';
+    pool.forEach(function (p) {
+        const vid = parseInt(String(p.variant_id), 10) || 0;
+        if (!vid) {
+            return;
+        }
+        const parts = [String(p.product_name || '').trim()];
+        if (p.color) {
+            parts.push(String(p.color));
+        }
+        if (p.size) {
+            parts.push(String(p.size));
+        }
+        const lab = parts.filter(Boolean).join(' · ');
+        opts +=
+            '<option value="' +
+            String(vid) +
+            '">' +
+            escCartHtml(lab) +
+            '</option>';
+    });
+    if (!opts) {
+        wrap.hidden = true;
+        inner.innerHTML = '';
+        try {
+            window.__orangeCheckoutGiftVariantId = 0;
+        } catch (eE) {}
+        return;
+    }
+    wrap.hidden = false;
+    const lbl = T.cart_gift_pick_label || '';
+    inner.innerHTML =
+        '<div class="cart-gift-promo__title">' +
+        escCartHtml(title) +
+        '</div><label class="cart-gift-promo__label"><span>' +
+        escCartHtml(lbl) +
+        '</span><select id="cartGiftVariantSelect" class="cart-gift-promo__select">' +
+        opts +
+        '</select></label>';
+    const sel = document.getElementById('cartGiftVariantSelect');
+    if (sel) {
+        if (pool.length === 1) {
+            try {
+                window.__orangeCheckoutGiftVariantId = parseInt(String(pool[0].variant_id), 10) || 0;
+            } catch (e1) {
+                window.__orangeCheckoutGiftVariantId = 0;
+            }
+        } else {
+            try {
+                window.__orangeCheckoutGiftVariantId = parseInt(String(sel.value), 10) || 0;
+            } catch (e2) {
+                window.__orangeCheckoutGiftVariantId = 0;
+            }
+        }
+        sel.addEventListener('change', function () {
+            try {
+                window.__orangeCheckoutGiftVariantId = parseInt(String(sel.value), 10) || 0;
+            } catch (e3) {
+                window.__orangeCheckoutGiftVariantId = 0;
+            }
+        });
+    }
+}
+
+function orangeUpdateCartBogoPromotionUI(bogo) {
+    const wrap = document.getElementById('cartBogoGiftPromoHost');
+    const inner = document.getElementById('cartBogoGiftPromoInner');
+    if (!wrap || !inner) {
+        return;
+    }
+    try {
+        window.__orangeLastBogoPromotion = bogo && typeof bogo === 'object' ? bogo : null;
+    } catch (eBg) {
+        window.__orangeLastBogoPromotion = null;
+    }
+    if (!bogo || typeof bogo !== 'object' || bogo.id == null) {
+        wrap.hidden = true;
+        inner.innerHTML = '';
+        try {
+            window.__orangeCheckoutBogoGiftVariantId = 0;
+        } catch (eZ2) {}
+        return;
+    }
+    const T = window.APP_T || {};
+    const title = T.cart_bogo_promo_title || '';
+    if (bogo.gift_kind === 'fixed' && bogo.fixed_variant_id) {
+        try {
+            window.__orangeCheckoutBogoGiftVariantId = parseInt(String(bogo.fixed_variant_id), 10) || 0;
+        } catch (eBf) {
+            window.__orangeCheckoutBogoGiftVariantId = 0;
+        }
+        const note = T.cart_bogo_included_fixed || '';
+        wrap.hidden = false;
+        inner.innerHTML =
+            '<div class="cart-gift-promo__title">' +
+            escCartHtml(title) +
+            '</div><p class="cart-gift-promo__note">' +
+            escCartHtml(note) +
+            '</p>';
+        return;
+    }
+    const poolB = Array.isArray(bogo.pool) ? bogo.pool : [];
+    if (!poolB.length) {
+        wrap.hidden = true;
+        inner.innerHTML = '';
+        try {
+            window.__orangeCheckoutBogoGiftVariantId = 0;
+        } catch (ePb) {}
+        return;
+    }
+    let optsB = '';
+    poolB.forEach(function (p) {
+        const vid = parseInt(String(p.variant_id), 10) || 0;
+        if (!vid) {
+            return;
+        }
+        const parts = [String(p.product_name || '').trim()];
+        if (p.color) {
+            parts.push(String(p.color));
+        }
+        if (p.size) {
+            parts.push(String(p.size));
+        }
+        const lab = parts.filter(Boolean).join(' · ');
+        optsB +=
+            '<option value="' +
+            String(vid) +
+            '">' +
+            escCartHtml(lab) +
+            '</option>';
+    });
+    if (!optsB) {
+        wrap.hidden = true;
+        inner.innerHTML = '';
+        try {
+            window.__orangeCheckoutBogoGiftVariantId = 0;
+        } catch (eEb) {}
+        return;
+    }
+    wrap.hidden = false;
+    const lblB = T.cart_bogo_pick_label || '';
+    inner.innerHTML =
+        '<div class="cart-gift-promo__title">' +
+        escCartHtml(title) +
+        '</div><label class="cart-gift-promo__label"><span>' +
+        escCartHtml(lblB) +
+        '</span><select id="cartBogoGiftVariantSelect" class="cart-gift-promo__select">' +
+        optsB +
+        '</select></label>';
+    const selB = document.getElementById('cartBogoGiftVariantSelect');
+    if (selB) {
+        if (poolB.length === 1) {
+            try {
+                window.__orangeCheckoutBogoGiftVariantId = parseInt(String(poolB[0].variant_id), 10) || 0;
+            } catch (eB1) {
+                window.__orangeCheckoutBogoGiftVariantId = 0;
+            }
+        } else {
+            try {
+                window.__orangeCheckoutBogoGiftVariantId = parseInt(String(selB.value), 10) || 0;
+            } catch (eB2) {
+                window.__orangeCheckoutBogoGiftVariantId = 0;
+            }
+        }
+        selB.addEventListener('change', function () {
+            try {
+                window.__orangeCheckoutBogoGiftVariantId = parseInt(String(selB.value), 10) || 0;
+            } catch (eB3) {
+                window.__orangeCheckoutBogoGiftVariantId = 0;
+            }
+        });
+    }
 }
 
 function orangeCartClientSubtotalFromItems(items) {
@@ -604,13 +827,14 @@ function orangeCartTotalsEpsilon() {
     return 1e-6;
 }
 
-function orangeHtmlCartMainTotals(subtotal, promoDiscount, total) {
+function orangeHtmlCartMainTotals(subtotal, comboDiscount, promoDiscount, total) {
     const T = window.APP_T || {};
     const totalLbl = T.cart_total_label || 'Total';
     const subLbl = T.cart_subtotal_label || 'Subtotal';
     const promoLbl = T.cart_promotion_discount_label || 'Cart offer';
+    const comboLbl = T.cart_combo_discount_label || 'Combo bundle';
     const eps = orangeCartTotalsEpsilon();
-    const showBreakdown = promoDiscount > eps;
+    const showBreakdown = comboDiscount > eps || promoDiscount > eps;
     let html =
         '<div class="cart-summary-totals" id="cartMainTotals">';
     if (showBreakdown) {
@@ -620,12 +844,22 @@ function orangeHtmlCartMainTotals(subtotal, promoDiscount, total) {
             '</span><span>' +
             formatMoney(subtotal) +
             '</span></div>';
-        html +=
-            '<div class="cart-summary-line cart-summary-line--promo"><span>' +
-            escCartHtml(promoLbl) +
-            '</span><span>−' +
-            formatMoney(promoDiscount) +
-            '</span></div>';
+        if (comboDiscount > eps) {
+            html +=
+                '<div class="cart-summary-line cart-summary-line--combo"><span>' +
+                escCartHtml(comboLbl) +
+                '</span><span>−' +
+                formatMoney(comboDiscount) +
+                '</span></div>';
+        }
+        if (promoDiscount > eps) {
+            html +=
+                '<div class="cart-summary-line cart-summary-line--promo"><span>' +
+                escCartHtml(promoLbl) +
+                '</span><span>−' +
+                formatMoney(promoDiscount) +
+                '</span></div>';
+        }
     }
     html +=
         '<div class="cart-total-box"><strong>' +
@@ -636,13 +870,14 @@ function orangeHtmlCartMainTotals(subtotal, promoDiscount, total) {
     return html;
 }
 
-function orangeHtmlCartMiniTotals(subtotal, promoDiscount, total) {
+function orangeHtmlCartMiniTotals(subtotal, comboDiscount, promoDiscount, total) {
     const T = window.APP_T || {};
     const totalLbl = T.cart_total_label || 'Total';
     const subLbl = T.cart_subtotal_label || 'Subtotal';
     const promoLbl = T.cart_promotion_discount_label || 'Cart offer';
+    const comboLbl = T.cart_combo_discount_label || 'Combo bundle';
     const eps = orangeCartTotalsEpsilon();
-    const showBreakdown = promoDiscount > eps;
+    const showBreakdown = comboDiscount > eps || promoDiscount > eps;
     let html =
         '<div class="cart-mini-totals-breakdown" id="cartMiniTotals">';
     if (showBreakdown) {
@@ -652,12 +887,22 @@ function orangeHtmlCartMiniTotals(subtotal, promoDiscount, total) {
             '</span><span>' +
             formatMoney(subtotal) +
             '</span></div>';
-        html +=
-            '<div class="cart-mini-total-line cart-mini-total-line--promo"><span>' +
-            escCartHtml(promoLbl) +
-            '</span><span>−' +
-            formatMoney(promoDiscount) +
-            '</span></div>';
+        if (comboDiscount > eps) {
+            html +=
+                '<div class="cart-mini-total-line cart-mini-total-line--combo"><span>' +
+                escCartHtml(comboLbl) +
+                '</span><span>−' +
+                formatMoney(comboDiscount) +
+                '</span></div>';
+        }
+        if (promoDiscount > eps) {
+            html +=
+                '<div class="cart-mini-total-line cart-mini-total-line--promo"><span>' +
+                escCartHtml(promoLbl) +
+                '</span><span>−' +
+                formatMoney(promoDiscount) +
+                '</span></div>';
+        }
     }
     html +=
         '<div class="cart-mini-total"><span>' +
@@ -669,19 +914,23 @@ function orangeHtmlCartMiniTotals(subtotal, promoDiscount, total) {
 }
 
 function orangeUpdateRegisterPromoTeaser(teaser) {
-    const el = document.getElementById('cartRegisterPromoTeaser');
-    if (!el) {
-        return;
-    }
     const acc = window.ORANGE_CART_SF_ACCOUNT || {};
+    const ids = ['cartRegisterPromoTeaser', 'cartBasketRegisterPromoTeaser'];
+    const clearAll = () => {
+        ids.forEach((id) => {
+            const node = document.getElementById(id);
+            if (node) {
+                node.hidden = true;
+                node.innerHTML = '';
+            }
+        });
+    };
     if (acc.logged_in) {
-        el.hidden = true;
-        el.innerHTML = '';
+        clearAll();
         return;
     }
     if (!teaser || typeof teaser.you_save_extra !== 'number' || !(teaser.you_save_extra > 1e-9)) {
-        el.hidden = true;
-        el.innerHTML = '';
+        clearAll();
         return;
     }
     const T = window.APP_T || {};
@@ -696,15 +945,82 @@ function orangeUpdateRegisterPromoTeaser(teaser) {
         linkHtml =
             ' <a class="cart-register-promo-teaser__link" href="' + escCartAttr(url) + '">' + safeAct + '</a>';
     }
-    el.hidden = false;
-    el.innerHTML = '<p class="cart-register-promo-teaser__text">' + safeMsg + linkHtml + '</p>';
+    const inner = '<p class="cart-register-promo-teaser__text">' + safeMsg + linkHtml + '</p>';
+    ids.forEach((id) => {
+        const node = document.getElementById(id);
+        if (node) {
+            node.hidden = false;
+            node.innerHTML = inner;
+        }
+    });
 }
 
-function orangePatchCartTotalsFromServer(subtotal, promoDiscount, total, registerTeaser) {
+function orangeUpdateGiftBogoRegisterUnlockTeaser(giftOn, bogoOn, comboOn) {
+    const acc = window.ORANGE_CART_SF_ACCOUNT || {};
+    const ids = ['cartGiftBogoRegisterUnlockTeaser', 'cartBasketGiftBogoRegisterUnlockTeaser'];
+    const T = window.APP_T || {};
+    const url = typeof window.ORANGE_REGISTER_URL === 'string' ? window.ORANGE_REGISTER_URL.trim() : '';
+    const action = T.cart_register_promo_teaser_action || '';
+    const linkHtml =
+        url && action
+            ? ' <a class="cart-register-promo-teaser__link" href="' + escCartAttr(url) + '">' + escCartHtml(action) + '</a>'
+            : '';
+    const parts = [];
+    if (!acc.logged_in && giftOn) {
+        parts.push(
+            '<p class="cart-register-promo-teaser__text">' +
+                escCartHtml(T.cart_gift_register_unlock_teaser || '') +
+                linkHtml +
+                '</p>'
+        );
+    }
+    if (!acc.logged_in && bogoOn) {
+        parts.push(
+            '<p class="cart-register-promo-teaser__text">' +
+                escCartHtml(T.cart_bogo_register_unlock_teaser || '') +
+                linkHtml +
+                '</p>'
+        );
+    }
+    if (!acc.logged_in && comboOn) {
+        parts.push(
+            '<p class="cart-register-promo-teaser__text">' +
+                escCartHtml(T.cart_combo_register_unlock_teaser || '') +
+                linkHtml +
+                '</p>'
+        );
+    }
+    const inner = parts.join('');
+    const show = parts.length > 0;
+    ids.forEach((id) => {
+        const node = document.getElementById(id);
+        if (!node) {
+            return;
+        }
+        if (!show) {
+            node.hidden = true;
+            node.innerHTML = '';
+        } else {
+            node.hidden = false;
+            node.innerHTML = inner;
+        }
+    });
+}
+
+function orangePatchCartTotalsFromServer(
+    subtotal,
+    comboDiscount,
+    promoDiscount,
+    total,
+    registerTeaser,
+    giftUnlock,
+    bogoUnlock,
+    comboUnlock
+) {
     const main = document.getElementById('cartMainTotals');
     if (main && main.parentNode) {
         const wrap = document.createElement('div');
-        wrap.innerHTML = orangeHtmlCartMainTotals(subtotal, promoDiscount, total);
+        wrap.innerHTML = orangeHtmlCartMainTotals(subtotal, comboDiscount, promoDiscount, total);
         const next = wrap.firstElementChild;
         if (next) {
             main.parentNode.replaceChild(next, main);
@@ -713,13 +1029,14 @@ function orangePatchCartTotalsFromServer(subtotal, promoDiscount, total, registe
     const mini = document.getElementById('cartMiniTotals');
     if (mini && mini.parentNode) {
         const wrap = document.createElement('div');
-        wrap.innerHTML = orangeHtmlCartMiniTotals(subtotal, promoDiscount, total);
+        wrap.innerHTML = orangeHtmlCartMiniTotals(subtotal, comboDiscount, promoDiscount, total);
         const next = wrap.firstElementChild;
         if (next) {
             mini.parentNode.replaceChild(next, mini);
         }
     }
     orangeUpdateRegisterPromoTeaser(registerTeaser);
+    orangeUpdateGiftBogoRegisterUnlockTeaser(!!giftUnlock, !!bogoUnlock, !!comboUnlock);
 }
 
 function orangeScheduleCheckoutPreview() {
@@ -740,6 +1057,7 @@ async function orangeRunCheckoutPreview() {
     const previewLines = orangeCartLineChoiceApplies(items) ? orangeCartGetSelectedItems(items) : items;
     if (!previewLines.length) {
         orangeUpdateRegisterPromoTeaser(null);
+        orangeUpdateGiftBogoRegisterUnlockTeaser(false, false, false);
         return;
     }
     const seq = ++__orangeCartPreviewSeq;
@@ -763,14 +1081,33 @@ async function orangeRunCheckoutPreview() {
             typeof data.subtotal === 'number' &&
             typeof data.total === 'number'
         ) {
+            const comboD =
+                typeof data.combo_discount === 'number' ? data.combo_discount : 0;
             const promo =
                 typeof data.promotion_discount === 'number' ? data.promotion_discount : 0;
-            orangePatchCartTotalsFromServer(data.subtotal, promo, data.total, data.register_promo_teaser || null);
+            orangePatchCartTotalsFromServer(
+                data.subtotal,
+                comboD,
+                promo,
+                data.total,
+                data.register_promo_teaser || null,
+                data.gift_register_unlock_teaser === true,
+                data.bogo_register_unlock_teaser === true,
+                data.combo_register_unlock_teaser === true
+            );
+            orangeUpdateCartGiftPromotionUI(data.gift_promotion || null);
+            orangeUpdateCartBogoPromotionUI(data.bogo_promotion || null);
         } else {
             orangeUpdateRegisterPromoTeaser(null);
+            orangeUpdateGiftBogoRegisterUnlockTeaser(false, false, false);
+            orangeUpdateCartGiftPromotionUI(null);
+            orangeUpdateCartBogoPromotionUI(null);
         }
     } catch (e) {
         orangeUpdateRegisterPromoTeaser(null);
+        orangeUpdateGiftBogoRegisterUnlockTeaser(false, false, false);
+        orangeUpdateCartGiftPromotionUI(null);
+        orangeUpdateCartBogoPromotionUI(null);
     }
 }
 
@@ -822,8 +1159,9 @@ function orangeRenderCheckoutMiniSummary() {
         listHtml +
         '</ul>' +
         moreHtml +
-        orangeHtmlCartMiniTotals(clientSub, 0, clientSub) +
+        orangeHtmlCartMiniTotals(clientSub, 0, 0, clientSub) +
         '<div class="cart-register-promo-teaser" id="cartRegisterPromoTeaser" hidden></div>' +
+        '<div class="cart-register-promo-teaser cart-gift-bogo-register-teaser" id="cartGiftBogoRegisterUnlockTeaser" hidden></div>' +
         '</div>';
     if (choice && !summaryItems.length) {
         orangeCancelCheckoutPreview();
@@ -982,7 +1320,14 @@ async function renderCart() {
         });
 
         html += '</div>';
-        html += '<div class="cart-summary-bar">' + orangeHtmlCartMainTotals(total, 0, total) + '</div>';
+        html += '<div class="cart-summary-bar">' + orangeHtmlCartMainTotals(total, 0, 0, total) + '</div>';
+        html +=
+            '<div class="cart-register-promo-teaser" id="cartBasketRegisterPromoTeaser" hidden></div>' +
+            '<div class="cart-register-promo-teaser cart-gift-bogo-register-teaser" id="cartBasketGiftBogoRegisterUnlockTeaser" hidden></div>';
+        html +=
+            '<div class="cart-gift-promo-host" id="cartGiftPromoHost" hidden><div class="cart-gift-promo-inner" id="cartGiftPromoInner"></div></div>';
+        html +=
+            '<div class="cart-gift-promo-host cart-bogo-gift-host" id="cartBogoGiftPromoHost" hidden><div class="cart-gift-promo-inner" id="cartBogoGiftPromoInner"></div></div>';
         html += '</div>';
 
         box.innerHTML = html;
@@ -1168,6 +1513,10 @@ function orangeFinishCheckoutSuccess(result, opts) {
     if (typeof result.total === 'number' && Number.isFinite(result.total)) {
         okMsg += ' · ' + (T.cart_total_label || 'Total') + ' ' + formatMoney(result.total);
     }
+    const cd = typeof result.combo_discount === 'number' ? result.combo_discount : 0;
+    if (cd > 1e-6) {
+        okMsg += ' · ' + (T.cart_combo_discount_label || '') + ' −' + Number(cd).toFixed(2) + ' KD';
+    }
     const pd = typeof result.promotion_discount === 'number' ? result.promotion_discount : 0;
     if (pd > 1e-6) {
         okMsg += ' · ' + (T.cart_promotion_discount_label || '') + ' −' + Number(pd).toFixed(2) + ' KD';
@@ -1261,6 +1610,38 @@ async function sendOrderNow() {
             items: items,
             lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
         };
+        try {
+            const gp = window.__orangeLastGiftPromotion;
+            if (gp && gp.gift_kind === 'choice') {
+                const vid = parseInt(String(window.__orangeCheckoutGiftVariantId || 0), 10) || 0;
+                if (!vid) {
+                    orangeShowToast(
+                        (window.APP_T && window.APP_T.checkout_gift_pick_required) || '',
+                        3600
+                    );
+                    return;
+                }
+                payloadAm.gift_variant_id = vid;
+            } else if (gp && gp.gift_kind === 'fixed' && gp.fixed_variant_id) {
+                payloadAm.gift_variant_id = parseInt(String(gp.fixed_variant_id), 10) || 0;
+            }
+        } catch (eAmGift) {}
+        try {
+            const bp = window.__orangeLastBogoPromotion;
+            if (bp && bp.gift_kind === 'choice') {
+                const bvid = parseInt(String(window.__orangeCheckoutBogoGiftVariantId || 0), 10) || 0;
+                if (!bvid) {
+                    orangeShowToast(
+                        (window.APP_T && window.APP_T.checkout_bogo_gift_pick_required) || '',
+                        3600
+                    );
+                    return;
+                }
+                payloadAm.bogo_gift_variant_id = bvid;
+            } else if (bp && bp.gift_kind === 'fixed' && bp.fixed_variant_id) {
+                payloadAm.bogo_gift_variant_id = parseInt(String(bp.fixed_variant_id), 10) || 0;
+            }
+        } catch (eAmBogo) {}
         let responseAm;
         let resultAm;
         try {
@@ -1368,6 +1749,40 @@ async function sendOrderNow() {
         payment_terms: paymentTerms,
         lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en',
     };
+
+    try {
+        const gp = window.__orangeLastGiftPromotion;
+        if (gp && gp.gift_kind === 'choice') {
+            const vid = parseInt(String(window.__orangeCheckoutGiftVariantId || 0), 10) || 0;
+            if (!vid) {
+                orangeShowToast(
+                    (window.APP_T && window.APP_T.checkout_gift_pick_required) || '',
+                    3600
+                );
+                return;
+            }
+            payload.gift_variant_id = vid;
+        } else if (gp && gp.gift_kind === 'fixed' && gp.fixed_variant_id) {
+            payload.gift_variant_id = parseInt(String(gp.fixed_variant_id), 10) || 0;
+        }
+    } catch (eGift) {}
+
+    try {
+        const bp = window.__orangeLastBogoPromotion;
+        if (bp && bp.gift_kind === 'choice') {
+            const bvid = parseInt(String(window.__orangeCheckoutBogoGiftVariantId || 0), 10) || 0;
+            if (!bvid) {
+                orangeShowToast(
+                    (window.APP_T && window.APP_T.checkout_bogo_gift_pick_required) || '',
+                    3600
+                );
+                return;
+            }
+            payload.bogo_gift_variant_id = bvid;
+        } else if (bp && bp.gift_kind === 'fixed' && bp.fixed_variant_id) {
+            payload.bogo_gift_variant_id = parseInt(String(bp.fixed_variant_id), 10) || 0;
+        }
+    } catch (eBogo) {}
 
     if (!payload.name || !phoneRaw || !payload.address) {
         orangeShowToast(window.APP_T.checkout_required_fields || 'Please fill all required fields.', 3200);
@@ -1602,6 +2017,20 @@ function orangeOrderCartPromoDiscountAmount(order) {
     return n;
 }
 
+function orangeOrderCartComboDiscountAmount(order) {
+    if (!order || order.cart_combo_discount == null) {
+        return 0;
+    }
+    const n =
+        typeof order.cart_combo_discount === 'number'
+            ? order.cart_combo_discount
+            : parseFloat(String(order.cart_combo_discount));
+    if (!Number.isFinite(n) || n <= 0) {
+        return 0;
+    }
+    return n;
+}
+
 /** صافي سطر الطلب بعد خصم السطر — مطابقة تقريبية لـ orange_order_item_line_net في PHP. */
 function orangeOrderItemLineNetJs(it) {
     const qty = Math.max(0, parseInt(String(it.qty || 0), 10) || 0);
@@ -1732,6 +2161,27 @@ function orangeHtmlOrderPromoParagraph(order, cur, paragraphClass) {
     );
 }
 
+function orangeHtmlOrderComboParagraph(order, cur, paragraphClass) {
+    const d = orangeOrderCartComboDiscountAmount(order);
+    if (d <= 1e-9) {
+        return '';
+    }
+    const T = window.APP_T || {};
+    const lbl = T.cart_combo_discount_label || '';
+    const cls = paragraphClass ? ' class="' + orangeEscDomAttr(paragraphClass) + '"' : '';
+    return (
+        '<p' +
+        cls +
+        '><strong>' +
+        orangeEscDomText(lbl) +
+        ':</strong> −' +
+        orangeEscDomText(d.toFixed(3)) +
+        ' ' +
+        orangeEscDomText(String(cur || '')) +
+        '</p>'
+    );
+}
+
 function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, items) {
     const UI = window.ORANGE_MY_ORDER_UI || {};
     const labels = window.ORANGE_ORDER_STATUS_LABELS || {};
@@ -1765,7 +2215,10 @@ function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, 
         html += '<p><strong>' + orangeEscDomText(lblPhone) + ':</strong> ' + orangeEscDomText(String(order.phone)) + '</p>';
     }
     const itemsLinesSum = orangeOrderLinesSubtotalPreferServer(order, itemRows);
-    if (orangeOrderCartPromoDiscountAmount(order) > 1e-9 && itemsLinesSum > 1e-9) {
+    if (
+        (orangeOrderCartPromoDiscountAmount(order) > 1e-9 || orangeOrderCartComboDiscountAmount(order) > 1e-9) &&
+        itemsLinesSum > 1e-9
+    ) {
         html +=
             '<p class="order-items-subtotal-line"><strong>' +
             orangeEscDomText(T.cart_subtotal_label || '') +
@@ -1775,6 +2228,7 @@ function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, 
             orangeEscDomText(cur) +
             '</p>';
     }
+    html += orangeHtmlOrderComboParagraph(order, cur, 'order-cart-promo-line');
     html += orangeHtmlOrderPromoParagraph(order, cur, 'order-cart-promo-line');
     html += '<p><strong>' + orangeEscDomText(UI.order_total_label || '') + ':</strong> ' + orangeEscDomText(String(order.total)) + ' ' + orangeEscDomText(cur) + '</p>';
     const pt = String(order.payment_terms || 'cash').toLowerCase();
@@ -1967,7 +2421,10 @@ function orangeRenderTrackSignupSummary(el, order, orderNumber, phoneTyped, item
         html += orangeEscDomText(String(order.phone)) + '</p>';
     }
     const itemsLinesSumSu = orangeOrderLinesSubtotalPreferServer(order, itemRows);
-    if (orangeOrderCartPromoDiscountAmount(order) > 1e-9 && itemsLinesSumSu > 1e-9) {
+    if (
+        (orangeOrderCartPromoDiscountAmount(order) > 1e-9 || orangeOrderCartComboDiscountAmount(order) > 1e-9) &&
+        itemsLinesSumSu > 1e-9
+    ) {
         html +=
             '<p class="track-signup-order-summary__line order-items-subtotal-line"><strong>' +
             orangeEscDomText(T.cart_subtotal_label || '') +
@@ -1977,6 +2434,11 @@ function orangeRenderTrackSignupSummary(el, order, orderNumber, phoneTyped, item
             orangeEscDomText(cur) +
             '</p>';
     }
+    html += orangeHtmlOrderComboParagraph(
+        order,
+        cur,
+        'track-signup-order-summary__line order-cart-promo-line'
+    );
     html += orangeHtmlOrderPromoParagraph(
         order,
         cur,
@@ -2275,7 +2737,10 @@ function orangeCartRenderAccountOrderCard(row) {
     const Tcard = window.APP_T || {};
     const linesSubRaw = row.lines_subtotal != null && row.lines_subtotal !== '' ? parseFloat(String(row.lines_subtotal)) : NaN;
     const linesSubNum = Number.isFinite(linesSubRaw) ? linesSubRaw : 0;
-    if (orangeOrderCartPromoDiscountAmount(row) > 1e-9 && linesSubNum > 1e-9) {
+    if (
+        (orangeOrderCartPromoDiscountAmount(row) > 1e-9 || orangeOrderCartComboDiscountAmount(row) > 1e-9) &&
+        linesSubNum > 1e-9
+    ) {
         html +=
             '<p class="cart-account-order-card__row order-items-subtotal-line"><strong>' +
             orangeEscDomText(Tcard.cart_subtotal_label || '') +
@@ -2285,6 +2750,11 @@ function orangeCartRenderAccountOrderCard(row) {
             orangeEscDomText(cur) +
             '</p>';
     }
+    html += orangeHtmlOrderComboParagraph(
+        row,
+        cur,
+        'cart-account-order-card__row order-cart-promo-line'
+    );
     html += orangeHtmlOrderPromoParagraph(
         row,
         cur,

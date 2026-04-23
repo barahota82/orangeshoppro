@@ -1650,6 +1650,47 @@ body.storefront .product-gallery__img {
     border-top: 1px dashed color-mix(in srgb, var(--border) 70%, var(--muted));
 }
 
+.cart-gift-promo-host {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: var(--radius, 10px);
+    border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+    background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+}
+
+.cart-gift-promo__title {
+    font-weight: 700;
+    font-size: 0.92rem;
+    margin: 0 0 6px;
+    color: var(--text);
+}
+
+.cart-gift-promo__note {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--muted);
+    line-height: 1.45;
+}
+
+.cart-gift-promo__label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 0.88rem;
+    color: var(--muted);
+}
+
+.cart-gift-promo__select {
+    width: 100%;
+    max-width: 28rem;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.9rem;
+}
+
 .cart-summary-totals {
     display: flex;
     flex-direction: column;
@@ -1668,6 +1709,11 @@ body.storefront .product-gallery__img {
 
 .cart-summary-line--promo {
     color: color-mix(in srgb, var(--primary) 75%, var(--text));
+    font-weight: 600;
+}
+
+.cart-summary-line--combo {
+    color: color-mix(in srgb, var(--primary) 55%, var(--text));
     font-weight: 600;
 }
 
@@ -1763,6 +1809,11 @@ body.storefront .product-gallery__img {
 
 .cart-mini-total-line--promo {
     color: color-mix(in srgb, var(--primary) 75%, var(--text));
+    font-weight: 600;
+}
+
+.cart-mini-total-line--combo {
+    color: color-mix(in srgb, var(--primary) 55%, var(--text));
     font-weight: 600;
 }
 

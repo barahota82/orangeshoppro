@@ -127,7 +127,7 @@ $orangeMyOrderUi = [
             </div>
             <div class="actions-row track-page-actions">
                 <button type="submit" class="btn btn--track-submit"><?php echo htmlspecialchars(t('track_order'), ENT_QUOTES, 'UTF-8'); ?></button>
-            </div>
+        </div>
         </form>
         <div id="trackResult" class="cart-track-result track-page-result" style="margin-top:18px;" tabindex="-1" role="region" aria-live="polite" aria-label="<?php echo htmlspecialchars(t('track_result_region_aria'), ENT_QUOTES, 'UTF-8'); ?>"></div>
     </div>
