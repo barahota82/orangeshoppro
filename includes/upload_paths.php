@@ -295,6 +295,19 @@ function storefront_channel_logo_web_path(?string $filenameFromDb): string
 }
 
 /**
+ * مسار شعار قناة لـ ‎src‎ في HTML (يشمل ‎PUBLIC_BASE_PATH‎ إن وُجد).
+ */
+function storefront_channel_logo_href(?string $filenameFromDb): string
+{
+    $rel = storefront_channel_logo_web_path($filenameFromDb);
+    if ($rel === '') {
+        return '';
+    }
+
+    return storefront_public_path($rel);
+}
+
+/**
  * أرشيف مستندات الشركة (غير عام — التنزيل عبر سكربت يتحقق من الجلسة).
  * مسار الويب المباشر لا يُفضَّل؛ استخدم API التنزيل.
  */
