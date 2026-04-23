@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Orange - continuity
 
-**قبل أي تنفيذ (أدوات، تعديل، أوامر، commit):** اطلع **إلزامياً** على **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** و **`IBRAHIM_ORANGE_MASTER.txt`** و **`.cursor/rules/orange-session-handoff.mdc`** و **`docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt`**. ثم تابع القائمة أدناه حسب النطاق.
+**قبل أي تنفيذ (أدوات، تعديل، أوامر، commit):** اطلع **إلزامياً** على **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** و **`IBRAHIM_ORANGE_MASTER.txt`** و **`.cursor/rules/orange-session-handoff.mdc`** و **`docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt`**. ثم اطلع **إلزامياً** — **قراءة فعلية كاملة** — على **جميع** بنود قائمة الاستمرارية أدناه (**0–6** و**5b**)، أي افتح كل ملف مذكور واقرأ محتواه (ولا يكفي تلخيص سياق الدردشة أو تخطّي بنود). **الاستثناء الوحيد:** إن **حدّد المالك صراحةً** في الرسالة نفسها أن ملفاً مُعيّناً خارج النطاق أو غير مطلوب لهذه المهمة — وإلا فالقائمة **كاملة** ملزمة. مسجّل أرشيفياً في **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** (ملحق الغرض) و**`IBRAHIM_ORANGE_MASTER.txt`** (إلزام الوكلاء).
 
 **عند طلب المالك «كمّل العمل» (أو ما يعادله):** ابدأ من **إجابات المالك** في **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** — خاصة فقرات **«تنفيذ»** والأسئلة س1–س30 حيث تنطبق على المهمة — ثم **قارن بالكود** وأغلق الفجوات الظاهرة. **لا يكفي** الاكتفاء بتقرير أن Git نظيف دون هذه المراجعة.
 

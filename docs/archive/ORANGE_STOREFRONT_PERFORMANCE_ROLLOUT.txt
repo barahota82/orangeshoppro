@@ -19,7 +19,7 @@ ORANGE — أرشيف خطة أداء الواجهة وترحيل المخطط (
 --------------------------------------------------------------------
 1. **docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt** — سياسة الواجهة والقنوات (س25/س26، كود الدولة، السلة، التتبع، …).
 2. **IBRAHIM_ORANGE_MASTER.txt** — خاصة §2 (ensure_schema، migrations)، §4 (ترتيب SQL)، و§10 إن وُجد (ربط القنوات).
-3. **.cursor/rules/orange-session-handoff.mdc** و **orange-continuity.mdc** و **orange-php-utf8-workflow.mdc**.
+3. **.cursor/rules/orange-session-handoff.mdc** و **orange-continuity.mdc** (اطّلع **فعلياً** على **جميع** بنود القائمة فيه: **0–6** و**5b** — إلزام مالك مسجّل في **ORANGE_STOREFRONT_POLICY_REFERENCE.txt**) و **orange-php-utf8-workflow.mdc**.
 4. **هذا الملف** — ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt.
 5. **`scripts/orange_db.sql`** — عند العمل على مخطط/جداول/ترحيل: لقطة «الحقيقة» (IBRAHIM §2أ)؛ راجع الأجزاء المعنية فقط؛ قد لا يُرفع في Git.
 6. **`docs/archive/ORANGE_AGENT_QA_REFERENCE.txt`** — أسئلة وأجوبة تشغيلية (وكلاء، نشر، مخطط القاعدة) عند الحاجة.
