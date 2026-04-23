@@ -105,6 +105,34 @@ function orange_ensure_products_upload_dir(): ?string
 }
 
 /**
+ * مسار URL تحت ‎/uploads/products/‎ لصورة منتج كما في قاعدة البيانات (اسم ملف في الجذر).
+ * إن وُجد ملف ‎{نفس_الاسم_بدون_امتداد}.webp‎ بجانب الملف الأصلي على القرص يُفضَّل WebP؛ وإلا يُعاد المسار للملف الأصلي.
+ *
+ * @return string مثل ‎/uploads/products/x.webp‎ أو ‎/uploads/products/x.jpg‎، أو ‎''‎ إن المدخل فارغ/غير صالح
+ */
+function storefront_product_image_web_path(?string $mainImageFromDb): string
+{
+    $raw = trim(str_replace('\\', '/', (string) $mainImageFromDb));
+    if ($raw === '') {
+        return '';
+    }
+    $base = basename($raw);
+    if ($base === '' || $base === '.' || $base === '..') {
+        return '';
+    }
+    $dir = orange_products_upload_dir();
+    $stem = pathinfo($base, PATHINFO_FILENAME);
+    if ($stem !== '' && $stem !== '.' && $stem !== '..') {
+        $webp = $stem . '.webp';
+        if (is_file($dir . DIRECTORY_SEPARATOR . $webp)) {
+            return '/uploads/products/' . rawurlencode($webp);
+        }
+    }
+
+    return '/uploads/products/' . rawurlencode($base);
+}
+
+/**
  * أرشيف مستندات الشركة (غير عام — التنزيل عبر سكربت يتحقق من الجلسة).
  * مسار الويب المباشر لا يُفضَّل؛ استخدم API التنزيل.
  */

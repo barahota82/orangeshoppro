@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/catalog_schema.php';
+require_once __DIR__ . '/../includes/upload_paths.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -47,9 +48,9 @@ $ORANGE_STOREFRONT_CANONICAL_URL = storefront_absolute_url(
 $ORANGE_STOREFRONT_OG_TYPE = 'product';
 $mainForOg = trim((string) ($product['main_image'] ?? ''));
 if ($mainForOg !== '') {
-    $fnOg = basename(str_replace('\\', '/', $mainForOg));
-    if ($fnOg !== '' && $fnOg !== '.' && $fnOg !== '..') {
-        $ORANGE_STOREFRONT_OG_IMAGE = storefront_absolute_url('/uploads/products/' . rawurlencode($fnOg));
+    $ogPath = storefront_product_image_web_path($mainForOg);
+    if ($ogPath !== '') {
+        $ORANGE_STOREFRONT_OG_IMAGE = storefront_absolute_url($ogPath);
     }
 }
 
@@ -121,14 +122,20 @@ foreach ($variants as $v) {
 $mainFile = trim((string)($product['main_image'] ?? ''));
 $galleryUrls = [];
 if ($mainFile !== '') {
-    $galleryUrls[] = '/uploads/products/' . $mainFile;
+    $uMain = storefront_product_image_web_path($mainFile);
+    if ($uMain !== '') {
+        $galleryUrls[] = $uMain;
+    }
 }
 foreach ($images as $img) {
     $rel = trim((string)($img['image_path'] ?? ''));
     if ($rel === '' || $rel === $mainFile) {
         continue;
     }
-    $galleryUrls[] = '/uploads/products/' . $rel;
+    $uExtra = storefront_product_image_web_path($rel);
+    if ($uExtra !== '') {
+        $galleryUrls[] = $uExtra;
+    }
 }
 $galleryCount = count($galleryUrls);
 $glPrevLabel = htmlspecialchars(t('product_gallery_prev'), ENT_QUOTES, 'UTF-8');
