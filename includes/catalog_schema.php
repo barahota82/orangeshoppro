@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 7);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 8);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -1692,12 +1692,24 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
                 gift_kind VARCHAR(16) NOT NULL DEFAULT 'choice',
                 fixed_variant_id INT UNSIGNED NULL DEFAULT NULL,
                 pool_variant_ids TEXT NULL,
+                gift_unit_charge_kind VARCHAR(24) NOT NULL DEFAULT 'free',
+                gift_unit_charge_value DECIMAL(18,4) NOT NULL DEFAULT 0,
                 sort_order INT NOT NULL DEFAULT 0,
                 is_active TINYINT(1) NOT NULL DEFAULT 1,
                 updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 KEY idx_cart_gift_promo_active_min (is_active, min_subtotal)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
+    }
+
+    if (orange_table_exists($pdo, 'cart_gift_promotions') && !orange_table_has_column($pdo, 'cart_gift_promotions', 'gift_unit_charge_kind')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            "ALTER TABLE cart_gift_promotions ADD COLUMN gift_unit_charge_kind VARCHAR(24) NOT NULL DEFAULT 'free'"
+        );
+    }
+    if (orange_table_exists($pdo, 'cart_gift_promotions') && !orange_table_has_column($pdo, 'cart_gift_promotions', 'gift_unit_charge_value')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE cart_gift_promotions ADD COLUMN gift_unit_charge_value DECIMAL(18,4) NOT NULL DEFAULT 0');
     }
 
     if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'cart_gift_promotion_id')) {

@@ -69,7 +69,8 @@ function orange_storefront_build_promotional_gift_lines(
             }
         }
         if ($pickVid > 0) {
-            $giftLine = orange_storefront_build_gift_order_line($pdo, $pickVid, $validatedItems, true);
+            $giftUnit = orange_cart_promo_resolve_gift_unit_price_from_rule($pdo, $giftRule, $pickVid);
+            $giftLine = orange_storefront_build_gift_order_line($pdo, $pickVid, $validatedItems, true, $giftUnit);
             $giftPromoId = $giftRule['id'];
             $giftVariantId = $pickVid;
         }

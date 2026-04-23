@@ -3,6 +3,53 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
+require_once __DIR__ . '/cart_promo_gift_charge.php';
+
+/**
+ * أعلى سعر وحدة ممكن لهدية ترويجية في معاينة العربة (هدية مجموع سلة أو BOGO).
+ *
+ * @param list<array{product:array<string,mixed>,qty:int,color:string,size:string,variant_id:int,price:float,cost:float}> $ctxValidatedItems
+ */
+function orange_cart_promo_preview_gift_max_unit_charge(PDO $pdo, array $rule, array $ctxValidatedItems): float
+{
+    $kind = strtolower(trim((string) ($rule['gift_unit_charge_kind'] ?? 'free')));
+    if ($kind === '' || $kind === 'free') {
+        return 0.0;
+    }
+    $gKind = strtolower(trim((string) ($rule['gift_kind'] ?? 'choice'))) === 'fixed' ? 'fixed' : 'choice';
+    if ($gKind === 'fixed') {
+        $fv = (int) ($rule['fixed_variant_id'] ?? 0);
+        if ($fv <= 0) {
+            return 0.0;
+        }
+        if (count(orange_cart_gift_promotion_pool_options($pdo, [$fv], $ctxValidatedItems, false)) === 0) {
+            return 0.0;
+        }
+
+        return orange_cart_promo_resolve_gift_unit_price_from_rule($pdo, $rule, $fv);
+    }
+    $pool = $rule['pool_variant_ids'] ?? [];
+    if (!is_array($pool) || count($pool) === 0) {
+        return 0.0;
+    }
+    $opts = orange_cart_gift_promotion_pool_options($pdo, $pool, $ctxValidatedItems, false);
+    if (count($opts) === 0) {
+        return 0.0;
+    }
+    $max = 0.0;
+    foreach ($opts as $opt) {
+        $vid = (int) ($opt['variant_id'] ?? 0);
+        if ($vid <= 0) {
+            continue;
+        }
+        $p = orange_cart_promo_resolve_gift_unit_price_from_rule($pdo, $rule, $vid);
+        if ($p > $max) {
+            $max = $p;
+        }
+    }
+
+    return $max;
+}
 
 /**
  * @return list<int>
@@ -36,7 +83,7 @@ function orange_cart_gift_promotions_admin_list(PDO $pdo): array
         return [];
     }
     $st = $pdo->query(
-        'SELECT id, min_subtotal, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids, sort_order, is_active
+        'SELECT id, min_subtotal, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids, gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active
          FROM cart_gift_promotions ORDER BY sort_order ASC, id ASC'
     );
     if (!$st) {
@@ -53,6 +100,8 @@ function orange_cart_gift_promotions_admin_list(PDO $pdo): array
             'gift_kind' => (string) ($row['gift_kind'] ?? 'choice'),
             'fixed_variant_id' => $fix > 0 ? $fix : null,
             'pool_variant_ids' => orange_cart_gift_parse_pool($row['pool_variant_ids'] ?? null),
+            'gift_unit_charge_kind' => (string) ($row['gift_unit_charge_kind'] ?? 'free'),
+            'gift_unit_charge_value' => (float) ($row['gift_unit_charge_value'] ?? 0),
             'sort_order' => (int) ($row['sort_order'] ?? 0),
             'is_active' => (int) ($row['is_active'] ?? 0),
         ];
@@ -72,7 +121,7 @@ function orange_cart_gift_promotion_select_rule(PDO $pdo, float $subtotal, bool 
         return null;
     }
     $st = $pdo->query(
-        "SELECT id, min_subtotal, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids
+        "SELECT id, min_subtotal, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids, gift_unit_charge_kind, gift_unit_charge_value
          FROM cart_gift_promotions
          WHERE is_active = 1
          ORDER BY min_subtotal DESC, id DESC"
@@ -99,11 +148,18 @@ function orange_cart_gift_promotion_select_rule(PDO $pdo, float $subtotal, bool 
             continue;
         }
 
+        $gcKind = strtolower(trim((string) ($row['gift_unit_charge_kind'] ?? 'free')));
+        if (!in_array($gcKind, ['free', 'percent_off', 'fixed_unit', 'amount_off_unit'], true)) {
+            $gcKind = 'free';
+        }
+
         return [
             'id' => (int) $row['id'],
             'gift_kind' => $kind,
             'fixed_variant_id' => $fixed > 0 ? $fixed : null,
             'pool_variant_ids' => $pool,
+            'gift_unit_charge_kind' => $gcKind,
+            'gift_unit_charge_value' => (float) ($row['gift_unit_charge_value'] ?? 0),
         ];
     }
 
