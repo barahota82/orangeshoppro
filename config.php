@@ -896,6 +896,10 @@ function storefront_current_page_kind(): string {
  * @return array{channel: array<string, mixed>, lang: string, channelSlug: string, pageKind: 'home'|'cart'|'track'|'product'|'register'|'verify_email', storefrontExtra: array, langOpts: array, currentLangLabel: string}
  */
 function storefront_toolbar_state(): array {
+    static $memo = null;
+    if ($memo !== null) {
+        return $memo;
+    }
     $lang = current_lang();
     $slug = current_channel_slug();
     $channel = get_channel_by_slug($slug);
@@ -922,7 +926,7 @@ function storefront_toolbar_state(): array {
     $langOpts = storefront_lang_options();
     $currentLangLabel = (string)($langOpts[$lang]['label'] ?? $lang);
 
-    return [
+    $memo = [
         'channel' => $channel,
         'lang' => $lang,
         'channelSlug' => $channelSlug,
@@ -931,6 +935,8 @@ function storefront_toolbar_state(): array {
         'langOpts' => $langOpts,
         'currentLangLabel' => $currentLangLabel,
     ];
+
+    return $memo;
 }
 
 /** wa.me link for channel WhatsApp (digits only). */

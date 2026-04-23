@@ -153,6 +153,10 @@ function orange_storefront_header_tagline_row_lang_cycle(array $row): array
  */
 function orange_storefront_header_tagline_cycle_resolved(PDO $pdo): array
 {
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
     $out = [];
     try {
         if (orange_table_exists($pdo, 'storefront_copy_lines')) {
@@ -192,8 +196,12 @@ function orange_storefront_header_tagline_cycle_resolved(PDO $pdo): array
     }
 
     if ($out === []) {
-        return ['', ''];
+        $cached = ['', ''];
+
+        return $cached;
     }
 
-    return orange_storefront_copy_pad_rotation($out);
+    $cached = orange_storefront_copy_pad_rotation($out);
+
+    return $cached;
 }
