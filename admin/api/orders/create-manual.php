@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/order_helpers.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/order_fulfillment.php';
+require_once __DIR__ . '/../../../includes/phone_validation.php';
 require_admin_api();
 
 try {
@@ -14,6 +15,14 @@ try {
     $data = get_json_input();
 
     require_fields($data, ['customer_name', 'phone', 'channel_id', 'items']);
+    $phoneRawIn = trim((string) ($data['phone'] ?? ''));
+    $phoneNorm = orange_normalize_customer_phone($phoneRawIn, null);
+    if ($phoneNorm === null) {
+        json_response([
+            'success' => false,
+            'message' => 'رقم الهاتف غير صالح. استخدم + أو 00 مع كود الدولة، أو أدخل رقماً وطنياً صالحاً (مثلاً جوال كويت 8 أرقام).',
+        ], 422);
+    }
     if (!is_array($data['items']) || count($data['items']) === 0) {
         json_response(['success' => false, 'message' => 'أضف سطرًا واحدًا على الأقل من المنتجات المسجّلة'], 422);
     }
@@ -116,7 +125,7 @@ try {
     $params = [
         $orderNumber,
         trim((string)$data['customer_name']),
-        trim((string)$data['phone']),
+        $phoneNorm,
         trim((string)($data['area'] ?? '')),
         trim((string)($data['address'] ?? '')),
         trim((string)($data['notes'] ?? '')),
