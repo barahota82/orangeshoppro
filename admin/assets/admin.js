@@ -130,6 +130,42 @@ function postJSON(url, payload) {
         }));
 }
 
+function getJSON(url) {
+    return fetch(url, {
+        method: 'GET',
+        credentials: 'same-origin'
+    })
+        .then(async (r) => {
+            const text = await r.text();
+            const parsed = parseResponseJson(text);
+            if (parsed.ok) {
+                return parsed.data;
+            }
+            const status = r.status;
+            let msg;
+            if (parsed.reason === 'empty') {
+                msg =
+                    'رد السيرفر فارغ (HTTP ' +
+                    status +
+                    '). غالباً: مسار الملف غلط، أو PHP يتوقف قبل إرسال JSON، أو خطأ قاتل في السيرفر.';
+            } else {
+                msg =
+                    'السيرفر لم يرد بـ JSON صالح (HTTP ' +
+                    status +
+                    '). غالباً: تحذير/خطأ PHP يظهر قبل JSON، أو مسافات/BOM قبل <?php في ملف الـ API، أو الملف محفوظ UTF-16.';
+                const hint = readableSnippet(parsed.raw, 100);
+                if (hint.length >= 10) {
+                    msg += ' — مقتطف مقروء: ' + hint;
+                }
+            }
+            return { success: false, message: msg };
+        })
+        .catch((e) => ({
+            success: false,
+            message: e.message || 'تعذر الاتصال بالخادم'
+        }));
+}
+
 /**
  * فشل API مع suggest_admin: يعرض confirm واختياري الانتقال لشاشة الإدارة.
  * @param {object} r ناتج JSON (يجب أن يحتوي success === false)
