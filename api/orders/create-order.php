@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/phone_validation.php';
 require_once __DIR__ . '/../../includes/storefront_account.php';
 require_once __DIR__ . '/../../includes/delivery_areas.php';
+require_once __DIR__ . '/../../includes/upload_paths.php';
 
 try {
     $pdo = db();
@@ -144,7 +145,7 @@ try {
         'code' => 'checkout_busy',
         'message' => t('checkout_queue_busy'),
         'intake_token' => $publicToken,
-        'intake_status_url' => '/api/orders/intake-status.php?token=' . rawurlencode($publicToken),
+        'intake_status_url' => storefront_public_path('/api/orders/intake-status.php?token=' . rawurlencode($publicToken)),
     ], 503);
 } catch (Throwable $e) {
     api_error($e, t('checkout_failed_generic'));
