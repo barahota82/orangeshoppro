@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Orange - continuity
 
-**قبل أي تنفيذ (أدوات، تعديل، أوامر، commit):** اطلع **إلزامياً** على **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** و **`IBRAHIM_ORANGE_MASTER.txt`** و **`.cursor/rules/orange-session-handoff.mdc`** و **`docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt`**. ثم اطلع **إلزامياً** — **قراءة فعلية كاملة** — على **جميع** بنود قائمة الاستمرارية أدناه (**0–6** و**5b**)، أي افتح كل ملف مذكور واقرأ محتواه (ولا يكفي تلخيص سياق الدردشة أو تخطّي بنود). **الاستثناء الوحيد:** إن **حدّد المالك صراحةً** في الرسالة نفسها أن ملفاً مُعيّناً خارج النطاق أو غير مطلوب لهذه المهمة — وإلا فالقائمة **كاملة** ملزمة. مسجّل أرشيفياً في **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** (ملحق الغرض) و**`IBRAHIM_ORANGE_MASTER.txt`** (إلزام الوكلاء).
+**قبل أي تنفيذ (أدوات، تعديل، أوامر، commit):** اطلع **إلزامياً** على **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** و **`IBRAHIM_ORANGE_MASTER.txt`** و **`.cursor/rules/orange-session-handoff.mdc`** و **`docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt`**. ثم اطلع **إلزامياً** — **قراءة فعلية كاملة** — على **جميع** بنود قائمة الاستمرارية أدناه (**0–8** و**5b**)، أي افتح كل ملف مذكور واقرأ محتواه (ولا يكفي تلخيص سياق الدردشة أو تخطّي بنود). **بعد القراءة:** **نطاق التنفيذ** هو ما يحدده المالك في الرسالة أو المهمة — لا تُنفَّذ كل مراحل خارطة الاستكمال دفعة واحدة إلا بتوجيه صريح؛ أما **ترتيب المراحل ومعايير الإنجاز** عند العمل في نطاق «استكمال المشروع» فمرجعها البند **8** أدناه. **الاستثناء الوحيد:** إن **حدّد المالك صراحةً** في الرسالة نفسها أن ملفاً مُعيّناً خارج النطاق أو غير مطلوب لهذه المهمة — وإلا فالقائمة **كاملة** ملزمة. مسجّل أرشيفياً في **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** (ملحق الغرض) و**`IBRAHIM_ORANGE_MASTER.txt`** (إلزام الوكلاء).
 
 **عند طلب المالك «كمّل العمل» (أو ما يعادله):** ابدأ من **إجابات المالك** في **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** — خاصة فقرات **«تنفيذ»** والأسئلة س1–س30 حيث تنطبق على المهمة — ثم **قارن بالكود** وأغلق الفجوات الظاهرة. **لا يكفي** الاكتفاء بتقرير أن Git نظيف دون هذه المراجعة.
 
@@ -20,6 +20,8 @@ When resuming Orange work, read:
 5. **`docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt`** — أداء الواجهة، ترحيل المخطط على مسار المتجر، مخاطر وتراجع (مرتبط بقراءة session-handoff).
 5b. **`docs/archive/ORANGE_AGENT_QA_REFERENCE.txt`** — أسئلة وأجوبة تشغيلية (وكلاء، نشر، مخطط القاعدة) عند الحاجة.
 6. **`docs/archive/ORANGE_PROJECT_CONTINUITY.txt`** - project status, path, agreements.
+7. **`docs/archive/ORANGE_TECH_REFERENCE.txt`** — مرجع تقني ثابت للاستضافة والستاك (بحث/تثبيت سريع؛ لا يغني عن CONTINUITY وIBRAHIM).
+8. **`docs/archive/ORANGE_PROJECT_COMPLETION_ROADMAP.txt`** — خارطة طريق موحّدة **لاستكمال المشروع**: ترتيب المراحل، معايير الإنجاز، والإحالة للسياسات التفصيلية؛ **بعد قراءتها** يُحدَّد ما يُنفَّذ منها حسب **نطاق** المهمة لا إغراق الجلسة بكل المراحل دون توجيه.
 
 **Local path (agents):** Canonical clone is **`D:\orange`** (IBRAHIM plus `ORANGE_PROJECT_CONTINUITY.txt` section 8). Do **not** mirror the repo to another folder or change workspace path unless the **owner explicitly asks**. Work only inside the folder the user opened in Cursor.
 

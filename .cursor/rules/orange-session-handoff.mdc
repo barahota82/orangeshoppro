@@ -16,7 +16,7 @@ alwaysApply: true
 5. **`scripts/orange_db.sql`** — عند أي عمل يمس **مخطط الإنتاج** أو **جداول** أو **ترحيلاً** (IBRAHIM §2أ): راجع **الأجزاء ذات الصلة** محلياً؛ الملف لقطة «الحقيقة» وقد لا يُرفع في Git. إن غاب الملف على الجهاز، اذكر ذلك للمالك ولا تفترض المخطط من Git وحدَه.
 6. **`docs/archive/ORANGE_AGENT_QA_REFERENCE.txt`** — عند الحاجة: أسئلة وأجوبة تشغيلية مختصرة (وكلاء، نشر، ترحيل، `orange_db.sql`)؛ لا تغني عن المراجع التفصيلية أعلاه.
 
-بعدها التزم بـ **`orange-continuity.mdc`**: **قراءة كاملة** لقائمة الاستمرارية فيه (**البنود 0–6 و5b**، كل ملف فعلياً) — **ليس** الاكتفاء بعبارة «حسب النطاق» — إلا إن **استثنى المالك ملفاً صراحةً** في طلبه؛ ثم **`orange-php-utf8-workflow.mdc`** وباقي القواعد. (مسجّل أرشيفياً كإلزام مالك.)
+بعدها التزم بـ **`orange-continuity.mdc`**: **قراءة كاملة** لقائمة الاستمرارية فيه (**البنود 0–8 و5b**، بما فيها **ORANGE_TECH_REFERENCE** و**ORANGE_PROJECT_COMPLETION_ROADMAP**، كل ملف فعلياً) — ثم **نطاق التنفيذ** كما في رسالة المالك (الخارطة لا تُنفَّذ كاملةً دفعة واحدة دون توجيه) — **ليس** الاكتفاء بملخص الدردشة — إلا إن **استثنى المالك ملفاً صراحةً** في طلبه؛ ثم **`orange-php-utf8-workflow.mdc`** وباقي القواعد. (مسجّل أرشيفياً كإلزام مالك.)
 
 ## عند طلب المالك «إضافة للأرشيف» (نطاق ضيق)
 
@@ -33,7 +33,7 @@ alwaysApply: true
 
 ## عند بداية جلسة (وكيل جديد أو بلا سياق دردشة سابقة)
 
-نفّذ قسم **«قبل أي تنفيذ»** أعلاه أولاً؛ ثم نفّذ **قراءة كاملة** لقائمة **`orange-continuity.mdc`** (**0–6** و**5b**) — انظر **`orange-continuity.mdc`** نفسه و**ORANGE_STOREFRONT_POLICY_REFERENCE.txt** (ملحق الغرض).
+نفّذ قسم **«قبل أي تنفيذ»** أعلاه أولاً؛ ثم نفّذ **قراءة كاملة** لقائمة **`orange-continuity.mdc`** (**0–8** و**5b**) — انظر **`orange-continuity.mdc`** نفسه و**ORANGE_STOREFRONT_POLICY_REFERENCE.txt** (ملحق الغرض).
 
 ## عند انتهاء **عمل تنفيذي** (تعديل ملفات، أوامر، commit، أو إغلاق مهمة متعددة الخطوات)
 
@@ -41,7 +41,7 @@ alwaysApply: true
 
 1. الجملة الصريحة: **`تم انتهاء الجلسة التنفيذية.`**
 2. تذكير للمالك: **المحادثة التالية قد تكون مع وكيل آخر دون سياق هذه الدردشة.**
-3. تذكير: الوكيل التالي **إلزامياً** يطلع قبل أي تنفيذ على **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** و **`IBRAHIM_ORANGE_MASTER.txt`** و **`.cursor/rules/orange-session-handoff.mdc`** و **`docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt`**؛ وعند نطاق مخطط/ترحيل: **`scripts/orange_db.sql`** محلياً إن وُجد؛ وعند الحاجة **`docs/archive/ORANGE_AGENT_QA_REFERENCE.txt`**؛ ثم **قراءة كاملة** لقائمة **`orange-continuity.mdc`** (**0–6** و**5b**) كما في الأرشيف — إلا إن **استثنى المالك** صراحةً.
+3. تذكير: الوكيل التالي **إلزامياً** يطلع قبل أي تنفيذ على **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** و **`IBRAHIM_ORANGE_MASTER.txt`** و **`.cursor/rules/orange-session-handoff.mdc`** و **`docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt`**؛ وعند نطاق مخطط/ترحيل: **`scripts/orange_db.sql`** محلياً إن وُجد؛ وعند الحاجة **`docs/archive/ORANGE_AGENT_QA_REFERENCE.txt`**؛ ثم **قراءة كاملة** لقائمة **`orange-continuity.mdc`** (**0–8** و**5b**) كما في الأرشيف — إلا إن **استثنى المالك** صراحةً.
 
 **لا تُغلق مهمة تنفيذية** (بعد أدوات أو تغييرات في المشروع) **دون هذه الفقرة**.
 
