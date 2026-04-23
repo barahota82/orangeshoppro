@@ -9,6 +9,7 @@ alwaysApply: true
 
 **عند طلب المالك «كمّل العمل» (أو ما يعادله):** ابدأ من **إجابات المالك** في **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** — خاصة فقرات **«تنفيذ»** والأسئلة س1–س30 حيث تنطبق على المهمة — ثم **قارن بالكود** وأغلق الفجوات الظاهرة. **لا يكفي** الاكتفاء بتقرير أن Git نظيف دون هذه المراجعة.
 
+
 When resuming Orange work, read:
 
 0. **`IBRAHIM_ORANGE_MASTER.txt`** (repo root) - unified entry (Ibrahim handoff): doc precedence, encoding/deploy summary, paths. **DB schema truth for review:** `D:\orange\scripts\orange_db.sql` (local mysqldump; IBRAHIM section 2).
@@ -24,4 +25,4 @@ When resuming Orange work, read:
 
 Do not claim "no chat context" without reading these files first.
 
-**Session end (owner visibility):** follow **`orange-session-handoff.mdc`** — after substantive work, notify the owner explicitly so they know a new agent may start without this chat's context.
+**Session end (owner visibility):** follow **`orange-session-handoff.mdc`** — after substantive work, notify the owner explicitly so they know a new agent may start without this chat’s context.
