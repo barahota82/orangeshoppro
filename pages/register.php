@@ -131,12 +131,32 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                 </div>
                 <p id="orangeRegisterMsg" class="track-signup-cta__feedback" style="margin-top: 0.75rem;" hidden></p>
                 <div class="track-signup-cta__actions">
-                    <button type="submit" class="btn track-signup-cta__btn"><?php echo htmlspecialchars(t('storefront_register_submit'), ENT_QUOTES, 'UTF-8'); ?></button>
+                    <button type="submit" class="btn track-signup-cta__btn" id="orangeRegisterSubmitBtn"><?php echo htmlspecialchars(t('storefront_register_submit'), ENT_QUOTES, 'UTF-8'); ?></button>
                 </div>
             </form>
+            <div id="orangeRegisterMergePanel" class="card-box register-merge-panel" hidden style="margin-top: 1rem; text-align: start;">
+                <p class="track-signup-cta__title" style="margin-top: 0;"><?php echo htmlspecialchars(t('storefront_register_title'), ENT_QUOTES, 'UTF-8'); ?></p>
+                <p id="orangeRegisterMergeIntro" class="track-signup-cta__text" style="margin-bottom: 0.75rem;"></p>
+                <p class="cart-checkout-intro" style="margin: 0 0 0.25rem; font-weight: 600;"><?php echo htmlspecialchars(t('storefront_register_phone_merge_masked_label'), ENT_QUOTES, 'UTF-8'); ?></p>
+                <p id="orangeRegisterMergeMasked" dir="ltr" style="margin: 0 0 0.75rem;"></p>
+                <p class="cart-checkout-intro" style="margin: 0 0 0.25rem;"><?php echo htmlspecialchars(t('storefront_register_phone_merge_steps'), ENT_QUOTES, 'UTF-8'); ?></p>
+                <p style="margin: 0.75rem 0 0.35rem; font-weight: 600;"><?php echo htmlspecialchars(t('storefront_register_phone_merge_token_label'), ENT_QUOTES, 'UTF-8'); ?></p>
+                <code id="orangeRegisterMergeToken" dir="ltr" style="display: inline-block; padding: 0.35rem 0.5rem; background: var(--card-bg, #f8fafc); border-radius: 6px; word-break: break-all;"></code>
+                <div class="track-signup-cta__actions" style="margin-top: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <a class="btn track-signup-cta__btn" id="orangeRegisterMergeWa" href="#" target="_blank" rel="noopener noreferrer"><?php echo htmlspecialchars(t('storefront_register_phone_merge_wa_cta'), ENT_QUOTES, 'UTF-8'); ?></a>
+                    <button type="button" class="btn btn-secondary" id="orangeRegisterMergeCopyToken"><?php echo htmlspecialchars(t('track_share_reference_copy'), ENT_QUOTES, 'UTF-8'); ?></button>
+                </div>
+                <button type="button" class="btn track-signup-cta__btn" id="orangeRegisterMergeApplyBtn" style="margin-top: 1rem;"><?php echo htmlspecialchars(t('storefront_register_phone_merge_apply_btn'), ENT_QUOTES, 'UTF-8'); ?></button>
+                <p id="orangeRegisterMergeApplyMsg" class="track-signup-cta__feedback" style="margin-top: 0.75rem;" hidden></p>
+            </div>
             </div>
             <script>
             window.ORANGE_DELIVERY_AREAS = <?php echo json_encode($registerDeliveryAreas, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+            window.ORANGE_REGISTER_MERGE_T = <?php echo json_encode([
+                'intro' => t('storefront_register_phone_merge_intro'),
+                'apply_err' => t('storefront_merge_apply_err'),
+                'copy_ok' => t('track_share_reference_copied'),
+            ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
             (function () {
                 document.addEventListener('DOMContentLoaded', function () {
                     if (
@@ -148,6 +168,16 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                     }
                     var form = document.getElementById('orangeRegisterForm');
                     var msg = document.getElementById('orangeRegisterMsg');
+                    var mergePanel = document.getElementById('orangeRegisterMergePanel');
+                    var mergeIntro = document.getElementById('orangeRegisterMergeIntro');
+                    var mergeMasked = document.getElementById('orangeRegisterMergeMasked');
+                    var mergeTokEl = document.getElementById('orangeRegisterMergeToken');
+                    var mergeWa = document.getElementById('orangeRegisterMergeWa');
+                    var mergeCopyBtn = document.getElementById('orangeRegisterMergeCopyToken');
+                    var mergeApplyBtn = document.getElementById('orangeRegisterMergeApplyBtn');
+                    var mergeApplyMsg = document.getElementById('orangeRegisterMergeApplyMsg');
+                    var submitBtn = document.getElementById('orangeRegisterSubmitBtn');
+                    var mergeT = window.ORANGE_REGISTER_MERGE_T || {};
                     if (!form || !msg) return;
                 var sent = <?php echo json_encode(t('storefront_register_sent'), JSON_UNESCAPED_UNICODE); ?>;
                 var cooldown = <?php echo json_encode(t('storefront_register_cooldown'), JSON_UNESCAPED_UNICODE); ?>;
@@ -156,6 +186,69 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                 var reqMsg = (window.APP_T && window.APP_T.checkout_required_fields) || '';
                 var badEmail = (window.APP_T && window.APP_T.checkout_invalid_email) || '';
                 var badPhone = (window.APP_T && window.APP_T.checkout_invalid_phone) || '';
+                var __mergeToken = '';
+                function mergeApplyUrl() {
+                    var base = typeof window.STOREFRONT_BASE === 'string' ? window.STOREFRONT_BASE : '';
+                    var u =
+                        typeof storefrontApiUrl === 'function'
+                            ? storefrontApiUrl('/api/auth/apply-phone-merge.php')
+                            : String(base || '').replace(/\/+$/, '') + '/api/auth/apply-phone-merge.php';
+                    var L =
+                        typeof window.APP_LANG === 'string' ? window.APP_LANG.trim().toLowerCase() : '';
+                    if (L && ['en', 'ar', 'fil', 'hi'].indexOf(L) !== -1) {
+                        u += (u.indexOf('?') === -1 ? '?' : '&') + 'lang=' + encodeURIComponent(L);
+                    }
+                    return u;
+                }
+                if (mergeCopyBtn && mergeTokEl) {
+                    mergeCopyBtn.addEventListener('click', function () {
+                        var t = mergeTokEl.textContent || '';
+                        if (!t) return;
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(t).then(function () {
+                                mergeCopyBtn.textContent = mergeT.copy_ok || '';
+                                setTimeout(function () {
+                                    mergeCopyBtn.textContent = <?php echo json_encode(t('track_share_reference_copy'), JSON_UNESCAPED_UNICODE); ?>;
+                                }, 1600);
+                            });
+                        }
+                    });
+                }
+                if (mergeApplyBtn) {
+                    mergeApplyBtn.addEventListener('click', function () {
+                        if (!mergeApplyMsg) return;
+                        mergeApplyMsg.hidden = false;
+                        mergeApplyMsg.textContent = '';
+                        var em = (document.getElementById('reg_email') || {}).value.trim() || '';
+                        if (!__mergeToken || !em) {
+                            mergeApplyMsg.textContent = reqMsg;
+                            return;
+                        }
+                        fetch(mergeApplyUrl(), {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ merge_token: __mergeToken, email: em, lang: typeof window.APP_LANG === 'string' ? window.APP_LANG : 'en' })
+                        })
+                            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+                            .then(function (x) {
+                                if (x.ok && x.j && x.j.success) {
+                                    mergeApplyMsg.textContent = x.j.message || '';
+                                    if (mergePanel) mergePanel.hidden = true;
+                                    if (form) form.reset();
+                                    if (submitBtn) submitBtn.disabled = false;
+                                    __mergeToken = '';
+                                    return;
+                                }
+                                mergeApplyMsg.textContent =
+                                    typeof window.orangeStorefrontRegisterApiError === 'function'
+                                        ? window.orangeStorefrontRegisterApiError(x.j, mergeT.apply_err || '')
+                                        : mergeT.apply_err || '';
+                            })
+                            .catch(function () {
+                                mergeApplyMsg.textContent = (window.APP_T && window.APP_T.api_request_failed) || mergeT.apply_err || '';
+                            });
+                    });
+                }
                 form.addEventListener('submit', function (e) {
                     e.preventDefault();
                     msg.hidden = false;
@@ -251,6 +344,39 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                         })
                     }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
                     .then(function (x) {
+                        if (mergePanel) mergePanel.hidden = true;
+                        if (mergeApplyMsg) {
+                            mergeApplyMsg.hidden = true;
+                            mergeApplyMsg.textContent = '';
+                        }
+                        __mergeToken = '';
+                        if (submitBtn) submitBtn.disabled = false;
+                        if (x.ok && x.j && x.j.merge_required) {
+                            msg.hidden = false;
+                            msg.textContent = String((x.j && x.j.message) || mergeT.intro || '');
+                            if (mergePanel && mergeIntro && mergeMasked && mergeTokEl && mergeWa) {
+                                mergeIntro.textContent = mergeT.intro || '';
+                                mergeMasked.textContent = String((x.j && x.j.existing_email_masked) || '');
+                                var mt = String((x.j && x.j.merge_token) || '');
+                                __mergeToken = mt;
+                                mergeTokEl.textContent = mt;
+                                var wh = String((x.j && x.j.whatsapp_href) || '');
+                                mergeWa.setAttribute('href', wh || '#');
+                                if (!wh) mergeWa.setAttribute('aria-disabled', 'true');
+                                mergePanel.hidden = false;
+                                if (submitBtn) submitBtn.disabled = true;
+                            }
+                            if (x.j.channel && /^[a-z0-9\-]+$/i.test(String(x.j.channel))) {
+                                try {
+                                    if (typeof window.orangeSfPersistChannel === 'function') {
+                                        window.orangeSfPersistChannel(String(x.j.channel).toLowerCase());
+                                    } else {
+                                        localStorage.setItem('orange_storefront_channel', String(x.j.channel).toLowerCase());
+                                    }
+                                } catch (e1) {}
+                            }
+                            return;
+                        }
                         if (x.ok && x.j && x.j.success) {
                             if (x.j.channel && /^[a-z0-9\-]+$/i.test(String(x.j.channel))) {
                                 try {

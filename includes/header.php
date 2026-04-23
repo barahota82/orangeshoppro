@@ -350,7 +350,11 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
             cart_account_auth_required: <?php echo json_encode(t('cart_account_auth_required'), JSON_UNESCAPED_UNICODE); ?>,
             cart_guest_orders_empty: <?php echo json_encode(t('cart_guest_orders_empty'), JSON_UNESCAPED_UNICODE); ?>,
             cart_register_promo_teaser: <?php echo json_encode(t('cart_register_promo_teaser'), JSON_UNESCAPED_UNICODE); ?>,
-            cart_register_promo_teaser_action: <?php echo json_encode(t('cart_register_promo_teaser_action'), JSON_UNESCAPED_UNICODE); ?>
+            cart_register_promo_teaser_action: <?php echo json_encode(t('cart_register_promo_teaser_action'), JSON_UNESCAPED_UNICODE); ?>,
+            storefront_merge_wa_not_confirmed: <?php echo json_encode(t('storefront_merge_wa_not_confirmed'), JSON_UNESCAPED_UNICODE); ?>,
+            storefront_merge_email_mismatch: <?php echo json_encode(t('storefront_merge_email_mismatch'), JSON_UNESCAPED_UNICODE); ?>,
+            storefront_merge_invalid_token: <?php echo json_encode(t('storefront_merge_invalid_token'), JSON_UNESCAPED_UNICODE); ?>,
+            storefront_merge_apply_err: <?php echo json_encode(t('storefront_merge_apply_err'), JSON_UNESCAPED_UNICODE); ?>
         };
         window.orangeStorefrontRegisterApiError = function (j, fallback) {
             if (typeof window.orangeCheckoutApiMessage === 'function') {

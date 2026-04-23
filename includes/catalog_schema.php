@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 1);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 2);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -1868,6 +1868,35 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         orange_catalog_safe_exec(
             $pdo,
             'ALTER TABLE storefront_accounts ADD COLUMN customer_notes TEXT NULL DEFAULT NULL'
+        );
+    }
+
+    if (!orange_table_exists($pdo, 'storefront_phone_merge_requests')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE storefront_phone_merge_requests (
+                id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                storefront_account_id INT UNSIGNED NOT NULL,
+                phone_normalized VARCHAR(64) NOT NULL,
+                proposed_email VARCHAR(255) NOT NULL,
+                proposed_channel_slug VARCHAR(32) NULL DEFAULT NULL,
+                proposed_name VARCHAR(255) NULL DEFAULT NULL,
+                proposed_delivery_area_id INT UNSIGNED NULL DEFAULT NULL,
+                proposed_area VARCHAR(255) NULL DEFAULT NULL,
+                proposed_address TEXT NULL DEFAULT NULL,
+                proposed_notes TEXT NULL DEFAULT NULL,
+                proposed_phone_country_dial VARCHAR(8) NULL DEFAULT NULL,
+                proposed_phone_national VARCHAR(32) NULL DEFAULT NULL,
+                merge_token_hash CHAR(64) NOT NULL,
+                wa_confirmed_at DATETIME NULL DEFAULT NULL,
+                expires_at DATETIME NOT NULL,
+                consumed_at DATETIME NULL DEFAULT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY idx_spmr_account (storefront_account_id),
+                KEY idx_spmr_phone (phone_normalized),
+                KEY idx_spmr_expires (expires_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
     }
 

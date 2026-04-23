@@ -68,6 +68,7 @@ function orange_admin_page_resource(string $page): string
         'logs' => 'reports',
         'company_settings' => 'settings',
         'storefront_hero' => 'settings',
+        'storefront_merge_requests' => 'settings',
         'delivery_areas' => 'settings',
         'cart_promotions' => 'settings',
         'channels' => 'settings',
@@ -110,6 +111,7 @@ function orange_admin_api_folder_resource(string $folder): string
         'company_documents' => 'settings',
         'delivery_areas' => 'settings',
         'cart_promotions' => 'settings',
+        'storefront' => 'settings',
         'admins' => 'admin_users',
     ];
 

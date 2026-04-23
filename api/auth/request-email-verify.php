@@ -184,6 +184,56 @@ try {
         $customerNotes = $notesRaw === '' ? '' : orange_storefront_clip_utf8($notesRaw, 4000);
     }
 
+    if (!$trackCtx) {
+        require_once __DIR__ . '/../../includes/storefront_phone_merge.php';
+        $dupAcc = orange_storefront_find_verified_account_by_phone($pdo, $customerPhone);
+        if ($dupAcc !== null && orange_table_exists($pdo, 'storefront_phone_merge_requests')) {
+            $dupEmailRaw = (string) ($dupAcc['email'] ?? '');
+            $dupEmail = orange_storefront_normalize_email($dupEmailRaw) ?? strtolower(trim($dupEmailRaw));
+            if ($dupEmail !== '' && strcasecmp($email, $dupEmail) !== 0) {
+                try {
+                    $mergeCreated = orange_storefront_create_phone_merge_request(
+                        $pdo,
+                        (int) ($dupAcc['id'] ?? 0),
+                        $customerPhone,
+                        $email,
+                        $channelSlug,
+                        $customerName,
+                        $customerDaId !== null && (int) $customerDaId > 0 ? (int) $customerDaId : null,
+                        $customerArea,
+                        $customerAddress,
+                        $customerNotes,
+                        $customerPhoneCountryDial,
+                        $customerPhoneNational
+                    );
+                } catch (Throwable $e) {
+                    if (function_exists('error_log')) {
+                        error_log('[orange] request-email-verify phone merge: ' . $e->getMessage());
+                    }
+                    json_response(['success' => false, 'code' => 'server_error', 'message' => t('api_request_failed')], 500);
+                }
+                $chRow = get_channel_by_slug($channelSlug);
+                $waTemplate = t('storefront_register_phone_merge_wa_body');
+                $waText = str_replace(
+                    ['{token}', '{email}', '{site}'],
+                    [$mergeCreated['plain_token'], $email, orange_site_public_origin()],
+                    $waTemplate
+                );
+                $waHref = is_array($chRow) ? storefront_whatsapp_href($chRow, $waText) : null;
+                json_response([
+                    'success' => true,
+                    'merge_required' => true,
+                    'merge_token' => $mergeCreated['plain_token'],
+                    'merge_request_id' => $mergeCreated['id'],
+                    'whatsapp_href' => $waHref,
+                    'existing_email_masked' => orange_storefront_mask_email_for_display((string) ($dupAcc['email'] ?? '')),
+                    'message' => t('storefront_register_phone_merge_intro'),
+                    'channel' => $channelSlug,
+                ]);
+            }
+        }
+    }
+
     $st = $pdo->prepare(
         'SELECT id, email_verified_at, verify_email_sent_at, registered_channel_slug FROM storefront_accounts WHERE email = ? LIMIT 1'
     );

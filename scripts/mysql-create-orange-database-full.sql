@@ -708,6 +708,30 @@ CREATE TABLE `storefront_accounts` (
   KEY `idx_storefront_accounts_channel` (`registered_channel_slug`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE `storefront_phone_merge_requests` (
+  `id` int UNSIGNED NOT NULL AUTO_INCREMENT,
+  `storefront_account_id` int UNSIGNED NOT NULL,
+  `phone_normalized` varchar(64) NOT NULL,
+  `proposed_email` varchar(255) NOT NULL,
+  `proposed_channel_slug` varchar(32) DEFAULT NULL,
+  `proposed_name` varchar(255) DEFAULT NULL,
+  `proposed_delivery_area_id` int UNSIGNED DEFAULT NULL,
+  `proposed_area` varchar(255) DEFAULT NULL,
+  `proposed_address` text,
+  `proposed_notes` text,
+  `proposed_phone_country_dial` varchar(8) DEFAULT NULL,
+  `proposed_phone_national` varchar(32) DEFAULT NULL,
+  `merge_token_hash` char(64) NOT NULL,
+  `wa_confirmed_at` datetime DEFAULT NULL,
+  `expires_at` datetime NOT NULL,
+  `consumed_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_spmr_account` (`storefront_account_id`),
+  KEY `idx_spmr_phone` (`phone_normalized`),
+  KEY `idx_spmr_expires` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `logs` (
   `id` int NOT NULL AUTO_INCREMENT,
   `type` varchar(50) DEFAULT NULL,

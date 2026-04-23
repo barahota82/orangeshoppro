@@ -1,7 +1,7 @@
 IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
 ============================================
 النسخة المعتمدة: جذر المستودع — IBRAHIM_ORANGE_MASTER.txt (مثلاً D:\orange)
-آخر تحديث: 2026-04-26 (إلزام الوكلاء: **ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt**؛ §10: س25/س26؛ س13 + بريد التتبع؛ س30 بنود الطلب الجزئي؛ س19 بريد الضيف؛ **س27** `get-order.php` POST فقط + مرجع نصي للمشاركة في `cart.js`؛ **تعريف كود الدولة (قائمة + رقم)** في أرشيف السياسات قسم «صفر»؛ س7؛ س28؛ س4)
+آخر تحديث: 2026-04-26 (إلزام الوكلاء: **ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt**؛ §10: س25/س26؛ س13 + بريد التتبع؛ س30 بنود الطلب الجزئي؛ س19 بريد الضيف؛ **س27** `get-order.php` POST فقط + مرجع نصي للمشاركة في `cart.js`؛ **تعريف كود الدولة (قائمة + رقم)** في أرشيف السياسات قسم «صفر»؛ س7؛ س28؛ س4؛ **س15** دمج هاتف التسجيل: `storefront_phone_merge.php` + `apply-phone-merge.php` + أدمن `storefront_merge_requests`)
 
 الغرض
 -------
@@ -176,6 +176,9 @@ IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
 - تحفيز التسجيل عبر العروض (س7): `includes/cart_promotions.php` (`orange_cart_promotion_register_incentive_teaser`)؛ استجابة `api/cart/checkout-preview.php` (`register_promo_teaser`)؛ عرض في `assets/js/cart.js` + `pages/cart.php` (`ORANGE_REGISTER_URL`).
 - نطاق العرض مسجّل/الكل (س4): شاشة `admin/pages/cart_promotions.php` — عمود «نطاق العرض»: «جميع الزوّار» أو «مسجّل فقط» (`requires_registered_account`).
 - الطلبات المحجوزة (س28): `admin/pages/reserved_orders.php`.
+- دمج هاتف التسجيل (س15 — صفحة register + تأكيد واتس يدوي): `includes/storefront_phone_merge.php`،
+  `api/auth/request-email-verify.php`، `api/auth/apply-phone-merge.php`، `admin/pages/storefront_merge_requests.php`،
+  جدول `storefront_phone_merge_requests` (يُنشأ عبر `orange_catalog_ensure_schema`).
 
 
 10) سياسات الواجهة والطلب أونلاين — مرجع إجابات المالك (إلزامي قبل التنفيذ)

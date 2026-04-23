@@ -256,6 +256,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
             $navSettings = [
                 ['page' => 'company_settings', 'href' => '/admin/index.php?page=company_settings', 'label' => 'بيانات الشركة', 'class' => '', 'sub' => false],
                 ['page' => 'storefront_hero', 'href' => '/admin/index.php?page=storefront_hero', 'label' => 'بانر الصفحة الرئيسية', 'class' => '', 'sub' => false],
+                ['page' => 'storefront_merge_requests', 'href' => '/admin/index.php?page=storefront_merge_requests', 'label' => 'دمج هاتف التسجيل (س15)', 'class' => '', 'sub' => false],
                 ['page' => 'delivery_areas', 'href' => '/admin/index.php?page=delivery_areas', 'label' => 'مناطق التوصيل', 'class' => '', 'sub' => false],
                 ['page' => 'cart_promotions', 'href' => '/admin/index.php?page=cart_promotions', 'label' => 'عروض مجموع السلة', 'class' => '', 'sub' => false],
                 ['page' => 'channels', 'href' => '/admin/index.php?page=channels', 'label' => 'قنوات العملاء', 'class' => '', 'sub' => false],

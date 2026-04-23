@@ -412,6 +412,18 @@ function orangeCheckoutApiMessage(result) {
     if (c === 'product_not_found' && T.product_not_found) {
         return T.product_not_found;
     }
+    if (c === 'merge_wa_not_confirmed' && T.storefront_merge_wa_not_confirmed) {
+        return T.storefront_merge_wa_not_confirmed;
+    }
+    if (c === 'merge_email_mismatch' && T.storefront_merge_email_mismatch) {
+        return T.storefront_merge_email_mismatch;
+    }
+    if (c === 'merge_invalid_token' && T.storefront_merge_invalid_token) {
+        return T.storefront_merge_invalid_token;
+    }
+    if (c === 'merge_failed' && T.storefront_merge_apply_err) {
+        return T.storefront_merge_apply_err;
+    }
     if (c === 'server_error') {
         if (result.message && String(result.message).trim() !== '') {
             return String(result.message);
