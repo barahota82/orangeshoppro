@@ -1631,6 +1631,74 @@ function orangeOrderLinesSubtotalPreferServer(order, itemRows) {
     return orangeOrderItemsLinesSum(itemRows);
 }
 
+function orangeHtmlTrackShareReferenceBlock(orderNumber) {
+    const T = window.APP_T || {};
+    const title = String(T.track_share_reference_title || '').trim();
+    const hint = String(T.track_share_reference_hint || '').trim();
+    const copyLbl = String(T.track_share_reference_copy || '').trim();
+    const code = String(orderNumber || '').trim();
+    if (!title || !code || !copyLbl) {
+        return '';
+    }
+    let html = '<div class="track-share-ref">';
+    html += '<p class="track-share-ref__title"><strong>' + orangeEscDomText(title) + '</strong></p>';
+    html += '<div class="track-share-ref__row">';
+    html += '<code class="track-share-ref__code" translate="no">' + orangeEscDomText(code) + '</code>';
+    html +=
+        '<button type="button" class="btn btn-secondary track-share-ref__copy" onclick="orangeCopyTrackShareCode(this)">' +
+        orangeEscDomText(copyLbl) +
+        '</button>';
+    html += '</div>';
+    if (hint) {
+        html += '<p class="track-share-ref__hint">' + orangeEscDomText(hint) + '</p>';
+    }
+    html += '</div>';
+    return html;
+}
+
+function orangeCopyTrackShareCode(btn) {
+    const wrap = btn && btn.closest ? btn.closest('.track-share-ref') : null;
+    const codeEl = wrap ? wrap.querySelector('.track-share-ref__code') : null;
+    const text = codeEl ? String(codeEl.textContent || '').trim() : '';
+    const T = window.APP_T || {};
+    const okMsg = String(T.track_share_reference_copied || '').trim() || 'OK';
+    if (!text) {
+        return;
+    }
+    const done = function () {
+        if (typeof window.orangeShowToast === 'function') {
+            window.orangeShowToast(okMsg, 2200);
+        }
+    };
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        navigator.clipboard.writeText(text).then(done).catch(function () {
+            try {
+                const r = document.createRange();
+                r.selectNodeContents(codeEl);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(r);
+                document.execCommand('copy');
+                sel.removeAllRanges();
+            } catch (e) {}
+            done();
+        });
+        return;
+    }
+    try {
+        const r = document.createRange();
+        r.selectNodeContents(codeEl);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(r);
+        document.execCommand('copy');
+        sel.removeAllRanges();
+    } catch (e2) {}
+    done();
+}
+
+window.orangeCopyTrackShareCode = orangeCopyTrackShareCode;
+
 function orangeHtmlOrderPromoParagraph(order, cur, paragraphClass) {
     const d = orangeOrderCartPromoDiscountAmount(order);
     if (d <= 1e-9) {
@@ -1680,6 +1748,7 @@ function orangeRenderTrackedOrderBox(resultBox, order, orderNumber, phoneTyped, 
     html += '<p class="order-status-row"><strong>' + orangeEscDomText(UI.status_label || '') + ':</strong> ';
     html += '<span class="order-status-pill order-status-pill--' + orangeEscDomText(st) + '">' + orangeEscDomText(statusText) + '</span></p>';
     html += '<p><strong>' + orangeEscDomText(lblOrder) + ':</strong> ' + orangeEscDomText(String(order.order_number || '')) + '</p>';
+    html += orangeHtmlTrackShareReferenceBlock(String(order.order_number || orderNumber || ''));
     if (order.phone) {
         html += '<p><strong>' + orangeEscDomText(lblPhone) + ':</strong> ' + orangeEscDomText(String(order.phone)) + '</p>';
     }
@@ -1880,6 +1949,7 @@ function orangeRenderTrackSignupSummary(el, order, orderNumber, phoneTyped, item
     html += '<span class="order-status-pill order-status-pill--' + orangeEscDomText(st) + '">' + orangeEscDomText(statusText) + '</span></p>';
     html += '<p class="track-signup-order-summary__line"><strong>' + orangeEscDomText(lblOrder) + ':</strong> ';
     html += orangeEscDomText(String(order.order_number || '')) + '</p>';
+    html += orangeHtmlTrackShareReferenceBlock(String(order.order_number || orderNumber || ''));
     if (order.phone) {
         html += '<p class="track-signup-order-summary__line"><strong>' + orangeEscDomText(lblPhone) + ':</strong> ';
         html += orangeEscDomText(String(order.phone)) + '</p>';
