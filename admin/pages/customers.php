@@ -261,6 +261,8 @@ function custSave() {
     var phone = document.getElementById('cust_phone').value.trim();
     var ccEl = custPhoneCountryEl();
     var phoneCountry = ccEl && ccEl.value ? String(ccEl.value).trim() : '';
+    var intlSel = ccEl && ccEl.tagName === 'SELECT' && phoneCountry === '__intl__';
+    var ccForNorm = intlSel ? null : phoneCountry && phoneCountry !== '__intl__' ? phoneCountry : null;
     var email = document.getElementById('cust_email').value.trim();
     var area = document.getElementById('cust_area').value.trim();
     var address = document.getElementById('cust_address').value.trim();
@@ -271,7 +273,7 @@ function custSave() {
         return;
     }
     if (window.orangeNormalizeCustomerPhone) {
-        var ok = window.orangeNormalizeCustomerPhone(phone, phoneCountry || null);
+        var ok = window.orangeNormalizeCustomerPhone(phone, ccForNorm, intlSel);
         if (!ok) {
             alert('رقم الهاتف غير صالح. استخدم + أو 00 مع كود الدولة، أو اختر الدولة وأدخل الرقم الوطني (8–14 رقماً مع الكود).');
             return;

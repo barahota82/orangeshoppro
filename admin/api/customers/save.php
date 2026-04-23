@@ -36,9 +36,10 @@ try {
     if ($phoneRaw === '') {
         json_response(['success' => false, 'message' => 'رقم الهاتف مطلوب كمعرّف للعميل'], 422);
     }
-    $admCc = trim((string) ($data['phone_country'] ?? ''));
-    $admCc = $admCc === '' ? null : $admCc;
-    $phone = orange_normalize_customer_phone($phoneRaw, $admCc);
+    $admCcRaw = trim((string) ($data['phone_country'] ?? ''));
+    $pcParsed = orange_storefront_parse_api_phone_country($admCcRaw);
+    $dialForNational = ($pcParsed['dial'] ?? '') !== '' ? $pcParsed['dial'] : null;
+    $phone = orange_normalize_customer_phone($phoneRaw, $dialForNational, $pcParsed['full_intl']);
     if ($phone === null) {
         json_response(['success' => false, 'message' => 'رقم الهاتف غير صالح. استخدم + أو 00 مع كود الدولة، أو اختر الدولة وأدخل الرقم الوطني (8–14 رقماً مع الكود).'], 422);
     }
