@@ -91,7 +91,7 @@ function orange_admin_orders_action_buttons(array $o): void
     $stNow = strtolower(trim((string) ($o['status'] ?? '')));
     $stJs = json_encode($stNow, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     $invoicePath = '/admin/index.php?page=invoice&order_id=' . $id;
-    $invoiceHref = htmlspecialchars($invoicePath, ENT_QUOTES, 'UTF-8');
+    $invoiceHref = htmlspecialchars(storefront_public_path($invoicePath), ENT_QUOTES, 'UTF-8');
 
     /* ترتيب التنفيذ: قبول → فاتورة → بالطريق → تم التوصيل → رفض — onclick بعلامات اقتباس مفردة حول السمة لتمرير json_encode بأمان */
     echo '<button type="button" onclick=\'updateOrderStatus(' . $id . ', "approved", ' . $stJs . ')\'>قبول</button>';
@@ -106,10 +106,10 @@ function orange_admin_orders_action_buttons(array $o): void
     <p class="page-subtitle">المخزن <strong>موحّد للشركة</strong> — الطلب من أي قناة يخصم نفس المخزون لتفادي البيع رغم النفاد. عمود «قناة العملاء» لتتبّع المصدر وتجميع العملاء (تيك توك، واتساب، …) وليس لمخزون منفصل.
         <?php
         if (orange_admin_may($admin, $pdo, 'sales', 'view')) {
-            echo ' — <a href="/admin/index.php?page=reserved_orders">طلبات محجوزة (مخزون)</a>';
+            echo ' — <a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=reserved_orders'), ENT_QUOTES, 'UTF-8') . '">طلبات محجوزة (مخزون)</a>';
         }
         if (orange_admin_may($admin, $pdo, 'sales', 'view') && orange_table_exists($pdo, 'order_intake_queue')) {
-            echo ' — <a href="/admin/index.php?page=order_intake_queue">طابور طلبات الموقع (قبل إنشاء الطلب)</a>';
+            echo ' — <a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=order_intake_queue'), ENT_QUOTES, 'UTF-8') . '">طابور طلبات الموقع (قبل إنشاء الطلب)</a>';
         }
         ?>
     </p>

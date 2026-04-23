@@ -44,7 +44,7 @@ function orange_reserved_orders_payment_badge(array $o): string
     <p class="page-subtitle">
         طلبات ما زال لها <strong>حجز مخزون نشط</strong> (حركات <code>pending_order</code>) حتى التسليم أو رفض/إلغاء يُطلق المخزون.
         لتحرير الحجز يدوياً: حدّث حالة الطلب من
-        <a href="/admin/index.php?page=orders">شاشة الطلبات</a>
+        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">شاشة الطلبات</a>
         (رفض/إلغاء) أو نفّذ التسليم حسب السياسة.
     </p>
 </div>
@@ -104,11 +104,11 @@ function orange_reserved_orders_payment_badge(array $o): string
                         <?php
                         $oid = (int) ($o['id'] ?? 0);
                         if ($oid > 0) {
-                            $invHref = '/admin/index.php?page=invoice&order_id=' . $oid;
+                            $invHref = storefront_public_path('/admin/index.php?page=invoice&order_id=' . $oid);
                             echo '<a class="btn btn-secondary" href="' . htmlspecialchars($invHref, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener">فاتورة</a> ';
                         }
                         ?>
-                        <a class="btn btn-secondary" href="/admin/index.php?page=orders">كل الطلبات</a>
+                        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">كل الطلبات</a>
                     </td>
                 </tr>
                 <?php endforeach; ?>

@@ -86,7 +86,7 @@ require_once __DIR__ . '/../../includes/storefront_hero.php';
         <button type="button" onclick="saveHeaderCopyLine()" <?php echo !$hasTable ? 'disabled' : ''; ?>><?php echo $headerEdit ? 'حفظ التعديلات' : 'إضافة جملة'; ?></button>
         <button type="button" class="btn btn-secondary" onclick="translateHeaderFromArabic()" <?php echo !$hasTable ? 'disabled' : ''; ?>>ترجمة من العربي</button>
         <?php if ($headerEdit): ?>
-            <a class="btn btn-secondary" href="/admin/index.php?page=storefront_hero">إلغاء التعديل</a>
+            <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=storefront_hero'), ENT_QUOTES, 'UTF-8'); ?>">إلغاء التعديل</a>
         <?php endif; ?>
     </div>
 </div>
@@ -121,7 +121,7 @@ require_once __DIR__ . '/../../includes/storefront_hero.php';
                     <td>
                         <button type="button" class="btn btn-secondary" style="font-size:0.85rem;padding:0.25rem 0.5rem;" onclick="toggleCopyLine('header_tagline', <?php echo (int) $row['id']; ?>, <?php echo (int) ($row['is_active'] ?? 0); ?>)"><?php echo (int) ($row['is_active'] ?? 0) === 1 ? 'إخفاء' : 'تفعيل'; ?></button>
                     </td>
-                    <td><a href="/admin/index.php?page=storefront_hero&amp;edit=<?php echo (int) $row['id']; ?>">تعديل</a></td>
+                    <td><a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=storefront_hero&edit=' . (int) $row['id']), ENT_QUOTES, 'UTF-8'); ?>">تعديل</a></td>
                     <td><button type="button" class="btn btn-secondary" style="font-size:0.85rem;padding:0.25rem 0.5rem;" onclick="deleteCopyLine('header_tagline', <?php echo (int) $row['id']; ?>)">حذف</button></td>
                 </tr>
                 <?php endforeach; ?>
@@ -162,7 +162,7 @@ require_once __DIR__ . '/../../includes/storefront_hero.php';
         <button type="button" onclick="saveHeroCopyLine()" <?php echo !$hasTable ? 'disabled' : ''; ?>><?php echo $heroEdit ? 'حفظ التعديلات' : 'إضافة جملة'; ?></button>
         <button type="button" class="btn btn-secondary" onclick="translateHeroFromArabic()" <?php echo !$hasTable ? 'disabled' : ''; ?>>ترجمة من العربي</button>
         <?php if ($heroEdit): ?>
-            <a class="btn btn-secondary" href="/admin/index.php?page=storefront_hero">إلغاء التعديل</a>
+            <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=storefront_hero'), ENT_QUOTES, 'UTF-8'); ?>">إلغاء التعديل</a>
         <?php endif; ?>
     </div>
 </div>
@@ -197,7 +197,7 @@ require_once __DIR__ . '/../../includes/storefront_hero.php';
                     <td>
                         <button type="button" class="btn btn-secondary" style="font-size:0.85rem;padding:0.25rem 0.5rem;" onclick="toggleCopyLine('home_hero', <?php echo (int) $row['id']; ?>, <?php echo (int) ($row['is_active'] ?? 0); ?>)"><?php echo (int) ($row['is_active'] ?? 0) === 1 ? 'إخفاء' : 'تفعيل'; ?></button>
                     </td>
-                    <td><a href="/admin/index.php?page=storefront_hero&amp;edit=<?php echo (int) $row['id']; ?>">تعديل</a></td>
+                    <td><a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=storefront_hero&edit=' . (int) $row['id']), ENT_QUOTES, 'UTF-8'); ?>">تعديل</a></td>
                     <td><button type="button" class="btn btn-secondary" style="font-size:0.85rem;padding:0.25rem 0.5rem;" onclick="deleteCopyLine('home_hero', <?php echo (int) $row['id']; ?>)">حذف</button></td>
                 </tr>
                 <?php endforeach; ?>

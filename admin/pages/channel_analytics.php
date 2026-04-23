@@ -120,8 +120,8 @@ foreach ($topRaw as $tr) {
     }
 }
 
-$channelsUrl = '/admin/index.php?page=channels';
-$ordersUrl = '/admin/index.php?page=orders';
+$channelsUrl = storefront_public_path('/admin/index.php?page=channels');
+$ordersUrl = storefront_public_path('/admin/index.php?page=orders');
 ?>
 <div class="page-title">
     <h1>تحليل القنوات</h1>
@@ -146,7 +146,7 @@ $ordersUrl = '/admin/index.php?page=orders';
         </div>
         <div class="actions" style="margin:0;">
             <button type="submit">تطبيق</button>
-            <a class="btn btn-secondary" href="/admin/index.php?page=channel_analytics">كل الفترات</a>
+            <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=channel_analytics'), ENT_QUOTES, 'UTF-8'); ?>">كل الفترات</a>
         </div>
     </form>
 </div>
@@ -225,6 +225,6 @@ $ordersUrl = '/admin/index.php?page=orders';
     <p>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars($channelsUrl, ENT_QUOTES, 'UTF-8'); ?>">إدارة القنوات</a>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars($ordersUrl, ENT_QUOTES, 'UTF-8'); ?>">الطلبات</a>
-        <a class="btn btn-secondary" href="/admin/index.php?page=reports">تقارير المبيعات العامة</a>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=reports'), ENT_QUOTES, 'UTF-8'); ?>">تقارير المبيعات العامة</a>
     </p>
 </div>

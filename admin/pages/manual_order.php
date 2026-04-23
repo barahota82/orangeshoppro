@@ -221,7 +221,7 @@ foreach ($products as $p) {
     <div class="actions admin-doc-lines-toolbar" style="margin-top:12px;">
         <button type="button" class="btn-secondary" id="mo_btn_addline" onclick="moAddLine()" <?php echo $products === [] ? 'disabled' : ''; ?>>+ سطر</button>
         <button type="button" id="mo_btn_save" onclick="moSubmit()" <?php echo $products === [] ? 'disabled' : ''; ?>>حفظ وتسجيل الفاتورة</button>
-        <a class="btn btn-secondary" href="/admin/index.php?page=orders">الطلبات</a>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">الطلبات</a>
     </div>
 </div>
 
@@ -783,7 +783,8 @@ function moSubmit() {
     }).then(function (res) {
         alert(res.message || (res.success ? 'تم' : 'فشل'));
         if (res.success && res.order_id) {
-            location.href = '/admin/index.php?page=invoice&order_id=' + encodeURIComponent(String(res.order_id));
+            var __pub = typeof window.ORANGE_PUBLIC_BASE_PATH === 'string' ? window.ORANGE_PUBLIC_BASE_PATH.replace(/\/+$/, '') : '';
+            location.href = __pub + '/admin/index.php?page=invoice&order_id=' + encodeURIComponent(String(res.order_id));
         }
     });
 }

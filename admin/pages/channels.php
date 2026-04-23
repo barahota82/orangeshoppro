@@ -24,7 +24,7 @@ $editIsActive = $editRow ? (int) ($editRow['is_active'] ?? 1) : 1;
 <div class="page-title">
     <h1>الواجهات (قنوات العملاء)</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;">كل قناة تمثّل واجهة أو مصدراً لتجميع <strong>العملاء وطلباتهم</strong>. المخزون والمبيعات المحاسبية <strong>للشركة موحّدة</strong> — الطلب من أي قناة يسحب من نفس المخزن الرئيسي.</p>
-    <p style="margin:0.6rem 0 0;"><a class="btn btn-secondary" href="/admin/index.php?page=channel_analytics">تحليل أداء القنوات (مبيعات، أكثر منتج، ترتيب النشاط)</a></p>
+    <p style="margin:0.6rem 0 0;"><a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=channel_analytics'), ENT_QUOTES, 'UTF-8'); ?>">تحليل أداء القنوات (مبيعات، أكثر منتج، ترتيب النشاط)</a></p>
     <p class="card-hint" style="margin:0.75rem 0 0;">روابط <strong>معاينة الواجهة</strong> تمرّ بصفحة أدمن ثم تفتح المتجر <strong>بدون إظهار سر في عنوان المتجر</strong> (جلسة معاينة ~15 دقيقة). اختياري: <code dir="ltr">ORANGE_STOREFRONT_PREVIEW_TOKEN</code> في <code dir="ltr">.env.php</code> لروابط قديمة بـ <code dir="ltr">?sf_preview=</code>.</p>
 </div>
 
@@ -66,7 +66,7 @@ $editIsActive = $editRow ? (int) ($editRow['is_active'] ?? 1) : 1;
     <div class="actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
         <button type="button" onclick="saveChannel()"><?php echo $editRow ? 'حفظ التعديلات' : 'حفظ الواجهة'; ?></button>
         <?php if ($editRow): ?>
-            <a class="btn btn-secondary" href="/admin/index.php?page=channels">إلغاء التعديل</a>
+            <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=channels'), ENT_QUOTES, 'UTF-8'); ?>">إلغاء التعديل</a>
         <?php endif; ?>
     </div>
 </div>
@@ -111,7 +111,7 @@ $editIsActive = $editRow ? (int) ($editRow['is_active'] ?? 1) : 1;
                     <td>
                         <button type="button" class="btn btn-secondary" style="font-size:0.85rem;padding:0.25rem 0.5rem;" onclick="toggleChannelActive(<?php echo (int) $ch['id']; ?>, <?php echo (int) $ch['is_active']; ?>)"><?php echo (int) $ch['is_active'] === 1 ? 'إخفاء' : 'تفعيل'; ?></button>
                     </td>
-                    <td><a href="/admin/index.php?page=channels&amp;edit=<?php echo (int) $ch['id']; ?>">تعديل</a></td>
+                    <td><a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=channels&edit=' . (int) $ch['id']), ENT_QUOTES, 'UTF-8'); ?>">تعديل</a></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>

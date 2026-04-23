@@ -66,7 +66,7 @@ if ($stmtPartyJson === false) {
         <p class="page-subtitle">
             تُسجَّل الذمم تلقائياً عند <strong>تسليم طلب آجل</strong> (إن وُجد هاتف للعميل) وعند <strong>شراء آجل</strong> مع اختيار مورد.
             استخدم سندات القبض/الدفع أدناه لتحريك النقدية مقابل ذمم العملاء والموردين — مع قيود محاسبية متزامنة.
-            <a href="/admin/index.php?page=partner_reports">تقارير الذمم المالية ومطابقة الدليل</a>
+            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_reports'), ENT_QUOTES, 'UTF-8'); ?>">تقارير الذمم المالية ومطابقة الدليل</a>
         </p>
     </div>
 </div>
@@ -299,7 +299,7 @@ if ($stmtPartyJson === false) {
             </tbody>
         </table>
     </div>
-    <p class="card-hint">إدارة الموردين من <a href="/admin/index.php?page=suppliers">شاشة الموردين</a> أو عند إنشاء <a href="/admin/index.php?page=purchases">مستند شراء</a>.</p>
+    <p class="card-hint">إدارة الموردين من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=suppliers'), ENT_QUOTES, 'UTF-8'); ?>">شاشة الموردين</a> أو عند إنشاء <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchases'), ENT_QUOTES, 'UTF-8'); ?>">مستند شراء</a>.</p>
 </div>
 
 <div class="card">

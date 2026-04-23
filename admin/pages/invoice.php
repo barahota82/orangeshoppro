@@ -380,7 +380,7 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
         </label>
         <button type="submit">عرض</button>
     </form>
-    <p style="margin:0 0 12px;"><a class="btn btn-secondary" href="/admin/index.php?page=orders">← كل الطلبات</a></p>
+    <p style="margin:0 0 12px;"><a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">← كل الطلبات</a></p>
     <?php if ($recentForPicker): ?>
     <p class="card-hint" style="margin:0 0 10px;">انقر صفاً داخل الجدول ثم استخدم <kbd class="admin-kbd">↑</kbd> <kbd class="admin-kbd">↓</kbd> للتنقل و <kbd class="admin-kbd">Enter</kbd> لفتح الفاتورة.</p>
     <div class="table-wrap">
@@ -413,7 +413,7 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
                         $rst = strtolower(trim((string) ($r['status'] ?? '')));
                         echo htmlspecialchars($orderStatusAr[$rst] ?? (string) ($r['status'] ?? ''), ENT_QUOTES, 'UTF-8');
                     ?></td>
-                    <td><a class="btn btn-secondary" href="/admin/index.php?page=invoice&amp;order_id=<?php echo (int)$r['id']; ?>">فتح</a></td>
+                    <td><a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=invoice&order_id=' . (int) $r['id']), ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -503,9 +503,9 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
     </div>
     <div class="invoice-workflow-bar__actions">
         <button type="button" class="btn" onclick="window.print()">طباعة / PDF</button>
-        <a class="btn btn-secondary" href="/admin/index.php?page=manual_order">+ فاتورة مبيعات</a>
-        <a class="btn btn-secondary" href="/admin/index.php?page=orders">الطلبات</a>
-        <a class="btn btn-secondary" href="/admin/index.php?page=invoice">فاتورة أخرى</a>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=manual_order'), ENT_QUOTES, 'UTF-8'); ?>">+ فاتورة مبيعات</a>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">الطلبات</a>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=invoice'), ENT_QUOTES, 'UTF-8'); ?>">فاتورة أخرى</a>
     </div>
 </div>
 
@@ -694,8 +694,8 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
         <?php endif; ?>
 
         <div class="invoice-actions">
-            <a class="btn btn-secondary" href="/admin/index.php?page=invoice">فاتورة أخرى</a>
-            <a class="btn btn-secondary" href="/admin/index.php?page=orders">الطلبات</a>
+            <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=invoice'), ENT_QUOTES, 'UTF-8'); ?>">فاتورة أخرى</a>
+            <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">الطلبات</a>
             <button type="button" class="btn" onclick="window.print()">طباعة / PDF</button>
         </div>
     </div>

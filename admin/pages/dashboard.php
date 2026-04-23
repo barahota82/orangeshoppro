@@ -63,7 +63,7 @@ if ($intakeQueueVisible) {
         <h3>قارب على النفاذ</h3>
         <div class="value"><?php echo $lowStockVariantsDash; ?></div>
         <p class="card-hint" style="margin:8px 0 0;font-size:0.88rem;">متغيرات ≤ <?php echo (int) $lowStockThDash; ?> — نشطة</p>
-        <p style="margin:10px 0 0;"><a class="btn btn-secondary" href="/admin/index.php?page=stock#low-stock-variants">المستودع</a></p>
+        <p style="margin:10px 0 0;"><a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock#low-stock-variants'), ENT_QUOTES, 'UTF-8'); ?>">المستودع</a></p>
     </div>
     <?php endif; ?>
 </div>
@@ -77,7 +77,7 @@ if ($intakeQueueVisible) {
         — فاشل: <strong><?php echo (int) $intakeFailed; ?></strong>
     </p>
     <p style="margin:0;">
-        <a class="btn btn-secondary" href="/admin/index.php?page=order_intake_queue">إدارة الطابور</a>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=order_intake_queue'), ENT_QUOTES, 'UTF-8'); ?>">إدارة الطابور</a>
         <?php if ($intakePending > 0 || $intakeFailed > 0): ?>
             <span class="muted" style="margin-inline-start:8px;">راجع الفاشل أو شغّل «معالجة يدوية» عند الحاجة.</span>
         <?php endif; ?>
@@ -89,7 +89,7 @@ if ($intakeQueueVisible) {
 <div class="card">
     <h3>التحقق من نشر الكود</h3>
     <p class="small">إذا كان النشر أوتوماتيكياً ولا ترى تغييرات في الشاشات، افتح الرابط التالي — يجب أن يظهر JSON وكل عناصر <code>markers</code> تكون <code>true</code>. (اختياري: عرّف <code>ORANGE_BUILD_REF</code> في <code>.env.php</code> ليظهر مرجع البناء.)</p>
-    <p style="margin:0;"><a href="/admin/api/system/deploy-check.php" target="_blank" rel="noopener">فتح فحص النشر</a></p>
+    <p style="margin:0;"><a href="<?php echo htmlspecialchars(storefront_public_path('/admin/api/system/deploy-check.php'), ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener">فتح فحص النشر</a></p>
 </div>
 <?php endif; ?>
 

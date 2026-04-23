@@ -73,7 +73,7 @@ $rows = $pdo->query("
                     <td><?php echo htmlspecialchars((string) ($lr['size'] ?? '') ?: '—', ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><strong><?php echo (int) ($lr['stock_quantity'] ?? 0); ?></strong></td>
                     <td>
-                        <a class="btn-link" href="/admin/index.php?page=item_card&amp;product_id=<?php echo (int) ($lr['product_id'] ?? 0); ?>">فتح الكارت</a>
+                        <a class="btn-link" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=item_card&product_id=' . (int) ($lr['product_id'] ?? 0)), ENT_QUOTES, 'UTF-8'); ?>">فتح الكارت</a>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -109,7 +109,7 @@ $rows = $pdo->query("
                     <td><strong><?php echo (int)$it['total_stock']; ?></strong></td>
                     <td><?php echo !empty($it['is_active']) ? 'نشط' : 'موقوف'; ?></td>
                     <td>
-                        <a class="btn-link" href="/admin/index.php?page=item_card&amp;product_id=<?php echo (int)$it['id']; ?>">كارت الصنف</a>
+                        <a class="btn-link" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=item_card&product_id=' . (int) $it['id']), ENT_QUOTES, 'UTF-8'); ?>">كارت الصنف</a>
                     </td>
                 </tr>
                 <?php endforeach; ?>

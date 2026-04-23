@@ -131,8 +131,8 @@ $statusLabel = [
         </p>
     </div>
     <div class="actions">
-        <a class="btn btn-secondary" href="/admin/api/order_intake/export-csv.php?status=<?php echo rawurlencode($statusFilter); ?>">تصدير CSV</a>
-        <a class="btn btn-secondary" href="/admin/index.php?page=orders">الطلبات</a>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/api/order_intake/export-csv.php?status=' . rawurlencode($statusFilter)), ENT_QUOTES, 'UTF-8'); ?>">تصدير CSV</a>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">الطلبات</a>
     </div>
 </div>
 
@@ -204,7 +204,7 @@ $statusLabel = [
         <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
             <span class="muted">تصفية السيرفر:</span>
             <?php
-            $base = '/admin/index.php?page=order_intake_queue';
+            $base = storefront_public_path('/admin/index.php?page=order_intake_queue');
             $filters = [
                 'all' => 'الكل',
                 'pending' => 'معلّقة',
@@ -212,9 +212,9 @@ $statusLabel = [
                 'completed' => 'مكتملة',
             ];
             foreach ($filters as $k => $lab) {
-                $href = $k === 'all' ? $base : $base . '&amp;status=' . rawurlencode($k);
+                $href = $k === 'all' ? $base : $base . '&status=' . rawurlencode($k);
                 $cls = $statusFilter === $k ? 'btn' : 'btn-secondary';
-                echo '<a class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '" href="' . $href . '">' . htmlspecialchars($lab, ENT_QUOTES, 'UTF-8') . '</a>';
+                echo '<a class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '" href="' . htmlspecialchars($href, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($lab, ENT_QUOTES, 'UTF-8') . '</a>';
             }
             ?>
         </div>
@@ -256,7 +256,7 @@ $statusLabel = [
                                 $on = trim((string) ($r['order_number'] ?? ''));
                                 $oid = (int) ($r['order_id'] ?? 0);
                                 if ($oid > 0 && $st === 'completed') {
-                                    $invHref = '/admin/index.php?page=invoice&amp;order_id=' . $oid;
+                                    $invHref = storefront_public_path('/admin/index.php?page=invoice&order_id=' . $oid);
                                     $disp = $on !== '' ? $on : ('#' . $oid);
                                     echo '<a class="btn-secondary" style="display:inline-block;padding:2px 8px;font-size:0.9em;" href="' . htmlspecialchars($invHref, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($disp, ENT_QUOTES, 'UTF-8') . '</a>';
                                 } elseif ($on !== '') {

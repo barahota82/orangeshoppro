@@ -71,7 +71,7 @@ if ($fyId > 0 && orange_journal_vouchers_ready($pdo)) {
         </div>
     </form>
     <?php if ($years === []): ?>
-        <p class="card-hint">لا توجد سنة مفتوحة — افتح سنة من <a href="/admin/index.php?page=fiscal_years">السنوات المالية</a>.</p>
+        <p class="card-hint">لا توجد سنة مفتوحة — افتح سنة من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=fiscal_years'), ENT_QUOTES, 'UTF-8'); ?>">السنوات المالية</a>.</p>
     <?php endif; ?>
 </div>
 

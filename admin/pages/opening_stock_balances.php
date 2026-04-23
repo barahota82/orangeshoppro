@@ -19,8 +19,8 @@ $rows = $pdo->query("
         <h1>أرصدة أول المدة المخزنية</h1>
         <p class="page-subtitle">
             مخصّصة لسيناريو <strong>نقل من نظام قديم</strong> عندما لا يُستورد المخزون تلقائياً: تُحدَّد هنا كمية كل متغير (لون/مقاس) كـ <strong>رصيد افتتاحي</strong> في السجلات.
-            <strong>ليست إدخالاً دورياً يومياً</strong> — التشغيل العادي يستخدم شاشة <a href="/admin/index.php?page=stock">المستودع</a> أو حركات الشراء والبيع.
-            الأرصدة <a href="/admin/index.php?page=opening_balances">المالية الافتتاحية</a> تُسجَّل في شاشة منفصلة.
+            <strong>ليست إدخالاً دورياً يومياً</strong> — التشغيل العادي يستخدم شاشة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8'); ?>">المستودع</a> أو حركات الشراء والبيع.
+            الأرصدة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=opening_balances'), ENT_QUOTES, 'UTF-8'); ?>">المالية الافتتاحية</a> تُسجَّل في شاشة منفصلة.
         </p>
     </div>
 </div>
@@ -62,7 +62,7 @@ $rows = $pdo->query("
         </table>
     </div>
     <?php if ($rows === []): ?>
-        <p class="card-hint">لا توجد متغيرات منتجات — أضف منتجات ومتغيرات من <a href="/admin/index.php?page=products">المنتجات</a>.</p>
+        <p class="card-hint">لا توجد متغيرات منتجات — أضف منتجات ومتغيرات من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=products'), ENT_QUOTES, 'UTF-8'); ?>">المنتجات</a>.</p>
     <?php endif; ?>
 </div>
 

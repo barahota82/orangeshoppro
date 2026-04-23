@@ -12,7 +12,7 @@ $entityPresets = orange_company_document_entity_presets();
     <p class="card-hint" style="margin:0.35rem 0 0;max-width:920px;line-height:1.6;">
         مستودع مركزي لملفات الشركة (عقود، فواتير أصلية، مراسلات، مستندات مشتريات، …) مع <strong>بيانات وصفية</strong> و<strong>ربط اختياري</strong> بطلب أو شراء أو قيد.
         التنزيل يتم عبر النظام بعد تسجيل الدخول — لا تشارك روابط الملفات مباشرة مع العامة.
-        يُسجَّل رفع وحذف المستندات في <a href="/admin/index.php?page=logs">سجل النشاط</a>.
+        يُسجَّل رفع وحذف المستندات في <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=logs'), ENT_QUOTES, 'UTF-8'); ?>">سجل النشاط</a>.
     </p>
 </div>
 
@@ -134,7 +134,8 @@ $entityPresets = orange_company_document_entity_presets();
     }
 
     function dlUrl(id) {
-        return '/admin/api/company_documents/download.php?id=' + encodeURIComponent(String(id));
+        var __pub = typeof window.ORANGE_PUBLIC_BASE_PATH === 'string' ? window.ORANGE_PUBLIC_BASE_PATH.replace(/\/+$/, '') : '';
+        return __pub + '/admin/api/company_documents/download.php?id=' + encodeURIComponent(String(id));
     }
 
     async function loadList() {

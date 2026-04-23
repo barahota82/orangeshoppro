@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/account_tree.php';
+require_once __DIR__ . '/upload_paths.php';
 
 /**
  * ربط الحسابات الأساسية (مفاتيح ثابتة) بحسابات الدليل — يُضبط من لوحة الإدارة.
@@ -478,7 +479,7 @@ function orange_gl_journal_delete_blocked_admin_link(string $entryType): ?array
     $page = $map[$et]['page'];
 
     return [
-        'href' => '/admin/index.php?page=' . rawurlencode($page),
+        'href' => storefront_public_path('/admin/index.php?page=' . rawurlencode($page)),
         'label' => $map[$et]['label'],
     ];
 }
@@ -495,13 +496,13 @@ function orange_gl_unpost_errors_suggest_admin_link(array $errors): ?array
         $e = (string) $err;
         if (str_contains($e, 'أرصدة افتتاحية')) {
             return [
-                'href' => '/admin/index.php?page=opening_balances',
+                'href' => storefront_public_path('/admin/index.php?page=opening_balances'),
                 'label' => 'الأرصدة الافتتاحية',
             ];
         }
         if (str_contains($e, 'إقفال سنوي')) {
             return [
-                'href' => '/admin/index.php?page=fiscal_years',
+                'href' => storefront_public_path('/admin/index.php?page=fiscal_years'),
                 'label' => 'السنوات المالية / الإقفال',
             ];
         }
@@ -529,7 +530,7 @@ function orange_gl_post_errors_suggest_admin_link(array $errors): ?array
             || str_contains($e, 'لم يُضبط الدليل المحاسبي')
         ) {
             return [
-                'href' => '/admin/index.php?page=gl_account_settings',
+                'href' => storefront_public_path('/admin/index.php?page=gl_account_settings'),
                 'label' => 'حسابات القيود التلقائية',
             ];
         }
@@ -538,7 +539,7 @@ function orange_gl_post_errors_suggest_admin_link(array $errors): ?array
         $e = (string) $err;
         if (str_contains($e, 'سنة مالية')) {
             return [
-                'href' => '/admin/index.php?page=fiscal_years',
+                'href' => storefront_public_path('/admin/index.php?page=fiscal_years'),
                 'label' => 'السنوات المالية',
             ];
         }
@@ -555,7 +556,7 @@ function orange_gl_post_errors_suggest_admin_link(array $errors): ?array
 function orange_gl_suggest_admin_fiscal_years_screen(): array
 {
     return [
-        'href' => '/admin/index.php?page=fiscal_years',
+        'href' => storefront_public_path('/admin/index.php?page=fiscal_years'),
         'label' => 'السنوات المالية',
     ];
 }
@@ -581,7 +582,7 @@ function orange_gl_exception_suggest_admin(Throwable $e): ?array
         || str_contains($m, 'الحساب المربوط لـ')
     ) {
         return [
-            'href' => '/admin/index.php?page=gl_account_settings',
+            'href' => storefront_public_path('/admin/index.php?page=gl_account_settings'),
             'label' => 'حسابات القيود التلقائية',
         ];
     }

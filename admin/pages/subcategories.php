@@ -57,7 +57,7 @@ if ($hasSubcategoriesTable) {
 <div class="card">
     <p style="margin:0 0 12px;font-size:14px;color:#555;">
         الفئة الفرعية مستوى تحت <strong>الفئة</strong> (مثل: تيشرتات / بناطيل تحت «ملابس نسائية»). يُربط المنتج بها من
-        <a href="/admin/index.php?page=products">المنتجات</a> بعد اختيار الفئة.
+        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=products'), ENT_QUOTES, 'UTF-8'); ?>">المنتجات</a> بعد اختيار الفئة.
     </p>
 </div>
 

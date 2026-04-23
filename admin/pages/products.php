@@ -123,13 +123,13 @@ foreach ($categories as $cat) {
 </div>
 
 <div class="card" style="margin-bottom:12px;">
-    <p style="margin:0;">قبل إضافة منتج بمقاسات: عرّف <a href="/admin/index.php?page=size_families">عائلات المقاسات</a>.
-        قبل الألوان: <a href="/admin/index.php?page=color_dictionary">قاموس الألوان</a>.</p>
+    <p style="margin:0;">قبل إضافة منتج بمقاسات: عرّف <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_families'), ENT_QUOTES, 'UTF-8'); ?>">عائلات المقاسات</a>.
+        قبل الألوان: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=color_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس الألوان</a>.</p>
 </div>
 
 <div class="card">
     <h3 id="productFormTitle">إضافة / تعديل منتج</h3>
-    <p id="productEditHint" style="display:none;margin:0 0 12px;color:#555;font-size:14px;">تعديل البيانات الأساسية. الترتيب في المتجر من الجدول فقط (↑↓ ثم حفظ الترتيب). كميات الألوان والمقاسات من <a href="/admin/index.php?page=stock">المخزون</a>.</p>
+    <p id="productEditHint" style="display:none;margin:0 0 12px;color:#555;font-size:14px;">تعديل البيانات الأساسية. الترتيب في المتجر من الجدول فقط (↑↓ ثم حفظ الترتيب). كميات الألوان والمقاسات من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8'); ?>">المخزون</a>.</p>
     <form id="productForm">
         <input type="hidden" id="product_record_id" value="0">
         <p class="admin-product-form-intro">مسار العمل: <strong>البيانات الأساسية</strong> ← <strong>المقاسات والألوان</strong> ← <strong>الصور</strong> (صورة مرجعية للصنف) ← <strong>المتغيرات</strong> ثم «توليد المتغيرات». زر «حفظ المنتج» يطبّق كل التبويبات دفعة واحدة.</p>
@@ -213,7 +213,7 @@ foreach ($categories as $cat) {
                 <?php if ($hasDepartmentsTable && $hasCategoryDepartment): ?>
                     <small style="display:block;color:#666;margin-top:4px;">كل فئة تحت قسمها لتفادي الخلط بين فئات متشابهة.</small>
                 <?php elseif (!$hasDepartmentsTable || !$hasCategoryDepartment): ?>
-                    <small style="display:block;color:#f59e0b;margin-top:4px;">لربط الفئات بالأقسام: من صفحة <a href="/admin/index.php?page=categories">الفئات</a>.</small>
+                    <small style="display:block;color:#f59e0b;margin-top:4px;">لربط الفئات بالأقسام: من صفحة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=categories'), ENT_QUOTES, 'UTF-8'); ?>">الفئات</a>.</small>
                 <?php endif; ?>
             </div>
             <?php if ($hasSubcategoriesTable && $hasProductSubcategoryColumn): ?>
@@ -223,7 +223,7 @@ foreach ($categories as $cat) {
                     <option value="">— بدون —</option>
                 </select>
                 <small style="display:block;color:#666;margin-top:4px;">يُحدَّث حسب الفئة المختارة. أضف التصنيفات من
-                    <a href="/admin/index.php?page=subcategories">فئات فرعية</a>.</small>
+                    <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=subcategories'), ENT_QUOTES, 'UTF-8'); ?>">فئات فرعية</a>.</small>
             </div>
             <?php endif; ?>
             <div>
@@ -913,7 +913,7 @@ async function loadProductForEdit(id) {
         document.getElementById('sizing_guide_scope').value = p.sizing_guide_scope || 'none';
         document.getElementById('colorwaysBox').innerHTML = '';
         document.getElementById('variantsBox').innerHTML =
-            '<p class="admin-variants-edit-note">المتغيرات والمخزون الحالي: من صفحة <a href="/admin/index.php?page=stock">المستودع / المخزون</a>.</p>';
+            <?php echo json_encode('<p class="admin-variants-edit-note">المتغيرات والمخزون الحالي: من صفحة <a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8') . '">المستودع / المخزون</a>.</p>', JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
         window.PRODUCT_EXTRA_IMAGES = extrasEarly;
         renderGalleryUploadList();
         onHasFlagsChange();

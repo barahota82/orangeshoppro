@@ -45,7 +45,7 @@ $topProducts = $pdo->query("
 <div class="page-title">
     <h1>التقارير</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;">لتحليل <strong>كل قناة على حدة</strong> (طلبات، إيراد، أكثر منتج، ترتيب النشاط) استخدم
-        <a href="/admin/index.php?page=channel_analytics">تحليل القنوات</a>.</p>
+        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=channel_analytics'), ENT_QUOTES, 'UTF-8'); ?>">تحليل القنوات</a>.</p>
 </div>
 
 <div class="grid-4">

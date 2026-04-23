@@ -67,7 +67,7 @@ foreach ($accounts as $a) {
         <p class="page-subtitle" style="margin-top:0.5rem;">
             <strong>الطابور مقابل السند الظاهر هنا:</strong> كثير من الحركات (تسليم طلبات، مشتريات، مصروفات، قبض/دفع، قيود يدوية من هذه الشاشة، أرصدة افتتاحية…) تُسجَّل أولاً في
             <strong>طابور المحاسبة</strong> ثم تتحول إلى سند فعلي من شاشة
-            <a href="/admin/index.php?page=gl_posting">ترحيل الحركات</a>.
+            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=gl_posting'), ENT_QUOTES, 'UTF-8'); ?>">ترحيل الحركات</a>.
             ما تراه في الجدول أدناه هو <strong>سندات مُرحَّلة</strong> فقط (أو سندات أُنشئت بترحيل فوري إن وُجد).
             إن ظهرت رسالة «تم الإضافة إلى طابور الترحيل» فالسند لم يُنشأ بعد هنا حتى تُرحّل من الشاشة المذكورة.
         </p>

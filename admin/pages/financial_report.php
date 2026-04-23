@@ -157,7 +157,7 @@ $bsCheck = round($bsAssets - ($bsLiab + $bsEquity), 2);
 
 <div class="card">
     <?php if ($years === []): ?>
-        <p class="card-hint">لا توجد سنوات مالية معرفة. افتح <a href="/admin/index.php?page=fiscal_years">السنوات المالية</a>.</p>
+        <p class="card-hint">لا توجد سنوات مالية معرفة. افتح <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=fiscal_years'), ENT_QUOTES, 'UTF-8'); ?>">السنوات المالية</a>.</p>
     <?php else: ?>
     <form method="get" action="" class="form-grid" style="align-items:end;">
         <input type="hidden" name="page" value="financial_report">
@@ -242,7 +242,7 @@ $bsCheck = round($bsAssets - ($bsLiab + $bsEquity), 2);
         <?php endif; ?>
         <p class="actions" style="margin-top:12px;">
             <button type="button" class="btn-secondary" onclick="window.print()">طباعة الكشف</button>
-            <a class="btn-secondary" href="/admin/index.php?page=financial_report&amp;fy=<?php echo (int) $fyId; ?>">العودة للتقارير</a>
+            <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=financial_report&fy=' . (int) $fyId), ENT_QUOTES, 'UTF-8'); ?>">العودة للتقارير</a>
         </p>
     <?php endif; ?>
 </div>

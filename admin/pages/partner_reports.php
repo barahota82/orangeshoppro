@@ -56,7 +56,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
         <h1>تقارير الذمم الشاملة</h1>
         <p class="page-subtitle">
             ملخص أرصدة كل العملاء والموردين، مطابقة أرصدة الدليل مع دفتر الذمم، وتصدير CSV.
-            <a href="/admin/index.php?page=partner_ledger">العودة لحركات القبض والدفع</a>
+            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_ledger'), ENT_QUOTES, 'UTF-8'); ?>">العودة لحركات القبض والدفع</a>
         </p>
     </div>
 </div>
@@ -64,10 +64,10 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 <div class="card">
     <h3 class="card-title">خيارات العرض</h3>
     <div class="actions" style="flex-wrap:wrap; gap:8px;">
-        <a class="btn-secondary" href="/admin/index.php?page=partner_reports<?php echo $includeAging ? '' : '&amp;aging=1'; ?>">
+        <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_reports' . ($includeAging ? '' : '&aging=1')), ENT_QUOTES, 'UTF-8'); ?>">
             <?php echo $includeAging ? 'إخفاء أعمار الذمم (أسرع)' : 'إظهار أعمار الذمم (أبطأ)'; ?>
         </a>
-        <a class="btn-secondary" href="/admin/index.php?page=partner_reports&amp;export=csv<?php echo $includeAging ? '&amp;aging=1' : ''; ?>">تنزيل CSV</a>
+        <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_reports&export=csv' . ($includeAging ? '&aging=1' : '')), ENT_QUOTES, 'UTF-8'); ?>">تنزيل CSV</a>
         <button type="button" class="btn-secondary" onclick="backfillOrders()">ربط طلبات آجل بعملاء (هاتف)</button>
     </div>
     <p class="card-hint muted" style="margin-top:10px;">اعتباراً من <?php echo htmlspecialchars($report['as_of'], ENT_QUOTES, 'UTF-8'); ?></p>

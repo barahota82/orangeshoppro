@@ -7,7 +7,7 @@ require_once __DIR__ . '/../../includes/upload_paths.php';
 
 $productId = (int)($_GET['product_id'] ?? 0);
 if ($productId < 1) {
-    echo '<div class="card"><p class="alert-error">صنف غير صالح.</p><a href="/admin/index.php?page=stock">العودة للمستودع</a></div>';
+    echo '<div class="card"><p class="alert-error">صنف غير صالح.</p><a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8') . '">العودة للمستودع</a></div>';
     return;
 }
 
@@ -24,7 +24,7 @@ $stmt->execute([$productId]);
 $product = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$product) {
-    echo '<div class="card"><p class="alert-error">الصنف غير موجود.</p><a href="/admin/index.php?page=stock">العودة للمستودع</a></div>';
+    echo '<div class="card"><p class="alert-error">الصنف غير موجود.</p><a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8') . '">العودة للمستودع</a></div>';
     return;
 }
 
@@ -51,9 +51,9 @@ $img = storefront_product_image_href((string) ($product['main_image'] ?? ''));
     <div>
         <h1>كارت الصنف</h1>
         <p class="page-subtitle">
-            <a href="/admin/index.php?page=stock#balances">← المستودع</a>
+            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock#balances'), ENT_QUOTES, 'UTF-8'); ?>">← المستودع</a>
             &nbsp;·&nbsp;
-            <a href="/admin/index.php?page=products">المنتجات</a>
+            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=products'), ENT_QUOTES, 'UTF-8'); ?>">المنتجات</a>
         </p>
     </div>
 </div>
