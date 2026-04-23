@@ -2054,8 +2054,18 @@ body.storefront .product-gallery__img {
     box-shadow: 0 1px 0 color-mix(in srgb, var(--border) 50%, transparent);
 }
 
+.cart-page-panel--basket .cart-item-left picture,
 .cart-page-panel--basket .cart-item-left img {
     height: 76px;
+}
+
+.cart-page-panel--basket .cart-item-left picture {
+    display: block;
+    width: 100%;
+}
+
+.cart-page-panel--basket .cart-item-left picture img {
+    height: 100%;
 }
 
 .cart-page-panel--basket .cart-item-right h4 {
@@ -2844,6 +2854,12 @@ button.track-signup-cta__btn[hidden] {
     border-bottom: 1px solid var(--border);
 }
 
+.cart-item-left picture {
+    display: block;
+    width: 100%;
+}
+
+.cart-item-left picture img,
 .cart-item-left img {
     width: 100%;
     height: 100px;

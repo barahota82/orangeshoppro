@@ -220,6 +220,58 @@ function escCartAttr(s) {
         .replace(/'/g, '&#39;');
 }
 
+/** مسار عام تحت جذر المتجر (بدون ?lang=) — للصور والأصول الثابتة. */
+function orangeStorefrontPublicPath(path) {
+    const raw = typeof window.STOREFRONT_BASE === 'string' ? window.STOREFRONT_BASE : '';
+    const base = raw.replace(/\/+$/, '');
+    const p = path.startsWith('/') ? path : '/' + path;
+    return base + p;
+}
+
+/**
+ * صورة بند العربة: يفضّل ‎.webp‎ بنفس الجذر عبر ‎<picture>‎ إن كان الملف الأصلي ليس webp.
+ */
+function orangeCartProductImageMarkup(item) {
+    let name = String(item && item.image != null ? item.image : '')
+        .replace(/"/g, '')
+        .trim();
+    if (!name) {
+        return '<span class="cart-item-thumb-placeholder" aria-hidden="true"></span>';
+    }
+    name = name.split(/[/\\]/).pop() || '';
+    if (!name || name === '.' || name === '..') {
+        return '<span class="cart-item-thumb-placeholder" aria-hidden="true"></span>';
+    }
+    const prefix = orangeStorefrontPublicPath('/uploads/products/');
+    const lower = name.toLowerCase();
+    const alt = escCartHtml(item.name || '');
+    if (lower.endsWith('.webp')) {
+        const src = prefix + encodeURIComponent(name);
+        return (
+            '<img src="' +
+            escCartAttr(src) +
+            '" alt="' +
+            alt +
+            '" loading="lazy" decoding="async">'
+        );
+    }
+    const stem = name.includes('.') ? name.slice(0, name.lastIndexOf('.')) : name;
+    const webpSrc = prefix + encodeURIComponent(stem + '.webp');
+    const fallbackSrc = prefix + encodeURIComponent(name);
+    return (
+        '<picture>' +
+        '<source type="image/webp" srcset="' +
+        escCartAttr(webpSrc) +
+        '">' +
+        '<img src="' +
+        escCartAttr(fallbackSrc) +
+        '" alt="' +
+        alt +
+        '" loading="lazy" decoding="async">' +
+        '</picture>'
+    );
+}
+
 function storefrontApiUrl(path) {
     const raw = typeof window.STOREFRONT_BASE === 'string' ? window.STOREFRONT_BASE : '';
     const base = raw.replace(/\/+$/, '');
@@ -891,7 +943,7 @@ async function renderCart() {
             html += `
             <div class="cart-item-card" data-cart-idx="${idx}">
                 <div class="cart-item-left">
-                    <img src="/uploads/products/${String(item.image || '').replace(/"/g, '')}" alt="${escCartHtml(item.name || '')}">
+                    ${orangeCartProductImageMarkup(item)}
                 </div>
                 <div class="cart-item-right">
                     ${lineChoiceHtml}
