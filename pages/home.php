@@ -460,15 +460,96 @@ function orangeSfLazyTokenMatch(df, filter) {
     var tokens = String(df || '').trim().split(/\s+/).filter(Boolean);
     return tokens.indexOf(filter) !== -1;
 }
+function orangeSfPublicPath(path) {
+    var raw = typeof window.STOREFRONT_BASE === 'string' ? window.STOREFRONT_BASE : '';
+    var base = raw.replace(/\/+$/, '');
+    var p = path.charAt(0) === '/' ? path : '/' + path;
+    return base + p;
+}
+function orangeSfResolveUploadsUrl(u) {
+    if (!u) {
+        return u;
+    }
+    var s = String(u);
+    if (s.indexOf('//') === 0) {
+        return s;
+    }
+    if (s.charAt(0) === '/' && (s.indexOf('/uploads/') === 0 || s.indexOf('/assets/') === 0)) {
+        return orangeSfPublicPath(s);
+    }
+    return s;
+}
 function orangeSfImgSrcFromMainImage(img) {
-    var seg = String(img || '').split('/').map(function (s) { return encodeURIComponent(s); }).join('/');
-    return '/uploads/products/' + seg;
+    var name = String(img || '').trim();
+    if (!name) {
+        return '';
+    }
+    var segs = name.split(/[/\\]/);
+    name = segs[segs.length - 1] || '';
+    if (!name || name === '.' || name === '..') {
+        return '';
+    }
+    var prefix = orangeSfPublicPath('/uploads/products/');
+    return prefix + encodeURIComponent(name);
 }
 function orangeSfProductCardImgSrc(item) {
     if (item && item.imgSrc) {
-        return item.imgSrc;
+        return orangeSfResolveUploadsUrl(item.imgSrc);
     }
     return orangeSfImgSrcFromMainImage(item && item.img);
+}
+function orangeSfMountProductThumb(wrap, item) {
+    if (!wrap || !item) {
+        return;
+    }
+    var alt = item.title || '';
+    var primary = orangeSfProductCardImgSrc(item);
+    if (!primary) {
+        return;
+    }
+    var pathOnly = primary.split('?')[0].split('#')[0];
+    var isWebp = pathOnly.toLowerCase().lastIndexOf('.webp') === pathOnly.length - 5;
+    if (isWebp) {
+        var imgW = document.createElement('img');
+        imgW.setAttribute('src', primary);
+        imgW.setAttribute('alt', alt);
+        imgW.loading = 'lazy';
+        imgW.decoding = 'async';
+        wrap.appendChild(imgW);
+        return;
+    }
+    var m = primary.match(/^(.+\/)([^/?#]+)$/);
+    if (!m) {
+        var imgF = document.createElement('img');
+        imgF.setAttribute('src', primary);
+        imgF.setAttribute('alt', alt);
+        imgF.loading = 'lazy';
+        imgF.decoding = 'async';
+        wrap.appendChild(imgF);
+        return;
+    }
+    var dir = m[1];
+    var fileEnc = m[2];
+    var file = fileEnc;
+    try {
+        file = decodeURIComponent(fileEnc);
+    } catch (e1) {
+        file = fileEnc;
+    }
+    var stem = file.indexOf('.') !== -1 ? file.slice(0, file.lastIndexOf('.')) : file;
+    var webpSrc = dir + encodeURIComponent(stem + '.webp');
+    var pic = document.createElement('picture');
+    var srcEl = document.createElement('source');
+    srcEl.setAttribute('type', 'image/webp');
+    srcEl.setAttribute('srcset', webpSrc);
+    pic.appendChild(srcEl);
+    var imgP = document.createElement('img');
+    imgP.setAttribute('src', primary);
+    imgP.setAttribute('alt', alt);
+    imgP.loading = 'lazy';
+    imgP.decoding = 'async';
+    pic.appendChild(imgP);
+    wrap.appendChild(pic);
 }
 function orangeSfGridSentinelEl() {
     return document.getElementById('orangeSfGridSentinel');
@@ -564,12 +645,7 @@ function orangeSfAppendRegularCard(item) {
     art.setAttribute('data-filter', item.df);
     var wrap = document.createElement('div');
     wrap.className = 'product-image-wrap';
-    var img = document.createElement('img');
-    img.setAttribute('src', orangeSfProductCardImgSrc(item));
-    img.setAttribute('alt', item.title);
-    img.loading = 'lazy';
-    img.decoding = 'async';
-    wrap.appendChild(img);
+    orangeSfMountProductThumb(wrap, item);
     var body = document.createElement('div');
     body.className = 'product-body';
     var h3 = document.createElement('h3');

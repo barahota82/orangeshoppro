@@ -904,6 +904,11 @@ body.storefront-browse-menu-lock {
     background: var(--bg-soft);
 }
 
+.product-image-wrap picture {
+    display: block;
+    width: 100%;
+}
+
 .product-image-wrap img {
     width: 100%;
     height: 260px;
