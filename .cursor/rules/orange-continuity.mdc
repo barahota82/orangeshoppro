@@ -29,4 +29,4 @@ When resuming Orange work, read:
 
 Do not claim "no chat context" without reading these files first.
 
-**Session end (owner visibility):** follow **`orange-session-handoff.mdc`** — after substantive work, notify the owner explicitly so they know a new agent may start without this chat’s context.
+**انتهاء الجلسة (إشعار المالك — إلزام أرشيفي):** عند **عمل تنفيذي**، **أخبر المالك صراحةً** في **آخر الرد** بجملة **`تم انتهاء الجلسة التنفيذية.`** وتذكير بأن **المحادثة التالية** قد تكون مع **وكيل آخر** بلا سياق هذه الدردشة — حتى **يعلم المالك** ولا يفترض استمرار نفس الوكيل/السياق. التفاصيل في **`orange-session-handoff.mdc`** (قسم «عند انتهاء عمل تنفيذي»).
