@@ -3,12 +3,28 @@
 declare(strict_types=1);
 
 /**
+ * Payload `phone_country` من الواجهة: أرقام بادئة (مثل 965) أو الرمز **__intl__** لخيار «رقم دولي كامل» (صفر§4).
+ *
+ * @return array{full_intl: bool, dial: string}
+ */
+function orange_storefront_parse_api_phone_country(string $raw): array
+{
+    $t = trim($raw);
+    if ($t === '__intl__') {
+        return ['full_intl' => true, 'dial' => ''];
+    }
+
+    return ['full_intl' => false, 'dial' => preg_replace('/\D+/', '', $t)];
+}
+
+/**
  * Normalize storefront / customer phone to +digits (8–14 digits after +, incl. country code).
  * Accepts leading 00 (converted to +). Rejects letters.
  *
  * @param string|null $countryDialDigits e.g. "965" when the user picked Kuwait and typed the national number only
+ * @param bool $internationalSingleField عند true (قائمة «دولي كامل»): لا يُطبَّق افتراض الكويت على 8 أرقام وطنية
  */
-function orange_normalize_customer_phone(string $raw, ?string $countryDialDigits = null): ?string
+function orange_normalize_customer_phone(string $raw, ?string $countryDialDigits = null, bool $internationalSingleField = false): ?string
 {
     $s = trim($raw);
     if ($s === '') {
@@ -72,7 +88,7 @@ function orange_normalize_customer_phone(string $raw, ?string $countryDialDigits
     }
 
     $len = strlen($digits);
-    if ($len === 8 && preg_match('/^[569]/', $digits)) {
+    if (!$internationalSingleField && $len === 8 && preg_match('/^[569]/', $digits)) {
         $full = '965' . $digits;
         if (strlen($full) > 14) {
             return null;

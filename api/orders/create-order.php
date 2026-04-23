@@ -38,20 +38,20 @@ try {
 
     require_fields($data, ['name', 'phone', 'area', 'address', 'channel_id', 'items']);
 
-    $phoneCcRaw = trim((string) ($data['phone_country'] ?? ''));
-    $phoneCc = preg_replace('/\D+/', '', $phoneCcRaw);
-    if ($phoneCc === '') {
+    $pcParsed = orange_storefront_parse_api_phone_country((string) ($data['phone_country'] ?? ''));
+    if (!$pcParsed['full_intl'] && $pcParsed['dial'] === '') {
         json_response(['success' => false, 'code' => 'phone_country_required', 'message' => t('phone_country_required')], 422);
     }
 
     $phoneRawIn = trim((string) $data['phone']);
-    $phoneParts = orange_storefront_phone_storage_parts($phoneRawIn, $phoneCc);
-    $phoneNorm = orange_normalize_customer_phone($phoneRawIn, $phoneCc);
+    $dialForNational = $pcParsed['full_intl'] ? null : $pcParsed['dial'];
+    $phoneNorm = orange_normalize_customer_phone($phoneRawIn, $dialForNational, $pcParsed['full_intl']);
     if ($phoneNorm === null) {
         json_response(['success' => false, 'code' => 'invalid_phone', 'message' => t('checkout_invalid_phone')], 422);
     }
     $data['phone'] = $phoneNorm;
-    $data['phone_country'] = $phoneCc;
+    $data['phone_country'] = $pcParsed['full_intl'] ? '' : $pcParsed['dial'];
+    $phoneParts = orange_storefront_phone_storage_parts($phoneRawIn, $dialForNational);
     $data['phone_country_dial'] = $phoneParts['country_dial'];
     $data['phone_national'] = $phoneParts['national'];
 

@@ -37,6 +37,7 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 **نطاق التطبيق المقصود بالسياسة:** نماذج **التسجيل**، **الطلب من العربة (الضيف)**، **التتبع**
 (إن وُجد تحقق بالهاتف)، وأي نموذج واجهة يطلب هاتف العميل بنفس المنطق. تنفيذ الكود قد
 يتقدم أو يتأخر عن النص؛ **مرجع المعنى للمالك هو هذا القسم وس8 وس18**.
+**تنفيذ (حالي — بند 4):** خيار القائمة ‎`__intl__`‎ في `assets/js/storefront-country-codes.js`؛ الواجهة ترسل `phone_country: "__intl__"` أو أرقام بادئة؛ `orange_storefront_parse_api_phone_country` ووسيط `internationalSingleField` في `orange_normalize_customer_phone` داخل `includes/phone_validation.php`؛ تخطي افتراض الكويت لثمانية أرقام وطنية عند الوضع الدولي في `assets/js/input-constraints.js`؛ مسارات الطلب/الطابور `api/orders/create-order.php` و`includes/order_intake_queue.php`؛ التسجيل والبريد `api/auth/request-email-verify.php`؛ العربة `assets/js/cart.js`؛ التسجيل والتتبع `pages/register.php` و`pages/track.php`.
 
 
 --------------------------------------------------------------------

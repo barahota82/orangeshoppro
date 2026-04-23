@@ -1,10 +1,12 @@
 /**
  * Phone normalization (must match includes/phone_validation.php rules).
  * @param {string} raw
- * @param {string|null|undefined} countryDialDigits e.g. "965"
+ * @param {string|null|undefined} countryDialDigits e.g. "965"; use null with internationalFullNumberField when قائمة «دولي كامل»
+ * @param {boolean} [internationalFullNumberField] يعطّل افتراض الكويت لـ 8 أرقام وطنية
  * @returns {string|null}
  */
-function orangeNormalizeCustomerPhone(raw, countryDialDigits) {
+function orangeNormalizeCustomerPhone(raw, countryDialDigits, internationalFullNumberField) {
+    internationalFullNumberField = !!internationalFullNumberField;
     var s = String(raw || '').trim();
     if (s === '') {
         return null;
@@ -58,7 +60,7 @@ function orangeNormalizeCustomerPhone(raw, countryDialDigits) {
         return '+' + digits;
     }
 
-    if (digits.length === 8 && /^[569]/.test(digits)) {
+    if (!internationalFullNumberField && digits.length === 8 && /^[569]/.test(digits)) {
         var ku = '965' + digits;
         if (ku.length > 14) {
             return null;
@@ -112,6 +114,31 @@ function orangeSanitizeNationalPhoneInput(el, countrySelectId) {
         typeof window.orangeStorefrontPhoneCountryDigits === 'function'
             ? window.orangeStorefrontPhoneCountryDigits(countrySelectId)
             : null;
+    if (cc === null) {
+        return;
+    }
+    if (cc === '') {
+        var vFull = el.value;
+        var outFull = '';
+        for (var fi = 0; fi < vFull.length; fi++) {
+            var chf = vFull.charAt(fi);
+            if (/\d/.test(chf)) {
+                outFull += chf;
+                continue;
+            }
+            if (chf === '+' && outFull.indexOf('+') === -1 && outFull.length === 0) {
+                outFull += chf;
+                continue;
+            }
+            if (' -().'.indexOf(chf) !== -1) {
+                outFull += chf;
+            }
+        }
+        if (outFull !== vFull) {
+            el.value = outFull;
+        }
+        return;
+    }
     var v = el.value.replace(/\D/g, '');
     if (cc && v.indexOf(cc) === 0) {
         v = v.slice(cc.length);

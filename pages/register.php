@@ -114,7 +114,7 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                     </div>
                     <div class="field track-signup-cta__field field-phone-row__number">
                         <label for="reg_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
-                        <input id="reg_phone" name="phone" class="js-orange-phone-input" type="tel" autocomplete="tel" required inputmode="numeric" maxlength="16" data-orange-national-phone="reg_phone_country" placeholder="<?php echo htmlspecialchars(t('register_placeholder_phone'), ENT_QUOTES, 'UTF-8'); ?>">
+                        <input id="reg_phone" name="phone" class="js-orange-phone-input" type="tel" autocomplete="tel" required inputmode="numeric" maxlength="22" data-orange-national-phone="reg_phone_country" placeholder="<?php echo htmlspecialchars(t('register_placeholder_phone'), ENT_QUOTES, 'UTF-8'); ?>">
                     </div>
                 </div>
                 <div class="field track-signup-cta__field">
@@ -267,7 +267,7 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                         typeof window.orangeStorefrontPhoneCountryDigits === 'function'
                             ? window.orangeStorefrontPhoneCountryDigits('reg_phone_country')
                             : null;
-                    if (!regCcEarly) {
+                    if (regCcEarly === null || regCcEarly === undefined) {
                         msg.textContent = (window.APP_T && window.APP_T.phone_country_required) || reqMsg;
                         return;
                     }
@@ -314,9 +314,15 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                         typeof window.orangeStorefrontPhoneCountryDigits === 'function'
                             ? window.orangeStorefrontPhoneCountryDigits('reg_phone_country')
                             : null;
+                    var regIntl =
+                        (document.getElementById('reg_phone_country') || {}).value === '__intl__';
                     var phoneNorm =
                         typeof window.orangeNormalizeCustomerPhone === 'function'
-                            ? window.orangeNormalizeCustomerPhone(phoneRaw, regCc)
+                            ? window.orangeNormalizeCustomerPhone(
+                                  phoneRaw,
+                                  regIntl ? null : regCc,
+                                  regIntl
+                              )
                             : null;
                     if (!phoneNorm) {
                         msg.textContent = badPhone || reqMsg;
@@ -346,7 +352,7 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                             email: email,
                             name: name,
                             phone: phoneNorm,
-                            phone_country: regCc || '',
+                            phone_country: regIntl ? '__intl__' : regCc || '',
                             area: area,
                             delivery_area_id: deliveryAreaId,
                             address: address,

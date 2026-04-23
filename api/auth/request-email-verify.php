@@ -75,12 +75,15 @@ try {
         $itemsMailStmt->execute([(int) ($orderRow['id'] ?? 0)]);
         $trackSignupItemsForMail = $itemsMailStmt->fetchAll(PDO::FETCH_ASSOC);
         if ($phoneRaw !== '') {
-            $regCc2Raw = trim((string) ($data['phone_country'] ?? ''));
-            $regCc2 = preg_replace('/\D+/', '', $regCc2Raw);
-            if ($regCc2 === '') {
+            $regCc2Parsed = orange_storefront_parse_api_phone_country(trim((string) ($data['phone_country'] ?? '')));
+            if (!$regCc2Parsed['full_intl'] && $regCc2Parsed['dial'] === '') {
                 json_response(['success' => false, 'code' => 'phone_country_required', 'message' => t('phone_country_required')], 422);
             }
-            $prNorm = orange_normalize_customer_phone($phoneRaw, $regCc2);
+            $prNorm = orange_normalize_customer_phone(
+                $phoneRaw,
+                $regCc2Parsed['full_intl'] ? null : $regCc2Parsed['dial'],
+                $regCc2Parsed['full_intl']
+            );
             if ($prNorm === null || !orange_order_phones_match_for_lookup($prNorm, (string) ($orderRow['phone'] ?? ''))) {
                 json_response(['success' => false, 'code' => 'signup_phone_mismatch', 'message' => t('track_signup_order_mismatch')], 422);
             }
@@ -154,12 +157,15 @@ try {
         if ($nameRaw === '' || $phoneRaw === '' || $addressRaw === '') {
             json_response(['success' => false, 'code' => 'missing_fields', 'message' => t('checkout_required_fields')], 422);
         }
-        $regCcRaw = trim((string) ($data['phone_country'] ?? ''));
-        $regCc = preg_replace('/\D+/', '', $regCcRaw);
-        if ($regCc === '') {
+        $regCcParsed = orange_storefront_parse_api_phone_country(trim((string) ($data['phone_country'] ?? '')));
+        if (!$regCcParsed['full_intl'] && $regCcParsed['dial'] === '') {
             json_response(['success' => false, 'code' => 'phone_country_required', 'message' => t('phone_country_required')], 422);
         }
-        $phoneNormReg = orange_normalize_customer_phone($phoneRaw, $regCc);
+        $phoneNormReg = orange_normalize_customer_phone(
+            $phoneRaw,
+            $regCcParsed['full_intl'] ? null : $regCcParsed['dial'],
+            $regCcParsed['full_intl']
+        );
         if ($phoneNormReg === null) {
             json_response(['success' => false, 'code' => 'invalid_phone', 'message' => t('checkout_invalid_phone')], 422);
         }
@@ -177,7 +183,8 @@ try {
 
         $customerName = orange_storefront_clip_utf8($nameRaw, 255);
         $customerPhone = orange_storefront_clip_utf8($phoneNormReg, 64);
-        $regParts = orange_storefront_phone_storage_parts($phoneRaw, $regCc);
+        $regDialForParts = $regCcParsed['full_intl'] ? null : $regCcParsed['dial'];
+        $regParts = orange_storefront_phone_storage_parts($phoneRaw, $regDialForParts);
         $customerPhoneCountryDial = $regParts['country_dial'];
         $customerPhoneNational = $regParts['national'];
         $customerAddress = orange_storefront_clip_utf8($addressRaw, 4000);

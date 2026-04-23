@@ -68,7 +68,7 @@ $orangeMyOrderUi = [
                         </div>
                         <div class="field track-signup-cta__field field-phone-row__number">
                             <label for="trackSignupVerifyPhone"><?php echo htmlspecialchars(t('track_signup_verify_phone_label'), ENT_QUOTES, 'UTF-8'); ?></label>
-                            <input id="trackSignupVerifyPhone" name="signup_verify_phone" class="js-orange-phone-input" type="tel" autocomplete="tel" inputmode="numeric" maxlength="16" data-orange-national-phone="trackSignupVerifyPhone_country" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_verify_phone'), ENT_QUOTES, 'UTF-8'); ?>" required>
+                            <input id="trackSignupVerifyPhone" name="signup_verify_phone" class="js-orange-phone-input" type="tel" autocomplete="tel" inputmode="numeric" maxlength="22" data-orange-national-phone="trackSignupVerifyPhone_country" placeholder="<?php echo htmlspecialchars(t('track_signup_placeholder_verify_phone'), ENT_QUOTES, 'UTF-8'); ?>" required>
                         </div>
                     </div>
                     <div class="track-signup-cta__verify-row">
@@ -129,7 +129,7 @@ $orangeMyOrderUi = [
                 </div>
                 <div class="field field-phone-row__number">
                     <label for="track_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
-                    <input id="track_phone" class="js-orange-phone-input" name="phone" autocomplete="tel" inputmode="numeric" maxlength="16" data-orange-national-phone="track_phone_country" placeholder="<?php echo htmlspecialchars(t('phone_field_hint'), ENT_QUOTES, 'UTF-8'); ?>" required>
+                    <input id="track_phone" class="js-orange-phone-input" name="phone" autocomplete="tel" inputmode="numeric" maxlength="22" data-orange-national-phone="track_phone_country" placeholder="<?php echo htmlspecialchars(t('phone_field_hint'), ENT_QUOTES, 'UTF-8'); ?>" required>
                 </div>
             </div>
             <div class="actions-row track-page-actions">
@@ -194,17 +194,35 @@ function orangeTrackPhoneForApi(raw, countrySelectId) {
     if (!s) {
         return '';
     }
+    var sel =
+        countrySelectId && typeof countrySelectId === 'string'
+            ? document.getElementById(countrySelectId)
+            : null;
+    var intl = sel && sel.tagName === 'SELECT' && sel.value === '__intl__';
     var cc =
         countrySelectId && typeof window.orangeStorefrontPhoneCountryDigits === 'function'
             ? window.orangeStorefrontPhoneCountryDigits(countrySelectId)
             : null;
     if (typeof window.orangeNormalizeCustomerPhone === 'function') {
-        var n = window.orangeNormalizeCustomerPhone(s, cc);
+        var n = window.orangeNormalizeCustomerPhone(s, intl ? null : cc, intl);
         if (n) {
             return n;
         }
     }
     return s;
+}
+
+function orangeTrackPhoneCountryPayload(selectId) {
+    var el = selectId ? document.getElementById(selectId) : null;
+    if (!el || el.tagName !== 'SELECT' || el.value === '') {
+        return '';
+    }
+    if (el.value === '__intl__') {
+        return '__intl__';
+    }
+    return typeof window.orangeStorefrontPhoneCountryDigits === 'function'
+        ? window.orangeStorefrontPhoneCountryDigits(selectId) || ''
+        : '';
 }
 
 async function pageTrackOrderNow() {
@@ -225,7 +243,7 @@ async function pageTrackOrderNow() {
         typeof window.orangeStorefrontPhoneCountryDigits === 'function'
             ? window.orangeStorefrontPhoneCountryDigits('track_phone_country')
             : null;
-    if (!trackCc) {
+    if (trackCc === null || trackCc === undefined) {
         if (typeof window.orangeShowToast === 'function') {
             window.orangeShowToast(msgCc, 3800);
         } else {
@@ -525,7 +543,7 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
             typeof window.orangeStorefrontPhoneCountryDigits === 'function'
                 ? window.orangeStorefrontPhoneCountryDigits('trackSignupVerifyPhone_country')
                 : null;
-        if (!verifyCc) {
+        if (verifyCc === null || verifyCc === undefined) {
             verifyFeedbackEl.textContent = (window.APP_T && window.APP_T.phone_country_required) || trackSignupT.missing || '';
             return;
         }
@@ -627,7 +645,7 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
             typeof window.orangeStorefrontPhoneCountryDigits === 'function'
                 ? window.orangeStorefrontPhoneCountryDigits('trackSignupVerifyPhone_country')
                 : null;
-        if (!signupVerifyCc) {
+        if (signupVerifyCc === null || signupVerifyCc === undefined) {
             msgEl.textContent = (window.APP_T && window.APP_T.phone_country_required) || trackSignupT.order_required || '';
             return;
         }
@@ -684,10 +702,7 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
                 email: email,
                 name: name,
                 phone: orderVerifyPhone,
-                phone_country:
-                    typeof window.orangeStorefrontPhoneCountryDigits === 'function'
-                        ? window.orangeStorefrontPhoneCountryDigits('trackSignupVerifyPhone_country') || ''
-                        : '',
+                phone_country: orangeTrackPhoneCountryPayload('trackSignupVerifyPhone_country'),
                 area: area,
                 delivery_area_id: deliveryAreaId,
                 address: address,

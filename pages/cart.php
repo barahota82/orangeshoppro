@@ -118,7 +118,7 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
                     </div>
                     <div class="field field-phone-row__number">
                         <label for="customer_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
-                        <input id="customer_phone" class="js-orange-phone-input" type="tel" autocomplete="tel" inputmode="numeric" maxlength="16" data-orange-national-phone="customer_phone_country" placeholder="<?php echo htmlspecialchars(t('phone_field_hint'), ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" required>
+                        <input id="customer_phone" class="js-orange-phone-input" type="tel" autocomplete="tel" inputmode="numeric" maxlength="22" data-orange-national-phone="customer_phone_country" placeholder="<?php echo htmlspecialchars(t('phone_field_hint'), ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" required>
                     </div>
                 </div>
                 <div class="field">

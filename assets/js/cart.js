@@ -1575,7 +1575,7 @@ async function sendOrderNow() {
             typeof window.orangeStorefrontPhoneCountryDigits === 'function'
                 ? window.orangeStorefrontPhoneCountryDigits('customer_phone_country')
                 : null;
-        if (!ccAm) {
+        if (ccAm === null || ccAm === undefined) {
             orangeShowToast(
                 (window.APP_T && window.APP_T.phone_country_required) ||
                     (window.APP_T && window.APP_T.checkout_required_fields) ||
@@ -1584,12 +1584,18 @@ async function sendOrderNow() {
             );
             return;
         }
+        const intlAm =
+            (document.getElementById('customer_phone_country') || {}).value === '__intl__';
         const phoneRawAm = document.getElementById('customer_phone')
             ? document.getElementById('customer_phone').value.trim()
             : '';
         const phoneNormAm =
             typeof window.orangeNormalizeCustomerPhone === 'function'
-                ? window.orangeNormalizeCustomerPhone(phoneRawAm, ccAm)
+                ? window.orangeNormalizeCustomerPhone(
+                      phoneRawAm,
+                      intlAm ? null : ccAm,
+                      intlAm
+                  )
                 : null;
         const amendNorm =
             typeof window.orangeNormalizeCustomerPhone === 'function'
@@ -1709,7 +1715,7 @@ async function sendOrderNow() {
         typeof window.orangeStorefrontPhoneCountryDigits === 'function'
             ? window.orangeStorefrontPhoneCountryDigits('customer_phone_country')
             : null;
-    if (!checkoutCc) {
+    if (checkoutCc === null || checkoutCc === undefined) {
         orangeShowToast(
             (window.APP_T && window.APP_T.phone_country_required) ||
                 (window.APP_T && window.APP_T.checkout_required_fields) ||
@@ -1718,12 +1724,18 @@ async function sendOrderNow() {
         );
         return;
     }
+    const checkoutIntl =
+        (document.getElementById('customer_phone_country') || {}).value === '__intl__';
     const phoneRaw = document.getElementById('customer_phone')
         ? document.getElementById('customer_phone').value.trim()
         : '';
     const phoneNorm =
         typeof window.orangeNormalizeCustomerPhone === 'function'
-            ? window.orangeNormalizeCustomerPhone(phoneRaw, checkoutCc)
+            ? window.orangeNormalizeCustomerPhone(
+                  phoneRaw,
+                  checkoutIntl ? null : checkoutCc,
+                  checkoutIntl
+              )
             : null;
     const areaEl = document.getElementById('customer_area');
     let deliveryAreaId = 0;
@@ -1747,7 +1759,7 @@ async function sendOrderNow() {
     const payload = {
         name: document.getElementById('customer_name').value.trim(),
         phone: phoneNorm || phoneRaw,
-        phone_country: checkoutCc || '',
+        phone_country: checkoutIntl ? '__intl__' : checkoutCc || '',
         email: emailRaw,
         area: areaVal,
         delivery_area_id: deliveryAreaId,

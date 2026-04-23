@@ -460,6 +460,17 @@
             opt.textContent = label;
             selectEl.appendChild(opt);
         });
+        var intlLabel = T.phone_country_full_international || 'International — full number';
+        var optIntl = document.createElement('option');
+        optIntl.value = '__intl__';
+        optIntl.textContent = intlLabel;
+        selectEl.appendChild(optIntl);
+        rowsForCombo.push({
+            value: '__intl__',
+            label: intlLabel,
+            country: intlLabel,
+            codeDigits: '',
+        });
         selectEl._orangeCountryRows = rowsForCombo;
         selectEl.dataset.orangeCountryCodesDone = '1';
         orangeAttachCountryCombobox(selectEl);
@@ -467,7 +478,7 @@
 
     /**
      * @param {string|HTMLSelectElement|null|undefined} selectIdOrEl
-     * @returns {string|null} digits only, e.g. "965", or null if international / invalid
+     * @returns {string|null} أرقام البادئة (مثل 965)، أو "" عند اختيار ‎__intl__‎، أو null إن لم يُختر شيء/غير صالح
      */
     function orangeStorefrontPhoneCountryDigits(selectIdOrEl) {
         var el =
@@ -478,6 +489,9 @@
         var v = el.value;
         if (v === '') {
             return null;
+        }
+        if (v === '__intl__') {
+            return '';
         }
         var idx = parseInt(v, 10);
         if (isNaN(idx) || !window.COUNTRY_CODES || !window.COUNTRY_CODES[idx]) {

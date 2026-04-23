@@ -295,19 +295,19 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     }
     $data['email'] = $emailCheck;
 
-    $phoneCcRaw = trim((string) ($data['phone_country'] ?? ''));
-    $phoneCc = preg_replace('/\D+/', '', $phoneCcRaw);
-    if ($phoneCc === '') {
+    $pcParsed = orange_storefront_parse_api_phone_country((string) ($data['phone_country'] ?? ''));
+    if (!$pcParsed['full_intl'] && $pcParsed['dial'] === '') {
         throw new RuntimeException(function_exists('t') ? t('phone_country_required') : 'Country code required.');
     }
     $phoneRawIn = trim((string) ($data['phone'] ?? ''));
-    $phoneNorm = orange_normalize_customer_phone($phoneRawIn, $phoneCc);
+    $dialForNational = $pcParsed['full_intl'] ? null : $pcParsed['dial'];
+    $phoneNorm = orange_normalize_customer_phone($phoneRawIn, $dialForNational, $pcParsed['full_intl']);
     if ($phoneNorm === null) {
         throw new RuntimeException(function_exists('t') ? t('checkout_invalid_phone') : 'Invalid phone.');
     }
     $data['phone'] = $phoneNorm;
-    $data['phone_country'] = $phoneCc;
-    $partsStore = orange_storefront_phone_storage_parts($phoneRawIn, $phoneCc);
+    $data['phone_country'] = $pcParsed['full_intl'] ? '' : $pcParsed['dial'];
+    $partsStore = orange_storefront_phone_storage_parts($phoneRawIn, $dialForNational);
     $data['phone_country_dial'] = $partsStore['country_dial'];
     $data['phone_national'] = $partsStore['national'];
 
