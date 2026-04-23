@@ -169,6 +169,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var hasNameEn = <?php echo $hasNameEn ? 'true' : 'false'; ?>;
     var hasSuspended = <?php echo $hasSuspended ? 'true' : 'false'; ?>;
     var hasNb = <?php echo $hasNb ? 'true' : 'false'; ?>;
+    var __orangeAdminPub = typeof window.ORANGE_PUBLIC_BASE_PATH === 'string' ? window.ORANGE_PUBLIC_BASE_PATH.replace(/\/+$/, '') : '';
 
     var levelOrds = ['', 'الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر'];
 
@@ -243,7 +244,7 @@ document.addEventListener('DOMContentLoaded', function () {
             a.classList.add('coa-footer-link--disabled');
             return;
         }
-        a.href = '/admin/index.php?page=financial_report&fy=' + encodeURIComponent(fy) + '&account=' + id;
+        a.href = __orangeAdminPub + '/admin/index.php?page=financial_report&fy=' + encodeURIComponent(fy) + '&account=' + id;
         a.classList.remove('coa-footer-link--disabled');
     }
 
@@ -574,7 +575,7 @@ document.addEventListener('DOMContentLoaded', function () {
             alert('عرّف سنة مالية أولاً من «السنوات المالية»');
             return;
         }
-        window.open('/admin/index.php?page=financial_report&fy=' + encodeURIComponent(fy) + '&account=' + id + '&print=1', '_blank');
+        window.open(__orangeAdminPub + '/admin/index.php?page=financial_report&fy=' + encodeURIComponent(fy) + '&account=' + id + '&print=1', '_blank');
     });
 
     document.getElementById('coa_btn_statement').addEventListener('click', function (e) {

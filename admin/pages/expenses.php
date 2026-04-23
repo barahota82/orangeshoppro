@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/upload_paths.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -14,7 +15,7 @@ if (orange_table_exists($pdo, 'expenses')) {
     $hasNotesCol = orange_table_has_column($pdo, 'expenses', 'notes');
     $expenseList = $pdo->query('SELECT * FROM expenses ORDER BY id DESC LIMIT 200')->fetchAll(PDO::FETCH_ASSOC);
 }
-$glHint = '/admin/index.php?page=gl_account_settings';
+$glHint = storefront_public_path('/admin/index.php?page=gl_account_settings');
 ?>
 <div class="page-title page-title--stacked">
     <h1>المصروفات</h1>

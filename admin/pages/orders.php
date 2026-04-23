@@ -58,7 +58,7 @@ try {
 
 $ordersIndex = (isset($_SERVER['SCRIPT_NAME']) && is_string($_SERVER['SCRIPT_NAME']) && $_SERVER['SCRIPT_NAME'] !== '')
     ? $_SERVER['SCRIPT_NAME']
-    : '/admin/index.php';
+    : storefront_public_path('/admin/index.php');
 
 /**
  * @param array<string, mixed> $o
