@@ -87,7 +87,14 @@ $orangeMyOrderUi = [
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="trackSignupArea"><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <?php if (count($trackDeliveryAreas) > 0): ?>
                     <input id="trackSignupArea" name="area" autocomplete="address-level1">
+                    <?php else: ?>
+                    <select id="trackSignupArea" name="area" class="js-orange-delivery-area-unavailable" autocomplete="address-level1" disabled aria-describedby="trackSignupAreaUnavailableHelp">
+                        <option value=""><?php echo htmlspecialchars(t('checkout_select_area'), ENT_QUOTES, 'UTF-8'); ?></option>
+                    </select>
+                    <p id="trackSignupAreaUnavailableHelp" class="track-signup-cta__text" style="margin:0.35rem 0 0;color:#b45309;"><?php echo htmlspecialchars(t('checkout_delivery_areas_unavailable_note'), ENT_QUOTES, 'UTF-8'); ?></p>
+                    <?php endif; ?>
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="trackSignupAddress"><?php echo htmlspecialchars(t('address'), ENT_QUOTES, 'UTF-8'); ?></label>
@@ -634,6 +641,13 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
         }
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             msgEl.textContent = badEmail;
+            return;
+        }
+        if (areaElSubmit && areaElSubmit.tagName === 'SELECT' && areaElSubmit.disabled) {
+            msgEl.textContent =
+                (window.APP_T && window.APP_T.checkout_delivery_areas_unavailable) ||
+                trackSignupT.order_required ||
+                '';
             return;
         }
         if (areaElSubmit && areaElSubmit.tagName === 'SELECT') {

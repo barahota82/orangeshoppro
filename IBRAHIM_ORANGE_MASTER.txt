@@ -171,6 +171,7 @@ IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
   واجهة `pages/cart.php` + `assets/js/cart.js`.
 - طلب جزئي من العربة (س30): عند أكثر من سطر وليس وضع تعديل طلب، اختيار البنود المُرسَلة في `assets/js/cart.js`؛ الباقي يبقى في `localStorage`؛ الإرسال `sendOrderNow` → `create-order.php`؛ وضع التعديل `amend` يُرسل كامل السلة كسابق.
 - تعديل بنود الطلب بعد الإرسال (س22): `api/orders/amend-order-items.php` — ترتيب الخصومات كالإنشاء: **كومبو** (`cart_combo_promotions.php`) ثم خصم **مجموع السلة** على الصافي بعد الكومبو ثم **هدايا المجموع وBOGO** (`storefront_checkout_promo_lines.php`)؛ انظر `docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt` س22.
+- مناطق التوصيل في الواجهة (س8/س20): عند **صفر** مناطق نشطة في `delivery_areas` — `pages/cart.php` و`pages/register.php` و`pages/track.php` تعرض قائمة معطّلة ورسالة؛ `assets/js/cart.js` (إرسال الطلب) ونماذج التسجيل ترفض الإكمال؛ مفاتيح ترجمة `checkout_delivery_areas_unavailable` و`checkout_delivery_areas_unavailable_note` في `config.php` و`includes/header.php` (`APP_T`).
 - بريد تفاصيل الطلب بعد التتبع (س13): `api/orders/email-track-order-summary.php` + عرض في `assets/js/cart.js` (`orangeSendTrackOrderEmailSummary`).
 - تقرير مبيعات حسب منطقة التوصيل (س8): `admin/pages/reports.php` — طلبات مكتملة مجمّعة حسب المنطقة.
 - بريد الضيف في الطلب (س19): حقل اختياري `#customer_email` في `pages/cart.php`؛ الإرسال من `assets/js/cart.js` (`sendOrderNow`) إلى `api/orders/create-order.php`.

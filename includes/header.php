@@ -281,6 +281,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
             checkout_select_area: <?php echo json_encode(t('checkout_select_area'), JSON_UNESCAPED_UNICODE); ?>,
             delivery_area_open_list: <?php echo json_encode(t('delivery_area_open_list'), JSON_UNESCAPED_UNICODE); ?>,
             checkout_delivery_area_required: <?php echo json_encode(t('checkout_delivery_area_required'), JSON_UNESCAPED_UNICODE); ?>,
+            checkout_delivery_areas_unavailable: <?php echo json_encode(t('checkout_delivery_areas_unavailable'), JSON_UNESCAPED_UNICODE); ?>,
             select_color: <?php echo json_encode(t('select_color'), JSON_UNESCAPED_UNICODE); ?>,
             select_size: <?php echo json_encode(t('select_size'), JSON_UNESCAPED_UNICODE); ?>,
             added: <?php echo json_encode(t('added'), JSON_UNESCAPED_UNICODE); ?>,

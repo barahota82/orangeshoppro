@@ -1728,6 +1728,15 @@ async function sendOrderNow() {
     const areaEl = document.getElementById('customer_area');
     let deliveryAreaId = 0;
     let areaVal = '';
+    if (areaEl && areaEl.tagName === 'SELECT' && areaEl.disabled) {
+        orangeShowToast(
+            (window.APP_T && window.APP_T.checkout_delivery_areas_unavailable) ||
+                (window.APP_T && window.APP_T.checkout_delivery_area_required) ||
+                '',
+            4200
+        );
+        return;
+    }
     if (areaEl && areaEl.tagName === 'SELECT') {
         deliveryAreaId = parseInt(areaEl.value, 10) || 0;
         const opt = areaEl.options[areaEl.selectedIndex];

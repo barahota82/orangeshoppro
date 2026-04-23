@@ -119,7 +119,14 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="reg_area"><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
+                    <?php if (count($registerDeliveryAreas) > 0): ?>
                     <input id="reg_area" name="area" autocomplete="address-level1" required placeholder="<?php echo htmlspecialchars(t('register_placeholder_area'), ENT_QUOTES, 'UTF-8'); ?>">
+                    <?php else: ?>
+                    <select id="reg_area" name="area" class="js-orange-delivery-area-unavailable" autocomplete="address-level1" disabled aria-describedby="regAreaUnavailableHelp">
+                        <option value=""><?php echo htmlspecialchars(t('checkout_select_area'), ENT_QUOTES, 'UTF-8'); ?></option>
+                    </select>
+                    <p id="regAreaUnavailableHelp" class="track-signup-cta__text" style="margin:0.35rem 0 0;color:#b45309;"><?php echo htmlspecialchars(t('checkout_delivery_areas_unavailable_note'), ENT_QUOTES, 'UTF-8'); ?></p>
+                    <?php endif; ?>
                 </div>
                 <div class="field track-signup-cta__field">
                     <label for="reg_address"><?php echo htmlspecialchars(t('address'), ENT_QUOTES, 'UTF-8'); ?></label>
@@ -267,6 +274,11 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                     var areaEl = document.getElementById('reg_area');
                     var area = '';
                     var deliveryAreaId = 0;
+                    if (areaEl && areaEl.tagName === 'SELECT' && areaEl.disabled) {
+                        msg.textContent =
+                            (window.APP_T && window.APP_T.checkout_delivery_areas_unavailable) || reqMsg;
+                        return;
+                    }
                     if (areaEl && areaEl.tagName === 'SELECT') {
                         deliveryAreaId = parseInt(areaEl.value, 10) || 0;
                         var optA = areaEl.options[areaEl.selectedIndex];
