@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/order_stock.php';
+require_once __DIR__ . '/../../includes/upload_paths.php';
 
 $productId = (int)($_GET['product_id'] ?? 0);
 if ($productId < 1) {
@@ -44,7 +45,7 @@ $movements = $pdo->prepare("
 $movements->execute([$productId]);
 $movements = $movements->fetchAll(PDO::FETCH_ASSOC);
 
-$img = $product['main_image'] ? '/uploads/products/' . rawurlencode($product['main_image']) : '';
+$img = storefront_product_image_web_path((string) ($product['main_image'] ?? ''));
 ?>
 <div class="page-title page-title--stacked">
     <div>
