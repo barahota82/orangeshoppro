@@ -7,10 +7,11 @@ orange_catalog_ensure_schema($pdo);
 $hasTable = orange_table_exists($pdo, 'cart_bogo_promotions');
 ?>
 <div class="page-title page-title--stacked">
-    <h1>عروض BOGO (قطعتان متطابقتان / من نفس الفئة)</h1>
+    <h1>عروض BOGO (متطابق / فئة / حزمة شراء أ+ب)</h1>
     <p class="page-subtitle"><strong>س4:</strong> (1) <em>نفس المتغير</em> — عدد القطع على سطر واحد يبلغ الحد الأدنى (افتراضي 2).
-        (2) <em>نفس الفئة</em> — عدد المنتجات <strong>المختلفة</strong> ضمن الفئة يبلغ الحد الأدنى (مثال 2 = منتجان مختلفان من نفس التصنيف).
-        الهدية: ثابتة أو اختيار من قائمة متغيرات. يُطبَّق أول قاعدة نشطة بالترتيب تطابق السلة. يعمل مع عروض هدية المجموع عند تفعيلها معاً.</p>
+        (2) <em>نفس الفئة</em> — عدد المنتجات <strong>المختلفة</strong> ضمن الفئة يبلغ الحد الأدنى.
+        (3) <em>حزمة شراء</em> — متغيران مختلفان على الأقل بكميات محددة في السلة (أسعار التجزئة للشراء؛ الهدية كما تضبطها أدناه).
+        الهدية: ثابتة أو اختيار. يُطبَّق أول قاعدة نشطة بالترتيب تطابق السلة.</p>
 </div>
 
 <?php if (!$hasTable): ?>
@@ -32,13 +33,20 @@ $hasTable = orange_table_exists($pdo, 'cart_bogo_promotions');
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
                     <input type="radio" name="cbp_bogo" value="same_category" onchange="cbpToggleBogo()"> منتجات مختلفة من نفس الفئة
                 </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="radio" name="cbp_bogo" value="buy_bundle" onchange="cbpToggleBogo()"> حزمة شراء (متغير أ + متغير ب…)
+                </label>
             </div>
         </div>
         <div id="cbp_cat_wrap" style="grid-column:1/-1;display:none;">
             <label>رقم الفئة (category_id)</label>
             <input type="number" id="cbp_cat" class="admin-inp" min="1" step="1" style="max-width:12rem;" dir="ltr">
         </div>
-        <div>
+        <div id="cbp_buy_bundle_wrap" style="grid-column:1/-1;display:none;">
+            <label>مكوّنات الشراء — سطر لكل متغير: <code dir="ltr">variant_id qty</code> (متغيران مختلفان على الأقل)</label>
+            <textarea id="cbp_buy_comp" rows="4" class="admin-inp" dir="ltr" style="width:100%;max-width:40rem;font-family:monospace;" placeholder="101 1&#10;205 1"></textarea>
+        </div>
+        <div id="cbp_minbuy_wrap">
             <label>الحد الأدنى للكمية / عدد المنتجات المختلفة</label>
             <input type="number" id="cbp_minbuy" class="admin-inp" min="2" step="1" value="2" style="max-width:12rem;" dir="ltr">
         </div>
@@ -104,9 +112,11 @@ $hasTable = orange_table_exists($pdo, 'cart_bogo_promotions');
 
 <script>
 function cbpToggleBogo() {
-    const cat = document.querySelector('input[name="cbp_bogo"]:checked');
-    const show = cat && cat.value === 'same_category';
-    document.getElementById('cbp_cat_wrap').style.display = show ? 'block' : 'none';
+    const el = document.querySelector('input[name="cbp_bogo"]:checked');
+    const v = el ? el.value : 'same_variant';
+    document.getElementById('cbp_cat_wrap').style.display = v === 'same_category' ? 'block' : 'none';
+    document.getElementById('cbp_buy_bundle_wrap').style.display = v === 'buy_bundle' ? 'block' : 'none';
+    document.getElementById('cbp_minbuy_wrap').style.display = v === 'buy_bundle' ? 'none' : 'block';
 }
 
 function cbpToggleGift() {
@@ -123,6 +133,7 @@ function resetCartBogoPromotionForm() {
     document.getElementById('cbp_sort').value = '0';
     document.getElementById('cbp_pool').value = '';
     document.getElementById('cbp_fixed').value = '';
+    document.getElementById('cbp_buy_comp').value = '';
     document.querySelector('input[name="cbp_bogo"][value="same_variant"]').checked = true;
     document.querySelector('input[name="cbp_gift"][value="choice"]').checked = true;
     document.getElementById('cbp_reg').checked = false;
@@ -133,7 +144,12 @@ function resetCartBogoPromotionForm() {
 
 function editCartBogoPromotion(row) {
     document.getElementById('cbp_id').value = String(row.id != null ? row.id : 0);
-    const bk = (row.bogo_kind || 'same_variant') === 'same_category' ? 'same_category' : 'same_variant';
+    let bk = 'same_variant';
+    if ((row.bogo_kind || '') === 'same_category') {
+        bk = 'same_category';
+    } else if ((row.bogo_kind || '') === 'buy_bundle') {
+        bk = 'buy_bundle';
+    }
     document.querySelector('input[name="cbp_bogo"][value="' + bk + '"]').checked = true;
     cbpToggleBogo();
     document.getElementById('cbp_cat').value =
@@ -149,6 +165,11 @@ function editCartBogoPromotion(row) {
         row.fixed_variant_id != null && row.fixed_variant_id !== '' ? String(row.fixed_variant_id) : '';
     document.getElementById('cbp_reg').checked = parseInt(row.requires_registered_account, 10) === 1;
     document.getElementById('cbp_active').checked = parseInt(row.is_active, 10) === 1;
+    var buyLines = [];
+    (row.buy_components || []).forEach(function (c) {
+        buyLines.push(String(c.variant_id) + ' ' + String(c.qty));
+    });
+    document.getElementById('cbp_buy_comp').value = buyLines.join('\n');
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -169,8 +190,12 @@ async function loadCartBogoPromotions() {
     const tb = document.getElementById('cbp_tbody');
     tb.innerHTML = '';
     rows.forEach(function (r) {
-        const cond =
-            (r.bogo_kind || '') === 'same_category' ? 'فئة — منتجات مختلفة' : 'نفس المتغير';
+        let cond = 'نفس المتغير';
+        if ((r.bogo_kind || '') === 'same_category') {
+            cond = 'فئة — منتجات مختلفة';
+        } else if ((r.bogo_kind || '') === 'buy_bundle') {
+            cond = 'حزمة شراء';
+        }
         const cat = r.category_id != null && r.category_id !== '' ? escCbp(String(r.category_id)) : '—';
         const gkind = (r.gift_kind || '') === 'fixed' ? 'ثابتة' : 'اختيار';
         const tr = document.createElement('tr');
@@ -209,7 +234,8 @@ async function saveCartBogoPromotion() {
         is_active: document.getElementById('cbp_active').checked ? 1 : 0,
         gift_kind: giftEl ? giftEl.value : 'choice',
         fixed_variant_id: parseInt(document.getElementById('cbp_fixed').value, 10) || 0,
-        pool_variant_ids_text: document.getElementById('cbp_pool').value
+        pool_variant_ids_text: document.getElementById('cbp_pool').value,
+        buy_components_text: document.getElementById('cbp_buy_comp').value
     });
     alert(res.message || (res.success ? 'تم الحفظ' : 'فشل'));
     if (res.success) {

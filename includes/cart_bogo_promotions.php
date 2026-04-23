@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/cart_gift_promotions.php';
+require_once __DIR__ . '/cart_combo_promotions.php';
 
 /**
  * @param array<string,mixed> $row صف من cart_bogo_promotions
@@ -11,7 +12,32 @@ require_once __DIR__ . '/cart_gift_promotions.php';
  */
 function orange_cart_bogo_rule_matches_cart(array $validatedItems, array $row): bool
 {
-    $kind = strtolower(trim((string) ($row['bogo_kind'] ?? ''))) === 'same_category' ? 'same_category' : 'same_variant';
+    $kindRaw = strtolower(trim((string) ($row['bogo_kind'] ?? '')));
+    if ($kindRaw === 'buy_bundle') {
+        $comps = orange_cart_combo_parse_components_json($row['buy_components_json'] ?? null);
+        if (count($comps) < 2) {
+            return false;
+        }
+        $uniq = [];
+        foreach ($comps as $c) {
+            $uniq[(int) $c['variant_id']] = true;
+        }
+        if (count($uniq) < 2) {
+            return false;
+        }
+        $byV = orange_cart_combo_aggregate_variant_units($validatedItems);
+        foreach ($comps as $c) {
+            $vid = (int) $c['variant_id'];
+            $need = (int) $c['qty'];
+            if (!isset($byV[$vid]) || $byV[$vid]['qty'] < $need) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    $kind = $kindRaw === 'same_category' ? 'same_category' : 'same_variant';
     $minQ = max(2, (int) ($row['min_buy_qty'] ?? 2));
 
     if ($kind === 'same_variant') {
@@ -49,7 +75,7 @@ function orange_cart_bogo_promotions_admin_list(PDO $pdo): array
         return [];
     }
     $st = $pdo->query(
-        'SELECT id, bogo_kind, category_id, min_buy_qty, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids, sort_order, is_active
+        'SELECT id, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids, sort_order, is_active
          FROM cart_bogo_promotions ORDER BY sort_order ASC, id ASC'
     );
     if (!$st) {
@@ -64,6 +90,7 @@ function orange_cart_bogo_promotions_admin_list(PDO $pdo): array
             'bogo_kind' => (string) ($row['bogo_kind'] ?? 'same_variant'),
             'category_id' => isset($row['category_id']) ? (int) $row['category_id'] : null,
             'min_buy_qty' => (int) ($row['min_buy_qty'] ?? 2),
+            'buy_components' => orange_cart_combo_parse_components_json($row['buy_components_json'] ?? null),
             'requires_registered_account' => (int) ($row['requires_registered_account'] ?? 0),
             'gift_kind' => (string) ($row['gift_kind'] ?? 'choice'),
             'fixed_variant_id' => $fix > 0 ? $fix : null,
@@ -88,7 +115,7 @@ function orange_cart_bogo_promotion_select_rule(PDO $pdo, array $validatedItems,
         return null;
     }
     $st = $pdo->query(
-        "SELECT id, bogo_kind, category_id, min_buy_qty, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids
+        "SELECT id, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids
          FROM cart_bogo_promotions
          WHERE is_active = 1
          ORDER BY sort_order ASC, id ASC"
@@ -103,6 +130,7 @@ function orange_cart_bogo_promotion_select_rule(PDO $pdo, array $validatedItems,
         if (!orange_cart_bogo_rule_matches_cart($validatedItems, $row)) {
             continue;
         }
+        $bogoKindNorm = strtolower(trim((string) ($row['bogo_kind'] ?? ''))) === 'buy_bundle' ? 'buy_bundle' : (strtolower(trim((string) ($row['bogo_kind'] ?? ''))) === 'same_category' ? 'same_category' : 'same_variant');
         $gKind = strtolower(trim((string) ($row['gift_kind'] ?? 'choice'))) === 'fixed' ? 'fixed' : 'choice';
         $fixed = isset($row['fixed_variant_id']) ? (int) $row['fixed_variant_id'] : 0;
         $pool = orange_cart_gift_parse_pool($row['pool_variant_ids'] ?? null);
@@ -115,7 +143,7 @@ function orange_cart_bogo_promotion_select_rule(PDO $pdo, array $validatedItems,
 
         return [
             'id' => (int) $row['id'],
-            'bogo_kind' => (string) ($row['bogo_kind'] ?? 'same_variant'),
+            'bogo_kind' => $bogoKindNorm,
             'category_id' => isset($row['category_id']) ? (int) $row['category_id'] : null,
             'min_buy_qty' => (int) ($row['min_buy_qty'] ?? 2),
             'gift_kind' => $gKind,

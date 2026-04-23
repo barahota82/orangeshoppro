@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 5);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 6);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -1715,6 +1715,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
                 bogo_kind VARCHAR(24) NOT NULL DEFAULT 'same_variant',
                 category_id INT UNSIGNED NULL DEFAULT NULL,
                 min_buy_qty INT UNSIGNED NOT NULL DEFAULT 2,
+                buy_components_json TEXT NULL,
                 requires_registered_account TINYINT(1) NOT NULL DEFAULT 0,
                 gift_kind VARCHAR(16) NOT NULL DEFAULT 'choice',
                 fixed_variant_id INT UNSIGNED NULL DEFAULT NULL,
@@ -1725,6 +1726,10 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
                 KEY idx_cart_bogo_active_sort (is_active, sort_order)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
+    }
+
+    if (orange_table_exists($pdo, 'cart_bogo_promotions') && !orange_table_has_column($pdo, 'cart_bogo_promotions', 'buy_components_json')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE cart_bogo_promotions ADD COLUMN buy_components_json TEXT NULL');
     }
 
     if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'cart_bogo_promotion_id')) {
