@@ -22,11 +22,16 @@ if (function_exists('storefront_tagline_cycle_messages')) {
     ?>
 <textarea id="storefront-tagline-json" hidden readonly class="storefront-tagline-json"><?php echo htmlspecialchars((string)$sfTaglineJson, ENT_QUOTES, 'UTF-8'); ?></textarea>
 <?php } ?>
-<script src="<?php echo htmlspecialchars(storefront_asset_url('/assets/js/lang.js'), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
-<script src="<?php echo htmlspecialchars(storefront_asset_url('/assets/js/country-codes.js'), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
-<script src="<?php echo htmlspecialchars(storefront_asset_url('/assets/js/input-constraints.js'), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
-<script src="<?php echo htmlspecialchars(storefront_asset_url('/assets/js/storefront-country-codes.js'), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
-<script src="<?php echo htmlspecialchars(storefront_asset_url('/assets/js/app.js'), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
-<script src="<?php echo htmlspecialchars(storefront_asset_url('/assets/js/cart.js'), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+<?php
+if (!function_exists('storefront_public_path')) {
+    require_once __DIR__ . '/upload_paths.php';
+}
+?>
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/lang.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/country-codes.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/input-constraints.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/storefront-country-codes.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/app.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/cart.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
 </body>
 </html>

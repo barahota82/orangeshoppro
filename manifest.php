@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/catalog_schema.php';
 require_once __DIR__ . '/includes/storefront_account.php';
+require_once __DIR__ . '/includes/upload_paths.php';
 
 $pdo = db();
 orange_catalog_ensure_storefront_read_bootstrap($pdo);
@@ -33,10 +34,9 @@ if (function_exists('mb_strlen') && function_exists('mb_substr')) {
     $shortName = substr($shortName, 0, 12) . '…';
 }
 
-$pub = PUBLIC_BASE_PATH === '' ? '' : PUBLIC_BASE_PATH;
 /** روابط مطلقة: Chrome/Edge على الويندوز يعتمدون عليها لأيقونة التثبيت والاختصار */
-$pwaIconSrc = static function (string $file) use ($pub): string {
-    $rel = $pub . storefront_asset_url('/assets/images/' . $file);
+$pwaIconSrc = static function (string $file): string {
+    $rel = storefront_public_path(storefront_asset_url('/assets/images/' . $file));
 
     return storefront_absolute_url($rel);
 };

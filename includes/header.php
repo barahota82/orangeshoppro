@@ -209,8 +209,8 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
     <?php if ($orangeOgImage !== ''): ?>
     <meta property="og:image" content="<?php echo htmlspecialchars($orangeOgImage, ENT_QUOTES, 'UTF-8'); ?>">
     <?php endif; ?>
-    <link rel="stylesheet" href="<?php echo htmlspecialchars(storefront_asset_url('/assets/css/main.css'), ENT_QUOTES, 'UTF-8'); ?>">
-    <link rel="stylesheet" href="<?php echo htmlspecialchars(storefront_asset_url('/assets/css/theme-' . $theme . '.css'), ENT_QUOTES, 'UTF-8'); ?>">
+    <link rel="stylesheet" href="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/css/main.css')), ENT_QUOTES, 'UTF-8'); ?>">
+    <link rel="stylesheet" href="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/css/theme-' . $theme . '.css')), ENT_QUOTES, 'UTF-8'); ?>">
     <script>
         window.APP_LANG = <?php echo json_encode($lang, JSON_UNESCAPED_UNICODE); ?>;
         window.APP_TAGLINE_CYCLE = <?php echo json_encode($taglineCycle, JSON_UNESCAPED_UNICODE); ?>;

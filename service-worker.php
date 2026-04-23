@@ -7,6 +7,7 @@ declare(strict_types=1);
  * يحسّن سرعة التنقل في نافذة PWA (standalone) بعد أول زيارة.
  */
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/includes/upload_paths.php';
 
 header('Content-Type: application/javascript; charset=utf-8');
 header('Cache-Control: public, max-age=120');
@@ -23,7 +24,7 @@ $precacheRel = [
 ];
 $precacheUrls = [];
 foreach ($precacheRel as $rel) {
-    $precacheUrls[] = $pub . $rel;
+    $precacheUrls[] = storefront_public_path($rel);
 }
 
 $v = storefront_asset_version();

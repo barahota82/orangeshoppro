@@ -293,7 +293,7 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
 </dialog>
 <?php endif; ?>
 
-<script src="<?php echo htmlspecialchars(storefront_asset_url('/assets/js/product.js'), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/product.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
 <script>
 window.CURRENT_PRODUCT = {
     id: <?php echo (int)$product['id']; ?>,
