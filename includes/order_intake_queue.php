@@ -359,6 +359,15 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     $bogoGiftVariantId = $promoBundle['bogoGiftVariantId'];
     $linesForStock = $promoBundle['linesForStock'];
 
+    $giftLinesCharge = 0.0;
+    if ($giftLine !== null) {
+        $giftLinesCharge += round((float) ($giftLine['price'] ?? 0) * (int) ($giftLine['qty'] ?? 1), 4);
+    }
+    if ($bogoLine !== null) {
+        $giftLinesCharge += round((float) ($bogoLine['price'] ?? 0) * (int) ($bogoLine['qty'] ?? 1), 4);
+    }
+    $orderTotal = max(0.0, round($orderTotal + $giftLinesCharge, 4));
+
     $customerRowId = orange_storefront_upsert_customer_from_checkout(
         $pdo,
         trim((string) $data['name']),

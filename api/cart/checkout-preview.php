@@ -74,6 +74,7 @@ try {
 
     $bogoPayload = null;
     $bogoRule = orange_cart_bogo_promotion_select_rule($pdo, $validatedItems, $buyerReg);
+    $bogoCtx = $validatedItems;
     if ($bogoRule !== null) {
         $bogoCtx = $validatedItems;
         if ($giftPayload !== null && ($giftPayload['gift_kind'] ?? '') === 'fixed' && !empty($giftPayload['fixed_variant_id'])) {
@@ -119,6 +120,15 @@ try {
             }
         }
     }
+
+    $bogoGiftChargePreview = 0.0;
+    if ($bogoRule !== null && $bogoPayload !== null) {
+        $bogoGiftChargePreview = orange_cart_bogo_preview_gift_charge_upper_bound($pdo, $bogoRule, $bogoCtx);
+        $bogoPayload['gift_unit_charge_kind'] = (string) ($bogoRule['gift_unit_charge_kind'] ?? 'free');
+        $bogoPayload['gift_unit_charge_value'] = (float) ($bogoRule['gift_unit_charge_value'] ?? 0);
+        $bogoPayload['preview_max_gift_unit_charge'] = $bogoGiftChargePreview;
+    }
+    $total = max(0.0, round($total + $bogoGiftChargePreview, 4));
 
     json_response([
         'success' => true,

@@ -71,6 +71,20 @@ $hasTable = orange_table_exists($pdo, 'cart_bogo_promotions');
             <input type="number" id="cbp_fixed" class="admin-inp" min="1" step="1" style="max-width:12rem;" dir="ltr">
         </div>
         <div style="grid-column:1/-1;">
+            <label for="cbp_gift_charge_kind"><strong>تسعير بند هدية BOGO (ب)</strong></label>
+            <select id="cbp_gift_charge_kind" class="admin-inp" style="max-width:28rem;margin-top:6px;" onchange="cbpToggleGiftCharge()">
+                <option value="free">مجانية بالكامل (سطر هدية بسعر صفر)</option>
+                <option value="percent_off">خصم نسبة من سعر التجزئة للوحدة</option>
+                <option value="amount_off_unit">خصم مبلغ ثابت من سعر التجزئة للوحدة</option>
+                <option value="fixed_unit">سعر بيع ثابت للوحدة (د.ك)</option>
+            </select>
+            <p class="page-subtitle" style="margin-top:6px;">للنسبة والمبلغ المخصوم: يُحسب من <code dir="ltr">products.price</code> للمنتج المختار كهدية. معاينة العربة تضيف أعلى تكلفة ممكنة عند «اختيار من مجموعة».</p>
+        </div>
+        <div id="cbp_gift_charge_val_wrap" style="grid-column:1/-1;display:none;">
+            <label id="cbp_gift_charge_val_label">القيمة</label>
+            <input type="number" id="cbp_gift_charge_val" class="admin-inp" min="0" step="0.0001" style="max-width:14rem;" dir="ltr" value="0">
+        </div>
+        <div style="grid-column:1/-1;">
             <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;max-width:52rem;line-height:1.45;">
                 <input type="checkbox" id="cbp_reg" style="margin-top:4px;flex-shrink:0;">
                 <span><strong>للمسجّلين فقط</strong></span>
@@ -99,6 +113,7 @@ $hasTable = orange_table_exists($pdo, 'cart_bogo_promotions');
                     <th>فئة</th>
                     <th>حد أدنى</th>
                     <th>هدية</th>
+                    <th>تسعير ب</th>
                     <th>نطاق</th>
                     <th>ترتيب</th>
                     <th>نشط</th>
@@ -126,6 +141,36 @@ function cbpToggleGift() {
     document.getElementById('cbp_block_pool').style.display = isFixed ? 'none' : 'block';
 }
 
+function cbpToggleGiftCharge() {
+    const sel = document.getElementById('cbp_gift_charge_kind');
+    const k = sel ? sel.value : 'free';
+    const wrap = document.getElementById('cbp_gift_charge_val_wrap');
+    const lab = document.getElementById('cbp_gift_charge_val_label');
+    const inp = document.getElementById('cbp_gift_charge_val');
+    if (!wrap || !lab || !inp) {
+        return;
+    }
+    if (k === 'free') {
+        wrap.style.display = 'none';
+        inp.value = '0';
+        return;
+    }
+    wrap.style.display = 'block';
+    if (k === 'percent_off') {
+        lab.textContent = 'نسبة الخصم (0–100)';
+        inp.max = '100';
+        inp.step = '0.01';
+    } else if (k === 'fixed_unit') {
+        lab.textContent = 'سعر الوحدة (د.ك)';
+        inp.removeAttribute('max');
+        inp.step = '0.0001';
+    } else {
+        lab.textContent = 'المبلغ المخصوم من سعر التجزئة للوحدة (د.ك)';
+        inp.removeAttribute('max');
+        inp.step = '0.0001';
+    }
+}
+
 function resetCartBogoPromotionForm() {
     document.getElementById('cbp_id').value = '0';
     document.getElementById('cbp_cat').value = '';
@@ -138,8 +183,11 @@ function resetCartBogoPromotionForm() {
     document.querySelector('input[name="cbp_gift"][value="choice"]').checked = true;
     document.getElementById('cbp_reg').checked = false;
     document.getElementById('cbp_active').checked = true;
+    document.getElementById('cbp_gift_charge_kind').value = 'free';
+    document.getElementById('cbp_gift_charge_val').value = '0';
     cbpToggleBogo();
     cbpToggleGift();
+    cbpToggleGiftCharge();
 }
 
 function editCartBogoPromotion(row) {
@@ -170,6 +218,12 @@ function editCartBogoPromotion(row) {
         buyLines.push(String(c.variant_id) + ' ' + String(c.qty));
     });
     document.getElementById('cbp_buy_comp').value = buyLines.join('\n');
+    var gck = (row.gift_unit_charge_kind || 'free').toLowerCase();
+    var allowed = { free: 1, percent_off: 1, fixed_unit: 1, amount_off_unit: 1 };
+    document.getElementById('cbp_gift_charge_kind').value = allowed[gck] ? gck : 'free';
+    document.getElementById('cbp_gift_charge_val').value =
+        row.gift_unit_charge_value != null && row.gift_unit_charge_value !== '' ? String(row.gift_unit_charge_value) : '0';
+    cbpToggleGiftCharge();
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -198,6 +252,15 @@ async function loadCartBogoPromotions() {
         }
         const cat = r.category_id != null && r.category_id !== '' ? escCbp(String(r.category_id)) : '—';
         const gkind = (r.gift_kind || '') === 'fixed' ? 'ثابتة' : 'اختيار';
+        var gcharge = 'مجانية';
+        var gck = (r.gift_unit_charge_kind || 'free').toLowerCase();
+        if (gck === 'percent_off') {
+            gcharge = 'خصم %';
+        } else if (gck === 'fixed_unit') {
+            gcharge = 'سعر ثابت';
+        } else if (gck === 'amount_off_unit') {
+            gcharge = 'خصم مبلغ';
+        }
         const tr = document.createElement('tr');
         tr.innerHTML =
             '<td>' + escCbp(String(r.id)) + '</td>' +
@@ -205,6 +268,7 @@ async function loadCartBogoPromotions() {
             '<td dir="ltr">' + cat + '</td>' +
             '<td>' + escCbp(String(r.min_buy_qty != null ? r.min_buy_qty : 2)) + '</td>' +
             '<td>' + gkind + '</td>' +
+            '<td>' + escCbp(gcharge) + '</td>' +
             '<td>' + (parseInt(r.requires_registered_account, 10) === 1 ? 'مسجّل فقط' : 'الكل') + '</td>' +
             '<td>' + escCbp(String(r.sort_order)) + '</td>' +
             '<td>' + (parseInt(r.is_active, 10) === 1 ? 'نعم' : 'لا') + '</td>' +
@@ -235,7 +299,9 @@ async function saveCartBogoPromotion() {
         gift_kind: giftEl ? giftEl.value : 'choice',
         fixed_variant_id: parseInt(document.getElementById('cbp_fixed').value, 10) || 0,
         pool_variant_ids_text: document.getElementById('cbp_pool').value,
-        buy_components_text: document.getElementById('cbp_buy_comp').value
+        buy_components_text: document.getElementById('cbp_buy_comp').value,
+        gift_unit_charge_kind: document.getElementById('cbp_gift_charge_kind').value,
+        gift_unit_charge_value: parseFloat(document.getElementById('cbp_gift_charge_val').value) || 0
     });
     alert(res.message || (res.success ? 'تم الحفظ' : 'فشل'));
     if (res.success) {
@@ -246,5 +312,6 @@ async function saveCartBogoPromotion() {
 
 cbpToggleBogo();
 cbpToggleGift();
+cbpToggleGiftCharge();
 loadCartBogoPromotions();
 </script>

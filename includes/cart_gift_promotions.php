@@ -172,13 +172,18 @@ function orange_cart_gift_promotion_pool_options(
 }
 
 /**
- * بند هدية بسعر صفر للفاتورة والحجز.
+ * بند هدية للفاتورة والحجز (مجانية افتراضياً؛ يُمرَّر سعر الوحدة لعروض مثل BOGO الجزئية).
  *
  * @param list<array{product:array<string,mixed>,qty:int,color:string,size:string,variant_id:int,price:float,cost:float}> $validatedItems
  * @return array{product:array<string,mixed>,qty:int,color:string,size:string,variant_id:int,price:float,cost:float,is_gift:bool}
  */
-function orange_storefront_build_gift_order_line(PDO $pdo, int $variantId, array $validatedItems, bool $lockVariants): array
-{
+function orange_storefront_build_gift_order_line(
+    PDO $pdo,
+    int $variantId,
+    array $validatedItems,
+    bool $lockVariants,
+    ?float $forcedUnitPrice = null
+): array {
     $lockSql = $lockVariants ? ' FOR UPDATE' : '';
     $vStmt = $pdo->prepare('SELECT * FROM product_variants WHERE id = ? LIMIT 1' . $lockSql);
     $vStmt->execute([$variantId]);
@@ -198,13 +203,18 @@ function orange_storefront_build_gift_order_line(PDO $pdo, int $variantId, array
         throw new RuntimeException(function_exists('t') ? t('checkout_gift_out_of_stock') : 'Gift item out of stock.');
     }
 
+    $unit = 0.0;
+    if ($forcedUnitPrice !== null) {
+        $unit = max(0.0, round((float) $forcedUnitPrice, 4));
+    }
+
     return [
         'product' => $product,
         'qty' => 1,
         'color' => (string) ($variant['color'] ?? ''),
         'size' => (string) ($variant['size'] ?? ''),
         'variant_id' => $variantId,
-        'price' => 0.0,
+        'price' => $unit,
         'cost' => (float) ($product['cost'] ?? 0),
         'is_gift' => true,
     ];

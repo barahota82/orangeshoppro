@@ -121,7 +121,8 @@ function orange_storefront_build_promotional_gift_lines(
             }
         }
         if ($bogoPick > 0) {
-            $bogoLine = orange_storefront_build_gift_order_line($pdo, $bogoPick, $linesAfterSubtotalGift, true);
+            $bogoUnit = orange_cart_bogo_resolve_gift_unit_price($pdo, $bogoRule, $bogoPick);
+            $bogoLine = orange_storefront_build_gift_order_line($pdo, $bogoPick, $linesAfterSubtotalGift, true, $bogoUnit);
             $bogoLine['is_bogo_gift'] = true;
             $bogoPromoId = $bogoRule['id'];
             $bogoGiftVariantId = $bogoPick;

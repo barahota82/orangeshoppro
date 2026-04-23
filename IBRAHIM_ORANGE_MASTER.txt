@@ -175,6 +175,7 @@ IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
 - بريد الضيف في الطلب (س19): حقل اختياري `#customer_email` في `pages/cart.php`؛ الإرسال من `assets/js/cart.js` (`sendOrderNow`) إلى `api/orders/create-order.php`.
 - تحفيز التسجيل عبر العروض (س7): `includes/cart_promotions.php` (`orange_cart_promotion_register_incentive_teaser`)؛ استجابة `api/cart/checkout-preview.php` (`register_promo_teaser`)؛ عرض في `assets/js/cart.js` + `pages/cart.php` (`ORANGE_REGISTER_URL`).
 - نطاق العرض مسجّل/الكل (س4): شاشة `admin/pages/cart_promotions.php` — عمود «نطاق العرض»: «جميع الزوّار» أو «مسجّل فقط» (`requires_registered_account`).
+- تسعير جزئي لهدية BOGO (س4): `cart_bogo_promotions.gift_unit_charge_kind` / `gift_unit_charge_value`؛ منطق `orange_cart_bogo_resolve_gift_unit_price` في `includes/cart_bogo_promotions.php`؛ ترحيل المخطط `ORANGE_CATALOG_SCHEMA_PHP_REVISION` 7.
 - الطلبات المحجوزة (س28): `admin/pages/reserved_orders.php`.
 - دمج هاتف التسجيل (س15 — صفحة register + تأكيد واتس يدوي): `includes/storefront_phone_merge.php`،
   `api/auth/request-email-verify.php`، `api/auth/apply-phone-merge.php`، `admin/pages/storefront_merge_requests.php`،

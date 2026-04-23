@@ -73,11 +73,22 @@ try {
         $orderTotal = max(0.0, round($netAfterCombo - $promoDiscount, 4));
 
         $promoBundle = orange_storefront_build_promotional_gift_lines($pdo, $data, $validatedItems, $subtotal, $buyerRegistered);
+        $giftLine = $promoBundle['giftLine'];
         $giftPromoId = $promoBundle['giftPromoId'];
         $giftVariantId = $promoBundle['giftVariantId'];
+        $bogoLine = $promoBundle['bogoLine'];
         $bogoPromoId = $promoBundle['bogoPromoId'];
         $bogoGiftVariantId = $promoBundle['bogoGiftVariantId'];
         $linesForStock = $promoBundle['linesForStock'];
+
+        $giftLinesCharge = 0.0;
+        if ($giftLine !== null) {
+            $giftLinesCharge += round((float) ($giftLine['price'] ?? 0) * (int) ($giftLine['qty'] ?? 1), 4);
+        }
+        if ($bogoLine !== null) {
+            $giftLinesCharge += round((float) ($bogoLine['price'] ?? 0) * (int) ($bogoLine['qty'] ?? 1), 4);
+        }
+        $orderTotal = max(0.0, round($orderTotal + $giftLinesCharge, 4));
 
         $orderId = (int) $order['id'];
         $hasCartPromo = orange_table_has_column($pdo, 'orders', 'cart_promotion_id')

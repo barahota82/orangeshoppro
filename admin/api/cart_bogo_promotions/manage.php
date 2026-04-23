@@ -151,11 +151,25 @@ try {
             }
         }
 
+        $gcRaw = strtolower(trim((string) ($data['gift_unit_charge_kind'] ?? 'free')));
+        $allowedGc = ['free', 'percent_off', 'fixed_unit', 'amount_off_unit'];
+        $giftChargeKind = in_array($gcRaw, $allowedGc, true) ? $gcRaw : 'free';
+        $giftChargeVal = (float) ($data['gift_unit_charge_value'] ?? 0);
+        if ($giftChargeKind === 'free') {
+            $giftChargeVal = 0.0;
+        }
+        if ($giftChargeKind === 'percent_off' && ($giftChargeVal < 0 || $giftChargeVal > 100)) {
+            json_response(['success' => false, 'message' => 'نسبة الخصم على هدية BOGO يجب أن تكون بين 0 و 100'], 422);
+        }
+        if (($giftChargeKind === 'fixed_unit' || $giftChargeKind === 'amount_off_unit') && $giftChargeVal < 0) {
+            json_response(['success' => false, 'message' => 'قيمة التسعير الجزئي لهدية BOGO لا يمكن أن تكون سالبة'], 422);
+        }
+
         $catSql = $bogoKind === 'same_category' && $catId > 0 ? $catId : null;
 
         if ($id > 0) {
             $st = $pdo->prepare(
-                'UPDATE cart_bogo_promotions SET bogo_kind = ?, category_id = ?, min_buy_qty = ?, buy_components_json = ?, requires_registered_account = ?, gift_kind = ?, fixed_variant_id = ?, pool_variant_ids = ?, sort_order = ?, is_active = ? WHERE id = ?'
+                'UPDATE cart_bogo_promotions SET bogo_kind = ?, category_id = ?, min_buy_qty = ?, buy_components_json = ?, requires_registered_account = ?, gift_kind = ?, fixed_variant_id = ?, pool_variant_ids = ?, gift_unit_charge_kind = ?, gift_unit_charge_value = ?, sort_order = ?, is_active = ? WHERE id = ?'
             );
             $st->execute([
                 $bogoKind,
@@ -166,13 +180,15 @@ try {
                 $giftKind,
                 $giftKind === 'fixed' ? $fixedVid : null,
                 $giftKind === 'choice' ? $poolJson : null,
+                $giftChargeKind,
+                $giftChargeVal,
                 $sortOrder,
                 $isActive,
                 $id,
             ]);
         } else {
             $st = $pdo->prepare(
-                'INSERT INTO cart_bogo_promotions (bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                'INSERT INTO cart_bogo_promotions (bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids, gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
             $st->execute([
                 $bogoKind,
@@ -183,6 +199,8 @@ try {
                 $giftKind,
                 $giftKind === 'fixed' ? $fixedVid : null,
                 $giftKind === 'choice' ? $poolJson : null,
+                $giftChargeKind,
+                $giftChargeVal,
                 $sortOrder,
                 $isActive,
             ]);

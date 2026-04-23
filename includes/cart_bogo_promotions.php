@@ -7,6 +7,93 @@ require_once __DIR__ . '/cart_gift_promotions.php';
 require_once __DIR__ . '/cart_combo_promotions.php';
 
 /**
+ * سعر وحدة بند هدية BOGO بعد تطبيق سياسة التسعير الجزئي (مجاني / نسبة من التجزئة / سعر ثابت / خصم مبلغ من التجزئة).
+ *
+ * @param array<string,mixed> $rule صف قاعدة أو مصفوفة مُرجعة من orange_cart_bogo_promotion_select_rule
+ */
+function orange_cart_bogo_resolve_gift_unit_price(PDO $pdo, array $rule, int $variantId): float
+{
+    if ($variantId <= 0) {
+        return 0.0;
+    }
+    $kind = strtolower(trim((string) ($rule['gift_unit_charge_kind'] ?? 'free')));
+    if ($kind === '' || $kind === 'free') {
+        return 0.0;
+    }
+    $val = (float) ($rule['gift_unit_charge_value'] ?? 0);
+    if ($kind === 'fixed_unit') {
+        return max(0.0, round($val, 4));
+    }
+    $st = $pdo->prepare(
+        'SELECT p.price FROM products p
+         INNER JOIN product_variants v ON v.product_id = p.id
+         WHERE v.id = ? AND p.is_active = 1 LIMIT 1'
+    );
+    $st->execute([$variantId]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        return 0.0;
+    }
+    $retail = (float) ($row['price'] ?? 0);
+    if ($kind === 'percent_off') {
+        $pct = min(100.0, max(0.0, $val));
+
+        return max(0.0, round($retail * (1.0 - $pct / 100.0), 4));
+    }
+    if ($kind === 'amount_off_unit') {
+        return max(0.0, round($retail - max(0.0, $val), 4));
+    }
+
+    return 0.0;
+}
+
+/**
+ * أعلى سعر وحدة ممكن لهدية BOGO في معاينة العربة (للدمج في الإجمالي عند تسعير جزئي).
+ *
+ * @param list<array{product:array<string,mixed>,qty:int,color:string,size:string,variant_id:int,price:float,cost:float}> $bogoCtxValidatedItems
+ */
+function orange_cart_bogo_preview_gift_charge_upper_bound(PDO $pdo, array $rule, array $bogoCtxValidatedItems): float
+{
+    $kind = strtolower(trim((string) ($rule['gift_unit_charge_kind'] ?? 'free')));
+    if ($kind === '' || $kind === 'free') {
+        return 0.0;
+    }
+    $gKind = strtolower(trim((string) ($rule['gift_kind'] ?? 'choice'))) === 'fixed' ? 'fixed' : 'choice';
+    if ($gKind === 'fixed') {
+        $fv = (int) ($rule['fixed_variant_id'] ?? 0);
+        if ($fv <= 0) {
+            return 0.0;
+        }
+        if (count(orange_cart_gift_promotion_pool_options($pdo, [$fv], $bogoCtxValidatedItems, false)) === 0) {
+            return 0.0;
+        }
+
+        return orange_cart_bogo_resolve_gift_unit_price($pdo, $rule, $fv);
+    }
+    $pool = $rule['pool_variant_ids'] ?? [];
+    if (!is_array($pool) || count($pool) === 0) {
+        return 0.0;
+    }
+    $opts = orange_cart_gift_promotion_pool_options($pdo, $pool, $bogoCtxValidatedItems, false);
+    if (count($opts) === 0) {
+        return 0.0;
+    }
+    $max = 0.0;
+    foreach ($opts as $opt) {
+        $vid = (int) ($opt['variant_id'] ?? 0);
+        if ($vid <= 0) {
+            continue;
+        }
+        $p = orange_cart_bogo_resolve_gift_unit_price($pdo, $rule, $vid);
+        if ($p > $max) {
+            $max = $p;
+        }
+    }
+
+    return $max;
+}
+
+/**
  * @param array<string,mixed> $row صف من cart_bogo_promotions
  * @param list<array{product:array<string,mixed>,qty:int,color:string,size:string,variant_id:int,price:float,cost:float}> $validatedItems
  */
@@ -75,7 +162,7 @@ function orange_cart_bogo_promotions_admin_list(PDO $pdo): array
         return [];
     }
     $st = $pdo->query(
-        'SELECT id, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids, sort_order, is_active
+        'SELECT id, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids, gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active
          FROM cart_bogo_promotions ORDER BY sort_order ASC, id ASC'
     );
     if (!$st) {
@@ -95,6 +182,8 @@ function orange_cart_bogo_promotions_admin_list(PDO $pdo): array
             'gift_kind' => (string) ($row['gift_kind'] ?? 'choice'),
             'fixed_variant_id' => $fix > 0 ? $fix : null,
             'pool_variant_ids' => orange_cart_gift_parse_pool($row['pool_variant_ids'] ?? null),
+            'gift_unit_charge_kind' => (string) ($row['gift_unit_charge_kind'] ?? 'free'),
+            'gift_unit_charge_value' => (float) ($row['gift_unit_charge_value'] ?? 0),
             'sort_order' => (int) ($row['sort_order'] ?? 0),
             'is_active' => (int) ($row['is_active'] ?? 0),
         ];
@@ -115,7 +204,7 @@ function orange_cart_bogo_promotion_select_rule(PDO $pdo, array $validatedItems,
         return null;
     }
     $st = $pdo->query(
-        "SELECT id, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids
+        "SELECT id, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids, gift_unit_charge_kind, gift_unit_charge_value
          FROM cart_bogo_promotions
          WHERE is_active = 1
          ORDER BY sort_order ASC, id ASC"
@@ -141,6 +230,11 @@ function orange_cart_bogo_promotion_select_rule(PDO $pdo, array $validatedItems,
             continue;
         }
 
+        $gcKind = strtolower(trim((string) ($row['gift_unit_charge_kind'] ?? 'free')));
+        if (!in_array($gcKind, ['free', 'percent_off', 'fixed_unit', 'amount_off_unit'], true)) {
+            $gcKind = 'free';
+        }
+
         return [
             'id' => (int) $row['id'],
             'bogo_kind' => $bogoKindNorm,
@@ -149,6 +243,8 @@ function orange_cart_bogo_promotion_select_rule(PDO $pdo, array $validatedItems,
             'gift_kind' => $gKind,
             'fixed_variant_id' => $fixed > 0 ? $fixed : null,
             'pool_variant_ids' => $pool,
+            'gift_unit_charge_kind' => $gcKind,
+            'gift_unit_charge_value' => (float) ($row['gift_unit_charge_value'] ?? 0),
         ];
     }
 
