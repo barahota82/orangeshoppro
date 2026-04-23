@@ -3428,6 +3428,42 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 .orange-vp-qty-row label {
     font-weight: 600;
 }
+.orange-vp-filters {
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    background: #f8fafc;
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: var(--radius-sm, 10px);
+}
+.orange-vp-filters-title {
+    font-weight: 700;
+    margin-bottom: 10px;
+    font-size: 0.95rem;
+}
+.orange-vp-filters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 10px 12px;
+    align-items: end;
+}
+.orange-vp-filter-cell label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.88rem;
+    margin-bottom: 4px;
+}
+.orange-vp-filter-cell .admin-inp {
+    width: 100%;
+}
+.orange-vp-filter-actions .orange-vp-filter-spacer {
+    display: block;
+    margin-bottom: 4px;
+    min-height: 1.2em;
+}
+.orange-vp-filters-note {
+    margin: 10px 0 0;
+    font-size: 0.88rem;
+}
 .orange-vp-results {
     margin-top: 8px;
     max-height: min(52vh, 480px);

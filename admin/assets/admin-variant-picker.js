@@ -1,5 +1,6 @@
 /**
  * منتقي متغيرات بصري لشاشات عروض السلة (هدايا، كومبو، BOGO).
+ * تصفية: قسم → فئة → فئة فرعية + بحث نصي.
  */
 (function () {
     var state = {
@@ -8,6 +9,9 @@
         debounceTimer: null,
         searchSeq: 0
     };
+
+    var filterTreeCache = null;
+    var filterTreeLoading = null;
 
     function $(id) {
         return document.getElementById(id);
@@ -28,6 +32,111 @@
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/"/g, '&quot;');
+    }
+
+    function loadFilterTree() {
+        if (filterTreeCache) {
+            return Promise.resolve(filterTreeCache);
+        }
+        if (filterTreeLoading) {
+            return filterTreeLoading;
+        }
+        filterTreeLoading = postJSON('/admin/api/settings/variants_search.php', { action: 'filter_tree' }).then(
+            function (res) {
+                filterTreeLoading = null;
+                if (res && res.success) {
+                    filterTreeCache = res;
+                    return res;
+                }
+                return res;
+            }
+        );
+        return filterTreeLoading;
+    }
+
+    function syncDeptVisibility() {
+        var w = $('orange-vp-dept-wrap');
+        if (!w) {
+            return;
+        }
+        var deps = filterTreeCache && filterTreeCache.departments ? filterTreeCache.departments : [];
+        w.style.display = deps.length ? '' : 'none';
+    }
+
+    function fillDepartmentsFromCache() {
+        var ds = $('orange-vp-dept');
+        if (!ds || !filterTreeCache) {
+            return;
+        }
+        ds.innerHTML = '<option value="">— كل الأقسام —</option>';
+        (filterTreeCache.departments || []).forEach(function (d) {
+            var o = document.createElement('option');
+            o.value = String(d.id);
+            var lab = (d.name_ar || d.name_en || '#' + d.id).trim();
+            o.textContent = lab + ' (#' + d.id + ')';
+            ds.appendChild(o);
+        });
+        ds.value = '';
+    }
+
+    function rebuildCategoryOptions() {
+        var sel = $('orange-vp-cat');
+        if (!sel || !filterTreeCache) {
+            return;
+        }
+        var deptVal = ($('orange-vp-dept') && $('orange-vp-dept').value) || '';
+        var cats = filterTreeCache.categories || [];
+        var filtered = cats;
+        if (deptVal !== '') {
+            var di = parseInt(deptVal, 10);
+            filtered = cats.filter(function (c) {
+                return c.department_id != null && parseInt(c.department_id, 10) === di;
+            });
+        }
+        var prev = sel.value;
+        sel.innerHTML = '<option value="">— كل الفئات —</option>';
+        filtered.forEach(function (c) {
+            var o = document.createElement('option');
+            o.value = String(c.id);
+            var lab = (c.name_ar || c.name_en || '#' + c.id).trim();
+            o.textContent = lab + ' (#' + c.id + ')';
+            sel.appendChild(o);
+        });
+        if (prev && filtered.some(function (c) { return String(c.id) === prev; })) {
+            sel.value = prev;
+        } else {
+            sel.value = '';
+        }
+        rebuildSubcategoryOptions();
+    }
+
+    function rebuildSubcategoryOptions() {
+        var sel = $('orange-vp-sub');
+        if (!sel || !filterTreeCache) {
+            return;
+        }
+        var catVal = ($('orange-vp-cat') && $('orange-vp-cat').value) || '';
+        var subs = filterTreeCache.subcategories || [];
+        var filtered =
+            catVal === ''
+                ? []
+                : subs.filter(function (s) {
+                      return String(s.category_id) === String(catVal);
+                  });
+        var prev = sel.value;
+        sel.innerHTML = '<option value="">— كل الفئات الفرعية —</option>';
+        filtered.forEach(function (s) {
+            var o = document.createElement('option');
+            o.value = String(s.id);
+            var lab = (s.name_ar || s.name_en || '#' + s.id).trim();
+            o.textContent = lab + ' (#' + s.id + ')';
+            sel.appendChild(o);
+        });
+        if (prev && filtered.some(function (s) { return String(s.id) === prev; })) {
+            sel.value = prev;
+        } else {
+            sel.value = '';
+        }
     }
 
     function mergePoolText(textarea, vid) {
@@ -60,13 +169,14 @@
             return;
         }
         if (!variants || !variants.length) {
-            box.innerHTML = '<p class="muted">لا نتائج. جرّب كلمات أخرى أو اترك البحث فارغاً لعرض أول النتائج.</p>';
+            box.innerHTML =
+                '<p class="muted">لا نتائج ضمن التصفية والبحث الحاليين. جرّب «مسح التصفية» أو نصاً أوسع.</p>';
             return;
         }
         var mode = state.mode;
         var html =
             '<div class="table-wrap orange-vp-table-wrap"><table class="orange-vp-table"><thead><tr>' +
-            '<th># متغير</th><th>منتج</th><th>لون</th><th>مقاس</th><th>مخزون</th><th></th>' +
+            '<th># متغير</th><th>منتج / هدية</th><th>لون</th><th>مقاس</th><th>مخزون</th><th></th>' +
             '</tr></thead><tbody>';
         variants.forEach(function (v) {
             var vid = v.variant_id;
@@ -74,7 +184,7 @@
             var pen = v.product_name_en || '';
             var sub = pen && pen !== pn ? ' <span class="muted">(' + esc(pen) + ')</span>' : '';
             var label = esc(pn) + sub;
-            var btnClass = mode === 'fixed' ? 'btn-secondary orange-vp-pick' : 'btn-secondary orange-vp-pick';
+            var btnClass = 'btn-secondary orange-vp-pick';
             var btnText = mode === 'fixed' ? 'اختيار' : mode === 'lines' ? 'إضافة سطر' : 'إضافة للقائمة';
             html +=
                 '<tr data-vid="' +
@@ -142,7 +252,28 @@
         if (box) {
             box.innerHTML = '<p class="muted">جاري التحميل…</p>';
         }
-        postJSON('/admin/api/settings/variants_search.php', { q: q, limit: 80 }).then(function (res) {
+        var fd = 0;
+        var fc = 0;
+        var fs = 0;
+        var de = $('orange-vp-dept');
+        var ce = $('orange-vp-cat');
+        var se = $('orange-vp-sub');
+        if (de && de.value) {
+            fd = parseInt(de.value, 10) || 0;
+        }
+        if (ce && ce.value) {
+            fc = parseInt(ce.value, 10) || 0;
+        }
+        if (se && se.value) {
+            fs = parseInt(se.value, 10) || 0;
+        }
+        postJSON('/admin/api/settings/variants_search.php', {
+            q: q,
+            limit: 80,
+            department_id: fd,
+            category_id: fc,
+            subcategory_id: fs
+        }).then(function (res) {
             if (seq !== state.searchSeq) {
                 return;
             }
@@ -173,14 +304,15 @@
             }
             if (hint) {
                 hint.textContent =
-                    'يُضاف كل سطر بالصيغة: رقم_المتغير ثم مسافة ثم الكمية (مثل الكومبو وحزمة شراء BOGO).';
+                    'يُضاف كل سطر بالصيغة: رقم_المتغير ثم مسافة ثم الكمية (مثل الكومبو وحزمة شراء BOGO). صفوف المنتجات أدناه هي نفس أصناف المتجر (الهدية منتج بمتغير لون/مقاس).';
             }
         } else if (state.mode === 'fixed') {
             if (qtyWrap) {
                 qtyWrap.hidden = true;
             }
             if (hint) {
-                hint.textContent = 'اختر صفاً واحداً ليُنسخ رقم المتغير إلى الحقل ثم يُغلق المنتقي.';
+                hint.textContent =
+                    'صفِّ القسم/الفئة/الفرعية ثم اختر المتغير؛ الهدية في النظام = منتج نشط كأي صنف.';
             }
         } else {
             if (qtyWrap) {
@@ -188,7 +320,7 @@
             }
             if (hint) {
                 hint.textContent =
-                    'أضف متغيرات واحداً تلو الآخر؛ لا يُكرر نفس الرقم إن كان موجوداً في القائمة.';
+                    'صفِّ الهيكل أو ابحث؛ أضف متغيرات للقائمة دون تكرار. الهدية والمنتج المعروض للبيع يستخدمان نفس الجدول.';
             }
         }
         overlay.hidden = false;
@@ -199,12 +331,46 @@
         }
         var resBox = $('orange-vp-results');
         if (resBox) {
-            resBox.innerHTML = '';
+            resBox.innerHTML = '<p class="muted">جاري تحميل التصفية…</p>';
         }
-        if (qInput) {
-            qInput.focus();
-        }
-        runSearch();
+
+        loadFilterTree()
+            .then(function (res) {
+                if (!res || !res.success) {
+                    if (resBox) {
+                        resBox.innerHTML =
+                            '<p class="alert-error">' +
+                            esc((res && res.message) || 'تعذر تحميل أقسام الفئات') +
+                            '</p>';
+                    }
+                    return;
+                }
+                filterTreeCache = res;
+                fillDepartmentsFromCache();
+                syncDeptVisibility();
+                var catEl = $('orange-vp-cat');
+                var subEl = $('orange-vp-sub');
+                var deptEl = $('orange-vp-dept');
+                if (deptEl) {
+                    deptEl.value = '';
+                }
+                if (catEl) {
+                    catEl.value = '';
+                }
+                if (subEl) {
+                    subEl.value = '';
+                }
+                rebuildCategoryOptions();
+                if (qInput) {
+                    qInput.focus();
+                }
+                runSearch();
+            })
+            .catch(function () {
+                if (resBox) {
+                    resBox.innerHTML = '<p class="alert-error">تعذر الاتصال بالخادم</p>';
+                }
+            });
     };
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -231,6 +397,54 @@
             qEl.addEventListener('input', function () {
                 clearTimeout(state.debounceTimer);
                 state.debounceTimer = setTimeout(runSearch, 320);
+            });
+        }
+        var deptEl = $('orange-vp-dept');
+        if (deptEl) {
+            deptEl.addEventListener('change', function () {
+                var cat = $('orange-vp-cat');
+                var sub = $('orange-vp-sub');
+                if (cat) {
+                    cat.value = '';
+                }
+                if (sub) {
+                    sub.value = '';
+                }
+                rebuildCategoryOptions();
+                runSearch();
+            });
+        }
+        var catEl = $('orange-vp-cat');
+        if (catEl) {
+            catEl.addEventListener('change', function () {
+                var sub = $('orange-vp-sub');
+                if (sub) {
+                    sub.value = '';
+                }
+                rebuildSubcategoryOptions();
+                runSearch();
+            });
+        }
+        var subEl = $('orange-vp-sub');
+        if (subEl) {
+            subEl.addEventListener('change', function () {
+                runSearch();
+            });
+        }
+        var clr = $('orange-vp-clear-filters');
+        if (clr) {
+            clr.addEventListener('click', function () {
+                if (deptEl) {
+                    deptEl.value = '';
+                }
+                if (catEl) {
+                    catEl.value = '';
+                }
+                if (subEl) {
+                    subEl.value = '';
+                }
+                rebuildCategoryOptions();
+                runSearch();
             });
         }
     });
