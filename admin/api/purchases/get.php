@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/gl_settings.php';
+require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_admin_api();
 
 $purchaseId = (int) ($_GET['purchase_id'] ?? 0);
@@ -21,6 +23,16 @@ $st->execute([$purchaseId]);
 $purchase = $st->fetch(PDO::FETCH_ASSOC);
 if (!$purchase) {
     json_response(['success' => false, 'message' => 'الفاتورة غير موجودة'], 404);
+}
+
+$purRef = 'PUR-' . $purchaseId;
+$accRow = orange_accounting_row_by_reference($pdo, $purRef);
+if (orange_accounting_is_locked($pdo, $accRow)) {
+    json_response([
+        'success' => false,
+        'message' => 'لا يمكن تحميل فاتورة شراء مرتبطة بسنة مالية مغلقة للتعديل',
+        'suggest_admin' => orange_gl_suggest_admin_fiscal_years_screen(),
+    ], 422);
 }
 
 $hasV = orange_table_has_column($pdo, 'purchase_items', 'variant_id');

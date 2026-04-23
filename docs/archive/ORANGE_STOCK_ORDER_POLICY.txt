@@ -14,4 +14,11 @@ Orange - Stock / Orders / Purchases policy (implementation reference)
 
 5) Safety: no final deduct without ship (or explicit equivalent event). No reserve without availability check.
 
+6) Admin purchases — implementation paths (Orange; stock on receipt per §4)
+   - Schema: purchase_items.qty_received (INT, default 0); migration + legacy backfill qty_received = qty in includes/catalog_schema.php.
+   - Save invoice without stock bump: admin/api/purchases/create.php and admin/api/purchases/update.php insert lines with qty_received = 0 when column exists; variant stock is not increased until receipt.
+   - Receipt: admin/api/purchases/receive.php (mode all or lines); partial line data for UI: admin/api/purchases/lines.php.
+   - Edit load + fiscal lock check: admin/api/purchases/get.php; POST update/delete: admin/api/purchases/update.php (reverses stock using qty_received only before replacing lines).
+   - UI: admin/pages/purchases.php — استلام كامل / استلام جزئي / تعديل / حذف.
+
 Agreed with project owner for Orange implementation.
