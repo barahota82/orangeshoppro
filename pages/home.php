@@ -178,6 +178,19 @@ foreach ($offers as $op) {
     $offerProductIds[(int) $op['id']] = true;
 }
 
+/** @var list<array<string,mixed>> */
+$productsNonOffer = [];
+foreach ($products as $p) {
+    if (isset($offerProductIds[(int) $p['id']])) {
+        continue;
+    }
+    $productsNonOffer[] = $p;
+}
+$sfHomeGridInitial = 24;
+$sfHomeGridScrollBatch = 24;
+$productsInitial = array_slice($productsNonOffer, 0, $sfHomeGridInitial);
+$productsLazyRows = array_slice($productsNonOffer, $sfHomeGridInitial);
+
 if ($hasDepartmentsTable) {
     $needDeptLookup = [];
     foreach ($products as $p) {
@@ -224,6 +237,19 @@ $storefrontExtraFilterSuffix = function (array $row) use ($categoryToDepartment)
 
     return $parts === [] ? '' : ' ' . implode(' ', $parts);
 };
+
+/** @var list<array{id:int,df:string,img:string,title:string,price:string,href:string}> */
+$lazyForJs = [];
+foreach ($productsLazyRows as $p) {
+    $lazyForJs[] = [
+        'id' => (int) $p['id'],
+        'df' => 'all cat-' . (int) $p['category_id'] . $storefrontExtraFilterSuffix($p),
+        'img' => (string) ($p['main_image'] ?? ''),
+        'title' => storefront_product_display_name($p),
+        'price' => number_format((float) $p['price'], 2),
+        'href' => storefront_url('product', (string) $channel['slug'], $lang, ['id' => (int) $p['id']]),
+    ];
+}
 
 /** اتجاه القائمة والشريط: عربي = يمين لليسار */
 $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
@@ -356,9 +382,9 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
 
     <section id="productsGrid" class="products-grid">
         <?php foreach ($offers as $p): ?>
-            <article class="product-card" data-filter="offers cat-<?php echo (int) $p['category_id']; ?><?php echo $storefrontExtraFilterSuffix($p); ?>">
+            <article class="product-card" data-product-id="<?php echo (int) $p['id']; ?>" data-filter="offers cat-<?php echo (int) $p['category_id']; ?><?php echo $storefrontExtraFilterSuffix($p); ?>">
                 <div class="product-image-wrap">
-                    <img src="/uploads/products/<?php echo htmlspecialchars($p['main_image'], ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?>">
+                    <img src="/uploads/products/<?php echo htmlspecialchars($p['main_image'], ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" decoding="async">
                     <span class="offer-badge"><?php echo htmlspecialchars(t('offers'), ENT_QUOTES, 'UTF-8'); ?></span>
                 </div>
                 <div class="product-body">
@@ -374,13 +400,10 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
             </article>
         <?php endforeach; ?>
 
-        <?php foreach ($products as $p): ?>
-            <?php if (isset($offerProductIds[(int) $p['id']])) {
-                continue;
-            } ?>
-            <article class="product-card" data-filter="all cat-<?php echo (int) $p['category_id']; ?><?php echo $storefrontExtraFilterSuffix($p); ?>">
+        <?php foreach ($productsInitial as $p): ?>
+            <article class="product-card" data-product-id="<?php echo (int) $p['id']; ?>" data-filter="all cat-<?php echo (int) $p['category_id']; ?><?php echo $storefrontExtraFilterSuffix($p); ?>">
                 <div class="product-image-wrap">
-                    <img src="/uploads/products/<?php echo htmlspecialchars($p['main_image'], ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?>">
+                    <img src="/uploads/products/<?php echo htmlspecialchars($p['main_image'], ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" decoding="async">
                 </div>
                 <div class="product-body">
                     <h3><?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?></h3>
@@ -393,12 +416,163 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                 </div>
             </article>
         <?php endforeach; ?>
+        <div id="orangeSfGridSentinel" aria-hidden="true" style="width:100%;height:1px;pointer-events:none;flex-basis:100%"></div>
     </section>
 </div>
 
 <script>
+<?php
+$orangeSfGridJsonFlags = JSON_UNESCAPED_UNICODE;
+if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+    $orangeSfGridJsonFlags |= JSON_INVALID_UTF8_SUBSTITUTE;
+}
+?>
+window.ORANGE_SF_GRID_LAZY_PRODUCTS = <?php echo json_encode($lazyForJs, $orangeSfGridJsonFlags); ?>;
+window.ORANGE_SF_GRID_BATCH = <?php echo (int) $sfHomeGridScrollBatch; ?>;
+window.ORANGE_SF_GRID_VIEW_LABEL = <?php echo json_encode(t('view_product'), $orangeSfGridJsonFlags); ?>;
 var ORANGE_SF_GRID_FILTER_KEY = 'orange_sf_grid_filter';
 var ORANGE_BROWSE_DETAILS_OPEN_KEY = 'orange_browse_details_open';
+var orangeSfLazyRenderedIds = new Set();
+var orangeSfGridObserver = null;
+function orangeSfLazyTokenMatch(df, filter) {
+    if (filter === 'all') {
+        return false;
+    }
+    var tokens = String(df || '').trim().split(/\s+/).filter(Boolean);
+    return tokens.indexOf(filter) !== -1;
+}
+function orangeSfImgSrcFromMainImage(img) {
+    var seg = String(img || '').split('/').map(function (s) { return encodeURIComponent(s); }).join('/');
+    return '/uploads/products/' + seg;
+}
+function orangeSfAppendRegularCard(item) {
+    var grid = document.getElementById('productsGrid');
+    var sent = document.getElementById('orangeSfGridSentinel');
+    if (!grid || !item) {
+        return;
+    }
+    var art = document.createElement('article');
+    art.className = 'product-card';
+    art.setAttribute('data-product-id', String(item.id));
+    art.setAttribute('data-filter', item.df);
+    var wrap = document.createElement('div');
+    wrap.className = 'product-image-wrap';
+    var img = document.createElement('img');
+    img.setAttribute('src', orangeSfImgSrcFromMainImage(item.img));
+    img.setAttribute('alt', item.title);
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    wrap.appendChild(img);
+    var body = document.createElement('div');
+    body.className = 'product-body';
+    var h3 = document.createElement('h3');
+    h3.textContent = item.title;
+    var pr = document.createElement('div');
+    pr.className = 'price-row';
+    var strong = document.createElement('strong');
+    strong.textContent = item.price + ' KD';
+    pr.appendChild(strong);
+    var a = document.createElement('a');
+    a.className = 'btn';
+    a.setAttribute('href', item.href);
+    a.textContent = window.ORANGE_SF_GRID_VIEW_LABEL || '';
+    body.appendChild(h3);
+    body.appendChild(pr);
+    body.appendChild(a);
+    art.appendChild(wrap);
+    art.appendChild(body);
+    if (sent && sent.parentNode === grid) {
+        grid.insertBefore(art, sent);
+    } else {
+        grid.appendChild(art);
+    }
+}
+function orangeSfEnsureLazyForFilter(filter) {
+    var pool = window.ORANGE_SF_GRID_LAZY_PRODUCTS || [];
+    if (filter === 'all' || !pool.length) {
+        return;
+    }
+    var grid = document.getElementById('productsGrid');
+    var sent = document.getElementById('orangeSfGridSentinel');
+    for (var i = 0; i < pool.length; i++) {
+        var item = pool[i];
+        if (orangeSfLazyRenderedIds.has(item.id)) {
+            continue;
+        }
+        if (!orangeSfLazyTokenMatch(item.df, filter)) {
+            continue;
+        }
+        orangeSfAppendRegularCard(item);
+        orangeSfLazyRenderedIds.add(item.id);
+    }
+    if (sent && grid && sent.parentNode !== grid) {
+        grid.appendChild(sent);
+    }
+}
+function orangeSfGridLazyRemainingCount() {
+    var pool = window.ORANGE_SF_GRID_LAZY_PRODUCTS || [];
+    var n = 0;
+    for (var i = 0; i < pool.length; i++) {
+        if (!orangeSfLazyRenderedIds.has(pool[i].id)) {
+            n++;
+        }
+    }
+    return n;
+}
+function orangeSfLoadNextScrollBatch() {
+    var pool = window.ORANGE_SF_GRID_LAZY_PRODUCTS || [];
+    var batch = window.ORANGE_SF_GRID_BATCH || 24;
+    if (!pool.length || orangeGetActiveGridFilter() !== 'all') {
+        return;
+    }
+    var loaded = 0;
+    for (var i = 0; i < pool.length && loaded < batch; i++) {
+        var item = pool[i];
+        if (orangeSfLazyRenderedIds.has(item.id)) {
+            continue;
+        }
+        orangeSfAppendRegularCard(item);
+        orangeSfLazyRenderedIds.add(item.id);
+        loaded++;
+    }
+}
+function orangeSfMaybeDisconnectObserver() {
+    if (orangeSfGridLazyRemainingCount() === 0 && orangeSfGridObserver) {
+        orangeSfGridObserver.disconnect();
+        orangeSfGridObserver = null;
+    }
+}
+function orangeSfInitGridInfiniteScroll() {
+    document.querySelectorAll('#productsGrid .product-card[data-product-id]').forEach(function (c) {
+        var id = parseInt(c.getAttribute('data-product-id'), 10);
+        if (!isNaN(id)) {
+            orangeSfLazyRenderedIds.add(id);
+        }
+    });
+    var pool = window.ORANGE_SF_GRID_LAZY_PRODUCTS || [];
+    var sent = document.getElementById('orangeSfGridSentinel');
+    if (!pool.length || !sent || typeof IntersectionObserver === 'undefined') {
+        orangeSfMaybeDisconnectObserver();
+        return;
+    }
+    orangeSfGridObserver = new IntersectionObserver(
+        function (entries) {
+            entries.forEach(function (en) {
+                if (!en.isIntersecting) {
+                    return;
+                }
+                if (orangeGetActiveGridFilter() !== 'all') {
+                    return;
+                }
+                orangeSfLoadNextScrollBatch();
+                applyGridFilterVisibility(orangeGetActiveGridFilter());
+                orangeSfMaybeDisconnectObserver();
+            });
+        },
+        { root: null, rootMargin: '320px', threshold: 0 }
+    );
+    orangeSfGridObserver.observe(sent);
+}
 
 function orangePersistGridFilter(filter) {
     try {
@@ -509,7 +683,7 @@ function scrollHomeCategoryTabs(direction) {
     var delta = direction * amount * (rtl ? -1 : 1);
     el.scrollBy({ left: delta, behavior: 'smooth' });
 }
-function applyGridFilter(filter) {
+function applyGridFilterVisibility(filter) {
     document.querySelectorAll('.product-card').forEach(function (card) {
         var raw = card.getAttribute('data-filter') || '';
         if (filter === 'all') {
@@ -520,6 +694,11 @@ function applyGridFilter(filter) {
         var tokens = raw.trim().split(/\s+/).filter(Boolean);
         card.style.display = tokens.indexOf(filter) !== -1 ? '' : 'none';
     });
+}
+function applyGridFilter(filter) {
+    orangeSfEnsureLazyForFilter(filter);
+    applyGridFilterVisibility(filter);
+    orangeSfMaybeDisconnectObserver();
 }
 function filterProducts(filter, el) {
     document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
@@ -596,6 +775,7 @@ function closeStorefrontBrowseMenu() {
             }
         }, true);
     }
+    orangeSfInitGridInfiniteScroll();
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') closeStorefrontBrowseMenu();
     });
