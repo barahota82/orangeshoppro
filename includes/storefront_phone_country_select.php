@@ -8,7 +8,7 @@ declare(strict_types=1);
 function orange_phone_country_options(): array
 {
     return [
-        '' => t('phone_country_full_international'),
+        '__intl__' => t('phone_country_full_international'),
         '965' => t('phone_country_kw'),
         '63' => t('phone_country_ph'),
         '91' => t('phone_country_in'),

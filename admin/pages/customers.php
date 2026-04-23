@@ -70,7 +70,7 @@ $count = count($rows);
         <div>
             <label for="cust_phone_country">كود الدولة (اختياري)</label>
             <?php orange_storefront_render_phone_country_select('cust_phone_country'); ?>
-            <p class="card-hint" style="margin:6px 0 0;">إن لم تختر دولة، أدخل الرقم كاملاً بصيغة دولية (<span dir="ltr">+</span> أو <span dir="ltr">00</span>).</p>
+            <p class="card-hint" style="margin:6px 0 0;">للرقم الدولي الكامل اختر أول خيار في القائمة ثم أدخل الرقم بـ <span dir="ltr">+</span> أو <span dir="ltr">00</span>؛ أو اختر دولة وأدخل الرقم الوطني فقط.</p>
         </div>
         <div>
             <label for="cust_phone">الهاتف <span style="color:#b45309;">*</span></label>
@@ -197,12 +197,12 @@ function custPhoneCountryEl() {
 function custSplitPhoneForForm(stored) {
     var raw = String(stored || '').trim();
     if (!raw) {
-        return { country: '', phone: '' };
+        return { country: '__intl__', phone: '' };
     }
     var normFn = window.orangeNormalizeCustomerPhone;
     var norm = normFn ? normFn(raw, null) : null;
     if (!norm) {
-        return { country: '', phone: raw };
+        return { country: '__intl__', phone: raw };
     }
     var digits = norm.replace(/\D/g, '');
     var prefs = ['965', '92', '91', '63'];
@@ -219,7 +219,7 @@ function custSplitPhoneForForm(stored) {
             return { country: cc, phone: nat };
         }
     }
-    return { country: '', phone: norm.charAt(0) === '+' ? norm.slice(1) : norm };
+    return { country: '__intl__', phone: norm.charAt(0) === '+' ? norm.slice(1) : norm };
 }
 function custResetForm() {
     document.getElementById('cust_id').value = '0';
@@ -228,7 +228,7 @@ function custResetForm() {
     document.getElementById('cust_phone').value = '';
     var cc = custPhoneCountryEl();
     if (cc) {
-        cc.value = '';
+        cc.value = '__intl__';
     }
     document.getElementById('cust_email').value = '';
     document.getElementById('cust_area').value = '';
@@ -243,7 +243,7 @@ function custEdit(row) {
     var split = custSplitPhoneForForm(row.phone || '');
     var ccEl = custPhoneCountryEl();
     if (ccEl) {
-        ccEl.value = split.country || '';
+        ccEl.value = split.country && split.country !== '' ? split.country : '__intl__';
     }
     document.getElementById('cust_phone').value = split.phone || '';
     document.getElementById('cust_email').value = row.email || '';
@@ -260,7 +260,7 @@ function custSave() {
     var name = document.getElementById('cust_name').value.trim();
     var phone = document.getElementById('cust_phone').value.trim();
     var ccEl = custPhoneCountryEl();
-    var phoneCountry = ccEl && ccEl.value ? String(ccEl.value).trim() : '';
+    var phoneCountry = ccEl ? String(ccEl.value || '').trim() : '';
     var intlSel = ccEl && ccEl.tagName === 'SELECT' && phoneCountry === '__intl__';
     var ccForNorm = intlSel ? null : phoneCountry && phoneCountry !== '__intl__' ? phoneCountry : null;
     var email = document.getElementById('cust_email').value.trim();
@@ -286,7 +286,7 @@ function custSave() {
     var payload = {
         name_ar: name || 'عميل',
         phone: phone,
-        phone_country: phoneCountry || null,
+        phone_country: phoneCountry !== '' ? phoneCountry : null,
         area: area,
         address: address,
         email: email || null,
