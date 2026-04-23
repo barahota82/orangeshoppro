@@ -150,6 +150,26 @@ function orange_image_write_webp_beside(string $absolutePath): void
 }
 
 /**
+ * بادئة ‎PUBLIC_BASE_PATH‎ لمسار ويب يبدأ بـ ‎/‎ (رفع، أصول) عند نشر التطبيق داخل مجلد فرعي.
+ */
+function storefront_public_path(string $relativeWebPath): string
+{
+    $p = str_replace('\\', '/', trim($relativeWebPath));
+    if ($p !== '' && $p[0] !== '/') {
+        $p = '/' . $p;
+    }
+    $base = PUBLIC_BASE_PATH === '' ? '' : rtrim(PUBLIC_BASE_PATH, '/');
+    if ($base === '' || $p === '') {
+        return $p;
+    }
+    if ($p === $base || str_starts_with($p, $base . '/')) {
+        return $p;
+    }
+
+    return $base . $p;
+}
+
+/**
  * مسار URL تحت ‎/uploads/products/‎ لصورة منتج كما في قاعدة البيانات (اسم ملف في الجذر).
  * إن وُجد ملف ‎{نفس_الاسم_بدون_امتداد}.webp‎ بجانب الملف الأصلي على القرص يُفضَّل WebP؛ وإلا يُعاد المسار للملف الأصلي.
  *
@@ -175,6 +195,19 @@ function storefront_product_image_web_path(?string $mainImageFromDb): string
     }
 
     return '/uploads/products/' . rawurlencode($base);
+}
+
+/**
+ * مسار صورة منتج لـ ‎src‎ في HTML (يشمل ‎PUBLIC_BASE_PATH‎ إن وُجد).
+ */
+function storefront_product_image_href(?string $mainImageFromDb): string
+{
+    $rel = storefront_product_image_web_path($mainImageFromDb);
+    if ($rel === '') {
+        return '';
+    }
+
+    return storefront_public_path($rel);
 }
 
 /**

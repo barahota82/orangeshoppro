@@ -48,7 +48,7 @@ $ORANGE_STOREFRONT_CANONICAL_URL = storefront_absolute_url(
 $ORANGE_STOREFRONT_OG_TYPE = 'product';
 $mainForOg = trim((string) ($product['main_image'] ?? ''));
 if ($mainForOg !== '') {
-    $ogPath = storefront_product_image_web_path($mainForOg);
+    $ogPath = storefront_product_image_href($mainForOg);
     if ($ogPath !== '') {
         $ORANGE_STOREFRONT_OG_IMAGE = storefront_absolute_url($ogPath);
     }
@@ -122,7 +122,7 @@ foreach ($variants as $v) {
 $mainFile = trim((string)($product['main_image'] ?? ''));
 $galleryUrls = [];
 if ($mainFile !== '') {
-    $uMain = storefront_product_image_web_path($mainFile);
+    $uMain = storefront_product_image_href($mainFile);
     if ($uMain !== '') {
         $galleryUrls[] = $uMain;
     }
@@ -132,7 +132,7 @@ foreach ($images as $img) {
     if ($rel === '' || $rel === $mainFile) {
         continue;
     }
-    $uExtra = storefront_product_image_web_path($rel);
+    $uExtra = storefront_product_image_href($rel);
     if ($uExtra !== '') {
         $galleryUrls[] = $uExtra;
     }

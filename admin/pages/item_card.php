@@ -45,7 +45,7 @@ $movements = $pdo->prepare("
 $movements->execute([$productId]);
 $movements = $movements->fetchAll(PDO::FETCH_ASSOC);
 
-$img = storefront_product_image_web_path((string) ($product['main_image'] ?? ''));
+$img = storefront_product_image_href((string) ($product['main_image'] ?? ''));
 ?>
 <div class="page-title page-title--stacked">
     <div>

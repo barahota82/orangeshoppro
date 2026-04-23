@@ -247,7 +247,7 @@ foreach ($productsLazyRows as $p) {
     $lazyForJs[] = [
         'id' => (int) $p['id'],
         'df' => 'all cat-' . (int) $p['category_id'] . $storefrontExtraFilterSuffix($p),
-        'imgSrc' => storefront_product_image_web_path((string) ($p['main_image'] ?? '')),
+        'imgSrc' => storefront_product_image_href((string) ($p['main_image'] ?? '')),
         'title' => storefront_product_display_name($p),
         'price' => number_format((float) $p['price'], 2),
         'href' => storefront_url('product', (string) $channel['slug'], $lang, ['id' => (int) $p['id']]),
@@ -260,7 +260,7 @@ foreach ($offersLazyRows as $p) {
     $lazyOffersForJs[] = [
         'id' => (int) $p['id'],
         'df' => 'offers cat-' . (int) $p['category_id'] . $storefrontExtraFilterSuffix($p),
-        'imgSrc' => storefront_product_image_web_path((string) ($p['main_image'] ?? '')),
+        'imgSrc' => storefront_product_image_href((string) ($p['main_image'] ?? '')),
         'title' => storefront_product_display_name($p),
         'oldPrice' => number_format((float) $p['price'], 2),
         'salePrice' => number_format((float) $p['price'] - (float) $p['discount'], 2),
@@ -401,7 +401,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
         <?php foreach ($offersInitial as $p): ?>
             <article class="product-card" data-product-id="<?php echo (int) $p['id']; ?>" data-filter="offers cat-<?php echo (int) $p['category_id']; ?><?php echo $storefrontExtraFilterSuffix($p); ?>">
                 <div class="product-image-wrap">
-                    <img src="<?php echo htmlspecialchars(storefront_product_image_web_path((string) ($p['main_image'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" decoding="async">
+                    <img src="<?php echo htmlspecialchars(storefront_product_image_href((string) ($p['main_image'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" decoding="async">
                     <span class="offer-badge"><?php echo htmlspecialchars(t('offers'), ENT_QUOTES, 'UTF-8'); ?></span>
                 </div>
                 <div class="product-body">
@@ -420,7 +420,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
         <?php foreach ($productsInitial as $p): ?>
             <article class="product-card" data-product-id="<?php echo (int) $p['id']; ?>" data-filter="all cat-<?php echo (int) $p['category_id']; ?><?php echo $storefrontExtraFilterSuffix($p); ?>">
                 <div class="product-image-wrap">
-                    <img src="<?php echo htmlspecialchars(storefront_product_image_web_path((string) ($p['main_image'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" decoding="async">
+                    <img src="<?php echo htmlspecialchars(storefront_product_image_href((string) ($p['main_image'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" decoding="async">
                 </div>
                 <div class="product-body">
                     <h3><?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?></h3>
