@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../../includes/order_helpers.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/document_sequences.php';
+require_once __DIR__ . '/../../includes/upload_paths.php';
 
 /**
  * @param array<string, mixed> $order
@@ -53,11 +54,11 @@ function orange_invoice_logo_url(string $raw): string
     if (preg_match('#^https?://#i', $raw) === 1) {
         return $raw;
     }
-    if (isset($raw[0]) && $raw[0] === '/') {
-        return $raw;
-    }
+    $path = (isset($raw[0]) && $raw[0] === '/')
+        ? $raw
+        : '/uploads/' . rawurlencode(basename($raw));
 
-    return '/uploads/' . rawurlencode(basename($raw));
+    return storefront_public_path($path);
 }
 
 /**
