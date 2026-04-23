@@ -178,6 +178,63 @@ function storefront_product_image_web_path(?string $mainImageFromDb): string
 }
 
 /**
+ * هل يوجد ملف شعار قناة مطابق لما في قاعدة البيانات أو نسخة ‎.webp‎ بنفس الاسم الأساسي تحت uploads/channels.
+ */
+function orange_channels_logo_file_resolved_exists(?string $filenameFromDb): bool
+{
+    $raw = trim(str_replace('\\', '/', (string) $filenameFromDb));
+    if ($raw === '') {
+        return false;
+    }
+    $base = basename($raw);
+    if ($base === '' || $base === '.' || $base === '..') {
+        return false;
+    }
+    $dir = orange_channels_upload_dir();
+    if (is_file($dir . DIRECTORY_SEPARATOR . $base)) {
+        return true;
+    }
+    $stem = pathinfo($base, PATHINFO_FILENAME);
+    if ($stem !== '' && $stem !== '.' && $stem !== '..'
+        && is_file($dir . DIRECTORY_SEPARATOR . $stem . '.webp')) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * تحت ‎/assets/images‎: يفضّل ‎stem.webp‎ إن وُجد على القرص، وإلا الملف المسمّى في المسار إن وُجد، وإلا يعيد المسار كما مرّ (سلوك سابق؛ قد ينتج 404).
+ *
+ * @param string $relativePath مثل ‎/assets/images/logo-orange.png‎
+ */
+function storefront_asset_image_preferred_path(string $relativePath): string
+{
+    $rel = str_replace('\\', '/', $relativePath);
+    $prefix = '/assets/images/';
+    if (!str_starts_with($rel, $prefix)) {
+        return $relativePath;
+    }
+    $base = basename(substr($rel, strlen($prefix)));
+    if ($base === '' || $base === '.' || $base === '..') {
+        return $relativePath;
+    }
+    $dirFs = orange_project_root_path() . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'images';
+    $stem = pathinfo($base, PATHINFO_FILENAME);
+    if ($stem !== '' && $stem !== '.' && $stem !== '..') {
+        $webp = $stem . '.webp';
+        if (is_file($dirFs . DIRECTORY_SEPARATOR . $webp)) {
+            return $prefix . $webp;
+        }
+    }
+    if (is_file($dirFs . DIRECTORY_SEPARATOR . $base)) {
+        return $prefix . $base;
+    }
+
+    return $relativePath;
+}
+
+/**
  * مسار URL تحت ‎/uploads/channels/‎ لشعار مرفوع (اسم ملف في الجذر). يفضّل ‎.webp‎ المرافق إن وُجد.
  *
  * @return string مثل ‎/uploads/channels/x.webp‎ أو المسار للأصل، أو ‎''‎ إن المدخل غير صالح

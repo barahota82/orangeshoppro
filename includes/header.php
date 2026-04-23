@@ -46,21 +46,25 @@ try {
 }
 
 $orangePubBase = PUBLIC_BASE_PATH === '' ? '' : PUBLIC_BASE_PATH;
-$orangeChannelLogoFile = 'logo-orange.png';
 $chLogoFn = trim((string) ($channel['logo'] ?? ''));
-if ($chLogoFn !== '' && is_file(orange_channels_upload_dir() . DIRECTORY_SEPARATOR . $chLogoFn)) {
+if ($chLogoFn !== '' && orange_channels_logo_file_resolved_exists($chLogoFn)) {
     $chLogoRel = storefront_channel_logo_web_path($chLogoFn);
     $orangeChannelLogoUrl = ($chLogoRel !== '')
         ? ($orangePubBase . $chLogoRel)
-        : ($orangePubBase . '/uploads/channels/' . rawurlencode($chLogoFn));
+        : ($orangePubBase . '/uploads/channels/' . rawurlencode(basename($chLogoFn)));
 } else {
-    $orangeChannelLogoUrl = $orangePubBase . storefront_asset_url('/assets/images/' . $orangeChannelLogoFile);
+    $fallbackLogoFile = $chLogoFn !== '' ? basename($chLogoFn) : 'logo-orange.png';
+    $orangeChannelLogoUrl = $orangePubBase . storefront_asset_url(
+        storefront_asset_image_preferred_path('/assets/images/' . $fallbackLogoFile)
+    );
 }
 $orangePwaApple180Url = $orangePubBase . storefront_asset_url('/assets/images/pwa-apple-180.png');
 $orangePwaApple120Url = $orangePubBase . storefront_asset_url('/assets/images/pwa-apple-120.png');
 $orangePwaIcon192Url = $orangePubBase . storefront_asset_url('/assets/images/pwa-icon-192.png');
 $orangePwaIcon512Url = $orangePubBase . storefront_asset_url('/assets/images/pwa-icon-512.png');
-$orangeWordmarkUrl = $orangePubBase . storefront_asset_url('/assets/images/orange-company-wordmark.png');
+$orangeWordmarkUrl = $orangePubBase . storefront_asset_url(
+    storefront_asset_image_preferred_path('/assets/images/orange-company-wordmark.png')
+);
 $orangeManifestHref = $orangePubBase . '/manifest.php?' . http_build_query(['channel' => $channelSlug, 'lang' => $lang]);
 
 $pdoSfHdr = db();
