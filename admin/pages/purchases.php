@@ -30,7 +30,9 @@ foreach ($vRows as $vr) {
 }
 
 $recent = $pdo->query(
-    'SELECT p.*, s.name AS supplier_name
+    'SELECT p.*, s.name AS supplier_name,
+            (SELECT COALESCE(SUM(pi.qty), 0) FROM purchase_items pi WHERE pi.purchase_id = p.id) AS items_qty_sum,
+            (SELECT COALESCE(SUM(pi.qty_received), 0) FROM purchase_items pi WHERE pi.purchase_id = p.id) AS items_received_sum
      FROM purchases p
      LEFT JOIN suppliers s ON s.id = p.supplier_id
      ORDER BY p.id DESC
@@ -40,7 +42,7 @@ $recent = $pdo->query(
 <div class="page-title page-title--stacked">
     <div>
         <h1>فاتورة شراء</h1>
-        <p class="page-subtitle">تسجيل مشتريات نقدي أو آجل؛ يُحدَّث مخزون <strong>المتغير</strong> (لون/مقاس) المختار فقط، ويُولَّد قيد محاسبي واحد حسب نوع الشراء.</p>
+        <p class="page-subtitle">تسجيل مشتريات نقدي أو آجل؛ <strong>حفظ الفاتورة لا يزيد المخزون</strong> — يزيد مخزون <strong>المتغير</strong> (لون/مقاس) عند <strong>استلام البضاعة</strong> من الجدول أدناه. يُولَّد قيد محاسبي عند الحفظ حسب نوع الشراء.</p>
     </div>
 </div>
 
@@ -99,7 +101,7 @@ $recent = $pdo->query(
         <button type="button" class="btn-secondary" onclick="purAddLine()">+ سطر</button>
         <button type="button" onclick="purSubmit()">حفظ فاتورة الشراء</button>
     </div>
-    <p class="card-hint" style="margin-top:12px;margin-bottom:0;"><strong>المجموع المحسوب:</strong> <span id="pur_total_preview">0.00</span> KD</p>
+    <p class="card-hint" style="margin-top:12px;margin-bottom:0;"><strong>المجموع المحسوب:</strong> <span id="pur_total_preview">0.00</span> KD — بعد الحفظ استخدم «استلام كامل» في قائمة آخر الفواتير لزيادة المخزون.</p>
 </div>
 
 <div class="card">
@@ -113,20 +115,28 @@ $recent = $pdo->query(
                     <th>المورد</th>
                     <th>النوع</th>
                     <th>الإجمالي</th>
+                    <th>الاستلام (مستلم / مُطلوب)</th>
                     <th>ملاحظات</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody>
                 <?php foreach ($recent as $r): ?>
+                <?php
+                    $pq = (int) ($r['items_qty_sum'] ?? 0);
+                    $pr = (int) ($r['items_received_sum'] ?? 0);
+                    $purCanReceive = $pq > 0 && $pr < $pq;
+                ?>
                 <tr>
                     <td><?php echo (int)$r['id']; ?></td>
                     <td><?php echo htmlspecialchars(orange_format_datetime_dmY_hi((string) ($r['created_at'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo htmlspecialchars((string)($r['supplier_name'] ?: '—'), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo ($r['type'] ?? '') === 'credit' ? 'آجل' : 'نقدي'; ?></td>
                     <td><?php echo number_format((float)($r['total'] ?? 0), 2); ?> KD</td>
+                    <td><?php echo (int) $pr; ?> / <?php echo (int) $pq; ?></td>
                     <td><?php echo htmlspecialchars((string)($r['notes'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td>
+                        <button type="button" class="btn-secondary" style="margin-left:6px;" <?php echo $purCanReceive ? '' : 'disabled'; ?> onclick="purReceiveAll(<?php echo (int)$r['id']; ?>)">استلام كامل</button>
                         <button type="button" class="btn-danger" onclick="purDelete(<?php echo (int)$r['id']; ?>)">حذف</button>
                     </td>
                 </tr>
@@ -392,8 +402,22 @@ function purSubmit() {
     });
 }
 
+function purReceiveAll(id) {
+    if (!confirm('تسجيل استلام كامل للكميات المتبقية في فاتورة الشراء #' + id + '؟ سيُزاد المخزون فقط للكمية غير المستلمة بعد.')) return;
+    postJSON('/admin/api/purchases/receive.php', { purchase_id: id, mode: 'all' }).then(function (res) {
+        if (res.success) {
+            alert(res.message || 'تم الاستلام');
+            location.reload();
+            return;
+        }
+        if (!orangeAdminOfferSuggestOnFailure(res, 'فشل')) {
+            alert(res.message || 'فشل');
+        }
+    });
+}
+
 function purDelete(id) {
-    if (!confirm('حذف فاتورة الشراء هذه؟ سيتم عكس المخزون وحذف القيد المحاسبي المرتبط بمرجع PUR-' + id + '.')) return;
+    if (!confirm('حذف فاتورة الشراء هذه؟ سيتم عكس المخزون للكميات المستلمة فقط، وحذف القيد المحاسبي المرتبط بمرجع PUR-' + id + '.')) return;
     postJSON('/admin/api/purchases/update.php', { id: id, action: 'delete' }).then(function (res) {
         if (res.success) {
             alert(res.message || 'تم الحذف');

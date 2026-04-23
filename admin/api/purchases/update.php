@@ -15,16 +15,27 @@ require_admin_api();
 function reverse_purchase_stock(PDO $pdo, int $purchaseId): void
 {
     $hasV = orange_table_has_column($pdo, 'purchase_items', 'variant_id');
-    $sql = $hasV
-        ? 'SELECT product_id, variant_id, qty FROM purchase_items WHERE purchase_id = ?'
-        : 'SELECT product_id, qty FROM purchase_items WHERE purchase_id = ?';
+    $hasRecv = orange_table_has_column($pdo, 'purchase_items', 'qty_received');
+    $cols = 'product_id, qty';
+    if ($hasRecv) {
+        $cols .= ', qty_received';
+    }
+    if ($hasV) {
+        $cols .= ', variant_id';
+    }
+    $sql = 'SELECT ' . $cols . ' FROM purchase_items WHERE purchase_id = ?';
     $itemsStmt = $pdo->prepare($sql);
     $itemsStmt->execute([$purchaseId]);
     $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
     foreach ($items as $item) {
-        $qty = (int) ($item['qty'] ?? 0);
         $pid = (int) ($item['product_id'] ?? 0);
-        if ($qty <= 0 || $pid <= 0) {
+        if ($pid <= 0) {
+            continue;
+        }
+        $qty = $hasRecv
+            ? (int) ($item['qty_received'] ?? 0)
+            : (int) ($item['qty'] ?? 0);
+        if ($qty <= 0) {
             continue;
         }
         $vid = $hasV ? (int) ($item['variant_id'] ?? 0) : 0;
@@ -40,6 +51,7 @@ function reverse_purchase_stock(PDO $pdo, int $purchaseId): void
 function apply_purchase_items(PDO $pdo, int $purchaseId, array $items): float
 {
     $hasV = orange_table_has_column($pdo, 'purchase_items', 'variant_id');
+    $hasRecv = orange_table_has_column($pdo, 'purchase_items', 'qty_received');
     $total = 0.0;
     foreach ($items as $item) {
         $productId = (int)($item['product_id'] ?? 0);
@@ -54,16 +66,26 @@ function apply_purchase_items(PDO $pdo, int $purchaseId, array $items): float
             $productId,
             (int)($item['variant_id'] ?? 0)
         );
-        if ($hasV) {
+        if ($hasV && $hasRecv) {
+            $pdo->prepare(
+                'INSERT INTO purchase_items (purchase_id, product_id, variant_id, qty, qty_received, cost) VALUES (?, ?, ?, ?, 0, ?)'
+            )->execute([$purchaseId, $productId, $variantId, $qty, $cost]);
+        } elseif ($hasV) {
             $pdo->prepare(
                 'INSERT INTO purchase_items (purchase_id, product_id, variant_id, qty, cost) VALUES (?, ?, ?, ?, ?)'
             )->execute([$purchaseId, $productId, $variantId, $qty, $cost]);
+            $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ?')
+                ->execute([$qty, $variantId]);
+        } elseif ($hasRecv) {
+            $pdo->prepare(
+                'INSERT INTO purchase_items (purchase_id, product_id, qty, qty_received, cost) VALUES (?, ?, ?, 0, ?)'
+            )->execute([$purchaseId, $productId, $qty, $cost]);
         } else {
             $pdo->prepare("INSERT INTO purchase_items (purchase_id, product_id, qty, cost) VALUES (?, ?, ?, ?)")
                 ->execute([$purchaseId, $productId, $qty, $cost]);
+            $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ?')
+                ->execute([$qty, $variantId]);
         }
-        $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ?')
-            ->execute([$qty, $variantId]);
     }
 
     return $total;

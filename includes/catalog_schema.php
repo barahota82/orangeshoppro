@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 8);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 9);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -1558,6 +1558,14 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     if (orange_table_exists($pdo, 'purchase_items') && !orange_table_has_column($pdo, 'purchase_items', 'variant_id')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE purchase_items ADD COLUMN variant_id INT NULL');
         orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_purchase_items_variant ON purchase_items (variant_id)');
+    }
+
+    if (orange_table_exists($pdo, 'purchase_items') && !orange_table_has_column($pdo, 'purchase_items', 'qty_received')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE purchase_items ADD COLUMN qty_received INT NOT NULL DEFAULT 0'
+        );
+        orange_catalog_safe_exec($pdo, 'UPDATE purchase_items SET qty_received = qty');
     }
 
     if (orange_table_exists($pdo, 'company_settings') && !orange_table_has_column($pdo, 'company_settings', 'vat_number')) {

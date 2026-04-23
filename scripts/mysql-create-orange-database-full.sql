@@ -529,6 +529,7 @@ CREATE TABLE `purchase_items` (
   `purchase_id` int NOT NULL,
   `product_id` int NOT NULL,
   `qty` int NOT NULL,
+  `qty_received` int NOT NULL DEFAULT '0',
   `cost` decimal(10,2) NOT NULL,
   `variant_id` int DEFAULT NULL,
   PRIMARY KEY (`id`),

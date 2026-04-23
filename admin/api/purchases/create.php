@@ -43,6 +43,7 @@ try {
     $purchaseId = (int)$pdo->lastInsertId();
 
     $hasPiVariant = orange_table_has_column($pdo, 'purchase_items', 'variant_id');
+    $hasPiQtyReceived = orange_table_has_column($pdo, 'purchase_items', 'qty_received');
 
     foreach ($items as $item) {
         $productId = (int)($item['product_id'] ?? 0);
@@ -58,17 +59,26 @@ try {
             (int)($item['variant_id'] ?? 0)
         );
 
-        if ($hasPiVariant) {
+        if ($hasPiVariant && $hasPiQtyReceived) {
+            $pdo->prepare(
+                'INSERT INTO purchase_items (purchase_id, product_id, variant_id, qty, qty_received, cost) VALUES (?, ?, ?, ?, 0, ?)'
+            )->execute([$purchaseId, $productId, $variantId, $qty, $cost]);
+        } elseif ($hasPiVariant) {
             $pdo->prepare(
                 'INSERT INTO purchase_items (purchase_id, product_id, variant_id, qty, cost) VALUES (?, ?, ?, ?, ?)'
             )->execute([$purchaseId, $productId, $variantId, $qty, $cost]);
+            $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ?')
+                ->execute([$qty, $variantId]);
+        } elseif ($hasPiQtyReceived) {
+            $pdo->prepare(
+                'INSERT INTO purchase_items (purchase_id, product_id, qty, qty_received, cost) VALUES (?, ?, ?, 0, ?)'
+            )->execute([$purchaseId, $productId, $qty, $cost]);
         } else {
             $pdo->prepare("INSERT INTO purchase_items (purchase_id, product_id, qty, cost) VALUES (?, ?, ?, ?)")
                 ->execute([$purchaseId, $productId, $qty, $cost]);
+            $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ?')
+                ->execute([$qty, $variantId]);
         }
-
-        $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ?')
-            ->execute([$qty, $variantId]);
     }
 
     $inventoryId = orange_gl_account_id($pdo, 'inventory');
