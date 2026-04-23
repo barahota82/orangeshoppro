@@ -14,7 +14,7 @@ IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
 - **docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt**
 - **IBRAHIM_ORANGE_MASTER.txt** (هذا الملف)
 - **.cursor/rules/orange-session-handoff.mdc**
-- **docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt** (أداء الواجهة والترحيل وتقليل المخاطر)
+- **docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt** (أداء الواجهة والترحيل وتقليل المخاطر) — يتضمن **إلزاماً أرشيفياً: عدم المساس بسرعة تحميل الموقع وصفحاته** (قسم «ثانياً»).
 - عند نطاق **مخطط/جداول/ترحيل:** **scripts/orange_db.sql** محلياً (§2أ) — الأجزاء ذات الصلة فقط؛ إن غاب الملف راجع هذا القسم ولا تفترض المخطط من Git وحدَه.
 - **أسئلة وأجوبة تشغيلية (وكلاء/نشر/ترحيل):** **docs/archive/ORANGE_AGENT_QA_REFERENCE.txt**
 
