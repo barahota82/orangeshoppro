@@ -136,6 +136,9 @@ try {
     $notes = trim((string)($data['notes'] ?? (string)$purchase['notes']));
     $items = isset($data['items']) && is_array($data['items']) ? $data['items'] : [];
     if (!in_array($type, ['cash', 'credit'], true) || count($items) === 0) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         json_response(['success' => false, 'message' => 'بيانات التعديل غير صحيحة'], 422);
     }
 

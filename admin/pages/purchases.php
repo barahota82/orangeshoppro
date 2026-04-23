@@ -46,6 +46,11 @@ $recent = $pdo->query(
     </div>
 </div>
 
+<div class="card" id="pur_edit_banner" hidden>
+    <p class="card-hint" style="margin:0 0 10px;"><strong>وضع التعديل</strong> — فاتورة <span id="pur_edit_banner_id"></span>. إن وُجد استلام مخزون، الحفظ يعكسه ويُصفّر أعمدة الاستلام ثم يعيد بنود الفاتورة كما في النموذج (قد تحتاج إعادة استلام لاحقاً).</p>
+    <button type="button" class="btn-secondary" onclick="purCancelEdit()">إلغاء التعديل</button>
+</div>
+
 <div class="card">
     <h2 class="card-title">بيانات الفاتورة</h2>
     <p class="card-hint">الآجل يُرحَّل على ذمم الموردين؛ النقدي يُقابل الصندوق/البنك حسب إعداد الحسابات في الكود (1، 3، 5). مرتجع المشتريات وسندات الصرف ستُبنى لاحقًا كمرحلة محاسبية كاملة.</p>
@@ -99,7 +104,7 @@ $recent = $pdo->query(
     <?php endif; ?>
     <div class="actions admin-doc-lines-toolbar" style="margin-top:12px;">
         <button type="button" class="btn-secondary" onclick="purAddLine()">+ سطر</button>
-        <button type="button" onclick="purSubmit()">حفظ فاتورة الشراء</button>
+        <button type="button" id="pur_submit_btn" onclick="purSubmit()">حفظ فاتورة الشراء</button>
     </div>
     <p class="card-hint" style="margin-top:12px;margin-bottom:0;"><strong>المجموع المحسوب:</strong> <span id="pur_total_preview">0.00</span> KD — بعد الحفظ استخدم «استلام جزئي» أو «استلام كامل» في قائمة آخر الفواتير لزيادة المخزون.</p>
 </div>
@@ -136,6 +141,7 @@ $recent = $pdo->query(
                     <td><?php echo (int) $pr; ?> / <?php echo (int) $pq; ?></td>
                     <td><?php echo htmlspecialchars((string)($r['notes'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td>
+                        <button type="button" class="btn-secondary" style="margin-left:6px;" onclick="purEdit(<?php echo (int)$r['id']; ?>)">تعديل</button>
                         <button type="button" class="btn-secondary" style="margin-left:6px;" <?php echo $purCanReceive ? '' : 'disabled'; ?> onclick="purReceivePartialOpen(<?php echo (int)$r['id']; ?>)">استلام جزئي</button>
                         <button type="button" class="btn-secondary" style="margin-left:6px;" <?php echo $purCanReceive ? '' : 'disabled'; ?> onclick="purReceiveAll(<?php echo (int)$r['id']; ?>)">استلام كامل</button>
                         <button type="button" class="btn-danger" onclick="purDelete(<?php echo (int)$r['id']; ?>)">حذف</button>
@@ -387,6 +393,134 @@ function purBindLinesBody() {
     });
 }
 
+var PUR_EDIT_ID = 0;
+
+function purSetEditUi() {
+    var btn = document.getElementById('pur_submit_btn');
+    var ban = document.getElementById('pur_edit_banner');
+    if (btn) {
+        btn.textContent = PUR_EDIT_ID ? 'حفظ التعديلات' : 'حفظ فاتورة الشراء';
+    }
+    if (ban) {
+        ban.hidden = !PUR_EDIT_ID;
+    }
+}
+
+function purMergeProductForEdit(it) {
+    var pid = parseInt(it.product_id, 10) || 0;
+    if (!pid) {
+        return;
+    }
+    if (PUR_PRODUCTS.some(function (x) { return x.id === pid; })) {
+        return;
+    }
+    PUR_PRODUCTS.push({
+        id: pid,
+        name: it.is_product_active ? it.product_name : (it.product_name + ' (غير نشط)'),
+        cost: parseFloat(it.product_cost) || 0,
+        has_colors: it.has_colors ? 1 : 0,
+        has_sizes: it.has_sizes ? 1 : 0
+    });
+}
+
+function purCancelEdit() {
+    PUR_EDIT_ID = 0;
+    var sup = document.getElementById('pur_supplier');
+    var typ = document.getElementById('pur_type');
+    var nte = document.getElementById('pur_notes');
+    if (sup) {
+        sup.value = '0';
+    }
+    if (typ) {
+        typ.value = 'cash';
+    }
+    if (nte) {
+        nte.value = '';
+    }
+    var tb = document.getElementById('pur_lines_body');
+    if (tb) {
+        tb.innerHTML = '';
+        purAddLine();
+        purSyncTrailingRows();
+        purRecalcPreview();
+    }
+    var bid = document.getElementById('pur_edit_banner_id');
+    if (bid) {
+        bid.textContent = '';
+    }
+    purSetEditUi();
+}
+
+function purEdit(purchaseId) {
+    var tb = document.getElementById('pur_lines_body');
+    if (!tb) {
+        alert('لا يمكن التعديل: لا توجد أصناف نشطة في النظام.');
+        return;
+    }
+    getJSON('/admin/api/purchases/get.php?purchase_id=' + encodeURIComponent(String(purchaseId))).then(function (res) {
+        if (!res.success) {
+            if (!orangeAdminOfferSuggestOnFailure(res, 'فشل')) {
+                alert(res.message || 'فشل');
+            }
+            return;
+        }
+        if (res.has_received_stock) {
+            if (!confirm('هذه الفاتورة عليها استلام مخزون مُسجَّل. التعديل يعكس ذلك المخزون ويُصفّر أعمدة الاستلام ثم يعيد البنود كما في النموذج (قد تحتاج إعادة الاستلام لاحقاً). المتابعة؟')) {
+                return;
+            }
+        }
+        var p = res.purchase;
+        var items = res.items || [];
+        for (var m = 0; m < items.length; m++) {
+            purMergeProductForEdit(items[m]);
+        }
+        PUR_EDIT_ID = parseInt(p.id, 10) || 0;
+        var sup = document.getElementById('pur_supplier');
+        var typ = document.getElementById('pur_type');
+        var nte = document.getElementById('pur_notes');
+        if (sup) {
+            sup.value = String(p.supplier_id || 0);
+        }
+        if (typ) {
+            typ.value = p.type === 'credit' ? 'credit' : 'cash';
+        }
+        if (nte) {
+            nte.value = p.notes || '';
+        }
+        tb.innerHTML = '';
+        for (var i = 0; i < items.length; i++) {
+            purAddLine();
+            var rows = tb.querySelectorAll('tr.pur-line');
+            var tr = rows[rows.length - 1];
+            var sel = tr.querySelector('.pur-p');
+            if (sel) {
+                sel.value = String(items[i].product_id);
+                purLineChanged(sel);
+            }
+            var vsel = tr.querySelector('.pur-v');
+            if (vsel) {
+                vsel.value = String(items[i].variant_id || 0);
+            }
+            var qIn = tr.querySelector('.pur-q');
+            var cIn = tr.querySelector('.pur-c');
+            if (qIn) {
+                qIn.value = String(items[i].qty);
+            }
+            if (cIn) {
+                cIn.value = String(items[i].cost);
+            }
+        }
+        purSyncTrailingRows();
+        purRecalcPreview();
+        var bid = document.getElementById('pur_edit_banner_id');
+        if (bid) {
+            bid.textContent = '#' + String(p.id);
+        }
+        purSetEditUi();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+}
+
 function purSubmit() {
     var supplier = parseInt(document.getElementById('pur_supplier').value, 10) || 0;
     var type = document.getElementById('pur_type').value;
@@ -413,14 +547,21 @@ function purSubmit() {
         alert('أضف سطرًا واحدًا على الأقل بصنف وكمية صحيحة');
         return;
     }
-    postJSON('/admin/api/purchases/create.php', {
+    var url = '/admin/api/purchases/create.php';
+    var payload = {
         supplier_id: supplier,
         type: type,
         notes: notes,
         items: items
-    }).then(function (res) {
+    };
+    if (PUR_EDIT_ID) {
+        url = '/admin/api/purchases/update.php';
+        payload.id = PUR_EDIT_ID;
+        payload.action = 'update';
+    }
+    postJSON(url, payload).then(function (res) {
         if (res.success) {
-            alert(res.message || 'تم حفظ فاتورة الشراء');
+            alert(res.message || (PUR_EDIT_ID ? 'تم تعديل فاتورة الشراء' : 'تم حفظ فاتورة الشراء'));
             location.reload();
             return;
         }
