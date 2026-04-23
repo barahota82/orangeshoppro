@@ -37,10 +37,16 @@ $hasTable = orange_table_exists($pdo, 'cart_gift_promotions');
         </div>
         <div id="cgp_block_pool" style="grid-column:1/-1;">
             <label>أرقام متغيرات المنتج (Variant IDs) — مفصولة بفاصلة أو سطر جديد</label>
+            <div style="margin:6px 0 8px;">
+                <button type="button" class="btn-secondary" onclick="orangeOpenVariantPicker({ mode: 'pool', targetId: 'cgp_pool' })">اختيار بصري — إضافة للقائمة</button>
+            </div>
             <textarea id="cgp_pool" rows="3" class="admin-inp" dir="ltr" style="width:100%;max-width:40rem;font-family:monospace;" placeholder="101, 102, 103"></textarea>
         </div>
         <div id="cgp_block_fixed" style="grid-column:1/-1;display:none;">
             <label>رقم المتغير الثابت (Variant ID)</label>
+            <div style="margin:6px 0 8px;">
+                <button type="button" class="btn-secondary" onclick="orangeOpenVariantPicker({ mode: 'fixed', targetId: 'cgp_fixed' })">اختيار بصري — متغير واحد</button>
+            </div>
             <input type="number" id="cgp_fixed" class="admin-inp" min="1" step="1" style="max-width:12rem;" dir="ltr">
         </div>
         <div style="grid-column:1/-1;">

@@ -28,6 +28,9 @@ $hasTable = orange_table_exists($pdo, 'cart_combo_promotions');
         <div><label>الترتيب</label><input type="number" id="ccp_sort" value="0" style="max-width:120px;"></div>
         <div style="grid-column:1/-1;">
             <label>المكوّنات — سطر لكل متغير: <code dir="ltr">variant_id qty</code> أو <code dir="ltr">variant_id, qty</code> (متغيران مختلفان على الأقل)</label>
+            <div style="margin:6px 0 8px;">
+                <button type="button" class="btn-secondary" onclick="orangeOpenVariantPicker({ mode: 'lines', targetId: 'ccp_comp' })">اختيار بصري — إضافة سطر (متغير + كمية)</button>
+            </div>
             <textarea id="ccp_comp" rows="5" class="admin-inp" dir="ltr" style="width:100%;max-width:40rem;font-family:monospace;" placeholder="101 1&#10;205 1"></textarea>
         </div>
         <div style="grid-column:1/-1;">

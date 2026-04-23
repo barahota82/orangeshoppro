@@ -44,6 +44,9 @@ $hasTable = orange_table_exists($pdo, 'cart_bogo_promotions');
         </div>
         <div id="cbp_buy_bundle_wrap" style="grid-column:1/-1;display:none;">
             <label>مكوّنات الشراء — سطر لكل متغير: <code dir="ltr">variant_id qty</code> (متغيران مختلفان على الأقل)</label>
+            <div style="margin:6px 0 8px;">
+                <button type="button" class="btn-secondary" onclick="orangeOpenVariantPicker({ mode: 'lines', targetId: 'cbp_buy_comp' })">اختيار بصري — إضافة سطر</button>
+            </div>
             <textarea id="cbp_buy_comp" rows="4" class="admin-inp" dir="ltr" style="width:100%;max-width:40rem;font-family:monospace;" placeholder="101 1&#10;205 1"></textarea>
         </div>
         <div id="cbp_minbuy_wrap">
@@ -64,10 +67,16 @@ $hasTable = orange_table_exists($pdo, 'cart_bogo_promotions');
         </div>
         <div id="cbp_block_pool" style="grid-column:1/-1;">
             <label>أرقام متغيرات المنتج (Variant IDs)</label>
+            <div style="margin:6px 0 8px;">
+                <button type="button" class="btn-secondary" onclick="orangeOpenVariantPicker({ mode: 'pool', targetId: 'cbp_pool' })">اختيار بصري — إضافة للقائمة</button>
+            </div>
             <textarea id="cbp_pool" rows="3" class="admin-inp" dir="ltr" style="width:100%;max-width:40rem;font-family:monospace;" placeholder="201, 202"></textarea>
         </div>
         <div id="cbp_block_fixed" style="grid-column:1/-1;display:none;">
             <label>رقم المتغير الثابت</label>
+            <div style="margin:6px 0 8px;">
+                <button type="button" class="btn-secondary" onclick="orangeOpenVariantPicker({ mode: 'fixed', targetId: 'cbp_fixed' })">اختيار بصري — متغير واحد</button>
+            </div>
             <input type="number" id="cbp_fixed" class="admin-inp" min="1" step="1" style="max-width:12rem;" dir="ltr">
         </div>
         <div style="grid-column:1/-1;">
