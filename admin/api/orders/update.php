@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/order_stock.php';
 require_once __DIR__ . '/../../../includes/order_fulfillment.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
+require_once __DIR__ . '/../../../includes/phone_validation.php';
 require_admin_api();
 
 try {
@@ -28,6 +29,22 @@ try {
         json_response(['success' => false, 'message' => 'حالة الطلب غير صحيحة'], 422);
     }
 
+    $phoneOut = trim((string) ($order['phone'] ?? ''));
+    if (array_key_exists('phone', $data)) {
+        $phoneRaw = trim((string) $data['phone']);
+        if ($phoneRaw === '') {
+            json_response(['success' => false, 'message' => 'رقم الهاتف مطلوب'], 422);
+        }
+        $phoneNorm = orange_normalize_customer_phone($phoneRaw, null);
+        if ($phoneNorm === null) {
+            json_response([
+                'success' => false,
+                'message' => 'رقم الهاتف غير صالح. استخدم + أو 00 مع كود الدولة، أو أدخل رقماً وطنياً صالحاً.',
+            ], 422);
+        }
+        $phoneOut = $phoneNorm;
+    }
+
     $pdo->beginTransaction();
 
     $prevStatus = (string)($order['status'] ?? '');
@@ -44,7 +61,7 @@ try {
         WHERE id = ?
     ")->execute([
         trim((string)($data['customer_name'] ?? $order['customer_name'])),
-        trim((string)($data['phone'] ?? $order['phone'])),
+        $phoneOut,
         trim((string)($data['area'] ?? $order['area'])),
         trim((string)($data['address'] ?? $order['address'])),
         trim((string)($data['notes'] ?? $order['notes'])),

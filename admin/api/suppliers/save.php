@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/phone_validation.php';
 require_admin_api();
 
 function orange_supplier_normalize_code(PDO $pdo, $raw): ?string
@@ -31,8 +32,18 @@ try {
     if ($name === '') {
         json_response(['success' => false, 'message' => 'اسم المورد مطلوب'], 422);
     }
-    $phone = trim((string) ($data['phone'] ?? ''));
-    $phoneSql = $phone === '' ? null : $phone;
+    $phoneRaw = trim((string) ($data['phone'] ?? ''));
+    $phoneSql = null;
+    if ($phoneRaw !== '') {
+        $phoneNorm = orange_normalize_customer_phone($phoneRaw, null);
+        if ($phoneNorm === null) {
+            json_response([
+                'success' => false,
+                'message' => 'رقم الهاتف غير صالح. استخدم + أو 00 مع كود الدولة، أو أدخل رقماً وطنياً صالحاً.',
+            ], 422);
+        }
+        $phoneSql = $phoneNorm;
+    }
     $notesRaw = trim((string) ($data['notes'] ?? ''));
     $notesSql = $notesRaw === '' ? null : (function_exists('mb_substr') ? mb_substr($notesRaw, 0, 255, 'UTF-8') : substr($notesRaw, 0, 255));
     $hasCode = orange_table_has_column($pdo, 'suppliers', 'code');
