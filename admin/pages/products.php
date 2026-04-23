@@ -374,9 +374,7 @@ foreach ($categories as $cat) {
                 <input type="hidden" id="main_image" value="">
                 <input type="file" id="main_image_file" accept="image/jpeg,image/png,image/webp,image/gif">
                 <button type="button" class="btn-secondary" style="margin-top:8px;" onclick="uploadMainProductImage()">رفع الصورة الرئيسية</button>
-                <div style="margin-top:10px;">
-                    <img id="main_image_preview" alt="" style="display:none;max-height:140px;border-radius:8px;border:1px solid #ddd;">
-                </div>
+                <div id="main_image_preview" style="display:none;margin-top:10px;"></div>
                 <p class="admin-product-image-hint">الصورة هنا <strong>مرجع للصنف</strong> (ما يظهر للعميل). المتغيرات (لون × مقاس) تُربط بنفس الصنف؛ صورة لكل لون يمكن إضافتها لاحقاً في التطوير. <strong>أول صورة تُرفع</strong> تُعتبر الرئيسية ما لم تغيّرها. يُثبت الربط عند «حفظ المنتج».</p>
             </div>
             <div style="grid-column:1/-1;">
@@ -505,6 +503,52 @@ const PRODUCT_MSG = {
     OK_REORDER: 'تم حفظ ترتيب المنتجات',
     OK_TOG: 'تم تحديث الحالة'
 };
+
+function adminEscAttr(s) {
+    return String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;');
+}
+function adminProductImageBasename(filename) {
+    const fn = String(filename || '').trim();
+    if (!fn) {
+        return '';
+    }
+    const parts = fn.split(/[/\\]/);
+    return parts[parts.length - 1] || '';
+}
+/** معاينة الصورة الرئيسية: يفضّل ‎webp‎ المرافق كما في الواجهة. */
+function adminSetMainImagePreview(filename) {
+    const mount = document.getElementById('main_image_preview');
+    if (!mount) {
+        return;
+    }
+    const base = adminProductImageBasename(filename);
+    if (!base) {
+        mount.innerHTML = '';
+        mount.style.display = 'none';
+        return;
+    }
+    const lower = base.toLowerCase();
+    const orig = '/uploads/products/' + encodeURIComponent(base);
+    const style = 'max-height:140px;border-radius:8px;border:1px solid #ddd;';
+    if (lower.endsWith('.webp')) {
+        mount.innerHTML = '<img alt="" style="' + style + '" src="' + adminEscAttr(orig) + '">';
+    } else {
+        const stem = base.indexOf('.') !== -1 ? base.slice(0, base.lastIndexOf('.')) : base;
+        const webp = '/uploads/products/' + encodeURIComponent(stem + '.webp');
+        mount.innerHTML =
+            '<picture><source type="image/webp" srcset="' +
+            adminEscAttr(webp) +
+            '"><img alt="" style="' +
+            style +
+            '" src="' +
+            adminEscAttr(orig) +
+            '"></picture>';
+    }
+    mount.style.display = 'block';
+}
 
 let productTranslateTimer = null;
 let productEnTranslateTimer = null;
@@ -641,11 +685,7 @@ function assignMainImageFromGalleryIfEmpty() {
     }
     const fn = list[0];
     mainEl.value = fn;
-    const prev = document.getElementById('main_image_preview');
-    if (prev) {
-        prev.src = '/uploads/products/' + fn;
-        prev.style.display = 'block';
-    }
+    adminSetMainImagePreview(fn);
 }
 
 function renderGalleryUploadList() {
@@ -669,11 +709,7 @@ function renderGalleryUploadList() {
                 mainEl.value = '';
                 assignMainImageFromGalleryIfEmpty();
                 if (!mainEl.value.trim()) {
-                    const pv = document.getElementById('main_image_preview');
-                    if (pv) {
-                        pv.src = '';
-                        pv.style.display = 'none';
-                    }
+                    adminSetMainImagePreview('');
                 }
             }
             renderGalleryUploadList();
@@ -699,9 +735,7 @@ async function uploadMainProductImage() {
             return;
         }
         document.getElementById('main_image').value = j.filename;
-        const prev = document.getElementById('main_image_preview');
-        prev.src = '/uploads/products/' + j.filename;
-        prev.style.display = 'block';
+        adminSetMainImagePreview(j.filename);
         inp.value = '';
     } catch (e) {
         alert('خطأ في الاتصال أثناء الرفع');
@@ -770,11 +804,7 @@ function resetProductForm() {
     }
     document.getElementById('main_image').value = '';
     document.getElementById('main_image_file').value = '';
-    const prev = document.getElementById('main_image_preview');
-    if (prev) {
-        prev.src = '';
-        prev.style.display = 'none';
-    }
+    adminSetMainImagePreview('');
     document.getElementById('has_sizes').value = '0';
     document.getElementById('has_colors').value = '0';
     document.getElementById('size_family_id').value = '';
@@ -868,14 +898,7 @@ async function loadProductForEdit(id) {
             mainFn = extrasEarly[0];
         }
         document.getElementById('main_image').value = mainFn;
-        const prev = document.getElementById('main_image_preview');
-        if (mainFn && prev) {
-            prev.src = '/uploads/products/' + mainFn;
-            prev.style.display = 'block';
-        } else if (prev) {
-            prev.src = '';
-            prev.style.display = 'none';
-        }
+        adminSetMainImagePreview(mainFn);
         document.getElementById('has_sizes').value = parseInt(p.has_sizes, 10) === 1 ? '1' : '0';
         document.getElementById('has_colors').value = parseInt(p.has_colors, 10) === 1 ? '1' : '0';
         document.getElementById('size_family_id').value = p.size_family_id ? String(p.size_family_id) : '';
@@ -1014,8 +1037,28 @@ function adminVariantReferenceThumbHtml() {
     if (!mainImg) {
         return '<span class="admin-variant-thumb-placeholder" title="ارفع صورة من تبويب الصور">؟</span>';
     }
-    const safe = mainImg.replace(/"/g, '');
-    return '<img src="/uploads/products/' + safe + '" alt="" class="admin-variant-thumb" width="48" height="48" loading="lazy">';
+    const base = adminProductImageBasename(mainImg);
+    if (!base) {
+        return '<span class="admin-variant-thumb-placeholder" title="ارفع صورة من تبويب الصور">؟</span>';
+    }
+    const lower = base.toLowerCase();
+    const orig = '/uploads/products/' + encodeURIComponent(base);
+    if (lower.endsWith('.webp')) {
+        return (
+            '<img src="' +
+            adminEscAttr(orig) +
+            '" alt="" class="admin-variant-thumb" width="48" height="48" loading="lazy">'
+        );
+    }
+    const stem = base.indexOf('.') !== -1 ? base.slice(0, base.lastIndexOf('.')) : base;
+    const webp = '/uploads/products/' + encodeURIComponent(stem + '.webp');
+    return (
+        '<picture class="admin-variant-thumb-picture"><source type="image/webp" srcset="' +
+        adminEscAttr(webp) +
+        '"><img src="' +
+        adminEscAttr(orig) +
+        '" alt="" class="admin-variant-thumb" width="48" height="48" loading="lazy"></picture>'
+    );
 }
 
 function addColorwayRow() {

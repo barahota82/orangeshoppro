@@ -1950,6 +1950,15 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
 .admin-table.admin-variants-matrix .td-stock {
     width: 7rem;
 }
+.admin-variant-thumb-picture {
+    display: block;
+    width: 48px;
+    height: 48px;
+    margin-inline: auto;
+}
+.admin-variant-thumb-picture img.admin-variant-thumb {
+    margin-inline: 0;
+}
 .admin-variant-thumb {
     display: block;
     width: 48px;
