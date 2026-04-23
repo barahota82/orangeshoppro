@@ -1,7 +1,7 @@
 IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
 ============================================
 النسخة المعتمدة: جذر المستودع — IBRAHIM_ORANGE_MASTER.txt (مثلاً D:\orange)
-آخر تحديث: 2026-04-26 (إلزام الوكلاء: **ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt**؛ §10: س25/س26؛ س13 + بريد التتبع؛ س30 بنود الطلب الجزئي؛ س19 بريد الضيف؛ **س27** `get-order.php` POST فقط + مرجع نصي للمشاركة في `cart.js`؛ **تعريف كود الدولة (قائمة + رقم)** في أرشيف السياسات قسم «صفر»؛ س7؛ س28؛ س4 (**عروض المجموع + الهدايا + BOGO** بما فيها حزمة شراء `buy_bundle` + **كومبو** في الأدمن والطابور)؛ **س15** دمج هاتف التسجيل: `storefront_phone_merge.php` + `apply-phone-merge.php` + أدمن `storefront_merge_requests`)
+آخر تحديث: 2026-04-26 (إلزام الوكلاء: **ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt**؛ §10: س25/س26؛ س13 + بريد التتبع؛ س30 بنود الطلب الجزئي؛ س19 بريد الضيف؛ **س27** `get-order.php` POST فقط + مرجع نصي للمشاركة في `cart.js`؛ **تعريف كود الدولة (قائمة + رقم)** في أرشيف السياسات قسم «صفر»؛ س7؛ س28؛ س4 (**عروض المجموع + الهدايا + BOGO** بما فيها حزمة شراء `buy_bundle` + **كومبو** في الأدمن والطابور)؛ **س22** تعديل البنود `amend-order-items.php` — كومبو ثم خصم المجموع ثم هدايا/BOGO؛ **س15** دمج هاتف التسجيل: `storefront_phone_merge.php` + `apply-phone-merge.php` + أدمن `storefront_merge_requests`)
 
 الغرض
 -------
@@ -170,6 +170,7 @@ IBRAHIM — Orange | مؤشر أرشيف ومرجع تشغيل
   API `api/orders/list-guest-storefront-orders.php`؛ تعبئة الجلسة من `create-order.php`، `intake-status.php`، `amend-order-items.php`؛
   واجهة `pages/cart.php` + `assets/js/cart.js`.
 - طلب جزئي من العربة (س30): عند أكثر من سطر وليس وضع تعديل طلب، اختيار البنود المُرسَلة في `assets/js/cart.js`؛ الباقي يبقى في `localStorage`؛ الإرسال `sendOrderNow` → `create-order.php`؛ وضع التعديل `amend` يُرسل كامل السلة كسابق.
+- تعديل بنود الطلب بعد الإرسال (س22): `api/orders/amend-order-items.php` — ترتيب الخصومات كالإنشاء: **كومبو** (`cart_combo_promotions.php`) ثم خصم **مجموع السلة** على الصافي بعد الكومبو ثم **هدايا المجموع وBOGO** (`storefront_checkout_promo_lines.php`)؛ انظر `docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt` س22.
 - بريد تفاصيل الطلب بعد التتبع (س13): `api/orders/email-track-order-summary.php` + عرض في `assets/js/cart.js` (`orangeSendTrackOrderEmailSummary`).
 - تقرير مبيعات حسب منطقة التوصيل (س8): `admin/pages/reports.php` — طلبات مكتملة مجمّعة حسب المنطقة.
 - بريد الضيف في الطلب (س19): حقل اختياري `#customer_email` في `pages/cart.php`؛ الإرسال من `assets/js/cart.js` (`sendOrderNow`) إلى `api/orders/create-order.php`.
