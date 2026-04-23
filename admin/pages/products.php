@@ -491,6 +491,7 @@ foreach ($categories as $cat) {
 </div>
 
 <script>
+window.ORANGE_PUBLIC_BASE_PATH = <?php echo json_encode(PUBLIC_BASE_PATH === '' ? '' : rtrim(PUBLIC_BASE_PATH, '/'), JSON_UNESCAPED_UNICODE); ?>;
 window.ORANGE_COLORS = <?php echo json_encode($colors, JSON_UNESCAPED_UNICODE); ?>;
 window.ORANGE_FAMILIES = <?php echo json_encode($familiesOut, JSON_UNESCAPED_UNICODE); ?>;
 window.ORANGE_SUBCATEGORIES = <?php echo json_encode($subcategoriesForJs, JSON_UNESCAPED_UNICODE); ?>;
@@ -509,6 +510,12 @@ function adminEscAttr(s) {
         .replace(/&/g, '&amp;')
         .replace(/"/g, '&quot;')
         .replace(/</g, '&lt;');
+}
+function adminPublicPath(path) {
+    const raw = typeof window.ORANGE_PUBLIC_BASE_PATH === 'string' ? window.ORANGE_PUBLIC_BASE_PATH : '';
+    const base = raw.replace(/\/+$/, '');
+    const p = path.charAt(0) === '/' ? path : '/' + path;
+    return base + p;
 }
 function adminProductImageBasename(filename) {
     const fn = String(filename || '').trim();
@@ -531,13 +538,14 @@ function adminSetMainImagePreview(filename) {
         return;
     }
     const lower = base.toLowerCase();
-    const orig = '/uploads/products/' + encodeURIComponent(base);
+    const prefix = adminPublicPath('/uploads/products/');
+    const orig = prefix + encodeURIComponent(base);
     const style = 'max-height:140px;border-radius:8px;border:1px solid #ddd;';
     if (lower.endsWith('.webp')) {
         mount.innerHTML = '<img alt="" style="' + style + '" src="' + adminEscAttr(orig) + '">';
     } else {
         const stem = base.indexOf('.') !== -1 ? base.slice(0, base.lastIndexOf('.')) : base;
-        const webp = '/uploads/products/' + encodeURIComponent(stem + '.webp');
+        const webp = prefix + encodeURIComponent(stem + '.webp');
         mount.innerHTML =
             '<picture><source type="image/webp" srcset="' +
             adminEscAttr(webp) +
@@ -1042,7 +1050,8 @@ function adminVariantReferenceThumbHtml() {
         return '<span class="admin-variant-thumb-placeholder" title="ارفع صورة من تبويب الصور">؟</span>';
     }
     const lower = base.toLowerCase();
-    const orig = '/uploads/products/' + encodeURIComponent(base);
+    const prefix = adminPublicPath('/uploads/products/');
+    const orig = prefix + encodeURIComponent(base);
     if (lower.endsWith('.webp')) {
         return (
             '<img src="' +
@@ -1051,7 +1060,7 @@ function adminVariantReferenceThumbHtml() {
         );
     }
     const stem = base.indexOf('.') !== -1 ? base.slice(0, base.lastIndexOf('.')) : base;
-    const webp = '/uploads/products/' + encodeURIComponent(stem + '.webp');
+    const webp = prefix + encodeURIComponent(stem + '.webp');
     return (
         '<picture class="admin-variant-thumb-picture"><source type="image/webp" srcset="' +
         adminEscAttr(webp) +
