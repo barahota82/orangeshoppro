@@ -8,6 +8,7 @@ if (!isset($admin)) {
 $orangeAdminPage = isset($page) ? (string) $page : 'dashboard';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
+require_once __DIR__ . '/../../includes/upload_paths.php';
 $pdoNav = db();
 orange_catalog_ensure_schema($pdoNav);
 
@@ -38,9 +39,10 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?php echo htmlspecialchars(admin_asset_url('/admin/assets/admin.css'), ENT_QUOTES, 'UTF-8'); ?>">
-    <script src="<?php echo htmlspecialchars(admin_asset_url('/admin/assets/admin.js'), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
-    <script src="<?php echo htmlspecialchars(admin_asset_url('/admin/assets/admin-money-fields.js'), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+    <link rel="stylesheet" href="<?php echo htmlspecialchars(storefront_public_path(admin_asset_url('/admin/assets/admin.css')), ENT_QUOTES, 'UTF-8'); ?>">
+    <script>window.ORANGE_PUBLIC_BASE_PATH = <?php echo json_encode(PUBLIC_BASE_PATH, JSON_UNESCAPED_UNICODE); ?>;</script>
+    <script src="<?php echo htmlspecialchars(storefront_public_path(admin_asset_url('/admin/assets/admin.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+    <script src="<?php echo htmlspecialchars(storefront_public_path(admin_asset_url('/admin/assets/admin-money-fields.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
 </head>
 <body>
 <div class="admin-layout">
@@ -73,7 +75,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 }
                 $active = $orangeNavLinkActive($nl);
                 $cls = trim($nl['class'] . ($active ? ' is-active' : ''));
-                echo '<a href="' . htmlspecialchars($nl['href'], ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($nl['label'], ENT_QUOTES, 'UTF-8') . '</a>';
+                echo '<a href="' . htmlspecialchars(storefront_public_path((string) $nl['href']), ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($nl['label'], ENT_QUOTES, 'UTF-8') . '</a>';
             };
 
             $orangeRenderNavLinkMega = static function (array $nl) use ($admin, $pdoNav, $orangeNavLinkActive): void {
@@ -82,7 +84,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 }
                 $active = $orangeNavLinkActive($nl);
                 $cls = trim($nl['class'] . ' admin-mega-link' . ($active ? ' is-active' : ''));
-                echo '<a href="' . htmlspecialchars($nl['href'], ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($nl['label'], ENT_QUOTES, 'UTF-8') . '</a>';
+                echo '<a href="' . htmlspecialchars(storefront_public_path((string) $nl['href']), ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($nl['label'], ENT_QUOTES, 'UTF-8') . '</a>';
             };
 
             /**
@@ -279,7 +281,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 }
                 $active = $orangeNavLinkActive($nl);
                 $cls = 'admin-topbar-mega-home' . ($active ? ' is-active' : '');
-                echo '<a href="' . htmlspecialchars($nl['href'], ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($nl['label'], ENT_QUOTES, 'UTF-8') . '</a>';
+                echo '<a href="' . htmlspecialchars(storefront_public_path((string) $nl['href']), ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($nl['label'], ENT_QUOTES, 'UTF-8') . '</a>';
             }
             foreach ($orangeNavMegaSections as $sec) {
                 [$anyVis, $hasAct] = $orangeNavSectionMeta($sec['items']);
@@ -303,7 +305,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                     <span class="admin-user__label">المستخدم</span>
                     <span class="admin-user__name"><?php echo htmlspecialchars($admin['display_name'] ?: $admin['username'], ENT_QUOTES, 'UTF-8'); ?></span>
                 </div>
-                <a href="/admin/logout.php" class="admin-topbar-logout"><?php echo htmlspecialchars('تسجيل الخروج', ENT_QUOTES, 'UTF-8'); ?></a>
+                <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/logout.php'), ENT_QUOTES, 'UTF-8'); ?>" class="admin-topbar-logout"><?php echo htmlspecialchars('تسجيل الخروج', ENT_QUOTES, 'UTF-8'); ?></a>
             </div>
         </div>
         <div class="admin-mega-layer">

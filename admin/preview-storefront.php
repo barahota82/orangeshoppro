@@ -9,12 +9,13 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config.php';
 orange_send_html_no_cache_headers();
 require_once __DIR__ . '/../includes/catalog_schema.php';
+require_once __DIR__ . '/../includes/upload_paths.php';
 
 require_admin_page();
 
 $ps = isset($_GET['ps']) ? strtolower((string) preg_replace('/[^a-z0-9\-]/i', '', (string) $_GET['ps'])) : '';
 if ($ps === '' || in_array($ps, orange_storefront_reserved_path_segments(), true)) {
-    header('Location: /admin/index.php?page=channels', true, 302);
+    header('Location: ' . storefront_public_path('/admin/index.php?page=channels'), true, 302);
     exit;
 }
 
@@ -23,7 +24,7 @@ orange_catalog_ensure_schema($pdo);
 $st = $pdo->prepare('SELECT 1 FROM channels WHERE path_segment = ? LIMIT 1');
 $st->execute([$ps]);
 if (!$st->fetchColumn()) {
-    header('Location: /admin/index.php?page=channels', true, 302);
+    header('Location: ' . storefront_public_path('/admin/index.php?page=channels'), true, 302);
     exit;
 }
 

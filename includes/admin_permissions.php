@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
+require_once __DIR__ . '/upload_paths.php';
 
 /**
  * موارد الصلاحيات — مفتاح ثابت => عنوان عربي.
@@ -217,7 +218,7 @@ function orange_admin_require_page(array $admin, PDO $pdo, string $page): void
         header('Content-Type: text/html; charset=UTF-8');
         http_response_code(403);
         echo '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>ممنوع</title></head><body style="font-family:Cairo,sans-serif;padding:2rem;">'
-            . '<h1>إدارة المستخدمين للمشرف العام فقط</h1><p><a href="/admin/index.php?page=dashboard">الرئيسية</a></p></body></html>';
+            . '<h1>إدارة المستخدمين للمشرف العام فقط</h1><p><a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=dashboard'), ENT_QUOTES, 'UTF-8') . '">الرئيسية</a></p></body></html>';
         exit;
     }
     $res = orange_admin_page_resource($page);
@@ -225,7 +226,7 @@ function orange_admin_require_page(array $admin, PDO $pdo, string $page): void
         header('Content-Type: text/html; charset=UTF-8');
         http_response_code(403);
         echo '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>ممنوع</title></head><body style="font-family:Cairo,sans-serif;padding:2rem;">'
-            . '<h1>لا تملك صلاحية عرض هذه الصفحة</h1><p><a href="/admin/index.php?page=dashboard">الرئيسية</a></p></body></html>';
+            . '<h1>لا تملك صلاحية عرض هذه الصفحة</h1><p><a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=dashboard'), ENT_QUOTES, 'UTF-8') . '">الرئيسية</a></p></body></html>';
         exit;
     }
 }

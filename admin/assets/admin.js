@@ -1,3 +1,29 @@
+/** يسبق مسارات الأدمن بـ PUBLIC_BASE_PATH عند نشر التطبيق تحت مجلد فرعي. */
+function orangeAdminResolveUrl(url) {
+    if (typeof url !== 'string') {
+        return url;
+    }
+    if (url.length < 8 || url.indexOf('/admin/') !== 0) {
+        return url;
+    }
+    var raw = typeof window.ORANGE_PUBLIC_BASE_PATH === 'string' ? window.ORANGE_PUBLIC_BASE_PATH : '';
+    var base = raw.replace(/\/+$/, '');
+    return base === '' ? url : base + url;
+}
+
+(function () {
+    var nativeFetch = window.fetch;
+    if (typeof nativeFetch !== 'function') {
+        return;
+    }
+    window.fetch = function (input, init) {
+        if (typeof input === 'string') {
+            input = orangeAdminResolveUrl(input);
+        }
+        return nativeFetch.call(this, input, init);
+    };
+})();
+
 function stripUtf8Bom(s) {
     if (!s || s.length < 1) return s;
     if (s.charCodeAt(0) === 0xfeff) return s.slice(1);

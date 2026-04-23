@@ -2216,7 +2216,8 @@ function admin_logout(): void {
 
 function require_admin_page(): array {
     if (!current_admin()) {
-        header('Location: /admin/login.php');
+        require_once __DIR__ . '/includes/upload_paths.php';
+        header('Location: ' . storefront_public_path('/admin/login.php'));
         exit;
     }
     $pdo = db();
@@ -2225,7 +2226,8 @@ function require_admin_page(): array {
     $admin = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$admin) {
         admin_logout();
-        header('Location: /admin/login.php');
+        require_once __DIR__ . '/includes/upload_paths.php';
+        header('Location: ' . storefront_public_path('/admin/login.php'));
         exit;
     }
     return $admin;
