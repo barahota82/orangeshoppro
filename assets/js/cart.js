@@ -817,7 +817,117 @@ async function renderCart() {
         return;
     }
 
-    const limits = await fetchCartStockLimits(items);
+    const limitsPromise = fetchCartStockLimits(items);
+
+    function paintCartBasket(itemsModel, limitsArr) {
+        let total = 0;
+        let html = '';
+        const T = window.APP_T || {};
+        const removeLabel = T.cart_remove || 'Remove';
+        const countTpl = T.cart_items_count || '{n} items';
+        const countStr = countTpl.replace(/\{n\}/g, String(itemsModel.length));
+        const unitLbl = T.cart_unit_price || '';
+        const subLbl = T.cart_line_subtotal || '';
+        const maxShortTpl = T.cart_max_available_short || '';
+        const choiceOn = orangeCartLineChoiceApplies(itemsModel);
+
+        itemsModel.forEach((itInit) => {
+            const k0 = orangeCartLineKey(itInit);
+            if (!Object.prototype.hasOwnProperty.call(orangeCartLineIncluded, k0)) {
+                orangeCartLineIncluded[k0] = true;
+            }
+        });
+
+        html += '<div class="cart-items-shell">';
+        html +=
+            '<div class="cart-list-head"><span class="cart-list-head__count">' +
+            escCartHtml(countStr) +
+            '</span>';
+        if (choiceOn) {
+            html +=
+                '<div class="cart-list-selection-tools">' +
+                '<span class="cart-list-selection-hint">' +
+                escCartHtml(T.cart_order_line_choice_hint || '') +
+                '</span>' +
+                '<span class="cart-list-selection-actions">' +
+                '<button type="button" class="btn btn-ghost cart-select-all-btn" onclick="orangeCartSelectAllLines(true)">' +
+                escCartHtml(T.cart_select_all_lines || '') +
+                '</button>' +
+                '<button type="button" class="btn btn-ghost cart-deselect-all-btn" onclick="orangeCartSelectAllLines(false)">' +
+                escCartHtml(T.cart_deselect_all_lines || '') +
+                '</button>' +
+                '</span></div>';
+        }
+        html += '</div>';
+        html += '<div class="cart-items-list">';
+
+        itemsModel.forEach((item, idx) => {
+            const qty = Math.max(1, parseInt(item.qty, 10) || 1);
+            const lineTotal = qty * Number(item.price);
+            if (!choiceOn || orangeCartLineIsIncluded(item)) {
+                total += lineTotal;
+            }
+            const maxStock =
+                limitsArr && limitsArr[idx] != null && !Number.isNaN(limitsArr[idx])
+                    ? Math.max(0, parseInt(limitsArr[idx], 10))
+                    : null;
+            const maxAttr = maxStock != null && maxStock > 0 ? ` max="${maxStock}"` : '';
+            const stockHint =
+                maxStock != null && maxStock > 0 && maxShortTpl
+                    ? '<p class="cart-stock-hint">' +
+                      escCartHtml(maxShortTpl.replace(/\{n\}/g, String(maxStock))) +
+                      '</p>'
+                    : '';
+
+            const incl = orangeCartLineIsIncluded(item);
+            const lineChoiceHtml = choiceOn
+                ? '<div class="cart-line-include"><label class="cart-line-include-label"><input type="checkbox" class="cart-line-include-cb" ' +
+                  (incl ? 'checked ' : '') +
+                  `onchange="orangeCartSetLineIncluded(${idx}, this.checked)"> <span class="cart-line-include-text">${escCartHtml(
+                      T.cart_include_in_this_order || ''
+                  )}</span></label></div>`
+                : '';
+
+            html += `
+            <div class="cart-item-card" data-cart-idx="${idx}">
+                <div class="cart-item-left">
+                    <img src="/uploads/products/${String(item.image || '').replace(/"/g, '')}" alt="${escCartHtml(item.name || '')}">
+                </div>
+                <div class="cart-item-right">
+                    ${lineChoiceHtml}
+                    <h4>${escCartHtml(item.name || '')}</h4>
+                    ${item.color ? `<p class="cart-item-variant">${escCartHtml(T.color || '')}: ${escCartHtml(item.color)}</p>` : ''}
+                    ${item.size ? `<p class="cart-item-variant">${escCartHtml(T.size || '')}: ${escCartHtml(item.size)}</p>` : ''}
+                    <div class="cart-line-price-row">
+                        <span class="cart-unit-price"><span class="cart-meta-label">${escCartHtml(unitLbl)}</span> ${formatMoney(item.price)}</span>
+                        <span class="cart-line-subtotal"><span class="cart-meta-label">${escCartHtml(subLbl)}</span><strong>${formatMoney(lineTotal)}</strong></span>
+                    </div>
+                    ${stockHint}
+                    <div class="cart-qty-row">
+                        <span class="cart-qty-label">${escCartHtml(T.quantity || '')}</span>
+                        <div class="qty-control cart-qty-control">
+                            <button type="button" class="cart-qty-btn" onclick="adjustCartQty(${idx}, -1)" aria-label="-">−</button>
+                            <input type="number" class="cart-qty-input" id="cartQty${idx}" value="${qty}" min="1"${maxAttr} inputmode="numeric" onchange="setCartQtyFromInput(${idx})" onblur="setCartQtyFromInput(${idx})">
+                            <button type="button" class="cart-qty-btn" onclick="adjustCartQty(${idx}, 1)" aria-label="+">+</button>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-ghost cart-remove-btn" onclick="removeCartItem(${idx})">${escCartHtml(removeLabel)}</button>
+                </div>
+            </div>
+        `;
+        });
+
+        html += '</div>';
+        html += '<div class="cart-summary-bar">' + orangeHtmlCartMainTotals(total, 0, total) + '</div>';
+        html += '</div>';
+
+        box.innerHTML = html;
+    }
+
+    paintCartBasket(items, null);
+
+    let limits = await limitsPromise;
+    let cartMutated = false;
     if (limits && limits.length === items.length) {
         const beforeLen = items.length;
         const next = [];
@@ -845,6 +955,7 @@ async function renderCart() {
         });
         if (changed || next.length !== beforeLen) {
             setCart(next);
+            cartMutated = true;
         }
         items = getCart();
     }
@@ -863,108 +974,11 @@ async function renderCart() {
         return;
     }
 
-    let total = 0;
-    let html = '';
-    const T = window.APP_T || {};
-    const removeLabel = T.cart_remove || 'Remove';
-    const countTpl = T.cart_items_count || '{n} items';
-    const countStr = countTpl.replace(/\{n\}/g, String(items.length));
-    const unitLbl = T.cart_unit_price || '';
-    const subLbl = T.cart_line_subtotal || '';
-    const maxShortTpl = T.cart_max_available_short || '';
-    const choiceOn = orangeCartLineChoiceApplies(items);
-
-    items.forEach((itInit) => {
-        const k0 = orangeCartLineKey(itInit);
-        if (!Object.prototype.hasOwnProperty.call(orangeCartLineIncluded, k0)) {
-            orangeCartLineIncluded[k0] = true;
-        }
-    });
-
-    html += '<div class="cart-items-shell">';
-    html +=
-        '<div class="cart-list-head"><span class="cart-list-head__count">' +
-        escCartHtml(countStr) +
-        '</span>';
-    if (choiceOn) {
-        html +=
-            '<div class="cart-list-selection-tools">' +
-            '<span class="cart-list-selection-hint">' +
-            escCartHtml(T.cart_order_line_choice_hint || '') +
-            '</span>' +
-            '<span class="cart-list-selection-actions">' +
-            '<button type="button" class="btn btn-ghost cart-select-all-btn" onclick="orangeCartSelectAllLines(true)">' +
-            escCartHtml(T.cart_select_all_lines || '') +
-            '</button>' +
-            '<button type="button" class="btn btn-ghost cart-deselect-all-btn" onclick="orangeCartSelectAllLines(false)">' +
-            escCartHtml(T.cart_deselect_all_lines || '') +
-            '</button>' +
-            '</span></div>';
+    const limitsOk = !!(limits && limits.length === items.length);
+    if (limitsOk || cartMutated) {
+        paintCartBasket(items, limitsOk ? limits : null);
     }
-    html += '</div>';
-    html += '<div class="cart-items-list">';
 
-    items.forEach((item, idx) => {
-        const qty = Math.max(1, parseInt(item.qty, 10) || 1);
-        const lineTotal = qty * Number(item.price);
-        if (!choiceOn || orangeCartLineIsIncluded(item)) {
-            total += lineTotal;
-        }
-        const maxStock =
-            limits && limits[idx] != null && !Number.isNaN(limits[idx])
-                ? Math.max(0, parseInt(limits[idx], 10))
-                : null;
-        const maxAttr = maxStock != null && maxStock > 0 ? ` max="${maxStock}"` : '';
-        const stockHint =
-            maxStock != null && maxStock > 0 && maxShortTpl
-                ? '<p class="cart-stock-hint">' +
-                  escCartHtml(maxShortTpl.replace(/\{n\}/g, String(maxStock))) +
-                  '</p>'
-                : '';
-
-        const incl = orangeCartLineIsIncluded(item);
-        const lineChoiceHtml = choiceOn
-            ? '<div class="cart-line-include"><label class="cart-line-include-label"><input type="checkbox" class="cart-line-include-cb" ' +
-              (incl ? 'checked ' : '') +
-              `onchange="orangeCartSetLineIncluded(${idx}, this.checked)"> <span class="cart-line-include-text">${escCartHtml(
-                  T.cart_include_in_this_order || ''
-              )}</span></label></div>`
-            : '';
-
-        html += `
-            <div class="cart-item-card" data-cart-idx="${idx}">
-                <div class="cart-item-left">
-                    <img src="/uploads/products/${String(item.image || '').replace(/"/g, '')}" alt="${escCartHtml(item.name || '')}">
-                </div>
-                <div class="cart-item-right">
-                    ${lineChoiceHtml}
-                    <h4>${escCartHtml(item.name || '')}</h4>
-                    ${item.color ? `<p class="cart-item-variant">${escCartHtml(T.color || '')}: ${escCartHtml(item.color)}</p>` : ''}
-                    ${item.size ? `<p class="cart-item-variant">${escCartHtml(T.size || '')}: ${escCartHtml(item.size)}</p>` : ''}
-                    <div class="cart-line-price-row">
-                        <span class="cart-unit-price"><span class="cart-meta-label">${escCartHtml(unitLbl)}</span> ${formatMoney(item.price)}</span>
-                        <span class="cart-line-subtotal"><span class="cart-meta-label">${escCartHtml(subLbl)}</span><strong>${formatMoney(lineTotal)}</strong></span>
-                    </div>
-                    ${stockHint}
-                    <div class="cart-qty-row">
-                        <span class="cart-qty-label">${escCartHtml(T.quantity || '')}</span>
-                        <div class="qty-control cart-qty-control">
-                            <button type="button" class="cart-qty-btn" onclick="adjustCartQty(${idx}, -1)" aria-label="-">−</button>
-                            <input type="number" class="cart-qty-input" id="cartQty${idx}" value="${qty}" min="1"${maxAttr} inputmode="numeric" onchange="setCartQtyFromInput(${idx})" onblur="setCartQtyFromInput(${idx})">
-                            <button type="button" class="cart-qty-btn" onclick="adjustCartQty(${idx}, 1)" aria-label="+">+</button>
-                        </div>
-                    </div>
-                    <button type="button" class="btn btn-ghost cart-remove-btn" onclick="removeCartItem(${idx})">${escCartHtml(removeLabel)}</button>
-                </div>
-            </div>
-        `;
-    });
-
-    html += '</div>';
-    html += '<div class="cart-summary-bar">' + orangeHtmlCartMainTotals(total, 0, total) + '</div>';
-    html += '</div>';
-
-    box.innerHTML = html;
     orangeSyncCartProceedBtn();
     orangeSyncCartTabCount();
     orangeRenderCheckoutMiniSummary();
