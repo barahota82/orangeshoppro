@@ -97,7 +97,7 @@ TRANSLATE UX (confirmed pattern on at least)
 - categories.php -> translate flow + categories/translate.php
 
 متطابق مع الكود الحالي (راجع عند تغيير المسارات)
-- **حجز مخزون طلب الواجهة:** `orange_order_apply_pending_stock_reservation()` في **`includes/order_stock.php`** — يُستدعى من **`includes/order_intake_queue.php`** و**`api/orders/amend-order-items.php`**؛ الإلغاء/الرفض يفرّج الحجز عبر **`orange_order_release_pending_stock_reservation`** (انظر **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** س23–س24).
+- **حجز مخزون طلب الواجهة:** `orange_order_apply_pending_stock_reservation()` في **`includes/order_stock.php`** — يُستدعى من **`includes/order_intake_queue.php`** و**`api/orders/amend-order-items.php`**؛ الإلغاء/الرفض يفرّج الحجز عبر **`orange_order_release_pending_stock_reservation`** (انظر **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** س23–س24). **تفصيل التريغر والإكمال:** **`docs/archive/ORANGE_STOCK_ORDER_POLICY.txt`** §2.
 - **مشتريات — متغير واحد محلول:** **`orange_purchase_resolve_variant_id()`** في **`includes/purchase_helpers.php`** — يُستخدم في **`admin/api/purchases/create.php`** و**`admin/api/purchases/update.php`** و**`admin/api/purchases/receive.php`** (لا يُفترض تحديث كل متغيرات المنتج دفعة واحدة عند عكس المخزون).
 - **مشتريات — استلام وزيادة مخزون:** **`admin/api/purchases/receive.php`**؛ عكس/حذف يعتمد **`qty_received`** في **`admin/api/purchases/update.php`**؛ تحميل للتعديل **`admin/api/purchases/get.php`** (رفض عند سنة مالية مغلقة كما في التحديث).
 

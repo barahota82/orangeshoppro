@@ -3,8 +3,14 @@ Orange - Stock / Orders / Purchases policy (implementation reference)
 1) Stock unit = VARIANT (color x size). Each variant has its own qty.
    Cart, orders, purchases must reference variant_id.
 
-2) Orders: RESERVE on create/confirm (exact trigger TBD in code), then DEDUCT on ship.
-   Partial ship allowed: deduct per order line when that line ships.
+2) Orders: RESERVE when the storefront checkout persists the order, then finalize stock on completion/shipment per fulfillment code.
+   Partial ship allowed (policy target): deduct per order line when that line ships — verify admin/shipping paths separately if extended.
+
+   Orange implementation — reserve trigger (not TBD):
+   - Function: `orange_order_apply_pending_stock_reservation()` in `includes/order_stock.php` (idempotent per `ORDER-{order_number}` in `stock_movements`, `type = 'pending_order'`; decrements `product_variants.stock_quantity` with availability check).
+   - Primary call: `orange_storefront_execute_checkout_payload()` in `includes/order_intake_queue.php`, immediately after inserting `orders` + `order_items`, same DB transaction.
+   - Customer amend: `api/orders/amend-order-items.php` — `orange_order_release_pending_stock_reservation()` → replace lines → `orange_order_apply_pending_stock_reservation()` again.
+   - Completion: `orange_complete_order_fulfillment()` in `includes/order_fulfillment.php` — if a web `pending_order` reserve exists for the order number, stock is not deducted again on complete; movements may be relabeled (`pending_order_fulfilled`). Other order sources handled in the same function.
 
 3) Cancel / edit after reserve:
    - Cancel before ship: release all reservations.

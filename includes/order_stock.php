@@ -25,6 +25,9 @@ function orange_order_has_pending_stock_reservation(PDO $pdo, string $orderNumbe
 
 /**
  * Decrement variant stock for a web/WhatsApp checkout (pending order). Idempotent per order reference.
+ * Policy + triggers: docs/archive/ORANGE_STOCK_ORDER_POLICY.txt §2 — called from
+ * `orange_storefront_execute_checkout_payload()` (includes/order_intake_queue.php) and from
+ * `api/orders/amend-order-items.php` after `orange_order_release_pending_stock_reservation()`.
  *
  * @param array<int,array{product:array<string,mixed>,qty:int,color:string,size:string,variant_id:int,price:float,cost:float}> $validatedItems
  */
