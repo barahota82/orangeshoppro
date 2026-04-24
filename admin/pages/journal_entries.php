@@ -16,10 +16,6 @@ if (orange_journal_vouchers_ready($pdo)) {
 $jvFormDocumentEnteredDisplay = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 $jvNavReady = orange_journal_vouchers_ready($pdo);
 $jvHeaderLineClass = 'jv-voucher-header-line' . ($jvNavReady ? ' jv-voucher-header-line--nav' : '');
-$jvReportsSearchHref = '/admin/index.php?page=journal_voucher_reports';
-if (function_exists('storefront_public_path')) {
-    $jvReportsSearchHref = storefront_public_path($jvReportsSearchHref);
-}
 
 $hasGrp = orange_table_has_column($pdo, 'accounts', 'is_group');
 $accCols = $hasGrp ? 'id, name, code, is_group' : 'id, name, code';
@@ -85,7 +81,7 @@ foreach ($accounts as $a) {
                     <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_prev" title="السند السابق (تنازلي)" aria-label="السند السابق">&lt;</button>
                     <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_next" title="السند التالي (تصاعدي)" aria-label="السند التالي">&gt;</button>
                     <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_last" title="آخر سند" aria-label="آخر سند">&gt;&gt;</button>
-                    <a class="btn-secondary jv-nav-search" href="<?php echo htmlspecialchars($jvReportsSearchHref, ENT_QUOTES, 'UTF-8'); ?>" title="تقارير السندات — بحث وتصفية">بحث</a>
+                    <button type="button" class="btn-secondary jv-nav-search" id="jv_btn_open_search" title="بحث عن سند داخل الشاشة">بحث</button>
                 </div>
             </div>
             <?php endif; ?>
@@ -146,6 +142,75 @@ foreach ($accounts as $a) {
     <p class="jv-acct-picker-hint muted">نقرتان على صف لاختيار الحساب — Esc للإغلاق</p>
 </div>
 
+<?php if ($jvNavReady): ?>
+<div id="jv_search_modal" class="jv-search-modal jv-print-hide" style="display:none;" aria-hidden="true" role="dialog" aria-labelledby="jv_search_modal_title">
+    <div class="jv-search-modal__backdrop" id="jv_search_modal_backdrop"></div>
+    <div class="jv-search-modal__panel">
+        <div class="jv-search-modal__head">
+            <h3 id="jv_search_modal_title" class="jv-search-modal__title">بحث في سندات القيد اليدوية</h3>
+            <button type="button" class="btn-secondary" id="jv_search_close" title="إغلاق">إغلاق</button>
+        </div>
+        <div class="jv-search-modal__body">
+            <p class="muted jv-search-modal__hint">حدّد معياراً واحداً أو أكثر. اترك غير المستخدم فارغاً.</p>
+            <div class="form-grid jv-search-modal__form">
+                <div>
+                    <label for="jv_search_id">رقم السند (محدد)</label>
+                    <input type="number" id="jv_search_id" class="admin-inp" min="1" step="1" placeholder="" dir="ltr" lang="en">
+                </div>
+                <div>
+                    <label for="jv_search_id_from">من رقم سند</label>
+                    <input type="number" id="jv_search_id_from" class="admin-inp" min="1" step="1" placeholder="" dir="ltr" lang="en">
+                </div>
+                <div>
+                    <label for="jv_search_id_to">إلى رقم سند</label>
+                    <input type="number" id="jv_search_id_to" class="admin-inp" min="1" step="1" placeholder="" dir="ltr" lang="en">
+                </div>
+                <div>
+                    <label for="jv_search_date">تاريخ السند (يوم محدد)</label>
+                    <input type="date" id="jv_search_date" class="admin-inp" dir="ltr" lang="en">
+                </div>
+                <div>
+                    <label for="jv_search_date_from">من تاريخ</label>
+                    <input type="date" id="jv_search_date_from" class="admin-inp" dir="ltr" lang="en">
+                </div>
+                <div>
+                    <label for="jv_search_date_to">إلى تاريخ</label>
+                    <input type="date" id="jv_search_date_to" class="admin-inp" dir="ltr" lang="en">
+                </div>
+                <div style="grid-column:1/-1;">
+                    <label for="jv_search_ref">المرجع (يحتوي النص)</label>
+                    <input type="text" id="jv_search_ref" class="admin-inp" placeholder="" autocomplete="off" dir="auto">
+                </div>
+                <div style="grid-column:1/-1;">
+                    <label for="jv_search_desc">بيان القيد العام (يحتوي النص)</label>
+                    <input type="text" id="jv_search_desc" class="admin-inp" placeholder="" autocomplete="off" dir="auto">
+                </div>
+            </div>
+            <div class="actions jv-search-modal__actions">
+                <button type="button" id="jv_search_run">تنفيذ البحث</button>
+            </div>
+            <div class="jv-search-modal__results">
+                <p class="muted jv-search-results-hint" id="jv_search_results_hint">نقرتان على صف لفتح السند في هذه الشاشة</p>
+                <div class="table-wrap jv-search-table-wrap">
+                    <table class="admin-table jv-search-results-table">
+                        <thead>
+                            <tr>
+                                <th>رقم</th>
+                                <th>تاريخ السند</th>
+                                <th>تاريخ المستند</th>
+                                <th>المرجع</th>
+                                <th>البيان</th>
+                            </tr>
+                        </thead>
+                        <tbody id="jv_search_results_tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <style>
 /* كود الحساب كالسابق (~9rem)؛ اسم الحساب يتمدد؛ مدين/دائن أضيق لكن قابلة للإدخال */
 .jv-lines-table { table-layout: fixed; width: 100%; }
@@ -195,6 +260,52 @@ foreach ($accounts as $a) {
 .jv-acct-picker-hint { margin: 8px 0 0; font-size: 0.8rem; }
 .jv-lines-table tr.jv-line-memo td { padding-top: 6px; padding-bottom: 12px; border-bottom: 1px solid #e4e4e7; }
 .jv-lines-table tr.jv-line-memo .jv-m { width: 100%; box-sizing: border-box; }
+.jv-search-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10060;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    direction: rtl;
+}
+.jv-search-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+}
+.jv-search-modal__panel {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 46rem;
+    max-height: calc(100vh - 32px);
+    overflow: auto;
+    background: #fff;
+    border: 1px solid #e4e4e7;
+    border-radius: 10px;
+    box-shadow: 0 20px 50px rgba(0,0,0,.18);
+}
+.jv-search-modal__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid #e4e4e7;
+}
+.jv-search-modal__title { margin: 0; font-size: 1.05rem; }
+.jv-search-modal__body { padding: 14px 16px 18px; }
+.jv-search-modal__hint { margin: 0 0 12px; font-size: 0.88rem; }
+.jv-search-modal__form { margin-bottom: 12px; }
+.jv-search-modal__actions { margin: 0 0 16px; }
+.jv-search-table-wrap { max-height: min(40vh, 22rem); overflow: auto; border: 1px solid #e4e4e7; border-radius: 8px; }
+.jv-search-results-table { margin: 0; font-size: 0.9rem; }
+.jv-search-results-table tbody tr { cursor: pointer; }
+.jv-search-results-table tbody tr:hover { background: #f4f4f5; }
+.jv-search-results-hint { margin: 0 0 8px; font-size: 0.85rem; }
 </style>
 
 <script>
@@ -348,12 +459,123 @@ function jvAcctPickerOnDocMouseDown(ev) {
 
 function jvAcctPickerOnKey(ev) {
     if (ev.key === 'Escape') {
+        var sm = document.getElementById('jv_search_modal');
+        if (sm && sm.style.display === 'flex') {
+            jvSearchModalClose();
+            return;
+        }
         jvAcctPickerClose();
     }
 }
 
 document.addEventListener('mousedown', jvAcctPickerOnDocMouseDown, true);
 document.addEventListener('keydown', jvAcctPickerOnKey, true);
+
+function jvSearchModalClose() {
+    var m = document.getElementById('jv_search_modal');
+    if (!m) {
+        return;
+    }
+    m.style.display = 'none';
+    m.setAttribute('aria-hidden', 'true');
+}
+
+function jvSearchModalOpen() {
+    var m = document.getElementById('jv_search_modal');
+    if (!m) {
+        return;
+    }
+    m.style.display = 'flex';
+    m.setAttribute('aria-hidden', 'false');
+    var tb0 = document.getElementById('jv_search_results_tbody');
+    if (tb0) {
+        tb0.innerHTML = '';
+    }
+    var hint = document.getElementById('jv_search_results_hint');
+    if (hint) {
+        hint.textContent = 'نقرتان على صف لفتح السند في هذه الشاشة';
+    }
+}
+
+function jvSearchCollectPayload() {
+    return {
+        action: 'search_manual',
+        id: parseInt(String(document.getElementById('jv_search_id').value || '0'), 10) || 0,
+        id_from: parseInt(String(document.getElementById('jv_search_id_from').value || '0'), 10) || 0,
+        id_to: parseInt(String(document.getElementById('jv_search_id_to').value || '0'), 10) || 0,
+        date: document.getElementById('jv_search_date').value.trim(),
+        date_from: document.getElementById('jv_search_date_from').value.trim(),
+        date_to: document.getElementById('jv_search_date_to').value.trim(),
+        reference: document.getElementById('jv_search_ref').value.trim(),
+        description: document.getElementById('jv_search_desc').value.trim()
+    };
+}
+
+function jvSearchRenderRows(rows) {
+    var tb = document.getElementById('jv_search_results_tbody');
+    var hint = document.getElementById('jv_search_results_hint');
+    if (!tb) {
+        return;
+    }
+    tb.innerHTML = '';
+    (rows || []).forEach(function (r) {
+        var tr = document.createElement('tr');
+        tr.setAttribute('data-vid', String(r.id));
+        tr.innerHTML = '<td>' + jvEscapeHtml(r.id) + '</td>' +
+            '<td dir="ltr">' + jvEscapeHtml(r.voucher_date) + '</td>' +
+            '<td dir="ltr">' + jvEscapeHtml(r.document_entered_display) + '</td>' +
+            '<td>' + jvEscapeHtml(r.reference) + '</td>' +
+            '<td>' + jvEscapeHtml(r.description) + '</td>';
+        tr.addEventListener('dblclick', function () {
+            var vid = parseInt(tr.getAttribute('data-vid'), 10) || 0;
+            if (vid > 0) {
+                jvLoadVoucherFromApi(vid);
+            }
+        });
+        tb.appendChild(tr);
+    });
+    if (hint) {
+        hint.textContent = rows && rows.length
+            ? ('عدد النتائج: ' + rows.length + ' — نقرتان على صف لفتح السند')
+            : 'لا توجد نتائج — نقرتان على صف لفتح السند';
+    }
+}
+
+function jvSearchRun() {
+    postJSON('/admin/api/journal/manage.php', jvSearchCollectPayload()).then(function (r) {
+        if (!r.success) {
+            if (!orangeAdminOfferSuggestOnFailure(r, 'بحث')) {
+                alert(r.message || 'فشل البحث');
+            }
+            jvSearchRenderRows([]);
+            return;
+        }
+        jvSearchRenderRows(r.rows || []);
+    }).catch(function (e) {
+        alert(e.message || String(e));
+        jvSearchRenderRows([]);
+    });
+}
+
+function jvSearchModalBind() {
+    var openB = document.getElementById('jv_btn_open_search');
+    if (openB) {
+        openB.addEventListener('click', function () { jvSearchModalOpen(); });
+    }
+    var closeB = document.getElementById('jv_search_close');
+    if (closeB) {
+        closeB.addEventListener('click', jvSearchModalClose);
+    }
+    var bd = document.getElementById('jv_search_modal_backdrop');
+    if (bd) {
+        bd.addEventListener('click', jvSearchModalClose);
+    }
+    var runB = document.getElementById('jv_search_run');
+    if (runB) {
+        runB.addEventListener('click', jvSearchRun);
+    }
+}
+jvSearchModalBind();
 
 (function jvAcctPickerSearchBind() {
     var searchEl = document.getElementById('jv_acct_picker_search');
@@ -579,6 +801,7 @@ function jvApplyVoucherPayload(r) {
     });
     jvApplyViewModeUi();
     jvRecalc();
+    jvSearchModalClose();
 }
 
 function jvLoadVoucherFromApi(id) {

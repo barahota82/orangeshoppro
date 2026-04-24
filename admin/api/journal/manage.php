@@ -302,6 +302,118 @@ try {
         return;
     }
 
+    if ($action === 'search_manual') {
+        require_once __DIR__ . '/../../../includes/date_format.php';
+        if (!orange_journal_vouchers_ready($pdo)) {
+            json_response(['success' => false, 'message' => 'جداول السندات غير جاهزة'], 422);
+        }
+        $et = 'manual';
+        $parts = ['entry_type = ?'];
+        $params = [$et];
+        $hasCriterion = false;
+
+        $idSingle = (int) ($data['id'] ?? 0);
+        $idFrom = (int) ($data['id_from'] ?? 0);
+        $idTo = (int) ($data['id_to'] ?? 0);
+        if ($idSingle > 0) {
+            $parts[] = 'id = ?';
+            $params[] = $idSingle;
+            $hasCriterion = true;
+        } else {
+            if ($idFrom > 0 && $idTo > 0) {
+                if ($idFrom > $idTo) {
+                    $tmp = $idFrom;
+                    $idFrom = $idTo;
+                    $idTo = $tmp;
+                }
+                $parts[] = 'id BETWEEN ? AND ?';
+                $params[] = $idFrom;
+                $params[] = $idTo;
+                $hasCriterion = true;
+            } elseif ($idFrom > 0) {
+                $parts[] = 'id >= ?';
+                $params[] = $idFrom;
+                $hasCriterion = true;
+            } elseif ($idTo > 0) {
+                $parts[] = 'id <= ?';
+                $params[] = $idTo;
+                $hasCriterion = true;
+            }
+        }
+
+        $dateEq = trim((string) ($data['date'] ?? ''));
+        $dateFrom = trim((string) ($data['date_from'] ?? ''));
+        $dateTo = trim((string) ($data['date_to'] ?? ''));
+        $dateRe = '/^\d{4}-\d{2}-\d{2}$/';
+        if ($dateEq !== '' && preg_match($dateRe, $dateEq)) {
+            $parts[] = 'DATE(voucher_date) = ?';
+            $params[] = $dateEq;
+            $hasCriterion = true;
+        } else {
+            if ($dateFrom !== '' && preg_match($dateRe, $dateFrom)) {
+                $parts[] = 'DATE(voucher_date) >= ?';
+                $params[] = $dateFrom;
+                $hasCriterion = true;
+            }
+            if ($dateTo !== '' && preg_match($dateRe, $dateTo)) {
+                $parts[] = 'DATE(voucher_date) <= ?';
+                $params[] = $dateTo;
+                $hasCriterion = true;
+            }
+        }
+
+        $ref = trim((string) ($data['reference'] ?? ''));
+        if ($ref !== '') {
+            $refEsc = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $ref);
+            $parts[] = 'reference LIKE ?';
+            $params[] = '%' . $refEsc . '%';
+            $hasCriterion = true;
+        }
+
+        $desc = trim((string) ($data['description'] ?? ''));
+        if ($desc !== '') {
+            $descEsc = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $desc);
+            $parts[] = 'description LIKE ?';
+            $params[] = '%' . $descEsc . '%';
+            $hasCriterion = true;
+        }
+
+        if (!$hasCriterion) {
+            json_response(['success' => false, 'message' => 'حدّد معيار بحث واحد على الأقل (رقم، تاريخ، مرجع، أو بيان)'], 422);
+        }
+
+        $hasDoc = orange_table_has_column($pdo, 'journal_vouchers', 'document_entered_at');
+        $sel = $hasDoc
+            ? 'id, voucher_date, reference, description, document_entered_at'
+            : 'id, voucher_date, reference, description';
+        $sql = 'SELECT ' . $sel . ' FROM journal_vouchers WHERE ' . implode(' AND ', $parts)
+            . ' ORDER BY id DESC LIMIT 300';
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
+        $rows = [];
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+            $vd = (string) ($row['voucher_date'] ?? '');
+            $dateDisp = strlen($vd) >= 10 ? substr($vd, 0, 10) : '';
+            $docRaw = '';
+            if ($hasDoc && !empty($row['document_entered_at'])) {
+                $docRaw = (string) $row['document_entered_at'];
+            } else {
+                $docRaw = $vd;
+            }
+            $docDisp = orange_format_datetime_dmY_hi($docRaw !== '' ? $docRaw : date('Y-m-d H:i:s'));
+            $rows[] = [
+                'id' => (int) $row['id'],
+                'voucher_date' => $dateDisp,
+                'reference' => (string) ($row['reference'] ?? ''),
+                'description' => (string) ($row['description'] ?? ''),
+                'document_entered_display' => $docDisp,
+            ];
+        }
+        json_response(['success' => true, 'rows' => $rows]);
+
+        return;
+    }
+
     $id = (int)($data['id'] ?? 0);
     if ($id <= 0) {
         json_response(['success' => false, 'message' => 'معرف السند مطلوب'], 422);
