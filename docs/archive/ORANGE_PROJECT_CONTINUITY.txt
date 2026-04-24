@@ -9,6 +9,7 @@ PURPOSE
 - When resuming work: read IBRAHIM_ORANGE_MASTER.txt, then this file, then ORANGE_STOCK_ORDER_POLICY.txt and ORANGE_TECH_REFERENCE.txt.
 - **خارطة استكمال المشروع (خطوات مرحلية موحّدة):** ORANGE_PROJECT_COMPLETION_ROADMAP.txt
 - **مؤجّل بقرار المالك:** إعادة صياغة ومناقشة **س4 (سياسة العروض)** في `ORANGE_STOREFRONT_POLICY_REFERENCE.txt` إلى ما بعد إتمام مراجعة باقي بنود المرجع؛ **لا توسعة نطاق تنفيذ جديد خاصة بالعروض** في الجلسات الحالية حتى اعتماد صياغة نهائية — المسارات والشاشات الموجودة في الكود تبقى المرجع التشغيلي حتى ذلك الحين.
+- **منجز (واجهة — خارج س4):** عند وجود مناطق نشطة، حقل المنطقة يُعرض كقائمة `<select>` مُولَّدة من الخادم في `pages/cart.php` و`pages/register.php` و`pages/track.php` عبر `orange_storefront_delivery_area_select_markup()` في `includes/delivery_areas.php` (مطابقة **س8** و**س20**؛ بلا اعتماد على استبدال حقل نصّي بـ JS فقط).
 - **الحركات المحاسبية وإقفالها وشاشة الترحيل (سياسة متفق عليها):** ORANGE_GL_MOVEMENTS_AND_POSTING_POLICY.txt
 - Partner AR/AP subledger (ذمم العملاء والموردين): read ORANGE_PARTNER_SUBLEDGER_REFERENCE.txt for full technical handoff.
 
