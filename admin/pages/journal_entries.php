@@ -16,6 +16,8 @@ if (orange_journal_vouchers_ready($pdo)) {
 $jvFormDocumentEnteredDisplay = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 $jvNavReady = orange_journal_vouchers_ready($pdo);
 $jvHeaderLineClass = 'jv-voucher-header-line' . ($jvNavReady ? ' jv-voucher-header-line--nav' : '');
+/** بادئة عرض رقم القيد اليدوي (القيمة المخزّنة في القاعدة تبقى رقماً صحيحاً فقط). */
+$jvManualVoucherNoPrefix = 'M-';
 
 $hasGrp = orange_table_has_column($pdo, 'accounts', 'is_group');
 $accCols = $hasGrp ? 'id, name, code, is_group' : 'id, name, code';
@@ -46,8 +48,9 @@ foreach ($accounts as $a) {
             <div>
                 <label for="jv_number_preview">رقم القيد</label>
                 <input type="text" id="jv_number_preview" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;text-align:center;"
-                    value="<?php echo (int) $nextJournalVoucherNo; ?>"
-                    title="يُخصَّص تلقائياً من النظام عند الحفظ (تسلسل قاعدة البيانات)">
+                    value="<?php echo htmlspecialchars($jvManualVoucherNoPrefix . (int) $nextJournalVoucherNo, ENT_QUOTES, 'UTF-8'); ?>"
+                    title="يُخصَّص تلقائياً من النظام عند الحفظ (تسلسل قاعدة البيانات)"
+                    dir="ltr" lang="en">
             </div>
             <div>
                 <label for="jv_date">تاريخ السند</label>
@@ -154,11 +157,17 @@ foreach ($accounts as $a) {
                 <div class="jv-search-modal__row jv-search-modal__row--fields">
                     <div class="jv-search-field jv-search-field--id">
                         <label for="jv_search_id_from">رقم القيد — من</label>
-                        <input type="number" id="jv_search_id_from" class="admin-inp" min="1" step="1" placeholder="" dir="ltr" lang="en">
+                        <div class="jv-id-input-wrap" dir="ltr" lang="en">
+                            <span class="jv-id-prefix"><?php echo htmlspecialchars($jvManualVoucherNoPrefix, ENT_QUOTES, 'UTF-8'); ?></span>
+                            <input type="text" id="jv_search_id_from" class="admin-inp jv-search-id-num" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="" aria-label="رقم القيد — من (بدون البادئة)">
+                        </div>
                     </div>
                     <div class="jv-search-field jv-search-field--id">
                         <label for="jv_search_id_to">رقم القيد — إلى</label>
-                        <input type="number" id="jv_search_id_to" class="admin-inp" min="1" step="1" placeholder="" dir="ltr" lang="en">
+                        <div class="jv-id-input-wrap" dir="ltr" lang="en">
+                            <span class="jv-id-prefix"><?php echo htmlspecialchars($jvManualVoucherNoPrefix, ENT_QUOTES, 'UTF-8'); ?></span>
+                            <input type="text" id="jv_search_id_to" class="admin-inp jv-search-id-num" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="" aria-label="رقم القيد — إلى (بدون البادئة)">
+                        </div>
                     </div>
                     <div class="jv-search-field jv-search-field--date">
                         <label for="jv_search_date_from">تاريخ السند — من</label>
@@ -326,7 +335,44 @@ foreach ($accounts as $a) {
     box-sizing: border-box;
 }
 .jv-search-field--id {
-    flex: 0 0 7rem;
+    flex: 0 0 8.75rem;
+}
+.jv-id-input-wrap {
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #d4d4d8;
+    border-radius: 6px;
+    background: #fff;
+    overflow: hidden;
+}
+.jv-id-input-wrap:focus-within {
+    border-color: #a1a1aa;
+    box-shadow: 0 0 0 1px rgba(24, 24, 27, 0.08);
+}
+.jv-id-prefix {
+    display: flex;
+    align-items: center;
+    padding: 0 0.35rem 0 0.45rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #52525b;
+    user-select: none;
+    flex-shrink: 0;
+    background: #fafafa;
+    border-right: 1px solid #e4e4e7;
+}
+.jv-search-id-num {
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto !important;
+}
+.jv-search-id-num:focus {
+    outline: none;
 }
 .jv-search-field--date {
     flex: 0 0 11rem;
@@ -347,6 +393,23 @@ foreach ($accounts as $a) {
 
 <script>
 var JV_ACCOUNTS = <?php echo json_encode($jvAccountsLeaf, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>;
+var JV_MANUAL_NO_PREFIX = <?php echo json_encode($jvManualVoucherNoPrefix, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>;
+
+function jvFormatManualNo(id) {
+    var n = parseInt(String(id), 10);
+    if (!isFinite(n) || n <= 0) {
+        return JV_MANUAL_NO_PREFIX;
+    }
+    return JV_MANUAL_NO_PREFIX + String(n);
+}
+
+function jvSearchNumericIdValue(el) {
+    if (!el) {
+        return 0;
+    }
+    var d = String(el.value || '').replace(/\D/g, '');
+    return parseInt(d, 10) || 0;
+}
 
 var jvAcctPickerAnchor = null;
 var jvPairSeq = 0;
@@ -550,8 +613,8 @@ function jvSearchModalOpen() {
 function jvSearchCollectPayload() {
     return {
         action: 'search_manual',
-        id_from: parseInt(String(document.getElementById('jv_search_id_from').value || '0'), 10) || 0,
-        id_to: parseInt(String(document.getElementById('jv_search_id_to').value || '0'), 10) || 0,
+        id_from: jvSearchNumericIdValue(document.getElementById('jv_search_id_from')),
+        id_to: jvSearchNumericIdValue(document.getElementById('jv_search_id_to')),
         date_from: document.getElementById('jv_search_date_from').value.trim(),
         date_to: document.getElementById('jv_search_date_to').value.trim(),
         reference: document.getElementById('jv_search_ref').value.trim(),
@@ -569,7 +632,7 @@ function jvSearchRenderRows(rows) {
         var tr = document.createElement('tr');
         tr.setAttribute('data-vid', String(r.id));
         var amt = typeof r.amount === 'number' ? r.amount : parseFloat(String(r.amount || '0').replace(',', '.')) || 0;
-        tr.innerHTML = '<td>' + jvEscapeHtml(r.id) + '</td>' +
+        tr.innerHTML = '<td dir="ltr">' + jvEscapeHtml(jvFormatManualNo(r.id)) + '</td>' +
             '<td dir="ltr">' + jvEscapeHtml(r.voucher_date) + '</td>' +
             '<td>' + jvEscapeHtml(r.reference) + '</td>' +
             '<td class="jv-search-col-desc">' + jvEscapeHtml(r.description) + '</td>' +
@@ -616,6 +679,19 @@ function jvSearchModalBind() {
     if (runB) {
         runB.addEventListener('click', jvSearchRun);
     }
+    ['jv_search_id_from', 'jv_search_id_to'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el || el.getAttribute('data-jv-digits-only')) {
+            return;
+        }
+        el.setAttribute('data-jv-digits-only', '1');
+        el.addEventListener('input', function () {
+            var d = String(el.value || '').replace(/\D/g, '');
+            if (el.value !== d) {
+                el.value = d;
+            }
+        });
+    });
 }
 jvSearchModalBind();
 
@@ -816,7 +892,7 @@ function jvApplyVoucherPayload(r) {
     }
     jvViewMode = true;
     jvBrowseId = r.voucher.id;
-    document.getElementById('jv_number_preview').value = String(r.voucher.id);
+    document.getElementById('jv_number_preview').value = jvFormatManualNo(r.voucher.id);
     document.getElementById('jv_date').value = r.voucher.date || '';
     document.getElementById('jv_ref').value = r.voucher.reference || '';
     document.getElementById('jv_desc').value = r.voucher.description || '';
