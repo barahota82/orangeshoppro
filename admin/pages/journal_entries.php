@@ -67,17 +67,6 @@ foreach ($accounts as $a) {
 <div class="page-title page-title--stacked">
     <div>
         <h1>سند قيد</h1>
-        <p class="page-subtitle">
-            كل سند يضم عدة أسطر؛ مجموع المدين يجب أن يساوي مجموع الدائن.
-            سندات <strong>الافتتاح</strong> و<strong>الإقفال</strong> تُدار من شاشات السنة المالية والإقفال.
-        </p>
-        <p class="page-subtitle" style="margin-top:0.5rem;">
-            <strong>الطابور مقابل السند الظاهر هنا:</strong> كثير من الحركات (تسليم طلبات، مشتريات، مصروفات، قبض/دفع، قيود يدوية من هذه الشاشة، أرصدة افتتاحية…) تُسجَّل أولاً في
-            <strong>طابور المحاسبة</strong> ثم تتحول إلى سند فعلي من شاشة
-            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=gl_posting'), ENT_QUOTES, 'UTF-8'); ?>">ترحيل الحركات</a>.
-            ما تراه في الجدول أدناه هو <strong>سندات مُرحَّلة</strong> فقط (أو سندات أُنشئت بترحيل فوري إن وُجد).
-            إن ظهرت رسالة «تم الإضافة إلى طابور الترحيل» فالسند لم يُنشأ بعد هنا حتى تُرحّل من الشاشة المذكورة.
-        </p>
     </div>
 </div>
 
