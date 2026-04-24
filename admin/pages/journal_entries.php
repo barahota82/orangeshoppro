@@ -72,13 +72,6 @@ foreach ($accounts as $a) {
     <div class="admin-doc-frame">
         <div class="table-wrap">
             <table class="admin-table admin-doc-lines-table jv-lines-table">
-                <colgroup>
-                    <col class="jv-col-code">
-                    <col class="jv-col-name">
-                    <col class="jv-col-amt">
-                    <col class="jv-col-amt">
-                    <col class="jv-col-act">
-                </colgroup>
                 <thead>
                     <tr>
                         <th>كود الحساب</th>
@@ -116,20 +109,8 @@ foreach ($accounts as $a) {
 </div>
 
 <style>
-/* مدين/دائن بعرض أضيق (~نصف الحجم السابق)؛ المتبقي لاسم الحساب */
-.jv-lines-table { table-layout: fixed; width: 100%; }
-.jv-lines-table col.jv-col-code { width: 9rem; }
-.jv-lines-table col.jv-col-name { width: auto; }
-.jv-lines-table col.jv-col-amt { width: 4.25rem; }
-.jv-lines-table col.jv-col-act { width: 4.25rem; }
-.jv-lines-table .jv-line-main td:nth-child(3) .jv-d,
-.jv-lines-table .jv-line-main td:nth-child(4) .jv-c {
-    width: 100%;
-    min-width: 0;
-    box-sizing: border-box;
-}
-.jv-lines-table .jv-acc-code { cursor: pointer; min-width: 0; }
-.jv-lines-table .jv-acc-name { background: #f4f4f5; cursor: default; min-width: 0; width: 100%; box-sizing: border-box; }
+.jv-lines-table .jv-acc-code { cursor: pointer; min-width: 7rem; }
+.jv-lines-table .jv-acc-name { background: #f4f4f5; cursor: default; min-width: 10rem; }
 .jv-acct-picker {
     position: fixed;
     z-index: 10050;
