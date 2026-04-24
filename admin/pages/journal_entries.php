@@ -3,9 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
-require_once __DIR__ . '/../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
-require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 
 $pdo = db();
@@ -17,74 +15,23 @@ if (orange_journal_vouchers_ready($pdo)) {
 }
 $jvFormDocumentEnteredDisplay = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 
-$years = orange_fiscal_years_list($pdo);
-$fyId = isset($_GET['fy']) ? (int)$_GET['fy'] : 0;
-if ($fyId <= 0 && $years !== []) {
-    $fyId = (int)$years[0]['id'];
-}
-
 $hasGrp = orange_table_has_column($pdo, 'accounts', 'is_group');
 $accCols = $hasGrp ? 'id, name, code, is_group' : 'id, name, code';
 $accounts = $pdo->query('SELECT ' . $accCols . ' FROM accounts ORDER BY COALESCE(code, \'\'), name')->fetchAll(PDO::FETCH_ASSOC);
-$accMap = [];
-foreach ($accounts as $a) {
-    $accMap[(int)$a['id']] = trim((string)($a['code'] ?? '')) !== '' ? $a['code'] . ' — ' . $a['name'] : $a['name'];
-}
-
-$vouchers = [];
-if (orange_journal_vouchers_ready($pdo) && $fyId > 0) {
-    $st = $pdo->prepare('SELECT * FROM journal_vouchers WHERE fiscal_year_id = ? ORDER BY voucher_date DESC, id DESC LIMIT 120');
-    $st->execute([$fyId]);
-    $vouchers = $st->fetchAll(PDO::FETCH_ASSOC);
-}
-
-$linesByVid = [];
-if ($vouchers !== []) {
-    $ids = array_map(static fn ($v) => (int)$v['id'], $vouchers);
-    $in = implode(',', $ids);
-    if ($in !== '') {
-        $jl = $pdo->query(
-            'SELECT * FROM journal_lines WHERE voucher_id IN (' . $in . ') ORDER BY voucher_id ASC, line_no ASC'
-        )->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($jl as $ln) {
-            $vid = (int)$ln['voucher_id'];
-            if (!isset($linesByVid[$vid])) {
-                $linesByVid[$vid] = [];
-            }
-            $linesByVid[$vid][] = $ln;
-        }
-    }
-}
 
 $acctOpts = '';
 foreach ($accounts as $a) {
     if ($hasGrp && !empty($a['is_group'])) {
         continue;
     }
-    $acctOpts .= '<option value="' . (int)$a['id'] . '">' . htmlspecialchars($accMap[(int)$a['id']], ENT_QUOTES, 'UTF-8') . '</option>';
+    $lab = trim((string) ($a['code'] ?? '')) !== '' ? $a['code'] . ' — ' . $a['name'] : $a['name'];
+    $acctOpts .= '<option value="' . (int) $a['id'] . '">' . htmlspecialchars($lab, ENT_QUOTES, 'UTF-8') . '</option>';
 }
 ?>
 <div class="page-title page-title--stacked">
     <div>
         <h1>سند قيد</h1>
     </div>
-</div>
-
-<div class="card">
-    <h3 class="card-title">تصفية</h3>
-    <form method="get" action="" class="form-grid" style="align-items:end;">
-        <input type="hidden" name="page" value="journal_entries">
-        <div>
-            <label for="fy_sel">السنة المالية</label>
-            <select id="fy_sel" name="fy" onchange="this.form.submit()">
-                <?php foreach ($years as $y): ?>
-                    <option value="<?php echo (int)$y['id']; ?>" <?php echo ((int)$y['id'] === $fyId) ? 'selected' : ''; ?>>
-                        <?php echo htmlspecialchars($y['label_ar'] . ' (' . $y['start_date'] . ' — ' . $y['end_date'] . ')', ENT_QUOTES, 'UTF-8'); ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-    </form>
 </div>
 
 <div class="card">
@@ -139,73 +86,6 @@ foreach ($accounts as $a) {
         <button type="button" class="btn-secondary" onclick="jvAddRow()">+ سطر يدوي</button>
         <button type="button" onclick="jvSubmit()">حفظ السند</button>
     </div>
-</div>
-
-<div class="card">
-    <h3 class="card-title">السندات المسجّلة</h3>
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>تاريخ السند</th>
-                    <th>تاريخ المستند</th>
-                    <th>النوع</th>
-                    <th>مرجع</th>
-                    <th>البيان</th>
-                    <th>التفاصيل</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($vouchers as $v): ?>
-                    <?php
-                    $vid = (int)$v['id'];
-                    $lines = $linesByVid[$vid] ?? [];
-                    $det = [];
-                    foreach ($lines as $ln) {
-                        $aid = (int)$ln['account_id'];
-                        $det[] = htmlspecialchars($accMap[$aid] ?? ('#' . $aid), ENT_QUOTES, 'UTF-8')
-                            . ' م:' . $ln['debit'] . ' د:' . $ln['credit'];
-                    }
-                    $et = (string)($v['entry_type'] ?? '');
-                    $lockDel = in_array($et, orange_gl_entry_types_delete_locked_from_journal_ui(), true);
-                    $etAr = orange_gl_entry_type_label_ar($et);
-                    ?>
-                    <tr>
-                        <td><?php echo $vid; ?></td>
-                        <td><?php echo htmlspecialchars(orange_format_datetime_dmY_hi((string) ($v['voucher_date'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php
-                            $docIn = (string) ($v['document_entered_at'] ?? '');
-                        if ($docIn === '') {
-                            $docIn = (string) ($v['created_at'] ?? '');
-                        }
-                        echo htmlspecialchars(orange_format_datetime_dmY_hi($docIn), ENT_QUOTES, 'UTF-8');
-                        ?></td>
-                        <td><?php echo htmlspecialchars($etAr, ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars((string)($v['reference'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars((string)($v['description'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td style="font-size:12px;max-width:22rem;"><?php echo implode(' | ', $det); ?></td>
-                        <td>
-                            <?php if (!$lockDel): ?>
-                                <button type="button" class="btn-secondary" onclick="jvDelete(<?php echo $vid; ?>)">حذف</button>
-                            <?php else:
-                                $blk = orange_gl_journal_delete_blocked_admin_link($et);
-                                ?>
-                                <span class="muted" title="<?php echo htmlspecialchars(orange_gl_journal_delete_blocked_message_ar($et), ENT_QUOTES, 'UTF-8'); ?>">—</span>
-                                <?php if ($blk !== null): ?>
-                                    <br><a class="muted" style="font-size:11px;white-space:normal;" href="<?php echo htmlspecialchars($blk['href'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($blk['label'], ENT_QUOTES, 'UTF-8'); ?></a>
-                                <?php endif; ?>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-    <?php if ($vouchers === []): ?>
-        <p class="page-subtitle">لا سندات في هذه السنة أو لم تُهيّأ الجداول بعد.</p>
-    <?php endif; ?>
 </div>
 
 <script>
@@ -387,22 +267,6 @@ function jvSubmit() {
             alert(r.message || 'فشل');
         }
     }).catch(function (e) { alert(e.message || String(e)); });
-}
-
-function jvDelete(id) {
-    if (!confirm('حذف السند #' + id + '؟')) return;
-    postJSON('/admin/api/journal/manage.php', { action: 'delete', id: id })
-        .then(function (r) {
-            if (r.success) {
-                alert(r.message || 'تم');
-                location.reload();
-                return;
-            }
-            if (!orangeAdminOfferSuggestOnFailure(r, 'فشل')) {
-                alert(r.message || 'فشل');
-            }
-        })
-        .catch(function (e) { alert(e.message || String(e)); });
 }
 
 jvAddRow();
