@@ -18,6 +18,15 @@ $salesToday = (float)$pdo->query("SELECT COALESCE(SUM(total),0) FROM orders WHER
 $pendingOrders = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'pending'")->fetchColumn();
 $productsCount = (int)$pdo->query("SELECT COUNT(*) FROM products")->fetchColumn();
 
+$lowStockThDash = orange_stock_low_alert_threshold();
+$stLowDash = $pdo->prepare(
+    'SELECT COUNT(*) FROM product_variants pv
+     INNER JOIN products p ON p.id = pv.product_id
+     WHERE p.is_active = 1 AND pv.stock_quantity <= ?'
+);
+$stLowDash->execute([$lowStockThDash]);
+$lowStockVariantsDash = (int) $stLowDash->fetchColumn();
+
 $intakePending = 0;
 $intakeFailed = 0;
 $intakeQueueVisible = orange_admin_may($admin, $pdo, 'sales', 'view')
