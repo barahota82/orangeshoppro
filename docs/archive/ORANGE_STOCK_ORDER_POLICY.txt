@@ -11,6 +11,7 @@ Orange - Stock / Orders / Purchases policy (implementation reference)
    - Primary call: `orange_storefront_execute_checkout_payload()` in `includes/order_intake_queue.php`, immediately after inserting `orders` + `order_items`, same DB transaction.
    - Customer amend: `api/orders/amend-order-items.php` — `orange_order_release_pending_stock_reservation()` → replace lines → `orange_order_apply_pending_stock_reservation()` again.
    - Completion: `orange_complete_order_fulfillment()` in `includes/order_fulfillment.php` — if a web `pending_order` reserve exists for the order number, stock is not deducted again on complete; movements may be relabeled (`pending_order_fulfilled`). Other order sources handled in the same function.
+   - Admin sales orders (today): `admin/api/orders/update.php` and `admin/api/orders/update-status.php` move the whole order to `completed`, which calls `orange_complete_order_fulfillment()`. There are no `order_items` shipped/partial columns — **line-level partial ship for outbound sales** is not implemented in UI/schema yet; **inbound** partial receipt exists for purchases (§4).
 
 3) Cancel / edit after reserve:
    - Cancel before ship: release all reservations.

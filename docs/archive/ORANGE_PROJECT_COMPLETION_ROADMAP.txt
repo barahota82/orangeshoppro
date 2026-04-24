@@ -1,5 +1,5 @@
 ORANGE — خارطة الطريق الموحّدة لاستكمال المشروع
-Last updated: 2026-04-19
+Last updated: 2026-04-26
 
 إلزام أرشيفي للوكلاء (قرار المالك — مسجّل بالكامل)
 ----------------------------------------------------
@@ -39,7 +39,7 @@ Last updated: 2026-04-19
 المرحلة 1 — الكتالوج والمتجر (من CONTINUITY §4 STILL PENDING)
 --------------------------------------------------------------
 1. حقول منتج متعددة اللغات + SEO (name_en / name_fil / name_hi + بطاقات SEO) إن كان مطلوباً للإطلاق.
-2. دليل المقاسات الغني: استبدال نص التنبيه (alert) بجداول/قوالب HTML عند توفر المحتوى.
+2. دليل المقاسات على المتجر: **منفّذ أساساً** — `pages/product.php` حوار `<dialog>` + جدول HTML من `size_family_sizes`؛ فتح الدليل عبر `showModal` في `assets/js/product.js` (وليس `alert` لدليل المقاسات). **اختياري لاحقاً:** قوالب أغنى أو جدولان لنطاق `both` دون تقسيم DB — انظر **`docs/archive/ORANGE_PROJECT_CONTINUITY.txt`** (STILL PENDING).
 3. (اختياري) سكربت ترحيل بيانات من متغيرات نصية قديمة إلى القاموس/العائلات.
 
 معيار إنجاز: §4 في CONTINUITY لا يحتوي بنود «STILL PENDING» الحرجة لديكم.
@@ -47,8 +47,8 @@ Last updated: 2026-04-19
 المرحلة 2 — المخزون والطلبات والمشتريات (STOCK_ORDER + CONTINUITY §5)
 ----------------------------------------------------------------------
 1. توقيت الحجز (reserve) عند إنشاء/تأكيد الطلب — موثّق في **`docs/archive/ORANGE_STOCK_ORDER_POLICY.txt` §2** (مسارات `order_intake_queue` و`amend-order-items` و`order_fulfillment`).
-2. التحقق من variant_id في أسطر المشتريات وعند الاستلام إن وُجد مسار منفصل عن stock adjust.
-3. مراجعة خصم المخزون عند الشحن بدون شحن جزئي مخالف للسياسة.
+2. التحقق من variant_id في أسطر المشتريات والاستلام — **منطبق:** `orange_purchase_resolve_variant_id()` في **`includes/purchase_helpers.php`** ومسارات **`admin/api/purchases/create.php`** و**`update.php`** و**`receive.php`**.
+3. خصم المخزون و«الشحن» — **الوضع الحالي:** الأدمن يعتمد انتقال حالة الطلب كاملاً إلى `completed` (`admin/api/orders/update.php` و**`update-status.php`**) ثم **`orange_complete_order_fulfillment()`**؛ لا شحن جزئي لبنود **مبيعات** في الواجهات الحالية. سياسة «جزئي لكل سطر» للمبيعات مذكورة في **`ORANGE_STOCK_ORDER_POLICY.txt`** §2 كتوسعة مستقبلية؛ الاستلام الجزئي لـ **المشتريات** منفّذ (§6).
 
 معيار إنجاز: ORANGE_STOCK_ORDER_POLICY.txt منطبق على المسارات الرئيسية دون استثناءات صامتة.
 

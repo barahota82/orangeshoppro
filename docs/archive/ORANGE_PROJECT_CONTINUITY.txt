@@ -48,7 +48,7 @@ SIZES (target)
 ----------------------------------------------------------------------
 - Stock quantity is per VARIANT (color x size).
 - Cart / orders / purchases should reference variant_id.
-- Orders: reserve via `orange_order_apply_pending_stock_reservation` (storefront intake in `includes/order_intake_queue.php`, amend in `api/orders/amend-order-items.php`); deduct on ship; partial ship supported per line.
+- Orders: reserve via `orange_order_apply_pending_stock_reservation` (storefront intake in `includes/order_intake_queue.php`, amend in `api/orders/amend-order-items.php`); finalize stock on admin `completed` via `orange_complete_order_fulfillment` (`admin/api/orders/update.php`, `update-status.php`). Line-level partial ship for **sales** is not in admin/schema yet — see **`docs/archive/ORANGE_STOCK_ORDER_POLICY.txt`** §2. Partial **purchase** receipt per line: purchases §6.
 - Purchases: increase stock on RECEIPT; partial receipt per line.
 - No final deduct without ship; no reserve without availability check.
 
