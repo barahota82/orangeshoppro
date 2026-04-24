@@ -122,6 +122,7 @@ foreach ($accounts as $a) {
 .jv-lines-table col.jv-col-name { width: auto; }
 .jv-lines-table col.jv-col-amt { width: 7rem; }
 .jv-lines-table col.jv-col-act { width: 5rem; }
+.jv-lines-table thead th { text-align: center; vertical-align: middle; }
 .jv-lines-table .jv-acc-code {
     cursor: pointer;
     width: 100%;
