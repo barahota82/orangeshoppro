@@ -7,6 +7,8 @@ alwaysApply: true
 
 **الوكيل ملزَم — قبل أي تنفيذ — بالاطلاع على `docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt` و `IBRAHIM_ORANGE_MASTER.txt` و `.cursor/rules/orange-session-handoff.mdc` و `docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt`؛ وعند نطاق مخطط/ترحيل `scripts/orange_db.sql` محلياً إن وُجد؛ وعند الحاجة `docs/archive/ORANGE_AGENT_QA_REFERENCE.txt`؛ ثم قراءة كاملة لقائمة `orange-continuity.mdc` كما في الأرشيف (ثم باقي الاستمرارية حسب النطاق).**
 
+**أولوية إنجاز المشروع (قرار المالك):** عند **إتمام عمل** أو **«كمّل العمل»** أو **مطابقة الكود** مع سياسة الواجهة والطلب أونلاين والتسجيل والتتبع والحجز والقنوات، يُعامَل **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** **أولاً** بين مراجع الأرشيف ذات الصلة — أي راجع **إجابات المالك** وفقرات **«تنفيذ»** (وس1–س30 و**صفر**) **قبل** الاعتماد على **`ORANGE_PROJECT_COMPLETION_ROADMAP`** أو **`ORANGE_PROJECT_CONTINUITY`** لتحديد ما يُنجَز، ما لم يحدّد المالك نطاقاً لا يمس هذه السياسة (مثلاً محاسبة داخلية بلا مسار واجهة). بعدها أكمل بقية البنود **0–8** و**5b** أدناه.
+
 **تفسير إلزامي:** «قراءة كاملة» = فتح **كل** بند في القائمة المرقّمة أدناه (**0–8** و**5b**) والاطلاع على محتوى الملف، لا ملخص الدردشة. **نطاق التنفيذ** بعد القراءة كما يحدده المالك (مثلاً البند **8** خارطة استكمال — لا تُنفَّذ كل المراحل دفعة واحدة دون توجيه). **باقي الاستمرارية حسب النطاق** = على سبيل المثال **`orange-php-utf8-workflow.mdc`** و**`orange-stack.mdc`** وغيرها من `.cursor/rules/` حسب المهمة. **الاستثناء:** إن **استثنى المالك ملفاً صراحةً** في الرسالة — وإلا فالقائمة أدناه كاملة. مسجّل في **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** و**`IBRAHIM_ORANGE_MASTER.txt`**.
 
 **عند طلب المالك «كمّل العمل» (أو ما يعادله):** ابدأ من **إجابات المالك** في **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** — خاصة فقرات **«تنفيذ»** والأسئلة س1–س30 حيث تنطبق على المهمة — ثم **قارن بالكود** وأغلق الفجوات الظاهرة. **لا يكفي** الاكتفاء بتقرير أن Git نظيف دون هذه المراجعة.
@@ -18,7 +20,7 @@ When resuming Orange work, read:
 1. **`docs/archive/ORANGE_CHAT_CONTINUITY.md`** - archive: encoding, invoice, deploy detail, Arabic summary.
 2. **`.cursor/rules/orange-php-utf8-workflow.mdc`** - mandatory workflow (UTF-8, SQL path policy, do not touch `config.php` for helpers, routing, etc.).
 3. **`docs/archive/ORANGE_STOCK_ORDER_POLICY.txt`** - stock/order policy if relevant.
-4. **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** - سياسات الواجهة والطلب أونلاين (إجابات المالك؛ اطلع عليها قبل أي تنفيذ للمتجر/السلة/التتبع/التسجيل/الحجز).
+4. **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** — **أولوية إنجاز** لسياسات الواجهة والطلب أونلاين (إجابات المالك؛ **أول** مرجع أرشيفي تفصيلي عند إتمام عمل ينطبق على المتجر/السلة/التتبع/التسجيل/الحجز/القنوات؛ اطلع عليها قبل أي تنفيذ لتلك المسارات).
 5. **`docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt`** — أداء الواجهة، ترحيل المخطط على مسار المتجر، مخاطر وتراجع (مرتبط بقراءة session-handoff).
 5b. **`docs/archive/ORANGE_AGENT_QA_REFERENCE.txt`** — أسئلة وأجوبة تشغيلية (وكلاء، نشر، مخطط القاعدة) عند الحاجة.
 6. **`docs/archive/ORANGE_PROJECT_CONTINUITY.txt`** - project status, path, agreements.

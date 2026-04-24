@@ -10,6 +10,8 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 التتبع، الطلب أونلاين، المخزون/الحجز، الخصوصية، وارتباط المحاسبة عالي المستوى بالتسليم،
 والقنوات/المسارات التقنية.
 
+**أولوية إنجاز المشروع (قرار المالك):** عند **إتمام عمل** أو **مطابقة الكود** مع هذه السياسات، يُعامَل **هذا الملف** **أولاً** بين وثائق الأرشيف ذات الصلة — قبل **`ORANGE_PROJECT_COMPLETION_ROADMAP`** وقبل **`ORANGE_PROJECT_CONTINUITY`** لتحديد ما يُنجَز في نطاق الواجهة والطلب؛ التفاصيل في **`.cursor/rules/orange-continuity.mdc`** و**`orange-session-handoff.mdc`**.
+
 **صيغة إلزام موحّدة للوكلاء (قرار المالك — مُثبَّتة في الأرشيف والقواعد):** **الوكيل ملزَم — قبل أي تنفيذ — بالاطلاع على docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt و IBRAHIM_ORANGE_MASTER.txt و .cursor/rules/orange-session-handoff.mdc و docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt؛ وعند نطاق مخطط/ترحيل scripts/orange_db.sql محلياً إن وُجد؛ وعند الحاجة docs/archive/ORANGE_AGENT_QA_REFERENCE.txt؛ ثم قراءة كاملة لقائمة orange-continuity.mdc كما في الأرشيف (ثم باقي الاستمرارية حسب النطاق).** — تفاصيل البنود **0–8** و**5b** و**باقي القواعد** في **`.cursor/rules/orange-continuity.mdc`**.
 
 **إلزام أرشيفي (إشعار المالك بانتهاء الجلسة):** عند **انتهاء عمل تنفيذي** (تعديلات، أوامر، commit، …)، **يلزم** الوكيل **إخبار المالك صراحةً** في **آخر ردّه** بجملة **`تم انتهاء الجلسة التنفيذية.`** وتذكير بأن **المحادثة التالية** قد تكون مع **وكيل آخر** دون سياق هذه الدردشة — **ليعلم المالك** ولا يفترض استمرار نفس السياق. مُنفَّذ في **`.cursor/rules/orange-session-handoff.mdc`** و**`orange-continuity.mdc`**.
