@@ -152,30 +152,34 @@ foreach ($accounts as $a) {
         </div>
         <div class="jv-search-modal__body">
             <p class="muted jv-search-modal__hint">حدّد معياراً واحداً على الأقل. لرقم سند واحد أو يوم واحد: املأ «من» واترك «إلى» فارغاً (أو العكس بـ«إلى» فقط). لمدى: املأ الحقلين معاً.</p>
-            <div class="form-grid jv-search-modal__form">
-                <div>
-                    <label for="jv_search_id_from">رقم القيد — من</label>
-                    <input type="number" id="jv_search_id_from" class="admin-inp" min="1" step="1" placeholder="" dir="ltr" lang="en">
+            <div class="jv-search-modal__form">
+                <div class="jv-search-modal__row jv-search-modal__row--fields">
+                    <div class="jv-search-field jv-search-field--id">
+                        <label for="jv_search_id_from">رقم القيد — من</label>
+                        <input type="number" id="jv_search_id_from" class="admin-inp" min="1" step="1" placeholder="" dir="ltr" lang="en">
+                    </div>
+                    <div class="jv-search-field jv-search-field--id">
+                        <label for="jv_search_id_to">رقم القيد — إلى</label>
+                        <input type="number" id="jv_search_id_to" class="admin-inp" min="1" step="1" placeholder="" dir="ltr" lang="en">
+                    </div>
+                    <div class="jv-search-field jv-search-field--date">
+                        <label for="jv_search_date_from">تاريخ السند — من</label>
+                        <input type="date" id="jv_search_date_from" class="admin-inp" dir="ltr" lang="en">
+                    </div>
+                    <div class="jv-search-field jv-search-field--date">
+                        <label for="jv_search_date_to">تاريخ السند — إلى</label>
+                        <input type="date" id="jv_search_date_to" class="admin-inp" dir="ltr" lang="en">
+                    </div>
+                    <div class="jv-search-field jv-search-field--ref">
+                        <label for="jv_search_ref">المرجع (يحتوي النص)</label>
+                        <input type="text" id="jv_search_ref" class="admin-inp" placeholder="" autocomplete="off" dir="auto">
+                    </div>
                 </div>
-                <div>
-                    <label for="jv_search_id_to">رقم القيد — إلى</label>
-                    <input type="number" id="jv_search_id_to" class="admin-inp" min="1" step="1" placeholder="" dir="ltr" lang="en">
-                </div>
-                <div>
-                    <label for="jv_search_date_from">تاريخ السند — من</label>
-                    <input type="date" id="jv_search_date_from" class="admin-inp" dir="ltr" lang="en">
-                </div>
-                <div>
-                    <label for="jv_search_date_to">تاريخ السند — إلى</label>
-                    <input type="date" id="jv_search_date_to" class="admin-inp" dir="ltr" lang="en">
-                </div>
-                <div style="grid-column:1/-1;">
-                    <label for="jv_search_ref">المرجع (يحتوي النص)</label>
-                    <input type="text" id="jv_search_ref" class="admin-inp" placeholder="" autocomplete="off" dir="auto">
-                </div>
-                <div style="grid-column:1/-1;">
-                    <label for="jv_search_desc">بيان القيد العام (يحتوي النص)</label>
-                    <input type="text" id="jv_search_desc" class="admin-inp" placeholder="" autocomplete="off" dir="auto">
+                <div class="jv-search-modal__row jv-search-modal__row--desc">
+                    <div class="jv-search-field jv-search-field--full">
+                        <label for="jv_search_desc">بيان القيد العام (يحتوي النص)</label>
+                        <input type="text" id="jv_search_desc" class="admin-inp" placeholder="" autocomplete="off" dir="auto">
+                    </div>
                 </div>
             </div>
             <div class="actions jv-search-modal__actions">
@@ -272,7 +276,7 @@ foreach ($accounts as $a) {
     position: relative;
     z-index: 1;
     width: 100%;
-    max-width: 46rem;
+    max-width: min(96vw, 58rem);
     max-height: calc(100vh - 32px);
     overflow: auto;
     background: #fff;
@@ -291,7 +295,55 @@ foreach ($accounts as $a) {
 .jv-search-modal__title { margin: 0; font-size: 1.05rem; }
 .jv-search-modal__body { padding: 14px 16px 18px; }
 .jv-search-modal__hint { margin: 0 0 12px; font-size: 0.88rem; }
-.jv-search-modal__form { margin-bottom: 12px; }
+.jv-search-modal__form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+.jv-search-modal__row--fields {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    gap: 10px;
+    width: 100%;
+    overflow-x: auto;
+    box-sizing: border-box;
+    padding-bottom: 2px;
+    direction: ltr;
+}
+.jv-search-modal__row--desc {
+    width: 100%;
+}
+.jv-search-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+.jv-search-field label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.jv-search-field input {
+    width: 100%;
+    box-sizing: border-box;
+}
+.jv-search-field--id {
+    flex: 0 0 7rem;
+}
+.jv-search-field--date {
+    flex: 0 0 11rem;
+}
+.jv-search-field--ref {
+    flex: 1 1 0;
+    min-width: 7rem;
+}
+.jv-search-field--full {
+    width: 100%;
+}
 .jv-search-modal__actions { margin: 0 0 16px; }
 .jv-search-table-wrap { max-height: min(40vh, 22rem); overflow: auto; border: 1px solid #e4e4e7; border-radius: 8px; }
 .jv-search-results-table { margin: 0; font-size: 0.9rem; }
