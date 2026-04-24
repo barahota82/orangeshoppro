@@ -163,7 +163,6 @@ foreach ($accounts as $a) {
 .jv-acct-picker-hint { margin: 8px 0 0; font-size: 0.8rem; }
 .jv-lines-table tr.jv-line-memo td { padding-top: 6px; padding-bottom: 12px; border-bottom: 1px solid #e4e4e7; }
 .jv-lines-table tr.jv-line-memo .jv-m { width: 100%; box-sizing: border-box; }
-.jv-line-memo-label { display: block; font-size: 0.8rem; margin-bottom: 4px; font-weight: 600; }
 </style>
 
 <script>
@@ -345,7 +344,6 @@ function jvAddRow() {
     trMemo.className = 'jv-line-memo';
     trMemo.setAttribute('data-jv-pair', pair);
     trMemo.innerHTML = '<td colspan="5">' +
-        '<label class="jv-line-memo-label muted" for="jv_m_' + pair + '">بيان السطر</label>' +
         '<input type="text" id="jv_m_' + pair + '" class="jv-m admin-inp" value="" placeholder="البيان" autocomplete="off">' +
         '</td>';
     var codeInp = trMain.querySelector('.jv-acc-code');
