@@ -153,3 +153,44 @@ function orange_storefront_resolve_registration_area(
         'delivery_area_id' => $idOut,
     ];
 }
+
+/**
+ * قائمة مناطق نشطة في الواجهة (س8/س20): ‎<select>‎ من الخادم — لا يعتمد على JS لاستبدال حقل نصّي.
+ *
+ * @param list<array{id:int,name:string}> $areas قيمة ‎orange_delivery_areas_storefront_payload‎
+ */
+function orange_storefront_delivery_area_select_markup(
+    string $elementId,
+    array $areas,
+    bool $required = true,
+    string $nameAttr = 'area',
+    string $extraClass = ''
+): string {
+    if ($areas === []) {
+        return '';
+    }
+    $cls = trim($extraClass);
+    $buf = '<select id="' . htmlspecialchars($elementId, ENT_QUOTES, 'UTF-8') . '"'
+        . ' name="' . htmlspecialchars($nameAttr, ENT_QUOTES, 'UTF-8') . '"'
+        . ' autocomplete="address-level1"';
+    if ($required) {
+        $buf .= ' required';
+    }
+    if ($cls !== '') {
+        $buf .= ' class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '"';
+    }
+    $buf .= '>';
+    $ph = function_exists('t') ? (string) t('checkout_select_area') : 'Select area';
+    $buf .= '<option value="">' . htmlspecialchars($ph, ENT_QUOTES, 'UTF-8') . '</option>';
+    foreach ($areas as $da) {
+        $id = (int) ($da['id'] ?? 0);
+        if ($id <= 0) {
+            continue;
+        }
+        $label = (string) ($da['name'] ?? '');
+        $buf .= '<option value="' . $id . '">' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</option>';
+    }
+    $buf .= '</select>';
+
+    return $buf;
+}

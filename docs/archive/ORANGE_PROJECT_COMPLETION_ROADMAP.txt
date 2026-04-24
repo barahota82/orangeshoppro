@@ -12,6 +12,8 @@ Last updated: 2026-04-26
 
 اقرأ أولاً (مرجعيات ثابتة)
 ---------------------------
+**أولاً — سياسة الواجهة والطلب (أولوية إنجاز قرار المالك):** `docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt` — إجابات المالك وفقرات «تنفيذ»؛ اقرأه **قبل** الخارطة ولقطة المشروع عند إتمام عمل يلمس المتجر أو العربة أو التتبع أو التسجيل أو الحجز أو القنوات؛ التفاصيل في `.cursor/rules/orange-continuity.mdc` و`orange-session-handoff.mdc`.
+
 1. ORANGE_PROJECT_CONTINUITY.txt     — لقطة المشروع، المخزون، الترجمة، سياسة المسار D:\orange، النشر.
 2. ORANGE_TECH_REFERENCE.txt         — الاستضافة والستاك.
 3. ORANGE_STOCK_ORDER_POLICY.txt     — سياسة الطلبات والمخزون والاستلام.

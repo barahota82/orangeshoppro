@@ -128,7 +128,7 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
                 <div class="field">
                     <label for="customer_area"><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <?php if (count($orangeDeliveryAreasStorefront) > 0): ?>
-                    <input id="customer_area" autocomplete="address-level1" maxlength="500">
+                    <?php echo orange_storefront_delivery_area_select_markup('customer_area', $orangeDeliveryAreasStorefront, true, 'customer_area'); ?>
                     <?php else: ?>
                     <select id="customer_area" class="js-orange-delivery-area-unavailable" autocomplete="address-level1" disabled aria-describedby="customerAreaUnavailableHelp">
                         <option value=""><?php echo htmlspecialchars(t('checkout_select_area'), ENT_QUOTES, 'UTF-8'); ?></option>

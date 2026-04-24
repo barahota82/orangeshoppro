@@ -88,7 +88,7 @@ $orangeMyOrderUi = [
                 <div class="field track-signup-cta__field">
                     <label for="trackSignupArea"><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <?php if (count($trackDeliveryAreas) > 0): ?>
-                    <input id="trackSignupArea" name="area" autocomplete="address-level1">
+                    <?php echo orange_storefront_delivery_area_select_markup('trackSignupArea', $trackDeliveryAreas, true, 'area'); ?>
                     <?php else: ?>
                     <select id="trackSignupArea" name="area" class="js-orange-delivery-area-unavailable" autocomplete="address-level1" disabled aria-describedby="trackSignupAreaUnavailableHelp">
                         <option value=""><?php echo htmlspecialchars(t('checkout_select_area'), ENT_QUOTES, 'UTF-8'); ?></option>

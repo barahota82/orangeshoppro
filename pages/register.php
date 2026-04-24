@@ -120,7 +120,7 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                 <div class="field track-signup-cta__field">
                     <label for="reg_area"><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <?php if (count($registerDeliveryAreas) > 0): ?>
-                    <input id="reg_area" name="area" autocomplete="address-level1" required placeholder="<?php echo htmlspecialchars(t('register_placeholder_area'), ENT_QUOTES, 'UTF-8'); ?>">
+                    <?php echo orange_storefront_delivery_area_select_markup('reg_area', $registerDeliveryAreas, true, 'area'); ?>
                     <?php else: ?>
                     <select id="reg_area" name="area" class="js-orange-delivery-area-unavailable" autocomplete="address-level1" disabled aria-describedby="regAreaUnavailableHelp">
                         <option value=""><?php echo htmlspecialchars(t('checkout_select_area'), ENT_QUOTES, 'UTF-8'); ?></option>
