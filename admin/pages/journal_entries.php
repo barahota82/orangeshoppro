@@ -148,10 +148,8 @@ foreach ($accounts as $a) {
     <div class="jv-search-modal__panel">
         <div class="jv-search-modal__head">
             <h3 id="jv_search_modal_title" class="jv-search-modal__title">بحث في سندات القيد اليدوية</h3>
-            <button type="button" class="btn-secondary" id="jv_search_close" title="إغلاق">إغلاق</button>
         </div>
         <div class="jv-search-modal__body">
-            <p class="muted jv-search-modal__hint">حدّد معياراً واحداً على الأقل. لرقم سند واحد أو يوم واحد: املأ «من» واترك «إلى» فارغاً (أو العكس بـ«إلى» فقط). لمدى: املأ الحقلين معاً.</p>
             <div class="jv-search-modal__form">
                 <div class="jv-search-modal__row jv-search-modal__row--fields">
                     <div class="jv-search-field jv-search-field--id">
@@ -186,7 +184,6 @@ foreach ($accounts as $a) {
                 <button type="button" id="jv_search_run">تنفيذ البحث</button>
             </div>
             <div class="jv-search-modal__results">
-                <p class="muted jv-search-results-hint" id="jv_search_results_hint">نقرتان على صف لفتح السند في هذه الشاشة</p>
                 <div class="table-wrap jv-search-table-wrap">
                     <table class="admin-table jv-search-results-table">
                         <thead>
@@ -287,14 +284,12 @@ foreach ($accounts as $a) {
 .jv-search-modal__head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    justify-content: center;
     padding: 14px 16px;
     border-bottom: 1px solid #e4e4e7;
 }
-.jv-search-modal__title { margin: 0; font-size: 1.05rem; }
+.jv-search-modal__title { margin: 0; font-size: 1.05rem; text-align: center; }
 .jv-search-modal__body { padding: 14px 16px 18px; }
-.jv-search-modal__hint { margin: 0 0 12px; font-size: 0.88rem; }
 .jv-search-modal__form {
     display: flex;
     flex-direction: column;
@@ -348,7 +343,6 @@ foreach ($accounts as $a) {
 .jv-search-results-table { margin: 0; font-size: 0.9rem; }
 .jv-search-results-table tbody tr { cursor: pointer; }
 .jv-search-results-table tbody tr:hover { background: #f4f4f5; }
-.jv-search-results-hint { margin: 0 0 8px; font-size: 0.85rem; }
 </style>
 
 <script>
@@ -511,6 +505,23 @@ function jvAcctPickerOnKey(ev) {
     }
 }
 
+function jvSearchModalOnDocMouseDown(ev) {
+    var m = document.getElementById('jv_search_modal');
+    if (!m || m.style.display !== 'flex') {
+        return;
+    }
+    var t = ev.target;
+    if (t.closest && t.closest('#jv_btn_open_search')) {
+        return;
+    }
+    var panel = m.querySelector('.jv-search-modal__panel');
+    if (panel && (panel === t || panel.contains(t))) {
+        return;
+    }
+    jvSearchModalClose();
+}
+
+document.addEventListener('mousedown', jvSearchModalOnDocMouseDown, true);
 document.addEventListener('mousedown', jvAcctPickerOnDocMouseDown, true);
 document.addEventListener('keydown', jvAcctPickerOnKey, true);
 
@@ -534,10 +545,6 @@ function jvSearchModalOpen() {
     if (tb0) {
         tb0.innerHTML = '';
     }
-    var hint = document.getElementById('jv_search_results_hint');
-    if (hint) {
-        hint.textContent = 'نقرتان على صف لفتح السند في هذه الشاشة';
-    }
 }
 
 function jvSearchCollectPayload() {
@@ -554,7 +561,6 @@ function jvSearchCollectPayload() {
 
 function jvSearchRenderRows(rows) {
     var tb = document.getElementById('jv_search_results_tbody');
-    var hint = document.getElementById('jv_search_results_hint');
     if (!tb) {
         return;
     }
@@ -576,11 +582,6 @@ function jvSearchRenderRows(rows) {
         });
         tb.appendChild(tr);
     });
-    if (hint) {
-        hint.textContent = rows && rows.length
-            ? ('عدد النتائج: ' + rows.length + ' — نقرتان على صف لفتح السند')
-            : 'لا توجد نتائج — نقرتان على صف لفتح السند';
-    }
 }
 
 function jvSearchRun() {
@@ -602,15 +603,14 @@ function jvSearchRun() {
 function jvSearchModalBind() {
     var openB = document.getElementById('jv_btn_open_search');
     if (openB) {
-        openB.addEventListener('click', function () { jvSearchModalOpen(); });
-    }
-    var closeB = document.getElementById('jv_search_close');
-    if (closeB) {
-        closeB.addEventListener('click', jvSearchModalClose);
-    }
-    var bd = document.getElementById('jv_search_modal_backdrop');
-    if (bd) {
-        bd.addEventListener('click', jvSearchModalClose);
+        openB.addEventListener('click', function () {
+            var sm = document.getElementById('jv_search_modal');
+            if (sm && sm.style.display === 'flex') {
+                jvSearchModalClose();
+            } else {
+                jvSearchModalOpen();
+            }
+        });
     }
     var runB = document.getElementById('jv_search_run');
     if (runB) {
