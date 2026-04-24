@@ -24,8 +24,11 @@ try {
     $isGroup = !empty($data['is_group']) ? 1 : 0;
     $nameEn = trim((string) ($data['name_en'] ?? ''));
     $isSuspended = !empty($data['is_suspended']) ? 1 : 0;
-    $nbRaw = strtolower(trim((string) ($data['normal_balance'] ?? 'debit')));
-    $normalBalance = $nbRaw === 'credit' ? 'credit' : 'debit';
+    $normalBalance = 'debit';
+    if ($isGroup !== 1) {
+        $nbRaw = strtolower(trim((string) ($data['normal_balance'] ?? 'debit')));
+        $normalBalance = $nbRaw === 'credit' ? 'credit' : 'debit';
+    }
 
     if ($name === '') {
         json_response(['success' => false, 'message' => 'اسم الحساب مطلوب'], 422);

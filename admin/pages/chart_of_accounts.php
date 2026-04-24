@@ -85,7 +85,8 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
                     <?php if ($hasNb): ?>
                     <div class="coa-field coa-field--span2">
                         <label for="coa_normal_balance">طبيعة الحساب</label>
-                        <select id="coa_normal_balance">
+                        <select id="coa_normal_balance" title="للحسابات الفرعية فقط — الحساب الرئيسي (مجموعة) لا طبيعة محددة له">
+                            <option value="">—</option>
                             <option value="debit">مدين</option>
                             <option value="credit">دائن</option>
                         </select>
@@ -203,6 +204,29 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    /** طبيعة الحساب تُحدَّد للفرعي فقط؛ الرئيسي (مجموعة) الحقل فارغ وغير مفعّل. */
+    function coaSyncNormalBalanceUi() {
+        if (!hasNb) {
+            return;
+        }
+        var sel = document.getElementById('coa_normal_balance');
+        if (!sel) {
+            return;
+        }
+        var stEl = document.querySelector('input[name="coa_state"]:checked');
+        var st = stEl ? stEl.value : 'leaf';
+        var isGroup = st === 'group';
+        if (isGroup) {
+            sel.value = '';
+            sel.disabled = true;
+        } else {
+            sel.disabled = false;
+            if (!sel.value) {
+                sel.value = 'debit';
+            }
+        }
+    }
+
     function updateParentFieldsFromContext() {
         var id = parseInt(document.getElementById('coa_id').value, 10) || 0;
         var pidEl = document.getElementById('coa_parent_id');
@@ -308,9 +332,15 @@ document.addEventListener('DOMContentLoaded', function () {
             cDisp.textContent = li.dataset.categoryName || '—';
         }
         if (hasNb) {
-            var nb = li.dataset.normalBalance || 'debit';
-            document.getElementById('coa_normal_balance').value = nb === 'credit' ? 'credit' : 'debit';
+            var nbSel = document.getElementById('coa_normal_balance');
+            if (li.dataset.isGroup === '1') {
+                nbSel.value = '';
+            } else {
+                var nb = li.dataset.normalBalance || 'debit';
+                nbSel.value = nb === 'credit' ? 'credit' : 'debit';
+            }
         }
+        coaSyncNormalBalanceUi();
         updateParentFieldsFromContext();
         updateStatementLink();
     }
@@ -418,6 +448,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (hasNb) {
                         document.getElementById('coa_normal_balance').value = 'debit';
                     }
+                    coaSyncNormalBalanceUi();
                     updateParentFieldsFromContext();
                     updatePreviewFromParent();
                     updateStatementLink();
@@ -500,6 +531,11 @@ document.addEventListener('DOMContentLoaded', function () {
         updateParentFieldsFromContext();
         updatePreviewFromParent();
         updateStatementLink();
+        coaSyncNormalBalanceUi();
+    });
+
+    document.querySelectorAll('input[name="coa_state"]').forEach(function (radio) {
+        radio.addEventListener('change', coaSyncNormalBalanceUi);
     });
 
     document.getElementById('coa_btn_save').addEventListener('click', function () {
@@ -517,8 +553,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (hasNameEn) {
             payload.name_en = document.getElementById('coa_name_en').value.trim();
         }
-        if (hasNb) {
-            payload.normal_balance = document.getElementById('coa_normal_balance').value;
+        if (hasNb && st !== 'group') {
+            payload.normal_balance = document.getElementById('coa_normal_balance').value || 'debit';
         }
         if (!payload.name) {
             alert('اسم الحساب بالعربية مطلوب');
