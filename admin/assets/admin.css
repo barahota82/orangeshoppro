@@ -1364,6 +1364,10 @@ label {
 .jv-voucher-header-line > div {
     min-width: 0;
 }
+.jv-voucher-header-line > div > label {
+    display: block;
+    text-align: center;
+}
 .jv-voucher-header-line input[type="text"],
 .jv-voucher-header-line input[type="date"] {
     width: 100%;
