@@ -33,11 +33,12 @@ $count = count($rows);
         <h1>العملاء</h1>
         <p class="page-subtitle">
             سجل العملاء: <strong>الهاتف</strong> معرّف فريد للعميل (مثل الكود). الحقول: الاسم، المنطقة، العنوان، البريد، الملاحظات (تُحدَّث تلقائياً من ملاحظات كل طلب ويب)، حد الائتمان، والذمم.
-            الذمم والقبض من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_ledger'), ENT_QUOTES, 'UTF-8'); ?>">ذمم العملاء والموردين</a>.
+            الذمم والقبض من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_customer_receipt'), ENT_QUOTES, 'UTF-8'); ?>">سند قبض / عميل</a>
+            أو نظرة عامة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_ledger'), ENT_QUOTES, 'UTF-8'); ?>">ذمم العملاء والموردين</a>.
         </p>
     </div>
     <div class="actions">
-        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_ledger'), ENT_QUOTES, 'UTF-8'); ?>">الذمم وسندات القبض</a>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_customer_receipt'), ENT_QUOTES, 'UTF-8'); ?>">سند قبض / عميل</a>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=manual_order'), ENT_QUOTES, 'UTF-8'); ?>">فاتورة مبيعات</a>
     </div>
 </div>
@@ -178,7 +179,7 @@ $count = count($rows);
                                     'credit_limit' => $c['credit_limit'] ?? null,
                                     'notes' => (string) ($c['notes'] ?? ''),
                                 ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>)'>تعديل</button>
-                                <a class="btn btn-secondary party-registry-btn" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_ledger&stmt_party_kind=customer&stmt_party_id=' . (int) $cid . '#partner-account-statement'), ENT_QUOTES, 'UTF-8'); ?>">كشف حساب</a>
+                                <a class="btn btn-secondary party-registry-btn" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_customer_receipt&stmt_party_kind=customer&stmt_party_id=' . (int) $cid . '#partner-account-statement'), ENT_QUOTES, 'UTF-8'); ?>">كشف حساب</a>
                             </td>
                         </tr>
                     <?php endforeach; ?>

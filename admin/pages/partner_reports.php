@@ -56,7 +56,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
         <h1>تقارير الذمم الشاملة</h1>
         <p class="page-subtitle">
             ملخص أرصدة كل العملاء والموردين، مطابقة أرصدة الدليل مع دفتر الذمم، وتصدير CSV.
-            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_ledger'), ENT_QUOTES, 'UTF-8'); ?>">العودة لحركات القبض والدفع</a>
+            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_ledger'), ENT_QUOTES, 'UTF-8'); ?>">العودة لذمم العملاء والموردين</a>
         </p>
     </div>
 </div>

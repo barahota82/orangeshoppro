@@ -26,12 +26,13 @@ $count = count($rows);
             إدارة موردي المشتريات: <strong>كود المورد</strong> (فريد اختياري)، الذمم الدائنة، وعدد مستندات الشراء.
             مستقبلاً: ربط <strong>مردود المشتريات</strong> بجدول <code dir="ltr">purchase_returns</code> (المورد + مستند الشراء الأصلي).
             المشتريات من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchases'), ENT_QUOTES, 'UTF-8'); ?>">المشتريات</a>؛ السداد والكشوف من
-            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_ledger'), ENT_QUOTES, 'UTF-8'); ?>">ذمم العملاء والموردين</a>.
+            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment'), ENT_QUOTES, 'UTF-8'); ?>">سند صرف / مورد</a>
+            أو <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_ledger'), ENT_QUOTES, 'UTF-8'); ?>">ذمم العملاء والموردين</a>.
         </p>
     </div>
     <div class="actions">
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchases'), ENT_QUOTES, 'UTF-8'); ?>">مستند شراء</a>
-        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_ledger'), ENT_QUOTES, 'UTF-8'); ?>">الذمم وسندات الدفع</a>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment'), ENT_QUOTES, 'UTF-8'); ?>">سند صرف / مورد</a>
     </div>
 </div>
 
@@ -124,7 +125,7 @@ $count = count($rows);
                                     'phone' => $phone,
                                     'notes' => (string) ($s['notes'] ?? ''),
                                 ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>)'>تعديل</button>
-                                <a class="btn btn-secondary party-registry-btn" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_ledger&stmt_party_kind=supplier&stmt_party_id=' . (int) $sid . '#partner-account-statement'), ENT_QUOTES, 'UTF-8'); ?>">كشف حساب</a>
+                                <a class="btn btn-secondary party-registry-btn" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment&stmt_party_kind=supplier&stmt_party_id=' . (int) $sid . '#partner-account-statement'), ENT_QUOTES, 'UTF-8'); ?>">كشف حساب</a>
                             </td>
                         </tr>
                     <?php endforeach; ?>
