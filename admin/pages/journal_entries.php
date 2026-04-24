@@ -113,12 +113,14 @@ foreach ($accounts as $a) {
             </table>
         </div>
     </div>
-    <div class="actions admin-doc-lines-toolbar jv-print-hide" style="margin-top:10px;flex-wrap:wrap;gap:8px;">
+    <div class="actions admin-doc-lines-toolbar jv-doc-toolbar jv-print-hide">
         <button type="button" class="btn-secondary" id="jv_btn_add_line" onclick="jvAddRow()">+ سطر يدوي</button>
-        <button type="button" id="jv_btn_new_sheet" title="إدخال سند جديد">سند جديد</button>
-        <button type="button" class="btn-secondary" id="jv_btn_delete_voucher" title="حذف السند المعروض" disabled>حذف السند</button>
-        <button type="button" class="btn-secondary" id="jv_btn_print_voucher" title="طباعة السند">طباعة السند</button>
-        <button type="button" id="jv_btn_save" onclick="jvSubmit()">حفظ السند</button>
+        <div class="jv-toolbar-primary-group">
+            <button type="button" id="jv_btn_new_sheet" title="إدخال سند جديد">سند جديد</button>
+            <button type="button" class="btn-secondary" id="jv_btn_delete_voucher" title="حذف السند المعروض" disabled>حذف السند</button>
+            <button type="button" class="btn-secondary" id="jv_btn_print_voucher" title="طباعة السند">طباعة السند</button>
+            <button type="button" id="jv_btn_save" onclick="jvSubmit()">حفظ السند</button>
+        </div>
     </div>
 </div>
 

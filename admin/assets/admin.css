@@ -1408,6 +1408,23 @@ label {
     padding: 6px 8px;
     line-height: 1.2;
 }
+/* سند قيد — شريط الأدوات: «+ سطر» عند البداية، مجموعة سند جديد/حذف/طباعة/حفظ في سطر واحد عند النهاية (يسار الشاشة في RTL) */
+.jv-doc-toolbar {
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+}
+.jv-toolbar-primary-group {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+}
 @media (max-width: 960px) {
     .jv-voucher-header-line {
         grid-template-columns: minmax(5rem, 7rem) minmax(9rem, 1fr);
