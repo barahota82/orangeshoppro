@@ -1356,7 +1356,7 @@ label {
     grid-template-columns:
         minmax(5.25rem, 7rem)
         minmax(9.5rem, 11.5rem)
-        minmax(0, 1fr)
+        minmax(5.25rem, 7rem)
         minmax(9.5rem, 11.5rem);
     gap: 12px 14px;
     align-items: end;
