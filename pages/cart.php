@@ -236,12 +236,13 @@ window.ORANGE_TRACK_LABELS = window.ORANGE_TRACK_LABELS || {
 })();
 
 document.addEventListener('DOMContentLoaded', function () {
-    if (
-        typeof window.orangeReplaceInputWithDeliveryAreaSelect === 'function' &&
-        window.ORANGE_DELIVERY_AREAS &&
-        window.ORANGE_DELIVERY_AREAS.length
-    ) {
-        window.orangeReplaceInputWithDeliveryAreaSelect('customer_area', window.ORANGE_DELIVERY_AREAS);
+    if (window.ORANGE_DELIVERY_AREAS && window.ORANGE_DELIVERY_AREAS.length) {
+        if (typeof window.orangeReplaceInputWithDeliveryAreaSelect === 'function') {
+            window.orangeReplaceInputWithDeliveryAreaSelect('customer_area', window.ORANGE_DELIVERY_AREAS);
+        }
+        if (typeof window.orangeEnhanceDeliveryAreaSelect === 'function') {
+            window.orangeEnhanceDeliveryAreaSelect('customer_area', window.ORANGE_DELIVERY_AREAS);
+        }
     }
 });
 </script>

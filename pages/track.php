@@ -765,12 +765,13 @@ window.__orangeCartTrackRefresh = pageTrackOrderNow;
     };
 
     document.addEventListener('DOMContentLoaded', function () {
-        if (
-            typeof window.orangeReplaceInputWithDeliveryAreaSelect === 'function' &&
-            window.ORANGE_DELIVERY_AREAS &&
-            window.ORANGE_DELIVERY_AREAS.length
-        ) {
-            window.orangeReplaceInputWithDeliveryAreaSelect('trackSignupArea', window.ORANGE_DELIVERY_AREAS);
+        if (window.ORANGE_DELIVERY_AREAS && window.ORANGE_DELIVERY_AREAS.length) {
+            if (typeof window.orangeReplaceInputWithDeliveryAreaSelect === 'function') {
+                window.orangeReplaceInputWithDeliveryAreaSelect('trackSignupArea', window.ORANGE_DELIVERY_AREAS);
+            }
+            if (typeof window.orangeEnhanceDeliveryAreaSelect === 'function') {
+                window.orangeEnhanceDeliveryAreaSelect('trackSignupArea', window.ORANGE_DELIVERY_AREAS);
+            }
         }
     });
 })();

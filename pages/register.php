@@ -166,12 +166,13 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
             ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
             (function () {
                 document.addEventListener('DOMContentLoaded', function () {
-                    if (
-                        typeof window.orangeReplaceInputWithDeliveryAreaSelect === 'function' &&
-                        window.ORANGE_DELIVERY_AREAS &&
-                        window.ORANGE_DELIVERY_AREAS.length
-                    ) {
-                        window.orangeReplaceInputWithDeliveryAreaSelect('reg_area', window.ORANGE_DELIVERY_AREAS);
+                    if (window.ORANGE_DELIVERY_AREAS && window.ORANGE_DELIVERY_AREAS.length) {
+                        if (typeof window.orangeReplaceInputWithDeliveryAreaSelect === 'function') {
+                            window.orangeReplaceInputWithDeliveryAreaSelect('reg_area', window.ORANGE_DELIVERY_AREAS);
+                        }
+                        if (typeof window.orangeEnhanceDeliveryAreaSelect === 'function') {
+                            window.orangeEnhanceDeliveryAreaSelect('reg_area', window.ORANGE_DELIVERY_AREAS);
+                        }
                     }
                     var form = document.getElementById('orangeRegisterForm');
                     var msg = document.getElementById('orangeRegisterMsg');

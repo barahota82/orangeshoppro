@@ -552,7 +552,42 @@ function orangeReplaceInputWithDeliveryAreaSelect(inputId, areasList) {
         });
     }
 }
+
+/**
+ * عند بناء قائمة المناطق من الخادم (‎<select>‎ جاهز): يُفعَّل نفس البحث القابل للفلترة كمسار الاستبدال من حقل نصّي.
+ */
+function orangeEnhanceDeliveryAreaSelect(selectId, areasList) {
+    if (!selectId || !Array.isArray(areasList) || areasList.length === 0) {
+        return;
+    }
+    var sel = document.getElementById(selectId);
+    if (!sel || sel.tagName !== 'SELECT' || sel.disabled) {
+        return;
+    }
+    if (sel.dataset && sel.dataset.orangeSearchableCombobox === '1') {
+        return;
+    }
+    var comboRows = [];
+    for (var i = 0; i < areasList.length; i++) {
+        var a = areasList[i];
+        if (!a || a.id == null) {
+            continue;
+        }
+        var label = a.name != null ? String(a.name) : '';
+        comboRows.push({ value: String(a.id), label: label, filterText: label });
+    }
+    if (!comboRows.length || typeof window.orangeAttachSearchableCombobox !== 'function') {
+        return;
+    }
+    var T = typeof window.APP_T === 'object' && window.APP_T ? window.APP_T : {};
+    window.orangeAttachSearchableCombobox(sel, comboRows, {
+        placeholder: T.checkout_select_area || '',
+        openListAria: T.delivery_area_open_list || T.phone_country_open_list || 'Open list',
+        inputDir: 'auto',
+    });
+}
 window.orangeReplaceInputWithDeliveryAreaSelect = orangeReplaceInputWithDeliveryAreaSelect;
+window.orangeEnhanceDeliveryAreaSelect = orangeEnhanceDeliveryAreaSelect;
 
 /** كاش CSS/JS للواجهة — يخفّف بطء التنقل في نافذة PWA مقارنةً بتبويب المتصفح */
 (function orangeStorefrontRegisterServiceWorker() {
