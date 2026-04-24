@@ -109,7 +109,7 @@ TRANSLATE UX (confirmed pattern on at least)
 ----------------------------------------------------------------------
 - Open the **canonical** workspace folder: **D:\\orange** (see section 7–8). Do not switch the project root to another path without **explicit owner approval** — causes duplicate edits and confusion. **Do not** document or assume non-canonical local paths in repo files. D: is the durable primary path by owner decision.
 - Do not re-ask for hosting stack if ORANGE_TECH_REFERENCE.txt unchanged.
-- When user says "continue", extend implementation toward section 4 NOT YET DONE unless they redirect.
+- When user says "continue", use **`docs/archive/ORANGE_PROJECT_COMPLETION_ROADMAP.txt`** + policy-vs-code checks; §4 is not empty: multilingual names + SEO meta exist in **`admin/pages/products.php`** (APIs) and **`pages/product.php`** (`storefront_product_seo_meta_*`); optional: richer sizing `both`, data migration script (see STILL PENDING above).
 - User policy: do NOT add helpers to config.php unless explicitly asked. Order helpers: includes/order_helpers.php (require_fields, generate_order_number).
 
 ----------------------------------------------------------------------

@@ -38,7 +38,7 @@ Last updated: 2026-04-26
 
 المرحلة 1 — الكتالوج والمتجر (CONTINUITY §4 — متبقٍّ حرج عندكم غالباً SEO/إطلاق؛ دليل مقاسات المتجر منفّذ أساساً)
 --------------------------------------------------------------
-1. حقول منتج متعددة اللغات + SEO (name_en / name_fil / name_hi + بطاقات SEO) إن كان مطلوباً للإطلاق.
+1. حقول منتج متعددة اللغات + SEO — **هيكل منفّذ:** أعمدة `name_*` و`seo_meta_*` في المخطط (`includes/catalog_schema.php`)، إدخال من **`admin/pages/products.php`** + **`admin/api/products/create.php` / `update.php`**، وعرض ميتا الصفحة من **`pages/product.php`** (`storefront_product_seo_meta_title` / `description`). يتبقى عند الإطلاق: **تعبئة المحتوى** ومراجعة السلوك حسب القناة/اللغة لا بناء الحقول من الصفر.
 2. دليل المقاسات على المتجر: **منفّذ أساساً** — `pages/product.php` حوار `<dialog>` + جدول HTML من `size_family_sizes`؛ فتح الدليل عبر `showModal` في `assets/js/product.js` (وليس `alert` لدليل المقاسات). **اختياري لاحقاً:** قوالب أغنى أو جدولان لنطاق `both` دون تقسيم DB — انظر **`docs/archive/ORANGE_PROJECT_CONTINUITY.txt`** (STILL PENDING).
 3. (اختياري) سكربت ترحيل بيانات من متغيرات نصية قديمة إلى القاموس/العائلات.
 
