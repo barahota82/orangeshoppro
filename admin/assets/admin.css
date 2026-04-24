@@ -1403,6 +1403,7 @@ label {
     gap: 6px;
     justify-content: center;
     align-items: flex-end;
+    direction: ltr;
 }
 .jv-voucher-nav-btns .jv-nav-btn {
     min-width: 2.35rem;

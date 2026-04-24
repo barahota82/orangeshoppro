@@ -81,10 +81,10 @@ foreach ($accounts as $a) {
             <?php if ($jvNavReady): ?>
             <div class="jv-voucher-nav-cell jv-print-hide">
                 <div class="jv-voucher-nav-btns" role="group" aria-label="تنقل بين سندات القيد اليدوية">
-                    <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_first" title="أول سند" aria-label="أول سند">⏮</button>
-                    <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_prev" title="السند السابق" aria-label="السند السابق">◀</button>
-                    <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_next" title="السند التالي" aria-label="السند التالي">▶</button>
-                    <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_last" title="آخر سند" aria-label="آخر سند">⏭</button>
+                    <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_first" title="أول سند" aria-label="أول سند">&lt;&lt;</button>
+                    <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_prev" title="السند السابق (تنازلي)" aria-label="السند السابق">&lt;</button>
+                    <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_next" title="السند التالي (تصاعدي)" aria-label="السند التالي">&gt;</button>
+                    <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_last" title="آخر سند" aria-label="آخر سند">&gt;&gt;</button>
                     <a class="btn-secondary jv-nav-search" href="<?php echo htmlspecialchars($jvReportsSearchHref, ENT_QUOTES, 'UTF-8'); ?>" title="تقارير السندات — بحث وتصفية">بحث</a>
                 </div>
             </div>
