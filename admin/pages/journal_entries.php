@@ -311,7 +311,6 @@ foreach ($accounts as $a) {
     overflow-x: auto;
     box-sizing: border-box;
     padding-bottom: 2px;
-    direction: ltr;
 }
 .jv-search-modal__row--desc {
     width: 100%;
