@@ -403,13 +403,41 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    /** توسيع كل الآباء حتى يظهر العقدة `li` (مثلاً بعد حفظ حساب فرعي جديد). */
+    function coaExpandAncestorsOfNode(li) {
+        if (!li) {
+            return;
+        }
+        var el = li.parentElement;
+        while (el && el !== treeEl) {
+            if (el.classList && el.classList.contains('coa-tree-list')) {
+                var parentLi = el.parentElement;
+                if (parentLi && parentLi.classList.contains('coa-tree-node')) {
+                    parentLi.classList.remove('coa-tree-node--collapsed');
+                    parentLi.setAttribute('aria-expanded', 'true');
+                    var tb = parentLi.querySelector(':scope > .coa-tree-row > .coa-tree-toggle:not(.coa-tree-toggle--leaf)');
+                    if (tb) {
+                        tb.textContent = '\u2212';
+                        tb.setAttribute('aria-expanded', 'true');
+                    }
+                }
+                el = parentLi ? parentLi.parentElement : null;
+            } else {
+                el = el.parentElement;
+            }
+        }
+    }
+
     function getActiveCoaTreeId() {
         var a = treeEl.querySelector('.coa-tree-node.is-active');
         return a ? parseInt(a.dataset.id, 10) || 0 : 0;
     }
 
-    function refreshCoaMainTree() {
-        var keepId = getActiveCoaTreeId();
+    /**
+     * @param {number} [optFocusId] إن وُجد يُحدَّد هذا الحساب بعد التحديث (مثلاً id من استجابة الحفظ).
+     */
+    function refreshCoaMainTree(optFocusId) {
+        var keepId = typeof optFocusId === 'number' && optFocusId > 0 ? optFocusId : getActiveCoaTreeId();
         return fetch('/admin/api/accounts/tree-html.php', { credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
             .then(function (data) {
@@ -422,12 +450,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 var q = document.getElementById('coa_tree_search').value;
                 applyCoaTreeFilter(q);
                 var pick = keepId > 0 ? treeEl.querySelector('.coa-tree-node[data-id="' + keepId + '"]') : null;
+                if (!pick && keepId > 0) {
+                    var searchInp = document.getElementById('coa_tree_search');
+                    if (searchInp && String(searchInp.value || '').trim() !== '') {
+                        searchInp.value = '';
+                        applyCoaTreeFilter('');
+                        pick = treeEl.querySelector('.coa-tree-node[data-id="' + keepId + '"]');
+                    }
+                }
                 if (!pick) {
                     pick = treeEl.querySelector('.coa-tree-node');
                 }
                 if (pick) {
                     treeEl.querySelectorAll('.coa-tree-node.is-active').forEach(function (x) { x.classList.remove('is-active'); });
                     pick.classList.add('is-active');
+                    coaExpandAncestorsOfNode(pick);
+                    try {
+                        pick.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    } catch (e) {
+                        pick.scrollIntoView(false);
+                    }
                     fillForm(pick);
                 } else {
                     document.getElementById('coa_id').value = '0';
@@ -577,7 +619,11 @@ document.addEventListener('DOMContentLoaded', function () {
         postJSON('/admin/api/accounts/save-node.php', payload).then(function (r) {
             alert(r.message || (r.success ? 'تم' : 'فشل'));
             if (r.success) {
-                location.reload();
+                var savedId = parseInt(String(r.id || '0'), 10) || 0;
+                refreshCoaMainTree(savedId > 0 ? savedId : undefined).catch(function (err) {
+                    alert((err && err.message) ? err.message : String(err));
+                    location.reload();
+                });
             }
         }).catch(function (e) { alert(e.message || String(e)); });
     });
