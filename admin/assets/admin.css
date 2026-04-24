@@ -1354,10 +1354,10 @@ label {
 .jv-voucher-header-line {
     display: grid;
     grid-template-columns:
-        minmax(4.25rem, 6rem)
+        minmax(5.25rem, 7rem)
         minmax(9.5rem, 11.5rem)
         minmax(0, 1fr)
-        minmax(9.5rem, 13.5rem);
+        minmax(9.5rem, 11.5rem);
     gap: 12px 14px;
     align-items: end;
 }
@@ -1375,7 +1375,7 @@ label {
 }
 @media (max-width: 960px) {
     .jv-voucher-header-line {
-        grid-template-columns: minmax(4rem, 6rem) minmax(9rem, 1fr);
+        grid-template-columns: minmax(5rem, 7rem) minmax(9rem, 1fr);
     }
 }
 @media (max-width: 520px) {
