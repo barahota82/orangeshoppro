@@ -14,6 +14,8 @@ if (orange_journal_vouchers_ready($pdo)) {
     $nextJournalVoucherNo = (int) $pdo->query('SELECT COALESCE(MAX(id),0) + 1 FROM journal_vouchers')->fetchColumn();
 }
 $jvFormDocumentEnteredDisplay = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$jvNavReady = orange_journal_vouchers_ready($pdo);
+$jvHeaderLineClass = 'jv-voucher-header-line' . ($jvNavReady ? ' jv-voucher-header-line--nav' : '');
 
 $hasGrp = orange_table_has_column($pdo, 'accounts', 'is_group');
 $accCols = $hasGrp ? 'id, name, code, is_group' : 'id, name, code';
@@ -40,7 +42,7 @@ foreach ($accounts as $a) {
 <div class="card">
     <h3 class="card-title">سند قيد</h3>
     <div class="form-grid">
-        <div class="jv-voucher-header-line" style="grid-column:1/-1;">
+        <div class="<?php echo htmlspecialchars($jvHeaderLineClass, ENT_QUOTES, 'UTF-8'); ?>" style="grid-column:1/-1;">
             <div>
                 <label for="jv_number_preview">رقم القيد</label>
                 <input type="text" id="jv_number_preview" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;text-align:center;"
@@ -72,6 +74,20 @@ foreach ($accounts as $a) {
                 <input type="text" id="jv_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000"
                     title="إجمالي الدائن من أسطر السند" dir="ltr" lang="en" inputmode="decimal">
             </div>
+            <?php if ($jvNavReady): ?>
+            <div class="jv-voucher-nav-cell">
+                <span class="jv-voucher-nav-label muted" id="jv_nav_label">تنقّل</span>
+                <div class="jv-voucher-nav-wrap" role="group" aria-label="تنقل بين سندات القيد اليدوية">
+                    <div class="jv-voucher-nav-btns">
+                        <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_first" title="أول سند" aria-label="أول سند">⏮</button>
+                        <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_prev" title="السند السابق" aria-label="السند السابق">◀</button>
+                        <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_next" title="السند التالي" aria-label="السند التالي">▶</button>
+                        <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_last" title="آخر سند" aria-label="آخر سند">⏭</button>
+                    </div>
+                    <button type="button" class="btn-link jv-nav-new" id="jv_btn_new_sheet" title="إدخال سند جديد">سند جديد</button>
+                </div>
+            </div>
+            <?php endif; ?>
         </div>
         <div style="grid-column:1/-1;">
             <label for="jv_desc">البيان</label>
@@ -102,8 +118,8 @@ foreach ($accounts as $a) {
         </div>
     </div>
     <div class="actions admin-doc-lines-toolbar" style="margin-top:10px;flex-wrap:wrap;gap:8px;">
-        <button type="button" class="btn-secondary" onclick="jvAddRow()">+ سطر يدوي</button>
-        <button type="button" onclick="jvSubmit()">حفظ السند</button>
+        <button type="button" class="btn-secondary" id="jv_btn_add_line" onclick="jvAddRow()">+ سطر يدوي</button>
+        <button type="button" id="jv_btn_save" onclick="jvSubmit()">حفظ السند</button>
     </div>
 </div>
 
@@ -180,6 +196,8 @@ var JV_ACCOUNTS = <?php echo json_encode($jvAccountsLeaf, JSON_UNESCAPED_UNICODE
 
 var jvAcctPickerAnchor = null;
 var jvPairSeq = 0;
+var jvViewMode = false;
+var jvBrowseId = null;
 
 function jvMemoRow(mainTr) {
     if (!mainTr) {
@@ -285,6 +303,9 @@ function jvAcctPickerApply(a) {
 }
 
 function jvAcctPickerOpen(anchorInput) {
+    if (jvViewMode) {
+        return;
+    }
     var box = document.getElementById('jv_acct_picker');
     var searchEl = document.getElementById('jv_acct_picker_search');
     if (!box || !searchEl) {
@@ -420,6 +441,9 @@ function jvTrimExtraTrailingBlanks() {
 }
 
 function jvSyncTrailingRows() {
+    if (jvViewMode) {
+        return;
+    }
     jvTrimExtraTrailingBlanks();
     var tb = document.getElementById('jv_lines_body');
     var mains = jvAllMainRows(tb);
@@ -479,6 +503,100 @@ function jvBindLinesBody() {
     });
 }
 
+function jvClearLinesBody() {
+    var tb = document.getElementById('jv_lines_body');
+    if (tb) {
+        tb.innerHTML = '';
+    }
+    jvPairSeq = 0;
+}
+
+function jvApplyViewModeUi() {
+    var ro = jvViewMode;
+    ['jv_date', 'jv_ref', 'jv_desc'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) {
+            el.readOnly = ro;
+        }
+    });
+    var saveBtn = document.getElementById('jv_btn_save');
+    if (saveBtn) {
+        saveBtn.disabled = ro;
+    }
+    var addLineBtn = document.getElementById('jv_btn_add_line');
+    if (addLineBtn) {
+        addLineBtn.disabled = ro;
+    }
+    document.querySelectorAll('#jv_lines_body input').forEach(function (inp) {
+        inp.readOnly = ro;
+    });
+    document.querySelectorAll('#jv_lines_body .admin-doc-line-remove').forEach(function (bt) {
+        bt.disabled = ro;
+        bt.style.visibility = ro ? 'hidden' : '';
+    });
+}
+
+function jvApplyVoucherPayload(r) {
+    if (!r || !r.voucher) {
+        return;
+    }
+    jvViewMode = true;
+    jvBrowseId = r.voucher.id;
+    document.getElementById('jv_number_preview').value = String(r.voucher.id);
+    document.getElementById('jv_date').value = r.voucher.date || '';
+    document.getElementById('jv_ref').value = r.voucher.reference || '';
+    document.getElementById('jv_desc').value = r.voucher.description || '';
+    document.getElementById('jv_document_entered').value = r.voucher.document_entered_display || '';
+    jvClearLinesBody();
+    (r.lines || []).forEach(function (ln) {
+        jvAddRow();
+        var mains = jvAllMainRows(document.getElementById('jv_lines_body'));
+        var main = mains[mains.length - 1];
+        if (!main) {
+            return;
+        }
+        var memo = jvMemoRow(main);
+        main.querySelector('.jv-acc-id').value = String(ln.account_id);
+        main.querySelector('.jv-acc-code').value = ln.code || '';
+        main.querySelector('.jv-acc-name').value = ln.name || '';
+        var deb = parseFloat(String(ln.debit || 0));
+        var cre = parseFloat(String(ln.credit || 0));
+        main.querySelector('.jv-d').value = deb > 0 ? deb.toFixed(3) : '';
+        main.querySelector('.jv-c').value = cre > 0 ? cre.toFixed(3) : '';
+        if (memo) {
+            memo.querySelector('.jv-m').value = ln.memo || '';
+        }
+    });
+    jvApplyViewModeUi();
+    jvRecalc();
+}
+
+function jvLoadVoucherFromApi(id) {
+    postJSON('/admin/api/journal/manage.php', { action: 'get', id: id }).then(function (r) {
+        if (!r.success || !r.voucher) {
+            if (!orangeAdminOfferSuggestOnFailure(r, 'تعذر العرض')) {
+                alert(r.message || 'فشل');
+            }
+            return;
+        }
+        jvApplyVoucherPayload(r);
+    }).catch(function (e) { alert(e.message || String(e)); });
+}
+
+function jvNav(where) {
+    postJSON('/admin/api/journal/manage.php', {
+        action: 'nav_manual',
+        where: where,
+        current_id: jvBrowseId || 0
+    }).then(function (r) {
+        if (!r.success || !r.id) {
+            alert(r.message || 'لا يمكن التنقل');
+            return;
+        }
+        jvLoadVoucherFromApi(r.id);
+    }).catch(function (e) { alert(e.message || String(e)); });
+}
+
 function jvRecalc() {
     var sd = 0, sc = 0;
     document.querySelectorAll('#jv_lines_body tr.jv-line-main').forEach(function (tr) {
@@ -497,6 +615,9 @@ function jvRecalc() {
 }
 
 function jvSubmit() {
+    if (jvViewMode) {
+        return;
+    }
     var d = document.getElementById('jv_date').value;
     var ref = document.getElementById('jv_ref').value.trim();
     var desc = document.getElementById('jv_desc').value.trim();
@@ -559,4 +680,23 @@ function jvSubmit() {
 jvAddRow();
 jvBindLinesBody();
 jvSyncTrailingRows();
+
+(function jvNavBind() {
+    var map = [
+        ['jv_nav_first', 'first'],
+        ['jv_nav_prev', 'prev'],
+        ['jv_nav_next', 'next'],
+        ['jv_nav_last', 'last']
+    ];
+    map.forEach(function (pair) {
+        var b = document.getElementById(pair[0]);
+        if (b) {
+            b.addEventListener('click', function () { jvNav(pair[1]); });
+        }
+    });
+    var nb = document.getElementById('jv_btn_new_sheet');
+    if (nb) {
+        nb.addEventListener('click', function () { location.reload(); });
+    }
+})();
 </script>

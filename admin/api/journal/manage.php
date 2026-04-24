@@ -181,6 +181,127 @@ try {
         return;
     }
 
+    if ($action === 'get') {
+        require_once __DIR__ . '/../../../includes/date_format.php';
+        $gid = (int)($data['id'] ?? 0);
+        if ($gid <= 0) {
+            json_response(['success' => false, 'message' => 'معرف السند مطلوب'], 422);
+        }
+        if (!orange_journal_vouchers_ready($pdo)) {
+            json_response(['success' => false, 'message' => 'جداول السندات غير جاهزة'], 422);
+        }
+        $st = $pdo->prepare('SELECT * FROM journal_vouchers WHERE id = ? LIMIT 1');
+        $st->execute([$gid]);
+        $v = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$v) {
+            json_response(['success' => false, 'message' => 'السند غير موجود'], 404);
+        }
+        if ((string)($v['entry_type'] ?? '') !== 'manual') {
+            json_response(['success' => false, 'message' => 'لا يُعرَض إلا سند القيد اليدوي من هذه الشاشة'], 422);
+        }
+        $vd = (string)($v['voucher_date'] ?? '');
+        $dateForInput = strlen($vd) >= 10 ? substr($vd, 0, 10) : '';
+        $docRaw = '';
+        if (!empty($v['document_entered_at'])) {
+            $docRaw = (string) $v['document_entered_at'];
+        } else {
+            $docRaw = $vd;
+        }
+        $docDisplay = orange_format_datetime_dmY_hi($docRaw !== '' ? $docRaw : date('Y-m-d H:i:s'));
+        $lst = $pdo->prepare(
+            'SELECT jl.account_id, jl.debit, jl.credit, jl.memo, a.code, a.name
+             FROM journal_lines jl
+             INNER JOIN accounts a ON a.id = jl.account_id
+             WHERE jl.voucher_id = ?
+             ORDER BY jl.line_no ASC'
+        );
+        $lst->execute([$gid]);
+        $lines = [];
+        while ($row = $lst->fetch(PDO::FETCH_ASSOC)) {
+            $lines[] = [
+                'account_id' => (int) $row['account_id'],
+                'code' => (string)($row['code'] ?? ''),
+                'name' => (string)($row['name'] ?? ''),
+                'debit' => (float) $row['debit'],
+                'credit' => (float) $row['credit'],
+                'memo' => (string)($row['memo'] ?? ''),
+            ];
+        }
+        json_response([
+            'success' => true,
+            'voucher' => [
+                'id' => (int) $v['id'],
+                'date' => $dateForInput,
+                'reference' => (string)($v['reference'] ?? ''),
+                'description' => (string)($v['description'] ?? ''),
+                'document_entered_display' => $docDisplay,
+            ],
+            'lines' => $lines,
+        ]);
+
+        return;
+    }
+
+    if ($action === 'nav_manual') {
+        $where = trim((string)($data['where'] ?? ''));
+        $currentId = (int)($data['current_id'] ?? 0);
+        if (!orange_journal_vouchers_ready($pdo)) {
+            json_response(['success' => false, 'message' => 'جداول السندات غير جاهزة'], 422);
+        }
+        $et = 'manual';
+        $cSt = $pdo->prepare('SELECT COUNT(*) FROM journal_vouchers WHERE entry_type = ?');
+        $cSt->execute([$et]);
+        if ((int) $cSt->fetchColumn() === 0) {
+            json_response(['success' => false, 'message' => 'لا توجد سندات قيد يدوية بعد']);
+        }
+        $target = 0;
+        if ($where === 'first') {
+            $q = $pdo->prepare('SELECT COALESCE(MIN(id), 0) FROM journal_vouchers WHERE entry_type = ?');
+            $q->execute([$et]);
+            $target = (int) $q->fetchColumn();
+        } elseif ($where === 'last') {
+            $q = $pdo->prepare('SELECT COALESCE(MAX(id), 0) FROM journal_vouchers WHERE entry_type = ?');
+            $q->execute([$et]);
+            $target = (int) $q->fetchColumn();
+        } elseif ($where === 'prev') {
+            if ($currentId <= 0) {
+                $q = $pdo->prepare('SELECT COALESCE(MAX(id), 0) FROM journal_vouchers WHERE entry_type = ?');
+                $q->execute([$et]);
+                $target = (int) $q->fetchColumn();
+            } else {
+                $q = $pdo->prepare('SELECT id FROM journal_vouchers WHERE entry_type = ? AND id < ? ORDER BY id DESC LIMIT 1');
+                $q->execute([$et, $currentId]);
+                $row = $q->fetch(PDO::FETCH_ASSOC);
+                $target = $row ? (int) $row['id'] : 0;
+            }
+        } elseif ($where === 'next') {
+            if ($currentId <= 0) {
+                $q = $pdo->prepare('SELECT COALESCE(MIN(id), 0) FROM journal_vouchers WHERE entry_type = ?');
+                $q->execute([$et]);
+                $target = (int) $q->fetchColumn();
+            } else {
+                $q = $pdo->prepare('SELECT id FROM journal_vouchers WHERE entry_type = ? AND id > ? ORDER BY id ASC LIMIT 1');
+                $q->execute([$et, $currentId]);
+                $row = $q->fetch(PDO::FETCH_ASSOC);
+                $target = $row ? (int) $row['id'] : 0;
+            }
+        } else {
+            json_response(['success' => false, 'message' => 'أمر تنقل غير معروف'], 422);
+        }
+        if ($target <= 0) {
+            $msg = 'لا توجد سندات قيد يدوية بعد';
+            if ($where === 'prev') {
+                $msg = 'لا يوجد سند أسبق';
+            } elseif ($where === 'next') {
+                $msg = 'لا يوجد سند لاحق';
+            }
+            json_response(['success' => false, 'message' => $msg]);
+        }
+        json_response(['success' => true, 'id' => $target]);
+
+        return;
+    }
+
     $id = (int)($data['id'] ?? 0);
     if ($id <= 0) {
         json_response(['success' => false, 'message' => 'معرف السند مطلوب'], 422);

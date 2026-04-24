@@ -1363,6 +1363,16 @@ label {
     gap: 12px 14px;
     align-items: end;
 }
+.jv-voucher-header-line--nav {
+    grid-template-columns:
+        minmax(5.25rem, 7rem)
+        minmax(9.5rem, 11.5rem)
+        minmax(5.25rem, 7rem)
+        minmax(9.5rem, 11.5rem)
+        minmax(7rem, 9rem)
+        minmax(7rem, 9rem)
+        minmax(8.5rem, 12rem);
+}
 .jv-voucher-header-line > div {
     min-width: 0;
 }
@@ -1379,6 +1389,38 @@ label {
     text-align: center;
     background: #f4f4f5;
     cursor: default;
+}
+.jv-voucher-nav-cell {
+    min-width: 0;
+}
+.jv-voucher-nav-label {
+    display: block;
+    text-align: center;
+    font-size: 0.8rem;
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+.jv-voucher-nav-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+.jv-voucher-nav-btns {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+}
+.jv-voucher-nav-btns .jv-nav-btn {
+    min-width: 2.35rem;
+    padding: 6px 8px;
+    line-height: 1.2;
+}
+.jv-nav-new {
+    font-size: 0.85rem;
+    padding: 2px 0;
 }
 @media (max-width: 960px) {
     .jv-voucher-header-line {
