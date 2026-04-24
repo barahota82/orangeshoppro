@@ -571,6 +571,65 @@ function orangeAdminOfferSuggestAfterWarnings(r) {
 })();
 
 /**
+ * صفحة ذمم العملاء: عدة عناصر قائمة تشترك في page=partner_ledger مع فروقات بالـ hash.
+ * الخادم يفعّل is-active للجميع؛ نبقي البرتقالي على الرابط المطابق للهاش فقط.
+ */
+(function initPartnerLedgerNavActive() {
+    function pageParam() {
+        try {
+            return new URLSearchParams(window.location.search).get('page') || '';
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function hashFromAttrHref(href) {
+        if (!href || typeof href !== 'string') {
+            return '';
+        }
+        var i = href.indexOf('#');
+        return i === -1 ? '' : href.slice(i + 1).toLowerCase();
+    }
+
+    function currentLedgerHash() {
+        return (window.location.hash || '').replace(/^#/, '').toLowerCase();
+    }
+
+    function run() {
+        if (pageParam() !== 'partner_ledger') {
+            return;
+        }
+        var sel =
+            '.admin-topbar-mega a[href*="page=partner_ledger"],' +
+            '.admin-mega-panel a[href*="page=partner_ledger"],' +
+            '#admin-nav-drawer a[href*="page=partner_ledger"]';
+        var links = document.querySelectorAll(sel);
+        if (!links.length) {
+            return;
+        }
+        var want = currentLedgerHash();
+        var matched = null;
+        links.forEach(function (a) {
+            a.classList.remove('is-active');
+            var h = hashFromAttrHref(a.getAttribute('href') || '');
+            if (h === want) {
+                matched = a;
+            }
+        });
+        if (matched) {
+            matched.classList.add('is-active');
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', run);
+    } else {
+        run();
+    }
+    window.addEventListener('hashchange', run);
+})();
+
+/**
  * إشعار سريع في لوحة الإدارة (بديل أنظف عن alert للعمليات البسيطة).
  * @param {string} message
  * @param {'ok'|'err'|'info'} [kind]
