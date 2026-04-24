@@ -101,6 +101,7 @@ try {
             try {
                 $vid = orange_voucher_post($pdo, [
                     'voucher_date' => $date,
+                    'document_entered_at' => date('Y-m-d H:i:s'),
                     'reference' => $reference !== '' ? $reference : null,
                     'description' => $description,
                     'entry_type' => $entryTypeNorm,
@@ -163,6 +164,7 @@ try {
         try {
             $vid = orange_voucher_post($pdo, [
                 'voucher_date' => $date,
+                'document_entered_at' => date('Y-m-d H:i:s'),
                 'reference' => $reference !== '' ? $reference : null,
                 'description' => $description,
                 'entry_type' => $entryTypeNorm,

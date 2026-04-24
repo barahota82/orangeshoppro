@@ -6,9 +6,16 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
+require_once __DIR__ . '/../../includes/date_format.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+
+$nextJournalVoucherNo = 1;
+if (orange_journal_vouchers_ready($pdo)) {
+    $nextJournalVoucherNo = (int) $pdo->query('SELECT COALESCE(MAX(id),0) + 1 FROM journal_vouchers')->fetchColumn();
+}
+$jvFormDocumentEnteredDisplay = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 
 $years = orange_fiscal_years_list($pdo);
 $fyId = isset($_GET['fy']) ? (int)$_GET['fy'] : 0;
@@ -95,13 +102,30 @@ foreach ($accounts as $a) {
     <h3 class="card-title">سند يدوي جديد (متعدد الأسطر)</h3>
     <div class="form-grid">
         <div>
-            <label for="jv_date">تاريخ السند</label>
-            <input type="date" id="jv_date" value="<?php echo htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8'); ?>">
+            <label for="jv_number_preview">رقم القيد</label>
+            <input type="text" id="jv_number_preview" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;"
+                value="<?php echo (int) $nextJournalVoucherNo; ?>"
+                title="يُخصَّص تلقائياً من النظام عند الحفظ (تسلسل قاعدة البيانات)">
         </div>
         <div>
-            <label for="jv_ref">مرجع (اختياري)</label>
-            <input type="text" id="jv_ref" placeholder="JV-...">
+            <label for="jv_date">تاريخ السند</label>
+            <input type="date" id="jv_date" value="<?php echo htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8'); ?>"
+                title="تاريخ محاسبي للسند (يختاره المستخدم)">
         </div>
+        <div>
+            <label for="jv_ref">المرجع <span class="muted" style="font-weight:normal;">(اختياري)</span></label>
+            <input type="text" id="jv_ref" placeholder="مرجع داخلي أو خارجي" autocomplete="off">
+        </div>
+        <div>
+            <label for="jv_document_entered">تاريخ المستند</label>
+            <input type="text" id="jv_document_entered" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;"
+                value="<?php echo htmlspecialchars($jvFormDocumentEnteredDisplay, ENT_QUOTES, 'UTF-8'); ?>"
+                title="وقت تسجيل إدخال القيد في النظام — يُثبت عند الحفظ ولا يُقبل من المتصفح">
+        </div>
+        <p class="card-hint" style="grid-column:1/-1;margin:0;">
+            <strong>رقم القيد:</strong> تقدير للرقم التالي قبل الحفظ؛ الرقم الفعلي يظهر في الجدول بعد الإضافة.
+            <strong>تاريخ المستند:</strong> يعكس لحظة الإدخال على السيرفر عند الضغط على «حفظ السند» (للسندات المُرحَّلة فوراً)، أو وقت الإدراج في الطابور ثم يُنسَخ عند الترحيل.
+        </p>
         <div style="grid-column:1/-1;">
             <label for="jv_desc">البيان</label>
             <input type="text" id="jv_desc" placeholder="وصف السند">
@@ -139,7 +163,8 @@ foreach ($accounts as $a) {
             <thead>
                 <tr>
                     <th>#</th>
-                    <th>التاريخ</th>
+                    <th>تاريخ السند</th>
+                    <th>تاريخ المستند</th>
                     <th>النوع</th>
                     <th>مرجع</th>
                     <th>البيان</th>
@@ -165,6 +190,13 @@ foreach ($accounts as $a) {
                     <tr>
                         <td><?php echo $vid; ?></td>
                         <td><?php echo htmlspecialchars(orange_format_datetime_dmY_hi((string) ($v['voucher_date'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php
+                            $docIn = (string) ($v['document_entered_at'] ?? '');
+                        if ($docIn === '') {
+                            $docIn = (string) ($v['created_at'] ?? '');
+                        }
+                        echo htmlspecialchars(orange_format_datetime_dmY_hi($docIn), ENT_QUOTES, 'UTF-8');
+                        ?></td>
                         <td><?php echo htmlspecialchars($etAr, ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars((string)($v['reference'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars((string)($v['description'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>

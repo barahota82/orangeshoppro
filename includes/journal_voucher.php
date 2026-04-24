@@ -124,7 +124,7 @@ function orange_accounting_is_locked(PDO $pdo, ?array $row): bool
 }
 
 /**
- * @param array{voucher_date:string,reference?:?string,description:string,entry_type?:string} $header
+ * @param array{voucher_date:string,reference?:?string,description:string,entry_type?:string,document_entered_at?:string} $header
  * @param list<array{account_id:int,debit:float,credit:float,memo?:string}> $lines
  * @return int voucher id
  */
@@ -190,9 +190,23 @@ function orange_voucher_post(PDO $pdo, array $header, array $lines): int
 
     $chk = $pdo->prepare('SELECT id FROM accounts WHERE id = ? LIMIT 1');
 
-    $pdo->prepare(
-        'INSERT INTO journal_vouchers (voucher_date, reference, description, entry_type, fiscal_year_id) VALUES (?,?,?,?,?)'
-    )->execute([$date, $referenceSql, $description, $entryType, $fyId]);
+    $docEntered = trim((string) ($header['document_entered_at'] ?? ''));
+    if ($docEntered === '' || strlen($docEntered) < 8) {
+        $docEntered = date('Y-m-d H:i:s');
+    }
+    if (strlen($docEntered) === 10) {
+        $docEntered .= ' ' . date('H:i:s');
+    }
+
+    if (orange_table_has_column($pdo, 'journal_vouchers', 'document_entered_at')) {
+        $pdo->prepare(
+            'INSERT INTO journal_vouchers (voucher_date, document_entered_at, reference, description, entry_type, fiscal_year_id) VALUES (?,?,?,?,?,?)'
+        )->execute([$date, $docEntered, $referenceSql, $description, $entryType, $fyId]);
+    } else {
+        $pdo->prepare(
+            'INSERT INTO journal_vouchers (voucher_date, reference, description, entry_type, fiscal_year_id) VALUES (?,?,?,?,?)'
+        )->execute([$date, $referenceSql, $description, $entryType, $fyId]);
+    }
     $vid = (int) $pdo->lastInsertId();
 
     $ins = $pdo->prepare(

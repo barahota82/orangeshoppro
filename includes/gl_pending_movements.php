@@ -314,15 +314,25 @@ function orange_gl_pending_post_by_ids(PDO $pdo, array $ids): array
                 if (!is_array($decoded) || $decoded === []) {
                     throw new InvalidArgumentException('أسطر السند المعلّق تالفة (#' . $id . ').');
                 }
+                $docEntered = trim((string) ($row['created_at'] ?? ''));
+                if ($docEntered === '' || strlen($docEntered) < 8) {
+                    $docEntered = date('Y-m-d H:i:s');
+                }
                 $vid = orange_voucher_post($pdo, [
                     'voucher_date' => (string) $row['voucher_date'],
+                    'document_entered_at' => $docEntered,
                     'reference' => trim((string) ($row['reference'] ?? '')) !== '' ? trim((string) $row['reference']) : null,
                     'description' => $desc,
                     'entry_type' => (string) ($row['entry_type'] ?? 'general'),
                 ], $decoded);
             } else {
+                $docEntered = trim((string) ($row['created_at'] ?? ''));
+                if ($docEntered === '' || strlen($docEntered) < 8) {
+                    $docEntered = date('Y-m-d H:i:s');
+                }
                 $vid = orange_voucher_post($pdo, [
                     'voucher_date' => (string) $row['voucher_date'],
+                    'document_entered_at' => $docEntered,
                     'reference' => trim((string) ($row['reference'] ?? '')) !== '' ? trim((string) $row['reference']) : null,
                     'description' => $desc,
                     'entry_type' => (string) ($row['entry_type'] ?? 'general'),

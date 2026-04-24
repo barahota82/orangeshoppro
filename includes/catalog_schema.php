@@ -948,6 +948,23 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
     }
+    if (orange_table_exists($pdo, 'journal_vouchers')
+        && !orange_table_has_column($pdo, 'journal_vouchers', 'document_entered_at')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE journal_vouchers ADD COLUMN document_entered_at DATETIME NULL AFTER voucher_date'
+        );
+        orange_schema_invalidate_column_check('journal_vouchers', 'document_entered_at');
+        try {
+            $pdo->exec(
+                'UPDATE journal_vouchers SET document_entered_at = COALESCE(created_at, voucher_date) WHERE document_entered_at IS NULL'
+            );
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] journal_vouchers document_entered_at backfill: ' . $e->getMessage());
+            }
+        }
+    }
 
     if (!orange_table_exists($pdo, 'journal_lines')) {
         orange_catalog_safe_exec(
