@@ -101,26 +101,28 @@ foreach ($accounts as $a) {
 <div class="card">
     <h3 class="card-title">سند يدوي جديد (متعدد الأسطر)</h3>
     <div class="form-grid">
-        <div>
-            <label for="jv_number_preview">رقم القيد</label>
-            <input type="text" id="jv_number_preview" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;"
-                value="<?php echo (int) $nextJournalVoucherNo; ?>"
-                title="يُخصَّص تلقائياً من النظام عند الحفظ (تسلسل قاعدة البيانات)">
-        </div>
-        <div>
-            <label for="jv_date">تاريخ السند</label>
-            <input type="date" id="jv_date" value="<?php echo htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8'); ?>"
-                title="تاريخ محاسبي للسند (يختاره المستخدم)">
-        </div>
-        <div>
-            <label for="jv_ref">المرجع <span class="muted" style="font-weight:normal;">(اختياري)</span></label>
-            <input type="text" id="jv_ref" placeholder="مرجع داخلي أو خارجي" autocomplete="off">
-        </div>
-        <div>
-            <label for="jv_document_entered">تاريخ المستند</label>
-            <input type="text" id="jv_document_entered" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;"
-                value="<?php echo htmlspecialchars($jvFormDocumentEnteredDisplay, ENT_QUOTES, 'UTF-8'); ?>"
-                title="وقت تسجيل إدخال القيد في النظام — يُثبت عند الحفظ ولا يُقبل من المتصفح">
+        <div class="jv-voucher-header-line" style="grid-column:1/-1;">
+            <div>
+                <label for="jv_number_preview">رقم القيد</label>
+                <input type="text" id="jv_number_preview" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;text-align:center;"
+                    value="<?php echo (int) $nextJournalVoucherNo; ?>"
+                    title="يُخصَّص تلقائياً من النظام عند الحفظ (تسلسل قاعدة البيانات)">
+            </div>
+            <div>
+                <label for="jv_date">تاريخ السند</label>
+                <input type="date" id="jv_date" value="<?php echo htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8'); ?>"
+                    title="تاريخ محاسبي للسند (يختاره المستخدم)" dir="ltr" lang="en">
+            </div>
+            <div>
+                <label for="jv_ref">المرجع <span class="muted" style="font-weight:normal;">(اختياري)</span></label>
+                <input type="text" id="jv_ref" placeholder="مرجع داخلي أو خارجي" autocomplete="off">
+            </div>
+            <div>
+                <label for="jv_document_entered">تاريخ المستند</label>
+                <input type="text" id="jv_document_entered" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;"
+                    value="<?php echo htmlspecialchars($jvFormDocumentEnteredDisplay, ENT_QUOTES, 'UTF-8'); ?>"
+                    title="وقت تسجيل إدخال القيد في النظام — يُثبت عند الحفظ ولا يُقبل من المتصفح" dir="ltr" lang="en">
+            </div>
         </div>
         <p class="card-hint" style="grid-column:1/-1;margin:0;">
             <strong>رقم القيد:</strong> تقدير للرقم التالي قبل الحفظ؛ الرقم الفعلي يظهر في الجدول بعد الإضافة.

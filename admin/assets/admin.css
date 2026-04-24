@@ -1350,6 +1350,36 @@ label {
     gap: 12px 16px;
 }
 
+/* سند قيد — رقم القيد، تاريخ السند، المرجع، تاريخ المستند في صف واحد */
+.jv-voucher-header-line {
+    display: grid;
+    grid-template-columns:
+        minmax(4.25rem, 6rem)
+        minmax(9.5rem, 11.5rem)
+        minmax(0, 1fr)
+        minmax(9.5rem, 13.5rem);
+    gap: 12px 14px;
+    align-items: end;
+}
+.jv-voucher-header-line > div {
+    min-width: 0;
+}
+.jv-voucher-header-line input[type="text"],
+.jv-voucher-header-line input[type="date"] {
+    width: 100%;
+    box-sizing: border-box;
+}
+@media (max-width: 960px) {
+    .jv-voucher-header-line {
+        grid-template-columns: minmax(4rem, 6rem) minmax(9rem, 1fr);
+    }
+}
+@media (max-width: 520px) {
+    .jv-voucher-header-line {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* سجلات العملاء / الموردين */
 .party-registry-stats {
     display: grid;
