@@ -724,7 +724,10 @@ if (!function_exists('orange_render_coa_tree')) {
             $nameEn = htmlspecialchars((string) ($n['name_en'] ?? ''), ENT_QUOTES, 'UTF-8');
             $isG = (int) ($n['is_group'] ?? 0) === 1;
             $susp = (int) ($n['is_suspended'] ?? 0) === 1;
-            $nb = htmlspecialchars((string) ($n['normal_balance'] ?? 'debit'), ENT_QUOTES, 'UTF-8');
+            $nbRaw = $n['normal_balance'] ?? null;
+            $nb = ($nbRaw !== null && $nbRaw !== '')
+                ? htmlspecialchars((string) $nbRaw, ENT_QUOTES, 'UTF-8')
+                : '';
             $rc = orange_coa_root_category_names($flat, $id);
             $rootN = htmlspecialchars($rc['root'], ENT_QUOTES, 'UTF-8');
             $catN = htmlspecialchars($rc['category'], ENT_QUOTES, 'UTF-8');

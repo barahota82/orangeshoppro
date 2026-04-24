@@ -60,7 +60,7 @@ try {
             }
             if ($hasNb) {
                 $cols[] = 'normal_balance';
-                $vals[] = 'debit';
+                $vals[] = null;
             }
             $ph = implode(',', array_fill(0, count($cols), '?'));
             $pdo->prepare('INSERT INTO accounts (' . implode(',', $cols) . ') VALUES (' . $ph . ')')->execute($vals);

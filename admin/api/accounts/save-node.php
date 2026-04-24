@@ -24,7 +24,7 @@ try {
     $isGroup = !empty($data['is_group']) ? 1 : 0;
     $nameEn = trim((string) ($data['name_en'] ?? ''));
     $isSuspended = !empty($data['is_suspended']) ? 1 : 0;
-    $normalBalance = 'debit';
+    $normalBalance = null;
     if ($isGroup !== 1) {
         $nbRaw = strtolower(trim((string) ($data['normal_balance'] ?? 'debit')));
         $normalBalance = $nbRaw === 'credit' ? 'credit' : 'debit';

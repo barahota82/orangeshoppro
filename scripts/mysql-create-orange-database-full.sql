@@ -138,7 +138,7 @@ CREATE TABLE `accounts` (
   `is_group` tinyint(1) NOT NULL DEFAULT 0,
   `name_en` varchar(191) NOT NULL DEFAULT '',
   `is_suspended` tinyint(1) NOT NULL DEFAULT 0,
-  `normal_balance` varchar(16) NOT NULL DEFAULT 'debit',
+  `normal_balance` varchar(16) DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_accounts_code` (`code`),
@@ -989,13 +989,13 @@ INSERT INTO `company_settings` (
 ) VALUES ('', '', '', '', '', '', '', NULL);
 
 INSERT INTO `accounts` (`name`, `code`, `parent_id`, `is_group`, `name_en`, `is_suspended`, `normal_balance`) VALUES
-('الأصول', '1', NULL, 1, 'Assets', 0, 'debit'),
-('الخصوم', '2', NULL, 1, 'Liabilities', 0, 'credit'),
-('حقوق الملكية', '3', NULL, 1, 'Equity', 0, 'credit'),
-('الإيرادات', '4', NULL, 1, 'Revenue', 0, 'credit'),
-('تكلفة المبيعات', '5', NULL, 1, 'Cost of sales', 0, 'debit'),
-('المصروفات', '6', NULL, 1, 'Expenses', 0, 'debit'),
-('الحسابات التحليلية', '7', NULL, 1, 'Analytical accounts', 0, 'debit');
+('الأصول', '1', NULL, 1, 'Assets', 0, NULL),
+('الخصوم', '2', NULL, 1, 'Liabilities', 0, NULL),
+('حقوق الملكية', '3', NULL, 1, 'Equity', 0, NULL),
+('الإيرادات', '4', NULL, 1, 'Revenue', 0, NULL),
+('تكلفة المبيعات', '5', NULL, 1, 'Cost of sales', 0, NULL),
+('المصروفات', '6', NULL, 1, 'Expenses', 0, NULL),
+('الحسابات التحليلية', '7', NULL, 1, 'Analytical accounts', 0, NULL);
 
 INSERT INTO `journal_types` (`code`, `name_ar`, `name_en`, `sort_order`) VALUES
 ('OBV', 'سند رصيد افتتاحي', 'Opening balance voucher', 1),

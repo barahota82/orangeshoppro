@@ -348,13 +348,13 @@ function orange_catalog_seed_default_accounts_if_empty(PDO $pdo): void
     }
 
     $roots = [
-        ['code' => '1', 'name' => 'الأصول', 'name_en' => 'Assets', 'nb' => 'debit'],
-        ['code' => '2', 'name' => 'الخصوم', 'name_en' => 'Liabilities', 'nb' => 'credit'],
-        ['code' => '3', 'name' => 'حقوق الملكية', 'name_en' => 'Equity', 'nb' => 'credit'],
-        ['code' => '4', 'name' => 'الإيرادات', 'name_en' => 'Revenue', 'nb' => 'credit'],
-        ['code' => '5', 'name' => 'تكلفة المبيعات', 'name_en' => 'Cost of sales', 'nb' => 'debit'],
-        ['code' => '6', 'name' => 'المصروفات', 'name_en' => 'Expenses', 'nb' => 'debit'],
-        ['code' => '7', 'name' => 'الحسابات التحليلية', 'name_en' => 'Analytical accounts', 'nb' => 'debit'],
+        ['code' => '1', 'name' => 'الأصول', 'name_en' => 'Assets'],
+        ['code' => '2', 'name' => 'الخصوم', 'name_en' => 'Liabilities'],
+        ['code' => '3', 'name' => 'حقوق الملكية', 'name_en' => 'Equity'],
+        ['code' => '4', 'name' => 'الإيرادات', 'name_en' => 'Revenue'],
+        ['code' => '5', 'name' => 'تكلفة المبيعات', 'name_en' => 'Cost of sales'],
+        ['code' => '6', 'name' => 'المصروفات', 'name_en' => 'Expenses'],
+        ['code' => '7', 'name' => 'الحسابات التحليلية', 'name_en' => 'Analytical accounts'],
     ];
 
     $lock = 'orange_seed_coa';
@@ -390,7 +390,7 @@ function orange_catalog_seed_default_accounts_if_empty(PDO $pdo): void
             }
             if ($hasNb) {
                 $cols[] = 'normal_balance';
-                $vals[] = $r['nb'];
+                $vals[] = null;
             }
             $ph = implode(',', array_fill(0, count($cols), '?'));
             $pdo->prepare('INSERT INTO accounts (' . implode(',', $cols) . ') VALUES (' . $ph . ')')->execute($vals);
@@ -811,7 +811,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
                 is_group TINYINT(1) NOT NULL DEFAULT 0,
                 name_en VARCHAR(191) NOT NULL DEFAULT \'\',
                 is_suspended TINYINT(1) NOT NULL DEFAULT 0,
-                normal_balance VARCHAR(16) NOT NULL DEFAULT \'debit\',
+                normal_balance VARCHAR(16) NULL DEFAULT NULL,
                 updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
                 UNIQUE KEY uq_accounts_code (code),
                 KEY idx_accounts_parent_id (parent_id)
@@ -1527,8 +1527,17 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     if (orange_table_exists($pdo, 'accounts') && !orange_table_has_column($pdo, 'accounts', 'normal_balance')) {
         orange_catalog_safe_exec(
             $pdo,
-            "ALTER TABLE accounts ADD COLUMN normal_balance VARCHAR(16) NOT NULL DEFAULT 'debit'"
+            'ALTER TABLE accounts ADD COLUMN normal_balance VARCHAR(16) NULL DEFAULT NULL'
         );
+    }
+    if (orange_table_exists($pdo, 'accounts') && orange_table_has_column($pdo, 'accounts', 'normal_balance')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE accounts MODIFY COLUMN normal_balance VARCHAR(16) NULL DEFAULT NULL'
+        );
+        if (orange_table_has_column($pdo, 'accounts', 'is_group')) {
+            orange_catalog_safe_exec($pdo, 'UPDATE accounts SET normal_balance = NULL WHERE is_group = 1');
+        }
     }
 
     static $accountsDefaultSeeded = false;
