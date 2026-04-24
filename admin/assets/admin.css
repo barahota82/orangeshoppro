@@ -1392,12 +1392,9 @@ label {
 }
 .jv-voucher-nav-cell {
     min-width: 0;
-}
-.jv-voucher-nav-wrap {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
+    align-items: flex-end;
+    justify-content: center;
 }
 .jv-voucher-nav-btns {
     display: flex;
@@ -1410,10 +1407,6 @@ label {
     min-width: 2.35rem;
     padding: 6px 8px;
     line-height: 1.2;
-}
-.jv-nav-new {
-    font-size: 0.85rem;
-    padding: 2px 0;
 }
 @media (max-width: 960px) {
     .jv-voucher-header-line {

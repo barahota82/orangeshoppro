@@ -76,14 +76,11 @@ foreach ($accounts as $a) {
             </div>
             <?php if ($jvNavReady): ?>
             <div class="jv-voucher-nav-cell">
-                <div class="jv-voucher-nav-wrap" role="group" aria-label="تنقل بين سندات القيد اليدوية">
-                    <div class="jv-voucher-nav-btns">
-                        <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_first" title="أول سند" aria-label="أول سند">⏮</button>
-                        <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_prev" title="السند السابق" aria-label="السند السابق">◀</button>
-                        <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_next" title="السند التالي" aria-label="السند التالي">▶</button>
-                        <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_last" title="آخر سند" aria-label="آخر سند">⏭</button>
-                    </div>
-                    <button type="button" class="btn-link jv-nav-new" id="jv_btn_new_sheet" title="إدخال سند جديد">سند جديد</button>
+                <div class="jv-voucher-nav-btns" role="group" aria-label="تنقل بين سندات القيد اليدوية">
+                    <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_first" title="أول سند" aria-label="أول سند">⏮</button>
+                    <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_prev" title="السند السابق" aria-label="السند السابق">◀</button>
+                    <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_next" title="السند التالي" aria-label="السند التالي">▶</button>
+                    <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_last" title="آخر سند" aria-label="آخر سند">⏭</button>
                 </div>
             </div>
             <?php endif; ?>
@@ -118,6 +115,7 @@ foreach ($accounts as $a) {
     </div>
     <div class="actions admin-doc-lines-toolbar" style="margin-top:10px;flex-wrap:wrap;gap:8px;">
         <button type="button" class="btn-secondary" id="jv_btn_add_line" onclick="jvAddRow()">+ سطر يدوي</button>
+        <button type="button" id="jv_btn_new_sheet" title="إدخال سند جديد">سند جديد</button>
         <button type="button" id="jv_btn_save" onclick="jvSubmit()">حفظ السند</button>
     </div>
 </div>
