@@ -379,31 +379,23 @@ try {
             json_response(['success' => false, 'message' => 'حدّد معيار بحث واحد على الأقل (رقم، تاريخ، مرجع، أو بيان)'], 422);
         }
 
-        $hasDoc = orange_table_has_column($pdo, 'journal_vouchers', 'document_entered_at');
-        $sel = $hasDoc
-            ? 'id, voucher_date, reference, description, document_entered_at'
-            : 'id, voucher_date, reference, description';
-        $sql = 'SELECT ' . $sel . ' FROM journal_vouchers WHERE ' . implode(' AND ', $parts)
-            . ' ORDER BY id DESC LIMIT 300';
+        $sql = 'SELECT jv.id, jv.voucher_date, jv.reference, jv.description,
+            (SELECT COALESCE(SUM(jl.debit), 0) FROM journal_lines jl WHERE jl.voucher_id = jv.id) AS voucher_total
+            FROM journal_vouchers jv
+            WHERE ' . implode(' AND ', $parts)
+            . ' ORDER BY jv.id DESC LIMIT 300';
         $st = $pdo->prepare($sql);
         $st->execute($params);
         $rows = [];
         while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
             $vd = (string) ($row['voucher_date'] ?? '');
             $dateDisp = strlen($vd) >= 10 ? substr($vd, 0, 10) : '';
-            $docRaw = '';
-            if ($hasDoc && !empty($row['document_entered_at'])) {
-                $docRaw = (string) $row['document_entered_at'];
-            } else {
-                $docRaw = $vd;
-            }
-            $docDisp = orange_format_datetime_dmY_hi($docRaw !== '' ? $docRaw : date('Y-m-d H:i:s'));
             $rows[] = [
                 'id' => (int) $row['id'],
                 'voucher_date' => $dateDisp,
                 'reference' => (string) ($row['reference'] ?? ''),
                 'description' => (string) ($row['description'] ?? ''),
-                'document_entered_display' => $docDisp,
+                'amount' => round((float) ($row['voucher_total'] ?? 0), 3),
             ];
         }
         json_response(['success' => true, 'rows' => $rows]);

@@ -193,9 +193,9 @@ foreach ($accounts as $a) {
                             <tr>
                                 <th>رقم</th>
                                 <th>تاريخ السند</th>
-                                <th>تاريخ المستند</th>
                                 <th>المرجع</th>
                                 <th>البيان</th>
+                                <th>مبلغ القيد</th>
                             </tr>
                         </thead>
                         <tbody id="jv_search_results_tbody"></tbody>
@@ -562,11 +562,12 @@ function jvSearchRenderRows(rows) {
     (rows || []).forEach(function (r) {
         var tr = document.createElement('tr');
         tr.setAttribute('data-vid', String(r.id));
+        var amt = typeof r.amount === 'number' ? r.amount : parseFloat(String(r.amount || '0').replace(',', '.')) || 0;
         tr.innerHTML = '<td>' + jvEscapeHtml(r.id) + '</td>' +
             '<td dir="ltr">' + jvEscapeHtml(r.voucher_date) + '</td>' +
-            '<td dir="ltr">' + jvEscapeHtml(r.document_entered_display) + '</td>' +
             '<td>' + jvEscapeHtml(r.reference) + '</td>' +
-            '<td>' + jvEscapeHtml(r.description) + '</td>';
+            '<td class="jv-search-col-desc">' + jvEscapeHtml(r.description) + '</td>' +
+            '<td dir="ltr">' + jvEscapeHtml(amt.toFixed(3)) + '</td>';
         tr.addEventListener('dblclick', function () {
             var vid = parseInt(tr.getAttribute('data-vid'), 10) || 0;
             if (vid > 0) {
