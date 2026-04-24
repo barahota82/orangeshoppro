@@ -78,7 +78,6 @@ foreach ($accounts as $a) {
                         <th>اسم الحساب</th>
                         <th>مدين</th>
                         <th>دائن</th>
-                        <th>بيان</th>
                         <th class="admin-doc-col-actions" aria-label="حذف السطر"></th>
                     </tr>
                 </thead>
@@ -132,12 +131,40 @@ foreach ($accounts as $a) {
 .jv-acct-picker-table tbody tr { cursor: pointer; }
 .jv-acct-picker-table tbody tr:hover { background: #f4f4f5; }
 .jv-acct-picker-hint { margin: 8px 0 0; font-size: 0.8rem; }
+.jv-lines-table tr.jv-line-memo td { padding-top: 6px; padding-bottom: 12px; border-bottom: 1px solid #e4e4e7; }
+.jv-lines-table tr.jv-line-memo .jv-m { width: 100%; box-sizing: border-box; }
+.jv-line-memo-label { display: block; font-size: 0.8rem; margin-bottom: 4px; font-weight: 600; }
 </style>
 
 <script>
 var JV_ACCOUNTS = <?php echo json_encode($jvAccountsLeaf, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>;
 
 var jvAcctPickerAnchor = null;
+var jvPairSeq = 0;
+
+function jvMemoRow(mainTr) {
+    if (!mainTr) {
+        return null;
+    }
+    var pair = mainTr.getAttribute('data-jv-pair');
+    var n = mainTr.nextElementSibling;
+    if (n && n.classList.contains('jv-line-memo') && n.getAttribute('data-jv-pair') === pair) {
+        return n;
+    }
+    return null;
+}
+
+function jvAllMainRows(tb) {
+    return Array.prototype.slice.call(tb.querySelectorAll('tr.jv-line-main'));
+}
+
+function jvRemovePair(mainTr) {
+    var memo = jvMemoRow(mainTr);
+    if (memo) {
+        memo.remove();
+    }
+    mainTr.remove();
+}
 
 function jvEscapeHtml(s) {
     return String(s == null ? '' : s)
@@ -272,59 +299,82 @@ document.addEventListener('keydown', jvAcctPickerOnKey, true);
 
 function jvAddRow() {
     var tb = document.getElementById('jv_lines_body');
-    var tr = document.createElement('tr');
-    tr.innerHTML = '<td class="jv-acc-code-cell">' +
+    var pair = 'jv' + String(++jvPairSeq);
+    var trMain = document.createElement('tr');
+    trMain.className = 'jv-line-main';
+    trMain.setAttribute('data-jv-pair', pair);
+    trMain.innerHTML = '<td class="jv-acc-code-cell">' +
         '<input type="hidden" class="jv-acc-id" value="">' +
         '<input type="text" class="jv-acc-code admin-inp" value="" placeholder="نقرتان للاختيار" readonly autocomplete="off" title="نقرتان لفتح قائمة الحسابات">' +
         '</td>' +
         '<td><input type="text" class="jv-acc-name admin-inp" value="" readonly tabindex="-1" placeholder="—" title="يُعبأ تلقائياً"></td>' +
         '<td><input type="number" class="jv-d admin-inp-money" step="any" min="0" value="" placeholder="0.000" inputmode="decimal" lang="en" dir="ltr"></td>' +
         '<td><input type="number" class="jv-c admin-inp-money" step="any" min="0" value="" placeholder="0.000" inputmode="decimal" lang="en" dir="ltr"></td>' +
-        '<td><input type="text" class="jv-m" value="" placeholder="البيان" autocomplete="off"></td>' +
         '<td><button type="button" class="btn-secondary admin-doc-line-remove" onclick="jvRemoveRow(this)">حذف</button></td>';
-    var codeInp = tr.querySelector('.jv-acc-code');
+    var trMemo = document.createElement('tr');
+    trMemo.className = 'jv-line-memo';
+    trMemo.setAttribute('data-jv-pair', pair);
+    trMemo.innerHTML = '<td colspan="5">' +
+        '<label class="jv-line-memo-label muted" for="jv_m_' + pair + '">بيان السطر</label>' +
+        '<input type="text" id="jv_m_' + pair + '" class="jv-m admin-inp" value="" placeholder="البيان" autocomplete="off">' +
+        '</td>';
+    var codeInp = trMain.querySelector('.jv-acc-code');
     codeInp.addEventListener('dblclick', function (e) { e.preventDefault(); jvAcctPickerOpen(codeInp); });
-    tb.appendChild(tr);
+    tb.appendChild(trMain);
+    tb.appendChild(trMemo);
     jvRecalc();
 }
 
 function jvRemoveRow(btn) {
     var tb = document.getElementById('jv_lines_body');
-    if (tb.querySelectorAll('tr').length <= 1) {
-        var tr = btn.closest('tr');
-        tr.querySelector('.jv-acc-id').value = '';
-        tr.querySelector('.jv-acc-code').value = '';
-        tr.querySelector('.jv-acc-name').value = '';
-        tr.querySelectorAll('.jv-d,.jv-c,.jv-m').forEach(function (el) { el.value = ''; });
+    var main = btn.closest('tr.jv-line-main');
+    if (!main) {
+        return;
+    }
+    if (jvAllMainRows(tb).length <= 1) {
+        var memo = jvMemoRow(main);
+        main.querySelector('.jv-acc-id').value = '';
+        main.querySelector('.jv-acc-code').value = '';
+        main.querySelector('.jv-acc-name').value = '';
+        main.querySelectorAll('.jv-d,.jv-c').forEach(function (el) { el.value = ''; });
+        if (memo) {
+            var mi = memo.querySelector('.jv-m');
+            if (mi) {
+                mi.value = '';
+            }
+        }
         jvSyncTrailingRows();
         jvRecalc();
         return;
     }
-    btn.closest('tr').remove();
+    jvRemovePair(main);
     jvSyncTrailingRows();
     jvRecalc();
 }
 
-function jvRowIsBlank(tr) {
-    var acc = parseInt(tr.querySelector('.jv-acc-id').value, 10) || 0;
-    var deb = parseFloat(String(tr.querySelector('.jv-d').value || '0').replace(',', '.')) || 0;
-    var cre = parseFloat(String(tr.querySelector('.jv-c').value || '0').replace(',', '.')) || 0;
-    var memo = tr.querySelector('.jv-m').value.trim();
+function jvRowIsBlank(mainTr) {
+    if (!mainTr || !mainTr.classList.contains('jv-line-main')) {
+        return true;
+    }
+    var acc = parseInt(mainTr.querySelector('.jv-acc-id').value, 10) || 0;
+    var deb = parseFloat(String(mainTr.querySelector('.jv-d').value || '0').replace(',', '.')) || 0;
+    var cre = parseFloat(String(mainTr.querySelector('.jv-c').value || '0').replace(',', '.')) || 0;
+    var memoTr = jvMemoRow(mainTr);
+    var memo = memoTr ? memoTr.querySelector('.jv-m').value.trim() : '';
     return acc <= 0 && deb <= 0 && cre <= 0 && memo === '';
 }
 
 function jvTrimExtraTrailingBlanks() {
     var tb = document.getElementById('jv_lines_body');
-    var rows;
     for (;;) {
-        rows = tb.querySelectorAll('tr');
-        if (rows.length < 2) {
+        var mains = jvAllMainRows(tb);
+        if (mains.length < 2) {
             return;
         }
-        var a = rows[rows.length - 2];
-        var b = rows[rows.length - 1];
+        var a = mains[mains.length - 2];
+        var b = mains[mains.length - 1];
         if (jvRowIsBlank(a) && jvRowIsBlank(b)) {
-            a.remove();
+            jvRemovePair(a);
         } else {
             return;
         }
@@ -334,12 +384,12 @@ function jvTrimExtraTrailingBlanks() {
 function jvSyncTrailingRows() {
     jvTrimExtraTrailingBlanks();
     var tb = document.getElementById('jv_lines_body');
-    var rows = tb.querySelectorAll('tr');
-    if (rows.length === 0) {
+    var mains = jvAllMainRows(tb);
+    if (mains.length === 0) {
         jvAddRow();
         return;
     }
-    var last = rows[rows.length - 1];
+    var last = mains[mains.length - 1];
     if (!jvRowIsBlank(last)) {
         jvAddRow();
     }
@@ -371,18 +421,20 @@ function jvBindLinesBody() {
         if (!tr || tr.parentElement !== tb) {
             return;
         }
-        var rows = tb.querySelectorAll('tr');
-        if (tr !== rows[rows.length - 1]) {
+        if (!tr.classList.contains('jv-line-memo') || !ta.classList.contains('jv-m')) {
             return;
         }
-        if (!ta.classList || !ta.classList.contains('jv-m')) {
+        var mains = jvAllMainRows(tb);
+        var lastMain = mains[mains.length - 1];
+        var lastMemo = lastMain ? jvMemoRow(lastMain) : null;
+        if (!lastMemo || tr !== lastMemo) {
             return;
         }
         e.preventDefault();
         jvSyncTrailingRows();
-        var rows2 = tb.querySelectorAll('tr');
-        var next = rows2[rows2.length - 1];
-        var codeInp = next && next.querySelector('.jv-acc-code');
+        var mains2 = jvAllMainRows(tb);
+        var nextMain = mains2[mains2.length - 1];
+        var codeInp = nextMain && nextMain.querySelector('.jv-acc-code');
         if (codeInp) {
             codeInp.focus();
         }
@@ -391,7 +443,7 @@ function jvBindLinesBody() {
 
 function jvRecalc() {
     var sd = 0, sc = 0;
-    document.querySelectorAll('#jv_lines_body tr').forEach(function (tr) {
+    document.querySelectorAll('#jv_lines_body tr.jv-line-main').forEach(function (tr) {
         var d = parseFloat(String(tr.querySelector('.jv-d').value || '0').replace(',', '.'));
         var c = parseFloat(String(tr.querySelector('.jv-c').value || '0').replace(',', '.'));
         sd += d; sc += c;
@@ -409,11 +461,12 @@ function jvSubmit() {
     }
     var lines = [];
     var memoAbort = false;
-    document.querySelectorAll('#jv_lines_body tr').forEach(function (tr) {
+    document.querySelectorAll('#jv_lines_body tr.jv-line-main').forEach(function (tr) {
         var acc = parseInt(tr.querySelector('.jv-acc-id').value, 10) || 0;
         var deb = parseFloat(String(tr.querySelector('.jv-d').value || '0').replace(',', '.'));
         var cre = parseFloat(String(tr.querySelector('.jv-c').value || '0').replace(',', '.'));
-        var memo = tr.querySelector('.jv-m').value.trim();
+        var memoTr = jvMemoRow(tr);
+        var memo = memoTr ? memoTr.querySelector('.jv-m').value.trim() : '';
         if (acc <= 0) return;
         if (deb > 0 && cre > 0) {
             cre = 0;
