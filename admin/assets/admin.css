@@ -1393,13 +1393,6 @@ label {
 .jv-voucher-nav-cell {
     min-width: 0;
 }
-.jv-voucher-nav-label {
-    display: block;
-    text-align: center;
-    font-size: 0.8rem;
-    margin-bottom: 4px;
-    font-weight: 600;
-}
 .jv-voucher-nav-wrap {
     display: flex;
     flex-direction: column;

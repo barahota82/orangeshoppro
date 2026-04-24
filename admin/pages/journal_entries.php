@@ -76,7 +76,6 @@ foreach ($accounts as $a) {
             </div>
             <?php if ($jvNavReady): ?>
             <div class="jv-voucher-nav-cell">
-                <span class="jv-voucher-nav-label muted" id="jv_nav_label">تنقّل</span>
                 <div class="jv-voucher-nav-wrap" role="group" aria-label="تنقل بين سندات القيد اليدوية">
                     <div class="jv-voucher-nav-btns">
                         <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_first" title="أول سند" aria-label="أول سند">⏮</button>
