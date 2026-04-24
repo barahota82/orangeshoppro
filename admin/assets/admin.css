@@ -1350,14 +1350,16 @@ label {
     gap: 12px 16px;
 }
 
-/* سند قيد — رقم القيد، تاريخ السند، المرجع، تاريخ المستند في صف واحد */
+/* سند قيد — رأس السند: رقم، تواريخ، مرجع، مجموع مدين/دائن */
 .jv-voucher-header-line {
     display: grid;
     grid-template-columns:
         minmax(5.25rem, 7rem)
         minmax(9.5rem, 11.5rem)
         minmax(5.25rem, 7rem)
-        minmax(9.5rem, 11.5rem);
+        minmax(9.5rem, 11.5rem)
+        minmax(7rem, 9rem)
+        minmax(7rem, 9rem);
     gap: 12px 14px;
     align-items: end;
 }
@@ -1372,6 +1374,11 @@ label {
 .jv-voucher-header-line input[type="date"] {
     width: 100%;
     box-sizing: border-box;
+}
+.jv-voucher-header-line .jv-tot-readonly {
+    text-align: center;
+    background: #f4f4f5;
+    cursor: default;
 }
 @media (max-width: 960px) {
     .jv-voucher-header-line {

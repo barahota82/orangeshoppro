@@ -62,13 +62,22 @@ foreach ($accounts as $a) {
                     value="<?php echo htmlspecialchars($jvFormDocumentEnteredDisplay, ENT_QUOTES, 'UTF-8'); ?>"
                     title="وقت تسجيل إدخال القيد في النظام — يُثبت عند الحفظ ولا يُقبل من المتصفح" dir="ltr" lang="en">
             </div>
+            <div>
+                <label for="jv_tot_debit">مجموع المدين</label>
+                <input type="text" id="jv_tot_debit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000"
+                    title="إجمالي المدين من أسطر السند" dir="ltr" lang="en" inputmode="decimal">
+            </div>
+            <div>
+                <label for="jv_tot_credit">مجموع الدائن</label>
+                <input type="text" id="jv_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000"
+                    title="إجمالي الدائن من أسطر السند" dir="ltr" lang="en" inputmode="decimal">
+            </div>
         </div>
         <div style="grid-column:1/-1;">
             <label for="jv_desc">البيان</label>
             <input type="text" id="jv_desc" placeholder="وصف السند">
         </div>
     </div>
-    <p class="card-hint" id="jv_balance_hint">مجموع المدين: 0 — مجموع الدائن: 0</p>
     <div class="admin-doc-frame">
         <div class="table-wrap">
             <table class="admin-table admin-doc-lines-table jv-lines-table">
@@ -477,7 +486,14 @@ function jvRecalc() {
         var c = parseFloat(String(tr.querySelector('.jv-c').value || '0').replace(',', '.'));
         sd += d; sc += c;
     });
-    document.getElementById('jv_balance_hint').textContent = 'مجموع المدين: ' + sd.toFixed(3) + ' — مجموع الدائن: ' + sc.toFixed(3);
+    var elD = document.getElementById('jv_tot_debit');
+    var elC = document.getElementById('jv_tot_credit');
+    if (elD) {
+        elD.value = sd.toFixed(3);
+    }
+    if (elC) {
+        elC.value = sc.toFixed(3);
+    }
 }
 
 function jvSubmit() {
