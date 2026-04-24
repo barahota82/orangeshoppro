@@ -234,7 +234,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 ['page' => 'color_dictionary', 'href' => '/admin/index.php?page=color_dictionary', 'label' => 'قاموس الألوان', 'class' => '', 'sub' => false],
                 ['page' => 'size_families', 'href' => '/admin/index.php?page=size_families', 'label' => 'عائلات المقاسات', 'class' => '', 'sub' => false],
                 ['page' => 'products', 'href' => '/admin/index.php?page=products', 'label' => 'المنتجات', 'class' => '', 'sub' => false],
-                ['page' => 'offers', 'href' => '/admin/index.php?page=offers', 'label' => 'العروض', 'class' => '', 'sub' => false],
+                ['page' => 'offers', 'href' => '/admin/index.php?page=offers', 'label' => 'عروض المنتجات', 'class' => '', 'sub' => false],
                 ['page' => 'stock', 'href' => '/admin/index.php?page=stock', 'label' => 'المستودع', 'class' => '', 'sub' => false],
                 ['page' => 'opening_stock_balances', 'href' => '/admin/index.php?page=opening_stock_balances', 'label' => 'أرصدة أول المدة المخزنية', 'class' => 'admin-nav-sub', 'sub' => true],
             ];
@@ -242,6 +242,14 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
             $navPurchasing = [
                 ['page' => 'suppliers', 'href' => '/admin/index.php?page=suppliers', 'label' => 'الموردين', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'purchases', 'href' => '/admin/index.php?page=purchases', 'label' => 'المشتريات', 'class' => '', 'sub' => false],
+            ];
+
+            /** عروض العربة / س4 — كانت تحت الإعدادات؛ قائمة منسدلة مستقلة بعنوان «العروض» */
+            $navPromotions = [
+                ['page' => 'cart_promotions', 'href' => '/admin/index.php?page=cart_promotions', 'label' => 'عروض مجموع السلة', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'cart_gift_promotions', 'href' => '/admin/index.php?page=cart_gift_promotions', 'label' => 'عروض الهدايا (س4)', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'cart_bogo_promotions', 'href' => '/admin/index.php?page=cart_bogo_promotions', 'label' => 'عروض BOGO (س4)', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'cart_combo_promotions', 'href' => '/admin/index.php?page=cart_combo_promotions', 'label' => 'عروض الكومبو', 'class' => 'admin-nav-sub', 'sub' => true],
             ];
 
             $navSales = [
@@ -260,10 +268,6 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 ['page' => 'storefront_hero', 'href' => '/admin/index.php?page=storefront_hero', 'label' => 'بانر الصفحة الرئيسية', 'class' => '', 'sub' => false],
                 ['page' => 'storefront_merge_requests', 'href' => '/admin/index.php?page=storefront_merge_requests', 'label' => 'دمج هاتف التسجيل (س15)', 'class' => '', 'sub' => false],
                 ['page' => 'delivery_areas', 'href' => '/admin/index.php?page=delivery_areas', 'label' => 'مناطق التوصيل', 'class' => '', 'sub' => false],
-                ['page' => 'cart_promotions', 'href' => '/admin/index.php?page=cart_promotions', 'label' => 'عروض مجموع السلة', 'class' => '', 'sub' => false],
-                ['page' => 'cart_gift_promotions', 'href' => '/admin/index.php?page=cart_gift_promotions', 'label' => 'عروض الهدايا (س4)', 'class' => '', 'sub' => false],
-                ['page' => 'cart_bogo_promotions', 'href' => '/admin/index.php?page=cart_bogo_promotions', 'label' => 'عروض BOGO (س4)', 'class' => '', 'sub' => false],
-                ['page' => 'cart_combo_promotions', 'href' => '/admin/index.php?page=cart_combo_promotions', 'label' => 'عروض الكومبو', 'class' => '', 'sub' => false],
                 ['page' => 'channels', 'href' => '/admin/index.php?page=channels', 'label' => 'قنوات العملاء', 'class' => '', 'sub' => false],
                 ['page' => 'company_documents', 'href' => '/admin/index.php?page=company_documents', 'label' => 'أرشيف المستندات', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'admin_users', 'href' => '/admin/index.php?page=admin_users', 'label' => 'المستخدمون والصلاحيات', 'class' => 'admin-nav-sub', 'sub' => true],
@@ -275,6 +279,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 ['id' => 'acct_vouchers', 'title' => 'القيود المحاسبية', 'muted' => false, 'items' => $navAccountingVouchers],
                 ['id' => 'acct_reports', 'title' => 'التقارير', 'muted' => false, 'items' => $navAccountingReports],
                 ['id' => 'ops', 'title' => 'المخازن', 'muted' => false, 'items' => $navOps],
+                ['id' => 'promotions', 'title' => 'العروض', 'muted' => false, 'items' => $navPromotions],
                 ['id' => 'purchasing', 'title' => 'المشتريات', 'muted' => false, 'items' => $navPurchasing],
                 ['id' => 'sales', 'title' => 'المبيعات', 'muted' => false, 'items' => $navSales],
                 ['id' => 'settings', 'title' => 'الإعدادات العامة', 'muted' => true, 'items' => $navSettings],
@@ -352,6 +357,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 $orangeRenderNavSection('acct_vouchers', 'القيود المحاسبية', $navAccountingVouchers);
                 $orangeRenderNavSection('acct_reports', 'التقارير', $navAccountingReports);
                 $orangeRenderNavSection('ops', 'المخازن', $navOps);
+                $orangeRenderNavSection('promotions', 'العروض', $navPromotions);
                 $orangeRenderNavSection('purchasing', 'المشتريات', $navPurchasing);
                 $orangeRenderNavSection('sales', 'المبيعات', $navSales);
                 $orangeRenderNavSection('settings', 'الإعدادات العامة', $navSettings);
