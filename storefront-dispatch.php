@@ -70,12 +70,19 @@ $lang = match ($langTokNorm) {
     default => '',
 };
 if ($lang === '') {
-    $fromCookie = orange_storefront_read_saved_lang();
-    if ($fromCookie !== null) {
-        $lang = $fromCookie;
-    } else {
-        $lang = orange_lang_from_accept_language_header($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? null);
+    if (isset($_GET['lang'])) {
+        $raw = strtolower(trim((string) $_GET['lang']));
+        if (in_array($raw, ['en', 'ar', 'fil', 'hi'], true)) {
+            $lang = $raw;
+        }
     }
+}
+/*
+ * مسار قصير بلا لاحقة ‎-ar/-hi/-ph‎ يُعرّف الإنجليزية (مثل ‎/web‎). لا نستخدم كوكي قديم هنا —
+ * وإلا يبقى العرض عربي/هندي بعد اختيار الإنجليزية من القائمة.
+ */
+if ($lang === '') {
+    $lang = 'en';
 }
 
 if ($first === '') {
