@@ -726,9 +726,9 @@ function orange_storefront_normalized_public_path(): string
 }
 
 /**
- * لغة الواجهة من لاحقة المسار القصير ‎-ar / -hi / -ph‎ (بدون ‎?lang=‎).
+ * لغة الواجهة من المسار القصير: ‎-ar / -hi / -ph‎ أو غياب اللاحقة مع مقطع قناة صالح (= ‎en‎، بدون ‎?lang=‎).
  *
- * @return 'ar'|'fil'|'hi'|null
+ * @return 'ar'|'en'|'fil'|'hi'|null
  */
 function orange_storefront_lang_from_short_url_path(): ?string
 {
@@ -746,6 +746,15 @@ function orange_storefront_lang_from_short_url_path(): ?string
         }
     }
     if (empty($m[2])) {
+        try {
+            $pdo = db();
+            $slug = orange_channel_slug_for_path_segment($pdo, $first, true);
+            if ($slug !== null && $slug !== '') {
+                return 'en';
+            }
+        } catch (Throwable $e) {
+        }
+
         return null;
     }
     $suf = strtolower((string) $m[2]);
