@@ -1,12 +1,14 @@
 ORANGE - Project continuity (agreements + status + next steps)
 Archive: this file lives in docs/archive/ — IBRAHIM_ORANGE_MASTER.txt stays in the repository root for quick handoff.
-Last updated: 2026-04-19 (§4–§5: مسار استلام المشتريات qty_received؛ ORANGE_STOCK_ORDER_POLICY §6؛ الترميز المعتمد للملف: UTF-8 بدون BOM)
+Last updated: 2026-04-26 (مواءمة أولوية إنجاز ORANGE_STOREFRONT_POLICY_REFERENCE.txt في orange-continuity.mdc؛ §4–§5 سابقاً: مسار استلام المشتريات qty_received؛ ORANGE_STOCK_ORDER_POLICY §6؛ UTF-8 بدون BOM)
 
 PURPOSE
 - Single handoff file for humans and Cursor.
+- **أولوية إنجاز الواجهة والطلب (قرار المالك):** عند «كمّل العمل» أو مطابقة المتجر/السلة/التتبع/التسجيل/الحجز/القنوات — اقرأ **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** أولاً بين مراجع الأرشيف التفصيلية، ثم **`IBRAHIM_ORANGE_MASTER.txt`** وهذا الملف. التفاصيل في **`.cursor/rules/orange-continuity.mdc`** و**`orange-session-handoff.mdc`**.
 - **دخول سريع (إبراهيم):** `IBRAHIM_ORANGE_MASTER.txt` — أرسله في أول محادثة؛ يجمع الأولويات والترميز والمسار.
 - When resuming work: read IBRAHIM_ORANGE_MASTER.txt, then this file, then ORANGE_STOCK_ORDER_POLICY.txt and ORANGE_TECH_REFERENCE.txt.
 - **خارطة استكمال المشروع (خطوات مرحلية موحّدة):** ORANGE_PROJECT_COMPLETION_ROADMAP.txt
+- **مؤجّل بقرار المالك:** إعادة صياغة ومناقشة **س4 (سياسة العروض)** في `ORANGE_STOREFRONT_POLICY_REFERENCE.txt` إلى ما بعد إتمام مراجعة باقي بنود المرجع؛ **لا توسعة نطاق تنفيذ جديد خاصة بالعروض** في الجلسات الحالية حتى اعتماد صياغة نهائية — المسارات والشاشات الموجودة في الكود تبقى المرجع التشغيلي حتى ذلك الحين.
 - **الحركات المحاسبية وإقفالها وشاشة الترحيل (سياسة متفق عليها):** ORANGE_GL_MOVEMENTS_AND_POSTING_POLICY.txt
 - Partner AR/AP subledger (ذمم العملاء والموردين): read ORANGE_PARTNER_SUBLEDGER_REFERENCE.txt for full technical handoff.
 
