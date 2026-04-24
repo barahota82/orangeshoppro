@@ -54,7 +54,7 @@ foreach ($accounts as $a) {
             </div>
             <div>
                 <label for="jv_ref">المرجع <span class="muted" style="font-weight:normal;">(اختياري)</span></label>
-                <input type="text" id="jv_ref" placeholder="مرجع داخلي أو خارجي" autocomplete="off">
+                <input type="text" id="jv_ref" autocomplete="off">
             </div>
             <div>
                 <label for="jv_document_entered">تاريخ المستند</label>
