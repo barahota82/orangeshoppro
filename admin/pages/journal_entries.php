@@ -151,30 +151,22 @@ foreach ($accounts as $a) {
             <button type="button" class="btn-secondary" id="jv_search_close" title="إغلاق">إغلاق</button>
         </div>
         <div class="jv-search-modal__body">
-            <p class="muted jv-search-modal__hint">حدّد معياراً واحداً أو أكثر. اترك غير المستخدم فارغاً.</p>
+            <p class="muted jv-search-modal__hint">حدّد معياراً واحداً على الأقل. لرقم سند واحد أو يوم واحد: املأ «من» واترك «إلى» فارغاً (أو العكس بـ«إلى» فقط). لمدى: املأ الحقلين معاً.</p>
             <div class="form-grid jv-search-modal__form">
                 <div>
-                    <label for="jv_search_id">رقم السند (محدد)</label>
-                    <input type="number" id="jv_search_id" class="admin-inp" min="1" step="1" placeholder="" dir="ltr" lang="en">
-                </div>
-                <div>
-                    <label for="jv_search_id_from">من رقم سند</label>
+                    <label for="jv_search_id_from">رقم القيد — من</label>
                     <input type="number" id="jv_search_id_from" class="admin-inp" min="1" step="1" placeholder="" dir="ltr" lang="en">
                 </div>
                 <div>
-                    <label for="jv_search_id_to">إلى رقم سند</label>
+                    <label for="jv_search_id_to">رقم القيد — إلى</label>
                     <input type="number" id="jv_search_id_to" class="admin-inp" min="1" step="1" placeholder="" dir="ltr" lang="en">
                 </div>
                 <div>
-                    <label for="jv_search_date">تاريخ السند (يوم محدد)</label>
-                    <input type="date" id="jv_search_date" class="admin-inp" dir="ltr" lang="en">
-                </div>
-                <div>
-                    <label for="jv_search_date_from">من تاريخ</label>
+                    <label for="jv_search_date_from">تاريخ السند — من</label>
                     <input type="date" id="jv_search_date_from" class="admin-inp" dir="ltr" lang="en">
                 </div>
                 <div>
-                    <label for="jv_search_date_to">إلى تاريخ</label>
+                    <label for="jv_search_date_to">تاريخ السند — إلى</label>
                     <input type="date" id="jv_search_date_to" class="admin-inp" dir="ltr" lang="en">
                 </div>
                 <div style="grid-column:1/-1;">
@@ -500,10 +492,8 @@ function jvSearchModalOpen() {
 function jvSearchCollectPayload() {
     return {
         action: 'search_manual',
-        id: parseInt(String(document.getElementById('jv_search_id').value || '0'), 10) || 0,
         id_from: parseInt(String(document.getElementById('jv_search_id_from').value || '0'), 10) || 0,
         id_to: parseInt(String(document.getElementById('jv_search_id_to').value || '0'), 10) || 0,
-        date: document.getElementById('jv_search_date').value.trim(),
         date_from: document.getElementById('jv_search_date_from').value.trim(),
         date_to: document.getElementById('jv_search_date_to').value.trim(),
         reference: document.getElementById('jv_search_ref').value.trim(),

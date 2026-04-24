@@ -312,54 +312,51 @@ try {
         $params = [$et];
         $hasCriterion = false;
 
-        $idSingle = (int) ($data['id'] ?? 0);
         $idFrom = (int) ($data['id_from'] ?? 0);
         $idTo = (int) ($data['id_to'] ?? 0);
-        if ($idSingle > 0) {
-            $parts[] = 'id = ?';
-            $params[] = $idSingle;
-            $hasCriterion = true;
-        } else {
-            if ($idFrom > 0 && $idTo > 0) {
-                if ($idFrom > $idTo) {
-                    $tmp = $idFrom;
-                    $idFrom = $idTo;
-                    $idTo = $tmp;
-                }
-                $parts[] = 'id BETWEEN ? AND ?';
-                $params[] = $idFrom;
-                $params[] = $idTo;
-                $hasCriterion = true;
-            } elseif ($idFrom > 0) {
-                $parts[] = 'id >= ?';
-                $params[] = $idFrom;
-                $hasCriterion = true;
-            } elseif ($idTo > 0) {
-                $parts[] = 'id <= ?';
-                $params[] = $idTo;
-                $hasCriterion = true;
+        if ($idFrom > 0 && $idTo > 0) {
+            if ($idFrom > $idTo) {
+                $tmp = $idFrom;
+                $idFrom = $idTo;
+                $idTo = $tmp;
             }
+            $parts[] = 'id BETWEEN ? AND ?';
+            $params[] = $idFrom;
+            $params[] = $idTo;
+            $hasCriterion = true;
+        } elseif ($idFrom > 0) {
+            $parts[] = 'id = ?';
+            $params[] = $idFrom;
+            $hasCriterion = true;
+        } elseif ($idTo > 0) {
+            $parts[] = 'id = ?';
+            $params[] = $idTo;
+            $hasCriterion = true;
         }
 
-        $dateEq = trim((string) ($data['date'] ?? ''));
         $dateFrom = trim((string) ($data['date_from'] ?? ''));
         $dateTo = trim((string) ($data['date_to'] ?? ''));
         $dateRe = '/^\d{4}-\d{2}-\d{2}$/';
-        if ($dateEq !== '' && preg_match($dateRe, $dateEq)) {
-            $parts[] = 'DATE(voucher_date) = ?';
-            $params[] = $dateEq;
+        $dfOk = $dateFrom !== '' && preg_match($dateRe, $dateFrom);
+        $dtOk = $dateTo !== '' && preg_match($dateRe, $dateTo);
+        if ($dfOk && $dtOk) {
+            if ($dateFrom > $dateTo) {
+                $tmp = $dateFrom;
+                $dateFrom = $dateTo;
+                $dateTo = $tmp;
+            }
+            $parts[] = 'DATE(voucher_date) BETWEEN ? AND ?';
+            $params[] = $dateFrom;
+            $params[] = $dateTo;
             $hasCriterion = true;
-        } else {
-            if ($dateFrom !== '' && preg_match($dateRe, $dateFrom)) {
-                $parts[] = 'DATE(voucher_date) >= ?';
-                $params[] = $dateFrom;
-                $hasCriterion = true;
-            }
-            if ($dateTo !== '' && preg_match($dateRe, $dateTo)) {
-                $parts[] = 'DATE(voucher_date) <= ?';
-                $params[] = $dateTo;
-                $hasCriterion = true;
-            }
+        } elseif ($dfOk) {
+            $parts[] = 'DATE(voucher_date) = ?';
+            $params[] = $dateFrom;
+            $hasCriterion = true;
+        } elseif ($dtOk) {
+            $parts[] = 'DATE(voucher_date) = ?';
+            $params[] = $dateTo;
+            $hasCriterion = true;
         }
 
         $ref = trim((string) ($data['reference'] ?? ''));
