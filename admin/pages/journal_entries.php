@@ -33,13 +33,13 @@ foreach ($accounts as $a) {
     ];
 }
 ?>
-<div class="page-title page-title--stacked">
+<div class="page-title page-title--stacked jv-print-hide">
     <div>
         <h1>سند قيد</h1>
     </div>
 </div>
 
-<div class="card">
+<div class="card jv-print-area">
     <h3 class="card-title">سند قيد</h3>
     <div class="form-grid">
         <div class="<?php echo htmlspecialchars($jvHeaderLineClass, ENT_QUOTES, 'UTF-8'); ?>" style="grid-column:1/-1;">
@@ -75,7 +75,7 @@ foreach ($accounts as $a) {
                     title="إجمالي الدائن من أسطر السند" dir="ltr" lang="en" inputmode="decimal">
             </div>
             <?php if ($jvNavReady): ?>
-            <div class="jv-voucher-nav-cell">
+            <div class="jv-voucher-nav-cell jv-print-hide">
                 <div class="jv-voucher-nav-btns" role="group" aria-label="تنقل بين سندات القيد اليدوية">
                     <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_first" title="أول سند" aria-label="أول سند">⏮</button>
                     <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_prev" title="السند السابق" aria-label="السند السابق">◀</button>
@@ -113,14 +113,16 @@ foreach ($accounts as $a) {
             </table>
         </div>
     </div>
-    <div class="actions admin-doc-lines-toolbar" style="margin-top:10px;flex-wrap:wrap;gap:8px;">
+    <div class="actions admin-doc-lines-toolbar jv-print-hide" style="margin-top:10px;flex-wrap:wrap;gap:8px;">
         <button type="button" class="btn-secondary" id="jv_btn_add_line" onclick="jvAddRow()">+ سطر يدوي</button>
         <button type="button" id="jv_btn_new_sheet" title="إدخال سند جديد">سند جديد</button>
+        <button type="button" class="btn-secondary" id="jv_btn_delete_voucher" title="حذف السند المعروض" disabled>حذف السند</button>
+        <button type="button" class="btn-secondary" id="jv_btn_print_voucher" title="طباعة السند">طباعة السند</button>
         <button type="button" id="jv_btn_save" onclick="jvSubmit()">حفظ السند</button>
     </div>
 </div>
 
-<div id="jv_acct_picker" class="jv-acct-picker" style="display:none;" aria-hidden="true">
+<div id="jv_acct_picker" class="jv-acct-picker jv-print-hide" style="display:none;" aria-hidden="true">
     <label class="jv-acct-picker-label" for="jv_acct_picker_search">بحث</label>
     <input type="search" id="jv_acct_picker_search" class="jv-acct-picker-search admin-inp" placeholder="اكتب كلمات من الاسم أو الكود…" autocomplete="off" dir="auto">
     <div class="jv-acct-picker-scroll">
@@ -524,6 +526,10 @@ function jvApplyViewModeUi() {
     if (addLineBtn) {
         addLineBtn.disabled = ro;
     }
+    var delVBtn = document.getElementById('jv_btn_delete_voucher');
+    if (delVBtn) {
+        delVBtn.disabled = !jvBrowseId;
+    }
     document.querySelectorAll('#jv_lines_body input').forEach(function (inp) {
         inp.readOnly = ro;
     });
@@ -578,6 +584,30 @@ function jvLoadVoucherFromApi(id) {
         }
         jvApplyVoucherPayload(r);
     }).catch(function (e) { alert(e.message || String(e)); });
+}
+
+function jvDeleteVoucher() {
+    if (!jvBrowseId) {
+        alert('لا يوجد سند محفوظ للحذف');
+        return;
+    }
+    if (!confirm('تأكيد حذف هذا السند؟ لا يمكن التراجع.')) {
+        return;
+    }
+    postJSON('/admin/api/journal/manage.php', { action: 'delete', id: jvBrowseId }).then(function (r) {
+        if (r.success) {
+            alert(r.message || 'تم الحذف');
+            location.reload();
+            return;
+        }
+        if (!orangeAdminOfferSuggestOnFailure(r, 'فشل الحذف')) {
+            alert(r.message || 'فشل');
+        }
+    }).catch(function (e) { alert(e.message || String(e)); });
+}
+
+function jvPrintVoucher() {
+    window.print();
 }
 
 function jvNav(where) {
@@ -694,6 +724,14 @@ jvSyncTrailingRows();
     var nb = document.getElementById('jv_btn_new_sheet');
     if (nb) {
         nb.addEventListener('click', function () { location.reload(); });
+    }
+    var db = document.getElementById('jv_btn_delete_voucher');
+    if (db) {
+        db.addEventListener('click', jvDeleteVoucher);
+    }
+    var pb = document.getElementById('jv_btn_print_voucher');
+    if (pb) {
+        pb.addEventListener('click', jvPrintVoucher);
     }
 })();
 </script>

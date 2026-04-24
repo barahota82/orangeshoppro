@@ -3434,6 +3434,26 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .coa-setup-modal__footer {
         display: none !important;
     }
+    .jv-print-area,
+    .jv-print-area * {
+        visibility: visible;
+    }
+    .jv-print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        max-height: none;
+        border: none;
+        box-shadow: none;
+    }
+    .jv-print-hide {
+        display: none !important;
+    }
+    .jv-print-area .jv-lines-table thead th.admin-doc-col-actions,
+    .jv-print-area .jv-lines-table tr.jv-line-main td:last-child {
+        display: none !important;
+    }
 }
 
 /* منتقي المتغيرات (عروض السلة) */
