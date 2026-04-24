@@ -1371,7 +1371,7 @@ label {
         minmax(9.5rem, 11.5rem)
         minmax(7rem, 9rem)
         minmax(7rem, 9rem)
-        minmax(8.5rem, 12rem);
+        minmax(10rem, 15rem);
 }
 .jv-voucher-header-line > div {
     min-width: 0;
@@ -1399,14 +1399,25 @@ label {
 .jv-voucher-nav-btns {
     display: flex;
     flex-direction: row;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 6px;
     justify-content: center;
+    align-items: flex-end;
 }
 .jv-voucher-nav-btns .jv-nav-btn {
     min-width: 2.35rem;
     padding: 6px 8px;
     line-height: 1.2;
+}
+.jv-voucher-nav-btns .jv-nav-search {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding: 6px 12px;
+    text-decoration: none;
+    box-sizing: border-box;
+    white-space: nowrap;
 }
 /* سند قيد — شريط الأدوات: «+ سطر» عند البداية، مجموعة سند جديد/حذف/طباعة/حفظ في سطر واحد عند النهاية (يسار الشاشة في RTL) */
 .jv-doc-toolbar {

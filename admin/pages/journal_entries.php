@@ -16,6 +16,10 @@ if (orange_journal_vouchers_ready($pdo)) {
 $jvFormDocumentEnteredDisplay = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 $jvNavReady = orange_journal_vouchers_ready($pdo);
 $jvHeaderLineClass = 'jv-voucher-header-line' . ($jvNavReady ? ' jv-voucher-header-line--nav' : '');
+$jvReportsSearchHref = '/admin/index.php?page=journal_voucher_reports';
+if (function_exists('storefront_public_path')) {
+    $jvReportsSearchHref = storefront_public_path($jvReportsSearchHref);
+}
 
 $hasGrp = orange_table_has_column($pdo, 'accounts', 'is_group');
 $accCols = $hasGrp ? 'id, name, code, is_group' : 'id, name, code';
@@ -81,6 +85,7 @@ foreach ($accounts as $a) {
                     <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_prev" title="السند السابق" aria-label="السند السابق">◀</button>
                     <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_next" title="السند التالي" aria-label="السند التالي">▶</button>
                     <button type="button" class="btn-secondary jv-nav-btn" id="jv_nav_last" title="آخر سند" aria-label="آخر سند">⏭</button>
+                    <a class="btn-secondary jv-nav-search" href="<?php echo htmlspecialchars($jvReportsSearchHref, ENT_QUOTES, 'UTF-8'); ?>" title="تقارير السندات — بحث وتصفية">بحث</a>
                 </div>
             </div>
             <?php endif; ?>
