@@ -99,7 +99,7 @@ foreach ($accounts as $a) {
 </div>
 
 <div class="card">
-    <h3 class="card-title">سند يدوي جديد (متعدد الأسطر)</h3>
+    <h3 class="card-title">سند قيد</h3>
     <div class="form-grid">
         <div class="jv-voucher-header-line" style="grid-column:1/-1;">
             <div>
@@ -124,17 +124,12 @@ foreach ($accounts as $a) {
                     title="وقت تسجيل إدخال القيد في النظام — يُثبت عند الحفظ ولا يُقبل من المتصفح" dir="ltr" lang="en">
             </div>
         </div>
-        <p class="card-hint" style="grid-column:1/-1;margin:0;">
-            <strong>رقم القيد:</strong> تقدير للرقم التالي قبل الحفظ؛ الرقم الفعلي يظهر في الجدول بعد الإضافة.
-            <strong>تاريخ المستند:</strong> يعكس لحظة الإدخال على السيرفر عند الضغط على «حفظ السند» (للسندات المُرحَّلة فوراً)، أو وقت الإدراج في الطابور ثم يُنسَخ عند الترحيل.
-        </p>
         <div style="grid-column:1/-1;">
             <label for="jv_desc">البيان</label>
             <input type="text" id="jv_desc" placeholder="وصف السند">
         </div>
     </div>
     <p class="card-hint" id="jv_balance_hint">مجموع المدين: 0 — مجموع الدائن: 0</p>
-    <p class="card-hint" style="margin-top:0;margin-bottom:10px;">أسطر السند داخل إطار واحد؛ عند إدخال مبلغ في آخر سطر يُفتح سطر جديد تلقائياً، أو <kbd class="admin-kbd">Tab</kbd> من خانة البيان لسطر جديد. داخل الجدول: <kbd class="admin-kbd">←</kbd> <kbd class="admin-kbd">→</kbd> <kbd class="admin-kbd">↑</kbd> <kbd class="admin-kbd">↓</kbd> للتنقل بين الخلايا.</p>
     <div class="admin-doc-frame">
         <div class="table-wrap">
             <table class="admin-table admin-doc-lines-table">
@@ -151,7 +146,6 @@ foreach ($accounts as $a) {
             </table>
         </div>
     </div>
-    <p class="card-hint" style="margin-top:0.75rem;">إن كان الترحيل غير فوري للقيود اليدوية، سيُخزَّن الطلب في الطابور وستصلك رسالة للتوجيه إلى «ترحيل الحركات».</p>
     <div class="actions admin-doc-lines-toolbar" style="margin-top:10px;flex-wrap:wrap;gap:8px;">
         <button type="button" class="btn-secondary" onclick="jvAddRow()">+ سطر يدوي</button>
         <button type="button" onclick="jvSubmit()">حفظ السند</button>
