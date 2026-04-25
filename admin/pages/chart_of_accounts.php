@@ -403,28 +403,31 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    /** توسيع كل الآباء حتى يظهر العقدة `li` (مثلاً بعد حفظ حساب فرعي جديد). */
-    function coaExpandAncestorsOfNode(li) {
-        if (!li) {
+    /**
+     * تمرير لوحة الشجرة دون طي/فتح: إن كان الحساب داخل فرع مطوي يُمرَّر إلى صف أقرب أب مطوي (يبقى الفرع مغلقاً).
+     */
+    function coaScrollTreeWithoutExpanding(targetLi) {
+        if (!targetLi) {
             return;
         }
-        var el = li.parentElement;
-        while (el && el !== treeEl) {
-            if (el.classList && el.classList.contains('coa-tree-list')) {
-                var parentLi = el.parentElement;
-                if (parentLi && parentLi.classList.contains('coa-tree-node')) {
-                    parentLi.classList.remove('coa-tree-node--collapsed');
-                    parentLi.setAttribute('aria-expanded', 'true');
-                    var tb = parentLi.querySelector(':scope > .coa-tree-row > .coa-tree-toggle:not(.coa-tree-toggle--leaf)');
-                    if (tb) {
-                        tb.textContent = '\u2212';
-                        tb.setAttribute('aria-expanded', 'true');
-                    }
+        var scrollTarget = targetLi;
+        var node = targetLi;
+        while (node && node !== treeEl) {
+            var par = node.parentElement;
+            if (par && par.classList.contains('coa-tree-list')) {
+                var parentLi = par.parentElement;
+                if (parentLi && parentLi.classList.contains('coa-tree-node') && parentLi.classList.contains('coa-tree-node--collapsed')) {
+                    scrollTarget = parentLi;
                 }
-                el = parentLi ? parentLi.parentElement : null;
+                node = parentLi;
             } else {
-                el = el.parentElement;
+                node = node.parentElement;
             }
+        }
+        try {
+            scrollTarget.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        } catch (e) {
+            scrollTarget.scrollIntoView(false);
         }
     }
 
@@ -464,12 +467,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (pick) {
                     treeEl.querySelectorAll('.coa-tree-node.is-active').forEach(function (x) { x.classList.remove('is-active'); });
                     pick.classList.add('is-active');
-                    coaExpandAncestorsOfNode(pick);
-                    try {
-                        pick.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                    } catch (e) {
-                        pick.scrollIntoView(false);
-                    }
+                    coaScrollTreeWithoutExpanding(pick);
                     fillForm(pick);
                 } else {
                     document.getElementById('coa_id').value = '0';
