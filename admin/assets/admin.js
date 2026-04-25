@@ -88,8 +88,36 @@ function readableSnippet(s, max) {
     return out.replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
-function postJSON(url, payload) {
-    return fetch(url, {
+/**
+ * POST JSON للأدمن. يمنع النقر المزدوج: يعطّل الزر ويضبط data-orange-postjson-busy، ويستنتج الزر من آخر نقر (ORANGE_POSTJSON_INFER_SUBMITTER) ما لم يُمرَّر submitter أو inferSubmitter:false.
+ * @param {string} url
+ * @param {object} payload
+ * @param {{ submitter?: Element, inferSubmitter?: boolean }|Element} [opts] عنصر الزر أو خيارات؛ inferSubmitter: false يعطّل الربط التلقائي لهذا الطلب فقط (مثلاً طلبين متتابعين من نفس الزر).
+ */
+function postJSON(url, payload, opts) {
+    var options = opts;
+    if (options && options.nodeType === 1) {
+        options = { submitter: options };
+    }
+    if (!options || typeof options !== 'object') {
+        options = {};
+    }
+    var submitter = options.submitter || null;
+    if (options.inferSubmitter !== false && typeof window !== 'undefined' && window.ORANGE_POSTJSON_INFER_SUBMITTER === true) {
+        if (!submitter && window.__orangeLastPointerButton) {
+            submitter = window.__orangeLastPointerButton;
+        }
+    }
+    var prevDisabled = false;
+    if (submitter && submitter.nodeType === 1) {
+        if ('disabled' in submitter) {
+            prevDisabled = submitter.disabled;
+            submitter.disabled = true;
+        }
+        submitter.setAttribute('data-orange-postjson-busy', '1');
+    }
+
+    var chain = fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -128,7 +156,59 @@ function postJSON(url, payload) {
             success: false,
             message: e.message || 'تعذر الاتصال بالخادم'
         }));
+
+    return chain.finally(function () {
+        if (submitter && submitter.nodeType === 1) {
+            submitter.removeAttribute('data-orange-postjson-busy');
+            if ('disabled' in submitter) {
+                submitter.disabled = prevDisabled;
+            }
+        }
+    });
 }
+
+(function orangeAdminPostJsonPointerCapture() {
+    if (typeof document === 'undefined') {
+        return;
+    }
+    document.addEventListener(
+        'click',
+        function (e) {
+            if (typeof window === 'undefined' || window.ORANGE_POSTJSON_INFER_SUBMITTER !== true) {
+                return;
+            }
+            var t = e.target;
+            if (!t || !t.closest) {
+                return;
+            }
+            var btn = t.closest('button, input[type="submit"]');
+            if (!btn || btn.hasAttribute('data-no-post-guard')) {
+                return;
+            }
+            if (btn.getAttribute('data-orange-postjson-busy') === '1') {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                return;
+            }
+            window.__orangeLastPointerButton = btn;
+            var ref = btn;
+            if (typeof queueMicrotask === 'function') {
+                queueMicrotask(function () {
+                    if (window.__orangeLastPointerButton === ref) {
+                        window.__orangeLastPointerButton = null;
+                    }
+                });
+            } else {
+                setTimeout(function () {
+                    if (window.__orangeLastPointerButton === ref) {
+                        window.__orangeLastPointerButton = null;
+                    }
+                }, 0);
+            }
+        },
+        true
+    );
+})();
 
 function getJSON(url) {
     return fetch(url, {

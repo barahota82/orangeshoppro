@@ -40,7 +40,11 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?php echo htmlspecialchars(storefront_public_path(admin_asset_url('/admin/assets/admin.css')), ENT_QUOTES, 'UTF-8'); ?>">
-    <script>window.ORANGE_PUBLIC_BASE_PATH = <?php echo json_encode(PUBLIC_BASE_PATH, JSON_UNESCAPED_UNICODE); ?>;</script>
+    <script>
+    window.ORANGE_PUBLIC_BASE_PATH = <?php echo json_encode(PUBLIC_BASE_PATH, JSON_UNESCAPED_UNICODE); ?>;
+    /** عطّل النقر المزدوج على «حفظ» تلقائياً: postJSON يربط آخر زر نقر (ما لم يُستثنَ بـ data-no-post-guard). */
+    window.ORANGE_POSTJSON_INFER_SUBMITTER = true;
+    </script>
     <script src="<?php echo htmlspecialchars(storefront_public_path(admin_asset_url('/admin/assets/admin.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?php echo htmlspecialchars(storefront_public_path(admin_asset_url('/admin/assets/admin-money-fields.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?php echo htmlspecialchars(storefront_public_path(admin_asset_url('/admin/assets/admin-variant-picker.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
@@ -51,7 +55,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
     <div class="admin-header-wrap">
     <header class="admin-topbar">
         <div class="admin-topbar-strip">
-            <button type="button" class="admin-menu-toggle" id="admin-menu-toggle" aria-expanded="false" aria-controls="admin-nav-drawer" aria-label="فتح وإغلاق قائمة لوحة التحكم">
+            <button type="button" class="admin-menu-toggle" id="admin-menu-toggle" data-no-post-guard aria-expanded="false" aria-controls="admin-nav-drawer" aria-label="فتح وإغلاق قائمة لوحة التحكم">
                 <span class="admin-menu-toggle__icon" aria-hidden="true">☰</span>
                 <span class="admin-menu-toggle__text">القائمة</span>
             </button>
