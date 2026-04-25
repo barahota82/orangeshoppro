@@ -446,6 +446,8 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     if ($metaOk || $ckOk) {
         require_once __DIR__ . '/schema_migrations.php';
         orange_schema_run_pending_migrations($pdo);
+        /* جدول accounts قد يُفرَّغ يدوياً؛ المسار السريع كان يتخطى البذرة فلا تُعاد الجذور الافتراضية */
+        orange_catalog_seed_default_accounts_if_empty($pdo);
         if (! $metaOk && $ckOk) {
             orange_schema_meta_save($pdo, $schemaRev);
         }
