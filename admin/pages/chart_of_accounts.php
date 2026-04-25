@@ -32,7 +32,7 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
             <div class="coa-tree-scroll" id="coa_tree_root" role="tree">
                 <?php if ($tree === []): ?>
                     <p class="muted">
-                        لا توجد حسابات في القاعدة. عند أول تشغيل على قاعدة فارغة يُنشأ النظام تلقائياً ستة جذور (أصول، خصوم، حقوق ملكية، إيرادات، تكلفة مبيعات، مصروفات) بترميز UTF-8.
+                        لا توجد حسابات في القاعدة. عند أول تشغيل على قاعدة فارغة يُنشأ النظام تلقائياً سبعة جذور (أصول، خصوم، حقوق ملكية، إيرادات، تكلفة مبيعات، مصروفات، حسابات نظامية خارج الميزانية) بترميز UTF-8.
                         إن بقيت الشجرة فارغة فتحقق من الاتصال بقاعدة البيانات أو افتح «اضافة الدليل المحاسبي» لإضافة الجذور يدوياً.
                     </p>
                 <?php else: ?>
@@ -171,6 +171,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var hasSuspended = <?php echo $hasSuspended ? 'true' : 'false'; ?>;
     var hasNb = <?php echo $hasNb ? 'true' : 'false'; ?>;
     var __orangeAdminPub = typeof window.ORANGE_PUBLIC_BASE_PATH === 'string' ? window.ORANGE_PUBLIC_BASE_PATH.replace(/\/+$/, '') : '';
+    var coaMainSaveInFlight = false;
+    var coaSetupSaveInFlight = false;
 
     var levelOrds = ['', 'الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر'];
 
@@ -579,6 +581,10 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     document.getElementById('coa_btn_save').addEventListener('click', function () {
+        var coaSaveBtn = document.getElementById('coa_btn_save');
+        if (coaMainSaveInFlight || (coaSaveBtn && coaSaveBtn.getAttribute('data-orange-postjson-busy') === '1')) {
+            return;
+        }
         var id = parseInt(document.getElementById('coa_id').value, 10) || 0;
         var p = document.getElementById('coa_parent_id').value.trim();
         var stEl = document.querySelector('input[name="coa_state"]:checked');
@@ -614,7 +620,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         }
-        postJSON('/admin/api/accounts/save-node.php', payload).then(function (r) {
+        coaMainSaveInFlight = true;
+        postJSON('/admin/api/accounts/save-node.php', payload, coaSaveBtn).then(function (r) {
             alert(r.message || (r.success ? 'تم' : 'فشل'));
             if (r.success) {
                 var savedId = parseInt(String(r.id || '0'), 10) || 0;
@@ -625,6 +632,8 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }).catch(function (e) {
             alert(e.message || String(e));
+        }).finally(function () {
+            coaMainSaveInFlight = false;
         });
     });
 
@@ -803,6 +812,10 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('coa_setup_btn_close').addEventListener('click', closeGuideModal);
     document.getElementById('coa_setup_btn_new').addEventListener('click', clearSetupForm);
     document.getElementById('coa_setup_btn_save').addEventListener('click', function () {
+        var coaSetupSaveBtn = document.getElementById('coa_setup_btn_save');
+        if (coaSetupSaveInFlight || (coaSetupSaveBtn && coaSetupSaveBtn.getAttribute('data-orange-postjson-busy') === '1')) {
+            return;
+        }
         var name = document.getElementById('coa_setup_name').value.trim();
         if (!name) {
             alert('الاسم بالعربية مطلوب');
@@ -814,7 +827,8 @@ document.addEventListener('DOMContentLoaded', function () {
             name: name,
             name_en: document.getElementById('coa_setup_name_en').value.trim()
         };
-        postJSON('/admin/api/accounts/save-root-setup.php', payload).then(function (r) {
+        coaSetupSaveInFlight = true;
+        postJSON('/admin/api/accounts/save-root-setup.php', payload, coaSetupSaveBtn).then(function (r) {
             if (!r.success) {
                 alert(r.message || 'فشل الحفظ');
                 return;
@@ -827,7 +841,9 @@ document.addEventListener('DOMContentLoaded', function () {
             }).catch(function (e) {
                 alert(msg + '\n— تعذر تحديث العرض: ' + (e.message || e));
             });
-        }).catch(function (e) { alert(e.message || String(e)); });
+        }).catch(function (e) { alert(e.message || String(e)); }).finally(function () {
+            coaSetupSaveInFlight = false;
+        });
     });
     document.getElementById('coa_setup_btn_print').addEventListener('click', function () {
         window.print();

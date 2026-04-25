@@ -63,7 +63,7 @@ function orange_accounts_root_numeric_pl_roles(): array
  */
 function orange_accounts_root_rank_pl_roles(): array
 {
-    /* ترتيب الجذور 1–3 ميزانية؛ 4–6 قائمة دخل؛ أي جذر إضافي → other */
+    /* ترتيب الجذور 1–3 ميزانية؛ 4–6 قائمة دخل؛ 7 (خارج الميزانية) مذكور في التقارير كـ other */
     return [
         4 => 'revenue',
         5 => 'cogs',

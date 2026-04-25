@@ -316,7 +316,8 @@ function orange_schema_varchar_max_length(PDO $pdo, string $table, string $colum
 }
 
 /**
- * عند نشر قاعدة جديدة أو جدول accounts فارغ: إدراج جذور دليل افتراضية (1–6) بترميز utf8mb4.
+ * عند نشر قاعدة جديدة أو جدول accounts فارغ: إدراج جذور دليل افتراضية (1–7) بترميز utf8mb4.
+ * الجذر 7: حسابات نظامية (خارج الميزانية) — off-balance / memorandum.
  * لا يعمل إن وُجدت أي صفوف — لن يستبدل دليلاً قائماً.
  */
 function orange_catalog_seed_default_accounts_if_empty(PDO $pdo): void
@@ -354,6 +355,7 @@ function orange_catalog_seed_default_accounts_if_empty(PDO $pdo): void
         ['code' => '4', 'name' => 'الإيرادات', 'name_en' => 'Revenue'],
         ['code' => '5', 'name' => 'تكلفة المبيعات', 'name_en' => 'Cost of sales'],
         ['code' => '6', 'name' => 'المصروفات', 'name_en' => 'Expenses'],
+        ['code' => '7', 'name' => 'حسابات نظامية (خارج الميزانية)', 'name_en' => 'Off-balance sheet accounts'],
     ];
 
     $lock = 'orange_seed_coa';
