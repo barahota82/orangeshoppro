@@ -48,7 +48,7 @@ function orange_accounts_top_root_id(PDO $pdo, int $accountId): int
  */
 function orange_accounts_root_numeric_pl_roles(): array
 {
-    /* يطابق الجذور الافتراضية 4–6: إيرادات، تكلفة مبيعات، مصروفات (الكود 7 تحليلي = other في القوائم) */
+    /* يطابق الجذور الافتراضية 4–6: إيرادات، تكلفة مبيعات، مصروفات */
     return [
         4 => 'revenue',
         5 => 'cogs',
@@ -63,7 +63,7 @@ function orange_accounts_root_numeric_pl_roles(): array
  */
 function orange_accounts_root_rank_pl_roles(): array
 {
-    /* ترتيب الجذور 1–3 ميزانية؛ 4–6 قائمة دخل؛ 7 تحليلي → other */
+    /* ترتيب الجذور 1–3 ميزانية؛ 4–6 قائمة دخل؛ أي جذر إضافي → other */
     return [
         4 => 'revenue',
         5 => 'cogs',

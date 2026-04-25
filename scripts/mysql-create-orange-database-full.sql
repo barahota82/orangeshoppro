@@ -994,8 +994,7 @@ INSERT INTO `accounts` (`name`, `code`, `parent_id`, `is_group`, `name_en`, `is_
 ('حقوق الملكية', '3', NULL, 1, 'Equity', 0, NULL),
 ('الإيرادات', '4', NULL, 1, 'Revenue', 0, NULL),
 ('تكلفة المبيعات', '5', NULL, 1, 'Cost of sales', 0, NULL),
-('المصروفات', '6', NULL, 1, 'Expenses', 0, NULL),
-('الحسابات التحليلية', '7', NULL, 1, 'Analytical accounts', 0, NULL);
+('المصروفات', '6', NULL, 1, 'Expenses', 0, NULL);
 
 INSERT INTO `journal_types` (`code`, `name_ar`, `name_en`, `sort_order`) VALUES
 ('OBV', 'سند رصيد افتتاحي', 'Opening balance voucher', 1),
