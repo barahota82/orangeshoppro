@@ -170,6 +170,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var hasNameEn = <?php echo $hasNameEn ? 'true' : 'false'; ?>;
     var hasSuspended = <?php echo $hasSuspended ? 'true' : 'false'; ?>;
     var hasNb = <?php echo $hasNb ? 'true' : 'false'; ?>;
+    var coaSaveInFlight = false;
     var __orangeAdminPub = typeof window.ORANGE_PUBLIC_BASE_PATH === 'string' ? window.ORANGE_PUBLIC_BASE_PATH.replace(/\/+$/, '') : '';
 
     var levelOrds = ['', 'الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر'];
@@ -581,6 +582,10 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     document.getElementById('coa_btn_save').addEventListener('click', function () {
+        if (coaSaveInFlight) {
+            return;
+        }
+        var saveBtn = document.getElementById('coa_btn_save');
         var id = parseInt(document.getElementById('coa_id').value, 10) || 0;
         var p = document.getElementById('coa_parent_id').value.trim();
         var stEl = document.querySelector('input[name="coa_state"]:checked');
@@ -616,16 +621,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         }
+        coaSaveInFlight = true;
+        saveBtn.disabled = true;
         postJSON('/admin/api/accounts/save-node.php', payload).then(function (r) {
             alert(r.message || (r.success ? 'تم' : 'فشل'));
             if (r.success) {
                 var savedId = parseInt(String(r.id || '0'), 10) || 0;
-                refreshCoaMainTree(savedId > 0 ? savedId : undefined).catch(function (err) {
+                return refreshCoaMainTree(savedId > 0 ? savedId : undefined).catch(function (err) {
                     alert((err && err.message) ? err.message : String(err));
                     location.reload();
                 });
             }
-        }).catch(function (e) { alert(e.message || String(e)); });
+        }).catch(function (e) {
+            alert(e.message || String(e));
+        }).finally(function () {
+            coaSaveInFlight = false;
+            saveBtn.disabled = false;
+        });
     });
 
     document.getElementById('coa_btn_delete').addEventListener('click', function () {
