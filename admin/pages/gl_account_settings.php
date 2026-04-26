@@ -111,8 +111,9 @@ $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
 <div class="card gl-auto-form-card" style="margin-top:1rem;">
         <h3 class="card-title">٢ — ربط نوع اليومية ببند مدين وبند دائن</h3>
         <p class="card-hint" style="margin:0 0 0.75rem;max-width:52rem;line-height:1.55;">
-            <strong>فاتورة مشتريات (PIN) ومردود مشتريات (PDN):</strong> أضف سطراً لـ <strong>نقدي</strong> (تختار المدين والدائن)،
-            وسطراً لـ <strong>آجل</strong> — شراء/مردود آجل يحدّد أحد الجانبين فقط؛ الجانب الآخر يُؤخذ من <strong>حساب ذمة المورد</strong> في المستند (اترك البند الفارغ في العمود المناسب).
+            <strong>فاتورة مشتريات (PIN) ومردود مشتريات (PDN):</strong> أضف سطراً لـ <strong>نقدي</strong> (يظهر المدين والدائن معاً)،
+            وسطراً لـ <strong>آجل</strong> — يظهر <strong>بند واحد فقط</strong> (المدين لفاتورة المشتريات الآجل، أو الدائن لمردود المشتريات الآجل)،
+            والجانب الآخر يُؤخذ تلقائياً من <strong>حساب ذمة المورد</strong> في المستند دون اختيار هنا.
             باقي أنواع اليومية: عمود «قياسي» ويجب اختيار مدين ودائن معاً.
         </p>
         <div class="table-wrap gl-settings-table-wrap">
@@ -227,9 +228,11 @@ $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
         if (ptEl && !ptEl.classList.contains('gl-sel-pt--standard')) {
             ptEl.addEventListener('change', function () {
                 syncRuleRowLabels(tr);
+                applyPurchaseCreditColumnLayout(tr);
             });
         }
         syncRuleRowLabels(tr);
+        applyPurchaseCreditColumnLayout(tr);
     }
 
     function collectUsedJournalRules(exceptTr) {
