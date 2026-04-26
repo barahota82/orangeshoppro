@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/party_allocations.php';
 require_once __DIR__ . '/../../../includes/document_sequences.php';
 require_once __DIR__ . '/../../../includes/supplier_payable_account.php';
+require_once __DIR__ . '/../../../includes/date_format.php';
 require_admin_api();
 
 try {
@@ -21,9 +22,9 @@ try {
     $amount = (float) ($data['amount'] ?? 0);
     $description = trim((string) ($data['description'] ?? ''));
     $dateRaw = trim((string) ($data['date'] ?? ''));
-    $date = $dateRaw !== '' ? $dateRaw : date('Y-m-d H:i:s');
-    if (strlen($date) === 10) {
-        $date .= ' 12:00:00';
+    $date = orange_normalize_admin_posted_datetime($dateRaw);
+    if ($date === null) {
+        json_response(['success' => false, 'message' => 'التاريخ غير صالح'], 422);
     }
     if ($supplierId <= 0 || $amount <= 0) {
         json_response(['success' => false, 'message' => 'المورد والمبلغ مطلوبان'], 422);

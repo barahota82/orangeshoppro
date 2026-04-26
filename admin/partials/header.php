@@ -46,6 +46,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
     window.ORANGE_POSTJSON_INFER_SUBMITTER = true;
     </script>
     <script src="<?php echo htmlspecialchars(storefront_public_path(admin_asset_url('/admin/assets/admin.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+    <script src="<?php echo htmlspecialchars(storefront_public_path(admin_asset_url('/admin/assets/admin-date-dmy.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?php echo htmlspecialchars(storefront_public_path(admin_asset_url('/admin/assets/admin-money-fields.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?php echo htmlspecialchars(storefront_public_path(admin_asset_url('/admin/assets/admin-variant-picker.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
 </head>

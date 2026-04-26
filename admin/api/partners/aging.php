@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
+require_once __DIR__ . '/../../../includes/date_format.php';
 require_admin_api();
 
 try {
@@ -30,7 +31,14 @@ try {
             json_response(['success' => false, 'message' => 'المورد غير موجود'], 404);
         }
     }
-    $asOfNorm = $asOf !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $asOf) ? $asOf : null;
+    if ($asOf !== '') {
+        $asOfNorm = orange_parse_admin_date_to_ymd($asOf);
+        if ($asOfNorm === '') {
+            json_response(['success' => false, 'message' => 'تاريخ غير صالح'], 422);
+        }
+    } else {
+        $asOfNorm = null;
+    }
     $report = orange_party_aging_buckets($pdo, $partyKind, $partyId, $asOfNorm);
     json_response(['success' => true, 'aging' => $report]);
 } catch (Throwable $e) {

@@ -10,12 +10,14 @@ require_once __DIR__ . '/../../includes/date_format.php';
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
-$dateTo = trim((string) ($_GET['date_to'] ?? ''));
-$dateFrom = trim((string) ($_GET['date_from'] ?? ''));
-if ($dateTo === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) {
+$dateToRaw = trim((string) ($_GET['date_to'] ?? ''));
+$dateFromRaw = trim((string) ($_GET['date_from'] ?? ''));
+$dateTo = orange_parse_admin_date_to_ymd($dateToRaw);
+$dateFrom = orange_parse_admin_date_to_ymd($dateFromRaw);
+if ($dateTo === '') {
     $dateTo = date('Y-m-d');
 }
-if ($dateFrom === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) {
+if ($dateFrom === '') {
     $dateFrom = date('Y-m-01');
 }
 if ($dateFrom > $dateTo) {
@@ -23,6 +25,8 @@ if ($dateFrom > $dateTo) {
     $dateFrom = $dateTo;
     $dateTo = $tmp;
 }
+$dateFromDisp = orange_format_date_dmY($dateFrom);
+$dateToDisp = orange_format_date_dmY($dateTo);
 
 $entryTypeFilter = trim((string) ($_GET['entry_type'] ?? ''));
 if ($entryTypeFilter !== '' && !preg_match('/^[a-zA-Z0-9_\-]+$/', $entryTypeFilter)) {
@@ -99,11 +103,13 @@ if (orange_journal_vouchers_ready($pdo)) {
         <input type="hidden" name="page" value="journal_voucher_reports">
         <div>
             <label for="jvr_from">من تاريخ</label>
-            <input type="date" id="jvr_from" name="date_from" value="<?php echo htmlspecialchars($dateFrom, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
+            <input type="text" id="jvr_from" name="date_from" class="admin-inp orange-inp-dmy"
+                value="<?php echo htmlspecialchars($dateFromDisp, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" autocomplete="off">
         </div>
         <div>
             <label for="jvr_to">إلى تاريخ</label>
-            <input type="date" id="jvr_to" name="date_to" value="<?php echo htmlspecialchars($dateTo, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
+            <input type="text" id="jvr_to" name="date_to" class="admin-inp orange-inp-dmy"
+                value="<?php echo htmlspecialchars($dateToDisp, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" autocomplete="off">
         </div>
         <div style="grid-column:1/-1; max-width:28rem;">
             <label for="jvr_entry_type">نوع القيد</label>

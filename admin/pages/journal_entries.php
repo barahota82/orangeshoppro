@@ -14,6 +14,7 @@ if (orange_journal_vouchers_ready($pdo)) {
     $nextJournalVoucherNo = (int) $pdo->query('SELECT COALESCE(MAX(id),0) + 1 FROM journal_vouchers')->fetchColumn();
 }
 $jvFormDocumentEnteredDisplay = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$jvFormVoucherDateDisplay = orange_format_date_dmY(date('Y-m-d'));
 $jvNavReady = orange_journal_vouchers_ready($pdo);
 $jvHeaderLineClass = 'jv-voucher-header-line' . ($jvNavReady ? ' jv-voucher-header-line--nav' : '');
 
@@ -51,8 +52,9 @@ foreach ($accounts as $a) {
             </div>
             <div>
                 <label for="jv_date">تاريخ السند</label>
-                <input type="date" id="jv_date" value="<?php echo htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8'); ?>"
-                    title="تاريخ محاسبي للسند (يختاره المستخدم)" dir="ltr" lang="en">
+                <input type="text" id="jv_date" class="admin-inp orange-inp-dmy"
+                    value="<?php echo htmlspecialchars($jvFormVoucherDateDisplay, ENT_QUOTES, 'UTF-8'); ?>"
+                    title="تاريخ محاسبي للسند — يوم/شهر/سنة" dir="ltr" lang="en" autocomplete="off">
             </div>
             <div>
                 <label for="jv_ref">المرجع <span class="muted" style="font-weight:normal;">(اختياري)</span></label>
@@ -162,11 +164,11 @@ foreach ($accounts as $a) {
                     </div>
                     <div class="jv-search-field jv-search-field--date">
                         <label for="jv_search_date_from">تاريخ السند — من</label>
-                        <input type="date" id="jv_search_date_from" class="admin-inp" dir="ltr" lang="en">
+                        <input type="text" id="jv_search_date_from" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off">
                     </div>
                     <div class="jv-search-field jv-search-field--date">
                         <label for="jv_search_date_to">تاريخ السند — إلى</label>
-                        <input type="date" id="jv_search_date_to" class="admin-inp" dir="ltr" lang="en">
+                        <input type="text" id="jv_search_date_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off">
                     </div>
                     <div class="jv-search-field jv-search-field--ref">
                         <label for="jv_search_ref">المرجع (يحتوي النص)</label>
@@ -548,12 +550,14 @@ function jvSearchModalOpen() {
 }
 
 function jvSearchCollectPayload() {
+    var elDf = document.getElementById('jv_search_date_from');
+    var elDt = document.getElementById('jv_search_date_to');
     return {
         action: 'search_manual',
         id_from: parseInt(String(document.getElementById('jv_search_id_from').value || '0'), 10) || 0,
         id_to: parseInt(String(document.getElementById('jv_search_id_to').value || '0'), 10) || 0,
-        date_from: document.getElementById('jv_search_date_from').value.trim(),
-        date_to: document.getElementById('jv_search_date_to').value.trim(),
+        date_from: orangeGetDmyValueAsIso(elDf),
+        date_to: orangeGetDmyValueAsIso(elDt),
         reference: document.getElementById('jv_search_ref').value.trim(),
         description: document.getElementById('jv_search_desc').value.trim()
     };
@@ -817,7 +821,7 @@ function jvApplyVoucherPayload(r) {
     jvViewMode = true;
     jvBrowseId = r.voucher.id;
     document.getElementById('jv_number_preview').value = String(r.voucher.id);
-    document.getElementById('jv_date').value = r.voucher.date || '';
+    document.getElementById('jv_date').value = orangeIsoDateToDmy(r.voucher.date || '');
     document.getElementById('jv_ref').value = r.voucher.reference || '';
     document.getElementById('jv_desc').value = r.voucher.description || '';
     document.getElementById('jv_document_entered').value = r.voucher.document_entered_display || '';
@@ -917,11 +921,11 @@ function jvSubmit() {
     if (jvViewMode) {
         return;
     }
-    var d = document.getElementById('jv_date').value;
+    var dIso = orangeGetDmyValueAsIso(document.getElementById('jv_date'));
     var ref = document.getElementById('jv_ref').value.trim();
     var desc = document.getElementById('jv_desc').value.trim();
-    if (!d || !desc) {
-        alert('التاريخ والبيان مطلوبان');
+    if (!dIso || !desc) {
+        alert('التاريخ والبيان مطلوبان (التاريخ بصيغة يوم/شهر/سنة)');
         return;
     }
     var lines = [];
@@ -959,7 +963,7 @@ function jvSubmit() {
     }
     postJSON('/admin/api/journal/manage.php', {
         action: 'create',
-        date: d,
+        date: dIso,
         reference: ref,
         description: desc,
         entry_type: 'manual',

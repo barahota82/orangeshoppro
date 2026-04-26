@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/upload_paths.php';
 require_once __DIR__ . '/../../../includes/company_documents.php';
+require_once __DIR__ . '/../../../includes/date_format.php';
 require_admin_api();
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
@@ -42,10 +43,11 @@ if ($titleAr === '') {
 
 $docDate = null;
 if ($docDateRaw !== '') {
-    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $docDateRaw) !== 1) {
-        json_response(['success' => false, 'message' => 'تاريخ المستند بصيغة YYYY-MM-DD'], 422);
+    $docYmd = orange_parse_admin_date_to_ymd($docDateRaw);
+    if ($docYmd === '') {
+        json_response(['success' => false, 'message' => 'تاريخ المستند غير صالح (يوم/شهر/سنة)'], 422);
     }
-    $docDate = $docDateRaw;
+    $docDate = $docYmd;
 }
 
 if (!isset($_FILES['file']) || !is_array($_FILES['file'])) {

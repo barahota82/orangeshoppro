@@ -3,35 +3,40 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/date_format.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
-$fromIn = isset($_GET['from']) ? trim((string) $_GET['from']) : '';
-$toIn = isset($_GET['to']) ? trim((string) $_GET['to']) : '';
-$fromOk = $fromIn !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromIn) === 1;
-$toOk = $toIn !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $toIn) === 1;
+$fromRaw = isset($_GET['from']) ? trim((string) $_GET['from']) : '';
+$toRaw = isset($_GET['to']) ? trim((string) $_GET['to']) : '';
+$fromYmd = $fromRaw !== '' ? orange_parse_admin_date_to_ymd($fromRaw) : '';
+$toYmd = $toRaw !== '' ? orange_parse_admin_date_to_ymd($toRaw) : '';
+$fromOk = $fromYmd !== '';
+$toOk = $toYmd !== '';
+$fromIn = $fromOk ? orange_format_date_dmY($fromYmd) : $fromRaw;
+$toIn = $toOk ? orange_format_date_dmY($toYmd) : $toRaw;
 
 /**
  * @return array{0: string, 1: list<mixed>}
  */
-function orange_channel_analytics_join_orders_on(bool $fromOk, string $fromIn, bool $toOk, string $toIn): array
+function orange_channel_analytics_join_orders_on(bool $fromOk, string $fromYmd, bool $toOk, string $toYmd): array
 {
     $on = 'o.channel_id = c.id';
     $params = [];
     if ($fromOk) {
         $on .= ' AND o.created_at >= ?';
-        $params[] = $fromIn . ' 00:00:00';
+        $params[] = $fromYmd . ' 00:00:00';
     }
     if ($toOk) {
         $on .= ' AND o.created_at <= ?';
-        $params[] = $toIn . ' 23:59:59';
+        $params[] = $toYmd . ' 23:59:59';
     }
 
     return [$on, $params];
 }
 
-[$joinOn, $joinParams] = orange_channel_analytics_join_orders_on($fromOk, $fromIn, $toOk, $toIn);
+[$joinOn, $joinParams] = orange_channel_analytics_join_orders_on($fromOk, $fromYmd, $toOk, $toYmd);
 
 $sqlChannels = "
     SELECT
@@ -72,11 +77,11 @@ $orphanSql = '
 $orphanParams = [];
 if ($fromOk) {
     $orphanSql .= ' AND created_at >= ?';
-    $orphanParams[] = $fromIn . ' 00:00:00';
+    $orphanParams[] = $fromYmd . ' 00:00:00';
 }
 if ($toOk) {
     $orphanSql .= ' AND created_at <= ?';
-    $orphanParams[] = $toIn . ' 23:59:59';
+    $orphanParams[] = $toYmd . ' 23:59:59';
 }
 $stOr = $pdo->prepare($orphanSql);
 $stOr->execute($orphanParams);
@@ -92,11 +97,11 @@ $topSql = '
 $topParams = [];
 if ($fromOk) {
     $topSql .= ' AND o.created_at >= ?';
-    $topParams[] = $fromIn . ' 00:00:00';
+    $topParams[] = $fromYmd . ' 00:00:00';
 }
 if ($toOk) {
     $topSql .= ' AND o.created_at <= ?';
-    $topParams[] = $toIn . ' 23:59:59';
+    $topParams[] = $toYmd . ' 23:59:59';
 }
 $topSql .= ' GROUP BY o.channel_id, oi.product_name ORDER BY o.channel_id ASC, qty_sum DESC';
 
@@ -138,11 +143,13 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
         <input type="hidden" name="page" value="channel_analytics">
         <div>
             <label for="ca_from">من</label>
-            <input type="date" id="ca_from" name="from" value="<?php echo htmlspecialchars($fromIn, ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="text" id="ca_from" name="from" class="admin-inp orange-inp-dmy"
+                value="<?php echo htmlspecialchars($fromIn, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" autocomplete="off">
         </div>
         <div>
             <label for="ca_to">إلى</label>
-            <input type="date" id="ca_to" name="to" value="<?php echo htmlspecialchars($toIn, ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="text" id="ca_to" name="to" class="admin-inp orange-inp-dmy"
+                value="<?php echo htmlspecialchars($toIn, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" autocomplete="off">
         </div>
         <div class="actions" style="margin:0;">
             <button type="submit">تطبيق</button>

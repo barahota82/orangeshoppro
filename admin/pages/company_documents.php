@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/company_documents.php';
+require_once __DIR__ . '/../../includes/date_format.php';
 
 $typeLabels = orange_company_document_type_labels();
+$cdDefaultDocDate = orange_format_date_dmY(date('Y-m-d'));
 $entityPresets = orange_company_document_entity_presets();
 ?>
 <div class="page-title">
@@ -42,7 +44,7 @@ $entityPresets = orange_company_document_entity_presets();
         </div>
         <div>
             <label for="cd_date">تاريخ المستند</label>
-            <input type="date" id="cd_date">
+            <input type="text" id="cd_date" class="admin-inp orange-inp-dmy" value="<?php echo htmlspecialchars($cdDefaultDocDate, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" autocomplete="off">
         </div>
         <div>
             <label for="cd_entity">ربط بكيان</label>
@@ -237,7 +239,7 @@ $entityPresets = orange_company_document_entity_presets();
         document.getElementById('cd_file').value = '';
         document.getElementById('cd_title').value = '';
         document.getElementById('cd_ref').value = '';
-        document.getElementById('cd_date').value = '';
+        document.getElementById('cd_date').value = '<?php echo htmlspecialchars($cdDefaultDocDate, ENT_QUOTES, 'UTF-8'); ?>';
         document.getElementById('cd_entity').value = '';
         document.getElementById('cd_entity_id').value = '';
         document.getElementById('cd_notes').value = '';

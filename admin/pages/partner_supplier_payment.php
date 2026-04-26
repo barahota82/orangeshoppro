@@ -5,9 +5,11 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/party_subledger.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
+require_once __DIR__ . '/../../includes/date_format.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+$partnerUiTodayDmy = orange_format_date_dmY(date('Y-m-d'));
 
 $prefillStmtKind = in_array((string) ($_GET['stmt_party_kind'] ?? ''), ['customer', 'supplier'], true)
     ? (string) $_GET['stmt_party_kind']
@@ -77,7 +79,7 @@ $customerVoucher = storefront_public_path('/admin/index.php?page=partner_custome
         </div>
         <div>
             <label for="pay_date">التاريخ</label>
-            <input type="date" id="pay_date" value="<?php echo htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="text" id="pay_date" class="admin-inp orange-inp-dmy" value="<?php echo htmlspecialchars($partnerUiTodayDmy, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" autocomplete="off">
         </div>
         <div style="grid-column:1/-1;">
             <label for="pay_desc">البيان</label>
@@ -143,7 +145,7 @@ $customerVoucher = storefront_public_path('/admin/index.php?page=partner_custome
     <div class="form-grid">
         <div>
             <label for="aging_as_of">اعتباراً من تاريخ</label>
-            <input type="date" id="aging_as_of" value="<?php echo htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="text" id="aging_as_of" class="admin-inp orange-inp-dmy" value="<?php echo htmlspecialchars($partnerUiTodayDmy, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" autocomplete="off">
         </div>
     </div>
     <div class="actions" style="margin-top:10px;">
@@ -214,7 +216,7 @@ function stmtRefreshSelect() {
 
 function loadAging() {
     var id = parseInt(document.getElementById('stmt_party').value, 10) || 0;
-    var asOf = document.getElementById('aging_as_of').value;
+    var asOf = orangeGetDmyValueAsIso(document.getElementById('aging_as_of'));
     var tb = document.getElementById('aging_tbody');
     var sumEl = document.getElementById('aging_summary');
     if (id <= 0) {
@@ -223,7 +225,7 @@ function loadAging() {
         return;
     }
     if (!asOf) {
-        alert('اختر تاريخ المرجع');
+        alert('اختر تاريخ المرجع (يوم/شهر/سنة)');
         return;
     }
     tb.innerHTML = '<tr><td colspan="2">جاري الحساب…</td></tr>';
@@ -378,13 +380,13 @@ if (document.readyState === 'loading') {
 function doPay() {
     var id = parseInt(document.getElementById('pay_sup').value, 10) || 0;
     var amt = parseFloat(document.getElementById('pay_amt').value || '0');
-    var d = document.getElementById('pay_date').value;
+    var dIso = orangeGetDmyValueAsIso(document.getElementById('pay_date'));
     var desc = document.getElementById('pay_desc').value.trim();
-    if (id <= 0 || amt <= 0 || !d) { alert('أكمل المورد والمبلغ والتاريخ'); return; }
+    if (id <= 0 || amt <= 0 || !dIso) { alert('أكمل المورد والمبلغ والتاريخ (يوم/شهر/سنة)'); return; }
     postJSON('/admin/api/partners/supplier-payment.php', {
         supplier_id: id,
         amount: amt,
-        date: d,
+        date: dIso,
         description: desc || 'دفع مورد',
         allow_excess: document.getElementById('pay_allow_excess').checked,
         allocations: collectAllocTbody('alloc_pay_tbody')

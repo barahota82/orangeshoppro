@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
+require_once __DIR__ . '/../../includes/date_format.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
 $linkedJournalTypes = orange_gl_posting_linked_journal_types($pdo);
-$todayEnd = date('Y-m-d\T23:59');
-$monthStartDt = date('Y-m-01\T00:00');
+$glPostDateFromDisp = orange_format_datetime_dmY_hi(date('Y-m-01 00:00:00'));
+$glPostDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
 ?>
 <div class="gl-posting-page" dir="rtl">
     <header class="gl-posting-appbar">
@@ -60,11 +61,11 @@ $monthStartDt = date('Y-m-01\T00:00');
                 <div class="gl-posting-dates">
                     <div class="gl-posting-field">
                         <label class="gl-posting-field__label" for="gl_post_date_from">تاريخ الحركة من</label>
-                        <input type="datetime-local" id="gl_post_date_from" class="gl-posting-inp-datetime" value="<?php echo htmlspecialchars($monthStartDt, ENT_QUOTES, 'UTF-8'); ?>">
+                        <input type="text" id="gl_post_date_from" class="gl-posting-inp-datetime orange-inp-dmyhi" value="<?php echo htmlspecialchars($glPostDateFromDisp, ENT_QUOTES, 'UTF-8'); ?>" autocomplete="off">
                     </div>
                     <div class="gl-posting-field">
                         <label class="gl-posting-field__label" for="gl_post_date_to">إلى تاريخ</label>
-                        <input type="datetime-local" id="gl_post_date_to" class="gl-posting-inp-datetime" value="<?php echo htmlspecialchars($todayEnd, ENT_QUOTES, 'UTF-8'); ?>">
+                        <input type="text" id="gl_post_date_to" class="gl-posting-inp-datetime orange-inp-dmyhi" value="<?php echo htmlspecialchars($glPostDateToDisp, ENT_QUOTES, 'UTF-8'); ?>" autocomplete="off">
                     </div>
                 </div>
             </div>
@@ -298,6 +299,8 @@ $monthStartDt = date('Y-m-01\T00:00');
         }
         var df = document.getElementById('gl_post_date_from');
         var dt = document.getElementById('gl_post_date_to');
+        var dfVal = df && window.orangeDmyHiToSqlDatetime ? window.orangeDmyHiToSqlDatetime(df.value) : (df ? df.value : '');
+        var dtVal = dt && window.orangeDmyHiToSqlDatetime ? window.orangeDmyHiToSqlDatetime(dt.value) : (dt ? dt.value : '');
         var jtParam = '';
         if (sel && chkAll && !sel.disabled && !chkAll.checked) {
             var jtv = sel.value;
@@ -306,8 +309,8 @@ $monthStartDt = date('Y-m-01\T00:00');
             }
         }
         var q = 'status=' + encodeURIComponent(status)
-            + '&date_from=' + encodeURIComponent(df ? df.value : '')
-            + '&date_to=' + encodeURIComponent(dt ? dt.value : '')
+            + '&date_from=' + encodeURIComponent(dfVal || '')
+            + '&date_to=' + encodeURIComponent(dtVal || '')
             + jtParam;
         var res = await fetch('/admin/api/gl/pending-list.php?' + q, { credentials: 'same-origin' });
         var j = await res.json();

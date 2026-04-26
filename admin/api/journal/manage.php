@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
 require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
+require_once __DIR__ . '/../../../includes/date_format.php';
 require_admin_api();
 
 try {
@@ -20,9 +21,9 @@ try {
         $reference = trim((string)($data['reference'] ?? ''));
         $entryType = trim((string)($data['entry_type'] ?? 'manual'));
         $dateRaw = trim((string)($data['date'] ?? ''));
-        $date = $dateRaw !== '' ? $dateRaw : date('Y-m-d H:i:s');
-        if (strlen($date) === 10) {
-            $date .= ' 12:00:00';
+        $date = orange_normalize_admin_posted_datetime($dateRaw);
+        if ($date === null) {
+            json_response(['success' => false, 'message' => 'تاريخ السند غير صالح'], 422);
         }
         if ($description === '') {
             json_response(['success' => false, 'message' => 'بيان السند مطلوب'], 422);
@@ -182,7 +183,6 @@ try {
     }
 
     if ($action === 'get') {
-        require_once __DIR__ . '/../../../includes/date_format.php';
         $gid = (int)($data['id'] ?? 0);
         if ($gid <= 0) {
             json_response(['success' => false, 'message' => 'معرف السند مطلوب'], 422);
@@ -303,7 +303,6 @@ try {
     }
 
     if ($action === 'search_manual') {
-        require_once __DIR__ . '/../../../includes/date_format.php';
         if (!orange_journal_vouchers_ready($pdo)) {
             json_response(['success' => false, 'message' => 'جداول السندات غير جاهزة'], 422);
         }
@@ -334,28 +333,29 @@ try {
             $hasCriterion = true;
         }
 
-        $dateFrom = trim((string) ($data['date_from'] ?? ''));
-        $dateTo = trim((string) ($data['date_to'] ?? ''));
-        $dateRe = '/^\d{4}-\d{2}-\d{2}$/';
-        $dfOk = $dateFrom !== '' && preg_match($dateRe, $dateFrom);
-        $dtOk = $dateTo !== '' && preg_match($dateRe, $dateTo);
+        $dateFromRaw = trim((string) ($data['date_from'] ?? ''));
+        $dateToRaw = trim((string) ($data['date_to'] ?? ''));
+        $dfNorm = $dateFromRaw !== '' ? orange_parse_admin_date_to_ymd($dateFromRaw) : '';
+        $dtNorm = $dateToRaw !== '' ? orange_parse_admin_date_to_ymd($dateToRaw) : '';
+        $dfOk = $dfNorm !== '';
+        $dtOk = $dtNorm !== '';
         if ($dfOk && $dtOk) {
-            if ($dateFrom > $dateTo) {
-                $tmp = $dateFrom;
-                $dateFrom = $dateTo;
-                $dateTo = $tmp;
+            if ($dfNorm > $dtNorm) {
+                $tmp = $dfNorm;
+                $dfNorm = $dtNorm;
+                $dtNorm = $tmp;
             }
             $parts[] = 'DATE(voucher_date) BETWEEN ? AND ?';
-            $params[] = $dateFrom;
-            $params[] = $dateTo;
+            $params[] = $dfNorm;
+            $params[] = $dtNorm;
             $hasCriterion = true;
         } elseif ($dfOk) {
             $parts[] = 'DATE(voucher_date) = ?';
-            $params[] = $dateFrom;
+            $params[] = $dfNorm;
             $hasCriterion = true;
         } elseif ($dtOk) {
             $parts[] = 'DATE(voucher_date) = ?';
-            $params[] = $dateTo;
+            $params[] = $dtNorm;
             $hasCriterion = true;
         }
 
@@ -389,7 +389,7 @@ try {
         $rows = [];
         while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
             $vd = (string) ($row['voucher_date'] ?? '');
-            $dateDisp = strlen($vd) >= 10 ? substr($vd, 0, 10) : '';
+            $dateDisp = strlen($vd) >= 10 ? orange_format_date_dmY(substr($vd, 0, 10)) : '';
             $rows[] = [
                 'id' => (int) $row['id'],
                 'voucher_date' => $dateDisp,
