@@ -35,6 +35,8 @@ function orange_gl_setting_key_labels(): array
         'sales_returns_online' => 'مردود مبيعات أونلاين',
         'cogs' => 'تكلفة المبيعات — مدين عند تسليم الطلب (نقدي / آجل / أونلاين)',
         'cogs_returns' => 'تكلفة مردودات المبيعات — دائن عند إلغاء التسليم وإرجاع التكلفة للمخزون',
+        'sales_discount' => 'خصم المبيعات — يُستخدم عند قيود خصم مسموح على المبيعات (حسب سياسة الدليل)',
+        'purchase_discount' => 'خصم المشتريات — يُستخدم عند خصم من المورد أو إثبات خصم مشتريات (حسب سياسة الدليل)',
         /** احتياط توافق قديم — يُستبدل بمفتاح cogs */
         'cogs_cash' => 'تكلفة مبيعات نقدي — احتياط تقني فقط',
         'cogs_credit' => 'تكلفة مبيعات آجل — احتياط تقني فقط',
@@ -56,19 +58,23 @@ function orange_gl_setting_key_labels(): array
  */
 function orange_gl_setting_row_short_labels(): array
 {
+    $p = 'حـ / ';
+
     return [
-        'cash' => 'الخزينة',
-        'inventory' => 'المخزن',
-        'ar_cash' => 'العملاء النقدي',
-        'ar_credit' => 'العملاء الاجل',
-        'sales_revenue_cash' => 'المبيعات النقدية',
-        'sales_returns_cash' => 'مردود المبيعات النقدي',
-        'sales_revenue_credit' => 'المبيعات الآجل',
-        'sales_returns_credit' => 'مردود المبيعات الاجل',
-        'sales_revenue_online' => 'المبيعات الاونلاين',
-        'sales_returns_online' => 'مردود المبيعات الاونلاين',
-        'cogs' => 'تكلفة المبيعات',
-        'cogs_returns' => 'تكلفة مردودات المبيعات',
+        'cash' => $p . 'الخزينة',
+        'inventory' => $p . 'المخزن',
+        'ar_cash' => $p . 'العملاء النقدي',
+        'ar_credit' => $p . 'العملاء الاجل',
+        'sales_revenue_cash' => $p . 'المبيعات النقدية',
+        'sales_returns_cash' => $p . 'مردودات المبيعات النقدي',
+        'sales_revenue_credit' => $p . 'المبيعات الآجل',
+        'sales_returns_credit' => $p . 'مردودات المبيعات الاجل',
+        'sales_revenue_online' => $p . 'المبيعات الاونلاين',
+        'sales_returns_online' => $p . 'مردود المبيعات الاونلاين',
+        'cogs' => $p . 'تكلفة المبيعات',
+        'cogs_returns' => $p . 'تكلفة مردودات المبيعات',
+        'sales_discount' => $p . 'خصم المبيعات',
+        'purchase_discount' => $p . 'خصم المشتريات',
     ];
 }
 
@@ -92,6 +98,8 @@ function orange_gl_settings_form_key_order(): array
         'sales_returns_online',
         'cogs',
         'cogs_returns',
+        'sales_discount',
+        'purchase_discount',
     ];
 }
 
