@@ -2908,6 +2908,42 @@ body.coa-modal-open {
 .fy-close-main-modal .gl-pick-modal__dialog {
     max-width: 440px;
 }
+.fy-close-gl-msg {
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+.fy-close-gl-msg--ok {
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #065f46;
+}
+.fy-close-gl-msg--warn {
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    color: #92400e;
+}
+.fy-close-gl-msg__title {
+    margin: 0 0 8px;
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+.fy-close-gl-msg__body {
+    margin: 0;
+}
+.fy-close-gl-msg__list {
+    margin: 0;
+    padding-right: 1.25rem;
+}
+.fy-close-gl-msg__list li {
+    margin: 4px 0;
+}
+.fy-close-gl-msg a {
+    font-weight: 600;
+    text-decoration: underline;
+}
 .fy-col-center {
     text-align: center;
 }

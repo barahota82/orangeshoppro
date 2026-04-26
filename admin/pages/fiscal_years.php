@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/fiscal_years.php';
+require_once __DIR__ . '/../../includes/gl_settings.php';
+require_once __DIR__ . '/../../includes/upload_paths.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -19,6 +21,27 @@ foreach ($years as $y) {
     }
 }
 $fySuggestYear = $maxEndY + 1;
+
+$fyGlIncomeId = orange_gl_account_id_optional($pdo, 'income_summary') ?? 0;
+$fyGlRetainedId = orange_gl_account_id_optional($pdo, 'retained_earnings') ?? 0;
+$fyCloseGlLinked = $fyGlIncomeId > 0 && $fyGlRetainedId > 0;
+$fyGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_settings');
+
+$fyAccountBrief = static function (PDO $pdoConn, int $accId): array {
+    if ($accId <= 0) {
+        return ['code' => '', 'name' => ''];
+    }
+    $st = $pdoConn->prepare('SELECT code, name FROM accounts WHERE id = ? LIMIT 1');
+    $st->execute([$accId]);
+    $r = $st->fetch(PDO::FETCH_ASSOC);
+    if (! $r) {
+        return ['code' => '', 'name' => ''];
+    }
+
+    return ['code' => (string) ($r['code'] ?? ''), 'name' => (string) ($r['name'] ?? '')];
+};
+$fyGlIncomeBrief = $fyAccountBrief($pdo, $fyGlIncomeId);
+$fyGlRetainedBrief = $fyAccountBrief($pdo, $fyGlRetainedId);
 ?>
 <div class="fy-years-page" dir="rtl">
     <h1 class="fy-years-page__title">السنوات المالية</h1>
@@ -94,45 +117,34 @@ $fySuggestYear = $maxEndY + 1;
     <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="fy_close_main_title">
         <h3 id="fy_close_main_title" class="gl-pick-modal__title">إقفال سنة مالية</h3>
         <p class="muted" style="margin:0 0 12px;font-size:0.9rem;line-height:1.45;">
-            عند وجود إيرادات أو مصروفات أو تكلفة مبيعات مصنّفة في الدليل: <strong>سند 1 (YEC-PL)</strong> بآخر يوم السنة — إلى حساب <strong>أرباح / خسائر السنة الحالية</strong> (الوسيط)؛
-            ثم <strong>سند 2 (YEC-RE)</strong> — ترحيل كامل الوسيط إلى <strong>الأرباح المحتجزة</strong>؛
-            عند صافي ربح ونسبة محفوظة: <strong>سند 3 (YEC-LR)</strong> — من مبلغ الترحيل للمحتجز يُحسب الاحتياطي بالنسبة وقيد منفصل (مدين محتجز، دائن احتياطي).
-            اربط الحسابات من «حسابات القيود التلقائية» (income_summary و retained_earnings و legal_reserve والنسبة).
+            عند تفعيل الإقفال المحاسبي ووجود إيرادات/مصروفات مصنّفة: <strong>YEC-PL</strong> بآخر يوم السنة إلى حساب <strong>أرباح / خسائر السنة الحالية</strong>؛
+            ثم <strong>YEC-RE</strong> إلى <strong>الأرباح المحتجزة</strong>؛ وعند الربح مع نسبة محفوظة <strong>YEC-LR</strong> (احتياطي قانوني).
+            حسابا الوسيط والمحتجزة يُؤخذان من <strong>حسابات القيود التلقائية</strong> إن وُجد ربطهما هناك.
         </p>
         <label class="fy-close-check-label" style="display:flex;align-items:center;gap:8px;margin-bottom:14px;cursor:pointer;">
             <input type="checkbox" id="fy_close_do_accounting" checked>
             <span>تنفيذ قيود الإقفال المحاسبي (إيرادات/مصروفات)</span>
         </label>
-        <div class="fy-close-acc-field" data-fy-close-role="income" data-account-id="0">
-            <label class="fy-close-acc-label">حساب أرباح / خسائر السنة الحالية (وسيط)</label>
-            <div class="fy-close-acc-row">
-                <input type="text" class="fy-close-code" dir="ltr" autocomplete="off" placeholder="كود الحساب" aria-label="كود أرباح السنة الحالية">
-                <button type="button" class="fy-close-search btn-secondary" title="بحث" aria-label="بحث أرباح السنة الحالية">🔍</button>
-                <input type="text" class="fy-close-name" readonly tabindex="-1" placeholder="اسم الحساب" aria-label="اسم أرباح السنة الحالية">
-            </div>
+        <div id="fy_close_acc_linked" class="fy-close-gl-msg fy-close-gl-msg--ok" hidden>
+            <p class="fy-close-gl-msg__title">الحسابات مربوطة من «حسابات القيود التلقائية» — لا حاجة لاختيارها هنا.</p>
+            <ul class="fy-close-gl-msg__list">
+                <li><span class="muted">أرباح / خسائر السنة الحالية:</span>
+                    <span dir="ltr"><?php echo htmlspecialchars(trim(($fyGlIncomeBrief['code'] !== '' ? $fyGlIncomeBrief['code'] . ' — ' : '') . $fyGlIncomeBrief['name']), ENT_QUOTES, 'UTF-8'); ?></span></li>
+                <li><span class="muted">الأرباح المحتجزة:</span>
+                    <span dir="ltr"><?php echo htmlspecialchars(trim(($fyGlRetainedBrief['code'] !== '' ? $fyGlRetainedBrief['code'] . ' — ' : '') . $fyGlRetainedBrief['name']), ENT_QUOTES, 'UTF-8'); ?></span></li>
+            </ul>
+            <p class="muted fy-close-gl-msg__hint" style="margin:0;font-size:0.85rem;">للاحتياطي القانوني والنسبة: نفس الشاشة — صف الاحتياطي القانوني.</p>
         </div>
-        <div class="fy-close-acc-field" data-fy-close-role="retained" data-account-id="0" style="margin-top:12px;">
-            <label class="fy-close-acc-label">حساب الأرباح المحتجزة</label>
-            <div class="fy-close-acc-row">
-                <input type="text" class="fy-close-code" dir="ltr" autocomplete="off" placeholder="كود الحساب" aria-label="كود الأرباح المحتجزة">
-                <button type="button" class="fy-close-search btn-secondary" title="بحث" aria-label="بحث الأرباح المحتجزة">🔍</button>
-                <input type="text" class="fy-close-name" readonly tabindex="-1" placeholder="اسم الحساب" aria-label="اسم الأرباح المحتجزة">
-            </div>
+        <div id="fy_close_acc_need_link" class="fy-close-gl-msg fy-close-gl-msg--warn" hidden>
+            <p class="fy-close-gl-msg__title">لا يمكن تنفيذ الإقفال المحاسبي دون ربط الحسابات.</p>
+            <p class="fy-close-gl-msg__body">اربط <strong>حساب ملخص الدخل (أرباح/خسائر السنة الحالية)</strong> و<strong>حساب الأرباح المحتجزة</strong> من شاشة
+                <a href="<?php echo htmlspecialchars($fyGlSettingsUrl, ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">حسابات القيود التلقائية</a>
+                ثم حدّث صفحة «السنوات المالية» إن لزم، وأعد فتح «إقفال…».</p>
         </div>
         <div class="fy-close-main-actions" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;">
             <button type="button" id="fy_close_main_submit">تأكيد إغلاق السنة</button>
             <button type="button" class="btn-secondary" id="fy_close_main_cancel">إلغاء</button>
         </div>
-    </div>
-</div>
-
-<div class="gl-pick-modal" id="fy_close_pick_modal" hidden aria-hidden="true">
-    <div class="gl-pick-modal__backdrop" id="fy_close_pick_backdrop"></div>
-    <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="fy_close_pick_title">
-        <h3 id="fy_close_pick_title" class="gl-pick-modal__title">اختيار حساب فرعي</h3>
-        <input type="search" id="fy_close_pick_q" class="gl-pick-modal__search" placeholder="ابحث بالكود أو الاسم…" autocomplete="off" dir="rtl">
-        <ul class="gl-pick-modal__list" id="fy_close_pick_list"></ul>
-        <button type="button" class="btn-secondary" id="fy_close_pick_close">إغلاق</button>
     </div>
 </div>
 
@@ -278,78 +290,40 @@ $fySuggestYear = $maxEndY + 1;
             }
         });
 
+        var fyCloseGlLinked = <?php echo $fyCloseGlLinked ? 'true' : 'false'; ?>;
         var fyClosePendingId = 0;
-        var fyClosePickRole = null;
-        var fyClosePickTimer = null;
-        var fyClosePickSeq = 0;
         var mainModal = document.getElementById('fy_close_main_modal');
         var mainBackdrop = document.getElementById('fy_close_main_backdrop');
         var mainCancel = document.getElementById('fy_close_main_cancel');
         var mainSubmit = document.getElementById('fy_close_main_submit');
-        var pickModal = document.getElementById('fy_close_pick_modal');
-        var pickBackdrop = document.getElementById('fy_close_pick_backdrop');
-        var pickClose = document.getElementById('fy_close_pick_close');
-        var pickList = document.getElementById('fy_close_pick_list');
-        var pickQ = document.getElementById('fy_close_pick_q');
         var chkDoAccounting = document.getElementById('fy_close_do_accounting');
+        var elLinked = document.getElementById('fy_close_acc_linked');
+        var elNeedLink = document.getElementById('fy_close_acc_need_link');
 
-        function fyCloseFillField(role, acc) {
-            var wrap = document.querySelector('[data-fy-close-role="' + role + '"]');
-            if (!wrap || !acc) {
+        function fyCloseSyncGlPanels() {
+            if (!elLinked || !elNeedLink || !chkDoAccounting) {
                 return;
             }
-            wrap.setAttribute('data-account-id', String(acc.id));
-            var c = wrap.querySelector('.fy-close-code');
-            var n = wrap.querySelector('.fy-close-name');
-            if (c) {
-                c.value = acc.code || '';
-            }
-            if (n) {
-                n.value = acc.name || '';
-            }
-        }
-        function fyCloseClearField(role) {
-            var wrap = document.querySelector('[data-fy-close-role="' + role + '"]');
-            if (!wrap) {
+            var doAcct = !!chkDoAccounting.checked;
+            if (!doAcct) {
+                elLinked.hidden = true;
+                elNeedLink.hidden = true;
                 return;
             }
-            wrap.setAttribute('data-account-id', '0');
-            var c = wrap.querySelector('.fy-close-code');
-            var n = wrap.querySelector('.fy-close-name');
-            if (c) {
-                c.value = '';
+            if (fyCloseGlLinked) {
+                elLinked.hidden = false;
+                elNeedLink.hidden = true;
+            } else {
+                elLinked.hidden = true;
+                elNeedLink.hidden = false;
             }
-            if (n) {
-                n.value = '';
-            }
-        }
-        function fyCloseStripResolvedField(role) {
-            var wrap = document.querySelector('[data-fy-close-role="' + role + '"]');
-            if (!wrap) {
-                return;
-            }
-            wrap.setAttribute('data-account-id', '0');
-            var n = wrap.querySelector('.fy-close-name');
-            if (n) {
-                n.value = '';
-            }
-        }
-        function fyCloseFieldIncomplete(wrap) {
-            if (!wrap) {
-                return false;
-            }
-            var c = wrap.querySelector('.fy-close-code');
-            var code = c ? String(c.value || '').trim() : '';
-            var id = parseInt(wrap.getAttribute('data-account-id'), 10) || 0;
-            return code !== '' && id <= 0;
         }
         function fyCloseMainOpen(fyId) {
             fyClosePendingId = fyId;
             if (chkDoAccounting) {
                 chkDoAccounting.checked = true;
             }
-            fyCloseClearField('income');
-            fyCloseClearField('retained');
+            fyCloseSyncGlPanels();
             if (mainModal) {
                 mainModal.hidden = false;
                 mainModal.setAttribute('aria-hidden', 'false');
@@ -362,87 +336,9 @@ $fySuggestYear = $maxEndY + 1;
                 mainModal.setAttribute('aria-hidden', 'true');
             }
         }
-        function fyClosePickOpen(role) {
-            fyClosePickRole = role;
-            if (!pickModal || !pickQ || !pickList) {
-                return;
-            }
-            pickModal.hidden = false;
-            pickModal.setAttribute('aria-hidden', 'false');
-            document.body.classList.add('gl-pick-open');
-            pickQ.value = '';
-            pickList.innerHTML = '';
-            fyClosePickLoad('');
-            pickQ.focus();
-        }
-        function fyClosePickClose() {
-            fyClosePickRole = null;
-            if (pickModal) {
-                pickModal.hidden = true;
-                pickModal.setAttribute('aria-hidden', 'true');
-            }
-            document.body.classList.remove('gl-pick-open');
-        }
-        function fyClosePickLoad(q) {
-            if (!pickList) {
-                return;
-            }
-            var url = '/admin/api/accounts/search-leaves.php?q=' + encodeURIComponent(q || '');
-            fetch(url, { credentials: 'same-origin' })
-                .then(function (r) { return r.json(); })
-                .then(function (data) {
-                    if (!data.success) {
-                        pickList.innerHTML = '<li class="gl-pick-empty">' + (data.message || 'تعذر التحميل') + '</li>';
-                        return;
-                    }
-                    var accs = data.accounts || [];
-                    if (accs.length === 0) {
-                        pickList.innerHTML = '<li class="gl-pick-empty">لا نتائج</li>';
-                        return;
-                    }
-                    pickList.innerHTML = '';
-                    accs.forEach(function (a) {
-                        var li = document.createElement('li');
-                        li.className = 'gl-pick-item';
-                        var code = a.code || '';
-                        li.textContent = (code ? code + ' — ' : '') + (a.name || '');
-                        li.setAttribute('role', 'button');
-                        li.tabIndex = 0;
-                        li.addEventListener('click', function () {
-                            if (fyClosePickRole) {
-                                fyCloseFillField(fyClosePickRole, { id: a.id, code: code, name: a.name || '' });
-                            }
-                            fyClosePickClose();
-                        });
-                        li.addEventListener('keydown', function (ev) {
-                            if (ev.key === 'Enter' || ev.key === ' ') {
-                                ev.preventDefault();
-                                li.click();
-                            }
-                        });
-                        pickList.appendChild(li);
-                    });
-                })
-                .catch(function (e) {
-                    pickList.innerHTML = '<li class="gl-pick-empty">' + (e.message || String(e)) + '</li>';
-                });
-        }
 
-        if (pickQ) {
-            pickQ.addEventListener('input', function () {
-                if (fyClosePickTimer) {
-                    clearTimeout(fyClosePickTimer);
-                }
-                fyClosePickTimer = setTimeout(function () {
-                    fyClosePickLoad(pickQ.value.trim());
-                }, 280);
-            });
-        }
-        if (pickBackdrop) {
-            pickBackdrop.addEventListener('click', fyClosePickClose);
-        }
-        if (pickClose) {
-            pickClose.addEventListener('click', fyClosePickClose);
+        if (chkDoAccounting) {
+            chkDoAccounting.addEventListener('change', fyCloseSyncGlPanels);
         }
         if (mainBackdrop) {
             mainBackdrop.addEventListener('click', fyCloseMainClose);
@@ -450,65 +346,17 @@ $fySuggestYear = $maxEndY + 1;
         if (mainCancel) {
             mainCancel.addEventListener('click', fyCloseMainClose);
         }
-        document.querySelectorAll('.fy-close-acc-field .fy-close-search').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var wrap = btn.closest('[data-fy-close-role]');
-                var role = wrap ? wrap.getAttribute('data-fy-close-role') : null;
-                if (role) {
-                    fyClosePickOpen(role);
-                }
-            });
-        });
-        document.querySelectorAll('.fy-close-acc-field .fy-close-code').forEach(function (inp) {
-            inp.addEventListener('change', function () {
-                var wrap = inp.closest('[data-fy-close-role]');
-                var role = wrap ? wrap.getAttribute('data-fy-close-role') : null;
-                if (!role) {
-                    return;
-                }
-                var raw = inp.value.trim();
-                if (!raw) {
-                    fyCloseClearField(role);
-                    return;
-                }
-                fetch('/admin/api/accounts/lookup-by-code.php?code=' + encodeURIComponent(raw), { credentials: 'same-origin' })
-                    .then(function (r) { return r.json(); })
-                    .then(function (data) {
-                        if (!data.success) {
-                            fyCloseStripResolvedField(role);
-                            return;
-                        }
-                        fyCloseFillField(role, data.account);
-                    })
-                    .catch(function (e) {
-                        fyCloseStripResolvedField(role);
-                        alert(e.message || String(e));
-                    });
-            });
-        });
         if (mainSubmit) {
             mainSubmit.addEventListener('click', function () {
                 if (fyClosePendingId <= 0) {
                     return;
                 }
                 var doAcct = chkDoAccounting && chkDoAccounting.checked;
-                var payload = { action: 'close', id: fyClosePendingId, accounting_close: !!doAcct };
-                if (doAcct) {
-                    var incW = document.querySelector('[data-fy-close-role="income"]');
-                    var retW = document.querySelector('[data-fy-close-role="retained"]');
-                    if (fyCloseFieldIncomplete(incW) || fyCloseFieldIncomplete(retW)) {
-                        alert('يوجد كود مكتوب دون حساب فرعي — أكمل الاسم عبر كود فرعي صحيح أو امسح الحقل قبل الإقفال.');
-                        return;
-                    }
-                    var incId = incW ? parseInt(incW.getAttribute('data-account-id'), 10) || 0 : 0;
-                    var retId = retW ? parseInt(retW.getAttribute('data-account-id'), 10) || 0 : 0;
-                    if (incId > 0) {
-                        payload.income_summary_account_id = incId;
-                    }
-                    if (retId > 0) {
-                        payload.retained_earnings_account_id = retId;
-                    }
+                if (doAcct && !fyCloseGlLinked) {
+                    alert('اربط حسابي ملخص الدخل والأرباح المحتجزة من شاشة «حسابات القيود التلقائية» ثم أغلق النافذة وأعد فتح «إقفال…».');
+                    return;
                 }
+                var payload = { action: 'close', id: fyClosePendingId, accounting_close: !!doAcct };
                 postJSON('/admin/api/fiscal_years/save.php', payload)
                     .then(function (r) {
                         alert(r.message || (r.success ? 'تم' : 'فشل'));
