@@ -23,9 +23,13 @@ if (! defined('ORANGE_SCHEMA_CODE_VERSION')) {
  */
 function orange_table_exists(PDO $pdo, string $table): bool
 {
-    static $cache = [];
-    if (array_key_exists($table, $cache)) {
-        return $cache[$table];
+    if (! isset($GLOBALS['orange_schema_table_cache']) || ! is_array($GLOBALS['orange_schema_table_cache'])) {
+        $GLOBALS['orange_schema_table_cache'] = [];
+    }
+    $cache = &$GLOBALS['orange_schema_table_cache'];
+    $cacheKey = strtolower($table);
+    if (array_key_exists($cacheKey, $cache)) {
+        return $cache[$cacheKey];
     }
     $stmt = $pdo->prepare(
         'SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
@@ -33,9 +37,20 @@ function orange_table_exists(PDO $pdo, string $table): bool
     );
     $stmt->execute([$table]);
     $exists = (int) $stmt->fetchColumn() > 0;
-    $cache[$table] = $exists;
+    $cache[$cacheKey] = $exists;
 
     return $exists;
+}
+
+/**
+ * بعد CREATE TABLE في نفس الطلب: orange_table_exists() تخزّن false قبل الإنشاء فيجب إبطال الكاش.
+ */
+function orange_schema_invalidate_table_exists(string $table): void
+{
+    if (! isset($GLOBALS['orange_schema_table_cache']) || ! is_array($GLOBALS['orange_schema_table_cache'])) {
+        return;
+    }
+    unset($GLOBALS['orange_schema_table_cache'][strtolower($table)]);
 }
 
 /**
@@ -841,6 +856,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
                 CONSTRAINT orange_fk_gl_setting_account FOREIGN KEY (account_id) REFERENCES accounts (id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'
         );
+        orange_schema_invalidate_table_exists('orange_gl_account_settings');
     }
     if (orange_table_exists($pdo, 'orange_gl_account_settings')
         && !orange_table_has_column($pdo, 'orange_gl_account_settings', 'journal_type_id')) {
@@ -858,6 +874,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
                 PRIMARY KEY (setting_key)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
+        orange_schema_invalidate_table_exists('orange_gl_setting_alloc');
     }
 
     /*
@@ -1084,6 +1101,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
                 CONSTRAINT orange_fk_ojtr_jt FOREIGN KEY (journal_type_id) REFERENCES journal_types (id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
+        orange_schema_invalidate_table_exists('orange_gl_journal_type_rules');
     }
 
     /*
