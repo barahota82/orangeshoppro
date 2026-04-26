@@ -6,6 +6,7 @@ require_once __DIR__ . '/order_helpers.php';
 require_once __DIR__ . '/order_stock.php';
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/gl_settings.php';
+require_once __DIR__ . '/sales_gl_accounts.php';
 require_once __DIR__ . '/gl_pending_movements.php';
 require_once __DIR__ . '/journal_write.php';
 require_once __DIR__ . '/party_subledger.php';
@@ -45,8 +46,9 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
         $debitReceivable = orange_gl_account_id($pdo, 'ar_credit');
         $salesId = orange_gl_account_id($pdo, 'sales_revenue_credit');
     } else {
-        $debitReceivable = orange_gl_account_id($pdo, 'cash');
-        $salesId = orange_gl_account_id($pdo, 'sales_revenue_cash');
+        // نقدي: إيراد التسليم يُرحَّل بأربعة أسطر (ar_cash ← مبيعات، ثم خزينة ← ar_cash).
+        $debitReceivable = 0;
+        $salesId = 0;
     }
     $cogsDeliveryId = orange_gl_cogs_delivery_account_id($pdo);
 
@@ -161,7 +163,32 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
         $srcLabel = 'ORDER-' . $order['order_number'];
 
         if ($salesAmount > 0.0001) {
-            if (orange_gl_use_pending_queue($pdo)) {
+            if (!$isOnline && !$isCredit) {
+                $memoSaleLeg = 'مبيعات نقدي — تسجيل على عملاء نقدي';
+                $memoCashLeg = 'مبيعات نقدي — تحصيل نقدي';
+                $cashSaleFour = orange_gl_cash_delivery_sale_four_lines($pdo, $salesAmount, $memoSaleLeg, $memoCashLeg);
+                if (orange_gl_use_pending_queue($pdo)) {
+                    orange_gl_pending_enqueue_multi(
+                        $pdo,
+                        $cashSaleFour['lines'],
+                        $saleRef,
+                        $srcLabel,
+                        $now,
+                        $now,
+                        $saleDesc,
+                        'order_delivery_sale',
+                        null
+                    );
+                } else {
+                    orange_voucher_post($pdo, [
+                        'voucher_date' => $now,
+                        'document_entered_at' => $now,
+                        'reference' => $saleRef,
+                        'description' => $saleDesc,
+                        'entry_type' => 'order_delivery_sale',
+                    ], $cashSaleFour['lines']);
+                }
+            } elseif (orange_gl_use_pending_queue($pdo)) {
                 $afterJson = null;
                 if ($isCredit && $customerIdForAr > 0) {
                     $afterJson = json_encode([
