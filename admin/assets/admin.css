@@ -23,7 +23,16 @@
     --radius-sm: 10px;
     --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.06), 0 8px 28px rgba(15, 23, 42, 0.06);
     --shadow-sidebar: 4px 0 32px rgba(15, 23, 42, 0.12);
-    --input-min-h: 42px;
+    /* كثافة موحّدة: نفس مقياس صفحات admin-fy-shell وباقي لوحة التحكم */
+    --input-min-h: 36px;
+    --admin-btn-min-h: 36px;
+    --admin-btn-pad-y: 7px;
+    --admin-btn-pad-x: 14px;
+    --admin-btn-font-size: 13px;
+    --admin-heading-page: 1.35rem;
+    --admin-card-section-title: 1.05rem;
+    --admin-table-cell-pad-y: 6px;
+    --admin-table-cell-pad-x: 8px;
     /* تنقل لوحة التحكم: قيم مطابقة للمظهر السابق؛ التعديل هنا فقط لتوحيد المصدر (صيانة) دون تغيير بكسل */
     --admin-topbar-nav-pad-y: 9px;
     --admin-topbar-nav-pad-x: 12px;
@@ -651,16 +660,16 @@ a { text-decoration: none; color: inherit; }
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 24px;
-    padding-bottom: 18px;
-    border-bottom: 1px solid rgba(226, 232, 240, 0.95);
+    margin-bottom: 16px;
+    padding-bottom: 0;
+    border-bottom: none;
 }
 .page-title h1 {
     margin: 0;
     font-family: var(--font-display);
-    font-size: 1.65rem;
+    font-size: var(--admin-heading-page);
     font-weight: 700;
-    letter-spacing: -0.03em;
+    letter-spacing: -0.02em;
     color: #0f172a;
 }
 .page-title--stacked {
@@ -671,13 +680,14 @@ a { text-decoration: none; color: inherit; }
 }
 .page-subtitle {
     margin: 0;
-    font-size: 14px;
+    font-size: 0.95rem;
     color: var(--muted);
-    line-height: 1.5;
+    line-height: 1.55;
 }
 .card-title {
     margin: 0 0 8px;
-    font-size: 18px;
+    font-size: var(--admin-card-section-title);
+    font-weight: 700;
 }
 .card-hint {
     margin: 0 0 14px;
@@ -747,12 +757,12 @@ a { text-decoration: none; color: inherit; }
 }
 .card > h3:first-child {
     margin-top: 0;
+    margin-bottom: 10px;
+    padding-bottom: 0;
+    border-bottom: none;
     font-family: var(--font-display);
-    font-size: 1.08rem;
+    font-size: var(--admin-card-section-title);
     font-weight: 700;
-    padding-bottom: 14px;
-    margin-bottom: 18px;
-    border-bottom: 1px solid var(--border);
     color: #0f172a;
 }
 .grid-2 {
@@ -799,6 +809,14 @@ a { text-decoration: none; color: inherit; }
 .table-wrap {
     overflow-x: auto;
 }
+/* حقول داخل جداول المحتوى: أقصر قليلاً من حقول النماذج العامة */
+.admin-main .table-wrap input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.admin-main .table-wrap select {
+    min-height: 34px;
+    padding: 5px 8px;
+    font-size: var(--admin-btn-font-size);
+    box-sizing: border-box;
+}
 
 /* شريط تصفية/إجراءات فوق الجداول — بدل تنسيقات مضمنة */
 .admin-toolbar {
@@ -826,6 +844,10 @@ a { text-decoration: none; color: inherit; }
 .admin-toolbar__field select {
     min-width: 11rem;
     max-width: 100%;
+    min-height: var(--admin-btn-min-h);
+    padding: 6px 10px;
+    font-size: var(--admin-btn-font-size);
+    box-sizing: border-box;
 }
 
 /* جداول بعرض البطاقة — حواف نظيفة بدل «إطار داخل إطار» */
@@ -1267,10 +1289,26 @@ table.admin-table th {
     padding: 11px 14px;
 }
 
+table.admin-orders-list-table th,
+table.admin-orders-list-table td {
+    border: 1px solid var(--border, #cbd5e1);
+    padding: var(--admin-table-cell-pad-y) var(--admin-table-cell-pad-x);
+    font-size: var(--admin-btn-font-size);
+}
+table.admin-orders-list-table th {
+    background: #f1f5f9;
+    font-weight: 700;
+}
 table.admin-orders-list-table tbody tr:nth-child(even) {
     background: rgba(248, 250, 252, 0.65);
 }
 table.admin-orders-list-table tbody tr:hover {
+    background: rgba(234, 88, 12, 0.06);
+}
+.admin-main table.invoice-recent-picker tbody tr:nth-child(even) {
+    background: rgba(248, 250, 252, 0.65);
+}
+.admin-main table.invoice-recent-picker tbody tr:hover {
     background: rgba(234, 88, 12, 0.06);
 }
 
@@ -1549,14 +1587,15 @@ button:disabled:hover {
 button, .btn {
     border: 0;
     border-radius: var(--radius-sm);
-    padding: 9px 16px;
+    padding: var(--admin-btn-pad-y) var(--admin-btn-pad-x);
     cursor: pointer;
     background: var(--primary);
     color: #fff;
-    font-size: 14px;
+    font-size: var(--admin-btn-font-size);
     font-weight: 600;
-    line-height: 1.25;
-    min-height: 40px;
+    line-height: 1.2;
+    min-height: var(--admin-btn-min-h);
+    box-sizing: border-box;
 }
 /* روابط تُعرض كأزرار (مثل فاتورة في جدول الطلبات) */
 a.btn {
@@ -1594,6 +1633,28 @@ button:hover,
 }
 .btn-success:hover {
     background: var(--success-hover);
+    color: #fff;
+    filter: none;
+}
+
+/* روابط بمظهر زر ثانوي داخل المحتوى — نفس مقياس الأزرار (بدون لمس شريط التنقل) */
+.admin-main a.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    min-height: var(--admin-btn-min-h);
+    padding: var(--admin-btn-pad-y) var(--admin-btn-pad-x);
+    font-size: var(--admin-btn-font-size);
+    font-weight: 600;
+    line-height: 1.2;
+    text-decoration: none;
+    border-radius: var(--radius-sm);
+    background: #475569;
+    color: #fff;
+}
+.admin-main a.btn-secondary:hover {
+    background: #334155;
     color: #fff;
     filter: none;
 }
@@ -2402,9 +2463,9 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
 .coa-shell__footer .btn-secondary,
 .coa-shell__footer .btn-danger,
 .coa-shell__footer a.btn-secondary {
-    min-height: 36px;
-    padding: 7px 12px;
-    font-size: 13px;
+    min-height: var(--admin-btn-min-h);
+    padding: var(--admin-btn-pad-y) 12px;
+    font-size: var(--admin-btn-font-size);
 }
 .coa-shell__footer .btn,
 .coa-shell__footer .btn-secondary,
@@ -2808,7 +2869,7 @@ body.coa-modal-open {
 .admin-fy-shell__title,
 .fy-years-page__title {
     margin: 0 0 14px;
-    font-size: 1.35rem;
+    font-size: var(--admin-heading-page);
     font-weight: 700;
     color: #0f172a;
     font-family: var(--font-display);
@@ -2836,17 +2897,6 @@ body.coa-modal-open {
     font-size: 1.05rem;
     font-weight: 700;
 }
-/* إلغاء شريط العنوان الثقيل الافتراضي لـ .card > h3 — صفحة السنوات المالية بدون h3 في البطاقة */
-.admin-fy-shell .admin-fy-card > h3:first-child {
-    margin-top: 0;
-    margin-bottom: 10px;
-    padding-bottom: 0;
-    border-bottom: none;
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: #0f172a;
-    font-family: var(--font-display);
-}
 .fy-years-card,
 .admin-fy-card.fy-years-card {
     margin-bottom: 0;
@@ -2867,82 +2917,13 @@ body.coa-modal-open {
 .admin-fy-table th,
 .admin-fy-table td {
     border: 1px solid var(--border, #cbd5e1);
-    padding: 6px 8px;
+    padding: var(--admin-table-cell-pad-y) var(--admin-table-cell-pad-x);
     vertical-align: middle;
 }
 .fy-years-table th,
 .admin-fy-table th {
     background: #f1f5f9;
     font-weight: 700;
-}
-/* جداول الطلبات داخل الهيكل الموحّد: نفس كثافة الخلايا */
-.admin-fy-shell table.admin-orders-list-table th,
-.admin-fy-shell table.admin-orders-list-table td {
-    border: 1px solid var(--border, #cbd5e1);
-    padding: 6px 8px;
-    font-size: 13px;
-}
-.admin-fy-shell table.admin-orders-list-table th {
-    background: #f1f5f9;
-}
-.admin-fy-shell table.invoice-recent-picker tbody tr:nth-child(even) {
-    background: rgba(248, 250, 252, 0.65);
-}
-.admin-fy-shell table.invoice-recent-picker tbody tr:hover {
-    background: rgba(234, 88, 12, 0.06);
-}
-
-/* أحجام تحكم موحّدة داخل الصفحات بنفس الهيكل (أزرار/مدخلات/قوائم التصفية) */
-.admin-fy-shell button,
-.admin-fy-shell input[type="submit"],
-.admin-fy-shell .btn,
-.admin-fy-shell a.btn {
-    min-height: 36px;
-    padding: 7px 14px;
-    font-size: 13px;
-    font-weight: 600;
-    line-height: 1.2;
-    box-sizing: border-box;
-}
-.admin-fy-shell a.btn-secondary {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    box-sizing: border-box;
-    min-height: 36px;
-    padding: 7px 14px;
-    font-size: 13px;
-    font-weight: 600;
-    line-height: 1.2;
-    text-decoration: none;
-}
-.admin-fy-shell .admin-toolbar select {
-    min-height: 36px;
-    padding: 6px 10px;
-    font-size: 13px;
-    box-sizing: border-box;
-}
-.admin-fy-shell .admin-fy-table input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-.admin-fy-shell .admin-fy-table select,
-.admin-fy-shell table.admin-orders-list-table input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-.admin-fy-shell table.admin-orders-list-table select {
-    min-height: 34px;
-    padding: 5px 8px;
-    font-size: 13px;
-    box-sizing: border-box;
-}
-.admin-fy-shell .fy-btn-acct-close,
-.admin-fy-shell .fy-btn-reopen,
-.admin-fy-shell .fy-btn-del {
-    min-height: 36px;
-    padding: 7px 14px;
-    font-size: 13px;
-    font-weight: 600;
-}
-.admin-fy-shell .fy-actions > button {
-    min-height: 36px;
-    padding: 7px 14px;
-    font-size: 13px;
 }
 /* السنوات المالية — أعمدة خاصة */
 .fy-col-num {
@@ -2997,10 +2978,12 @@ body.coa-modal-open {
     width: 4.25rem;
 }
 .fy-btn-acct-close {
-    padding: 4px 8px;
-    min-height: 32px;
-    font-size: 12px;
+    padding: var(--admin-btn-pad-y) var(--admin-btn-pad-x);
+    min-height: var(--admin-btn-min-h);
+    font-size: var(--admin-btn-font-size);
+    font-weight: 600;
     white-space: nowrap;
+    box-sizing: border-box;
 }
 .fy-close-acc-label {
     display: block;
@@ -3076,9 +3059,11 @@ body.coa-modal-open {
     text-align: center;
 }
 .fy-btn-del {
-    padding: 4px 10px;
-    min-height: 32px;
-    font-size: 12px;
+    padding: var(--admin-btn-pad-y) var(--admin-btn-pad-x);
+    min-height: var(--admin-btn-min-h);
+    font-size: var(--admin-btn-font-size);
+    font-weight: 600;
+    box-sizing: border-box;
 }
 .fy-actions {
     display: flex;
