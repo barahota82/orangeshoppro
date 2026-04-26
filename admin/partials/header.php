@@ -224,7 +224,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
 
             /* الحسابات العامة: الدليل وأنواع اليوميات والقيود التلقائية ثم السنوات والترحيل */
             $navAccounting = [
-                ['page' => 'chart_of_accounts', 'href' => '/admin/index.php?page=chart_of_accounts', 'label' => 'الدليل المحاسبي', 'class' => '', 'sub' => false],
+                ['page' => 'chart_of_accounts', 'href' => '/admin/index.php?page=chart_of_accounts', 'label' => 'الدليل المحاسبي', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'journal_types', 'href' => '/admin/index.php?page=journal_types', 'label' => 'أنواع اليوميات', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'gl_account_settings', 'href' => '/admin/index.php?page=gl_account_settings', 'label' => 'حسابات القيود التلقائية', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'fiscal_years', 'href' => '/admin/index.php?page=fiscal_years', 'label' => 'السنوات المالية', 'class' => 'admin-nav-sub', 'sub' => true],
