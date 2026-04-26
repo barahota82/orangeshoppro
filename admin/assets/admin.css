@@ -2830,15 +2830,22 @@ body.coa-modal-open {
 .admin-fy-shell > .card.admin-fy-card:last-child {
     margin-bottom: 0;
 }
-.admin-fy-shell .admin-fy-card .card-title {
-    margin: 0 0 10px;
-    font-size: 1.05rem;
-    font-weight: 700;
-}
+.admin-fy-shell .admin-fy-card .card-title,
 .admin-fy-shell .admin-fy-card > h3:not(.card-title) {
     margin: 0 0 10px;
     font-size: 1.05rem;
     font-weight: 700;
+}
+/* إلغاء شريط العنوان الثقيل الافتراضي لـ .card > h3 — صفحة السنوات المالية بدون h3 في البطاقة */
+.admin-fy-shell .admin-fy-card > h3:first-child {
+    margin-top: 0;
+    margin-bottom: 10px;
+    padding-bottom: 0;
+    border-bottom: none;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #0f172a;
+    font-family: var(--font-display);
 }
 .fy-years-card,
 .admin-fy-card.fy-years-card {
@@ -2883,6 +2890,59 @@ body.coa-modal-open {
 }
 .admin-fy-shell table.invoice-recent-picker tbody tr:hover {
     background: rgba(234, 88, 12, 0.06);
+}
+
+/* أحجام تحكم موحّدة داخل الصفحات بنفس الهيكل (أزرار/مدخلات/قوائم التصفية) */
+.admin-fy-shell button,
+.admin-fy-shell input[type="submit"],
+.admin-fy-shell .btn,
+.admin-fy-shell a.btn {
+    min-height: 36px;
+    padding: 7px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.2;
+    box-sizing: border-box;
+}
+.admin-fy-shell a.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    min-height: 36px;
+    padding: 7px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.2;
+    text-decoration: none;
+}
+.admin-fy-shell .admin-toolbar select {
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: 13px;
+    box-sizing: border-box;
+}
+.admin-fy-shell .admin-fy-table input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.admin-fy-shell .admin-fy-table select,
+.admin-fy-shell table.admin-orders-list-table input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.admin-fy-shell table.admin-orders-list-table select {
+    min-height: 34px;
+    padding: 5px 8px;
+    font-size: 13px;
+    box-sizing: border-box;
+}
+.admin-fy-shell .fy-btn-acct-close,
+.admin-fy-shell .fy-btn-reopen,
+.admin-fy-shell .fy-btn-del {
+    min-height: 36px;
+    padding: 7px 14px;
+    font-size: 13px;
+    font-weight: 600;
+}
+.admin-fy-shell .fy-actions > button {
+    min-height: 36px;
+    padding: 7px 14px;
+    font-size: 13px;
 }
 /* السنوات المالية — أعمدة خاصة */
 .fy-col-num {
