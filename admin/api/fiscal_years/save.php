@@ -125,6 +125,13 @@ try {
                         json_response(['success' => false, 'message' => 'سنة غير موجودة: #' . $id], 422);
                     }
                     $wasClosed = (int) ($prev['is_closed'] ?? 0) === 1;
+                    if ($wasClosed && $isClosed === 0) {
+                        $pdo->rollBack();
+                        json_response([
+                            'success' => false,
+                            'message' => 'لا يمكن فتح سنة مغلقة من زر «حفظ» — استخدم «فك الإقفال» في عمود الإقفال المحاسبي لحذف سند الإقفال وإعادة فتح السنة.',
+                        ], 422);
+                    }
                     if ($isClosed === 1 && ! $wasClosed) {
                         $closedAt = date('Y-m-d H:i:s');
                     } elseif ($isClosed === 1 && $wasClosed) {
@@ -212,6 +219,32 @@ try {
             'message' => $accountingClose
                 ? 'تم الإقفال المحاسبي (إن وُجدت إيرادات/مصروفات مصنفة) ثم إغلاق السنة.'
                 : 'تم إغلاق السنة إدارياً دون قيود إقفال تلقائية.',
+        ]);
+    }
+
+    if ($action === 'reopen') {
+        $id = (int) ($data['id'] ?? 0);
+        if ($id <= 0) {
+            json_response(['success' => false, 'message' => 'معرف السنة مطلوب'], 422);
+        }
+        try {
+            $info = orange_fiscal_year_reopen($pdo, $id);
+        } catch (Throwable $e) {
+            if ($e instanceof InvalidArgumentException || $e instanceof RuntimeException) {
+                json_response(['success' => false, 'message' => $e->getMessage()], 422);
+            }
+            orange_gl_api_catch_json($e, 'تعذر فك إقفال السنة');
+        }
+        $n = (int) ($info['removed_year_end_vouchers'] ?? 0);
+        audit_log('fiscal_year_reopen', 'فك إقفال سنة مالية #' . $id . ' — حذف سندات إقفال: ' . $n, 'fiscal_years', $id);
+        $hint = ' راجع أرصدة أول المدة للسنة التالية إن كانت مُرحَّلة.';
+        json_response([
+            'success' => true,
+            'message' => ($n > 0
+                ? 'تم حذف ' . $n . ' سند إقفال محاسبي وإعادة فتح السنة.'
+                : 'تم إعادة فتح السنة (لم يُوجد سند إقفال محاسبي — إغلاق إداري أو بلا قيود).')
+                . $hint,
+            'removed_year_end_vouchers' => $n,
         ]);
     }
 

@@ -20,10 +20,11 @@ function orange_gl_setting_key_labels(): array
 {
     return [
         'cash' => 'الخزينة / النقدية — دائن شراء نقدي؛ مدين تحصيل مبيعات نقدي',
-        'general_expense' => 'مصروف عام (لوحة المصروفات) — مدين عند تسجيل مصروف إداري من شاشة المصروفات',
+        /** احتياط فقط (مصروفات قديمة بلا حساب فرعي / عكس قيد) — لا يُعرض في شاشة الربط. */
+        'general_expense' => 'مصروف عام — احتياط تقني فقط',
         'inventory' => 'المخزون — مدين شراء؛ دائن تكلفة البضاعة المباعة',
-        /** لا يُعرض في شاشة «حسابات القيود التلقائية»؛ يُستخدم في مشتريات آجل وسندات الموردين. */
-        'accounts_payable' => 'ذمم الموردين — دائن شراء آجل',
+        /** احتياط فقط (تقارير ذمم / توافق قديم) — شراء آجل يُرحَّل على حساب ذمة كل مورد. */
+        'accounts_payable' => 'ذمم الموردين المجمّعة — احتياط تقني فقط',
         'sales_revenue_cash' => 'إيراد مبيعات نقدي — دائن عند تسليم طلب نقدي',
         'sales_revenue_credit' => 'إيراد مبيعات آجل — دائن عند تسليم طلب آجل',
         'sales_revenue_online' => 'إيراد مبيعات أونلاين — دائن عند تسليم طلب أونلاين',
@@ -53,9 +54,7 @@ function orange_gl_setting_row_short_labels(): array
 {
     return [
         'cash' => 'الخزينة',
-        'general_expense' => 'مصروف عام',
         'inventory' => 'المخزن',
-        'accounts_payable' => 'ذمم الموردين',
         'ar_cash' => 'العملاء النقدي',
         'ar_credit' => 'العملاء الاجل',
         'sales_revenue_cash' => 'المبيعات النقدية',
@@ -82,9 +81,7 @@ function orange_gl_settings_form_key_order(): array
 {
     return [
         'cash',
-        'general_expense',
         'inventory',
-        'accounts_payable',
         'ar_cash',
         'ar_credit',
         'sales_revenue_cash',

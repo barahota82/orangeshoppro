@@ -77,6 +77,30 @@ function orange_fiscal_is_closed_for_entry(PDO $pdo, array $journalRow): bool
 }
 
 /**
+ * السنة المالية التالية لإقفال ملخص الدخل إلى المحتجز: يُفضّل أن يكون أولها = نهاية السنة الحالية + يوم واحد.
+ *
+ * @return array<string, mixed>|null
+ */
+function orange_fiscal_year_next_after_end(PDO $pdo, string $endDateYmd): ?array
+{
+    if (! orange_table_exists($pdo, 'fiscal_years') || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $endDateYmd)) {
+        return null;
+    }
+    $nextDay = date('Y-m-d', strtotime($endDateYmd . ' +1 day'));
+    $st = $pdo->prepare('SELECT * FROM fiscal_years WHERE start_date = ? ORDER BY id ASC LIMIT 1');
+    $st->execute([$nextDay]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if ($row) {
+        return $row;
+    }
+    $st = $pdo->prepare('SELECT * FROM fiscal_years WHERE start_date > ? ORDER BY start_date ASC, id ASC LIMIT 1');
+    $st->execute([$endDateYmd]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+
+    return $row ?: null;
+}
+
+/**
  * تداخل النطاقات: يوجد صف يقطع المدى [start,end]؟
  */
 function orange_fiscal_range_overlaps_existing(PDO $pdo, string $start, string $end, ?int $exceptId = null): bool

@@ -30,17 +30,25 @@ $rowTitles = orange_gl_setting_row_short_labels();
 $keyHints = orange_gl_setting_key_labels();
 $orderedKeys = orange_gl_settings_ui_key_order();
 $journalRules = orange_gl_journal_type_rules_list($pdo);
+$allowedGlKeys = orange_gl_allowed_setting_keys();
+$ruleKeyOrder = array_values(array_unique(array_merge(
+    $orderedKeys,
+    array_values(array_diff($allowedGlKeys, $orderedKeys))
+)));
 
 $jtJson = json_encode($journalTypesList, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 $keysJson = json_encode($orderedKeys, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 $shortJson = json_encode($rowTitles, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+$hintsJson = json_encode($keyHints, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+$ruleKeysJson = json_encode($ruleKeyOrder, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 $rulesJson = json_encode($journalRules, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 ?>
 <div class="page-title page-title--stacked">
     <h1>حسابات القيود التلقائية</h1>
     <p class="page-subtitle">
         <strong>الجزء الأول:</strong> ربط كل بند بحساب فرعي من الدليل (بدون نوع يومية هنا).
-        <strong>الجزء الثاني:</strong> لكل نوع يومية اختر بنداً للمدين وبنداً للدائن من نفس البنود أعلاه — كل نوع يومية مرة واحدة فقط.
+        لا يُعرض هنا «مصروف عام» أو «ذمم موردين مجمّعة» — المصروفات تُربط لكل بند من شاشة المصروفات، والشراء الآجل على حساب ذمة كل مورد.
+        <strong>الجزء الثاني:</strong> لكل نوع يومية اختر بنداً للمدين وبنداً للدائن — يمكن تضمين مفاتيح احتياطية في القائمة المنسدلة إن وُجدت في قاعدة البيانات لقواعد قديمة.
     </p>
 </div>
 
@@ -117,6 +125,8 @@ $rulesJson = json_encode($journalRules, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_E
     var glJournalTypes = <?php echo $jtJson; ?>;
     var glUiKeyOrder = <?php echo $keysJson; ?>;
     var glKeyShort = <?php echo $shortJson; ?>;
+    var glKeyHints = <?php echo $hintsJson; ?>;
+    var glRuleKeyOrder = <?php echo $ruleKeysJson; ?>;
     var glInitialRules = <?php echo $rulesJson; ?>;
 
     function esc(s) {
@@ -128,9 +138,9 @@ $rulesJson = json_encode($journalRules, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_E
 
     function keyOptionsHtml(selected) {
         var h = '<option value="">— بند —</option>';
-        for (var i = 0; i < glUiKeyOrder.length; i++) {
-            var k = glUiKeyOrder[i];
-            var lab = glKeyShort[k] || k;
+        for (var i = 0; i < glRuleKeyOrder.length; i++) {
+            var k = glRuleKeyOrder[i];
+            var lab = glKeyShort[k] || glKeyHints[k] || k;
             h += '<option value="' + esc(k) + '"' + (k === selected ? ' selected' : '') + '>' + esc(lab) + '</option>';
         }
         return h;

@@ -95,7 +95,7 @@ try {
 
     $inventoryId = orange_gl_account_id($pdo, 'inventory');
     $cashId = orange_gl_account_id($pdo, 'cash');
-    $apId = orange_gl_account_id($pdo, 'accounts_payable');
+    $apId = 0;
     if ($type === 'credit') {
         $apId = orange_supplier_required_payable_account_id($pdo, $supplierId);
     }

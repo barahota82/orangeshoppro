@@ -135,11 +135,11 @@ try {
                 $pdo->rollBack();
                 json_response(['success' => false, 'message' => 'بند المدين والدائن يجب أن يختلفان في نفس القاعدة.'], 422);
             }
-            if (!in_array($dk, $uiKeys, true) || !in_array($ck, $uiKeys, true)) {
+            if (!in_array($dk, $allowedKeys, true) || !in_array($ck, $allowedKeys, true)) {
                 $pdo->rollBack();
                 json_response([
                     'success' => false,
-                    'message' => 'بند المدين/الدائن يجب أن يكون من البنود المعروضة في الجدول العلوي.',
+                    'message' => 'بند المدين/الدائن يجب أن يكون مفتاحاً معرفاً في النظام (قائمة إعدادات القيود).',
                 ], 422);
             }
             if (!$chkJt) {

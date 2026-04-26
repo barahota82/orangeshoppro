@@ -62,11 +62,11 @@ $fySuggestYear = $maxEndY + 1;
                             <input type="text" class="fy-inp-end fy-inp-dmy" dir="ltr" autocomplete="off" placeholder="يوم/شهر/سنة" maxlength="10" value="<?php echo htmlspecialchars($edDisp, ENT_QUOTES, 'UTF-8'); ?>">
                         </td>
                         <td class="fy-col-closed fy-col-center">
-                            <input type="checkbox" class="fy-chk-closed" <?php echo $closed ? ' checked' : ''; ?>>
+                            <input type="checkbox" class="fy-chk-closed"<?php echo $closed ? ' checked disabled title="سنة مغلقة — لفتحها استخدم فك الإقفال"' : ''; ?>>
                         </td>
                         <td class="fy-col-acct-close fy-col-center">
                             <?php if ($closed): ?>
-                                <span class="muted">—</span>
+                                <button type="button" class="fy-btn-reopen btn-secondary" title="حذف سند الإقفال المحاسبي وإعادة فتح السنة">فك الإقفال…</button>
                             <?php else: ?>
                                 <button type="button" class="fy-btn-acct-close btn-secondary" title="إغلاق السنة مع خيارات الإقفال">إقفال…</button>
                             <?php endif; ?>
@@ -94,8 +94,9 @@ $fySuggestYear = $maxEndY + 1;
     <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="fy_close_main_title">
         <h3 id="fy_close_main_title" class="gl-pick-modal__title">إقفال سنة مالية</h3>
         <p class="muted" style="margin:0 0 12px;font-size:0.9rem;line-height:1.45;">
-            عند وجود إيرادات أو مصروفات أو تكلفة مبيعات مصنّفة في الدليل، يُنشأ سند إقفال. حدّد حساب <strong>ملخص الدخل</strong> (وسيط) و<strong>الأرباح المحتجزة</strong>،
-            أو اترك الحقلين فارغين إن كانا مربوطين مسبقاً في قاعدة البيانات.
+            عند وجود إيرادات أو مصروفات أو تكلفة مبيعات مصنّفة في الدليل: <strong>سند 1</strong> بتاريخ <strong>آخر يوم</strong> من السنة — إقفال القائمة إلى ملخص الدخل؛
+            وإن وُجد صافي ربح أو خسارة <strong>سند 2</strong> بتاريخ <strong>أول يوم</strong> من السنة التالية (يجب أن تكون معرّفة ومفتوحة) — من ملخص الدخل إلى الأرباح المحتجزة.
+            حدّد حسابي <strong>ملخص الدخل</strong> و<strong>المحتجز</strong> أو اتركهما للربط في القاعدة.
         </p>
         <label class="fy-close-check-label" style="display:flex;align-items:center;gap:8px;margin-bottom:14px;cursor:pointer;">
             <input type="checkbox" id="fy_close_do_accounting" checked>
@@ -520,6 +521,29 @@ $fySuggestYear = $maxEndY + 1;
         }
 
         tbody.addEventListener('click', function (ev) {
+            var reopenBtn = ev.target.closest('.fy-btn-reopen');
+            if (reopenBtn) {
+                var trR = reopenBtn.closest('tr[data-fy-row]');
+                if (!trR) {
+                    return;
+                }
+                var rid = parseInt(trR.getAttribute('data-id'), 10) || 0;
+                if (rid <= 0) {
+                    return;
+                }
+                if (!confirm('فك إقفال هذه السنة؟\n\nسيتم حذف سندات الإقفال (YEC-PL وYEC-RE أو السند القديم YEC-) إن وُجدت، وإعادة فتح السنة.\nإن وُجدت أرصدة أول مدة للسنة التالية مُرحَّلة، راجعها بعد التصحيح.')) {
+                    return;
+                }
+                postJSON('/admin/api/fiscal_years/save.php', { action: 'reopen', id: rid })
+                    .then(function (r) {
+                        alert(r.message || (r.success ? 'تم' : 'فشل'));
+                        if (r.success) {
+                            location.reload();
+                        }
+                    })
+                    .catch(function (e) { alert(e.message || String(e)); });
+                return;
+            }
             var acBtn = ev.target.closest('.fy-btn-acct-close');
             if (acBtn) {
                 var tr = acBtn.closest('tr[data-fy-row]');

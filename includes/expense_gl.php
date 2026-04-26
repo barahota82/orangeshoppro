@@ -51,8 +51,15 @@ function orange_expense_gl_pair_for_delete_row(PDO $pdo, array $row): array
         return orange_expense_gl_accounts($pdo, $oid);
     }
 
+    $fallback = orange_gl_account_id_optional($pdo, 'general_expense');
+    if ($fallback === null || $fallback <= 0) {
+        throw new RuntimeException(
+            'مصروف قديم بلا حساب مصروف في الدليل — عيّن له حساباً من شاشة المصروفات أو أضف مؤقتاً مفتاح general_expense في جدول إعدادات القيود لعكس القيد.'
+        );
+    }
+
     return [
-        'debit' => orange_gl_account_id($pdo, 'general_expense'),
+        'debit' => $fallback,
         'credit' => orange_gl_account_id($pdo, 'cash'),
     ];
 }
