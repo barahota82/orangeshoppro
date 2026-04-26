@@ -57,13 +57,7 @@ $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
 <div class="card gl-auto-form-card">
         <h3 class="card-title">١ — البنود والحسابات من الدليل</h3>
         <div class="table-wrap gl-settings-table-wrap">
-            <table class="gl-settings-table gl-settings-table--account-keys">
-                <colgroup>
-                    <col class="gl-col-label">
-                    <col class="gl-col-code">
-                    <col class="gl-col-name">
-                    <col class="gl-col-pct">
-                </colgroup>
+            <table class="gl-settings-table">
                 <thead>
                     <tr>
                         <th class="gl-th-label">البند</th>

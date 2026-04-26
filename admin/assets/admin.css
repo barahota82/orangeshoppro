@@ -2941,22 +2941,6 @@ body.coa-modal-open {
     border-collapse: collapse;
     font-size: 13px;
 }
-/* جدول البنود + الكود + الاسم + نسبة: عمود النسبة بعرض ثابت والباقي للاسم */
-.gl-settings-table--account-keys {
-    table-layout: fixed;
-}
-.gl-settings-table--account-keys col.gl-col-label {
-    width: 1%;
-}
-.gl-settings-table--account-keys col.gl-col-code {
-    width: 8.75rem;
-}
-.gl-settings-table--account-keys col.gl-col-name {
-    width: auto;
-}
-.gl-settings-table--account-keys col.gl-col-pct {
-    width: 3.5rem;
-}
 .gl-settings-table th,
 .gl-settings-table td {
     border: 1px solid var(--border, #cbd5e1);
@@ -3047,24 +3031,22 @@ body.coa-modal-open {
     color: #1f2937;
     box-sizing: border-box;
 }
-/* نسبة الاحتياطي القانوني — عمود ضيق (يُثبَّت عرضه بـ colgroup + table-layout:fixed على الجدول الأول) */
-.gl-settings-table--account-keys .gl-th-pct,
-.gl-settings-table--account-keys .gl-td-pct {
-    width: 3.5rem;
-    max-width: 3.5rem;
-    min-width: 3.5rem;
-    padding: 8px 4px;
+/* نسبة الاحتياطي القانوني — عمود ضيق مناسب لقيم 0–100 */
+.gl-th-pct,
+.gl-td-pct {
+    width: 4.75rem;
+    max-width: 5.25rem;
+    min-width: 4.25rem;
     text-align: center;
     white-space: nowrap;
-    box-sizing: border-box;
 }
 .gl-inp-alloc-pct {
     width: 100%;
-    max-width: 3.25rem;
+    max-width: 4.5rem;
     margin: 0 auto;
     display: block;
-    min-height: 32px;
-    padding: 5px 2px;
+    min-height: 34px;
+    padding: 6px 4px;
     font-size: 13px;
     border: 1px solid #cbd5e1;
     border-radius: 6px;
