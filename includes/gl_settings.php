@@ -212,6 +212,7 @@ function orange_gl_allowed_setting_keys(): array
 function orange_gl_setting_alloc_percent(PDO $pdo, string $settingKey): float
 {
     orange_catalog_ensure_schema($pdo);
+    orange_catalog_ensure_gl_account_settings_alloc_tables($pdo);
     if (trim($settingKey) === '' || ! orange_table_exists($pdo, 'orange_gl_setting_alloc')) {
         return 0.0;
     }

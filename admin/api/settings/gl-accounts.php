@@ -12,6 +12,7 @@ require_admin_api();
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
+    orange_catalog_ensure_gl_account_settings_alloc_tables($pdo);
 
     $data = get_json_input();
     $action = trim((string) ($data['action'] ?? 'get'));

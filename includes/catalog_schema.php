@@ -443,6 +443,53 @@ function orange_catalog_ensure_storefront_read_bootstrap(PDO $pdo): void
     $bootDone = true;
 }
 
+/**
+ * جداول ربط حسابات القيود التلقائية + نسب (مثل الاحتياطي القانوني).
+ * المسار السريع عند تطابق checkpoint كان يتخطى النواة الكاملة فلا يُنشَأ orange_gl_setting_alloc
+ * ولا تُقرأ/تُحفَظ النسبة — لذا يُستدعى هذا من المسار السريع ومن شاشة الإعدادات.
+ */
+function orange_catalog_ensure_gl_account_settings_alloc_tables(PDO $pdo): void
+{
+    if (!orange_table_exists($pdo, 'accounts')) {
+        return;
+    }
+
+    if (!orange_table_exists($pdo, 'orange_gl_account_settings')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE orange_gl_account_settings (
+                setting_key VARCHAR(64) NOT NULL,
+                account_id INT NOT NULL,
+                journal_type_id INT NULL,
+                updated_at DATETIME NULL DEFAULT NULL ON UPDATE current_timestamp(),
+                PRIMARY KEY (setting_key),
+                KEY idx_gl_set_account (account_id),
+                KEY idx_gl_set_jt (journal_type_id),
+                CONSTRAINT orange_fk_gl_setting_account FOREIGN KEY (account_id) REFERENCES accounts (id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'
+        );
+        orange_schema_invalidate_table_exists('orange_gl_account_settings');
+    }
+    if (orange_table_exists($pdo, 'orange_gl_account_settings')
+        && !orange_table_has_column($pdo, 'orange_gl_account_settings', 'journal_type_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE orange_gl_account_settings ADD COLUMN journal_type_id INT NULL');
+        orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_gl_set_jt ON orange_gl_account_settings (journal_type_id)');
+    }
+
+    if (!orange_table_exists($pdo, 'orange_gl_setting_alloc')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE orange_gl_setting_alloc (
+                setting_key VARCHAR(64) NOT NULL,
+                percent_value DECIMAL(8,4) NOT NULL DEFAULT 0.0000,
+                updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (setting_key)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+        orange_schema_invalidate_table_exists('orange_gl_setting_alloc');
+    }
+}
+
 function orange_catalog_ensure_schema_core(PDO $pdo): void
 {
     // Per-connection charset (avoids editing config.php; some hosts break PDO::MYSQL_ATTR_INIT_COMMAND).
@@ -465,6 +512,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         orange_schema_run_pending_migrations($pdo);
         /* جدول accounts قد يُفرَّغ يدوياً؛ المسار السريع كان يتخطى البذرة فلا تُعاد الجذور الافتراضية */
         orange_catalog_seed_default_accounts_if_empty($pdo);
+        orange_catalog_ensure_gl_account_settings_alloc_tables($pdo);
         if (! $metaOk && $ckOk) {
             orange_schema_meta_save($pdo, $schemaRev);
         }
@@ -842,40 +890,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         orange_catalog_safe_exec($pdo, 'CREATE UNIQUE INDEX uq_accounts_code ON accounts (code)');
     }
 
-    if (!orange_table_exists($pdo, 'orange_gl_account_settings')) {
-        orange_catalog_safe_exec(
-            $pdo,
-            'CREATE TABLE orange_gl_account_settings (
-                setting_key VARCHAR(64) NOT NULL,
-                account_id INT NOT NULL,
-                journal_type_id INT NULL,
-                updated_at DATETIME NULL DEFAULT NULL ON UPDATE current_timestamp(),
-                PRIMARY KEY (setting_key),
-                KEY idx_gl_set_account (account_id),
-                KEY idx_gl_set_jt (journal_type_id),
-                CONSTRAINT orange_fk_gl_setting_account FOREIGN KEY (account_id) REFERENCES accounts (id)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'
-        );
-        orange_schema_invalidate_table_exists('orange_gl_account_settings');
-    }
-    if (orange_table_exists($pdo, 'orange_gl_account_settings')
-        && !orange_table_has_column($pdo, 'orange_gl_account_settings', 'journal_type_id')) {
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE orange_gl_account_settings ADD COLUMN journal_type_id INT NULL');
-        orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_gl_set_jt ON orange_gl_account_settings (journal_type_id)');
-    }
-
-    if (!orange_table_exists($pdo, 'orange_gl_setting_alloc')) {
-        orange_catalog_safe_exec(
-            $pdo,
-            'CREATE TABLE orange_gl_setting_alloc (
-                setting_key VARCHAR(64) NOT NULL,
-                percent_value DECIMAL(8,4) NOT NULL DEFAULT 0.0000,
-                updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-                PRIMARY KEY (setting_key)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
-        );
-        orange_schema_invalidate_table_exists('orange_gl_setting_alloc');
-    }
+    orange_catalog_ensure_gl_account_settings_alloc_tables($pdo);
 
     /*
      |--------------------------------------------------------------------------

@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../includes/journal_types.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+orange_catalog_ensure_gl_account_settings_alloc_tables($pdo);
 
 $accountsRows = $pdo->query(
     'SELECT id, name, code FROM accounts ORDER BY COALESCE(code, \'\'), name ASC'
