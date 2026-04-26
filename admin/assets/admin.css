@@ -412,10 +412,34 @@ a { text-decoration: none; color: inherit; }
     border-inline-start: var(--admin-mega-link-sub-border-w) solid rgba(255, 255, 255, 0.22);
     padding-inline-start: var(--admin-mega-link-sub-pad-start);
 }
+
+/* لوحة «الحسابات العامة»: خلايا متساوية العرض (مع احترام إخفاء روابط بالصلاحيات) */
+#mega-panel-accounting .admin-mega-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(10.75rem, 100%), 1fr));
+}
+#mega-panel-accounting .admin-mega-grid > .admin-mega-link {
+    justify-content: center;
+    text-align: center;
+}
+
 /* 992 بدل 1025: نوافذ 1024px (شائعة مع شريط أدوات) كانت تخفي القائمة العلوية بالكامل */
 @media (min-width: 992px) {
     .admin-topbar-mega {
         display: flex;
+    }
+    /* توزيع متساوٍ لعناوين الأقسام (الحسابات العامة، المخازن، …) دون تغيير عرض «الرئيسية» */
+    .admin-topbar-mega > .admin-mega-dropdown {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+    .admin-topbar-mega .admin-mega-trigger {
+        width: 100%;
+        max-width: none;
+        justify-content: center;
+    }
+    .admin-topbar-mega .admin-mega-trigger__label {
+        flex: 0 1 auto;
+        text-align: center;
     }
     .admin-menu-toggle {
         display: none !important;
