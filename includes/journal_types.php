@@ -166,3 +166,32 @@ function orange_gl_entry_types_for_journal_type_id(PDO $pdo, int $journalTypeId)
     }
     return orange_gl_entry_types_for_journal_type_code($code);
 }
+
+function orange_journal_type_code_by_id(PDO $pdo, int $id): string
+{
+    if ($id <= 0 || !orange_table_exists($pdo, 'journal_types')) {
+        return '';
+    }
+    $st = $pdo->prepare('SELECT code FROM journal_types WHERE id = ? LIMIT 1');
+    $st->execute([$id]);
+    $c = $st->fetchColumn();
+    if ($c === false || $c === null) {
+        return '';
+    }
+
+    return orange_journal_type_normalize_code((string) $c);
+}
+
+function orange_journal_type_id_by_code(PDO $pdo, string $code): int
+{
+    $norm = orange_journal_type_normalize_code($code);
+    if ($norm === '' || !orange_table_exists($pdo, 'journal_types')) {
+        return 0;
+    }
+    orange_journal_types_sync_canonical_defaults($pdo);
+    $st = $pdo->prepare('SELECT id FROM journal_types WHERE code = ? LIMIT 1');
+    $st->execute([$norm]);
+    $id = $st->fetchColumn();
+
+    return ($id !== false && $id !== null) ? (int) $id : 0;
+}

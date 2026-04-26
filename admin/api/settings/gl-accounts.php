@@ -121,9 +121,9 @@ try {
             : null;
         $pdo->exec('DELETE FROM orange_gl_journal_type_rules');
         $insRule = $pdo->prepare(
-            'INSERT INTO orange_gl_journal_type_rules (journal_type_id, debit_setting_key, credit_setting_key) VALUES (?,?,?)'
+            'INSERT INTO orange_gl_journal_type_rules (journal_type_id, payment_terms, debit_setting_key, credit_setting_key) VALUES (?,?,?,?)'
         );
-        $seenJt = [];
+        $seenRule = [];
         foreach ($rawRules as $rule) {
             if (!is_array($rule)) {
                 continue;
@@ -131,14 +131,148 @@ try {
             $jt = (int) ($rule['journal_type_id'] ?? 0);
             $dk = trim((string) ($rule['debit_setting_key'] ?? ''));
             $ck = trim((string) ($rule['credit_setting_key'] ?? ''));
+            $pt = trim((string) ($rule['payment_terms'] ?? ''));
             if ($jt <= 0 && $dk === '' && $ck === '') {
+                continue;
+            }
+            if (!$chkJt) {
+                $pdo->rollBack();
+                json_response(['success' => false, 'message' => 'جدول أنواع اليوميات غير متوفر'], 422);
+            }
+            $chkJt->execute([$jt]);
+            if (!$chkJt->fetch()) {
+                $pdo->rollBack();
+                json_response(['success' => false, 'message' => 'نوع يومية غير صالح في قواعد الربط.'], 422);
+            }
+            $jCode = orange_journal_type_code_by_id($pdo, $jt);
+            $isPin = $jCode === 'PIN';
+            $isPdn = $jCode === 'PDN';
+            if ($isPin || $isPdn) {
+                if ($pt !== 'cash' && $pt !== 'credit') {
+                    $pdo->rollBack();
+                    json_response([
+                        'success' => false,
+                        'message' => 'لفاتورة/مردود المشتريات اختر «نقدي» أو «آجل» في العمود الثاني.',
+                    ], 422);
+                }
+            } else {
+                if ($pt !== '') {
+                    $pdo->rollBack();
+                    json_response([
+                        'success' => false,
+                        'message' => 'عمود نقدي/آجل يخص فاتورة المشتريات (PIN) ومردود المشتريات (PDN) فقط.',
+                    ], 422);
+                }
+                $pt = '';
+            }
+            $ruleSig = $jt . "\0" . $pt;
+            if (isset($seenRule[$ruleSig])) {
+                $pdo->rollBack();
+                json_response(['success' => false, 'message' => 'قاعدة مكررة لنفس نوع اليومية ونفس نقدي/آجل.'], 422);
+            }
+            $seenRule[$ruleSig] = true;
+
+            if ($isPin && $pt === 'credit') {
+                if ($dk === '') {
+                    $pdo->rollBack();
+                    json_response([
+                        'success' => false,
+                        'message' => 'فاتورة مشتريات آجل: بند المدين مطلوب (غالباً المخزون)؛ اترك الدائن فارغاً لذمة المورد.',
+                    ], 422);
+                }
+                if ($ck !== '' && $dk === $ck) {
+                    $pdo->rollBack();
+                    json_response(['success' => false, 'message' => 'بند المدين والدائن يجب أن يختلفان إذا حددت الدائن يدوياً.'], 422);
+                }
+                if (!in_array($dk, $allowedKeys, true)) {
+                    $pdo->rollBack();
+                    json_response([
+                        'success' => false,
+                        'message' => 'بند المدين يجب أن يكون مفتاحاً معرفاً في النظام.',
+                    ], 422);
+                }
+                if ($ck !== '' && !in_array($ck, $allowedKeys, true)) {
+                    $pdo->rollBack();
+                    json_response([
+                        'success' => false,
+                        'message' => 'بند الدائن يجب أن يكون مفتاحاً معرفاً في النظام.',
+                    ], 422);
+                }
+                $aidD = (int) ($resolved[$dk] ?? 0);
+                if ($aidD <= 0) {
+                    $pdo->rollBack();
+                    json_response([
+                        'success' => false,
+                        'message' => 'اربط حساباً لبند المدين في الجدول العلوي قبل الحفظ.',
+                    ], 422);
+                }
+                if ($ck !== '') {
+                    $aidC = (int) ($resolved[$ck] ?? 0);
+                    if ($aidC <= 0) {
+                        $pdo->rollBack();
+                        json_response([
+                            'success' => false,
+                            'message' => 'اربط حساباً لبند الدائن في الجدول العلوي قبل الحفظ.',
+                        ], 422);
+                    }
+                }
+                $insRule->execute([$jt, $pt, $dk, $ck]);
+
+                continue;
+            }
+            if ($isPdn && $pt === 'credit') {
+                if ($ck === '') {
+                    $pdo->rollBack();
+                    json_response([
+                        'success' => false,
+                        'message' => 'مردود مشتريات آجل: بند الدائن مطلوب؛ اترك المدين فارغاً لذمة المورد.',
+                    ], 422);
+                }
+                if ($dk !== '' && $dk === $ck) {
+                    $pdo->rollBack();
+                    json_response(['success' => false, 'message' => 'بند المدين والدائن يجب أن يختلفان إذا حددت المدين يدوياً.'], 422);
+                }
+                if (!in_array($ck, $allowedKeys, true)) {
+                    $pdo->rollBack();
+                    json_response([
+                        'success' => false,
+                        'message' => 'بند الدائن يجب أن يكون مفتاحاً معرفاً في النظام.',
+                    ], 422);
+                }
+                if ($dk !== '' && !in_array($dk, $allowedKeys, true)) {
+                    $pdo->rollBack();
+                    json_response([
+                        'success' => false,
+                        'message' => 'بند المدين يجب أن يكون مفتاحاً معرفاً في النظام.',
+                    ], 422);
+                }
+                $aidC = (int) ($resolved[$ck] ?? 0);
+                if ($aidC <= 0) {
+                    $pdo->rollBack();
+                    json_response([
+                        'success' => false,
+                        'message' => 'اربط حساباً لبند الدائن في الجدول العلوي قبل الحفظ.',
+                    ], 422);
+                }
+                if ($dk !== '') {
+                    $aidD = (int) ($resolved[$dk] ?? 0);
+                    if ($aidD <= 0) {
+                        $pdo->rollBack();
+                        json_response([
+                            'success' => false,
+                            'message' => 'اربط حساباً لبند المدين في الجدول العلوي قبل الحفظ.',
+                        ], 422);
+                    }
+                }
+                $insRule->execute([$jt, $pt, $dk, $ck]);
+
                 continue;
             }
             if ($jt <= 0 || $dk === '' || $ck === '') {
                 $pdo->rollBack();
                 json_response([
                     'success' => false,
-                    'message' => 'كل قاعدة تحتاج نوع يومية وبند مدين وبند دائن.',
+                    'message' => 'كل قاعدة تحتاج نوع يومية وبند مدين وبند دائن (أو نقدي/آجل كامل لمشتريات).',
                 ], 422);
             }
             if ($dk === $ck) {
@@ -152,20 +286,6 @@ try {
                     'message' => 'بند المدين/الدائن يجب أن يكون مفتاحاً معرفاً في النظام (قائمة إعدادات القيود).',
                 ], 422);
             }
-            if (!$chkJt) {
-                $pdo->rollBack();
-                json_response(['success' => false, 'message' => 'جدول أنواع اليوميات غير متوفر'], 422);
-            }
-            $chkJt->execute([$jt]);
-            if (!$chkJt->fetch()) {
-                $pdo->rollBack();
-                json_response(['success' => false, 'message' => 'نوع يومية غير صالح في قواعد الربط.'], 422);
-            }
-            if (isset($seenJt[$jt])) {
-                $pdo->rollBack();
-                json_response(['success' => false, 'message' => 'لا يُكرر نفس نوع اليومية في أكثر من سطر.'], 422);
-            }
-            $seenJt[$jt] = true;
             $aidD = (int) ($resolved[$dk] ?? 0);
             $aidC = (int) ($resolved[$ck] ?? 0);
             if ($aidD <= 0 || $aidC <= 0) {
@@ -175,7 +295,7 @@ try {
                     'message' => 'اربط حساباً للبندين في الجدول العلوي قبل حفظ قاعدة المدين/الدائن.',
                 ], 422);
             }
-            $insRule->execute([$jt, $dk, $ck]);
+            $insRule->execute([$jt, $pt, $dk, $ck]);
         }
     }
 

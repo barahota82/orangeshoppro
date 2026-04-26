@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/account_tree.php';
+require_once __DIR__ . '/journal_types.php';
 require_once __DIR__ . '/upload_paths.php';
 
 /**
@@ -122,9 +123,9 @@ function orange_gl_journal_type_rules_list(PDO $pdo): array
     }
     try {
         $st = $pdo->query(
-            'SELECT journal_type_id, debit_setting_key, credit_setting_key
+            'SELECT journal_type_id, payment_terms, debit_setting_key, credit_setting_key
              FROM orange_gl_journal_type_rules
-             ORDER BY journal_type_id ASC'
+             ORDER BY journal_type_id ASC, payment_terms ASC'
         );
 
         return $st ? $st->fetchAll(PDO::FETCH_ASSOC) : [];
@@ -134,6 +135,44 @@ function orange_gl_journal_type_rules_list(PDO $pdo): array
         }
 
         return [];
+    }
+}
+
+/**
+ * صف قاعدة ربط نوع اليومية (مدين/دائن) لنقدي أو آجل — يُستخدم عند الترحيل.
+ *
+ * @param 'cash'|'credit'|'' $paymentTerms للمشتريات: cash أو credit؛ للأنواع الأخرى يُمرَّر '' فقط.
+ *
+ * @return array{debit_setting_key: string, credit_setting_key: string}|null
+ */
+function orange_gl_journal_type_rule_for_terms(PDO $pdo, int $journalTypeId, string $paymentTerms): ?array
+{
+    orange_catalog_ensure_schema($pdo);
+    if ($journalTypeId <= 0 || !orange_table_exists($pdo, 'orange_gl_journal_type_rules')) {
+        return null;
+    }
+    $pt = trim($paymentTerms);
+    $code = orange_journal_type_code_by_id($pdo, $journalTypeId);
+    if ($code !== 'PIN' && $code !== 'PDN') {
+        $pt = '';
+    } elseif ($pt !== 'cash' && $pt !== 'credit') {
+        return null;
+    }
+    try {
+        $st = $pdo->prepare(
+            'SELECT debit_setting_key, credit_setting_key FROM orange_gl_journal_type_rules
+             WHERE journal_type_id = ? AND payment_terms = ? LIMIT 1'
+        );
+        $st->execute([$journalTypeId, $pt]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+
+        return $row !== false ? $row : null;
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] orange_gl_journal_type_rule_for_terms: ' . $e->getMessage());
+        }
+
+        return null;
     }
 }
 
@@ -151,7 +190,7 @@ function orange_gl_posting_linked_journal_types(PDO $pdo): array
     try {
         if (orange_table_exists($pdo, 'orange_gl_journal_type_rules')) {
             $st = $pdo->query(
-                'SELECT jt.id, jt.code, jt.name_ar, jt.sort_order
+                'SELECT DISTINCT jt.id, jt.code, jt.name_ar, jt.sort_order
                  FROM orange_gl_journal_type_rules r
                  INNER JOIN journal_types jt ON jt.id = r.journal_type_id
                  ORDER BY jt.sort_order ASC, jt.id ASC'

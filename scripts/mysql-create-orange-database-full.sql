@@ -218,11 +218,12 @@ CREATE TABLE `orange_gl_account_settings` (
 CREATE TABLE `orange_gl_journal_type_rules` (
   `id` int NOT NULL AUTO_INCREMENT,
   `journal_type_id` int NOT NULL,
+  `payment_terms` varchar(8) NOT NULL DEFAULT '' COMMENT 'cash|credit for PIN/PDN; empty=standard',
   `debit_setting_key` varchar(64) NOT NULL,
   `credit_setting_key` varchar(64) NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_ojtr_journal_type` (`journal_type_id`),
+  UNIQUE KEY `uq_ojtr_jt_terms` (`journal_type_id`,`payment_terms`),
   KEY `idx_ojtr_debit` (`debit_setting_key`),
   KEY `idx_ojtr_credit` (`credit_setting_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

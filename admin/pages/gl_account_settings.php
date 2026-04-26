@@ -110,11 +110,17 @@ $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
 
 <div class="card gl-auto-form-card" style="margin-top:1rem;">
         <h3 class="card-title">٢ — ربط نوع اليومية ببند مدين وبند دائن</h3>
+        <p class="card-hint" style="margin:0 0 0.75rem;max-width:52rem;line-height:1.55;">
+            <strong>فاتورة مشتريات (PIN) ومردود مشتريات (PDN):</strong> أضف سطراً لـ <strong>نقدي</strong> (تختار المدين والدائن)،
+            وسطراً لـ <strong>آجل</strong> — شراء/مردود آجل يحدّد أحد الجانبين فقط؛ الجانب الآخر يُؤخذ من <strong>حساب ذمة المورد</strong> في المستند (اترك البند الفارغ في العمود المناسب).
+            باقي أنواع اليومية: عمود «قياسي» ويجب اختيار مدين ودائن معاً.
+        </p>
         <div class="table-wrap gl-settings-table-wrap">
             <table class="gl-settings-table" id="gl_jt_rules_table">
                 <thead>
                     <tr>
                         <th>نوع اليومية</th>
+                        <th>نقدي / آجل</th>
                         <th>بند المدين</th>
                         <th>بند الدائن</th>
                         <th class="gl-th-actions" aria-label="إزالة"></th>
@@ -165,8 +171,96 @@ $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
         return h;
     }
 
-    function journalTypeOptionsHtml(selectedId, excludeIds) {
-        var ex = excludeIds || {};
+    function journalTypeCodeById(jtId) {
+        for (var i = 0; i < glJournalTypes.length; i++) {
+            if (parseInt(glJournalTypes[i].id, 10) === jtId) {
+                return String(glJournalTypes[i].code || '').trim().toUpperCase();
+            }
+        }
+        return '';
+    }
+    function isPurchaseSplitJournalCode(code) {
+        return code === 'PIN' || code === 'PDN';
+    }
+    function paymentTermsSelectHtml(jtId, selectedPt) {
+        var code = journalTypeCodeById(jtId);
+        if (!isPurchaseSplitJournalCode(code)) {
+            return '<select class="gl-sel-pt gl-sel-pt--standard" aria-label="نقدي أو آجل">' +
+                '<option value="" selected>قياسي</option></select>';
+        }
+        var pt = String(selectedPt || '').trim();
+        if (pt !== 'cash' && pt !== 'credit') {
+            pt = 'cash';
+        }
+        return '<select class="gl-sel-pt" aria-label="نقدي أو آجل">' +
+            '<option value="cash"' + (pt === 'cash' ? ' selected' : '') + '>نقدي (مدين + دائن)</option>' +
+            '<option value="credit"' + (pt === 'credit' ? ' selected' : '') + '>آجل (جانب من ذمة المورد)</option>' +
+            '</select>';
+    }
+    function syncRuleRowLabels(tr) {
+        var jt = parseInt((tr.querySelector('.gl-sel-jt-id') || {}).value, 10) || 0;
+        var code = journalTypeCodeById(jt);
+        var ptSel = tr.querySelector('.gl-sel-pt');
+        var pt = ptSel ? String(ptSel.value || '').trim() : '';
+        var deb = tr.querySelector('.gl-sel-debit-key');
+        var cre = tr.querySelector('.gl-sel-credit-key');
+        if (deb) {
+            deb.title = '';
+        }
+        if (cre) {
+            cre.title = '';
+        }
+        if (code === 'PIN' && pt === 'credit' && cre) {
+            cre.title = 'اترك «— بند —» لاستخدام ذمة المورد من فاتورة الشراء الآجل';
+        }
+        if (code === 'PDN' && pt === 'credit' && deb) {
+            deb.title = 'اترك «— بند —» لاستخدام ذمة المورد من مردود الشراء الآجل';
+        }
+    }
+    function paintPaymentTermsCell(tr, jtId, selectedPt) {
+        var td = tr.querySelector('.gl-td-pt');
+        if (!td) {
+            return;
+        }
+        td.innerHTML = paymentTermsSelectHtml(jtId, selectedPt);
+        var ptEl = td.querySelector('.gl-sel-pt');
+        if (ptEl && !ptEl.classList.contains('gl-sel-pt--standard')) {
+            ptEl.addEventListener('change', function () {
+                syncRuleRowLabels(tr);
+            });
+        }
+        syncRuleRowLabels(tr);
+    }
+
+    function collectUsedJournalRules(exceptTr) {
+        var u = {};
+        document.querySelectorAll('#gl_jt_rules_body tr[data-jt-rule]').forEach(function (tr) {
+            if (tr === exceptTr) {
+                return;
+            }
+            var jt = parseInt((tr.querySelector('.gl-sel-jt-id') || {}).value, 10) || 0;
+            if (jt <= 0) {
+                return;
+            }
+            var code = journalTypeCodeById(jt);
+            var pt = String((tr.querySelector('.gl-sel-pt') || {}).value || '').trim();
+            if (!u[jt]) {
+                u[jt] = { standard: false, cash: false, credit: false };
+            }
+            if (isPurchaseSplitJournalCode(code)) {
+                if (pt === 'cash') {
+                    u[jt].cash = true;
+                } else if (pt === 'credit') {
+                    u[jt].credit = true;
+                }
+            } else {
+                u[jt].standard = true;
+            }
+        });
+        return u;
+    }
+
+    function journalTypeOptionsHtml(selectedId, usedMap) {
         var h = '<option value="0">— نوع يومية —</option>';
         for (var i = 0; i < glJournalTypes.length; i++) {
             var jt = glJournalTypes[i];
@@ -174,8 +268,18 @@ $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
             if (id <= 0) {
                 continue;
             }
-            if (ex[id] && id !== selectedId) {
-                continue;
+            var code = String(jt.code || '').trim().toUpperCase();
+            if (id !== selectedId) {
+                var u = usedMap[id];
+                if (u) {
+                    if (isPurchaseSplitJournalCode(code)) {
+                        if (u.cash && u.credit) {
+                            continue;
+                        }
+                    } else if (u.standard) {
+                        continue;
+                    }
+                }
             }
             var lab = (jt.name_ar || jt.name_en || jt.code || '').trim();
             h += '<option value="' + id + '"' + (id === selectedId ? ' selected' : '') + '>' + esc(lab) + '</option>';
@@ -183,67 +287,58 @@ $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
         return h;
     }
 
-    function collectUsedJournalTypeIds(exceptTr) {
-        var u = {};
-        document.querySelectorAll('#gl_jt_rules_body tr[data-jt-rule]').forEach(function (tr) {
-            if (tr === exceptTr) {
-                return;
-            }
-            var s = tr.querySelector('.gl-sel-jt-id');
-            var id = s ? parseInt(s.value, 10) || 0 : 0;
-            if (id > 0) {
-                u[id] = true;
-            }
-        });
-        return u;
-    }
-
-    function refreshJournalTypeOptions(exceptTr) {
-        var used = collectUsedJournalTypeIds(exceptTr);
+    function refreshJournalTypeOptions() {
         document.querySelectorAll('#gl_jt_rules_body tr[data-jt-rule]').forEach(function (tr) {
             var sel = tr.querySelector('.gl-sel-jt-id');
             if (!sel) {
                 return;
             }
             var cur = parseInt(sel.value, 10) || 0;
+            var used = collectUsedJournalRules(tr);
             sel.innerHTML = journalTypeOptionsHtml(cur, used);
         });
     }
 
-    function addRuleRow(jtId, dk, ck) {
+    function addRuleRow(jtId, paymentTerms, dk, ck) {
         jtId = jtId || 0;
         dk = dk || '';
         ck = ck || '';
+        paymentTerms = String(paymentTerms || '').trim();
         var tbody = document.getElementById('gl_jt_rules_body');
         if (!tbody) {
             return;
         }
         var tr = document.createElement('tr');
         tr.setAttribute('data-jt-rule', '1');
-        var used = collectUsedJournalTypeIds(null);
+        var used = collectUsedJournalRules(null);
         tr.innerHTML =
-            '<td><select class="gl-sel-jt-id" aria-label="نوع اليومية">' + journalTypeOptionsHtml(jtId, used) + '</select></td>' +
-            '<td><select class="gl-sel-debit-key" aria-label="بند المدين">' + keyOptionsHtml(dk) + '</select></td>' +
-            '<td><select class="gl-sel-credit-key" aria-label="بند الدائن">' + keyOptionsHtml(ck) + '</select></td>' +
+            '<td class="gl-td-jt"><select class="gl-sel-jt-id" aria-label="نوع اليومية">' + journalTypeOptionsHtml(jtId, used) + '</select></td>' +
+            '<td class="gl-td-pt"></td>' +
+            '<td class="gl-td-debit"><select class="gl-sel-debit-key" aria-label="بند المدين">' + keyOptionsHtml(dk) + '</select></td>' +
+            '<td class="gl-td-credit"><select class="gl-sel-credit-key" aria-label="بند الدائن">' + keyOptionsHtml(ck) + '</select></td>' +
             '<td><button type="button" class="btn-secondary gl-btn-remove-rule">حذف</button></td>';
         tbody.appendChild(tr);
+        paintPaymentTermsCell(tr, jtId, paymentTerms);
         var jtSel = tr.querySelector('.gl-sel-jt-id');
         if (jtSel) {
             jtSel.addEventListener('change', function () {
-                refreshJournalTypeOptions(null);
+                var nid = parseInt(jtSel.value, 10) || 0;
+                paintPaymentTermsCell(tr, nid, '');
+                refreshJournalTypeOptions();
             });
         }
         tr.querySelector('.gl-btn-remove-rule').addEventListener('click', function () {
             tr.remove();
-            refreshJournalTypeOptions(null);
+            refreshJournalTypeOptions();
         });
-        refreshJournalTypeOptions(null);
+        refreshJournalTypeOptions();
     }
 
     if (glInitialRules && glInitialRules.length) {
         glInitialRules.forEach(function (r) {
             addRuleRow(
                 parseInt(r.journal_type_id, 10) || 0,
+                String(r.payment_terms != null ? r.payment_terms : ''),
                 String(r.debit_setting_key || ''),
                 String(r.credit_setting_key || '')
             );
@@ -251,7 +346,7 @@ $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
     }
 
     document.getElementById('gl_btn_add_rule').addEventListener('click', function () {
-        addRuleRow(0, '', '');
+        addRuleRow(0, '', '', '');
     });
 
     var pickModal = document.getElementById('gl_pick_modal');
@@ -463,19 +558,87 @@ $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
             settings[k] = parseInt(tr.getAttribute('data-account-id'), 10) || 0;
         });
         var journalRules = [];
+        var seenRuleSig = {};
+        var jtRulesInvalid = false;
         document.querySelectorAll('#gl_jt_rules_body tr[data-jt-rule]').forEach(function (tr) {
+            if (jtRulesInvalid) {
+                return;
+            }
             var jt = parseInt((tr.querySelector('.gl-sel-jt-id') || {}).value, 10) || 0;
             var dk = String((tr.querySelector('.gl-sel-debit-key') || {}).value || '').trim();
             var ck = String((tr.querySelector('.gl-sel-credit-key') || {}).value || '').trim();
+            var pt = String((tr.querySelector('.gl-sel-pt') || {}).value || '').trim();
             if (jt <= 0 && dk === '' && ck === '') {
                 return;
             }
+            var jcode = journalTypeCodeById(jt);
+            if (isPurchaseSplitJournalCode(jcode)) {
+                if (pt !== 'cash' && pt !== 'credit') {
+                    alert('اختر «نقدي» أو «آجل» لصف فاتورة/مردود المشتريات.');
+                    jtRulesInvalid = true;
+                    return;
+                }
+            } else {
+                pt = '';
+            }
+            var sig = jt + '\0' + pt;
+            if (seenRuleSig[sig]) {
+                alert('قاعدة مكررة لنفس نوع اليومية ونفس نقدي/آجل.');
+                jtRulesInvalid = true;
+                return;
+            }
+            seenRuleSig[sig] = true;
+            if (jcode === 'PIN' && pt === 'credit') {
+                if (!dk) {
+                    alert('فاتورة مشتريات آجل: اختر بند المدين (مثلاً المخزون).');
+                    jtRulesInvalid = true;
+                    return;
+                }
+                if (ck && dk === ck) {
+                    alert('بند المدين والدائن يجب أن يختلفان.');
+                    jtRulesInvalid = true;
+                    return;
+                }
+            } else if (jcode === 'PIN' && pt === 'cash') {
+                if (!dk || !ck || dk === ck) {
+                    alert('فاتورة مشتريات نقدي: اختر بند مدين وبند دائن مختلفين.');
+                    jtRulesInvalid = true;
+                    return;
+                }
+            } else if (jcode === 'PDN' && pt === 'credit') {
+                if (!ck) {
+                    alert('مردود مشتريات آجل: اختر بند الدائن.');
+                    jtRulesInvalid = true;
+                    return;
+                }
+                if (dk && dk === ck) {
+                    alert('بند المدين والدائن يجب أن يختلفان.');
+                    jtRulesInvalid = true;
+                    return;
+                }
+            } else if (jcode === 'PDN' && pt === 'cash') {
+                if (!dk || !ck || dk === ck) {
+                    alert('مردود مشتريات نقدي: اختر بند مدين وبند دائن مختلفين.');
+                    jtRulesInvalid = true;
+                    return;
+                }
+            } else {
+                if (!dk || !ck || dk === ck) {
+                    alert('للأنواع الأخرى: اختر بند مدين وبند دائن مختلفين (عمود قياسي).');
+                    jtRulesInvalid = true;
+                    return;
+                }
+            }
             journalRules.push({
                 journal_type_id: jt,
+                payment_terms: pt,
                 debit_setting_key: dk,
                 credit_setting_key: ck
             });
         });
+        if (jtRulesInvalid) {
+            return;
+        }
         var allocPercents = {};
         var pctInp = document.querySelector('tr[data-gl-key="legal_reserve"] .gl-inp-alloc-pct');
         if (pctInp) {

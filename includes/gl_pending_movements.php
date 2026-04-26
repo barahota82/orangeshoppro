@@ -260,6 +260,60 @@ function orange_gl_pending_list(PDO $pdo, string $status, ?string $dateFrom, ?st
 }
 
 /**
+ * تطبيق after_post_json بعد إنشاء السند (طابور الترحيل أو ترحيل فوري).
+ */
+function orange_gl_apply_voucher_after_post_hooks(PDO $pdo, int $voucherId, ?string $hookJson): void
+{
+    $hook = trim((string) ($hookJson ?? ''));
+    if ($hook === '' || $voucherId <= 0) {
+        return;
+    }
+    $h = json_decode($hook, true);
+    if (!is_array($h)) {
+        return;
+    }
+    $applyParty = static function (PDO $pdo, int $voucherId, array $ps): void {
+        $partyRefId = null;
+        if (array_key_exists('ref_id', $ps) && $ps['ref_id'] !== null && $ps['ref_id'] !== '') {
+            $partyRefId = (int) $ps['ref_id'];
+        }
+        orange_party_subledger_record(
+            $pdo,
+            (string) ($ps['party_kind'] ?? 'customer'),
+            (int) ($ps['party_id'] ?? 0),
+            $voucherId,
+            (float) ($ps['debit'] ?? 0),
+            (float) ($ps['credit'] ?? 0),
+            isset($ps['ref_type']) ? (string) $ps['ref_type'] : null,
+            $partyRefId,
+            isset($ps['memo']) ? (string) $ps['memo'] : null
+        );
+    };
+
+    if (isset($h['party_subledger_entries']) && is_array($h['party_subledger_entries'])
+        && $h['party_subledger_entries'] !== []) {
+        foreach ($h['party_subledger_entries'] as $ps) {
+            if (is_array($ps)) {
+                $applyParty($pdo, $voucherId, $ps);
+            }
+        }
+    } elseif (isset($h['party_subledger']) && is_array($h['party_subledger'])) {
+        $applyParty($pdo, $voucherId, $h['party_subledger']);
+    }
+
+    if (isset($h['party_payment_allocations']) && is_array($h['party_payment_allocations'])) {
+        $pa = $h['party_payment_allocations'];
+        $pKind = (string) ($pa['party_kind'] ?? '');
+        $pPartyId = (int) ($pa['party_id'] ?? 0);
+        $pAmt = (float) ($pa['amount'] ?? 0);
+        $pLines = $pa['lines'] ?? [];
+        if ($pKind !== '' && $pPartyId > 0 && is_array($pLines) && $pLines !== []) {
+            orange_party_insert_payment_allocations($pdo, $pKind, $pPartyId, $voucherId, $pAmt, $pLines);
+        }
+    }
+}
+
+/**
  * سطر خطأ لعرض الأدمن عند ترحيل/فك دفعي — لا يُعرض نص أخطاء تقنية (مثل PDO) للمستخدم.
  */
 function orange_gl_pending_batch_error_user_line(int $id, Throwable $e): string
@@ -343,35 +397,7 @@ function orange_gl_pending_post_by_ids(PDO $pdo, array $ids): array
             }
             $hook = trim((string) ($row['after_post_json'] ?? ''));
             if ($hook !== '') {
-                $h = json_decode($hook, true);
-                if (is_array($h) && isset($h['party_subledger']) && is_array($h['party_subledger'])) {
-                    $ps = $h['party_subledger'];
-                    $partyRefId = null;
-                    if (array_key_exists('ref_id', $ps) && $ps['ref_id'] !== null && $ps['ref_id'] !== '') {
-                        $partyRefId = (int) $ps['ref_id'];
-                    }
-                    orange_party_subledger_record(
-                        $pdo,
-                        (string) ($ps['party_kind'] ?? 'customer'),
-                        (int) ($ps['party_id'] ?? 0),
-                        $vid,
-                        (float) ($ps['debit'] ?? 0),
-                        (float) ($ps['credit'] ?? 0),
-                        isset($ps['ref_type']) ? (string) $ps['ref_type'] : null,
-                        $partyRefId,
-                        isset($ps['memo']) ? (string) $ps['memo'] : null
-                    );
-                }
-                if (is_array($h) && isset($h['party_payment_allocations']) && is_array($h['party_payment_allocations'])) {
-                    $pa = $h['party_payment_allocations'];
-                    $pKind = (string) ($pa['party_kind'] ?? '');
-                    $pPartyId = (int) ($pa['party_id'] ?? 0);
-                    $pAmt = (float) ($pa['amount'] ?? 0);
-                    $pLines = $pa['lines'] ?? [];
-                    if ($pKind !== '' && $pPartyId > 0 && is_array($pLines) && $pLines !== []) {
-                        orange_party_insert_payment_allocations($pdo, $pKind, $pPartyId, $vid, $pAmt, $pLines);
-                    }
-                }
+                orange_gl_apply_voucher_after_post_hooks($pdo, $vid, $hook);
             }
             $pdo->prepare(
                 'UPDATE orange_gl_pending_movements SET status = \'posted\', journal_voucher_id = ?, posted_at = NOW() WHERE id = ?'

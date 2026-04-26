@@ -1107,15 +1107,42 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             'CREATE TABLE orange_gl_journal_type_rules (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 journal_type_id INT NOT NULL,
+                payment_terms VARCHAR(8) NOT NULL DEFAULT \'\' COMMENT \'cash|credit for PIN/PDN; empty=standard\',
                 debit_setting_key VARCHAR(64) NOT NULL,
                 credit_setting_key VARCHAR(64) NOT NULL,
                 created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE KEY uq_ojtr_journal_type (journal_type_id),
+                UNIQUE KEY uq_ojtr_jt_terms (journal_type_id, payment_terms),
                 KEY idx_ojtr_debit (debit_setting_key),
                 KEY idx_ojtr_credit (credit_setting_key),
                 CONSTRAINT orange_fk_ojtr_jt FOREIGN KEY (journal_type_id) REFERENCES journal_types (id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
+        orange_schema_invalidate_table_exists('orange_gl_journal_type_rules');
+    }
+
+    if (orange_table_exists($pdo, 'orange_gl_journal_type_rules')
+        && !orange_table_has_column($pdo, 'orange_gl_journal_type_rules', 'payment_terms')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE orange_gl_journal_type_rules ADD COLUMN payment_terms VARCHAR(8) NOT NULL DEFAULT \'\' AFTER journal_type_id'
+        );
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE orange_gl_journal_type_rules DROP INDEX uq_ojtr_journal_type');
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE orange_gl_journal_type_rules ADD UNIQUE KEY uq_ojtr_jt_terms (journal_type_id, payment_terms)'
+        );
+        try {
+            $pdo->exec(
+                "UPDATE orange_gl_journal_type_rules r
+                 INNER JOIN journal_types jt ON jt.id = r.journal_type_id AND jt.code IN ('PIN','PDN')
+                 SET r.payment_terms = 'cash'
+                 WHERE r.payment_terms = ''"
+            );
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] orange_gl_journal_type_rules payment_terms migrate: ' . $e->getMessage());
+            }
+        }
         orange_schema_invalidate_table_exists('orange_gl_journal_type_rules');
     }
 

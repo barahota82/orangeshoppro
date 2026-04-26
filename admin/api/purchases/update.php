@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/purchase_helpers.php';
 require_once __DIR__ . '/../../../includes/supplier_payable_account.php';
+require_once __DIR__ . '/../../../includes/purchase_gl_accounts.php';
 require_admin_api();
 
 function reverse_purchase_stock(PDO $pdo, int $purchaseId): void
@@ -159,6 +160,16 @@ try {
             json_response(['success' => false, 'message' => $e->getMessage()], 422);
         }
     }
+    if ($type === 'cash' && $supplierId > 0) {
+        try {
+            orange_supplier_required_payable_account_id($pdo, $supplierId);
+        } catch (RuntimeException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            json_response(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
 
     $newTotal = apply_purchase_items($pdo, $purchaseId, $items);
     $pdo->prepare("UPDATE purchases SET supplier_id = ?, total = ?, type = ?, notes = ?, updated_at = NOW() WHERE id = ?")
@@ -167,80 +178,64 @@ try {
     orange_purchase_remove_accounting($pdo, $purRef);
     orange_gl_pending_remove_by_reference($pdo, $purRef);
 
-    $inventoryId = orange_gl_account_id($pdo, 'inventory');
-    $cashId = orange_gl_account_id($pdo, 'cash');
-    $apId = 0;
-    if ($type === 'credit') {
-        $apId = orange_supplier_required_payable_account_id($pdo, $supplierId);
-    }
-    $purRef = 'PUR-' . $purchaseId;
+    $glB = orange_gl_purchase_invoice_posting_bundle($pdo, $type, $supplierId, $purchaseId, $newTotal);
     $now = date('Y-m-d H:i:s');
+    $afterJson = $glB['after_post'] !== null
+        ? json_encode($glB['after_post'], JSON_UNESCAPED_UNICODE)
+        : null;
+
     if (orange_gl_use_pending_queue($pdo)) {
-        $afterJson = null;
-        if ($type === 'credit' && $supplierId > 0 && $newTotal > 0.0001) {
-            $afterJson = json_encode([
-                'party_subledger' => [
-                    'party_kind' => 'supplier',
-                    'party_id' => $supplierId,
-                    'debit' => 0.0,
-                    'credit' => $newTotal,
-                    'ref_type' => 'purchase',
-                    'ref_id' => $purchaseId,
-                    'memo' => 'شراء آجل',
-                ],
-            ], JSON_UNESCAPED_UNICODE);
-        }
-        if ($type === 'cash') {
-            orange_gl_pending_enqueue_simple($pdo, [
-                'reference' => $purRef,
-                'source_label' => $purRef,
-                'movement_at' => $now,
-                'voucher_date' => $now,
-                'account_debit' => $inventoryId,
-                'account_credit' => $cashId,
-                'amount' => $newTotal,
-                'description' => 'شراء نقدي',
-                'entry_type' => 'purchase',
-                'after_post_json' => $afterJson,
-            ]);
+        if ($glB['is_multi']) {
+            orange_gl_pending_enqueue_multi(
+                $pdo,
+                $glB['lines'],
+                $purRef,
+                $purRef,
+                $now,
+                $now,
+                $glB['voucher_description'],
+                'purchase',
+                $afterJson
+            );
         } else {
             orange_gl_pending_enqueue_simple($pdo, [
                 'reference' => $purRef,
                 'source_label' => $purRef,
                 'movement_at' => $now,
                 'voucher_date' => $now,
-                'account_debit' => $inventoryId,
-                'account_credit' => $apId,
+                'account_debit' => $glB['debit'],
+                'account_credit' => $glB['credit'],
                 'amount' => $newTotal,
-                'description' => 'شراء آجل — ذمم موردين',
+                'description' => $glB['voucher_description'],
                 'entry_type' => 'purchase',
                 'after_post_json' => $afterJson,
             ]);
         }
     } else {
-        if ($type === 'cash') {
-            orange_journal_insert_line($pdo, [
-                'date' => $now,
-                'account_debit' => $inventoryId,
-                'account_credit' => $cashId,
-                'amount' => $newTotal,
+        if ($glB['is_multi']) {
+            $vid = orange_voucher_post($pdo, [
+                'voucher_date' => $now,
+                'document_entered_at' => $now,
                 'reference' => $purRef,
-                'description' => 'شراء نقدي',
+                'description' => $glB['voucher_description'],
                 'entry_type' => 'purchase',
-            ]);
+            ], $glB['lines']);
+            orange_gl_apply_voucher_after_post_hooks($pdo, $vid, $afterJson);
         } else {
             orange_journal_insert_line($pdo, [
                 'date' => $now,
-                'account_debit' => $inventoryId,
-                'account_credit' => $apId,
+                'account_debit' => $glB['debit'],
+                'account_credit' => $glB['credit'],
                 'amount' => $newTotal,
                 'reference' => $purRef,
-                'description' => 'شراء آجل — ذمم موردين',
+                'description' => $glB['voucher_description'],
                 'entry_type' => 'purchase',
             ]);
-        }
 
-        orange_purchase_record_ap_subledger($pdo, $purchaseId, $supplierId, $type, $newTotal);
+            if ($glB['legacy_ap_subledger']) {
+                orange_purchase_record_ap_subledger($pdo, $purchaseId, $supplierId, $type, $newTotal);
+            }
+        }
     }
 
     $pdo->commit();
