@@ -36,7 +36,8 @@
     --admin-drawer-link-pad-x: 12px;
     --admin-drawer-link-sub-pad-start: 18px;
     --admin-mega-grid-gap: 10px;
-    --admin-mega-grid-col-min: 210px;
+    /* عمود واحد: كل روابط اللوحة بنفس العرض (توحيد بصري) */
+    --admin-mega-grid-columns: minmax(0, 1fr);
     --admin-mega-trigger-max-w: 22rem;
     --font-ui: "Cairo", "Segoe UI", system-ui, sans-serif;
     --font-display: "Outfit", "Cairo", sans-serif;
@@ -243,7 +244,7 @@ a { text-decoration: none; color: inherit; }
 }
 .admin-mega-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(var(--admin-mega-grid-col-min), 1fr));
+    grid-template-columns: var(--admin-mega-grid-columns);
     gap: var(--admin-mega-grid-gap);
     align-items: start;
 }
