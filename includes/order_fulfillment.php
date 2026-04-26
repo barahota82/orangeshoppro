@@ -40,8 +40,9 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
 
     $inventoryId = orange_gl_account_id($pdo, 'inventory');
     if ($isOnline) {
-        $debitReceivable = orange_gl_account_id($pdo, 'cash');
-        $salesId = orange_gl_account_id($pdo, 'sales_revenue_online');
+        // أونلاين: إيراد التسليم بأربعة أسطر (انظر orange_gl_online_delivery_sale_four_lines).
+        $debitReceivable = 0;
+        $salesId = 0;
     } elseif ($isCredit) {
         $debitReceivable = orange_gl_account_id($pdo, 'ar_credit');
         $salesId = orange_gl_account_id($pdo, 'sales_revenue_credit');
@@ -163,14 +164,20 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
         $srcLabel = 'ORDER-' . $order['order_number'];
 
         if ($salesAmount > 0.0001) {
-            if (!$isOnline && !$isCredit) {
-                $memoSaleLeg = 'مبيعات نقدي — تسجيل على عملاء نقدي';
-                $memoCashLeg = 'مبيعات نقدي — تحصيل نقدي';
-                $cashSaleFour = orange_gl_cash_delivery_sale_four_lines($pdo, $salesAmount, $memoSaleLeg, $memoCashLeg);
+            if (!$isCredit) {
+                if ($isOnline) {
+                    $memoSaleLeg = 'مبيعات أونلاين — تسجيل على عملاء أونلاين';
+                    $memoCashLeg = 'مبيعات أونلاين — تحصيل نقدي';
+                    $saleFour = orange_gl_online_delivery_sale_four_lines($pdo, $salesAmount, $memoSaleLeg, $memoCashLeg);
+                } else {
+                    $memoSaleLeg = 'مبيعات نقدي — تسجيل على عملاء نقدي';
+                    $memoCashLeg = 'مبيعات نقدي — تحصيل نقدي';
+                    $saleFour = orange_gl_cash_delivery_sale_four_lines($pdo, $salesAmount, $memoSaleLeg, $memoCashLeg);
+                }
                 if (orange_gl_use_pending_queue($pdo)) {
                     orange_gl_pending_enqueue_multi(
                         $pdo,
-                        $cashSaleFour['lines'],
+                        $saleFour['lines'],
                         $saleRef,
                         $srcLabel,
                         $now,
@@ -186,7 +193,7 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
                         'reference' => $saleRef,
                         'description' => $saleDesc,
                         'entry_type' => 'order_delivery_sale',
-                    ], $cashSaleFour['lines']);
+                    ], $saleFour['lines']);
                 }
             } elseif (orange_gl_use_pending_queue($pdo)) {
                 $afterJson = null;
