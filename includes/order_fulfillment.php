@@ -41,16 +41,14 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
     if ($isOnline) {
         $debitReceivable = orange_gl_account_id($pdo, 'cash');
         $salesId = orange_gl_account_id($pdo, 'sales_revenue_online');
-        $cogsId = orange_gl_account_id($pdo, 'cogs_online');
     } elseif ($isCredit) {
         $debitReceivable = orange_gl_account_id($pdo, 'ar_credit');
         $salesId = orange_gl_account_id($pdo, 'sales_revenue_credit');
-        $cogsId = orange_gl_account_id($pdo, 'cogs_credit');
     } else {
         $debitReceivable = orange_gl_account_id($pdo, 'cash');
         $salesId = orange_gl_account_id($pdo, 'sales_revenue_cash');
-        $cogsId = orange_gl_account_id($pdo, 'cogs_cash');
     }
+    $cogsDeliveryId = orange_gl_cogs_delivery_account_id($pdo);
 
     $orderNumber = (string)($order['order_number'] ?? '');
     $ref = orange_order_stock_reference($orderNumber);
@@ -223,7 +221,7 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
                     'source_label' => $srcLabel,
                     'movement_at' => $now,
                     'voucher_date' => $now,
-                    'account_debit' => $cogsId,
+                    'account_debit' => $cogsDeliveryId,
                     'account_credit' => $inventoryId,
                     'amount' => $costAmount,
                     'description' => $cogsDesc,
@@ -232,7 +230,7 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
             } else {
                 orange_journal_insert_line($pdo, [
                     'date' => $now,
-                    'account_debit' => $cogsId,
+                    'account_debit' => $cogsDeliveryId,
                     'account_credit' => $inventoryId,
                     'amount' => $costAmount,
                     'reference' => $cogsRef,
@@ -391,16 +389,14 @@ function orange_order_reverse_completed_fulfillment(PDO $pdo, int $orderId, stri
     if ($isOnline) {
         $debitReceivable = orange_gl_account_id($pdo, 'cash');
         $salesId = orange_gl_account_id($pdo, 'sales_revenue_online');
-        $cogsId = orange_gl_account_id($pdo, 'cogs_online');
     } elseif ($isCredit) {
         $debitReceivable = orange_gl_account_id($pdo, 'ar_credit');
         $salesId = orange_gl_account_id($pdo, 'sales_revenue_credit');
-        $cogsId = orange_gl_account_id($pdo, 'cogs_credit');
     } else {
         $debitReceivable = orange_gl_account_id($pdo, 'cash');
         $salesId = orange_gl_account_id($pdo, 'sales_revenue_cash');
-        $cogsId = orange_gl_account_id($pdo, 'cogs_cash');
     }
+    $cogsReturnId = orange_gl_cogs_return_account_id($pdo);
 
     $customerIdForAr = 0;
     if ($isCredit && orange_table_exists($pdo, 'customers')) {
@@ -545,7 +541,7 @@ function orange_order_reverse_completed_fulfillment(PDO $pdo, int $orderId, stri
                     'movement_at' => $now,
                     'voucher_date' => $now,
                     'account_debit' => $inventoryId,
-                    'account_credit' => $cogsId,
+                    'account_credit' => $cogsReturnId,
                     'amount' => $costAmount,
                     'description' => $cogsDesc,
                     'entry_type' => 'order_return_cogs',
@@ -554,7 +550,7 @@ function orange_order_reverse_completed_fulfillment(PDO $pdo, int $orderId, stri
                 orange_journal_insert_line($pdo, [
                     'date' => $now,
                     'account_debit' => $inventoryId,
-                    'account_credit' => $cogsId,
+                    'account_credit' => $cogsReturnId,
                     'amount' => $costAmount,
                     'reference' => $cogsRetRef,
                     'description' => $cogsDesc,

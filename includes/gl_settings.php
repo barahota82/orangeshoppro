@@ -33,12 +33,16 @@ function orange_gl_setting_key_labels(): array
         'sales_returns_cash' => 'مردود مبيعات نقدي — يُستخدم عند تسجيل مرتجعات المبيعات النقدية',
         'sales_returns_credit' => 'مردود مبيعات آجل — يُستخدم عند تسجيل مرتجعات المبيعات الآجلة',
         'sales_returns_online' => 'مردود مبيعات أونلاين',
-        'cogs_cash' => 'تكلفة مبيعات نقدي — مدين عند التسليم',
-        'cogs_credit' => 'تكلفة مبيعات آجل — مدين عند التسليم',
-        'cogs_online' => 'تكلفة مبيعات أونلاين — مدين عند التسليم',
-        'cogs_returns_cash' => 'تكلفة مردود مبيعات نقدي — دائن عند إثبات تكلفة المرتجع النقدي',
-        'cogs_returns_credit' => 'تكلفة مردود مبيعات آجل — دائن عند إثبات تكلفة المرتجع الآجل',
-        'cogs_returns_online' => 'تكلفة مردود مبيعات أونلاين',
+        'cogs' => 'تكلفة المبيعات — مدين عند تسليم الطلب (نقدي / آجل / أونلاين)',
+        'cogs_returns' => 'تكلفة مردودات المبيعات — دائن عند إلغاء التسليم وإرجاع التكلفة للمخزون',
+        /** احتياط توافق قديم — يُستبدل بمفتاح cogs */
+        'cogs_cash' => 'تكلفة مبيعات نقدي — احتياط تقني فقط',
+        'cogs_credit' => 'تكلفة مبيعات آجل — احتياط تقني فقط',
+        'cogs_online' => 'تكلفة مبيعات أونلاين — احتياط تقني فقط',
+        /** احتياط توافق قديم — يُستبدل بمفتاح cogs_returns */
+        'cogs_returns_cash' => 'تكلفة مردود مبيعات نقدي — احتياط تقني فقط',
+        'cogs_returns_credit' => 'تكلفة مردود مبيعات آجل — احتياط تقني فقط',
+        'cogs_returns_online' => 'تكلفة مردود مبيعات أونلاين — احتياط تقني فقط',
         /** مفتاحان اختياريان: لا يُعرضان في «حسابات القيود التلقائية»؛ يُربطان عند الإقفال أو يُمرَّران في طلب الإقفال. */
         'income_summary' => 'ملخص الدخل (مؤقت) — قيود إقفال السنة',
         'retained_earnings' => 'الأرباح المحتجزة — صافي الدخل عند الإقفال',
@@ -58,17 +62,13 @@ function orange_gl_setting_row_short_labels(): array
         'ar_cash' => 'العملاء النقدي',
         'ar_credit' => 'العملاء الاجل',
         'sales_revenue_cash' => 'المبيعات النقدية',
-        'cogs_cash' => 'تكلفة المبيعات النقدي',
         'sales_returns_cash' => 'مردود المبيعات النقدي',
-        'cogs_returns_cash' => 'تكلفة مردود المبيعات النقدي',
         'sales_revenue_credit' => 'المبيعات الآجل',
-        'cogs_credit' => 'تكلفة المبيعات الآجلة',
         'sales_returns_credit' => 'مردود المبيعات الاجل',
-        'cogs_returns_credit' => 'تكلفة مردود المبيعات الآجلة',
         'sales_revenue_online' => 'المبيعات الاونلاين',
-        'cogs_online' => 'تكلفة المبيعات الاونلاين',
         'sales_returns_online' => 'مردود المبيعات الاونلاين',
-        'cogs_returns_online' => 'تكلفة مردود المبيعات الاونلاين',
+        'cogs' => 'تكلفة المبيعات',
+        'cogs_returns' => 'تكلفة مردودات المبيعات',
     ];
 }
 
@@ -85,17 +85,13 @@ function orange_gl_settings_form_key_order(): array
         'ar_cash',
         'ar_credit',
         'sales_revenue_cash',
-        'cogs_cash',
         'sales_returns_cash',
-        'cogs_returns_cash',
         'sales_revenue_credit',
-        'cogs_credit',
         'sales_returns_credit',
-        'cogs_returns_credit',
         'sales_revenue_online',
-        'cogs_online',
         'sales_returns_online',
-        'cogs_returns_online',
+        'cogs',
+        'cogs_returns',
     ];
 }
 
@@ -357,6 +353,40 @@ function orange_gl_account_id(PDO $pdo, string $key): int
     throw new RuntimeException(
         'حساب أساسي غير مربوط: ' . $lab . ' — افتح «الحسابات الأساسية للقيود التلقائية» واختر الحساب من الشجرة.'
     );
+}
+
+/**
+ * حساب تكلفة المبيعات عند التسليم (بند مدين) — يفضّل المفتاح cogs ثم احتياط المفاتيح القديمة حسب قناة الدفع.
+ *
+ * @throws RuntimeException
+ */
+function orange_gl_cogs_delivery_account_id(PDO $pdo): int
+{
+    foreach (['cogs', 'cogs_cash', 'cogs_credit', 'cogs_online'] as $key) {
+        $id = orange_gl_account_id_optional($pdo, $key);
+        if ($id !== null && $id > 0) {
+            return $id;
+        }
+    }
+
+    return orange_gl_account_id($pdo, 'cogs');
+}
+
+/**
+ * حساب تكلفة مردود المبيعات عند إلغاء التسليم (بند دائن) — يفضّل cogs_returns ثم احتياط قديم، ثم نفس حساب تكلفة المبيعات.
+ *
+ * @throws RuntimeException
+ */
+function orange_gl_cogs_return_account_id(PDO $pdo): int
+{
+    foreach (['cogs_returns', 'cogs_returns_cash', 'cogs_returns_credit', 'cogs_returns_online'] as $key) {
+        $id = orange_gl_account_id_optional($pdo, $key);
+        if ($id !== null && $id > 0) {
+            return $id;
+        }
+    }
+
+    return orange_gl_cogs_delivery_account_id($pdo);
 }
 
 /**
