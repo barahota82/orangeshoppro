@@ -229,8 +229,7 @@ a { text-decoration: none; color: inherit; }
 }
 .admin-mega-grid {
     display: grid;
-    /* عمود واحد: كل روابط الشاشات بنفس عرض اللوحة (توحيد العرض) */
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
     gap: 10px;
     align-items: start;
 }
@@ -322,6 +321,7 @@ a { text-decoration: none; color: inherit; }
     margin: 0;
     padding: 9px 12px;
     min-height: 40px;
+    max-width: min(100%, 22rem);
     border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.06);
@@ -396,8 +396,7 @@ a { text-decoration: none; color: inherit; }
 }
 .admin-mega-link.admin-nav-sub {
     border-inline-start: 3px solid rgba(255, 255, 255, 0.22);
-    /* 9px + 3px حد ≈ 12px مثل باقي الجوانب — محاذاة النص مع الروابط غير الفرعية */
-    padding-inline-start: 9px;
+    padding-inline-start: 14px;
 }
 /* 992 بدل 1025: نوافذ 1024px (شائعة مع شريط أدوات) كانت تخفي القائمة العلوية بالكامل */
 @media (min-width: 992px) {
@@ -603,7 +602,7 @@ a { text-decoration: none; color: inherit; }
     background: var(--primary-hover);
     color: #fff;
 }
-/* روابط فرعية: نفس عرض الروابط العادية؛ الحد 3px + حشوة بداية 9px ≈ 12px مثل غير الفرعي */
+/* روابط فرعية تحت الطلبات: نفس عرض/ارتفاع باقي الروابط + إزاحة بصرية خفيفة */
 .admin-nav-drawer nav a.admin-nav-sub {
     align-self: stretch;
     width: 100%;
@@ -611,7 +610,7 @@ a { text-decoration: none; color: inherit; }
     box-sizing: border-box;
     border-inline-start: 3px solid rgba(255,255,255,0.22);
     padding: 10px 12px;
-    padding-inline-start: 9px;
+    padding-inline-start: 18px;
     font-size: 14px;
     line-height: 1.35;
     display: flex;
