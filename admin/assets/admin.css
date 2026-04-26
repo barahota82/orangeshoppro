@@ -2976,6 +2976,55 @@ body.coa-modal-open {
     font-weight: 600;
     color: #374151;
 }
+/* نسبة الاحتياطي القانوني داخل خلية البند فقط — بدون عمود منفصل */
+.gl-td-label--legal-pct {
+    white-space: normal;
+    vertical-align: middle;
+    width: auto;
+    max-width: 28rem;
+    min-width: 14rem;
+}
+.gl-legal-pct-inline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+    justify-content: space-between;
+    row-gap: 8px;
+}
+.gl-legal-pct-inline__name {
+    flex: 1 1 auto;
+    min-width: 10rem;
+}
+.gl-legal-pct-inline__field {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    margin: 0;
+    font-weight: 500;
+    color: #4b5563;
+}
+.gl-legal-pct-inline__hint {
+    font-size: 12px;
+    color: #6b7280;
+    white-space: nowrap;
+}
+.gl-legal-pct-inline__unit {
+    font-size: 13px;
+    color: #6b7280;
+}
+.gl-inp-alloc-pct {
+    width: 4.25rem;
+    max-width: 5rem;
+    min-height: 32px;
+    padding: 5px 6px;
+    font-size: 13px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    box-sizing: border-box;
+    text-align: center;
+}
 .gl-sel-journal-type {
     width: 100%;
     max-width: 100%;

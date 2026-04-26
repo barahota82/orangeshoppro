@@ -49,7 +49,7 @@ $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
     <p class="page-subtitle">
         <strong>الجزء الأول:</strong> ربط كل بند بحساب فرعي من الدليل (بدون نوع يومية هنا).
         لا يُعرض هنا «مصروف عام» أو «ذمم موردين مجمّعة» — المصروفات تُربط لكل بند من شاشة المصروفات، والشراء الآجل على حساب ذمة كل مورد.
-        صف <strong>الاحتياطي القانوني</strong> يتضمّن نسبة مئوية تُقرأ برمجياً كجزء من أرباح السنة الحالية (بعد إقفال القائمة) لقيود الإقفال/الاحتياطي.
+        صف <strong>الاحتياطي القانوني</strong> فقط يعرض حقل النسبة بجانب اسم البند (بدون عمود منفصل) — تُقرأ برمجياً من أرباح السنة الحالية بعد إقفال القائمة لقيود الإقفال.
         <strong>الجزء الثاني:</strong> لكل نوع يومية اختر بنداً للمدين وبنداً للدائن — يمكن تضمين مفاتيح احتياطية في القائمة المنسدلة إن وُجدت في قاعدة البيانات لقواعد قديمة.
     </p>
 </div>
@@ -63,7 +63,6 @@ $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
                         <th class="gl-th-label">البند</th>
                         <th class="gl-th-code">كود الحساب</th>
                         <th class="gl-th-name">اسم الحساب</th>
-                        <th class="gl-th-pct" title="من أرباح السنة الحالية بعد إقفال القائمة — للاحتياطي القانوني">نسبة %</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -75,7 +74,23 @@ $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
                         $short = htmlspecialchars($rowTitles[$key] ?? $key, ENT_QUOTES, 'UTF-8');
                         ?>
                     <tr data-gl-key="<?php echo htmlspecialchars($key, ENT_QUOTES, 'UTF-8'); ?>" data-account-id="<?php echo $aid; ?>" title="<?php echo $title; ?>">
-                        <td class="gl-td-label"><?php echo $short; ?></td>
+                        <td class="gl-td-label<?php echo $key === 'legal_reserve' ? ' gl-td-label--legal-pct' : ''; ?>">
+                            <?php if ($key === 'legal_reserve'): ?>
+                            <div class="gl-legal-pct-inline" title="من أرباح السنة الحالية بعد إقفال القائمة — للاحتياطي القانوني">
+                                <span class="gl-legal-pct-inline__name"><?php echo $short; ?></span>
+                                <label class="gl-legal-pct-inline__field">
+                                    <span class="gl-legal-pct-inline__hint">نسبة</span>
+                                    <input type="number" class="gl-inp-alloc-pct" min="0" max="100" step="0.01" inputmode="decimal" lang="en" dir="ltr"
+                                        value="<?php echo htmlspecialchars((string) $legalReservePct, ENT_QUOTES, 'UTF-8'); ?>"
+                                        title="نسبة من أرباح السنة الحالية (بعد إقفال الإيرادات والمصروفات) تُخصَّص للاحتياطي القانوني — للاستخدام في قيود الإقفال"
+                                        aria-label="نسبة الاحتياطي القانوني من أرباح السنة الحالية">
+                                    <span class="gl-legal-pct-inline__unit" aria-hidden="true">%</span>
+                                </label>
+                            </div>
+                            <?php else: ?>
+                            <?php echo $short; ?>
+                            <?php endif; ?>
+                        </td>
                         <td class="gl-td-code">
                             <input type="text" class="gl-inp-code" dir="ltr" autocomplete="off" value="<?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?>" aria-label="كود الحساب">
                         </td>
@@ -85,12 +100,6 @@ $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
                                 <input type="text" class="gl-inp-name" readonly value="<?php echo htmlspecialchars($name, ENT_QUOTES, 'UTF-8'); ?>" aria-label="اسم الحساب"<?php echo $aid > 0 ? ' disabled' : ''; ?> tabindex="<?php echo $aid > 0 ? '-1' : '0'; ?>">
                             </div>
                         </td>
-                        <td class="gl-td-pct"><?php if ($key === 'legal_reserve'): ?>
-                            <input type="number" class="gl-inp-alloc-pct" min="0" max="100" step="0.01" inputmode="decimal" lang="en" dir="ltr"
-                                value="<?php echo htmlspecialchars((string) $legalReservePct, ENT_QUOTES, 'UTF-8'); ?>"
-                                title="نسبة من أرباح السنة الحالية (بعد إقفال الإيرادات والمصروفات) تُخصَّص للاحتياطي القانوني — للاستخدام في قيود الإقفال"
-                                aria-label="نسبة الاحتياطي القانوني من أرباح السنة الحالية">
-                        <?php else: ?><span class="muted">—</span><?php endif; ?></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
