@@ -2877,15 +2877,27 @@ body.coa-modal-open {
     width: 3.75rem;
 }
 .fy-col-acct-close {
-    width: 6.75rem;
+    min-width: 10.5rem;
+    width: 10.5rem;
 }
 .fy-col-del {
-    width: 4.25rem;
+    min-width: 10.5rem;
+    width: 10.5rem;
 }
-.fy-btn-acct-close {
-    padding: 4px 8px;
-    min-height: 32px;
+/* أزرار الصف: نفس الارتفاع والعرض الأدنى (أطول نص: «فك الإقفال…») */
+.fy-years-table .fy-btn-acct-close,
+.fy-years-table .fy-btn-reopen,
+.fy-years-table .fy-btn-del {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 9.75rem;
+    min-height: 34px;
+    padding: 5px 10px;
     font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
     white-space: nowrap;
 }
 .fy-close-acc-label {
@@ -2961,11 +2973,6 @@ body.coa-modal-open {
 .fy-col-center {
     text-align: center;
 }
-.fy-btn-del {
-    padding: 4px 10px;
-    min-height: 32px;
-    font-size: 12px;
-}
 .fy-actions {
     display: flex;
     flex-wrap: wrap;
@@ -2973,6 +2980,14 @@ body.coa-modal-open {
     padding-top: 12px;
     margin-top: 8px;
     border-top: 1px solid var(--border, #e5e7eb);
+}
+.fy-actions > button {
+    flex: 1 1 7rem;
+    box-sizing: border-box;
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 .fy-empty-hint {
     margin: 8px 0 0;
@@ -3553,7 +3568,9 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         box-shadow: none;
     }
     .fy-actions,
-    .fy-btn-del {
+    .fy-years-table .fy-btn-acct-close,
+    .fy-years-table .fy-btn-reopen,
+    .fy-years-table .fy-btn-del {
         display: none !important;
     }
     .coa-setup-modal__backdrop {
