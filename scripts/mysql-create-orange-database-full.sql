@@ -227,6 +227,13 @@ CREATE TABLE `orange_gl_journal_type_rules` (
   KEY `idx_ojtr_credit` (`credit_setting_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE `orange_gl_setting_alloc` (
+  `setting_key` varchar(64) NOT NULL,
+  `percent_value` decimal(8,4) NOT NULL DEFAULT 0.0000,
+  `updated_at` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`setting_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `orange_gl_pending_movements` (
   `id` int NOT NULL AUTO_INCREMENT,
   `reference` varchar(100) NOT NULL,

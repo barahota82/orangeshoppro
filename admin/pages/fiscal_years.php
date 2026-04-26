@@ -94,9 +94,10 @@ $fySuggestYear = $maxEndY + 1;
     <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="fy_close_main_title">
         <h3 id="fy_close_main_title" class="gl-pick-modal__title">إقفال سنة مالية</h3>
         <p class="muted" style="margin:0 0 12px;font-size:0.9rem;line-height:1.45;">
-            عند وجود إيرادات أو مصروفات أو تكلفة مبيعات مصنّفة في الدليل: <strong>سند 1</strong> بتاريخ <strong>آخر يوم</strong> من السنة — إقفال القائمة إلى حساب <strong>أرباح / خسائر السنة الحالية</strong> (الوسيط)؛
-            وإن وُجد صافي ربح أو خسارة <strong>سند 2</strong> بتاريخ <strong>أول يوم</strong> من السنة التالية (يجب أن تكون معرّفة ومفتوحة) — من ذلك الوسيط إلى <strong>الأرباح المحتجزة</strong>.
-            حدّد الحسابين أو اربطهما من «حسابات القيود التلقائية» (مفاتيح income_summary و retained_earnings).
+            عند وجود إيرادات أو مصروفات أو تكلفة مبيعات مصنّفة في الدليل: <strong>سند 1 (YEC-PL)</strong> بآخر يوم السنة — إلى حساب <strong>أرباح / خسائر السنة الحالية</strong> (الوسيط)؛
+            ثم <strong>سند 2 (YEC-RE)</strong> — ترحيل كامل الوسيط إلى <strong>الأرباح المحتجزة</strong>؛
+            عند صافي ربح ونسبة محفوظة: <strong>سند 3 (YEC-LR)</strong> — من مبلغ الترحيل للمحتجز يُحسب الاحتياطي بالنسبة وقيد منفصل (مدين محتجز، دائن احتياطي).
+            اربط الحسابات من «حسابات القيود التلقائية» (income_summary و retained_earnings و legal_reserve والنسبة).
         </p>
         <label class="fy-close-check-label" style="display:flex;align-items:center;gap:8px;margin-bottom:14px;cursor:pointer;">
             <input type="checkbox" id="fy_close_do_accounting" checked>
@@ -531,7 +532,7 @@ $fySuggestYear = $maxEndY + 1;
                 if (rid <= 0) {
                     return;
                 }
-                if (!confirm('فك إقفال هذه السنة؟\n\nسيتم حذف سندات الإقفال (YEC-PL وYEC-RE أو السند القديم YEC-) إن وُجدت، وإعادة فتح السنة.\nإن وُجدت أرصدة أول مدة للسنة التالية مُرحَّلة، راجعها بعد التصحيح.')) {
+                if (!confirm('فك إقفال هذه السنة؟\n\nسيتم حذف سندات الإقفال (YEC-PL وYEC-RE وYEC-LR إن وُجد، أو السند القديم YEC-)، وإعادة فتح السنة.\nإن وُجدت أرصدة أول مدة للسنة التالية مُرحَّلة، راجعها بعد التصحيح.')) {
                     return;
                 }
                 postJSON('/admin/api/fiscal_years/save.php', { action: 'reopen', id: rid })

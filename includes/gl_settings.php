@@ -47,7 +47,7 @@ function orange_gl_setting_key_labels(): array
         'cogs_returns_online' => 'تكلفة مردود مبيعات أونلاين — احتياط تقني فقط',
         'income_summary' => 'أرباح / خسائر السنة الحالية (وسيط إقفال) — قيود إقفال القائمة ثم الترحيل للمحتجز',
         'retained_earnings' => 'الأرباح المحتجزة — صافي الدخل أو الخسارة المرحّلة بعد الإقفال',
-        'legal_reserve' => 'الاحتياطي القانوني — حقوق ملكية (حسب سياسة الدليل والقيد اليدوي أو القواعد لاحقاً)',
+        'legal_reserve' => 'الاحتياطي القانوني — حقوق ملكية؛ النسبة % تُخصَّم من أرباح السنة الحالية (بعد إقفال القائمة) لاستخدامها في قيود الإقفال لاحقاً',
     ];
 }
 
@@ -204,6 +204,33 @@ function orange_gl_settings_ui_key_order(): array
 function orange_gl_allowed_setting_keys(): array
 {
     return array_keys(orange_gl_setting_key_labels());
+}
+
+/**
+ * نسبة مئوية (0–100) مربوطة ببند إعداد — تُخزَّن في orange_gl_setting_alloc (مثل نسبة الاحتياطي من أرباح السنة الحالية).
+ */
+function orange_gl_setting_alloc_percent(PDO $pdo, string $settingKey): float
+{
+    orange_catalog_ensure_schema($pdo);
+    if (trim($settingKey) === '' || ! orange_table_exists($pdo, 'orange_gl_setting_alloc')) {
+        return 0.0;
+    }
+    $st = $pdo->prepare('SELECT percent_value FROM orange_gl_setting_alloc WHERE setting_key = ? LIMIT 1');
+    $st->execute([$settingKey]);
+    $v = $st->fetchColumn();
+    if ($v === false || $v === null) {
+        return 0.0;
+    }
+
+    return max(0.0, min(100.0, round((float) $v, 4)));
+}
+
+/**
+ * نسبة الاحتياطي القانوني من أرباح السنة الحالية (للاستخدام في منطق الإقفال أو القيود التلقائية).
+ */
+function orange_gl_legal_reserve_percent_of_current_year_profit(PDO $pdo): float
+{
+    return orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
 }
 
 /**

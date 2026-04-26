@@ -42,12 +42,14 @@ $shortJson = json_encode($rowTitles, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERRO
 $hintsJson = json_encode($keyHints, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 $ruleKeysJson = json_encode($ruleKeyOrder, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 $rulesJson = json_encode($journalRules, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+$legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
 ?>
 <div class="page-title page-title--stacked">
     <h1>حسابات القيود التلقائية</h1>
     <p class="page-subtitle">
         <strong>الجزء الأول:</strong> ربط كل بند بحساب فرعي من الدليل (بدون نوع يومية هنا).
         لا يُعرض هنا «مصروف عام» أو «ذمم موردين مجمّعة» — المصروفات تُربط لكل بند من شاشة المصروفات، والشراء الآجل على حساب ذمة كل مورد.
+        صف <strong>الاحتياطي القانوني</strong> يتضمّن نسبة مئوية تُقرأ برمجياً كجزء من أرباح السنة الحالية (بعد إقفال القائمة) لقيود الإقفال/الاحتياطي.
         <strong>الجزء الثاني:</strong> لكل نوع يومية اختر بنداً للمدين وبنداً للدائن — يمكن تضمين مفاتيح احتياطية في القائمة المنسدلة إن وُجدت في قاعدة البيانات لقواعد قديمة.
     </p>
 </div>
@@ -61,6 +63,7 @@ $rulesJson = json_encode($journalRules, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_E
                         <th class="gl-th-label">البند</th>
                         <th class="gl-th-code">كود الحساب</th>
                         <th class="gl-th-name">اسم الحساب</th>
+                        <th class="gl-th-pct" title="من أرباح السنة الحالية بعد إقفال القائمة — للاحتياطي القانوني">نسبة %</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -82,6 +85,12 @@ $rulesJson = json_encode($journalRules, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_E
                                 <input type="text" class="gl-inp-name" readonly value="<?php echo htmlspecialchars($name, ENT_QUOTES, 'UTF-8'); ?>" aria-label="اسم الحساب"<?php echo $aid > 0 ? ' disabled' : ''; ?> tabindex="<?php echo $aid > 0 ? '-1' : '0'; ?>">
                             </div>
                         </td>
+                        <td class="gl-td-pct"><?php if ($key === 'legal_reserve'): ?>
+                            <input type="number" class="gl-inp-alloc-pct" min="0" max="100" step="0.01" inputmode="decimal" lang="en" dir="ltr"
+                                value="<?php echo htmlspecialchars((string) $legalReservePct, ENT_QUOTES, 'UTF-8'); ?>"
+                                title="نسبة من أرباح السنة الحالية (بعد إقفال الإيرادات والمصروفات) تُخصَّص للاحتياطي القانوني — للاستخدام في قيود الإقفال"
+                                aria-label="نسبة الاحتياطي القانوني من أرباح السنة الحالية">
+                        <?php else: ?><span class="muted">—</span><?php endif; ?></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -457,10 +466,21 @@ $rulesJson = json_encode($journalRules, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_E
                 credit_setting_key: ck
             });
         });
+        var allocPercents = {};
+        var pctInp = document.querySelector('tr[data-gl-key="legal_reserve"] .gl-inp-alloc-pct');
+        if (pctInp) {
+            var pv = parseFloat(String(pctInp.value || '').replace(',', '.'), 10);
+            if (!isNaN(pv) && pv > 0) {
+                allocPercents.legal_reserve = pv;
+            } else {
+                allocPercents.legal_reserve = '';
+            }
+        }
         postJSON('/admin/api/settings/gl-accounts.php', {
             action: 'save',
             settings: settings,
-            journal_rules: journalRules
+            journal_rules: journalRules,
+            alloc_percents: allocPercents
         }).then(function (res) {
             alert(res.message || (res.success ? 'تم' : 'فشل'));
             if (res.success) {

@@ -32,12 +32,21 @@ try {
             }
         }
 
+        $allocPercents = [];
+        if (orange_table_exists($pdo, 'orange_gl_setting_alloc')) {
+            $ar = $pdo->query('SELECT setting_key, percent_value FROM orange_gl_setting_alloc')->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($ar ?: [] as $row) {
+                $allocPercents[(string) $row['setting_key']] = round((float) ($row['percent_value'] ?? 0), 4);
+            }
+        }
+
         json_response([
             'success' => true,
             'keys' => orange_gl_setting_key_labels(),
             'ui_key_order' => orange_gl_settings_ui_key_order(),
             'accounts' => $accounts,
             'current' => $current,
+            'alloc_percents' => $allocPercents,
             'journal_rules' => orange_gl_journal_type_rules_list($pdo),
             'journal_types' => orange_journal_types_list($pdo),
         ]);
@@ -166,6 +175,37 @@ try {
                 ], 422);
             }
             $insRule->execute([$jt, $dk, $ck]);
+        }
+    }
+
+    if (isset($data['alloc_percents']) && is_array($data['alloc_percents']) && orange_table_exists($pdo, 'orange_gl_setting_alloc')) {
+        $allowedAllocKeys = ['legal_reserve'];
+        $upPct = $pdo->prepare(
+            'INSERT INTO orange_gl_setting_alloc (setting_key, percent_value, updated_at) VALUES (?, ?, NOW())
+             ON DUPLICATE KEY UPDATE percent_value = VALUES(percent_value), updated_at = NOW()'
+        );
+        $delPct = $pdo->prepare('DELETE FROM orange_gl_setting_alloc WHERE setting_key = ?');
+        foreach ($allowedAllocKeys as $ak) {
+            if (! array_key_exists($ak, $data['alloc_percents'])) {
+                continue;
+            }
+            $raw = $data['alloc_percents'][$ak];
+            if ($raw === '' || $raw === null) {
+                $delPct->execute([$ak]);
+
+                continue;
+            }
+            $pct = round((float) $raw, 4);
+            if ($pct < 0 || $pct > 100) {
+                $pdo->rollBack();
+                json_response(['success' => false, 'message' => 'نسبة الاحتياطي القانوني يجب أن تكون بين 0 و 100'], 422);
+            }
+            if ($pct <= 0) {
+                $delPct->execute([$ak]);
+
+                continue;
+            }
+            $upPct->execute([$ak, $pct]);
         }
     }
 

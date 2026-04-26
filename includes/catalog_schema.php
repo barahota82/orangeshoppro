@@ -848,6 +848,18 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_gl_set_jt ON orange_gl_account_settings (journal_type_id)');
     }
 
+    if (!orange_table_exists($pdo, 'orange_gl_setting_alloc')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE orange_gl_setting_alloc (
+                setting_key VARCHAR(64) NOT NULL,
+                percent_value DECIMAL(8,4) NOT NULL DEFAULT 0.0000,
+                updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (setting_key)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
     /*
      |--------------------------------------------------------------------------
      | السنوات المالية — إغلاق سنة / فتح سنة جديدة / ربط القيود
