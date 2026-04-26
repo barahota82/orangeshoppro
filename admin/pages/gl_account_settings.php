@@ -212,12 +212,71 @@ $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
             cre.title = '';
         }
         if (code === 'PIN' && pt === 'credit' && cre) {
-            cre.title = 'اترك «— بند —» لاستخدام ذمة المورد من فاتورة الشراء الآجل';
+            cre.title = '';
         }
         if (code === 'PDN' && pt === 'credit' && deb) {
-            deb.title = 'اترك «— بند —» لاستخدام ذمة المورد من مردود الشراء الآجل';
+            deb.title = '';
         }
     }
+
+    /**
+     * آجل PIN/PDN: إظهار قائمة مدين أو دائن فقط؛ الجانب الآخر من ذمة المورد في المستند.
+     */
+    function applyPurchaseCreditColumnLayout(tr) {
+        var jt = parseInt((tr.querySelector('.gl-sel-jt-id') || {}).value, 10) || 0;
+        var code = journalTypeCodeById(jt);
+        var ptSel = tr.querySelector('.gl-sel-pt');
+        var pt = ptSel && !ptSel.classList.contains('gl-sel-pt--standard')
+            ? String(ptSel.value || '').trim()
+            : '';
+        var tdDeb = tr.querySelector('.gl-td-debit');
+        var tdCre = tr.querySelector('.gl-td-credit');
+        var deb = tr.querySelector('.gl-sel-debit-key');
+        var cre = tr.querySelector('.gl-sel-credit-key');
+        if (tdDeb) {
+            tdDeb.querySelectorAll('.gl-rule-from-doc-placeholder').forEach(function (n) { n.remove(); });
+        }
+        if (tdCre) {
+            tdCre.querySelectorAll('.gl-rule-from-doc-placeholder').forEach(function (n) { n.remove(); });
+        }
+        if (deb) {
+            deb.style.display = '';
+            deb.disabled = false;
+        }
+        if (cre) {
+            cre.style.display = '';
+            cre.disabled = false;
+        }
+        if (!isPurchaseSplitJournalCode(code) || pt !== 'credit') {
+            return;
+        }
+        var ph = document.createElement('span');
+        ph.className = 'gl-rule-from-doc-placeholder';
+        ph.style.cssText = 'display:inline-block;padding:0.35rem 0.5rem;color:var(--muted,#666);font-size:0.92em;line-height:1.4;';
+        ph.textContent = 'ذمة المورد (من المستند)';
+        ph.title = 'يُحدَّد عند الترحيل من حساب المورد — لا يُختار في هذه الشاشة';
+
+        if (code === 'PIN') {
+            if (cre) {
+                cre.value = '';
+                cre.style.display = 'none';
+                cre.disabled = true;
+            }
+            if (tdCre) {
+                tdCre.appendChild(ph.cloneNode(true));
+            }
+        } else if (code === 'PDN') {
+            if (deb) {
+                deb.value = '';
+                deb.style.display = 'none';
+                deb.disabled = true;
+            }
+            if (tdDeb) {
+                tdDeb.appendChild(ph.cloneNode(true));
+            }
+        }
+    }
+
     function paintPaymentTermsCell(tr, jtId, selectedPt) {
         var td = tr.querySelector('.gl-td-pt');
         if (!td) {
