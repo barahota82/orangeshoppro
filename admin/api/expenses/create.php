@@ -18,22 +18,28 @@ try {
     $name = trim((string)($data['name'] ?? ''));
     $amount = (float)($data['amount'] ?? 0);
     $expAccRaw = isset($data['expense_account_id']) ? (int) $data['expense_account_id'] : 0;
-    $expenseAccountOverride = $expAccRaw > 0 ? $expAccRaw : null;
     $notes = trim((string)($data['notes'] ?? ''));
     if ($name === '' || $amount <= 0) {
         json_response(['success' => false, 'message' => 'بيانات المصروف غير صحيحة'], 422);
     }
 
-    $pair = orange_expense_gl_accounts($pdo, $expenseAccountOverride);
+    if (!orange_table_has_column($pdo, 'expenses', 'expense_account_id')) {
+        json_response(['success' => false, 'message' => 'قاعدة البيانات تحتاج عمود expense_account_id في جدول المصروفات.'], 422);
+    }
+    if ($expAccRaw <= 0) {
+        json_response(['success' => false, 'message' => 'اختر حساب مصروف من الدليل — إلزامي (لا يُستخدم حساب مصروف مجمع).'], 422);
+    }
+
+    $pair = orange_expense_gl_accounts($pdo, $expAccRaw);
 
     $pdo->beginTransaction();
 
-    if (orange_table_has_column($pdo, 'expenses', 'expense_account_id') && orange_table_has_column($pdo, 'expenses', 'notes')) {
+    if (orange_table_has_column($pdo, 'expenses', 'notes')) {
         $pdo->prepare('INSERT INTO expenses (name, amount, expense_account_id, notes) VALUES (?, ?, ?, ?)')
-            ->execute([$name, $amount, $expenseAccountOverride, $notes]);
+            ->execute([$name, $amount, $expAccRaw, $notes]);
     } else {
-        $pdo->prepare('INSERT INTO expenses (name, amount) VALUES (?, ?)')
-            ->execute([$name, $amount]);
+        $pdo->prepare('INSERT INTO expenses (name, amount, expense_account_id) VALUES (?, ?, ?)')
+            ->execute([$name, $amount, $expAccRaw]);
     }
     $expenseId = (int) $pdo->lastInsertId();
 

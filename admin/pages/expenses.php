@@ -42,9 +42,9 @@ $glHint = storefront_public_path('/admin/index.php?page=gl_account_settings');
 ?>
 <div class="page-title page-title--stacked">
     <h1>المصروفات</h1>
-    <p class="page-subtitle">القيد: مدين <strong>حساب مصروف من الدليل</strong> (يُفضَّل اختيار بند من جذر المصروفات) أو ترك الافتراضي <strong>مصروف عام</strong> من
-        <a href="<?php echo htmlspecialchars($glHint, ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a>
-        — دائن <strong>الخزينة</strong>. يُرحَّل عبر الطابور أو مباشرة حسب إعداد النظام.</p>
+    <p class="page-subtitle">القيد: مدين <strong>حساب مصروف فرعي من الدليل</strong> (جذر المصروفات) — <strong>إلزامي لكل مصروف</strong>؛ دائن <strong>الخزينة</strong> من
+        <a href="<?php echo htmlspecialchars($glHint, ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a>.
+        لا يُستخدم حساب مصروف مجمع عند التسجيل من هذه الشاشة.</p>
 </div>
 
 <div class="card">
@@ -76,7 +76,7 @@ $glHint = storefront_public_path('/admin/index.php?page=gl_account_settings');
                     <?php if ($hasExpenseAccCol): ?>
                     <td><?php
                         $ea = (int) ($ex['expense_account_id'] ?? 0);
-                        echo $ea > 0 ? htmlspecialchars($expenseAccountLabel($ea), ENT_QUOTES, 'UTF-8') : '<span class="muted">مصروف عام</span>';
+                        echo $ea > 0 ? htmlspecialchars($expenseAccountLabel($ea), ENT_QUOTES, 'UTF-8') : '<span class="badge cancelled">بلا حساب — عيّن حساباً ثم حدّث</span>';
                     ?></td>
                     <?php endif; ?>
                     <td class="actions">
@@ -103,9 +103,9 @@ $glHint = storefront_public_path('/admin/index.php?page=gl_account_settings');
             <input id="exp_amount" type="number" class="admin-inp-money" step="any" min="0" placeholder="0" inputmode="decimal" lang="en" dir="ltr">
         </div>
         <div>
-            <label for="exp_account_id">حساب المصروف في الدليل</label>
-            <select id="exp_account_id">
-                <option value="">— افتراضي: مصروف عام من الإعدادات —</option>
+            <label for="exp_account_id">حساب المصروف في الدليل (إلزامي)</label>
+            <select id="exp_account_id" required>
+                <option value="" disabled selected>— اختر حساباً من جذر المصروفات —</option>
                 <?php foreach ($expensePickAccounts as $a): ?>
                     <?php
                     $eid = (int) $a['id'];
@@ -154,7 +154,7 @@ $glHint = storefront_public_path('/admin/index.php?page=gl_account_settings');
         var accEl = document.getElementById('exp_account_id');
         if (accEl) {
             accEl.value = r.expense_account_id ? String(r.expense_account_id) : '';
-            accEl.disabled = true;
+            accEl.disabled = false;
         }
         document.getElementById('exp_btn_cancel').style.display = '';
         document.getElementById('exp_btn_save').textContent = 'تحديث';
@@ -170,6 +170,9 @@ $glHint = storefront_public_path('/admin/index.php?page=gl_account_settings');
         var accEl2 = document.getElementById('exp_account_id');
         if (accEl2) {
             accEl2.value = '';
+            if (accEl2.options.length && accEl2.options[0].disabled) {
+                accEl2.selectedIndex = 0;
+            }
             accEl2.disabled = false;
         }
         document.getElementById('exp_btn_cancel').style.display = 'none';
@@ -203,10 +206,11 @@ $glHint = storefront_public_path('/admin/index.php?page=gl_account_settings');
             alert('أدخل البيان والمبلغ بشكل صحيح');
             return;
         }
-        var payload = { name: name, amount: amount, notes: notes };
-        if (accEl3 && !accEl3.disabled && accRaw > 0) {
-            payload.expense_account_id = accRaw;
+        if (!accEl3 || accRaw <= 0) {
+            alert('اختر حساب مصروف من الدليل — إلزامي');
+            return;
         }
+        var payload = { name: name, amount: amount, notes: notes, expense_account_id: accRaw };
         var url = editId ? '/admin/api/expenses/update.php' : '/admin/api/expenses/create.php';
         if (editId) {
             payload.id = editId;

@@ -54,12 +54,13 @@ try {
     $payableAccountSql = null;
     if ($hasPayableAcc) {
         $pRaw = isset($data['payable_account_id']) ? (int) $data['payable_account_id'] : 0;
-        if ($pRaw > 0) {
-            if (!orange_accounts_account_is_posting_leaf($pdo, $pRaw)) {
-                json_response(['success' => false, 'message' => 'حساب ذمة المورد يجب أن يكون حساباً فرعياً (ورقة ترحيل) في الدليل.'], 422);
-            }
-            $payableAccountSql = $pRaw;
+        if ($pRaw <= 0) {
+            json_response(['success' => false, 'message' => 'حساب ذمة المورد في الدليل إلزامي — أنشئ حساباً فرعياً تحت الخصوم واختره (لا يُستخدم حساب مجمع).'], 422);
         }
+        if (!orange_accounts_account_is_posting_leaf($pdo, $pRaw)) {
+            json_response(['success' => false, 'message' => 'حساب ذمة المورد يجب أن يكون حساباً فرعياً (ورقة ترحيل) في الدليل.'], 422);
+        }
+        $payableAccountSql = $pRaw;
     }
 
     if ($phoneSql !== null) {

@@ -143,6 +143,23 @@ try {
         json_response(['success' => false, 'message' => 'بيانات التعديل غير صحيحة'], 422);
     }
 
+    if ($type === 'credit') {
+        if ($supplierId <= 0) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            json_response(['success' => false, 'message' => 'شراء آجل يتطلّب مورداً مربوطاً بحساب ذمة خاص في الدليل.'], 422);
+        }
+        try {
+            orange_supplier_required_payable_account_id($pdo, $supplierId);
+        } catch (RuntimeException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            json_response(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
     $newTotal = apply_purchase_items($pdo, $purchaseId, $items);
     $pdo->prepare("UPDATE purchases SET supplier_id = ?, total = ?, type = ?, notes = ?, updated_at = NOW() WHERE id = ?")
         ->execute([$supplierId > 0 ? $supplierId : null, $newTotal, $type, $notes, $purchaseId]);
@@ -154,7 +171,7 @@ try {
     $cashId = orange_gl_account_id($pdo, 'cash');
     $apId = orange_gl_account_id($pdo, 'accounts_payable');
     if ($type === 'credit') {
-        $apId = orange_supplier_payable_account_id($pdo, $supplierId);
+        $apId = orange_supplier_required_payable_account_id($pdo, $supplierId);
     }
     $purRef = 'PUR-' . $purchaseId;
     $now = date('Y-m-d H:i:s');

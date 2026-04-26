@@ -18,9 +18,12 @@ function orange_expense_gl_accounts(PDO $pdo, ?int $expenseAccountOverride): arr
         if (!orange_accounts_account_is_posting_leaf($pdo, $expenseAccountOverride)) {
             throw new RuntimeException('حساب المصروف يجب أن يكون فرعياً (ورقة ترحيل).');
         }
+        if (orange_accounts_account_pl_role($pdo, $expenseAccountOverride) !== 'expense') {
+            throw new RuntimeException('حساب المصروف يجب أن يكون ضمن جذر المصروفات في الدليل.');
+        }
         $debitId = $expenseAccountOverride;
     } else {
-        $debitId = orange_gl_account_id($pdo, 'general_expense');
+        throw new RuntimeException('يجب اختيار حساب مصروف فرعي من الدليل لكل مصروف — لا يُستخدم حساب مصروف مجمع.');
     }
 
     return ['debit' => $debitId, 'credit' => $creditId];
@@ -33,4 +36,23 @@ function orange_expense_gl_accounts(PDO $pdo, ?int $expenseAccountOverride): arr
 function orange_expense_gl_reversal_pair(array $pair): array
 {
     return ['debit' => $pair['credit'], 'credit' => $pair['debit']];
+}
+
+/**
+ * لعكس حذف مصروف قديم بلا expense_account_id (قبل سياسة «حساب لكل مصروف»).
+ *
+ * @param array<string, mixed> $row
+ * @return array{debit: int, credit: int}
+ */
+function orange_expense_gl_pair_for_delete_row(PDO $pdo, array $row): array
+{
+    $oid = (int) ($row['expense_account_id'] ?? 0);
+    if ($oid > 0) {
+        return orange_expense_gl_accounts($pdo, $oid);
+    }
+
+    return [
+        'debit' => orange_gl_account_id($pdo, 'general_expense'),
+        'credit' => orange_gl_account_id($pdo, 'cash'),
+    ];
 }

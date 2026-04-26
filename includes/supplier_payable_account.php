@@ -8,6 +8,8 @@ require_once __DIR__ . '/gl_settings.php';
 
 /**
  * معرف حساب الذمة الدائنة الفعلي للمورد: عمود payable_account_id إن وُجد وصالح، وإلا حساب «ذمم الموردين» من الإعدادات.
+ *
+ * @deprecated للترحيل التلقائي يُفضّل orange_supplier_required_payable_account_id عند السياسة «ذمة لكل مورد».
  */
 function orange_supplier_payable_account_id(PDO $pdo, int $supplierId): int
 {
@@ -23,6 +25,33 @@ function orange_supplier_payable_account_id(PDO $pdo, int $supplierId): int
     $aid = (int) $raw;
     if ($aid <= 0 || !orange_accounts_account_is_posting_leaf($pdo, $aid)) {
         return orange_gl_account_id($pdo, 'accounts_payable');
+    }
+
+    return $aid;
+}
+
+/**
+ * حساب ذمة المورد الإلزامي (ورقة دليل) — بدون الرجوع لحساب مجمع.
+ *
+ * @throws RuntimeException
+ */
+function orange_supplier_required_payable_account_id(PDO $pdo, int $supplierId): int
+{
+    if ($supplierId <= 0) {
+        throw new RuntimeException('شراء آجل أو دفع مورد يتطلب اختيار مورد.');
+    }
+    if (!orange_table_has_column($pdo, 'suppliers', 'payable_account_id')) {
+        throw new RuntimeException('قاعدة البيانات تحتاج عمود payable_account_id في جدول الموردين — حدّث المخطط.');
+    }
+    $st = $pdo->prepare('SELECT payable_account_id FROM suppliers WHERE id = ? LIMIT 1');
+    $st->execute([$supplierId]);
+    $raw = $st->fetchColumn();
+    if ($raw === false || $raw === null) {
+        throw new RuntimeException('المورد غير مربوط بحساب ذمة في الدليل. افتح «الموردين» واختر حساباً فرعياً تحت الخصوم.');
+    }
+    $aid = (int) $raw;
+    if ($aid <= 0 || !orange_accounts_account_is_posting_leaf($pdo, $aid)) {
+        throw new RuntimeException('حساب ذمة المورد غير صالح (يجب أن يكون حساباً فرعياً في الدليل). حدّث بيانات المورد.');
     }
 
     return $aid;

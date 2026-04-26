@@ -53,7 +53,11 @@ try {
 
     $allocLines = orange_party_normalize_allocations_payload($data['allocations'] ?? []);
 
-    $apId = orange_supplier_payable_account_id($pdo, $supplierId);
+    try {
+        $apId = orange_supplier_required_payable_account_id($pdo, $supplierId);
+    } catch (RuntimeException $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 422);
+    }
     $cashId = orange_gl_account_id($pdo, 'cash');
 
     $seq = orange_sequence_next($pdo, 'spay_' . date('Ymd'));

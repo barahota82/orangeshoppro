@@ -10,12 +10,33 @@ $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
 $leafAccountOptions = [];
+$supplierPayablePickAccounts = [];
 if (orange_table_exists($pdo, 'accounts')) {
     $lw = orange_accounts_posting_leaf_where_sql($pdo, 'a');
     $leafAccountOptions = $pdo->query(
         'SELECT a.id, a.code, a.name FROM accounts a WHERE ' . $lw . ' ORDER BY COALESCE(a.code, \'\'), a.name'
     )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    foreach ($leafAccountOptions as $a) {
+        $aid = (int) $a['id'];
+        if (orange_accounts_account_pl_role($pdo, $aid) === 'liability') {
+            $supplierPayablePickAccounts[] = $a;
+        }
+    }
 }
+$payableAccountLabel = static function (int $id) use ($leafAccountOptions, $supplierPayablePickAccounts): string {
+    foreach ($supplierPayablePickAccounts as $a) {
+        if ((int) $a['id'] === $id) {
+            return (trim((string) ($a['code'] ?? '')) !== '' ? $a['code'] . ' — ' : '') . ($a['name'] ?? '');
+        }
+    }
+    foreach ($leafAccountOptions as $a) {
+        if ((int) $a['id'] === $id) {
+            return (trim((string) ($a['code'] ?? '')) !== '' ? $a['code'] . ' — ' : '') . ($a['name'] ?? '');
+        }
+    }
+
+    return '#' . $id;
+};
 $hasSupplierPayableCol = orange_table_has_column($pdo, 'suppliers', 'payable_account_id');
 
 $rows = [];
@@ -39,7 +60,7 @@ $count = count($rows);
             <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment'), ENT_QUOTES, 'UTF-8'); ?>">سند صرف / مورد</a>
             أو <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_ledger'), ENT_QUOTES, 'UTF-8'); ?>">ذمم العملاء والموردين</a>.
             <?php if ($hasSupplierPayableCol): ?>
-                اربط <strong>حساب ذمة</strong> فرعياً من الدليل لكل مورد لتُرحَّل مشتريات الآجل والدفع على ذلك الحساب بدلاً من مجمع «ذمم الموردين» فقط.
+                <strong>حساب ذمة فرعي</strong> (تحت الخصوم) <strong>إلزامي لكل مورد</strong> — تُرحَّل مشتريات الآجل والسداد على ذلك الحساب فقط، دون استخدام حساب مجمع للموردين في القيود التلقائية.
             <?php endif; ?>
         </p>
     </div>
@@ -84,10 +105,10 @@ $count = count($rows);
         </div>
         <?php if ($hasSupplierPayableCol): ?>
         <div style="grid-column:1/-1;">
-            <label for="sup_payable_account_id">حساب ذمة المورد في الدليل (اختياري)</label>
-            <select id="sup_payable_account_id">
-                <option value="">— افتراضي: حساب «ذمم الموردين» من إعدادات القيود —</option>
-                <?php foreach ($leafAccountOptions as $acc): ?>
+            <label for="sup_payable_account_id">حساب ذمة المورد في الدليل (إلزامي)</label>
+            <select id="sup_payable_account_id" required>
+                <option value="" disabled selected>— اختر حساب خصوم (ورقة ترحيل) —</option>
+                <?php foreach ($supplierPayablePickAccounts as $acc): ?>
                     <?php
                     $lid = (int) $acc['id'];
                     $lab = (trim((string) ($acc['code'] ?? '')) !== '' ? $acc['code'] . ' — ' : '') . ($acc['name'] ?? '');
@@ -95,7 +116,7 @@ $count = count($rows);
                     <option value="<?php echo $lid; ?>"><?php echo htmlspecialchars($lab, ENT_QUOTES, 'UTF-8'); ?></option>
                 <?php endforeach; ?>
             </select>
-            <p class="card-hint" style="margin:6px 0 0;">أنشئ حساباً فرعياً تحت خصوم (مثلاً باسم المورد) من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=chart_of_accounts'), ENT_QUOTES, 'UTF-8'); ?>">دليل الحسابات</a> ثم اختره هنا.</p>
+            <p class="card-hint" style="margin:6px 0 0;">أنشئ حساباً فرعياً تحت جذر الخصوم (مثلاً باسم المورد) من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=chart_of_accounts'), ENT_QUOTES, 'UTF-8'); ?>">دليل الحسابات</a> ثم اختره هنا.</p>
         </div>
         <?php endif; ?>
     </div>
@@ -138,18 +159,7 @@ $count = count($rows);
                         $phone = (string) ($s['phone'] ?? '');
                         $codeDisp = isset($s['code']) && (string) $s['code'] !== '' ? (string) $s['code'] : '—';
                         $pAcc = $hasSupplierPayableCol ? (int) ($s['payable_account_id'] ?? 0) : 0;
-                        $pAccLabel = '—';
-                        if ($pAcc > 0) {
-                            foreach ($leafAccountOptions as $acc) {
-                                if ((int) $acc['id'] === $pAcc) {
-                                    $pAccLabel = (trim((string) ($acc['code'] ?? '')) !== '' ? $acc['code'] . ' — ' : '') . ($acc['name'] ?? '');
-                                    break;
-                                }
-                            }
-                            if ($pAccLabel === '—') {
-                                $pAccLabel = '#' . $pAcc;
-                            }
-                        }
+                        $pAccLabel = $pAcc > 0 ? $payableAccountLabel($pAcc) : '';
                         $hayRaw = trim((string) ($s['code'] ?? '') . ' ' . ($s['name'] ?? '') . ' ' . $phone . ' ' . ($s['notes'] ?? '') . ' ' . $pAccLabel);
                         $hay = function_exists('mb_strtolower') ? mb_strtolower($hayRaw, 'UTF-8') : strtolower($hayRaw);
                         ?>
@@ -160,7 +170,11 @@ $count = count($rows);
                             <td dir="ltr"><?php echo $phone !== '' ? htmlspecialchars($phone, ENT_QUOTES, 'UTF-8') : '—'; ?></td>
                             <td dir="ltr"><?php echo number_format($bal, 3); ?></td>
                             <?php if ($hasSupplierPayableCol): ?>
-                                <td><small><?php echo htmlspecialchars($pAccLabel, ENT_QUOTES, 'UTF-8'); ?></small></td>
+                                <td><small><?php
+                                    echo $pAcc > 0
+                                        ? htmlspecialchars($pAccLabel, ENT_QUOTES, 'UTF-8')
+                                        : '<span class="badge cancelled">بلا حساب ذمة — حدّث المورد</span>';
+                                ?></small></td>
                             <?php endif; ?>
                             <td><?php echo (int) ($s['purchase_cnt'] ?? 0); ?></td>
                             <td class="party-registry-actions">
@@ -190,7 +204,12 @@ function supResetForm() {
     document.getElementById('sup_phone').value = '';
     document.getElementById('sup_notes').value = '';
     var ps = document.getElementById('sup_payable_account_id');
-    if (ps) { ps.value = ''; }
+    if (ps) {
+        ps.value = '';
+        if (ps.options.length && ps.options[0].disabled) {
+            ps.selectedIndex = 0;
+        }
+    }
 }
 function supEdit(row) {
     document.getElementById('sup_id').value = String(row.id || 0);
@@ -202,6 +221,9 @@ function supEdit(row) {
     if (ps) {
         var p = row.payable_account_id != null && row.payable_account_id > 0 ? String(row.payable_account_id) : '';
         ps.value = p;
+        if (p && ps.value !== p) {
+            alert('حساب الذمة الحالي غير ضمن قائمة الخصوم — راجع الدليل أو اختر حساباً صالحاً');
+        }
     }
     document.getElementById('sup_name').closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -222,8 +244,12 @@ function supSave() {
     };
     var ps = document.getElementById('sup_payable_account_id');
     if (ps) {
-        var pv = parseInt(ps.value, 10);
-        payload.payable_account_id = pv > 0 ? pv : null;
+        var pv = parseInt(String(ps.value || '0'), 10);
+        if (!(pv > 0)) {
+            alert('اختر حساب ذمة المورد من الدليل — إلزامي');
+            return;
+        }
+        payload.payable_account_id = pv;
     }
     if (id > 0) {
         payload.id = id;

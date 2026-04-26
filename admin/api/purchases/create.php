@@ -27,6 +27,17 @@ try {
         json_response(['success' => false, 'message' => 'بيانات الشراء غير صحيحة'], 422);
     }
 
+    if ($type === 'credit') {
+        if ($supplierId <= 0) {
+            json_response(['success' => false, 'message' => 'شراء آجل يتطلّب مورداً مربوطاً بحساب ذمة خاص في الدليل.'], 422);
+        }
+        try {
+            orange_supplier_required_payable_account_id($pdo, $supplierId);
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
     $pdo->beginTransaction();
 
     $computedTotal = 0.0;
@@ -86,7 +97,7 @@ try {
     $cashId = orange_gl_account_id($pdo, 'cash');
     $apId = orange_gl_account_id($pdo, 'accounts_payable');
     if ($type === 'credit') {
-        $apId = orange_supplier_payable_account_id($pdo, $supplierId);
+        $apId = orange_supplier_required_payable_account_id($pdo, $supplierId);
     }
 
     $purRef = 'PUR-' . $purchaseId;

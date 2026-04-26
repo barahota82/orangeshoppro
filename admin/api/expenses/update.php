@@ -8,6 +8,8 @@ require_once __DIR__ . '/../../../includes/gl_settings.php';
 require_once __DIR__ . '/../../../includes/expense_gl.php';
 require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_write.php';
+require_once __DIR__ . '/../../../includes/journal_voucher.php';
+require_once __DIR__ . '/../../../includes/account_tree.php';
 require_admin_api();
 
 /**
@@ -18,7 +20,7 @@ function orange_expense_pair_from_expense_row(PDO $pdo, array $row): array
 {
     $oid = (int) ($row['expense_account_id'] ?? 0);
 
-    return orange_expense_gl_accounts($pdo, $oid > 0 ? $oid : null);
+    return orange_expense_gl_accounts($pdo, $oid);
 }
 
 try {
@@ -44,7 +46,7 @@ try {
     $pdo->beginTransaction();
     if ($action === 'delete') {
         $oldAmount = (float) $row['amount'];
-        $pair = orange_expense_pair_from_expense_row($pdo, $row);
+        $pair = orange_expense_gl_pair_for_delete_row($pdo, $row);
         $revPair = orange_expense_gl_reversal_pair($pair);
         $pdo->prepare('DELETE FROM expenses WHERE id = ?')->execute([$id]);
         orange_gl_pending_remove_by_reference($pdo, 'EXP-' . $id);
@@ -85,17 +87,49 @@ try {
         }
         json_response(['success' => false, 'message' => 'بيانات المصروف غير صحيحة'], 422);
     }
+
+    if (!orange_table_has_column($pdo, 'expenses', 'expense_account_id')) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        json_response(['success' => false, 'message' => 'قاعدة البيانات تحتاج عمود expense_account_id في جدول المصروفات.'], 422);
+    }
+    $expAccNew = array_key_exists('expense_account_id', $data) ? (int) $data['expense_account_id'] : (int) ($row['expense_account_id'] ?? 0);
+    if ($expAccNew <= 0) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        json_response(['success' => false, 'message' => 'اختر حساب مصروف من الدليل — إلزامي.'], 422);
+    }
+    if (!orange_accounts_account_is_posting_leaf($pdo, $expAccNew) || orange_accounts_account_pl_role($pdo, $expAccNew) !== 'expense') {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        json_response(['success' => false, 'message' => 'حساب المصروف يجب أن يكون ورقة ترحيل ضمن جذر المصروفات.'], 422);
+    }
+    $oldAcc = (int) ($row['expense_account_id'] ?? 0);
+    if ($oldAcc !== $expAccNew && orange_journal_vouchers_ready($pdo) && orange_voucher_by_reference($pdo, 'EXP-' . $id)) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        json_response(['success' => false, 'message' => 'لا يمكن تغيير حساب المصروف بعد ترحيل السند المحاسبي — استخدم قيداً يدوياً أو احذف السند وفق سياسة المنشأة.'], 422);
+    }
+
     $oldAmount = (float) $row['amount'];
     $delta = $amount - $oldAmount;
-    $pair = orange_expense_pair_from_expense_row($pdo, $row);
 
     if (orange_table_has_column($pdo, 'expenses', 'notes')) {
-        $pdo->prepare('UPDATE expenses SET name = ?, amount = ?, notes = ?, updated_at = NOW() WHERE id = ?')
-            ->execute([$name, $amount, $notes, $id]);
+        $pdo->prepare('UPDATE expenses SET name = ?, amount = ?, notes = ?, expense_account_id = ?, updated_at = NOW() WHERE id = ?')
+            ->execute([$name, $amount, $notes, $expAccNew, $id]);
     } else {
-        $pdo->prepare('UPDATE expenses SET name = ?, amount = ?, updated_at = NOW() WHERE id = ?')
-            ->execute([$name, $amount, $id]);
+        $pdo->prepare('UPDATE expenses SET name = ?, amount = ?, expense_account_id = ?, updated_at = NOW() WHERE id = ?')
+            ->execute([$name, $amount, $expAccNew, $id]);
     }
+
+    $rowForPair = $row;
+    $rowForPair['expense_account_id'] = $expAccNew;
+    $rowForPair['amount'] = $amount;
+    $pair = orange_expense_pair_from_expense_row($pdo, $rowForPair);
 
     if (abs($delta) > 0.0001) {
         $now = date('Y-m-d H:i:s');
