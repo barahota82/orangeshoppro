@@ -241,11 +241,6 @@ a { text-decoration: none; color: inherit; }
     box-sizing: border-box;
     align-self: stretch;
 }
-/* الحسابات العامة: عمود واحد وروابط بعرض موحّد (بدل auto-fill متعدد الأعمدة) */
-#mega-panel-accounting .admin-mega-grid {
-    grid-template-columns: minmax(0, 1fr);
-    max-width: 26rem;
-}
 /* مجموعة فرعية داخل لوحة «الحسابات العامة» (مثل القيود المحاسبية) */
 .admin-mega-group {
     display: flex;
