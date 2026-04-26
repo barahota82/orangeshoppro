@@ -94,20 +94,20 @@ $fySuggestYear = $maxEndY + 1;
     <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="fy_close_main_title">
         <h3 id="fy_close_main_title" class="gl-pick-modal__title">إقفال سنة مالية</h3>
         <p class="muted" style="margin:0 0 12px;font-size:0.9rem;line-height:1.45;">
-            عند وجود إيرادات أو مصروفات أو تكلفة مبيعات مصنّفة في الدليل: <strong>سند 1</strong> بتاريخ <strong>آخر يوم</strong> من السنة — إقفال القائمة إلى ملخص الدخل؛
-            وإن وُجد صافي ربح أو خسارة <strong>سند 2</strong> بتاريخ <strong>أول يوم</strong> من السنة التالية (يجب أن تكون معرّفة ومفتوحة) — من ملخص الدخل إلى الأرباح المحتجزة.
-            حدّد حسابي <strong>ملخص الدخل</strong> و<strong>المحتجز</strong> أو اتركهما للربط في القاعدة.
+            عند وجود إيرادات أو مصروفات أو تكلفة مبيعات مصنّفة في الدليل: <strong>سند 1</strong> بتاريخ <strong>آخر يوم</strong> من السنة — إقفال القائمة إلى حساب <strong>أرباح / خسائر السنة الحالية</strong> (الوسيط)؛
+            وإن وُجد صافي ربح أو خسارة <strong>سند 2</strong> بتاريخ <strong>أول يوم</strong> من السنة التالية (يجب أن تكون معرّفة ومفتوحة) — من ذلك الوسيط إلى <strong>الأرباح المحتجزة</strong>.
+            حدّد الحسابين أو اربطهما من «حسابات القيود التلقائية» (مفاتيح income_summary و retained_earnings).
         </p>
         <label class="fy-close-check-label" style="display:flex;align-items:center;gap:8px;margin-bottom:14px;cursor:pointer;">
             <input type="checkbox" id="fy_close_do_accounting" checked>
             <span>تنفيذ قيود الإقفال المحاسبي (إيرادات/مصروفات)</span>
         </label>
         <div class="fy-close-acc-field" data-fy-close-role="income" data-account-id="0">
-            <label class="fy-close-acc-label">حساب ملخص الدخل (وسيط)</label>
+            <label class="fy-close-acc-label">حساب أرباح / خسائر السنة الحالية (وسيط)</label>
             <div class="fy-close-acc-row">
-                <input type="text" class="fy-close-code" dir="ltr" autocomplete="off" placeholder="كود الحساب" aria-label="كود ملخص الدخل">
-                <button type="button" class="fy-close-search btn-secondary" title="بحث" aria-label="بحث ملخص الدخل">🔍</button>
-                <input type="text" class="fy-close-name" readonly tabindex="-1" placeholder="اسم الحساب" aria-label="اسم ملخص الدخل">
+                <input type="text" class="fy-close-code" dir="ltr" autocomplete="off" placeholder="كود الحساب" aria-label="كود أرباح السنة الحالية">
+                <button type="button" class="fy-close-search btn-secondary" title="بحث" aria-label="بحث أرباح السنة الحالية">🔍</button>
+                <input type="text" class="fy-close-name" readonly tabindex="-1" placeholder="اسم الحساب" aria-label="اسم أرباح السنة الحالية">
             </div>
         </div>
         <div class="fy-close-acc-field" data-fy-close-role="retained" data-account-id="0" style="margin-top:12px;">

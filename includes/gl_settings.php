@@ -36,7 +36,7 @@ function orange_gl_setting_key_labels(): array
         'cogs' => 'تكلفة المبيعات — مدين عند تسليم الطلب (نقدي / آجل / أونلاين)',
         'cogs_returns' => 'تكلفة مردودات المبيعات — دائن عند إلغاء التسليم وإرجاع التكلفة للمخزون',
         'sales_discount' => 'خصم المبيعات — يُستخدم عند قيود خصم مسموح على المبيعات (حسب سياسة الدليل)',
-        'purchase_discount' => 'خصم المشتريات — يُستخدم عند خصم من المورد أو إثبات خصم مشتريات (حسب سياسة الدليل)',
+        'purchase_discount' => 'خصم مكتسب على المشتريات — يُستخدم عند خصم من المورد أو إثبات خصم مشتريات (حسب سياسة الدليل)',
         /** احتياط توافق قديم — يُستبدل بمفتاح cogs */
         'cogs_cash' => 'تكلفة مبيعات نقدي — احتياط تقني فقط',
         'cogs_credit' => 'تكلفة مبيعات آجل — احتياط تقني فقط',
@@ -45,9 +45,9 @@ function orange_gl_setting_key_labels(): array
         'cogs_returns_cash' => 'تكلفة مردود مبيعات نقدي — احتياط تقني فقط',
         'cogs_returns_credit' => 'تكلفة مردود مبيعات آجل — احتياط تقني فقط',
         'cogs_returns_online' => 'تكلفة مردود مبيعات أونلاين — احتياط تقني فقط',
-        /** مفتاحان اختياريان: لا يُعرضان في «حسابات القيود التلقائية»؛ يُربطان عند الإقفال أو يُمرَّران في طلب الإقفال. */
-        'income_summary' => 'ملخص الدخل (مؤقت) — قيود إقفال السنة',
-        'retained_earnings' => 'الأرباح المحتجزة — صافي الدخل عند الإقفال',
+        'income_summary' => 'أرباح / خسائر السنة الحالية (وسيط إقفال) — قيود إقفال القائمة ثم الترحيل للمحتجز',
+        'retained_earnings' => 'الأرباح المحتجزة — صافي الدخل أو الخسارة المرحّلة بعد الإقفال',
+        'legal_reserve' => 'الاحتياطي القانوني — حقوق ملكية (حسب سياسة الدليل والقيد اليدوي أو القواعد لاحقاً)',
     ];
 }
 
@@ -70,11 +70,14 @@ function orange_gl_setting_row_short_labels(): array
         'sales_revenue_credit' => $p . 'المبيعات الآجل',
         'sales_returns_credit' => $p . 'مردودات المبيعات الاجل',
         'sales_revenue_online' => $p . 'المبيعات الاونلاين',
-        'sales_returns_online' => $p . 'مردود المبيعات الاونلاين',
+        'sales_returns_online' => $p . 'مردودات المبيعات الاونلاين',
         'cogs' => $p . 'تكلفة المبيعات',
         'cogs_returns' => $p . 'تكلفة مردودات المبيعات',
         'sales_discount' => $p . 'خصم المبيعات',
-        'purchase_discount' => $p . 'خصم المشتريات',
+        'purchase_discount' => $p . 'خصم مكتسب على المشتريات',
+        'income_summary' => $p . 'أرباح / خسائر السنة الحالية',
+        'retained_earnings' => $p . 'الأرباح المحتجزة',
+        'legal_reserve' => $p . 'الاحتياطي القانوني',
     ];
 }
 
@@ -100,6 +103,9 @@ function orange_gl_settings_form_key_order(): array
         'cogs_returns',
         'sales_discount',
         'purchase_discount',
+        'income_summary',
+        'retained_earnings',
+        'legal_reserve',
     ];
 }
 
