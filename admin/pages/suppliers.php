@@ -4,9 +4,19 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/party_subledger.php';
+require_once __DIR__ . '/../../includes/account_tree.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+
+$leafAccountOptions = [];
+if (orange_table_exists($pdo, 'accounts')) {
+    $lw = orange_accounts_posting_leaf_where_sql($pdo, 'a');
+    $leafAccountOptions = $pdo->query(
+        'SELECT a.id, a.code, a.name FROM accounts a WHERE ' . $lw . ' ORDER BY COALESCE(a.code, \'\'), a.name'
+    )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+$hasSupplierPayableCol = orange_table_has_column($pdo, 'suppliers', 'payable_account_id');
 
 $rows = [];
 $totalBalance = 0.0;
@@ -28,6 +38,9 @@ $count = count($rows);
             المشتريات من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchases'), ENT_QUOTES, 'UTF-8'); ?>">المشتريات</a>؛ السداد والكشوف من
             <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment'), ENT_QUOTES, 'UTF-8'); ?>">سند صرف / مورد</a>
             أو <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_ledger'), ENT_QUOTES, 'UTF-8'); ?>">ذمم العملاء والموردين</a>.
+            <?php if ($hasSupplierPayableCol): ?>
+                اربط <strong>حساب ذمة</strong> فرعياً من الدليل لكل مورد لتُرحَّل مشتريات الآجل والدفع على ذلك الحساب بدلاً من مجمع «ذمم الموردين» فقط.
+            <?php endif; ?>
         </p>
     </div>
     <div class="actions">
@@ -69,6 +82,22 @@ $count = count($rows);
             <label for="sup_notes">ملاحظات</label>
             <input type="text" id="sup_notes" autocomplete="off" placeholder="اختياري">
         </div>
+        <?php if ($hasSupplierPayableCol): ?>
+        <div style="grid-column:1/-1;">
+            <label for="sup_payable_account_id">حساب ذمة المورد في الدليل (اختياري)</label>
+            <select id="sup_payable_account_id">
+                <option value="">— افتراضي: حساب «ذمم الموردين» من إعدادات القيود —</option>
+                <?php foreach ($leafAccountOptions as $acc): ?>
+                    <?php
+                    $lid = (int) $acc['id'];
+                    $lab = (trim((string) ($acc['code'] ?? '')) !== '' ? $acc['code'] . ' — ' : '') . ($acc['name'] ?? '');
+                    ?>
+                    <option value="<?php echo $lid; ?>"><?php echo htmlspecialchars($lab, ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+            <p class="card-hint" style="margin:6px 0 0;">أنشئ حساباً فرعياً تحت خصوم (مثلاً باسم المورد) من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=chart_of_accounts'), ENT_QUOTES, 'UTF-8'); ?>">دليل الحسابات</a> ثم اختره هنا.</p>
+        </div>
+        <?php endif; ?>
     </div>
     <div class="actions" style="margin-top:12px;">
         <button type="button" onclick="supSave()">حفظ</button>
@@ -96,6 +125,7 @@ $count = count($rows);
                         <th>الاسم</th>
                         <th>الهاتف</th>
                         <th>ذمة المورد</th>
+                        <?php if ($hasSupplierPayableCol): ?><th>حساب الذمة (دليل)</th><?php endif; ?>
                         <th>مشتريات</th>
                         <th class="party-registry-col-actions">إجراءات</th>
                     </tr>
@@ -107,7 +137,20 @@ $count = count($rows);
                         $bal = orange_party_balance_supplier($pdo, $sid);
                         $phone = (string) ($s['phone'] ?? '');
                         $codeDisp = isset($s['code']) && (string) $s['code'] !== '' ? (string) $s['code'] : '—';
-                        $hayRaw = trim((string) ($s['code'] ?? '') . ' ' . ($s['name'] ?? '') . ' ' . $phone . ' ' . ($s['notes'] ?? ''));
+                        $pAcc = $hasSupplierPayableCol ? (int) ($s['payable_account_id'] ?? 0) : 0;
+                        $pAccLabel = '—';
+                        if ($pAcc > 0) {
+                            foreach ($leafAccountOptions as $acc) {
+                                if ((int) $acc['id'] === $pAcc) {
+                                    $pAccLabel = (trim((string) ($acc['code'] ?? '')) !== '' ? $acc['code'] . ' — ' : '') . ($acc['name'] ?? '');
+                                    break;
+                                }
+                            }
+                            if ($pAccLabel === '—') {
+                                $pAccLabel = '#' . $pAcc;
+                            }
+                        }
+                        $hayRaw = trim((string) ($s['code'] ?? '') . ' ' . ($s['name'] ?? '') . ' ' . $phone . ' ' . ($s['notes'] ?? '') . ' ' . $pAccLabel);
                         $hay = function_exists('mb_strtolower') ? mb_strtolower($hayRaw, 'UTF-8') : strtolower($hayRaw);
                         ?>
                         <tr data-sup-search="<?php echo htmlspecialchars($hay, ENT_QUOTES, 'UTF-8'); ?>">
@@ -116,6 +159,9 @@ $count = count($rows);
                             <td><?php echo htmlspecialchars((string) ($s['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td dir="ltr"><?php echo $phone !== '' ? htmlspecialchars($phone, ENT_QUOTES, 'UTF-8') : '—'; ?></td>
                             <td dir="ltr"><?php echo number_format($bal, 3); ?></td>
+                            <?php if ($hasSupplierPayableCol): ?>
+                                <td><small><?php echo htmlspecialchars($pAccLabel, ENT_QUOTES, 'UTF-8'); ?></small></td>
+                            <?php endif; ?>
                             <td><?php echo (int) ($s['purchase_cnt'] ?? 0); ?></td>
                             <td class="party-registry-actions">
                                 <button type="button" class="btn-secondary party-registry-btn" onclick='supEdit(<?php echo json_encode([
@@ -124,6 +170,7 @@ $count = count($rows);
                                     'name' => (string) ($s['name'] ?? ''),
                                     'phone' => $phone,
                                     'notes' => (string) ($s['notes'] ?? ''),
+                                    'payable_account_id' => $pAcc > 0 ? $pAcc : null,
                                 ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>)'>تعديل</button>
                                 <a class="btn btn-secondary party-registry-btn" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment&stmt_party_kind=supplier&stmt_party_id=' . (int) $sid . '#partner-account-statement'), ENT_QUOTES, 'UTF-8'); ?>">كشف حساب</a>
                             </td>
@@ -142,6 +189,8 @@ function supResetForm() {
     document.getElementById('sup_name').value = '';
     document.getElementById('sup_phone').value = '';
     document.getElementById('sup_notes').value = '';
+    var ps = document.getElementById('sup_payable_account_id');
+    if (ps) { ps.value = ''; }
 }
 function supEdit(row) {
     document.getElementById('sup_id').value = String(row.id || 0);
@@ -149,6 +198,11 @@ function supEdit(row) {
     document.getElementById('sup_name').value = row.name || '';
     document.getElementById('sup_phone').value = row.phone || '';
     document.getElementById('sup_notes').value = row.notes || '';
+    var ps = document.getElementById('sup_payable_account_id');
+    if (ps) {
+        var p = row.payable_account_id != null && row.payable_account_id > 0 ? String(row.payable_account_id) : '';
+        ps.value = p;
+    }
     document.getElementById('sup_name').closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 function supSave() {
@@ -166,6 +220,11 @@ function supSave() {
         notes: notes || null,
         code: (document.getElementById('sup_code') && document.getElementById('sup_code').value.trim()) || null
     };
+    var ps = document.getElementById('sup_payable_account_id');
+    if (ps) {
+        var pv = parseInt(ps.value, 10);
+        payload.payable_account_id = pv > 0 ? pv : null;
+    }
     if (id > 0) {
         payload.id = id;
     }

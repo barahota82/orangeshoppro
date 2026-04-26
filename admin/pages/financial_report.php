@@ -7,6 +7,9 @@ require_once __DIR__ . '/../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
+require_once __DIR__ . '/../../includes/financial_report_breakdown.php';
+require_once __DIR__ . '/../../includes/supplier_payable_account.php';
+require_once __DIR__ . '/../../includes/account_tree.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -28,10 +31,12 @@ foreach ($years as $y) {
 $accounts = $pdo->query('SELECT id, name, code FROM accounts ORDER BY COALESCE(code, \'\'), name')->fetchAll(PDO::FETCH_ASSOC);
 $plRoleById = [];
 $bsRoleById = [];
+$accountLabelById = [];
 foreach ($accounts as $a) {
     $aid = (int) $a['id'];
     $plRoleById[$aid] = orange_accounts_account_pl_role($pdo, $aid);
     $bsRoleById[$aid] = orange_accounts_account_bs_role($pdo, $aid);
+    $accountLabelById[$aid] = (trim((string) ($a['code'] ?? '')) !== '' ? $a['code'] . ' — ' : '') . $a['name'];
 }
 
 $useVouchers = orange_journal_vouchers_ready($pdo);
@@ -82,7 +87,7 @@ if ($useVouchers && $fyId > 0) {
         $cred = (float)$t['credit'];
         if ($deb > 0.0001 || $cred > 0.0001) {
             $label = (trim((string)($a['code'] ?? '')) !== '' ? $a['code'] . ' — ' : '') . $a['name'];
-            $rows[] = ['label' => $label, 'debit' => $deb, 'credit' => $cred, 'net' => $deb - $cred];
+            $rows[] = ['account_id' => $aid, 'label' => $label, 'debit' => $deb, 'credit' => $cred, 'net' => $deb - $cred];
             $sumDebit += $deb;
             $sumCredit += $cred;
         }
@@ -98,9 +103,60 @@ if ($useVouchers && $fyId > 0) {
         $cred = (float)$stC->fetchColumn();
         if ($deb > 0.0001 || $cred > 0.0001) {
             $label = (trim((string)($a['code'] ?? '')) !== '' ? $a['code'] . ' — ' : '') . $a['name'];
-            $rows[] = ['label' => $label, 'debit' => $deb, 'credit' => $cred, 'net' => $deb - $cred];
+            $rows[] = ['account_id' => $aid, 'label' => $label, 'debit' => $deb, 'credit' => $cred, 'net' => $deb - $cred];
             $sumDebit += $deb;
             $sumCredit += $cred;
+        }
+    }
+}
+
+$apAccountId = orange_financial_safe_ap_account_id($pdo);
+$supplierFyDetail = [];
+$supplierBsBalances = [];
+$registeredExpenses = [];
+$expenseTbBreakdown = [];
+$expenseAccountIdsForTb = [];
+if ($useVouchers && $fyId > 0) {
+    foreach ($plRoleById as $eid => $cls) {
+        if ($cls === 'expense') {
+            $expenseAccountIdsForTb[] = (int) $eid;
+        }
+    }
+    $supplierFyDetail = orange_financial_supplier_fy_subledger($pdo, $fyId);
+    $registeredExpenses = orange_financial_registered_expenses_fy($pdo, $fyId);
+    if ($expenseAccountIdsForTb !== []) {
+        $expenseTbBreakdown = orange_financial_expense_account_line_breakdown($pdo, $fyId, $expenseAccountIdsForTb);
+    }
+}
+if ($useVouchers && is_array($fyRow) && isset($fyRow['end_date']) && trim((string) $fyRow['end_date']) !== '') {
+    $supplierBsBalances = orange_financial_supplier_balance_until_date($pdo, (string) $fyRow['end_date']);
+}
+
+$dedicatedSupplierPayableByPartyId = [];
+$supplierFySubrowsByAccountId = [];
+if ($useVouchers && $fyId > 0 && orange_table_has_column($pdo, 'suppliers', 'payable_account_id')) {
+    $supPayRows = $pdo->query(
+        'SELECT id, payable_account_id FROM suppliers WHERE payable_account_id IS NOT NULL AND payable_account_id > 0'
+    );
+    if ($supPayRows) {
+        foreach ($supPayRows->fetchAll(PDO::FETCH_ASSOC) as $sr) {
+            $sid = (int) $sr['id'];
+            $paid = (int) $sr['payable_account_id'];
+            if ($paid > 0 && orange_accounts_account_is_posting_leaf($pdo, $paid)) {
+                $dedicatedSupplierPayableByPartyId[$sid] = $paid;
+            }
+        }
+    }
+    $fyByParty = [];
+    foreach ($supplierFyDetail as $sd) {
+        $fyByParty[(int) $sd['party_id']] = $sd;
+    }
+    foreach ($dedicatedSupplierPayableByPartyId as $sid => $paid) {
+        if (isset($fyByParty[$sid])) {
+            if (!isset($supplierFySubrowsByAccountId[$paid])) {
+                $supplierFySubrowsByAccountId[$paid] = [];
+            }
+            $supplierFySubrowsByAccountId[$paid][] = $fyByParty[$sid];
         }
     }
 }
@@ -151,6 +207,7 @@ $bsCheck = round($bsAssets - ($bsLiab + $bsEquity), 2);
         <p class="page-subtitle">
             ميزان مراجعة، قائمة دخل، وميزانية عمومية مبسطة حسب <strong>جذر الحساب</strong>
             (كود الجذر وترتيبه في «إعداد الدليل» — مطابقة الجذور مع الأدوار في المشروع داخل account_tree.php).
+            تفصيل <strong>الموردين</strong> من دفتر الذمم؛ تفصيل <strong>المصروفات</strong> من بنود التسجيل ومذكرات سطور حسابات المصروف.
         </p>
     </div>
 </div>
@@ -269,6 +326,29 @@ window.addEventListener('load', function () {
         <div class="stat-card"><h3>إجمالي المصروفات والتكلفة</h3><div class="value"><?php echo number_format($plExpense, 2); ?></div></div>
     </div>
     <p style="margin:14px 0 0;font-size:1.1rem;"><strong>صافي الدخل:</strong> <?php echo number_format($netIncome, 2); ?> KD</p>
+    <?php if ($useVouchers && $fyId > 0 && $registeredExpenses !== []): ?>
+        <h4 class="card-title" style="margin-top:18px;font-size:1rem;">تفصيل المصروفات المسجّلة (بالبند)</h4>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>بند المصروف</th>
+                        <th>حساب المصروف في الدليل</th>
+                        <th>المبلغ (مدين)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($registeredExpenses as $re): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($re['label'], ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td><small><?php echo htmlspecialchars($accountLabelById[$re['account_id']] ?? ('#' . $re['account_id']), ENT_QUOTES, 'UTF-8'); ?></small></td>
+                            <td><?php echo number_format($re['amount'], 2); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php endif; ?>
 </div>
 
 <div class="card">
@@ -279,6 +359,28 @@ window.addEventListener('load', function () {
         <div class="stat-card"><h3>الخصوم</h3><div class="value"><?php echo number_format($bsLiab, 2); ?></div></div>
     </div>
     <div class="stat-card" style="margin-top:14px;"><h3>حقوق الملكية</h3><div class="value"><?php echo number_format($bsEquity, 2); ?></div></div>
+    <?php if ($useVouchers && $fyId > 0 && $supplierBsBalances !== []): ?>
+        <h4 class="card-title" style="margin-top:18px;font-size:1rem;">تفصيل ذمم الموردين (رصيد دائن حتى نهاية السنة)</h4>
+        <p class="card-hint">من دفتر الأطراف المرتبط بالسندات؛ إن وُجدت قيود على حساب الموردين دون تسجيل طرف قد لا يظهر هنا.</p>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>المورد</th>
+                        <th>الرصيد (دائن لنا)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($supplierBsBalances as $sb): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($sb['name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td><?php echo number_format($sb['balance'], 2); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php endif; ?>
     <p class="card-hint" style="margin-top:12px;">
         <?php if (abs($bsCheck) < 0.05): ?>
             <span class="badge approved">أصول ≈ خصوم + حقوق (فرق <?php echo number_format($bsCheck, 2); ?>)</span>
@@ -296,6 +398,7 @@ window.addEventListener('load', function () {
         <?php else: ?>
             <span class="badge cancelled">فرق: <?php echo number_format($sumDebit - $sumCredit, 2); ?></span>
         <?php endif; ?>
+        — أسطر «↳» تفصيل: ذمم موردين تستخدم المجمع، أو مورد له حساب ذمة في الدليل (تحت حسابه)، أو بيان/مذكرة ضمن حسابات المصروف؛ الإجماليات في التذييل للصفوف الرئيسية فقط.
     </p>
     <div class="table-wrap">
         <table>
@@ -309,12 +412,46 @@ window.addEventListener('load', function () {
             </thead>
             <tbody>
                 <?php foreach ($rows as $r): ?>
+                    <?php $rid = (int) ($r['account_id'] ?? 0); ?>
                     <tr>
                         <td><?php echo htmlspecialchars($r['label'], ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo number_format($r['debit'], 2); ?></td>
                         <td><?php echo number_format($r['credit'], 2); ?></td>
                         <td><?php echo number_format($r['net'], 2); ?></td>
                     </tr>
+                    <?php if ($apAccountId > 0 && $rid === $apAccountId && $supplierFyDetail !== []): ?>
+                        <?php foreach ($supplierFyDetail as $sd): ?>
+                            <?php if (isset($dedicatedSupplierPayableByPartyId[(int) $sd['party_id']])) {
+                                continue;
+                            } ?>
+                            <tr class="fin-report-subrow">
+                                <td style="padding-right:1.75rem;"><span class="muted">↳ <?php echo htmlspecialchars($sd['name'], ENT_QUOTES, 'UTF-8'); ?></span> <small class="muted">(ذمة مورد)</small></td>
+                                <td><?php echo number_format($sd['debit'], 2); ?></td>
+                                <td><?php echo number_format($sd['credit'], 2); ?></td>
+                                <td><?php echo number_format($sd['net'], 2); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                    <?php if (isset($supplierFySubrowsByAccountId[$rid]) && $supplierFySubrowsByAccountId[$rid] !== []): ?>
+                        <?php foreach ($supplierFySubrowsByAccountId[$rid] as $sd): ?>
+                            <tr class="fin-report-subrow">
+                                <td style="padding-right:1.75rem;"><span class="muted">↳ <?php echo htmlspecialchars($sd['name'], ENT_QUOTES, 'UTF-8'); ?></span> <small class="muted">(ذمة مورد — حساب دليل)</small></td>
+                                <td><?php echo number_format($sd['debit'], 2); ?></td>
+                                <td><?php echo number_format($sd['credit'], 2); ?></td>
+                                <td><?php echo number_format($sd['net'], 2); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                    <?php if (isset($expenseTbBreakdown[$rid]) && $expenseTbBreakdown[$rid] !== []): ?>
+                        <?php foreach ($expenseTbBreakdown[$rid] as $ex): ?>
+                            <tr class="fin-report-subrow">
+                                <td style="padding-right:1.75rem;"><span class="muted">↳ <?php echo htmlspecialchars($ex['sublabel'], ENT_QUOTES, 'UTF-8'); ?></span></td>
+                                <td><?php echo number_format($ex['debit'], 2); ?></td>
+                                <td><?php echo number_format($ex['credit'], 2); ?></td>
+                                <td><?php echo number_format($ex['debit'] - $ex['credit'], 2); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 <?php endforeach; ?>
             </tbody>
             <tfoot>

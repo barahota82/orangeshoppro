@@ -4,12 +4,35 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
+require_once __DIR__ . '/../../includes/account_tree.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 $expenseList = [];
 $hasExpenseAccCol = false;
 $hasNotesCol = false;
+$expensePickAccounts = [];
+if (orange_table_exists($pdo, 'accounts')) {
+    $lw = orange_accounts_posting_leaf_where_sql($pdo, 'a');
+    $accRows = $pdo->query(
+        'SELECT a.id, a.code, a.name FROM accounts a WHERE ' . $lw . ' ORDER BY COALESCE(a.code, \'\'), a.name'
+    )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    foreach ($accRows as $a) {
+        $aid = (int) $a['id'];
+        if (orange_accounts_account_pl_role($pdo, $aid) === 'expense') {
+            $expensePickAccounts[] = $a;
+        }
+    }
+}
+$expenseAccountLabel = static function (int $id) use ($expensePickAccounts): string {
+    foreach ($expensePickAccounts as $a) {
+        if ((int) $a['id'] === $id) {
+            return (trim((string) ($a['code'] ?? '')) !== '' ? $a['code'] . ' — ' : '') . ($a['name'] ?? '');
+        }
+    }
+
+    return '#' . $id;
+};
 if (orange_table_exists($pdo, 'expenses')) {
     $hasExpenseAccCol = orange_table_has_column($pdo, 'expenses', 'expense_account_id');
     $hasNotesCol = orange_table_has_column($pdo, 'expenses', 'notes');
@@ -19,9 +42,9 @@ $glHint = storefront_public_path('/admin/index.php?page=gl_account_settings');
 ?>
 <div class="page-title page-title--stacked">
     <h1>المصروفات</h1>
-    <p class="page-subtitle">القيد: مدين <strong>مصروف عام</strong> (أو حساب تختاره) / دائن <strong>الخزينة</strong> — اربطهما من
-        <a href="<?php echo htmlspecialchars($glHint, ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a>.
-        يُرحَّل المصروف عبر الطابور أو مباشرة حسب إعداد النظام.</p>
+    <p class="page-subtitle">القيد: مدين <strong>حساب مصروف من الدليل</strong> (يُفضَّل اختيار بند من جذر المصروفات) أو ترك الافتراضي <strong>مصروف عام</strong> من
+        <a href="<?php echo htmlspecialchars($glHint, ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a>
+        — دائن <strong>الخزينة</strong>. يُرحَّل عبر الطابور أو مباشرة حسب إعداد النظام.</p>
 </div>
 
 <div class="card">
@@ -52,8 +75,8 @@ $glHint = storefront_public_path('/admin/index.php?page=gl_account_settings');
                     <?php endif; ?>
                     <?php if ($hasExpenseAccCol): ?>
                     <td><?php
-                        $ea = (int)($ex['expense_account_id'] ?? 0);
-                        echo $ea > 0 ? (string) $ea : '—';
+                        $ea = (int) ($ex['expense_account_id'] ?? 0);
+                        echo $ea > 0 ? htmlspecialchars($expenseAccountLabel($ea), ENT_QUOTES, 'UTF-8') : '<span class="muted">مصروف عام</span>';
                     ?></td>
                     <?php endif; ?>
                     <td class="actions">
@@ -80,8 +103,17 @@ $glHint = storefront_public_path('/admin/index.php?page=gl_account_settings');
             <input id="exp_amount" type="number" class="admin-inp-money" step="any" min="0" placeholder="0" inputmode="decimal" lang="en" dir="ltr">
         </div>
         <div>
-            <label for="exp_account_id">معرّف حساب مصروف (اختياري)</label>
-            <input id="exp_account_id" type="number" min="0" step="1" placeholder="فارغ = مصروف عام من الإعدادات" lang="en" dir="ltr">
+            <label for="exp_account_id">حساب المصروف في الدليل</label>
+            <select id="exp_account_id">
+                <option value="">— افتراضي: مصروف عام من الإعدادات —</option>
+                <?php foreach ($expensePickAccounts as $a): ?>
+                    <?php
+                    $eid = (int) $a['id'];
+                    $elab = (trim((string) ($a['code'] ?? '')) !== '' ? $a['code'] . ' — ' : '') . ($a['name'] ?? '');
+                    ?>
+                    <option value="<?php echo $eid; ?>"><?php echo htmlspecialchars($elab, ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
         </div>
         <div style="grid-column:1/-1;">
             <label for="exp_notes">ملاحظات</label>
@@ -119,8 +151,11 @@ $glHint = storefront_public_path('/admin/index.php?page=gl_account_settings');
         document.getElementById('exp_name').value = r.name || '';
         document.getElementById('exp_amount').value = String(r.amount != null ? r.amount : '');
         document.getElementById('exp_notes').value = r.notes || '';
-        document.getElementById('exp_account_id').value = r.expense_account_id ? String(r.expense_account_id) : '';
-        document.getElementById('exp_account_id').disabled = true;
+        var accEl = document.getElementById('exp_account_id');
+        if (accEl) {
+            accEl.value = r.expense_account_id ? String(r.expense_account_id) : '';
+            accEl.disabled = true;
+        }
         document.getElementById('exp_btn_cancel').style.display = '';
         document.getElementById('exp_btn_save').textContent = 'تحديث';
         window.scrollTo(0, document.getElementById('exp_form_title').offsetTop - 20);
@@ -132,8 +167,11 @@ $glHint = storefront_public_path('/admin/index.php?page=gl_account_settings');
         document.getElementById('exp_name').value = '';
         document.getElementById('exp_amount').value = '';
         document.getElementById('exp_notes').value = '';
-        document.getElementById('exp_account_id').value = '';
-        document.getElementById('exp_account_id').disabled = false;
+        var accEl2 = document.getElementById('exp_account_id');
+        if (accEl2) {
+            accEl2.value = '';
+            accEl2.disabled = false;
+        }
         document.getElementById('exp_btn_cancel').style.display = 'none';
         document.getElementById('exp_btn_save').textContent = 'حفظ';
     };
@@ -159,13 +197,14 @@ $glHint = storefront_public_path('/admin/index.php?page=gl_account_settings');
         var name = document.getElementById('exp_name').value.trim();
         var amount = parseFloat(String(document.getElementById('exp_amount').value || '0').replace(',', '.'));
         var notes = document.getElementById('exp_notes').value.trim();
-        var accRaw = parseInt(String(document.getElementById('exp_account_id').value || '0'), 10);
+        var accEl3 = document.getElementById('exp_account_id');
+        var accRaw = accEl3 ? parseInt(String(accEl3.value || '0'), 10) : 0;
         if (!name || amount <= 0) {
             alert('أدخل البيان والمبلغ بشكل صحيح');
             return;
         }
         var payload = { name: name, amount: amount, notes: notes };
-        if (!document.getElementById('exp_account_id').disabled && accRaw > 0) {
+        if (accEl3 && !accEl3.disabled && accRaw > 0) {
             payload.expense_account_id = accRaw;
         }
         var url = editId ? '/admin/api/expenses/update.php' : '/admin/api/expenses/create.php';

@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/phone_validation.php';
+require_once __DIR__ . '/../../../includes/account_tree.php';
 require_admin_api();
 
 function orange_supplier_normalize_code(PDO $pdo, $raw): ?string
@@ -47,7 +48,19 @@ try {
     $notesRaw = trim((string) ($data['notes'] ?? ''));
     $notesSql = $notesRaw === '' ? null : (function_exists('mb_substr') ? mb_substr($notesRaw, 0, 255, 'UTF-8') : substr($notesRaw, 0, 255));
     $hasCode = orange_table_has_column($pdo, 'suppliers', 'code');
+    $hasPayableAcc = orange_table_has_column($pdo, 'suppliers', 'payable_account_id');
     $codeSql = orange_supplier_normalize_code($pdo, $data['code'] ?? '');
+
+    $payableAccountSql = null;
+    if ($hasPayableAcc) {
+        $pRaw = isset($data['payable_account_id']) ? (int) $data['payable_account_id'] : 0;
+        if ($pRaw > 0) {
+            if (!orange_accounts_account_is_posting_leaf($pdo, $pRaw)) {
+                json_response(['success' => false, 'message' => 'حساب ذمة المورد يجب أن يكون حساباً فرعياً (ورقة ترحيل) في الدليل.'], 422);
+            }
+            $payableAccountSql = $pRaw;
+        }
+    }
 
     if ($phoneSql !== null) {
         if ($idIn > 0) {
@@ -85,8 +98,12 @@ try {
             json_response(['success' => false, 'message' => 'المورد غير موجود'], 404);
         }
         $assertCodeUnique($idIn);
-        if ($hasCode) {
+        if ($hasCode && $hasPayableAcc) {
+            $pdo->prepare('UPDATE suppliers SET name = ?, phone = ?, notes = ?, code = ?, payable_account_id = ? WHERE id = ?')->execute([$name, $phoneSql, $notesSql, $codeSql, $payableAccountSql, $idIn]);
+        } elseif ($hasCode) {
             $pdo->prepare('UPDATE suppliers SET name = ?, phone = ?, notes = ?, code = ? WHERE id = ?')->execute([$name, $phoneSql, $notesSql, $codeSql, $idIn]);
+        } elseif ($hasPayableAcc) {
+            $pdo->prepare('UPDATE suppliers SET name = ?, phone = ?, notes = ?, payable_account_id = ? WHERE id = ?')->execute([$name, $phoneSql, $notesSql, $payableAccountSql, $idIn]);
         } else {
             $pdo->prepare('UPDATE suppliers SET name = ?, phone = ?, notes = ? WHERE id = ?')->execute([$name, $phoneSql, $notesSql, $idIn]);
         }
@@ -97,8 +114,12 @@ try {
     }
 
     $assertCodeUnique(0);
-    if ($hasCode) {
+    if ($hasCode && $hasPayableAcc) {
+        $pdo->prepare('INSERT INTO suppliers (name, phone, notes, code, payable_account_id) VALUES (?, ?, ?, ?, ?)')->execute([$name, $phoneSql, $notesSql, $codeSql, $payableAccountSql]);
+    } elseif ($hasCode) {
         $pdo->prepare('INSERT INTO suppliers (name, phone, notes, code) VALUES (?, ?, ?, ?)')->execute([$name, $phoneSql, $notesSql, $codeSql]);
+    } elseif ($hasPayableAcc) {
+        $pdo->prepare('INSERT INTO suppliers (name, phone, notes, payable_account_id) VALUES (?, ?, ?, ?)')->execute([$name, $phoneSql, $notesSql, $payableAccountSql]);
     } else {
         $pdo->prepare('INSERT INTO suppliers (name, phone, notes) VALUES (?, ?, ?)')->execute([$name, $phoneSql, $notesSql]);
     }

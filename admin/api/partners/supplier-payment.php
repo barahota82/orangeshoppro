@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/party_allocations.php';
 require_once __DIR__ . '/../../../includes/document_sequences.php';
+require_once __DIR__ . '/../../../includes/supplier_payable_account.php';
 require_admin_api();
 
 try {
@@ -52,7 +53,7 @@ try {
 
     $allocLines = orange_party_normalize_allocations_payload($data['allocations'] ?? []);
 
-    $apId = orange_gl_account_id($pdo, 'accounts_payable');
+    $apId = orange_supplier_payable_account_id($pdo, $supplierId);
     $cashId = orange_gl_account_id($pdo, 'cash');
 
     $seq = orange_sequence_next($pdo, 'spay_' . date('Ymd'));

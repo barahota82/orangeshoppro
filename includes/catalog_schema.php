@@ -1295,6 +1295,12 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         orange_catalog_safe_exec($pdo, 'ALTER TABLE suppliers ADD COLUMN code VARCHAR(32) NULL');
         orange_catalog_safe_exec($pdo, 'CREATE UNIQUE INDEX uq_suppliers_code ON suppliers (code)');
     }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'payable_account_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN payable_account_id INT NULL DEFAULT NULL AFTER notes'
+        );
+    }
 
     /*
      |--------------------------------------------------------------------------

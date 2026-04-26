@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../../includes/journal_write.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/purchase_helpers.php';
+require_once __DIR__ . '/../../../includes/supplier_payable_account.php';
 require_admin_api();
 
 function reverse_purchase_stock(PDO $pdo, int $purchaseId): void
@@ -152,6 +153,9 @@ try {
     $inventoryId = orange_gl_account_id($pdo, 'inventory');
     $cashId = orange_gl_account_id($pdo, 'cash');
     $apId = orange_gl_account_id($pdo, 'accounts_payable');
+    if ($type === 'credit') {
+        $apId = orange_supplier_payable_account_id($pdo, $supplierId);
+    }
     $purRef = 'PUR-' . $purchaseId;
     $now = date('Y-m-d H:i:s');
     if (orange_gl_use_pending_queue($pdo)) {

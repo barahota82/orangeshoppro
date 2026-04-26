@@ -285,6 +285,7 @@ CREATE TABLE `suppliers` (
   `name` varchar(160) NOT NULL DEFAULT '',
   `phone` varchar(40) DEFAULT NULL,
   `notes` varchar(255) DEFAULT NULL,
+  `payable_account_id` int DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_suppliers_phone` (`phone`),

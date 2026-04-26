@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/party_subledger.php';
 require_once __DIR__ . '/gl_settings.php';
+require_once __DIR__ . '/supplier_payable_account.php';
 
 function orange_party_allocations_ready(PDO $pdo): bool
 {
@@ -356,13 +357,17 @@ function orange_partner_gl_reconcile(PDO $pdo, int $fyId): ?array
     }
 
     $arId = orange_gl_account_id($pdo, 'ar_credit');
-    $apId = orange_gl_account_id($pdo, 'accounts_payable');
+    $apIds = orange_supplier_payable_gl_account_ids_for_reconcile($pdo);
 
     $tb = orange_voucher_account_totals($pdo, $fyId, []);
     $arD = (float) ($tb[$arId]['debit'] ?? 0);
     $arC = (float) ($tb[$arId]['credit'] ?? 0);
-    $apD = (float) ($tb[$apId]['debit'] ?? 0);
-    $apC = (float) ($tb[$apId]['credit'] ?? 0);
+    $apD = 0.0;
+    $apC = 0.0;
+    foreach ($apIds as $apid) {
+        $apD += (float) ($tb[$apid]['debit'] ?? 0);
+        $apC += (float) ($tb[$apid]['credit'] ?? 0);
+    }
 
     $glArNet = round($arD - $arC, 4);
     $glApNet = round($apC - $apD, 4);
@@ -383,7 +388,7 @@ function orange_partner_gl_reconcile(PDO $pdo, int $fyId): ?array
     return [
         'fiscal_year_id' => $fyId,
         'ar_credit_account_id' => $arId,
-        'accounts_payable_account_id' => $apId,
+        'accounts_payable_account_ids' => $apIds,
         'gl' => [
             'ar_debit' => $arD,
             'ar_credit' => $arC,
