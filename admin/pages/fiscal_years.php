@@ -43,11 +43,11 @@ $fyAccountBrief = static function (PDO $pdoConn, int $accId): array {
 $fyGlIncomeBrief = $fyAccountBrief($pdo, $fyGlIncomeId);
 $fyGlRetainedBrief = $fyAccountBrief($pdo, $fyGlRetainedId);
 ?>
-<div class="fy-years-page" dir="rtl">
+<div class="admin-fy-shell fy-years-page" dir="rtl">
     <h1 class="fy-years-page__title">السنوات المالية</h1>
 
-    <div class="card fy-years-card fy-print-area">
-        <div class="table-wrap fy-years-table-wrap">
+    <div class="card admin-fy-card fy-years-card fy-print-area">
+        <div class="table-wrap fy-years-table-wrap admin-fy-table-wrap">
             <table class="fy-years-table">
                 <thead>
                     <tr>

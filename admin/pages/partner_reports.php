@@ -51,17 +51,14 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     exit;
 }
 ?>
-<div class="page-title page-title--stacked">
-    <div>
-        <h1>تقارير الذمم الشاملة</h1>
-        <p class="page-subtitle">
-            ملخص أرصدة كل العملاء والموردين، مطابقة أرصدة الدليل مع دفتر الذمم، وتصدير CSV.
-            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_ledger'), ENT_QUOTES, 'UTF-8'); ?>">العودة لذمم العملاء والموردين</a>
-        </p>
-    </div>
-</div>
+<div class="admin-fy-shell" dir="rtl">
+    <h1 class="admin-fy-shell__title">تقارير الذمم الشاملة</h1>
+    <p class="admin-fy-shell__lead">
+        ملخص أرصدة كل العملاء والموردين، مطابقة أرصدة الدليل مع دفتر الذمم، وتصدير CSV.
+        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_ledger'), ENT_QUOTES, 'UTF-8'); ?>">العودة لذمم العملاء والموردين</a>
+    </p>
 
-<div class="card">
+<div class="card admin-fy-card">
     <h3 class="card-title">خيارات العرض</h3>
     <div class="actions" style="flex-wrap:wrap; gap:8px;">
         <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_reports' . ($includeAging ? '' : '&aging=1')), ENT_QUOTES, 'UTF-8'); ?>">
@@ -74,7 +71,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 </div>
 
 <?php if ($reconcile !== null): ?>
-<div class="card">
+<div class="card admin-fy-card">
     <h3 class="card-title">مطابقة الدليل مع دفتر الذمم</h3>
     <form method="get" class="form-grid" style="max-width:420px;">
         <input type="hidden" name="page" value="partner_reports">
@@ -90,8 +87,8 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
             </select>
         </div>
     </form>
-    <div class="table-wrap" style="margin-top:12px;">
-        <table>
+    <div class="table-wrap admin-fy-table-wrap" style="margin-top:12px;">
+        <table class="admin-fy-table">
             <thead>
                 <tr><th>البند</th><th>دفتر الأستاذ (سنة مالية)</th><th>دفتر الذمم</th><th>الفرق</th></tr>
             </thead>
@@ -114,15 +111,15 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     <p class="card-hint">فرق غير صفر يعني قيوداً على حسابات الموردين (المجمع أو حسابات ذمم مربوطة بموردين) بدون تسجيل في الذمم الفرعية أو العكس — راجع القيود اليدوية.</p>
 </div>
 <?php else: ?>
-<div class="card">
+<div class="card admin-fy-card">
     <p class="muted">لا توجد سنة مالية أو السندات غير مفعّلة — عرّف سنة من «السنوات المالية».</p>
 </div>
 <?php endif; ?>
 
-<div class="card">
+<div class="card admin-fy-card">
     <h3 class="card-title">أرصدة العملاء</h3>
-    <div class="table-wrap">
-        <table>
+    <div class="table-wrap admin-fy-table-wrap">
+        <table class="admin-fy-table">
             <thead>
                 <tr>
                     <th>#</th><th>الاسم</th><th>الهاتف</th><th>الرصيد</th><th>حد ائتمان</th><th>تجاوز</th>
@@ -150,10 +147,10 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     </div>
 </div>
 
-<div class="card">
+<div class="card admin-fy-card">
     <h3 class="card-title">أرصدة الموردين</h3>
-    <div class="table-wrap">
-        <table>
+    <div class="table-wrap admin-fy-table-wrap">
+        <table class="admin-fy-table">
             <thead>
                 <tr>
                     <th>#</th><th>الاسم</th><th>الهاتف</th><th>الذمة</th>
@@ -177,6 +174,8 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
             </tbody>
         </table>
     </div>
+</div>
+
 </div>
 
 <script>

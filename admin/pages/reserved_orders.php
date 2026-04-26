@@ -39,20 +39,19 @@ function orange_reserved_orders_payment_badge(array $o): string
 }
 
 ?>
-<div class="page-title page-title--stacked">
-    <h1>طلبات محجوزة (مخزون)</h1>
-    <p class="page-subtitle">
+<div class="admin-fy-shell" dir="rtl">
+    <h1 class="admin-fy-shell__title">طلبات محجوزة (مخزون)</h1>
+    <p class="admin-fy-shell__lead">
         طلبات ما زال لها <strong>حجز مخزون نشط</strong> (حركات <code>pending_order</code>) حتى التسليم أو رفض/إلغاء يُطلق المخزون.
         لتحرير الحجز يدوياً: حدّث حالة الطلب من
         <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">شاشة الطلبات</a>
         (رفض/إلغاء) أو نفّذ التسليم حسب السياسة.
     </p>
-</div>
 
-<div class="card">
-    <h3>قائمة الطلبات ذات الحجز الفعّال</h3>
+<div class="card admin-fy-card">
+    <h3 class="card-title">قائمة الطلبات ذات الحجز الفعّال</h3>
     <?php if ($reservedRows === []): ?>
-        <p class="page-subtitle" style="margin-top:12px;">لا توجد طلبات محجوزة حالياً.</p>
+        <p class="muted" style="margin:12px 0 0;">لا توجد طلبات محجوزة حالياً.</p>
     <?php else: ?>
     <div class="table-wrap">
         <table class="admin-orders-list-table">
@@ -116,4 +115,6 @@ function orange_reserved_orders_payment_badge(array $o): string
         </table>
     </div>
     <?php endif; ?>
+</div>
+
 </div>

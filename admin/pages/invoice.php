@@ -174,10 +174,9 @@ if ($order && orange_table_has_column($pdo, 'orders', 'amount_paid')) {
 }
 $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 0.0;
 ?>
-<div class="page-title page-title--stacked">
-    <h1>فاتورة أونلاين</h1>
-    <p class="page-subtitle">مستند للعميل من <strong>طلب محفوظ</strong> — رقم فاتورة مسلسل (<code>INV-</code>) يُخصَّص تلقائياً في النظام عند أول فتح لهذه الصفحة (لا زر «حفظ» منفصل). بعدها: <strong>طباعة / PDF</strong> من الشريط أعلاه أو <kbd class="admin-kbd">Ctrl</kbd>+<kbd class="admin-kbd">P</kbd>.</p>
-</div>
+<div class="admin-fy-shell invoice-admin-shell" dir="rtl">
+    <h1 class="admin-fy-shell__title">فاتورة أونلاين</h1>
+    <p class="admin-fy-shell__lead">مستند للعميل من <strong>طلب محفوظ</strong> — رقم فاتورة مسلسل (<code>INV-</code>) يُخصَّص تلقائياً في النظام عند أول فتح لهذه الصفحة (لا زر «حفظ» منفصل). بعدها: <strong>طباعة / PDF</strong> من الشريط أعلاه أو <kbd class="admin-kbd">Ctrl</kbd>+<kbd class="admin-kbd">P</kbd>.</p>
 
 <style>
     .invoice-doc {
@@ -363,7 +362,7 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
     .invoice-payment-box .row-pay { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
     .invoice-payment-box input[type="number"] { min-width: 8rem; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; }
     @media print {
-        .invoice-workflow-bar, .invoice-payment-box, .invoice-actions, .invoice-picker, .page-title, .admin-header-wrap, .admin-topbar, .admin-nav-backdrop, .admin-nav-drawer, .admin-mega-backdrop, .admin-mega-panel, .admin-user, .brand { display: none !important; }
+        .invoice-workflow-bar, .invoice-payment-box, .invoice-actions, .invoice-picker, .page-title, .admin-fy-shell__title, .admin-fy-shell__lead, .admin-header-wrap, .admin-topbar, .admin-nav-backdrop, .admin-nav-drawer, .admin-mega-backdrop, .admin-mega-panel, .admin-user, .brand { display: none !important; }
         .admin-main { margin: 0 !important; padding: 0 !important; }
         body { background: #fff !important; }
         .invoice-doc { box-shadow: none; border: none; max-width: none; }
@@ -371,8 +370,8 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
 </style>
 
 <?php if (!$order): ?>
-<div class="card">
-    <h3>فتح فاتورة</h3>
+<div class="card admin-fy-card">
+    <h3 class="card-title">فتح فاتورة</h3>
     <?php if ($orderId > 0 || $orderNumberLookup !== ''): ?>
         <div class="alert-error" style="margin-bottom:12px;">لم يتم العثور على الطلب<?php echo $orderId > 0 ? ' (المعرّف: ' . (int)$orderId . ')' : ''; ?><?php echo $orderNumberLookup !== '' ? ' (الرقم: ' . htmlspecialchars($orderNumberLookup, ENT_QUOTES, 'UTF-8') . ')' : ''; ?>.</div>
     <?php endif; ?>
@@ -387,8 +386,8 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
     <p style="margin:0 0 12px;"><a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">← كل الطلبات</a></p>
     <?php if ($recentForPicker): ?>
     <p class="card-hint" style="margin:0 0 10px;">انقر صفاً داخل الجدول ثم استخدم <kbd class="admin-kbd">↑</kbd> <kbd class="admin-kbd">↓</kbd> للتنقل و <kbd class="admin-kbd">Enter</kbd> لفتح الفاتورة.</p>
-    <div class="table-wrap">
-        <table class="invoice-recent-picker admin-table">
+    <div class="table-wrap admin-fy-table-wrap">
+        <table class="invoice-recent-picker admin-fy-table">
             <thead>
                 <tr>
                     <th>#</th>
@@ -718,3 +717,5 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
     </div>
 </div>
 <?php endif; ?>
+
+</div>

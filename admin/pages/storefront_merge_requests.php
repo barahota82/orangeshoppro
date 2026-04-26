@@ -18,23 +18,23 @@ if ($hasTable) {
     $rows = $q ? $q->fetchAll(PDO::FETCH_ASSOC) : [];
 }
 ?>
-<div class="page-title">
-    <h1>دمج هاتف التسجيل (س15)</h1>
-</div>
-<p class="page-subtitle" style="margin-top:0;">
-    عندما يحاول عميل التسجيل ببريد جديد لكن هاتفه مرتبط بحساب <strong>مفعّل</strong> مسبقاً، يُنشأ طلب دمج.
-    بعد استلام رسالة واتساب من <strong>نفس رقم العميل</strong> وتطابق النص مع الطلب، اضغط «تأكيد واتساب»؛
-    ثم يكمل العميل من صفحة التسجيل بزر «تطبيق تحديث بيانات الملف».
-    البريد المؤكَّد للدخول <strong>لا يتغيّر</strong> — يُحدَّث الاسم والمنطقة والعنوان فقط على الحساب القائم.
-</p>
+<div class="admin-fy-shell" dir="rtl">
+    <h1 class="admin-fy-shell__title">دمج هاتف التسجيل (س15)</h1>
+    <p class="admin-fy-shell__lead">
+        عندما يحاول عميل التسجيل ببريد جديد لكن هاتفه مرتبط بحساب <strong>مفعّل</strong> مسبقاً، يُنشأ طلب دمج.
+        بعد استلام رسالة واتساب من <strong>نفس رقم العميل</strong> وتطابق النص مع الطلب، اضغط «تأكيد واتساب»؛
+        ثم يكمل العميل من صفحة التسجيل بزر «تطبيق تحديث بيانات الملف».
+        البريد المؤكَّد للدخول <strong>لا يتغيّر</strong> — يُحدَّث الاسم والمنطقة والعنوان فقط على الحساب القائم.
+    </p>
 
 <?php if (!$hasTable): ?>
     <div class="alert-error">جدول <code>storefront_phone_merge_requests</code> غير جاهز — حدّث المخطط بزيارة الواجهة أو الأدمن.</div>
 <?php elseif ($rows === []): ?>
-    <div class="card"><p style="margin:0;">لا توجد طلبات دمج نشطة حالياً.</p></div>
+    <div class="card admin-fy-card"><p class="muted" style="margin:0;">لا توجد طلبات دمج نشطة حالياً.</p></div>
 <?php else: ?>
-    <div class="table-wrap card">
-        <table>
+    <div class="card admin-fy-card">
+        <div class="table-wrap admin-fy-table-wrap">
+        <table class="admin-fy-table">
             <thead>
                 <tr>
                     <th>#</th>
@@ -72,6 +72,7 @@ if ($hasTable) {
                 <?php endforeach; ?>
             </tbody>
         </table>
+        </div>
     </div>
     <script>
     async function orangeConfirmMergeWa(id) {
@@ -82,3 +83,5 @@ if ($hasTable) {
     }
     </script>
 <?php endif; ?>
+
+</div>

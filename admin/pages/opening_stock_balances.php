@@ -14,25 +14,22 @@ $rows = $pdo->query("
     ORDER BY p.name ASC, pv.color ASC, pv.size ASC, pv.id ASC
 ")->fetchAll(PDO::FETCH_ASSOC);
 ?>
-<div class="page-title page-title--stacked">
-    <div>
-        <h1>أرصدة أول المدة المخزنية</h1>
-        <p class="page-subtitle">
-            مخصّصة لسيناريو <strong>نقل من نظام قديم</strong> عندما لا يُستورد المخزون تلقائياً: تُحدَّد هنا كمية كل متغير (لون/مقاس) كـ <strong>رصيد افتتاحي</strong> في السجلات.
-            <strong>ليست إدخالاً دورياً يومياً</strong> — التشغيل العادي يستخدم شاشة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8'); ?>">المستودع</a> أو حركات الشراء والبيع.
-            الأرصدة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=opening_balances'), ENT_QUOTES, 'UTF-8'); ?>">المالية الافتتاحية</a> تُسجَّل في شاشة منفصلة.
-        </p>
-    </div>
-</div>
+<div class="admin-fy-shell" dir="rtl">
+    <h1 class="admin-fy-shell__title">أرصدة أول المدة المخزنية</h1>
+    <p class="admin-fy-shell__lead">
+        مخصّصة لسيناريو <strong>نقل من نظام قديم</strong> عندما لا يُستورد المخزون تلقائياً: تُحدَّد هنا كمية كل متغير (لون/مقاس) كـ <strong>رصيد افتتاحي</strong> في السجلات.
+        <strong>ليست إدخالاً دورياً يومياً</strong> — التشغيل العادي يستخدم شاشة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8'); ?>">المستودع</a> أو حركات الشراء والبيع.
+        الأرصدة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=opening_balances'), ENT_QUOTES, 'UTF-8'); ?>">المالية الافتتاحية</a> تُسجَّل في شاشة منفصلة.
+    </p>
 
-<div class="card">
+<div class="card admin-fy-card">
     <h3 class="card-title">كميات المخزون الافتتاحية (حسب المتغير)</h3>
     <p class="muted" style="margin:0 0 10px;">
         أدخل <strong>الكمية الجديدة</strong> ثم اضغط <strong>تسجيل الرصيد الافتتاحي</strong> للصف. يُسجَّل النوع «رصيد افتتاحي» في حركات المخزون (كما في المستودع).
         الكميات: <strong>أعداد صحيحة فقط</strong>، بدون سالب.
     </p>
-    <div class="table-wrap">
-        <table>
+    <div class="table-wrap admin-fy-table-wrap">
+        <table class="admin-fy-table">
             <thead>
                 <tr>
                     <th>المنتج</th>
@@ -64,6 +61,8 @@ $rows = $pdo->query("
     <?php if ($rows === []): ?>
         <p class="card-hint">لا توجد متغيرات منتجات — أضف منتجات ومتغيرات من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=products'), ENT_QUOTES, 'UTF-8'); ?>">المنتجات</a>.</p>
     <?php endif; ?>
+</div>
+
 </div>
 
 <script>

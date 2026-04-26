@@ -2804,33 +2804,87 @@ body.coa-modal-open {
     cursor: pointer;
 }
 
-/* السنوات المالية — جدول بسيط */
+/* هيكل صفحة موحّد (نمط السنوات المالية: عنوان مضغوط + بطاقات + جداول إطار كامل) */
+.admin-fy-shell__title,
 .fy-years-page__title {
     margin: 0 0 14px;
     font-size: 1.35rem;
+    font-weight: 700;
+    color: #0f172a;
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
 }
-.fy-years-card {
+.admin-fy-shell__lead {
+    margin: -6px 0 16px;
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: var(--muted, #64748b);
+}
+.admin-fy-shell__lead a {
+    font-weight: 600;
+}
+.admin-fy-card {
+    margin-bottom: 14px;
+}
+.admin-fy-shell > .admin-fy-card:last-child,
+.admin-fy-shell > .card.admin-fy-card:last-child {
     margin-bottom: 0;
 }
-.fy-years-table-wrap {
+.admin-fy-shell .admin-fy-card .card-title {
+    margin: 0 0 10px;
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+.admin-fy-shell .admin-fy-card > h3:not(.card-title) {
+    margin: 0 0 10px;
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+.fy-years-card,
+.admin-fy-card.fy-years-card {
+    margin-bottom: 0;
+}
+.fy-years-table-wrap,
+.admin-fy-table-wrap {
     overflow-x: auto;
     margin-bottom: 4px;
 }
-.fy-years-table {
+.fy-years-table,
+.admin-fy-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 13px;
 }
 .fy-years-table th,
-.fy-years-table td {
+.fy-years-table td,
+.admin-fy-table th,
+.admin-fy-table td {
     border: 1px solid var(--border, #cbd5e1);
     padding: 6px 8px;
     vertical-align: middle;
 }
-.fy-years-table th {
+.fy-years-table th,
+.admin-fy-table th {
     background: #f1f5f9;
     font-weight: 700;
 }
+/* جداول الطلبات داخل الهيكل الموحّد: نفس كثافة الخلايا */
+.admin-fy-shell table.admin-orders-list-table th,
+.admin-fy-shell table.admin-orders-list-table td {
+    border: 1px solid var(--border, #cbd5e1);
+    padding: 6px 8px;
+    font-size: 13px;
+}
+.admin-fy-shell table.admin-orders-list-table th {
+    background: #f1f5f9;
+}
+.admin-fy-shell table.invoice-recent-picker tbody tr:nth-child(even) {
+    background: rgba(248, 250, 252, 0.65);
+}
+.admin-fy-shell table.invoice-recent-picker tbody tr:hover {
+    background: rgba(234, 88, 12, 0.06);
+}
+/* السنوات المالية — أعمدة خاصة */
 .fy-col-num {
     width: 3.5rem;
     text-align: center;

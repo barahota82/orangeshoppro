@@ -102,9 +102,9 @@ function orange_admin_orders_action_buttons(array $o): void
     echo '<button type="button" class="btn-danger" onclick=\'updateOrderStatus(' . $id . ', "rejected", ' . $stJs . ')\'>رفض</button>';
 }
 ?>
-<div class="page-title page-title--stacked">
-    <h1>الطلبات</h1>
-    <p class="page-subtitle">المخزن <strong>موحّد للشركة</strong> — الطلب من أي قناة يخصم نفس المخزون لتفادي البيع رغم النفاد. عمود «قناة العملاء» لتتبّع المصدر وتجميع العملاء (تيك توك، واتساب، …) وليس لمخزون منفصل.
+<div class="admin-fy-shell" dir="rtl">
+    <h1 class="admin-fy-shell__title">الطلبات</h1>
+    <p class="admin-fy-shell__lead">المخزن <strong>موحّد للشركة</strong> — الطلب من أي قناة يخصم نفس المخزون لتفادي البيع رغم النفاد. عمود «قناة العملاء» لتتبّع المصدر وتجميع العملاء (تيك توك، واتساب، …) وليس لمخزون منفصل.
         <?php
         if (orange_admin_may($admin, $pdo, 'sales', 'view')) {
             echo ' — <a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=reserved_orders'), ENT_QUOTES, 'UTF-8') . '">طلبات محجوزة (مخزون)</a>';
@@ -114,10 +114,9 @@ function orange_admin_orders_action_buttons(array $o): void
         }
         ?>
     </p>
-</div>
 
-<div class="card">
-    <h3>قائمة الطلبات</h3>
+<div class="card admin-fy-card">
+    <h3 class="card-title">قائمة الطلبات</h3>
     <div class="admin-toolbar" role="region" aria-label="تصفية الطلبات">
         <label class="admin-toolbar__field">
             <span>تصفية حسب المصدر</span>
@@ -212,6 +211,8 @@ function orange_admin_orders_action_buttons(array $o): void
             </tbody>
         </table>
     </div>
+</div>
+
 </div>
 
 <script>
