@@ -24,6 +24,20 @@
     --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.06), 0 8px 28px rgba(15, 23, 42, 0.06);
     --shadow-sidebar: 4px 0 32px rgba(15, 23, 42, 0.12);
     --input-min-h: 42px;
+    /* تنقل لوحة التحكم: قيم مطابقة للمظهر السابق؛ التعديل هنا فقط لتوحيد المصدر (صيانة) دون تغيير بكسل */
+    --admin-topbar-nav-pad-y: 9px;
+    --admin-topbar-nav-pad-x: 12px;
+    --admin-topbar-nav-min-h: 40px;
+    --admin-mega-link-pad-y: 10px;
+    --admin-mega-link-pad-x: 12px;
+    --admin-mega-link-sub-border-w: 3px;
+    --admin-mega-link-sub-pad-start: 14px;
+    --admin-drawer-link-pad-y: 10px;
+    --admin-drawer-link-pad-x: 12px;
+    --admin-drawer-link-sub-pad-start: 18px;
+    --admin-mega-grid-gap: 10px;
+    --admin-mega-grid-col-min: 210px;
+    --admin-mega-trigger-max-w: 22rem;
     --font-ui: "Cairo", "Segoe UI", system-ui, sans-serif;
     --font-display: "Outfit", "Cairo", sans-serif;
 }
@@ -229,8 +243,8 @@ a { text-decoration: none; color: inherit; }
 }
 .admin-mega-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(var(--admin-mega-grid-col-min), 1fr));
+    gap: var(--admin-mega-grid-gap);
     align-items: start;
 }
 /* خلية مباشرة في الشبكة: الرابط يملأ العمود بشكل متسق */
@@ -290,8 +304,8 @@ a { text-decoration: none; color: inherit; }
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 9px 12px;
-    min-height: 40px;
+    padding: var(--admin-topbar-nav-pad-y) var(--admin-topbar-nav-pad-x);
+    min-height: var(--admin-topbar-nav-min-h);
     box-sizing: border-box;
     border-radius: var(--radius-sm);
     font-size: 13px;
@@ -319,9 +333,9 @@ a { text-decoration: none; color: inherit; }
     align-items: center;
     gap: 6px;
     margin: 0;
-    padding: 9px 12px;
-    min-height: 40px;
-    max-width: min(100%, 22rem);
+    padding: var(--admin-topbar-nav-pad-y) var(--admin-topbar-nav-pad-x);
+    min-height: var(--admin-topbar-nav-min-h);
+    max-width: min(100%, var(--admin-mega-trigger-max-w));
     border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.06);
@@ -372,8 +386,8 @@ a { text-decoration: none; color: inherit; }
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    padding: 10px 12px;
-    min-height: 42px;
+    padding: var(--admin-mega-link-pad-y) var(--admin-mega-link-pad-x);
+    min-height: var(--input-min-h);
     border-radius: 10px;
     background: rgba(255, 255, 255, 0.05);
     font-size: 13px;
@@ -395,8 +409,8 @@ a { text-decoration: none; color: inherit; }
     border-color: rgba(253, 186, 116, 0.35);
 }
 .admin-mega-link.admin-nav-sub {
-    border-inline-start: 3px solid rgba(255, 255, 255, 0.22);
-    padding-inline-start: 14px;
+    border-inline-start: var(--admin-mega-link-sub-border-w) solid rgba(255, 255, 255, 0.22);
+    padding-inline-start: var(--admin-mega-link-sub-pad-start);
 }
 /* 992 بدل 1025: نوافذ 1024px (شائعة مع شريط أدوات) كانت تخفي القائمة العلوية بالكامل */
 @media (min-width: 992px) {
@@ -578,8 +592,8 @@ a { text-decoration: none; color: inherit; }
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
-    padding: 10px 12px;
-    min-height: 42px;
+    padding: var(--admin-drawer-link-pad-y) var(--admin-drawer-link-pad-x);
+    min-height: var(--input-min-h);
     border-radius: 10px;
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -608,9 +622,9 @@ a { text-decoration: none; color: inherit; }
     width: 100%;
     margin-inline-start: 0;
     box-sizing: border-box;
-    border-inline-start: 3px solid rgba(255,255,255,0.22);
-    padding: 10px 12px;
-    padding-inline-start: 18px;
+    border-inline-start: var(--admin-mega-link-sub-border-w) solid rgba(255, 255, 255, 0.22);
+    padding: var(--admin-drawer-link-pad-y) var(--admin-drawer-link-pad-x);
+    padding-inline-start: var(--admin-drawer-link-sub-pad-start);
     font-size: 14px;
     line-height: 1.35;
     display: flex;
