@@ -3100,6 +3100,27 @@ body.coa-modal-open {
     background: #f1f5f9;
     font-weight: 700;
 }
+/* قسم قواعد اليومية: معاينة الحساب المرتبط بالبند (من القسم ١) */
+.gl-rule-key-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: stretch;
+}
+.gl-rule-key-cell select {
+    max-width: 100%;
+}
+.gl-rule-acct-preview {
+    font-size: 0.88em;
+    line-height: 1.35;
+    color: #475569;
+    padding: 2px 0 0;
+    word-break: break-word;
+}
+.gl-rule-acct-muted {
+    color: #64748b;
+    font-style: italic;
+}
 /* عمود البند بعرض المحتوى فقط؛ كود أوسع؛ نوع اليومية قائمة */
 .gl-th-label,
 .gl-td-label {

@@ -44,6 +44,15 @@ $hintsJson = json_encode($keyHints, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
 $ruleKeysJson = json_encode($ruleKeyOrder, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 $rulesJson = json_encode($journalRules, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
+$accountsByIdForJs = [];
+foreach ($byId as $aidJs => $aRow) {
+    $accountsByIdForJs[(string) (int) $aidJs] = [
+        'code' => (string) ($aRow['code'] ?? ''),
+        'name' => (string) ($aRow['name'] ?? ''),
+    ];
+}
+$currentForRulesJson = json_encode($current, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+$accountsByIdJson = json_encode($accountsByIdForJs, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 ?>
 <div class="page-title page-title--stacked">
     <h1>حسابات القيود التلقائية</h1>
@@ -124,8 +133,8 @@ $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
                     <tr>
                         <th>نوع اليومية</th>
                         <th>نقدي / آجل</th>
-                        <th>بند المدين</th>
-                        <th>بند الدائن</th>
+                        <th>بند المدين → الحساب (من القسم ١)</th>
+                        <th>بند الدائن → الحساب (من القسم ١)</th>
                         <th class="gl-th-actions" aria-label="إزالة"></th>
                     </tr>
                 </thead>
@@ -156,12 +165,93 @@ $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
     var glKeyHints = <?php echo $hintsJson; ?>;
     var glRuleKeyOrder = <?php echo $ruleKeysJson; ?>;
     var glInitialRules = <?php echo $rulesJson; ?>;
+    var glKeyAccountInitial = <?php echo $currentForRulesJson; ?>;
+    var glAccountsById = <?php echo $accountsByIdJson; ?>;
 
     function esc(s) {
         return String(s == null ? '' : s)
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/"/g, '&quot;');
+    }
+
+    function accountPreviewForSettingKey(k) {
+        k = String(k || '').trim();
+        if (!k) {
+            return '—';
+        }
+        var row = document.querySelector('tr[data-gl-key="' + k.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"]');
+        if (row) {
+            var id = parseInt(row.getAttribute('data-account-id'), 10) || 0;
+            if (id <= 0) {
+                return '— لم يُربط في القسم ١ —';
+            }
+            var codeEl = row.querySelector('.gl-inp-code');
+            var nameEl = row.querySelector('.gl-inp-name');
+            var code = codeEl ? String(codeEl.value || '').trim() : '';
+            var name = nameEl ? String(nameEl.value || '').trim() : '';
+            if (!name && !code) {
+                return '— لم يُربط في القسم ١ —';
+            }
+            return (code ? code + ' — ' : '') + name;
+        }
+        var sid = glKeyAccountInitial[k];
+        var iid = typeof sid === 'number' ? sid : parseInt(String(sid || '0'), 10) || 0;
+        if (iid <= 0) {
+            return '— لم يُربط في القسم ١ —';
+        }
+        var a = glAccountsById[String(iid)] || glAccountsById[iid];
+        if (!a) {
+            return '— حساب #' + iid + ' —';
+        }
+        var c = String(a.code || '').trim();
+        var n = String(a.name || '').trim();
+        if (!n && !c) {
+            return '— لم يُربط في القسم ١ —';
+        }
+        return (c ? c + ' — ' : '') + n;
+    }
+
+    function syncRuleAccountPreviews(tr) {
+        if (!tr) {
+            return;
+        }
+        var jt = parseInt((tr.querySelector('.gl-sel-jt-id') || {}).value, 10) || 0;
+        var code = journalTypeCodeById(jt);
+        var ptSel = tr.querySelector('.gl-sel-pt');
+        var pt = ptSel && !ptSel.classList.contains('gl-sel-pt--standard')
+            ? String(ptSel.value || '').trim()
+            : '';
+        var deb = tr.querySelector('.gl-sel-debit-key');
+        var cre = tr.querySelector('.gl-sel-credit-key');
+        var debDiv = tr.querySelector('.gl-rule-debit-acct');
+        var creDiv = tr.querySelector('.gl-rule-credit-acct');
+        if (debDiv) {
+            if (code === 'PDN' && pt === 'credit') {
+                debDiv.innerHTML = '<span class="gl-rule-acct-muted">ذمة المورد (من المستند)</span>';
+            } else if (deb && deb.style.display !== 'none' && !deb.disabled) {
+                debDiv.textContent = accountPreviewForSettingKey(deb.value);
+            } else if (deb && deb.value) {
+                debDiv.textContent = accountPreviewForSettingKey(deb.value);
+            } else {
+                debDiv.textContent = '—';
+            }
+        }
+        if (creDiv) {
+            if (code === 'PIN' && pt === 'credit') {
+                creDiv.innerHTML = '<span class="gl-rule-acct-muted">ذمة المورد (من المستند)</span>';
+            } else if (cre && cre.style.display !== 'none' && !cre.disabled) {
+                creDiv.textContent = accountPreviewForSettingKey(cre.value);
+            } else if (cre && cre.value) {
+                creDiv.textContent = accountPreviewForSettingKey(cre.value);
+            } else {
+                creDiv.textContent = '—';
+            }
+        }
+    }
+
+    function refreshAllRuleAccountPreviews() {
+        document.querySelectorAll('#gl_jt_rules_body tr[data-jt-rule]').forEach(syncRuleAccountPreviews);
     }
 
     function keyOptionsHtml(selected) {
@@ -277,6 +367,7 @@ $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
                 tdDeb.appendChild(ph.cloneNode(true));
             }
         }
+        syncRuleAccountPreviews(tr);
     }
 
     function paintPaymentTermsCell(tr, jtId, selectedPt) {
@@ -294,6 +385,7 @@ $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
         }
         syncRuleRowLabels(tr);
         applyPurchaseCreditColumnLayout(tr);
+        syncRuleAccountPreviews(tr);
     }
 
     function collectUsedJournalRules(exceptTr) {
@@ -378,11 +470,21 @@ $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
         tr.innerHTML =
             '<td class="gl-td-jt"><select class="gl-sel-jt-id" aria-label="نوع اليومية">' + journalTypeOptionsHtml(jtId, used) + '</select></td>' +
             '<td class="gl-td-pt"></td>' +
-            '<td class="gl-td-debit"><select class="gl-sel-debit-key" aria-label="بند المدين">' + keyOptionsHtml(dk) + '</select></td>' +
-            '<td class="gl-td-credit"><select class="gl-sel-credit-key" aria-label="بند الدائن">' + keyOptionsHtml(ck) + '</select></td>' +
+            '<td class="gl-td-debit"><div class="gl-rule-key-cell"><select class="gl-sel-debit-key" aria-label="بند المدين">' + keyOptionsHtml(dk) + '</select>' +
+            '<div class="gl-rule-debit-acct gl-rule-acct-preview" aria-live="polite"></div></div></td>' +
+            '<td class="gl-td-credit"><div class="gl-rule-key-cell"><select class="gl-sel-credit-key" aria-label="بند الدائن">' + keyOptionsHtml(ck) + '</select>' +
+            '<div class="gl-rule-credit-acct gl-rule-acct-preview" aria-live="polite"></div></div></td>' +
             '<td><button type="button" class="btn-secondary gl-btn-remove-rule">حذف</button></td>';
         tbody.appendChild(tr);
         paintPaymentTermsCell(tr, jtId, paymentTerms);
+        var debK = tr.querySelector('.gl-sel-debit-key');
+        var creK = tr.querySelector('.gl-sel-credit-key');
+        if (debK) {
+            debK.addEventListener('change', function () { syncRuleAccountPreviews(tr); });
+        }
+        if (creK) {
+            creK.addEventListener('change', function () { syncRuleAccountPreviews(tr); });
+        }
         var jtSel = tr.querySelector('.gl-sel-jt-id');
         if (jtSel) {
             jtSel.addEventListener('change', function () {
@@ -406,6 +508,17 @@ $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
                 String(r.debit_setting_key || ''),
                 String(r.credit_setting_key || '')
             );
+        });
+    }
+    refreshAllRuleAccountPreviews();
+
+    var glSection1Table = document.querySelector('.gl-auto-form-card .gl-settings-table');
+    if (glSection1Table) {
+        glSection1Table.addEventListener('change', refreshAllRuleAccountPreviews);
+        glSection1Table.addEventListener('input', function (ev) {
+            if (ev.target && ev.target.classList && ev.target.classList.contains('gl-inp-code')) {
+                refreshAllRuleAccountPreviews();
+            }
         });
     }
 
@@ -446,6 +559,7 @@ $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
             n.value = acc.name || '';
         }
         glSyncNameFieldState(tr);
+        refreshAllRuleAccountPreviews();
     }
     function glClearRow(tr) {
         tr.setAttribute('data-account-id', '0');
@@ -458,6 +572,7 @@ $legalReservePct = orange_gl_setting_alloc_percent($pdo, 'legal_reserve');
             n.value = '';
         }
         glSyncNameFieldState(tr);
+        refreshAllRuleAccountPreviews();
     }
     function glStripResolvedRow(tr) {
         glClearRow(tr);
