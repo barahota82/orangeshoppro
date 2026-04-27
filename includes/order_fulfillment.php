@@ -422,13 +422,13 @@ function orange_order_reverse_completed_fulfillment(PDO $pdo, int $orderId, stri
     $inventoryId = orange_gl_account_id($pdo, 'inventory');
     if ($isOnline) {
         $debitReceivable = orange_gl_account_id($pdo, 'cash');
-        $salesId = orange_gl_account_id($pdo, 'sales_revenue_online');
+        $salesId = orange_gl_order_return_sale_debit_account_id($pdo, 'online');
     } elseif ($isCredit) {
         $debitReceivable = orange_gl_account_id($pdo, 'ar_credit');
-        $salesId = orange_gl_account_id($pdo, 'sales_revenue_credit');
+        $salesId = orange_gl_order_return_sale_debit_account_id($pdo, 'credit');
     } else {
         $debitReceivable = orange_gl_account_id($pdo, 'cash');
-        $salesId = orange_gl_account_id($pdo, 'sales_revenue_cash');
+        $salesId = orange_gl_order_return_sale_debit_account_id($pdo, 'cash');
     }
     $cogsReturnId = orange_gl_cogs_return_account_id($pdo);
 

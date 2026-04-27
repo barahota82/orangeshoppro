@@ -53,7 +53,7 @@ $recent = $pdo->query(
 
 <div class="card">
     <h2 class="card-title">بيانات الفاتورة</h2>
-    <p class="card-hint">الآجل يُرحَّل على ذمم الموردين؛ النقدي يُقابل الصندوق/البنك حسب إعداد الحسابات في الكود (1، 3، 5). مرتجع المشتريات وسندات الصرف ستُبنى لاحقًا كمرحلة محاسبية كاملة.</p>
+    <p class="card-hint">الآجل يُرحَّل على ذمم الموردين؛ النقدي يُقابل الصندوق/البنك حسب «حسابات القيود التلقائية». مردود المشتريات: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchase_returns'), ENT_QUOTES, 'UTF-8'); ?>">مردود المشتريات</a> (PDN).</p>
     <div class="form-grid">
         <div>
             <label>المورد (اختياري)</label>

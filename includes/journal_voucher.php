@@ -90,6 +90,16 @@ function orange_purchase_remove_accounting(PDO $pdo, string $purchaseReference):
 }
 
 /**
+ * حذف قيد مردود المشتريات (نفس منطق حذف قيد الشراء حسب المرجع).
+ *
+ * @throws RuntimeException
+ */
+function orange_purchase_return_remove_accounting(PDO $pdo, string $returnReference): void
+{
+    orange_purchase_remove_accounting($pdo, $returnReference);
+}
+
+/**
  * @return array<string, mixed>|null صف للتحقق من إغلاق السنة (سند أو قيد قديم)
  */
 function orange_accounting_row_by_reference(PDO $pdo, string $reference): ?array

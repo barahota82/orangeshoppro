@@ -115,6 +115,36 @@ function orange_purchase_record_ap_subledger(
 }
 
 /**
+ * ذمة المورد بعد ترحيل مردود مشتريات آجل (سند فوري بسطرين) — مدين المورد يقلل الذمة الدائنة.
+ */
+function orange_purchase_return_record_ap_subledger(
+    PDO $pdo,
+    int $returnId,
+    int $supplierId,
+    string $returnType,
+    float $total
+): void {
+    if ($returnType !== 'credit' || $supplierId <= 0 || $total <= 0.0001) {
+        return;
+    }
+    $v = orange_voucher_by_reference($pdo, 'PR-' . $returnId);
+    if (!$v) {
+        return;
+    }
+    orange_party_subledger_record(
+        $pdo,
+        'supplier',
+        $supplierId,
+        (int) $v['id'],
+        $total,
+        0.0,
+        'purchase_return',
+        $returnId,
+        'مردود مشتريات آجل'
+    );
+}
+
+/**
  * كشف حساب طرف من دفتر الذمم (مرتب زمنياً مع الرصيد الجاري بعد كل سطر).
  *
  * @param 'customer'|'supplier' $partyKind

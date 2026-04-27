@@ -30,6 +30,7 @@ $allowed = [
     'customers',
     'suppliers',
     'purchases',
+    'purchase_returns',
     'stock',
     'item_card',
     'chart_of_accounts',

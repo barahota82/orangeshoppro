@@ -248,6 +248,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
             $navPurchasing = [
                 ['page' => 'suppliers', 'href' => '/admin/index.php?page=suppliers', 'label' => 'الموردين', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'purchases', 'href' => '/admin/index.php?page=purchases', 'label' => 'المشتريات', 'class' => '', 'sub' => false],
+                ['page' => 'purchase_returns', 'href' => '/admin/index.php?page=purchase_returns', 'label' => 'مردود المشتريات', 'class' => '', 'sub' => false],
             ];
 
             /** عروض العربة / س4 — كانت تحت الإعدادات؛ قائمة منسدلة مستقلة بعنوان «العروض» */

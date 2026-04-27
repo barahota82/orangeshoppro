@@ -471,6 +471,41 @@ function orange_gl_cogs_return_account_id(PDO $pdo): int
 }
 
 /**
+ * بند مدين قيد مردود الإيراد عند إلغاء تسليم طلب مكتمل.
+ * إن وُجد ربط لـ sales_returns_* يُستخدم (مطابقة دليل منفصل لمردود المبيعات)؛ وإلا يُعكس على حساب الإيراد نفسه
+ * (نفس التوازن مع شاشة الربط الحالية دون إجبار صفوف إضافية).
+ *
+ * @param 'cash'|'online'|'credit' $channel
+ *
+ * @throws RuntimeException
+ */
+function orange_gl_order_return_sale_debit_account_id(PDO $pdo, string $channel): int
+{
+    $channel = trim($channel);
+    if ($channel === 'credit') {
+        return orange_gl_account_id($pdo, 'sales_revenue_credit');
+    }
+    if ($channel === 'online') {
+        $id = orange_gl_account_id_optional($pdo, 'sales_returns_online');
+        if ($id !== null && $id > 0) {
+            return $id;
+        }
+
+        return orange_gl_account_id($pdo, 'sales_revenue_online');
+    }
+    if ($channel === 'cash') {
+        $id = orange_gl_account_id_optional($pdo, 'sales_returns_cash');
+        if ($id !== null && $id > 0) {
+            return $id;
+        }
+
+        return orange_gl_account_id($pdo, 'sales_revenue_cash');
+    }
+
+    throw new RuntimeException('قناة دفع غير صالحة لمردود تسليم الطلب.');
+}
+
+/**
  * تسميات عربية لحقل journal_vouchers.entry_type / طابور المحاسبة (للعرض فقط).
  *
  * @return array<string, string>
@@ -484,7 +519,8 @@ function orange_gl_entry_type_labels_map(): array
         'year_end_close' => 'إقفال سنة مالية',
         'customer_receipt' => 'قبض عميل',
         'supplier_payment' => 'دفع مورد',
-        'purchase' => 'شراء / مردود مشتريات',
+        'purchase' => 'شراء',
+        'purchase_return' => 'مردود مشتريات',
         'expense' => 'مصروف',
         'expense_adjustment' => 'تعديل مصروف',
         'expense_reversal' => 'عكس مصروف',
@@ -522,6 +558,7 @@ function orange_gl_entry_types_delete_locked_from_journal_ui(): array
         'order_return_sale',
         'order_return_cogs',
         'purchase',
+        'purchase_return',
         'customer_receipt',
         'supplier_payment',
         'expense',
@@ -548,6 +585,7 @@ function orange_gl_journal_delete_blocked_message_ar(string $entryType): string
         'order_return_sale' => 'كما سبق — مردود الإيراد من إلغاء التسليم.',
         'order_return_cogs' => 'كما سبق — مردود التكلفة من إلغاء التسليم.',
         'purchase' => 'عدّل أو ألغِ من شاشة المشتريات.',
+        'purchase_return' => 'عدّل أو ألغِ من شاشة مردود المشتريات.',
         'customer_receipt' => 'عدّل من مسار قبض العملاء / الذمم.',
         'supplier_payment' => 'عدّل من مسار دفع الموردين / الذمم.',
         'expense' => 'عدّل من شاشة المصروفات.',
@@ -571,6 +609,7 @@ function orange_gl_journal_delete_blocked_admin_link(string $entryType): ?array
         'opening_balance' => ['page' => 'opening_balances', 'label' => 'الأرصدة الافتتاحية'],
         'year_end_close' => ['page' => 'fiscal_years', 'label' => 'السنوات المالية / الإقفال'],
         'purchase' => ['page' => 'purchases', 'label' => 'المشتريات'],
+        'purchase_return' => ['page' => 'purchase_returns', 'label' => 'مردود المشتريات'],
         'customer_receipt' => ['page' => 'partner_customer_receipt', 'label' => 'سند قبض / عميل'],
         'supplier_payment' => ['page' => 'partner_supplier_payment', 'label' => 'سند صرف / مورد'],
         'expense' => ['page' => 'expenses', 'label' => 'المصروفات'],
