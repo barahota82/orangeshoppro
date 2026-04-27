@@ -82,25 +82,34 @@ if ($fyId > 0 && orange_journal_vouchers_ready($pdo)) {
         <span class="card-hint ob-opening-summary__totals" id="ob_hint_totals">مجموع المدين: 0 — مجموع الدائن: 0</span>
         <label class="ob-opening-summary__statement" for="ob_statement">
             <span class="ob-opening-summary__statement-label">البيان</span>
-            <input type="text" id="ob_statement" class="ob-statement-input" dir="rtl" autocomplete="off" value="<?php echo htmlspecialchars($obStatement, ENT_QUOTES, 'UTF-8'); ?>" aria-required="true">
+            <input type="text" id="ob_statement" class="ob-statement-input admin-inp" dir="rtl" autocomplete="off" value="<?php echo htmlspecialchars($obStatement, ENT_QUOTES, 'UTF-8'); ?>" aria-required="true" placeholder="وصف السند (مثل سند القيد)">
         </label>
     </div>
-    <div class="table-wrap ob-opening-table-wrap">
-        <table class="ob-opening-table">
-            <thead>
-                <tr>
-                    <th class="ob-th-code">كود الحساب</th>
-                    <th class="ob-th-name">اسم الحساب</th>
-                    <th>مدين</th>
-                    <th>دائن</th>
-                    <th aria-label="حذف"></th>
-                </tr>
-            </thead>
-            <tbody id="ob_body"></tbody>
-        </table>
+    <div class="admin-doc-frame">
+        <div class="table-wrap ob-opening-table-wrap">
+            <table class="admin-table admin-doc-lines-table ob-opening-table jv-lines-table">
+                <colgroup>
+                    <col class="jv-col-code">
+                    <col class="jv-col-name">
+                    <col class="jv-col-amt">
+                    <col class="jv-col-amt">
+                    <col class="jv-col-act">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th class="ob-th-code">كود الحساب</th>
+                        <th class="ob-th-name">اسم الحساب</th>
+                        <th>مدين</th>
+                        <th>دائن</th>
+                        <th class="admin-doc-col-actions" aria-label="حذف السطر"></th>
+                    </tr>
+                </thead>
+                <tbody id="ob_body"></tbody>
+            </table>
+        </div>
     </div>
-    <div class="actions" style="margin-top:10px;">
-        <button type="button" class="btn-secondary" id="ob_btn_add">إضافة سطر</button>
+    <div class="actions admin-doc-lines-toolbar ob-opening-toolbar" style="margin-top:10px;">
+        <button type="button" class="btn-secondary" id="ob_btn_add">+ سطر يدوي</button>
         <button type="button" id="ob_btn_save">حفظ الرصيد الافتتاحي</button>
     </div>
 </div>
@@ -109,7 +118,8 @@ if ($fyId > 0 && orange_journal_vouchers_ready($pdo)) {
     <div class="gl-pick-modal__backdrop" id="ob_pick_backdrop"></div>
     <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="ob_pick_title">
         <h3 id="ob_pick_title" class="gl-pick-modal__title">اختيار حساب فرعي</h3>
-        <input type="search" id="ob_pick_q" class="gl-pick-modal__search" placeholder="ابحث بالكود أو الاسم…" autocomplete="off" dir="rtl">
+        <p class="gl-pick-modal__hint muted" style="margin:0 0 8px;font-size:0.9rem;">نقرتان على حقل كود الحساب في الجدول لفتح هذه القائمة — انقر صفاً للاختيار — Esc للإغلاق</p>
+        <input type="search" id="ob_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بالكود أو الاسم…" autocomplete="off" dir="rtl">
         <ul class="gl-pick-modal__list" id="ob_pick_list"></ul>
         <button type="button" class="btn-secondary" id="ob_pick_close">إغلاق</button>
     </div>
@@ -130,6 +140,94 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
     var obPickSeq = 0;
     var searchTimer = null;
 
+    function obAllRows(tb) {
+        return tb ? Array.prototype.slice.call(tb.querySelectorAll('tr')) : [];
+    }
+    function obRowIsBlank(tr) {
+        if (!tr) {
+            return true;
+        }
+        var id = parseInt(tr.getAttribute('data-account-id'), 10) || 0;
+        var d = parseFloat(String((tr.querySelector('.ob-d') || {}).value || '0').replace(',', '.')) || 0;
+        var c = parseFloat(String((tr.querySelector('.ob-c') || {}).value || '0').replace(',', '.')) || 0;
+        return id <= 0 && d <= 0.0000001 && c <= 0.0000001;
+    }
+    function obTrimExtraTrailingBlanks() {
+        var tb = document.getElementById('ob_body');
+        if (!tb) {
+            return;
+        }
+        for (;;) {
+            var rows = obAllRows(tb);
+            if (rows.length < 2) {
+                return;
+            }
+            var a = rows[rows.length - 2];
+            var b = rows[rows.length - 1];
+            if (obRowIsBlank(a) && obRowIsBlank(b)) {
+                b.remove();
+            } else {
+                return;
+            }
+        }
+    }
+    function obSyncTrailingRows() {
+        obTrimExtraTrailingBlanks();
+        var tb = document.getElementById('ob_body');
+        if (!tb) {
+            return;
+        }
+        var rows = obAllRows(tb);
+        if (rows.length === 0) {
+            window.obAdd();
+            return;
+        }
+        var last = rows[rows.length - 1];
+        if (!obRowIsBlank(last)) {
+            window.obAdd();
+        }
+    }
+    function obBindBody() {
+        var tb = document.getElementById('ob_body');
+        if (!tb || tb.getAttribute('data-ob-bound') === '1') {
+            return;
+        }
+        tb.setAttribute('data-ob-bound', '1');
+        tb.addEventListener('input', function () {
+            obSyncTrailingRows();
+            window.obRecalc();
+        });
+        tb.addEventListener('change', function () {
+            obSyncTrailingRows();
+            window.obRecalc();
+        });
+        tb.addEventListener('keydown', function (e) {
+            if (e.key !== 'Tab' || e.shiftKey) {
+                return;
+            }
+            var ta = e.target;
+            if (!ta || !ta.closest || !ta.classList.contains('ob-c')) {
+                return;
+            }
+            var tr = ta.closest('tr');
+            if (!tr || tr.parentElement !== tb) {
+                return;
+            }
+            var rows = obAllRows(tb);
+            if (rows.length === 0 || tr !== rows[rows.length - 1]) {
+                return;
+            }
+            e.preventDefault();
+            obSyncTrailingRows();
+            var rows2 = obAllRows(tb);
+            var next = rows2[rows2.length - 1];
+            var codeInp = next && next.querySelector('.ob-inp-code');
+            if (codeInp) {
+                codeInp.focus();
+            }
+        });
+    }
+
     /** عند ربط حساب: اسم الحساب معطّل؛ عند مسح الكود يُفعَّل لإعادة الاختيار (مع بقاء الحقل للعرض فقط — لا إدخال يدوي للاسم). */
     function obSyncNameFieldState(tr) {
         var n = tr.querySelector('.ob-inp-name');
@@ -139,7 +237,7 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
         var id = parseInt(tr.getAttribute('data-account-id'), 10) || 0;
         n.readOnly = true;
         n.disabled = id > 0;
-        n.setAttribute('tabindex', id > 0 ? '-1' : '0');
+        n.setAttribute('tabindex', '-1');
     }
     function obFillAccount(tr, acc) {
         if (!tr || !acc) {
@@ -216,16 +314,19 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
                     li.textContent = (code ? code + ' — ' : '') + (a.name || '');
                     li.setAttribute('role', 'button');
                     li.tabIndex = 0;
-                    li.addEventListener('click', function () {
+                    function obPickChoose() {
                         if (activeObPickTr) {
                             obFillAccount(activeObPickTr, { id: a.id, code: code, name: a.name || '' });
+                            obSyncTrailingRows();
+                            window.obRecalc();
                         }
                         obClosePick();
-                    });
+                    }
+                    li.addEventListener('click', obPickChoose);
                     li.addEventListener('keydown', function (ev) {
                         if (ev.key === 'Enter' || ev.key === ' ') {
                             ev.preventDefault();
-                            li.click();
+                            obPickChoose();
                         }
                     });
                     pickList.appendChild(li);
@@ -240,6 +341,13 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
         var codeInp = tr.querySelector('.ob-inp-code');
         if (!codeInp) {
             return;
+        }
+        if (!codeInp.getAttribute('data-ob-dbl')) {
+            codeInp.setAttribute('data-ob-dbl', '1');
+            codeInp.addEventListener('dblclick', function (e) {
+                e.preventDefault();
+                obOpenPick(tr);
+            });
         }
         var glLookupInFlight = false;
         codeInp.addEventListener('input', function () {
@@ -262,6 +370,8 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
                         return;
                     }
                     obFillAccount(tr, data.account);
+                    obSyncTrailingRows();
+                    window.obRecalc();
                 })
                 .catch(function () {
                     obStripInvalid(tr);
@@ -299,18 +409,19 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
         var tr = document.createElement('tr');
         tr.setAttribute('data-account-id', '0');
         tr.innerHTML =
-            '<td><input type="text" class="gl-inp-code ob-inp-code" dir="ltr" autocomplete="off" value="" aria-label="كود الحساب"></td>' +
+            '<td><input type="text" class="gl-inp-code ob-inp-code admin-inp" dir="ltr" autocomplete="off" value="" aria-label="كود الحساب" placeholder="نقرتان للاختيار أو اكتب الكود" title="نقرتان لفتح قائمة الحسابات — أو أدخِل الكود وغيّر الحقل للتحقق"></td>' +
             '<td><div class="gl-name-row">' +
             '<button type="button" class="gl-search-btn ob-search-btn" title="بحث — حسابات فرعية فقط" aria-label="بحث">🔍</button>' +
-            '<input type="text" class="gl-inp-name ob-inp-name" readonly value="" aria-label="اسم الحساب">' +
+            '<input type="text" class="gl-inp-name ob-inp-name admin-inp" readonly tabindex="-1" value="" aria-label="اسم الحساب" placeholder="—" title="يُعبأ تلقائياً">' +
             '</div></td>' +
             '<td><input type="number" class="ob-d admin-inp-money" step="any" min="0" value="" inputmode="decimal" lang="en" dir="ltr" aria-label="مدين" placeholder="0.000"></td>' +
             '<td><input type="number" class="ob-c admin-inp-money" step="any" min="0" value="" inputmode="decimal" lang="en" dir="ltr" aria-label="دائن" placeholder="0.000"></td>' +
-            '<td><button type="button" class="btn-secondary ob-row-del">حذف</button></td>';
+            '<td><button type="button" class="btn-secondary admin-doc-line-remove ob-row-del">حذف</button></td>';
         tb.appendChild(tr);
         tr.querySelector('.ob-row-del').addEventListener('click', function () {
             tr.remove();
-            obRecalc();
+            obSyncTrailingRows();
+            window.obRecalc();
         });
         obWireCodeRow(tr);
         obSyncNameFieldState(tr);
@@ -433,14 +544,23 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
         if (pickClose) {
             pickClose.addEventListener('click', obClosePick);
         }
+        document.addEventListener('keydown', function (ev) {
+            if (ev.key !== 'Escape') {
+                return;
+            }
+            if (pickModal && !pickModal.hidden) {
+                obClosePick();
+            }
+        }, true);
         if (Array.isArray(OB_INITIAL) && OB_INITIAL.length > 0) {
             OB_INITIAL.forEach(function (row) {
                 obAdd(row);
             });
         } else {
             obAdd();
-            obAdd();
         }
+        obBindBody();
+        obSyncTrailingRows();
     }
 })();
 </script>
