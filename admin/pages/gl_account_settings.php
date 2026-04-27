@@ -31,11 +31,7 @@ $rowTitles = orange_gl_setting_row_short_labels();
 $keyHints = orange_gl_setting_key_labels();
 $orderedKeys = orange_gl_settings_ui_key_order();
 $journalRules = orange_gl_journal_type_rules_list($pdo);
-$allowedGlKeys = orange_gl_allowed_setting_keys();
-$ruleKeyOrder = array_values(array_unique(array_merge(
-    $orderedKeys,
-    array_values(array_diff($allowedGlKeys, $orderedKeys))
-)));
+$ruleKeyOrder = orange_gl_journal_rule_dropdown_key_order($current);
 
 $jtJson = json_encode($journalTypesList, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 $keysJson = json_encode($orderedKeys, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
@@ -54,7 +50,7 @@ foreach ($byId as $aidJs => $aRow) {
 $currentForRulesJson = json_encode($current, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 $accountsByIdJson = json_encode($accountsByIdForJs, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 $resolvedAccountLineByKey = [];
-foreach ($ruleKeyOrder as $gk) {
+foreach (orange_gl_allowed_setting_keys() as $gk) {
     $aidR = (int) ($current[$gk] ?? 0);
     if ($aidR > 0 && isset($byId[$aidR])) {
         $cR = trim((string) ($byId[$aidR]['code'] ?? ''));
@@ -352,10 +348,18 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
 
     function keyOptionsHtml(selected) {
         var h = '<option value="">— اختر حساب المدين/الدائن (حسب القسم ١) —</option>';
+        var sel = String(selected || '').trim();
+        var seenSel = false;
         for (var i = 0; i < glRuleKeyOrder.length; i++) {
             var k = glRuleKeyOrder[i];
+            if (k === sel) {
+                seenSel = true;
+            }
             var lab = optionLabelForKey(k);
-            h += '<option value="' + esc(k) + '"' + (k === selected ? ' selected' : '') + '>' + esc(lab) + '</option>';
+            h += '<option value="' + esc(k) + '"' + (k === sel ? ' selected' : '') + '>' + esc(lab) + '</option>';
+        }
+        if (sel && !seenSel) {
+            h += '<option value="' + esc(sel) + '" selected>' + esc(optionLabelForKey(sel)) + '</option>';
         }
         return h;
     }

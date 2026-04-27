@@ -58,6 +58,7 @@ try {
     }
 
     $allowedKeys = orange_gl_allowed_setting_keys();
+    $excludedJnKeys = orange_gl_journal_rule_dropdown_excluded_keys();
     $uiKeys = orange_gl_settings_ui_key_order();
     $settings = isset($data['settings']) && is_array($data['settings']) ? $data['settings'] : [];
     $hasJtCol = orange_table_has_column($pdo, 'orange_gl_account_settings', 'journal_type_id');
@@ -134,6 +135,14 @@ try {
             $pt = trim((string) ($rule['payment_terms'] ?? ''));
             if ($jt <= 0 && $dk === '' && $ck === '') {
                 continue;
+            }
+            if (($dk !== '' && in_array($dk, $excludedJnKeys, true))
+                || ($ck !== '' && in_array($ck, $excludedJnKeys, true))) {
+                $pdo->rollBack();
+                json_response([
+                    'success' => false,
+                    'message' => 'أحد البنود المختارة لم يعد مستخدماً في ربط أنواع اليومية — استبدله من القائمة (مثلاً تكلفة المبيعات cogs أو تكلفة مردودات المبيعات cogs_returns).',
+                ], 422);
             }
             if (!$chkJt) {
                 $pdo->rollBack();

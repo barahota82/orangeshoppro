@@ -21,11 +21,11 @@ function orange_gl_setting_key_labels(): array
 {
     return [
         'cash' => 'الخزينة / النقدية — دائن شراء نقدي؛ مدين تحصيل مبيعات نقدي',
-        /** احتياط فقط (مصروفات قديمة بلا حساب فرعي / عكس قيد) — لا يُعرض في شاشة الربط. */
-        'general_expense' => 'مصروف عام — احتياط تقني فقط',
+        /** توافق قديم — لا يُعرض في قوائم ربط نوع اليومية. */
+        'general_expense' => 'مصروف عام',
         'inventory' => 'المخزون — مدين شراء؛ دائن تكلفة البضاعة المباعة',
-        /** احتياط فقط (تقارير ذمم / توافق قديم) — شراء آجل يُرحَّل على حساب ذمة كل مورد. */
-        'accounts_payable' => 'ذمم الموردين المجمّعة — احتياط تقني فقط',
+        /** توافق قديم — شراء آجل يُرحَّل على حساب ذمة كل مورد. */
+        'accounts_payable' => 'ذمم الموردين المجمّعة',
         'sales_revenue_cash' => 'إيراد مبيعات نقدي — دائن عند تسليم طلب نقدي',
         'sales_revenue_credit' => 'إيراد مبيعات آجل — دائن عند تسليم طلب آجل',
         'sales_revenue_online' => 'إيراد مبيعات أونلاين — دائن عند تسليم طلب أونلاين',
@@ -38,14 +38,14 @@ function orange_gl_setting_key_labels(): array
         'cogs_returns' => 'تكلفة مردودات المبيعات — دائن عند إلغاء التسليم وإرجاع التكلفة للمخزون',
         'sales_discount' => 'خصم المبيعات — يُستخدم عند قيود خصم مسموح على المبيعات (حسب سياسة الدليل)',
         'purchase_discount' => 'خصم مكتسب على المشتريات — يُستخدم عند خصم من المورد أو إثبات خصم مشتريات (حسب سياسة الدليل)',
-        /** احتياط توافق قديم — يُستبدل بمفتاح cogs */
-        'cogs_cash' => 'تكلفة مبيعات نقدي — احتياط تقني فقط',
-        'cogs_credit' => 'تكلفة مبيعات آجل — احتياط تقني فقط',
-        'cogs_online' => 'تكلفة مبيعات أونلاين — احتياط تقني فقط',
-        /** احتياط توافق قديم — يُستبدل بمفتاح cogs_returns */
-        'cogs_returns_cash' => 'تكلفة مردود مبيعات نقدي — احتياط تقني فقط',
-        'cogs_returns_credit' => 'تكلفة مردود مبيعات آجل — احتياط تقني فقط',
-        'cogs_returns_online' => 'تكلفة مردود مبيعات أونلاين — احتياط تقني فقط',
+        /** توافق قديم — يُستبدل بمفتاح cogs */
+        'cogs_cash' => 'تكلفة مبيعات نقدي',
+        'cogs_credit' => 'تكلفة مبيعات آجل',
+        'cogs_online' => 'تكلفة مبيعات أونلاين',
+        /** توافق قديم — يُستبدل بمفتاح cogs_returns */
+        'cogs_returns_cash' => 'تكلفة مردود مبيعات نقدي',
+        'cogs_returns_credit' => 'تكلفة مردود مبيعات آجل',
+        'cogs_returns_online' => 'تكلفة مردود مبيعات أونلاين',
         'income_summary' => 'أرباح / خسائر السنة الحالية (وسيط إقفال) — قيود إقفال القائمة ثم الترحيل للمحتجز',
         'retained_earnings' => 'الأرباح المحتجزة — صافي الدخل أو الخسارة المرحّلة بعد الإقفال',
         'legal_reserve' => 'الاحتياطي القانوني — حقوق ملكية؛ النسبة % تُخصَّم من أرباح السنة الحالية (بعد إقفال القائمة) لاستخدامها في قيود الإقفال لاحقاً',
@@ -243,6 +243,50 @@ function orange_gl_settings_ui_key_order(): array
 function orange_gl_allowed_setting_keys(): array
 {
     return array_keys(orange_gl_setting_key_labels());
+}
+
+/**
+ * مفاتيح لا تُعرض في قوائم «ربط نوع اليومية» — احتياطات قديمة أو غير مستخدمة في مسار الشاشة.
+ *
+ * @return list<string>
+ */
+function orange_gl_journal_rule_dropdown_excluded_keys(): array
+{
+    return [
+        'general_expense',
+        'accounts_payable',
+        'cogs_cash',
+        'cogs_credit',
+        'cogs_online',
+        'cogs_returns_cash',
+        'cogs_returns_credit',
+        'cogs_returns_online',
+    ];
+}
+
+/**
+ * ترتيب مفاتيح قوائم المدين/الدائن (القسم ٢): بند يظهر فقط إذا وُجد له حساب مربوط في القسم ١ (ومستبعدة مفاتيح التوافق القديمة).
+ * قواعد محفوظة قد تشير لمفتاح خارج القائمة؛ الواجهة تُضيف خياراً مؤقتاً لذلك المفتاح في صف القاعدة فقط.
+ *
+ * @param array<string, int> $current setting_key => account_id من orange_gl_account_settings
+ *
+ * @return list<string>
+ */
+function orange_gl_journal_rule_dropdown_key_order(array $current): array
+{
+    $excluded = orange_gl_journal_rule_dropdown_excluded_keys();
+    $formOrder = orange_gl_settings_form_key_order();
+    $out = [];
+    foreach ($formOrder as $k) {
+        if (in_array($k, $excluded, true)) {
+            continue;
+        }
+        if ((int) ($current[$k] ?? 0) > 0) {
+            $out[] = $k;
+        }
+    }
+
+    return $out;
 }
 
 /**
