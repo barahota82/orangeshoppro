@@ -66,14 +66,8 @@ foreach ($ruleKeyOrder as $gk) {
 }
 $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 ?>
-<div class="page-title page-title--stacked">
+<div class="page-title">
     <h1>حسابات القيود التلقائية</h1>
-    <p class="page-subtitle">
-        <strong>الجزء الأول:</strong> ربط كل بند بحساب فرعي من الدليل (بدون نوع يومية هنا).
-        لا يُعرض هنا «مصروف عام» أو «ذمم موردين مجمّعة» — المصروفات تُربط لكل بند من شاشة المصروفات، والشراء الآجل على حساب ذمة كل مورد.
-        صف <strong>الاحتياطي القانوني</strong> فقط يعرض حقل النسبة بجانب اسم البند (بدون عمود منفصل) — تُقرأ برمجياً من أرباح السنة الحالية بعد إقفال القائمة لقيود الإقفال.
-        <strong>الجزء الثاني:</strong> لكل نوع يومية اختر <strong>حساب المدين والدائن</strong> (يُعرض اسم الحساب من القسم ١) — تُخزَّن داخلياً كمفتاح بند الربط.
-    </p>
 </div>
 
 <div class="card gl-auto-form-card">
@@ -131,26 +125,14 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
 
 <div class="card gl-auto-form-card" style="margin-top:1rem;">
         <h3 class="card-title">٢ — ربط نوع اليومية بحساب مدين وحساب دائن</h3>
-        <p class="card-hint" style="margin:0 0 0.75rem;max-width:52rem;line-height:1.55;">
-            <strong>كيف تختار هنا؟</strong> القائمة تعرض <strong>كود واسم الحساب</strong> كما ربطته في القسم ١ لكل بند (القيمة المخزّنة داخلياً هي مفتاح البند؛ المعروض لك هو الحساب من الدليل).
-            إن ظهرت عبارة «لم يُربط في القسم ١» فارجع للجدول الأول واختر الحساب الفرعي لذلك البند.
-            لتغيير الحساب في القيد غيّر الربط في القسم ١ أو اختر بنداً آخر هنا.
-            <br><br>
-            <strong>فاتورة مشتريات (PIN) ومردود مشتريات (PDN):</strong> أضف سطراً لـ <strong>نقدي</strong> (يظهر المدين والدائن معاً)،
-            وسطراً لـ <strong>آجل</strong> — يظهر <strong>بند واحد فقط</strong> (المدين لفاتورة المشتريات الآجل، أو الدائن لمردود المشتريات الآجل)،
-            والجانب الآخر يُؤخذ تلقائياً من <strong>حساب ذمة المورد</strong> في المستند دون اختيار هنا.
-            <strong>مبيعات نقدي (CSI)</strong> ونحوها تظهر <strong>قياسي</strong> لأن هذا العمود مخصّص لتمييز نقدي/آجل في المشتريات فقط؛
-            أما <strong>تسليم الطلب النقدي أو الأونلاين</strong> فيُستخدَم <strong>نفس حساب العملاء النقدي</strong> كوسيط (دون حساب أونلاين منفصل)، مع <strong>إيراد مبيعات نقدي</strong> أو <strong>إيراد مبيعات أونلاين</strong> و<strong>الخزينة</strong> (قيد بأربعة أسطر)، وليس من صف CSI/OSI في الجدول أدناه.
-            باقي أنواع اليومية إن أُضيفت هنا: «قياسي» واختيار مدين ودائن معاً حيث ينطبق ذلك على مسارها في النظام.
-        </p>
         <div class="table-wrap gl-settings-table-wrap">
             <table class="gl-settings-table" id="gl_jt_rules_table">
                 <thead>
                     <tr>
                         <th>نوع اليومية</th>
                         <th>نقدي / آجل</th>
-                        <th>المدين <span class="gl-th-sub">(اسم الحساب المربوط في القسم ١)</span></th>
-                        <th>الدائن <span class="gl-th-sub">(اسم الحساب المربوط في القسم ١)</span></th>
+                        <th>المدين</th>
+                        <th>الدائن</th>
                         <th class="gl-th-actions" aria-label="إزالة"></th>
                     </tr>
                 </thead>
