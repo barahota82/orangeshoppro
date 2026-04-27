@@ -40,7 +40,7 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
 
     $inventoryId = orange_gl_account_id($pdo, 'inventory');
     if ($isOnline) {
-        // أونلاين: إيراد التسليم بأربعة أسطر (انظر orange_gl_online_delivery_sale_four_lines).
+        // أونلاين: إيراد التسليم بأربعة أسطر عبر ar_cash ثم الخزينة (نفس وسيط النقدي؛ إيراد على مبيعات أونلاين).
         $debitReceivable = 0;
         $salesId = 0;
     } elseif ($isCredit) {
@@ -166,8 +166,8 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
         if ($salesAmount > 0.0001) {
             if (!$isCredit) {
                 if ($isOnline) {
-                    $memoSaleLeg = 'مبيعات أونلاين — تسجيل على عملاء أونلاين';
-                    $memoCashLeg = 'مبيعات أونلاين — تحصيل نقدي';
+                    $memoSaleLeg = 'مبيعات أونلاين — تسجيل على عملاء نقدي (وسيط مشترك)';
+                    $memoCashLeg = 'مبيعات أونلاين — تحصيل للخزينة';
                     $saleFour = orange_gl_online_delivery_sale_four_lines($pdo, $salesAmount, $memoSaleLeg, $memoCashLeg);
                 } else {
                     $memoSaleLeg = 'مبيعات نقدي — تسجيل على عملاء نقدي';

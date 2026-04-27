@@ -58,7 +58,7 @@ function orange_gl_cash_delivery_sale_four_lines(PDO $pdo, float $amount, string
 }
 
 /**
- * إيراد تسليم طلب أونلاين: عملاء أونلاين ثم خزينة (نفس منطق النقدي).
+ * إيراد تسليم طلب أونلاين: نفس وسيط عملاء النقدي (ar_cash) ثم الخزينة؛ الإيراد على sales_revenue_online.
  *
  * @return array{lines: list<array{account_id:int,debit:float,credit:float,memo:string}>}
  */
@@ -67,7 +67,7 @@ function orange_gl_online_delivery_sale_four_lines(PDO $pdo, float $amount, stri
     return orange_gl_bridge_delivery_sale_four_lines(
         $pdo,
         $amount,
-        'ar_online',
+        'ar_cash',
         'sales_revenue_online',
         $memoSaleLeg,
         $memoCashLeg
