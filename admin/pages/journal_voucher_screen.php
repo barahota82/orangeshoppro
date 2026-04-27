@@ -70,7 +70,7 @@ foreach ($accounts as $a) {
     <p class="card-hint jv-print-hide" style="margin:0 0 12px;">اربط حساب <strong>الخزينة / النقدية</strong> من <a href="<?php echo htmlspecialchars($jvGlSettingsUrl, ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a> (بند النقدية) لاستخدام سند القبض بسطر خزينة ثابت.</p>
     <?php endif; ?>
     <?php if (($jvPageEntryType ?? '') === 'receipt_voucher' && $jvReceiptCashLock !== null): ?>
-    <p class="card-hint jv-print-hide" style="margin:0 0 12px;">السطر الأول: <strong>الخزينة</strong> (<?php echo htmlspecialchars(trim($jvReceiptCashLock['code'] . ' — ' . $jvReceiptCashLock['name']), ENT_QUOTES, 'UTF-8'); ?>) — ثابت؛ أدخل المبلغ في <strong>مدين</strong> ثم أكمل بقية الأسطر (دائن).</p>
+    <p class="card-hint jv-print-hide" style="margin:0 0 12px;">السطر الأول: <strong>الخزينة</strong> (<?php echo htmlspecialchars(trim($jvReceiptCashLock['code'] . ' — ' . $jvReceiptCashLock['name']), ENT_QUOTES, 'UTF-8'); ?>) — ثابت؛ <strong>مدين الخزينة</strong> يُحسب تلقائياً من مجموع <strong>دائن</strong> الحسابات التي تُختار يدوياً (لا يُدخل مدين إلا للخزينة عبر التجميع).</p>
     <?php endif; ?>
     <div class="form-grid">
         <div class="<?php echo htmlspecialchars($jvHeaderLineClass, ENT_QUOTES, 'UTF-8'); ?>" style="grid-column:1/-1;">
@@ -375,6 +375,60 @@ foreach ($accounts as $a) {
 var JV_ACCOUNTS = <?php echo json_encode($jvAccountsLeaf, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>;
 var JV_ENTRY_TYPE = <?php echo json_encode($jvPageEntryType, JSON_UNESCAPED_UNICODE); ?>;
 var JV_RECEIPT_LOCK_CASH = <?php echo json_encode($jvReceiptCashLock, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>;
+
+function jvReceiptCashMode() {
+    return !!(JV_RECEIPT_LOCK_CASH && JV_RECEIPT_LOCK_CASH.id);
+}
+
+/** مدين الخزينة = مجموع دائن جميع الأسطر غير المقفلة (سند قبض). */
+function jvReceiptSyncTreasuryDebitFromCredits() {
+    if (!jvReceiptCashMode()) {
+        return;
+    }
+    var tb = document.getElementById('jv_lines_body');
+    if (!tb) {
+        return;
+    }
+    var cashDeb = null;
+    var sumCre = 0;
+    jvAllMainRows(tb).forEach(function (tr) {
+        var c = parseFloat(String(tr.querySelector('.jv-c').value || '0').replace(',', '.')) || 0;
+        if (tr.getAttribute('data-jv-cash-locked') === '1') {
+            cashDeb = tr.querySelector('.jv-d');
+        } else {
+            sumCre += c;
+        }
+    });
+    if (cashDeb) {
+        cashDeb.value = sumCre > 0 ? sumCre.toFixed(3) : '';
+    }
+}
+
+function jvReceiptApplyLineAmountUi(mainTr) {
+    if (!mainTr || !jvReceiptCashMode()) {
+        return;
+    }
+    var dEl = mainTr.querySelector('.jv-d');
+    var cEl = mainTr.querySelector('.jv-c');
+    if (!dEl || !cEl) {
+        return;
+    }
+    if (mainTr.getAttribute('data-jv-cash-locked') === '1') {
+        dEl.readOnly = true;
+        dEl.setAttribute('tabindex', '-1');
+        dEl.classList.add('admin-inp-readonly');
+        dEl.title = 'يُحسب تلقائياً من مجموع دائن الحسابات الأخرى';
+        return;
+    }
+    dEl.value = '';
+    dEl.readOnly = true;
+    dEl.setAttribute('tabindex', '-1');
+    dEl.classList.add('admin-inp-readonly');
+    dEl.title = 'في سند القبض يُسجَّل الدائن فقط — المدين غير مفعّل';
+    cEl.readOnly = false;
+    cEl.removeAttribute('tabindex');
+    cEl.classList.remove('admin-inp-readonly');
+}
 
 var jvAcctPickerAnchor = null;
 var jvPairSeq = 0;
@@ -684,7 +738,7 @@ function jvAddReceiptCashRow() {
         '<input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="' + jvEscapeHtml(JV_RECEIPT_LOCK_CASH.code || '') + '" readonly tabindex="-1" autocomplete="off" title="حساب الخزينة — ثابت">' +
         '</td>' +
         '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + jvEscapeHtml(JV_RECEIPT_LOCK_CASH.name || '') + '" readonly tabindex="-1" title="حساب الخزينة — ثابت"></td>' +
-        '<td><input type="number" class="jv-d admin-inp-money" step="any" min="0" value="" placeholder="0.000" inputmode="decimal" lang="en" dir="ltr" title="مبلغ القبض (مدين)"></td>' +
+        '<td><input type="number" class="jv-d admin-inp-money" step="any" min="0" value="" placeholder="تلقائي" inputmode="decimal" lang="en" dir="ltr" title="يُملأ تلقائياً من مجموع الدائن"></td>' +
         '<td><input type="number" class="jv-c admin-inp-money" step="any" min="0" value="" placeholder="0" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1" title="دائن الخزينة في القبض يبقى صفر"></td>' +
         '<td><span class="muted" style="display:inline-block;padding:8px 0;" aria-hidden="true">—</span></td>';
     var trMemo = document.createElement('tr');
@@ -695,6 +749,7 @@ function jvAddReceiptCashRow() {
         '</td>';
     tb.appendChild(trMain);
     tb.appendChild(trMemo);
+    jvReceiptApplyLineAmountUi(trMain);
     jvRecalc();
 }
 
@@ -722,6 +777,7 @@ function jvAddRow() {
     codeInp.addEventListener('dblclick', function (e) { e.preventDefault(); jvAcctPickerOpen(codeInp); });
     tb.appendChild(trMain);
     tb.appendChild(trMemo);
+    jvReceiptApplyLineAmountUi(trMain);
     jvRecalc();
 }
 
@@ -878,6 +934,7 @@ function jvFillMainFromLine(main, ln) {
     if (memo) {
         memo.querySelector('.jv-m').value = ln.memo || '';
     }
+    jvReceiptApplyLineAmountUi(main);
 }
 
 function jvApplyViewModeUi() {
@@ -1014,6 +1071,7 @@ function jvNav(where) {
 }
 
 function jvRecalc() {
+    jvReceiptSyncTreasuryDebitFromCredits();
     var sd = 0, sc = 0;
     document.querySelectorAll('#jv_lines_body tr.jv-line-main').forEach(function (tr) {
         var d = parseFloat(String(tr.querySelector('.jv-d').value || '0').replace(',', '.'));
@@ -1034,6 +1092,7 @@ function jvSubmit() {
     if (jvViewMode) {
         return;
     }
+    jvReceiptSyncTreasuryDebitFromCredits();
     var dIso = orangeGetDmyValueAsIso(document.getElementById('jv_date'));
     var ref = document.getElementById('jv_ref').value.trim();
     var desc = document.getElementById('jv_desc').value.trim();
