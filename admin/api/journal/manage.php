@@ -30,6 +30,29 @@ function orange_journal_manage_resolve_ui_entry_type(array $data, string $fallba
     return $t;
 }
 
+/**
+ * سند القبض: أول سطر يجب أن يكون حساب النقدية (الخزينة) من الإعدادات، مديناً بلا دائن.
+ *
+ * @param list<array{account_id:int,debit:float,credit:float,memo:string}> $postLines
+ */
+function orange_journal_manage_assert_receipt_cash_first_line(PDO $pdo, string $entryTypeNorm, array $postLines): void
+{
+    if ($entryTypeNorm !== 'receipt_voucher' || $postLines === []) {
+        return;
+    }
+    $cashId = orange_gl_account_id_optional($pdo, 'cash');
+    if ($cashId === null || $cashId <= 0) {
+        json_response(['success' => false, 'message' => 'اربط حساب النقدية (الخزينة) في إعدادات القيود التلقائية لاستخدام سند القبض.'], 422);
+    }
+    $first = $postLines[0];
+    if ((int) $first['account_id'] !== (int) $cashId) {
+        json_response(['success' => false, 'message' => 'سند القبض يجب أن يبدأ بسطر حساب الخزينة (النقدية) كما في الشاشة.'], 422);
+    }
+    if ((float) $first['debit'] <= 0.0 || (float) $first['credit'] > 0.0) {
+        json_response(['success' => false, 'message' => 'السطر الأول في سند القبض (الخزينة) يجب أن يكون مديناً بمبلغ القبض دون دائن.'], 422);
+    }
+}
+
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
@@ -79,6 +102,7 @@ try {
             if (count($postLines) < 2) {
                 json_response(['success' => false, 'message' => 'يُشترط سطران صالحان على الأقل في السند'], 422);
             }
+            orange_journal_manage_assert_receipt_cash_first_line($pdo, $entryTypeNorm, $postLines);
             if (orange_table_has_column($pdo, 'accounts', 'is_group')) {
                 foreach ($postLines as $ln) {
                     $aid = (int) $ln['account_id'];
