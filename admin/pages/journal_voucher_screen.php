@@ -69,9 +69,6 @@ foreach ($accounts as $a) {
     <?php if (($jvPageEntryType ?? '') === 'receipt_voucher' && $jvReceiptCashLock === null): ?>
     <p class="card-hint jv-print-hide" style="margin:0 0 12px;">اربط حساب <strong>الخزينة / النقدية</strong> من <a href="<?php echo htmlspecialchars($jvGlSettingsUrl, ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a> (بند النقدية) لاستخدام سند القبض بسطر خزينة ثابت.</p>
     <?php endif; ?>
-    <?php if (($jvPageEntryType ?? '') === 'receipt_voucher' && $jvReceiptCashLock !== null): ?>
-    <p class="card-hint jv-print-hide" style="margin:0 0 12px;">السطر الأول: <strong>الخزينة</strong> (<?php echo htmlspecialchars(trim($jvReceiptCashLock['code'] . ' — ' . $jvReceiptCashLock['name']), ENT_QUOTES, 'UTF-8'); ?>) — ثابت؛ <strong>مدين الخزينة</strong> يُحسب تلقائياً من مجموع <strong>دائن</strong> الحسابات التي تُختار يدوياً (لا يُدخل مدين إلا للخزينة عبر التجميع).</p>
-    <?php endif; ?>
     <div class="form-grid">
         <div class="<?php echo htmlspecialchars($jvHeaderLineClass, ENT_QUOTES, 'UTF-8'); ?>" style="grid-column:1/-1;">
             <div>
@@ -418,6 +415,9 @@ function jvReceiptApplyLineAmountUi(mainTr) {
         dEl.setAttribute('tabindex', '-1');
         dEl.classList.add('admin-inp-readonly');
         dEl.title = 'يُحسب تلقائياً من مجموع دائن الحسابات الأخرى';
+        cEl.readOnly = true;
+        cEl.setAttribute('tabindex', '-1');
+        cEl.value = '0.000';
         return;
     }
     dEl.value = '';
@@ -477,13 +477,17 @@ function jvAcctTokens(q) {
 /** بحث بالكلمات: كل كلمة يجب أن تظهر في (الكود + الاسم) — غير متطابق حرفي بالكامل */
 function jvAcctFilterAccounts(q) {
     var tokens = jvAcctTokens(q);
-    if (!tokens.length) {
-        return JV_ACCOUNTS.slice();
-    }
-    return JV_ACCOUNTS.filter(function (a) {
+    var rows = !tokens.length ? JV_ACCOUNTS.slice() : JV_ACCOUNTS.filter(function (a) {
         var hay = ((a.code || '') + ' ' + (a.name || '')).toLowerCase();
         return tokens.every(function (t) { return hay.indexOf(t) !== -1; });
     });
+    if (jvReceiptCashMode() && JV_RECEIPT_LOCK_CASH && JV_RECEIPT_LOCK_CASH.id) {
+        var exId = parseInt(String(JV_RECEIPT_LOCK_CASH.id), 10) || 0;
+        if (exId > 0) {
+            rows = rows.filter(function (a) { return (parseInt(String(a.id), 10) || 0) !== exId; });
+        }
+    }
+    return rows;
 }
 
 function jvAcctPickerPosition(anchorEl) {
@@ -739,7 +743,7 @@ function jvAddReceiptCashRow() {
         '</td>' +
         '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + jvEscapeHtml(JV_RECEIPT_LOCK_CASH.name || '') + '" readonly tabindex="-1" title="حساب الخزينة — ثابت"></td>' +
         '<td><input type="number" class="jv-d admin-inp-money" step="any" min="0" value="" placeholder="تلقائي" inputmode="decimal" lang="en" dir="ltr" title="يُملأ تلقائياً من مجموع الدائن"></td>' +
-        '<td><input type="number" class="jv-c admin-inp-money" step="any" min="0" value="" placeholder="0" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1" title="دائن الخزينة في القبض يبقى صفر"></td>' +
+        '<td><input type="number" class="jv-c admin-inp-money" step="any" min="0" value="0.000" placeholder="0.000" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1" title="دائن الخزينة في القبض = صفر"></td>' +
         '<td><span class="muted" style="display:inline-block;padding:8px 0;" aria-hidden="true">—</span></td>';
     var trMemo = document.createElement('tr');
     trMemo.className = 'jv-line-memo';
@@ -930,7 +934,11 @@ function jvFillMainFromLine(main, ln) {
     var deb = parseFloat(String(ln.debit || 0));
     var cre = parseFloat(String(ln.credit || 0));
     main.querySelector('.jv-d').value = deb > 0 ? deb.toFixed(3) : '';
-    main.querySelector('.jv-c').value = cre > 0 ? cre.toFixed(3) : '';
+    if (main.getAttribute('data-jv-cash-locked') === '1') {
+        main.querySelector('.jv-c').value = '0.000';
+    } else {
+        main.querySelector('.jv-c').value = cre > 0 ? cre.toFixed(3) : '';
+    }
     if (memo) {
         memo.querySelector('.jv-m').value = ln.memo || '';
     }
