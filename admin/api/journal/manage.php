@@ -31,6 +31,40 @@ function orange_journal_manage_resolve_ui_entry_type(array $data, string $fallba
 }
 
 /**
+ * شاشة «سندات أخرى»: أنواع القيود المعروضة حسب فلتر نوع اليومية من إعدادات القيود التلقائية (قسم ٢).
+ *
+ * @return list<string>
+ */
+function orange_journal_manage_other_voucher_browse_entry_types(PDO $pdo, int $journalTypeFilterId): array
+{
+    if ($journalTypeFilterId <= 0) {
+        return ['other_voucher'];
+    }
+    $types = orange_gl_entry_types_for_journal_type_id($pdo, $journalTypeFilterId);
+
+    return array_values(array_unique(array_filter($types, static function ($t) {
+        return trim((string) $t) !== '';
+    })));
+}
+
+/**
+ * @param list<string> $types
+ * @return array{0:string,1:list<string>}
+ */
+function orange_journal_manage_entry_type_sql_fragment(array $types): array
+{
+    if ($types === []) {
+        return ['1=0', []];
+    }
+    if (count($types) === 1) {
+        return ['entry_type = ?', $types];
+    }
+    $ph = implode(', ', array_fill(0, count($types), '?'));
+
+    return ['entry_type IN (' . $ph . ')', $types];
+}
+
+/**
  * سند القبض: أول سطر يجب أن يكون حساب النقدية (الخزينة) من الإعدادات، مديناً بلا دائن.
  *
  * @param list<array{account_id:int,debit:float,credit:float,memo:string}> $postLines
@@ -263,7 +297,17 @@ try {
         if (!$v) {
             json_response(['success' => false, 'message' => 'السند غير موجود'], 404);
         }
-        if ((string)($v['entry_type'] ?? '') !== $etReq) {
+        $jtFilterGet = (int) ($data['journal_type_id'] ?? 0);
+        if ($etReq === 'other_voucher') {
+            $allowedGet = orange_journal_manage_other_voucher_browse_entry_types($pdo, $jtFilterGet);
+            if ($allowedGet === []) {
+                json_response(['success' => false, 'message' => 'نوع اليومية المحدد غير مرتبط بأنواع قيود في الإعدادات'], 422);
+            }
+            $vEtGet = (string) ($v['entry_type'] ?? '');
+            if (!in_array($vEtGet, $allowedGet, true)) {
+                json_response(['success' => false, 'message' => 'لا يُعرَض هذا السند مع فلتر النوع الحالي'], 422);
+            }
+        } elseif ((string)($v['entry_type'] ?? '') !== $etReq) {
             json_response(['success' => false, 'message' => 'لا يُعرَض هذا السند من هذه الشاشة'], 422);
         }
         $vd = (string)($v['voucher_date'] ?? '');
@@ -302,6 +346,7 @@ try {
                 'reference' => (string)($v['reference'] ?? ''),
                 'description' => (string)($v['description'] ?? ''),
                 'document_entered_display' => $docDisplay,
+                'entry_type' => (string) ($v['entry_type'] ?? ''),
             ],
             'lines' => $lines,
         ]);
@@ -311,44 +356,54 @@ try {
 
     if ($action === 'nav_manual') {
         $et = orange_journal_manage_resolve_ui_entry_type($data, 'manual');
+        $jtNav = (int) ($data['journal_type_id'] ?? 0);
+        $navTypes = [$et];
+        $etFrag = 'entry_type = ?';
+        if ($et === 'other_voucher') {
+            $navTypes = orange_journal_manage_other_voucher_browse_entry_types($pdo, $jtNav);
+            if ($navTypes === []) {
+                json_response(['success' => false, 'message' => 'نوع اليومية المحدد غير مرتبط بأنواع قيود في الإعدادات'], 422);
+            }
+            [$etFrag, $navTypes] = orange_journal_manage_entry_type_sql_fragment($navTypes);
+        }
         $where = trim((string)($data['where'] ?? ''));
         $currentId = (int)($data['current_id'] ?? 0);
         if (!orange_journal_vouchers_ready($pdo)) {
             json_response(['success' => false, 'message' => 'جداول السندات غير جاهزة'], 422);
         }
-        $cSt = $pdo->prepare('SELECT COUNT(*) FROM journal_vouchers WHERE entry_type = ?');
-        $cSt->execute([$et]);
+        $cSt = $pdo->prepare('SELECT COUNT(*) FROM journal_vouchers WHERE ' . $etFrag);
+        $cSt->execute($navTypes);
         if ((int) $cSt->fetchColumn() === 0) {
             json_response(['success' => false, 'message' => 'لا توجد سندات من هذا النوع بعد']);
         }
         $target = 0;
         if ($where === 'first') {
-            $q = $pdo->prepare('SELECT COALESCE(MIN(id), 0) FROM journal_vouchers WHERE entry_type = ?');
-            $q->execute([$et]);
+            $q = $pdo->prepare('SELECT COALESCE(MIN(id), 0) FROM journal_vouchers WHERE ' . $etFrag);
+            $q->execute($navTypes);
             $target = (int) $q->fetchColumn();
         } elseif ($where === 'last') {
-            $q = $pdo->prepare('SELECT COALESCE(MAX(id), 0) FROM journal_vouchers WHERE entry_type = ?');
-            $q->execute([$et]);
+            $q = $pdo->prepare('SELECT COALESCE(MAX(id), 0) FROM journal_vouchers WHERE ' . $etFrag);
+            $q->execute($navTypes);
             $target = (int) $q->fetchColumn();
         } elseif ($where === 'prev') {
             if ($currentId <= 0) {
-                $q = $pdo->prepare('SELECT COALESCE(MAX(id), 0) FROM journal_vouchers WHERE entry_type = ?');
-                $q->execute([$et]);
+                $q = $pdo->prepare('SELECT COALESCE(MAX(id), 0) FROM journal_vouchers WHERE ' . $etFrag);
+                $q->execute($navTypes);
                 $target = (int) $q->fetchColumn();
             } else {
-                $q = $pdo->prepare('SELECT id FROM journal_vouchers WHERE entry_type = ? AND id < ? ORDER BY id DESC LIMIT 1');
-                $q->execute([$et, $currentId]);
+                $q = $pdo->prepare('SELECT id FROM journal_vouchers WHERE ' . $etFrag . ' AND id < ? ORDER BY id DESC LIMIT 1');
+                $q->execute(array_merge($navTypes, [$currentId]));
                 $row = $q->fetch(PDO::FETCH_ASSOC);
                 $target = $row ? (int) $row['id'] : 0;
             }
         } elseif ($where === 'next') {
             if ($currentId <= 0) {
-                $q = $pdo->prepare('SELECT COALESCE(MIN(id), 0) FROM journal_vouchers WHERE entry_type = ?');
-                $q->execute([$et]);
+                $q = $pdo->prepare('SELECT COALESCE(MIN(id), 0) FROM journal_vouchers WHERE ' . $etFrag);
+                $q->execute($navTypes);
                 $target = (int) $q->fetchColumn();
             } else {
-                $q = $pdo->prepare('SELECT id FROM journal_vouchers WHERE entry_type = ? AND id > ? ORDER BY id ASC LIMIT 1');
-                $q->execute([$et, $currentId]);
+                $q = $pdo->prepare('SELECT id FROM journal_vouchers WHERE ' . $etFrag . ' AND id > ? ORDER BY id ASC LIMIT 1');
+                $q->execute(array_merge($navTypes, [$currentId]));
                 $row = $q->fetch(PDO::FETCH_ASSOC);
                 $target = $row ? (int) $row['id'] : 0;
             }
@@ -374,8 +429,18 @@ try {
             json_response(['success' => false, 'message' => 'جداول السندات غير جاهزة'], 422);
         }
         $et = orange_journal_manage_resolve_ui_entry_type($data, 'manual');
-        $parts = ['entry_type = ?'];
-        $params = [$et];
+        $jtSearch = (int) ($data['journal_type_id'] ?? 0);
+        $searchTypes = [$et];
+        $etSearchFrag = 'entry_type = ?';
+        if ($et === 'other_voucher') {
+            $searchTypes = orange_journal_manage_other_voucher_browse_entry_types($pdo, $jtSearch);
+            if ($searchTypes === []) {
+                json_response(['success' => false, 'message' => 'نوع اليومية المحدد غير مرتبط بأنواع قيود في الإعدادات'], 422);
+            }
+            [$etSearchFrag, $searchTypes] = orange_journal_manage_entry_type_sql_fragment($searchTypes);
+        }
+        $parts = [$etSearchFrag];
+        $params = $searchTypes;
         $hasCriterion = false;
 
         $idFrom = (int) ($data['id_from'] ?? 0);
@@ -446,7 +511,7 @@ try {
             json_response(['success' => false, 'message' => 'حدّد معيار بحث واحد على الأقل (رقم، تاريخ، مرجع، أو بيان)'], 422);
         }
 
-        $sql = 'SELECT jv.id, jv.voucher_date, jv.reference, jv.description,
+        $sql = 'SELECT jv.id, jv.voucher_date, jv.reference, jv.description, jv.entry_type,
             (SELECT COALESCE(SUM(jl.debit), 0) FROM journal_lines jl WHERE jl.voucher_id = jv.id) AS voucher_total
             FROM journal_vouchers jv
             WHERE ' . implode(' AND ', $parts)
@@ -457,12 +522,15 @@ try {
         while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
             $vd = (string) ($row['voucher_date'] ?? '');
             $dateDisp = strlen($vd) >= 10 ? orange_format_date_dmY(substr($vd, 0, 10)) : '';
+            $etRow = (string) ($row['entry_type'] ?? '');
             $rows[] = [
                 'id' => (int) $row['id'],
                 'voucher_date' => $dateDisp,
                 'reference' => (string) ($row['reference'] ?? ''),
                 'description' => (string) ($row['description'] ?? ''),
                 'amount' => round((float) ($row['voucher_total'] ?? 0), 3),
+                'entry_type' => $etRow,
+                'entry_type_label' => orange_gl_entry_type_label_ar($etRow),
             ];
         }
         json_response(['success' => true, 'rows' => $rows]);

@@ -35,6 +35,11 @@ if ($jvPageEt === 'receipt_voucher' || $jvPageEt === 'payment_voucher') {
 }
 $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_settings');
 
+$jvPostingLinkedJournalTypes = [];
+if ($jvPageEt === 'other_voucher') {
+    $jvPostingLinkedJournalTypes = orange_gl_posting_linked_journal_types($pdo);
+}
+
 $nextJournalVoucherNo = 1;
 if (orange_journal_vouchers_ready($pdo)) {
     $nextJournalVoucherNo = (int) $pdo->query('SELECT COALESCE(MAX(id),0) + 1 FROM journal_vouchers')->fetchColumn();
@@ -72,6 +77,20 @@ foreach ($accounts as $a) {
     <p class="card-hint jv-print-hide" style="margin:0 0 12px;">اربط حساب <strong>الخزينة / النقدية</strong> من <a href="<?php echo htmlspecialchars($jvGlSettingsUrl, ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a> (بند النقدية) لاستخدام سند القبض أو سند الصرف بسطر خزينة ثابت.</p>
     <?php endif; ?>
     <div class="form-grid">
+        <?php if ($jvPageEt === 'other_voucher'): ?>
+        <div class="jv-other-voucher-filter-row jv-print-hide" style="grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-bottom:6px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <label for="jv_journal_type_filter" style="margin:0;font-weight:600;white-space:nowrap;">نوع القيد (اليومية)</label>
+                <select id="jv_journal_type_filter" class="admin-inp" style="min-width:15rem;">
+                    <option value="0">سندات أخرى — إدخال يدوي</option>
+                    <?php foreach ($jvPostingLinkedJournalTypes as $jt): ?>
+                    <option value="<?php echo (int) ($jt['id'] ?? 0); ?>"><?php echo htmlspecialchars(trim((string) ($jt['name_ar'] ?? $jt['code'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <span class="muted" style="font-size:0.85rem;flex:1 1 12rem;">لمراجعة القيود المُولَّدة تلقائياً اختر نوع اليومية المربوط في <a href="<?php echo htmlspecialchars($jvGlSettingsUrl, ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a> (قسم ربط نوع اليومية).</span>
+        </div>
+        <?php endif; ?>
         <div class="<?php echo htmlspecialchars($jvHeaderLineClass, ENT_QUOTES, 'UTF-8'); ?>" style="grid-column:1/-1;">
             <div>
                 <label for="jv_number_preview">رقم القيد</label>
@@ -221,6 +240,9 @@ foreach ($accounts as $a) {
                             <tr>
                                 <th>رقم</th>
                                 <th>تاريخ السند</th>
+                                <?php if ($jvPageEt === 'other_voucher'): ?>
+                                <th>نوع القيد</th>
+                                <?php endif; ?>
                                 <th>المرجع</th>
                                 <th>البيان</th>
                                 <th>مبلغ القيد</th>
@@ -373,6 +395,7 @@ foreach ($accounts as $a) {
 <script>
 var JV_ACCOUNTS = <?php echo json_encode($jvAccountsLeaf, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>;
 var JV_ENTRY_TYPE = <?php echo json_encode($jvPageEntryType, JSON_UNESCAPED_UNICODE); ?>;
+var JV_OTHER_VOUCHER_BROWSE = <?php echo $jvPageEt === 'other_voucher' ? 'true' : 'false'; ?>;
 var JV_CASH_LOCK = <?php echo json_encode($jvCashLock, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>;
 
 function jvCashLockActive() {
@@ -496,6 +519,15 @@ var jvAcctPickerAnchor = null;
 var jvPairSeq = 0;
 var jvViewMode = false;
 var jvBrowseId = null;
+var jvBrowseEntryType = null;
+
+function jvJournalTypeFilterId() {
+    var s = document.getElementById('jv_journal_type_filter');
+    if (!s) {
+        return 0;
+    }
+    return parseInt(String(s.value || '0'), 10) || 0;
+}
 
 function jvMemoRow(mainTr) {
     if (!mainTr) {
@@ -709,7 +741,7 @@ function jvSearchModalOpen() {
 function jvSearchCollectPayload() {
     var elDf = document.getElementById('jv_search_date_from');
     var elDt = document.getElementById('jv_search_date_to');
-    return {
+    var p = {
         action: 'search_manual',
         entry_type: JV_ENTRY_TYPE,
         id_from: parseInt(String(document.getElementById('jv_search_id_from').value || '0'), 10) || 0,
@@ -719,6 +751,10 @@ function jvSearchCollectPayload() {
         reference: document.getElementById('jv_search_ref').value.trim(),
         description: document.getElementById('jv_search_desc').value.trim()
     };
+    if (JV_OTHER_VOUCHER_BROWSE) {
+        p.journal_type_id = jvJournalTypeFilterId();
+    }
+    return p;
 }
 
 function jvSearchRenderRows(rows) {
@@ -731,8 +767,13 @@ function jvSearchRenderRows(rows) {
         var tr = document.createElement('tr');
         tr.setAttribute('data-vid', String(r.id));
         var amt = typeof r.amount === 'number' ? r.amount : parseFloat(String(r.amount || '0').replace(',', '.')) || 0;
+        var etCell = '';
+        if (JV_OTHER_VOUCHER_BROWSE) {
+            etCell = '<td><small>' + jvEscapeHtml(r.entry_type_label || r.entry_type || '') + '</small></td>';
+        }
         tr.innerHTML = '<td>' + jvEscapeHtml(r.id) + '</td>' +
             '<td dir="ltr">' + jvEscapeHtml(r.voucher_date) + '</td>' +
+            etCell +
             '<td>' + jvEscapeHtml(r.reference) + '</td>' +
             '<td class="jv-search-col-desc">' + jvEscapeHtml(r.description) + '</td>' +
             '<td dir="ltr">' + jvEscapeHtml(amt.toFixed(3)) + '</td>';
@@ -1077,7 +1118,11 @@ function jvApplyViewModeUi() {
     }
     var delVBtn = document.getElementById('jv_btn_delete_voucher');
     if (delVBtn) {
-        delVBtn.disabled = !jvBrowseId;
+        var allowDel = !!jvBrowseId;
+        if (JV_OTHER_VOUCHER_BROWSE && jvBrowseEntryType && jvBrowseEntryType !== 'other_voucher') {
+            allowDel = false;
+        }
+        delVBtn.disabled = !allowDel;
     }
     document.querySelectorAll('#jv_lines_body input').forEach(function (inp) {
         inp.readOnly = ro;
@@ -1094,6 +1139,7 @@ function jvApplyVoucherPayload(r) {
     }
     jvViewMode = true;
     jvBrowseId = r.voucher.id;
+    jvBrowseEntryType = r.voucher.entry_type ? String(r.voucher.entry_type) : null;
     document.getElementById('jv_number_preview').value = String(r.voucher.id);
     document.getElementById('jv_date').value = orangeIsoDateToDmy(r.voucher.date || '');
     document.getElementById('jv_ref').value = r.voucher.reference || '';
@@ -1155,7 +1201,11 @@ function jvApplyVoucherPayload(r) {
 }
 
 function jvLoadVoucherFromApi(id) {
-    postJSON('/admin/api/journal/manage.php', { action: 'get', id: id, entry_type: JV_ENTRY_TYPE }).then(function (r) {
+    var getPayload = { action: 'get', id: id, entry_type: JV_ENTRY_TYPE };
+    if (JV_OTHER_VOUCHER_BROWSE) {
+        getPayload.journal_type_id = jvJournalTypeFilterId();
+    }
+    postJSON('/admin/api/journal/manage.php', getPayload).then(function (r) {
         if (!r.success || !r.voucher) {
             if (!orangeAdminOfferSuggestOnFailure(r, 'تعذر العرض')) {
                 alert(r.message || 'فشل');
@@ -1191,12 +1241,16 @@ function jvPrintVoucher() {
 }
 
 function jvNav(where) {
-    postJSON('/admin/api/journal/manage.php', {
+    var navPayload = {
         action: 'nav_manual',
         entry_type: JV_ENTRY_TYPE,
         where: where,
         current_id: jvBrowseId || 0
-    }).then(function (r) {
+    };
+    if (JV_OTHER_VOUCHER_BROWSE) {
+        navPayload.journal_type_id = jvJournalTypeFilterId();
+    }
+    postJSON('/admin/api/journal/manage.php', navPayload).then(function (r) {
         if (!r.success || !r.id) {
             alert(r.message || 'لا يمكن التنقل');
             return;
