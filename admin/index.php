@@ -45,6 +45,8 @@ $allowed = [
     'gl_account_settings',
     'expenses',
     'journal_entries',
+    'receipt_voucher',
+    'payment_voucher',
     'journal_voucher_reports',
     'journal_types',
     'gl_posting',

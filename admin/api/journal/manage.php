@@ -10,6 +10,26 @@ require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
 require_admin_api();
 
+/**
+ * أنواع السندات من شاشات القيد اليدوي الموحّدة (سند قيد / قبض / صرف).
+ *
+ * @return list<string>
+ */
+function orange_journal_manage_ui_entry_types(): array
+{
+    return ['manual', 'receipt_voucher', 'payment_voucher'];
+}
+
+function orange_journal_manage_resolve_ui_entry_type(array $data, string $fallback): string
+{
+    $t = trim((string) ($data['entry_type'] ?? $fallback));
+    if (!in_array($t, orange_journal_manage_ui_entry_types(), true)) {
+        return $fallback;
+    }
+
+    return $t;
+}
+
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
@@ -19,7 +39,7 @@ try {
     if ($action === 'create') {
         $description = trim((string)($data['description'] ?? ''));
         $reference = trim((string)($data['reference'] ?? ''));
-        $entryType = trim((string)($data['entry_type'] ?? 'manual'));
+        $entryTypeNorm = orange_journal_manage_resolve_ui_entry_type($data, 'manual');
         $dateRaw = trim((string)($data['date'] ?? ''));
         $date = orange_normalize_admin_posted_datetime($dateRaw);
         if ($date === null) {
@@ -69,7 +89,6 @@ try {
                     }
                 }
             }
-            $entryTypeNorm = $entryType !== '' ? $entryType : 'manual';
             if (orange_gl_use_pending_queue($pdo)) {
                 $refOut = $reference !== '' ? $reference : ('JM-' . str_replace(['.', ' '], '', uniqid('', true)));
                 try {
@@ -131,7 +150,6 @@ try {
                 }
             }
         }
-        $entryTypeNorm = $entryType !== '' ? $entryType : 'manual';
         if (orange_gl_use_pending_queue($pdo)) {
             $refOut = $reference !== '' ? $reference : ('JM-' . str_replace(['.', ' '], '', uniqid('', true)));
             try {
@@ -183,6 +201,7 @@ try {
     }
 
     if ($action === 'get') {
+        $etReq = orange_journal_manage_resolve_ui_entry_type($data, 'manual');
         $gid = (int)($data['id'] ?? 0);
         if ($gid <= 0) {
             json_response(['success' => false, 'message' => 'معرف السند مطلوب'], 422);
@@ -196,8 +215,8 @@ try {
         if (!$v) {
             json_response(['success' => false, 'message' => 'السند غير موجود'], 404);
         }
-        if ((string)($v['entry_type'] ?? '') !== 'manual') {
-            json_response(['success' => false, 'message' => 'لا يُعرَض إلا سند القيد اليدوي من هذه الشاشة'], 422);
+        if ((string)($v['entry_type'] ?? '') !== $etReq) {
+            json_response(['success' => false, 'message' => 'لا يُعرَض هذا السند من هذه الشاشة'], 422);
         }
         $vd = (string)($v['voucher_date'] ?? '');
         $dateForInput = strlen($vd) >= 10 ? substr($vd, 0, 10) : '';
@@ -243,16 +262,16 @@ try {
     }
 
     if ($action === 'nav_manual') {
+        $et = orange_journal_manage_resolve_ui_entry_type($data, 'manual');
         $where = trim((string)($data['where'] ?? ''));
         $currentId = (int)($data['current_id'] ?? 0);
         if (!orange_journal_vouchers_ready($pdo)) {
             json_response(['success' => false, 'message' => 'جداول السندات غير جاهزة'], 422);
         }
-        $et = 'manual';
         $cSt = $pdo->prepare('SELECT COUNT(*) FROM journal_vouchers WHERE entry_type = ?');
         $cSt->execute([$et]);
         if ((int) $cSt->fetchColumn() === 0) {
-            json_response(['success' => false, 'message' => 'لا توجد سندات قيد يدوية بعد']);
+            json_response(['success' => false, 'message' => 'لا توجد سندات من هذا النوع بعد']);
         }
         $target = 0;
         if ($where === 'first') {
@@ -289,7 +308,7 @@ try {
             json_response(['success' => false, 'message' => 'أمر تنقل غير معروف'], 422);
         }
         if ($target <= 0) {
-            $msg = 'لا توجد سندات قيد يدوية بعد';
+            $msg = 'لا توجد سندات من هذا النوع بعد';
             if ($where === 'prev') {
                 $msg = 'لا يوجد سند أسبق';
             } elseif ($where === 'next') {
@@ -306,7 +325,7 @@ try {
         if (!orange_journal_vouchers_ready($pdo)) {
             json_response(['success' => false, 'message' => 'جداول السندات غير جاهزة'], 422);
         }
-        $et = 'manual';
+        $et = orange_journal_manage_resolve_ui_entry_type($data, 'manual');
         $parts = ['entry_type = ?'];
         $params = [$et];
         $hasCriterion = false;

@@ -58,6 +58,8 @@ function orange_admin_page_resource(string $page): string
         'fiscal_years' => 'accounting',
         'opening_balances' => 'accounting',
         'journal_entries' => 'accounting',
+        'receipt_voucher' => 'accounting',
+        'payment_voucher' => 'accounting',
         'journal_voucher_reports' => 'accounting',
         'journal_types' => 'accounting',
         'gl_posting' => 'accounting',

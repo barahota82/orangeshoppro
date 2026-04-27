@@ -622,6 +622,8 @@ function orange_gl_entry_type_labels_map(): array
 {
     return [
         'manual' => 'سند يدوي',
+        'receipt_voucher' => 'سند قبض',
+        'payment_voucher' => 'سند صرف',
         'general' => 'قيد عام',
         'opening_balance' => 'قيد رصيد افتتاحي',
         'year_end_close' => 'إقفال سنة مالية',
