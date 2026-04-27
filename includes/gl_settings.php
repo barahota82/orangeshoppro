@@ -24,8 +24,11 @@ function orange_gl_setting_key_labels(): array
         /** احتياط فقط (مصروفات قديمة بلا حساب فرعي / عكس قيد) — لا يُعرض في شاشة الربط. */
         'general_expense' => 'مصروف عام — احتياط تقني فقط',
         'inventory' => 'المخزون — مدين شراء؛ دائن تكلفة البضاعة المباعة',
-        /** وسيط: فاتورة شراء قبل استلام الكمية (يُقابَل عند الاستلام بمدين المخزون) */
-        'purchase_grni' => 'مشتريات قيد الاستلام (GRNI) — مدين فاتورة شراء ذات استلام لاحق؛ دائن عند إثبات المخزون',
+        /**
+         * تمرير قيمة فاتورة الشراء حتى الاستلام: مدين مع حفظ الفاتورة؛ دائن عند استلام المخزون (مدين المخزون).
+         * اربطه بحساب «المشتريات» أو ما يعادله في دليلكم — يجب أن يختلف عن حساب المخزون.
+         */
+        'purchase_clearing' => 'تمرير المشتريات (إلى المخزون عند الاستلام) — مدين مع فاتورة الشراء؛ دائن عند الاستلام',
         /** احتياط فقط (تقارير ذمم / توافق قديم) — شراء آجل يُرحَّل على حساب ذمة كل مورد. */
         'accounts_payable' => 'ذمم الموردين المجمّعة — احتياط تقني فقط',
         'sales_revenue_cash' => 'إيراد مبيعات نقدي — دائن عند تسليم طلب نقدي',
@@ -66,7 +69,7 @@ function orange_gl_setting_row_short_labels(): array
     return [
         'cash' => $p . 'الخزينة',
         'inventory' => $p . 'المخزن',
-        'purchase_grni' => $p . 'مشتريات قيد الاستلام',
+        'purchase_clearing' => $p . 'تمرير المشتريات',
         'ar_cash' => $p . 'العملاء النقدي',
         'ar_credit' => $p . 'العملاء الاجل',
         'sales_revenue_cash' => $p . 'المبيعات النقدية',
@@ -95,7 +98,7 @@ function orange_gl_settings_form_key_order(): array
     return [
         'cash',
         'inventory',
-        'purchase_grni',
+        'purchase_clearing',
         'ar_cash',
         'ar_credit',
         'sales_revenue_cash',
@@ -455,6 +458,25 @@ function orange_gl_cogs_delivery_account_id(PDO $pdo): int
     }
 
     return orange_gl_account_id($pdo, 'cogs');
+}
+
+/**
+ * حساب تمرير المشتريات (فاتورة ثم استلام): يفضّل purchase_clearing ثم الاحتياط purchase_grni للترحيلات القديمة.
+ *
+ * @throws RuntimeException
+ */
+function orange_gl_purchase_receipt_clearing_account_id(PDO $pdo): int
+{
+    $id = orange_gl_account_id_optional($pdo, 'purchase_clearing');
+    if ($id !== null && $id > 0) {
+        return $id;
+    }
+    $legacy = orange_gl_account_id_optional($pdo, 'purchase_grni');
+    if ($legacy !== null && $legacy > 0) {
+        return $legacy;
+    }
+
+    return orange_gl_account_id($pdo, 'purchase_clearing');
 }
 
 /**

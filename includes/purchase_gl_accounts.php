@@ -5,7 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/supplier_payable_account.php';
 
 /**
- * عند تفعيل استلام لاحق (عمود qty_received): يُستبدل مدين «المخزون» بحساب «مشتريات قيد الاستلام» إن وافق المدين المحلّى حساب المخزون.
+ * عند تفعيل استلام لاحق (عمود qty_received): يُستبدل مدين «المخزون» بحساب «تمرير المشتريات» (purchase_clearing) إن وافق المدين المحلّى حساب المخزون.
  */
 function orange_gl_purchase_invoice_asset_debit_account_id(
     PDO $pdo,
@@ -20,7 +20,7 @@ function orange_gl_purchase_invoice_asset_debit_account_id(
         return $resolvedDebitAccountId;
     }
 
-    return orange_gl_account_id($pdo, 'purchase_grni');
+    return orange_gl_purchase_receipt_clearing_account_id($pdo);
 }
 
 /**

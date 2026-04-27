@@ -136,7 +136,7 @@ try {
 
     if ($receiveGrniValue > 0.0001) {
         $invId = orange_gl_account_id($pdo, 'inventory');
-        $grniId = orange_gl_account_id($pdo, 'purchase_grni');
+        $clearingId = orange_gl_purchase_receipt_clearing_account_id($pdo);
         $now = date('Y-m-d H:i:s');
         $rcvRef = 'PUR-' . $purchaseId . '-RCV-' . bin2hex(random_bytes(5));
         $rcvDesc = 'قيد استلام مخزون — فاتورة شراء #' . $purchaseId;
@@ -147,7 +147,7 @@ try {
                 'movement_at' => $now,
                 'voucher_date' => $now,
                 'account_debit' => $invId,
-                'account_credit' => $grniId,
+                'account_credit' => $clearingId,
                 'amount' => $receiveGrniValue,
                 'description' => $rcvDesc,
                 'entry_type' => 'purchase_receive',
@@ -156,7 +156,7 @@ try {
             orange_journal_insert_line($pdo, [
                 'date' => $now,
                 'account_debit' => $invId,
-                'account_credit' => $grniId,
+                'account_credit' => $clearingId,
                 'amount' => $receiveGrniValue,
                 'reference' => $rcvRef,
                 'description' => $rcvDesc,
