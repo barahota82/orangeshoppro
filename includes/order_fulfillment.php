@@ -39,19 +39,42 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
     $isOnline = orange_order_delivery_sale_uses_online_revenue_account($pdo, $order);
 
     $inventoryId = orange_gl_account_id($pdo, 'inventory');
+
+    $revenueRule = null;
     if ($isOnline) {
-        // فاتورة شركة / أونلاين (دفع مسبق أو سياسة إيراد أونلاين): إيراد على sales_revenue_online ثم الخزينة عبر ar_cash.
+        $revenueRule = orange_gl_order_delivery_setting_keys_from_rule($pdo, 'OSI');
+    } elseif ($isCredit) {
+        $revenueRule = orange_gl_order_delivery_setting_keys_from_rule($pdo, 'SIN');
+    } else {
+        $revenueRule = orange_gl_order_delivery_setting_keys_from_rule($pdo, 'CSI');
+    }
+
+    $cogsRuleCode = $isOnline ? 'CGO' : ($isCredit ? 'CGT' : 'CGC');
+    $cogsRule = orange_gl_order_delivery_setting_keys_from_rule($pdo, $cogsRuleCode);
+
+    if ($isOnline) {
         $debitReceivable = 0;
         $salesId = 0;
     } elseif ($isCredit) {
-        $debitReceivable = orange_gl_account_id($pdo, 'ar_credit');
-        $salesId = orange_gl_account_id($pdo, 'sales_revenue_credit');
+        if ($revenueRule !== null) {
+            $debitReceivable = orange_gl_account_id($pdo, $revenueRule['debit_key']);
+            $salesId = orange_gl_account_id($pdo, $revenueRule['credit_key']);
+        } else {
+            $debitReceivable = orange_gl_account_id($pdo, 'ar_credit');
+            $salesId = orange_gl_account_id($pdo, 'sales_revenue_credit');
+        }
     } else {
-        // نقدي: إيراد التسليم يُرحَّل بأربعة أسطر (ar_cash ← مبيعات، ثم خزينة ← ar_cash).
         $debitReceivable = 0;
         $salesId = 0;
     }
+
     $cogsDeliveryId = orange_gl_cogs_delivery_account_id($pdo);
+    $cogsDebitId = $cogsDeliveryId;
+    $cogsCreditId = $inventoryId;
+    if ($cogsRule !== null) {
+        $cogsDebitId = orange_gl_account_id($pdo, $cogsRule['debit_key']);
+        $cogsCreditId = orange_gl_account_id($pdo, $cogsRule['credit_key']);
+    }
 
     $orderNumber = (string)($order['order_number'] ?? '');
     $ref = orange_order_stock_reference($orderNumber);
@@ -168,11 +191,33 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
                 if ($isOnline) {
                     $memoSaleLeg = 'مبيعات أونلاين — تسجيل على عملاء نقدي (وسيط مشترك)';
                     $memoCashLeg = 'مبيعات أونلاين — تحصيل للخزينة';
-                    $saleFour = orange_gl_online_delivery_sale_four_lines($pdo, $salesAmount, $memoSaleLeg, $memoCashLeg);
+                    if ($revenueRule !== null) {
+                        $saleFour = orange_gl_bridge_delivery_sale_four_lines(
+                            $pdo,
+                            $salesAmount,
+                            $revenueRule['debit_key'],
+                            $revenueRule['credit_key'],
+                            $memoSaleLeg,
+                            $memoCashLeg
+                        );
+                    } else {
+                        $saleFour = orange_gl_online_delivery_sale_four_lines($pdo, $salesAmount, $memoSaleLeg, $memoCashLeg);
+                    }
                 } else {
                     $memoSaleLeg = 'مبيعات نقدي — تسجيل على عملاء نقدي';
                     $memoCashLeg = 'مبيعات نقدي — تحصيل نقدي';
-                    $saleFour = orange_gl_cash_delivery_sale_four_lines($pdo, $salesAmount, $memoSaleLeg, $memoCashLeg);
+                    if ($revenueRule !== null) {
+                        $saleFour = orange_gl_bridge_delivery_sale_four_lines(
+                            $pdo,
+                            $salesAmount,
+                            $revenueRule['debit_key'],
+                            $revenueRule['credit_key'],
+                            $memoSaleLeg,
+                            $memoCashLeg
+                        );
+                    } else {
+                        $saleFour = orange_gl_cash_delivery_sale_four_lines($pdo, $salesAmount, $memoSaleLeg, $memoCashLeg);
+                    }
                 }
                 if (orange_gl_use_pending_queue($pdo)) {
                     orange_gl_pending_enqueue_multi(
@@ -255,8 +300,8 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
                     'source_label' => $srcLabel,
                     'movement_at' => $now,
                     'voucher_date' => $now,
-                    'account_debit' => $cogsDeliveryId,
-                    'account_credit' => $inventoryId,
+                    'account_debit' => $cogsDebitId,
+                    'account_credit' => $cogsCreditId,
                     'amount' => $costAmount,
                     'description' => $cogsDesc,
                     'entry_type' => 'order_delivery_cogs',
@@ -264,8 +309,8 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
             } else {
                 orange_journal_insert_line($pdo, [
                     'date' => $now,
-                    'account_debit' => $cogsDeliveryId,
-                    'account_credit' => $inventoryId,
+                    'account_debit' => $cogsDebitId,
+                    'account_credit' => $cogsCreditId,
                     'amount' => $costAmount,
                     'reference' => $cogsRef,
                     'description' => $cogsDesc,
@@ -419,12 +464,30 @@ function orange_order_reverse_completed_fulfillment(PDO $pdo, int $orderId, stri
     $isCredit = ($paymentTerms === 'credit');
     $isOnline = orange_order_delivery_sale_uses_online_revenue_account($pdo, $order);
 
+    $revenueRuleRev = null;
+    if ($isOnline) {
+        $revenueRuleRev = orange_gl_order_delivery_setting_keys_from_rule($pdo, 'OSI');
+    } elseif ($isCredit) {
+        $revenueRuleRev = orange_gl_order_delivery_setting_keys_from_rule($pdo, 'SIN');
+    } else {
+        $revenueRuleRev = orange_gl_order_delivery_setting_keys_from_rule($pdo, 'CSI');
+    }
+    $cogsRuleCodeRev = $isOnline ? 'CGO' : ($isCredit ? 'CGT' : 'CGC');
+    $cogsRuleRev = orange_gl_order_delivery_setting_keys_from_rule($pdo, $cogsRuleCodeRev);
+
     $inventoryId = orange_gl_account_id($pdo, 'inventory');
+    $cogsInventoryDebitOnReturn = $inventoryId;
+    if ($cogsRuleRev !== null) {
+        $cogsInventoryDebitOnReturn = orange_gl_account_id($pdo, $cogsRuleRev['credit_key']);
+    }
+
     if ($isOnline) {
         $debitReceivable = orange_gl_account_id($pdo, 'cash');
         $salesId = orange_gl_order_return_sale_debit_account_id($pdo, 'online');
     } elseif ($isCredit) {
-        $debitReceivable = orange_gl_account_id($pdo, 'ar_credit');
+        $debitReceivable = $revenueRuleRev !== null
+            ? orange_gl_account_id($pdo, $revenueRuleRev['debit_key'])
+            : orange_gl_account_id($pdo, 'ar_credit');
         $salesId = orange_gl_order_return_sale_debit_account_id($pdo, 'credit');
     } else {
         $debitReceivable = orange_gl_account_id($pdo, 'cash');
@@ -574,7 +637,7 @@ function orange_order_reverse_completed_fulfillment(PDO $pdo, int $orderId, stri
                     'source_label' => $srcLabel,
                     'movement_at' => $now,
                     'voucher_date' => $now,
-                    'account_debit' => $inventoryId,
+                    'account_debit' => $cogsInventoryDebitOnReturn,
                     'account_credit' => $cogsReturnId,
                     'amount' => $costAmount,
                     'description' => $cogsDesc,
@@ -583,7 +646,7 @@ function orange_order_reverse_completed_fulfillment(PDO $pdo, int $orderId, stri
             } else {
                 orange_journal_insert_line($pdo, [
                     'date' => $now,
-                    'account_debit' => $inventoryId,
+                    'account_debit' => $cogsInventoryDebitOnReturn,
                     'account_credit' => $cogsReturnId,
                     'amount' => $costAmount,
                     'reference' => $cogsRetRef,

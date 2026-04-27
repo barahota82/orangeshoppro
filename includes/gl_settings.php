@@ -177,6 +177,42 @@ function orange_gl_journal_type_rule_for_terms(PDO $pdo, int $journalTypeId, str
 }
 
 /**
+ * قاعدة «مدين/دائن» من شاشة ربط أنواع اليومية (payment_terms فارغ) لتسليم الطلب.
+ *
+ * - إيراد آجل: SIN — مدين: عملاء آجل، دائن: إيراد مبيعات آجل (أو ما يعادلهما في القاعدة).
+ * - إيراد نقدي: CSI — مدين: وسيط عملاء نقدي، دائن: إيراد مبيعات نقدي؛ الخزينة تُؤخذ من بند cash (قيد أربعة أسطر).
+ * - إيراد أونلاين: OSI — نفس منطق النقدي مع إيراد أونلاين.
+ * - تكلفة آجل/نقدي/أونلاين: CGT / CGC / CGO — مدين: تكلفة، دائن: مخزون (عادة).
+ *
+ * @param 'SIN'|'CSI'|'OSI'|'CGT'|'CGC'|'CGO' $journalCode كود journal_types
+ *
+ * @return array{debit_key: string, credit_key: string}|null إن لم توجد قاعدة أو ناقصة
+ */
+function orange_gl_order_delivery_setting_keys_from_rule(PDO $pdo, string $journalCode): ?array
+{
+    $code = orange_journal_type_normalize_code($journalCode);
+    $allowed = ['SIN', 'CSI', 'OSI', 'CGT', 'CGC', 'CGO'];
+    if ($code === '' || !in_array($code, $allowed, true)) {
+        return null;
+    }
+    $jtId = orange_journal_type_id_by_code($pdo, $code);
+    if ($jtId <= 0) {
+        return null;
+    }
+    $rule = orange_gl_journal_type_rule_for_terms($pdo, $jtId, '');
+    if ($rule === null) {
+        return null;
+    }
+    $dk = trim((string) ($rule['debit_setting_key'] ?? ''));
+    $ck = trim((string) ($rule['credit_setting_key'] ?? ''));
+    if ($dk === '' || $ck === '' || $dk === $ck) {
+        return null;
+    }
+
+    return ['debit_key' => $dk, 'credit_key' => $ck];
+}
+
+/**
  * أنواع اليومية لشاشة الترحيل: من جدول القواعد إن وُجد، وإلا من الربط القديم في orange_gl_account_settings.
  *
  * @return list<array<string, mixed>>
