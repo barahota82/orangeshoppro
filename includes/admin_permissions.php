@@ -59,6 +59,7 @@ function orange_admin_page_resource(string $page): string
         'journal_entries' => 'accounting',
         'receipt_voucher' => 'accounting',
         'payment_voucher' => 'accounting',
+        'other_vouchers' => 'accounting',
         'journal_voucher_reports' => 'accounting',
         'journal_types' => 'accounting',
         'gl_posting' => 'accounting',

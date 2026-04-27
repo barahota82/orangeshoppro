@@ -154,7 +154,7 @@ function orange_gl_entry_types_for_journal_type_code(string $code): array
     $code = orange_journal_type_normalize_code($code);
     static $map = [
         'OBV' => ['opening_balance'],
-        'JE' => ['manual', 'general'],
+        'JE' => ['manual', 'general', 'other_voucher'],
         'RV' => ['customer_receipt', 'receipt_voucher'],
         'PV' => ['supplier_payment', 'payment_voucher', 'expense', 'expense_adjustment', 'expense_reversal'],
         'YEC' => ['year_end_close'],

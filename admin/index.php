@@ -46,6 +46,7 @@ $allowed = [
     'journal_entries',
     'receipt_voucher',
     'payment_voucher',
+    'other_vouchers',
     'journal_voucher_reports',
     'journal_types',
     'gl_posting',

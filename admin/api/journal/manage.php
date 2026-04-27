@@ -17,7 +17,7 @@ require_admin_api();
  */
 function orange_journal_manage_ui_entry_types(): array
 {
-    return ['manual', 'receipt_voucher', 'payment_voucher'];
+    return ['manual', 'other_voucher', 'receipt_voucher', 'payment_voucher'];
 }
 
 function orange_journal_manage_resolve_ui_entry_type(array $data, string $fallback): string

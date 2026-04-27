@@ -622,6 +622,7 @@ function orange_gl_entry_type_labels_map(): array
 {
     return [
         'manual' => 'سند يدوي',
+        'other_voucher' => 'سندات أخرى',
         'receipt_voucher' => 'سند قبض',
         'payment_voucher' => 'سند صرف',
         'general' => 'قيد عام',
