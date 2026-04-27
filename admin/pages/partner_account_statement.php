@@ -51,14 +51,15 @@ if ($stmtPartyJson === false) {
     $stmtPartyJson = '{}';
 }
 
-$partnerLedgerUrl = storefront_public_path('/admin/index.php?page=partner_ledger');
+$dashUrl = storefront_public_path('/admin/index.php?page=dashboard');
+$partnerReportsNavUrl = storefront_public_path('/admin/index.php?page=partner_reports');
 ?>
 <div class="page-title page-title--stacked">
     <div>
         <h1>كشف حساب طرف</h1>
         <p class="page-subtitle muted" style="margin-top:6px;">
-            <a href="<?php echo htmlspecialchars($partnerLedgerUrl, ENT_QUOTES, 'UTF-8'); ?>">ذمم العملاء والموردين</a>
-            — <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_reports'), ENT_QUOTES, 'UTF-8'); ?>">تقارير الذمم المالية</a>
+            <a href="<?php echo htmlspecialchars($dashUrl, ENT_QUOTES, 'UTF-8'); ?>">الرئيسية</a>
+            — <a href="<?php echo htmlspecialchars($partnerReportsNavUrl, ENT_QUOTES, 'UTF-8'); ?>">تقارير الذمم المالية</a>
         </p>
     </div>
 </div>

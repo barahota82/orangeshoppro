@@ -34,7 +34,8 @@ $count = count($rows);
         <p class="page-subtitle">
             سجل العملاء: <strong>الهاتف</strong> معرّف فريد للعميل (مثل الكود). الحقول: الاسم، المنطقة، العنوان، البريد، الملاحظات (تُحدَّث تلقائياً من ملاحظات كل طلب ويب)، حد الائتمان، والذمم.
             الذمم والتحصيل من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_customer_receipt'), ENT_QUOTES, 'UTF-8'); ?>">سداد فواتير مبيعات آجلة</a>
-            أو نظرة عامة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_ledger'), ENT_QUOTES, 'UTF-8'); ?>">ذمم العملاء والموردين</a>.
+            — <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_account_statement'), ENT_QUOTES, 'UTF-8'); ?>">كشف حساب</a>
+            و<a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_reports'), ENT_QUOTES, 'UTF-8'); ?>">تقارير الذمم المالية</a>.
         </p>
     </div>
     <div class="actions">

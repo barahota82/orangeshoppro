@@ -55,7 +55,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     <h1 class="admin-fy-shell__title">تقارير الذمم الشاملة</h1>
     <p class="admin-fy-shell__lead">
         ملخص أرصدة كل العملاء والموردين، مطابقة أرصدة الدليل مع دفتر الذمم، وتصدير CSV.
-        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_ledger'), ENT_QUOTES, 'UTF-8'); ?>">العودة لذمم العملاء والموردين</a>
+        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_account_statement'), ENT_QUOTES, 'UTF-8'); ?>">كشف حساب طرف</a>
     </p>
 
 <div class="card admin-fy-card">

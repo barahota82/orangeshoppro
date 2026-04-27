@@ -65,7 +65,6 @@ function orange_admin_page_resource(string $page): string
         'gl_posting' => 'accounting',
         'financial_report' => 'accounting',
         'gl_account_settings' => 'accounting',
-        'partner_ledger' => 'partners',
         'partner_account_statement' => 'partners',
         'partner_customer_receipt' => 'partners',
         'partner_supplier_payment' => 'partners',

@@ -208,9 +208,6 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 ['page' => 'dashboard', 'href' => '/admin/index.php?page=dashboard', 'label' => 'الرئيسية', 'class' => '', 'sub' => false],
             ];
 
-            $navAccountingVouchers = [
-                ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger', 'label' => 'ذمم العملاء والموردين', 'class' => 'admin-nav-sub', 'sub' => true],
-            ];
 
             $navAccountingReports = [
                 ['page' => 'partner_account_statement', 'href' => '/admin/index.php?page=partner_account_statement', 'label' => 'كشف حساب', 'class' => 'admin-nav-sub', 'sub' => true],
@@ -286,7 +283,6 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
 
             $orangeNavMegaSections = [
                 ['id' => 'accounting', 'title' => 'الحسابات العامة', 'muted' => false, 'items' => $navAccounting],
-                ['id' => 'acct_vouchers', 'title' => 'القيود المحاسبية', 'muted' => false, 'items' => $navAccountingVouchers],
                 ['id' => 'acct_reports', 'title' => 'التقارير', 'muted' => false, 'items' => $navAccountingReports],
                 ['id' => 'ops', 'title' => 'المخازن', 'muted' => false, 'items' => $navOps],
                 ['id' => 'promotions', 'title' => 'العروض', 'muted' => false, 'items' => $navPromotions],
@@ -364,7 +360,6 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                     $orangeRenderNavLink($nl);
                 }
                 $orangeRenderNavSection('accounting', 'الحسابات العامة', $navAccounting);
-                $orangeRenderNavSection('acct_vouchers', 'القيود المحاسبية', $navAccountingVouchers);
                 $orangeRenderNavSection('acct_reports', 'التقارير', $navAccountingReports);
                 $orangeRenderNavSection('ops', 'المخازن', $navOps);
                 $orangeRenderNavSection('promotions', 'العروض', $navPromotions);
