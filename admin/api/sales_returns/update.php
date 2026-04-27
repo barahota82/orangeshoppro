@@ -183,8 +183,6 @@ try {
     $retNum = 'SR-' . $returnId;
     $now = date('Y-m-d H:i:s');
     $refCogs = 'SR-' . $returnId . '-RC';
-    $inventoryId = orange_gl_account_id($pdo, 'inventory');
-    $cogsRetId = orange_gl_cogs_return_account_id($pdo);
 
     if ($revenueTotal > 0.0001) {
         $glRev = orange_gl_sales_return_revenue_bundle($pdo, $channel, $customerId, $returnId, $revenueTotal);
@@ -221,6 +219,7 @@ try {
     }
 
     if ($cogsTotal > 0.0001) {
+        $glCogs = orange_gl_sales_return_cogs_accounts($pdo, $channel);
         $cogsDesc = 'مردود تكلفة مبيعات — مستند مردود';
         if (orange_gl_use_pending_queue($pdo)) {
             orange_gl_pending_enqueue_simple($pdo, [
@@ -228,8 +227,8 @@ try {
                 'source_label' => $retNum,
                 'movement_at' => $now,
                 'voucher_date' => $now,
-                'account_debit' => $inventoryId,
-                'account_credit' => $cogsRetId,
+                'account_debit' => $glCogs['debit'],
+                'account_credit' => $glCogs['credit'],
                 'amount' => $cogsTotal,
                 'description' => $cogsDesc,
                 'entry_type' => 'order_return_cogs',
@@ -237,8 +236,8 @@ try {
         } else {
             orange_journal_insert_line($pdo, [
                 'date' => $now,
-                'account_debit' => $inventoryId,
-                'account_credit' => $cogsRetId,
+                'account_debit' => $glCogs['debit'],
+                'account_credit' => $glCogs['credit'],
                 'amount' => $cogsTotal,
                 'reference' => $refCogs,
                 'description' => $cogsDesc,

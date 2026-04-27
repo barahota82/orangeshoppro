@@ -105,6 +105,46 @@ function orange_gl_sales_return_revenue_bundle(
         throw new RuntimeException('قناة مردود المبيعات غير صالحة.');
     }
 
+    $revCode = $channel === 'credit' ? 'SRR' : ($channel === 'online' ? 'OSR' : 'SCR');
+    $revRule = orange_gl_order_delivery_setting_keys_from_rule($pdo, $revCode);
+    if ($revRule !== null) {
+        $revDebit = orange_gl_account_id($pdo, $revRule['debit_key']);
+        $revCredit = orange_gl_account_id($pdo, $revRule['credit_key']);
+        if ($revDebit === $revCredit) {
+            throw new RuntimeException(
+                'قاعدة مردود الإيراد (' . $revCode . '): المدين والدائن يجب أن يختلفا — راجع «ربط أنواع اليومية».'
+            );
+        }
+        $after = null;
+        $legacy = false;
+        if ($channel === 'credit' && $customerId > 0 && $amount > 0.0001) {
+            $after = [
+                'party_subledger' => [
+                    'party_kind' => 'customer',
+                    'party_id' => $customerId,
+                    'debit' => 0.0,
+                    'credit' => $amount,
+                    'ref_type' => 'sales_return',
+                    'ref_id' => $returnId,
+                    'memo' => 'مردود مبيعات آجل',
+                ],
+            ];
+            $legacy = true;
+        }
+
+        return [
+            'is_multi' => false,
+            'lines' => [],
+            'debit' => $revDebit,
+            'credit' => $revCredit,
+            'voucher_description' => $channel === 'credit'
+                ? 'مردود مبيعات آجل'
+                : ($channel === 'online' ? 'مردود مبيعات أونلاين' : 'مردود مبيعات نقدي'),
+            'after_post' => $after,
+            'legacy_ar_subledger' => $legacy,
+        ];
+    }
+
     $revDebit = orange_gl_sales_return_revenue_debit_account_id($pdo, $channel);
 
     if ($channel === 'credit') {
@@ -150,4 +190,35 @@ function orange_gl_sales_return_revenue_bundle(
         'after_post' => null,
         'legacy_ar_subledger' => false,
     ];
+}
+
+/**
+ * حسابات قيد مردود تكلفة المبيعات (مخزون مدين / تكلفة مردود دائن) من القسم ١ أو من قاعدة CSR/CGR/COR.
+ *
+ * @return array{debit: int, credit: int}
+ *
+ * @throws RuntimeException
+ */
+function orange_gl_sales_return_cogs_accounts(PDO $pdo, string $channel): array
+{
+    $channel = trim($channel);
+    if (!in_array($channel, ['cash', 'online', 'credit'], true)) {
+        throw new RuntimeException('قناة مردود المبيعات غير صالحة.');
+    }
+    $inventoryId = orange_gl_account_id($pdo, 'inventory');
+    $cogsRetId = orange_gl_cogs_return_account_id($pdo);
+    $cogsCode = $channel === 'credit' ? 'CGR' : ($channel === 'online' ? 'COR' : 'CSR');
+    $rule = orange_gl_order_delivery_setting_keys_from_rule($pdo, $cogsCode);
+    if ($rule === null) {
+        return ['debit' => $inventoryId, 'credit' => $cogsRetId];
+    }
+    $deb = orange_gl_account_id($pdo, $rule['debit_key']);
+    $cred = orange_gl_account_id($pdo, $rule['credit_key']);
+    if ($deb === $cred) {
+        throw new RuntimeException(
+            'قاعدة مردود التكلفة (' . $cogsCode . '): المدين والدائن يجب أن يختلفا — راجع «ربط أنواع اليومية».'
+        );
+    }
+
+    return ['debit' => $deb, 'credit' => $cred];
 }
