@@ -166,16 +166,9 @@ $obAdminIndexUrl = storefront_public_path('/admin/index.php');
             </div>
             <div>
                 <label for="ob_date">تاريخ السند</label>
-                <div class="admin-inp-dmy-with-picker">
-                    <input type="text" id="ob_date" class="admin-inp orange-inp-dmy"
-                        value="<?php echo htmlspecialchars($obVoucherDateDisp, ENT_QUOTES, 'UTF-8'); ?>"
-                        title="عرض يوم/شهر/سنة — يحدد السنة المالية تلقائياً" dir="ltr" lang="en-GB" autocomplete="off">
-                    <div class="admin-inp-dmy-picker-wrap jv-print-hide" title="اختيار من التقويم">
-                        <button type="button" class="admin-inp-dmy-picker-face" tabindex="-1" aria-hidden="true">&#128197;</button>
-                        <input type="date" id="ob_date_picker" class="admin-inp-dmy-picker-native" lang="en-GB" dir="ltr"
-                            title="اختيار من التقويم" aria-label="تقويم — اختيار تاريخ السند">
-                    </div>
-                </div>
+                <input type="text" id="ob_date" class="admin-inp orange-inp-dmy"
+                    value="<?php echo htmlspecialchars($obVoucherDateDisp, ENT_QUOTES, 'UTF-8'); ?>"
+                    title="عرض يوم/شهر/سنة — يحدد السنة المالية تلقائياً (التقويم يُضاف تلقائياً لكل حقول التاريخ في الإدارة)" dir="ltr" lang="en-GB" autocomplete="off">
             </div>
             <div>
                 <label for="ob_ref">المرجع</label>
@@ -201,9 +194,9 @@ $obAdminIndexUrl = storefront_public_path('/admin/index.php');
             </div>
             <div class="jv-voucher-nav-cell jv-print-hide">
                 <div class="jv-voucher-nav-btns ob-voucher-action-btns" role="group" aria-label="إجراءات سند الرصيد الافتتاحي">
-                    <button type="button" class="btn-secondary jv-nav-search" id="ob_btn_delete"<?php echo $obVid <= 0 ? ' disabled' : ''; ?>>حذف السند</button>
-                    <button type="button" class="btn-secondary jv-nav-search" id="ob_btn_print">طباعة السند</button>
                     <button type="button" id="ob_btn_save">حفظ</button>
+                    <button type="button" class="btn-secondary jv-nav-search" id="ob_btn_print">طباعة السند</button>
+                    <button type="button" class="btn-secondary jv-nav-search" id="ob_btn_delete"<?php echo $obVid <= 0 ? ' disabled' : ''; ?>>حذف السند</button>
                 </div>
             </div>
         </div>
@@ -290,38 +283,6 @@ var OB_SAVED_VOUCHER_ID = <?php echo (int) $obVid; ?>;
         return { iso: iso, fy: fyResolved };
     }
 
-    function obSyncDatePickerFromText() {
-        var obDateEl = document.getElementById('ob_date');
-        var pick = document.getElementById('ob_date_picker');
-        if (!obDateEl || !pick || typeof orangeGetDmyValueAsIso !== 'function') {
-            return;
-        }
-        var iso = orangeGetDmyValueAsIso(obDateEl);
-        pick.value = iso || '';
-    }
-
-    function obWireNativeDatePicker() {
-        var text = document.getElementById('ob_date');
-        var pick = document.getElementById('ob_date_picker');
-        if (!text || !pick) {
-            return;
-        }
-        pick.addEventListener('change', function () {
-            if (!pick.value) {
-                return;
-            }
-            if (typeof orangeIsoDateToDmy === 'function') {
-                text.value = orangeIsoDateToDmy(pick.value);
-            }
-            if (typeof orangeNormalizeDmyInput === 'function') {
-                orangeNormalizeDmyInput(text);
-            }
-            obSyncDatePickerFromText();
-            text.dispatchEvent(new Event('blur', { bubbles: true }));
-        });
-        obSyncDatePickerFromText();
-    }
-
     function obWireDateReload() {
         var obDateEl = document.getElementById('ob_date');
         if (!obDateEl) {
@@ -331,7 +292,6 @@ var OB_SAVED_VOUCHER_ID = <?php echo (int) $obVid; ?>;
             if (typeof orangeNormalizeDmyInput === 'function') {
                 orangeNormalizeDmyInput(obDateEl);
             }
-            obSyncDatePickerFromText();
             var r = obSyncRefFromDate();
             if (r.fy > 0 && r.fy !== OB_PAGE_FY && r.iso) {
                 window.location.href = OB_ADMIN_INDEX + '?page=opening_balances&ob_date=' + encodeURIComponent(r.iso);
@@ -842,7 +802,6 @@ var OB_SAVED_VOUCHER_ID = <?php echo (int) $obVid; ?>;
             pickClose.addEventListener('click', obClosePick);
         }
         obWireDateReload();
-        obWireNativeDatePicker();
         obSyncRefFromDate();
         document.addEventListener('keydown', function (ev) {
             if (ev.key !== 'Escape') {
