@@ -132,6 +132,10 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
 <div class="card gl-auto-form-card" style="margin-top:1rem;">
         <h3 class="card-title">٢ — ربط نوع اليومية ببند مدين وبند دائن</h3>
         <p class="card-hint" style="margin:0 0 0.75rem;max-width:52rem;line-height:1.55;">
+            <strong>كيف تختار هنا؟</strong> القائمة المنسدلة ليست شجرة الحسابات — تختار <strong>بند الإعداد</strong> (نفس تسمية عمود «البند» في القسم ١، مثل «حـ/ المخزن» أو «حـ/ الخزينة»).
+            الحساب الفعلي من دليلكم يُربَط في <strong>القسم ١</strong>؛ أسفل كل قائمة يُعرض <strong>كود واسم الحساب</strong> المرتبط بهذا البند بعد الربط.
+            إن احتجت حساباً مختلفاً في الدفتر، غيّر الربط في القسم ١ لذلك البند أو اختر بنداً آخر هنا.
+            <br><br>
             <strong>فاتورة مشتريات (PIN) ومردود مشتريات (PDN):</strong> أضف سطراً لـ <strong>نقدي</strong> (يظهر المدين والدائن معاً)،
             وسطراً لـ <strong>آجل</strong> — يظهر <strong>بند واحد فقط</strong> (المدين لفاتورة المشتريات الآجل، أو الدائن لمردود المشتريات الآجل)،
             والجانب الآخر يُؤخذ تلقائياً من <strong>حساب ذمة المورد</strong> في المستند دون اختيار هنا.
@@ -145,8 +149,8 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
                     <tr>
                         <th>نوع اليومية</th>
                         <th>نقدي / آجل</th>
-                        <th>بند المدين → الحساب (من القسم ١)</th>
-                        <th>بند الدائن → الحساب (من القسم ١)</th>
+                        <th>المدين: بند الإعداد <span class="gl-th-sub">(الحساب يظهر تحت القائمة)</span></th>
+                        <th>الدائن: بند الإعداد <span class="gl-th-sub">(الحساب يظهر تحت القائمة)</span></th>
                         <th class="gl-th-actions" aria-label="إزالة"></th>
                     </tr>
                 </thead>
@@ -274,7 +278,7 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
     }
 
     function keyOptionsHtml(selected) {
-        var h = '<option value="">— بند —</option>';
+        var h = '<option value="">— اختر بند الإعداد (القسم ١) —</option>';
         for (var i = 0; i < glRuleKeyOrder.length; i++) {
             var k = glRuleKeyOrder[i];
             var lab = glKeyShort[k] || glKeyHints[k] || k;
@@ -489,9 +493,9 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
         tr.innerHTML =
             '<td class="gl-td-jt"><select class="gl-sel-jt-id" aria-label="نوع اليومية">' + journalTypeOptionsHtml(jtId, used) + '</select></td>' +
             '<td class="gl-td-pt"></td>' +
-            '<td class="gl-td-debit"><div class="gl-rule-key-cell"><select class="gl-sel-debit-key" aria-label="بند المدين">' + keyOptionsHtml(dk) + '</select>' +
+            '<td class="gl-td-debit"><div class="gl-rule-key-cell"><select class="gl-sel-debit-key" aria-label="بند إعداد المدين — الحساب من القسم ١">' + keyOptionsHtml(dk) + '</select>' +
             '<div class="gl-rule-debit-acct gl-rule-acct-preview" aria-live="polite"></div></div></td>' +
-            '<td class="gl-td-credit"><div class="gl-rule-key-cell"><select class="gl-sel-credit-key" aria-label="بند الدائن">' + keyOptionsHtml(ck) + '</select>' +
+            '<td class="gl-td-credit"><div class="gl-rule-key-cell"><select class="gl-sel-credit-key" aria-label="بند إعداد الدائن — الحساب من القسم ١">' + keyOptionsHtml(ck) + '</select>' +
             '<div class="gl-rule-credit-acct gl-rule-acct-preview" aria-live="polite"></div></div></td>' +
             '<td><button type="button" class="btn-secondary gl-btn-remove-rule">حذف</button></td>';
         tbody.appendChild(tr);

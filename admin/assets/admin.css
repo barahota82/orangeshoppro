@@ -3100,6 +3100,14 @@ body.coa-modal-open {
     background: #f1f5f9;
     font-weight: 700;
 }
+.gl-settings-table th .gl-th-sub {
+    display: block;
+    margin-top: 4px;
+    font-weight: 500;
+    font-size: 0.82em;
+    color: #64748b;
+    line-height: 1.35;
+}
 /* قسم قواعد اليومية: معاينة الحساب المرتبط بالبند (من القسم ١) */
 .gl-rule-key-cell {
     display: flex;
