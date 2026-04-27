@@ -5,7 +5,9 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
+require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
+require_once __DIR__ . '/../../../includes/journal_write.php';
 require_once __DIR__ . '/../../../includes/purchase_helpers.php';
 require_admin_api();
 
@@ -60,7 +62,7 @@ try {
     }
 
     $hasV = orange_table_has_column($pdo, 'purchase_items', 'variant_id');
-    $selCols = 'id, product_id, qty, qty_received';
+    $selCols = 'id, product_id, qty, qty_received, cost';
     if ($hasV) {
         $selCols .= ', variant_id';
     }
@@ -71,6 +73,7 @@ try {
     $pdo->beginTransaction();
 
     $totalReceivedUnits = 0;
+    $receiveGrniValue = 0.0;
     foreach ($rows as $row) {
         $itemId = (int) ($row['id'] ?? 0);
         $productId = (int) ($row['product_id'] ?? 0);
@@ -111,6 +114,10 @@ try {
             ->execute([$delta, $itemId, $purchaseId]);
 
         $totalReceivedUnits += $delta;
+        $lineCost = (float) ($row['cost'] ?? 0);
+        if ($lineCost > 0 && $delta > 0) {
+            $receiveGrniValue = round($receiveGrniValue + round($lineCost * $delta, 4), 4);
+        }
     }
 
     if ($mode === 'lines') {
@@ -122,11 +129,43 @@ try {
         }
     }
 
-    $pdo->commit();
-
     if ($totalReceivedUnits <= 0) {
+        $pdo->commit();
         json_response(['success' => true, 'message' => 'لا كمية متبقية للاستلام', 'received_units' => 0]);
     }
+
+    if ($receiveGrniValue > 0.0001) {
+        $invId = orange_gl_account_id($pdo, 'inventory');
+        $grniId = orange_gl_account_id($pdo, 'purchase_grni');
+        $now = date('Y-m-d H:i:s');
+        $rcvRef = 'PUR-' . $purchaseId . '-RCV-' . bin2hex(random_bytes(5));
+        $rcvDesc = 'قيد استلام مخزون — فاتورة شراء #' . $purchaseId;
+        if (orange_gl_use_pending_queue($pdo)) {
+            orange_gl_pending_enqueue_simple($pdo, [
+                'reference' => $rcvRef,
+                'source_label' => $purRef,
+                'movement_at' => $now,
+                'voucher_date' => $now,
+                'account_debit' => $invId,
+                'account_credit' => $grniId,
+                'amount' => $receiveGrniValue,
+                'description' => $rcvDesc,
+                'entry_type' => 'purchase_receive',
+            ]);
+        } else {
+            orange_journal_insert_line($pdo, [
+                'date' => $now,
+                'account_debit' => $invId,
+                'account_credit' => $grniId,
+                'amount' => $receiveGrniValue,
+                'reference' => $rcvRef,
+                'description' => $rcvDesc,
+                'entry_type' => 'purchase_receive',
+            ]);
+        }
+    }
+
+    $pdo->commit();
 
     audit_log('purchase_receive', 'استلام مخزون لفاتورة شراء: ' . $purchaseId . ' وحدات: ' . $totalReceivedUnits, 'purchases', $purchaseId);
     json_response([

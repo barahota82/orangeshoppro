@@ -101,7 +101,15 @@ try {
         }
     }
 
-    $glB = orange_gl_purchase_invoice_posting_bundle($pdo, $type, $supplierId, $purchaseId, $computedTotal);
+    $deferGrni = $hasPiQtyReceived;
+    $glB = orange_gl_purchase_invoice_posting_bundle(
+        $pdo,
+        $type,
+        $supplierId,
+        $purchaseId,
+        $computedTotal,
+        $deferGrni
+    );
 
     $purRef = 'PUR-' . $purchaseId;
     $now = date('Y-m-d H:i:s');

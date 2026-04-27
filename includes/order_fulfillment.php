@@ -36,11 +36,11 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
         $paymentTerms = orange_normalize_payment_terms($order['payment_terms'] ?? 'cash');
     }
     $isCredit = ($paymentTerms === 'credit');
-    $isOnline = ($paymentTerms === 'online');
+    $isOnline = orange_order_delivery_sale_uses_online_revenue_account($pdo, $order);
 
     $inventoryId = orange_gl_account_id($pdo, 'inventory');
     if ($isOnline) {
-        // أونلاين: إيراد التسليم بأربعة أسطر عبر ar_cash ثم الخزينة (نفس وسيط النقدي؛ إيراد على مبيعات أونلاين).
+        // فاتورة شركة / أونلاين (دفع مسبق أو سياسة إيراد أونلاين): إيراد على sales_revenue_online ثم الخزينة عبر ar_cash.
         $debitReceivable = 0;
         $salesId = 0;
     } elseif ($isCredit) {
@@ -417,7 +417,7 @@ function orange_order_reverse_completed_fulfillment(PDO $pdo, int $orderId, stri
         $paymentTerms = orange_normalize_payment_terms($order['payment_terms'] ?? 'cash');
     }
     $isCredit = ($paymentTerms === 'credit');
-    $isOnline = ($paymentTerms === 'online');
+    $isOnline = orange_order_delivery_sale_uses_online_revenue_account($pdo, $order);
 
     $inventoryId = orange_gl_account_id($pdo, 'inventory');
     if ($isOnline) {

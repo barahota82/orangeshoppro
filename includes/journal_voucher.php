@@ -90,6 +90,39 @@ function orange_purchase_remove_accounting(PDO $pdo, string $purchaseReference):
 }
 
 /**
+ * حذف قيود/طابور «استلام المخزون» المرتبطة بفاتورة شراء (PUR-{id}-RCV-*) عند تعديل أو حذف الفاتورة.
+ *
+ * @throws RuntimeException
+ */
+function orange_purchase_remove_receive_accounting(PDO $pdo, int $purchaseId): void
+{
+    orange_catalog_ensure_schema($pdo);
+    if ($purchaseId <= 0) {
+        return;
+    }
+    $like = 'PUR-' . $purchaseId . '-RCV-%';
+    if (orange_table_exists($pdo, 'orange_gl_pending_movements')) {
+        $pdo->prepare(
+            "DELETE FROM orange_gl_pending_movements WHERE reference LIKE ? AND entry_type = 'purchase_receive'"
+        )->execute([$like]);
+    }
+    if (!orange_journal_vouchers_ready($pdo)) {
+        return;
+    }
+    $st = $pdo->prepare(
+        'SELECT reference FROM journal_vouchers WHERE reference LIKE ? ORDER BY id ASC'
+    );
+    $st->execute([$like]);
+    $refs = $st->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    foreach ($refs as $ref) {
+        $r = trim((string) $ref);
+        if ($r !== '') {
+            orange_voucher_delete_by_reference($pdo, $r);
+        }
+    }
+}
+
+/**
  * حذف قيد مردود المشتريات (نفس منطق حذف قيد الشراء حسب المرجع).
  *
  * @throws RuntimeException

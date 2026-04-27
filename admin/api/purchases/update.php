@@ -125,6 +125,7 @@ try {
     $pdo->prepare("DELETE FROM purchase_items WHERE purchase_id = ?")->execute([$purchaseId]);
 
     if ($action === 'delete') {
+        orange_purchase_remove_receive_accounting($pdo, $purchaseId);
         orange_purchase_remove_accounting($pdo, $purRef);
         orange_gl_pending_remove_by_reference($pdo, $purRef);
         $pdo->prepare("DELETE FROM purchases WHERE id = ?")->execute([$purchaseId]);
@@ -175,10 +176,19 @@ try {
     $pdo->prepare("UPDATE purchases SET supplier_id = ?, total = ?, type = ?, notes = ?, updated_at = NOW() WHERE id = ?")
         ->execute([$supplierId > 0 ? $supplierId : null, $newTotal, $type, $notes, $purchaseId]);
 
+    orange_purchase_remove_receive_accounting($pdo, $purchaseId);
     orange_purchase_remove_accounting($pdo, $purRef);
     orange_gl_pending_remove_by_reference($pdo, $purRef);
 
-    $glB = orange_gl_purchase_invoice_posting_bundle($pdo, $type, $supplierId, $purchaseId, $newTotal);
+    $hasRecvCol = orange_table_has_column($pdo, 'purchase_items', 'qty_received');
+    $glB = orange_gl_purchase_invoice_posting_bundle(
+        $pdo,
+        $type,
+        $supplierId,
+        $purchaseId,
+        $newTotal,
+        $hasRecvCol
+    );
     $now = date('Y-m-d H:i:s');
     $afterJson = $glB['after_post'] !== null
         ? json_encode($glB['after_post'], JSON_UNESCAPED_UNICODE)

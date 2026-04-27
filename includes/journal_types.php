@@ -132,7 +132,7 @@ function orange_gl_entry_types_for_journal_type_code(string $code): array
         'PV' => ['supplier_payment'],
         'EXP' => ['expense', 'expense_adjustment', 'expense_reversal'],
         'YEC' => ['year_end_close'],
-        'PIN' => ['purchase'],
+        'PIN' => ['purchase', 'purchase_receive'],
         'PDN' => ['purchase_return'],
         'CSI' => ['order_delivery_sale'],
         'SIN' => ['order_delivery_sale'],

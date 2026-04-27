@@ -24,12 +24,14 @@ function orange_gl_setting_key_labels(): array
         /** احتياط فقط (مصروفات قديمة بلا حساب فرعي / عكس قيد) — لا يُعرض في شاشة الربط. */
         'general_expense' => 'مصروف عام — احتياط تقني فقط',
         'inventory' => 'المخزون — مدين شراء؛ دائن تكلفة البضاعة المباعة',
+        /** وسيط: فاتورة شراء قبل استلام الكمية (يُقابَل عند الاستلام بمدين المخزون) */
+        'purchase_grni' => 'مشتريات قيد الاستلام (GRNI) — مدين فاتورة شراء ذات استلام لاحق؛ دائن عند إثبات المخزون',
         /** احتياط فقط (تقارير ذمم / توافق قديم) — شراء آجل يُرحَّل على حساب ذمة كل مورد. */
         'accounts_payable' => 'ذمم الموردين المجمّعة — احتياط تقني فقط',
         'sales_revenue_cash' => 'إيراد مبيعات نقدي — دائن عند تسليم طلب نقدي',
         'sales_revenue_credit' => 'إيراد مبيعات آجل — دائن عند تسليم طلب آجل',
         'sales_revenue_online' => 'إيراد مبيعات أونلاين — دائن عند تسليم طلب أونلاين',
-        'ar_cash' => 'عملاء نقدي — وسيط تسليم المبيعات النقدية والأونلاين (دفع مسبق): تسجيل على هذا الحساب ثم التحصيل من الخزينة؛ حساب وسيط واحد دون تكرار في الميزانية',
+        'ar_cash' => 'عملاء نقدي — وسيط تسليم: تسجيل على هذا الحساب ثم التحصيل إلى الخزينة (نقد عند التسليم COD لطلب الواجهة، أو مسار أونلاين للفواتير غير الواجهة حسب نوع البيع)؛ حساب وسيط واحد دون تكرار في الميزانية',
         'ar_credit' => 'عملاء آجل — مدين عند تسليم طلب آجل',
         'sales_returns_cash' => 'مردود مبيعات نقدي — يُستخدم عند تسجيل مرتجعات المبيعات النقدية',
         'sales_returns_credit' => 'مردود مبيعات آجل — يُستخدم عند تسجيل مرتجعات المبيعات الآجلة',
@@ -64,6 +66,7 @@ function orange_gl_setting_row_short_labels(): array
     return [
         'cash' => $p . 'الخزينة',
         'inventory' => $p . 'المخزن',
+        'purchase_grni' => $p . 'مشتريات قيد الاستلام',
         'ar_cash' => $p . 'العملاء النقدي',
         'ar_credit' => $p . 'العملاء الاجل',
         'sales_revenue_cash' => $p . 'المبيعات النقدية',
@@ -92,6 +95,7 @@ function orange_gl_settings_form_key_order(): array
     return [
         'cash',
         'inventory',
+        'purchase_grni',
         'ar_cash',
         'ar_credit',
         'sales_revenue_cash',
@@ -543,6 +547,7 @@ function orange_gl_entry_type_labels_map(): array
         'customer_receipt' => 'قبض عميل',
         'supplier_payment' => 'دفع مورد',
         'purchase' => 'شراء',
+        'purchase_receive' => 'استلام مخزون — شراء',
         'purchase_return' => 'مردود مشتريات',
         'expense' => 'مصروف',
         'expense_adjustment' => 'تعديل مصروف',
@@ -581,6 +586,7 @@ function orange_gl_entry_types_delete_locked_from_journal_ui(): array
         'order_return_sale',
         'order_return_cogs',
         'purchase',
+        'purchase_receive',
         'purchase_return',
         'customer_receipt',
         'supplier_payment',
@@ -608,6 +614,7 @@ function orange_gl_journal_delete_blocked_message_ar(string $entryType): string
         'order_return_sale' => 'من شاشة «مردود المبيعات» أو إلغاء تسليم طلب — راجع «ترحيل الحركات» إن لزم.',
         'order_return_cogs' => 'من شاشة «مردود المبيعات» أو إلغاء تسليم طلب — راجع «ترحيل الحركات» إن لزم.',
         'purchase' => 'عدّل أو ألغِ من شاشة المشتريات.',
+        'purchase_receive' => 'يُدار من استلام بنود فاتورة الشراء؛ عند الحاجة عدّل الفاتورة أو الاستلامات من شاشة المشتريات.',
         'purchase_return' => 'عدّل أو ألغِ من شاشة مردود المشتريات.',
         'customer_receipt' => 'عدّل من مسار قبض العملاء / الذمم.',
         'supplier_payment' => 'عدّل من مسار دفع الموردين / الذمم.',
@@ -632,6 +639,7 @@ function orange_gl_journal_delete_blocked_admin_link(string $entryType): ?array
         'opening_balance' => ['page' => 'opening_balances', 'label' => 'الأرصدة الافتتاحية'],
         'year_end_close' => ['page' => 'fiscal_years', 'label' => 'السنوات المالية / الإقفال'],
         'purchase' => ['page' => 'purchases', 'label' => 'المشتريات'],
+        'purchase_receive' => ['page' => 'purchases', 'label' => 'المشتريات'],
         'purchase_return' => ['page' => 'purchase_returns', 'label' => 'مردود المشتريات'],
         'customer_receipt' => ['page' => 'partner_customer_receipt', 'label' => 'سند قبض / عميل'],
         'supplier_payment' => ['page' => 'partner_supplier_payment', 'label' => 'سند صرف / مورد'],

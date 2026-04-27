@@ -326,11 +326,8 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
 
     [$subtotal, $validatedItems] = orange_storefront_validate_cart_items_core($pdo, $data['items'], true);
 
+    // سياسة المتجر: طلب الواجهة = دفع عند الاستلام (COD) → نقدي عند التسليم ليطابق القيود (إيراد نقدي + خزينة فورية).
     $paymentTerms = 'cash';
-    if (isset($data['payment_terms'])) {
-        $pt = orange_normalize_payment_terms($data['payment_terms']);
-        $paymentTerms = ($pt === 'online') ? 'online' : 'cash';
-    }
     $hasSource = orange_table_has_column($pdo, 'orders', 'order_source');
     $hasPay = orange_table_has_column($pdo, 'orders', 'payment_terms');
     $hasCustomerId = orange_table_has_column($pdo, 'orders', 'customer_id');

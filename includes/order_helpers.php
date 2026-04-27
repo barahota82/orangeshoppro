@@ -92,6 +92,25 @@ function orange_order_payment_terms_label_ar(mixed $raw): string
 }
 
 /**
+ * هل يُستخدم حساب إيراد «مبيعات أونلاين» في قيد تسليم الطلب؟
+ *
+ * طلبات الواجهة (order_source = website) بسياسة الدفع عند الاستلام تُرحَّل كنقدي عند التسليم
+ * (قالب إيراد نقدي + خزينة فورية)، حتى لو خُزّن قديماً payment_terms = online.
+ */
+function orange_order_delivery_sale_uses_online_revenue_account(PDO $pdo, array $order): bool
+{
+    $pt = orange_normalize_payment_terms($order['payment_terms'] ?? 'cash');
+    if ($pt !== 'online') {
+        return false;
+    }
+    if (!orange_table_has_column($pdo, 'orders', 'order_source')) {
+        return true;
+    }
+
+    return trim((string) ($order['order_source'] ?? '')) !== 'website';
+}
+
+/**
  * Resolve a catalog variant row for an order line (variant_id preferred, else color/size).
  *
  * @param array<string,mixed> $item
