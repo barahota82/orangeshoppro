@@ -207,13 +207,7 @@ foreach ($accounts as $a) {
 <?php endif; ?>
 
 <style>
-/* كود الحساب كالسابق (~9rem)؛ اسم الحساب يتمدد؛ مدين/دائن أضيق لكن قابلة للإدخال */
-.jv-lines-table { table-layout: fixed; width: 100%; }
-.jv-lines-table col.jv-col-code { width: 9rem; }
-.jv-lines-table col.jv-col-name { width: auto; }
-.jv-lines-table col.jv-col-amt { width: 7rem; }
-.jv-lines-table col.jv-col-act { width: 5rem; }
-.jv-lines-table thead th { text-align: center; vertical-align: middle; }
+/* أعمدة الجدول المشتركة مع أرصدة أول المدة: admin/assets/admin.css (.jv-lines-table) */
 .jv-lines-table .jv-acc-code {
     cursor: pointer;
     width: 100%;

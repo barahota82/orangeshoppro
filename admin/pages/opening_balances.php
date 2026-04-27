@@ -169,9 +169,12 @@ $obAdminIndexUrl = storefront_public_path('/admin/index.php');
                 <div class="admin-inp-dmy-with-picker">
                     <input type="text" id="ob_date" class="admin-inp orange-inp-dmy"
                         value="<?php echo htmlspecialchars($obVoucherDateDisp, ENT_QUOTES, 'UTF-8'); ?>"
-                        title="يحدد السنة المالية تلقائياً — يجب أن يقع التاريخ ضمن سنة مفتوحة" dir="ltr" lang="en" autocomplete="off">
-                    <input type="date" id="ob_date_picker" class="admin-inp admin-inp-dmy-picker jv-print-hide" lang="en" dir="ltr"
-                        title="اختيار من التقويم" aria-label="تقويم — اختيار تاريخ السند">
+                        title="عرض يوم/شهر/سنة — يحدد السنة المالية تلقائياً" dir="ltr" lang="en-GB" autocomplete="off">
+                    <div class="admin-inp-dmy-picker-wrap jv-print-hide" title="اختيار من التقويم">
+                        <button type="button" class="admin-inp-dmy-picker-face" tabindex="-1" aria-hidden="true">&#128197;</button>
+                        <input type="date" id="ob_date_picker" class="admin-inp-dmy-picker-native" lang="en-GB" dir="ltr"
+                            title="اختيار من التقويم" aria-label="تقويم — اختيار تاريخ السند">
+                    </div>
                 </div>
             </div>
             <div>
@@ -309,8 +312,6 @@ var OB_SAVED_VOUCHER_ID = <?php echo (int) $obVid; ?>;
             }
             if (typeof orangeIsoDateToDmy === 'function') {
                 text.value = orangeIsoDateToDmy(pick.value);
-            } else {
-                text.value = pick.value;
             }
             if (typeof orangeNormalizeDmyInput === 'function') {
                 orangeNormalizeDmyInput(text);

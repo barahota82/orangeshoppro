@@ -930,6 +930,43 @@ a { text-decoration: none; color: inherit; }
     min-height: 36px;
     font-size: 12px;
 }
+/* سند القيد + أرصدة أول المدة — عرض أعمدة الكود / الاسم / مدين / دائن / إجراء */
+.jv-lines-table {
+    table-layout: fixed;
+    width: 100%;
+}
+.jv-lines-table col.jv-col-code {
+    width: 9rem;
+}
+.jv-lines-table col.jv-col-name {
+    width: auto;
+}
+.jv-lines-table col.jv-col-amt {
+    width: 7rem;
+}
+.jv-lines-table col.jv-col-act {
+    width: 5rem;
+}
+.jv-lines-table .ob-line-main td:nth-child(3) .ob-d,
+.jv-lines-table .ob-line-main td:nth-child(4) .ob-c {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+.jv-lines-table .ob-inp-code,
+.jv-lines-table .gl-inp-code.ob-inp-code {
+    cursor: pointer;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+.jv-lines-table .ob-inp-name {
+    background: #f4f4f5;
+    cursor: default;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
 .admin-doc-frame + .admin-doc-lines-toolbar,
 .admin-doc-lines-toolbar {
     margin-top: 12px;
@@ -1478,7 +1515,7 @@ label {
     justify-content: center;
 }
 
-/* تاريخ نصي d/m/Y + حقل type=date للتقويم الأصلي للمتصفح */
+/* تاريخ نصي يوم/شهر/سنة + زر تقويم (حقل date شفاف فوق الزر — لا يُعرض ترتيب الشهر/اليوم للمتصفح) */
 .admin-inp-dmy-with-picker {
     display: flex;
     align-items: stretch;
@@ -1490,14 +1527,42 @@ label {
     flex: 1;
     min-width: 0;
 }
-.admin-inp-dmy-picker {
+.admin-inp-dmy-picker-wrap {
+    position: relative;
     flex: 0 0 auto;
-    width: auto;
-    min-width: 8.5rem;
-    max-width: 10.5rem;
-    padding: 6px 8px;
+    width: 2.65rem;
+    min-width: 2.65rem;
+    min-height: 38px;
+    align-self: stretch;
+}
+.admin-inp-dmy-picker-face {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0 4px;
+    border: 1px solid var(--border, #d4d4d8);
+    border-radius: 6px;
+    background: #fafafa;
+    font-size: 1.15rem;
+    line-height: 1;
     box-sizing: border-box;
+    pointer-events: none;
+}
+.admin-inp-dmy-picker-native {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
     cursor: pointer;
+    border: 0;
+    font-size: 16px;
+    box-sizing: border-box;
 }
 /* سند قيد — شريط الأدوات: «+ سطر» عند البداية، مجموعة سند جديد/حذف/طباعة/حفظ في سطر واحد عند النهاية (يسار الشاشة في RTL) */
 .jv-doc-toolbar {
@@ -3637,12 +3702,6 @@ body.ob-pick-open {
 }
 .ob-opening-table-wrap {
     overflow-x: auto;
-}
-.ob-opening-table .ob-th-code {
-    min-width: 7rem;
-}
-.ob-opening-table .ob-th-name {
-    min-width: 14rem;
 }
 
 /*
