@@ -106,7 +106,7 @@ if ($ppvIsReceipt && $prefillStmtKind === 'customer' && $prefillStmtId > 0) {
 }
 
 $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_settings');
-$ppvHeaderLineClass = 'jv-voucher-header-line';
+$ppvHeaderLineClass = 'jv-voucher-header-line jv-voucher-header-line--ppv';
 $ppvReady = $ppvCashLock !== null && (!$ppvIsReceipt || $ppvPartyDefaultAcc !== null);
 ?>
 <div class="page-title page-title--stacked ppv-print-hide">
@@ -185,17 +185,16 @@ $ppvReady = $ppvCashLock !== null && (!$ppvIsReceipt || $ppvPartyDefaultAcc !== 
                 <label for="ppv_tot_debit">مجموع المدين</label>
                 <input type="text" id="ppv_tot_debit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000" dir="ltr" lang="en">
             </div>
-            <div>
-                <label for="ppv_tot_credit">مجموع الدائن</label>
-                <input type="text" id="ppv_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000" dir="ltr" lang="en">
-            </div>
-        </div>
-
-        <div class="ppv-voucher-toolbar actions admin-doc-lines-toolbar jv-doc-toolbar ppv-print-hide" style="grid-column:1/-1;margin-top:8px;padding-top:10px;border-top:1px solid #e4e4e7;">
-            <div class="jv-toolbar-primary-group">
-                <button type="button" id="ppv_btn_new" title="سند جديد">سند جديد</button>
-                <button type="button" class="btn-secondary" id="ppv_btn_print" title="طباعة">طباعة السند</button>
-                <button type="button" id="ppv_btn_save"<?php echo !$ppvReady ? ' disabled' : ''; ?>>حفظ السند</button>
+            <div class="ppv-header-credit-actions">
+                <div>
+                    <label for="ppv_tot_credit">مجموع الدائن</label>
+                    <input type="text" id="ppv_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000" dir="ltr" lang="en">
+                </div>
+                <div class="jv-toolbar-primary-group ppv-header-action-btns ppv-print-hide" role="group" aria-label="إجراءات السند">
+                    <button type="button" id="ppv_btn_new" title="سند جديد">سند جديد</button>
+                    <button type="button" class="btn-secondary" id="ppv_btn_print" title="طباعة">طباعة السند</button>
+                    <button type="button" id="ppv_btn_save"<?php echo !$ppvReady ? ' disabled' : ''; ?>>حفظ السند</button>
+                </div>
             </div>
         </div>
 
