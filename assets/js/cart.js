@@ -1222,15 +1222,15 @@ async function renderCart() {
     const limitsPromise = fetchCartStockLimits(items);
 
     function paintCartBasket(itemsModel, limitsArr) {
-        let total = 0;
-        let html = '';
-        const T = window.APP_T || {};
-        const removeLabel = T.cart_remove || 'Remove';
-        const countTpl = T.cart_items_count || '{n} items';
+    let total = 0;
+    let html = '';
+    const T = window.APP_T || {};
+    const removeLabel = T.cart_remove || 'Remove';
+    const countTpl = T.cart_items_count || '{n} items';
         const countStr = countTpl.replace(/\{n\}/g, String(itemsModel.length));
-        const unitLbl = T.cart_unit_price || '';
-        const subLbl = T.cart_line_subtotal || '';
-        const maxShortTpl = T.cart_max_available_short || '';
+    const unitLbl = T.cart_unit_price || '';
+    const subLbl = T.cart_line_subtotal || '';
+    const maxShortTpl = T.cart_max_available_short || '';
         const choiceOn = orangeCartLineChoiceApplies(itemsModel);
 
         itemsModel.forEach((itInit) => {
@@ -1240,10 +1240,10 @@ async function renderCart() {
             }
         });
 
-        html += '<div class="cart-items-shell">';
-        html +=
-            '<div class="cart-list-head"><span class="cart-list-head__count">' +
-            escCartHtml(countStr) +
+    html += '<div class="cart-items-shell">';
+    html +=
+        '<div class="cart-list-head"><span class="cart-list-head__count">' +
+        escCartHtml(countStr) +
             '</span>';
         if (choiceOn) {
             html +=
@@ -1258,27 +1258,27 @@ async function renderCart() {
                 '<button type="button" class="btn btn-ghost cart-deselect-all-btn" onclick="orangeCartSelectAllLines(false)">' +
                 escCartHtml(T.cart_deselect_all_lines || '') +
                 '</button>' +
-                '</span></div>';
+        '</span></div>';
         }
         html += '</div>';
-        html += '<div class="cart-items-list">';
+    html += '<div class="cart-items-list">';
 
         itemsModel.forEach((item, idx) => {
-            const qty = Math.max(1, parseInt(item.qty, 10) || 1);
-            const lineTotal = qty * Number(item.price);
+        const qty = Math.max(1, parseInt(item.qty, 10) || 1);
+        const lineTotal = qty * Number(item.price);
             if (!choiceOn || orangeCartLineIsIncluded(item)) {
-                total += lineTotal;
+        total += lineTotal;
             }
-            const maxStock =
+        const maxStock =
                 limitsArr && limitsArr[idx] != null && !Number.isNaN(limitsArr[idx])
                     ? Math.max(0, parseInt(limitsArr[idx], 10))
-                    : null;
-            const maxAttr = maxStock != null && maxStock > 0 ? ` max="${maxStock}"` : '';
-            const stockHint =
-                maxStock != null && maxStock > 0 && maxShortTpl
-                    ? '<p class="cart-stock-hint">' +
-                      escCartHtml(maxShortTpl.replace(/\{n\}/g, String(maxStock))) +
-                      '</p>'
+                : null;
+        const maxAttr = maxStock != null && maxStock > 0 ? ` max="${maxStock}"` : '';
+        const stockHint =
+            maxStock != null && maxStock > 0 && maxShortTpl
+                ? '<p class="cart-stock-hint">' +
+                  escCartHtml(maxShortTpl.replace(/\{n\}/g, String(maxStock))) +
+                  '</p>'
                     : '';
 
             const incl = orangeCartLineIsIncluded(item);
@@ -1290,7 +1290,7 @@ async function renderCart() {
                   )}</span></label></div>`
                 : '';
 
-            html += `
+        html += `
             <div class="cart-item-card" data-cart-idx="${idx}">
                 <div class="cart-item-left">
                     ${orangeCartProductImageMarkup(item)}
@@ -1317,20 +1317,20 @@ async function renderCart() {
                 </div>
             </div>
         `;
-        });
+    });
 
-        html += '</div>';
+    html += '</div>';
         html += '<div class="cart-summary-bar">' + orangeHtmlCartMainTotals(total, 0, 0, total) + '</div>';
-        html +=
+    html +=
             '<div class="cart-register-promo-teaser" id="cartBasketRegisterPromoTeaser" hidden></div>' +
             '<div class="cart-register-promo-teaser cart-gift-bogo-register-teaser" id="cartBasketGiftBogoRegisterUnlockTeaser" hidden></div>';
         html +=
             '<div class="cart-gift-promo-host" id="cartGiftPromoHost" hidden><div class="cart-gift-promo-inner" id="cartGiftPromoInner"></div></div>';
         html +=
             '<div class="cart-gift-promo-host cart-bogo-gift-host" id="cartBogoGiftPromoHost" hidden><div class="cart-gift-promo-inner" id="cartBogoGiftPromoInner"></div></div>';
-        html += '</div>';
+    html += '</div>';
 
-        box.innerHTML = html;
+    box.innerHTML = html;
     }
 
     paintCartBasket(items, null);
@@ -1376,10 +1376,10 @@ async function renderCart() {
         orangeClearPendingAmendStorage();
         box.innerHTML = cartEmptyStateHtml();
         orangeSyncAmendModeBanner();
-        orangeSyncCartProceedBtn();
-        orangeSyncCartTabCount();
+    orangeSyncCartProceedBtn();
+    orangeSyncCartTabCount();
         orangeCancelCheckoutPreview();
-        orangeRenderCheckoutMiniSummary();
+    orangeRenderCheckoutMiniSummary();
         return;
     }
 
@@ -2142,7 +2142,7 @@ function orangeCopyTrackShareCode(btn) {
                 sel.addRange(r);
                 document.execCommand('copy');
                 sel.removeAllRanges();
-            } catch (e) {}
+    } catch (e) {}
             done();
         });
         return;
