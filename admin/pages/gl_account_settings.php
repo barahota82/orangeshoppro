@@ -72,7 +72,7 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
         <strong>الجزء الأول:</strong> ربط كل بند بحساب فرعي من الدليل (بدون نوع يومية هنا).
         لا يُعرض هنا «مصروف عام» أو «ذمم موردين مجمّعة» — المصروفات تُربط لكل بند من شاشة المصروفات، والشراء الآجل على حساب ذمة كل مورد.
         صف <strong>الاحتياطي القانوني</strong> فقط يعرض حقل النسبة بجانب اسم البند (بدون عمود منفصل) — تُقرأ برمجياً من أرباح السنة الحالية بعد إقفال القائمة لقيود الإقفال.
-        <strong>الجزء الثاني:</strong> لكل نوع يومية اختر بنداً للمدين وبنداً للدائن — يمكن تضمين مفاتيح احتياطية في القائمة المنسدلة إن وُجدت في قاعدة البيانات لقواعد قديمة.
+        <strong>الجزء الثاني:</strong> لكل نوع يومية اختر <strong>حساب المدين والدائن</strong> (يُعرض اسم الحساب من القسم ١) — تُخزَّن داخلياً كمفتاح بند الربط.
     </p>
 </div>
 
@@ -130,11 +130,11 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
 </div>
 
 <div class="card gl-auto-form-card" style="margin-top:1rem;">
-        <h3 class="card-title">٢ — ربط نوع اليومية ببند مدين وبند دائن</h3>
+        <h3 class="card-title">٢ — ربط نوع اليومية بحساب مدين وحساب دائن</h3>
         <p class="card-hint" style="margin:0 0 0.75rem;max-width:52rem;line-height:1.55;">
-            <strong>كيف تختار هنا؟</strong> القائمة المنسدلة ليست شجرة الحسابات — تختار <strong>بند الإعداد</strong> (نفس تسمية عمود «البند» في القسم ١، مثل «حـ/ المخزن» أو «حـ/ الخزينة»).
-            الحساب الفعلي من دليلكم يُربَط في <strong>القسم ١</strong>؛ أسفل كل قائمة يُعرض <strong>كود واسم الحساب</strong> المرتبط بهذا البند بعد الربط.
-            إن احتجت حساباً مختلفاً في الدفتر، غيّر الربط في القسم ١ لذلك البند أو اختر بنداً آخر هنا.
+            <strong>كيف تختار هنا؟</strong> القائمة تعرض <strong>كود واسم الحساب</strong> كما ربطته في القسم ١ لكل بند (القيمة المخزّنة داخلياً هي مفتاح البند؛ المعروض لك هو الحساب من الدليل).
+            إن ظهرت عبارة «لم يُربط في القسم ١» فارجع للجدول الأول واختر الحساب الفرعي لذلك البند.
+            لتغيير الحساب في القيد غيّر الربط في القسم ١ أو اختر بنداً آخر هنا.
             <br><br>
             <strong>فاتورة مشتريات (PIN) ومردود مشتريات (PDN):</strong> أضف سطراً لـ <strong>نقدي</strong> (يظهر المدين والدائن معاً)،
             وسطراً لـ <strong>آجل</strong> — يظهر <strong>بند واحد فقط</strong> (المدين لفاتورة المشتريات الآجل، أو الدائن لمردود المشتريات الآجل)،
@@ -149,8 +149,8 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
                     <tr>
                         <th>نوع اليومية</th>
                         <th>نقدي / آجل</th>
-                        <th>المدين: بند الإعداد <span class="gl-th-sub">(الحساب يظهر تحت القائمة)</span></th>
-                        <th>الدائن: بند الإعداد <span class="gl-th-sub">(الحساب يظهر تحت القائمة)</span></th>
+                        <th>المدين <span class="gl-th-sub">(اسم الحساب المربوط في القسم ١)</span></th>
+                        <th>الدائن <span class="gl-th-sub">(اسم الحساب المربوط في القسم ١)</span></th>
                         <th class="gl-th-actions" aria-label="إزالة"></th>
                     </tr>
                 </thead>
@@ -235,6 +235,33 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
         return (c ? c + ' — ' : '') + n;
     }
 
+    /** نص خيار القائمة: الحساب من القسم ١؛ وإلا تلميح بالبند غير المربوط */
+    function optionLabelForKey(k) {
+        k = String(k || '').trim();
+        if (!k) {
+            return '';
+        }
+        var preview = accountPreviewForSettingKey(k);
+        var shortLab = glKeyShort[k] || glKeyHints[k] || k;
+        if (preview === '—' || preview.indexOf('لم يُربط') !== -1) {
+            return shortLab + ' — لم يُربط في القسم ١';
+        }
+        return preview;
+    }
+
+    function refreshAllRuleSelectLabels() {
+        document.querySelectorAll('#gl_jt_rules_body .gl-sel-debit-key, #gl_jt_rules_body .gl-sel-credit-key').forEach(function (sel) {
+            for (var i = 0; i < sel.options.length; i++) {
+                var opt = sel.options[i];
+                var v = String(opt.value || '').trim();
+                if (!v) {
+                    continue;
+                }
+                opt.textContent = optionLabelForKey(v);
+            }
+        });
+    }
+
     function syncRuleAccountPreviews(tr) {
         if (!tr) {
             return;
@@ -250,10 +277,12 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
         var debDiv = tr.querySelector('.gl-rule-debit-acct');
         var creDiv = tr.querySelector('.gl-rule-credit-acct');
         if (debDiv) {
+            debDiv.removeAttribute('aria-hidden');
             if (code === 'PDN' && pt === 'credit') {
                 debDiv.innerHTML = '<span class="gl-rule-acct-muted">ذمة المورد (من المستند)</span>';
             } else if (deb && deb.style.display !== 'none' && !deb.disabled) {
-                debDiv.textContent = accountPreviewForSettingKey(deb.value);
+                debDiv.textContent = '';
+                debDiv.setAttribute('aria-hidden', 'true');
             } else if (deb && deb.value) {
                 debDiv.textContent = accountPreviewForSettingKey(deb.value);
             } else {
@@ -261,10 +290,12 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
             }
         }
         if (creDiv) {
+            creDiv.removeAttribute('aria-hidden');
             if (code === 'PIN' && pt === 'credit') {
                 creDiv.innerHTML = '<span class="gl-rule-acct-muted">ذمة المورد (من المستند)</span>';
             } else if (cre && cre.style.display !== 'none' && !cre.disabled) {
-                creDiv.textContent = accountPreviewForSettingKey(cre.value);
+                creDiv.textContent = '';
+                creDiv.setAttribute('aria-hidden', 'true');
             } else if (cre && cre.value) {
                 creDiv.textContent = accountPreviewForSettingKey(cre.value);
             } else {
@@ -275,13 +306,14 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
 
     function refreshAllRuleAccountPreviews() {
         document.querySelectorAll('#gl_jt_rules_body tr[data-jt-rule]').forEach(syncRuleAccountPreviews);
+        refreshAllRuleSelectLabels();
     }
 
     function keyOptionsHtml(selected) {
-        var h = '<option value="">— اختر بند الإعداد (القسم ١) —</option>';
+        var h = '<option value="">— اختر حساب المدين/الدائن (حسب القسم ١) —</option>';
         for (var i = 0; i < glRuleKeyOrder.length; i++) {
             var k = glRuleKeyOrder[i];
-            var lab = glKeyShort[k] || glKeyHints[k] || k;
+            var lab = optionLabelForKey(k);
             h += '<option value="' + esc(k) + '"' + (k === selected ? ' selected' : '') + '>' + esc(lab) + '</option>';
         }
         return h;
@@ -390,7 +422,6 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
                 tdDeb.appendChild(ph.cloneNode(true));
             }
         }
-        syncRuleAccountPreviews(tr);
     }
 
     function paintPaymentTermsCell(tr, jtId, selectedPt) {
@@ -404,11 +435,12 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
             ptEl.addEventListener('change', function () {
                 syncRuleRowLabels(tr);
                 applyPurchaseCreditColumnLayout(tr);
+                refreshAllRuleAccountPreviews();
             });
         }
         syncRuleRowLabels(tr);
         applyPurchaseCreditColumnLayout(tr);
-        syncRuleAccountPreviews(tr);
+        refreshAllRuleAccountPreviews();
     }
 
     function collectUsedJournalRules(exceptTr) {
@@ -493,9 +525,9 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
         tr.innerHTML =
             '<td class="gl-td-jt"><select class="gl-sel-jt-id" aria-label="نوع اليومية">' + journalTypeOptionsHtml(jtId, used) + '</select></td>' +
             '<td class="gl-td-pt"></td>' +
-            '<td class="gl-td-debit"><div class="gl-rule-key-cell"><select class="gl-sel-debit-key" aria-label="بند إعداد المدين — الحساب من القسم ١">' + keyOptionsHtml(dk) + '</select>' +
+            '<td class="gl-td-debit"><div class="gl-rule-key-cell"><select class="gl-sel-debit-key" aria-label="حساب المدين — كما في القسم ١">' + keyOptionsHtml(dk) + '</select>' +
             '<div class="gl-rule-debit-acct gl-rule-acct-preview" aria-live="polite"></div></div></td>' +
-            '<td class="gl-td-credit"><div class="gl-rule-key-cell"><select class="gl-sel-credit-key" aria-label="بند إعداد الدائن — الحساب من القسم ١">' + keyOptionsHtml(ck) + '</select>' +
+            '<td class="gl-td-credit"><div class="gl-rule-key-cell"><select class="gl-sel-credit-key" aria-label="حساب الدائن — كما في القسم ١">' + keyOptionsHtml(ck) + '</select>' +
             '<div class="gl-rule-credit-acct gl-rule-acct-preview" aria-live="polite"></div></div></td>' +
             '<td><button type="button" class="btn-secondary gl-btn-remove-rule">حذف</button></td>';
         tbody.appendChild(tr);
@@ -792,41 +824,41 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
             seenRuleSig[sig] = true;
             if (jcode === 'PIN' && pt === 'credit') {
                 if (!dk) {
-                    alert('فاتورة مشتريات آجل: اختر بند المدين (مثلاً المخزون).');
+                    alert('فاتورة مشتريات آجل: اختر حساب المدين (مثلاً المخزون من القسم ١).');
                     jtRulesInvalid = true;
                     return;
                 }
                 if (ck && dk === ck) {
-                    alert('بند المدين والدائن يجب أن يختلفان.');
+                    alert('حساب المدين والدائن يجب أن يختلفان.');
                     jtRulesInvalid = true;
                     return;
                 }
             } else if (jcode === 'PIN' && pt === 'cash') {
                 if (!dk || !ck || dk === ck) {
-                    alert('فاتورة مشتريات نقدي: اختر بند مدين وبند دائن مختلفين.');
+                    alert('فاتورة مشتريات نقدي: اختر حساب مدين وحساب دائن مختلفين.');
                     jtRulesInvalid = true;
                     return;
                 }
             } else if (jcode === 'PDN' && pt === 'credit') {
                 if (!ck) {
-                    alert('مردود مشتريات آجل: اختر بند الدائن.');
+                    alert('مردود مشتريات آجل: اختر حساب الدائن.');
                     jtRulesInvalid = true;
                     return;
                 }
                 if (dk && dk === ck) {
-                    alert('بند المدين والدائن يجب أن يختلفان.');
+                    alert('حساب المدين والدائن يجب أن يختلفان.');
                     jtRulesInvalid = true;
                     return;
                 }
             } else if (jcode === 'PDN' && pt === 'cash') {
                 if (!dk || !ck || dk === ck) {
-                    alert('مردود مشتريات نقدي: اختر بند مدين وبند دائن مختلفين.');
+                    alert('مردود مشتريات نقدي: اختر حساب مدين وحساب دائن مختلفين.');
                     jtRulesInvalid = true;
                     return;
                 }
             } else {
                 if (!dk || !ck || dk === ck) {
-                    alert('للأنواع الأخرى: اختر بند مدين وبند دائن مختلفين (عمود قياسي).');
+                    alert('للأنواع الأخرى: اختر حساب مدين وحساب دائن مختلفين (عمود قياسي).');
                     jtRulesInvalid = true;
                     return;
                 }
