@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 
@@ -15,18 +16,61 @@ if ($fyId <= 0 && $years !== []) {
     $fyId = (int) $years[0]['id'];
 }
 
+$obVid = 0;
 $obInitial = [];
 $obStatement = '';
-if ($fyId > 0 && orange_journal_vouchers_ready($pdo)) {
+$obRef = $fyId > 0 ? 'OB-' . $fyId : '';
+$obVoucherDateDisp = '';
+$obDocEnteredDisp = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+$obNumberPreview = 1;
+$fyRowSel = null;
+
+if ($fyId > 0) {
+    $fySt = $pdo->prepare('SELECT * FROM fiscal_years WHERE id = ? LIMIT 1');
+    $fySt->execute([$fyId]);
+    $fyRowSel = $fySt->fetch(PDO::FETCH_ASSOC) ?: null;
+    if ($fyRowSel !== null) {
+        $sd = (string) ($fyRowSel['start_date'] ?? '');
+        if (strlen($sd) >= 10) {
+            $obVoucherDateDisp = orange_format_date_dmY(substr($sd, 0, 10));
+        }
+    }
+}
+
+if (orange_journal_vouchers_ready($pdo)) {
+    $obNumberPreview = (int) $pdo->query('SELECT COALESCE(MAX(id),0) + 1 FROM journal_vouchers')->fetchColumn();
+}
+
+if ($fyId > 0 && $fyRowSel !== null && orange_journal_vouchers_ready($pdo)) {
     $vst = $pdo->prepare(
         'SELECT id FROM journal_vouchers WHERE fiscal_year_id = ? AND entry_type = ? ORDER BY id DESC LIMIT 1'
     );
     $vst->execute([$fyId, 'opening_balance']);
     $obVid = (int) $vst->fetchColumn();
     if ($obVid > 0) {
-        $vd = $pdo->prepare('SELECT description FROM journal_vouchers WHERE id = ? LIMIT 1');
+        $vd = $pdo->prepare(
+            'SELECT voucher_date, reference, description, document_entered_at, created_at FROM journal_vouchers WHERE id = ? LIMIT 1'
+        );
         $vd->execute([$obVid]);
-        $obStatement = trim((string) $vd->fetchColumn());
+        $vh = $vd->fetch(PDO::FETCH_ASSOC);
+        if ($vh) {
+            $obStatement = trim((string) ($vh['description'] ?? ''));
+            $refRow = trim((string) ($vh['reference'] ?? ''));
+            if ($refRow !== '') {
+                $obRef = $refRow;
+            }
+            $vdStr = (string) ($vh['voucher_date'] ?? '');
+            if (strlen($vdStr) >= 10) {
+                $obVoucherDateDisp = orange_format_date_dmY(substr($vdStr, 0, 10));
+            }
+            $docAt = trim((string) ($vh['document_entered_at'] ?? ''));
+            if ($docAt === '') {
+                $docAt = trim((string) ($vh['created_at'] ?? ''));
+            }
+            if ($docAt !== '') {
+                $obDocEnteredDisp = orange_format_datetime_dmY_hi($docAt);
+            }
+        }
         $lst = $pdo->prepare(
             'SELECT jl.account_id, jl.debit, jl.credit, a.code, a.name
              FROM journal_lines jl
@@ -46,12 +90,20 @@ if ($fyId > 0 && orange_journal_vouchers_ready($pdo)) {
         }
     }
 }
+
+if ($obVoucherDateDisp === '' && $fyId > 0) {
+    $obVoucherDateDisp = orange_format_date_dmY(date('Y-m-d'));
+}
+
+$obNumberDisplay = $obVid > 0 ? $obVid : $obNumberPreview;
 ?>
-<div class="page-title">
-    <h1>أرصدة أول المدة المالية</h1>
+<div class="page-title page-title--stacked jv-print-hide">
+    <div>
+        <h1>أرصدة أول المدة المالية</h1>
+    </div>
 </div>
 
-<div class="card">
+<div class="card jv-print-hide">
     <form method="get" action="" class="form-grid" style="align-items:end;">
         <input type="hidden" name="page" value="opening_balances">
         <div>
@@ -76,14 +128,47 @@ if ($fyId > 0 && orange_journal_vouchers_ready($pdo)) {
 </div>
 
 <?php if ($fyId > 0 && $years !== []): ?>
-<div class="card ob-opening-card">
+<div class="card jv-print-area ob-opening-card">
     <h3 class="card-title">سند رصيد افتتاحي</h3>
-    <div class="ob-opening-summary">
-        <span class="card-hint ob-opening-summary__totals" id="ob_hint_totals">مجموع المدين: 0 — مجموع الدائن: 0</span>
-        <label class="ob-opening-summary__statement" for="ob_statement">
-            <span class="ob-opening-summary__statement-label">البيان</span>
-            <input type="text" id="ob_statement" class="ob-statement-input admin-inp" dir="rtl" autocomplete="off" value="<?php echo htmlspecialchars($obStatement, ENT_QUOTES, 'UTF-8'); ?>" aria-required="true" placeholder="وصف السند (مثل سند القيد)">
-        </label>
+    <div class="form-grid">
+        <div class="jv-voucher-header-line" style="grid-column:1/-1;">
+            <div>
+                <label for="ob_number_preview">رقم القيد</label>
+                <input type="text" id="ob_number_preview" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;text-align:center;"
+                    value="<?php echo (int) $obNumberDisplay; ?>"
+                    title="يُثبت عند الحفظ — قيد رصيد افتتاحي واحد لكل سنة مالية">
+            </div>
+            <div>
+                <label for="ob_date">تاريخ السند</label>
+                <input type="text" id="ob_date" class="admin-inp orange-inp-dmy"
+                    value="<?php echo htmlspecialchars($obVoucherDateDisp, ENT_QUOTES, 'UTF-8'); ?>"
+                    title="ضمن نطاق السنة المالية المختارة" dir="ltr" lang="en" autocomplete="off">
+            </div>
+            <div>
+                <label for="ob_ref">المرجع <span class="muted" style="font-weight:normal;">(اختياري)</span></label>
+                <input type="text" id="ob_ref" autocomplete="off" value="<?php echo htmlspecialchars($obRef, ENT_QUOTES, 'UTF-8'); ?>">
+            </div>
+            <div>
+                <label for="ob_document_entered">تاريخ المستند</label>
+                <input type="text" id="ob_document_entered" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;"
+                    value="<?php echo htmlspecialchars($obDocEnteredDisp, ENT_QUOTES, 'UTF-8'); ?>"
+                    title="يُحدَّث من السند المحفوظ؛ عند أول حفظ يُثبت تلقائياً" dir="ltr" lang="en">
+            </div>
+            <div>
+                <label for="ob_tot_debit">مجموع المدين</label>
+                <input type="text" id="ob_tot_debit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000"
+                    title="إجمالي المدين من أسطر السند" dir="ltr" lang="en" inputmode="decimal">
+            </div>
+            <div>
+                <label for="ob_tot_credit">مجموع الدائن</label>
+                <input type="text" id="ob_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000"
+                    title="إجمالي الدائن من أسطر السند" dir="ltr" lang="en" inputmode="decimal">
+            </div>
+        </div>
+        <div style="grid-column:1/-1;">
+            <label for="ob_statement">البيان</label>
+            <input type="text" id="ob_statement" class="admin-inp" dir="rtl" autocomplete="off" value="<?php echo htmlspecialchars($obStatement, ENT_QUOTES, 'UTF-8'); ?>" aria-required="true" placeholder="وصف السند">
+        </div>
     </div>
     <div class="admin-doc-frame">
         <div class="table-wrap ob-opening-table-wrap">
@@ -108,9 +193,13 @@ if ($fyId > 0 && orange_journal_vouchers_ready($pdo)) {
             </table>
         </div>
     </div>
-    <div class="actions admin-doc-lines-toolbar ob-opening-toolbar" style="margin-top:10px;">
+    <div class="actions admin-doc-lines-toolbar ob-opening-toolbar jv-doc-toolbar jv-print-hide" style="margin-top:10px;">
         <button type="button" class="btn-secondary" id="ob_btn_add">+ سطر يدوي</button>
-        <button type="button" id="ob_btn_save">حفظ الرصيد الافتتاحي</button>
+        <div class="jv-toolbar-primary-group">
+            <button type="button" class="btn-secondary" id="ob_btn_delete"<?php echo $obVid <= 0 ? ' disabled' : ''; ?>>حذف السند</button>
+            <button type="button" class="btn-secondary" id="ob_btn_print">طباعة السند</button>
+            <button type="button" id="ob_btn_save">حفظ</button>
+        </div>
     </div>
 </div>
 
@@ -129,6 +218,7 @@ if ($fyId > 0 && orange_journal_vouchers_ready($pdo)) {
 <script>
 var OB_FY = <?php echo (int) $fyId; ?>;
 var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
+var OB_SAVED_VOUCHER_ID = <?php echo (int) $obVid; ?>;
 
 (function () {
     var pickModal = document.getElementById('ob_pick_modal');
@@ -394,12 +484,6 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
                 }
             }, 0);
         });
-        var btn = tr.querySelector('.ob-search-btn');
-        if (btn) {
-            btn.addEventListener('click', function () {
-                obOpenPick(tr);
-            });
-        }
     }
     window.obAdd = function (preset) {
         var tb = document.getElementById('ob_body');
@@ -407,13 +491,11 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
             return;
         }
         var tr = document.createElement('tr');
+        tr.className = 'ob-line-main';
         tr.setAttribute('data-account-id', '0');
         tr.innerHTML =
             '<td><input type="text" class="gl-inp-code ob-inp-code admin-inp" dir="ltr" autocomplete="off" value="" aria-label="كود الحساب" placeholder="نقرتان للاختيار أو اكتب الكود" title="نقرتان لفتح قائمة الحسابات — أو أدخِل الكود وغيّر الحقل للتحقق"></td>' +
-            '<td><div class="gl-name-row">' +
-            '<button type="button" class="gl-search-btn ob-search-btn" title="بحث — حسابات فرعية فقط" aria-label="بحث">🔍</button>' +
-            '<input type="text" class="gl-inp-name ob-inp-name admin-inp" readonly tabindex="-1" value="" aria-label="اسم الحساب" placeholder="—" title="يُعبأ تلقائياً">' +
-            '</div></td>' +
+            '<td><input type="text" class="gl-inp-name ob-inp-name admin-inp" readonly tabindex="-1" value="" aria-label="اسم الحساب" placeholder="—" title="يُعبأ تلقائياً"></td>' +
             '<td><input type="number" class="ob-d admin-inp-money" step="any" min="0" value="" inputmode="decimal" lang="en" dir="ltr" aria-label="مدين" placeholder="0.000"></td>' +
             '<td><input type="number" class="ob-c admin-inp-money" step="any" min="0" value="" inputmode="decimal" lang="en" dir="ltr" aria-label="دائن" placeholder="0.000"></td>' +
             '<td><button type="button" class="btn-secondary admin-doc-line-remove ob-row-del">حذف</button></td>';
@@ -457,10 +539,6 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
         obRecalc();
     };
     window.obRecalc = function () {
-        var el = document.getElementById('ob_hint_totals');
-        if (!el) {
-            return;
-        }
         var sd = 0;
         var sc = 0;
         document.querySelectorAll('#ob_body tr').forEach(function (tr) {
@@ -468,7 +546,14 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
             sc += parseFloat(String((tr.querySelector('.ob-c') || {}).value || '0').replace(',', '.'));
         });
         var dec = window.OrangeMoney ? window.OrangeMoney.DECIMALS : 3;
-        el.textContent = 'مجموع المدين: ' + sd.toFixed(dec) + ' — مجموع الدائن: ' + sc.toFixed(dec);
+        var elD = document.getElementById('ob_tot_debit');
+        var elC = document.getElementById('ob_tot_credit');
+        if (elD) {
+            elD.value = sd.toFixed(dec);
+        }
+        if (elC) {
+            elC.value = sc.toFixed(dec);
+        }
     };
     window.obSave = function () {
         if (OB_FY <= 0) {
@@ -510,7 +595,26 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
             alert('السند غير متوازن');
             return;
         }
-        postJSON('/admin/api/opening_balances/save.php', { fiscal_year_id: OB_FY, statement: statement, lines: lines })
+        var obDateEl = document.getElementById('ob_date');
+        var vIso = typeof orangeGetDmyValueAsIso === 'function' && obDateEl
+            ? orangeGetDmyValueAsIso(obDateEl)
+            : '';
+        if (!vIso) {
+            alert('تاريخ السند مطلوب (يوم/شهر/سنة)');
+            if (obDateEl) {
+                obDateEl.focus();
+            }
+            return;
+        }
+        var refEl = document.getElementById('ob_ref');
+        var refVal = refEl ? String(refEl.value || '').trim() : '';
+        postJSON('/admin/api/opening_balances/save.php', {
+            fiscal_year_id: OB_FY,
+            statement: statement,
+            voucher_date: vIso,
+            reference: refVal,
+            lines: lines
+        })
             .then(function (r) {
                 if (r.success) {
                     alert(r.message || 'تم');
@@ -524,10 +628,43 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
             .catch(function (e) { alert(e.message || String(e)); });
     };
 
+    function obPrint() {
+        window.print();
+    }
+    function obDelete() {
+        if (OB_SAVED_VOUCHER_ID <= 0) {
+            alert('لا يوجد سند محفوظ للحذف');
+            return;
+        }
+        if (!confirm('تأكيد حذف سند الرصيد الافتتاحي لهذه السنة؟')) {
+            return;
+        }
+        postJSON('/admin/api/opening_balances/delete.php', { fiscal_year_id: OB_FY })
+            .then(function (r) {
+                if (r.success) {
+                    alert(r.message || 'تم');
+                    location.reload();
+                    return;
+                }
+                if (!orangeAdminOfferSuggestOnFailure(r, 'فشل الحذف')) {
+                    alert(r.message || 'فشل');
+                }
+            })
+            .catch(function (e) { alert(e.message || String(e)); });
+    }
+
     var tb = document.getElementById('ob_body');
     if (tb) {
         document.getElementById('ob_btn_add').addEventListener('click', function () { obAdd(); });
         document.getElementById('ob_btn_save').addEventListener('click', obSave);
+        var obDel = document.getElementById('ob_btn_delete');
+        if (obDel) {
+            obDel.addEventListener('click', obDelete);
+        }
+        var obPr = document.getElementById('ob_btn_print');
+        if (obPr) {
+            obPr.addEventListener('click', obPrint);
+        }
         if (pickQ) {
             pickQ.addEventListener('input', function () {
                 if (searchTimer) {
@@ -561,6 +698,7 @@ var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
         }
         obBindBody();
         obSyncTrailingRows();
+        window.obRecalc();
     }
 })();
 </script>

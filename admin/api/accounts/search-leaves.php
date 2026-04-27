@@ -26,7 +26,57 @@ try {
     if (orange_table_has_column($pdo, 'accounts', 'is_group')) {
         $cols .= ', a.is_group';
     }
-    $sql = 'SELECT ' . $cols . ' FROM accounts a WHERE ' . orange_accounts_posting_leaf_where_sql($pdo, 'a');
+
+    $leafWhere = orange_accounts_posting_leaf_where_sql($pdo, 'a');
+    if (trim($leafWhere) === '(1=0)') {
+        $sql = 'SELECT ' . $cols . ' FROM accounts a WHERE 1=1';
+        $params = [];
+        if ($q !== '') {
+            $sql .= ' AND (a.code LIKE ? OR a.name LIKE ?)';
+            $like = '%' . $q . '%';
+            $params[] = $like;
+            $params[] = $like;
+        }
+        $sql .= ' ORDER BY COALESCE(a.code, \'\'), a.name ASC LIMIT 500';
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        $rows = orange_accounts_filter_rows_for_leaf_search($pdo, $rows);
+        if ($q !== '') {
+            $qLower = function_exists('mb_strtolower') ? mb_strtolower($q, 'UTF-8') : strtolower($q);
+            $rows = array_values(array_filter(
+                $rows,
+                static function (array $r) use ($qLower): bool {
+                    $hayRaw = trim((string) ($r['code'] ?? '')) . ' ' . trim((string) ($r['name'] ?? ''));
+                    $hay = function_exists('mb_strtolower') ? mb_strtolower($hayRaw, 'UTF-8') : strtolower($hayRaw);
+                    if ($hay === '') {
+                        return false;
+                    }
+                    if (function_exists('mb_strpos')) {
+                        return mb_strpos($hay, $qLower, 0, 'UTF-8') !== false;
+                    }
+
+                    return strpos($hay, $qLower) !== false;
+                }
+            ));
+        }
+        $rows = array_slice($rows, 0, 80);
+        $out = [];
+        foreach ($rows as $r) {
+            $id = (int) ($r['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $out[] = [
+                'id' => $id,
+                'code' => (string) ($r['code'] ?? ''),
+                'name' => (string) ($r['name'] ?? ''),
+            ];
+        }
+        json_response(['success' => true, 'accounts' => $out]);
+    }
+
+    $sql = 'SELECT ' . $cols . ' FROM accounts a WHERE ' . $leafWhere;
     $params = [];
     if ($q !== '') {
         $sql .= ' AND (a.code LIKE ? OR a.name LIKE ?)';

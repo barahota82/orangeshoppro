@@ -915,6 +915,7 @@ a { text-decoration: none; color: inherit; }
     font-weight: 700;
     padding: 12px 14px;
     border-bottom: 1px solid var(--border);
+    text-align: center;
 }
 .admin-doc-frame .admin-doc-lines-table tbody td {
     padding: 10px 12px;
@@ -2924,6 +2925,7 @@ body.coa-modal-open {
 .admin-fy-table th {
     background: #f1f5f9;
     font-weight: 700;
+    text-align: center;
 }
 /* السنوات المالية — أعمدة خاصة */
 .fy-col-num {
@@ -3099,6 +3101,7 @@ body.coa-modal-open {
 .gl-settings-table th {
     background: #f1f5f9;
     font-weight: 700;
+    text-align: center;
 }
 .gl-settings-table th .gl-th-sub {
     display: block;
@@ -3709,6 +3712,10 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     }
     .jv-print-area .jv-lines-table thead th.admin-doc-col-actions,
     .jv-print-area .jv-lines-table tr.jv-line-main td:last-child {
+        display: none !important;
+    }
+    .jv-print-area .ob-opening-table thead th.admin-doc-col-actions,
+    .jv-print-area .ob-line-main td:last-child {
         display: none !important;
     }
 }
