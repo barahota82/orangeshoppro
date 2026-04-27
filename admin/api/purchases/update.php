@@ -189,8 +189,7 @@ try {
         $type,
         $supplierId,
         $purchaseId,
-        $newTotal,
-        false
+        $newTotal
     );
     $now = date('Y-m-d H:i:s');
     $afterJson = $glB['after_post'] !== null

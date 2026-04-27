@@ -5,26 +5,6 @@ declare(strict_types=1);
 require_once __DIR__ . '/supplier_payable_account.php';
 
 /**
- * عند `$deferInventoryUntilReceipt === true`: يُستبدل مدين «المخزون» بـ purchase_clearing إن وافق المدين المحلّى حساب المخزون.
- * مسار فاتورة الشراء الحالي يمرّر دائماً `false` (المخزون مع حفظ الفاتورة).
- */
-function orange_gl_purchase_invoice_asset_debit_account_id(
-    PDO $pdo,
-    int $resolvedDebitAccountId,
-    bool $deferInventoryUntilReceipt
-): int {
-    if (!$deferInventoryUntilReceipt) {
-        return $resolvedDebitAccountId;
-    }
-    $invId = orange_gl_account_id($pdo, 'inventory');
-    if ($resolvedDebitAccountId !== $invId) {
-        return $resolvedDebitAccountId;
-    }
-
-    return orange_gl_purchase_receipt_clearing_account_id($pdo);
-}
-
-/**
  * حزمة ترحيل فاتورة مشتريات: قيد بسيط أو سند بأربعة أسطر (نقدي + مورد عبر الذمة).
  *
  * @return array{
@@ -44,8 +24,7 @@ function orange_gl_purchase_invoice_posting_bundle(
     string $purchaseType,
     int $supplierId,
     int $purchaseId,
-    float $amount,
-    bool $deferInventoryUntilReceipt = false
+    float $amount
 ): array {
     if (!in_array($purchaseType, ['cash', 'credit'], true)) {
         throw new RuntimeException('نوع الشراء غير صالح');
@@ -63,11 +42,7 @@ function orange_gl_purchase_invoice_posting_bundle(
 
         if ($rule === null) {
             $inventoryId = orange_gl_account_id($pdo, 'inventory');
-            $debitAssetId = orange_gl_purchase_invoice_asset_debit_account_id(
-                $pdo,
-                $inventoryId,
-                $deferInventoryUntilReceipt
-            );
+            $debitAssetId = $inventoryId;
             $sync = $supplierId > 0 && $apId > 0;
             $after = null;
             if ($sync && $amount > 0.0001) {
@@ -103,7 +78,6 @@ function orange_gl_purchase_invoice_posting_bundle(
             );
         }
         $d = orange_gl_account_id($pdo, $dk);
-        $d = orange_gl_purchase_invoice_asset_debit_account_id($pdo, $d, $deferInventoryUntilReceipt);
         $c = $ck !== '' ? orange_gl_account_id($pdo, $ck) : $apId;
         if ($c <= 0) {
             throw new RuntimeException('تعذر تحديد حساب الدائن — اربط ذمة المورد أو بند الدائن في القاعدة.');
@@ -144,11 +118,7 @@ function orange_gl_purchase_invoice_posting_bundle(
         $pinId = orange_journal_type_id_by_code($pdo, 'PIN');
         $rule = ($pinId > 0) ? orange_gl_journal_type_rule_for_terms($pdo, $pinId, 'cash') : null;
         if ($rule === null) {
-            $purchaseDebit = orange_gl_purchase_invoice_asset_debit_account_id(
-                $pdo,
-                orange_gl_account_id($pdo, 'inventory'),
-                $deferInventoryUntilReceipt
-            );
+            $purchaseDebit = orange_gl_account_id($pdo, 'inventory');
             $cashCredit = orange_gl_account_id($pdo, 'cash');
         } else {
             $dk = trim((string) ($rule['debit_setting_key'] ?? ''));
@@ -158,11 +128,7 @@ function orange_gl_purchase_invoice_posting_bundle(
                     'قاعدة فاتورة مشتريات نقدي غير مكتملة — راجع «حسابات القيود التلقائية» (قسم ٢).'
                 );
             }
-            $purchaseDebit = orange_gl_purchase_invoice_asset_debit_account_id(
-                $pdo,
-                orange_gl_account_id($pdo, $dk),
-                $deferInventoryUntilReceipt
-            );
+            $purchaseDebit = orange_gl_account_id($pdo, $dk);
             $cashCredit = orange_gl_account_id($pdo, $ck);
         }
         if ($purchaseDebit === $apId || $cashCredit === $apId) {
@@ -224,11 +190,7 @@ function orange_gl_purchase_invoice_posting_bundle(
     $pinId = orange_journal_type_id_by_code($pdo, 'PIN');
     $rule = ($pinId > 0) ? orange_gl_journal_type_rule_for_terms($pdo, $pinId, 'cash') : null;
     if ($rule === null) {
-        $inventoryId = orange_gl_purchase_invoice_asset_debit_account_id(
-            $pdo,
-            orange_gl_account_id($pdo, 'inventory'),
-            $deferInventoryUntilReceipt
-        );
+        $inventoryId = orange_gl_account_id($pdo, 'inventory');
         $cashId = orange_gl_account_id($pdo, 'cash');
 
         return [
@@ -249,7 +211,6 @@ function orange_gl_purchase_invoice_posting_bundle(
         );
     }
     $d = orange_gl_account_id($pdo, $dk);
-    $d = orange_gl_purchase_invoice_asset_debit_account_id($pdo, $d, $deferInventoryUntilReceipt);
     $c = orange_gl_account_id($pdo, $ck);
     if ($d === $c) {
         throw new RuntimeException('في قاعدة المشتريات النقدي يجب أن يختلف المدين عن الدائن.');

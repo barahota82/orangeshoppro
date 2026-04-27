@@ -110,8 +110,7 @@ try {
         $type,
         $supplierId,
         $purchaseId,
-        $computedTotal,
-        false
+        $computedTotal
     );
 
     $purRef = 'PUR-' . $purchaseId;
