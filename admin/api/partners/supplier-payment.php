@@ -30,7 +30,7 @@ try {
         json_response(['success' => false, 'message' => 'المورد والمبلغ مطلوبان'], 422);
     }
     if ($description === '') {
-        $description = 'سند دفع مورد';
+        $description = 'سداد فواتير مشتريات آجلة';
     }
 
     $chk = $pdo->prepare('SELECT id FROM suppliers WHERE id = ? LIMIT 1');
@@ -98,7 +98,7 @@ try {
                 'after_post_json' => json_encode($after, JSON_UNESCAPED_UNICODE),
             ]);
             $pdo->commit();
-            audit_log('supplier_payment', 'دفع مورد (معلّق) #' . $supplierId . ' مبلغ ' . $amount, 'party_subledger', $supplierId);
+            audit_log('supplier_payment', 'سداد فواتير مشتريات آجلة (معلّق) #' . $supplierId . ' مبلغ ' . $amount, 'party_subledger', $supplierId);
             json_response([
                 'success' => true,
                 'message' => 'تم تسجيل الدفع في طابور الترحيل — أكمل من «إقفال الحركات»',
@@ -129,7 +129,7 @@ try {
         throw $e;
     }
 
-    audit_log('supplier_payment', 'دفع مورد #' . $supplierId . ' مبلغ ' . $amount, 'party_subledger', $supplierId);
+    audit_log('supplier_payment', 'سداد فواتير مشتريات آجلة #' . $supplierId . ' مبلغ ' . $amount, 'party_subledger', $supplierId);
     json_response(['success' => true, 'message' => 'تم تسجيل الدفع', 'voucher_id' => $vid]);
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {

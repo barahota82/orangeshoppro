@@ -16,12 +16,12 @@ $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
 $ppvIsReceipt = $ppvKind === 'customer_receipt';
-$ppvTitle = $ppvIsReceipt ? 'سند قبض عميل' : 'سند صرف مورد';
-$ppvCardTitle = $ppvIsReceipt ? 'سند قبض من عميل (خزينة ↔ عملاء آجل)' : 'سند صرف لمورد (ذمة مورد ↔ خزينة)';
+$ppvTitle = $ppvIsReceipt ? 'سداد فواتير مبيعات آجلة' : 'سداد فواتير مشتريات آجلة';
+$ppvCardTitle = $ppvIsReceipt ? 'سداد فواتير مبيعات آجلة (خزينة ↔ عملاء آجل)' : 'سداد فواتير مشتريات آجلة (ذمة مورد ↔ خزينة)';
 $ppvOtherPageUrl = storefront_public_path(
     $ppvIsReceipt ? '/admin/index.php?page=partner_supplier_payment' : '/admin/index.php?page=partner_customer_receipt'
 );
-$ppvOtherPageLabel = $ppvIsReceipt ? 'سند صرف مورد' : 'سند قبض عميل';
+$ppvOtherPageLabel = $ppvIsReceipt ? 'سداد فواتير مشتريات آجلة' : 'سداد فواتير مبيعات آجلة';
 $ppvApiUrl = $ppvIsReceipt
     ? '/admin/api/partners/customer-receipt.php'
     : '/admin/api/partners/supplier-payment.php';
@@ -113,7 +113,7 @@ $ppvReady = $ppvCashLock !== null && (!$ppvIsReceipt || $ppvPartyDefaultAcc !== 
     <div>
         <h1><?php echo htmlspecialchars($ppvTitle, ENT_QUOTES, 'UTF-8'); ?></h1>
         <p class="page-subtitle muted" style="margin-top:6px;">
-            <?php echo $ppvIsReceipt ? 'قبض نقدي يخفّض ذمة عميل (عملاء آجل) مع تخصيص اختياري على مستندات مفتوحة.' : 'دفع نقدي يخفّض ذمة مورد مع تخصيص اختياري على مشتريات آجلة مفتوحة.'; ?>
+            <?php echo $ppvIsReceipt ? 'تسجيل تحصيل نقدي مقابل فواتير مبيعات آجلة، مع تخصيص اختياري على مستندات مفتوحة.' : 'تسجيل دفع نقدي مقابل فواتير مشتريات آجلة، مع تخصيص اختياري على مستندات مفتوحة.'; ?>
             <a href="<?php echo htmlspecialchars($ppvOtherPageUrl, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($ppvOtherPageLabel, ENT_QUOTES, 'UTF-8'); ?></a>
         </p>
     </div>
@@ -193,7 +193,7 @@ $ppvReady = $ppvCashLock !== null && (!$ppvIsReceipt || $ppvPartyDefaultAcc !== 
 
         <div style="grid-column:1/-1;">
             <label for="ppv_desc">البيان</label>
-            <input type="text" id="ppv_desc" placeholder="<?php echo $ppvIsReceipt ? 'تحصيل / دفعة عميل' : 'دفعة مورد'; ?>"<?php echo !$ppvReady ? ' disabled' : ''; ?>>
+            <input type="text" id="ppv_desc" placeholder="<?php echo $ppvIsReceipt ? 'بيان السداد — مبيعات آجل' : 'بيان السداد — مشتريات آجل'; ?>"<?php echo !$ppvReady ? ' disabled' : ''; ?>>
         </div>
 
         <div style="grid-column:1/-1;" class="form-check ppv-print-hide">
@@ -510,7 +510,7 @@ function ppvSave() {
             customer_id: partyId,
             amount: amt,
             date: dIso,
-            description: desc || 'قبض عميل',
+            description: desc || 'سداد فواتير مبيعات آجلة',
             allow_excess: document.getElementById('ppv_allow_excess').checked,
             allocations: allocs
         };
@@ -519,7 +519,7 @@ function ppvSave() {
             supplier_id: partyId,
             amount: amt,
             date: dIso,
-            description: desc || 'دفع مورد',
+            description: desc || 'سداد فواتير مشتريات آجلة',
             allow_excess: document.getElementById('ppv_allow_excess').checked,
             allocations: allocs
         };

@@ -68,9 +68,9 @@ if ($stmtPartyJson === false) {
         <p class="page-subtitle">
             تُسجَّل الذمم تلقائياً عند <strong>تسليم طلب آجل</strong> (إن وُجد هاتف للعميل) وعند <strong>شراء آجل</strong> مع اختيار مورد.
             سندات القبض والصرف في شاشتين منفصلتين:
-            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_customer_receipt'), ENT_QUOTES, 'UTF-8'); ?>"><strong>سند قبض / عميل</strong></a>
+            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_customer_receipt'), ENT_QUOTES, 'UTF-8'); ?>"><strong>سداد فواتير مبيعات آجلة</strong></a>
             —
-            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment'), ENT_QUOTES, 'UTF-8'); ?>"><strong>سند صرف / مورد</strong></a>.
+            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment'), ENT_QUOTES, 'UTF-8'); ?>"><strong>سداد فواتير مشتريات آجلة</strong></a>.
             <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_reports'), ENT_QUOTES, 'UTF-8'); ?>">تقارير الذمم المالية ومطابقة الدليل</a>
         </p>
     </div>

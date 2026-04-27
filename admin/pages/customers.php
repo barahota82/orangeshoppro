@@ -33,12 +33,12 @@ $count = count($rows);
         <h1>العملاء</h1>
         <p class="page-subtitle">
             سجل العملاء: <strong>الهاتف</strong> معرّف فريد للعميل (مثل الكود). الحقول: الاسم، المنطقة، العنوان، البريد، الملاحظات (تُحدَّث تلقائياً من ملاحظات كل طلب ويب)، حد الائتمان، والذمم.
-            الذمم والقبض من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_customer_receipt'), ENT_QUOTES, 'UTF-8'); ?>">سند قبض / عميل</a>
+            الذمم والتحصيل من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_customer_receipt'), ENT_QUOTES, 'UTF-8'); ?>">سداد فواتير مبيعات آجلة</a>
             أو نظرة عامة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_ledger'), ENT_QUOTES, 'UTF-8'); ?>">ذمم العملاء والموردين</a>.
         </p>
     </div>
     <div class="actions">
-        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_customer_receipt'), ENT_QUOTES, 'UTF-8'); ?>">سند قبض / عميل</a>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_customer_receipt'), ENT_QUOTES, 'UTF-8'); ?>">سداد فواتير مبيعات آجلة</a>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=manual_order'), ENT_QUOTES, 'UTF-8'); ?>">فاتورة مبيعات</a>
     </div>
 </div>

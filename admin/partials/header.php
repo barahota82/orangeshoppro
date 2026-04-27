@@ -209,8 +209,8 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
             ];
 
             $navAccountingVouchers = [
-                ['page' => 'partner_customer_receipt', 'href' => '/admin/index.php?page=partner_customer_receipt', 'label' => 'سند قبض / عميل', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'partner_supplier_payment', 'href' => '/admin/index.php?page=partner_supplier_payment', 'label' => 'سند صرف / مورد', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'partner_customer_receipt', 'href' => '/admin/index.php?page=partner_customer_receipt', 'label' => 'سداد فواتير مبيعات آجلة', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'partner_supplier_payment', 'href' => '/admin/index.php?page=partner_supplier_payment', 'label' => 'سداد فواتير مشتريات آجلة', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger', 'label' => 'ذمم العملاء', 'class' => 'admin-nav-sub', 'sub' => true],
             ];
 

@@ -29,7 +29,7 @@ try {
         json_response(['success' => false, 'message' => 'العميل والمبلغ مطلوبان'], 422);
     }
     if ($description === '') {
-        $description = 'سند قبض عميل';
+        $description = 'سداد فواتير مبيعات آجلة';
     }
 
     $chk = $pdo->prepare('SELECT id FROM customers WHERE id = ? LIMIT 1');
@@ -90,7 +90,7 @@ try {
                 'after_post_json' => json_encode($after, JSON_UNESCAPED_UNICODE),
             ]);
             $pdo->commit();
-            audit_log('customer_receipt', 'قبض عميل (معلّق) #' . $customerId . ' مبلغ ' . $amount, 'party_subledger', $customerId);
+            audit_log('customer_receipt', 'سداد فواتير مبيعات آجلة (معلّق) #' . $customerId . ' مبلغ ' . $amount, 'party_subledger', $customerId);
             json_response([
                 'success' => true,
                 'message' => 'تم تسجيل القبض في طابور الترحيل — أكمل من «إقفال الحركات»',
@@ -121,7 +121,7 @@ try {
         throw $e;
     }
 
-    audit_log('customer_receipt', 'قبض عميل #' . $customerId . ' مبلغ ' . $amount, 'party_subledger', $customerId);
+    audit_log('customer_receipt', 'سداد فواتير مبيعات آجلة #' . $customerId . ' مبلغ ' . $amount, 'party_subledger', $customerId);
     json_response(['success' => true, 'message' => 'تم تسجيل القبض', 'voucher_id' => $vid]);
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
