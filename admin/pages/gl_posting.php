@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
+require_once __DIR__ . '/../../includes/journal_types.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
-
-$linkedJournalTypes = orange_gl_posting_linked_journal_types($pdo);
+orange_journal_types_sync_canonical_defaults($pdo);
+/** @var list<array<string, mixed>> $postingJournalTypes */
+$postingJournalTypes = orange_journal_types_list($pdo);
 $glPostDateFromDisp = orange_format_datetime_dmY_hi(date('Y-m-01 00:00:00'));
 $glPostDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
 ?>
@@ -20,11 +22,10 @@ $glPostDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
     <p class="gl-posting-intro" style="margin:0.5rem 1rem 0.75rem;font-size:0.95rem;color:#444;line-height:1.5;">
         من هنا تُستعرض الحركات المحفوظة في <strong>طابور الترحيل</strong> ثم تُرحَّل إلى سندات القيد في الدفتر.
         استخدم «الحركات الغير مرحلة» للاختيار والترحيل، و«الحركات المرحلة» لعرض ما أُثبت ثم <strong>إلغاء الترحيل</strong> انتقائياً عند التصحيح (حسب الصلاحيات والسنة المفتوحة).
-        فلتر <strong>نوع اليومية</strong> يعتمد على الربط في
-        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=gl_account_settings'), ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a> (قسم قواعد أنواع اليومية) أو على الربط القديم حتى تُحدَّث القواعد.
-        يُزامَج تلقائياً نوع <strong>قيد مصروف (EXP)</strong> مع حركات المصروف في الطابور عند ظهوره في القائمة.
-        <?php if ($linkedJournalTypes === []): ?>
-            <strong style="color:#b45309;">تنبيه:</strong> لا توجد أنواع يومية مربوطة بعد — عيّن قواعد في شاشة الإعدادات أو ربطاً سابقاً في الجدول ليظهر الفلتر.
+        فلتر <strong>نوع اليومية</strong> يعرض <strong>جميع</strong> الأنواع المعرفة في جدول أنواع اليومية (سند قيد، قبض، صرف، مصروف، رصيد افتتاحي، إقفال، مشتريات، مبيعات، …). عند الاختيار تُصفّى حركات الطابور حسب <strong>أنواع القيد</strong> المقابلة لذلك الكود؛ ربط الحسابات يبقى من
+        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=gl_account_settings'), ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a>.
+        <?php if ($postingJournalTypes === []): ?>
+            <strong style="color:#b45309;">تنبيه:</strong> لا توجد أنواع يومية في النظام — راجع ترحيل المخطط أو جدول <code>journal_types</code>.
         <?php endif; ?>
     </p>
     <style>
@@ -40,12 +41,12 @@ $glPostDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
                 <div class="gl-posting-field">
                     <span class="gl-posting-field__label" id="gl_post_movement_type_label">نوع الحركة :</span>
                     <div class="gl-posting-field__row gl-posting-field__row--movement">
-                        <select id="gl_post_movement_type" class="gl-posting-select gl-posting-select--movement-type" aria-labelledby="gl_post_movement_type_label"<?php echo $linkedJournalTypes === [] ? ' disabled' : ''; ?>>
+                        <select id="gl_post_movement_type" class="gl-posting-select gl-posting-select--movement-type" aria-labelledby="gl_post_movement_type_label"<?php echo $postingJournalTypes === [] ? ' disabled' : ''; ?>>
                             <option value="">— اختر نوع اليومية —</option>
-                            <?php if ($linkedJournalTypes !== []): ?>
+                            <?php if ($postingJournalTypes !== []): ?>
                             <option value="all">الكل</option>
                             <?php endif; ?>
-                            <?php foreach ($linkedJournalTypes as $jt):
+                            <?php foreach ($postingJournalTypes as $jt):
                                 $jid = (int) ($jt['id'] ?? 0);
                                 $jname = trim((string) ($jt['name_ar'] ?? ''));
                                 ?>
