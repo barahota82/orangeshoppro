@@ -53,6 +53,29 @@ function orange_journal_manage_assert_receipt_cash_first_line(PDO $pdo, string $
     }
 }
 
+/**
+ * سند الصرف: آخر سطر يجب أن يكون حساب النقدية (الخزينة) من الإعدادات، دائناً بلا مدين.
+ *
+ * @param list<array{account_id:int,debit:float,credit:float,memo:string}> $postLines
+ */
+function orange_journal_manage_assert_payment_cash_last_line(PDO $pdo, string $entryTypeNorm, array $postLines): void
+{
+    if ($entryTypeNorm !== 'payment_voucher' || $postLines === []) {
+        return;
+    }
+    $cashId = orange_gl_account_id_optional($pdo, 'cash');
+    if ($cashId === null || $cashId <= 0) {
+        json_response(['success' => false, 'message' => 'اربط حساب النقدية (الخزينة) في إعدادات القيود التلقائية لاستخدام سند الصرف.'], 422);
+    }
+    $last = $postLines[count($postLines) - 1];
+    if ((int) $last['account_id'] !== (int) $cashId) {
+        json_response(['success' => false, 'message' => 'سند الصرف يجب أن ينتهي بسطر حساب الخزينة (النقدية) كما في الشاشة.'], 422);
+    }
+    if ((float) $last['credit'] <= 0.0 || (float) $last['debit'] > 0.0) {
+        json_response(['success' => false, 'message' => 'السطر الأخير في سند الصرف (الخزينة) يجب أن يكون دائناً بمبلغ الصرف دون مدين.'], 422);
+    }
+}
+
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
@@ -103,6 +126,7 @@ try {
                 json_response(['success' => false, 'message' => 'يُشترط سطران صالحان على الأقل في السند'], 422);
             }
             orange_journal_manage_assert_receipt_cash_first_line($pdo, $entryTypeNorm, $postLines);
+            orange_journal_manage_assert_payment_cash_last_line($pdo, $entryTypeNorm, $postLines);
             if (orange_table_has_column($pdo, 'accounts', 'is_group')) {
                 foreach ($postLines as $ln) {
                     $aid = (int) $ln['account_id'];
