@@ -88,7 +88,6 @@ foreach ($accounts as $a) {
                     <?php endforeach; ?>
                 </select>
             </div>
-            <span class="muted" style="font-size:0.85rem;flex:1 1 12rem;">اختر نوع يومية واحد (من <a href="<?php echo htmlspecialchars($jvGlSettingsUrl, ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a>) لعرض القيود والبحث والتنقل، ولـ<strong>حفظ</strong> سند جديد من هذه الشاشة بحيث يُصنَّف ضمن نفس النوع ويظهر لاحقاً تحت نفس الفلتر. لا يوجد عرض لكل الأنواع معاً.</span>
         </div>
         <?php if ($jvPostingLinkedJournalTypes === []): ?>
         <p class="card-hint jv-print-hide" style="grid-column:1/-1;margin:0 0 8px;">لا توجد أنواع يومية مستخرجة من قواعد الترحيل — راجع قسم ربط نوع اليومية في <a href="<?php echo htmlspecialchars($jvGlSettingsUrl, ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a>.</p>

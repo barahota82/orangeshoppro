@@ -45,6 +45,8 @@
     --admin-drawer-link-pad-x: 12px;
     --admin-drawer-link-sub-pad-start: 18px;
     --admin-mega-grid-gap: 10px;
+    /** عدد الأعمدة في لوحة التنقل المنسدلة (زر ثابت لكل خلية) */
+    --admin-mega-grid-cols: 6;
     --admin-mega-grid-col-min: 210px;
     --admin-mega-trigger-max-w: 22rem;
     --font-ui: "Cairo", "Segoe UI", system-ui, sans-serif;
@@ -252,9 +254,13 @@ a { text-decoration: none; color: inherit; }
 }
 .admin-mega-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(var(--admin-mega-grid-col-min), 1fr));
+    grid-template-columns: repeat(var(--admin-mega-grid-cols), minmax(0, 1fr));
     gap: var(--admin-mega-grid-gap);
-    align-items: start;
+    align-items: stretch;
+}
+/* مجموعة فرعية ترِث صفاً كاملاً داخل الشبكة */
+.admin-mega-grid > .admin-mega-group {
+    grid-column: 1 / -1;
 }
 /* خلية مباشرة في الشبكة: الرابط يملأ العمود بشكل متسق */
 .admin-mega-grid > .admin-mega-link {
@@ -394,16 +400,17 @@ a { text-decoration: none; color: inherit; }
 .admin-mega-link {
     display: flex;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: center;
     padding: var(--admin-mega-link-pad-y) var(--admin-mega-link-pad-x);
-    min-height: var(--input-min-h);
+    min-height: var(--admin-btn-min-h);
     border-radius: 10px;
     background: rgba(255, 255, 255, 0.05);
-    font-size: 13px;
+    font-size: var(--admin-btn-font-size);
+    font-weight: 600;
     line-height: 1.35;
     color: #f1f5f9;
     border: 1px solid rgba(255, 255, 255, 0.08);
-    text-align: start;
+    text-align: center;
     word-break: break-word;
 }
 .admin-mega-link:hover {

@@ -18,10 +18,6 @@ orange_catalog_ensure_schema($pdo);
 $ppvIsReceipt = $ppvKind === 'customer_receipt';
 $ppvTitle = $ppvIsReceipt ? 'سداد فواتير مبيعات آجلة' : 'سداد فواتير مشتريات آجلة';
 $ppvCardTitle = $ppvIsReceipt ? 'سداد فواتير مبيعات آجلة (خزينة ↔ عملاء آجل)' : 'سداد فواتير مشتريات آجلة (ذمة مورد ↔ خزينة)';
-$ppvOtherPageUrl = storefront_public_path(
-    $ppvIsReceipt ? '/admin/index.php?page=partner_supplier_payment' : '/admin/index.php?page=partner_customer_receipt'
-);
-$ppvOtherPageLabel = $ppvIsReceipt ? 'سداد فواتير مشتريات آجلة' : 'سداد فواتير مبيعات آجلة';
 $ppvApiUrl = $ppvIsReceipt
     ? '/admin/api/partners/customer-receipt.php'
     : '/admin/api/partners/supplier-payment.php';
@@ -112,10 +108,6 @@ $ppvReady = $ppvCashLock !== null && (!$ppvIsReceipt || $ppvPartyDefaultAcc !== 
 <div class="page-title page-title--stacked ppv-print-hide">
     <div>
         <h1><?php echo htmlspecialchars($ppvTitle, ENT_QUOTES, 'UTF-8'); ?></h1>
-        <p class="page-subtitle muted" style="margin-top:6px;">
-            <?php echo $ppvIsReceipt ? 'تسجيل تحصيل نقدي مقابل فواتير مبيعات آجلة، مع تخصيص اختياري على مستندات مفتوحة.' : 'تسجيل دفع نقدي مقابل فواتير مشتريات آجلة، مع تخصيص اختياري على مستندات مفتوحة.'; ?>
-            <a href="<?php echo htmlspecialchars($ppvOtherPageUrl, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($ppvOtherPageLabel, ENT_QUOTES, 'UTF-8'); ?></a>
-        </p>
     </div>
 </div>
 
@@ -172,8 +164,8 @@ $ppvReady = $ppvCashLock !== null && (!$ppvIsReceipt || $ppvPartyDefaultAcc !== 
             <div>
                 <label for="ppv_ref">المرجع</label>
                 <input type="text" id="ppv_ref" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;"
-                    value="يُولَّد آلياً عند الحفظ"
-                    title="مرجع تسلسلي من النظام">
+                    value=""
+                    autocomplete="off">
             </div>
             <div>
                 <label for="ppv_document_entered">تاريخ المستند</label>
@@ -191,9 +183,9 @@ $ppvReady = $ppvCashLock !== null && (!$ppvIsReceipt || $ppvPartyDefaultAcc !== 
             </div>
             <div class="jv-voucher-nav-cell jv-print-hide">
                 <div class="jv-voucher-nav-btns ppv-voucher-action-btns" role="group" aria-label="إجراءات السند">
-                    <button type="button" class="btn-secondary jv-nav-search" id="ppv_btn_new" title="سند جديد">سند جديد</button>
-                    <button type="button" class="btn-secondary jv-nav-search" id="ppv_btn_print" title="طباعة">طباعة السند</button>
                     <button type="button" id="ppv_btn_save"<?php echo !$ppvReady ? ' disabled' : ''; ?>>حفظ السند</button>
+                    <button type="button" class="btn-secondary jv-nav-search" id="ppv_btn_print" title="طباعة">طباعة السند</button>
+                    <button type="button" class="btn-secondary jv-nav-search" id="ppv_btn_new" title="سند جديد">سند جديد</button>
                 </div>
             </div>
         </div>
@@ -235,7 +227,6 @@ $ppvReady = $ppvCashLock !== null && (!$ppvIsReceipt || $ppvPartyDefaultAcc !== 
     </div>
 
     <div style="grid-column:1/-1; margin-top:12px; padding-top:12px; border-top:1px solid #e4e4e7;" class="ppv-print-hide">
-        <p class="card-hint" style="margin:0 0 8px;">تخصيص السداد على مستندات مفتوحة (اختياري) — مجموع التخصيصات ≤ مبلغ السند.</p>
         <button type="button" class="btn-secondary" id="ppv_btn_load_alloc"<?php echo !$ppvReady ? ' disabled' : ''; ?>>تحميل المستندات ذات الرصيد</button>
         <div class="table-wrap" style="margin-top:8px;">
             <table class="admin-table">
