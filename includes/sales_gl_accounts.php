@@ -73,3 +73,81 @@ function orange_gl_online_delivery_sale_four_lines(PDO $pdo, float $amount, stri
         $memoCashLeg
     );
 }
+
+/**
+ * حزمة قيد إيراد مردود مبيعات (مستند مستقل، نقدي / أونلاين / آجل).
+ *
+ * @return array{
+ *   is_multi: bool,
+ *   lines: list<array{account_id:int,debit:float,credit:float,memo:string}>,
+ *   debit: int,
+ *   credit: int,
+ *   voucher_description: string,
+ *   after_post: array|null,
+ *   legacy_ar_subledger: bool
+ * }
+ *
+ * @throws RuntimeException
+ */
+function orange_gl_sales_return_revenue_bundle(
+    PDO $pdo,
+    string $channel,
+    int $customerId,
+    int $returnId,
+    float $amount
+): array {
+    $amount = round($amount, 4);
+    if ($amount <= 0.0001) {
+        throw new RuntimeException('مبلغ مردود المبيعات غير صالح.');
+    }
+    $channel = trim($channel);
+    if (!in_array($channel, ['cash', 'online', 'credit'], true)) {
+        throw new RuntimeException('قناة مردود المبيعات غير صالحة.');
+    }
+
+    $revDebit = orange_gl_sales_return_revenue_debit_account_id($pdo, $channel);
+
+    if ($channel === 'credit') {
+        if ($customerId <= 0) {
+            throw new RuntimeException('مردود مبيعات آجل يتطلّب عميلاً.');
+        }
+        $arId = orange_gl_account_id($pdo, 'ar_credit');
+        $after = null;
+        $legacy = $customerId > 0;
+        if ($legacy && $amount > 0.0001) {
+            $after = [
+                'party_subledger' => [
+                    'party_kind' => 'customer',
+                    'party_id' => $customerId,
+                    'debit' => 0.0,
+                    'credit' => $amount,
+                    'ref_type' => 'sales_return',
+                    'ref_id' => $returnId,
+                    'memo' => 'مردود مبيعات آجل',
+                ],
+            ];
+        }
+
+        return [
+            'is_multi' => false,
+            'lines' => [],
+            'debit' => $revDebit,
+            'credit' => $arId,
+            'voucher_description' => 'مردود مبيعات آجل',
+            'after_post' => $after,
+            'legacy_ar_subledger' => $legacy,
+        ];
+    }
+
+    $cashId = orange_gl_account_id($pdo, 'cash');
+
+    return [
+        'is_multi' => false,
+        'lines' => [],
+        'debit' => $revDebit,
+        'credit' => $cashId,
+        'voucher_description' => $channel === 'online' ? 'مردود مبيعات أونلاين' : 'مردود مبيعات نقدي',
+        'after_post' => null,
+        'legacy_ar_subledger' => false,
+    ];
+}

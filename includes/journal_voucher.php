@@ -100,6 +100,23 @@ function orange_purchase_return_remove_accounting(PDO $pdo, string $returnRefere
 }
 
 /**
+ * حذف قيود مردود مبيعات مستند (إيراد + تكلفة مجمّعة).
+ *
+ * @throws RuntimeException
+ */
+function orange_sales_return_remove_accounting(PDO $pdo, int $returnId): void
+{
+    orange_catalog_ensure_schema($pdo);
+    $rs = 'SR-' . $returnId . '-RS';
+    $rc = 'SR-' . $returnId . '-RC';
+    if (orange_table_exists($pdo, 'orange_gl_pending_movements')) {
+        $pdo->prepare('DELETE FROM orange_gl_pending_movements WHERE reference IN (?,?)')->execute([$rs, $rc]);
+    }
+    orange_purchase_remove_accounting($pdo, $rs);
+    orange_purchase_remove_accounting($pdo, $rc);
+}
+
+/**
  * @return array<string, mixed>|null صف للتحقق من إغلاق السنة (سند أو قيد قديم)
  */
 function orange_accounting_row_by_reference(PDO $pdo, string $reference): ?array

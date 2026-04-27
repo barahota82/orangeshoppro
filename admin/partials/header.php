@@ -262,6 +262,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
             $navSales = [
                 ['page' => 'customers', 'href' => '/admin/index.php?page=customers', 'label' => 'العملاء', 'class' => '', 'sub' => false],
                 ['page' => 'orders', 'href' => '/admin/index.php?page=orders', 'label' => 'الطلبات', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'sales_returns', 'href' => '/admin/index.php?page=sales_returns', 'label' => 'مردود المبيعات', 'class' => '', 'sub' => false],
                 ['page' => 'reserved_orders', 'href' => '/admin/index.php?page=reserved_orders', 'label' => 'طلبات محجوزة (مخزون)', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'order_intake_queue', 'href' => '/admin/index.php?page=order_intake_queue', 'label' => 'طابور الطلبات', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'invoice', 'href' => '/admin/index.php?page=invoice', 'label' => 'فاتورة أونلاين', 'class' => 'admin-nav-sub', 'sub' => true],

@@ -506,6 +506,29 @@ function orange_gl_order_return_sale_debit_account_id(PDO $pdo, string $channel)
 }
 
 /**
+ * بند مدين قيد إيراد مردود مبيعات (مستند مستقل): يفضّل sales_returns_credit للآجل إن وُجد ربط؛ وإلا sales_revenue_credit.
+ * النقدي والأونلاين: نفس منطق إلغاء التسليم (مردود منفصل أو إيراد).
+ *
+ * @param 'cash'|'online'|'credit' $channel
+ *
+ * @throws RuntimeException
+ */
+function orange_gl_sales_return_revenue_debit_account_id(PDO $pdo, string $channel): int
+{
+    $channel = trim($channel);
+    if ($channel === 'credit') {
+        $id = orange_gl_account_id_optional($pdo, 'sales_returns_credit');
+        if ($id !== null && $id > 0) {
+            return $id;
+        }
+
+        return orange_gl_account_id($pdo, 'sales_revenue_credit');
+    }
+
+    return orange_gl_order_return_sale_debit_account_id($pdo, $channel);
+}
+
+/**
  * تسميات عربية لحقل journal_vouchers.entry_type / طابور المحاسبة (للعرض فقط).
  *
  * @return array<string, string>
@@ -582,8 +605,8 @@ function orange_gl_journal_delete_blocked_message_ar(string $entryType): string
         'opening_balance' => 'عدّل من شاشة «الأرصدة الافتتاحية».',
         'order_delivery_sale' => 'للتصحيح: «ترحيل الحركات» (فك ترحيل) أو مسار الطلب.',
         'order_delivery_cogs' => 'كما سبق — تكلفة التسليم مرتبطة بالطابور أو الطلب.',
-        'order_return_sale' => 'كما سبق — مردود الإيراد من إلغاء التسليم.',
-        'order_return_cogs' => 'كما سبق — مردود التكلفة من إلغاء التسليم.',
+        'order_return_sale' => 'من شاشة «مردود المبيعات» أو إلغاء تسليم طلب — راجع «ترحيل الحركات» إن لزم.',
+        'order_return_cogs' => 'من شاشة «مردود المبيعات» أو إلغاء تسليم طلب — راجع «ترحيل الحركات» إن لزم.',
         'purchase' => 'عدّل أو ألغِ من شاشة المشتريات.',
         'purchase_return' => 'عدّل أو ألغِ من شاشة مردود المشتريات.',
         'customer_receipt' => 'عدّل من مسار قبض العملاء / الذمم.',
@@ -617,8 +640,8 @@ function orange_gl_journal_delete_blocked_admin_link(string $entryType): ?array
         'expense_reversal' => ['page' => 'expenses', 'label' => 'المصروفات'],
         'order_delivery_sale' => ['page' => 'gl_posting', 'label' => 'ترحيل الحركات'],
         'order_delivery_cogs' => ['page' => 'gl_posting', 'label' => 'ترحيل الحركات'],
-        'order_return_sale' => ['page' => 'gl_posting', 'label' => 'ترحيل الحركات'],
-        'order_return_cogs' => ['page' => 'gl_posting', 'label' => 'ترحيل الحركات'],
+        'order_return_sale' => ['page' => 'sales_returns', 'label' => 'مردود المبيعات'],
+        'order_return_cogs' => ['page' => 'sales_returns', 'label' => 'مردود المبيعات'],
     ];
     if (!isset($map[$et])) {
         return null;

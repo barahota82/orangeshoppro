@@ -1447,6 +1447,12 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
     }
+    if (orange_table_exists($pdo, 'sales_returns') && !orange_table_has_column($pdo, 'sales_returns', 'channel_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE sales_returns ADD COLUMN channel_id INT NULL AFTER customer_id'
+        );
+    }
 
     /*
      |--------------------------------------------------------------------------
