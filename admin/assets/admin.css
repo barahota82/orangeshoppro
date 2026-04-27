@@ -1463,42 +1463,9 @@ label {
         minmax(7rem, 9rem)
         minmax(10rem, 15rem);
 }
-/* سداد فواتير آجلة — عمود واحد: مجموع دائن + أزرار السند في سطر واحد */
-.jv-voucher-header-line--ppv {
-    grid-template-columns:
-        minmax(5.25rem, 7rem)
-        minmax(9.5rem, 11.5rem)
-        minmax(5.25rem, 7rem)
-        minmax(9.5rem, 11.5rem)
-        minmax(7rem, 9rem)
-        minmax(7rem, 9rem)
-        minmax(16rem, 1fr);
-}
-.jv-voucher-header-line--ppv .ppv-header-credit-actions {
-    display: flex;
-    flex-direction: row;
-    align-items: flex-end;
-    justify-content: flex-start;
-    gap: 10px 12px;
-    flex-wrap: nowrap;
-    min-width: 0;
-}
-.jv-voucher-header-line--ppv .ppv-header-credit-actions > div:first-child {
-    flex: 0 0 auto;
-    min-width: min(9rem, 100%);
-}
-.jv-voucher-header-line--ppv .ppv-header-action-btns {
-    flex: 1 1 auto;
-    min-width: 0;
-    display: flex;
-    flex-wrap: nowrap;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 0;
-}
-.jv-voucher-header-line--ppv .ppv-header-action-btns button {
-    white-space: nowrap;
+.jv-voucher-nav-btns.ppv-voucher-action-btns {
+    flex-wrap: wrap;
+    justify-content: center;
 }
 .jv-voucher-header-line > div {
     min-width: 0;
@@ -1622,21 +1589,10 @@ label {
     .jv-voucher-header-line {
         grid-template-columns: minmax(5rem, 7rem) minmax(9rem, 1fr);
     }
-    .jv-voucher-header-line--ppv .ppv-header-credit-actions {
-        flex-wrap: wrap;
-    }
 }
 @media (max-width: 520px) {
     .jv-voucher-header-line {
         grid-template-columns: 1fr;
-    }
-    .jv-voucher-header-line--ppv .ppv-header-credit-actions {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    .jv-voucher-header-line--ppv .ppv-header-action-btns {
-        justify-content: flex-start;
-        flex-wrap: wrap;
     }
 }
 
