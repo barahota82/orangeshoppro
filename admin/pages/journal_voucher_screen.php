@@ -81,15 +81,18 @@ foreach ($accounts as $a) {
         <div class="jv-other-voucher-filter-row jv-print-hide" style="grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-bottom:6px;">
             <div style="display:flex;align-items:center;gap:8px;">
                 <label for="jv_journal_type_filter" style="margin:0;font-weight:600;white-space:nowrap;">نوع القيد (اليومية)</label>
-                <select id="jv_journal_type_filter" class="admin-inp" style="min-width:15rem;">
-                    <option value="0">سندات أخرى — إدخال يدوي</option>
+                <select id="jv_journal_type_filter" class="admin-inp" style="min-width:15rem;"<?php echo $jvPostingLinkedJournalTypes === [] ? ' disabled' : ''; ?>>
+                    <option value=""><?php echo $jvPostingLinkedJournalTypes === [] ? '— لا توجد أنواع يومية في الإعدادات —' : '— اختر نوع اليومية —'; ?></option>
                     <?php foreach ($jvPostingLinkedJournalTypes as $jt): ?>
                     <option value="<?php echo (int) ($jt['id'] ?? 0); ?>"><?php echo htmlspecialchars(trim((string) ($jt['name_ar'] ?? $jt['code'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
-            <span class="muted" style="font-size:0.85rem;flex:1 1 12rem;">لمراجعة القيود المُولَّدة تلقائياً اختر نوع اليومية المربوط في <a href="<?php echo htmlspecialchars($jvGlSettingsUrl, ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a> (قسم ربط نوع اليومية).</span>
+            <span class="muted" style="font-size:0.85rem;flex:1 1 12rem;">اختر نوع يومية واحد (من <a href="<?php echo htmlspecialchars($jvGlSettingsUrl, ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a>) لعرض القيود والبحث والتنقل، ولـ<strong>حفظ</strong> سند جديد من هذه الشاشة بحيث يُصنَّف ضمن نفس النوع ويظهر لاحقاً تحت نفس الفلتر. لا يوجد عرض لكل الأنواع معاً.</span>
         </div>
+        <?php if ($jvPostingLinkedJournalTypes === []): ?>
+        <p class="card-hint jv-print-hide" style="grid-column:1/-1;margin:0 0 8px;">لا توجد أنواع يومية مستخرجة من قواعد الترحيل — راجع قسم ربط نوع اليومية في <a href="<?php echo htmlspecialchars($jvGlSettingsUrl, ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a>.</p>
+        <?php endif; ?>
         <?php endif; ?>
         <div class="<?php echo htmlspecialchars($jvHeaderLineClass, ENT_QUOTES, 'UTF-8'); ?>" style="grid-column:1/-1;">
             <div>
@@ -529,6 +532,30 @@ function jvJournalTypeFilterId() {
     return parseInt(String(s.value || '0'), 10) || 0;
 }
 
+function jvOtherVoucherBrowseBlockedMsg() {
+    return 'اختر نوع اليومية من الفلتر أولاً. لا يُسمح بعرض أو بحث كل القيود دفعة واحدة.';
+}
+
+function jvOtherVoucherBrowseOk() {
+    if (!JV_OTHER_VOUCHER_BROWSE) {
+        return true;
+    }
+    return jvJournalTypeFilterId() > 0;
+}
+
+function jvApplyOtherVoucherBrowseGateUi() {
+    if (!JV_OTHER_VOUCHER_BROWSE) {
+        return;
+    }
+    var ok = jvOtherVoucherBrowseOk();
+    ['jv_nav_first', 'jv_nav_prev', 'jv_nav_next', 'jv_nav_last', 'jv_btn_open_search'].forEach(function (id) {
+        var b = document.getElementById(id);
+        if (b) {
+            b.disabled = !ok;
+        }
+    });
+}
+
 function jvMemoRow(mainTr) {
     if (!mainTr) {
         return null;
@@ -788,6 +815,10 @@ function jvSearchRenderRows(rows) {
 }
 
 function jvSearchRun() {
+    if (JV_OTHER_VOUCHER_BROWSE && !jvOtherVoucherBrowseOk()) {
+        alert(jvOtherVoucherBrowseBlockedMsg());
+        return;
+    }
     postJSON('/admin/api/journal/manage.php', jvSearchCollectPayload()).then(function (r) {
         if (!r.success) {
             if (!orangeAdminOfferSuggestOnFailure(r, 'بحث')) {
@@ -821,6 +852,14 @@ function jvSearchModalBind() {
     }
 }
 jvSearchModalBind();
+
+(function jvOtherVoucherFilterBind() {
+    var sel = document.getElementById('jv_journal_type_filter');
+    if (sel && !sel.getAttribute('data-jv-bound')) {
+        sel.setAttribute('data-jv-bound', '1');
+        sel.addEventListener('change', jvApplyOtherVoucherBrowseGateUi);
+    }
+})();
 
 (function jvAcctPickerSearchBind() {
     var searchEl = document.getElementById('jv_acct_picker_search');
@@ -1118,11 +1157,7 @@ function jvApplyViewModeUi() {
     }
     var delVBtn = document.getElementById('jv_btn_delete_voucher');
     if (delVBtn) {
-        var allowDel = !!jvBrowseId;
-        if (JV_OTHER_VOUCHER_BROWSE && jvBrowseEntryType && jvBrowseEntryType !== 'other_voucher') {
-            allowDel = false;
-        }
-        delVBtn.disabled = !allowDel;
+        delVBtn.disabled = !jvBrowseId;
     }
     document.querySelectorAll('#jv_lines_body input').forEach(function (inp) {
         inp.readOnly = ro;
@@ -1137,7 +1172,8 @@ function jvApplyVoucherPayload(r) {
     if (!r || !r.voucher) {
         return;
     }
-    jvViewMode = true;
+    var canEdit = r.voucher.editable === true;
+    jvViewMode = !canEdit;
     jvBrowseId = r.voucher.id;
     jvBrowseEntryType = r.voucher.entry_type ? String(r.voucher.entry_type) : null;
     document.getElementById('jv_number_preview').value = String(r.voucher.id);
@@ -1201,6 +1237,10 @@ function jvApplyVoucherPayload(r) {
 }
 
 function jvLoadVoucherFromApi(id) {
+    if (JV_OTHER_VOUCHER_BROWSE && !jvOtherVoucherBrowseOk()) {
+        alert(jvOtherVoucherBrowseBlockedMsg());
+        return;
+    }
     var getPayload = { action: 'get', id: id, entry_type: JV_ENTRY_TYPE };
     if (JV_OTHER_VOUCHER_BROWSE) {
         getPayload.journal_type_id = jvJournalTypeFilterId();
@@ -1241,6 +1281,10 @@ function jvPrintVoucher() {
 }
 
 function jvNav(where) {
+    if (JV_OTHER_VOUCHER_BROWSE && !jvOtherVoucherBrowseOk()) {
+        alert(jvOtherVoucherBrowseBlockedMsg());
+        return;
+    }
     var navPayload = {
         action: 'nav_manual',
         entry_type: JV_ENTRY_TYPE,
@@ -1279,6 +1323,10 @@ function jvRecalc() {
 
 function jvSubmit() {
     if (jvViewMode) {
+        return;
+    }
+    if (JV_OTHER_VOUCHER_BROWSE && !jvOtherVoucherBrowseOk()) {
+        alert(jvOtherVoucherBrowseBlockedMsg() + ' — مطلوب أيضاً قبل حفظ سند جديد.');
         return;
     }
     jvCashLockSyncTreasuryAmount();
@@ -1345,17 +1393,28 @@ function jvSubmit() {
         alert('السند غير متوازن');
         return;
     }
-    postJSON('/admin/api/journal/manage.php', {
-        action: 'create',
+    var savePayload = {
+        action: (jvBrowseId && !jvViewMode) ? 'update' : 'create',
         date: dIso,
         reference: ref,
         description: desc,
         entry_type: JV_ENTRY_TYPE,
         lines: lines
-    }).then(function (r) {
+    };
+    if (jvBrowseId && !jvViewMode) {
+        savePayload.id = jvBrowseId;
+    }
+    if (JV_OTHER_VOUCHER_BROWSE) {
+        savePayload.journal_type_id = jvJournalTypeFilterId();
+    }
+    postJSON('/admin/api/journal/manage.php', savePayload).then(function (r) {
         if (r.success) {
             alert(r.message || 'تم');
-            location.reload();
+            if (savePayload.action === 'update' && jvBrowseId) {
+                jvLoadVoucherFromApi(jvBrowseId);
+            } else {
+                location.reload();
+            }
             return;
         }
         if (!orangeAdminOfferSuggestOnFailure(r, 'فشل')) {
@@ -1401,5 +1460,6 @@ jvSyncTrailingRows();
     if (pb) {
         pb.addEventListener('click', jvPrintVoucher);
     }
+    jvApplyOtherVoucherBrowseGateUi();
 })();
 </script>

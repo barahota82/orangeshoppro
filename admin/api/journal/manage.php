@@ -31,6 +31,22 @@ function orange_journal_manage_resolve_ui_entry_type(array $data, string $fallba
 }
 
 /**
+ * شاشة «سندات أخرى»: مراجعة القيود المرتبطة بنوع يومية محدد فقط — لا يُقبل journal_type_id = 0 (لا «عرض الكل»).
+ */
+function orange_journal_manage_other_voucher_require_journal_type_id(array $data): int
+{
+    $jid = (int) ($data['journal_type_id'] ?? 0);
+    if ($jid <= 0) {
+        json_response([
+            'success' => false,
+            'message' => 'اختر نوع اليومية من الفلتر لعرض القيود أو البحث أو التنقل. لا يُسمح بعرض كل القيود دفعة واحدة.',
+        ], 422);
+    }
+
+    return $jid;
+}
+
+/**
  * شاشة «سندات أخرى»: أنواع القيود المعروضة حسب فلتر نوع اليومية من إعدادات القيود التلقائية (قسم ٢).
  *
  * @return list<string>
@@ -38,7 +54,7 @@ function orange_journal_manage_resolve_ui_entry_type(array $data, string $fallba
 function orange_journal_manage_other_voucher_browse_entry_types(PDO $pdo, int $journalTypeFilterId): array
 {
     if ($journalTypeFilterId <= 0) {
-        return ['other_voucher'];
+        return [];
     }
     $types = orange_gl_entry_types_for_journal_type_id($pdo, $journalTypeFilterId);
 
@@ -62,6 +78,79 @@ function orange_journal_manage_entry_type_sql_fragment(array $types): array
     $ph = implode(', ', array_fill(0, count($types), '?'));
 
     return ['entry_type IN (' . $ph . ')', $types];
+}
+
+/**
+ * سند يُنشأ من شاشة «سندات أخرى»: يُخزَّن بنوع قيد ضمن مجموعة نوع اليومية المختار في الفلتر ليظهر مع البحث/الفلتر نفسه.
+ * يُفضَّل manual / general / other_voucher إن وُجدت ضمن المجموعة؛ وإلا أول نوع غير مقفّل حذفه من شاشة القيود؛ وإلا أول نوع في القائمة.
+ */
+function orange_journal_manage_store_entry_type_for_other_voucher_screen(PDO $pdo, int $journalTypeId): string
+{
+    $allowed = orange_journal_manage_other_voucher_browse_entry_types($pdo, $journalTypeId);
+    if ($allowed === []) {
+        json_response(['success' => false, 'message' => 'نوع اليومية المحدد غير مرتبط بأنواع قيود في الإعدادات'], 422);
+    }
+    foreach (['manual', 'general', 'other_voucher'] as $pref) {
+        if (in_array($pref, $allowed, true)) {
+            return $pref;
+        }
+    }
+    $lockedFlip = array_flip(orange_gl_entry_types_delete_locked_from_journal_ui());
+    foreach ($allowed as $t) {
+        if (!isset($lockedFlip[$t])) {
+            return $t;
+        }
+    }
+
+    return (string) $allowed[0];
+}
+
+/**
+ * @param list<mixed> $linesIn
+ * @return list<array{account_id:int,debit:float,credit:float,memo:string}>
+ */
+function orange_journal_manage_normalize_multiline_body(PDO $pdo, array $linesIn): array
+{
+    $norm = [];
+    foreach ($linesIn as $ln) {
+        if (!is_array($ln)) {
+            continue;
+        }
+        $norm[] = [
+            'account_id' => (int) ($ln['account_id'] ?? 0),
+            'debit' => (float) ($ln['debit'] ?? 0),
+            'credit' => (float) ($ln['credit'] ?? 0),
+            'memo' => trim((string) ($ln['memo'] ?? '')),
+        ];
+    }
+    $postLines = [];
+    foreach ($norm as $ln) {
+        $aid = (int) ($ln['account_id'] ?? 0);
+        $d = (float) ($ln['debit'] ?? 0);
+        $c = (float) ($ln['credit'] ?? 0);
+        if ($aid <= 0 || ($d <= 0 && $c <= 0)) {
+            continue;
+        }
+        if (($ln['memo'] ?? '') === '') {
+            json_response(['success' => false, 'message' => 'بيان كل سطر مطلوب'], 422);
+        }
+        $postLines[] = $ln;
+    }
+    if (count($postLines) < 2) {
+        json_response(['success' => false, 'message' => 'يُشترط سطران صالحان على الأقل في السند'], 422);
+    }
+    if (orange_table_has_column($pdo, 'accounts', 'is_group')) {
+        foreach ($postLines as $ln) {
+            $aid = (int) $ln['account_id'];
+            $chk = $pdo->prepare('SELECT is_group FROM accounts WHERE id = ? LIMIT 1');
+            $chk->execute([$aid]);
+            if ((int) $chk->fetchColumn() === 1) {
+                json_response(['success' => false, 'message' => 'لا يُسجَّل على حساب رئيسي — اختر حساباً فرعياً من الدليل'], 422);
+            }
+        }
+    }
+
+    return $postLines;
 }
 
 /**
@@ -129,48 +218,23 @@ try {
             json_response(['success' => false, 'message' => 'بيان السند مطلوب'], 422);
         }
 
+        $entryTypeForPost = $entryTypeNorm;
+        if ($entryTypeNorm === 'other_voucher') {
+            $jtCreate = (int) ($data['journal_type_id'] ?? 0);
+            if ($jtCreate <= 0) {
+                json_response([
+                    'success' => false,
+                    'message' => 'اختر نوع اليومية من الفلتر قبل حفظ السند ليُصنَّف مع القيود المعروضة تحت ذلك النوع.',
+                ], 422);
+            }
+            $entryTypeForPost = orange_journal_manage_store_entry_type_for_other_voucher_screen($pdo, $jtCreate);
+        }
+
         $linesIn = $data['lines'] ?? null;
         if (is_array($linesIn) && count($linesIn) >= 2) {
-            $norm = [];
-            foreach ($linesIn as $ln) {
-                if (!is_array($ln)) {
-                    continue;
-                }
-                $norm[] = [
-                    'account_id' => (int)($ln['account_id'] ?? 0),
-                    'debit' => (float)($ln['debit'] ?? 0),
-                    'credit' => (float)($ln['credit'] ?? 0),
-                    'memo' => trim((string)($ln['memo'] ?? '')),
-                ];
-            }
-            $postLines = [];
-            foreach ($norm as $ln) {
-                $aid = (int) ($ln['account_id'] ?? 0);
-                $d = (float) ($ln['debit'] ?? 0);
-                $c = (float) ($ln['credit'] ?? 0);
-                if ($aid <= 0 || ($d <= 0 && $c <= 0)) {
-                    continue;
-                }
-                if (($ln['memo'] ?? '') === '') {
-                    json_response(['success' => false, 'message' => 'بيان كل سطر مطلوب'], 422);
-                }
-                $postLines[] = $ln;
-            }
-            if (count($postLines) < 2) {
-                json_response(['success' => false, 'message' => 'يُشترط سطران صالحان على الأقل في السند'], 422);
-            }
+            $postLines = orange_journal_manage_normalize_multiline_body($pdo, $linesIn);
             orange_journal_manage_assert_receipt_cash_first_line($pdo, $entryTypeNorm, $postLines);
             orange_journal_manage_assert_payment_cash_last_line($pdo, $entryTypeNorm, $postLines);
-            if (orange_table_has_column($pdo, 'accounts', 'is_group')) {
-                foreach ($postLines as $ln) {
-                    $aid = (int) $ln['account_id'];
-                    $chk = $pdo->prepare('SELECT is_group FROM accounts WHERE id = ? LIMIT 1');
-                    $chk->execute([$aid]);
-                    if ((int) $chk->fetchColumn() === 1) {
-                        json_response(['success' => false, 'message' => 'لا يُسجَّل على حساب رئيسي — اختر حساباً فرعياً من الدليل'], 422);
-                    }
-                }
-            }
             if (orange_gl_use_pending_queue($pdo)) {
                 $refOut = $reference !== '' ? $reference : ('JM-' . str_replace(['.', ' '], '', uniqid('', true)));
                 try {
@@ -182,7 +246,7 @@ try {
                         $date,
                         $date,
                         $description,
-                        $entryTypeNorm
+                        $entryTypeForPost
                     );
                 } catch (Throwable $e) {
                     orange_admin_api_catch($e, 'تعذر إضافة السند', 422);
@@ -206,7 +270,7 @@ try {
                     'document_entered_at' => date('Y-m-d H:i:s'),
                     'reference' => $reference !== '' ? $reference : null,
                     'description' => $description,
-                    'entry_type' => $entryTypeNorm,
+                    'entry_type' => $entryTypeForPost,
                 ], $postLines);
             } catch (Throwable $e) {
                 orange_admin_api_catch($e, 'تعذر إضافة السند', 422);
@@ -244,7 +308,7 @@ try {
                     'account_credit' => $accountCredit,
                     'amount' => $amount,
                     'description' => $description,
-                    'entry_type' => $entryTypeNorm,
+                    'entry_type' => $entryTypeForPost,
                 ]);
             } catch (Throwable $e) {
                 orange_admin_api_catch($e, 'تعذر إضافة السند', 422);
@@ -268,7 +332,7 @@ try {
                 'document_entered_at' => date('Y-m-d H:i:s'),
                 'reference' => $reference !== '' ? $reference : null,
                 'description' => $description,
-                'entry_type' => $entryTypeNorm,
+                'entry_type' => $entryTypeForPost,
             ], [
                 ['account_id' => $accountDebit, 'debit' => $amount, 'credit' => 0, 'memo' => $description],
                 ['account_id' => $accountCredit, 'debit' => 0, 'credit' => $amount, 'memo' => $description],
@@ -288,6 +352,10 @@ try {
         if ($gid <= 0) {
             json_response(['success' => false, 'message' => 'معرف السند مطلوب'], 422);
         }
+        $jtFilterGet = 0;
+        if ($etReq === 'other_voucher') {
+            $jtFilterGet = orange_journal_manage_other_voucher_require_journal_type_id($data);
+        }
         if (!orange_journal_vouchers_ready($pdo)) {
             json_response(['success' => false, 'message' => 'جداول السندات غير جاهزة'], 422);
         }
@@ -297,7 +365,6 @@ try {
         if (!$v) {
             json_response(['success' => false, 'message' => 'السند غير موجود'], 404);
         }
-        $jtFilterGet = (int) ($data['journal_type_id'] ?? 0);
         if ($etReq === 'other_voucher') {
             $allowedGet = orange_journal_manage_other_voucher_browse_entry_types($pdo, $jtFilterGet);
             if ($allowedGet === []) {
@@ -338,6 +405,8 @@ try {
                 'memo' => (string)($row['memo'] ?? ''),
             ];
         }
+        $vEtLock = (string) ($v['entry_type'] ?? '');
+        $editableV = !in_array($vEtLock, orange_gl_entry_types_delete_locked_from_journal_ui(), true);
         json_response([
             'success' => true,
             'voucher' => [
@@ -347,6 +416,7 @@ try {
                 'description' => (string)($v['description'] ?? ''),
                 'document_entered_display' => $docDisplay,
                 'entry_type' => (string) ($v['entry_type'] ?? ''),
+                'editable' => $editableV,
             ],
             'lines' => $lines,
         ]);
@@ -356,10 +426,11 @@ try {
 
     if ($action === 'nav_manual') {
         $et = orange_journal_manage_resolve_ui_entry_type($data, 'manual');
-        $jtNav = (int) ($data['journal_type_id'] ?? 0);
+        $jtNav = 0;
         $navTypes = [$et];
         $etFrag = 'entry_type = ?';
         if ($et === 'other_voucher') {
+            $jtNav = orange_journal_manage_other_voucher_require_journal_type_id($data);
             $navTypes = orange_journal_manage_other_voucher_browse_entry_types($pdo, $jtNav);
             if ($navTypes === []) {
                 json_response(['success' => false, 'message' => 'نوع اليومية المحدد غير مرتبط بأنواع قيود في الإعدادات'], 422);
@@ -429,10 +500,11 @@ try {
             json_response(['success' => false, 'message' => 'جداول السندات غير جاهزة'], 422);
         }
         $et = orange_journal_manage_resolve_ui_entry_type($data, 'manual');
-        $jtSearch = (int) ($data['journal_type_id'] ?? 0);
+        $jtSearch = 0;
         $searchTypes = [$et];
         $etSearchFrag = 'entry_type = ?';
         if ($et === 'other_voucher') {
+            $jtSearch = orange_journal_manage_other_voucher_require_journal_type_id($data);
             $searchTypes = orange_journal_manage_other_voucher_browse_entry_types($pdo, $jtSearch);
             if ($searchTypes === []) {
                 json_response(['success' => false, 'message' => 'نوع اليومية المحدد غير مرتبط بأنواع قيود في الإعدادات'], 422);
@@ -570,6 +642,54 @@ try {
             $blocked['suggest_admin'] = $suggest;
         }
         json_response($blocked, 422);
+    }
+
+    if ($action === 'update') {
+        $etReqUp = orange_journal_manage_resolve_ui_entry_type($data, 'manual');
+        $linesInUp = $data['lines'] ?? null;
+        if (!is_array($linesInUp) || count($linesInUp) < 2) {
+            json_response(['success' => false, 'message' => 'يُشترط سطران صالحان على الأقل في السند'], 422);
+        }
+        $postLinesUp = orange_journal_manage_normalize_multiline_body($pdo, $linesInUp);
+        orange_journal_manage_assert_receipt_cash_first_line($pdo, $entryTypeV, $postLinesUp);
+        orange_journal_manage_assert_payment_cash_last_line($pdo, $entryTypeV, $postLinesUp);
+
+        $descriptionUp = trim((string) ($data['description'] ?? ''));
+        $referenceUp = trim((string) ($data['reference'] ?? ''));
+        $dateRawUp = trim((string) ($data['date'] ?? ''));
+        $dateUp = orange_normalize_admin_posted_datetime($dateRawUp);
+        if ($dateUp === null) {
+            json_response(['success' => false, 'message' => 'تاريخ السند غير صالح'], 422);
+        }
+        if ($descriptionUp === '') {
+            json_response(['success' => false, 'message' => 'بيان السند مطلوب'], 422);
+        }
+
+        if ($etReqUp === 'other_voucher') {
+            $jtUp = orange_journal_manage_other_voucher_require_journal_type_id($data);
+            $allowedUp = orange_journal_manage_other_voucher_browse_entry_types($pdo, $jtUp);
+            if (!in_array($entryTypeV, $allowedUp, true)) {
+                json_response(['success' => false, 'message' => 'لا يمكن تعديل هذا السند مع فلتر نوع اليومية الحالي'], 422);
+            }
+        } elseif ($entryTypeV !== $etReqUp) {
+            json_response(['success' => false, 'message' => 'نوع السند لا يطابق هذه الشاشة'], 422);
+        }
+
+        try {
+            orange_voucher_update_multiline($pdo, $id, [
+                'voucher_date' => $dateUp,
+                'reference' => $referenceUp,
+                'description' => $descriptionUp,
+            ], $postLinesUp);
+        } catch (InvalidArgumentException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (Throwable $e) {
+            orange_admin_api_catch($e, 'تعذر تحديث السند', 422);
+        }
+        audit_log('journal_update', 'تم تحديث سند محاسبي رقم: ' . $id, 'journal_vouchers', $id);
+        json_response(['success' => true, 'message' => 'تم تحديث السند', 'id' => $id]);
+
+        return;
     }
 
     if ($action === 'delete') {

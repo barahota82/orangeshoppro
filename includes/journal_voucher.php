@@ -327,6 +327,116 @@ function orange_journal_insert_line(PDO $pdo, array $row): int
 }
 
 /**
+ * تحديث سند موجود (نفس entry_type) مع استبدال الأسطر — للشاشات اليدوية فقط حسب حماية الـ API.
+ *
+ * @param array{voucher_date:string,reference?:string,description:string} $header
+ * @param list<array{account_id:int,debit:float,credit:float,memo:string}> $postLines
+ *
+ * @throws InvalidArgumentException
+ */
+function orange_voucher_update_multiline(PDO $pdo, int $voucherId, array $header, array $postLines): void
+{
+    if (!orange_journal_vouchers_ready($pdo)) {
+        throw new RuntimeException('جداول السندات غير جاهزة.');
+    }
+    if ($voucherId <= 0) {
+        throw new InvalidArgumentException('معرف السند غير صالح.');
+    }
+    $ex = $pdo->prepare('SELECT id FROM journal_vouchers WHERE id = ? LIMIT 1');
+    $ex->execute([$voucherId]);
+    if (!$ex->fetch()) {
+        throw new InvalidArgumentException('السند غير موجود.');
+    }
+
+    $date = (string) ($header['voucher_date'] ?? '');
+    if ($date === '') {
+        $date = date('Y-m-d H:i:s');
+    }
+    if (strlen($date) === 10) {
+        $date .= ' 12:00:00';
+    }
+    $description = trim((string) ($header['description'] ?? ''));
+    if ($description === '') {
+        throw new InvalidArgumentException('بيان السند مطلوب.');
+    }
+    $reference = array_key_exists('reference', $header) ? trim((string) $header['reference']) : '';
+    $referenceSql = $reference === '' ? null : $reference;
+
+    $totalD = 0.0;
+    $totalC = 0.0;
+    $norm = [];
+    $lineNo = 0;
+    foreach ($postLines as $ln) {
+        $aid = (int) ($ln['account_id'] ?? 0);
+        $d = round((float) ($ln['debit'] ?? 0), 4);
+        $c = round((float) ($ln['credit'] ?? 0), 4);
+        if ($aid <= 0) {
+            throw new InvalidArgumentException('حساب غير صالح في سطر السند.');
+        }
+        if ($d < 0 || $c < 0) {
+            throw new InvalidArgumentException('لا يقبل السند سالباً في المدين أو الدائن.');
+        }
+        if ($d > 0 && $c > 0) {
+            throw new InvalidArgumentException('كل سطر إما مدين أو دائن فقط.');
+        }
+        if ($d === 0.0 && $c === 0.0) {
+            continue;
+        }
+        $memo = trim((string) ($ln['memo'] ?? ''));
+        if ($memo === '') {
+            throw new InvalidArgumentException('بيان السطر مطلوب لكل بند في السند.');
+        }
+        $norm[] = ['account_id' => $aid, 'debit' => $d, 'credit' => $c, 'memo' => $memo, 'line_no' => ++$lineNo];
+        $totalD += $d;
+        $totalC += $c;
+    }
+    if ($norm === []) {
+        throw new InvalidArgumentException('السند بدون أسطر.');
+    }
+    if (round($totalD - $totalC, 4) !== 0.0) {
+        throw new InvalidArgumentException('السند غير متوازن: مجموع المدين ' . $totalD . ' ≠ مجموع الدائن ' . $totalC);
+    }
+
+    $fyId = orange_fiscal_require_open_for_posting($pdo, $date);
+    $chk = $pdo->prepare('SELECT id FROM accounts WHERE id = ? LIMIT 1');
+
+    $hasUpdatedAt = orange_table_has_column($pdo, 'journal_vouchers', 'updated_at');
+    $updSql = $hasUpdatedAt
+        ? 'UPDATE journal_vouchers SET voucher_date = ?, reference = ?, description = ?, fiscal_year_id = ?, updated_at = NOW() WHERE id = ?'
+        : 'UPDATE journal_vouchers SET voucher_date = ?, reference = ?, description = ?, fiscal_year_id = ? WHERE id = ?';
+
+    $pdo->beginTransaction();
+    try {
+        $upd = $pdo->prepare($updSql);
+        $upd->execute([$date, $referenceSql, $description, $fyId, $voucherId]);
+        $pdo->prepare('DELETE FROM journal_lines WHERE voucher_id = ?')->execute([$voucherId]);
+        $ins = $pdo->prepare(
+            'INSERT INTO journal_lines (voucher_id, line_no, account_id, debit, credit, memo) VALUES (?,?,?,?,?,?)'
+        );
+        foreach ($norm as $row) {
+            $chk->execute([$row['account_id']]);
+            if (!$chk->fetch()) {
+                throw new InvalidArgumentException('حساب غير موجود في الدليل: ' . $row['account_id']);
+            }
+            $ins->execute([
+                $voucherId,
+                $row['line_no'],
+                $row['account_id'],
+                $row['debit'],
+                $row['credit'],
+                $row['memo'] === '' ? null : $row['memo'],
+            ]);
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
+    }
+}
+
+/**
  * أرصدة مجمّعة لكل حساب ضمن سنة مالية.
  *
  * @param list<string> $excludeEntryTypes أنواع سندات تُستبعد (مثلاً قائمة دخل)
