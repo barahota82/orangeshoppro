@@ -262,6 +262,65 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
         });
     }
 
+    function resolvedAccountIdForKey(k) {
+        k = String(k || '').trim();
+        if (!k) {
+            return 0;
+        }
+        var section1 = document.getElementById('gl_settings_section1_table');
+        var row = section1
+            ? section1.querySelector('tr[data-gl-key="' + k.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"]')
+            : null;
+        if (row) {
+            var id = parseInt(row.getAttribute('data-account-id'), 10) || 0;
+            if (id > 0) {
+                return id;
+            }
+        }
+        var sid = glKeyAccountInitial[k];
+        return typeof sid === 'number' ? sid : parseInt(String(sid || '0'), 10) || 0;
+    }
+
+    /** نفس مفتاح البند أو نفس حساب القسم ١ (حتى ببندين مختلفين) */
+    function glDebitCreditKeysConflict(dk, ck) {
+        dk = String(dk || '').trim();
+        ck = String(ck || '').trim();
+        if (!dk || !ck) {
+            return false;
+        }
+        if (dk === ck) {
+            return true;
+        }
+        var idD = resolvedAccountIdForKey(dk);
+        var idC = resolvedAccountIdForKey(ck);
+        return idD > 0 && idC > 0 && idD === idC;
+    }
+
+    /**
+     * تعديل الدائن ليطابق المدين → إفراغ المدين. تعديل المدين ليطابق الدائن → إفراغ الدائن.
+     */
+    function enforceGlRuleDistinctSides(tr, changedSide) {
+        var deb = tr.querySelector('.gl-sel-debit-key');
+        var cre = tr.querySelector('.gl-sel-credit-key');
+        if (!deb || !cre) {
+            return;
+        }
+        var dk = String(deb.value || '').trim();
+        var ck = String(cre.value || '').trim();
+        if (!glDebitCreditKeysConflict(dk, ck)) {
+            return;
+        }
+        if (changedSide === 'credit') {
+            if (!deb.disabled && deb.style.display !== 'none') {
+                deb.value = '';
+            }
+        } else if (changedSide === 'debit') {
+            if (!cre.disabled && cre.style.display !== 'none') {
+                cre.value = '';
+            }
+        }
+    }
+
     function syncRuleAccountPreviews(tr) {
         if (!tr) {
             return;
@@ -535,10 +594,16 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
         var debK = tr.querySelector('.gl-sel-debit-key');
         var creK = tr.querySelector('.gl-sel-credit-key');
         if (debK) {
-            debK.addEventListener('change', function () { syncRuleAccountPreviews(tr); });
+            debK.addEventListener('change', function () {
+                enforceGlRuleDistinctSides(tr, 'debit');
+                refreshAllRuleAccountPreviews();
+            });
         }
         if (creK) {
-            creK.addEventListener('change', function () { syncRuleAccountPreviews(tr); });
+            creK.addEventListener('change', function () {
+                enforceGlRuleDistinctSides(tr, 'credit');
+                refreshAllRuleAccountPreviews();
+            });
         }
         var jtSel = tr.querySelector('.gl-sel-jt-id');
         if (jtSel) {
@@ -828,14 +893,14 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
                     jtRulesInvalid = true;
                     return;
                 }
-                if (ck && dk === ck) {
-                    alert('حساب المدين والدائن يجب أن يختلفان.');
+                if (ck && glDebitCreditKeysConflict(dk, ck)) {
+                    alert('لا يمكن أن يكون نفس الحساب مديناً ودائناً.');
                     jtRulesInvalid = true;
                     return;
                 }
             } else if (jcode === 'PIN' && pt === 'cash') {
-                if (!dk || !ck || dk === ck) {
-                    alert('فاتورة مشتريات نقدي: اختر حساب مدين وحساب دائن مختلفين.');
+                if (!dk || !ck || glDebitCreditKeysConflict(dk, ck)) {
+                    alert('فاتورة مشتريات نقدي: اختر حسابين مختلفين للمدين والدائن (لا نفس الحساب).');
                     jtRulesInvalid = true;
                     return;
                 }
@@ -845,20 +910,20 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
                     jtRulesInvalid = true;
                     return;
                 }
-                if (dk && dk === ck) {
-                    alert('حساب المدين والدائن يجب أن يختلفان.');
+                if (dk && glDebitCreditKeysConflict(dk, ck)) {
+                    alert('لا يمكن أن يكون نفس الحساب مديناً ودائناً.');
                     jtRulesInvalid = true;
                     return;
                 }
             } else if (jcode === 'PDN' && pt === 'cash') {
-                if (!dk || !ck || dk === ck) {
-                    alert('مردود مشتريات نقدي: اختر حساب مدين وحساب دائن مختلفين.');
+                if (!dk || !ck || glDebitCreditKeysConflict(dk, ck)) {
+                    alert('مردود مشتريات نقدي: اختر حسابين مختلفين للمدين والدائن (لا نفس الحساب).');
                     jtRulesInvalid = true;
                     return;
                 }
             } else {
-                if (!dk || !ck || dk === ck) {
-                    alert('للأنواع الأخرى: اختر حساب مدين وحساب دائن مختلفين (عمود قياسي).');
+                if (!dk || !ck || glDebitCreditKeysConflict(dk, ck)) {
+                    alert('للأنواع الأخرى: اختر حسابين مختلفين للمدين والدائن (لا نفس الحساب).');
                     jtRulesInvalid = true;
                     return;
                 }
