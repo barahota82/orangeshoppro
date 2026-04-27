@@ -42,12 +42,12 @@ $recent = $pdo->query(
 <div class="page-title page-title--stacked">
     <div>
         <h1>فاتورة شراء</h1>
-        <p class="page-subtitle">تسجيل مشتريات نقدي أو آجل؛ <strong>حفظ الفاتورة لا يزيد المخزون</strong> — يزيد مخزون <strong>المتغير</strong> عند <strong>استلام البضاعة</strong>. قيد الحفظ يمرّر المبلغ عبر <strong>تمرير المشتريات</strong> (صف «حـ / تمرير المشتريات» في حسابات القيود التلقائية؛ اربطه بحساب «المشتريات» في دليلكم — ليس المخزون) ثم عند الاستلام يُدين <strong>المخزون</strong> ويُقابَل التمرير. مردود المشتريات كما هو عبر شاشة مردود المشتريات.</p>
+        <p class="page-subtitle">تسجيل مشتريات نقدي أو آجل؛ <strong>حفظ فاتورة الشراء يعني أن المخزن استلم الكميات بالكامل</strong> — تُزاد كميات <strong>المتغيرات</strong> فور الحفظ ويُرحَّل القيد على <strong>حساب المخزون</strong> (حسب «حسابات القيود التلقائية»). لا استلام لاحق ولا جزئي. مردود المشتريات من شاشة مردود المشتريات.</p>
     </div>
 </div>
 
 <div class="card" id="pur_edit_banner" hidden>
-    <p class="card-hint" style="margin:0 0 10px;"><strong>وضع التعديل</strong> — فاتورة <span id="pur_edit_banner_id"></span>. إن وُجد استلام مخزون، الحفظ يعكسه ويُصفّر أعمدة الاستلام ثم يعيد بنود الفاتورة كما في النموذج (قد تحتاج إعادة استلام لاحقاً).</p>
+    <p class="card-hint" style="margin:0 0 10px;"><strong>وضع التعديل</strong> — فاتورة <span id="pur_edit_banner_id"></span>. الحفظ يعكس زيادة المخزون السابقة لهذه الفاتورة ثم يطبّق البنود الجديدة.</p>
     <button type="button" class="btn-secondary" onclick="purCancelEdit()">إلغاء التعديل</button>
 </div>
 
@@ -106,7 +106,7 @@ $recent = $pdo->query(
         <button type="button" class="btn-secondary" onclick="purAddLine()">+ سطر</button>
         <button type="button" id="pur_submit_btn" onclick="purSubmit()">حفظ فاتورة الشراء</button>
     </div>
-    <p class="card-hint" style="margin-top:12px;margin-bottom:0;"><strong>المجموع المحسوب:</strong> <span id="pur_total_preview">0.00</span> KD — بعد الحفظ استخدم «استلام جزئي» أو «استلام كامل» في قائمة آخر الفواتير لزيادة المخزون.</p>
+    <p class="card-hint" style="margin-top:12px;margin-bottom:0;"><strong>المجموع المحسوب:</strong> <span id="pur_total_preview">0.00</span> KD — عند الحفظ تُحدَّث كميات المخزن تلقائياً بالكامل.</p>
 </div>
 
 <div class="card">
@@ -120,7 +120,7 @@ $recent = $pdo->query(
                     <th>المورد</th>
                     <th>النوع</th>
                     <th>الإجمالي</th>
-                    <th>الاستلام (مستلم / مُطلوب)</th>
+                    <th>الكميات (مُسجَّلة / مُطلوبة)</th>
                     <th>ملاحظات</th>
                     <th></th>
                 </tr>
@@ -130,7 +130,6 @@ $recent = $pdo->query(
                 <?php
                     $pq = (int) ($r['items_qty_sum'] ?? 0);
                     $pr = (int) ($r['items_received_sum'] ?? 0);
-                    $purCanReceive = $pq > 0 && $pr < $pq;
                 ?>
                 <tr>
                     <td><?php echo (int)$r['id']; ?></td>
@@ -142,41 +141,12 @@ $recent = $pdo->query(
                     <td><?php echo htmlspecialchars((string)($r['notes'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td>
                         <button type="button" class="btn-secondary" style="margin-left:6px;" onclick="purEdit(<?php echo (int)$r['id']; ?>)">تعديل</button>
-                        <button type="button" class="btn-secondary" style="margin-left:6px;" <?php echo $purCanReceive ? '' : 'disabled'; ?> onclick="purReceivePartialOpen(<?php echo (int)$r['id']; ?>)">استلام جزئي</button>
-                        <button type="button" class="btn-secondary" style="margin-left:6px;" <?php echo $purCanReceive ? '' : 'disabled'; ?> onclick="purReceiveAll(<?php echo (int)$r['id']; ?>)">استلام كامل</button>
                         <button type="button" class="btn-danger" onclick="purDelete(<?php echo (int)$r['id']; ?>)">حذف</button>
                     </td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
         </table>
-    </div>
-</div>
-
-<div class="gl-pick-modal" id="pur_recv_modal" hidden aria-hidden="true">
-    <div class="gl-pick-modal__backdrop" id="pur_recv_backdrop"></div>
-    <div class="gl-pick-modal__dialog" id="pur_recv_dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="pur_recv_title" style="max-width:min(720px, 96vw);">
-        <h3 class="gl-pick-modal__title" id="pur_recv_title">استلام جزئي — فاتورة <span id="pur_recv_pid"></span></h3>
-        <p class="card-hint" style="margin:0 0 10px;">أدخل كمية «استلم الآن» لكل سطر (لا تتجاوز المتبقي). الأسطر بلا متبقي لا تُعرض.</p>
-        <div class="table-wrap" style="overflow:auto; max-height:50vh;">
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>الصنف</th>
-                        <th>المتغير</th>
-                        <th>مطلوب</th>
-                        <th>مستلم</th>
-                        <th>متبقي</th>
-                        <th>استلم الآن</th>
-                    </tr>
-                </thead>
-                <tbody id="pur_recv_tbody"></tbody>
-            </table>
-        </div>
-        <div class="actions" style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
-            <button type="button" class="btn-secondary" id="pur_recv_cancel">إلغاء</button>
-            <button type="button" id="pur_recv_save">تسجيل الاستلام</button>
-        </div>
     </div>
 </div>
 
@@ -571,118 +541,8 @@ function purSubmit() {
     });
 }
 
-var PUR_RECV_PURCHASE_ID = 0;
-
-function purRecvModalSetOpen(open) {
-    var m = document.getElementById('pur_recv_modal');
-    if (!m) {
-        return;
-    }
-    m.hidden = !open;
-    m.setAttribute('aria-hidden', open ? 'false' : 'true');
-}
-
-function purReceivePartialOpen(purchaseId) {
-    PUR_RECV_PURCHASE_ID = purchaseId;
-    getJSON('/admin/api/purchases/lines.php?purchase_id=' + encodeURIComponent(String(purchaseId))).then(function (res) {
-        if (!res.success) {
-            if (!orangeAdminOfferSuggestOnFailure(res, 'فشل')) {
-                alert(res.message || 'فشل');
-            }
-            return;
-        }
-        var elPid = document.getElementById('pur_recv_pid');
-        if (elPid) {
-            elPid.textContent = '#' + purchaseId;
-        }
-        var tb = document.getElementById('pur_recv_tbody');
-        if (!tb) {
-            return;
-        }
-        tb.innerHTML = '';
-        var items = res.items || [];
-        for (var i = 0; i < items.length; i++) {
-            var it = items[i];
-            var rem = parseInt(it.remaining, 10) || 0;
-            if (rem <= 0) {
-                continue;
-            }
-            var tr = document.createElement('tr');
-            tr.innerHTML =
-                '<td>' + purEsc(it.product_name) + '</td>' +
-                '<td>' + purEsc(it.variant_label) + '</td>' +
-                '<td dir="ltr">' + String(it.qty) + '</td>' +
-                '<td dir="ltr">' + String(it.qty_received) + '</td>' +
-                '<td dir="ltr">' + String(rem) + '</td>' +
-                '<td><input type="number" class="pur-recv-q admin-inp-qty" data-item-id="' + String(it.item_id) + '" min="0" max="' + String(rem) + '" step="1" value="0" inputmode="numeric" lang="en" dir="ltr" style="width:5rem;"></td>';
-            tb.appendChild(tr);
-        }
-        if (!tb.querySelector('tr')) {
-            alert('لا توجد كميات متبقية للاستلام في هذه الفاتورة.');
-            return;
-        }
-        purRecvModalSetOpen(true);
-    });
-}
-
-function purRecvPartialSubmit() {
-    var tb = document.getElementById('pur_recv_tbody');
-    if (!tb || !PUR_RECV_PURCHASE_ID) {
-        return;
-    }
-    var inputs = tb.querySelectorAll('.pur-recv-q');
-    var lines = [];
-    for (var i = 0; i < inputs.length; i++) {
-        var inp = inputs[i];
-        var q = parseInt(inp.value, 10) || 0;
-        if (q <= 0) {
-            continue;
-        }
-        var iid = parseInt(inp.getAttribute('data-item-id'), 10) || 0;
-        var max = parseInt(inp.getAttribute('max'), 10) || 0;
-        if (q > max) {
-            alert('الكمية تتجاوز المتبقي في أحد الأسطر.');
-            return;
-        }
-        lines.push({ item_id: iid, qty: q });
-    }
-    if (!lines.length) {
-        alert('أدخل كمية استلام واحدة على الأقل.');
-        return;
-    }
-    postJSON('/admin/api/purchases/receive.php', {
-        purchase_id: PUR_RECV_PURCHASE_ID,
-        mode: 'lines',
-        lines: lines
-    }).then(function (res) {
-        if (res.success) {
-            purRecvModalSetOpen(false);
-            alert(res.message || 'تم الاستلام');
-            location.reload();
-            return;
-        }
-        if (!orangeAdminOfferSuggestOnFailure(res, 'فشل')) {
-            alert(res.message || 'فشل');
-        }
-    });
-}
-
-function purReceiveAll(id) {
-    if (!confirm('تسجيل استلام كامل للكميات المتبقية في فاتورة الشراء #' + id + '؟ سيُزاد المخزون فقط للكمية غير المستلمة بعد.')) return;
-    postJSON('/admin/api/purchases/receive.php', { purchase_id: id, mode: 'all' }).then(function (res) {
-        if (res.success) {
-            alert(res.message || 'تم الاستلام');
-            location.reload();
-            return;
-        }
-        if (!orangeAdminOfferSuggestOnFailure(res, 'فشل')) {
-            alert(res.message || 'فشل');
-        }
-    });
-}
-
 function purDelete(id) {
-    if (!confirm('حذف فاتورة الشراء هذه؟ سيتم عكس المخزون للكميات المستلمة فقط، وحذف القيد المحاسبي المرتبط بمرجع PUR-' + id + '.')) return;
+    if (!confirm('حذف فاتورة الشراء هذه؟ سيتم عكس المخزون حسب الكميات المُسجَّلة على البنود، وحذف القيد المحاسبي المرتبط بمرجع PUR-' + id + '.')) return;
     postJSON('/admin/api/purchases/update.php', { id: id, action: 'delete' }).then(function (res) {
         if (res.success) {
             alert(res.message || 'تم الحذف');
@@ -701,22 +561,4 @@ if (document.getElementById('pur_lines_body')) {
     purSyncTrailingRows();
 }
 
-(function purRecvModalInit() {
-    var bd = document.getElementById('pur_recv_backdrop');
-    var cancel = document.getElementById('pur_recv_cancel');
-    var save = document.getElementById('pur_recv_save');
-    if (bd) {
-        bd.addEventListener('click', function () {
-            purRecvModalSetOpen(false);
-        });
-    }
-    if (cancel) {
-        cancel.addEventListener('click', function () {
-            purRecvModalSetOpen(false);
-        });
-    }
-    if (save) {
-        save.addEventListener('click', purRecvPartialSubmit);
-    }
-})();
 </script>

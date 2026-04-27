@@ -61,7 +61,7 @@ $items = [];
 $hasReceived = false;
 foreach ($rows as $row) {
     $recv = (int) ($row['qty_received'] ?? 0);
-    if ($recv > 0) {
+    if ((int) ($row['qty'] ?? 0) > 0) {
         $hasReceived = true;
     }
     $vid = $hasV ? (int) ($row['variant_id'] ?? 0) : 0;

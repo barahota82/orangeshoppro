@@ -70,8 +70,10 @@ function apply_purchase_items(PDO $pdo, int $purchaseId, array $items): float
         );
         if ($hasV && $hasRecv) {
             $pdo->prepare(
-                'INSERT INTO purchase_items (purchase_id, product_id, variant_id, qty, qty_received, cost) VALUES (?, ?, ?, ?, 0, ?)'
-            )->execute([$purchaseId, $productId, $variantId, $qty, $cost]);
+                'INSERT INTO purchase_items (purchase_id, product_id, variant_id, qty, qty_received, cost) VALUES (?, ?, ?, ?, ?, ?)'
+            )->execute([$purchaseId, $productId, $variantId, $qty, $qty, $cost]);
+            $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ? AND product_id = ?')
+                ->execute([$qty, $variantId, $productId]);
         } elseif ($hasV) {
             $pdo->prepare(
                 'INSERT INTO purchase_items (purchase_id, product_id, variant_id, qty, cost) VALUES (?, ?, ?, ?, ?)'
@@ -80,8 +82,10 @@ function apply_purchase_items(PDO $pdo, int $purchaseId, array $items): float
                 ->execute([$qty, $variantId]);
         } elseif ($hasRecv) {
             $pdo->prepare(
-                'INSERT INTO purchase_items (purchase_id, product_id, qty, qty_received, cost) VALUES (?, ?, ?, 0, ?)'
-            )->execute([$purchaseId, $productId, $qty, $cost]);
+                'INSERT INTO purchase_items (purchase_id, product_id, qty, qty_received, cost) VALUES (?, ?, ?, ?, ?)'
+            )->execute([$purchaseId, $productId, $qty, $qty, $cost]);
+            $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ? AND product_id = ?')
+                ->execute([$qty, $variantId, $productId]);
         } else {
             $pdo->prepare("INSERT INTO purchase_items (purchase_id, product_id, qty, cost) VALUES (?, ?, ?, ?)")
                 ->execute([$purchaseId, $productId, $qty, $cost]);
@@ -180,14 +184,13 @@ try {
     orange_purchase_remove_accounting($pdo, $purRef);
     orange_gl_pending_remove_by_reference($pdo, $purRef);
 
-    $hasRecvCol = orange_table_has_column($pdo, 'purchase_items', 'qty_received');
     $glB = orange_gl_purchase_invoice_posting_bundle(
         $pdo,
         $type,
         $supplierId,
         $purchaseId,
         $newTotal,
-        $hasRecvCol
+        false
     );
     $now = date('Y-m-d H:i:s');
     $afterJson = $glB['after_post'] !== null

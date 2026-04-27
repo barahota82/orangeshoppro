@@ -5,7 +5,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/supplier_payable_account.php';
 
 /**
- * عند تفعيل استلام لاحق (عمود qty_received): يُستبدل مدين «المخزون» بحساب «تمرير المشتريات» (purchase_clearing) إن وافق المدين المحلّى حساب المخزون.
+ * عند `$deferInventoryUntilReceipt === true`: يُستبدل مدين «المخزون» بـ purchase_clearing إن وافق المدين المحلّى حساب المخزون.
+ * مسار فاتورة الشراء الحالي يمرّر دائماً `false` (المخزون مع حفظ الفاتورة).
  */
 function orange_gl_purchase_invoice_asset_debit_account_id(
     PDO $pdo,

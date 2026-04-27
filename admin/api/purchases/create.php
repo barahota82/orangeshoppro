@@ -81,8 +81,10 @@ try {
 
         if ($hasPiVariant && $hasPiQtyReceived) {
             $pdo->prepare(
-                'INSERT INTO purchase_items (purchase_id, product_id, variant_id, qty, qty_received, cost) VALUES (?, ?, ?, ?, 0, ?)'
-            )->execute([$purchaseId, $productId, $variantId, $qty, $cost]);
+                'INSERT INTO purchase_items (purchase_id, product_id, variant_id, qty, qty_received, cost) VALUES (?, ?, ?, ?, ?, ?)'
+            )->execute([$purchaseId, $productId, $variantId, $qty, $qty, $cost]);
+            $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ? AND product_id = ?')
+                ->execute([$qty, $variantId, $productId]);
         } elseif ($hasPiVariant) {
             $pdo->prepare(
                 'INSERT INTO purchase_items (purchase_id, product_id, variant_id, qty, cost) VALUES (?, ?, ?, ?, ?)'
@@ -91,8 +93,10 @@ try {
                 ->execute([$qty, $variantId]);
         } elseif ($hasPiQtyReceived) {
             $pdo->prepare(
-                'INSERT INTO purchase_items (purchase_id, product_id, qty, qty_received, cost) VALUES (?, ?, ?, 0, ?)'
-            )->execute([$purchaseId, $productId, $qty, $cost]);
+                'INSERT INTO purchase_items (purchase_id, product_id, qty, qty_received, cost) VALUES (?, ?, ?, ?, ?)'
+            )->execute([$purchaseId, $productId, $qty, $qty, $cost]);
+            $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ? AND product_id = ?')
+                ->execute([$qty, $variantId, $productId]);
         } else {
             $pdo->prepare("INSERT INTO purchase_items (purchase_id, product_id, qty, cost) VALUES (?, ?, ?, ?)")
                 ->execute([$purchaseId, $productId, $qty, $cost]);
@@ -101,14 +105,13 @@ try {
         }
     }
 
-    $deferGrni = $hasPiQtyReceived;
     $glB = orange_gl_purchase_invoice_posting_bundle(
         $pdo,
         $type,
         $supplierId,
         $purchaseId,
         $computedTotal,
-        $deferGrni
+        false
     );
 
     $purRef = 'PUR-' . $purchaseId;
