@@ -6,36 +6,83 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
+require_once __DIR__ . '/../../includes/upload_paths.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
 $years = array_values(array_filter(orange_fiscal_years_list($pdo), static fn ($y) => (int) ($y['is_closed'] ?? 0) === 0));
-$fyId = isset($_GET['fy']) ? (int) $_GET['fy'] : 0;
-if ($fyId <= 0 && $years !== []) {
-    $fyId = (int) $years[0]['id'];
+
+$obFyRanges = [];
+foreach ($years as $y) {
+    $obFyRanges[] = [
+        'id' => (int) $y['id'],
+        'start' => substr((string) ($y['start_date'] ?? ''), 0, 10),
+        'end' => substr((string) ($y['end_date'] ?? ''), 0, 10),
+    ];
+}
+
+$obDateParam = isset($_GET['ob_date']) ? trim((string) $_GET['ob_date']) : '';
+$bootstrapIso = '';
+if ($obDateParam !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $obDateParam)) {
+    $bootstrapIso = $obDateParam;
+} else {
+    $bootstrapIso = date('Y-m-d');
+}
+
+$fyRowSel = null;
+$fyId = 0;
+
+$isYearOpenAndListed = static function (?array $row) use ($years): bool {
+    if (!$row) {
+        return false;
+    }
+    if ((int) ($row['is_closed'] ?? 0) === 1) {
+        return false;
+    }
+    $id = (int) ($row['id'] ?? 0);
+    foreach ($years as $y) {
+        if ((int) $y['id'] === $id) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
+if ($years !== []) {
+    $fyTry = orange_fiscal_find_for_date($pdo, $bootstrapIso);
+    if ($isYearOpenAndListed($fyTry)) {
+        $fyRowSel = $fyTry;
+        $fyId = (int) $fyRowSel['id'];
+    } else {
+        $first = $years[0];
+        $bootstrapIso = substr((string) ($first['start_date'] ?? ''), 0, 10);
+        if (strlen($bootstrapIso) !== 10) {
+            $bootstrapIso = date('Y-m-d');
+        }
+        $fyTry2 = orange_fiscal_find_for_date($pdo, $bootstrapIso);
+        if ($isYearOpenAndListed($fyTry2)) {
+            $fyRowSel = $fyTry2;
+            $fyId = (int) $fyRowSel['id'];
+        } else {
+            $fyRowSel = $first;
+            $fyId = (int) $fyRowSel['id'];
+            $bootstrapIso = substr((string) ($fyRowSel['start_date'] ?? ''), 0, 10);
+            if (strlen($bootstrapIso) !== 10) {
+                $bootstrapIso = date('Y-m-d');
+            }
+        }
+    }
 }
 
 $obVid = 0;
 $obInitial = [];
 $obStatement = '';
 $obRef = $fyId > 0 ? 'OB-' . $fyId : '';
-$obVoucherDateDisp = '';
+$obVoucherDateDisp = strlen($bootstrapIso) === 10 ? orange_format_date_dmY($bootstrapIso) : '';
 $obDocEnteredDisp = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 $obNumberPreview = 1;
-$fyRowSel = null;
-
-if ($fyId > 0) {
-    $fySt = $pdo->prepare('SELECT * FROM fiscal_years WHERE id = ? LIMIT 1');
-    $fySt->execute([$fyId]);
-    $fyRowSel = $fySt->fetch(PDO::FETCH_ASSOC) ?: null;
-    if ($fyRowSel !== null) {
-        $sd = (string) ($fyRowSel['start_date'] ?? '');
-        if (strlen($sd) >= 10) {
-            $obVoucherDateDisp = orange_format_date_dmY(substr($sd, 0, 10));
-        }
-    }
-}
 
 if (orange_journal_vouchers_ready($pdo)) {
     $obNumberPreview = (int) $pdo->query('SELECT COALESCE(MAX(id),0) + 1 FROM journal_vouchers')->fetchColumn();
@@ -55,10 +102,6 @@ if ($fyId > 0 && $fyRowSel !== null && orange_journal_vouchers_ready($pdo)) {
         $vh = $vd->fetch(PDO::FETCH_ASSOC);
         if ($vh) {
             $obStatement = trim((string) ($vh['description'] ?? ''));
-            $refRow = trim((string) ($vh['reference'] ?? ''));
-            if ($refRow !== '') {
-                $obRef = $refRow;
-            }
             $vdStr = (string) ($vh['voucher_date'] ?? '');
             if (strlen($vdStr) >= 10) {
                 $obVoucherDateDisp = orange_format_date_dmY(substr($vdStr, 0, 10));
@@ -96,6 +139,7 @@ if ($obVoucherDateDisp === '' && $fyId > 0) {
 }
 
 $obNumberDisplay = $obVid > 0 ? $obVid : $obNumberPreview;
+$obAdminIndexUrl = storefront_public_path('/admin/index.php');
 ?>
 <div class="page-title page-title--stacked jv-print-hide">
     <div>
@@ -103,35 +147,17 @@ $obNumberDisplay = $obVid > 0 ? $obVid : $obNumberPreview;
     </div>
 </div>
 
+<?php if ($years === []): ?>
 <div class="card jv-print-hide">
-    <form method="get" action="" class="form-grid" style="align-items:end;">
-        <input type="hidden" name="page" value="opening_balances">
-        <div>
-            <label for="ob_fy">السنة المالية (مفتوحة)</label>
-            <select id="ob_fy" name="fy" onchange="this.form.submit()">
-                <?php foreach ($years as $y): ?>
-                    <?php
-                    $sd = orange_format_date_dmY((string) ($y['start_date'] ?? ''));
-                    $ed = orange_format_date_dmY((string) ($y['end_date'] ?? ''));
-                    $range = $sd !== '' && $ed !== '' ? $sd . ' — ' . $ed : '';
-                    ?>
-                    <option value="<?php echo (int) $y['id']; ?>" <?php echo ((int) $y['id'] === $fyId) ? 'selected' : ''; ?>>
-                        <?php echo htmlspecialchars(trim($y['label_ar'] . ($range !== '' ? ' (' . $range . ')' : '')), ENT_QUOTES, 'UTF-8'); ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-    </form>
-    <?php if ($years === []): ?>
-        <p class="card-hint">لا توجد سنة مفتوحة — افتح سنة من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=fiscal_years'), ENT_QUOTES, 'UTF-8'); ?>">السنوات المالية</a>.</p>
-    <?php endif; ?>
+    <p class="card-hint">لا توجد سنة مفتوحة — افتح سنة من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=fiscal_years'), ENT_QUOTES, 'UTF-8'); ?>">السنوات المالية</a>.</p>
 </div>
+<?php endif; ?>
 
 <?php if ($fyId > 0 && $years !== []): ?>
 <div class="card jv-print-area ob-opening-card">
     <h3 class="card-title">سند رصيد افتتاحي</h3>
     <div class="form-grid">
-        <div class="jv-voucher-header-line" style="grid-column:1/-1;">
+        <div class="jv-voucher-header-line jv-voucher-header-line--nav" style="grid-column:1/-1;">
             <div>
                 <label for="ob_number_preview">رقم القيد</label>
                 <input type="text" id="ob_number_preview" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;text-align:center;"
@@ -142,11 +168,13 @@ $obNumberDisplay = $obVid > 0 ? $obVid : $obNumberPreview;
                 <label for="ob_date">تاريخ السند</label>
                 <input type="text" id="ob_date" class="admin-inp orange-inp-dmy"
                     value="<?php echo htmlspecialchars($obVoucherDateDisp, ENT_QUOTES, 'UTF-8'); ?>"
-                    title="ضمن نطاق السنة المالية المختارة" dir="ltr" lang="en" autocomplete="off">
+                    title="يحدد السنة المالية تلقائياً — يجب أن يقع التاريخ ضمن سنة مفتوحة" dir="ltr" lang="en" autocomplete="off">
             </div>
             <div>
-                <label for="ob_ref">المرجع <span class="muted" style="font-weight:normal;">(اختياري)</span></label>
-                <input type="text" id="ob_ref" autocomplete="off" value="<?php echo htmlspecialchars($obRef, ENT_QUOTES, 'UTF-8'); ?>">
+                <label for="ob_ref">المرجع</label>
+                <input type="text" id="ob_ref" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;" tabindex="-1"
+                    value="<?php echo htmlspecialchars($obRef, ENT_QUOTES, 'UTF-8'); ?>"
+                    title="يُولَّد تلقائياً من السنة المالية (OB-رقم السنة)" dir="ltr" lang="en" autocomplete="off">
             </div>
             <div>
                 <label for="ob_document_entered">تاريخ المستند</label>
@@ -163,6 +191,14 @@ $obNumberDisplay = $obVid > 0 ? $obVid : $obNumberPreview;
                 <label for="ob_tot_credit">مجموع الدائن</label>
                 <input type="text" id="ob_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000"
                     title="إجمالي الدائن من أسطر السند" dir="ltr" lang="en" inputmode="decimal">
+            </div>
+            <div class="jv-voucher-nav-cell jv-print-hide">
+                <div class="jv-voucher-nav-btns ob-voucher-action-btns" role="group" aria-label="إجراءات سند الرصيد الافتتاحي">
+                    <button type="button" class="btn-secondary jv-nav-search" id="ob_btn_add">+ سطر يدوي</button>
+                    <button type="button" class="btn-secondary jv-nav-search" id="ob_btn_delete"<?php echo $obVid <= 0 ? ' disabled' : ''; ?>>حذف السند</button>
+                    <button type="button" class="btn-secondary jv-nav-search" id="ob_btn_print">طباعة السند</button>
+                    <button type="button" id="ob_btn_save">حفظ</button>
+                </div>
             </div>
         </div>
         <div style="grid-column:1/-1;">
@@ -193,14 +229,6 @@ $obNumberDisplay = $obVid > 0 ? $obVid : $obNumberPreview;
             </table>
         </div>
     </div>
-    <div class="actions admin-doc-lines-toolbar ob-opening-toolbar jv-doc-toolbar jv-print-hide" style="margin-top:10px;">
-        <button type="button" class="btn-secondary" id="ob_btn_add">+ سطر يدوي</button>
-        <div class="jv-toolbar-primary-group">
-            <button type="button" class="btn-secondary" id="ob_btn_delete"<?php echo $obVid <= 0 ? ' disabled' : ''; ?>>حذف السند</button>
-            <button type="button" class="btn-secondary" id="ob_btn_print">طباعة السند</button>
-            <button type="button" id="ob_btn_save">حفظ</button>
-        </div>
-    </div>
 </div>
 
 <div class="gl-pick-modal" id="ob_pick_modal" hidden aria-hidden="true">
@@ -216,11 +244,55 @@ $obNumberDisplay = $obVid > 0 ? $obVid : $obNumberPreview;
 <?php endif; ?>
 
 <script>
-var OB_FY = <?php echo (int) $fyId; ?>;
+var OB_PAGE_FY = <?php echo (int) $fyId; ?>;
+var OB_FY_RANGES = <?php echo json_encode($obFyRanges, JSON_UNESCAPED_UNICODE); ?>;
+var OB_ADMIN_INDEX = <?php echo json_encode($obAdminIndexUrl, JSON_UNESCAPED_UNICODE); ?>;
 var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
 var OB_SAVED_VOUCHER_ID = <?php echo (int) $obVid; ?>;
 
 (function () {
+    var obSaveInFlight = false;
+    var obDeleteInFlight = false;
+    var obPrintArm = true;
+
+    function obResolveFyIdFromIso(iso) {
+        if (!iso || !OB_FY_RANGES || !OB_FY_RANGES.length) {
+            return 0;
+        }
+        for (var i = 0; i < OB_FY_RANGES.length; i++) {
+            var r = OB_FY_RANGES[i];
+            if (iso >= r.start && iso <= r.end) {
+                return parseInt(r.id, 10) || 0;
+            }
+        }
+        return 0;
+    }
+
+    function obSyncRefFromDate() {
+        var obDateEl = document.getElementById('ob_date');
+        var refEl = document.getElementById('ob_ref');
+        if (!obDateEl || !refEl) {
+            return { iso: '', fy: 0 };
+        }
+        var iso = typeof orangeGetDmyValueAsIso === 'function' ? orangeGetDmyValueAsIso(obDateEl) : '';
+        var fy = obResolveFyIdFromIso(iso);
+        refEl.value = fy > 0 ? 'OB-' + fy : '';
+        return { iso: iso, fy: fy };
+    }
+
+    function obWireDateReload() {
+        var obDateEl = document.getElementById('ob_date');
+        if (!obDateEl) {
+            return;
+        }
+        obDateEl.addEventListener('blur', function () {
+            var r = obSyncRefFromDate();
+            if (r.fy > 0 && r.fy !== OB_PAGE_FY && r.iso) {
+                window.location.href = OB_ADMIN_INDEX + '?page=opening_balances&ob_date=' + encodeURIComponent(r.iso);
+            }
+        });
+    }
+
     var pickModal = document.getElementById('ob_pick_modal');
     var pickList = document.getElementById('ob_pick_list');
     var pickQ = document.getElementById('ob_pick_q');
@@ -556,8 +628,7 @@ var OB_SAVED_VOUCHER_ID = <?php echo (int) $obVid; ?>;
         }
     };
     window.obSave = function () {
-        if (OB_FY <= 0) {
-            alert('اختر سنة');
+        if (obSaveInFlight) {
             return;
         }
         var stEl = document.getElementById('ob_statement');
@@ -606,13 +677,21 @@ var OB_SAVED_VOUCHER_ID = <?php echo (int) $obVid; ?>;
             }
             return;
         }
-        var refEl = document.getElementById('ob_ref');
-        var refVal = refEl ? String(refEl.value || '').trim() : '';
+        if (obResolveFyIdFromIso(vIso) <= 0) {
+            alert('تاريخ السند خارج السنوات المالية المفتوحة');
+            if (obDateEl) {
+                obDateEl.focus();
+            }
+            return;
+        }
+        obSaveInFlight = true;
+        var saveBtn = document.getElementById('ob_btn_save');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+        }
         postJSON('/admin/api/opening_balances/save.php', {
-            fiscal_year_id: OB_FY,
             statement: statement,
             voucher_date: vIso,
-            reference: refVal,
             lines: lines
         })
             .then(function (r) {
@@ -625,13 +704,29 @@ var OB_SAVED_VOUCHER_ID = <?php echo (int) $obVid; ?>;
                     alert(r.message || 'فشل');
                 }
             })
-            .catch(function (e) { alert(e.message || String(e)); });
+            .catch(function (e) { alert(e.message || String(e)); })
+            .finally(function () {
+                obSaveInFlight = false;
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                }
+            });
     };
 
     function obPrint() {
+        if (!obPrintArm) {
+            return;
+        }
+        obPrintArm = false;
         window.print();
+        window.setTimeout(function () {
+            obPrintArm = true;
+        }, 1500);
     }
     function obDelete() {
+        if (obDeleteInFlight) {
+            return;
+        }
         if (OB_SAVED_VOUCHER_ID <= 0) {
             alert('لا يوجد سند محفوظ للحذف');
             return;
@@ -639,7 +734,20 @@ var OB_SAVED_VOUCHER_ID = <?php echo (int) $obVid; ?>;
         if (!confirm('تأكيد حذف سند الرصيد الافتتاحي لهذه السنة؟')) {
             return;
         }
-        postJSON('/admin/api/opening_balances/delete.php', { fiscal_year_id: OB_FY })
+        var obDateEl = document.getElementById('ob_date');
+        var vIso = typeof orangeGetDmyValueAsIso === 'function' && obDateEl
+            ? orangeGetDmyValueAsIso(obDateEl)
+            : '';
+        if (!vIso) {
+            alert('تاريخ السند مطلوب لتحديد السنة');
+            return;
+        }
+        obDeleteInFlight = true;
+        var delBtn = document.getElementById('ob_btn_delete');
+        if (delBtn) {
+            delBtn.disabled = true;
+        }
+        postJSON('/admin/api/opening_balances/delete.php', { voucher_date: vIso })
             .then(function (r) {
                 if (r.success) {
                     alert(r.message || 'تم');
@@ -650,7 +758,13 @@ var OB_SAVED_VOUCHER_ID = <?php echo (int) $obVid; ?>;
                     alert(r.message || 'فشل');
                 }
             })
-            .catch(function (e) { alert(e.message || String(e)); });
+            .catch(function (e) { alert(e.message || String(e)); })
+            .finally(function () {
+                obDeleteInFlight = false;
+                if (delBtn) {
+                    delBtn.disabled = OB_SAVED_VOUCHER_ID <= 0;
+                }
+            });
     }
 
     var tb = document.getElementById('ob_body');
@@ -681,6 +795,8 @@ var OB_SAVED_VOUCHER_ID = <?php echo (int) $obVid; ?>;
         if (pickClose) {
             pickClose.addEventListener('click', obClosePick);
         }
+        obWireDateReload();
+        obSyncRefFromDate();
         document.addEventListener('keydown', function (ev) {
             if (ev.key !== 'Escape') {
                 return;

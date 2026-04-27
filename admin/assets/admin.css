@@ -1473,6 +1473,10 @@ label {
     box-sizing: border-box;
     white-space: nowrap;
 }
+.jv-voucher-nav-btns.ob-voucher-action-btns {
+    flex-wrap: wrap;
+    justify-content: center;
+}
 /* سند قيد — شريط الأدوات: «+ سطر» عند البداية، مجموعة سند جديد/حذف/طباعة/حفظ في سطر واحد عند النهاية (يسار الشاشة في RTL) */
 .jv-doc-toolbar {
     margin-top: 10px;

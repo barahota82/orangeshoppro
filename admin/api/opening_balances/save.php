@@ -19,50 +19,23 @@ try {
     }
 
     $data = get_json_input();
-    $fyId = (int)($data['fiscal_year_id'] ?? 0);
     $statement = trim((string)($data['statement'] ?? ''));
     $linesIn = isset($data['lines']) && is_array($data['lines']) ? $data['lines'] : [];
-    if ($fyId <= 0 || count($linesIn) < 2) {
-        json_response(['success' => false, 'message' => 'السنة وأسطر الأرصدة (سطران على الأقل) مطلوبة'], 422);
+    if (count($linesIn) < 2) {
+        json_response(['success' => false, 'message' => 'أسطر الأرصدة (سطران على الأقل) مطلوبة'], 422);
     }
     if ($statement === '') {
         json_response(['success' => false, 'message' => 'البيان مطلوب لقيد رصيد الافتتاح'], 422);
     }
 
-    $fySt = $pdo->prepare('SELECT * FROM fiscal_years WHERE id = ? LIMIT 1');
-    $fySt->execute([$fyId]);
-    $fy = $fySt->fetch(PDO::FETCH_ASSOC);
-    if (!$fy) {
-        json_response(['success' => false, 'message' => 'السنة غير موجودة'], 404);
-    }
-    if ((int)$fy['is_closed'] === 1) {
-        json_response([
-            'success' => false,
-            'message' => 'لا يمكن تعديل أرصدة افتتاحية لسنة مغلقة',
-            'suggest_admin' => orange_gl_suggest_admin_fiscal_years_screen(),
-        ], 422);
-    }
-
-    $refIn = trim((string) ($data['reference'] ?? ''));
     $dateIso = trim((string) ($data['voucher_date'] ?? ''));
-    $startD = (string) ($fy['start_date'] ?? '');
-    $endD = (string) ($fy['end_date'] ?? '');
     if ($dateIso === '' || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateIso)) {
-        $dateIso = strlen($startD) >= 10 ? substr($startD, 0, 10) : date('Y-m-d');
-    }
-    if ($startD !== '' && strlen($startD) >= 10 && strcmp($dateIso, substr($startD, 0, 10)) < 0) {
-        json_response(['success' => false, 'message' => 'تاريخ السند قبل بداية السنة المالية'], 422);
-    }
-    if ($endD !== '' && strlen($endD) >= 10 && strcmp($dateIso, substr($endD, 0, 10)) > 0) {
-        json_response(['success' => false, 'message' => 'تاريخ السند بعد نهاية السنة المالية'], 422);
+        json_response(['success' => false, 'message' => 'تاريخ السند مطلوب بصيغة صحيحة (يوم/شهر/سنة)'], 422);
     }
     try {
-        $fyFromDate = orange_fiscal_require_open_for_posting($pdo, $dateIso . ' 12:00:00');
+        $fyId = orange_fiscal_require_open_for_posting($pdo, $dateIso . ' 12:00:00');
     } catch (Throwable $e) {
         json_response(['success' => false, 'message' => $e->getMessage()], 422);
-    }
-    if ($fyFromDate !== $fyId) {
-        json_response(['success' => false, 'message' => 'تاريخ السند لا يطابق السنة المالية المختارة'], 422);
     }
 
     $norm = [];
@@ -106,7 +79,7 @@ try {
         orange_gl_pending_remove_by_reference($pdo, 'OB-' . $fyId);
 
         $obDate = $dateIso . ' 10:00:00';
-        $obRef = $refIn !== '' ? $refIn : ('OB-' . $fyId);
+        $obRef = 'OB-' . $fyId;
         if ($useQueue) {
             $pendingOb = orange_gl_pending_enqueue_multi(
                 $pdo,

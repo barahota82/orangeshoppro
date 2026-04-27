@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
 require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
+require_once __DIR__ . '/../../../includes/fiscal_years.php';
 require_admin_api();
 
 try {
@@ -17,23 +18,14 @@ try {
     }
 
     $data = get_json_input();
-    $fyId = (int) ($data['fiscal_year_id'] ?? 0);
-    if ($fyId <= 0) {
-        json_response(['success' => false, 'message' => 'السنة المالية مطلوبة'], 422);
+    $dateIso = trim((string) ($data['voucher_date'] ?? ''));
+    if ($dateIso === '' || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateIso)) {
+        json_response(['success' => false, 'message' => 'تاريخ السند مطلوب لتحديد السنة المالية'], 422);
     }
-
-    $fySt = $pdo->prepare('SELECT * FROM fiscal_years WHERE id = ? LIMIT 1');
-    $fySt->execute([$fyId]);
-    $fy = $fySt->fetch(PDO::FETCH_ASSOC);
-    if (!$fy) {
-        json_response(['success' => false, 'message' => 'السنة غير موجودة'], 404);
-    }
-    if ((int) $fy['is_closed'] === 1) {
-        json_response([
-            'success' => false,
-            'message' => 'لا يمكن حذف أرصدة افتتاحية لسنة مغلقة',
-            'suggest_admin' => orange_gl_suggest_admin_fiscal_years_screen(),
-        ], 422);
+    try {
+        $fyId = orange_fiscal_require_open_for_posting($pdo, $dateIso . ' 12:00:00');
+    } catch (Throwable $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 422);
     }
 
     $pdo->beginTransaction();
