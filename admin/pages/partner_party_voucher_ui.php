@@ -191,6 +191,14 @@ $ppvReady = $ppvCashLock !== null && (!$ppvIsReceipt || $ppvPartyDefaultAcc !== 
             </div>
         </div>
 
+        <div class="ppv-voucher-toolbar actions admin-doc-lines-toolbar jv-doc-toolbar ppv-print-hide" style="grid-column:1/-1;margin-top:8px;padding-top:10px;border-top:1px solid #e4e4e7;">
+            <div class="jv-toolbar-primary-group">
+                <button type="button" id="ppv_btn_new" title="سند جديد">سند جديد</button>
+                <button type="button" class="btn-secondary" id="ppv_btn_print" title="طباعة">طباعة السند</button>
+                <button type="button" id="ppv_btn_save"<?php echo !$ppvReady ? ' disabled' : ''; ?>>حفظ السند</button>
+            </div>
+        </div>
+
         <div style="grid-column:1/-1;">
             <label for="ppv_desc">البيان</label>
             <input type="text" id="ppv_desc" placeholder="<?php echo $ppvIsReceipt ? 'بيان السداد — مبيعات آجل' : 'بيان السداد — مشتريات آجل'; ?>"<?php echo !$ppvReady ? ' disabled' : ''; ?>>
@@ -238,13 +246,6 @@ $ppvReady = $ppvCashLock !== null && (!$ppvIsReceipt || $ppvPartyDefaultAcc !== 
         </div>
     </div>
 
-    <div class="actions admin-doc-lines-toolbar jv-doc-toolbar ppv-print-hide" style="margin-top:14px;">
-        <div class="jv-toolbar-primary-group">
-            <button type="button" id="ppv_btn_new" title="سند جديد">سند جديد</button>
-            <button type="button" class="btn-secondary" id="ppv_btn_print" title="طباعة">طباعة السند</button>
-            <button type="button" id="ppv_btn_save"<?php echo !$ppvReady ? ' disabled' : ''; ?>>حفظ السند</button>
-        </div>
-    </div>
 </div>
 
 <script>
