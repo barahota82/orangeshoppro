@@ -1477,6 +1477,28 @@ label {
     flex-wrap: wrap;
     justify-content: center;
 }
+
+/* تاريخ نصي d/m/Y + حقل type=date للتقويم الأصلي للمتصفح */
+.admin-inp-dmy-with-picker {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+}
+.admin-inp-dmy-with-picker .orange-inp-dmy {
+    flex: 1;
+    min-width: 0;
+}
+.admin-inp-dmy-picker {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 8.5rem;
+    max-width: 10.5rem;
+    padding: 6px 8px;
+    box-sizing: border-box;
+    cursor: pointer;
+}
 /* سند قيد — شريط الأدوات: «+ سطر» عند البداية، مجموعة سند جديد/حذف/طباعة/حفظ في سطر واحد عند النهاية (يسار الشاشة في RTL) */
 .jv-doc-toolbar {
     margin-top: 10px;
