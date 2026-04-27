@@ -43,7 +43,6 @@ $allowed = [
     'partner_supplier_payment',
     'partner_reports',
     'gl_account_settings',
-    'expenses',
     'journal_entries',
     'receipt_voucher',
     'payment_voucher',

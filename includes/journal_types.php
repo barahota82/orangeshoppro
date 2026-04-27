@@ -39,7 +39,6 @@ function orange_journal_types_canonical_rows(): array
         ['JE', 'سند قيد', 'Journal entry'],
         ['RV', 'سند قبض', 'Receipt voucher'],
         ['PV', 'سند صرف', 'Payment voucher'],
-        ['EXP', 'قيد مصروف', 'Expense voucher'],
         ['YEC', 'قيد الإقفال السنوي', 'Year-end closing entry'],
         ['PIN', 'فاتورة مشتريات', 'Purchase invoice'],
         ['PDN', 'مردود مشتريات', 'Purchase return'],
@@ -92,6 +91,7 @@ function orange_journal_types_merge_canonical_defaults(PDO $pdo): void
                 $ins->execute([$code, $r[1], $r[2], $ord]);
             }
         }
+        orange_journal_types_retire_obsolete_exp_type($pdo);
         $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
@@ -99,6 +99,33 @@ function orange_journal_types_merge_canonical_defaults(PDO $pdo): void
         }
         throw $e;
     }
+}
+
+/**
+ * إزالة نوع اليومية EXP (قيد مصروف) بعد الاعتماد على سند الصرف؛ يُنظّف القواعد والارتباطات ثم يحذف الصف.
+ */
+function orange_journal_types_retire_obsolete_exp_type(PDO $pdo): void
+{
+    if (!orange_table_exists($pdo, 'journal_types')) {
+        return;
+    }
+    $st = $pdo->prepare('SELECT id FROM journal_types WHERE UPPER(TRIM(code)) = ? LIMIT 1');
+    $st->execute(['EXP']);
+    $raw = $st->fetchColumn();
+    if ($raw === false || $raw === null) {
+        return;
+    }
+    $expId = (int) $raw;
+    if ($expId <= 0) {
+        return;
+    }
+    if (orange_table_exists($pdo, 'orange_gl_journal_type_rules')) {
+        $pdo->prepare('DELETE FROM orange_gl_journal_type_rules WHERE journal_type_id = ?')->execute([$expId]);
+    }
+    if (orange_table_has_column($pdo, 'orange_gl_account_settings', 'journal_type_id')) {
+        $pdo->prepare('UPDATE orange_gl_account_settings SET journal_type_id = NULL WHERE journal_type_id = ?')->execute([$expId]);
+    }
+    $pdo->prepare('DELETE FROM journal_types WHERE id = ?')->execute([$expId]);
 }
 
 /**
@@ -128,9 +155,8 @@ function orange_gl_entry_types_for_journal_type_code(string $code): array
     static $map = [
         'OBV' => ['opening_balance'],
         'JE' => ['manual', 'general'],
-        'RV' => ['customer_receipt'],
-        'PV' => ['supplier_payment'],
-        'EXP' => ['expense', 'expense_adjustment', 'expense_reversal'],
+        'RV' => ['customer_receipt', 'receipt_voucher'],
+        'PV' => ['supplier_payment', 'payment_voucher', 'expense', 'expense_adjustment', 'expense_reversal'],
         'YEC' => ['year_end_close'],
         'PIN' => ['purchase', 'purchase_receive'],
         'PDN' => ['purchase_return'],

@@ -214,7 +214,6 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 ['page' => 'payment_voucher', 'href' => '/admin/index.php?page=payment_voucher', 'label' => 'سند صرف', 'class' => '', 'sub' => false],
                 ['page' => 'partner_customer_receipt', 'href' => '/admin/index.php?page=partner_customer_receipt', 'label' => 'سند قبض / عميل', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'partner_supplier_payment', 'href' => '/admin/index.php?page=partner_supplier_payment', 'label' => 'سند صرف / مورد', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'expenses', 'href' => '/admin/index.php?page=expenses', 'label' => 'المصروفات', 'class' => '', 'sub' => false],
                 ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger', 'label' => 'ذمم العملاء', 'class' => 'admin-nav-sub', 'sub' => true],
             ];
 

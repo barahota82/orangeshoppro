@@ -701,9 +701,9 @@ function orange_gl_journal_delete_blocked_message_ar(string $entryType): string
         'purchase_return' => 'عدّل أو ألغِ من شاشة مردود المشتريات.',
         'customer_receipt' => 'عدّل من مسار قبض العملاء / الذمم.',
         'supplier_payment' => 'عدّل من مسار دفع الموردين / الذمم.',
-        'expense' => 'عدّل من شاشة المصروفات.',
-        'expense_adjustment' => 'عدّل من شاشة المصروفات.',
-        'expense_reversal' => 'يُدار من شاشة المصروفات (إلغاء/عكس).',
+        'expense' => 'قيود قديمة من شاشة مصروفات أُزيلت — للتصحيح: سند صرف أو قيد يدوي أو ترحيل الحركات.',
+        'expense_adjustment' => 'كما سبق — راجع سند الصرف أو القيود اليدوية.',
+        'expense_reversal' => 'كما سبق — راجع الترحيل أو القيود اليدوية.',
     ];
     $hint = $hints[$et] ?? 'استخدم الشاشة أو المسار الذي أنشأ السند، أو فك الترحيل من «ترحيل الحركات» إن وُجد في الطابور.';
 
@@ -726,9 +726,9 @@ function orange_gl_journal_delete_blocked_admin_link(string $entryType): ?array
         'purchase_return' => ['page' => 'purchase_returns', 'label' => 'مردود المشتريات'],
         'customer_receipt' => ['page' => 'partner_customer_receipt', 'label' => 'سند قبض / عميل'],
         'supplier_payment' => ['page' => 'partner_supplier_payment', 'label' => 'سند صرف / مورد'],
-        'expense' => ['page' => 'expenses', 'label' => 'المصروفات'],
-        'expense_adjustment' => ['page' => 'expenses', 'label' => 'المصروفات'],
-        'expense_reversal' => ['page' => 'expenses', 'label' => 'المصروفات'],
+        'expense' => ['page' => 'payment_voucher', 'label' => 'سند صرف'],
+        'expense_adjustment' => ['page' => 'payment_voucher', 'label' => 'سند صرف'],
+        'expense_reversal' => ['page' => 'payment_voucher', 'label' => 'سند صرف'],
         'order_delivery_sale' => ['page' => 'gl_posting', 'label' => 'ترحيل الحركات'],
         'order_delivery_cogs' => ['page' => 'gl_posting', 'label' => 'ترحيل الحركات'],
         'order_return_sale' => ['page' => 'sales_returns', 'label' => 'مردود المبيعات'],

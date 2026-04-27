@@ -105,7 +105,7 @@ function orange_financial_supplier_balance_until_date(PDO $pdo, string $endDateI
 }
 
 /**
- * مصروفات مسجّلة من شاشة المصروفات (سندات entry_type = expense) مجمّعة بالبند والحساب المدين.
+ * مصروفات قديمة (سندات entry_type = expense من مسار أُزيل) مجمّعة بالبند والحساب المدين.
  *
  * @return list<array{account_id:int, label:string, amount:float}>
  */
