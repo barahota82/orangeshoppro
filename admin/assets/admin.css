@@ -3116,6 +3116,7 @@ body.coa-modal-open {
     color: #475569;
     padding: 2px 0 0;
     word-break: break-word;
+    min-height: 1.2em;
 }
 .gl-rule-acct-muted {
     color: #64748b;

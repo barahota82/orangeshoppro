@@ -53,6 +53,18 @@ foreach ($byId as $aidJs => $aRow) {
 }
 $currentForRulesJson = json_encode($current, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 $accountsByIdJson = json_encode($accountsByIdForJs, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+$resolvedAccountLineByKey = [];
+foreach ($ruleKeyOrder as $gk) {
+    $aidR = (int) ($current[$gk] ?? 0);
+    if ($aidR > 0 && isset($byId[$aidR])) {
+        $cR = trim((string) ($byId[$aidR]['code'] ?? ''));
+        $nR = trim((string) ($byId[$aidR]['name'] ?? ''));
+        $resolvedAccountLineByKey[$gk] = ($cR !== '' ? $cR . ' — ' : '') . $nR;
+    } else {
+        $resolvedAccountLineByKey[$gk] = '';
+    }
+}
+$resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 ?>
 <div class="page-title page-title--stacked">
     <h1>حسابات القيود التلقائية</h1>
@@ -67,7 +79,7 @@ $accountsByIdJson = json_encode($accountsByIdForJs, JSON_UNESCAPED_UNICODE | JSO
 <div class="card gl-auto-form-card">
         <h3 class="card-title">١ — البنود والحسابات من الدليل</h3>
         <div class="table-wrap gl-settings-table-wrap">
-            <table class="gl-settings-table">
+            <table class="gl-settings-table" id="gl_settings_section1_table">
                 <thead>
                     <tr>
                         <th class="gl-th-label">البند</th>
@@ -167,6 +179,7 @@ $accountsByIdJson = json_encode($accountsByIdForJs, JSON_UNESCAPED_UNICODE | JSO
     var glInitialRules = <?php echo $rulesJson; ?>;
     var glKeyAccountInitial = <?php echo $currentForRulesJson; ?>;
     var glAccountsById = <?php echo $accountsByIdJson; ?>;
+    var glResolvedLineByKey = <?php echo $resolvedLineByKeyJson; ?>;
 
     function esc(s) {
         return String(s == null ? '' : s)
@@ -180,20 +193,26 @@ $accountsByIdJson = json_encode($accountsByIdForJs, JSON_UNESCAPED_UNICODE | JSO
         if (!k) {
             return '—';
         }
-        var row = document.querySelector('tr[data-gl-key="' + k.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"]');
+        var fromDb = String(glResolvedLineByKey[k] || '').trim();
+        var section1 = document.getElementById('gl_settings_section1_table');
+        var row = section1
+            ? section1.querySelector('tr[data-gl-key="' + k.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"]')
+            : null;
         if (row) {
             var id = parseInt(row.getAttribute('data-account-id'), 10) || 0;
-            if (id <= 0) {
-                return '— لم يُربط في القسم ١ —';
-            }
             var codeEl = row.querySelector('.gl-inp-code');
             var nameEl = row.querySelector('.gl-inp-name');
             var code = codeEl ? String(codeEl.value || '').trim() : '';
             var name = nameEl ? String(nameEl.value || '').trim() : '';
-            if (!name && !code) {
-                return '— لم يُربط في القسم ١ —';
+            if (code || name) {
+                return (code ? code + ' — ' : '') + name;
             }
-            return (code ? code + ' — ' : '') + name;
+            if (id > 0 && fromDb) {
+                return fromDb;
+            }
+        }
+        if (fromDb) {
+            return fromDb;
         }
         var sid = glKeyAccountInitial[k];
         var iid = typeof sid === 'number' ? sid : parseInt(String(sid || '0'), 10) || 0;
@@ -512,7 +531,7 @@ $accountsByIdJson = json_encode($accountsByIdForJs, JSON_UNESCAPED_UNICODE | JSO
     }
     refreshAllRuleAccountPreviews();
 
-    var glSection1Table = document.querySelector('.gl-auto-form-card .gl-settings-table');
+    var glSection1Table = document.getElementById('gl_settings_section1_table');
     if (glSection1Table) {
         glSection1Table.addEventListener('change', refreshAllRuleAccountPreviews);
         glSection1Table.addEventListener('input', function (ev) {
