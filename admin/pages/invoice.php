@@ -469,7 +469,7 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
 })();
 </script>
 <?php else: ?>
-        <?php
+<?php
     $logoSrc = orange_invoice_logo_url((string)($companyProfile['company_logo'] ?? ''));
     $nameAr = trim((string)($companyProfile['company_name_ar'] ?? ''));
     $nameEn = trim((string)($companyProfile['company_name_en'] ?? ''));
@@ -479,8 +479,8 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
     $vat = trim((string)($companyProfile['vat_number'] ?? ''));
     $footerLegal = trim((string)($companyProfile['invoice_footer'] ?? ''));
     $formalInv = trim((string)($order['invoice_number'] ?? ''));
-        $orderSrc = (string)($order['order_source'] ?? 'website');
-        $orderSrcAr = $orderSrc === 'company'
+    $orderSrc = (string)($order['order_source'] ?? 'website');
+    $orderSrcAr = $orderSrc === 'company'
         ? 'طلب مسجّل كمصدر شركة (داخلي)'
         : 'طلب وارد من واجهة المتجر';
     $ost = strtolower(trim((string) ($order['status'] ?? '')));
@@ -532,7 +532,7 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
             <?php else: ?>
                 <div><strong>رقم الفاتورة:</strong> <span style="color:#94a3b8;">يُخصص تلقائياً عند أول عرض</span></div>
             <?php endif; ?>
-        <div><strong>رقم الطلب:</strong> <?php echo htmlspecialchars((string)$order['order_number'], ENT_QUOTES, 'UTF-8'); ?></div>
+            <div><strong>رقم الطلب:</strong> <?php echo htmlspecialchars((string)$order['order_number'], ENT_QUOTES, 'UTF-8'); ?></div>
             <div><strong>تاريخ الطلب:</strong> <?php echo htmlspecialchars(orange_format_datetime_dmY_hi((string)($order['created_at'] ?? '')) ?: '—', ENT_QUOTES, 'UTF-8'); ?></div>
             <div><strong>طباعة:</strong> <?php echo htmlspecialchars(orange_format_datetime_dmY_hi(date('Y-m-d H:i:s')), ENT_QUOTES, 'UTF-8'); ?></div>
             <?php if ($vat !== ''): ?>
@@ -569,9 +569,9 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
             <div class="invoice-panel">
                 <h3>حالة المستند</h3>
                 <div><strong>حالة الطلب:</strong> <?php echo htmlspecialchars($statusLabel, ENT_QUOTES, 'UTF-8'); ?></div>
-        <div><strong>نوع البيع:</strong> <?php echo htmlspecialchars($ptAr, ENT_QUOTES, 'UTF-8'); ?></div>
+                <div><strong>نوع البيع:</strong> <?php echo htmlspecialchars($ptAr, ENT_QUOTES, 'UTF-8'); ?></div>
             </div>
-    </div>
+        </div>
 
         <?php if ($linesMismatch): ?>
             <div class="invoice-warn">تنبيه: <?php
@@ -590,20 +590,20 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
             ?>لا يطابق إجمالي الطلب المحفوظ (<?php echo number_format($orderTotalVal, 2); ?> KD). راجع الطلب أو الخصومات.</div>
         <?php endif; ?>
 
-    <table class="invoice-table">
-        <thead>
-            <tr>
+        <table class="invoice-table">
+            <thead>
+                <tr>
                     <th class="num">#</th>
-                <th>الوصف</th>
-                <th>اللون</th>
-                <th>المقاس</th>
+                    <th>الوصف</th>
+                    <th>اللون</th>
+                    <th>المقاس</th>
                     <th class="num">الكمية</th>
                     <th class="num">سعر الوحدة</th>
                     <th class="num">خصم</th>
                     <th class="num">الصافي</th>
-            </tr>
-        </thead>
-        <tbody>
+                </tr>
+            </thead>
+            <tbody>
                 <?php $ln = 0; foreach ($items as $row): ?>
                     <?php
                     ++$ln;
@@ -612,17 +612,17 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
                     ?>
                     <tr>
                         <td class="num"><?php echo (int)$ln; ?></td>
-                    <td><?php echo htmlspecialchars((string)$row['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo htmlspecialchars((string)($row['color'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo htmlspecialchars((string)($row['size'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars((string)$row['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars((string)($row['color'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars((string)($row['size'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td class="num"><?php echo (int)$row['qty']; ?></td>
                         <td class="num"><?php echo number_format((float)$row['price'], 3); ?> KD</td>
                         <td class="num"><?php echo $disc > 0.0001 ? number_format($disc, 3) . ' KD' : '—'; ?></td>
                         <td class="num"><?php echo number_format($lineNet, 3); ?> KD</td>
-                </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
 
         <div class="invoice-totals">
             <div class="invoice-totals-inner">
@@ -709,7 +709,7 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
             <div class="invoice-footer-legal"><?php echo nl2br(htmlspecialchars($footerLegal, ENT_QUOTES, 'UTF-8')); ?></div>
         <?php endif; ?>
 
-    <div class="invoice-actions">
+        <div class="invoice-actions">
             <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=invoice'), ENT_QUOTES, 'UTF-8'); ?>">فاتورة أخرى</a>
             <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">الطلبات</a>
             <button type="button" class="btn" onclick="window.print()">طباعة / PDF</button>
