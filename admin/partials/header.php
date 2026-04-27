@@ -42,7 +42,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
     <link rel="stylesheet" href="<?php echo htmlspecialchars(storefront_public_path(admin_asset_url('/admin/assets/admin.css')), ENT_QUOTES, 'UTF-8'); ?>">
     <script>
     window.ORANGE_PUBLIC_BASE_PATH = <?php echo json_encode(PUBLIC_BASE_PATH, JSON_UNESCAPED_UNICODE); ?>;
-    /** عطّل النقر المزدوج على «حفظ» تلقائياً: postJSON يربط آخر زر نقر (ما لم يُستثنَ بـ data-no-post-guard). */
+    /** منع تكرار الإرسال: postJSON يعطّل الزر (آخر نقرة أو زر إرسال النموذج) ما لم يُستثنَ بـ data-no-post-guard. */
     window.ORANGE_POSTJSON_INFER_SUBMITTER = true;
     </script>
     <script src="<?php echo htmlspecialchars(storefront_public_path(admin_asset_url('/admin/assets/admin.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>

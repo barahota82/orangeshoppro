@@ -106,6 +106,7 @@ function postJSON(url, payload, opts) {
     if (options.inferSubmitter !== false && typeof window !== 'undefined' && window.ORANGE_POSTJSON_INFER_SUBMITTER === true) {
         if (!submitter && window.__orangeLastPointerButton) {
             submitter = window.__orangeLastPointerButton;
+            window.__orangeLastPointerButton = null;
         }
     }
     var prevDisabled = false;
@@ -191,20 +192,34 @@ function postJSON(url, payload, opts) {
                 return;
             }
             window.__orangeLastPointerButton = btn;
-            var ref = btn;
-            if (typeof queueMicrotask === 'function') {
-                queueMicrotask(function () {
-                    if (window.__orangeLastPointerButton === ref) {
-                        window.__orangeLastPointerButton = null;
-                    }
-                });
-            } else {
-                setTimeout(function () {
-                    if (window.__orangeLastPointerButton === ref) {
-                        window.__orangeLastPointerButton = null;
-                    }
-                }, 0);
+        },
+        true
+    );
+})();
+
+/** إرسال النموذج (Enter / زر إرسال): يربط نفس آلية postJSON كالنقر على الزر */
+(function orangeAdminPostJsonSubmitCapture() {
+    if (typeof document === 'undefined') {
+        return;
+    }
+    document.addEventListener(
+        'submit',
+        function (e) {
+            if (typeof window === 'undefined' || window.ORANGE_POSTJSON_INFER_SUBMITTER !== true) {
+                return;
             }
+            var sub = e.submitter;
+            if (!sub || sub.nodeType !== 1) {
+                return;
+            }
+            var tag = sub.tagName;
+            if (tag !== 'BUTTON' && tag !== 'INPUT') {
+                return;
+            }
+            if (sub.hasAttribute('data-no-post-guard')) {
+                return;
+            }
+            window.__orangeLastPointerButton = sub;
         },
         true
     );
