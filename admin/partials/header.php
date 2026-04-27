@@ -209,8 +209,6 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
             ];
 
             $navAccountingVouchers = [
-                ['page' => 'partner_customer_receipt', 'href' => '/admin/index.php?page=partner_customer_receipt', 'label' => 'سداد فواتير مبيعات آجلة', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'partner_supplier_payment', 'href' => '/admin/index.php?page=partner_supplier_payment', 'label' => 'سداد فواتير مشتريات آجلة', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'partner_ledger', 'href' => '/admin/index.php?page=partner_ledger', 'label' => 'ذمم العملاء', 'class' => 'admin-nav-sub', 'sub' => true],
             ];
 
@@ -221,7 +219,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report', 'label' => 'التقارير المالية', 'class' => '', 'sub' => false],
             ];
 
-            /* الحسابات العامة: الدليل ثم الإعدادات والسنوات والترحيل وأرصدة أول المدة ثم سند قيد/قبض/صرف */
+            /* الحسابات العامة: الدليل ثم الإعدادات والسنوات والترحيل وأرصدة أول المدة ثم سند قيد/قبض/صرف/سندات أخرى ثم سداد فواتير الآجل */
             $navAccounting = [
                 ['page' => 'chart_of_accounts', 'href' => '/admin/index.php?page=chart_of_accounts', 'label' => 'الدليل المحاسبي', 'class' => '', 'sub' => false],
                 ['page' => 'journal_types', 'href' => '/admin/index.php?page=journal_types', 'label' => 'أنواع اليوميات', 'class' => 'admin-nav-sub', 'sub' => true],
@@ -233,6 +231,8 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 ['page' => 'receipt_voucher', 'href' => '/admin/index.php?page=receipt_voucher', 'label' => 'سند قبض', 'class' => '', 'sub' => false],
                 ['page' => 'payment_voucher', 'href' => '/admin/index.php?page=payment_voucher', 'label' => 'سند صرف', 'class' => '', 'sub' => false],
                 ['page' => 'other_vouchers', 'href' => '/admin/index.php?page=other_vouchers', 'label' => 'سندات أخرى', 'class' => '', 'sub' => false],
+                ['page' => 'partner_customer_receipt', 'href' => '/admin/index.php?page=partner_customer_receipt', 'label' => 'سداد فواتير مبيعات آجلة', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'partner_supplier_payment', 'href' => '/admin/index.php?page=partner_supplier_payment', 'label' => 'سداد فواتير مشتريات آجلة', 'class' => 'admin-nav-sub', 'sub' => true],
             ];
 
             $navOps = [
