@@ -186,7 +186,7 @@ $count = count($rows);
                                     'notes' => (string) ($s['notes'] ?? ''),
                                     'payable_account_id' => $pAcc > 0 ? $pAcc : null,
                                 ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>)'>تعديل</button>
-                                <a class="btn btn-secondary party-registry-btn" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment&stmt_party_kind=supplier&stmt_party_id=' . (int) $sid . '#partner-account-statement'), ENT_QUOTES, 'UTF-8'); ?>">كشف حساب</a>
+                                <a class="btn btn-secondary party-registry-btn" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_account_statement&stmt_party_kind=supplier&stmt_party_id=' . (int) $sid), ENT_QUOTES, 'UTF-8'); ?>">كشف حساب</a>
                             </td>
                         </tr>
                     <?php endforeach; ?>

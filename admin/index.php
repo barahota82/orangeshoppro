@@ -39,6 +39,7 @@ $allowed = [
     'opening_balances',
     'opening_stock_balances',
     'partner_ledger',
+    'partner_account_statement',
     'partner_customer_receipt',
     'partner_supplier_payment',
     'partner_reports',

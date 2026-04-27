@@ -179,7 +179,7 @@ $count = count($rows);
                                     'credit_limit' => $c['credit_limit'] ?? null,
                                     'notes' => (string) ($c['notes'] ?? ''),
                                 ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>)'>تعديل</button>
-                                <a class="btn btn-secondary party-registry-btn" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_customer_receipt&stmt_party_kind=customer&stmt_party_id=' . (int) $cid . '#partner-account-statement'), ENT_QUOTES, 'UTF-8'); ?>">كشف حساب</a>
+                                <a class="btn btn-secondary party-registry-btn" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_account_statement&stmt_party_kind=customer&stmt_party_id=' . (int) $cid), ENT_QUOTES, 'UTF-8'); ?>">كشف حساب</a>
                             </td>
                         </tr>
                     <?php endforeach; ?>
