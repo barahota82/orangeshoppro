@@ -4059,18 +4059,21 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 .gas-acc-stmt-toolbar--main-center > .gas-acc-stmt-field:not(.gas-acc-stmt-actions) .gas-acc-stmt-acc-code-input,
 .gas-acc-stmt-toolbar--main-center > .gas-acc-stmt-field:not(.gas-acc-stmt-actions) .gas-acc-stmt-acc-name-input,
 .gas-acc-stmt-toolbar--main-center > .gas-acc-stmt-field:not(.gas-acc-stmt-actions) input.admin-inp.orange-inp-dmy,
-.gas-acc-stmt-toolbar--main-center > .gas-acc-stmt-field:not(.gas-acc-stmt-actions) select.admin-inp {
+.gas-acc-stmt-toolbar--main-center > .gas-acc-stmt-field:not(.gas-acc-stmt-actions) select.admin-inp,
+.gas-acc-stmt-toolbar--main-center > .gas-acc-stmt-field:not(.gas-acc-stmt-actions) input.admin-inp[type="month"] {
     text-align: center;
 }
 
-/* الحركة الشهرية لحساب — شريط بحث (سنة + كود + اسم + أزرار) متوافق مع كشف الحساب */
+/* الحركة الشهرية لحساب — سنة + من/إلى شهر + كود + اسم + أزرار */
 .gl-m-monthly-toolbar.gas-acc-stmt-toolbar {
     grid-template-columns:
         minmax(11rem, 15rem)
+        minmax(9.25rem, 10.75rem)
+        minmax(9.25rem, 10.75rem)
         minmax(5.25rem, 7rem)
         minmax(12rem, 1fr)
         auto;
-    min-width: min(720px, 100%);
+    min-width: min(960px, 100%);
 }
 .jv-acct-picker {
     position: fixed;
