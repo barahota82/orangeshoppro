@@ -8,7 +8,7 @@ require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
-require_once __DIR__ . '/../../includes/party_subledger.php';
+require_once __DIR__ . '/../../includes/gl_account_aging.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -48,37 +48,6 @@ function orange_gas_stmt_line_matches(array $ln, string $filtDc, string $filtPos
     }
 
     return true;
-}
-
-/**
- * @return array{party_kind:string, party_id:int}|null
- */
-function orange_gas_resolve_aging_party(PDO $pdo, int $accountId): ?array
-{
-    if ($accountId <= 0) {
-        return null;
-    }
-    if (! orange_table_has_column($pdo, 'suppliers', 'payable_account_id')) {
-        return null;
-    }
-    try {
-        $st = $pdo->prepare(
-            'SELECT id FROM suppliers WHERE payable_account_id = ? ORDER BY id ASC LIMIT 2'
-        );
-        $st->execute([$accountId]);
-        $ids = [];
-        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
-            $ids[] = (int) ($r['id'] ?? 0);
-        }
-        $ids = array_values(array_filter($ids, static fn ($x) => $x > 0));
-        if (count($ids) !== 1) {
-            return null;
-        }
-
-        return ['party_kind' => 'supplier', 'party_id' => $ids[0]];
-    } catch (Throwable $e) {
-        return null;
-    }
 }
 
 /**
@@ -190,7 +159,6 @@ $sumCreditPeriod = 0.0;
 $closingBal = 0.0;
 $err = '';
 $agingReport = null;
-$agingPartyHint = '';
 $stmtFilterNoMatch = false;
 
 if ($accountId > 0 && ! orange_accounts_account_is_posting_leaf($pdo, $accountId)) {
@@ -252,20 +220,8 @@ if ($useVouchers && $accountId > 0 && $err === '') {
         $closingBal = $rows === [] ? $openingBal : (float) ($rows[count($rows) - 1]['balance'] ?? $openingBal);
         $stmtFilterNoMatch = $rawLines !== [] && $rows === [];
 
-        if ($showAging && orange_party_subledger_ready($pdo)) {
-            $ap = orange_gas_resolve_aging_party($pdo, $accountId);
-            if ($ap !== null) {
-                $agingReport = orange_party_aging_buckets(
-                    $pdo,
-                    $ap['party_kind'],
-                    $ap['party_id'],
-                    $dateToYmd
-                );
-            } else {
-                $agingPartyHint = 'أعمار الذمم تُعرض عندما يكون هذا الحساب هو «ذمة المورد» لطرف واحد فقط في بيانات الموردين.';
-            }
-        } elseif ($showAging && ! orange_party_subledger_ready($pdo)) {
-            $agingPartyHint = 'جدول ذمم الأطراف غير مهيّأ — لا يمكن عرض أعمار الذمم.';
+        if ($showAging) {
+            $agingReport = orange_gl_account_statement_aging_buckets($pdo, $accountId, $dateToYmd);
         }
     } catch (Throwable $e) {
         $err = 'تعذر قراءة الحركات.';
@@ -341,7 +297,7 @@ if ($useVouchers && $accountId > 0 && $err === '') {
                         </label>
                     </div>
                 </div>
-                <p class="gas-acc-stmt-options-hint muted">السطر الثاني اختياري: يحدد أسطر المدين/الدائن، وما إذا كان السند من التشغيل أو يدوياً؛ تفعيل الأعمار يعرض تقسيم الذمة عند ربط هذا الحساب بمورد واحد؛ عمود الرصيد في الجدول أعلاه وفق هذه الخيارات.</p>
+                <p class="gas-acc-stmt-options-hint muted">السطر الثاني: تصفية أسطر المدين أو الدائن؛ و«مرحّل / غير مرحّل» حسب تصنيف السند. تفعيل «أعمار الذمم» يوزّع الرصيد المتبقي حتى تاريخ «إلى» وفق أسطر هذا الحساب فقط (أقدمية FIFO، سواء جهة المدين أو الدائن في السطر) — دون ربط بذمة عميل أو مورد خارج كشف الحساب.</p>
             </div>
         </form>
         <?php if ($err !== ''): ?>
@@ -579,7 +535,7 @@ if ($useVouchers && $accountId > 0 && $err === '') {
             <?php if ($showAging): ?>
                 <?php if ($agingReport !== null && is_array($agingReport)): ?>
                     <div class="gl-acc-stmt-aging-wrap">
-                        <h3 class="gl-acc-stmt-aging-title">توزيع أعمار الذمم — بحسب الذمة وحتى <?php echo htmlspecialchars(orange_format_date_dmY((string) ($agingReport['as_of'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></h3>
+                        <h3 class="gl-acc-stmt-aging-title">توزيع أعمار الذمم — وفق أسطر هذا الحساب في الدفتر (FIFO) حتى <?php echo htmlspecialchars(orange_format_date_dmY((string) ($agingReport['as_of'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></h3>
                         <div class="table-wrap admin-fy-table-wrap">
                             <table class="admin-fy-table gl-acc-stmt-table gl-acc-stmt-aging-table">
                                 <thead>
@@ -606,12 +562,12 @@ if ($useVouchers && $accountId > 0 && $err === '') {
                                 <?php if (isset($agingReport['balance']) || isset($agingReport['prepayment'])): ?>
                                     <tfoot>
                                         <tr>
-                                            <td>رصيد الذمة بحسب طرف المورد (دفتر الطرف حتى هذا التاريخ)</td>
+                                            <td>رصيد الحساب (مجموع مدين − دائن حتى تاريخ «إلى الفترة»)</td>
                                             <td class="gl-acc-stmt-col-num"><?php echo number_format((float) ($agingReport['balance'] ?? 0), 4); ?></td>
                                         </tr>
                                         <?php if ((float) ($agingReport['prepayment'] ?? 0) > 0.0001): ?>
                                             <tr>
-                                                <td>دفعة مقدمة (تسوية وفق آلية الذمة المفتوحة)</td>
+                                                <td>رصيد دائن (لصالح الطرف الآخر) — عندما يكون الرصيد سالباً وفق الدفتر</td>
                                                 <td class="gl-acc-stmt-col-num"><?php echo number_format((float) ($agingReport['prepayment'] ?? 0), 4); ?></td>
                                             </tr>
                                         <?php endif; ?>
@@ -620,8 +576,6 @@ if ($useVouchers && $accountId > 0 && $err === '') {
                             </table>
                         </div>
                     </div>
-                <?php elseif ($agingPartyHint !== ''): ?>
-                    <p class="gl-acc-stmt-aging-hint muted"><?php echo htmlspecialchars($agingPartyHint, ENT_QUOTES, 'UTF-8'); ?></p>
                 <?php endif; ?>
             <?php endif; ?>
             <div class="gl-acc-stmt-print-footer">
