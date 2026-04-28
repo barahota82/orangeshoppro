@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
+require_once __DIR__ . '/../../includes/date_format.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -139,15 +140,68 @@ if (
     $monthlyRows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
 }
 
-$running = 0.0;
+$openingBal = 0.0;
+if (
+    $useVouchers && $accountId > 0 && $periodDateFrom !== ''
+    && strcmp($periodDateFrom, $periodDateTo) <= 0
+) {
+    $stOb = $pdo->prepare(
+        'SELECT COALESCE(SUM(jl.debit), 0) AS sd, COALESCE(SUM(jl.credit), 0) AS sc
+         FROM journal_lines jl
+         INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
+         WHERE jl.account_id = ?
+           AND jv.voucher_date < ?'
+    );
+    $stOb->execute([$accountId, $periodDateFrom]);
+    $obl = $stOb->fetch(PDO::FETCH_ASSOC);
+    if (is_array($obl)) {
+        $openingBal = (float) $obl['sd'] - (float) $obl['sc'];
+    }
+}
+
+$glMonthlyMonthLabelAr = static function (string $ym): string {
+    static $months = [
+        '01' => 'يناير', '02' => 'فبراير', '03' => 'مارس', '04' => 'إبريل',
+        '05' => 'مايو', '06' => 'يونيو', '07' => 'يوليو', '08' => 'أغسطس',
+        '09' => 'سبتمبر', '10' => 'أكتوبر', '11' => 'نوفمبر', '12' => 'ديسمبر',
+    ];
+    if (! preg_match('/^(\d{4})-(\d{2})$/', $ym, $m)) {
+        return $ym;
+    }
+    $mo = $m[2];
+
+    return ($months[$mo] ?? $mo) . ' ' . $m[1];
+};
+
+$running = $openingBal;
+$totalDebitPeriod = 0.0;
+$totalCreditPeriod = 0.0;
+$totalNetPeriod = 0.0;
 foreach ($monthlyRows as &$mr) {
     $d = (float) $mr['sum_debit'];
     $c = (float) $mr['sum_credit'];
     $running += ($d - $c);
     $mr['net_month'] = $d - $c;
     $mr['balance_eom'] = $running;
+    $totalDebitPeriod += $d;
+    $totalCreditPeriod += $c;
+    $totalNetPeriod += ($d - $c);
 }
 unset($mr);
+
+$closingBal = $running;
+$reportDateFromDmY = orange_format_date_dmY($periodDateFrom);
+$reportDateToDmY = orange_format_date_dmY($periodDateTo);
+$todayDmY = orange_format_date_dmY(date('Y-m-d'));
+$printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+
+$companyNameAr = '';
+if (orange_table_exists($pdo, 'company_settings')) {
+    $cs = $pdo->query('SELECT company_name_ar FROM company_settings ORDER BY id ASC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
+    if (is_array($cs)) {
+        $companyNameAr = trim((string) ($cs['company_name_ar'] ?? ''));
+    }
+}
 
 
 ?>
@@ -353,45 +407,77 @@ unset($mr);
 </div>
 <?php elseif ($periodLabel !== ''): ?>
 <div class="card admin-fy-card gl-acc-stmt-print">
-    <h3 class="card-title">النتيجة</h3>
-    <p class="page-subtitle">
-        <?php echo htmlspecialchars($accLabel !== '' ? $accLabel : ('#' . $accountId), ENT_QUOTES, 'UTF-8'); ?>
-        —
-        من شهر <?php echo htmlspecialchars($periodYmFrom, ENT_QUOTES, 'UTF-8'); ?>
-        إلى <?php echo htmlspecialchars($periodYmTo, ENT_QUOTES, 'UTF-8'); ?>
-        — حدود تاريخ السند: <?php echo htmlspecialchars($periodLabel, ENT_QUOTES, 'UTF-8'); ?>
-    </p>
-    <?php if ($monthlyRows === []): ?>
-        <p class="muted">لا حركة على هذا الحساب في الأشهر المحددة (حسب تاريخ السند في المدّة المختارة).</p>
-    <?php else: ?>
-    <div class="table-wrap admin-fy-table-wrap">
-        <table class="admin-fy-table">
-            <thead>
-                <tr>
-                    <th>الشهر</th>
-                    <th>مجموع مدين</th>
-                    <th>مجموع دائن</th>
-                    <th>صافي الشهر</th>
-                    <th>رصيد متحرّك بعد الشهر</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($monthlyRows as $mr): ?>
+    <div class="gl-acc-stmt-print-sheet gl-m-monthly-print-sheet">
+        <header class="gl-acc-stmt-print-banner">
+            <?php if ($companyNameAr !== ''): ?>
+                <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
+            <?php endif; ?>
+            <h2 class="gl-acc-stmt-print-title gl-m-monthly-print-title">
+                <span class="gl-acc-stmt-print-title-ar" lang="ar">تقـــــــرير&nbsp;&nbsp;الحركة الشهرية لحساب عــن الفتــرة من <?php echo htmlspecialchars($reportDateFromDmY, ENT_QUOTES, 'UTF-8'); ?> إلى&nbsp;&nbsp;<?php echo htmlspecialchars($reportDateToDmY, ENT_QUOTES, 'UTF-8'); ?></span>
+            </h2>
+        </header>
+        <div class="gl-acc-stmt-print-grid">
+            <div class="gl-acc-stmt-print-row"><span class="gl-acc-stmt-print-k">رقـــم الحســاب</span><span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($accCodeDisp !== '' ? $accCodeDisp : '—', ENT_QUOTES, 'UTF-8'); ?></span></div>
+            <div class="gl-acc-stmt-print-row"><span class="gl-acc-stmt-print-k">اسم الحســـــــــاب</span><span class="gl-acc-stmt-print-v"><?php echo htmlspecialchars($accNameDisp !== '' ? $accNameDisp : ($accLabel !== '' ? $accLabel : '—'), ENT_QUOTES, 'UTF-8'); ?></span></div>
+            <div class="gl-acc-stmt-print-row gl-acc-stmt-print-row--dates">
+                <span class="gl-acc-stmt-print-k">من تاريخ</span><span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($reportDateFromDmY, ENT_QUOTES, 'UTF-8'); ?></span>
+                <span class="gl-acc-stmt-print-k">الى تاريخ</span><span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($reportDateToDmY, ENT_QUOTES, 'UTF-8'); ?></span>
+                <span class="gl-acc-stmt-print-k">تاريخ الكشف</span><span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($todayDmY, ENT_QUOTES, 'UTF-8'); ?></span>
+            </div>
+        </div>
+        <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
+            <table class="admin-fy-table gl-acc-stmt-table">
+                <thead>
                     <tr>
-                        <td><?php echo htmlspecialchars((string) ($mr['ym'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo number_format((float) ($mr['sum_debit'] ?? 0), 4); ?></td>
-                        <td><?php echo number_format((float) ($mr['sum_credit'] ?? 0), 4); ?></td>
-                        <td><?php echo number_format((float) ($mr['net_month'] ?? 0), 4); ?></td>
-                        <td><?php echo number_format((float) ($mr['balance_eom'] ?? 0), 4); ?></td>
+                        <th>الشهر</th>
+                        <th class="gl-acc-stmt-col-num">مديـــــن</th>
+                        <th class="gl-acc-stmt-col-num">دائــــــن</th>
+                        <th class="gl-acc-stmt-col-num">رصيد حركة الشهر</th>
+                        <th class="gl-acc-stmt-col-num">الرصيد</th>
                     </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    <tr class="gl-acc-stmt-row-opening">
+                        <td>رصيد افتتاحي</td>
+                        <td class="gl-acc-stmt-col-num">ـــــــــــ</td>
+                        <td class="gl-acc-stmt-col-num">ـــــــــــ</td>
+                        <td class="gl-acc-stmt-col-num">ـــــــــــ</td>
+                        <td class="gl-acc-stmt-col-num"><?php echo number_format($openingBal, 4); ?></td>
+                    </tr>
+                    <?php if ($monthlyRows === []): ?>
+                        <tr>
+                            <td colspan="5" class="muted">لا حركة على هذا الحساب في الأشهر المحددة (حسب تاريخ السند في المدّة المختارة) بعد الرصيد الافتتاحي.</td>
+                        </tr>
+                    <?php else: ?>
+                        <?php foreach ($monthlyRows as $mr): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($glMonthlyMonthLabelAr((string) ($mr['ym'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo number_format((float) ($mr['sum_debit'] ?? 0), 4); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo number_format((float) ($mr['sum_credit'] ?? 0), 4); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo number_format((float) ($mr['net_month'] ?? 0), 4); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo number_format((float) ($mr['balance_eom'] ?? 0), 4); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+                <tfoot>
+                    <tr class="gl-acc-stmt-foot-label">
+                        <td class="gl-acc-stmt-foot-total-title">الإجمالى</td>
+                        <td class="gl-acc-stmt-col-num"><?php echo number_format($totalDebitPeriod, 4); ?></td>
+                        <td class="gl-acc-stmt-col-num"><?php echo number_format($totalCreditPeriod, 4); ?></td>
+                        <td class="gl-acc-stmt-col-num"><?php echo number_format($totalNetPeriod, 4); ?></td>
+                        <td class="gl-acc-stmt-col-num"><?php echo number_format($closingBal, 4); ?></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <div class="gl-acc-stmt-print-footer gl-m-monthly-print-footer">
+            <p class="gl-acc-stmt-print-metafoot" dir="ltr">تاريخ ووقت الطباعة: <?php echo htmlspecialchars($printDatetime, ENT_QUOTES, 'UTF-8'); ?> — صفحة 1 من 1</p>
+        </div>
     </div>
-    <p class="card-hint" style="margin-top:12px;">
-        الرصيد المتحرّك يتراكم حسب أشهر ظهور حركة فقط؛ لكشف سطراً بسطر استخدم «التقارير المالية» مع معامل حساب.
+    <p class="card-hint gl-acc-stmt-no-print" style="margin-top:12px;margin-bottom:0;">
+        تقرير تقويمي بحدود يوم السند الأول/الأخير للمدى (<span dir="ltr"><?php echo htmlspecialchars($periodLabel, ENT_QUOTES, 'UTF-8'); ?></span>). الرصيد يبدأ قبل أول اليوم وفق المعامل المحاسبي (مجموع مدين − مجموع دائن). الأشهر بلا حركة لا تظهر صفوفاً لها.
     </p>
-    <?php endif; ?>
 </div>
 <?php else: ?>
 <div class="card admin-fy-card">

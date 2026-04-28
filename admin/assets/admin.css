@@ -3985,6 +3985,12 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     text-align: right;
 }
 
+/* الحركة الشهرية لحساب — عنوان التقرير كنص واحد (كملف Excel المرجعي) */
+.gl-m-monthly-print-title .gl-acc-stmt-print-title-ar {
+    line-height: 1.45;
+    padding: 0 0.35rem;
+}
+
 @media print {
     .gl-acc-stmt-print-sheet {
         border-width: 1px;
