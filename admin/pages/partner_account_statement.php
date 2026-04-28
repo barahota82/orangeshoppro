@@ -293,11 +293,11 @@ if ($useVouchers && $accountId > 0 && $err === '') {
                     <div class="gas-opt-unit gas-opt-unit--aging">
                         <label class="gas-opt-chip gas-opt-chip--solo">
                             <input type="checkbox" name="show_aging" value="1"<?php echo $showAging ? ' checked' : ''; ?>>
-                            إظهار أعمار الذمم
+                            إظهار أعمار الرصيد (توزيع زمني)
                         </label>
                     </div>
                 </div>
-                <p class="gas-acc-stmt-options-hint muted">السطر الثاني: تصفية أسطر المدين أو الدائن؛ و«مرحّل / غير مرحّل» حسب تصنيف السند. تفعيل «أعمار الذمم» يوزّع الرصيد المتبقي حتى تاريخ «إلى» وفق أسطر هذا الحساب فقط (أقدمية FIFO، سواء جهة المدين أو الدائن في السطر) — دون ربط بذمة عميل أو مورد خارج كشف الحساب.</p>
+                <p class="gas-acc-stmt-options-hint muted">السطر الثاني: تصفية أسطر المدين أو الدائن؛ و«مرحّل / غير مرحّل» حسب تصنيف السند. تفعيل «أعمار الرصيد» يُظهر توزيع الرصيد المتبقي حتى تاريخ «إلى» وفق أسطر هذا الحساب فقط (FIFO، أسوة المدين أو الدائن في كل سطر)، دون اعتماد طرفاً منفصلاً خارج كشف الحساب.</p>
             </div>
         </form>
         <?php if ($err !== ''): ?>
@@ -535,7 +535,7 @@ if ($useVouchers && $accountId > 0 && $err === '') {
             <?php if ($showAging): ?>
                 <?php if ($agingReport !== null && is_array($agingReport)): ?>
                     <div class="gl-acc-stmt-aging-wrap">
-                        <h3 class="gl-acc-stmt-aging-title">توزيع أعمار الذمم — وفق أسطر هذا الحساب في الدفتر (FIFO) حتى <?php echo htmlspecialchars(orange_format_date_dmY((string) ($agingReport['as_of'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></h3>
+                        <h3 class="gl-acc-stmt-aging-title">توزيع الرصيد زمنياً (أعمار الرصيد، FIFO) حتى <?php echo htmlspecialchars(orange_format_date_dmY((string) ($agingReport['as_of'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></h3>
                         <div class="table-wrap admin-fy-table-wrap">
                             <table class="admin-fy-table gl-acc-stmt-table gl-acc-stmt-aging-table">
                                 <thead>
