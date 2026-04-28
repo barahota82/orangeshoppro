@@ -164,7 +164,6 @@ if (
            AND jv.voucher_date >= ?
            AND jv.voucher_date <= ?
          GROUP BY ym
-         HAVING ym >= ? AND ym <= ?
          ORDER BY ym ASC'
     );
     $st->execute([
@@ -172,8 +171,6 @@ if (
         $fyId,
         $periodDateFrom,
         $periodDateTo,
-        $periodYmFrom,
-        $periodYmTo,
     ]);
     $monthlyRows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
 }
@@ -397,9 +394,11 @@ unset($mr);
 <div class="card admin-fy-card">
     <p class="muted">سندات اليومية غير جاهزة بعد — لا يمكن عرض التقرير.</p>
 </div>
-<?php elseif ($fyId <= 0): ?>
+<?php elseif ($fyId <= 0 || !$fyRow): ?>
 <div class="card admin-fy-card">
-    <p class="muted">عرّف سنة مالية من «السنوات المالية».</p>
+    <p class="muted"><?php echo $fyId <= 0
+        ? 'عرّف سنة مالية من «السنوات المالية».'
+        : 'السنة المالية المطلوبة غير موجودة — اختر سنة من القائمة.'; ?></p>
 </div>
 <?php elseif ($fyRow && ($periodYmFrom === '' || $periodYmTo === '')): ?>
 <div class="card admin-fy-card">
@@ -450,6 +449,10 @@ unset($mr);
         الرصيد المتحرّك يتراكم حسب أشهر ظهور حركة فقط؛ لكشف سطراً بسطر استخدم «التقارير المالية» مع معامل حساب.
     </p>
     <?php endif; ?>
+</div>
+<?php else: ?>
+<div class="card admin-fy-card">
+    <p class="muted">تعذر عرض التقرير لهذه الجلسة (حالة غير متوقعة) — حدِّث الصفحة ثم إن لزم اختر السنة والحساب من جديد.</p>
 </div>
 <?php endif; ?>
 
