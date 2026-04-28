@@ -1070,6 +1070,32 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         }
     }
 
+    if (orange_table_exists($pdo, 'journal_vouchers') && !orange_table_has_column($pdo, 'journal_vouchers', 'journal_type_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE journal_vouchers ADD COLUMN journal_type_id INT NULL AFTER fiscal_year_id'
+        );
+        orange_schema_invalidate_column_check('journal_vouchers', 'journal_type_id');
+    }
+    if (orange_table_exists($pdo, 'journal_vouchers')
+        && orange_table_has_column($pdo, 'journal_vouchers', 'journal_type_id')
+        && !orange_table_has_column($pdo, 'journal_vouchers', 'journal_serial_bucket')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            "ALTER TABLE journal_vouchers ADD COLUMN journal_serial_bucket VARCHAR(64) NOT NULL DEFAULT '' AFTER journal_type_id"
+        );
+        orange_schema_invalidate_column_check('journal_vouchers', 'journal_serial_bucket');
+    }
+    if (orange_table_exists($pdo, 'journal_vouchers')
+        && orange_table_has_column($pdo, 'journal_vouchers', 'journal_serial_bucket')
+        && !orange_table_has_column($pdo, 'journal_vouchers', 'voucher_serial')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE journal_vouchers ADD COLUMN voucher_serial INT UNSIGNED NOT NULL DEFAULT 0 AFTER journal_serial_bucket'
+        );
+        orange_schema_invalidate_column_check('journal_vouchers', 'voucher_serial');
+    }
+
     if (!orange_table_exists($pdo, 'journal_lines')) {
         orange_catalog_safe_exec(
             $pdo,
@@ -1131,6 +1157,15 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         );
     }
 
+    if (orange_table_exists($pdo, 'orange_gl_pending_movements')
+        && !orange_table_has_column($pdo, 'orange_gl_pending_movements', 'journal_type_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE orange_gl_pending_movements ADD COLUMN journal_type_id INT NULL AFTER entry_type'
+        );
+        orange_schema_invalidate_column_check('orange_gl_pending_movements', 'journal_type_id');
+    }
+
     if (!orange_table_exists($pdo, 'journal_types')) {
         orange_catalog_safe_exec(
             $pdo,
@@ -1154,6 +1189,28 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         } catch (Throwable $e) {
             if (function_exists('error_log')) {
                 error_log('[orange] journal_types sync: ' . $e->getMessage());
+            }
+        }
+
+        require_once __DIR__ . '/journal_voucher.php';
+        try {
+            orange_journal_vouchers_backfill_serial_numbers($pdo);
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] journal_vouchers serial backfill (post-merge): ' . $e->getMessage());
+            }
+        }
+        if (orange_table_exists($pdo, 'journal_vouchers')
+            && orange_table_has_column($pdo, 'journal_vouchers', 'voucher_serial')) {
+            try {
+                $pdo->exec(
+                    'CREATE UNIQUE INDEX uq_jv_fy_bucket_serial ON journal_vouchers (fiscal_year_id, journal_serial_bucket, voucher_serial)'
+                );
+            } catch (Throwable $e) {
+                // قد يكون موجوداً مسبقاً.
+                if (function_exists('error_log')) {
+                    error_log('[orange] CREATE uq_jv_fy_bucket_serial: ' . $e->getMessage());
+                }
             }
         }
     }
@@ -1228,6 +1285,16 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
                         $pdo->exec('DELETE FROM journal_entries');
                     }
                     $pdo->commit();
+                    if ($migrated > 0 && orange_table_has_column($pdo, 'journal_vouchers', 'voucher_serial')) {
+                        require_once __DIR__ . '/journal_voucher.php';
+                        try {
+                            orange_journal_vouchers_backfill_serial_numbers($pdo);
+                        } catch (Throwable $eSerial) {
+                            if (function_exists('error_log')) {
+                                error_log('[orange] journal legacy migrate serial backfill: ' . $eSerial->getMessage());
+                            }
+                        }
+                    }
                 } catch (Throwable $e) {
                     if ($pdo->inTransaction()) {
                         $pdo->rollBack();

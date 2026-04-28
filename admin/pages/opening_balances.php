@@ -85,7 +85,14 @@ $obDocEnteredDisp = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 $obNumberPreview = 1;
 
 if (orange_journal_vouchers_ready($pdo)) {
-    $obNumberPreview = (int) $pdo->query('SELECT COALESCE(MAX(id),0) + 1 FROM journal_vouchers')->fetchColumn();
+    orange_journal_types_sync_canonical_defaults($pdo);
+    $obFyForSerial = $fyId;
+    if ($obFyForSerial > 0 && orange_table_has_column($pdo, 'journal_vouchers', 'voucher_serial')) {
+        $obMeta = orange_journal_voucher_resolve_serial_meta($pdo, 'opening_balance', null);
+        $obNumberPreview = orange_journal_voucher_next_serial($pdo, $obFyForSerial, $obMeta['journal_serial_bucket']);
+    } else {
+        $obNumberPreview = (int) $pdo->query('SELECT COALESCE(MAX(id),0) + 1 FROM journal_vouchers')->fetchColumn();
+    }
 }
 
 if ($fyId > 0 && $fyRowSel !== null && orange_journal_vouchers_ready($pdo)) {

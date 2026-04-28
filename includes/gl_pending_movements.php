@@ -109,6 +109,7 @@ function orange_gl_pending_enqueue_simple(PDO $pdo, array $row): int
     if ($entryType === '') {
         $entryType = 'general';
     }
+    $jtHint = isset($row['journal_type_id']) ? (int) $row['journal_type_id'] : 0;
     $afterJson = array_key_exists('after_post_json', $row) ? $row['after_post_json'] : null;
     if ($afterJson !== null && $afterJson !== '') {
         $afterJson = (string) $afterJson;
@@ -116,25 +117,48 @@ function orange_gl_pending_enqueue_simple(PDO $pdo, array $row): int
         $afterJson = null;
     }
 
-    $ins = $pdo->prepare(
-        'INSERT IGNORE INTO orange_gl_pending_movements (
-            reference, source_label, movement_at, voucher_date,
-            account_debit, account_credit, amount, description, entry_type, status, after_post_json,
-            multi_line, voucher_lines_json
-        ) VALUES (?,?,?,?,?,?,?,?,?,\'pending\',?,0,NULL)'
-    );
-    $ins->execute([
-        $reference,
-        trim((string) ($row['source_label'] ?? '')),
-        $movementAt,
-        $voucherDate,
-        $debit,
-        $credit,
-        $amount,
-        $description,
-        $entryType,
-        $afterJson,
-    ]);
+    if (orange_table_has_column($pdo, 'orange_gl_pending_movements', 'journal_type_id')) {
+        $ins = $pdo->prepare(
+            'INSERT IGNORE INTO orange_gl_pending_movements (
+                reference, source_label, movement_at, voucher_date,
+                account_debit, account_credit, amount, description, entry_type, journal_type_id,
+                status, after_post_json, multi_line, voucher_lines_json
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,\'pending\',?,0,NULL)'
+        );
+        $ins->execute([
+            $reference,
+            trim((string) ($row['source_label'] ?? '')),
+            $movementAt,
+            $voucherDate,
+            $debit,
+            $credit,
+            $amount,
+            $description,
+            $entryType,
+            $jtHint > 0 ? $jtHint : null,
+            $afterJson,
+        ]);
+    } else {
+        $ins = $pdo->prepare(
+            'INSERT IGNORE INTO orange_gl_pending_movements (
+                reference, source_label, movement_at, voucher_date,
+                account_debit, account_credit, amount, description, entry_type, status, after_post_json,
+                multi_line, voucher_lines_json
+            ) VALUES (?,?,?,?,?,?,?,?,?,\'pending\',?,0,NULL)'
+        );
+        $ins->execute([
+            $reference,
+            trim((string) ($row['source_label'] ?? '')),
+            $movementAt,
+            $voucherDate,
+            $debit,
+            $credit,
+            $amount,
+            $description,
+            $entryType,
+            $afterJson,
+        ]);
+    }
     $newId = (int) $pdo->lastInsertId();
 
     return $newId > 0 ? $newId : 0;
@@ -154,7 +178,8 @@ function orange_gl_pending_enqueue_multi(
     string $voucherDate,
     string $description,
     string $entryType,
-    ?string $afterPostJson = null
+    ?string $afterPostJson = null,
+    ?int $journalTypeHintId = null
 ): int {
     orange_catalog_ensure_schema($pdo);
     if (!orange_table_exists($pdo, 'orange_gl_pending_movements')) {
@@ -169,6 +194,7 @@ function orange_gl_pending_enqueue_multi(
         throw new InvalidArgumentException('بيان السند المعلّق مطلوب.');
     }
     $entryType = trim($entryType) !== '' ? trim($entryType) : 'general';
+    $jtHint = (int) ($journalTypeHintId ?? 0);
     $sumD = 0.0;
     $sumC = 0.0;
     foreach ($lines as $ln) {
@@ -192,26 +218,51 @@ function orange_gl_pending_enqueue_multi(
         $afterPostJson = null;
     }
 
-    $ins = $pdo->prepare(
-        'INSERT IGNORE INTO orange_gl_pending_movements (
-            reference, source_label, movement_at, voucher_date,
-            account_debit, account_credit, amount, description, entry_type, status, after_post_json,
-            multi_line, voucher_lines_json
-        ) VALUES (?,?,?,?,?,?,?,?,?,\'pending\',?,1,?)'
-    );
-    $ins->execute([
-        $reference,
-        trim($sourceLabel),
-        $movementAt,
-        $voucherDate,
-        0,
-        0,
-        $displayAmt,
-        $description,
-        $entryType,
-        $afterPostJson,
-        $json,
-    ]);
+    if (orange_table_has_column($pdo, 'orange_gl_pending_movements', 'journal_type_id')) {
+        $ins = $pdo->prepare(
+            'INSERT IGNORE INTO orange_gl_pending_movements (
+                reference, source_label, movement_at, voucher_date,
+                account_debit, account_credit, amount, description, entry_type, journal_type_id,
+                status, after_post_json,
+                multi_line, voucher_lines_json
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,\'pending\',?,1,?)'
+        );
+        $ins->execute([
+            $reference,
+            trim($sourceLabel),
+            $movementAt,
+            $voucherDate,
+            0,
+            0,
+            $displayAmt,
+            $description,
+            $entryType,
+            $jtHint > 0 ? $jtHint : null,
+            $afterPostJson,
+            $json,
+        ]);
+    } else {
+        $ins = $pdo->prepare(
+            'INSERT IGNORE INTO orange_gl_pending_movements (
+                reference, source_label, movement_at, voucher_date,
+                account_debit, account_credit, amount, description, entry_type, status, after_post_json,
+                multi_line, voucher_lines_json
+            ) VALUES (?,?,?,?,?,?,?,?,?,\'pending\',?,1,?)'
+        );
+        $ins->execute([
+            $reference,
+            trim($sourceLabel),
+            $movementAt,
+            $voucherDate,
+            0,
+            0,
+            $displayAmt,
+            $description,
+            $entryType,
+            $afterPostJson,
+            $json,
+        ]);
+    }
     $newId = (int) $pdo->lastInsertId();
 
     return $newId > 0 ? $newId : 0;
@@ -372,25 +423,35 @@ function orange_gl_pending_post_by_ids(PDO $pdo, array $ids): array
                 if ($docEntered === '' || strlen($docEntered) < 8) {
                     $docEntered = date('Y-m-d H:i:s');
                 }
-                $vid = orange_voucher_post($pdo, [
+                $jtHint = isset($row['journal_type_id']) ? (int) $row['journal_type_id'] : 0;
+                $vh = [
                     'voucher_date' => (string) $row['voucher_date'],
                     'document_entered_at' => $docEntered,
                     'reference' => trim((string) ($row['reference'] ?? '')) !== '' ? trim((string) $row['reference']) : null,
                     'description' => $desc,
                     'entry_type' => (string) ($row['entry_type'] ?? 'general'),
-                ], $decoded);
+                ];
+                if ($jtHint > 0) {
+                    $vh['journal_type_id'] = $jtHint;
+                }
+                $vid = orange_voucher_post($pdo, $vh, $decoded);
             } else {
                 $docEntered = trim((string) ($row['created_at'] ?? ''));
                 if ($docEntered === '' || strlen($docEntered) < 8) {
                     $docEntered = date('Y-m-d H:i:s');
                 }
-                $vid = orange_voucher_post($pdo, [
+                $jtHintSimple = isset($row['journal_type_id']) ? (int) $row['journal_type_id'] : 0;
+                $vh2 = [
                     'voucher_date' => (string) $row['voucher_date'],
                     'document_entered_at' => $docEntered,
                     'reference' => trim((string) ($row['reference'] ?? '')) !== '' ? trim((string) $row['reference']) : null,
                     'description' => $desc,
                     'entry_type' => (string) ($row['entry_type'] ?? 'general'),
-                ], [
+                ];
+                if ($jtHintSimple > 0) {
+                    $vh2['journal_type_id'] = $jtHintSimple;
+                }
+                $vid = orange_voucher_post($pdo, $vh2, [
                     ['account_id' => (int) $row['account_debit'], 'debit' => (float) $row['amount'], 'credit' => 0.0, 'memo' => $desc],
                     ['account_id' => (int) $row['account_credit'], 'debit' => 0.0, 'credit' => (float) $row['amount'], 'memo' => $desc],
                 ]);

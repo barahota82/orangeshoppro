@@ -42,7 +42,28 @@ if ($jvPageEt === 'other_voucher') {
 
 $nextJournalVoucherNo = 1;
 if (orange_journal_vouchers_ready($pdo)) {
-    $nextJournalVoucherNo = (int) $pdo->query('SELECT COALESCE(MAX(id),0) + 1 FROM journal_vouchers')->fetchColumn();
+    orange_journal_types_sync_canonical_defaults($pdo);
+    $fyPeek = orange_fiscal_find_for_date($pdo, date('Y-m-d'));
+    $fyPeekId = $fyPeek ? (int) $fyPeek['id'] : 0;
+    $etPeek = isset($jvPageEntryType) ? (string) $jvPageEntryType : '';
+    if (
+        $fyPeekId > 0
+        && $etPeek !== ''
+        && orange_table_has_column($pdo, 'journal_vouchers', 'voucher_serial')
+    ) {
+        if ($etPeek === 'other_voucher') {
+            $nextJournalVoucherNo = (int) $pdo->query(
+                'SELECT COALESCE(MAX(id),0) + 1 FROM journal_vouchers'
+            )->fetchColumn();
+        } else {
+            $jm = orange_journal_voucher_resolve_serial_meta($pdo, $etPeek, null);
+            $nextJournalVoucherNo = orange_journal_voucher_next_serial($pdo, $fyPeekId, $jm['journal_serial_bucket']);
+        }
+    } else {
+        $nextJournalVoucherNo = (int) $pdo->query(
+            'SELECT COALESCE(MAX(id),0) + 1 FROM journal_vouchers'
+        )->fetchColumn();
+    }
 }
 $jvFormDocumentEnteredDisplay = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 $jvFormVoucherDateDisplay = orange_format_date_dmY(date('Y-m-d'));
@@ -797,7 +818,7 @@ function jvSearchRenderRows(rows) {
         if (JV_OTHER_VOUCHER_BROWSE) {
             etCell = '<td><small>' + jvEscapeHtml(r.entry_type_label || r.entry_type || '') + '</small></td>';
         }
-        tr.innerHTML = '<td>' + jvEscapeHtml(r.id) + '</td>' +
+        tr.innerHTML = '<td>' + jvEscapeHtml(r.display_no != null ? r.display_no : r.id) + '</td>' +
             '<td dir="ltr">' + jvEscapeHtml(r.voucher_date) + '</td>' +
             etCell +
             '<td>' + jvEscapeHtml(r.reference) + '</td>' +
@@ -1175,7 +1196,7 @@ function jvApplyVoucherPayload(r) {
     jvViewMode = !canEdit;
     jvBrowseId = r.voucher.id;
     jvBrowseEntryType = r.voucher.entry_type ? String(r.voucher.entry_type) : null;
-    document.getElementById('jv_number_preview').value = String(r.voucher.id);
+    document.getElementById('jv_number_preview').value = String(r.voucher.display_voucher_no != null ? r.voucher.display_voucher_no : r.voucher.id);
     document.getElementById('jv_date').value = orangeIsoDateToDmy(r.voucher.date || '');
     document.getElementById('jv_ref').value = r.voucher.reference || '';
     document.getElementById('jv_desc').value = r.voucher.description || '';

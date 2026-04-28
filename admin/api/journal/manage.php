@@ -218,6 +218,7 @@ try {
             json_response(['success' => false, 'message' => 'بيان السند مطلوب'], 422);
         }
 
+        $jtCreate = 0;
         $entryTypeForPost = $entryTypeNorm;
         if ($entryTypeNorm === 'other_voucher') {
             $jtCreate = (int) ($data['journal_type_id'] ?? 0);
@@ -228,6 +229,11 @@ try {
                 ], 422);
             }
             $entryTypeForPost = orange_journal_manage_store_entry_type_for_other_voucher_screen($pdo, $jtCreate);
+        }
+
+        $headerExtra = [];
+        if ($jtCreate > 0) {
+            $headerExtra['journal_type_id'] = $jtCreate;
         }
 
         $linesIn = $data['lines'] ?? null;
@@ -246,7 +252,9 @@ try {
                         $date,
                         $date,
                         $description,
-                        $entryTypeForPost
+                        $entryTypeForPost,
+                        null,
+                        $jtCreate > 0 ? $jtCreate : null
                     );
                 } catch (Throwable $e) {
                     orange_admin_api_catch($e, 'تعذر إضافة السند', 422);
@@ -265,13 +273,13 @@ try {
                 return;
             }
             try {
-                $vid = orange_voucher_post($pdo, [
+                $vid = orange_voucher_post($pdo, array_merge($headerExtra, [
                     'voucher_date' => $date,
                     'document_entered_at' => date('Y-m-d H:i:s'),
                     'reference' => $reference !== '' ? $reference : null,
                     'description' => $description,
                     'entry_type' => $entryTypeForPost,
-                ], $postLines);
+                ]), $postLines);
             } catch (Throwable $e) {
                 orange_admin_api_catch($e, 'تعذر إضافة السند', 422);
             }
@@ -299,7 +307,7 @@ try {
         if (orange_gl_use_pending_queue($pdo)) {
             $refOut = $reference !== '' ? $reference : ('JM-' . str_replace(['.', ' '], '', uniqid('', true)));
             try {
-                $pendingId = orange_gl_pending_enqueue_simple($pdo, [
+                $simpleRow = [
                     'reference' => $refOut,
                     'source_label' => $refOut,
                     'movement_at' => $date,
@@ -309,7 +317,11 @@ try {
                     'amount' => $amount,
                     'description' => $description,
                     'entry_type' => $entryTypeForPost,
-                ]);
+                ];
+                if ($jtCreate > 0) {
+                    $simpleRow['journal_type_id'] = $jtCreate;
+                }
+                $pendingId = orange_gl_pending_enqueue_simple($pdo, $simpleRow);
             } catch (Throwable $e) {
                 orange_admin_api_catch($e, 'تعذر إضافة السند', 422);
             }
@@ -327,13 +339,13 @@ try {
             return;
         }
         try {
-            $vid = orange_voucher_post($pdo, [
+            $vid = orange_voucher_post($pdo, array_merge($headerExtra, [
                 'voucher_date' => $date,
                 'document_entered_at' => date('Y-m-d H:i:s'),
                 'reference' => $reference !== '' ? $reference : null,
                 'description' => $description,
                 'entry_type' => $entryTypeForPost,
-            ], [
+            ]), [
                 ['account_id' => $accountDebit, 'debit' => $amount, 'credit' => 0, 'memo' => $description],
                 ['account_id' => $accountCredit, 'debit' => 0, 'credit' => $amount, 'memo' => $description],
             ]);
@@ -411,6 +423,8 @@ try {
             'success' => true,
             'voucher' => [
                 'id' => (int) $v['id'],
+                'voucher_serial' => (int) ($v['voucher_serial'] ?? 0),
+                'display_voucher_no' => orange_journal_voucher_display_number($v),
                 'date' => $dateForInput,
                 'reference' => (string)($v['reference'] ?? ''),
                 'description' => (string)($v['description'] ?? ''),
@@ -437,49 +451,123 @@ try {
             }
             [$etFrag, $navTypes] = orange_journal_manage_entry_type_sql_fragment($navTypes);
         }
+        $etFragJv = preg_replace('/\bentry_type\b/', 'jv.entry_type', $etFrag);
         $where = trim((string)($data['where'] ?? ''));
-        $currentId = (int)($data['current_id'] ?? 0);
+        $currentId = (int) ($data['current_id'] ?? 0);
         if (!orange_journal_vouchers_ready($pdo)) {
             json_response(['success' => false, 'message' => 'جداول السندات غير جاهزة'], 422);
         }
-        $cSt = $pdo->prepare('SELECT COUNT(*) FROM journal_vouchers WHERE ' . $etFrag);
-        $cSt->execute($navTypes);
-        if ((int) $cSt->fetchColumn() === 0) {
-            json_response(['success' => false, 'message' => 'لا توجد سندات من هذا النوع بعد']);
+
+        $useSerialNav = orange_table_has_column($pdo, 'journal_vouchers', 'voucher_serial')
+            && orange_table_has_column($pdo, 'journal_vouchers', 'journal_serial_bucket');
+
+        $serialNav = false;
+        $fyScope = 0;
+        $buckScope = '';
+        $vsCur = 0;
+        if ($useSerialNav && $currentId > 0) {
+            $stCur = $pdo->prepare(
+                'SELECT id, fiscal_year_id, voucher_serial, journal_serial_bucket, entry_type FROM journal_vouchers WHERE id = ? LIMIT 1'
+            );
+            $stCur->execute([$currentId]);
+            $curRow = $stCur->fetch(PDO::FETCH_ASSOC);
+            if ($curRow) {
+                $fyScope = (int) ($curRow['fiscal_year_id'] ?? 0);
+                $vsCur = (int) ($curRow['voucher_serial'] ?? 0);
+                $buckStored = trim((string) ($curRow['journal_serial_bucket'] ?? ''));
+                $buckScope = $et === 'other_voucher' ? ('JT' . $jtNav) : $buckStored;
+                if ($fyScope > 0 && $buckScope !== '' && $vsCur > 0) {
+                    $serialNav = true;
+                }
+            }
         }
-        $target = 0;
-        if ($where === 'first') {
-            $q = $pdo->prepare('SELECT COALESCE(MIN(id), 0) FROM journal_vouchers WHERE ' . $etFrag);
-            $q->execute($navTypes);
-            $target = (int) $q->fetchColumn();
-        } elseif ($where === 'last') {
-            $q = $pdo->prepare('SELECT COALESCE(MAX(id), 0) FROM journal_vouchers WHERE ' . $etFrag);
-            $q->execute($navTypes);
-            $target = (int) $q->fetchColumn();
-        } elseif ($where === 'prev') {
-            if ($currentId <= 0) {
-                $q = $pdo->prepare('SELECT COALESCE(MAX(id), 0) FROM journal_vouchers WHERE ' . $etFrag);
-                $q->execute($navTypes);
+
+        if ($serialNav) {
+            $cSt = $pdo->prepare(
+                'SELECT COUNT(*) FROM journal_vouchers jv WHERE ' . $etFragJv . ' AND jv.fiscal_year_id = ? AND jv.journal_serial_bucket = ?'
+            );
+            $cSt->execute(array_merge($navTypes, [$fyScope, $buckScope]));
+            if ((int) $cSt->fetchColumn() === 0) {
+                json_response(['success' => false, 'message' => 'لا توجد سندات من هذا النوع بعد']);
+            }
+            $target = 0;
+            if ($where === 'first') {
+                $q = $pdo->prepare(
+                    'SELECT jv.id FROM journal_vouchers jv WHERE ' . $etFragJv
+                    . ' AND jv.fiscal_year_id = ? AND jv.journal_serial_bucket = ? ORDER BY jv.voucher_serial ASC, jv.id ASC LIMIT 1'
+                );
+                $q->execute(array_merge($navTypes, [$fyScope, $buckScope]));
                 $target = (int) $q->fetchColumn();
-            } else {
-                $q = $pdo->prepare('SELECT id FROM journal_vouchers WHERE ' . $etFrag . ' AND id < ? ORDER BY id DESC LIMIT 1');
-                $q->execute(array_merge($navTypes, [$currentId]));
+            } elseif ($where === 'last') {
+                $q = $pdo->prepare(
+                    'SELECT jv.id FROM journal_vouchers jv WHERE ' . $etFragJv
+                    . ' AND jv.fiscal_year_id = ? AND jv.journal_serial_bucket = ? ORDER BY jv.voucher_serial DESC, jv.id DESC LIMIT 1'
+                );
+                $q->execute(array_merge($navTypes, [$fyScope, $buckScope]));
+                $target = (int) $q->fetchColumn();
+            } elseif ($where === 'prev') {
+                $q = $pdo->prepare(
+                    'SELECT jv.id FROM journal_vouchers jv WHERE ' . $etFragJv
+                    . ' AND jv.fiscal_year_id = ? AND jv.journal_serial_bucket = ? '
+                    . 'AND (jv.voucher_serial < ? OR (jv.voucher_serial = ? AND jv.id < ?)) '
+                    . 'ORDER BY jv.voucher_serial DESC, jv.id DESC LIMIT 1'
+                );
+                $q->execute(array_merge($navTypes, [$fyScope, $buckScope, $vsCur, $vsCur, $currentId]));
                 $row = $q->fetch(PDO::FETCH_ASSOC);
                 $target = $row ? (int) $row['id'] : 0;
+            } elseif ($where === 'next') {
+                $q = $pdo->prepare(
+                    'SELECT jv.id FROM journal_vouchers jv WHERE ' . $etFragJv
+                    . ' AND jv.fiscal_year_id = ? AND jv.journal_serial_bucket = ? '
+                    . 'AND (jv.voucher_serial > ? OR (jv.voucher_serial = ? AND jv.id > ?)) '
+                    . 'ORDER BY jv.voucher_serial ASC, jv.id ASC LIMIT 1'
+                );
+                $q->execute(array_merge($navTypes, [$fyScope, $buckScope, $vsCur, $vsCur, $currentId]));
+                $row = $q->fetch(PDO::FETCH_ASSOC);
+                $target = $row ? (int) $row['id'] : 0;
+            } else {
+                json_response(['success' => false, 'message' => 'أمر تنقل غير معروف'], 422);
             }
-        } elseif ($where === 'next') {
-            if ($currentId <= 0) {
+        } else {
+            $cSt = $pdo->prepare('SELECT COUNT(*) FROM journal_vouchers WHERE ' . $etFrag);
+            $cSt->execute($navTypes);
+            if ((int) $cSt->fetchColumn() === 0) {
+                json_response(['success' => false, 'message' => 'لا توجد سندات من هذا النوع بعد']);
+            }
+            $target = 0;
+            if ($where === 'first') {
                 $q = $pdo->prepare('SELECT COALESCE(MIN(id), 0) FROM journal_vouchers WHERE ' . $etFrag);
                 $q->execute($navTypes);
                 $target = (int) $q->fetchColumn();
+            } elseif ($where === 'last') {
+                $q = $pdo->prepare('SELECT COALESCE(MAX(id), 0) FROM journal_vouchers WHERE ' . $etFrag);
+                $q->execute($navTypes);
+                $target = (int) $q->fetchColumn();
+            } elseif ($where === 'prev') {
+                if ($currentId <= 0) {
+                    $q = $pdo->prepare('SELECT COALESCE(MAX(id), 0) FROM journal_vouchers WHERE ' . $etFrag);
+                    $q->execute($navTypes);
+                    $target = (int) $q->fetchColumn();
+                } else {
+                    $q = $pdo->prepare('SELECT id FROM journal_vouchers WHERE ' . $etFrag . ' AND id < ? ORDER BY id DESC LIMIT 1');
+                    $q->execute(array_merge($navTypes, [$currentId]));
+                    $row = $q->fetch(PDO::FETCH_ASSOC);
+                    $target = $row ? (int) $row['id'] : 0;
+                }
+            } elseif ($where === 'next') {
+                if ($currentId <= 0) {
+                    $q = $pdo->prepare('SELECT COALESCE(MIN(id), 0) FROM journal_vouchers WHERE ' . $etFrag);
+                    $q->execute($navTypes);
+                    $target = (int) $q->fetchColumn();
+                } else {
+                    $q = $pdo->prepare('SELECT id FROM journal_vouchers WHERE ' . $etFrag . ' AND id > ? ORDER BY id ASC LIMIT 1');
+                    $q->execute(array_merge($navTypes, [$currentId]));
+                    $row = $q->fetch(PDO::FETCH_ASSOC);
+                    $target = $row ? (int) $row['id'] : 0;
+                }
             } else {
-                $q = $pdo->prepare('SELECT id FROM journal_vouchers WHERE ' . $etFrag . ' AND id > ? ORDER BY id ASC LIMIT 1');
-                $q->execute(array_merge($navTypes, [$currentId]));
-                $row = $q->fetch(PDO::FETCH_ASSOC);
-                $target = $row ? (int) $row['id'] : 0;
+                json_response(['success' => false, 'message' => 'أمر تنقل غير معروف'], 422);
             }
-        } else {
-            json_response(['success' => false, 'message' => 'أمر تنقل غير معروف'], 422);
         }
         if ($target <= 0) {
             $msg = 'لا توجد سندات من هذا النوع بعد';
@@ -583,11 +671,13 @@ try {
             json_response(['success' => false, 'message' => 'حدّد معيار بحث واحد على الأقل (رقم، تاريخ، مرجع، أو بيان)'], 422);
         }
 
-        $sql = 'SELECT jv.id, jv.voucher_date, jv.reference, jv.description, jv.entry_type,
+        $sql = 'SELECT jv.*,
             (SELECT COALESCE(SUM(jl.debit), 0) FROM journal_lines jl WHERE jl.voucher_id = jv.id) AS voucher_total
             FROM journal_vouchers jv
             WHERE ' . implode(' AND ', $parts)
-            . ' ORDER BY jv.id DESC LIMIT 300';
+            . (orange_table_has_column($pdo, 'journal_vouchers', 'voucher_serial')
+                ? ' ORDER BY COALESCE(jv.voucher_serial, jv.id) DESC, jv.id DESC LIMIT 300'
+                : ' ORDER BY jv.id DESC LIMIT 300');
         $st = $pdo->prepare($sql);
         $st->execute($params);
         $rows = [];
@@ -597,6 +687,7 @@ try {
             $etRow = (string) ($row['entry_type'] ?? '');
             $rows[] = [
                 'id' => (int) $row['id'],
+                'display_no' => orange_journal_voucher_display_number($row),
                 'voucher_date' => $dateDisp,
                 'reference' => (string) ($row['reference'] ?? ''),
                 'description' => (string) ($row['description'] ?? ''),

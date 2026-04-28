@@ -38,7 +38,9 @@ function orange_journal_types_canonical_rows(): array
         ['OBV', 'سند رصيد افتتاحي', 'Opening balance voucher'],
         ['JE', 'سند قيد', 'Journal entry'],
         ['RV', 'سند قبض', 'Receipt voucher'],
+        ['CRR', 'قبض عميل آجل', 'Customer AR receipt'],
         ['PV', 'سند صرف', 'Payment voucher'],
+        ['SPR', 'صرف مورد آجل', 'Supplier AP payment'],
         ['YEC', 'قيد الإقفال السنوي', 'Year-end closing entry'],
         ['PIN', 'فاتورة مشتريات', 'Purchase invoice'],
         ['PDN', 'مردود مشتريات', 'Purchase return'],
@@ -155,8 +157,10 @@ function orange_gl_entry_types_for_journal_type_code(string $code): array
     static $map = [
         'OBV' => ['opening_balance'],
         'JE' => ['manual', 'general', 'other_voucher'],
-        'RV' => ['customer_receipt', 'receipt_voucher'],
-        'PV' => ['supplier_payment', 'payment_voucher', 'expense', 'expense_adjustment', 'expense_reversal'],
+        'RV' => ['receipt_voucher'],
+        'PV' => ['payment_voucher', 'expense', 'expense_adjustment', 'expense_reversal'],
+        'CRR' => ['customer_receipt'],
+        'SPR' => ['supplier_payment'],
         'YEC' => ['year_end_close'],
         'PIN' => ['purchase', 'purchase_receive'],
         'PDN' => ['purchase_return'],
@@ -220,4 +224,33 @@ function orange_journal_type_id_by_code(PDO $pdo, string $code): int
     $id = $st->fetchColumn();
 
     return ($id !== false && $id !== null) ? (int) $id : 0;
+}
+
+/**
+ * مطابقة كود journal_types من entry_type عندما يكون المسار فريداً.
+ * القيم الفارغة تعني أن النوع يشارك عدة يوميات (مثل order_delivery_sale) — يُستخدم دلو تسلسل منفصل.
+ */
+function orange_journal_type_code_from_entry_type(string $entryType): string
+{
+    $k = strtolower(trim($entryType));
+    static $map = [
+        'opening_balance' => 'OBV',
+        'manual' => 'JE',
+        'general' => 'JE',
+        'other_voucher' => 'JE',
+        'migrated' => 'JE',
+        'receipt_voucher' => 'RV',
+        'payment_voucher' => 'PV',
+        'customer_receipt' => 'CRR',
+        'supplier_payment' => 'SPR',
+        'year_end_close' => 'YEC',
+        'purchase' => 'PIN',
+        'purchase_receive' => 'PIN',
+        'purchase_return' => 'PDN',
+        'expense' => 'PV',
+        'expense_adjustment' => 'PV',
+        'expense_reversal' => 'PV',
+    ];
+
+    return $map[$k] ?? '';
 }

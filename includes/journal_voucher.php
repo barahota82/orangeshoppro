@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/fiscal_years.php';
+require_once __DIR__ . '/journal_types.php';
 
 function orange_journal_vouchers_ready(PDO $pdo): bool
 {
@@ -184,7 +185,127 @@ function orange_accounting_is_locked(PDO $pdo, ?array $row): bool
 }
 
 /**
- * @param array{voucher_date:string,reference?:?string,description:string,entry_type?:string,document_entered_at?:string} $header
+ * رقم العرض اليومية: التسلسل داخل سنة المالية وحسب دليل اليومية؛ يُكمِّل إلى id قبل التعبئة القديمة.
+ *
+ * @param array<string, mixed> $voucherRow
+ */
+function orange_journal_voucher_display_number(array $voucherRow): int
+{
+    $vs = isset($voucherRow['voucher_serial']) ? (int) $voucherRow['voucher_serial'] : 0;
+
+    return $vs > 0 ? $vs : (int) ($voucherRow['id'] ?? 0);
+}
+
+/**
+ * دليل واحد ضمن كل سنة لتسلسل قبض عميل آجل / صرف مورد مقابل عمومي؛ وقيم «جزء واحد لوغاريتماً» بالنسبة لأنواع دون كود وحيد.
+ *
+ * @return array{journal_type_id:int|null,journal_serial_bucket:string}
+ */
+function orange_journal_voucher_resolve_serial_meta(PDO $pdo, string $entryType, ?int $overrideJournalTypeId = null): array
+{
+    orange_catalog_ensure_schema($pdo);
+    orange_journal_types_sync_canonical_defaults($pdo);
+    $ov = (int) ($overrideJournalTypeId ?? 0);
+    if ($ov > 0) {
+        return ['journal_type_id' => $ov, 'journal_serial_bucket' => 'JT' . $ov];
+    }
+    $code = orange_journal_type_code_from_entry_type($entryType);
+    if ($code !== '') {
+        $jid = orange_journal_type_id_by_code($pdo, $code);
+        if ($jid > 0) {
+            return ['journal_type_id' => $jid, 'journal_serial_bucket' => 'JT' . $jid];
+        }
+    }
+    $safe = preg_replace('/[^a-zA-Z0-9_\-]/', '_', trim($entryType));
+    if ($safe === '') {
+        $safe = 'unknown';
+    }
+    if (strlen($safe) > 40) {
+        $safe = substr($safe, 0, 40);
+    }
+
+    return ['journal_type_id' => null, 'journal_serial_bucket' => 'ET:' . $safe];
+}
+
+function orange_journal_voucher_next_serial(PDO $pdo, int $fiscalYearId, string $bucket): int
+{
+    if ($fiscalYearId <= 0 || !orange_table_has_column($pdo, 'journal_vouchers', 'voucher_serial')) {
+        return 1;
+    }
+    $st = $pdo->prepare(
+        'SELECT COALESCE(MAX(voucher_serial), 0) + 1 FROM journal_vouchers WHERE fiscal_year_id = ? AND journal_serial_bucket = ?'
+    );
+    $st->execute([$fiscalYearId, $bucket]);
+
+    return (int) $st->fetchColumn();
+}
+
+/**
+ * تعبئة journal_serial_bucket + voucher_serial بعد إضافة أعمدة المخطّط (عملية واحدة ثقيلة عند وجود نقص).
+ *
+ * يُفرَض تنفيذه من catalog_schema؛ لا تعتمد عليه في مسار كل طلب خارج ensure_schema ما لم توجد نقائص فعلياً.
+ */
+function orange_journal_vouchers_backfill_serial_numbers(PDO $pdo): void
+{
+    if (!orange_journal_vouchers_ready($pdo)
+        || !orange_table_has_column($pdo, 'journal_vouchers', 'voucher_serial')
+        || !orange_table_has_column($pdo, 'journal_vouchers', 'journal_serial_bucket')) {
+        return;
+    }
+    orange_journal_types_sync_canonical_defaults($pdo);
+    $need = (int) $pdo->query(
+        'SELECT COUNT(*) FROM journal_vouchers WHERE voucher_serial <= 0 OR TRIM(COALESCE(journal_serial_bucket,\'\')) = \'\''
+    )->fetchColumn();
+    if ($need <= 0) {
+        return;
+    }
+    $rows = $pdo->query(
+        'SELECT id, entry_type, fiscal_year_id, voucher_date FROM journal_vouchers WHERE voucher_serial <= 0 OR TRIM(COALESCE(journal_serial_bucket,\'\')) = \'\' ORDER BY COALESCE(fiscal_year_id,0) ASC, id ASC'
+    )->fetchAll(PDO::FETCH_ASSOC);
+    if ($rows === []) {
+        return;
+    }
+    $upd = $pdo->prepare(
+        'UPDATE journal_vouchers SET journal_type_id = ?, journal_serial_bucket = ?, voucher_serial = ? WHERE id = ?'
+    );
+    $counters = [];
+    foreach ($rows as $r) {
+        $id = (int) ($r['id'] ?? 0);
+        if ($id <= 0) {
+            continue;
+        }
+        $et = trim((string) ($r['entry_type'] ?? 'general'));
+        if ($et === '') {
+            $et = 'general';
+        }
+        $meta = orange_journal_voucher_resolve_serial_meta($pdo, $et, null);
+        $fyId = (int) ($r['fiscal_year_id'] ?? 0);
+        $vdRaw = trim((string) ($r['voucher_date'] ?? ''));
+        if ($fyId <= 0 && $vdRaw !== '') {
+            orange_catalog_ensure_schema($pdo);
+            $fy = orange_fiscal_find_for_date($pdo, $vdRaw);
+            if ($fy) {
+                $fyId = (int) ($fy['id']);
+                $pdo->prepare(
+                    'UPDATE journal_vouchers SET fiscal_year_id = ? WHERE id = ? AND (fiscal_year_id IS NULL OR fiscal_year_id <= 0)'
+                )->execute([$fyId, $id]);
+            }
+        }
+        if ($fyId <= 0) {
+            $fyId = 0;
+        }
+        $b = $meta['journal_serial_bucket'];
+        $jid = isset($meta['journal_type_id']) ? $meta['journal_type_id'] : null;
+        $jidSql = ($jid !== null && (int) $jid > 0) ? (int) $jid : null;
+        $key = $fyId . '|' . $b;
+        $counters[$key] = ($counters[$key] ?? 0) + 1;
+        $ser = $counters[$key];
+        $upd->execute([$jidSql, $b, $ser, $id]);
+    }
+}
+
+/**
+ * @param array{voucher_date:string,reference?:?string,description:string,entry_type?:string,document_entered_at?:string,journal_type_id?:int} $header
  * @param list<array{account_id:int,debit:float,credit:float,memo?:string}> $lines
  * @return int voucher id
  */
@@ -248,6 +369,18 @@ function orange_voucher_post(PDO $pdo, array $header, array $lines): int
 
     $fyId = orange_fiscal_require_open_for_posting($pdo, $date);
 
+    $overrideJt = isset($header['journal_type_id']) ? (int) $header['journal_type_id'] : 0;
+    $metaSerial = orange_journal_voucher_resolve_serial_meta(
+        $pdo,
+        $entryType,
+        $overrideJt > 0 ? $overrideJt : null
+    );
+    $hasSerialCols = orange_table_has_column($pdo, 'journal_vouchers', 'voucher_serial')
+        && orange_table_has_column($pdo, 'journal_vouchers', 'journal_serial_bucket');
+    $jidSerial = isset($metaSerial['journal_type_id']) && $metaSerial['journal_type_id'] !== null
+        ? (int) $metaSerial['journal_type_id']
+        : null;
+
     $chk = $pdo->prepare('SELECT id FROM accounts WHERE id = ? LIMIT 1');
 
     $docEntered = trim((string) ($header['document_entered_at'] ?? ''));
@@ -258,34 +391,113 @@ function orange_voucher_post(PDO $pdo, array $header, array $lines): int
         $docEntered .= ' ' . date('H:i:s');
     }
 
-    if (orange_table_has_column($pdo, 'journal_vouchers', 'document_entered_at')) {
-        $pdo->prepare(
-            'INSERT INTO journal_vouchers (voucher_date, document_entered_at, reference, description, entry_type, fiscal_year_id) VALUES (?,?,?,?,?,?)'
-        )->execute([$date, $docEntered, $referenceSql, $description, $entryType, $fyId]);
-    } else {
-        $pdo->prepare(
-            'INSERT INTO journal_vouchers (voucher_date, reference, description, entry_type, fiscal_year_id) VALUES (?,?,?,?,?)'
-        )->execute([$date, $referenceSql, $description, $entryType, $fyId]);
+    $ownTx = !$pdo->inTransaction();
+    if ($ownTx) {
+        $pdo->beginTransaction();
     }
-    $vid = (int) $pdo->lastInsertId();
-
-    $ins = $pdo->prepare(
-        'INSERT INTO journal_lines (voucher_id, line_no, account_id, debit, credit, memo) VALUES (?,?,?,?,?,?)'
-    );
-    foreach ($norm as $row) {
-        $chk->execute([$row['account_id']]);
-        if (!$chk->fetch()) {
-            $pdo->prepare('DELETE FROM journal_vouchers WHERE id = ?')->execute([$vid]);
-            throw new InvalidArgumentException('حساب غير موجود في الدليل: ' . $row['account_id']);
+    $vid = 0;
+    try {
+        $nextSerial = 1;
+        if ($hasSerialCols) {
+            $nextSerial = orange_journal_voucher_next_serial($pdo, $fyId, $metaSerial['journal_serial_bucket']);
         }
-        $ins->execute([
-            $vid,
-            $row['line_no'],
-            $row['account_id'],
-            $row['debit'],
-            $row['credit'],
-            $row['memo'] === '' ? null : $row['memo'],
-        ]);
+        $bucket = $metaSerial['journal_serial_bucket'];
+
+        $inserted = false;
+        $lastErr = null;
+        if ($hasSerialCols && orange_table_has_column($pdo, 'journal_vouchers', 'journal_type_id')) {
+            $maxDup = 12;
+            for ($attempt = 0; $attempt < $maxDup; ++$attempt) {
+                try {
+                    if (orange_table_has_column($pdo, 'journal_vouchers', 'document_entered_at')) {
+                        $pdo->prepare(
+                            'INSERT INTO journal_vouchers (
+                                voucher_date, document_entered_at, reference, description, entry_type, fiscal_year_id,
+                                journal_type_id, journal_serial_bucket, voucher_serial
+                             ) VALUES (?,?,?,?,?,?,?,?,?)'
+                        )->execute([
+                            $date,
+                            $docEntered,
+                            $referenceSql,
+                            $description,
+                            $entryType,
+                            $fyId,
+                            $jidSerial,
+                            $bucket,
+                            $nextSerial,
+                        ]);
+                    } else {
+                        $pdo->prepare(
+                            'INSERT INTO journal_vouchers (
+                                voucher_date, reference, description, entry_type, fiscal_year_id,
+                                journal_type_id, journal_serial_bucket, voucher_serial
+                             ) VALUES (?,?,?,?,?,?,?,?)'
+                        )->execute([
+                            $date,
+                            $referenceSql,
+                            $description,
+                            $entryType,
+                            $fyId,
+                            $jidSerial,
+                            $bucket,
+                            $nextSerial,
+                        ]);
+                    }
+                    $inserted = true;
+                    break;
+                } catch (\PDOException $e) {
+                    $lastErr = $e;
+                    $dup = strpos($e->getMessage(), 'Duplicate') !== false
+                        || (int) ($e->errorInfo[1] ?? 0) === 1062;
+                    if (!$dup || $attempt >= $maxDup - 1) {
+                        throw $e;
+                    }
+                    $nextSerial = orange_journal_voucher_next_serial($pdo, $fyId, $bucket);
+                }
+            }
+            if (!$inserted) {
+                throw $lastErr instanceof Throwable
+                    ? $lastErr
+                    : new RuntimeException('تعذر تعيين رقم قيد لتسلسل اليومية.');
+            }
+        } elseif (orange_table_has_column($pdo, 'journal_vouchers', 'document_entered_at')) {
+            $pdo->prepare(
+                'INSERT INTO journal_vouchers (voucher_date, document_entered_at, reference, description, entry_type, fiscal_year_id) VALUES (?,?,?,?,?,?)'
+            )->execute([$date, $docEntered, $referenceSql, $description, $entryType, $fyId]);
+        } else {
+            $pdo->prepare(
+                'INSERT INTO journal_vouchers (voucher_date, reference, description, entry_type, fiscal_year_id) VALUES (?,?,?,?,?)'
+            )->execute([$date, $referenceSql, $description, $entryType, $fyId]);
+        }
+        $vid = (int) $pdo->lastInsertId();
+
+        $ins = $pdo->prepare(
+            'INSERT INTO journal_lines (voucher_id, line_no, account_id, debit, credit, memo) VALUES (?,?,?,?,?,?)'
+        );
+        foreach ($norm as $row) {
+            $chk->execute([$row['account_id']]);
+            if (!$chk->fetch()) {
+                $pdo->prepare('DELETE FROM journal_vouchers WHERE id = ?')->execute([$vid]);
+                throw new InvalidArgumentException('حساب غير موجود في الدليل: ' . $row['account_id']);
+            }
+            $ins->execute([
+                $vid,
+                $row['line_no'],
+                $row['account_id'],
+                $row['debit'],
+                $row['credit'],
+                $row['memo'] === '' ? null : $row['memo'],
+            ]);
+        }
+
+        if ($ownTx && $pdo->inTransaction()) {
+            $pdo->commit();
+        }
+    } catch (Throwable $e) {
+        if ($ownTx && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
     }
 
     return $vid;
