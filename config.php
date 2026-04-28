@@ -503,19 +503,36 @@ function orange_channel_slug_for_path_segment(PDO $pdo, string $pathSegment, boo
     if ($s === '') {
         return null;
     }
-    try {
-        $sql = 'SELECT slug FROM channels WHERE path_segment = ?';
-        if ($requireActive) {
-            $sql .= ' AND is_active = 1';
+    $sql = 'SELECT slug FROM channels WHERE path_segment = ?';
+    if ($requireActive) {
+        $sql .= ' AND is_active = 1';
+    }
+    $sql .= ' LIMIT 1';
+    for ($attempt = 0; $attempt < 2; $attempt++) {
+        try {
+            $st = $pdo->prepare($sql);
+            $st->execute([$s]);
+            $row = $st->fetchColumn();
+            if ($row !== false && $row !== null && (string) $row !== '') {
+                return (string) $row;
+            }
+
+            return null;
+        } catch (Throwable $e) {
+            if ($attempt === 0) {
+                if (function_exists('error_log')) {
+                    error_log('[orange] channel_slug_for_path_segment transient (will retry): ' . $e->getMessage());
+                }
+                usleep(50000);
+
+                continue;
+            }
+            if (function_exists('error_log')) {
+                error_log('[orange] channel_slug_for_path_segment: ' . $e->getMessage());
+            }
+
+            return null;
         }
-        $sql .= ' LIMIT 1';
-        $st = $pdo->prepare($sql);
-        $st->execute([$s]);
-        $row = $st->fetchColumn();
-        if ($row !== false && $row !== null && (string) $row !== '') {
-            return (string) $row;
-        }
-    } catch (Throwable $e) {
     }
 
     return null;
@@ -527,16 +544,33 @@ function orange_channel_path_segment_for_slug(PDO $pdo, string $slug): ?string
     if ($s === '') {
         return null;
     }
-    try {
-        $st = $pdo->prepare(
-            "SELECT path_segment FROM channels WHERE slug = ? AND is_active = 1 AND path_segment IS NOT NULL AND path_segment <> '' LIMIT 1"
-        );
-        $st->execute([$s]);
-        $row = $st->fetchColumn();
-        if ($row !== false && $row !== null && (string) $row !== '') {
-            return (string) $row;
+    $slugSql =
+        'SELECT path_segment FROM channels WHERE slug = ? AND is_active = 1 AND path_segment IS NOT NULL AND path_segment <> \'\' LIMIT 1';
+    for ($attempt = 0; $attempt < 2; $attempt++) {
+        try {
+            $st = $pdo->prepare($slugSql);
+            $st->execute([$s]);
+            $row = $st->fetchColumn();
+            if ($row !== false && $row !== null && (string) $row !== '') {
+                return (string) $row;
+            }
+
+            return null;
+        } catch (Throwable $e) {
+            if ($attempt === 0) {
+                if (function_exists('error_log')) {
+                    error_log('[orange] channel_path_segment_for_slug transient (will retry): ' . $e->getMessage());
+                }
+                usleep(50000);
+
+                continue;
+            }
+            if (function_exists('error_log')) {
+                error_log('[orange] channel_path_segment_for_slug: ' . $e->getMessage());
+            }
+
+            return null;
         }
-    } catch (Throwable $e) {
     }
 
     return null;
