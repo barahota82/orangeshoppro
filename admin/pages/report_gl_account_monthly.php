@@ -60,134 +60,33 @@ foreach ($years as $y) {
     }
 }
 
-/**
- * قبول مدخل month (YYYY-MM) من النموذج أو GET.
- */
-$normalizeYm = static function (string $raw): ?string {
-    $raw = trim($raw);
-    if (!preg_match('/^(\d{4})-(\d{2})$/', $raw, $m)) {
-        return null;
-    }
-    $month = (int) $m[2];
-    if ($month < 1 || $month > 12) {
-        return null;
-    }
-
-    return sprintf('%04d-%02d', (int) $m[1], $month);
-};
-
-$ymFromGet = isset($_GET['m_from']) ? $normalizeYm((string) $_GET['m_from']) : null;
-$ymToGet = isset($_GET['m_to']) ? $normalizeYm((string) $_GET['m_to']) : null;
-
-/** أول يوم من شهر YYYY-MM */
-$firstDayOfYm = static function (string $ym): string {
-    return $ym . '-01';
-};
-
-/** آخر يوم من شهر YYYY-MM */
-$lastDayOfYm = static function (string $ym): string {
-    $t = strtotime($firstDayOfYm($ym) . ' 12:00:00');
-
-    return $t ? date('Y-m-t', $t) : $ym . '-28';
-};
-
 $useVouchers = orange_journal_vouchers_ready($pdo);
 $monthlyRows = [];
-$periodLabel = '';
-$periodYmFrom = '';
-$periodYmTo = '';
-$periodDateFrom = '';
-$periodDateTo = '';
-/** حدود YYYY-MM للسنة المالية الحالية (لـ min/max على حقول الشهر) */
-$fyYmBoundMin = '';
-$fyYmBoundMax = '';
 
-if ($fyRow) {
-    $fyStartYmd = (string) ($fyRow['start_date'] ?? '');
-    $fyEndYmd = (string) ($fyRow['end_date'] ?? '');
-    /** أول يوم وفق yyyy-mm-dd فقط لتفادي أخطاء المقارنة مع DATETIME أو أشكال مختلفة من السيرفر */
-    $fyStartDay = preg_match('/^(\d{4}-\d{2}-\d{2})/', trim($fyStartYmd), $mY) ? $mY[1] : '';
-    $fyEndDay = preg_match('/^(\d{4}-\d{2}-\d{2})/', trim($fyEndYmd), $mY) ? $mY[1] : '';
-    $fyMinYm = strlen($fyStartDay) >= 7 ? substr($fyStartDay, 0, 7) : '';
-    $fyMaxYm = strlen($fyEndDay) >= 7 ? substr($fyEndDay, 0, 7) : '';
-    if ($fyMinYm !== '' && $fyMaxYm !== '' && $fyMinYm <= $fyMaxYm && $fyStartDay !== '' && $fyEndDay !== '') {
-        $fyYmBoundMin = $fyMinYm;
-        $fyYmBoundMax = $fyMaxYm;
-        $ymFrom = $ymFromGet ?? $fyMinYm;
-        $ymTo = $ymToGet ?? $fyMaxYm;
-        if ($ymFrom < $fyMinYm) {
-            $ymFrom = $fyMinYm;
-        }
-        if ($ymFrom > $fyMaxYm) {
-            $ymFrom = $fyMaxYm;
-        }
-        if ($ymTo < $fyMinYm) {
-            $ymTo = $fyMinYm;
-        }
-        if ($ymTo > $fyMaxYm) {
-            $ymTo = $fyMaxYm;
-        }
-        if ($ymFrom > $ymTo) {
-            $tmp = $ymFrom;
-            $ymFrom = $ymTo;
-            $ymTo = $tmp;
-        }
-        $periodYmFrom = $ymFrom;
-        $periodYmTo = $ymTo;
-
-        $monthFirst = $firstDayOfYm($ymFrom);
-        $monthLast = $lastDayOfYm($ymTo);
-        /** التقاطع مع السنة المالية بدءاً من آخر اليوم المعقول (جميعهم YYYY-MM-DD بنفس الطول للمقارنة السليمة). */
-        $periodDateFrom = strcmp($monthFirst, $fyStartDay) >= 0 ? $monthFirst : $fyStartDay;
-        $periodDateTo = strcmp($monthLast, $fyEndDay) <= 0 ? $monthLast : $fyEndDay;
-        if ($periodDateFrom !== '' && $periodDateTo !== '') {
-            if ($periodDateFrom > $periodDateTo) {
-                $periodYmFrom = '';
-                $periodYmTo = '';
-                $periodDateFrom = '';
-                $periodDateTo = '';
-            } else {
-                $periodLabel = $periodDateFrom . ' — ' . $periodDateTo;
-            }
-        }
-    }
-}
-
-if (
-    $useVouchers && $fyId > 0 && $accountId > 0 && $periodDateFrom !== '' && $periodDateTo !== ''
-    && $periodDateFrom <= $periodDateTo
-) {
+if ($useVouchers && $fyId > 0 && $accountId > 0) {
     $st = $pdo->prepare(
         'SELECT DATE_FORMAT(jv.voucher_date, \'%Y-%m\') AS ym,
                 COALESCE(SUM(jl.debit), 0) AS sum_debit,
                 COALESCE(SUM(jl.credit), 0) AS sum_credit
          FROM journal_lines jl
          INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
-         WHERE jl.account_id = ?
-           AND jv.fiscal_year_id = ?
-           AND jv.voucher_date >= ?
-           AND jv.voucher_date <= ?
+         WHERE jl.account_id = ? AND jv.fiscal_year_id = ?
          GROUP BY ym
          ORDER BY ym ASC'
     );
-    $st->execute([
-        $accountId,
-        $fyId,
-        $periodDateFrom,
-        $periodDateTo,
-    ]);
+    $st->execute([$accountId, $fyId]);
     $monthlyRows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
-}
 
-$running = 0.0;
-foreach ($monthlyRows as &$mr) {
-    $d = (float) $mr['sum_debit'];
-    $c = (float) $mr['sum_credit'];
-    $running += ($d - $c);
-    $mr['net_month'] = $d - $c;
-    $mr['balance_eom'] = $running;
+    $running = 0.0;
+    foreach ($monthlyRows as &$mr) {
+        $d = (float) $mr['sum_debit'];
+        $c = (float) $mr['sum_credit'];
+        $running += ($d - $c);
+        $mr['net_month'] = $d - $c;
+        $mr['balance_eom'] = $running;
+    }
+    unset($mr);
 }
-unset($mr);
 
 
 ?>
@@ -212,28 +111,6 @@ unset($mr);
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="gas-acc-stmt-field gl-m-stmt-field--month">
-                        <label for="gl_m_month_from">من شهر</label>
-                        <input type="month" name="m_from" id="gl_m_month_from" class="admin-inp"
-                            lang="en" dir="ltr"
-                            value="<?php echo htmlspecialchars($periodYmFrom, ENT_QUOTES, 'UTF-8'); ?>"
-                            <?php if ($fyYmBoundMin !== '' && $fyYmBoundMax !== ''): ?>
-                            min="<?php echo htmlspecialchars($fyYmBoundMin, ENT_QUOTES, 'UTF-8'); ?>"
-                            max="<?php echo htmlspecialchars($fyYmBoundMax, ENT_QUOTES, 'UTF-8'); ?>"
-                            <?php endif; ?>
-                            autocomplete="off">
-                    </div>
-                    <div class="gas-acc-stmt-field gl-m-stmt-field--month">
-                        <label for="gl_m_month_to">إلى شهر</label>
-                        <input type="month" name="m_to" id="gl_m_month_to" class="admin-inp"
-                            lang="en" dir="ltr"
-                            value="<?php echo htmlspecialchars($periodYmTo, ENT_QUOTES, 'UTF-8'); ?>"
-                            <?php if ($fyYmBoundMin !== '' && $fyYmBoundMax !== ''): ?>
-                            min="<?php echo htmlspecialchars($fyYmBoundMin, ENT_QUOTES, 'UTF-8'); ?>"
-                            max="<?php echo htmlspecialchars($fyYmBoundMax, ENT_QUOTES, 'UTF-8'); ?>"
-                            <?php endif; ?>
-                            autocomplete="off">
-                    </div>
                     <div class="gas-acc-stmt-field gas-acc-stmt-field--code">
                         <label for="gl_m_acc_code">كود الحساب</label>
                         <input type="text" id="gl_m_acc_code" autocomplete="off" readonly
@@ -250,19 +127,16 @@ unset($mr);
                     </div>
                     <div class="gas-acc-stmt-actions">
                         <button type="submit">عرض</button>
-                        <?php if ($useVouchers && $fyId > 0 && $accountId > 0 && $periodLabel !== ''): ?>
+                        <?php if ($useVouchers && $fyId > 0 && $accountId > 0): ?>
                             <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
                         <?php endif; ?>
                     </div>
                 </div>
             </div>
         </form>
-        <?php if ($fyYmBoundMin !== ''): ?>
-            <p class="card-hint" style="margin-top:12px;margin-bottom:0;">الفترة أشهر تقويمية كاملة ضمن السنة؛ تُقصّ تاريخ السند عند التقاطع مع بداية أو نهاية السنة المالية إن لزم.</p>
-        <?php endif; ?>
     </div>
 
-<div class="gl-pick-modal gl-acc-stmt-no-print" id="gl_m_pick_modal" hidden aria-hidden="true">
+<div class="gl-pick-modal" id="gl_m_pick_modal" hidden aria-hidden="true">
     <div class="gl-pick-modal__backdrop" id="gl_m_pick_backdrop"></div>
     <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="gl_m_pick_title">
         <h3 id="gl_m_pick_title" class="gl-pick-modal__title">اختيار حساب فرعي</h3>
@@ -398,15 +272,9 @@ unset($mr);
 <div class="card admin-fy-card">
     <p class="muted">سندات اليومية غير جاهزة بعد — لا يمكن عرض التقرير.</p>
 </div>
-<?php elseif ($fyId <= 0 || !$fyRow): ?>
+<?php elseif ($fyId <= 0): ?>
 <div class="card admin-fy-card">
-    <p class="muted"><?php echo $fyId <= 0
-        ? 'عرّف سنة مالية من «السنوات المالية».'
-        : 'السنة المالية المطلوبة غير موجودة — اختر سنة من القائمة.'; ?></p>
-</div>
-<?php elseif ($fyRow && ($periodYmFrom === '' || $periodYmTo === '')): ?>
-<div class="card admin-fy-card">
-    <p class="muted">تعذر تحديد نطاق أشهر من تواريخ السنة المالية — راجع «السنوات المالية».</p>
+    <p class="muted">عرّف سنة مالية من «السنوات المالية».</p>
 </div>
 <?php elseif ($accountId <= 0): ?>
 <div class="card admin-fy-card">
@@ -418,12 +286,10 @@ unset($mr);
     <p class="page-subtitle">
         <?php echo htmlspecialchars($accLabel !== '' ? $accLabel : ('#' . $accountId), ENT_QUOTES, 'UTF-8'); ?>
         —
-        من شهر <?php echo htmlspecialchars($periodYmFrom, ENT_QUOTES, 'UTF-8'); ?>
-        إلى <?php echo htmlspecialchars($periodYmTo, ENT_QUOTES, 'UTF-8'); ?>
-        (حدود السندات: <?php echo htmlspecialchars($periodLabel, ENT_QUOTES, 'UTF-8'); ?>)
+        الفترة: <?php echo htmlspecialchars(($fyRow['start_date'] ?? '') . ' — ' . ($fyRow['end_date'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>
     </p>
     <?php if ($monthlyRows === []): ?>
-        <p class="muted">لا حركة على هذا الحساب في الأشهر المحددة ضمن الفترة (حسب السندات المرصودة لهذه السنة المالية).</p>
+        <p class="muted">لا حركة على هذا الحساب في هذه السنة (حسب السندات المرتبطة بالسنة).</p>
     <?php else: ?>
     <div class="table-wrap admin-fy-table-wrap">
         <table class="admin-fy-table">
@@ -453,10 +319,6 @@ unset($mr);
         الرصيد المتحرّك يتراكم حسب أشهر ظهور حركة فقط؛ لكشف سطراً بسطر استخدم «التقارير المالية» مع معامل حساب.
     </p>
     <?php endif; ?>
-</div>
-<?php else: ?>
-<div class="card admin-fy-card">
-    <p class="muted">تعذر عرض التقرير لهذه الجلسة (حالة غير متوقعة) — حدِّث الصفحة ثم إن لزم اختر السنة والحساب من جديد.</p>
 </div>
 <?php endif; ?>
 
