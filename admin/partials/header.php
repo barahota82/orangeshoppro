@@ -209,13 +209,20 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
             ];
 
 
+            /* كل بند = دخول مباشر لشاشة (أو قسم بمرساة داخل شاشة موجودة) — بدون صفحة «فهرس» مجمّعة */
             $navAccountingReports = [
-                ['page' => 'accounting_reports_index', 'href' => '/admin/index.php?page=accounting_reports_index', 'label' => 'فهرس التقارير المحاسبية', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'partner_account_statement', 'href' => '/admin/index.php?page=partner_account_statement', 'label' => 'كشف حساب', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'partner_reports', 'href' => '/admin/index.php?page=partner_reports', 'label' => 'تقارير الذمم المالية', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'journal_voucher_reports', 'href' => '/admin/index.php?page=journal_voucher_reports', 'label' => 'تقارير السندات', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report', 'label' => 'التقارير المالية', 'class' => '', 'sub' => false],
+                ['page' => 'partner_account_statement', 'href' => '/admin/index.php?page=partner_account_statement', 'label' => 'كشف حساب', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'chart_of_accounts', 'href' => '/admin/index.php?page=chart_of_accounts', 'label' => 'قائمة الحسابات (الدليل)', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'report_gl_account_monthly', 'href' => '/admin/index.php?page=report_gl_account_monthly', 'label' => 'الحركة الشهرية لحساب', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'partner_reports', 'href' => '/admin/index.php?page=partner_reports', 'label' => 'تقارير الذمم الشاملة', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'partner_reports', 'href' => '/admin/index.php?page=partner_reports#partner-balances-customers', 'label' => 'أرصدة العملاء (ذمم)', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'partner_reports', 'href' => '/admin/index.php?page=partner_reports#partner-balances-suppliers', 'label' => 'أرصدة الموردين (ذمم)', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'partner_reports', 'href' => '/admin/index.php?page=partner_reports&aging=1', 'label' => 'أعمار الذمم', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report', 'label' => 'التقارير المالية (الصفحة كاملة)', 'class' => '', 'sub' => false],
+                ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report#report-income', 'label' => 'قائمة الدخل', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report#report-balance-sheet', 'label' => 'الميزانية العمومية', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report#report-trial-balance', 'label' => 'ميزان المراجعة / أرصدة الحسابات', 'class' => 'admin-nav-sub', 'sub' => true],
             ];
 
             /* الحسابات العامة: الدليل ثم الإعدادات والسنوات والترحيل وأرصدة أول المدة ثم سند قيد/قبض/صرف/سندات أخرى ثم سداد فواتير الآجل */

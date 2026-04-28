@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * فهرس التقارير المحاسبية — روابط إلى شاشات موجودة ومُرساة على أقسام داخل الصفحة الموحدة.
+ * مرجع اختياري لروابط التقارير — الدخول الرسمي من قائمة «التقارير» في الشريط (زر لكل شاشة).
  */
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
@@ -17,10 +17,13 @@ $financialBase = htmlspecialchars($baseAdmin . '?page=financial_report', ENT_QUO
 $financialWithFy = $financialBase . (isset($_GET['fy']) && (int) $_GET['fy'] > 0 ? '&fy=' . (int) $_GET['fy'] : '');
 
 ?>
+<div class="card" style="margin-bottom:1rem;">
+    <p class="card-hint" style="margin:0;">للوصول السريع استخدم قائمة <strong>التقارير</strong> في أعلى لوحة التحكم — كل تقرير له رابط مستقل. هذه الصفحة للمراجعة والنسخ اليدوي للروابط فقط.</p>
+</div>
 <div class="page-title page-title--stacked">
     <div>
-        <h1>فهرس التقارير المحاسبية</h1>
-        <p class="page-subtitle">خريطة سريعة لكل تقارير GL والذمم؛ الصفحة الواحدة «التقارير المالية» تجمع جزءاً كبيراً تحت عنوان واحد مع روابط مرساة.</p>
+        <h1>فهرس التقارير المحاسبية (مرجعي)</h1>
+        <p class="page-subtitle">جداول مساعدة؛ «التقارير المالية» و«الذمم» تدعم المراسي (#) من القائمة الرئيسية.</p>
     </div>
 </div>
 
