@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
@@ -18,19 +19,43 @@ if ($fyId <= 0 && $years !== []) {
 
 $accountId = isset($_GET['account']) ? (int) $_GET['account'] : 0;
 
+$leafWhere = orange_accounts_posting_leaf_where_sql($pdo, 'a');
+$accounts = $pdo->query(
+    "SELECT a.id, a.name, a.code FROM accounts a WHERE $leafWhere ORDER BY COALESCE(a.code, ''), a.name"
+)->fetchAll(PDO::FETCH_ASSOC);
+
+$accLabel = '';
+$accCodeDisp = '';
+$accNameDisp = '';
+if ($accountId > 0) {
+    if (! orange_accounts_account_is_posting_leaf($pdo, $accountId)) {
+        $accountId = 0;
+    } else {
+        foreach ($accounts as $a) {
+            if ((int) $a['id'] === $accountId) {
+                $accCodeDisp = trim((string) ($a['code'] ?? ''));
+                $accNameDisp = (string) ($a['name'] ?? '');
+                $accLabel = ($accCodeDisp !== '' ? $accCodeDisp . ' — ' : '') . $accNameDisp;
+                break;
+            }
+        }
+        if ($accLabel === '' && $accountId > 0) {
+            $stOne = $pdo->prepare('SELECT code, name FROM accounts WHERE id = ? LIMIT 1');
+            $stOne->execute([$accountId]);
+            $rowOne = $stOne->fetch(PDO::FETCH_ASSOC);
+            if ($rowOne) {
+                $accCodeDisp = trim((string) ($rowOne['code'] ?? ''));
+                $accNameDisp = (string) ($rowOne['name'] ?? '');
+                $accLabel = ($accCodeDisp !== '' ? $accCodeDisp . ' — ' : '') . $accNameDisp;
+            }
+        }
+    }
+}
+
 $fyRow = null;
 foreach ($years as $y) {
     if ((int) $y['id'] === $fyId) {
         $fyRow = $y;
-        break;
-    }
-}
-
-$accounts = $pdo->query('SELECT id, name, code FROM accounts ORDER BY COALESCE(code, \'\'), name')->fetchAll(PDO::FETCH_ASSOC);
-$accLabel = '';
-foreach ($accounts as $a) {
-    if ((int) $a['id'] === $accountId) {
-        $accLabel = (trim((string) ($a['code'] ?? '')) !== '' ? $a['code'] . ' — ' : '') . $a['name'];
         break;
     }
 }
@@ -86,28 +111,156 @@ $base = htmlspecialchars(storefront_public_path('/admin/index.php'), ENT_QUOTES,
                 <?php endforeach; ?>
             </select>
         </div>
+        <input type="hidden" name="account" id="gl_m_account_id" value="<?php echo (int) $accountId; ?>">
         <div>
-            <label for="acct_gl_m">الحساب</label>
-            <select name="account" id="acct_gl_m" required>
-                <option value="">— اختر حساباً —</option>
-                <?php foreach ($accounts as $a): ?>
-                    <option value="<?php echo (int) $a['id']; ?>"<?php echo (int) $a['id'] === $accountId ? ' selected' : ''; ?>>
-                        <?php
-                        echo htmlspecialchars(
-                            (trim((string) ($a['code'] ?? '')) !== '' ? $a['code'] . ' — ' : '') . $a['name'],
-                            ENT_QUOTES,
-                            'UTF-8'
-                        );
-                        ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
+            <label for="gl_m_acc_code">كود الحساب</label>
+            <input type="text" id="gl_m_acc_code" autocomplete="off" readonly class="admin-inp gl-m-acc-code-inp"
+                placeholder="انقر نقرتين للاختيار"
+                title="انقر نقرتين لفتح قائمة الحسابات الفرعية"
+                value="<?php echo htmlspecialchars($accCodeDisp, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
+        </div>
+        <div>
+            <label for="gl_m_acc_name">اسم الحساب</label>
+            <input type="text" id="gl_m_acc_name" tabindex="-1" readonly autocomplete="off" class="admin-inp gl-m-acc-name-inp"
+                placeholder="—" title="يُعبأ بعد اختيار الحساب" value="<?php echo htmlspecialchars($accNameDisp, ENT_QUOTES, 'UTF-8'); ?>">
         </div>
         <div class="actions" style="align-self:end;">
             <button type="submit">عرض</button>
         </div>
     </form>
 </div>
+
+<div class="gl-pick-modal" id="gl_m_pick_modal" hidden aria-hidden="true">
+    <div class="gl-pick-modal__backdrop" id="gl_m_pick_backdrop"></div>
+    <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="gl_m_pick_title">
+        <h3 id="gl_m_pick_title" class="gl-pick-modal__title">اختيار حساب فرعي</h3>
+        <p class="gl-pick-modal__hint muted" style="margin:0 0 8px;font-size:0.9rem;">نقرتان على حقل كود الحساب لفتح هذه القائمة — انقر صفاً للاختيار — Esc للإغلاق</p>
+        <input type="search" id="gl_m_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بالكود أو الاسم…" autocomplete="off" dir="rtl">
+        <ul class="gl-pick-modal__list" id="gl_m_pick_list"></ul>
+        <button type="button" class="btn-secondary" id="gl_m_pick_close">إغلاق</button>
+    </div>
+</div>
+
+<script>
+(function () {
+    var GL_M_SEARCH_LEAVES = <?php echo json_encode(storefront_public_path('/admin/api/accounts/search-leaves.php'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+    var seq = 0;
+    var tmr = null;
+    function glMPickClose() {
+        var pm = document.getElementById('gl_m_pick_modal');
+        if (pm) {
+            pm.hidden = true;
+            pm.setAttribute('aria-hidden', 'true');
+        }
+        document.body.classList.remove('gl-pick-open');
+    }
+    function glMPickLoad(q) {
+        var mySeq = ++seq;
+        var pickList = document.getElementById('gl_m_pick_list');
+        if (!pickList) {
+            return;
+        }
+        fetch(GL_M_SEARCH_LEAVES + '?q=' + encodeURIComponent(q || ''), { credentials: 'same-origin', cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (mySeq !== seq) {
+                    return;
+                }
+                if (!data.success) {
+                    pickList.innerHTML = '<li class="gl-pick-empty">' + (data.message || 'تعذر التحميل') + '</li>';
+                    return;
+                }
+                var accs = data.accounts || [];
+                if (accs.length === 0) {
+                    pickList.innerHTML = '<li class="gl-pick-empty">لا نتائج</li>';
+                    return;
+                }
+                pickList.innerHTML = '';
+                accs.forEach(function (a) {
+                    var li = document.createElement('li');
+                    li.className = 'gl-pick-item';
+                    var code = a.code || '';
+                    li.textContent = (code ? code + ' — ' : '') + (a.name || '');
+                    li.setAttribute('role', 'button');
+                    li.tabIndex = 0;
+                    function choose() {
+                        var hid = document.getElementById('gl_m_account_id');
+                        var cd = document.getElementById('gl_m_acc_code');
+                        var nm = document.getElementById('gl_m_acc_name');
+                        if (hid) { hid.value = String(a.id || '0'); }
+                        if (cd) { cd.value = a.code || ''; }
+                        if (nm) { nm.value = a.name || ''; }
+                        glMPickClose();
+                    }
+                    li.addEventListener('click', choose);
+                    li.addEventListener('keydown', function (ev) {
+                        if (ev.key === 'Enter' || ev.key === ' ') {
+                            ev.preventDefault();
+                            choose();
+                        }
+                    });
+                    pickList.appendChild(li);
+                });
+            })
+            .catch(function (e) {
+                pickList.innerHTML = '<li class="gl-pick-empty">' + (e.message || String(e)) + '</li>';
+            });
+    }
+    function glMPickOpen() {
+        var pm = document.getElementById('gl_m_pick_modal');
+        var pq = document.getElementById('gl_m_pick_q');
+        var pl = document.getElementById('gl_m_pick_list');
+        if (!pm || !pq || !pl) {
+            return;
+        }
+        pq.value = '';
+        pl.innerHTML = '';
+        glMPickLoad('');
+        pm.hidden = false;
+        pm.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('gl-pick-open');
+        pq.focus();
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        var codeIn = document.getElementById('gl_m_acc_code');
+        if (codeIn) {
+            codeIn.addEventListener('dblclick', function (e) {
+                e.preventDefault();
+                glMPickOpen();
+            });
+        }
+        var pq = document.getElementById('gl_m_pick_q');
+        if (pq && !pq.getAttribute('data-bound')) {
+            pq.setAttribute('data-bound', '1');
+            pq.addEventListener('input', function () {
+                if (tmr) {
+                    clearTimeout(tmr);
+                }
+                tmr = setTimeout(function () {
+                    glMPickLoad(pq.value.trim());
+                }, 280);
+            });
+        }
+        var bd = document.getElementById('gl_m_pick_backdrop');
+        var cl = document.getElementById('gl_m_pick_close');
+        if (bd) {
+            bd.addEventListener('click', glMPickClose);
+        }
+        if (cl) {
+            cl.addEventListener('click', glMPickClose);
+        }
+        document.addEventListener('keydown', function (ev) {
+            if (ev.key !== 'Escape') {
+                return;
+            }
+            var gm = document.getElementById('gl_m_pick_modal');
+            if (gm && !gm.hidden) {
+                glMPickClose();
+            }
+        }, true);
+    });
+})();
+</script>
 
 <?php if (!$useVouchers): ?>
 <div class="card admin-fy-card">

@@ -69,22 +69,6 @@ $jvFormDocumentEnteredDisplay = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'
 $jvFormVoucherDateDisplay = orange_format_date_dmY(date('Y-m-d'));
 $jvNavReady = orange_journal_vouchers_ready($pdo);
 $jvHeaderLineClass = 'jv-voucher-header-line' . ($jvNavReady ? ' jv-voucher-header-line--nav' : '');
-
-$hasGrp = orange_table_has_column($pdo, 'accounts', 'is_group');
-$accCols = $hasGrp ? 'id, name, code, is_group' : 'id, name, code';
-$accounts = $pdo->query('SELECT ' . $accCols . ' FROM accounts ORDER BY COALESCE(code, \'\'), name')->fetchAll(PDO::FETCH_ASSOC);
-
-$jvAccountsLeaf = [];
-foreach ($accounts as $a) {
-    if ($hasGrp && !empty($a['is_group'])) {
-        continue;
-    }
-    $jvAccountsLeaf[] = [
-        'id' => (int) $a['id'],
-        'code' => (string) ($a['code'] ?? ''),
-        'name' => (string) ($a['name'] ?? ''),
-    ];
-}
 ?>
 <div class="page-title page-title--stacked jv-print-hide">
     <div>
@@ -198,21 +182,15 @@ foreach ($accounts as $a) {
     </div>
 </div>
 
-<div id="jv_acct_picker" class="jv-acct-picker jv-print-hide" style="display:none;" aria-hidden="true">
-    <label class="jv-acct-picker-label" for="jv_acct_picker_search">بحث</label>
-    <input type="search" id="jv_acct_picker_search" class="jv-acct-picker-search admin-inp" placeholder="اكتب كلمات من الاسم أو الكود…" autocomplete="off" dir="auto">
-    <div class="jv-acct-picker-scroll">
-        <table class="admin-table jv-acct-picker-table">
-            <thead>
-                <tr>
-                    <th>كود الحساب</th>
-                    <th>اسم الحساب</th>
-                </tr>
-            </thead>
-            <tbody id="jv_acct_picker_tbody"></tbody>
-        </table>
+<div class="gl-pick-modal jv-print-hide" id="jv_pick_modal" hidden aria-hidden="true">
+    <div class="gl-pick-modal__backdrop" id="jv_pick_backdrop"></div>
+    <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="jv_pick_title">
+        <h3 id="jv_pick_title" class="gl-pick-modal__title">اختيار حساب فرعي</h3>
+        <p class="gl-pick-modal__hint muted" style="margin:0 0 8px;font-size:0.9rem;">نقرتان على حقل كود الحساب لفتح هذه القائمة — انقر صفاً للاختيار — Esc للإغلاق</p>
+        <input type="search" id="jv_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بالكود أو الاسم…" autocomplete="off" dir="rtl">
+        <ul class="gl-pick-modal__list" id="jv_pick_list"></ul>
+        <button type="button" class="btn-secondary" id="jv_pick_close">إغلاق</button>
     </div>
-    <p class="jv-acct-picker-hint muted">نقرتان على صف لاختيار الحساب — Esc للإغلاق</p>
 </div>
 
 <?php if ($jvNavReady): ?>
@@ -301,26 +279,9 @@ foreach ($accounts as $a) {
     min-width: 0;
     box-sizing: border-box;
 }
-.jv-acct-picker {
-    position: fixed;
-    z-index: 10050;
-    min-width: min(28rem, calc(100vw - 2rem));
-    max-width: calc(100vw - 1rem);
-    padding: 10px 12px;
-    background: #fff;
-    border: 1px solid #d4d4d8;
-    border-radius: 8px;
-    box-shadow: 0 10px 40px rgba(0,0,0,.12);
-    direction: rtl;
+.gl-pick-modal#jv_pick_modal {
+    z-index: 12100;
 }
-.jv-acct-picker-label { display: block; font-size: 0.85rem; margin-bottom: 4px; font-weight: 600; }
-.jv-acct-picker-search { width: 100%; box-sizing: border-box; margin-bottom: 8px; }
-.jv-acct-picker-scroll { max-height: 16rem; overflow: auto; border: 1px solid #e4e4e7; border-radius: 6px; }
-.jv-acct-picker-table { margin: 0; font-size: 0.9rem; }
-.jv-acct-picker-table thead th { position: sticky; top: 0; background: #fafafa; z-index: 1; }
-.jv-acct-picker-table tbody tr { cursor: pointer; }
-.jv-acct-picker-table tbody tr:hover { background: #f4f4f5; }
-.jv-acct-picker-hint { margin: 8px 0 0; font-size: 0.8rem; }
 .jv-lines-table tr.jv-line-memo td { padding-top: 6px; padding-bottom: 12px; border-bottom: 1px solid #e4e4e7; }
 .jv-lines-table tr.jv-line-memo .jv-m { width: 100%; box-sizing: border-box; }
 .jv-search-modal {
@@ -416,7 +377,6 @@ foreach ($accounts as $a) {
 </style>
 
 <script>
-var JV_ACCOUNTS = <?php echo json_encode($jvAccountsLeaf, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>;
 var JV_ENTRY_TYPE = <?php echo json_encode($jvPageEntryType, JSON_UNESCAPED_UNICODE); ?>;
 var JV_OTHER_VOUCHER_BROWSE = <?php echo $jvPageEt === 'other_voucher' ? 'true' : 'false'; ?>;
 var JV_CASH_LOCK = <?php echo json_encode($jvCashLock, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>;
@@ -539,6 +499,8 @@ function jvCashLockApplyLineAmountUi(mainTr) {
 }
 
 var jvAcctPickerAnchor = null;
+var jvPickSeq = 0;
+var jvPickSearchTimer = null;
 var jvPairSeq = 0;
 var jvViewMode = false;
 var jvBrowseId = null;
@@ -611,62 +573,70 @@ function jvEscapeHtml(s) {
         .replace(/"/g, '&quot;');
 }
 
-function jvAcctTokens(q) {
-    return String(q || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
-}
-
-/** بحث بالكلمات: كل كلمة يجب أن تظهر في (الكود + الاسم) — غير متطابق حرفي بالكامل */
-function jvAcctFilterAccounts(q) {
-    var tokens = jvAcctTokens(q);
-    var rows = !tokens.length ? JV_ACCOUNTS.slice() : JV_ACCOUNTS.filter(function (a) {
-        var hay = ((a.code || '') + ' ' + (a.name || '')).toLowerCase();
-        return tokens.every(function (t) { return hay.indexOf(t) !== -1; });
-    });
-    if (jvCashLockActive() && JV_CASH_LOCK && JV_CASH_LOCK.id) {
-        var exId = parseInt(String(JV_CASH_LOCK.id), 10) || 0;
-        if (exId > 0) {
-            rows = rows.filter(function (a) { return (parseInt(String(a.id), 10) || 0) !== exId; });
-        }
+function jvAcctPickerExcludeCashId(acc) {
+    if (!jvCashLockActive() || !JV_CASH_LOCK || !JV_CASH_LOCK.id) {
+        return false;
     }
-    return rows;
+    var cid = parseInt(String(JV_CASH_LOCK.id), 10) || 0;
+    var aid = parseInt(String(acc.id), 10) || 0;
+    return cid > 0 && aid === cid;
 }
 
-function jvAcctPickerPosition(anchorEl) {
-    var box = document.getElementById('jv_acct_picker');
-    if (!box || !anchorEl) {
+function jvAcctPickerLoadIntoList(q) {
+    var mySeq = ++jvPickSeq;
+    var url = '/admin/api/accounts/search-leaves.php?q=' + encodeURIComponent(q || '');
+    var pickList = document.getElementById('jv_pick_list');
+    if (!pickList) {
         return;
     }
-    var r = anchorEl.getBoundingClientRect();
-    var margin = 8;
-    var w = box.offsetWidth || 320;
-    box.style.left = Math.max(margin, Math.min(r.left, window.innerWidth - w - margin)) + 'px';
-    box.style.top = (r.top - margin) + 'px';
-    box.style.transform = 'translateY(-100%)';
-}
-
-function jvAcctPickerRender() {
-    var searchEl = document.getElementById('jv_acct_picker_search');
-    var tb = document.getElementById('jv_acct_picker_tbody');
-    if (!tb) {
-        return;
-    }
-    var q = searchEl ? searchEl.value : '';
-    var rows = jvAcctFilterAccounts(q);
-    tb.innerHTML = '';
-    rows.forEach(function (a) {
-        var tr = document.createElement('tr');
-        tr.innerHTML = '<td>' + jvEscapeHtml(a.code) + '</td><td>' + jvEscapeHtml(a.name) + '</td>';
-        tr.addEventListener('dblclick', function () { jvAcctPickerApply(a); });
-        tb.appendChild(tr);
-    });
+    fetch(url, { credentials: 'same-origin', cache: 'no-store' })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (mySeq !== jvPickSeq) {
+                return;
+            }
+            if (!data.success) {
+                pickList.innerHTML = '<li class="gl-pick-empty">' + (data.message || 'تعذر التحميل') + '</li>';
+                return;
+            }
+            var accs = (data.accounts || []).filter(function (a) { return !jvAcctPickerExcludeCashId(a); });
+            if (accs.length === 0) {
+                pickList.innerHTML = '<li class="gl-pick-empty">لا نتائج</li>';
+                return;
+            }
+            pickList.innerHTML = '';
+            accs.forEach(function (a) {
+                var li = document.createElement('li');
+                li.className = 'gl-pick-item';
+                var code = a.code || '';
+                li.textContent = (code ? code + ' — ' : '') + (a.name || '');
+                li.setAttribute('role', 'button');
+                li.tabIndex = 0;
+                function jvAcctPickerChooseFromList() {
+                    jvAcctPickerApply(a);
+                }
+                li.addEventListener('click', jvAcctPickerChooseFromList);
+                li.addEventListener('keydown', function (ev) {
+                    if (ev.key === 'Enter' || ev.key === ' ') {
+                        ev.preventDefault();
+                        jvAcctPickerChooseFromList();
+                    }
+                });
+                pickList.appendChild(li);
+            });
+        })
+        .catch(function (e) {
+            pickList.innerHTML = '<li class="gl-pick-empty">' + (e.message || String(e)) + '</li>';
+        });
 }
 
 function jvAcctPickerClose() {
-    var box = document.getElementById('jv_acct_picker');
-    if (box) {
-        box.style.display = 'none';
-        box.setAttribute('aria-hidden', 'true');
+    var pm = document.getElementById('jv_pick_modal');
+    if (pm) {
+        pm.hidden = true;
+        pm.setAttribute('aria-hidden', 'true');
     }
+    document.body.classList.remove('gl-pick-open');
     jvAcctPickerAnchor = null;
 }
 
@@ -698,48 +668,34 @@ function jvAcctPickerOpen(anchorInput) {
     if (trLock && trLock.getAttribute('data-jv-cash-locked') === '1') {
         return;
     }
-    var box = document.getElementById('jv_acct_picker');
-    var searchEl = document.getElementById('jv_acct_picker_search');
-    if (!box || !searchEl) {
+    var pm = document.getElementById('jv_pick_modal');
+    var pickQ = document.getElementById('jv_pick_q');
+    var pickList = document.getElementById('jv_pick_list');
+    if (!pm || !pickQ || !pickList) {
         return;
     }
     jvAcctPickerAnchor = anchorInput;
-    searchEl.value = '';
-    jvAcctPickerRender();
-    box.style.display = 'block';
-    box.setAttribute('aria-hidden', 'false');
-    box.style.transform = '';
-    jvAcctPickerPosition(anchorInput);
-    requestAnimationFrame(function () {
-        jvAcctPickerPosition(anchorInput);
-        searchEl.focus();
-        searchEl.select();
-    });
-}
-
-function jvAcctPickerOnDocMouseDown(ev) {
-    var box = document.getElementById('jv_acct_picker');
-    if (!box || box.style.display === 'none') {
-        return;
-    }
-    var t = ev.target;
-    if (box.contains(t)) {
-        return;
-    }
-    if (jvAcctPickerAnchor && (t === jvAcctPickerAnchor || jvAcctPickerAnchor.contains(t))) {
-        return;
-    }
-    jvAcctPickerClose();
+    pickQ.value = '';
+    pickList.innerHTML = '';
+    jvAcctPickerLoadIntoList('');
+    pm.hidden = false;
+    pm.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('gl-pick-open');
+    pickQ.focus();
 }
 
 function jvAcctPickerOnKey(ev) {
-    if (ev.key === 'Escape') {
-        var sm = document.getElementById('jv_search_modal');
-        if (sm && sm.style.display === 'flex') {
-            jvSearchModalClose();
-            return;
-        }
+    if (ev.key !== 'Escape') {
+        return;
+    }
+    var pmEsc = document.getElementById('jv_pick_modal');
+    if (pmEsc && !pmEsc.hidden) {
         jvAcctPickerClose();
+        return;
+    }
+    var sm = document.getElementById('jv_search_modal');
+    if (sm && sm.style.display === 'flex') {
+        jvSearchModalClose();
     }
 }
 
@@ -760,7 +716,6 @@ function jvSearchModalOnDocMouseDown(ev) {
 }
 
 document.addEventListener('mousedown', jvSearchModalOnDocMouseDown, true);
-document.addEventListener('mousedown', jvAcctPickerOnDocMouseDown, true);
 document.addEventListener('keydown', jvAcctPickerOnKey, true);
 
 function jvSearchModalClose() {
@@ -881,11 +836,27 @@ jvSearchModalBind();
     }
 })();
 
-(function jvAcctPickerSearchBind() {
-    var searchEl = document.getElementById('jv_acct_picker_search');
-    if (searchEl && !searchEl.getAttribute('data-jv-bound')) {
-        searchEl.setAttribute('data-jv-bound', '1');
-        searchEl.addEventListener('input', function () { jvAcctPickerRender(); });
+(function jvAcctPickerModalBind() {
+    var pickQ = document.getElementById('jv_pick_q');
+    var pickBackdrop = document.getElementById('jv_pick_backdrop');
+    var pickClose = document.getElementById('jv_pick_close');
+    if (!pickQ || pickQ.getAttribute('data-jv-bound')) {
+        return;
+    }
+    pickQ.setAttribute('data-jv-bound', '1');
+    pickQ.addEventListener('input', function () {
+        if (jvPickSearchTimer) {
+            clearTimeout(jvPickSearchTimer);
+        }
+        jvPickSearchTimer = setTimeout(function () {
+            jvAcctPickerLoadIntoList(pickQ.value.trim());
+        }, 280);
+    });
+    if (pickBackdrop) {
+        pickBackdrop.addEventListener('click', jvAcctPickerClose);
+    }
+    if (pickClose) {
+        pickClose.addEventListener('click', jvAcctPickerClose);
     }
 })();
 

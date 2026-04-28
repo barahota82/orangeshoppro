@@ -91,19 +91,6 @@ $accounts = $pdo->query(
     "SELECT a.id, a.name, a.code FROM accounts a WHERE $leafWhere ORDER BY COALESCE(a.code, ''), a.name"
 )->fetchAll(PDO::FETCH_ASSOC);
 
-$gasAccountsLeafArr = [];
-foreach ($accounts as $ga) {
-    $gasAccountsLeafArr[] = [
-        'id' => (int) ($ga['id'] ?? 0),
-        'code' => (string) ($ga['code'] ?? ''),
-        'name' => (string) ($ga['name'] ?? ''),
-    ];
-}
-$gasAccountsLeafJson = json_encode($gasAccountsLeafArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-if ($gasAccountsLeafJson === false) {
-    $gasAccountsLeafJson = '[]';
-}
-
 $companyNameAr = '';
 if (orange_table_exists($pdo, 'company_settings')) {
     $cs = $pdo->query('SELECT company_name_ar FROM company_settings ORDER BY id ASC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
@@ -305,107 +292,99 @@ if ($useVouchers && $accountId > 0 && $err === '') {
         <?php endif; ?>
     </div>
 
-    <div id="gas_acct_picker" class="jv-acct-picker jv-print-hide gl-acc-stmt-no-print" style="display:none;" aria-hidden="true">
-        <label class="jv-acct-picker-label" for="gas_acct_picker_search">بحث</label>
-        <input type="search" id="gas_acct_picker_search" class="jv-acct-picker-search admin-inp" placeholder="اكتب كلمات من الاسم أو الكود…" autocomplete="off" dir="auto">
-        <div class="jv-acct-picker-scroll">
-            <table class="admin-table jv-acct-picker-table">
-                <thead>
-                    <tr>
-                        <th>كود الحساب</th>
-                        <th>اسم الحساب</th>
-                    </tr>
-                </thead>
-                <tbody id="gas_acct_picker_tbody"></tbody>
-            </table>
+    <div class="gl-pick-modal gl-acc-stmt-no-print" id="gas_pick_modal" hidden aria-hidden="true">
+        <div class="gl-pick-modal__backdrop" id="gas_pick_backdrop"></div>
+        <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="gas_pick_title">
+            <h3 id="gas_pick_title" class="gl-pick-modal__title">اختيار حساب فرعي</h3>
+            <p class="gl-pick-modal__hint muted" style="margin:0 0 8px;font-size:0.9rem;">نقرتان على حقل كود الحساب لفتح هذه القائمة — انقر صفاً للاختيار — Esc للإغلاق</p>
+            <input type="search" id="gas_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بالكود أو الاسم…" autocomplete="off" dir="rtl">
+            <ul class="gl-pick-modal__list" id="gas_pick_list"></ul>
+            <button type="button" class="btn-secondary" id="gas_pick_close">إغلاق</button>
         </div>
-        <p class="jv-acct-picker-hint muted">نقرتان على صف لاختيار الحساب — Esc للإغلاق</p>
     </div>
 
     <script>
     (function () {
-        var GAS_ACCOUNTS = <?php echo $gasAccountsLeafJson; ?>;
-        var gasAcctPickerAnchor = null;
+        var gasPickSeq = 0;
+        var gasPickSearchTimer = null;
 
-        function escapeHtml(s) {
-            return String(s == null ? '' : s)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;');
-        }
-        function gasAcctTokens(q) {
-            return String(q || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
-        }
-        function gasAcctFilterAccounts(q) {
-            var tokens = gasAcctTokens(q);
-            var rows = !tokens.length ? GAS_ACCOUNTS.slice() : GAS_ACCOUNTS.filter(function (a) {
-                var hay = ((a.code || '') + ' ' + (a.name || '')).toLowerCase();
-                return tokens.every(function (t) { return hay.indexOf(t) !== -1; });
-            });
-            return rows;
-        }
-        function gasAcctPickerPosition(anchorEl) {
-            var box = document.getElementById('gas_acct_picker');
-            if (!box || !anchorEl) { return; }
-            var r = anchorEl.getBoundingClientRect();
-            var margin = 8;
-            var w = box.offsetWidth || 320;
-            box.style.left = Math.max(margin, Math.min(r.left, window.innerWidth - w - margin)) + 'px';
-            box.style.top = (r.top - margin) + 'px';
-            box.style.transform = 'translateY(-100%)';
-        }
-        function gasAcctPickerRender() {
-            var searchEl = document.getElementById('gas_acct_picker_search');
-            var tb = document.getElementById('gas_acct_picker_tbody');
-            if (!tb) { return; }
-            var q = searchEl ? searchEl.value : '';
-            var rows = gasAcctFilterAccounts(q);
-            tb.innerHTML = '';
-            rows.forEach(function (a) {
-                var tr = document.createElement('tr');
-                tr.innerHTML = '<td>' + escapeHtml(a.code) + '</td><td>' + escapeHtml(a.name) + '</td>';
-                tr.addEventListener('dblclick', function () { gasAcctPickerApply(a); });
-                tb.appendChild(tr);
-            });
-        }
-        function gasAcctPickerClose() {
-            var box = document.getElementById('gas_acct_picker');
-            if (box) {
-                box.style.display = 'none';
-                box.setAttribute('aria-hidden', 'true');
-            }
-            gasAcctPickerAnchor = null;
-        }
-        function gasAcctPickerApply(a) {
-            if (!a) {
-                gasAcctPickerClose();
+        function gasPickLoad(q) {
+            var mySeq = ++gasPickSeq;
+            var url = '/admin/api/accounts/search-leaves.php?q=' + encodeURIComponent(q || '');
+            var pickList = document.getElementById('gas_pick_list');
+            if (!pickList) {
                 return;
             }
-            var hid = document.getElementById('gas_account_id');
-            var cd = document.getElementById('gas_acc_code');
-            var nm = document.getElementById('gas_acc_name');
-            if (hid) { hid.value = String(a.id || '0'); }
-            if (cd) { cd.value = a.code || ''; }
-            if (nm) { nm.value = a.name || ''; }
-            gasAcctPickerClose();
+            fetch(url, { credentials: 'same-origin', cache: 'no-store' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (mySeq !== gasPickSeq) {
+                        return;
+                    }
+                    if (!data.success) {
+                        pickList.innerHTML = '<li class="gl-pick-empty">' + (data.message || 'تعذر التحميل') + '</li>';
+                        return;
+                    }
+                    var accs = data.accounts || [];
+                    if (accs.length === 0) {
+                        pickList.innerHTML = '<li class="gl-pick-empty">لا نتائج</li>';
+                        return;
+                    }
+                    pickList.innerHTML = '';
+                    accs.forEach(function (a) {
+                        var li = document.createElement('li');
+                        li.className = 'gl-pick-item';
+                        var code = a.code || '';
+                        li.textContent = (code ? code + ' — ' : '') + (a.name || '');
+                        li.setAttribute('role', 'button');
+                        li.tabIndex = 0;
+                        function gasPickChoose() {
+                            var hid = document.getElementById('gas_account_id');
+                            var cd = document.getElementById('gas_acc_code');
+                            var nm = document.getElementById('gas_acc_name');
+                            if (hid) { hid.value = String(a.id || '0'); }
+                            if (cd) { cd.value = a.code || ''; }
+                            if (nm) { nm.value = a.name || ''; }
+                            gasPickClose();
+                        }
+                        li.addEventListener('click', gasPickChoose);
+                        li.addEventListener('keydown', function (ev) {
+                            if (ev.key === 'Enter' || ev.key === ' ') {
+                                ev.preventDefault();
+                                gasPickChoose();
+                            }
+                        });
+                        pickList.appendChild(li);
+                    });
+                })
+                .catch(function (e) {
+                    pickList.innerHTML = '<li class="gl-pick-empty">' + (e.message || String(e)) + '</li>';
+                });
         }
-        function gasAcctPickerOpen(anchorEl) {
-            var box = document.getElementById('gas_acct_picker');
-            var searchEl = document.getElementById('gas_acct_picker_search');
-            if (!box || !searchEl || !anchorEl) { return; }
-            gasAcctPickerAnchor = anchorEl;
-            searchEl.value = '';
-            gasAcctPickerRender();
-            box.style.display = 'block';
-            box.setAttribute('aria-hidden', 'false');
-            box.style.transform = '';
-            gasAcctPickerPosition(anchorEl);
-            requestAnimationFrame(function () {
-                gasAcctPickerPosition(anchorEl);
-                searchEl.focus();
-                searchEl.select();
-            });
+
+        function gasPickClose() {
+            var pm = document.getElementById('gas_pick_modal');
+            if (pm) {
+                pm.hidden = true;
+                pm.setAttribute('aria-hidden', 'true');
+            }
+            document.body.classList.remove('gl-pick-open');
+        }
+
+        function gasPickOpen() {
+            var pm = document.getElementById('gas_pick_modal');
+            var pickQ = document.getElementById('gas_pick_q');
+            var pickList = document.getElementById('gas_pick_list');
+            if (!pm || !pickQ || !pickList) {
+                return;
+            }
+            pickQ.value = '';
+            pickList.innerHTML = '';
+            gasPickLoad('');
+            pm.hidden = false;
+            pm.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('gl-pick-open');
+            pickQ.focus();
         }
 
         document.addEventListener('DOMContentLoaded', function () {
@@ -413,30 +392,36 @@ if ($useVouchers && $accountId > 0 && $err === '') {
             if (cd) {
                 cd.addEventListener('dblclick', function (e) {
                     e.preventDefault();
-                    gasAcctPickerOpen(cd);
+                    gasPickOpen();
                 });
             }
-            var searchEl = document.getElementById('gas_acct_picker_search');
-            if (searchEl && !searchEl.getAttribute('data-gas-bound')) {
-                searchEl.setAttribute('data-gas-bound', '1');
-                searchEl.addEventListener('input', gasAcctPickerRender);
-                searchEl.addEventListener('keydown', function (ev) {
-                    if (ev.key === 'Enter') { ev.preventDefault(); }
+            var pickQ = document.getElementById('gas_pick_q');
+            if (pickQ && !pickQ.getAttribute('data-gas-bound')) {
+                pickQ.setAttribute('data-gas-bound', '1');
+                pickQ.addEventListener('input', function () {
+                    if (gasPickSearchTimer) {
+                        clearTimeout(gasPickSearchTimer);
+                    }
+                    gasPickSearchTimer = setTimeout(function () {
+                        gasPickLoad(pickQ.value.trim());
+                    }, 280);
                 });
             }
-
-            document.addEventListener('mousedown', function gasAcctPickDoc(ev) {
-                var box = document.getElementById('gas_acct_picker');
-                if (!box || box.style.display === 'none') { return; }
-                var t = ev.target;
-                if (box.contains(t)) { return; }
-                if (gasAcctPickerAnchor && (t === gasAcctPickerAnchor || (gasAcctPickerAnchor.contains && gasAcctPickerAnchor.contains(t)))) { return; }
-                gasAcctPickerClose();
-            }, true);
-
-            document.addEventListener('keydown', function gasAcctPickEsc(ev) {
-                if (ev.key === 'Escape') {
-                    gasAcctPickerClose();
+            var bd = document.getElementById('gas_pick_backdrop');
+            var closer = document.getElementById('gas_pick_close');
+            if (bd) {
+                bd.addEventListener('click', gasPickClose);
+            }
+            if (closer) {
+                closer.addEventListener('click', gasPickClose);
+            }
+            document.addEventListener('keydown', function gasPickEsc(ev) {
+                if (ev.key !== 'Escape') {
+                    return;
+                }
+                var gm = document.getElementById('gas_pick_modal');
+                if (gm && !gm.hidden) {
+                    gasPickClose();
                 }
             }, true);
         });
