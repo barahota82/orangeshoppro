@@ -71,6 +71,7 @@ function orange_admin_page_resource(string $page): string
         'report_pl_compare_years' => 'accounting',
         'gl_account_settings' => 'accounting',
         'partner_account_statement' => 'partners',
+        'gl_account_statement' => 'accounting',
         'partner_customer_receipt' => 'partners',
         'partner_supplier_payment' => 'partners',
         'partner_reports' => 'partners',

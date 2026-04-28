@@ -229,7 +229,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
             /* التقارير المحاسبية — المسميات والترتيب حسب طلب العميل */
             $navAccountingReports = [
                 ['page' => 'journal_voucher_reports', 'href' => '/admin/index.php?page=journal_voucher_reports', 'label' => 'تقارير السندات', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'partner_account_statement', 'href' => '/admin/index.php?page=partner_account_statement', 'label' => 'كشف حساب', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'gl_account_statement', 'href' => '/admin/index.php?page=gl_account_statement', 'label' => 'كشف حساب', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'chart_of_accounts', 'href' => '/admin/index.php?page=chart_of_accounts', 'label' => 'قائمة الحسابات', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report#report-account-balances', 'label' => 'أرصدة الحسابات', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'report_gl_account_monthly', 'href' => '/admin/index.php?page=report_gl_account_monthly', 'label' => 'الحركة الشهرية لحساب', 'class' => 'admin-nav-sub', 'sub' => true],

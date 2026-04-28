@@ -3814,6 +3814,53 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     .jv-print-area .ob-line-main td:last-child {
         display: none !important;
     }
+    .gl-acc-stmt-no-print {
+        display: none !important;
+    }
+    .gl-acc-stmt-print,
+    .gl-acc-stmt-print * {
+        visibility: visible;
+    }
+    .gl-acc-stmt-print {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        max-height: none;
+        border: none !important;
+        box-shadow: none !important;
+    }
+}
+
+/* كشف حساب (دليل عام) — رأس المطبوعة */
+.gl-acc-stmt-print-head {
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border, #e2e8f0);
+}
+.gl-acc-stmt-print-title {
+    margin: 0 0 0.75rem;
+    font-size: 1.35rem;
+    text-align: center;
+}
+.gl-acc-stmt-print-meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.5rem 1.25rem;
+    margin: 0;
+}
+.gl-acc-stmt-print-meta dt {
+    font-weight: 600;
+    margin: 0;
+    opacity: 0.85;
+    font-size: 0.88rem;
+}
+.gl-acc-stmt-print-meta dd {
+    margin: 0.15rem 0 0;
+}
+.gl-acc-stmt-open-line {
+    margin: 0.75rem 0 0;
+    font-size: 0.95rem;
 }
 
 /* منتقي المتغيرات (عروض السلة) */

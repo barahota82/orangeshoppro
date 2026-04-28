@@ -45,6 +45,11 @@ $financialWithFy = $financialBase . (isset($_GET['fy']) && (int) $_GET['fy'] > 0
                     <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=journal_voucher_reports', ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
                 </tr>
                 <tr>
+                    <td>كشف حساب (دليل — من تاريخ إلى تاريخ مع طباعة)</td>
+                    <td><span class="badge approved">جاهز</span></td>
+                    <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=gl_account_statement', ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
+                </tr>
+                <tr>
                     <td>كشف حساب لطرف (عميل / مورد حسب المرجع)</td>
                     <td><span class="badge approved">جاهز</span></td>
                     <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=partner_account_statement', ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
