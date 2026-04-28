@@ -186,7 +186,7 @@ $jvHeaderLineClass = 'jv-voucher-header-line' . ($jvNavReady ? ' jv-voucher-head
     <div class="gl-pick-modal__backdrop" id="jv_pick_backdrop"></div>
     <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="jv_pick_title">
         <h3 id="jv_pick_title" class="gl-pick-modal__title">اختيار حساب فرعي</h3>
-        <p class="gl-pick-modal__hint muted" style="margin:0 0 8px;font-size:0.9rem;">نقرتان على حقل كود الحساب لفتح هذه القائمة — انقر صفاً للاختيار — Esc للإغلاق</p>
+        <p class="gl-pick-modal__hint muted" style="margin:0 0 8px;font-size:0.9rem;">نقرتان للاختيار</p>
         <input type="search" id="jv_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بالكود أو الاسم…" autocomplete="off" dir="rtl">
         <ul class="gl-pick-modal__list" id="jv_pick_list"></ul>
         <button type="button" class="btn-secondary" id="jv_pick_close">إغلاق</button>
@@ -905,7 +905,7 @@ function jvAddRow() {
     trMain.setAttribute('data-jv-pair', pair);
     trMain.innerHTML = '<td class="jv-acc-code-cell">' +
         '<input type="hidden" class="jv-acc-id" value="">' +
-        '<input type="text" class="jv-acc-code admin-inp" value="" placeholder="نقرتان للاختيار" readonly autocomplete="off" title="نقرتان لفتح قائمة الحسابات">' +
+        '<input type="text" class="jv-acc-code admin-inp" value="" placeholder="نقرتان للاختيار" readonly autocomplete="off" title="نقرتان للاختيار">' +
         '</td>' +
         '<td><input type="text" class="jv-acc-name admin-inp" value="" readonly tabindex="-1" placeholder="—" title="يُعبأ تلقائياً"></td>' +
         '<td><input type="number" class="jv-d admin-inp-money" step="any" min="0" value="" placeholder="0.000" inputmode="decimal" lang="en" dir="ltr"></td>' +

@@ -90,7 +90,47 @@ if (orange_journal_vouchers_ready($pdo)) {
         }
     }
 }
+
+$resetUrl = htmlspecialchars(storefront_public_path('/admin/index.php?page=journal_voucher_reports'), ENT_QUOTES, 'UTF-8');
 ?>
+<style>
+/*
+ * عرض تواريخ مساوٍ لمربعات «بحث السند» بسند القيد (~11rem): jv-search-field--date
+ */
+.jvr-filter-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+    width: 100%;
+    box-sizing: border-box;
+}
+.jvr-filter-tools__entry {
+    flex: 1 1 16rem;
+    min-width: 12rem;
+}
+.jvr-filter-tools__entry .admin-inp {
+    width: 100%;
+    box-sizing: border-box;
+}
+.jvr-filter-tools__date {
+    flex: 0 0 11rem;
+    min-width: 11rem;
+    max-width: 11rem;
+}
+.jvr-filter-tools__date .admin-inp.orange-inp-dmy {
+    width: 100%;
+    box-sizing: border-box;
+}
+.jvr-filter-tools__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-inline-start: auto;
+}
+</style>
+
 <div class="page-title page-title--stacked">
     <div>
         <h1>تقارير السندات</h1>
@@ -99,34 +139,41 @@ if (orange_journal_vouchers_ready($pdo)) {
 
 <div class="card">
     <h3 class="card-title">تصفية</h3>
-    <form method="get" action="" class="form-grid" style="align-items:end;">
+    <form method="get" action="">
         <input type="hidden" name="page" value="journal_voucher_reports">
-        <div>
-            <label for="jvr_from">من تاريخ</label>
-            <input type="text" id="jvr_from" name="date_from" class="admin-inp orange-inp-dmy"
-                value="<?php echo htmlspecialchars($dateFromDisp, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" autocomplete="off">
-        </div>
-        <div>
-            <label for="jvr_to">إلى تاريخ</label>
-            <input type="text" id="jvr_to" name="date_to" class="admin-inp orange-inp-dmy"
-                value="<?php echo htmlspecialchars($dateToDisp, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" autocomplete="off">
-        </div>
-        <div style="grid-column:1/-1; max-width:28rem;">
-            <label for="jvr_entry_type">نوع القيد</label>
-            <select id="jvr_entry_type" name="entry_type">
-                <option value=""<?php echo $entryTypeFilter === '' ? ' selected' : ''; ?>>الكل</option>
-                <?php foreach ($typeLabels as $code => $lab): ?>
-                    <option value="<?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?>"<?php echo $entryTypeFilter === $code ? ' selected' : ''; ?>>
-                        <?php echo htmlspecialchars($lab . ' (' . $code . ')', ENT_QUOTES, 'UTF-8'); ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div class="actions" style="grid-column:1/-1; margin:0;">
-            <button type="submit">عرض التقرير</button>
-            <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=journal_voucher_reports'), ENT_QUOTES, 'UTF-8'); ?>">إعادة ضبط الفلاتر</a>
+        <div class="jvr-filter-tools">
+            <div class="jvr-filter-tools__entry">
+                <label for="jvr_entry_type">نوع القيد</label>
+                <select id="jvr_entry_type" name="entry_type" class="admin-inp">
+                    <option value=""<?php echo $entryTypeFilter === '' ? ' selected' : ''; ?>>الكل</option>
+                    <?php foreach ($typeLabels as $code => $lab): ?>
+                        <option value="<?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?>"<?php echo $entryTypeFilter === $code ? ' selected' : ''; ?>>
+                            <?php echo htmlspecialchars($lab . ' (' . $code . ')', ENT_QUOTES, 'UTF-8'); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="jvr-filter-tools__date">
+                <label for="jvr_from">من تاريخ</label>
+                <input type="text" id="jvr_from" name="date_from" class="admin-inp orange-inp-dmy"
+                    value="<?php echo htmlspecialchars($dateFromDisp, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" autocomplete="off">
+            </div>
+            <div class="jvr-filter-tools__date">
+                <label for="jvr_to">إلى تاريخ</label>
+                <input type="text" id="jvr_to" name="date_to" class="admin-inp orange-inp-dmy"
+                    value="<?php echo htmlspecialchars($dateToDisp, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" autocomplete="off">
+            </div>
+            <div class="jvr-filter-tools__actions">
+                <button type="submit">عرض التقرير</button>
+                <a class="btn btn-secondary" href="<?php echo $resetUrl; ?>">إعادة ضبط الفلتر</a>
+            </div>
         </div>
     </form>
+    <p class="card-hint muted" style="margin:12px 0 0;line-height:1.45;">
+        <strong>لماذا تختلف التسميات عن «أنواع اليومية»؟</strong>
+        الفلترة هنا وفق القيمة التقنية <strong>entry_type</strong> المخزَّنة مع كل سند (مسار تشغيلي وقيود آلية)، وتُعرض تسمياتها من جدول المعرفات بالنظام؛ الرمز بين القوسين هو القيمة الفعلية في قاعدة البيانات.
+        أسماء «أنواع اليومية» في الإعدادات تخصّ دفتر التسجيل وواجهة الإدخال وقد لا تطابق ذلك حرفياً؛ ويجوز أن يتعدد <strong>entry_type</strong> المرتبط بيومية واحدة بحسب المسار.
+    </p>
 </div>
 
 <?php if (!orange_journal_vouchers_ready($pdo)): ?>
@@ -168,9 +215,9 @@ if (orange_journal_vouchers_ready($pdo)) {
                         <td><?php echo htmlspecialchars(orange_format_datetime_dmY_hi((string) ($v['voucher_date'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php
                             $docIn = (string) ($v['document_entered_at'] ?? '');
-                        if ($docIn === '') {
-                            $docIn = (string) ($v['created_at'] ?? '');
-                        }
+                            if ($docIn === '') {
+                                $docIn = (string) ($v['created_at'] ?? '');
+                            }
                         echo htmlspecialchars(orange_format_datetime_dmY_hi($docIn), ENT_QUOTES, 'UTF-8');
                         ?></td>
                         <td title="<?php echo htmlspecialchars($et, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($etAr, ENT_QUOTES, 'UTF-8'); ?></td>

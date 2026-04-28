@@ -244,7 +244,7 @@ $obAdminIndexUrl = storefront_public_path('/admin/index.php');
     <div class="gl-pick-modal__backdrop" id="ob_pick_backdrop"></div>
     <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="ob_pick_title">
         <h3 id="ob_pick_title" class="gl-pick-modal__title">اختيار حساب فرعي</h3>
-        <p class="gl-pick-modal__hint muted" style="margin:0 0 8px;font-size:0.9rem;">نقرتان على حقل كود الحساب في الجدول لفتح هذه القائمة — انقر صفاً للاختيار — Esc للإغلاق</p>
+        <p class="gl-pick-modal__hint muted" style="margin:0 0 8px;font-size:0.9rem;">نقرتان للاختيار</p>
         <input type="search" id="ob_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بالكود أو الاسم…" autocomplete="off" dir="rtl">
         <ul class="gl-pick-modal__list" id="ob_pick_list"></ul>
         <button type="button" class="btn-secondary" id="ob_pick_close">إغلاق</button>
@@ -579,7 +579,7 @@ var OB_SAVED_VOUCHER_ID = <?php echo (int) $obVid; ?>;
         tr.className = 'ob-line-main';
         tr.setAttribute('data-account-id', '0');
         tr.innerHTML =
-            '<td><input type="text" class="gl-inp-code ob-inp-code admin-inp" dir="ltr" autocomplete="off" value="" aria-label="كود الحساب" placeholder="نقرتان للاختيار أو اكتب الكود" title="نقرتان لفتح قائمة الحسابات — أو أدخِل الكود وغيّر الحقل للتحقق"></td>' +
+            '<td><input type="text" class="gl-inp-code ob-inp-code admin-inp" dir="ltr" autocomplete="off" value="" aria-label="كود الحساب" placeholder="نقرتان للاختيار" title="نقرتان للاختيار"></td>' +
             '<td><input type="text" class="gl-inp-name ob-inp-name admin-inp" readonly tabindex="-1" value="" aria-label="اسم الحساب" placeholder="—" title="يُعبأ تلقائياً"></td>' +
             '<td><input type="number" class="ob-d admin-inp-money" step="any" min="0" value="" inputmode="decimal" lang="en" dir="ltr" aria-label="مدين" placeholder="0.000"></td>' +
             '<td><input type="number" class="ob-c admin-inp-money" step="any" min="0" value="" inputmode="decimal" lang="en" dir="ltr" aria-label="دائن" placeholder="0.000"></td>' +

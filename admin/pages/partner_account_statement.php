@@ -233,8 +233,8 @@ if ($useVouchers && $accountId > 0 && $err === '') {
                         <label for="gas_acc_code">كود الحساب</label>
                         <input type="text" id="gas_acc_code" name="_gas_acc_code_dummy" autocomplete="off" readonly
                             class="admin-inp jv-acc-code gas-acc-stmt-acc-code-input"
-                            placeholder="انقر نقرتين للاختيار"
-                            title="انقر نقرتين لفتح قائمة الحسابات الفرعية"
+                            placeholder="نقرتان للاختيار"
+                            title="نقرتان للاختيار"
                             value="<?php echo htmlspecialchars($accCode, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
                     </div>
                     <div class="gas-acc-stmt-field gas-acc-stmt-field--name">
@@ -284,7 +284,6 @@ if ($useVouchers && $accountId > 0 && $err === '') {
                         </label>
                     </div>
                 </div>
-                <p class="gas-acc-stmt-options-hint muted">السطر الثاني: تصفية أسطر المدين أو الدائن؛ و«مرحّل / غير مرحّل» حسب تصنيف السند. تفعيل «أعمار الرصيد» يُظهر توزيع الرصيد المتبقي حتى تاريخ «إلى» وفق أسطر هذا الحساب فقط (FIFO، أسوة المدين أو الدائن في كل سطر)، دون اعتماد طرفاً منفصلاً خارج كشف الحساب.</p>
             </div>
         </form>
         <?php if ($err !== ''): ?>
@@ -296,7 +295,7 @@ if ($useVouchers && $accountId > 0 && $err === '') {
         <div class="gl-pick-modal__backdrop" id="gas_pick_backdrop"></div>
         <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="gas_pick_title">
             <h3 id="gas_pick_title" class="gl-pick-modal__title">اختيار حساب فرعي</h3>
-            <p class="gl-pick-modal__hint muted" style="margin:0 0 8px;font-size:0.9rem;">نقرتان على حقل كود الحساب لفتح هذه القائمة — انقر صفاً للاختيار — Esc للإغلاق</p>
+            <p class="gl-pick-modal__hint muted" style="margin:0 0 8px;font-size:0.9rem;">نقرتان للاختيار</p>
             <input type="search" id="gas_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بالكود أو الاسم…" autocomplete="off" dir="rtl">
             <ul class="gl-pick-modal__list" id="gas_pick_list"></ul>
             <button type="button" class="btn-secondary" id="gas_pick_close">إغلاق</button>

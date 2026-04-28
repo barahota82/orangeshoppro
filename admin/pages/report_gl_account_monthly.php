@@ -115,8 +115,8 @@ $base = htmlspecialchars(storefront_public_path('/admin/index.php'), ENT_QUOTES,
         <div>
             <label for="gl_m_acc_code">كود الحساب</label>
             <input type="text" id="gl_m_acc_code" autocomplete="off" readonly class="admin-inp gl-m-acc-code-inp"
-                placeholder="انقر نقرتين للاختيار"
-                title="انقر نقرتين لفتح قائمة الحسابات الفرعية"
+                placeholder="نقرتان للاختيار"
+                title="نقرتان للاختيار"
                 value="<?php echo htmlspecialchars($accCodeDisp, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
         </div>
         <div>
@@ -134,7 +134,7 @@ $base = htmlspecialchars(storefront_public_path('/admin/index.php'), ENT_QUOTES,
     <div class="gl-pick-modal__backdrop" id="gl_m_pick_backdrop"></div>
     <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="gl_m_pick_title">
         <h3 id="gl_m_pick_title" class="gl-pick-modal__title">اختيار حساب فرعي</h3>
-        <p class="gl-pick-modal__hint muted" style="margin:0 0 8px;font-size:0.9rem;">نقرتان على حقل كود الحساب لفتح هذه القائمة — انقر صفاً للاختيار — Esc للإغلاق</p>
+        <p class="gl-pick-modal__hint muted" style="margin:0 0 8px;font-size:0.9rem;">نقرتان للاختيار</p>
         <input type="search" id="gl_m_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بالكود أو الاسم…" autocomplete="off" dir="rtl">
         <ul class="gl-pick-modal__list" id="gl_m_pick_list"></ul>
         <button type="button" class="btn-secondary" id="gl_m_pick_close">إغلاق</button>

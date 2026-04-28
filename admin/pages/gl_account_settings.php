@@ -145,6 +145,7 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
     <div class="gl-pick-modal__backdrop" id="gl_pick_backdrop"></div>
     <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="gl_pick_title">
         <h3 id="gl_pick_title" class="gl-pick-modal__title">اختيار حساب فرعي</h3>
+        <p class="gl-pick-modal__hint muted" style="margin:0 0 8px;font-size:0.9rem;">نقرتان للاختيار</p>
         <input type="search" id="gl_pick_q" class="gl-pick-modal__search" placeholder="ابحث بالكود أو الاسم…" autocomplete="off" dir="rtl">
         <ul class="gl-pick-modal__list" id="gl_pick_list"></ul>
         <button type="button" class="btn-secondary" id="gl_pick_close">إغلاق</button>
