@@ -570,6 +570,14 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         /* جدول accounts قد يُفرَّغ يدوياً؛ المسار السريع كان يتخطى البذرة فلا تُعاد الجذور الافتراضية */
         orange_catalog_seed_default_accounts_if_empty($pdo);
         orange_catalog_ensure_gl_account_settings_alloc_tables($pdo);
+        require_once __DIR__ . '/journal_types.php';
+        try {
+            orange_journal_types_merge_canonical_defaults($pdo);
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] canonical journal_types merge (fast path): ' . $e->getMessage());
+            }
+        }
         if (! $metaOk && $ckOk) {
             orange_schema_meta_save($pdo, $schemaRev);
         }

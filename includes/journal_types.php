@@ -61,12 +61,16 @@ function orange_journal_types_canonical_rows(): array
 
 /**
  * دمج قائمة الأنواع المرجعية في الجدول: يحدّث الأسماء والترتيب للأكواد الموجودة ويُدخل الناقص.
- * يُستدعى عند الحاجة أكثر من مرة في نفس الطلب (مثلاً استعادة بعد جدول فارغ).
+ * يُفعَّل تلقائياً من مسار المخطط السريع وبعد أول نجاح في نفس طلب PHP لا يُكرَّر (static).
  *
  * @throws Throwable عند فشل المعاملة
  */
 function orange_journal_types_merge_canonical_defaults(PDO $pdo): void
 {
+    static $completedOk = false;
+    if ($completedOk) {
+        return;
+    }
     if (!orange_table_exists($pdo, 'journal_types')) {
         return;
     }
@@ -95,6 +99,7 @@ function orange_journal_types_merge_canonical_defaults(PDO $pdo): void
         }
         orange_journal_types_retire_obsolete_exp_type($pdo);
         $pdo->commit();
+        $completedOk = true;
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
