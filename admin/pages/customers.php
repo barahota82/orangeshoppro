@@ -34,8 +34,7 @@ $count = count($rows);
         <p class="page-subtitle">
             سجل العملاء: <strong>الهاتف</strong> معرّف فريد للعميل (مثل الكود). الحقول: الاسم، المنطقة، العنوان، البريد، الملاحظات (تُحدَّث تلقائياً من ملاحظات كل طلب ويب)، حد الائتمان، والذمم.
             الذمم والتحصيل من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_customer_receipt'), ENT_QUOTES, 'UTF-8'); ?>">سداد فواتير مبيعات آجلة</a>
-            — <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_account_statement'), ENT_QUOTES, 'UTF-8'); ?>">كشف حساب</a>
-            و<a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_reports'), ENT_QUOTES, 'UTF-8'); ?>">تقارير الذمم المالية</a>.
+            — <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_reports'), ENT_QUOTES, 'UTF-8'); ?>">تقارير الذمم المالية</a> (أرصدة وحركات لكل طرف).
         </p>
     </div>
     <div class="actions">
@@ -180,7 +179,7 @@ $count = count($rows);
                                     'credit_limit' => $c['credit_limit'] ?? null,
                                     'notes' => (string) ($c['notes'] ?? ''),
                                 ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>)'>تعديل</button>
-                                <a class="btn btn-secondary party-registry-btn" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_account_statement&stmt_party_kind=customer&stmt_party_id=' . (int) $cid), ENT_QUOTES, 'UTF-8'); ?>">كشف حساب</a>
+                                <a class="btn btn-secondary party-registry-btn" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_reports#partner-balances-customers'), ENT_QUOTES, 'UTF-8'); ?>">ذمة العميل</a>
                             </td>
                         </tr>
                     <?php endforeach; ?>
