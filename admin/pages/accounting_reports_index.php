@@ -107,6 +107,11 @@ $financialWithFy = $financialBase . (isset($_GET['fy']) && (int) $_GET['fy'] > 0
                     <td><span class="badge approved">شاشة مخصّصة</span></td>
                     <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=report_gl_account_monthly', ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
                 </tr>
+                <tr>
+                    <td>قائمة الدخل (إيرادات، تكلفة مبيعات، مصروفات — من شهر إلى شهر مثل الحركة الشهرية)</td>
+                    <td><span class="badge approved">جاهز</span></td>
+                    <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=report_income_statement', ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
+                </tr>
             </tbody>
         </table>
     </div>
@@ -128,9 +133,14 @@ $financialWithFy = $financialBase . (isset($_GET['fy']) && (int) $_GET['fy'] > 0
             </thead>
             <tbody>
                 <tr>
-                    <td>قائمة الدخل (إيراد / مصروف وصافي تقريبي)</td>
+                    <td>قائمة الدخل ملخّصة (إيراد / مصروف وصافي تقريبي)</td>
                     <td><span class="badge approved">معروض ضمن الشاشة</span></td>
                     <td><a href="<?php echo $financialWithFy; ?>#report-income">#report-income</a></td>
+                </tr>
+                <tr>
+                    <td>قائمة الدخل تفصيلية بتقويم (مثل ملف قائمة الدخل Excel)</td>
+                    <td><span class="badge approved">شاشة مستقلة</span></td>
+                    <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=report_income_statement', ENT_QUOTES, 'UTF-8'); ?>">report_income_statement</a></td>
                 </tr>
                 <tr>
                     <td>قائمة حساب المتاجرة / تجزئة نتيجة التشغيل (عند احتياج لفصل المتاجرة رسمياً)</td>

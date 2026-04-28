@@ -4022,6 +4022,16 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     border-top: 2px solid #64748b;
 }
 
+.ta-report-table tbody tr.ta-report-grand--net td {
+    background: #eef2ff;
+}
+
+.ta-report-table tbody tr.ta-report-section--sub td {
+    font-weight: 600;
+    background: #f8fafc;
+    font-size: 0.95rem;
+}
+
 .ta-report-table-scroll {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;

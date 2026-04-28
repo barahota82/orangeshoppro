@@ -1,0 +1,503 @@
+<?php
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/account_tree.php';
+require_once __DIR__ . '/../../includes/journal_voucher.php';
+require_once __DIR__ . '/../../includes/upload_paths.php';
+require_once __DIR__ . '/../../includes/date_format.php';
+
+$pdo = db();
+orange_catalog_ensure_schema($pdo);
+
+$normalizeYm = static function (string $raw): ?string {
+    $raw = trim($raw);
+    if (! preg_match('/^(\d{4})-(\d{2})$/', $raw, $m)) {
+        return null;
+    }
+    $month = (int) $m[2];
+    if ($month < 1 || $month > 12) {
+        return null;
+    }
+
+    return sprintf('%04d-%02d', (int) $m[1], $month);
+};
+
+$ymFromGet = isset($_GET['m_from']) ? $normalizeYm((string) $_GET['m_from']) : null;
+$ymToGet = isset($_GET['m_to']) ? $normalizeYm((string) $_GET['m_to']) : null;
+
+$firstDayOfYm = static function (string $ym): string {
+    return $ym . '-01';
+};
+
+$lastDayOfYm = static function (string $ym): string {
+    $d0 = $ym . '-01';
+    $t = strtotime($d0 . ' 12:00:00');
+
+    return $t ? date('Y-m-t', $t) : $ym . '-28';
+};
+
+$useVouchers = orange_journal_vouchers_ready($pdo);
+$periodLabel = '';
+$periodYmFrom = '';
+$periodYmTo = '';
+$periodDateFrom = '';
+$periodDateTo = '';
+
+$calYmMinBound = '2000-01';
+$calYmMaxBound = '2100-12';
+
+$yNow = (int) date('Y');
+$mNow = (int) date('n');
+$defaultYmJan = sprintf('%04d-01', $yNow);
+$defaultYmToday = sprintf('%04d-%02d', $yNow, $mNow);
+
+$ymFrom = $ymFromGet ?? $defaultYmJan;
+$ymTo = $ymToGet ?? $defaultYmToday;
+if ($ymFrom < $calYmMinBound) {
+    $ymFrom = $calYmMinBound;
+}
+if ($ymFrom > $calYmMaxBound) {
+    $ymFrom = $calYmMaxBound;
+}
+if ($ymTo < $calYmMinBound) {
+    $ymTo = $calYmMinBound;
+}
+if ($ymTo > $calYmMaxBound) {
+    $ymTo = $calYmMaxBound;
+}
+if ($ymFrom > $ymTo) {
+    $swap = $ymFrom;
+    $ymFrom = $ymTo;
+    $ymTo = $swap;
+}
+$periodYmFrom = $ymFrom;
+$periodYmTo = $ymTo;
+
+$periodDateFrom = $firstDayOfYm($periodYmFrom);
+$periodDateTo = $lastDayOfYm($periodYmTo);
+if (strcmp($periodDateFrom, $periodDateTo) <= 0) {
+    $periodLabel = $periodDateFrom . ' — ' . $periodDateTo;
+}
+
+$tbRange = [];
+$tbBefore = [];
+if (
+    $useVouchers && $periodLabel !== ''
+    && $periodDateFrom !== '' && $periodDateTo !== ''
+    && strcmp($periodDateFrom, $periodDateTo) <= 0
+) {
+    $tbRange = orange_voucher_account_totals_by_voucher_date_range($pdo, $periodDateFrom, $periodDateTo, []);
+    $tbBefore = orange_voucher_account_totals_strictly_before_date($pdo, $periodDateFrom, []);
+}
+
+$leafWhere = orange_accounts_posting_leaf_where_sql($pdo, 'a');
+$accountsLeaf = $pdo->query(
+    "SELECT a.id, a.name, a.code FROM accounts a WHERE $leafWhere ORDER BY COALESCE(a.code, ''), a.name"
+)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+/**
+ * @return list<array{code:string,name:string,opening:float,period:float,closing:float}>
+ */
+$buildPlSection = static function (
+    PDO $pdo,
+    array $accountsLeaf,
+    array $tbRange,
+    array $tbBefore,
+    string $plClass
+): array {
+    $out = [];
+    foreach ($accountsLeaf as $a) {
+        $aid = (int) ($a['id'] ?? 0);
+        if ($aid <= 0) {
+            continue;
+        }
+        $pr = orange_accounts_account_pl_role($pdo, $aid);
+        if ($pr !== $plClass) {
+            continue;
+        }
+        $d0 = $c0 = $d1 = $c1 = 0.0;
+        if (isset($tbBefore[$aid])) {
+            $d0 = (float) $tbBefore[$aid]['debit'];
+            $c0 = (float) $tbBefore[$aid]['credit'];
+        }
+        if (isset($tbRange[$aid])) {
+            $d1 = (float) $tbRange[$aid]['debit'];
+            $c1 = (float) $tbRange[$aid]['credit'];
+        }
+        if ($plClass === 'revenue') {
+            $open = $c0 - $d0;
+            $period = $c1 - $d1;
+        } else {
+            $open = $d0 - $c0;
+            $period = $d1 - $c1;
+        }
+        $closing = $open + $period;
+        if (abs($open) < 0.0001 && abs($period) < 0.0001 && abs($closing) < 0.0001) {
+            continue;
+        }
+        $code = trim((string) ($a['code'] ?? ''));
+        $nm = (string) ($a['name'] ?? '');
+        $out[] = [
+            'code' => $code,
+            'name' => $nm,
+            'opening' => $open,
+            'period' => $period,
+            'closing' => $closing,
+        ];
+    }
+
+    return $out;
+};
+
+$revenueLines = $useVouchers ? $buildPlSection($pdo, $accountsLeaf, $tbRange, $tbBefore, 'revenue') : [];
+$cogsLines = $useVouchers ? $buildPlSection($pdo, $accountsLeaf, $tbRange, $tbBefore, 'cogs') : [];
+$expenseLines = $useVouchers ? $buildPlSection($pdo, $accountsLeaf, $tbRange, $tbBefore, 'expense') : [];
+
+/**
+ * تجزئة مصروفات التشغيل تبعاً أوائل الكود الرقمية (يطابق عموماً دليلاً من نوع 61x/62x مقابل 63x).
+ *
+ * @return array{direct: list, indirect: list, misc: list}
+ */
+$splitExpenseBuckets = static function (array $expLines): array {
+    $direct = [];
+    $indirect = [];
+    $misc = [];
+    foreach ($expLines as $ln) {
+        $code = trim((string) ($ln['code'] ?? ''));
+        $h = 0;
+        if (preg_match('/^(\d{3})/', $code, $m)) {
+            $h = (int) $m[1];
+        }
+        if ($h >= 610 && $h <= 629) {
+            $direct[] = $ln;
+        } elseif ($h >= 630 && $h <= 699) {
+            $indirect[] = $ln;
+        } else {
+            $misc[] = $ln;
+        }
+    }
+
+    return ['direct' => $direct, 'indirect' => $indirect, 'misc' => $misc];
+};
+
+$expBuckets = $splitExpenseBuckets($expenseLines);
+/** مصروفات مباشرة + ما لا يُصنَّف بمدى 630–699 يُعرَض مع المباشرة */
+$mergedDirectExpense = array_merge($expBuckets['direct'], $expBuckets['misc']);
+$indirectExpenseOnly = $expBuckets['indirect'];
+$useExpenseTwoBlocks = $indirectExpenseOnly !== [];
+
+$sumOpen = static function (array $lines): float {
+    $s = 0.0;
+    foreach ($lines as $ln) {
+        $s += (float) ($ln['opening'] ?? 0);
+    }
+
+    return $s;
+};
+$sumPer = static function (array $lines): float {
+    $s = 0.0;
+    foreach ($lines as $ln) {
+        $s += (float) ($ln['period'] ?? 0);
+    }
+
+    return $s;
+};
+$sumClose = static function (array $lines): float {
+    $s = 0.0;
+    foreach ($lines as $ln) {
+        $s += (float) ($ln['closing'] ?? 0);
+    }
+
+    return $s;
+};
+
+$totalRevOpening = $sumOpen($revenueLines);
+$totalRevPeriod = $sumPer($revenueLines);
+$totalRevClosing = $sumClose($revenueLines);
+$totalCogsOpening = $sumOpen($cogsLines);
+$totalCogsPeriod = $sumPer($cogsLines);
+$totalCogsClosing = $sumClose($cogsLines);
+$totalExpOpening = $sumOpen($expenseLines);
+$totalExpPeriod = $sumPer($expenseLines);
+$totalExpClosing = $sumClose($expenseLines);
+$totalExpDirOpening = $sumOpen($mergedDirectExpense);
+$totalExpDirPeriod = $sumPer($mergedDirectExpense);
+$totalExpDirClosing = $sumClose($mergedDirectExpense);
+$totalExpIndOpening = $sumOpen($indirectExpenseOnly);
+$totalExpIndPeriod = $sumPer($indirectExpenseOnly);
+$totalExpIndClosing = $sumClose($indirectExpenseOnly);
+
+/* مجمل الربح = إيرادات − تكلفة مبيعات؛ صافي الربح = مجمل الربح − مصروفات */
+$grossOpening = $totalRevOpening - $totalCogsOpening;
+$grossPeriod = $totalRevPeriod - $totalCogsPeriod;
+$grossClosing = $totalRevClosing - $totalCogsClosing;
+$netOpening = $grossOpening - $totalExpOpening;
+$netPeriod = $grossPeriod - $totalExpPeriod;
+$netClosing = $grossClosing - $totalExpClosing;
+
+$reportDateFromDmY = orange_format_date_dmY($periodDateFrom);
+$reportDateToDmY = orange_format_date_dmY($periodDateTo);
+$todayDmY = orange_format_date_dmY(date('Y-m-d'));
+$printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
+
+$companyNameAr = '';
+if (orange_table_exists($pdo, 'company_settings')) {
+    $cs = $pdo->query('SELECT company_name_ar FROM company_settings ORDER BY id ASC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
+    if (is_array($cs)) {
+        $companyNameAr = trim((string) ($cs['company_name_ar'] ?? ''));
+    }
+}
+
+$hasPlData = $revenueLines !== [] || $cogsLines !== [] || $expenseLines !== [];
+
+$fmt5 = static function (float $v): string {
+    return number_format($v, 4);
+};
+
+?>
+<div class="admin-fy-shell" dir="rtl">
+    <div class="gl-acc-stmt-no-print">
+        <h1 class="admin-fy-shell__title">قائمة الدخل</h1>
+    </div>
+
+    <div class="card admin-fy-card gl-acc-stmt-no-print gas-acc-stmt-search-card">
+        <form method="get" class="gas-acc-stmt-filter-form" id="is_report_form">
+            <input type="hidden" name="page" value="report_income_statement">
+            <div class="gas-acc-stmt-toolbar-wrap">
+                <div class="gas-acc-stmt-toolbar ta-report-toolbar gas-acc-stmt-toolbar--main-center">
+                    <div class="gas-acc-stmt-field gl-m-stmt-field--month">
+                        <label for="is_m_month_from">من شهر</label>
+                        <input type="month" name="m_from" id="is_m_month_from" class="admin-inp"
+                            lang="en" dir="ltr"
+                            value="<?php echo htmlspecialchars($periodYmFrom, ENT_QUOTES, 'UTF-8'); ?>"
+                            min="<?php echo htmlspecialchars($calYmMinBound, ENT_QUOTES, 'UTF-8'); ?>"
+                            max="<?php echo htmlspecialchars($calYmMaxBound, ENT_QUOTES, 'UTF-8'); ?>"
+                            title="أول وأخر يوم من الشهرين (مثل الحركة الشهرية لحساب)، حسب تاريخ السند."
+                            autocomplete="off">
+                    </div>
+                    <div class="gas-acc-stmt-field gl-m-stmt-field--month">
+                        <label for="is_m_month_to">إلى شهر</label>
+                        <input type="month" name="m_to" id="is_m_month_to" class="admin-inp"
+                            lang="en" dir="ltr"
+                            value="<?php echo htmlspecialchars($periodYmTo, ENT_QUOTES, 'UTF-8'); ?>"
+                            min="<?php echo htmlspecialchars($calYmMinBound, ENT_QUOTES, 'UTF-8'); ?>"
+                            max="<?php echo htmlspecialchars($calYmMaxBound, ENT_QUOTES, 'UTF-8'); ?>"
+                            autocomplete="off">
+                    </div>
+                    <div class="gas-acc-stmt-actions">
+                        <button type="submit">عرض</button>
+                        <?php if ($useVouchers && $periodLabel !== ''): ?>
+                            <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </form>
+        <p class="card-hint" style="margin-top:12px;margin-bottom:0;">
+            عمود القيود وفق تاريخ السند ضمن المدى؛ التصنيف إيراد / تكلفة مبيعات / مصروف يُستمد من جذور الدليل («إعداد الدليل» والأدوار المعتمدة في النظام).
+            شبكة الأعمدة مطابقة لقالب المتاجرة: كود الحساب، اسم الحساب، رصيد أول الفترة، قيود الفترة، الرصيد الختامي.
+        </p>
+    </div>
+
+<?php if (! $useVouchers): ?>
+    <div class="card admin-fy-card">
+        <p class="muted">سندات اليومية غير جاهزة بعد — لا يمكن عرض قائمة الدخل.</p>
+    </div>
+<?php elseif ($periodLabel === ''): ?>
+    <div class="card admin-fy-card">
+        <p class="muted">تعذّر تحديد مدى التقويم.</p>
+    </div>
+<?php else: ?>
+    <div class="card admin-fy-card gl-acc-stmt-print">
+        <div class="gl-acc-stmt-print-sheet ta-report-print-sheet">
+            <header class="gl-acc-stmt-print-banner">
+                <?php if ($companyNameAr !== ''): ?>
+                    <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
+                <?php endif; ?>
+                <h2 class="gl-acc-stmt-print-title ta-report-print-title">
+                    <span class="gl-acc-stmt-print-title-ar" lang="ar">تقرير قائمة الدخل عن الفترة من <?php echo htmlspecialchars($reportDateFromDmY, ENT_QUOTES, 'UTF-8'); ?> إلـى&nbsp;<?php echo htmlspecialchars($reportDateToDmY, ENT_QUOTES, 'UTF-8'); ?></span>
+                </h2>
+            </header>
+            <div class="gl-acc-stmt-print-grid">
+                <div class="gl-acc-stmt-print-row gl-acc-stmt-print-row--dates">
+                    <span class="gl-acc-stmt-print-k">من تاريخ</span>
+                    <span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($reportDateFromDmY, ENT_QUOTES, 'UTF-8'); ?></span>
+                    <span class="gl-acc-stmt-print-k">الى تاريخ</span>
+                    <span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($reportDateToDmY, ENT_QUOTES, 'UTF-8'); ?></span>
+                    <span class="gl-acc-stmt-print-k">تاريخ الكشف</span>
+                    <span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($todayDmY, ENT_QUOTES, 'UTF-8'); ?></span>
+                </div>
+            </div>
+
+            <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap ta-report-table-scroll">
+                <table class="admin-fy-table gl-acc-stmt-table ta-report-table ta-report-table--xlsx">
+                    <thead>
+                        <tr>
+                            <th class="gl-acc-stmt-col-num">كــود الحســاب</th>
+                            <th>اســــــم الحســــــاب</th>
+                            <th class="gl-acc-stmt-col-num">رصيد اول الفترة</th>
+                            <th class="gl-acc-stmt-col-num">رصيد الفترة</th>
+                            <th class="gl-acc-stmt-col-num">الرصيد</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="ta-report-section">
+                            <td colspan="5">مبيعات</td>
+                        </tr>
+                        <?php if ($revenueLines === []): ?>
+                            <tr><td colspan="5" class="muted">لا حسابات مبيعات / إيرادات فرعية بها حركة في المدى.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($revenueLines as $rl): ?>
+                                <tr>
+                                    <td class="gl-acc-stmt-col-num" dir="ltr"><?php echo htmlspecialchars((string) ($rl['code'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                    <td><?php echo htmlspecialchars((string) ($rl['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($rl['opening'] ?? 0)); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($rl['period'] ?? 0)); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($rl['closing'] ?? 0)); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                        <tr class="ta-report-subtotal ta-report-subtotal--sales">
+                            <td class="gl-acc-stmt-col-num muted">—</td>
+                            <td>اجمالى مبيعات</td>
+                            <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalRevOpening); ?></td>
+                            <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalRevPeriod); ?></td>
+                            <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalRevClosing); ?></td>
+                        </tr>
+
+                        <tr class="ta-report-section">
+                            <td colspan="5">تكلفة مبيعات</td>
+                        </tr>
+                        <?php if ($cogsLines === []): ?>
+                            <tr><td colspan="5" class="muted">لا حسابات تكلفة مبيعات بها حركة في المدى.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($cogsLines as $cl): ?>
+                                <tr>
+                                    <td class="gl-acc-stmt-col-num" dir="ltr"><?php echo htmlspecialchars((string) ($cl['code'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                    <td><?php echo htmlspecialchars((string) ($cl['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($cl['opening'] ?? 0)); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($cl['period'] ?? 0)); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($cl['closing'] ?? 0)); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                        <tr class="ta-report-subtotal ta-report-subtotal--cogs">
+                            <td class="gl-acc-stmt-col-num muted">—</td>
+                            <td>اجمالى تكلفة مبيعات</td>
+                            <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalCogsOpening); ?></td>
+                            <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalCogsPeriod); ?></td>
+                            <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalCogsClosing); ?></td>
+                        </tr>
+
+                        <tr class="ta-report-grand">
+                            <td class="gl-acc-stmt-col-num muted">—</td>
+                            <td><strong>مجمل الربح</strong></td>
+                            <td class="gl-acc-stmt-col-num"><strong><?php echo $fmt5($grossOpening); ?></strong></td>
+                            <td class="gl-acc-stmt-col-num"><strong><?php echo $fmt5($grossPeriod); ?></strong></td>
+                            <td class="gl-acc-stmt-col-num"><strong><?php echo $fmt5($grossClosing); ?></strong></td>
+                        </tr>
+
+                        <?php if ($expenseLines === []): ?>
+                            <tr class="ta-report-section">
+                                <td colspan="5">مصروفات</td>
+                            </tr>
+                            <tr><td colspan="5" class="muted">لا حسابات مصروفات فرعية بها حركة في المدى.</td></tr>
+                        <?php elseif ($useExpenseTwoBlocks): ?>
+                            <tr class="ta-report-section ta-report-section--sub">
+                                <td colspan="5">مصروفات مباشرة</td>
+                            </tr>
+                            <?php if ($mergedDirectExpense === []): ?>
+                                <tr><td colspan="5" class="muted">—</td></tr>
+                            <?php else: ?>
+                                <?php foreach ($mergedDirectExpense as $ex): ?>
+                                    <tr>
+                                        <td class="gl-acc-stmt-col-num" dir="ltr"><?php echo htmlspecialchars((string) ($ex['code'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td><?php echo htmlspecialchars((string) ($ex['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($ex['opening'] ?? 0)); ?></td>
+                                        <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($ex['period'] ?? 0)); ?></td>
+                                        <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($ex['closing'] ?? 0)); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                            <tr class="ta-report-subtotal ta-report-subtotal--exp">
+                                <td class="gl-acc-stmt-col-num muted">—</td>
+                                <td>اجمالى مصروفات مباشرة</td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalExpDirOpening); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalExpDirPeriod); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalExpDirClosing); ?></td>
+                            </tr>
+                            <tr class="ta-report-section ta-report-section--sub">
+                                <td colspan="5">مصروفات غير مباشرة</td>
+                            </tr>
+                            <?php if ($indirectExpenseOnly === []): ?>
+                                <tr><td colspan="5" class="muted">—</td></tr>
+                            <?php else: ?>
+                                <?php foreach ($indirectExpenseOnly as $ex): ?>
+                                    <tr>
+                                        <td class="gl-acc-stmt-col-num" dir="ltr"><?php echo htmlspecialchars((string) ($ex['code'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td><?php echo htmlspecialchars((string) ($ex['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($ex['opening'] ?? 0)); ?></td>
+                                        <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($ex['period'] ?? 0)); ?></td>
+                                        <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($ex['closing'] ?? 0)); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                            <tr class="ta-report-subtotal ta-report-subtotal--exp">
+                                <td class="gl-acc-stmt-col-num muted">—</td>
+                                <td>اجمالى مصروفات غير مباشرة</td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalExpIndOpening); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalExpIndPeriod); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalExpIndClosing); ?></td>
+                            </tr>
+                        <?php else: ?>
+                            <tr class="ta-report-section">
+                                <td colspan="5">مصروفات</td>
+                            </tr>
+                            <?php foreach ($expenseLines as $ex): ?>
+                                <tr>
+                                    <td class="gl-acc-stmt-col-num" dir="ltr"><?php echo htmlspecialchars((string) ($ex['code'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                    <td><?php echo htmlspecialchars((string) ($ex['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($ex['opening'] ?? 0)); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($ex['period'] ?? 0)); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($ex['closing'] ?? 0)); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            <tr class="ta-report-subtotal ta-report-subtotal--exp">
+                                <td class="gl-acc-stmt-col-num muted">—</td>
+                                <td>إجمالي المصروفات</td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalExpOpening); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalExpPeriod); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalExpClosing); ?></td>
+                            </tr>
+                        <?php endif; ?>
+
+                        <tr class="ta-report-grand ta-report-grand--net">
+                            <td class="gl-acc-stmt-col-num muted">—</td>
+                            <td><strong>صافى ربح الفترة</strong></td>
+                            <td class="gl-acc-stmt-col-num"><strong><?php echo $fmt5($netOpening); ?></strong></td>
+                            <td class="gl-acc-stmt-col-num"><strong><?php echo $fmt5($netPeriod); ?></strong></td>
+                            <td class="gl-acc-stmt-col-num"><strong><?php echo $fmt5($netClosing); ?></strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <?php if (! $hasPlData): ?>
+                <p class="card-hint ta-report-empty-msg" style="margin-top:10px;margin-bottom:0;">لا توجد حركة إيرادات أو تكلفة أو مصروف على حسابات فرعية تصنَّف قطاع قائمة الدخل في المدى.</p>
+            <?php endif; ?>
+
+            <div class="gl-acc-stmt-print-footer ta-report-print-footer">
+                <p class="gl-acc-stmt-print-metafoot" dir="ltr">تاريخ ووقت الطباعة: <?php echo htmlspecialchars($printDatetime, ENT_QUOTES, 'UTF-8'); ?> — صفحة 1 من 1</p>
+            </div>
+        </div>
+        <p class="card-hint gl-acc-stmt-no-print" style="margin-top:12px;margin-bottom:0;">
+            مدى التاريخ: <span dir="ltr"><?php echo htmlspecialchars($periodLabel, ENT_QUOTES, 'UTF-8'); ?></span>
+            — مجمل الربح = اجمالى مبيعات − اجمالى تكلفة مبيعات؛ صافى الربح = مجمل الربح − مجموع المصروفات؛
+            والمصروفات المباشرة/غير المباشرة تُجمَّع بتقريب وفق أوائل أكواد 610–629 و630–699 (ما عدا ذلك يعرض ضمن المباشرة إلى حين مطابقة الدليل).
+        </p>
+    </div>
+<?php endif; ?>
+
+</div>
