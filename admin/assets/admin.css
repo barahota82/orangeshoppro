@@ -4022,6 +4022,15 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     border-top: 2px solid #64748b;
 }
 
+.ta-report-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.ta-report-table--xlsx {
+    min-width: 780px;
+}
+
 @media print {
     .gl-acc-stmt-print-sheet {
         border-width: 1px;

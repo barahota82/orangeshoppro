@@ -730,3 +730,47 @@ function orange_voucher_account_totals_by_voucher_date_range(
 
     return $out;
 }
+
+/**
+ * أرصدة مجمّعة لكل حساب من سندات بتاريخ **أقدم من** نطاق المدى (`voucher_date < ?`) — رصيد أول الفترة.
+ *
+ * @param list<string> $excludeEntryTypes
+ * @return array<int, array{debit:float,credit:float}>
+ */
+function orange_voucher_account_totals_strictly_before_date(
+    PDO $pdo,
+    string $beforeDateYmd,
+    array $excludeEntryTypes = []
+): array {
+    if (! orange_journal_vouchers_ready($pdo)) {
+        return [];
+    }
+    $beforeDateYmd = trim($beforeDateYmd);
+    if ($beforeDateYmd === '') {
+        return [];
+    }
+    $sql = 'SELECT jl.account_id, COALESCE(SUM(jl.debit),0) AS d, COALESCE(SUM(jl.credit),0) AS c
+            FROM journal_lines jl
+            INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
+            WHERE jv.voucher_date < ?';
+    $params = [$beforeDateYmd];
+    if ($excludeEntryTypes !== []) {
+        $placeholders = implode(',', array_fill(0, count($excludeEntryTypes), '?'));
+        $sql .= ' AND jv.entry_type NOT IN (' . $placeholders . ')';
+        foreach ($excludeEntryTypes as $t) {
+            $params[] = $t;
+        }
+    }
+    $sql .= ' GROUP BY jl.account_id';
+    $st = $pdo->prepare($sql);
+    $st->execute($params);
+    $out = [];
+    while ($r = $st->fetch(PDO::FETCH_ASSOC)) {
+        $out[(int) $r['account_id']] = [
+            'debit' => (float) $r['d'],
+            'credit' => (float) $r['c'],
+        ];
+    }
+
+    return $out;
+}
