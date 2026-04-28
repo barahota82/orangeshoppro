@@ -116,7 +116,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 </div>
 <?php endif; ?>
 
-<div class="card admin-fy-card">
+<div class="card admin-fy-card" id="partner-balances-customers">
     <h3 class="card-title">أرصدة العملاء</h3>
     <div class="table-wrap admin-fy-table-wrap">
         <table class="admin-fy-table">
@@ -147,7 +147,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     </div>
 </div>
 
-<div class="card admin-fy-card">
+<div class="card admin-fy-card" id="partner-balances-suppliers">
     <h3 class="card-title">أرصدة الموردين</h3>
     <div class="table-wrap admin-fy-table-wrap">
         <table class="admin-fy-table">

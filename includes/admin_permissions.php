@@ -64,6 +64,8 @@ function orange_admin_page_resource(string $page): string
         'journal_types' => 'accounting',
         'gl_posting' => 'accounting',
         'financial_report' => 'accounting',
+        'accounting_reports_index' => 'accounting',
+        'report_gl_account_monthly' => 'accounting',
         'gl_account_settings' => 'accounting',
         'partner_account_statement' => 'partners',
         'partner_customer_receipt' => 'partners',

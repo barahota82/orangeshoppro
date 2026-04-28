@@ -1,0 +1,172 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * فهرس التقارير المحاسبية — روابط إلى شاشات موجودة ومُرساة على أقسام داخل الصفحة الموحدة.
+ */
+
+require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/upload_paths.php';
+
+$pdo = db();
+orange_catalog_ensure_schema($pdo);
+
+$baseAdmin = storefront_public_path('/admin/index.php');
+$financialBase = htmlspecialchars($baseAdmin . '?page=financial_report', ENT_QUOTES, 'UTF-8');
+$financialWithFy = $financialBase . (isset($_GET['fy']) && (int) $_GET['fy'] > 0 ? '&fy=' . (int) $_GET['fy'] : '');
+
+?>
+<div class="page-title page-title--stacked">
+    <div>
+        <h1>فهرس التقارير المحاسبية</h1>
+        <p class="page-subtitle">خريطة سريعة لكل تقارير GL والذمم؛ الصفحة الواحدة «التقارير المالية» تجمع جزءاً كبيراً تحت عنوان واحد مع روابط مرساة.</p>
+    </div>
+</div>
+
+<div class="card">
+    <h3 class="card-title">تقارير السندات والأطراف</h3>
+    <div class="table-wrap">
+        <table class="admin-fy-table">
+            <thead>
+                <tr>
+                    <th>التقرير</th>
+                    <th>الحالة</th>
+                    <th>افتح</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>تقارير السندات (فلاتر نوع القيد والتاريخ)</td>
+                    <td><span class="badge approved">جاهز</span></td>
+                    <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=journal_voucher_reports', ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
+                </tr>
+                <tr>
+                    <td>كشف حساب لطرف (عميل / مورد حسب المرجع)</td>
+                    <td><span class="badge approved">جاهز</span></td>
+                    <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=partner_account_statement', ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
+                </tr>
+                <tr>
+                    <td>تقارير الذمم الشاملة (أرصدة، مطابقة، أعمار ذمم اختياري)</td>
+                    <td><span class="badge approved">جاهز</span></td>
+                    <td>
+                        <a href="<?php echo htmlspecialchars($baseAdmin . '?page=partner_reports', ENT_QUOTES, 'UTF-8'); ?>">فتح الكل</a>
+                        —
+                        <a href="<?php echo htmlspecialchars($baseAdmin . '?page=partner_reports#partner-balances-customers', ENT_QUOTES, 'UTF-8'); ?>">عملاء</a>
+                        —
+                        <a href="<?php echo htmlspecialchars($baseAdmin . '?page=partner_reports#partner-balances-suppliers', ENT_QUOTES, 'UTF-8'); ?>">موردين</a>
+                        —
+                        <a href="<?php echo htmlspecialchars($baseAdmin . '?page=partner_reports&amp;aging=1', ENT_QUOTES, 'UTF-8'); ?>">مع أعمار الذمم</a>
+                    </td>
+                </tr>
+                <tr>
+                    <td>أعمار ذمم العملاء / الموردين (تفصيل حسب قائمة الشركاء)</td>
+                    <td><span class="badge approved">ضمن الذمم + زر aging</span></td>
+                    <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=partner_reports&amp;aging=1', ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <h3 class="card-title">الدليل والحركات والأرصدة</h3>
+    <div class="table-wrap">
+        <table class="admin-fy-table">
+            <thead>
+                <tr>
+                    <th>التقرير</th>
+                    <th>الحالة</th>
+                    <th>افتح</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>قائمة الحسابات (إعداد الدليل)</td>
+                    <td><span class="badge approved">جاهز</span></td>
+                    <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=chart_of_accounts', ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
+                </tr>
+                <tr>
+                    <td>أرصدة الحسابات / ميزان المراجعة (إجمالي مدين ودائن لكل حساب له حركة)</td>
+                    <td><span class="badge approved">جاهز</span></td>
+                    <td>
+                        <a href="<?php echo $financialWithFy; ?>#report-trial-balance">قسم «ميزان المراجعة»</a>
+                    </td>
+                </tr>
+                <tr>
+                    <td>كشف حركة حساب خط بخط خلال سنة مالية</td>
+                    <td><span class="badge approved">جاهز من الدليل</span></td>
+                    <td>من «الدليل المحاسبي» افتح حساباً ثم روابط الإجماليات والكشف، أو استخدم روابط قائمة الدخل أدناه مع اختيار الحساب.</td>
+                </tr>
+                <tr>
+                    <td>الحركة الشهرية لحساب (تجميع مدين / دائن لكل شهر ضمن سنة)</td>
+                    <td><span class="badge approved">شاشة مخصّصة</span></td>
+                    <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=report_gl_account_monthly', ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <h3 class="card-title">القوائم المالية الموحدة (صفحة واحدة)</h3>
+    <p class="card-hint" style="margin-bottom:14px;">
+        شاشة <strong><a href="<?php echo $financialBase; ?>">التقارير المالية</a></strong> تجمع عدّة لوحات: قائمة دخل تقريبية، ميزانية عمومية مبسطة، وميزان مراجعة بتفاصيل المحصّلات عند توفر البيانات.
+    </p>
+    <div class="table-wrap">
+        <table class="admin-fy-table">
+            <thead>
+                <tr>
+                    <th>التقرير</th>
+                    <th>الحالة</th>
+                    <th>افتح (مرساة داخل الصفحة)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>قائمة الدخل (إيراد / مصروف وصافي تقريبي)</td>
+                    <td><span class="badge approved">معروض ضمن الشاشة</span></td>
+                    <td><a href="<?php echo $financialWithFy; ?>#report-income">#report-income</a></td>
+                </tr>
+                <tr>
+                    <td>قائمة حساب المتاجرة / تجزئة نتيجة التشغيل (عند احتياج لفصل المتاجرة رسمياً)</td>
+                    <td><span class="muted">يجري توثيق المنطق لاحقاً بجانب قائمة الدخل</span></td>
+                    <td>توجيه مبدئي: نفس مسار قائمة الدخل حتى يُعتمد دليلكم لأقسام المتاجرة.</td>
+                </tr>
+                <tr>
+                    <td>الميزانية العمومية (موجز أصول وخصوم وحقوق)</td>
+                    <td><span class="badge approved">معروض ضمن الشاشة</span></td>
+                    <td><a href="<?php echo $financialWithFy; ?>#report-balance-sheet">#report-balance-sheet</a></td>
+                </tr>
+                <tr>
+                    <td>ميزان المراجعة</td>
+                    <td><span class="badge approved">معروض ضمن الشاشة</span></td>
+                    <td><a href="<?php echo $financialWithFy; ?>#report-trial-balance">#report-trial-balance</a></td>
+                </tr>
+                <tr>
+                    <td>قائمة إيرادات ومصروفات شهرية مجمعة</td>
+                    <td><span class="muted">تطوير لاحق</span></td>
+                    <td>سيُختبر كأعمدة شهرية؛ راجع مؤقتاً <a href="<?php echo htmlspecialchars($baseAdmin . '?page=report_gl_account_monthly', ENT_QUOTES, 'UTF-8'); ?>">الحركة الشهرية لحساب</a>.</td>
+                </tr>
+                <tr>
+                    <td>أرباح وخسائر عموماً (صفحة وحدة بدل قائمة جزئيات)</td>
+                    <td><span class="badge approved">صفافي قائمة الدخل</span></td>
+                    <td><a href="<?php echo $financialWithFy; ?>#report-income">قائمة الدخل</a></td>
+                </tr>
+                <tr>
+                    <td>أرباح وخسائر مقارنة بين سنوات مالية متعددة</td>
+                    <td><span class="muted">تطوير لاحق</span></td>
+                    <td>سيُضاف بعد تثبيت تعريف صافي السنة الموحدة.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <h3 class="card-title">تذكير</h3>
+    <ul class="card-hint" style="margin:0;padding-right:1.25rem;">
+        <li>«التقارير المالية» تعتمد على تصنيف جذور الحساب في <code>includes/account_tree.php</code> ومراجع الأدوار؛ أي حساب لا يُوزَّن لا يُظهر عدلاً في الميزانية الموجزة أو قائمة الدخل.</li>
+        <li>لإضافة صفحة تقرير جديدة حقيقياً ضع ملفاً تحت <code>admin/pages/</code> ثم اسم الصفحة في <code>admin/index.php</code> والصلاحيات والقائمة.</li>
+    </ul>
+</div>

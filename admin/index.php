@@ -50,6 +50,8 @@ $allowed = [
     'journal_voucher_reports',
     'journal_types',
     'gl_posting',
+    'accounting_reports_index',
+    'report_gl_account_monthly',
     'reports',
     'financial_report',
     'logs',

@@ -318,7 +318,7 @@ window.addEventListener('load', function () {
 </div>
 <?php endif; ?>
 
-<div class="card">
+<div class="card" id="report-income">
     <h3 class="card-title">قائمة الدخل (تقريبية)</h3>
     <p class="card-hint">استبعاد أرصدة الافتتاح وقيود إقفال السنة. حسابات بلا تصنيف «إيراد/مصروف/تكلفة» لا تُدخل هنا.</p>
     <div class="grid-2">
@@ -351,7 +351,7 @@ window.addEventListener('load', function () {
     <?php endif; ?>
 </div>
 
-<div class="card">
+<div class="card" id="report-balance-sheet">
     <h3 class="card-title">ميزانية عمومية (مبسطة)</h3>
     <p class="card-hint">أصول = مدين − دائن | خصوم وحقوق = دائن − مدين (للحسابات المصنفة فقط).</p>
     <div class="grid-2">
@@ -390,7 +390,7 @@ window.addEventListener('load', function () {
     </p>
 </div>
 
-<div class="card">
+<div class="card" id="report-trial-balance">
     <h3 class="card-title">ميزان المراجعة</h3>
     <p class="card-hint">
         <?php if ($balanced): ?>
