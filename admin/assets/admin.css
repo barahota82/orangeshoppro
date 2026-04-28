@@ -4067,12 +4067,43 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 /* الحركة الشهرية لحساب — من/إلى شهر (تقويم) + كود + اسم + أزرار */
 .gl-m-monthly-toolbar.gas-acc-stmt-toolbar {
     grid-template-columns:
-        minmax(9.25rem, 10.75rem)
-        minmax(9.25rem, 10.75rem)
+        minmax(14rem, 18rem)
+        minmax(14rem, 18rem)
         minmax(5.25rem, 7rem)
         minmax(12rem, 1fr)
         auto;
-    min-width: min(840px, 100%);
+    min-width: min(980px, 100%);
+}
+.gl-m-stmt-field--period-range {
+    grid-column: auto;
+}
+.gl-m-period-heading {
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+    text-align: center;
+}
+.gl-m-stmt-field--period-range .gl-m-ym-pair label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 600;
+    margin-bottom: 3px;
+    color: var(--text-secondary, #475569);
+    text-align: center;
+}
+.gl-m-ym-pair {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: flex-end;
+    justify-content: center;
+}
+.gl-m-ym-unit select.admin-inp {
+    min-width: 7.5rem;
+}
+.gl-m-ym-unit:first-of-type select.admin-inp {
+    min-width: 5.25rem;
 }
 .jv-acct-picker {
     position: fixed;

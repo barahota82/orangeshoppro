@@ -58,8 +58,29 @@ $normalizeYm = static function (string $raw): ?string {
     return sprintf('%04d-%02d', (int) $m[1], $month);
 };
 
-$ymFromGet = isset($_GET['m_from']) ? $normalizeYm((string) $_GET['m_from']) : null;
-$ymToGet = isset($_GET['m_to']) ? $normalizeYm((string) $_GET['m_to']) : null;
+$ymFromGet = null;
+if (isset($_GET['from_y'], $_GET['from_m'])) {
+    $yf = (int) $_GET['from_y'];
+    $mf = (int) $_GET['from_m'];
+    if ($yf >= 2000 && $yf <= 2100 && $mf >= 1 && $mf <= 12) {
+        $ymFromGet = sprintf('%04d-%02d', $yf, $mf);
+    }
+}
+if ($ymFromGet === null && isset($_GET['m_from'])) {
+    $ymFromGet = $normalizeYm((string) $_GET['m_from']);
+}
+
+$ymToGet = null;
+if (isset($_GET['to_y'], $_GET['to_m'])) {
+    $yt = (int) $_GET['to_y'];
+    $mt = (int) $_GET['to_m'];
+    if ($yt >= 2000 && $yt <= 2100 && $mt >= 1 && $mt <= 12) {
+        $ymToGet = sprintf('%04d-%02d', $yt, $mt);
+    }
+}
+if ($ymToGet === null && isset($_GET['m_to'])) {
+    $ymToGet = $normalizeYm((string) $_GET['m_to']);
+}
 
 $firstDayOfYm = static function (string $ym): string {
     return $ym . '-01';
@@ -112,6 +133,27 @@ if ($ymFrom > $ymTo) {
 $periodYmFrom = $ymFrom;
 $periodYmTo = $ymTo;
 
+/** قيم مختارة لقوائم سنة/شهر */
+$selYFrom = (int) substr($periodYmFrom, 0, 4);
+$selMFrom = substr($periodYmFrom, 5, 2);
+$selYTo = (int) substr($periodYmTo, 0, 4);
+$selMTo = substr($periodYmTo, 5, 2);
+
+$gregMonthsAr = [
+    '01' => 'كانون الثاني',
+    '02' => 'شباط',
+    '03' => 'آذار',
+    '04' => 'نيسان',
+    '05' => 'أيار',
+    '06' => 'حزيران',
+    '07' => 'تمّوز',
+    '08' => 'آب',
+    '09' => 'أيلول',
+    '10' => 'تشرين الأوّل',
+    '11' => 'تشرين الثاني',
+    '12' => 'كانون الأول',
+];
+
 $periodDateFrom = $firstDayOfYm($periodYmFrom);
 $periodDateTo = $lastDayOfYm($periodYmTo);
 if (strcmp($periodDateFrom, $periodDateTo) <= 0) {
@@ -162,25 +204,49 @@ unset($mr);
             <input type="hidden" name="account" id="gl_m_account_id" value="<?php echo (int) $accountId; ?>">
             <div class="gas-acc-stmt-toolbar-wrap">
                 <div class="gas-acc-stmt-toolbar gl-m-monthly-toolbar gas-acc-stmt-toolbar--main-center">
-                    <div class="gas-acc-stmt-field gl-m-stmt-field--month">
-                        <label for="gl_m_month_from">من شهر</label>
-                        <input type="month" name="m_from" id="gl_m_month_from" class="admin-inp"
-                            lang="en" dir="ltr"
-                            value="<?php echo htmlspecialchars($periodYmFrom, ENT_QUOTES, 'UTF-8'); ?>"
-                            min="<?php echo htmlspecialchars($calYmMinBound, ENT_QUOTES, 'UTF-8'); ?>"
-                            max="<?php echo htmlspecialchars($calYmMaxBound, ENT_QUOTES, 'UTF-8'); ?>"
-                            title="انقر الحقل؛ في منتقي المتصفّح انقر سنة الشهر أو استخدم الأسهم لتغيير السنة (2000–2100)."
-                            autocomplete="off">
+                    <div class="gas-acc-stmt-field gl-m-stmt-field--period-range">
+                        <span class="gl-m-period-heading">من شهر</span>
+                        <div class="gl-m-ym-pair" role="group" aria-label="من شهر: اختر السنة ثم الشهر">
+                            <div class="gl-m-ym-unit">
+                                <label for="gl_from_y">سنة</label>
+                                <select name="from_y" id="gl_from_y" class="admin-inp" autocomplete="off"
+                                    dir="ltr" lang="en">
+                                    <?php for ($yy = 2000; $yy <= 2100; ++$yy): ?>
+                                        <option value="<?php echo (int) $yy; ?>"<?php echo $yy === $selYFrom ? ' selected' : ''; ?>><?php echo (int) $yy; ?></option>
+                                    <?php endfor; ?>
+                                </select>
+                            </div>
+                            <div class="gl-m-ym-unit">
+                                <label for="gl_from_m">شهر</label>
+                                <select name="from_m" id="gl_from_m" class="admin-inp" autocomplete="off">
+                                    <?php foreach ($gregMonthsAr as $mv => $mLabel): ?>
+                                        <option value="<?php echo htmlspecialchars($mv, ENT_QUOTES, 'UTF-8'); ?>"<?php echo $mv === $selMFrom ? ' selected' : ''; ?>><?php echo htmlspecialchars($mLabel . ' (' . $mv . ')', ENT_QUOTES, 'UTF-8'); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
                     </div>
-                    <div class="gas-acc-stmt-field gl-m-stmt-field--month">
-                        <label for="gl_m_month_to">إلى شهر</label>
-                        <input type="month" name="m_to" id="gl_m_month_to" class="admin-inp"
-                            lang="en" dir="ltr"
-                            value="<?php echo htmlspecialchars($periodYmTo, ENT_QUOTES, 'UTF-8'); ?>"
-                            min="<?php echo htmlspecialchars($calYmMinBound, ENT_QUOTES, 'UTF-8'); ?>"
-                            max="<?php echo htmlspecialchars($calYmMaxBound, ENT_QUOTES, 'UTF-8'); ?>"
-                            title="انقر الحقل؛ في منتقي المتصفّح انقر سنة الشهر أو استخدم الأسهم لتغيير السنة (2000–2100)."
-                            autocomplete="off">
+                    <div class="gas-acc-stmt-field gl-m-stmt-field--period-range">
+                        <span class="gl-m-period-heading">إلى شهر</span>
+                        <div class="gl-m-ym-pair" role="group" aria-label="إلى شهر: اختر السنة ثم الشهر">
+                            <div class="gl-m-ym-unit">
+                                <label for="gl_to_y">سنة</label>
+                                <select name="to_y" id="gl_to_y" class="admin-inp" autocomplete="off"
+                                    dir="ltr" lang="en">
+                                    <?php for ($yy = 2000; $yy <= 2100; ++$yy): ?>
+                                        <option value="<?php echo (int) $yy; ?>"<?php echo $yy === $selYTo ? ' selected' : ''; ?>><?php echo (int) $yy; ?></option>
+                                    <?php endfor; ?>
+                                </select>
+                            </div>
+                            <div class="gl-m-ym-unit">
+                                <label for="gl_to_m">شهر</label>
+                                <select name="to_m" id="gl_to_m" class="admin-inp" autocomplete="off">
+                                    <?php foreach ($gregMonthsAr as $mv => $mLabel): ?>
+                                        <option value="<?php echo htmlspecialchars($mv, ENT_QUOTES, 'UTF-8'); ?>"<?php echo $mv === $selMTo ? ' selected' : ''; ?>><?php echo htmlspecialchars($mLabel . ' (' . $mv . ')', ENT_QUOTES, 'UTF-8'); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                     <div class="gas-acc-stmt-field gas-acc-stmt-field--code">
                         <label for="gl_m_acc_code">كود الحساب</label>
@@ -207,7 +273,7 @@ unset($mr);
         </form>
         <p class="card-hint" style="margin-top:12px;margin-bottom:0;">
             تقرير تقويمي: أول وآخر يوم للشهرين المختارين؛ يجمّع أي سند سندًا لـ<strong>تاريخ السند</strong> ضمن المدى (قد تشمل أكثر من سنة مالية). الأشهر بلا حركة لا صفوف لها.
-            <span class="muted" style="display:block;margin-top:8px;font-size:0.9rem;">ظهور سنة 2026 عند الفتح هو الافتراضي للسنة الحالية على جهازك/السيرفر؛ لتغيير السنة انقر الحقل ثم غيّر السنة من منتقي المتصفّح (كُروم/إيدج: غالباً نقرة على رقم السنة أو ‹ ›).</span>
+            <span class="muted" style="display:block;margin-top:8px;font-size:0.9rem;">اختر السنة ثم الشهر من القوائم (2000–2100). الروابط القديمة بصيغة <code dir="ltr">m_from</code> / <code dir="ltr">m_to</code> لا تزال تعمل.</span>
         </p>
     </div>
 
