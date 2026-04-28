@@ -325,7 +325,7 @@ window.addEventListener('load', function () {
         <div class="stat-card"><h3>إجمالي الإيرادات (طبيعة دائنة)</h3><div class="value"><?php echo number_format($plRevenue, 2); ?></div></div>
         <div class="stat-card"><h3>إجمالي المصروفات والتكلفة</h3><div class="value"><?php echo number_format($plExpense, 2); ?></div></div>
     </div>
-    <p style="margin:14px 0 0;font-size:1.1rem;"><strong>صافي الدخل:</strong> <?php echo number_format($netIncome, 2); ?> KD</p>
+    <p id="report-net-result" style="scroll-margin-top:92px;margin:14px 0 0;font-size:1.1rem;"><strong>أرباح وخسائر (صافي الدخل):</strong> <?php echo number_format($netIncome, 2); ?> KD</p>
     <?php if ($useVouchers && $fyId > 0 && $registeredExpenses !== []): ?>
         <h4 class="card-title" style="margin-top:18px;font-size:1rem;">تفصيل المصروفات المسجّلة (بالبند)</h4>
         <div class="table-wrap">
@@ -352,7 +352,7 @@ window.addEventListener('load', function () {
 </div>
 
 <div class="card" id="report-balance-sheet">
-    <h3 class="card-title">ميزانية عمومية (مبسطة)</h3>
+    <h3 class="card-title">الميزانية العمومية (مبسطة)</h3>
     <p class="card-hint">أصول = مدين − دائن | خصوم وحقوق = دائن − مدين (للحسابات المصنفة فقط).</p>
     <div class="grid-2">
         <div class="stat-card"><h3>الأصول</h3><div class="value"><?php echo number_format($bsAssets, 2); ?></div></div>
@@ -390,8 +390,9 @@ window.addEventListener('load', function () {
     </p>
 </div>
 
-<div class="card" id="report-trial-balance">
-    <h3 class="card-title">ميزان المراجعة</h3>
+<div class="card">
+    <span id="report-account-balances" class="financial-anchor" style="display:block;height:0;scroll-margin-top:92px;"></span>
+    <h3 id="report-trial-balance" class="card-title" style="scroll-margin-top:92px;">ميزان المراجعة</h3>
     <p class="card-hint">
         <?php if ($balanced): ?>
             <span class="badge approved">المدين والدائن متطابقان (<?php echo number_format($sumDebit, 2); ?>)</span>
