@@ -53,6 +53,7 @@ $allowed = [
     'accounting_reports_index',
     'report_gl_account_monthly',
     'report_trading_account',
+    'report_trial_balance',
     'report_pl_monthly',
     'report_pl_compare_years',
     'reports',

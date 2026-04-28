@@ -90,10 +90,11 @@ $financialWithFy = $financialBase . (isset($_GET['fy']) && (int) $_GET['fy'] > 0
                     <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=chart_of_accounts', ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
                 </tr>
                 <tr>
-                    <td>أرصدة الحسابات / ميزان المراجعة (إجمالي مدين ودائن لكل حساب له حركة)</td>
+                    <td>أرصدة الحسابات / ميزان المراجعة (تقويمي: من شهر إلى شهر)</td>
                     <td><span class="badge approved">جاهز</span></td>
                     <td>
-                        <a href="<?php echo $financialWithFy; ?>#report-trial-balance">قسم «ميزان المراجعة»</a>
+                        <a href="<?php echo htmlspecialchars($baseAdmin . '?page=report_trial_balance', ENT_QUOTES, 'UTF-8'); ?>">شاشة ميزان المراجعة</a>
+                        — أو ضمن سنة مالية من <a href="<?php echo $financialWithFy; ?>#report-trial-balance">التقارير المالية</a>
                     </td>
                 </tr>
                 <tr>
@@ -142,9 +143,10 @@ $financialWithFy = $financialBase . (isset($_GET['fy']) && (int) $_GET['fy'] > 0
                     <td><a href="<?php echo $financialWithFy; ?>#report-balance-sheet">#report-balance-sheet</a></td>
                 </tr>
                 <tr>
-                    <td>ميزان المراجعة</td>
+                    <td>ميزان المراجعة حسب سنة مالية (ملخّص داخل الشاشة)</td>
                     <td><span class="badge approved">معروض ضمن الشاشة</span></td>
-                    <td><a href="<?php echo $financialWithFy; ?>#report-trial-balance">#report-trial-balance</a></td>
+                    <td><a href="<?php echo $financialWithFy; ?>#report-trial-balance">#report-trial-balance</a>
+                        — للتقويم المنفصل: <a href="<?php echo htmlspecialchars($baseAdmin . '?page=report_trial_balance', ENT_QUOTES, 'UTF-8'); ?>">ميزان المراجعة</a></td>
                 </tr>
                 <tr>
                     <td>قائمة إيرادات ومصروفات شهرية مجمعة</td>

@@ -240,7 +240,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 ['page' => 'report_pl_monthly', 'href' => '/admin/index.php?page=report_pl_monthly', 'label' => 'قائمة إيرادات ومصروفات شهرية', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report#report-net-result', 'label' => 'أرباح وخسائر', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'report_pl_compare_years', 'href' => '/admin/index.php?page=report_pl_compare_years', 'label' => 'أرباح وخسائر مقارنة بين السنوات', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report#report-trial-balance', 'label' => 'ميزان المراجعة', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'report_trial_balance', 'href' => '/admin/index.php?page=report_trial_balance', 'label' => 'ميزان المراجعة', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report#report-balance-sheet', 'label' => 'الميزانية', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report', 'label' => 'التقارير المالية (الصفحة كاملة)', 'class' => '', 'sub' => false],
             ];

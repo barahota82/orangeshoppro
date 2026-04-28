@@ -4031,6 +4031,32 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     min-width: 780px;
 }
 
+/* ميزان المراجعة — 8 أعمدة */
+.gl-acc-stmt-table.tb-report-table {
+    min-width: 900px;
+}
+
+.gl-acc-stmt-table.tb-report-table thead tr.tb-subhead th {
+    font-size: 0.78rem;
+    background: #e2e8f0;
+}
+
+th.tb-grouphead {
+    text-align: center;
+    vertical-align: middle;
+    font-size: 0.83rem;
+}
+
+th.tb-col-name,
+td.tb-col-name,
+.tb-col-code {
+    white-space: nowrap;
+}
+
+.tb-report-total td {
+    background: #f1f5f9;
+}
+
 @media print {
     .gl-acc-stmt-print-sheet {
         border-width: 1px;
