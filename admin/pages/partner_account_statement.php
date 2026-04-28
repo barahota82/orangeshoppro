@@ -53,6 +53,19 @@ $accounts = $pdo->query(
     "SELECT a.id, a.name, a.code FROM accounts a WHERE $leafWhere ORDER BY COALESCE(a.code, ''), a.name"
 )->fetchAll(PDO::FETCH_ASSOC);
 
+$gasAccountsLeafArr = [];
+foreach ($accounts as $ga) {
+    $gasAccountsLeafArr[] = [
+        'id' => (int) ($ga['id'] ?? 0),
+        'code' => (string) ($ga['code'] ?? ''),
+        'name' => (string) ($ga['name'] ?? ''),
+    ];
+}
+$gasAccountsLeafJson = json_encode($gasAccountsLeafArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+if ($gasAccountsLeafJson === false) {
+    $gasAccountsLeafJson = '[]';
+}
+
 $companyNameAr = '';
 if (orange_table_exists($pdo, 'company_settings')) {
     $cs = $pdo->query('SELECT company_name_ar FROM company_settings ORDER BY id ASC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
@@ -66,7 +79,7 @@ $dateFromRaw = trim((string) ($_GET['date_from'] ?? ''));
 $dateToRaw = trim((string) ($_GET['date_to'] ?? ''));
 
 if ($dateFromRaw === '') {
-    $dateFromRaw = orange_format_date_dmY(date('Y-m-01'));
+    $dateFromRaw = orange_format_date_dmY(date('Y-01-01'));
 }
 if ($dateToRaw === '') {
     $dateToRaw = $todayDmY;
@@ -75,7 +88,7 @@ if ($dateToRaw === '') {
 $dateFromYmd = orange_parse_admin_date_to_ymd($dateFromRaw);
 $dateToYmd = orange_parse_admin_date_to_ymd($dateToRaw);
 if ($dateFromYmd === '' || $dateToYmd === '') {
-    $dateFromYmd = date('Y-m-01');
+    $dateFromYmd = date('Y-01-01');
     $dateToYmd = date('Y-m-d');
     $dateFromRaw = orange_format_date_dmY($dateFromYmd);
     $dateToRaw = orange_format_date_dmY($dateToYmd);
@@ -89,16 +102,6 @@ if ($dateFromYmd > $dateToYmd) {
     $dateToRaw = orange_format_date_dmY($dateToYmd);
 }
 
-$accCode = '';
-$accNameOnly = '';
-foreach ($accounts as $a) {
-    if ((int) $a['id'] === $accountId) {
-        $accCode = trim((string) ($a['code'] ?? ''));
-        $accNameOnly = trim((string) ($a['name'] ?? ''));
-        break;
-    }
-}
-
 $useVouchers = orange_journal_vouchers_ready($pdo);
 
 $openingBal = 0.0;
@@ -110,6 +113,17 @@ $err = '';
 
 if ($accountId > 0 && ! orange_accounts_account_is_posting_leaf($pdo, $accountId)) {
     $err = 'يُعرض كشف الحساب للحسابات الفرعية (ورقة ترحيل) فقط.';
+    $accountId = 0;
+}
+
+$accCode = '';
+$accNameOnly = '';
+foreach ($accounts as $a) {
+    if ((int) $a['id'] === $accountId) {
+        $accCode = trim((string) ($a['code'] ?? ''));
+        $accNameOnly = trim((string) ($a['name'] ?? ''));
+        break;
+    }
 }
 
 if ($useVouchers && $accountId > 0 && $err === '') {
@@ -153,7 +167,7 @@ if ($useVouchers && $accountId > 0 && $err === '') {
     } catch (Throwable $e) {
         $err = 'تعذر قراءة الحركات.';
     }
-} elseif (!$useVouchers) {
+} elseif (! $useVouchers) {
     $err = 'سندات اليومية غير جاهزة بعد.';
 }
 
@@ -161,49 +175,187 @@ if ($useVouchers && $accountId > 0 && $err === '') {
 <div class="admin-fy-shell" dir="rtl">
     <div class="gl-acc-stmt-no-print">
         <h1 class="admin-fy-shell__title">كشف حساب</h1>
-        <p class="admin-fy-shell__lead">اختر حساباً فرعياً (ورقة ترحيل) من الدليل وحدد الفترة — يعتمد على سندات اليومية.</p>
     </div>
 
-    <div class="card admin-fy-card gl-acc-stmt-no-print">
-        <h3 class="card-title">بحث</h3>
-        <form method="get" class="form-grid" style="max-width:720px;">
+    <div class="card admin-fy-card gl-acc-stmt-no-print gas-acc-stmt-search-card">
+        <form method="get" id="gas_acc_stmt_form" class="gas-acc-stmt-filter-form">
             <input type="hidden" name="page" value="partner_account_statement">
-            <div>
-                <label for="gas_account">الحساب (فرعي — ورقة ترحيل)</label>
-                <select name="account" id="gas_account" required>
-                    <option value="">— اختر حساباً —</option>
-                    <?php foreach ($accounts as $a): ?>
-                        <option value="<?php echo (int) $a['id']; ?>"<?php echo (int) $a['id'] === $accountId ? ' selected' : ''; ?>>
-                            <?php
-                            echo htmlspecialchars(
-                                (trim((string) ($a['code'] ?? '')) !== '' ? $a['code'] . ' — ' : '') . $a['name'],
-                                ENT_QUOTES,
-                                'UTF-8'
-                            );
-                            ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div>
-                <label for="gas_from">من تاريخ</label>
-                <input type="text" name="date_from" id="gas_from" class="admin-inp orange-inp-dmy" value="<?php echo htmlspecialchars($dateFromRaw, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" autocomplete="off" required>
-            </div>
-            <div>
-                <label for="gas_to">إلى تاريخ</label>
-                <input type="text" name="date_to" id="gas_to" class="admin-inp orange-inp-dmy" value="<?php echo htmlspecialchars($dateToRaw, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" autocomplete="off" required>
-            </div>
-            <div class="actions" style="align-self:end;">
-                <button type="submit">استخراج الكشف</button>
-                <?php if ($accountId > 0 && $err === '' && $useVouchers): ?>
-                    <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
-                <?php endif; ?>
+            <input type="hidden" name="account" id="gas_account_id" value="<?php echo (int) $accountId; ?>">
+            <div class="gas-acc-stmt-toolbar-wrap">
+                <div class="gas-acc-stmt-toolbar">
+                    <div class="gas-acc-stmt-field gas-acc-stmt-field--code">
+                        <label for="gas_acc_code">كود الحساب</label>
+                        <input type="text" id="gas_acc_code" name="_gas_acc_code_dummy" autocomplete="off" readonly
+                            class="admin-inp jv-acc-code gas-acc-stmt-acc-code-input"
+                            placeholder="انقر نقرتين للاختيار"
+                            title="انقر نقرتين لفتح قائمة الحسابات الفرعية"
+                            value="<?php echo htmlspecialchars($accCode, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
+                    </div>
+                    <div class="gas-acc-stmt-field gas-acc-stmt-field--name">
+                        <label for="gas_acc_name">اسم الحساب</label>
+                        <input type="text" id="gas_acc_name" name="_gas_acc_name_dummy" tabindex="-1" readonly autocomplete="off"
+                            class="admin-inp gas-acc-stmt-acc-name-input"
+                            placeholder="—" title="يُعبأ بعد اختيار الحساب" value="<?php echo htmlspecialchars($accNameOnly, ENT_QUOTES, 'UTF-8'); ?>">
+                    </div>
+                    <div class="gas-acc-stmt-field gas-acc-stmt-field--date gas-acc-stmt-field--dmy">
+                        <label for="gas_from">من تاريخ</label>
+                        <input type="text" name="date_from" id="gas_from" class="admin-inp orange-inp-dmy" value="<?php echo htmlspecialchars($dateFromRaw, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" autocomplete="off" required>
+                    </div>
+                    <div class="gas-acc-stmt-field gas-acc-stmt-field--date gas-acc-stmt-field--dmy">
+                        <label for="gas_to">إلى تاريخ</label>
+                        <input type="text" name="date_to" id="gas_to" class="admin-inp orange-inp-dmy" value="<?php echo htmlspecialchars($dateToRaw, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" autocomplete="off" required>
+                    </div>
+                    <div class="gas-acc-stmt-actions">
+                        <button type="submit">استخراج الكشف</button>
+                        <?php if ($accountId > 0 && $err === '' && $useVouchers): ?>
+                            <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
+                        <?php endif; ?>
+                    </div>
+                </div>
             </div>
         </form>
         <?php if ($err !== ''): ?>
-            <p class="card-hint" style="color:var(--danger,#b91c1c);margin-top:10px;"><?php echo htmlspecialchars($err, ENT_QUOTES, 'UTF-8'); ?></p>
+            <p class="card-hint gas-acc-stmt-err-msg" style="color:var(--danger,#b91c1c);margin-top:10px;"><?php echo htmlspecialchars($err, ENT_QUOTES, 'UTF-8'); ?></p>
         <?php endif; ?>
     </div>
+
+    <div id="gas_acct_picker" class="jv-acct-picker jv-print-hide gl-acc-stmt-no-print" style="display:none;" aria-hidden="true">
+        <label class="jv-acct-picker-label" for="gas_acct_picker_search">بحث</label>
+        <input type="search" id="gas_acct_picker_search" class="jv-acct-picker-search admin-inp" placeholder="اكتب كلمات من الاسم أو الكود…" autocomplete="off" dir="auto">
+        <div class="jv-acct-picker-scroll">
+            <table class="admin-table jv-acct-picker-table">
+                <thead>
+                    <tr>
+                        <th>كود الحساب</th>
+                        <th>اسم الحساب</th>
+                    </tr>
+                </thead>
+                <tbody id="gas_acct_picker_tbody"></tbody>
+            </table>
+        </div>
+        <p class="jv-acct-picker-hint muted">نقرتان على صف لاختيار الحساب — Esc للإغلاق</p>
+    </div>
+
+    <script>
+    (function () {
+        var GAS_ACCOUNTS = <?php echo $gasAccountsLeafJson; ?>;
+        var gasAcctPickerAnchor = null;
+
+        function escapeHtml(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+        function gasAcctTokens(q) {
+            return String(q || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+        }
+        function gasAcctFilterAccounts(q) {
+            var tokens = gasAcctTokens(q);
+            var rows = !tokens.length ? GAS_ACCOUNTS.slice() : GAS_ACCOUNTS.filter(function (a) {
+                var hay = ((a.code || '') + ' ' + (a.name || '')).toLowerCase();
+                return tokens.every(function (t) { return hay.indexOf(t) !== -1; });
+            });
+            return rows;
+        }
+        function gasAcctPickerPosition(anchorEl) {
+            var box = document.getElementById('gas_acct_picker');
+            if (!box || !anchorEl) { return; }
+            var r = anchorEl.getBoundingClientRect();
+            var margin = 8;
+            var w = box.offsetWidth || 320;
+            box.style.left = Math.max(margin, Math.min(r.left, window.innerWidth - w - margin)) + 'px';
+            box.style.top = (r.top - margin) + 'px';
+            box.style.transform = 'translateY(-100%)';
+        }
+        function gasAcctPickerRender() {
+            var searchEl = document.getElementById('gas_acct_picker_search');
+            var tb = document.getElementById('gas_acct_picker_tbody');
+            if (!tb) { return; }
+            var q = searchEl ? searchEl.value : '';
+            var rows = gasAcctFilterAccounts(q);
+            tb.innerHTML = '';
+            rows.forEach(function (a) {
+                var tr = document.createElement('tr');
+                tr.innerHTML = '<td>' + escapeHtml(a.code) + '</td><td>' + escapeHtml(a.name) + '</td>';
+                tr.addEventListener('dblclick', function () { gasAcctPickerApply(a); });
+                tb.appendChild(tr);
+            });
+        }
+        function gasAcctPickerClose() {
+            var box = document.getElementById('gas_acct_picker');
+            if (box) {
+                box.style.display = 'none';
+                box.setAttribute('aria-hidden', 'true');
+            }
+            gasAcctPickerAnchor = null;
+        }
+        function gasAcctPickerApply(a) {
+            if (!a) {
+                gasAcctPickerClose();
+                return;
+            }
+            var hid = document.getElementById('gas_account_id');
+            var cd = document.getElementById('gas_acc_code');
+            var nm = document.getElementById('gas_acc_name');
+            if (hid) { hid.value = String(a.id || '0'); }
+            if (cd) { cd.value = a.code || ''; }
+            if (nm) { nm.value = a.name || ''; }
+            gasAcctPickerClose();
+        }
+        function gasAcctPickerOpen(anchorEl) {
+            var box = document.getElementById('gas_acct_picker');
+            var searchEl = document.getElementById('gas_acct_picker_search');
+            if (!box || !searchEl || !anchorEl) { return; }
+            gasAcctPickerAnchor = anchorEl;
+            searchEl.value = '';
+            gasAcctPickerRender();
+            box.style.display = 'block';
+            box.setAttribute('aria-hidden', 'false');
+            box.style.transform = '';
+            gasAcctPickerPosition(anchorEl);
+            requestAnimationFrame(function () {
+                gasAcctPickerPosition(anchorEl);
+                searchEl.focus();
+                searchEl.select();
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            var cd = document.getElementById('gas_acc_code');
+            if (cd) {
+                cd.addEventListener('dblclick', function (e) {
+                    e.preventDefault();
+                    gasAcctPickerOpen(cd);
+                });
+            }
+            var searchEl = document.getElementById('gas_acct_picker_search');
+            if (searchEl && !searchEl.getAttribute('data-gas-bound')) {
+                searchEl.setAttribute('data-gas-bound', '1');
+                searchEl.addEventListener('input', gasAcctPickerRender);
+                searchEl.addEventListener('keydown', function (ev) {
+                    if (ev.key === 'Enter') { ev.preventDefault(); }
+                });
+            }
+
+            document.addEventListener('mousedown', function gasAcctPickDoc(ev) {
+                var box = document.getElementById('gas_acct_picker');
+                if (!box || box.style.display === 'none') { return; }
+                var t = ev.target;
+                if (box.contains(t)) { return; }
+                if (gasAcctPickerAnchor && (t === gasAcctPickerAnchor || (gasAcctPickerAnchor.contains && gasAcctPickerAnchor.contains(t)))) { return; }
+                gasAcctPickerClose();
+            }, true);
+
+            document.addEventListener('keydown', function gasAcctPickEsc(ev) {
+                if (ev.key === 'Escape') {
+                    gasAcctPickerClose();
+                }
+            }, true);
+        });
+    })();
+    </script>
 
     <?php if ($accountId > 0 && $err === '' && $useVouchers): ?>
 

@@ -3984,6 +3984,8 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 .gl-acc-stmt-foot-total-title {
     text-align: right;
 }
+
+@media print {
     .gl-acc-stmt-print-sheet {
         border-width: 1px;
         padding: 0.5cm;
@@ -3993,6 +3995,112 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         print-color-adjust: exact;
         -webkit-print-color-adjust: exact;
     }
+}
+
+/* كشف حساب — شريط البحث (سطر واحد) + نافذة اختيار الحساب (مثل سند القيد) */
+.gas-acc-stmt-search-card.card {
+    padding-top: 14px;
+    padding-bottom: 14px;
+}
+.gas-acc-stmt-filter-form {
+    margin: 0;
+}
+.gas-acc-stmt-toolbar-wrap {
+    overflow-x: auto;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+}
+.gas-acc-stmt-toolbar {
+    display: grid;
+    grid-template-columns:
+        minmax(5.25rem, 7rem)
+        minmax(12rem, 1fr)
+        minmax(9.5rem, 11.5rem)
+        minmax(9.5rem, 11.5rem)
+        auto;
+    gap: 12px 14px;
+    align-items: end;
+    min-width: 900px;
+}
+.gas-acc-stmt-toolbar > .gas-acc-stmt-field {
+    min-width: 0;
+}
+.gas-acc-stmt-field > label {
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+.gas-acc-stmt-field--date.gas-acc-stmt-field--dmy input.admin-inp.orange-inp-dmy {
+    width: 100%;
+    box-sizing: border-box;
+}
+.gas-acc-stmt-acc-code-input {
+    cursor: pointer;
+    width: 100%;
+    box-sizing: border-box;
+}
+.gas-acc-stmt-acc-name-input {
+    background: #f4f4f5;
+    cursor: default;
+    width: 100%;
+    box-sizing: border-box;
+}
+.gas-acc-stmt-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    gap: 8px;
+    padding-bottom: 1px;
+}
+.jv-acct-picker {
+    position: fixed;
+    z-index: 10050;
+    min-width: min(28rem, calc(100vw - 2rem));
+    max-width: calc(100vw - 1rem);
+    padding: 10px 12px;
+    background: #fff;
+    border: 1px solid #d4d4d8;
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+    direction: rtl;
+}
+.jv-acct-picker-label {
+    display: block;
+    font-size: 0.85rem;
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+.jv-acct-picker-search {
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 8px;
+}
+.jv-acct-picker-scroll {
+    max-height: 16rem;
+    overflow: auto;
+    border: 1px solid #e4e4e7;
+    border-radius: 6px;
+}
+.jv-acct-picker-table {
+    margin: 0;
+    font-size: 0.9rem;
+}
+.jv-acct-picker-table thead th {
+    position: sticky;
+    top: 0;
+    background: #fafafa;
+    z-index: 1;
+}
+.jv-acct-picker-table tbody tr {
+    cursor: pointer;
+}
+.jv-acct-picker-table tbody tr:hover {
+    background: #f4f4f5;
+}
+.jv-acct-picker-hint {
+    margin: 8px 0 0;
+    font-size: 0.8rem;
 }
 
 /* منتقي المتغيرات (عروض السلة) */
