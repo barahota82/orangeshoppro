@@ -3832,35 +3832,167 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     }
 }
 
-/* كشف حساب (دليل عام) — رأس المطبوعة */
-.gl-acc-stmt-print-head {
-    margin-bottom: 1rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--border, #e2e8f0);
+/* كشف حساب — شكل مطابقة قريبة من الطباعة الاحترافية */
+.gl-acc-stmt-print-sheet {
+    padding: 0.75rem;
+    border: 2px solid #1e293b;
+    border-radius: 4px;
+    background: #fff;
 }
-.gl-acc-stmt-print-title {
-    margin: 0 0 0.75rem;
-    font-size: 1.35rem;
+.gl-acc-stmt-print-banner {
+    margin-bottom: 0.85rem;
+    padding-bottom: 0.65rem;
+    border-bottom: 2px solid #334155;
+}
+.gl-acc-stmt-print-company {
+    margin: 0 0 0.35rem;
+    font-size: 1.08rem;
+    font-weight: 700;
     text-align: center;
 }
-.gl-acc-stmt-print-meta {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 0.5rem 1.25rem;
+.gl-acc-stmt-print-title {
     margin: 0;
+    font-size: 1.2rem;
+    text-align: center;
+    font-weight: 700;
 }
-.gl-acc-stmt-print-meta dt {
+.gl-acc-stmt-print-title-ar {
+    display: block;
+}
+.gl-acc-stmt-print-title-en {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.92rem;
     font-weight: 600;
-    margin: 0;
-    opacity: 0.85;
+    letter-spacing: 0.04em;
+    color: var(--muted-text, #64748b);
+}
+.gl-acc-stmt-print-grid {
+    margin: 0.75rem 0 0.5rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    overflow: hidden;
+}
+.gl-acc-stmt-print-row {
+    display: grid;
+    grid-template-columns: minmax(180px, 34%) 1fr;
+    gap: 0.65rem;
+    align-items: baseline;
+    padding: 0.45rem 0.65rem;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 0.95rem;
+}
+.gl-acc-stmt-print-row:last-child {
+    border-bottom: none;
+}
+.gl-acc-stmt-print-k {
+    font-weight: 600;
+    color: var(--text-secondary, #475569);
+    font-size: 0.86rem;
+}
+.gl-acc-stmt-print-v {
+    font-weight: 600;
+    word-break: break-word;
+}
+.gl-acc-stmt-table-wrap {
+    margin-top: 0.25rem;
+}
+.gl-acc-stmt-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+.gl-acc-stmt-table thead th {
+    background: #f1f5f9;
+    border: 1px solid #94a3b8;
+    padding: 0.45rem 0.4rem;
+    font-weight: 700;
+    font-size: 0.82rem;
+}
+.gl-acc-stmt-table tbody td {
+    border: 1px solid #cbd5e1;
+    padding: 0.35rem 0.4rem;
+    vertical-align: top;
+}
+.gl-acc-stmt-table tfoot td {
+    border: 1px solid #64748b;
+    padding: 0.45rem 0.4rem;
+    font-weight: 700;
+    background: #f8fafc;
+}
+.gl-acc-stmt-col-num {
+    text-align: left;
+    direction: ltr;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.gl-acc-stmt-col-ref {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.gl-acc-stmt-print-row--dates {
+    display: grid;
+    grid-template-columns: auto minmax(5rem, 1fr) auto minmax(5rem, 1fr) auto minmax(5rem, 1fr);
+    gap: 0.35rem 0.65rem;
+    align-items: baseline;
+}
+
+@media (max-width: 640px) {
+    .gl-acc-stmt-print-row--dates {
+        grid-template-columns: auto 1fr;
+    }
+}
+
+.gl-acc-stmt-table tbody tr.gl-acc-stmt-row-opening td {
+    background: #fafafa;
+}
+
+.gl-acc-stmt-print-footer {
+    margin-top: 1.25rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid #cbd5e1;
     font-size: 0.88rem;
 }
-.gl-acc-stmt-print-meta dd {
-    margin: 0.15rem 0 0;
+.gl-acc-stmt-print-disclaimer {
+    margin: 0 0 1rem;
+    line-height: 1.55;
+    text-align: justify;
 }
-.gl-acc-stmt-open-line {
-    margin: 0.75rem 0 0;
-    font-size: 0.95rem;
+.gl-acc-stmt-print-signatures {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 2rem;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+.gl-acc-stmt-print-sig {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.gl-acc-stmt-print-sig-line {
+    color: var(--muted-text, #64748b);
+    letter-spacing: 0;
+}
+.gl-acc-stmt-print-metafoot {
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--muted-text, #64748b);
+}
+
+.gl-acc-stmt-foot-total-title {
+    text-align: right;
+}
+    .gl-acc-stmt-print-sheet {
+        border-width: 1px;
+        padding: 0.5cm;
+        border-radius: 0;
+    }
+    .gl-acc-stmt-table thead th {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
 }
 
 /* منتقي المتغيرات (عروض السلة) */
