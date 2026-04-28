@@ -465,6 +465,80 @@ function orangeAdminOfferSuggestAfterWarnings(r) {
     }
 })();
 
+(function initOrangeAcctReportsNavPins() {
+    function normPath(path) {
+        if (!path) return '';
+        return path.length > 1 && path.charAt(path.length - 1) === '/' ? path.slice(0, -1) : path;
+    }
+
+    function stripHash(h) {
+        if (!h) return '';
+        return String(h).replace(/^#/, '');
+    }
+
+    function matchPinnedAcctNav(anchorEl) {
+        try {
+            var lu = new URL(anchorEl.href);
+            var ww = window.location;
+            if (normPath(lu.pathname) !== normPath(ww.pathname)) {
+                return false;
+            }
+            var wSearch = ww.search.startsWith('?') ? ww.search.slice(1) : (ww.search || '').replace(/^\?/, '');
+            var lSearch = lu.search.startsWith('?') ? lu.search.slice(1) : (lu.search || '').replace(/^\?/, '');
+            var wPage = new URLSearchParams(wSearch).get('page') || '';
+            var lPage = new URLSearchParams(lSearch).get('page') || '';
+            if (!wPage || wPage !== lPage) return false;
+
+            if (wPage === 'financial_report') {
+                var lh = stripHash(lu.hash);
+                var wh = stripHash(ww.hash);
+                if (!lh) return !wh;
+                return lh === wh;
+            }
+            if (wPage === 'partner_reports') {
+                var lParams = new URLSearchParams(lSearch);
+                var wParams = new URLSearchParams(wSearch);
+                var linkAging = lParams.get('aging') === '1';
+                var winAging = wParams.get('aging') === '1';
+                if (linkAging) return winAging;
+                if (!linkAging && winAging) return false;
+
+                var lhPr = stripHash(lu.hash);
+                var whPr = stripHash(ww.hash);
+
+                /** رابط قائمة لا يحدد # — يطبق على أعلى الصفحة فقط بدون مرساة في العنوان */
+                if (!lhPr) return !whPr;
+
+                return lhPr === whPr;
+            }
+        } catch (e) {
+            return false;
+        }
+        return false;
+    }
+
+    function applyAcctReportPins() {
+        var sel = 'a[data-orange-admin-nav-pin="acct-reports"]';
+        document.querySelectorAll(sel).forEach(function (a) {
+            a.classList.remove('is-active');
+        });
+        Array.prototype.slice.call(document.querySelectorAll(sel)).filter(matchPinnedAcctNav).forEach(function (a) {
+            a.classList.add('is-active');
+        });
+    }
+
+    function boot() {
+        applyAcctReportPins();
+        window.addEventListener('hashchange', applyAcctReportPins);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
+})();
+
 (function initAdminTopNavDrawer() {
     function run() {
         var toggle = document.getElementById('admin-menu-toggle');

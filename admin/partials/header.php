@@ -69,6 +69,18 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
             </div>
             <?php
             /**
+             * دوال الميجا وجوال تُقيِّم نشاط الرابط بالاعتماد على ?page فقط؛
+             * عدة أزرار تشترك نفس القيمة (التقارير المالية والذمم + مراسي #) فيُفعَّل واحد بالمتصفح.
+             *
+             * @param array<string, mixed> $nl
+             */
+            $orange_nav_acct_reports_need_client_active = static function (array $nl): bool {
+                $p = (string) ($nl['page'] ?? '');
+
+                return $p === 'financial_report' || $p === 'partner_reports';
+            };
+
+            /**
              * @param array{page:string,href:string,label:string,class:string,sub:bool} $nl
              */
             $orangeNavLinkActive = static function (array $nl) use ($orangeAdminPage): bool {
@@ -76,22 +88,27 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                     || $orangeAdminPage === $nl['page'];
             };
 
-            $orangeRenderNavLink = static function (array $nl) use ($admin, $pdoNav, $orangeNavLinkActive): void {
+            /** @param array<string, mixed> $nl */
+            $orangeRenderNavLinkMega = static function (array $nl, string $megaSectionId = '') use ($admin, $pdoNav, $orangeNavLinkActive, $orange_nav_acct_reports_need_client_active): void {
                 if (!orange_admin_nav_visible($admin, $pdoNav, $nl['page'])) {
                     return;
                 }
-                $active = $orangeNavLinkActive($nl);
-                $cls = trim($nl['class'] . ($active ? ' is-active' : ''));
-                echo '<a href="' . htmlspecialchars(storefront_public_path((string) $nl['href']), ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($nl['label'], ENT_QUOTES, 'UTF-8') . '</a>';
+                $pinAcct = ($megaSectionId === 'acct_reports' && $orange_nav_acct_reports_need_client_active($nl));
+                $active = !$pinAcct && $orangeNavLinkActive($nl);
+                $cls = trim($nl['class'] . ' admin-mega-link' . ($active ? ' is-active' : ''));
+                $pinAttr = $pinAcct ? ' data-orange-admin-nav-pin="acct-reports"' : '';
+                echo '<a href="' . htmlspecialchars(storefront_public_path((string) $nl['href']), ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '"' . $pinAttr . '>' . htmlspecialchars($nl['label'], ENT_QUOTES, 'UTF-8') . '</a>';
             };
 
-            $orangeRenderNavLinkMega = static function (array $nl) use ($admin, $pdoNav, $orangeNavLinkActive): void {
+            $orangeRenderNavLink = static function (array $nl, string $navSectionId = '') use ($admin, $pdoNav, $orangeNavLinkActive, $orange_nav_acct_reports_need_client_active): void {
                 if (!orange_admin_nav_visible($admin, $pdoNav, $nl['page'])) {
                     return;
                 }
-                $active = $orangeNavLinkActive($nl);
-                $cls = trim($nl['class'] . ' admin-mega-link' . ($active ? ' is-active' : ''));
-                echo '<a href="' . htmlspecialchars(storefront_public_path((string) $nl['href']), ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($nl['label'], ENT_QUOTES, 'UTF-8') . '</a>';
+                $pinAcct = ($navSectionId === 'acct_reports' && $orange_nav_acct_reports_need_client_active($nl));
+                $active = !$pinAcct && $orangeNavLinkActive($nl);
+                $cls = trim($nl['class'] . ($active ? ' is-active' : ''));
+                $pinAttr = $pinAcct ? ' data-orange-admin-nav-pin="acct-reports"' : '';
+                echo '<a href="' . htmlspecialchars(storefront_public_path((string) $nl['href']), ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '"' . $pinAttr . '>' . htmlspecialchars($nl['label'], ENT_QUOTES, 'UTF-8') . '</a>';
             };
 
             /**
@@ -164,21 +181,21 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                         echo '<div class="admin-nav-subgroup__title">' . $gtitle . '</div>';
                         foreach ($nl['items'] as $c) {
                             if (is_array($c)) {
-                                $orangeRenderNavLink($c);
+                                $orangeRenderNavLink($c, $sectionId);
                             }
                         }
                         echo '</div>';
                         continue;
                     }
                     if (is_array($nl)) {
-                        $orangeRenderNavLink($nl);
+                        $orangeRenderNavLink($nl, $sectionId);
                     }
                 }
                 echo '</div></div>';
             };
 
             /** مجموعة داخل لوحة الميجا */
-            $orangeRenderNavMegaGroup = static function (array $group) use ($admin, $pdoNav, $orangeRenderNavLinkMega): void {
+            $orangeRenderNavMegaGroup = static function (array $group, string $megaSectionId = '') use ($admin, $pdoNav, $orangeRenderNavLinkMega): void {
                 if (empty($group['items']) || !is_array($group['items'])) {
                     return;
                 }
@@ -198,7 +215,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 echo '<div class="admin-mega-group__links">';
                 foreach ($group['items'] as $c) {
                     if (is_array($c)) {
-                        $orangeRenderNavLinkMega($c);
+                        $orangeRenderNavLinkMega($c, $megaSectionId);
                     }
                 }
                 echo '</div></div>';
@@ -342,18 +359,19 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 if (!$anyVisMega) {
                     continue;
                 }
-                $sidMega = htmlspecialchars((string) $sec['id'], ENT_QUOTES, 'UTF-8');
+                $sidMegaRaw = (string) $sec['id'];
+                $sidMega = htmlspecialchars($sidMegaRaw, ENT_QUOTES, 'UTF-8');
                 $pidMega = 'mega-panel-' . $sidMega;
                 $bidMega = $pidMega . '-btn';
                 echo '<div id="' . $pidMega . '" class="admin-mega-panel" role="region" hidden aria-labelledby="' . $bidMega . '">';
                 echo '<div class="admin-mega-grid">';
                 foreach ($sec['items'] as $nlMega) {
                     if (!empty($nlMega['group']) && !empty($nlMega['items']) && is_array($nlMega['items'])) {
-                        $orangeRenderNavMegaGroup($nlMega);
+                        $orangeRenderNavMegaGroup($nlMega, $sidMegaRaw);
                         continue;
                     }
                     if (is_array($nlMega)) {
-                        $orangeRenderNavLinkMega($nlMega);
+                        $orangeRenderNavLinkMega($nlMega, $sidMegaRaw);
                     }
                 }
                 echo '</div></div>';
