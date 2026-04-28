@@ -105,9 +105,12 @@ $fyYmBoundMax = '';
 if ($fyRow) {
     $fyStartYmd = (string) ($fyRow['start_date'] ?? '');
     $fyEndYmd = (string) ($fyRow['end_date'] ?? '');
-    $fyMinYm = strlen($fyStartYmd) >= 7 ? substr($fyStartYmd, 0, 7) : '';
-    $fyMaxYm = strlen($fyEndYmd) >= 7 ? substr($fyEndYmd, 0, 7) : '';
-    if ($fyMinYm !== '' && $fyMaxYm !== '' && $fyMinYm <= $fyMaxYm) {
+    /** أول يوم وفق yyyy-mm-dd فقط لتفادي أخطاء المقارنة مع DATETIME أو أشكال مختلفة من السيرفر */
+    $fyStartDay = preg_match('/^(\d{4}-\d{2}-\d{2})/', trim($fyStartYmd), $mY) ? $mY[1] : '';
+    $fyEndDay = preg_match('/^(\d{4}-\d{2}-\d{2})/', trim($fyEndYmd), $mY) ? $mY[1] : '';
+    $fyMinYm = strlen($fyStartDay) >= 7 ? substr($fyStartDay, 0, 7) : '';
+    $fyMaxYm = strlen($fyEndDay) >= 7 ? substr($fyEndDay, 0, 7) : '';
+    if ($fyMinYm !== '' && $fyMaxYm !== '' && $fyMinYm <= $fyMaxYm && $fyStartDay !== '' && $fyEndDay !== '') {
         $fyYmBoundMin = $fyMinYm;
         $fyYmBoundMax = $fyMaxYm;
         $ymFrom = $ymFromGet ?? $fyMinYm;
@@ -134,8 +137,9 @@ if ($fyRow) {
 
         $monthFirst = $firstDayOfYm($ymFrom);
         $monthLast = $lastDayOfYm($ymTo);
-        $periodDateFrom = $monthFirst > $fyStartYmd ? $monthFirst : $fyStartYmd;
-        $periodDateTo = $monthLast < $fyEndYmd ? $monthLast : $fyEndYmd;
+        /** التقاطع مع السنة المالية بدءاً من آخر اليوم المعقول (جميعهم YYYY-MM-DD بنفس الطول للمقارنة السليمة). */
+        $periodDateFrom = strcmp($monthFirst, $fyStartDay) >= 0 ? $monthFirst : $fyStartDay;
+        $periodDateTo = strcmp($monthLast, $fyEndDay) <= 0 ? $monthLast : $fyEndDay;
         if ($periodDateFrom !== '' && $periodDateTo !== '') {
             if ($periodDateFrom > $periodDateTo) {
                 $periodYmFrom = '';

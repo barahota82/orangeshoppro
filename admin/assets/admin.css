@@ -4059,7 +4059,8 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 .gas-acc-stmt-toolbar--main-center > .gas-acc-stmt-field:not(.gas-acc-stmt-actions) .gas-acc-stmt-acc-code-input,
 .gas-acc-stmt-toolbar--main-center > .gas-acc-stmt-field:not(.gas-acc-stmt-actions) .gas-acc-stmt-acc-name-input,
 .gas-acc-stmt-toolbar--main-center > .gas-acc-stmt-field:not(.gas-acc-stmt-actions) input.admin-inp.orange-inp-dmy,
-.gas-acc-stmt-toolbar--main-center > .gas-acc-stmt-field:not(.gas-acc-stmt-actions) select.admin-inp {
+.gas-acc-stmt-toolbar--main-center > .gas-acc-stmt-field:not(.gas-acc-stmt-actions) select.admin-inp,
+.gas-acc-stmt-toolbar--main-center > .gas-acc-stmt-field:not(.gas-acc-stmt-actions) input.admin-inp[type="month"] {
     text-align: center;
 }
 
