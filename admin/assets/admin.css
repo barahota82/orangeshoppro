@@ -4103,6 +4103,78 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     font-size: 0.8rem;
 }
 
+/* كشف حساب — الصف الثاني (فلاتر اختيارية) */
+.gas-acc-stmt-options-row-wrap {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border, #e2e8f0);
+}
+.gas-acc-stmt-options-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px 22px;
+    align-items: flex-end;
+}
+.gas-opt-unit {
+    min-width: 0;
+}
+.gas-opt-unit-label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: var(--muted-text, #475569);
+}
+.gas-opt-radio-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    align-items: center;
+}
+.gas-opt-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.855rem;
+    cursor: pointer;
+    user-select: none;
+}
+.gas-opt-chip input {
+    margin: 0;
+    accent-color: var(--accent, #2563eb);
+}
+.gas-opt-unit--aging {
+    margin-inline-start: auto;
+}
+.gas-acc-stmt-options-hint {
+    margin: 10px 0 0;
+    font-size: 0.8rem;
+    line-height: 1.48;
+}
+.gl-acc-stmt-filter-note {
+    margin: 0 0 0.65rem;
+    font-size: 0.85rem;
+    line-height: 1.45;
+}
+.gl-acc-stmt-aging-wrap {
+    margin-top: 1rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #cbd5e1;
+}
+.gl-acc-stmt-aging-title {
+    margin: 0 0 8px;
+    font-size: 1rem;
+    font-weight: 700;
+}
+.gl-acc-stmt-aging-table {
+    max-width: 28rem;
+}
+.gl-acc-stmt-aging-hint {
+    margin: 10px 0 0;
+    font-size: 0.86rem;
+    line-height: 1.45;
+}
+
 /* منتقي المتغيرات (عروض السلة) */
 .orange-vp-overlay {
     position: fixed;

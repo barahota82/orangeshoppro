@@ -8,9 +8,78 @@ require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
+require_once __DIR__ . '/../../includes/party_subledger.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+
+/**
+ * تمرير أسطر القيد لفلاتر مدين/دائن ونوع الترحيل (يدوي مقابل نظام التشغيل).
+ *
+ * «غير مرحل» يشمل أنواع السند اليدوية (manual / other_voucher / general والفراغ).
+ *
+ * @param array<string, mixed> $ln
+ */
+function orange_gas_stmt_line_matches(array $ln, string $filtDc, string $filtPost): bool
+{
+    $d = round((float) ($ln['debit'] ?? 0), 4);
+    $c = round((float) ($ln['credit'] ?? 0), 4);
+
+    if ($filtDc === 'debit') {
+        if ($d <= 0.0001) {
+            return false;
+        }
+    } elseif ($filtDc === 'credit') {
+        if ($c <= 0.0001) {
+            return false;
+        }
+    }
+
+    $et = strtolower(trim((string) ($ln['entry_type'] ?? '')));
+    $isManualBucket = ($et === '' || in_array($et, ['manual', 'other_voucher', 'general'], true));
+    if ($filtPost === 'posted') {
+        if ($isManualBucket) {
+            return false;
+        }
+    } elseif ($filtPost === 'unposted') {
+        if (! $isManualBucket) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * @return array{party_kind:string, party_id:int}|null
+ */
+function orange_gas_resolve_aging_party(PDO $pdo, int $accountId): ?array
+{
+    if ($accountId <= 0) {
+        return null;
+    }
+    if (! orange_table_has_column($pdo, 'suppliers', 'payable_account_id')) {
+        return null;
+    }
+    try {
+        $st = $pdo->prepare(
+            'SELECT id FROM suppliers WHERE payable_account_id = ? ORDER BY id ASC LIMIT 2'
+        );
+        $st->execute([$accountId]);
+        $ids = [];
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $ids[] = (int) ($r['id'] ?? 0);
+        }
+        $ids = array_values(array_filter($ids, static fn ($x) => $x > 0));
+        if (count($ids) !== 1) {
+            return null;
+        }
+
+        return ['party_kind' => 'supplier', 'party_id' => $ids[0]];
+    } catch (Throwable $e) {
+        return null;
+    }
+}
 
 /**
  * @param array<string, mixed> $jv
@@ -78,6 +147,16 @@ $accountId = isset($_GET['account']) ? (int) $_GET['account'] : 0;
 $dateFromRaw = trim((string) ($_GET['date_from'] ?? ''));
 $dateToRaw = trim((string) ($_GET['date_to'] ?? ''));
 
+$filtDc = strtolower(trim((string) ($_GET['filt_dc'] ?? 'all')));
+if (! in_array($filtDc, ['all', 'debit', 'credit'], true)) {
+    $filtDc = 'all';
+}
+$filtPost = strtolower(trim((string) ($_GET['filt_post'] ?? 'all')));
+if (! in_array($filtPost, ['all', 'posted', 'unposted'], true)) {
+    $filtPost = 'all';
+}
+$showAging = isset($_GET['show_aging']) && (string) $_GET['show_aging'] === '1';
+
 if ($dateFromRaw === '') {
     $dateFromRaw = orange_format_date_dmY(date('Y-01-01'));
 }
@@ -110,6 +189,9 @@ $sumDebitPeriod = 0.0;
 $sumCreditPeriod = 0.0;
 $closingBal = 0.0;
 $err = '';
+$agingReport = null;
+$agingPartyHint = '';
+$stmtFilterNoMatch = false;
 
 if ($accountId > 0 && ! orange_accounts_account_is_posting_leaf($pdo, $accountId)) {
     $err = 'يُعرض كشف الحساب للحسابات الفرعية (ورقة ترحيل) فقط.';
@@ -153,8 +235,12 @@ if ($useVouchers && $accountId > 0 && $err === '') {
              ORDER BY jv.voucher_date ASC, jv.id ASC, jl.line_no ASC"
         );
         $stL->execute([$accountId, $dateFromYmd, $dateToYmd]);
+        $rawLines = $stL->fetchAll(PDO::FETCH_ASSOC);
         $bal = $openingBal;
-        foreach ($stL->fetchAll(PDO::FETCH_ASSOC) as $ln) {
+        foreach ($rawLines as $ln) {
+            if (! orange_gas_stmt_line_matches($ln, $filtDc, $filtPost)) {
+                continue;
+            }
             $d = (float) $ln['debit'];
             $c = (float) $ln['credit'];
             $sumDebitPeriod += $d;
@@ -164,6 +250,23 @@ if ($useVouchers && $accountId > 0 && $err === '') {
             $rows[] = $ln;
         }
         $closingBal = $rows === [] ? $openingBal : (float) ($rows[count($rows) - 1]['balance'] ?? $openingBal);
+        $stmtFilterNoMatch = $rawLines !== [] && $rows === [];
+
+        if ($showAging && orange_party_subledger_ready($pdo)) {
+            $ap = orange_gas_resolve_aging_party($pdo, $accountId);
+            if ($ap !== null) {
+                $agingReport = orange_party_aging_buckets(
+                    $pdo,
+                    $ap['party_kind'],
+                    $ap['party_id'],
+                    $dateToYmd
+                );
+            } else {
+                $agingPartyHint = 'أعمار الذمم تُعرض عندما يكون هذا الحساب هو «ذمة المورد» لطرف واحد فقط في بيانات الموردين.';
+            }
+        } elseif ($showAging && ! orange_party_subledger_ready($pdo)) {
+            $agingPartyHint = 'جدول ذمم الأطراف غير مهيّأ — لا يمكن عرض أعمار الذمم.';
+        }
     } catch (Throwable $e) {
         $err = 'تعذر قراءة الحركات.';
     }
@@ -212,6 +315,33 @@ if ($useVouchers && $accountId > 0 && $err === '') {
                         <?php endif; ?>
                     </div>
                 </div>
+            </div>
+            <div class="gas-acc-stmt-options-row-wrap">
+                <div class="gas-acc-stmt-options-row" role="group" aria-label="خيارات الكشف">
+                    <div class="gas-opt-unit">
+                        <span class="gas-opt-unit-label">حركة السطر</span>
+                        <div class="gas-opt-radio-group">
+                            <label class="gas-opt-chip"><input type="radio" name="filt_dc" value="all"<?php echo $filtDc === 'all' ? ' checked' : ''; ?>> الكل</label>
+                            <label class="gas-opt-chip"><input type="radio" name="filt_dc" value="debit"<?php echo $filtDc === 'debit' ? ' checked' : ''; ?>> مدين فقط</label>
+                            <label class="gas-opt-chip"><input type="radio" name="filt_dc" value="credit"<?php echo $filtDc === 'credit' ? ' checked' : ''; ?>> دائن فقط</label>
+                        </div>
+                    </div>
+                    <div class="gas-opt-unit">
+                        <span class="gas-opt-unit-label">التصنيف</span>
+                        <div class="gas-opt-radio-group">
+                            <label class="gas-opt-chip"><input type="radio" name="filt_post" value="all"<?php echo $filtPost === 'all' ? ' checked' : ''; ?>> الكل</label>
+                            <label class="gas-opt-chip"><input type="radio" name="filt_post" value="posted"<?php echo $filtPost === 'posted' ? ' checked' : ''; ?>> مرحّل (وحدات التشغيل)</label>
+                            <label class="gas-opt-chip"><input type="radio" name="filt_post" value="unposted"<?php echo $filtPost === 'unposted' ? ' checked' : ''; ?>> غير مرحّل (يدوي)</label>
+                        </div>
+                    </div>
+                    <div class="gas-opt-unit gas-opt-unit--aging">
+                        <label class="gas-opt-chip gas-opt-chip--solo">
+                            <input type="checkbox" name="show_aging" value="1"<?php echo $showAging ? ' checked' : ''; ?>>
+                            إظهار أعمار الذمم
+                        </label>
+                    </div>
+                </div>
+                <p class="gas-acc-stmt-options-hint muted">السطر الثاني اختياري: يحدد أسطر المدين/الدائن، وما إذا كان السند من التشغيل أو يدوياً؛ تفعيل الأعمار يعرض تقسيم الذمة عند ربط هذا الحساب بمورد واحد؛ عمود الرصيد في الجدول أعلاه وفق هذه الخيارات.</p>
             </div>
         </form>
         <?php if ($err !== ''): ?>
@@ -379,6 +509,22 @@ if ($useVouchers && $accountId > 0 && $err === '') {
                     <span class="gl-acc-stmt-print-k">تاريخ الكشف</span><span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($todayDmY, ENT_QUOTES, 'UTF-8'); ?></span>
                 </div>
             </div>
+            <?php if ($filtDc !== 'all' || $filtPost !== 'all'): ?>
+                <p class="gl-acc-stmt-filter-note muted">تصفية معروضة: <?php
+                    $bits = [];
+                    if ($filtDc === 'debit') {
+                        $bits[] = 'مدين فقط';
+                    } elseif ($filtDc === 'credit') {
+                        $bits[] = 'دائن فقط';
+                    }
+                    if ($filtPost === 'posted') {
+                        $bits[] = 'مرحّل (وحدات التشغيل) فقط';
+                    } elseif ($filtPost === 'unposted') {
+                        $bits[] = 'غير مرحّل (يدوي) فقط';
+                    }
+                    echo htmlspecialchars(implode(' — ', $bits), ENT_QUOTES, 'UTF-8');
+                ?> — عمود الرصيد يُحسب من الرصيد الافتتاحي ثم الأسطر الظاهرة فقط.</p>
+            <?php endif; ?>
             <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
                 <table class="admin-fy-table gl-acc-stmt-table">
                     <thead>
@@ -402,7 +548,9 @@ if ($useVouchers && $accountId > 0 && $err === '') {
                             <td class="gl-acc-stmt-col-num"><?php echo number_format(0.0, 4); ?></td>
                             <td class="gl-acc-stmt-col-num"><?php echo number_format($openingBal, 4); ?></td>
                         </tr>
-                        <?php if ($rows === []): ?>
+                        <?php if ($stmtFilterNoMatch): ?>
+                            <tr><td colspan="7" class="muted">يوجد على الحساب حركات في هذه الفترة لكن لا يوجد سطر يطابق خيارات العرض (مدين/دائن أو مرحّل/غير مرحّل).</td></tr>
+                        <?php elseif ($rows === []): ?>
                             <tr><td colspan="7" class="muted">لا حركة على هذا الحساب في هذه الفترة بعد الرصيد الافتتاحي.</td></tr>
                         <?php else: ?>
                             <?php foreach ($rows as $sr): ?>
@@ -428,6 +576,54 @@ if ($useVouchers && $accountId > 0 && $err === '') {
                     </tfoot>
                 </table>
             </div>
+            <?php if ($showAging): ?>
+                <?php if ($agingReport !== null && is_array($agingReport)): ?>
+                    <div class="gl-acc-stmt-aging-wrap">
+                        <h3 class="gl-acc-stmt-aging-title">توزيع أعمار الذمم — بحسب الذمة وحتى <?php echo htmlspecialchars(orange_format_date_dmY((string) ($agingReport['as_of'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></h3>
+                        <div class="table-wrap admin-fy-table-wrap">
+                            <table class="admin-fy-table gl-acc-stmt-table gl-acc-stmt-aging-table">
+                                <thead>
+                                    <tr>
+                                        <th>الفئة</th>
+                                        <th class="gl-acc-stmt-col-num">المبلغ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php
+                                    $lbls = isset($agingReport['bucket_labels_ar']) && is_array($agingReport['bucket_labels_ar']) ? $agingReport['bucket_labels_ar'] : [];
+                                    $bks = isset($agingReport['buckets']) && is_array($agingReport['buckets']) ? $agingReport['buckets'] : [];
+                                    foreach ($bks as $k => $amt) {
+                                        $lb = isset($lbls[$k]) ? (string) $lbls[$k] : (string) $k;
+                                        ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars($lb, ENT_QUOTES, 'UTF-8'); ?></td>
+                                            <td class="gl-acc-stmt-col-num"><?php echo number_format((float) $amt, 4); ?></td>
+                                        </tr>
+                                        <?php
+                                    }
+                                    ?>
+                                </tbody>
+                                <?php if (isset($agingReport['balance']) || isset($agingReport['prepayment'])): ?>
+                                    <tfoot>
+                                        <tr>
+                                            <td>رصيد الذمة بحسب طرف المورد (دفتر الطرف حتى هذا التاريخ)</td>
+                                            <td class="gl-acc-stmt-col-num"><?php echo number_format((float) ($agingReport['balance'] ?? 0), 4); ?></td>
+                                        </tr>
+                                        <?php if ((float) ($agingReport['prepayment'] ?? 0) > 0.0001): ?>
+                                            <tr>
+                                                <td>دفعة مقدمة (تسوية وفق آلية الذمة المفتوحة)</td>
+                                                <td class="gl-acc-stmt-col-num"><?php echo number_format((float) ($agingReport['prepayment'] ?? 0), 4); ?></td>
+                                            </tr>
+                                        <?php endif; ?>
+                                    </tfoot>
+                                <?php endif; ?>
+                            </table>
+                        </div>
+                    </div>
+                <?php elseif ($agingPartyHint !== ''): ?>
+                    <p class="gl-acc-stmt-aging-hint muted"><?php echo htmlspecialchars($agingPartyHint, ENT_QUOTES, 'UTF-8'); ?></p>
+                <?php endif; ?>
+            <?php endif; ?>
             <div class="gl-acc-stmt-print-footer">
                 <p class="gl-acc-stmt-print-disclaimer">يعتبر كشف الحساب هذا صحيحا ومقبولا ما لم يتم اخطارنا باى اختلافات خلال اسبوعين من تاريخ الاستلام</p>
                 <div class="gl-acc-stmt-print-signatures">
