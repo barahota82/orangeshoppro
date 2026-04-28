@@ -58,11 +58,19 @@ $normalizeYm = static function (string $raw): ?string {
     return sprintf('%04d-%02d', (int) $m[1], $month);
 };
 
+$yNow = (int) date('Y');
+$mNow = (int) date('n');
+/** سنة السيرفر؛ يوسِّع القائمة كل سنة — حد ثابت 2000/2100 لم يعود مستخدماً */
+$yearMin = max(1900, $yNow - 120);
+$yearMax = $yNow + 80;
+$calYmMinBound = sprintf('%04d-01', $yearMin);
+$calYmMaxBound = sprintf('%04d-12', $yearMax);
+
 $ymFromGet = null;
 if (isset($_GET['from_y'], $_GET['from_m'])) {
     $yf = (int) $_GET['from_y'];
     $mf = (int) $_GET['from_m'];
-    if ($yf >= 2000 && $yf <= 2100 && $mf >= 1 && $mf <= 12) {
+    if ($yf >= $yearMin && $yf <= $yearMax && $mf >= 1 && $mf <= 12) {
         $ymFromGet = sprintf('%04d-%02d', $yf, $mf);
     }
 }
@@ -74,7 +82,7 @@ $ymToGet = null;
 if (isset($_GET['to_y'], $_GET['to_m'])) {
     $yt = (int) $_GET['to_y'];
     $mt = (int) $_GET['to_m'];
-    if ($yt >= 2000 && $yt <= 2100 && $mt >= 1 && $mt <= 12) {
+    if ($yt >= $yearMin && $yt <= $yearMax && $mt >= 1 && $mt <= 12) {
         $ymToGet = sprintf('%04d-%02d', $yt, $mt);
     }
 }
@@ -101,12 +109,6 @@ $periodYmTo = '';
 $periodDateFrom = '';
 $periodDateTo = '';
 
-/** نطاق مسموح لحقول شهر/سنة (تقييد واجهة فقط؛ التاريخ يُقيَّد أيضاً قبل الاستعلام) */
-$calYmMinBound = '2000-01';
-$calYmMaxBound = '2100-12';
-
-$yNow = (int) date('Y');
-$mNow = (int) date('n');
 $defaultYmJan = sprintf('%04d-01', $yNow);
 $defaultYmToday = sprintf('%04d-%02d', $yNow, $mNow);
 
@@ -138,6 +140,9 @@ $selYFrom = (int) substr($periodYmFrom, 0, 4);
 $selMFrom = substr($periodYmFrom, 5, 2);
 $selYTo = (int) substr($periodYmTo, 0, 4);
 $selMTo = substr($periodYmTo, 5, 2);
+
+$yearUiMin = min($yearMin, $selYFrom, $selYTo);
+$yearUiMax = max($yearMax, $selYFrom, $selYTo);
 
 $gregMonthsAr = [
     '01' => 'كانون الثاني',
@@ -211,7 +216,7 @@ unset($mr);
                                 <label for="gl_from_y">سنة</label>
                                 <select name="from_y" id="gl_from_y" class="admin-inp" autocomplete="off"
                                     dir="ltr" lang="en">
-                                    <?php for ($yy = 2000; $yy <= 2100; ++$yy): ?>
+                                    <?php for ($yy = $yearUiMin; $yy <= $yearUiMax; ++$yy): ?>
                                         <option value="<?php echo (int) $yy; ?>"<?php echo $yy === $selYFrom ? ' selected' : ''; ?>><?php echo (int) $yy; ?></option>
                                     <?php endfor; ?>
                                 </select>
@@ -233,7 +238,7 @@ unset($mr);
                                 <label for="gl_to_y">سنة</label>
                                 <select name="to_y" id="gl_to_y" class="admin-inp" autocomplete="off"
                                     dir="ltr" lang="en">
-                                    <?php for ($yy = 2000; $yy <= 2100; ++$yy): ?>
+                                    <?php for ($yy = $yearUiMin; $yy <= $yearUiMax; ++$yy): ?>
                                         <option value="<?php echo (int) $yy; ?>"<?php echo $yy === $selYTo ? ' selected' : ''; ?>><?php echo (int) $yy; ?></option>
                                     <?php endfor; ?>
                                 </select>
@@ -273,7 +278,7 @@ unset($mr);
         </form>
         <p class="card-hint" style="margin-top:12px;margin-bottom:0;">
             تقرير تقويمي: أول وآخر يوم للشهرين المختارين؛ يجمّع أي سند سندًا لـ<strong>تاريخ السند</strong> ضمن المدى (قد تشمل أكثر من سنة مالية). الأشهر بلا حركة لا صفوف لها.
-            <span class="muted" style="display:block;margin-top:8px;font-size:0.9rem;">اختر السنة ثم الشهر من القوائم (2000–2100). الروابط القديمة بصيغة <code dir="ltr">m_from</code> / <code dir="ltr">m_to</code> لا تزال تعمل.</span>
+            <span class="muted" style="display:block;margin-top:8px;font-size:0.9rem;">نطاق السنوات يتوسّع تلقائياً مع سنة السيرفر؛ لسنوات خارج القائمة استخدم رابطاً بصيغة <code dir="ltr">m_from=YYYY-MM&amp;m_to=YYYY-MM</code>. روابط <code dir="ltr">m_from</code> / <code dir="ltr">m_to</code> القديمة لا تزال تعمل.</span>
         </p>
     </div>
 
