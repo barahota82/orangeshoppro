@@ -91,11 +91,9 @@ if ($useVouchers && $fyId > 0 && $accountId > 0) {
 
 ?>
 <div class="admin-fy-shell" dir="rtl">
-    <div class="gl-acc-stmt-no-print">
-        <h1 class="admin-fy-shell__title">الحركة الشهرية لحساب</h1>
-    </div>
+    <h1 class="admin-fy-shell__title">الحركة الشهرية لحساب (GL)</h1>
 
-    <div class="card admin-fy-card gas-acc-stmt-search-card gl-acc-stmt-no-print">
+    <div class="card admin-fy-card gas-acc-stmt-search-card">
         <form method="get" class="gas-acc-stmt-filter-form" id="gl_m_monthly_form">
             <input type="hidden" name="page" value="report_gl_account_monthly">
             <input type="hidden" name="account" id="gl_m_account_id" value="<?php echo (int) $accountId; ?>">
@@ -127,16 +125,13 @@ if ($useVouchers && $fyId > 0 && $accountId > 0) {
                     </div>
                     <div class="gas-acc-stmt-actions">
                         <button type="submit">عرض</button>
-                        <?php if ($useVouchers && $fyId > 0 && $accountId > 0): ?>
-                            <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
-                        <?php endif; ?>
                     </div>
                 </div>
             </div>
         </form>
     </div>
 
-<div class="gl-pick-modal gl-acc-stmt-no-print" id="gl_m_pick_modal" hidden aria-hidden="true">
+<div class="gl-pick-modal" id="gl_m_pick_modal" hidden aria-hidden="true">
     <div class="gl-pick-modal__backdrop" id="gl_m_pick_backdrop"></div>
     <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="gl_m_pick_title">
         <h3 id="gl_m_pick_title" class="gl-pick-modal__title">اختيار حساب فرعي</h3>
@@ -281,7 +276,7 @@ if ($useVouchers && $fyId > 0 && $accountId > 0) {
     <p class="card-hint">اختر حساباً ثم اضغط «عرض».</p>
 </div>
 <?php elseif ($fyRow): ?>
-<div class="card admin-fy-card gl-acc-stmt-print">
+<div class="card admin-fy-card">
     <h3 class="card-title">النتيجة</h3>
     <p class="page-subtitle">
         <?php echo htmlspecialchars($accLabel !== '' ? $accLabel : ('#' . $accountId), ENT_QUOTES, 'UTF-8'); ?>
