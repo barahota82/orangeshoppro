@@ -228,7 +228,7 @@ if ($useVouchers && $accountId > 0 && $err === '') {
             <input type="hidden" name="page" value="partner_account_statement">
             <input type="hidden" name="account" id="gas_account_id" value="<?php echo (int) $accountId; ?>">
             <div class="gas-acc-stmt-toolbar-wrap">
-                <div class="gas-acc-stmt-toolbar">
+                <div class="gas-acc-stmt-toolbar gas-acc-stmt-toolbar--main-center">
                     <div class="gas-acc-stmt-field gas-acc-stmt-field--code">
                         <label for="gas_acc_code">كود الحساب</label>
                         <input type="text" id="gas_acc_code" name="_gas_acc_code_dummy" autocomplete="off" readonly

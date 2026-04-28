@@ -129,6 +129,18 @@ $resetUrl = htmlspecialchars(storefront_public_path('/admin/index.php?page=journ
     gap: 8px;
     margin-inline-start: auto;
 }
+.jvr-filter-tools--center .jvr-filter-tools__entry,
+.jvr-filter-tools--center .jvr-filter-tools__date {
+    text-align: center;
+}
+.jvr-filter-tools--center .jvr-filter-tools__entry label,
+.jvr-filter-tools--center .jvr-filter-tools__date label {
+    text-align: center;
+}
+.jvr-filter-tools--center .jvr-filter-tools__entry .admin-inp,
+.jvr-filter-tools--center .jvr-filter-tools__date .admin-inp {
+    text-align: center;
+}
 </style>
 
 <div class="page-title page-title--stacked">
@@ -138,10 +150,9 @@ $resetUrl = htmlspecialchars(storefront_public_path('/admin/index.php?page=journ
 </div>
 
 <div class="card">
-    <h3 class="card-title">تصفية</h3>
     <form method="get" action="">
         <input type="hidden" name="page" value="journal_voucher_reports">
-        <div class="jvr-filter-tools">
+        <div class="jvr-filter-tools jvr-filter-tools--center">
             <div class="jvr-filter-tools__entry">
                 <label for="jvr_entry_type">نوع القيد</label>
                 <select id="jvr_entry_type" name="entry_type" class="admin-inp">
@@ -169,11 +180,6 @@ $resetUrl = htmlspecialchars(storefront_public_path('/admin/index.php?page=journ
             </div>
         </div>
     </form>
-    <p class="card-hint muted" style="margin:12px 0 0;line-height:1.45;">
-        <strong>لماذا تختلف التسميات عن «أنواع اليومية»؟</strong>
-        الفلترة هنا وفق القيمة التقنية <strong>entry_type</strong> المخزَّنة مع كل سند (مسار تشغيلي وقيود آلية)، وتُعرض تسمياتها من جدول المعرفات بالنظام؛ الرمز بين القوسين هو القيمة الفعلية في قاعدة البيانات.
-        أسماء «أنواع اليومية» في الإعدادات تخصّ دفتر التسجيل وواجهة الإدخال وقد لا تطابق ذلك حرفياً؛ ويجوز أن يتعدد <strong>entry_type</strong> المرتبط بيومية واحدة بحسب المسار.
-    </p>
 </div>
 
 <?php if (!orange_journal_vouchers_ready($pdo)): ?>

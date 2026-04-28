@@ -88,47 +88,48 @@ if ($useVouchers && $fyId > 0 && $accountId > 0) {
     unset($mr);
 }
 
-$base = htmlspecialchars(storefront_public_path('/admin/index.php'), ENT_QUOTES, 'UTF-8');
+
 ?>
 <div class="admin-fy-shell" dir="rtl">
     <h1 class="admin-fy-shell__title">الحركة الشهرية لحساب (GL)</h1>
-    <p class="admin-fy-shell__lead">
-        تجميع مدين ودائن لكل شهر ضمن السنة المالية المختارة — من سندات اليومية الموحّدة.
-        <a href="<?php echo $base; ?>?page=accounting_reports_index">العودة لفهرس التقارير</a>
-    </p>
 
-<div class="card admin-fy-card">
-    <h3 class="card-title">اختيار السنة والحساب</h3>
-    <form method="get" class="form-grid" style="max-width:560px;">
-        <input type="hidden" name="page" value="report_gl_account_monthly">
-        <div>
-            <label for="fy_gl_m">السنة المالية</label>
-            <select name="fy" id="fy_gl_m">
-                <?php foreach ($years as $y): ?>
-                    <option value="<?php echo (int) $y['id']; ?>"<?php echo (int) $y['id'] === $fyId ? ' selected' : ''; ?>>
-                        <?php echo htmlspecialchars((string) ($y['label_ar'] ?? $y['id']), ENT_QUOTES, 'UTF-8'); ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <input type="hidden" name="account" id="gl_m_account_id" value="<?php echo (int) $accountId; ?>">
-        <div>
-            <label for="gl_m_acc_code">كود الحساب</label>
-            <input type="text" id="gl_m_acc_code" autocomplete="off" readonly class="admin-inp gl-m-acc-code-inp"
-                placeholder="نقرتان للاختيار"
-                title="نقرتان للاختيار"
-                value="<?php echo htmlspecialchars($accCodeDisp, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
-        </div>
-        <div>
-            <label for="gl_m_acc_name">اسم الحساب</label>
-            <input type="text" id="gl_m_acc_name" tabindex="-1" readonly autocomplete="off" class="admin-inp gl-m-acc-name-inp"
-                placeholder="—" title="يُعبأ بعد اختيار الحساب" value="<?php echo htmlspecialchars($accNameDisp, ENT_QUOTES, 'UTF-8'); ?>">
-        </div>
-        <div class="actions" style="align-self:end;">
-            <button type="submit">عرض</button>
-        </div>
-    </form>
-</div>
+    <div class="card admin-fy-card gas-acc-stmt-search-card">
+        <form method="get" class="gas-acc-stmt-filter-form" id="gl_m_monthly_form">
+            <input type="hidden" name="page" value="report_gl_account_monthly">
+            <input type="hidden" name="account" id="gl_m_account_id" value="<?php echo (int) $accountId; ?>">
+            <div class="gas-acc-stmt-toolbar-wrap">
+                <div class="gas-acc-stmt-toolbar gl-m-monthly-toolbar gas-acc-stmt-toolbar--main-center">
+                    <div class="gas-acc-stmt-field gl-m-stmt-field--fy">
+                        <label for="fy_gl_m">السنة المالية</label>
+                        <select name="fy" id="fy_gl_m" class="admin-inp">
+                            <?php foreach ($years as $y): ?>
+                                <option value="<?php echo (int) $y['id']; ?>"<?php echo (int) $y['id'] === $fyId ? ' selected' : ''; ?>>
+                                    <?php echo htmlspecialchars((string) ($y['label_ar'] ?? $y['id']), ENT_QUOTES, 'UTF-8'); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="gas-acc-stmt-field gas-acc-stmt-field--code">
+                        <label for="gl_m_acc_code">كود الحساب</label>
+                        <input type="text" id="gl_m_acc_code" autocomplete="off" readonly
+                            class="admin-inp gas-acc-stmt-acc-code-input gl-m-acc-code-inp"
+                            placeholder="نقرتان للاختيار"
+                            title="نقرتان للاختيار"
+                            value="<?php echo htmlspecialchars($accCodeDisp, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
+                    </div>
+                    <div class="gas-acc-stmt-field gas-acc-stmt-field--name">
+                        <label for="gl_m_acc_name">اسم الحساب</label>
+                        <input type="text" id="gl_m_acc_name" tabindex="-1" readonly autocomplete="off"
+                            class="admin-inp gas-acc-stmt-acc-name-input gl-m-acc-name-inp"
+                            placeholder="—" title="يُعبأ بعد اختيار الحساب" value="<?php echo htmlspecialchars($accNameDisp, ENT_QUOTES, 'UTF-8'); ?>">
+                    </div>
+                    <div class="gas-acc-stmt-actions">
+                        <button type="submit">عرض</button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
 
 <div class="gl-pick-modal" id="gl_m_pick_modal" hidden aria-hidden="true">
     <div class="gl-pick-modal__backdrop" id="gl_m_pick_backdrop"></div>
