@@ -102,7 +102,7 @@ $financialWithFy = $financialBase . (isset($_GET['fy']) && (int) $_GET['fy'] > 0
                     <td>من «الدليل المحاسبي» افتح حساباً ثم روابط الإجماليات والكشف، أو استخدم روابط قائمة الدخل أدناه مع اختيار الحساب.</td>
                 </tr>
                 <tr>
-                    <td>الحركة الشهرية لحساب (تجميع مدين / دائن لكل شهر ضمن سنة)</td>
+                    <td>الحركة الشهرية لحساب (تجميع مدين / دائن لكل شهر تقويمي في مدى تختاره)</td>
                     <td><span class="badge approved">شاشة مخصّصة</span></td>
                     <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=report_gl_account_monthly', ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
                 </tr>

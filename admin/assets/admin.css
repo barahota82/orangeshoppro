@@ -4064,16 +4064,15 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     text-align: center;
 }
 
-/* الحركة الشهرية لحساب — سنة + من/إلى شهر + كود + اسم + أزرار */
+/* الحركة الشهرية لحساب — من/إلى شهر (تقويم) + كود + اسم + أزرار */
 .gl-m-monthly-toolbar.gas-acc-stmt-toolbar {
     grid-template-columns:
-        minmax(11rem, 15rem)
         minmax(9.25rem, 10.75rem)
         minmax(9.25rem, 10.75rem)
         minmax(5.25rem, 7rem)
         minmax(12rem, 1fr)
         auto;
-    min-width: min(960px, 100%);
+    min-width: min(840px, 100%);
 }
 .jv-acct-picker {
     position: fixed;
