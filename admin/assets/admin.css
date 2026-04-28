@@ -4041,6 +4041,29 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     min-width: 780px;
 }
 
+.pl-monthly-matrix-wrap.ta-report-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.admin-fy-table.pl-monthly-matrix-table {
+    min-width: 760px;
+}
+
+.admin-fy-table.pl-monthly-matrix-table thead th.month-col {
+    white-space: nowrap;
+    font-size: 0.88rem;
+}
+
+.admin-fy-table.pl-monthly-matrix-table .pl-m-num {
+    unicode-bidi: isolate;
+}
+
+.admin-fy-table.pl-monthly-matrix-table tfoot th {
+    border-top: 2px solid #64748b;
+    background: #f1f5f9;
+}
+
 /* ميزان المراجعة — 8 أعمدة */
 .gl-acc-stmt-table.tb-report-table {
     min-width: 900px;

@@ -159,9 +159,10 @@ $financialWithFy = $financialBase . (isset($_GET['fy']) && (int) $_GET['fy'] > 0
                         — للتقويم المنفصل: <a href="<?php echo htmlspecialchars($baseAdmin . '?page=report_trial_balance', ENT_QUOTES, 'UTF-8'); ?>">ميزان المراجعة</a></td>
                 </tr>
                 <tr>
-                    <td>قائمة إيرادات ومصروفات شهرية مجمعة</td>
-                    <td><span class="muted">تطوير لاحق</span></td>
-                    <td>سيُختبر كأعمدة شهرية؛ راجع مؤقتاً <a href="<?php echo htmlspecialchars($baseAdmin . '?page=report_gl_account_monthly', ENT_QUOTES, 'UTF-8'); ?>">الحركة الشهرية لحساب</a>.</td>
+                    <td>قائمة إيرادات ومصروفات شهرية مجمعة (أعمدة شهرية بتوقيع قطاع قائمة الدخل)</td>
+                    <td><span class="badge approved">جاهز</span></td>
+                    <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=report_pl_monthly', ENT_QUOTES, 'UTF-8'); ?>">report_pl_monthly</a>
+                        — أو <a href="<?php echo htmlspecialchars($baseAdmin . '?page=report_gl_account_monthly', ENT_QUOTES, 'UTF-8'); ?>">حركة حساب واحد شهراً شهراً</a></td>
                 </tr>
                 <tr>
                     <td>أرباح وخسائر عموماً (صفحة وحدة بدل قائمة جزئيات)</td>
