@@ -118,13 +118,14 @@ $buildTradingSection = static function (
         if ($aid <= 0) {
             continue;
         }
-        $bucket = orange_accounts_pnl_bucket_for_report($pdo, $aid, orange_accounts_map_row_from_leaf_account_row($a));
+        $bucket = orange_accounts_pnl_bucket_for_trading_row($pdo, $aid, orange_accounts_map_row_from_leaf_account_row($a));
         if ($bucket !== $plClass) {
             continue;
         }
         if ($hasSec) {
             $sec = strtolower(trim((string) ($a['report_section'] ?? '')));
-            if ($sec !== '' && $sec !== 'trading') {
+            /* متاجرة = إيراد + تكلفة: تقبل فراغاً أو trading أو pnl (كثير من القواعد تضع القائمة كلها تحت pnl). */
+            if ($sec !== '' && ! in_array($sec, ['trading', 'pnl'], true)) {
                 continue;
             }
         }

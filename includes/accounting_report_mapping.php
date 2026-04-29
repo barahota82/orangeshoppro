@@ -116,6 +116,43 @@ function orange_accounts_map_row_from_leaf_account_row(array $leafRow): ?array
     return ['account_type' => $leafRow['account_type']];
 }
 
+/**
+ * دلو إيراد/تكلفة لقائمة المتاجرة فقط: يُفضّل الحقول المحفوظة إذا كانت متسقة مع دور الشجرة؛
+ * وإلا يُعاد دور الشجرة لتفادي إفراغ التقرير عند تعارض (مثلاً account_type = expense لحساب تحت جذر إيرادات).
+ */
+function orange_accounts_pnl_bucket_for_trading_row(PDO $pdo, int $accountId, ?array $mapRowFromLeaf): string
+{
+    $tree = orange_accounts_account_pl_role($pdo, $accountId);
+    $fromMap = orange_accounts_pnl_bucket_for_report($pdo, $accountId, $mapRowFromLeaf);
+    if (! in_array($tree, ['revenue', 'cogs'], true)) {
+        return $fromMap;
+    }
+    if (! in_array($fromMap, ['revenue', 'cogs', 'expense'], true)) {
+        return $tree;
+    }
+    if ($fromMap === $tree) {
+        return $fromMap;
+    }
+    /* تعارض: مصروف في الخريطة لكن الشجرة إيراد/تكلفة — اعتمد الشجرة. */
+    if ($fromMap === 'expense' && in_array($tree, ['revenue', 'cogs'], true)) {
+        return $tree;
+    }
+    /* شجرة = مصروف لكن الخريطة إيراد/تكلفة — اعتمد الخريطة. */
+    if (($fromMap === 'revenue' || $fromMap === 'cogs') && $tree === 'expense') {
+        return $fromMap;
+    }
+    /* إيراد مقابل تكلفة بين الخريطة والشجرة: نعتمد الخريطة لتمييز عمودي المتاجرة. */
+    if (
+        ($fromMap === 'revenue' || $fromMap === 'cogs')
+        && ($tree === 'revenue' || $tree === 'cogs')
+        && $fromMap !== $tree
+    ) {
+        return $fromMap;
+    }
+
+    return $fromMap;
+}
+
 /** تسمية عربية لقسم التقرير (قيم account_tree / الحقول المحفوظة). */
 function orange_accounts_report_section_label_ar(?string $sec): string
 {
