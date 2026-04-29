@@ -183,6 +183,7 @@ $nf = static function (float $v): string {
                             value="<?php echo htmlspecialchars($periodYmFrom, ENT_QUOTES, 'UTF-8'); ?>"
                             min="<?php echo htmlspecialchars($calYmMinBound, ENT_QUOTES, 'UTF-8'); ?>"
                             max="<?php echo htmlspecialchars($calYmMaxBound, ENT_QUOTES, 'UTF-8'); ?>"
+                            title="انقر الحقل؛ في منتقي المتصفّح انقر سنة الشهر أو استخدم الأسهم لتغيير السنة (2000–2100)."
                             autocomplete="off">
                     </div>
                     <div class="gas-acc-stmt-field gl-m-stmt-field--month">
@@ -192,6 +193,7 @@ $nf = static function (float $v): string {
                             value="<?php echo htmlspecialchars($periodYmTo, ENT_QUOTES, 'UTF-8'); ?>"
                             min="<?php echo htmlspecialchars($calYmMinBound, ENT_QUOTES, 'UTF-8'); ?>"
                             max="<?php echo htmlspecialchars($calYmMaxBound, ENT_QUOTES, 'UTF-8'); ?>"
+                            title="انقر الحقل؛ في منتقي المتصفّح انقر سنة الشهر أو استخدم الأسهم لتغيير السنة (2000–2100)."
                             autocomplete="off">
                     </div>
                     <div class="gas-acc-stmt-actions">
@@ -203,12 +205,6 @@ $nf = static function (float $v): string {
                 </div>
             </div>
         </form>
-        <p class="card-hint" style="margin-top:12px;margin-bottom:0;">
-            ميـــزان المراجعة بالأرصــدة بتقويم شهر/سنة مثل «الحركة الشهرية لحساب»: أولاَف الفترة = سندات قبل أول اليوم؛
-            حركة الفترة = بين أول يوم وأخر اليوم وفقًا لـ<strong>تاريخ السند</strong>؛
-            الرصيد الختامي = مجموعة المبالغ التراكمية في مدين ودائن.
-            <span class="muted" style="display:block;margin-top:8px;font-size:0.9rem;">يشمل الحسابات الفرعية فقط بحسب دليلكم.</span>
-        </p>
     </div>
 
 <?php if (! $useVouchers): ?>
@@ -307,10 +303,6 @@ $nf = static function (float $v): string {
                 <p class="gl-acc-stmt-print-metafoot" dir="ltr">تاريخ الطباعة: <?php echo htmlspecialchars($printDatetime, ENT_QUOTES, 'UTF-8'); ?> — صفحة 1 من 1</p>
             </div>
         </div>
-        <p class="card-hint gl-acc-stmt-no-print" style="margin-top:12px;margin-bottom:0;">
-            المدى: <span dir="ltr"><?php echo htmlspecialchars($periodLabel, ENT_QUOTES, 'UTF-8'); ?></span>
-            — للمقارنة مع ميزان السنة المالية في «التقارير المالية» استخدم نفس الحسابات مع قيود السنة المالية المختارة هناك.
-        </p>
     </div>
 <?php endif; ?>
 

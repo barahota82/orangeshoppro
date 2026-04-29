@@ -227,7 +227,7 @@ $fmt5 = static function (float $v): string {
                             value="<?php echo htmlspecialchars($periodYmFrom, ENT_QUOTES, 'UTF-8'); ?>"
                             min="<?php echo htmlspecialchars($calYmMinBound, ENT_QUOTES, 'UTF-8'); ?>"
                             max="<?php echo htmlspecialchars($calYmMaxBound, ENT_QUOTES, 'UTF-8'); ?>"
-                            title="أول يوم وأخر يوم من الشهرين (مثل تقرير الحركة الشهرية لحساب)."
+                            title="انقر الحقل؛ في منتقي المتصفّح انقر سنة الشهر أو استخدم الأسهم لتغيير السنة (2000–2100)."
                             autocomplete="off">
                     </div>
                     <div class="gas-acc-stmt-field gl-m-stmt-field--month">
@@ -237,6 +237,7 @@ $fmt5 = static function (float $v): string {
                             value="<?php echo htmlspecialchars($periodYmTo, ENT_QUOTES, 'UTF-8'); ?>"
                             min="<?php echo htmlspecialchars($calYmMinBound, ENT_QUOTES, 'UTF-8'); ?>"
                             max="<?php echo htmlspecialchars($calYmMaxBound, ENT_QUOTES, 'UTF-8'); ?>"
+                            title="انقر الحقل؛ في منتقي المتصفّح انقر سنة الشهر أو استخدم الأسهم لتغيير السنة (2000–2100)."
                             autocomplete="off">
                     </div>
                     <div class="gas-acc-stmt-actions">
@@ -248,11 +249,6 @@ $fmt5 = static function (float $v): string {
                 </div>
             </div>
         </form>
-        <p class="card-hint" style="margin-top:12px;margin-bottom:0;">
-            شبكة الأعمدة مطابقة لقالب Excel المرجعي: <strong>كود الحساب</strong>، <strong>اسم الحساب</strong>،
-            <strong>رصيد أول الفترة</strong>، <strong>رصيد الفترة</strong>، <strong>الرصيد</strong>؛
-            التصفية بتقويم شهر/سنة مثل «الحركة الشهرية لحساب» و<strong>تاريخ السند</strong>.
-        </p>
     </div>
 
 <?php if (! $useVouchers): ?>
@@ -364,10 +360,6 @@ $fmt5 = static function (float $v): string {
                 <p class="gl-acc-stmt-print-metafoot" dir="ltr">تاريخ ووقت الطباعة: <?php echo htmlspecialchars($printDatetime, ENT_QUOTES, 'UTF-8'); ?> — صفحة 1 من 1</p>
             </div>
         </div>
-        <p class="card-hint gl-acc-stmt-no-print" style="margin-top:12px;margin-bottom:0;">
-            مدى التاريخ: <span dir="ltr"><?php echo htmlspecialchars($periodLabel, ENT_QUOTES, 'UTF-8'); ?></span>
-            — مجمل الرصيد = مجموع عمود الرصيد لصف «اجمالى مبيعات» + «اجمالى تكلفة مبيعات» (بتوقيع قطاع المتاجرة).
-        </p>
     </div>
 <?php endif; ?>
 

@@ -3991,15 +3991,23 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     padding: 0 0.35rem;
 }
 
-/* قائمة حساب المتاجرة — شريط بحث (شهرين فقط) */
+/* تقارير شهر/سنة (من شهر → إلى شهر): نفس أبعاد حقول «من/إلى شهر» في الحركة الشهرية لحساب */
 .ta-report-toolbar.gas-acc-stmt-toolbar {
     grid-template-columns:
-        minmax(5.25rem, 7rem)
-        minmax(5.25rem, 7rem)
+        minmax(9.25rem, 10.75rem)
+        minmax(9.25rem, 10.75rem)
         auto;
     gap: 12px 14px;
     align-items: end;
-    min-width: 420px;
+    min-width: min(840px, 100%);
+}
+
+.ta-report-toolbar.ta-report-toolbar--pl-extra.gas-acc-stmt-toolbar {
+    grid-template-columns:
+        minmax(9.25rem, 10.75rem)
+        minmax(9.25rem, 10.75rem)
+        minmax(14rem, 1fr)
+        auto;
 }
 
 .ta-report-print-title .gl-acc-stmt-print-title-ar {
@@ -4135,8 +4143,7 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 }
 
 @media print {
-    .admin-fy-shell .gl-acc-stmt-no-print,
-    .pl-month-range-muted {
+    .admin-fy-shell .gl-acc-stmt-no-print {
         display: none !important;
     }
 

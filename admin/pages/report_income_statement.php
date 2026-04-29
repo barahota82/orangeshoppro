@@ -229,7 +229,6 @@ $totalExpIndOpening = $sumOpen($indirectExpenseOnly);
 $totalExpIndPeriod = $sumPer($indirectExpenseOnly);
 $totalExpIndClosing = $sumClose($indirectExpenseOnly);
 
-/* مجمل الربح = إيرادات − تكلفة مبيعات؛ صافي الربح = مجمل الربح − مصروفات */
 $grossOpening = $totalRevOpening - $totalCogsOpening;
 $grossPeriod = $totalRevPeriod - $totalCogsPeriod;
 $grossClosing = $totalRevClosing - $totalCogsClosing;
@@ -274,7 +273,7 @@ $fmt5 = static function (float $v): string {
                             value="<?php echo htmlspecialchars($periodYmFrom, ENT_QUOTES, 'UTF-8'); ?>"
                             min="<?php echo htmlspecialchars($calYmMinBound, ENT_QUOTES, 'UTF-8'); ?>"
                             max="<?php echo htmlspecialchars($calYmMaxBound, ENT_QUOTES, 'UTF-8'); ?>"
-                            title="أول وأخر يوم من الشهرين (مثل الحركة الشهرية لحساب)، حسب تاريخ السند."
+                            title="انقر الحقل؛ في منتقي المتصفّح انقر سنة الشهر أو استخدم الأسهم لتغيير السنة (2000–2100)."
                             autocomplete="off">
                     </div>
                     <div class="gas-acc-stmt-field gl-m-stmt-field--month">
@@ -284,6 +283,7 @@ $fmt5 = static function (float $v): string {
                             value="<?php echo htmlspecialchars($periodYmTo, ENT_QUOTES, 'UTF-8'); ?>"
                             min="<?php echo htmlspecialchars($calYmMinBound, ENT_QUOTES, 'UTF-8'); ?>"
                             max="<?php echo htmlspecialchars($calYmMaxBound, ENT_QUOTES, 'UTF-8'); ?>"
+                            title="انقر الحقل؛ في منتقي المتصفّح انقر سنة الشهر أو استخدم الأسهم لتغيير السنة (2000–2100)."
                             autocomplete="off">
                     </div>
                     <div class="gas-acc-stmt-actions">
@@ -295,10 +295,6 @@ $fmt5 = static function (float $v): string {
                 </div>
             </div>
         </form>
-        <p class="card-hint" style="margin-top:12px;margin-bottom:0;">
-            عمود القيود وفق تاريخ السند ضمن المدى؛ التصنيف إيراد / تكلفة مبيعات / مصروف يُستمد من جذور الدليل («إعداد الدليل» والأدوار المعتمدة في النظام).
-            شبكة الأعمدة مطابقة لقالب المتاجرة: كود الحساب، اسم الحساب، رصيد أول الفترة، قيود الفترة، الرصيد الختامي.
-        </p>
     </div>
 
 <?php if (! $useVouchers): ?>
@@ -492,11 +488,6 @@ $fmt5 = static function (float $v): string {
                 <p class="gl-acc-stmt-print-metafoot" dir="ltr">تاريخ ووقت الطباعة: <?php echo htmlspecialchars($printDatetime, ENT_QUOTES, 'UTF-8'); ?> — صفحة 1 من 1</p>
             </div>
         </div>
-        <p class="card-hint gl-acc-stmt-no-print" style="margin-top:12px;margin-bottom:0;">
-            مدى التاريخ: <span dir="ltr"><?php echo htmlspecialchars($periodLabel, ENT_QUOTES, 'UTF-8'); ?></span>
-            — مجمل الربح = اجمالى مبيعات − اجمالى تكلفة مبيعات؛ صافى الربح = مجمل الربح − مجموع المصروفات؛
-            والمصروفات المباشرة/غير المباشرة تُجمَّع بتقريب وفق أوائل أكواد 610–629 و630–699 (ما عدا ذلك يعرض ضمن المباشرة إلى حين مطابقة الدليل).
-        </p>
     </div>
 <?php endif; ?>
 

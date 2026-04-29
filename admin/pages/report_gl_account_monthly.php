@@ -259,10 +259,6 @@ if (orange_table_exists($pdo, 'company_settings')) {
                 </div>
             </div>
         </form>
-        <p class="card-hint" style="margin-top:12px;margin-bottom:0;">
-            تقرير تقويمي: أول وآخر يوم للشهرين المختارين؛ يجمّع أي سند سندًا لـ<strong>تاريخ السند</strong> ضمن المدى (قد تشمل أكثر من سنة مالية). الأشهر بلا حركة لا صفوف لها.
-            <span class="muted" style="display:block;margin-top:8px;font-size:0.9rem;">ظهور سنة 2026 عند الفتح هو الافتراضي للسنة الحالية على جهازك/السيرفر؛ لتغيير السنة انقر الحقل ثم غيّر السنة من منتقي المتصفّح (كُروم/إيدج: غالباً نقرة على رقم السنة أو ‹ ›).</span>
-        </p>
     </div>
 
 <div class="gl-pick-modal gl-acc-stmt-no-print" id="gl_m_pick_modal" hidden aria-hidden="true">
@@ -475,9 +471,6 @@ if (orange_table_exists($pdo, 'company_settings')) {
             <p class="gl-acc-stmt-print-metafoot" dir="ltr">تاريخ ووقت الطباعة: <?php echo htmlspecialchars($printDatetime, ENT_QUOTES, 'UTF-8'); ?> — صفحة 1 من 1</p>
         </div>
     </div>
-    <p class="card-hint gl-acc-stmt-no-print" style="margin-top:12px;margin-bottom:0;">
-        تقرير تقويمي بحدود يوم السند الأول/الأخير للمدى (<span dir="ltr"><?php echo htmlspecialchars($periodLabel, ENT_QUOTES, 'UTF-8'); ?></span>). الرصيد يبدأ قبل أول اليوم وفق المعامل المحاسبي (مجموع مدين − مجموع دائن). الأشهر بلا حركة لا تظهر صفوفاً لها.
-    </p>
 </div>
 <?php else: ?>
 <div class="card admin-fy-card">

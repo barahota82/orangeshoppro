@@ -357,7 +357,7 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
         <form method="get" class="gas-acc-stmt-filter-form" id="pl_m_form">
             <input type="hidden" name="page" value="report_pl_monthly">
             <div class="gas-acc-stmt-toolbar-wrap">
-                <div class="gas-acc-stmt-toolbar ta-report-toolbar gas-acc-stmt-toolbar--main-center">
+                <div class="gas-acc-stmt-toolbar ta-report-toolbar ta-report-toolbar--pl-extra gas-acc-stmt-toolbar--main-center">
                     <div class="gas-acc-stmt-field gl-m-stmt-field--month">
                         <label for="pl_m_month_from">من شهر</label>
                         <input type="month" name="m_from" id="pl_m_month_from" class="admin-inp"
@@ -365,6 +365,7 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
                             value="<?php echo htmlspecialchars($periodYmFrom, ENT_QUOTES, 'UTF-8'); ?>"
                             min="<?php echo htmlspecialchars($calYmMinBound, ENT_QUOTES, 'UTF-8'); ?>"
                             max="<?php echo htmlspecialchars($calYmMaxBound, ENT_QUOTES, 'UTF-8'); ?>"
+                            title="انقر الحقل؛ في منتقي المتصفّح انقر سنة الشهر أو استخدم الأسهم لتغيير السنة (2000–2100)."
                             autocomplete="off">
                     </div>
                     <div class="gas-acc-stmt-field gl-m-stmt-field--month">
@@ -374,6 +375,7 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
                             value="<?php echo htmlspecialchars($periodYmTo, ENT_QUOTES, 'UTF-8'); ?>"
                             min="<?php echo htmlspecialchars($calYmMinBound, ENT_QUOTES, 'UTF-8'); ?>"
                             max="<?php echo htmlspecialchars($calYmMaxBound, ENT_QUOTES, 'UTF-8'); ?>"
+                            title="انقر الحقل؛ في منتقي المتصفّح انقر سنة الشهر أو استخدم الأسهم لتغيير السنة (2000–2100)."
                             autocomplete="off">
                     </div>
                     <label class="gas-acc-stmt-field" style="align-items:flex-start;margin-top:0.15rem;">
@@ -389,9 +391,6 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
                 </div>
             </div>
         </form>
-        <p class="card-hint pl-month-range-muted" style="margin-top:12px;margin-bottom:0;">
-            التقرير يطابق تخطيط المرجع: بلوكان جنب بعض — <strong>إيرادات</strong> و<strong>مصروفات وتكلفة</strong> — بثلاثة أعمدة لكل طرف (الرصيد، اسم الحساب، الكود)، مع صفوف «ربح» و«إجمالي»؛ أكثر من شهر يُكرَّر القالب مع فاصل بين الشهور للطباعة.
-        </p>
     </div>
 
 <?php if (! $useVouchers): ?>
