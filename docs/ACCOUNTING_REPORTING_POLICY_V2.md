@@ -22,7 +22,7 @@ Reporting **must**:
 - Fall back to **tree/P&amp;L role** helpers (`orange_accounts_account_pl_role` / `bs_role`) **only where** `report_line_id` / mapping columns were never set (legacy databases).
 - Enforce **`debit == credit`** at journal voucher level independently of titles (existing voucher logic).
 
-Screens updated toward mapping-first grouping include **Trading** (`admin/pages/report_trading_account.php`), **Income Statement** (`admin/pages/report_income_statement.php`), and the shared helpers used by **Financial report** (P&amp;L / balance summary and the **embedded trial balance** table on the same page), **standalone trial balance** (`admin/pages/report_trial_balance.php`), and **monthly P&amp;L** (`admin/pages/report_pl_monthly.php`) via `includes/accounting_report_mapping.php`. Broader reports should follow the same pattern when touching them.
+Screens updated toward mapping-first grouping include **Trading** and **Income Statement** (section membership via **`orange_accounts_pnl_bucket_for_report`** plus `orange_accounts_map_row_from_leaf_account_row` before `report_section` gates). **Year-over-year P&amp;L comparison** (`admin/pages/report_pl_compare_years.php`) uses **`orange_accounts_fy_pl_summary_from_vouchers`**. The same shared helpers underpin **Financial report** (P&amp;L / balance summary and **embedded trial balance**), **standalone trial balance** (`admin/pages/report_trial_balance.php`), and **monthly P&amp;L** (`admin/pages/report_pl_monthly.php`) in `includes/accounting_report_mapping.php`. Broader reports should follow the same pattern when touching them.
 
 ---
 

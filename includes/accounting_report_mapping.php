@@ -99,6 +99,23 @@ function orange_accounts_bs_bucket_for_report(PDO $pdo, int $accountId, ?array $
     return in_array($br, ['asset', 'liability', 'equity'], true) ? $br : 'other';
 }
 
+/**
+ * صف خريطة لـ {@see orange_accounts_pnl_bucket_for_report} من صف ناتج عن
+ * `orange_financial_report_leaf_accounts_with_mapping()` — يُعبَّأ فقط عند وجود account_type غير فارغ.
+ */
+function orange_accounts_map_row_from_leaf_account_row(array $leafRow): ?array
+{
+    if (! array_key_exists('account_type', $leafRow)) {
+        return null;
+    }
+    $raw = trim((string) ($leafRow['account_type'] ?? ''));
+    if ($raw === '') {
+        return null;
+    }
+
+    return ['account_type' => $leafRow['account_type']];
+}
+
 /** تسمية عربية لقسم التقرير (قيم account_tree / الحقول المحفوظة). */
 function orange_accounts_report_section_label_ar(?string $sec): string
 {
@@ -177,4 +194,40 @@ function orange_accounts_report_tb_rows_compare(array $x, array $y): int
     }
 
     return strcmp((string) ($x['code'] ?? ''), (string) ($y['code'] ?? ''));
+}
+
+/**
+ * ملخص قائمة الدخل لسنة مالية واحدة من السندات (بدون أرصدة افتتاح ولا قيود إقفال)، بخريطة الحساب المحفوظة ثم دور الشجرة.
+ *
+ * @param array<int, array<string, mixed>> $mapById ناتج orange_accounts_report_mapping_by_ids
+ *
+ * @return array{revenue: float, cogs_expense: float, net: float}
+ */
+function orange_accounts_fy_pl_summary_from_vouchers(PDO $pdo, int $fiscalYearId, array $mapById): array
+{
+    require_once __DIR__ . '/journal_voucher.php';
+    $zero = ['revenue' => 0.0, 'cogs_expense' => 0.0, 'net' => 0.0];
+    if ($fiscalYearId <= 0 || ! function_exists('orange_journal_vouchers_ready') || ! orange_journal_vouchers_ready($pdo)) {
+        return $zero;
+    }
+    $tbPl = orange_voucher_account_totals($pdo, $fiscalYearId, ['opening_balance', 'year_end_close']);
+    $plRevenue = 0.0;
+    $plExpense = 0.0;
+    foreach ($tbPl as $aid => $t) {
+        $cls = orange_accounts_pnl_bucket_for_report($pdo, (int) $aid, $mapById[(int) $aid] ?? null);
+        $deb = (float) $t['debit'];
+        $cred = (float) $t['credit'];
+        if ($cls === 'revenue') {
+            $plRevenue += ($cred - $deb);
+        } elseif ($cls === 'expense' || $cls === 'cogs') {
+            $plExpense += ($deb - $cred);
+        }
+    }
+    $net = round($plRevenue - $plExpense, 2);
+
+    return [
+        'revenue' => round($plRevenue, 2),
+        'cogs_expense' => round($plExpense, 2),
+        'net' => $net,
+    ];
 }

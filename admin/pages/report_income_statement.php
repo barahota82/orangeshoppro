@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/financial_report_breakdown.php';
+require_once __DIR__ . '/../../includes/accounting_report_mapping.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -119,8 +120,8 @@ $buildPlSection = static function (
         if ($aid <= 0) {
             continue;
         }
-        $pr = orange_accounts_account_pl_role($pdo, $aid);
-        if ($pr !== $plClass) {
+        $bucket = orange_accounts_pnl_bucket_for_report($pdo, $aid, orange_accounts_map_row_from_leaf_account_row($a));
+        if ($bucket !== $plClass) {
             continue;
         }
         if ($hasSec) {
@@ -191,6 +192,8 @@ $cogsLines = $useVouchers ? $buildPlSection($pdo, $accountsLeaf, $tbRange, $tbBe
 $expenseLines = $useVouchers ? $buildPlSection($pdo, $accountsLeaf, $tbRange, $tbBefore, 'expense') : [];
 
 /**
+ * تفريع مصروفات مباشرة / غير مباشرة وفق كود سطر المرجع فقط — لا يُستدل من رقم كود الحساب (سياسة v2).
+ *
  * @return array{direct: list, indirect: list, misc: list}
  */
 $splitExpenseBuckets = static function (array $expLines): array {
@@ -199,43 +202,34 @@ $splitExpenseBuckets = static function (array $expLines): array {
     $misc = [];
     foreach ($expLines as $ln) {
         $mk = strtolower(trim((string) ($ln['report_line_master_code'] ?? '')));
-        if ($mk !== '') {
-            if ($mk === 'finance_expenses') {
-                $indirect[] = $ln;
+        if ($mk === 'finance_expenses') {
+            $indirect[] = $ln;
 
-                continue;
-            }
-            if (
+            continue;
+        }
+        if (
+            $mk !== ''
+            && (
                 $mk === 'operating_expenses'
                 || $mk === 'purchase_expenses'
                 || $mk === 'depreciation'
                 || $mk === 'expense'
                 || strpos($mk, 'cogs') === 0
-            ) {
-                $direct[] = $ln;
-
-                continue;
-            }
-        }
-        $code = trim((string) ($ln['code'] ?? ''));
-        $h = 0;
-        if (preg_match('/^(\d{3})/', $code, $m)) {
-            $h = (int) $m[1];
-        }
-        if ($h >= 610 && $h <= 629) {
+            )
+        ) {
             $direct[] = $ln;
-        } elseif ($h >= 630 && $h <= 699) {
-            $indirect[] = $ln;
-        } else {
-            $misc[] = $ln;
+
+            continue;
         }
+        /* كود مرجعي غير معروف أو فارغ يُجمَّع ضمن misc ثم مع المباشرة في العرض — راجع حقول المرجع في الدليل. */
+        $misc[] = $ln;
     }
 
     return ['direct' => $direct, 'indirect' => $indirect, 'misc' => $misc];
 };
 
 $expBuckets = $splitExpenseBuckets($expenseLines);
-/** مصروفات مباشرة + ما لا يُصنَّف بمدى 630–699 يُعرَض مع المباشرة */
+/** مصروفات مباشرة + misc (بلا كود مرجعي معروف كغير مباشر) */
 $mergedDirectExpense = array_merge($expBuckets['direct'], $expBuckets['misc']);
 $indirectExpenseOnly = $expBuckets['indirect'];
 $useExpenseTwoBlocks = $indirectExpenseOnly !== [];

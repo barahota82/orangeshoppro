@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/date_format.php';
+require_once __DIR__ . '/../../includes/accounting_report_mapping.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -95,7 +96,7 @@ if (
 $accountsLeaf = orange_financial_report_leaf_accounts_with_mapping($pdo);
 
 /**
- * أسطر المتاجرة: تجميع وفق عنوان سطر التقرير المرجعي حيث وُجد report_line؛ وإلا دور القائمة التقليدي.
+ * أسطر المتاجرة: تصنيف الحسابات عبر account_type المحفوظ ثم دور الشجرة؛ تجميع عناوين عبر سطر المرجع حيث وُجد.
  *
  * @return list<array<string, mixed>>
  */
@@ -117,8 +118,8 @@ $buildTradingSection = static function (
         if ($aid <= 0) {
             continue;
         }
-        $pr = orange_accounts_account_pl_role($pdo, $aid);
-        if ($pr !== $plClass) {
+        $bucket = orange_accounts_pnl_bucket_for_report($pdo, $aid, orange_accounts_map_row_from_leaf_account_row($a));
+        if ($bucket !== $plClass) {
             continue;
         }
         if ($hasSec) {
