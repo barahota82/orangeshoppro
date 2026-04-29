@@ -126,16 +126,30 @@ function orange_accounts_pnl_bucket_for_trading_row(PDO $pdo, int $accountId, ?a
     $mapRep = orange_accounts_pnl_bucket_for_report($pdo, $accountId, $mapRowFromLeaf);
     $treePl = orange_accounts_account_pl_role($pdo, $accountId);
 
+    /*
+     * قائمة المتاجرة = مجمل الربح (إيرادات + تكلفة المبيعات) فقط بحسب دور جذر الشجرة (إيرادات / تكم / مصروف).
+     * عمود account_type المحفوظ قد يُعرِّف كل شيء «مصروف» بالخطأ بعد ترحيل أو استيراد — في هذه الحالة قائمة الدخل تعرضها تحت المصروفات
+     * وتبقى «المتاجرة» فارغة رغم الجذور 4 و5. المعتمد هنا دور الشجرة إذا كان إيراداً أو تكلفة بيع قبل استبعاد السطر بالمصروف.
+     */
+    if ($treePl === 'revenue' || $treePl === 'cogs') {
+        if ($mapRep === 'revenue' || $mapRep === 'cogs') {
+            /* الخريطة قد تشير لإيراد/تكم لا يُطابق الجذر 4/5 — للمتاجرة يُعتمد دور الجذر. */
+            return ($mapRep !== $treePl) ? $treePl : $mapRep;
+        }
+        /* map يقول expense لكن الشجرة تحت جذر مبيعات/تكم — المتاجرة تتبع الشجرة. */
+        if ($mapRep === 'expense') {
+            return $treePl;
+        }
+
+        return $treePl;
+    }
+
     if ($mapRep === 'expense') {
         return 'expense';
     }
 
     if ($mapRep === 'revenue' || $mapRep === 'cogs') {
         return $mapRep;
-    }
-
-    if ($treePl === 'revenue' || $treePl === 'cogs') {
-        return $treePl;
     }
 
     /* تعارض نادر: الشجرة مصروف لكن الخريطة تقول إيراد/تكلفة — المعتمدة للمتاجرة. */
