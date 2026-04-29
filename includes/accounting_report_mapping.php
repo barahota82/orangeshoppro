@@ -117,50 +117,22 @@ function orange_accounts_map_row_from_leaf_account_row(array $leafRow): ?array
 }
 
 /**
- * دلو إيراد/تكلفة لقائمة المتاجرة: يُعتمد تصنيف القائمة `orange_accounts_pnl_bucket_for_report`
- * (خريطة + شجرة)؛ المصروفات التشغيلية تُعرَض كمصروف (لا تشمل مجمل المتاجرة). عند البقاء `other`
- * تُكمَّل الشجرة بـ `orange_accounts_account_pl_role` لتفادي إفراغ الشاشة عند تعارض بيانات.
+ * ترتيب قطاع المتاجرة: نفس أساس `orange_accounts_pnl_bucket_for_report` مع ضبط بحسب جذور 4 و5 إذا قطعت القيم المحفوظة السطر.
  */
 function orange_accounts_pnl_bucket_for_trading_row(PDO $pdo, int $accountId, ?array $mapRowFromLeaf): string
 {
-    $mapRep = orange_accounts_pnl_bucket_for_report($pdo, $accountId, $mapRowFromLeaf);
-    $treePl = orange_accounts_account_pl_role($pdo, $accountId);
+    $b = orange_accounts_pnl_bucket_for_report($pdo, $accountId, $mapRowFromLeaf);
+    $tree = orange_accounts_account_pl_role($pdo, $accountId);
 
-    /*
-     * قائمة المتاجرة = مجمل الربح (إيرادات + تكلفة المبيعات) فقط بحسب دور جذر الشجرة (إيرادات / تكم / مصروف).
-     * عمود account_type المحفوظ قد يُعرِّف كل شيء «مصروف» بالخطأ بعد ترحيل أو استيراد — في هذه الحالة قائمة الدخل تعرضها تحت المصروفات
-     * وتبقى «المتاجرة» فارغة رغم الجذور 4 و5. المعتمد هنا دور الشجرة إذا كان إيراداً أو تكلفة بيع قبل استبعاد السطر بالمصروف.
-     */
-    if ($treePl === 'revenue' || $treePl === 'cogs') {
-        if ($mapRep === 'revenue' || $mapRep === 'cogs') {
-            /* الخريطة قد تشير لإيراد/تكم لا يُطابق الجذر 4/5 — للمتاجرة يُعتمد دور الجذر. */
-            return ($mapRep !== $treePl) ? $treePl : $mapRep;
-        }
-        /* map يقول expense لكن الشجرة تحت جذر مبيعات/تكم — المتاجرة تتبع الشجرة. */
-        if ($mapRep === 'expense') {
-            return $treePl;
-        }
-
-        return $treePl;
+    if ($b === 'expense' && ($tree === 'revenue' || $tree === 'cogs')) {
+        return $tree;
     }
 
-    if ($mapRep === 'expense') {
-        return 'expense';
+    if ($b === 'other' && ($tree === 'revenue' || $tree === 'cogs')) {
+        return $tree;
     }
 
-    if ($mapRep === 'revenue' || $mapRep === 'cogs') {
-        return $mapRep;
-    }
-
-    /* تعارض نادر: الشجرة مصروف لكن الخريطة تقول إيراد/تكلفة — المعتمدة للمتاجرة. */
-    if ($treePl === 'expense') {
-        $at = strtolower(trim((string) (($mapRowFromLeaf ?? [])['account_type'] ?? '')));
-        if ($at === 'revenue' || $at === 'cogs') {
-            return $at;
-        }
-    }
-
-    return 'other';
+    return $b;
 }
 
 /** تسمية عربية لقسم التقرير (قيم account_tree / الحقول المحفوظة). */

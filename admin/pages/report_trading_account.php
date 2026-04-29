@@ -124,10 +124,24 @@ $buildTradingSection = static function (
         }
         if ($hasSec) {
             $sec = strtolower(trim((string) ($a['report_section'] ?? '')));
-            /* قيم الدليل: balance_sheet / cashflow لا تُعرَض في المتاجرة؛ الفراغ و none و trading و pnl مقبولة. */
-            $allowedSec = ['', 'none', 'trading', 'pnl'];
-            if ($sec !== '' && ! in_array($sec, $allowedSec, true)) {
-                continue;
+            /*
+             * قطاع المتاجرة: يُفترض أن يكون فارغ أو trading أو pnl أو none؛
+             * إذا وُسمت إيراد/تكم ب balance_sheet أو cashflow بالخطأ لا نُسقط السطر ما دام دور الشجرة يطابق قسم المتاجرة.
+             */
+            if ($sec !== '') {
+                $treePlRole = orange_accounts_account_pl_role($pdo, $aid);
+                $ambiguousPlSec = ['balance_sheet', 'cashflow'];
+                if (
+                    $treePlRole === $plClass
+                    && in_array($sec, $ambiguousPlSec, true)
+                ) {
+                    /* تجاهل وسم المتاجرة؛ الحساب فعلاً من قطاع المتاجرة حسب الشجرة/السلة. */
+                } else {
+                    $allowedSec = ['', 'none', 'trading', 'pnl'];
+                    if (! in_array($sec, $allowedSec, true)) {
+                        continue;
+                    }
+                }
             }
         }
         $d0 = $c0 = $d1 = $c1 = 0.0;
