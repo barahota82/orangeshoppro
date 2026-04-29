@@ -205,8 +205,8 @@ if (
              FROM journal_lines jl
              INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
              WHERE jl.account_id IN ($ph)
-               AND jv.voucher_date >= ?
-               AND jv.voucher_date <= ?
+               AND DATE(jv.voucher_date) >= ?
+               AND DATE(jv.voucher_date) <= ?
              GROUP BY jl.account_id, ym";
         $params = array_merge($ids, [$periodDateFrom, $periodDateTo]);
         $st = $pdo->prepare($sql);

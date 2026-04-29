@@ -687,6 +687,8 @@ function orange_voucher_account_totals(PDO $pdo, int $fiscalYearId, array $exclu
 
 /**
  * أرصدة مجمّعة لكل حساب ضمن مدى **تاريخ السند** (تقارير تقويمية بلا ربط بحصرية السنة المالية).
+ * يُقارَن بـ **تاريخ التقويم** لأن `voucher_date` مخزّن كـ DATETIME — المقارنة بسلسلة يوم فقط (`<= '2026-04-30'`)
+ * كانت تستبعد أي سند مسجَّل بعد منتصف ليل آخر يوم.
  *
  * @param list<string> $excludeEntryTypes أنواع سندات تُستبعد
  * @return array<int, array{debit:float,credit:float}>
@@ -708,7 +710,7 @@ function orange_voucher_account_totals_by_voucher_date_range(
     $sql = 'SELECT jl.account_id, COALESCE(SUM(jl.debit),0) AS d, COALESCE(SUM(jl.credit),0) AS c
             FROM journal_lines jl
             INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
-            WHERE jv.voucher_date >= ? AND jv.voucher_date <= ?';
+            WHERE DATE(jv.voucher_date) >= ? AND DATE(jv.voucher_date) <= ?';
     $params = [$dateFromYmd, $dateToYmd];
     if ($excludeEntryTypes !== []) {
         $placeholders = implode(',', array_fill(0, count($excludeEntryTypes), '?'));
@@ -732,7 +734,7 @@ function orange_voucher_account_totals_by_voucher_date_range(
 }
 
 /**
- * أرصدة مجمّعة لكل حساب من سندات بتاريخ **أقدم من** نطاق المدى (`voucher_date < ?`) — رصيد أول الفترة.
+ * أرصدة مجمّعة لكل حساب من سندات بتاريخ **أقدم من** بداية اليوم المعرّف (`DATE(voucher_date) < ?`) — رصيد أول الفترة.
  *
  * @param list<string> $excludeEntryTypes
  * @return array<int, array{debit:float,credit:float}>
@@ -752,7 +754,7 @@ function orange_voucher_account_totals_strictly_before_date(
     $sql = 'SELECT jl.account_id, COALESCE(SUM(jl.debit),0) AS d, COALESCE(SUM(jl.credit),0) AS c
             FROM journal_lines jl
             INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
-            WHERE jv.voucher_date < ?';
+            WHERE DATE(jv.voucher_date) < ?';
     $params = [$beforeDateYmd];
     if ($excludeEntryTypes !== []) {
         $placeholders = implode(',', array_fill(0, count($excludeEntryTypes), '?'));

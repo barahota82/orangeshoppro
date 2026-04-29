@@ -124,8 +124,9 @@ $buildTradingSection = static function (
         }
         if ($hasSec) {
             $sec = strtolower(trim((string) ($a['report_section'] ?? '')));
-            /* متاجرة = إيراد + تكلفة: تقبل فراغاً أو trading أو pnl (كثير من القواعد تضع القائمة كلها تحت pnl). */
-            if ($sec !== '' && ! in_array($sec, ['trading', 'pnl'], true)) {
+            /* قيم الدليل: balance_sheet / cashflow لا تُعرَض في المتاجرة؛ الفراغ و none و trading و pnl مقبولة. */
+            $allowedSec = ['', 'none', 'trading', 'pnl'];
+            if ($sec !== '' && ! in_array($sec, $allowedSec, true)) {
                 continue;
             }
         }

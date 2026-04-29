@@ -131,8 +131,8 @@ if (
          FROM journal_lines jl
          INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
          WHERE jl.account_id = ?
-           AND jv.voucher_date >= ?
-           AND jv.voucher_date <= ?
+           AND DATE(jv.voucher_date) >= ?
+           AND DATE(jv.voucher_date) <= ?
          GROUP BY ym
          ORDER BY ym ASC'
     );
@@ -150,7 +150,7 @@ if (
          FROM journal_lines jl
          INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
          WHERE jl.account_id = ?
-           AND jv.voucher_date < ?'
+           AND DATE(jv.voucher_date) < ?'
     );
     $stOb->execute([$accountId, $periodDateFrom]);
     $obl = $stOb->fetch(PDO::FETCH_ASSOC);
