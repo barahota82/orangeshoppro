@@ -4062,8 +4062,59 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     -webkit-overflow-scrolling: touch;
 }
 
+/* إيرادات | مصروفات جنب بعض — وفق شبكة المرجع */
+.pl-print-dual-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1rem 1.25rem;
+    align-items: start;
+}
+
+.pl-print-dual-col {
+    min-width: 0;
+}
+
+.pl-print-dual-h {
+    margin: 0 0 0.55rem;
+    text-align: center;
+    font-size: 1.02rem;
+    font-weight: 700;
+}
+
+.pl-month-pl-profit {
+    margin: 0.35rem 0 0;
+    text-align: center;
+    font-weight: 700;
+    font-size: 1.05rem;
+}
+
+.pl-month-meta-row {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.75rem 2rem;
+    margin: 0.4rem 0 0.85rem;
+    font-weight: 600;
+}
+
+.pl-print-side-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+@media screen and (max-width: 960px) {
+    .pl-print-dual-wrap {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
 .admin-fy-table.pl-month-table {
     min-width: 520px;
+}
+
+.pl-print-dual-wrap .admin-fy-table.pl-month-table {
+    min-width: 0;
+    width: 100%;
 }
 
 .admin-fy-table.pl-month-table tbody td.pl-m-num {
