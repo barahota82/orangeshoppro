@@ -163,7 +163,7 @@ if ($useVouchers && $fyId > 0 && orange_table_has_column($pdo, 'suppliers', 'pay
 
 $balanced = abs($sumDebit - $sumCredit) < 0.02;
 
-/* قائمة الدخل — بدون أرصدة افتتاح ولا إقفال */
+/* أرباح وخسائر (ملخص) — بدون أرصدة افتتاح ولا إقفال */
 $plRevenue = 0.0;
 $plExpense = 0.0;
 if ($useVouchers && $fyId > 0) {
@@ -205,7 +205,7 @@ $bsCheck = round($bsAssets - ($bsLiab + $bsEquity), 2);
     <div>
         <h1>التقارير المالية</h1>
         <p class="page-subtitle">
-            ميزان مراجعة، قائمة دخل، وميزانية عمومية مبسطة حسب <strong>جذر الحساب</strong>
+            ميزان مراجعة، وأرباح وخسائر ملخّصة، وميزانية عمومية مبسطة حسب <strong>جذر الحساب</strong>
             (كود الجذر وترتيبه في «إعداد الدليل» — مطابقة الجذور مع الأدوار في المشروع داخل account_tree.php).
             تفصيل <strong>الموردين</strong> من دفتر الذمم؛ تفصيل <strong>المصروفات</strong> من بنود التسجيل ومذكرات سطور حسابات المصروف.
         </p>
@@ -319,7 +319,7 @@ window.addEventListener('load', function () {
 <?php endif; ?>
 
 <div class="card" id="report-income">
-    <h3 class="card-title">قائمة الدخل (تقريبية)</h3>
+    <h3 class="card-title">أرباح وخسائر (ملخّص تقريبي)</h3>
     <p class="card-hint">استبعاد أرصدة الافتتاح وقيود إقفال السنة. حسابات بلا تصنيف «إيراد/مصروف/تكلفة» لا تُدخل هنا.</p>
     <div class="grid-2">
         <div class="stat-card"><h3>إجمالي الإيرادات (طبيعة دائنة)</h3><div class="value"><?php echo number_format($plRevenue, 2); ?></div></div>

@@ -100,7 +100,7 @@ $financialWithFy = $financialBase . (isset($_GET['fy']) && (int) $_GET['fy'] > 0
                 <tr>
                     <td>كشف حركة حساب خط بخط خلال سنة مالية</td>
                     <td><span class="badge approved">جاهز من الدليل</span></td>
-                    <td>من «الدليل المحاسبي» افتح حساباً ثم روابط الإجماليات والكشف، أو استخدم روابط قائمة الدخل أدناه مع اختيار الحساب.</td>
+                    <td>من «الدليل المحاسبي» افتح حساباً ثم روابط الإجماليات والكشف، أو استخدم تقرير <strong>أرباح وخسائر</strong> أدناه مع اختيار الحساب عند اللزوم.</td>
                 </tr>
                 <tr>
                     <td>الحركة الشهرية لحساب (تجميع مدين / دائن لكل شهر تقويمي في مدى تختاره)</td>
@@ -108,9 +108,9 @@ $financialWithFy = $financialBase . (isset($_GET['fy']) && (int) $_GET['fy'] > 0
                     <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=report_gl_account_monthly', ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
                 </tr>
                 <tr>
-                    <td>قائمة الدخل (إيرادات، تكلفة مبيعات، مصروفات — من شهر إلى شهر مثل الحركة الشهرية)</td>
+                    <td>أرباح وخسائر (إيرادات، تكلفة مبيعات، مصروفات — من شهر إلى شهر مثل الحركة الشهرية)</td>
                     <td><span class="badge approved">جاهز</span></td>
-                    <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=report_income_statement', ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
+                    <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=report_income_statement', ENT_QUOTES, 'UTF-8'); ?>">أرباح وخسائر</a></td>
                 </tr>
             </tbody>
         </table>
@@ -133,19 +133,19 @@ $financialWithFy = $financialBase . (isset($_GET['fy']) && (int) $_GET['fy'] > 0
             </thead>
             <tbody>
                 <tr>
-                    <td>قائمة الدخل ملخّصة (إيراد / مصروف وصافي تقريبي)</td>
+                    <td>أرباح وخسائر ملخّصة (إيراد / مصروف وصافي تقريبي — ضمن شاشة «التقارير المالية»)</td>
                     <td><span class="badge approved">معروض ضمن الشاشة</span></td>
                     <td><a href="<?php echo $financialWithFy; ?>#report-income">#report-income</a></td>
                 </tr>
                 <tr>
-                    <td>قائمة الدخل تفصيلية بتقويم (مثل ملف قائمة الدخل Excel)</td>
+                    <td>أرباح وخسائر تفصيلية بتقويم (مثل الجداول المرجعية لقائمة الأرباح والخسائر)</td>
                     <td><span class="badge approved">شاشة مستقلة</span></td>
-                    <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=report_income_statement', ENT_QUOTES, 'UTF-8'); ?>">report_income_statement</a></td>
+                    <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=report_income_statement', ENT_QUOTES, 'UTF-8'); ?>">أرباح وخسائر (شاشة)</a></td>
                 </tr>
                 <tr>
                     <td>قائمة حساب المتاجرة / تجزئة نتيجة التشغيل (عند احتياج لفصل المتاجرة رسمياً)</td>
-                    <td><span class="muted">يجري توثيق المنطق لاحقاً بجانب قائمة الدخل</span></td>
-                    <td>توجيه مبدئي: نفس مسار قائمة الدخل حتى يُعتمد دليلكم لأقسام المتاجرة.</td>
+                    <td><span class="muted">يجري توثيق المنطق لاحقاً بجانب تقرير أرباح وخسائر</span></td>
+                    <td>توجيه مبدئي: نفس مسار أرباح وخسائر حتى يُعتمد دليلكم لأقسام المتاجرة.</td>
                 </tr>
                 <tr>
                     <td>الميزانية العمومية (موجز أصول وخصوم وحقوق)</td>
@@ -165,11 +165,6 @@ $financialWithFy = $financialBase . (isset($_GET['fy']) && (int) $_GET['fy'] > 0
                         — أو <a href="<?php echo htmlspecialchars($baseAdmin . '?page=report_gl_account_monthly', ENT_QUOTES, 'UTF-8'); ?>">حركة حساب واحد شهراً شهراً</a></td>
                 </tr>
                 <tr>
-                    <td>أرباح وخسائر عموماً (صفحة وحدة بدل قائمة جزئيات)</td>
-                    <td><span class="badge approved">صفافي قائمة الدخل</span></td>
-                    <td><a href="<?php echo $financialWithFy; ?>#report-income">قائمة الدخل</a></td>
-                </tr>
-                <tr>
                     <td>أرباح وخسائر مقارنة بين سنوات مالية متعددة</td>
                     <td><span class="muted">تطوير لاحق</span></td>
                     <td>سيُضاف بعد تثبيت تعريف صافي السنة الموحدة.</td>
@@ -182,7 +177,7 @@ $financialWithFy = $financialBase . (isset($_GET['fy']) && (int) $_GET['fy'] > 0
 <div class="card">
     <h3 class="card-title">تذكير</h3>
     <ul class="card-hint" style="margin:0;padding-right:1.25rem;">
-        <li>«التقارير المالية» تعتمد على تصنيف جذور الحساب في <code>includes/account_tree.php</code> ومراجع الأدوار؛ أي حساب لا يُوزَّن لا يُظهر عدلاً في الميزانية الموجزة أو قائمة الدخل.</li>
+        <li>«التقارير المالية» تعتمد على تصنيف جذور الحساب في <code>includes/account_tree.php</code> ومراجع الأدوار؛ أي حساب لا يُوزَّن لا يُظهر عدلاً في الميزانية الموجزة أو في تقارير الأرباح والخسائر.</li>
         <li>لإضافة صفحة تقرير جديدة حقيقياً ضع ملفاً تحت <code>admin/pages/</code> ثم اسم الصفحة في <code>admin/index.php</code> والصلاحيات والقائمة.</li>
     </ul>
 </div>

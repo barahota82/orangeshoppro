@@ -258,7 +258,7 @@ $fmt5 = static function (float $v): string {
 ?>
 <div class="admin-fy-shell" dir="rtl">
     <div class="gl-acc-stmt-no-print">
-        <h1 class="admin-fy-shell__title">قائمة الدخل</h1>
+        <h1 class="admin-fy-shell__title">أرباح وخسائر</h1>
     </div>
 
     <div class="card admin-fy-card gl-acc-stmt-no-print gas-acc-stmt-search-card">
@@ -299,7 +299,7 @@ $fmt5 = static function (float $v): string {
 
 <?php if (! $useVouchers): ?>
     <div class="card admin-fy-card">
-        <p class="muted">سندات اليومية غير جاهزة بعد — لا يمكن عرض قائمة الدخل.</p>
+        <p class="muted">سندات اليومية غير جاهزة بعد — لا يمكن عرض تقرير أرباح وخسائر.</p>
     </div>
 <?php elseif ($periodLabel === ''): ?>
     <div class="card admin-fy-card">
@@ -313,7 +313,7 @@ $fmt5 = static function (float $v): string {
                     <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
                 <?php endif; ?>
                 <h2 class="gl-acc-stmt-print-title ta-report-print-title">
-                    <span class="gl-acc-stmt-print-title-ar" lang="ar">تقرير قائمة الدخل عن الفترة من <?php echo htmlspecialchars($reportDateFromDmY, ENT_QUOTES, 'UTF-8'); ?> إلـى&nbsp;<?php echo htmlspecialchars($reportDateToDmY, ENT_QUOTES, 'UTF-8'); ?></span>
+                    <span class="gl-acc-stmt-print-title-ar" lang="ar">تقرير أرباح وخسائر عن الفترة من <?php echo htmlspecialchars($reportDateFromDmY, ENT_QUOTES, 'UTF-8'); ?> إلـى&nbsp;<?php echo htmlspecialchars($reportDateToDmY, ENT_QUOTES, 'UTF-8'); ?></span>
                 </h2>
             </header>
             <div class="gl-acc-stmt-print-grid">
@@ -481,7 +481,7 @@ $fmt5 = static function (float $v): string {
             </div>
 
             <?php if (! $hasPlData): ?>
-                <p class="card-hint ta-report-empty-msg" style="margin-top:10px;margin-bottom:0;">لا توجد حركة إيرادات أو تكلفة أو مصروف على حسابات فرعية تصنَّف قطاع قائمة الدخل في المدى.</p>
+                <p class="card-hint ta-report-empty-msg" style="margin-top:10px;margin-bottom:0;">لا توجد حركة إيرادات أو تكلفة أو مصروف على حسابات فرعية مُصنَّفة لتقرير أرباح وخسائر ضمن الدليل في هذا المدى.</p>
             <?php endif; ?>
 
             <div class="gl-acc-stmt-print-footer ta-report-print-footer">
