@@ -6,10 +6,10 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
+require_once __DIR__ . '/../../includes/accounting_report_mapping.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/financial_report_breakdown.php';
 require_once __DIR__ . '/../../includes/supplier_payable_account.php';
-require_once __DIR__ . '/../../includes/account_tree.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -29,15 +29,12 @@ foreach ($years as $y) {
 }
 
 $accounts = $pdo->query('SELECT id, name, code FROM accounts ORDER BY COALESCE(code, \'\'), name')->fetchAll(PDO::FETCH_ASSOC);
-$plRoleById = [];
-$bsRoleById = [];
 $accountLabelById = [];
 foreach ($accounts as $a) {
     $aid = (int) $a['id'];
-    $plRoleById[$aid] = orange_accounts_account_pl_role($pdo, $aid);
-    $bsRoleById[$aid] = orange_accounts_account_bs_role($pdo, $aid);
     $accountLabelById[$aid] = (trim((string) ($a['code'] ?? '')) !== '' ? $a['code'] . ' — ' : '') . $a['name'];
 }
+$mapById = orange_accounts_report_mapping_by_ids($pdo, array_map(static fn (array $x): int => (int) $x['id'], $accounts));
 
 $useVouchers = orange_journal_vouchers_ready($pdo);
 
@@ -87,10 +84,21 @@ if ($useVouchers && $fyId > 0) {
         $cred = (float)$t['credit'];
         if ($deb > 0.0001 || $cred > 0.0001) {
             $label = (trim((string)($a['code'] ?? '')) !== '' ? $a['code'] . ' — ' : '') . $a['name'];
-            $rows[] = ['account_id' => $aid, 'label' => $label, 'debit' => $deb, 'credit' => $cred, 'net' => $deb - $cred];
+            $code = trim((string) ($a['code'] ?? ''));
+            $rows[] = array_merge([
+                'account_id' => $aid,
+                'code' => $code,
+                'label' => $label,
+                'debit' => $deb,
+                'credit' => $cred,
+                'net' => $deb - $cred,
+            ], orange_accounts_report_display_and_sort_meta($mapById[$aid] ?? null));
             $sumDebit += $deb;
             $sumCredit += $cred;
         }
+    }
+    if ($rows !== []) {
+        usort($rows, 'orange_accounts_report_tb_rows_compare');
     }
 } elseif ($fyId > 0 && orange_table_has_column($pdo, 'journal_entries', 'fiscal_year_id')) {
     foreach ($accounts as $a) {
@@ -103,10 +111,21 @@ if ($useVouchers && $fyId > 0) {
         $cred = (float)$stC->fetchColumn();
         if ($deb > 0.0001 || $cred > 0.0001) {
             $label = (trim((string)($a['code'] ?? '')) !== '' ? $a['code'] . ' — ' : '') . $a['name'];
-            $rows[] = ['account_id' => $aid, 'label' => $label, 'debit' => $deb, 'credit' => $cred, 'net' => $deb - $cred];
+            $code = trim((string) ($a['code'] ?? ''));
+            $rows[] = array_merge([
+                'account_id' => $aid,
+                'code' => $code,
+                'label' => $label,
+                'debit' => $deb,
+                'credit' => $cred,
+                'net' => $deb - $cred,
+            ], orange_accounts_report_display_and_sort_meta($mapById[$aid] ?? null));
             $sumDebit += $deb;
             $sumCredit += $cred;
         }
+    }
+    if ($rows !== []) {
+        usort($rows, 'orange_accounts_report_tb_rows_compare');
     }
 }
 
@@ -117,9 +136,10 @@ $registeredExpenses = [];
 $expenseTbBreakdown = [];
 $expenseAccountIdsForTb = [];
 if ($useVouchers && $fyId > 0) {
-    foreach ($plRoleById as $eid => $cls) {
-        if ($cls === 'expense') {
-            $expenseAccountIdsForTb[] = (int) $eid;
+    foreach ($accounts as $a) {
+        $eid = (int) $a['id'];
+        if (orange_accounts_pnl_bucket_for_report($pdo, $eid, $mapById[$eid] ?? null) === 'expense') {
+            $expenseAccountIdsForTb[] = $eid;
         }
     }
     $supplierFyDetail = orange_financial_supplier_fy_subledger($pdo, $fyId);
@@ -169,7 +189,7 @@ $plExpense = 0.0;
 if ($useVouchers && $fyId > 0) {
     $tbPl = orange_voucher_account_totals($pdo, $fyId, ['opening_balance', 'year_end_close']);
     foreach ($tbPl as $aid => $t) {
-        $cls = $plRoleById[$aid] ?? 'other';
+        $cls = orange_accounts_pnl_bucket_for_report($pdo, (int) $aid, $mapById[(int) $aid] ?? null);
         $deb = (float)$t['debit'];
         $cred = (float)$t['credit'];
         if ($cls === 'revenue') {
@@ -187,7 +207,7 @@ $bsLiab = 0.0;
 $bsEquity = 0.0;
 if ($useVouchers && $fyId > 0) {
     foreach ($tbAll as $aid => $t) {
-        $cls = $bsRoleById[$aid] ?? 'other';
+        $cls = orange_accounts_bs_bucket_for_report($pdo, (int) $aid, $mapById[(int) $aid] ?? null);
         $deb = (float)$t['debit'];
         $cred = (float)$t['credit'];
         if ($cls === 'asset') {
@@ -205,8 +225,9 @@ $bsCheck = round($bsAssets - ($bsLiab + $bsEquity), 2);
     <div>
         <h1>التقارير المالية</h1>
         <p class="page-subtitle">
-            ميزان مراجعة، وأرباح وخسائر ملخّصة، وميزانية عمومية مبسطة حسب <strong>جذر الحساب</strong>
-            (كود الجذر وترتيبه في «إعداد الدليل» — مطابقة الجذور مع الأدوار في المشروع داخل account_tree.php).
+            ميزان مراجعة، وأرباح وخسائر ملخّصة، وميزانية عمومية مبسطة: تُجمَّع الإيرادات/التكلفة والمصروفات والملخص وفق <strong>الخريطة المحفوظة على الحساب</strong>
+            (<code dir="ltr">account_type</code> وربط المرجع) مع <strong>سقوط تلقائي</strong> على تصنيف جذور الشجرة عند ترك الحقول فارغة؛ راجع الوثائق
+            <code dir="ltr" style="unicode-bidi:embed;">docs/ACCOUNTING_REPORTING_POLICY_V2.md</code>.
             تفصيل <strong>الموردين</strong> من دفتر الذمم؛ تفصيل <strong>المصروفات</strong> من بنود التسجيل ومذكرات سطور حسابات المصروف.
         </p>
     </div>
@@ -320,7 +341,7 @@ window.addEventListener('load', function () {
 
 <div class="card" id="report-income">
     <h3 class="card-title">أرباح وخسائر (ملخّص تقريبي)</h3>
-    <p class="card-hint">استبعاد أرصدة الافتتاح وقيود إقفال السنة. حسابات بلا تصنيف «إيراد/مصروف/تكلفة» لا تُدخل هنا.</p>
+    <p class="card-hint">استبعاد أرصدة الافتتاح وقيود إقفال السنة. التصنيف يعتمد أولاً على حقول الدليل ثم جذر الحساب؛ ما لا يُصنَّف كإيراد/تكلفة/مصروف لا يُدخل هنا.</p>
     <div class="grid-2">
         <div class="stat-card"><h3>إجمالي الإيرادات (طبيعة دائنة)</h3><div class="value"><?php echo number_format($plRevenue, 2); ?></div></div>
         <div class="stat-card"><h3>إجمالي المصروفات والتكلفة</h3><div class="value"><?php echo number_format($plExpense, 2); ?></div></div>
@@ -406,6 +427,8 @@ window.addEventListener('load', function () {
             <thead>
                 <tr>
                     <th>الحساب</th>
+                    <th lang="ar">قسم التقرير</th>
+                    <th lang="ar">سطر المرجع</th>
                     <th>إجمالي مدين</th>
                     <th>إجمالي دائن</th>
                     <th>صافي (مدين − دائن)</th>
@@ -416,6 +439,8 @@ window.addEventListener('load', function () {
                     <?php $rid = (int) ($r['account_id'] ?? 0); ?>
                     <tr>
                         <td><?php echo htmlspecialchars($r['label'], ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td class="muted"><?php echo htmlspecialchars((string) ($r['sec_label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td class="muted"><?php echo htmlspecialchars((string) ($r['line_label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo number_format($r['debit'], 2); ?></td>
                         <td><?php echo number_format($r['credit'], 2); ?></td>
                         <td><?php echo number_format($r['net'], 2); ?></td>
@@ -426,7 +451,7 @@ window.addEventListener('load', function () {
                                 continue;
                             } ?>
                             <tr class="fin-report-subrow">
-                                <td style="padding-right:1.75rem;"><span class="muted">↳ <?php echo htmlspecialchars($sd['name'], ENT_QUOTES, 'UTF-8'); ?></span> <small class="muted">(ذمة مورد)</small></td>
+                                <td colspan="3" style="padding-right:1.75rem;"><span class="muted">↳ <?php echo htmlspecialchars($sd['name'], ENT_QUOTES, 'UTF-8'); ?></span> <small class="muted">(ذمة مورد)</small></td>
                                 <td><?php echo number_format($sd['debit'], 2); ?></td>
                                 <td><?php echo number_format($sd['credit'], 2); ?></td>
                                 <td><?php echo number_format($sd['net'], 2); ?></td>
@@ -446,7 +471,7 @@ window.addEventListener('load', function () {
                     <?php if (isset($expenseTbBreakdown[$rid]) && $expenseTbBreakdown[$rid] !== []): ?>
                         <?php foreach ($expenseTbBreakdown[$rid] as $ex): ?>
                             <tr class="fin-report-subrow">
-                                <td style="padding-right:1.75rem;"><span class="muted">↳ <?php echo htmlspecialchars($ex['sublabel'], ENT_QUOTES, 'UTF-8'); ?></span></td>
+                                <td colspan="3" style="padding-right:1.75rem;"><span class="muted">↳ <?php echo htmlspecialchars($ex['sublabel'], ENT_QUOTES, 'UTF-8'); ?></span></td>
                                 <td><?php echo number_format($ex['debit'], 2); ?></td>
                                 <td><?php echo number_format($ex['credit'], 2); ?></td>
                                 <td><?php echo number_format($ex['debit'] - $ex['credit'], 2); ?></td>
@@ -457,7 +482,7 @@ window.addEventListener('load', function () {
             </tbody>
             <tfoot>
                 <tr>
-                    <th>الإجمالي</th>
+                    <th colspan="3">الإجمالي</th>
                     <th><?php echo number_format($sumDebit, 2); ?></th>
                     <th><?php echo number_format($sumCredit, 2); ?></th>
                     <th><?php echo number_format($sumDebit - $sumCredit, 2); ?></th>

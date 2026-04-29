@@ -92,13 +92,12 @@ if (
     $tbBefore = orange_voucher_account_totals_strictly_before_date($pdo, $periodDateFrom, []);
 }
 
-$leafWhere = orange_accounts_posting_leaf_where_sql($pdo, 'a');
-$accountsLeaf = $pdo->query(
-    "SELECT a.id, a.name, a.code FROM accounts a WHERE $leafWhere ORDER BY COALESCE(a.code, ''), a.name"
-)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+$accountsLeaf = orange_financial_report_leaf_accounts_with_mapping($pdo);
 
 /**
- * @return list<array{code:string,name:string,opening:float,period:float,closing:float}>
+ * أسطر المتاجرة: تجميع وفق عنوان سطر التقرير المرجعي حيث وُجد report_line؛ وإلا دور القائمة التقليدي.
+ *
+ * @return list<array<string, mixed>>
  */
 $buildTradingSection = static function (
     PDO $pdo,
@@ -108,6 +107,11 @@ $buildTradingSection = static function (
     string $plClass
 ): array {
     $out = [];
+    $hasSec = orange_table_has_column($pdo, 'accounts', 'report_section');
+    $legacyHeading = $plClass === 'revenue'
+        ? 'إيرادات / مبيعات — تصنيف افتراضي (دورة الحساب في الشجرة عند تعذّر سطر المرجع)'
+        : 'تكلفة مبيعات — تصنيف افتراضي (دورة الحساب في الشجرة عند تعذّر سطر المرجع)';
+
     foreach ($accountsLeaf as $a) {
         $aid = (int) ($a['id'] ?? 0);
         if ($aid <= 0) {
@@ -116,6 +120,12 @@ $buildTradingSection = static function (
         $pr = orange_accounts_account_pl_role($pdo, $aid);
         if ($pr !== $plClass) {
             continue;
+        }
+        if ($hasSec) {
+            $sec = strtolower(trim((string) ($a['report_section'] ?? '')));
+            if ($sec !== '' && $sec !== 'trading') {
+                continue;
+            }
         }
         $d0 = $c0 = $d1 = $c1 = 0.0;
         if (isset($tbBefore[$aid])) {
@@ -137,6 +147,18 @@ $buildTradingSection = static function (
         if (abs($open) < 0.0001 && abs($period) < 0.0001 && abs($closing) < 0.0001) {
             continue;
         }
+        $mappedHeading = trim((string) ($a['report_line_heading_ar'] ?? ''));
+        $sortKey = 500000;
+        if ($mappedHeading !== '') {
+            $sortKey = (int) ($a['report_line_sort'] ?? 0);
+        } elseif ((int) ($a['report_line_id'] ?? 0) > 0 && $mappedHeading === '') {
+            $mappedHeading = $legacyHeading;
+            $sortKey = ($plClass === 'revenue') ? 400000 : 400001;
+        } else {
+            $mappedHeading = $legacyHeading;
+            $sortKey = ($plClass === 'revenue') ? 300000 : 300001;
+        }
+
         $code = trim((string) ($a['code'] ?? ''));
         $nm = (string) ($a['name'] ?? '');
         $out[] = [
@@ -145,8 +167,19 @@ $buildTradingSection = static function (
             'opening' => $open,
             'period' => $period,
             'closing' => $closing,
+            '_section_heading' => $mappedHeading,
+            '_section_sort' => $sortKey,
         ];
     }
+
+    usort($out, static function (array $x, array $y): int {
+        $sx = (int) ($x['_section_sort'] ?? 0);
+        $sy = (int) ($y['_section_sort'] ?? 0);
+        if ($sx !== $sy) {
+            return $sx <=> $sy;
+        }
+        return strcmp((string) ($x['code'] ?? ''), (string) ($y['code'] ?? ''));
+    });
 
     return $out;
 };
@@ -293,13 +326,18 @@ $fmt5 = static function (float $v): string {
                         </tr>
                     </thead>
                     <tbody>
-                        <tr class="ta-report-section">
-                            <td colspan="5">مبيعات</td>
-                        </tr>
                         <?php if ($revenueLines === []): ?>
                             <tr><td colspan="5" class="muted">لا بيانات إيرادات / مبيعات بحسب الحسابات الفرعية في المدى.</td></tr>
                         <?php else: ?>
-                            <?php foreach ($revenueLines as $rl): ?>
+                            <?php
+                            $prevRevenueSection = '';
+foreach ($revenueLines as $rl):
+    $secH = (string) ($rl['_section_heading'] ?? '');
+    if ($secH !== '' && $secH !== $prevRevenueSection) {
+        $prevRevenueSection = $secH;
+        echo '<tr class="ta-report-section"><td colspan="5">' . htmlspecialchars($secH, ENT_QUOTES, 'UTF-8') . '</td></tr>';
+    }
+    ?>
                                 <tr>
                                     <td class="gl-acc-stmt-col-num" dir="ltr"><?php echo htmlspecialchars((string) ($rl['code'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                                     <td><?php echo htmlspecialchars((string) ($rl['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
@@ -307,7 +345,9 @@ $fmt5 = static function (float $v): string {
                                     <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($rl['period'] ?? 0)); ?></td>
                                     <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($rl['closing'] ?? 0)); ?></td>
                                 </tr>
-                            <?php endforeach; ?>
+                            <?php
+endforeach;
+?>
                         <?php endif; ?>
                         <tr class="ta-report-subtotal ta-report-subtotal--sales">
                             <td class="gl-acc-stmt-col-num muted">—</td>
@@ -317,13 +357,18 @@ $fmt5 = static function (float $v): string {
                             <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalRevClosing); ?></td>
                         </tr>
 
-                        <tr class="ta-report-section">
-                            <td colspan="5">تكلفة مبيعات</td>
-                        </tr>
                         <?php if ($cogsLines === []): ?>
                             <tr><td colspan="5" class="muted">لا بيانات تكلفة مبيعات بحسب الحسابات الفرعية في المدى.</td></tr>
                         <?php else: ?>
-                            <?php foreach ($cogsLines as $cl): ?>
+                            <?php
+                            $prevCogsSection = '';
+foreach ($cogsLines as $cl):
+    $secC = (string) ($cl['_section_heading'] ?? '');
+    if ($secC !== '' && $secC !== $prevCogsSection) {
+        $prevCogsSection = $secC;
+        echo '<tr class="ta-report-section"><td colspan="5">' . htmlspecialchars($secC, ENT_QUOTES, 'UTF-8') . '</td></tr>';
+    }
+    ?>
                                 <tr>
                                     <td class="gl-acc-stmt-col-num" dir="ltr"><?php echo htmlspecialchars((string) ($cl['code'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                                     <td><?php echo htmlspecialchars((string) ($cl['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
@@ -331,7 +376,9 @@ $fmt5 = static function (float $v): string {
                                     <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($cl['period'] ?? 0)); ?></td>
                                     <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($cl['closing'] ?? 0)); ?></td>
                                 </tr>
-                            <?php endforeach; ?>
+                            <?php
+endforeach;
+?>
                         <?php endif; ?>
                         <tr class="ta-report-subtotal ta-report-subtotal--cogs">
                             <td class="gl-acc-stmt-col-num muted">—</td>

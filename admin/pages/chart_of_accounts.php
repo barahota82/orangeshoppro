@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
+require_once __DIR__ . '/../../includes/report_line_master.php';
 require_once __DIR__ . '/../../includes/fiscal_years.php';
 
 $pdo = db();
@@ -15,6 +16,9 @@ $depths = orange_accounts_depth_by_id($flat);
 $hasNameEn = orange_table_has_column($pdo, 'accounts', 'name_en');
 $hasSuspended = orange_table_has_column($pdo, 'accounts', 'is_suspended');
 $hasNb = orange_table_has_column($pdo, 'accounts', 'normal_balance');
+$hasMap = orange_table_has_column($pdo, 'accounts', 'account_type');
+$hasRli = orange_table_has_column($pdo, 'accounts', 'report_line_id');
+$reportLineOpts = ($hasMap && $hasRli) ? orange_report_line_master_list_active($pdo) : [];
 
 $fyList = orange_fiscal_years_list($pdo);
 $fyDefault = $fyList !== [] ? (int) $fyList[0]['id'] : 0;
@@ -43,6 +47,11 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
 
         <div class="coa-shell__main" dir="rtl">
             <div class="coa-shell__panel">
+    <p class="card-hint" style="margin-top:14px;line-height:1.55;">
+        سياسة التقارير: حقول <strong>التصنيف المحاسبي</strong> أدناه (نوع الحساب، قسم التقرير، سطر المرجع) تُستخدم في تجميع قوائم النظام والتقارير المرتبطة. عند ترك الحقول فارغة يُطبَّق التصنيف الموروث من جذور الشجرة وفق المنطق في السيرفر.
+        المرجع النصّي الكامل للمشروع: <code dir="ltr" style="unicode-bidi:embed;font-size:0.92em;">docs/ACCOUNTING_REPORTING_POLICY_V2.md</code>
+    </p>
+
             <div class="card coa-form-card coa-form-card--classic">
                 <h3 class="card-title coa-form-card__title">بيانات الحساب</h3>
                 <input type="hidden" id="coa_id" value="0">
@@ -91,6 +100,62 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
                             <option value="credit">دائن</option>
                         </select>
                     </div>
+                    <?php endif; ?>
+
+                    <?php if ($hasMap): ?>
+                    <details class="coa-field coa-field--span2 coa-mapping-details" open>
+                        <summary class="coa-mapping-details__sum">التصنيف المحاسبي (افتراضي من الأب — راجع قبل الحفظ)</summary>
+                        <div class="coa-form-grid coa-form-grid--mapping">
+                            <div class="coa-field">
+                                <label for="coa_account_type">نوع الحساب (التقارير)</label>
+                                <select id="coa_account_type" title="يُشتقّ من الحساب الأب إن لم تُختر قيمة">
+                                    <option value="">— افتراضي من السيرفر / الأب</option>
+                                    <option value="asset">أصول</option>
+                                    <option value="liability">خصوم</option>
+                                    <option value="equity">حقوق ملكية</option>
+                                    <option value="revenue">إيرادات</option>
+                                    <option value="cogs">تكلفة مبيعات</option>
+                                    <option value="expense">مصروفات</option>
+                                    <option value="other">أخرى</option>
+                                </select>
+                            </div>
+                            <div class="coa-field">
+                                <label for="coa_report_section">قسم التقرير</label>
+                                <select id="coa_report_section">
+                                    <option value="">— افتراضي من السيرفر / الأب</option>
+                                    <option value="balance_sheet">الميزانية</option>
+                                    <option value="trading">أرباح وخسائر — تداول</option>
+                                    <option value="pnl">أرباح وخسائر — عام</option>
+                                    <option value="cashflow">التدفقات النقدية</option>
+                                    <option value="none">لا يُصنّف</option>
+                                </select>
+                            </div>
+                            <?php if ($hasRli): ?>
+                            <div class="coa-field coa-field--span2">
+                                <label for="coa_report_line_id">سطر التقرير (مرجع معتمد)</label>
+                                <select id="coa_report_line_id" title="يُشتقّ من الأب؛ التعديل فقط ضمن المرجع المعتمد">
+                                    <option value="">— افتراضي من السيرفر / الأب</option>
+                                    <?php foreach ($reportLineOpts as $rlrow): ?>
+                                    <option value="<?php echo (int) ($rlrow['id'] ?? 0); ?>">
+                                        <?php echo htmlspecialchars((string) ($rlrow['label_ar'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>
+                                        (<?php echo htmlspecialchars((string) ($rlrow['code'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>)
+                                    </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <?php endif; ?>
+                            <div class="coa-field">
+                                <label for="coa_cashflow_section">التدفقات النقدية</label>
+                                <select id="coa_cashflow_section">
+                                    <option value="">— افتراضي من السيرفر / الأب</option>
+                                    <option value="none">غير مؤثر</option>
+                                    <option value="operating">تشغيلية</option>
+                                    <option value="investing">استثمارية</option>
+                                    <option value="financing">تمويلية</option>
+                                </select>
+                            </div>
+                        </div>
+                    </details>
                     <?php endif; ?>
 
                     <div class="coa-field coa-field--kind coa-field--span2">
@@ -170,11 +235,61 @@ document.addEventListener('DOMContentLoaded', function () {
     var hasNameEn = <?php echo $hasNameEn ? 'true' : 'false'; ?>;
     var hasSuspended = <?php echo $hasSuspended ? 'true' : 'false'; ?>;
     var hasNb = <?php echo $hasNb ? 'true' : 'false'; ?>;
+    var hasMap = <?php echo $hasMap ? 'true' : 'false'; ?>;
+    var hasRli = <?php echo $hasRli ? 'true' : 'false'; ?>;
     var __orangeAdminPub = typeof window.ORANGE_PUBLIC_BASE_PATH === 'string' ? window.ORANGE_PUBLIC_BASE_PATH.replace(/\/+$/, '') : '';
     var coaMainSaveInFlight = false;
     var coaSetupSaveInFlight = false;
 
     var levelOrds = ['', 'الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر'];
+
+    /** ملء حقول التصنيف من عُقدة الشجرة (الحساب نفسه أو الأب عند «إضافة»). */
+    function coaApplyDatasetToMappingFields(li) {
+        if (!hasMap) {
+            return;
+        }
+        var atSel = document.getElementById('coa_account_type');
+        var rsSel = document.getElementById('coa_report_section');
+        var rlSel = hasRli ? document.getElementById('coa_report_line_id') : null;
+        var cfSel = document.getElementById('coa_cashflow_section');
+        if (!atSel || !rsSel || !cfSel) {
+            return;
+        }
+        if (hasRli && !rlSel) {
+            return;
+        }
+        var at = '';
+        var rs = '';
+        var rli = '';
+        var cf = '';
+        if (li && li.dataset) {
+            at = String(li.dataset.accountType || '').trim().toLowerCase();
+            rs = String(li.dataset.reportSection || '').trim().toLowerCase();
+            rli = String(li.dataset.reportLineId || '').trim();
+            cf = String(li.dataset.cashflowSection || '').trim().toLowerCase();
+        }
+        function optOk(sel, v) {
+            if (!v) {
+                sel.value = '';
+
+                return;
+            }
+            var ok = false;
+            for (var i = 0; i < sel.options.length; i++) {
+                if (sel.options[i].value === v) {
+                    ok = true;
+                    break;
+                }
+            }
+            sel.value = ok ? v : '';
+        }
+        optOk(atSel, at);
+        optOk(rsSel, rs);
+        if (hasRli && rlSel) {
+            optOk(rlSel, rli);
+        }
+        optOk(cfSel, cf);
+    }
 
     function coaHumanLevel(depthStr) {
         var d = parseInt(depthStr, 10);
@@ -342,6 +457,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 nbSel.value = nb === 'credit' ? 'credit' : 'debit';
             }
         }
+        coaApplyDatasetToMappingFields(li);
         coaSyncNormalBalanceUi();
         updateParentFieldsFromContext();
         updateStatementLink();
@@ -490,6 +606,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (hasNb) {
                         document.getElementById('coa_normal_balance').value = 'debit';
                     }
+                    coaApplyDatasetToMappingFields(null);
                     coaSyncNormalBalanceUi();
                     updateParentFieldsFromContext();
                     updatePreviewFromParent();
@@ -550,9 +667,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (hasNameEn) {
             document.getElementById('coa_name_en').value = '';
         }
-        if (hasNb) {
-            document.getElementById('coa_normal_balance').value = 'debit';
-        }
         setStateRadios(false, false);
         if (pick) {
             document.getElementById('coa_parent_id').value = pick.dataset.id || '';
@@ -570,9 +684,18 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         document.getElementById('coa_type_display').textContent = '—';
         document.getElementById('coa_category_display').textContent = '—';
+        if (hasNb) {
+            var nbSel = document.getElementById('coa_normal_balance');
+            if (pick && pick.dataset && pick.dataset.isGroup !== '1' && pick.dataset.normalBalance) {
+                nbSel.value = pick.dataset.normalBalance === 'credit' ? 'credit' : 'debit';
+            } else {
+                nbSel.value = 'debit';
+            }
+        }
         updateParentFieldsFromContext();
         updatePreviewFromParent();
         updateStatementLink();
+        coaApplyDatasetToMappingFields(pick || null);
         coaSyncNormalBalanceUi();
     });
 
@@ -601,6 +724,26 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         if (hasNb && st !== 'group') {
             payload.normal_balance = document.getElementById('coa_normal_balance').value || 'debit';
+        }
+        if (hasMap) {
+            var at = document.getElementById('coa_account_type');
+            var rs = document.getElementById('coa_report_section');
+            var cf = document.getElementById('coa_cashflow_section');
+            if (at) {
+                payload.account_type = String(at.value || '').trim();
+            }
+            if (rs) {
+                payload.report_section = String(rs.value || '').trim();
+            }
+            if (hasRli) {
+                var rl = document.getElementById('coa_report_line_id');
+                if (rl) {
+                    payload.report_line_id = String(rl.value || '').trim();
+                }
+            }
+            if (cf) {
+                payload.cashflow_section = String(cf.value || '').trim();
+            }
         }
         if (!payload.name) {
             alert('اسم الحساب بالعربية مطلوب');

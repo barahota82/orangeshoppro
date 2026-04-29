@@ -24,16 +24,35 @@ try {
     $isGroup = !empty($data['is_group']) ? 1 : 0;
     $nameEn = trim((string) ($data['name_en'] ?? ''));
     $isSuspended = !empty($data['is_suspended']) ? 1 : 0;
+
+    $inheritMap = [];
+    if ($parentId !== null && $parentId > 0) {
+        $inheritMap = orange_accounts_inherit_mapping_from_parent($pdo, $parentId);
+    } else {
+        $inheritMap = orange_accounts_default_mapping_for_tree_context($pdo, 0);
+    }
+    $sanMap = orange_accounts_sanitize_saved_mapping($pdo, $data);
+    $finalMap = orange_accounts_merge_mapping_payload($sanMap, $inheritMap, $isGroup);
+
     $normalBalance = null;
     if ($isGroup !== 1) {
-        $nbRaw = strtolower(trim((string) ($data['normal_balance'] ?? 'debit')));
-        $normalBalance = $nbRaw === 'credit' ? 'credit' : 'debit';
+        $nbUse = $finalMap['normal_balance'] ?? null;
+        if ($nbUse === 'credit' || $nbUse === 'debit') {
+            $normalBalance = $nbUse;
+        } else {
+            $nbRaw = strtolower(trim((string) ($data['normal_balance'] ?? 'debit')));
+            $normalBalance = $nbRaw === 'credit' ? 'credit' : 'debit';
+        }
+    }
+
+    $cfStore = $finalMap['cashflow_section'] ?? 'none';
+    if ($cfStore === null || $cfStore === '') {
+        $cfStore = 'none';
     }
 
     if ($name === '') {
         json_response(['success' => false, 'message' => 'اسم الحساب مطلوب'], 422);
     }
-    // الجذور تُنشأ فقط من «إعداد الدليل» (save-root-setup) — لا إنشاء جذر من نموذج الشجرة الرئيسي.
     if ($id <= 0 && ($parentId === null || $parentId <= 0)) {
         json_response([
             'success' => false,
@@ -43,7 +62,7 @@ try {
     if ($parentId !== null) {
         $chk = $pdo->prepare('SELECT id FROM accounts WHERE id = ? LIMIT 1');
         $chk->execute([$parentId]);
-        if (!$chk->fetch()) {
+        if (! $chk->fetch()) {
             json_response(['success' => false, 'message' => 'الحساب الأب غير موجود'], 404);
         }
     }
@@ -65,6 +84,8 @@ try {
         $hasNameEn = orange_table_has_column($pdo, 'accounts', 'name_en');
         $hasSuspended = orange_table_has_column($pdo, 'accounts', 'is_suspended');
         $hasNb = orange_table_has_column($pdo, 'accounts', 'normal_balance');
+        $hasAt = orange_table_has_column($pdo, 'accounts', 'account_type');
+        $hasRlId = orange_table_has_column($pdo, 'accounts', 'report_line_id');
 
         if ($id <= 0) {
             $code = orange_accounts_suggest_child_code($pdo, $parentId);
@@ -95,6 +116,18 @@ try {
                 $cols[] = 'normal_balance';
                 $vals[] = $normalBalance;
             }
+            if ($hasAt) {
+                $cols[] = 'account_type';
+                $cols[] = 'report_section';
+                $cols[] = 'cashflow_section';
+                $vals[] = $finalMap['account_type'] ?? null;
+                $vals[] = $finalMap['report_section'] ?? null;
+                $vals[] = $cfStore;
+            }
+            if ($hasRlId) {
+                $cols[] = 'report_line_id';
+                $vals[] = isset($finalMap['report_line_id']) && (int) $finalMap['report_line_id'] > 0 ? (int) $finalMap['report_line_id'] : null;
+            }
             $ph = implode(',', array_fill(0, count($cols), '?'));
             $pdo->prepare('INSERT INTO accounts (' . implode(',', $cols) . ') VALUES (' . $ph . ')')->execute($vals);
             $newId = (int) $pdo->lastInsertId();
@@ -105,7 +138,7 @@ try {
         $exSt = $pdo->prepare('SELECT code FROM accounts WHERE id = ? LIMIT 1');
         $exSt->execute([$id]);
         $exRow = $exSt->fetch(PDO::FETCH_ASSOC);
-        if (!$exRow) {
+        if (! $exRow) {
             json_response(['success' => false, 'message' => 'الحساب غير موجود'], 404);
         }
         $code = trim((string) ($exRow['code'] ?? ''));
@@ -140,6 +173,18 @@ try {
         if ($hasNb) {
             $sets[] = 'normal_balance = ?';
             $vals[] = $normalBalance;
+        }
+        if ($hasAt) {
+            $sets[] = 'account_type = ?';
+            $sets[] = 'report_section = ?';
+            $sets[] = 'cashflow_section = ?';
+            $vals[] = $finalMap['account_type'] ?? null;
+            $vals[] = $finalMap['report_section'] ?? null;
+            $vals[] = $cfStore;
+        }
+        if ($hasRlId) {
+            $sets[] = 'report_line_id = ?';
+            $vals[] = isset($finalMap['report_line_id']) && (int) $finalMap['report_line_id'] > 0 ? (int) $finalMap['report_line_id'] : null;
         }
         $vals[] = $id;
         $pdo->prepare('UPDATE accounts SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($vals);

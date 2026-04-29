@@ -1,0 +1,59 @@
+Orange — بوابة واحدة: القراءات الإلزامية قبل أي تنفيذ
+====================================================
+المسار: ORANGE_AGENT_READ_FIRST.txt (جذر المستودع بجانب IBRAHIM_ORANGE_MASTER.txt)
+آخر تحديث: 2026-04-19
+
+الاستخدام
+-------
+**أرسل للوكيل اسم هذا الملف فقط** (أو أرفق الملف). الوكيل **يلزَمه** فتح **هذا الملف أولاً**، ثم قراءة **كل** الملفات والمسارات أدناه **كاملةً** (ليس ملخص الدردشة).  
+القائمة المرآة الرسمية في المستودع: **`.cursor/rules/orange-continuity.mdc`** — عند التعارض يُرجّح نصُ الريبو المحدَّث.
+
+التعريفات
+-------
+- **قراءة كاملة** = فتح الملف والاطلاع على محتواه فعلياً، لا الاكتفاء بما قيل في المحادثة.
+- **إن وُجد** = المسار اختياري إن كان الملف موجوداً على الجهاز (مثل `scripts/orange_db.sql` قد لا يُرفع في Git).
+- **عند الحاجة / عند النطاق** = تُقرأ فقط إذا كانت المهمة تلامس ذلك النطاق ما لم يستثِ المالك صراحةً.
+
+---
+أ) الحزمة الموحّدة (قبل أي تنفيذ تقني)
+---
+1. **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`**
+2. **`IBRAHIM_ORANGE_MASTER.txt`** (جذر المستودع)
+3. **`.cursor/rules/orange-session-handoff.mdc`**
+4. **`docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt`**
+5. **`scripts/orange_db.sql`** — **عند نطاق مخطط قاعدة بيانات أو ترحيل؛ إن وُجد محلياً** (مراجعة «الحقيقة»؛ إن غاب لا تُفترَض من Git وحدَه — راجع `IBRAHIM_ORANGE_MASTER.txt` قسم قاعدة البيانات).
+6. **`docs/archive/ORANGE_AGENT_QA_REFERENCE.txt`** — عند الحاجة (نشر، مخطط، أسئلة تشغيلية).
+
+ثم: **قراءة كاملة** لقائمة **`.cursor/rules/orange-continuity.mdc`** (المحتوى الكامل للقائمة المرقّمة 0–8 و5b و5c).
+
+---
+ب) قائمة الاستمرارية المرقّمة (من `orange-continuity.mdc`)
+---
+**0.** `IBRAHIM_ORANGE_MASTER.txt`  
+**1.** `docs/archive/ORANGE_CHAT_CONTINUITY.md`  
+**2.** `.cursor/rules/orange-php-utf8-workflow.mdc`  
+**3.** `docs/archive/ORANGE_STOCK_ORDER_POLICY.txt` — إن كان النطاق يمس المخزون/الطلبات  
+**4.** `docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt` — **أولوية** إن كان النطاق واجهة/طلب أونلاين/تسجيل/تتبع/قنوات (**أطلع عليه قبل** الخارطة العامة لإتمام تلك السياسات)  
+**5.** `docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt`  
+**5b.** `docs/archive/ORANGE_AGENT_QA_REFERENCE.txt` — عند الحاجة  
+**5c.** `docs/archive/ORANGE_ACCOUNTING_MAPPING_AND_REPORT_HANDOFF.txt` — **قراءة كاملة** عند نطاق **محاسبة داخلية / دليل حسابات / تقارير مالية / ترحيل GL**؛ ويُكمِّل **`docs/ACCOUNTING_REPORTING_POLICY_V2.md`** (تلخيص سياسة التقارير v2 حيث ينطبق)  
+**6.** `docs/archive/ORANGE_PROJECT_CONTINUITY.txt`  
+**7.** `docs/archive/ORANGE_TECH_REFERENCE.txt`  
+**8.** `docs/archive/ORANGE_PROJECT_COMPLETION_ROADMAP.txt` — تنفيذ ما ينطبق منها **بحسب نطاق المالك** لا كل المراحل دفعةً واحدةً دون توجيه  
+
+**باقي القواعد حسب المهمة** (مثل **`.cursor/rules/orange-stack.mdc`**): من `.cursor/rules/` كما تنطبق بعد أعلاه.
+
+---
+ج) أولوية «كمّل العمل» الواجهة/المتجر
+---
+عند إتمام أو مطابقة عمل يلمس المتجر أو الطلب أونلاين أو التسجيل أو التتبع أو القنوات: راجع **`ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** وفقرات «تنفيذ» وس1–س30 و«صفر» **قبل** الاعتماد على الخريطة العامة أو تقارير حالة مشروع بديلة — إلا إن استثنى المالك النطاق صراحةً.
+
+---
+د) مسار العمل الموصى به على القرص
+---
+الاستنساخ المعتمد: **`D:\orange`** — لا تنسخ المجلد لمكان آخر وتعمل منه ما لم يطلب المالك ذلك.
+
+---
+هـ) انتهاء جلسة تنفيذية
+---
+عند **عمل تنفيذي** يغيّر المستودع أو أوامر/Commit: التزم إشعار المالك بانتهاء الجلسة وفق **`orange-session-handoff.mdc`**.

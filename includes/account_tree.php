@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
+require_once __DIR__ . '/report_line_master.php';
 
 /**
  * مخطط الدليل الرقمي (موحّد في النظام): المستوى الأول = أكواد رقمية 1…N، وأول مستوى للترحيل يبدأ من N+1 (افتراضياً 1–10 ثم من 11).
@@ -158,6 +159,203 @@ function orange_accounts_account_bs_role(PDO $pdo, int $accountId): string
 }
 
 /**
+ * تصنيف افتراضي للتقارير مُشتق من جذور الميزانية أو قائمة الدخل (عند غياب قيم مخزّنة).
+ *
+ * @return array{account_type: string, report_section: string, report_line_id: ?int, normal_balance: ?string, cashflow_section: string}
+ */
+function orange_accounts_default_mapping_for_tree_context(PDO $pdo, int $contextAccountId): array
+{
+    $bs = orange_accounts_account_bs_role($pdo, $contextAccountId);
+    if ($bs !== 'other') {
+        return [
+            'account_type' => $bs,
+            'report_section' => 'balance_sheet',
+            'report_line_id' => orange_report_line_id_for_code($pdo, $bs),
+            'normal_balance' => $bs === 'asset' ? 'debit' : 'credit',
+            'cashflow_section' => 'none',
+        ];
+    }
+    $pl = orange_accounts_account_pl_role($pdo, $contextAccountId);
+    if ($pl === 'revenue') {
+        return [
+            'account_type' => 'revenue',
+            'report_section' => 'trading',
+            'report_line_id' => orange_report_line_id_for_code($pdo, 'revenue'),
+            'normal_balance' => 'credit',
+            'cashflow_section' => 'none',
+        ];
+    }
+    if ($pl === 'cogs') {
+        return [
+            'account_type' => 'cogs',
+            'report_section' => 'trading',
+            'report_line_id' => orange_report_line_id_for_code($pdo, 'cogs'),
+            'normal_balance' => 'debit',
+            'cashflow_section' => 'none',
+        ];
+    }
+    if ($pl === 'expense') {
+        return [
+            'account_type' => 'expense',
+            'report_section' => 'pnl',
+            'report_line_id' => orange_report_line_id_for_code($pdo, 'expense'),
+            'normal_balance' => 'debit',
+            'cashflow_section' => 'none',
+        ];
+    }
+
+    return [
+        'account_type' => 'other',
+        'report_section' => 'none',
+        'report_line_id' => orange_report_line_id_for_code($pdo, 'other'),
+        'normal_balance' => null,
+        'cashflow_section' => 'none',
+    ];
+}
+
+/**
+ * حقول التصنيف لحساب جديد: وراثة من الأب ثم تعبئة الفراغات بالاشتقاق من الجذور.
+ *
+ * @return array{account_type: string, report_section: string, report_line_id: ?int, normal_balance: ?string, cashflow_section: string}
+ */
+function orange_accounts_inherit_mapping_from_parent(PDO $pdo, int $parentId): array
+{
+    $base = orange_accounts_default_mapping_for_tree_context($pdo, $parentId);
+    if (! orange_table_has_column($pdo, 'accounts', 'account_type')) {
+        return $base;
+    }
+    if ($parentId <= 0) {
+        return $base;
+    }
+    $hasRli = orange_table_has_column($pdo, 'accounts', 'report_line_id');
+    $sel = 'account_type, report_section, normal_balance, cashflow_section';
+    if ($hasRli) {
+        $sel .= ', report_line_id';
+    }
+    $st = $pdo->prepare('SELECT ' . $sel . ' FROM accounts WHERE id = ? LIMIT 1');
+    $st->execute([$parentId]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (! is_array($row)) {
+        return $base;
+    }
+    foreach (['account_type', 'report_section'] as $k) {
+        $t = trim((string) ($row[$k] ?? ''));
+        if ($t !== '') {
+            $base[$k] = $t;
+        }
+    }
+    if ($hasRli) {
+        $rid = (int) ($row['report_line_id'] ?? 0);
+        if ($rid > 0) {
+            $base['report_line_id'] = $rid;
+        }
+    }
+    $nb = trim((string) ($row['normal_balance'] ?? ''));
+    if ($nb === 'debit' || $nb === 'credit') {
+        $base['normal_balance'] = $nb;
+    }
+    $cf = strtolower(trim((string) ($row['cashflow_section'] ?? '')));
+    if ($cf !== '') {
+        $base['cashflow_section'] = $cf;
+    }
+    if (($base['cashflow_section'] ?? '') === '') {
+        $base['cashflow_section'] = 'none';
+    }
+
+    return $base;
+}
+
+/**
+ * @return array{account_type: ?string, report_section: ?string, report_line_id: ?int, normal_balance: ?string, cashflow_section: ?string}
+ */
+function orange_accounts_sanitize_saved_mapping(PDO $pdo, array $payload): array
+{
+    $out = [
+        'account_type' => null,
+        'report_section' => null,
+        'report_line_id' => null,
+        'normal_balance' => null,
+        'cashflow_section' => null,
+    ];
+    $types = ['asset', 'liability', 'equity', 'revenue', 'cogs', 'expense', 'other'];
+    $sections = ['balance_sheet', 'trading', 'pnl', 'none', 'cashflow'];
+    $cfSecs = ['none', 'operating', 'investing', 'financing'];
+
+    if (orange_table_has_column($pdo, 'accounts', 'account_type')) {
+        $raw = strtolower(trim((string) ($payload['account_type'] ?? '')));
+        $out['account_type'] = in_array($raw, $types, true) ? $raw : null;
+    }
+    if (orange_table_has_column($pdo, 'accounts', 'report_section')) {
+        $raw = strtolower(trim((string) ($payload['report_section'] ?? '')));
+        $out['report_section'] = in_array($raw, $sections, true) ? $raw : null;
+    }
+    if (orange_table_has_column($pdo, 'accounts', 'report_line_id')) {
+        $raw = $payload['report_line_id'] ?? null;
+        if ($raw !== null && $raw !== '') {
+            $try = (int) $raw;
+            if ($try > 0 && orange_report_line_validate_id($pdo, $try)) {
+                $out['report_line_id'] = $try;
+            }
+        }
+    }
+    if (orange_table_has_column($pdo, 'accounts', 'cashflow_section')) {
+        $raw = strtolower(trim((string) ($payload['cashflow_section'] ?? '')));
+        $out['cashflow_section'] = in_array($raw, $cfSecs, true) ? $raw : null;
+    }
+    if (orange_table_has_column($pdo, 'accounts', 'normal_balance')) {
+        $raw = strtolower(trim((string) ($payload['normal_balance'] ?? '')));
+        if ($raw === 'debit' || $raw === 'credit') {
+            $out['normal_balance'] = $raw;
+        }
+    }
+
+    return $out;
+}
+
+/**
+ * دمج حقول الواجهة المُنقّاة مع الوراثة من الأب؛ الحقول الفارغة تُملأ من inherit.
+ *
+ * @param array{account_type: ?string, report_section: ?string, report_line_id: ?int, normal_balance: ?string, cashflow_section: ?string} $san
+ * @param array<string, mixed> $inherit
+ *
+ * @return array{account_type: ?string, report_section: ?string, report_line_id: ?int, normal_balance: ?string, cashflow_section: ?string}
+ */
+function orange_accounts_merge_mapping_payload(array $san, array $inherit, int $isGroup): array
+{
+    $out = [];
+    $keys = ['account_type', 'report_section', 'normal_balance', 'cashflow_section'];
+    foreach ($keys as $k) {
+        $sv = $san[$k] ?? null;
+        if ($sv !== null && $sv !== '') {
+            $out[$k] = $sv;
+
+            continue;
+        }
+        $inh = $inherit[$k] ?? null;
+        if ($inh !== null && $inh !== '') {
+            $out[$k] = $inh;
+
+            continue;
+        }
+        $out[$k] = null;
+    }
+
+    $svR = isset($san['report_line_id']) ? (int) $san['report_line_id'] : 0;
+    if ($svR > 0) {
+        $out['report_line_id'] = $svR;
+    } else {
+        $inhR = isset($inherit['report_line_id']) ? (int) $inherit['report_line_id'] : 0;
+        $out['report_line_id'] = $inhR > 0 ? $inhR : null;
+    }
+
+    if ($isGroup === 1) {
+        $out['normal_balance'] = null;
+    }
+
+    return $out;
+}
+
+/**
  * @return list<array<string, mixed>>
  */
 function orange_accounts_flat(PDO $pdo): array
@@ -166,30 +364,58 @@ function orange_accounts_flat(PDO $pdo): array
     if (!orange_table_exists($pdo, 'accounts')) {
         return [];
     }
+
     $hasPar = orange_table_has_column($pdo, 'accounts', 'parent_id');
     $hasGrp = orange_table_has_column($pdo, 'accounts', 'is_group');
     $hasNameEn = orange_table_has_column($pdo, 'accounts', 'name_en');
     $hasSuspended = orange_table_has_column($pdo, 'accounts', 'is_suspended');
     $hasNb = orange_table_has_column($pdo, 'accounts', 'normal_balance');
-    $cols = 'id, name, code, updated_at';
+    $hasMap = orange_table_has_column($pdo, 'accounts', 'account_type');
+    $hasRli = orange_table_has_column($pdo, 'accounts', 'report_line_id');
+
+    $cols = 'a.id, a.name, a.code, a.updated_at';
     if ($hasPar) {
-        $cols .= ', parent_id';
+        $cols .= ', a.parent_id';
     }
     if ($hasGrp) {
-        $cols .= ', is_group';
+        $cols .= ', a.is_group';
     }
     if ($hasNameEn) {
-        $cols .= ', name_en';
+        $cols .= ', a.name_en';
     }
     if ($hasSuspended) {
-        $cols .= ', is_suspended';
+        $cols .= ', a.is_suspended';
     }
     if ($hasNb) {
-        $cols .= ', normal_balance';
+        $cols .= ', a.normal_balance';
     }
-    $rows = $pdo->query('SELECT ' . $cols . ' FROM accounts ORDER BY COALESCE(code, \'\'), id')->fetchAll(PDO::FETCH_ASSOC);
+    if ($hasMap) {
+        $cols .= ', a.account_type, a.report_section';
+        if ($hasRli) {
+            $cols .= ', a.report_line_id';
+        }
+        $cols .= ', a.cashflow_section';
+    }
 
-    return $rows;
+    $from = 'accounts a';
+    if ($hasRli && orange_table_exists($pdo, 'report_line_master')) {
+        $cols .= ', rlm.code AS report_line_code';
+        $from .= ' LEFT JOIN report_line_master rlm ON rlm.id = a.report_line_id';
+    }
+
+    try {
+        $rows = $pdo->query(
+            'SELECT ' . $cols . ' FROM ' . $from . ' ORDER BY COALESCE(a.code, \'\'), a.id'
+        )->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] orange_accounts_flat: ' . $e->getMessage());
+        }
+
+        return [];
+    }
+
+    return is_array($rows) ? $rows : [];
 }
 
 /**
@@ -738,6 +964,11 @@ if (!function_exists('orange_render_coa_tree')) {
             }
             $pCode = htmlspecialchars($pCodeRaw, ENT_QUOTES, 'UTF-8');
             $hasKids = !empty($n['children']);
+            $cfSec = htmlspecialchars((string) ($n['cashflow_section'] ?? 'none'), ENT_QUOTES, 'UTF-8');
+            $acct = htmlspecialchars((string) ($n['account_type'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $rsec = htmlspecialchars((string) ($n['report_section'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $rlineCode = htmlspecialchars((string) ($n['report_line_code'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $rlineId = isset($n['report_line_id']) ? (int) $n['report_line_id'] : 0;
             $cls = $activeId === $id ? 'coa-tree-node is-active' : 'coa-tree-node';
             if ($susp) {
                 $cls .= ' coa-tree-node--suspended';
@@ -748,7 +979,7 @@ if (!function_exists('orange_render_coa_tree')) {
             if ($isG) {
                 $cls .= ' coa-tree-node--is-group';
             }
-            echo '<li class="' . $cls . '" role="treeitem" aria-expanded="' . ($hasKids ? 'true' : 'false') . '" data-id="' . $id . '" data-code="' . $code . '" data-name="' . $name . '" data-name-en="' . $nameEn . '" data-is-group="' . ($isG ? '1' : '0') . '" data-parent="' . $pId . '" data-parent-code="' . $pCode . '" data-suspended="' . ($susp ? '1' : '0') . '" data-depth="' . $depth . '" data-root-name="' . $rootN . '" data-category-name="' . $catN . '" data-normal-balance="' . $nb . '">';
+            echo '<li class="' . $cls . '" role="treeitem" aria-expanded="' . ($hasKids ? 'true' : 'false') . '" data-id="' . $id . '" data-code="' . $code . '" data-name="' . $name . '" data-name-en="' . $nameEn . '" data-is-group="' . ($isG ? '1' : '0') . '" data-parent="' . $pId . '" data-parent-code="' . $pCode . '" data-suspended="' . ($susp ? '1' : '0') . '" data-depth="' . $depth . '" data-root-name="' . $rootN . '" data-category-name="' . $catN . '" data-normal-balance="' . $nb . '" data-account-type="' . $acct . '" data-report-section="' . $rsec . '" data-report-line-id="' . $rlineId . '" data-report-line-code="' . $rlineCode . '" data-cashflow-section="' . $cfSec . '">';
             echo '<div class="coa-tree-row">';
             if ($hasKids) {
                 echo '<button type="button" class="coa-tree-toggle" aria-label="طي أو توسيع الفرع" title="طي / توسيع" aria-expanded="true">−</button>';

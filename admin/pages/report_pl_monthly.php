@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
+require_once __DIR__ . '/../../includes/accounting_report_mapping.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/date_format.php';
@@ -129,6 +130,15 @@ $accountsLeaf = $pdo->query(
     "SELECT a.id, a.name, a.code FROM accounts a WHERE $leafWhere ORDER BY COALESCE(a.code, ''), a.name"
 )->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
+$leafIdsPl = [];
+foreach ($accountsLeaf as $al) {
+    $lid = (int) ($al['id'] ?? 0);
+    if ($lid > 0) {
+        $leafIdsPl[] = $lid;
+    }
+}
+$mapLeafPl = orange_accounts_report_mapping_by_ids($pdo, $leafIdsPl);
+
 $revAccounts = [];
 $outAccounts = [];
 
@@ -137,14 +147,14 @@ foreach ($accountsLeaf as $a) {
     if ($aid <= 0) {
         continue;
     }
-    $role = orange_accounts_account_pl_role($pdo, $aid);
-    if ($role === 'revenue') {
+    $bucket = orange_accounts_pnl_bucket_for_report($pdo, $aid, $mapLeafPl[$aid] ?? null);
+    if ($bucket === 'revenue') {
         $revAccounts[] = [
             'id' => $aid,
             'code' => trim((string) ($a['code'] ?? '')),
             'name' => (string) ($a['name'] ?? ''),
         ];
-    } elseif ($role === 'cogs' || $role === 'expense') {
+    } elseif ($bucket === 'cogs' || $bucket === 'expense') {
         $outAccounts[] = [
             'id' => $aid,
             'code' => trim((string) ($a['code'] ?? '')),
@@ -182,7 +192,7 @@ if (
 
     foreach ($ids as $ida) {
         if ($ida > 0) {
-            $idRoleMap[(string) $ida] = orange_accounts_account_pl_role($pdo, $ida);
+            $idRoleMap[(string) $ida] = orange_accounts_pnl_bucket_for_report($pdo, $ida, $mapLeafPl[$ida] ?? null);
         }
     }
 
@@ -398,7 +408,7 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
 <?php elseif ($periodLabel === ''): ?>
     <div class="card admin-fy-card"><p class="muted">تعذّر تحديد مدى التقويم.</p></div>
 <?php elseif ($revAccounts === [] && $outAccounts === []): ?>
-    <div class="card admin-fy-card"><p class="muted">لا توجد حسابات فرعية مصنَّفة كإيراد أو تكلفة/مصروف في الدليل.</p></div>
+    <div class="card admin-fy-card"><p class="muted">لا توجد حسابات فرعية تصنَّف وفق دليل الخريطة أو جذر الشجرة كإيراد أو تكلفة مبيعات/مصروف.</p></div>
 <?php else: ?>
     <?php foreach ($monthSheetsBuilt as $si => $ms): ?>
         <?php

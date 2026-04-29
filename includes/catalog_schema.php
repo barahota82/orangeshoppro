@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 9);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 10);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -1714,6 +1714,45 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         if (orange_table_has_column($pdo, 'accounts', 'is_group')) {
             orange_catalog_safe_exec($pdo, 'UPDATE accounts SET normal_balance = NULL WHERE is_group = 1');
         }
+    }
+    if (orange_table_exists($pdo, 'accounts') && !orange_table_has_column($pdo, 'accounts', 'account_type')) {
+        orange_catalog_safe_exec($pdo, "ALTER TABLE accounts ADD COLUMN account_type VARCHAR(32) NULL DEFAULT NULL AFTER normal_balance");
+    }
+    if (orange_table_exists($pdo, 'accounts') && !orange_table_has_column($pdo, 'accounts', 'report_section')) {
+        orange_catalog_safe_exec($pdo, "ALTER TABLE accounts ADD COLUMN report_section VARCHAR(32) NULL DEFAULT NULL AFTER account_type");
+    }
+    if (orange_table_exists($pdo, 'accounts') && !orange_table_has_column($pdo, 'accounts', 'report_line')) {
+        orange_catalog_safe_exec($pdo, "ALTER TABLE accounts ADD COLUMN report_line VARCHAR(128) NULL DEFAULT NULL AFTER report_section");
+    }
+
+    if (orange_table_exists($pdo, 'accounts')) {
+        require_once __DIR__ . '/report_line_master.php';
+        orange_report_line_master_ensure_table($pdo);
+        orange_report_line_master_seed_defaults($pdo);
+        if (!orange_table_has_column($pdo, 'accounts', 'report_line_id')) {
+            if (orange_table_has_column($pdo, 'accounts', 'report_section')) {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'ALTER TABLE accounts ADD COLUMN report_line_id INT UNSIGNED NULL DEFAULT NULL AFTER report_section'
+                );
+            } else {
+                orange_catalog_safe_exec($pdo, 'ALTER TABLE accounts ADD COLUMN report_line_id INT UNSIGNED NULL DEFAULT NULL');
+            }
+        }
+        orange_report_line_migrate_legacy_text_column($pdo);
+    }
+
+    if (orange_table_exists($pdo, 'accounts') && !orange_table_has_column($pdo, 'accounts', 'cashflow_section')) {
+        $afterCol = 'report_section';
+        if (orange_table_has_column($pdo, 'accounts', 'report_line_id')) {
+            $afterCol = 'report_line_id';
+        } elseif (orange_table_has_column($pdo, 'accounts', 'report_line')) {
+            $afterCol = 'report_line';
+        }
+        orange_catalog_safe_exec(
+            $pdo,
+            "ALTER TABLE accounts ADD COLUMN cashflow_section VARCHAR(32) NOT NULL DEFAULT 'none' AFTER {$afterCol}"
+        );
     }
 
     static $accountsDefaultSeeded = false;

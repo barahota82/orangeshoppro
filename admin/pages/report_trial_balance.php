@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
+require_once __DIR__ . '/../../includes/accounting_report_mapping.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/date_format.php';
@@ -94,6 +95,15 @@ $accountsLeaf = $pdo->query(
     "SELECT a.id, a.name, a.code FROM accounts a WHERE $leafWhere ORDER BY COALESCE(a.code, ''), a.name"
 )->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
+$leafIdsForMap = [];
+foreach ($accountsLeaf as $al) {
+    $lid = (int) ($al['id'] ?? 0);
+    if ($lid > 0) {
+        $leafIdsForMap[] = $lid;
+    }
+}
+$mapLeaf = orange_accounts_report_mapping_by_ids($pdo, $leafIdsForMap);
+
 $rowsTb = [];
 
 $sum_od = $sum_oc = $sum_pd = $sum_pc = $sum_ed = $sum_ec = 0.0;
@@ -129,7 +139,9 @@ foreach ($accountsLeaf as $a) {
     $code = trim((string) ($a['code'] ?? ''));
     $name = (string) ($a['name'] ?? '');
 
-    $rowsTb[] = [
+    $rowBase = orange_accounts_report_display_and_sort_meta($mapLeaf[$aid] ?? null);
+
+    $rowsTb[] = array_merge([
         'aid' => $aid,
         'code' => $code,
         'name' => $name,
@@ -139,7 +151,7 @@ foreach ($accountsLeaf as $a) {
         'per_cred' => $pperc,
         'end_deb' => $endDeb,
         'end_cred' => $endCre,
-    ];
+    ], $rowBase);
     $sum_od += $opd;
     $sum_oc += $opc;
     $sum_pd += $pperd;
@@ -147,6 +159,8 @@ foreach ($accountsLeaf as $a) {
     $sum_ed += $endDeb;
     $sum_ec += $endCre;
 }
+
+usort($rowsTb, 'orange_accounts_report_tb_rows_compare');
 
 $reportDateFromDmY = orange_format_date_dmY($periodDateFrom);
 $reportDateToDmY = orange_format_date_dmY($periodDateTo);
@@ -246,12 +260,14 @@ $nf = static function (float $v): string {
                         <tr>
                             <th class="gl-acc-stmt-col-num tb-col-code">كــود الحســاب</th>
                             <th class="tb-col-name">اســــــم الحســــــاب</th>
+                            <th class="tb-col-map" lang="ar">قســــم التقريــر</th>
+                            <th class="tb-col-map" lang="ar">سطر المرجع</th>
                             <th class="tb-grouphead" colspan="2">رصيد أول الفترة</th>
                             <th class="tb-grouphead" colspan="2">قيود الفترة</th>
                             <th class="tb-grouphead" colspan="2">رصيد نهاية الفترة</th>
                         </tr>
                         <tr class="tb-subhead">
-                            <th colspan="2"></th>
+                            <th colspan="4"></th>
                             <th class="gl-acc-stmt-col-num">مديـــــــن</th>
                             <th class="gl-acc-stmt-col-num">دائــــــــن</th>
                             <th class="gl-acc-stmt-col-num">مديـــــــن</th>
@@ -262,12 +278,14 @@ $nf = static function (float $v): string {
                     </thead>
                     <tbody>
                         <?php if ($rowsTb === []): ?>
-                            <tr><td colspan="8" class="muted">لا أرصدة أو حركات على حسابات فرعية في المدى المحدد.</td></tr>
+                            <tr><td colspan="10" class="muted">لا أرصدة أو حركات على حسابات فرعية في المدى المحدد.</td></tr>
                         <?php else: ?>
                             <?php foreach ($rowsTb as $r): ?>
                                 <tr>
                                     <td class="gl-acc-stmt-col-num tb-col-code" dir="ltr"><?php echo htmlspecialchars((string) ($r['code'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                                     <td><?php echo htmlspecialchars((string) ($r['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                    <td class="tb-col-map muted" lang="ar"><?php echo htmlspecialchars((string) ($r['sec_label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                    <td class="tb-col-map muted" lang="ar"><?php echo htmlspecialchars((string) ($r['line_label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                                     <td class="gl-acc-stmt-col-num"><?php echo $nf((float) ($r['op_deb'] ?? 0)); ?></td>
                                     <td class="gl-acc-stmt-col-num"><?php echo $nf((float) ($r['op_cred'] ?? 0)); ?></td>
                                     <td class="gl-acc-stmt-col-num"><?php echo $nf((float) ($r['per_deb'] ?? 0)); ?></td>
@@ -281,7 +299,7 @@ $nf = static function (float $v): string {
                     <?php if ($rowsTb !== []): ?>
                         <tfoot>
                             <tr class="tb-report-total">
-                                <td class="muted" colspan="2">الإجمــــــــــــــــــــــــــــــــــــــــالى</td>
+                                <td class="muted" colspan="4">الإجمــــــــــــــــــــــــــــــــــــــــالى</td>
                                 <td class="gl-acc-stmt-col-num"><?php echo $nf($sum_od); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo $nf($sum_oc); ?></td>
                                 <td class="gl-acc-stmt-col-num"><?php echo $nf($sum_pd); ?></td>

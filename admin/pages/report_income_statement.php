@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/date_format.php';
+require_once __DIR__ . '/../../includes/financial_report_breakdown.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -92,13 +93,10 @@ if (
     $tbBefore = orange_voucher_account_totals_strictly_before_date($pdo, $periodDateFrom, []);
 }
 
-$leafWhere = orange_accounts_posting_leaf_where_sql($pdo, 'a');
-$accountsLeaf = $pdo->query(
-    "SELECT a.id, a.name, a.code FROM accounts a WHERE $leafWhere ORDER BY COALESCE(a.code, ''), a.name"
-)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+$accountsLeaf = orange_financial_report_leaf_accounts_with_mapping($pdo);
 
 /**
- * @return list<array{code:string,name:string,opening:float,period:float,closing:float}>
+ * @return list<array<string, mixed>>
  */
 $buildPlSection = static function (
     PDO $pdo,
@@ -108,6 +106,14 @@ $buildPlSection = static function (
     string $plClass
 ): array {
     $out = [];
+    $hasSec = orange_table_has_column($pdo, 'accounts', 'report_section');
+    $expectSec = ['revenue' => 'trading', 'cogs' => 'trading', 'expense' => 'pnl'];
+    $legacyHeadingMap = [
+        'revenue' => 'إيرادات ومبيعات — تصنيف افتراضي (دورة الشجرة عند غياب سطر المرجع)',
+        'cogs' => 'تكلفة المبيعات — تصنيف افتراضي (دورة الشجرة)',
+        'expense' => 'مصروفات — تصنيف افتراضي (دورة الشجرة)',
+    ];
+
     foreach ($accountsLeaf as $a) {
         $aid = (int) ($a['id'] ?? 0);
         if ($aid <= 0) {
@@ -116,6 +122,13 @@ $buildPlSection = static function (
         $pr = orange_accounts_account_pl_role($pdo, $aid);
         if ($pr !== $plClass) {
             continue;
+        }
+        if ($hasSec) {
+            $sec = strtolower(trim((string) ($a['report_section'] ?? '')));
+            $want = $expectSec[$plClass] ?? '';
+            if ($want !== '' && $sec !== '' && $sec !== $want) {
+                continue;
+            }
         }
         $d0 = $c0 = $d1 = $c1 = 0.0;
         if (isset($tbBefore[$aid])) {
@@ -137,16 +150,38 @@ $buildPlSection = static function (
         if (abs($open) < 0.0001 && abs($period) < 0.0001 && abs($closing) < 0.0001) {
             continue;
         }
+
+        $mappedHeading = trim((string) ($a['report_line_heading_ar'] ?? ''));
+        $sortKey = (int) ($a['report_line_sort'] ?? 500000);
+        if ($mappedHeading === '') {
+            $mappedHeading = $legacyHeadingMap[$plClass] ?? '—';
+            $sortKey = ['revenue' => 301000, 'cogs' => 302000, 'expense' => 303000][$plClass] ?? 399999;
+        }
+
         $code = trim((string) ($a['code'] ?? ''));
         $nm = (string) ($a['name'] ?? '');
-        $out[] = [
+        $row = [
             'code' => $code,
             'name' => $nm,
             'opening' => $open,
             'period' => $period,
             'closing' => $closing,
+            '_section_heading' => $mappedHeading,
+            '_section_sort' => $sortKey,
+            'report_line_master_code' => strtolower(trim((string) ($a['report_line_master_code'] ?? ''))),
         ];
+        $out[] = $row;
     }
+
+    usort($out, static function (array $x, array $y): int {
+        $sx = (int) ($x['_section_sort'] ?? 0);
+        $sy = (int) ($y['_section_sort'] ?? 0);
+        if ($sx !== $sy) {
+            return $sx <=> $sy;
+        }
+
+        return strcmp((string) ($x['code'] ?? ''), (string) ($y['code'] ?? ''));
+    });
 
     return $out;
 };
@@ -156,8 +191,6 @@ $cogsLines = $useVouchers ? $buildPlSection($pdo, $accountsLeaf, $tbRange, $tbBe
 $expenseLines = $useVouchers ? $buildPlSection($pdo, $accountsLeaf, $tbRange, $tbBefore, 'expense') : [];
 
 /**
- * تجزئة مصروفات التشغيل تبعاً أوائل الكود الرقمية (يطابق عموماً دليلاً من نوع 61x/62x مقابل 63x).
- *
  * @return array{direct: list, indirect: list, misc: list}
  */
 $splitExpenseBuckets = static function (array $expLines): array {
@@ -165,6 +198,25 @@ $splitExpenseBuckets = static function (array $expLines): array {
     $indirect = [];
     $misc = [];
     foreach ($expLines as $ln) {
+        $mk = strtolower(trim((string) ($ln['report_line_master_code'] ?? '')));
+        if ($mk !== '') {
+            if ($mk === 'finance_expenses') {
+                $indirect[] = $ln;
+
+                continue;
+            }
+            if (
+                $mk === 'operating_expenses'
+                || $mk === 'purchase_expenses'
+                || $mk === 'depreciation'
+                || $mk === 'expense'
+                || strpos($mk, 'cogs') === 0
+            ) {
+                $direct[] = $ln;
+
+                continue;
+            }
+        }
         $code = trim((string) ($ln['code'] ?? ''));
         $h = 0;
         if (preg_match('/^(\d{3})/', $code, $m)) {

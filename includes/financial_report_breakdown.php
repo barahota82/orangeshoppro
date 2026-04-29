@@ -191,3 +191,50 @@ function orange_financial_expense_account_line_breakdown(PDO $pdo, int $fiscalYe
 
     return $out;
 }
+
+require_once __DIR__ . '/account_tree.php';
+
+/**
+ * صفوف حسابات الترحيل مع عنوان سطر تقرير مرجعي (عند وجود report_line_id ومخططه).
+ *
+ * @return list<array<string, mixed>>
+ */
+function orange_financial_report_leaf_accounts_with_mapping(PDO $pdo): array
+{
+    orange_catalog_ensure_schema($pdo);
+    $lw = orange_accounts_posting_leaf_where_sql($pdo, 'a');
+    $hasRl = orange_table_has_column($pdo, 'accounts', 'report_line_id');
+    $hasAt = orange_table_has_column($pdo, 'accounts', 'account_type');
+    $hasSec = orange_table_has_column($pdo, 'accounts', 'report_section');
+    $cols = 'a.id, a.code, a.name';
+    if ($hasAt) {
+        $cols .= ', a.account_type';
+    }
+    if ($hasSec) {
+        $cols .= ', a.report_section';
+    }
+    if ($hasRl) {
+        $cols .= ', a.report_line_id';
+    }
+    $join = '';
+    if ($hasRl && orange_table_exists($pdo, 'report_line_master')) {
+        $cols .= ', COALESCE(NULLIF(TRIM(rlm.label_ar),\'\'), rlm.code) AS report_line_heading_ar';
+        $cols .= ', rlm.sort_order AS report_line_sort';
+        $cols .= ', rlm.code AS report_line_master_code';
+        $join = ' LEFT JOIN report_line_master rlm ON rlm.id = a.report_line_id ';
+    }
+
+    try {
+        $rows = $pdo->query(
+            'SELECT ' . $cols . ' FROM accounts a' . $join . ' WHERE ' . $lw . ' ORDER BY COALESCE(a.code, \'\'), a.name ASC'
+        )->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange_financial_report_leaf_accounts_with_mapping] ' . $e->getMessage());
+        }
+
+        return [];
+    }
+
+    return is_array($rows) ? $rows : [];
+}
