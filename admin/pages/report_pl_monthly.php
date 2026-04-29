@@ -122,6 +122,7 @@ if (strcmp($periodDateFrom, $periodDateTo) <= 0) {
 }
 
 $monthList = $iterateYmRange($periodYmFrom, $periodYmTo);
+$showZeros = isset($_GET['show_zeros']) && (string) $_GET['show_zeros'] === '1';
 
 $leafWhere = orange_accounts_posting_leaf_where_sql($pdo, 'a');
 $accountsLeaf = $pdo->query(
@@ -129,7 +130,6 @@ $accountsLeaf = $pdo->query(
 )->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
 $plAccounts = [];
-
 foreach ($accountsLeaf as $a) {
     $aid = (int) ($a['id'] ?? 0);
     if ($aid <= 0) {
@@ -160,8 +160,8 @@ $signedNature = static function (string $role, float $deb, float $cred): float {
     return round($deb - $cred, 4);
 };
 
-/** @var array<int, array<string, float>> */
-$amtByAccountYm = [];
+/** account_id => ym => ['d'=>,'c'=>] */
+$dcByAccountYm = [];
 
 if (
     $useVouchers
@@ -195,69 +195,62 @@ if (
         if ($aid <= 0 || $ym === '') {
             continue;
         }
-        $role = $idToRole[$aid] ?? 'other';
-        if ($role === 'other') {
+        if (! isset($dcByAccountYm[$aid])) {
+            $dcByAccountYm[$aid] = [];
+        }
+        $dcByAccountYm[$aid][$ym] = [
+            'd' => (float) ($rw['d'] ?? 0),
+            'c' => (float) ($rw['c'] ?? 0),
+        ];
+    }
+}
+
+/** @return list<array{ym:string,date_from:string,date_to:string,rows:list,sum_d:float,sum_c:float,sum_net:float}> */
+$monthSheets = [];
+foreach ($monthList as $ym) {
+    $df = $firstDayOfYm($ym);
+    $dt = $lastDayOfYm($ym);
+    $rows = [];
+    foreach ($plAccounts as $pa) {
+        $aid = (int) $pa['id'];
+        $role = (string) $pa['role'];
+        $dc = $dcByAccountYm[$aid][$ym] ?? ['d' => 0.0, 'c' => 0.0];
+        $d = (float) $dc['d'];
+        $c = (float) $dc['c'];
+        $net = $signedNature($role, $d, $c);
+        $hasMovement = abs($d) >= 0.0001 || abs($c) >= 0.0001;
+        if (! $showZeros && ! $hasMovement) {
             continue;
         }
-        $amt = $signedNature(
-            $role,
-            (float) ($rw['d'] ?? 0),
-            (float) ($rw['c'] ?? 0)
-        );
-        if (! isset($amtByAccountYm[$aid])) {
-            $amtByAccountYm[$aid] = [];
-        }
-        $amtByAccountYm[$aid][$ym] = $amt;
+        $rows[] = [
+            'code' => (string) $pa['code'],
+            'name' => (string) $pa['name'],
+            'debit' => round($d, 4),
+            'credit' => round($c, 4),
+            'net' => $net,
+        ];
     }
-}
-
-$showZeros = isset($_GET['show_zeros']) && (string) $_GET['show_zeros'] === '1';
-
-$rowTotals = [];
-$tableRows = [];
-foreach ($plAccounts as $pa) {
-    $aid = (int) $pa['id'];
-    $accTot = 0.0;
-    foreach ($monthList as $ym) {
-        $v = (float) ($amtByAccountYm[$aid][$ym] ?? 0.0);
-        $accTot += $v;
+    $sumD = 0.0;
+    $sumC = 0.0;
+    $sumNet = 0.0;
+    foreach ($rows as $r) {
+        $sumD += (float) $r['debit'];
+        $sumC += (float) $r['credit'];
+        $sumNet += (float) $r['net'];
     }
-    if (abs($accTot) < 0.0001 && ! $showZeros) {
-        /** تُخفَى الصفرية إلا عند الطلب؛ صف واحد فارغ لا نملؤه بحسابات بلا أي حركة في المدى */
-        continue;
-    }
-    $tableRows[] = [
-        'id' => $aid,
-        'code' => (string) $pa['code'],
-        'name' => (string) $pa['name'],
-        'by_month' => array_fill_keys($monthList, 0.0),
-        'row_total' => round($accTot, 4),
+    $monthSheets[] = [
+        'ym' => $ym,
+        'date_from' => $df,
+        'date_to' => $dt,
+        'rows' => $rows,
+        'sum_d' => round($sumD, 4),
+        'sum_c' => round($sumC, 4),
+        'sum_net' => round($sumNet, 4),
     ];
-    $nr = count($tableRows) - 1;
-    foreach ($monthList as $ym) {
-        $v = (float) ($amtByAccountYm[$aid][$ym] ?? 0.0);
-        $tableRows[$nr]['by_month'][$ym] = $v;
-    }
-    $rowTotals[$aid] = $tableRows[$nr]['row_total'];
 }
 
-/** إجمالي عمود شهر = مجاميع تأثير الحسابات على قطاع قائمة الدخل بتوقيعها */
-$colTotals = [];
-foreach ($monthList as $ym) {
-    $colTotals[$ym] = 0.0;
-}
-
-foreach ($tableRows as $tr) {
-    foreach ($monthList as $ym) {
-        $colTotals[$ym] += (float) ($tr['by_month'][$ym] ?? 0.0);
-    }
-}
-
-$grandTot = array_sum($rowTotals);
-$grandTot = round($grandTot, 4);
-
-$reportDateFromDmY = orange_format_date_dmY($periodDateFrom);
-$reportDateToDmY = orange_format_date_dmY($periodDateTo);
+$reportRangeFromDmY = orange_format_date_dmY($periodDateFrom);
+$reportRangeToDmY = orange_format_date_dmY($periodDateTo);
 $todayDmY = orange_format_date_dmY(date('Y-m-d'));
 $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 
@@ -289,7 +282,7 @@ $fmt = static fn (float $v): string => number_format($v, 4);
                             value="<?php echo htmlspecialchars($periodYmFrom, ENT_QUOTES, 'UTF-8'); ?>"
                             min="<?php echo htmlspecialchars($calYmMinBound, ENT_QUOTES, 'UTF-8'); ?>"
                             max="<?php echo htmlspecialchars($calYmMaxBound, ENT_QUOTES, 'UTF-8'); ?>"
-                            title="حدود اليوم الأول/الأخير بالشهر (مثل الحركة الشهرية لحساب)، حسب تاريخ السند."
+                            title="المدّة تشمل عدّة تقارير—كل شهر في صفحة طباعة منفردة؛ حسب تاريخ السند."
                             autocomplete="off">
                     </div>
                     <div class="gas-acc-stmt-field gl-m-stmt-field--month">
@@ -303,7 +296,7 @@ $fmt = static fn (float $v): string => number_format($v, 4);
                     </div>
                     <label class="gas-acc-stmt-field" style="align-items:flex-start;margin-top:0.15rem;">
                         <input type="checkbox" name="show_zeros" value="1" <?php echo $showZeros ? 'checked' : ''; ?> style="margin-top:6px;margin-left:6px;">
-                        <span>عرض كل الحسابات حتى بدون حركة</span>
+                        <span>عرض كل الحسابات حتى بدون حركة في ذلك الشهر</span>
                     </label>
                     <div class="gas-acc-stmt-actions">
                         <button type="submit">عرض</button>
@@ -315,7 +308,7 @@ $fmt = static fn (float $v): string => number_format($v, 4);
             </div>
         </form>
         <p class="card-hint" style="margin-top:12px;margin-bottom:0;">
-            مصفوفة شهرية بحسب قطاع قائمة الدخل على جذور الدليل: قيمة الشهر للإيراد = (دائن − مدين)، وللتكلفة/المصروف = (مدين − دائن)، ثم مجموع أفقي لكل حساب؛ صفوف التذييل تُظهر مجموع عمود شهر كمحصّلة تقريبية لأثر الفترة.
+            شكل كالملف المحاسبي المرجعي: <strong>تقرير لكل شهر وحده</strong> ضمن مدى الشهر الأول/الأخير الذي اخترته؛ عند الطباعة تُفصل الأشهر <strong>صفحة بصفحة</strong> بحيث لا تُكمَّن الأشهر كأعمدة عرضية والصف يبقى سهل القراءة والطباعة.
         </p>
     </div>
 
@@ -332,79 +325,86 @@ $fmt = static fn (float $v): string => number_format($v, 4);
         <p class="muted">لا توجد حسابات فرعية مصنَّفة كإيراد / تكلفة مبيعات / مصروف في الدليل.</p>
     </div>
 <?php else: ?>
-    <div class="card admin-fy-card gl-acc-stmt-print">
-        <div class="gl-acc-stmt-print-sheet ta-report-print-sheet">
-            <header class="gl-acc-stmt-print-banner">
-                <?php if ($companyNameAr !== ''): ?>
-                    <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
-                <?php endif; ?>
-                <h2 class="gl-acc-stmt-print-title ta-report-print-title">
-                    <span class="gl-acc-stmt-print-title-ar" lang="ar">قائمة إيرادات ومصروفات شهرية عن الفترة من&nbsp;<?php echo htmlspecialchars($reportDateFromDmY, ENT_QUOTES, 'UTF-8'); ?> إلـى&nbsp;<?php echo htmlspecialchars($reportDateToDmY, ENT_QUOTES, 'UTF-8'); ?></span>
-                </h2>
-            </header>
-            <div class="gl-acc-stmt-print-grid">
-                <div class="gl-acc-stmt-print-row gl-acc-stmt-print-row--dates">
-                    <span class="gl-acc-stmt-print-k">من تاريخ</span>
-                    <span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($reportDateFromDmY, ENT_QUOTES, 'UTF-8'); ?></span>
-                    <span class="gl-acc-stmt-print-k">الى تاريخ</span>
-                    <span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($reportDateToDmY, ENT_QUOTES, 'UTF-8'); ?></span>
-                    <span class="gl-acc-stmt-print-k">تاريخ الكشف</span>
-                    <span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($todayDmY, ENT_QUOTES, 'UTF-8'); ?></span>
+
+    <?php foreach ($monthSheets as $si => $sheet): ?>
+        <?php
+        $ym = (string) $sheet['ym'];
+        $df = (string) $sheet['date_from'];
+        $dt = (string) $sheet['date_to'];
+        $rows = $sheet['rows'];
+        $sheetTitleYm = htmlspecialchars($monthLabelAr($ym), ENT_QUOTES, 'UTF-8');
+        $fromDm = orange_format_date_dmY($df);
+        $toDm = orange_format_date_dmY($dt);
+        ?>
+        <section class="pl-month-print-page <?php echo $si === count($monthSheets) - 1 ? 'pl-month-print-page--last' : ''; ?>" dir="rtl">
+            <div class="card admin-fy-card gl-acc-stmt-print pl-month-print-inner">
+                <div class="gl-acc-stmt-print-sheet ta-report-print-sheet">
+                    <header class="gl-acc-stmt-print-banner">
+                        <?php if ($companyNameAr !== ''): ?>
+                            <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
+                        <?php endif; ?>
+                        <h2 class="gl-acc-stmt-print-title ta-report-print-title pl-month-print-title">
+                            <span class="gl-acc-stmt-print-title-ar" lang="ar">قائمة إيرادات ومصروفات شهرية — <?php echo $sheetTitleYm; ?></span>
+                        </h2>
+                        <p class="gl-acc-stmt-print-subtitle pl-month-subtitle" lang="ar">عن&nbsp;الشهر&nbsp;من&nbsp;<?php echo htmlspecialchars($fromDm, ENT_QUOTES, 'UTF-8'); ?>&nbsp;إلـى&nbsp;<?php echo htmlspecialchars($toDm, ENT_QUOTES, 'UTF-8'); ?></p>
+                        <p class="pl-month-range-muted muted gl-acc-stmt-no-print" style="margin:0.35rem 0 0;text-align:center;font-size:0.9rem;">
+                            إن شملت قائمة الواجهة أكثر من شهر، يظهر هنا جزء ذلك الشهر فقط؛ المدّة الكاملة: <span dir="ltr"><?php echo htmlspecialchars($reportRangeFromDmY, ENT_QUOTES, 'UTF-8'); ?></span> — <span dir="ltr"><?php echo htmlspecialchars($reportRangeToDmY, ENT_QUOTES, 'UTF-8'); ?></span>
+                        </p>
+                    </header>
+                    <div class="gl-acc-stmt-print-grid">
+                        <div class="gl-acc-stmt-print-row gl-acc-stmt-print-row--dates">
+                            <span class="gl-acc-stmt-print-k">تاريخ الكشف</span>
+                            <span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($todayDmY, ENT_QUOTES, 'UTF-8'); ?></span>
+                        </div>
+                    </div>
+
+                    <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap pl-month-single-table-wrap ta-report-table-scroll">
+                        <table class="admin-fy-table gl-acc-stmt-table ta-report-table ta-report-table--xlsx pl-month-table">
+                            <thead>
+                                <tr>
+                                    <th class="gl-acc-stmt-col-num">كــود الحســاب</th>
+                                    <th>اســــــم الحســــــاب</th>
+                                    <th class="gl-acc-stmt-col-num">مدين</th>
+                                    <th class="gl-acc-stmt-col-num">دائن</th>
+                                    <th class="gl-acc-stmt-col-num">صافي القائمة</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if ($rows === []): ?>
+                                    <tr><td colspan="5" class="muted">لا حركة في هذا الشهر على حسابات قائمة الدخل (فعّل «عرض كل الحسابات» إن احتجت الصفوف الصفرية).</td></tr>
+                                <?php else: ?>
+                                    <?php foreach ($rows as $r): ?>
+                                        <tr>
+                                            <td class="gl-acc-stmt-col-num pl-m-num" dir="ltr"><?php echo htmlspecialchars((string) $r['code'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                            <td><?php echo htmlspecialchars((string) $r['name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                            <td class="gl-acc-stmt-col-num"><?php echo $fmt((float) $r['debit']); ?></td>
+                                            <td class="gl-acc-stmt-col-num"><?php echo $fmt((float) $r['credit']); ?></td>
+                                            <td class="gl-acc-stmt-col-num"><?php echo $fmt((float) $r['net']); ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                            <?php if ($rows !== []): ?>
+                                <tfoot>
+                                    <tr class="pl-month-tfoot-totals">
+                                        <th colspan="2">الإجمالي</th>
+                                        <th class="gl-acc-stmt-col-num"><?php echo $fmt((float) $sheet['sum_d']); ?></th>
+                                        <th class="gl-acc-stmt-col-num"><?php echo $fmt((float) $sheet['sum_c']); ?></th>
+                                        <th class="gl-acc-stmt-col-num"><?php echo $fmt((float) $sheet['sum_net']); ?></th>
+                                    </tr>
+                                </tfoot>
+                            <?php endif; ?>
+                        </table>
+                    </div>
+
+                    <div class="gl-acc-stmt-print-footer ta-report-print-footer">
+                        <p class="gl-acc-stmt-print-metafoot" dir="ltr">طباعة: <?php echo htmlspecialchars($printDatetime, ENT_QUOTES, 'UTF-8'); ?> — صفحة شهر <?php echo $sheetTitleYm; ?> ( <?php echo (int) $si + 1; ?> من <?php echo count($monthSheets); ?>)</p>
+                    </div>
                 </div>
             </div>
+        </section>
+    <?php endforeach; ?>
 
-            <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap pl-monthly-matrix-wrap ta-report-table-scroll">
-                <table class="admin-fy-table gl-acc-stmt-table ta-report-table pl-monthly-matrix-table ta-report-table--xlsx">
-                    <thead>
-                        <tr>
-                            <th class="gl-acc-stmt-col-num">كــود الحســاب</th>
-                            <th>اســــــم الحســــــاب</th>
-                            <?php foreach ($monthList as $ym): ?>
-                                <th class="gl-acc-stmt-col-num month-col"><?php echo htmlspecialchars($monthLabelAr($ym), ENT_QUOTES, 'UTF-8'); ?></th>
-                            <?php endforeach; ?>
-                            <th class="gl-acc-stmt-col-num">الإجمالي</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if ($tableRows === []): ?>
-                            <tr><td colspan="<?php echo count($monthList) + 3; ?>" class="muted">لا توجد حركة في المدّة على حسابات قائمة الدخل المصنّفة (فعِّل «عرض كل الحسابات» لمقارنتها مع الدليل).</td></tr>
-                        <?php else: ?>
-                            <?php foreach ($tableRows as $tr): ?>
-                                <tr>
-                                    <td class="gl-acc-stmt-col-num pl-m-num" dir="ltr"><?php echo htmlspecialchars((string) ($tr['code'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                                    <td><?php echo htmlspecialchars((string) ($tr['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                                    <?php foreach ($monthList as $ym): ?>
-                                        <td class="gl-acc-stmt-col-num pl-m-num"><?php echo $fmt((float) ($tr['by_month'][$ym] ?? 0)); ?></td>
-                                    <?php endforeach; ?>
-                                    <td class="gl-acc-stmt-col-num pl-m-num"><?php echo $fmt((float) ($tr['row_total'] ?? 0)); ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </tbody>
-                    <?php if ($tableRows !== [] && $monthList !== []): ?>
-                        <tfoot>
-                            <tr class="pl-monthly-foot">
-                                <th colspan="2">صافى أثر الفترة (تقريب للعمود)</th>
-                                <?php foreach ($monthList as $ym): ?>
-                                    <th class="gl-acc-stmt-col-num pl-m-num"><?php echo $fmt((float) ($colTotals[$ym] ?? 0)); ?></th>
-                                <?php endforeach; ?>
-                                <th class="gl-acc-stmt-col-num pl-m-num"><?php echo $fmt($grandTot); ?></th>
-                            </tr>
-                        </tfoot>
-                    <?php endif; ?>
-                </table>
-            </div>
-
-            <div class="gl-acc-stmt-print-footer ta-report-print-footer">
-                <p class="gl-acc-stmt-print-metafoot" dir="ltr">تاريخ ووقت الطباعة: <?php echo htmlspecialchars($printDatetime, ENT_QUOTES, 'UTF-8'); ?> — صفحة 1 من 1</p>
-            </div>
-        </div>
-        <p class="card-hint gl-acc-stmt-no-print" style="margin-top:12px;margin-bottom:0;">
-            مدى التاريخ: <span dir="ltr"><?php echo htmlspecialchars($periodLabel, ENT_QUOTES, 'UTF-8'); ?></span>
-            — عدد الأشهر: <?php echo count($monthList); ?>.
-            يُكمِّن على تقرير مفصول لكل شهر مثل المرجع الورقي؛ هذا العرض شبكة واحدة بكل الأشهر عمودًا.
-        </p>
-    </div>
 <?php endif; ?>
 
 </div>

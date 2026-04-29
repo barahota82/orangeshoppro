@@ -4041,27 +4041,66 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     min-width: 780px;
 }
 
-.pl-monthly-matrix-wrap.ta-report-table-scroll {
+/* قائمة إيرادات ومصروفات شهرية — كتلة/طباعة لكل شهر */
+.pl-month-print-inner .card {
+    margin-bottom: 0;
+}
+
+.pl-month-print-title .gl-acc-stmt-print-title-ar {
+    line-height: 1.35;
+}
+
+.pl-month-subtitle {
+    margin: 0.45rem 0 0;
+    text-align: center;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.pl-month-single-table-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
 }
 
-.admin-fy-table.pl-monthly-matrix-table {
-    min-width: 760px;
+.admin-fy-table.pl-month-table {
+    min-width: 520px;
 }
 
-.admin-fy-table.pl-monthly-matrix-table thead th.month-col {
-    white-space: nowrap;
-    font-size: 0.88rem;
-}
-
-.admin-fy-table.pl-monthly-matrix-table .pl-m-num {
+.admin-fy-table.pl-month-table tbody td.pl-m-num {
     unicode-bidi: isolate;
 }
 
-.admin-fy-table.pl-monthly-matrix-table tfoot th {
+.admin-fy-table.pl-month-table .pl-month-tfoot-totals th {
     border-top: 2px solid #64748b;
     background: #f1f5f9;
+}
+
+@media screen {
+    .pl-month-print-page:not(.pl-month-print-page--last) {
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px dashed #cbd5e1;
+    }
+}
+
+@media print {
+    .admin-fy-shell .gl-acc-stmt-no-print,
+    .pl-month-range-muted {
+        display: none !important;
+    }
+
+    .pl-month-print-inner.card {
+        box-shadow: none !important;
+        border: none !important;
+    }
+
+    .pl-month-print-page {
+        page-break-after: always;
+    }
+
+    .pl-month-print-page--last {
+        page-break-after: auto !important;
+    }
 }
 
 /* ميزان المراجعة — 8 أعمدة */
