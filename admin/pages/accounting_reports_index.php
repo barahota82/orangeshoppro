@@ -7,10 +7,22 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/account_tree.php';
+require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+
+$acctIdxPostingLeafCt = 0;
+if (orange_journal_vouchers_ready($pdo)) {
+    $acctIdxLw = orange_accounts_posting_leaf_where_sql($pdo, 'a');
+    try {
+        $acctIdxPostingLeafCt = (int) $pdo->query("SELECT COUNT(*) FROM accounts a WHERE $acctIdxLw")->fetchColumn();
+    } catch (Throwable $e) {
+        $acctIdxPostingLeafCt = 0;
+    }
+}
 
 $baseAdmin = storefront_public_path('/admin/index.php');
 $financialBase = htmlspecialchars($baseAdmin . '?page=financial_report', ENT_QUOTES, 'UTF-8');
@@ -20,6 +32,11 @@ $financialWithFy = $financialBase . (isset($_GET['fy']) && (int) $_GET['fy'] > 0
 <div class="card" style="margin-bottom:1rem;">
     <p class="card-hint" style="margin:0;">للوصول السريع استخدم قائمة <strong>التقارير</strong> في أعلى لوحة التحكم — كل تقرير له رابط مستقل. هذه الصفحة للمراجعة والنسخ اليدوي للروابط فقط.</p>
 </div>
+<?php if (orange_journal_vouchers_ready($pdo) && $acctIdxPostingLeafCt === 0): ?>
+<div class="card" style="margin-bottom:1rem;border:1px solid #fcd34d;background:#fffbeb;">
+    <p class="card-hint" style="margin:0;line-height:1.55;"><strong>تنبيه:</strong> لا توجد حسابات ترحيل (أوراق) في الدليل بعد؛ التقارير المالية ومطابقة الذمم تفترض أوراقاً في «الدليل المحاسبي». هذا الفهرس <strong>يعمل للروابط</strong> — المتوقَّع أثناء الإعداد الأول.</p>
+</div>
+<?php endif; ?>
 <div class="page-title page-title--stacked">
     <div>
         <h1>فهرس التقارير المحاسبية (مرجعي)</h1>

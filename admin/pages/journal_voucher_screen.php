@@ -7,6 +7,7 @@ if (!isset($jvPageEntryType, $jvPageTitle, $jvPageCardTitle, $jvSearchModalTitle
 }
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
@@ -68,6 +69,15 @@ if (orange_journal_vouchers_ready($pdo)) {
 $jvFormDocumentEnteredDisplay = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 $jvFormVoucherDateDisplay = orange_format_date_dmY(date('Y-m-d'));
 $jvNavReady = orange_journal_vouchers_ready($pdo);
+$jvPostingLeafCt = 0;
+if ($jvNavReady) {
+    $jvLw = orange_accounts_posting_leaf_where_sql($pdo, 'a');
+    try {
+        $jvPostingLeafCt = (int) $pdo->query("SELECT COUNT(*) FROM accounts a WHERE $jvLw")->fetchColumn();
+    } catch (Throwable $e) {
+        $jvPostingLeafCt = 0;
+    }
+}
 $jvHeaderLineClass = 'jv-voucher-header-line' . ($jvNavReady ? ' jv-voucher-header-line--nav' : '');
 ?>
 <div class="page-title page-title--stacked jv-print-hide">
@@ -75,6 +85,12 @@ $jvHeaderLineClass = 'jv-voucher-header-line' . ($jvNavReady ? ' jv-voucher-head
         <h1><?php echo htmlspecialchars($jvPageTitle, ENT_QUOTES, 'UTF-8'); ?></h1>
     </div>
 </div>
+
+<?php if ($jvNavReady && $jvPostingLeafCt === 0): ?>
+<div class="card jv-print-hide" style="border:1px solid #fcd34d;background:#fffbeb;margin-bottom:12px;">
+    <p class="card-hint" style="margin:0;line-height:1.55;"><strong>تنبيه:</strong> لا توجد حسابات ترحيل (أوراق) في الدليل بعد؛ أسطر القيد لا تُكمَّل بحسابات صالحة للترحيل حتى تعريف أوراق في «الدليل المحاسبي». <strong>الشاشة تعمل</strong> — المتوقَّع أثناء الإعداد الأول.</p>
+</div>
+<?php endif; ?>
 
 <div class="card jv-print-area">
     <h3 class="card-title"><?php echo htmlspecialchars($jvPageCardTitle, ENT_QUOTES, 'UTF-8'); ?></h3>

@@ -3,12 +3,24 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/account_tree.php';
+require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/journal_types.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 orange_catalog_ensure_gl_account_settings_alloc_tables($pdo);
+
+$glSetPostingLeafCt = 0;
+if (orange_journal_vouchers_ready($pdo)) {
+    $glSetLw = orange_accounts_posting_leaf_where_sql($pdo, 'a');
+    try {
+        $glSetPostingLeafCt = (int) $pdo->query("SELECT COUNT(*) FROM accounts a WHERE $glSetLw")->fetchColumn();
+    } catch (Throwable $e) {
+        $glSetPostingLeafCt = 0;
+    }
+}
 
 $accountsRows = $pdo->query(
     'SELECT id, name, code FROM accounts ORDER BY COALESCE(code, \'\'), name ASC'
@@ -65,6 +77,12 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
 <div class="page-title">
     <h1>حسابات القيود التلقائية</h1>
 </div>
+
+<?php if (orange_journal_vouchers_ready($pdo) && $glSetPostingLeafCt === 0): ?>
+<div class="card" style="border:1px solid #fcd34d;background:#fffbeb;margin-bottom:12px;">
+    <p class="card-hint" style="margin:0;line-height:1.55;"><strong>تنبيه:</strong> لا توجد حسابات ترحيل (أوراق) في الدليل بعد؛ الاختيار الموصى به لكل بند هو حساب ورقة للترحيل. <strong>الشاشة والجداول تعملان</strong> — أكمل «الدليل المحاسبي» ثم عد لربط القيود التلقائية والذمم.</p>
+</div>
+<?php endif; ?>
 
 <div class="card gl-auto-form-card">
         <h3 class="card-title">١ — البنود والحسابات من الدليل</h3>

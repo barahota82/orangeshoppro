@@ -9,6 +9,8 @@ if (!isset($ppvKind) || !in_array($ppvKind, ['customer_receipt', 'supplier_payme
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/party_subledger.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
+require_once __DIR__ . '/../../includes/account_tree.php';
+require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/supplier_payable_account.php';
 
@@ -104,12 +106,28 @@ if ($ppvIsReceipt && $prefillStmtKind === 'customer' && $prefillStmtId > 0) {
 $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_settings');
 $ppvHeaderLineClass = 'jv-voucher-header-line jv-voucher-header-line--nav';
 $ppvReady = $ppvCashLock !== null && (!$ppvIsReceipt || $ppvPartyDefaultAcc !== null);
+
+$ppvPostingLeafCt = 0;
+if (orange_journal_vouchers_ready($pdo)) {
+    $ppvLw = orange_accounts_posting_leaf_where_sql($pdo, 'a');
+    try {
+        $ppvPostingLeafCt = (int) $pdo->query("SELECT COUNT(*) FROM accounts a WHERE $ppvLw")->fetchColumn();
+    } catch (Throwable $e) {
+        $ppvPostingLeafCt = 0;
+    }
+}
 ?>
 <div class="page-title page-title--stacked ppv-print-hide">
     <div>
         <h1><?php echo htmlspecialchars($ppvTitle, ENT_QUOTES, 'UTF-8'); ?></h1>
     </div>
 </div>
+
+<?php if (orange_journal_vouchers_ready($pdo) && $ppvPostingLeafCt === 0): ?>
+<div class="card ppv-print-hide" style="border:1px solid #fcd34d;background:#fffbeb;margin-bottom:12px;">
+    <p class="card-hint" style="margin:0;line-height:1.55;"><strong>تنبيه:</strong> لا توجد حسابات ترحيل (أوراق) في الدليل بعد؛ القيود المحاسبية للسداد تستهدف الخزينة وحسابات الذمم كأوراق ترحيل. <strong>الشاشة تعمل</strong> بعد ربط الإعدادات — المتوقَّع تأخراً حتى إكمال «الدليل المحاسبي».</p>
+</div>
+<?php endif; ?>
 
 <div class="card ppv-print-area">
     <h3 class="card-title"><?php echo htmlspecialchars($ppvCardTitle, ENT_QUOTES, 'UTF-8'); ?></h3>

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/date_format.php';
@@ -48,6 +49,16 @@ try {
     /* ignore */
 }
 asort($typeLabels, SORT_STRING);
+
+$jvrPostingLeafCt = 0;
+if (orange_journal_vouchers_ready($pdo)) {
+    $jvrLw = orange_accounts_posting_leaf_where_sql($pdo, 'a');
+    try {
+        $jvrPostingLeafCt = (int) $pdo->query("SELECT COUNT(*) FROM accounts a WHERE $jvrLw")->fetchColumn();
+    } catch (Throwable $e) {
+        $jvrPostingLeafCt = 0;
+    }
+}
 
 $vouchers = [];
 $linesByVid = [];
@@ -148,6 +159,12 @@ $resetUrl = htmlspecialchars(storefront_public_path('/admin/index.php?page=journ
         <h1>تقارير السندات</h1>
     </div>
 </div>
+
+<?php if (orange_journal_vouchers_ready($pdo) && $jvrPostingLeafCt === 0): ?>
+<div class="card" style="border:1px solid #fcd34d;background:#fffbeb;margin-bottom:12px;">
+    <p class="card-hint" style="margin:0;line-height:1.55;"><strong>تنبيه:</strong> لا توجد حسابات ترحيل (أوراق) في الدليل بعد؛ تفسير أسطر السند والحسابات يعتمد على دليل كامل للأوراق. <strong>الفلاتر والشاشة تعملان</strong> — المتوقَّع أثناء الإعداد الأول في «الدليل المحاسبي».</p>
+</div>
+<?php endif; ?>
 
 <div class="card">
     <form method="get" action="">

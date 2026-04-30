@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
+require_once __DIR__ . '/../../includes/account_tree.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -147,6 +148,15 @@ if ($obVoucherDateDisp === '' && $fyId > 0) {
 
 $obNumberDisplay = $obVid > 0 ? $obVid : $obNumberPreview;
 $obAdminIndexUrl = storefront_public_path('/admin/index.php');
+
+$obLeafWhere = orange_accounts_posting_leaf_where_sql($pdo, 'a');
+$obPostingLeafCt = 0;
+try {
+    $obPostingLeafCt = (int) $pdo->query("SELECT COUNT(*) FROM accounts a WHERE $obLeafWhere")->fetchColumn();
+} catch (Throwable $e) {
+    $obPostingLeafCt = 0;
+}
+
 ?>
 <div class="page-title page-title--stacked jv-print-hide">
     <div>
@@ -157,6 +167,12 @@ $obAdminIndexUrl = storefront_public_path('/admin/index.php');
 <?php if ($years === []): ?>
 <div class="card jv-print-hide">
     <p class="card-hint">لا توجد سنة مفتوحة — افتح سنة من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=fiscal_years'), ENT_QUOTES, 'UTF-8'); ?>">السنوات المالية</a>.</p>
+</div>
+<?php endif; ?>
+
+<?php if ($years !== [] && orange_journal_vouchers_ready($pdo) && $obPostingLeafCt === 0): ?>
+<div class="card jv-print-hide" style="border:1px solid #fcd34d;background:#fffbeb;">
+    <p class="card-hint" style="margin:0;line-height:1.55;"><strong>تنبيه:</strong> لا توجد حسابات ترحيل (أوراق) في الدليل بعد؛ أسطر القيد ستبقى نادرة أو فارغة حتى تعريف أوراق في «الدليل المحاسبي». <strong>الشاشة تعمل</strong> لإعداد التاريخ ومعلومات السند، ثم أكمل الأسطر بعد إنشاء الحسابات.</p>
 </div>
 <?php endif; ?>
 

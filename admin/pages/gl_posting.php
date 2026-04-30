@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/account_tree.php';
+require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/journal_types.php';
 require_once __DIR__ . '/../../includes/date_format.php';
@@ -12,6 +14,16 @@ orange_catalog_ensure_schema($pdo);
 orange_journal_types_sync_canonical_defaults($pdo);
 /** @var list<array<string, mixed>> $postingJournalTypes */
 $postingJournalTypes = orange_journal_types_list($pdo);
+$glPostingVouchersReady = orange_journal_vouchers_ready($pdo);
+$glPostingLeafCt = 0;
+if ($glPostingVouchersReady) {
+    $glPlw = orange_accounts_posting_leaf_where_sql($pdo, 'a');
+    try {
+        $glPostingLeafCt = (int) $pdo->query("SELECT COUNT(*) FROM accounts a WHERE $glPlw")->fetchColumn();
+    } catch (Throwable $e) {
+        $glPostingLeafCt = 0;
+    }
+}
 $glPostDateFromDisp = orange_format_datetime_dmY_hi(date('Y-m-01 00:00:00'));
 $glPostDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
 ?>
@@ -22,6 +34,11 @@ $glPostDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
     <?php if ($postingJournalTypes === []): ?>
     <p class="gl-posting-intro" style="margin:0.5rem 1rem 0.75rem;font-size:0.95rem;color:#444;line-height:1.5;">
         <strong style="color:#b45309;">تنبيه:</strong> لا توجد أنواع يومية في النظام — راجع ترحيل المخطط أو جدول <code>journal_types</code>.
+    </p>
+    <?php endif; ?>
+    <?php if ($glPostingVouchersReady && $glPostingLeafCt === 0): ?>
+    <p class="gl-posting-intro" style="margin:0.25rem 1rem 0.75rem;padding:10px 12px;border-radius:6px;border:1px solid #fcd34d;background:#fffbeb;font-size:0.95rem;color:#444;line-height:1.55;">
+        <strong style="color:#92400e;">تنبيه:</strong> لا توجد حسابات ترحيل (أوراق) في الدليل بعد؛ القيود المرحَّلة تستهدف حسابات GL صالحة للترحيل من «الدليل المحاسبي». <strong>الشاشة تعمل</strong> — المتوقَّع أثناء الإعداد الأول.
     </p>
     <?php endif; ?>
     <style>

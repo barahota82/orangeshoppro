@@ -5,6 +5,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../includes/party_allocations.php';
+require_once __DIR__ . '/../../includes/journal_voucher.php';
+require_once __DIR__ . '/../../includes/account_tree.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -18,6 +20,14 @@ if ($fyId <= 0 && $years !== []) {
     $fyId = (int) $years[0]['id'];
 }
 $reconcile = orange_partner_gl_reconcile($pdo, $fyId);
+
+$prLeafWhere = orange_accounts_posting_leaf_where_sql($pdo, 'a');
+$prPostingLeafCt = 0;
+try {
+    $prPostingLeafCt = (int) $pdo->query("SELECT COUNT(*) FROM accounts a WHERE $prLeafWhere")->fetchColumn();
+} catch (Throwable $e) {
+    $prPostingLeafCt = 0;
+}
 
 if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     header('Content-Type: text/csv; charset=UTF-8');
@@ -68,6 +78,12 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     </div>
     <p class="card-hint muted" style="margin-top:10px;">اعتباراً من <?php echo htmlspecialchars($report['as_of'], ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
+
+<?php if (orange_journal_vouchers_ready($pdo) && $prPostingLeafCt === 0): ?>
+<div class="card admin-fy-card" style="border:1px solid #fcd34d;background:#fffbeb;">
+    <p class="card-hint" style="margin:0;line-height:1.55;"><strong>تنبيه:</strong> لا توجد حسابات ترحيل (أوراق) في الدليل بعد؛ مطابقة الدليل مع دفتر الذمم وسطور التقرير تعتمد على دليل GL مكتملاً. أكمل الدليل من «الدليل المحاسبي» واربط حسابات الذمم (عملاء آجل، موردون، ...) قبل الاعتماد على الأرقام.</p>
+</div>
+<?php endif; ?>
 
 <?php if ($reconcile !== null): ?>
 <div class="card admin-fy-card">
