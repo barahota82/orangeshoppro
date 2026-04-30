@@ -123,7 +123,9 @@ $buildTradingSection = static function (
             continue;
         }
         if ($hasSec) {
-            $sec = strtolower(trim((string) ($a['report_section'] ?? '')));
+            $sec = orange_accounts_normalize_report_section_value(
+                isset($a['report_section']) ? (string) $a['report_section'] : ''
+            );
             /*
              * قطاع المتاجرة: يُفترض أن يكون فارغ أو trading أو pnl أو none؛
              * إذا وُسمت إيراد/تكم ب balance_sheet أو cashflow بالخطأ لا نُسقط السطر ما دام دور الشجرة يطابق قسم المتاجرة.

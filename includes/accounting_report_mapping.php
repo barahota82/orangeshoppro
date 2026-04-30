@@ -117,6 +117,27 @@ function orange_accounts_map_row_from_leaf_account_row(array $leafRow): ?array
 }
 
 /**
+ * تطبيع قيمة report_section قبل المقارنة (حروف مخفية أو BOM داخل السلسلة ليست «عربي»؛
+ * تفسّر أحياناً ظهور عمود «فارغ» تقريراً رغم وجود نص في الواجهة).
+ */
+function orange_accounts_normalize_report_section_value(?string $raw): string
+{
+    $s = (string) ($raw ?? '');
+    if ($s !== '') {
+        $s = preg_replace('/[\x{200B}\x{FEFF}\x{200C}\x{200D}]/u', '', $s);
+    }
+    $s = trim($s);
+    if ($s === '') {
+        return '';
+    }
+    if (function_exists('mb_strtolower')) {
+        return mb_strtolower($s, 'UTF-8');
+    }
+
+    return strtolower($s);
+}
+
+/**
  * ترتيب قطاع المتاجرة: نفس أساس `orange_accounts_pnl_bucket_for_report` مع ضبط بحسب جذور 4 و5 إذا قطعت القيم المحفوظة السطر.
  */
 function orange_accounts_pnl_bucket_for_trading_row(PDO $pdo, int $accountId, ?array $mapRowFromLeaf): string

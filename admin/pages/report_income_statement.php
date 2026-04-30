@@ -125,7 +125,7 @@ $buildPlSection = static function (
             continue;
         }
         if ($hasSec) {
-            $sec = strtolower(trim((string) ($a['report_section'] ?? '')));
+            $sec = orange_accounts_normalize_report_section_value(isset($a['report_section']) ? (string) $a['report_section'] : '');
             $want = $expectSec[$plClass] ?? '';
             if ($want !== '' && $sec !== '' && $sec !== $want) {
                 continue;
