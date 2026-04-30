@@ -38,6 +38,14 @@ $mapById = orange_accounts_report_mapping_by_ids($pdo, array_map(static fn (arra
 
 $useVouchers = orange_journal_vouchers_ready($pdo);
 
+$frPostingLeafWhere = orange_accounts_posting_leaf_where_sql($pdo, 'a');
+$financialReportPostingLeafCt = 0;
+try {
+    $financialReportPostingLeafCt = (int) $pdo->query("SELECT COUNT(*) FROM accounts a WHERE $frPostingLeafWhere")->fetchColumn();
+} catch (Throwable $e) {
+    $financialReportPostingLeafCt = 0;
+}
+
 $stmtAccountId = isset($_GET['account']) ? (int) $_GET['account'] : 0;
 $statementRows = [];
 $statementAccLabel = '';
@@ -261,6 +269,12 @@ $bsCheck = round($bsAssets - ($bsLiab + $bsEquity), 2);
         </p>
     <?php endif; ?>
 </div>
+
+<?php if ($useVouchers && $financialReportPostingLeafCt === 0 && $years !== [] && $fyRow): ?>
+<div class="card gl-acc-stmt-no-print" style="border:1px solid #fcd34d;background:#fffbeb;">
+    <p class="card-hint" style="margin:0;line-height:1.55;"><strong>تنبيه:</strong> لا توجد حسابات ترحيل (أوراق) في الدليل بعد؛ ملخص الإيرادات والمصروفات والميزانية وميزان المراجعة هنا تعتمد على حسابات فعلية بعد إنشاء الدليل. <strong>الصفحة وتبديل السنة تعملان</strong> — المتوقَّع أثناء الإعداد الأول.</p>
+</div>
+<?php endif; ?>
 
 <?php if ($stmtAccountId > 0): ?>
 <div class="card account-statement-print" id="account_statement_card">

@@ -261,6 +261,12 @@ if (orange_table_exists($pdo, 'company_settings')) {
         </form>
     </div>
 
+<?php if ($useVouchers && $accounts === []): ?>
+    <div class="card admin-fy-card gl-acc-stmt-no-print" style="border:1px solid #fcd34d;background:#fffbeb;">
+        <p class="muted" style="margin:0;line-height:1.55;"><strong>تنبيه:</strong> لا توجد حسابات ترحيل (أوراق) في الدليل بعد؛ اختر حساباً بعد إنشاء الدليل. <strong>الشاشة والفترات تعملان</strong>.</p>
+    </div>
+<?php endif; ?>
+
 <div class="gl-pick-modal gl-acc-stmt-no-print" id="gl_m_pick_modal" hidden aria-hidden="true">
     <div class="gl-pick-modal__backdrop" id="gl_m_pick_backdrop"></div>
     <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="gl_m_pick_title">
