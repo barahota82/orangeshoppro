@@ -21,6 +21,14 @@ foreach ($accounts as $a) {
 }
 $mapById = orange_accounts_report_mapping_by_ids($pdo, $ids);
 
+$leafWhereCmp = orange_accounts_posting_leaf_where_sql($pdo, 'a');
+$cmpPostingLeafCt = 0;
+try {
+    $cmpPostingLeafCt = (int) $pdo->query("SELECT COUNT(*) FROM accounts a WHERE $leafWhereCmp")->fetchColumn();
+} catch (Throwable $e) {
+    $cmpPostingLeafCt = 0;
+}
+
 $useVouchers = orange_journal_vouchers_ready($pdo);
 
 $submitted = isset($_GET['cmp']) && (string) $_GET['cmp'] === '1';
@@ -137,6 +145,12 @@ $todayDmY = orange_format_date_dmY(date('Y-m-d'));
             <?php endif; ?>
         </form>
     </div>
+
+<?php if ($useVouchers && $cmpPostingLeafCt === 0 && $years !== []): ?>
+    <div class="card admin-fy-card gl-acc-stmt-no-print" style="border:1px solid #fcd34d;background:#fffbeb;">
+        <p class="muted" style="margin:0;line-height:1.55;"><strong>تنبيه:</strong> لا توجد حسابات ترحيل (أوراق) في الدليل بعد؛ المقارنة تعتمد على القيود المرتبطة بالحسابات المؤهَّلة؛ قد تظهر أصفار أو لا نتيجة تشخيصية حتى إكمال الدليل. <strong>النموذج يعمل</strong>.</p>
+    </div>
+<?php endif; ?>
 
 <?php if (! $useVouchers): ?>
     <div class="card admin-fy-card">
