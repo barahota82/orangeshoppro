@@ -21,6 +21,7 @@ $allowed = [
     'categories',
     'subcategories',
     'color_dictionary',
+    'pattern_dictionary',
     'size_families',
     'products',
     'offers',

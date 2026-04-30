@@ -112,6 +112,18 @@ CREATE TABLE `color_dictionary` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE `pattern_dictionary` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name_ar` varchar(191) NOT NULL DEFAULT '',
+  `name_en` varchar(191) NOT NULL DEFAULT '',
+  `name_fil` varchar(191) NOT NULL DEFAULT '',
+  `name_hi` varchar(191) NOT NULL DEFAULT '',
+  `sort_order` int NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `size_families` (
   `id` int NOT NULL AUTO_INCREMENT,
   `name_ar` varchar(191) NOT NULL DEFAULT '',
@@ -399,6 +411,8 @@ CREATE TABLE `product_colorways` (
   `product_id` int NOT NULL,
   `primary_color_id` int DEFAULT NULL,
   `secondary_color_id` int DEFAULT NULL,
+  `primary_pattern_id` int DEFAULT NULL,
+  `secondary_pattern_id` int DEFAULT NULL,
   `sort_order` int NOT NULL DEFAULT 0,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
@@ -410,7 +424,7 @@ CREATE TABLE `product_variants` (
   `id` int NOT NULL AUTO_INCREMENT,
   `product_id` int NOT NULL,
   `size` varchar(50) DEFAULT NULL,
-  `color` varchar(50) DEFAULT NULL,
+  `color` varchar(191) DEFAULT NULL,
   `stock_quantity` int NOT NULL DEFAULT 0,
   `product_colorway_id` int DEFAULT NULL,
   `size_family_size_id` int DEFAULT NULL,
@@ -848,6 +862,14 @@ ALTER TABLE `product_colorways`
 
 ALTER TABLE `product_colorways`
   ADD CONSTRAINT `fk_pcw_secondary_color` FOREIGN KEY (`secondary_color_id`) REFERENCES `color_dictionary` (`id`)
+  ON DELETE SET NULL ON UPDATE CASCADE;
+
+ALTER TABLE `product_colorways`
+  ADD CONSTRAINT `fk_pcw_primary_pattern` FOREIGN KEY (`primary_pattern_id`) REFERENCES `pattern_dictionary` (`id`)
+  ON DELETE SET NULL ON UPDATE CASCADE;
+
+ALTER TABLE `product_colorways`
+  ADD CONSTRAINT `fk_pcw_secondary_pattern` FOREIGN KEY (`secondary_pattern_id`) REFERENCES `pattern_dictionary` (`id`)
   ON DELETE SET NULL ON UPDATE CASCADE;
 
 ALTER TABLE `product_variants`

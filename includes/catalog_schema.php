@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 10);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 11);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -18,7 +18,7 @@ if (! defined('ORANGE_SCHEMA_CODE_VERSION')) {
 }
 
 /**
- * Ensures catalog tables and columns for colors, size families, colorways, and variant FKs exist.
+ * Ensures catalog tables and columns for colors, patterns, size families, colorways, and variant FKs exist.
  * Safe to call multiple times per request (uses static guard).
  */
 function orange_table_exists(PDO $pdo, string $table): bool
@@ -633,6 +633,19 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     );
 
     orange_catalog_safe_exec($pdo,
+        'CREATE TABLE IF NOT EXISTS pattern_dictionary (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name_ar VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_en VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_fil VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_hi VARCHAR(191) NOT NULL DEFAULT \'\',
+            sort_order INT NOT NULL DEFAULT 0,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+
+    orange_catalog_safe_exec($pdo,
         'CREATE TABLE IF NOT EXISTS size_families (
             id INT AUTO_INCREMENT PRIMARY KEY,
             name_ar VARCHAR(191) NOT NULL DEFAULT \'\',
@@ -662,12 +675,21 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             product_id INT NOT NULL,
             primary_color_id INT NULL,
             secondary_color_id INT NULL,
+            primary_pattern_id INT NULL,
+            secondary_pattern_id INT NULL,
             sort_order INT NOT NULL DEFAULT 0,
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_product_colorways_product (product_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
+
+    if (orange_table_exists($pdo, 'product_colorways') && !orange_table_has_column($pdo, 'product_colorways', 'primary_pattern_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE product_colorways ADD COLUMN primary_pattern_id INT NULL AFTER secondary_color_id');
+    }
+    if (orange_table_exists($pdo, 'product_colorways') && !orange_table_has_column($pdo, 'product_colorways', 'secondary_pattern_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE product_colorways ADD COLUMN secondary_pattern_id INT NULL AFTER primary_pattern_id');
+    }
 
     if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'size_family_id')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN size_family_id INT NULL');
@@ -693,8 +715,22 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'barcode')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN barcode VARCHAR(64) NULL');
     }
-    if (orange_table_exists($pdo, 'product_variants') && !orange_table_has_column($pdo, 'product_variants', 'barcode')) {
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE product_variants ADD COLUMN barcode VARCHAR(64) NULL');
+    if (orange_table_exists($pdo, 'product_variants') && orange_table_has_column($pdo, 'product_variants', 'color')) {
+        try {
+            $colStmt = $pdo->query(
+                "SELECT CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE, COLUMN_TYPE FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'product_variants' AND COLUMN_NAME = 'color' LIMIT 1"
+            );
+            $colMeta = $colStmt ? $colStmt->fetch(PDO::FETCH_ASSOC) : false;
+            $mlColor = $colMeta ? (int) ($colMeta['CHARACTER_MAXIMUM_LENGTH'] ?? 0) : 0;
+            if ($mlColor > 0 && $mlColor < 191) {
+                orange_catalog_safe_exec($pdo, 'ALTER TABLE product_variants MODIFY COLUMN color VARCHAR(191) NULL DEFAULT NULL');
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] product_variants.color widen: ' . $e->getMessage());
+            }
+        }
     }
     if (orange_table_exists($pdo, 'order_items') && !orange_table_has_column($pdo, 'order_items', 'variant_id')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE order_items ADD COLUMN variant_id INT NULL');

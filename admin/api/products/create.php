@@ -18,33 +18,37 @@ function orange_product_create_colorway_map(PDO $pdo, int $productId, array $var
     $map = [];
     $sort = 0;
     $ins = $pdo->prepare(
-        'INSERT INTO product_colorways (product_id, primary_color_id, secondary_color_id, sort_order, is_active)
-         VALUES (?,?,?,?,1)'
+        'INSERT INTO product_colorways (product_id, primary_color_id, secondary_color_id, primary_pattern_id, secondary_pattern_id, sort_order, is_active)
+         VALUES (?,?,?,?,?,?,1)'
     );
 
     foreach ($variantRows as $row) {
-        $p = isset($row['primary_color_id']) ? (int)$row['primary_color_id'] : 0;
-        $s = isset($row['secondary_color_id']) ? (int)$row['secondary_color_id'] : 0;
+        $p = isset($row['primary_color_id']) ? (int) $row['primary_color_id'] : 0;
+        $s = isset($row['secondary_color_id']) ? (int) $row['secondary_color_id'] : 0;
+        $pp = isset($row['primary_pattern_id']) ? (int) $row['primary_pattern_id'] : 0;
+        $sp = isset($row['secondary_pattern_id']) ? (int) $row['secondary_pattern_id'] : 0;
         if (!$hasColors) {
             $key = '-';
             if (!isset($map[$key])) {
-                $ins->execute([$productId, null, null, $sort++]);
-                $map[$key] = (int)$pdo->lastInsertId();
+                $ins->execute([$productId, null, null, null, null, $sort++]);
+                $map[$key] = (int) $pdo->lastInsertId();
             }
             continue;
         }
         $p = $p > 0 ? $p : null;
         $s = $s > 0 ? $s : null;
-        $key = ($p ?? 0) . ':' . ($s ?? 0);
+        $pp = $pp > 0 ? $pp : null;
+        $sp = $sp > 0 ? $sp : null;
+        $key = ($p ?? 0) . ':' . ($s ?? 0) . ':' . ($pp ?? 0) . ':' . ($sp ?? 0);
         if (!isset($map[$key])) {
-            $ins->execute([$productId, $p, $s, $sort++]);
-            $map[$key] = (int)$pdo->lastInsertId();
+            $ins->execute([$productId, $p, $s, $pp, $sp, $sort++]);
+            $map[$key] = (int) $pdo->lastInsertId();
         }
     }
 
     if (!$hasColors && !isset($map['-'])) {
-        $ins->execute([$productId, null, null, 0]);
-        $map['-'] = (int)$pdo->lastInsertId();
+        $ins->execute([$productId, null, null, null, null, 0]);
+        $map['-'] = (int) $pdo->lastInsertId();
     }
 
     return $map;
@@ -99,9 +103,17 @@ try {
 
     if ($hasColors) {
         foreach ($variantsIn as $rv) {
-            $rp = isset($rv['primary_color_id']) ? (int)$rv['primary_color_id'] : 0;
+            $rp = isset($rv['primary_color_id']) ? (int) $rv['primary_color_id'] : 0;
             if ($rp <= 0) {
                 json_response(['success' => false, 'message' => 'كل متغير ملون يجب أن يحدد لوناً أساسياً من القاموس'], 422);
+            }
+            $ppPat = isset($rv['primary_pattern_id']) ? (int) $rv['primary_pattern_id'] : 0;
+            $spPat = isset($rv['secondary_pattern_id']) ? (int) $rv['secondary_pattern_id'] : 0;
+            if ($ppPat > 0 && ! orange_pattern_dictionary_id_is_active_posting($pdo, $ppPat)) {
+                json_response(['success' => false, 'message' => 'نمط أساسي غير صالح أو غير نشط — راجع قاموس أنماط الألوان'], 422);
+            }
+            if ($spPat > 0 && ! orange_pattern_dictionary_id_is_active_posting($pdo, $spPat)) {
+                json_response(['success' => false, 'message' => 'نمط ثانوي غير صالح أو غير نشط — راجع قاموس أنماط الألوان'], 422);
             }
         }
     }
@@ -230,9 +242,11 @@ try {
     );
 
     foreach ($variantsIn as $variant) {
-        $p = isset($variant['primary_color_id']) ? (int)$variant['primary_color_id'] : 0;
-        $s = isset($variant['secondary_color_id']) ? (int)$variant['secondary_color_id'] : 0;
-        $szId = isset($variant['size_family_size_id']) ? (int)$variant['size_family_size_id'] : 0;
+        $p = isset($variant['primary_color_id']) ? (int) $variant['primary_color_id'] : 0;
+        $s = isset($variant['secondary_color_id']) ? (int) $variant['secondary_color_id'] : 0;
+        $pp = isset($variant['primary_pattern_id']) ? (int) $variant['primary_pattern_id'] : 0;
+        $sp = isset($variant['secondary_pattern_id']) ? (int) $variant['secondary_pattern_id'] : 0;
+        $szId = isset($variant['size_family_size_id']) ? (int) $variant['size_family_size_id'] : 0;
         $stock = (int)($variant['stock_quantity'] ?? 0);
 
         if (!$hasColors) {
@@ -240,7 +254,9 @@ try {
         } else {
             $p = $p > 0 ? $p : null;
             $s = $s > 0 ? $s : null;
-            $cwKey = ($p ?? 0) . ':' . ($s ?? 0);
+            $pp = $pp > 0 ? $pp : null;
+            $sp = $sp > 0 ? $sp : null;
+            $cwKey = ($p ?? 0) . ':' . ($s ?? 0) . ':' . ($pp ?? 0) . ':' . ($sp ?? 0);
         }
 
         $colorwayId = $cwMap[$cwKey] ?? null;
@@ -262,7 +278,13 @@ try {
             }
         }
 
-        $colorLabel = orange_colorway_display_label($pdo, $hasColors ? $p : null, $hasColors ? $s : null);
+        $colorLabel = orange_colorway_display_label(
+            $pdo,
+            $hasColors ? $p : null,
+            $hasColors ? $s : null,
+            $hasColors ? $pp : null,
+            $hasColors ? $sp : null
+        );
         $sizeLabel = orange_size_display_label($sizeRow);
 
         $variantStmt->execute([

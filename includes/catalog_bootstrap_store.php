@@ -238,7 +238,7 @@ CREATE TABLE IF NOT EXISTS product_variants (
   id INT NOT NULL AUTO_INCREMENT,
   product_id INT NOT NULL,
   size VARCHAR(50) DEFAULT NULL,
-  color VARCHAR(50) DEFAULT NULL,
+  color VARCHAR(191) DEFAULT NULL,
   stock_quantity INT NOT NULL DEFAULT 0,
   product_colorway_id INT DEFAULT NULL,
   size_family_size_id INT DEFAULT NULL,

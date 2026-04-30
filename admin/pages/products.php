@@ -57,6 +57,17 @@ $colors = $pdo->query(
     'SELECT ' . $colorSelectCols . ' FROM color_dictionary WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
 )->fetchAll(PDO::FETCH_ASSOC);
 
+$patterns = [];
+if (orange_table_exists($pdo, 'pattern_dictionary')) {
+    try {
+        $patterns = $pdo->query(
+            'SELECT id, name_ar, name_en FROM pattern_dictionary WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
+        )->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        $patterns = [];
+    }
+}
+
 $families = $pdo->query('SELECT * FROM size_families WHERE is_active = 1 ORDER BY sort_order ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
 $famSizes = $pdo->query(
     'SELECT * FROM size_family_sizes WHERE is_active = 1 ORDER BY size_family_id ASC, sort_order ASC, id ASC'
@@ -124,7 +135,8 @@ foreach ($categories as $cat) {
 
 <div class="card" style="margin-bottom:12px;">
     <p style="margin:0;">قبل إضافة منتج بمقاسات: عرّف <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_families'), ENT_QUOTES, 'UTF-8'); ?>">عائلات المقاسات</a>.
-        قبل الألوان: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=color_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس الألوان</a>.</p>
+        قبل الألوان: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=color_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس الألوان</a>.
+        أنماط بصريّة اختيارية مع كل خليط لوني: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=pattern_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">أنماط الألوان</a>.</p>
 </div>
 
 <div class="card">
@@ -493,6 +505,7 @@ foreach ($categories as $cat) {
 <script>
 window.ORANGE_PUBLIC_BASE_PATH = <?php echo json_encode(PUBLIC_BASE_PATH === '' ? '' : rtrim(PUBLIC_BASE_PATH, '/'), JSON_UNESCAPED_UNICODE); ?>;
 window.ORANGE_COLORS = <?php echo json_encode($colors, JSON_UNESCAPED_UNICODE); ?>;
+window.ORANGE_PATTERNS = <?php echo json_encode($patterns, JSON_UNESCAPED_UNICODE); ?>;
 window.ORANGE_FAMILIES = <?php echo json_encode($familiesOut, JSON_UNESCAPED_UNICODE); ?>;
 window.ORANGE_SUBCATEGORIES = <?php echo json_encode($subcategoriesForJs, JSON_UNESCAPED_UNICODE); ?>;
 window.ORANGE_CATEGORY_META = <?php echo json_encode($categoryCatalogMeta, JSON_UNESCAPED_UNICODE); ?>;
@@ -1017,6 +1030,15 @@ function onHasFlagsChange() {
     }
 }
 
+function patternOptionsHtml() {
+    let h = '<option value="0">—</option>';
+    (window.ORANGE_PATTERNS || []).forEach(pt => {
+        const t = (pt.name_ar || pt.name_en || '').replace(/</g,'');
+        h += `<option value="${pt.id}">${t}</option>`;
+    });
+    return h;
+}
+
 function colorOptionsHtml() {
     let h = '<option value="0">—</option>';
     (window.ORANGE_COLORS || []).forEach(c => {
@@ -1077,6 +1099,8 @@ function addColorwayRow() {
     div.innerHTML = `
         <div><label>أساسي</label><select class="cw-p">${colorOptionsHtml()}</select></div>
         <div><label>ثانوي (اختياري)</label><select class="cw-s">${colorOptionsHtml()}</select></div>
+        <div><label>نمط أساسي (اختياري)</label><select class="cw-pp">${patternOptionsHtml()}</select></div>
+        <div><label>نمط ثانوي (اختياري)</label><select class="cw-sp">${patternOptionsHtml()}</select></div>
     `;
     box.appendChild(div);
 }
@@ -1115,28 +1139,32 @@ function generateVariants() {
 
     let combos = [];
     if (!hasC && !hasS) {
-        combos.push({ primary_color_id: 0, secondary_color_id: 0, size_family_size_id: 0, stock: 0 });
+        combos.push({ primary_color_id: 0, secondary_color_id: 0, primary_pattern_id: 0, secondary_pattern_id: 0, size_family_size_id: 0, stock: 0 });
     } else if (hasC && hasS) {
         document.querySelectorAll('#colorwaysBox .cw-row').forEach(row => {
             const p = parseInt(row.querySelector('.cw-p').value, 10) || 0;
             const s = parseInt(row.querySelector('.cw-s').value, 10) || 0;
+            const pp = parseInt((row.querySelector('.cw-pp') && row.querySelector('.cw-pp').value) || '0', 10) || 0;
+            const sp = parseInt((row.querySelector('.cw-sp') && row.querySelector('.cw-sp').value) || '0', 10) || 0;
             if (!p) {
                 return;
             }
             sizes.forEach(sz => {
-                combos.push({ primary_color_id: p, secondary_color_id: s, size_family_size_id: sz.id, stock: 0 });
+                combos.push({ primary_color_id: p, secondary_color_id: s, primary_pattern_id: pp, secondary_pattern_id: sp, size_family_size_id: sz.id, stock: 0 });
             });
         });
     } else if (hasC && !hasS) {
         document.querySelectorAll('#colorwaysBox .cw-row').forEach(row => {
             const p = parseInt(row.querySelector('.cw-p').value, 10) || 0;
             const s = parseInt(row.querySelector('.cw-s').value, 10) || 0;
+            const pp = parseInt((row.querySelector('.cw-pp') && row.querySelector('.cw-pp').value) || '0', 10) || 0;
+            const sp = parseInt((row.querySelector('.cw-sp') && row.querySelector('.cw-sp').value) || '0', 10) || 0;
             if (!p) return;
-            combos.push({ primary_color_id: p, secondary_color_id: s, size_family_size_id: 0, stock: 0 });
+            combos.push({ primary_color_id: p, secondary_color_id: s, primary_pattern_id: pp, secondary_pattern_id: sp, size_family_size_id: 0, stock: 0 });
         });
     } else if (!hasC && hasS) {
         sizes.forEach(sz => {
-            combos.push({ primary_color_id: 0, secondary_color_id: 0, size_family_size_id: sz.id, stock: 0 });
+            combos.push({ primary_color_id: 0, secondary_color_id: 0, primary_pattern_id: 0, secondary_pattern_id: 0, size_family_size_id: sz.id, stock: 0 });
         });
     }
 
@@ -1146,7 +1174,7 @@ function generateVariants() {
     }
 
     const thumbCell = adminVariantReferenceThumbHtml();
-    let html = '<p class="admin-variants-lead">كل صف يمثل <strong>نفس الصنف</strong> مع دمج لون × مقاس. عمود «صورة المرجع» يعكس الصورة الرئيسية الحالية (من تبويب الصور).</p>';
+    let html = '<p class="admin-variants-lead">كل صف يمثل <strong>نفس الصنف</strong> مع دمج لون ونمط اختياري × مقاس. عمود «صورة المرجع» يعكس الصورة الرئيسية الحالية (من تبويب الصور).</p>';
     html += '<div class="table-wrap admin-table-wrap-elevated"><table class="admin-table admin-variants-matrix"><thead><tr>';
     html += '<th class="col-ref-img">صورة المرجع</th><th>اللون</th><th>المقاس</th><th class="col-stock">مخزون أولي</th>';
     html += '</tr></thead><tbody>';
@@ -1159,9 +1187,18 @@ function generateVariants() {
         if (p) colorLabel += (p.name_ar || p.name_en);
         if (s) colorLabel += (colorLabel ? ' + ' : '') + (s.name_ar || s.name_en);
         if (!colorLabel) colorLabel = '—';
+        const ppt = (window.ORANGE_PATTERNS || []).find(x => String(x.id) === String(c.primary_pattern_id));
+        const spt = (window.ORANGE_PATTERNS || []).find(x => String(x.id) === String(c.secondary_pattern_id));
+        let patPhrase = '';
+        if (ppt) patPhrase += (ppt.name_ar || ppt.name_en);
+        if (spt) patPhrase += (patPhrase ? ' · ' : '') + (spt.name_ar || spt.name_en);
+        if (patPhrase) {
+            colorLabel = colorLabel === '—' ? patPhrase : colorLabel + ' — ' + patPhrase;
+        }
         const dots = [adminColorSwatchHtml(p), adminColorSwatchHtml(s && (!p || String(s.id) !== String(p.id)) ? s : null)].filter(Boolean).join('');
         const colorCell = '<div class="admin-variant-color-cell">' + dots + '<span class="admin-variant-color-names">' + colorLabel + '</span></div>' +
-            `<input type="hidden" class="v-p" value="${c.primary_color_id}"><input type="hidden" class="v-s" value="${c.secondary_color_id}">`;
+            `<input type="hidden" class="v-p" value="${c.primary_color_id}"><input type="hidden" class="v-s" value="${c.secondary_color_id}">` +
+            `<input type="hidden" class="v-pp" value="${c.primary_pattern_id || 0}"><input type="hidden" class="v-sp" value="${c.secondary_pattern_id || 0}">`;
         html += `<tr>
             <td class="td-ref-img">${thumbCell}</td>
             <td>${colorCell}</td>
@@ -1257,6 +1294,8 @@ async function saveProduct() {
     const variants = rows.map((tr) => ({
         primary_color_id: parseInt(tr.querySelector('.v-p').value, 10) || 0,
         secondary_color_id: parseInt(tr.querySelector('.v-s').value, 10) || 0,
+        primary_pattern_id: parseInt((tr.querySelector('.v-pp') && tr.querySelector('.v-pp').value) || '0', 10) || 0,
+        secondary_pattern_id: parseInt((tr.querySelector('.v-sp') && tr.querySelector('.v-sp').value) || '0', 10) || 0,
         size_family_size_id: parseInt(tr.querySelector('.v-zid').value, 10) || 0,
         stock_quantity: parseInt(tr.querySelector('.v-stock').value || '0', 10)
     }));
