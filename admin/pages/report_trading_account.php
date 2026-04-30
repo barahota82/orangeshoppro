@@ -95,57 +95,42 @@ if (
 
 $accountsLeaf = orange_financial_report_leaf_accounts_with_mapping($pdo);
 
-$leafIdsForMap = [];
-foreach ($accountsLeaf as $al) {
-    $lid = (int) ($al['id'] ?? 0);
-    if ($lid > 0) {
-        $leafIdsForMap[] = $lid;
-    }
-}
-/* نفس مصدر خريطة الحساب في report_pl_monthly و financial_report — لا يُقتصر على account_type من صف الورقة فقط */
-$mapTradingById = orange_accounts_report_mapping_by_ids($pdo, $leafIdsForMap);
-
 /**
- * أسطر المتاجرة: تصنيف كـ report_pl_monthly / الملخص المالي (دلو P&amp;L + شجرة)؛
- * لا نفلتر بـ report_section كشاشة أرباح وخسائر حتى لا تُسقَط إيرادات/تكم موسومة pnl أو غيرها؛
- * نستبعد وسم balance_sheet فقط عندما يُصنَّف الحساب فعلاً في بند ميزانية بحسب الخريطة/الشجرة.
- *
- * @param array<int, array<string, mixed>> $mapTradingById
+ * مطابقة سطرًا بسطر لـ «أرباح وخسائر» لنفس فترة تقويم اليوم على الحسابات الفرعية:
+ * {@see admin/pages/report_income_statement.php} — `$buildPlSection` لقطاعَي revenue و cogs.
  *
  * @return list<array<string, mixed>>
  */
 $buildTradingSection = static function (
     PDO $pdo,
     array $accountsLeaf,
-    array $mapTradingById,
     array $tbRange,
     array $tbBefore,
     string $plClass
 ): array {
     $out = [];
     $hasSec = orange_table_has_column($pdo, 'accounts', 'report_section');
-    $legacyHeading = $plClass === 'revenue'
-        ? 'إيرادات / مبيعات — تصنيف افتراضي (دورة الحساب في الشجرة عند تعذّر سطر المرجع)'
-        : 'تكلفة مبيعات — تصنيف افتراضي (دورة الحساب في الشجرة عند تعذّر سطر المرجع)';
+    $expectSec = ['revenue' => 'trading', 'cogs' => 'trading', 'expense' => 'pnl'];
+    $legacyHeadingMap = [
+        'revenue' => 'إيرادات ومبيعات — تصنيف افتراضي (دورة الشجرة عند غياب سطر المرجع)',
+        'cogs' => 'تكلفة المبيعات — تصنيف افتراضي (دورة الشجرة)',
+        'expense' => 'مصروفات — تصنيف افتراضي (دورة الشجرة)',
+    ];
 
     foreach ($accountsLeaf as $a) {
         $aid = (int) ($a['id'] ?? 0);
         if ($aid <= 0) {
             continue;
         }
-        $bucket = orange_accounts_pnl_bucket_for_trading_row($pdo, $aid, $mapTradingById[$aid] ?? null);
+        $bucket = orange_accounts_pnl_bucket_for_report($pdo, $aid, orange_accounts_map_row_from_leaf_account_row($a));
         if ($bucket !== $plClass) {
             continue;
         }
         if ($hasSec) {
-            $sec = orange_accounts_normalize_report_section_value(
-                isset($a['report_section']) ? (string) $a['report_section'] : ''
-            );
-            if ($sec === 'balance_sheet') {
-                $bsb = orange_accounts_bs_bucket_for_report($pdo, $aid, $mapTradingById[$aid] ?? null);
-                if ($bsb !== 'other') {
-                    continue;
-                }
+            $sec = orange_accounts_normalize_report_section_value(isset($a['report_section']) ? (string) $a['report_section'] : '');
+            $want = $expectSec[$plClass] ?? '';
+            if ($want !== '' && $sec !== '' && $sec !== $want) {
+                continue;
             }
         }
         $d0 = $c0 = $d1 = $c1 = 0.0;
@@ -168,16 +153,12 @@ $buildTradingSection = static function (
         if (abs($open) < 0.0001 && abs($period) < 0.0001 && abs($closing) < 0.0001) {
             continue;
         }
+
         $mappedHeading = trim((string) ($a['report_line_heading_ar'] ?? ''));
-        $sortKey = 500000;
-        if ($mappedHeading !== '') {
-            $sortKey = (int) ($a['report_line_sort'] ?? 0);
-        } elseif ((int) ($a['report_line_id'] ?? 0) > 0 && $mappedHeading === '') {
-            $mappedHeading = $legacyHeading;
-            $sortKey = ($plClass === 'revenue') ? 400000 : 400001;
-        } else {
-            $mappedHeading = $legacyHeading;
-            $sortKey = ($plClass === 'revenue') ? 300000 : 300001;
+        $sortKey = (int) ($a['report_line_sort'] ?? 500000);
+        if ($mappedHeading === '') {
+            $mappedHeading = $legacyHeadingMap[$plClass] ?? '—';
+            $sortKey = ['revenue' => 301000, 'cogs' => 302000, 'expense' => 303000][$plClass] ?? 399999;
         }
 
         $code = trim((string) ($a['code'] ?? ''));
@@ -199,14 +180,15 @@ $buildTradingSection = static function (
         if ($sx !== $sy) {
             return $sx <=> $sy;
         }
+
         return strcmp((string) ($x['code'] ?? ''), (string) ($y['code'] ?? ''));
     });
 
     return $out;
 };
 
-$revenueLines = $useVouchers ? $buildTradingSection($pdo, $accountsLeaf, $mapTradingById, $tbRange, $tbBefore, 'revenue') : [];
-$cogsLines = $useVouchers ? $buildTradingSection($pdo, $accountsLeaf, $mapTradingById, $tbRange, $tbBefore, 'cogs') : [];
+$revenueLines = $useVouchers ? $buildTradingSection($pdo, $accountsLeaf, $tbRange, $tbBefore, 'revenue') : [];
+$cogsLines = $useVouchers ? $buildTradingSection($pdo, $accountsLeaf, $tbRange, $tbBefore, 'cogs') : [];
 
 $sumOpen = static function (array $lines): float {
     $s = 0.0;
