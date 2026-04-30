@@ -132,7 +132,7 @@ function orange_report_line_master_seed_defaults(PDO $pdo): void
         ['cogs', 'تكلفة المبيعات', 'Cost of goods sold', 'cogs', 'trading', 110],
         ['cogs_goods', 'تكلفة البضاعة المباعة', 'COGS goods', 'cogs', 'trading', 111],
         ['cogs_returns', 'تكلفة مرتجعات', 'COGS returns', 'cogs', 'trading', 112],
-        ['purchase_expenses', 'مصاريف مشتريات', 'Purchase expenses', 'expense', 'pnl', 200],
+        ['purchase_expenses', 'مصاريف توريد وشحن (ضمن تكلفة المبيعات)', 'Landed cost & purchase charges (COGS)', 'cogs', 'trading', 115],
         ['operating_expenses', 'مصاريف تشغيلية', 'Operating expenses', 'expense', 'pnl', 210],
         ['finance_expenses', 'مصاريف تمويلية', 'Finance expenses', 'expense', 'pnl', 220],
         ['depreciation', 'استهلاك', 'Depreciation', 'expense', 'pnl', 230],
