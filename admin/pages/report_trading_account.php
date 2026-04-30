@@ -127,22 +127,22 @@ $buildTradingSection = static function (
                 isset($a['report_section']) ? (string) $a['report_section'] : ''
             );
             /*
-             * قطاع المتاجرة: يُفترض أن يكون فارغ أو trading أو pnl أو none؛
-             * إذا وُسمت إيراد/تكم ب balance_sheet أو cashflow بالخطأ لا نُسقط السطر ما دام دور الشجرة يطابق قسم المتاجرة.
+             * بعد سياسة التقارير v2 قد تُخزَّن قيم غير متوقعة في report_section؛ نُبقي التصفية خفيفة:
+             * — القيم الشائعة: trading / pnl / none؛ الفراغ يُقبل؛
+             * — balance_sheet أو cashflow على ورقة إيراد/تكم: نسمح إذا جذر الشجرة يطابق قطاع المتاجرة؛
+             * — أي نص آخر: نسمح إذا كان دور الشجرة يطابق revenue/cogs لهذا السطر (لا نُفرّغ الشاشة بسبب وسم قديم).
              */
             if ($sec !== '') {
-                $treePlRole = orange_accounts_account_pl_role($pdo, $aid);
-                $ambiguousPlSec = ['balance_sheet', 'cashflow'];
-                if (
-                    $treePlRole === $plClass
-                    && in_array($sec, $ambiguousPlSec, true)
-                ) {
-                    /* تجاهل وسم المتاجرة؛ الحساب فعلاً من قطاع المتاجرة حسب الشجرة/السلة. */
-                } else {
-                    $allowedSec = ['', 'none', 'trading', 'pnl'];
-                    if (! in_array($sec, $allowedSec, true)) {
-                        continue;
-                    }
+                $treeForSec = orange_accounts_account_pl_role($pdo, $aid);
+                $secOk = $sec === 'trading' || $sec === 'pnl' || $sec === 'none';
+                if (! $secOk && in_array($sec, ['balance_sheet', 'cashflow'], true)) {
+                    $secOk = ($treeForSec === $plClass);
+                }
+                if (! $secOk && $treeForSec === $plClass) {
+                    $secOk = true;
+                }
+                if (! $secOk) {
+                    continue;
                 }
             }
         }

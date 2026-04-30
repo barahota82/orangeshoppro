@@ -123,8 +123,11 @@ function orange_accounts_map_row_from_leaf_account_row(array $leafRow): ?array
 function orange_accounts_normalize_report_section_value(?string $raw): string
 {
     $s = (string) ($raw ?? '');
-    if ($s !== '') {
-        $s = preg_replace('/[\x{200B}\x{FEFF}\x{200C}\x{200D}]/u', '', $s);
+    if ($s !== '' && preg_match('//u', $s) === 1) {
+        $t = preg_replace('/[\x{200B}\x{FEFF}\x{200C}\x{200D}]/u', '', $s);
+        if (is_string($t)) {
+            $s = $t;
+        }
     }
     $s = trim($s);
     if ($s === '') {
