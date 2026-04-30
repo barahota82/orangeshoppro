@@ -54,7 +54,8 @@ function orange_accounts_build_pl_statement_section_lines(
                 && ($plClass === 'revenue' || $plClass === 'cogs')
             ) {
                 if ($sec !== '') {
-                    $allowedTrading = ['none', 'trading', 'pnl'];
+                    // none/trading/pnl — سياسة المتاجرة؛ و«operating» إن وُضع بالخطأ في report_section (غالباً مخصّص لـ cashflow_section).
+                    $allowedTrading = ['none', 'trading', 'pnl', 'operating'];
                     $ok = in_array($sec, $allowedTrading, true);
                     if (! $ok && in_array($sec, ['balance_sheet', 'cashflow'], true)) {
                         $ok = orange_accounts_account_pl_role($pdo, $aid) === $plClass;
