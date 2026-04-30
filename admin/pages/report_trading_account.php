@@ -12,6 +12,10 @@ require_once __DIR__ . '/../../includes/accounting_pl_statement_rows.php';
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
+$pNav = (string) ($page ?? '');
+$taPageQuery = ($pNav === 'report_trading_account_basic') ? 'report_trading_account_basic' : 'report_trading_account';
+$taHeadingAr = ($pNav === 'report_trading_account_basic') ? 'قائمة حسابات المتاجرة' : 'قائمة حسابات المتاجرة 2';
+
 $normalizeYm = static function (string $raw): ?string {
     $raw = trim($raw);
     if (! preg_match('/^(\d{4})-(\d{2})$/', $raw, $m)) {
@@ -158,12 +162,12 @@ $fmt5 = static function (float $v): string {
 ?>
 <div class="admin-fy-shell" dir="rtl">
     <div class="gl-acc-stmt-no-print">
-        <h1 class="admin-fy-shell__title">قائمة حسابات المتاجرة</h1>
+        <h1 class="admin-fy-shell__title"><?php echo htmlspecialchars($taHeadingAr, ENT_QUOTES, 'UTF-8'); ?></h1>
     </div>
 
     <div class="card admin-fy-card gl-acc-stmt-no-print gas-acc-stmt-search-card">
         <form method="get" class="gas-acc-stmt-filter-form" id="ta_report_form">
-            <input type="hidden" name="page" value="report_trading_account">
+            <input type="hidden" name="page" value="<?php echo htmlspecialchars($taPageQuery, ENT_QUOTES, 'UTF-8'); ?>">
             <div class="gas-acc-stmt-toolbar-wrap">
                 <div class="gas-acc-stmt-toolbar ta-report-toolbar gas-acc-stmt-toolbar--main-center">
                     <div class="gas-acc-stmt-field gl-m-stmt-field--month">
@@ -197,7 +201,7 @@ $fmt5 = static function (float $v): string {
         </form>
         <p class="muted gas-acc-stmt-toolbar" style="margin-top:10px;margin-bottom:0;font-size:12px;">
             <a href="<?php echo htmlspecialchars(
-                '?page=report_trading_account&m_from=' . rawurlencode($periodYmFrom) . '&m_to=' . rawurlencode($periodYmTo) . '&diag=1',
+                '?page=' . rawurlencode($taPageQuery) . '&m_from=' . rawurlencode($periodYmFrom) . '&m_to=' . rawurlencode($periodYmTo) . '&diag=1',
                 ENT_QUOTES,
                 'UTF-8'
             ); ?>">تشخيص (عدادات المصدر)</a>
@@ -239,7 +243,7 @@ echo htmlspecialchars((string) ($diagPayload !== false ? $diagPayload : '{}'), E
                     <p class="gl-acc-stmt-print-company"><?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?></p>
                 <?php endif; ?>
                 <h2 class="gl-acc-stmt-print-title ta-report-print-title">
-                    <span class="gl-acc-stmt-print-title-ar" lang="ar">قائمة حسابات المتاجرة عن الفترة من <?php echo htmlspecialchars($reportDateFromDmY, ENT_QUOTES, 'UTF-8'); ?> إلـى&nbsp;<?php echo htmlspecialchars($reportDateToDmY, ENT_QUOTES, 'UTF-8'); ?></span>
+                    <span class="gl-acc-stmt-print-title-ar" lang="ar"><?php echo htmlspecialchars($taHeadingAr, ENT_QUOTES, 'UTF-8'); ?> عن الفترة من <?php echo htmlspecialchars($reportDateFromDmY, ENT_QUOTES, 'UTF-8'); ?> إلـى&nbsp;<?php echo htmlspecialchars($reportDateToDmY, ENT_QUOTES, 'UTF-8'); ?></span>
                 </h2>
             </header>
             <div class="gl-acc-stmt-print-grid">
