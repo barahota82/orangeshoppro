@@ -10,7 +10,7 @@ require_once __DIR__ . '/accounting_report_mapping.php';
  * @param 'revenue'|'cogs'|'expense' $plClass
  * @param 'income_statement'|'trading_account' $sectionPolicy
  *        — `income_statement`: إيراد/تكم → report_section فارغ أو trading (شاشة أرباح وخسائر).
- *        — `trading_account`: إيراد/تكم → يُقبل أيضاً pnl و none؛ وتُحمَّل دليل المتاجرة بـ bucket يستند للشجرة
+ *        — `trading_account`: إيراد/تكم → يُقبل أيضاً pnl و none و trading؛ و operating إن وُضع بالخطأ في report_section؛ وتُحمَّل دليل المتاجرة بـ bucket يستند للشجرة
  *           عند تعارض `account_type` (مثل leaf تحت فرع الإيرادات مسجَّل مصروفاً في القاعدة).
  *
  * @return list<array<string, mixed>>
