@@ -214,6 +214,12 @@ $fmt5 = static function (float $v): string {
         </p>
     </div>
 
+<?php if ($useVouchers && $accountsLeaf === []): ?>
+    <div class="card admin-fy-card gl-acc-stmt-no-print" style="border:1px solid #fcd34d;background:#fffbeb;">
+        <p class="muted" style="margin:0;line-height:1.55;"><strong>تنبيه:</strong> لا توجد حسابات ترحيل (أوراق) في الدليل بعد؛ التقرير يظهر فارغاً إلى أن تُنشأ حسابات في «الدليل المحاسبي». <strong>الشاشة والنموذج يعملان</strong> — هذا متوقَّع أثناء الإعداد الأول.</p>
+    </div>
+<?php endif; ?>
+
 <?php if ($taShowDiag && $useVouchers && $periodLabel !== ''): ?>
     <div class="card admin-fy-card gl-acc-stmt-no-print">
         <p class="muted" style="margin:0 0 8px 0;"><strong dir="ltr">diag</strong> — المتاجرة: bucket من نوع الحساب والشجرة؛ يُستبعد صراحةً فقط <code dir="ltr">report_section=balance_sheet</code> لأوراق الإيراد/التكم.</p>
