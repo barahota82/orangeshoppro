@@ -19,6 +19,7 @@ function storefront_catalog_label(array $row, string $lang): string
 
 require_once __DIR__ . '/../includes/catalog_schema.php';
 orange_catalog_ensure_schema(db());
+require_once __DIR__ . '/../includes/catalog_labels.php';
 
 include __DIR__ . '/../includes/header.php';
 
@@ -194,6 +195,20 @@ foreach ($products as $p) {
 $productsInitial = array_slice($productsNonOffer, 0, $sfHomeGridInitial);
 $productsLazyRows = array_slice($productsNonOffer, $sfHomeGridInitial);
 
+$sfHomeCardColorPidList = [];
+foreach ($products as $hp) {
+    if ((int) ($hp['has_colors'] ?? 0) === 1) {
+        $sfHomeCardColorPidList[] = (int) $hp['id'];
+    }
+}
+foreach ($offers as $hop) {
+    if ((int) ($hop['has_colors'] ?? 0) === 1) {
+        $sfHomeCardColorPidList[] = (int) $hop['id'];
+    }
+}
+/** @var array<int, list<array{color: string, pattern: string}>> */
+$sfProductCardVariantLines = orange_storefront_product_card_variant_line_map($pdo, $sfHomeCardColorPidList);
+
 if ($hasDepartmentsTable) {
     $needDeptLookup = [];
     foreach ($products as $p) {
@@ -241,30 +256,42 @@ $storefrontExtraFilterSuffix = function (array $row) use ($categoryToDepartment)
     return $parts === [] ? '' : ' ' . implode(' ', $parts);
 };
 
-/** @var list<array{id:int,df:string,imgSrc:string,title:string,price:string,href:string}> */
+/** @var list<array{id:int,df:string,imgSrc:string,title:string,price:string,href:string,vl:list<array{c:string,p:string}>}> */
 $lazyForJs = [];
 foreach ($productsLazyRows as $p) {
+    $pid = (int) $p['id'];
+    $vl = [];
+    foreach ($sfProductCardVariantLines[$pid] ?? [] as $ln) {
+        $vl[] = ['c' => (string) $ln['color'], 'p' => (string) $ln['pattern']];
+    }
     $lazyForJs[] = [
-        'id' => (int) $p['id'],
+        'id' => $pid,
         'df' => 'all cat-' . (int) $p['category_id'] . $storefrontExtraFilterSuffix($p),
         'imgSrc' => storefront_product_image_href((string) ($p['main_image'] ?? '')),
         'title' => storefront_product_display_name($p),
         'price' => number_format((float) $p['price'], 2),
-        'href' => storefront_url('product', (string) $channel['slug'], $lang, ['id' => (int) $p['id']]),
+        'href' => storefront_url('product', (string) $channel['slug'], $lang, ['id' => $pid]),
+        'vl' => $vl,
     ];
 }
 
-/** @var list<array{id:int,df:string,imgSrc:string,title:string,oldPrice:string,salePrice:string,href:string}> */
+/** @var list<array{id:int,df:string,imgSrc:string,title:string,oldPrice:string,salePrice:string,href:string,vl:list<array{c:string,p:string}>}> */
 $lazyOffersForJs = [];
 foreach ($offersLazyRows as $p) {
+    $pid = (int) $p['id'];
+    $vlOff = [];
+    foreach ($sfProductCardVariantLines[$pid] ?? [] as $ln) {
+        $vlOff[] = ['c' => (string) $ln['color'], 'p' => (string) $ln['pattern']];
+    }
     $lazyOffersForJs[] = [
-        'id' => (int) $p['id'],
+        'id' => $pid,
         'df' => 'offers cat-' . (int) $p['category_id'] . $storefrontExtraFilterSuffix($p),
         'imgSrc' => storefront_product_image_href((string) ($p['main_image'] ?? '')),
         'title' => storefront_product_display_name($p),
         'oldPrice' => number_format((float) $p['price'], 2),
         'salePrice' => number_format((float) $p['price'] - (float) $p['discount'], 2),
-        'href' => storefront_url('product', (string) $channel['slug'], $lang, ['id' => (int) $p['id']]),
+        'href' => storefront_url('product', (string) $channel['slug'], $lang, ['id' => $pid]),
+        'vl' => $vlOff,
     ];
 }
 
@@ -406,6 +433,25 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                 </div>
                 <div class="product-body">
                     <h3><?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?></h3>
+                    <?php
+                    $sfCvOff = $sfProductCardVariantLines[(int) $p['id']] ?? [];
+                    if ($sfCvOff !== []) {
+                        ?>
+                    <div class="product-card-variant-meta" dir="auto">
+                        <?php foreach ($sfCvOff as $sfLn): ?>
+                        <div class="product-card-variant-line">
+                            <?php if (($sfLn['color'] ?? '') !== ''): ?>
+                            <span class="product-card-color"><?php echo htmlspecialchars((string) $sfLn['color'], ENT_QUOTES, 'UTF-8'); ?></span>
+                            <?php endif; ?>
+                            <?php if (($sfLn['pattern'] ?? '') !== ''): ?>
+                            <span class="product-card-pattern"><?php echo htmlspecialchars((string) $sfLn['pattern'], ENT_QUOTES, 'UTF-8'); ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                        <?php
+                    }
+                    ?>
                     <div class="price-row">
                         <strong><?php echo number_format((float) $p['price'] - (float) $p['discount'], 2); ?> KD</strong>
                         <span class="old-price"><?php echo number_format((float) $p['price'], 2); ?> KD</span>
@@ -424,6 +470,25 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
                 </div>
                 <div class="product-body">
                     <h3><?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?></h3>
+                    <?php
+                    $sfCvReg = $sfProductCardVariantLines[(int) $p['id']] ?? [];
+                    if ($sfCvReg !== []) {
+                        ?>
+                    <div class="product-card-variant-meta" dir="auto">
+                        <?php foreach ($sfCvReg as $sfLn): ?>
+                        <div class="product-card-variant-line">
+                            <?php if (($sfLn['color'] ?? '') !== ''): ?>
+                            <span class="product-card-color"><?php echo htmlspecialchars((string) $sfLn['color'], ENT_QUOTES, 'UTF-8'); ?></span>
+                            <?php endif; ?>
+                            <?php if (($sfLn['pattern'] ?? '') !== ''): ?>
+                            <span class="product-card-pattern"><?php echo htmlspecialchars((string) $sfLn['pattern'], ENT_QUOTES, 'UTF-8'); ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                        <?php
+                    }
+                    ?>
                     <div class="price-row">
                         <strong><?php echo number_format((float) $p['price'], 2); ?> KD</strong>
                     </div>
@@ -551,6 +616,44 @@ function orangeSfMountProductThumb(wrap, item) {
     pic.appendChild(imgP);
     wrap.appendChild(pic);
 }
+function orangeSfAppendCardVariantMeta(bodyEl, lines) {
+    if (!bodyEl || !lines || !lines.length) {
+        return;
+    }
+    var wrap = document.createElement('div');
+    wrap.className = 'product-card-variant-meta';
+    wrap.setAttribute('dir', 'auto');
+    var i;
+    for (i = 0; i < lines.length; i++) {
+        var ln = lines[i] || {};
+        var line = document.createElement('div');
+        line.className = 'product-card-variant-line';
+        if (ln.c) {
+            var sc = document.createElement('span');
+            sc.className = 'product-card-color';
+            sc.textContent = ln.c;
+            line.appendChild(sc);
+        }
+        if (ln.p) {
+            var sp = document.createElement('span');
+            sp.className = 'product-card-pattern';
+            sp.textContent = ln.p;
+            line.appendChild(sp);
+        }
+        if (line.firstChild) {
+            wrap.appendChild(line);
+        }
+    }
+    if (!wrap.firstChild) {
+        return;
+    }
+    var h3v = bodyEl.querySelector('h3');
+    if (h3v) {
+        h3v.insertAdjacentElement('afterend', wrap);
+    } else {
+        bodyEl.insertBefore(wrap, bodyEl.firstChild);
+    }
+}
 function orangeSfGridSentinelEl() {
     return document.getElementById('orangeSfGridSentinel');
 }
@@ -626,6 +729,7 @@ function orangeSfAppendOfferCard(item) {
     a.setAttribute('href', item.href);
     a.textContent = window.ORANGE_SF_GRID_VIEW_LABEL || '';
     body.appendChild(h3);
+    orangeSfAppendCardVariantMeta(body, item.vl || []);
     body.appendChild(pr);
     body.appendChild(a);
     art.appendChild(wrap);
@@ -660,6 +764,7 @@ function orangeSfAppendRegularCard(item) {
     a.setAttribute('href', item.href);
     a.textContent = window.ORANGE_SF_GRID_VIEW_LABEL || '';
     body.appendChild(h3);
+    orangeSfAppendCardVariantMeta(body, item.vl || []);
     body.appendChild(pr);
     body.appendChild(a);
     art.appendChild(wrap);

@@ -941,6 +941,31 @@ body.storefront-browse-menu-lock {
     line-height: 1.35;
 }
 
+.product-card-variant-meta {
+    margin: 0 0 8px;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: var(--muted);
+}
+
+.product-card-variant-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.28rem 0.45rem;
+    align-items: baseline;
+}
+
+.product-card-color {
+    font-weight: 650;
+    color: var(--text);
+}
+
+.product-card-pattern {
+    font-weight: 500;
+    font-size: 0.76rem;
+    color: color-mix(in srgb, var(--text) 78%, var(--muted));
+}
+
 .price-row {
     display: flex;
     gap: 10px;
