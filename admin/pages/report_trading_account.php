@@ -7,7 +7,7 @@ require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/date_format.php';
-require_once __DIR__ . '/../../includes/accounting_report_mapping.php';
+require_once __DIR__ . '/../../includes/accounting_pl_statement_rows.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -95,100 +95,10 @@ if (
 
 $accountsLeaf = orange_financial_report_leaf_accounts_with_mapping($pdo);
 
-/**
- * مطابقة سطرًا بسطر لـ «أرباح وخسائر» لنفس فترة تقويم اليوم على الحسابات الفرعية:
- * {@see admin/pages/report_income_statement.php} — `$buildPlSection` لقطاعَي revenue و cogs.
- *
- * @return list<array<string, mixed>>
- */
-$buildTradingSection = static function (
-    PDO $pdo,
-    array $accountsLeaf,
-    array $tbRange,
-    array $tbBefore,
-    string $plClass
-): array {
-    $out = [];
-    $hasSec = orange_table_has_column($pdo, 'accounts', 'report_section');
-    $expectSec = ['revenue' => 'trading', 'cogs' => 'trading', 'expense' => 'pnl'];
-    $legacyHeadingMap = [
-        'revenue' => 'إيرادات ومبيعات — تصنيف افتراضي (دورة الشجرة عند غياب سطر المرجع)',
-        'cogs' => 'تكلفة المبيعات — تصنيف افتراضي (دورة الشجرة)',
-        'expense' => 'مصروفات — تصنيف افتراضي (دورة الشجرة)',
-    ];
+$taShowDiag = isset($_GET['diag']) && (string) $_GET['diag'] === '1';
 
-    foreach ($accountsLeaf as $a) {
-        $aid = (int) ($a['id'] ?? 0);
-        if ($aid <= 0) {
-            continue;
-        }
-        $bucket = orange_accounts_pnl_bucket_for_report($pdo, $aid, orange_accounts_map_row_from_leaf_account_row($a));
-        if ($bucket !== $plClass) {
-            continue;
-        }
-        if ($hasSec) {
-            $sec = orange_accounts_normalize_report_section_value(isset($a['report_section']) ? (string) $a['report_section'] : '');
-            $want = $expectSec[$plClass] ?? '';
-            if ($want !== '' && $sec !== '' && $sec !== $want) {
-                continue;
-            }
-        }
-        $d0 = $c0 = $d1 = $c1 = 0.0;
-        if (isset($tbBefore[$aid])) {
-            $d0 = (float) $tbBefore[$aid]['debit'];
-            $c0 = (float) $tbBefore[$aid]['credit'];
-        }
-        if (isset($tbRange[$aid])) {
-            $d1 = (float) $tbRange[$aid]['debit'];
-            $c1 = (float) $tbRange[$aid]['credit'];
-        }
-        if ($plClass === 'revenue') {
-            $open = $c0 - $d0;
-            $period = $c1 - $d1;
-        } else {
-            $open = $d0 - $c0;
-            $period = $d1 - $c1;
-        }
-        $closing = $open + $period;
-        if (abs($open) < 0.0001 && abs($period) < 0.0001 && abs($closing) < 0.0001) {
-            continue;
-        }
-
-        $mappedHeading = trim((string) ($a['report_line_heading_ar'] ?? ''));
-        $sortKey = (int) ($a['report_line_sort'] ?? 500000);
-        if ($mappedHeading === '') {
-            $mappedHeading = $legacyHeadingMap[$plClass] ?? '—';
-            $sortKey = ['revenue' => 301000, 'cogs' => 302000, 'expense' => 303000][$plClass] ?? 399999;
-        }
-
-        $code = trim((string) ($a['code'] ?? ''));
-        $nm = (string) ($a['name'] ?? '');
-        $out[] = [
-            'code' => $code,
-            'name' => $nm,
-            'opening' => $open,
-            'period' => $period,
-            'closing' => $closing,
-            '_section_heading' => $mappedHeading,
-            '_section_sort' => $sortKey,
-        ];
-    }
-
-    usort($out, static function (array $x, array $y): int {
-        $sx = (int) ($x['_section_sort'] ?? 0);
-        $sy = (int) ($y['_section_sort'] ?? 0);
-        if ($sx !== $sy) {
-            return $sx <=> $sy;
-        }
-
-        return strcmp((string) ($x['code'] ?? ''), (string) ($y['code'] ?? ''));
-    });
-
-    return $out;
-};
-
-$revenueLines = $useVouchers ? $buildTradingSection($pdo, $accountsLeaf, $tbRange, $tbBefore, 'revenue') : [];
-$cogsLines = $useVouchers ? $buildTradingSection($pdo, $accountsLeaf, $tbRange, $tbBefore, 'cogs') : [];
+$revenueLines = $useVouchers ? orange_accounts_build_pl_statement_section_lines($pdo, $accountsLeaf, $tbRange, $tbBefore, 'revenue') : [];
+$cogsLines = $useVouchers ? orange_accounts_build_pl_statement_section_lines($pdo, $accountsLeaf, $tbRange, $tbBefore, 'cogs') : [];
 
 $sumOpen = static function (array $lines): float {
     $s = 0.0;
@@ -285,7 +195,32 @@ $fmt5 = static function (float $v): string {
                 </div>
             </div>
         </form>
+        <p class="muted gas-acc-stmt-toolbar" style="margin-top:10px;margin-bottom:0;font-size:12px;">
+            <a href="<?php echo htmlspecialchars(
+                '?page=report_trading_account&m_from=' . rawurlencode($periodYmFrom) . '&m_to=' . rawurlencode($periodYmTo) . '&diag=1',
+                ENT_QUOTES,
+                'UTF-8'
+            ); ?>">تشخيص (عدادات المصدر)</a>
+            — للمقارنة استخدم شاشة «أرباح وخسائر» بنفس الشهر؛ مصدر الأسطر أصبح <strong>نفس الدالة البرمجية</strong>.
+        </p>
     </div>
+
+<?php if ($taShowDiag && $useVouchers && $periodLabel !== ''): ?>
+    <div class="card admin-fy-card gl-acc-stmt-no-print">
+        <p class="muted" style="margin:0 0 8px 0;"><strong dir="ltr">diag</strong> — نفس منطق <code dir="ltr">orange_accounts_build_pl_statement_section_lines</code> الخاص بـ أرباح/خسائر.</p>
+        <pre dir="ltr" style="margin:0;font-size:11px;white-space:pre-wrap;background:#fafafa;padding:10px;border-radius:6px;"><?php
+        $diagPayload = json_encode([
+                'vouchers_ready' => $useVouchers,
+                'period' => [$periodDateFrom, $periodDateTo],
+                'leaf_accounts' => count($accountsLeaf),
+                'tb_range_accounts_with_activity' => count($tbRange),
+                'revenue_lines_out' => count($revenueLines),
+                'cogs_lines_out' => count($cogsLines),
+        ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+echo htmlspecialchars((string) ($diagPayload !== false ? $diagPayload : '{}'), ENT_QUOTES, 'UTF-8');
+?></pre>
+    </div>
+<?php endif; ?>
 
 <?php if (! $useVouchers): ?>
     <div class="card admin-fy-card">
