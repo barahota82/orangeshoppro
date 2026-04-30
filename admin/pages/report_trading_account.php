@@ -207,7 +207,7 @@ $fmt5 = static function (float $v): string {
 
 <?php if ($taShowDiag && $useVouchers && $periodLabel !== ''): ?>
     <div class="card admin-fy-card gl-acc-stmt-no-print">
-        <p class="muted" style="margin:0 0 8px 0;"><strong dir="ltr">diag</strong> — سياسة <code dir="ltr">trading_account</code> (إيراد/تكم: pnl أو none أو trading أو operating إذا وُضع بالخطأ في <code dir="ltr">report_section</code>).</p>
+        <p class="muted" style="margin:0 0 8px 0;"><strong dir="ltr">diag</strong> — المتاجرة: bucket من نوع الحساب والشجرة؛ يُستبعد صراحةً فقط <code dir="ltr">report_section=balance_sheet</code> لأوراق الإيراد/التكم.</p>
         <pre dir="ltr" style="margin:0;font-size:11px;white-space:pre-wrap;background:#fafafa;padding:10px;border-radius:6px;"><?php
         $diagPayload = json_encode([
                 'section_policy' => 'trading_account',

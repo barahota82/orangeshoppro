@@ -10,8 +10,8 @@ require_once __DIR__ . '/accounting_report_mapping.php';
  * @param 'revenue'|'cogs'|'expense' $plClass
  * @param 'income_statement'|'trading_account' $sectionPolicy
  *        — `income_statement`: إيراد/تكم → report_section فارغ أو trading (شاشة أرباح وخسائر).
- *        — `trading_account`: إيراد/تكم → يُقبل أيضاً pnl و none و trading؛ و operating إن وُضع بالخطأ في report_section؛ وتُحمَّل دليل المتاجرة بـ bucket يستند للشجرة
- *           عند تعارض `account_type` (مثل leaf تحت فرع الإيرادات مسجَّل مصروفاً في القاعدة).
+ *        — `trading_account`: إيراد/تكم يُحمَّى عبر bucket الشجرة/النوع؛ تصفية `report_section`:
+ *           تُرفض فقط `balance_sheet` (أقسام ميزانية في خانة المتاجرة)؛ خلاف ذلك تُحمَّى مع طبيعة PL.
  *
  * @return list<array<string, mixed>>
  */
@@ -53,16 +53,8 @@ function orange_accounts_build_pl_statement_section_lines(
                 $sectionPolicy === 'trading_account'
                 && ($plClass === 'revenue' || $plClass === 'cogs')
             ) {
-                if ($sec !== '') {
-                    // none/trading/pnl — سياسة المتاجرة؛ و«operating» إن وُضع بالخطأ في report_section (غالباً مخصّص لـ cashflow_section).
-                    $allowedTrading = ['none', 'trading', 'pnl', 'operating'];
-                    $ok = in_array($sec, $allowedTrading, true);
-                    if (! $ok && in_array($sec, ['balance_sheet', 'cashflow'], true)) {
-                        $ok = orange_accounts_account_pl_role($pdo, $aid) === $plClass;
-                    }
-                    if (! $ok) {
-                        continue;
-                    }
+                if ($sec === 'balance_sheet') {
+                    continue;
                 }
             } else {
                 $want = $expectSec[$plClass] ?? '';
