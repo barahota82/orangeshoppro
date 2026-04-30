@@ -1,7 +1,7 @@
 Orange — بوابة واحدة: القراءات الإلزامية قبل أي تنفيذ
 ====================================================
 المسار: ORANGE_AGENT_READ_FIRST.txt (جذر المستودع بجانب IBRAHIM_ORANGE_MASTER.txt)
-آخر تحديث: 2026-04-19
+آخر تحديث: 2026-04-26
 
 الاستخدام
 -------
@@ -23,6 +23,7 @@ Orange — بوابة واحدة: القراءات الإلزامية قبل أ�
 4. **`docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt`**
 5. **`scripts/orange_db.sql`** — **عند نطاق مخطط قاعدة بيانات أو ترحيل؛ إن وُجد محلياً** (مراجعة «الحقيقة»؛ إن غاب لا تُفترَض من Git وحدَه — راجع `IBRAHIM_ORANGE_MASTER.txt` قسم قاعدة البيانات).
 6. **`docs/archive/ORANGE_AGENT_QA_REFERENCE.txt`** — عند الحاجة (نشر، مخطط، أسئلة تشغيلية).
+7. **`docs/archive/ORANGE_UNIFIED_TAXONOMY_AND_CATALOG_ERD.txt`** — **قراءة كاملة عند نطاق أقسام/شجرة منتجات/صفات أو ربط تصنيف بالكتالوج (قبل أي Patch لتصنيف المنتج).** سياسة موجزة: **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** قسم «تاسعاً».
 
 ثم: **قراءة كاملة** لقائمة **`.cursor/rules/orange-continuity.mdc`** (المحتوى الكامل للقائمة المرقّمة 0–8 و5b و5c).
 
@@ -36,6 +37,7 @@ Orange — بوابة واحدة: القراءات الإلزامية قبل أ�
 **4.** `docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt` — **أولوية** إن كان النطاق واجهة/طلب أونلاين/تسجيل/تتبع/قنوات (**أطلع عليه قبل** الخارطة العامة لإتمام تلك السياسات)  
 **5.** `docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt`  
 **5b.** `docs/archive/ORANGE_AGENT_QA_REFERENCE.txt` — عند الحاجة  
+**5tax.** `docs/archive/ORANGE_UNIFIED_TAXONOMY_AND_CATALOG_ERD.txt` — **قراءة كاملة** عند نطاق **تصنيف موحّد / شجرة منتجات / صفات** (قبل Patch كتالوج؛ انظر أيضاً **`ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** قسم «تاسعاً»).  
 **5c.** `docs/archive/ORANGE_ACCOUNTING_MAPPING_AND_REPORT_HANDOFF.txt` — **قراءة كاملة** عند نطاق **محاسبة داخلية / دليل حسابات / تقارير مالية / ترحيل GL**؛ ويُكمِّل **`docs/ACCOUNTING_REPORTING_POLICY_V2.md`** (تلخيص سياسة التقارير v2 حيث ينطبق)  
 **6.** `docs/archive/ORANGE_PROJECT_CONTINUITY.txt`  
 **7.** `docs/archive/ORANGE_TECH_REFERENCE.txt`  
@@ -46,7 +48,7 @@ Orange — بوابة واحدة: القراءات الإلزامية قبل أ�
 ---
 ج) أولوية «كمّل العمل» الواجهة/المتجر
 ---
-عند إتمام أو مطابقة عمل يلمس المتجر أو الطلب أونلاين أو التسجيل أو التتبع أو القنوات: راجع **`ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** وفقرات «تنفيذ» وس1–س30 و«صفر» **قبل** الاعتماد على الخريطة العامة أو تقارير حالة مشروع بديلة — إلا إن استثنى المالك النطاق صراحةً.
+عند إتمام أو مطابقة عمل يلمس المتجر أو الطلب أونلاين أو التسجيل أو التتبع أو القنوات: راجع **`ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** وفقرات «تنفيذ» وس1–س30 و«صفر» **قبل** الاعتماد على الخارطة العامة أو تقارير حالة مشروع بديلة — إلا إن استثنى المالك النطاق صراحةً.
 
 ---
 د) مسار العمل الموصى به على القرص

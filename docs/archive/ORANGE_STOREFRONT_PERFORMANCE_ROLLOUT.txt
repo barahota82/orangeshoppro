@@ -17,14 +17,15 @@ ORANGE — أرشيف خطة أداء الواجهة وترحيل المخطط (
 --------------------------------------------------------------------
 أولاً: القراءات الإلزامية (قبل أي تنفيذ في هذا النطاق)
 --------------------------------------------------------------------
-**الصيغة الموحّدة لكل النطاقات (ومنها أداء الواجهة/الترحيل):** **الوكيل ملزَم — قبل أي تنفيذ — بالاطلاع على docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt و IBRAHIM_ORANGE_MASTER.txt و .cursor/rules/orange-session-handoff.mdc و docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt؛ وعند نطاق مخطط/ترحيل scripts/orange_db.sql محلياً إن وُجد؛ وعند الحاجة docs/archive/ORANGE_AGENT_QA_REFERENCE.txt؛ ثم قراءة كاملة لقائمة orange-continuity.mdc كما في الأرشيف (ثم باقي الاستمرارية حسب النطاق).**
+**الصيغة الموحّدة لكل النطاقات (ومنها أداء الواجهة/الترحيل):** **الوكيل ملزَم — قبل أي تنفيذ — بالاطلاع على docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt و IBRAHIM_ORANGE_MASTER.txt و .cursor/rules/orange-session-handoff.mdc و docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt؛ وعند نطاق مخطط/ترحيل scripts/orange_db.sql محلياً إن وُجد؛ وعند الحاجة docs/archive/ORANGE_AGENT_QA_REFERENCE.txt؛ وعند نطاق تصنيف منتج موحّد / شجرة كتالوج docs/archive/ORANGE_UNIFIED_TAXONOMY_AND_CATALOG_ERD.txt (قراءة كاملة قبل Patch)؛ ثم قراءة كاملة لقائمة orange-continuity.mdc كما في الأرشيف (ثم باقي الاستمرارية حسب النطاق).**
 
 1. **docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt** — سياسة الواجهة والقنوات (س25/س26، كود الدولة، السلة، التتبع، …).
 2. **IBRAHIM_ORANGE_MASTER.txt** — خاصة §2 (ensure_schema، migrations)، §4 (ترتيب SQL)، و§10 إن وُجد (ربط القنوات).
-3. **.cursor/rules/orange-session-handoff.mdc** و **orange-continuity.mdc** (اطّلع **فعلياً** على **جميع** بنود القائمة فيه: **0–8** و**5b**، بما فيها **ORANGE_TECH_REFERENCE.txt** و**ORANGE_PROJECT_COMPLETION_ROADMAP.txt** — إلزام مالك مسجّل في **ORANGE_STOREFRONT_POLICY_REFERENCE.txt**) و **orange-php-utf8-workflow.mdc**.
+3. **.cursor/rules/orange-session-handoff.mdc** و **orange-continuity.mdc** (اطّلع **فعلياً** على **جميع** بنود القائمة فيه: **0–8** و**5b** و**5tax**، بما فيها **ORANGE_TECH_REFERENCE.txt** و**ORANGE_PROJECT_COMPLETION_ROADMAP.txt** — إلزام مالك مسجّل في **ORANGE_STOREFRONT_POLICY_REFERENCE.txt**) و **orange-php-utf8-workflow.mdc**.
 4. **هذا الملف** — ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt.
 5. **`scripts/orange_db.sql`** — عند العمل على مخطط/جداول/ترحيل: لقطة «الحقيقة» (IBRAHIM §2أ)؛ راجع الأجزاء المعنية فقط؛ قد لا يُرفع في Git.
 6. **`docs/archive/ORANGE_AGENT_QA_REFERENCE.txt`** — أسئلة وأجوبة تشغيلية (وكلاء، نشر، مخطط القاعدة) عند الحاجة.
+7. **`docs/archive/ORANGE_UNIFIED_TAXONOMY_AND_CATALOG_ERD.txt`** — عند تنفيذ **شجرة تصنيف موحّدة**؛ صمّم الاستعلامات والجدايل بحيث لا تُثقّل مسار المتجر الساخن (فهارس، تجنّب JOIN أعمدة غير مستخدمة على الصفحة الرئيسية).
 
 
 --------------------------------------------------------------------
