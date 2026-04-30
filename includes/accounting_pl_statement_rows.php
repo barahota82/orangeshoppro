@@ -5,10 +5,12 @@ declare(strict_types=1);
 require_once __DIR__ . '/accounting_report_mapping.php';
 
 /**
- * قطاع واحد من قائمة الدخل الزمنية (إيراد / تكم / مصروف) — منطق واحد لـ
- * `report_income_statement` و `report_trading_account` (إيراد+تكم) حتى لا تتفرّع الشاشات.
+ * قطاع واحد من قائمة الدخل الزمنية (إيراد / تكم / مصروف).
  *
  * @param 'revenue'|'cogs'|'expense' $plClass
+ * @param 'income_statement'|'trading_account' $sectionPolicy
+ *        — `income_statement`: إيراد/تكم → report_section فارغ أو trading (شاشة أرباح وخسائر).
+ *        — `trading_account`: إيراد/تكم → يُقبل أيضاً pnl و none (مجمل المتاجرة عند وسوم قائمة الدخل بـ pnl).
  *
  * @return list<array<string, mixed>>
  */
@@ -17,7 +19,8 @@ function orange_accounts_build_pl_statement_section_lines(
     array $accountsLeaf,
     array $tbRange,
     array $tbBefore,
-    string $plClass
+    string $plClass,
+    string $sectionPolicy = 'income_statement'
 ): array {
     $out = [];
     $hasSec = orange_table_has_column($pdo, 'accounts', 'report_section');
@@ -39,9 +42,25 @@ function orange_accounts_build_pl_statement_section_lines(
         }
         if ($hasSec) {
             $sec = orange_accounts_normalize_report_section_value(isset($a['report_section']) ? (string) $a['report_section'] : '');
-            $want = $expectSec[$plClass] ?? '';
-            if ($want !== '' && $sec !== '' && $sec !== $want) {
-                continue;
+            if (
+                $sectionPolicy === 'trading_account'
+                && ($plClass === 'revenue' || $plClass === 'cogs')
+            ) {
+                if ($sec !== '') {
+                    $allowedTrading = ['none', 'trading', 'pnl'];
+                    $ok = in_array($sec, $allowedTrading, true);
+                    if (! $ok && in_array($sec, ['balance_sheet', 'cashflow'], true)) {
+                        $ok = orange_accounts_account_pl_role($pdo, $aid) === $plClass;
+                    }
+                    if (! $ok) {
+                        continue;
+                    }
+                }
+            } else {
+                $want = $expectSec[$plClass] ?? '';
+                if ($want !== '' && $sec !== '' && $sec !== $want) {
+                    continue;
+                }
             }
         }
         $d0 = $c0 = $d1 = $c1 = 0.0;

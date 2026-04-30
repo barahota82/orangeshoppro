@@ -97,8 +97,8 @@ $accountsLeaf = orange_financial_report_leaf_accounts_with_mapping($pdo);
 
 $taShowDiag = isset($_GET['diag']) && (string) $_GET['diag'] === '1';
 
-$revenueLines = $useVouchers ? orange_accounts_build_pl_statement_section_lines($pdo, $accountsLeaf, $tbRange, $tbBefore, 'revenue') : [];
-$cogsLines = $useVouchers ? orange_accounts_build_pl_statement_section_lines($pdo, $accountsLeaf, $tbRange, $tbBefore, 'cogs') : [];
+$revenueLines = $useVouchers ? orange_accounts_build_pl_statement_section_lines($pdo, $accountsLeaf, $tbRange, $tbBefore, 'revenue', 'trading_account') : [];
+$cogsLines = $useVouchers ? orange_accounts_build_pl_statement_section_lines($pdo, $accountsLeaf, $tbRange, $tbBefore, 'cogs', 'trading_account') : [];
 
 $sumOpen = static function (array $lines): float {
     $s = 0.0;
@@ -207,9 +207,10 @@ $fmt5 = static function (float $v): string {
 
 <?php if ($taShowDiag && $useVouchers && $periodLabel !== ''): ?>
     <div class="card admin-fy-card gl-acc-stmt-no-print">
-        <p class="muted" style="margin:0 0 8px 0;"><strong dir="ltr">diag</strong> — نفس منطق <code dir="ltr">orange_accounts_build_pl_statement_section_lines</code> الخاص بـ أرباح/خسائر.</p>
+        <p class="muted" style="margin:0 0 8px 0;"><strong dir="ltr">diag</strong> — سياسة <code dir="ltr">trading_account</code> (تقبل pnl/none/trading لإيراد/تكم).</p>
         <pre dir="ltr" style="margin:0;font-size:11px;white-space:pre-wrap;background:#fafafa;padding:10px;border-radius:6px;"><?php
         $diagPayload = json_encode([
+                'section_policy' => 'trading_account',
                 'vouchers_ready' => $useVouchers,
                 'period' => [$periodDateFrom, $periodDateTo],
                 'leaf_accounts' => count($accountsLeaf),
