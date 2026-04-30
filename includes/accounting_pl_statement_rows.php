@@ -10,7 +10,8 @@ require_once __DIR__ . '/accounting_report_mapping.php';
  * @param 'revenue'|'cogs'|'expense' $plClass
  * @param 'income_statement'|'trading_account' $sectionPolicy
  *        — `income_statement`: إيراد/تكم → report_section فارغ أو trading (شاشة أرباح وخسائر).
- *        — `trading_account`: إيراد/تكم → يُقبل أيضاً pnl و none (مجمل المتاجرة عند وسوم قائمة الدخل بـ pnl).
+ *        — `trading_account`: إيراد/تكم → يُقبل أيضاً pnl و none؛ وتُحمَّل دليل المتاجرة بـ bucket يستند للشجرة
+ *           عند تعارض `account_type` (مثل leaf تحت فرع الإيرادات مسجَّل مصروفاً في القاعدة).
  *
  * @return list<array<string, mixed>>
  */
@@ -36,7 +37,13 @@ function orange_accounts_build_pl_statement_section_lines(
         if ($aid <= 0) {
             continue;
         }
-        $bucket = orange_accounts_pnl_bucket_for_report($pdo, $aid, orange_accounts_map_row_from_leaf_account_row($a));
+        $mapLeaf = orange_accounts_map_row_from_leaf_account_row($a);
+        $bucket = (
+            $sectionPolicy === 'trading_account'
+            && ($plClass === 'revenue' || $plClass === 'cogs')
+        )
+            ? orange_accounts_pnl_bucket_for_trading_row($pdo, $aid, $mapLeaf)
+            : orange_accounts_pnl_bucket_for_report($pdo, $aid, $mapLeaf);
         if ($bucket !== $plClass) {
             continue;
         }
