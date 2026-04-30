@@ -253,6 +253,12 @@ $fmt5 = static function (float $v): string {
         </form>
     </div>
 
+<?php if ($useVouchers && $accountsLeaf === []): ?>
+    <div class="card admin-fy-card gl-acc-stmt-no-print" style="border:1px solid #fcd34d;background:#fffbeb;">
+        <p class="muted" style="margin:0;line-height:1.55;"><strong>تنبيه:</strong> لا توجد حسابات ترحيل (أوراق) في الدليل بعد؛ التقرير يظهر فارغاً إلى أن تُنشأ حسابات في «الدليل المحاسبي». <strong>الشاشة والنموذج يعملان</strong> — هذا متوقَّع أثناء الإعداد الأول.</p>
+    </div>
+<?php endif; ?>
+
 <?php if (! $useVouchers): ?>
     <div class="card admin-fy-card">
         <p class="muted">سندات اليومية غير جاهزة بعد — لا يمكن عرض تقرير أرباح وخسائر.</p>

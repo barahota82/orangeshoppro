@@ -408,7 +408,15 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
 <?php elseif ($periodLabel === ''): ?>
     <div class="card admin-fy-card"><p class="muted">تعذّر تحديد مدى التقويم.</p></div>
 <?php elseif ($revAccounts === [] && $outAccounts === []): ?>
-    <div class="card admin-fy-card"><p class="muted">لا توجد حسابات فرعية تصنَّف وفق دليل الخريطة أو جذر الشجرة كإيراد أو تكلفة مبيعات/مصروف.</p></div>
+    <div class="card admin-fy-card<?php echo $accountsLeaf === [] ? ' gl-acc-stmt-no-print' : ''; ?>" <?php echo $accountsLeaf === [] ? 'style="border:1px solid #fcd34d;background:#fffbeb;"' : ''; ?>>
+        <p class="muted" style="margin:0;line-height:1.55;">
+            <?php if ($accountsLeaf === []): ?>
+                <strong>تنبيه:</strong> لا توجد حسابات ترحيل (أوراق) في الدليل بعد؛ القائمة تظهر بدون أسطر حساب إلى أن تُضاف أوراق في «الدليل المحاسبي». <strong>الشاشة والنموذج يعملان</strong> — متوقَّع أثناء الإعداد الأول.
+            <?php else: ?>
+                لا توجد حسابات فرعية تصنَّف وفق دليل الخريطة أو جذر الشجرة كإيراد أو تكلفة مبيعات/مصروف.
+            <?php endif; ?>
+        </p>
+    </div>
 <?php else: ?>
     <?php foreach ($monthSheetsBuilt as $si => $ms): ?>
         <?php
