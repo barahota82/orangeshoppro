@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/catalog_schema.php';
+require_once __DIR__ . '/../includes/catalog_labels.php';
 require_once __DIR__ . '/../includes/upload_paths.php';
 
 $pdo = db();
@@ -60,12 +61,24 @@ $imagesStmt = $pdo->prepare("SELECT * FROM product_images WHERE product_id = ? O
 $imagesStmt->execute([$id]);
 $images = $imagesStmt->fetchAll();
 
-$variantsStmt = $pdo->prepare("SELECT * FROM product_variants WHERE product_id = ? ORDER BY color ASC, size ASC, id ASC");
+$variantsStmt = $pdo->prepare(
+    "SELECT v.*,
+        cw.primary_color_id, cw.secondary_color_id, cw.primary_pattern_id, cw.secondary_pattern_id,
+        sfs.label_ar AS sfs_la, sfs.label_en AS sfs_le
+     FROM product_variants v
+     LEFT JOIN product_colorways cw ON cw.id = v.product_colorway_id
+     LEFT JOIN size_family_sizes sfs ON sfs.id = v.size_family_size_id
+     WHERE v.product_id = ? ORDER BY v.color ASC, v.size ASC, v.id ASC"
+);
 $variantsStmt->execute([$id]);
 $variants = $variantsStmt->fetchAll();
 
-$colors = [];
-$sizes = [];
+$colorChipOrder = [];
+/** @var array<string, array{color: string, pattern: string}> */
+$colorChipMeta = [];
+$sizeChipOrder = [];
+/** @var array<string, string> */
+$sizeChipLabel = [];
 $totalStock = 0;
 $scope = isset($product['sizing_guide_scope']) ? (string)$product['sizing_guide_scope'] : 'none';
 $sizingHintKeys = [
@@ -110,14 +123,48 @@ $homeUrl = storefront_url('home', $channelSlug, $lang);
 $needsVariantPick = ((int)$product['has_colors'] === 1 || (int)$product['has_sizes'] === 1);
 
 foreach ($variants as $v) {
-    if ($v['color'] !== '' && !in_array($v['color'], $colors, true)) {
-        $colors[] = $v['color'];
+    if ((int)$product['has_colors'] === 1) {
+        $mk = trim((string)($v['color'] ?? ''));
+        if ($mk !== '' && !isset($colorChipMeta[$mk])) {
+            $pc = isset($v['primary_color_id']) ? (int) $v['primary_color_id'] : 0;
+            $sc = isset($v['secondary_color_id']) ? (int) $v['secondary_color_id'] : 0;
+            $pp = isset($v['primary_pattern_id']) ? (int) $v['primary_pattern_id'] : 0;
+            $psp = isset($v['secondary_pattern_id']) ? (int) $v['secondary_pattern_id'] : 0;
+            if ($pc > 0 || $sc > 0 || $pp > 0 || $psp > 0) {
+                $segs = orange_colorway_display_segments(
+                    $pdo,
+                    $pc > 0 ? $pc : null,
+                    $sc > 0 ? $sc : null,
+                    $pp > 0 ? $pp : null,
+                    $psp > 0 ? $psp : null,
+                    $lang
+                );
+            } else {
+                $segs = orange_storefront_split_variant_color_field($mk);
+            }
+            $colorChipMeta[$mk] = $segs;
+            $colorChipOrder[] = $mk;
+        }
     }
-    if ($v['size'] !== '' && !in_array($v['size'], $sizes, true)) {
-        $sizes[] = $v['size'];
+    if ((int)$product['has_sizes'] === 1) {
+        $sk = trim((string)($v['size'] ?? ''));
+        if ($sk !== '' && !isset($sizeChipLabel[$sk])) {
+            $szRow = null;
+            if (isset($v['sfs_la']) || isset($v['sfs_le'])) {
+                $szRow = [
+                    'label_ar' => (string) ($v['sfs_la'] ?? ''),
+                    'label_en' => (string) ($v['sfs_le'] ?? ''),
+                ];
+            }
+            $sizeChipLabel[$sk] = $szRow ? orange_size_display_label($szRow, $lang) : $sk;
+            $sizeChipOrder[] = $sk;
+        }
     }
-    $totalStock += (int)$v['stock_quantity'];
+    $totalStock += (int) $v['stock_quantity'];
 }
+
+$colors = $colorChipOrder;
+$sizes = $sizeChipOrder;
 
 $mainFile = trim((string)($product['main_image'] ?? ''));
 $galleryUrls = [];
@@ -202,9 +249,15 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
                 <div class="option-block">
                     <label><?php echo htmlspecialchars(t('color'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <div class="chips">
-                        <?php foreach ($colors as $color): ?>
-                            <button type="button" class="chip color-chip" data-color="<?php echo htmlspecialchars($color, ENT_QUOTES, 'UTF-8'); ?>" onclick="selectColor(this)">
-                                <?php echo htmlspecialchars($color, ENT_QUOTES, 'UTF-8'); ?>
+                        <?php foreach ($colors as $cMatch): ?>
+                            <?php $segPm = $colorChipMeta[$cMatch] ?? ['color' => $cMatch, 'pattern' => '']; ?>
+                            <button type="button" class="chip color-chip" data-color="<?php echo htmlspecialchars($cMatch, ENT_QUOTES, 'UTF-8'); ?>" onclick="selectColor(this)">
+                                <?php if (($segPm['color'] ?? '') !== ''): ?>
+                                <span class="chip-text chip-text--color"><?php echo htmlspecialchars((string) $segPm['color'], ENT_QUOTES, 'UTF-8'); ?></span>
+                                <?php endif; ?>
+                                <?php if (($segPm['pattern'] ?? '') !== ''): ?>
+                                <span class="chip-text chip-text--pattern"><?php echo htmlspecialchars((string) $segPm['pattern'], ENT_QUOTES, 'UTF-8'); ?></span>
+                                <?php endif; ?>
                             </button>
                         <?php endforeach; ?>
                     </div>
@@ -215,9 +268,10 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
                 <div class="option-block">
                     <label><?php echo htmlspecialchars(t('size'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <div class="chips">
-                        <?php foreach ($sizes as $size): ?>
-                            <button type="button" class="chip size-chip" data-size="<?php echo htmlspecialchars($size, ENT_QUOTES, 'UTF-8'); ?>" onclick="selectSize(this)">
-                                <?php echo htmlspecialchars($size, ENT_QUOTES, 'UTF-8'); ?>
+                        <?php foreach ($sizes as $sizeKey): ?>
+                            <?php $sd = $sizeChipLabel[$sizeKey] ?? $sizeKey; ?>
+                            <button type="button" class="chip size-chip" data-size="<?php echo htmlspecialchars($sizeKey, ENT_QUOTES, 'UTF-8'); ?>" onclick="selectSize(this)">
+                                <?php echo htmlspecialchars($sd, ENT_QUOTES, 'UTF-8'); ?>
                             </button>
                         <?php endforeach; ?>
                     </div>

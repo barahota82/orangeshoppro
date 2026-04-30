@@ -207,7 +207,7 @@ foreach ($offers as $hop) {
     }
 }
 /** @var array<int, list<array{color: string, pattern: string}>> */
-$sfProductCardVariantLines = orange_storefront_product_card_variant_line_map($pdo, $sfHomeCardColorPidList);
+$sfProductCardVariantLines = orange_storefront_product_card_variant_line_map($pdo, $sfHomeCardColorPidList, $lang);
 
 if ($hasDepartmentsTable) {
     $needDeptLookup = [];

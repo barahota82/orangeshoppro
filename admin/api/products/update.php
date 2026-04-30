@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/catalog_labels.php';
+require_once __DIR__ . '/../../../includes/product_variants_write.php';
 require_once __DIR__ . '/../../../includes/product_channels.php';
 require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
 require_admin_api();
@@ -40,6 +42,7 @@ try {
         $scope = 'none';
     }
     $hasSizes = (int)($data['has_sizes'] ?? 0) === 1;
+    $hasColors = (int)($data['has_colors'] ?? 0) === 1;
     if ($hasSizes && $sizeFamilyId === null) {
         json_response(['success' => false, 'message' => 'يجب اختيار عائلة مقاسات عند تفعيل المقاسات'], 422);
     }
@@ -79,6 +82,38 @@ try {
             if ($fn !== '' && $fn !== '.' && $fn !== '..') {
                 $mainImage = $fn;
                 break;
+            }
+        }
+    }
+
+    $variantsMaybe = $data['variants'] ?? null;
+    if ($variantsMaybe !== null) {
+        if (!is_array($variantsMaybe) || count($variantsMaybe) === 0) {
+            json_response(['success' => false, 'message' => 'مصفوفة المتغيرات مطلوبة عند تحديث المخزون من نموذج المتغيرات'], 422);
+        }
+        foreach ($variantsMaybe as $rv) {
+            if (!is_array($rv)) {
+                json_response(['success' => false, 'message' => 'صف متغير غير صالح'], 422);
+            }
+            if ($hasColors) {
+                $rp = isset($rv['primary_color_id']) ? (int) $rv['primary_color_id'] : 0;
+                if ($rp <= 0) {
+                    json_response(['success' => false, 'message' => 'كل متغير ملون يجب أن يحدد لوناً أساسياً من القاموس'], 422);
+                }
+                $ppPat = isset($rv['primary_pattern_id']) ? (int) $rv['primary_pattern_id'] : 0;
+                $spPat = isset($rv['secondary_pattern_id']) ? (int) $rv['secondary_pattern_id'] : 0;
+                if ($ppPat > 0 && ! orange_pattern_dictionary_id_is_active_posting($pdo, $ppPat)) {
+                    json_response(['success' => false, 'message' => 'نمط أساسي غير صالح أو غير نشط — راجع قاموس أنماط الألوان'], 422);
+                }
+                if ($spPat > 0 && ! orange_pattern_dictionary_id_is_active_posting($pdo, $spPat)) {
+                    json_response(['success' => false, 'message' => 'نمط ثانوي غير صالح أو غير نشط — راجع قاموس أنماط الألوان'], 422);
+                }
+            }
+            if ($hasSizes) {
+                $z = isset($rv['size_family_size_id']) ? (int) $rv['size_family_size_id'] : 0;
+                if ($z <= 0) {
+                    json_response(['success' => false, 'message' => 'كل متغير يجب أن يرتبط بمقاس من عائلة المقاسات'], 422);
+                }
             }
         }
     }
@@ -164,6 +199,17 @@ try {
             }
             $imgIns->execute([$productId, $fn]);
         }
+    }
+
+    if ($variantsMaybe !== null && is_array($variantsMaybe)) {
+        orange_product_sync_variants_matrix(
+            $pdo,
+            $productId,
+            $variantsMaybe,
+            $hasColors,
+            $hasSizes,
+            $sizeFamilyId
+        );
     }
 
     $pdo->commit();

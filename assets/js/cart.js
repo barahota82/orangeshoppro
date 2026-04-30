@@ -284,6 +284,84 @@ function storefrontApiUrl(path) {
     return url;
 }
 
+async function orangeHydrateCartVariantDisplayLang(itemsModel) {
+    if (!itemsModel || !itemsModel.length) {
+        return;
+    }
+    const lang = typeof window.APP_LANG === 'string' ? window.APP_LANG : 'ar';
+    const ids = [];
+    itemsModel.forEach((it) => {
+        const v = parseInt(it.variant_id || 0, 10) || 0;
+        if (v && ids.indexOf(v) === -1) {
+            ids.push(v);
+        }
+    });
+    if (!ids.length || typeof fetch !== 'function') {
+        return;
+    }
+    try {
+        const response = await fetch(storefrontApiUrl('/api/products/variant-labels.php'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ variant_ids: ids, lang: lang }),
+        });
+        const data = await response.json();
+        if (!data.success || !data.labels) {
+            return;
+        }
+        const L = data.labels;
+        document.querySelectorAll('.cart-item-card[data-variant-id]').forEach((card) => {
+            const vid = parseInt(card.getAttribute('data-variant-id') || '0', 10) || 0;
+            const row = L[String(vid)];
+            if (!row) {
+                return;
+            }
+            const host = card.querySelector('.js-cart-vlabel-host');
+            if (!host) {
+                return;
+            }
+            const T = window.APP_T || {};
+            let h = '';
+            if (row.color_part || row.pattern_part) {
+                h +=
+                    '<p class="cart-item-variant"><span class="cart-meta-k">' +
+                    escCartHtml(T.color || '') +
+                    '</span> ';
+                if (row.color_part) {
+                    h += '<span class="cart-v-c">' + escCartHtml(row.color_part) + '</span>';
+                }
+                if (row.pattern_part) {
+                    h +=
+                        '<span class="cart-v-sep"> </span><span class="cart-v-p">' +
+                        escCartHtml(row.pattern_part) +
+                        '</span>';
+                }
+                h += '</p>';
+            } else if (row.color) {
+                h +=
+                    '<p class="cart-item-variant"><span class="cart-meta-k">' +
+                    escCartHtml(T.color || '') +
+                    '</span> ' +
+                    escCartHtml(row.color) +
+                    '</p>';
+            }
+            if (row.size) {
+                h +=
+                    '<p class="cart-item-variant"><span class="cart-meta-k">' +
+                    escCartHtml(T.size || '') +
+                    '</span> ' +
+                    escCartHtml(row.size) +
+                    '</p>';
+            }
+            if (h) {
+                host.innerHTML = h;
+            }
+        });
+    } catch (e) {
+        /* offline */
+    }
+}
+
 function ensureOrangeToast() {
     if (document.getElementById('orangeSfToast')) {
         return;
@@ -1264,7 +1342,8 @@ async function renderCart() {
     html += '<div class="cart-items-list">';
 
         itemsModel.forEach((item, idx) => {
-        const qty = Math.max(1, parseInt(item.qty, 10) || 1);
+            const qty = Math.max(1, parseInt(item.qty, 10) || 1);
+            const vidLine = parseInt(item.variant_id || 0, 10) || 0;
         const lineTotal = qty * Number(item.price);
             if (!choiceOn || orangeCartLineIsIncluded(item)) {
         total += lineTotal;
@@ -1291,15 +1370,28 @@ async function renderCart() {
                 : '';
 
         html += `
-            <div class="cart-item-card" data-cart-idx="${idx}">
+            <div class="cart-item-card" data-cart-idx="${idx}"${vidLine ? ` data-variant-id="${vidLine}"` : ''}>
                 <div class="cart-item-left">
                     ${orangeCartProductImageMarkup(item)}
                 </div>
                 <div class="cart-item-right">
                     ${lineChoiceHtml}
                     <h4>${escCartHtml(item.name || '')}</h4>
-                    ${item.color ? `<p class="cart-item-variant">${escCartHtml(T.color || '')}: ${escCartHtml(item.color)}</p>` : ''}
-                    ${item.size ? `<p class="cart-item-variant">${escCartHtml(T.size || '')}: ${escCartHtml(item.size)}</p>` : ''}
+                    ${
+                        vidLine
+                            ? `<div class="js-cart-vlabel-host">${
+                                  item.color
+                                      ? `<p class="cart-item-variant">${escCartHtml(T.color || '')}: ${escCartHtml(item.color)}</p>`
+                                      : ''
+                              }${
+                                  item.size
+                                      ? `<p class="cart-item-variant">${escCartHtml(T.size || '')}: ${escCartHtml(item.size)}</p>`
+                                      : ''
+                              }</div>`
+                            : `${item.color ? `<p class="cart-item-variant">${escCartHtml(T.color || '')}: ${escCartHtml(item.color)}</p>` : ''}${
+                                  item.size ? `<p class="cart-item-variant">${escCartHtml(T.size || '')}: ${escCartHtml(item.size)}</p>` : ''
+                              }`
+                    }
                     <div class="cart-line-price-row">
                         <span class="cart-unit-price"><span class="cart-meta-label">${escCartHtml(unitLbl)}</span> ${formatMoney(item.price)}</span>
                         <span class="cart-line-subtotal"><span class="cart-meta-label">${escCartHtml(subLbl)}</span><strong>${formatMoney(lineTotal)}</strong></span>
@@ -1392,6 +1484,7 @@ async function renderCart() {
     orangeSyncCartTabCount();
     orangeRenderCheckoutMiniSummary();
     orangeSyncAmendModeBanner();
+    void orangeHydrateCartVariantDisplayLang(getCart());
 }
 
 function clampCartLineQty(idx, rawQty) {

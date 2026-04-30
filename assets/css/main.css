@@ -1403,6 +1403,17 @@ body.storefront .product-gallery__img {
     border-color: transparent;
 }
 
+.chip-text {
+    display: inline;
+}
+
+.chip-text--pattern {
+    margin-inline-start: 0.35rem;
+    font-size: 0.88em;
+    font-weight: 500;
+    opacity: 0.9;
+}
+
 .qty-control {
     display: inline-flex;
     align-items: center;

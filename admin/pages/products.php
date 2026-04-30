@@ -925,11 +925,24 @@ async function loadProductForEdit(id) {
         document.getElementById('size_family_id').value = p.size_family_id ? String(p.size_family_id) : '';
         document.getElementById('sizing_guide_scope').value = p.sizing_guide_scope || 'none';
         document.getElementById('colorwaysBox').innerHTML = '';
-        document.getElementById('variantsBox').innerHTML =
-            <?php echo json_encode('<p class="admin-variants-edit-note">المتغيرات والمخزون الحالي: من صفحة <a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8') . '">المستودع / المخزون</a>.</p>', JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+        document.getElementById('variantsBox').innerHTML = '';
+        const vm = Array.isArray(p.variant_matrix_rows) ? p.variant_matrix_rows : [];
         window.PRODUCT_EXTRA_IMAGES = extrasEarly;
         renderGalleryUploadList();
         onHasFlagsChange();
+        buildColorwaysForEditFromVm(vm);
+        const needMatrix =
+            parseInt(p.has_colors, 10) === 1 ||
+            parseInt(p.has_sizes, 10) === 1 ||
+            (vm && vm.length > 0);
+        if (needMatrix) {
+            generateVariants();
+            applyVariantStocksFromVm(vm);
+        }
+        if (needMatrix && !document.querySelectorAll('#variantsBox tbody tr').length) {
+            document.getElementById('variantsBox').innerHTML =
+                '<p class="admin-variants-edit-note">لم تُستخرج المتغيرات — راجع الشاشة ثم استخدم «توليد المتغيرات» وحفظ.</p>';
+        }
         const sortRO = document.getElementById('product_sort_order');
         if (sortRO) {
             sortRO.readOnly = true;
@@ -1105,6 +1118,81 @@ function addColorwayRow() {
     box.appendChild(div);
 }
 
+function adminVariantRowStockKey(r) {
+    if (!r || typeof r !== 'object') {
+        return '';
+    }
+    const a = [
+        parseInt(r.primary_color_id, 10) || 0,
+        parseInt(r.secondary_color_id, 10) || 0,
+        parseInt(r.primary_pattern_id, 10) || 0,
+        parseInt(r.secondary_pattern_id, 10) || 0,
+        parseInt(r.size_family_size_id, 10) || 0
+    ];
+    return a.join(':');
+}
+
+function adminVariantTrStockKey(tr) {
+    if (!tr) {
+        return '';
+    }
+    const gv = (sel) => parseInt((tr.querySelector(sel) && tr.querySelector(sel).value) || '0', 10) || 0;
+    return [gv('.v-p'), gv('.v-s'), gv('.v-pp'), gv('.v-sp'), gv('.v-zid')].join(':');
+}
+
+function buildColorwaysForEditFromVm(vm) {
+    const hc = document.getElementById('has_colors').value === '1';
+    if (!hc) {
+        return;
+    }
+    const box = document.getElementById('colorwaysBox');
+    box.innerHTML = '';
+    const seen = new Set();
+    (vm || []).forEach((r) => {
+        const k = [r.primary_color_id || 0, r.secondary_color_id || 0, r.primary_pattern_id || 0, r.secondary_pattern_id || 0].join(':');
+        if (seen.has(k)) {
+            return;
+        }
+        seen.add(k);
+        addColorwayRow();
+        const rows = box.querySelectorAll('.cw-row');
+        const last = rows[rows.length - 1];
+        if (!last) {
+            return;
+        }
+        const pEl = last.querySelector('.cw-p');
+        const sEl = last.querySelector('.cw-s');
+        const ppEl = last.querySelector('.cw-pp');
+        const spEl = last.querySelector('.cw-sp');
+        if (pEl) {
+            pEl.value = String(parseInt(r.primary_color_id, 10) || 0);
+        }
+        if (sEl) {
+            sEl.value = String(parseInt(r.secondary_color_id, 10) || 0);
+        }
+        if (ppEl) {
+            ppEl.value = String(parseInt(r.primary_pattern_id, 10) || 0);
+        }
+        if (spEl) {
+            spEl.value = String(parseInt(r.secondary_pattern_id, 10) || 0);
+        }
+    });
+}
+
+function applyVariantStocksFromVm(vm) {
+    const map = {};
+    (vm || []).forEach((r) => {
+        map[adminVariantRowStockKey(r)] = parseInt(r.stock_quantity, 10) || 0;
+    });
+    document.querySelectorAll('#variantsBox tbody tr').forEach((tr) => {
+        const k = adminVariantTrStockKey(tr);
+        const inp = tr.querySelector('.v-stock');
+        if (inp && Object.prototype.hasOwnProperty.call(map, k)) {
+            inp.value = String(map[k]);
+        }
+    });
+}
+
 function sizesForFamily(fid) {
     const fam = (window.ORANGE_FAMILIES || []).find(f => String(f.id) === String(fid));
     return fam && fam.sizes ? fam.sizes : [];
@@ -1276,6 +1364,24 @@ async function saveProduct() {
             payload.subcategory_id = sv === '' ? null : parseInt(sv, 10);
         }
         payload.extra_images = window.PRODUCT_EXTRA_IMAGES || [];
+        const hsUp = parseInt(document.getElementById('has_sizes').value, 10) === 1;
+        const hcUp = parseInt(document.getElementById('has_colors').value, 10) === 1;
+        const varRowsUp = Array.from(document.querySelectorAll('#variantsBox tbody tr'));
+        if ((hsUp || hcUp) && !varRowsUp.length) {
+            productFormShowTab('variants');
+            alert('ولّد المتغيرات أو حمّل المصفوفة قبل التحديث');
+            return;
+        }
+        if (varRowsUp.length) {
+            payload.variants = varRowsUp.map((tr) => ({
+                primary_color_id: parseInt(tr.querySelector('.v-p').value, 10) || 0,
+                secondary_color_id: parseInt(tr.querySelector('.v-s').value, 10) || 0,
+                primary_pattern_id: parseInt((tr.querySelector('.v-pp') && tr.querySelector('.v-pp').value) || '0', 10) || 0,
+                secondary_pattern_id: parseInt((tr.querySelector('.v-sp') && tr.querySelector('.v-sp').value) || '0', 10) || 0,
+                size_family_size_id: parseInt(tr.querySelector('.v-zid').value, 10) || 0,
+                stock_quantity: parseInt(tr.querySelector('.v-stock').value || '0', 10)
+            }));
+        }
         const res = await postJSON('/admin/api/products/update.php', payload);
         alert(res.message || (res.success ? 'تم التحديث' : 'فشل'));
         if (res.success) {

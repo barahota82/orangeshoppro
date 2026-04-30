@@ -27,13 +27,24 @@ try {
         }
 
         $variantStmt = $pdo->prepare("
-            SELECT id, product_id, size, color, stock_quantity
-            FROM product_variants
-            WHERE product_id = ?
-            ORDER BY id ASC
+            SELECT v.id AS variant_id,
+                   v.product_colorway_id,
+                   v.size_family_size_id,
+                   v.stock_quantity,
+                   COALESCE(cw.primary_color_id, 0) AS primary_color_id,
+                   COALESCE(cw.secondary_color_id, 0) AS secondary_color_id,
+                   COALESCE(cw.primary_pattern_id, 0) AS primary_pattern_id,
+                   COALESCE(cw.secondary_pattern_id, 0) AS secondary_pattern_id
+            FROM product_variants v
+            LEFT JOIN product_colorways cw ON cw.id = v.product_colorway_id
+            WHERE v.product_id = ?
+            ORDER BY primary_color_id ASC, secondary_color_id ASC, primary_pattern_id ASC, secondary_pattern_id ASC,
+                     v.size_family_size_id ASC, v.id ASC
         ");
         $variantStmt->execute([$productId]);
         $product['variants'] = $variantStmt->fetchAll();
+        /** @var list<array<string,mixed>> */
+        $product['variant_matrix_rows'] = $product['variants'];
 
         $imgStmt = $pdo->prepare(
             'SELECT image_path FROM product_images WHERE product_id = ? ORDER BY id ASC'

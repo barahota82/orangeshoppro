@@ -6,53 +6,9 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/product_channels.php';
 require_once __DIR__ . '/../../../includes/catalog_labels.php';
+require_once __DIR__ . '/../../../includes/product_variants_write.php';
 require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
 require_admin_api();
-
-/**
- * @param array<int,array<string,mixed>> $variantRows
- * @return array<string,int>
- */
-function orange_product_create_colorway_map(PDO $pdo, int $productId, array $variantRows, bool $hasColors): array
-{
-    $map = [];
-    $sort = 0;
-    $ins = $pdo->prepare(
-        'INSERT INTO product_colorways (product_id, primary_color_id, secondary_color_id, primary_pattern_id, secondary_pattern_id, sort_order, is_active)
-         VALUES (?,?,?,?,?,?,1)'
-    );
-
-    foreach ($variantRows as $row) {
-        $p = isset($row['primary_color_id']) ? (int) $row['primary_color_id'] : 0;
-        $s = isset($row['secondary_color_id']) ? (int) $row['secondary_color_id'] : 0;
-        $pp = isset($row['primary_pattern_id']) ? (int) $row['primary_pattern_id'] : 0;
-        $sp = isset($row['secondary_pattern_id']) ? (int) $row['secondary_pattern_id'] : 0;
-        if (!$hasColors) {
-            $key = '-';
-            if (!isset($map[$key])) {
-                $ins->execute([$productId, null, null, null, null, $sort++]);
-                $map[$key] = (int) $pdo->lastInsertId();
-            }
-            continue;
-        }
-        $p = $p > 0 ? $p : null;
-        $s = $s > 0 ? $s : null;
-        $pp = $pp > 0 ? $pp : null;
-        $sp = $sp > 0 ? $sp : null;
-        $key = ($p ?? 0) . ':' . ($s ?? 0) . ':' . ($pp ?? 0) . ':' . ($sp ?? 0);
-        if (!isset($map[$key])) {
-            $ins->execute([$productId, $p, $s, $pp, $sp, $sort++]);
-            $map[$key] = (int) $pdo->lastInsertId();
-        }
-    }
-
-    if (!$hasColors && !isset($map['-'])) {
-        $ins->execute([$productId, null, null, null, null, 0]);
-        $map['-'] = (int) $pdo->lastInsertId();
-    }
-
-    return $map;
-}
 
 try {
     $pdo = db();
@@ -226,7 +182,7 @@ try {
 
     $productId = (int)$pdo->lastInsertId();
 
-    $cwMap = orange_product_create_colorway_map($pdo, $productId, $variantsIn, $hasColors);
+    $cwMap = orange_product_ensure_colorways($pdo, $productId, $variantsIn, $hasColors);
 
     $variantStmt = $pdo->prepare(
         'INSERT INTO product_variants (
@@ -283,7 +239,8 @@ try {
             $hasColors ? $p : null,
             $hasColors ? $s : null,
             $hasColors ? $pp : null,
-            $hasColors ? $sp : null
+            $hasColors ? $sp : null,
+            'ar'
         );
         $sizeLabel = orange_size_display_label($sizeRow);
 
