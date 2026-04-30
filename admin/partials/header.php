@@ -9,8 +9,11 @@ $orangeAdminPage = isset($page) ? (string) $page : 'dashboard';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
-$pdoNav = db();
-orange_catalog_ensure_schema($pdoNav);
+/** @var ?\PDO $pdo — يضبطه admin/index.php قبل تضمين هذا الملف؛ تجنّب استدعاء ensure_schema مرتين لكل صفحة أدمن */
+$pdoNav = (isset($pdo) && $pdo instanceof PDO) ? $pdo : db();
+if (!isset($pdo) || !$pdo instanceof PDO) {
+    orange_catalog_ensure_schema($pdoNav);
+}
 
 $orangeAdminCompanyTitle = '';
 try {
