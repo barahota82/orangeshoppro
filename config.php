@@ -1147,12 +1147,15 @@ function storefront_product_display_description(array $product): string
 }
 
 /**
- * تسمية صف مقاس في جدول عائلة المقاسات حسب لغة الواجهة (أعمدة label_ar / label_en).
+ * تسمية صف مقاس في جدول عائلة المقاسات حسب لغة الواجهة (label_ar/en/fil/hi عند توفر الأعمدة).
  *
  * @param array<string,mixed> $row
  */
 function storefront_size_chart_cell_label(array $row): string
 {
+    if (function_exists('orange_size_display_label')) {
+        return orange_size_display_label($row, current_lang());
+    }
     $lang = current_lang();
     $ar = trim((string) ($row['label_ar'] ?? ''));
     $en = trim((string) ($row['label_en'] ?? ''));

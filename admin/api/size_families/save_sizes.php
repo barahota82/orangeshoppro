@@ -75,21 +75,39 @@ try {
 
     $keepIds = [];
     $hasFoot = orange_table_has_column($pdo, 'size_family_sizes', 'foot_length_cm');
+    $hasSfLang = orange_table_has_column($pdo, 'size_family_sizes', 'label_fil')
+        && orange_table_has_column($pdo, 'size_family_sizes', 'label_hi');
 
-    $ins = $hasFoot
+    $ins = $hasFoot && $hasSfLang
+        ? $pdo->prepare(
+            'INSERT INTO size_family_sizes (size_family_id, label_ar, label_en, label_fil, label_hi, sort_order, foot_length_cm, is_active) VALUES (?,?,?,?,?,?,?,1)'
+        )
+        : ($hasFoot
         ? $pdo->prepare(
             'INSERT INTO size_family_sizes (size_family_id, label_ar, label_en, sort_order, foot_length_cm, is_active) VALUES (?,?,?,?,?,1)'
         )
-        : $pdo->prepare(
-            'INSERT INTO size_family_sizes (size_family_id, label_ar, label_en, sort_order, is_active) VALUES (?,?,?,?,1)'
-        );
-    $upd = $hasFoot
+        : ($hasSfLang
+            ? $pdo->prepare(
+                'INSERT INTO size_family_sizes (size_family_id, label_ar, label_en, label_fil, label_hi, sort_order, is_active) VALUES (?,?,?,?,?,?,1)'
+            )
+            : $pdo->prepare(
+                'INSERT INTO size_family_sizes (size_family_id, label_ar, label_en, sort_order, is_active) VALUES (?,?,?,?,1)'
+            )));
+    $upd = $hasFoot && $hasSfLang
+        ? $pdo->prepare(
+            'UPDATE size_family_sizes SET label_ar=?, label_en=?, label_fil=?, label_hi=?, sort_order=?, foot_length_cm=? WHERE id=? AND size_family_id=? LIMIT 1'
+        )
+        : ($hasFoot
         ? $pdo->prepare(
             'UPDATE size_family_sizes SET label_ar=?, label_en=?, sort_order=?, foot_length_cm=? WHERE id=? AND size_family_id=? LIMIT 1'
         )
-        : $pdo->prepare(
-            'UPDATE size_family_sizes SET label_ar=?, label_en=?, sort_order=? WHERE id=? AND size_family_id=? LIMIT 1'
-        );
+        : ($hasSfLang
+            ? $pdo->prepare(
+                'UPDATE size_family_sizes SET label_ar=?, label_en=?, label_fil=?, label_hi=?, sort_order=? WHERE id=? AND size_family_id=? LIMIT 1'
+            )
+            : $pdo->prepare(
+                'UPDATE size_family_sizes SET label_ar=?, label_en=?, sort_order=? WHERE id=? AND size_family_id=? LIMIT 1'
+            )));
 
     foreach ($rows as $i => $row) {
         if (!is_array($row)) {
@@ -98,6 +116,8 @@ try {
         $sid = (int)($row['id'] ?? 0);
         $la = trim((string)($row['label_ar'] ?? ''));
         $le = trim((string)($row['label_en'] ?? ''));
+        $lf = trim((string)($row['label_fil'] ?? ''));
+        $lh = trim((string)($row['label_hi'] ?? ''));
         $so = (int)($row['sort_order'] ?? $i);
         $footRaw = trim((string)($row['foot_length_cm'] ?? ''));
         $foot = null;
@@ -111,15 +131,23 @@ try {
             continue;
         }
         if ($sid > 0) {
-            if ($hasFoot) {
+            if ($hasFoot && $hasSfLang) {
+                $upd->execute([$la, $le, $lf, $lh, $so, $foot, $sid, $familyId]);
+            } elseif ($hasFoot) {
                 $upd->execute([$la, $le, $so, $foot, $sid, $familyId]);
+            } elseif ($hasSfLang) {
+                $upd->execute([$la, $le, $lf, $lh, $so, $sid, $familyId]);
             } else {
                 $upd->execute([$la, $le, $so, $sid, $familyId]);
             }
             $keepIds[] = $sid;
         } else {
-            if ($hasFoot) {
+            if ($hasFoot && $hasSfLang) {
+                $ins->execute([$familyId, $la, $le, $lf, $lh, $so, $foot]);
+            } elseif ($hasFoot) {
                 $ins->execute([$familyId, $la, $le, $so, $foot]);
+            } elseif ($hasSfLang) {
+                $ins->execute([$familyId, $la, $le, $lf, $lh, $so]);
             } else {
                 $ins->execute([$familyId, $la, $le, $so]);
             }

@@ -230,11 +230,25 @@ function orange_size_display_label(?array $sizeRow, string $lang = 'ar'): string
     if (!$sizeRow) {
         return '';
     }
-    $a = trim((string)($sizeRow['label_ar'] ?? ''));
-    $e = trim((string)($sizeRow['label_en'] ?? ''));
-    if (strtolower($lang) === 'en') {
-        return $e !== '' ? $e : $a;
-    }
+    $a = trim((string) ($sizeRow['label_ar'] ?? ''));
+    $e = trim((string) ($sizeRow['label_en'] ?? ''));
+    $f = trim((string) ($sizeRow['label_fil'] ?? ''));
+    $h = trim((string) ($sizeRow['label_hi'] ?? ''));
+    $lang = strtolower($lang);
+    $pick = static function (string $primary, string $fb1, string $fb2 = '', string $fb3 = ''): string {
+        foreach ([$primary, $fb1, $fb2, $fb3] as $x) {
+            if ($x !== '') {
+                return $x;
+            }
+        }
 
-    return $a !== '' ? $a : $e;
+        return '';
+    };
+
+    return match ($lang) {
+        'en' => $pick($e, $a, $f, $h),
+        'fil' => $pick($f, $e, $a, $h),
+        'hi' => $pick($h, $e, $a, $f),
+        default => $pick($a, $e, $f, $h),
+    };
 }

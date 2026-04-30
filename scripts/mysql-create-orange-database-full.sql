@@ -139,6 +139,8 @@ CREATE TABLE `size_family_sizes` (
   `size_family_id` int NOT NULL,
   `label_ar` varchar(191) NOT NULL DEFAULT '',
   `label_en` varchar(191) NOT NULL DEFAULT '',
+  `label_fil` varchar(191) NOT NULL DEFAULT '',
+  `label_hi` varchar(191) NOT NULL DEFAULT '',
   `sort_order` int NOT NULL DEFAULT 0,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,

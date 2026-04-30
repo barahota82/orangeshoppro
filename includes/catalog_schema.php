@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 11);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 12);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -662,6 +662,8 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             size_family_id INT NOT NULL,
             label_ar VARCHAR(191) NOT NULL DEFAULT \'\',
             label_en VARCHAR(191) NOT NULL DEFAULT \'\',
+            label_fil VARCHAR(191) NOT NULL DEFAULT \'\',
+            label_hi VARCHAR(191) NOT NULL DEFAULT \'\',
             sort_order INT NOT NULL DEFAULT 0,
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
@@ -813,7 +815,16 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             }
         }
     }
-    if (!orange_table_has_column($pdo, 'size_family_sizes', 'foot_length_cm')) {
+    if (orange_table_exists($pdo, 'size_family_sizes')) {
+        if (!orange_table_has_column($pdo, 'size_family_sizes', 'label_fil')) {
+            orange_catalog_safe_exec($pdo, 'ALTER TABLE size_family_sizes ADD COLUMN label_fil VARCHAR(191) NOT NULL DEFAULT \'\' AFTER label_en');
+        }
+        if (!orange_table_has_column($pdo, 'size_family_sizes', 'label_hi')) {
+            orange_catalog_safe_exec($pdo, 'ALTER TABLE size_family_sizes ADD COLUMN label_hi VARCHAR(191) NOT NULL DEFAULT \'\' AFTER label_fil');
+        }
+    }
+
+    if (orange_table_exists($pdo, 'size_family_sizes') && !orange_table_has_column($pdo, 'size_family_sizes', 'foot_length_cm')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE size_family_sizes ADD COLUMN foot_length_cm DECIMAL(6,2) NULL');
     }
     if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'name_en')) {

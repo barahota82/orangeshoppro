@@ -64,7 +64,8 @@ $images = $imagesStmt->fetchAll();
 $variantsStmt = $pdo->prepare(
     "SELECT v.*,
         cw.primary_color_id, cw.secondary_color_id, cw.primary_pattern_id, cw.secondary_pattern_id,
-        sfs.label_ar AS sfs_la, sfs.label_en AS sfs_le
+        sfs.label_ar AS sfs_la, sfs.label_en AS sfs_le,
+        sfs.label_fil AS sfs_lf, sfs.label_hi AS sfs_lh
      FROM product_variants v
      LEFT JOIN product_colorways cw ON cw.id = v.product_colorway_id
      LEFT JOIN size_family_sizes sfs ON sfs.id = v.size_family_size_id
@@ -96,6 +97,12 @@ $sfId = isset($product['size_family_id']) ? (int) $product['size_family_id'] : 0
 if ($sfId > 0 && orange_table_exists($pdo, 'size_family_sizes')) {
     $hasFootCol = orange_table_has_column($pdo, 'size_family_sizes', 'foot_length_cm');
     $cols = 'label_ar, label_en';
+    if (
+        orange_table_has_column($pdo, 'size_family_sizes', 'label_fil')
+        && orange_table_has_column($pdo, 'size_family_sizes', 'label_hi')
+    ) {
+        $cols .= ', label_fil, label_hi';
+    }
     if ($hasFootCol) {
         $cols .= ', foot_length_cm';
     }
@@ -150,10 +157,17 @@ foreach ($variants as $v) {
         $sk = trim((string)($v['size'] ?? ''));
         if ($sk !== '' && !isset($sizeChipLabel[$sk])) {
             $szRow = null;
-            if (isset($v['sfs_la']) || isset($v['sfs_le'])) {
+            if (
+                isset($v['sfs_la'])
+                || isset($v['sfs_le'])
+                || (isset($v['sfs_lf']) && trim((string) $v['sfs_lf']) !== '')
+                || (isset($v['sfs_lh']) && trim((string) $v['sfs_lh']) !== '')
+            ) {
                 $szRow = [
                     'label_ar' => (string) ($v['sfs_la'] ?? ''),
                     'label_en' => (string) ($v['sfs_le'] ?? ''),
+                    'label_fil' => (string) ($v['sfs_lf'] ?? ''),
+                    'label_hi' => (string) ($v['sfs_lh'] ?? ''),
                 ];
             }
             $sizeChipLabel[$sk] = $szRow ? orange_size_display_label($szRow, $lang) : $sk;

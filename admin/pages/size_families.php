@@ -291,14 +291,14 @@ function loadSizesEditor() {
         return;
     }
     var rows = ORANGE_SIZES_BY_FAMILY[String(fid)] || ORANGE_SIZES_BY_FAMILY[fid] || [];
-    var html = '<div class="table-wrap"><table><thead><tr><th>id</th><th>عربي</th><th>EN</th><th>طول القدم (سم)</th><th>ترتيب</th></tr></thead><tbody>';
+    var html = '<div class="table-wrap"><table><thead><tr><th>id</th><th>عربي</th><th>EN</th><th>Fil</th><th>Hi</th><th>طول القدم (سم)</th><th>ترتيب</th></tr></thead><tbody>';
     if (!rows.length) {
-        html += '<tr class="size-row" data-new="1"><td>0</td><td><input type="text" class="s-la"></td><td><input type="text" class="s-le"></td><td><input type="text" class="s-fl" placeholder="مثال 24.5"></td><td><input type="number" class="s-so" value="0"></td></tr>';
+        html += '<tr class="size-row" data-new="1"><td>0</td><td><input type="text" class="s-la"></td><td><input type="text" class="s-le"></td><td><input type="text" class="s-lf" placeholder="Fil"></td><td><input type="text" class="s-lh" placeholder="Hi"></td><td><input type="text" class="s-fl" placeholder="مثال 24.5"></td><td><input type="number" class="s-so" value="0"></td></tr>';
     } else {
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
             var fl = (r.foot_length_cm != null && r.foot_length_cm !== '') ? String(r.foot_length_cm) : '';
-            html += '<tr class="size-row" data-id="' + r.id + '"><td>' + r.id + '</td><td><input type="text" class="s-la" value="' + escapeAttr(r.label_ar) + '"></td><td><input type="text" class="s-le" value="' + escapeAttr(r.label_en) + '"></td><td><input type="text" class="s-fl" placeholder="اختياري" value="' + escapeAttr(fl) + '"></td><td><input type="number" class="s-so" value="' + (Number(r.sort_order) || 0) + '"></td></tr>';
+            html += '<tr class="size-row" data-id="' + r.id + '"><td>' + r.id + '</td><td><input type="text" class="s-la" value="' + escapeAttr(r.label_ar) + '"></td><td><input type="text" class="s-le" value="' + escapeAttr(r.label_en) + '"></td><td><input type="text" class="s-lf" placeholder="Fil" value="' + escapeAttr(r.label_fil) + '"></td><td><input type="text" class="s-lh" placeholder="Hi" value="' + escapeAttr(r.label_hi) + '"></td><td><input type="text" class="s-fl" placeholder="اختياري" value="' + escapeAttr(fl) + '"></td><td><input type="number" class="s-so" value="' + (Number(r.sort_order) || 0) + '"></td></tr>';
         }
     }
     html += '</tbody></table></div>';
@@ -320,7 +320,7 @@ function addSizeRow() {
     var tr = document.createElement('tr');
     tr.className = 'size-row';
     tr.setAttribute('data-new', '1');
-    tr.innerHTML = '<td>0</td><td><input type="text" class="s-la"></td><td><input type="text" class="s-le"></td><td><input type="text" class="s-fl" placeholder="اختياري"></td><td><input type="number" class="s-so" value="0"></td>';
+    tr.innerHTML = '<td>0</td><td><input type="text" class="s-la"></td><td><input type="text" class="s-le"></td><td><input type="text" class="s-lf" placeholder="Fil"></td><td><input type="text" class="s-lh" placeholder="Hi"></td><td><input type="text" class="s-fl" placeholder="اختياري"></td><td><input type="number" class="s-so" value="0"></td>';
     tbody.appendChild(tr);
 }
 
@@ -337,15 +337,19 @@ async function saveSizesForFamily() {
         var id = parseInt(tr.getAttribute('data-id') || '0', 10) || 0;
         var laEl = tr.querySelector('.s-la');
         var leEl = tr.querySelector('.s-le');
+        var lfEl = tr.querySelector('.s-lf');
+        var lhEl = tr.querySelector('.s-lh');
         var flEl = tr.querySelector('.s-fl');
         var soEl = tr.querySelector('.s-so');
         var la = laEl ? String(laEl.value || '').trim() : '';
         var le = leEl ? String(leEl.value || '').trim() : '';
+        var lf = lfEl ? String(lfEl.value || '').trim() : '';
+        var lh = lhEl ? String(lhEl.value || '').trim() : '';
         var fl = flEl ? String(flEl.value || '').trim() : '';
         var so = soEl ? parseInt(soEl.value || String(idx), 10) : idx;
         if (isNaN(so)) so = idx;
         if (la === '' && le === '') continue;
-        var row = { id: id, label_ar: la, label_en: le, sort_order: so };
+        var row = { id: id, label_ar: la, label_en: le, label_fil: lf, label_hi: lh, sort_order: so };
         if (fl !== '') row.foot_length_cm = fl;
         rows.push(row);
     }

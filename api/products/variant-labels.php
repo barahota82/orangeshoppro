@@ -43,7 +43,8 @@ try {
     $stmt = $pdo->prepare(
         "SELECT v.id, v.product_id, v.size, v.size_family_size_id, v.stock_quantity, v.color,
                 cw.primary_color_id, cw.secondary_color_id, cw.primary_pattern_id, cw.secondary_pattern_id,
-                sfs.label_ar AS sfs_la, sfs.label_en AS sfs_le
+                sfs.label_ar AS sfs_la, sfs.label_en AS sfs_le,
+                sfs.label_fil AS sfs_lf, sfs.label_hi AS sfs_lh
          FROM product_variants v
          LEFT JOIN product_colorways cw ON cw.id = v.product_colorway_id
          LEFT JOIN size_family_sizes sfs ON sfs.id = v.size_family_size_id
@@ -79,8 +80,13 @@ try {
             }
         }
         $szLbl = orange_size_display_label(
-            isset($rw['sfs_la']) || isset($rw['sfs_le'])
-                ? ['label_ar' => (string) ($rw['sfs_la'] ?? ''), 'label_en' => (string) ($rw['sfs_le'] ?? '')]
+            isset($rw['sfs_la']) || isset($rw['sfs_le']) || isset($rw['sfs_lf']) || isset($rw['sfs_lh'])
+                ? [
+                    'label_ar' => (string) ($rw['sfs_la'] ?? ''),
+                    'label_en' => (string) ($rw['sfs_le'] ?? ''),
+                    'label_fil' => (string) ($rw['sfs_lf'] ?? ''),
+                    'label_hi' => (string) ($rw['sfs_lh'] ?? ''),
+                ]
                 : null,
             $lang
         );
