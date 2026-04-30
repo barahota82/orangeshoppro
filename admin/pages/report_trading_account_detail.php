@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * منطق تقرير «قائمة حسابات المتاجرة 2» (slug: report_trading_account).
+ * منطق تقرير «قائمة حسابات المتاجرة» (slug: report_trading_account).
  * تُحمَّل من report_trading_account.php؛ $page يضبطه admin/index.php.
  */
 
@@ -19,7 +19,7 @@ $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
 $taPageQuery = 'report_trading_account';
-$taHeadingAr = 'قائمة حسابات المتاجرة 2';
+$taHeadingAr = 'قائمة حسابات المتاجرة';
 
 $normalizeYm = static function (string $raw): ?string {
     $raw = trim($raw);
