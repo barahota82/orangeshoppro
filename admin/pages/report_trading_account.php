@@ -7,7 +7,6 @@ require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/date_format.php';
-require_once __DIR__ . '/../../includes/financial_report_breakdown.php';
 require_once __DIR__ . '/../../includes/accounting_pl_statement_rows.php';
 
 $pdo = db();
