@@ -239,7 +239,6 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 ['page' => 'partner_reports', 'href' => '/admin/index.php?page=partner_reports#partner-balances-customers', 'label' => 'أرصدة العملاء (ذمم)', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'partner_reports', 'href' => '/admin/index.php?page=partner_reports#partner-balances-suppliers', 'label' => 'أرصدة الموردين (ذمم)', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'report_income_statement', 'href' => '/admin/index.php?page=report_income_statement', 'label' => 'أرباح وخسائر', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'report_trading_account_basic', 'href' => '/admin/index.php?page=report_trading_account_basic', 'label' => 'قائمة حسابات المتاجرة', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'report_trading_account', 'href' => '/admin/index.php?page=report_trading_account', 'label' => 'قائمة حسابات المتاجرة 2', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'report_pl_monthly', 'href' => '/admin/index.php?page=report_pl_monthly', 'label' => 'قائمة إيرادات ومصروفات شهرية', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'report_pl_compare_years', 'href' => '/admin/index.php?page=report_pl_compare_years', 'label' => 'أرباح وخسائر مقارنة بين السنوات', 'class' => 'admin-nav-sub', 'sub' => true],

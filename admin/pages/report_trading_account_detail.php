@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 /**
- * منطق تقرير «قائمة حسابات المتاجرة» (slug: report_trading_account_basic).
- * تُحمَّل من report_trading_account_basic.php بعد ضبط $page.
+ * منطق تقرير «قائمة حسابات المتاجرة 2» (slug: report_trading_account).
+ * تُحمَّل من report_trading_account.php؛ $page يضبطه admin/index.php.
  */
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
@@ -18,9 +18,8 @@ require_once __DIR__ . '/../../includes/accounting_pl_statement_rows.php';
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
-$pNav = (string) ($page ?? '');
-$taPageQuery = ($pNav === 'report_trading_account_basic') ? 'report_trading_account_basic' : 'report_trading_account';
-$taHeadingAr = ($pNav === 'report_trading_account_basic') ? 'قائمة حسابات المتاجرة' : 'قائمة حسابات المتاجرة 2';
+$taPageQuery = 'report_trading_account';
+$taHeadingAr = 'قائمة حسابات المتاجرة 2';
 
 $normalizeYm = static function (string $raw): ?string {
     $raw = trim($raw);
