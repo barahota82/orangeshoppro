@@ -95,14 +95,29 @@ if (
 
 $accountsLeaf = orange_financial_report_leaf_accounts_with_mapping($pdo);
 
+$leafIdsForMap = [];
+foreach ($accountsLeaf as $al) {
+    $lid = (int) ($al['id'] ?? 0);
+    if ($lid > 0) {
+        $leafIdsForMap[] = $lid;
+    }
+}
+/* نفس مصدر خريطة الحساب في report_pl_monthly و financial_report — لا يُقتصر على account_type من صف الورقة فقط */
+$mapTradingById = orange_accounts_report_mapping_by_ids($pdo, $leafIdsForMap);
+
 /**
- * أسطر المتاجرة: تصنيف الحسابات عبر account_type المحفوظ ثم دور الشجرة؛ تجميع عناوين عبر سطر المرجع حيث وُجد.
+ * أسطر المتاجرة: تصنيف كـ report_pl_monthly / الملخص المالي (دلو P&amp;L + شجرة)؛
+ * لا نفلتر بـ report_section كشاشة أرباح وخسائر حتى لا تُسقَط إيرادات/تكم موسومة pnl أو غيرها؛
+ * نستبعد وسم balance_sheet فقط عندما يُصنَّف الحساب فعلاً في بند ميزانية بحسب الخريطة/الشجرة.
+ *
+ * @param array<int, array<string, mixed>> $mapTradingById
  *
  * @return list<array<string, mixed>>
  */
 $buildTradingSection = static function (
     PDO $pdo,
     array $accountsLeaf,
+    array $mapTradingById,
     array $tbRange,
     array $tbBefore,
     string $plClass
@@ -118,7 +133,7 @@ $buildTradingSection = static function (
         if ($aid <= 0) {
             continue;
         }
-        $bucket = orange_accounts_pnl_bucket_for_trading_row($pdo, $aid, orange_accounts_map_row_from_leaf_account_row($a));
+        $bucket = orange_accounts_pnl_bucket_for_trading_row($pdo, $aid, $mapTradingById[$aid] ?? null);
         if ($bucket !== $plClass) {
             continue;
         }
@@ -126,22 +141,9 @@ $buildTradingSection = static function (
             $sec = orange_accounts_normalize_report_section_value(
                 isset($a['report_section']) ? (string) $a['report_section'] : ''
             );
-            /*
-             * بعد سياسة التقارير v2 قد تُخزَّن قيم غير متوقعة في report_section؛ نُبقي التصفية خفيفة:
-             * — القيم الشائعة: trading / pnl / none؛ الفراغ يُقبل؛
-             * — balance_sheet أو cashflow على ورقة إيراد/تكم: نسمح إذا جذر الشجرة يطابق قطاع المتاجرة؛
-             * — أي نص آخر: نسمح إذا كان دور الشجرة يطابق revenue/cogs لهذا السطر (لا نُفرّغ الشاشة بسبب وسم قديم).
-             */
-            if ($sec !== '') {
-                $treeForSec = orange_accounts_account_pl_role($pdo, $aid);
-                $secOk = $sec === 'trading' || $sec === 'pnl' || $sec === 'none';
-                if (! $secOk && in_array($sec, ['balance_sheet', 'cashflow'], true)) {
-                    $secOk = ($treeForSec === $plClass);
-                }
-                if (! $secOk && $treeForSec === $plClass) {
-                    $secOk = true;
-                }
-                if (! $secOk) {
+            if ($sec === 'balance_sheet') {
+                $bsb = orange_accounts_bs_bucket_for_report($pdo, $aid, $mapTradingById[$aid] ?? null);
+                if ($bsb !== 'other') {
                     continue;
                 }
             }
@@ -203,8 +205,8 @@ $buildTradingSection = static function (
     return $out;
 };
 
-$revenueLines = $useVouchers ? $buildTradingSection($pdo, $accountsLeaf, $tbRange, $tbBefore, 'revenue') : [];
-$cogsLines = $useVouchers ? $buildTradingSection($pdo, $accountsLeaf, $tbRange, $tbBefore, 'cogs') : [];
+$revenueLines = $useVouchers ? $buildTradingSection($pdo, $accountsLeaf, $mapTradingById, $tbRange, $tbBefore, 'revenue') : [];
+$cogsLines = $useVouchers ? $buildTradingSection($pdo, $accountsLeaf, $mapTradingById, $tbRange, $tbBefore, 'cogs') : [];
 
 $sumOpen = static function (array $lines): float {
     $s = 0.0;
