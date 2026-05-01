@@ -25,7 +25,7 @@ if ($hasTable) {
 ?>
 <div class="page-title">
     <h1>سمات الكتالوج</h1>
-    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;">عرض قراءة فقط — يُخطَّط لمستقبل الفلترة والخصائص (قيم منتج من <code>product_attribute_values</code> حسب السياسة الهرمية).</p>
+    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;">عرض قراءة للتعريفات؛ <strong>قيم كل منتج</strong> تُحفظ من صفحة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=products'), ENT_QUOTES, 'UTF-8'); ?>">المنتجات</a> ضمن قسم «صفات الكتالوج» وفق المرحلة D في سياسة التصنيف الموحَّد.</p>
 </div>
 
 <div class="card">

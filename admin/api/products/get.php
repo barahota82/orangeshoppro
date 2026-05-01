@@ -65,6 +65,23 @@ try {
             }
         }
 
+        $product['catalog_attribute_values'] = [];
+        if (orange_table_exists($pdo, 'product_attribute_values') && orange_table_exists($pdo, 'catalog_attributes')) {
+            try {
+                $attrStmt = $pdo->prepare(
+                    'SELECT pav.catalog_attribute_id, pav.value_raw, ca.attribute_key, ca.label_ar, ca.input_kind
+                     FROM product_attribute_values pav
+                     INNER JOIN catalog_attributes ca ON ca.id = pav.catalog_attribute_id AND ca.is_active = 1
+                     WHERE pav.product_id = ?
+                     ORDER BY ca.sort_order ASC, ca.id ASC'
+                );
+                $attrStmt->execute([$productId]);
+                $product['catalog_attribute_values'] = $attrStmt->fetchAll(PDO::FETCH_ASSOC);
+            } catch (Throwable $e) {
+                $product['catalog_attribute_values'] = [];
+            }
+        }
+
         json_response(['success' => true, 'product' => $product]);
     }
 

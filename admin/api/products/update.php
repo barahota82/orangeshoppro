@@ -229,6 +229,10 @@ try {
         );
     }
 
+    if (array_key_exists('catalog_attribute_values', $data)) {
+        orange_catalog_save_product_attribute_values($pdo, $productId, $data['catalog_attribute_values']);
+    }
+
     $pdo->commit();
 
     orange_product_attach_all_active_channels($pdo, $productId);

@@ -102,8 +102,8 @@ function orange_catalog_resolve_product_classification(PDO $pdo, array $data): a
 }
 
 /**
- * هرم المقاس (مستوى 3): يطابق `size_families.size_scheme_key` مع `product_types.expected_size_scheme_key`
- * عند ضبط المتوقع على الورقة وفتح المقاسات على المنتج.
+ * هرم المقاس: يطابق مخطط العائلة مع `product_types.expected_size_scheme_key`؛
+ * وعند وجود متوقع يُلزم مستويات 1–2 على العائلة (commercial_kind_key، sizing_category_key).
  *
  * @return string|null رسالة خطأ عربية أو null إن كان التحقق غير لازم أو ناجحاً
  */
@@ -135,7 +135,9 @@ function orange_catalog_validate_size_family_matches_product_type(
     if (!orange_table_exists($pdo, 'size_families')) {
         return null;
     }
-    $fs = $pdo->prepare('SELECT size_scheme_key FROM size_families WHERE id = ? LIMIT 1');
+    $fs = $pdo->prepare(
+        'SELECT size_scheme_key, commercial_kind_key, sizing_category_key FROM size_families WHERE id = ? LIMIT 1'
+    );
     $fs->execute([$sizeFamilyId]);
     $row = $fs->fetch(PDO::FETCH_ASSOC);
     if (!is_array($row)) {
@@ -149,5 +151,73 @@ function orange_catalog_validate_size_family_matches_product_type(
         return 'مخطط المقاس في العائلة («' . $actual . '») لا يطابق المخطط المتوقع لنوع المنتج («' . $expected . '»). غيّر العائلة أو نوع المنتج أو حدّث المفاتيح في الأدمن.';
     }
 
+    $ck = trim((string) ($row['commercial_kind_key'] ?? ''));
+    $sk = trim((string) ($row['sizing_category_key'] ?? ''));
+    if ($ck === '' || $sk === '') {
+        return 'في وضع مخطط مقاس متوقّع على نوع المنتج يجب ملء النوع التجاري وفئة القياس (commercial_kind_key و sizing_category_key) على عائلة المقاسات لاستكمال هرَم المقاس — صفحة عائلات المقاسات.';
+    }
+
     return null;
+}
+
+/**
+ * استبدال قيم الصفات المخزَّنة للمنتج (صفات نشطة معرّفة في catalog_attributes فقط).
+ *
+ * @param list<array<string,mixed>>|mixed $incoming صفوف { catalog_attribute_id, value_raw } أو معادل
+ */
+function orange_catalog_save_product_attribute_values(PDO $pdo, int $productId, mixed $incoming): void
+{
+    if ($productId <= 0 || !orange_table_exists($pdo, 'product_attribute_values')) {
+        return;
+    }
+    if (!orange_table_exists($pdo, 'catalog_attributes')) {
+        return;
+    }
+
+    $pdo->prepare('DELETE FROM product_attribute_values WHERE product_id = ?')->execute([$productId]);
+
+    if (!is_array($incoming) || $incoming === []) {
+        return;
+    }
+
+    $validIds = [];
+    try {
+        $st = $pdo->query(
+            'SELECT id FROM catalog_attributes WHERE is_active = 1 AND id IS NOT NULL'
+        );
+        $cols = $st ? $st->fetchAll(PDO::FETCH_ASSOC) : [];
+        foreach (is_array($cols) ? $cols : [] as $r) {
+            $aid = isset($r['id']) ? (int) $r['id'] : 0;
+            if ($aid > 0) {
+                $validIds[$aid] = true;
+            }
+        }
+    } catch (Throwable $e) {
+        return;
+    }
+
+    $ins = $pdo->prepare(
+        'INSERT INTO product_attribute_values (product_id, catalog_attribute_id, value_raw) VALUES (?,?,?)'
+    );
+    $maxLen = 767;
+
+    foreach ($incoming as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $aid = isset($row['catalog_attribute_id']) ? (int) $row['catalog_attribute_id'] : 0;
+        if ($aid <= 0 || !isset($validIds[$aid])) {
+            continue;
+        }
+        $raw = trim((string) ($row['value_raw'] ?? ''));
+        if ($raw === '') {
+            continue;
+        }
+        if (function_exists('mb_strlen') && mb_strlen($raw, 'UTF-8') > $maxLen) {
+            $raw = mb_substr($raw, 0, $maxLen, 'UTF-8');
+        } elseif (strlen($raw) > $maxLen) {
+            $raw = substr($raw, 0, $maxLen);
+        }
+        $ins->execute([$productId, $aid, $raw]);
+    }
 }

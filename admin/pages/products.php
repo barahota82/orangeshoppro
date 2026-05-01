@@ -21,6 +21,17 @@ if (orange_table_exists($pdo, 'product_types')) {
     }
 }
 
+$catalogAttributesActive = [];
+if (orange_table_exists($pdo, 'catalog_attributes')) {
+    try {
+        $catalogAttributesActive = $pdo->query(
+            'SELECT id, attribute_key, label_ar, label_en, input_kind FROM catalog_attributes WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
+        )->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        $catalogAttributesActive = [];
+    }
+}
+
 $categorySelectRequiresAttr = $catalogNavUnified ? '' : ' required';
 
 $hasDepartmentsTable = false;
@@ -356,6 +367,28 @@ foreach ($categories as $cat) {
                 <label for="seo_meta_description_hi">Meta description (Hindi)</label>
                 <textarea id="seo_meta_description_hi" rows="2" lang="hi" dir="ltr"></textarea>
             </div>
+            <?php if ($catalogAttributesActive !== []): ?>
+            <?php $catAttrHref = htmlspecialchars(storefront_public_path('/admin/index.php?page=catalog_attributes'), ENT_QUOTES, 'UTF-8'); ?>
+            <div style="grid-column:1/-1;">
+                <h4 class="admin-product-subsection-title" style="margin:8px 0 4px;">صفات الكتالوج</h4>
+                <p style="margin:0 0 12px;color:#666;font-size:13px;line-height:1.45;">قيم اختيارية لكل سمة معرّفة ونشطة (مرحلة الموحَّد «الصفات»). المرجع: <a href="<?php echo $catAttrHref; ?>">جدول السمات</a> — الإدارة الكاملة للتعريفات بالقاعدة كما خطّط المشروع؛ هنا إدخال القيم على المنتج فقط.</p>
+                <?php foreach ($catalogAttributesActive as $cattr): ?>
+                    <?php
+                    $caid = (int) $cattr['id'];
+                    $clabel = htmlspecialchars(
+                        (string) (($cattr['label_ar'] ?: $cattr['label_en']) ?: ($cattr['attribute_key'] ?? '')),
+                        ENT_QUOTES,
+                        'UTF-8'
+                    );
+                    $ckey = htmlspecialchars((string) ($cattr['attribute_key'] ?? ''), ENT_QUOTES, 'UTF-8');
+                    ?>
+                    <div class="orange-product-pav-row" style="margin-bottom:10px;">
+                        <label style="display:block;margin-bottom:4px;font-weight:500;"><?php echo $clabel; ?> <small style="color:#94a3b8;font-weight:400;"><?php echo $ckey; ?></small></label>
+                        <input type="text" class="orange-pav-input" data-catalog-attribute-id="<?php echo $caid; ?>" maxlength="767" dir="auto" autocomplete="off" placeholder="" style="width:100%;max-width:520px;">
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
         </div>
         </div>
         </div>
@@ -612,7 +645,6 @@ function orangeGetSelectedProductTypeExpectedScheme() {
     return opt ? String(opt.getAttribute('data-expected-scheme') || '').trim() : '';
 }
 
-/** يصفّي عائلات المقاسات حسب مخطط نوع المنتج (هرم المقاس — مستوى المخطط). */
 function orangeApplySizeFamilySchemeFilter() {
     const famSel = document.getElementById('size_family_id');
     const hint = document.getElementById('size_family_scheme_hint');
@@ -667,6 +699,47 @@ function orangeApplySizeFamilySchemeFilter() {
                 '». العائلات غير المطابقة غير متاحة في القائمة — راجع صفحة عائلات المقاسات لمفتاح size_scheme_key.';
         }
     }
+}
+
+function orangeCollectCatalogAttributePayload() {
+    const out = [];
+    document.querySelectorAll('.orange-pav-input').forEach(function (inp) {
+        const id = parseInt(inp.getAttribute('data-catalog-attribute-id') || '0', 10) || 0;
+        if (id <= 0) {
+            return;
+        }
+        const v = String(inp.value || '').trim();
+        if (v === '') {
+            return;
+        }
+        out.push({ catalog_attribute_id: id, value_raw: v });
+    });
+    return out;
+}
+
+function orangeClearCatalogAttributeInputs() {
+    document.querySelectorAll('.orange-pav-input').forEach(function (inp) {
+        inp.value = '';
+    });
+}
+
+function orangeApplyCatalogAttributeValuesFromProduct(p) {
+    orangeClearCatalogAttributeInputs();
+    const pavs = p && Array.isArray(p.catalog_attribute_values) ? p.catalog_attribute_values : [];
+    const byId = {};
+    pavs.forEach(function (row) {
+        const id = parseInt(String(row.catalog_attribute_id || '0'), 10) || 0;
+        if (id <= 0) {
+            return;
+        }
+        byId[id] = row.value_raw != null ? String(row.value_raw) : '';
+    });
+    document.querySelectorAll('.orange-pav-input').forEach(function (inp) {
+        const id = parseInt(inp.getAttribute('data-catalog-attribute-id') || '0', 10) || 0;
+        if (id > 0 && Object.prototype.hasOwnProperty.call(byId, id)) {
+            inp.value = byId[id];
+        }
+    });
 }
 
 function adminEscAttr(s) {
@@ -990,6 +1063,7 @@ function resetProductForm() {
     document.getElementById('variantsBox').innerHTML = '';
     window.PRODUCT_EXTRA_IMAGES = [];
     renderGalleryUploadList();
+    orangeClearCatalogAttributeInputs();
     onHasFlagsChange();
     productFormShowTab('basic');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1091,6 +1165,7 @@ async function loadProductForEdit(id) {
         window.PRODUCT_EXTRA_IMAGES = extrasEarly;
         renderGalleryUploadList();
         onHasFlagsChange();
+        orangeApplyCatalogAttributeValuesFromProduct(p);
         buildColorwaysForEditFromVm(vm);
         const needMatrix =
             parseInt(p.has_colors, 10) === 1 ||
@@ -1575,6 +1650,7 @@ async function saveProduct() {
             payload.subcategory_id = sv === '' ? null : parseInt(sv, 10);
         }
         payload.extra_images = window.PRODUCT_EXTRA_IMAGES || [];
+        payload.catalog_attribute_values = orangeCollectCatalogAttributePayload();
         const hsUp = parseInt(document.getElementById('has_sizes').value, 10) === 1;
         const hcUp = parseInt(document.getElementById('has_colors').value, 10) === 1;
         const varRowsUp = Array.from(document.querySelectorAll('#variantsBox tbody tr'));
@@ -1661,6 +1737,8 @@ async function saveProduct() {
         const sv2 = subElNew.value.trim();
         payload.subcategory_id = sv2 === '' ? null : parseInt(sv2, 10);
     }
+
+    payload.catalog_attribute_values = orangeCollectCatalogAttributePayload();
 
     const res = await postJSON('/admin/api/products/create.php', payload);
     alert(res.message || (res.success ? 'تم الحفظ' : 'فشل'));
