@@ -496,6 +496,38 @@ CREATE TABLE `products` (
   CONSTRAINT `fk_products_product_type` FOREIGN KEY (`product_type_id`) REFERENCES `product_types` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+CREATE TABLE `catalog_attributes` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `attribute_key` varchar(80) NOT NULL DEFAULT '',
+  `label_ar` varchar(191) NOT NULL DEFAULT '',
+  `label_en` varchar(191) NOT NULL DEFAULT '',
+  `label_fil` varchar(191) NOT NULL DEFAULT '',
+  `label_hi` varchar(191) NOT NULL DEFAULT '',
+  `input_kind` varchar(24) NOT NULL DEFAULT 'text_short',
+  `is_filterable` tinyint(1) NOT NULL DEFAULT 0,
+  `sort_order` int NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_catalog_attributes_key` (`attribute_key`),
+  KEY `idx_catalog_attributes_sort` (`sort_order`),
+  KEY `idx_catalog_attributes_active` (`is_active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `product_attribute_values` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `catalog_attribute_id` int unsigned NOT NULL,
+  `value_raw` varchar(767) NOT NULL DEFAULT '',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_pav_prod_attr` (`product_id`,`catalog_attribute_id`),
+  KEY `idx_pav_product` (`product_id`),
+  KEY `idx_pav_attr` (`catalog_attribute_id`),
+  CONSTRAINT `fk_pav_catalog_attribute` FOREIGN KEY (`catalog_attribute_id`) REFERENCES `catalog_attributes` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_pav_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `product_colorways` (
   `id` int NOT NULL AUTO_INCREMENT,
   `product_id` int NOT NULL,

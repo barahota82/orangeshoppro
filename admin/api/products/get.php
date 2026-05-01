@@ -13,9 +13,15 @@ try {
 
     if ($productId > 0) {
         $stmt = $pdo->prepare("
-            SELECT p.*, c.name_ar AS category_name_ar, c.name_en AS category_name_en
+            SELECT p.*,
+                   c.name_ar AS category_name_ar, c.name_en AS category_name_en,
+                   pt.name_ar AS product_type_name_ar,
+                   pt.name_en AS product_type_name_en,
+                   pt.slug AS product_type_slug,
+                   pt.expected_size_scheme_key AS product_type_expected_size_scheme_key
             FROM products p
             LEFT JOIN categories c ON c.id = p.category_id
+            LEFT JOIN product_types pt ON pt.id = p.product_type_id
             WHERE p.id = ?
             LIMIT 1
         ");
@@ -63,9 +69,15 @@ try {
     }
 
     $rows = $pdo->query("
-        SELECT p.*, c.name_ar AS category_name_ar, c.name_en AS category_name_en
+        SELECT p.*,
+               c.name_ar AS category_name_ar, c.name_en AS category_name_en,
+               pt.name_ar AS product_type_name_ar,
+               pt.name_en AS product_type_name_en,
+               pt.slug AS product_type_slug,
+               pt.expected_size_scheme_key AS product_type_expected_size_scheme_key
         FROM products p
         LEFT JOIN categories c ON c.id = p.category_id
+        LEFT JOIN product_types pt ON pt.id = p.product_type_id
         ORDER BY p.sort_order ASC, p.id ASC
     ")->fetchAll();
 

@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 14);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 15);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -1106,6 +1106,50 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         );
         orange_schema_invalidate_column_check('products', 'product_type_id');
     }
+
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE TABLE IF NOT EXISTS catalog_attributes (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            attribute_key VARCHAR(80) NOT NULL DEFAULT \'\',
+            label_ar VARCHAR(191) NOT NULL DEFAULT \'\',
+            label_en VARCHAR(191) NOT NULL DEFAULT \'\',
+            label_fil VARCHAR(191) NOT NULL DEFAULT \'\',
+            label_hi VARCHAR(191) NOT NULL DEFAULT \'\',
+            input_kind VARCHAR(24) NOT NULL DEFAULT \'text_short\',
+            is_filterable TINYINT(1) NOT NULL DEFAULT 0,
+            sort_order INT NOT NULL DEFAULT 0,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_catalog_attributes_key (attribute_key),
+            KEY idx_catalog_attributes_sort (sort_order),
+            KEY idx_catalog_attributes_active (is_active)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+    orange_schema_invalidate_table_exists('catalog_attributes');
+
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE TABLE IF NOT EXISTS product_attribute_values (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            product_id INT NOT NULL,
+            catalog_attribute_id INT UNSIGNED NOT NULL,
+            value_raw VARCHAR(767) NOT NULL DEFAULT \'\',
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_pav_prod_attr (product_id, catalog_attribute_id),
+            KEY idx_pav_product (product_id),
+            KEY idx_pav_attr (catalog_attribute_id),
+            CONSTRAINT fk_pav_catalog_attribute
+                FOREIGN KEY (catalog_attribute_id) REFERENCES catalog_attributes(id)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT fk_pav_product
+                FOREIGN KEY (product_id) REFERENCES products(id)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+    orange_schema_invalidate_table_exists('product_attribute_values');
 
     static $productSubOrphansCleaned = false;
     if (

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/catalog_labels.php';
 require_once __DIR__ . '/../../../includes/product_variants_write.php';
 require_once __DIR__ . '/../../../includes/product_channels.php';
@@ -20,7 +21,7 @@ try {
         json_response(['success' => false, 'message' => 'معرف المنتج مطلوب'], 422);
     }
 
-    if (empty($data['name']) || empty($data['category_id']) || !isset($data['price']) || !isset($data['cost'])) {
+    if (empty($data['name']) || !isset($data['price']) || !isset($data['cost'])) {
         json_response(['success' => false, 'message' => 'البيانات الأساسية مطلوبة'], 422);
     }
 
@@ -29,6 +30,19 @@ try {
     $nameHi = trim((string)($data['name_hi'] ?? ''));
     if ($nameEn === '' || $nameFil === '' || $nameHi === '') {
         json_response(['success' => false, 'message' => 'أسماء المنتج بلغات English / Filipino / Hindi مطلوبة'], 422);
+    }
+
+    $class = orange_catalog_resolve_product_classification($pdo, $data);
+    if (isset($class['error'])) {
+        json_response(['success' => false, 'message' => $class['error']], 422);
+    }
+
+    $resolvedCategoryId = (int) $class['category_id'];
+    $subcategoryId = $class['subcategory_id'] ?? null;
+    $subcategoryId = $subcategoryId !== null ? (int) $subcategoryId : null;
+    $productTypeIdResolved = isset($class['product_type_id']) ? $class['product_type_id'] : null;
+    if ($productTypeIdResolved !== null) {
+        $productTypeIdResolved = (int) $productTypeIdResolved;
     }
 
     $nameAr = trim((string)$data['name']);
@@ -48,17 +62,8 @@ try {
     }
     $sortOrder = (int)($data['sort_order'] ?? 0);
 
-    [$subOk, $subcategoryId, $subErr] = orange_product_resolve_subcategory_id(
-        $pdo,
-        (int) $data['category_id'],
-        $data['subcategory_id'] ?? null
-    );
-    if (!$subOk) {
-        json_response(['success' => false, 'message' => $subErr], 422);
-    }
-
     $prodStmt = $pdo->prepare('SELECT id, name FROM products WHERE category_id = ?');
-    $prodStmt->execute([(int)$data['category_id']]);
+    $prodStmt->execute([$resolvedCategoryId]);
     $prodRows = $prodStmt->fetchAll(PDO::FETCH_ASSOC);
     if (orange_rows_normalized_arabic_conflict(is_array($prodRows) ? $prodRows : [], 'id', 'name', $nameAr, $productId)) {
         json_response(['success' => false, 'message' => orange_arabic_duplicate_blocked_message()], 409);
@@ -137,7 +142,7 @@ try {
             description = ?, description_en = ?, description_fil = ?, description_hi = ?,
             seo_meta_title_ar = ?, seo_meta_title_en = ?, seo_meta_title_fil = ?, seo_meta_title_hi = ?,
             seo_meta_description_ar = ?, seo_meta_description_en = ?, seo_meta_description_fil = ?, seo_meta_description_hi = ?,
-            category_id = ?, subcategory_id = ?, size_family_id = ?, sizing_guide_scope = ?, price = ?, cost = ?,
+            category_id = ?, subcategory_id = ?, product_type_id = ?, size_family_id = ?, sizing_guide_scope = ?, price = ?, cost = ?,
             main_image = ?, has_sizes = ?, has_colors = ?, sort_order = ?, item_code = ?, barcode = ?, is_active = ?, updated_at = NOW()
         WHERE id = ?
     ");
@@ -159,8 +164,9 @@ try {
         $seoDescEn,
         $seoDescFil,
         $seoDescHi,
-        (int)$data['category_id'],
+        $resolvedCategoryId,
         $subcategoryId,
+        $productTypeIdResolved,
         $sizeFamilyId,
         $scope,
         (float)$data['price'],

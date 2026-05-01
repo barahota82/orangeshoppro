@@ -39,6 +39,7 @@ function orange_admin_page_resource(string $page): string
         'color_dictionary' => 'catalog',
         'pattern_dictionary' => 'catalog',
         'size_families' => 'catalog',
+        'catalog_attributes' => 'catalog',
         'products' => 'products',
         'offers' => 'products',
         'orders' => 'sales',

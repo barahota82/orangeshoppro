@@ -23,6 +23,7 @@ $allowed = [
     'color_dictionary',
     'pattern_dictionary',
     'size_families',
+    'catalog_attributes',
     'products',
     'offers',
     'orders',
