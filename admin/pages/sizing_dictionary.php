@@ -16,6 +16,12 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
         <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_families'), ENT_QUOTES, 'UTF-8'); ?>">عائلات المقاسات</a>.
         فارغ تماماً = لا إجبار مرجعي (السلوك السابق).
     </p>
+    <p class="page-subtitle" style="margin:0.5rem 0 0;font-size:0.92rem;color:#92400e;line-height:1.55;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 12px;">
+        <strong>تمييز إلزامي:</strong> المستوى 1 هنا (<code>commercial_kind</code>) هو <strong>نطاق قياسي تجاري ضيّق</strong> لعائلات المقاس (مثل ملابس / أحذية / حقائب — مفاتيح مثل <code>clothing</code>، <code>shoes</code>) وليس
+        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=departments'), ENT_QUOTES, 'UTF-8'); ?>">الأقسام الرئيسية</a> في شجرة المتجر (<code>departments</code>).
+        تكرار أسماء الأقسام الرئيسية كأنواع تجارية هنا يخلق <strong>تصنيفاً موازياً خاطئاً</strong>؛ راجع «سابعاً ب» في
+        <code>docs/archive/ORANGE_UNIFIED_TAXONOMY_AND_CATALOG_ERD.txt</code> وملخص «هرَم المقاس الأربعة» في مرجع الواجهة المؤرشف.
+    </p>
 </div>
 
 <?php if (!$tablesReady): ?>
