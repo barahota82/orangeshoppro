@@ -297,3 +297,33 @@ function orange_storefront_product_in_active_unified_chain(PDO $pdo, int $produc
         return true;
     }
 }
+
+/**
+ * معرف `catalog_categories` المرتبط بالمنتج عبر `product_types` → التصنيف الفرعي الموحَّد؛
+ * أو 0 إذا تعذّر الاستنتاج.
+ */
+function orange_catalog_product_catalog_category_id(PDO $pdo, int $productId): int
+{
+    if ($productId <= 0 || !function_exists('orange_table_exists')) {
+        return 0;
+    }
+    if (!orange_table_exists($pdo, 'products') || !orange_table_exists($pdo, 'product_types') || !orange_table_exists($pdo, 'catalog_subcategories')) {
+        return 0;
+    }
+    try {
+        $st = $pdo->prepare(
+            'SELECT ucs.catalog_category_id AS cid
+             FROM products p
+             INNER JOIN product_types pt ON pt.id = p.product_type_id
+             INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id
+             WHERE p.id = ?
+             LIMIT 1'
+        );
+        $st->execute([$productId]);
+        $v = $st->fetchColumn();
+
+        return $v !== false && $v !== null ? (int) $v : 0;
+    } catch (Throwable $e) {
+        return 0;
+    }
+}

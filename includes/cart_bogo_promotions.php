@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
+require_once __DIR__ . '/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/cart_gift_promotions.php';
 require_once __DIR__ . '/cart_combo_promotions.php';
 
@@ -30,7 +31,7 @@ function orange_cart_bogo_preview_gift_charge_upper_bound(PDO $pdo, array $rule,
  * @param array<string,mixed> $row صف من cart_bogo_promotions
  * @param list<array{product:array<string,mixed>,qty:int,color:string,size:string,variant_id:int,price:float,cost:float}> $validatedItems
  */
-function orange_cart_bogo_rule_matches_cart(array $validatedItems, array $row): bool
+function orange_cart_bogo_rule_matches_cart(PDO $pdo, array $validatedItems, array $row): bool
 {
     $kindRaw = strtolower(trim((string) ($row['bogo_kind'] ?? '')));
     if ($kindRaw === 'buy_bundle') {
@@ -70,6 +71,10 @@ function orange_cart_bogo_rule_matches_cart(array $validatedItems, array $row): 
         return false;
     }
 
+    $unifiedCat = function_exists('orange_catalog_nav_use_unified') && orange_catalog_nav_use_unified($pdo)
+        && function_exists('orange_table_exists')
+        && orange_table_exists($pdo, 'catalog_subcategories');
+
     $catId = (int) ($row['category_id'] ?? 0);
     if ($catId <= 0) {
         return false;
@@ -77,9 +82,19 @@ function orange_cart_bogo_rule_matches_cart(array $validatedItems, array $row): 
     $distinct = [];
     foreach ($validatedItems as $line) {
         $pid = (int) ($line['product']['id'] ?? 0);
-        $pcat = (int) ($line['product']['category_id'] ?? 0);
-        if ($pid > 0 && $pcat === $catId) {
-            $distinct[$pid] = true;
+        if ($pid <= 0) {
+            continue;
+        }
+        if ($unifiedCat) {
+            $uCat = orange_catalog_product_catalog_category_id($pdo, $pid);
+            if ($uCat > 0 && $uCat === $catId) {
+                $distinct[$pid] = true;
+            }
+        } else {
+            $pcat = (int) ($line['product']['category_id'] ?? 0);
+            if ($pcat === $catId) {
+                $distinct[$pid] = true;
+            }
         }
     }
 
@@ -149,7 +164,7 @@ function orange_cart_bogo_promotion_select_rule(PDO $pdo, array $validatedItems,
         if ((int) ($row['requires_registered_account'] ?? 0) === 1 && !$buyerRegistered) {
             continue;
         }
-        if (!orange_cart_bogo_rule_matches_cart($validatedItems, $row)) {
+        if (!orange_cart_bogo_rule_matches_cart($pdo, $validatedItems, $row)) {
             continue;
         }
         $bogoKindNorm = strtolower(trim((string) ($row['bogo_kind'] ?? ''))) === 'buy_bundle' ? 'buy_bundle' : (strtolower(trim((string) ($row['bogo_kind'] ?? ''))) === 'same_category' ? 'same_category' : 'same_variant');

@@ -4,7 +4,12 @@ declare(strict_types=1);
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
 $hasTable = orange_table_exists($pdo, 'cart_bogo_promotions');
+$cartBogoUnifiedCategoryHint =
+    orange_catalog_nav_use_unified($pdo)
+    && orange_table_exists($pdo, 'catalog_categories')
+    && orange_table_exists($pdo, 'product_types');
 ?>
 <div class="page-title page-title--stacked">
     <h1>عروض BOGO (متطابق / فئة / حزمة شراء أ+ب)</h1>
@@ -40,6 +45,9 @@ $hasTable = orange_table_exists($pdo, 'cart_bogo_promotions');
         </div>
         <div id="cbp_cat_wrap" style="grid-column:1/-1;display:none;">
             <label>رقم الفئة (category_id)</label>
+            <?php if ($cartBogoUnifiedCategoryHint): ?>
+            <p class="page-subtitle" style="margin:6px 0 10px;line-height:1.45;"><strong>تصنيف موحَّد:</strong> أدخل معرفًا من الفئات في الشجرة الموحّدة (<code dir="ltr">catalog_categories.id</code>)؛ يُطبَّق التطابق عبر مسار نوع المنتج، وليس عمود الفئة القديم على المنتج فقط.</p>
+            <?php endif; ?>
             <input type="number" id="cbp_cat" class="admin-inp" min="1" step="1" style="max-width:12rem;" dir="ltr">
         </div>
         <div id="cbp_buy_bundle_wrap" style="grid-column:1/-1;display:none;">
