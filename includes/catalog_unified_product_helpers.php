@@ -102,6 +102,39 @@ function orange_catalog_resolve_product_classification(PDO $pdo, array $data): a
 }
 
 /**
+ * عند تعيين أو تبديل المعرف إلى نوع منتج جديد: ورقة **product_types** يجب أن تكون نشطة؛
+ * يُستثنى الطلب الذي يترك المعرف كما كان (منتج قائم لا يُغيّر النوع) حتى لا يُقفَل التعديل آليًا بعد تعطيل الورقة.
+ *
+ * @return string|null رسالة خطأ أو null
+ */
+function orange_catalog_validate_product_type_assignment_active(PDO $pdo, ?int $newProductTypeId, ?int $previousProductTypeId): ?string
+{
+    $newId = $newProductTypeId !== null && $newProductTypeId > 0 ? $newProductTypeId : null;
+    if ($newId === null) {
+        return null;
+    }
+    if (!function_exists('orange_table_exists') || !orange_table_exists($pdo, 'product_types')) {
+        return null;
+    }
+    $prevId = $previousProductTypeId !== null && $previousProductTypeId > 0 ? $previousProductTypeId : null;
+    if ($prevId !== null && $prevId === $newId) {
+        return null;
+    }
+
+    $st = $pdo->prepare('SELECT is_active FROM product_types WHERE id = ? LIMIT 1');
+    $st->execute([$newId]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!is_array($row)) {
+        return 'نوع المنتج المحدد غير موجود في الشجرة الموحّدة.';
+    }
+    if ((int) ($row['is_active'] ?? 0) !== 1) {
+        return 'يجب أن يكون نوع المنتج نشطًا عند تعيينه أو تبديل إليه. فعّل الورقة من «أنواع المنتجات (موحّد)» أو اختر نوعًا نشطًا.';
+    }
+
+    return null;
+}
+
+/**
  * هرم المقاس: يطابق مخطط العائلة مع `product_types.expected_size_scheme_key`؛
  * وعند وجود متوقع يُلزم مستويات 1–2 على العائلة (commercial_kind_key، sizing_category_key).
  *

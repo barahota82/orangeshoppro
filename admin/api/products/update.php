@@ -71,6 +71,28 @@ try {
         json_response(['success' => false, 'message' => $schemeErr], 422);
     }
 
+    $prevProductTypeDb = null;
+    if (
+        orange_table_exists($pdo, 'products')
+        && orange_table_has_column($pdo, 'products', 'product_type_id')
+    ) {
+        $curPt = $pdo->prepare('SELECT product_type_id FROM products WHERE id = ? LIMIT 1');
+        $curPt->execute([$productId]);
+        $crow = $curPt->fetch(PDO::FETCH_ASSOC);
+        if (is_array($crow) && isset($crow['product_type_id']) && $crow['product_type_id'] !== null) {
+            $prevProductTypeDb = (int) $crow['product_type_id'];
+        }
+    }
+
+    $ptAssignErr = orange_catalog_validate_product_type_assignment_active(
+        $pdo,
+        $productTypeIdResolved !== null && $productTypeIdResolved > 0 ? $productTypeIdResolved : null,
+        $prevProductTypeDb !== null && $prevProductTypeDb > 0 ? $prevProductTypeDb : null
+    );
+    if ($ptAssignErr !== null) {
+        json_response(['success' => false, 'message' => $ptAssignErr], 422);
+    }
+
     $sortOrder = (int)($data['sort_order'] ?? 0);
 
     $prodStmt = $pdo->prepare('SELECT id, name FROM products WHERE category_id = ?');

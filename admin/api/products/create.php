@@ -76,6 +76,15 @@ try {
         json_response(['success' => false, 'message' => $schemeErr], 422);
     }
 
+    $ptAssignErr = orange_catalog_validate_product_type_assignment_active(
+        $pdo,
+        $productTypeIdResolved !== null && $productTypeIdResolved > 0 ? $productTypeIdResolved : null,
+        null
+    );
+    if ($ptAssignErr !== null) {
+        json_response(['success' => false, 'message' => $ptAssignErr], 422);
+    }
+
     $variantsIn = $data['variants'] ?? null;
     if (!is_array($variantsIn) || count($variantsIn) === 0) {
         json_response(['success' => false, 'message' => 'يجب توليد صفوف المتغيرات والمخزون'], 422);
