@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 15);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 16);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -92,6 +92,61 @@ function orange_catalog_safe_exec(PDO $pdo, string $sql): void
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] catalog_schema: ' . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * عند تفعيل المتجر الموحّد: إن امتلأ عمود product_type_id لكل المنتجات بقيمة صالحة تُطبَّق مطابقة سياسة ERD بعد الترحيل (NOT NULL).
+ * لا تُنفَّذ أي تعديل ما دام يوجد صف بلا نوع منتج أو بمرجعيته غير موجودة؛ يُسجَّل الخطأ فقط في الـ log إن تعذّر الـ MODIFY.
+ */
+function orange_catalog_ensure_products_product_type_id_not_null(PDO $pdo): void
+{
+    static $ran = false;
+    if ($ran) {
+        return;
+    }
+    $ran = true;
+    if (!orange_table_exists($pdo, 'products') || !orange_table_has_column($pdo, 'products', 'product_type_id')) {
+        return;
+    }
+    require_once __DIR__ . '/catalog_taxonomy_migrate.php';
+    if (!function_exists('orange_catalog_nav_use_unified') || !orange_catalog_nav_use_unified($pdo)) {
+        return;
+    }
+    if (!orange_table_exists($pdo, 'product_types')) {
+        return;
+    }
+    try {
+        $ncol = $pdo->prepare(
+            'SELECT IS_NULLABLE
+             FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = ?
+               AND COLUMN_NAME = ?'
+        );
+        $ncol->execute(['products', 'product_type_id']);
+        $crow = $ncol->fetch(PDO::FETCH_ASSOC);
+        if (! is_array($crow)) {
+            return;
+        }
+        if (strtoupper((string) ($crow['IS_NULLABLE'] ?? '')) !== 'YES') {
+            return;
+        }
+        $bad = (int) $pdo->query(
+            'SELECT COUNT(*) FROM products p WHERE p.product_type_id IS NULL OR p.product_type_id <= 0 OR NOT EXISTS (
+                SELECT 1 FROM product_types pt WHERE pt.id = p.product_type_id
+            )'
+        )->fetchColumn();
+        if ($bad > 0) {
+            return;
+        }
+
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products MODIFY COLUMN product_type_id INT UNSIGNED NOT NULL');
+        orange_schema_invalidate_column_check('products', 'product_type_id');
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] orange_catalog_ensure_products_product_type_id_not_null: ' . $e->getMessage());
         }
     }
 }
@@ -979,7 +1034,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
      |--------------------------------------------------------------------------
      | Unified catalog taxonomy (ERD Phase A — docs/archive/ORANGE_UNIFIED_TAXONOMY_AND_CATALOG_ERD.txt)
      | Department → catalog_sections → catalog_categories → catalog_subcategories → product_types
-     | products.product_type_id = leaf only (nullable أثناء الترحيل).
+     | products.product_type_id = ورقة الشجرة الموحّدة (nullable أثناء الترحيل؛ NOT NULL آلياً عند المتجر الموحّد وجاهزية البيانات الكاملة).
      |--------------------------------------------------------------------------
      */
     orange_catalog_safe_exec(
@@ -1150,6 +1205,64 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
     orange_schema_invalidate_table_exists('product_attribute_values');
+
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE TABLE IF NOT EXISTS catalog_attribute_options (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            catalog_attribute_id INT UNSIGNED NOT NULL,
+            option_key VARCHAR(80) NOT NULL DEFAULT \'\',
+            label_ar VARCHAR(191) NOT NULL DEFAULT \'\',
+            label_en VARCHAR(191) NOT NULL DEFAULT \'\',
+            label_fil VARCHAR(191) NOT NULL DEFAULT \'\',
+            label_hi VARCHAR(191) NOT NULL DEFAULT \'\',
+            sort_order INT NOT NULL DEFAULT 0,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_catalog_attr_opt_attr_key (catalog_attribute_id, option_key),
+            KEY idx_catalog_attr_opt_sort (catalog_attribute_id, sort_order),
+            CONSTRAINT fk_catalog_attr_opt_attr
+                FOREIGN KEY (catalog_attribute_id) REFERENCES catalog_attributes(id)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+    orange_schema_invalidate_table_exists('catalog_attribute_options');
+
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE TABLE IF NOT EXISTS commercial_kind_dictionary (
+            kind_key VARCHAR(32) NOT NULL,
+            label_ar VARCHAR(191) NOT NULL DEFAULT \'\',
+            label_en VARCHAR(191) NOT NULL DEFAULT \'\',
+            sort_order INT NOT NULL DEFAULT 0,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (kind_key),
+            KEY idx_ckd_sort (sort_order),
+            KEY idx_ckd_active (is_active)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+    orange_schema_invalidate_table_exists('commercial_kind_dictionary');
+
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE TABLE IF NOT EXISTS sizing_category_dictionary (
+            commercial_kind_key VARCHAR(32) NOT NULL,
+            category_key VARCHAR(64) NOT NULL,
+            label_ar VARCHAR(191) NOT NULL DEFAULT \'\',
+            label_en VARCHAR(191) NOT NULL DEFAULT \'\',
+            sort_order INT NOT NULL DEFAULT 0,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (commercial_kind_key, category_key),
+            KEY idx_scd_kind_sort (commercial_kind_key, sort_order),
+            CONSTRAINT fk_scd_commercial_kind
+                FOREIGN KEY (commercial_kind_key) REFERENCES commercial_kind_dictionary(kind_key)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+    orange_schema_invalidate_table_exists('sizing_category_dictionary');
 
     static $productSubOrphansCleaned = false;
     if (
@@ -2574,6 +2687,7 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
 
         require_once __DIR__ . '/catalog_taxonomy_migrate.php';
         orange_catalog_post_schema_legacy_unified($pdo);
+        orange_catalog_ensure_products_product_type_id_not_null($pdo);
 
         if ($apcuTtl > 0 && function_exists('apcu_store')) {
             @apcu_store($apcuKey, 1, $apcuTtl);

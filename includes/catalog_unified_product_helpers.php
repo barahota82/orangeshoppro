@@ -466,3 +466,46 @@ function orange_admin_validate_variants_storefront_chain(PDO $pdo, iterable $var
 
     return null;
 }
+
+/**
+ * لقائمة المنتجات في الواجهة: facet من معلمات attr_{attribute_key} في GET (صفات is_filterable فقط).
+ *
+ * @param list<mixed> $params
+ * @return array{0:string,1:list<mixed>}
+ */
+function orange_storefront_products_append_attr_filters_sql(PDO $pdo, string $sql, array $params, string $productAlias = 'p'): array
+{
+    if (!function_exists('orange_table_exists')
+        || !orange_table_exists($pdo, 'catalog_attributes')
+        || !orange_table_exists($pdo, 'product_attribute_values')) {
+        return [$sql, $params];
+    }
+    $pa = preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $productAlias) ? $productAlias : 'p';
+
+    foreach ($_GET as $gk => $gv) {
+        if (! is_string($gk) || ! str_starts_with($gk, 'attr_')) {
+            continue;
+        }
+        $ak = substr($gk, 5);
+        if ($ak === '' || ! preg_match('/^[a-zA-Z0-9_]{1,80}$/', $ak)) {
+            continue;
+        }
+        $valRaw = trim((string) $gv);
+        if ($valRaw === '') {
+            continue;
+        }
+        if (function_exists('mb_strlen') && mb_strlen($valRaw, 'UTF-8') > 400) {
+            continue;
+        }
+        $sql .= ' AND EXISTS (
+            SELECT 1 FROM product_attribute_values __pav
+            INNER JOIN catalog_attributes __ca ON __ca.id = __pav.catalog_attribute_id
+                AND __ca.is_active = 1 AND __ca.is_filterable = 1 AND __ca.attribute_key = ?
+            WHERE __pav.product_id = ' . $pa . '.id AND __pav.value_raw = ?
+        )';
+        $params[] = $ak;
+        $params[] = $valRaw;
+    }
+
+    return [$sql, $params];
+}

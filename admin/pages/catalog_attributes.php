@@ -31,7 +31,7 @@ if ($hasTable) {
 ?>
 <div class="page-title">
     <h1>سمات الكتالوج</h1>
-    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;">تعريف المفاتيح الإنجليزية الثابتة وعناوين العرض؛ <strong>قيم كل منتج</strong> تُحفظ من صفحة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=products'), ENT_QUOTES, 'UTF-8'); ?>">المنتجات</a> ضمن قسم «صفات الكتالوج» وفق المرحلة D في سياسة التصنيف الموحَّد.</p>
+    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;">تعريف المفاتيح الإنجليزية الثابتة وعناوين العرض؛ <strong>قيم كل منتج</strong> تُحفظ من صفحة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=products'), ENT_QUOTES, 'UTF-8'); ?>">المنتجات</a> ضمن «صفات الكتالوج». تعيين <code>is_filterable</code> يفعّل المنتج في معاملات الواجهة <code>attr_{key}</code> وواجهة <code>api/products/get-attribute-facets.php</code>. جدول <code>catalog_attribute_options</code> (يُنشأ مع المخطط) لقيم محددة مسبقاً اختيارية.</p>
 </div>
 
 <?php if (!$hasTable): ?>

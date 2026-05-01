@@ -6,6 +6,7 @@ declare(strict_types=1);
  * قائمة منتجات للواجهة/القناة.
  * - عند تفعيل التصنيف الموحّد: category_id يشير إلى catalog_categories.id (مثل تصفية الصفحة الرئيسية الموحّدة).
  * - في المسار القديم: category_id يشير إلى categories.id على المنتج.
+ * - فلترة صفات الكتالوج: معاملات attr_{attribute_key}=value (صفات is_filterable فقط).
  */
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
@@ -41,6 +42,7 @@ try {
             $sql .= ' AND ucc.id = ?';
             $params[] = $categoryId;
         }
+        [$sql, $params] = orange_storefront_products_append_attr_filters_sql($pdo, $sql, $params, 'p');
         $sql .= ' ORDER BY p.sort_order ASC, p.id ASC';
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
@@ -56,6 +58,7 @@ try {
             $sql .= ' AND p.category_id = ?';
             $params[] = $categoryId;
         }
+        [$sql, $params] = orange_storefront_products_append_attr_filters_sql($pdo, $sql, $params, 'p');
         $sql .= ' ORDER BY p.sort_order ASC, p.id ASC';
 
         $stmt = $pdo->prepare($sql);
