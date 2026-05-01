@@ -51,9 +51,9 @@ if ($hasDepartmentsTable) {
     <h3>إضافة / تعديل قسم</h3>
     <input type="hidden" id="dept_record_id" value="0">
     <div class="form-grid dep-form-grid">
-        <div class="dep-sort">
+        <div class="dep-sort admin-sort-field-wrap">
             <label>الترتيب (تلقائي)</label>
-            <input type="number" id="sort_order" value="<?php echo (int)$nextSort; ?>" disabled style="max-width:140px;">
+            <input type="number" id="sort_order" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int)$nextSort; ?>" disabled>
         </div>
         <div class="dep-ar">
             <label>الاسم العربي</label>
@@ -369,7 +369,7 @@ if (translateBtnDep) {
             grid-area:sort;
             justify-self:end;
             width:100%;
-            max-width:180px;
+            max-width:var(--admin-sort-field-max-w, 220px);
         }
         .dep-form-grid .dep-ar{grid-area:ar}
         .dep-form-grid .dep-en{grid-area:en}
@@ -379,7 +379,7 @@ if (translateBtnDep) {
         .dep-form-grid label,
         .dep-form-grid input,
         .dep-form-grid select{direction:rtl;text-align:right}
-        .dep-form-grid #sort_order{max-width:140px;margin-right:0;margin-left:auto;display:block}
+        .dep-form-grid #sort_order{margin-right:0;margin-left:auto;display:block}
         .dep-form-actions{justify-content:flex-end}
         @media (max-width: 860px){
             .dep-form-grid{grid-template-columns:1fr}
@@ -389,7 +389,7 @@ if (translateBtnDep) {
             .dep-form-grid .dep-hi,
             .dep-form-grid .dep-fil,
             .dep-form-grid .dep-slug{grid-column:1}
-            .dep-form-grid #sort_order{max-width:100%}
+            .dep-form-grid #sort_order{max-width:var(--admin-sort-field-max-w,220px)}
         }
         .cat-dep-list-wrap[data-list="departments"]{
             overflow-x:auto;

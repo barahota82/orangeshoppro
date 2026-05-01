@@ -49,6 +49,8 @@
     --admin-mega-grid-cols: 6;
     --admin-mega-grid-col-min: 210px;
     --admin-mega-trigger-max-w: 22rem;
+    /** عرض حقول الترتيب (تلقائي/عرض المتجر…) — موحد عبر لوحة الإدارة */
+    --admin-sort-field-max-w: 220px;
     --font-ui: "Cairo", "Segoe UI", system-ui, sans-serif;
     --font-display: "Outfit", "Cairo", sans-serif;
 }
@@ -1407,6 +1409,34 @@ select:focus {
     border-color: var(--primary);
     box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.15);
 }
+
+/* حقول الترتيب — نفس الحجم والعرض والحدود (نشِطة أو للقراءة/معطلة) */
+.admin-sort-field-wrap {
+    width: 100%;
+    max-width: var(--admin-sort-field-max-w);
+}
+
+input.admin-sort-field,
+textarea.admin-sort-field,
+select.admin-sort-field {
+    width: 100%;
+    max-width: var(--admin-sort-field-max-w);
+    box-sizing: border-box;
+}
+
+.admin-sort-field--muted,
+.admin-sort-field--muted:disabled {
+    background: #f4f6f9;
+    cursor: default;
+}
+
+.admin-sort-field--muted:disabled,
+.admin-sort-field--muted[readonly] {
+    opacity: 1;
+    -webkit-text-fill-color: var(--text);
+    color: var(--text);
+}
+
 textarea {
     min-height: 88px;
     max-height: 220px;

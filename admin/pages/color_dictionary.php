@@ -36,9 +36,9 @@ if ($hasTable) {
     <h3>إضافة / تعديل لون</h3>
     <input type="hidden" id="color_id" value="0">
     <div class="form-grid cd-form-grid">
-        <div class="cd-sort">
+        <div class="cd-sort admin-sort-field-wrap">
             <label>الترتيب (تلقائي)</label>
-            <input type="number" id="c_sort" value="<?php echo (int) $nextSort; ?>" disabled style="max-width:140px;">
+            <input type="number" id="c_sort" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int) $nextSort; ?>" disabled>
         </div>
         <div class="cd-ar">
             <label>الاسم العربي</label>
@@ -319,7 +319,7 @@ document.getElementById('c_name_en').addEventListener('input', scheduleColorTran
             grid-area:sort;
             justify-self:end;
             width:100%;
-            max-width:180px;
+            max-width:var(--admin-sort-field-max-w, 220px);
         }
         .cd-form-grid .cd-ar{grid-area:ar}
         .cd-form-grid .cd-en{grid-area:en}
@@ -330,7 +330,7 @@ document.getElementById('c_name_en').addEventListener('input', scheduleColorTran
         .cd-form-grid label,
         .cd-form-grid input,
         .cd-form-grid select{direction:rtl;text-align:right}
-        .cd-form-grid #c_sort{max-width:140px;margin-right:0;margin-left:auto;display:block}
+        .cd-form-grid #c_sort{margin-right:0;margin-left:auto;display:block}
         .cd-form-actions{justify-content:flex-end}
         @media (max-width: 860px){
             .cd-form-grid{grid-template-columns:1fr}
@@ -341,7 +341,7 @@ document.getElementById('c_name_en').addEventListener('input', scheduleColorTran
             .cd-form-grid .cd-fil,
             .cd-form-grid .cd-hex,
             .cd-form-grid .cd-active{grid-column:1}
-            .cd-form-grid #c_sort{max-width:100%}
+            .cd-form-grid #c_sort{max-width:var(--admin-sort-field-max-w,220px)}
         }
         .cat-dep-list-wrap[data-list="colors"]{
             overflow-x:auto;

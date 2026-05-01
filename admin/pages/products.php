@@ -269,9 +269,9 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
         <div class="form-grid product-form-tab-basic-grid">
             <div class="product-form-basic-top3">
                 <div class="form-grid-3 product-form-basic-top3-inner">
-                    <div>
+                    <div class="admin-sort-field-wrap">
                         <label>الترتيب (في المتجر)</label>
-                        <input type="text" id="product_sort_order" value="<?php echo (int)$nextProductSort; ?>" readonly tabindex="-1" autocomplete="off" inputmode="numeric" style="max-width:140px;background:#f1f3f5;cursor:default;color:#444;">
+                        <input type="text" id="product_sort_order" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int)$nextProductSort; ?>" readonly tabindex="-1" autocomplete="off" inputmode="numeric">
                         <small style="display:block;color:#666;margin-top:4px;">يُعرض للمراجعة فقط. الترتيب من ↑↓ في الجدول ثم «حفظ الترتيب».</small>
                     </div>
                     <div>

@@ -23,7 +23,7 @@ $ucCatEmpty = !empty($orange_uc['categories_empty_for_subcats']);
             <?php endif; ?>
         </div>
         <div><label for="uc_sub_slug">slug</label><input type="text" id="uc_sub_slug" dir="ltr" maxlength="191" autocomplete="off" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>></div>
-        <div><label for="uc_sub_sort">ترتيب</label><input type="number" id="uc_sub_sort" min="1" step="1" value="" placeholder="تلقائي" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>></div>
+        <div class="admin-sort-field-wrap"><label for="uc_sub_sort">ترتيب</label><input type="number" id="uc_sub_sort" class="admin-sort-field<?php echo $ucCatEmpty ? ' admin-sort-field--muted' : ''; ?>" min="1" step="1" value="" placeholder="تلقائي" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>></div>
         <div><label for="uc_sub_name_ar">عربي</label><input type="text" id="uc_sub_name_ar" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>></div>
         <div><label for="uc_sub_name_fil">Filipino</label><input type="text" id="uc_sub_name_fil" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>></div>
         <div><label for="uc_sub_name_en">English</label><input type="text" id="uc_sub_name_en" dir="ltr" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>></div>

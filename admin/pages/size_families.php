@@ -59,9 +59,9 @@ $tablesReady = $hasFamilies && $hasSizes;
     <h3>إضافة / تعديل عائلة</h3>
     <input type="hidden" id="fam_id" value="0">
     <div class="form-grid sf-form-grid">
-        <div class="sf-sort">
+        <div class="sf-sort admin-sort-field-wrap">
             <label>الترتيب (تلقائي)</label>
-            <input type="number" id="fam_sort" value="<?php echo (int) $nextSort; ?>" disabled style="max-width:140px;" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
+            <input type="number" id="fam_sort" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int) $nextSort; ?>" disabled>
         </div>
         <div class="sf-ar">
             <label>الاسم العربي</label>
@@ -411,7 +411,7 @@ document.getElementById('fam_name_ar').addEventListener('change', function () {
             grid-area:sort;
             justify-self:end;
             width:100%;
-            max-width:180px;
+            max-width:var(--admin-sort-field-max-w, 220px);
         }
         .sf-form-grid .sf-ar{grid-area:ar}
         .sf-form-grid .sf-en{grid-area:en}
@@ -419,7 +419,7 @@ document.getElementById('fam_name_ar').addEventListener('change', function () {
         .sf-form-grid label,
         .sf-form-grid input,
         .sf-form-grid select{direction:rtl;text-align:right}
-        .sf-form-grid #fam_sort{max-width:140px;margin-right:0;margin-left:auto;display:block}
+        .sf-form-grid #fam_sort{margin-right:0;margin-left:auto;display:block}
         .sf-form-actions,.sf-sizes-actions{justify-content:flex-end}
         @media (max-width: 860px){
             .sf-form-grid{grid-template-columns:1fr}
@@ -427,7 +427,7 @@ document.getElementById('fam_name_ar').addEventListener('change', function () {
             .sf-form-grid .sf-ar,
             .sf-form-grid .sf-en,
             .sf-form-grid .sf-active{grid-column:1}
-            .sf-form-grid #fam_sort{max-width:100%}
+            .sf-form-grid #fam_sort{max-width:var(--admin-sort-field-max-w,220px)}
         }
         .cat-dep-list-wrap[data-list="size-families"]{
             overflow-x:auto;

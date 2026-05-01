@@ -57,9 +57,9 @@ if ($hasTable) {
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="ca-sort-wrap">
+        <div class="ca-sort-wrap admin-sort-field-wrap">
             <label>ترتيب العرض</label>
-            <input type="number" id="ca_sort" min="0" step="1" value=""
+            <input type="number" id="ca_sort" class="admin-sort-field<?php echo !$hasTable ? ' admin-sort-field--muted' : ''; ?>" min="0" step="1" value=""
                 placeholder="<?php echo htmlspecialchars('مقترح: ' . (string) $nextSort, ENT_QUOTES, 'UTF-8'); ?>"
                 <?php echo !$hasTable ? 'disabled' : ''; ?>>
             <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;">عند الإنشاء: اتركه فارغًا أو 0 ليُطبَّق الترتيب التلقائي في الخادم.</small>

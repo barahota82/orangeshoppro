@@ -26,8 +26,8 @@ $ucDepsEmpty = !empty($orange_uc['deps_empty_for_sections']);
         <div><label for="uc_sec_slug">slug</label>
             <input type="text" id="uc_sec_slug" dir="ltr" maxlength="191" autocomplete="off" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>
         </div>
-        <div><label for="uc_sec_sort">ترتيب</label>
-            <input type="number" id="uc_sec_sort" min="1" step="1" value="" placeholder="تلقائي" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>
+        <div class="admin-sort-field-wrap"><label for="uc_sec_sort">ترتيب</label>
+            <input type="number" id="uc_sec_sort" class="admin-sort-field<?php echo $ucDepsEmpty ? ' admin-sort-field--muted' : ''; ?>" min="1" step="1" value="" placeholder="تلقائي" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>
         </div>
         <div><label for="uc_sec_name_ar">عربي</label><input type="text" id="uc_sec_name_ar" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>></div>
         <div><label for="uc_sec_name_fil">Filipino</label><input type="text" id="uc_sec_name_fil" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>></div>

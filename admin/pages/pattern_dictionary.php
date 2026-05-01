@@ -38,9 +38,9 @@ if ($hasTable) {
     <h3>إضافة / تعديل نمط</h3>
     <input type="hidden" id="pattern_id" value="0">
     <div class="form-grid pd-form-grid">
-        <div class="pd-sort">
+        <div class="pd-sort admin-sort-field-wrap">
             <label>الترتيب (تلقائي)</label>
-            <input type="number" id="p_sort" value="<?php echo (int) $nextSort; ?>" disabled style="max-width:140px;">
+            <input type="number" id="p_sort" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int) $nextSort; ?>" disabled>
         </div>
         <div class="pd-ar">
             <label>الاسم العربي</label>
@@ -307,19 +307,20 @@ if (pEnEl) pEnEl.addEventListener('input', schedulePatternTranslateFromEnglish);
             gap:14px 18px;
             direction:ltr;
         }
-        .pd-form-grid .pd-sort{ grid-area:sort; justify-self:end; width:100%; max-width:180px }
+        .pd-form-grid .pd-sort{ grid-area:sort; justify-self:end; width:100%; max-width:var(--admin-sort-field-max-w, 220px) }
         .pd-form-grid .pd-ar{grid-area:ar}
         .pd-form-grid .pd-en{grid-area:en}
         .pd-form-grid .pd-hi{grid-area:hi}
         .pd-form-grid .pd-fil{grid-area:fil}
         .pd-form-grid .pd-active{grid-area:active}
         .pd-form-grid label, .pd-form-grid input, .pd-form-grid select{direction:rtl;text-align:right}
-        .pd-form-grid #p_sort{max-width:140px;margin-right:0;margin-left:auto;display:block}
+        .pd-form-grid #p_sort{margin-right:0;margin-left:auto;display:block}
         .pd-form-actions{justify-content:flex-end}
         @media (max-width: 860px){
             .pd-form-grid{grid-template-columns:1fr}
             .pd-form-grid .pd-sort, .pd-form-grid .pd-ar, .pd-form-grid .pd-en,
             .pd-form-grid .pd-hi, .pd-form-grid .pd-fil, .pd-form-grid .pd-active{grid-column:1}
+            .pd-form-grid #p_sort{max-width:var(--admin-sort-field-max-w,220px)}
         }
         .cat-dep-list-wrap[data-list="patterns"] > table{
             min-width:820px;

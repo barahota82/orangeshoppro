@@ -161,8 +161,10 @@ if ($subOptionsJson === false) {
         </div>
         <div>
             <label for="pt_sort">ترتيب ضمن الفرع</label>
-            <input type="number" id="pt_sort" min="1" step="1" value="" placeholder="تلقائي"
-                <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
+            <div class="admin-sort-field-wrap">
+                <input type="number" id="pt_sort" class="admin-sort-field<?php echo $subOptions === [] ? ' admin-sort-field--muted' : ''; ?>" min="1" step="1" value="" placeholder="تلقائي"
+                    <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
+            </div>
         </div>
         <div>
             <label for="pt_name_ar">اسم العربي</label>

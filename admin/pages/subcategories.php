@@ -145,9 +145,9 @@ require __DIR__ . '/../partials/unified_catalog_branch_script.inc.php';
                 <?php endif; ?>
             </select>
         </div>
-        <div>
+        <div class="admin-sort-field-wrap">
             <label>الترتيب (تلقائي)</label>
-            <input type="number" id="subcat_sort_order" value="<?php echo (int) $nextSort; ?>" disabled style="max-width:140px;">
+            <input type="number" id="subcat_sort_order" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int) $nextSort; ?>" disabled>
         </div>
         <div>
             <label>الاسم العربي</label>

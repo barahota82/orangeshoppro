@@ -33,18 +33,12 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
         gap: 12px 18px;
         align-items: start;
     }
-    .sd-dict-ro-input[readonly],
-    .sd-dict-ro-input:disabled {
-        background: #f4f6f9;
-        cursor: default;
-        opacity: 1;
-    }
-    .sd-dict-kind .sd-kind-r1 { grid-column: 1 / -1; max-width: 240px; }
+    .sd-dict-kind .sd-kind-r1 { grid-column: 1 / -1; width: 100%; max-width: var(--admin-sort-field-max-w, 220px); }
     .sd-dict-kind .sd-kind-ar { grid-column: 1; }
     .sd-dict-kind .sd-kind-en { grid-column: 2; }
     .sd-dict-kind .sd-kind-key { grid-column: 1; }
     .sd-dict-kind .sd-kind-act { grid-column: 2; }
-    .sd-dict-cat .sd-cat-r1-sort { grid-column: 1; }
+    .sd-dict-cat .sd-cat-r1-sort { grid-column: 1; max-width: var(--admin-sort-field-max-w, 220px); width: 100%; }
     .sd-dict-cat .sd-cat-r1-parent { grid-column: 2; }
     .sd-dict-cat .sd-cat-ar { grid-column: 1; }
     .sd-dict-cat .sd-cat-en { grid-column: 2; }
@@ -76,7 +70,7 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
         <div class="sd-kind-r1">
             <label>الترتيب (تلقائي)</label>
             <input type="hidden" id="sd_kind_sort" value="0">
-            <input type="text" id="sd_kind_sort_view" class="sd-dict-ro-input" readonly disabled tabindex="-1" value="تلقائي" style="max-width:220px;">
+            <input type="text" id="sd_kind_sort_view" class="admin-sort-field admin-sort-field--muted" readonly disabled tabindex="-1" value="تلقائي">
             <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُحدَّد تلقائياً عند حفظ نوع جديد؛ ويُعرَض الرقم الحالي عند التعديل.</small>
         </div>
         <div class="sd-kind-ar">
@@ -90,7 +84,7 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
         </div>
         <div class="sd-kind-key">
             <label>مفتاح EN (<code>kind_key</code>) — للقراءة فقط</label>
-            <input type="text" id="sd_kind_key" maxlength="32" autocomplete="off" <?php echo !$tablesReady ? 'disabled' : ''; ?> readonly tabindex="-1" class="sd-dict-ro-input" style="cursor:default;">
+            <input type="text" id="sd_kind_key" maxlength="32" autocomplete="off" <?php echo !$tablesReady ? 'disabled' : ''; ?> readonly tabindex="-1" class="admin-sort-field admin-sort-field--muted">
             <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُحسب آلياً من الإنجليزي: حروف صغيرة وأرقام فقط مع <code>_</code> و<code>-</code> (حتى 32 محرفاً).</small>
         </div>
         <div class="sd-kind-act">
@@ -114,7 +108,7 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
         <div class="sd-cat-r1-sort">
             <label>الترتيب (تلقائي)</label>
             <input type="hidden" id="sd_cat_sort" value="0">
-            <input type="text" id="sd_cat_sort_view" class="sd-dict-ro-input" readonly disabled tabindex="-1" value="تلقائي" style="max-width:220px;">
+            <input type="text" id="sd_cat_sort_view" class="admin-sort-field admin-sort-field--muted" readonly disabled tabindex="-1" value="تلقائي">
             <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُحدَّد تلقائياً عند حفظ فئة جديدة ضمن نوع تجاري؛ ويُعرَض الرقم الحالي عند التعديل.</small>
         </div>
         <div class="sd-cat-r1-parent">
@@ -131,7 +125,7 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
         </div>
         <div class="sd-cat-key">
             <label>مفتاح EN (<code>category_key</code>) — للقراءة فقط</label>
-            <input type="text" id="sd_cat_key" maxlength="64" autocomplete="off" readonly tabindex="-1" class="sd-dict-ro-input" style="cursor:default;">
+            <input type="text" id="sd_cat_key" maxlength="64" autocomplete="off" readonly tabindex="-1" class="admin-sort-field admin-sort-field--muted">
             <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُحسب آلياً من الإنجليزي (حتى 64 محرفاً) بنفس قواعد المفتاح أعلاه.</small>
         </div>
         <div class="sd-cat-act">
