@@ -27,12 +27,6 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
 <?php else: ?>
 
 <style>
-    .sd-dict-form {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px 18px;
-        align-items: start;
-    }
     .sd-kind-form-grid {
         display: grid;
         grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -118,14 +112,102 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
     .sd-kind-form-actions {
         justify-content: flex-end;
     }
-    .sd-dict-cat .sd-cat-r1-sort { grid-column: 1; max-width: var(--admin-sort-field-max-w, 220px); width: 100%; }
-    .sd-dict-cat .sd-cat-r1-parent { grid-column: 2; }
-    .sd-dict-cat .sd-cat-ar { grid-column: 1; }
-    .sd-dict-cat .sd-cat-en { grid-column: 2; }
-    .sd-dict-cat .sd-cat-key { grid-column: 1; }
-    .sd-dict-cat .sd-cat-act { grid-column: 2; }
+    .sd-cat-form-grid {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        grid-template-areas:
+            "active active key key key key key key key key sort sort"
+            "parent parent parent parent parent parent parent parent parent parent parent parent"
+            "en en en en en en ar ar ar ar ar ar";
+        gap: 14px 18px;
+        direction: ltr;
+        align-items: start;
+    }
+    .sd-cat-form-grid .sd-cat-sort {
+        grid-area: sort;
+        justify-self: end;
+        width: 100%;
+    }
+    .sd-cat-form-grid .sd-cat-act {
+        grid-area: active;
+        justify-self: start;
+        width: 100%;
+    }
+    .sd-cat-form-grid .sd-cat-key {
+        grid-area: key;
+        min-width: 0;
+    }
+    .sd-cat-form-grid .sd-cat-parent {
+        grid-area: parent;
+        min-width: 0;
+    }
+    .sd-cat-form-grid .sd-cat-ar { grid-area: ar; }
+    .sd-cat-form-grid .sd-cat-en { grid-area: en; }
+    .sd-cat-form-grid label,
+    .sd-cat-form-grid input,
+    .sd-cat-form-grid select {
+        direction: rtl;
+        text-align: right;
+    }
+    .sd-cat-form-grid #sd_cat_sort_view {
+        margin-inline: 0;
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #cbd5e1;
+        border-radius: var(--radius-sm, 10px);
+        font-size: 14px;
+        line-height: calc(var(--input-min-h, 36px) - 2px);
+        min-height: var(--input-min-h, 36px);
+        height: var(--input-min-h, 36px);
+        max-height: var(--input-min-h, 36px);
+        padding-block: 0;
+        padding-inline: 12px;
+        background: #f4f6f9;
+        cursor: default;
+        color: var(--text, #0f172a);
+        opacity: 1;
+        -webkit-text-fill-color: var(--text, #0f172a);
+    }
+    .sd-cat-form-grid #sd_cat_key {
+        width: 100%;
+        max-width: none;
+        box-sizing: border-box;
+        cursor: default;
+        background: #f4f6f9;
+    }
+    .sd-cat-form-grid #sd_cat_active {
+        margin-inline: 0;
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #cbd5e1;
+        border-radius: var(--radius-sm, 10px);
+        font-size: 14px;
+        line-height: calc(var(--input-min-h, 36px) - 2px);
+        min-height: var(--input-min-h, 36px);
+        height: var(--input-min-h, 36px);
+        max-height: var(--input-min-h, 36px);
+        padding-block: 0;
+        padding-inline: 12px;
+        -webkit-appearance: none;
+        appearance: none;
+        background-color: #fff;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M2.75 4.25L6 7.55l3.25-3.3.65.64L6 8.82 2.1 4.9l.65-.65z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-size: 12px;
+        background-position: left 12px center;
+        padding-inline-end: 32px;
+    }
+    .sd-cat-form-grid #sd_cat_parent_kind {
+        width: 100%;
+        max-width: none;
+        box-sizing: border-box;
+    }
+    .sd-cat-form-actions {
+        justify-content: flex-end;
+    }
     @media (max-width: 720px) {
-        .sd-dict-form { grid-template-columns: 1fr; }
         .sd-kind-form-grid {
             grid-template-columns: 1fr;
             grid-template-areas:
@@ -140,14 +222,20 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
             justify-self: start;
             max-width: var(--admin-sort-field-max-w, 220px);
         }
-        .sd-dict-cat .sd-cat-r1-sort,
-        .sd-dict-cat .sd-cat-r1-parent,
-        .sd-dict-cat .sd-cat-ar,
-        .sd-dict-cat .sd-cat-en,
-        .sd-dict-cat .sd-cat-key,
-        .sd-dict-cat .sd-cat-act {
-            grid-column: 1 / -1;
-            max-width: none;
+        .sd-cat-form-grid {
+            grid-template-columns: 1fr;
+            grid-template-areas:
+                "sort"
+                "key"
+                "active"
+                "parent"
+                "ar"
+                "en";
+        }
+        .sd-cat-form-grid .sd-cat-sort,
+        .sd-cat-form-grid .sd-cat-act {
+            justify-self: start;
+            max-width: var(--admin-sort-field-max-w, 220px);
         }
     }
 </style>
@@ -193,14 +281,26 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
 <div class="card">
     <h3 style="margin-top:0;">فئة قياس (المستوى 2)</h3>
     <input type="hidden" id="sd_cat_old_key" value="">
-    <div class="sd-dict-form sd-dict-cat">
-        <div class="sd-cat-r1-sort">
+    <div class="form-grid sd-cat-form-grid">
+        <div class="sd-cat-sort admin-sort-field-wrap">
             <label>الترتيب (تلقائي)</label>
             <input type="hidden" id="sd_cat_sort" value="0">
             <input type="text" id="sd_cat_sort_view" class="admin-sort-field admin-sort-field--muted" readonly disabled tabindex="-1" value="تلقائي">
             <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُحدَّد تلقائياً عند حفظ فئة جديدة ضمن نوع تجاري؛ ويُعرَض الرقم الحالي عند التعديل.</small>
         </div>
-        <div class="sd-cat-r1-parent">
+        <div class="sd-cat-key">
+            <label>مفتاح EN (<code>category_key</code>) — للقراءة فقط</label>
+            <input type="text" id="sd_cat_key" maxlength="64" autocomplete="off" readonly tabindex="-1">
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُحسب آلياً من الإنجليزي (حتى 64 محرفاً) بنفس قواعد المفتاح أعلاه.</small>
+        </div>
+        <div class="sd-cat-act admin-sort-field-wrap">
+            <label>نشط</label>
+            <select id="sd_cat_active" class="admin-sort-field">
+                <option value="1">نعم</option>
+                <option value="0">لا</option>
+            </select>
+        </div>
+        <div class="sd-cat-parent">
             <label>النوع التجاري</label>
             <select id="sd_cat_parent_kind" <?php echo !$tablesReady ? 'disabled' : ''; ?>></select>
         </div>
@@ -212,20 +312,8 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
             <label>English</label>
             <input type="text" id="sd_cat_label_en" maxlength="191">
         </div>
-        <div class="sd-cat-key">
-            <label>مفتاح EN (<code>category_key</code>) — للقراءة فقط</label>
-            <input type="text" id="sd_cat_key" maxlength="64" autocomplete="off" readonly tabindex="-1" class="admin-sort-field admin-sort-field--muted">
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُحسب آلياً من الإنجليزي (حتى 64 محرفاً) بنفس قواعد المفتاح أعلاه.</small>
-        </div>
-        <div class="sd-cat-act">
-            <label>نشط</label>
-            <select id="sd_cat_active">
-                <option value="1">نعم</option>
-                <option value="0">لا</option>
-            </select>
-        </div>
     </div>
-    <div class="actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;">
+    <div class="actions sd-cat-form-actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;">
         <button type="button" onclick="sdSaveCategory()">حفظ الفئة</button>
         <button type="button" class="btn-secondary" onclick="sdResetCatForm(false)">مسح النموذج</button>
     </div>
