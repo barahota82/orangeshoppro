@@ -173,10 +173,27 @@ foreach ($categories as $cat) {
         'ref' => $did . '-' . $cid,
     ];
 }
+
+$unifiedActiveProductsMissingPt = 0;
+if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_has_column($pdo, 'products', 'product_type_id')) {
+    try {
+        $unifiedActiveProductsMissingPt = (int) $pdo->query(
+            'SELECT COUNT(*) FROM products WHERE is_active = 1 AND (product_type_id IS NULL OR product_type_id <= 0)'
+        )->fetchColumn();
+    } catch (Throwable $e) {
+        $unifiedActiveProductsMissingPt = 0;
+    }
+}
 ?>
 <div class="page-title">
     <h1>المنتجات</h1>
 </div>
+
+<?php if ($catalogNavUnified && $unifiedActiveProductsMissingPt > 0): ?>
+<div class="card" style="margin-bottom:12px;background:#fff7ed;border-color:#fdba74;">
+    <p style="margin:0;color:#9a3412;line-height:1.55;"><strong>تنبيه الشجرة الموحّدة:</strong> يوجد <strong><?php echo (int) $unifiedActiveProductsMissingPt; ?></strong> منتج <strong>نشط</strong> بلا <code>product_type_id</code> صالح. وفق السياسة يجب ربط كل منتج بـ <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">نوع منتج</a> في الشجرة قبل الاعتماد الكامل؛ راجع الصفوف في الجدول أدناه.</p>
+</div>
+<?php endif; ?>
 
 <div class="card" style="margin-bottom:12px;">
     <p style="margin:0;">قبل إضافة منتج بمقاسات: عرّف <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_families'), ENT_QUOTES, 'UTF-8'); ?>">عائلات المقاسات</a>.

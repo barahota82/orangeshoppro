@@ -41,9 +41,13 @@ try {
     }
 
     $nameAr = trim((string)$data['name']);
-    $prodStmt = $pdo->prepare('SELECT id, name FROM products WHERE category_id = ?');
-    $prodStmt->execute([$resolvedCategoryId]);
-    $prodRows = $prodStmt->fetchAll(PDO::FETCH_ASSOC);
+    $unifiedNav = function_exists('orange_catalog_nav_use_unified') && orange_catalog_nav_use_unified($pdo);
+    $prodRows = orange_catalog_products_rows_for_arabic_name_scope(
+        $pdo,
+        $resolvedCategoryId,
+        $productTypeIdResolved !== null && $productTypeIdResolved > 0 ? $productTypeIdResolved : null,
+        $unifiedNav
+    );
     if (orange_rows_normalized_arabic_conflict(is_array($prodRows) ? $prodRows : [], 'id', 'name', $nameAr, null)) {
         json_response(['success' => false, 'message' => orange_arabic_duplicate_blocked_message()], 409);
     }

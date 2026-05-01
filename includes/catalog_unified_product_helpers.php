@@ -329,6 +329,81 @@ function orange_catalog_product_catalog_category_id(PDO $pdo, int $productId): i
 }
 
 /**
+ * معرّف `catalog_categories` المستنتج من ورقة `product_types` (عبر التصنيف الفرعي الموحّد).
+ * يُستخدم قبل إنشاء صف منتج لضبط نطاق تكرار الاسم العربي في وضع التنقّل الموحّد.
+ */
+function orange_catalog_catalog_category_id_for_product_type(PDO $pdo, int $productTypeId): int
+{
+    if ($productTypeId <= 0 || !function_exists('orange_table_exists')) {
+        return 0;
+    }
+    if (!orange_table_exists($pdo, 'product_types') || !orange_table_exists($pdo, 'catalog_subcategories')) {
+        return 0;
+    }
+    try {
+        $st = $pdo->prepare(
+            'SELECT ucs.catalog_category_id
+             FROM product_types pt
+             INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id
+             WHERE pt.id = ?
+             LIMIT 1'
+        );
+        $st->execute([$productTypeId]);
+        $v = $st->fetchColumn();
+
+        return $v !== false && $v !== null ? (int) $v : 0;
+    } catch (Throwable $e) {
+        return 0;
+    }
+}
+
+/**
+ * صفوف {id,name} للمنتجات ضمن نفس نطاق تكرار الاسم العربي: في التنقّل الموحّد حسب فئة الكتالوج الموحّدة،
+ * وإلا حسب `category_id` القديم.
+ *
+ * @return list<array<string,mixed>>
+ */
+function orange_catalog_products_rows_for_arabic_name_scope(
+    PDO $pdo,
+    int $resolvedLegacyCategoryId,
+    ?int $productTypeId,
+    bool $unifiedNav
+): array {
+    if (!orange_table_exists($pdo, 'products')) {
+        return [];
+    }
+    if ($unifiedNav && $productTypeId !== null && $productTypeId > 0) {
+        $ccid = orange_catalog_catalog_category_id_for_product_type($pdo, $productTypeId);
+        if ($ccid > 0) {
+            try {
+                $st = $pdo->prepare(
+                    'SELECT p.id, p.name
+                     FROM products p
+                     INNER JOIN product_types pt ON pt.id = p.product_type_id
+                     INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id
+                     WHERE ucs.catalog_category_id = ?'
+                );
+                $st->execute([$ccid]);
+                $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+
+                return is_array($rows) ? $rows : [];
+            } catch (Throwable $e) {
+                // fallback أدناه
+            }
+        }
+    }
+    try {
+        $st = $pdo->prepare('SELECT id, name FROM products WHERE category_id = ?');
+        $st->execute([$resolvedLegacyCategoryId]);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+
+        return is_array($rows) ? $rows : [];
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
+/**
  * عند تنقّل الواجهة الموحَّد: تتطلّب عروض السلة المتغيرة أن تُشارك منتجات داخل سلسلة الكتالوج النشطة
  * كي لا تُحفظ قواعد لا تطبّق على المتجر الفعلي. خارج الوضع الموحَّد لا يُفرض قيد (سلوك المتجر القديم).
  *
