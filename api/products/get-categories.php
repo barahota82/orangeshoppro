@@ -26,6 +26,14 @@ try {
         ]);
     }
 
+    if (!orange_table_has_column($pdo, 'products', 'category_id')) {
+        json_response([
+            'success' => true,
+            'unified' => true,
+            'categories' => [],
+        ]);
+    }
+
     $sql = "
         SELECT c.*
         FROM categories c

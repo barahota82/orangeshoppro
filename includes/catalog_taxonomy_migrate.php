@@ -146,23 +146,31 @@ function orange_catalog_backfill_product_type_ids_only(PDO $pdo): void
             return;
         }
 
-        orange_catalog_safe_exec(
-            $pdo,
-            'UPDATE products p
+        if (orange_table_has_column($pdo, 'products', 'subcategory_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE products p
              INNER JOIN product_types pt ON pt.slug = CONCAT(\'legacy-ptype-sub-\', p.subcategory_id)
              SET p.product_type_id = pt.id
              WHERE p.product_type_id IS NULL AND p.subcategory_id IS NOT NULL AND p.subcategory_id > 0'
-        );
+            );
+        }
 
-        orange_catalog_safe_exec(
-            $pdo,
-            'UPDATE products p
+        if (orange_table_has_column($pdo, 'products', 'category_id')) {
+            $subNullCond = orange_table_has_column($pdo, 'products', 'subcategory_id')
+                ? ' AND (p.subcategory_id IS NULL OR p.subcategory_id = 0)'
+                : '';
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE products p
              INNER JOIN product_types pt ON pt.slug = CONCAT(\'legacy-ptype-cat-\', p.category_id)
              SET p.product_type_id = pt.id
-             WHERE p.product_type_id IS NULL
-               AND (p.subcategory_id IS NULL OR p.subcategory_id = 0)
+             WHERE p.product_type_id IS NULL'
+                . $subNullCond
+                . '
                AND p.category_id IS NOT NULL AND p.category_id > 0'
-        );
+            );
+        }
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] catalog backfill product_type_id: ' . $e->getMessage());
@@ -458,6 +466,13 @@ function orange_catalog_fill_legacy_product_row_cache(PDO $pdo): void
         return;
     }
     if (orange_catalog_migration_step_applied($pdo, ORANGE_CATALOG_LEGACY_PRODUCT_ROW_CACHE_STEP)) {
+        return;
+    }
+    $hasLegacyCatCol = orange_table_has_column($pdo, 'products', 'category_id');
+    $hasLegacySubCol = orange_table_has_column($pdo, 'products', 'subcategory_id');
+    if (! $hasLegacyCatCol || ! $hasLegacySubCol) {
+        orange_catalog_migration_step_record($pdo, ORANGE_CATALOG_LEGACY_PRODUCT_ROW_CACHE_STEP);
+
         return;
     }
     try {

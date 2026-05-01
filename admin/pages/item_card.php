@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/order_stock.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
+require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
 
 $productId = (int)($_GET['product_id'] ?? 0);
 if ($productId < 1) {
@@ -13,10 +15,14 @@ if ($productId < 1) {
 
 $pdo = db();
 
+$catJoin = orange_table_has_column($pdo, 'products', 'category_id')
+    ? 'LEFT JOIN categories c ON c.id = p.category_id'
+    : orange_catalog_products_sql_join_legacy_categories_derived($pdo, 'p', 'c');
+
 $stmt = $pdo->prepare("
     SELECT p.*, c.name_ar AS category_name
     FROM products p
-    LEFT JOIN categories c ON c.id = p.category_id
+    {$catJoin}
     WHERE p.id = ?
     LIMIT 1
 ");

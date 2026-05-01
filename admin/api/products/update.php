@@ -182,18 +182,25 @@ try {
     $itemCodeUp = $normSku($data['item_code'] ?? '');
     $barcodeUp = $normSku($data['barcode'] ?? '');
 
-    $stmt = $pdo->prepare("
-        UPDATE products
-        SET name = ?, name_en = ?, name_fil = ?, name_hi = ?,
-            description = ?, description_en = ?, description_fil = ?, description_hi = ?,
-            seo_meta_title_ar = ?, seo_meta_title_en = ?, seo_meta_title_fil = ?, seo_meta_title_hi = ?,
-            seo_meta_description_ar = ?, seo_meta_description_en = ?, seo_meta_description_fil = ?, seo_meta_description_hi = ?,
-            category_id = ?, subcategory_id = ?, product_type_id = ?, size_family_id = ?, sizing_guide_scope = ?, price = ?, cost = ?,
-            main_image = ?, has_sizes = ?, has_colors = ?, sort_order = ?, item_code = ?, barcode = ?, is_active = ?, updated_at = NOW()
-        WHERE id = ?
-    ");
-
-    $stmt->execute([
+    $setParts = [
+        'name = ?',
+        'name_en = ?',
+        'name_fil = ?',
+        'name_hi = ?',
+        'description = ?',
+        'description_en = ?',
+        'description_fil = ?',
+        'description_hi = ?',
+        'seo_meta_title_ar = ?',
+        'seo_meta_title_en = ?',
+        'seo_meta_title_fil = ?',
+        'seo_meta_title_hi = ?',
+        'seo_meta_description_ar = ?',
+        'seo_meta_description_en = ?',
+        'seo_meta_description_fil = ?',
+        'seo_meta_description_hi = ?',
+    ];
+    $execParams = [
         $nameAr,
         $nameEn,
         $nameFil,
@@ -210,8 +217,31 @@ try {
         $seoDescEn,
         $seoDescFil,
         $seoDescHi,
-        $resolvedCategoryId,
-        $subcategoryId,
+    ];
+    if (orange_table_has_column($pdo, 'products', 'category_id')) {
+        $setParts[] = 'category_id = ?';
+        $execParams[] = $resolvedCategoryId;
+    }
+    if (orange_table_has_column($pdo, 'products', 'subcategory_id')) {
+        $setParts[] = 'subcategory_id = ?';
+        $execParams[] = $subcategoryId;
+    }
+    array_push($setParts,
+        'product_type_id = ?',
+        'size_family_id = ?',
+        'sizing_guide_scope = ?',
+        'price = ?',
+        'cost = ?',
+        'main_image = ?',
+        'has_sizes = ?',
+        'has_colors = ?',
+        'sort_order = ?',
+        'item_code = ?',
+        'barcode = ?',
+        'is_active = ?',
+        'updated_at = NOW()'
+    );
+    array_push($execParams,
         $productTypeIdResolved,
         $sizeFamilyId,
         $scope,
@@ -224,8 +254,17 @@ try {
         $itemCodeUp,
         $barcodeUp,
         isset($data['is_active']) ? (int)$data['is_active'] : 1,
-        $productId
-    ]);
+    );
+
+    $execParams[] = $productId;
+
+    $stmt = $pdo->prepare('
+        UPDATE products
+        SET ' . implode(', ', $setParts) . '
+        WHERE id = ?
+    ');
+
+    $stmt->execute($execParams);
 
     if ($stmt->rowCount() === 0) {
         $checkStmt = $pdo->prepare("SELECT id FROM products WHERE id = ? LIMIT 1");

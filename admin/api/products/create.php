@@ -174,19 +174,13 @@ try {
         }
     }
 
-    $stmt = $pdo->prepare(
-        'INSERT INTO products (
-            name, name_en, name_fil, name_hi,
-            description, description_en, description_fil, description_hi,
-            seo_meta_title_ar, seo_meta_title_en, seo_meta_title_fil, seo_meta_title_hi,
-            seo_meta_description_ar, seo_meta_description_en, seo_meta_description_fil, seo_meta_description_hi,
-            category_id, subcategory_id, product_type_id, size_family_id, sizing_guide_scope, price, cost, main_image, has_sizes, has_colors, sort_order, item_code, barcode, is_active, created_at
-        ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW()
-        )'
-    );
-
-    $stmt->execute([
+    $columnNames = [
+        'name', 'name_en', 'name_fil', 'name_hi',
+        'description', 'description_en', 'description_fil', 'description_hi',
+        'seo_meta_title_ar', 'seo_meta_title_en', 'seo_meta_title_fil', 'seo_meta_title_hi',
+        'seo_meta_description_ar', 'seo_meta_description_en', 'seo_meta_description_fil', 'seo_meta_description_hi',
+    ];
+    $execParams = [
         $nameAr,
         $nameEn,
         $nameFil,
@@ -203,20 +197,46 @@ try {
         $seoDescEn,
         $seoDescFil,
         $seoDescHi,
-        $resolvedCategoryId,
-        $subcategoryId,
-        $productTypeIdResolved,
-        $sizeFamilyId,
-        $scope,
-        (float)$data['price'],
-        (float)$data['cost'],
-        $mainImage,
-        $hasSizes ? 1 : 0,
-        $hasColors ? 1 : 0,
-        $nextSort,
-        $itemCodeIns,
-        $barcodeIns,
-    ]);
+    ];
+    if (orange_table_has_column($pdo, 'products', 'category_id')) {
+        $columnNames[] = 'category_id';
+        $execParams[] = $resolvedCategoryId;
+    }
+    if (orange_table_has_column($pdo, 'products', 'subcategory_id')) {
+        $columnNames[] = 'subcategory_id';
+        $execParams[] = $subcategoryId;
+    }
+    $columnNames[] = 'product_type_id';
+    $columnNames[] = 'size_family_id';
+    $columnNames[] = 'sizing_guide_scope';
+    $columnNames[] = 'price';
+    $columnNames[] = 'cost';
+    $columnNames[] = 'main_image';
+    $columnNames[] = 'has_sizes';
+    $columnNames[] = 'has_colors';
+    $columnNames[] = 'sort_order';
+    $columnNames[] = 'item_code';
+    $columnNames[] = 'barcode';
+
+    $execParams[] = $productTypeIdResolved;
+    $execParams[] = $sizeFamilyId;
+    $execParams[] = $scope;
+    $execParams[] = (float) $data['price'];
+    $execParams[] = (float) $data['cost'];
+    $execParams[] = $mainImage;
+    $execParams[] = $hasSizes ? 1 : 0;
+    $execParams[] = $hasColors ? 1 : 0;
+    $execParams[] = $nextSort;
+    $execParams[] = $itemCodeIns;
+    $execParams[] = $barcodeIns;
+
+    $columnNamesWithMeta = array_merge($columnNames, ['is_active', 'created_at']);
+    $placeholdersBody = implode(', ', array_fill(0, count($execParams), '?')) . ', 1, NOW()';
+    $stmt = $pdo->prepare(
+        'INSERT INTO products (' . implode(', ', $columnNamesWithMeta) . ') VALUES (' . $placeholdersBody . ')'
+    );
+
+    $stmt->execute($execParams);
 
     $productId = (int)$pdo->lastInsertId();
 

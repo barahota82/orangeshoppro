@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_admin_api('GET');
 
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
     $productId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+
+    $catJoinLegacy = orange_table_has_column($pdo, 'products', 'category_id')
+        ? 'LEFT JOIN categories c ON c.id = p.category_id'
+        : orange_catalog_products_sql_join_legacy_categories_derived($pdo, 'p', 'c');
 
     if ($productId > 0) {
         $stmt = $pdo->prepare("
@@ -20,7 +25,7 @@ try {
                    pt.slug AS product_type_slug,
                    pt.expected_size_scheme_key AS product_type_expected_size_scheme_key
             FROM products p
-            LEFT JOIN categories c ON c.id = p.category_id
+            {$catJoinLegacy}
             LEFT JOIN product_types pt ON pt.id = p.product_type_id
             WHERE p.id = ?
             LIMIT 1
@@ -93,7 +98,7 @@ try {
                pt.slug AS product_type_slug,
                pt.expected_size_scheme_key AS product_type_expected_size_scheme_key
         FROM products p
-        LEFT JOIN categories c ON c.id = p.category_id
+        {$catJoinLegacy}
         LEFT JOIN product_types pt ON pt.id = p.product_type_id
         ORDER BY p.sort_order ASC, p.id ASC
     ")->fetchAll();

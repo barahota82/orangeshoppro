@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 17);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 18);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -102,11 +102,6 @@ function orange_catalog_safe_exec(PDO $pdo, string $sql): void
  */
 function orange_catalog_ensure_products_product_type_id_not_null(PDO $pdo): void
 {
-    static $ran = false;
-    if ($ran) {
-        return;
-    }
-    $ran = true;
     if (!orange_table_exists($pdo, 'products') || !orange_table_has_column($pdo, 'products', 'product_type_id')) {
         return;
     }
@@ -115,6 +110,116 @@ function orange_catalog_ensure_products_product_type_id_not_null(PDO $pdo): void
         return;
     }
     if (!orange_table_exists($pdo, 'product_types')) {
+        return;
+    }
+    try {
+        orange_catalog_try_modify_products_product_type_id_not_null($pdo);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] orange_catalog_ensure_products_product_type_id_not_null: ' . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * المرحلة النهائية (متجر موحّد فقط): إسقاط أعمدة الفئة القديمة على المنتج بعد تعبئة/تحقّق product_type_id و NOT NULL.
+ * لا يُنفَّذ أي إسقاط ما دام هناك صف بلا نوع منتج صالح.
+ */
+function orange_catalog_ensure_products_drop_legacy_classification_columns(PDO $pdo): void
+{
+    if (!orange_table_exists($pdo, 'products')) {
+        return;
+    }
+    require_once __DIR__ . '/catalog_taxonomy_migrate.php';
+    if (!function_exists('orange_catalog_nav_use_unified') || !orange_catalog_nav_use_unified($pdo)) {
+        return;
+    }
+    $hasCatCol = orange_table_has_column($pdo, 'products', 'category_id');
+    $hasSubCol = orange_table_has_column($pdo, 'products', 'subcategory_id');
+    if (! $hasCatCol && ! $hasSubCol) {
+        return;
+    }
+    if (!orange_table_has_column($pdo, 'products', 'product_type_id')) {
+        return;
+    }
+
+    try {
+        $bad = (int) $pdo->query(
+            'SELECT COUNT(*) FROM products p WHERE p.product_type_id IS NULL OR p.product_type_id <= 0 OR NOT EXISTS (
+                SELECT 1 FROM product_types pt WHERE pt.id = p.product_type_id
+            )'
+        )->fetchColumn();
+        if ($bad > 0) {
+            if (function_exists('error_log')) {
+                error_log('[orange] legacy product classification drop skipped: products missing valid product_type_id (' . $bad . ')');
+            }
+
+            return;
+        }
+
+        orange_catalog_fill_legacy_product_row_cache($pdo);
+
+        $fkSt = $pdo->prepare(
+            'SELECT DISTINCT k.CONSTRAINT_NAME
+             FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE k
+             INNER JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS t
+               ON k.CONSTRAINT_NAME = t.CONSTRAINT_NAME
+              AND k.TABLE_SCHEMA = t.TABLE_SCHEMA
+             WHERE k.TABLE_SCHEMA = DATABASE()
+               AND k.TABLE_NAME = \'products\'
+               AND k.COLUMN_NAME IN (\'category_id\', \'subcategory_id\')
+               AND k.REFERENCED_TABLE_NAME IS NOT NULL
+               AND t.CONSTRAINT_TYPE = \'FOREIGN KEY\''
+        );
+        $fkSt->execute();
+        foreach ($fkSt->fetchAll(PDO::FETCH_COLUMN, 0) ?: [] as $fkName) {
+            $fkName = trim((string) $fkName);
+            if ($fkName === '') {
+                continue;
+            }
+            orange_catalog_safe_exec($pdo, 'ALTER TABLE products DROP FOREIGN KEY `' . str_replace('`', '``', $fkName) . '`');
+        }
+
+        $ixSt = $pdo->prepare(
+            'SELECT DISTINCT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = \'products\'
+               AND COLUMN_NAME IN (\'category_id\', \'subcategory_id\')
+               AND INDEX_NAME <> \'PRIMARY\''
+        );
+        $ixSt->execute();
+        $indexes = array_values(array_unique(array_filter(array_map('trim', $ixSt->fetchAll(PDO::FETCH_COLUMN, 0) ?: []))));
+        foreach ($indexes as $ixName) {
+            orange_catalog_safe_exec($pdo, 'ALTER TABLE products DROP INDEX `' . str_replace('`', '``', $ixName) . '`');
+        }
+
+        $drops = [];
+        if ($hasCatCol) {
+            $drops[] = 'DROP COLUMN `category_id`';
+        }
+        if ($hasSubCol) {
+            $drops[] = 'DROP COLUMN `subcategory_id`';
+        }
+        if ($drops !== []) {
+            orange_catalog_safe_exec($pdo, 'ALTER TABLE products ' . implode(', ', $drops));
+            orange_schema_invalidate_column_check('products', 'category_id');
+            orange_schema_invalidate_column_check('products', 'subcategory_id');
+        }
+
+        orange_catalog_try_modify_products_product_type_id_not_null($pdo);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] orange_catalog_ensure_products_drop_legacy_classification_columns: ' . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * @internal
+ */
+function orange_catalog_try_modify_products_product_type_id_not_null(PDO $pdo): void
+{
+    if (!orange_table_exists($pdo, 'products') || !orange_table_has_column($pdo, 'products', 'product_type_id')) {
         return;
     }
     try {
@@ -146,7 +251,7 @@ function orange_catalog_ensure_products_product_type_id_not_null(PDO $pdo): void
         orange_schema_invalidate_column_check('products', 'product_type_id');
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
-            error_log('[orange] orange_catalog_ensure_products_product_type_id_not_null: ' . $e->getMessage());
+            error_log('[orange] orange_catalog_try_modify_products_product_type_id_not_null: ' . $e->getMessage());
         }
     }
 }
@@ -1151,7 +1256,10 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     }
 
     if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'product_type_id')) {
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN product_type_id INT UNSIGNED NULL DEFAULT NULL AFTER subcategory_id');
+        $afterLegacy = orange_table_has_column($pdo, 'products', 'subcategory_id')
+            ? ' AFTER subcategory_id'
+            : (orange_table_has_column($pdo, 'products', 'category_id') ? ' AFTER category_id' : '');
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN product_type_id INT UNSIGNED NULL DEFAULT NULL' . $afterLegacy);
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD INDEX idx_products_product_type (product_type_id)');
         orange_catalog_safe_exec(
             $pdo,
@@ -2687,6 +2795,8 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
 
         require_once __DIR__ . '/catalog_taxonomy_migrate.php';
         orange_catalog_post_schema_legacy_unified($pdo);
+        orange_catalog_ensure_products_product_type_id_not_null($pdo);
+        orange_catalog_ensure_products_drop_legacy_classification_columns($pdo);
         orange_catalog_ensure_products_product_type_id_not_null($pdo);
 
         if ($apcuTtl > 0 && function_exists('apcu_store')) {

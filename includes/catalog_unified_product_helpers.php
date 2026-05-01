@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/catalog_taxonomy_migrate.php';
 
 /**
@@ -62,6 +63,61 @@ function orange_catalog_resolve_product_classification(PDO $pdo, array $data): a
         'subcategory_id' => $subcategoryId,
         'product_type_id' => $resolvedPt,
     ];
+}
+
+/**
+ * سلسلة JOIN تربط جدول `categories` بالاسم المستعار المعطى إلى صف المنتج بعد إسقاط `products.category_id`.
+ * عند وجود العمود على المنتج تُرجِع سلسلة فارغة (يستخدم الاستدعاء المعتاد LEFT JOIN على p.category_id).
+ */
+function orange_catalog_products_sql_join_legacy_categories_derived(PDO $pdo, string $productsAlias, string $categoriesAlias): string
+{
+    $p = preg_replace('/[^A-Za-z0-9_]/', '', $productsAlias);
+    $c = preg_replace('/[^A-Za-z0-9_]/', '', $categoriesAlias);
+    if ($p === '' || $c === '') {
+        return '';
+    }
+    if (orange_table_has_column($pdo, 'products', 'category_id')) {
+        return '';
+    }
+    if (!orange_table_exists($pdo, 'categories')) {
+        return '';
+    }
+    $prefix = 'ocmap_lc_' . $p . '_';
+    if (!orange_table_has_column($pdo, 'products', 'product_type_id') || !orange_table_exists($pdo, 'product_types')) {
+        return "\n LEFT JOIN categories `{$c}` ON FALSE ";
+    }
+
+    $hasSub = orange_table_exists($pdo, 'subcategories');
+    $joinSub = '';
+    $catExpr = '';
+    if ($hasSub) {
+        $joinSub = "\n LEFT JOIN subcategories {$prefix}s ON {$prefix}s.id = CASE
+           WHEN ocmap_pt.slug LIKE 'legacy-ptype-sub-%'
+             THEN CAST(SUBSTRING_INDEX(ocmap_pt.slug, '-', -1) AS UNSIGNED)
+           WHEN ocmap_ucs.slug LIKE 'legacy-sub-%'
+             THEN CAST(SUBSTRING_INDEX(ocmap_ucs.slug, '-', -1) AS UNSIGNED)
+           ELSE NULL END ";
+        $catExpr = "CASE
+           WHEN ocmap_pt.slug LIKE 'legacy-ptype-cat-%'
+             THEN CAST(SUBSTRING_INDEX(ocmap_pt.slug, '-', -1) AS UNSIGNED)
+           WHEN ocmap_ucc.slug LIKE 'legacy-cat-%'
+             THEN CAST(SUBSTRING_INDEX(ocmap_ucc.slug, '-', -1) AS UNSIGNED)
+           WHEN {$prefix}s.id IS NOT NULL THEN {$prefix}s.category_id
+           ELSE NULL END";
+    } else {
+        $catExpr = "CASE
+           WHEN ocmap_pt.slug LIKE 'legacy-ptype-cat-%'
+             THEN CAST(SUBSTRING_INDEX(ocmap_pt.slug, '-', -1) AS UNSIGNED)
+           WHEN ocmap_ucc.slug LIKE 'legacy-cat-%'
+             THEN CAST(SUBSTRING_INDEX(ocmap_ucc.slug, '-', -1) AS UNSIGNED)
+           ELSE NULL END";
+    }
+
+    return "\n LEFT JOIN product_types ocmap_pt ON ocmap_pt.id = {$p}.product_type_id
+            LEFT JOIN catalog_subcategories ocmap_ucs ON ocmap_ucs.id = ocmap_pt.catalog_subcategory_id
+            LEFT JOIN catalog_categories ocmap_ucc ON ocmap_ucc.id = ocmap_ucs.catalog_category_id
+            {$joinSub}
+            LEFT JOIN categories `{$c}` ON `{$c}`.id = ({$catExpr}) ";
 }
 
 /**
@@ -373,6 +429,9 @@ function orange_catalog_products_rows_for_arabic_name_scope(
     }
     try {
         if ($resolvedLegacyCategoryId === null || $resolvedLegacyCategoryId <= 0) {
+            return [];
+        }
+        if (!orange_table_has_column($pdo, 'products', 'category_id')) {
             return [];
         }
         $st = $pdo->prepare('SELECT id, name FROM products WHERE category_id = ?');

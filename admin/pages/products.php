@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
+require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -93,6 +94,10 @@ if ($hasDepartmentsTable) {
 
 $hasProductTypesTable = orange_table_exists($pdo, 'product_types');
 
+$productCategoryJoin = orange_table_has_column($pdo, 'products', 'category_id')
+    ? 'LEFT JOIN categories c ON c.id = p.category_id'
+    : orange_catalog_products_sql_join_legacy_categories_derived($pdo, 'p', 'c');
+
 if ($hasDepartmentsTable && $hasCategoryDepartment) {
     $products = $pdo->query(
         'SELECT p.*, c.name_ar AS category_name, c.department_id AS category_department_id,
@@ -103,7 +108,7 @@ if ($hasDepartmentsTable && $hasCategoryDepartment) {
             : '')
         . '
         FROM products p
-        LEFT JOIN categories c ON c.id = p.category_id
+        ' . $productCategoryJoin . '
         LEFT JOIN departments d ON d.id = c.department_id'
         . ($hasProductTypesTable ? '
         LEFT JOIN product_types pt ON pt.id = p.product_type_id' : '')
@@ -120,7 +125,7 @@ if ($hasDepartmentsTable && $hasCategoryDepartment) {
             : '')
         . '
         FROM products p
-        LEFT JOIN categories c ON c.id = p.category_id'
+        ' . $productCategoryJoin
         . ($hasProductTypesTable ? '
         LEFT JOIN product_types pt ON pt.id = p.product_type_id' : '')
         . '

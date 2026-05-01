@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/stock_alerts.php';
+require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
 
 $pdo = db();
 
@@ -17,7 +19,12 @@ $stLowList = $pdo->prepare(
 $stLowList->execute([$lowStockTh]);
 $lowStockRows = $stLowList->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-$itemList = $pdo->query("
+$itemList = [];
+$catJoin = orange_table_has_column($pdo, 'products', 'category_id')
+    ? 'LEFT JOIN categories c ON c.id = p.category_id'
+    : orange_catalog_products_sql_join_legacy_categories_derived($pdo, 'p', 'c');
+try {
+    $itemList = $pdo->query("
     SELECT
         p.id,
         p.name,
@@ -27,9 +34,12 @@ $itemList = $pdo->query("
         (SELECT COUNT(*) FROM product_variants pv WHERE pv.product_id = p.id) AS variant_count,
         (SELECT COALESCE(SUM(pv.stock_quantity), 0) FROM product_variants pv WHERE pv.product_id = p.id) AS total_stock
     FROM products p
-    LEFT JOIN categories c ON c.id = p.category_id
+    {$catJoin}
     ORDER BY p.sort_order ASC, p.name ASC, p.id ASC
-")->fetchAll(PDO::FETCH_ASSOC);
+")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+} catch (Throwable $e) {
+    $itemList = [];
+}
 
 $rows = $pdo->query("
     SELECT pv.*, p.name AS product_name
