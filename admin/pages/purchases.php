@@ -2,12 +2,55 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
+
 $pdo = db();
+orange_catalog_ensure_schema($pdo);
+
+$purUnifiedCatalogGrouping =
+    function_exists('orange_catalog_nav_use_unified')
+    && orange_catalog_nav_use_unified($pdo)
+    && orange_table_exists($pdo, 'product_types')
+    && orange_table_has_column($pdo, 'products', 'product_type_id');
+
+if ($purUnifiedCatalogGrouping) {
+    try {
+        $products = $pdo->query(
+            'SELECT p.id, p.name, p.cost, p.has_colors, p.has_sizes,
+                COALESCE(
+                    NULLIF(TRIM(ucc.name_ar), \'\'),
+                    NULLIF(TRIM(ucc.name_en), \'\'),
+                    \'غير مرتبط بفئة الشجرة الموحّدة\'
+                ) AS catalog_group_label
+             FROM products p
+             LEFT JOIN product_types pt ON pt.id = p.product_type_id
+             LEFT JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id
+             LEFT JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id
+             WHERE p.is_active = 1
+             ORDER BY catalog_group_label ASC, p.sort_order ASC, p.name ASC, p.id ASC'
+        )->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        $products = $pdo->query(
+            'SELECT id, name, cost, has_colors, has_sizes FROM products WHERE is_active = 1 ORDER BY name ASC'
+        )->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($products as &$p) {
+            $p['catalog_group_label'] = '';
+        }
+        unset($p);
+        $purUnifiedCatalogGrouping = false;
+    }
+} else {
+    $products = $pdo->query(
+        'SELECT id, name, cost, has_colors, has_sizes FROM products WHERE is_active = 1 ORDER BY name ASC'
+    )->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($products as &$p) {
+        $p['catalog_group_label'] = '';
+    }
+    unset($p);
+}
 
 $suppliers = $pdo->query('SELECT id, name, phone FROM suppliers ORDER BY name ASC')->fetchAll(PDO::FETCH_ASSOC);
-$products = $pdo->query(
-    'SELECT id, name, cost, has_colors, has_sizes FROM products WHERE is_active = 1 ORDER BY name ASC'
-)->fetchAll(PDO::FETCH_ASSOC);
 
 $variantsByProduct = [];
 $vRows = $pdo->query(
@@ -83,7 +126,8 @@ $recent = $pdo->query(
     <?php if ($products === []): ?>
         <p class="card-hint">لا توجد منتجات نشطة لإضافتها. أنشئ منتجات من «المنتجات» أولًا.</p>
     <?php else: ?>
-    <p class="card-hint" style="margin-top:0;">بنود الفاتورة في جدول داخل إطار واحد؛ بعد اختيار صنف وكمية يُفتح سطر جديد تلقائياً. <kbd class="admin-kbd">Tab</kbd> من «تكلفة الوحدة» لسطر جديد؛ <kbd class="admin-kbd">←</kbd> <kbd class="admin-kbd">→</kbd> <kbd class="admin-kbd">↑</kbd> <kbd class="admin-kbd">↓</kbd> للتنقل بين الخلايا.</p>
+    <?php else: ?>
+    <p class="card-hint" style="margin-top:0;">بنود الفاتورة في جدول داخل إطار واحد؛ بعد اختيار صنف وكمية يُفتح سطر جديد تلقائياً. <kbd class="admin-kbd">Tab</kbd> من «تكلفة الوحدة» لسطر جديد؛ <kbd class="admin-kbd">←</kbd> <kbd class="admin-kbd">→</kbd> <kbd class="admin-kbd">↑</kbd> <kbd class="admin-kbd">↓</kbd> للتنقل بين الخلايا. <?php echo $purUnifiedCatalogGrouping ? 'قائمة الأصناف مُجمَّعة حسب <strong>فئة الشجرة الموحّدة</strong> المستنتجة من نوع المنتج لكل صنف.' : ''; ?></p>
     <div class="admin-doc-frame">
         <div class="table-wrap">
             <table class="admin-table admin-doc-lines-table pur-lines-table">
@@ -153,16 +197,55 @@ $recent = $pdo->query(
 <script>
 var PUR_PRODUCTS = <?php echo json_encode($products, JSON_UNESCAPED_UNICODE); ?>;
 var PUR_VARIANTS_BY_PID = <?php echo json_encode($variantsByProduct, JSON_UNESCAPED_UNICODE); ?>;
+var PUR_GROUP_BY_UNIFIED_CAT = <?php echo $purUnifiedCatalogGrouping ? 'true' : 'false'; ?>;
+
 
 function purEsc(s) {
     return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 }
 
 function purProductOptionsHtml() {
-    var o = '<option value="" data-cost="0">' + purEsc('— اختر صنفاً —') + '</option>';
-    return o + PUR_PRODUCTS.map(function (p) {
-        return '<option value="' + p.id + '" data-cost="' + String(parseFloat(p.cost) || 0) + '">' + purEsc(p.name) + '</option>';
-    }).join('');
+    var blank = '<option value="" data-cost="0">' + purEsc('— اختر صنفاً —') + '</option>';
+    var optHtml = '';
+    PUR_PRODUCTS.forEach(function (p) {
+        optHtml +=
+            '<option value="' +
+            p.id +
+            '" data-cost="' +
+            String(parseFloat(p.cost) || 0) +
+            '">' +
+            purEsc(p.name) +
+            '</option>';
+    });
+    if (typeof PUR_GROUP_BY_UNIFIED_CAT === 'undefined' || !PUR_GROUP_BY_UNIFIED_CAT) {
+        return blank + optHtml;
+    }
+    var buckets = {};
+    var orderKeys = [];
+    PUR_PRODUCTS.forEach(function (p) {
+        var k = String((p.catalog_group_label || '').trim() || 'غير مصنَّف بالشجرة الموحَّدة');
+        if (!Object.prototype.hasOwnProperty.call(buckets, k)) {
+            buckets[k] = [];
+            orderKeys.push(k);
+        }
+        buckets[k].push(p);
+    });
+    var chunks = '';
+    orderKeys.forEach(function (gk) {
+        chunks += '<optgroup label="' + purEsc(gk) + '">';
+        buckets[gk].forEach(function (p) {
+            chunks +=
+                '<option value="' +
+                p.id +
+                '" data-cost="' +
+                String(parseFloat(p.cost) || 0) +
+                '">' +
+                purEsc(p.name) +
+                '</option>';
+        });
+        chunks += '</optgroup>';
+    });
+    return blank + chunks;
 }
 
 function purRenumberRows() {

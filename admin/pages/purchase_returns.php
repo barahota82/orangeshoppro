@@ -3,13 +3,55 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/date_format.php';
+require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
 
 $pdo = db();
+orange_catalog_ensure_schema($pdo);
+
+$purUnifiedCatalogGrouping =
+    function_exists('orange_catalog_nav_use_unified')
+    && orange_catalog_nav_use_unified($pdo)
+    && orange_table_exists($pdo, 'product_types')
+    && orange_table_has_column($pdo, 'products', 'product_type_id');
+
+if ($purUnifiedCatalogGrouping) {
+    try {
+        $products = $pdo->query(
+            'SELECT p.id, p.name, p.cost, p.has_colors, p.has_sizes,
+                COALESCE(
+                    NULLIF(TRIM(ucc.name_ar), \'\'),
+                    NULLIF(TRIM(ucc.name_en), \'\'),
+                    \'غير مرتبط بفئة الشجرة الموحّدة\'
+                ) AS catalog_group_label
+             FROM products p
+             LEFT JOIN product_types pt ON pt.id = p.product_type_id
+             LEFT JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id
+             LEFT JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id
+             WHERE p.is_active = 1
+             ORDER BY catalog_group_label ASC, p.sort_order ASC, p.name ASC, p.id ASC'
+        )->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        $products = $pdo->query(
+            'SELECT id, name, cost, has_colors, has_sizes FROM products WHERE is_active = 1 ORDER BY name ASC'
+        )->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($products as &$p) {
+            $p['catalog_group_label'] = '';
+        }
+        unset($p);
+        $purUnifiedCatalogGrouping = false;
+    }
+} else {
+    $products = $pdo->query(
+        'SELECT id, name, cost, has_colors, has_sizes FROM products WHERE is_active = 1 ORDER BY name ASC'
+    )->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($products as &$p) {
+        $p['catalog_group_label'] = '';
+    }
+    unset($p);
+}
 
 $suppliers = $pdo->query('SELECT id, name, phone FROM suppliers ORDER BY name ASC')->fetchAll(PDO::FETCH_ASSOC);
-$products = $pdo->query(
-    'SELECT id, name, cost, has_colors, has_sizes FROM products WHERE is_active = 1 ORDER BY name ASC'
-)->fetchAll(PDO::FETCH_ASSOC);
 
 $variantsByProduct = [];
 $vRows = $pdo->query(
@@ -86,7 +128,7 @@ $recent = $pdo->query(
     <?php if ($products === []): ?>
         <p class="card-hint">لا توجد منتجات نشطة.</p>
     <?php else: ?>
-    <p class="card-hint" style="margin-top:0;">يُخصم من مخزون المتغير عند الحفظ؛ لا يُقبل سطراً تتجاوز فيه الكمية الرصيد الحالي.</p>
+    <p class="card-hint" style="margin-top:0;">يُخصم من مخزون المتغير عند الحفظ؛ لا يُقبل سطراً تتجاوز فيه الكمية الرصيد الحالي. <?php echo $purUnifiedCatalogGrouping ? 'قائمة الأصناف مُجمَّعة حسب <strong>فئة الشجرة الموحّدة</strong> (من نوع المنتج).' : ''; ?></p>
     <div class="admin-doc-frame">
         <div class="table-wrap">
             <table class="admin-table admin-doc-lines-table">
@@ -152,6 +194,7 @@ $recent = $pdo->query(
 <script>
 var PR_PRODUCTS = <?php echo json_encode($products, JSON_UNESCAPED_UNICODE); ?>;
 var PR_VARIANTS_BY_PID = <?php echo json_encode($variantsByProduct, JSON_UNESCAPED_UNICODE); ?>;
+var PR_GROUP_BY_UNIFIED_CAT = <?php echo $purUnifiedCatalogGrouping ? 'true' : 'false'; ?>;
 var PR_EDIT_ID = 0;
 
 function prEsc(s) {
@@ -159,10 +202,47 @@ function prEsc(s) {
 }
 
 function prProductOptionsHtml() {
-    var o = '<option value="" data-cost="0">' + prEsc('— اختر صنفاً —') + '</option>';
-    return o + PR_PRODUCTS.map(function (p) {
-        return '<option value="' + p.id + '" data-cost="' + String(parseFloat(p.cost) || 0) + '">' + prEsc(p.name) + '</option>';
-    }).join('');
+    var blank = '<option value="" data-cost="0">' + prEsc('— اختر صنفاً —') + '</option>';
+    var optHtml = '';
+    PR_PRODUCTS.forEach(function (p) {
+        optHtml +=
+            '<option value="' +
+            p.id +
+            '" data-cost="' +
+            String(parseFloat(p.cost) || 0) +
+            '">' +
+            prEsc(p.name) +
+            '</option>';
+    });
+    if (typeof PR_GROUP_BY_UNIFIED_CAT === 'undefined' || !PR_GROUP_BY_UNIFIED_CAT) {
+        return blank + optHtml;
+    }
+    var buckets = {};
+    var orderKeys = [];
+    PR_PRODUCTS.forEach(function (p) {
+        var k = String((p.catalog_group_label || '').trim() || 'غير مصنَّف بالشجرة الموحَّدة');
+        if (!Object.prototype.hasOwnProperty.call(buckets, k)) {
+            buckets[k] = [];
+            orderKeys.push(k);
+        }
+        buckets[k].push(p);
+    });
+    var chunks = '';
+    orderKeys.forEach(function (gk) {
+        chunks += '<optgroup label="' + prEsc(gk) + '">';
+        buckets[gk].forEach(function (p) {
+            chunks +=
+                '<option value="' +
+                p.id +
+                '" data-cost="' +
+                String(parseFloat(p.cost) || 0) +
+                '">' +
+                prEsc(p.name) +
+                '</option>';
+        });
+        chunks += '</optgroup>';
+    });
+    return blank + chunks;
 }
 
 function prRenumberRows() {

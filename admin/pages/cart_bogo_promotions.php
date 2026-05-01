@@ -9,7 +9,50 @@ $hasTable = orange_table_exists($pdo, 'cart_bogo_promotions');
 $cartBogoUnifiedCategoryHint =
     orange_catalog_nav_use_unified($pdo)
     && orange_table_exists($pdo, 'catalog_categories')
+    && orange_table_exists($pdo, 'catalog_sections')
+    && orange_table_exists($pdo, 'departments')
     && orange_table_exists($pdo, 'product_types');
+
+/** @var list<array{id:int,label:string}> */
+$cartBogoCatalogCategoryDropdown = [];
+if ($cartBogoUnifiedCategoryHint) {
+    try {
+        $crow = $pdo->query(
+            'SELECT ucc.id,
+                    CONCAT_WS(
+                        \' ← \',
+                        NULLIF(TRIM(d.name_ar), \'\'),
+                        NULLIF(TRIM(cs.name_ar), \'\'),
+                        NULLIF(TRIM(ucc.name_ar), \'\')
+                    ) AS trail_ar
+             FROM catalog_categories ucc
+             INNER JOIN catalog_sections cs ON cs.id = ucc.catalog_section_id AND cs.is_active = 1
+             INNER JOIN departments d ON d.id = cs.department_id AND d.is_active = 1
+             WHERE ucc.is_active = 1
+             ORDER BY d.sort_order ASC, d.id ASC, cs.sort_order ASC, cs.id ASC, ucc.sort_order ASC, ucc.id ASC'
+        )->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($crow ?: [] as $r) {
+            if (!is_array($r)) {
+                continue;
+            }
+            $cid = isset($r['id']) ? (int) $r['id'] : 0;
+            if ($cid <= 0) {
+                continue;
+            }
+            $tr = trim((string) ($r['trail_ar'] ?? ''));
+            if ($tr === '') {
+                $tr = '#' . $cid;
+            }
+            $cartBogoCatalogCategoryDropdown[] = ['id' => $cid, 'label' => $tr];
+        }
+    } catch (Throwable $e) {
+        $cartBogoCatalogCategoryDropdown = [];
+    }
+}
+$cartBogoCategoryLabelJs = [];
+foreach ($cartBogoCatalogCategoryDropdown as $e) {
+    $cartBogoCategoryLabelJs[(string) $e['id']] = $e['label'];
+}
 ?>
 <div class="page-title page-title--stacked">
     <h1>عروض BOGO (متطابق / فئة / حزمة شراء أ+ب)</h1>
@@ -44,11 +87,23 @@ $cartBogoUnifiedCategoryHint =
             </div>
         </div>
         <div id="cbp_cat_wrap" style="grid-column:1/-1;display:none;">
-            <label>رقم الفئة (category_id)</label>
-            <?php if ($cartBogoUnifiedCategoryHint): ?>
-            <p class="page-subtitle" style="margin:6px 0 10px;line-height:1.45;"><strong>تصنيف موحَّد:</strong> أدخل معرفًا من الفئات في الشجرة الموحّدة (<code dir="ltr">catalog_categories.id</code>)؛ يُطبَّق التطابق عبر مسار نوع المنتج، وليس عمود الفئة القديم على المنتج فقط.</p>
-            <?php endif; ?>
+            <?php if ($cartBogoUnifiedCategoryHint && $cartBogoCatalogCategoryDropdown !== []): ?>
+            <label for="cbp_cat">الفئة في الشجرة الموحّدة</label>
+            <p class="page-subtitle" style="margin:6px 0 10px;line-height:1.45;"><strong>تصنيف موحّد:</strong> تُقيَّد قائمة منتجات السلة وفق ورقة نوع المنتج ومسار <code dir="ltr">catalog_categories.id</code> المختارة (وليس عمود الفئة القديم على المنتج).</p>
+            <select id="cbp_cat" class="admin-inp" style="max-width:100%;width:min(42rem,100%);">
+                <option value="">— اختر فئة —</option>
+                <?php foreach ($cartBogoCatalogCategoryDropdown as $opt): ?>
+                <option value="<?php echo (int) $opt['id']; ?>"><?php echo htmlspecialchars($opt['label'], ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+            <?php elseif ($cartBogoUnifiedCategoryHint): ?>
+            <label for="cbp_cat">معرّف فئة الشجرة الموحّدة</label>
+            <p class="page-subtitle" style="margin:6px 0 10px;line-height:1.45;"><strong>تصنيف موحّد:</strong> لا توجد فئات نشطة في <code dir="ltr">catalog_categories</code> — أدخل <code dir="ltr">id</code> يدوياً أو أنشئ الفروع من صفحة فروع الشجرة.</p>
             <input type="number" id="cbp_cat" class="admin-inp" min="1" step="1" style="max-width:12rem;" dir="ltr">
+            <?php else: ?>
+            <label for="cbp_cat">رقم الفئة القديم على المنتج (<code dir="ltr">categories.id</code>)</label>
+            <input type="number" id="cbp_cat" class="admin-inp" min="1" step="1" style="max-width:12rem;" dir="ltr">
+            <?php endif; ?>
         </div>
         <div id="cbp_buy_bundle_wrap" style="grid-column:1/-1;display:none;">
             <label>مكوّنات الشراء — سطر لكل متغير: <code dir="ltr">variant_id qty</code> (متغيران مختلفان على الأقل)</label>
@@ -143,6 +198,7 @@ $cartBogoUnifiedCategoryHint =
 </div>
 
 <script>
+var CBP_CATEGORY_LABEL_MAP = <?php echo json_encode($cartBogoCategoryLabelJs, JSON_UNESCAPED_UNICODE); ?>;
 function cbpToggleBogo() {
     const el = document.querySelector('input[name="cbp_bogo"]:checked');
     const v = el ? el.value : 'same_variant';
@@ -267,7 +323,16 @@ async function loadCartBogoPromotions() {
         } else if ((r.bogo_kind || '') === 'buy_bundle') {
             cond = 'حزمة شراء';
         }
-        const cat = r.category_id != null && r.category_id !== '' ? escCbp(String(r.category_id)) : '—';
+        const catRaw = String(r.category_id != null ? r.category_id : '');
+        let catDisp = '—';
+        if (catRaw !== '') {
+            const lab =
+                typeof CBP_CATEGORY_LABEL_MAP !== 'undefined' ? CBP_CATEGORY_LABEL_MAP[catRaw] : null;
+            catDisp =
+                lab && String(lab).trim() !== ''
+                    ? escCbp(String(lab)) + ' (' + escCbp(catRaw) + ')'
+                    : escCbp(catRaw);
+        }
         const gkind = (r.gift_kind || '') === 'fixed' ? 'ثابتة' : 'اختيار';
         var gcharge = 'مجانية';
         var gck = (r.gift_unit_charge_kind || 'free').toLowerCase();
@@ -282,7 +347,7 @@ async function loadCartBogoPromotions() {
         tr.innerHTML =
             '<td>' + escCbp(String(r.id)) + '</td>' +
             '<td>' + cond + '</td>' +
-            '<td dir="ltr">' + cat + '</td>' +
+            '<td dir="ltr">' + catDisp + '</td>' +
             '<td>' + escCbp(String(r.min_buy_qty != null ? r.min_buy_qty : 2)) + '</td>' +
             '<td>' + gkind + '</td>' +
             '<td>' + escCbp(gcharge) + '</td>' +
