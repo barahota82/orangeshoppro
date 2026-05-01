@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 12);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 13);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -955,6 +955,121 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         $widenSub($pdo, 'name_fil', 'ALTER TABLE subcategories MODIFY COLUMN name_fil VARCHAR(191) NULL DEFAULT NULL');
         $widenSub($pdo, 'name_hi', 'ALTER TABLE subcategories MODIFY COLUMN name_hi VARCHAR(191) NULL DEFAULT NULL');
         $widenSub($pdo, 'slug', 'ALTER TABLE subcategories MODIFY COLUMN slug VARCHAR(191) NOT NULL');
+    }
+
+    /*
+     |--------------------------------------------------------------------------
+     | Unified catalog taxonomy (ERD Phase A — docs/archive/ORANGE_UNIFIED_TAXONOMY_AND_CATALOG_ERD.txt)
+     | Department → catalog_sections → catalog_categories → catalog_subcategories → product_types
+     | products.product_type_id = leaf only (nullable أثناء الترحيل).
+     |--------------------------------------------------------------------------
+     */
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE TABLE IF NOT EXISTS catalog_sections (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            department_id INT NOT NULL,
+            slug VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_ar VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_en VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_fil VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_hi VARCHAR(191) NOT NULL DEFAULT \'\',
+            sort_order INT NOT NULL DEFAULT 0,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_catalog_sections_dept_slug (department_id, slug),
+            KEY idx_catalog_sections_sort (department_id, sort_order),
+            KEY idx_catalog_sections_active (department_id, is_active),
+            CONSTRAINT fk_catalog_sections_department
+                FOREIGN KEY (department_id) REFERENCES departments(id)
+                ON DELETE RESTRICT ON UPDATE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+    orange_schema_invalidate_table_exists('catalog_sections');
+
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE TABLE IF NOT EXISTS catalog_categories (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            catalog_section_id INT UNSIGNED NOT NULL,
+            slug VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_ar VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_en VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_fil VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_hi VARCHAR(191) NOT NULL DEFAULT \'\',
+            sort_order INT NOT NULL DEFAULT 0,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_catalog_categories_section_slug (catalog_section_id, slug),
+            KEY idx_catalog_categories_sort (catalog_section_id, sort_order),
+            KEY idx_catalog_categories_active (catalog_section_id, is_active),
+            CONSTRAINT fk_catalog_categories_section
+                FOREIGN KEY (catalog_section_id) REFERENCES catalog_sections(id)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+    orange_schema_invalidate_table_exists('catalog_categories');
+
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE TABLE IF NOT EXISTS catalog_subcategories (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            catalog_category_id INT UNSIGNED NOT NULL,
+            slug VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_ar VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_en VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_fil VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_hi VARCHAR(191) NOT NULL DEFAULT \'\',
+            sort_order INT NOT NULL DEFAULT 0,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_catalog_subcategories_cat_slug (catalog_category_id, slug),
+            KEY idx_catalog_subcategories_sort (catalog_category_id, sort_order),
+            KEY idx_catalog_subcategories_active (catalog_category_id, is_active),
+            CONSTRAINT fk_catalog_subcategories_category
+                FOREIGN KEY (catalog_category_id) REFERENCES catalog_categories(id)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+    orange_schema_invalidate_table_exists('catalog_subcategories');
+
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE TABLE IF NOT EXISTS product_types (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            catalog_subcategory_id INT UNSIGNED NOT NULL,
+            slug VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_ar VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_en VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_fil VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_hi VARCHAR(191) NOT NULL DEFAULT \'\',
+            sort_order INT NOT NULL DEFAULT 0,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_product_types_sub_slug (catalog_subcategory_id, slug),
+            KEY idx_product_types_sort (catalog_subcategory_id, sort_order),
+            KEY idx_product_types_active (catalog_subcategory_id, is_active),
+            CONSTRAINT fk_product_types_catalog_subcategory
+                FOREIGN KEY (catalog_subcategory_id) REFERENCES catalog_subcategories(id)
+                ON DELETE RESTRICT ON UPDATE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+    orange_schema_invalidate_table_exists('product_types');
+
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'product_type_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN product_type_id INT UNSIGNED NULL DEFAULT NULL AFTER subcategory_id');
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD INDEX idx_products_product_type (product_type_id)');
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE products ADD CONSTRAINT fk_products_product_type
+                FOREIGN KEY (product_type_id) REFERENCES product_types(id)
+                ON DELETE RESTRICT ON UPDATE CASCADE'
+        );
+        orange_schema_invalidate_column_check('products', 'product_type_id');
     }
 
     static $productSubOrphansCleaned = false;

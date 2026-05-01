@@ -84,6 +84,79 @@ CREATE TABLE `subcategories` (
   KEY `idx_subcategories_department` (`department_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Unified catalog taxonomy leaf path (منتج يُربَط بالورقة الموحَّدة عبر products.product_type_id).
+CREATE TABLE `catalog_sections` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `department_id` int NOT NULL,
+  `slug` varchar(191) NOT NULL DEFAULT '',
+  `name_ar` varchar(191) NOT NULL DEFAULT '',
+  `name_en` varchar(191) NOT NULL DEFAULT '',
+  `name_fil` varchar(191) NOT NULL DEFAULT '',
+  `name_hi` varchar(191) NOT NULL DEFAULT '',
+  `sort_order` int NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_catalog_sections_dept_slug` (`department_id`,`slug`),
+  KEY `idx_catalog_sections_sort` (`department_id`,`sort_order`),
+  KEY `idx_catalog_sections_active` (`department_id`,`is_active`),
+  CONSTRAINT `fk_catalog_sections_department` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `catalog_categories` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `catalog_section_id` int unsigned NOT NULL,
+  `slug` varchar(191) NOT NULL DEFAULT '',
+  `name_ar` varchar(191) NOT NULL DEFAULT '',
+  `name_en` varchar(191) NOT NULL DEFAULT '',
+  `name_fil` varchar(191) NOT NULL DEFAULT '',
+  `name_hi` varchar(191) NOT NULL DEFAULT '',
+  `sort_order` int NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_catalog_categories_section_slug` (`catalog_section_id`,`slug`),
+  KEY `idx_catalog_categories_sort` (`catalog_section_id`,`sort_order`),
+  KEY `idx_catalog_categories_active` (`catalog_section_id`,`is_active`),
+  CONSTRAINT `fk_catalog_categories_section` FOREIGN KEY (`catalog_section_id`) REFERENCES `catalog_sections` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `catalog_subcategories` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `catalog_category_id` int unsigned NOT NULL,
+  `slug` varchar(191) NOT NULL DEFAULT '',
+  `name_ar` varchar(191) NOT NULL DEFAULT '',
+  `name_en` varchar(191) NOT NULL DEFAULT '',
+  `name_fil` varchar(191) NOT NULL DEFAULT '',
+  `name_hi` varchar(191) NOT NULL DEFAULT '',
+  `sort_order` int NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_catalog_subcategories_cat_slug` (`catalog_category_id`,`slug`),
+  KEY `idx_catalog_subcategories_sort` (`catalog_category_id`,`sort_order`),
+  KEY `idx_catalog_subcategories_active` (`catalog_category_id`,`is_active`),
+  CONSTRAINT `fk_catalog_subcategories_category` FOREIGN KEY (`catalog_category_id`) REFERENCES `catalog_categories` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `product_types` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `catalog_subcategory_id` int unsigned NOT NULL,
+  `slug` varchar(191) NOT NULL DEFAULT '',
+  `name_ar` varchar(191) NOT NULL DEFAULT '',
+  `name_en` varchar(191) NOT NULL DEFAULT '',
+  `name_fil` varchar(191) NOT NULL DEFAULT '',
+  `name_hi` varchar(191) NOT NULL DEFAULT '',
+  `sort_order` int NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_product_types_sub_slug` (`catalog_subcategory_id`,`slug`),
+  KEY `idx_product_types_sort` (`catalog_subcategory_id`,`sort_order`),
+  KEY `idx_product_types_active` (`catalog_subcategory_id`,`is_active`),
+  CONSTRAINT `fk_product_types_catalog_subcategory` FOREIGN KEY (`catalog_subcategory_id`) REFERENCES `catalog_subcategories` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `channels` (
   `id` int NOT NULL AUTO_INCREMENT,
   `name` varchar(100) NOT NULL,
@@ -379,6 +452,7 @@ CREATE TABLE `products` (
   `description_hi` text,
   `category_id` int DEFAULT NULL,
   `subcategory_id` int DEFAULT NULL,
+  `product_type_id` int unsigned DEFAULT NULL,
   `price` decimal(10,2) NOT NULL,
   `cost` decimal(10,2) NOT NULL,
   `main_image` varchar(255) DEFAULT NULL,
@@ -404,8 +478,10 @@ CREATE TABLE `products` (
   PRIMARY KEY (`id`),
   KEY `idx_products_category_active` (`category_id`,`is_active`),
   KEY `idx_products_subcategory` (`subcategory_id`),
+  KEY `idx_products_product_type` (`product_type_id`),
   KEY `idx_products_slug` (`slug`),
-  KEY `idx_products_sort` (`sort_order`,`id`)
+  KEY `idx_products_sort` (`sort_order`,`id`),
+  CONSTRAINT `fk_products_product_type` FOREIGN KEY (`product_type_id`) REFERENCES `product_types` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `product_colorways` (
