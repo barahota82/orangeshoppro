@@ -311,7 +311,7 @@ document.getElementById('c_name_en').addEventListener('input', scheduleColorTran
                 "ar en ."
                 "fil hi .";
             gap:14px 18px;
-            direction:ltr;
+            direction:rtl;
         }
         .cd-form-grid .cd-sort{
             grid-area:sort;
@@ -328,7 +328,7 @@ document.getElementById('c_name_en').addEventListener('input', scheduleColorTran
         .cd-form-grid label,
         .cd-form-grid input,
         .cd-form-grid select{direction:rtl;text-align:right}
-        .cd-form-grid #c_sort{margin-right:auto;margin-left:0;display:block}
+        .cd-form-grid #c_sort{margin-inline-start:0;margin-inline-end:auto;display:block}
         .cd-form-actions{justify-content:flex-end}
         @media (max-width: 860px){
             .cd-form-grid{
