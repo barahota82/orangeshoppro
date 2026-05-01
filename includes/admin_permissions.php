@@ -106,6 +106,7 @@ function orange_admin_api_folder_resource(string $folder): string
         'colors' => 'catalog',
         'patterns' => 'catalog',
         'size_families' => 'catalog',
+        'catalog_attributes' => 'catalog',
         'translate' => 'catalog',
         'products' => 'products',
         'uploads' => 'products',
