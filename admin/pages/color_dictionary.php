@@ -331,7 +331,41 @@ document.getElementById('c_name_en').addEventListener('input', scheduleColorTran
         .cd-form-grid input,
         .cd-form-grid select{direction:rtl;text-align:right}
         .cd-form-grid #c_sort,
-        .cd-form-grid #c_active{margin-inline-start:0;margin-inline-end:auto;display:block;width:100%;box-sizing:border-box}
+        .cd-form-grid #c_active{
+            margin-inline-start:0;
+            margin-inline-end:auto;
+            display:block;
+            width:100%;
+            box-sizing:border-box;
+            border:1px solid #cbd5e1;
+            border-radius:var(--radius-sm,10px);
+            font-size:14px;
+            line-height:calc(var(--input-min-h,36px) - 2px);
+            min-height:var(--input-min-h,36px);
+            height:var(--input-min-h,36px);
+            max-height:var(--input-min-h,36px);
+            padding-block:0;
+            padding-inline:12px;
+        }
+        .cd-form-grid input#c_sort::-webkit-outer-spin-button,
+        .cd-form-grid input#c_sort::-webkit-inner-spin-button{
+            -webkit-appearance:none;
+            margin:0;
+        }
+        .cd-form-grid input#c_sort{
+            -moz-appearance:textfield;
+            appearance:textfield;
+        }
+        .cd-form-grid #c_active{
+            -webkit-appearance:none;
+            appearance:none;
+            background-color:#fff;
+            background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M2.75 4.25L6 7.55l3.25-3.3.65.64L6 8.82 2.1 4.9l.65-.65z'/%3E%3C/svg%3E");
+            background-repeat:no-repeat;
+            background-size:12px;
+            background-position:left 12px center;
+            padding-inline-end:32px;
+        }
         .cd-form-actions{justify-content:flex-end}
         @media (max-width: 860px){
             .cd-form-grid{
