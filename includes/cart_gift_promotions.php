@@ -211,6 +211,10 @@ function orange_cart_gift_promotion_pool_options(
         if (!$v || (int) ($v['p_active'] ?? 0) !== 1) {
             continue;
         }
+        $poolPid = (int) ($v['product_id'] ?? 0);
+        if ($poolPid > 0 && !orange_storefront_product_in_active_unified_chain($pdo, $poolPid)) {
+            continue;
+        }
         $used = orange_cart_gift_variant_usage_in_lines($validatedItems, $vid);
         $stock = (int) ($v['stock_quantity'] ?? 0);
         if ($stock < $used + 1) {

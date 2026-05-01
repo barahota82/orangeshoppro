@@ -1,12 +1,44 @@
 <?php
+
+declare(strict_types=1);
+
 $pdo = db();
-$products = $pdo->query("SELECT id, name FROM products WHERE is_active = 1 ORDER BY name ASC")->fetchAll();
-$offers = $pdo->query("
+orange_catalog_ensure_schema($pdo);
+
+require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
+
+$catalogNavUnified = function_exists('orange_catalog_nav_use_unified') && orange_catalog_nav_use_unified($pdo);
+if (
+    $catalogNavUnified
+    && function_exists('orange_table_exists')
+    && orange_table_exists($pdo, 'product_types')
+    && orange_table_exists($pdo, 'catalog_subcategories')
+) {
+    $products = $pdo->query(
+        '
+        SELECT DISTINCT p.id, p.name
+        FROM products p
+        INNER JOIN product_types pt ON pt.id = p.product_type_id AND pt.is_active = 1
+        INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id AND ucs.is_active = 1
+        INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id AND ucc.is_active = 1
+        INNER JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id AND ucs2.is_active = 1
+        INNER JOIN departments d ON d.id = ucs2.department_id AND d.is_active = 1
+        WHERE p.is_active = 1
+        ORDER BY p.name ASC
+    '
+    )->fetchAll();
+} else {
+    $products = $pdo->query("SELECT id, name FROM products WHERE is_active = 1 ORDER BY name ASC")->fetchAll();
+}
+
+$offers = $pdo->query(
+    '
     SELECT o.*, p.name AS product_name
     FROM offers o
     INNER JOIN products p ON p.id = o.product_id
     ORDER BY o.id DESC
-")->fetchAll();
+'
+)->fetchAll();
 ?>
 <div class="page-title">
     <h1>العروض</h1>
@@ -20,7 +52,7 @@ $offers = $pdo->query("
             <select id="offer_product_id">
                 <option value="">اختر المنتج</option>
                 <?php foreach ($products as $p): ?>
-                    <option value="<?php echo (int)$p['id']; ?>"><?php echo htmlspecialchars($p['name']); ?></option>
+                    <option value="<?php echo (int)$p['id']; ?>"><?php echo htmlspecialchars((string) $p['name'], ENT_QUOTES, 'UTF-8'); ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -50,7 +82,7 @@ $offers = $pdo->query("
                 <?php foreach ($offers as $o): ?>
                 <tr>
                     <td><?php echo (int)$o['id']; ?></td>
-                    <td><?php echo htmlspecialchars($o['product_name']); ?></td>
+                    <td><?php echo htmlspecialchars((string) $o['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo number_format((float)$o['discount'], 2); ?></td>
                     <td><?php echo (int)$o['is_active'] === 1 ? 'نشط' : 'مخفي'; ?></td>
                 </tr>
