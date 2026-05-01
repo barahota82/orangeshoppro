@@ -26,29 +26,66 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
 </div>
 <?php else: ?>
 
+<style>
+    .sd-dict-form {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px 18px;
+        align-items: start;
+    }
+    .sd-dict-kind .sd-kind-r1 { grid-column: 1 / -1; max-width: 240px; }
+    .sd-dict-kind .sd-kind-ar { grid-column: 1; }
+    .sd-dict-kind .sd-kind-en { grid-column: 2; }
+    .sd-dict-kind .sd-kind-key { grid-column: 1; }
+    .sd-dict-kind .sd-kind-act { grid-column: 2; }
+    .sd-dict-cat .sd-cat-r1-sort { grid-column: 1; }
+    .sd-dict-cat .sd-cat-r1-parent { grid-column: 2; }
+    .sd-dict-cat .sd-cat-ar { grid-column: 1; }
+    .sd-dict-cat .sd-cat-en { grid-column: 2; }
+    .sd-dict-cat .sd-cat-key { grid-column: 1; }
+    .sd-dict-cat .sd-cat-act { grid-column: 2; }
+    @media (max-width: 720px) {
+        .sd-dict-form { grid-template-columns: 1fr; }
+        .sd-dict-kind .sd-kind-r1,
+        .sd-dict-kind .sd-kind-ar,
+        .sd-dict-kind .sd-kind-en,
+        .sd-dict-kind .sd-kind-key,
+        .sd-dict-kind .sd-kind-act,
+        .sd-dict-cat .sd-cat-r1-sort,
+        .sd-dict-cat .sd-cat-r1-parent,
+        .sd-dict-cat .sd-cat-ar,
+        .sd-dict-cat .sd-cat-en,
+        .sd-dict-cat .sd-cat-key,
+        .sd-dict-cat .sd-cat-act {
+            grid-column: 1 / -1;
+            max-width: none;
+        }
+    }
+</style>
+
 <div class="card">
     <h3>نوع تجاري (المستوى 1)</h3>
     <input type="hidden" id="sd_kind_old_key" value="">
-    <div class="form-grid" style="gap:12px;">
-        <div>
+    <div class="sd-dict-form sd-dict-kind">
+        <div class="sd-kind-r1">
+            <label>الترتيب (تلقائي)</label>
+            <input type="number" id="sd_kind_sort" value="0" style="max-width:120px;">
+        </div>
+        <div class="sd-kind-ar">
             <label>التسمية العربية</label>
             <input type="text" id="sd_kind_label_ar" maxlength="191" <?php echo !$tablesReady ? 'disabled' : ''; ?>>
             <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">عند التوقف عن الكتابة يُحدَّث الإنجليزي صامتاً (لتوليد المفتاح) وفق آلية ترجمة الأسماء في الأدمن.</small>
         </div>
-        <div>
+        <div class="sd-kind-en">
             <label>التسمية الإنجليزية</label>
             <input type="text" id="sd_kind_label_en" maxlength="191" <?php echo !$tablesReady ? 'disabled' : ''; ?>>
         </div>
-        <div>
+        <div class="sd-kind-key">
             <label>مفتاح EN (<code>kind_key</code>) — للقراءة فقط</label>
             <input type="text" id="sd_kind_key" maxlength="32" autocomplete="off" <?php echo !$tablesReady ? 'disabled' : ''; ?> readonly tabindex="-1" style="background:#f4f6f9;cursor:default;">
             <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُحسب آلياً من الإنجليزي: حروف صغيرة وأرقام فقط مع <code>_</code> و<code>-</code> (حتى 32 محرفاً).</small>
         </div>
-        <div>
-            <label>الترتيب</label>
-            <input type="number" id="sd_kind_sort" value="0" style="max-width:120px;">
-        </div>
-        <div>
+        <div class="sd-kind-act">
             <label>نشط</label>
             <select id="sd_kind_active">
                 <option value="1">نعم</option>
@@ -65,29 +102,29 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
 <div class="card">
     <h3 style="margin-top:0;">فئة قياس (المستوى 2)</h3>
     <input type="hidden" id="sd_cat_old_key" value="">
-    <div class="form-grid" style="gap:12px;">
-        <div>
+    <div class="sd-dict-form sd-dict-cat">
+        <div class="sd-cat-r1-sort">
+            <label>الترتيب (تلقائي)</label>
+            <input type="number" id="sd_cat_sort" value="0" style="max-width:120px;">
+        </div>
+        <div class="sd-cat-r1-parent">
             <label>النوع التجاري</label>
             <select id="sd_cat_parent_kind" <?php echo !$tablesReady ? 'disabled' : ''; ?>></select>
         </div>
-        <div>
+        <div class="sd-cat-ar">
             <label>التسمية العربية</label>
             <input type="text" id="sd_cat_label_ar" maxlength="191">
         </div>
-        <div>
+        <div class="sd-cat-en">
             <label>التسمية الإنجليزية</label>
             <input type="text" id="sd_cat_label_en" maxlength="191">
         </div>
-        <div>
+        <div class="sd-cat-key">
             <label>مفتاح EN (<code>category_key</code>) — للقراءة فقط</label>
             <input type="text" id="sd_cat_key" maxlength="64" autocomplete="off" readonly tabindex="-1" style="background:#f4f6f9;cursor:default;">
             <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُحسب آلياً من الإنجليزي (حتى 64 محرفاً) بنفس قواعد المفتاح أعلاه.</small>
         </div>
-        <div>
-            <label>الترتيب</label>
-            <input type="number" id="sd_cat_sort" value="0" style="max-width:120px;">
-        </div>
-        <div>
+        <div class="sd-cat-act">
             <label>نشط</label>
             <select id="sd_cat_active">
                 <option value="1">نعم</option>
