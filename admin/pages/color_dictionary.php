@@ -40,25 +40,9 @@ if ($hasTable) {
             <label>الترتيب (تلقائي)</label>
             <input type="number" id="c_sort" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int) $nextSort; ?>" disabled>
         </div>
-        <div class="cd-ar">
-            <label>الاسم العربي</label>
-            <input type="text" id="c_name_ar" <?php echo !$hasTable ? 'disabled' : ''; ?>>
-        </div>
-        <div class="cd-fil">
-            <label>Filipino</label>
-            <input type="text" id="c_name_fil" <?php echo !$hasTable ? 'disabled' : ''; ?>>
-        </div>
-        <div class="cd-en">
-            <label>English</label>
-            <input type="text" id="c_name_en" <?php echo !$hasTable ? 'disabled' : ''; ?>>
-        </div>
         <div class="cd-hex">
             <label>Hex (اختياري)</label>
             <input type="text" id="c_hex" placeholder="مثال #FFFFFF أو اتركه فارغاً" <?php echo !$hasTable ? 'disabled' : ''; ?>>
-        </div>
-        <div class="cd-hi">
-            <label>Hindi</label>
-            <input type="text" id="c_name_hi" <?php echo !$hasTable ? 'disabled' : ''; ?>>
         </div>
         <div class="cd-active">
             <label>نشط</label>
@@ -66,6 +50,22 @@ if ($hasTable) {
                 <option value="1">نعم</option>
                 <option value="0">لا</option>
             </select>
+        </div>
+        <div class="cd-ar">
+            <label>الاسم العربي</label>
+            <input type="text" id="c_name_ar" <?php echo !$hasTable ? 'disabled' : ''; ?>>
+        </div>
+        <div class="cd-en">
+            <label>English</label>
+            <input type="text" id="c_name_en" <?php echo !$hasTable ? 'disabled' : ''; ?>>
+        </div>
+        <div class="cd-fil">
+            <label>Filipino</label>
+            <input type="text" id="c_name_fil" <?php echo !$hasTable ? 'disabled' : ''; ?>>
+        </div>
+        <div class="cd-hi">
+            <label>Hindi</label>
+            <input type="text" id="c_name_hi" <?php echo !$hasTable ? 'disabled' : ''; ?>>
         </div>
     </div>
     <div class="actions cd-form-actions" style="margin-top:14px;">
@@ -305,19 +305,17 @@ document.getElementById('c_name_en').addEventListener('input', scheduleColorTran
     style.textContent = `
         .cd-form-grid{
             display:grid;
-            grid-template-columns:1fr 1fr;
+            grid-template-columns:1fr 1fr 1fr;
             grid-template-areas:
-                "blank sort"
-                "ar ar"
-                "fil en"
-                "hex hi"
-                "active active";
+                "sort hex active"
+                "ar en ."
+                "fil hi .";
             gap:14px 18px;
             direction:ltr;
         }
         .cd-form-grid .cd-sort{
             grid-area:sort;
-            justify-self:end;
+            justify-self:start;
             width:100%;
             max-width:var(--admin-sort-field-max-w, 220px);
         }
@@ -330,18 +328,24 @@ document.getElementById('c_name_en').addEventListener('input', scheduleColorTran
         .cd-form-grid label,
         .cd-form-grid input,
         .cd-form-grid select{direction:rtl;text-align:right}
-        .cd-form-grid #c_sort{margin-right:0;margin-left:auto;display:block}
+        .cd-form-grid #c_sort{margin-right:auto;margin-left:0;display:block}
         .cd-form-actions{justify-content:flex-end}
         @media (max-width: 860px){
-            .cd-form-grid{grid-template-columns:1fr}
-            .cd-form-grid .cd-sort,
-            .cd-form-grid .cd-ar,
-            .cd-form-grid .cd-en,
-            .cd-form-grid .cd-hi,
-            .cd-form-grid .cd-fil,
-            .cd-form-grid .cd-hex,
-            .cd-form-grid .cd-active{grid-column:1}
-            .cd-form-grid #c_sort{max-width:var(--admin-sort-field-max-w,220px)}
+            .cd-form-grid{
+                grid-template-columns:1fr;
+                grid-template-areas:
+                    "sort"
+                    "hex"
+                    "active"
+                    "ar"
+                    "en"
+                    "fil"
+                    "hi";
+            }
+            .cd-form-grid .cd-sort{
+                justify-self:start;
+                max-width:var(--admin-sort-field-max-w,220px)
+            }
         }
         .cat-dep-list-wrap[data-list="colors"]{
             overflow-x:auto;
