@@ -305,35 +305,35 @@ document.getElementById('c_name_en').addEventListener('input', scheduleColorTran
     style.textContent = `
         .cd-form-grid{
             display:grid;
-            grid-template-columns:repeat(6,minmax(0,1fr));
+            grid-template-columns:repeat(12,minmax(0,1fr));
             grid-template-areas:
-                "sort sort hex hex active active"
-                "ar ar ar en en en"
-                "fil fil fil hi hi hi";
+                "active active hex hex hex hex hex hex hex hex sort sort"
+                "en en en en en en ar ar ar ar ar ar"
+                "hi hi hi hi hi hi fil fil fil fil fil fil";
             gap:14px 18px;
-            direction:rtl;
-        }
-        .cd-form-grid .cd-sort,
-        .cd-form-grid .cd-active{
-            justify-self:start;
-            width:100%;
+            direction:ltr;
         }
         .cd-form-grid .cd-sort{
             grid-area:sort;
+            justify-self:end;
+            width:100%;
+        }
+        .cd-form-grid .cd-active{
+            grid-area:active;
+            justify-self:start;
+            width:100%;
         }
         .cd-form-grid .cd-ar{grid-area:ar}
         .cd-form-grid .cd-en{grid-area:en}
         .cd-form-grid .cd-hi{grid-area:hi}
         .cd-form-grid .cd-fil{grid-area:fil}
-        .cd-form-grid .cd-hex{grid-area:hex}
-        .cd-form-grid .cd-active{grid-area:active}
+        .cd-form-grid .cd-hex{grid-area:hex;min-width:0}
         .cd-form-grid label,
         .cd-form-grid input,
         .cd-form-grid select{direction:rtl;text-align:right}
         .cd-form-grid #c_sort,
         .cd-form-grid #c_active{
-            margin-inline-start:0;
-            margin-inline-end:auto;
+            margin-inline:0;
             display:block;
             width:100%;
             box-sizing:border-box;
