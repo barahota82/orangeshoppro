@@ -42,28 +42,28 @@ if ($hasTable) {
             <label>الترتيب (تلقائي)</label>
             <input type="number" id="p_sort" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int) $nextSort; ?>" disabled>
         </div>
+        <div class="pd-active admin-sort-field-wrap">
+            <label>نشط</label>
+            <select id="p_active" class="admin-sort-field" <?php echo !$hasTable ? 'disabled' : ''; ?>>
+                <option value="1">نعم</option>
+                <option value="0">لا</option>
+            </select>
+        </div>
         <div class="pd-ar">
             <label>الاسم العربي</label>
             <input type="text" id="p_name_ar" <?php echo !$hasTable ? 'disabled' : ''; ?>>
-        </div>
-        <div class="pd-fil">
-            <label>Filipino</label>
-            <input type="text" id="p_name_fil" <?php echo !$hasTable ? 'disabled' : ''; ?>>
         </div>
         <div class="pd-en">
             <label>English</label>
             <input type="text" id="p_name_en" <?php echo !$hasTable ? 'disabled' : ''; ?>>
         </div>
+        <div class="pd-fil">
+            <label>Filipino</label>
+            <input type="text" id="p_name_fil" <?php echo !$hasTable ? 'disabled' : ''; ?>>
+        </div>
         <div class="pd-hi">
             <label>Hindi</label>
             <input type="text" id="p_name_hi" <?php echo !$hasTable ? 'disabled' : ''; ?>>
-        </div>
-        <div class="pd-active">
-            <label>نشط</label>
-            <select id="p_active" <?php echo !$hasTable ? 'disabled' : ''; ?>>
-                <option value="1">نعم</option>
-                <option value="0">لا</option>
-            </select>
         </div>
     </div>
     <div class="actions pd-form-actions" style="margin-top:14px;">
@@ -121,7 +121,7 @@ if ($hasTable) {
                                     'sort_order' => (int) $c['sort_order'],
                                     'is_active' => (int) $c['is_active'],
                                 ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button>
-                                <button type="button" class="pd-btn-toggle btn-secondary" onclick="togglePattern(<?php echo (int) $c['id']; ?>, <?php echo (int) $c['is_active']; ?>)">
+                                <button type="button" class="pd-btn-toggle" onclick="togglePattern(<?php echo (int) $c['id']; ?>, <?php echo (int) $c['is_active']; ?>)">
                                     <?php echo (int) $c['is_active'] === 1 ? 'إخفاء' : 'إظهار'; ?>
                                 </button>
                             </div>
@@ -298,47 +298,157 @@ if (pEnEl) pEnEl.addEventListener('input', schedulePatternTranslateFromEnglish);
     style.textContent = `
         .pd-form-grid{
             display:grid;
-            grid-template-columns:1fr 1fr;
+            grid-template-columns:repeat(12,minmax(0,1fr));
             grid-template-areas:
-                "blank sort"
-                "ar ar"
-                "fil en"
-                "hi active";
+                "active active . . . . . . . . sort sort"
+                "en en en en en en ar ar ar ar ar ar"
+                "hi hi hi hi hi hi fil fil fil fil fil fil";
             gap:14px 18px;
             direction:ltr;
         }
-        .pd-form-grid .pd-sort{ grid-area:sort; justify-self:end; width:100%; max-width:var(--admin-sort-field-max-w, 220px) }
+        .pd-form-grid .pd-sort{
+            grid-area:sort;
+            justify-self:end;
+            width:100%;
+        }
+        .pd-form-grid .pd-active{
+            grid-area:active;
+            justify-self:start;
+            width:100%;
+        }
         .pd-form-grid .pd-ar{grid-area:ar}
         .pd-form-grid .pd-en{grid-area:en}
         .pd-form-grid .pd-hi{grid-area:hi}
         .pd-form-grid .pd-fil{grid-area:fil}
-        .pd-form-grid .pd-active{grid-area:active}
-        .pd-form-grid label, .pd-form-grid input, .pd-form-grid select{direction:rtl;text-align:right}
-        .pd-form-grid #p_sort{margin-right:0;margin-left:auto;display:block}
+        .pd-form-grid label,
+        .pd-form-grid input,
+        .pd-form-grid select{direction:rtl;text-align:right}
+        .pd-form-grid #p_sort,
+        .pd-form-grid #p_active{
+            margin-inline:0;
+            display:block;
+            width:100%;
+            box-sizing:border-box;
+            border:1px solid #cbd5e1;
+            border-radius:var(--radius-sm,10px);
+            font-size:14px;
+            line-height:calc(var(--input-min-h,36px) - 2px);
+            min-height:var(--input-min-h,36px);
+            height:var(--input-min-h,36px);
+            max-height:var(--input-min-h,36px);
+            padding-block:0;
+            padding-inline:12px;
+        }
+        .pd-form-grid input#p_sort::-webkit-outer-spin-button,
+        .pd-form-grid input#p_sort::-webkit-inner-spin-button{
+            -webkit-appearance:none;
+            margin:0;
+        }
+        .pd-form-grid input#p_sort{
+            -moz-appearance:textfield;
+            appearance:textfield;
+        }
+        .pd-form-grid #p_active{
+            -webkit-appearance:none;
+            appearance:none;
+            background-color:#fff;
+            background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M2.75 4.25L6 7.55l3.25-3.3.65.64L6 8.82 2.1 4.9l.65-.65z'/%3E%3C/svg%3E");
+            background-repeat:no-repeat;
+            background-size:12px;
+            background-position:left 12px center;
+            padding-inline-end:32px;
+        }
         .pd-form-actions{justify-content:flex-end}
         @media (max-width: 860px){
-            .pd-form-grid{grid-template-columns:1fr}
-            .pd-form-grid .pd-sort, .pd-form-grid .pd-ar, .pd-form-grid .pd-en,
-            .pd-form-grid .pd-hi, .pd-form-grid .pd-fil, .pd-form-grid .pd-active{grid-column:1}
-            .pd-form-grid #p_sort{max-width:var(--admin-sort-field-max-w,220px)}
+            .pd-form-grid{
+                grid-template-columns:1fr;
+                grid-template-areas:
+                    "sort"
+                    "active"
+                    "ar"
+                    "en"
+                    "fil"
+                    "hi";
+            }
+            .pd-form-grid .pd-sort,
+            .pd-form-grid .pd-active{
+                justify-self:start;
+                max-width:var(--admin-sort-field-max-w,220px)
+            }
+        }
+        .cat-dep-list-wrap[data-list="patterns"]{
+            overflow-x:auto;
+            max-width:100%;
+            -webkit-overflow-scrolling:touch;
         }
         .cat-dep-list-wrap[data-list="patterns"] > table{
-            min-width:820px;
+            min-width:860px;
             width:100%;
             border-collapse:collapse;
+            table-layout:fixed;
+        }
+        .cat-dep-list-wrap[data-list="patterns"] > table th,
+        .cat-dep-list-wrap[data-list="patterns"] > table td{
+            vertical-align:middle;
         }
         .cat-dep-list-wrap[data-list="patterns"] table .pd-ops-col,
         .cat-dep-list-wrap[data-list="patterns"] table .pd-row-ops{
             width:200px !important;
+            min-width:200px !important;
+            max-width:200px !important;
+            box-sizing:border-box !important;
             text-align:center !important;
+            vertical-align:middle !important;
+            padding:6px 8px !important;
         }
         .cat-dep-list-wrap[data-list="patterns"] .pd-ops-wrap{
             display:grid;
             grid-template-columns:38px minmax(0,1fr);
             gap:8px;
             align-items:center;
-            direction:rtl;
             margin:0 auto;
+            max-width:100%;
+            direction:rtl;
+        }
+        .cat-dep-list-wrap[data-list="patterns"] .pd-ops-arrows{
+            display:flex;
+            flex-direction:column;
+            gap:4px;
+            align-items:center;
+            justify-content:center;
+        }
+        .cat-dep-list-wrap[data-list="patterns"] .pd-ops-wrap button.pd-btn-reorder{
+            width:32px !important;
+            min-width:32px !important;
+            height:28px !important;
+            margin:0 !important;
+            padding:0 !important;
+            font-size:13px !important;
+            line-height:1 !important;
+            border-radius:6px !important;
+            display:inline-flex !important;
+            align-items:center;
+            justify-content:center;
+        }
+        .cat-dep-list-wrap[data-list="patterns"] .pd-ops-main{
+            display:flex;
+            flex-direction:column;
+            gap:5px;
+            min-width:0;
+        }
+        .cat-dep-list-wrap[data-list="patterns"] .pd-ops-main .btn-secondary,
+        .cat-dep-list-wrap[data-list="patterns"] .pd-ops-main .pd-btn-toggle{
+            width:100% !important;
+            margin:0 !important;
+            padding:6px 8px !important;
+            font-size:12px !important;
+            line-height:1.2 !important;
+            border-radius:6px !important;
+            box-sizing:border-box !important;
+            min-height:30px !important;
+            white-space:nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis;
         }
     `;
     document.head.appendChild(style);
