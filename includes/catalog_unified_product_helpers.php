@@ -254,3 +254,46 @@ function orange_catalog_save_product_attribute_values(PDO $pdo, int $productId, 
         $ins->execute([$productId, $aid, $raw]);
     }
 }
+
+/**
+ * في وضع الترحيل الموحّد للواجهة: المنتج مرئٍ فقط إذا ارتبط بسلسلة catalog نشطة ومطابقة لاستعلام الصفحة الرئيسية الموحّد.
+ * خارج الوضع الموحّد تُعاد دائماً true لتفويض بوابة المتجر القديمة.
+ */
+function orange_storefront_product_in_active_unified_chain(PDO $pdo, int $productId): bool
+{
+    if ($productId <= 0) {
+        return false;
+    }
+    if (!function_exists('orange_catalog_nav_use_unified') || !orange_catalog_nav_use_unified($pdo)) {
+        return true;
+    }
+    if (
+        !function_exists('orange_table_exists')
+        || !orange_table_exists($pdo, 'product_types')
+        || !orange_table_exists($pdo, 'catalog_subcategories')
+    ) {
+        return true;
+    }
+    try {
+        $st = $pdo->prepare(
+            'SELECT 1
+             FROM products p
+             INNER JOIN product_types pt ON pt.id = p.product_type_id AND pt.is_active = 1
+             INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id AND ucs.is_active = 1
+             INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id AND ucc.is_active = 1
+             INNER JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id AND ucs2.is_active = 1
+             INNER JOIN departments d ON d.id = ucs2.department_id AND d.is_active = 1
+             WHERE p.id = ? AND p.is_active = 1
+             LIMIT 1'
+        );
+        $st->execute([$productId]);
+
+        return (bool) $st->fetchColumn();
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] orange_storefront_product_in_active_unified_chain: ' . $e->getMessage());
+        }
+
+        return true;
+    }
+}

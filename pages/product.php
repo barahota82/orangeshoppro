@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/catalog_schema.php';
+require_once __DIR__ . '/../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../includes/catalog_labels.php';
 require_once __DIR__ . '/../includes/upload_paths.php';
 
@@ -14,6 +15,13 @@ $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $stmt = $pdo->prepare("SELECT * FROM products WHERE id = ? AND is_active = 1 LIMIT 1");
 $stmt->execute([$id]);
 $product = $stmt->fetch();
+if (
+    $product !== false
+    && is_array($product)
+    && !orange_storefront_product_in_active_unified_chain($pdo, $id)
+) {
+    $product = false;
+}
 
 $tbState = storefront_toolbar_state();
 $channelSlug = $tbState['channelSlug'];
