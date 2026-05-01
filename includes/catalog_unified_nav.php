@@ -42,7 +42,11 @@ function orange_storefront_unified_nav_for_home(PDO $pdo): array
               SELECT 1
               FROM products p
               INNER JOIN product_types pt ON pt.id = p.product_type_id AND pt.is_active = 1
-              INNER JOIN catalog_subcategories xc ON xc.id = pt.catalog_subcategory_id AND xc.catalog_category_id = cc.id
+              INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id
+                AND ucs.is_active = 1
+                AND ucs.catalog_category_id = cc.id
+              INNER JOIN catalog_sections sec_p ON sec_p.id = cc.catalog_section_id AND sec_p.is_active = 1
+              INNER JOIN departments d_p ON d_p.id = sec_p.department_id AND d_p.is_active = 1
               WHERE p.is_active = 1
           )';
 
@@ -82,6 +86,9 @@ function orange_storefront_unified_nav_for_home(PDO $pdo): array
                   SELECT 1
                   FROM product_types pt
                   INNER JOIN products p ON p.product_type_id = pt.id AND pt.is_active = 1 AND p.is_active = 1
+                  INNER JOIN catalog_categories cc2 ON cc2.id = s.catalog_category_id AND cc2.is_active = 1
+                  INNER JOIN catalog_sections sec2 ON sec2.id = cc2.catalog_section_id AND sec2.is_active = 1
+                  INNER JOIN departments d2 ON d2.id = sec2.department_id AND d2.is_active = 1
                   WHERE pt.catalog_subcategory_id = s.id
               )
             ORDER BY s.catalog_category_id ASC, s.sort_order ASC, s.id ASC

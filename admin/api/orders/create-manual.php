@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/order_helpers.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/order_fulfillment.php';
 require_once __DIR__ . '/../../../includes/phone_validation.php';
 require_admin_api();
@@ -56,6 +57,11 @@ try {
         $product = $productStmt->fetch(PDO::FETCH_ASSOC);
         if (!$product) {
             throw new RuntimeException('منتج غير موجود: ' . $pid);
+        }
+        if (!orange_storefront_product_in_active_unified_chain($pdo, $pid)) {
+            throw new RuntimeException(
+                'المنتج غير ضمن الكتالوج الموحّد النشط أو غير مرتبط بسلسلة التصنيف الصالحة: ' . $pid
+            );
         }
 
         $qty = max(1, (int)$item['qty']);
