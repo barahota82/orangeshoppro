@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/catalog_sizing_department_sync.php';
 require_admin_api();
 
 /** @return string */
@@ -36,10 +37,25 @@ try {
 
     switch ($action) {
         case 'list_kinds':
+            if (orange_table_exists($pdo, 'departments')) {
+                orange_catalog_sync_commercial_kinds_from_departments($pdo);
+            }
             $rows = $pdo->query(
-                'SELECT kind_key, label_ar, label_en, sort_order, is_active
-                 FROM commercial_kind_dictionary
-                 ORDER BY sort_order ASC, kind_key ASC'
+                'SELECT c.kind_key, c.label_ar, c.label_en, c.sort_order, c.is_active,
+                        CASE
+                            WHEN c.kind_key REGEXP \'^d[0-9]+$\'
+                                 AND d.id IS NOT NULL THEN d.id
+                            ELSE NULL
+                        END AS department_id,
+                        CASE WHEN d.id IS NOT NULL THEN 1 ELSE 0 END AS department_linked
+                 FROM commercial_kind_dictionary c
+                 LEFT JOIN departments d ON d.id = CAST(SUBSTRING(c.kind_key, 2) AS UNSIGNED)
+                 ORDER BY
+                    CASE WHEN d.id IS NOT NULL THEN 0 ELSE 1 END,
+                    COALESCE(d.sort_order, 999999) ASC,
+                    d.id ASC,
+                    c.sort_order ASC,
+                    c.kind_key ASC'
             )->fetchAll(PDO::FETCH_ASSOC);
             json_response(['success' => true, 'kinds' => is_array($rows) ? $rows : []]);
 
@@ -47,6 +63,14 @@ try {
             $ck = $sanitizeKind((string) ($data['commercial_kind_key'] ?? ''));
             if ($ck === '') {
                 json_response(['success' => false, 'message' => 'حدد النوع التجاري'], 422);
+            }
+            if (orange_table_exists($pdo, 'departments')) {
+                $deptId = orange_sizing_department_id_from_commercial_kind_key($ck);
+                if ($deptId !== null) {
+                    orange_catalog_sync_commercial_kind_for_department($pdo, $deptId);
+                } else {
+                    orange_catalog_sync_commercial_kinds_from_departments($pdo);
+                }
             }
             $st = $pdo->prepare(
                 'SELECT kind_key FROM commercial_kind_dictionary WHERE kind_key = ? LIMIT 1'
@@ -69,6 +93,14 @@ try {
         case 'save_kind':
             $kindKey = $sanitizeKind((string) ($data['kind_key'] ?? ''));
             $oldKind = $sanitizeKind((string) ($data['old_kind_key'] ?? ''));
+            if (orange_sizing_department_id_from_commercial_kind_key($kindKey) !== null
+                || orange_sizing_department_id_from_commercial_kind_key($oldKind) !== null
+            ) {
+                json_response([
+                    'success' => false,
+                    'message' => 'مفاتيح الأقسام الرئيسية (dرقم) تُدار من شاشة «الأقسام الرئيسية» وليس من هنا.',
+                ], 422);
+            }
             $labelAr = trim((string) ($data['label_ar'] ?? ''));
             $labelEn = trim((string) ($data['label_en'] ?? ''));
             $sort = (int) ($data['sort_order'] ?? 0);
@@ -139,6 +171,17 @@ try {
             if ($kindKey === '') {
                 json_response(['success' => false, 'message' => 'حدد نوعاً تجارياً'], 422);
             }
+            $didDel = orange_sizing_department_id_from_commercial_kind_key($kindKey);
+            if ($didDel !== null) {
+                $exd = $pdo->prepare('SELECT 1 FROM departments WHERE id = ? LIMIT 1');
+                $exd->execute([$didDel]);
+                if ($exd->fetchColumn()) {
+                    json_response([
+                        'success' => false,
+                        'message' => 'لا يُحذف مفتاح قسم رئيسي من هنا؛ احذف القسم من «الأقسام الرئيسية» إن رغبت (مع مراعاة الارتباطات).',
+                    ], 422);
+                }
+            }
             $cnt = $pdo->prepare(
                 'SELECT COUNT(*) FROM size_families WHERE commercial_kind_key = ?'
             );
@@ -164,6 +207,12 @@ try {
 
             if ($ck === '' || $catKey === '') {
                 json_response(['success' => false, 'message' => 'النوع التجاري ومفتاح فئة القياس مطلوبان'], 422);
+            }
+            if (orange_table_exists($pdo, 'departments')) {
+                $deptIdCat = orange_sizing_department_id_from_commercial_kind_key($ck);
+                if ($deptIdCat !== null) {
+                    orange_catalog_sync_commercial_kind_for_department($pdo, $deptIdCat);
+                }
             }
             $st = $pdo->prepare('SELECT 1 FROM commercial_kind_dictionary WHERE kind_key = ? LIMIT 1');
             $st->execute([$ck]);

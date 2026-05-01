@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../includes/catalog_sizing_department_sync.php';
 require_admin_api();
 
 try {
@@ -19,6 +20,7 @@ try {
         }
     }
     $pdo->commit();
+    orange_catalog_sync_commercial_kinds_from_departments($pdo);
     json_response(['success'=>true,'message'=>'تم حفظ ترتيب الأقسام']);
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {

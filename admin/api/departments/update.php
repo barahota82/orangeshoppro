@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
+require_once __DIR__ . '/../../../includes/catalog_sizing_department_sync.php';
 require_admin_api();
 
 try {
@@ -78,6 +79,8 @@ try {
         );
         $stmt->execute([$nameEn, $nameAr, $candidate, $sort, $id]);
     }
+
+    orange_catalog_sync_commercial_kind_for_department($pdo, $id);
 
     json_response(['success' => true, 'message' => 'OK_UPD', 'slug' => $candidate]);
 } catch (Throwable $e) {

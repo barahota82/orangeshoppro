@@ -11,6 +11,13 @@ try {
     $hasSizes = false;
 }
 
+$hasDepartmentsSf = false;
+try {
+    $hasDepartmentsSf = (bool) $pdo->query("SHOW TABLES LIKE 'departments'")->fetchColumn();
+} catch (Throwable $e) {
+    $hasDepartmentsSf = false;
+}
+
 $families = [];
 $sizesByFamily = [];
 $nextSort = 1;
@@ -46,7 +53,7 @@ $tablesReady = $hasFamilies && $hasSizes;
 ?>
 <div class="page-title">
     <h1>عائلات المقاسات</h1>
-    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.5;">هرَم المقاس وفق سياسة المشروع: <strong>نوع تجاري</strong> (<code>commercial_kind_key</code>) ← <strong>فئة القياس</strong> (<code>sizing_category_key</code>) ← <strong>مخطّط العائلة</strong> (<code>size_scheme_key</code>) ← قيم القائمة في <code>size_family_sizes</code>. مرجعية اختيارية للمستويين 1–2: إدارة القاموس من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس هرَم المقاس</a>؛ الجدايل <code>commercial_kind_dictionary</code> و<code>sizing_category_dictionary</code> تُنشأ مع المخطط. عند ضبط <code>expected_size_scheme_key</code> على <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">نوع منتج موحّد</a>، يُطبَّق تحقّق المطابقة تلقائياً مع حقلي المستويين الأولين على العائلة؛ وعند وجود صف نشط في القاموس يُفرَض تطابق المفاتيح عند الحفظ هنا.</p>
+    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.5;">هرَم المقاس وفق سياسة المشروع: <strong>نوع تجاري</strong> (<code>commercial_kind_key</code>) ← <strong>فئة القياس</strong> (<code>sizing_category_key</code>) ← <strong>مخطّط العائلة</strong> (<code>size_scheme_key</code>) ← قيم القائمة في <code>size_family_sizes</code>. مرجعية اختيارية للمستويين 1–2: إدارة القاموس من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس هرَم المقاس</a>؛ الجدايل <code>commercial_kind_dictionary</code> و<code>sizing_category_dictionary</code> تُنشأ مع المخطط. عند ضبط <code>expected_size_scheme_key</code> على <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">نوع منتج موحّد</a>، يُطبَّق تحقّق المطابقة تلقائياً مع حقلي المستويين الأولين على العائلة؛ وعند وجود صف نشط في القاموس يُفرَض تطابق المفاتيح عند الحفظ هنا.<?php if ($hasDepartmentsSf): ?> عند تفعيل <strong>الأقسام الرئيسية</strong> يكون المستوى 1 في القاموس مزامناً معها بمفتاح <code>d</code> + رقم القسم (مثل <code>d2</code>).<?php endif; ?></p>
 </div>
 
 <?php if (!$tablesReady): ?>
@@ -77,7 +84,7 @@ $tablesReady = $hasFamilies && $hasSizes;
         </div>
         <div class="sf-en">
             <label>commercial_kind_key</label>
-            <input type="text" id="fam_commercial_kind_key" maxlength="32" placeholder="clothing" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
+            <input type="text" id="fam_commercial_kind_key" maxlength="32" placeholder="<?php echo $hasDepartmentsSf ? 'd1' : 'clothing'; ?>" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
         </div>
         <div class="sf-en">
             <label>sizing_category_key</label>
