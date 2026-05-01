@@ -285,8 +285,12 @@ if ($sdNextKindSort < 1) {
     </div>
     <div class="actions sd-kind-form-actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;">
         <button type="button" id="sd_kind_save_btn" onclick="sdSaveKind()">حفظ النوع</button>
-        <button type="button" class="btn-secondary" onclick="sdResetKindForm()">صف جديد</button>
+        <button type="button" class="btn-secondary" onclick="sdResetKindForm()">مسح النموذج</button>
     </div>
+    <p style="margin:10px 0 0;font-size:0.88rem;color:#555;line-height:1.5;">
+        <strong>مسح النموذج</strong> يفرّغ الحقول أعلاه ويعيدك لوضع <strong>إضافة نوع جديد</strong> (لا يحذف صفوفاً من الجدول).
+        لحذف نوع مسجّل استخدم <strong>حذف</strong> من جدول «الأنواع التجارية» أسفل الصفحة (إن لم يُستخدَم في عائلات مقاس).
+    </p>
 </div>
 
 <div class="card">
