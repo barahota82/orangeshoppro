@@ -11,7 +11,7 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
     <h1>قاموس هرَم المقاس — المستويان 1 و2</h1>
     <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.5;">
         يحدِّد هذا القاموس مفاتيح <strong>commercial_kind_key</strong> و<strong>sizing_category_key</strong>
-        وبطاقات العرض (عربي/إنجليزي).
+        (تُولَّد آلياً من الإنجليزي بعد تعبئة التسميات لتفادي أخطاء الإدخال) وبطاقات العرض عربي/إنجليزي.
         بعد إضافة صف نشط لهذا النمط أو لفئة ضمن نوع تجاري، يُفرَض مطابقتها عند حفظ
         <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_families'), ENT_QUOTES, 'UTF-8'); ?>">عائلات المقاسات</a>.
         فارغ تماماً = لا إجبار مرجعي (السلوك السابق).
@@ -31,16 +31,18 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
     <input type="hidden" id="sd_kind_old_key" value="">
     <div class="form-grid" style="gap:12px;">
         <div>
-            <label>مفتاح EN (<code>kind_key</code>)</label>
-            <input type="text" id="sd_kind_key" maxlength="32" autocomplete="off" <?php echo !$tablesReady ? 'disabled' : ''; ?>>
-        </div>
-        <div>
             <label>التسمية العربية</label>
             <input type="text" id="sd_kind_label_ar" maxlength="191" <?php echo !$tablesReady ? 'disabled' : ''; ?>>
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">عند التوقف عن الكتابة يُحدَّث الإنجليزي صامتاً (لتوليد المفتاح) وفق آلية ترجمة الأسماء في الأدمن.</small>
         </div>
         <div>
             <label>التسمية الإنجليزية</label>
             <input type="text" id="sd_kind_label_en" maxlength="191" <?php echo !$tablesReady ? 'disabled' : ''; ?>>
+        </div>
+        <div>
+            <label>مفتاح EN (<code>kind_key</code>) — للقراءة فقط</label>
+            <input type="text" id="sd_kind_key" maxlength="32" autocomplete="off" <?php echo !$tablesReady ? 'disabled' : ''; ?> readonly tabindex="-1" style="background:#f4f6f9;cursor:default;">
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُحسب آلياً من الإنجليزي: حروف صغيرة وأرقام فقط مع <code>_</code> و<code>-</code> (حتى 32 محرفاً).</small>
         </div>
         <div>
             <label>الترتيب</label>
@@ -69,16 +71,17 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
             <select id="sd_cat_parent_kind" <?php echo !$tablesReady ? 'disabled' : ''; ?>></select>
         </div>
         <div>
-            <label>مفتاح EN (<code>category_key</code>)</label>
-            <input type="text" id="sd_cat_key" maxlength="64" autocomplete="off">
-        </div>
-        <div>
             <label>التسمية العربية</label>
             <input type="text" id="sd_cat_label_ar" maxlength="191">
         </div>
         <div>
             <label>التسمية الإنجليزية</label>
             <input type="text" id="sd_cat_label_en" maxlength="191">
+        </div>
+        <div>
+            <label>مفتاح EN (<code>category_key</code>) — للقراءة فقط</label>
+            <input type="text" id="sd_cat_key" maxlength="64" autocomplete="off" readonly tabindex="-1" style="background:#f4f6f9;cursor:default;">
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُحسب آلياً من الإنجليزي (حتى 64 محرفاً) بنفس قواعد المفتاح أعلاه.</small>
         </div>
         <div>
             <label>الترتيب</label>
@@ -142,6 +145,62 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
 <script>
 (function () {
     const api = '/admin/api/sizing_dictionary/manage.php';
+
+    /** يطابق تعقيم السيرفر: أحرف صغيرة + a-z0-9_- فقط */
+    function sdSizingSlugKey(raw, maxLen) {
+        let t = String(raw || '').trim().toLowerCase();
+        t = t.replace(/[^a-z0-9_-]/g, '');
+        if (t.length > maxLen) {
+            t = t.substring(0, maxLen);
+        }
+        return t;
+    }
+
+    function sdApplyAutoKindKey() {
+        const en = document.getElementById('sd_kind_label_en').value;
+        document.getElementById('sd_kind_key').value = sdSizingSlugKey(en, 32);
+    }
+
+    function sdApplyAutoCatKey() {
+        const en = document.getElementById('sd_cat_label_en').value;
+        document.getElementById('sd_cat_key').value = sdSizingSlugKey(en, 64);
+    }
+
+    let sdKindArTranslateTimer = null;
+    async function sdKindFillEnFromArDebounced() {
+        const arEl = document.getElementById('sd_kind_label_ar');
+        const enEl = document.getElementById('sd_kind_label_en');
+        const ar = arEl.value.trim();
+        if (!ar) {
+            sdApplyAutoKindKey();
+            return;
+        }
+        try {
+            const res = await postJSON('/admin/api/translate/names.php', { name_ar: ar, name_en: '' });
+            if (res && res.success && res.translations && res.translations.name_en) {
+                enEl.value = res.translations.name_en;
+            }
+        } catch (e) {}
+        sdApplyAutoKindKey();
+    }
+
+    let sdCatArTranslateTimer = null;
+    async function sdCatFillEnFromArDebounced() {
+        const arEl = document.getElementById('sd_cat_label_ar');
+        const enEl = document.getElementById('sd_cat_label_en');
+        const ar = arEl.value.trim();
+        if (!ar) {
+            sdApplyAutoCatKey();
+            return;
+        }
+        try {
+            const res = await postJSON('/admin/api/translate/names.php', { name_ar: ar, name_en: '' });
+            if (res && res.success && res.translations && res.translations.name_en) {
+                enEl.value = res.translations.name_en;
+            }
+        } catch (e) {}
+        sdApplyAutoCatKey();
+    }
 
     window.sdReloadAll = async function () {
         await sdLoadKinds(true);
@@ -267,9 +326,9 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
 
     window.sdEditKind = function (k) {
         document.getElementById('sd_kind_old_key').value = k.kind_key || '';
-        document.getElementById('sd_kind_key').value = k.kind_key || '';
         document.getElementById('sd_kind_label_ar').value = k.label_ar || '';
         document.getElementById('sd_kind_label_en').value = k.label_en || '';
+        sdApplyAutoKindKey();
         document.getElementById('sd_kind_sort').value = String(k.sort_order != null ? k.sort_order : 0);
         document.getElementById('sd_kind_active').value = (parseInt(k.is_active, 10) === 0 ? '0' : '1');
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -277,12 +336,30 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
 
     window.sdSaveKind = async function () {
         try {
+            sdApplyAutoKindKey();
+            let la = document.getElementById('sd_kind_label_ar').value.trim();
+            let le = document.getElementById('sd_kind_label_en').value.trim();
+            let kk = document.getElementById('sd_kind_key').value.trim();
+            if (kk === '' && la !== '') {
+                await sdKindFillEnFromArDebounced();
+                kk = document.getElementById('sd_kind_key').value.trim();
+                le = document.getElementById('sd_kind_label_en').value.trim();
+                la = document.getElementById('sd_kind_label_ar').value.trim();
+            }
+            if (kk === '') {
+                alert('أدخل التسمية العربية أو الإنجليزية لتُولَّد المفتاح آلياً قبل الحفظ.');
+                return;
+            }
+            if (la === '' && le === '') {
+                alert('عبِّئ التسمية العربية أو الإنجليزية على الأقل.');
+                return;
+            }
             const payload = {
                 action: 'save_kind',
                 old_kind_key: document.getElementById('sd_kind_old_key').value.trim(),
-                kind_key: document.getElementById('sd_kind_key').value.trim(),
-                label_ar: document.getElementById('sd_kind_label_ar').value.trim(),
-                label_en: document.getElementById('sd_kind_label_en').value.trim(),
+                kind_key: kk,
+                label_ar: la,
+                label_en: le,
                 sort_order: parseInt(document.getElementById('sd_kind_sort').value, 10) || 0,
                 is_active: parseInt(document.getElementById('sd_kind_active').value, 10),
             };
@@ -317,9 +394,9 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
     window.sdEditCategory = function (c) {
         document.getElementById('sd_cat_parent_kind').value = c.commercial_kind_key || '';
         document.getElementById('sd_cat_old_key').value = c.category_key || '';
-        document.getElementById('sd_cat_key').value = c.category_key || '';
         document.getElementById('sd_cat_label_ar').value = c.label_ar || '';
         document.getElementById('sd_cat_label_en').value = c.label_en || '';
+        sdApplyAutoCatKey();
         document.getElementById('sd_cat_sort').value = String(c.sort_order != null ? c.sort_order : 0);
         document.getElementById('sd_cat_active').value = (parseInt(c.is_active, 10) === 0 ? '0' : '1');
         window.scrollTo({ top: 200, behavior: 'smooth' });
@@ -327,13 +404,36 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
 
     window.sdSaveCategory = async function () {
         try {
+            sdApplyAutoCatKey();
+            const parent = document.getElementById('sd_cat_parent_kind').value.trim();
+            if (parent === '') {
+                alert('اختر النوع التجاري قبل حفظ الفئة.');
+                return;
+            }
+            let la = document.getElementById('sd_cat_label_ar').value.trim();
+            let le = document.getElementById('sd_cat_label_en').value.trim();
+            let ck = document.getElementById('sd_cat_key').value.trim();
+            if (ck === '' && la !== '') {
+                await sdCatFillEnFromArDebounced();
+                ck = document.getElementById('sd_cat_key').value.trim();
+                le = document.getElementById('sd_cat_label_en').value.trim();
+                la = document.getElementById('sd_cat_label_ar').value.trim();
+            }
+            if (ck === '') {
+                alert('أدخل التسمية العربية أو الإنجليزية لتُولَّد المفتاح آلياً قبل الحفظ.');
+                return;
+            }
+            if (la === '' && le === '') {
+                alert('عبِّئ التسمية العربية أو الإنجليزية على الأقل.');
+                return;
+            }
             const payload = {
                 action: 'save_category',
-                commercial_kind_key: document.getElementById('sd_cat_parent_kind').value.trim(),
+                commercial_kind_key: parent,
                 old_category_key: document.getElementById('sd_cat_old_key').value.trim(),
-                category_key: document.getElementById('sd_cat_key').value.trim(),
-                label_ar: document.getElementById('sd_cat_label_ar').value.trim(),
-                label_en: document.getElementById('sd_cat_label_en').value.trim(),
+                category_key: ck,
+                label_ar: la,
+                label_en: le,
                 sort_order: parseInt(document.getElementById('sd_cat_sort').value, 10) || 0,
                 is_active: parseInt(document.getElementById('sd_cat_active').value, 10),
             };
@@ -373,6 +473,17 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
 
     document.getElementById('sd_cat_parent_kind').addEventListener('change', function () {
         sdLoadCategories();
+    });
+
+    document.getElementById('sd_kind_label_en').addEventListener('input', sdApplyAutoKindKey);
+    document.getElementById('sd_kind_label_ar').addEventListener('input', function () {
+        clearTimeout(sdKindArTranslateTimer);
+        sdKindArTranslateTimer = setTimeout(sdKindFillEnFromArDebounced, 700);
+    });
+    document.getElementById('sd_cat_label_en').addEventListener('input', sdApplyAutoCatKey);
+    document.getElementById('sd_cat_label_ar').addEventListener('input', function () {
+        clearTimeout(sdCatArTranslateTimer);
+        sdCatArTranslateTimer = setTimeout(sdCatFillEnFromArDebounced, 700);
     });
 
     // postJSON يعرّفها admin.js المحمّلة بـ defer؛ السكربت المضمّن هنا ينفَّذ أثناء التحليل قبلها.
