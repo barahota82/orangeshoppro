@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/catalog_sizing_dictionary.php';
 require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
 require_admin_api();
 
@@ -41,6 +42,11 @@ try {
             'success' => false,
             'message' => 'عند ضبط مخطّط مقاس (size_scheme_key) يجب ملء هرَم المقاس: النوع التجاري commercial_kind_key وفئة القياس sizing_category_key — راجع سياسة الهرم الأربعة في الوثائق.',
         ], 422);
+    }
+
+    $dicErr = orange_catalog_validate_size_family_dictionary_consistency($pdo, $commercialKind, $sizingCategory);
+    if ($dicErr !== null) {
+        json_response(['success' => false, 'message' => $dicErr], 422);
     }
 
     $famRows = $pdo->query('SELECT id, name_ar FROM size_families')->fetchAll(PDO::FETCH_ASSOC);
