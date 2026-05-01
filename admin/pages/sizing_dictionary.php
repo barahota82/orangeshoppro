@@ -380,6 +380,13 @@ if ($sdNextKindSort < 1) {
     const api = '/admin/api/sizing_dictionary/manage.php';
     var sdNextKindSortPreview = <?php echo (int) $sdNextKindSort; ?>;
     var sdNextCatSortPreview = 1;
+    window.sdCatParentProgrammaticDepth = 0;
+    function sdCatParentBeginProgrammatic() {
+        window.sdCatParentProgrammaticDepth++;
+    }
+    function sdCatParentEndProgrammatic() {
+        window.sdCatParentProgrammaticDepth = Math.max(0, window.sdCatParentProgrammaticDepth - 1);
+    }
 
     function sdRefreshNextKindPreviewFromKinds(kinds) {
         var maxSo = 0;
@@ -434,14 +441,28 @@ if ($sdNextKindSort < 1) {
             vw.value = String(nc);
             return;
         }
-        const hidNum = parseInt(String(hid.value || '0'), 10) || 0;
-        if (hidNum <= 0) {
+        let hidNum = parseInt(String(hid.value || '').trim(), 10);
+        if (Number.isNaN(hidNum)) {
+            hidNum = 0;
+        }
+        const relocate = window.sdCatRelocateSort === true;
+        if (relocate && hidNum <= 0) {
             hid.value = '0';
             var nc2 = parseInt(String(sdNextCatSortPreview), 10) || 1;
             if (nc2 < 1) {
                 nc2 = 1;
             }
             vw.value = String(nc2);
+            return;
+        }
+        if (!relocate && hidNum <= 0) {
+            const os = window.sdCatEditOriginalSort;
+            var fb = parseInt(String(os != null ? os : '0'), 10);
+            if (Number.isNaN(fb)) {
+                fb = 0;
+            }
+            hid.value = String(fb);
+            vw.value = String(fb);
             return;
         }
         hid.value = String(hidNum);
@@ -523,6 +544,7 @@ if ($sdNextKindSort < 1) {
         preserveKindDropdown = !!preserveKindDropdown;
         window.sdCatEditOriginalCommercialKind = '';
         window.sdCatEditOriginalSort = null;
+        window.sdCatRelocateSort = false;
         document.getElementById('sd_cat_old_key').value = '';
         document.getElementById('sd_cat_key').value = '';
         document.getElementById('sd_cat_label_ar').value = '';
@@ -530,27 +552,37 @@ if ($sdNextKindSort < 1) {
         document.getElementById('sd_cat_sort').value = '0';
         document.getElementById('sd_cat_active').value = '1';
         if (!preserveKindDropdown) {
-            document.getElementById('sd_cat_parent_kind').value = '';
+            sdCatParentBeginProgrammatic();
+            try {
+                document.getElementById('sd_cat_parent_kind').value = '';
+            } finally {
+                sdCatParentEndProgrammatic();
+            }
         }
         sdSyncCatSortView();
     };
 
     function sdRefreshKindSelect(kinds, preferred) {
         const sel = document.getElementById('sd_cat_parent_kind');
-        const prev = preferred || sel.value || '';
-        sel.innerHTML = '';
-        const opt0 = document.createElement('option');
-        opt0.value = '';
-        opt0.textContent = '— اختر النوع —';
-        sel.appendChild(opt0);
-        (kinds || []).forEach(function (k) {
-            const o = document.createElement('option');
-            o.value = k.kind_key;
-            o.textContent = (k.label_ar || k.kind_key) + ' (' + k.kind_key + ')';
-            sel.appendChild(o);
-        });
-        if (prev && [...sel.options].some(function (x) { return x.value === prev; })) {
-            sel.value = prev;
+        sdCatParentBeginProgrammatic();
+        try {
+            const prev = preferred || sel.value || '';
+            sel.innerHTML = '';
+            const opt0 = document.createElement('option');
+            opt0.value = '';
+            opt0.textContent = '— اختر النوع —';
+            sel.appendChild(opt0);
+            (kinds || []).forEach(function (k) {
+                const o = document.createElement('option');
+                o.value = k.kind_key;
+                o.textContent = (k.label_ar || k.kind_key) + ' (' + k.kind_key + ')';
+                sel.appendChild(o);
+            });
+            if (prev && [...sel.options].some(function (x) { return x.value === prev; })) {
+                sel.value = prev;
+            }
+        } finally {
+            sdCatParentEndProgrammatic();
         }
     }
 
@@ -707,13 +739,19 @@ if ($sdNextKindSort < 1) {
     window.sdEditCategory = async function (c) {
         window.sdCatEditOriginalCommercialKind = String(c.commercial_kind_key || '');
         window.sdCatEditOriginalSort = c.sort_order != null ? c.sort_order : 0;
-        document.getElementById('sd_cat_parent_kind').value = c.commercial_kind_key || '';
-        document.getElementById('sd_cat_old_key').value = c.category_key || '';
-        document.getElementById('sd_cat_label_ar').value = c.label_ar || '';
-        document.getElementById('sd_cat_label_en').value = c.label_en || '';
-        sdApplyAutoCatKey();
-        document.getElementById('sd_cat_sort').value = String(c.sort_order != null ? c.sort_order : 0);
-        document.getElementById('sd_cat_active').value = (parseInt(c.is_active, 10) === 0 ? '0' : '1');
+        window.sdCatRelocateSort = false;
+        sdCatParentBeginProgrammatic();
+        try {
+            document.getElementById('sd_cat_parent_kind').value = c.commercial_kind_key || '';
+            document.getElementById('sd_cat_old_key').value = c.category_key || '';
+            document.getElementById('sd_cat_label_ar').value = c.label_ar || '';
+            document.getElementById('sd_cat_label_en').value = c.label_en || '';
+            sdApplyAutoCatKey();
+            document.getElementById('sd_cat_sort').value = String(c.sort_order != null ? c.sort_order : 0);
+            document.getElementById('sd_cat_active').value = (parseInt(c.is_active, 10) === 0 ? '0' : '1');
+        } finally {
+            sdCatParentEndProgrammatic();
+        }
         await sdLoadCategories();
         sdSyncCatSortView();
         window.scrollTo({ top: 200, behavior: 'smooth' });
@@ -792,12 +830,16 @@ if ($sdNextKindSort < 1) {
     }
 
     document.getElementById('sd_cat_parent_kind').addEventListener('change', async function () {
+        if (window.sdCatParentProgrammaticDepth > 0) {
+            return;
+        }
         await sdLoadCategories();
         const oldKey = document.getElementById('sd_cat_old_key').value.trim();
         if (oldKey !== '') {
             const now = this.value.trim();
-            const orig = typeof window.sdCatEditOriginalCommercialKind === 'string' ? window.sdCatEditOriginalCommercialKind : '';
-            if (now !== orig) {
+            const orig = typeof window.sdCatEditOriginalCommercialKind === 'string' ? window.sdCatEditOriginalCommercialKind.trim() : '';
+            window.sdCatRelocateSort = now !== orig && orig !== '';
+            if (window.sdCatRelocateSort) {
                 document.getElementById('sd_cat_sort').value = '0';
             } else {
                 const os = window.sdCatEditOriginalSort;
