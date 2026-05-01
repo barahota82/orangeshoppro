@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/catalog_unified_product_helpers.php';
+
 /**
  * تسعير وحدة بند هدية ترويجية (عروض مجموع سلة + BOGO) — مجاني أو نسبة/مبلغ/سعر ثابت.
  *
@@ -24,13 +26,17 @@ function orange_cart_promo_resolve_gift_unit_price_from_rule(PDO $pdo, array $ru
         return max(0.0, round($val, 4));
     }
     $st = $pdo->prepare(
-        'SELECT p.price FROM products p
+        'SELECT p.id AS product_id, p.price FROM products p
          INNER JOIN product_variants v ON v.product_id = p.id
          WHERE v.id = ? AND p.is_active = 1 LIMIT 1'
     );
     $st->execute([$variantId]);
     $row = $st->fetch(PDO::FETCH_ASSOC);
     if (!$row) {
+        return 0.0;
+    }
+    $giftPid = (int) ($row['product_id'] ?? 0);
+    if ($giftPid <= 0 || !orange_storefront_product_in_active_unified_chain($pdo, $giftPid)) {
         return 0.0;
     }
     $retail = (float) ($row['price'] ?? 0);

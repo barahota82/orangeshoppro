@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/catalog_taxonomy_migrate.php';
+require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_admin_api();
 
 /**
@@ -73,31 +75,51 @@ try {
     $categoryId = (int) ($raw['category_id'] ?? 0);
     $subcategoryId = (int) ($raw['subcategory_id'] ?? 0);
 
-    $sql = 'SELECT pv.id AS variant_id, pv.color, pv.size, pv.stock_quantity,
-                   p.id AS product_id, p.name AS product_name, p.name_en AS product_name_en
-            FROM product_variants pv
-            INNER JOIN products p ON p.id = pv.product_id';
-    $params = [];
+    $unifiedPicker = function_exists('orange_catalog_nav_use_unified') && orange_catalog_nav_use_unified($pdo)
+        && orange_table_exists($pdo, 'product_types')
+        && orange_table_exists($pdo, 'catalog_subcategories');
 
-    $hasCat = orange_table_exists($pdo, 'categories');
-    $joinCatForDept = $hasCat && $departmentId > 0 && orange_table_has_column($pdo, 'categories', 'department_id');
-    if ($joinCatForDept) {
-        $sql .= ' LEFT JOIN categories c ON c.id = p.category_id';
-    }
+    if ($unifiedPicker) {
+        /* التصفية الهرمية في الواجهة ما زالت تعتمد أرقام الشجرة القديمة؛ لا تُربَط بـ catalog_* حتى يُحدَّث منتقي الأدمن.
+           هنا نُقيّد النتائج بـ «سلسلة كتالوج نشطة» فقط + نص البحث. */
+        $sql = 'SELECT pv.id AS variant_id, pv.color, pv.size, pv.stock_quantity,
+                       p.id AS product_id, p.name AS product_name, p.name_en AS product_name_en
+                FROM product_variants pv
+                INNER JOIN products p ON p.id = pv.product_id AND p.is_active = 1
+                INNER JOIN product_types pt ON pt.id = p.product_type_id AND pt.is_active = 1
+                INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id AND ucs.is_active = 1
+                INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id AND ucc.is_active = 1
+                INNER JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id AND ucs2.is_active = 1
+                INNER JOIN departments d ON d.id = ucs2.department_id AND d.is_active = 1
+                WHERE 1=1';
+        $params = [];
+    } else {
+        $sql = 'SELECT pv.id AS variant_id, pv.color, pv.size, pv.stock_quantity,
+                       p.id AS product_id, p.name AS product_name, p.name_en AS product_name_en
+                FROM product_variants pv
+                INNER JOIN products p ON p.id = pv.product_id';
+        $params = [];
 
-    $sql .= ' WHERE p.is_active = 1';
+        $hasCat = orange_table_exists($pdo, 'categories');
+        $joinCatForDept = $hasCat && $departmentId > 0 && orange_table_has_column($pdo, 'categories', 'department_id');
+        if ($joinCatForDept) {
+            $sql .= ' LEFT JOIN categories c ON c.id = p.category_id';
+        }
 
-    if ($joinCatForDept) {
-        $sql .= ' AND c.department_id = ?';
-        $params[] = $departmentId;
-    }
-    if ($categoryId > 0) {
-        $sql .= ' AND p.category_id = ?';
-        $params[] = $categoryId;
-    }
-    if ($subcategoryId > 0 && orange_table_has_column($pdo, 'products', 'subcategory_id')) {
-        $sql .= ' AND p.subcategory_id = ?';
-        $params[] = $subcategoryId;
+        $sql .= ' WHERE p.is_active = 1';
+
+        if ($joinCatForDept) {
+            $sql .= ' AND c.department_id = ?';
+            $params[] = $departmentId;
+        }
+        if ($categoryId > 0) {
+            $sql .= ' AND p.category_id = ?';
+            $params[] = $categoryId;
+        }
+        if ($subcategoryId > 0 && orange_table_has_column($pdo, 'products', 'subcategory_id')) {
+            $sql .= ' AND p.subcategory_id = ?';
+            $params[] = $subcategoryId;
+        }
     }
 
     if ($q !== '') {
