@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/cart_combo_promotions.php';
 require_admin_api();
 
@@ -90,6 +91,15 @@ try {
         }
         if ($comboPrice <= 0) {
             json_response(['success' => false, 'message' => 'أدخل سعر الكومبو (أكبر من صفر).'], 422);
+        }
+
+        $vidsForChain = [];
+        foreach ($comps as $c) {
+            $vidsForChain[] = (int) $c['variant_id'];
+        }
+        $chainErr = orange_admin_validate_variants_storefront_chain($pdo, $vidsForChain);
+        if ($chainErr !== null) {
+            json_response(['success' => false, 'message' => $chainErr], 422);
         }
 
         $flags = JSON_UNESCAPED_UNICODE;

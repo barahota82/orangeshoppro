@@ -327,3 +327,67 @@ function orange_catalog_product_catalog_category_id(PDO $pdo, int $productId): i
         return 0;
     }
 }
+
+/**
+ * عند تنقّل الواجهة الموحَّد: تتطلّب عروض السلة المتغيرة أن تُشارك منتجات داخل سلسلة الكتالوج النشطة
+ * كي لا تُحفظ قواعد لا تطبّق على المتجر الفعلي. خارج الوضع الموحَّد لا يُفرض قيد (سلوك المتجر القديم).
+ *
+ * @param iterable<int> $variantIds
+ * @return string|null رسالة خطأ عربية أو null
+ */
+function orange_admin_validate_variants_storefront_chain(PDO $pdo, iterable $variantIds): ?string
+{
+    $uniq = [];
+    foreach ($variantIds as $vid) {
+        $n = (int) $vid;
+        if ($n > 0) {
+            $uniq[$n] = true;
+        }
+    }
+    $ids = array_keys($uniq);
+    if ($ids === []) {
+        return null;
+    }
+    if (!function_exists('orange_table_exists') || !orange_table_exists($pdo, 'product_variants')) {
+        return null;
+    }
+
+    sort($ids, SORT_NUMERIC);
+    $ph = implode(',', array_fill(0, count($ids), '?'));
+    try {
+        $st = $pdo->prepare('SELECT id, product_id FROM product_variants WHERE id IN (' . $ph . ')');
+        $st->execute($ids);
+        $map = [];
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $vid = (int) ($row['id'] ?? 0);
+            $pid = (int) ($row['product_id'] ?? 0);
+            if ($vid > 0) {
+                $map[$vid] = $pid;
+            }
+        }
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] orange_admin_validate_variants_storefront_chain: ' . $e->getMessage());
+        }
+
+        return null;
+    }
+
+    foreach ($ids as $vid) {
+        if (!isset($map[$vid])) {
+            return 'المتغير #' . $vid . ' غير موجود.';
+        }
+        $pid = (int) $map[$vid];
+        if ($pid <= 0) {
+            return 'المتغير #' . $vid . ' غير مرتبط بمنتج صالح.';
+        }
+        if (!orange_storefront_product_in_active_unified_chain($pdo, $pid)) {
+            return 'المتغير #' . $vid . ' مرتبط بمنتج خارج سلسلة الكتالوج الموحَّد النشطة؛ لن يظهر للعميل في الواجهة عند التنقّل الموحَّد. اختر متغيرات من منتجات في الشجرة الموحّدة.';
+        }
+    }
+
+    return null;
+}

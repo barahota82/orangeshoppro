@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/catalog_taxonomy_migrate.php';
 require_once __DIR__ . '/../../../includes/cart_gift_promotions.php';
+require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/cart_bogo_promotions.php';
 require_admin_api();
 
@@ -170,6 +171,24 @@ try {
             if ($poolJson === false) {
                 json_response(['success' => false, 'message' => 'تعذر ترميز قائمة المتغيرات'], 422);
             }
+        }
+
+        $bogoVids = [];
+        if ($bogoKind === 'buy_bundle') {
+            foreach ($buyComps as $bc) {
+                $bogoVids[] = (int) $bc['variant_id'];
+            }
+        }
+        if ($giftKind === 'fixed' && $fixedVid > 0) {
+            $bogoVids[] = $fixedVid;
+        } elseif ($giftKind === 'choice' && count($poolIds) > 0) {
+            foreach ($poolIds as $poolVid) {
+                $bogoVids[] = (int) $poolVid;
+            }
+        }
+        $bogoChainErr = orange_admin_validate_variants_storefront_chain($pdo, $bogoVids);
+        if ($bogoChainErr !== null) {
+            json_response(['success' => false, 'message' => $bogoChainErr], 422);
         }
 
         $gcRaw = strtolower(trim((string) ($data['gift_unit_charge_kind'] ?? 'free')));
