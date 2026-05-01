@@ -117,7 +117,7 @@ if ($subOptionsJson === false) {
 ?>
 <div class="page-title">
     <h1>أنواع المنتجات — الشجرة الموحّدة</h1>
-    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;">ورقة قبل SKU تحت التصنيف الفرعي الموحّد؛ ربط المنتجات يتم عبر <code>product_type_id</code> وفق السياسة (تاسعاً ووثيقة ERD). حقل <strong>expected_size_scheme_key</strong> يضبط مطابقة مخطط المقاس مع <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_families'), ENT_QUOTES, 'UTF-8'); ?>">عائلات المقاسات</a>.</p>
+    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;">ورقة قبل SKU تحت التصنيف الفرعي الموحّد؛ ربط المنتجات يتم عبر <code>product_type_id</code> وفق السياسة (تاسعاً ووثيقة ERD). أنشئ أو راجع الفروع من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع الشجرة الموحّدة</a>. حقل <strong>expected_size_scheme_key</strong> يضبط مطابقة مخطط المقاس مع <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_families'), ENT_QUOTES, 'UTF-8'); ?>">عائلات المقاسات</a>.</p>
 </div>
 
 <?php if (!$hasTree): ?>
