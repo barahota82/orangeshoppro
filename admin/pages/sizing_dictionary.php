@@ -430,9 +430,18 @@ if ($sdNextKindSort < 1) {
             vw.value = String(nc);
             return;
         }
-        const n = parseInt(String(hid.value || '0'), 10) || 0;
-        hid.value = String(n);
-        vw.value = String(n);
+        const hidNum = parseInt(String(hid.value || '0'), 10) || 0;
+        if (hidNum <= 0) {
+            hid.value = '0';
+            var nc2 = parseInt(String(sdNextCatSortPreview), 10) || 1;
+            if (nc2 < 1) {
+                nc2 = 1;
+            }
+            vw.value = String(nc2);
+            return;
+        }
+        hid.value = String(hidNum);
+        vw.value = String(hidNum);
     }
 
     /** يطابق تعقيم السيرفر: أحرف صغيرة + a-z0-9_- فقط */
@@ -508,6 +517,8 @@ if ($sdNextKindSort < 1) {
 
     window.sdResetCatForm = function (preserveKindDropdown) {
         preserveKindDropdown = !!preserveKindDropdown;
+        window.sdCatEditOriginalCommercialKind = '';
+        window.sdCatEditOriginalSort = null;
         document.getElementById('sd_cat_old_key').value = '';
         document.getElementById('sd_cat_key').value = '';
         document.getElementById('sd_cat_label_ar').value = '';
@@ -689,15 +700,18 @@ if ($sdNextKindSort < 1) {
         }
     };
 
-    window.sdEditCategory = function (c) {
+    window.sdEditCategory = async function (c) {
+        window.sdCatEditOriginalCommercialKind = String(c.commercial_kind_key || '');
+        window.sdCatEditOriginalSort = c.sort_order != null ? c.sort_order : 0;
         document.getElementById('sd_cat_parent_kind').value = c.commercial_kind_key || '';
         document.getElementById('sd_cat_old_key').value = c.category_key || '';
         document.getElementById('sd_cat_label_ar').value = c.label_ar || '';
         document.getElementById('sd_cat_label_en').value = c.label_en || '';
         sdApplyAutoCatKey();
         document.getElementById('sd_cat_sort').value = String(c.sort_order != null ? c.sort_order : 0);
-        sdSyncCatSortView();
         document.getElementById('sd_cat_active').value = (parseInt(c.is_active, 10) === 0 ? '0' : '1');
+        await sdLoadCategories();
+        sdSyncCatSortView();
         window.scrollTo({ top: 200, behavior: 'smooth' });
     };
 
@@ -726,10 +740,13 @@ if ($sdNextKindSort < 1) {
                 alert('عبِّئ الاسم العربي أو English على الأقل.');
                 return;
             }
+            const oldCatKey = document.getElementById('sd_cat_old_key').value.trim();
+            const origComm = typeof window.sdCatEditOriginalCommercialKind === 'string' ? window.sdCatEditOriginalCommercialKind.trim() : '';
             const payload = {
                 action: 'save_category',
                 commercial_kind_key: parent,
-                old_category_key: document.getElementById('sd_cat_old_key').value.trim(),
+                old_category_key: oldCatKey,
+                old_commercial_kind_key: oldCatKey !== '' ? origComm : '',
                 category_key: ck,
                 label_ar: la,
                 label_en: le,
@@ -770,8 +787,20 @@ if ($sdNextKindSort < 1) {
         return d.innerHTML;
     }
 
-    document.getElementById('sd_cat_parent_kind').addEventListener('change', function () {
-        sdLoadCategories();
+    document.getElementById('sd_cat_parent_kind').addEventListener('change', async function () {
+        await sdLoadCategories();
+        const oldKey = document.getElementById('sd_cat_old_key').value.trim();
+        if (oldKey !== '') {
+            const now = this.value.trim();
+            const orig = typeof window.sdCatEditOriginalCommercialKind === 'string' ? window.sdCatEditOriginalCommercialKind : '';
+            if (now !== orig) {
+                document.getElementById('sd_cat_sort').value = '0';
+            } else {
+                const os = window.sdCatEditOriginalSort;
+                document.getElementById('sd_cat_sort').value = String(os != null ? os : 0);
+            }
+            sdSyncCatSortView();
+        }
     });
 
     document.getElementById('sd_kind_label_en').addEventListener('input', sdApplyAutoKindKey);

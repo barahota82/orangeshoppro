@@ -171,6 +171,57 @@ try {
                 json_response(['success' => false, 'message' => 'النوع التجاري غير موجود في القاموس'], 404);
             }
 
+            $oldComm = $sanitizeKind((string) ($data['old_commercial_kind_key'] ?? ''));
+            if ($oldCat !== '' && $oldCat === $catKey && $oldComm !== '' && $oldComm !== $ck) {
+                $chkOldRow = $pdo->prepare(
+                    'SELECT 1 FROM sizing_category_dictionary WHERE commercial_kind_key = ? AND category_key = ? LIMIT 1'
+                );
+                $chkOldRow->execute([$oldComm, $catKey]);
+                if (! $chkOldRow->fetchColumn()) {
+                    json_response(['success' => false, 'message' => 'فئة القياس غير موجودة تحت النوع التجاري السابق'], 404);
+                }
+                $chkDup = $pdo->prepare(
+                    'SELECT 1 FROM sizing_category_dictionary WHERE commercial_kind_key = ? AND category_key = ? LIMIT 1'
+                );
+                $chkDup->execute([$ck, $catKey]);
+                if ($chkDup->fetchColumn()) {
+                    json_response(['success' => false, 'message' => 'مفتاح الفئة موجود بالفعل تحت النوع التجاري الجديد'], 409);
+                }
+                $stOldKind = $pdo->prepare('SELECT 1 FROM commercial_kind_dictionary WHERE kind_key = ? LIMIT 1');
+                $stOldKind->execute([$oldComm]);
+                if (! $stOldKind->fetchColumn()) {
+                    json_response(['success' => false, 'message' => 'النوع التجاري السابق غير معرّف في القاموس'], 404);
+                }
+                if ($sort <= 0) {
+                    $stMax = $pdo->prepare(
+                        'SELECT COALESCE(MAX(sort_order),0)+1 FROM sizing_category_dictionary WHERE commercial_kind_key = ?'
+                    );
+                    $stMax->execute([$ck]);
+                    $sort = (int) $stMax->fetchColumn();
+                    if ($sort <= 0) {
+                        $sort = 1;
+                    }
+                }
+                $pdo->beginTransaction();
+                try {
+                    $pdo->prepare(
+                        'UPDATE sizing_category_dictionary
+                         SET commercial_kind_key = ?, label_ar = ?, label_en = ?, sort_order = ?, is_active = ?
+                         WHERE commercial_kind_key = ? AND category_key = ? LIMIT 1'
+                    )->execute([$ck, $labelAr, $labelEn, $sort, $active, $oldComm, $catKey]);
+                    $pdo->prepare(
+                        'UPDATE size_families SET commercial_kind_key = ?
+                         WHERE commercial_kind_key = ? AND sizing_category_key = ?'
+                    )->execute([$ck, $oldComm, $catKey]);
+                    $pdo->commit();
+                } catch (Throwable $e) {
+                    $pdo->rollBack();
+                    throw $e;
+                }
+                json_response(['success' => true]);
+                break;
+            }
+
             if ($oldCat !== '' && $oldCat !== $catKey) {
                 $chkOld = $pdo->prepare(
                     'SELECT 1 FROM sizing_category_dictionary WHERE commercial_kind_key = ? AND category_key = ? LIMIT 1'
