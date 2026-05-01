@@ -100,3 +100,54 @@ function orange_catalog_resolve_product_classification(PDO $pdo, array $data): a
         'product_type_id' => $resolvedPt,
     ];
 }
+
+/**
+ * هرم المقاس (مستوى 3): يطابق `size_families.size_scheme_key` مع `product_types.expected_size_scheme_key`
+ * عند ضبط المتوقع على الورقة وفتح المقاسات على المنتج.
+ *
+ * @return string|null رسالة خطأ عربية أو null إن كان التحقق غير لازم أو ناجحاً
+ */
+function orange_catalog_validate_size_family_matches_product_type(
+    PDO $pdo,
+    ?int $productTypeId,
+    bool $productHasSizes,
+    ?int $sizeFamilyId
+): ?string {
+    if (!$productHasSizes || $sizeFamilyId === null || $sizeFamilyId <= 0) {
+        return null;
+    }
+    if ($productTypeId === null || $productTypeId <= 0) {
+        return null;
+    }
+    if (!function_exists('orange_table_exists') || !orange_table_exists($pdo, 'product_types')) {
+        return null;
+    }
+    $st = $pdo->prepare('SELECT expected_size_scheme_key FROM product_types WHERE id = ? LIMIT 1');
+    $st->execute([$productTypeId]);
+    $pt = $st->fetch(PDO::FETCH_ASSOC);
+    if (!is_array($pt)) {
+        return null;
+    }
+    $expected = trim((string) ($pt['expected_size_scheme_key'] ?? ''));
+    if ($expected === '') {
+        return null;
+    }
+    if (!orange_table_exists($pdo, 'size_families')) {
+        return null;
+    }
+    $fs = $pdo->prepare('SELECT size_scheme_key FROM size_families WHERE id = ? LIMIT 1');
+    $fs->execute([$sizeFamilyId]);
+    $row = $fs->fetch(PDO::FETCH_ASSOC);
+    if (!is_array($row)) {
+        return 'عائلة المقاسات المختارة غير موجودة.';
+    }
+    $actual = trim((string) ($row['size_scheme_key'] ?? ''));
+    if ($actual === '') {
+        return 'يجب ضبط size_scheme_key لعائلة المقاسات المختارة لمطابقة نوع المنتج («' . $expected . '»). راجع صفحة عائلات المقاسات.';
+    }
+    if ($actual !== $expected) {
+        return 'مخطط المقاس في العائلة («' . $actual . '») لا يطابق المخطط المتوقع لنوع المنتج («' . $expected . '»). غيّر العائلة أو نوع المنتج أو حدّث المفاتيح في الأدمن.';
+    }
+
+    return null;
+}

@@ -204,7 +204,7 @@ foreach ($categories as $cat) {
                         $ptSlug = htmlspecialchars((string) ($prt['slug'] ?? ''), ENT_QUOTES, 'UTF-8');
                         $ptLabel = htmlspecialchars((string) (($prt['name_ar'] ?: $prt['name_en']) ?: ('#' . $prt['id'])), ENT_QUOTES, 'UTF-8');
                         ?>
-                        <option value="<?php echo (int) $prt['id']; ?>" data-slug="<?php echo $ptSlug; ?>"><?php echo $ptLabel; ?></option>
+                        <option value="<?php echo (int) $prt['id']; ?>" data-slug="<?php echo $ptSlug; ?>" data-expected-scheme="<?php echo htmlspecialchars(trim((string) ($prt['expected_size_scheme_key'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>"><?php echo $ptLabel; ?></option>
                     <?php endforeach; ?>
                 </select>
                 <?php if ($catalogNavUnified): ?>
@@ -383,9 +383,13 @@ foreach ($categories as $cat) {
                 <select id="size_family_id" disabled>
                     <option value="">—</option>
                     <?php foreach ($familiesOut as $f): ?>
-                        <option value="<?php echo (int)$f['id']; ?>"><?php echo htmlspecialchars($f['name_ar'] ?: $f['name_en']); ?></option>
+                        <?php
+                        $famSch = htmlspecialchars(trim((string) ($f['size_scheme_key'] ?? '')), ENT_QUOTES, 'UTF-8');
+                        ?>
+                        <option value="<?php echo (int)$f['id']; ?>" data-size-scheme="<?php echo $famSch; ?>"><?php echo htmlspecialchars($f['name_ar'] ?: $f['name_en']); ?></option>
                     <?php endforeach; ?>
                 </select>
+                <small id="size_family_scheme_hint" style="display:none;margin-top:4px;line-height:1.45;color:#64748b;"></small>
             </div>
             <div>
                 <label>دليل المقاس الاسترشادي (عرض)</label>
@@ -596,6 +600,72 @@ function orangeSyncLegacyFieldsFromProductType() {
         }
         rebuildSubcategoryOptions(sid > 0 ? sid : null);
         updateProductCatalogHint();
+    }
+}
+
+function orangeGetSelectedProductTypeExpectedScheme() {
+    const el = document.getElementById('product_type_id');
+    if (!el || !el.value) {
+        return '';
+    }
+    const opt = el.options[el.selectedIndex];
+    return opt ? String(opt.getAttribute('data-expected-scheme') || '').trim() : '';
+}
+
+/** يصفّي عائلات المقاسات حسب مخطط نوع المنتج (هرم المقاس — مستوى المخطط). */
+function orangeApplySizeFamilySchemeFilter() {
+    const famSel = document.getElementById('size_family_id');
+    const hint = document.getElementById('size_family_scheme_hint');
+    if (!famSel) {
+        return;
+    }
+    const hs = document.getElementById('has_sizes') && document.getElementById('has_sizes').value === '1';
+    if (!hs) {
+        for (let i = 0; i < famSel.options.length; i++) {
+            famSel.options[i].disabled = false;
+        }
+        if (hint) {
+            hint.style.display = 'none';
+            hint.textContent = '';
+        }
+        return;
+    }
+
+    const expected = orangeGetSelectedProductTypeExpectedScheme();
+    let currentVal = famSel.value;
+    let selectedIsBad = false;
+
+    for (let i = 0; i < famSel.options.length; i++) {
+        const o = famSel.options[i];
+        if (!o.value) {
+            o.disabled = false;
+            continue;
+        }
+        const sch = String(o.getAttribute('data-size-scheme') || '').trim();
+        const ok = expected === '' || sch === expected;
+        o.disabled = !ok;
+        if (!ok && o.value === currentVal) {
+            selectedIsBad = true;
+        }
+    }
+
+    if (selectedIsBad) {
+        famSel.value = '';
+    } else if (currentVal && famSel.selectedOptions.length && famSel.selectedOptions[0].disabled) {
+        famSel.value = '';
+    }
+
+    if (hint) {
+        hint.style.display = 'block';
+        if (expected === '') {
+            hint.textContent =
+                'نوع المنتج المختار لم يُحدّد مخطط مقاس متوقع (expected_size_scheme_key في شجرة الأنواع). يمكن أي عائلة؛ أو ضبط المخطط على الورقة ثم ارجع لتصفية أفضل.';
+        } else {
+            hint.textContent =
+                'المخطط المتوقع لهذا نوع المنتج: «' +
+                expected +
+                '». العائلات غير المطابقة غير متاحة في القائمة — راجع صفحة عائلات المقاسات لمفتاح size_scheme_key.';
+        }
     }
 }
 
@@ -1132,6 +1202,7 @@ function onHasFlagsChange() {
     if (hc && !document.querySelector('#colorwaysBox .cw-row')) {
         addColorwayRow();
     }
+    orangeApplySizeFamilySchemeFilter();
 }
 
 function patternOptionsHtml() {
@@ -1427,6 +1498,25 @@ async function saveProduct() {
         }
     }
 
+    const hsCheck = parseInt(document.getElementById('has_sizes').value || '0', 10) === 1;
+    if (hsCheck) {
+        const ptSave = document.getElementById('product_type_id');
+        const ptIdSave = ptSave && ptSave.value ? (parseInt(ptSave.value, 10) || 0) : 0;
+        if (ptIdSave > 0) {
+            const expSch = orangeGetSelectedProductTypeExpectedScheme();
+            const famSel = document.getElementById('size_family_id');
+            if (famSel && famSel.value && expSch !== '') {
+                const fo = famSel.options[famSel.selectedIndex];
+                const fsch = fo ? String(fo.getAttribute('data-size-scheme') || '').trim() : '';
+                if (fsch !== expSch) {
+                    productFormShowTab('sizes');
+                    alert('عائلة المقاسات لا تطابق المخطط المتوقع لنوع المنتج («' + expSch + '»).');
+                    return;
+                }
+            }
+        }
+    }
+
     assignMainImageFromGalleryIfEmpty();
     const mainVal = document.getElementById('main_image').value.trim();
     const hasAnyImage = mainVal || (window.PRODUCT_EXTRA_IMAGES && window.PRODUCT_EXTRA_IMAGES.length);
@@ -1620,6 +1710,7 @@ const orangeProductTypeSelectEl = document.getElementById('product_type_id');
 if (orangeProductTypeSelectEl) {
     orangeProductTypeSelectEl.addEventListener('change', function () {
         orangeSyncLegacyFieldsFromProductType();
+        orangeApplySizeFamilySchemeFilter();
     });
 }
 rebuildSubcategoryOptions(null);

@@ -60,6 +60,17 @@ try {
     if ($hasSizes && $sizeFamilyId === null) {
         json_response(['success' => false, 'message' => 'يجب اختيار عائلة مقاسات عند تفعيل المقاسات'], 422);
     }
+
+    $schemeErr = orange_catalog_validate_size_family_matches_product_type(
+        $pdo,
+        $productTypeIdResolved !== null && $productTypeIdResolved > 0 ? $productTypeIdResolved : null,
+        $hasSizes,
+        $sizeFamilyId
+    );
+    if ($schemeErr !== null) {
+        json_response(['success' => false, 'message' => $schemeErr], 422);
+    }
+
     $sortOrder = (int)($data['sort_order'] ?? 0);
 
     $prodStmt = $pdo->prepare('SELECT id, name FROM products WHERE category_id = ?');

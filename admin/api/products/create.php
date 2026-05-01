@@ -66,6 +66,16 @@ try {
         json_response(['success' => false, 'message' => 'يجب اختيار عائلة مقاسات عند تفعيل المقاسات'], 422);
     }
 
+    $schemeErr = orange_catalog_validate_size_family_matches_product_type(
+        $pdo,
+        $productTypeIdResolved !== null && $productTypeIdResolved > 0 ? $productTypeIdResolved : null,
+        $hasSizes,
+        $sizeFamilyId
+    );
+    if ($schemeErr !== null) {
+        json_response(['success' => false, 'message' => $schemeErr], 422);
+    }
+
     $variantsIn = $data['variants'] ?? null;
     if (!is_array($variantsIn) || count($variantsIn) === 0) {
         json_response(['success' => false, 'message' => 'يجب توليد صفوف المتغيرات والمخزون'], 422);
