@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 13);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 14);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -650,9 +650,13 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             id INT AUTO_INCREMENT PRIMARY KEY,
             name_ar VARCHAR(191) NOT NULL DEFAULT \'\',
             name_en VARCHAR(191) NOT NULL DEFAULT \'\',
+            size_scheme_key VARCHAR(64) NOT NULL DEFAULT \'\',
+            commercial_kind_key VARCHAR(32) NOT NULL DEFAULT \'\',
+            sizing_category_key VARCHAR(64) NOT NULL DEFAULT \'\',
             sort_order INT NOT NULL DEFAULT 0,
             is_active TINYINT(1) NOT NULL DEFAULT 1,
-            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_size_families_sizing_scope (commercial_kind_key, sizing_category_key, size_scheme_key)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
 
@@ -827,6 +831,20 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     if (orange_table_exists($pdo, 'size_family_sizes') && !orange_table_has_column($pdo, 'size_family_sizes', 'foot_length_cm')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE size_family_sizes ADD COLUMN foot_length_cm DECIMAL(6,2) NULL');
     }
+    if (orange_table_exists($pdo, 'size_families') && !orange_table_has_column($pdo, 'size_families', 'size_scheme_key')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE size_families ADD COLUMN size_scheme_key VARCHAR(64) NOT NULL DEFAULT \'\' AFTER name_en');
+    }
+    if (orange_table_exists($pdo, 'size_families') && !orange_table_has_column($pdo, 'size_families', 'commercial_kind_key')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE size_families ADD COLUMN commercial_kind_key VARCHAR(32) NOT NULL DEFAULT \'\' AFTER size_scheme_key');
+    }
+    if (orange_table_exists($pdo, 'size_families') && !orange_table_has_column($pdo, 'size_families', 'sizing_category_key')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE size_families ADD COLUMN sizing_category_key VARCHAR(64) NOT NULL DEFAULT \'\' AFTER commercial_kind_key');
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE size_families ADD INDEX idx_size_families_sizing_scope (commercial_kind_key, sizing_category_key, size_scheme_key)'
+        );
+    }
+
     if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'name_en')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN name_en VARCHAR(191) NOT NULL DEFAULT \'\'');
     }
@@ -966,6 +984,15 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
      */
     orange_catalog_safe_exec(
         $pdo,
+        'CREATE TABLE IF NOT EXISTS orange_catalog_data_migration_log (
+            step_key VARCHAR(64) NOT NULL PRIMARY KEY,
+            applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+    orange_schema_invalidate_table_exists('orange_catalog_data_migration_log');
+
+    orange_catalog_safe_exec(
+        $pdo,
         'CREATE TABLE IF NOT EXISTS catalog_sections (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT,
             department_id INT NOT NULL,
@@ -1049,16 +1076,24 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             sort_order INT NOT NULL DEFAULT 0,
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            expected_size_scheme_key VARCHAR(64) NOT NULL DEFAULT \'\',
             PRIMARY KEY (id),
             UNIQUE KEY uq_product_types_sub_slug (catalog_subcategory_id, slug),
             KEY idx_product_types_sort (catalog_subcategory_id, sort_order),
             KEY idx_product_types_active (catalog_subcategory_id, is_active),
+            KEY idx_product_types_expected_scheme (expected_size_scheme_key),
             CONSTRAINT fk_product_types_catalog_subcategory
                 FOREIGN KEY (catalog_subcategory_id) REFERENCES catalog_subcategories(id)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
     orange_schema_invalidate_table_exists('product_types');
+
+    if (orange_table_exists($pdo, 'product_types') && !orange_table_has_column($pdo, 'product_types', 'expected_size_scheme_key')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE product_types ADD COLUMN expected_size_scheme_key VARCHAR(64) NOT NULL DEFAULT \'\' AFTER created_at');
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE product_types ADD INDEX idx_product_types_expected_scheme (expected_size_scheme_key)');
+        orange_schema_invalidate_column_check('product_types', 'expected_size_scheme_key');
+    }
 
     if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'product_type_id')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE products ADD COLUMN product_type_id INT UNSIGNED NULL DEFAULT NULL AFTER subcategory_id');
@@ -2492,6 +2527,9 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
             orange_schema_run_pending_migrations($pdo);
             orange_catalog_ensure_schema_core($pdo);
         }
+
+        require_once __DIR__ . '/catalog_taxonomy_migrate.php';
+        orange_catalog_post_schema_legacy_unified($pdo);
 
         if ($apcuTtl > 0 && function_exists('apcu_store')) {
             @apcu_store($apcuKey, 1, $apcuTtl);

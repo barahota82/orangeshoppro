@@ -150,11 +150,19 @@ CREATE TABLE `product_types` (
   `sort_order` int NOT NULL DEFAULT 0,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `expected_size_scheme_key` varchar(64) NOT NULL DEFAULT '',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_product_types_sub_slug` (`catalog_subcategory_id`,`slug`),
   KEY `idx_product_types_sort` (`catalog_subcategory_id`,`sort_order`),
   KEY `idx_product_types_active` (`catalog_subcategory_id`,`is_active`),
+  KEY `idx_product_types_expected_scheme` (`expected_size_scheme_key`),
   CONSTRAINT `fk_product_types_catalog_subcategory` FOREIGN KEY (`catalog_subcategory_id`) REFERENCES `catalog_subcategories` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `orange_catalog_data_migration_log` (
+  `step_key` varchar(64) NOT NULL,
+  `applied_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`step_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `channels` (
@@ -201,10 +209,14 @@ CREATE TABLE `size_families` (
   `id` int NOT NULL AUTO_INCREMENT,
   `name_ar` varchar(191) NOT NULL DEFAULT '',
   `name_en` varchar(191) NOT NULL DEFAULT '',
+  `size_scheme_key` varchar(64) NOT NULL DEFAULT '',
+  `commercial_kind_key` varchar(32) NOT NULL DEFAULT '',
+  `sizing_category_key` varchar(64) NOT NULL DEFAULT '',
   `sort_order` int NOT NULL DEFAULT 0,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  KEY `idx_size_families_sizing_scope` (`commercial_kind_key`,`sizing_category_key`,`size_scheme_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `size_family_sizes` (

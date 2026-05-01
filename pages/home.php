@@ -20,6 +20,7 @@ function storefront_catalog_label(array $row, string $lang): string
 require_once __DIR__ . '/../includes/catalog_schema.php';
 orange_catalog_ensure_schema(db());
 require_once __DIR__ . '/../includes/catalog_labels.php';
+require_once __DIR__ . '/../includes/catalog_unified_nav.php';
 
 include __DIR__ . '/../includes/header.php';
 
@@ -33,13 +34,18 @@ $pdo = db();
 /*
  * سياسة التبويبات (الشريط الأفقي): فئات بها منتج نشط فقط — عرض فئة كاملة.
  * القائمة (المينيو): أقسام ← فئات ← تصنيفات فرعية (إن وُجدت) مع اختيار نطاق أضيق.
+ * بعد ترحيل التصنيف الموحّد (سجل orange_catalog_data_migration_log) تُحمَّل القائمة من catalog_* + product_type_id.
  */
+$sfUnifiedNavPack = orange_storefront_unified_nav_for_home($pdo);
+$useUnifiedHomeNav = ($sfUnifiedNavPack['categories'] ?? []) !== [];
+
 $categoryProductFilter = '
           AND EXISTS (
               SELECT 1 FROM products p
               WHERE p.category_id = c.id AND p.is_active = 1
           )';
 
+if (!$useUnifiedHomeNav) {
 $navTableRows = $pdo->query(
     "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('departments','subcategories')"
@@ -156,22 +162,59 @@ foreach ($categories as $cat) {
     }
     $catsByDept[$did][] = $cat;
 }
+} else {
+    $departments = $sfUnifiedNavPack['departments'];
+    $categories = $sfUnifiedNavPack['categories'];
+    $subcategoriesByCategory = $sfUnifiedNavPack['subcategoriesByCategory'];
+    $catsByDept = $sfUnifiedNavPack['catsByDept'];
+    $categoryToDepartment = $sfUnifiedNavPack['categoryToDepartment'];
+    $hasDepartmentsTable = true;
+    $hasSubcategoriesTable = true;
+}
 
-$productsStmt = $pdo->query("
+if ($useUnifiedHomeNav) {
+    $productsSql = '
+    SELECT p.*, ucs2.department_id AS uf_dept_id, ucc.id AS uf_cat_id, ucs.id AS uf_sub_id
+    FROM products p
+    LEFT JOIN product_types pt ON pt.id = p.product_type_id
+    LEFT JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id
+    LEFT JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id
+    LEFT JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id
+    WHERE p.is_active = 1
+    ORDER BY p.sort_order ASC, p.id ASC
+';
+    $offersSql = '
+    SELECT o.discount,
+           p.*, ucs2.department_id AS uf_dept_id, ucc.id AS uf_cat_id, ucs.id AS uf_sub_id
+    FROM offers o
+    INNER JOIN products p ON p.id = o.product_id
+    LEFT JOIN product_types pt ON pt.id = p.product_type_id
+    LEFT JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id
+    LEFT JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id
+    LEFT JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id
+    WHERE o.is_active = 1 AND p.is_active = 1
+    ORDER BY p.sort_order ASC, p.id ASC, o.id ASC
+';
+} else {
+    $productsSql = '
     SELECT p.*
     FROM products p
     WHERE p.is_active = 1
     ORDER BY p.sort_order ASC, p.id ASC
-");
-$products = $productsStmt ? $productsStmt->fetchAll() : [];
-
-$offersStmt = $pdo->query("
+';
+    $offersSql = '
     SELECT o.discount, p.*
     FROM offers o
     INNER JOIN products p ON p.id = o.product_id
     WHERE o.is_active = 1 AND p.is_active = 1
     ORDER BY p.sort_order ASC, p.id ASC, o.id ASC
-");
+';
+}
+
+$productsStmt = $pdo->query($productsSql);
+$products = $productsStmt ? $productsStmt->fetchAll() : [];
+
+$offersStmt = $pdo->query($offersSql);
 $offers = $offersStmt ? $offersStmt->fetchAll() : [];
 
 $sfHomeGridInitial = 24;
@@ -209,7 +252,19 @@ foreach ($offers as $hop) {
 /** @var array<int, list<array{color: string, pattern: string}>> */
 $sfProductCardVariantLines = orange_storefront_product_card_variant_line_map($pdo, $sfHomeCardColorPidList, $lang);
 
-if ($hasDepartmentsTable) {
+$sfHomeFilterCatalogId = static function (array $row): int {
+    $u = isset($row['uf_cat_id']) ? (int) $row['uf_cat_id'] : 0;
+
+    return $u > 0 ? $u : (int) ($row['category_id'] ?? 0);
+};
+
+$sfHomeFilterSubcategoryId = static function (array $row): int {
+    $u = isset($row['uf_sub_id']) ? (int) $row['uf_sub_id'] : 0;
+
+    return $u > 0 ? $u : (int) ($row['subcategory_id'] ?? 0);
+};
+
+if ($hasDepartmentsTable && !$useUnifiedHomeNav) {
     $needDeptLookup = [];
     foreach ($products as $p) {
         $cid = (int) ($p['category_id'] ?? 0);
@@ -239,16 +294,28 @@ if ($hasDepartmentsTable) {
     }
 }
 
-$storefrontExtraFilterSuffix = function (array $row) use ($categoryToDepartment): string {
+$storefrontExtraFilterSuffix = function (array $row) use ($categoryToDepartment, $useUnifiedHomeNav, $sfHomeFilterCatalogId, $sfHomeFilterSubcategoryId): string {
     $parts = [];
-    $cid = (int) ($row['category_id'] ?? 0);
-    if ($cid > 0) {
-        $did = $categoryToDepartment[$cid] ?? 0;
-        if ($did > 0) {
-            $parts[] = 'dept-' . $did;
+    if ($useUnifiedHomeNav) {
+        $fc = $sfHomeFilterCatalogId($row);
+        if ($fc > 0) {
+            $didDirect = isset($row['uf_dept_id']) && $row['uf_dept_id'] !== null ? (int) $row['uf_dept_id'] : 0;
+            $did = $didDirect > 0 ? $didDirect : ($categoryToDepartment[$fc] ?? 0);
+            if ($did > 0) {
+                $parts[] = 'dept-' . $did;
+            }
+        }
+    } else {
+        $cid = (int) ($row['category_id'] ?? 0);
+        if ($cid > 0) {
+            $did = $categoryToDepartment[$cid] ?? 0;
+            if ($did > 0) {
+                $parts[] = 'dept-' . $did;
+            }
         }
     }
-    $sid = isset($row['subcategory_id']) ? (int) $row['subcategory_id'] : 0;
+
+    $sid = $sfHomeFilterSubcategoryId($row);
     if ($sid > 0) {
         $parts[] = 'sub-' . $sid;
     }
@@ -266,7 +333,7 @@ foreach ($productsLazyRows as $p) {
     }
     $lazyForJs[] = [
         'id' => $pid,
-        'df' => 'all cat-' . (int) $p['category_id'] . $storefrontExtraFilterSuffix($p),
+        'df' => 'all cat-' . $sfHomeFilterCatalogId($p) . $storefrontExtraFilterSuffix($p),
         'imgSrc' => storefront_product_image_href((string) ($p['main_image'] ?? '')),
         'title' => storefront_product_display_name($p),
         'price' => number_format((float) $p['price'], 2),
@@ -285,7 +352,7 @@ foreach ($offersLazyRows as $p) {
     }
     $lazyOffersForJs[] = [
         'id' => $pid,
-        'df' => 'offers cat-' . (int) $p['category_id'] . $storefrontExtraFilterSuffix($p),
+        'df' => 'offers cat-' . $sfHomeFilterCatalogId($p) . $storefrontExtraFilterSuffix($p),
         'imgSrc' => storefront_product_image_href((string) ($p['main_image'] ?? '')),
         'title' => storefront_product_display_name($p),
         'oldPrice' => number_format((float) $p['price'], 2),
@@ -426,7 +493,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
 
     <section id="productsGrid" class="products-grid">
         <?php foreach ($offersInitial as $p): ?>
-            <article class="product-card" data-product-id="<?php echo (int) $p['id']; ?>" data-filter="offers cat-<?php echo (int) $p['category_id']; ?><?php echo $storefrontExtraFilterSuffix($p); ?>">
+            <article class="product-card" data-product-id="<?php echo (int) $p['id']; ?>" data-filter="offers cat-<?php echo $sfHomeFilterCatalogId($p); ?><?php echo $storefrontExtraFilterSuffix($p); ?>">
                 <div class="product-image-wrap">
                     <img src="<?php echo htmlspecialchars(storefront_product_image_href((string) ($p['main_image'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" decoding="async">
                     <span class="offer-badge"><?php echo htmlspecialchars(t('offers'), ENT_QUOTES, 'UTF-8'); ?></span>
@@ -464,7 +531,7 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
         <?php endforeach; ?>
 
         <?php foreach ($productsInitial as $p): ?>
-            <article class="product-card" data-product-id="<?php echo (int) $p['id']; ?>" data-filter="all cat-<?php echo (int) $p['category_id']; ?><?php echo $storefrontExtraFilterSuffix($p); ?>">
+            <article class="product-card" data-product-id="<?php echo (int) $p['id']; ?>" data-filter="all cat-<?php echo $sfHomeFilterCatalogId($p); ?><?php echo $storefrontExtraFilterSuffix($p); ?>">
                 <div class="product-image-wrap">
                     <img src="<?php echo htmlspecialchars(storefront_product_image_href((string) ($p['main_image'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" decoding="async">
                 </div>

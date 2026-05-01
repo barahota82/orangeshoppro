@@ -70,6 +70,18 @@ $tablesReady = $hasFamilies && $hasSizes;
             <label>English</label>
             <input type="text" id="fam_name_en" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
         </div>
+        <div class="sf-en">
+            <label>size_scheme_key (EN)</label>
+            <input type="text" id="fam_size_scheme_key" maxlength="64" placeholder="clothing_alpha" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
+        </div>
+        <div class="sf-en">
+            <label>commercial_kind_key</label>
+            <input type="text" id="fam_commercial_kind_key" maxlength="32" placeholder="clothing" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
+        </div>
+        <div class="sf-en">
+            <label>sizing_category_key</label>
+            <input type="text" id="fam_sizing_category_key" maxlength="64" placeholder="tops" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
+        </div>
         <div class="sf-active">
             <label>نشط</label>
             <select id="fam_active" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
@@ -120,6 +132,7 @@ $tablesReady = $hasFamilies && $hasSizes;
                     <th>#</th>
                     <th>العربي</th>
                     <th>English</th>
+                    <th>scheme</th>
                     <th>عدد المقاسات</th>
                     <th>الترتيب</th>
                     <th>الحالة</th>
@@ -132,6 +145,7 @@ $tablesReady = $hasFamilies && $hasSizes;
                     <td><?php echo (int) $f['id']; ?></td>
                     <td><?php echo htmlspecialchars((string) $f['name_ar'], ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo htmlspecialchars((string) $f['name_en'], ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo htmlspecialchars((string) ($f['size_scheme_key'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo isset($sizesByFamily[(int) $f['id']]) ? count($sizesByFamily[(int) $f['id']]) : 0; ?></td>
                     <td><?php echo (int) $f['sort_order']; ?></td>
                     <td><?php echo (int) $f['is_active'] === 1 ? 'ظاهر' : 'مخفي'; ?></td>
@@ -146,6 +160,9 @@ $tablesReady = $hasFamilies && $hasSizes;
                                     'id' => (int) $f['id'],
                                     'name_ar' => (string) $f['name_ar'],
                                     'name_en' => (string) $f['name_en'],
+                                    'size_scheme_key' => (string) ($f['size_scheme_key'] ?? ''),
+                                    'commercial_kind_key' => (string) ($f['commercial_kind_key'] ?? ''),
+                                    'sizing_category_key' => (string) ($f['sizing_category_key'] ?? ''),
                                     'sort_order' => (int) $f['sort_order'],
                                     'is_active' => (int) $f['is_active'],
                                 ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button>
@@ -173,6 +190,9 @@ function resetFamilyForm() {
     document.getElementById('fam_id').value = '0';
     document.getElementById('fam_name_ar').value = '';
     document.getElementById('fam_name_en').value = '';
+    document.getElementById('fam_size_scheme_key').value = '';
+    document.getElementById('fam_commercial_kind_key').value = '';
+    document.getElementById('fam_sizing_category_key').value = '';
     document.getElementById('fam_sort').value = String(defaultNextFamilySort || 1);
     document.getElementById('fam_active').value = '1';
 }
@@ -181,6 +201,9 @@ function editFamily(f) {
     document.getElementById('fam_id').value = String(f.id != null ? f.id : 0);
     document.getElementById('fam_name_ar').value = f.name_ar || '';
     document.getElementById('fam_name_en').value = f.name_en || '';
+    document.getElementById('fam_size_scheme_key').value = f.size_scheme_key || '';
+    document.getElementById('fam_commercial_kind_key').value = f.commercial_kind_key || '';
+    document.getElementById('fam_sizing_category_key').value = f.sizing_category_key || '';
     document.getElementById('fam_sort').value = String(f.sort_order ?? 0);
     document.getElementById('fam_active').value = String(f.is_active === 0 ? 0 : 1);
     document.getElementById('sizes_family_id').value = String(f.id);
@@ -235,6 +258,9 @@ async function saveFamily() {
         var payload = {
             name_ar: document.getElementById('fam_name_ar').value.trim(),
             name_en: document.getElementById('fam_name_en').value.trim(),
+            size_scheme_key: document.getElementById('fam_size_scheme_key').value.trim(),
+            commercial_kind_key: document.getElementById('fam_commercial_kind_key').value.trim(),
+            sizing_category_key: document.getElementById('fam_sizing_category_key').value.trim(),
             sort_order: parseInt(document.getElementById('fam_sort').value || '0', 10),
             is_active: parseInt(document.getElementById('fam_active').value, 10)
         };

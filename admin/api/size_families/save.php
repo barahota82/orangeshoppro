@@ -12,6 +12,20 @@ try {
     orange_catalog_ensure_schema($pdo);
     $data = get_json_input();
 
+    $sanitizeKey = static function (string $raw, int $maxLen): string {
+        $t = strtolower(trim($raw));
+        $t = (string) (preg_replace('/[^a-z0-9_-]/', '', $t) ?? '');
+        if (strlen($t) > $maxLen) {
+            $t = substr($t, 0, $maxLen);
+        }
+
+        return $t;
+    };
+
+    $sizeScheme = $sanitizeKey((string) ($data['size_scheme_key'] ?? ''), 64);
+    $commercialKind = $sanitizeKey((string) ($data['commercial_kind_key'] ?? ''), 32);
+    $sizingCategory = $sanitizeKey((string) ($data['sizing_category_key'] ?? ''), 64);
+
     $id = (int)($data['id'] ?? 0);
     $nameAr = trim((string)($data['name_ar'] ?? ''));
     $nameEn = trim((string)($data['name_en'] ?? ''));
@@ -37,14 +51,14 @@ try {
 
     if ($id > 0) {
         $pdo->prepare(
-            'UPDATE size_families SET name_ar=?, name_en=?, sort_order=?, is_active=? WHERE id=? LIMIT 1'
-        )->execute([$nameAr, $nameEn, $sort, $active, $id]);
+            'UPDATE size_families SET name_ar=?, name_en=?, size_scheme_key=?, commercial_kind_key=?, sizing_category_key=?, sort_order=?, is_active=? WHERE id=? LIMIT 1'
+        )->execute([$nameAr, $nameEn, $sizeScheme, $commercialKind, $sizingCategory, $sort, $active, $id]);
         json_response(['success' => true, 'id' => $id]);
     }
 
     $pdo->prepare(
-        'INSERT INTO size_families (name_ar, name_en, sort_order, is_active) VALUES (?,?,?,?)'
-    )->execute([$nameAr, $nameEn, $sort, $active]);
+        'INSERT INTO size_families (name_ar, name_en, size_scheme_key, commercial_kind_key, sizing_category_key, sort_order, is_active) VALUES (?,?,?,?,?,?,?)'
+    )->execute([$nameAr, $nameEn, $sizeScheme, $commercialKind, $sizingCategory, $sort, $active]);
     json_response(['success' => true, 'id' => (int)$pdo->lastInsertId()]);
 } catch (Throwable $e) {
     orange_admin_api_catch($e, 'تعذر حفظ عائلة المقاسات');
