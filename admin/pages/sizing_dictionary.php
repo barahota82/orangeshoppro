@@ -175,12 +175,12 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
             </select>
         </div>
         <div class="sd-kind-ar">
-            <label>التسمية العربية</label>
+            <label>الاسم عربي</label>
             <input type="text" id="sd_kind_label_ar" maxlength="191" <?php echo !$tablesReady ? 'disabled' : ''; ?>>
             <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">عند التوقف عن الكتابة يُحدَّث الإنجليزي صامتاً (لتوليد المفتاح) وفق آلية ترجمة الأسماء في الأدمن.</small>
         </div>
         <div class="sd-kind-en">
-            <label>التسمية الإنجليزية</label>
+            <label>English</label>
             <input type="text" id="sd_kind_label_en" maxlength="191" <?php echo !$tablesReady ? 'disabled' : ''; ?>>
         </div>
     </div>
@@ -205,11 +205,11 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
             <select id="sd_cat_parent_kind" <?php echo !$tablesReady ? 'disabled' : ''; ?>></select>
         </div>
         <div class="sd-cat-ar">
-            <label>التسمية العربية</label>
+            <label>الاسم عربي</label>
             <input type="text" id="sd_cat_label_ar" maxlength="191">
         </div>
         <div class="sd-cat-en">
-            <label>التسمية الإنجليزية</label>
+            <label>English</label>
             <input type="text" id="sd_cat_label_en" maxlength="191">
         </div>
         <div class="sd-cat-key">
@@ -509,11 +509,11 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
                 la = document.getElementById('sd_kind_label_ar').value.trim();
             }
             if (kk === '') {
-                alert('أدخل التسمية العربية أو الإنجليزية لتُولَّد المفتاح آلياً قبل الحفظ.');
+                alert('أدخل الاسم العربي أو English لتُولَّد المفتاح آلياً قبل الحفظ.');
                 return;
             }
             if (la === '' && le === '') {
-                alert('عبِّئ التسمية العربية أو الإنجليزية على الأقل.');
+                alert('عبِّئ الاسم العربي أو English على الأقل.');
                 return;
             }
             const payload = {
@@ -583,11 +583,11 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
                 la = document.getElementById('sd_cat_label_ar').value.trim();
             }
             if (ck === '') {
-                alert('أدخل التسمية العربية أو الإنجليزية لتُولَّد المفتاح آلياً قبل الحفظ.');
+                alert('أدخل الاسم العربي أو English لتُولَّد المفتاح آلياً قبل الحفظ.');
                 return;
             }
             if (la === '' && le === '') {
-                alert('عبِّئ التسمية العربية أو الإنجليزية على الأقل.');
+                alert('عبِّئ الاسم العربي أو English على الأقل.');
                 return;
             }
             const payload = {
