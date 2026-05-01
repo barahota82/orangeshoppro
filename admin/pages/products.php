@@ -53,21 +53,39 @@ if ($hasDepartmentsTable) {
     $departmentsForProducts = $pdo->query('SELECT * FROM departments ORDER BY sort_order ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
 }
 
+$hasProductTypesTable = orange_table_exists($pdo, 'product_types');
+
 if ($hasDepartmentsTable && $hasCategoryDepartment) {
     $products = $pdo->query(
         'SELECT p.*, c.name_ar AS category_name, c.department_id AS category_department_id,
-            d.name_ar AS department_name_ar, d.name_en AS department_name_en
+            d.name_ar AS department_name_ar, d.name_en AS department_name_en'
+        . ($hasProductTypesTable
+            ? ',
+            pt.name_ar AS pt_name_ar_join, pt.name_en AS pt_name_en_join, pt.slug AS pt_slug_join'
+            : '')
+        . '
         FROM products p
         LEFT JOIN categories c ON c.id = p.category_id
-        LEFT JOIN departments d ON d.id = c.department_id
+        LEFT JOIN departments d ON d.id = c.department_id'
+        . ($hasProductTypesTable ? '
+        LEFT JOIN product_types pt ON pt.id = p.product_type_id' : '')
+        . '
         ORDER BY p.sort_order ASC, p.id ASC'
     )->fetchAll(PDO::FETCH_ASSOC);
 } else {
     $products = $pdo->query(
         'SELECT p.*, c.name_ar AS category_name, NULL AS category_department_id,
-            NULL AS department_name_ar, NULL AS department_name_en
+            NULL AS department_name_ar, NULL AS department_name_en'
+        . ($hasProductTypesTable
+            ? ',
+            pt.name_ar AS pt_name_ar_join, pt.name_en AS pt_name_en_join, pt.slug AS pt_slug_join'
+            : '')
+        . '
         FROM products p
-        LEFT JOIN categories c ON c.id = p.category_id
+        LEFT JOIN categories c ON c.id = p.category_id'
+        . ($hasProductTypesTable ? '
+        LEFT JOIN product_types pt ON pt.id = p.product_type_id' : '')
+        . '
         ORDER BY p.sort_order ASC, p.id ASC'
     )->fetchAll(PDO::FETCH_ASSOC);
 }
@@ -514,6 +532,9 @@ foreach ($categories as $cat) {
         </div>
     </div>
     <?php endif; ?>
+    <?php if ($catalogNavUnified && $hasProductTypesTable): ?>
+    <p style="margin:4px 0 12px;font-size:13px;color:#92400e;background:#fffbeb;padding:10px 12px;border-radius:8px;border:1px solid #fcd34d;">مع تفعيل التصنيف الموحّد، يُشترط اختيار نوع منتج على كل منتج جديد؛ راجع عمود «نوع (موحّد)» في الجدول وصحّح الصفوف التي تظهر تنبيه «ناقص».</p>
+    <?php endif; ?>
     <div class="table-wrap cat-dep-list-wrap" data-list="products">
         <table>
             <thead>
@@ -524,6 +545,9 @@ foreach ($categories as $cat) {
                     <th>القسم</th>
                     <th>الفئة</th>
                     <th title="رقم القسم من الفئة · رقم الفئة — للمطابقة مع المتجر دون لبس (مثلاً 1-3 وليس 13)">مرجع قسم-فئة</th>
+                    <?php if ($hasProductTypesTable): ?>
+                    <th>نوع (موحّد)</th>
+                    <?php endif; ?>
                     <th>دليل مقاس</th>
                     <th>السعر</th>
                     <th>التكلفة</th>
@@ -543,13 +567,37 @@ foreach ($categories as $cat) {
                 }
                 $deptCatRef = $pDeptId . '-' . $pCatId;
                 ?>
-                <tr data-id="<?php echo (int)$p['id']; ?>" data-dept-id="<?php echo $pDeptId; ?>" data-category-id="<?php echo $pCatId; ?>">
+                <?php
+                $pPtId = isset($p['product_type_id']) && $p['product_type_id'] !== null ? (int) $p['product_type_id'] : 0;
+                $pPtCell = '';
+                $pPtStyle = '';
+                if ($hasProductTypesTable) {
+                    if ($pPtId <= 0) {
+                        $pPtCell = htmlspecialchars(
+                            $catalogNavUnified ? 'ناقص — يُصلح بتعديل المنتج' : '—',
+                            ENT_QUOTES,
+                            'UTF-8'
+                        );
+                        $pPtStyle = $catalogNavUnified ? ' style="background:#fef2f2;color:#991b1b;font-weight:600;"' : '';
+                    } else {
+                        $pPtLabel = trim((string) ($p['pt_name_ar_join'] ?? ''))
+                            ?: trim((string) ($p['pt_name_en_join'] ?? ''))
+                            ?: trim((string) ($p['pt_slug_join'] ?? ''));
+                        $pPtCell = htmlspecialchars($pPtLabel !== '' ? $pPtLabel : ('#' . $pPtId), ENT_QUOTES, 'UTF-8')
+                            . ' <span style="color:#64748b;font-size:12px;">(#' . $pPtId . ')</span>';
+                    }
+                }
+                ?>
+                <tr data-id="<?php echo (int)$p['id']; ?>" data-dept-id="<?php echo $pDeptId; ?>" data-category-id="<?php echo $pCatId; ?>"<?php echo $hasProductTypesTable ? ' data-product-type-id="' . $pPtId . '"' : ''; ?>>
                     <td><?php echo (int)$p['id']; ?></td>
                     <td><?php echo (int)($p['sort_order'] ?? 0); ?></td>
                     <td><?php echo htmlspecialchars($p['name']); ?></td>
                     <td><?php echo htmlspecialchars($pDeptLabel); ?><?php echo $pDeptId > 0 ? ' <span style="color:#64748b;font-size:12px;">(#' . $pDeptId . ')</span>' : ''; ?></td>
                     <td><?php echo htmlspecialchars($p['category_name'] ?: '-'); ?><?php echo $pCatId > 0 ? ' <span style="color:#64748b;font-size:12px;">(#' . $pCatId . ')</span>' : ''; ?></td>
                     <td><code style="font-size:13px;"><?php echo htmlspecialchars($deptCatRef, ENT_QUOTES, 'UTF-8'); ?></code></td>
+                    <?php if ($hasProductTypesTable): ?>
+                    <td<?php echo $pPtStyle !== '' ? $pPtStyle : ''; ?>><?php echo $pPtCell; ?></td>
+                    <?php endif; ?>
                     <td><?php echo htmlspecialchars((string)($p['sizing_guide_scope'] ?? 'none')); ?></td>
                     <td><?php echo number_format((float)$p['price'], 2); ?></td>
                     <td><?php echo number_format((float)$p['cost'], 2); ?></td>
