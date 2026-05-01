@@ -6,22 +6,9 @@ $pdo = db();
 
 $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
     && orange_table_exists($pdo, 'sizing_category_dictionary');
-$sdUseDepartmentKinds = $tablesReady && orange_table_exists($pdo, 'departments');
 ?>
 <div class="page-title">
     <h1>قاموس هرَم المقاس — المستويان 1 و2</h1>
-    <?php if ($sdUseDepartmentKinds): ?>
-    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.5;">
-        <strong>المستوى 1</strong> = <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=departments'), ENT_QUOTES, 'UTF-8'); ?>">الأقسام الرئيسية</a> (<code>departments</code>):
-        يُنشأ لكل قسم مفتاح تلقائي في الهرم بصيغة <code>d</code> + رقم المعرف (مثل <code>d3</code>) ويُحدَّث مع الاسم والترتيب والحالة عند حفظ القسم.
-        <strong>المستوى 2</strong> = فئات القياس تحت كل قسم؛ تُعرَّف هنا (مفتاح <code>sizing_category_key</code> يُولَّد من الإنجليزي).
-        عند وجود صفوف مرجعية نشطة يُفرَض تطابقها عند حفظ
-        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_families'), ENT_QUOTES, 'UTF-8'); ?>">عائلات المقاسات</a>.
-    </p>
-    <p class="page-subtitle" style="margin:0.5rem 0 0;font-size:0.92rem;color:#14532d;line-height:1.55;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:10px;padding:10px 12px;">
-        <strong>ملاحظة:</strong> صفوف «نوع تجاري» القديمة غير المرتبطة بقسم (مثل <code>clothing</code>) تظهر أسفل الجدول ولا تزال قابلة للتعديل من هذه الصفحة حتى تُرحَّل يدوياً إلى مفاتيح <code>dرقم</code> إن رغبت.
-    </p>
-    <?php else: ?>
     <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.5;">
         يحدِّد هذا القاموس مفاتيح <strong>commercial_kind_key</strong> و<strong>sizing_category_key</strong>
         (تُولَّد آلياً من الإنجليزي بعد تعبئة التسميات لتفادي أخطاء الإدخال) وبطاقات العرض عربي/إنجليزي.
@@ -30,9 +17,11 @@ $sdUseDepartmentKinds = $tablesReady && orange_table_exists($pdo, 'departments')
         فارغ تماماً = لا إجبار مرجعي (السلوك السابق).
     </p>
     <p class="page-subtitle" style="margin:0.5rem 0 0;font-size:0.92rem;color:#92400e;line-height:1.55;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 12px;">
-        <strong>بدون جدول أقسام رئيسية:</strong> المستوى 1 يُدار يدوياً من هذه الصفحة. عند تفعيل <code>departments</code> يُفضَّل ربط الهرم بالأقسام الرئيسية (مزامنة تلقائية) لتفادي تكرار التصنيف.
+        <strong>تمييز إلزامي:</strong> المستوى 1 هنا (<code>commercial_kind</code>) هو <strong>نطاق قياسي تجاري ضيّق</strong> لعائلات المقاس (مثل ملابس / أحذية / حقائب — مفاتيح مثل <code>clothing</code>، <code>shoes</code>) وليس
+        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=departments'), ENT_QUOTES, 'UTF-8'); ?>">الأقسام الرئيسية</a> في شجرة المتجر (<code>departments</code>).
+        تكرار أسماء الأقسام الرئيسية كأنواع تجارية هنا يخلق <strong>تصنيفاً موازياً خاطئاً</strong>؛ راجع «سابعاً ب» في
+        <code>docs/archive/ORANGE_UNIFIED_TAXONOMY_AND_CATALOG_ERD.txt</code> وملخص «هرَم المقاس الأربعة» في مرجع الواجهة المؤرشف.
     </p>
-    <?php endif; ?>
 </div>
 
 <?php if (!$tablesReady): ?>
@@ -44,15 +33,13 @@ $sdUseDepartmentKinds = $tablesReady && orange_table_exists($pdo, 'departments')
 <?php else: ?>
 <?php
 $sdNextKindSort = 1;
-if (! $sdUseDepartmentKinds) {
-    try {
-        $sdNextKindSort = (int) $pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM commercial_kind_dictionary')->fetchColumn();
-    } catch (Throwable $e) {
-        $sdNextKindSort = 1;
-    }
-    if ($sdNextKindSort < 1) {
-        $sdNextKindSort = 1;
-    }
+try {
+    $sdNextKindSort = (int) $pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM commercial_kind_dictionary')->fetchColumn();
+} catch (Throwable $e) {
+    $sdNextKindSort = 1;
+}
+if ($sdNextKindSort < 1) {
+    $sdNextKindSort = 1;
 }
 ?>
 
@@ -270,10 +257,8 @@ if (! $sdUseDepartmentKinds) {
     }
 </style>
 
-<div class="card" id="sd_kind_form_card" style="<?php echo $sdUseDepartmentKinds ? 'display:none;' : ''; ?>">
-    <h3>نوع تجاري (المستوى 1)<?php if ($sdUseDepartmentKinds): ?>
-        <span style="font-size:0.85rem;font-weight:normal;color:#666;"> — يدوي فقط (غير <code>dرقم</code>)</span>
-    <?php endif; ?></h3>
+<div class="card">
+    <h3>نوع تجاري (المستوى 1)</h3>
     <input type="hidden" id="sd_kind_old_key" value="">
     <div class="form-grid sd-kind-form-grid">
         <div class="sd-kind-sort admin-sort-field-wrap">
@@ -333,7 +318,7 @@ if (! $sdUseDepartmentKinds) {
             </select>
         </div>
         <div class="sd-cat-parent">
-            <label><?php echo $sdUseDepartmentKinds ? 'القسم الرئيسي (المستوى 1)' : 'النوع التجاري'; ?></label>
+            <label>النوع التجاري</label>
             <select id="sd_cat_parent_kind" <?php echo !$tablesReady ? 'disabled' : ''; ?>></select>
         </div>
         <div class="sd-cat-ar">
@@ -353,16 +338,13 @@ if (! $sdUseDepartmentKinds) {
 
 <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
-        <h3 style="margin:0;"><?php echo $sdUseDepartmentKinds ? 'الأقسام الرئيسية في الهرم (المستوى 1)' : 'الأنواع التجارية'; ?></h3>
+        <h3 style="margin:0;">الأنواع التجارية</h3>
         <button type="button" class="btn-secondary" onclick="sdReloadAll()">تحديث القائمة</button>
     </div>
     <div class="table-wrap" style="margin-top:10px;">
         <table>
             <thead>
                 <tr>
-                    <?php if ($sdUseDepartmentKinds): ?>
-                    <th>قسم #</th>
-                    <?php endif; ?>
                     <th>المفتاح</th>
                     <th>عرض عربي</th>
                     <th>عرض EN</th>
@@ -398,8 +380,6 @@ if (! $sdUseDepartmentKinds) {
 <script>
 (function () {
     const api = '/admin/api/sizing_dictionary/manage.php';
-    const sdDepartmentKindMode = <?php echo $sdUseDepartmentKinds ? 'true' : 'false'; ?>;
-    const sdDepartmentsPage = <?php echo json_encode(storefront_public_path('/admin/index.php?page=departments'), JSON_UNESCAPED_UNICODE); ?>;
     var sdNextKindSortPreview = <?php echo (int) $sdNextKindSort; ?>;
     var sdNextCatSortPreview = 1;
 
@@ -529,14 +509,7 @@ if (! $sdUseDepartmentKinds) {
         document.getElementById('sd_kind_label_en').value = '';
         document.getElementById('sd_kind_sort').value = '0';
         document.getElementById('sd_kind_active').value = '1';
-        if (sdDepartmentKindMode) {
-            const wrap = document.getElementById('sd_kind_form_card');
-            if (wrap) {
-                wrap.style.display = 'none';
-            }
-        } else {
-            sdSyncKindSortView();
-        }
+        sdSyncKindSortView();
     };
 
     window.sdResetCatForm = function (preserveKindDropdown) {
@@ -584,14 +557,7 @@ if (! $sdUseDepartmentKinds) {
             tb.innerHTML = '';
             kinds.forEach(function (k) {
                 const tr = document.createElement('tr');
-                const deptId = k.department_id != null && k.department_id !== '' ? parseInt(String(k.department_id), 10) : 0;
-                const deptLinked = parseInt(String(k.department_linked != null ? k.department_linked : '0'), 10) === 1;
-                const isDeptRow = sdDepartmentKindMode && deptLinked && deptId > 0;
-                const deptCell = sdDepartmentKindMode
-                    ? ('<td>' + (deptId > 0 ? String(deptId) : '—') + '</td>')
-                    : '';
                 tr.innerHTML =
-                    deptCell +
                     '<td><code>' + escapeHtml(k.kind_key || '') + '</code></td>' +
                     '<td>' + escapeHtml(k.label_ar || '') + '</td>' +
                     '<td>' + escapeHtml(k.label_en || '') + '</td>' +
@@ -602,22 +568,12 @@ if (! $sdUseDepartmentKinds) {
                         '<button type="button" class="btn-secondary">حذف</button>' +
                     '</td>';
                 const btns = tr.querySelectorAll('button');
-                if (isDeptRow) {
-                    btns[0].textContent = 'تعديل القسم';
-                    btns[0].onclick = function () {
-                        window.location.href = sdDepartmentsPage;
-                    };
-                    btns[1].style.display = 'none';
-                } else {
-                    btns[0].onclick = function () { sdEditKind(k); };
-                    btns[1].onclick = function () { sdDeleteKind(k.kind_key); };
-                }
+                btns[0].onclick = function () { sdEditKind(k); };
+                btns[1].onclick = function () { sdDeleteKind(k.kind_key); };
                 tb.appendChild(tr);
             });
-            if (!sdDepartmentKindMode) {
-                sdRefreshNextKindPreviewFromKinds(kinds);
-                sdSyncKindSortView();
-            }
+            sdRefreshNextKindPreviewFromKinds(kinds);
+            sdSyncKindSortView();
             if (refreshSelect) {
                 sdRefreshKindSelect(kinds, prevKindForCats || document.getElementById('sd_cat_parent_kind').value);
             }
@@ -672,18 +628,7 @@ if (! $sdUseDepartmentKinds) {
     };
 
     window.sdEditKind = function (k) {
-        const kk = (k && k.kind_key) ? String(k.kind_key) : '';
-        if (sdDepartmentKindMode && /^d\d+$/.test(kk) && parseInt(String(k.department_linked != null ? k.department_linked : '0'), 10) === 1) {
-            window.location.href = sdDepartmentsPage;
-            return;
-        }
-        if (sdDepartmentKindMode) {
-            const wrap = document.getElementById('sd_kind_form_card');
-            if (wrap) {
-                wrap.style.display = '';
-            }
-        }
-        document.getElementById('sd_kind_old_key').value = kk;
+        document.getElementById('sd_kind_old_key').value = k.kind_key || '';
         document.getElementById('sd_kind_label_ar').value = k.label_ar || '';
         document.getElementById('sd_kind_label_en').value = k.label_en || '';
         sdApplyAutoKindKey();
@@ -848,9 +793,7 @@ if (! $sdUseDepartmentKinds) {
 
     // postJSON يعرّفها admin.js المحمّلة بـ defer؛ السكربت المضمّن هنا ينفَّذ أثناء التحليل قبلها.
     function sdInitSizingDictionary() {
-        if (!sdDepartmentKindMode) {
-            sdSyncKindSortView();
-        }
+        sdSyncKindSortView();
         sdSyncCatSortView();
         sdReloadAll();
     }

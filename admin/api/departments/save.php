@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
-require_once __DIR__ . '/../../../includes/catalog_sizing_department_sync.php';
 require_admin_api();
 
 try {
@@ -77,11 +76,6 @@ try {
             'INSERT INTO departments (name_en, name_ar, slug, is_active, sort_order) VALUES (?, ?, ?, 1, ?)'
         );
         $stmt->execute([$nameEn, $nameAr, $candidate, $sort]);
-    }
-
-    $newDeptId = (int) $pdo->lastInsertId();
-    if ($newDeptId > 0) {
-        orange_catalog_sync_commercial_kind_for_department($pdo, $newDeptId);
     }
 
     json_response(['success' => true, 'message' => 'تم حفظ القسم', 'slug' => $candidate]);
