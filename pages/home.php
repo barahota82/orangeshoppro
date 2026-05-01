@@ -35,6 +35,7 @@ $pdo = db();
  * سياسة التبويبات (الشريط الأفقي): فئات بها منتج نشط فقط — عرض فئة كاملة.
  * القائمة (المينيو): أقسام ← فئات ← تصنيفات فرعية (إن وُجدت) مع اختيار نطاق أضيق.
  * بعد ترحيل التصنيف الموحّد (سجل orange_catalog_data_migration_log) تُحمَّل القائمة من catalog_* + product_type_id.
+ * شبكة المنتجات في الوضع الموحّد تعرض فقط السلاسل النشطة: product_types + فروع catalog_* + القسم department.
  */
 $sfUnifiedNavPack = orange_storefront_unified_nav_for_home($pdo);
 $useUnifiedHomeNav = ($sfUnifiedNavPack['categories'] ?? []) !== [];
@@ -176,10 +177,11 @@ if ($useUnifiedHomeNav) {
     $productsSql = '
     SELECT p.*, ucs2.department_id AS uf_dept_id, ucc.id AS uf_cat_id, ucs.id AS uf_sub_id
     FROM products p
-    LEFT JOIN product_types pt ON pt.id = p.product_type_id
-    LEFT JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id
-    LEFT JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id
-    LEFT JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id
+    INNER JOIN product_types pt ON pt.id = p.product_type_id AND pt.is_active = 1
+    INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id AND ucs.is_active = 1
+    INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id AND ucc.is_active = 1
+    INNER JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id AND ucs2.is_active = 1
+    INNER JOIN departments d ON d.id = ucs2.department_id AND d.is_active = 1
     WHERE p.is_active = 1
     ORDER BY p.sort_order ASC, p.id ASC
 ';
@@ -188,10 +190,11 @@ if ($useUnifiedHomeNav) {
            p.*, ucs2.department_id AS uf_dept_id, ucc.id AS uf_cat_id, ucs.id AS uf_sub_id
     FROM offers o
     INNER JOIN products p ON p.id = o.product_id
-    LEFT JOIN product_types pt ON pt.id = p.product_type_id
-    LEFT JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id
-    LEFT JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id
-    LEFT JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id
+    INNER JOIN product_types pt ON pt.id = p.product_type_id AND pt.is_active = 1
+    INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id AND ucs.is_active = 1
+    INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id AND ucc.is_active = 1
+    INNER JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id AND ucs2.is_active = 1
+    INNER JOIN departments d ON d.id = ucs2.department_id AND d.is_active = 1
     WHERE o.is_active = 1 AND p.is_active = 1
     ORDER BY p.sort_order ASC, p.id ASC, o.id ASC
 ';
