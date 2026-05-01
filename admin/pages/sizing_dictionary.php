@@ -25,6 +25,17 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
     </div>
 </div>
 <?php else: ?>
+<?php
+$sdNextKindSort = 1;
+try {
+    $sdNextKindSort = (int) $pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM commercial_kind_dictionary')->fetchColumn();
+} catch (Throwable $e) {
+    $sdNextKindSort = 1;
+}
+if ($sdNextKindSort < 1) {
+    $sdNextKindSort = 1;
+}
+?>
 
 <style>
     .sd-kind-form-grid {
@@ -247,8 +258,8 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
         <div class="sd-kind-sort admin-sort-field-wrap">
             <label>الترتيب (تلقائي)</label>
             <input type="hidden" id="sd_kind_sort" value="0">
-            <input type="text" id="sd_kind_sort_view" class="admin-sort-field admin-sort-field--muted" readonly disabled tabindex="-1" value="تلقائي">
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُحدَّد تلقائياً عند حفظ نوع جديد؛ ويُعرَض الرقم الحالي عند التعديل.</small>
+            <input type="text" id="sd_kind_sort_view" class="admin-sort-field admin-sort-field--muted" readonly disabled tabindex="-1" value="<?php echo (int) $sdNextKindSort; ?>">
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">عند إضافة نوع جديد يُعرض <strong>رقم الترتيب التالي</strong> المتوقّع؛ عند التعديل يُعرض رقم الصف الحالي.</small>
         </div>
         <div class="sd-kind-key">
             <label>مفتاح EN (<code>kind_key</code>) — للقراءة فقط</label>
@@ -285,8 +296,8 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
         <div class="sd-cat-sort admin-sort-field-wrap">
             <label>الترتيب (تلقائي)</label>
             <input type="hidden" id="sd_cat_sort" value="0">
-            <input type="text" id="sd_cat_sort_view" class="admin-sort-field admin-sort-field--muted" readonly disabled tabindex="-1" value="تلقائي">
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُحدَّد تلقائياً عند حفظ فئة جديدة ضمن نوع تجاري؛ ويُعرَض الرقم الحالي عند التعديل.</small>
+            <input type="text" id="sd_cat_sort_view" class="admin-sort-field admin-sort-field--muted" readonly disabled tabindex="-1" value="1">
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">بعد اختيار النوع التجاري يُعرض <strong>رقم الترتيب التالي</strong> للفئات تحته؛ عند التعديل يُعرض رقم الصف الحالي.</small>
         </div>
         <div class="sd-cat-key">
             <label>مفتاح EN (<code>category_key</code>) — للقراءة فقط</label>
@@ -363,7 +374,30 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
 <script>
 (function () {
     const api = '/admin/api/sizing_dictionary/manage.php';
-    const SD_SORT_AUTO_LABEL = 'تلقائي';
+    var sdNextKindSortPreview = <?php echo (int) $sdNextKindSort; ?>;
+    var sdNextCatSortPreview = 1;
+
+    function sdRefreshNextKindPreviewFromKinds(kinds) {
+        var maxSo = 0;
+        (kinds || []).forEach(function (k) {
+            var s = parseInt(String(k.sort_order != null ? k.sort_order : '0'), 10) || 0;
+            if (s > maxSo) {
+                maxSo = s;
+            }
+        });
+        sdNextKindSortPreview = maxSo + 1;
+    }
+
+    function sdRefreshNextCatPreviewFromCats(cats) {
+        var maxSo = 0;
+        (cats || []).forEach(function (c) {
+            var s = parseInt(String(c.sort_order != null ? c.sort_order : '0'), 10) || 0;
+            if (s > maxSo) {
+                maxSo = s;
+            }
+        });
+        sdNextCatSortPreview = maxSo + 1;
+    }
 
     function sdSyncKindSortView() {
         const hid = document.getElementById('sd_kind_sort');
@@ -371,7 +405,11 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
         const oldK = document.getElementById('sd_kind_old_key').value.trim();
         if (oldK === '') {
             hid.value = '0';
-            vw.value = SD_SORT_AUTO_LABEL;
+            var nk = parseInt(String(sdNextKindSortPreview), 10) || 1;
+            if (nk < 1) {
+                nk = 1;
+            }
+            vw.value = String(nk);
             return;
         }
         const n = parseInt(String(hid.value || '0'), 10) || 0;
@@ -385,7 +423,11 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
         const oldC = document.getElementById('sd_cat_old_key').value.trim();
         if (oldC === '') {
             hid.value = '0';
-            vw.value = SD_SORT_AUTO_LABEL;
+            var nc = parseInt(String(sdNextCatSortPreview), 10) || 1;
+            if (nc < 1) {
+                nc = 1;
+            }
+            vw.value = String(nc);
             return;
         }
         const n = parseInt(String(hid.value || '0'), 10) || 0;
@@ -524,6 +566,8 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
                 btns[1].onclick = function () { sdDeleteKind(k.kind_key); };
                 tb.appendChild(tr);
             });
+            sdRefreshNextKindPreviewFromKinds(kinds);
+            sdSyncKindSortView();
             if (refreshSelect) {
                 sdRefreshKindSelect(kinds, prevKindForCats || document.getElementById('sd_cat_parent_kind').value);
             }
@@ -540,6 +584,8 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
         const tb = document.getElementById('sd_cats_tbody');
         if (!ck) {
             tb.innerHTML = '';
+            sdNextCatSortPreview = 1;
+            sdSyncCatSortView();
             return;
         }
         prevKindForCats = ck;
@@ -568,6 +614,8 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
                 btns[1].onclick = function () { sdDeleteCategory(c.commercial_kind_key, c.category_key); };
                 tb.appendChild(tr);
             });
+            sdRefreshNextCatPreviewFromCats(cats);
+            sdSyncCatSortView();
         } catch (e) {
             alert('خطأ شبكة أو خادم');
         }
@@ -618,8 +666,8 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
                 alert(res && res.message ? res.message : 'فشل الحفظ');
                 return;
             }
-            sdResetKindForm();
             await sdReloadAll();
+            sdResetKindForm();
         } catch (e) {
             alert('فشل الحفظ');
         }
@@ -633,9 +681,9 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
                 alert(res && res.message ? res.message : 'تعذر الحذف');
                 return;
             }
+            await sdReloadAll();
             sdResetKindForm();
             sdResetCatForm(false);
-            await sdReloadAll();
         } catch (e) {
             alert('تعذر الحذف');
         }
@@ -693,9 +741,9 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
                 alert(res && res.message ? res.message : 'فشل الحفظ');
                 return;
             }
-            sdResetCatForm(true);
             await sdLoadKinds(true);
             await sdLoadCategories();
+            sdResetCatForm(true);
         } catch (e) {
             alert('فشل الحفظ');
         }
@@ -709,8 +757,8 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
                 alert(res && res.message ? res.message : 'تعذر الحذف');
                 return;
             }
-            sdResetCatForm(false);
             await sdLoadCategories();
+            sdResetCatForm(false);
         } catch (e) {
             alert('تعذر الحذف');
         }
