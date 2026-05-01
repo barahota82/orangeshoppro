@@ -239,7 +239,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
 <?php endif; ?>
 
 <div class="card" style="margin-bottom:12px;">
-    <p style="margin:0;">قبل إضافة منتج بمقاسات: عرّف <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_families'), ENT_QUOTES, 'UTF-8'); ?>">عائلات المقاسات</a>.
+    <p style="margin:0;">قبل إضافة منتج بمقاسات: رتّب الهرم من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">القاموس (1–2)</a> ثم <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_families'), ENT_QUOTES, 'UTF-8'); ?>">عائلات المقاسات (3–4)</a>.
         قبل الألوان: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=color_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس الألوان</a>.
         أنماط بصريّة اختيارية مع كل خليط لوني: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=pattern_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">أنماط الألوان</a>.</p>
 </div>
