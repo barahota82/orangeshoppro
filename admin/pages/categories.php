@@ -1,5 +1,13 @@
 <?php
+
+declare(strict_types=1);
+
 $pdo = db();
+
+require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/admin_unified_catalog_branch_data.php';
+
+$orange_uc = orange_admin_uc_branch_bootstrap($pdo);
 
 $hasDepartmentsTable = false;
 $hasCategoryDepartment = false;
@@ -39,8 +47,29 @@ try {
 }
 ?>
 <div class="page-title">
+    <?php if ($orange_uc['has_unified_tables'] ?? false): ?>
+    <h1>أقسام داخلية (التصنيف الموحّد)</h1>
+    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.65;">وفق سياسة الكتالوج الموحّد، هذا المستوى هو <strong>Section</strong> (<code>catalog_sections</code>) تحت القسم الرئيسي <code>departments</code>، قبل الفئات <code>catalog_categories</code> والفرع الموحّد. ربط المنتج بتصنيف الشجرة يكون عبر <code>product_type_id</code> ورقة نوع المنتج. لتعديل الفئة والفرع الموحَّد معًا أو لعرض الصفحة المجمَّعة استخدم «<a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=subcategories'), ENT_QUOTES, 'UTF-8'); ?>">الفئة والفرع (موحّد)</a>» أو «<a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع الشجرة الموحّدة</a>».</p>
+    <?php else: ?>
     <h1>الفئات</h1>
+    <?php endif; ?>
 </div>
+
+<?php if (!empty($orange_uc['has_unified_tables'])): ?>
+<?php if (empty($orange_uc['unified_nav_active'])): ?>
+<div class="card" style="margin-bottom:12px;background:#fffbeb;border-color:#fcd34d;">
+    <p style="margin:0;color:#92400e;">مسار المتجر الموحّد لم يُفعَّل بعد. يمكنك تهيئة <code>catalog_sections</code> هنا لتجهيز الترحيل.</p>
+</div>
+<?php endif; ?>
+<?php
+require __DIR__ . '/../partials/unified_catalog_section_panel.inc.php';
+require __DIR__ . '/../partials/unified_catalog_branch_style.inc.php';
+require __DIR__ . '/../partials/unified_catalog_branch_script.inc.php';
+?>
+<div class="card" style="margin:20px 0 16px;background:#f9fafb;border-color:#e5e7eb;">
+    <p style="margin:0;line-height:1.55;color:#374151;"><strong>جدول الفئات القديم (<code>categories</code>):</strong> يُستخدم في مسار المتجر قبل اكتمال الترحيل أو لمحاذاة العرض؛ مصدر حقيقة التصنيف النهائي يُكمَل بـ الشجرة الموحّدة و<code>product_type_id</code>.</p>
+</div>
+<?php endif; ?>
 
 <?php if (!$hasDepartmentsTable): ?>
 <div class="card">

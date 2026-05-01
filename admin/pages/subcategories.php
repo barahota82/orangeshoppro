@@ -7,6 +7,10 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
+require_once __DIR__ . '/../../includes/admin_unified_catalog_branch_data.php';
+$orange_uc = orange_admin_uc_branch_bootstrap($pdo);
+$showUnifiedTree = $orange_uc['has_unified_tables'];
+
 $hasSubcategoriesTable = orange_table_exists($pdo, 'subcategories');
 $hasProductSubcategoryColumn = orange_table_has_column($pdo, 'products', 'subcategory_id');
 
@@ -36,12 +40,12 @@ if ($hasSubcategoriesTable) {
         $nextSort = 1;
     }
 }
+$legacySubReady = $hasSubcategoriesTable && $hasProductSubcategoryColumn;
 ?>
+<?php if (!$showUnifiedTree && !$legacySubReady): ?>
 <div class="page-title">
     <h1>فئات فرعية</h1>
 </div>
-
-<?php if (!$hasSubcategoriesTable || !$hasProductSubcategoryColumn): ?>
 <div class="card">
     <div class="alert-error">
         <?php if (!$hasSubcategoriesTable): ?>
@@ -49,15 +53,47 @@ if ($hasSubcategoriesTable) {
         <?php else: ?>
             عمود <code>products.subcategory_id</code> غير موجود.
         <?php endif; ?>
-        بعد إنشاء الجدول/العمود ستظهر هذه الصفحة وستُفعَّل خانة «فئة فرعية» في نموذج المنتج.
+        كما لا تتوفر جدايل الشجرة الموحّدة (<code>catalog_*</code>) بعد لتعديل بديل؛ صحح المخطّط وفق دليل الكتالوج الموحّد.
     </div>
 </div>
 <?php return; endif; ?>
 
+<div class="page-title">
+    <?php if ($showUnifiedTree): ?>
+    <h1>الفئة والفرع (التصنيف الموحّد)</h1>
+    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.65;">أسفله مستويان من الشجرة النهائية: <strong>catalog_categories</strong> ثم <strong>catalog_subcategories</strong> قبل ربط <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات</a>. لمستوى <strong>Section</strong> الذي فوق ذلك استخدم صفحة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=categories'), ENT_QUOTES, 'UTF-8'); ?>">أقسام داخلية</a>. عرض شامل: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع الشجرة الموحّدة</a>.</p>
+    <?php else: ?>
+    <h1>فئات فرعية</h1>
+    <?php endif; ?>
+</div>
+
+<?php if ($showUnifiedTree): ?>
+<?php if (empty($orange_uc['unified_nav_active'])): ?>
+<div class="card" style="margin-bottom:12px;background:#fffbeb;border-color:#fcd34d;">
+    <p style="margin:0;color:#92400e;">مسار المتجر الموحّد لم يُفعَّل بعد. يمكنك تعريف الفئات والتصنيفات الفرعية هنا تمهيدًا لربط <code>product_type_id</code>.</p>
+</div>
+<?php endif; ?>
+<?php
+require __DIR__ . '/../partials/unified_catalog_categories_panel.inc.php';
+require __DIR__ . '/../partials/unified_catalog_subcategories_panel.inc.php';
+require __DIR__ . '/../partials/unified_catalog_branch_style.inc.php';
+require __DIR__ . '/../partials/unified_catalog_branch_script.inc.php';
+?>
+<?php if ($legacySubReady): ?>
+<div class="card" style="margin:20px 0 16px;background:#f9fafb;border-color:#e5e7eb;">
+    <p style="margin:0;line-height:1.55;color:#374151;"><strong>جدول الفئات الفرعية القديم (<code>subcategories</code>):</strong> مسار ترحيل وربط نموذج المنتج القديم؛ التصنيف الموحّد النهائي عبر <code>product_type_id</code>.</p>
+</div>
+<?php endif; ?>
+<?php endif; ?>
+
+<?php if ($legacySubReady): ?>
 <div class="card">
     <p style="margin:0 0 12px;font-size:14px;color:#555;">
-        الفئة الفرعية مستوى تحت <strong>الفئة</strong> (مثل: تيشرتات / بناطيل تحت «ملابس نسائية»). يُربط المنتج بها من
-        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=products'), ENT_QUOTES, 'UTF-8'); ?>">المنتجات</a> بعد اختيار الفئة.
+        <?php if ($showUnifiedTree): ?>
+        <strong>مسار قديم:</strong>
+        <?php endif; ?>
+        الفئة الفرعية هنا تعني جدول <code>subcategories</code> المرتبط بـ <code>categories</code> (ليس <code>catalog_subcategories</code> أعلاه). يُربط المنتج من
+        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=products'), ENT_QUOTES, 'UTF-8'); ?>">المنتجات</a> عند الحاجة أثناء الترحيل.
     </p>
 </div>
 
@@ -196,6 +232,9 @@ if ($hasSubcategoriesTable) {
     </div>
 </div>
 
+<?php endif; ?>
+
+<?php if ($legacySubReady): ?>
 <script>
 const SUBCAT_MSG = {
     E_CAT: 'اختر الفئة الأم',
@@ -422,3 +461,4 @@ document.getElementById('subcat_name_ar').addEventListener('input', scheduleSubc
     });
 })();
 </script>
+<?php endif; ?>

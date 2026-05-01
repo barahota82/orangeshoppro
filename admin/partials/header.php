@@ -264,10 +264,10 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
             ];
 
             $navOps = [
-                ['page' => 'departments', 'href' => '/admin/index.php?page=departments', 'label' => 'الأقسام', 'class' => '', 'sub' => false],
-                ['page' => 'categories', 'href' => '/admin/index.php?page=categories', 'label' => 'الفئات', 'class' => '', 'sub' => false],
-                ['page' => 'subcategories', 'href' => '/admin/index.php?page=subcategories', 'label' => 'فئات فرعية', 'class' => '', 'sub' => false],
-                ['page' => 'unified_catalog_branches', 'href' => '/admin/index.php?page=unified_catalog_branches', 'label' => 'فروع الشجرة الموحّدة', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'departments', 'href' => '/admin/index.php?page=departments', 'label' => 'الأقسام الرئيسية', 'class' => '', 'sub' => false],
+                ['page' => 'categories', 'href' => '/admin/index.php?page=categories', 'label' => 'أقسام داخلية', 'class' => '', 'sub' => false],
+                ['page' => 'subcategories', 'href' => '/admin/index.php?page=subcategories', 'label' => 'الفئة والفرع', 'class' => '', 'sub' => false],
+                ['page' => 'unified_catalog_branches', 'href' => '/admin/index.php?page=unified_catalog_branches', 'label' => 'الشجرة (عرض شامل)', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'product_types', 'href' => '/admin/index.php?page=product_types', 'label' => 'أنواع المنتجات (موحّد)', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'color_dictionary', 'href' => '/admin/index.php?page=color_dictionary', 'label' => 'قاموس الألوان', 'class' => '', 'sub' => false],
                 ['page' => 'pattern_dictionary', 'href' => '/admin/index.php?page=pattern_dictionary', 'label' => 'أنماط الألوان', 'class' => '', 'sub' => false],

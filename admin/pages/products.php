@@ -289,7 +289,7 @@ foreach ($categories as $cat) {
                 <?php if ($hasDepartmentsTable && $hasCategoryDepartment): ?>
                     <small style="display:block;color:#666;margin-top:4px;">كل فئة تحت قسمها لتفادي الخلط بين فئات متشابهة.</small>
                 <?php elseif (!$hasDepartmentsTable || !$hasCategoryDepartment): ?>
-                    <small style="display:block;color:#f59e0b;margin-top:4px;">لربط الفئات بالأقسام: من صفحة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=categories'), ENT_QUOTES, 'UTF-8'); ?>">الفئات</a>.</small>
+                    <small style="display:block;color:#f59e0b;margin-top:4px;">لربط جدول <code>categories</code> القديم بالأقسام أو لإعداد أقسام داخلية موحّدة: صفحة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=categories'), ENT_QUOTES, 'UTF-8'); ?>">أقسام داخلية</a>.</small>
                 <?php endif; ?>
             </div>
             <?php if ($hasSubcategoriesTable && $hasProductSubcategoryColumn): ?>
