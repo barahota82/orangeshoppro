@@ -375,7 +375,15 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
         sdLoadCategories();
     });
 
-    sdReloadAll();
+    // postJSON يعرّفها admin.js المحمّلة بـ defer؛ السكربت المضمّن هنا ينفَّذ أثناء التحليل قبلها.
+    function sdInitSizingDictionary() {
+        sdReloadAll();
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', sdInitSizingDictionary);
+    } else {
+        sdInitSizingDictionary();
+    }
 })();
 </script>
 
