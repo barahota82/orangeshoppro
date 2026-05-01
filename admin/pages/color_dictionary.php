@@ -44,9 +44,9 @@ if ($hasTable) {
             <label>Hex (اختياري)</label>
             <input type="text" id="c_hex" placeholder="مثال #FFFFFF أو اتركه فارغاً" <?php echo !$hasTable ? 'disabled' : ''; ?>>
         </div>
-        <div class="cd-active">
+        <div class="cd-active admin-sort-field-wrap">
             <label>نشط</label>
-            <select id="c_active" <?php echo !$hasTable ? 'disabled' : ''; ?>>
+            <select id="c_active" class="admin-sort-field" <?php echo !$hasTable ? 'disabled' : ''; ?>>
                 <option value="1">نعم</option>
                 <option value="0">لا</option>
             </select>
@@ -305,19 +305,21 @@ document.getElementById('c_name_en').addEventListener('input', scheduleColorTran
     style.textContent = `
         .cd-form-grid{
             display:grid;
-            grid-template-columns:1fr 1fr 1fr;
+            grid-template-columns:repeat(6,minmax(0,1fr));
             grid-template-areas:
-                "sort hex active"
-                "ar en ."
-                "fil hi .";
+                "sort sort hex hex active active"
+                "ar ar ar en en en"
+                "fil fil fil hi hi hi";
             gap:14px 18px;
             direction:rtl;
         }
-        .cd-form-grid .cd-sort{
-            grid-area:sort;
+        .cd-form-grid .cd-sort,
+        .cd-form-grid .cd-active{
             justify-self:start;
             width:100%;
-            max-width:var(--admin-sort-field-max-w, 220px);
+        }
+        .cd-form-grid .cd-sort{
+            grid-area:sort;
         }
         .cd-form-grid .cd-ar{grid-area:ar}
         .cd-form-grid .cd-en{grid-area:en}
@@ -328,7 +330,8 @@ document.getElementById('c_name_en').addEventListener('input', scheduleColorTran
         .cd-form-grid label,
         .cd-form-grid input,
         .cd-form-grid select{direction:rtl;text-align:right}
-        .cd-form-grid #c_sort{margin-inline-start:0;margin-inline-end:auto;display:block}
+        .cd-form-grid #c_sort,
+        .cd-form-grid #c_active{margin-inline-start:0;margin-inline-end:auto;display:block;width:100%;box-sizing:border-box}
         .cd-form-actions{justify-content:flex-end}
         @media (max-width: 860px){
             .cd-form-grid{
@@ -342,7 +345,8 @@ document.getElementById('c_name_en').addEventListener('input', scheduleColorTran
                     "fil"
                     "hi";
             }
-            .cd-form-grid .cd-sort{
+            .cd-form-grid .cd-sort,
+            .cd-form-grid .cd-active{
                 justify-self:start;
                 max-width:var(--admin-sort-field-max-w,220px)
             }
