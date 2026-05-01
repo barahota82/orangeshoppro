@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../includes/catalog_labels.php';
 
 header('Content-Type: application/json; charset=UTF-8');
@@ -57,6 +58,10 @@ try {
             continue;
         }
         $vid = (int) ($rw['id'] ?? 0);
+        $productId = (int) ($rw['product_id'] ?? 0);
+        if ($productId > 0 && !orange_storefront_product_in_active_unified_chain($pdo, $productId)) {
+            continue;
+        }
         $p = isset($rw['primary_color_id']) ? (int) $rw['primary_color_id'] : 0;
         $s = isset($rw['secondary_color_id']) ? (int) $rw['secondary_color_id'] : 0;
         $pp = isset($rw['primary_pattern_id']) ? (int) $rw['primary_pattern_id'] : 0;

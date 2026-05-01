@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -10,15 +11,41 @@ orange_catalog_ensure_schema($pdo);
 $channels = $pdo->query('SELECT id, name FROM channels WHERE is_active = 1 ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
 
 $prodCols = 'id, name, price, cost, has_colors, has_sizes';
+$pProdCols = 'p.id, p.name, p.price, p.cost, p.has_colors, p.has_sizes';
 if (orange_table_has_column($pdo, 'products', 'item_code')) {
     $prodCols .= ', item_code';
+    $pProdCols .= ', p.item_code';
 }
 if (orange_table_has_column($pdo, 'products', 'barcode')) {
     $prodCols .= ', barcode';
+    $pProdCols .= ', p.barcode';
 }
-$products = $pdo->query(
-    "SELECT $prodCols FROM products WHERE is_active = 1 ORDER BY name ASC"
-)->fetchAll(PDO::FETCH_ASSOC);
+
+$catalogNavUnified = function_exists('orange_catalog_nav_use_unified') && orange_catalog_nav_use_unified($pdo);
+if (
+    $catalogNavUnified
+    && function_exists('orange_table_exists')
+    && orange_table_exists($pdo, 'product_types')
+    && orange_table_exists($pdo, 'catalog_subcategories')
+) {
+    $products = $pdo->query(
+        "
+        SELECT DISTINCT $pProdCols
+        FROM products p
+        INNER JOIN product_types pt ON pt.id = p.product_type_id AND pt.is_active = 1
+        INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id AND ucs.is_active = 1
+        INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id AND ucc.is_active = 1
+        INNER JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id AND ucs2.is_active = 1
+        INNER JOIN departments d ON d.id = ucs2.department_id AND d.is_active = 1
+        WHERE p.is_active = 1
+        ORDER BY p.name ASC
+    "
+    )->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $products = $pdo->query(
+        "SELECT $prodCols FROM products WHERE is_active = 1 ORDER BY name ASC"
+    )->fetchAll(PDO::FETCH_ASSOC);
+}
 
 $variants = $pdo->query('SELECT * FROM product_variants ORDER BY product_id ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
 $variantsByProduct = [];
