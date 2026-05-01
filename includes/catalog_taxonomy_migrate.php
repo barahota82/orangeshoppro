@@ -9,6 +9,9 @@ declare(strict_types=1);
 
 const ORANGE_CATALOG_LEGACY_UNIFIED_STEP = 'legacy_unified_taxonomy_v1';
 
+/** مزامنة لمرّة واحدة: تعبئة category_id/subcategory_id كـ cache مشتَّق من product_type_id. */
+const ORANGE_CATALOG_LEGACY_PRODUCT_ROW_CACHE_STEP = 'legacy_product_row_cache_v1';
+
 /** @internal */
 function orange_tax_mig_tables_exist(PDO $pdo, array $tables): bool
 {
@@ -362,8 +365,135 @@ function orange_catalog_legacy_unified_migrate_data(PDO $pdo): bool
 
     orange_catalog_backfill_product_type_ids_only($pdo);
     orange_catalog_migration_step_record($pdo, ORANGE_CATALOG_LEGACY_UNIFIED_STEP);
+    orange_catalog_fill_legacy_product_row_cache($pdo);
 
     return true;
+}
+
+/**
+ * اشتقاق حقول الفئة القديمة على صف المنتج من ورقة الشجرة الموحّدة (كـ Cache فقط).
+ *
+ * @return array{legacy_category_id: ?int, legacy_subcategory_id: ?int}
+ */
+function orange_catalog_legacy_classification_cache_for_product_type(PDO $pdo, int $productTypeId): array
+{
+    $nullOut = ['legacy_category_id' => null, 'legacy_subcategory_id' => null];
+    if ($productTypeId <= 0 || !function_exists('orange_table_exists')) {
+        return $nullOut;
+    }
+    if (!orange_table_exists($pdo, 'product_types') || !orange_table_exists($pdo, 'catalog_subcategories')) {
+        return $nullOut;
+    }
+    try {
+        $st = $pdo->prepare(
+            'SELECT pt.slug AS pt_slug, ucs.slug AS ucs_slug, ucc.slug AS ucc_slug
+             FROM product_types pt
+             INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id
+             INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id
+             WHERE pt.id = ?
+             LIMIT 1'
+        );
+        $st->execute([$productTypeId]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if (! is_array($row)) {
+            return $nullOut;
+        }
+        $ptSlug = (string) ($row['pt_slug'] ?? '');
+        if (preg_match('/^legacy-ptype-sub-(\\d+)$/', $ptSlug, $m)) {
+            $sid = (int) $m[1];
+            if ($sid > 0 && orange_table_exists($pdo, 'subcategories')) {
+                $q = $pdo->prepare('SELECT category_id FROM subcategories WHERE id = ? LIMIT 1');
+                $q->execute([$sid]);
+                $cid = $q->fetchColumn();
+                if ($cid !== false && $cid !== null && (int) $cid > 0) {
+                    return ['legacy_category_id' => (int) $cid, 'legacy_subcategory_id' => $sid];
+                }
+            }
+
+            return $nullOut;
+        }
+        if (preg_match('/^legacy-ptype-cat-(\\d+)$/', $ptSlug, $m)) {
+            $cid = (int) $m[1];
+
+            return $cid > 0 ? ['legacy_category_id' => $cid, 'legacy_subcategory_id' => null] : $nullOut;
+        }
+        $ucsSlug = (string) ($row['ucs_slug'] ?? '');
+        if (preg_match('/^legacy-sub-(\\d+)$/', $ucsSlug, $m)) {
+            $sid = (int) $m[1];
+            if ($sid > 0 && orange_table_exists($pdo, 'subcategories')) {
+                $q = $pdo->prepare('SELECT category_id FROM subcategories WHERE id = ? LIMIT 1');
+                $q->execute([$sid]);
+                $cid = $q->fetchColumn();
+                if ($cid !== false && $cid !== null && (int) $cid > 0) {
+                    return ['legacy_category_id' => (int) $cid, 'legacy_subcategory_id' => $sid];
+                }
+            }
+
+            return $nullOut;
+        }
+        $uccSlug = (string) ($row['ucc_slug'] ?? '');
+        if (preg_match('/^legacy-cat-(\\d+)$/', $uccSlug, $m)) {
+            $cid = (int) $m[1];
+
+            return $cid > 0 ? ['legacy_category_id' => $cid, 'legacy_subcategory_id' => null] : $nullOut;
+        }
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] legacy_classification_cache_for_product_type: ' . $e->getMessage());
+        }
+    }
+
+    return $nullOut;
+}
+
+/** بعد الترحيل الموحّد: يعبّئ صف المنتج مرة واحدة وفق هرَم product_types فقط. */
+function orange_catalog_fill_legacy_product_row_cache(PDO $pdo): void
+{
+    if (
+        !function_exists('orange_catalog_nav_use_unified')
+        || !orange_catalog_nav_use_unified($pdo)
+        || !function_exists('orange_table_has_column')
+        || !orange_table_has_column($pdo, 'products', 'product_type_id')
+    ) {
+        return;
+    }
+    if (orange_catalog_migration_step_applied($pdo, ORANGE_CATALOG_LEGACY_PRODUCT_ROW_CACHE_STEP)) {
+        return;
+    }
+    try {
+        $stmt = $pdo->query(
+            'SELECT id, product_type_id FROM products
+             WHERE product_type_id IS NOT NULL AND product_type_id > 0'
+        );
+        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        if (! is_array($rows)) {
+            $rows = [];
+        }
+        $up = $pdo->prepare(
+            'UPDATE products SET category_id = ?, subcategory_id = ? WHERE id = ? LIMIT 1'
+        );
+        foreach ($rows as $r) {
+            if (! is_array($r)) {
+                continue;
+            }
+            $pid = (int) ($r['id'] ?? 0);
+            $ptid = (int) ($r['product_type_id'] ?? 0);
+            if ($pid <= 0 || $ptid <= 0) {
+                continue;
+            }
+            $cache = orange_catalog_legacy_classification_cache_for_product_type($pdo, $ptid);
+            $up->execute([
+                $cache['legacy_category_id'],
+                $cache['legacy_subcategory_id'],
+                $pid,
+            ]);
+        }
+        orange_catalog_migration_step_record($pdo, ORANGE_CATALOG_LEGACY_PRODUCT_ROW_CACHE_STEP);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] orange_catalog_fill_legacy_product_row_cache: ' . $e->getMessage());
+        }
+    }
 }
 
 /** بعد orange_schema_check_and_bootstrap — يعتمد مخطّط الكتالوج الحالي محمَّلاً. */
@@ -377,6 +507,7 @@ function orange_catalog_post_schema_legacy_unified(PDO $pdo): void
 
     if (orange_catalog_migration_step_applied($pdo, ORANGE_CATALOG_LEGACY_UNIFIED_STEP)) {
         orange_catalog_backfill_product_type_ids_only($pdo);
+        orange_catalog_fill_legacy_product_row_cache($pdo);
 
         return;
     }

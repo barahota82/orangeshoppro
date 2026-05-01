@@ -21,6 +21,44 @@ if (orange_table_exists($pdo, 'product_types')) {
     }
 }
 
+$productTypeTrailsForJs = [];
+if ($catalogNavUnified && orange_table_exists($pdo, 'product_types') && orange_table_exists($pdo, 'catalog_sections')
+    && orange_table_exists($pdo, 'departments')) {
+    try {
+        $trailRows = $pdo->query(
+            'SELECT pt.id,
+                CONCAT_WS(
+                    \' ← \',
+                    NULLIF(TRIM(d.name_ar), \'\'),
+                    NULLIF(TRIM(cs.name_ar), \'\'),
+                    NULLIF(TRIM(ucc.name_ar), \'\'),
+                    NULLIF(TRIM(ucs.name_ar), \'\'),
+                    NULLIF(TRIM(pt.name_ar), \'\')
+                ) AS trail_ar
+             FROM product_types pt
+             INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id
+             INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id
+             INNER JOIN catalog_sections cs ON cs.id = ucc.catalog_section_id
+             INNER JOIN departments d ON d.id = cs.department_id
+             WHERE pt.is_active = 1'
+        );
+        foreach (($trailRows ? $trailRows->fetchAll(PDO::FETCH_ASSOC) : []) ?: [] as $tr) {
+            if (!is_array($tr)) {
+                continue;
+            }
+            $tid = (int) ($tr['id'] ?? 0);
+            if ($tid <= 0) {
+                continue;
+            }
+            $productTypeTrailsForJs[$tid] = [
+                'trail_ar' => trim((string) ($tr['trail_ar'] ?? '')),
+            ];
+        }
+    } catch (Throwable $e) {
+        $productTypeTrailsForJs = [];
+    }
+}
+
 $catalogAttributesActive = [];
 if (orange_table_exists($pdo, 'catalog_attributes')) {
     try {
@@ -206,6 +244,10 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
     <p id="productEditHint" style="display:none;margin:0 0 12px;color:#555;font-size:14px;">تعديل البيانات الأساسية. الترتيب في المتجر من الجدول فقط (↑↓ ثم حفظ الترتيب). كميات الألوان والمقاسات من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8'); ?>">المخزون</a>.</p>
     <form id="productForm">
         <input type="hidden" id="product_record_id" value="0">
+        <?php if ($catalogNavUnified): ?>
+        <input type="hidden" id="category_id" value="">
+        <input type="hidden" id="subcategory_id" value="">
+        <?php endif; ?>
         <p class="admin-product-form-intro">مسار العمل: <strong>البيانات الأساسية</strong> ← <strong>المقاسات والألوان</strong> ← <strong>الصور</strong> (صورة مرجعية للصنف) ← <strong>المتغيرات</strong> ثم «توليد المتغيرات». زر «حفظ المنتج» يطبّق كل التبويبات دفعة واحدة.</p>
 
         <div class="admin-product-tabs" role="tablist" aria-label="أقسام نموذج المنتج">
@@ -235,9 +277,9 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         </select>
                     </div>
                     <div>
-                        <label>القسم (يُستنتج من الفئة)</label>
+                <label><?php echo $catalogNavUnified ? 'مسار الشجرة الموحّدة (مقتطف)' : 'القسم (يُستنتج من الفئة)'; ?></label>
                         <div id="product_department_hint" style="padding:8px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;min-height:20px;">—</div>
-                        <small style="display:block;color:#666;margin-top:4px;">مرجع قسم-فئة: <code id="product_dept_cat_ref" style="font-size:13px;">—</code></small>
+                        <small style="display:block;color:#666;margin-top:4px;">مرجع: <code id="product_dept_cat_ref" style="font-size:13px;">—</code></small>
                     </div>
                 </div>
             </div>
@@ -254,14 +296,15 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                     <?php endforeach; ?>
                 </select>
                 <?php if ($catalogNavUnified): ?>
-                    <small style="display:block;color:#666;margin-top:4px;line-height:1.45;">يجب مطابقة الورقة لمسار المتجر الموحّد. تهيئة الفروع: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع الشجرة الموحّدة</a>، ثم <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات (موحّد)</a> ومفتاح مخطّط المقاس المتوقّع. للمسار الذي لم يُرحَّل آلياً: اختر الفئة أسفله لتطابق عرض المتجر الحالي.</small>
+                    <small style="display:block;color:#666;margin-top:4px;line-height:1.45;">يجب مطابقة الورقة لمسار المتجر الموحّد. تهيئة الفروع من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع الشجرة</a> و<a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات (موحّد)</a>؛ مخطّط المقاس المتوقّع على الورقة، وهرَم المقاس (1–2) من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">القاموس المرجعي</a>. <strong>مصدر التصنيف على المنتج هو هذه الورقة فقط</strong>؛ الحقول القديمة على المنتج تُحدَّث آلياً عند وجود جسر ترحيل.</small>
                 <?php else: ?>
                     <small style="display:block;color:#666;margin-top:4px;line-height:1.45;">تهيئة الشجرة الموحّدة: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع الشجرة</a> ثم <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات (موحّد)</a>.</small>
                 <?php endif; ?>
             </div>
-            <div class="orange-legacy-category-fields" <?php echo $catalogNavUnified ? ' style="opacity:0.92"' : ''; ?>>
+            <?php if (!$catalogNavUnified): ?>
+            <div class="orange-legacy-category-fields">
             <div <?php echo ($hasSubcategoriesTable && $hasProductSubcategoryColumn) ? '' : 'style="grid-column:1/-1;"'; ?>>
-                <label>الفئة (ضمن القسم)<?php echo $catalogNavUnified ? ' — للعرض/المسارات غير المرحَّلة' : ''; ?></label>
+                <label>الفئة (ضمن القسم)</label>
                 <select id="category_id"<?php echo $categorySelectRequiresAttr; ?>>
                     <option value="">اختر الفئة</option>
                     <?php if ($hasDepartmentsTable && $hasCategoryDepartment && $departmentsForProducts !== []): ?>
@@ -320,6 +363,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
             </div>
             <?php endif; ?>
             </div>
+            <?php endif; ?>
             <div>
                 <label>اسم المنتج (العربي)</label>
                 <input type="text" id="name" required>
@@ -648,6 +692,7 @@ window.ORANGE_FAMILIES = <?php echo json_encode($familiesOut, JSON_UNESCAPED_UNI
 window.ORANGE_SUBCATEGORIES = <?php echo json_encode($subcategoriesForJs, JSON_UNESCAPED_UNICODE); ?>;
 window.ORANGE_CATEGORY_META = <?php echo json_encode($categoryCatalogMeta, JSON_UNESCAPED_UNICODE); ?>;
 window.ORANGE_CATALOG_NAV_UNIFIED = <?php echo $catalogNavUnified ? 'true' : 'false'; ?>;
+window.ORANGE_PRODUCT_TYPE_TRAIL = <?php echo json_encode($productTypeTrailsForJs, JSON_UNESCAPED_UNICODE); ?>;
 window.PRODUCT_EXTRA_IMAGES = [];
 window.PRODUCT_NEXT_SORT = <?php echo (int)$nextProductSort; ?>;
 
@@ -668,7 +713,8 @@ function orangeGetSelectedProductTypeSlug() {
 
 /** عند ورقة ترحيل legacy يُعبِّئ الفئة/الفرع من الـ slug تلقائياً لتقليل خطأ الإدخال. */
 function orangeSyncLegacyFieldsFromProductType() {
-    if (!window.ORANGE_CATALOG_NAV_UNIFIED) {
+    if (window.ORANGE_CATALOG_NAV_UNIFIED) {
+        updateProductCatalogHint();
         return;
     }
     const slug = orangeGetSelectedProductTypeSlug();
@@ -1627,17 +1673,6 @@ async function saveProduct() {
             alert('في وضع الشجرة الموحّدة يجب اختيار «نوع المنتج».');
             return;
         }
-        const slugPt = orangeGetSelectedProductTypeSlug();
-        const isLegacySlug = /^legacy-ptype-(cat|sub)-\d+$/.test(slugPt);
-        if (!isLegacySlug) {
-            const cEl = document.getElementById('category_id');
-            const catVal = cEl ? (parseInt(cEl.value || '0', 10) || 0) : 0;
-            if (catVal <= 0) {
-                productFormShowTab('basic');
-                alert('لهذا نوع المنتج اختر الفئة المعروضة لتطابق مسار المتجر الحالي.');
-                return;
-            }
-        }
     }
 
     const hsCheck = parseInt(document.getElementById('has_sizes').value || '0', 10) === 1;
@@ -1822,6 +1857,23 @@ document.getElementById('description_en').addEventListener('input', scheduleProd
 function updateProductCatalogHint() {
     const hint = document.getElementById('product_department_hint');
     const refEl = document.getElementById('product_dept_cat_ref');
+    const ptEl = document.getElementById('product_type_id');
+    const trailMap = window.ORANGE_PRODUCT_TYPE_TRAIL || {};
+    if (window.ORANGE_CATALOG_NAV_UNIFIED) {
+        if (!hint || !refEl || !ptEl) {
+            return;
+        }
+        const pid = parseInt(ptEl.value || '0', 10) || 0;
+        const row = trailMap[pid];
+        if (!row || !String(row.trail_ar || '').trim()) {
+            hint.textContent = pid > 0 ? '— اختر نوع منتج نشط لعرض المسار' : '—';
+            refEl.textContent = pid > 0 ? 'pt-' + pid : '—';
+            return;
+        }
+        hint.textContent = String(row.trail_ar || '').trim();
+        refEl.textContent = 'pt-' + pid;
+        return;
+    }
     const sel = document.getElementById('category_id');
     if (!hint || !refEl || !sel) {
         return;
@@ -1856,6 +1908,9 @@ if (orangeProductTypeSelectEl) {
     orangeProductTypeSelectEl.addEventListener('change', function () {
         orangeSyncLegacyFieldsFromProductType();
         orangeApplySizeFamilySchemeFilter();
+        if (window.ORANGE_CATALOG_NAV_UNIFIED) {
+            updateProductCatalogHint();
+        }
     });
 }
 rebuildSubcategoryOptions(null);

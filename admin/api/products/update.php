@@ -37,9 +37,18 @@ try {
         json_response(['success' => false, 'message' => $class['error']], 422);
     }
 
-    $resolvedCategoryId = (int) $class['category_id'];
+    $resolvedCategoryId = $class['category_id'] ?? null;
+    if ($resolvedCategoryId !== null && (int) $resolvedCategoryId <= 0) {
+        $resolvedCategoryId = null;
+    } elseif ($resolvedCategoryId !== null) {
+        $resolvedCategoryId = (int) $resolvedCategoryId;
+    }
     $subcategoryId = $class['subcategory_id'] ?? null;
-    $subcategoryId = $subcategoryId !== null ? (int) $subcategoryId : null;
+    if ($subcategoryId !== null && (int) $subcategoryId <= 0) {
+        $subcategoryId = null;
+    } elseif ($subcategoryId !== null) {
+        $subcategoryId = (int) $subcategoryId;
+    }
     $productTypeIdResolved = isset($class['product_type_id']) ? $class['product_type_id'] : null;
     if ($productTypeIdResolved !== null) {
         $productTypeIdResolved = (int) $productTypeIdResolved;
