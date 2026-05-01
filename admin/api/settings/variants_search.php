@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/catalog_taxonomy_migrate.php';
 require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
+require_once __DIR__ . '/../../../includes/catalog_unified_nav.php';
 require_admin_api();
 
 /**
@@ -23,6 +24,57 @@ try {
     }
 
     if (($raw['action'] ?? '') === 'filter_tree') {
+        $unifiedFt = orange_catalog_nav_use_unified($pdo)
+            && orange_table_exists($pdo, 'departments')
+            && orange_table_exists($pdo, 'catalog_sections');
+
+        if ($unifiedFt) {
+            $pack = orange_storefront_unified_nav_for_home($pdo);
+            $ucats = $pack['categories'] ?? [];
+            if ($ucats !== []) {
+                $departments = $pack['departments'] ?? [];
+                $categories = [];
+                foreach ($ucats as $c) {
+                    if (!is_array($c)) {
+                        continue;
+                    }
+                    $did = $c['department_id'] ?? null;
+                    $categories[] = [
+                        'id' => (int) ($c['id'] ?? 0),
+                        'name_ar' => (string) ($c['name_ar'] ?? ''),
+                        'name_en' => (string) ($c['name_en'] ?? ''),
+                        'department_id' => $did !== null && $did !== '' ? (int) $did : null,
+                    ];
+                }
+                $subcategories = [];
+                $subsMap = $pack['subcategoriesByCategory'] ?? [];
+                foreach ($subsMap as $cid => $list) {
+                    if (!is_array($list)) {
+                        continue;
+                    }
+                    foreach ($list as $s) {
+                        if (!is_array($s)) {
+                            continue;
+                        }
+                        $scid = (int) ($s['catalog_category_id'] ?? $cid);
+                        $subcategories[] = [
+                            'id' => (int) ($s['id'] ?? 0),
+                            'category_id' => $scid,
+                            'name_ar' => (string) ($s['name_ar'] ?? ''),
+                            'name_en' => (string) ($s['name_en'] ?? ''),
+                        ];
+                    }
+                }
+                json_response([
+                    'success' => true,
+                    'filter_tree_source' => 'unified',
+                    'departments' => is_array($departments) ? $departments : [],
+                    'categories' => $categories,
+                    'subcategories' => $subcategories,
+                ]);
+            }
+        }
+
         $departments = [];
         if (orange_table_exists($pdo, 'departments')) {
             $departments = $pdo->query(
@@ -56,6 +108,7 @@ try {
 
         json_response([
             'success' => true,
+            'filter_tree_source' => 'legacy',
             'departments' => $departments,
             'categories' => $categories,
             'subcategories' => $subcategories,
@@ -80,8 +133,7 @@ try {
         && orange_table_exists($pdo, 'catalog_subcategories');
 
     if ($unifiedPicker) {
-        /* التصفية الهرمية في الواجهة ما زالت تعتمد أرقام الشجرة القديمة؛ لا تُربَط بـ catalog_* حتى يُحدَّث منتقي الأدمن.
-           هنا نُقيّد النتائج بـ «سلسلة كتالوج نشطة» فقط + نص البحث. */
+        /* قائمة الشجرة تُحمَّل عبر filter_tree من catalog_*؛ التصفية تستخدم معرفات ucc.id / ucs.id / d.id. */
         $sql = 'SELECT pv.id AS variant_id, pv.color, pv.size, pv.stock_quantity,
                        p.id AS product_id, p.name AS product_name, p.name_en AS product_name_en
                 FROM product_variants pv
@@ -93,6 +145,16 @@ try {
                 INNER JOIN departments d ON d.id = ucs2.department_id AND d.is_active = 1
                 WHERE 1=1';
         $params = [];
+        if ($subcategoryId > 0) {
+            $sql .= ' AND ucs.id = ?';
+            $params[] = $subcategoryId;
+        } elseif ($categoryId > 0) {
+            $sql .= ' AND ucc.id = ?';
+            $params[] = $categoryId;
+        } elseif ($departmentId > 0) {
+            $sql .= ' AND d.id = ?';
+            $params[] = $departmentId;
+        }
     } else {
         $sql = 'SELECT pv.id AS variant_id, pv.color, pv.size, pv.stock_quantity,
                        p.id AS product_id, p.name AS product_name, p.name_en AS product_name_en
