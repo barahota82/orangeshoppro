@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
 
 try {
     $pdo = db();
@@ -25,6 +26,10 @@ try {
         $pStmt = $pdo->prepare('SELECT id FROM products WHERE id = ? AND is_active = 1 LIMIT 1');
         $pStmt->execute([$pid]);
         if (!$pStmt->fetch()) {
+            $limits[] = 0;
+            continue;
+        }
+        if (!orange_storefront_product_in_active_unified_chain($pdo, $pid)) {
             $limits[] = 0;
             continue;
         }

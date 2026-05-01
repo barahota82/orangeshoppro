@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
+require_once __DIR__ . '/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/cart_promo_gift_charge.php';
 
 /**
@@ -251,6 +252,9 @@ function orange_storefront_build_gift_order_line(
     $pStmt->execute([(int) $variant['product_id']]);
     $product = $pStmt->fetch(PDO::FETCH_ASSOC);
     if (!$product) {
+        throw new RuntimeException(function_exists('t') ? t('checkout_gift_variant_invalid') : 'Invalid gift item.');
+    }
+    if (!orange_storefront_product_in_active_unified_chain($pdo, (int) $product['id'])) {
         throw new RuntimeException(function_exists('t') ? t('checkout_gift_variant_invalid') : 'Invalid gift item.');
     }
     $used = orange_cart_gift_variant_usage_in_lines($validatedItems, $variantId);

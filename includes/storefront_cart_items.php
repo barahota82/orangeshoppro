@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/order_helpers.php';
+require_once __DIR__ . '/catalog_unified_product_helpers.php';
 
 /**
  * التحقق من بنود السلة وحساب المجموع الفرعي. عند checkout استخدم lockVariants=true داخل معاملة.
@@ -32,6 +33,9 @@ function orange_storefront_validate_cart_items_core(PDO $pdo, array $items, bool
 
         if (!$product) {
             throw new RuntimeException('Product not found: ' . (int) $item['id']);
+        }
+        if (!orange_storefront_product_in_active_unified_chain($pdo, (int) $product['id'])) {
+            throw new RuntimeException(function_exists('t') ? t('product_not_found') : 'Product not available');
         }
 
         $qty = max(1, (int) $item['qty']);
