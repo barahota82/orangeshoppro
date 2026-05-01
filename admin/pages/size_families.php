@@ -83,6 +83,7 @@ $tablesReady = $hasFamilies && $hasSizes;
             <label>sizing_category_key</label>
             <input type="text" id="fam_sizing_category_key" maxlength="64" placeholder="tops" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
         </div>
+        <p style="grid-column:1/-1;margin:0;font-size:0.88rem;color:#555;line-height:1.45;">إن ملأت <code>size_scheme_key</code> فالحفظ يرفض دون تعبئة <code>commercial_kind_key</code> و<code>sizing_category_key</code> أيضًا (استكمال الهرم عند مستوى المخطّط).</p>
         <div class="sf-active">
             <label>نشط</label>
             <select id="fam_active" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>

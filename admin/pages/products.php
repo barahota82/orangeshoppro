@@ -219,9 +219,9 @@ foreach ($categories as $cat) {
                     <?php endforeach; ?>
                 </select>
                 <?php if ($catalogNavUnified): ?>
-                    <small style="display:block;color:#666;margin-top:4px;line-height:1.45;">يجب مطابقة الورقة لمسار المتجر الموحّد. تهيئة الأنواع ومفتاح مخطّط المقاس المتوقّع من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات (موحّد)</a>. للمسار الذي لم يُرحَّل آلياً: اختر الفئة أسفله لتطابق عرض المتجر الحالي.</small>
+                    <small style="display:block;color:#666;margin-top:4px;line-height:1.45;">يجب مطابقة الورقة لمسار المتجر الموحّد. تهيئة الفروع: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع الشجرة الموحّدة</a>، ثم <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات (موحّد)</a> ومفتاح مخطّط المقاس المتوقّع. للمسار الذي لم يُرحَّل آلياً: اختر الفئة أسفله لتطابق عرض المتجر الحالي.</small>
                 <?php else: ?>
-                    <small style="display:block;color:#666;margin-top:4px;line-height:1.45;">تهيئة شجرة الأنواع وفق الموحّد: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات (موحّد)</a>.</small>
+                    <small style="display:block;color:#666;margin-top:4px;line-height:1.45;">تهيئة الشجرة الموحّدة: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع الشجرة</a> ثم <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات (موحّد)</a>.</small>
                 <?php endif; ?>
             </div>
             <div class="orange-legacy-category-fields" <?php echo $catalogNavUnified ? ' style="opacity:0.92"' : ''; ?>>

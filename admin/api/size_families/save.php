@@ -36,6 +36,13 @@ try {
         json_response(['success' => false, 'message' => 'يجب تعبئة الاسم العربي والإنجليزي'], 422);
     }
 
+    if ($sizeScheme !== '' && ($commercialKind === '' || $sizingCategory === '')) {
+        json_response([
+            'success' => false,
+            'message' => 'عند ضبط مخطّط مقاس (size_scheme_key) يجب ملء هرَم المقاس: النوع التجاري commercial_kind_key وفئة القياس sizing_category_key — راجع سياسة الهرم الأربعة في الوثائق.',
+        ], 422);
+    }
+
     $famRows = $pdo->query('SELECT id, name_ar FROM size_families')->fetchAll(PDO::FETCH_ASSOC);
     $excludeFamId = $id > 0 ? $id : null;
     if (orange_rows_normalized_arabic_conflict(is_array($famRows) ? $famRows : [], 'id', 'name_ar', $nameAr, $excludeFamId)) {
