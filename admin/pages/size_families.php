@@ -46,6 +46,7 @@ $tablesReady = $hasFamilies && $hasSizes;
 ?>
 <div class="page-title">
     <h1>عائلات المقاسات</h1>
+    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.5;">هرَم المقاس وفق سياسة المشروع: <strong>نوع تجاري</strong> (<code>commercial_kind_key</code>) ← <strong>فئة القياس</strong> (<code>sizing_category_key</code>) ← <strong>مخطّط العائلة</strong> (<code>size_scheme_key</code>) ← قيم القائمة في <code>size_family_sizes</code>. عند ضبط <code>expected_size_scheme_key</code> على <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">نوع منتج موحّد</a>، يُطبَّق تحقّق المطابقة تلقائياً مع حقلي المستويين الأولين على العائلة.</p>
 </div>
 
 <?php if (!$tablesReady): ?>

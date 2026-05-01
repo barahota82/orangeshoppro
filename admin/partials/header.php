@@ -267,6 +267,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 ['page' => 'departments', 'href' => '/admin/index.php?page=departments', 'label' => 'الأقسام', 'class' => '', 'sub' => false],
                 ['page' => 'categories', 'href' => '/admin/index.php?page=categories', 'label' => 'الفئات', 'class' => '', 'sub' => false],
                 ['page' => 'subcategories', 'href' => '/admin/index.php?page=subcategories', 'label' => 'فئات فرعية', 'class' => '', 'sub' => false],
+                ['page' => 'product_types', 'href' => '/admin/index.php?page=product_types', 'label' => 'أنواع المنتجات (موحّد)', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'color_dictionary', 'href' => '/admin/index.php?page=color_dictionary', 'label' => 'قاموس الألوان', 'class' => '', 'sub' => false],
                 ['page' => 'pattern_dictionary', 'href' => '/admin/index.php?page=pattern_dictionary', 'label' => 'أنماط الألوان', 'class' => '', 'sub' => false],
                 ['page' => 'size_families', 'href' => '/admin/index.php?page=size_families', 'label' => 'عائلات المقاسات', 'class' => '', 'sub' => false],

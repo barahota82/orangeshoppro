@@ -20,6 +20,7 @@ $allowed = [
     'departments',
     'categories',
     'subcategories',
+    'product_types',
     'color_dictionary',
     'pattern_dictionary',
     'size_families',
