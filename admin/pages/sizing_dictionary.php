@@ -33,11 +33,91 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
         gap: 12px 18px;
         align-items: start;
     }
-    .sd-dict-kind .sd-kind-r1 { grid-column: 1 / -1; width: 100%; max-width: var(--admin-sort-field-max-w, 220px); }
-    .sd-dict-kind .sd-kind-ar { grid-column: 1; }
-    .sd-dict-kind .sd-kind-en { grid-column: 2; }
-    .sd-dict-kind .sd-kind-key { grid-column: 1; }
-    .sd-dict-kind .sd-kind-act { grid-column: 2; }
+    .sd-kind-form-grid {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        grid-template-areas:
+            "active active key key key key key key key key sort sort"
+            "en en en en en en ar ar ar ar ar ar";
+        gap: 14px 18px;
+        direction: ltr;
+        align-items: start;
+    }
+    .sd-kind-form-grid .sd-kind-sort {
+        grid-area: sort;
+        justify-self: end;
+        width: 100%;
+    }
+    .sd-kind-form-grid .sd-kind-act {
+        grid-area: active;
+        justify-self: start;
+        width: 100%;
+    }
+    .sd-kind-form-grid .sd-kind-key {
+        grid-area: key;
+        min-width: 0;
+    }
+    .sd-kind-form-grid .sd-kind-ar { grid-area: ar; }
+    .sd-kind-form-grid .sd-kind-en { grid-area: en; }
+    .sd-kind-form-grid label,
+    .sd-kind-form-grid input,
+    .sd-kind-form-grid select {
+        direction: rtl;
+        text-align: right;
+    }
+    .sd-kind-form-grid #sd_kind_sort_view {
+        margin-inline: 0;
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #cbd5e1;
+        border-radius: var(--radius-sm, 10px);
+        font-size: 14px;
+        line-height: calc(var(--input-min-h, 36px) - 2px);
+        min-height: var(--input-min-h, 36px);
+        height: var(--input-min-h, 36px);
+        max-height: var(--input-min-h, 36px);
+        padding-block: 0;
+        padding-inline: 12px;
+        background: #f4f6f9;
+        cursor: default;
+        color: var(--text, #0f172a);
+        opacity: 1;
+        -webkit-text-fill-color: var(--text, #0f172a);
+    }
+    .sd-kind-form-grid #sd_kind_key {
+        width: 100%;
+        max-width: none;
+        box-sizing: border-box;
+        cursor: default;
+        background: #f4f6f9;
+    }
+    .sd-kind-form-grid #sd_kind_active {
+        margin-inline: 0;
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #cbd5e1;
+        border-radius: var(--radius-sm, 10px);
+        font-size: 14px;
+        line-height: calc(var(--input-min-h, 36px) - 2px);
+        min-height: var(--input-min-h, 36px);
+        height: var(--input-min-h, 36px);
+        max-height: var(--input-min-h, 36px);
+        padding-block: 0;
+        padding-inline: 12px;
+        -webkit-appearance: none;
+        appearance: none;
+        background-color: #fff;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M2.75 4.25L6 7.55l3.25-3.3.65.64L6 8.82 2.1 4.9l.65-.65z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-size: 12px;
+        background-position: left 12px center;
+        padding-inline-end: 32px;
+    }
+    .sd-kind-form-actions {
+        justify-content: flex-end;
+    }
     .sd-dict-cat .sd-cat-r1-sort { grid-column: 1; max-width: var(--admin-sort-field-max-w, 220px); width: 100%; }
     .sd-dict-cat .sd-cat-r1-parent { grid-column: 2; }
     .sd-dict-cat .sd-cat-ar { grid-column: 1; }
@@ -46,11 +126,20 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
     .sd-dict-cat .sd-cat-act { grid-column: 2; }
     @media (max-width: 720px) {
         .sd-dict-form { grid-template-columns: 1fr; }
-        .sd-dict-kind .sd-kind-r1,
-        .sd-dict-kind .sd-kind-ar,
-        .sd-dict-kind .sd-kind-en,
-        .sd-dict-kind .sd-kind-key,
-        .sd-dict-kind .sd-kind-act,
+        .sd-kind-form-grid {
+            grid-template-columns: 1fr;
+            grid-template-areas:
+                "sort"
+                "key"
+                "active"
+                "ar"
+                "en";
+        }
+        .sd-kind-form-grid .sd-kind-sort,
+        .sd-kind-form-grid .sd-kind-act {
+            justify-self: start;
+            max-width: var(--admin-sort-field-max-w, 220px);
+        }
         .sd-dict-cat .sd-cat-r1-sort,
         .sd-dict-cat .sd-cat-r1-parent,
         .sd-dict-cat .sd-cat-ar,
@@ -66,12 +155,24 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
 <div class="card">
     <h3>نوع تجاري (المستوى 1)</h3>
     <input type="hidden" id="sd_kind_old_key" value="">
-    <div class="sd-dict-form sd-dict-kind">
-        <div class="sd-kind-r1">
+    <div class="form-grid sd-kind-form-grid">
+        <div class="sd-kind-sort admin-sort-field-wrap">
             <label>الترتيب (تلقائي)</label>
             <input type="hidden" id="sd_kind_sort" value="0">
             <input type="text" id="sd_kind_sort_view" class="admin-sort-field admin-sort-field--muted" readonly disabled tabindex="-1" value="تلقائي">
             <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُحدَّد تلقائياً عند حفظ نوع جديد؛ ويُعرَض الرقم الحالي عند التعديل.</small>
+        </div>
+        <div class="sd-kind-key">
+            <label>مفتاح EN (<code>kind_key</code>) — للقراءة فقط</label>
+            <input type="text" id="sd_kind_key" maxlength="32" autocomplete="off" <?php echo !$tablesReady ? 'disabled' : ''; ?> readonly tabindex="-1">
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُحسب آلياً من الإنجليزي: حروف صغيرة وأرقام فقط مع <code>_</code> و<code>-</code> (حتى 32 محرفاً).</small>
+        </div>
+        <div class="sd-kind-act admin-sort-field-wrap">
+            <label>نشط</label>
+            <select id="sd_kind_active" class="admin-sort-field">
+                <option value="1">نعم</option>
+                <option value="0">لا</option>
+            </select>
         </div>
         <div class="sd-kind-ar">
             <label>التسمية العربية</label>
@@ -82,20 +183,8 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
             <label>التسمية الإنجليزية</label>
             <input type="text" id="sd_kind_label_en" maxlength="191" <?php echo !$tablesReady ? 'disabled' : ''; ?>>
         </div>
-        <div class="sd-kind-key">
-            <label>مفتاح EN (<code>kind_key</code>) — للقراءة فقط</label>
-            <input type="text" id="sd_kind_key" maxlength="32" autocomplete="off" <?php echo !$tablesReady ? 'disabled' : ''; ?> readonly tabindex="-1" class="admin-sort-field admin-sort-field--muted">
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُحسب آلياً من الإنجليزي: حروف صغيرة وأرقام فقط مع <code>_</code> و<code>-</code> (حتى 32 محرفاً).</small>
-        </div>
-        <div class="sd-kind-act">
-            <label>نشط</label>
-            <select id="sd_kind_active">
-                <option value="1">نعم</option>
-                <option value="0">لا</option>
-            </select>
-        </div>
     </div>
-    <div class="actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;">
+    <div class="actions sd-kind-form-actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;">
         <button type="button" id="sd_kind_save_btn" onclick="sdSaveKind()">حفظ النوع</button>
         <button type="button" class="btn-secondary" onclick="sdResetKindForm()">صف جديد</button>
     </div>
