@@ -1342,7 +1342,7 @@ async function renderCart() {
     html += '<div class="cart-items-list">';
 
         itemsModel.forEach((item, idx) => {
-            const qty = Math.max(1, parseInt(item.qty, 10) || 1);
+        const qty = Math.max(1, parseInt(item.qty, 10) || 1);
             const vidLine = parseInt(item.variant_id || 0, 10) || 0;
         const lineTotal = qty * Number(item.price);
             if (!choiceOn || orangeCartLineIsIncluded(item)) {

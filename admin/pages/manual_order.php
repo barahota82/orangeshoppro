@@ -42,9 +42,9 @@ if (
     "
     )->fetchAll(PDO::FETCH_ASSOC);
 } else {
-    $products = $pdo->query(
+$products = $pdo->query(
         "SELECT $prodCols FROM products WHERE is_active = 1 ORDER BY name ASC"
-    )->fetchAll(PDO::FETCH_ASSOC);
+)->fetchAll(PDO::FETCH_ASSOC);
 }
 
 $variants = $pdo->query('SELECT * FROM product_variants ORDER BY product_id ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
