@@ -193,6 +193,17 @@ $tablesReady = $hasFamilies && $hasSizes;
         max-width: none;
         box-sizing: border-box;
     }
+    /* يتجاوز حد admin.css على select.admin-sort-field (220px) ليطابق عرض #fam_name_ar داخل الشبكة */
+    .sf-fam-form-grid select#fam_commercial_kind_key,
+    .sf-fam-form-grid select#fam_sizing_category_key {
+        max-width: none;
+    }
+    .sf-fam-form-grid #fam_name_ar,
+    .sf-fam-form-grid #fam_name_en {
+        width: 100%;
+        max-width: none;
+        box-sizing: border-box;
+    }
     .sf-fam-form-actions {
         justify-content: flex-end;
     }
