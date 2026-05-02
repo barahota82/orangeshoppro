@@ -251,7 +251,7 @@ if ($sdNextKindSort < 1) {
     }
 </style>
 
-<div class="card">
+<div class="card" id="sd_section_kind_form" tabindex="-1">
     <h3>نوع تجاري (المستوى 1)</h3>
     <input type="hidden" id="sd_kind_old_key" value="">
     <div class="form-grid sd-kind-form-grid">
@@ -293,7 +293,7 @@ if ($sdNextKindSort < 1) {
     </p>
 </div>
 
-<div class="card">
+<div class="card" id="sd_section_cat_form" tabindex="-1">
     <h3 style="margin-top:0;">فئة قياس (المستوى 2)</h3>
     <input type="hidden" id="sd_cat_old_key" value="">
     <div class="form-grid sd-cat-form-grid">
@@ -397,6 +397,25 @@ if ($sdNextKindSort < 1) {
             }
         });
         sdNextKindSortPreview = maxSo + 1;
+    }
+
+    function sdScrollToEditSection(sectionId, focusFieldId) {
+        const sec = document.getElementById(sectionId);
+        if (sec) {
+            sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        if (focusFieldId) {
+            setTimeout(function () {
+                const f = document.getElementById(focusFieldId);
+                if (f && typeof f.focus === 'function') {
+                    try {
+                        f.focus({ preventScroll: true });
+                    } catch (e2) {
+                        f.focus();
+                    }
+                }
+            }, 420);
+        }
     }
 
     function sdRefreshNextCatPreviewFromCats(cats) {
@@ -676,7 +695,7 @@ if ($sdNextKindSort < 1) {
         document.getElementById('sd_kind_sort').value = String(k.sort_order != null ? k.sort_order : 0);
         sdSyncKindSortView();
         document.getElementById('sd_kind_active').value = (parseInt(k.is_active, 10) === 0 ? '0' : '1');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        sdScrollToEditSection('sd_section_kind_form', 'sd_kind_label_ar');
     };
 
     window.sdSaveKind = async function () {
@@ -754,7 +773,7 @@ if ($sdNextKindSort < 1) {
         }
         await sdLoadCategories();
         sdSyncCatSortView();
-        window.scrollTo({ top: 200, behavior: 'smooth' });
+        sdScrollToEditSection('sd_section_cat_form', 'sd_cat_label_ar');
     };
 
     window.sdSaveCategory = async function () {
