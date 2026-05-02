@@ -218,6 +218,23 @@ if ($sdNextKindSort < 1) {
     .sd-cat-form-actions {
         justify-content: flex-end;
     }
+    .table-wrap table.sd-kinds-table {
+        width: auto !important;
+        min-width: 860px;
+        table-layout: fixed;
+    }
+    .table-wrap table.sd-kinds-table col.sd-kinds-col-key { width: 190px; }
+    .table-wrap table.sd-kinds-table col.sd-kinds-col-ar { width: 180px; }
+    .table-wrap table.sd-kinds-table col.sd-kinds-col-en { width: 180px; }
+    .table-wrap table.sd-kinds-table col.sd-kinds-col-sort { width: 80px; }
+    .table-wrap table.sd-kinds-table col.sd-kinds-col-active { width: 80px; }
+    .table-wrap table.sd-kinds-table col.sd-kinds-col-actions { width: 150px; }
+    .table-wrap table.sd-kinds-table th,
+    .table-wrap table.sd-kinds-table td {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
     @media (max-width: 720px) {
         .sd-kind-form-grid {
             grid-template-columns: 1fr;
@@ -340,7 +357,15 @@ if ($sdNextKindSort < 1) {
         <button type="button" class="btn-secondary" onclick="sdReloadAll()">تحديث القائمة</button>
     </div>
     <div class="table-wrap" style="margin-top:10px;">
-        <table>
+        <table class="sd-kinds-table">
+            <colgroup>
+                <col class="sd-kinds-col-key">
+                <col class="sd-kinds-col-ar">
+                <col class="sd-kinds-col-en">
+                <col class="sd-kinds-col-sort">
+                <col class="sd-kinds-col-active">
+                <col class="sd-kinds-col-actions">
+            </colgroup>
             <thead>
                 <tr>
                     <th>المفتاح</th>
