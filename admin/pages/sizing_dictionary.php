@@ -225,7 +225,7 @@ if ($sdNextKindSort < 1) {
     }
     .cat-dep-list-wrap[data-list="kinds"] > table{
         min-width:860px;
-        width:auto;
+        width:100%;
         border-collapse:collapse;
         table-layout:fixed;
     }
