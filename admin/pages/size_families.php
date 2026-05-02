@@ -55,7 +55,7 @@ $tablesReady = $hasFamilies && $hasSizes;
 <div class="page-title">
     <h1>عائلات المقاسات</h1>
     <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.65;word-wrap:break-word;overflow-wrap:anywhere;">
-        <strong>المستوى 3</strong> في هذه الشاشة = <code>size_scheme_key</code> (مخطّط العائلة) يُولَّد تلقائياً من <strong>1 + 2 + English</strong>. قبلها في الهرم: <strong>1</strong> = <code>commercial_kind_key</code>، <strong>2</strong> = <code>sizing_category_key</code> — من جداول
+        <strong>المستوى 3</strong> في هذه الشاشة = <code>size_scheme_key</code> (مخطّط العائلة) يُولَّد تلقائياً من <strong>2 + English</strong>. قبلها في الهرم: <strong>1</strong> = <code>commercial_kind_key</code>، <strong>2</strong> = <code>sizing_category_key</code> — من جداول
         <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس هرَم المقاس</a>.
         <strong>المستوى 4</strong> = القيم في «مقاسات داخل العائلة» (<code>size_family_sizes</code>).
     </p>
@@ -64,7 +64,7 @@ $tablesReady = $hasFamilies && $hasSizes;
         <ol style="margin:10px 0 0;padding-inline-start:1.25rem;line-height:1.7;color:#444;font-size:0.92rem;word-wrap:break-word;">
             <li>من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس هرَم المقاس</a> اختر <strong>النوع التجاري</strong> في القائمة، ثم انظر جدول <strong>«فئات القياس ضمن النوع المحدّد»</strong>.</li>
             <li><?php if ($sizingDictForFamilyForm): ?>في النموذج أدناه اختر <strong>النوع التجاري</strong> ثم <strong>فئة القياس</strong> من القائمتين (نفس أسلوب «فئة قياس» في القاموس).<?php else: ?>انسخ قيمة عمود <strong>المفتاح</strong> للفئة المطلوبة — هذه هي <code>sizing_category_key</code> (مستوى 2). وانسخ <strong>مفتاح</strong> النوع من الجدول الأول — <code>commercial_kind_key</code> (مستوى 1).<?php endif; ?></li>
-            <li>يُولَّد <code>size_scheme_key</code> للمستوى 3 تلقائياً بالترتيب: <strong>النوع التجاري</strong> ثم <strong>فئة القياس</strong> ثم <strong>English</strong> (مثال: <code>clothing_tops_mens</code>).</li>
+            <li>يُولَّد <code>size_scheme_key</code> للمستوى 3 تلقائياً بالترتيب: <strong>فئة القياس</strong> ثم <strong>English</strong> (مثال: <code>tops_mens</code>).</li>
             <li>احفظ العائلة، ثم من «مقاسات داخل العائلة» أضف صفوف المقاسات (المستوى 4).</li>
         </ol>
         <p style="margin:10px 0 0;font-size:0.88rem;color:#64748b;line-height:1.55;">عند تفعيل قاموس نشط، يُفرَض تطابق المفاتيح عند الحفظ. ربط <code>expected_size_scheme_key</code> من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات</a> يستعمل نفس الهرم للتحقق.</p>
@@ -238,8 +238,8 @@ $tablesReady = $hasFamilies && $hasSizes;
         </div>
         <div class="sf-fam-scheme">
             <label><code>size_scheme_key</code> (مستوى 3 — EN)</label>
-            <input type="text" id="fam_size_scheme_key" maxlength="64" placeholder="clothing_tops_mens" readonly tabindex="-1" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُولَّد تلقائياً بالترتيب: النوع التجاري (1) + فئة القياس (2) + English — للقراءة فقط (حتى 64 محرفاً بعد التعقيم).</small>
+            <input type="text" id="fam_size_scheme_key" maxlength="64" placeholder="tops_mens" readonly tabindex="-1" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُولَّد تلقائياً بالترتيب: فئة القياس (2) + English — للقراءة فقط (حتى 64 محرفاً بعد التعقيم).</small>
         </div>
         <div class="sf-fam-active admin-sort-field-wrap">
             <label>نشط</label>
@@ -401,16 +401,14 @@ function famApplyAutoSizeSchemeKey() {
     var keyEl = document.getElementById('fam_size_scheme_key');
     var enEl = document.getElementById('fam_name_en');
     if (!keyEl || !enEl) return;
-    var ck = famSizingSlugKey(famHierarchyFieldValue('fam_commercial_kind_key'), 32);
     var sk = famSizingSlugKey(famHierarchyFieldValue('fam_sizing_category_key'), 64);
     var en = famSizingSlugKey(enEl.value, 64);
-    var parts = [];
-    if (ck) parts.push(ck);
-    if (sk) parts.push(sk);
-    if (en) parts.push(en);
-    var combined = parts.join('_');
-    if (combined.length > 64) {
-        combined = combined.substring(0, 64);
+    var combined = '';
+    if (sk && en) {
+        combined = sk + '_' + en;
+        if (combined.length > 64) {
+            combined = combined.substring(0, 64);
+        }
     }
     keyEl.value = combined;
 }
