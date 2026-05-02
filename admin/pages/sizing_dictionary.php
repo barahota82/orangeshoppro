@@ -218,22 +218,62 @@ if ($sdNextKindSort < 1) {
     .sd-cat-form-actions {
         justify-content: flex-end;
     }
-    .table-wrap table.sd-kinds-table {
-        width: auto !important;
-        min-width: 860px;
-        table-layout: fixed;
+    .cat-dep-list-wrap[data-list="kinds"]{
+        overflow-x:auto;
+        max-width:100%;
+        -webkit-overflow-scrolling:touch;
     }
-    .table-wrap table.sd-kinds-table col.sd-kinds-col-key { width: 190px; }
-    .table-wrap table.sd-kinds-table col.sd-kinds-col-ar { width: 180px; }
-    .table-wrap table.sd-kinds-table col.sd-kinds-col-en { width: 180px; }
-    .table-wrap table.sd-kinds-table col.sd-kinds-col-sort { width: 80px; }
-    .table-wrap table.sd-kinds-table col.sd-kinds-col-active { width: 80px; }
-    .table-wrap table.sd-kinds-table col.sd-kinds-col-actions { width: 150px; }
-    .table-wrap table.sd-kinds-table th,
-    .table-wrap table.sd-kinds-table td {
+    .cat-dep-list-wrap[data-list="kinds"] > table{
+        min-width:860px;
+        width:auto;
+        border-collapse:collapse;
+        table-layout:fixed;
+    }
+    .cat-dep-list-wrap[data-list="kinds"] > table th,
+    .cat-dep-list-wrap[data-list="kinds"] > table td{
+        vertical-align:middle;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+    }
+    .cat-dep-list-wrap[data-list="kinds"] > table th:nth-child(1),
+    .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(1){ width:190px; }
+    .cat-dep-list-wrap[data-list="kinds"] > table th:nth-child(2),
+    .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(2){ width:180px; }
+    .cat-dep-list-wrap[data-list="kinds"] > table th:nth-child(3),
+    .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(3){ width:180px; }
+    .cat-dep-list-wrap[data-list="kinds"] > table th:nth-child(4),
+    .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(4){ width:80px; text-align:center; }
+    .cat-dep-list-wrap[data-list="kinds"] > table th:nth-child(5),
+    .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(5){ width:80px; text-align:center; }
+    .cat-dep-list-wrap[data-list="kinds"] table .sd-kind-ops-col,
+    .cat-dep-list-wrap[data-list="kinds"] table .sd-kind-row-ops{
+        width:170px !important;
+        min-width:170px !important;
+        max-width:170px !important;
+        box-sizing:border-box !important;
+        text-align:center !important;
+        vertical-align:middle !important;
+        padding:6px 8px !important;
+    }
+    .cat-dep-list-wrap[data-list="kinds"] .sd-kind-ops-main{
+        display:flex;
+        flex-direction:column;
+        gap:5px;
+        min-width:0;
+    }
+    .cat-dep-list-wrap[data-list="kinds"] .sd-kind-ops-main .btn-secondary{
+        width:100% !important;
+        margin:0 !important;
+        padding:6px 8px !important;
+        font-size:12px !important;
+        line-height:1.2 !important;
+        border-radius:6px !important;
+        box-sizing:border-box !important;
+        min-height:30px !important;
+        white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
     }
     @media (max-width: 720px) {
         .sd-kind-form-grid {
@@ -356,16 +396,8 @@ if ($sdNextKindSort < 1) {
         <h3 style="margin:0;">الأنواع التجارية</h3>
         <button type="button" class="btn-secondary" onclick="sdReloadAll()">تحديث القائمة</button>
     </div>
-    <div class="table-wrap" style="margin-top:10px;">
-        <table class="sd-kinds-table">
-            <colgroup>
-                <col class="sd-kinds-col-key">
-                <col class="sd-kinds-col-ar">
-                <col class="sd-kinds-col-en">
-                <col class="sd-kinds-col-sort">
-                <col class="sd-kinds-col-active">
-                <col class="sd-kinds-col-actions">
-            </colgroup>
+    <div class="table-wrap cat-dep-list-wrap" data-list="kinds" style="margin-top:10px;">
+        <table>
             <thead>
                 <tr>
                     <th>المفتاح</th>
@@ -373,7 +405,7 @@ if ($sdNextKindSort < 1) {
                     <th>عرض EN</th>
                     <th>ترتيب</th>
                     <th>نشط</th>
-                    <th>إجراءات</th>
+                    <th class="sd-kind-ops-col">إجراءات</th>
                 </tr>
             </thead>
             <tbody id="sd_kinds_tbody"></tbody>
@@ -657,9 +689,10 @@ if ($sdNextKindSort < 1) {
                     '<td>' + escapeHtml(k.label_en || '') + '</td>' +
                     '<td>' + String(k.sort_order != null ? k.sort_order : '') + '</td>' +
                     '<td>' + ((parseInt(k.is_active, 10) === 1) ? 'نعم' : 'لا') + '</td>' +
-                    '<td>' +
-                        '<button type="button" class="btn-secondary" style="margin-left:6px;">تعديل</button>' +
+                    '<td class="sd-kind-row-ops"><div class="sd-kind-ops-main">' +
+                        '<button type="button" class="btn-secondary">تعديل</button>' +
                         '<button type="button" class="btn-secondary">حذف</button>' +
+                    '</div>' +
                     '</td>';
                 const btns = tr.querySelectorAll('button');
                 btns[0].onclick = function () { sdEditKind(k); };
