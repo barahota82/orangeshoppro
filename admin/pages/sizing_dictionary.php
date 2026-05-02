@@ -362,9 +362,9 @@ if ($sdNextKindSort < 1) {
         <table>
             <thead>
                 <tr>
-                    <th>المفتاح</th>
                     <th>عرض عربي</th>
                     <th>عرض EN</th>
+                    <th><code>category_key</code></th>
                     <th>ترتيب</th>
                     <th>نشط</th>
                     <th>إجراءات</th>
@@ -675,9 +675,9 @@ if ($sdNextKindSort < 1) {
             cats.forEach(function (c) {
                 const tr = document.createElement('tr');
                 tr.innerHTML =
-                    '<td><code>' + escapeHtml(c.category_key || '') + '</code></td>' +
                     '<td>' + escapeHtml(c.label_ar || '') + '</td>' +
                     '<td>' + escapeHtml(c.label_en || '') + '</td>' +
+                    '<td><code>' + escapeHtml(c.category_key || '') + '</code></td>' +
                     '<td>' + String(c.sort_order != null ? c.sort_order : '') + '</td>' +
                     '<td>' + ((parseInt(c.is_active, 10) === 1) ? 'نعم' : 'لا') + '</td>' +
                     '<td>' +
