@@ -46,7 +46,21 @@ $tablesReady = $hasFamilies && $hasSizes;
 ?>
 <div class="page-title">
     <h1>عائلات المقاسات</h1>
-    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.5;">هرَم المقاس وفق سياسة المشروع: <strong>نوع تجاري</strong> (<code>commercial_kind_key</code>) ← <strong>فئة القياس</strong> (<code>sizing_category_key</code>) ← <strong>مخطّط العائلة</strong> (<code>size_scheme_key</code>) ← قيم القائمة في <code>size_family_sizes</code>. مرجعية اختيارية للمستويين 1–2: إدارة القاموس من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس هرَم المقاس</a>؛ الجدايل <code>commercial_kind_dictionary</code> و<code>sizing_category_dictionary</code> تُنشأ مع المخطط. عند ضبط <code>expected_size_scheme_key</code> على <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">نوع منتج موحّد</a>، يُطبَّق تحقّق المطابقة تلقائياً مع حقلي المستويين الأولين على العائلة؛ وعند وجود صف نشط في القاموس يُفرَض تطابق المفاتيح عند الحفظ هنا.</p>
+    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.65;word-wrap:break-word;overflow-wrap:anywhere;">
+        <strong>المستوى 3</strong> في هذه الشاشة = <code>size_scheme_key</code> (مخطّط العائلة). قبلها في الهرم: <strong>1</strong> = <code>commercial_kind_key</code>، <strong>2</strong> = <code>sizing_category_key</code> — تُنسَخ حرفياً من جداول
+        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس هرَم المقاس</a>.
+        <strong>المستوى 4</strong> = القيم في «مقاسات داخل العائلة» (<code>size_family_sizes</code>).
+    </p>
+    <details class="sf-hero-details" style="margin:0.75rem 0 0;padding:12px 14px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;max-width:100%;box-sizing:border-box;">
+        <summary style="cursor:pointer;font-weight:600;color:#334155;list-style-position:outside;">كيف أختار المستوى 2 وأربطه بالمستوى 3؟</summary>
+        <ol style="margin:10px 0 0;padding-inline-start:1.25rem;line-height:1.7;color:#444;font-size:0.92rem;word-wrap:break-word;">
+            <li>من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس هرَم المقاس</a> اختر <strong>النوع التجاري</strong> في القائمة، ثم انظر جدول <strong>«فئات القياس ضمن النوع المحدّد»</strong>.</li>
+            <li>انسخ قيمة عمود <strong>المفتاح</strong> للفئة المطلوبة — هذه هي <code>sizing_category_key</code> (مستوى 2). وانسخ <strong>مفتاح</strong> النوع من الجدول الأول — <code>commercial_kind_key</code> (مستوى 1).</li>
+            <li>في النموذج أدناه، الصق المفتاحين في الحقلين، ثم اكتب <code>size_scheme_key</code> للمستوى 3 (مثل <code>clothing_alpha</code> أو <code>shoes_eu</code>) بحيث يصف مخطّط المقاس لهذه العائلة.</li>
+            <li>احفظ العائلة، ثم من «مقاسات داخل العائلة» أضف صفوف المقاسات (المستوى 4).</li>
+        </ol>
+        <p style="margin:10px 0 0;font-size:0.88rem;color:#64748b;line-height:1.55;">عند تفعيل قاموس نشط، يُفرَض تطابق المفاتيح عند الحفظ. ربط <code>expected_size_scheme_key</code> من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات</a> يستعمل نفس الهرم للتحقق.</p>
+    </details>
 </div>
 
 <?php if (!$tablesReady): ?>
@@ -55,7 +69,7 @@ $tablesReady = $hasFamilies && $hasSizes;
 </div>
 <?php endif; ?>
 
-<div class="card">
+<div class="card" id="sf_section_family_form" tabindex="-1">
     <h3>إضافة / تعديل عائلة</h3>
     <input type="hidden" id="fam_id" value="0">
     <div class="form-grid sf-form-grid">
@@ -67,23 +81,26 @@ $tablesReady = $hasFamilies && $hasSizes;
             <label>الاسم العربي</label>
             <input type="text" id="fam_name_ar" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
         </div>
-        <div class="sf-en">
+        <div class="sf-name-en">
             <label>English</label>
             <input type="text" id="fam_name_en" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
         </div>
-        <div class="sf-en">
-            <label>size_scheme_key (EN)</label>
+        <div class="sf-scheme">
+            <label><code>size_scheme_key</code> (مستوى 3 — EN)</label>
             <input type="text" id="fam_size_scheme_key" maxlength="64" placeholder="clothing_alpha" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.82rem;line-height:1.4;">مفتاح مخطّط المقاس لهذه العائلة؛ يُكمّل المستويين 1 و2.</small>
         </div>
-        <div class="sf-en">
-            <label>commercial_kind_key</label>
+        <div class="sf-commercial">
+            <label><code>commercial_kind_key</code> (مستوى 1)</label>
             <input type="text" id="fam_commercial_kind_key" maxlength="32" placeholder="clothing" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.82rem;line-height:1.4;">من عمود «المفتاح» في جدول الأنواع بقاموس هرَم المقاس.</small>
         </div>
-        <div class="sf-en">
-            <label>sizing_category_key</label>
+        <div class="sf-sizingcat">
+            <label><code>sizing_category_key</code> (مستوى 2)</label>
             <input type="text" id="fam_sizing_category_key" maxlength="64" placeholder="tops" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.82rem;line-height:1.4;">بعد اختيار النوع في القاموس، انسخ «المفتاح» من جدول فئات القياس لنفس النوع.</small>
         </div>
-        <p style="grid-column:1/-1;margin:0;font-size:0.88rem;color:#555;line-height:1.45;">إن ملأت <code>size_scheme_key</code> فالحفظ يرفض دون تعبئة <code>commercial_kind_key</code> و<code>sizing_category_key</code> أيضًا (استكمال الهرم عند مستوى المخطّط).</p>
+        <p class="sf-help-row" style="margin:0;font-size:0.88rem;color:#555;line-height:1.5;">إن ملأت <code>size_scheme_key</code> فالحفظ يرفض دون تعبئة <code>commercial_kind_key</code> و<code>sizing_category_key</code> أيضاً (استكمال الهرم عند مستوى المخطّط).</p>
         <div class="sf-active">
             <label>نشط</label>
             <select id="fam_active" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
@@ -210,7 +227,17 @@ function editFamily(f) {
     document.getElementById('fam_active').value = String(f.is_active === 0 ? 0 : 1);
     document.getElementById('sizes_family_id').value = String(f.id);
     loadSizesEditor();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    var sec = document.getElementById('sf_section_family_form');
+    if (sec) {
+        sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(function () {
+            try {
+                document.getElementById('fam_name_ar').focus({ preventScroll: true });
+            } catch (e) {
+                document.getElementById('fam_name_ar').focus();
+            }
+        }, 350);
+    }
 }
 
 async function translateFamilyEn(opts) {
@@ -402,7 +429,11 @@ document.getElementById('fam_name_ar').addEventListener('change', function () {
             grid-template-areas:
                 "blank sort"
                 "ar ar"
-                "en en"
+                "name_en name_en"
+                "scheme scheme"
+                "commercial commercial"
+                "sizingcat sizingcat"
+                "help help"
                 "active active";
             gap:14px 18px;
             direction:ltr;
@@ -414,18 +445,30 @@ document.getElementById('fam_name_ar').addEventListener('change', function () {
             max-width:var(--admin-sort-field-max-w, 220px);
         }
         .sf-form-grid .sf-ar{grid-area:ar}
-        .sf-form-grid .sf-en{grid-area:en}
+        .sf-form-grid .sf-name-en{grid-area:name_en}
+        .sf-form-grid .sf-scheme{grid-area:scheme}
+        .sf-form-grid .sf-commercial{grid-area:commercial}
+        .sf-form-grid .sf-sizingcat{grid-area:sizingcat}
+        .sf-form-grid .sf-help-row{grid-area:help}
         .sf-form-grid .sf-active{grid-area:active}
         .sf-form-grid label,
         .sf-form-grid input,
-        .sf-form-grid select{direction:rtl;text-align:right}
+        .sf-form-grid select,
+        .sf-form-grid small{direction:rtl;text-align:right}
+        .sf-form-grid .sf-scheme label,
+        .sf-form-grid .sf-commercial label,
+        .sf-form-grid .sf-sizingcat label{word-break:break-word;overflow-wrap:anywhere}
         .sf-form-grid #fam_sort{margin-right:0;margin-left:auto;display:block}
         .sf-form-actions,.sf-sizes-actions{justify-content:flex-end}
         @media (max-width: 860px){
             .sf-form-grid{grid-template-columns:1fr}
             .sf-form-grid .sf-sort,
             .sf-form-grid .sf-ar,
-            .sf-form-grid .sf-en,
+            .sf-form-grid .sf-name-en,
+            .sf-form-grid .sf-scheme,
+            .sf-form-grid .sf-commercial,
+            .sf-form-grid .sf-sizingcat,
+            .sf-form-grid .sf-help-row,
             .sf-form-grid .sf-active{grid-column:1}
             .sf-form-grid #fam_sort{max-width:var(--admin-sort-field-max-w,220px)}
         }
