@@ -77,63 +77,201 @@ $tablesReady = $hasFamilies && $hasSizes;
 </div>
 <?php endif; ?>
 
+<style>
+    /* نفس منطق شبكة بطاقة «نوع تجاري (المستوى 1)» + صف الـ parent من «فئة قياس» في sizing_dictionary.php */
+    .sf-fam-form-grid {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        grid-template-areas:
+            "active active scheme scheme scheme scheme scheme scheme scheme scheme sort sort"
+            "comm comm comm comm comm comm siz siz siz siz siz siz"
+            "en en en en en en ar ar ar ar ar ar"
+            "help help help help help help help help help help help help";
+        gap: 14px 18px;
+        direction: ltr;
+        align-items: start;
+    }
+    .sf-fam-form-grid .sf-fam-sort {
+        grid-area: sort;
+        justify-self: end;
+        width: 100%;
+    }
+    .sf-fam-form-grid .sf-fam-active {
+        grid-area: active;
+        justify-self: start;
+        width: 100%;
+    }
+    .sf-fam-form-grid .sf-fam-scheme {
+        grid-area: scheme;
+        min-width: 0;
+    }
+    .sf-fam-form-grid .sf-fam-comm {
+        grid-area: comm;
+        min-width: 0;
+    }
+    .sf-fam-form-grid .sf-fam-siz {
+        grid-area: siz;
+        min-width: 0;
+    }
+    .sf-fam-form-grid .sf-fam-ar { grid-area: ar; }
+    .sf-fam-form-grid .sf-fam-en { grid-area: en; }
+    .sf-fam-form-grid .sf-fam-help {
+        grid-area: help;
+        margin: 0;
+        font-size: 0.88rem;
+        color: #555;
+        line-height: 1.5;
+    }
+    .sf-fam-form-grid label,
+    .sf-fam-form-grid input,
+    .sf-fam-form-grid select,
+    .sf-fam-form-grid small {
+        direction: rtl;
+        text-align: right;
+    }
+    .sf-fam-form-grid .sf-fam-scheme label,
+    .sf-fam-form-grid .sf-fam-comm label,
+    .sf-fam-form-grid .sf-fam-siz label {
+        word-break: break-word;
+        overflow-wrap: anywhere;
+    }
+    .sf-fam-form-grid #fam_sort {
+        margin-inline: 0;
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #cbd5e1;
+        border-radius: var(--radius-sm, 10px);
+        font-size: 14px;
+        line-height: calc(var(--input-min-h, 36px) - 2px);
+        min-height: var(--input-min-h, 36px);
+        height: var(--input-min-h, 36px);
+        max-height: var(--input-min-h, 36px);
+        padding-block: 0;
+        padding-inline: 12px;
+        background: #f4f6f9;
+        cursor: default;
+        color: var(--text, #0f172a);
+        opacity: 1;
+        -webkit-text-fill-color: var(--text, #0f172a);
+    }
+    .sf-fam-form-grid #fam_size_scheme_key {
+        width: 100%;
+        max-width: none;
+        box-sizing: border-box;
+    }
+    .sf-fam-form-grid #fam_active,
+    .sf-fam-form-grid select#fam_commercial_kind_key,
+    .sf-fam-form-grid select#fam_sizing_category_key {
+        margin-inline: 0;
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #cbd5e1;
+        border-radius: var(--radius-sm, 10px);
+        font-size: 14px;
+        line-height: calc(var(--input-min-h, 36px) - 2px);
+        min-height: var(--input-min-h, 36px);
+        height: var(--input-min-h, 36px);
+        max-height: var(--input-min-h, 36px);
+        padding-block: 0;
+        padding-inline: 12px;
+        -webkit-appearance: none;
+        appearance: none;
+        background-color: #fff;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M2.75 4.25L6 7.55l3.25-3.3.65.64L6 8.82 2.1 4.9l.65-.65z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-size: 12px;
+        background-position: left 12px center;
+        padding-inline-end: 32px;
+    }
+    .sf-fam-form-grid input#fam_commercial_kind_key,
+    .sf-fam-form-grid input#fam_sizing_category_key {
+        width: 100%;
+        max-width: none;
+        box-sizing: border-box;
+    }
+    .sf-fam-form-actions {
+        justify-content: flex-end;
+    }
+    @media (max-width: 720px) {
+        .sf-fam-form-grid {
+            grid-template-columns: 1fr;
+            grid-template-areas:
+                "sort"
+                "scheme"
+                "active"
+                "comm"
+                "siz"
+                "ar"
+                "en"
+                "help";
+        }
+        .sf-fam-form-grid .sf-fam-sort,
+        .sf-fam-form-grid .sf-fam-active {
+            justify-self: start;
+            max-width: var(--admin-sort-field-max-w, 220px);
+        }
+    }
+</style>
+
 <div class="card" id="sf_section_family_form" tabindex="-1">
     <h3>إضافة / تعديل عائلة</h3>
     <input type="hidden" id="fam_id" value="0">
-    <div class="form-grid sf-form-grid">
-        <div class="sf-sort admin-sort-field-wrap">
+    <div class="form-grid sf-fam-form-grid">
+        <div class="sf-fam-sort admin-sort-field-wrap">
             <label>الترتيب (تلقائي)</label>
             <input type="number" id="fam_sort" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int) $nextSort; ?>" disabled>
         </div>
-        <div class="sf-scheme">
+        <div class="sf-fam-scheme">
             <label><code>size_scheme_key</code> (مستوى 3 — EN)</label>
             <input type="text" id="fam_size_scheme_key" maxlength="64" placeholder="clothing_alpha" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.82rem;line-height:1.4;">مفتاح مخطّط المقاس لهذه العائلة؛ يُكمّل المستويين 1 و2.</small>
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">مفتاح مخطّط المقاس لهذه العائلة؛ يُكمّل المستويين 1 و2.</small>
         </div>
-        <div class="sf-active">
+        <div class="sf-fam-active admin-sort-field-wrap">
             <label>نشط</label>
             <select id="fam_active" class="admin-sort-field" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
                 <option value="1">نعم</option>
                 <option value="0">لا</option>
             </select>
         </div>
-        <div class="sf-commercial">
+        <div class="sf-fam-comm">
             <?php if ($sizingDictForFamilyForm): ?>
             <label>النوع التجاري (مستوى 1)</label>
             <select id="fam_commercial_kind_key" class="admin-sort-field" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
                 <option value="">— اختر النوع —</option>
             </select>
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.82rem;line-height:1.4;">قائمة من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس هرَم المقاس</a> (نفس أسلوب فئة القياس).</small>
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">قائمة من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس هرَم المقاس</a> (نفس بطاقة «فئة قياس»).</small>
             <?php else: ?>
             <label><code>commercial_kind_key</code> (مستوى 1)</label>
             <input type="text" id="fam_commercial_kind_key" class="admin-sort-field" maxlength="32" placeholder="clothing" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.82rem;line-height:1.4;">أدخل المفتاح يدوياً أو فعّل جدايل القاموس في المخطّط.</small>
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">أدخل المفتاح يدوياً أو فعّل جدايل القاموس في المخطّط.</small>
             <?php endif; ?>
         </div>
-        <div class="sf-sizingcat">
+        <div class="sf-fam-siz">
             <?php if ($sizingDictForFamilyForm): ?>
             <label>فئة القياس (مستوى 2)</label>
             <select id="fam_sizing_category_key" class="admin-sort-field" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
                 <option value="">— اختر النوع أولاً —</option>
             </select>
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.82rem;line-height:1.4;">تُحمَّل بعد اختيار النوع التجاري من القائمة.</small>
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">تُحمَّل بعد اختيار النوع التجاري من القائمة.</small>
             <?php else: ?>
             <label><code>sizing_category_key</code> (مستوى 2)</label>
             <input type="text" id="fam_sizing_category_key" class="admin-sort-field" maxlength="64" placeholder="tops" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.82rem;line-height:1.4;">أدخل المفتاح يدوياً.</small>
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">أدخل المفتاح يدوياً.</small>
             <?php endif; ?>
         </div>
-        <div class="sf-ar">
+        <div class="sf-fam-ar">
             <label>الاسم العربي</label>
             <input type="text" id="fam_name_ar" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
         </div>
-        <div class="sf-name-en">
+        <div class="sf-fam-en">
             <label>English</label>
             <input type="text" id="fam_name_en" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
         </div>
-        <p class="sf-help-row" style="margin:0;font-size:0.88rem;color:#555;line-height:1.5;">إن ملأت <code>size_scheme_key</code> فالحفظ يرفض دون تعبئة <code>commercial_kind_key</code> و<code>sizing_category_key</code> أيضاً (استكمال الهرم عند مستوى المخطّط).</p>
+        <p class="sf-fam-help">إن ملأت <code>size_scheme_key</code> فالحفظ يرفض دون تعبئة <code>commercial_kind_key</code> و<code>sizing_category_key</code> أيضاً (استكمال الهرم عند مستوى المخطّط).</p>
     </div>
-    <div class="actions sf-form-actions" style="margin-top:14px;">
+    <div class="actions sf-fam-form-actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;">
         <button type="button" onclick="saveFamily()" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>حفظ العائلة</button>
         <button type="button" class="btn-secondary" onclick="translateFamilyEn({ forceFromArabic: true })" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>ترجمة إلى English</button>
         <button type="button" class="btn-secondary" onclick="resetFamilyForm()" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>جديد</button>
@@ -545,64 +683,7 @@ document.getElementById('fam_name_ar').addEventListener('change', function () {
 (function () {
     var style = document.createElement('style');
     style.textContent = `
-        .sf-form-grid{
-            display:grid;
-            grid-template-columns:repeat(3, minmax(0, 1fr));
-            grid-template-areas:
-                "sort scheme active"
-                "commercial sizingcat sizingcat"
-                "ar name_en name_en"
-                "help help help";
-            gap:14px 18px;
-            direction:ltr;
-            align-items:start;
-        }
-        .sf-form-grid .sf-sort{
-            grid-area:sort;
-            width:100%;
-            max-width:100%;
-        }
-        .sf-form-grid .sf-ar{grid-area:ar}
-        .sf-form-grid .sf-name-en{grid-area:name_en}
-        .sf-form-grid .sf-scheme{grid-area:scheme}
-        .sf-form-grid .sf-commercial{grid-area:commercial}
-        .sf-form-grid .sf-sizingcat{grid-area:sizingcat}
-        .sf-form-grid .sf-help-row{grid-area:help}
-        .sf-form-grid .sf-active{grid-area:active}
-        .sf-form-grid label,
-        .sf-form-grid input,
-        .sf-form-grid select,
-        .sf-form-grid small{direction:rtl;text-align:right}
-        .sf-form-grid .sf-scheme label,
-        .sf-form-grid .sf-commercial label,
-        .sf-form-grid .sf-sizingcat label{word-break:break-word;overflow-wrap:anywhere}
-        .sf-form-grid #fam_sort{display:block;width:100%;max-width:var(--admin-sort-field-max-w, 220px)}
-        .sf-form-grid .sf-commercial select.admin-sort-field,
-        .sf-form-grid .sf-sizingcat select.admin-sort-field{width:100%;box-sizing:border-box}
-        .sf-form-actions,.sf-sizes-actions{justify-content:flex-end}
-        @media (max-width: 860px){
-            .sf-form-grid{
-                grid-template-columns:1fr;
-                grid-template-areas:
-                    "sort"
-                    "scheme"
-                    "active"
-                    "commercial"
-                    "sizingcat"
-                    "ar"
-                    "name_en"
-                    "help";
-            }
-            .sf-form-grid .sf-sort,
-            .sf-form-grid .sf-ar,
-            .sf-form-grid .sf-name-en,
-            .sf-form-grid .sf-scheme,
-            .sf-form-grid .sf-commercial,
-            .sf-form-grid .sf-sizingcat,
-            .sf-form-grid .sf-help-row,
-            .sf-form-grid .sf-active{grid-column:1}
-            .sf-form-grid #fam_sort{max-width:100%}
-        }
+        .sf-sizes-actions{justify-content:flex-end}
         .cat-dep-list-wrap[data-list="size-families"]{
             overflow-x:auto;
             max-width:100%;
