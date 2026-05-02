@@ -306,7 +306,7 @@ if ($sdNextKindSort < 1) {
         <div class="sd-cat-key">
             <label>مفتاح EN (<code>category_key</code>) — للقراءة فقط</label>
             <input type="text" id="sd_cat_key" maxlength="64" autocomplete="off" readonly tabindex="-1">
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُحسب آلياً من الإنجليزي (حتى 64 محرفاً) بنفس قواعد المفتاح أعلاه.</small>
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُحسب آلياً من <strong>النوع التجاري (مستوى 1)</strong> ثم <strong>English</strong> (حتى 64 محرفاً بعد التعقيم).</small>
         </div>
         <div class="sd-cat-act admin-sort-field-wrap">
             <label>نشط</label>
@@ -504,8 +504,16 @@ if ($sdNextKindSort < 1) {
     }
 
     function sdApplyAutoCatKey() {
-        const en = document.getElementById('sd_cat_label_en').value;
-        document.getElementById('sd_cat_key').value = sdSizingSlugKey(en, 64);
+        const parent = sdSizingSlugKey(document.getElementById('sd_cat_parent_kind').value, 32);
+        const en = sdSizingSlugKey(document.getElementById('sd_cat_label_en').value, 64);
+        let combined = '';
+        if (parent && en) {
+            combined = parent + '_' + en;
+            if (combined.length > 64) {
+                combined = combined.substring(0, 64);
+            }
+        }
+        document.getElementById('sd_cat_key').value = combined;
     }
 
     let sdKindArTranslateTimer = null;
@@ -600,6 +608,7 @@ if ($sdNextKindSort < 1) {
             if (prev && [...sel.options].some(function (x) { return x.value === prev; })) {
                 sel.value = prev;
             }
+            sdApplyAutoCatKey();
         } finally {
             sdCatParentEndProgrammatic();
         }
@@ -794,7 +803,7 @@ if ($sdNextKindSort < 1) {
                 la = document.getElementById('sd_cat_label_ar').value.trim();
             }
             if (ck === '') {
-                alert('أدخل الاسم العربي أو English لتُولَّد المفتاح آلياً قبل الحفظ.');
+                alert('اختر النوع التجاري واملأ English لتوليد category_key تلقائياً قبل الحفظ.');
                 return;
             }
             if (la === '' && le === '') {
@@ -852,6 +861,7 @@ if ($sdNextKindSort < 1) {
         if (window.sdCatParentProgrammaticDepth > 0) {
             return;
         }
+        sdApplyAutoCatKey();
         await sdLoadCategories();
         const oldKey = document.getElementById('sd_cat_old_key').value.trim();
         if (oldKey !== '') {

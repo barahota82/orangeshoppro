@@ -22,6 +22,18 @@ $sanitizeCat = static function (string $raw): string {
     return strlen($t) > 64 ? substr($t, 0, 64) : $t;
 };
 
+/** @return string */
+$composeCategoryKey = static function (string $kindKey, string $labelEn) use ($sanitizeCat): string {
+    $ck = trim($kindKey);
+    $en = $sanitizeCat($labelEn);
+    if ($ck === '' || $en === '') {
+        return '';
+    }
+    $combined = $ck . '_' . $en;
+
+    return strlen($combined) > 64 ? substr($combined, 0, 64) : $combined;
+};
+
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
@@ -155,15 +167,15 @@ try {
 
         case 'save_category':
             $ck = $sanitizeKind((string) ($data['commercial_kind_key'] ?? ''));
-            $catKey = $sanitizeCat((string) ($data['category_key'] ?? ''));
             $oldCat = $sanitizeCat((string) ($data['old_category_key'] ?? ''));
             $labelAr = trim((string) ($data['label_ar'] ?? ''));
             $labelEn = trim((string) ($data['label_en'] ?? ''));
+            $catKey = $composeCategoryKey($ck, $labelEn);
             $sort = (int) ($data['sort_order'] ?? 0);
             $active = (int) ($data['is_active'] ?? 1) === 0 ? 0 : 1;
 
             if ($ck === '' || $catKey === '') {
-                json_response(['success' => false, 'message' => 'النوع التجاري ومفتاح فئة القياس مطلوبان'], 422);
+                json_response(['success' => false, 'message' => 'النوع التجاري وEnglish مطلوبان لتوليد مفتاح الفئة تلقائياً'], 422);
             }
             $st = $pdo->prepare('SELECT 1 FROM commercial_kind_dictionary WHERE kind_key = ? LIMIT 1');
             $st->execute([$ck]);

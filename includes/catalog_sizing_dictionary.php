@@ -17,10 +17,8 @@ function orange_catalog_sizing_dictionary_kinds_enforced(PDO $pdo): bool
 }
 
 /**
- * عند وجود صفوف نشطة في قاموس الأنواع: يفرض وجود commercial_kind_key على العائلة إن وُجدت أنواع نشطة.
- * sizing_category_key يُحسب عند الحفظ ولا يُقارَن بصف في sizing_category_dictionary.
+ * عند وجود صفوف نشطة في القواميس المرجعية: يفرض تطابق المفاتيح على عائلة المقاسات.
  *
- * @param string $sizingCategory يُمرَّر للتوافق مع المستدعي؛ غير مستخدم في المنطق الحالي
  * @return string|null رسالة خطأ عربية أو null
  */
 function orange_catalog_validate_size_family_dictionary_consistency(PDO $pdo, string $commercialKind, string $sizingCategory): ?string
@@ -30,6 +28,7 @@ function orange_catalog_validate_size_family_dictionary_consistency(PDO $pdo, st
     }
 
     $ck = trim($commercialKind);
+    $sk = trim($sizingCategory);
 
     $kindsEnforced = orange_catalog_sizing_dictionary_kinds_enforced($pdo);
     if ($kindsEnforced && $ck !== '') {
@@ -46,8 +45,42 @@ function orange_catalog_validate_size_family_dictionary_consistency(PDO $pdo, st
         }
     }
 
-    // sizing_category_key على عائلة المقاسات يُولَّد تلقائياً من النوع التجاري + الاسم الإنجليزي؛
-    // لا يُفرض تطابق صف في sizing_category_dictionary عند الحفظ.
+    if (!orange_table_exists($pdo, 'sizing_category_dictionary')) {
+        return null;
+    }
+
+    try {
+        if ($ck === '' && $sk === '') {
+            return null;
+        }
+        if ($sk !== '' && $ck === '') {
+            return 'عند استخدام فئة قياس مرجعية يجب تعبئة النوع التجاري (commercial_kind_key) أولاً.';
+        }
+        if ($ck === '') {
+            return null;
+        }
+
+        $cntSt = $pdo->prepare(
+            'SELECT COUNT(*) FROM sizing_category_dictionary WHERE commercial_kind_key = ? AND is_active = 1'
+        );
+        $cntSt->execute([$ck]);
+        $cntForKind = (int) $cntSt->fetchColumn();
+        if ($cntForKind > 0 && $sk === '') {
+            return 'هذا النوع التجاري له فئات مقاس مسجَّلة في القاموس المرجعي؛ يجب تعبئة فئة القياس (sizing_category_key) وفق المرجعية.';
+        }
+        if ($sk !== '' && $cntForKind > 0) {
+            $chk = $pdo->prepare(
+                'SELECT 1 FROM sizing_category_dictionary
+                 WHERE commercial_kind_key = ? AND category_key = ? AND is_active = 1 LIMIT 1'
+            );
+            $chk->execute([$ck, $sk]);
+            if (! $chk->fetchColumn()) {
+                return 'sizing_category_key («' . htmlspecialchars($sk, ENT_QUOTES, 'UTF-8') . '») غير مرتبط بهذا النوع التجاري في قاموس هرَم المقاس.';
+            }
+        }
+    } catch (Throwable $e) {
+        return null;
+    }
 
     return null;
 }
