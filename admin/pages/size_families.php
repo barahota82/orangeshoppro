@@ -64,7 +64,7 @@ $tablesReady = $hasFamilies && $hasSizes;
         <ol style="margin:10px 0 0;padding-inline-start:1.25rem;line-height:1.7;color:#444;font-size:0.92rem;word-wrap:break-word;">
             <li>من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس هرَم المقاس</a> اختر <strong>النوع التجاري</strong> في القائمة، ثم انظر جدول <strong>«فئات القياس ضمن النوع المحدّد»</strong>.</li>
             <li><?php if ($sizingDictForFamilyForm): ?>في النموذج أدناه اختر <strong>النوع التجاري</strong> ثم <strong>فئة القياس</strong> من القائمتين (نفس أسلوب «فئة قياس» في القاموس).<?php else: ?>انسخ قيمة عمود <strong>المفتاح</strong> للفئة المطلوبة — هذه هي <code>sizing_category_key</code> (مستوى 2). وانسخ <strong>مفتاح</strong> النوع من الجدول الأول — <code>commercial_kind_key</code> (مستوى 1).<?php endif; ?></li>
-            <li>أكمل <code>size_scheme_key</code> للمستوى 3 (مثل <code>clothing_alpha</code> أو <code>shoes_eu</code>) بحيث يصف مخطّط المقاس لهذه العائلة.</li>
+            <li>اكتب اسم العائلة في <strong>English</strong> وسيُولَّد <code>size_scheme_key</code> تلقائياً للمستوى 3 (مثل <code>clothing_alpha</code> أو <code>shoes_eu</code>).</li>
             <li>احفظ العائلة، ثم من «مقاسات داخل العائلة» أضف صفوف المقاسات (المستوى 4).</li>
         </ol>
         <p style="margin:10px 0 0;font-size:0.88rem;color:#64748b;line-height:1.55;">عند تفعيل قاموس نشط، يُفرَض تطابق المفاتيح عند الحفظ. ربط <code>expected_size_scheme_key</code> من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات</a> يستعمل نفس الهرم للتحقق.</p>
@@ -84,7 +84,7 @@ $tablesReady = $hasFamilies && $hasSizes;
         grid-template-columns: repeat(12, minmax(0, 1fr));
         grid-template-areas:
             "active active scheme scheme scheme scheme scheme scheme scheme scheme sort sort"
-            "comm comm comm comm comm comm siz siz siz siz siz siz"
+            "siz siz siz siz siz siz comm comm comm comm comm comm"
             "en en en en en en ar ar ar ar ar ar"
             "help help help help help help help help help help help help";
         gap: 14px 18px;
@@ -159,6 +159,8 @@ $tablesReady = $hasFamilies && $hasSizes;
         width: 100%;
         max-width: none;
         box-sizing: border-box;
+        cursor: default;
+        background: #f4f6f9;
     }
     .sf-fam-form-grid #fam_active,
     .sf-fam-form-grid select#fam_commercial_kind_key,
@@ -225,8 +227,8 @@ $tablesReady = $hasFamilies && $hasSizes;
         </div>
         <div class="sf-fam-scheme">
             <label><code>size_scheme_key</code> (مستوى 3 — EN)</label>
-            <input type="text" id="fam_size_scheme_key" maxlength="64" placeholder="clothing_alpha" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">مفتاح مخطّط المقاس لهذه العائلة؛ يُكمّل المستويين 1 و2.</small>
+            <input type="text" id="fam_size_scheme_key" maxlength="64" placeholder="clothing_alpha" readonly tabindex="-1" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُولَّد تلقائياً من حقل English (نفس فكرة مفتاح EN في المستوى 1) وهو للقراءة فقط.</small>
         </div>
         <div class="sf-fam-active admin-sort-field-wrap">
             <label>نشط</label>
@@ -369,6 +371,22 @@ var FAM_SD_API = '/admin/api/sizing_dictionary/manage.php';
 let familyTranslateTimer = null;
 let isSavingFamily = false;
 
+function famSizingSlugKey(raw, maxLen) {
+    var t = String(raw || '').trim().toLowerCase();
+    t = t.replace(/[^a-z0-9_-]/g, '');
+    if (t.length > maxLen) {
+        t = t.substring(0, maxLen);
+    }
+    return t;
+}
+
+function famApplyAutoSizeSchemeKey() {
+    var enEl = document.getElementById('fam_name_en');
+    var keyEl = document.getElementById('fam_size_scheme_key');
+    if (!enEl || !keyEl) return;
+    keyEl.value = famSizingSlugKey(enEl.value, 64);
+}
+
 function famEnsureSelectOption(sel, value, label) {
     if (!sel || !value) return;
     var v = String(value);
@@ -456,7 +474,7 @@ function resetFamilyForm() {
     document.getElementById('fam_id').value = '0';
     document.getElementById('fam_name_ar').value = '';
     document.getElementById('fam_name_en').value = '';
-    document.getElementById('fam_size_scheme_key').value = '';
+    famApplyAutoSizeSchemeKey();
     var ckEl = document.getElementById('fam_commercial_kind_key');
     var skEl = document.getElementById('fam_sizing_category_key');
     if (FAM_SIZING_DICT_SELECTS && ckEl && ckEl.tagName === 'SELECT') {
@@ -475,7 +493,7 @@ async function editFamily(f) {
     document.getElementById('fam_id').value = String(f.id != null ? f.id : 0);
     document.getElementById('fam_name_ar').value = f.name_ar || '';
     document.getElementById('fam_name_en').value = f.name_en || '';
-    document.getElementById('fam_size_scheme_key').value = f.size_scheme_key || '';
+    famApplyAutoSizeSchemeKey();
     if (FAM_SIZING_DICT_SELECTS) {
         await famLoadKindsIntoSelect(f.commercial_kind_key || '');
         await famLoadSizingCategoriesIntoSelect(f.sizing_category_key || '');
@@ -515,7 +533,10 @@ async function translateFamilyEn(opts) {
             return;
         }
         var t = res.translations || {};
-        if (t.name_en) document.getElementById('fam_name_en').value = t.name_en;
+        if (t.name_en) {
+            document.getElementById('fam_name_en').value = t.name_en;
+            famApplyAutoSizeSchemeKey();
+        }
     } catch (e) {
         if (!silent) alert('فشل طلب الترجمة من السيرفر');
     }
@@ -525,6 +546,7 @@ function scheduleFamilyEnTranslate() {
     var nameAr = document.getElementById('fam_name_ar').value.trim();
     if (!nameAr) {
         document.getElementById('fam_name_en').value = '';
+        famApplyAutoSizeSchemeKey();
         return;
     }
     clearTimeout(familyTranslateTimer);
@@ -536,6 +558,7 @@ function scheduleFamilyEnTranslate() {
 async function saveFamily() {
     if (isSavingFamily) return;
     isSavingFamily = true;
+    famApplyAutoSizeSchemeKey();
     if (!document.getElementById('fam_name_ar').value.trim() || !document.getElementById('fam_name_en').value.trim()) {
         alert('يجب تعبئة الاسم العربي والإنجليزي قبل الحفظ');
         isSavingFamily = false;
@@ -679,6 +702,8 @@ document.getElementById('fam_name_ar').addEventListener('change', function () {
         translateFamilyEn({ silent: true, forceFromArabic: true });
     }
 });
+document.getElementById('fam_name_en').addEventListener('input', famApplyAutoSizeSchemeKey);
+document.getElementById('fam_name_en').addEventListener('change', famApplyAutoSizeSchemeKey);
 
 (function () {
     var style = document.createElement('style');
