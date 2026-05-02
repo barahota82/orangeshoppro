@@ -55,7 +55,7 @@ $tablesReady = $hasFamilies && $hasSizes;
 <div class="page-title">
     <h1>عائلات المقاسات</h1>
     <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.65;word-wrap:break-word;overflow-wrap:anywhere;">
-        <strong>المستوى 3</strong> في هذه الشاشة = <code>size_scheme_key</code> (مخطّط العائلة). قبلها في الهرم: <strong>1</strong> = <code>commercial_kind_key</code>، <strong>2</strong> = <code>sizing_category_key</code> — تُنسَخ حرفياً من جداول
+        <strong>المستوى 3</strong> في هذه الشاشة = <code>size_scheme_key</code> (مخطّط العائلة) يُولَّد تلقائياً من <strong>1 + 2 + English</strong>. قبلها في الهرم: <strong>1</strong> = <code>commercial_kind_key</code>، <strong>2</strong> = <code>sizing_category_key</code> — من جداول
         <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس هرَم المقاس</a>.
         <strong>المستوى 4</strong> = القيم في «مقاسات داخل العائلة» (<code>size_family_sizes</code>).
     </p>
@@ -64,7 +64,7 @@ $tablesReady = $hasFamilies && $hasSizes;
         <ol style="margin:10px 0 0;padding-inline-start:1.25rem;line-height:1.7;color:#444;font-size:0.92rem;word-wrap:break-word;">
             <li>من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس هرَم المقاس</a> اختر <strong>النوع التجاري</strong> في القائمة، ثم انظر جدول <strong>«فئات القياس ضمن النوع المحدّد»</strong>.</li>
             <li><?php if ($sizingDictForFamilyForm): ?>في النموذج أدناه اختر <strong>النوع التجاري</strong> ثم <strong>فئة القياس</strong> من القائمتين (نفس أسلوب «فئة قياس» في القاموس).<?php else: ?>انسخ قيمة عمود <strong>المفتاح</strong> للفئة المطلوبة — هذه هي <code>sizing_category_key</code> (مستوى 2). وانسخ <strong>مفتاح</strong> النوع من الجدول الأول — <code>commercial_kind_key</code> (مستوى 1).<?php endif; ?></li>
-            <li>اكتب اسم العائلة في <strong>English</strong> وسيُولَّد <code>size_scheme_key</code> تلقائياً للمستوى 3 (مثل <code>clothing_alpha</code> أو <code>shoes_eu</code>).</li>
+            <li>يُولَّد <code>size_scheme_key</code> للمستوى 3 تلقائياً بالترتيب: <strong>النوع التجاري</strong> ثم <strong>فئة القياس</strong> ثم <strong>English</strong> (مثال: <code>clothing_tops_mens</code>).</li>
             <li>احفظ العائلة، ثم من «مقاسات داخل العائلة» أضف صفوف المقاسات (المستوى 4).</li>
         </ol>
         <p style="margin:10px 0 0;font-size:0.88rem;color:#64748b;line-height:1.55;">عند تفعيل قاموس نشط، يُفرَض تطابق المفاتيح عند الحفظ. ربط <code>expected_size_scheme_key</code> من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات</a> يستعمل نفس الهرم للتحقق.</p>
@@ -238,8 +238,8 @@ $tablesReady = $hasFamilies && $hasSizes;
         </div>
         <div class="sf-fam-scheme">
             <label><code>size_scheme_key</code> (مستوى 3 — EN)</label>
-            <input type="text" id="fam_size_scheme_key" maxlength="64" placeholder="clothing_alpha" readonly tabindex="-1" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُولَّد تلقائياً من حقل English (نفس فكرة مفتاح EN في المستوى 1) وهو للقراءة فقط.</small>
+            <input type="text" id="fam_size_scheme_key" maxlength="64" placeholder="clothing_tops_mens" readonly tabindex="-1" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُولَّد تلقائياً بالترتيب: النوع التجاري (1) + فئة القياس (2) + English — للقراءة فقط (حتى 64 محرفاً بعد التعقيم).</small>
         </div>
         <div class="sf-fam-active admin-sort-field-wrap">
             <label>نشط</label>
@@ -282,7 +282,7 @@ $tablesReady = $hasFamilies && $hasSizes;
             <label>English</label>
             <input type="text" id="fam_name_en" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
         </div>
-        <p class="sf-fam-help">إن ملأت <code>size_scheme_key</code> فالحفظ يرفض دون تعبئة <code>commercial_kind_key</code> و<code>sizing_category_key</code> أيضاً (استكمال الهرم عند مستوى المخطّط).</p>
+        <p class="sf-fam-help">إن كان <code>size_scheme_key</code> غير فارغ بعد التوليد، فالحفظ يرفض دون تعبئة <code>commercial_kind_key</code> و<code>sizing_category_key</code> أيضاً (استكمال الهرم عند مستوى المخطّط).</p>
     </div>
     <div class="actions sf-fam-form-actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;">
         <button type="button" onclick="saveFamily()" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>حفظ العائلة</button>
@@ -391,11 +391,28 @@ function famSizingSlugKey(raw, maxLen) {
     return t;
 }
 
+function famHierarchyFieldValue(id) {
+    var el = document.getElementById(id);
+    if (!el) return '';
+    return String(el.value || '').trim();
+}
+
 function famApplyAutoSizeSchemeKey() {
-    var enEl = document.getElementById('fam_name_en');
     var keyEl = document.getElementById('fam_size_scheme_key');
-    if (!enEl || !keyEl) return;
-    keyEl.value = famSizingSlugKey(enEl.value, 64);
+    var enEl = document.getElementById('fam_name_en');
+    if (!keyEl || !enEl) return;
+    var ck = famSizingSlugKey(famHierarchyFieldValue('fam_commercial_kind_key'), 32);
+    var sk = famSizingSlugKey(famHierarchyFieldValue('fam_sizing_category_key'), 64);
+    var en = famSizingSlugKey(enEl.value, 64);
+    var parts = [];
+    if (ck) parts.push(ck);
+    if (sk) parts.push(sk);
+    if (en) parts.push(en);
+    var combined = parts.join('_');
+    if (combined.length > 64) {
+        combined = combined.substring(0, 64);
+    }
+    keyEl.value = combined;
 }
 
 function famEnsureSelectOption(sel, value, label) {
@@ -410,7 +427,10 @@ function famEnsureSelectOption(sel, value, label) {
 
 async function famLoadKindsIntoSelect(preferredKind) {
     var sel = document.getElementById('fam_commercial_kind_key');
-    if (!sel || sel.tagName !== 'SELECT' || typeof postJSON !== 'function') return;
+    if (!sel || sel.tagName !== 'SELECT' || typeof postJSON !== 'function') {
+        famApplyAutoSizeSchemeKey();
+        return;
+    }
     var prev = preferredKind !== undefined && preferredKind !== null ? String(preferredKind) : String(sel.value || '');
     try {
         var res = await postJSON(FAM_SD_API, { action: 'list_kinds' });
@@ -433,13 +453,18 @@ async function famLoadKindsIntoSelect(preferredKind) {
         } else {
             sel.value = '';
         }
-    } catch (e) { /* ignore */ }
+    } catch (e) { /* ignore */ } finally {
+        famApplyAutoSizeSchemeKey();
+    }
 }
 
 async function famLoadSizingCategoriesIntoSelect(preferredCat) {
     var kindSel = document.getElementById('fam_commercial_kind_key');
     var catSel = document.getElementById('fam_sizing_category_key');
-    if (!kindSel || kindSel.tagName !== 'SELECT' || !catSel || catSel.tagName !== 'SELECT' || typeof postJSON !== 'function') return;
+    if (!kindSel || kindSel.tagName !== 'SELECT' || !catSel || catSel.tagName !== 'SELECT' || typeof postJSON !== 'function') {
+        famApplyAutoSizeSchemeKey();
+        return;
+    }
     var ck = String(kindSel.value || '').trim();
     var prev = preferredCat !== undefined && preferredCat !== null ? String(preferredCat) : String(catSel.value || '');
     catSel.innerHTML = '';
@@ -449,6 +474,7 @@ async function famLoadSizingCategoriesIntoSelect(preferredCat) {
     catSel.appendChild(opt0);
     if (!ck) {
         catSel.value = '';
+        famApplyAutoSizeSchemeKey();
         return;
     }
     try {
@@ -466,16 +492,22 @@ async function famLoadSizingCategoriesIntoSelect(preferredCat) {
         } else {
             catSel.value = '';
         }
-    } catch (e) { /* ignore */ }
+    } catch (e) { /* ignore */ } finally {
+        famApplyAutoSizeSchemeKey();
+    }
 }
 
 function famInitSizingHierarchySelects() {
     if (!FAM_SIZING_DICT_SELECTS) return;
     var kindSel = document.getElementById('fam_commercial_kind_key');
+    var catSel = document.getElementById('fam_sizing_category_key');
     if (!kindSel || kindSel.tagName !== 'SELECT') return;
     kindSel.addEventListener('change', function () {
         void famLoadSizingCategoriesIntoSelect('');
     });
+    if (catSel && catSel.tagName === 'SELECT') {
+        catSel.addEventListener('change', famApplyAutoSizeSchemeKey);
+    }
     void famLoadKindsIntoSelect('').then(function () {
         return famLoadSizingCategoriesIntoSelect('');
     });
@@ -495,6 +527,7 @@ function resetFamilyForm() {
     } else {
         if (ckEl) ckEl.value = '';
         if (skEl) skEl.value = '';
+        famApplyAutoSizeSchemeKey();
     }
     document.getElementById('fam_sort').value = String(defaultNextFamilySort || 1);
     document.getElementById('fam_active').value = '1';
@@ -504,7 +537,6 @@ async function editFamily(f) {
     document.getElementById('fam_id').value = String(f.id != null ? f.id : 0);
     document.getElementById('fam_name_ar').value = f.name_ar || '';
     document.getElementById('fam_name_en').value = f.name_en || '';
-    famApplyAutoSizeSchemeKey();
     if (FAM_SIZING_DICT_SELECTS) {
         await famLoadKindsIntoSelect(f.commercial_kind_key || '');
         await famLoadSizingCategoriesIntoSelect(f.sizing_category_key || '');
@@ -512,6 +544,7 @@ async function editFamily(f) {
         document.getElementById('fam_commercial_kind_key').value = f.commercial_kind_key || '';
         document.getElementById('fam_sizing_category_key').value = f.sizing_category_key || '';
     }
+    famApplyAutoSizeSchemeKey();
     document.getElementById('fam_sort').value = String(f.sort_order ?? 0);
     document.getElementById('fam_active').value = String(f.is_active === 0 ? 0 : 1);
     document.getElementById('sizes_family_id').value = String(f.id);
@@ -715,6 +748,16 @@ document.getElementById('fam_name_ar').addEventListener('change', function () {
 });
 document.getElementById('fam_name_en').addEventListener('input', famApplyAutoSizeSchemeKey);
 document.getElementById('fam_name_en').addEventListener('change', famApplyAutoSizeSchemeKey);
+
+(function famBindLegacyHierarchyKeyRefresh() {
+    ['fam_commercial_kind_key', 'fam_sizing_category_key'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el && el.tagName === 'INPUT') {
+            el.addEventListener('input', famApplyAutoSizeSchemeKey);
+            el.addEventListener('change', famApplyAutoSizeSchemeKey);
+        }
+    });
+})();
 
 (function () {
     var style = document.createElement('style');
