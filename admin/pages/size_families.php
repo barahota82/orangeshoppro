@@ -55,19 +55,21 @@ $tablesReady = $hasFamilies && $hasSizes;
 <div class="page-title">
     <h1>عائلات المقاسات</h1>
     <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.65;word-wrap:break-word;overflow-wrap:anywhere;">
-        <strong>المستوى 3</strong> في هذه الشاشة = <code>size_scheme_key</code> (مخطّط العائلة) يُولَّد تلقائياً من <strong>1 + 2 + English</strong>. قبلها في الهرم: <strong>1</strong> = <code>commercial_kind_key</code>، <strong>2</strong> = <code>sizing_category_key</code> — من جداول
+        <strong>1</strong> = <code>commercial_kind_key</code> من قائمة
         <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس هرَم المقاس</a>.
+        <strong>2</strong> = <code>sizing_category_key</code> (مفتاح EN) يُولَّد تلقائياً من <strong>النوع التجاري ثم English</strong> (للقراءة فقط).
+        <strong>3</strong> = <code>size_scheme_key</code> يطابق نفس المفتاح المُولَّد (مخطّط العائلة).
         <strong>المستوى 4</strong> = القيم في «مقاسات داخل العائلة» (<code>size_family_sizes</code>).
     </p>
     <details class="sf-hero-details" style="margin:0.75rem 0 0;padding:12px 14px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;max-width:100%;box-sizing:border-box;">
         <summary style="cursor:pointer;font-weight:600;color:#334155;list-style-position:outside;">كيف أختار المستوى 2 وأربطه بالمستوى 3؟</summary>
         <ol style="margin:10px 0 0;padding-inline-start:1.25rem;line-height:1.7;color:#444;font-size:0.92rem;word-wrap:break-word;">
             <li>من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس هرَم المقاس</a> اختر <strong>النوع التجاري</strong> في القائمة، ثم انظر جدول <strong>«فئات القياس ضمن النوع المحدّد»</strong>.</li>
-            <li><?php if ($sizingDictForFamilyForm): ?>في النموذج أدناه اختر <strong>النوع التجاري</strong> ثم <strong>فئة القياس</strong> من القائمتين (نفس أسلوب «فئة قياس» في القاموس).<?php else: ?>انسخ قيمة عمود <strong>المفتاح</strong> للفئة المطلوبة — هذه هي <code>sizing_category_key</code> (مستوى 2). وانسخ <strong>مفتاح</strong> النوع من الجدول الأول — <code>commercial_kind_key</code> (مستوى 1).<?php endif; ?></li>
-            <li>يُولَّد <code>size_scheme_key</code> للمستوى 3 تلقائياً بالترتيب: <strong>النوع التجاري</strong> ثم <strong>فئة القياس</strong> ثم <strong>English</strong> (مثال: <code>clothing_tops_mens</code>).</li>
+            <li><?php if ($sizingDictForFamilyForm): ?>في النموذج اختر <strong>النوع التجاري</strong> من القائمة؛ يُحدَّث <code>sizing_category_key</code> و<code>size_scheme_key</code> تلقائياً من النوع + حقل <strong>English</strong>.<?php else: ?>أدخل <code>commercial_kind_key</code> (مستوى 1)؛ يُولَّد <code>sizing_category_key</code> و<code>size_scheme_key</code> تلقائياً من المستوى 1 + English.<?php endif; ?></li>
+            <li>مثال مفتاح مُولَّد: <code>clothing_mens_tops</code> (بعد تعقيم الأحرف) — حتى 64 محرفاً.</li>
             <li>احفظ العائلة، ثم من «مقاسات داخل العائلة» أضف صفوف المقاسات (المستوى 4).</li>
         </ol>
-        <p style="margin:10px 0 0;font-size:0.88rem;color:#64748b;line-height:1.55;">عند تفعيل قاموس نشط، يُفرَض تطابق المفاتيح عند الحفظ. ربط <code>expected_size_scheme_key</code> من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات</a> يستعمل نفس الهرم للتحقق.</p>
+        <p style="margin:10px 0 0;font-size:0.88rem;color:#64748b;line-height:1.55;">يُفرَض أن يكون <code>commercial_kind_key</code> معرّفاً في القاموس عند وجود أنواع نشطة. ربط <code>expected_size_scheme_key</code> من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات</a> يطابق <code>size_scheme_key</code> المُولَّد.</p>
     </details>
 </div>
 
@@ -163,8 +165,7 @@ $tablesReady = $hasFamilies && $hasSizes;
         background: #f4f6f9;
     }
     .sf-fam-form-grid #fam_active,
-    .sf-fam-form-grid select#fam_commercial_kind_key,
-    .sf-fam-form-grid select#fam_sizing_category_key {
+    .sf-fam-form-grid select#fam_commercial_kind_key {
         margin-inline: 0;
         display: block;
         width: 100%;
@@ -187,15 +188,20 @@ $tablesReady = $hasFamilies && $hasSizes;
         background-position: left 12px center;
         padding-inline-end: 32px;
     }
-    .sf-fam-form-grid input#fam_commercial_kind_key,
-    .sf-fam-form-grid input#fam_sizing_category_key {
+    .sf-fam-form-grid input#fam_commercial_kind_key {
         width: 100%;
         max-width: none;
         box-sizing: border-box;
     }
+    .sf-fam-form-grid #fam_sizing_category_key {
+        width: 100%;
+        max-width: none;
+        box-sizing: border-box;
+        cursor: default;
+        background: #f4f6f9;
+    }
     /* يتجاوز حد admin.css على select.admin-sort-field (220px) ليطابق عرض #fam_name_ar داخل الشبكة */
-    .sf-fam-form-grid select#fam_commercial_kind_key,
-    .sf-fam-form-grid select#fam_sizing_category_key {
+    .sf-fam-form-grid select#fam_commercial_kind_key {
         max-width: none;
     }
     .sf-fam-form-grid #fam_name_ar,
@@ -262,17 +268,9 @@ $tablesReady = $hasFamilies && $hasSizes;
             <?php endif; ?>
         </div>
         <div class="sf-fam-siz">
-            <?php if ($sizingDictForFamilyForm): ?>
-            <label>فئة القياس (مستوى 2)</label>
-            <select id="fam_sizing_category_key" class="admin-sort-field" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
-                <option value="">— اختر النوع أولاً —</option>
-            </select>
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">تُحمَّل بعد اختيار النوع التجاري من القائمة.</small>
-            <?php else: ?>
-            <label><code>sizing_category_key</code> (مستوى 2)</label>
-            <input type="text" id="fam_sizing_category_key" class="admin-sort-field" maxlength="64" placeholder="tops" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">أدخل المفتاح يدوياً.</small>
-            <?php endif; ?>
+            <label><code>sizing_category_key</code> (مستوى 2 — EN)</label>
+            <input type="text" id="fam_sizing_category_key" class="admin-sort-field" maxlength="64" placeholder="clothing_mens_tops" readonly tabindex="-1" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُولَّد تلقائياً: <strong>النوع التجاري</strong> ثم <strong>English</strong> (حتى 64 محرفاً بعد التعقيم).</small>
         </div>
         <div class="sf-fam-ar">
             <label>الاسم العربي</label>
@@ -282,7 +280,7 @@ $tablesReady = $hasFamilies && $hasSizes;
             <label>English</label>
             <input type="text" id="fam_name_en" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
         </div>
-        <p class="sf-fam-help">إن كان <code>size_scheme_key</code> غير فارغ بعد التوليد، فالحفظ يرفض دون تعبئة <code>commercial_kind_key</code> و<code>sizing_category_key</code> أيضاً (استكمال الهرم عند مستوى المخطّط).</p>
+        <p class="sf-fam-help">عند اختيار نوع تجاري وتعبئة English يُحسب المفتاحان <code>sizing_category_key</code> و<code>size_scheme_key</code> تلقائياً؛ الحفظ يتطلّب <code>commercial_kind_key</code> غير فارغ عندما يكون المخطّط المُولَّد غير فارغ.</p>
     </div>
     <div class="actions sf-fam-form-actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;">
         <button type="button" onclick="saveFamily()" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>حفظ العائلة</button>
@@ -397,21 +395,21 @@ function famHierarchyFieldValue(id) {
     return String(el.value || '').trim();
 }
 
-function famApplyAutoSizeSchemeKey() {
+function famApplyAutoFamilySizingKeys() {
+    var catEl = document.getElementById('fam_sizing_category_key');
     var keyEl = document.getElementById('fam_size_scheme_key');
     var enEl = document.getElementById('fam_name_en');
-    if (!keyEl || !enEl) return;
+    if (!catEl || !keyEl || !enEl) return;
     var ck = famSizingSlugKey(famHierarchyFieldValue('fam_commercial_kind_key'), 32);
-    var sk = famSizingSlugKey(famHierarchyFieldValue('fam_sizing_category_key'), 64);
     var en = famSizingSlugKey(enEl.value, 64);
-    var parts = [];
-    if (ck) parts.push(ck);
-    if (sk) parts.push(sk);
-    if (en) parts.push(en);
-    var combined = parts.join('_');
-    if (combined.length > 64) {
-        combined = combined.substring(0, 64);
+    var combined = '';
+    if (ck && en) {
+        combined = ck + '_' + en;
+        if (combined.length > 64) {
+            combined = combined.substring(0, 64);
+        }
     }
+    catEl.value = combined;
     keyEl.value = combined;
 }
 
@@ -428,7 +426,7 @@ function famEnsureSelectOption(sel, value, label) {
 async function famLoadKindsIntoSelect(preferredKind) {
     var sel = document.getElementById('fam_commercial_kind_key');
     if (!sel || sel.tagName !== 'SELECT' || typeof postJSON !== 'function') {
-        famApplyAutoSizeSchemeKey();
+        famApplyAutoFamilySizingKeys();
         return;
     }
     var prev = preferredKind !== undefined && preferredKind !== null ? String(preferredKind) : String(sel.value || '');
@@ -454,81 +452,29 @@ async function famLoadKindsIntoSelect(preferredKind) {
             sel.value = '';
         }
     } catch (e) { /* ignore */ } finally {
-        famApplyAutoSizeSchemeKey();
-    }
-}
-
-async function famLoadSizingCategoriesIntoSelect(preferredCat) {
-    var kindSel = document.getElementById('fam_commercial_kind_key');
-    var catSel = document.getElementById('fam_sizing_category_key');
-    if (!kindSel || kindSel.tagName !== 'SELECT' || !catSel || catSel.tagName !== 'SELECT' || typeof postJSON !== 'function') {
-        famApplyAutoSizeSchemeKey();
-        return;
-    }
-    var ck = String(kindSel.value || '').trim();
-    var prev = preferredCat !== undefined && preferredCat !== null ? String(preferredCat) : String(catSel.value || '');
-    catSel.innerHTML = '';
-    var opt0 = document.createElement('option');
-    opt0.value = '';
-    opt0.textContent = ck ? '— فئة القياس —' : '— اختر النوع أولاً —';
-    catSel.appendChild(opt0);
-    if (!ck) {
-        catSel.value = '';
-        famApplyAutoSizeSchemeKey();
-        return;
-    }
-    try {
-        var res = await postJSON(FAM_SD_API, { action: 'list_categories', commercial_kind_key: ck });
-        if (!res || !res.success) return;
-        (res.categories || []).forEach(function (c) {
-            var o = document.createElement('option');
-            o.value = c.category_key || '';
-            o.textContent = (c.label_ar || c.category_key || '') + ' (' + (c.category_key || '') + ')';
-            catSel.appendChild(o);
-        });
-        if (prev) {
-            famEnsureSelectOption(catSel, prev, prev + ' (غير مدرَج في القاموس)');
-            catSel.value = prev;
-        } else {
-            catSel.value = '';
-        }
-    } catch (e) { /* ignore */ } finally {
-        famApplyAutoSizeSchemeKey();
+        famApplyAutoFamilySizingKeys();
     }
 }
 
 function famInitSizingHierarchySelects() {
     if (!FAM_SIZING_DICT_SELECTS) return;
     var kindSel = document.getElementById('fam_commercial_kind_key');
-    var catSel = document.getElementById('fam_sizing_category_key');
     if (!kindSel || kindSel.tagName !== 'SELECT') return;
-    kindSel.addEventListener('change', function () {
-        void famLoadSizingCategoriesIntoSelect('');
-    });
-    if (catSel && catSel.tagName === 'SELECT') {
-        catSel.addEventListener('change', famApplyAutoSizeSchemeKey);
-    }
-    void famLoadKindsIntoSelect('').then(function () {
-        return famLoadSizingCategoriesIntoSelect('');
-    });
+    kindSel.addEventListener('change', famApplyAutoFamilySizingKeys);
+    void famLoadKindsIntoSelect('');
 }
 
 function resetFamilyForm() {
     document.getElementById('fam_id').value = '0';
     document.getElementById('fam_name_ar').value = '';
     document.getElementById('fam_name_en').value = '';
-    famApplyAutoSizeSchemeKey();
     var ckEl = document.getElementById('fam_commercial_kind_key');
-    var skEl = document.getElementById('fam_sizing_category_key');
     if (FAM_SIZING_DICT_SELECTS && ckEl && ckEl.tagName === 'SELECT') {
-        void famLoadKindsIntoSelect('').then(function () {
-            return famLoadSizingCategoriesIntoSelect('');
-        });
+        void famLoadKindsIntoSelect('');
     } else {
         if (ckEl) ckEl.value = '';
-        if (skEl) skEl.value = '';
-        famApplyAutoSizeSchemeKey();
     }
+    famApplyAutoFamilySizingKeys();
     document.getElementById('fam_sort').value = String(defaultNextFamilySort || 1);
     document.getElementById('fam_active').value = '1';
 }
@@ -539,12 +485,10 @@ async function editFamily(f) {
     document.getElementById('fam_name_en').value = f.name_en || '';
     if (FAM_SIZING_DICT_SELECTS) {
         await famLoadKindsIntoSelect(f.commercial_kind_key || '');
-        await famLoadSizingCategoriesIntoSelect(f.sizing_category_key || '');
     } else {
         document.getElementById('fam_commercial_kind_key').value = f.commercial_kind_key || '';
-        document.getElementById('fam_sizing_category_key').value = f.sizing_category_key || '';
     }
-    famApplyAutoSizeSchemeKey();
+    famApplyAutoFamilySizingKeys();
     document.getElementById('fam_sort').value = String(f.sort_order ?? 0);
     document.getElementById('fam_active').value = String(f.is_active === 0 ? 0 : 1);
     document.getElementById('sizes_family_id').value = String(f.id);
@@ -579,7 +523,7 @@ async function translateFamilyEn(opts) {
         var t = res.translations || {};
         if (t.name_en) {
             document.getElementById('fam_name_en').value = t.name_en;
-            famApplyAutoSizeSchemeKey();
+            famApplyAutoFamilySizingKeys();
         }
     } catch (e) {
         if (!silent) alert('فشل طلب الترجمة من السيرفر');
@@ -590,7 +534,7 @@ function scheduleFamilyEnTranslate() {
     var nameAr = document.getElementById('fam_name_ar').value.trim();
     if (!nameAr) {
         document.getElementById('fam_name_en').value = '';
-        famApplyAutoSizeSchemeKey();
+        famApplyAutoFamilySizingKeys();
         return;
     }
     clearTimeout(familyTranslateTimer);
@@ -602,7 +546,7 @@ function scheduleFamilyEnTranslate() {
 async function saveFamily() {
     if (isSavingFamily) return;
     isSavingFamily = true;
-    famApplyAutoSizeSchemeKey();
+    famApplyAutoFamilySizingKeys();
     if (!document.getElementById('fam_name_ar').value.trim() || !document.getElementById('fam_name_en').value.trim()) {
         alert('يجب تعبئة الاسم العربي والإنجليزي قبل الحفظ');
         isSavingFamily = false;
@@ -746,17 +690,15 @@ document.getElementById('fam_name_ar').addEventListener('change', function () {
         translateFamilyEn({ silent: true, forceFromArabic: true });
     }
 });
-document.getElementById('fam_name_en').addEventListener('input', famApplyAutoSizeSchemeKey);
-document.getElementById('fam_name_en').addEventListener('change', famApplyAutoSizeSchemeKey);
+document.getElementById('fam_name_en').addEventListener('input', famApplyAutoFamilySizingKeys);
+document.getElementById('fam_name_en').addEventListener('change', famApplyAutoFamilySizingKeys);
 
 (function famBindLegacyHierarchyKeyRefresh() {
-    ['fam_commercial_kind_key', 'fam_sizing_category_key'].forEach(function (id) {
-        var el = document.getElementById(id);
-        if (el && el.tagName === 'INPUT') {
-            el.addEventListener('input', famApplyAutoSizeSchemeKey);
-            el.addEventListener('change', famApplyAutoSizeSchemeKey);
-        }
-    });
+    var el = document.getElementById('fam_commercial_kind_key');
+    if (el && el.tagName === 'INPUT') {
+        el.addEventListener('input', famApplyAutoFamilySizingKeys);
+        el.addEventListener('change', famApplyAutoFamilySizingKeys);
+    }
 })();
 
 (function () {

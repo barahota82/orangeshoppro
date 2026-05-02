@@ -23,13 +23,24 @@ try {
         return $t;
     };
 
-    $sizeScheme = $sanitizeKey((string) ($data['size_scheme_key'] ?? ''), 64);
     $commercialKind = $sanitizeKey((string) ($data['commercial_kind_key'] ?? ''), 32);
-    $sizingCategory = $sanitizeKey((string) ($data['sizing_category_key'] ?? ''), 64);
 
     $id = (int)($data['id'] ?? 0);
     $nameAr = trim((string)($data['name_ar'] ?? ''));
     $nameEn = trim((string)($data['name_en'] ?? ''));
+    $enSlug = $sanitizeKey($nameEn, 64);
+
+    $sizingCategory = '';
+    $sizeScheme = '';
+    if ($commercialKind !== '' && $enSlug !== '') {
+        $combined = $commercialKind . '_' . $enSlug;
+        if (strlen($combined) > 64) {
+            $combined = substr($combined, 0, 64);
+        }
+        $sizingCategory = $combined;
+        $sizeScheme = $combined;
+    }
+
     $sort = (int)($data['sort_order'] ?? 0);
     $active = (int)($data['is_active'] ?? 1) === 0 ? 0 : 1;
 
