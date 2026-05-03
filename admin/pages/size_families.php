@@ -284,13 +284,7 @@ $tablesReady = $hasFamilies && $hasSizes;
     <p style="margin:0 0 12px;font-size:0.88rem;color:#555;line-height:1.5;">المقاسات تُستورد <strong>من قوالب المقاسات</strong> فقط (لا إدخال يدوي لصفوف الجدول). أنشئ أو عدّل القوالب من «إدارة القوالب» ثم حمّل القالب هنا واضغط «حفظ المقاسات».</p>
     <div class="form-grid">
         <div style="grid-column:1/-1;">
-            <label>اختر العائلة</label>
-            <select id="sizes_family_id" onchange="loadSizesEditor()" <?php echo !$tablesReady ? 'disabled' : ''; ?>>
-                <option value="">--</option>
-                <?php foreach ($families as $f): ?>
-                    <option value="<?php echo (int) $f['id']; ?>"><?php echo htmlspecialchars($f['name_ar'] ?: $f['name_en'], ENT_QUOTES, 'UTF-8'); ?></option>
-                <?php endforeach; ?>
-            </select>
+            <p id="sizes_family_context" class="card-hint" style="margin:0;font-size:0.9rem;line-height:1.55;"></p>
         </div>
         <?php if ($tablesReady): ?>
         <div style="grid-column:1/-1;margin-top:10px;">
@@ -540,6 +534,8 @@ function resetFamilyForm() {
     }
     document.getElementById('fam_sort').value = String(defaultNextFamilySort || 1);
     document.getElementById('fam_active').value = '1';
+    famRefreshSizesFamilyContext();
+    loadSizesEditor();
 }
 
 async function editFamily(f) {
@@ -556,7 +552,6 @@ async function editFamily(f) {
     famApplyAutoSizeSchemeKey();
     document.getElementById('fam_sort').value = String(f.sort_order ?? 0);
     document.getElementById('fam_active').value = String(f.is_active === 0 ? 0 : 1);
-    document.getElementById('sizes_family_id').value = String(f.id);
     loadSizesEditor();
     var sec = document.getElementById('sf_section_family_form');
     if (sec) {
@@ -674,11 +669,30 @@ async function saveFamiliesOrder() {
     if (res.success) location.reload();
 }
 
+function famRefreshSizesFamilyContext() {
+    var el = document.getElementById('sizes_family_context');
+    if (!el) {
+        return;
+    }
+    var id = parseInt(String(document.getElementById('fam_id').value || '0').trim(), 10) || 0;
+    var narEl = document.getElementById('fam_name_ar');
+    var nenEl = document.getElementById('fam_name_en');
+    var nar = narEl ? String(narEl.value || '').trim() : '';
+    var nen = nenEl ? String(nenEl.value || '').trim() : '';
+    if (id <= 0) {
+        el.textContent = 'المقاسات تُربَط بالعائلة في بطاقة «إضافة / تعديل عائلة» أعلاه. احفظ العائلة أولاً (ليُنشأ معرّف في القاعدة)، ثم حمّل المقاسات من قالب واضغط «حفظ المقاسات». أو اضغط «تعديل» من قائمة العائلات لتفتح عائلة محفوظة.';
+        return;
+    }
+    var label = nar || nen || ('#' + id);
+    el.textContent = 'المقاسات تُعرض وتُحفَظ للعائلة المفتوحة في النموذج أعلاه: «' + label + '» (معرّف ' + id + ').';
+}
+
 function loadSizesEditor() {
-    var fid = parseInt(document.getElementById('sizes_family_id').value, 10) || 0;
+    var fid = parseInt(String(document.getElementById('fam_id').value || '0').trim(), 10) || 0;
     var box = document.getElementById('sizesEditor');
     if (!fid) {
         box.innerHTML = '';
+        famRefreshSizesFamilyContext();
         return;
     }
     var rows = ORANGE_SIZES_BY_FAMILY[String(fid)] || ORANGE_SIZES_BY_FAMILY[fid] || [];
@@ -697,6 +711,7 @@ function loadSizesEditor() {
         html += '<p class="card-hint" style="margin-top:10px;font-size:0.85rem;">لتغيير المقاسات: استخدم «تحميل المقاسات من القالب» ليستبدل الجدول، أو عدّل القالب في «إدارة القوالب» ثم أعد التحميل.</p>';
     }
     box.innerHTML = html;
+    famRefreshSizesFamilyContext();
 }
 
 function escapeAttr(s) {
@@ -708,9 +723,9 @@ async function importSizeTemplateRows() {
         alert('لا توجد قوالب مقاسات. أنشئ قالباً من «إدارة القوالب» أولاً.');
         return;
     }
-    var fid = parseInt(document.getElementById('sizes_family_id').value, 10) || 0;
+    var fid = parseInt(String(document.getElementById('fam_id').value || '0').trim(), 10) || 0;
     if (!fid) {
-        alert('اختر العائلة أولاً');
+        alert('احفظ العائلة أولاً (أو اضغط «تعديل» على عائلة من القائمة) ثم حمّل المقاسات من القالب.');
         return;
     }
     var pick = document.getElementById('sizes_template_pick');
@@ -776,9 +791,9 @@ async function importSizeTemplateRows() {
 }
 
 async function saveSizesForFamily() {
-    var familyId = parseInt(document.getElementById('sizes_family_id').value, 10) || 0;
+    var familyId = parseInt(String(document.getElementById('fam_id').value || '0').trim(), 10) || 0;
     if (!familyId) {
-        alert('اختر عائلة');
+        alert('احفظ العائلة أولاً أو افتح عائلة محفوظة من «تعديل» قبل حفظ المقاسات.');
         return;
     }
     var trs = document.querySelectorAll('#sizesEditor tr.size-row');
@@ -914,16 +929,17 @@ document.getElementById('fam_name_en').addEventListener('change', famApplyAutoSi
     document.head.appendChild(style);
 
     var tbody = document.getElementById('orange-families-list-tbody');
-    if (!tbody) return;
-    tbody.addEventListener('click', function (ev) {
-        var btn = ev.target.closest('.sf-edit-btn');
-        if (!btn || !btn.dataset.familyJson) return;
-        try {
-            void editFamily(JSON.parse(btn.dataset.familyJson));
-        } catch (err) {
-            alert('تعذر قراءة بيانات العائلة للتعديل');
-        }
-    });
+    if (tbody) {
+        tbody.addEventListener('click', function (ev) {
+            var btn = ev.target.closest('.sf-edit-btn');
+            if (!btn || !btn.dataset.familyJson) return;
+            try {
+                void editFamily(JSON.parse(btn.dataset.familyJson));
+            } catch (err) {
+                alert('تعذر قراءة بيانات العائلة للتعديل');
+            }
+        });
+    }
 
     function famRunInitWhenPostJsonReady() {
         if (typeof postJSON !== 'function') {
@@ -931,6 +947,8 @@ document.getElementById('fam_name_en').addEventListener('change', famApplyAutoSi
             return;
         }
         famInitSizingHierarchySelects();
+        famRefreshSizesFamilyContext();
+        loadSizesEditor();
     }
     famRunInitWhenPostJsonReady();
 })();
