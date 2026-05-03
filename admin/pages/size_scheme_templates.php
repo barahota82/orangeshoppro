@@ -41,13 +41,21 @@ if ($tablesReady) {
 
 <div class="card" id="sst_form_card" tabindex="-1">
     <h3>إضافة / تعديل قالب</h3>
-    <p style="margin:0 0 14px;font-size:0.88rem;color:#555;line-height:1.5;">أول خانة: <strong>ترتيب تلقائي</strong> في القائمة (يُحسب عند إنشاء قالب جديد؛ عند التعديل يبقى الترتيب المحفوظ). <strong>Fil / Hi</strong> لاسم القالب من <strong>الإنجليزي</strong> بعد الترجمة من العربي أو عند تعديل الإنجليزي.</p>
+    <p style="margin:0 0 14px;font-size:0.88rem;color:#555;line-height:1.5;"><strong>الترتيب</strong> في القائمة تلقائي (جديد = تالي؛ تعديل = دون تغيير). <strong>Fil / Hi</strong> من <strong>الإنجليزي</strong>.</p>
     <input type="hidden" id="sst_id" value="0">
-    <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;">
-        <div>
-            <label>الترتيب (تلقائي)</label>
-            <p id="sst_sort_display" style="margin:6px 0 0;font-size:1.05rem;font-weight:600;"><?php echo (int) $nextSort; ?></p>
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.82rem;">يظهر في القائمة بهذا الترتيب</small>
+    <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px 14px;align-items:end;">
+        <div class="sst-sort-active" style="display:flex;flex-wrap:nowrap;align-items:flex-end;gap:14px;min-width:0;max-width:100%;">
+            <div style="flex:0 0 auto;">
+                <label style="margin-bottom:2px;">ترتيب (تلقائي)</label>
+                <p id="sst_sort_display" title="ترتيب ظهور القالب في القائمة" style="margin:0;padding:6px 8px;font-size:0.88rem;font-weight:600;line-height:1.2;border:1px solid #ddd;border-radius:4px;background:#f9fafb;min-width:2rem;text-align:center;"><?php echo (int) $nextSort; ?></p>
+            </div>
+            <div style="flex:1 1 7rem;min-width:5.5rem;max-width:10rem;">
+                <label for="sst_active">نشط</label>
+                <select id="sst_active" class="admin-sort-field" style="width:100%;margin-top:2px;">
+                    <option value="1">نعم</option>
+                    <option value="0">لا</option>
+                </select>
+            </div>
         </div>
         <div>
             <label>اسم القالب عربي</label>
@@ -64,13 +72,6 @@ if ($tablesReady) {
         <div>
             <label>اسم القالب Hindi</label>
             <input type="text" id="sst_name_hi" maxlength="191" autocomplete="off" title="يُحدَّث من الإنجليزي">
-        </div>
-        <div>
-            <label>نشط</label>
-            <select id="sst_active" class="admin-sort-field">
-                <option value="1">نعم</option>
-                <option value="0">لا</option>
-            </select>
         </div>
     </div>
     <h4 style="margin:18px 0 8px;font-size:1rem;">مقاسات داخل القالب</h4>
