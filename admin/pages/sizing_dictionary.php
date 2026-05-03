@@ -280,7 +280,9 @@ if ($sdNextKindSort < 1) {
         min-width:0;
     }
     .cat-dep-list-wrap[data-list="kinds"] .sd-kind-ops-main .btn-secondary,
-    .cat-dep-list-wrap[data-list="cats"] .sd-cat-ops-main .btn-secondary{
+    .cat-dep-list-wrap[data-list="kinds"] .sd-kind-ops-main .btn-danger,
+    .cat-dep-list-wrap[data-list="cats"] .sd-cat-ops-main .btn-secondary,
+    .cat-dep-list-wrap[data-list="cats"] .sd-cat-ops-main .btn-danger{
         width:100% !important;
         margin:0 !important;
         padding:6px 8px !important;
@@ -709,12 +711,12 @@ if ($sdNextKindSort < 1) {
                     '<td>' + ((parseInt(k.is_active, 10) === 1) ? 'نعم' : 'لا') + '</td>' +
                     '<td class="sd-kind-row-ops"><div class="sd-kind-ops-main">' +
                         '<button type="button" class="btn-secondary">تعديل</button>' +
-                        '<button type="button" class="btn-secondary">حذف</button>' +
+                        '<button type="button" class="btn-danger">حذف</button>' +
                     '</div>' +
                     '</td>';
                 const btns = tr.querySelectorAll('button');
                 btns[0].onclick = function () { sdEditKind(k); };
-                btns[1].onclick = function () { sdDeleteKind(k.kind_key); };
+                btns[1].onclick = function () { sdDeleteKind(k); };
                 tb.appendChild(tr);
             });
             sdRefreshNextKindPreviewFromKinds(kinds);
@@ -758,11 +760,11 @@ if ($sdNextKindSort < 1) {
                     '<td>' + ((parseInt(c.is_active, 10) === 1) ? 'نعم' : 'لا') + '</td>' +
                     '<td class="sd-cat-row-ops"><div class="sd-cat-ops-main">' +
                         '<button type="button" class="btn-secondary">تعديل</button>' +
-                        '<button type="button" class="btn-secondary">حذف</button>' +
+                        '<button type="button" class="btn-danger">حذف</button>' +
                     '</div></td>';
                 const btns = tr.querySelectorAll('button');
                 btns[0].onclick = function () { sdEditCategory(c); };
-                btns[1].onclick = function () { sdDeleteCategory(c.commercial_kind_key, c.category_key); };
+                btns[1].onclick = function () { sdDeleteCategory(c); };
                 tb.appendChild(tr);
             });
             sdRefreshNextCatPreviewFromCats(cats);
@@ -824,8 +826,19 @@ if ($sdNextKindSort < 1) {
         }
     };
 
-    window.sdDeleteKind = async function (kindKey) {
-        if (!confirm('حذف النوع وجميع فئاته المعرّفة تحته في القاموس؟ تأكّد أنه غير مستخدم في عائلات مقاس.')) return;
+    window.sdDeleteKind = async function (k) {
+        var kindKey = (k && k.kind_key) ? String(k.kind_key) : '';
+        if (kindKey === '') {
+            return;
+        }
+        var labelHint = (k.label_ar || k.label_en) ? ('\nالمفتاح: ' + kindKey + '\nالعرض: ' + (k.label_ar || '') + (k.label_en ? (' / ' + k.label_en) : '')) : ('\nالمفتاح: ' + kindKey);
+        alert('تنبيه — حذف نوع تجاري من القاموس:\n' +
+            '• تُحذف جميع فئات القياس المعرّفة تحته في هذا القاموس.\n' +
+            '• إن كان النوع أو إحدى فئاته مستخدماً في عائلات مقاس فلن يكتمل الحذف.\n' +
+            '• لا يمكن التراجع عن الحذف الناجح من هنا.' + labelHint);
+        if (!confirm('تأكيد الحذف: هل تريد بالفعل حذف هذا النوع التجاري وجميع فئاته من القاموس؟')) {
+            return;
+        }
         try {
             const res = await postJSON(api, { action: 'delete_kind', kind_key: kindKey });
             if (!res || !res.success) {
@@ -912,8 +925,20 @@ if ($sdNextKindSort < 1) {
         }
     };
 
-    window.sdDeleteCategory = async function (ck, catKey) {
-        if (!confirm('حذف فئة القياس من القاموس؟')) return;
+    window.sdDeleteCategory = async function (c) {
+        var ck = c && c.commercial_kind_key ? String(c.commercial_kind_key) : '';
+        var catKey = c && c.category_key ? String(c.category_key) : '';
+        if (ck === '' || catKey === '') {
+            return;
+        }
+        var labelHint = (c.label_ar || c.label_en) ? ('\nالمفتاح: ' + catKey + '\nالعرض: ' + (c.label_ar || '') + (c.label_en ? (' / ' + c.label_en) : '')) : ('\nالمفتاح: ' + catKey);
+        alert('تنبيه — حذف فئة قياس من القاموس:\n' +
+            '• تُزال الفئة من هذا القاموس فقط.\n' +
+            '• إن كانت الفئة مستخدمة في عائلات مقاس فلن يكتمل الحذف.\n' +
+            '• لا يمكن التراجع عن الحذف الناجح من هنا.' + labelHint);
+        if (!confirm('تأكيد الحذف: هل تريد بالفعل حذف هذه الفئة من القاموس؟')) {
+            return;
+        }
         try {
             const res = await postJSON(api, { action: 'delete_category', commercial_kind_key: ck, category_key: catKey });
             if (!res || !res.success) {
