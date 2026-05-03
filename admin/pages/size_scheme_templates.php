@@ -51,45 +51,61 @@ if ($tablesReady) {
         }
         #sst_form_card .sst-header-row {
             display: grid;
+            /* ترتيب ضيق | أربعة أعمدة متساوية للأسماء | نشط ضيق جداً (نعم/لا) */
             grid-template-columns:
-                minmax(2.75rem, 0.32fr)
-                minmax(0, 1.15fr)
-                minmax(0, 1.15fr)
-                minmax(0, 0.85fr)
-                minmax(0, 0.85fr)
-                minmax(4.25rem, 0.38fr);
-            column-gap: 14px;
+                minmax(3rem, 4.25rem)
+                minmax(0, 1fr)
+                minmax(0, 1fr)
+                minmax(0, 1fr)
+                minmax(0, 1fr)
+                minmax(4.5rem, 5.5rem);
+            column-gap: 12px;
             row-gap: 0;
             direction: rtl;
-            align-items: end;
-            min-width: min(100%, 52rem);
+            align-items: stretch;
+            justify-items: stretch;
+            min-width: 0;
         }
         #sst_form_card .sst-header-row .admin-sort-field-wrap {
             min-width: 0;
+            /* admin.css يفرض max-width:220px على .admin-sort-field-wrap فيكسر أعمدة grid 1fr */
+            max-width: none;
+            width: 100%;
             display: flex;
             flex-direction: column;
+            align-items: stretch;
             gap: 6px;
         }
         #sst_form_card .sst-header-row label {
             margin-bottom: 0;
+            width: 100%;
             font-size: 13px;
             font-weight: 600;
             color: #334155;
             line-height: 1.25;
         }
+        #sst_form_card .sst-header-row .admin-sort-field-wrap:first-child label {
+            text-align: center;
+        }
+        #sst_form_card .sst-header-row .admin-sort-field-wrap:last-child label {
+            text-align: center;
+        }
+        #sst_form_card .sst-header-row .admin-sort-field-wrap:not(:first-child):not(:last-child) label {
+            text-align: right;
+        }
         #sst_form_card .sst-header-row label,
         #sst_form_card .sst-header-row input,
         #sst_form_card .sst-header-row select {
             direction: rtl;
-            text-align: right;
         }
+        #sst_form_card .sst-header-row input.admin-sort-field,
         #sst_form_card .sst-header-row input[type="text"],
-        #sst_form_card .sst-header-row select#sst_active {
+        #sst_form_card .sst-header-row select#sst_active.admin-sort-field {
             margin-inline: 0;
             margin-top: 0;
             display: block;
             width: 100%;
-            max-width: none;
+            max-width: 100%;
             box-sizing: border-box;
             border: 1px solid #cbd5e1;
             border-radius: var(--radius-sm, 10px);
@@ -107,15 +123,16 @@ if ($tablesReady) {
             cursor: default;
         }
         #sst_form_card .sst-header-row select#sst_active {
+            text-align: right;
             -webkit-appearance: none;
             appearance: none;
             background-color: #fff;
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M2.75 4.25L6 7.55l3.25-3.3.65.64L6 8.82 2.1 4.9l.65-.65z'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-size: 12px;
-            background-position: left 10px center;
-            padding-inline-end: 30px;
-            padding-inline-start: 12px;
+            background-position: left 8px center;
+            padding-inline-end: 26px;
+            padding-inline-start: 10px;
         }
         #sst_sizes_tbody input.sst-lf[readonly],
         #sst_sizes_tbody input.sst-lh[readonly] {
