@@ -5,7 +5,6 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/catalog_sizing_dictionary.php';
-require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
 require_admin_api();
 
 try {
@@ -49,10 +48,26 @@ try {
         json_response(['success' => false, 'message' => $dicErr], 422);
     }
 
-    $famRows = $pdo->query('SELECT id, name_ar FROM size_families')->fetchAll(PDO::FETCH_ASSOC);
-    $excludeFamId = $id > 0 ? $id : null;
-    if (orange_rows_normalized_arabic_conflict(is_array($famRows) ? $famRows : [], 'id', 'name_ar', $nameAr, $excludeFamId)) {
-        json_response(['success' => false, 'message' => orange_arabic_duplicate_blocked_message()], 409);
+    // تمييز العائلات بـ size_scheme_key (مستوى 3 EN) وليس بالاسم العربي بعد التطبيع — يسمح بأسماء عربية متشابهة إذا اختلف المفتاح.
+    if ($sizeScheme !== '') {
+        $famRows = $pdo->query('SELECT id, size_scheme_key FROM size_families')->fetchAll(PDO::FETCH_ASSOC);
+        $excludeFamId = $id > 0 ? $id : null;
+        foreach (is_array($famRows) ? $famRows : [] as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $rid = (int) ($row['id'] ?? 0);
+            if ($excludeFamId !== null && $rid === $excludeFamId) {
+                continue;
+            }
+            $other = $sanitizeKey((string) ($row['size_scheme_key'] ?? ''), 64);
+            if ($other !== '' && $other === $sizeScheme) {
+                json_response([
+                    'success' => false,
+                    'message' => 'لا يمكن الحفظ: مفتاح مخطّط المقاس (size_scheme_key) مستخدم بالفعل لعائلة أخرى. غيّر الاسم الإنجليزي أو فئة القياس ليُولَّد مفتاح مختلف.',
+                ], 409);
+            }
+        }
     }
 
     if ($id <= 0 && $sort <= 0) {
