@@ -41,7 +41,6 @@ if ($tablesReady) {
 
 <div class="card" id="sst_form_card" tabindex="-1">
     <h3>إضافة / تعديل قالب</h3>
-    <p style="margin:0 0 14px;font-size:0.88rem;color:#555;line-height:1.5;"><strong>الترتيب</strong> في القائمة تلقائي (جديد = تالي؛ تعديل = دون تغيير). حقلا <strong>Fil</strong> و<strong>Hi</strong> يُعبَّآن تلقائياً <strong>بنفس نص الإنجليزي</strong> (للتوافق مع القنوات)، وليس بترجمة فلبينية/هندية.</p>
     <style>
         /* صف واحد بترتيب قراءة عربي: يمين ← يسار = ترتيب → عربي → EN → Fil → Hi → نشط. الشبكة direction: rtl حتى يطابق DOM. */
         #sst_form_card .sst-header-row-wrap {
@@ -173,7 +172,6 @@ if ($tablesReady) {
         </div>
     </div>
     <h4 style="margin:18px 0 8px;font-size:1rem;">مقاسات داخل القالب</h4>
-    <p style="margin:0 0 10px;font-size:0.88rem;color:#555;line-height:1.5;">ترتيب المقاسات <strong>تلقائي</strong> حسب ترتيب الصفوف (1، 2، 3…). أعمدة <strong>Fil / Hi</strong> تعرضان <strong>نفس نص EN</strong> (نسخ للتوافق)، وليست ترجمة للغتين.</p>
     <div class="table-wrap">
         <table>
             <thead>
