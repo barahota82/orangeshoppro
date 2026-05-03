@@ -43,9 +43,9 @@ if ($tablesReady) {
     <h3>إضافة / تعديل قالب</h3>
     <p style="margin:0 0 14px;font-size:0.88rem;color:#555;line-height:1.5;"><strong>الترتيب</strong> في القائمة تلقائي (جديد = تالي؛ تعديل = دون تغيير). حقلا <strong>Fil</strong> و<strong>Hi</strong> يُعبَّآن تلقائياً <strong>بنفس نص الإنجليزي</strong> (للتوافق مع القنوات)، وليس بترجمة فلبينية/هندية.</p>
     <style>
-        /* مواءمة ارتفاع الحقول مع حقل «اسم القالب عربي» (نفس padding / line-height / min-height) */
+        /* حقول النص: نفس أسلوب الأدمن. «الترتيب» و«نشط» يُطابقان ارتفاع «عربي» عبر JS (select أصلي يختلف بصرياً عن input). */
         #sst_form_card .form-grid input[type="text"],
-        #sst_form_card .form-grid select {
+        #sst_form_card .form-grid select#sst_active {
             min-height: 36px;
             padding: 8px 12px;
             font-size: 14px;
@@ -164,6 +164,47 @@ const SST_API = '/admin/api/size_scheme_templates/manage.php';
 const SST_NEXT_SORT = <?php echo (int) $nextSort; ?>;
 let sstHeaderArTimer = null;
 let sstHeaderEnTimer = null;
+let sstHeightSyncTimer = null;
+let sstNameArResizeObserver = null;
+
+/** مطابقة ارتفاع «الترتيب» و«نشط» لحقل «اسم القالب عربي» (الـ select لا يحترم نفس مقاس الـ input في كثير من المتصفحات). */
+function sstSyncSortActiveHeights() {
+    var ref = document.getElementById('sst_name_ar');
+    var sort = document.getElementById('sst_sort_display');
+    var act = document.getElementById('sst_active');
+    if (!ref || !sort || !act) {
+        return;
+    }
+    var h = Math.round(ref.getBoundingClientRect().height);
+    if (h < 28) {
+        return;
+    }
+    sort.style.height = h + 'px';
+    sort.style.minHeight = h + 'px';
+    act.style.height = h + 'px';
+    act.style.minHeight = h + 'px';
+}
+
+function sstScheduleSyncSortActiveHeights() {
+    clearTimeout(sstHeightSyncTimer);
+    sstHeightSyncTimer = setTimeout(function () {
+        sstSyncSortActiveHeights();
+    }, 30);
+}
+
+function sstBindSortActiveHeightSync() {
+    var ref = document.getElementById('sst_name_ar');
+    if (!ref || typeof ResizeObserver === 'undefined') {
+        return;
+    }
+    if (sstNameArResizeObserver) {
+        sstNameArResizeObserver.disconnect();
+    }
+    sstNameArResizeObserver = new ResizeObserver(function () {
+        sstScheduleSyncSortActiveHeights();
+    });
+    sstNameArResizeObserver.observe(ref);
+}
 
 function sstEscapeAttr(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
@@ -247,6 +288,7 @@ function sstResetForm() {
     }
     sstAddSizeRow();
     sstSyncHeaderFilHiFromEn();
+    sstScheduleSyncSortActiveHeights();
 }
 
 /** Fil/Hi = نسخ حرفية لعمود الإنجليزي (لا ترجمة فلبينية/هندية). */
@@ -509,6 +551,7 @@ async function sstLoadOne(tplId) {
             sstRefreshSizeRowOrder();
         }
         sstSyncHeaderFilHiFromEn();
+        sstScheduleSyncSortActiveHeights();
         document.getElementById('sst_form_card').scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e) {
         alert('خطأ شبكة');
@@ -527,6 +570,7 @@ async function sstLoadOne(tplId) {
         }
         if (t.id === 'sst_name_ar') {
             scheduleSstHeaderFromAr();
+            sstScheduleSyncSortActiveHeights();
             return;
         }
         if (t.id === 'sst_name_en') {
@@ -574,6 +618,18 @@ document.addEventListener('click', function (ev) {
 });
 
 sstResetForm();
+sstBindSortActiveHeightSync();
+window.addEventListener('resize', sstScheduleSyncSortActiveHeights);
+if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () {
+        sstScheduleSyncSortActiveHeights();
+    });
+} else {
+    sstScheduleSyncSortActiveHeights();
+}
+requestAnimationFrame(function () {
+    sstScheduleSyncSortActiveHeights();
+});
 </script>
 
 <?php endif; ?>
