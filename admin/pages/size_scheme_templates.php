@@ -155,7 +155,7 @@ if ($tablesReady) {
                 <input type="text" id="sst_name_en" maxlength="191" autocomplete="off">
             </div>
             <div class="admin-sort-field-wrap">
-                <label for="sst_name_fil">Fil <span style="font-weight:400;color:#64748b;">(نسخ الإنجليزي)</span></label>
+                <label for="sst_name_fil">Filipino</label>
                 <input type="text" id="sst_name_fil" class="admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" autocomplete="off" title="يُملأ تلقائياً بنفس نص الإنجليزي">
             </div>
             <div class="admin-sort-field-wrap">
