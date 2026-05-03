@@ -50,6 +50,22 @@ if ($hasSizes && $hasFamilies) {
     }
 }
 
+$hasSizeTemplates = false;
+$sizeTemplatesList = [];
+if ($hasFamilies) {
+    try {
+        if (orange_table_exists($pdo, 'size_scheme_templates')) {
+            $hasSizeTemplates = true;
+            $sizeTemplatesList = $pdo->query(
+                'SELECT id, name_ar, name_en FROM size_scheme_templates WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
+            )->fetchAll(PDO::FETCH_ASSOC);
+        }
+    } catch (Throwable $e) {
+        $hasSizeTemplates = false;
+        $sizeTemplatesList = [];
+    }
+}
+
 $tablesReady = $hasFamilies && $hasSizes;
 ?>
 <div class="page-title">
@@ -275,6 +291,22 @@ $tablesReady = $hasFamilies && $hasSizes;
                 <?php endforeach; ?>
             </select>
         </div>
+        <?php if ($hasSizeTemplates && count($sizeTemplatesList) > 0): ?>
+        <div style="grid-column:1/-1;margin-top:10px;">
+            <label>قالب مقاسات (إضافة صفوف للجدول)</label>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px;">
+                <select id="sizes_template_pick" style="min-width:220px;" <?php echo !$tablesReady ? 'disabled' : ''; ?>>
+                    <option value="">— اختر قالباً —</option>
+                    <?php foreach ($sizeTemplatesList as $tpl): ?>
+                    <option value="<?php echo (int) $tpl['id']; ?>"><?php echo htmlspecialchars((string) ($tpl['name_ar'] ?: $tpl['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <button type="button" class="btn-secondary" onclick="importSizeTemplateRows()" <?php echo !$tablesReady ? 'disabled' : ''; ?>>إضافة صفوف من القالب</button>
+                <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_scheme_templates'), ENT_QUOTES, 'UTF-8'); ?>" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;">إدارة القوالب</a>
+            </div>
+            <small style="display:block;color:#666;margin-top:6px;font-size:0.85rem;">لا يُحفظ تلقائياً — راجع الجدول ثم اضغط «حفظ المقاسات».</small>
+        </div>
+        <?php endif; ?>
     </div>
     <div id="sizesEditor" style="margin-top:12px;"></div>
     <div class="actions sf-sizes-actions" style="margin-top:14px;">
@@ -348,6 +380,7 @@ $tablesReady = $hasFamilies && $hasSizes;
 
 <script>
 var ORANGE_SIZES_BY_FAMILY = <?php echo json_encode($sizesByFamily, JSON_UNESCAPED_UNICODE); ?>;
+var SST_IMPORT_API = '/admin/api/size_scheme_templates/manage.php';
 const defaultNextFamilySort = <?php echo (int) $nextSort; ?>;
 var FAM_SIZING_DICT_SELECTS = <?php echo $sizingDictForFamilyForm ? 'true' : 'false'; ?>;
 var FAM_SD_API = '/admin/api/sizing_dictionary/manage.php';
@@ -659,6 +692,51 @@ function loadSizesEditor() {
 
 function escapeAttr(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
+
+async function importSizeTemplateRows() {
+    var fid = parseInt(document.getElementById('sizes_family_id').value, 10) || 0;
+    if (!fid) {
+        alert('اختر العائلة أولاً');
+        return;
+    }
+    var pick = document.getElementById('sizes_template_pick');
+    var tid = pick ? (parseInt(pick.value || '0', 10) || 0) : 0;
+    if (!tid) {
+        alert('اختر قالباً أولاً');
+        return;
+    }
+    try {
+        var res = await postJSON(SST_IMPORT_API, { action: 'get', id: tid });
+        if (!res || !res.success) {
+            alert((res && res.message) ? res.message : 'تعذر تحميل القالب');
+            return;
+        }
+        var sizes = res.sizes || [];
+        if (!sizes.length) {
+            alert('القالب لا يحتوي على مقاسات');
+            return;
+        }
+        var tbody = document.querySelector('#sizesEditor tbody');
+        if (!tbody) {
+            loadSizesEditor();
+            tbody = document.querySelector('#sizesEditor tbody');
+        }
+        if (!tbody) {
+            return;
+        }
+        for (var i = 0; i < sizes.length; i++) {
+            var r = sizes[i];
+            var tr = document.createElement('tr');
+            tr.className = 'size-row';
+            tr.setAttribute('data-new', '1');
+            var fl = (r.foot_length_cm != null && r.foot_length_cm !== '') ? String(r.foot_length_cm) : '';
+            tr.innerHTML = '<td>0</td><td><input type="text" class="s-la" value="' + escapeAttr(r.label_ar || '') + '"></td><td><input type="text" class="s-le" value="' + escapeAttr(r.label_en || '') + '"></td><td><input type="text" class="s-lf" placeholder="Fil" value="' + escapeAttr(r.label_fil || '') + '"></td><td><input type="text" class="s-lh" placeholder="Hi" value="' + escapeAttr(r.label_hi || '') + '"></td><td><input type="text" class="s-fl" placeholder="اختياري" value="' + escapeAttr(fl) + '"></td><td><input type="number" class="s-so" value="' + (Number(r.sort_order) || 0) + '"></td>';
+            tbody.appendChild(tr);
+        }
+    } catch (e) {
+        alert('خطأ شبكة أو خادم');
+    }
 }
 
 function addSizeRow() {

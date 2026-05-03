@@ -219,6 +219,32 @@ CREATE TABLE `size_families` (
   KEY `idx_size_families_sizing_scope` (`commercial_kind_key`,`sizing_category_key`,`size_scheme_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE `size_scheme_templates` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name_ar` varchar(191) NOT NULL DEFAULT '',
+  `name_en` varchar(191) NOT NULL DEFAULT '',
+  `sort_order` int NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_size_scheme_templates_sort` (`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `size_scheme_template_sizes` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `template_id` int NOT NULL,
+  `label_ar` varchar(191) NOT NULL DEFAULT '',
+  `label_en` varchar(191) NOT NULL DEFAULT '',
+  `label_fil` varchar(191) NOT NULL DEFAULT '',
+  `label_hi` varchar(191) NOT NULL DEFAULT '',
+  `sort_order` int NOT NULL DEFAULT 0,
+  `foot_length_cm` decimal(6,2) DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_size_scheme_template_sizes_tpl` (`template_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `size_family_sizes` (
   `id` int NOT NULL AUTO_INCREMENT,
   `size_family_id` int NOT NULL,

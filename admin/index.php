@@ -26,6 +26,7 @@ $allowed = [
     'pattern_dictionary',
     'sizing_dictionary',
     'size_families',
+    'size_scheme_templates',
     'catalog_attributes',
     'products',
     'offers',

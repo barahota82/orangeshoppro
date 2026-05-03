@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 18);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 19);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -832,6 +832,34 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_size_family_sizes_family (size_family_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+
+    orange_catalog_safe_exec($pdo,
+        'CREATE TABLE IF NOT EXISTS size_scheme_templates (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name_ar VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_en VARCHAR(191) NOT NULL DEFAULT \'\',
+            sort_order INT NOT NULL DEFAULT 0,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_size_scheme_templates_sort (sort_order)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+
+    orange_catalog_safe_exec($pdo,
+        'CREATE TABLE IF NOT EXISTS size_scheme_template_sizes (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            template_id INT NOT NULL,
+            label_ar VARCHAR(191) NOT NULL DEFAULT \'\',
+            label_en VARCHAR(191) NOT NULL DEFAULT \'\',
+            label_fil VARCHAR(191) NOT NULL DEFAULT \'\',
+            label_hi VARCHAR(191) NOT NULL DEFAULT \'\',
+            sort_order INT NOT NULL DEFAULT 0,
+            foot_length_cm DECIMAL(6,2) NULL,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_size_scheme_template_sizes_tpl (template_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
 
