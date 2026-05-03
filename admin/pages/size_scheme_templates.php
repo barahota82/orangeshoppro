@@ -43,37 +43,71 @@ if ($tablesReady) {
     <h3>إضافة / تعديل قالب</h3>
     <p style="margin:0 0 14px;font-size:0.88rem;color:#555;line-height:1.5;"><strong>الترتيب</strong> في القائمة تلقائي (جديد = تالي؛ تعديل = دون تغيير). حقلا <strong>Fil</strong> و<strong>Hi</strong> يُعبَّآن تلقائياً <strong>بنفس نص الإنجليزي</strong> (للتوافق مع القنوات)، وليس بترجمة فلبينية/هندية.</p>
     <style>
-        /* حقول النص: أسلوب الأدمن. JS يطابق ارتفاع «الترتيب» لحقل «عربي» فقط؛ لا يُفرض ارتفاع على select «نشط» (فرض الارتفاع يقصّ النص العربي). */
-        #sst_form_card .form-grid input[type="text"],
-        #sst_form_card .form-grid select#sst_active {
-            min-height: 36px;
-            padding: 8px 12px;
-            font-size: 14px;
-            line-height: 1.4;
-            box-sizing: border-box;
+        /* صف الترتيب + نشط: نفس أسلوب شاشة «أنماط الألوان» (pattern_dictionary) — شبكة ltr + حقول rtl + select بـ appearance:none وسهم مخصص */
+        #sst_form_card .sst-mini-grid {
+            display: grid;
+            grid-template-columns: minmax(4.5rem, 6.5rem) minmax(8rem, min(100%, var(--admin-sort-field-max-w, 220px)));
+            gap: 14px 18px;
+            direction: ltr;
+            align-items: start;
+            grid-column: 1 / -1;
         }
-        #sst_form_card .sst-sort-active { align-items: end; }
-        #sst_form_card #sst_sort_display {
-            width: 4.25rem;
-            max-width: 5rem;
+        #sst_form_card .sst-mini-grid label,
+        #sst_form_card .sst-mini-grid input,
+        #sst_form_card .sst-mini-grid select {
+            direction: rtl;
+            text-align: right;
+        }
+        #sst_form_card .sst-mini-grid #sst_sort_display,
+        #sst_form_card .sst-mini-grid #sst_active {
+            margin-inline: 0;
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid #cbd5e1;
+            border-radius: var(--radius-sm, 10px);
+            font-size: 14px;
+            line-height: calc(var(--input-min-h, 36px) - 2px);
+            min-height: var(--input-min-h, 36px);
+            height: var(--input-min-h, 36px);
+            max-height: var(--input-min-h, 36px);
+            padding-block: 0;
+            padding-inline: 12px;
+        }
+        #sst_form_card .sst-mini-grid #sst_sort_display {
             text-align: center;
             font-weight: 600;
             cursor: default;
+        }
+        #sst_form_card .sst-mini-grid #sst_active {
+            -webkit-appearance: none;
+            appearance: none;
+            background-color: #fff;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M2.75 4.25L6 7.55l3.25-3.3.65.64L6 8.82 2.1 4.9l.65-.65z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-size: 12px;
+            background-position: left 12px center;
+            padding-inline-end: 32px;
         }
         #sst_sizes_tbody input.sst-lf[readonly],
         #sst_sizes_tbody input.sst-lh[readonly] {
             background: #f4f6f9;
             cursor: default;
         }
+        @media (max-width: 860px) {
+            #sst_form_card .sst-mini-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
     <input type="hidden" id="sst_id" value="0">
     <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px 14px;align-items:end;">
-        <div class="sst-sort-active" style="display:flex;flex-wrap:nowrap;gap:14px;min-width:0;max-width:100%;">
-            <div style="flex:0 0 auto;min-width:0;">
+        <div class="sst-mini-grid">
+            <div class="admin-sort-field-wrap">
                 <label for="sst_sort_display">ترتيب (تلقائي)</label>
                 <input type="text" id="sst_sort_display" class="admin-sort-field admin-sort-field--muted" readonly tabindex="-1" value="<?php echo (int) $nextSort; ?>" title="ترتيب ظهور القالب في القائمة" aria-readonly="true" autocomplete="off">
             </div>
-            <div style="flex:1 1 8rem;min-width:6rem;max-width:12rem;">
+            <div class="admin-sort-field-wrap">
                 <label for="sst_active">نشط</label>
                 <select id="sst_active" class="admin-sort-field">
                     <option value="1">نعم</option>
@@ -164,50 +198,6 @@ const SST_API = '/admin/api/size_scheme_templates/manage.php';
 const SST_NEXT_SORT = <?php echo (int) $nextSort; ?>;
 let sstHeaderArTimer = null;
 let sstHeaderEnTimer = null;
-let sstHeightSyncTimer = null;
-let sstNameArResizeObserver = null;
-
-/** مطابقة ارتفاع خانة «الترتيب» لحقل «عربي» فقط. لا تُفرض أبعاد على «نشط» (select) حتى لا يُقصّ نص الخيارات العربية. */
-function sstSyncSortActiveHeights() {
-    var ref = document.getElementById('sst_name_ar');
-    var sort = document.getElementById('sst_sort_display');
-    var act = document.getElementById('sst_active');
-    if (!ref || !sort) {
-        return;
-    }
-    var h = Math.round(ref.getBoundingClientRect().height);
-    if (h < 28) {
-        return;
-    }
-    sort.style.height = h + 'px';
-    sort.style.minHeight = h + 'px';
-    if (act) {
-        act.style.height = '';
-        act.style.minHeight = '';
-        act.style.maxHeight = '';
-    }
-}
-
-function sstScheduleSyncSortActiveHeights() {
-    clearTimeout(sstHeightSyncTimer);
-    sstHeightSyncTimer = setTimeout(function () {
-        sstSyncSortActiveHeights();
-    }, 30);
-}
-
-function sstBindSortActiveHeightSync() {
-    var ref = document.getElementById('sst_name_ar');
-    if (!ref || typeof ResizeObserver === 'undefined') {
-        return;
-    }
-    if (sstNameArResizeObserver) {
-        sstNameArResizeObserver.disconnect();
-    }
-    sstNameArResizeObserver = new ResizeObserver(function () {
-        sstScheduleSyncSortActiveHeights();
-    });
-    sstNameArResizeObserver.observe(ref);
-}
 
 function sstEscapeAttr(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
@@ -291,7 +281,6 @@ function sstResetForm() {
     }
     sstAddSizeRow();
     sstSyncHeaderFilHiFromEn();
-    sstScheduleSyncSortActiveHeights();
 }
 
 /** Fil/Hi = نسخ حرفية لعمود الإنجليزي (لا ترجمة فلبينية/هندية). */
@@ -554,7 +543,6 @@ async function sstLoadOne(tplId) {
             sstRefreshSizeRowOrder();
         }
         sstSyncHeaderFilHiFromEn();
-        sstScheduleSyncSortActiveHeights();
         document.getElementById('sst_form_card').scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e) {
         alert('خطأ شبكة');
@@ -573,7 +561,6 @@ async function sstLoadOne(tplId) {
         }
         if (t.id === 'sst_name_ar') {
             scheduleSstHeaderFromAr();
-            sstScheduleSyncSortActiveHeights();
             return;
         }
         if (t.id === 'sst_name_en') {
@@ -621,18 +608,6 @@ document.addEventListener('click', function (ev) {
 });
 
 sstResetForm();
-sstBindSortActiveHeightSync();
-window.addEventListener('resize', sstScheduleSyncSortActiveHeights);
-if (document.fonts && document.fonts.ready) {
-    document.fonts.ready.then(function () {
-        sstScheduleSyncSortActiveHeights();
-    });
-} else {
-    sstScheduleSyncSortActiveHeights();
-}
-requestAnimationFrame(function () {
-    sstScheduleSyncSortActiveHeights();
-});
 </script>
 
 <?php endif; ?>
