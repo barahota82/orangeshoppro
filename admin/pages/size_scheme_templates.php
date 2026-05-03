@@ -42,7 +42,7 @@ if ($tablesReady) {
 <div class="card" id="sst_form_card" tabindex="-1">
     <h3>إضافة / تعديل قالب</h3>
     <style>
-        /* صف واحد بترتيب قراءة عربي: يمين ← يسار = ترتيب → عربي → EN → Fil → Hi → نشط. الشبكة direction: rtl حتى يطابق DOM. */
+        /* صف واحد RTL: يمين ← يسار = ترتيب → EN (أساسي) → عربي (= نسخ EN مثل Fil) → Fil → Hi → نشط. */
         #sst_form_card .sst-header-row-wrap {
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
@@ -147,12 +147,12 @@ if ($tablesReady) {
                 <input type="text" id="sst_sort_display" class="admin-sort-field admin-sort-field--muted" readonly tabindex="-1" value="<?php echo (int) $nextSort; ?>" title="ترتيب ظهور القالب في القائمة" aria-readonly="true" autocomplete="off">
             </div>
             <div class="admin-sort-field-wrap">
-                <label for="sst_name_ar">الاسم العربي</label>
-                <input type="text" id="sst_name_ar" maxlength="191" autocomplete="off">
-            </div>
-            <div class="admin-sort-field-wrap">
                 <label for="sst_name_en">English</label>
                 <input type="text" id="sst_name_en" maxlength="191" autocomplete="off">
+            </div>
+            <div class="admin-sort-field-wrap">
+                <label for="sst_name_ar">الاسم العربي</label>
+                <input type="text" id="sst_name_ar" class="admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" autocomplete="off" title="يُملأ تلقائياً بنفس نص الإنجليزي">
             </div>
             <div class="admin-sort-field-wrap">
                 <label for="sst_name_fil">Filipino</label>
@@ -177,8 +177,8 @@ if ($tablesReady) {
             <thead>
                 <tr>
                     <th style="width:3.2rem;">ترتيب</th>
-                    <th>عربي</th>
                     <th>EN</th>
+                    <th>عربي</th>
                     <th>Fil</th>
                     <th>Hi</th>
                     <th>طول القدم (سم)</th>
@@ -190,7 +190,7 @@ if ($tablesReady) {
     </div>
     <div class="actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;">
         <button type="button" onclick="sstAddSizeRow()">+ صف مقاس</button>
-        <button type="button" class="btn-secondary" onclick="sstTranslateAllFromArabic()">ترجمة تلقائية من العربي</button>
+        <button type="button" class="btn-secondary" onclick="sstSyncAllDerivedFromEnglish()">مزامنة الحقول المشتقة من English</button>
         <button type="button" onclick="sstSave()">حفظ القالب</button>
         <button type="button" class="btn-secondary" onclick="sstResetForm()">جديد</button>
     </div>
@@ -208,8 +208,8 @@ if ($tablesReady) {
             <thead>
                 <tr>
                     <th>#</th>
-                    <th>العربي</th>
                     <th>English</th>
+                    <th>العربي</th>
                     <th>عدد المقاسات</th>
                     <th>الترتيب</th>
                     <th>الحالة</th>
@@ -220,8 +220,8 @@ if ($tablesReady) {
                 <?php foreach ($templates as $t): ?>
                 <tr data-id="<?php echo (int) $t['id']; ?>">
                     <td><?php echo (int) $t['id']; ?></td>
-                    <td><?php echo htmlspecialchars((string) $t['name_ar'], ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo htmlspecialchars((string) $t['name_en'], ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo htmlspecialchars((string) $t['name_ar'], ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo (int) ($t['sizes_count'] ?? 0); ?></td>
                     <td><?php echo (int) $t['sort_order']; ?></td>
                     <td><?php echo (int) $t['is_active'] === 1 ? 'ظاهر' : 'مخفي'; ?></td>
@@ -248,7 +248,6 @@ if ($tablesReady) {
 const SST_API = '/admin/api/size_scheme_templates/manage.php';
 const SST_REORDER_API = '/admin/api/size_scheme_templates/reorder-save.php';
 const SST_NEXT_SORT = <?php echo (int) $nextSort; ?>;
-let sstHeaderArTimer = null;
 let sstHeaderEnTimer = null;
 
 function sstMoveTemplateListRow(btn, dir) {
@@ -307,8 +306,8 @@ function sstAddSizeRow() {
     var tr = document.createElement('tr');
     tr.className = 'sst-size-row';
     tr.innerHTML = '<td class="sst-ord">1</td>' +
-        '<td><input type="text" class="sst-la" maxlength="191"></td>' +
         '<td><input type="text" class="sst-le" maxlength="191"></td>' +
+        '<td><input type="text" class="sst-la" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN"></td>' +
         '<td><input type="text" class="sst-lf" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN"></td>' +
         '<td><input type="text" class="sst-lh" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN"></td>' +
         '<td><input type="text" class="sst-fl" placeholder="اختياري"></td>' +
@@ -361,29 +360,33 @@ function sstResetForm() {
         tb.innerHTML = '';
     }
     sstAddSizeRow();
-    sstSyncHeaderFilHiFromEn();
+    sstSyncHeaderArFilHiFromEn();
 }
 
-/** Fil/Hi = نسخ حرفية لعمود الإنجليزي (لا ترجمة فلبينية/هندية). */
-function sstSyncHeaderFilHiFromEn() {
+/** عربي / Fil / Hi = نسخ حرفية لعمود الإنجليزي (مثل سلوك Fil السابق للعربي). */
+function sstSyncHeaderArFilHiFromEn() {
     var enEl = document.getElementById('sst_name_en');
+    var arEl = document.getElementById('sst_name_ar');
     var filEl = document.getElementById('sst_name_fil');
     var hiEl = document.getElementById('sst_name_hi');
-    if (!enEl || !filEl || !hiEl) {
+    if (!enEl || !arEl || !filEl || !hiEl) {
         return;
     }
     var v = enEl.value;
     if (!String(v).trim()) {
+        arEl.value = '';
         filEl.value = '';
         hiEl.value = '';
         return;
     }
+    arEl.value = v;
     filEl.value = v;
     hiEl.value = v;
 }
 
-function sstSyncRowFilHiFromEn(tr) {
+function sstSyncRowArFilHiFromEn(tr) {
     var le = tr.querySelector('.sst-le');
+    var la = tr.querySelector('.sst-la');
     var lf = tr.querySelector('.sst-lf');
     var lh = tr.querySelector('.sst-lh');
     if (!le) {
@@ -391,6 +394,9 @@ function sstSyncRowFilHiFromEn(tr) {
     }
     var v = le.value;
     if (!String(v).trim()) {
+        if (la) {
+            la.value = '';
+        }
         if (lf) {
             lf.value = '';
         }
@@ -398,6 +404,9 @@ function sstSyncRowFilHiFromEn(tr) {
             lh.value = '';
         }
         return;
+    }
+    if (la) {
+        la.value = v;
     }
     if (lf) {
         lf.value = v;
@@ -407,152 +416,33 @@ function sstSyncRowFilHiFromEn(tr) {
     }
 }
 
-async function sstTranslateHeaderInternal(opts) {
-    opts = opts || {};
-    var silent = !!opts.silent;
-    var forceFromArabic = !!opts.forceFromArabic;
-    if (!forceFromArabic) {
-        sstSyncHeaderFilHiFromEn();
-        return true;
-    }
-    try {
-        var res = await postJSON('/admin/api/translate/names.php', {
-            name_ar: document.getElementById('sst_name_ar').value.trim(),
-            name_en: ''
-        });
-        if (!res || !res.success) {
-            if (!silent) {
-                alert((res && res.message) ? res.message : 'فشل الترجمة');
-            }
-            return false;
-        }
-        var t = res.translations || {};
-        if (t.name_en) {
-            document.getElementById('sst_name_en').value = t.name_en;
-        }
-        sstSyncHeaderFilHiFromEn();
-        return true;
-    } catch (e) {
-        if (!silent) {
-            alert('فشل طلب الترجمة');
-        }
-        return false;
-    }
-}
-
-function scheduleSstHeaderFromAr() {
-    var ar = document.getElementById('sst_name_ar').value.trim();
-    if (!ar) {
-        document.getElementById('sst_name_en').value = '';
-        document.getElementById('sst_name_fil').value = '';
-        document.getElementById('sst_name_hi').value = '';
-        return;
-    }
-    clearTimeout(sstHeaderArTimer);
-    sstHeaderArTimer = setTimeout(function () {
-        sstTranslateHeaderInternal({ silent: true, forceFromArabic: true });
-    }, 700);
-}
-
 function scheduleSstHeaderFromEn() {
     clearTimeout(sstHeaderEnTimer);
     sstHeaderEnTimer = setTimeout(function () {
-        sstSyncHeaderFilHiFromEn();
+        sstSyncHeaderArFilHiFromEn();
     }, 600);
-}
-
-async function sstTranslateRow(tr, opts) {
-    opts = opts || {};
-    var silent = !!opts.silent;
-    var forceFromArabic = !!opts.forceFromArabic;
-    var la = tr.querySelector('.sst-la');
-    var le = tr.querySelector('.sst-le');
-    if (!la || !le) {
-        return true;
-    }
-    if (!forceFromArabic) {
-        sstSyncRowFilHiFromEn(tr);
-        return true;
-    }
-    try {
-        var res = await postJSON('/admin/api/translate/names.php', {
-            name_ar: (la.value || '').trim(),
-            name_en: ''
-        });
-        if (!res || !res.success) {
-            if (!silent) {
-                alert((res && res.message) ? res.message : 'فشل الترجمة');
-            }
-            return false;
-        }
-        var t = res.translations || {};
-        if (t.name_en) {
-            le.value = t.name_en;
-        }
-        sstSyncRowFilHiFromEn(tr);
-        return true;
-    } catch (e) {
-        if (!silent) {
-            alert('فشل طلب الترجمة');
-        }
-        return false;
-    }
-}
-
-function scheduleSstRowFromAr(tr) {
-    var la = tr.querySelector('.sst-la');
-    if (!la) {
-        return;
-    }
-    var ar = (la.value || '').trim();
-    if (!ar) {
-        var le = tr.querySelector('.sst-le');
-        var lf = tr.querySelector('.sst-lf');
-        var lh = tr.querySelector('.sst-lh');
-        if (le) {
-            le.value = '';
-        }
-        if (lf) {
-            lf.value = '';
-        }
-        if (lh) {
-            lh.value = '';
-        }
-        return;
-    }
-    clearTimeout(tr._sstArTimer);
-    tr._sstArTimer = setTimeout(function () {
-        sstTranslateRow(tr, { silent: true, forceFromArabic: true });
-    }, 700);
 }
 
 function scheduleSstRowFromEn(tr) {
     clearTimeout(tr._sstEnTimer);
     tr._sstEnTimer = setTimeout(function () {
-        sstSyncRowFilHiFromEn(tr);
+        sstSyncRowArFilHiFromEn(tr);
     }, 550);
 }
 
-async function sstTranslateAllFromArabic() {
-    var ar = document.getElementById('sst_name_ar').value.trim();
-    if (!ar) {
-        alert('أدخل الاسم العربي للقالب أولاً');
+function sstSyncAllDerivedFromEnglish() {
+    var en = document.getElementById('sst_name_en').value.trim();
+    if (!en) {
+        alert('أدخل English للقالب أولاً');
         return;
     }
-    if (!(await sstTranslateHeaderInternal({ silent: false, forceFromArabic: true }))) {
-        return;
-    }
-    var rows = document.querySelectorAll('#sst_sizes_tbody tr.sst-size-row');
-    for (var i = 0; i < rows.length; i++) {
-        var tr = rows[i];
-        var la = tr.querySelector('.sst-la');
-        if (!la || !(la.value || '').trim()) {
-            continue;
+    sstSyncHeaderArFilHiFromEn();
+    document.querySelectorAll('#sst_sizes_tbody tr.sst-size-row').forEach(function (tr) {
+        var le = tr.querySelector('.sst-le');
+        if (le && String(le.value || '').trim()) {
+            sstSyncRowArFilHiFromEn(tr);
         }
-        if (!(await sstTranslateRow(tr, { silent: false, forceFromArabic: true }))) {
-            return;
-        }
-    }
+    });
 }
 
 async function sstSave() {
@@ -605,25 +495,25 @@ async function sstLoadOne(tplId) {
         var sizes = res.sizes || [];
         if (!sizes.length) {
             sstAddSizeRow();
-            sstSyncHeaderFilHiFromEn();
+            sstSyncHeaderArFilHiFromEn();
         } else {
             sizes.forEach(function (r, idx) {
                 var tr = document.createElement('tr');
                 tr.className = 'sst-size-row';
                 var fl = (r.foot_length_cm != null && r.foot_length_cm !== '') ? String(r.foot_length_cm) : '';
                 tr.innerHTML = '<td class="sst-ord">' + String(idx + 1) + '</td>' +
-                    '<td><input type="text" class="sst-la" maxlength="191" value="' + sstEscapeAttr(r.label_ar) + '"></td>' +
                     '<td><input type="text" class="sst-le" maxlength="191" value="' + sstEscapeAttr(r.label_en) + '"></td>' +
+                    '<td><input type="text" class="sst-la" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" value="' + sstEscapeAttr(r.label_ar) + '"></td>' +
                     '<td><input type="text" class="sst-lf" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" value="' + sstEscapeAttr(r.label_fil) + '"></td>' +
                     '<td><input type="text" class="sst-lh" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" value="' + sstEscapeAttr(r.label_hi) + '"></td>' +
                     '<td><input type="text" class="sst-fl" value="' + sstEscapeAttr(fl) + '"></td>' +
                     '<td><button type="button" class="btn-secondary" onclick="sstRemoveSizeRow(this)">حذف الصف</button></td>';
                 tb.appendChild(tr);
-                sstSyncRowFilHiFromEn(tr);
+                sstSyncRowArFilHiFromEn(tr);
             });
             sstRefreshSizeRowOrder();
         }
-        sstSyncHeaderFilHiFromEn();
+        sstSyncHeaderArFilHiFromEn();
         document.getElementById('sst_form_card').scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e) {
         alert('خطأ شبكة');
@@ -640,24 +530,18 @@ async function sstLoadOne(tplId) {
         if (!t) {
             return;
         }
-        if (t.id === 'sst_name_ar') {
-            scheduleSstHeaderFromAr();
-            return;
-        }
         if (t.id === 'sst_name_en') {
             scheduleSstHeaderFromEn();
             return;
         }
-        if (t.id === 'sst_name_fil' || t.id === 'sst_name_hi') {
+        if (t.id === 'sst_name_ar' || t.id === 'sst_name_fil' || t.id === 'sst_name_hi') {
             return;
         }
         var tr = t.closest ? t.closest('tr.sst-size-row') : null;
         if (!tr) {
             return;
         }
-        if (t.classList && t.classList.contains('sst-la')) {
-            scheduleSstRowFromAr(tr);
-        } else if (t.classList && t.classList.contains('sst-le')) {
+        if (t.classList && t.classList.contains('sst-le')) {
             scheduleSstRowFromEn(tr);
         }
     });
