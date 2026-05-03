@@ -220,7 +220,7 @@ if ($sdNextKindSort < 1) {
     }
     .cat-dep-list-wrap[data-list="kinds"]{
         overflow-x:auto;
-        max-width:100%;
+        max-width:none;
         -webkit-overflow-scrolling:touch;
     }
     .cat-dep-list-wrap[data-list="kinds"] > table{
