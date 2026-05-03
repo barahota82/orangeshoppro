@@ -58,6 +58,8 @@ try {
             $id = (int) ($data['id'] ?? 0);
             $nameAr = trim((string) ($data['name_ar'] ?? ''));
             $nameEn = trim((string) ($data['name_en'] ?? ''));
+            $nameFil = trim((string) ($data['name_fil'] ?? ''));
+            $nameHi = trim((string) ($data['name_hi'] ?? ''));
             $sort = (int) ($data['sort_order'] ?? 0);
             $active = (int) ($data['is_active'] ?? 1) === 0 ? 0 : 1;
             $sizesIn = $data['sizes'] ?? [];
@@ -124,8 +126,8 @@ try {
                         }
                     }
                     $pdo->prepare(
-                        'INSERT INTO size_scheme_templates (name_ar, name_en, sort_order, is_active) VALUES (?,?,?,?)'
-                    )->execute([$nameAr, $nameEn, $sort, $active]);
+                        'INSERT INTO size_scheme_templates (name_ar, name_en, name_fil, name_hi, sort_order, is_active) VALUES (?,?,?,?,?,?)'
+                    )->execute([$nameAr, $nameEn, $nameFil, $nameHi, $sort, $active]);
                     $tplId = (int) $pdo->lastInsertId();
                 }
 

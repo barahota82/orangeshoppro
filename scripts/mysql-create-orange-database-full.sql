@@ -223,6 +223,8 @@ CREATE TABLE `size_scheme_templates` (
   `id` int NOT NULL AUTO_INCREMENT,
   `name_ar` varchar(191) NOT NULL DEFAULT '',
   `name_en` varchar(191) NOT NULL DEFAULT '',
+  `name_fil` varchar(191) NOT NULL DEFAULT '',
+  `name_hi` varchar(191) NOT NULL DEFAULT '',
   `sort_order` int NOT NULL DEFAULT 0,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,

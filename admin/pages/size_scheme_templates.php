@@ -52,6 +52,14 @@ if ($tablesReady) {
             <input type="text" id="sst_name_en" maxlength="191" autocomplete="off">
         </div>
         <div>
+            <label>اسم القالب Filipino</label>
+            <input type="text" id="sst_name_fil" maxlength="191" autocomplete="off">
+        </div>
+        <div>
+            <label>اسم القالب Hindi</label>
+            <input type="text" id="sst_name_hi" maxlength="191" autocomplete="off">
+        </div>
+        <div>
             <label>الترتيب</label>
             <input type="number" id="sst_sort" class="admin-sort-field" value="<?php echo (int) $nextSort; ?>">
         </div>
@@ -82,7 +90,7 @@ if ($tablesReady) {
     </div>
     <div class="actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;">
         <button type="button" onclick="sstAddSizeRow()">+ صف مقاس</button>
-        <button type="button" class="btn-secondary" onclick="sstTranslateHeader()">ترجمة إلى English</button>
+        <button type="button" class="btn-secondary" onclick="sstTranslateAllFromArabic()">ترجمة تلقائية من العربي</button>
         <button type="button" onclick="sstSave()">حفظ القالب</button>
         <button type="button" class="btn-secondary" onclick="sstResetForm()">جديد</button>
     </div>
@@ -126,6 +134,8 @@ if ($tablesReady) {
 <script>
 const SST_API = '/admin/api/size_scheme_templates/manage.php';
 const SST_NEXT_SORT = <?php echo (int) $nextSort; ?>;
+let sstHeaderArTimer = null;
+let sstHeaderEnTimer = null;
 
 function sstEscapeAttr(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
@@ -181,6 +191,8 @@ function sstResetForm() {
     document.getElementById('sst_id').value = '0';
     document.getElementById('sst_name_ar').value = '';
     document.getElementById('sst_name_en').value = '';
+    document.getElementById('sst_name_fil').value = '';
+    document.getElementById('sst_name_hi').value = '';
     document.getElementById('sst_sort').value = String(SST_NEXT_SORT || 1);
     document.getElementById('sst_active').value = '1';
     var tb = document.getElementById('sst_sizes_tbody');
@@ -190,24 +202,163 @@ function sstResetForm() {
     sstAddSizeRow();
 }
 
-async function sstTranslateHeader() {
-    var ar = document.getElementById('sst_name_ar').value.trim();
-    if (!ar) {
-        alert('أدخل الاسم العربي للقالب أولاً');
-        return;
-    }
+async function sstTranslateHeaderInternal(opts) {
+    opts = opts || {};
+    var silent = !!opts.silent;
+    var forceFromArabic = !!opts.forceFromArabic;
     try {
-        var res = await postJSON('/admin/api/translate/names.php', { name_ar: ar, name_en: '' });
+        var res = await postJSON('/admin/api/translate/names.php', {
+            name_ar: document.getElementById('sst_name_ar').value.trim(),
+            name_en: forceFromArabic ? '' : document.getElementById('sst_name_en').value.trim()
+        });
         if (!res || !res.success) {
-            alert((res && res.message) ? res.message : 'فشل الترجمة');
-            return;
+            if (!silent) {
+                alert((res && res.message) ? res.message : 'فشل الترجمة');
+            }
+            return false;
         }
         var t = res.translations || {};
         if (t.name_en) {
             document.getElementById('sst_name_en').value = t.name_en;
         }
+        if (t.name_fil) {
+            document.getElementById('sst_name_fil').value = t.name_fil;
+        }
+        if (t.name_hi) {
+            document.getElementById('sst_name_hi').value = t.name_hi;
+        }
+        return true;
     } catch (e) {
-        alert('فشل طلب الترجمة');
+        if (!silent) {
+            alert('فشل طلب الترجمة');
+        }
+        return false;
+    }
+}
+
+function scheduleSstHeaderFromAr() {
+    var ar = document.getElementById('sst_name_ar').value.trim();
+    if (!ar) {
+        document.getElementById('sst_name_en').value = '';
+        document.getElementById('sst_name_fil').value = '';
+        document.getElementById('sst_name_hi').value = '';
+        return;
+    }
+    clearTimeout(sstHeaderArTimer);
+    sstHeaderArTimer = setTimeout(function () {
+        sstTranslateHeaderInternal({ silent: true, forceFromArabic: true });
+    }, 700);
+}
+
+function scheduleSstHeaderFromEn() {
+    var en = document.getElementById('sst_name_en').value.trim();
+    if (!en) {
+        return;
+    }
+    clearTimeout(sstHeaderEnTimer);
+    sstHeaderEnTimer = setTimeout(function () {
+        sstTranslateHeaderInternal({ silent: true, forceFromArabic: false });
+    }, 600);
+}
+
+async function sstTranslateRow(tr, opts) {
+    opts = opts || {};
+    var silent = !!opts.silent;
+    var forceFromArabic = !!opts.forceFromArabic;
+    var la = tr.querySelector('.sst-la');
+    var le = tr.querySelector('.sst-le');
+    var lf = tr.querySelector('.sst-lf');
+    var lh = tr.querySelector('.sst-lh');
+    if (!la || !le) {
+        return true;
+    }
+    try {
+        var res = await postJSON('/admin/api/translate/names.php', {
+            name_ar: (la.value || '').trim(),
+            name_en: forceFromArabic ? '' : (le.value || '').trim()
+        });
+        if (!res || !res.success) {
+            if (!silent) {
+                alert((res && res.message) ? res.message : 'فشل الترجمة');
+            }
+            return false;
+        }
+        var t = res.translations || {};
+        if (t.name_en) {
+            le.value = t.name_en;
+        }
+        if (lf && t.name_fil) {
+            lf.value = t.name_fil;
+        }
+        if (lh && t.name_hi) {
+            lh.value = t.name_hi;
+        }
+        return true;
+    } catch (e) {
+        if (!silent) {
+            alert('فشل طلب الترجمة');
+        }
+        return false;
+    }
+}
+
+function scheduleSstRowFromAr(tr) {
+    var la = tr.querySelector('.sst-la');
+    if (!la) {
+        return;
+    }
+    var ar = (la.value || '').trim();
+    if (!ar) {
+        var le = tr.querySelector('.sst-le');
+        var lf = tr.querySelector('.sst-lf');
+        var lh = tr.querySelector('.sst-lh');
+        if (le) {
+            le.value = '';
+        }
+        if (lf) {
+            lf.value = '';
+        }
+        if (lh) {
+            lh.value = '';
+        }
+        return;
+    }
+    clearTimeout(tr._sstArTimer);
+    tr._sstArTimer = setTimeout(function () {
+        sstTranslateRow(tr, { silent: true, forceFromArabic: true });
+    }, 700);
+}
+
+function scheduleSstRowFromEn(tr) {
+    var le = tr.querySelector('.sst-le');
+    if (!le || !(le.value || '').trim()) {
+        return;
+    }
+    clearTimeout(tr._sstEnTimer);
+    tr._sstEnTimer = setTimeout(function () {
+        sstTranslateRow(tr, { silent: true, forceFromArabic: false });
+    }, 600);
+}
+
+async function sstTranslateAllFromArabic() {
+    var ar = document.getElementById('sst_name_ar').value.trim();
+    if (!ar) {
+        alert('أدخل الاسم العربي للقالب أولاً');
+        return;
+    }
+    if (!(await sstTranslateHeaderInternal({ silent: false, forceFromArabic: true }))) {
+        return;
+    }
+    var rows = document.querySelectorAll('#sst_sizes_tbody tr.sst-size-row');
+    for (var i = 0; i < rows.length; i++) {
+        var tr = rows[i];
+        var la = tr.querySelector('.sst-la');
+        if (!la || !(la.value || '').trim()) {
+            continue;
+        }
+        if (!(await sstTranslateRow(tr, { silent: false, forceFromArabic: true }))) {
+            return;
+        }
     }
 }
 
@@ -218,6 +369,8 @@ async function sstSave() {
         id: id,
         name_ar: document.getElementById('sst_name_ar').value.trim(),
         name_en: document.getElementById('sst_name_en').value.trim(),
+        name_fil: document.getElementById('sst_name_fil').value.trim(),
+        name_hi: document.getElementById('sst_name_hi').value.trim(),
         sort_order: parseInt(document.getElementById('sst_sort').value || '0', 10) || 0,
         is_active: parseInt(document.getElementById('sst_active').value, 10),
         sizes: sstCollectSizes()
@@ -244,6 +397,8 @@ async function sstLoadOne(tplId) {
         document.getElementById('sst_id').value = String(t.id);
         document.getElementById('sst_name_ar').value = t.name_ar || '';
         document.getElementById('sst_name_en').value = t.name_en || '';
+        document.getElementById('sst_name_fil').value = t.name_fil || '';
+        document.getElementById('sst_name_hi').value = t.name_hi || '';
         document.getElementById('sst_sort').value = String(t.sort_order != null ? t.sort_order : 0);
         document.getElementById('sst_active').value = (parseInt(t.is_active, 10) === 0 ? '0' : '1');
         var tb = document.getElementById('sst_sizes_tbody');
@@ -271,6 +426,36 @@ async function sstLoadOne(tplId) {
         alert('خطأ شبكة');
     }
 }
+
+(function () {
+    var card = document.getElementById('sst_form_card');
+    if (!card) {
+        return;
+    }
+    card.addEventListener('input', function (ev) {
+        var t = ev.target;
+        if (!t) {
+            return;
+        }
+        if (t.id === 'sst_name_ar') {
+            scheduleSstHeaderFromAr();
+            return;
+        }
+        if (t.id === 'sst_name_en') {
+            scheduleSstHeaderFromEn();
+            return;
+        }
+        var tr = t.closest ? t.closest('tr.sst-size-row') : null;
+        if (!tr) {
+            return;
+        }
+        if (t.classList && t.classList.contains('sst-la')) {
+            scheduleSstRowFromAr(tr);
+        } else if (t.classList && t.classList.contains('sst-le')) {
+            scheduleSstRowFromEn(tr);
+        }
+    });
+})();
 
 document.addEventListener('click', function (ev) {
     var ed = ev.target.closest('[data-sst-edit]');
