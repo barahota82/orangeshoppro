@@ -733,6 +733,16 @@ async function importSizeTemplateRows() {
             var fl = (r.foot_length_cm != null && r.foot_length_cm !== '') ? String(r.foot_length_cm) : '';
             tr.innerHTML = '<td>0</td><td><input type="text" class="s-la" value="' + escapeAttr(r.label_ar || '') + '"></td><td><input type="text" class="s-le" value="' + escapeAttr(r.label_en || '') + '"></td><td><input type="text" class="s-lf" placeholder="Fil" value="' + escapeAttr(r.label_fil || '') + '"></td><td><input type="text" class="s-lh" placeholder="Hi" value="' + escapeAttr(r.label_hi || '') + '"></td><td><input type="text" class="s-fl" placeholder="اختياري" value="' + escapeAttr(fl) + '"></td><td><input type="number" class="s-so" value="' + (Number(r.sort_order) || 0) + '"></td>';
             tbody.appendChild(tr);
+            var leEl = tr.querySelector('.s-le');
+            var enVal = leEl ? leEl.value : '';
+            var lfEl = tr.querySelector('.s-lf');
+            var lhEl = tr.querySelector('.s-lh');
+            if (lfEl) {
+                lfEl.value = enVal;
+            }
+            if (lhEl) {
+                lhEl.value = enVal;
+            }
         }
     } catch (e) {
         alert('خطأ شبكة أو خادم');
