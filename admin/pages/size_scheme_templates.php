@@ -42,16 +42,28 @@ if ($tablesReady) {
 <div class="card" id="sst_form_card" tabindex="-1">
     <h3>إضافة / تعديل قالب</h3>
     <p style="margin:0 0 14px;font-size:0.88rem;color:#555;line-height:1.5;"><strong>الترتيب</strong> في القائمة تلقائي (جديد = تالي؛ تعديل = دون تغيير). <strong>Fil / Hi</strong> من <strong>الإنجليزي</strong>.</p>
+    <style>
+        /* نفس ارتفاع/حدود حقول الأدمن (input, select) — بدون عناصر مخصصة بارتفاع مختلف */
+        #sst_form_card .sst-sort-active { align-items: end; }
+        #sst_form_card #sst_sort_display {
+            width: 4.25rem;
+            max-width: 5rem;
+            text-align: center;
+            font-weight: 600;
+            cursor: default;
+            box-sizing: border-box;
+        }
+    </style>
     <input type="hidden" id="sst_id" value="0">
     <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px 14px;align-items:end;">
-        <div class="sst-sort-active" style="display:flex;flex-wrap:nowrap;align-items:flex-end;gap:14px;min-width:0;max-width:100%;">
-            <div style="flex:0 0 auto;">
-                <label style="margin-bottom:2px;">ترتيب (تلقائي)</label>
-                <p id="sst_sort_display" title="ترتيب ظهور القالب في القائمة" style="margin:0;padding:6px 8px;font-size:0.88rem;font-weight:600;line-height:1.2;border:1px solid #ddd;border-radius:4px;background:#f9fafb;min-width:2rem;text-align:center;"><?php echo (int) $nextSort; ?></p>
+        <div class="sst-sort-active" style="display:flex;flex-wrap:nowrap;gap:14px;min-width:0;max-width:100%;">
+            <div style="flex:0 0 auto;min-width:0;">
+                <label for="sst_sort_display">ترتيب (تلقائي)</label>
+                <input type="text" id="sst_sort_display" class="admin-sort-field admin-sort-field--muted" readonly tabindex="-1" value="<?php echo (int) $nextSort; ?>" title="ترتيب ظهور القالب في القائمة" aria-readonly="true" autocomplete="off">
             </div>
             <div style="flex:1 1 7rem;min-width:5.5rem;max-width:10rem;">
                 <label for="sst_active">نشط</label>
-                <select id="sst_active" class="admin-sort-field" style="width:100%;margin-top:2px;">
+                <select id="sst_active" class="admin-sort-field">
                     <option value="1">نعم</option>
                     <option value="0">لا</option>
                 </select>
@@ -214,7 +226,7 @@ function sstResetForm() {
     var nextSo = SST_NEXT_SORT || 1;
     var sortDisp = document.getElementById('sst_sort_display');
     if (sortDisp) {
-        sortDisp.textContent = String(nextSo);
+        sortDisp.value = String(nextSo);
     }
     document.getElementById('sst_active').value = '1';
     var tb = document.getElementById('sst_sizes_tbody');
@@ -503,7 +515,7 @@ async function sstLoadOne(tplId) {
         }
         var sortDisp = document.getElementById('sst_sort_display');
         if (sortDisp) {
-            sortDisp.textContent = String(so);
+            sortDisp.value = String(so);
         }
         document.getElementById('sst_active').value = (parseInt(t.is_active, 10) === 0 ? '0' : '1');
         var tb = document.getElementById('sst_sizes_tbody');
