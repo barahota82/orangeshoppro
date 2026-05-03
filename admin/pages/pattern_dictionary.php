@@ -378,7 +378,7 @@ if (pEnEl) pEnEl.addEventListener('input', schedulePatternTranslateFromEnglish);
         }
         .cat-dep-list-wrap[data-list="patterns"]{
             overflow-x:auto;
-            max-width:100%;
+            max-width:none;
             -webkit-overflow-scrolling:touch;
         }
         .cat-dep-list-wrap[data-list="patterns"] > table{

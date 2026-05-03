@@ -387,7 +387,7 @@ document.getElementById('c_name_en').addEventListener('input', scheduleColorTran
         }
         .cat-dep-list-wrap[data-list="colors"]{
             overflow-x:auto;
-            max-width:100%;
+            max-width:none;
             -webkit-overflow-scrolling:touch;
         }
         .cat-dep-list-wrap[data-list="colors"] > table{
