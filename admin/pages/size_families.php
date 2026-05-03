@@ -288,7 +288,7 @@ $tablesReady = $hasFamilies && $hasSizes;
                 <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">أدخل المفتاح يدوياً.</small>
                 <?php endif; ?>
             </div>
-            <div class="sf-fam-tpl admin-sort-field-wrap">
+            <div class="sf-fam-tpl">
                 <label>قالب المقاسات</label>
                 <?php if ($hasSizeTemplates && count($sizeTemplatesList) > 0): ?>
                 <select id="sizes_template_pick" class="admin-sort-field" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
