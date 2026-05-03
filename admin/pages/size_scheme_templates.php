@@ -204,21 +204,27 @@ if ($tablesReady) {
         </div>
     </div>
     <div class="table-wrap cat-dep-list-wrap" data-list="sst-templates" style="margin-top:10px;">
-        <table dir="rtl">
+        <table>
             <thead>
                 <tr>
-                    <th class="pd-ops-col">إجراءات</th>
-                    <th>الحالة</th>
-                    <th>الترتيب</th>
-                    <th>عدد المقاسات</th>
-                    <th>English</th>
-                    <th>العربي</th>
                     <th>#</th>
+                    <th>العربي</th>
+                    <th>English</th>
+                    <th>عدد المقاسات</th>
+                    <th>الترتيب</th>
+                    <th>الحالة</th>
+                    <th class="pd-ops-col">إجراءات</th>
                 </tr>
             </thead>
             <tbody id="orange-sst-templates-list-tbody">
                 <?php foreach ($templates as $t): ?>
                 <tr data-id="<?php echo (int) $t['id']; ?>">
+                    <td><?php echo (int) $t['id']; ?></td>
+                    <td><?php echo htmlspecialchars((string) $t['name_ar'], ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo htmlspecialchars((string) $t['name_en'], ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo (int) ($t['sizes_count'] ?? 0); ?></td>
+                    <td><?php echo (int) $t['sort_order']; ?></td>
+                    <td><?php echo (int) $t['is_active'] === 1 ? 'ظاهر' : 'مخفي'; ?></td>
                     <td class="pd-row-ops">
                         <div class="pd-ops-wrap">
                             <div class="pd-ops-arrows">
@@ -231,12 +237,6 @@ if ($tablesReady) {
                             </div>
                         </div>
                     </td>
-                    <td><?php echo (int) $t['is_active'] === 1 ? 'ظاهر' : 'مخفي'; ?></td>
-                    <td><?php echo (int) $t['sort_order']; ?></td>
-                    <td><?php echo (int) ($t['sizes_count'] ?? 0); ?></td>
-                    <td><?php echo htmlspecialchars((string) $t['name_en'], ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo htmlspecialchars((string) $t['name_ar'], ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo (int) $t['id']; ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
