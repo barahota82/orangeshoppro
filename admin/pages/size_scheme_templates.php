@@ -48,11 +48,9 @@ if ($tablesReady) {
         #sst_form_card .form-grid select#sst_active {
             min-height: 36px;
             padding: 8px 12px;
-            padding-inline-end: 2rem;
             font-size: 14px;
-            line-height: 1.5;
+            line-height: 1.4;
             box-sizing: border-box;
-            overflow: visible;
         }
         #sst_form_card .sst-sort-active { align-items: end; }
         #sst_form_card #sst_sort_display {
@@ -75,7 +73,7 @@ if ($tablesReady) {
                 <label for="sst_sort_display">ترتيب (تلقائي)</label>
                 <input type="text" id="sst_sort_display" class="admin-sort-field admin-sort-field--muted" readonly tabindex="-1" value="<?php echo (int) $nextSort; ?>" title="ترتيب ظهور القالب في القائمة" aria-readonly="true" autocomplete="off">
             </div>
-            <div style="flex:1 1 9rem;min-width:7.5rem;max-width:18rem;">
+            <div style="flex:1 1 7rem;min-width:5.5rem;max-width:10rem;">
                 <label for="sst_active">نشط</label>
                 <select id="sst_active" class="admin-sort-field">
                     <option value="1">نعم</option>
@@ -169,10 +167,7 @@ let sstHeaderEnTimer = null;
 let sstHeightSyncTimer = null;
 let sstNameArResizeObserver = null;
 
-/**
- * مطابقة ارتفاع «الترتيب» لحقل «عربي».
- * «نشط» = select أصلي: ارتفاع ثابت = يقص أحرف العربية (مثل ميم «نعم») — نضع min-height فقط ولا نفرض height.
- */
+/** مطابقة ارتفاع «الترتيب» و«نشط» لحقل «اسم القالب عربي» (الـ select لا يحترم نفس مقاس الـ input في كثير من المتصفحات). */
 function sstSyncSortActiveHeights() {
     var ref = document.getElementById('sst_name_ar');
     var sort = document.getElementById('sst_sort_display');
@@ -186,10 +181,8 @@ function sstSyncSortActiveHeights() {
     }
     sort.style.height = h + 'px';
     sort.style.minHeight = h + 'px';
-    act.style.height = '';
-    act.style.maxHeight = '';
-    var actMin = Math.max(h + 10, 42);
-    act.style.minHeight = actMin + 'px';
+    act.style.height = h + 'px';
+    act.style.minHeight = h + 'px';
 }
 
 function sstScheduleSyncSortActiveHeights() {
