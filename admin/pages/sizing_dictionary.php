@@ -590,6 +590,7 @@ if ($sdNextKindSort < 1) {
             if (!silent) {
                 alert('أدخل الاسم العربي أولاً لترجمته إلى English.');
             }
+            enEl.value = '';
             sdApplyAutoKindKey();
             return;
         }
@@ -620,6 +621,7 @@ if ($sdNextKindSort < 1) {
     async function sdKindFillEnFromArDebounced() {
         const ar = document.getElementById('sd_kind_label_ar').value.trim();
         if (!ar) {
+            document.getElementById('sd_kind_label_en').value = '';
             sdApplyAutoKindKey();
             return;
         }
@@ -637,6 +639,7 @@ if ($sdNextKindSort < 1) {
             if (!silent) {
                 alert('أدخل الاسم العربي أولاً لترجمته إلى English.');
             }
+            enEl.value = '';
             sdApplyAutoCatKey();
             return;
         }
@@ -667,6 +670,7 @@ if ($sdNextKindSort < 1) {
     async function sdCatFillEnFromArDebounced() {
         const ar = document.getElementById('sd_cat_label_ar').value.trim();
         if (!ar) {
+            document.getElementById('sd_cat_label_en').value = '';
             sdApplyAutoCatKey();
             return;
         }
@@ -1026,11 +1030,23 @@ if ($sdNextKindSort < 1) {
     document.getElementById('sd_kind_label_en').addEventListener('input', sdApplyAutoKindKey);
     document.getElementById('sd_kind_label_ar').addEventListener('input', function () {
         clearTimeout(sdKindArTranslateTimer);
+        const ar = document.getElementById('sd_kind_label_ar').value.trim();
+        if (!ar) {
+            document.getElementById('sd_kind_label_en').value = '';
+            sdApplyAutoKindKey();
+            return;
+        }
         sdKindArTranslateTimer = setTimeout(sdKindFillEnFromArDebounced, 700);
     });
     document.getElementById('sd_cat_label_en').addEventListener('input', sdApplyAutoCatKey);
     document.getElementById('sd_cat_label_ar').addEventListener('input', function () {
         clearTimeout(sdCatArTranslateTimer);
+        const ar = document.getElementById('sd_cat_label_ar').value.trim();
+        if (!ar) {
+            document.getElementById('sd_cat_label_en').value = '';
+            sdApplyAutoCatKey();
+            return;
+        }
         sdCatArTranslateTimer = setTimeout(sdCatFillEnFromArDebounced, 700);
     });
 
