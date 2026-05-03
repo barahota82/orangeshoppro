@@ -90,7 +90,7 @@ if ($hasDepartmentsTable) {
             <button type="button" class="btn-secondary" onclick="saveDepartmentsOrder()">حفظ الترتيب</button>
         </div>
     </div>
-    <div class="table-wrap cat-dep-list-wrap" data-list="departments">
+    <div class="table-wrap cat-dep-list-wrap" data-list="departments" style="margin-top:10px;">
         <table>
             <thead>
                 <tr>
@@ -393,7 +393,7 @@ if (translateBtnDep) {
         }
         .cat-dep-list-wrap[data-list="departments"]{
             overflow-x:auto;
-            max-width:100%;
+            max-width:none;
             -webkit-overflow-scrolling:touch;
         }
         .cat-dep-list-wrap[data-list="departments"] > table{
