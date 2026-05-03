@@ -25,7 +25,6 @@ if ($hasTable) {
 ?>
 <div class="page-title">
     <h1>أنماط الألوان</h1>
-    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;">قاموس منفصل عن <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=color_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس الألوان</a> — يُربط بكل <strong>خليط لون×لون</strong> عند إنشاء المنتج (لا يستبدل اللون). إخفاء نمط لا يحذف مراجع المخزون القائمة؛ منع الاستخدام في منتجات جديدة فقط.</p>
 </div>
 
 <?php if (!$hasTable): ?>

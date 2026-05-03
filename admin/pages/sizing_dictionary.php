@@ -9,13 +9,6 @@ $tablesReady = orange_table_exists($pdo, 'commercial_kind_dictionary')
 ?>
 <div class="page-title">
     <h1>قاموس هرَم المقاس — المستويان 1 و2</h1>
-    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.5;">
-        يحدِّد هذا القاموس مفاتيح <strong>commercial_kind_key</strong> و<strong>sizing_category_key</strong>
-        (تُولَّد آلياً من الإنجليزي بعد تعبئة التسميات لتفادي أخطاء الإدخال) وبطاقات العرض عربي/إنجليزي.
-        بعد إضافة صف نشط لهذا النمط أو لفئة ضمن نوع تجاري، يُفرَض مطابقتها عند حفظ
-        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_families'), ENT_QUOTES, 'UTF-8'); ?>">عائلات المقاسات</a>.
-        فارغ تماماً = لا إجبار مرجعي (السلوك السابق).
-    </p>
 </div>
 
 <?php if (!$tablesReady): ?>
@@ -336,12 +329,10 @@ if ($sdNextKindSort < 1) {
             <label>الترتيب (تلقائي)</label>
             <input type="hidden" id="sd_kind_sort" value="0">
             <input type="text" id="sd_kind_sort_view" class="admin-sort-field admin-sort-field--muted" readonly disabled tabindex="-1" value="<?php echo (int) $sdNextKindSort; ?>">
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">عند إضافة نوع جديد يُعرض <strong>رقم الترتيب التالي</strong> المتوقّع؛ عند التعديل يُعرض رقم الصف الحالي.</small>
         </div>
         <div class="sd-kind-key">
             <label>مفتاح EN (<code>kind_key</code>) — للقراءة فقط</label>
             <input type="text" id="sd_kind_key" maxlength="32" autocomplete="off" <?php echo !$tablesReady ? 'disabled' : ''; ?> readonly tabindex="-1">
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُحسب آلياً من الإنجليزي: حروف صغيرة وأرقام فقط مع <code>_</code> و<code>-</code> (حتى 32 محرفاً).</small>
         </div>
         <div class="sd-kind-act admin-sort-field-wrap">
             <label>نشط</label>
@@ -353,7 +344,6 @@ if ($sdNextKindSort < 1) {
         <div class="sd-kind-ar">
             <label>الاسم عربي</label>
             <input type="text" id="sd_kind_label_ar" maxlength="191" <?php echo !$tablesReady ? 'disabled' : ''; ?>>
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">عند التوقف عن الكتابة يُحدَّث الإنجليزي صامتاً (لتوليد المفتاح) وفق آلية ترجمة الأسماء في الأدمن.</small>
         </div>
         <div class="sd-kind-en">
             <label>English</label>
@@ -364,10 +354,6 @@ if ($sdNextKindSort < 1) {
         <button type="button" id="sd_kind_save_btn" onclick="sdSaveKind()">حفظ النوع</button>
         <button type="button" class="btn-secondary" onclick="sdResetKindForm()">مسح النموذج</button>
     </div>
-    <p style="margin:10px 0 0;font-size:0.88rem;color:#555;line-height:1.5;">
-        <strong>مسح النموذج</strong> يفرّغ الحقول أعلاه ويعيدك لوضع <strong>إضافة نوع جديد</strong> (لا يحذف صفوفاً من الجدول).
-        لحذف نوع مسجّل استخدم <strong>حذف</strong> من جدول «الأنواع التجارية» أسفل الصفحة (إن لم يُستخدَم في عائلات مقاس).
-    </p>
 </div>
 
 <div class="card" id="sd_section_cat_form" tabindex="-1">
@@ -378,12 +364,10 @@ if ($sdNextKindSort < 1) {
             <label>الترتيب (تلقائي)</label>
             <input type="hidden" id="sd_cat_sort" value="0">
             <input type="text" id="sd_cat_sort_view" class="admin-sort-field admin-sort-field--muted" readonly disabled tabindex="-1" value="1">
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">بعد اختيار النوع التجاري يُعرض <strong>رقم الترتيب التالي</strong> للفئات تحته؛ عند التعديل يُعرض رقم الصف الحالي.</small>
         </div>
         <div class="sd-cat-key">
             <label>مفتاح EN (<code>category_key</code>) — للقراءة فقط</label>
             <input type="text" id="sd_cat_key" maxlength="64" autocomplete="off" readonly tabindex="-1">
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">يُحسب آلياً من <strong>النوع التجاري (مستوى 1)</strong> ثم <strong>English</strong> (حتى 64 محرفاً بعد التعقيم).</small>
         </div>
         <div class="sd-cat-act admin-sort-field-wrap">
             <label>نشط</label>

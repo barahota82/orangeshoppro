@@ -38,7 +38,6 @@ if ($hasDepartmentsTable) {
 ?>
 <div class="page-title">
     <h1>الأقسام الرئيسية</h1>
-    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.65;">في التصنيف الموحّد هذا مستوى <strong>Department</strong> (<code>departments</code>): أعلى الشجرة قبل <strong>Section</strong> (<code>catalog_sections</code>) من صفحة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=categories'), ENT_QUOTES, 'UTF-8'); ?>">أقسام داخلية</a>، ثم <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=subcategories'), ENT_QUOTES, 'UTF-8'); ?>">الفئة والفرع (موحّد)</a>، ثم <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات</a>. هرَم المقاسات لا يُدار من هذه الشاشة — راجع «عائلات المقاسات» و<code>product_types.expected_size_scheme_key</code>.</p>
 </div>
 
 <?php if (!$hasDepartmentsTable): ?>
