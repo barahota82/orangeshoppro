@@ -224,7 +224,7 @@ if ($sdNextKindSort < 1) {
         -webkit-overflow-scrolling:touch;
     }
     .cat-dep-list-wrap[data-list="kinds"] > table{
-        min-width:864px;
+        min-width:910px;
         width:100%;
         border-collapse:collapse;
         table-layout:fixed;
@@ -243,7 +243,7 @@ if ($sdNextKindSort < 1) {
     .cat-dep-list-wrap[data-list="kinds"] > table th:nth-child(3),
     .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(3){ width:180px; }
     .cat-dep-list-wrap[data-list="kinds"] > table th:nth-child(4),
-    .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(4){ width:190px; }
+    .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(4){ width:236px; }
     .cat-dep-list-wrap[data-list="kinds"] > table th:nth-child(5),
     .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(5){ width:80px; text-align:center; }
     .cat-dep-list-wrap[data-list="kinds"] table .sd-kind-ops-col,
