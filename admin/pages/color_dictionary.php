@@ -83,7 +83,7 @@ if ($hasTable) {
             <button type="button" class="btn-secondary" onclick="saveColorsOrder()">حفظ الترتيب</button>
         </div>
     </div>
-    <div class="table-wrap cat-dep-list-wrap" data-list="colors">
+    <div class="table-wrap cat-dep-list-wrap" data-list="colors" style="margin-top:10px;">
         <table>
             <thead>
                 <tr>

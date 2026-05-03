@@ -81,7 +81,7 @@ if ($hasTable) {
             <button type="button" class="btn-secondary" onclick="savePatternsOrder()">حفظ الترتيب</button>
         </div>
     </div>
-    <div class="table-wrap cat-dep-list-wrap" data-list="patterns">
+    <div class="table-wrap cat-dep-list-wrap" data-list="patterns" style="margin-top:10px;">
         <table>
             <thead>
                 <tr>
