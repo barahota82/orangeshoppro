@@ -43,26 +43,41 @@ if ($tablesReady) {
     <h3>إضافة / تعديل قالب</h3>
     <p style="margin:0 0 14px;font-size:0.88rem;color:#555;line-height:1.5;"><strong>الترتيب</strong> في القائمة تلقائي (جديد = تالي؛ تعديل = دون تغيير). حقلا <strong>Fil</strong> و<strong>Hi</strong> يُعبَّآن تلقائياً <strong>بنفس نص الإنجليزي</strong> (للتوافق مع القنوات)، وليس بترجمة فلبينية/هندية.</p>
     <style>
-        /* صف الترتيب + نشط: نفس أسلوب شاشة «أنماط الألوان» (pattern_dictionary) — شبكة ltr + حقول rtl + select بـ appearance:none وسهم مخصص */
-        #sst_form_card .sst-mini-grid {
-            display: grid;
-            grid-template-columns: minmax(4.5rem, 6.5rem) minmax(8rem, min(100%, var(--admin-sort-field-max-w, 220px)));
-            gap: 14px 18px;
-            direction: ltr;
-            align-items: start;
-            grid-column: 1 / -1;
+        /* صف واحد: ترتيب — عربي — EN — Fil — Hi — نشط (عمود نشط ضيق). نفس منطق حقول أنماط الألوان: ltr للشبكة + rtl للنصوص + select مخصص */
+        #sst_form_card .sst-header-row-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin-bottom: 2px;
         }
-        #sst_form_card .sst-mini-grid label,
-        #sst_form_card .sst-mini-grid input,
-        #sst_form_card .sst-mini-grid select {
+        #sst_form_card .sst-header-row {
+            display: grid;
+            grid-template-columns:
+                minmax(2.75rem, 0.32fr)
+                minmax(0, 1.15fr)
+                minmax(0, 1.15fr)
+                minmax(0, 0.85fr)
+                minmax(0, 0.85fr)
+                minmax(4.25rem, 0.38fr);
+            gap: 10px 12px;
+            direction: ltr;
+            align-items: end;
+            min-width: min(100%, 52rem);
+        }
+        #sst_form_card .sst-header-row .admin-sort-field-wrap {
+            min-width: 0;
+        }
+        #sst_form_card .sst-header-row label,
+        #sst_form_card .sst-header-row input,
+        #sst_form_card .sst-header-row select {
             direction: rtl;
             text-align: right;
         }
-        #sst_form_card .sst-mini-grid #sst_sort_display,
-        #sst_form_card .sst-mini-grid #sst_active {
+        #sst_form_card .sst-header-row input[type="text"],
+        #sst_form_card .sst-header-row select#sst_active {
             margin-inline: 0;
             display: block;
             width: 100%;
+            max-width: none;
             box-sizing: border-box;
             border: 1px solid #cbd5e1;
             border-radius: var(--radius-sm, 10px);
@@ -72,40 +87,53 @@ if ($tablesReady) {
             height: var(--input-min-h, 36px);
             max-height: var(--input-min-h, 36px);
             padding-block: 0;
-            padding-inline: 12px;
+            padding-inline: 10px;
         }
-        #sst_form_card .sst-mini-grid #sst_sort_display {
+        #sst_form_card .sst-header-row #sst_sort_display {
             text-align: center;
             font-weight: 600;
             cursor: default;
+            padding-inline: 6px;
         }
-        #sst_form_card .sst-mini-grid #sst_active {
+        #sst_form_card .sst-header-row select#sst_active {
             -webkit-appearance: none;
             appearance: none;
             background-color: #fff;
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M2.75 4.25L6 7.55l3.25-3.3.65.64L6 8.82 2.1 4.9l.65-.65z'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-size: 12px;
-            background-position: left 12px center;
-            padding-inline-end: 32px;
+            background-position: left 8px center;
+            padding-inline-end: 26px;
+            padding-inline-start: 8px;
         }
         #sst_sizes_tbody input.sst-lf[readonly],
         #sst_sizes_tbody input.sst-lh[readonly] {
             background: #f4f6f9;
             cursor: default;
         }
-        @media (max-width: 860px) {
-            #sst_form_card .sst-mini-grid {
-                grid-template-columns: 1fr;
-            }
-        }
     </style>
     <input type="hidden" id="sst_id" value="0">
-    <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px 14px;align-items:end;">
-        <div class="sst-mini-grid">
+    <div class="sst-header-row-wrap">
+        <div class="sst-header-row">
             <div class="admin-sort-field-wrap">
                 <label for="sst_sort_display">ترتيب (تلقائي)</label>
                 <input type="text" id="sst_sort_display" class="admin-sort-field admin-sort-field--muted" readonly tabindex="-1" value="<?php echo (int) $nextSort; ?>" title="ترتيب ظهور القالب في القائمة" aria-readonly="true" autocomplete="off">
+            </div>
+            <div class="admin-sort-field-wrap">
+                <label for="sst_name_ar">اسم القالب عربي</label>
+                <input type="text" id="sst_name_ar" maxlength="191" autocomplete="off">
+            </div>
+            <div class="admin-sort-field-wrap">
+                <label for="sst_name_en">اسم القالب English</label>
+                <input type="text" id="sst_name_en" maxlength="191" autocomplete="off">
+            </div>
+            <div class="admin-sort-field-wrap">
+                <label for="sst_name_fil">Fil <span style="font-weight:400;color:#64748b;">(نسخ الإنجليزي)</span></label>
+                <input type="text" id="sst_name_fil" class="admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" autocomplete="off" title="يُملأ تلقائياً بنفس نص الإنجليزي">
+            </div>
+            <div class="admin-sort-field-wrap">
+                <label for="sst_name_hi">Hi <span style="font-weight:400;color:#64748b;">(نسخ الإنجليزي)</span></label>
+                <input type="text" id="sst_name_hi" class="admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" autocomplete="off" title="يُملأ تلقائياً بنفس نص الإنجليزي">
             </div>
             <div class="admin-sort-field-wrap">
                 <label for="sst_active">نشط</label>
@@ -114,22 +142,6 @@ if ($tablesReady) {
                     <option value="0">لا</option>
                 </select>
             </div>
-        </div>
-        <div>
-            <label>اسم القالب عربي</label>
-            <input type="text" id="sst_name_ar" maxlength="191" autocomplete="off">
-        </div>
-        <div>
-            <label>اسم القالب English</label>
-            <input type="text" id="sst_name_en" maxlength="191" autocomplete="off">
-        </div>
-        <div>
-            <label for="sst_name_fil">Fil <span style="font-weight:400;color:#64748b;">(نسخ الإنجليزي)</span></label>
-            <input type="text" id="sst_name_fil" class="admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" autocomplete="off" title="يُملأ تلقائياً بنفس نص الإنجليزي">
-        </div>
-        <div>
-            <label for="sst_name_hi">Hi <span style="font-weight:400;color:#64748b;">(نسخ الإنجليزي)</span></label>
-            <input type="text" id="sst_name_hi" class="admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" autocomplete="off" title="يُملأ تلقائياً بنفس نص الإنجليزي">
         </div>
     </div>
     <h4 style="margin:18px 0 8px;font-size:1rem;">مقاسات داخل القالب</h4>
