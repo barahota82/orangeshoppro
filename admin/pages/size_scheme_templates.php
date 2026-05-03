@@ -147,11 +147,11 @@ if ($tablesReady) {
                 <input type="text" id="sst_sort_display" class="admin-sort-field admin-sort-field--muted" readonly tabindex="-1" value="<?php echo (int) $nextSort; ?>" title="ترتيب ظهور القالب في القائمة" aria-readonly="true" autocomplete="off">
             </div>
             <div class="admin-sort-field-wrap">
-                <label for="sst_name_ar">اسم القالب عربي</label>
+                <label for="sst_name_ar">الاسم العربي</label>
                 <input type="text" id="sst_name_ar" maxlength="191" autocomplete="off">
             </div>
             <div class="admin-sort-field-wrap">
-                <label for="sst_name_en">اسم القالب English</label>
+                <label for="sst_name_en">English</label>
                 <input type="text" id="sst_name_en" maxlength="191" autocomplete="off">
             </div>
             <div class="admin-sort-field-wrap">
@@ -159,7 +159,7 @@ if ($tablesReady) {
                 <input type="text" id="sst_name_fil" class="admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" autocomplete="off" title="يُملأ تلقائياً بنفس نص الإنجليزي">
             </div>
             <div class="admin-sort-field-wrap">
-                <label for="sst_name_hi">Hi <span style="font-weight:400;color:#64748b;">(نسخ الإنجليزي)</span></label>
+                <label for="sst_name_hi">Hindi</label>
                 <input type="text" id="sst_name_hi" class="admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" autocomplete="off" title="يُملأ تلقائياً بنفس نص الإنجليزي">
             </div>
             <div class="admin-sort-field-wrap">
@@ -179,8 +179,8 @@ if ($tablesReady) {
                     <th style="width:3.2rem;">ترتيب</th>
                     <th>عربي</th>
                     <th>EN</th>
-                    <th>Fil <span style="font-weight:400;">(EN)</span></th>
-                    <th>Hi <span style="font-weight:400;">(EN)</span></th>
+                    <th>Fil</th>
+                    <th>Hi</th>
                     <th>طول القدم (سم)</th>
                     <th></th>
                 </tr>
