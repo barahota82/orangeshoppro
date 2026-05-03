@@ -224,7 +224,7 @@ if ($sdNextKindSort < 1) {
         -webkit-overflow-scrolling:touch;
     }
     .cat-dep-list-wrap[data-list="kinds"] > table{
-        min-width:860px;
+        min-width:910px;
         width:100%;
         border-collapse:collapse;
         table-layout:fixed;
@@ -237,20 +237,20 @@ if ($sdNextKindSort < 1) {
         text-overflow: ellipsis;
     }
     .cat-dep-list-wrap[data-list="kinds"] > table th:nth-child(1),
-    .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(1){ width:190px; }
+    .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(1){ width:80px; text-align:center; }
     .cat-dep-list-wrap[data-list="kinds"] > table th:nth-child(2),
     .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(2){ width:180px; }
     .cat-dep-list-wrap[data-list="kinds"] > table th:nth-child(3),
     .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(3){ width:180px; }
     .cat-dep-list-wrap[data-list="kinds"] > table th:nth-child(4),
-    .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(4){ width:80px; text-align:center; }
+    .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(4){ width:190px; }
     .cat-dep-list-wrap[data-list="kinds"] > table th:nth-child(5),
     .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(5){ width:80px; text-align:center; }
     .cat-dep-list-wrap[data-list="kinds"] table .sd-kind-ops-col,
     .cat-dep-list-wrap[data-list="kinds"] table .sd-kind-row-ops{
-        width:170px !important;
-        min-width:170px !important;
-        max-width:170px !important;
+        width:200px !important;
+        min-width:200px !important;
+        max-width:200px !important;
         box-sizing:border-box !important;
         text-align:center !important;
         vertical-align:middle !important;
@@ -400,10 +400,10 @@ if ($sdNextKindSort < 1) {
         <table>
             <thead>
                 <tr>
-                    <th>المفتاح</th>
+                    <th>ترتيب</th>
                     <th>عرض عربي</th>
                     <th>عرض EN</th>
-                    <th>ترتيب</th>
+                    <th>المفتاح</th>
                     <th>نشط</th>
                     <th class="sd-kind-ops-col">إجراءات</th>
                 </tr>
@@ -684,10 +684,10 @@ if ($sdNextKindSort < 1) {
             kinds.forEach(function (k) {
                 const tr = document.createElement('tr');
                 tr.innerHTML =
-                    '<td><code>' + escapeHtml(k.kind_key || '') + '</code></td>' +
+                    '<td>' + String(k.sort_order != null ? k.sort_order : '') + '</td>' +
                     '<td>' + escapeHtml(k.label_ar || '') + '</td>' +
                     '<td>' + escapeHtml(k.label_en || '') + '</td>' +
-                    '<td>' + String(k.sort_order != null ? k.sort_order : '') + '</td>' +
+                    '<td><code>' + escapeHtml(k.kind_key || '') + '</code></td>' +
                     '<td>' + ((parseInt(k.is_active, 10) === 1) ? 'نعم' : 'لا') + '</td>' +
                     '<td class="sd-kind-row-ops"><div class="sd-kind-ops-main">' +
                         '<button type="button" class="btn-secondary">تعديل</button>' +
