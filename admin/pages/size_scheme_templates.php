@@ -58,13 +58,24 @@ if ($tablesReady) {
                 minmax(0, 0.85fr)
                 minmax(0, 0.85fr)
                 minmax(4.25rem, 0.38fr);
-            gap: 10px 12px;
+            column-gap: 14px;
+            row-gap: 0;
             direction: rtl;
             align-items: end;
             min-width: min(100%, 52rem);
         }
         #sst_form_card .sst-header-row .admin-sort-field-wrap {
             min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        #sst_form_card .sst-header-row label {
+            margin-bottom: 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: #334155;
+            line-height: 1.25;
         }
         #sst_form_card .sst-header-row label,
         #sst_form_card .sst-header-row input,
@@ -75,6 +86,7 @@ if ($tablesReady) {
         #sst_form_card .sst-header-row input[type="text"],
         #sst_form_card .sst-header-row select#sst_active {
             margin-inline: 0;
+            margin-top: 0;
             display: block;
             width: 100%;
             max-width: none;
@@ -87,13 +99,12 @@ if ($tablesReady) {
             height: var(--input-min-h, 36px);
             max-height: var(--input-min-h, 36px);
             padding-block: 0;
-            padding-inline: 10px;
+            padding-inline: 12px;
         }
         #sst_form_card .sst-header-row #sst_sort_display {
             text-align: center;
             font-weight: 600;
             cursor: default;
-            padding-inline: 6px;
         }
         #sst_form_card .sst-header-row select#sst_active {
             -webkit-appearance: none;
@@ -102,9 +113,9 @@ if ($tablesReady) {
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M2.75 4.25L6 7.55l3.25-3.3.65.64L6 8.82 2.1 4.9l.65-.65z'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-size: 12px;
-            background-position: left 8px center;
-            padding-inline-end: 26px;
-            padding-inline-start: 8px;
+            background-position: left 10px center;
+            padding-inline-end: 30px;
+            padding-inline-start: 12px;
         }
         #sst_sizes_tbody input.sst-lf[readonly],
         #sst_sizes_tbody input.sst-lh[readonly] {
