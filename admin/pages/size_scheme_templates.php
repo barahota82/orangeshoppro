@@ -133,6 +133,28 @@ if ($tablesReady) {
             padding-inline-end: 26px;
             padding-inline-start: 10px;
         }
+        /* حقول صف المقاسات: EN + العربي + Fil + Hi — العربي بنفس شكل Fil (muted + خلفية للقراءة فقط) */
+        #sst_sizes_tbody input.sst-le,
+        #sst_sizes_tbody input.sst-la.admin-sort-field,
+        #sst_sizes_tbody input.sst-lf.admin-sort-field,
+        #sst_sizes_tbody input.sst-lh.admin-sort-field {
+            margin-inline: 0;
+            margin-top: 0;
+            display: block;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            border: 1px solid #cbd5e1;
+            border-radius: var(--radius-sm, 10px);
+            font-size: 14px;
+            line-height: calc(var(--input-min-h, 36px) - 2px);
+            min-height: var(--input-min-h, 36px);
+            height: var(--input-min-h, 36px);
+            max-height: var(--input-min-h, 36px);
+            padding-block: 0;
+            padding-inline: 12px;
+        }
+        #sst_sizes_tbody input.sst-la[readonly],
         #sst_sizes_tbody input.sst-lf[readonly],
         #sst_sizes_tbody input.sst-lh[readonly] {
             background: #f4f6f9;
@@ -306,10 +328,10 @@ function sstAddSizeRow() {
     var tr = document.createElement('tr');
     tr.className = 'sst-size-row';
     tr.innerHTML = '<td class="sst-ord">1</td>' +
-        '<td><input type="text" class="sst-le" maxlength="191"></td>' +
-        '<td><input type="text" class="sst-la" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN"></td>' +
-        '<td><input type="text" class="sst-lf" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN"></td>' +
-        '<td><input type="text" class="sst-lh" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN"></td>' +
+        '<td><input type="text" class="sst-le admin-sort-field" maxlength="191" autocomplete="off"></td>' +
+        '<td><input type="text" class="sst-la admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true"></td>' +
+        '<td><input type="text" class="sst-lf admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true"></td>' +
+        '<td><input type="text" class="sst-lh admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true"></td>' +
         '<td><input type="text" class="sst-fl" placeholder="اختياري"></td>' +
         '<td><button type="button" class="btn-secondary" onclick="sstRemoveSizeRow(this)">حذف الصف</button></td>';
     tb.appendChild(tr);
@@ -502,10 +524,10 @@ async function sstLoadOne(tplId) {
                 tr.className = 'sst-size-row';
                 var fl = (r.foot_length_cm != null && r.foot_length_cm !== '') ? String(r.foot_length_cm) : '';
                 tr.innerHTML = '<td class="sst-ord">' + String(idx + 1) + '</td>' +
-                    '<td><input type="text" class="sst-le" maxlength="191" value="' + sstEscapeAttr(r.label_en) + '"></td>' +
-                    '<td><input type="text" class="sst-la" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" value="' + sstEscapeAttr(r.label_ar) + '"></td>' +
-                    '<td><input type="text" class="sst-lf" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" value="' + sstEscapeAttr(r.label_fil) + '"></td>' +
-                    '<td><input type="text" class="sst-lh" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" value="' + sstEscapeAttr(r.label_hi) + '"></td>' +
+                    '<td><input type="text" class="sst-le admin-sort-field" maxlength="191" autocomplete="off" value="' + sstEscapeAttr(r.label_en) + '"></td>' +
+                    '<td><input type="text" class="sst-la admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true" value="' + sstEscapeAttr(r.label_ar) + '"></td>' +
+                    '<td><input type="text" class="sst-lf admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true" value="' + sstEscapeAttr(r.label_fil) + '"></td>' +
+                    '<td><input type="text" class="sst-lh admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true" value="' + sstEscapeAttr(r.label_hi) + '"></td>' +
                     '<td><input type="text" class="sst-fl" value="' + sstEscapeAttr(fl) + '"></td>' +
                     '<td><button type="button" class="btn-secondary" onclick="sstRemoveSizeRow(this)">حذف الصف</button></td>';
                 tb.appendChild(tr);
