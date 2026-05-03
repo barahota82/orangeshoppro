@@ -60,7 +60,6 @@ try {
             $nameEn = trim((string) ($data['name_en'] ?? ''));
             $nameFil = trim((string) ($data['name_fil'] ?? ''));
             $nameHi = trim((string) ($data['name_hi'] ?? ''));
-            $sort = (int) ($data['sort_order'] ?? 0);
             $active = (int) ($data['is_active'] ?? 1) === 0 ? 0 : 1;
             $sizesIn = $data['sizes'] ?? [];
             if (!is_array($sizesIn)) {
@@ -116,14 +115,12 @@ try {
                         json_response(['success' => false, 'message' => 'القالب غير موجود'], 404);
                     }
                     $pdo->prepare(
-                        'UPDATE size_scheme_templates SET name_ar=?, name_en=?, sort_order=?, is_active=? WHERE id=? LIMIT 1'
-                    )->execute([$nameAr, $nameEn, $sort, $active, $tplId]);
+                        'UPDATE size_scheme_templates SET name_ar=?, name_en=?, name_fil=?, name_hi=?, is_active=? WHERE id=? LIMIT 1'
+                    )->execute([$nameAr, $nameEn, $nameFil, $nameHi, $active, $tplId]);
                 } else {
+                    $sort = (int) $pdo->query('SELECT COALESCE(MAX(sort_order),0)+1 FROM size_scheme_templates')->fetchColumn();
                     if ($sort <= 0) {
-                        $sort = (int) $pdo->query('SELECT COALESCE(MAX(sort_order),0)+1 FROM size_scheme_templates')->fetchColumn();
-                        if ($sort <= 0) {
-                            $sort = 1;
-                        }
+                        $sort = 1;
                     }
                     $pdo->prepare(
                         'INSERT INTO size_scheme_templates (name_ar, name_en, name_fil, name_hi, sort_order, is_active) VALUES (?,?,?,?,?,?)'

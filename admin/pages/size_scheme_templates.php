@@ -41,8 +41,14 @@ if ($tablesReady) {
 
 <div class="card" id="sst_form_card" tabindex="-1">
     <h3>إضافة / تعديل قالب</h3>
+    <p style="margin:0 0 14px;font-size:0.88rem;color:#555;line-height:1.5;">أول خانة: <strong>ترتيب تلقائي</strong> في القائمة (يُحسب عند إنشاء قالب جديد؛ عند التعديل يبقى الترتيب المحفوظ). <strong>Fil / Hi</strong> لاسم القالب من <strong>الإنجليزي</strong> بعد الترجمة من العربي أو عند تعديل الإنجليزي.</p>
     <input type="hidden" id="sst_id" value="0">
     <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;">
+        <div>
+            <label>الترتيب (تلقائي)</label>
+            <p id="sst_sort_display" style="margin:6px 0 0;font-size:1.05rem;font-weight:600;"><?php echo (int) $nextSort; ?></p>
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.82rem;">يظهر في القائمة بهذا الترتيب</small>
+        </div>
         <div>
             <label>اسم القالب عربي</label>
             <input type="text" id="sst_name_ar" maxlength="191" autocomplete="off">
@@ -53,15 +59,11 @@ if ($tablesReady) {
         </div>
         <div>
             <label>اسم القالب Filipino</label>
-            <input type="text" id="sst_name_fil" maxlength="191" autocomplete="off">
+            <input type="text" id="sst_name_fil" maxlength="191" autocomplete="off" title="يُحدَّث من الإنجليزي">
         </div>
         <div>
             <label>اسم القالب Hindi</label>
-            <input type="text" id="sst_name_hi" maxlength="191" autocomplete="off">
-        </div>
-        <div>
-            <label>الترتيب</label>
-            <input type="number" id="sst_sort" class="admin-sort-field" value="<?php echo (int) $nextSort; ?>">
+            <input type="text" id="sst_name_hi" maxlength="191" autocomplete="off" title="يُحدَّث من الإنجليزي">
         </div>
         <div>
             <label>نشط</label>
@@ -208,7 +210,11 @@ function sstResetForm() {
     document.getElementById('sst_name_en').value = '';
     document.getElementById('sst_name_fil').value = '';
     document.getElementById('sst_name_hi').value = '';
-    document.getElementById('sst_sort').value = String(SST_NEXT_SORT || 1);
+    var nextSo = SST_NEXT_SORT || 1;
+    var sortDisp = document.getElementById('sst_sort_display');
+    if (sortDisp) {
+        sortDisp.textContent = String(nextSo);
+    }
     document.getElementById('sst_active').value = '1';
     var tb = document.getElementById('sst_sizes_tbody');
     if (tb) {
@@ -463,7 +469,6 @@ async function sstSave() {
         name_en: document.getElementById('sst_name_en').value.trim(),
         name_fil: document.getElementById('sst_name_fil').value.trim(),
         name_hi: document.getElementById('sst_name_hi').value.trim(),
-        sort_order: parseInt(document.getElementById('sst_sort').value || '0', 10) || 0,
         is_active: parseInt(document.getElementById('sst_active').value, 10),
         sizes: sstCollectSizes()
     };
@@ -491,7 +496,14 @@ async function sstLoadOne(tplId) {
         document.getElementById('sst_name_en').value = t.name_en || '';
         document.getElementById('sst_name_fil').value = t.name_fil || '';
         document.getElementById('sst_name_hi').value = t.name_hi || '';
-        document.getElementById('sst_sort').value = String(t.sort_order != null ? t.sort_order : 0);
+        var so = t.sort_order != null ? parseInt(String(t.sort_order), 10) : 0;
+        if (!Number.isFinite(so) || so < 1) {
+            so = 1;
+        }
+        var sortDisp = document.getElementById('sst_sort_display');
+        if (sortDisp) {
+            sortDisp.textContent = String(so);
+        }
         document.getElementById('sst_active').value = (parseInt(t.is_active, 10) === 0 ? '0' : '1');
         var tb = document.getElementById('sst_sizes_tbody');
         tb.innerHTML = '';
