@@ -254,7 +254,15 @@ if ($sdNextKindSort < 1) {
     .cat-dep-list-wrap[data-list="cats"] > table th:nth-child(5),
     .cat-dep-list-wrap[data-list="cats"] > table td:nth-child(5){ width:80px; text-align:center; }
     .cat-dep-list-wrap[data-list="kinds"] table .sd-kind-ops-col,
-    .cat-dep-list-wrap[data-list="kinds"] table .sd-kind-row-ops,
+    .cat-dep-list-wrap[data-list="kinds"] table .sd-kind-row-ops{
+        width:200px !important;
+        min-width:200px !important;
+        max-width:200px !important;
+        box-sizing:border-box !important;
+        text-align:center !important;
+        vertical-align:middle !important;
+        padding:6px 8px !important;
+    }
     .cat-dep-list-wrap[data-list="cats"] table .sd-cat-ops-col,
     .cat-dep-list-wrap[data-list="cats"] table .sd-cat-row-ops{
         width:154px !important;
@@ -879,12 +887,7 @@ if ($sdNextKindSort < 1) {
         if (kindKey === '') {
             return;
         }
-        var labelHint = (k.label_ar || k.label_en) ? ('\nالمفتاح: ' + kindKey + '\nالعرض: ' + (k.label_ar || '') + (k.label_en ? (' / ' + k.label_en) : '')) : ('\nالمفتاح: ' + kindKey);
-        alert('تنبيه — حذف نوع تجاري من القاموس:\n' +
-            '• تُحذف جميع فئات القياس المعرّفة تحته في هذا القاموس.\n' +
-            '• إن كان النوع أو إحدى فئاته مستخدماً في عائلات مقاس فلن يكتمل الحذف.\n' +
-            '• لا يمكن التراجع عن الحذف الناجح من هنا.' + labelHint);
-        if (!confirm('تأكيد الحذف: هل تريد بالفعل حذف هذا النوع التجاري وجميع فئاته من القاموس؟')) {
+        if (!confirm('حذف هذا النوع التجاري وجميع فئات القياس التابعة له من القاموس؟')) {
             return;
         }
         try {
