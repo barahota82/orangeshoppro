@@ -352,7 +352,8 @@ if ($sdNextKindSort < 1) {
     </div>
     <div class="actions sd-kind-form-actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;">
         <button type="button" id="sd_kind_save_btn" onclick="sdSaveKind()">حفظ النوع</button>
-        <button type="button" class="btn-secondary" onclick="sdResetKindForm()">مسح النموذج</button>
+        <button type="button" class="btn-secondary" onclick="sdTranslateKindEn({ forceFromArabic: true })">ترجمة إلى English</button>
+        <button type="button" class="btn-secondary" onclick="sdResetKindForm()">جديد</button>
     </div>
 </div>
 
@@ -391,7 +392,8 @@ if ($sdNextKindSort < 1) {
     </div>
     <div class="actions sd-cat-form-actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;">
         <button type="button" onclick="sdSaveCategory()">حفظ الفئة</button>
-        <button type="button" class="btn-secondary" onclick="sdResetCatForm(false)">مسح النموذج</button>
+        <button type="button" class="btn-secondary" onclick="sdTranslateCatEn({ forceFromArabic: true })">ترجمة إلى English</button>
+        <button type="button" class="btn-secondary" onclick="sdResetCatForm(false)">جديد</button>
     </div>
 </div>
 
@@ -577,40 +579,98 @@ if ($sdNextKindSort < 1) {
         document.getElementById('sd_cat_key').value = combined;
     }
 
-    let sdKindArTranslateTimer = null;
-    async function sdKindFillEnFromArDebounced() {
+    window.sdTranslateKindEn = async function (opts) {
+        opts = opts || {};
+        const silent = !!opts.silent;
+        const forceFromArabic = !!opts.forceFromArabic;
         const arEl = document.getElementById('sd_kind_label_ar');
         const enEl = document.getElementById('sd_kind_label_en');
         const ar = arEl.value.trim();
         if (!ar) {
+            if (!silent) {
+                alert('أدخل الاسم العربي أولاً لترجمته إلى English.');
+            }
             sdApplyAutoKindKey();
             return;
         }
         try {
-            const res = await postJSON('/admin/api/translate/names.php', { name_ar: ar, name_en: '' });
-            if (res && res.success && res.translations && res.translations.name_en) {
-                enEl.value = res.translations.name_en;
+            const res = await postJSON('/admin/api/translate/names.php', {
+                name_ar: ar,
+                name_en: forceFromArabic ? '' : enEl.value.trim()
+            });
+            if (!res || !res.success) {
+                if (!silent) {
+                    alert((res && res.message) ? res.message : 'فشل الترجمة');
+                }
+                return;
             }
-        } catch (e) {}
-        sdApplyAutoKindKey();
+            const t = res.translations || {};
+            if (t.name_en) {
+                enEl.value = t.name_en;
+            }
+            sdApplyAutoKindKey();
+        } catch (e) {
+            if (!silent) {
+                alert('فشل طلب الترجمة من السيرفر');
+            }
+        }
+    };
+
+    let sdKindArTranslateTimer = null;
+    async function sdKindFillEnFromArDebounced() {
+        const ar = document.getElementById('sd_kind_label_ar').value.trim();
+        if (!ar) {
+            sdApplyAutoKindKey();
+            return;
+        }
+        await window.sdTranslateKindEn({ silent: true, forceFromArabic: true });
     }
 
-    let sdCatArTranslateTimer = null;
-    async function sdCatFillEnFromArDebounced() {
+    window.sdTranslateCatEn = async function (opts) {
+        opts = opts || {};
+        const silent = !!opts.silent;
+        const forceFromArabic = !!opts.forceFromArabic;
         const arEl = document.getElementById('sd_cat_label_ar');
         const enEl = document.getElementById('sd_cat_label_en');
         const ar = arEl.value.trim();
         if (!ar) {
+            if (!silent) {
+                alert('أدخل الاسم العربي أولاً لترجمته إلى English.');
+            }
             sdApplyAutoCatKey();
             return;
         }
         try {
-            const res = await postJSON('/admin/api/translate/names.php', { name_ar: ar, name_en: '' });
-            if (res && res.success && res.translations && res.translations.name_en) {
-                enEl.value = res.translations.name_en;
+            const res = await postJSON('/admin/api/translate/names.php', {
+                name_ar: ar,
+                name_en: forceFromArabic ? '' : enEl.value.trim()
+            });
+            if (!res || !res.success) {
+                if (!silent) {
+                    alert((res && res.message) ? res.message : 'فشل الترجمة');
+                }
+                return;
             }
-        } catch (e) {}
-        sdApplyAutoCatKey();
+            const t = res.translations || {};
+            if (t.name_en) {
+                enEl.value = t.name_en;
+            }
+            sdApplyAutoCatKey();
+        } catch (e) {
+            if (!silent) {
+                alert('فشل طلب الترجمة من السيرفر');
+            }
+        }
+    };
+
+    let sdCatArTranslateTimer = null;
+    async function sdCatFillEnFromArDebounced() {
+        const ar = document.getElementById('sd_cat_label_ar').value.trim();
+        if (!ar) {
+            sdApplyAutoCatKey();
+            return;
+        }
+        await window.sdTranslateCatEn({ silent: true, forceFromArabic: true });
     }
 
     window.sdReloadAll = async function () {
