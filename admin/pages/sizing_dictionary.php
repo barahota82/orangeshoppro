@@ -218,36 +218,52 @@ if ($sdNextKindSort < 1) {
     .sd-cat-form-actions {
         justify-content: flex-end;
     }
-    .cat-dep-list-wrap[data-list="kinds"]{
+    .cat-dep-list-wrap[data-list="kinds"],
+    .cat-dep-list-wrap[data-list="cats"]{
         overflow-x:auto;
         max-width:none;
         -webkit-overflow-scrolling:touch;
     }
-    .cat-dep-list-wrap[data-list="kinds"] > table{
+    .cat-dep-list-wrap[data-list="kinds"] > table,
+    .cat-dep-list-wrap[data-list="cats"] > table{
         min-width:910px;
         width:100%;
         border-collapse:collapse;
         table-layout:fixed;
     }
     .cat-dep-list-wrap[data-list="kinds"] > table th,
-    .cat-dep-list-wrap[data-list="kinds"] > table td{
+    .cat-dep-list-wrap[data-list="kinds"] > table td,
+    .cat-dep-list-wrap[data-list="cats"] > table th,
+    .cat-dep-list-wrap[data-list="cats"] > table td{
         vertical-align:middle;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
     .cat-dep-list-wrap[data-list="kinds"] > table th:nth-child(1),
-    .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(1){ width:80px; text-align:center; }
+    .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(1),
+    .cat-dep-list-wrap[data-list="cats"] > table th:nth-child(1),
+    .cat-dep-list-wrap[data-list="cats"] > table td:nth-child(1){ width:80px; text-align:center; }
     .cat-dep-list-wrap[data-list="kinds"] > table th:nth-child(2),
-    .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(2){ width:180px; }
+    .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(2),
+    .cat-dep-list-wrap[data-list="cats"] > table th:nth-child(2),
+    .cat-dep-list-wrap[data-list="cats"] > table td:nth-child(2){ width:180px; }
     .cat-dep-list-wrap[data-list="kinds"] > table th:nth-child(3),
-    .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(3){ width:180px; }
+    .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(3),
+    .cat-dep-list-wrap[data-list="cats"] > table th:nth-child(3),
+    .cat-dep-list-wrap[data-list="cats"] > table td:nth-child(3){ width:180px; }
     .cat-dep-list-wrap[data-list="kinds"] > table th:nth-child(4),
-    .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(4){ width:236px; }
+    .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(4),
+    .cat-dep-list-wrap[data-list="cats"] > table th:nth-child(4),
+    .cat-dep-list-wrap[data-list="cats"] > table td:nth-child(4){ width:236px; }
     .cat-dep-list-wrap[data-list="kinds"] > table th:nth-child(5),
-    .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(5){ width:80px; text-align:center; }
+    .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(5),
+    .cat-dep-list-wrap[data-list="cats"] > table th:nth-child(5),
+    .cat-dep-list-wrap[data-list="cats"] > table td:nth-child(5){ width:80px; text-align:center; }
     .cat-dep-list-wrap[data-list="kinds"] table .sd-kind-ops-col,
-    .cat-dep-list-wrap[data-list="kinds"] table .sd-kind-row-ops{
+    .cat-dep-list-wrap[data-list="kinds"] table .sd-kind-row-ops,
+    .cat-dep-list-wrap[data-list="cats"] table .sd-cat-ops-col,
+    .cat-dep-list-wrap[data-list="cats"] table .sd-cat-row-ops{
         width:154px !important;
         min-width:154px !important;
         max-width:154px !important;
@@ -256,13 +272,15 @@ if ($sdNextKindSort < 1) {
         vertical-align:middle !important;
         padding:6px 8px !important;
     }
-    .cat-dep-list-wrap[data-list="kinds"] .sd-kind-ops-main{
+    .cat-dep-list-wrap[data-list="kinds"] .sd-kind-ops-main,
+    .cat-dep-list-wrap[data-list="cats"] .sd-cat-ops-main{
         display:flex;
         flex-direction:column;
         gap:5px;
         min-width:0;
     }
-    .cat-dep-list-wrap[data-list="kinds"] .sd-kind-ops-main .btn-secondary{
+    .cat-dep-list-wrap[data-list="kinds"] .sd-kind-ops-main .btn-secondary,
+    .cat-dep-list-wrap[data-list="cats"] .sd-cat-ops-main .btn-secondary{
         width:100% !important;
         margin:0 !important;
         padding:6px 8px !important;
@@ -415,16 +433,16 @@ if ($sdNextKindSort < 1) {
 
 <div class="card">
     <h3 style="margin-top:0;">فئات القياس ضمن النوع المحدّد</h3>
-    <div class="table-wrap">
+    <div class="table-wrap cat-dep-list-wrap" data-list="cats">
         <table>
             <thead>
                 <tr>
+                    <th>ترتيب</th>
                     <th>عرض عربي</th>
                     <th>عرض EN</th>
-                    <th><code>category_key</code></th>
-                    <th>ترتيب</th>
+                    <th>المفتاح</th>
                     <th>نشط</th>
-                    <th>إجراءات</th>
+                    <th class="sd-cat-ops-col">إجراءات</th>
                 </tr>
             </thead>
             <tbody id="sd_cats_tbody"></tbody>
@@ -733,15 +751,15 @@ if ($sdNextKindSort < 1) {
             cats.forEach(function (c) {
                 const tr = document.createElement('tr');
                 tr.innerHTML =
+                    '<td>' + String(c.sort_order != null ? c.sort_order : '') + '</td>' +
                     '<td>' + escapeHtml(c.label_ar || '') + '</td>' +
                     '<td>' + escapeHtml(c.label_en || '') + '</td>' +
                     '<td><code>' + escapeHtml(c.category_key || '') + '</code></td>' +
-                    '<td>' + String(c.sort_order != null ? c.sort_order : '') + '</td>' +
                     '<td>' + ((parseInt(c.is_active, 10) === 1) ? 'نعم' : 'لا') + '</td>' +
-                    '<td>' +
-                        '<button type="button" class="btn-secondary" style="margin-left:6px;">تعديل</button>' +
+                    '<td class="sd-cat-row-ops"><div class="sd-cat-ops-main">' +
+                        '<button type="button" class="btn-secondary">تعديل</button>' +
                         '<button type="button" class="btn-secondary">حذف</button>' +
-                    '</td>';
+                    '</div></td>';
                 const btns = tr.querySelectorAll('button');
                 btns[0].onclick = function () { sdEditCategory(c); };
                 btns[1].onclick = function () { sdDeleteCategory(c.commercial_kind_key, c.category_key); };
