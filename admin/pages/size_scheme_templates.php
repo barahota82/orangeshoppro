@@ -72,16 +72,17 @@ if ($tablesReady) {
         </div>
     </div>
     <h4 style="margin:18px 0 8px;font-size:1rem;">مقاسات داخل القالب</h4>
+    <p style="margin:0 0 10px;font-size:0.88rem;color:#555;line-height:1.5;">ترتيب المقاسات <strong>تلقائي</strong> حسب ترتيب الصفوف من الأعلى للأسفل (1، 2، 3…). حقول الفلبيني والهندي تُحدَّث من <strong>الإنجليزي</strong> بعد ترجمته من العربي أو عند تعديل الإنجليزي.</p>
     <div class="table-wrap">
         <table>
             <thead>
                 <tr>
+                    <th style="width:3.2rem;">ترتيب</th>
                     <th>عربي</th>
                     <th>EN</th>
                     <th>Fil</th>
                     <th>Hi</th>
                     <th>طول القدم (سم)</th>
-                    <th>ترتيب</th>
                     <th></th>
                 </tr>
             </thead>
@@ -141,19 +142,37 @@ function sstEscapeAttr(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 }
 
+function sstRefreshSizeRowOrder() {
+    document.querySelectorAll('#sst_sizes_tbody tr.sst-size-row').forEach(function (tr, i) {
+        var c = tr.querySelector('td.sst-ord');
+        if (c) {
+            c.textContent = String(i + 1);
+        }
+    });
+}
+
+function sstRemoveSizeRow(btn) {
+    var tr = btn.closest ? btn.closest('tr.sst-size-row') : null;
+    if (tr) {
+        tr.remove();
+    }
+    sstRefreshSizeRowOrder();
+}
+
 function sstAddSizeRow() {
     var tb = document.getElementById('sst_sizes_tbody');
     if (!tb) return;
     var tr = document.createElement('tr');
     tr.className = 'sst-size-row';
-    tr.innerHTML = '<td><input type="text" class="sst-la" maxlength="191"></td>' +
+    tr.innerHTML = '<td class="sst-ord">1</td>' +
+        '<td><input type="text" class="sst-la" maxlength="191"></td>' +
         '<td><input type="text" class="sst-le" maxlength="191"></td>' +
         '<td><input type="text" class="sst-lf" maxlength="191" placeholder="Fil"></td>' +
         '<td><input type="text" class="sst-lh" maxlength="191" placeholder="Hi"></td>' +
         '<td><input type="text" class="sst-fl" placeholder="اختياري"></td>' +
-        '<td><input type="number" class="sst-so" value="0"></td>' +
-        '<td><button type="button" class="btn-secondary" onclick="this.closest(\'tr\').remove()">حذف الصف</button></td>';
+        '<td><button type="button" class="btn-secondary" onclick="sstRemoveSizeRow(this)">حذف الصف</button></td>';
     tb.appendChild(tr);
+    sstRefreshSizeRowOrder();
 }
 
 function sstCollectSizes() {
@@ -164,13 +183,12 @@ function sstCollectSizes() {
         var lf = tr.querySelector('.sst-lf');
         var lh = tr.querySelector('.sst-lh');
         var fl = tr.querySelector('.sst-fl');
-        var so = tr.querySelector('.sst-so');
         var o = {
             label_ar: la ? String(la.value || '').trim() : '',
             label_en: le ? String(le.value || '').trim() : '',
             label_fil: lf ? String(lf.value || '').trim() : '',
             label_hi: lh ? String(lh.value || '').trim() : '',
-            sort_order: so ? parseInt(so.value || '0', 10) || 0 : 0
+            sort_order: idx + 1
         };
         var flv = fl ? String(fl.value || '').trim() : '';
         if (flv !== '') {
@@ -178,9 +196,6 @@ function sstCollectSizes() {
         }
         if (o.label_ar === '' && o.label_en === '') {
             return;
-        }
-        if (o.sort_order <= 0) {
-            o.sort_order = idx + 1;
         }
         rows.push(o);
     });
@@ -202,14 +217,57 @@ function sstResetForm() {
     sstAddSizeRow();
 }
 
+async function sstApplyHeaderFilHiOnly(silent) {
+    var en = document.getElementById('sst_name_en').value.trim();
+    var filEl = document.getElementById('sst_name_fil');
+    var hiEl = document.getElementById('sst_name_hi');
+    if (!en) {
+        if (filEl) {
+            filEl.value = '';
+        }
+        if (hiEl) {
+            hiEl.value = '';
+        }
+        return true;
+    }
+    try {
+        var res = await postJSON('/admin/api/translate/names.php', {
+            name_ar: document.getElementById('sst_name_ar').value.trim(),
+            name_en: en
+        });
+        if (!res || !res.success) {
+            if (!silent) {
+                alert((res && res.message) ? res.message : 'فشل الترجمة');
+            }
+            return false;
+        }
+        var t = res.translations || {};
+        if (filEl && t.name_fil) {
+            filEl.value = t.name_fil;
+        }
+        if (hiEl && t.name_hi) {
+            hiEl.value = t.name_hi;
+        }
+        return true;
+    } catch (e) {
+        if (!silent) {
+            alert('فشل طلب الترجمة');
+        }
+        return false;
+    }
+}
+
 async function sstTranslateHeaderInternal(opts) {
     opts = opts || {};
     var silent = !!opts.silent;
     var forceFromArabic = !!opts.forceFromArabic;
+    if (!forceFromArabic) {
+        return sstApplyHeaderFilHiOnly(silent);
+    }
     try {
         var res = await postJSON('/admin/api/translate/names.php', {
             name_ar: document.getElementById('sst_name_ar').value.trim(),
-            name_en: forceFromArabic ? '' : document.getElementById('sst_name_en').value.trim()
+            name_en: ''
         });
         if (!res || !res.success) {
             if (!silent) {
@@ -221,13 +279,7 @@ async function sstTranslateHeaderInternal(opts) {
         if (t.name_en) {
             document.getElementById('sst_name_en').value = t.name_en;
         }
-        if (t.name_fil) {
-            document.getElementById('sst_name_fil').value = t.name_fil;
-        }
-        if (t.name_hi) {
-            document.getElementById('sst_name_hi').value = t.name_hi;
-        }
-        return true;
+        return await sstApplyHeaderFilHiOnly(silent);
     } catch (e) {
         if (!silent) {
             alert('فشل طلب الترجمة');
@@ -257,8 +309,53 @@ function scheduleSstHeaderFromEn() {
     }
     clearTimeout(sstHeaderEnTimer);
     sstHeaderEnTimer = setTimeout(function () {
-        sstTranslateHeaderInternal({ silent: true, forceFromArabic: false });
+        sstApplyHeaderFilHiOnly(true);
     }, 600);
+}
+
+async function sstApplyRowFilHiOnly(tr, silent) {
+    var la = tr.querySelector('.sst-la');
+    var le = tr.querySelector('.sst-le');
+    var lf = tr.querySelector('.sst-lf');
+    var lh = tr.querySelector('.sst-lh');
+    if (!le) {
+        return true;
+    }
+    var en = (le.value || '').trim();
+    if (!en) {
+        if (lf) {
+            lf.value = '';
+        }
+        if (lh) {
+            lh.value = '';
+        }
+        return true;
+    }
+    try {
+        var res = await postJSON('/admin/api/translate/names.php', {
+            name_ar: la ? (la.value || '').trim() : '',
+            name_en: en
+        });
+        if (!res || !res.success) {
+            if (!silent) {
+                alert((res && res.message) ? res.message : 'فشل الترجمة');
+            }
+            return false;
+        }
+        var t = res.translations || {};
+        if (lf && t.name_fil) {
+            lf.value = t.name_fil;
+        }
+        if (lh && t.name_hi) {
+            lh.value = t.name_hi;
+        }
+        return true;
+    } catch (e) {
+        if (!silent) {
+            alert('فشل طلب الترجمة');
+        }
+        return false;
+    }
 }
 
 async function sstTranslateRow(tr, opts) {
@@ -267,15 +364,16 @@ async function sstTranslateRow(tr, opts) {
     var forceFromArabic = !!opts.forceFromArabic;
     var la = tr.querySelector('.sst-la');
     var le = tr.querySelector('.sst-le');
-    var lf = tr.querySelector('.sst-lf');
-    var lh = tr.querySelector('.sst-lh');
     if (!la || !le) {
         return true;
+    }
+    if (!forceFromArabic) {
+        return sstApplyRowFilHiOnly(tr, silent);
     }
     try {
         var res = await postJSON('/admin/api/translate/names.php', {
             name_ar: (la.value || '').trim(),
-            name_en: forceFromArabic ? '' : (le.value || '').trim()
+            name_en: ''
         });
         if (!res || !res.success) {
             if (!silent) {
@@ -287,13 +385,7 @@ async function sstTranslateRow(tr, opts) {
         if (t.name_en) {
             le.value = t.name_en;
         }
-        if (lf && t.name_fil) {
-            lf.value = t.name_fil;
-        }
-        if (lh && t.name_hi) {
-            lh.value = t.name_hi;
-        }
-        return true;
+        return await sstApplyRowFilHiOnly(tr, silent);
     } catch (e) {
         if (!silent) {
             alert('فشل طلب الترجمة');
@@ -336,7 +428,7 @@ function scheduleSstRowFromEn(tr) {
     }
     clearTimeout(tr._sstEnTimer);
     tr._sstEnTimer = setTimeout(function () {
-        sstTranslateRow(tr, { silent: true, forceFromArabic: false });
+        sstApplyRowFilHiOnly(tr, true);
     }, 600);
 }
 
@@ -407,19 +499,20 @@ async function sstLoadOne(tplId) {
         if (!sizes.length) {
             sstAddSizeRow();
         } else {
-            sizes.forEach(function (r) {
+            sizes.forEach(function (r, idx) {
                 var tr = document.createElement('tr');
                 tr.className = 'sst-size-row';
                 var fl = (r.foot_length_cm != null && r.foot_length_cm !== '') ? String(r.foot_length_cm) : '';
-                tr.innerHTML = '<td><input type="text" class="sst-la" maxlength="191" value="' + sstEscapeAttr(r.label_ar) + '"></td>' +
+                tr.innerHTML = '<td class="sst-ord">' + String(idx + 1) + '</td>' +
+                    '<td><input type="text" class="sst-la" maxlength="191" value="' + sstEscapeAttr(r.label_ar) + '"></td>' +
                     '<td><input type="text" class="sst-le" maxlength="191" value="' + sstEscapeAttr(r.label_en) + '"></td>' +
                     '<td><input type="text" class="sst-lf" maxlength="191" value="' + sstEscapeAttr(r.label_fil) + '"></td>' +
                     '<td><input type="text" class="sst-lh" maxlength="191" value="' + sstEscapeAttr(r.label_hi) + '"></td>' +
                     '<td><input type="text" class="sst-fl" value="' + sstEscapeAttr(fl) + '"></td>' +
-                    '<td><input type="number" class="sst-so" value="' + (Number(r.sort_order) || 0) + '"></td>' +
-                    '<td><button type="button" class="btn-secondary" onclick="this.closest(\'tr\').remove()">حذف الصف</button></td>';
+                    '<td><button type="button" class="btn-secondary" onclick="sstRemoveSizeRow(this)">حذف الصف</button></td>';
                 tb.appendChild(tr);
             });
+            sstRefreshSizeRowOrder();
         }
         document.getElementById('sst_form_card').scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e) {
