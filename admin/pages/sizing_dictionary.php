@@ -224,7 +224,7 @@ if ($sdNextKindSort < 1) {
         -webkit-overflow-scrolling:touch;
     }
     .cat-dep-list-wrap[data-list="kinds"] > table{
-        min-width:910px;
+        min-width:864px;
         width:100%;
         border-collapse:collapse;
         table-layout:fixed;
@@ -248,9 +248,9 @@ if ($sdNextKindSort < 1) {
     .cat-dep-list-wrap[data-list="kinds"] > table td:nth-child(5){ width:80px; text-align:center; }
     .cat-dep-list-wrap[data-list="kinds"] table .sd-kind-ops-col,
     .cat-dep-list-wrap[data-list="kinds"] table .sd-kind-row-ops{
-        width:200px !important;
-        min-width:200px !important;
-        max-width:200px !important;
+        width:154px !important;
+        min-width:154px !important;
+        max-width:154px !important;
         box-sizing:border-box !important;
         text-align:center !important;
         vertical-align:middle !important;
