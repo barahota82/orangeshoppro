@@ -197,33 +197,46 @@ if ($tablesReady) {
 </div>
 
 <div class="card">
-    <h3 style="margin-top:0;">قائمة القوالب</h3>
-    <div class="table-wrap">
-        <table>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+        <h3 style="margin:0;">قائمة القوالب</h3>
+        <div class="actions">
+            <button type="button" class="btn-secondary" onclick="sstSaveTemplatesListOrder()">حفظ الترتيب</button>
+        </div>
+    </div>
+    <div class="table-wrap cat-dep-list-wrap" data-list="sst-templates" style="margin-top:10px;">
+        <table dir="rtl">
             <thead>
                 <tr>
-                    <th>#</th>
-                    <th>العربي</th>
-                    <th>English</th>
+                    <th class="pd-ops-col">إجراءات</th>
+                    <th>الحالة</th>
+                    <th>الترتيب</th>
                     <th>عدد المقاسات</th>
-                    <th>ترتيب</th>
-                    <th>نشط</th>
-                    <th>إجراءات</th>
+                    <th>English</th>
+                    <th>العربي</th>
+                    <th>#</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="orange-sst-templates-list-tbody">
                 <?php foreach ($templates as $t): ?>
-                <tr>
-                    <td><?php echo (int) $t['id']; ?></td>
-                    <td><?php echo htmlspecialchars((string) $t['name_ar'], ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo htmlspecialchars((string) $t['name_en'], ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo (int) ($t['sizes_count'] ?? 0); ?></td>
-                    <td><?php echo (int) $t['sort_order']; ?></td>
-                    <td><?php echo (int) $t['is_active'] === 1 ? 'نعم' : 'لا'; ?></td>
-                    <td>
-                        <button type="button" class="btn-secondary" data-sst-edit="<?php echo (int) $t['id']; ?>">تعديل</button>
-                        <button type="button" class="btn-danger" data-sst-del="<?php echo (int) $t['id']; ?>">حذف</button>
+                <tr data-id="<?php echo (int) $t['id']; ?>">
+                    <td class="pd-row-ops">
+                        <div class="pd-ops-wrap">
+                            <div class="pd-ops-arrows">
+                                <button type="button" class="btn-secondary pd-btn-reorder" onclick="sstMoveTemplateListRow(this,'up')" aria-label="أعلى">↑</button>
+                                <button type="button" class="btn-secondary pd-btn-reorder" onclick="sstMoveTemplateListRow(this,'down')" aria-label="أسفل">↓</button>
+                            </div>
+                            <div class="pd-ops-main">
+                                <button type="button" class="btn-secondary" data-sst-edit="<?php echo (int) $t['id']; ?>">تعديل</button>
+                                <button type="button" class="btn-danger" data-sst-del="<?php echo (int) $t['id']; ?>">حذف</button>
+                            </div>
+                        </div>
                     </td>
+                    <td><?php echo (int) $t['is_active'] === 1 ? 'ظاهر' : 'مخفي'; ?></td>
+                    <td><?php echo (int) $t['sort_order']; ?></td>
+                    <td><?php echo (int) ($t['sizes_count'] ?? 0); ?></td>
+                    <td><?php echo htmlspecialchars((string) $t['name_en'], ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo htmlspecialchars((string) $t['name_ar'], ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo (int) $t['id']; ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -233,9 +246,39 @@ if ($tablesReady) {
 
 <script>
 const SST_API = '/admin/api/size_scheme_templates/manage.php';
+const SST_REORDER_API = '/admin/api/size_scheme_templates/reorder-save.php';
 const SST_NEXT_SORT = <?php echo (int) $nextSort; ?>;
 let sstHeaderArTimer = null;
 let sstHeaderEnTimer = null;
+
+function sstMoveTemplateListRow(btn, dir) {
+    var tr = btn.closest('tr');
+    if (!tr) return;
+    var tbody = document.getElementById('orange-sst-templates-list-tbody');
+    if (!tbody) return;
+    if (dir === 'up') {
+        var prev = tr.previousElementSibling;
+        if (prev) tbody.insertBefore(tr, prev);
+    } else {
+        var next = tr.nextElementSibling;
+        if (next) tbody.insertBefore(next, tr);
+    }
+}
+
+async function sstSaveTemplatesListOrder() {
+    var tbody = document.getElementById('orange-sst-templates-list-tbody');
+    if (!tbody) return;
+    var ids = Array.from(tbody.querySelectorAll('tr[data-id]'))
+        .map(function (tr) { return parseInt(tr.getAttribute('data-id') || '0', 10); })
+        .filter(function (id) { return id > 0; });
+    try {
+        var res = await postJSON(SST_REORDER_API, { ordered_ids: ids });
+        alert(res.message || (res.success ? 'تم حفظ الترتيب' : 'فشل حفظ الترتيب'));
+        if (res.success) location.reload();
+    } catch (e) {
+        alert('فشل الاتصال بالخادم أثناء حفظ الترتيب');
+    }
+}
 
 function sstEscapeAttr(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
@@ -644,6 +687,24 @@ document.addEventListener('click', function (ev) {
         }
     }
 });
+
+(function () {
+    var style = document.createElement('style');
+    style.textContent =
+        '.cat-dep-list-wrap[data-list="sst-templates"]{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:none;}' +
+        '.cat-dep-list-wrap[data-list="sst-templates"] > table{min-width:860px;width:100%;border-collapse:collapse;table-layout:fixed;}' +
+        '.cat-dep-list-wrap[data-list="sst-templates"] > table th,' +
+        '.cat-dep-list-wrap[data-list="sst-templates"] > table td{vertical-align:middle;}' +
+        '.cat-dep-list-wrap[data-list="sst-templates"] table .pd-ops-col,' +
+        '.cat-dep-list-wrap[data-list="sst-templates"] table .pd-row-ops{width:200px !important;min-width:200px !important;max-width:200px !important;box-sizing:border-box !important;text-align:center !important;vertical-align:middle !important;padding:6px 8px !important;}' +
+        '.cat-dep-list-wrap[data-list="sst-templates"] .pd-ops-wrap{display:grid;grid-template-columns:38px minmax(0,1fr);gap:8px;align-items:center;margin:0 auto;max-width:100%;direction:rtl;}' +
+        '.cat-dep-list-wrap[data-list="sst-templates"] .pd-ops-arrows{display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;}' +
+        '.cat-dep-list-wrap[data-list="sst-templates"] .pd-ops-wrap button.pd-btn-reorder{width:32px !important;min-width:32px !important;height:28px !important;margin:0 !important;padding:0 !important;font-size:13px !important;line-height:1 !important;border-radius:6px !important;display:inline-flex !important;align-items:center;justify-content:center;}' +
+        '.cat-dep-list-wrap[data-list="sst-templates"] .pd-ops-main{display:flex;flex-direction:column;gap:5px;min-width:0;}' +
+        '.cat-dep-list-wrap[data-list="sst-templates"] .pd-ops-main .btn-secondary,' +
+        '.cat-dep-list-wrap[data-list="sst-templates"] .pd-ops-main .btn-danger{width:100% !important;margin:0 !important;padding:6px 8px !important;font-size:12px !important;line-height:1.2 !important;border-radius:6px !important;box-sizing:border-box !important;min-height:30px !important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}';
+    document.head.appendChild(style);
+})();
 
 sstResetForm();
 </script>
