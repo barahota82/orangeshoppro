@@ -43,7 +43,7 @@ if ($tablesReady) {
     <h3>إضافة / تعديل قالب</h3>
     <p style="margin:0 0 14px;font-size:0.88rem;color:#555;line-height:1.5;"><strong>الترتيب</strong> في القائمة تلقائي (جديد = تالي؛ تعديل = دون تغيير). حقلا <strong>Fil</strong> و<strong>Hi</strong> يُعبَّآن تلقائياً <strong>بنفس نص الإنجليزي</strong> (للتوافق مع القنوات)، وليس بترجمة فلبينية/هندية.</p>
     <style>
-        /* حقول النص: نفس أسلوب الأدمن. «الترتيب» و«نشط» يُطابقان ارتفاع «عربي» عبر JS (select أصلي يختلف بصرياً عن input). */
+        /* حقول النص: أسلوب الأدمن. JS يطابق ارتفاع «الترتيب» لحقل «عربي» فقط؛ لا يُفرض ارتفاع على select «نشط» (فرض الارتفاع يقصّ النص العربي). */
         #sst_form_card .form-grid input[type="text"],
         #sst_form_card .form-grid select#sst_active {
             min-height: 36px;
@@ -73,7 +73,7 @@ if ($tablesReady) {
                 <label for="sst_sort_display">ترتيب (تلقائي)</label>
                 <input type="text" id="sst_sort_display" class="admin-sort-field admin-sort-field--muted" readonly tabindex="-1" value="<?php echo (int) $nextSort; ?>" title="ترتيب ظهور القالب في القائمة" aria-readonly="true" autocomplete="off">
             </div>
-            <div style="flex:1 1 7rem;min-width:5.5rem;max-width:10rem;">
+            <div style="flex:1 1 8rem;min-width:6rem;max-width:12rem;">
                 <label for="sst_active">نشط</label>
                 <select id="sst_active" class="admin-sort-field">
                     <option value="1">نعم</option>
@@ -167,12 +167,12 @@ let sstHeaderEnTimer = null;
 let sstHeightSyncTimer = null;
 let sstNameArResizeObserver = null;
 
-/** مطابقة ارتفاع «الترتيب» و«نشط» لحقل «اسم القالب عربي» (الـ select لا يحترم نفس مقاس الـ input في كثير من المتصفحات). */
+/** مطابقة ارتفاع خانة «الترتيب» لحقل «عربي» فقط. لا تُفرض أبعاد على «نشط» (select) حتى لا يُقصّ نص الخيارات العربية. */
 function sstSyncSortActiveHeights() {
     var ref = document.getElementById('sst_name_ar');
     var sort = document.getElementById('sst_sort_display');
     var act = document.getElementById('sst_active');
-    if (!ref || !sort || !act) {
+    if (!ref || !sort) {
         return;
     }
     var h = Math.round(ref.getBoundingClientRect().height);
@@ -181,8 +181,11 @@ function sstSyncSortActiveHeights() {
     }
     sort.style.height = h + 'px';
     sort.style.minHeight = h + 'px';
-    act.style.height = h + 'px';
-    act.style.minHeight = h + 'px';
+    if (act) {
+        act.style.height = '';
+        act.style.minHeight = '';
+        act.style.maxHeight = '';
+    }
 }
 
 function sstScheduleSyncSortActiveHeights() {
