@@ -281,6 +281,7 @@ $tablesReady = $hasFamilies && $hasSizes;
 
 <div class="card">
     <h3>مقاسات داخل العائلة</h3>
+    <p style="margin:0 0 12px;font-size:0.88rem;color:#555;line-height:1.5;">المقاسات تُستورد <strong>من قوالب المقاسات</strong> فقط (لا إدخال يدوي لصفوف الجدول). أنشئ أو عدّل القوالب من «إدارة القوالب» ثم حمّل القالب هنا واضغط «حفظ المقاسات».</p>
     <div class="form-grid">
         <div style="grid-column:1/-1;">
             <label>اختر العائلة</label>
@@ -291,26 +292,30 @@ $tablesReady = $hasFamilies && $hasSizes;
                 <?php endforeach; ?>
             </select>
         </div>
-        <?php if ($hasSizeTemplates && count($sizeTemplatesList) > 0): ?>
+        <?php if ($tablesReady): ?>
         <div style="grid-column:1/-1;margin-top:10px;">
-            <label>قالب مقاسات (إضافة صفوف للجدول)</label>
+            <label>قالب المقاسات</label>
             <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px;">
-                <select id="sizes_template_pick" style="min-width:220px;" <?php echo !$tablesReady ? 'disabled' : ''; ?>>
+                <?php if ($hasSizeTemplates && count($sizeTemplatesList) > 0): ?>
+                <select id="sizes_template_pick" style="min-width:220px;">
                     <option value="">— اختر قالباً —</option>
                     <?php foreach ($sizeTemplatesList as $tpl): ?>
                     <option value="<?php echo (int) $tpl['id']; ?>"><?php echo htmlspecialchars((string) ($tpl['name_ar'] ?: $tpl['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
                     <?php endforeach; ?>
                 </select>
-                <button type="button" class="btn-secondary" onclick="importSizeTemplateRows()" <?php echo !$tablesReady ? 'disabled' : ''; ?>>إضافة صفوف من القالب</button>
+                <button type="button" class="btn-secondary" onclick="importSizeTemplateRows()">تحميل المقاسات من القالب</button>
+                <?php else: ?>
+                <select id="sizes_template_pick" style="min-width:220px;display:none;" aria-hidden="true"><option value=""></option></select>
+                <span style="font-size:0.9rem;color:#92400e;">لا توجد قوالب مقاسات مفعّلة. أنشئ قالباً أولاً.</span>
+                <?php endif; ?>
                 <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_scheme_templates'), ENT_QUOTES, 'UTF-8'); ?>" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;">إدارة القوالب</a>
             </div>
-            <small style="display:block;color:#666;margin-top:6px;font-size:0.85rem;">لا يُحفظ تلقائياً — راجع الجدول ثم اضغط «حفظ المقاسات».</small>
+            <small style="display:block;color:#666;margin-top:6px;font-size:0.85rem;">«تحميل من القالب» يستبدل صفوف الجدول الحالية (قبل الحفظ في القاعدة). ثم اضغط «حفظ المقاسات».</small>
         </div>
         <?php endif; ?>
     </div>
     <div id="sizesEditor" style="margin-top:12px;"></div>
     <div class="actions sf-sizes-actions" style="margin-top:14px;">
-        <button type="button" class="btn-secondary" onclick="addSizeRow()" <?php echo !$tablesReady ? 'disabled' : ''; ?>>+ صف مقاس</button>
         <button type="button" onclick="saveSizesForFamily()" <?php echo !$tablesReady ? 'disabled' : ''; ?>>حفظ المقاسات</button>
     </div>
 </div>
@@ -381,6 +386,7 @@ $tablesReady = $hasFamilies && $hasSizes;
 <script>
 var ORANGE_SIZES_BY_FAMILY = <?php echo json_encode($sizesByFamily, JSON_UNESCAPED_UNICODE); ?>;
 var SST_IMPORT_API = '/admin/api/size_scheme_templates/manage.php';
+var FAM_HAS_SIZE_TEMPLATES = <?php echo ($hasSizeTemplates && count($sizeTemplatesList) > 0) ? 'true' : 'false'; ?>;
 const defaultNextFamilySort = <?php echo (int) $nextSort; ?>;
 var FAM_SIZING_DICT_SELECTS = <?php echo $sizingDictForFamilyForm ? 'true' : 'false'; ?>;
 var FAM_SD_API = '/admin/api/sizing_dictionary/manage.php';
@@ -676,17 +682,20 @@ function loadSizesEditor() {
         return;
     }
     var rows = ORANGE_SIZES_BY_FAMILY[String(fid)] || ORANGE_SIZES_BY_FAMILY[fid] || [];
-    var html = '<div class="table-wrap"><table><thead><tr><th>id</th><th>عربي</th><th>EN</th><th>Fil</th><th>Hi</th><th>طول القدم (سم)</th><th>ترتيب</th></tr></thead><tbody>';
+    var thead = '<thead><tr><th>id</th><th>عربي</th><th>EN</th><th>Fil</th><th>Hi</th><th>طول القدم (سم)</th><th>ترتيب</th></tr></thead>';
+    var html = '<div class="table-wrap"><table>' + thead + '<tbody>';
     if (!rows.length) {
-        html += '<tr class="size-row" data-new="1"><td>0</td><td><input type="text" class="s-la"></td><td><input type="text" class="s-le"></td><td><input type="text" class="s-lf" placeholder="Fil"></td><td><input type="text" class="s-lh" placeholder="Hi"></td><td><input type="text" class="s-fl" placeholder="مثال 24.5"></td><td><input type="number" class="s-so" value="0"></td></tr>';
+        html += '</tbody></table></div>';
+        html += '<p class="card-hint" style="margin-top:10px;">لا مقاسات محفوظة لهذه العائلة. اختر قالباً ثم «تحميل المقاسات من القالب»، ثم «حفظ المقاسات».</p>';
     } else {
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
             var fl = (r.foot_length_cm != null && r.foot_length_cm !== '') ? String(r.foot_length_cm) : '';
-            html += '<tr class="size-row" data-id="' + r.id + '"><td>' + r.id + '</td><td><input type="text" class="s-la" value="' + escapeAttr(r.label_ar) + '"></td><td><input type="text" class="s-le" value="' + escapeAttr(r.label_en) + '"></td><td><input type="text" class="s-lf" placeholder="Fil" value="' + escapeAttr(r.label_fil) + '"></td><td><input type="text" class="s-lh" placeholder="Hi" value="' + escapeAttr(r.label_hi) + '"></td><td><input type="text" class="s-fl" placeholder="اختياري" value="' + escapeAttr(fl) + '"></td><td><input type="number" class="s-so" value="' + (Number(r.sort_order) || 0) + '"></td></tr>';
+            html += '<tr class="size-row" data-id="' + r.id + '"><td>' + r.id + '</td><td><input type="text" class="s-la" readonly tabindex="-1" value="' + escapeAttr(r.label_ar) + '"></td><td><input type="text" class="s-le" readonly tabindex="-1" value="' + escapeAttr(r.label_en) + '"></td><td><input type="text" class="s-lf" readonly tabindex="-1" value="' + escapeAttr(r.label_fil) + '"></td><td><input type="text" class="s-lh" readonly tabindex="-1" value="' + escapeAttr(r.label_hi) + '"></td><td><input type="text" class="s-fl" readonly tabindex="-1" value="' + escapeAttr(fl) + '"></td><td><input type="number" class="s-so" readonly tabindex="-1" value="' + (Number(r.sort_order) || 0) + '"></td></tr>';
         }
+        html += '</tbody></table></div>';
+        html += '<p class="card-hint" style="margin-top:10px;font-size:0.85rem;">لتغيير المقاسات: استخدم «تحميل المقاسات من القالب» ليستبدل الجدول، أو عدّل القالب في «إدارة القوالب» ثم أعد التحميل.</p>';
     }
-    html += '</tbody></table></div>';
     box.innerHTML = html;
 }
 
@@ -695,6 +704,10 @@ function escapeAttr(s) {
 }
 
 async function importSizeTemplateRows() {
+    if (!FAM_HAS_SIZE_TEMPLATES) {
+        alert('لا توجد قوالب مقاسات. أنشئ قالباً من «إدارة القوالب» أولاً.');
+        return;
+    }
     var fid = parseInt(document.getElementById('sizes_family_id').value, 10) || 0;
     if (!fid) {
         alert('اختر العائلة أولاً');
@@ -725,13 +738,26 @@ async function importSizeTemplateRows() {
         if (!tbody) {
             return;
         }
+        var existing = tbody.querySelectorAll('tr.size-row').length;
+        if (existing > 0) {
+            if (!confirm('سيتم استبدال جميع صفوف المقاسات في الجدول بمحتوى القالب. التغيير لا يُسجَّل في القاعدة حتى تضغط «حفظ المقاسات». متابعة؟')) {
+                return;
+            }
+            while (tbody.firstChild) {
+                tbody.removeChild(tbody.firstChild);
+            }
+        }
+        var hint = document.querySelector('#sizesEditor > p.card-hint');
+        if (hint) {
+            hint.remove();
+        }
         for (var i = 0; i < sizes.length; i++) {
             var r = sizes[i];
             var tr = document.createElement('tr');
             tr.className = 'size-row';
             tr.setAttribute('data-new', '1');
             var fl = (r.foot_length_cm != null && r.foot_length_cm !== '') ? String(r.foot_length_cm) : '';
-            tr.innerHTML = '<td>0</td><td><input type="text" class="s-la" value="' + escapeAttr(r.label_ar || '') + '"></td><td><input type="text" class="s-le" value="' + escapeAttr(r.label_en || '') + '"></td><td><input type="text" class="s-lf" placeholder="Fil" value="' + escapeAttr(r.label_fil || '') + '"></td><td><input type="text" class="s-lh" placeholder="Hi" value="' + escapeAttr(r.label_hi || '') + '"></td><td><input type="text" class="s-fl" placeholder="اختياري" value="' + escapeAttr(fl) + '"></td><td><input type="number" class="s-so" value="' + (Number(r.sort_order) || 0) + '"></td>';
+            tr.innerHTML = '<td>0</td><td><input type="text" class="s-la" readonly tabindex="-1" value="' + escapeAttr(r.label_ar || '') + '"></td><td><input type="text" class="s-le" readonly tabindex="-1" value="' + escapeAttr(r.label_en || '') + '"></td><td><input type="text" class="s-lf" readonly tabindex="-1" value="' + escapeAttr(r.label_fil || '') + '"></td><td><input type="text" class="s-lh" readonly tabindex="-1" value="' + escapeAttr(r.label_hi || '') + '"></td><td><input type="text" class="s-fl" readonly tabindex="-1" value="' + escapeAttr(fl) + '"></td><td><input type="number" class="s-so" readonly tabindex="-1" value="' + (Number(r.sort_order) || 0) + '"></td>';
             tbody.appendChild(tr);
             var leEl = tr.querySelector('.s-le');
             var enVal = leEl ? leEl.value : '';
@@ -749,29 +775,18 @@ async function importSizeTemplateRows() {
     }
 }
 
-function addSizeRow() {
-    var fid = parseInt(document.getElementById('sizes_family_id').value, 10) || 0;
-    if (!fid) {
-        alert('اختر عائلة أولاً');
-        return;
-    }
-    var tbody = document.querySelector('#sizesEditor tbody');
-    if (!tbody) return;
-    var tr = document.createElement('tr');
-    tr.className = 'size-row';
-    tr.setAttribute('data-new', '1');
-    tr.innerHTML = '<td>0</td><td><input type="text" class="s-la"></td><td><input type="text" class="s-le"></td><td><input type="text" class="s-lf" placeholder="Fil"></td><td><input type="text" class="s-lh" placeholder="Hi"></td><td><input type="text" class="s-fl" placeholder="اختياري"></td><td><input type="number" class="s-so" value="0"></td>';
-    tbody.appendChild(tr);
-}
-
 async function saveSizesForFamily() {
     var familyId = parseInt(document.getElementById('sizes_family_id').value, 10) || 0;
     if (!familyId) {
         alert('اختر عائلة');
         return;
     }
-    var rows = [];
     var trs = document.querySelectorAll('#sizesEditor tr.size-row');
+    if (!trs.length) {
+        alert('حمّل المقاسات من قالب أولاً (لا يوجد صف في الجدول).');
+        return;
+    }
+    var rows = [];
     for (var idx = 0; idx < trs.length; idx++) {
         var tr = trs[idx];
         var id = parseInt(tr.getAttribute('data-id') || '0', 10) || 0;
