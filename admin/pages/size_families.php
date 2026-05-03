@@ -85,7 +85,7 @@ $tablesReady = $hasFamilies && $hasSizes;
         grid-template-columns: repeat(12, minmax(0, 1fr));
         grid-template-areas:
             "active active scheme scheme scheme scheme scheme scheme scheme scheme sort sort"
-            "siz siz siz siz siz siz comm comm comm comm comm comm"
+            "comm comm comm comm siz siz siz siz tpl tpl tpl tpl"
             "en en en en en en ar ar ar ar ar ar";
         gap: 14px 18px;
         direction: ltr;
@@ -113,6 +113,10 @@ $tablesReady = $hasFamilies && $hasSizes;
         grid-area: siz;
         min-width: 0;
     }
+    .sf-fam-form-grid .sf-fam-tpl {
+        grid-area: tpl;
+        min-width: 0;
+    }
     .sf-fam-form-grid .sf-fam-ar { grid-area: ar; }
     .sf-fam-form-grid .sf-fam-en { grid-area: en; }
     .sf-fam-form-grid label,
@@ -124,7 +128,8 @@ $tablesReady = $hasFamilies && $hasSizes;
     }
     .sf-fam-form-grid .sf-fam-scheme label,
     .sf-fam-form-grid .sf-fam-comm label,
-    .sf-fam-form-grid .sf-fam-siz label {
+    .sf-fam-form-grid .sf-fam-siz label,
+    .sf-fam-form-grid .sf-fam-tpl label {
         word-break: break-word;
         overflow-wrap: anywhere;
     }
@@ -157,7 +162,8 @@ $tablesReady = $hasFamilies && $hasSizes;
     }
     .sf-fam-form-grid #fam_active,
     .sf-fam-form-grid select#fam_commercial_kind_key,
-    .sf-fam-form-grid select#fam_sizing_category_key {
+    .sf-fam-form-grid select#fam_sizing_category_key,
+    .sf-fam-form-grid select#sizes_template_pick {
         margin-inline: 0;
         display: block;
         width: 100%;
@@ -188,8 +194,19 @@ $tablesReady = $hasFamilies && $hasSizes;
     }
     /* يتجاوز حد admin.css على select.admin-sort-field (220px) ليطابق عرض #fam_name_ar داخل الشبكة */
     .sf-fam-form-grid select#fam_commercial_kind_key,
-    .sf-fam-form-grid select#fam_sizing_category_key {
+    .sf-fam-form-grid select#fam_sizing_category_key,
+    .sf-fam-form-grid select#sizes_template_pick {
         max-width: none;
+    }
+    .sf-fam-form-grid .sf-fam-tpl-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin-top: 8px;
+    }
+    .sf-fam-form-grid .sf-fam-tpl-actions .btn-secondary {
+        margin: 0;
     }
     .sf-fam-form-grid #fam_name_ar,
     .sf-fam-form-grid #fam_name_en {
@@ -209,6 +226,7 @@ $tablesReady = $hasFamilies && $hasSizes;
                 "active"
                 "comm"
                 "siz"
+                "tpl"
                 "ar"
                 "en";
         }
@@ -263,6 +281,28 @@ $tablesReady = $hasFamilies && $hasSizes;
             <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;line-height:1.4;">أدخل المفتاح يدوياً.</small>
             <?php endif; ?>
         </div>
+        <div class="sf-fam-tpl admin-sort-field-wrap">
+            <label>قالب المقاسات</label>
+            <?php if ($hasSizeTemplates && count($sizeTemplatesList) > 0): ?>
+            <select id="sizes_template_pick" class="admin-sort-field" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
+                <option value="">— اختر قالباً —</option>
+                <?php foreach ($sizeTemplatesList as $tpl): ?>
+                <option value="<?php echo (int) $tpl['id']; ?>"><?php echo htmlspecialchars((string) ($tpl['name_ar'] ?: $tpl['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+            <div class="sf-fam-tpl-actions">
+                <button type="button" class="btn-secondary" onclick="importSizeTemplateRows()" <?php echo !$hasFamilies || !$tablesReady ? 'disabled' : ''; ?>>تحميل المقاسات من القالب</button>
+                <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_scheme_templates'), ENT_QUOTES, 'UTF-8'); ?>" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;">إدارة القوالب</a>
+            </div>
+            <small style="display:block;color:#666;margin-top:6px;font-size:0.8rem;line-height:1.4;">يستبدل صفوف الجدول في بطاقة «مقاسات داخل العائلة» قبل «حفظ المقاسات».</small>
+            <?php else: ?>
+            <select id="sizes_template_pick" class="admin-sort-field" style="display:none;" aria-hidden="true" <?php echo !$hasFamilies ? 'disabled' : ''; ?>><option value=""></option></select>
+            <span style="font-size:0.88rem;color:#92400e;">لا توجد قوالب مفعّلة.</span>
+            <div class="sf-fam-tpl-actions" style="margin-top:8px;">
+                <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_scheme_templates'), ENT_QUOTES, 'UTF-8'); ?>" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;">إدارة القوالب</a>
+            </div>
+            <?php endif; ?>
+        </div>
         <div class="sf-fam-ar">
             <label>الاسم العربي</label>
             <input type="text" id="fam_name_ar" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
@@ -281,32 +321,11 @@ $tablesReady = $hasFamilies && $hasSizes;
 
 <div class="card">
     <h3>مقاسات داخل العائلة</h3>
-    <p style="margin:0 0 12px;font-size:0.88rem;color:#555;line-height:1.5;">المقاسات تُستورد <strong>من قوالب المقاسات</strong> فقط (لا إدخال يدوي لصفوف الجدول). أنشئ أو عدّل القوالب من «إدارة القوالب» ثم حمّل القالب هنا واضغط «حفظ المقاسات».</p>
+    <p style="margin:0 0 12px;font-size:0.88rem;color:#555;line-height:1.5;">المقاسات تُستورد <strong>من قوالب المقاسات</strong> فقط (لا إدخال يدوي لصفوف الجدول). اختر القالب وحمّل الصفوف من بطاقة «إضافة / تعديل عائلة» أعلاه، ثم احفظ من هنا.</p>
     <div class="form-grid">
         <div style="grid-column:1/-1;">
             <p id="sizes_family_context" class="card-hint" style="margin:0;font-size:0.9rem;line-height:1.55;"></p>
         </div>
-        <?php if ($tablesReady): ?>
-        <div style="grid-column:1/-1;margin-top:10px;">
-            <label>قالب المقاسات</label>
-            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px;">
-                <?php if ($hasSizeTemplates && count($sizeTemplatesList) > 0): ?>
-                <select id="sizes_template_pick" style="min-width:220px;">
-                    <option value="">— اختر قالباً —</option>
-                    <?php foreach ($sizeTemplatesList as $tpl): ?>
-                    <option value="<?php echo (int) $tpl['id']; ?>"><?php echo htmlspecialchars((string) ($tpl['name_ar'] ?: $tpl['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
-                    <?php endforeach; ?>
-                </select>
-                <button type="button" class="btn-secondary" onclick="importSizeTemplateRows()">تحميل المقاسات من القالب</button>
-                <?php else: ?>
-                <select id="sizes_template_pick" style="min-width:220px;display:none;" aria-hidden="true"><option value=""></option></select>
-                <span style="font-size:0.9rem;color:#92400e;">لا توجد قوالب مقاسات مفعّلة. أنشئ قالباً أولاً.</span>
-                <?php endif; ?>
-                <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_scheme_templates'), ENT_QUOTES, 'UTF-8'); ?>" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;">إدارة القوالب</a>
-            </div>
-            <small style="display:block;color:#666;margin-top:6px;font-size:0.85rem;">«تحميل من القالب» يستبدل صفوف الجدول الحالية (قبل الحفظ في القاعدة). ثم اضغط «حفظ المقاسات».</small>
-        </div>
-        <?php endif; ?>
     </div>
     <div id="sizesEditor" style="margin-top:12px;"></div>
     <div class="actions sf-sizes-actions" style="margin-top:14px;">
