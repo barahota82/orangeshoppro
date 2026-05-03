@@ -43,7 +43,7 @@ if ($tablesReady) {
     <h3>إضافة / تعديل قالب</h3>
     <p style="margin:0 0 14px;font-size:0.88rem;color:#555;line-height:1.5;"><strong>الترتيب</strong> في القائمة تلقائي (جديد = تالي؛ تعديل = دون تغيير). حقلا <strong>Fil</strong> و<strong>Hi</strong> يُعبَّآن تلقائياً <strong>بنفس نص الإنجليزي</strong> (للتوافق مع القنوات)، وليس بترجمة فلبينية/هندية.</p>
     <style>
-        /* صف واحد: ترتيب — عربي — EN — Fil — Hi — نشط (عمود نشط ضيق). نفس منطق حقول أنماط الألوان: ltr للشبكة + rtl للنصوص + select مخصص */
+        /* صف واحد بترتيب قراءة عربي: يمين ← يسار = ترتيب → عربي → EN → Fil → Hi → نشط. الشبكة direction: rtl حتى يطابق DOM. */
         #sst_form_card .sst-header-row-wrap {
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
@@ -59,7 +59,7 @@ if ($tablesReady) {
                 minmax(0, 0.85fr)
                 minmax(4.25rem, 0.38fr);
             gap: 10px 12px;
-            direction: ltr;
+            direction: rtl;
             align-items: end;
             min-width: min(100%, 52rem);
         }
