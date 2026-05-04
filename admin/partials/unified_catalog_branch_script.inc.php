@@ -24,7 +24,7 @@ function ucSlugifyLabel(str) {
 }
 
 function refreshUcSlug(which) {
-    if (ucSlugManual[which]) {
+    if (which !== 'sec' && ucSlugManual[which]) {
         return;
     }
     const map = { sec: 'uc_sec_', cat: 'uc_cat_', sub: 'uc_sub_' };
@@ -39,6 +39,11 @@ function refreshUcSlug(which) {
     }
     const next = ucSlugifyLabel(enEl.value.trim());
     if (!next) {
+        if (which === 'sec' || !ucSlugManual[which]) {
+            ucSlugSkipInputEvent = true;
+            slugEl.value = '';
+            setTimeout(function () { ucSlugSkipInputEvent = false; }, 0);
+        }
         return;
     }
     ucSlugSkipInputEvent = true;
@@ -119,7 +124,7 @@ function editUcSection(j) {
     document.getElementById('uc_sec_name_fil').value = j.name_fil || '';
     document.getElementById('uc_sec_name_hi').value = j.name_hi || '';
     document.getElementById('uc_sec_active').value = String(j.is_active === 0 ? 0 : 1);
-    ucSlugManual.sec = !!(j.slug && String(j.slug).trim() !== '');
+    ucSlugManual.sec = false;
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -359,7 +364,6 @@ function scheduleUcFromEn(which) {
             });
         }
     });
-    ucBindSlugAuto('sec', 'uc_sec_');
     ucBindSlugAuto('cat', 'uc_cat_');
     ucBindSlugAuto('sub', 'uc_sub_');
 })();
