@@ -117,7 +117,7 @@ if ($subOptionsJson === false) {
 ?>
 <div class="page-title">
     <h1>أنواع المنتجات — الشجرة الموحّدة</h1>
-    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;">ورقة قبل SKU تحت التصنيف الفرعي الموحّد؛ ربط المنتجات يتم عبر <code>product_type_id</code> وفق السياسة (تاسعاً ووثيقة ERD). أنشئ أو راجع الفروع من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع الشجرة الموحّدة</a>. حقل <strong>expected_size_scheme_key</strong> يضبط مطابقة مخطط المقاس مع <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_families'), ENT_QUOTES, 'UTF-8'); ?>">عائلات المقاسات</a>.</p>
+    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.55;">ورقة قبل SKU تحت التصنيف الفرعي الموحّد؛ ربط المنتجات يتم عبر <code>product_type_id</code> وفق السياسة (تاسعاً ووثيقة ERD). أنشئ أو راجع الفروع من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع الشجرة الموحّدة</a> ثم عد لهذه الصفحة. بعد إنشاء الأوراق، اربط كل منتج من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=products'), ENT_QUOTES, 'UTF-8'); ?>">المنتجات</a> بنوع المنتج المناسب. حقل <strong>expected_size_scheme_key</strong> يضبط مطابقة مخطط المقاس مع <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_families'), ENT_QUOTES, 'UTF-8'); ?>">عائلات المقاسات</a>.</p>
 </div>
 
 <?php if (!$hasTree): ?>
@@ -129,6 +129,16 @@ if ($subOptionsJson === false) {
 <?php if (! $unifiedActive): ?>
 <div class="card" style="margin-bottom:12px;background:#fffbeb;border-color:#fcd34d;">
     <p style="margin:0;color:#92400e;">لم يُفعَّل مسار المتجر الموحّد بعد (ترحيل البيانات). ما زال بالإمكان تهيئة الأوراق ومفتاح مخطّط المقاس؛ منتجاتك تُخيَّر بين الفئة القديمة ونوع المنتج إلى أن يكتمل الخطوة في سجلّ الترحيل.</p>
+</div>
+<?php endif; ?>
+
+<?php if ($hasTree && $subOptions === []): ?>
+<div class="card" style="margin-bottom:12px;background:#f0f9ff;border:1px solid #bae6fd;">
+    <p style="margin:0;color:#0c4a6e;line-height:1.55;"><strong>لا يوجد تصنيف فرعي نشط بعد</strong> على الشجرة الموحّدة، لذلك لا يمكن اختيار «مسار الشجرة» هنا. أنشئ قسماً رئيسياً من
+        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=departments'), ENT_QUOTES, 'UTF-8'); ?>">الأقسام الرئيسية</a>
+        ثم من
+        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع الشجرة الموحّدة (عرض شامل)</a>
+        أضف Section ثم Category ثم Subcategory على الأقل؛ بعدها سيظهر التصنيف الفرعي في القائمة أدناه.</p>
 </div>
 <?php endif; ?>
 
