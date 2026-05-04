@@ -4,10 +4,16 @@
  */
 $secJ = $orange_uc['section_opts_json'] ?? '[]';
 $catJ = $orange_uc['category_opts_json'] ?? '[]';
+$ucNextDeptJ = json_encode($orange_uc['next_sort_by_department'] ?? [], JSON_UNESCAPED_UNICODE) ?: '{}';
+$ucNextSecJ = json_encode($orange_uc['next_sort_by_section'] ?? [], JSON_UNESCAPED_UNICODE) ?: '{}';
+$ucNextCatJ = json_encode($orange_uc['next_sort_by_category'] ?? [], JSON_UNESCAPED_UNICODE) ?: '{}';
 ?>
 <script>
 const ucSectionOptions = <?php echo $secJ; ?>;
 const ucCategoryOptions = <?php echo $catJ; ?>;
+const ucNextSortByDept = <?php echo $ucNextDeptJ; ?>;
+const ucNextSortBySec = <?php echo $ucNextSecJ; ?>;
+const ucNextSortByCat = <?php echo $ucNextCatJ; ?>;
 let ucTimers = {};
 let ucEnTimers = {};
 let ucSaving = false;
@@ -87,6 +93,74 @@ function parseSortPayload(raw) {
     return t === '' ? 0 : ((parseInt(t, 10) || 0));
 }
 
+function ucPickNextSort(map, rawId) {
+    const n = parseInt(String(rawId || ''), 10) || 0;
+    if (n <= 0) {
+        return '';
+    }
+    if (map == null) {
+        return '1';
+    }
+    const v = map[n] !== undefined && map[n] !== null ? map[n] : map[String(n)];
+    const num = typeof v === 'number' ? v : parseInt(String(v || ''), 10);
+    if (num > 0) {
+        return String(num);
+    }
+    return '1';
+}
+
+function ucApplyNextSortForNewSec() {
+    if ((parseInt(document.getElementById('uc_sec_id').value || '0', 10) || 0) > 0) {
+        return;
+    }
+    const d = document.getElementById('uc_sec_department_id');
+    const s = document.getElementById('uc_sec_sort');
+    if (!d || !s || d.disabled) {
+        return;
+    }
+    s.value = ucPickNextSort(ucNextSortByDept, d.value);
+}
+
+function ucTryAutoSingleSection() {
+    const sel = document.getElementById('uc_cat_section_id');
+    if (!sel || sel.disabled || sel.options.length !== 2) {
+        return;
+    }
+    sel.selectedIndex = 1;
+}
+
+function ucApplyNextSortForNewCat() {
+    if ((parseInt(document.getElementById('uc_cat_id').value || '0', 10) || 0) > 0) {
+        return;
+    }
+    const sel = document.getElementById('uc_cat_section_id');
+    const s = document.getElementById('uc_cat_sort');
+    if (!sel || !s || sel.disabled) {
+        return;
+    }
+    s.value = ucPickNextSort(ucNextSortBySec, sel.value);
+}
+
+function ucTryAutoSingleSubcategoryParent() {
+    const sel = document.getElementById('uc_sub_category_id');
+    if (!sel || sel.disabled || sel.options.length !== 2) {
+        return;
+    }
+    sel.selectedIndex = 1;
+}
+
+function ucApplyNextSortForNewSub() {
+    if ((parseInt(document.getElementById('uc_sub_id').value || '0', 10) || 0) > 0) {
+        return;
+    }
+    const sel = document.getElementById('uc_sub_category_id');
+    const s = document.getElementById('uc_sub_sort');
+    if (!sel || !s || sel.disabled) {
+        return;
+    }
+    s.value = ucPickNextSort(ucNextSortByCat, sel.value);
+}
+
 async function ucPost(url, payload) {
     ucSaving = true;
     try {
@@ -106,12 +180,12 @@ function resetUcSection() {
     var dsel = document.getElementById('uc_sec_department_id');
     if (dsel && dsel.options.length) dsel.selectedIndex = 0;
     document.getElementById('uc_sec_slug').value = '';
-    document.getElementById('uc_sec_sort').value = '';
     document.getElementById('uc_sec_name_ar').value = '';
     document.getElementById('uc_sec_name_en').value = '';
     document.getElementById('uc_sec_name_fil').value = '';
     document.getElementById('uc_sec_name_hi').value = '';
     document.getElementById('uc_sec_active').value = '1';
+    ucApplyNextSortForNewSec();
 }
 
 function editUcSection(j) {
@@ -157,6 +231,8 @@ function resetUcCategory() {
     document.getElementById('uc_cat_name_fil').value = '';
     document.getElementById('uc_cat_name_hi').value = '';
     document.getElementById('uc_cat_active').value = '1';
+    ucTryAutoSingleSection();
+    ucApplyNextSortForNewCat();
 }
 
 function editUcCategory(j) {
@@ -217,6 +293,8 @@ function resetUcSubcategory() {
     document.getElementById('uc_sub_name_fil').value = '';
     document.getElementById('uc_sub_name_hi').value = '';
     document.getElementById('uc_sub_active').value = '1';
+    ucTryAutoSingleSubcategoryParent();
+    ucApplyNextSortForNewSub();
 }
 
 function editUcSubcategory(j) {
@@ -366,5 +444,22 @@ function scheduleUcFromEn(which) {
     });
     ucBindSlugAuto('cat', 'uc_cat_');
     ucBindSlugAuto('sub', 'uc_sub_');
+    var dDept = document.getElementById('uc_sec_department_id');
+    if (dDept) {
+        dDept.addEventListener('change', function () { ucApplyNextSortForNewSec(); });
+    }
+    var dSec = document.getElementById('uc_cat_section_id');
+    if (dSec) {
+        dSec.addEventListener('change', function () { ucApplyNextSortForNewCat(); });
+    }
+    var dCat = document.getElementById('uc_sub_category_id');
+    if (dCat) {
+        dCat.addEventListener('change', function () { ucApplyNextSortForNewSub(); });
+    }
+    ucApplyNextSortForNewSec();
+    ucTryAutoSingleSection();
+    ucApplyNextSortForNewCat();
+    ucTryAutoSingleSubcategoryParent();
+    ucApplyNextSortForNewSub();
 })();
 </script>

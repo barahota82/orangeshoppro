@@ -12,7 +12,7 @@ $ucSecEmpty = !empty($orange_uc['sections_empty_for_categories']);
     <div class="form-grid uc-cat-form-grid">
         <div class="uc-cat-sort admin-sort-field-wrap">
             <label for="uc_cat_sort">الترتيب (تلقائي)</label>
-            <input type="number" id="uc_cat_sort" class="admin-sort-field<?php echo $ucSecEmpty ? ' admin-sort-field--muted' : ''; ?>" min="1" step="1" value="" placeholder="تلقائي" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>>
+            <input type="number" id="uc_cat_sort" class="admin-sort-field<?php echo $ucSecEmpty ? ' admin-sort-field--muted' : ''; ?>" min="1" step="1" value="" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>>
         </div>
         <div class="uc-cat-active admin-sort-field-wrap">
             <label for="uc_cat_active">نشط</label>

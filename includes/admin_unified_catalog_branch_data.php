@@ -18,7 +18,10 @@ require_once __DIR__ . '/catalog_taxonomy_migrate.php';
  *   section_select_options: list<array{id:int,label:string}>,
  *   category_select_options: list<array{id:int,label:string}>,
  *   section_opts_json: string,
- *   category_opts_json: string
+ *   category_opts_json: string,
+ *   next_sort_by_department: array<int,int>,
+ *   next_sort_by_section: array<int,int>,
+ *   next_sort_by_category: array<int,int>
  * }
  */
 function orange_admin_uc_branch_bootstrap(PDO $pdo): array
@@ -47,6 +50,9 @@ function orange_admin_uc_branch_bootstrap(PDO $pdo): array
         'deps_empty_for_sections' => true,
         'sections_empty_for_categories' => true,
         'categories_empty_for_subcats' => true,
+        'next_sort_by_department' => [],
+        'next_sort_by_section' => [],
+        'next_sort_by_category' => [],
     ];
 
     if (! $hasUnified || ! orange_table_exists($pdo, 'departments')) {
@@ -94,6 +100,67 @@ function orange_admin_uc_branch_bootstrap(PDO $pdo): array
         return $defaults;
     }
 
+    $nextSortByDepartment = [];
+    $nextSortBySection = [];
+    $nextSortByCategory = [];
+    try {
+        $st = $pdo->query(
+            'SELECT department_id, COALESCE(MAX(sort_order), 0) + 1 AS n FROM catalog_sections GROUP BY department_id'
+        );
+        if ($st) {
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                if (! is_array($r)) {
+                    continue;
+                }
+                $did = (int) ($r['department_id'] ?? 0);
+                if ($did > 0) {
+                    $nextSortByDepartment[$did] = max(1, (int) ($r['n'] ?? 1));
+                }
+            }
+        }
+        foreach ($departments as $d) {
+            if (! is_array($d)) {
+                continue;
+            }
+            $did = (int) ($d['id'] ?? 0);
+            if ($did > 0 && ! isset($nextSortByDepartment[$did])) {
+                $nextSortByDepartment[$did] = 1;
+            }
+        }
+        $st2 = $pdo->query(
+            'SELECT catalog_section_id, COALESCE(MAX(sort_order), 0) + 1 AS n FROM catalog_categories GROUP BY catalog_section_id'
+        );
+        if ($st2) {
+            foreach ($st2->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                if (! is_array($r)) {
+                    continue;
+                }
+                $sid = (int) ($r['catalog_section_id'] ?? 0);
+                if ($sid > 0) {
+                    $nextSortBySection[$sid] = max(1, (int) ($r['n'] ?? 1));
+                }
+            }
+        }
+        $st3 = $pdo->query(
+            'SELECT catalog_category_id, COALESCE(MAX(sort_order), 0) + 1 AS n FROM catalog_subcategories GROUP BY catalog_category_id'
+        );
+        if ($st3) {
+            foreach ($st3->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                if (! is_array($r)) {
+                    continue;
+                }
+                $cid = (int) ($r['catalog_category_id'] ?? 0);
+                if ($cid > 0) {
+                    $nextSortByCategory[$cid] = max(1, (int) ($r['n'] ?? 1));
+                }
+            }
+        }
+    } catch (Throwable $e) {
+        $nextSortByDepartment = [];
+        $nextSortBySection = [];
+        $nextSortByCategory = [];
+    }
+
     $sectionSelectOptions = [];
     foreach ($sectionsFlat as $s) {
         if (! is_array($s)) {
@@ -102,6 +169,9 @@ function orange_admin_uc_branch_bootstrap(PDO $pdo): array
         $sid = (int) ($s['id'] ?? 0);
         if ($sid <= 0) {
             continue;
+        }
+        if (! isset($nextSortBySection[$sid])) {
+            $nextSortBySection[$sid] = 1;
         }
         $sectionSelectOptions[] = [
             'id' => $sid,
@@ -117,6 +187,9 @@ function orange_admin_uc_branch_bootstrap(PDO $pdo): array
         $cid = (int) ($c['id'] ?? 0);
         if ($cid <= 0) {
             continue;
+        }
+        if (! isset($nextSortByCategory[$cid])) {
+            $nextSortByCategory[$cid] = 1;
         }
         $categorySelectOptions[] = [
             'id' => $cid,
@@ -144,5 +217,8 @@ function orange_admin_uc_branch_bootstrap(PDO $pdo): array
         'deps_empty_for_sections' => $departments === [],
         'sections_empty_for_categories' => $sectionSelectOptions === [],
         'categories_empty_for_subcats' => $categorySelectOptions === [],
+        'next_sort_by_department' => $nextSortByDepartment,
+        'next_sort_by_section' => $nextSortBySection,
+        'next_sort_by_category' => $nextSortByCategory,
     ];
 }
