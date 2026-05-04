@@ -60,12 +60,31 @@ function orange_parse_foot_length_nullable($raw, ?string &$err = null): ?float
         '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
         '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
         '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
-        '٫' => '.', ',' => '.', '٬' => '',
+        '٫' => '.', '،' => '.', ',' => '.', '٬' => '',
+        "\u{00A0}" => ' ', "\u{202F}" => ' ', "\u{200F}" => '', "\u{200E}" => '',
     ]);
-    $v = str_replace(' ', '', $v);
+    $v = preg_replace('/\s+/u', '', $v) ?? $v;
+    $v = preg_replace('/(?:cm|cms|سم)$/iu', '', $v) ?? $v;
+    $v = preg_replace('/[^0-9\.\-]/u', '', $v) ?? '';
     if ($v === '') {
+        $err = 'طول القدم يجب أن يكون رقماً (سم)';
         return null;
     }
+    $sign = '';
+    if (strpos($v, '-') === 0) {
+        $sign = '-';
+    }
+    $v = str_replace('-', '', $v);
+    if ($v === '') {
+        $err = 'طول القدم يجب أن يكون رقماً (سم)';
+        return null;
+    }
+    if (substr_count($v, '.') > 1) {
+        $parts = explode('.', $v);
+        $dec = (string) array_pop($parts);
+        $v = implode('', $parts) . '.' . $dec;
+    }
+    $v = $sign . $v;
     if (!preg_match('/^-?\d+(?:\.\d+)?$/', $v)) {
         $err = 'طول القدم يجب أن يكون رقماً (سم)';
         return null;
