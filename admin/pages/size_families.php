@@ -542,6 +542,52 @@ function famReadTemplatePickLabels() {
 }
 
 /**
+ * عند التعديل: استنتاج id القالب من size_scheme_key + sizing_category_key
+ * (نفس قاعدة famApplyAutoSizeSchemeKey: slug(فئة) + '_' + slug(EN القالب)).
+ */
+function famResolveTemplateIdForEdit(f) {
+    var scheme = String(f.size_scheme_key || '').trim().toLowerCase();
+    var catKey = famSizingSlugKey(String(f.sizing_category_key || '').trim(), 64);
+    var tplEl = document.getElementById('sizes_template_pick');
+    if (!tplEl || tplEl.tagName !== 'SELECT' || !scheme) {
+        return '';
+    }
+    var i;
+    for (i = 0; i < tplEl.options.length; i++) {
+        var o = tplEl.options[i];
+        var tid = String(o.value || '').trim();
+        if (!tid) {
+            continue;
+        }
+        var ne = String(o.getAttribute('data-name-en') || '').trim();
+        var tplSlug = famSizingSlugKey(ne, 64);
+        if (!tplSlug) {
+            tplSlug = famSizingSlugKey('tpl_' + tid, 64);
+        }
+        var combined = (catKey && tplSlug) ? (catKey + '_' + tplSlug) : (catKey || tplSlug);
+        if (combined && combined === scheme) {
+            return tid;
+        }
+    }
+    if (catKey && scheme.indexOf(catKey + '_') === 0) {
+        var suff = scheme.substring((catKey + '_').length);
+        for (i = 0; i < tplEl.options.length; i++) {
+            var o2 = tplEl.options[i];
+            var tid2 = String(o2.value || '').trim();
+            if (!tid2) {
+                continue;
+            }
+            var ne2 = String(o2.getAttribute('data-name-en') || '').trim();
+            var ts2 = famSizingSlugKey(ne2, 64) || famSizingSlugKey('tpl_' + tid2, 64);
+            if (ts2 && ts2 === suff) {
+                return tid2;
+            }
+        }
+    }
+    return '';
+}
+
+/**
  * من تسميات القاموس: عربي/EN من label_ar + label؛ ومع قالب مقاسات:
  * «الأساس - تسمية_القالب» (تسمية القالب: EN إن وُجدت وإلا نص الخيار).
  */
@@ -733,7 +779,13 @@ async function editFamily(f) {
     if (FAM_SIZING_DICT_SELECTS) {
         await famLoadKindsIntoSelect(f.commercial_kind_key || '');
         await famLoadSizingCategoriesIntoSelect(f.sizing_category_key || '');
-        famApplyAutoNamesFromDictionary();
+        var tplPick = document.getElementById('sizes_template_pick');
+        if (tplPick && tplPick.tagName === 'SELECT') {
+            tplPick.value = famResolveTemplateIdForEdit(f) || '';
+        }
+        document.getElementById('fam_name_ar').value = String(f.name_ar || '');
+        document.getElementById('fam_name_en').value = String(f.name_en || '');
+        famSyncFamFilHiFromEn();
     } else {
         document.getElementById('fam_name_ar').value = f.name_ar || '';
         document.getElementById('fam_name_en').value = f.name_en || '';
@@ -742,6 +794,13 @@ async function editFamily(f) {
         famSyncFamFilHiFromEn();
     }
     famApplyAutoSizeSchemeKey();
+    var keyEl = document.getElementById('fam_size_scheme_key');
+    if (keyEl && f.size_scheme_key != null && String(f.size_scheme_key).trim() !== '') {
+        var wantKey = String(f.size_scheme_key).trim();
+        if (String(keyEl.value || '').trim() !== wantKey) {
+            keyEl.value = wantKey;
+        }
+    }
     document.getElementById('fam_sort').value = String(f.sort_order ?? 0);
     document.getElementById('fam_active').value = String(f.is_active === 0 ? 0 : 1);
     loadSizesEditor();
