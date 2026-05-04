@@ -165,7 +165,18 @@ async function ucPost(url, payload) {
     try {
         const res = await postJSON(url, payload);
         alert(res.message || (res.success ? 'تم الحفظ' : 'فشل'));
-        if (res.success) location.reload();
+        if (res.success) {
+            try {
+                if (url.indexOf('save_section') !== -1 && payload.department_id) {
+                    sessionStorage.setItem('ucRestoreSecDept', String(payload.department_id));
+                } else if (url.indexOf('save_category') !== -1 && payload.catalog_section_id) {
+                    sessionStorage.setItem('ucRestoreCatSection', String(payload.catalog_section_id));
+                } else if (url.indexOf('save_subcategory') !== -1 && payload.catalog_category_id) {
+                    sessionStorage.setItem('ucRestoreSubCategory', String(payload.catalog_category_id));
+                }
+            } catch (e) { /* ignore */ }
+            location.reload();
+        }
     } catch (e) {
         alert('فشل الاتصال بالخادم أثناء الحفظ');
     } finally {
@@ -173,7 +184,46 @@ async function ucPost(url, payload) {
     }
 }
 
+function ucRestoreAfterSaveThenSort() {
+    try {
+        var rid;
+        var v;
+        var el;
+        v = sessionStorage.getItem('ucRestoreSecDept');
+        rid = document.getElementById('uc_sec_id');
+        if (v && rid && (parseInt(rid.value || '0', 10) || 0) === 0) {
+            sessionStorage.removeItem('ucRestoreSecDept');
+            el = document.getElementById('uc_sec_department_id');
+            if (el && !el.disabled) {
+                el.value = v;
+                ucApplyNextSortForNewSec();
+            }
+        }
+        v = sessionStorage.getItem('ucRestoreCatSection');
+        rid = document.getElementById('uc_cat_id');
+        if (v && rid && (parseInt(rid.value || '0', 10) || 0) === 0) {
+            sessionStorage.removeItem('ucRestoreCatSection');
+            el = document.getElementById('uc_cat_section_id');
+            if (el && !el.disabled) {
+                el.value = v;
+                ucApplyNextSortForNewCat();
+            }
+        }
+        v = sessionStorage.getItem('ucRestoreSubCategory');
+        rid = document.getElementById('uc_sub_id');
+        if (v && rid && (parseInt(rid.value || '0', 10) || 0) === 0) {
+            sessionStorage.removeItem('ucRestoreSubCategory');
+            el = document.getElementById('uc_sub_category_id');
+            if (el && !el.disabled) {
+                el.value = v;
+                ucApplyNextSortForNewSub();
+            }
+        }
+    } catch (e) { /* ignore */ }
+}
+
 function resetUcSection() {
+    try { sessionStorage.removeItem('ucRestoreSecDept'); } catch (e) { /* ignore */ }
     ucSlugManual.sec = false;
     document.getElementById('uc_sec_id').value = '0';
     var dsel = document.getElementById('uc_sec_department_id');
@@ -220,6 +270,7 @@ function saveUcSection() {
 }
 
 function resetUcCategory() {
+    try { sessionStorage.removeItem('ucRestoreCatSection'); } catch (e) { /* ignore */ }
     ucSlugManual.cat = false;
     document.getElementById('uc_cat_id').value = '0';
     document.getElementById('uc_cat_section_id').value = '';
@@ -281,6 +332,7 @@ function saveUcCategory() {
 }
 
 function resetUcSubcategory() {
+    try { sessionStorage.removeItem('ucRestoreSubCategory'); } catch (e) { /* ignore */ }
     ucSlugManual.sub = false;
     document.getElementById('uc_sub_id').value = '0';
     document.getElementById('uc_sub_category_id').value = '';
@@ -456,5 +508,6 @@ function scheduleUcFromEn(which) {
     ucApplyNextSortForNewSec();
     ucApplyNextSortForNewCat();
     ucApplyNextSortForNewSub();
+    ucRestoreAfterSaveThenSort();
 })();
 </script>
