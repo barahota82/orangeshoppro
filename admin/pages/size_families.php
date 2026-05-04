@@ -331,7 +331,6 @@ $tablesReady = $hasFamilies && $hasSizes;
                     <option value="<?php echo (int) $tpl['id']; ?>" data-name-en="<?php echo htmlspecialchars((string) ($tpl['name_en'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) ($tpl['name_ar'] ?: $tpl['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
                     <?php endforeach; ?>
                 </select>
-                <small style="display:block;color:#666;margin-top:6px;font-size:0.8rem;line-height:1.4;">يستبدل صفوف الجدول في «مقاسات داخل العائلة» قبل «حفظ المقاسات».</small>
                 <?php else: ?>
                 <select id="sizes_template_pick" class="admin-sort-field" style="display:none;" aria-hidden="true" <?php echo !$hasFamilies ? 'disabled' : ''; ?>><option value=""></option></select>
                 <span style="font-size:0.88rem;color:#92400e;">لا توجد قوالب مفعّلة.</span>
@@ -372,12 +371,6 @@ $tablesReady = $hasFamilies && $hasSizes;
 
 <div class="card">
     <h3>مقاسات داخل العائلة</h3>
-    <p style="margin:0 0 12px;font-size:0.88rem;color:#555;line-height:1.5;">المقاسات تُستورد <strong>من قوالب المقاسات</strong> فقط (لا إدخال يدوي لصفوف الجدول). اختر القالب وحمّل الصفوف من بطاقة «إضافة / تعديل عائلة» أعلاه، ثم احفظ من هنا.</p>
-    <div class="form-grid">
-        <div style="grid-column:1/-1;">
-            <p id="sizes_family_context" class="card-hint" style="margin:0;font-size:0.9rem;line-height:1.55;"></p>
-        </div>
-    </div>
     <div id="sizesEditor" style="margin-top:12px;"></div>
     <div class="actions sf-sizes-actions" style="margin-top:14px;">
         <button type="button" onclick="saveSizesForFamily()" <?php echo !$tablesReady ? 'disabled' : ''; ?>>حفظ المقاسات</button>
@@ -697,7 +690,6 @@ function resetFamilyForm() {
     }
     document.getElementById('fam_sort').value = String(defaultNextFamilySort || 1);
     document.getElementById('fam_active').value = '1';
-    famRefreshSizesFamilyContext();
     loadSizesEditor();
 }
 
@@ -839,30 +831,11 @@ async function saveFamiliesOrder() {
     if (res.success) location.reload();
 }
 
-function famRefreshSizesFamilyContext() {
-    var el = document.getElementById('sizes_family_context');
-    if (!el) {
-        return;
-    }
-    var id = parseInt(String(document.getElementById('fam_id').value || '0').trim(), 10) || 0;
-    var narEl = document.getElementById('fam_name_ar');
-    var nenEl = document.getElementById('fam_name_en');
-    var nar = narEl ? String(narEl.value || '').trim() : '';
-    var nen = nenEl ? String(nenEl.value || '').trim() : '';
-    if (id <= 0) {
-        el.textContent = 'المقاسات تُربَط بالعائلة في بطاقة «إضافة / تعديل عائلة» أعلاه. احفظ العائلة أولاً (ليُنشأ معرّف في القاعدة)، ثم حمّل المقاسات من قالب واضغط «حفظ المقاسات». أو اضغط «تعديل» من قائمة العائلات لتفتح عائلة محفوظة.';
-        return;
-    }
-    var label = nar || nen || ('#' + id);
-    el.textContent = 'المقاسات تُعرض وتُحفَظ للعائلة المفتوحة في النموذج أعلاه: «' + label + '» (معرّف ' + id + ').';
-}
-
 function loadSizesEditor() {
     var fid = parseInt(String(document.getElementById('fam_id').value || '0').trim(), 10) || 0;
     var box = document.getElementById('sizesEditor');
     if (!fid) {
         box.innerHTML = '';
-        famRefreshSizesFamilyContext();
         return;
     }
     var rows = ORANGE_SIZES_BY_FAMILY[String(fid)] || ORANGE_SIZES_BY_FAMILY[fid] || [];
@@ -881,7 +854,6 @@ function loadSizesEditor() {
         html += '<p class="card-hint" style="margin-top:10px;font-size:0.85rem;">لتغيير المقاسات: استخدم «تحميل المقاسات من القالب» ليستبدل الجدول، أو عدّل القالب في «إدارة القوالب» ثم أعد التحميل.</p>';
     }
     box.innerHTML = html;
-    famRefreshSizesFamilyContext();
 }
 
 function escapeAttr(s) {
@@ -1136,7 +1108,6 @@ async function saveSizesForFamily() {
             tplPick._sfSchemeBound = true;
             tplPick.addEventListener('change', famApplyAutoSizeSchemeKey);
         }
-        famRefreshSizesFamilyContext();
         loadSizesEditor();
     }
     famRunInitWhenPostJsonReady();
