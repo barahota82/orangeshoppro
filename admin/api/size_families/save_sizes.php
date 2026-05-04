@@ -7,6 +7,31 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
 require_admin_api();
 
+/**
+ * تحديث سطر القالب وجميع مقاسات العائلات المربوطة به (مزامنة ثنائية).
+ *
+ * @param float|null $foot
+ */
+function orange_catalog_sync_template_size_to_linked_families(
+    PDO $pdo,
+    int $templateSizeId,
+    string $la,
+    string $le,
+    string $lf,
+    string $lh,
+    int $sortOrder,
+    $foot
+): void {
+    $wu = $pdo->prepare(
+        'UPDATE size_scheme_template_sizes SET label_ar=?, label_en=?, label_fil=?, label_hi=?, sort_order=?, foot_length_cm=? WHERE id=? LIMIT 1'
+    );
+    $wu->execute([$la, $le, $lf, $lh, $sortOrder, $foot, $templateSizeId]);
+    $wf = $pdo->prepare(
+        'UPDATE size_family_sizes SET label_ar=?, label_en=?, label_fil=?, label_hi=?, sort_order=?, foot_length_cm=? WHERE scheme_template_size_id=?'
+    );
+    $wf->execute([$la, $le, $lf, $lh, $sortOrder, $foot, $templateSizeId]);
+}
+
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
@@ -77,6 +102,16 @@ try {
     $hasFoot = orange_table_has_column($pdo, 'size_family_sizes', 'foot_length_cm');
     $hasSfLang = orange_table_has_column($pdo, 'size_family_sizes', 'label_fil')
         && orange_table_has_column($pdo, 'size_family_sizes', 'label_hi');
+    $hasTplLink = orange_table_exists($pdo, 'size_family_sizes')
+        && orange_table_has_column($pdo, 'size_family_sizes', 'scheme_template_size_id');
+    $syncTemplateId = (int) ($data['sync_template_id'] ?? 0);
+
+    $insTplSz = null;
+    if ($hasTplLink && $syncTemplateId > 0) {
+        $insTplSz = $pdo->prepare(
+            'INSERT INTO size_scheme_template_sizes (template_id, label_ar, label_en, label_fil, label_hi, sort_order, foot_length_cm, is_active) VALUES (?,?,?,?,?,?,?,1)'
+        );
+    }
 
     $ins = $hasFoot && $hasSfLang
         ? $pdo->prepare(
@@ -109,6 +144,13 @@ try {
                 'UPDATE size_family_sizes SET label_ar=?, label_en=?, sort_order=? WHERE id=? AND size_family_id=? LIMIT 1'
             )));
 
+    $linkStmt = $hasTplLink
+        ? $pdo->prepare('UPDATE size_family_sizes SET scheme_template_size_id=? WHERE id=? AND size_family_id=? LIMIT 1')
+        : null;
+    $unlinkStmt = $hasTplLink
+        ? $pdo->prepare('UPDATE size_family_sizes SET scheme_template_size_id=NULL WHERE id=? AND size_family_id=? LIMIT 1')
+        : null;
+
     foreach ($rows as $i => $row) {
         if (!is_array($row)) {
             continue;
@@ -130,18 +172,52 @@ try {
         if ($la === '' && $le === '') {
             continue;
         }
-        if ($sid > 0) {
-            if ($hasFoot && $hasSfLang) {
-                $upd->execute([$la, $le, $lf, $lh, $so, $foot, $sid, $familyId]);
-            } elseif ($hasFoot) {
-                $upd->execute([$la, $le, $so, $foot, $sid, $familyId]);
-            } elseif ($hasSfLang) {
-                $upd->execute([$la, $le, $lf, $lh, $so, $sid, $familyId]);
-            } else {
-                $upd->execute([$la, $le, $so, $sid, $familyId]);
+
+        $tstId = $hasTplLink ? (int) ($row['scheme_template_size_id'] ?? 0) : 0;
+        if ($tstId > 0) {
+            $vchk = $pdo->prepare('SELECT id FROM size_scheme_template_sizes WHERE id = ? LIMIT 1');
+            $vchk->execute([$tstId]);
+            if (!$vchk->fetch()) {
+                $pdo->rollBack();
+                json_response(['success' => false, 'message' => 'مرجع مقاس القالب غير صالح'], 422);
             }
-            $keepIds[] = $sid;
+        }
+
+        if ($sid > 0) {
+            if ($hasTplLink && $tstId > 0) {
+                if ($linkStmt !== null) {
+                    $linkStmt->execute([$tstId, $sid, $familyId]);
+                }
+                orange_catalog_sync_template_size_to_linked_families($pdo, $tstId, $la, $le, $lf, $lh, $so, $foot);
+                $keepIds[] = $sid;
+            } else {
+                if ($hasFoot && $hasSfLang) {
+                    $upd->execute([$la, $le, $lf, $lh, $so, $foot, $sid, $familyId]);
+                } elseif ($hasFoot) {
+                    $upd->execute([$la, $le, $so, $foot, $sid, $familyId]);
+                } elseif ($hasSfLang) {
+                    $upd->execute([$la, $le, $lf, $lh, $so, $sid, $familyId]);
+                } else {
+                    $upd->execute([$la, $le, $so, $sid, $familyId]);
+                }
+                if ($unlinkStmt !== null) {
+                    $unlinkStmt->execute([$sid, $familyId]);
+                }
+                $keepIds[] = $sid;
+            }
         } else {
+            $attachTpl = 0;
+            if ($hasTplLink && $tstId === 0 && $syncTemplateId > 0 && $insTplSz !== null) {
+                $chkTpl = $pdo->prepare('SELECT id FROM size_scheme_templates WHERE id = ? LIMIT 1');
+                $chkTpl->execute([$syncTemplateId]);
+                if (!$chkTpl->fetch()) {
+                    $pdo->rollBack();
+                    json_response(['success' => false, 'message' => 'قالب المقاسات غير موجود'], 422);
+                }
+                $insTplSz->execute([$syncTemplateId, $la, $le, $lf, $lh, $so, $foot]);
+                $attachTpl = (int) $pdo->lastInsertId();
+            }
+
             if ($hasFoot && $hasSfLang) {
                 $ins->execute([$familyId, $la, $le, $lf, $lh, $so, $foot]);
             } elseif ($hasFoot) {
@@ -151,7 +227,15 @@ try {
             } else {
                 $ins->execute([$familyId, $la, $le, $so]);
             }
-            $keepIds[] = (int) $pdo->lastInsertId();
+            $newFamSid = (int) $pdo->lastInsertId();
+            $keepIds[] = $newFamSid;
+
+            if ($linkStmt !== null) {
+                $linkVal = $tstId > 0 ? $tstId : $attachTpl;
+                if ($linkVal > 0) {
+                    $linkStmt->execute([$linkVal, $newFamSid, $familyId]);
+                }
+            }
         }
     }
 

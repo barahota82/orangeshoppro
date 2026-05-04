@@ -252,6 +252,7 @@ CREATE TABLE `size_scheme_template_sizes` (
 CREATE TABLE `size_family_sizes` (
   `id` int NOT NULL AUTO_INCREMENT,
   `size_family_id` int NOT NULL,
+  `scheme_template_size_id` int DEFAULT NULL,
   `label_ar` varchar(191) NOT NULL DEFAULT '',
   `label_en` varchar(191) NOT NULL DEFAULT '',
   `label_fil` varchar(191) NOT NULL DEFAULT '',
@@ -261,7 +262,8 @@ CREATE TABLE `size_family_sizes` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `foot_length_cm` decimal(6,2) DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `idx_size_family_sizes_family` (`size_family_id`)
+  KEY `idx_size_family_sizes_family` (`size_family_id`),
+  KEY `idx_size_family_sizes_tpl_sz` (`scheme_template_size_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `accounts` (

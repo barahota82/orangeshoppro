@@ -357,6 +357,10 @@ function sstCollectSizes() {
         if (flv !== '') {
             o.foot_length_cm = flv;
         }
+        var sid = parseInt(tr.getAttribute('data-sst-size-id') || '0', 10) || 0;
+        if (sid > 0) {
+            o.id = sid;
+        }
         if (o.label_ar === '' && o.label_en === '') {
             return;
         }
@@ -522,6 +526,9 @@ async function sstLoadOne(tplId) {
             sizes.forEach(function (r, idx) {
                 var tr = document.createElement('tr');
                 tr.className = 'sst-size-row';
+                if (r.id != null && parseInt(String(r.id), 10) > 0) {
+                    tr.setAttribute('data-sst-size-id', String(parseInt(String(r.id), 10)));
+                }
                 var fl = (r.foot_length_cm != null && r.foot_length_cm !== '') ? String(r.foot_length_cm) : '';
                 tr.innerHTML = '<td class="sst-ord">' + String(idx + 1) + '</td>' +
                     '<td><input type="text" class="sst-le admin-sort-field" maxlength="191" autocomplete="off" value="' + sstEscapeAttr(r.label_en) + '"></td>' +

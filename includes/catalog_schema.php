@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 21);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 22);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -1033,6 +1033,17 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         if (!orange_table_has_column($pdo, 'size_family_sizes', 'label_hi')) {
             orange_catalog_safe_exec($pdo, 'ALTER TABLE size_family_sizes ADD COLUMN label_hi VARCHAR(191) NOT NULL DEFAULT \'\' AFTER label_fil');
         }
+    }
+
+    if (orange_table_exists($pdo, 'size_family_sizes') && !orange_table_has_column($pdo, 'size_family_sizes', 'scheme_template_size_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE size_family_sizes ADD COLUMN scheme_template_size_id INT NULL DEFAULT NULL AFTER size_family_id'
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE size_family_sizes ADD KEY idx_size_family_sizes_tpl_sz (scheme_template_size_id)'
+        );
     }
 
     if (orange_table_exists($pdo, 'size_family_sizes') && !orange_table_has_column($pdo, 'size_family_sizes', 'foot_length_cm')) {

@@ -892,7 +892,13 @@ async function saveFamily() {
         }
         var sizeRowsPayload = famCollectSizesRowsFromEditor();
         if (sizeRowsPayload.length > 0 && savedId > 0) {
-            var sz = await postJSON('/admin/api/size_families/save_sizes.php', { family_id: savedId, sizes: sizeRowsPayload });
+            var syncTpl = document.getElementById('sizes_template_pick');
+            var syncTplId = (syncTpl && syncTpl.tagName === 'SELECT') ? (parseInt(syncTpl.value || '0', 10) || 0) : 0;
+            var sz = await postJSON('/admin/api/size_families/save_sizes.php', {
+                family_id: savedId,
+                sizes: sizeRowsPayload,
+                sync_template_id: syncTplId
+            });
             if (!sz || !sz.success) {
                 alert('تم حفظ العائلة لكن حفظ المقاسات فشل: ' + ((sz && sz.message) ? sz.message : 'خطأ'));
                 return;
@@ -959,7 +965,8 @@ function loadSizesEditor() {
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
             var fl = (r.foot_length_cm != null && r.foot_length_cm !== '') ? String(r.foot_length_cm) : '';
-            html += '<tr class="size-row" data-id="' + r.id + '"><td>' + r.id + '</td><td><input type="text" class="s-la" readonly tabindex="-1" value="' + escapeAttr(r.label_ar) + '"></td><td><input type="text" class="s-le" readonly tabindex="-1" value="' + escapeAttr(r.label_en) + '"></td><td><input type="text" class="s-lf" readonly tabindex="-1" value="' + escapeAttr(r.label_fil) + '"></td><td><input type="text" class="s-lh" readonly tabindex="-1" value="' + escapeAttr(r.label_hi) + '"></td><td><input type="text" class="s-fl" readonly tabindex="-1" value="' + escapeAttr(fl) + '"></td><td><input type="number" class="s-so" readonly tabindex="-1" value="' + (Number(r.sort_order) || 0) + '"></td></tr>';
+            var tplSz = parseInt(String(r.scheme_template_size_id != null ? r.scheme_template_size_id : '0'), 10) || 0;
+            html += '<tr class="size-row" data-id="' + r.id + '" data-scheme-template-size-id="' + tplSz + '"><td>' + r.id + '</td><td><input type="text" class="s-la" readonly tabindex="-1" value="' + escapeAttr(r.label_ar) + '"></td><td><input type="text" class="s-le" readonly tabindex="-1" value="' + escapeAttr(r.label_en) + '"></td><td><input type="text" class="s-lf" readonly tabindex="-1" value="' + escapeAttr(r.label_fil) + '"></td><td><input type="text" class="s-lh" readonly tabindex="-1" value="' + escapeAttr(r.label_hi) + '"></td><td><input type="text" class="s-fl" readonly tabindex="-1" value="' + escapeAttr(fl) + '"></td><td><input type="number" class="s-so" readonly tabindex="-1" value="' + (Number(r.sort_order) || 0) + '"></td></tr>';
         }
         html += '</tbody></table></div>';
     }
@@ -1006,6 +1013,10 @@ function famCollectSizesRowsFromEditor() {
         if (la === '' && le === '') continue;
         var row = { id: id, label_ar: la, label_en: le, label_fil: lf, label_hi: lh, sort_order: so };
         if (fl !== '') row.foot_length_cm = fl;
+        var tplL = parseInt(tr.getAttribute('data-scheme-template-size-id') || '0', 10) || 0;
+        if (tplL > 0) {
+            row.scheme_template_size_id = tplL;
+        }
         rows.push(row);
     }
     return rows;
@@ -1064,6 +1075,10 @@ async function famApplyTemplateSizesToEditor(tid, opts) {
             var tr = document.createElement('tr');
             tr.className = 'size-row';
             tr.setAttribute('data-new', '1');
+            var tplSzId = parseInt(String(r.id != null ? r.id : '0'), 10) || 0;
+            if (tplSzId > 0) {
+                tr.setAttribute('data-scheme-template-size-id', String(tplSzId));
+            }
             var fl = (r.foot_length_cm != null && r.foot_length_cm !== '') ? String(r.foot_length_cm) : '';
             tr.innerHTML = '<td>0</td><td><input type="text" class="s-la" readonly tabindex="-1" value="' + escapeAttr(r.label_ar || '') + '"></td><td><input type="text" class="s-le" readonly tabindex="-1" value="' + escapeAttr(r.label_en || '') + '"></td><td><input type="text" class="s-lf" readonly tabindex="-1" value="' + escapeAttr(r.label_fil || '') + '"></td><td><input type="text" class="s-lh" readonly tabindex="-1" value="' + escapeAttr(r.label_hi || '') + '"></td><td><input type="text" class="s-fl" readonly tabindex="-1" value="' + escapeAttr(fl) + '"></td><td><input type="number" class="s-so" readonly tabindex="-1" value="' + (Number(r.sort_order) || 0) + '"></td>';
             tbody.appendChild(tr);
@@ -1118,7 +1133,13 @@ async function saveSizesForFamily() {
         alert('حمّل المقاسات من قالب أولاً (لا يوجد صف في الجدول).');
         return;
     }
-    var res = await postJSON('/admin/api/size_families/save_sizes.php', { family_id: familyId, sizes: rows });
+    var syncPick = document.getElementById('sizes_template_pick');
+    var syncTplId2 = (syncPick && syncPick.tagName === 'SELECT') ? (parseInt(syncPick.value || '0', 10) || 0) : 0;
+    var res = await postJSON('/admin/api/size_families/save_sizes.php', {
+        family_id: familyId,
+        sizes: rows,
+        sync_template_id: syncTplId2
+    });
     alert(res.message || (res.success ? 'تم حفظ المقاسات' : 'فشل'));
     if (res.success) location.reload();
 }

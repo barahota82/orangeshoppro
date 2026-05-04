@@ -90,7 +90,9 @@ try {
                 if ($flRaw !== null && $flRaw !== '') {
                     $fl = is_numeric($flRaw) ? (float) $flRaw : null;
                 }
+                $rowTplSizeId = (int) ($row['id'] ?? 0);
                 $normalized[] = [
+                    'id' => $rowTplSizeId,
                     'label_ar' => $la,
                     'label_en' => $le,
                     'label_fil' => $lf,
@@ -128,24 +130,83 @@ try {
                     $tplId = (int) $pdo->lastInsertId();
                 }
 
-                $pdo->prepare('DELETE FROM size_scheme_template_sizes WHERE template_id = ?')->execute([$tplId]);
-                $ins = $pdo->prepare(
+                $stOld = $pdo->prepare('SELECT id FROM size_scheme_template_sizes WHERE template_id = ?');
+                $stOld->execute([$tplId]);
+                $oldTplSizeIds = array_map(
+                    static function ($v) {
+                        return (int) $v;
+                    },
+                    array_column($stOld->fetchAll(PDO::FETCH_ASSOC) ?: [], 'id')
+                );
+
+                $insTplSz = $pdo->prepare(
                     'INSERT INTO size_scheme_template_sizes
                         (template_id, label_ar, label_en, label_fil, label_hi, sort_order, foot_length_cm, is_active)
                      VALUES (?,?,?,?,?,?,?,1)'
                 );
+                $updTplSz = $pdo->prepare(
+                    'UPDATE size_scheme_template_sizes SET label_ar=?, label_en=?, label_fil=?, label_hi=?, sort_order=?, foot_length_cm=?
+                     WHERE id=? AND template_id=? LIMIT 1'
+                );
+
+                $keptTplSizeIds = [];
                 foreach ($normalized as $i => $r) {
                     $so = $r['sort_order'] > 0 ? $r['sort_order'] : ($i + 1);
-                    $ins->execute([
-                        $tplId,
-                        $r['label_ar'],
-                        $r['label_en'],
-                        $r['label_fil'],
-                        $r['label_hi'],
-                        $so,
-                        $r['foot_length_cm'],
-                    ]);
+                    $rid = (int) ($r['id'] ?? 0);
+                    if ($rid > 0 && in_array($rid, $oldTplSizeIds, true)) {
+                        $updTplSz->execute([
+                            $r['label_ar'],
+                            $r['label_en'],
+                            $r['label_fil'],
+                            $r['label_hi'],
+                            $so,
+                            $r['foot_length_cm'],
+                            $rid,
+                            $tplId,
+                        ]);
+                        $keptTplSizeIds[] = $rid;
+                    } else {
+                        $insTplSz->execute([
+                            $tplId,
+                            $r['label_ar'],
+                            $r['label_en'],
+                            $r['label_fil'],
+                            $r['label_hi'],
+                            $so,
+                            $r['foot_length_cm'],
+                        ]);
+                        $keptTplSizeIds[] = (int) $pdo->lastInsertId();
+                    }
                 }
+
+                $removedTplSizeIds = array_values(array_diff($oldTplSizeIds, $keptTplSizeIds));
+                if ($removedTplSizeIds !== []) {
+                    $hasFamLink = orange_table_exists($pdo, 'size_family_sizes')
+                        && orange_table_has_column($pdo, 'size_family_sizes', 'scheme_template_size_id');
+                    if ($hasFamLink) {
+                        $phR = implode(',', array_fill(0, count($removedTplSizeIds), '?'));
+                        $pdo->prepare(
+                            "UPDATE size_family_sizes SET scheme_template_size_id = NULL WHERE scheme_template_size_id IN ($phR)"
+                        )->execute($removedTplSizeIds);
+                    }
+                    $phD = implode(',', array_fill(0, count($removedTplSizeIds), '?'));
+                    $pdo->prepare(
+                        "DELETE FROM size_scheme_template_sizes WHERE template_id = ? AND id IN ($phD)"
+                    )->execute(array_merge([$tplId], $removedTplSizeIds));
+                }
+
+                $hasFamLink = orange_table_exists($pdo, 'size_family_sizes')
+                    && orange_table_has_column($pdo, 'size_family_sizes', 'scheme_template_size_id');
+                if ($hasFamLink && $keptTplSizeIds !== []) {
+                    $phK = implode(',', array_fill(0, count($keptTplSizeIds), '?'));
+                    $sqlSync = 'UPDATE size_family_sizes sfs
+                        INNER JOIN size_scheme_template_sizes tst ON tst.id = sfs.scheme_template_size_id
+                        SET sfs.label_ar = tst.label_ar, sfs.label_en = tst.label_en, sfs.label_fil = tst.label_fil,
+                            sfs.label_hi = tst.label_hi, sfs.sort_order = tst.sort_order, sfs.foot_length_cm = tst.foot_length_cm
+                        WHERE tst.template_id = ? AND sfs.scheme_template_size_id IN (' . $phK . ')';
+                    $pdo->prepare($sqlSync)->execute(array_merge([$tplId], $keptTplSizeIds));
+                }
+
                 $pdo->commit();
             } catch (Throwable $e) {
                 $pdo->rollBack();
@@ -157,6 +218,21 @@ try {
             $id = (int) ($data['id'] ?? 0);
             if ($id <= 0) {
                 json_response(['success' => false, 'message' => 'معرّف القالب غير صالح'], 422);
+            }
+            $stDel = $pdo->prepare('SELECT id FROM size_scheme_template_sizes WHERE template_id = ?');
+            $stDel->execute([$id]);
+            $delTstIds = array_map(
+                static function ($v) {
+                    return (int) $v;
+                },
+                array_column($stDel->fetchAll(PDO::FETCH_ASSOC) ?: [], 'id')
+            );
+            if ($delTstIds !== [] && orange_table_exists($pdo, 'size_family_sizes')
+                && orange_table_has_column($pdo, 'size_family_sizes', 'scheme_template_size_id')) {
+                $phDel = implode(',', array_fill(0, count($delTstIds), '?'));
+                $pdo->prepare(
+                    "UPDATE size_family_sizes SET scheme_template_size_id = NULL WHERE scheme_template_size_id IN ($phDel)"
+                )->execute($delTstIds);
             }
             $pdo->prepare('DELETE FROM size_scheme_template_sizes WHERE template_id = ?')->execute([$id]);
             $pdo->prepare('DELETE FROM size_scheme_templates WHERE id = ? LIMIT 1')->execute([$id]);
