@@ -291,9 +291,18 @@ try {
                 }
 
                 $removedTplSizeIds = array_values(array_diff($oldTplSizeIds, $keptTplSizeIds));
+                $hasFamLink = orange_table_exists($pdo, 'size_family_sizes')
+                    && orange_table_has_column($pdo, 'size_family_sizes', 'scheme_template_size_id');
+                $hasFamTplRef = orange_table_exists($pdo, 'size_families')
+                    && orange_table_has_column($pdo, 'size_families', 'size_scheme_template_id');
                 if ($removedTplSizeIds !== []) {
-                    $hasFamLink = orange_table_exists($pdo, 'size_family_sizes')
-                        && orange_table_has_column($pdo, 'size_family_sizes', 'scheme_template_size_id');
+                    if ($hasFamLink && $hasFamTplRef) {
+                        $phR = implode(',', array_fill(0, count($removedTplSizeIds), '?'));
+                        $sqlDelBound = "DELETE sfs FROM size_family_sizes sfs
+                            INNER JOIN size_families fam ON fam.id = sfs.size_family_id AND fam.size_scheme_template_id = ?
+                            WHERE sfs.scheme_template_size_id IN ($phR)";
+                        $pdo->prepare($sqlDelBound)->execute(array_merge([$tplId], $removedTplSizeIds));
+                    }
                     if ($hasFamLink) {
                         $phR = implode(',', array_fill(0, count($removedTplSizeIds), '?'));
                         $pdo->prepare(
@@ -306,8 +315,6 @@ try {
                     )->execute(array_merge([$tplId], $removedTplSizeIds));
                 }
 
-                $hasFamLink = orange_table_exists($pdo, 'size_family_sizes')
-                    && orange_table_has_column($pdo, 'size_family_sizes', 'scheme_template_size_id');
                 if ($hasFamLink && $keptTplSizeIds !== []) {
                     $phK = implode(',', array_fill(0, count($keptTplSizeIds), '?'));
                     $sqlSync = 'UPDATE size_family_sizes sfs
@@ -318,8 +325,6 @@ try {
                     $pdo->prepare($sqlSync)->execute(array_merge([$tplId], $keptTplSizeIds));
                 }
 
-                $hasFamTplRef = orange_table_exists($pdo, 'size_families')
-                    && orange_table_has_column($pdo, 'size_families', 'size_scheme_template_id');
                 if ($hasFamTplRef) {
                     $famNullTpl = $pdo->query(
                         'SELECT id, name_en, size_scheme_key, sizing_category_key, COALESCE(size_scheme_template_id,0) AS size_scheme_template_id
@@ -521,6 +526,16 @@ try {
                                         1,
                                         $tstIdRow,
                                     ]);
+                                }
+                            }
+                            $tplCount = count($tplRowsList);
+                            if (count($famSizeIdsList) > $tplCount) {
+                                $dropIds = array_slice($famSizeIdsList, $tplCount);
+                                if ($dropIds !== []) {
+                                    $phDrop = implode(',', array_fill(0, count($dropIds), '?'));
+                                    $pdo->prepare(
+                                        "DELETE FROM size_family_sizes WHERE size_family_id = ? AND id IN ($phDrop)"
+                                    )->execute(array_merge([$syncFamId], $dropIds));
                                 }
                             }
                         }
