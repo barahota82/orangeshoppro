@@ -179,13 +179,7 @@ async function ucPost(url, payload) {
         alert(res.message || (res.success ? 'تم الحفظ' : 'فشل'));
         if (res.success) {
             try {
-                if (url.indexOf('save_section') !== -1 && payload.department_id) {
-                    sessionStorage.setItem('ucRestoreSecDept', String(payload.department_id));
-                } else if (url.indexOf('save_category') !== -1 && payload.catalog_section_id) {
-                    sessionStorage.setItem('ucRestoreCatSection', String(payload.catalog_section_id));
-                } else if (url.indexOf('save_subcategory') !== -1 && payload.catalog_category_id) {
-                    sessionStorage.setItem('ucRestoreSubCategory', String(payload.catalog_category_id));
-                }
+                sessionStorage.setItem('ucSkipParentAutoOnce', '1');
             } catch (e) { /* ignore */ }
             location.reload();
         }
@@ -196,46 +190,14 @@ async function ucPost(url, payload) {
     }
 }
 
-function ucRestoreAfterSaveThenSort() {
-    try {
-        var rid;
-        var v;
-        var el;
-        v = sessionStorage.getItem('ucRestoreSecDept');
-        rid = document.getElementById('uc_sec_id');
-        if (v && rid && (parseInt(rid.value || '0', 10) || 0) === 0) {
-            sessionStorage.removeItem('ucRestoreSecDept');
-            el = document.getElementById('uc_sec_department_id');
-            if (el && !el.disabled) {
-                el.value = v;
-                ucApplyNextSortForNewSec();
-            }
-        }
-        v = sessionStorage.getItem('ucRestoreCatSection');
-        rid = document.getElementById('uc_cat_id');
-        if (v && rid && (parseInt(rid.value || '0', 10) || 0) === 0) {
-            sessionStorage.removeItem('ucRestoreCatSection');
-            el = document.getElementById('uc_cat_section_id');
-            if (el && !el.disabled) {
-                el.value = v;
-                ucApplyNextSortForNewCat();
-            }
-        }
-        v = sessionStorage.getItem('ucRestoreSubCategory');
-        rid = document.getElementById('uc_sub_id');
-        if (v && rid && (parseInt(rid.value || '0', 10) || 0) === 0) {
-            sessionStorage.removeItem('ucRestoreSubCategory');
-            el = document.getElementById('uc_sub_category_id');
-            if (el && !el.disabled) {
-                el.value = v;
-                ucApplyNextSortForNewSub();
-            }
-        }
-    } catch (e) { /* ignore */ }
-}
-
 /** إن وُجد خيار «اختر» + أب واحد فقط، نختار الأب تلقائياً ليُحسب الترتيب التالي (لا يبقى الحقل فارغاً). */
 function ucInitSingleParentBranchForms() {
+    try {
+        if (sessionStorage.getItem('ucSkipParentAutoOnce') === '1') {
+            sessionStorage.removeItem('ucSkipParentAutoOnce');
+            return;
+        }
+    } catch (e) { /* ignore */ }
     var rid = document.getElementById('uc_sec_id');
     var d = document.getElementById('uc_sec_department_id');
     if (rid && d && !d.disabled && (parseInt(rid.value || '0', 10) || 0) === 0) {
@@ -263,7 +225,6 @@ function ucInitSingleParentBranchForms() {
 }
 
 function resetUcSection() {
-    try { sessionStorage.removeItem('ucRestoreSecDept'); } catch (e) { /* ignore */ }
     ucSlugManual.sec = false;
     document.getElementById('uc_sec_id').value = '0';
     var dsel = document.getElementById('uc_sec_department_id');
@@ -311,7 +272,6 @@ function saveUcSection() {
 }
 
 function resetUcCategory() {
-    try { sessionStorage.removeItem('ucRestoreCatSection'); } catch (e) { /* ignore */ }
     ucSlugManual.cat = false;
     document.getElementById('uc_cat_id').value = '0';
     var catSec = document.getElementById('uc_cat_section_id');
@@ -377,7 +337,6 @@ function saveUcCategory() {
 }
 
 function resetUcSubcategory() {
-    try { sessionStorage.removeItem('ucRestoreSubCategory'); } catch (e) { /* ignore */ }
     ucSlugManual.sub = false;
     document.getElementById('uc_sub_id').value = '0';
     var subCat = document.getElementById('uc_sub_category_id');
@@ -511,6 +470,11 @@ function scheduleUcFromEn(which) {
 }
 
 (function () {
+    try {
+        sessionStorage.removeItem('ucRestoreSecDept');
+        sessionStorage.removeItem('ucRestoreCatSection');
+        sessionStorage.removeItem('ucRestoreSubCategory');
+    } catch (e) { /* ignore */ }
     document.addEventListener('click', function (ev) {
         var b = ev.target.closest('.uc-edit-sec');
         if (b && b.dataset.json) {
@@ -557,7 +521,6 @@ function scheduleUcFromEn(which) {
     ucApplyNextSortForNewSec();
     ucApplyNextSortForNewCat();
     ucApplyNextSortForNewSub();
-    ucRestoreAfterSaveThenSort();
     ucInitSingleParentBranchForms();
 })();
 </script>

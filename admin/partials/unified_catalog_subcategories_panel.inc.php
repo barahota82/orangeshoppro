@@ -12,7 +12,7 @@ $ucCatEmpty = !empty($orange_uc['categories_empty_for_subcats']);
     <div class="form-grid uc-sub-form-grid">
         <div class="uc-sub-sort admin-sort-field-wrap">
             <label for="uc_sub_sort">الترتيب (تلقائي)</label>
-            <small style="display:block;color:#64748b;font-size:12px;margin-top:2px;line-height:1.4;">بعد الحفظ تُستعاد نفس الفئة ويُعرض الرقم التالي تلقائياً.</small>
+            <small style="display:block;color:#64748b;font-size:12px;margin-top:2px;line-height:1.4;">بعد الحفظ وتجديد الصفحة يُفرَّغ اختيار الفئة والترتيب؛ اختر الفئة ليظهر الترتيب التالي.</small>
             <input type="number" id="uc_sub_sort" class="admin-sort-field<?php echo $ucCatEmpty ? ' admin-sort-field--muted' : ''; ?>" min="1" step="1" value="" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>>
         </div>
         <div class="uc-sub-active admin-sort-field-wrap">
