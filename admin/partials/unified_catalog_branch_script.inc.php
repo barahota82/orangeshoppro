@@ -118,15 +118,12 @@ function ucApplyNextSortForNewSec() {
     if (!d || !s || d.disabled) {
         return;
     }
-    s.value = ucPickNextSort(ucNextSortByDept, d.value);
-}
-
-function ucTryAutoSingleSection() {
-    const sel = document.getElementById('uc_cat_section_id');
-    if (!sel || sel.disabled || sel.options.length !== 2) {
+    const depId = String(d.value || '').trim();
+    if (!depId) {
+        s.value = '';
         return;
     }
-    sel.selectedIndex = 1;
+    s.value = ucPickNextSort(ucNextSortByDept, depId);
 }
 
 function ucApplyNextSortForNewCat() {
@@ -138,15 +135,12 @@ function ucApplyNextSortForNewCat() {
     if (!sel || !s || sel.disabled) {
         return;
     }
-    s.value = ucPickNextSort(ucNextSortBySec, sel.value);
-}
-
-function ucTryAutoSingleSubcategoryParent() {
-    const sel = document.getElementById('uc_sub_category_id');
-    if (!sel || sel.disabled || sel.options.length !== 2) {
+    const sid = String(sel.value || '').trim();
+    if (!sid) {
+        s.value = '';
         return;
     }
-    sel.selectedIndex = 1;
+    s.value = ucPickNextSort(ucNextSortBySec, sid);
 }
 
 function ucApplyNextSortForNewSub() {
@@ -158,7 +152,12 @@ function ucApplyNextSortForNewSub() {
     if (!sel || !s || sel.disabled) {
         return;
     }
-    s.value = ucPickNextSort(ucNextSortByCat, sel.value);
+    const cid = String(sel.value || '').trim();
+    if (!cid) {
+        s.value = '';
+        return;
+    }
+    s.value = ucPickNextSort(ucNextSortByCat, cid);
 }
 
 async function ucPost(url, payload) {
@@ -231,7 +230,6 @@ function resetUcCategory() {
     document.getElementById('uc_cat_name_fil').value = '';
     document.getElementById('uc_cat_name_hi').value = '';
     document.getElementById('uc_cat_active').value = '1';
-    ucTryAutoSingleSection();
     ucApplyNextSortForNewCat();
 }
 
@@ -293,7 +291,6 @@ function resetUcSubcategory() {
     document.getElementById('uc_sub_name_fil').value = '';
     document.getElementById('uc_sub_name_hi').value = '';
     document.getElementById('uc_sub_active').value = '1';
-    ucTryAutoSingleSubcategoryParent();
     ucApplyNextSortForNewSub();
 }
 
@@ -457,9 +454,7 @@ function scheduleUcFromEn(which) {
         dCat.addEventListener('change', function () { ucApplyNextSortForNewSub(); });
     }
     ucApplyNextSortForNewSec();
-    ucTryAutoSingleSection();
     ucApplyNextSortForNewCat();
-    ucTryAutoSingleSubcategoryParent();
     ucApplyNextSortForNewSub();
 })();
 </script>

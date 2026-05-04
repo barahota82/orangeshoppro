@@ -7,14 +7,6 @@ $ucDepartments = $orange_uc['departments'] ?? [];
 $ucSectionsFlat = $orange_uc['sections_flat'] ?? [];
 $ucSecOpts = $orange_uc['section_select_options'] ?? [];
 $ucDepsEmpty = !empty($orange_uc['deps_empty_for_sections']);
-$ucMapDeptSort = $orange_uc['next_sort_by_department'] ?? [];
-$ucNextSecSort = 1;
-if (! $ucDepsEmpty && isset($ucDepartments[0]) && is_array($ucDepartments[0])) {
-    $fd = (int) ($ucDepartments[0]['id'] ?? 0);
-    if ($fd > 0 && isset($ucMapDeptSort[$fd])) {
-        $ucNextSecSort = (int) $ucMapDeptSort[$fd];
-    }
-}
 ?>
 <div class="card" style="margin-bottom:14px;">
     <h3 style="margin-top:0;">1 — أقسام داخلية (catalog_sections)</h3>
@@ -22,7 +14,7 @@ if (! $ucDepsEmpty && isset($ucDepartments[0]) && is_array($ucDepartments[0])) {
     <div class="form-grid uc-sec-form-grid">
         <div class="uc-sec-sort admin-sort-field-wrap">
             <label for="uc_sec_sort">الترتيب (تلقائي)</label>
-            <input type="number" id="uc_sec_sort" class="admin-sort-field<?php echo $ucDepsEmpty ? ' admin-sort-field--muted' : ''; ?>" min="1" step="1" value="<?php echo $ucDepsEmpty ? '' : (string) (int) $ucNextSecSort; ?>" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>
+            <input type="number" id="uc_sec_sort" class="admin-sort-field<?php echo $ucDepsEmpty ? ' admin-sort-field--muted' : ''; ?>" min="1" step="1" value="" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>
         </div>
         <div class="uc-sec-active admin-sort-field-wrap">
             <label for="uc_sec_active">نشط</label>
@@ -34,6 +26,9 @@ if (! $ucDepsEmpty && isset($ucDepartments[0]) && is_array($ucDepartments[0])) {
         <div class="uc-sec-dept">
             <label for="uc_sec_department_id">القسم (department)</label>
             <select id="uc_sec_department_id" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>
+                <?php if (! $ucDepsEmpty): ?>
+                    <option value="">— اختر —</option>
+                <?php endif; ?>
                 <?php foreach ($ucDepartments as $d): ?>
                     <?php if (! is_array($d)) { continue; } ?>
                     <option value="<?php echo (int) ($d['id'] ?? 0); ?>"><?php echo htmlspecialchars((string) (($d['name_ar'] ?: $d['name_en']) ?: $d['slug'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></option>
