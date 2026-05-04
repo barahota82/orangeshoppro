@@ -542,8 +542,8 @@ function famReadTemplatePickLabels() {
 }
 
 /**
- * من تسميات القاموس: عربي/EN من label_ar + label؛ ومع قالب مقاسات يُضاف
- * « ( الأساس - تسمية_القالب ) » (تسمية القالب: EN إن وُجدت وإلا نص الخيار).
+ * من تسميات القاموس: عربي/EN من label_ar + label؛ ومع قالب مقاسات:
+ * «الأساس - تسمية_القالب» (تسمية القالب: EN إن وُجدت وإلا نص الخيار).
  */
 function famApplyAutoNamesFromDictionary() {
     if (!FAM_SIZING_DICT_SELECTS) {
@@ -566,12 +566,12 @@ function famApplyAutoNamesFromDictionary() {
     var tToken = String(tpl.en || tpl.ar || '').trim();
     if (tToken && (arBase || enBase)) {
         if (arBase) {
-            arEl.value = arBase + ' (' + arBase + ' - ' + tToken + ')';
+            arEl.value = arBase + ' - ' + tToken;
         } else {
             arEl.value = '';
         }
         if (enBase) {
-            enEl.value = enBase + ' (' + enBase + ' - ' + tToken + ')';
+            enEl.value = enBase + ' - ' + tToken;
         } else {
             enEl.value = '';
         }
