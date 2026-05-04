@@ -9,8 +9,19 @@ $ucSecEmpty = !empty($orange_uc['sections_empty_for_categories']);
 <div class="card" style="margin-bottom:14px;">
     <h3 style="margin-top:0;">2 — فئات الموحّد (catalog_categories)</h3>
     <input type="hidden" id="uc_cat_id" value="0">
-    <div class="uc-form-grid">
-        <div style="grid-column:1/-1;">
+    <div class="form-grid uc-cat-form-grid">
+        <div class="uc-cat-sort admin-sort-field-wrap">
+            <label for="uc_cat_sort">الترتيب (تلقائي)</label>
+            <input type="number" id="uc_cat_sort" class="admin-sort-field<?php echo $ucSecEmpty ? ' admin-sort-field--muted' : ''; ?>" min="1" step="1" value="" placeholder="تلقائي" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>>
+        </div>
+        <div class="uc-cat-active admin-sort-field-wrap">
+            <label for="uc_cat_active">نشط</label>
+            <select id="uc_cat_active" class="admin-sort-field" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>>
+                <option value="1">نعم</option>
+                <option value="0">لا</option>
+            </select>
+        </div>
+        <div class="uc-cat-dept">
             <label for="uc_cat_section_id">القسم الداخلي الأم</label>
             <select id="uc_cat_section_id" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>>
                 <option value="">— اختر —</option>
@@ -22,13 +33,26 @@ $ucSecEmpty = !empty($orange_uc['sections_empty_for_categories']);
                 <small style="color:#b45309;display:block;margin-top:4px;">أنشئ قسمًا داخليًا أولًا من شاشة <strong>أقسام داخلية</strong>.</small>
             <?php endif; ?>
         </div>
-        <div><label for="uc_cat_slug">slug <span style="font-weight:normal;color:#64748b;">(تلقائي من English — يمكن التعديل)</span></label><input type="text" id="uc_cat_slug" dir="ltr" maxlength="191" autocomplete="off" placeholder="يُملأ تلقائياً" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>></div>
-        <div class="admin-sort-field-wrap"><label for="uc_cat_sort">ترتيب</label><input type="number" id="uc_cat_sort" class="admin-sort-field<?php echo $ucSecEmpty ? ' admin-sort-field--muted' : ''; ?>" min="1" step="1" value="" placeholder="تلقائي" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>></div>
-        <div><label for="uc_cat_name_ar">عربي</label><input type="text" id="uc_cat_name_ar" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>></div>
-        <div><label for="uc_cat_name_fil">Filipino</label><input type="text" id="uc_cat_name_fil" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>></div>
-        <div><label for="uc_cat_name_en">English</label><input type="text" id="uc_cat_name_en" dir="ltr" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>></div>
-        <div><label for="uc_cat_name_hi">Hindi</label><input type="text" id="uc_cat_name_hi" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>></div>
-        <div><label for="uc_cat_active">نشط</label><select id="uc_cat_active" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>><option value="1">نعم</option><option value="0">لا</option></select></div>
+        <div class="uc-cat-slug">
+            <label for="uc_cat_slug">slug <span style="font-weight:normal;color:#64748b;">(تلقائي من English — يمكن التعديل)</span></label>
+            <input type="text" id="uc_cat_slug" dir="ltr" maxlength="191" autocomplete="off" placeholder="يُملأ تلقائياً" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>>
+        </div>
+        <div class="uc-cat-ar">
+            <label for="uc_cat_name_ar">الاسم العربي</label>
+            <input type="text" id="uc_cat_name_ar" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>>
+        </div>
+        <div class="uc-cat-en">
+            <label for="uc_cat_name_en">English</label>
+            <input type="text" id="uc_cat_name_en" dir="ltr" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>>
+        </div>
+        <div class="uc-cat-fil">
+            <label for="uc_cat_name_fil">Filipino</label>
+            <input type="text" id="uc_cat_name_fil" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>>
+        </div>
+        <div class="uc-cat-hi">
+            <label for="uc_cat_name_hi">Hindi</label>
+            <input type="text" id="uc_cat_name_hi" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>>
+        </div>
     </div>
     <div class="actions" style="margin-top:12px;gap:8px;flex-wrap:wrap;">
         <button type="button" onclick="saveUcCategory()" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>>حفظ الفئة</button>
