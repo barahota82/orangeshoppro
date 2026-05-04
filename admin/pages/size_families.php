@@ -526,7 +526,25 @@ function famReadSelectOptionLabels(sel) {
     };
 }
 
-/** من تسميات القاموس: عربي = label_ar1 + مسافة + label_ar2، EN من label_en (عند تفعيل قوائم القاموس). */
+/** تسمية القالب المختار: EN من data-name-en ثم نص الخيار (غالباً عربي). */
+function famReadTemplatePickLabels() {
+    var tplEl = document.getElementById('sizes_template_pick');
+    if (!tplEl || tplEl.tagName !== 'SELECT' || !String(tplEl.value || '').trim()) {
+        return { ar: '', en: '' };
+    }
+    var opt = tplEl.options[tplEl.selectedIndex];
+    if (!opt) {
+        return { ar: '', en: '' };
+    }
+    var en = String(opt.getAttribute('data-name-en') || '').trim();
+    var ar = String(opt.textContent || '').trim();
+    return { ar: ar, en: en };
+}
+
+/**
+ * من تسميات القاموس: عربي/EN من label_ar + label؛ ومع قالب مقاسات يُضاف
+ * « ( الأساس - تسمية_القالب ) » (تسمية القالب: EN إن وُجدت وإلا نص الخيار).
+ */
 function famApplyAutoNamesFromDictionary() {
     if (!FAM_SIZING_DICT_SELECTS) {
         return;
@@ -542,8 +560,25 @@ function famApplyAutoNamesFromDictionary() {
     var c = famReadSelectOptionLabels(cSel);
     var arParts = [k.ar, c.ar].filter(function (x) { return x; });
     var enParts = [k.en, c.en].filter(function (x) { return x; });
-    arEl.value = arParts.join(' ');
-    enEl.value = enParts.join(' ');
+    var arBase = arParts.join(' ');
+    var enBase = enParts.join(' ');
+    var tpl = famReadTemplatePickLabels();
+    var tToken = String(tpl.en || tpl.ar || '').trim();
+    if (tToken && (arBase || enBase)) {
+        if (arBase) {
+            arEl.value = arBase + ' (' + arBase + ' - ' + tToken + ')';
+        } else {
+            arEl.value = '';
+        }
+        if (enBase) {
+            enEl.value = enBase + ' (' + enBase + ' - ' + tToken + ')';
+        } else {
+            enEl.value = '';
+        }
+    } else {
+        arEl.value = arBase;
+        enEl.value = enBase;
+    }
     famSyncFamFilHiFromEn();
 }
 
@@ -1156,7 +1191,10 @@ async function saveSizesForFamily() {
         var tplPick = document.getElementById('sizes_template_pick');
         if (tplPick && tplPick.tagName === 'SELECT' && !tplPick._sfSchemeBound) {
             tplPick._sfSchemeBound = true;
-            tplPick.addEventListener('change', famApplyAutoSizeSchemeKey);
+            tplPick.addEventListener('change', function () {
+                famApplyAutoNamesFromDictionary();
+                famApplyAutoSizeSchemeKey();
+            });
         }
         loadSizesEditor();
     }
