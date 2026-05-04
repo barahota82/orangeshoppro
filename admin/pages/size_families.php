@@ -1119,6 +1119,20 @@ async function famApplyTemplateSizesToEditor(tid, opts) {
             return false;
         }
         var existing = tbody.querySelectorAll('tr.size-row').length;
+        var existingByTpl = Object.create(null);
+        var existingByOrdinal = [];
+        if (existing > 0) {
+            tbody.querySelectorAll('tr.size-row').forEach(function (rowTr) {
+                var oldId = parseInt(rowTr.getAttribute('data-id') || '0', 10) || 0;
+                var oldTpl = parseInt(rowTr.getAttribute('data-scheme-template-size-id') || '0', 10) || 0;
+                if (oldId > 0) {
+                    existingByOrdinal.push(oldId);
+                    if (oldTpl > 0 && existingByTpl[String(oldTpl)] == null) {
+                        existingByTpl[String(oldTpl)] = oldId;
+                    }
+                }
+            });
+        }
         if (existing > 0) {
             if (!confirm('سيتم استبدال جميع صفوف المقاسات في الجدول بمحتوى القالب. متابعة؟')) {
                 return false;
@@ -1131,13 +1145,23 @@ async function famApplyTemplateSizesToEditor(tid, opts) {
             var r = sizes[i];
             var tr = document.createElement('tr');
             tr.className = 'size-row';
-            tr.setAttribute('data-new', '1');
             var tplSzId = parseInt(String(r.id != null ? r.id : '0'), 10) || 0;
             if (tplSzId > 0) {
                 tr.setAttribute('data-scheme-template-size-id', String(tplSzId));
             }
+            var keepId = 0;
+            if (tplSzId > 0 && existingByTpl[String(tplSzId)] != null) {
+                keepId = parseInt(String(existingByTpl[String(tplSzId)]), 10) || 0;
+            } else if (i < existingByOrdinal.length) {
+                keepId = parseInt(String(existingByOrdinal[i]), 10) || 0;
+            }
+            if (keepId > 0) {
+                tr.setAttribute('data-id', String(keepId));
+            } else {
+                tr.setAttribute('data-new', '1');
+            }
             var fl = (r.foot_length_cm != null && r.foot_length_cm !== '') ? String(r.foot_length_cm) : '';
-            tr.innerHTML = '<td>0</td><td><input type="text" class="s-le admin-sort-field" maxlength="191" autocomplete="off" value="' + escapeAttr(r.label_en || '') + '"></td><td><input type="text" class="s-la admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true" value=""></td><td><input type="text" class="s-lf admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td><td><input type="text" class="s-lh admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td><td><input type="text" class="s-fl admin-sort-field" maxlength="32" autocomplete="off" value="' + escapeAttr(fl) + '"></td><td><input type="number" class="s-so admin-sort-field" autocomplete="off" value="' + (Number(r.sort_order) || 0) + '"></td>';
+            tr.innerHTML = '<td>' + String(keepId > 0 ? keepId : 0) + '</td><td><input type="text" class="s-le admin-sort-field" maxlength="191" autocomplete="off" value="' + escapeAttr(r.label_en || '') + '"></td><td><input type="text" class="s-la admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true" value=""></td><td><input type="text" class="s-lf admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td><td><input type="text" class="s-lh admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td><td><input type="text" class="s-fl admin-sort-field" maxlength="32" autocomplete="off" value="' + escapeAttr(fl) + '"></td><td><input type="number" class="s-so admin-sort-field" autocomplete="off" value="' + (Number(r.sort_order) || (i + 1)) + '"></td>';
             tbody.appendChild(tr);
             famSyncRowLabelsFromEn(tr);
         }
