@@ -843,7 +843,6 @@ function loadSizesEditor() {
     var html = '<div class="table-wrap"><table>' + thead + '<tbody>';
     if (!rows.length) {
         html += '</tbody></table></div>';
-        html += '<p class="card-hint" style="margin-top:10px;">لا مقاسات محفوظة لهذه العائلة. اختر قالباً ثم «تحميل المقاسات من القالب»، ثم «حفظ المقاسات».</p>';
     } else {
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
@@ -851,7 +850,6 @@ function loadSizesEditor() {
             html += '<tr class="size-row" data-id="' + r.id + '"><td>' + r.id + '</td><td><input type="text" class="s-la" readonly tabindex="-1" value="' + escapeAttr(r.label_ar) + '"></td><td><input type="text" class="s-le" readonly tabindex="-1" value="' + escapeAttr(r.label_en) + '"></td><td><input type="text" class="s-lf" readonly tabindex="-1" value="' + escapeAttr(r.label_fil) + '"></td><td><input type="text" class="s-lh" readonly tabindex="-1" value="' + escapeAttr(r.label_hi) + '"></td><td><input type="text" class="s-fl" readonly tabindex="-1" value="' + escapeAttr(fl) + '"></td><td><input type="number" class="s-so" readonly tabindex="-1" value="' + (Number(r.sort_order) || 0) + '"></td></tr>';
         }
         html += '</tbody></table></div>';
-        html += '<p class="card-hint" style="margin-top:10px;font-size:0.85rem;">لتغيير المقاسات: استخدم «تحميل المقاسات من القالب» ليستبدل الجدول، أو عدّل القالب في «إدارة القوالب» ثم أعد التحميل.</p>';
     }
     box.innerHTML = html;
 }
@@ -903,10 +901,6 @@ async function importSizeTemplateRows() {
             while (tbody.firstChild) {
                 tbody.removeChild(tbody.firstChild);
             }
-        }
-        var hint = document.querySelector('#sizesEditor > p.card-hint');
-        if (hint) {
-            hint.remove();
         }
         for (var i = 0; i < sizes.length; i++) {
             var r = sizes[i];
