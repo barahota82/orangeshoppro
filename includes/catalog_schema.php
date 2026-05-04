@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 23);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 24);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -1055,6 +1055,84 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             $pdo,
             'ALTER TABLE size_family_sizes ADD KEY idx_size_family_sizes_tpl_sz (scheme_template_size_id)'
         );
+    }
+
+    /*
+     |--------------------------------------------------------------------------
+     | قوالب المقاس ↔ العائلات/الصفوف: تنظيف مراجع يتيمة ثم FK (إن غابت)
+     |--------------------------------------------------------------------------
+     */
+    if (
+        orange_table_exists($pdo, 'size_scheme_templates')
+        && orange_table_exists($pdo, 'size_scheme_template_sizes')
+        && orange_table_exists($pdo, 'size_families')
+        && orange_table_has_column($pdo, 'size_families', 'size_scheme_template_id')
+        && orange_table_exists($pdo, 'size_family_sizes')
+        && orange_table_has_column($pdo, 'size_family_sizes', 'scheme_template_size_id')
+    ) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'UPDATE size_family_sizes sfs
+             INNER JOIN size_families fam ON fam.id = sfs.size_family_id
+             INNER JOIN size_scheme_template_sizes tst ON tst.id = sfs.scheme_template_size_id
+             SET sfs.scheme_template_size_id = NULL
+             WHERE fam.size_scheme_template_id IS NOT NULL AND fam.size_scheme_template_id > 0
+               AND tst.template_id <> fam.size_scheme_template_id'
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'UPDATE size_families sf
+             LEFT JOIN size_scheme_templates t ON t.id = sf.size_scheme_template_id
+             SET sf.size_scheme_template_id = NULL
+             WHERE sf.size_scheme_template_id IS NOT NULL AND t.id IS NULL'
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'UPDATE size_family_sizes sfs
+             LEFT JOIN size_scheme_template_sizes tst ON tst.id = sfs.scheme_template_size_id
+             SET sfs.scheme_template_size_id = NULL
+             WHERE sfs.scheme_template_size_id IS NOT NULL AND tst.id IS NULL'
+        );
+        try {
+            $fkNameStmt = $pdo->query(
+                "SELECT CONSTRAINT_NAME FROM information_schema.TABLE_CONSTRAINTS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'size_families'
+                   AND CONSTRAINT_TYPE = 'FOREIGN KEY'"
+            );
+            $fkNames = $fkNameStmt ? ($fkNameStmt->fetchAll(PDO::FETCH_COLUMN) ?: []) : [];
+            $fkSet = array_fill_keys(array_map('strtolower', array_map('strval', $fkNames)), true);
+            if (!isset($fkSet['orange_fk_sf_scheme_template'])) {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'ALTER TABLE size_families
+                     ADD CONSTRAINT orange_fk_sf_scheme_template
+                     FOREIGN KEY (size_scheme_template_id) REFERENCES size_scheme_templates (id)
+                     ON DELETE SET NULL ON UPDATE CASCADE'
+                );
+            }
+            $fkNameStmt2 = $pdo->query(
+                "SELECT CONSTRAINT_NAME FROM information_schema.TABLE_CONSTRAINTS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'size_family_sizes'
+                   AND CONSTRAINT_TYPE = 'FOREIGN KEY'"
+            );
+            $fkNames2 = $fkNameStmt2 ? ($fkNameStmt2->fetchAll(PDO::FETCH_COLUMN) ?: []) : [];
+            $fkSet2 = array_fill_keys(array_map('strtolower', array_map('strval', $fkNames2)), true);
+            if (!isset($fkSet2['orange_fk_sfs_scheme_template_size'])) {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'ALTER TABLE size_family_sizes
+                     ADD CONSTRAINT orange_fk_sfs_scheme_template_size
+                     FOREIGN KEY (scheme_template_size_id) REFERENCES size_scheme_template_sizes (id)
+                     ON DELETE SET NULL ON UPDATE CASCADE'
+                );
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] size scheme template FK ensure: ' . $e->getMessage());
+            }
+        }
     }
 
     if (orange_table_exists($pdo, 'size_family_sizes') && !orange_table_has_column($pdo, 'size_family_sizes', 'foot_length_cm')) {

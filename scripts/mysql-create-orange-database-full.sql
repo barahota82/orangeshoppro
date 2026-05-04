@@ -953,6 +953,14 @@ ALTER TABLE `size_family_sizes`
   ADD CONSTRAINT `fk_sfs_size_family` FOREIGN KEY (`size_family_id`) REFERENCES `size_families` (`id`)
   ON DELETE CASCADE ON UPDATE CASCADE;
 
+ALTER TABLE `size_families`
+  ADD CONSTRAINT `orange_fk_sf_scheme_template` FOREIGN KEY (`size_scheme_template_id`) REFERENCES `size_scheme_templates` (`id`)
+  ON DELETE SET NULL ON UPDATE CASCADE;
+
+ALTER TABLE `size_family_sizes`
+  ADD CONSTRAINT `orange_fk_sfs_scheme_template_size` FOREIGN KEY (`scheme_template_size_id`) REFERENCES `size_scheme_template_sizes` (`id`)
+  ON DELETE SET NULL ON UPDATE CASCADE;
+
 ALTER TABLE `journal_vouchers`
   ADD CONSTRAINT `fk_journal_vouchers_fiscal_year` FOREIGN KEY (`fiscal_year_id`) REFERENCES `fiscal_years` (`id`)
   ON DELETE SET NULL ON UPDATE CASCADE;
