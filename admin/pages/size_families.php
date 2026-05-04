@@ -216,6 +216,10 @@ $tablesReady = $hasFamilies && $hasSizes;
         align-items: center;
         justify-content: center;
     }
+    /* إظهار زر الترجمة لاحقاً: أزل class التالي من الزر أو عيّن display:inline-flex في التطوير */
+    .sf-fam-form-actions .sf-fam-translate-btn--hidden {
+        display: none !important;
+    }
     .sf-fam-form-grid #fam_name_ar,
     .sf-fam-form-grid #fam_name_en {
         width: 100%;
@@ -294,7 +298,7 @@ $tablesReady = $hasFamilies && $hasSizes;
                 <select id="sizes_template_pick" class="admin-sort-field" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
                     <option value="">— اختر قالباً —</option>
                     <?php foreach ($sizeTemplatesList as $tpl): ?>
-                    <option value="<?php echo (int) $tpl['id']; ?>"><?php echo htmlspecialchars((string) ($tpl['name_ar'] ?: $tpl['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
+                    <option value="<?php echo (int) $tpl['id']; ?>" data-name-en="<?php echo htmlspecialchars((string) ($tpl['name_en'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) ($tpl['name_ar'] ?: $tpl['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
                     <?php endforeach; ?>
                 </select>
                 <small style="display:block;color:#666;margin-top:6px;font-size:0.8rem;line-height:1.4;">يستبدل صفوف الجدول في «مقاسات داخل العائلة» قبل «حفظ المقاسات».</small>
@@ -315,7 +319,7 @@ $tablesReady = $hasFamilies && $hasSizes;
     </div>
     <div class="actions sf-fam-form-actions" style="margin-top:14px;">
         <button type="button" onclick="saveFamily()" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>حفظ العائلة</button>
-        <button type="button" class="btn-secondary" onclick="translateFamilyEn({ forceFromArabic: true })" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>ترجمة إلى English</button>
+        <button type="button" class="btn-secondary sf-fam-translate-btn--hidden" id="fam_btn_translate_en" onclick="translateFamilyEn({ forceFromArabic: true })" <?php echo !$hasFamilies ? 'disabled' : ''; ?> title="مخفي عن المستخدم؛ يبقى لاستدعاء الترجمة عند التطوير">ترجمة إلى English</button>
         <button type="button" class="btn-secondary" onclick="resetFamilyForm()" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>جديد</button>
         <?php if ($hasSizeTemplates && count($sizeTemplatesList) > 0): ?>
         <button type="button" class="btn-secondary" id="fam_btn_import_template" onclick="importSizeTemplateRows()" <?php echo !$hasFamilies || !$tablesReady ? 'disabled' : ''; ?>>تحميل المقاسات من القالب</button>
@@ -428,35 +432,88 @@ function famHierarchyFieldValue(id) {
     return String(el.value || '').trim();
 }
 
+/** مستوى 3: slug(فئة القياس) + '_' + slug(English اسم القالب). */
 function famApplyAutoSizeSchemeKey() {
     var keyEl = document.getElementById('fam_size_scheme_key');
-    var enEl = document.getElementById('fam_name_en');
-    if (!keyEl || !enEl) return;
+    if (!keyEl) return;
     var sk = famSizingSlugKey(famHierarchyFieldValue('fam_sizing_category_key'), 64);
-    var en = famSizingSlugKey(enEl.value, 64);
-    var combined = '';
-    if (sk && en) {
-        combined = sk + '_' + en;
-        if (combined.length > 64) {
-            combined = combined.substring(0, 64);
+    var tplEl = document.getElementById('sizes_template_pick');
+    var tplSlug = '';
+    if (tplEl && tplEl.tagName === 'SELECT' && String(tplEl.value || '').trim() !== '') {
+        var opt = tplEl.options[tplEl.selectedIndex];
+        var ne = opt && opt.getAttribute('data-name-en') ? String(opt.getAttribute('data-name-en')) : '';
+        tplSlug = famSizingSlugKey(ne, 64);
+        if (!tplSlug) {
+            tplSlug = famSizingSlugKey('tpl_' + String(tplEl.value || '').trim(), 64);
         }
+    }
+    var combined = '';
+    if (sk && tplSlug) {
+        combined = sk + '_' + tplSlug;
+    } else if (sk) {
+        combined = sk;
+    }
+    if (combined.length > 64) {
+        combined = combined.substring(0, 64);
     }
     keyEl.value = combined;
 }
 
-function famEnsureSelectOption(sel, value, label) {
+function famReadSelectOptionLabels(sel) {
+    if (!sel || sel.tagName !== 'SELECT') {
+        return { ar: '', en: '' };
+    }
+    var opt = sel.options[sel.selectedIndex];
+    if (!opt || !String(sel.value || '').trim()) {
+        return { ar: '', en: '' };
+    }
+    return {
+        ar: String(opt.getAttribute('data-label-ar') || '').trim(),
+        en: String(opt.getAttribute('data-label-en') || '').trim()
+    };
+}
+
+/** من تسميات القاموس: عربي = label_ar1 + مسافة + label_ar2، EN من label_en (عند تفعيل قوائم القاموس). */
+function famApplyAutoNamesFromDictionary() {
+    if (!FAM_SIZING_DICT_SELECTS) {
+        return;
+    }
+    var kSel = document.getElementById('fam_commercial_kind_key');
+    var cSel = document.getElementById('fam_sizing_category_key');
+    var arEl = document.getElementById('fam_name_ar');
+    var enEl = document.getElementById('fam_name_en');
+    if (!kSel || !cSel || !arEl || !enEl) {
+        return;
+    }
+    var k = famReadSelectOptionLabels(kSel);
+    var c = famReadSelectOptionLabels(cSel);
+    var arParts = [k.ar, c.ar].filter(function (x) { return x; });
+    var enParts = [k.en, c.en].filter(function (x) { return x; });
+    arEl.value = arParts.join(' ');
+    enEl.value = enParts.join(' ');
+}
+
+function famEnsureSelectOption(sel, value, label, dataLabels) {
     if (!sel || !value) return;
     var v = String(value);
     if ([].some.call(sel.options, function (o) { return o.value === v; })) return;
     var o = document.createElement('option');
     o.value = v;
     o.textContent = label || v;
+    dataLabels = dataLabels || {};
+    if (dataLabels.labelAr != null) {
+        o.setAttribute('data-label-ar', String(dataLabels.labelAr));
+    }
+    if (dataLabels.labelEn != null) {
+        o.setAttribute('data-label-en', String(dataLabels.labelEn));
+    }
     sel.appendChild(o);
 }
 
 async function famLoadKindsIntoSelect(preferredKind) {
     var sel = document.getElementById('fam_commercial_kind_key');
     if (!sel || sel.tagName !== 'SELECT' || typeof postJSON !== 'function') {
+        famApplyAutoNamesFromDictionary();
         famApplyAutoSizeSchemeKey();
         return;
     }
@@ -474,15 +531,18 @@ async function famLoadKindsIntoSelect(preferredKind) {
             var o = document.createElement('option');
             o.value = k.kind_key || '';
             o.textContent = (k.label_ar || k.kind_key || '') + ' (' + (k.kind_key || '') + ')';
+            o.setAttribute('data-label-ar', String(k.label_ar != null ? k.label_ar : ''));
+            o.setAttribute('data-label-en', String(k.label_en != null ? k.label_en : ''));
             sel.appendChild(o);
         });
         if (prev) {
-            famEnsureSelectOption(sel, prev, prev + ' (غير مدرَج في القاموس)');
+            famEnsureSelectOption(sel, prev, prev + ' (غير مدرَج في القاموس)', { labelAr: prev, labelEn: prev });
             sel.value = prev;
         } else {
             sel.value = '';
         }
     } catch (e) { /* ignore */ } finally {
+        famApplyAutoNamesFromDictionary();
         famApplyAutoSizeSchemeKey();
     }
 }
@@ -491,6 +551,7 @@ async function famLoadSizingCategoriesIntoSelect(preferredCat) {
     var kindSel = document.getElementById('fam_commercial_kind_key');
     var catSel = document.getElementById('fam_sizing_category_key');
     if (!kindSel || kindSel.tagName !== 'SELECT' || !catSel || catSel.tagName !== 'SELECT' || typeof postJSON !== 'function') {
+        famApplyAutoNamesFromDictionary();
         famApplyAutoSizeSchemeKey();
         return;
     }
@@ -503,6 +564,7 @@ async function famLoadSizingCategoriesIntoSelect(preferredCat) {
     catSel.appendChild(opt0);
     if (!ck) {
         catSel.value = '';
+        famApplyAutoNamesFromDictionary();
         famApplyAutoSizeSchemeKey();
         return;
     }
@@ -513,15 +575,18 @@ async function famLoadSizingCategoriesIntoSelect(preferredCat) {
             var o = document.createElement('option');
             o.value = c.category_key || '';
             o.textContent = (c.label_ar || c.category_key || '') + ' (' + (c.category_key || '') + ')';
+            o.setAttribute('data-label-ar', String(c.label_ar != null ? c.label_ar : ''));
+            o.setAttribute('data-label-en', String(c.label_en != null ? c.label_en : ''));
             catSel.appendChild(o);
         });
         if (prev) {
-            famEnsureSelectOption(catSel, prev, prev + ' (غير مدرَج في القاموس)');
+            famEnsureSelectOption(catSel, prev, prev + ' (غير مدرَج في القاموس)', { labelAr: prev, labelEn: prev });
             catSel.value = prev;
         } else {
             catSel.value = '';
         }
     } catch (e) { /* ignore */ } finally {
+        famApplyAutoNamesFromDictionary();
         famApplyAutoSizeSchemeKey();
     }
 }
@@ -535,7 +600,10 @@ function famInitSizingHierarchySelects() {
         void famLoadSizingCategoriesIntoSelect('');
     });
     if (catSel && catSel.tagName === 'SELECT') {
-        catSel.addEventListener('change', famApplyAutoSizeSchemeKey);
+        catSel.addEventListener('change', function () {
+            famApplyAutoNamesFromDictionary();
+            famApplyAutoSizeSchemeKey();
+        });
     }
     void famLoadKindsIntoSelect('').then(function () {
         return famLoadSizingCategoriesIntoSelect('');
@@ -546,6 +614,10 @@ function resetFamilyForm() {
     document.getElementById('fam_id').value = '0';
     document.getElementById('fam_name_ar').value = '';
     document.getElementById('fam_name_en').value = '';
+    var tplPick = document.getElementById('sizes_template_pick');
+    if (tplPick && tplPick.tagName === 'SELECT') {
+        tplPick.value = '';
+    }
     famApplyAutoSizeSchemeKey();
     var ckEl = document.getElementById('fam_commercial_kind_key');
     var skEl = document.getElementById('fam_sizing_category_key');
@@ -566,12 +638,13 @@ function resetFamilyForm() {
 
 async function editFamily(f) {
     document.getElementById('fam_id').value = String(f.id != null ? f.id : 0);
-    document.getElementById('fam_name_ar').value = f.name_ar || '';
-    document.getElementById('fam_name_en').value = f.name_en || '';
     if (FAM_SIZING_DICT_SELECTS) {
         await famLoadKindsIntoSelect(f.commercial_kind_key || '');
         await famLoadSizingCategoriesIntoSelect(f.sizing_category_key || '');
+        famApplyAutoNamesFromDictionary();
     } else {
+        document.getElementById('fam_name_ar').value = f.name_ar || '';
+        document.getElementById('fam_name_en').value = f.name_en || '';
         document.getElementById('fam_commercial_kind_key').value = f.commercial_kind_key || '';
         document.getElementById('fam_sizing_category_key').value = f.sizing_category_key || '';
     }
@@ -609,8 +682,8 @@ async function translateFamilyEn(opts) {
         var t = res.translations || {};
         if (t.name_en) {
             document.getElementById('fam_name_en').value = t.name_en;
-            famApplyAutoSizeSchemeKey();
         }
+        famApplyAutoSizeSchemeKey();
     } catch (e) {
         if (!silent) alert('فشل طلب الترجمة من السيرفر');
     }
@@ -854,14 +927,17 @@ async function saveSizesForFamily() {
     if (res.success) location.reload();
 }
 
-document.getElementById('fam_name_ar').addEventListener('input', scheduleFamilyEnTranslate);
-document.getElementById('fam_name_ar').addEventListener('change', function () {
-    if (document.getElementById('fam_name_ar').value.trim()) {
-        translateFamilyEn({ silent: true, forceFromArabic: true });
+(function famBindFamilyNameTranslateIfLegacy() {
+    if (FAM_SIZING_DICT_SELECTS) {
+        return;
     }
-});
-document.getElementById('fam_name_en').addEventListener('input', famApplyAutoSizeSchemeKey);
-document.getElementById('fam_name_en').addEventListener('change', famApplyAutoSizeSchemeKey);
+    document.getElementById('fam_name_ar').addEventListener('input', scheduleFamilyEnTranslate);
+    document.getElementById('fam_name_ar').addEventListener('change', function () {
+        if (document.getElementById('fam_name_ar').value.trim()) {
+            translateFamilyEn({ silent: true, forceFromArabic: true });
+        }
+    });
+})();
 
 (function famBindLegacyHierarchyKeyRefresh() {
     ['fam_commercial_kind_key', 'fam_sizing_category_key'].forEach(function (id) {
@@ -973,6 +1049,11 @@ document.getElementById('fam_name_en').addEventListener('change', famApplyAutoSi
             return;
         }
         famInitSizingHierarchySelects();
+        var tplPick = document.getElementById('sizes_template_pick');
+        if (tplPick && tplPick.tagName === 'SELECT' && !tplPick._sfSchemeBound) {
+            tplPick._sfSchemeBound = true;
+            tplPick.addEventListener('change', famApplyAutoSizeSchemeKey);
+        }
         famRefreshSizesFamilyContext();
         loadSizesEditor();
     }
