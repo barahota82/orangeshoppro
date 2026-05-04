@@ -4,7 +4,7 @@
 .uc-form-grid #uc_sec_slug,#uc_cat_slug,#uc_sub_slug,#uc_sec_name_en,#uc_cat_name_en,#uc_sub_name_en{text-align:left;direction:ltr;}
 .uc-form-grid .admin-sort-field-wrap{width:100%;max-width:var(--admin-sort-field-max-w,220px);}
 @media(max-width:860px){.uc-form-grid{grid-template-columns:1fr;}}
-.uc-sec-form-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-areas:"sort sort . . . . . . . . active active""dept dept dept dept dept slug slug slug slug slug slug slug""ar ar ar ar ar ar en en en en en en""fil fil fil fil fil fil hi hi hi hi hi hi";gap:14px 18px;direction:ltr;}
+.uc-sec-form-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-areas:"active active . . . . . . . . sort sort""slug slug slug slug slug slug dept dept dept dept dept dept""en en en en en en ar ar ar ar ar ar""hi hi hi hi hi hi fil fil fil fil fil fil";gap:14px 18px;direction:ltr;}
 .uc-sec-form-grid .uc-sec-sort{grid-area:sort;justify-self:end;width:100%;}
 .uc-sec-form-grid .uc-sec-active{grid-area:active;justify-self:start;width:100%;}
 .uc-sec-form-grid .uc-sec-dept{grid-area:dept;}
