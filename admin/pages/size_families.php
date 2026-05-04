@@ -389,26 +389,26 @@ $tablesReady = $hasFamilies && $hasSizes;
         <table>
             <thead>
                 <tr>
-                    <th>#</th>
-                    <th>العربي</th>
-                    <th>English</th>
-                    <th>scheme</th>
-                    <th>عدد المقاسات</th>
-                    <th>الترتيب</th>
-                    <th>الحالة</th>
+                    <th class="sf-col-id">#</th>
+                    <th class="sf-col-ar">العربي</th>
+                    <th class="sf-col-en">English</th>
+                    <th class="sf-col-scheme">scheme</th>
+                    <th class="sf-col-szcount">عدد المقاسات</th>
+                    <th class="sf-col-sort">الترتيب</th>
+                    <th class="sf-col-status">الحالة</th>
                     <th class="sf-ops-col">إجراءات</th>
                 </tr>
             </thead>
             <tbody id="orange-families-list-tbody">
                 <?php foreach ($families as $f): ?>
                 <tr data-id="<?php echo (int) $f['id']; ?>">
-                    <td><?php echo (int) $f['id']; ?></td>
-                    <td><?php echo htmlspecialchars((string) $f['name_ar'], ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo htmlspecialchars((string) $f['name_en'], ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo htmlspecialchars((string) ($f['size_scheme_key'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo isset($sizesByFamily[(int) $f['id']]) ? count($sizesByFamily[(int) $f['id']]) : 0; ?></td>
-                    <td><?php echo (int) $f['sort_order']; ?></td>
-                    <td><?php echo (int) $f['is_active'] === 1 ? 'ظاهر' : 'مخفي'; ?></td>
+                    <td class="sf-col-id"><?php echo (int) $f['id']; ?></td>
+                    <td class="sf-col-ar"><?php echo htmlspecialchars((string) $f['name_ar'], ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td class="sf-col-en"><?php echo htmlspecialchars((string) $f['name_en'], ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td class="sf-col-scheme"><?php echo htmlspecialchars((string) ($f['size_scheme_key'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td class="sf-col-szcount"><?php echo isset($sizesByFamily[(int) $f['id']]) ? count($sizesByFamily[(int) $f['id']]) : 0; ?></td>
+                    <td class="sf-col-sort"><?php echo (int) $f['sort_order']; ?></td>
+                    <td class="sf-col-status"><?php echo (int) $f['is_active'] === 1 ? 'ظاهر' : 'مخفي'; ?></td>
                     <td class="sf-row-ops">
                         <div class="sf-ops-wrap">
                             <div class="sf-ops-arrows">
@@ -1007,7 +1007,7 @@ async function saveSizesForFamily() {
             -webkit-overflow-scrolling:touch;
         }
         .cat-dep-list-wrap[data-list="size-families"] > table{
-            min-width:860px;
+            min-width:960px;
             width:100%;
             border-collapse:collapse;
             table-layout:fixed;
@@ -1015,6 +1015,62 @@ async function saveSizesForFamily() {
         .cat-dep-list-wrap[data-list="size-families"] > table th,
         .cat-dep-list-wrap[data-list="size-families"] > table td{
             vertical-align:middle;
+        }
+        .cat-dep-list-wrap[data-list="size-families"] > table th.sf-col-id,
+        .cat-dep-list-wrap[data-list="size-families"] > table td.sf-col-id{
+            width:52px;
+            max-width:52px;
+            text-align:center;
+            padding-inline:6px !important;
+        }
+        .cat-dep-list-wrap[data-list="size-families"] > table th.sf-col-ar,
+        .cat-dep-list-wrap[data-list="size-families"] > table td.sf-col-ar,
+        .cat-dep-list-wrap[data-list="size-families"] > table th.sf-col-en,
+        .cat-dep-list-wrap[data-list="size-families"] > table td.sf-col-en{
+            min-width:0;
+            overflow:hidden;
+            text-overflow:ellipsis;
+        }
+        .cat-dep-list-wrap[data-list="size-families"] > table th.sf-col-scheme,
+        .cat-dep-list-wrap[data-list="size-families"] > table td.sf-col-scheme{
+            width:32%;
+            min-width:220px;
+            word-break:break-word;
+            overflow-wrap:anywhere;
+        }
+        .cat-dep-list-wrap[data-list="size-families"] > table th.sf-col-szcount{
+            white-space:normal;
+            line-height:1.25;
+            font-size:11px;
+            font-weight:700;
+        }
+        .cat-dep-list-wrap[data-list="size-families"] > table th.sf-col-szcount,
+        .cat-dep-list-wrap[data-list="size-families"] > table td.sf-col-szcount{
+            width:4.25rem;
+            max-width:5rem;
+            text-align:center;
+            padding-inline:4px !important;
+            font-variant-numeric:tabular-nums;
+        }
+        .cat-dep-list-wrap[data-list="size-families"] > table td.sf-col-szcount{
+            white-space:nowrap;
+        }
+        .cat-dep-list-wrap[data-list="size-families"] > table th.sf-col-sort,
+        .cat-dep-list-wrap[data-list="size-families"] > table td.sf-col-sort{
+            width:3.75rem;
+            max-width:4.25rem;
+            text-align:center;
+            white-space:nowrap;
+            padding-inline:4px !important;
+            font-variant-numeric:tabular-nums;
+        }
+        .cat-dep-list-wrap[data-list="size-families"] > table th.sf-col-status,
+        .cat-dep-list-wrap[data-list="size-families"] > table td.sf-col-status{
+            width:4.5rem;
+            max-width:5rem;
+            text-align:center;
+            white-space:nowrap;
+            padding-inline:4px !important;
         }
         .cat-dep-list-wrap[data-list="size-families"] table .sf-ops-col,
         .cat-dep-list-wrap[data-list="size-families"] table .sf-row-ops{
