@@ -263,23 +263,23 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 ['page' => 'partner_supplier_payment', 'href' => '/admin/index.php?page=partner_supplier_payment', 'label' => 'سداد فواتير مشتريات آجلة', 'class' => 'admin-nav-sub', 'sub' => true],
             ];
 
+            /* ترتيب المخازن حسب مسار الإدخال المتفق عليه (مستودع/ألوان/مقاسات ثم شجرة ثم منتجات ثم تراث) */
             $navOps = [
-                ['page' => 'departments', 'href' => '/admin/index.php?page=departments', 'label' => 'الأقسام الرئيسية', 'class' => '', 'sub' => false],
-                ['page' => 'unified_catalog_branches', 'href' => '/admin/index.php?page=unified_catalog_branches', 'label' => 'الشجرة (عرض شامل)', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'product_types', 'href' => '/admin/index.php?page=product_types', 'label' => 'أنواع المنتجات (موحّد)', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'stock', 'href' => '/admin/index.php?page=stock', 'label' => 'المستودع', 'class' => '', 'sub' => false],
                 ['page' => 'color_dictionary', 'href' => '/admin/index.php?page=color_dictionary', 'label' => 'قاموس الألوان', 'class' => '', 'sub' => false],
                 ['page' => 'pattern_dictionary', 'href' => '/admin/index.php?page=pattern_dictionary', 'label' => 'أنماط الألوان', 'class' => '', 'sub' => false],
                 ['page' => 'size_scheme_templates', 'href' => '/admin/index.php?page=size_scheme_templates', 'label' => 'قوالب المقاسات', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'sizing_dictionary', 'href' => '/admin/index.php?page=sizing_dictionary', 'label' => 'قاموس هرَم المقاس (1–2)', 'class' => '', 'sub' => false],
+                ['page' => 'sizing_dictionary', 'href' => '/admin/index.php?page=sizing_dictionary', 'label' => 'قاموس هرم المقاسات (1–2)', 'class' => '', 'sub' => false],
                 ['page' => 'size_families', 'href' => '/admin/index.php?page=size_families', 'label' => 'عائلات المقاسات (3–4)', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'departments', 'href' => '/admin/index.php?page=departments', 'label' => 'الأقسام الرئيسية', 'class' => '', 'sub' => false],
+                ['page' => 'unified_catalog_branches', 'href' => '/admin/index.php?page=unified_catalog_branches', 'label' => 'الشجرة (عرض شامل)', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'product_types', 'href' => '/admin/index.php?page=product_types', 'label' => 'أنواع المنتجات (موحّد)', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'catalog_attributes', 'href' => '/admin/index.php?page=catalog_attributes', 'label' => 'سمات الكتالوج', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'products', 'href' => '/admin/index.php?page=products', 'label' => 'المنتجات', 'class' => '', 'sub' => false],
                 ['page' => 'offers', 'href' => '/admin/index.php?page=offers', 'label' => 'عروض المنتجات', 'class' => '', 'sub' => false],
-                ['page' => 'stock', 'href' => '/admin/index.php?page=stock', 'label' => 'المستودع', 'class' => '', 'sub' => false],
                 ['page' => 'opening_stock_balances', 'href' => '/admin/index.php?page=opening_stock_balances', 'label' => 'أرصدة أول المدة المخزنية', 'class' => 'admin-nav-sub', 'sub' => true],
-                /* ترشيح التصنيف القديم (جداول categories/subcategories) — بعد أرصدة المخزون؛ يُزال لاحقاً عند اكتمال الشجرة الموحّدة */
                 ['page' => 'categories', 'href' => '/admin/index.php?page=categories', 'label' => 'أقسام داخلية (تراث — قد تُلغى)', 'class' => 'admin-nav-sub admin-nav-link--legacy', 'sub' => true],
-                ['page' => 'subcategories', 'href' => '/admin/index.php?page=subcategories', 'label' => 'الفئة والفرع (تراث — قد تُلغى)', 'class' => 'admin-nav-sub admin-nav-link--legacy', 'sub' => true],
+                ['page' => 'subcategories', 'href' => '/admin/index.php?page=subcategories', 'label' => 'الفئة والفروع (تراث — قد تُلغى)', 'class' => 'admin-nav-sub admin-nav-link--legacy', 'sub' => true],
             ];
 
             $navPurchasing = [
