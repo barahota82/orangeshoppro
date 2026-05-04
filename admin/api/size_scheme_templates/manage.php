@@ -6,6 +6,66 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_admin_api();
 
+function orange_tpl_slugify_key(string $s): string
+{
+    $s = strtolower(trim($s));
+    $s = (string) (preg_replace('/[^a-z0-9_-]+/', '_', $s) ?? '');
+    $s = (string) (preg_replace('/_+/', '_', $s) ?? $s);
+    $s = trim($s, '_');
+
+    return $s;
+}
+
+/**
+ * يطابق العائلة مع القالب حتى عند غياب size_scheme_template_id (اعتماداً على size_scheme_key / الاسم الإنجليزي).
+ *
+ * @param array<string,mixed> $famRow
+ */
+function orange_family_matches_template_guess(array $famRow, string $tplNameEn, int $tplId): bool
+{
+    $tplSlug = orange_tpl_slugify_key($tplNameEn);
+    $fallbackTplSlug = 'tpl_' . $tplId;
+    if ($tplSlug === '') {
+        $tplSlug = $fallbackTplSlug;
+    }
+
+    $scheme = orange_tpl_slugify_key((string) ($famRow['size_scheme_key'] ?? ''));
+    $cat = orange_tpl_slugify_key((string) ($famRow['sizing_category_key'] ?? ''));
+    if ($scheme !== '' && $cat !== '' && strpos($scheme, $cat . '_') === 0) {
+        $suffix = substr($scheme, strlen($cat) + 1);
+        if ($suffix === $tplSlug || $suffix === $fallbackTplSlug) {
+            return true;
+        }
+    }
+    if ($scheme !== '') {
+        if ($scheme === $tplSlug || $scheme === $fallbackTplSlug) {
+            return true;
+        }
+        $tail1 = '_' . $tplSlug;
+        $tail2 = '_' . $fallbackTplSlug;
+        if (strlen($scheme) > strlen($tail1) && substr($scheme, -strlen($tail1)) === $tail1) {
+            return true;
+        }
+        if (strlen($scheme) > strlen($tail2) && substr($scheme, -strlen($tail2)) === $tail2) {
+            return true;
+        }
+    }
+
+    $famEn = strtolower(trim((string) ($famRow['name_en'] ?? '')));
+    $tplEn = strtolower(trim($tplNameEn));
+    if ($famEn !== '' && $tplEn !== '') {
+        if ($famEn === $tplEn) {
+            return true;
+        }
+        $needle = ' - ' . $tplEn;
+        if (strlen($famEn) > strlen($needle) && substr($famEn, -strlen($needle)) === $needle) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
@@ -209,6 +269,31 @@ try {
 
                 $hasFamTplRef = orange_table_exists($pdo, 'size_families')
                     && orange_table_has_column($pdo, 'size_families', 'size_scheme_template_id');
+                if ($hasFamTplRef) {
+                    $famNullTpl = $pdo->query(
+                        'SELECT id, name_en, size_scheme_key, sizing_category_key, COALESCE(size_scheme_template_id,0) AS size_scheme_template_id
+                         FROM size_families'
+                    );
+                    $bindFamTpl = $pdo->prepare(
+                        'UPDATE size_families SET size_scheme_template_id = ? WHERE id = ? LIMIT 1'
+                    );
+                    foreach (($famNullTpl->fetchAll(PDO::FETCH_ASSOC) ?: []) as $fr) {
+                        if (!is_array($fr)) {
+                            continue;
+                        }
+                        if (!orange_family_matches_template_guess($fr, $nameEn, $tplId)) {
+                            continue;
+                        }
+                        $currentTplRef = (int) ($fr['size_scheme_template_id'] ?? 0);
+                        if ($currentTplRef === $tplId) {
+                            continue;
+                        }
+                        $fidBind = (int) ($fr['id'] ?? 0);
+                        if ($fidBind > 0) {
+                            $bindFamTpl->execute([$tplId, $fidBind]);
+                        }
+                    }
+                }
                 if ($hasFamLink && $hasFamTplRef) {
                     $sqlBack = 'UPDATE size_family_sizes sfs
                         INNER JOIN size_families fam ON fam.id = sfs.size_family_id AND fam.size_scheme_template_id = ?
