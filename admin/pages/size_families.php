@@ -882,8 +882,26 @@ async function saveFamily() {
         };
         if (recordId > 0) payload.id = recordId;
         var res = await postJSON('/admin/api/size_families/save.php', payload);
-        alert(res.message || (res.success ? 'تم الحفظ' : 'فشل'));
-        if (res.success) location.reload();
+        if (!res || !res.success) {
+            alert((res && res.message) ? res.message : 'فشل');
+            return;
+        }
+        var savedId = parseInt(String(res.id != null ? res.id : (recordId > 0 ? recordId : 0)), 10) || 0;
+        if (savedId > 0) {
+            document.getElementById('fam_id').value = String(savedId);
+        }
+        var sizeRowsPayload = famCollectSizesRowsFromEditor();
+        if (sizeRowsPayload.length > 0 && savedId > 0) {
+            var sz = await postJSON('/admin/api/size_families/save_sizes.php', { family_id: savedId, sizes: sizeRowsPayload });
+            if (!sz || !sz.success) {
+                alert('تم حفظ العائلة لكن حفظ المقاسات فشل: ' + ((sz && sz.message) ? sz.message : 'خطأ'));
+                return;
+            }
+            alert('تم حفظ العائلة والمقاسات');
+        } else {
+            alert(res.message || 'تم الحفظ');
+        }
+        location.reload();
     } catch (e) {
         alert('فشل الاتصال بالخادم أثناء الحفظ');
     } finally {
@@ -952,45 +970,90 @@ function escapeAttr(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 }
 
-async function importSizeTemplateRows() {
-    if (!FAM_HAS_SIZE_TEMPLATES) {
-        alert('لا توجد قوالب مقاسات. أنشئ قالباً من «إدارة القوالب» أولاً.');
-        return;
+function famEnsureSizesEditorEmptyTable() {
+    var box = document.getElementById('sizesEditor');
+    if (!box) {
+        return null;
     }
+    var tbody = box.querySelector('tbody');
+    if (tbody) {
+        return tbody;
+    }
+    var thead = '<thead><tr><th>id</th><th>عربي</th><th>EN</th><th>Fil</th><th>Hi</th><th>طول القدم (سم)</th><th>ترتيب</th></tr></thead>';
+    box.innerHTML = '<div class="table-wrap"><table>' + thead + '<tbody></tbody></table></div>';
+    return box.querySelector('tbody');
+}
+
+function famCollectSizesRowsFromEditor() {
+    var trs = document.querySelectorAll('#sizesEditor tr.size-row');
+    var rows = [];
+    for (var idx = 0; idx < trs.length; idx++) {
+        var tr = trs[idx];
+        var id = parseInt(tr.getAttribute('data-id') || '0', 10) || 0;
+        var laEl = tr.querySelector('.s-la');
+        var leEl = tr.querySelector('.s-le');
+        var lfEl = tr.querySelector('.s-lf');
+        var lhEl = tr.querySelector('.s-lh');
+        var flEl = tr.querySelector('.s-fl');
+        var soEl = tr.querySelector('.s-so');
+        var la = laEl ? String(laEl.value || '').trim() : '';
+        var le = leEl ? String(leEl.value || '').trim() : '';
+        var lf = lfEl ? String(lfEl.value || '').trim() : '';
+        var lh = lhEl ? String(lhEl.value || '').trim() : '';
+        var fl = flEl ? String(flEl.value || '').trim() : '';
+        var so = soEl ? parseInt(soEl.value || String(idx), 10) : idx;
+        if (isNaN(so)) so = idx;
+        if (la === '' && le === '') continue;
+        var row = { id: id, label_ar: la, label_en: le, label_fil: lf, label_hi: lh, sort_order: so };
+        if (fl !== '') row.foot_length_cm = fl;
+        rows.push(row);
+    }
+    return rows;
+}
+
+/**
+ * @param {number} tid
+ * @param {{ allowDraftFamily?: boolean }} opts allowDraftFamily: عائلة جديدة بدون fam_id بعد
+ */
+async function famApplyTemplateSizesToEditor(tid, opts) {
+    opts = opts || {};
+    var allowDraftFamily = !!opts.allowDraftFamily;
     var fid = parseInt(String(document.getElementById('fam_id').value || '0').trim(), 10) || 0;
-    if (!fid) {
+    if (!allowDraftFamily && !fid) {
         alert('احفظ العائلة أولاً (أو اضغط «تعديل» على عائلة من القائمة) ثم حمّل المقاسات من القالب.');
-        return;
+        return false;
     }
-    var pick = document.getElementById('sizes_template_pick');
-    var tid = pick ? (parseInt(pick.value || '0', 10) || 0) : 0;
     if (!tid) {
         alert('اختر قالباً أولاً');
-        return;
+        return false;
     }
     try {
         var res = await postJSON(SST_IMPORT_API, { action: 'get', id: tid });
         if (!res || !res.success) {
             alert((res && res.message) ? res.message : 'تعذر تحميل القالب');
-            return;
+            return false;
         }
         var sizes = res.sizes || [];
         if (!sizes.length) {
             alert('القالب لا يحتوي على مقاسات');
-            return;
+            return false;
         }
         var tbody = document.querySelector('#sizesEditor tbody');
         if (!tbody) {
-            loadSizesEditor();
-            tbody = document.querySelector('#sizesEditor tbody');
+            if (fid > 0) {
+                loadSizesEditor();
+                tbody = document.querySelector('#sizesEditor tbody');
+            } else {
+                tbody = famEnsureSizesEditorEmptyTable();
+            }
         }
         if (!tbody) {
-            return;
+            return false;
         }
         var existing = tbody.querySelectorAll('tr.size-row').length;
         if (existing > 0) {
-            if (!confirm('سيتم استبدال جميع صفوف المقاسات في الجدول بمحتوى القالب. التغيير لا يُسجَّل في القاعدة حتى تضغط «حفظ المقاسات». متابعة؟')) {
-                return;
+            if (!confirm('سيتم استبدال جميع صفوف المقاسات في الجدول بمحتوى القالب. متابعة؟')) {
+                return false;
             }
             while (tbody.firstChild) {
                 tbody.removeChild(tbody.firstChild);
@@ -1015,9 +1078,33 @@ async function importSizeTemplateRows() {
                 lhEl.value = enVal;
             }
         }
+        return true;
     } catch (e) {
         alert('خطأ شبكة أو خادم');
+        return false;
     }
+}
+
+async function famAutoImportOnTemplateChange() {
+    if (!FAM_HAS_SIZE_TEMPLATES) {
+        return;
+    }
+    var pick = document.getElementById('sizes_template_pick');
+    var tid = pick ? (parseInt(pick.value || '0', 10) || 0) : 0;
+    if (!tid) {
+        return;
+    }
+    await famApplyTemplateSizesToEditor(tid, { allowDraftFamily: true });
+}
+
+async function importSizeTemplateRows() {
+    if (!FAM_HAS_SIZE_TEMPLATES) {
+        alert('لا توجد قوالب مقاسات. أنشئ قالباً من «إدارة القوالب» أولاً.');
+        return;
+    }
+    var pick = document.getElementById('sizes_template_pick');
+    var tid = pick ? (parseInt(pick.value || '0', 10) || 0) : 0;
+    await famApplyTemplateSizesToEditor(tid, { allowDraftFamily: false });
 }
 
 async function saveSizesForFamily() {
@@ -1026,32 +1113,10 @@ async function saveSizesForFamily() {
         alert('احفظ العائلة أولاً أو افتح عائلة محفوظة من «تعديل» قبل حفظ المقاسات.');
         return;
     }
-    var trs = document.querySelectorAll('#sizesEditor tr.size-row');
-    if (!trs.length) {
+    var rows = famCollectSizesRowsFromEditor();
+    if (!rows.length) {
         alert('حمّل المقاسات من قالب أولاً (لا يوجد صف في الجدول).');
         return;
-    }
-    var rows = [];
-    for (var idx = 0; idx < trs.length; idx++) {
-        var tr = trs[idx];
-        var id = parseInt(tr.getAttribute('data-id') || '0', 10) || 0;
-        var laEl = tr.querySelector('.s-la');
-        var leEl = tr.querySelector('.s-le');
-        var lfEl = tr.querySelector('.s-lf');
-        var lhEl = tr.querySelector('.s-lh');
-        var flEl = tr.querySelector('.s-fl');
-        var soEl = tr.querySelector('.s-so');
-        var la = laEl ? String(laEl.value || '').trim() : '';
-        var le = leEl ? String(leEl.value || '').trim() : '';
-        var lf = lfEl ? String(lfEl.value || '').trim() : '';
-        var lh = lhEl ? String(lhEl.value || '').trim() : '';
-        var fl = flEl ? String(flEl.value || '').trim() : '';
-        var so = soEl ? parseInt(soEl.value || String(idx), 10) : idx;
-        if (isNaN(so)) so = idx;
-        if (la === '' && le === '') continue;
-        var row = { id: id, label_ar: la, label_en: le, label_fil: lf, label_hi: lh, sort_order: so };
-        if (fl !== '') row.foot_length_cm = fl;
-        rows.push(row);
     }
     var res = await postJSON('/admin/api/size_families/save_sizes.php', { family_id: familyId, sizes: rows });
     alert(res.message || (res.success ? 'تم حفظ المقاسات' : 'فشل'));
@@ -1253,6 +1318,7 @@ async function saveSizesForFamily() {
             tplPick.addEventListener('change', function () {
                 famApplyAutoNamesFromDictionary();
                 famApplyAutoSizeSchemeKey();
+                void famAutoImportOnTemplateChange();
             });
         }
         loadSizesEditor();
