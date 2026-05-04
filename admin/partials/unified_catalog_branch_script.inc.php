@@ -110,7 +110,11 @@ function ucPickNextSort(map, rawId) {
 }
 
 function ucApplyNextSortForNewSec() {
-    if ((parseInt(document.getElementById('uc_sec_id').value || '0', 10) || 0) > 0) {
+    const rid = document.getElementById('uc_sec_id');
+    if (!rid) {
+        return;
+    }
+    if ((parseInt(rid.value || '0', 10) || 0) > 0) {
         return;
     }
     const d = document.getElementById('uc_sec_department_id');
@@ -127,7 +131,11 @@ function ucApplyNextSortForNewSec() {
 }
 
 function ucApplyNextSortForNewCat() {
-    if ((parseInt(document.getElementById('uc_cat_id').value || '0', 10) || 0) > 0) {
+    const rid = document.getElementById('uc_cat_id');
+    if (!rid) {
+        return;
+    }
+    if ((parseInt(rid.value || '0', 10) || 0) > 0) {
         return;
     }
     const sel = document.getElementById('uc_cat_section_id');
@@ -144,7 +152,11 @@ function ucApplyNextSortForNewCat() {
 }
 
 function ucApplyNextSortForNewSub() {
-    if ((parseInt(document.getElementById('uc_sub_id').value || '0', 10) || 0) > 0) {
+    const rid = document.getElementById('uc_sub_id');
+    if (!rid) {
+        return;
+    }
+    if ((parseInt(rid.value || '0', 10) || 0) > 0) {
         return;
     }
     const sel = document.getElementById('uc_sub_category_id');
