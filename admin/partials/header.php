@@ -265,8 +265,6 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
 
             $navOps = [
                 ['page' => 'departments', 'href' => '/admin/index.php?page=departments', 'label' => 'الأقسام الرئيسية', 'class' => '', 'sub' => false],
-                ['page' => 'categories', 'href' => '/admin/index.php?page=categories', 'label' => 'أقسام داخلية', 'class' => '', 'sub' => false],
-                ['page' => 'subcategories', 'href' => '/admin/index.php?page=subcategories', 'label' => 'الفئة والفرع', 'class' => '', 'sub' => false],
                 ['page' => 'unified_catalog_branches', 'href' => '/admin/index.php?page=unified_catalog_branches', 'label' => 'الشجرة (عرض شامل)', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'product_types', 'href' => '/admin/index.php?page=product_types', 'label' => 'أنواع المنتجات (موحّد)', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'color_dictionary', 'href' => '/admin/index.php?page=color_dictionary', 'label' => 'قاموس الألوان', 'class' => '', 'sub' => false],
@@ -279,6 +277,9 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 ['page' => 'offers', 'href' => '/admin/index.php?page=offers', 'label' => 'عروض المنتجات', 'class' => '', 'sub' => false],
                 ['page' => 'stock', 'href' => '/admin/index.php?page=stock', 'label' => 'المستودع', 'class' => '', 'sub' => false],
                 ['page' => 'opening_stock_balances', 'href' => '/admin/index.php?page=opening_stock_balances', 'label' => 'أرصدة أول المدة المخزنية', 'class' => 'admin-nav-sub', 'sub' => true],
+                /* ترشيح التصنيف القديم (جداول categories/subcategories) — بعد أرصدة المخزون؛ يُزال لاحقاً عند اكتمال الشجرة الموحّدة */
+                ['page' => 'categories', 'href' => '/admin/index.php?page=categories', 'label' => 'أقسام داخلية (تراث — قد تُلغى)', 'class' => 'admin-nav-sub admin-nav-link--legacy', 'sub' => true],
+                ['page' => 'subcategories', 'href' => '/admin/index.php?page=subcategories', 'label' => 'الفئة والفرع (تراث — قد تُلغى)', 'class' => 'admin-nav-sub admin-nav-link--legacy', 'sub' => true],
             ];
 
             $navPurchasing = [

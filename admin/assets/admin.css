@@ -430,6 +430,14 @@ a { text-decoration: none; color: inherit; }
     border-inline-start: var(--admin-mega-link-sub-border-w) solid rgba(255, 255, 255, 0.22);
     padding-inline-start: var(--admin-mega-link-sub-pad-start);
 }
+/* روابط تصنيف تراثي (جداول قديمة) — تظهر أسفل أرصدة المخزون */
+.admin-mega-link.admin-nav-link--legacy {
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 13px;
+}
+.admin-mega-link.admin-nav-link--legacy:hover {
+    color: #fff;
+}
 /* 992 بدل 1025: نوافذ 1024px (شائعة مع شريط أدوات) كانت تخفي القائمة العلوية بالكامل */
 @media (min-width: 992px) {
     .admin-topbar-mega {
@@ -656,6 +664,13 @@ a { text-decoration: none; color: inherit; }
 }
 .admin-nav-drawer nav a.admin-nav-sub.is-active:hover {
     background: var(--primary-hover);
+    color: #fff;
+}
+.admin-nav-drawer nav a.admin-nav-link--legacy {
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 13px;
+}
+.admin-nav-drawer nav a.admin-nav-link--legacy:hover {
     color: #fff;
 }
 .admin-main {
