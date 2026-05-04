@@ -43,6 +43,38 @@ function orange_tpl_slugify_key(string $s): string
 }
 
 /**
+ * @param mixed $raw
+ */
+function orange_parse_foot_length_nullable($raw, ?string &$err = null): ?float
+{
+    $err = null;
+    if ($raw === null) {
+        return null;
+    }
+    $v = trim((string) $raw);
+    if ($v === '') {
+        return null;
+    }
+    $v = strtr($v, [
+        '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
+        '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+        '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
+        '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+        '٫' => '.', ',' => '.', '٬' => '',
+    ]);
+    $v = str_replace(' ', '', $v);
+    if ($v === '') {
+        return null;
+    }
+    if (!preg_match('/^-?\d+(?:\.\d+)?$/', $v)) {
+        $err = 'طول القدم يجب أن يكون رقماً (سم)';
+        return null;
+    }
+
+    return round((float) $v, 2);
+}
+
+/**
  * @param array<string,mixed> $famRow
  * @param array<string,mixed> $tplRow
  */
@@ -271,13 +303,10 @@ try {
             $lh = $le;
         }
         $so = (int)($row['sort_order'] ?? $i);
-        $footRaw = trim((string)($row['foot_length_cm'] ?? ''));
-        $foot = null;
-        if ($footRaw !== '') {
-            if (!is_numeric($footRaw)) {
-                json_response(['success' => false, 'message' => 'طول القدم يجب أن يكون رقماً (سم)'], 422);
-            }
-            $foot = round((float) $footRaw, 2);
+        $footErr = null;
+        $foot = orange_parse_foot_length_nullable($row['foot_length_cm'] ?? null, $footErr);
+        if ($footErr !== null) {
+            json_response(['success' => false, 'message' => $footErr], 422);
         }
         if ($la === '' && $le === '') {
             continue;

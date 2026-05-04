@@ -17,6 +17,38 @@ function orange_tpl_slugify_key(string $s): string
 }
 
 /**
+ * @param mixed $raw
+ */
+function orange_parse_foot_length_nullable($raw, ?string &$err = null): ?float
+{
+    $err = null;
+    if ($raw === null) {
+        return null;
+    }
+    $v = trim((string) $raw);
+    if ($v === '') {
+        return null;
+    }
+    $v = strtr($v, [
+        '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
+        '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+        '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
+        '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+        '٫' => '.', ',' => '.', '٬' => '',
+    ]);
+    $v = str_replace(' ', '', $v);
+    if ($v === '') {
+        return null;
+    }
+    if (!preg_match('/^-?\d+(?:\.\d+)?$/', $v)) {
+        $err = 'طول القدم يجب أن يكون رقماً (سم)';
+        return null;
+    }
+
+    return round((float) $v, 2);
+}
+
+/**
  * يطابق العائلة مع القالب حتى عند غياب size_scheme_template_id (اعتماداً على size_scheme_key / الاسم الإنجليزي).
  *
  * @param array<string,mixed> $famRow
@@ -145,10 +177,10 @@ try {
                 $lf = trim((string) ($row['label_fil'] ?? ''));
                 $lh = trim((string) ($row['label_hi'] ?? ''));
                 $so = (int) ($row['sort_order'] ?? 0);
-                $flRaw = $row['foot_length_cm'] ?? null;
-                $fl = null;
-                if ($flRaw !== null && $flRaw !== '') {
-                    $fl = is_numeric($flRaw) ? (float) $flRaw : null;
+                $footErr = null;
+                $fl = orange_parse_foot_length_nullable($row['foot_length_cm'] ?? null, $footErr);
+                if ($footErr !== null) {
+                    json_response(['success' => false, 'message' => $footErr], 422);
                 }
                 $rowTplSizeId = (int) ($row['id'] ?? 0);
                 $normalized[] = [
@@ -316,6 +348,39 @@ try {
                     $tplRowsOrd->execute([$tplId]);
                     $tplRowsList = $tplRowsOrd->fetchAll(PDO::FETCH_ASSOC) ?: [];
                     if ($tplRowsList !== []) {
+                        $hasFamFoot = orange_table_has_column($pdo, 'size_family_sizes', 'foot_length_cm');
+                        $hasFamSfLang = orange_table_has_column($pdo, 'size_family_sizes', 'label_fil')
+                            && orange_table_has_column($pdo, 'size_family_sizes', 'label_hi');
+                        $ordUp = $hasFamFoot && $hasFamSfLang
+                            ? $pdo->prepare(
+                                'UPDATE size_family_sizes SET label_ar=?, label_en=?, label_fil=?, label_hi=?, sort_order=?, foot_length_cm=?, scheme_template_size_id=? WHERE id=? AND size_family_id=? LIMIT 1'
+                            )
+                            : ($hasFamFoot
+                                ? $pdo->prepare(
+                                    'UPDATE size_family_sizes SET label_ar=?, label_en=?, sort_order=?, foot_length_cm=?, scheme_template_size_id=? WHERE id=? AND size_family_id=? LIMIT 1'
+                                )
+                                : ($hasFamSfLang
+                                    ? $pdo->prepare(
+                                        'UPDATE size_family_sizes SET label_ar=?, label_en=?, label_fil=?, label_hi=?, sort_order=?, scheme_template_size_id=? WHERE id=? AND size_family_id=? LIMIT 1'
+                                    )
+                                    : $pdo->prepare(
+                                        'UPDATE size_family_sizes SET label_ar=?, label_en=?, sort_order=?, scheme_template_size_id=? WHERE id=? AND size_family_id=? LIMIT 1'
+                                    )));
+                        $ordIns = $hasFamFoot && $hasFamSfLang
+                            ? $pdo->prepare(
+                                'INSERT INTO size_family_sizes (size_family_id, label_ar, label_en, label_fil, label_hi, sort_order, foot_length_cm, is_active, scheme_template_size_id) VALUES (?,?,?,?,?,?,?,?,?)'
+                            )
+                            : ($hasFamFoot
+                                ? $pdo->prepare(
+                                    'INSERT INTO size_family_sizes (size_family_id, label_ar, label_en, sort_order, foot_length_cm, is_active, scheme_template_size_id) VALUES (?,?,?,?,?,?,?)'
+                                )
+                                : ($hasFamSfLang
+                                    ? $pdo->prepare(
+                                        'INSERT INTO size_family_sizes (size_family_id, label_ar, label_en, label_fil, label_hi, sort_order, is_active, scheme_template_size_id) VALUES (?,?,?,?,?,?,?,?)'
+                                    )
+                                    : $pdo->prepare(
+                                        'INSERT INTO size_family_sizes (size_family_id, label_ar, label_en, sort_order, is_active, scheme_template_size_id) VALUES (?,?,?,?,?,?)'
+                                    )));
                         $famIdsStmt = $pdo->prepare('SELECT id FROM size_families WHERE size_scheme_template_id = ?');
                         $famIdsStmt->execute([$tplId]);
                         foreach ($famIdsStmt->fetchAll(PDO::FETCH_COLUMN) ?: [] as $syncFamId) {
@@ -334,9 +399,6 @@ try {
                                 array_column($sfsOrdStmt->fetchAll(PDO::FETCH_ASSOC) ?: [], 'id')
                             );
                             $nPair = min(count($tplRowsList), count($famSizeIdsList));
-                            $ordUp = $pdo->prepare(
-                                'UPDATE size_family_sizes SET label_ar=?, label_en=?, label_fil=?, label_hi=?, sort_order=?, foot_length_cm=?, scheme_template_size_id=? WHERE id=? AND size_family_id=? LIMIT 1'
-                            );
                             for ($pi = 0; $pi < $nPair; $pi++) {
                                 $t = $tplRowsList[$pi];
                                 $tstIdRow = (int) ($t['id'] ?? 0);
@@ -346,17 +408,101 @@ try {
                                 }
                                 $soT = (int) ($t['sort_order'] ?? ($pi + 1));
                                 $footT = $t['foot_length_cm'] ?? null;
-                                $ordUp->execute([
-                                    (string) ($t['label_ar'] ?? ''),
-                                    (string) ($t['label_en'] ?? ''),
-                                    (string) ($t['label_fil'] ?? ''),
-                                    (string) ($t['label_hi'] ?? ''),
-                                    $soT,
-                                    $footT,
-                                    $tstIdRow,
-                                    $fSid,
-                                    $syncFamId,
-                                ]);
+                                if ($hasFamFoot && $hasFamSfLang) {
+                                    $ordUp->execute([
+                                        (string) ($t['label_ar'] ?? ''),
+                                        (string) ($t['label_en'] ?? ''),
+                                        (string) ($t['label_fil'] ?? ''),
+                                        (string) ($t['label_hi'] ?? ''),
+                                        $soT,
+                                        $footT,
+                                        $tstIdRow,
+                                        $fSid,
+                                        $syncFamId,
+                                    ]);
+                                } elseif ($hasFamFoot) {
+                                    $ordUp->execute([
+                                        (string) ($t['label_ar'] ?? ''),
+                                        (string) ($t['label_en'] ?? ''),
+                                        $soT,
+                                        $footT,
+                                        $tstIdRow,
+                                        $fSid,
+                                        $syncFamId,
+                                    ]);
+                                } elseif ($hasFamSfLang) {
+                                    $ordUp->execute([
+                                        (string) ($t['label_ar'] ?? ''),
+                                        (string) ($t['label_en'] ?? ''),
+                                        (string) ($t['label_fil'] ?? ''),
+                                        (string) ($t['label_hi'] ?? ''),
+                                        $soT,
+                                        $tstIdRow,
+                                        $fSid,
+                                        $syncFamId,
+                                    ]);
+                                } else {
+                                    $ordUp->execute([
+                                        (string) ($t['label_ar'] ?? ''),
+                                        (string) ($t['label_en'] ?? ''),
+                                        $soT,
+                                        $tstIdRow,
+                                        $fSid,
+                                        $syncFamId,
+                                    ]);
+                                }
+                            }
+                            for ($pi = $nPair; $pi < count($tplRowsList); $pi++) {
+                                $t = $tplRowsList[$pi];
+                                $tstIdRow = (int) ($t['id'] ?? 0);
+                                if ($tstIdRow <= 0) {
+                                    continue;
+                                }
+                                $soT = (int) ($t['sort_order'] ?? ($pi + 1));
+                                $footT = $t['foot_length_cm'] ?? null;
+                                if ($hasFamFoot && $hasFamSfLang) {
+                                    $ordIns->execute([
+                                        $syncFamId,
+                                        (string) ($t['label_ar'] ?? ''),
+                                        (string) ($t['label_en'] ?? ''),
+                                        (string) ($t['label_fil'] ?? ''),
+                                        (string) ($t['label_hi'] ?? ''),
+                                        $soT,
+                                        $footT,
+                                        1,
+                                        $tstIdRow,
+                                    ]);
+                                } elseif ($hasFamFoot) {
+                                    $ordIns->execute([
+                                        $syncFamId,
+                                        (string) ($t['label_ar'] ?? ''),
+                                        (string) ($t['label_en'] ?? ''),
+                                        $soT,
+                                        $footT,
+                                        1,
+                                        $tstIdRow,
+                                    ]);
+                                } elseif ($hasFamSfLang) {
+                                    $ordIns->execute([
+                                        $syncFamId,
+                                        (string) ($t['label_ar'] ?? ''),
+                                        (string) ($t['label_en'] ?? ''),
+                                        (string) ($t['label_fil'] ?? ''),
+                                        (string) ($t['label_hi'] ?? ''),
+                                        $soT,
+                                        1,
+                                        $tstIdRow,
+                                    ]);
+                                } else {
+                                    $ordIns->execute([
+                                        $syncFamId,
+                                        (string) ($t['label_ar'] ?? ''),
+                                        (string) ($t['label_en'] ?? ''),
+                                        $soT,
+                                        1,
+                                        $tstIdRow,
+                                    ]);
+                                }
                             }
                         }
                     }
