@@ -385,7 +385,7 @@ $tablesReady = $hasFamilies && $hasSizes;
             <button type="button" class="btn-secondary" onclick="saveFamiliesOrder()">حفظ الترتيب</button>
         </div>
     </div>
-    <div class="table-wrap cat-dep-list-wrap" data-list="size-families">
+    <div class="table-wrap cat-dep-list-wrap" data-list="size-families" style="margin-top:10px;">
         <table>
             <thead>
                 <tr>
@@ -1003,7 +1003,7 @@ async function saveSizesForFamily() {
         .sf-sizes-actions{justify-content:flex-end}
         .cat-dep-list-wrap[data-list="size-families"]{
             overflow-x:auto;
-            max-width:100%;
+            max-width:none;
             -webkit-overflow-scrolling:touch;
         }
         .cat-dep-list-wrap[data-list="size-families"] > table{
