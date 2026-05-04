@@ -234,6 +234,34 @@ function ucRestoreAfterSaveThenSort() {
     } catch (e) { /* ignore */ }
 }
 
+/** إن وُجد خيار «اختر» + أب واحد فقط، نختار الأب تلقائياً ليُحسب الترتيب التالي (لا يبقى الحقل فارغاً). */
+function ucInitSingleParentBranchForms() {
+    var rid = document.getElementById('uc_sec_id');
+    var d = document.getElementById('uc_sec_department_id');
+    if (rid && d && !d.disabled && (parseInt(rid.value || '0', 10) || 0) === 0) {
+        if (!String(d.value || '').trim() && d.options.length === 2) {
+            d.selectedIndex = 1;
+            ucApplyNextSortForNewSec();
+        }
+    }
+    rid = document.getElementById('uc_cat_id');
+    var s = document.getElementById('uc_cat_section_id');
+    if (rid && s && !s.disabled && (parseInt(rid.value || '0', 10) || 0) === 0) {
+        if (!String(s.value || '').trim() && s.options.length === 2) {
+            s.selectedIndex = 1;
+            ucApplyNextSortForNewCat();
+        }
+    }
+    rid = document.getElementById('uc_sub_id');
+    var c = document.getElementById('uc_sub_category_id');
+    if (rid && c && !c.disabled && (parseInt(rid.value || '0', 10) || 0) === 0) {
+        if (!String(c.value || '').trim() && c.options.length === 2) {
+            c.selectedIndex = 1;
+            ucApplyNextSortForNewSub();
+        }
+    }
+}
+
 function resetUcSection() {
     try { sessionStorage.removeItem('ucRestoreSecDept'); } catch (e) { /* ignore */ }
     ucSlugManual.sec = false;
@@ -247,6 +275,7 @@ function resetUcSection() {
     document.getElementById('uc_sec_name_hi').value = '';
     document.getElementById('uc_sec_active').value = '1';
     ucApplyNextSortForNewSec();
+    ucInitSingleParentBranchForms();
 }
 
 function editUcSection(j) {
@@ -285,7 +314,10 @@ function resetUcCategory() {
     try { sessionStorage.removeItem('ucRestoreCatSection'); } catch (e) { /* ignore */ }
     ucSlugManual.cat = false;
     document.getElementById('uc_cat_id').value = '0';
-    document.getElementById('uc_cat_section_id').value = '';
+    var catSec = document.getElementById('uc_cat_section_id');
+    if (catSec && catSec.options.length) {
+        catSec.selectedIndex = 0;
+    }
     document.getElementById('uc_cat_slug').value = '';
     document.getElementById('uc_cat_sort').value = '';
     document.getElementById('uc_cat_name_ar').value = '';
@@ -294,6 +326,7 @@ function resetUcCategory() {
     document.getElementById('uc_cat_name_hi').value = '';
     document.getElementById('uc_cat_active').value = '1';
     ucApplyNextSortForNewCat();
+    ucInitSingleParentBranchForms();
 }
 
 function editUcCategory(j) {
@@ -347,7 +380,10 @@ function resetUcSubcategory() {
     try { sessionStorage.removeItem('ucRestoreSubCategory'); } catch (e) { /* ignore */ }
     ucSlugManual.sub = false;
     document.getElementById('uc_sub_id').value = '0';
-    document.getElementById('uc_sub_category_id').value = '';
+    var subCat = document.getElementById('uc_sub_category_id');
+    if (subCat && subCat.options.length) {
+        subCat.selectedIndex = 0;
+    }
     document.getElementById('uc_sub_slug').value = '';
     document.getElementById('uc_sub_sort').value = '';
     document.getElementById('uc_sub_name_ar').value = '';
@@ -356,6 +392,7 @@ function resetUcSubcategory() {
     document.getElementById('uc_sub_name_hi').value = '';
     document.getElementById('uc_sub_active').value = '1';
     ucApplyNextSortForNewSub();
+    ucInitSingleParentBranchForms();
 }
 
 function editUcSubcategory(j) {
@@ -521,5 +558,6 @@ function scheduleUcFromEn(which) {
     ucApplyNextSortForNewCat();
     ucApplyNextSortForNewSub();
     ucRestoreAfterSaveThenSort();
+    ucInitSingleParentBranchForms();
 })();
 </script>
