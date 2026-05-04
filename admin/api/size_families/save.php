@@ -63,8 +63,14 @@ try {
     }
 
     // تمييز العائلات بـ size_scheme_key (مستوى 3 EN) وليس بالاسم العربي بعد التطبيع — يسمح بأسماء عربية متشابهة إذا اختلف المفتاح.
+    $resolvedIdByScheme = 0;
+    $resolvedSortByScheme = 0;
+    $resolvedTplRefByScheme = 0;
     if ($sizeScheme !== '') {
-        $famRows = $pdo->query('SELECT id, size_scheme_key FROM size_families')->fetchAll(PDO::FETCH_ASSOC);
+        $famRows = $pdo->query(
+            'SELECT id, size_scheme_key, name_en, commercial_kind_key, sizing_category_key, sort_order, COALESCE(size_scheme_template_id,0) AS size_scheme_template_id
+             FROM size_families'
+        )->fetchAll(PDO::FETCH_ASSOC);
         $excludeFamId = $id > 0 ? $id : null;
         foreach (is_array($famRows) ? $famRows : [] as $row) {
             if (!is_array($row)) {
@@ -76,11 +82,35 @@ try {
             }
             $other = $sanitizeKey((string) ($row['size_scheme_key'] ?? ''), 64);
             if ($other !== '' && $other === $sizeScheme) {
+                if ($id <= 0) {
+                    $nameEnRow = strtolower(trim((string) ($row['name_en'] ?? '')));
+                    $sameNameEn = $nameEnRow !== '' && $nameEnRow === strtolower($nameEn);
+                    $sameKind = $sanitizeKey((string) ($row['commercial_kind_key'] ?? ''), 32) === $commercialKind
+                        && $sanitizeKey((string) ($row['sizing_category_key'] ?? ''), 64) === $sizingCategory;
+                    $sameTpl = $tplRefRaw > 0 && (int) ($row['size_scheme_template_id'] ?? 0) === $tplRefRaw;
+                    if ($sameNameEn || $sameKind || $sameTpl) {
+                        $id = $rid;
+                        $excludeFamId = $rid;
+                        $resolvedIdByScheme = $rid;
+                        $resolvedSortByScheme = (int) ($row['sort_order'] ?? 0);
+                        $resolvedTplRefByScheme = (int) ($row['size_scheme_template_id'] ?? 0);
+                        continue;
+                    }
+                }
                 json_response([
                     'success' => false,
                     'message' => 'لا يمكن الحفظ: مفتاح مخطّط المقاس (size_scheme_key) مستخدم بالفعل لعائلة أخرى. غيّر الاسم الإنجليزي أو فئة القياس ليُولَّد مفتاح مختلف.',
                 ], 409);
             }
+        }
+    }
+
+    if ($resolvedIdByScheme > 0) {
+        if ($sort <= 0 && $resolvedSortByScheme > 0) {
+            $sort = $resolvedSortByScheme;
+        }
+        if ($tplRefRaw <= 0 && $resolvedTplRefByScheme > 0) {
+            $tplRefBind = $resolvedTplRefByScheme;
         }
     }
 
