@@ -36,7 +36,7 @@ if ($sdNextKindSort < 1) {
         grid-template-columns: repeat(12, minmax(0, 1fr));
         grid-template-areas:
             "active active key key key key key key key key sort sort"
-            "en en en en en en ar ar ar ar ar ar";
+            "names names names names names names names names names names names names";
         gap: 14px 18px;
         direction: ltr;
         align-items: start;
@@ -55,8 +55,42 @@ if ($sdNextKindSort < 1) {
         grid-area: key;
         min-width: 0;
     }
-    .sd-kind-form-grid .sd-kind-ar { grid-area: ar; }
-    .sd-kind-form-grid .sd-kind-en { grid-area: en; }
+    .sd-kind-form-grid .sd-kind-names-row {
+        grid-area: names;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px 18px;
+        direction: rtl;
+        align-items: start;
+        min-width: 0;
+    }
+    .sd-kind-form-grid .sd-kind-names-row > div {
+        min-width: 0;
+    }
+    .sd-kind-form-grid .sd-kind-names-row .admin-sort-field-wrap {
+        max-width: none;
+        width: 100%;
+    }
+    .sd-kind-form-grid .sd-kind-names-row input.admin-sort-field {
+        margin-inline: 0;
+        display: block;
+        width: 100%;
+        max-width: none;
+        box-sizing: border-box;
+        border: 1px solid #cbd5e1;
+        border-radius: var(--radius-sm, 10px);
+        font-size: 14px;
+        line-height: calc(var(--input-min-h, 36px) - 2px);
+        min-height: var(--input-min-h, 36px);
+        height: var(--input-min-h, 36px);
+        max-height: var(--input-min-h, 36px);
+        padding-block: 0;
+        padding-inline: 12px;
+    }
+    .sd-kind-form-grid .sd-kind-names-row input.admin-sort-field--muted[readonly] {
+        background: #f4f6f9;
+        cursor: default;
+    }
     .sd-kind-form-grid label,
     .sd-kind-form-grid input,
     .sd-kind-form-grid select {
@@ -122,7 +156,7 @@ if ($sdNextKindSort < 1) {
         grid-template-areas:
             "active active key key key key key key key key sort sort"
             "parent parent parent parent parent parent parent parent parent parent parent parent"
-            "en en en en en en ar ar ar ar ar ar";
+            "names names names names names names names names names names names names";
         gap: 14px 18px;
         direction: ltr;
         align-items: start;
@@ -145,8 +179,42 @@ if ($sdNextKindSort < 1) {
         grid-area: parent;
         min-width: 0;
     }
-    .sd-cat-form-grid .sd-cat-ar { grid-area: ar; }
-    .sd-cat-form-grid .sd-cat-en { grid-area: en; }
+    .sd-cat-form-grid .sd-cat-names-row {
+        grid-area: names;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px 18px;
+        direction: rtl;
+        align-items: start;
+        min-width: 0;
+    }
+    .sd-cat-form-grid .sd-cat-names-row > div {
+        min-width: 0;
+    }
+    .sd-cat-form-grid .sd-cat-names-row .admin-sort-field-wrap {
+        max-width: none;
+        width: 100%;
+    }
+    .sd-cat-form-grid .sd-cat-names-row input.admin-sort-field {
+        margin-inline: 0;
+        display: block;
+        width: 100%;
+        max-width: none;
+        box-sizing: border-box;
+        border: 1px solid #cbd5e1;
+        border-radius: var(--radius-sm, 10px);
+        font-size: 14px;
+        line-height: calc(var(--input-min-h, 36px) - 2px);
+        min-height: var(--input-min-h, 36px);
+        height: var(--input-min-h, 36px);
+        max-height: var(--input-min-h, 36px);
+        padding-block: 0;
+        padding-inline: 12px;
+    }
+    .sd-cat-form-grid .sd-cat-names-row input.admin-sort-field--muted[readonly] {
+        background: #f4f6f9;
+        cursor: default;
+    }
     .sd-cat-form-grid label,
     .sd-cat-form-grid input,
     .sd-cat-form-grid select {
@@ -297,19 +365,24 @@ if ($sdNextKindSort < 1) {
         text-overflow:ellipsis;
     }
     @media (max-width: 720px) {
+        .sd-kind-form-grid .sd-kind-names-row {
+            grid-template-columns: 1fr;
+        }
         .sd-kind-form-grid {
             grid-template-columns: 1fr;
             grid-template-areas:
                 "sort"
                 "key"
                 "active"
-                "ar"
-                "en";
+                "names";
         }
         .sd-kind-form-grid .sd-kind-sort,
         .sd-kind-form-grid .sd-kind-act {
             justify-self: start;
             max-width: var(--admin-sort-field-max-w, 220px);
+        }
+        .sd-cat-form-grid .sd-cat-names-row {
+            grid-template-columns: 1fr;
         }
         .sd-cat-form-grid {
             grid-template-columns: 1fr;
@@ -318,8 +391,7 @@ if ($sdNextKindSort < 1) {
                 "key"
                 "active"
                 "parent"
-                "ar"
-                "en";
+                "names";
         }
         .sd-cat-form-grid .sd-cat-sort,
         .sd-cat-form-grid .sd-cat-act {
@@ -349,13 +421,23 @@ if ($sdNextKindSort < 1) {
                 <option value="0">لا</option>
             </select>
         </div>
-        <div class="sd-kind-ar">
-            <label>الاسم عربي</label>
-            <input type="text" id="sd_kind_label_ar" maxlength="191" <?php echo !$tablesReady ? 'disabled' : ''; ?>>
-        </div>
-        <div class="sd-kind-en">
-            <label>English</label>
-            <input type="text" id="sd_kind_label_en" maxlength="191" <?php echo !$tablesReady ? 'disabled' : ''; ?>>
+        <div class="sd-kind-names-row">
+            <div class="admin-sort-field-wrap">
+                <label for="sd_kind_label_ar">الاسم عربي</label>
+                <input type="text" id="sd_kind_label_ar" class="admin-sort-field" maxlength="191" autocomplete="off" <?php echo !$tablesReady ? 'disabled' : ''; ?>>
+            </div>
+            <div class="admin-sort-field-wrap">
+                <label for="sd_kind_label_en">English</label>
+                <input type="text" id="sd_kind_label_en" class="admin-sort-field" maxlength="191" autocomplete="off" <?php echo !$tablesReady ? 'disabled' : ''; ?>>
+            </div>
+            <div class="admin-sort-field-wrap">
+                <label for="sd_kind_label_fil">Filipino</label>
+                <input type="text" id="sd_kind_label_fil" class="admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" autocomplete="off" title="يُطابق English" aria-readonly="true" <?php echo !$tablesReady ? 'disabled' : ''; ?>>
+            </div>
+            <div class="admin-sort-field-wrap">
+                <label for="sd_kind_label_hi">Hindi</label>
+                <input type="text" id="sd_kind_label_hi" class="admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" autocomplete="off" title="يُطابق English" aria-readonly="true" <?php echo !$tablesReady ? 'disabled' : ''; ?>>
+            </div>
         </div>
     </div>
     <div class="actions sd-kind-form-actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;">
@@ -389,13 +471,23 @@ if ($sdNextKindSort < 1) {
             <label>النوع التجاري</label>
             <select id="sd_cat_parent_kind" <?php echo !$tablesReady ? 'disabled' : ''; ?>></select>
         </div>
-        <div class="sd-cat-ar">
-            <label>الاسم عربي</label>
-            <input type="text" id="sd_cat_label_ar" maxlength="191">
-        </div>
-        <div class="sd-cat-en">
-            <label>English</label>
-            <input type="text" id="sd_cat_label_en" maxlength="191">
+        <div class="sd-cat-names-row">
+            <div class="admin-sort-field-wrap">
+                <label for="sd_cat_label_ar">الاسم عربي</label>
+                <input type="text" id="sd_cat_label_ar" class="admin-sort-field" maxlength="191" autocomplete="off">
+            </div>
+            <div class="admin-sort-field-wrap">
+                <label for="sd_cat_label_en">English</label>
+                <input type="text" id="sd_cat_label_en" class="admin-sort-field" maxlength="191" autocomplete="off">
+            </div>
+            <div class="admin-sort-field-wrap">
+                <label for="sd_cat_label_fil">Filipino</label>
+                <input type="text" id="sd_cat_label_fil" class="admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" autocomplete="off" title="يُطابق English" aria-readonly="true">
+            </div>
+            <div class="admin-sort-field-wrap">
+                <label for="sd_cat_label_hi">Hindi</label>
+                <input type="text" id="sd_cat_label_hi" class="admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" autocomplete="off" title="يُطابق English" aria-readonly="true">
+            </div>
         </div>
     </div>
     <div class="actions sd-cat-form-actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;">
@@ -600,6 +692,7 @@ if ($sdNextKindSort < 1) {
             }
             enEl.value = '';
             sdApplyAutoKindKey();
+            sdSyncKindFilHiFromEn();
             return;
         }
         try {
@@ -618,6 +711,7 @@ if ($sdNextKindSort < 1) {
                 enEl.value = t.name_en;
             }
             sdApplyAutoKindKey();
+            sdSyncKindFilHiFromEn();
         } catch (e) {
             if (!silent) {
                 alert('فشل طلب الترجمة من السيرفر');
@@ -626,11 +720,37 @@ if ($sdNextKindSort < 1) {
     };
 
     let sdKindArTranslateTimer = null;
+    let sdKindEnFilHiTimer = null;
+    function sdSyncKindFilHiFromEn() {
+        const enEl = document.getElementById('sd_kind_label_en');
+        const filEl = document.getElementById('sd_kind_label_fil');
+        const hiEl = document.getElementById('sd_kind_label_hi');
+        if (!enEl || !filEl || !hiEl) {
+            return;
+        }
+        const v = enEl.value;
+        if (!String(v).trim()) {
+            filEl.value = '';
+            hiEl.value = '';
+            return;
+        }
+        filEl.value = v;
+        hiEl.value = v;
+    }
+    function scheduleSdKindFilHiFromEn() {
+        clearTimeout(sdKindEnFilHiTimer);
+        sdKindEnFilHiTimer = setTimeout(sdSyncKindFilHiFromEn, 550);
+    }
+    function sdOnKindEnInput() {
+        sdApplyAutoKindKey();
+        scheduleSdKindFilHiFromEn();
+    }
     async function sdKindFillEnFromArDebounced() {
         const ar = document.getElementById('sd_kind_label_ar').value.trim();
         if (!ar) {
             document.getElementById('sd_kind_label_en').value = '';
             sdApplyAutoKindKey();
+            sdSyncKindFilHiFromEn();
             return;
         }
         await window.sdTranslateKindEn({ silent: true, forceFromArabic: true });
@@ -649,6 +769,7 @@ if ($sdNextKindSort < 1) {
             }
             enEl.value = '';
             sdApplyAutoCatKey();
+            sdSyncCatFilHiFromEn();
             return;
         }
         try {
@@ -667,6 +788,7 @@ if ($sdNextKindSort < 1) {
                 enEl.value = t.name_en;
             }
             sdApplyAutoCatKey();
+            sdSyncCatFilHiFromEn();
         } catch (e) {
             if (!silent) {
                 alert('فشل طلب الترجمة من السيرفر');
@@ -675,11 +797,37 @@ if ($sdNextKindSort < 1) {
     };
 
     let sdCatArTranslateTimer = null;
+    let sdCatEnFilHiTimer = null;
+    function sdSyncCatFilHiFromEn() {
+        const enEl = document.getElementById('sd_cat_label_en');
+        const filEl = document.getElementById('sd_cat_label_fil');
+        const hiEl = document.getElementById('sd_cat_label_hi');
+        if (!enEl || !filEl || !hiEl) {
+            return;
+        }
+        const v = enEl.value;
+        if (!String(v).trim()) {
+            filEl.value = '';
+            hiEl.value = '';
+            return;
+        }
+        filEl.value = v;
+        hiEl.value = v;
+    }
+    function scheduleSdCatFilHiFromEn() {
+        clearTimeout(sdCatEnFilHiTimer);
+        sdCatEnFilHiTimer = setTimeout(sdSyncCatFilHiFromEn, 550);
+    }
+    function sdOnCatEnInput() {
+        sdApplyAutoCatKey();
+        scheduleSdCatFilHiFromEn();
+    }
     async function sdCatFillEnFromArDebounced() {
         const ar = document.getElementById('sd_cat_label_ar').value.trim();
         if (!ar) {
             document.getElementById('sd_cat_label_en').value = '';
             sdApplyAutoCatKey();
+            sdSyncCatFilHiFromEn();
             return;
         }
         await window.sdTranslateCatEn({ silent: true, forceFromArabic: true });
@@ -695,6 +843,8 @@ if ($sdNextKindSort < 1) {
         document.getElementById('sd_kind_key').value = '';
         document.getElementById('sd_kind_label_ar').value = '';
         document.getElementById('sd_kind_label_en').value = '';
+        document.getElementById('sd_kind_label_fil').value = '';
+        document.getElementById('sd_kind_label_hi').value = '';
         document.getElementById('sd_kind_sort').value = '0';
         document.getElementById('sd_kind_active').value = '1';
         sdSyncKindSortView();
@@ -709,6 +859,8 @@ if ($sdNextKindSort < 1) {
         document.getElementById('sd_cat_key').value = '';
         document.getElementById('sd_cat_label_ar').value = '';
         document.getElementById('sd_cat_label_en').value = '';
+        document.getElementById('sd_cat_label_fil').value = '';
+        document.getElementById('sd_cat_label_hi').value = '';
         document.getElementById('sd_cat_sort').value = '0';
         document.getElementById('sd_cat_active').value = '1';
         if (!preserveKindDropdown) {
@@ -834,6 +986,7 @@ if ($sdNextKindSort < 1) {
         document.getElementById('sd_kind_old_key').value = k.kind_key || '';
         document.getElementById('sd_kind_label_ar').value = k.label_ar || '';
         document.getElementById('sd_kind_label_en').value = k.label_en || '';
+        sdSyncKindFilHiFromEn();
         sdApplyAutoKindKey();
         document.getElementById('sd_kind_sort').value = String(k.sort_order != null ? k.sort_order : 0);
         sdSyncKindSortView();
@@ -914,6 +1067,7 @@ if ($sdNextKindSort < 1) {
             document.getElementById('sd_cat_old_key').value = c.category_key || '';
             document.getElementById('sd_cat_label_ar').value = c.label_ar || '';
             document.getElementById('sd_cat_label_en').value = c.label_en || '';
+            sdSyncCatFilHiFromEn();
             sdApplyAutoCatKey();
             document.getElementById('sd_cat_sort').value = String(c.sort_order != null ? c.sort_order : 0);
             document.getElementById('sd_cat_active').value = (parseInt(c.is_active, 10) === 0 ? '0' : '1');
@@ -1030,24 +1184,26 @@ if ($sdNextKindSort < 1) {
         }
     });
 
-    document.getElementById('sd_kind_label_en').addEventListener('input', sdApplyAutoKindKey);
+    document.getElementById('sd_kind_label_en').addEventListener('input', sdOnKindEnInput);
     document.getElementById('sd_kind_label_ar').addEventListener('input', function () {
         clearTimeout(sdKindArTranslateTimer);
         const ar = document.getElementById('sd_kind_label_ar').value.trim();
         if (!ar) {
             document.getElementById('sd_kind_label_en').value = '';
             sdApplyAutoKindKey();
+            sdSyncKindFilHiFromEn();
             return;
         }
         sdKindArTranslateTimer = setTimeout(sdKindFillEnFromArDebounced, 700);
     });
-    document.getElementById('sd_cat_label_en').addEventListener('input', sdApplyAutoCatKey);
+    document.getElementById('sd_cat_label_en').addEventListener('input', sdOnCatEnInput);
     document.getElementById('sd_cat_label_ar').addEventListener('input', function () {
         clearTimeout(sdCatArTranslateTimer);
         const ar = document.getElementById('sd_cat_label_ar').value.trim();
         if (!ar) {
             document.getElementById('sd_cat_label_en').value = '';
             sdApplyAutoCatKey();
+            sdSyncCatFilHiFromEn();
             return;
         }
         sdCatArTranslateTimer = setTimeout(sdCatFillEnFromArDebounced, 700);
