@@ -141,33 +141,6 @@ try {
         $arSeenInPayload[$normKey] = true;
     }
 
-    $existingStmt = $pdo->prepare('SELECT id, label_ar FROM size_family_sizes WHERE size_family_id = ?');
-    $existingStmt->execute([$familyId]);
-    $dbSizeRows = $existingStmt->fetchAll(PDO::FETCH_ASSOC);
-    $dbSizeRows = is_array($dbSizeRows) ? $dbSizeRows : [];
-
-    foreach ($rows as $row) {
-        if (!is_array($row)) {
-            continue;
-        }
-        $sid = (int)($row['id'] ?? 0);
-        $la = trim((string)($row['label_ar'] ?? ''));
-        $le = trim((string)($row['label_en'] ?? ''));
-        if ($la === '' && $le !== '') {
-            $la = $le;
-        }
-        if ($la === '' && $le === '') {
-            continue;
-        }
-        if ($la === '') {
-            continue;
-        }
-        $excludeSid = $sid > 0 ? $sid : null;
-        if (orange_rows_normalized_arabic_conflict($dbSizeRows, 'id', 'label_ar', $la, $excludeSid)) {
-            json_response(['success' => false, 'message' => orange_arabic_duplicate_blocked_message()], 409);
-        }
-    }
-
     $pdo->beginTransaction();
 
     $keepIds = [];
