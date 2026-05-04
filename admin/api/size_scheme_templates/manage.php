@@ -219,6 +219,64 @@ try {
                     $pdo->prepare($sqlBack)->execute([$tplId, $tplId]);
                 }
 
+                /*
+                 * مزامنة بالترتيب (الصف N في القالب ↔ الصف N في العائلة): تعالج حالات
+                 * scheme_template_size_id = NULL أو اختلاف sort_order بين العائلة والقالب بعد التعديل من شاشة القالب.
+                 */
+                if ($hasFamLink && $hasFamTplRef) {
+                    $tplRowsOrd = $pdo->prepare(
+                        'SELECT id, label_ar, label_en, label_fil, label_hi, sort_order, foot_length_cm
+                         FROM size_scheme_template_sizes WHERE template_id = ? ORDER BY sort_order ASC, id ASC'
+                    );
+                    $tplRowsOrd->execute([$tplId]);
+                    $tplRowsList = $tplRowsOrd->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                    if ($tplRowsList !== []) {
+                        $famIdsStmt = $pdo->prepare('SELECT id FROM size_families WHERE size_scheme_template_id = ?');
+                        $famIdsStmt->execute([$tplId]);
+                        foreach ($famIdsStmt->fetchAll(PDO::FETCH_COLUMN) ?: [] as $syncFamId) {
+                            $syncFamId = (int) $syncFamId;
+                            if ($syncFamId <= 0) {
+                                continue;
+                            }
+                            $sfsOrdStmt = $pdo->prepare(
+                                'SELECT id FROM size_family_sizes WHERE size_family_id = ? ORDER BY sort_order ASC, id ASC'
+                            );
+                            $sfsOrdStmt->execute([$syncFamId]);
+                            $famSizeIdsList = array_map(
+                                static function ($v) {
+                                    return (int) $v;
+                                },
+                                array_column($sfsOrdStmt->fetchAll(PDO::FETCH_ASSOC) ?: [], 'id')
+                            );
+                            $nPair = min(count($tplRowsList), count($famSizeIdsList));
+                            $ordUp = $pdo->prepare(
+                                'UPDATE size_family_sizes SET label_ar=?, label_en=?, label_fil=?, label_hi=?, sort_order=?, foot_length_cm=?, scheme_template_size_id=? WHERE id=? AND size_family_id=? LIMIT 1'
+                            );
+                            for ($pi = 0; $pi < $nPair; $pi++) {
+                                $t = $tplRowsList[$pi];
+                                $tstIdRow = (int) ($t['id'] ?? 0);
+                                $fSid = $famSizeIdsList[$pi];
+                                if ($tstIdRow <= 0 || $fSid <= 0) {
+                                    continue;
+                                }
+                                $soT = (int) ($t['sort_order'] ?? ($pi + 1));
+                                $footT = $t['foot_length_cm'] ?? null;
+                                $ordUp->execute([
+                                    (string) ($t['label_ar'] ?? ''),
+                                    (string) ($t['label_en'] ?? ''),
+                                    (string) ($t['label_fil'] ?? ''),
+                                    (string) ($t['label_hi'] ?? ''),
+                                    $soT,
+                                    $footT,
+                                    $tstIdRow,
+                                    $fSid,
+                                    $syncFamId,
+                                ]);
+                            }
+                        }
+                    }
+                }
+
                 $pdo->commit();
             } catch (Throwable $e) {
                 $pdo->rollBack();

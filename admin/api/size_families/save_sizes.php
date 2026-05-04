@@ -112,6 +112,23 @@ try {
     $hasTplLink = orange_table_exists($pdo, 'size_family_sizes')
         && orange_table_has_column($pdo, 'size_family_sizes', 'scheme_template_size_id');
     $syncTemplateId = (int) ($data['sync_template_id'] ?? 0);
+    $hasFamTplRef = orange_table_exists($pdo, 'size_families')
+        && orange_table_has_column($pdo, 'size_families', 'size_scheme_template_id');
+
+    /** ترتيب مقاسات القالب (لربط الصف N من الطلب بسطر القالب N عند غياب scheme_template_size_id في JSON). */
+    $tplOrderedIds = [];
+    if ($hasTplLink && $hasFamTplRef && $syncTemplateId > 0) {
+        $chkFamTpl = $pdo->prepare('SELECT COALESCE(size_scheme_template_id, 0) FROM size_families WHERE id = ? LIMIT 1');
+        $chkFamTpl->execute([$familyId]);
+        $famStoredTpl = (int) $chkFamTpl->fetchColumn();
+        if ($famStoredTpl === $syncTemplateId) {
+            $qTpl = $pdo->prepare(
+                'SELECT id FROM size_scheme_template_sizes WHERE template_id = ? ORDER BY sort_order ASC, id ASC'
+            );
+            $qTpl->execute([$syncTemplateId]);
+            $tplOrderedIds = array_map('intval', $qTpl->fetchAll(PDO::FETCH_COLUMN) ?: []);
+        }
+    }
 
     $insTplSz = null;
     if ($hasTplLink && $syncTemplateId > 0) {
@@ -158,6 +175,7 @@ try {
         ? $pdo->prepare('UPDATE size_family_sizes SET scheme_template_size_id=NULL WHERE id=? AND size_family_id=? LIMIT 1')
         : null;
 
+    $ordIdx = 0;
     foreach ($rows as $i => $row) {
         if (!is_array($row)) {
             continue;
@@ -190,6 +208,9 @@ try {
         }
 
         $tstId = $hasTplLink ? (int) ($row['scheme_template_size_id'] ?? 0) : 0;
+        if ($tstId <= 0 && $syncTemplateId > 0 && $tplOrderedIds !== [] && isset($tplOrderedIds[$ordIdx])) {
+            $tstId = $tplOrderedIds[$ordIdx];
+        }
         if ($tstId > 0) {
             $vchk = $pdo->prepare('SELECT id FROM size_scheme_template_sizes WHERE id = ? LIMIT 1');
             $vchk->execute([$tstId]);
@@ -253,6 +274,7 @@ try {
                 }
             }
         }
+        $ordIdx++;
     }
 
     $keepIds = array_values(array_unique(array_filter($keepIds)));
