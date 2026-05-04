@@ -23,8 +23,8 @@ $ucDepsEmpty = !empty($orange_uc['deps_empty_for_sections']);
                 <small style="color:#b45309;display:block;margin-top:4px;">لا توجد أقسام نشطة — أضف قسمًا من لوحة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=departments'), ENT_QUOTES, 'UTF-8'); ?>">الأقسام الرئيسية</a>.</small>
             <?php endif; ?>
         </div>
-        <div><label for="uc_sec_slug">slug</label>
-            <input type="text" id="uc_sec_slug" dir="ltr" maxlength="191" autocomplete="off" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>
+        <div><label for="uc_sec_slug">slug <span style="font-weight:normal;color:#64748b;">(تلقائي من English — يمكن التعديل)</span></label>
+            <input type="text" id="uc_sec_slug" dir="ltr" maxlength="191" autocomplete="off" placeholder="يُملأ تلقائياً" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>
         </div>
         <div class="admin-sort-field-wrap"><label for="uc_sec_sort">ترتيب</label>
             <input type="number" id="uc_sec_sort" class="admin-sort-field<?php echo $ucDepsEmpty ? ' admin-sort-field--muted' : ''; ?>" min="1" step="1" value="" placeholder="تلقائي" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>

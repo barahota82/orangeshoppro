@@ -11,6 +11,71 @@ const ucCategoryOptions = <?php echo $catJ; ?>;
 let ucTimers = {};
 let ucEnTimers = {};
 let ucSaving = false;
+const ucSlugManual = { sec: false, cat: false, sub: false };
+let ucSlugSkipInputEvent = false;
+const ucSlugRefreshTimers = {};
+
+function ucSlugifyLabel(str) {
+    return String(str || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/[\s-]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
+function refreshUcSlug(which) {
+    if (ucSlugManual[which]) {
+        return;
+    }
+    const map = { sec: 'uc_sec_', cat: 'uc_cat_', sub: 'uc_sub_' };
+    const p = map[which];
+    if (!p) {
+        return;
+    }
+    const enEl = document.getElementById(p + 'name_en');
+    const slugEl = document.getElementById(p + 'slug');
+    if (!enEl || !slugEl || slugEl.disabled) {
+        return;
+    }
+    const next = ucSlugifyLabel(enEl.value.trim());
+    if (!next) {
+        return;
+    }
+    ucSlugSkipInputEvent = true;
+    slugEl.value = next;
+    setTimeout(function () { ucSlugSkipInputEvent = false; }, 0);
+}
+
+function scheduleUcSlugRefresh(which) {
+    if (ucSlugRefreshTimers[which]) {
+        clearTimeout(ucSlugRefreshTimers[which]);
+    }
+    ucSlugRefreshTimers[which] = setTimeout(function () { refreshUcSlug(which); }, 120);
+}
+
+function ucBindSlugAuto(which, prefix) {
+    const slugEl = document.getElementById(prefix + 'slug');
+    if (!slugEl) {
+        return;
+    }
+    slugEl.addEventListener('input', function () {
+        if (ucSlugSkipInputEvent) {
+            return;
+        }
+        ucSlugManual[which] = slugEl.value.trim() !== '';
+    });
+}
+
+function ucEnsureSlugBeforeSave(prefix, which) {
+    const slugEl = document.getElementById(prefix + 'slug');
+    if (!slugEl || slugEl.disabled) {
+        return;
+    }
+    if (!slugEl.value.trim()) {
+        ucSlugManual[which] = false;
+        refreshUcSlug(which);
+    }
+}
 
 function parseSortPayload(raw) {
     const t = String(raw || '').trim();
@@ -31,6 +96,7 @@ async function ucPost(url, payload) {
 }
 
 function resetUcSection() {
+    ucSlugManual.sec = false;
     document.getElementById('uc_sec_id').value = '0';
     var dsel = document.getElementById('uc_sec_department_id');
     if (dsel && dsel.options.length) dsel.selectedIndex = 0;
@@ -53,11 +119,13 @@ function editUcSection(j) {
     document.getElementById('uc_sec_name_fil').value = j.name_fil || '';
     document.getElementById('uc_sec_name_hi').value = j.name_hi || '';
     document.getElementById('uc_sec_active').value = String(j.is_active === 0 ? 0 : 1);
+    ucSlugManual.sec = !!(j.slug && String(j.slug).trim() !== '');
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function saveUcSection() {
     if (ucSaving) return;
+    ucEnsureSlugBeforeSave('uc_sec_', 'sec');
     const id = parseInt(document.getElementById('uc_sec_id').value || '0', 10) || 0;
     const payload = {
         department_id: parseInt(document.getElementById('uc_sec_department_id').value || '0', 10) || 0,
@@ -74,6 +142,7 @@ function saveUcSection() {
 }
 
 function resetUcCategory() {
+    ucSlugManual.cat = false;
     document.getElementById('uc_cat_id').value = '0';
     document.getElementById('uc_cat_section_id').value = '';
     document.getElementById('uc_cat_slug').value = '';
@@ -95,6 +164,7 @@ function editUcCategory(j) {
     document.getElementById('uc_cat_name_fil').value = j.name_fil || '';
     document.getElementById('uc_cat_name_hi').value = j.name_hi || '';
     document.getElementById('uc_cat_active').value = String(j.is_active === 0 ? 0 : 1);
+    ucSlugManual.cat = !!(j.slug && String(j.slug).trim() !== '');
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -115,6 +185,7 @@ function ucEnsureOption(selectId, val, pool) {
 
 function saveUcCategory() {
     if (ucSaving) return;
+    ucEnsureSlugBeforeSave('uc_cat_', 'cat');
     const id = parseInt(document.getElementById('uc_cat_id').value || '0', 10) || 0;
     const payload = {
         catalog_section_id: parseInt(document.getElementById('uc_cat_section_id').value || '0', 10) || 0,
@@ -131,6 +202,7 @@ function saveUcCategory() {
 }
 
 function resetUcSubcategory() {
+    ucSlugManual.sub = false;
     document.getElementById('uc_sub_id').value = '0';
     document.getElementById('uc_sub_category_id').value = '';
     document.getElementById('uc_sub_slug').value = '';
@@ -152,11 +224,13 @@ function editUcSubcategory(j) {
     document.getElementById('uc_sub_name_fil').value = j.name_fil || '';
     document.getElementById('uc_sub_name_hi').value = j.name_hi || '';
     document.getElementById('uc_sub_active').value = String(j.is_active === 0 ? 0 : 1);
+    ucSlugManual.sub = !!(j.slug && String(j.slug).trim() !== '');
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function saveUcSubcategory() {
     if (ucSaving) return;
+    ucEnsureSlugBeforeSave('uc_sub_', 'sub');
     const id = parseInt(document.getElementById('uc_sub_id').value || '0', 10) || 0;
     const payload = {
         catalog_category_id: parseInt(document.getElementById('uc_sub_category_id').value || '0', 10) || 0,
@@ -195,6 +269,7 @@ async function translateUc(which) {
         if (t.name_en) document.getElementById(m.en).value = t.name_en;
         if (t.name_fil) document.getElementById(m.fil).value = t.name_fil;
         if (t.name_hi) document.getElementById(m.hi).value = t.name_hi;
+        refreshUcSlug(which);
     } catch (e) {
         alert('فشل طلب الترجمة');
     }
@@ -225,6 +300,7 @@ function scheduleUcTranslate(which) {
                 if (t.name_en) document.getElementById(m.en).value = t.name_en;
                 if (t.name_fil) document.getElementById(m.fil).value = t.name_fil;
                 if (t.name_hi) document.getElementById(m.hi).value = t.name_hi;
+                refreshUcSlug(which);
             }
         } catch (e) { /* silent */ }
     }, 700);
@@ -276,7 +352,15 @@ function scheduleUcFromEn(which) {
     });
     [['uc_sec_name_en', 'sec'], ['uc_cat_name_en', 'cat'], ['uc_sub_name_en', 'sub']].forEach(function (pair) {
         var el = document.getElementById(pair[0]);
-        if (el) el.addEventListener('input', function () { scheduleUcFromEn(pair[1]); });
+        if (el) {
+            el.addEventListener('input', function () {
+                scheduleUcFromEn(pair[1]);
+                scheduleUcSlugRefresh(pair[1]);
+            });
+        }
     });
+    ucBindSlugAuto('sec', 'uc_sec_');
+    ucBindSlugAuto('cat', 'uc_cat_');
+    ucBindSlugAuto('sub', 'uc_sub_');
 })();
 </script>

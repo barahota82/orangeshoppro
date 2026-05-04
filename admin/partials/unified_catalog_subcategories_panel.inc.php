@@ -22,7 +22,7 @@ $ucCatEmpty = !empty($orange_uc['categories_empty_for_subcats']);
                 <small style="color:#b45309;display:block;margin-top:4px;">أنشئ صفًا ضمن «فئات الموحّد» في البلوك أعلاه أولًا.</small>
             <?php endif; ?>
         </div>
-        <div><label for="uc_sub_slug">slug</label><input type="text" id="uc_sub_slug" dir="ltr" maxlength="191" autocomplete="off" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>></div>
+        <div><label for="uc_sub_slug">slug <span style="font-weight:normal;color:#64748b;">(تلقائي من English — يمكن التعديل)</span></label><input type="text" id="uc_sub_slug" dir="ltr" maxlength="191" autocomplete="off" placeholder="يُملأ تلقائياً" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>></div>
         <div class="admin-sort-field-wrap"><label for="uc_sub_sort">ترتيب</label><input type="number" id="uc_sub_sort" class="admin-sort-field<?php echo $ucCatEmpty ? ' admin-sort-field--muted' : ''; ?>" min="1" step="1" value="" placeholder="تلقائي" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>></div>
         <div><label for="uc_sub_name_ar">عربي</label><input type="text" id="uc_sub_name_ar" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>></div>
         <div><label for="uc_sub_name_fil">Filipino</label><input type="text" id="uc_sub_name_fil" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>></div>

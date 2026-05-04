@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
+require_once __DIR__ . '/../../../includes/catalog_unified_branch_slug.php';
 require_admin_api();
 
 try {
@@ -21,17 +22,7 @@ try {
     $data = get_json_input();
     $id = (int) ($data['id'] ?? 0);
 
-    $sanitizeSlug = static function (string $raw): string {
-        $t = strtolower(trim($raw));
-        if ($t !== '' && !preg_match('/^[a-z0-9][a-z0-9_-]{0,190}$/', $t)) {
-            return '';
-        }
-
-        return $t;
-    };
-
     $depId = (int) ($data['department_id'] ?? 0);
-    $slugRaw = $sanitizeSlug((string) ($data['slug'] ?? ''));
     $nameAr = trim((string) ($data['name_ar'] ?? ''));
     $nameEn = trim((string) ($data['name_en'] ?? ''));
     $nameFil = trim((string) ($data['name_fil'] ?? ''));
@@ -42,25 +33,31 @@ try {
     if ($depId <= 0) {
         json_response(['success' => false, 'message' => 'اختر القسم (department) الأب.'], 422);
     }
-    if ($slugRaw === '') {
-        json_response(['success' => false, 'message' => 'slug غير صالح (إنجليزي صغير، أول محرف حرف أو رقم).'], 422);
-    }
     if ($nameAr === '' || $nameEn === '') {
         json_response(['success' => false, 'message' => 'الاسم العربي والإنجليزي مطلوبان.'], 422);
     }
+
+    $slugResolved = orange_catalog_unified_branch_slug_resolve(
+        (string) ($data['slug'] ?? ''),
+        $nameEn,
+        $nameAr
+    );
+    $slugRaw = orange_catalog_unified_branch_slug_allocate(
+        $slugResolved,
+        static function (string $cand) use ($pdo, $depId, $id): bool {
+            $st = $pdo->prepare(
+                'SELECT id FROM catalog_sections WHERE department_id = ? AND slug = ? AND id <> ? LIMIT 1'
+            );
+            $st->execute([$depId, $cand, max(0, $id)]);
+
+            return (bool) $st->fetchColumn();
+        }
+    );
 
     $dChk = $pdo->prepare('SELECT id FROM departments WHERE id = ? LIMIT 1');
     $dChk->execute([$depId]);
     if (!$dChk->fetch()) {
         json_response(['success' => false, 'message' => 'القسم المختار غير موجود.'], 404);
-    }
-
-    $dupSlug = $pdo->prepare(
-        'SELECT id FROM catalog_sections WHERE department_id = ? AND slug = ? AND id <> ? LIMIT 1'
-    );
-    $dupSlug->execute([$depId, $slugRaw, max(0, $id)]);
-    if ($dupSlug->fetchColumn()) {
-        json_response(['success' => false, 'message' => 'slug مستخدم تحت نفس القسم.'], 409);
     }
 
     $sib = $pdo->prepare('SELECT id, name_ar FROM catalog_sections WHERE department_id = ?');

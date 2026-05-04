@@ -22,7 +22,7 @@ $ucSecEmpty = !empty($orange_uc['sections_empty_for_categories']);
                 <small style="color:#b45309;display:block;margin-top:4px;">أنشئ قسمًا داخليًا أولًا من شاشة <strong>أقسام داخلية</strong>.</small>
             <?php endif; ?>
         </div>
-        <div><label for="uc_cat_slug">slug</label><input type="text" id="uc_cat_slug" dir="ltr" maxlength="191" autocomplete="off" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>></div>
+        <div><label for="uc_cat_slug">slug <span style="font-weight:normal;color:#64748b;">(تلقائي من English — يمكن التعديل)</span></label><input type="text" id="uc_cat_slug" dir="ltr" maxlength="191" autocomplete="off" placeholder="يُملأ تلقائياً" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>></div>
         <div class="admin-sort-field-wrap"><label for="uc_cat_sort">ترتيب</label><input type="number" id="uc_cat_sort" class="admin-sort-field<?php echo $ucSecEmpty ? ' admin-sort-field--muted' : ''; ?>" min="1" step="1" value="" placeholder="تلقائي" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>></div>
         <div><label for="uc_cat_name_ar">عربي</label><input type="text" id="uc_cat_name_ar" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>></div>
         <div><label for="uc_cat_name_fil">Filipino</label><input type="text" id="uc_cat_name_fil" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>></div>
