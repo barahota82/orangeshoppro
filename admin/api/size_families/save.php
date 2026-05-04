@@ -41,6 +41,10 @@ try {
     }
     $sort = (int)($data['sort_order'] ?? 0);
     $active = (int)($data['is_active'] ?? 1) === 0 ? 0 : 1;
+    $tplRefRaw = (int) ($data['size_scheme_template_id'] ?? 0);
+    $tplRefBind = $tplRefRaw > 0 ? $tplRefRaw : null;
+    $hasFamTplRef = orange_table_exists($pdo, 'size_families')
+        && orange_table_has_column($pdo, 'size_families', 'size_scheme_template_id');
 
     if ($nameAr === '' || $nameEn === '') {
         json_response(['success' => false, 'message' => 'يجب تعبئة الاسم العربي والإنجليزي'], 422);
@@ -100,6 +104,11 @@ try {
                 'UPDATE size_families SET name_ar=?, name_en=?, size_scheme_key=?, commercial_kind_key=?, sizing_category_key=?, sort_order=?, is_active=? WHERE id=? LIMIT 1'
             )->execute([$nameAr, $nameEn, $sizeScheme, $commercialKind, $sizingCategory, $sort, $active, $id]);
         }
+        if ($hasFamTplRef) {
+            $pdo->prepare(
+                'UPDATE size_families SET size_scheme_template_id=? WHERE id=? LIMIT 1'
+            )->execute([$tplRefBind, $id]);
+        }
         json_response(['success' => true, 'id' => $id]);
     }
 
@@ -112,7 +121,13 @@ try {
             'INSERT INTO size_families (name_ar, name_en, size_scheme_key, commercial_kind_key, sizing_category_key, sort_order, is_active) VALUES (?,?,?,?,?,?,?)'
         )->execute([$nameAr, $nameEn, $sizeScheme, $commercialKind, $sizingCategory, $sort, $active]);
     }
-    json_response(['success' => true, 'id' => (int)$pdo->lastInsertId()]);
+    $newFamId = (int) $pdo->lastInsertId();
+    if ($hasFamTplRef && $newFamId > 0) {
+        $pdo->prepare(
+            'UPDATE size_families SET size_scheme_template_id=? WHERE id=? LIMIT 1'
+        )->execute([$tplRefBind, $newFamId]);
+    }
+    json_response(['success' => true, 'id' => $newFamId]);
 } catch (Throwable $e) {
     orange_admin_api_catch($e, 'تعذر حفظ عائلة المقاسات');
 }

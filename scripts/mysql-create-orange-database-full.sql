@@ -214,11 +214,13 @@ CREATE TABLE `size_families` (
   `size_scheme_key` varchar(64) NOT NULL DEFAULT '',
   `commercial_kind_key` varchar(32) NOT NULL DEFAULT '',
   `sizing_category_key` varchar(64) NOT NULL DEFAULT '',
+  `size_scheme_template_id` int DEFAULT NULL,
   `sort_order` int NOT NULL DEFAULT 0,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_size_families_sizing_scope` (`commercial_kind_key`,`sizing_category_key`,`size_scheme_key`)
+  KEY `idx_size_families_sizing_scope` (`commercial_kind_key`,`sizing_category_key`,`size_scheme_key`),
+  KEY `idx_size_families_tpl` (`size_scheme_template_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `size_scheme_templates` (

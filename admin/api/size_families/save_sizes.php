@@ -59,6 +59,10 @@ try {
             continue;
         }
         $la = trim((string)($row['label_ar'] ?? ''));
+        $leDup = trim((string)($row['label_en'] ?? ''));
+        if ($la === '' && $leDup !== '') {
+            $la = $leDup;
+        }
         if ($la === '') {
             continue;
         }
@@ -84,6 +88,9 @@ try {
         $sid = (int)($row['id'] ?? 0);
         $la = trim((string)($row['label_ar'] ?? ''));
         $le = trim((string)($row['label_en'] ?? ''));
+        if ($la === '' && $le !== '') {
+            $la = $le;
+        }
         if ($la === '' && $le === '') {
             continue;
         }
@@ -160,6 +167,15 @@ try {
         $le = trim((string)($row['label_en'] ?? ''));
         $lf = trim((string)($row['label_fil'] ?? ''));
         $lh = trim((string)($row['label_hi'] ?? ''));
+        if ($la === '' && $le !== '') {
+            $la = $le;
+        }
+        if ($lf === '' && $le !== '') {
+            $lf = $le;
+        }
+        if ($lh === '' && $le !== '') {
+            $lh = $le;
+        }
         $so = (int)($row['sort_order'] ?? $i);
         $footRaw = trim((string)($row['foot_length_cm'] ?? ''));
         $foot = null;

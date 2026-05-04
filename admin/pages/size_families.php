@@ -373,6 +373,7 @@ $tablesReady = $hasFamilies && $hasSizes;
     <h3>مقاسات داخل العائلة</h3>
     <div id="sizesEditor" style="margin-top:12px;"></div>
     <div class="actions sf-sizes-actions" style="margin-top:14px;">
+        <button type="button" class="btn-secondary" onclick="famAddEmptySizeRow()" <?php echo !$tablesReady ? 'disabled' : ''; ?>>إضافة مقاس</button>
         <button type="button" onclick="saveSizesForFamily()" <?php echo !$tablesReady ? 'disabled' : ''; ?>>حفظ المقاسات</button>
     </div>
 </div>
@@ -425,6 +426,7 @@ $tablesReady = $hasFamilies && $hasSizes;
                                     'size_scheme_key' => (string) ($f['size_scheme_key'] ?? ''),
                                     'commercial_kind_key' => (string) ($f['commercial_kind_key'] ?? ''),
                                     'sizing_category_key' => (string) ($f['sizing_category_key'] ?? ''),
+                                    'size_scheme_template_id' => (int) ($f['size_scheme_template_id'] ?? 0),
                                     'sort_order' => (int) $f['sort_order'],
                                     'is_active' => (int) $f['is_active'],
                                 ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button>
@@ -781,7 +783,15 @@ async function editFamily(f) {
         await famLoadSizingCategoriesIntoSelect(f.sizing_category_key || '');
         var tplPick = document.getElementById('sizes_template_pick');
         if (tplPick && tplPick.tagName === 'SELECT') {
-            tplPick.value = famResolveTemplateIdForEdit(f) || '';
+            var byScheme = famResolveTemplateIdForEdit(f) || '';
+            var byCol = '';
+            if (f.size_scheme_template_id != null) {
+                var tc = parseInt(String(f.size_scheme_template_id), 10) || 0;
+                if (tc > 0 && [].some.call(tplPick.options, function (o) { return String(o.value) === String(tc); })) {
+                    byCol = String(tc);
+                }
+            }
+            tplPick.value = byScheme || byCol || '';
         }
         document.getElementById('fam_name_ar').value = String(f.name_ar || '');
         document.getElementById('fam_name_en').value = String(f.name_en || '');
@@ -881,6 +891,9 @@ async function saveFamily() {
             is_active: parseInt(document.getElementById('fam_active').value, 10)
         };
         if (recordId > 0) payload.id = recordId;
+        var tplPickSave = document.getElementById('sizes_template_pick');
+        var tplRefSave = (tplPickSave && tplPickSave.tagName === 'SELECT') ? (parseInt(tplPickSave.value || '0', 10) || 0) : 0;
+        payload.size_scheme_template_id = tplRefSave;
         var res = await postJSON('/admin/api/size_families/save.php', payload);
         if (!res || !res.success) {
             alert((res && res.message) ? res.message : 'فشل');
@@ -957,7 +970,7 @@ function loadSizesEditor() {
         return;
     }
     var rows = ORANGE_SIZES_BY_FAMILY[String(fid)] || ORANGE_SIZES_BY_FAMILY[fid] || [];
-    var thead = '<thead><tr><th>id</th><th>عربي</th><th>EN</th><th>Fil</th><th>Hi</th><th>طول القدم (سم)</th><th>ترتيب</th></tr></thead>';
+    var thead = '<thead><tr><th>id</th><th>EN</th><th>عربي</th><th>Fil</th><th>Hi</th><th>طول القدم (سم)</th><th>ترتيب</th></tr></thead>';
     var html = '<div class="table-wrap"><table>' + thead + '<tbody>';
     if (!rows.length) {
         html += '</tbody></table></div>';
@@ -966,15 +979,41 @@ function loadSizesEditor() {
             var r = rows[i];
             var fl = (r.foot_length_cm != null && r.foot_length_cm !== '') ? String(r.foot_length_cm) : '';
             var tplSz = parseInt(String(r.scheme_template_size_id != null ? r.scheme_template_size_id : '0'), 10) || 0;
-            html += '<tr class="size-row" data-id="' + r.id + '" data-scheme-template-size-id="' + tplSz + '"><td>' + r.id + '</td><td><input type="text" class="s-la" readonly tabindex="-1" value="' + escapeAttr(r.label_ar) + '"></td><td><input type="text" class="s-le" readonly tabindex="-1" value="' + escapeAttr(r.label_en) + '"></td><td><input type="text" class="s-lf" readonly tabindex="-1" value="' + escapeAttr(r.label_fil) + '"></td><td><input type="text" class="s-lh" readonly tabindex="-1" value="' + escapeAttr(r.label_hi) + '"></td><td><input type="text" class="s-fl" readonly tabindex="-1" value="' + escapeAttr(fl) + '"></td><td><input type="number" class="s-so" readonly tabindex="-1" value="' + (Number(r.sort_order) || 0) + '"></td></tr>';
+            html += '<tr class="size-row" data-id="' + r.id + '" data-scheme-template-size-id="' + tplSz + '"><td>' + r.id + '</td><td><input type="text" class="s-le admin-sort-field" maxlength="191" autocomplete="off" value="' + escapeAttr(r.label_en) + '"></td><td><input type="text" class="s-la admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true" value=""></td><td><input type="text" class="s-lf admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td><td><input type="text" class="s-lh admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td><td><input type="text" class="s-fl admin-sort-field" maxlength="32" autocomplete="off" value="' + escapeAttr(fl) + '"></td><td><input type="number" class="s-so admin-sort-field" autocomplete="off" value="' + (Number(r.sort_order) || 0) + '"></td></tr>';
         }
         html += '</tbody></table></div>';
     }
     box.innerHTML = html;
+    if (rows.length) {
+        box.querySelectorAll('tr.size-row').forEach(function (tr) {
+            famSyncRowLabelsFromEn(tr);
+        });
+    }
 }
 
 function escapeAttr(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
+
+/** نسخ EN إلى عربي / Fil / Hi (مثل شاشة قوالب المقاسات). */
+function famSyncRowLabelsFromEn(tr) {
+    if (!tr) {
+        return;
+    }
+    var leEl = tr.querySelector('.s-le');
+    var v = leEl ? String(leEl.value || '') : '';
+    var la = tr.querySelector('.s-la');
+    var lf = tr.querySelector('.s-lf');
+    var lh = tr.querySelector('.s-lh');
+    if (la) {
+        la.value = v;
+    }
+    if (lf) {
+        lf.value = v;
+    }
+    if (lh) {
+        lh.value = v;
+    }
 }
 
 function famEnsureSizesEditorEmptyTable() {
@@ -986,9 +1025,28 @@ function famEnsureSizesEditorEmptyTable() {
     if (tbody) {
         return tbody;
     }
-    var thead = '<thead><tr><th>id</th><th>عربي</th><th>EN</th><th>Fil</th><th>Hi</th><th>طول القدم (سم)</th><th>ترتيب</th></tr></thead>';
+    var thead = '<thead><tr><th>id</th><th>EN</th><th>عربي</th><th>Fil</th><th>Hi</th><th>طول القدم (سم)</th><th>ترتيب</th></tr></thead>';
     box.innerHTML = '<div class="table-wrap"><table>' + thead + '<tbody></tbody></table></div>';
     return box.querySelector('tbody');
+}
+
+function famAddEmptySizeRow() {
+    var tbody = famEnsureSizesEditorEmptyTable();
+    if (!tbody) {
+        return;
+    }
+    var n = tbody.querySelectorAll('tr.size-row').length;
+    var tr = document.createElement('tr');
+    tr.className = 'size-row';
+    tr.setAttribute('data-new', '1');
+    tr.innerHTML = '<td>0</td>' +
+        '<td><input type="text" class="s-le admin-sort-field" maxlength="191" autocomplete="off" value=""></td>' +
+        '<td><input type="text" class="s-la admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true" value=""></td>' +
+        '<td><input type="text" class="s-lf admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td>' +
+        '<td><input type="text" class="s-lh admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td>' +
+        '<td><input type="text" class="s-fl admin-sort-field" maxlength="32" autocomplete="off" value=""></td>' +
+        '<td><input type="number" class="s-so admin-sort-field" autocomplete="off" value="' + String(n + 1) + '"></td>';
+    tbody.appendChild(tr);
 }
 
 function famCollectSizesRowsFromEditor() {
@@ -997,20 +1055,19 @@ function famCollectSizesRowsFromEditor() {
     for (var idx = 0; idx < trs.length; idx++) {
         var tr = trs[idx];
         var id = parseInt(tr.getAttribute('data-id') || '0', 10) || 0;
-        var laEl = tr.querySelector('.s-la');
         var leEl = tr.querySelector('.s-le');
-        var lfEl = tr.querySelector('.s-lf');
-        var lhEl = tr.querySelector('.s-lh');
         var flEl = tr.querySelector('.s-fl');
         var soEl = tr.querySelector('.s-so');
-        var la = laEl ? String(laEl.value || '').trim() : '';
         var le = leEl ? String(leEl.value || '').trim() : '';
-        var lf = lfEl ? String(lfEl.value || '').trim() : '';
-        var lh = lhEl ? String(lhEl.value || '').trim() : '';
+        if (le === '') {
+            continue;
+        }
+        var la = le;
+        var lf = le;
+        var lh = le;
         var fl = flEl ? String(flEl.value || '').trim() : '';
         var so = soEl ? parseInt(soEl.value || String(idx), 10) : idx;
         if (isNaN(so)) so = idx;
-        if (la === '' && le === '') continue;
         var row = { id: id, label_ar: la, label_en: le, label_fil: lf, label_hi: lh, sort_order: so };
         if (fl !== '') row.foot_length_cm = fl;
         var tplL = parseInt(tr.getAttribute('data-scheme-template-size-id') || '0', 10) || 0;
@@ -1080,18 +1137,9 @@ async function famApplyTemplateSizesToEditor(tid, opts) {
                 tr.setAttribute('data-scheme-template-size-id', String(tplSzId));
             }
             var fl = (r.foot_length_cm != null && r.foot_length_cm !== '') ? String(r.foot_length_cm) : '';
-            tr.innerHTML = '<td>0</td><td><input type="text" class="s-la" readonly tabindex="-1" value="' + escapeAttr(r.label_ar || '') + '"></td><td><input type="text" class="s-le" readonly tabindex="-1" value="' + escapeAttr(r.label_en || '') + '"></td><td><input type="text" class="s-lf" readonly tabindex="-1" value="' + escapeAttr(r.label_fil || '') + '"></td><td><input type="text" class="s-lh" readonly tabindex="-1" value="' + escapeAttr(r.label_hi || '') + '"></td><td><input type="text" class="s-fl" readonly tabindex="-1" value="' + escapeAttr(fl) + '"></td><td><input type="number" class="s-so" readonly tabindex="-1" value="' + (Number(r.sort_order) || 0) + '"></td>';
+            tr.innerHTML = '<td>0</td><td><input type="text" class="s-le admin-sort-field" maxlength="191" autocomplete="off" value="' + escapeAttr(r.label_en || '') + '"></td><td><input type="text" class="s-la admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" placeholder="= EN" title="نسخة من عمود EN" autocomplete="off" aria-readonly="true" value=""></td><td><input type="text" class="s-lf admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td><td><input type="text" class="s-lh admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" value=""></td><td><input type="text" class="s-fl admin-sort-field" maxlength="32" autocomplete="off" value="' + escapeAttr(fl) + '"></td><td><input type="number" class="s-so admin-sort-field" autocomplete="off" value="' + (Number(r.sort_order) || 0) + '"></td>';
             tbody.appendChild(tr);
-            var leEl = tr.querySelector('.s-le');
-            var enVal = leEl ? leEl.value : '';
-            var lfEl = tr.querySelector('.s-lf');
-            var lhEl = tr.querySelector('.s-lh');
-            if (lfEl) {
-                lfEl.value = enVal;
-            }
-            if (lhEl) {
-                lhEl.value = enVal;
-            }
+            famSyncRowLabelsFromEn(tr);
         }
         return true;
     } catch (e) {
@@ -1181,6 +1229,12 @@ async function saveSizesForFamily() {
     var style = document.createElement('style');
     style.textContent = `
         .sf-sizes-actions{justify-content:flex-end}
+        #sizesEditor input.s-la[readonly],
+        #sizesEditor input.s-lf[readonly],
+        #sizesEditor input.s-lh[readonly]{
+            cursor:default;
+            opacity:0.92;
+        }
         .cat-dep-list-wrap[data-list="size-families"]{
             overflow-x:auto;
             max-width:none;
@@ -1340,6 +1394,21 @@ async function saveSizesForFamily() {
                 famApplyAutoNamesFromDictionary();
                 famApplyAutoSizeSchemeKey();
                 void famAutoImportOnTemplateChange();
+            });
+        }
+        var sizesBox = document.getElementById('sizesEditor');
+        if (sizesBox && !sizesBox._famLeBound) {
+            sizesBox._famLeBound = true;
+            sizesBox.addEventListener('input', function (ev) {
+                var t = ev.target;
+                if (!t || !t.classList || !t.classList.contains('s-le')) {
+                    return;
+                }
+                var tr = t.closest ? t.closest('tr.size-row') : null;
+                if (!tr) {
+                    return;
+                }
+                famSyncRowLabelsFromEn(tr);
             });
         }
         loadSizesEditor();

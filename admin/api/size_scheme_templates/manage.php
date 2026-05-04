@@ -207,6 +207,18 @@ try {
                     $pdo->prepare($sqlSync)->execute(array_merge([$tplId], $keptTplSizeIds));
                 }
 
+                $hasFamTplRef = orange_table_exists($pdo, 'size_families')
+                    && orange_table_has_column($pdo, 'size_families', 'size_scheme_template_id');
+                if ($hasFamLink && $hasFamTplRef) {
+                    $sqlBack = 'UPDATE size_family_sizes sfs
+                        INNER JOIN size_families fam ON fam.id = sfs.size_family_id AND fam.size_scheme_template_id = ?
+                        INNER JOIN size_scheme_template_sizes tst ON tst.template_id = ? AND tst.sort_order = sfs.sort_order
+                        SET sfs.label_ar = tst.label_ar, sfs.label_en = tst.label_en, sfs.label_fil = tst.label_fil,
+                            sfs.label_hi = tst.label_hi, sfs.foot_length_cm = tst.foot_length_cm, sfs.scheme_template_size_id = tst.id
+                        WHERE sfs.scheme_template_size_id IS NULL';
+                    $pdo->prepare($sqlBack)->execute([$tplId, $tplId]);
+                }
+
                 $pdo->commit();
             } catch (Throwable $e) {
                 $pdo->rollBack();
@@ -218,6 +230,10 @@ try {
             $id = (int) ($data['id'] ?? 0);
             if ($id <= 0) {
                 json_response(['success' => false, 'message' => 'معرّف القالب غير صالح'], 422);
+            }
+            if (orange_table_exists($pdo, 'size_families')
+                && orange_table_has_column($pdo, 'size_families', 'size_scheme_template_id')) {
+                $pdo->prepare('UPDATE size_families SET size_scheme_template_id = NULL WHERE size_scheme_template_id = ?')->execute([$id]);
             }
             $stDel = $pdo->prepare('SELECT id FROM size_scheme_template_sizes WHERE template_id = ?');
             $stDel->execute([$id]);
