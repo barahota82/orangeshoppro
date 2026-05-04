@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 20);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 21);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -810,6 +810,8 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             id INT AUTO_INCREMENT PRIMARY KEY,
             name_ar VARCHAR(191) NOT NULL DEFAULT \'\',
             name_en VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_fil VARCHAR(191) NOT NULL DEFAULT \'\',
+            name_hi VARCHAR(191) NOT NULL DEFAULT \'\',
             size_scheme_key VARCHAR(64) NOT NULL DEFAULT \'\',
             commercial_kind_key VARCHAR(32) NOT NULL DEFAULT \'\',
             sizing_category_key VARCHAR(64) NOT NULL DEFAULT \'\',
@@ -1047,6 +1049,18 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         orange_catalog_safe_exec(
             $pdo,
             'ALTER TABLE size_families ADD INDEX idx_size_families_sizing_scope (commercial_kind_key, sizing_category_key, size_scheme_key)'
+        );
+    }
+    if (orange_table_exists($pdo, 'size_families') && !orange_table_has_column($pdo, 'size_families', 'name_fil')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE size_families ADD COLUMN name_fil VARCHAR(191) NOT NULL DEFAULT \'\' AFTER name_en'
+        );
+    }
+    if (orange_table_exists($pdo, 'size_families') && !orange_table_has_column($pdo, 'size_families', 'name_hi')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE size_families ADD COLUMN name_hi VARCHAR(191) NOT NULL DEFAULT \'\' AFTER name_fil'
         );
     }
 

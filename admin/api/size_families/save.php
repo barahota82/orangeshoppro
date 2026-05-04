@@ -29,6 +29,16 @@ try {
     $id = (int)($data['id'] ?? 0);
     $nameAr = trim((string)($data['name_ar'] ?? ''));
     $nameEn = trim((string)($data['name_en'] ?? ''));
+    $nameFil = trim((string)($data['name_fil'] ?? ''));
+    $nameHi = trim((string)($data['name_hi'] ?? ''));
+    if ($nameEn !== '') {
+        if ($nameFil === '') {
+            $nameFil = $nameEn;
+        }
+        if ($nameHi === '') {
+            $nameHi = $nameEn;
+        }
+    }
     $sort = (int)($data['sort_order'] ?? 0);
     $active = (int)($data['is_active'] ?? 1) === 0 ? 0 : 1;
 
@@ -77,16 +87,31 @@ try {
         }
     }
 
+    $hasFilHi = orange_table_has_column($pdo, 'size_families', 'name_fil')
+        && orange_table_has_column($pdo, 'size_families', 'name_hi');
+
     if ($id > 0) {
-        $pdo->prepare(
-            'UPDATE size_families SET name_ar=?, name_en=?, size_scheme_key=?, commercial_kind_key=?, sizing_category_key=?, sort_order=?, is_active=? WHERE id=? LIMIT 1'
-        )->execute([$nameAr, $nameEn, $sizeScheme, $commercialKind, $sizingCategory, $sort, $active, $id]);
+        if ($hasFilHi) {
+            $pdo->prepare(
+                'UPDATE size_families SET name_ar=?, name_en=?, name_fil=?, name_hi=?, size_scheme_key=?, commercial_kind_key=?, sizing_category_key=?, sort_order=?, is_active=? WHERE id=? LIMIT 1'
+            )->execute([$nameAr, $nameEn, $nameFil, $nameHi, $sizeScheme, $commercialKind, $sizingCategory, $sort, $active, $id]);
+        } else {
+            $pdo->prepare(
+                'UPDATE size_families SET name_ar=?, name_en=?, size_scheme_key=?, commercial_kind_key=?, sizing_category_key=?, sort_order=?, is_active=? WHERE id=? LIMIT 1'
+            )->execute([$nameAr, $nameEn, $sizeScheme, $commercialKind, $sizingCategory, $sort, $active, $id]);
+        }
         json_response(['success' => true, 'id' => $id]);
     }
 
-    $pdo->prepare(
-        'INSERT INTO size_families (name_ar, name_en, size_scheme_key, commercial_kind_key, sizing_category_key, sort_order, is_active) VALUES (?,?,?,?,?,?,?)'
-    )->execute([$nameAr, $nameEn, $sizeScheme, $commercialKind, $sizingCategory, $sort, $active]);
+    if ($hasFilHi) {
+        $pdo->prepare(
+            'INSERT INTO size_families (name_ar, name_en, name_fil, name_hi, size_scheme_key, commercial_kind_key, sizing_category_key, sort_order, is_active) VALUES (?,?,?,?,?,?,?,?,?)'
+        )->execute([$nameAr, $nameEn, $nameFil, $nameHi, $sizeScheme, $commercialKind, $sizingCategory, $sort, $active]);
+    } else {
+        $pdo->prepare(
+            'INSERT INTO size_families (name_ar, name_en, size_scheme_key, commercial_kind_key, sizing_category_key, sort_order, is_active) VALUES (?,?,?,?,?,?,?)'
+        )->execute([$nameAr, $nameEn, $sizeScheme, $commercialKind, $sizingCategory, $sort, $active]);
+    }
     json_response(['success' => true, 'id' => (int)$pdo->lastInsertId()]);
 } catch (Throwable $e) {
     orange_admin_api_catch($e, 'تعذر حفظ عائلة المقاسات');

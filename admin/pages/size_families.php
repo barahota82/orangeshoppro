@@ -86,7 +86,7 @@ $tablesReady = $hasFamilies && $hasSizes;
         grid-template-areas:
             "active active scheme scheme scheme scheme scheme scheme scheme scheme sort sort"
             "hrow hrow hrow hrow hrow hrow hrow hrow hrow hrow hrow hrow"
-            "en en en en en en ar ar ar ar ar ar";
+            "names names names names names names names names names names names names";
         gap: 14px 18px;
         direction: ltr;
         align-items: start;
@@ -119,8 +119,42 @@ $tablesReady = $hasFamilies && $hasSizes;
     .sf-fam-form-grid .sf-fam-hierarchy-row > .sf-fam-tpl {
         min-width: 0;
     }
-    .sf-fam-form-grid .sf-fam-ar { grid-area: ar; }
-    .sf-fam-form-grid .sf-fam-en { grid-area: en; }
+    .sf-fam-form-grid .sf-fam-names-row {
+        grid-area: names;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px 18px;
+        direction: rtl;
+        align-items: start;
+        min-width: 0;
+    }
+    .sf-fam-form-grid .sf-fam-names-row > div {
+        min-width: 0;
+    }
+    .sf-fam-form-grid .sf-fam-names-row .admin-sort-field-wrap {
+        max-width: none;
+        width: 100%;
+    }
+    .sf-fam-form-grid .sf-fam-names-row input.admin-sort-field {
+        margin-inline: 0;
+        display: block;
+        width: 100%;
+        max-width: none;
+        box-sizing: border-box;
+        border: 1px solid #cbd5e1;
+        border-radius: var(--radius-sm, 10px);
+        font-size: 14px;
+        line-height: calc(var(--input-min-h, 36px) - 2px);
+        min-height: var(--input-min-h, 36px);
+        height: var(--input-min-h, 36px);
+        max-height: var(--input-min-h, 36px);
+        padding-block: 0;
+        padding-inline: 12px;
+    }
+    .sf-fam-form-grid .sf-fam-names-row input.admin-sort-field--muted[readonly] {
+        background: #f4f6f9;
+        cursor: default;
+    }
     .sf-fam-form-grid label,
     .sf-fam-form-grid input,
     .sf-fam-form-grid select,
@@ -220,14 +254,11 @@ $tablesReady = $hasFamilies && $hasSizes;
     .sf-fam-form-actions .sf-fam-translate-btn--hidden {
         display: none !important;
     }
-    .sf-fam-form-grid #fam_name_ar,
-    .sf-fam-form-grid #fam_name_en {
-        width: 100%;
-        max-width: none;
-        box-sizing: border-box;
-    }
     @media (max-width: 720px) {
         .sf-fam-form-grid .sf-fam-hierarchy-row {
+            grid-template-columns: 1fr;
+        }
+        .sf-fam-form-grid .sf-fam-names-row {
             grid-template-columns: 1fr;
         }
         .sf-fam-form-grid {
@@ -237,8 +268,7 @@ $tablesReady = $hasFamilies && $hasSizes;
                 "scheme"
                 "active"
                 "hrow"
-                "ar"
-                "en";
+                "names";
         }
         .sf-fam-form-grid .sf-fam-sort,
         .sf-fam-form-grid .sf-fam-active {
@@ -308,13 +338,23 @@ $tablesReady = $hasFamilies && $hasSizes;
                 <?php endif; ?>
             </div>
         </div>
-        <div class="sf-fam-ar">
-            <label>الاسم العربي</label>
-            <input type="text" id="fam_name_ar" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
-        </div>
-        <div class="sf-fam-en">
-            <label>English</label>
-            <input type="text" id="fam_name_en" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
+        <div class="sf-fam-names-row">
+            <div class="admin-sort-field-wrap">
+                <label for="fam_name_ar">الاسم العربي</label>
+                <input type="text" id="fam_name_ar" class="admin-sort-field" maxlength="191" autocomplete="off" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
+            </div>
+            <div class="admin-sort-field-wrap">
+                <label for="fam_name_en">English</label>
+                <input type="text" id="fam_name_en" class="admin-sort-field" maxlength="191" autocomplete="off" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
+            </div>
+            <div class="admin-sort-field-wrap">
+                <label for="fam_name_fil">Filipino</label>
+                <input type="text" id="fam_name_fil" class="admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" autocomplete="off" title="يُطابق English" aria-readonly="true" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
+            </div>
+            <div class="admin-sort-field-wrap">
+                <label for="fam_name_hi">Hindi</label>
+                <input type="text" id="fam_name_hi" class="admin-sort-field admin-sort-field--muted" maxlength="191" readonly tabindex="-1" autocomplete="off" title="يُطابق English" aria-readonly="true" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
+            </div>
         </div>
     </div>
     <div class="actions sf-fam-form-actions" style="margin-top:14px;">
@@ -387,6 +427,8 @@ $tablesReady = $hasFamilies && $hasSizes;
                                     'id' => (int) $f['id'],
                                     'name_ar' => (string) $f['name_ar'],
                                     'name_en' => (string) $f['name_en'],
+                                    'name_fil' => (string) ($f['name_fil'] ?? ''),
+                                    'name_hi' => (string) ($f['name_hi'] ?? ''),
                                     'size_scheme_key' => (string) ($f['size_scheme_key'] ?? ''),
                                     'commercial_kind_key' => (string) ($f['commercial_kind_key'] ?? ''),
                                     'sizing_category_key' => (string) ($f['sizing_category_key'] ?? ''),
@@ -415,7 +457,25 @@ const defaultNextFamilySort = <?php echo (int) $nextSort; ?>;
 var FAM_SIZING_DICT_SELECTS = <?php echo $sizingDictForFamilyForm ? 'true' : 'false'; ?>;
 var FAM_SD_API = '/admin/api/sizing_dictionary/manage.php';
 let familyTranslateTimer = null;
+let famEnFilHiTimer = null;
 let isSavingFamily = false;
+
+function famSyncFamFilHiFromEn() {
+    var enEl = document.getElementById('fam_name_en');
+    var filEl = document.getElementById('fam_name_fil');
+    var hiEl = document.getElementById('fam_name_hi');
+    if (!enEl || !filEl || !hiEl) {
+        return;
+    }
+    var v = enEl.value;
+    if (!String(v).trim()) {
+        filEl.value = '';
+        hiEl.value = '';
+        return;
+    }
+    filEl.value = v;
+    hiEl.value = v;
+}
 
 function famSizingSlugKey(raw, maxLen) {
     var t = String(raw || '').trim().toLowerCase();
@@ -491,6 +551,7 @@ function famApplyAutoNamesFromDictionary() {
     var enParts = [k.en, c.en].filter(function (x) { return x; });
     arEl.value = arParts.join(' ');
     enEl.value = enParts.join(' ');
+    famSyncFamFilHiFromEn();
 }
 
 function famEnsureSelectOption(sel, value, label, dataLabels) {
@@ -614,6 +675,10 @@ function resetFamilyForm() {
     document.getElementById('fam_id').value = '0';
     document.getElementById('fam_name_ar').value = '';
     document.getElementById('fam_name_en').value = '';
+    var filEl = document.getElementById('fam_name_fil');
+    var hiEl = document.getElementById('fam_name_hi');
+    if (filEl) filEl.value = '';
+    if (hiEl) hiEl.value = '';
     var tplPick = document.getElementById('sizes_template_pick');
     if (tplPick && tplPick.tagName === 'SELECT') {
         tplPick.value = '';
@@ -647,6 +712,7 @@ async function editFamily(f) {
         document.getElementById('fam_name_en').value = f.name_en || '';
         document.getElementById('fam_commercial_kind_key').value = f.commercial_kind_key || '';
         document.getElementById('fam_sizing_category_key').value = f.sizing_category_key || '';
+        famSyncFamFilHiFromEn();
     }
     famApplyAutoSizeSchemeKey();
     document.getElementById('fam_sort').value = String(f.sort_order ?? 0);
@@ -683,6 +749,7 @@ async function translateFamilyEn(opts) {
         if (t.name_en) {
             document.getElementById('fam_name_en').value = t.name_en;
         }
+        famSyncFamFilHiFromEn();
         famApplyAutoSizeSchemeKey();
     } catch (e) {
         if (!silent) alert('فشل طلب الترجمة من السيرفر');
@@ -693,6 +760,7 @@ function scheduleFamilyEnTranslate() {
     var nameAr = document.getElementById('fam_name_ar').value.trim();
     if (!nameAr) {
         document.getElementById('fam_name_en').value = '';
+        famSyncFamFilHiFromEn();
         famApplyAutoSizeSchemeKey();
         return;
     }
@@ -706,6 +774,7 @@ async function saveFamily() {
     if (isSavingFamily) return;
     isSavingFamily = true;
     famApplyAutoSizeSchemeKey();
+    famSyncFamFilHiFromEn();
     if (!document.getElementById('fam_name_ar').value.trim() || !document.getElementById('fam_name_en').value.trim()) {
         alert('يجب تعبئة الاسم العربي والإنجليزي قبل الحفظ');
         isSavingFamily = false;
@@ -717,6 +786,8 @@ async function saveFamily() {
         var payload = {
             name_ar: document.getElementById('fam_name_ar').value.trim(),
             name_en: document.getElementById('fam_name_en').value.trim(),
+            name_fil: document.getElementById('fam_name_fil').value.trim(),
+            name_hi: document.getElementById('fam_name_hi').value.trim(),
             size_scheme_key: document.getElementById('fam_size_scheme_key').value.trim(),
             commercial_kind_key: document.getElementById('fam_commercial_kind_key').value.trim(),
             sizing_category_key: document.getElementById('fam_sizing_category_key').value.trim(),
@@ -936,6 +1007,17 @@ async function saveSizesForFamily() {
         if (document.getElementById('fam_name_ar').value.trim()) {
             translateFamilyEn({ silent: true, forceFromArabic: true });
         }
+    });
+})();
+
+(function famBindFamNameEnFilHiSync() {
+    var enEl = document.getElementById('fam_name_en');
+    if (!enEl) {
+        return;
+    }
+    enEl.addEventListener('input', function () {
+        clearTimeout(famEnFilHiTimer);
+        famEnFilHiTimer = setTimeout(famSyncFamFilHiFromEn, 450);
     });
 })();
 

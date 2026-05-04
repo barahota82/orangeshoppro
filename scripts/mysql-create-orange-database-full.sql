@@ -209,6 +209,8 @@ CREATE TABLE `size_families` (
   `id` int NOT NULL AUTO_INCREMENT,
   `name_ar` varchar(191) NOT NULL DEFAULT '',
   `name_en` varchar(191) NOT NULL DEFAULT '',
+  `name_fil` varchar(191) NOT NULL DEFAULT '',
+  `name_hi` varchar(191) NOT NULL DEFAULT '',
   `size_scheme_key` varchar(64) NOT NULL DEFAULT '',
   `commercial_kind_key` varchar(32) NOT NULL DEFAULT '',
   `sizing_category_key` varchar(64) NOT NULL DEFAULT '',
