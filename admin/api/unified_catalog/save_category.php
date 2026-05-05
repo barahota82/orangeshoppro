@@ -10,10 +10,9 @@ require_admin_api();
 
 try {
     $pdo = db();
-    orange_catalog_ensure_schema($pdo);
 
     if (!orange_table_exists($pdo, 'catalog_categories') || !orange_table_exists($pdo, 'catalog_sections')) {
-        json_response(['success' => false, 'message' => 'جداول الشجرة الموحّدة غير جاهزة.'], 503);
+        json_response(['success' => false, 'message' => 'جداول الشجرة الموحّدة غير جاهزة — راجع المخطط أو الترحيل.'], 422);
     }
 
     $data = get_json_input();

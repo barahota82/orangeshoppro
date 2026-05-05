@@ -120,7 +120,11 @@ function postJSON(url, payload, opts) {
 
     var chain = fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json'
+        },
         body: JSON.stringify(payload)
     })
         .then(async (r) => {

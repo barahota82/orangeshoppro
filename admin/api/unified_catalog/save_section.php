@@ -10,13 +10,12 @@ require_admin_api();
 
 try {
     $pdo = db();
-    orange_catalog_ensure_schema($pdo);
 
     if (!orange_table_exists($pdo, 'catalog_sections')) {
-        json_response(['success' => false, 'message' => 'جدول catalog_sections غير متاح.'], 503);
+        json_response(['success' => false, 'message' => 'جدول catalog_sections غير متاح — راجع المخطط أو الترحيل.'], 422);
     }
     if (!orange_table_exists($pdo, 'departments')) {
-        json_response(['success' => false, 'message' => 'جدول departments غير متاح.'], 503);
+        json_response(['success' => false, 'message' => 'جدول departments غير متاح — راجع المخطط.'], 422);
     }
 
     $data = get_json_input();
