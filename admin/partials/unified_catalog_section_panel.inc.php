@@ -8,7 +8,7 @@ $ucSectionsFlat = $orange_uc['sections_flat'] ?? [];
 $ucSecOpts = $orange_uc['section_select_options'] ?? [];
 $ucDepsEmpty = !empty($orange_uc['deps_empty_for_sections']);
 ?>
-<div class="card" style="margin-bottom:14px;">
+<div class="card" id="uc_branch_card_sec" style="margin-bottom:14px;">
     <h3 style="margin-top:0;">1 — أقسام داخلية (catalog_sections)</h3>
     <input type="hidden" id="uc_sec_id" value="0">
     <div class="form-grid uc-sec-form-grid">

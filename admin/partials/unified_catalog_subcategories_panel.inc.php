@@ -6,7 +6,7 @@ $ucSubFlat = $orange_uc['subcats_flat'] ?? [];
 $ucCatOpts = $orange_uc['category_select_options'] ?? [];
 $ucCatEmpty = !empty($orange_uc['categories_empty_for_subcats']);
 ?>
-<div class="card" style="margin-bottom:14px;">
+<div class="card" id="uc_branch_card_sub" style="margin-bottom:14px;">
     <h3 style="margin-top:0;">3 — تصنيفات فرعية (catalog_subcategories)</h3>
     <input type="hidden" id="uc_sub_id" value="0">
     <div class="form-grid uc-sub-form-grid">

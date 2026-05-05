@@ -273,6 +273,18 @@ function ucInitSingleParentBranchForms() {
     }
 }
 
+function ucScrollToBranchCard(which) {
+    var map = { sec: 'uc_branch_card_sec', cat: 'uc_branch_card_cat', sub: 'uc_branch_card_sub' };
+    var id = map[which];
+    if (!id) {
+        return;
+    }
+    var el = document.getElementById(id);
+    if (el && typeof el.scrollIntoView === 'function') {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
 function resetUcSection() {
     ucSlugManual.sec = false;
     document.getElementById('uc_sec_id').value = '0';
@@ -299,7 +311,7 @@ function editUcSection(j) {
     document.getElementById('uc_sec_name_hi').value = j.name_hi || '';
     document.getElementById('uc_sec_active').value = String(j.is_active === 0 ? 0 : 1);
     ucSlugManual.sec = false;
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    ucScrollToBranchCard('sec');
 }
 
 function saveUcSection() {
@@ -349,7 +361,7 @@ function editUcCategory(j) {
     document.getElementById('uc_cat_name_hi').value = j.name_hi || '';
     document.getElementById('uc_cat_active').value = String(j.is_active === 0 ? 0 : 1);
     ucSlugManual.cat = !!(j.slug && String(j.slug).trim() !== '');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    ucScrollToBranchCard('cat');
 }
 
 function ucEnsureOption(selectId, val, pool) {
@@ -414,7 +426,7 @@ function editUcSubcategory(j) {
     document.getElementById('uc_sub_name_hi').value = j.name_hi || '';
     document.getElementById('uc_sub_active').value = String(j.is_active === 0 ? 0 : 1);
     ucSlugManual.sub = !!(j.slug && String(j.slug).trim() !== '');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    ucScrollToBranchCard('sub');
 }
 
 function saveUcSubcategory() {

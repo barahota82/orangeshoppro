@@ -6,7 +6,7 @@ $ucCatsFlat = $orange_uc['categories_flat'] ?? [];
 $ucSecOpts = $orange_uc['section_select_options'] ?? [];
 $ucSecEmpty = !empty($orange_uc['sections_empty_for_categories']);
 ?>
-<div class="card" style="margin-bottom:14px;">
+<div class="card" id="uc_branch_card_cat" style="margin-bottom:14px;">
     <h3 style="margin-top:0;">2 — فئات الموحّد (catalog_categories)</h3>
     <input type="hidden" id="uc_cat_id" value="0">
     <div class="form-grid uc-cat-form-grid">
