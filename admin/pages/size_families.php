@@ -287,8 +287,8 @@ $tablesReady = $hasFamilies && $hasSizes;
             <input type="number" id="fam_sort" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int) $nextSort; ?>" disabled>
         </div>
         <div class="sf-fam-scheme">
-            <label><code>size_scheme_key</code> (مستوى 3 — EN)</label>
-            <input type="text" id="fam_size_scheme_key" maxlength="64" placeholder="tops_mens" readonly tabindex="-1" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
+            <label for="fam_size_scheme_key">size_scheme_key</label>
+            <input type="text" id="fam_size_scheme_key" maxlength="64" readonly tabindex="-1" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
         </div>
         <div class="sf-fam-active admin-sort-field-wrap">
             <label>نشط</label>

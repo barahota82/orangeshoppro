@@ -34,8 +34,8 @@ $ucCatEmpty = !empty($orange_uc['categories_empty_for_subcats']);
             <?php endif; ?>
         </div>
         <div class="uc-sub-slug">
-            <label for="uc_sub_slug">slug <span style="font-weight:normal;color:#64748b;">(تلقائي: slug الفئة الأم ثم English — يمكن التعديل)</span></label>
-            <input type="text" id="uc_sub_slug" dir="ltr" maxlength="191" autocomplete="off" placeholder="يُملأ تلقائياً" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>>
+            <label for="uc_sub_slug">slug</label>
+            <input type="text" id="uc_sub_slug" dir="ltr" lang="en" maxlength="191" autocomplete="off" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>>
         </div>
         <div class="uc-sub-ar">
             <label for="uc_sub_name_ar">الاسم العربي</label>

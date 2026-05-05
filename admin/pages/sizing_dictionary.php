@@ -411,7 +411,7 @@ if ($sdNextKindSort < 1) {
             <input type="text" id="sd_kind_sort_view" class="admin-sort-field admin-sort-field--muted" readonly disabled tabindex="-1" value="<?php echo (int) $sdNextKindSort; ?>">
         </div>
         <div class="sd-kind-key">
-            <label>مفتاح EN (<code>kind_key</code>) — للقراءة فقط</label>
+            <label for="sd_kind_key">kind_key</label>
             <input type="text" id="sd_kind_key" maxlength="32" autocomplete="off" <?php echo !$tablesReady ? 'disabled' : ''; ?> readonly tabindex="-1">
         </div>
         <div class="sd-kind-act admin-sort-field-wrap">
@@ -457,7 +457,7 @@ if ($sdNextKindSort < 1) {
             <input type="text" id="sd_cat_sort_view" class="admin-sort-field admin-sort-field--muted" readonly disabled tabindex="-1" value="1">
         </div>
         <div class="sd-cat-key">
-            <label>مفتاح EN (<code>category_key</code>) — للقراءة فقط</label>
+            <label for="sd_cat_key">category_key</label>
             <input type="text" id="sd_cat_key" maxlength="64" autocomplete="off" readonly tabindex="-1">
         </div>
         <div class="sd-cat-act admin-sort-field-wrap">
