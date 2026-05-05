@@ -176,6 +176,7 @@ function orange_admin_uc_branch_bootstrap(PDO $pdo): array
         $sectionSelectOptions[] = [
             'id' => $sid,
             'label' => trim((string) ($s['dept_label'] ?? '')) . ' ← ' . trim((string) (($s['name_ar'] ?: $s['name_en']) ?: $s['slug'] ?? '')),
+            'slug' => trim((string) ($s['slug'] ?? '')),
         ];
     }
 
@@ -195,6 +196,8 @@ function orange_admin_uc_branch_bootstrap(PDO $pdo): array
             'id' => $cid,
             'label' => trim((string) ($c['dept_label'] ?? '')) . ' ← ' . trim((string) ($c['sec_label'] ?? '')) . ' ← '
                 . trim((string) (($c['name_ar'] ?: $c['name_en']) ?: $c['slug'] ?? '')),
+            'section_slug' => trim((string) ($c['sec_slug'] ?? '')),
+            'category_slug' => trim((string) ($c['slug'] ?? '')),
         ];
     }
 

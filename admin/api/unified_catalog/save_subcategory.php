@@ -34,8 +34,29 @@ try {
         json_response(['success' => false, 'message' => 'الاسم العربي والإنجليزي مطلوبان.'], 422);
     }
 
-    $slugResolved = orange_catalog_unified_branch_slug_resolve(
+    $trailSt = $pdo->prepare(
+        'SELECT cc.slug AS cat_slug, cc.name_en AS cat_name_en, cs.slug AS sec_slug, cs.name_en AS sec_name_en
+         FROM catalog_categories cc
+         INNER JOIN catalog_sections cs ON cs.id = cc.catalog_section_id
+         WHERE cc.id = ? LIMIT 1'
+    );
+    $trailSt->execute([$categoryId]);
+    $trail = $trailSt->fetch(PDO::FETCH_ASSOC);
+    $secPrefix = '';
+    $catPrefix = '';
+    if (is_array($trail)) {
+        $secPrefix = trim((string) ($trail['sec_slug'] ?? ''));
+        if ($secPrefix === '') {
+            $secPrefix = trim((string) ($trail['sec_name_en'] ?? ''));
+        }
+        $catPrefix = trim((string) ($trail['cat_slug'] ?? ''));
+        if ($catPrefix === '') {
+            $catPrefix = trim((string) ($trail['cat_name_en'] ?? ''));
+        }
+    }
+    $slugResolved = orange_catalog_unified_branch_slug_resolve_prefixed(
         (string) ($data['slug'] ?? ''),
+        [$secPrefix, $catPrefix],
         $nameEn,
         $nameAr
     );

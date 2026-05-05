@@ -17,9 +17,62 @@ function orange_catalog_unified_branch_slug_sanitize(string $raw): string
     return $t;
 }
 
+/** مقطع slug واحد (أحرف صغيرة وأرقام وشرطات). */
+function orange_catalog_unified_branch_slug_segment(string $raw): string
+{
+    $t = strtolower(trim($raw));
+    if ($t === '') {
+        return '';
+    }
+    $t = (string) preg_replace('/[^a-z0-9]+/', '-', $t);
+    $t = (string) preg_replace('/-+/', '-', $t);
+
+    return trim($t, '-');
+}
+
 /**
- * يولّد slug من الاسم الإنجليزي (مثل departments slugify)؛ إن تعذّر يُرجع n-xxxxxxxx.
+ * يبني slug من مقاطع (مثلاً slug القسم الداخلي ثم الإنجليزي) ثم يعود لـ derive عند الفراغ.
+ *
+ * @param list<string> $prefixSegments
  */
+function orange_catalog_unified_branch_slug_from_prefixes_and_names(array $prefixSegments, string $nameEn, string $nameAr): string
+{
+    $parts = [];
+    foreach ($prefixSegments as $seg) {
+        $s = orange_catalog_unified_branch_slug_segment((string) $seg);
+        if ($s !== '') {
+            $parts[] = $s;
+        }
+    }
+    $en = orange_catalog_unified_branch_slug_segment($nameEn);
+    if ($en !== '') {
+        $parts[] = $en;
+    }
+    $base = implode('-', $parts);
+    if ($base !== '') {
+        return substr($base, 0, 191);
+    }
+
+    return orange_catalog_unified_branch_slug_derive($nameEn, $nameAr);
+}
+
+/**
+ * slug مرسل من الواجهة إن صالحاً؛ وإلا توليد من المقاطع + الإنجليزي/العربي.
+ *
+ * @param list<string> $prefixSegments
+ */
+function orange_catalog_unified_branch_slug_resolve_prefixed(string $postedSlug, array $prefixSegments, string $nameEn, string $nameAr): string
+{
+    $posted = orange_catalog_unified_branch_slug_sanitize($postedSlug);
+    if ($posted !== '') {
+        return $posted;
+    }
+    $cand = orange_catalog_unified_branch_slug_from_prefixes_and_names($prefixSegments, $nameEn, $nameAr);
+    $san = orange_catalog_unified_branch_slug_sanitize($cand);
+
+    return $san !== '' ? $san : orange_catalog_unified_branch_slug_derive($nameEn, $nameAr);
+}
+
 function orange_catalog_unified_branch_slug_derive(string $nameEn, string $nameAr): string
 {
     $en = strtolower(trim($nameEn));

@@ -35,7 +35,7 @@ $ucSecEmpty = !empty($orange_uc['sections_empty_for_categories']);
             <?php endif; ?>
         </div>
         <div class="uc-cat-slug">
-            <label for="uc_cat_slug">slug <span style="font-weight:normal;color:#64748b;">(تلقائي من English — يمكن التعديل)</span></label>
+            <label for="uc_cat_slug">slug <span style="font-weight:normal;color:#64748b;">(تلقائي: slug القسم الداخلي ثم English — يمكن التعديل)</span></label>
             <input type="text" id="uc_cat_slug" dir="ltr" maxlength="191" autocomplete="off" placeholder="يُملأ تلقائياً" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>>
         </div>
         <div class="uc-cat-ar">
