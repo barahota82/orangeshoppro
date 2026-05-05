@@ -14,7 +14,6 @@ $ucDepsEmpty = !empty($orange_uc['deps_empty_for_sections']);
     <div class="form-grid uc-sec-form-grid">
         <div class="uc-sec-sort admin-sort-field-wrap">
             <label for="uc_sec_sort">الترتيب (تلقائي)</label>
-            <small style="display:block;color:#64748b;font-size:12px;margin-top:2px;line-height:1.4;">بعد الحفظ وتجديد الصفحة يُفرَّغ اختيار القسم والترتيب؛ اختر القسم ليظهر الترتيب التالي.</small>
             <input type="number" id="uc_sec_sort" class="admin-sort-field<?php echo $ucDepsEmpty ? ' admin-sort-field--muted' : ''; ?>" min="1" step="1" value="" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>
         </div>
         <div class="uc-sec-active admin-sort-field-wrap">

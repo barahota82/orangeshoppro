@@ -40,7 +40,6 @@ if ($hasDepartmentsTable) {
     <h1>الأقسام الرئيسية</h1>
     <?php if ($hasDepartmentsTable): ?>
     <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.55;">
-        المستوى الأعلى <strong>Department</strong> في سياسة الشجرة الموحّدة (تاسعاً في المرجع المؤرشف).
         بعد حفظ الأقسام، تابع من
         <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع الشجرة الموحّدة (عرض شامل)</a>
         لإضافة قسم كتالوج (Section) ثم فئة وتصنيف فرعي، ثم
