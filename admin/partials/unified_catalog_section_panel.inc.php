@@ -40,7 +40,7 @@ $ucDepsEmpty = !empty($orange_uc['deps_empty_for_sections']);
         </div>
         <div class="uc-sec-slug">
             <label for="uc_sec_slug">slug</label>
-            <input type="text" id="uc_sec_slug" dir="ltr" lang="en" maxlength="191" autocomplete="off" readonly <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>
+            <input type="text" id="uc_sec_slug" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" maxlength="191" autocomplete="off" readonly <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>
         </div>
         <div class="uc-sec-ar">
             <label for="uc_sec_name_ar">الاسم العربي</label>

@@ -35,7 +35,7 @@ $ucSecEmpty = !empty($orange_uc['sections_empty_for_categories']);
         </div>
         <div class="uc-cat-slug">
             <label for="uc_cat_slug">slug</label>
-            <input type="text" id="uc_cat_slug" dir="ltr" lang="en" maxlength="191" autocomplete="off" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>>
+            <input type="text" id="uc_cat_slug" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" maxlength="191" autocomplete="off" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>>
         </div>
         <div class="uc-cat-ar">
             <label for="uc_cat_name_ar">الاسم العربي</label>

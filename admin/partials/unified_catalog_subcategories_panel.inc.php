@@ -35,7 +35,7 @@ $ucCatEmpty = !empty($orange_uc['categories_empty_for_subcats']);
         </div>
         <div class="uc-sub-slug">
             <label for="uc_sub_slug">slug</label>
-            <input type="text" id="uc_sub_slug" dir="ltr" lang="en" maxlength="191" autocomplete="off" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>>
+            <input type="text" id="uc_sub_slug" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" maxlength="191" autocomplete="off" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>>
         </div>
         <div class="uc-sub-ar">
             <label for="uc_sub_name_ar">الاسم العربي</label>
