@@ -40,20 +40,18 @@ function ucSlugPrefixForCategory() {
     return ucSlugifyLabel(raw);
 }
 
-function ucSlugPrefixesForSubcategory() {
+function ucSlugPrefixForSubcategory() {
     const sel = document.getElementById('uc_sub_category_id');
     if (!sel || !String(sel.value || '').trim()) {
-        return { sec: '', cat: '' };
+        return '';
     }
     const id = String(sel.value);
     const hit = Array.isArray(ucCategoryOptions) ? ucCategoryOptions.find(function (x) { return String(x.id) === id; }) : null;
     if (!hit) {
-        return { sec: '', cat: '' };
+        return '';
     }
-    return {
-        sec: ucSlugifyLabel(hit.section_slug ? String(hit.section_slug) : ''),
-        cat: ucSlugifyLabel(hit.category_slug ? String(hit.category_slug) : '')
-    };
+    const raw = hit.category_slug ? String(hit.category_slug) : '';
+    return ucSlugifyLabel(raw);
 }
 
 function refreshUcSlug(which) {
@@ -80,11 +78,9 @@ function refreshUcSlug(which) {
             next = enSeg;
         }
     } else if (which === 'sub') {
-        const pr = ucSlugPrefixesForSubcategory();
-        const parts = [pr.sec, pr.cat].filter(function (x) { return !!x; });
-        const prefix = parts.join('-');
-        if (prefix && enSeg) {
-            next = prefix + '-' + enSeg;
+        const pr = ucSlugPrefixForSubcategory();
+        if (pr && enSeg) {
+            next = pr + '-' + enSeg;
         } else if (enSeg) {
             next = enSeg;
         }
