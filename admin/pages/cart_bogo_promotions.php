@@ -98,7 +98,7 @@ foreach ($cartBogoCatalogCategoryDropdown as $e) {
             </select>
             <?php elseif ($cartBogoUnifiedCategoryHint): ?>
             <label for="cbp_cat">معرّف فئة الشجرة الموحّدة</label>
-            <p class="page-subtitle" style="margin:6px 0 10px;line-height:1.45;"><strong>تصنيف موحّد:</strong> لا توجد فئات نشطة في <code dir="ltr">catalog_categories</code> — أدخل <code dir="ltr">id</code> يدوياً أو أنشئ الفروع من صفحة فروع الشجرة.</p>
+            <p class="page-subtitle" style="margin:6px 0 10px;line-height:1.45;"><strong>تصنيف موحّد:</strong> لا توجد فئات نشطة في <code dir="ltr">catalog_categories</code> — أدخل <code dir="ltr">id</code> يدوياً أو أنشئ الفروع من صفحة فروع شجرة المنتجات.</p>
             <input type="number" id="cbp_cat" class="admin-inp" min="1" step="1" style="max-width:12rem;" dir="ltr">
             <?php else: ?>
             <label for="cbp_cat">رقم الفئة القديم على المنتج (<code dir="ltr">categories.id</code>)</label>

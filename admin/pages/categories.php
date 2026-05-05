@@ -49,7 +49,7 @@ try {
 <div class="page-title">
     <?php if ($orange_uc['has_unified_tables'] ?? false): ?>
     <h1>أقسام داخلية (التصنيف الموحّد)</h1>
-    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.65;">وفق سياسة الكتالوج الموحّد، هذا المستوى هو <strong>Section</strong> (<code>catalog_sections</code>) تحت القسم الرئيسي <code>departments</code>، قبل الفئات <code>catalog_categories</code> والفرع الموحّد. ربط المنتج بتصنيف الشجرة يكون عبر <code>product_type_id</code> ورقة نوع المنتج. لتعديل الفئة والفرع الموحَّد معًا أو لعرض الصفحة المجمَّعة استخدم «<a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=subcategories'), ENT_QUOTES, 'UTF-8'); ?>">الفئة والفرع (موحّد)</a>» أو «<a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع الشجرة الموحّدة</a>».</p>
+    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.65;">وفق سياسة الكتالوج الموحّد، هذا المستوى هو <strong>Section</strong> (<code>catalog_sections</code>) تحت القسم الرئيسي <code>departments</code>، قبل الفئات <code>catalog_categories</code> والفرع الموحّد. ربط المنتج بتصنيف الشجرة يكون عبر <code>product_type_id</code> ورقة نوع المنتج. لتعديل الفئة والفرع الموحَّد معًا أو لعرض الصفحة المجمَّعة استخدم «<a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=subcategories'), ENT_QUOTES, 'UTF-8'); ?>">الفئة والفرع (موحّد)</a>» أو «<a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع شجرة المنتجات</a>».</p>
     <?php else: ?>
     <h1>الفئات</h1>
     <?php endif; ?>

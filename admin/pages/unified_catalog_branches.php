@@ -11,7 +11,7 @@ require_once __DIR__ . '/../../includes/admin_unified_catalog_branch_data.php';
 $orange_uc = orange_admin_uc_branch_bootstrap($pdo);
 ?>
 <div class="page-title">
-    <h1>فروع الشجرة الموحّدة (عرض شامل)</h1>
+    <h1>فروع شجرة المنتجات</h1>
 </div>
 
 <?php if (!$orange_uc['has_unified_tables']): ?>

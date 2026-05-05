@@ -61,7 +61,7 @@ $legacySubReady = $hasSubcategoriesTable && $hasProductSubcategoryColumn;
 <div class="page-title">
     <?php if ($showUnifiedTree): ?>
     <h1>الفئة والفرع (التصنيف الموحّد)</h1>
-    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.65;">أسفله مستويان من الشجرة النهائية: <strong>catalog_categories</strong> ثم <strong>catalog_subcategories</strong> قبل ربط <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات</a>. لمستوى <strong>Section</strong> الذي فوق ذلك استخدم صفحة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=categories'), ENT_QUOTES, 'UTF-8'); ?>">أقسام داخلية</a>. عرض شامل: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع الشجرة الموحّدة</a>.</p>
+    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.65;">أسفله مستويان من الشجرة النهائية: <strong>catalog_categories</strong> ثم <strong>catalog_subcategories</strong> قبل ربط <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات</a>. لمستوى <strong>Section</strong> الذي فوق ذلك استخدم صفحة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=categories'), ENT_QUOTES, 'UTF-8'); ?>">أقسام داخلية</a>. عرض مجمّع: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع شجرة المنتجات</a>.</p>
     <?php else: ?>
     <h1>فئات فرعية</h1>
     <?php endif; ?>
