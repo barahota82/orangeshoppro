@@ -223,6 +223,12 @@ async function ucPost(url, payload) {
         if (res.success) {
             try {
                 sessionStorage.setItem('ucSkipParentAutoOnce', '1');
+                if (url.indexOf('save_subcategory.php') !== -1) {
+                    const cid = parseInt(String(payload.catalog_category_id || '0'), 10) || 0;
+                    if (cid > 0) {
+                        sessionStorage.setItem('ucRestoreSubCategory', String(cid));
+                    }
+                }
             } catch (e) { /* ignore */ }
             location.reload();
         }
@@ -516,7 +522,6 @@ function scheduleUcFromEn(which) {
     try {
         sessionStorage.removeItem('ucRestoreSecDept');
         sessionStorage.removeItem('ucRestoreCatSection');
-        sessionStorage.removeItem('ucRestoreSubCategory');
     } catch (e) { /* ignore */ }
     document.addEventListener('click', function (ev) {
         var b = ev.target.closest('.uc-edit-sec');
