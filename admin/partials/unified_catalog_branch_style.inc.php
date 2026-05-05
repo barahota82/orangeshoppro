@@ -12,7 +12,6 @@
 .uc-sec-form-grid #uc_sec_slug,.uc-cat-form-grid #uc_cat_slug,.uc-sub-form-grid #uc_sub_slug{text-align:right;direction:ltr;}
 .uc-cat-form-grid #uc_cat_slug:not([readonly]),
 .uc-sub-form-grid #uc_sub_slug:not([readonly]){cursor:text;}
-.uc-table thead th.uc-col-slug,.uc-table tbody td.uc-col-slug{background:#f4f6f9;}
 .uc-sec-form-grid #uc_sec_name_en,.uc-cat-form-grid #uc_cat_name_en,.uc-sub-form-grid #uc_sub_name_en{direction:ltr;text-align:right;}
 .uc-sec-form-grid .uc-sec-sort.admin-sort-field-wrap,.uc-sec-form-grid .uc-sec-active.admin-sort-field-wrap,.uc-cat-form-grid .uc-cat-sort.admin-sort-field-wrap,.uc-cat-form-grid .uc-cat-active.admin-sort-field-wrap,.uc-sub-form-grid .uc-sub-sort.admin-sort-field-wrap,.uc-sub-form-grid .uc-sub-active.admin-sort-field-wrap{max-width:var(--admin-sort-field-max-w,220px);}
 .uc-sec-form-grid #uc_sec_sort,.uc-sec-form-grid #uc_sec_active,.uc-cat-form-grid #uc_cat_sort,.uc-cat-form-grid #uc_cat_active,.uc-sub-form-grid #uc_sub_sort,.uc-sub-form-grid #uc_sub_active{margin-inline:0;display:block;width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:var(--radius-sm,10px);font-size:14px;line-height:calc(var(--input-min-h,36px) - 2px);min-height:var(--input-min-h,36px);height:var(--input-min-h,36px);max-height:var(--input-min-h,36px);padding-block:0;padding-inline:12px;}
@@ -25,7 +24,6 @@
 .uc-table{border-collapse:collapse;width:100%;font-size:0.93rem;}
 .uc-table th,.uc-table td{padding:10px;border-bottom:1px solid #f0f1f5;vertical-align:top;}
 .uc-table thead th{border-bottom-color:#e8e9ec;text-align:right;}
-.uc-table thead th.uc-col-slug,.uc-table tbody td.uc-col-slug{text-align:right;}
 .uc-table thead th:last-child{text-align:center;}
 .uc-table tbody td:last-child{text-align:center;}
 </style>

@@ -67,14 +67,14 @@ $ucDepsEmpty = !empty($orange_uc['deps_empty_for_sections']);
     <?php if ($ucSectionsFlat !== []): ?>
     <div style="overflow-x:auto;margin-top:16px;">
         <table class="uc-table"><thead><tr>
-            <th>#</th><th>مسار</th><th class="uc-col-slug">slug</th><th>عربي</th><th>ترتيب</th><th>نشط</th><th>إجراء</th>
+            <th>#</th><th>مسار</th><th>slug</th><th>عربي</th><th>ترتيب</th><th>نشط</th><th>إجراء</th>
         </tr></thead><tbody>
         <?php foreach ($ucSectionsFlat as $row): ?>
             <?php if (! is_array($row)) { continue; } ?>
             <tr>
                 <td><?php echo (int) ($row['id'] ?? 0); ?></td>
                 <td><?php echo htmlspecialchars(trim((string) ($row['dept_label'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
-                <td class="uc-col-slug" dir="ltr" lang="en"><?php echo htmlspecialchars((string) ($row['slug'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                <td dir="ltr"><?php echo htmlspecialchars((string) ($row['slug'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                 <td><?php echo htmlspecialchars((string) ($row['name_ar'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                 <td><?php echo (int) ($row['sort_order'] ?? 0); ?></td>
                 <td><?php echo ((int) ($row['is_active'] ?? 0) === 1) ? '√' : '—'; ?></td>
