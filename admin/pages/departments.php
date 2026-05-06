@@ -52,7 +52,10 @@ if ($hasDepartmentsTable) {
     <div class="form-grid dep-form-grid">
         <div class="dep-slug">
             <label for="slug">Slug</label>
-            <input type="text" id="slug" dir="ltr" lang="en" disabled>
+            <div class="dep-slug-field">
+                <input type="text" id="slug" dir="ltr" lang="en" disabled>
+                <span class="dep-slug-frost" aria-hidden="true"></span>
+            </div>
         </div>
         <div class="dep-sort admin-sort-field-wrap">
             <label for="sort_order">الترتيب (تلقائي)</label>
@@ -357,13 +360,36 @@ if (translateBtnDep) {
             display:grid;
             grid-template-columns:repeat(12,minmax(0,1fr));
             grid-template-areas:
-                "slug slug slug slug slug slug sort sort sort sort sort sort"
+                "slug slug slug slug slug slug slug slug slug sort sort sort"
                 "en en en en en en ar ar ar ar ar ar"
                 "hi hi hi hi hi hi fil fil fil fil fil fil";
             gap:14px 18px;
             direction:ltr;
         }
-        .dep-form-grid .dep-slug{grid-area:slug}
+        .dep-form-grid .dep-slug{grid-area:slug;min-width:0}
+        .dep-form-grid .dep-slug-field{
+            position:relative;
+            display:block;
+            width:100%;
+            border-radius:var(--radius-sm,10px);
+            overflow:hidden;
+        }
+        .dep-form-grid .dep-slug-frost{
+            position:absolute;
+            inset:0;
+            z-index:1;
+            pointer-events:none;
+            border-radius:inherit;
+            box-sizing:border-box;
+            border:1px solid rgba(203,213,225,0.75);
+            background:rgba(248,250,252,0.42);
+            backdrop-filter:blur(8px) saturate(1.15);
+            -webkit-backdrop-filter:blur(8px) saturate(1.15);
+        }
+        .dep-form-grid .dep-slug-field #slug{
+            position:relative;
+            z-index:0;
+        }
         .dep-form-grid .dep-sort{
             grid-area:sort;
             justify-self:end;
@@ -380,8 +406,7 @@ if (translateBtnDep) {
         .dep-form-grid #slug{direction:ltr;text-align:right}
         .dep-form-grid #name_en{direction:ltr;text-align:right}
         .dep-form-grid .dep-sort.admin-sort-field-wrap{max-width:var(--admin-sort-field-max-w,220px)}
-        .dep-form-grid #sort_order,
-        .dep-form-grid #slug{
+        .dep-form-grid #sort_order{
             margin-inline:0;
             display:block;
             width:100%;
@@ -395,6 +420,22 @@ if (translateBtnDep) {
             max-height:var(--input-min-h,36px);
             padding-block:0;
             padding-inline:12px;
+        }
+        .dep-form-grid .dep-slug-field #slug{
+            margin-inline:0;
+            display:block;
+            width:100%;
+            box-sizing:border-box;
+            border:1px solid #cbd5e1;
+            border-radius:var(--radius-sm,10px);
+            font-size:14px;
+            line-height:calc(var(--input-min-h,36px) - 2px);
+            min-height:var(--input-min-h,36px);
+            height:var(--input-min-h,36px);
+            max-height:var(--input-min-h,36px);
+            padding-block:0;
+            padding-inline:12px;
+            background:#f8fafc;
         }
         .dep-form-grid #name_ar,
         .dep-form-grid #name_en,
