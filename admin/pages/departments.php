@@ -38,15 +38,6 @@ if ($hasDepartmentsTable) {
 ?>
 <div class="page-title">
     <h1>الأقسام الرئيسية</h1>
-    <?php if ($hasDepartmentsTable): ?>
-    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.55;">
-        بعد حفظ الأقسام، تابع من
-        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع شجرة المنتجات</a>
-        لإضافة قسم كتالوج (Section) ثم فئة وتصنيف فرعي، ثم
-        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات الموحدة</a>
-        ثم ربط المنتجات بـ <code>product_type_id</code> من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=products'), ENT_QUOTES, 'UTF-8'); ?>">المنتجات</a>.
-    </p>
-    <?php endif; ?>
 </div>
 
 <?php if (!$hasDepartmentsTable): ?>
@@ -86,7 +77,7 @@ if ($hasDepartmentsTable) {
     </div>
     <div class="actions dep-form-actions" style="margin-top:14px;">
         <button type="button" onclick="saveDepartment()" <?php echo !$hasDepartmentsTable ? 'disabled' : ''; ?>>حفظ القسم</button>
-        <button type="button" class="btn-secondary" onclick="translateDepartment({ forceFromArabic: true })">ترجمة تلقائية</button>
+        <button type="button" class="btn-secondary" onclick="translateDepartment({ forceFromArabic: true })">ترجمة</button>
         <button type="button" class="btn-secondary" onclick="resetDepartmentForm()">جديد</button>
     </div>
 </div>

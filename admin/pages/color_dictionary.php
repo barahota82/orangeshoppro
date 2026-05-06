@@ -70,7 +70,7 @@ if ($hasTable) {
     </div>
     <div class="actions cd-form-actions" style="margin-top:14px;">
         <button type="button" onclick="saveColor()" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ اللون</button>
-        <button type="button" class="btn-secondary" onclick="translateColor({ forceFromArabic: true })" <?php echo !$hasTable ? 'disabled' : ''; ?>>ترجمة تلقائية</button>
+        <button type="button" class="btn-secondary" onclick="translateColor({ forceFromArabic: true })" <?php echo !$hasTable ? 'disabled' : ''; ?>>ترجمة</button>
         <button type="button" class="btn-secondary" onclick="resetColorForm()" <?php echo !$hasTable ? 'disabled' : ''; ?>>جديد</button>
     </div>
 </div>

@@ -213,7 +213,7 @@ if ($tablesReady) {
     <div class="actions admin-actions--start" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;">
         <button type="button" class="btn-secondary" onclick="sstResetForm()">جديد</button>
         <button type="button" onclick="sstAddSizeRow()">+ صف مقاس</button>
-        <button type="button" class="btn-secondary" onclick="sstSyncAllDerivedFromEnglish()">مزامنة الحقول المشتقة من English</button>
+        <button type="button" class="btn-secondary" onclick="sstSyncAllDerivedFromEnglish()">ترجمة</button>
         <button type="button" onclick="sstSave()">حفظ القالب</button>
     </div>
 </div>

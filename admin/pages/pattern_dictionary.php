@@ -67,7 +67,7 @@ if ($hasTable) {
     </div>
     <div class="actions pd-form-actions" style="margin-top:14px;">
         <button type="button" onclick="savePattern()" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ النمط</button>
-        <button type="button" class="btn-secondary" onclick="translatePattern({ forceFromArabic: true })" <?php echo !$hasTable ? 'disabled' : ''; ?>>ترجمة تلقائية</button>
+        <button type="button" class="btn-secondary" onclick="translatePattern({ forceFromArabic: true })" <?php echo !$hasTable ? 'disabled' : ''; ?>>ترجمة</button>
         <button type="button" class="btn-secondary" onclick="resetPatternForm()" <?php echo !$hasTable ? 'disabled' : ''; ?>>جديد</button>
     </div>
 </div>

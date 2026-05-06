@@ -442,7 +442,7 @@ if ($sdNextKindSort < 1) {
     </div>
     <div class="actions sd-kind-form-actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;">
         <button type="button" id="sd_kind_save_btn" onclick="sdSaveKind()">حفظ النوع</button>
-        <button type="button" class="btn-secondary" onclick="sdTranslateKindEn({ forceFromArabic: true })">ترجمة إلى English</button>
+        <button type="button" class="btn-secondary" onclick="sdTranslateKindEn({ forceFromArabic: true })">ترجمة</button>
         <button type="button" class="btn-secondary" onclick="sdResetKindForm()">جديد</button>
     </div>
 </div>
@@ -492,7 +492,7 @@ if ($sdNextKindSort < 1) {
     </div>
     <div class="actions sd-cat-form-actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;">
         <button type="button" onclick="sdSaveCategory()">حفظ الفئة</button>
-        <button type="button" class="btn-secondary" onclick="sdTranslateCatEn({ forceFromArabic: true })">ترجمة إلى English</button>
+        <button type="button" class="btn-secondary" onclick="sdTranslateCatEn({ forceFromArabic: true })">ترجمة</button>
         <button type="button" class="btn-secondary" onclick="sdResetCatForm(false)">جديد</button>
     </div>
 </div>

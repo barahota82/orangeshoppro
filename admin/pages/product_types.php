@@ -315,7 +315,7 @@ if ($subOptionsJson === false) {
     </div>
     <div class="actions pt-form-actions" style="margin-top:14px;gap:8px;flex-wrap:wrap;">
         <button type="button" onclick="saveProductType()" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>حفظ</button>
-        <button type="button" class="btn-secondary" onclick="translatePtNames({ forceFromArabic: true })" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>ترجمة تلقائية</button>
+        <button type="button" class="btn-secondary" onclick="translatePtNames({ forceFromArabic: true })" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>ترجمة</button>
         <button type="button" class="btn-secondary" onclick="resetPtForm()" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>جديد</button>
     </div>
 </div>
