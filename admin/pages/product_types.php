@@ -214,23 +214,25 @@ if ($subOptionsJson === false) {
 <div class="card">
     <h3>إضافة / تعديل نوع منتج</h3>
     <input type="hidden" id="pt_id" value="0">
-    <div class="form-grid pt-form-grid">
-        <div class="pt-sort admin-sort-field-wrap">
-            <label for="pt_sort">ترتيب ضمن الورقة</label>
-            <input type="number" id="pt_sort" class="admin-sort-field admin-sort-field--muted" min="1" step="1" value=""
-                <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
-        </div>
-        <div class="pt-slug">
-            <label for="pt_slug">slug</label>
-            <input type="text" id="pt_slug" class="pt-slug-auto" dir="ltr" lang="en" maxlength="191" autocomplete="off" title="يُولَّد تلقائياً: slug قسم الشجرة (catalog_sections) ثم الاسم الإنجليزي"
-                <?php echo $subOptions === [] ? 'disabled' : 'readonly'; ?>>
-        </div>
-        <div class="pt-active admin-sort-field-wrap">
-            <label for="pt_active">نشط</label>
-            <select id="pt_active" class="admin-sort-field" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
-                <option value="1">نعم</option>
-                <option value="0">لا</option>
-            </select>
+    <div class="pt-form-grid">
+        <div class="pt-row pt-row--r1">
+            <div class="pt-sort admin-sort-field-wrap">
+                <label for="pt_sort">ترتيب ضمن الورقة</label>
+                <input type="number" id="pt_sort" class="admin-sort-field admin-sort-field--muted" min="1" step="1" value=""
+                    <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
+            </div>
+            <div class="pt-slug">
+                <label for="pt_slug">slug</label>
+                <input type="text" id="pt_slug" class="pt-slug-auto" dir="ltr" lang="en" maxlength="191" autocomplete="off" title="يُولَّد تلقائياً: slug قسم الشجرة (catalog_sections) ثم الاسم الإنجليزي"
+                    <?php echo $subOptions === [] ? 'disabled' : 'readonly'; ?>>
+            </div>
+            <div class="pt-active admin-sort-field-wrap">
+                <label for="pt_active">نشط</label>
+                <select id="pt_active" class="admin-sort-field" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
+                    <option value="1">نعم</option>
+                    <option value="0">لا</option>
+                </select>
+            </div>
         </div>
         <div class="pt-path">
             <label for="pt_catalog_subcategory_id">مسار الشجرة (التصنيف الفرعي الموحّد)</label>
@@ -244,6 +246,7 @@ if ($subOptionsJson === false) {
                 <small style="display:block;color:#b45309;margin-top:4px;">لا توجد أفرع نشطة؛ أنشئ أقسام الشجرة الموحّدة عبر ترحيل البيانات أو إعداد يدوي.</small>
             <?php endif; ?>
         </div>
+        <div class="pt-row pt-row--r2">
         <div class="pt-ck">
             <?php if ($sizingDictForPtForm): ?>
             <label for="pt_expected_commercial_kind_key">النوع التجاري (مستوى 1)</label>
@@ -294,6 +297,8 @@ if ($subOptionsJson === false) {
                 <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
             <?php endif; ?>
         </div>
+        </div>
+        <div class="pt-row pt-row--names1">
         <div class="pt-ar">
             <label for="pt_name_ar">الاسم العربي</label>
             <input type="text" id="pt_name_ar" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
@@ -302,6 +307,8 @@ if ($subOptionsJson === false) {
             <label for="pt_name_en">English</label>
             <input type="text" id="pt_name_en" lang="en" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
         </div>
+        </div>
+        <div class="pt-row pt-row--names2">
         <div class="pt-fil">
             <label for="pt_name_fil">Filipino</label>
             <input type="text" id="pt_name_fil" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
@@ -309,6 +316,7 @@ if ($subOptionsJson === false) {
         <div class="pt-hi">
             <label for="pt_name_hi">Hindi</label>
             <input type="text" id="pt_name_hi" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
+        </div>
         </div>
     </div>
     <div class="actions pt-form-actions" style="margin-top:14px;gap:8px;flex-wrap:wrap;">
@@ -380,54 +388,85 @@ if ($subOptionsJson === false) {
 </div>
 
 <style>
-/* تنسيق الصفوف مثل color_dictionary / pattern_dictionary: LTR grid + ترتيب عربي (الأول في الجملة يمين الشاشة). */
+/* الصف الأول مثل كارت سمات الكتالوج: ترتيب | slug (وسط مرن) | نشط — direction:rtl */
 .pt-form-grid {
-    display: grid;
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    grid-template-areas:
-        "active active active slug slug slug slug slug slug sort sort sort"
-        "path path path path path path path path path path path path"
-        "sk sk sk sk sk sk ck ck ck ck ck ck"
-        "en en en en en en ar ar ar ar ar ar"
-        "hi hi hi hi hi hi fil fil fil fil fil fil";
+    display: flex;
+    flex-direction: column;
     gap: 14px 18px;
     direction: ltr;
+    align-items: stretch;
 }
-.pt-form-grid .pt-sort {
-    grid-area: sort;
-    justify-self: end;
-    width: 100%;
-}
-.pt-form-grid .pt-slug {
-    grid-area: slug;
+.pt-form-grid .pt-row--r1 {
+    display: grid;
+    grid-template-columns: minmax(0, 200px) minmax(0, 1fr) minmax(0, 200px);
+    gap: 14px 18px;
+    direction: rtl;
+    align-items: start;
     min-width: 0;
 }
-.pt-form-grid .pt-active {
-    grid-area: active;
-    justify-self: start;
+.pt-form-grid .pt-row--r1 > div {
+    min-width: 0;
+}
+.pt-form-grid .pt-row--r1 .admin-sort-field-wrap {
+    max-width: none;
     width: 100%;
 }
-.pt-form-grid .pt-path { grid-area: path; min-width: 0; }
-.pt-form-grid .pt-ck { grid-area: ck; min-width: 0; width: 100%; }
-.pt-form-grid .pt-sk { grid-area: sk; min-width: 0; width: 100%; }
-.pt-form-grid .pt-ar { grid-area: ar; }
-.pt-form-grid .pt-en { grid-area: en; }
-/* تجاوز max-width لـ .admin-sort-field في admin.css (220px) حتى يملأ نصف الشبكة مثل #pt_name_ar */
-.pt-form-grid .pt-ck .admin-sort-field,
-.pt-form-grid .pt-sk .admin-sort-field {
+.pt-form-grid .pt-row--r2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 18px;
+    direction: ltr;
+    align-items: start;
+    min-width: 0;
+}
+.pt-form-grid .pt-row--r2 .pt-sk { grid-column: 1; }
+.pt-form-grid .pt-row--r2 .pt-ck { grid-column: 2; }
+.pt-form-grid .pt-row--r2 > div {
+    min-width: 0;
+}
+.pt-form-grid .pt-path { min-width: 0; width: 100%; }
+.pt-form-grid .pt-slug {
+    min-width: 0;
+    width: 100%;
+}
+.pt-form-grid .pt-slug #pt_slug {
+    width: 100%;
     max-width: none;
+    box-sizing: border-box;
+}
+.pt-form-grid .pt-row--names1,
+.pt-form-grid .pt-row--names2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 18px;
+    direction: ltr;
+    align-items: start;
+    min-width: 0;
+}
+.pt-form-grid .pt-row--names1 .pt-en { grid-column: 1; }
+.pt-form-grid .pt-row--names1 .pt-ar { grid-column: 2; }
+.pt-form-grid .pt-row--names2 .pt-hi { grid-column: 1; }
+.pt-form-grid .pt-row--names2 .pt-fil { grid-column: 2; }
+.pt-form-grid .pt-row--names1 > div,
+.pt-form-grid .pt-row--names2 > div {
+    min-width: 0;
 }
 .pt-form-grid .pt-ar,
 .pt-form-grid .pt-en {
     min-width: 0;
 }
+/* تجاوز max-width لـ .admin-sort-field في admin.css (220px) حتى يملأ نصف الشبكة مثل #pt_name_ar */
+.pt-form-grid .pt-ck .admin-sort-field,
+.pt-form-grid .pt-sk .admin-sort-field {
+    max-width: none;
+}
 .pt-form-grid .pt-ar input,
-.pt-form-grid .pt-en input {
+.pt-form-grid .pt-en input,
+.pt-form-grid .pt-fil input,
+.pt-form-grid .pt-hi input {
     width: 100%;
     box-sizing: border-box;
 }
-.pt-form-grid .pt-fil { grid-area: fil; }
-.pt-form-grid .pt-hi { grid-area: hi; }
 .pt-form-grid label,
 .pt-form-grid input,
 .pt-form-grid select {
@@ -505,24 +544,24 @@ if ($subOptionsJson === false) {
 }
 .pt-form-actions { justify-content: flex-end; }
 @media (max-width: 860px) {
-    .pt-form-grid {
+    .pt-form-grid .pt-row--r1,
+    .pt-form-grid .pt-row--r2,
+    .pt-form-grid .pt-row--names1,
+    .pt-form-grid .pt-row--names2 {
         grid-template-columns: 1fr;
-        grid-template-areas:
-            "sort"
-            "slug"
-            "active"
-            "path"
-            "ck"
-            "sk"
-            "ar"
-            "en"
-            "fil"
-            "hi";
     }
-    .pt-form-grid .pt-sort,
-    .pt-form-grid .pt-active {
-        justify-self: start;
-        max-width: var(--admin-sort-field-max-w, 220px);
+    .pt-form-grid .pt-row--r2 .pt-sk,
+    .pt-form-grid .pt-row--r2 .pt-ck,
+    .pt-form-grid .pt-row--names1 .pt-en,
+    .pt-form-grid .pt-row--names1 .pt-ar,
+    .pt-form-grid .pt-row--names2 .pt-hi,
+    .pt-form-grid .pt-row--names2 .pt-fil {
+        grid-column: auto;
+    }
+    .pt-form-grid .pt-row--r1 .pt-sort,
+    .pt-form-grid .pt-row--r1 .pt-active {
+        justify-self: stretch;
+        max-width: none;
     }
 }
 </style>
