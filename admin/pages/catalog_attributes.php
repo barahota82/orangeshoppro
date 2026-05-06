@@ -43,7 +43,7 @@ if ($hasTable) {
 <div class="card">
     <h3>إضافة / تعديل سمة</h3>
     <input type="hidden" id="ca_attr_id" value="0">
-    <div class="form-grid ca-attr-form-grid">
+    <div class="ca-attr-form-grid">
         <div class="ca-row ca-row--r1">
             <div class="ca-sort-wrap admin-sort-field-wrap">
                 <label>ترتيب العرض</label>
@@ -167,8 +167,10 @@ if ($hasTable) {
 
 <style>
     /* تنسيق مطابق لفكرة بطاقة «إضافة / تعديل عائلة» في size_families.php: صفوف شبكة + direction:rtl ليظهر الحقل المذكور أولاً على اليمين */
+    /* لا تضف form-grid هنا: admin.css يفرض عمودين فيضع صفّين (r1|r2) و(r3|r4) جنباً بدل أربعة أسطر */
     .ca-attr-form-grid {
         display: grid;
+        grid-template-columns: minmax(0, 1fr);
         gap: 14px 18px;
         direction: ltr;
         align-items: start;
