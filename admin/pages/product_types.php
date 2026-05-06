@@ -301,7 +301,7 @@ if ($subOptionsJson === false) {
         </div>
         <div class="pt-en">
             <label for="pt_name_en">English</label>
-            <input type="text" id="pt_name_en" dir="ltr" lang="en" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
+            <input type="text" id="pt_name_en" lang="en" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
         </div>
         <div class="pt-fil">
             <label for="pt_name_fil">Filipino</label>
@@ -437,8 +437,7 @@ if ($subOptionsJson === false) {
 }
 .pt-form-grid #pt_slug,
 .pt-form-grid #pt_expected_commercial_kind_key,
-.pt-form-grid #pt_expected_sizing_category_key,
-.pt-form-grid #pt_name_en {
+.pt-form-grid #pt_expected_sizing_category_key {
     text-align: left;
     direction: ltr;
 }
