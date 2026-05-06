@@ -152,7 +152,12 @@ try {
             $id,
         ]);
         audit_log('product_type_save', 'تحديث نوع منتج (شجرة موحّدة): ' . $slugRaw, 'product_types', $id);
-        json_response(['success' => true, 'id' => $id]);
+        json_response([
+            'success' => true,
+            'id' => $id,
+            'catalog_subcategory_id' => $subId,
+            'sort_order' => $sortOrder,
+        ]);
     }
 
     $pdo->prepare(
@@ -175,7 +180,12 @@ try {
     ]);
     $newId = (int) $pdo->lastInsertId();
     audit_log('product_type_save', 'إضافة نوع منتج (شجرة موحّدة): ' . $slugRaw, 'product_types', $newId);
-    json_response(['success' => true, 'id' => $newId]);
+    json_response([
+        'success' => true,
+        'id' => $newId,
+        'catalog_subcategory_id' => $subId,
+        'sort_order' => $sortOrder,
+    ]);
 } catch (Throwable $e) {
     orange_admin_api_catch($e, 'تعذر حفظ نوع المنتج في الشجرة الموحّدة');
 }

@@ -111,6 +111,25 @@ if ($hasTree) {
              ORDER BY d.sort_order ASC, d.id ASC, cs.sort_order ASC, cs.id ASC,
                       cc.sort_order ASC, cc.id ASC, csub.sort_order ASC, csub.id ASC'
         );
+        $nextSortBySubId = [];
+        try {
+            $nxStmt = $pdo->query(
+                'SELECT catalog_subcategory_id, COALESCE(MAX(sort_order), 0) + 1 AS nxt
+                 FROM product_types
+                 GROUP BY catalog_subcategory_id'
+            );
+            foreach (($nxStmt ? $nxStmt->fetchAll(PDO::FETCH_ASSOC) : []) ?: [] as $nx) {
+                if (! is_array($nx)) {
+                    continue;
+                }
+                $nid = (int) ($nx['catalog_subcategory_id'] ?? 0);
+                if ($nid > 0) {
+                    $nextSortBySubId[$nid] = (int) ($nx['nxt'] ?? 1);
+                }
+            }
+        } catch (Throwable $e) {
+            $nextSortBySubId = [];
+        }
         foreach ($subOptsStmt ? ($subOptsStmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [] as $r) {
             if (! is_array($r)) {
                 continue;
@@ -123,6 +142,7 @@ if ($hasTree) {
                 'id' => $sid,
                 'label' => $branchLabel($r),
                 'sec_slug' => trim((string) ($r['sec_slug'] ?? '')),
+                'next_sort_order' => $nextSortBySubId[$sid] ?? 1,
             ];
         }
     } catch (Throwable $e) {
@@ -198,7 +218,7 @@ if ($subOptionsJson === false) {
     <div class="form-grid pt-form-grid">
         <div class="pt-sort admin-sort-field-wrap">
             <label for="pt_sort">ترتيب ضمن الفرع</label>
-            <input type="number" id="pt_sort" class="admin-sort-field<?php echo $subOptions === [] ? ' admin-sort-field--muted' : ''; ?>" min="1" step="1" value="" placeholder="تلقائي"
+            <input type="number" id="pt_sort" class="admin-sort-field<?php echo $subOptions === [] ? ' admin-sort-field--muted' : ''; ?>" min="1" step="1" value=""
                 <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
         </div>
         <div class="pt-slug">
@@ -508,6 +528,42 @@ if ($subOptionsJson === false) {
 
 <script>
 const ptSubOptions = <?php echo $subOptionsJson; ?>;
+/** ترتيب ضمن الفرع التالي (MAX+1) من بيانات الصفحة — لعرض رقمي بدل «تلقائي». */
+function ptNextSortForSubcategoryId(sid) {
+    var id = parseInt(String(sid || ''), 10) || 0;
+    if (!id || !Array.isArray(ptSubOptions)) {
+        return 1;
+    }
+    for (var i = 0; i < ptSubOptions.length; i++) {
+        var o = ptSubOptions[i];
+        if (!o || parseInt(String(o.id), 10) !== id) {
+            continue;
+        }
+        var n = parseInt(String(o.next_sort_order != null ? o.next_sort_order : 1), 10);
+        return n > 0 ? n : 1;
+    }
+    return 1;
+}
+
+function ptApplyDefaultSortForNewRecord() {
+    var sortEl = document.getElementById('pt_sort');
+    var idField = document.getElementById('pt_id');
+    var subEl = document.getElementById('pt_catalog_subcategory_id');
+    if (!sortEl || sortEl.disabled || !idField) {
+        return;
+    }
+    var recId = parseInt(String(idField.value || '0'), 10) || 0;
+    if (recId > 0) {
+        return;
+    }
+    var subId = subEl ? (parseInt(String(subEl.value || ''), 10) || 0) : 0;
+    if (subId <= 0) {
+        sortEl.value = '';
+        return;
+    }
+    sortEl.value = String(ptNextSortForSubcategoryId(subId));
+}
+
 var PT_SD_API = '/admin/api/sizing_dictionary/manage.php';
 var PT_SIZING_DICT_SELECTS = <?php echo $sizingDictForPtForm ? 'true' : 'false'; ?>;
 window.PT_BOOTSTRAP_COMMERCIAL_KINDS = <?php echo $ptCommercialKindsJson; ?>;
@@ -728,7 +784,6 @@ function resetPtForm() {
     var skEl = document.getElementById('pt_expected_sizing_category_key');
     if (ckEl) ckEl.value = '';
     if (skEl) skEl.value = '';
-    document.getElementById('pt_sort').value = '';
     document.getElementById('pt_name_ar').value = '';
     document.getElementById('pt_name_en').value = '';
     document.getElementById('pt_name_fil').value = '';
@@ -739,6 +794,7 @@ function resetPtForm() {
             return ptLoadSizingCategoriesIntoSelect('');
         });
     }
+    ptApplyDefaultSortForNewRecord();
 }
 
 function editProductType(p) {
@@ -756,7 +812,9 @@ function editProductType(p) {
         if (ckEl2) ckEl2.value = pCk;
         if (skEl2) skEl2.value = pSk;
     }
-    document.getElementById('pt_sort').value = p.sort_order != null && p.sort_order > 0 ? String(p.sort_order) : '';
+    var so = parseInt(String(p.sort_order != null ? p.sort_order : 0), 10) || 0;
+    var subIdForSort = parseInt(String(p.catalog_subcategory_id != null ? p.catalog_subcategory_id : 0), 10) || 0;
+    document.getElementById('pt_sort').value = so > 0 ? String(so) : (subIdForSort > 0 ? String(ptNextSortForSubcategoryId(subIdForSort)) : '');
     document.getElementById('pt_name_ar').value = p.name_ar || '';
     document.getElementById('pt_name_en').value = p.name_en || '';
     document.getElementById('pt_name_fil').value = p.name_fil || '';
@@ -870,7 +928,14 @@ async function saveProductType() {
         if (recordId > 0) payload.id = recordId;
         const res = await postJSON('/admin/api/product_types/save.php', payload);
         alert(res.message || (res.success ? 'تم الحفظ' : 'فشل'));
-        if (res.success) location.reload();
+        if (res.success) {
+            try {
+                if (subId > 0) {
+                    sessionStorage.setItem('orange_pt_prefill_sub', String(subId));
+                }
+            } catch (ePref) { /* ignore */ }
+            location.reload();
+        }
     } catch (e) {
         alert('فشل الاتصال بالخادم أثناء الحفظ');
     } finally {
@@ -897,8 +962,24 @@ async function saveProductType() {
     }
     var subSel = document.getElementById('pt_catalog_subcategory_id');
     if (subSel) {
-        subSel.addEventListener('change', refreshPtSlugFromEnglish);
+        subSel.addEventListener('change', function () {
+            refreshPtSlugFromEnglish();
+            ptApplyDefaultSortForNewRecord();
+        });
     }
+    try {
+        var preSub = sessionStorage.getItem('orange_pt_prefill_sub');
+        if (preSub && subSel) {
+            subSel.value = preSub;
+            sessionStorage.removeItem('orange_pt_prefill_sub');
+            refreshPtSlugFromEnglish();
+            ptApplyDefaultSortForNewRecord();
+            var preNum = parseInt(String(preSub), 10) || 0;
+            if (preNum > 0) {
+                warnIfSubNotInDropdown(preNum);
+            }
+        }
+    } catch (eSs) { /* ignore */ }
     ptInitSizingHierarchySelects();
     var tbody = document.getElementById('orange-pt-list-tbody');
     if (tbody) {
