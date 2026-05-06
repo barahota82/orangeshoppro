@@ -1724,6 +1724,12 @@ label {
     gap: 8px;
     flex-wrap: wrap;
 }
+/* محاذاة صف الأزرار لليسار (إحداثيات الشاشة) — يُضاف مع .actions حيث يطلب المالك */
+.actions.admin-actions--start {
+    justify-content: flex-start;
+    flex-direction: row;
+    direction: ltr;
+}
 button:disabled {
     opacity: 0.45;
     cursor: not-allowed;

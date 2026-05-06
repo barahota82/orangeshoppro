@@ -54,7 +54,7 @@ $ucCatEmpty = !empty($orange_uc['categories_empty_for_subcats']);
             <input type="text" id="uc_sub_name_hi" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>>
         </div>
     </div>
-    <div class="actions" style="margin-top:12px;gap:8px;flex-wrap:wrap;">
+    <div class="actions admin-actions--start" style="margin-top:12px;gap:8px;flex-wrap:wrap;">
         <button type="button" onclick="saveUcSubcategory()" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>>حفظ التصنيف الفرعي</button>
         <button type="button" class="btn-secondary" onclick="translateUc('sub')" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>>ترجمة</button>
         <button type="button" class="btn-secondary" onclick="resetUcSubcategory()" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>>جديد</button>

@@ -210,7 +210,7 @@ if ($tablesReady) {
             <tbody id="sst_sizes_tbody"></tbody>
         </table>
     </div>
-    <div class="actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;">
+    <div class="actions admin-actions--start" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;">
         <button type="button" onclick="sstAddSizeRow()">+ صف مقاس</button>
         <button type="button" class="btn-secondary" onclick="sstSyncAllDerivedFromEnglish()">مزامنة الحقول المشتقة من English</button>
         <button type="button" onclick="sstSave()">حفظ القالب</button>
@@ -221,7 +221,7 @@ if ($tablesReady) {
 <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
         <h3 style="margin:0;">قائمة القوالب</h3>
-        <div class="actions">
+        <div class="actions admin-actions--start">
             <button type="button" class="btn-secondary" onclick="sstSaveTemplatesListOrder()">حفظ الترتيب</button>
         </div>
     </div>

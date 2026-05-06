@@ -101,7 +101,7 @@ if ($hasTable) {
             </div>
         </div>
     </div>
-    <div class="actions ca-attr-form-actions" style="margin-top:14px;gap:8px;flex-wrap:wrap;">
+    <div class="actions ca-attr-form-actions admin-actions--start" style="margin-top:14px;gap:8px;flex-wrap:wrap;">
         <button type="button" onclick="saveCatalogAttribute()" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ السمة</button>
         <button type="button" class="btn-secondary" onclick="translateCatalogLabels({ forceFromArabic: true })" <?php echo !$hasTable ? 'disabled' : ''; ?>>ترجمة تلقائية</button>
         <button type="button" class="btn-secondary" onclick="resetCatalogAttrForm()" <?php echo !$hasTable ? 'disabled' : ''; ?>>جديد</button>
@@ -259,8 +259,6 @@ if ($hasTable) {
         flex-wrap: wrap;
         gap: 8px;
         align-items: center;
-        justify-content: flex-end;
-        flex-direction: row-reverse;
     }
     .ca-attr-form-actions > button {
         min-height: var(--input-min-h, 40px);

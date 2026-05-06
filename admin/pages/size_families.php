@@ -239,8 +239,9 @@ $tablesReady = $hasFamilies && $hasSizes;
         flex-wrap: wrap;
         gap: 8px;
         align-items: center;
-        justify-content: flex-end;
-        flex-direction: row-reverse;
+        justify-content: flex-start;
+        flex-direction: row;
+        direction: ltr;
     }
     .sf-fam-form-actions > button,
     .sf-fam-form-actions > a.btn-secondary {
@@ -1252,7 +1253,7 @@ async function saveSizesForFamily() {
 (function () {
     var style = document.createElement('style');
     style.textContent = `
-        .sf-sizes-actions{justify-content:flex-end}
+        .sf-sizes-actions{justify-content:flex-start;flex-direction:row;direction:ltr}
         #sizesEditor input.s-la[readonly],
         #sizesEditor input.s-lf[readonly],
         #sizesEditor input.s-lh[readonly]{

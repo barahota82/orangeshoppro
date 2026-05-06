@@ -59,7 +59,7 @@ $ucDepsEmpty = !empty($orange_uc['deps_empty_for_sections']);
             <input type="text" id="uc_sec_name_hi" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>
         </div>
     </div>
-    <div class="actions" style="margin-top:12px;gap:8px;flex-wrap:wrap;">
+    <div class="actions admin-actions--start" style="margin-top:12px;gap:8px;flex-wrap:wrap;">
         <button type="button" onclick="saveUcSection()" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>حفظ القسم الداخلي</button>
         <button type="button" class="btn-secondary" onclick="translateUc('sec')" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>ترجمة</button>
         <button type="button" class="btn-secondary" onclick="resetUcSection()" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>جديد</button>
