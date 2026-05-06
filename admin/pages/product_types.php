@@ -201,8 +201,8 @@ if ($subOptionsJson === false) {
         </div>
         <div class="pt-slug">
             <label for="pt_slug">slug</label>
-            <input type="text" id="pt_slug" dir="ltr" lang="en" maxlength="191" placeholder="women-tshirt" autocomplete="off" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;">إنجليزي صغير، أول محرف حرف أو رقم؛ ثم <code>_</code> أو <code>-</code>.</small>
+            <input type="text" id="pt_slug" class="pt-slug-auto" dir="ltr" lang="en" maxlength="191" autocomplete="off" title="يُولَّد تلقائياً من الاسم الإنجليزي"
+                <?php echo $subOptions === [] ? 'disabled' : 'readonly'; ?>>
         </div>
         <div class="pt-active admin-sort-field-wrap">
             <label for="pt_active">نشط</label>
@@ -225,7 +225,7 @@ if ($subOptionsJson === false) {
         </div>
         <div class="pt-ck">
             <?php if ($sizingDictForPtForm): ?>
-            <label for="pt_expected_commercial_kind_key">النوع التجاري المتوقع (مستوى 1)</label>
+            <label for="pt_expected_commercial_kind_key">النوع التجاري (مستوى 1)</label>
             <select id="pt_expected_commercial_kind_key" class="admin-sort-field" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
                 <option value="">— بدون نطاق هرَم —</option>
                 <?php foreach ($ptCommercialKindRows as $krow): ?>
@@ -259,11 +259,10 @@ if ($subOptionsJson === false) {
             <input type="text" id="pt_expected_commercial_kind_key" class="admin-sort-field" maxlength="32" placeholder="clothing" dir="ltr" lang="en"
                 <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
             <?php endif; ?>
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;">معاً مع «فئة القياس» يحدّدان أي عائلات مقاسات تظهر عند اختيار هذا النوع في <strong>المنتجات</strong> (أي مخطط مقاس مستوى 3 ضمن نفس الفئة).</small>
         </div>
         <div class="pt-sk">
             <?php if ($sizingDictForPtForm): ?>
-            <label for="pt_expected_sizing_category_key">فئة القياس المتوقعة (مستوى 2)</label>
+            <label for="pt_expected_sizing_category_key">فئة القياس (مستوى 2)</label>
             <select id="pt_expected_sizing_category_key" class="admin-sort-field" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
                 <option value="">— اختر النوع التجاري أولاً —</option>
             </select>
@@ -275,7 +274,7 @@ if ($subOptionsJson === false) {
             <?php endif; ?>
         </div>
         <div class="pt-ar">
-            <label for="pt_name_ar">اسم العربي</label>
+            <label for="pt_name_ar">الاسم العربي</label>
             <input type="text" id="pt_name_ar" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
         </div>
         <div class="pt-en">
@@ -421,6 +420,11 @@ if ($subOptionsJson === false) {
     text-align: left;
     direction: ltr;
 }
+.pt-form-grid #pt_slug.pt-slug-auto[readonly] {
+    background: #f4f6f9;
+    cursor: default;
+    color: var(--text, #334155);
+}
 .pt-form-grid #pt_sort,
 .pt-form-grid #pt_active,
 .pt-form-grid select#pt_expected_commercial_kind_key,
@@ -509,6 +513,28 @@ window.PT_BOOTSTRAP_SIZING_CATS_BY_KIND = <?php echo $ptSizingCatsByKindJson; ?>
 let ptTranslateTimer = null;
 let ptEnTranslateTimer = null;
 let isSavingPt = false;
+
+/** يطابق تقريباً التحقق في admin/api/product_types/save.php (حروف صغيرة وأرقام و _ و -). */
+function ptSlugify(str) {
+    var s = String(str || '').toLowerCase().trim()
+        .replace(/[^a-z0-9\s_-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^[-_]+|[-_]+$/g, '');
+    if (s.length > 191) {
+        s = s.slice(0, 191).replace(/[-_]+$/g, '');
+    }
+    return s;
+}
+
+function refreshPtSlugFromEnglish() {
+    var slugEl = document.getElementById('pt_slug');
+    var enEl = document.getElementById('pt_name_en');
+    if (!slugEl || slugEl.disabled || !enEl) {
+        return;
+    }
+    slugEl.value = ptSlugify(enEl.value.trim());
+}
 
 function ptEnsureSelectOption(sel, value, label, dataLabels) {
     if (!sel || !value) return;
@@ -693,7 +719,10 @@ function resetPtForm() {
 function editProductType(p) {
     document.getElementById('pt_id').value = String(p.id != null ? p.id : 0);
     document.getElementById('pt_catalog_subcategory_id').value = String(p.catalog_subcategory_id != null ? p.catalog_subcategory_id : '');
-    document.getElementById('pt_slug').value = p.slug || '';
+    var sl = document.getElementById('pt_slug');
+    if (sl && !sl.disabled) {
+        sl.value = (p.slug && String(p.slug).trim()) || ptSlugify(String(p.name_en || '').trim());
+    }
     var pCk = p.expected_commercial_kind_key || '';
     var pSk = p.expected_sizing_category_key || '';
     if (PT_SIZING_DICT_SELECTS) {
@@ -749,6 +778,7 @@ async function translatePtNames(opts) {
         if (t.name_en) document.getElementById('pt_name_en').value = t.name_en;
         if (t.name_fil) document.getElementById('pt_name_fil').value = t.name_fil;
         if (t.name_hi) document.getElementById('pt_name_hi').value = t.name_hi;
+        refreshPtSlugFromEnglish();
     } catch (e) {
         if (!silent) alert('فشل طلب الترجمة من السيرفر');
     }
@@ -760,6 +790,7 @@ function schedulePtAutoTranslate() {
         document.getElementById('pt_name_en').value = '';
         document.getElementById('pt_name_fil').value = '';
         document.getElementById('pt_name_hi').value = '';
+        refreshPtSlugFromEnglish();
         return;
     }
     if (ptTranslateTimer) clearTimeout(ptTranslateTimer);
@@ -785,11 +816,17 @@ async function saveProductType() {
         const subId = parseInt(document.getElementById('pt_catalog_subcategory_id').value || '0', 10) || 0;
         const sortRaw = document.getElementById('pt_sort').value.trim();
         const sortParsed = sortRaw === '' ? 0 : (parseInt(sortRaw, 10) || 0);
+        const nameEnTrim = document.getElementById('pt_name_en').value.trim();
+        const slugSync = ptSlugify(nameEnTrim);
+        var slugEl = document.getElementById('pt_slug');
+        if (slugEl && !slugEl.disabled) {
+            slugEl.value = slugSync;
+        }
         const payload = {
             catalog_subcategory_id: subId,
-            slug: document.getElementById('pt_slug').value.trim(),
+            slug: slugSync,
             name_ar: document.getElementById('pt_name_ar').value.trim(),
-            name_en: document.getElementById('pt_name_en').value.trim(),
+            name_en: nameEnTrim,
             name_fil: document.getElementById('pt_name_fil').value.trim(),
             name_hi: document.getElementById('pt_name_hi').value.trim(),
             expected_commercial_kind_key: (function () {
@@ -826,7 +863,10 @@ async function saveProductType() {
         });
     }
     if (enEl) {
-        enEl.addEventListener('input', schedulePtTranslateFromEnglish);
+        enEl.addEventListener('input', function () {
+            refreshPtSlugFromEnglish();
+            schedulePtTranslateFromEnglish();
+        });
     }
     ptInitSizingHierarchySelects();
     var tbody = document.getElementById('orange-pt-list-tbody');
