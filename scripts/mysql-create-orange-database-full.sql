@@ -151,11 +151,14 @@ CREATE TABLE `product_types` (
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `expected_size_scheme_key` varchar(64) NOT NULL DEFAULT '',
+  `expected_commercial_kind_key` varchar(32) NOT NULL DEFAULT '',
+  `expected_sizing_category_key` varchar(64) NOT NULL DEFAULT '',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_product_types_sub_slug` (`catalog_subcategory_id`,`slug`),
   KEY `idx_product_types_sort` (`catalog_subcategory_id`,`sort_order`),
   KEY `idx_product_types_active` (`catalog_subcategory_id`,`is_active`),
   KEY `idx_product_types_expected_scheme` (`expected_size_scheme_key`),
+  KEY `idx_product_types_expected_sizing` (`expected_commercial_kind_key`,`expected_sizing_category_key`),
   CONSTRAINT `fk_product_types_catalog_subcategory` FOREIGN KEY (`catalog_subcategory_id`) REFERENCES `catalog_subcategories` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

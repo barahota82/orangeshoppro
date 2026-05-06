@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
+require_once __DIR__ . '/../../includes/catalog_sizing_dictionary.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+
+$sizingDictForPtForm = orange_table_exists($pdo, 'commercial_kind_dictionary')
+    && orange_table_exists($pdo, 'sizing_category_dictionary');
 
 $unifiedActive = orange_catalog_nav_use_unified($pdo);
 
@@ -84,6 +88,7 @@ if ($hasTree) {
         $typesList = $pdo->query(
             'SELECT pt.id, pt.slug, pt.name_ar, pt.name_en, pt.name_fil, pt.name_hi,
                     pt.catalog_subcategory_id, pt.expected_size_scheme_key,
+                    pt.expected_commercial_kind_key, pt.expected_sizing_category_key,
                     pt.sort_order, pt.is_active,
                     csub.slug AS sub_slug, csub.name_ar AS sub_ar, csub.name_en AS sub_en,
                     cc.name_ar AS cat_ar, cc.name_en AS cat_en,
@@ -179,7 +184,32 @@ if ($subOptionsJson === false) {
             <label for="pt_expected_size_scheme_key">expected_size_scheme_key</label>
             <input type="text" id="pt_expected_size_scheme_key" dir="ltr" lang="en" maxlength="64" placeholder="clothing_alpha أو فارغ"
                 <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;">إن ملأته وفعلت المقاسات على منتج؛ يُلزِم أي عائلة مقاس مستخدمة بتطابق <code>size_scheme_key</code> وكلّ المستويين الفوقيّين على العائلة.</small>
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;">إن ملأته وفعلت المقاسات على منتج؛ يُلزم تطابق <code>size_scheme_key</code> للعائلة (ويُتجاهَل حينها حقل «نطاق فئة القياس» أدناه). إن تركته فارغاً وملأت النوع التجاري + فئة القياس؛ يُقبل أي مخطط مقاس (مستوى 3) طالما العائلة تحمل نفس الهرم 1–2.</small>
+        </div>
+        <div class="pt-ck">
+            <?php if ($sizingDictForPtForm): ?>
+            <label for="pt_expected_commercial_kind_key">النوع التجاري المتوقع (مستوى 1)</label>
+            <select id="pt_expected_commercial_kind_key" class="admin-sort-field" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
+                <option value="">— بدون نطاق هرَم —</option>
+            </select>
+            <?php else: ?>
+            <label for="pt_expected_commercial_kind_key"><code>expected_commercial_kind_key</code></label>
+            <input type="text" id="pt_expected_commercial_kind_key" class="admin-sort-field" maxlength="32" placeholder="clothing" dir="ltr" lang="en"
+                <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
+            <?php endif; ?>
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;">يُستخدم عند ترك <code>expected_size_scheme_key</code> فارغاً لتوسيع المسموح إلى كل عائلات «فئة القياس» تحت هذا النوع التجاري.</small>
+        </div>
+        <div class="pt-sk">
+            <?php if ($sizingDictForPtForm): ?>
+            <label for="pt_expected_sizing_category_key">فئة القياس المتوقعة (مستوى 2)</label>
+            <select id="pt_expected_sizing_category_key" class="admin-sort-field" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
+                <option value="">— اختر النوع التجاري أولاً —</option>
+            </select>
+            <?php else: ?>
+            <label for="pt_expected_sizing_category_key"><code>expected_sizing_category_key</code></label>
+            <input type="text" id="pt_expected_sizing_category_key" class="admin-sort-field" maxlength="64" placeholder="tops" dir="ltr" lang="en"
+                <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
+            <?php endif; ?>
         </div>
         <div class="pt-ar">
             <label for="pt_name_ar">اسم العربي</label>
@@ -219,7 +249,7 @@ if ($subOptionsJson === false) {
                     <th style="padding:10px;text-align:right;border-bottom:1px solid #e8e9ec;">slug</th>
                     <th style="padding:10px;text-align:right;border-bottom:1px solid #e8e9ec;">عربي</th>
                     <th style="padding:10px;text-align:right;border-bottom:1px solid #e8e9ec;">EN</th>
-                    <th style="padding:10px;text-align:right;border-bottom:1px solid #e8e9ec;">مخطّط مقاس متوقَّع</th>
+                    <th style="padding:10px;text-align:right;border-bottom:1px solid #e8e9ec;">مخطّط / نطاق هرَم</th>
                     <th style="padding:10px;text-align:center;border-bottom:1px solid #e8e9ec;">ترتيب</th>
                     <th style="padding:10px;text-align:center;border-bottom:1px solid #e8e9ec;">نشط</th>
                     <th style="padding:10px;text-align:center;border-bottom:1px solid #e8e9ec;">إجراء</th>
@@ -234,7 +264,18 @@ if ($subOptionsJson === false) {
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;" dir="ltr" lang="en"><?php echo htmlspecialchars((string) ($row['slug'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;"><?php echo htmlspecialchars((string) ($row['name_ar'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;" dir="ltr" lang="en"><?php echo htmlspecialchars((string) ($row['name_en'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td style="padding:10px;border-bottom:1px solid #f0f1f5;" dir="ltr" lang="en"><?php echo htmlspecialchars(trim((string) ($row['expected_size_scheme_key'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td style="padding:10px;border-bottom:1px solid #f0f1f5;" dir="ltr" lang="en"><?php
+                            $esch = trim((string) ($row['expected_size_scheme_key'] ?? ''));
+                            $eck = trim((string) ($row['expected_commercial_kind_key'] ?? ''));
+                            $esk = trim((string) ($row['expected_sizing_category_key'] ?? ''));
+                            if ($esch !== '') {
+                                echo htmlspecialchars($esch, ENT_QUOTES, 'UTF-8');
+                            } elseif ($eck !== '' || $esk !== '') {
+                                echo htmlspecialchars($eck . ' / ' . $esk, ENT_QUOTES, 'UTF-8');
+                            } else {
+                                echo '—';
+                            }
+                            ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;text-align:center;"><?php echo (int) ($row['sort_order'] ?? 0); ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;text-align:center;"><?php echo ((int) ($row['is_active'] ?? 0) === 1) ? '√' : '—'; ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;text-align:center;">
@@ -247,6 +288,8 @@ if ($subOptionsJson === false) {
                                 'name_fil' => (string) ($row['name_fil'] ?? ''),
                                 'name_hi' => (string) ($row['name_hi'] ?? ''),
                                 'expected_size_scheme_key' => (string) ($row['expected_size_scheme_key'] ?? ''),
+                                'expected_commercial_kind_key' => (string) ($row['expected_commercial_kind_key'] ?? ''),
+                                'expected_sizing_category_key' => (string) ($row['expected_sizing_category_key'] ?? ''),
                                 'sort_order' => (int) ($row['sort_order'] ?? 0),
                                 'is_active' => (int) ($row['is_active'] ?? 1),
                             ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button>
@@ -267,6 +310,7 @@ if ($subOptionsJson === false) {
     grid-template-areas:
         "active active active slug slug slug slug slug slug sort sort sort"
         "path path path path path path exp exp exp exp exp exp"
+        "ck ck ck ck ck ck sk sk sk sk sk sk"
         "en en en en en en ar ar ar ar ar ar"
         "hi hi hi hi hi hi fil fil fil fil fil fil";
     gap: 14px 18px;
@@ -288,6 +332,8 @@ if ($subOptionsJson === false) {
 }
 .pt-form-grid .pt-path { grid-area: path; min-width: 0; }
 .pt-form-grid .pt-exp { grid-area: exp; min-width: 0; }
+.pt-form-grid .pt-ck { grid-area: ck; min-width: 0; }
+.pt-form-grid .pt-sk { grid-area: sk; min-width: 0; }
 .pt-form-grid .pt-ar { grid-area: ar; }
 .pt-form-grid .pt-en { grid-area: en; }
 .pt-form-grid .pt-fil { grid-area: fil; }
@@ -300,12 +346,16 @@ if ($subOptionsJson === false) {
 }
 .pt-form-grid #pt_slug,
 .pt-form-grid #pt_expected_size_scheme_key,
+.pt-form-grid #pt_expected_commercial_kind_key,
+.pt-form-grid #pt_expected_sizing_category_key,
 .pt-form-grid #pt_name_en {
     text-align: left;
     direction: ltr;
 }
 .pt-form-grid #pt_sort,
-.pt-form-grid #pt_active {
+.pt-form-grid #pt_active,
+.pt-form-grid select#pt_expected_commercial_kind_key,
+.pt-form-grid select#pt_expected_sizing_category_key {
     margin-inline: 0;
     display: block;
     width: 100%;
@@ -329,7 +379,9 @@ if ($subOptionsJson === false) {
     -moz-appearance: textfield;
     appearance: textfield;
 }
-.pt-form-grid #pt_active {
+.pt-form-grid #pt_active,
+.pt-form-grid select#pt_expected_commercial_kind_key,
+.pt-form-grid select#pt_expected_sizing_category_key {
     -webkit-appearance: none;
     appearance: none;
     background-color: #fff;
@@ -338,6 +390,22 @@ if ($subOptionsJson === false) {
     background-size: 12px;
     background-position: left 12px center;
     padding-inline-end: 32px;
+}
+.pt-form-grid input#pt_expected_commercial_kind_key,
+.pt-form-grid input#pt_expected_sizing_category_key {
+    margin-inline: 0;
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #cbd5e1;
+    border-radius: var(--radius-sm, 10px);
+    font-size: 14px;
+    line-height: calc(var(--input-min-h, 36px) - 2px);
+    min-height: var(--input-min-h, 36px);
+    height: var(--input-min-h, 36px);
+    max-height: var(--input-min-h, 36px);
+    padding-block: 0;
+    padding-inline: 12px;
 }
 .pt-form-actions { justify-content: flex-end; }
 @media (max-width: 860px) {
@@ -349,6 +417,8 @@ if ($subOptionsJson === false) {
             "active"
             "path"
             "exp"
+            "ck"
+            "sk"
             "ar"
             "en"
             "fil"
@@ -364,21 +434,130 @@ if ($subOptionsJson === false) {
 
 <script>
 const ptSubOptions = <?php echo $subOptionsJson; ?>;
+var PT_SD_API = '/admin/api/sizing_dictionary/manage.php';
+var PT_SIZING_DICT_SELECTS = <?php echo $sizingDictForPtForm ? 'true' : 'false'; ?>;
 let ptTranslateTimer = null;
 let ptEnTranslateTimer = null;
 let isSavingPt = false;
+
+function ptEnsureSelectOption(sel, value, label, dataLabels) {
+    if (!sel || !value) return;
+    var v = String(value);
+    if ([].some.call(sel.options, function (o) { return o.value === v; })) return;
+    var o = document.createElement('option');
+    o.value = v;
+    o.textContent = label || v;
+    dataLabels = dataLabels || {};
+    if (dataLabels.labelAr != null) {
+        o.setAttribute('data-label-ar', String(dataLabels.labelAr));
+    }
+    if (dataLabels.labelEn != null) {
+        o.setAttribute('data-label-en', String(dataLabels.labelEn));
+    }
+    sel.appendChild(o);
+}
+
+async function ptLoadKindsIntoSelect(preferredKind) {
+    var sel = document.getElementById('pt_expected_commercial_kind_key');
+    if (!sel || sel.tagName !== 'SELECT' || typeof postJSON !== 'function') {
+        return;
+    }
+    var prev = preferredKind !== undefined && preferredKind !== null ? String(preferredKind) : String(sel.value || '');
+    try {
+        var res = await postJSON(PT_SD_API, { action: 'list_kinds' });
+        if (!res || !res.success) return;
+        var kinds = res.kinds || [];
+        sel.innerHTML = '';
+        var opt0 = document.createElement('option');
+        opt0.value = '';
+        opt0.textContent = '— بدون نطاق هرَم —';
+        sel.appendChild(opt0);
+        kinds.forEach(function (k) {
+            var o = document.createElement('option');
+            o.value = k.kind_key || '';
+            o.textContent = (k.label_ar || k.kind_key || '') + ' (' + (k.kind_key || '') + ')';
+            o.setAttribute('data-label-ar', String(k.label_ar != null ? k.label_ar : ''));
+            o.setAttribute('data-label-en', String(k.label_en != null ? k.label_en : ''));
+            sel.appendChild(o);
+        });
+        if (prev) {
+            ptEnsureSelectOption(sel, prev, prev + ' (غير مدرَج في القاموس)', { labelAr: prev, labelEn: prev });
+            sel.value = prev;
+        } else {
+            sel.value = '';
+        }
+    } catch (e) { /* ignore */ }
+}
+
+async function ptLoadSizingCategoriesIntoSelect(preferredCat) {
+    var kindSel = document.getElementById('pt_expected_commercial_kind_key');
+    var catSel = document.getElementById('pt_expected_sizing_category_key');
+    if (!kindSel || kindSel.tagName !== 'SELECT' || !catSel || catSel.tagName !== 'SELECT' || typeof postJSON !== 'function') {
+        return;
+    }
+    var ck = String(kindSel.value || '').trim();
+    var prev = preferredCat !== undefined && preferredCat !== null ? String(preferredCat) : String(catSel.value || '');
+    catSel.innerHTML = '';
+    var opt0 = document.createElement('option');
+    opt0.value = '';
+    opt0.textContent = ck ? '— فئة القياس —' : '— اختر النوع التجاري أولاً —';
+    catSel.appendChild(opt0);
+    if (!ck) {
+        catSel.value = '';
+        return;
+    }
+    try {
+        var res = await postJSON(PT_SD_API, { action: 'list_categories', commercial_kind_key: ck });
+        if (!res || !res.success) return;
+        (res.categories || []).forEach(function (c) {
+            var o = document.createElement('option');
+            o.value = c.category_key || '';
+            o.textContent = (c.label_ar || c.category_key || '') + ' (' + (c.category_key || '') + ')';
+            o.setAttribute('data-label-ar', String(c.label_ar != null ? c.label_ar : ''));
+            o.setAttribute('data-label-en', String(c.label_en != null ? c.label_en : ''));
+            catSel.appendChild(o);
+        });
+        if (prev) {
+            ptEnsureSelectOption(catSel, prev, prev + ' (غير مدرَج في القاموس)', { labelAr: prev, labelEn: prev });
+            catSel.value = prev;
+        } else {
+            catSel.value = '';
+        }
+    } catch (e) { /* ignore */ }
+}
+
+function ptInitSizingHierarchySelects() {
+    if (!PT_SIZING_DICT_SELECTS) return;
+    var kindSel = document.getElementById('pt_expected_commercial_kind_key');
+    if (!kindSel || kindSel.tagName !== 'SELECT') return;
+    kindSel.addEventListener('change', function () {
+        void ptLoadSizingCategoriesIntoSelect('');
+    });
+    void ptLoadKindsIntoSelect('').then(function () {
+        return ptLoadSizingCategoriesIntoSelect('');
+    });
+}
 
 function resetPtForm() {
     document.getElementById('pt_id').value = '0';
     document.getElementById('pt_catalog_subcategory_id').value = '';
     document.getElementById('pt_slug').value = '';
     document.getElementById('pt_expected_size_scheme_key').value = '';
+    var ckEl = document.getElementById('pt_expected_commercial_kind_key');
+    var skEl = document.getElementById('pt_expected_sizing_category_key');
+    if (ckEl) ckEl.value = '';
+    if (skEl) skEl.value = '';
     document.getElementById('pt_sort').value = '';
     document.getElementById('pt_name_ar').value = '';
     document.getElementById('pt_name_en').value = '';
     document.getElementById('pt_name_fil').value = '';
     document.getElementById('pt_name_hi').value = '';
     document.getElementById('pt_active').value = '1';
+    if (PT_SIZING_DICT_SELECTS) {
+        void ptLoadKindsIntoSelect('').then(function () {
+            return ptLoadSizingCategoriesIntoSelect('');
+        });
+    }
 }
 
 function editProductType(p) {
@@ -386,6 +565,18 @@ function editProductType(p) {
     document.getElementById('pt_catalog_subcategory_id').value = String(p.catalog_subcategory_id != null ? p.catalog_subcategory_id : '');
     document.getElementById('pt_slug').value = p.slug || '';
     document.getElementById('pt_expected_size_scheme_key').value = p.expected_size_scheme_key || '';
+    var pCk = p.expected_commercial_kind_key || '';
+    var pSk = p.expected_sizing_category_key || '';
+    if (PT_SIZING_DICT_SELECTS) {
+        void ptLoadKindsIntoSelect(pCk).then(function () {
+            return ptLoadSizingCategoriesIntoSelect(pSk);
+        });
+    } else {
+        var ckEl2 = document.getElementById('pt_expected_commercial_kind_key');
+        var skEl2 = document.getElementById('pt_expected_sizing_category_key');
+        if (ckEl2) ckEl2.value = pCk;
+        if (skEl2) skEl2.value = pSk;
+    }
     document.getElementById('pt_sort').value = p.sort_order != null && p.sort_order > 0 ? String(p.sort_order) : '';
     document.getElementById('pt_name_ar').value = p.name_ar || '';
     document.getElementById('pt_name_en').value = p.name_en || '';
@@ -473,6 +664,14 @@ async function saveProductType() {
             name_fil: document.getElementById('pt_name_fil').value.trim(),
             name_hi: document.getElementById('pt_name_hi').value.trim(),
             expected_size_scheme_key: document.getElementById('pt_expected_size_scheme_key').value.trim(),
+            expected_commercial_kind_key: (function () {
+                var el = document.getElementById('pt_expected_commercial_kind_key');
+                return el ? String(el.value || '').trim() : '';
+            }()),
+            expected_sizing_category_key: (function () {
+                var el = document.getElementById('pt_expected_sizing_category_key');
+                return el ? String(el.value || '').trim() : '';
+            }()),
             sort_order: sortParsed,
             is_active: parseInt(document.getElementById('pt_active').value || '1', 10) ? 1 : 0
         };
@@ -501,6 +700,7 @@ async function saveProductType() {
     if (enEl) {
         enEl.addEventListener('input', schedulePtTranslateFromEnglish);
     }
+    ptInitSizingHierarchySelects();
     var tbody = document.getElementById('orange-pt-list-tbody');
     if (tbody) {
         tbody.addEventListener('click', function (ev) {

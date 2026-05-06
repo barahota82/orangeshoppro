@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/catalog_taxonomy_migrate.php';
+require_once __DIR__ . '/catalog_sizing_dictionary.php';
 
 /**
  * يستنتج حقول تصنيف المنتج: مع تفعيل المتجر الموحّد يكون مصدر الحقيقة **`product_type_id`** فقط؛
@@ -154,8 +155,9 @@ function orange_catalog_validate_product_type_assignment_active(PDO $pdo, ?int $
 }
 
 /**
- * هرم المقاس: يطابق مخطط العائلة مع `product_types.expected_size_scheme_key`؛
- * وعند وجود متوقع يُلزم مستويات 1–2 على العائلة (commercial_kind_key، sizing_category_key).
+ * هرم المقاس على نوع المنتج:
+ * - إن وُجد `expected_size_scheme_key` غير فارغ: يُلزم تطابق `size_scheme_key` للعائلة (مستوى 3) + اكتمال 1–2 على العائلة.
+ * - وإلا إن وُجدت `expected_sizing_category_key` و`expected_commercial_kind_key`: يُقبل أي `size_scheme_key` للعائلة طالما 1–2 يطابقان النوع (نطاق فئة قياس).
  *
  * @return string|null رسالة خطأ عربية أو null إن كان التحقق غير لازم أو ناجحاً
  */
@@ -174,16 +176,25 @@ function orange_catalog_validate_size_family_matches_product_type(
     if (!function_exists('orange_table_exists') || !orange_table_exists($pdo, 'product_types')) {
         return null;
     }
-    $st = $pdo->prepare('SELECT expected_size_scheme_key FROM product_types WHERE id = ? LIMIT 1');
+    $hasExpCk = function_exists('orange_table_has_column') && orange_table_has_column($pdo, 'product_types', 'expected_commercial_kind_key');
+    $hasExpSk = function_exists('orange_table_has_column') && orange_table_has_column($pdo, 'product_types', 'expected_sizing_category_key');
+    $ptCols = 'expected_size_scheme_key';
+    if ($hasExpCk) {
+        $ptCols .= ', expected_commercial_kind_key';
+    }
+    if ($hasExpSk) {
+        $ptCols .= ', expected_sizing_category_key';
+    }
+    $st = $pdo->prepare('SELECT ' . $ptCols . ' FROM product_types WHERE id = ? LIMIT 1');
     $st->execute([$productTypeId]);
     $pt = $st->fetch(PDO::FETCH_ASSOC);
     if (!is_array($pt)) {
         return null;
     }
-    $expected = trim((string) ($pt['expected_size_scheme_key'] ?? ''));
-    if ($expected === '') {
-        return null;
-    }
+    $expectedScheme = trim((string) ($pt['expected_size_scheme_key'] ?? ''));
+    $expCk = $hasExpCk ? trim((string) ($pt['expected_commercial_kind_key'] ?? '')) : '';
+    $expSk = $hasExpSk ? trim((string) ($pt['expected_sizing_category_key'] ?? '')) : '';
+
     if (!orange_table_exists($pdo, 'size_families')) {
         return null;
     }
@@ -195,18 +206,44 @@ function orange_catalog_validate_size_family_matches_product_type(
     if (!is_array($row)) {
         return 'عائلة المقاسات المختارة غير موجودة.';
     }
-    $actual = trim((string) ($row['size_scheme_key'] ?? ''));
-    if ($actual === '') {
-        return 'يجب ضبط size_scheme_key لعائلة المقاسات المختارة لمطابقة نوع المنتج («' . $expected . '»). راجع صفحة عائلات المقاسات.';
-    }
-    if ($actual !== $expected) {
-        return 'مخطط المقاس في العائلة («' . $actual . '») لا يطابق المخطط المتوقع لنوع المنتج («' . $expected . '»). غيّر العائلة أو نوع المنتج أو حدّث المفاتيح في الأدمن.';
+    $famCk = trim((string) ($row['commercial_kind_key'] ?? ''));
+    $famSk = trim((string) ($row['sizing_category_key'] ?? ''));
+    $famScheme = trim((string) ($row['size_scheme_key'] ?? ''));
+
+    if ($expectedScheme !== '') {
+        if ($famScheme === '') {
+            return 'يجب ضبط size_scheme_key لعائلة المقاسات المختارة لمطابقة نوع المنتج («' . $expectedScheme . '»). راجع صفحة عائلات المقاسات.';
+        }
+        if ($famScheme !== $expectedScheme) {
+            return 'مخطط المقاس في العائلة («' . $famScheme . '») لا يطابق المخطط المتوقع لنوع المنتج («' . $expectedScheme . '»). غيّر العائلة أو نوع المنتج أو حدّث المفاتيح في الأدمن.';
+        }
+        if ($famCk === '' || $famSk === '') {
+            return 'في وضع مخطط مقاس متوقّع على نوع المنتج يجب ملء النوع التجاري وفئة القياس (commercial_kind_key و sizing_category_key) على عائلة المقاسات لاستكمال هرَم المقاس — صفحة عائلات المقاسات.';
+        }
+
+        return null;
     }
 
-    $ck = trim((string) ($row['commercial_kind_key'] ?? ''));
-    $sk = trim((string) ($row['sizing_category_key'] ?? ''));
-    if ($ck === '' || $sk === '') {
-        return 'في وضع مخطط مقاس متوقّع على نوع المنتج يجب ملء النوع التجاري وفئة القياس (commercial_kind_key و sizing_category_key) على عائلة المقاسات لاستكمال هرَم المقاس — صفحة عائلات المقاسات.';
+    if ($expSk === '' && $expCk === '') {
+        return null;
+    }
+    if ($expSk !== '' && $expCk === '') {
+        return 'على نوع المنتج: عند ضبط فئة قياس متوقعة يجب تعبئة النوع التجاري (expected_commercial_kind_key) أيضاً.';
+    }
+    if ($expCk !== '' && $expSk === '') {
+        return 'على نوع المنتج: عند ضبط النوع التجاري المتوقع يجب تعبئة فئة القياس (expected_sizing_category_key) أيضاً.';
+    }
+
+    $dicErr = orange_catalog_validate_size_family_dictionary_consistency($pdo, $expCk, $expSk);
+    if ($dicErr !== null) {
+        return 'توقّع هرَم المقاس على نوع المنتج غير متسق مع القاموس المرجعي: ' . $dicErr;
+    }
+    if ($famCk === '' || $famSk === '') {
+        return 'عائلة المقاسات يجب أن تحمل النوع التجاري وفئة القياس (المستويان 1–2) لمطابقة نطاق نوع المنتج — صفحة عائلات المقاسات.';
+    }
+    if ($famCk !== $expCk || $famSk !== $expSk) {
+        return 'هرَم المقاس للعائلة (النوع التجاري «' . $famCk . '» / فئة «' . $famSk
+            . '») لا يطابق النطاق المسموح على نوع المنتج («' . $expCk . '» / «' . $expSk . '»). اختر عائلة ضمن نفس فئة القياس أو عدّل الورقة.';
     }
 
     return null;

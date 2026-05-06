@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 24);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 25);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -1396,11 +1396,14 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
             expected_size_scheme_key VARCHAR(64) NOT NULL DEFAULT \'\',
+            expected_commercial_kind_key VARCHAR(32) NOT NULL DEFAULT \'\',
+            expected_sizing_category_key VARCHAR(64) NOT NULL DEFAULT \'\',
             PRIMARY KEY (id),
             UNIQUE KEY uq_product_types_sub_slug (catalog_subcategory_id, slug),
             KEY idx_product_types_sort (catalog_subcategory_id, sort_order),
             KEY idx_product_types_active (catalog_subcategory_id, is_active),
             KEY idx_product_types_expected_scheme (expected_size_scheme_key),
+            KEY idx_product_types_expected_sizing (expected_commercial_kind_key, expected_sizing_category_key),
             CONSTRAINT fk_product_types_catalog_subcategory
                 FOREIGN KEY (catalog_subcategory_id) REFERENCES catalog_subcategories(id)
                 ON DELETE RESTRICT ON UPDATE CASCADE
@@ -1412,6 +1415,40 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         orange_catalog_safe_exec($pdo, 'ALTER TABLE product_types ADD COLUMN expected_size_scheme_key VARCHAR(64) NOT NULL DEFAULT \'\' AFTER created_at');
         orange_catalog_safe_exec($pdo, 'ALTER TABLE product_types ADD INDEX idx_product_types_expected_scheme (expected_size_scheme_key)');
         orange_schema_invalidate_column_check('product_types', 'expected_size_scheme_key');
+    }
+
+    if (orange_table_exists($pdo, 'product_types') && !orange_table_has_column($pdo, 'product_types', 'expected_commercial_kind_key')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE product_types ADD COLUMN expected_commercial_kind_key VARCHAR(32) NOT NULL DEFAULT \'\' AFTER expected_size_scheme_key'
+        );
+        orange_schema_invalidate_column_check('product_types', 'expected_commercial_kind_key');
+    }
+    if (orange_table_exists($pdo, 'product_types') && !orange_table_has_column($pdo, 'product_types', 'expected_sizing_category_key')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE product_types ADD COLUMN expected_sizing_category_key VARCHAR(64) NOT NULL DEFAULT \'\' AFTER expected_commercial_kind_key'
+        );
+        orange_schema_invalidate_column_check('product_types', 'expected_sizing_category_key');
+    }
+    if (orange_table_exists($pdo, 'product_types')
+        && orange_table_has_column($pdo, 'product_types', 'expected_commercial_kind_key')
+        && orange_table_has_column($pdo, 'product_types', 'expected_sizing_category_key')
+    ) {
+        try {
+            $chkIdx = $pdo->query(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'product_types' AND INDEX_NAME = 'idx_product_types_expected_sizing'"
+            );
+            if ($chkIdx && (int) $chkIdx->fetchColumn() === 0) {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'ALTER TABLE product_types ADD INDEX idx_product_types_expected_sizing (expected_commercial_kind_key, expected_sizing_category_key)'
+                );
+            }
+        } catch (Throwable $e) {
+            // ignore
+        }
     }
 
     if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'product_type_id')) {

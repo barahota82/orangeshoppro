@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/catalog_sizing_dictionary.php';
 require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
 require_admin_api();
 
@@ -37,6 +38,20 @@ try {
         return $t;
     };
 
+    $sanitizeKind32 = static function (string $raw): string {
+        $t = strtolower(trim($raw));
+        $t = (string) (preg_replace('/[^a-z0-9_-]/', '', $t) ?? '');
+
+        return strlen($t) > 32 ? substr($t, 0, 32) : $t;
+    };
+
+    $sanitizeCat64 = static function (string $raw): string {
+        $t = strtolower(trim($raw));
+        $t = (string) (preg_replace('/[^a-z0-9_-]/', '', $t) ?? '');
+
+        return strlen($t) > 64 ? substr($t, 0, 64) : $t;
+    };
+
     $subId = (int) ($data['catalog_subcategory_id'] ?? 0);
     $slugRaw = $sanitizeSlug((string) ($data['slug'] ?? ''));
     $nameAr = trim((string) ($data['name_ar'] ?? ''));
@@ -44,6 +59,8 @@ try {
     $nameFil = trim((string) ($data['name_fil'] ?? ''));
     $nameHi = trim((string) ($data['name_hi'] ?? ''));
     $scheme = $sanitizeScheme((string) ($data['expected_size_scheme_key'] ?? ''));
+    $expCk = $sanitizeKind32((string) ($data['expected_commercial_kind_key'] ?? ''));
+    $expSk = $sanitizeCat64((string) ($data['expected_sizing_category_key'] ?? ''));
     $sortOrder = (int) ($data['sort_order'] ?? 0);
     $active = (int) ($data['is_active'] ?? 1) === 0 ? 0 : 1;
 
@@ -61,6 +78,19 @@ try {
 
     if ($nameEn === '') {
         json_response(['success' => false, 'message' => 'الاسم الإنجليزي مطلوب.'], 422);
+    }
+
+    if ($expSk !== '' && $expCk === '') {
+        json_response(['success' => false, 'message' => 'عند ضبط فئة قياس متوقعة على نوع المنتج يجب تعبئة النوع التجاري (commercial_kind_key).'], 422);
+    }
+    if ($expCk !== '' && $expSk === '') {
+        json_response(['success' => false, 'message' => 'عند ضبط النوع التجاري المتوقع على نوع المنتج يجب تعبئة فئة القياس (sizing_category_key).'], 422);
+    }
+    if ($expCk !== '' && $expSk !== '') {
+        $hierErr = orange_catalog_validate_size_family_dictionary_consistency($pdo, $expCk, $expSk);
+        if ($hierErr !== null) {
+            json_response(['success' => false, 'message' => $hierErr], 422);
+        }
     }
 
     $subChk = $pdo->prepare('SELECT id FROM catalog_subcategories WHERE id = ? LIMIT 1');
@@ -108,7 +138,7 @@ try {
 
         $pdo->prepare(
             'UPDATE product_types SET catalog_subcategory_id = ?, slug = ?, name_ar = ?, name_en = ?, name_fil = ?, name_hi = ?,
-                expected_size_scheme_key = ?, sort_order = ?, is_active = ? WHERE id = ? LIMIT 1'
+                expected_size_scheme_key = ?, expected_commercial_kind_key = ?, expected_sizing_category_key = ?, sort_order = ?, is_active = ? WHERE id = ? LIMIT 1'
         )->execute([
             $subId,
             $slugRaw,
@@ -117,6 +147,8 @@ try {
             $nameFil,
             $nameHi,
             $scheme,
+            $expCk,
+            $expSk,
             $sortOrder,
             $active,
             $id,
@@ -128,8 +160,8 @@ try {
     $pdo->prepare(
         'INSERT INTO product_types (
             catalog_subcategory_id, slug, name_ar, name_en, name_fil, name_hi,
-            expected_size_scheme_key, sort_order, is_active
-        ) VALUES (?,?,?,?,?,?,?,?,?)'
+            expected_size_scheme_key, expected_commercial_kind_key, expected_sizing_category_key, sort_order, is_active
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?)'
     )->execute([
         $subId,
         $slugRaw,
@@ -138,6 +170,8 @@ try {
         $nameFil,
         $nameHi,
         $scheme,
+        $expCk,
+        $expSk,
         $sortOrder,
         $active,
     ]);

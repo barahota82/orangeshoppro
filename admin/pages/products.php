@@ -15,7 +15,9 @@ $productTypesForForm = [];
 if (orange_table_exists($pdo, 'product_types')) {
     try {
         $productTypesForForm = $pdo->query(
-            'SELECT id, slug, name_ar, name_en, expected_size_scheme_key FROM product_types WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
+            'SELECT id, slug, name_ar, name_en, expected_size_scheme_key,
+                    expected_commercial_kind_key, expected_sizing_category_key
+             FROM product_types WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
         )->fetchAll(PDO::FETCH_ASSOC);
     } catch (Throwable $e) {
         $productTypesForForm = [];
@@ -296,8 +298,10 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         <?php
                         $ptSlug = htmlspecialchars((string) ($prt['slug'] ?? ''), ENT_QUOTES, 'UTF-8');
                         $ptLabel = htmlspecialchars((string) (($prt['name_ar'] ?: $prt['name_en']) ?: ('#' . $prt['id'])), ENT_QUOTES, 'UTF-8');
+                        $ptExpCk = htmlspecialchars(trim((string) ($prt['expected_commercial_kind_key'] ?? '')), ENT_QUOTES, 'UTF-8');
+                        $ptExpSk = htmlspecialchars(trim((string) ($prt['expected_sizing_category_key'] ?? '')), ENT_QUOTES, 'UTF-8');
                         ?>
-                        <option value="<?php echo (int) $prt['id']; ?>" data-slug="<?php echo $ptSlug; ?>" data-expected-scheme="<?php echo htmlspecialchars(trim((string) ($prt['expected_size_scheme_key'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>"><?php echo $ptLabel; ?></option>
+                        <option value="<?php echo (int) $prt['id']; ?>" data-slug="<?php echo $ptSlug; ?>" data-expected-scheme="<?php echo htmlspecialchars(trim((string) ($prt['expected_size_scheme_key'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>" data-expected-kind="<?php echo $ptExpCk; ?>" data-expected-cat="<?php echo $ptExpSk; ?>"><?php echo $ptLabel; ?></option>
                     <?php endforeach; ?>
                 </select>
                 <?php if ($catalogNavUnified): ?>
@@ -504,8 +508,10 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                     <?php foreach ($familiesOut as $f): ?>
                         <?php
                         $famSch = htmlspecialchars(trim((string) ($f['size_scheme_key'] ?? '')), ENT_QUOTES, 'UTF-8');
+                        $famCk = htmlspecialchars(trim((string) ($f['commercial_kind_key'] ?? '')), ENT_QUOTES, 'UTF-8');
+                        $famSk = htmlspecialchars(trim((string) ($f['sizing_category_key'] ?? '')), ENT_QUOTES, 'UTF-8');
                         ?>
-                        <option value="<?php echo (int)$f['id']; ?>" data-size-scheme="<?php echo $famSch; ?>"><?php echo htmlspecialchars($f['name_ar'] ?: $f['name_en']); ?></option>
+                        <option value="<?php echo (int)$f['id']; ?>" data-size-scheme="<?php echo $famSch; ?>" data-commercial-kind="<?php echo $famCk; ?>" data-sizing-category="<?php echo $famSk; ?>"><?php echo htmlspecialchars($f['name_ar'] ?: $f['name_en']); ?></option>
                     <?php endforeach; ?>
                 </select>
                 <small id="size_family_scheme_hint" style="display:none;margin-top:4px;line-height:1.45;color:#64748b;"></small>
@@ -763,6 +769,24 @@ function orangeGetSelectedProductTypeExpectedScheme() {
     return opt ? String(opt.getAttribute('data-expected-scheme') || '').trim() : '';
 }
 
+function orangeGetSelectedProductTypeExpectedKind() {
+    const el = document.getElementById('product_type_id');
+    if (!el || !el.value) {
+        return '';
+    }
+    const opt = el.options[el.selectedIndex];
+    return opt ? String(opt.getAttribute('data-expected-kind') || '').trim() : '';
+}
+
+function orangeGetSelectedProductTypeExpectedCat() {
+    const el = document.getElementById('product_type_id');
+    if (!el || !el.value) {
+        return '';
+    }
+    const opt = el.options[el.selectedIndex];
+    return opt ? String(opt.getAttribute('data-expected-cat') || '').trim() : '';
+}
+
 function orangeApplySizeFamilySchemeFilter() {
     const famSel = document.getElementById('size_family_id');
     const hint = document.getElementById('size_family_scheme_hint');
@@ -782,6 +806,8 @@ function orangeApplySizeFamilySchemeFilter() {
     }
 
     const expected = orangeGetSelectedProductTypeExpectedScheme();
+    const expKind = orangeGetSelectedProductTypeExpectedKind();
+    const expCat = orangeGetSelectedProductTypeExpectedCat();
     let currentVal = famSel.value;
     let selectedIsBad = false;
 
@@ -792,7 +818,14 @@ function orangeApplySizeFamilySchemeFilter() {
             continue;
         }
         const sch = String(o.getAttribute('data-size-scheme') || '').trim();
-        const ok = expected === '' || sch === expected;
+        const fk = String(o.getAttribute('data-commercial-kind') || '').trim();
+        const fsk = String(o.getAttribute('data-sizing-category') || '').trim();
+        let ok = true;
+        if (expected !== '') {
+            ok = sch === expected;
+        } else if (expKind !== '' && expCat !== '') {
+            ok = fk === expKind && fsk === expCat;
+        }
         o.disabled = !ok;
         if (!ok && o.value === currentVal) {
             selectedIsBad = true;
@@ -807,14 +840,21 @@ function orangeApplySizeFamilySchemeFilter() {
 
     if (hint) {
         hint.style.display = 'block';
-        if (expected === '') {
-            hint.textContent =
-                'نوع المنتج المختار لم يُحدّد مخطط مقاس متوقع (expected_size_scheme_key في شجرة الأنواع). يمكن أي عائلة؛ أو ضبط المخطط على الورقة ثم ارجع لتصفية أفضل.';
-        } else {
+        if (expected !== '') {
             hint.textContent =
                 'المخطط المتوقع لهذا نوع المنتج: «' +
                 expected +
                 '». العائلات غير المطابقة غير متاحة في القائمة — راجع صفحة عائلات المقاسات لمفتاح size_scheme_key.';
+        } else if (expKind !== '' && expCat !== '') {
+            hint.textContent =
+                'نطاق هرَم نوع المنتج: النوع التجاري «' +
+                expKind +
+                '» وفئة القياس «' +
+                expCat +
+                '». تُعرض عائلات المقاسات المطابقة لهذا الهرم فقط (أي مخطط مقاس مستوى 3 ضمن الفئة).';
+        } else {
+            hint.textContent =
+                'نوع المنتج المختار لم يُقيّد مخطط مقاس (مستوى 3) ولا نطاق فئة قياس (1–2). يمكن أي عائلة؛ أو ضبط الورقة في «أنواع المنتجات» ثم ارجع لتصفية أفضل.';
         }
     }
 }
@@ -1686,13 +1726,22 @@ async function saveProduct() {
         const ptIdSave = ptSave && ptSave.value ? (parseInt(ptSave.value, 10) || 0) : 0;
         if (ptIdSave > 0) {
             const expSch = orangeGetSelectedProductTypeExpectedScheme();
+            const expKind = orangeGetSelectedProductTypeExpectedKind();
+            const expCat = orangeGetSelectedProductTypeExpectedCat();
             const famSel = document.getElementById('size_family_id');
-            if (famSel && famSel.value && expSch !== '') {
+            if (famSel && famSel.value) {
                 const fo = famSel.options[famSel.selectedIndex];
                 const fsch = fo ? String(fo.getAttribute('data-size-scheme') || '').trim() : '';
-                if (fsch !== expSch) {
+                const fk = fo ? String(fo.getAttribute('data-commercial-kind') || '').trim() : '';
+                const fsk = fo ? String(fo.getAttribute('data-sizing-category') || '').trim() : '';
+                if (expSch !== '' && fsch !== expSch) {
                     productFormShowTab('sizes');
                     alert('عائلة المقاسات لا تطابق المخطط المتوقع لنوع المنتج («' + expSch + '»).');
+                    return;
+                }
+                if (expSch === '' && expKind !== '' && expCat !== '' && (fk !== expKind || fsk !== expCat)) {
+                    productFormShowTab('sizes');
+                    alert('عائلة المقاسات لا تطابق نطاق هرَم نوع المنتج (النوع التجاري «' + expKind + '» / فئة «' + expCat + '»).');
                     return;
                 }
             }
