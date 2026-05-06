@@ -47,15 +47,16 @@ if ($hasTable) {
         <div class="ca-row ca-row--r1">
             <div class="ca-sort-wrap admin-sort-field-wrap">
                 <label>ترتيب العرض</label>
-                <input type="number" id="ca_sort" class="admin-sort-field<?php echo !$hasTable ? ' admin-sort-field--muted' : ''; ?>" min="0" step="1" value=""
-                    placeholder="<?php echo htmlspecialchars('مقترح: ' . (string) $nextSort, ENT_QUOTES, 'UTF-8'); ?>"
-                    <?php echo !$hasTable ? 'disabled' : ''; ?>>
-                <small class="ca-field-hint">عند الإنشاء: اتركه فارغًا أو 0 ليُطبَّق الترتيب التلقائي في الخادم.</small>
+                <input type="number" id="ca_sort" class="admin-sort-field admin-sort-field--muted"
+                    min="0" step="1"
+                    value="<?php echo $hasTable ? htmlspecialchars((string) $nextSort, ENT_QUOTES, 'UTF-8') : ''; ?>"
+                    disabled>
+                <small class="ca-field-hint" id="ca_sort_hint">عند <strong>إضافة</strong> سمة جديدة: يُحدَّد تلقائياً في الخادم (القيمة المعروضة تقديرية). عند <strong>تعديل</strong>: يمكنك تغيير الرقم.</small>
             </div>
             <div class="ca-key-wrap">
                 <label>المفتاح الإنجليزي (attribute_key)</label>
-                <input type="text" id="ca_key" dir="ltr" lang="en" maxlength="80" placeholder="مثال material أو care_notes" autocomplete="off" <?php echo !$hasTable ? 'disabled' : ''; ?>>
-                <small class="ca-field-hint">حرف صغير أولاً، ثم صغيرة/أرقام/<wbr>_ أو -، حتى 80 محرفًا.</small>
+                <input type="text" id="ca_key" dir="ltr" lang="en" maxlength="80" placeholder="اتركه فارغاً للتوليد التلقائي (من English إن وُجد، وإلا من العربي)" autocomplete="off" <?php echo !$hasTable ? 'disabled' : ''; ?>>
+                <small class="ca-field-hint" id="ca_key_hint">عند <strong>إضافة</strong> فقط: فارغ = توليد تلقائي؛ أو أدخل مفتاحاً يدوياً (حرف صغير ثم a-z0-9_-). عند <strong>تعديل</strong>: يُعرض المفتاح المحفوظ ويمكن تغييره.</small>
             </div>
             <div class="ca-active-wrap admin-sort-field-wrap">
                 <label>نشطة</label>
@@ -285,21 +286,36 @@ if ($hasTable) {
 </style>
 
 <script>
+window.ORANGE_CA_NEXT_SORT = <?php echo (int) $nextSort; ?>;
 let caTranslateTimer = null;
 let caEnTranslateTimer = null;
 let isSavingCatalogAttr = false;
+
+function applyCatalogAttrFormMode(editMode) {
+    var sortEl = document.getElementById('ca_sort');
+    if (!sortEl) return;
+    if (editMode) {
+        sortEl.removeAttribute('disabled');
+        sortEl.classList.remove('admin-sort-field--muted');
+    } else {
+        sortEl.setAttribute('disabled', 'disabled');
+        sortEl.classList.add('admin-sort-field--muted');
+        var n = typeof window.ORANGE_CA_NEXT_SORT === 'number' ? window.ORANGE_CA_NEXT_SORT : parseInt(String(window.ORANGE_CA_NEXT_SORT || '1'), 10) || 1;
+        sortEl.value = String(n);
+    }
+}
 
 function resetCatalogAttrForm() {
     document.getElementById('ca_attr_id').value = '0';
     document.getElementById('ca_key').value = '';
     document.getElementById('ca_input_kind').value = 'text_short';
-    document.getElementById('ca_sort').value = '';
     document.getElementById('ca_label_ar').value = '';
     document.getElementById('ca_label_en').value = '';
     document.getElementById('ca_label_fil').value = '';
     document.getElementById('ca_label_hi').value = '';
     document.getElementById('ca_filterable').value = '0';
     document.getElementById('ca_active').value = '1';
+    applyCatalogAttrFormMode(false);
 }
 
 function editCatalogAttribute(a) {
@@ -313,6 +329,7 @@ function editCatalogAttribute(a) {
     document.getElementById('ca_label_hi').value = a.label_hi || '';
     document.getElementById('ca_filterable').value = String((a.is_filterable === 1 || a.is_filterable === true) ? 1 : 0);
     document.getElementById('ca_active').value = String((a.is_active === 0 || a.is_active === false) ? 0 : 1);
+    applyCatalogAttrFormMode(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -377,7 +394,7 @@ async function saveCatalogAttribute() {
             label_hi: document.getElementById('ca_label_hi').value.trim(),
             input_kind: document.getElementById('ca_input_kind').value,
             is_filterable: parseInt(document.getElementById('ca_filterable').value || '0', 10) ? 1 : 0,
-            sort_order: isNaN(sortVal) ? 0 : sortVal,
+            sort_order: recordId > 0 ? (isNaN(sortVal) ? 0 : sortVal) : 0,
             is_active: parseInt(document.getElementById('ca_active').value || '1', 10) ? 1 : 0
         };
         if (recordId > 0) payload.id = recordId;

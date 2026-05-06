@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/catalog_attribute_helpers.php';
 require_admin_api();
 
 /**
@@ -30,10 +31,23 @@ try {
         json_response(['success' => false, 'message' => 'عنوان السمة بالعربي مطلوب.'], 422);
     }
 
+    if ($id > 0) {
+        if ($keyRaw === '') {
+            $prevKey = $pdo->prepare('SELECT attribute_key FROM catalog_attributes WHERE id = ? LIMIT 1');
+            $prevKey->execute([$id]);
+            $keyRaw = trim((string) $prevKey->fetchColumn());
+            if ($keyRaw === '') {
+                json_response(['success' => false, 'message' => 'تعذر استرجاع المفتاح المحفوظ لهذه السمة.'], 500);
+            }
+        }
+    } elseif ($keyRaw === '') {
+        $keyRaw = orange_catalog_attribute_key_allocate_unique($pdo, $labelEn, $labelAr, 0);
+    }
+
     if ($keyRaw === '' || !preg_match('/^[a-z][a-z0-9_-]{1,79}$/', $keyRaw)) {
         json_response([
             'success' => false,
-            'message' => 'المفتاح (attribute_key): حرف إنجليزي صغير أولاً، ثم حروف صغيرة/أرقام/ شرطة سفلية أو وسط؛ الطول حتى 80.',
+            'message' => 'المفتاح (attribute_key): حرف إنجليزي صغير أولاً، ثم حروف صغيرة/أرقام/ شرطة سفلية أو وسط؛ الطول حتى 80. اتركه فارغاً عند الإضافة للتوليد التلقائي.',
         ], 422);
     }
 
@@ -47,7 +61,13 @@ try {
     $filterable = (int) ($data['is_filterable'] ?? 0) === 1 ? 1 : 0;
     $active = (int) ($data['is_active'] ?? 1) === 0 ? 0 : 1;
 
-    if ($sortOrder <= 0 && $id <= 0) {
+    if ($id > 0) {
+        if ($sortOrder <= 0) {
+            $prevSort = $pdo->prepare('SELECT sort_order FROM catalog_attributes WHERE id = ? LIMIT 1');
+            $prevSort->execute([$id]);
+            $sortOrder = (int) $prevSort->fetchColumn();
+        }
+    } elseif ($sortOrder <= 0) {
         $next = (int) $pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM catalog_attributes')->fetchColumn();
         $sortOrder = $next >= 1 ? $next : 1;
     }
