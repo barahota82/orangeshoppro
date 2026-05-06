@@ -85,7 +85,8 @@ $branchLabel = static function (array $r): string {
     }
     $p[] = $sub !== '' ? $sub : ('#' . $fallbackId);
 
-    return implode(' ← ', array_reverse($p));
+    /* من الجذر (قسم رئيسي) نحو الورقة (تصنيف فرعي): نساء ← … ← تيشيرتات */
+    return implode(' ← ', $p);
 };
 
 $subOptions = [];
