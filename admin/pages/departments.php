@@ -50,29 +50,29 @@ if ($hasDepartmentsTable) {
     <h3>إضافة / تعديل قسم</h3>
     <input type="hidden" id="dept_record_id" value="0">
     <div class="form-grid dep-form-grid">
+        <div class="dep-slug">
+            <label for="slug">Slug</label>
+            <input type="text" id="slug" dir="ltr" lang="en" disabled>
+        </div>
         <div class="dep-sort admin-sort-field-wrap">
-            <label>الترتيب (تلقائي)</label>
+            <label for="sort_order">الترتيب (تلقائي)</label>
             <input type="number" id="sort_order" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int)$nextSort; ?>" disabled>
         </div>
         <div class="dep-ar">
-            <label>الاسم العربي</label>
+            <label for="name_ar">الاسم العربي</label>
             <input type="text" id="name_ar">
         </div>
-        <div class="dep-fil">
-            <label>Filipino</label>
-            <input type="text" id="name_fil">
-        </div>
         <div class="dep-en">
-            <label>English</label>
-            <input type="text" id="name_en">
-        </div>
-        <div class="dep-slug">
-            <label>Slug</label>
-            <input type="text" id="slug" disabled>
+            <label for="name_en">English</label>
+            <input type="text" id="name_en" dir="ltr">
         </div>
         <div class="dep-hi">
-            <label>Hindi</label>
+            <label for="name_hi">Hindi</label>
             <input type="text" id="name_hi">
+        </div>
+        <div class="dep-fil">
+            <label for="name_fil">Filipino</label>
+            <input type="text" id="name_fil">
         </div>
     </div>
     <div class="actions dep-form-actions" style="margin-top:14px;">
@@ -355,40 +355,79 @@ if (translateBtnDep) {
     style.textContent = `
         .dep-form-grid{
             display:grid;
-            grid-template-columns:1fr 1fr;
+            grid-template-columns:repeat(12,minmax(0,1fr));
             grid-template-areas:
-                "blank sort"
-                "ar ar"
-                "fil en"
-                "slug hi";
+                "slug slug slug slug slug slug sort sort sort sort sort sort"
+                "en en en en en en ar ar ar ar ar ar"
+                "hi hi hi hi hi hi fil fil fil fil fil fil";
             gap:14px 18px;
             direction:ltr;
         }
+        .dep-form-grid .dep-slug{grid-area:slug}
         .dep-form-grid .dep-sort{
             grid-area:sort;
             justify-self:end;
             width:100%;
-            max-width:var(--admin-sort-field-max-w, 220px);
+            max-width:var(--admin-sort-field-max-w,220px);
         }
         .dep-form-grid .dep-ar{grid-area:ar}
         .dep-form-grid .dep-en{grid-area:en}
         .dep-form-grid .dep-hi{grid-area:hi}
         .dep-form-grid .dep-fil{grid-area:fil}
-        .dep-form-grid .dep-slug{grid-area:slug}
         .dep-form-grid label,
         .dep-form-grid input,
         .dep-form-grid select{direction:rtl;text-align:right}
-        .dep-form-grid #sort_order{margin-right:0;margin-left:auto;display:block}
+        .dep-form-grid #slug{direction:ltr;text-align:right}
+        .dep-form-grid #name_en{direction:ltr;text-align:right}
+        .dep-form-grid .dep-sort.admin-sort-field-wrap{max-width:var(--admin-sort-field-max-w,220px)}
+        .dep-form-grid #sort_order,
+        .dep-form-grid #slug{
+            margin-inline:0;
+            display:block;
+            width:100%;
+            box-sizing:border-box;
+            border:1px solid #cbd5e1;
+            border-radius:var(--radius-sm,10px);
+            font-size:14px;
+            line-height:calc(var(--input-min-h,36px) - 2px);
+            min-height:var(--input-min-h,36px);
+            height:var(--input-min-h,36px);
+            max-height:var(--input-min-h,36px);
+            padding-block:0;
+            padding-inline:12px;
+        }
+        .dep-form-grid #name_ar,
+        .dep-form-grid #name_en,
+        .dep-form-grid #name_fil,
+        .dep-form-grid #name_hi{
+            margin-inline:0;
+            display:block;
+            width:100%;
+            max-width:none;
+            box-sizing:border-box;
+            border:1px solid #cbd5e1;
+            border-radius:var(--radius-sm,10px);
+            font-size:14px;
+            line-height:1.4;
+            min-height:var(--input-min-h,36px);
+            padding:8px 12px;
+        }
+        .dep-form-grid input#sort_order::-webkit-outer-spin-button,
+        .dep-form-grid input#sort_order::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+        .dep-form-grid input#sort_order{-moz-appearance:textfield;appearance:textfield}
         .dep-form-actions{justify-content:flex-end}
         @media (max-width: 860px){
-            .dep-form-grid{grid-template-columns:1fr}
-            .dep-form-grid .dep-sort,
-            .dep-form-grid .dep-ar,
-            .dep-form-grid .dep-en,
-            .dep-form-grid .dep-hi,
-            .dep-form-grid .dep-fil,
-            .dep-form-grid .dep-slug{grid-column:1}
-            .dep-form-grid #sort_order{max-width:var(--admin-sort-field-max-w,220px)}
+            .dep-form-grid{
+                grid-template-columns:1fr;
+                grid-template-areas:
+                    "sort"
+                    "slug"
+                    "ar"
+                    "en"
+                    "fil"
+                    "hi";
+            }
+            .dep-form-grid .dep-sort{justify-self:start}
         }
         .cat-dep-list-wrap[data-list="departments"]{
             overflow-x:auto;
