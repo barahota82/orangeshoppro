@@ -323,7 +323,7 @@ if ($subOptionsJson === false) {
     <?php if ($typesList === []): ?>
         <p style="margin:0;color:#555;">لا توجد أنواع بعد.</p>
     <?php else: ?>
-        <div style="overflow-x:auto;">
+        <div class="table-wrap">
             <table style="border-collapse:collapse;width:100%;font-size:0.93rem;">
                 <thead>
                 <tr>

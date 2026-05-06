@@ -65,7 +65,7 @@ $ucDepsEmpty = !empty($orange_uc['deps_empty_for_sections']);
         <button type="button" class="btn-secondary" onclick="resetUcSection()" <?php echo $ucDepsEmpty ? 'disabled' : ''; ?>>جديد</button>
     </div>
     <?php if ($ucSectionsFlat !== []): ?>
-    <div style="overflow-x:auto;margin-top:16px;">
+    <div class="table-wrap" style="margin-top:16px;">
         <table class="uc-table"><thead><tr>
             <th>#</th><th>مسار</th><th>slug</th><th>عربي</th><th>ترتيب</th><th>نشط</th><th>إجراء</th>
         </tr></thead><tbody>

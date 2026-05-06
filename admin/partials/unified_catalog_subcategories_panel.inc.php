@@ -60,7 +60,7 @@ $ucCatEmpty = !empty($orange_uc['categories_empty_for_subcats']);
         <button type="button" class="btn-secondary" onclick="resetUcSubcategory()" <?php echo $ucCatEmpty ? 'disabled' : ''; ?>>جديد</button>
     </div>
     <?php if ($ucSubFlat !== []): ?>
-    <div style="overflow-x:auto;margin-top:16px;">
+    <div class="table-wrap" style="margin-top:16px;">
         <table class="uc-table"><thead><tr>
             <th>#</th><th>مسار</th><th>slug</th><th>عربي</th><th>ترتيب</th><th>نشط</th><th>إجراء</th>
         </tr></thead><tbody>
