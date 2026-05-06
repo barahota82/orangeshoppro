@@ -421,7 +421,7 @@ async function saveCatalogAttribute() {
     var tbody = document.getElementById('orange-ca-list-tbody');
     if (tbody) {
         tbody.addEventListener('click', function (ev) {
-            var btn = ev.target.closest('.ca-edit-btn');
+            var btn = orangeAdminClosest(ev, '.ca-edit-btn');
             if (!btn || !btn.dataset.attributeJson) return;
             try {
                 editCatalogAttribute(JSON.parse(btn.dataset.attributeJson));

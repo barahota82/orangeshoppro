@@ -455,7 +455,7 @@ if (pEnEl) pEnEl.addEventListener('input', schedulePatternTranslateFromEnglish);
     const tbody = document.getElementById('orange-patterns-list-tbody');
     if (!tbody) return;
     tbody.addEventListener('click', function (ev) {
-        const btn = ev.target.closest('.pd-edit-btn');
+        const btn = orangeAdminClosest(ev, '.pd-edit-btn');
         if (!btn || !btn.dataset.patternJson) return;
         try {
             editPattern(JSON.parse(btn.dataset.patternJson));

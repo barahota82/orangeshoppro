@@ -289,11 +289,11 @@ $glPostDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
 
     if (tbody) {
         tbody.addEventListener('click', function (ev) {
-            var tr = ev.target.closest('tr[data-id]');
+            var tr = orangeAdminClosest(ev, 'tr[data-id]');
             if (!tr) {
                 return;
             }
-            if (ev.target.closest('input[type="checkbox"]')) {
+            if (orangeAdminClosest(ev, 'input[type="checkbox"]')) {
                 return;
             }
             var pid = parseInt(tr.getAttribute('data-id'), 10) || 0;

@@ -1396,7 +1396,7 @@ async function saveSizesForFamily() {
     var tbody = document.getElementById('orange-families-list-tbody');
     if (tbody) {
         tbody.addEventListener('click', function (ev) {
-            var btn = ev.target.closest('.sf-edit-btn');
+            var btn = orangeAdminClosest(ev, '.sf-edit-btn');
             if (!btn || !btn.dataset.familyJson) return;
             try {
                 void editFamily(JSON.parse(btn.dataset.familyJson));

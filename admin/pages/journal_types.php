@@ -156,7 +156,7 @@ $jtShowEmptyHint = ($types === []);
         });
 
         tbody.addEventListener('click', function (ev) {
-            var btn = ev.target.closest('.jt-btn-del');
+            var btn = orangeAdminClosest(ev, '.jt-btn-del');
             if (!btn) {
                 return;
             }

@@ -24,6 +24,20 @@ function orangeAdminResolveUrl(url) {
     };
 })();
 
+/**
+ * closest آمن من هدف الحدث — يتجنب رمياً إن لم يكن الهدف عنصر DOM (مثلاً عند تفويض النقر).
+ * @param {Event} ev
+ * @param {string} selector
+ * @returns {Element|null}
+ */
+function orangeAdminClosest(ev, selector) {
+    var t = ev && ev.target;
+    if (!t || typeof t.closest !== 'function') {
+        return null;
+    }
+    return t.closest(selector);
+}
+
 function stripUtf8Bom(s) {
     if (!s || s.length < 1) return s;
     if (s.charCodeAt(0) === 0xfeff) return s.slice(1);
@@ -441,12 +455,7 @@ function orangeAdminOfferSuggestAfterWarnings(r) {
         }
 
         document.addEventListener('click', function (e) {
-            var t = e.target;
-            if (!t || typeof t.closest !== 'function') {
-                closeAll();
-                return;
-            }
-            if (t.closest('.admin-topbar-mega') || t.closest('.admin-mega-panel')) {
+            if (orangeAdminClosest(e, '.admin-topbar-mega') || orangeAdminClosest(e, '.admin-mega-panel')) {
                 return;
             }
             closeAll();

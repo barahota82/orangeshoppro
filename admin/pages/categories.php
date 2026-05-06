@@ -539,7 +539,7 @@ if (translateBtn) {
     const tbody = document.getElementById('categoriesTbody');
     if (!tbody) return;
     tbody.addEventListener('click', function (ev) {
-        const btn = ev.target.closest('.cat-edit-btn');
+        const btn = orangeAdminClosest(ev, '.cat-edit-btn');
         if (!btn || !btn.dataset.catJson) return;
         try {
             editCategory(JSON.parse(btn.dataset.catJson));

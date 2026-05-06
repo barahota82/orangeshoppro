@@ -672,7 +672,7 @@ function moBindPickModal() {
         });
     }
     body.addEventListener('dblclick', function (e) {
-        var tr = e.target.closest('tr[data-pick-idx]');
+        var tr = orangeAdminClosest(e, 'tr[data-pick-idx]');
         if (!tr || !moPickTargetRow) {
             return;
         }
@@ -699,7 +699,7 @@ function moBindLinesBody() {
     }
     tb.setAttribute('data-mo-bound', '1');
     tb.addEventListener('click', function (e) {
-        var btn = e.target.closest('.mo-code-search');
+        var btn = orangeAdminClosest(e, '.mo-code-search');
         if (!btn) {
             return;
         }

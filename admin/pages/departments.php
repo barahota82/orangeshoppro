@@ -470,7 +470,7 @@ if (translateBtnDep) {
     const tbody = document.getElementById('departmentsTbody');
     if (!tbody) return;
     tbody.addEventListener('click', function (ev) {
-        const btn = ev.target.closest('.dep-edit-btn');
+        const btn = orangeAdminClosest(ev, '.dep-edit-btn');
         if (!btn || !btn.dataset.depJson) return;
         try {
             editDepartment(JSON.parse(btn.dataset.depJson));

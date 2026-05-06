@@ -553,17 +553,17 @@ function scheduleUcFromEn(which) {
         sessionStorage.removeItem('ucRestoreCatSection');
     } catch (e) { /* ignore */ }
     document.addEventListener('click', function (ev) {
-        var b = ev.target.closest('.uc-edit-sec');
+        var b = orangeAdminClosest(ev, '.uc-edit-sec');
         if (b && b.dataset.json) {
             try { editUcSection(JSON.parse(b.dataset.json)); } catch (e) { alert('تعذر قراءة البيانات'); }
             return;
         }
-        b = ev.target.closest('.uc-edit-cat');
+        b = orangeAdminClosest(ev, '.uc-edit-cat');
         if (b && b.dataset.json) {
             try { editUcCategory(JSON.parse(b.dataset.json)); } catch (e) { alert('تعذر قراءة البيانات'); }
             return;
         }
-        b = ev.target.closest('.uc-edit-sub');
+        b = orangeAdminClosest(ev, '.uc-edit-sub');
         if (b && b.dataset.json) {
             try { editUcSubcategory(JSON.parse(b.dataset.json)); } catch (e) { alert('تعذر قراءة البيانات'); }
         }

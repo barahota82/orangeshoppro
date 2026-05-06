@@ -437,13 +437,13 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
         tr.setAttribute('tabindex', '-1');
     });
     tb.addEventListener('click', function (e) {
-        var tr = e.target.closest('tr');
+        var tr = orangeAdminClosest(e, 'tr');
         if (tr && tr.parentElement === tb) {
             tr.focus();
         }
     });
     tb.addEventListener('keydown', function (e) {
-        var tr = e.target.closest('tr');
+        var tr = orangeAdminClosest(e, 'tr');
         if (!tr || tr.parentElement !== tb) {
             return;
         }

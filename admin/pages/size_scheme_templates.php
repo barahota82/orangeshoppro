@@ -577,7 +577,7 @@ async function sstLoadOne(tplId) {
 })();
 
 document.addEventListener('click', function (ev) {
-    var ed = ev.target.closest('[data-sst-edit]');
+    var ed = orangeAdminClosest(ev, '[data-sst-edit]');
     if (ed) {
         var id = parseInt(ed.getAttribute('data-sst-edit') || '0', 10);
         if (id > 0) {
@@ -585,7 +585,7 @@ document.addEventListener('click', function (ev) {
         }
         return;
     }
-    var del = ev.target.closest('[data-sst-del]');
+    var del = orangeAdminClosest(ev, '[data-sst-del]');
     if (del) {
         var did = parseInt(del.getAttribute('data-sst-del') || '0', 10);
         if (did > 0 && confirm('حذف القالب وجميع مقاساته من القائمة المرجعية؟')) {

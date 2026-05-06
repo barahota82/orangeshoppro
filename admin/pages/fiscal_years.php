@@ -370,7 +370,7 @@ $fyGlRetainedBrief = $fyAccountBrief($pdo, $fyGlRetainedId);
         }
 
         tbody.addEventListener('click', function (ev) {
-            var reopenBtn = ev.target.closest('.fy-btn-reopen');
+            var reopenBtn = orangeAdminClosest(ev, '.fy-btn-reopen');
             if (reopenBtn) {
                 var trR = reopenBtn.closest('tr[data-fy-row]');
                 if (!trR) {
@@ -393,7 +393,7 @@ $fyGlRetainedBrief = $fyAccountBrief($pdo, $fyGlRetainedId);
                     .catch(function (e) { alert(e.message || String(e)); });
                 return;
             }
-            var acBtn = ev.target.closest('.fy-btn-acct-close');
+            var acBtn = orangeAdminClosest(ev, '.fy-btn-acct-close');
             if (acBtn) {
                 var tr = acBtn.closest('tr[data-fy-row]');
                 if (!tr) {
@@ -407,7 +407,7 @@ $fyGlRetainedBrief = $fyAccountBrief($pdo, $fyGlRetainedId);
                 fyCloseMainOpen(fid);
                 return;
             }
-            var btn = ev.target.closest('.fy-btn-del');
+            var btn = orangeAdminClosest(ev, '.fy-btn-del');
             if (!btn) {
                 return;
             }

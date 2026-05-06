@@ -988,7 +988,7 @@ async function saveProductType() {
     var tbody = document.getElementById('orange-pt-list-tbody');
     if (tbody) {
         tbody.addEventListener('click', function (ev) {
-            var btn = ev.target.closest('.pt-edit-btn');
+            var btn = orangeAdminClosest(ev, '.pt-edit-btn');
             if (!btn || !btn.dataset.ptJson) return;
             try {
                 editProductType(JSON.parse(btn.dataset.ptJson));

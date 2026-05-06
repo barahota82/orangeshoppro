@@ -451,7 +451,7 @@ document.getElementById('subcat_name_ar').addEventListener('input', scheduleSubc
     const tbody = document.getElementById('subcategoriesTbody');
     if (!tbody) return;
     tbody.addEventListener('click', function (ev) {
-        const btn = ev.target.closest('.subcat-edit-btn');
+        const btn = orangeAdminClosest(ev, '.subcat-edit-btn');
         if (!btn || !btn.dataset.subcatJson) return;
         try {
             editSubcategory(JSON.parse(btn.dataset.subcatJson));

@@ -465,7 +465,7 @@ document.getElementById('c_name_en').addEventListener('input', scheduleColorTran
     var tbody = document.getElementById('orange-colors-list-tbody');
     if (!tbody) return;
     tbody.addEventListener('click', function (ev) {
-        var btn = ev.target.closest('.cd-edit-btn');
+        var btn = orangeAdminClosest(ev, '.cd-edit-btn');
         if (!btn || !btn.dataset.colorJson) return;
         try {
             editColor(JSON.parse(btn.dataset.colorJson));
