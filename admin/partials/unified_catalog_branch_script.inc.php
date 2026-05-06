@@ -360,7 +360,8 @@ function editUcCategory(j) {
     document.getElementById('uc_cat_name_fil').value = j.name_fil || '';
     document.getElementById('uc_cat_name_hi').value = j.name_hi || '';
     document.getElementById('uc_cat_active').value = String(j.is_active === 0 ? 0 : 1);
-    ucSlugManual.cat = !!(j.slug && String(j.slug).trim() !== '');
+    /* false = يعاد توليد slug من الإنجليزي + بادئة القسم عند التعديل (مثل catalog_sections). */
+    ucSlugManual.cat = false;
     ucScrollToBranchCard('cat');
 }
 
@@ -425,7 +426,8 @@ function editUcSubcategory(j) {
     document.getElementById('uc_sub_name_fil').value = j.name_fil || '';
     document.getElementById('uc_sub_name_hi').value = j.name_hi || '';
     document.getElementById('uc_sub_active').value = String(j.is_active === 0 ? 0 : 1);
-    ucSlugManual.sub = !!(j.slug && String(j.slug).trim() !== '');
+    /* false = يعاد توليد slug من الإنجليزي + بادئة الفئة عند التعديل. */
+    ucSlugManual.sub = false;
     ucScrollToBranchCard('sub');
 }
 
