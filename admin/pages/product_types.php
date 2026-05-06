@@ -928,11 +928,6 @@ async function saveProductType() {
         const res = await postJSON('/admin/api/product_types/save.php', payload);
         alert(res.message || (res.success ? 'تم الحفظ' : 'فشل'));
         if (res.success) {
-            try {
-                if (subId > 0) {
-                    sessionStorage.setItem('orange_pt_prefill_sub', String(subId));
-                }
-            } catch (ePref) { /* ignore */ }
             location.reload();
         }
     } catch (e) {
@@ -967,18 +962,8 @@ async function saveProductType() {
         });
     }
     try {
-        var preSub = sessionStorage.getItem('orange_pt_prefill_sub');
-        if (preSub && subSel) {
-            subSel.value = preSub;
-            sessionStorage.removeItem('orange_pt_prefill_sub');
-            refreshPtSlugFromEnglish();
-            ptApplyDefaultSortForNewRecord();
-            var preNum = parseInt(String(preSub), 10) || 0;
-            if (preNum > 0) {
-                warnIfSubNotInDropdown(preNum);
-            }
-        }
-    } catch (eSs) { /* ignore */ }
+        sessionStorage.removeItem('orange_pt_prefill_sub');
+    } catch (eClr) { /* ignore */ }
     ptInitSizingHierarchySelects();
     var tbody = document.getElementById('orange-pt-list-tbody');
     if (tbody) {
