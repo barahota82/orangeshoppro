@@ -246,7 +246,6 @@ if ($subOptionsJson === false) {
                 <small style="display:block;color:#b45309;margin-top:4px;">لا توجد أفرع نشطة؛ أنشئ أقسام الشجرة الموحّدة عبر ترحيل البيانات أو إعداد يدوي.</small>
             <?php endif; ?>
         </div>
-        <div class="pt-row pt-row--r2">
         <div class="pt-ck">
             <?php if ($sizingDictForPtForm): ?>
             <label for="pt_expected_commercial_kind_key">النوع التجاري (مستوى 1)</label>
@@ -297,8 +296,6 @@ if ($subOptionsJson === false) {
                 <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
             <?php endif; ?>
         </div>
-        </div>
-        <div class="pt-row pt-row--names1">
         <div class="pt-ar">
             <label for="pt_name_ar">الاسم العربي</label>
             <input type="text" id="pt_name_ar" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
@@ -307,8 +304,6 @@ if ($subOptionsJson === false) {
             <label for="pt_name_en">English</label>
             <input type="text" id="pt_name_en" lang="en" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
         </div>
-        </div>
-        <div class="pt-row pt-row--names2">
         <div class="pt-fil">
             <label for="pt_name_fil">Filipino</label>
             <input type="text" id="pt_name_fil" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
@@ -316,7 +311,6 @@ if ($subOptionsJson === false) {
         <div class="pt-hi">
             <label for="pt_name_hi">Hindi</label>
             <input type="text" id="pt_name_hi" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
-        </div>
         </div>
     </div>
     <div class="actions pt-form-actions" style="margin-top:14px;gap:8px;flex-wrap:wrap;">
@@ -388,15 +382,21 @@ if ($subOptionsJson === false) {
 </div>
 
 <style>
-/* الصف الأول مثل كارت سمات الكتالوج: ترتيب | slug (وسط مرن) | نشط — direction:rtl */
+/* شبكة 12 عموداً للصفوف 2–5 كما سبق؛ الصف الأول (r1) داخله شبكة ثلاثية مثل سمات الكتالوج */
 .pt-form-grid {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-template-areas:
+        "r1 r1 r1 r1 r1 r1 r1 r1 r1 r1 r1 r1"
+        "path path path path path path path path path path path path"
+        "sk sk sk sk sk sk ck ck ck ck ck ck"
+        "en en en en en en ar ar ar ar ar ar"
+        "hi hi hi hi hi hi fil fil fil fil fil fil";
     gap: 14px 18px;
     direction: ltr;
-    align-items: stretch;
 }
-.pt-form-grid .pt-row--r1 {
+.pt-form-grid > .pt-row--r1 {
+    grid-area: r1;
     display: grid;
     grid-template-columns: minmax(0, 200px) minmax(0, 1fr) minmax(0, 200px);
     gap: 14px 18px;
@@ -404,27 +404,13 @@ if ($subOptionsJson === false) {
     align-items: start;
     min-width: 0;
 }
-.pt-form-grid .pt-row--r1 > div {
+.pt-form-grid > .pt-row--r1 > div {
     min-width: 0;
 }
-.pt-form-grid .pt-row--r1 .admin-sort-field-wrap {
+.pt-form-grid > .pt-row--r1 .admin-sort-field-wrap {
     max-width: none;
     width: 100%;
 }
-.pt-form-grid .pt-row--r2 {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px 18px;
-    direction: ltr;
-    align-items: start;
-    min-width: 0;
-}
-.pt-form-grid .pt-row--r2 .pt-sk { grid-column: 1; }
-.pt-form-grid .pt-row--r2 .pt-ck { grid-column: 2; }
-.pt-form-grid .pt-row--r2 > div {
-    min-width: 0;
-}
-.pt-form-grid .pt-path { min-width: 0; width: 100%; }
 .pt-form-grid .pt-slug {
     min-width: 0;
     width: 100%;
@@ -434,27 +420,21 @@ if ($subOptionsJson === false) {
     max-width: none;
     box-sizing: border-box;
 }
-.pt-form-grid .pt-row--names1,
-.pt-form-grid .pt-row--names2 {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px 18px;
-    direction: ltr;
-    align-items: start;
-    min-width: 0;
+.pt-form-grid .pt-sort {
+    justify-self: stretch;
+    width: 100%;
 }
-.pt-form-grid .pt-row--names1 .pt-en { grid-column: 1; }
-.pt-form-grid .pt-row--names1 .pt-ar { grid-column: 2; }
-.pt-form-grid .pt-row--names2 .pt-hi { grid-column: 1; }
-.pt-form-grid .pt-row--names2 .pt-fil { grid-column: 2; }
-.pt-form-grid .pt-row--names1 > div,
-.pt-form-grid .pt-row--names2 > div {
-    min-width: 0;
+.pt-form-grid .pt-active {
+    justify-self: stretch;
+    width: 100%;
 }
-.pt-form-grid .pt-ar,
-.pt-form-grid .pt-en {
-    min-width: 0;
-}
+.pt-form-grid .pt-path { grid-area: path; min-width: 0; }
+.pt-form-grid .pt-ck { grid-area: ck; min-width: 0; width: 100%; }
+.pt-form-grid .pt-sk { grid-area: sk; min-width: 0; width: 100%; }
+.pt-form-grid .pt-ar { grid-area: ar; min-width: 0; }
+.pt-form-grid .pt-en { grid-area: en; min-width: 0; }
+.pt-form-grid .pt-fil { grid-area: fil; min-width: 0; }
+.pt-form-grid .pt-hi { grid-area: hi; min-width: 0; }
 /* تجاوز max-width لـ .admin-sort-field في admin.css (220px) حتى يملأ نصف الشبكة مثل #pt_name_ar */
 .pt-form-grid .pt-ck .admin-sort-field,
 .pt-form-grid .pt-sk .admin-sort-field {
@@ -544,22 +524,23 @@ if ($subOptionsJson === false) {
 }
 .pt-form-actions { justify-content: flex-end; }
 @media (max-width: 860px) {
-    .pt-form-grid .pt-row--r1,
-    .pt-form-grid .pt-row--r2,
-    .pt-form-grid .pt-row--names1,
-    .pt-form-grid .pt-row--names2 {
+    .pt-form-grid {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "r1"
+            "path"
+            "sk"
+            "ck"
+            "ar"
+            "en"
+            "fil"
+            "hi";
+    }
+    .pt-form-grid > .pt-row--r1 {
         grid-template-columns: 1fr;
     }
-    .pt-form-grid .pt-row--r2 .pt-sk,
-    .pt-form-grid .pt-row--r2 .pt-ck,
-    .pt-form-grid .pt-row--names1 .pt-en,
-    .pt-form-grid .pt-row--names1 .pt-ar,
-    .pt-form-grid .pt-row--names2 .pt-hi,
-    .pt-form-grid .pt-row--names2 .pt-fil {
-        grid-column: auto;
-    }
-    .pt-form-grid .pt-row--r1 .pt-sort,
-    .pt-form-grid .pt-row--r1 .pt-active {
+    .pt-form-grid .pt-sort,
+    .pt-form-grid .pt-active {
         justify-self: stretch;
         max-width: none;
     }
