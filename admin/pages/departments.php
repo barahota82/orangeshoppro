@@ -43,7 +43,7 @@ if ($hasDepartmentsTable) {
         بعد حفظ الأقسام، تابع من
         <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع شجرة المنتجات</a>
         لإضافة قسم كتالوج (Section) ثم فئة وتصنيف فرعي، ثم
-        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات (موحّد)</a>
+        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات الموحدة</a>
         ثم ربط المنتجات بـ <code>product_type_id</code> من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=products'), ENT_QUOTES, 'UTF-8'); ?>">المنتجات</a>.
     </p>
     <?php endif; ?>

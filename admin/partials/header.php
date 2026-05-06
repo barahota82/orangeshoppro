@@ -273,7 +273,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 ['page' => 'size_families', 'href' => '/admin/index.php?page=size_families', 'label' => 'عائلات المقاسات (3–4)', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'departments', 'href' => '/admin/index.php?page=departments', 'label' => 'الأقسام الرئيسية', 'class' => '', 'sub' => false],
                 ['page' => 'unified_catalog_branches', 'href' => '/admin/index.php?page=unified_catalog_branches', 'label' => 'فروع شجرة المنتجات', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'product_types', 'href' => '/admin/index.php?page=product_types', 'label' => 'أنواع المنتجات (موحّد)', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'product_types', 'href' => '/admin/index.php?page=product_types', 'label' => 'أنواع المنتجات الموحدة', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'catalog_attributes', 'href' => '/admin/index.php?page=catalog_attributes', 'label' => 'سمات الكتالوج', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'products', 'href' => '/admin/index.php?page=products', 'label' => 'المنتجات', 'class' => '', 'sub' => false],
                 ['page' => 'offers', 'href' => '/admin/index.php?page=offers', 'label' => 'عروض المنتجات', 'class' => '', 'sub' => false],
