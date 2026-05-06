@@ -69,64 +69,6 @@ if ($hasTable) {
 
 <div class="card">
     <h3>إضافة / تعديل سمة</h3>
-    <div class="ca-registration-help" dir="rtl">
-        <p class="ca-registration-help__lead">
-            <strong>آلية التسجيل:</strong> هنا تُعرَّف <strong>السمة</strong> (اسمها ونوعها وهل تُفلتر) مرة واحدة في الكتالوج.
-            القيم المسموحة (مثل نساء / رجال) <strong>لا تُدخل في هذا الجدول</strong>؛ تُكتب لاحقاً على <strong>كل منتج</strong> في شاشة المنتج ضمن «صفات الكتالوج» بنفس الصياغة حرفياً.
-        </p>
-        <div class="table-wrap ca-registration-help__wrap">
-            <table class="ca-registration-help__table">
-                <caption class="ca-registration-help__caption">خانات النموذج — مثال تسجيل سمة «الجنس»</caption>
-                <thead>
-                <tr>
-                    <th scope="col">الخانة</th>
-                    <th scope="col">المعنى</th>
-                    <th scope="col">ماذا تضع لمثال «الجنس»</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr>
-                    <td>ترتيب العرض</td>
-                    <td>ترتيب ظهور السمة في القوائم والمنتج</td>
-                    <td>رقم مناسب (مثلاً <code dir="ltr">1</code>)</td>
-                </tr>
-                <tr>
-                    <td><code dir="ltr">attribute_key</code></td>
-                    <td>مفتاح برمجي فريد للسمة</td>
-                    <td>يُولَّد تلقائياً عند الحفظ (لا تكتبه يدوياً)</td>
-                </tr>
-                <tr>
-                    <td>نشطة</td>
-                    <td>هل السمة متاحة للاستخدام</td>
-                    <td><strong>نعم</strong></td>
-                </tr>
-                <tr>
-                    <td>نوع الحقل</td>
-                    <td>شكل القيمة: واحد من قائمة ثابتة / نص / …</td>
-                    <td><strong>قائمة واحدة</strong> (قيمة واحدة من: نساء، رجال، …)</td>
-                </tr>
-                <tr>
-                    <td>قابلة للتصفية</td>
-                    <td>هل تُستخدم في فلاتر قائمة المنتجات في المتجر</td>
-                    <td><strong>نعم</strong> إن أردت تصفية بالجنس؛ وإلا <strong>لا</strong></td>
-                </tr>
-                <tr>
-                    <td>عربي (عنوان العرض)</td>
-                    <td>الاسم الظاهر للزائر وللفريق</td>
-                    <td><strong>الجنس</strong></td>
-                </tr>
-                <tr>
-                    <td>English / Filipino / Hindi</td>
-                    <td>عناوين بلغات أخرى (اختياري مع الترجمة)</td>
-                    <td>مثال EN: <code dir="ltr">Gender</code></td>
-                </tr>
-                </tbody>
-            </table>
-        </div>
-        <p class="ca-registration-help__note">
-            <strong>القيم (مثل نساء، رجال، …):</strong> عرّفها في الجدول أدناه «القيم المعرفة» ثم احفظ السمة؛ في المنتج تظهر <strong>قائمة منسدلة</strong> بها هذه القيم. إذا تركت «القيم المعرفة» فارغة يبقى إدخال القيمة <strong>نصاً حراً</strong> من صفحة المنتجات.
-        </p>
-    </div>
     <input type="hidden" id="ca_attr_id" value="0">
     <div class="ca-attr-form-grid">
         <div class="ca-row ca-row--r1">
@@ -263,59 +205,6 @@ if ($hasTable) {
 <?php endif; ?>
 
 <style>
-    .ca-registration-help {
-        margin: 0 0 18px;
-        padding: 12px 14px;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: var(--radius-sm, 10px);
-        line-height: 1.55;
-    }
-    .ca-registration-help__lead {
-        margin: 0 0 12px;
-        font-size: 0.93rem;
-        color: #334155;
-    }
-    .ca-registration-help__wrap {
-        margin: 0 0 12px;
-    }
-    .ca-registration-help__caption {
-        caption-side: top;
-        text-align: right;
-        font-weight: 600;
-        font-size: 0.92rem;
-        color: #1e293b;
-        padding: 0 0 8px;
-    }
-    .ca-registration-help__table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.88rem;
-        background: #fff;
-    }
-    .ca-registration-help__table th,
-    .ca-registration-help__table td {
-        padding: 8px 10px;
-        border: 1px solid #e8e9ec;
-        text-align: right;
-        vertical-align: top;
-    }
-    .ca-registration-help__table thead th {
-        background: #f1f5f9;
-        color: #0f172a;
-        font-weight: 600;
-    }
-    .ca-registration-help__table code {
-        font-size: 0.85em;
-        background: #f1f5f9;
-        padding: 1px 5px;
-        border-radius: 4px;
-    }
-    .ca-registration-help__note {
-        margin: 0;
-        font-size: 0.88rem;
-        color: #475569;
-    }
     .ca-attr-form-grid .ca-row--opts {
         grid-column: 1 / -1;
     }
