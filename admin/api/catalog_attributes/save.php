@@ -21,7 +21,6 @@ try {
     $data = get_json_input();
     $id = (int) ($data['id'] ?? 0);
 
-    $keyRaw = trim((string) ($data['attribute_key'] ?? ''));
     $labelAr = trim((string) ($data['label_ar'] ?? ''));
     $labelEn = trim((string) ($data['label_en'] ?? ''));
     $labelFil = trim((string) ($data['label_fil'] ?? ''));
@@ -31,23 +30,22 @@ try {
         json_response(['success' => false, 'message' => 'عنوان السمة بالعربي مطلوب.'], 422);
     }
 
+    /* attribute_key دائماً من الخادم: إنشاء = توليد؛ تحديث = المفتاح المحفوظ (لا يُقبل من العميل). */
     if ($id > 0) {
+        $prevKey = $pdo->prepare('SELECT attribute_key FROM catalog_attributes WHERE id = ? LIMIT 1');
+        $prevKey->execute([$id]);
+        $keyRaw = trim((string) $prevKey->fetchColumn());
         if ($keyRaw === '') {
-            $prevKey = $pdo->prepare('SELECT attribute_key FROM catalog_attributes WHERE id = ? LIMIT 1');
-            $prevKey->execute([$id]);
-            $keyRaw = trim((string) $prevKey->fetchColumn());
-            if ($keyRaw === '') {
-                json_response(['success' => false, 'message' => 'تعذر استرجاع المفتاح المحفوظ لهذه السمة.'], 500);
-            }
+            json_response(['success' => false, 'message' => 'السجل غير موجود.'], 404);
         }
-    } elseif ($keyRaw === '') {
+    } else {
         $keyRaw = orange_catalog_attribute_key_allocate_unique($pdo, $labelEn, $labelAr, 0);
     }
 
     if ($keyRaw === '' || !preg_match('/^[a-z][a-z0-9_-]{1,79}$/', $keyRaw)) {
         json_response([
             'success' => false,
-            'message' => 'المفتاح (attribute_key): حرف إنجليزي صغير أولاً، ثم حروف صغيرة/أرقام/ شرطة سفلية أو وسط؛ الطول حتى 80. اتركه فارغاً عند الإضافة للتوليد التلقائي.',
+            'message' => 'تعذر توليد attribute_key صالح. جرّب تعبئة English أو غيّر عنوان العربي.',
         ], 422);
     }
 
@@ -84,12 +82,6 @@ try {
     }
 
     if ($id > 0) {
-        $chk = $pdo->prepare('SELECT id FROM catalog_attributes WHERE id = ? LIMIT 1');
-        $chk->execute([$id]);
-        if (!$chk->fetch()) {
-            json_response(['success' => false, 'message' => 'السجل غير موجود.'], 404);
-        }
-
         $pdo->prepare(
             'UPDATE catalog_attributes SET attribute_key = ?, label_ar = ?, label_en = ?, label_fil = ?, label_hi = ?,
                 input_kind = ?, is_filterable = ?, sort_order = ?, is_active = ? WHERE id = ? LIMIT 1'

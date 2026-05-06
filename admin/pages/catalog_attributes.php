@@ -31,7 +31,6 @@ if ($hasTable) {
 ?>
 <div class="page-title">
     <h1>سمات الكتالوج</h1>
-    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;">تعريف المفاتيح الإنجليزية الثابتة وعناوين العرض؛ <strong>قيم كل منتج</strong> تُحفظ من صفحة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=products'), ENT_QUOTES, 'UTF-8'); ?>">المنتجات</a> ضمن «صفات الكتالوج». تعيين <code>is_filterable</code> يفعّل المنتج في معاملات الواجهة <code>attr_{key}</code> وواجهة <code>api/products/get-attribute-facets.php</code>. جدول <code>catalog_attribute_options</code> (يُنشأ مع المخطط) لقيم محددة مسبقاً اختيارية.</p>
 </div>
 
 <?php if (!$hasTable): ?>
@@ -51,12 +50,10 @@ if ($hasTable) {
                     min="0" step="1"
                     value="<?php echo $hasTable ? htmlspecialchars((string) $nextSort, ENT_QUOTES, 'UTF-8') : ''; ?>"
                     disabled>
-                <small class="ca-field-hint" id="ca_sort_hint">عند <strong>إضافة</strong> سمة جديدة: يُحدَّد تلقائياً في الخادم (القيمة المعروضة تقديرية). عند <strong>تعديل</strong>: يمكنك تغيير الرقم.</small>
             </div>
             <div class="ca-key-wrap">
-                <label>المفتاح الإنجليزي (attribute_key)</label>
-                <input type="text" id="ca_key" dir="ltr" lang="en" maxlength="80" placeholder="اتركه فارغاً للتوليد التلقائي (من English إن وُجد، وإلا من العربي)" autocomplete="off" <?php echo !$hasTable ? 'disabled' : ''; ?>>
-                <small class="ca-field-hint" id="ca_key_hint">عند <strong>إضافة</strong> فقط: فارغ = توليد تلقائي؛ أو أدخل مفتاحاً يدوياً (حرف صغير ثم a-z0-9_-). عند <strong>تعديل</strong>: يُعرض المفتاح المحفوظ ويمكن تغييره.</small>
+                <label for="ca_key">attribute_key</label>
+                <input type="text" id="ca_key" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" maxlength="80" readonly tabindex="-1" autocomplete="off" title="يُولَّد تلقائياً عند الحفظ ولا يُعدَّل يدوياً" aria-readonly="true" <?php echo !$hasTable ? 'disabled' : ''; ?>>
             </div>
             <div class="ca-active-wrap admin-sort-field-wrap">
                 <label>نشطة</label>
@@ -222,6 +219,8 @@ if ($hasTable) {
         box-sizing: border-box;
         text-align: left;
         direction: ltr;
+        cursor: default;
+        background: #f4f6f9;
     }
     .ca-attr-form-grid #ca_label_en {
         text-align: left;
@@ -387,7 +386,6 @@ async function saveCatalogAttribute() {
         const sortRaw = document.getElementById('ca_sort').value.trim();
         const sortVal = sortRaw === '' ? 0 : (parseInt(sortRaw, 10) || 0);
         const payload = {
-            attribute_key: document.getElementById('ca_key').value.trim(),
             label_ar: document.getElementById('ca_label_ar').value.trim(),
             label_en: document.getElementById('ca_label_en').value.trim(),
             label_fil: document.getElementById('ca_label_fil').value.trim(),
