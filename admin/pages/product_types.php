@@ -96,7 +96,7 @@ if ($hasTree) {
         $subOptsStmt = $pdo->query(
             'SELECT csub.id, csub.slug AS sub_slug, csub.name_ar AS sub_ar, csub.name_en AS sub_en,
                     cc.name_ar AS cat_ar, cc.name_en AS cat_en,
-                    cs.name_ar AS sec_ar, cs.name_en AS sec_en,
+                    cs.slug AS sec_slug, cs.name_ar AS sec_ar, cs.name_en AS sec_en,
                     d.name_ar AS dept_ar, d.name_en AS dept_en,
                     d.sort_order AS dept_so, d.id AS dept_id,
                     cs.sort_order AS sec_so, cs.id AS sec_id,
@@ -121,6 +121,7 @@ if ($hasTree) {
             $subOptions[] = [
                 'id' => $sid,
                 'label' => $branchLabel($r),
+                'sec_slug' => trim((string) ($r['sec_slug'] ?? '')),
             ];
         }
     } catch (Throwable $e) {
@@ -201,7 +202,7 @@ if ($subOptionsJson === false) {
         </div>
         <div class="pt-slug">
             <label for="pt_slug">slug</label>
-            <input type="text" id="pt_slug" class="pt-slug-auto" dir="ltr" lang="en" maxlength="191" autocomplete="off" title="يُولَّد تلقائياً من الاسم الإنجليزي"
+            <input type="text" id="pt_slug" class="pt-slug-auto" dir="ltr" lang="en" maxlength="191" autocomplete="off" title="يُولَّد تلقائياً: slug قسم الشجرة (catalog_sections) ثم الاسم الإنجليزي"
                 <?php echo $subOptions === [] ? 'disabled' : 'readonly'; ?>>
         </div>
         <div class="pt-active admin-sort-field-wrap">
@@ -527,13 +528,36 @@ function ptSlugify(str) {
     return s;
 }
 
+function ptSecSlugForSelectedSubcategory() {
+    var sel = document.getElementById('pt_catalog_subcategory_id');
+    var sid = sel ? (parseInt(String(sel.value || '').trim(), 10) || 0) : 0;
+    if (!sid || !Array.isArray(ptSubOptions)) {
+        return '';
+    }
+    var hit = null;
+    for (var i = 0; i < ptSubOptions.length; i++) {
+        if (ptSubOptions[i] && parseInt(String(ptSubOptions[i].id || 0), 10) === sid) {
+            hit = ptSubOptions[i];
+            break;
+        }
+    }
+    return hit && hit.sec_slug != null ? String(hit.sec_slug).trim() : '';
+}
+
+/** قسم داخلي (catalog_sections.slug) ثم الاسم الإنجليزي — يطابق حدود save.php للطول والأحرف. */
 function refreshPtSlugFromEnglish() {
     var slugEl = document.getElementById('pt_slug');
     var enEl = document.getElementById('pt_name_en');
     if (!slugEl || slugEl.disabled || !enEl) {
         return;
     }
-    slugEl.value = ptSlugify(enEl.value.trim());
+    var secPart = ptSlugify(ptSecSlugForSelectedSubcategory());
+    var enPart = ptSlugify(enEl.value.trim());
+    var combined = [secPart, enPart].filter(Boolean).join('-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    if (combined.length > 191) {
+        combined = combined.slice(0, 191).replace(/[-_]+$/g, '');
+    }
+    slugEl.value = combined;
 }
 
 function ptEnsureSelectOption(sel, value, label, dataLabels) {
@@ -719,10 +743,6 @@ function resetPtForm() {
 function editProductType(p) {
     document.getElementById('pt_id').value = String(p.id != null ? p.id : 0);
     document.getElementById('pt_catalog_subcategory_id').value = String(p.catalog_subcategory_id != null ? p.catalog_subcategory_id : '');
-    var sl = document.getElementById('pt_slug');
-    if (sl && !sl.disabled) {
-        sl.value = (p.slug && String(p.slug).trim()) || ptSlugify(String(p.name_en || '').trim());
-    }
     var pCk = p.expected_commercial_kind_key || '';
     var pSk = p.expected_sizing_category_key || '';
     if (PT_SIZING_DICT_SELECTS) {
@@ -742,6 +762,14 @@ function editProductType(p) {
     document.getElementById('pt_name_hi').value = p.name_hi || '';
     document.getElementById('pt_active').value = String((p.is_active === 0 || p.is_active === false) ? 0 : 1);
     warnIfSubNotInDropdown(p.catalog_subcategory_id);
+    var sl = document.getElementById('pt_slug');
+    if (sl && !sl.disabled) {
+        if (p.slug && String(p.slug).trim()) {
+            sl.value = String(p.slug).trim();
+        } else {
+            refreshPtSlugFromEnglish();
+        }
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -817,11 +845,9 @@ async function saveProductType() {
         const sortRaw = document.getElementById('pt_sort').value.trim();
         const sortParsed = sortRaw === '' ? 0 : (parseInt(sortRaw, 10) || 0);
         const nameEnTrim = document.getElementById('pt_name_en').value.trim();
-        const slugSync = ptSlugify(nameEnTrim);
+        refreshPtSlugFromEnglish();
         var slugEl = document.getElementById('pt_slug');
-        if (slugEl && !slugEl.disabled) {
-            slugEl.value = slugSync;
-        }
+        const slugSync = slugEl && !slugEl.disabled ? String(slugEl.value || '').trim() : ptSlugify(nameEnTrim);
         const payload = {
             catalog_subcategory_id: subId,
             slug: slugSync,
@@ -867,6 +893,10 @@ async function saveProductType() {
             refreshPtSlugFromEnglish();
             schedulePtTranslateFromEnglish();
         });
+    }
+    var subSel = document.getElementById('pt_catalog_subcategory_id');
+    if (subSel) {
+        subSel.addEventListener('change', refreshPtSlugFromEnglish);
     }
     ptInitSizingHierarchySelects();
     var tbody = document.getElementById('orange-pt-list-tbody');
