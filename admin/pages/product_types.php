@@ -544,15 +544,11 @@ function ptNextSortForSubcategoryId(sid) {
     return 1;
 }
 
+/** يحدّث «ترتيب ضمن الورقة» من بيانات الصفحة (MAX+1 للفرع المختار) — جديد أو بعد تغيير مسار الشجرة عند التعديل. */
 function ptApplyDefaultSortForNewRecord() {
     var sortEl = document.getElementById('pt_sort');
-    var idField = document.getElementById('pt_id');
     var subEl = document.getElementById('pt_catalog_subcategory_id');
-    if (!sortEl || sortEl.disabled || !idField) {
-        return;
-    }
-    var recId = parseInt(String(idField.value || '0'), 10) || 0;
-    if (recId > 0) {
+    if (!sortEl || sortEl.disabled) {
         return;
     }
     var subId = subEl ? (parseInt(String(subEl.value || ''), 10) || 0) : 0;
