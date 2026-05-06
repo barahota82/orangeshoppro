@@ -152,23 +152,8 @@ $tablesReady = $hasFamilies && $hasSizes;
         padding-inline: 12px;
     }
     .sf-fam-form-grid .sf-fam-names-row input.admin-sort-field--muted[readonly] {
-        background: rgba(248, 250, 252, 0.92);
+        background: #f4f6f9;
         cursor: default;
-        backdrop-filter: blur(6px);
-        -webkit-backdrop-filter: blur(6px);
-        border: 1px dashed #cbd5e1;
-    }
-    /* منع أي تداخل/تعمية تُنسب لخطأ للحقول القابلة للتحرير */
-    .sf-fam-form-grid .sf-fam-names-row #fam_name_ar,
-    .sf-fam-form-grid .sf-fam-names-row #fam_name_en {
-        position: relative;
-        z-index: 2;
-        pointer-events: auto;
-        -webkit-user-select: text;
-        user-select: text;
-        background-color: #fff;
-        cursor: text;
-        border-style: solid;
     }
     .sf-fam-form-grid label,
     .sf-fam-form-grid input,
@@ -297,7 +282,7 @@ $tablesReady = $hasFamilies && $hasSizes;
 <div class="card" id="sf_section_family_form" tabindex="-1">
     <h3>إضافة / تعديل عائلة</h3>
     <input type="hidden" id="fam_id" value="0">
-    <div class="sf-fam-form-grid">
+    <div class="form-grid sf-fam-form-grid">
         <div class="sf-fam-sort admin-sort-field-wrap">
             <label>الترتيب (تلقائي)</label>
             <input type="number" id="fam_sort" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int) $nextSort; ?>" disabled>
@@ -356,11 +341,21 @@ $tablesReady = $hasFamilies && $hasSizes;
         <div class="sf-fam-names-row">
             <div class="admin-sort-field-wrap">
                 <label for="fam_name_ar">الاسم العربي</label>
-                <input type="text" id="fam_name_ar" class="admin-sort-field" maxlength="191" autocomplete="off" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
+                <input type="text" id="fam_name_ar" class="admin-sort-field<?php echo $sizingDictForFamilyForm ? ' admin-sort-field--muted' : ''; ?>" maxlength="191" autocomplete="off"<?php
+                if ($sizingDictForFamilyForm && $hasFamilies) {
+                    echo ' readonly tabindex="-1" aria-readonly="true" title="يُشتق تلقائياً من النوع التجاري وفئة القياس والقالب — لا يُعدَّل يدوياً"';
+                }
+                echo !$hasFamilies ? ' disabled' : '';
+                ?>>
             </div>
             <div class="admin-sort-field-wrap">
                 <label for="fam_name_en">English</label>
-                <input type="text" id="fam_name_en" class="admin-sort-field" maxlength="191" autocomplete="off" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>
+                <input type="text" id="fam_name_en" class="admin-sort-field<?php echo $sizingDictForFamilyForm ? ' admin-sort-field--muted' : ''; ?>" maxlength="191" autocomplete="off"<?php
+                if ($sizingDictForFamilyForm && $hasFamilies) {
+                    echo ' readonly tabindex="-1" aria-readonly="true" title="يُشتق تلقائياً من النوع التجاري وفئة القياس والقالب — لا يُعدَّل يدوياً"';
+                }
+                echo !$hasFamilies ? ' disabled' : '';
+                ?>>
             </div>
             <div class="admin-sort-field-wrap">
                 <label for="fam_name_fil">Filipino</label>
@@ -1232,13 +1227,12 @@ async function saveSizesForFamily() {
     if (res.success) location.reload();
 }
 
-(function famBindFamilyNameTranslate() {
-    var arEl = document.getElementById('fam_name_ar');
-    if (!arEl) {
+(function famBindFamilyNameTranslateIfLegacy() {
+    if (FAM_SIZING_DICT_SELECTS) {
         return;
     }
-    arEl.addEventListener('input', scheduleFamilyEnTranslate);
-    arEl.addEventListener('change', function () {
+    document.getElementById('fam_name_ar').addEventListener('input', scheduleFamilyEnTranslate);
+    document.getElementById('fam_name_ar').addEventListener('change', function () {
         if (document.getElementById('fam_name_ar').value.trim()) {
             translateFamilyEn({ silent: true, forceFromArabic: true });
         }
@@ -1248,6 +1242,9 @@ async function saveSizesForFamily() {
 (function famBindFamNameEnFilHiSync() {
     var enEl = document.getElementById('fam_name_en');
     if (!enEl) {
+        return;
+    }
+    if (FAM_SIZING_DICT_SELECTS) {
         return;
     }
     enEl.addEventListener('input', function () {
