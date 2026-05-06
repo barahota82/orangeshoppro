@@ -43,59 +43,67 @@ if ($hasTable) {
 <div class="card">
     <h3>إضافة / تعديل سمة</h3>
     <input type="hidden" id="ca_attr_id" value="0">
-    <div class="ca-form-grid form-grid">
-        <div class="ca-key-wrap">
-            <label>المفتاح الإنجليزي (attribute_key)</label>
-            <input type="text" id="ca_key" dir="ltr" lang="en" maxlength="80" placeholder="مثال material أو care_notes" autocomplete="off" <?php echo !$hasTable ? 'disabled' : ''; ?>>
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;">حرف صغير أولاً، ثم صغيرة/أرقام/<wbr>_ أو -، حتى 80 محرفًا.</small>
+    <div class="form-grid ca-attr-form-grid">
+        <div class="ca-row ca-row--r1">
+            <div class="ca-sort-wrap admin-sort-field-wrap">
+                <label>ترتيب العرض</label>
+                <input type="number" id="ca_sort" class="admin-sort-field<?php echo !$hasTable ? ' admin-sort-field--muted' : ''; ?>" min="0" step="1" value=""
+                    placeholder="<?php echo htmlspecialchars('مقترح: ' . (string) $nextSort, ENT_QUOTES, 'UTF-8'); ?>"
+                    <?php echo !$hasTable ? 'disabled' : ''; ?>>
+                <small class="ca-field-hint">عند الإنشاء: اتركه فارغًا أو 0 ليُطبَّق الترتيب التلقائي في الخادم.</small>
+            </div>
+            <div class="ca-key-wrap">
+                <label>المفتاح الإنجليزي (attribute_key)</label>
+                <input type="text" id="ca_key" dir="ltr" lang="en" maxlength="80" placeholder="مثال material أو care_notes" autocomplete="off" <?php echo !$hasTable ? 'disabled' : ''; ?>>
+                <small class="ca-field-hint">حرف صغير أولاً، ثم صغيرة/أرقام/<wbr>_ أو -، حتى 80 محرفًا.</small>
+            </div>
+            <div class="ca-active-wrap admin-sort-field-wrap">
+                <label>نشطة</label>
+                <select id="ca_active" class="admin-sort-field" <?php echo !$hasTable ? 'disabled' : ''; ?>>
+                    <option value="1">نعم</option>
+                    <option value="0">لا</option>
+                </select>
+            </div>
         </div>
-        <div>
-            <label>نوع الحقل</label>
-            <select id="ca_input_kind" <?php echo !$hasTable ? 'disabled' : ''; ?>>
-                <?php foreach (['text_short' => 'نص قصير', 'text_long' => 'نص طويل', 'enum_single' => 'قائمة واحدة', 'multi' => 'متعدّد القيم', 'boolean' => 'نعم/لا'] as $k => $lbl): ?>
-                    <option value="<?php echo htmlspecialchars($k, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($lbl, ENT_QUOTES, 'UTF-8'); ?></option>
-                <?php endforeach; ?>
-            </select>
+        <div class="ca-row ca-row--r2">
+            <div class="ca-input-kind-wrap admin-sort-field-wrap">
+                <label>نوع الحقل</label>
+                <select id="ca_input_kind" class="admin-sort-field" <?php echo !$hasTable ? 'disabled' : ''; ?>>
+                    <?php foreach (['text_short' => 'نص قصير', 'text_long' => 'نص طويل', 'enum_single' => 'قائمة واحدة', 'multi' => 'متعدّد القيم', 'boolean' => 'نعم/لا'] as $k => $lbl): ?>
+                        <option value="<?php echo htmlspecialchars($k, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($lbl, ENT_QUOTES, 'UTF-8'); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="ca-filter-wrap admin-sort-field-wrap">
+                <label>قابلة للتصفية</label>
+                <select id="ca_filterable" class="admin-sort-field" <?php echo !$hasTable ? 'disabled' : ''; ?>>
+                    <option value="0">لا</option>
+                    <option value="1">نعم</option>
+                </select>
+            </div>
         </div>
-        <div class="ca-sort-wrap admin-sort-field-wrap">
-            <label>ترتيب العرض</label>
-            <input type="number" id="ca_sort" class="admin-sort-field<?php echo !$hasTable ? ' admin-sort-field--muted' : ''; ?>" min="0" step="1" value=""
-                placeholder="<?php echo htmlspecialchars('مقترح: ' . (string) $nextSort, ENT_QUOTES, 'UTF-8'); ?>"
-                <?php echo !$hasTable ? 'disabled' : ''; ?>>
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;">عند الإنشاء: اتركه فارغًا أو 0 ليُطبَّق الترتيب التلقائي في الخادم.</small>
+        <div class="ca-row ca-row--r3">
+            <div class="admin-sort-field-wrap">
+                <label for="ca_label_ar">عربي (عنوان العرض)</label>
+                <input type="text" id="ca_label_ar" class="admin-sort-field" <?php echo !$hasTable ? 'disabled' : ''; ?>>
+            </div>
+            <div class="admin-sort-field-wrap">
+                <label for="ca_label_en">English</label>
+                <input type="text" id="ca_label_en" class="admin-sort-field" dir="ltr" lang="en" <?php echo !$hasTable ? 'disabled' : ''; ?>>
+            </div>
         </div>
-        <div>
-            <label>عربي (عنوان العرض)</label>
-            <input type="text" id="ca_label_ar" <?php echo !$hasTable ? 'disabled' : ''; ?>>
-        </div>
-        <div>
-            <label>Filipino</label>
-            <input type="text" id="ca_label_fil" <?php echo !$hasTable ? 'disabled' : ''; ?>>
-        </div>
-        <div>
-            <label>English</label>
-            <input type="text" id="ca_label_en" dir="ltr" lang="en" <?php echo !$hasTable ? 'disabled' : ''; ?>>
-        </div>
-        <div>
-            <label>Hindi</label>
-            <input type="text" id="ca_label_hi" <?php echo !$hasTable ? 'disabled' : ''; ?>>
-        </div>
-        <div>
-            <label>قابلة للتصفية</label>
-            <select id="ca_filterable" <?php echo !$hasTable ? 'disabled' : ''; ?>>
-                <option value="0">لا</option>
-                <option value="1">نعم</option>
-            </select>
-        </div>
-        <div>
-            <label>نشطة</label>
-            <select id="ca_active" <?php echo !$hasTable ? 'disabled' : ''; ?>>
-                <option value="1">نعم</option>
-                <option value="0">لا</option>
-            </select>
+        <div class="ca-row ca-row--r4">
+            <div class="admin-sort-field-wrap">
+                <label for="ca_label_fil">Filipino</label>
+                <input type="text" id="ca_label_fil" class="admin-sort-field" <?php echo !$hasTable ? 'disabled' : ''; ?>>
+            </div>
+            <div class="admin-sort-field-wrap">
+                <label for="ca_label_hi">Hindi</label>
+                <input type="text" id="ca_label_hi" class="admin-sort-field" <?php echo !$hasTable ? 'disabled' : ''; ?>>
+            </div>
         </div>
     </div>
-    <div class="actions" style="margin-top:14px;gap:8px;flex-wrap:wrap;">
+    <div class="actions ca-attr-form-actions" style="margin-top:14px;gap:8px;flex-wrap:wrap;">
         <button type="button" onclick="saveCatalogAttribute()" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ السمة</button>
         <button type="button" class="btn-secondary" onclick="translateCatalogLabels({ forceFromArabic: true })" <?php echo !$hasTable ? 'disabled' : ''; ?>>ترجمة تلقائية</button>
         <button type="button" class="btn-secondary" onclick="resetCatalogAttrForm()" <?php echo !$hasTable ? 'disabled' : ''; ?>>جديد</button>
@@ -158,22 +166,120 @@ if ($hasTable) {
 <?php endif; ?>
 
 <style>
-.ca-form-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px 18px;
-    direction: ltr;
-}
-.ca-form-grid .ca-key-wrap { grid-column: 1 / -1; }
-.ca-form-grid label,
-.ca-form-grid input,
-.ca-form-grid select { direction: rtl; text-align: right; }
-.ca-form-grid #ca_key { text-align: left; direction: ltr; }
-.ca-form-grid #ca_label_en { text-align: left; }
-@media (max-width: 860px) {
-    .ca-form-grid { grid-template-columns: 1fr; }
-    .ca-form-grid .ca-key-wrap { grid-column: 1; }
-}
+    /* تنسيق مطابق لفكرة بطاقة «إضافة / تعديل عائلة» في size_families.php: صفوف شبكة + direction:rtl ليظهر الحقل المذكور أولاً على اليمين */
+    .ca-attr-form-grid {
+        display: grid;
+        gap: 14px 18px;
+        direction: ltr;
+        align-items: start;
+    }
+    .ca-attr-form-grid .ca-row {
+        display: grid;
+        gap: 14px 18px;
+        align-items: start;
+        min-width: 0;
+    }
+    .ca-attr-form-grid .ca-row--r1 {
+        grid-template-columns: minmax(0, 200px) minmax(0, 1fr) minmax(0, 200px);
+        direction: rtl;
+    }
+    .ca-attr-form-grid .ca-row--r2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        direction: rtl;
+    }
+    .ca-attr-form-grid .ca-row--r3,
+    .ca-attr-form-grid .ca-row--r4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        direction: rtl;
+    }
+    .ca-attr-form-grid .ca-row > div {
+        min-width: 0;
+    }
+    .ca-attr-form-grid .admin-sort-field-wrap {
+        max-width: none;
+        width: 100%;
+    }
+    .ca-attr-form-grid label,
+    .ca-attr-form-grid small.ca-field-hint {
+        direction: rtl;
+        text-align: right;
+    }
+    .ca-attr-form-grid .ca-field-hint {
+        display: block;
+        color: #666;
+        margin-top: 4px;
+        font-size: 0.85rem;
+        line-height: 1.4;
+    }
+    .ca-attr-form-grid #ca_key {
+        margin-inline: 0;
+        display: block;
+        width: 100%;
+        max-width: none;
+        box-sizing: border-box;
+        text-align: left;
+        direction: ltr;
+    }
+    .ca-attr-form-grid #ca_label_en {
+        text-align: left;
+    }
+    .ca-attr-form-grid input.admin-sort-field,
+    .ca-attr-form-grid select.admin-sort-field {
+        margin-inline: 0;
+        display: block;
+        width: 100%;
+        max-width: none;
+        box-sizing: border-box;
+    }
+    .ca-attr-form-grid .ca-active-wrap select#ca_active,
+    .ca-attr-form-grid .ca-input-kind-wrap select#ca_input_kind,
+    .ca-attr-form-grid .ca-filter-wrap select#ca_filterable {
+        border: 1px solid #cbd5e1;
+        border-radius: var(--radius-sm, 10px);
+        font-size: 14px;
+        line-height: calc(var(--input-min-h, 36px) - 2px);
+        min-height: var(--input-min-h, 36px);
+        height: var(--input-min-h, 36px);
+        max-height: var(--input-min-h, 36px);
+        padding-block: 0;
+        padding-inline: 12px;
+        -webkit-appearance: none;
+        appearance: none;
+        background-color: #fff;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M2.75 4.25L6 7.55l3.25-3.3.65.64L6 8.82 2.1 4.9l.65-.65z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-size: 12px;
+        background-position: left 12px center;
+        padding-inline-end: 32px;
+    }
+    .ca-attr-form-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        justify-content: flex-end;
+        flex-direction: row-reverse;
+    }
+    .ca-attr-form-actions > button {
+        min-height: var(--input-min-h, 40px);
+        box-sizing: border-box;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    @media (max-width: 720px) {
+        .ca-attr-form-grid .ca-row--r1,
+        .ca-attr-form-grid .ca-row--r2,
+        .ca-attr-form-grid .ca-row--r3,
+        .ca-attr-form-grid .ca-row--r4 {
+            grid-template-columns: 1fr;
+        }
+        .ca-attr-form-grid .ca-row--r1 .ca-sort-wrap,
+        .ca-attr-form-grid .ca-row--r1 .ca-active-wrap {
+            justify-self: stretch;
+            max-width: none;
+        }
+    }
 </style>
 
 <script>
