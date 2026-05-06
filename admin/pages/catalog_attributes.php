@@ -10,6 +10,7 @@ orange_catalog_ensure_schema($pdo);
 $hasTable = orange_table_exists($pdo, 'catalog_attributes');
 $attrs = [];
 $nextSort = 1;
+$caOptionsByAttrId = [];
 
 if ($hasTable) {
     try {
@@ -26,6 +27,33 @@ if ($hasTable) {
     } catch (Throwable $e) {
         $attrs = [];
         $nextSort = 1;
+    }
+    if (orange_table_exists($pdo, 'catalog_attribute_options')) {
+        try {
+            $orows = $pdo->query(
+                'SELECT catalog_attribute_id, label_ar, label_en, label_fil, label_hi, sort_order
+                 FROM catalog_attribute_options
+                 WHERE is_active = 1
+                 ORDER BY catalog_attribute_id ASC, sort_order ASC, id ASC'
+            )->fetchAll(PDO::FETCH_ASSOC);
+            foreach (is_array($orows) ? $orows : [] as $o) {
+                if (! is_array($o)) {
+                    continue;
+                }
+                $aid = (int) ($o['catalog_attribute_id'] ?? 0);
+                if ($aid <= 0) {
+                    continue;
+                }
+                $caOptionsByAttrId[$aid][] = [
+                    'label_ar' => (string) ($o['label_ar'] ?? ''),
+                    'label_en' => (string) ($o['label_en'] ?? ''),
+                    'label_fil' => (string) ($o['label_fil'] ?? ''),
+                    'label_hi' => (string) ($o['label_hi'] ?? ''),
+                ];
+            }
+        } catch (Throwable $e) {
+            $caOptionsByAttrId = [];
+        }
     }
 }
 ?>
@@ -96,10 +124,7 @@ if ($hasTable) {
             </table>
         </div>
         <p class="ca-registration-help__note">
-            <strong>القيم المسموحة للجنس على المنتج:</strong>
-            اكتب واحدة فقط لكل منتج من دون خطأ إملائي:
-            نساء، رجال، أطفال، مواليد، للجميع
-            — من شاشة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=products'), ENT_QUOTES, 'UTF-8'); ?>">المنتجات</a> بعد اختيار/إنشاء المنتج.
+            <strong>القيم (مثل نساء، رجال، …):</strong> عرّفها في الجدول أدناه «القيم المعرفة» ثم احفظ السمة؛ في المنتج تظهر <strong>قائمة منسدلة</strong> بها هذه القيم. إذا تركت «القيم المعرفة» فارغة يبقى إدخال القيمة <strong>نصاً حراً</strong> من صفحة المنتجات.
         </p>
     </div>
     <input type="hidden" id="ca_attr_id" value="0">
@@ -161,6 +186,17 @@ if ($hasTable) {
                 <input type="text" id="ca_label_hi" class="admin-sort-field" <?php echo !$hasTable ? 'disabled' : ''; ?>>
             </div>
         </div>
+        <div class="ca-row ca-row--opts" dir="rtl">
+            <div class="ca-row--opts-inner">
+                <h4 class="admin-product-subsection-title" style="margin:0 0 6px;">القيم المعرفة (اختياري)</h4>
+                <p class="ca-field-hint" style="margin:0 0 10px;">
+                    صف واحد = خيار واحد في قائمة المنتج. <strong>العربي</strong> هو النص المخزَّن للمنتج وللفلاتر (يجب أن يكون فريداً ضمن نفس السمة).
+                    إن لم تُضف صفوفاً يبقى حقل المنتج <strong>نصاً حراً</strong>.
+                </p>
+                <div id="ca_options_box"></div>
+                <button type="button" class="btn-secondary ca-opt-add-btn" onclick="caOptionsAddRow()" <?php echo !$hasTable ? 'disabled' : ''; ?>>+ إضافة قيمة</button>
+            </div>
+        </div>
     </div>
     <div class="actions ca-attr-form-actions admin-actions--start" style="margin-top:14px;gap:8px;flex-wrap:wrap;">
         <button type="button" class="btn-secondary" onclick="resetCatalogAttrForm()" <?php echo !$hasTable ? 'disabled' : ''; ?>>جديد</button>
@@ -184,6 +220,7 @@ if ($hasTable) {
                     <th style="padding:10px;text-align:right;border-bottom:1px solid #e8e9ec;">النوع</th>
                     <th style="padding:10px;text-align:right;border-bottom:1px solid #e8e9ec;">عربي</th>
                     <th style="padding:10px;text-align:right;border-bottom:1px solid #e8e9ec;">EN</th>
+                    <th style="padding:10px;text-align:center;border-bottom:1px solid #e8e9ec;">قيم معرفة</th>
                     <th style="padding:10px;text-align:center;border-bottom:1px solid #e8e9ec;">فلتر</th>
                     <th style="padding:10px;text-align:center;border-bottom:1px solid #e8e9ec;">ترتيب</th>
                     <th style="padding:10px;text-align:center;border-bottom:1px solid #e8e9ec;">نشط</th>
@@ -198,6 +235,7 @@ if ($hasTable) {
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;"><?php echo htmlspecialchars((string) ($row['input_kind'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;"><?php echo htmlspecialchars((string) ($row['label_ar'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;" dir="ltr" lang="en"><?php echo htmlspecialchars((string) ($row['label_en'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td style="padding:10px;border-bottom:1px solid #f0f1f5;text-align:center;"><?php echo (int) count($caOptionsByAttrId[(int) ($row['id'] ?? 0)] ?? []); ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;text-align:center;"><?php echo ((int) ($row['is_filterable'] ?? 0) === 1) ? '√' : '—'; ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;text-align:center;"><?php echo (int) ($row['sort_order'] ?? 0); ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;text-align:center;"><?php echo ((int) ($row['is_active'] ?? 0) === 1) ? '√' : '—'; ?></td>
@@ -277,6 +315,37 @@ if ($hasTable) {
         margin: 0;
         font-size: 0.88rem;
         color: #475569;
+    }
+    .ca-attr-form-grid .ca-row--opts {
+        grid-column: 1 / -1;
+    }
+    .ca-row--opts-inner {
+        width: 100%;
+        min-width: 0;
+    }
+    .ca-opt-row {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+        gap: 8px 12px;
+        align-items: end;
+        margin-bottom: 10px;
+        padding: 10px;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+    }
+    .ca-opt-row .ca-opt-remove {
+        min-height: var(--input-min-h, 36px);
+        align-self: end;
+    }
+    @media (max-width: 900px) {
+        .ca-opt-row {
+            grid-template-columns: 1fr 1fr;
+        }
+        .ca-opt-row .ca-opt-remove {
+            grid-column: 1 / -1;
+            justify-self: start;
+        }
     }
     /* تنسيق مطابق لفكرة بطاقة «إضافة / تعديل عائلة» في size_families.php: صفوف شبكة + direction:rtl ليظهر الحقل المذكور أولاً على اليمين */
     /* لا تضف form-grid هنا: admin.css يفرض عمودين فيضع صفّين (r1|r2) و(r3|r4) جنباً بدل أربعة أسطر */
@@ -397,10 +466,127 @@ if ($hasTable) {
 </style>
 
 <script>
+window.ORANGE_CATALOG_ATTR_OPTIONS = <?php echo json_encode($caOptionsByAttrId, JSON_UNESCAPED_UNICODE); ?>;
+if (!window.ORANGE_CATALOG_ATTR_OPTIONS || Array.isArray(window.ORANGE_CATALOG_ATTR_OPTIONS)) {
+    window.ORANGE_CATALOG_ATTR_OPTIONS = {};
+}
 window.ORANGE_CA_NEXT_SORT = <?php echo (int) $nextSort; ?>;
 let caTranslateTimer = null;
 let caEnTranslateTimer = null;
 let isSavingCatalogAttr = false;
+
+function caGetOptionsForAttrId(aid) {
+    var m = window.ORANGE_CATALOG_ATTR_OPTIONS;
+    if (!m || typeof m !== 'object' || Array.isArray(m)) {
+        return [];
+    }
+    var n = parseInt(String(aid || '0'), 10) || 0;
+    if (n <= 0) {
+        return [];
+    }
+    return m[n] || m[String(n)] || [];
+}
+
+function caOptionsCollect() {
+    var out = [];
+    var box = document.getElementById('ca_options_box');
+    if (!box) {
+        return out;
+    }
+    box.querySelectorAll('.ca-opt-row').forEach(function (row) {
+        var ar = row.querySelector('.ca-opt-ar');
+        var en = row.querySelector('.ca-opt-en');
+        var fil = row.querySelector('.ca-opt-fil');
+        var hi = row.querySelector('.ca-opt-hi');
+        out.push({
+            label_ar: ar ? ar.value.trim() : '',
+            label_en: en ? en.value.trim() : '',
+            label_fil: fil ? fil.value.trim() : '',
+            label_hi: hi ? hi.value.trim() : ''
+        });
+    });
+    return out;
+}
+
+function caOptionsPayload() {
+    return caOptionsCollect().filter(function (r) {
+        return (r.label_ar || '').trim() !== '';
+    });
+}
+
+function caOptionsRender(rows) {
+    var box = document.getElementById('ca_options_box');
+    if (!box) {
+        return;
+    }
+    box.innerHTML = '';
+    if (!rows || rows.length === 0) {
+        var p = document.createElement('p');
+        p.className = 'ca-field-hint';
+        p.style.margin = '0';
+        p.textContent = 'لا توجد قيم معرفة — سيُستخدم حقل نص حر في صفحة المنتج لهذه السمة.';
+        box.appendChild(p);
+        return;
+    }
+    rows.forEach(function (r) {
+        var wrap = document.createElement('div');
+        wrap.className = 'ca-opt-row';
+        function addField(cls, label, val, ph, useLtr) {
+            var d = document.createElement('div');
+            d.className = 'admin-sort-field-wrap';
+            var lb = document.createElement('label');
+            lb.textContent = label;
+            var inp = document.createElement('input');
+            inp.type = 'text';
+            inp.className = 'admin-sort-field ' + cls;
+            inp.value = val != null ? String(val) : '';
+            if (ph) {
+                inp.setAttribute('placeholder', ph);
+            }
+            if (useLtr) {
+                inp.setAttribute('dir', 'ltr');
+            }
+            d.appendChild(lb);
+            d.appendChild(inp);
+            wrap.appendChild(d);
+        }
+        addField('ca-opt-ar', 'العربي (القيمة المحفوظة)', r.label_ar || '', '', false);
+        addField('ca-opt-en', 'English', r.label_en || '', '', true);
+        addField('ca-opt-fil', 'Filipino', r.label_fil || '', '', true);
+        addField('ca-opt-hi', 'Hindi', r.label_hi || '', '', true);
+        var rm = document.createElement('button');
+        rm.type = 'button';
+        rm.className = 'btn-secondary ca-opt-remove';
+        rm.textContent = 'حذف';
+        rm.onclick = function () {
+            caOptionsRemoveRow(rm);
+        };
+        wrap.appendChild(rm);
+        box.appendChild(wrap);
+    });
+}
+
+function caOptionsRenderFromAttrId(aid) {
+    caOptionsRender(caGetOptionsForAttrId(aid));
+}
+
+function caOptionsAddRow() {
+    var cur = caOptionsCollect();
+    cur.push({ label_ar: '', label_en: '', label_fil: '', label_hi: '' });
+    caOptionsRender(cur);
+}
+
+function caOptionsRemoveRow(btn) {
+    var row = btn && btn.closest ? btn.closest('.ca-opt-row') : null;
+    if (!row) {
+        return;
+    }
+    row.remove();
+    var box = document.getElementById('ca_options_box');
+    if (box && !box.querySelector('.ca-opt-row')) {
+        caOptionsRender([]);
+    }
+}
 
 function applyCatalogAttrFormMode(editMode) {
     var sortEl = document.getElementById('ca_sort');
@@ -426,6 +612,7 @@ function resetCatalogAttrForm() {
     document.getElementById('ca_label_hi').value = '';
     document.getElementById('ca_filterable').value = '0';
     document.getElementById('ca_active').value = '1';
+    caOptionsRender([]);
     applyCatalogAttrFormMode(false);
 }
 
@@ -440,6 +627,7 @@ function editCatalogAttribute(a) {
     document.getElementById('ca_label_hi').value = a.label_hi || '';
     document.getElementById('ca_filterable').value = String((a.is_filterable === 1 || a.is_filterable === true) ? 1 : 0);
     document.getElementById('ca_active').value = String((a.is_active === 0 || a.is_active === false) ? 0 : 1);
+    caOptionsRenderFromAttrId(a.id);
     applyCatalogAttrFormMode(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -508,6 +696,7 @@ async function saveCatalogAttribute() {
             is_active: parseInt(document.getElementById('ca_active').value || '1', 10) ? 1 : 0
         };
         if (recordId > 0) payload.id = recordId;
+        payload.options = caOptionsPayload();
         const res = await postJSON('/admin/api/catalog_attributes/save.php', payload);
         alert(res.message || (res.success ? 'تم الحفظ' : 'فشل'));
         if (res.success) location.reload();
@@ -532,6 +721,7 @@ async function saveCatalogAttribute() {
     if (enEl) {
         enEl.addEventListener('input', scheduleCatalogAttrTranslateFromEnglish);
     }
+    caOptionsRender([]);
     var tbody = document.getElementById('orange-ca-list-tbody');
     if (tbody) {
         tbody.addEventListener('click', function (ev) {

@@ -93,6 +93,46 @@ if (orange_table_exists($pdo, 'catalog_attributes')) {
     }
 }
 
+$catalogAttrOptionsByAttrId = [];
+if ($catalogAttributesActive !== [] && orange_table_exists($pdo, 'catalog_attribute_options')) {
+    try {
+        $attrIds = [];
+        foreach ($catalogAttributesActive as $caRow) {
+            if (! is_array($caRow)) {
+                continue;
+            }
+            $aid = (int) ($caRow['id'] ?? 0);
+            if ($aid > 0) {
+                $attrIds[] = $aid;
+            }
+        }
+        $attrIds = array_values(array_unique($attrIds));
+        if ($attrIds !== []) {
+            $placeholders = implode(',', array_fill(0, count($attrIds), '?'));
+            $stOp = $pdo->prepare(
+                "SELECT catalog_attribute_id, label_ar, label_en, sort_order
+                 FROM catalog_attribute_options
+                 WHERE is_active = 1 AND catalog_attribute_id IN ($placeholders)
+                 ORDER BY catalog_attribute_id ASC, sort_order ASC, id ASC"
+            );
+            $stOp->execute($attrIds);
+            $opRows = $stOp->fetchAll(PDO::FETCH_ASSOC);
+            foreach (is_array($opRows) ? $opRows : [] as $or) {
+                if (! is_array($or)) {
+                    continue;
+                }
+                $aid = (int) ($or['catalog_attribute_id'] ?? 0);
+                if ($aid <= 0) {
+                    continue;
+                }
+                $catalogAttrOptionsByAttrId[$aid][] = $or;
+            }
+        }
+    } catch (Throwable $e) {
+        $catalogAttrOptionsByAttrId = [];
+    }
+}
+
 $categorySelectRequiresAttr = $catalogNavUnified ? '' : ' required';
 
 $hasDepartmentsTable = false;
@@ -481,7 +521,8 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
             <?php $catAttrHref = htmlspecialchars(storefront_public_path('/admin/index.php?page=catalog_attributes'), ENT_QUOTES, 'UTF-8'); ?>
             <div style="grid-column:1/-1;">
                 <h4 class="admin-product-subsection-title" style="margin:8px 0 4px;">صفات الكتالوج</h4>
-                <p style="margin:0 0 12px;color:#666;font-size:13px;line-height:1.45;">قيم اختيارية لكل سمة معرّفة ونشطة (مرحلة الموحَّد «الصفات»). المرجع: <a href="<?php echo $catAttrHref; ?>">جدول السمات</a> — الإدارة الكاملة للتعريفات بالقاعدة كما خطّط المشروع؛ هنا إدخال القيم على المنتج فقط.</p>
+                <p style="margin:0 0 12px;color:#666;font-size:13px;line-height:1.45;">قيم اختيارية لكل سمة معرّفة ونشطة (مرحلة الموحَّد «الصفات»). المرجع: <a href="<?php echo $catAttrHref; ?>">جدول السمات</a> — الإدارة الكاملة للتعريفات بالقاعدة كما خطّط المشروع؛ هنا إدخال القيم على المنتج فقط.
+                    <strong>لا توجد قائمة «اختر سمة»:</strong> كل سمة نشطة تظهر كسطر لاحقاً في هذا القسم؛ عنوان السطر (مثل الجنس) هو السمة، والحقل النصي تحته للقيمة فقط (اتركه فارغاً إن لم تنطبق على هذا المنتج).</p>
                 <?php foreach ($catalogAttributesActive as $cattr): ?>
                     <?php
                     $caid = (int) $cattr['id'];
@@ -491,10 +532,31 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         'UTF-8'
                     );
                     $ckey = htmlspecialchars((string) ($cattr['attribute_key'] ?? ''), ENT_QUOTES, 'UTF-8');
+                    $pavOpts = $catalogAttrOptionsByAttrId[$caid] ?? [];
                     ?>
                     <div class="orange-product-pav-row" style="margin-bottom:10px;">
                         <label style="display:block;margin-bottom:4px;font-weight:500;"><?php echo $clabel; ?> <small style="color:#94a3b8;font-weight:400;"><?php echo $ckey; ?></small></label>
+                        <?php if ($pavOpts !== []): ?>
+                        <select class="orange-pav-input admin-sort-field" data-catalog-attribute-id="<?php echo $caid; ?>" style="width:100%;max-width:520px;">
+                            <option value="">— بدون —</option>
+                            <?php foreach ($pavOpts as $opt): ?>
+                                <?php
+                                if (! is_array($opt)) {
+                                    continue;
+                                }
+                                $optAr = trim((string) ($opt['label_ar'] ?? ''));
+                                if ($optAr === '') {
+                                    continue;
+                                }
+                                $optEn = trim((string) ($opt['label_en'] ?? ''));
+                                $optDisp = $optAr . ($optEn !== '' ? ' / ' . $optEn : '');
+                                ?>
+                            <option value="<?php echo htmlspecialchars($optAr, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($optDisp, ENT_QUOTES, 'UTF-8'); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <?php else: ?>
                         <input type="text" class="orange-pav-input" data-catalog-attribute-id="<?php echo $caid; ?>" maxlength="767" dir="auto" autocomplete="off" placeholder="" style="width:100%;max-width:520px;">
+                        <?php endif; ?>
                     </div>
                 <?php endforeach; ?>
             </div>

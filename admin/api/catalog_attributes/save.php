@@ -81,10 +81,42 @@ try {
         json_response(['success' => false, 'message' => 'المفتاح الإنجليزي مستخدم لسمة أخرى.'], 409);
     }
 
-    if ($id > 0) {
+    $optionsIn = null;
+    if (array_key_exists('options', $data)) {
+        $optionsIn = is_array($data['options']) ? $data['options'] : [];
+    }
+
+    $pdo->beginTransaction();
+    try {
+        if ($id > 0) {
+            $pdo->prepare(
+                'UPDATE catalog_attributes SET attribute_key = ?, label_ar = ?, label_en = ?, label_fil = ?, label_hi = ?,
+                    input_kind = ?, is_filterable = ?, sort_order = ?, is_active = ? WHERE id = ? LIMIT 1'
+            )->execute([
+                $keyRaw,
+                $labelAr,
+                $labelEn,
+                $labelFil,
+                $labelHi,
+                $inputKind,
+                $filterable,
+                $sortOrder,
+                $active,
+                $id,
+            ]);
+            if ($optionsIn !== null) {
+                orange_catalog_attribute_options_replace($pdo, $id, $optionsIn);
+            }
+            audit_log('catalog_attribute_save', 'تحديث سمة كتالوج: ' . $keyRaw, 'catalog_attributes', $id);
+            $pdo->commit();
+            json_response(['success' => true, 'id' => $id]);
+        }
+
         $pdo->prepare(
-            'UPDATE catalog_attributes SET attribute_key = ?, label_ar = ?, label_en = ?, label_fil = ?, label_hi = ?,
-                input_kind = ?, is_filterable = ?, sort_order = ?, is_active = ? WHERE id = ? LIMIT 1'
+            'INSERT INTO catalog_attributes (
+                attribute_key, label_ar, label_en, label_fil, label_hi,
+                input_kind, is_filterable, sort_order, is_active
+            ) VALUES (?,?,?,?,?,?,?,?,?)'
         )->execute([
             $keyRaw,
             $labelAr,
@@ -95,31 +127,25 @@ try {
             $filterable,
             $sortOrder,
             $active,
-            $id,
         ]);
-        audit_log('catalog_attribute_save', 'تحديث سمة كتالوج: ' . $keyRaw, 'catalog_attributes', $id);
-        json_response(['success' => true, 'id' => $id]);
+        $newId = (int) $pdo->lastInsertId();
+        if ($optionsIn !== null) {
+            orange_catalog_attribute_options_replace($pdo, $newId, $optionsIn);
+        }
+        audit_log('catalog_attribute_save', 'إضافة سمة كتالوج: ' . $keyRaw, 'catalog_attributes', $newId);
+        $pdo->commit();
+        json_response(['success' => true, 'id' => $newId]);
+    } catch (\InvalidArgumentException $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        json_response(['success' => false, 'message' => $e->getMessage()], 422);
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
     }
-
-    $pdo->prepare(
-        'INSERT INTO catalog_attributes (
-            attribute_key, label_ar, label_en, label_fil, label_hi,
-            input_kind, is_filterable, sort_order, is_active
-        ) VALUES (?,?,?,?,?,?,?,?,?)'
-    )->execute([
-        $keyRaw,
-        $labelAr,
-        $labelEn,
-        $labelFil,
-        $labelHi,
-        $inputKind,
-        $filterable,
-        $sortOrder,
-        $active,
-    ]);
-    $newId = (int) $pdo->lastInsertId();
-    audit_log('catalog_attribute_save', 'إضافة سمة كتالوج: ' . $keyRaw, 'catalog_attributes', $newId);
-    json_response(['success' => true, 'id' => $newId]);
 } catch (Throwable $e) {
     orange_admin_api_catch($e, 'تعذر حفظ سمة الكتالوج');
 }
