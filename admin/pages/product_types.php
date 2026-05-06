@@ -367,7 +367,7 @@ if ($subOptionsJson === false) {
     grid-template-areas:
         "active active active slug slug slug slug slug slug sort sort sort"
         "path path path path path path path path path path path path"
-        "ck ck ck ck ck ck sk sk sk sk sk sk"
+        "sk sk sk sk sk sk ck ck ck ck ck ck"
         "en en en en en en ar ar ar ar ar ar"
         "hi hi hi hi hi hi fil fil fil fil fil fil";
     gap: 14px 18px;
