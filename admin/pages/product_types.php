@@ -186,8 +186,7 @@ if ($subOptionsJson === false) {
 }
 ?>
 <div class="page-title">
-    <h1>أنواع المنتجات — الشجرة الموحّدة</h1>
-    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.55;">ورقة قبل SKU تحت التصنيف الفرعي الموحّد؛ ربط المنتجات يتم عبر <code>product_type_id</code>. حدّد <strong>مسار الشجرة</strong> ثم <strong>النوع التجاري</strong> و<strong>فئة القياس</strong> (هرَم المقاس 1–2 من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">القاموس المرجعي</a>)؛ عند تسجيل منتج تُعرض عائلات المقاسات المطابقة لهذا الهرم فقط في شاشة المنتجات. الفروع: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع شجرة المنتجات</a> — العائلات: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_families'), ENT_QUOTES, 'UTF-8'); ?>">عائلات المقاسات</a>.</p>
+    <h1>أنواع المنتجات الموحدة</h1>
 </div>
 
 <?php if (!$hasTree): ?>
