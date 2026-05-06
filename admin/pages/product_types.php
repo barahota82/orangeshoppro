@@ -569,6 +569,8 @@ window.PT_BOOTSTRAP_COMMERCIAL_KINDS = <?php echo $ptCommercialKindsJson; ?>;
 window.PT_BOOTSTRAP_SIZING_CATS_BY_KIND = <?php echo $ptSizingCatsByKindJson; ?>;
 let ptTranslateTimer = null;
 let ptEnTranslateTimer = null;
+/** أنواع المنتجات: ترجمة أسرع عند تعديل الاسم العربي/الإنجليزي. */
+const PT_TRANSLATE_DEBOUNCE_MS = 200;
 let isSavingPt = false;
 
 /** يطابق تقريباً التحقق في admin/api/product_types/save.php (حروف صغيرة وأرقام و _ و -). */
@@ -882,7 +884,7 @@ function schedulePtAutoTranslate() {
     if (ptTranslateTimer) clearTimeout(ptTranslateTimer);
     ptTranslateTimer = setTimeout(function () {
         translatePtNames({ silent: true, forceFromArabic: true });
-    }, 700);
+    }, PT_TRANSLATE_DEBOUNCE_MS);
 }
 
 function schedulePtTranslateFromEnglish() {
@@ -891,7 +893,7 @@ function schedulePtTranslateFromEnglish() {
         const en = document.getElementById('pt_name_en').value.trim();
         if (!en) return;
         translatePtNames({ silent: true, forceFromArabic: false });
-    }, 650);
+    }, PT_TRANSLATE_DEBOUNCE_MS);
 }
 
 async function saveProductType() {

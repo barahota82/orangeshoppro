@@ -16,6 +16,8 @@ const ucNextSortBySec = <?php echo $ucNextSecJ; ?>;
 const ucNextSortByCat = <?php echo $ucNextCatJ; ?>;
 let ucTimers = {};
 let ucEnTimers = {};
+/** فروع الشجرة الموحّدة: ترجمة سريعة عند الكتابة (أقصر من شاشات الأدمن العامة). */
+const UC_TRANSLATE_DEBOUNCE_MS = 200;
 let ucSaving = false;
 const ucSlugManual = { sec: false, cat: false, sub: false };
 let ucSlugSkipInputEvent = false;
@@ -519,7 +521,7 @@ function scheduleUcTranslate(which) {
                 refreshUcSlug(which);
             }
         } catch (e) { /* silent */ }
-    }, 700);
+    }, UC_TRANSLATE_DEBOUNCE_MS);
 }
 
 function scheduleUcFromEn(which) {
@@ -542,7 +544,7 @@ function scheduleUcFromEn(which) {
                 if (t.name_hi) document.getElementById(m.hi).value = t.name_hi;
             }
         } catch (e) { /* silent */ }
-    }, 650);
+    }, UC_TRANSLATE_DEBOUNCE_MS);
 }
 
 (function () {
