@@ -120,9 +120,27 @@ function ucBindSlugAuto(which, prefix) {
     });
 }
 
+/** تعيين slug عند التعديل دون اعتباره كتابة يدوية (يُتخطى حدث input الذي كان يثبّت ucSlugManual). */
+function ucSetSlugValueFromRecord(which, raw) {
+    const map = { sec: 'uc_sec_', cat: 'uc_cat_', sub: 'uc_sub_' };
+    const p = map[which];
+    const slugEl = p ? document.getElementById(p + 'slug') : null;
+    if (!slugEl || slugEl.disabled) {
+        return;
+    }
+    ucSlugSkipInputEvent = true;
+    slugEl.value = raw != null ? String(raw) : '';
+    ucSlugManual[which] = false;
+    setTimeout(function () { ucSlugSkipInputEvent = false; }, 0);
+}
+
 function ucEnsureSlugBeforeSave(prefix, which) {
     const slugEl = document.getElementById(prefix + 'slug');
     if (!slugEl || slugEl.disabled) {
+        return;
+    }
+    if (!ucSlugManual[which]) {
+        refreshUcSlug(which);
         return;
     }
     if (!slugEl.value.trim()) {
@@ -303,14 +321,13 @@ function resetUcSection() {
 function editUcSection(j) {
     document.getElementById('uc_sec_id').value = String(j.id);
     document.getElementById('uc_sec_department_id').value = String(j.department_id);
-    document.getElementById('uc_sec_slug').value = j.slug || '';
+    ucSetSlugValueFromRecord('sec', j.slug || '');
     document.getElementById('uc_sec_sort').value = j.sort_order > 0 ? String(j.sort_order) : '';
     document.getElementById('uc_sec_name_ar').value = j.name_ar || '';
     document.getElementById('uc_sec_name_en').value = j.name_en || '';
     document.getElementById('uc_sec_name_fil').value = j.name_fil || '';
     document.getElementById('uc_sec_name_hi').value = j.name_hi || '';
     document.getElementById('uc_sec_active').value = String(j.is_active === 0 ? 0 : 1);
-    ucSlugManual.sec = false;
     ucScrollToBranchCard('sec');
 }
 
@@ -353,15 +370,13 @@ function resetUcCategory() {
 function editUcCategory(j) {
     document.getElementById('uc_cat_id').value = String(j.id);
     ucEnsureOption('uc_cat_section_id', j.catalog_section_id, ucSectionOptions);
-    document.getElementById('uc_cat_slug').value = j.slug || '';
+    ucSetSlugValueFromRecord('cat', j.slug || '');
     document.getElementById('uc_cat_sort').value = j.sort_order > 0 ? String(j.sort_order) : '';
     document.getElementById('uc_cat_name_ar').value = j.name_ar || '';
     document.getElementById('uc_cat_name_en').value = j.name_en || '';
     document.getElementById('uc_cat_name_fil').value = j.name_fil || '';
     document.getElementById('uc_cat_name_hi').value = j.name_hi || '';
     document.getElementById('uc_cat_active').value = String(j.is_active === 0 ? 0 : 1);
-    /* false = يعاد توليد slug من الإنجليزي + بادئة القسم عند التعديل (مثل catalog_sections). */
-    ucSlugManual.cat = false;
     ucScrollToBranchCard('cat');
 }
 
@@ -419,15 +434,13 @@ function resetUcSubcategory() {
 function editUcSubcategory(j) {
     document.getElementById('uc_sub_id').value = String(j.id);
     ucEnsureOption('uc_sub_category_id', j.catalog_category_id, ucCategoryOptions);
-    document.getElementById('uc_sub_slug').value = j.slug || '';
+    ucSetSlugValueFromRecord('sub', j.slug || '');
     document.getElementById('uc_sub_sort').value = j.sort_order > 0 ? String(j.sort_order) : '';
     document.getElementById('uc_sub_name_ar').value = j.name_ar || '';
     document.getElementById('uc_sub_name_en').value = j.name_en || '';
     document.getElementById('uc_sub_name_fil').value = j.name_fil || '';
     document.getElementById('uc_sub_name_hi').value = j.name_hi || '';
     document.getElementById('uc_sub_active').value = String(j.is_active === 0 ? 0 : 1);
-    /* false = يعاد توليد slug من الإنجليزي + بادئة الفئة عند التعديل. */
-    ucSlugManual.sub = false;
     ucScrollToBranchCard('sub');
 }
 
