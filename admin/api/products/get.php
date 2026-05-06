@@ -23,7 +23,6 @@ try {
                    pt.name_ar AS product_type_name_ar,
                    pt.name_en AS product_type_name_en,
                    pt.slug AS product_type_slug,
-                   pt.expected_size_scheme_key AS product_type_expected_size_scheme_key,
                    pt.expected_commercial_kind_key AS product_type_expected_commercial_kind_key,
                    pt.expected_sizing_category_key AS product_type_expected_sizing_category_key
             FROM products p
@@ -98,7 +97,6 @@ try {
                pt.name_ar AS product_type_name_ar,
                pt.name_en AS product_type_name_en,
                pt.slug AS product_type_slug,
-               pt.expected_size_scheme_key AS product_type_expected_size_scheme_key,
                pt.expected_commercial_kind_key AS product_type_expected_commercial_kind_key,
                pt.expected_sizing_category_key AS product_type_expected_sizing_category_key
         FROM products p

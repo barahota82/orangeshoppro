@@ -15,7 +15,7 @@ $productTypesForForm = [];
 if (orange_table_exists($pdo, 'product_types')) {
     try {
         $productTypesForForm = $pdo->query(
-            'SELECT id, slug, name_ar, name_en, expected_size_scheme_key,
+            'SELECT id, slug, name_ar, name_en,
                     expected_commercial_kind_key, expected_sizing_category_key
              FROM product_types WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
         )->fetchAll(PDO::FETCH_ASSOC);
@@ -301,11 +301,11 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         $ptExpCk = htmlspecialchars(trim((string) ($prt['expected_commercial_kind_key'] ?? '')), ENT_QUOTES, 'UTF-8');
                         $ptExpSk = htmlspecialchars(trim((string) ($prt['expected_sizing_category_key'] ?? '')), ENT_QUOTES, 'UTF-8');
                         ?>
-                        <option value="<?php echo (int) $prt['id']; ?>" data-slug="<?php echo $ptSlug; ?>" data-expected-scheme="<?php echo htmlspecialchars(trim((string) ($prt['expected_size_scheme_key'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>" data-expected-kind="<?php echo $ptExpCk; ?>" data-expected-cat="<?php echo $ptExpSk; ?>"><?php echo $ptLabel; ?></option>
+                        <option value="<?php echo (int) $prt['id']; ?>" data-slug="<?php echo $ptSlug; ?>" data-expected-kind="<?php echo $ptExpCk; ?>" data-expected-cat="<?php echo $ptExpSk; ?>"><?php echo $ptLabel; ?></option>
                     <?php endforeach; ?>
                 </select>
                 <?php if ($catalogNavUnified): ?>
-                    <small style="display:block;color:#666;margin-top:4px;line-height:1.45;">يجب مطابقة الورقة لمسار المتجر الموحّد. تهيئة الفروع من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع شجرة المنتجات</a> و<a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات (موحّد)</a>؛ مخطّط المقاس المتوقّع على الورقة، وهرَم المقاس (1–2) من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">القاموس المرجعي</a>. <strong>مصدر التصنيف على المنتج هو هذه الورقة فقط</strong>؛ الحقول القديمة على المنتج تُحدَّث آلياً عند وجود جسر ترحيل.</small>
+                    <small style="display:block;color:#666;margin-top:4px;line-height:1.45;">يجب مطابقة الورقة لمسار المتجر الموحّد. تهيئة الفروع من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع شجرة المنتجات</a> و<a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات (موحّد)</a>؛ على الورقة يُحدَّد <strong>هرَم المقاس 1–2</strong> (النوع التجاري وفئة القياس) من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">القاموس المرجعي</a> لتصفية عائلات المقاسات في تبويب المقاسات. <strong>مصدر التصنيف على المنتج هو هذه الورقة فقط</strong>؛ الحقول القديمة على المنتج تُحدَّث آلياً عند وجود جسر ترحيل.</small>
                 <?php else: ?>
                     <small style="display:block;color:#666;margin-top:4px;line-height:1.45;">تهيئة الشجرة الموحّدة: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع شجرة المنتجات</a> ثم <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات (موحّد)</a>.</small>
                 <?php endif; ?>
@@ -760,15 +760,6 @@ function orangeSyncLegacyFieldsFromProductType() {
     }
 }
 
-function orangeGetSelectedProductTypeExpectedScheme() {
-    const el = document.getElementById('product_type_id');
-    if (!el || !el.value) {
-        return '';
-    }
-    const opt = el.options[el.selectedIndex];
-    return opt ? String(opt.getAttribute('data-expected-scheme') || '').trim() : '';
-}
-
 function orangeGetSelectedProductTypeExpectedKind() {
     const el = document.getElementById('product_type_id');
     if (!el || !el.value) {
@@ -805,7 +796,6 @@ function orangeApplySizeFamilySchemeFilter() {
         return;
     }
 
-    const expected = orangeGetSelectedProductTypeExpectedScheme();
     const expKind = orangeGetSelectedProductTypeExpectedKind();
     const expCat = orangeGetSelectedProductTypeExpectedCat();
     let currentVal = famSel.value;
@@ -817,13 +807,10 @@ function orangeApplySizeFamilySchemeFilter() {
             o.disabled = false;
             continue;
         }
-        const sch = String(o.getAttribute('data-size-scheme') || '').trim();
         const fk = String(o.getAttribute('data-commercial-kind') || '').trim();
         const fsk = String(o.getAttribute('data-sizing-category') || '').trim();
         let ok = true;
-        if (expected !== '') {
-            ok = sch === expected;
-        } else if (expKind !== '' && expCat !== '') {
+        if (expKind !== '' && expCat !== '') {
             ok = fk === expKind && fsk === expCat;
         }
         o.disabled = !ok;
@@ -840,21 +827,16 @@ function orangeApplySizeFamilySchemeFilter() {
 
     if (hint) {
         hint.style.display = 'block';
-        if (expected !== '') {
+        if (expKind !== '' && expCat !== '') {
             hint.textContent =
-                'المخطط المتوقع لهذا نوع المنتج: «' +
-                expected +
-                '». العائلات غير المطابقة غير متاحة في القائمة — راجع صفحة عائلات المقاسات لمفتاح size_scheme_key.';
-        } else if (expKind !== '' && expCat !== '') {
-            hint.textContent =
-                'نطاق هرَم نوع المنتج: النوع التجاري «' +
+                'نطاق نوع المنتج على هرَم المقاس: النوع التجاري «' +
                 expKind +
                 '» وفئة القياس «' +
                 expCat +
-                '». تُعرض عائلات المقاسات المطابقة لهذا الهرم فقط (أي مخطط مقاس مستوى 3 ضمن الفئة).';
+                '». تُعرض عائلات المقاسات المطابقة لهذا الهرم فقط (أي مخطط مقاس مستوى 3 ضمن نفس الفئة).';
         } else {
             hint.textContent =
-                'نوع المنتج المختار لم يُقيّد مخطط مقاس (مستوى 3) ولا نطاق فئة قياس (1–2). يمكن أي عائلة؛ أو ضبط الورقة في «أنواع المنتجات» ثم ارجع لتصفية أفضل.';
+                'نوع المنتج المختار بلا نطاق هرَم (1–2) — تظهر كل العائلات النشطة. عند ضبط النوع التجاري وفئة القياس في «أنواع المنتجات» تُصفّى القائمة تلقائياً.';
         }
     }
 }
@@ -1725,21 +1707,14 @@ async function saveProduct() {
         const ptSave = document.getElementById('product_type_id');
         const ptIdSave = ptSave && ptSave.value ? (parseInt(ptSave.value, 10) || 0) : 0;
         if (ptIdSave > 0) {
-            const expSch = orangeGetSelectedProductTypeExpectedScheme();
             const expKind = orangeGetSelectedProductTypeExpectedKind();
             const expCat = orangeGetSelectedProductTypeExpectedCat();
             const famSel = document.getElementById('size_family_id');
             if (famSel && famSel.value) {
                 const fo = famSel.options[famSel.selectedIndex];
-                const fsch = fo ? String(fo.getAttribute('data-size-scheme') || '').trim() : '';
                 const fk = fo ? String(fo.getAttribute('data-commercial-kind') || '').trim() : '';
                 const fsk = fo ? String(fo.getAttribute('data-sizing-category') || '').trim() : '';
-                if (expSch !== '' && fsch !== expSch) {
-                    productFormShowTab('sizes');
-                    alert('عائلة المقاسات لا تطابق المخطط المتوقع لنوع المنتج («' + expSch + '»).');
-                    return;
-                }
-                if (expSch === '' && expKind !== '' && expCat !== '' && (fk !== expKind || fsk !== expCat)) {
+                if (expKind !== '' && expCat !== '' && (fk !== expKind || fsk !== expCat)) {
                     productFormShowTab('sizes');
                     alert('عائلة المقاسات لا تطابق نطاق هرَم نوع المنتج (النوع التجاري «' + expKind + '» / فئة «' + expCat + '»).');
                     return;

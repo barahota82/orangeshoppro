@@ -28,16 +28,6 @@ try {
         return $t;
     };
 
-    $sanitizeScheme = static function (string $raw): string {
-        $t = strtolower(trim($raw));
-        $t = (string) (preg_replace('/[^a-z0-9_-]/', '', $t) ?? '');
-        if (strlen($t) > 64) {
-            $t = substr($t, 0, 64);
-        }
-
-        return $t;
-    };
-
     $sanitizeKind32 = static function (string $raw): string {
         $t = strtolower(trim($raw));
         $t = (string) (preg_replace('/[^a-z0-9_-]/', '', $t) ?? '');
@@ -58,7 +48,6 @@ try {
     $nameEn = trim((string) ($data['name_en'] ?? ''));
     $nameFil = trim((string) ($data['name_fil'] ?? ''));
     $nameHi = trim((string) ($data['name_hi'] ?? ''));
-    $scheme = $sanitizeScheme((string) ($data['expected_size_scheme_key'] ?? ''));
     $expCk = $sanitizeKind32((string) ($data['expected_commercial_kind_key'] ?? ''));
     $expSk = $sanitizeCat64((string) ($data['expected_sizing_category_key'] ?? ''));
     $sortOrder = (int) ($data['sort_order'] ?? 0);
@@ -90,6 +79,15 @@ try {
         $hierErr = orange_catalog_validate_size_family_dictionary_consistency($pdo, $expCk, $expSk);
         if ($hierErr !== null) {
             json_response(['success' => false, 'message' => $hierErr], 422);
+        }
+    }
+
+    if (function_exists('orange_catalog_sizing_dictionary_kinds_enforced') && orange_catalog_sizing_dictionary_kinds_enforced($pdo)) {
+        if ($expCk === '' || $expSk === '') {
+            json_response([
+                'success' => false,
+                'message' => 'مع وجود أنواع تجارية نشطة في القاموس المرجعي، يجب اختيار النوع التجاري وفئة القياس المتوقّة على ورقة نوع المنتج (هرَم المقاس 1–2).',
+            ], 422);
         }
     }
 
@@ -146,7 +144,7 @@ try {
             $nameEn,
             $nameFil,
             $nameHi,
-            $scheme,
+            '',
             $expCk,
             $expSk,
             $sortOrder,
@@ -169,7 +167,7 @@ try {
         $nameEn,
         $nameFil,
         $nameHi,
-        $scheme,
+        '',
         $expCk,
         $expSk,
         $sortOrder,

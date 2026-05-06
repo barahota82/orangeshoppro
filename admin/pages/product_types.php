@@ -130,7 +130,7 @@ if ($hasTree) {
     try {
         $typesList = $pdo->query(
             'SELECT pt.id, pt.slug, pt.name_ar, pt.name_en, pt.name_fil, pt.name_hi,
-                    pt.catalog_subcategory_id, pt.expected_size_scheme_key,
+                    pt.catalog_subcategory_id,
                     pt.expected_commercial_kind_key, pt.expected_sizing_category_key,
                     pt.sort_order, pt.is_active,
                     csub.slug AS sub_slug, csub.name_ar AS sub_ar, csub.name_en AS sub_en,
@@ -165,7 +165,7 @@ if ($subOptionsJson === false) {
 ?>
 <div class="page-title">
     <h1>أنواع المنتجات — الشجرة الموحّدة</h1>
-    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.55;">ورقة قبل SKU تحت التصنيف الفرعي الموحّد؛ ربط المنتجات يتم عبر <code>product_type_id</code> وفق السياسة (تاسعاً ووثيقة ERD). أنشئ أو راجع الفروع من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع شجرة المنتجات</a> ثم عد لهذه الصفحة. بعد إنشاء الأوراق، اربط كل منتج من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=products'), ENT_QUOTES, 'UTF-8'); ?>">المنتجات</a> بنوع المنتج المناسب. حقل <strong>expected_size_scheme_key</strong> يضبط مطابقة مخطط المقاس مع <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_families'), ENT_QUOTES, 'UTF-8'); ?>">عائلات المقاسات</a>.</p>
+    <p class="page-subtitle" style="margin:0.35rem 0 0;font-size:0.95rem;color:#555;line-height:1.55;">ورقة قبل SKU تحت التصنيف الفرعي الموحّد؛ ربط المنتجات يتم عبر <code>product_type_id</code>. حدّد <strong>مسار الشجرة</strong> ثم <strong>النوع التجاري</strong> و<strong>فئة القياس</strong> (هرَم المقاس 1–2 من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">القاموس المرجعي</a>)؛ عند تسجيل منتج تُعرض عائلات المقاسات المطابقة لهذا الهرم فقط في شاشة المنتجات. الفروع: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع شجرة المنتجات</a> — العائلات: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_families'), ENT_QUOTES, 'UTF-8'); ?>">عائلات المقاسات</a>.</p>
 </div>
 
 <?php if (!$hasTree): ?>
@@ -223,12 +223,6 @@ if ($subOptionsJson === false) {
                 <small style="display:block;color:#b45309;margin-top:4px;">لا توجد أفرع نشطة؛ أنشئ أقسام الشجرة الموحّدة عبر ترحيل البيانات أو إعداد يدوي.</small>
             <?php endif; ?>
         </div>
-        <div class="pt-exp">
-            <label for="pt_expected_size_scheme_key">expected_size_scheme_key</label>
-            <input type="text" id="pt_expected_size_scheme_key" dir="ltr" lang="en" maxlength="64" placeholder="clothing_alpha أو فارغ"
-                <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;">إن ملأته وفعلت المقاسات على منتج؛ يُلزم تطابق <code>size_scheme_key</code> للعائلة (ويُتجاهَل حينها حقل «نطاق فئة القياس» أدناه). إن تركته فارغاً وملأت النوع التجاري + فئة القياس؛ يُقبل أي مخطط مقاس (مستوى 3) طالما العائلة تحمل نفس الهرم 1–2.</small>
-        </div>
         <div class="pt-ck">
             <?php if ($sizingDictForPtForm): ?>
             <label for="pt_expected_commercial_kind_key">النوع التجاري المتوقع (مستوى 1)</label>
@@ -265,7 +259,7 @@ if ($subOptionsJson === false) {
             <input type="text" id="pt_expected_commercial_kind_key" class="admin-sort-field" maxlength="32" placeholder="clothing" dir="ltr" lang="en"
                 <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
             <?php endif; ?>
-            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;">يُستخدم عند ترك <code>expected_size_scheme_key</code> فارغاً لتوسيع المسموح إلى كل عائلات «فئة القياس» تحت هذا النوع التجاري.</small>
+            <small style="display:block;color:#666;margin-top:4px;font-size:0.85rem;">معاً مع «فئة القياس» يحدّدان أي عائلات مقاسات تظهر عند اختيار هذا النوع في <strong>المنتجات</strong> (أي مخطط مقاس مستوى 3 ضمن نفس الفئة).</small>
         </div>
         <div class="pt-sk">
             <?php if ($sizingDictForPtForm): ?>
@@ -318,7 +312,7 @@ if ($subOptionsJson === false) {
                     <th style="padding:10px;text-align:right;border-bottom:1px solid #e8e9ec;">slug</th>
                     <th style="padding:10px;text-align:right;border-bottom:1px solid #e8e9ec;">عربي</th>
                     <th style="padding:10px;text-align:right;border-bottom:1px solid #e8e9ec;">EN</th>
-                    <th style="padding:10px;text-align:right;border-bottom:1px solid #e8e9ec;">مخطّط / نطاق هرَم</th>
+                    <th style="padding:10px;text-align:right;border-bottom:1px solid #e8e9ec;">هرَم المقاس (1–2)</th>
                     <th style="padding:10px;text-align:center;border-bottom:1px solid #e8e9ec;">ترتيب</th>
                     <th style="padding:10px;text-align:center;border-bottom:1px solid #e8e9ec;">نشط</th>
                     <th style="padding:10px;text-align:center;border-bottom:1px solid #e8e9ec;">إجراء</th>
@@ -334,16 +328,11 @@ if ($subOptionsJson === false) {
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;"><?php echo htmlspecialchars((string) ($row['name_ar'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;" dir="ltr" lang="en"><?php echo htmlspecialchars((string) ($row['name_en'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;" dir="ltr" lang="en"><?php
-                            $esch = trim((string) ($row['expected_size_scheme_key'] ?? ''));
                             $eck = trim((string) ($row['expected_commercial_kind_key'] ?? ''));
                             $esk = trim((string) ($row['expected_sizing_category_key'] ?? ''));
-                            if ($esch !== '') {
-                                echo htmlspecialchars($esch, ENT_QUOTES, 'UTF-8');
-                            } elseif ($eck !== '' || $esk !== '') {
-                                echo htmlspecialchars($eck . ' / ' . $esk, ENT_QUOTES, 'UTF-8');
-                            } else {
-                                echo '—';
-                            }
+                            echo ($eck !== '' || $esk !== '')
+                                ? htmlspecialchars($eck . ' / ' . $esk, ENT_QUOTES, 'UTF-8')
+                                : '—';
                             ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;text-align:center;"><?php echo (int) ($row['sort_order'] ?? 0); ?></td>
                         <td style="padding:10px;border-bottom:1px solid #f0f1f5;text-align:center;"><?php echo ((int) ($row['is_active'] ?? 0) === 1) ? '√' : '—'; ?></td>
@@ -356,7 +345,6 @@ if ($subOptionsJson === false) {
                                 'name_en' => (string) ($row['name_en'] ?? ''),
                                 'name_fil' => (string) ($row['name_fil'] ?? ''),
                                 'name_hi' => (string) ($row['name_hi'] ?? ''),
-                                'expected_size_scheme_key' => (string) ($row['expected_size_scheme_key'] ?? ''),
                                 'expected_commercial_kind_key' => (string) ($row['expected_commercial_kind_key'] ?? ''),
                                 'expected_sizing_category_key' => (string) ($row['expected_sizing_category_key'] ?? ''),
                                 'sort_order' => (int) ($row['sort_order'] ?? 0),
@@ -378,7 +366,7 @@ if ($subOptionsJson === false) {
     grid-template-columns: repeat(12, minmax(0, 1fr));
     grid-template-areas:
         "active active active slug slug slug slug slug slug sort sort sort"
-        "path path path path path path exp exp exp exp exp exp"
+        "path path path path path path path path path path path path"
         "ck ck ck ck ck ck sk sk sk sk sk sk"
         "en en en en en en ar ar ar ar ar ar"
         "hi hi hi hi hi hi fil fil fil fil fil fil";
@@ -400,7 +388,6 @@ if ($subOptionsJson === false) {
     width: 100%;
 }
 .pt-form-grid .pt-path { grid-area: path; min-width: 0; }
-.pt-form-grid .pt-exp { grid-area: exp; min-width: 0; }
 .pt-form-grid .pt-ck { grid-area: ck; min-width: 0; }
 .pt-form-grid .pt-sk { grid-area: sk; min-width: 0; }
 .pt-form-grid .pt-ar { grid-area: ar; }
@@ -414,7 +401,6 @@ if ($subOptionsJson === false) {
     text-align: right;
 }
 .pt-form-grid #pt_slug,
-.pt-form-grid #pt_expected_size_scheme_key,
 .pt-form-grid #pt_expected_commercial_kind_key,
 .pt-form-grid #pt_expected_sizing_category_key,
 .pt-form-grid #pt_name_en {
@@ -485,7 +471,6 @@ if ($subOptionsJson === false) {
             "slug"
             "active"
             "path"
-            "exp"
             "ck"
             "sk"
             "ar"
@@ -674,7 +659,6 @@ function resetPtForm() {
     document.getElementById('pt_id').value = '0';
     document.getElementById('pt_catalog_subcategory_id').value = '';
     document.getElementById('pt_slug').value = '';
-    document.getElementById('pt_expected_size_scheme_key').value = '';
     var ckEl = document.getElementById('pt_expected_commercial_kind_key');
     var skEl = document.getElementById('pt_expected_sizing_category_key');
     if (ckEl) ckEl.value = '';
@@ -696,7 +680,6 @@ function editProductType(p) {
     document.getElementById('pt_id').value = String(p.id != null ? p.id : 0);
     document.getElementById('pt_catalog_subcategory_id').value = String(p.catalog_subcategory_id != null ? p.catalog_subcategory_id : '');
     document.getElementById('pt_slug').value = p.slug || '';
-    document.getElementById('pt_expected_size_scheme_key').value = p.expected_size_scheme_key || '';
     var pCk = p.expected_commercial_kind_key || '';
     var pSk = p.expected_sizing_category_key || '';
     if (PT_SIZING_DICT_SELECTS) {
@@ -795,7 +778,6 @@ async function saveProductType() {
             name_en: document.getElementById('pt_name_en').value.trim(),
             name_fil: document.getElementById('pt_name_fil').value.trim(),
             name_hi: document.getElementById('pt_name_hi').value.trim(),
-            expected_size_scheme_key: document.getElementById('pt_expected_size_scheme_key').value.trim(),
             expected_commercial_kind_key: (function () {
                 var el = document.getElementById('pt_expected_commercial_kind_key');
                 return el ? String(el.value || '').trim() : '';
