@@ -441,7 +441,12 @@ function orangeAdminOfferSuggestAfterWarnings(r) {
         }
 
         document.addEventListener('click', function (e) {
-            if (e.target.closest('.admin-topbar-mega') || e.target.closest('.admin-mega-panel')) {
+            var t = e.target;
+            if (!t || typeof t.closest !== 'function') {
+                closeAll();
+                return;
+            }
+            if (t.closest('.admin-topbar-mega') || t.closest('.admin-mega-panel')) {
                 return;
             }
             closeAll();
