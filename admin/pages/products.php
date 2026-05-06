@@ -14,11 +14,31 @@ $catalogNavUnified = orange_catalog_nav_use_unified($pdo);
 $productTypesForForm = [];
 if (orange_table_exists($pdo, 'product_types')) {
     try {
-        $productTypesForForm = $pdo->query(
-            'SELECT id, slug, name_ar, name_en,
-                    expected_commercial_kind_key, expected_sizing_category_key
-             FROM product_types WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
-        )->fetchAll(PDO::FETCH_ASSOC);
+        $ptTreeOrder = orange_table_exists($pdo, 'catalog_subcategories')
+            && orange_table_exists($pdo, 'catalog_categories')
+            && orange_table_exists($pdo, 'catalog_sections')
+            && orange_table_exists($pdo, 'departments');
+        if ($ptTreeOrder) {
+            $productTypesForForm = $pdo->query(
+                'SELECT pt.id, pt.slug, pt.name_ar, pt.name_en,
+                        pt.expected_commercial_kind_key, pt.expected_sizing_category_key
+                 FROM product_types pt
+                 INNER JOIN catalog_subcategories csub ON csub.id = pt.catalog_subcategory_id
+                 INNER JOIN catalog_categories cc ON cc.id = csub.catalog_category_id
+                 INNER JOIN catalog_sections cs ON cs.id = cc.catalog_section_id
+                 INNER JOIN departments d ON d.id = cs.department_id
+                 WHERE pt.is_active = 1
+                 ORDER BY d.sort_order ASC, d.id ASC, cs.sort_order ASC, cs.id ASC,
+                          cc.sort_order ASC, cc.id ASC, csub.sort_order ASC, csub.id ASC,
+                          pt.sort_order ASC, pt.id ASC'
+            )->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            $productTypesForForm = $pdo->query(
+                'SELECT id, slug, name_ar, name_en,
+                        expected_commercial_kind_key, expected_sizing_category_key
+                 FROM product_types WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
+            )->fetchAll(PDO::FETCH_ASSOC);
+        }
     } catch (Throwable $e) {
         $productTypesForForm = [];
     }

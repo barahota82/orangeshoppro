@@ -217,7 +217,7 @@ if ($subOptionsJson === false) {
     <input type="hidden" id="pt_id" value="0">
     <div class="form-grid pt-form-grid">
         <div class="pt-sort admin-sort-field-wrap">
-            <label for="pt_sort">ترتيب ضمن الفرع</label>
+            <label for="pt_sort">ترتيب ضمن الورقة</label>
             <input type="number" id="pt_sort" class="admin-sort-field<?php echo $subOptions === [] ? ' admin-sort-field--muted' : ''; ?>" min="1" step="1" value=""
                 <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
         </div>
@@ -334,7 +334,7 @@ if ($subOptionsJson === false) {
                     <th style="padding:10px;text-align:right;border-bottom:1px solid #e8e9ec;">عربي</th>
                     <th style="padding:10px;text-align:right;border-bottom:1px solid #e8e9ec;">EN</th>
                     <th style="padding:10px;text-align:right;border-bottom:1px solid #e8e9ec;">هرَم المقاس (1–2)</th>
-                    <th style="padding:10px;text-align:center;border-bottom:1px solid #e8e9ec;">ترتيب</th>
+                    <th style="padding:10px;text-align:center;border-bottom:1px solid #e8e9ec;" title="رقم الترتيب داخل نفس التصنيف الفرعي (الورقة) فقط — يبدأ من 1 لكل فرع؛ ليس تسلسلاً عاماً بين نساء ورجال.">ترتيب ضمن الورقة</th>
                     <th style="padding:10px;text-align:center;border-bottom:1px solid #e8e9ec;">نشط</th>
                     <th style="padding:10px;text-align:center;border-bottom:1px solid #e8e9ec;">إجراء</th>
                 </tr>
