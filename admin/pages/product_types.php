@@ -12,6 +12,49 @@ orange_catalog_ensure_schema($pdo);
 $sizingDictForPtForm = orange_table_exists($pdo, 'commercial_kind_dictionary')
     && orange_table_exists($pdo, 'sizing_category_dictionary');
 
+/** @var list<array<string,mixed>> */
+$ptCommercialKindRows = [];
+/** @var array<string, list<array<string,mixed>>> */
+$ptSizingCatsByKind = [];
+if ($sizingDictForPtForm) {
+    try {
+        $ptCommercialKindRows = $pdo->query(
+            'SELECT kind_key, label_ar, label_en, sort_order, is_active
+             FROM commercial_kind_dictionary
+             ORDER BY sort_order ASC, kind_key ASC'
+        )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $allCats = $pdo->query(
+            'SELECT commercial_kind_key, category_key, label_ar, label_en, sort_order, is_active
+             FROM sizing_category_dictionary
+             ORDER BY commercial_kind_key ASC, sort_order ASC, category_key ASC'
+        )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        foreach ($allCats as $cr) {
+            if (! is_array($cr)) {
+                continue;
+            }
+            $k = trim((string) ($cr['commercial_kind_key'] ?? ''));
+            if ($k === '') {
+                continue;
+            }
+            if (! isset($ptSizingCatsByKind[$k])) {
+                $ptSizingCatsByKind[$k] = [];
+            }
+            $ptSizingCatsByKind[$k][] = $cr;
+        }
+    } catch (Throwable $e) {
+        $ptCommercialKindRows = [];
+        $ptSizingCatsByKind = [];
+    }
+}
+$ptSizingCatsByKindJson = json_encode($ptSizingCatsByKind, JSON_UNESCAPED_UNICODE);
+if ($ptSizingCatsByKindJson === false) {
+    $ptSizingCatsByKindJson = '{}';
+}
+$ptCommercialKindsJson = json_encode($ptCommercialKindRows, JSON_UNESCAPED_UNICODE);
+if ($ptCommercialKindsJson === false) {
+    $ptCommercialKindsJson = '[]';
+}
+
 $unifiedActive = orange_catalog_nav_use_unified($pdo);
 
 $hasTree = orange_table_exists($pdo, 'product_types')
@@ -191,7 +234,32 @@ if ($subOptionsJson === false) {
             <label for="pt_expected_commercial_kind_key">النوع التجاري المتوقع (مستوى 1)</label>
             <select id="pt_expected_commercial_kind_key" class="admin-sort-field" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
                 <option value="">— بدون نطاق هرَم —</option>
+                <?php foreach ($ptCommercialKindRows as $krow): ?>
+                    <?php if (! is_array($krow)) {
+                        continue;
+                    } ?>
+                    <?php
+                    $kk = htmlspecialchars(trim((string) ($krow['kind_key'] ?? '')), ENT_QUOTES, 'UTF-8');
+                    if ($kk === '') {
+                        continue;
+                    }
+                    $klab = trim((string) ($krow['label_ar'] ?? ''));
+                    if ($klab === '') {
+                        $klab = trim((string) ($krow['label_en'] ?? ''));
+                    }
+                    if ($klab === '') {
+                        $klab = $kk;
+                    }
+                    $klabDisp = htmlspecialchars($klab . ' (' . $kk . ')', ENT_QUOTES, 'UTF-8');
+                    ?>
+                    <option value="<?php echo $kk; ?>"
+                        data-label-ar="<?php echo htmlspecialchars(trim((string) ($krow['label_ar'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>"
+                        data-label-en="<?php echo htmlspecialchars(trim((string) ($krow['label_en'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>"><?php echo $klabDisp; ?></option>
+                <?php endforeach; ?>
             </select>
+            <?php if ($ptCommercialKindRows === []): ?>
+                <small style="display:block;color:#b45309;margin-top:4px;font-size:0.85rem;">لا توجد صفوف في <code>commercial_kind_dictionary</code> بعد — أضف الأنواع التجارية من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">القاموس المرجعي للمقاسات</a> حتى تظهر الخيارات هنا.</small>
+            <?php endif; ?>
             <?php else: ?>
             <label for="pt_expected_commercial_kind_key"><code>expected_commercial_kind_key</code></label>
             <input type="text" id="pt_expected_commercial_kind_key" class="admin-sort-field" maxlength="32" placeholder="clothing" dir="ltr" lang="en"
@@ -205,6 +273,7 @@ if ($subOptionsJson === false) {
             <select id="pt_expected_sizing_category_key" class="admin-sort-field" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
                 <option value="">— اختر النوع التجاري أولاً —</option>
             </select>
+            <small id="pt_sizing_cat_empty_hint" style="display:none;color:#b45309;margin-top:4px;font-size:0.85rem;">لا توجد فئات قياس مسجّلة لهذا النوع التجاري في القاموس المرجعي — راجع <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">القاموس المرجعي للمقاسات</a>.</small>
             <?php else: ?>
             <label for="pt_expected_sizing_category_key"><code>expected_sizing_category_key</code></label>
             <input type="text" id="pt_expected_sizing_category_key" class="admin-sort-field" maxlength="64" placeholder="tops" dir="ltr" lang="en"
@@ -436,6 +505,8 @@ if ($subOptionsJson === false) {
 const ptSubOptions = <?php echo $subOptionsJson; ?>;
 var PT_SD_API = '/admin/api/sizing_dictionary/manage.php';
 var PT_SIZING_DICT_SELECTS = <?php echo $sizingDictForPtForm ? 'true' : 'false'; ?>;
+window.PT_BOOTSTRAP_COMMERCIAL_KINDS = <?php echo $ptCommercialKindsJson; ?>;
+window.PT_BOOTSTRAP_SIZING_CATS_BY_KIND = <?php echo $ptSizingCatsByKindJson; ?>;
 let ptTranslateTimer = null;
 let ptEnTranslateTimer = null;
 let isSavingPt = false;
@@ -457,7 +528,44 @@ function ptEnsureSelectOption(sel, value, label, dataLabels) {
     sel.appendChild(o);
 }
 
+function ptFillCommercialKindOptionsFromBootstrap(preferredKind) {
+    var sel = document.getElementById('pt_expected_commercial_kind_key');
+    if (!sel || sel.tagName !== 'SELECT') {
+        return Promise.resolve();
+    }
+    var prev = preferredKind !== undefined && preferredKind !== null ? String(preferredKind) : String(sel.value || '');
+    var kinds = Array.isArray(window.PT_BOOTSTRAP_COMMERCIAL_KINDS) ? window.PT_BOOTSTRAP_COMMERCIAL_KINDS : [];
+    sel.innerHTML = '';
+    var opt0 = document.createElement('option');
+    opt0.value = '';
+    opt0.textContent = '— بدون نطاق هرَم —';
+    sel.appendChild(opt0);
+    kinds.forEach(function (k) {
+        if (!k || !k.kind_key) {
+            return;
+        }
+        var o = document.createElement('option');
+        o.value = String(k.kind_key || '').trim();
+        o.textContent = (k.label_ar || k.kind_key || '') + ' (' + (k.kind_key || '') + ')';
+        o.setAttribute('data-label-ar', String(k.label_ar != null ? k.label_ar : ''));
+        o.setAttribute('data-label-en', String(k.label_en != null ? k.label_en : ''));
+        sel.appendChild(o);
+    });
+    if (prev) {
+        ptEnsureSelectOption(sel, prev, prev + ' (غير مدرَج في القاموس)', { labelAr: prev, labelEn: prev });
+        sel.value = prev;
+    } else {
+        sel.value = '';
+    }
+    return Promise.resolve();
+}
+
+/** إن كانت البيانات المضمّنة فارغة (نادر)، جرّب الـ API. */
 async function ptLoadKindsIntoSelect(preferredKind) {
+    var kinds = Array.isArray(window.PT_BOOTSTRAP_COMMERCIAL_KINDS) ? window.PT_BOOTSTRAP_COMMERCIAL_KINDS : [];
+    if (kinds.length > 0) {
+        return ptFillCommercialKindOptionsFromBootstrap(preferredKind);
+    }
     var sel = document.getElementById('pt_expected_commercial_kind_key');
     if (!sel || sel.tagName !== 'SELECT' || typeof postJSON !== 'function') {
         return;
@@ -465,34 +573,27 @@ async function ptLoadKindsIntoSelect(preferredKind) {
     var prev = preferredKind !== undefined && preferredKind !== null ? String(preferredKind) : String(sel.value || '');
     try {
         var res = await postJSON(PT_SD_API, { action: 'list_kinds' });
-        if (!res || !res.success) return;
-        var kinds = res.kinds || [];
-        sel.innerHTML = '';
-        var opt0 = document.createElement('option');
-        opt0.value = '';
-        opt0.textContent = '— بدون نطاق هرَم —';
-        sel.appendChild(opt0);
-        kinds.forEach(function (k) {
-            var o = document.createElement('option');
-            o.value = k.kind_key || '';
-            o.textContent = (k.label_ar || k.kind_key || '') + ' (' + (k.kind_key || '') + ')';
-            o.setAttribute('data-label-ar', String(k.label_ar != null ? k.label_ar : ''));
-            o.setAttribute('data-label-en', String(k.label_en != null ? k.label_en : ''));
-            sel.appendChild(o);
-        });
-        if (prev) {
-            ptEnsureSelectOption(sel, prev, prev + ' (غير مدرَج في القاموس)', { labelAr: prev, labelEn: prev });
-            sel.value = prev;
-        } else {
-            sel.value = '';
+        if (!res || !res.success) {
+            return ptFillCommercialKindOptionsFromBootstrap(preferredKind);
         }
-    } catch (e) { /* ignore */ }
+        window.PT_BOOTSTRAP_COMMERCIAL_KINDS = res.kinds || [];
+        return ptFillCommercialKindOptionsFromBootstrap(prev);
+    } catch (e) {
+        return ptFillCommercialKindOptionsFromBootstrap(preferredKind);
+    }
+}
+
+function ptSizingCatEmptyHint(show) {
+    var el = document.getElementById('pt_sizing_cat_empty_hint');
+    if (el) {
+        el.style.display = show ? 'block' : 'none';
+    }
 }
 
 async function ptLoadSizingCategoriesIntoSelect(preferredCat) {
     var kindSel = document.getElementById('pt_expected_commercial_kind_key');
     var catSel = document.getElementById('pt_expected_sizing_category_key');
-    if (!kindSel || kindSel.tagName !== 'SELECT' || !catSel || catSel.tagName !== 'SELECT' || typeof postJSON !== 'function') {
+    if (!kindSel || kindSel.tagName !== 'SELECT' || !catSel || catSel.tagName !== 'SELECT') {
         return;
     }
     var ck = String(kindSel.value || '').trim();
@@ -502,16 +603,23 @@ async function ptLoadSizingCategoriesIntoSelect(preferredCat) {
     opt0.value = '';
     opt0.textContent = ck ? '— فئة القياس —' : '— اختر النوع التجاري أولاً —';
     catSel.appendChild(opt0);
+    ptSizingCatEmptyHint(false);
     if (!ck) {
         catSel.value = '';
         return;
     }
-    try {
-        var res = await postJSON(PT_SD_API, { action: 'list_categories', commercial_kind_key: ck });
-        if (!res || !res.success) return;
-        (res.categories || []).forEach(function (c) {
+    var byKind = window.PT_BOOTSTRAP_SIZING_CATS_BY_KIND && typeof window.PT_BOOTSTRAP_SIZING_CATS_BY_KIND === 'object'
+        ? window.PT_BOOTSTRAP_SIZING_CATS_BY_KIND
+        : {};
+    var fromBoot = byKind[ck];
+    var list = Array.isArray(fromBoot) ? fromBoot : [];
+    function fillFromRows(rows) {
+        rows.forEach(function (c) {
+            if (!c || !c.category_key) {
+                return;
+            }
             var o = document.createElement('option');
-            o.value = c.category_key || '';
+            o.value = String(c.category_key || '').trim();
             o.textContent = (c.label_ar || c.category_key || '') + ' (' + (c.category_key || '') + ')';
             o.setAttribute('data-label-ar', String(c.label_ar != null ? c.label_ar : ''));
             o.setAttribute('data-label-en', String(c.label_en != null ? c.label_en : ''));
@@ -523,7 +631,31 @@ async function ptLoadSizingCategoriesIntoSelect(preferredCat) {
         } else {
             catSel.value = '';
         }
-    } catch (e) { /* ignore */ }
+        ptSizingCatEmptyHint(rows.length === 0);
+    }
+    if (list.length > 0) {
+        fillFromRows(list);
+        return;
+    }
+    if (typeof postJSON !== 'function') {
+        fillFromRows([]);
+        return;
+    }
+    try {
+        var res = await postJSON(PT_SD_API, { action: 'list_categories', commercial_kind_key: ck });
+        if (!res || !res.success) {
+            fillFromRows([]);
+            return;
+        }
+        var rows = res.categories || [];
+        if (rows.length > 0 && !byKind[ck]) {
+            byKind[ck] = rows;
+            window.PT_BOOTSTRAP_SIZING_CATS_BY_KIND = byKind;
+        }
+        fillFromRows(rows);
+    } catch (e) {
+        fillFromRows([]);
+    }
 }
 
 function ptInitSizingHierarchySelects() {
