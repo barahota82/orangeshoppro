@@ -50,6 +50,28 @@ try {
         json_response(['success' => false, 'message' => 'يجب تعبئة الاسم العربي والإنجليزي'], 422);
     }
 
+    $dictUi = orange_table_exists($pdo, 'commercial_kind_dictionary')
+        && orange_table_exists($pdo, 'sizing_category_dictionary');
+    if ($dictUi) {
+        if ($commercialKind === '') {
+            json_response(['success' => false, 'message' => 'اختر النوع التجاري (مستوى 1) قبل الحفظ.'], 422);
+        }
+        if ($sizingCategory === '') {
+            json_response(['success' => false, 'message' => 'اختر فئة القياس (مستوى 2) قبل الحفظ.'], 422);
+        }
+        $activeTplCount = 0;
+        if (orange_table_exists($pdo, 'size_scheme_templates')) {
+            try {
+                $activeTplCount = (int) $pdo->query('SELECT COUNT(*) FROM size_scheme_templates WHERE is_active = 1')->fetchColumn();
+            } catch (Throwable $e) {
+                $activeTplCount = 0;
+            }
+        }
+        if ($activeTplCount > 0 && $tplRefRaw <= 0) {
+            json_response(['success' => false, 'message' => 'اختر قالب المقاسات قبل الحفظ.'], 422);
+        }
+    }
+
     if ($sizeScheme !== '' && ($commercialKind === '' || $sizingCategory === '')) {
         json_response([
             'success' => false,

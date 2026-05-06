@@ -887,6 +887,31 @@ async function saveFamily() {
         isSavingFamily = false;
         return;
     }
+    if (FAM_SIZING_DICT_SELECTS) {
+        var kindEl = document.getElementById('fam_commercial_kind_key');
+        var catEl = document.getElementById('fam_sizing_category_key');
+        var ck = kindEl ? String(kindEl.value || '').trim() : '';
+        var sk = catEl ? String(catEl.value || '').trim() : '';
+        if (!ck) {
+            alert('اختر النوع التجاري (مستوى 1) قبل الحفظ.');
+            isSavingFamily = false;
+            return;
+        }
+        if (!sk) {
+            alert('اختر فئة القياس (مستوى 2) قبل الحفظ.');
+            isSavingFamily = false;
+            return;
+        }
+        if (FAM_HAS_SIZE_TEMPLATES) {
+            var tplEl = document.getElementById('sizes_template_pick');
+            var tid = tplEl && tplEl.tagName === 'SELECT' ? (parseInt(tplEl.value || '0', 10) || 0) : 0;
+            if (tid <= 0) {
+                alert('اختر قالب المقاسات قبل الحفظ.');
+                isSavingFamily = false;
+                return;
+            }
+        }
+    }
     try {
         var rawId = parseInt(String(document.getElementById('fam_id').value || '0').trim(), 10);
         var recordId = (Number.isFinite(rawId) && rawId > 0) ? rawId : 0;
