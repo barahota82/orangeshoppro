@@ -388,10 +388,24 @@ if ($subOptionsJson === false) {
     width: 100%;
 }
 .pt-form-grid .pt-path { grid-area: path; min-width: 0; }
-.pt-form-grid .pt-ck { grid-area: ck; min-width: 0; }
-.pt-form-grid .pt-sk { grid-area: sk; min-width: 0; }
+.pt-form-grid .pt-ck { grid-area: ck; min-width: 0; width: 100%; }
+.pt-form-grid .pt-sk { grid-area: sk; min-width: 0; width: 100%; }
 .pt-form-grid .pt-ar { grid-area: ar; }
 .pt-form-grid .pt-en { grid-area: en; }
+/* تجاوز max-width لـ .admin-sort-field في admin.css (220px) حتى يملأ نصف الشبكة مثل #pt_name_ar */
+.pt-form-grid .pt-ck .admin-sort-field,
+.pt-form-grid .pt-sk .admin-sort-field {
+    max-width: none;
+}
+.pt-form-grid .pt-ar,
+.pt-form-grid .pt-en {
+    min-width: 0;
+}
+.pt-form-grid .pt-ar input,
+.pt-form-grid .pt-en input {
+    width: 100%;
+    box-sizing: border-box;
+}
 .pt-form-grid .pt-fil { grid-area: fil; }
 .pt-form-grid .pt-hi { grid-area: hi; }
 .pt-form-grid label,
