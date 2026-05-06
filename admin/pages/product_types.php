@@ -217,7 +217,7 @@ if ($subOptionsJson === false) {
     <div class="form-grid pt-form-grid">
         <div class="pt-sort admin-sort-field-wrap">
             <label for="pt_sort">ترتيب ضمن الورقة</label>
-            <input type="number" id="pt_sort" class="admin-sort-field<?php echo $subOptions === [] ? ' admin-sort-field--muted' : ''; ?>" min="1" step="1" value=""
+            <input type="number" id="pt_sort" class="admin-sort-field admin-sort-field--muted" min="1" step="1" value=""
                 <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
         </div>
         <div class="pt-slug">
@@ -444,6 +444,9 @@ if ($subOptionsJson === false) {
     background: #f4f6f9;
     cursor: default;
     color: var(--text, #334155);
+}
+.pt-form-grid #pt_sort.admin-sort-field--muted:not(:disabled) {
+    cursor: text;
 }
 .pt-form-grid #pt_sort,
 .pt-form-grid #pt_active,
