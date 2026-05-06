@@ -55,9 +55,9 @@ $ucSecEmpty = !empty($orange_uc['sections_empty_for_categories']);
         </div>
     </div>
     <div class="actions admin-actions--start" style="margin-top:12px;gap:8px;flex-wrap:wrap;">
-        <button type="button" onclick="saveUcCategory()" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>>حفظ الفئة</button>
-        <button type="button" class="btn-secondary" onclick="translateUc('cat')" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>>ترجمة</button>
         <button type="button" class="btn-secondary" onclick="resetUcCategory()" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>>جديد</button>
+        <button type="button" class="btn-secondary" onclick="translateUc('cat')" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>>ترجمة</button>
+        <button type="button" onclick="saveUcCategory()" <?php echo $ucSecEmpty ? 'disabled' : ''; ?>>حفظ الفئة</button>
     </div>
     <?php if ($ucCatsFlat !== []): ?>
     <div class="table-wrap" style="margin-top:16px;">

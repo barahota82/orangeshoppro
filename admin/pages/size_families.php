@@ -358,15 +358,15 @@ $tablesReady = $hasFamilies && $hasSizes;
         </div>
     </div>
     <div class="actions sf-fam-form-actions" style="margin-top:14px;">
-        <button type="button" onclick="saveFamily()" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>حفظ العائلة</button>
-        <button type="button" class="btn-secondary sf-fam-translate-btn--hidden" id="fam_btn_translate_en" onclick="translateFamilyEn({ forceFromArabic: true })" <?php echo !$hasFamilies ? 'disabled' : ''; ?> title="مخفي عن المستخدم؛ يبقى لاستدعاء الترجمة عند التطوير">ترجمة إلى English</button>
         <button type="button" class="btn-secondary" onclick="resetFamilyForm()" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>جديد</button>
+        <button type="button" class="btn-secondary sf-fam-translate-btn--hidden" id="fam_btn_translate_en" onclick="translateFamilyEn({ forceFromArabic: true })" <?php echo !$hasFamilies ? 'disabled' : ''; ?> title="مخفي عن المستخدم؛ يبقى لاستدعاء الترجمة عند التطوير">ترجمة إلى English</button>
         <?php if ($hasSizeTemplates && count($sizeTemplatesList) > 0): ?>
         <button type="button" class="btn-secondary" id="fam_btn_import_template" onclick="importSizeTemplateRows()" <?php echo !$hasFamilies || !$tablesReady ? 'disabled' : ''; ?>>تحميل المقاسات من القالب</button>
         <?php else: ?>
         <button type="button" class="btn-secondary" id="fam_btn_import_template" disabled title="لا توجد قوالب">تحميل المقاسات من القالب</button>
         <?php endif; ?>
         <a class="btn-secondary" id="fam_link_manage_templates" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_scheme_templates'), ENT_QUOTES, 'UTF-8'); ?>">إدارة القوالب</a>
+        <button type="button" onclick="saveFamily()" <?php echo !$hasFamilies ? 'disabled' : ''; ?>>حفظ العائلة</button>
     </div>
 </div>
 
