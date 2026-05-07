@@ -1568,22 +1568,6 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     );
     orange_schema_invalidate_table_exists('sizing_category_dictionary');
 
-    static $productSubOrphansCleaned = false;
-    if (
-        !$productSubOrphansCleaned
-        && orange_table_exists($pdo, 'subcategories')
-        && orange_table_has_column($pdo, 'products', 'subcategory_id')
-    ) {
-        $productSubOrphansCleaned = true;
-        orange_catalog_safe_exec(
-            $pdo,
-            'UPDATE products p
-             LEFT JOIN subcategories s ON s.id = p.subcategory_id
-             SET p.subcategory_id = NULL
-             WHERE p.subcategory_id IS NOT NULL AND s.id IS NULL'
-        );
-    }
-
     /*
      |--------------------------------------------------------------------------
      | كود الحساب في الشجرة + ربط الحسابات الأساسية للقيود التلقائية
@@ -3019,31 +3003,6 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
 function orange_catalog_ensure_schema(PDO $pdo): void
 {
     orange_schema_check_and_bootstrap($pdo);
-}
-
-/**
- * @param mixed $raw subcategory_id من الطلب (فارغ = NULL)
- * @return array{0: bool, 1: int|null, 2: string} [نجح، القيمة أو null، رسالة خطأ عربية]
- */
-function orange_product_resolve_subcategory_id(PDO $pdo, int $categoryId, $raw): array
-{
-    if ($categoryId <= 0) {
-        return [false, null, 'الفئة غير صالحة'];
-    }
-    $sid = ($raw === null || $raw === '') ? 0 : (int) $raw;
-    if ($sid <= 0) {
-        return [true, null, ''];
-    }
-    if (!orange_table_exists($pdo, 'subcategories')) {
-        return [false, null, 'جدول الفئات الفرعية غير متوفر'];
-    }
-    $st = $pdo->prepare('SELECT id FROM subcategories WHERE id = ? AND category_id = ? LIMIT 1');
-    $st->execute([$sid, $categoryId]);
-    if (!$st->fetch()) {
-        return [false, null, 'التصنيف الفرعي غير موجود أو لا يتبع الفئة المختارة'];
-    }
-
-    return [true, $sid, ''];
 }
 
 /**

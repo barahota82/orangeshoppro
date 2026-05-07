@@ -14,117 +14,33 @@ require_once __DIR__ . '/catalog_sizing_dictionary.php';
  */
 function orange_catalog_resolve_product_classification(PDO $pdo, array $data): array
 {
-    $unified = function_exists('orange_catalog_nav_use_unified') && orange_catalog_nav_use_unified($pdo);
-
     $ptIn = isset($data['product_type_id']) ? (int) $data['product_type_id'] : 0;
-    $catIn = isset($data['category_id']) ? (int) $data['category_id'] : 0;
-    $rawSub = $data['subcategory_id'] ?? null;
-
-    if ($unified) {
-        if ($ptIn <= 0) {
-            return ['error' => 'يجب اختيار «نوع المنتج» في الشجرة الموحّدة (ورقة product_types).'];
-        }
-
-        $st = $pdo->prepare('SELECT id FROM product_types WHERE id = ? LIMIT 1');
-        $st->execute([$ptIn]);
-        if (! $st->fetchColumn()) {
-            return ['error' => 'نوع المنتج المختار غير موجود.'];
-        }
-
-        $cache = orange_catalog_legacy_classification_cache_for_product_type($pdo, $ptIn);
-
-        return [
-            'category_id' => $cache['legacy_category_id'],
-            'subcategory_id' => $cache['legacy_subcategory_id'],
-            'product_type_id' => $ptIn,
-        ];
+    if (!orange_table_exists($pdo, 'product_types')) {
+        return ['error' => 'جدول أنواع المنتجات غير متوفر. أكمل تهيئة الشجرة الموحّدة أولاً.'];
+    }
+    if ($ptIn <= 0) {
+        return ['error' => 'يجب اختيار «نوع المنتج» في الشجرة الموحّدة (ورقة product_types).'];
     }
 
-    if ($catIn <= 0) {
-        return ['error' => 'البيانات الأساسية مطلوبة'];
+    $st = $pdo->prepare('SELECT id FROM product_types WHERE id = ? LIMIT 1');
+    $st->execute([$ptIn]);
+    if (! $st->fetchColumn()) {
+        return ['error' => 'نوع المنتج المختار غير موجود.'];
     }
 
-    [$subOk, $subcategoryId, $subErr] = orange_product_resolve_subcategory_id($pdo, $catIn, $rawSub);
-    if (!$subOk) {
-        return ['error' => $subErr];
-    }
-
-    $resolvedPt = null;
-    if ($ptIn > 0) {
-        $chk = $pdo->prepare('SELECT id FROM product_types WHERE id = ? LIMIT 1');
-        $chk->execute([$ptIn]);
-        if (!$chk->fetchColumn()) {
-            return ['error' => 'نوع المنتج (الشجرة الموحّدة) غير صالح.'];
-        }
-        $resolvedPt = $ptIn;
-    }
+    $cache = orange_catalog_legacy_classification_cache_for_product_type($pdo, $ptIn);
 
     return [
-        'category_id' => $catIn,
-        'subcategory_id' => $subcategoryId,
-        'product_type_id' => $resolvedPt,
+        'category_id' => $cache['legacy_category_id'],
+        'subcategory_id' => $cache['legacy_subcategory_id'],
+        'product_type_id' => $ptIn,
     ];
 }
 
 /**
- * سلسلة JOIN تربط جدول `categories` بالاسم المستعار المعطى إلى صف المنتج بعد إسقاط `products.category_id`.
- * عند وجود العمود على المنتج تُرجِع سلسلة فارغة (يستخدم الاستدعاء المعتاد LEFT JOIN على p.category_id).
- */
-function orange_catalog_products_sql_join_legacy_categories_derived(PDO $pdo, string $productsAlias, string $categoriesAlias): string
-{
-    $p = preg_replace('/[^A-Za-z0-9_]/', '', $productsAlias);
-    $c = preg_replace('/[^A-Za-z0-9_]/', '', $categoriesAlias);
-    if ($p === '' || $c === '') {
-        return '';
-    }
-    if (orange_table_has_column($pdo, 'products', 'category_id')) {
-        return '';
-    }
-    if (!orange_table_exists($pdo, 'categories')) {
-        return '';
-    }
-    $prefix = 'ocmap_lc_' . $p . '_';
-    if (!orange_table_has_column($pdo, 'products', 'product_type_id') || !orange_table_exists($pdo, 'product_types')) {
-        return "\n LEFT JOIN categories `{$c}` ON FALSE ";
-    }
-
-    $hasSub = orange_table_exists($pdo, 'subcategories');
-    $joinSub = '';
-    $catExpr = '';
-    if ($hasSub) {
-        $joinSub = "\n LEFT JOIN subcategories {$prefix}s ON {$prefix}s.id = CASE
-           WHEN ocmap_pt.slug LIKE 'legacy-ptype-sub-%'
-             THEN CAST(SUBSTRING_INDEX(ocmap_pt.slug, '-', -1) AS UNSIGNED)
-           WHEN ocmap_ucs.slug LIKE 'legacy-sub-%'
-             THEN CAST(SUBSTRING_INDEX(ocmap_ucs.slug, '-', -1) AS UNSIGNED)
-           ELSE NULL END ";
-        $catExpr = "CASE
-           WHEN ocmap_pt.slug LIKE 'legacy-ptype-cat-%'
-             THEN CAST(SUBSTRING_INDEX(ocmap_pt.slug, '-', -1) AS UNSIGNED)
-           WHEN ocmap_ucc.slug LIKE 'legacy-cat-%'
-             THEN CAST(SUBSTRING_INDEX(ocmap_ucc.slug, '-', -1) AS UNSIGNED)
-           WHEN {$prefix}s.id IS NOT NULL THEN {$prefix}s.category_id
-           ELSE NULL END";
-    } else {
-        $catExpr = "CASE
-           WHEN ocmap_pt.slug LIKE 'legacy-ptype-cat-%'
-             THEN CAST(SUBSTRING_INDEX(ocmap_pt.slug, '-', -1) AS UNSIGNED)
-           WHEN ocmap_ucc.slug LIKE 'legacy-cat-%'
-             THEN CAST(SUBSTRING_INDEX(ocmap_ucc.slug, '-', -1) AS UNSIGNED)
-           ELSE NULL END";
-    }
-
-    return "\n LEFT JOIN product_types ocmap_pt ON ocmap_pt.id = {$p}.product_type_id
-            LEFT JOIN catalog_subcategories ocmap_ucs ON ocmap_ucs.id = ocmap_pt.catalog_subcategory_id
-            LEFT JOIN catalog_categories ocmap_ucc ON ocmap_ucc.id = ocmap_ucs.catalog_category_id
-            {$joinSub}
-            LEFT JOIN categories `{$c}` ON `{$c}`.id = ({$catExpr}) ";
-}
-
-/**
  * سلسلة LEFT JOIN لعرض صف فئة باسم مستعار `c` (name_ar / name_en) في استعلامات الأدمن عن المنتجات.
- * - متجر موحّد: `c` = catalog_categories عبر product_type_id (وإن وُجد alias لـ product_types يُمرَّر).
- * - غير موحّد: categories على p.category_id أو الاشتقاق عبر orange_catalog_products_sql_join_legacy_categories_derived.
+ * مصدر العرض الموحّد فقط: `c` = catalog_categories عبر product_type_id.
+ * عند غياب بنية الشجرة الموحّدة الكاملة تُعاد قيم null دون الرجوع إلى taxonomy legacy.
  *
  * @param string|null $existingProductTypesAlias اسم مستعار لـ product_types إن وُجد مسبقاً في الاستعلام (مثل pt)؛
  *        null = يُنشأ JOIN داخلي باسم orange_disp_pt عند الحاجة.
@@ -132,9 +48,7 @@ function orange_catalog_products_sql_join_legacy_categories_derived(PDO $pdo, st
 function orange_catalog_admin_sql_join_product_category_display(PDO $pdo, string $productsAlias = 'p', ?string $existingProductTypesAlias = null): string
 {
     $p = preg_replace('/[^A-Za-z0-9_]/', '', $productsAlias) ?: 'p';
-    $unified = function_exists('orange_catalog_nav_use_unified') && orange_catalog_nav_use_unified($pdo);
-    if ($unified
-        && orange_table_exists($pdo, 'product_types')
+    if (orange_table_exists($pdo, 'product_types')
         && orange_table_exists($pdo, 'catalog_subcategories')
         && orange_table_exists($pdo, 'catalog_categories')
         && orange_table_has_column($pdo, 'products', 'product_type_id')
@@ -154,11 +68,8 @@ function orange_catalog_admin_sql_join_product_category_display(PDO $pdo, string
         return "\n LEFT JOIN catalog_subcategories orange_disp_ucs ON orange_disp_ucs.id = {$pt}.catalog_subcategory_id"
             . "\n LEFT JOIN catalog_categories c ON c.id = orange_disp_ucs.catalog_category_id";
     }
-    if (orange_table_has_column($pdo, 'products', 'category_id')) {
-        return "\n LEFT JOIN categories c ON c.id = {$p}.category_id";
-    }
 
-    return orange_catalog_products_sql_join_legacy_categories_derived($pdo, $p, 'c');
+    return "\n LEFT JOIN (SELECT NULL AS id, NULL AS name_ar, NULL AS name_en, NULL AS catalog_section_id) c ON 1=1";
 }
 
 /**
@@ -436,8 +347,7 @@ function orange_catalog_catalog_category_id_for_product_type(PDO $pdo, int $prod
 }
 
 /**
- * صفوف {id,name} للمنتجات ضمن نفس نطاق تكرار الاسم العربي: في التنقّل الموحّد حسب فئة الكتالوج الموحّدة،
- * وإلا حسب `category_id` القديم.
+ * صفوف {id,name} للمنتجات ضمن نفس نطاق تكرار الاسم العربي وفق فئة الكتالوج الموحّدة.
  *
  * @return list<array<string,mixed>>
  */
@@ -450,7 +360,7 @@ function orange_catalog_products_rows_for_arabic_name_scope(
     if (!orange_table_exists($pdo, 'products')) {
         return [];
     }
-    if ($unifiedNav && $productTypeId !== null && $productTypeId > 0) {
+    if ($productTypeId !== null && $productTypeId > 0) {
         $ccid = orange_catalog_catalog_category_id_for_product_type($pdo, $productTypeId);
         if ($ccid > 0) {
             try {
@@ -486,21 +396,8 @@ function orange_catalog_products_rows_for_arabic_name_scope(
             }
         }
     }
-    try {
-        if ($resolvedLegacyCategoryId === null || $resolvedLegacyCategoryId <= 0) {
-            return [];
-        }
-        if (!orange_table_has_column($pdo, 'products', 'category_id')) {
-            return [];
-        }
-        $st = $pdo->prepare('SELECT id, name FROM products WHERE category_id = ?');
-        $st->execute([$resolvedLegacyCategoryId]);
-        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 
-        return is_array($rows) ? $rows : [];
-    } catch (Throwable $e) {
-        return [];
-    }
+    return [];
 }
 
 /**

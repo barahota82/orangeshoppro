@@ -135,7 +135,6 @@ if ($catalogAttributesActive !== [] && orange_table_exists($pdo, 'catalog_attrib
 
 $hasDepartmentsTable = false;
 $hasCategoryDepartment = false;
-$categories = [];
 $departmentsForProducts = [];
 $hasProductTypesTable = orange_table_exists($pdo, 'product_types');
 
@@ -179,8 +178,8 @@ if ($unifiedProductList) {
         . $catJ . '
         ORDER BY p.sort_order ASC, p.id ASC'
     )->fetchAll(PDO::FETCH_ASSOC);
-} elseif ($catalogNavUnified) {
-    /* تفعيل موحّد لكن مخطط غير مكتمل — لا استعلام على categories التراثية */
+} else {
+    /* غير مسار القائمة الكامل الموحّد: لا استعلام على جداول categories/subcategories التراثية */
     if ($hasProductTypesTable) {
         $products = $pdo->query(
             'SELECT p.*, NULL AS category_name, NULL AS catalog_category_display_id,
@@ -198,64 +197,18 @@ if ($unifiedProductList) {
             ORDER BY p.sort_order ASC, p.id ASC'
         )->fetchAll(PDO::FETCH_ASSOC);
     }
-} else {
-    try {
-        $hasDepartmentsTable = (bool) $pdo->query("SHOW TABLES LIKE 'departments'")->fetchColumn();
-        if ($hasDepartmentsTable) {
-            $colStmt = $pdo->query("SHOW COLUMNS FROM categories LIKE 'department_id'");
-            $hasCategoryDepartment = (bool) $colStmt->fetch();
-        }
-    } catch (Throwable $e) {
-        $hasDepartmentsTable = false;
-        $hasCategoryDepartment = false;
-    }
+}
 
-    $categories = $pdo->query('SELECT * FROM categories ORDER BY sort_order ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
+try {
+    $hasDepartmentsTable = (bool) $pdo->query("SHOW TABLES LIKE 'departments'")->fetchColumn();
     if ($hasDepartmentsTable) {
         $departmentsForProducts = $pdo->query('SELECT * FROM departments ORDER BY sort_order ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
     }
-
-    $productCategoryJoin = orange_table_has_column($pdo, 'products', 'category_id')
-        ? 'LEFT JOIN categories c ON c.id = p.category_id'
-        : orange_catalog_products_sql_join_legacy_categories_derived($pdo, 'p', 'c');
-
-    if ($hasDepartmentsTable && $hasCategoryDepartment) {
-        $products = $pdo->query(
-            'SELECT p.*, c.name_ar AS category_name, NULL AS catalog_category_display_id,
-            c.department_id AS category_department_id,
-            d.name_ar AS department_name_ar, d.name_en AS department_name_en'
-            . ($hasProductTypesTable
-                ? ',
-            pt.name_ar AS pt_name_ar_join, pt.name_en AS pt_name_en_join, pt.slug AS pt_slug_join'
-                : '')
-            . '
-        FROM products p
-        ' . $productCategoryJoin . '
-        LEFT JOIN departments d ON d.id = c.department_id'
-            . ($hasProductTypesTable ? '
-        LEFT JOIN product_types pt ON pt.id = p.product_type_id' : '')
-            . '
-        ORDER BY p.sort_order ASC, p.id ASC'
-        )->fetchAll(PDO::FETCH_ASSOC);
-    } else {
-        $products = $pdo->query(
-            'SELECT p.*, c.name_ar AS category_name, NULL AS category_department_id,
-            NULL AS department_name_ar, NULL AS department_name_en'
-            . ($hasProductTypesTable
-                ? ',
-            pt.name_ar AS pt_name_ar_join, pt.name_en AS pt_name_en_join, pt.slug AS pt_slug_join'
-                : '')
-            . ',
-            NULL AS catalog_category_display_id
-        FROM products p
-        ' . $productCategoryJoin
-            . ($hasProductTypesTable ? '
-        LEFT JOIN product_types pt ON pt.id = p.product_type_id' : '')
-            . '
-        ORDER BY p.sort_order ASC, p.id ASC'
-        )->fetchAll(PDO::FETCH_ASSOC);
-    }
+} catch (Throwable $e) {
+    $hasDepartmentsTable = false;
+    $departmentsForProducts = [];
 }
+$hasCategoryDepartment = false;
 $nextProductSort = (int)$pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM products')->fetchColumn();
 if ($nextProductSort < 1) {
     $nextProductSort = 1;
@@ -296,53 +249,9 @@ foreach ($families as $f) {
     $familiesOut[] = $f;
 }
 
-$hasSubcategoriesTable = false;
 $subcategoriesForJs = [];
-$hasProductSubcategoryColumn = false;
 $categoryCatalogMeta = [];
-
-if (!$catalogNavUnified) {
-    try {
-        $hasSubcategoriesTable = (bool) $pdo->query("SHOW TABLES LIKE 'subcategories'")->fetchColumn();
-        $hasProductSubcategoryColumn = orange_table_has_column($pdo, 'products', 'subcategory_id');
-        if ($hasSubcategoriesTable && $hasProductSubcategoryColumn) {
-            $subRows = $pdo->query(
-                'SELECT id, category_id, name_ar, name_en FROM subcategories WHERE is_active = 1 ORDER BY category_id ASC, sort_order ASC, id ASC'
-            )->fetchAll(PDO::FETCH_ASSOC);
-            foreach ($subRows as $sr) {
-                $subcategoriesForJs[] = [
-                    'id' => (int) $sr['id'],
-                    'category_id' => (int) $sr['category_id'],
-                    'label' => (string) ($sr['name_ar'] ?: $sr['name_en'] ?: ('#' . $sr['id'])),
-                ];
-            }
-        }
-    } catch (Throwable $e) {
-        $hasSubcategoriesTable = false;
-        $subcategoriesForJs = [];
-        $hasProductSubcategoryColumn = false;
-    }
-
-    /** @var array<int, array{dept_id: int, dept_label: string, ref: string}> */
-    foreach ($categories as $cat) {
-        $cid = (int) $cat['id'];
-        $did = isset($cat['department_id']) && $cat['department_id'] !== null ? (int) $cat['department_id'] : 0;
-        $deptLabel = '';
-        if ($hasDepartmentsTable && $did > 0 && $departmentsForProducts !== []) {
-            foreach ($departmentsForProducts as $d) {
-                if ((int) $d['id'] === $did) {
-                    $deptLabel = (string) ($d['name_ar'] ?: $d['name_en'] ?: '');
-                    break;
-                }
-            }
-        }
-        $categoryCatalogMeta[$cid] = [
-            'dept_id' => $did,
-            'dept_label' => $deptLabel,
-            'ref' => $did . '-' . $cid,
-        ];
-    }
-}
+/* لا تحميل runtime من جداول taxonomy التراثية هنا (categories/subcategories). */
 
 $unifiedActiveProductsMissingPt = 0;
 if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_has_column($pdo, 'products', 'product_type_id')) {
@@ -410,16 +319,16 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         </select>
                     </div>
                     <div>
-                <label><?php echo $catalogNavUnified ? 'مسار الشجرة الموحّدة (مقتطف)' : 'القسم (يُستنتج من الفئة)'; ?></label>
+                <label>مسار الشجرة الموحّدة (مقتطف)</label>
                         <div id="product_department_hint" style="padding:8px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;min-height:20px;">—</div>
                         <small style="display:block;color:#666;margin-top:4px;">مرجع: <code id="product_dept_cat_ref" style="font-size:13px;">—</code></small>
                     </div>
                 </div>
             </div>
-            <div <?php echo ($hasSubcategoriesTable && $hasProductSubcategoryColumn) ? '' : 'style="grid-column:1/-1;"'; ?> id="product_type_block" class="orange-product-type-block">
-                <label for="product_type_id"><?php echo $catalogNavUnified ? 'نوع المنتج (ورقة الشجرة الموحّدة) — مطلوب' : 'نوع المنتج — اختياري'; ?></label>
-                <select id="product_type_id"<?php echo $catalogNavUnified ? ' required' : ''; ?>>
-                    <option value=""><?php echo $catalogNavUnified ? 'اختر نوع المنتج' : '—'; ?></option>
+            <div style="grid-column:1/-1;" id="product_type_block" class="orange-product-type-block">
+                <label for="product_type_id">نوع المنتج (ورقة الشجرة الموحّدة) — مطلوب</label>
+                <select id="product_type_id" required>
+                    <option value="">اختر نوع المنتج</option>
                     <?php foreach ($productTypesForForm as $prt): ?>
                         <?php
                         $ptIdOpt = (int) ($prt['id'] ?? 0);
@@ -735,11 +644,11 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                 if ($hasProductTypesTable) {
                     if ($pPtId <= 0) {
                         $pPtCell = htmlspecialchars(
-                            $catalogNavUnified ? 'ناقص — يُصلح بتعديل المنتج' : '—',
+                            'ناقص — يُصلح بتعديل المنتج',
                             ENT_QUOTES,
                             'UTF-8'
                         );
-                        $pPtStyle = $catalogNavUnified ? ' style="background:#fef2f2;color:#991b1b;font-weight:600;"' : '';
+                        $pPtStyle = ' style="background:#fef2f2;color:#991b1b;font-weight:600;"';
                     } else {
                         $pPtLabel = trim((string) ($p['pt_name_ar_join'] ?? ''))
                             ?: trim((string) ($p['pt_name_en_join'] ?? ''))
@@ -802,51 +711,9 @@ const PRODUCT_MSG = {
     OK_TOG: 'تم تحديث الحالة'
 };
 
-function orangeGetSelectedProductTypeSlug() {
-    const el = document.getElementById('product_type_id');
-    if (!el || !el.value) {
-        return '';
-    }
-    const opt = el.options[el.selectedIndex];
-    return opt ? (opt.getAttribute('data-slug') || '') : '';
-}
-
-/** عند ورقة ترحيل legacy يُعبِّئ الفئة/الفرع من الـ slug تلقائياً لتقليل خطأ الإدخال. */
+/** اعتماد التصنيف الموحّد فقط: التلميح يُحدَّث من الورقة المختارة. */
 function orangeSyncLegacyFieldsFromProductType() {
-    if (window.ORANGE_CATALOG_NAV_UNIFIED) {
-        updateProductCatalogHint();
-        return;
-    }
-    const slug = orangeGetSelectedProductTypeSlug();
-    let m = /^legacy-ptype-cat-(\d+)$/.exec(slug);
-    if (m) {
-        const catEl = document.getElementById('category_id');
-        if (catEl) {
-            catEl.value = m[1];
-        }
-        rebuildSubcategoryOptions(null);
-        updateProductCatalogHint();
-        return;
-    }
-    m = /^legacy-ptype-sub-(\d+)$/.exec(slug);
-    if (m) {
-        const sid = parseInt(m[1], 10) || 0;
-        const subs = window.ORANGE_SUBCATEGORIES || [];
-        let catId = 0;
-        for (let i = 0; i < subs.length; i++) {
-            const row = subs[i];
-            if ((parseInt(row.id, 10) || 0) === sid) {
-                catId = parseInt(row.category_id, 10) || 0;
-                break;
-            }
-        }
-        const catEl = document.getElementById('category_id');
-        if (catEl && catId > 0) {
-            catEl.value = String(catId);
-        }
-        rebuildSubcategoryOptions(sid > 0 ? sid : null);
-        updateProductCatalogHint();
-    }
+    updateProductCatalogHint();
 }
 
 function orangeGetSelectedProductTypeExpectedKind() {
@@ -1789,14 +1656,12 @@ async function saveProduct() {
         }
     }
 
-    if (window.ORANGE_CATALOG_NAV_UNIFIED) {
-        const ptEl = document.getElementById('product_type_id');
-        const ptVal = ptEl ? (parseInt(ptEl.value || '0', 10) || 0) : 0;
-        if (ptVal <= 0) {
-            productFormShowTab('basic');
-            alert('في وضع الشجرة الموحّدة يجب اختيار «نوع المنتج».');
-            return;
-        }
+    const ptEl = document.getElementById('product_type_id');
+    const ptVal = ptEl ? (parseInt(ptEl.value || '0', 10) || 0) : 0;
+    if (ptVal <= 0) {
+        productFormShowTab('basic');
+        alert('يجب اختيار «نوع المنتج» قبل الحفظ.');
+        return;
     }
 
     const hsCheck = parseInt(document.getElementById('has_sizes').value || '0', 10) === 1;
