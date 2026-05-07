@@ -235,24 +235,48 @@ function admin_asset_url(string $path): string
 function db(): PDO
 {
     static $pdo = null;
+    /** @var ?string يميّز الطلب الحالي داخل worker الـ FPM — static يبقى بين الطلبات لذا نعيد فحص الاتصال مرة لكل HTTP request */
+    static $requestDbChecked = null;
 
-    if ($pdo instanceof PDO) {
-        return $pdo;
+    $requestId = isset($_SERVER['REQUEST_TIME_FLOAT'])
+        ? (string) $_SERVER['REQUEST_TIME_FLOAT']
+        : (string) microtime(true);
+
+    if ($pdo instanceof PDO && $requestDbChecked !== $requestId) {
+        try {
+            $pdo->query('SELECT 1');
+            $requestDbChecked = $requestId;
+        } catch (PDOException $e) {
+            $driverCode = (int) ($e->errorInfo[1] ?? 0);
+            $msg = $e->getMessage();
+            $stale = $driverCode === 2006
+                || $driverCode === 2013
+                || stripos($msg, 'gone away') !== false
+                || stripos($msg, 'Lost connection') !== false;
+            if ($stale) {
+                $pdo = null;
+            } else {
+                throw $e;
+            }
+        }
     }
 
-    $dsn = 'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4';
+    if ($pdo === null) {
+        $dsn = 'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4';
 
-    $pdo = new PDO($dsn, DB_USER, DB_PASS, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    ]);
+        $pdo = new PDO($dsn, DB_USER, DB_PASS, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]);
 
-    // Optional: align timezone + charset with Click
-    try {
-        $pdo->exec("SET time_zone = '+03:00'");
-        $pdo->exec("SET NAMES utf8mb4");
-    } catch (Throwable $e) {
-        // ignore if permissions restrict
+        // Optional: align timezone + charset with Click
+        try {
+            $pdo->exec("SET time_zone = '+03:00'");
+            $pdo->exec("SET NAMES utf8mb4");
+        } catch (Throwable $e) {
+            // ignore if permissions restrict
+        }
+        $requestDbChecked = $requestId;
     }
 
     return $pdo;
