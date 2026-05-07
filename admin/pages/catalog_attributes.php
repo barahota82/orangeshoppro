@@ -115,7 +115,7 @@ if ($hasTable) {
             </div>
             <div class="admin-sort-field-wrap">
                 <label for="ca_label_en">English</label>
-                <input type="text" id="ca_label_en" class="admin-sort-field" dir="ltr" lang="en" <?php echo !$hasTable ? 'disabled' : ''; ?>>
+                <input type="text" id="ca_label_en" class="admin-sort-field" lang="en" <?php echo !$hasTable ? 'disabled' : ''; ?>>
             </div>
         </div>
         <div class="ca-row ca-row--r4">
@@ -133,7 +133,7 @@ if ($hasTable) {
                 <h4 class="admin-product-subsection-title" style="margin:0 0 6px;">القيم المعرفة (اختياري)</h4>
                 <p class="ca-field-hint" style="margin:0 0 10px;">
                     صف واحد = خيار واحد في قائمة المنتج. <strong>العربي</strong> هو النص المخزَّن للمنتج وللفلاتر (يجب أن يكون فريداً ضمن نفس السمة).
-                    إن لم تُضف صفوفاً يبقى حقل المنتج <strong>نصاً حراً</strong>.
+                    بعد كتابة العربي يُحدَّث English وFilipino وHindi تلقائياً (نفس ترجمة عناوين السمة). إن لم تُضف صفوفاً يبقى حقل المنتج <strong>نصاً حراً</strong>.
                 </p>
                 <div id="ca_options_box"></div>
                 <button type="button" class="btn-secondary ca-opt-add-btn" onclick="caOptionsAddRow()" <?php echo !$hasTable ? 'disabled' : ''; ?>>+ إضافة قيمة</button>
@@ -294,8 +294,16 @@ if ($hasTable) {
         cursor: default;
         background: #f4f6f9;
     }
-    .ca-attr-form-grid #ca_label_en {
-        text-align: left;
+    .ca-attr-form-grid #ca_label_ar,
+    .ca-attr-form-grid #ca_label_en,
+    .ca-attr-form-grid #ca_label_fil,
+    .ca-attr-form-grid #ca_label_hi {
+        direction: rtl;
+        text-align: right;
+    }
+    .ca-opt-row input.admin-sort-field {
+        direction: rtl;
+        text-align: right;
     }
     .ca-attr-form-grid input.admin-sort-field,
     .ca-attr-form-grid select.admin-sort-field {
@@ -420,7 +428,7 @@ function caOptionsRender(rows) {
     rows.forEach(function (r) {
         var wrap = document.createElement('div');
         wrap.className = 'ca-opt-row';
-        function addField(cls, label, val, ph, useLtr) {
+        function addField(cls, label, val, ph) {
             var d = document.createElement('div');
             d.className = 'admin-sort-field-wrap';
             var lb = document.createElement('label');
@@ -432,17 +440,14 @@ function caOptionsRender(rows) {
             if (ph) {
                 inp.setAttribute('placeholder', ph);
             }
-            if (useLtr) {
-                inp.setAttribute('dir', 'ltr');
-            }
             d.appendChild(lb);
             d.appendChild(inp);
             wrap.appendChild(d);
         }
-        addField('ca-opt-ar', 'العربي (القيمة المحفوظة)', r.label_ar || '', '', false);
-        addField('ca-opt-en', 'English', r.label_en || '', '', true);
-        addField('ca-opt-fil', 'Filipino', r.label_fil || '', '', true);
-        addField('ca-opt-hi', 'Hindi', r.label_hi || '', '', true);
+        addField('ca-opt-ar', 'العربي (القيمة المحفوظة)', r.label_ar || '', '');
+        addField('ca-opt-en', 'English', r.label_en || '', '');
+        addField('ca-opt-fil', 'Filipino', r.label_fil || '', '');
+        addField('ca-opt-hi', 'Hindi', r.label_hi || '', '');
         var rm = document.createElement('button');
         rm.type = 'button';
         rm.className = 'btn-secondary ca-opt-remove';
@@ -475,6 +480,173 @@ function caOptionsRemoveRow(btn) {
     if (box && !box.querySelector('.ca-opt-row')) {
         caOptionsRender([]);
     }
+}
+
+var caOptArDebouncers = new WeakMap();
+var caOptEnDebouncers = new WeakMap();
+
+function caClearOptionRowDerived(row) {
+    if (!row) {
+        return;
+    }
+    ['.ca-opt-en', '.ca-opt-fil', '.ca-opt-hi'].forEach(function (sel) {
+        var el = row.querySelector(sel);
+        if (el) {
+            el.value = '';
+        }
+    });
+}
+
+function scheduleCaOptTranslateFromAr(row) {
+    if (!row) {
+        return;
+    }
+    var arEl = row.querySelector('.ca-opt-ar');
+    if (!arEl || !arEl.value.trim()) {
+        caClearOptionRowDerived(row);
+        return;
+    }
+    var prev = caOptArDebouncers.get(row);
+    if (prev) {
+        clearTimeout(prev);
+    }
+    caOptArDebouncers.set(
+        row,
+        setTimeout(function () {
+            caOptArDebouncers.delete(row);
+            translateCaOptRowFromArabic(row, true);
+        }, 700)
+    );
+}
+
+function scheduleCaOptTranslateFromEn(row) {
+    if (!row) {
+        return;
+    }
+    var enEl = row.querySelector('.ca-opt-en');
+    if (!enEl || !enEl.value.trim()) {
+        return;
+    }
+    var prev = caOptEnDebouncers.get(row);
+    if (prev) {
+        clearTimeout(prev);
+    }
+    caOptEnDebouncers.set(
+        row,
+        setTimeout(function () {
+            caOptEnDebouncers.delete(row);
+            translateCaOptRowFromEnglish(row, true);
+        }, 650)
+    );
+}
+
+async function translateCaOptRowFromArabic(row, silent) {
+    silent = !!silent;
+    var arEl = row.querySelector('.ca-opt-ar');
+    var enEl = row.querySelector('.ca-opt-en');
+    var filEl = row.querySelector('.ca-opt-fil');
+    var hiEl = row.querySelector('.ca-opt-hi');
+    if (!arEl) {
+        return;
+    }
+    var ar = arEl.value.trim();
+    if (!ar) {
+        caClearOptionRowDerived(row);
+        return;
+    }
+    try {
+        var res = await postJSON('/admin/api/translate/names.php', { name_ar: ar, name_en: '' });
+        if (!res || !res.success) {
+            if (!silent) {
+                alert((res && res.message) ? res.message : 'فشل الترجمة');
+            }
+            return;
+        }
+        var t = res.translations || {};
+        if (t.name_en && enEl) {
+            enEl.value = t.name_en;
+        }
+        if (t.name_fil && filEl) {
+            filEl.value = t.name_fil;
+        }
+        if (t.name_hi && hiEl) {
+            hiEl.value = t.name_hi;
+        }
+    } catch (e) {
+        if (!silent) {
+            alert('فشل طلب الترجمة من السيرفر');
+        }
+    }
+}
+
+async function translateCaOptRowFromEnglish(row, silent) {
+    silent = !!silent;
+    var arEl = row.querySelector('.ca-opt-ar');
+    var enEl = row.querySelector('.ca-opt-en');
+    var filEl = row.querySelector('.ca-opt-fil');
+    var hiEl = row.querySelector('.ca-opt-hi');
+    if (!enEl || !enEl.value.trim()) {
+        return;
+    }
+    try {
+        var res = await postJSON('/admin/api/translate/names.php', {
+            name_ar: arEl ? arEl.value.trim() : '',
+            name_en: enEl.value.trim()
+        });
+        if (!res || !res.success) {
+            if (!silent) {
+                alert((res && res.message) ? res.message : 'فشل الترجمة');
+            }
+            return;
+        }
+        var t = res.translations || {};
+        if (t.name_fil && filEl) {
+            filEl.value = t.name_fil;
+        }
+        if (t.name_hi && hiEl) {
+            hiEl.value = t.name_hi;
+        }
+    } catch (e) {
+        if (!silent) {
+            alert('فشل طلب الترجمة من السيرفر');
+        }
+    }
+}
+
+function caBindOptionsBoxTranslateDelegation() {
+    var box = document.getElementById('ca_options_box');
+    if (!box || box.getAttribute('data-ca-opt-deleg') === '1') {
+        return;
+    }
+    box.setAttribute('data-ca-opt-deleg', '1');
+    box.addEventListener('input', function (ev) {
+        var t = ev.target;
+        if (!t || !t.classList) {
+            return;
+        }
+        var row = t.closest('.ca-opt-row');
+        if (!row) {
+            return;
+        }
+        if (t.classList.contains('ca-opt-ar')) {
+            scheduleCaOptTranslateFromAr(row);
+        } else if (t.classList.contains('ca-opt-en')) {
+            scheduleCaOptTranslateFromEn(row);
+        }
+    });
+    box.addEventListener('change', function (ev) {
+        var t = ev.target;
+        if (!t || !t.classList || !t.classList.contains('ca-opt-ar')) {
+            return;
+        }
+        var row = t.closest('.ca-opt-row');
+        if (!row) {
+            return;
+        }
+        if (t.value.trim()) {
+            translateCaOptRowFromArabic(row, true);
+        }
+    });
 }
 
 function applyCatalogAttrFormMode(editMode) {
@@ -611,6 +783,7 @@ async function saveCatalogAttribute() {
         enEl.addEventListener('input', scheduleCatalogAttrTranslateFromEnglish);
     }
     caOptionsRender([]);
+    caBindOptionsBoxTranslateDelegation();
     var tbody = document.getElementById('orange-ca-list-tbody');
     if (tbody) {
         tbody.addEventListener('click', function (ev) {
