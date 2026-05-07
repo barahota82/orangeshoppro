@@ -81,9 +81,33 @@ try {
         json_response(['success' => false, 'message' => 'المفتاح الإنجليزي مستخدم لسمة أخرى.'], 409);
     }
 
-    $optionsIn = null;
-    if (array_key_exists('options', $data)) {
-        $optionsIn = is_array($data['options']) ? $data['options'] : [];
+    $requiresOptions = ($inputKind === 'enum_single' || $inputKind === 'multi');
+    $optsOut = [];
+    if (array_key_exists('options', $data) && is_array($data['options'])) {
+        foreach ($data['options'] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $lar = trim((string) ($row['label_ar'] ?? ''));
+            if ($lar === '') {
+                continue;
+            }
+            $optsOut[] = [
+                'label_ar' => $lar,
+                'label_en' => trim((string) ($row['label_en'] ?? '')),
+                'label_fil' => trim((string) ($row['label_fil'] ?? '')),
+                'label_hi' => trim((string) ($row['label_hi'] ?? '')),
+            ];
+        }
+    }
+    if ($requiresOptions && $optsOut === []) {
+        json_response([
+            'success' => false,
+            'message' => 'نوع الحقل «قائمة واحدة» أو «متعدّد القيم» يتطلب إضافة قيمة معرّفة واحدة على الأقل (عربي) قبل الحفظ.',
+        ], 422);
+    }
+    if (! $requiresOptions) {
+        $optsOut = [];
     }
 
     $pdo->beginTransaction();
@@ -104,9 +128,7 @@ try {
                 $active,
                 $id,
             ]);
-            if ($optionsIn !== null) {
-                orange_catalog_attribute_options_replace($pdo, $id, $optionsIn);
-            }
+            orange_catalog_attribute_options_replace($pdo, $id, $optsOut);
             audit_log('catalog_attribute_save', 'تحديث سمة كتالوج: ' . $keyRaw, 'catalog_attributes', $id);
             $pdo->commit();
             json_response(['success' => true, 'id' => $id]);
@@ -129,9 +151,7 @@ try {
             $active,
         ]);
         $newId = (int) $pdo->lastInsertId();
-        if ($optionsIn !== null) {
-            orange_catalog_attribute_options_replace($pdo, $newId, $optionsIn);
-        }
+        orange_catalog_attribute_options_replace($pdo, $newId, $optsOut);
         audit_log('catalog_attribute_save', 'إضافة سمة كتالوج: ' . $keyRaw, 'catalog_attributes', $newId);
         $pdo->commit();
         json_response(['success' => true, 'id' => $newId]);

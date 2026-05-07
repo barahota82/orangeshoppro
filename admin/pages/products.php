@@ -532,6 +532,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         'UTF-8'
                     );
                     $ckey = htmlspecialchars((string) ($cattr['attribute_key'] ?? ''), ENT_QUOTES, 'UTF-8');
+                    $inputKind = (string) ($cattr['input_kind'] ?? 'text_short');
                     $pavOpts = $catalogAttrOptionsByAttrId[$caid] ?? [];
                     ?>
                     <div class="orange-product-pav-row" style="margin-bottom:10px;">
@@ -553,6 +554,12 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                                 ?>
                             <option value="<?php echo htmlspecialchars($optAr, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($optDisp, ENT_QUOTES, 'UTF-8'); ?></option>
                             <?php endforeach; ?>
+                        </select>
+                        <?php elseif ($inputKind === 'boolean'): ?>
+                        <select class="orange-pav-input admin-sort-field" data-catalog-attribute-id="<?php echo $caid; ?>" style="width:100%;max-width:520px;">
+                            <option value="">— بدون —</option>
+                            <option value="نعم">نعم</option>
+                            <option value="لا">لا</option>
                         </select>
                         <?php else: ?>
                         <input type="text" class="orange-pav-input" data-catalog-attribute-id="<?php echo $caid; ?>" maxlength="767" dir="auto" autocomplete="off" placeholder="" style="width:100%;max-width:520px;">

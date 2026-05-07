@@ -128,13 +128,10 @@ if ($hasTable) {
                 <input type="text" id="ca_label_hi" class="admin-sort-field" <?php echo !$hasTable ? 'disabled' : ''; ?>>
             </div>
         </div>
-        <div class="ca-row ca-row--opts" dir="rtl">
+        <div id="ca_row_opts" class="ca-row ca-row--opts" dir="rtl" style="display:none;">
             <div class="ca-row--opts-inner">
-                <h4 class="admin-product-subsection-title" style="margin:0 0 6px;">القيم المعرفة (اختياري)</h4>
-                <p class="ca-field-hint" style="margin:0 0 10px;">
-                    صف واحد = خيار واحد في قائمة المنتج. <strong>العربي</strong> هو النص المخزَّن للمنتج وللفلاتر (يجب أن يكون فريداً ضمن نفس السمة).
-                    بعد كتابة العربي يُحدَّث English وFilipino وHindi تلقائياً (نفس ترجمة عناوين السمة). إن لم تُضف صفوفاً يبقى حقل المنتج <strong>نصاً حراً</strong>.
-                </p>
+                <h4 id="ca_opts_title" class="admin-product-subsection-title" style="margin:0 0 6px;">القيم المعرفة</h4>
+                <p id="ca_opts_hint" class="ca-field-hint" style="margin:0 0 10px;"></p>
                 <div id="ca_options_box"></div>
                 <button type="button" class="btn-secondary ca-opt-add-btn" onclick="caOptionsAddRow()" <?php echo !$hasTable ? 'disabled' : ''; ?>>+ إضافة قيمة</button>
             </div>
@@ -421,7 +418,12 @@ function caOptionsRender(rows) {
         var p = document.createElement('p');
         p.className = 'ca-field-hint';
         p.style.margin = '0';
-        p.textContent = 'لا توجد قيم معرفة — سيُستخدم حقل نص حر في صفحة المنتج لهذه السمة.';
+        var kindSel = document.getElementById('ca_input_kind');
+        var kk = kindSel ? String(kindSel.value || '') : '';
+        var needOpts = kk === 'enum_single' || kk === 'multi';
+        p.textContent = needOpts
+            ? 'لا توجد قيم معرفة بعد — أضف صفاً واحداً على الأقل (العربي للقيمة مطلوب) قبل الحفظ، أو استخدم «+ إضافة قيمة».'
+            : 'لا توجد قيم معرفة — للأنواع نص/نعم-لا تُدخل القيمة من صفحة المنتج ولا من هنا.';
         box.appendChild(p);
         return;
     }
@@ -649,6 +651,39 @@ function caBindOptionsBoxTranslateDelegation() {
     });
 }
 
+function caInputKindAllowsOptions() {
+    var sel = document.getElementById('ca_input_kind');
+    var k = sel ? String(sel.value || '') : '';
+    return k === 'enum_single' || k === 'multi';
+}
+
+function caRefreshOptionsSectionVisibility() {
+    var row = document.getElementById('ca_row_opts');
+    var title = document.getElementById('ca_opts_title');
+    var hint = document.getElementById('ca_opts_hint');
+    if (!row) {
+        return;
+    }
+    var need = caInputKindAllowsOptions();
+    if (need) {
+        row.style.display = '';
+        if (title) {
+            title.textContent = 'القيم المعرفة (إلزامي)';
+        }
+        if (hint) {
+            hint.textContent =
+                'صف واحد = خيار واحد في قائمة المنتج. العربي هو النص المخزَّن للمنتج وللفلاتر (يفضّل أن يكون فريداً ضمن نفس السمة). بعد كتابة العربي يُحدَّث English وFilipino وHindi تلقائياً. نوع «قائمة واحدة» أو «متعدّد القيم» يتطلب قيمة معرّفة واحدة على الأقل قبل الحفظ.';
+        }
+        var box = document.getElementById('ca_options_box');
+        if (box && !box.querySelector('.ca-opt-row')) {
+            caOptionsRender([]);
+        }
+    } else {
+        row.style.display = 'none';
+        caOptionsRender([]);
+    }
+}
+
 function applyCatalogAttrFormMode(editMode) {
     var sortEl = document.getElementById('ca_sort');
     if (!sortEl) return;
@@ -675,6 +710,7 @@ function resetCatalogAttrForm() {
     document.getElementById('ca_active').value = '1';
     caOptionsRender([]);
     applyCatalogAttrFormMode(false);
+    caRefreshOptionsSectionVisibility();
 }
 
 function editCatalogAttribute(a) {
@@ -688,8 +724,14 @@ function editCatalogAttribute(a) {
     document.getElementById('ca_label_hi').value = a.label_hi || '';
     document.getElementById('ca_filterable').value = String((a.is_filterable === 1 || a.is_filterable === true) ? 1 : 0);
     document.getElementById('ca_active').value = String((a.is_active === 0 || a.is_active === false) ? 0 : 1);
-    caOptionsRenderFromAttrId(a.id);
+    var ik = a.input_kind || 'text_short';
+    if (ik === 'enum_single' || ik === 'multi') {
+        caOptionsRenderFromAttrId(a.id);
+    } else {
+        caOptionsRender([]);
+    }
     applyCatalogAttrFormMode(true);
+    caRefreshOptionsSectionVisibility();
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -743,6 +785,12 @@ async function saveCatalogAttribute() {
     if (isSavingCatalogAttr) return;
     isSavingCatalogAttr = true;
     try {
+        const kind = document.getElementById('ca_input_kind').value || '';
+        if ((kind === 'enum_single' || kind === 'multi') && caOptionsPayload().length < 1) {
+            alert('نوع «قائمة واحدة» أو «متعدّد القيم» يتطلب قيمة معرّفة واحدة على الأقل (عربي) قبل الحفظ.');
+            isSavingCatalogAttr = false;
+            return;
+        }
         const recordId = parseInt(document.getElementById('ca_attr_id').value || '0', 10) || 0;
         const sortRaw = document.getElementById('ca_sort').value.trim();
         const sortVal = sortRaw === '' ? 0 : (parseInt(sortRaw, 10) || 0);
@@ -782,8 +830,13 @@ async function saveCatalogAttribute() {
     if (enEl) {
         enEl.addEventListener('input', scheduleCatalogAttrTranslateFromEnglish);
     }
+    var kindEl = document.getElementById('ca_input_kind');
+    if (kindEl) {
+        kindEl.addEventListener('change', caRefreshOptionsSectionVisibility);
+    }
     caOptionsRender([]);
     caBindOptionsBoxTranslateDelegation();
+    caRefreshOptionsSectionVisibility();
     var tbody = document.getElementById('orange-ca-list-tbody');
     if (tbody) {
         tbody.addEventListener('click', function (ev) {
