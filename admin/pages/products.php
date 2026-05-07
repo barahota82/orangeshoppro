@@ -300,14 +300,11 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
 </div>
 <?php endif; ?>
 
+<?php if ($catalogNavUnified): ?>
 <div class="card" style="margin-bottom:12px;">
-    <p style="margin:0;">قبل إضافة منتج بمقاسات: رتّب الهرم من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">القاموس (1–2)</a> ثم <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_families'), ENT_QUOTES, 'UTF-8'); ?>">عائلات المقاسات (3–4)</a>.
-        قبل الألوان: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=color_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس الألوان</a>.
-        أنماط بصريّة اختيارية مع كل خليط لوني: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=pattern_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">أنماط الألوان</a>.</p>
-    <?php if ($catalogNavUnified): ?>
-    <p style="margin:10px 0 0;color:#334155;font-size:14px;line-height:1.55;border-top:1px solid #e2e8f0;padding-top:10px;"><strong>التصنيف الموحّد:</strong> مسار المتجر للمنتج = <strong>نوع المنتج</strong> (ورقة الشجرة) في النموذج — وليس فئة/فرعاً يدوياً على المنتج. هرَم المقاس التجاري (1–2) يُضبط على الورقة فيقترح النموذج عائلات المقاسات (3–4) المتوافقة. الألوان والأنماط تُدار من القواميس وتُربَط بالمتغيرات عند «توليد المتغيرات».</p>
-    <?php endif; ?>
+    <p style="margin:0;color:#334155;font-size:14px;line-height:1.55;"><strong>التصنيف الموحّد:</strong> مسار المتجر للمنتج = <strong>نوع المنتج</strong> (ورقة الشجرة) في النموذج — وليس فئة/فرعاً يدوياً على المنتج. هرَم المقاس التجاري (1–2) يُضبط على الورقة فيقترح النموذج عائلات المقاسات (3–4) المتوافقة. الألوان والأنماط تُدار من القواميس وتُربَط بالمتغيرات عند «توليد المتغيرات».</p>
 </div>
+<?php endif; ?>
 
 <div class="card">
     <h3 id="productFormTitle">إضافة / تعديل منتج</h3>
@@ -318,9 +315,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
         <input type="hidden" id="category_id" value="">
         <input type="hidden" id="subcategory_id" value="">
         <?php endif; ?>
-        <p class="admin-product-form-intro"><?php echo $catalogNavUnified
-            ? 'مسار العمل: <strong>البيانات الأساسية</strong> (اختر <strong>نوع المنتج</strong> = ورقة الشجرة الموحّدة) ← <strong>المقاسات والألوان</strong> (عائلة مقاسات ضمن هرَم الورقة + خلطات لون من القواميس) ← <strong>الصور</strong> ← <strong>المتغيرات</strong> ثم «توليد المتغيرات». «حفظ المنتج» يطبّق الكل دفعة واحدة.'
-            : 'مسار العمل: <strong>البيانات الأساسية</strong> ← <strong>المقاسات والألوان</strong> ← <strong>الصور</strong> (صورة مرجعية للصنف) ← <strong>المتغيرات</strong> ثم «توليد المتغيرات». زر «حفظ المنتج» يطبّق كل التبويبات دفعة واحدة.'; ?></p>
 
         <div class="admin-product-tabs" role="tablist" aria-label="أقسام نموذج المنتج">
             <button type="button" class="admin-product-tab is-active" role="tab" id="productTabBtnBasic" aria-controls="productTabPanelBasic" aria-selected="true" data-product-tab="basic">البيانات الأساسية</button>
@@ -339,7 +333,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                     <div class="admin-sort-field-wrap">
                         <label>الترتيب (في المتجر)</label>
                         <input type="text" id="product_sort_order" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int)$nextProductSort; ?>" readonly tabindex="-1" autocomplete="off" inputmode="numeric">
-                        <small style="display:block;color:#666;margin-top:4px;">يُعرض للمراجعة فقط. الترتيب من ↑↓ في الجدول ثم «حفظ الترتيب».</small>
                     </div>
                     <div>
                         <label>حالة العرض</label>
@@ -375,11 +368,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         <option value="<?php echo $ptIdOpt; ?>" data-slug="<?php echo $ptSlug; ?>" data-expected-kind="<?php echo $ptExpCk; ?>" data-expected-cat="<?php echo $ptExpSk; ?>"<?php echo $ptTitleAttr; ?>><?php echo $ptLabel; ?></option>
                     <?php endforeach; ?>
                 </select>
-                <?php if ($catalogNavUnified): ?>
-                    <small style="display:block;color:#666;margin-top:4px;line-height:1.45;">يجب مطابقة الورقة لمسار المتجر الموحّد. تهيئة الفروع من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع شجرة المنتجات</a> و<a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات الموحدة</a>؛ على الورقة يُحدَّد <strong>هرَم المقاس 1–2</strong> (النوع التجاري وفئة القياس) من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">القاموس المرجعي</a> لتصفية عائلات المقاسات في تبويب المقاسات. <strong>مصدر التصنيف على المنتج هو هذه الورقة فقط</strong>؛ الحقول القديمة على المنتج تُحدَّث آلياً عند وجود جسر ترحيل.</small>
-                <?php else: ?>
-                    <small style="display:block;color:#666;margin-top:4px;line-height:1.45;">تهيئة الشجرة الموحّدة: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع شجرة المنتجات</a> ثم <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات الموحدة</a>.</small>
-                <?php endif; ?>
             </div>
             <?php if (!$catalogNavUnified): ?>
             <div class="orange-legacy-category-fields">
@@ -426,9 +414,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </select>
-                <?php if ($hasDepartmentsTable && $hasCategoryDepartment): ?>
-                    <small style="display:block;color:#666;margin-top:4px;">كل فئة تحت قسمها لتفادي الخلط بين فئات متشابهة.</small>
-                <?php elseif (!$hasDepartmentsTable || !$hasCategoryDepartment): ?>
+                <?php if (!$hasDepartmentsTable || !$hasCategoryDepartment): ?>
                     <small style="display:block;color:#f59e0b;margin-top:4px;">لربط جدول <code>categories</code> القديم بالأقسام أو لإعداد أقسام داخلية موحّدة: صفحة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=categories'), ENT_QUOTES, 'UTF-8'); ?>">أقسام داخلية</a>.</small>
                 <?php endif; ?>
             </div>
@@ -438,8 +424,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                 <select id="subcategory_id">
                     <option value="">— بدون —</option>
                 </select>
-                <small style="display:block;color:#666;margin-top:4px;">يُحدَّث حسب الفئة المختارة. أضف التصنيفات من
-                    <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=subcategories'), ENT_QUOTES, 'UTF-8'); ?>">فئات فرعية</a>.</small>
             </div>
             <?php endif; ?>
             </div>
@@ -494,7 +478,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
             </div>
             <div style="grid-column:1/-1;">
                 <h4 class="admin-product-subsection-title" style="margin:8px 0 4px;">SEO — عناوين ووصف الميتا (اختياري)</h4>
-                <p style="margin:0 0 10px;color:#666;font-size:13px;line-height:1.45;">إذا تُركت فارغة، يُستخدم عنوان المنتج ووصف مختصر من نص الوصف في المتجر (وميتا Open Graph).</p>
             </div>
             <div>
                 <label for="seo_meta_title_ar">عنوان الميتا (عربي)</label>
@@ -529,11 +512,8 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                 <textarea id="seo_meta_description_hi" rows="2" lang="hi" dir="ltr"></textarea>
             </div>
             <?php if ($catalogAttributesActive !== []): ?>
-            <?php $catAttrHref = htmlspecialchars(storefront_public_path('/admin/index.php?page=catalog_attributes'), ENT_QUOTES, 'UTF-8'); ?>
             <div style="grid-column:1/-1;">
                 <h4 class="admin-product-subsection-title" style="margin:8px 0 4px;">صفات الكتالوج</h4>
-                <p style="margin:0 0 12px;color:#666;font-size:13px;line-height:1.45;">قيم اختيارية لكل سمة معرّفة ونشطة (مرحلة الموحَّد «الصفات»). المرجع: <a href="<?php echo $catAttrHref; ?>">جدول السمات</a> — الإدارة الكاملة للتعريفات بالقاعدة كما خطّط المشروع؛ هنا إدخال القيم على المنتج فقط.
-                    <strong>لا توجد قائمة «اختر سمة»:</strong> كل سمة نشطة تظهر كسطر لاحقاً في هذا القسم؛ عنوان السطر (مثل الجنس) هو السمة، والحقل النصي تحته للقيمة فقط (اتركه فارغاً إن لم تنطبق على هذا المنتج).</p>
                 <?php foreach ($catalogAttributesActive as $cattr): ?>
                     <?php
                     $caid = (int) $cattr['id'];
@@ -586,9 +566,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
         <div id="productTabPanelSizes" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnSizes">
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">المقاسات والألوان</h4>
-        <p style="margin:0 0 14px;color:#475569;font-size:13px;line-height:1.55;"><?php echo $catalogNavUnified
-            ? 'يرتبط هذا التبويب بـ<strong>هرَم المقاس</strong> الموثّق للمشروع: المستويان 1–2 (نوع تجاري + فئة قياس) يأتيان من <strong>نوع المنتج</strong> الذي اخترته في «البيانات الأساسية»؛ تُعرض عائلات المقاسات (مخطّط 3 + قيم 4) المتوافقة فقط عند تفعيل «له مقاسات؟». الألوان والأنماط من <a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=color_dictionary'), ENT_QUOTES, 'UTF-8') . '">قاموس الألوان</a> و<a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=pattern_dictionary'), ENT_QUOTES, 'UTF-8') . '">أنماط الألوان</a> — لا تُعرَّف كمستوى في شجرة التنقل.'
-            : 'عند تفعيل المقاسات اختر عائلة مقاسات؛ عند تفعيل الألوان عرّف خلطات لون من القواميس. راجع <a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=sizing_dictionary'), ENT_QUOTES, 'UTF-8') . '">قاموس المقاس</a> وعائلات المقاسات لتجهيز الهرم.'; ?></p>
         <?php if ($colors === []): ?>
         <p style="margin:0 0 12px;padding:10px 12px;background:#fff7ed;border:1px solid #fdba74;border-radius:8px;color:#9a3412;font-size:13px;">قاموس <strong>الألوان</strong> فارغ — لن تظهر خيارات في خلطات اللون. أضف ألواناً من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=color_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس الألوان</a> قبل تفعيل «له ألوان؟».</p>
         <?php endif; ?>
@@ -638,14 +615,8 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
 
         <div id="colorwaysSection" class="card admin-nested-panel" style="display:none;">
             <h4 class="admin-nested-panel__title">تركيبات اللون (أساسي / ثانوي اختياري)</h4>
-            <p style="margin:0 0 10px;color:#64748b;font-size:13px;line-height:1.5;">كل صف = خليط لوني (من <strong>قاموس الألوان</strong>) مع أنماط اختيارية من <strong>قاموس الأنماط</strong>. عند الحفظ يجب أن يكون لكل متغير ملون <strong>لون أساسي</strong> من القاموس (كما في سياسة المتغيرات).</p>
             <div id="colorwaysBox"></div>
             <button type="button" class="btn-secondary" onclick="addColorwayRow()">+ صف لون</button>
-        </div>
-
-        <div id="productAdvancedSizingSlot" class="card admin-nested-panel">
-            <h4 class="admin-product-subsection-title" style="margin-top:0;">من «المقاسات والألوان» إلى «المتغيرات»</h4>
-            <p style="margin:0;color:#475569;font-size:13px;line-height:1.55;">بعد اختيار عائلة المقاسات (إن وُجدت) وخلطات اللون (إن وُجدت)، انتقل لتبويب <strong>المتغيرات</strong> واضغط <strong>توليد المتغيرات</strong>: يُبنى الجدول من دمج المقاسات المعروضة للعائلة المختارة مع صفوف الألوان، وفق نفس الهرم والقواميس — لا مسار تصنيف موازٍ للشجرة الموحّدة.</p>
         </div>
         </div>
         </div>
@@ -660,7 +631,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                 <input type="file" id="main_image_file" accept="image/jpeg,image/png,image/webp,image/gif">
                 <button type="button" class="btn-secondary" style="margin-top:8px;" onclick="uploadMainProductImage()">رفع الصورة الرئيسية</button>
                 <div id="main_image_preview" style="display:none;margin-top:10px;"></div>
-                <p class="admin-product-image-hint">الصورة هنا <strong>مرجع للصنف</strong> (ما يظهر للعميل). المتغيرات (لون × مقاس) تُربط بنفس الصنف؛ صورة لكل لون يمكن إضافتها لاحقاً في التطوير. <strong>أول صورة تُرفع</strong> تُعتبر الرئيسية ما لم تغيّرها. يُثبت الربط عند «حفظ المنتج».</p>
             </div>
             <div style="grid-column:1/-1;">
                 <label>صور إضافية للمعرض (عدة ملفات)</label>
@@ -681,7 +651,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
         </div>
 
         <div class="admin-product-form-actions admin-product-form-actions--bar">
-            <p class="admin-product-save-hint">حفظ واحد لكل الحقول أعلاه.</p>
             <div class="actions admin-product-form-actions__buttons">
                 <button type="button" class="btn-secondary" id="btnProductTranslate" onclick="translateProductLocalesFromArabic()">ترجمة تلقائية من العربي</button>
                 <button type="button" id="btnGenerateVariants" onclick="generateVariants()">توليد المتغيرات</button>
@@ -699,7 +668,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
             <button type="button" class="btn" onclick="saveProductsOrder()">حفظ الترتيب</button>
         </div>
     </div>
-    <p style="margin:8px 0 12px;font-size:13px;color:#666;">الترتيب في المتجر: تصاعدي حسب «الترتيب» ثم رقم المنتج (مثل الفئات). استخدم ↑↓ ثم احفظ.</p>
     <?php if ($hasDepartmentsTable && $hasCategoryDepartment && $departmentsForProducts !== []): ?>
     <div class="form-grid" style="margin-bottom:12px;max-width:420px;">
         <div>
