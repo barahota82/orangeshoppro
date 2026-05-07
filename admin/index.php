@@ -18,8 +18,6 @@ $allowed = [
     'cart_bogo_promotions',
     'cart_combo_promotions',
     'departments',
-    'categories',
-    'subcategories',
     'unified_catalog_branches',
     'product_types',
     'color_dictionary',

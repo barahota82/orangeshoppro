@@ -278,8 +278,6 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 ['page' => 'products', 'href' => '/admin/index.php?page=products', 'label' => 'المنتجات', 'class' => '', 'sub' => false],
                 ['page' => 'offers', 'href' => '/admin/index.php?page=offers', 'label' => 'عروض المنتجات', 'class' => '', 'sub' => false],
                 ['page' => 'opening_stock_balances', 'href' => '/admin/index.php?page=opening_stock_balances', 'label' => 'أرصدة أول المدة المخزنية', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'categories', 'href' => '/admin/index.php?page=categories', 'label' => 'أقسام داخلية (تراث — قد تُلغى)', 'class' => 'admin-nav-sub admin-nav-link--legacy', 'sub' => true],
-                ['page' => 'subcategories', 'href' => '/admin/index.php?page=subcategories', 'label' => 'الفئة والفروع (تراث — قد تُلغى)', 'class' => 'admin-nav-sub admin-nav-link--legacy', 'sub' => true],
             ];
 
             $navPurchasing = [

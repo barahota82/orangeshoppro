@@ -34,8 +34,6 @@ function orange_admin_page_resource(string $page): string
     static $map = [
         'dashboard' => 'dashboard',
         'departments' => 'catalog',
-        'categories' => 'catalog',
-        'subcategories' => 'catalog',
         'unified_catalog_branches' => 'catalog',
         'product_types' => 'catalog',
         'color_dictionary' => 'catalog',
@@ -105,8 +103,6 @@ function orange_admin_api_folder_resource(string $folder): string
 {
     static $map = [
         'departments' => 'catalog',
-        'categories' => 'catalog',
-        'subcategories' => 'catalog',
         'product_types' => 'catalog',
         'colors' => 'catalog',
         'patterns' => 'catalog',

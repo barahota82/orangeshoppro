@@ -133,8 +133,6 @@ if ($catalogAttributesActive !== [] && orange_table_exists($pdo, 'catalog_attrib
     }
 }
 
-$categorySelectRequiresAttr = $catalogNavUnified ? '' : ' required';
-
 $hasDepartmentsTable = false;
 $hasCategoryDepartment = false;
 try {
@@ -309,12 +307,15 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
 <div class="card">
     <h3 id="productFormTitle">إضافة / تعديل منتج</h3>
     <p id="productEditHint" style="display:none;margin:0 0 12px;color:#555;font-size:14px;">تعديل البيانات الأساسية. الترتيب في المتجر من الجدول فقط (↑↓ ثم حفظ الترتيب). كميات الألوان والمقاسات من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8'); ?>">المخزون</a>.</p>
+    <?php if (!$catalogNavUnified): ?>
+    <div style="margin-bottom:12px;padding:12px 14px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;">
+        <p style="margin:0;color:#991b1b;line-height:1.55;">تمت إزالة شاشات التصنيف التراثية (<strong>أقسام داخلية</strong> و<strong>الفئة والفروع</strong>) من لوحة التحكم. لتعديل المنتجات بالتصنيف الصحيح فعّل <strong>الشجرة الموحّدة</strong> ثم استخدم <strong>نوع المنتج</strong> فقط. المرجع: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع شجرة المنتجات</a> و<a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات</a>.</p>
+    </div>
+    <?php endif; ?>
     <form id="productForm">
         <input type="hidden" id="product_record_id" value="0">
-        <?php if ($catalogNavUnified): ?>
         <input type="hidden" id="category_id" value="">
         <input type="hidden" id="subcategory_id" value="">
-        <?php endif; ?>
 
         <div class="admin-product-tabs" role="tablist" aria-label="أقسام نموذج المنتج">
             <button type="button" class="admin-product-tab is-active" role="tab" id="productTabBtnBasic" aria-controls="productTabPanelBasic" aria-selected="true" data-product-tab="basic">البيانات الأساسية</button>
@@ -369,65 +370,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                     <?php endforeach; ?>
                 </select>
             </div>
-            <?php if (!$catalogNavUnified): ?>
-            <div class="orange-legacy-category-fields">
-            <div <?php echo ($hasSubcategoriesTable && $hasProductSubcategoryColumn) ? '' : 'style="grid-column:1/-1;"'; ?>>
-                <label>الفئة (ضمن القسم)</label>
-                <select id="category_id"<?php echo $categorySelectRequiresAttr; ?>>
-                    <option value="">اختر الفئة</option>
-                    <?php if ($hasDepartmentsTable && $hasCategoryDepartment && $departmentsForProducts !== []): ?>
-                        <?php
-                        $catsByDept = [];
-                        foreach ($categories as $cat) {
-                            $did = isset($cat['department_id']) && $cat['department_id'] !== null ? (int) $cat['department_id'] : 0;
-                            if (!isset($catsByDept[$did])) {
-                                $catsByDept[$did] = [];
-                            }
-                            $catsByDept[$did][] = $cat;
-                        }
-                        ?>
-                        <?php foreach ($departmentsForProducts as $dep): ?>
-                            <?php
-                            $did = (int) $dep['id'];
-                            $deptCats = $catsByDept[$did] ?? [];
-                            if ($deptCats === []) {
-                                continue;
-                            }
-                            $ogLabel = (string) ($dep['name_ar'] ?: $dep['name_en'] ?: ('#' . $did));
-                            ?>
-                            <optgroup label="<?php echo htmlspecialchars($ogLabel, ENT_QUOTES, 'UTF-8'); ?>">
-                                <?php foreach ($deptCats as $cat): ?>
-                                    <option value="<?php echo (int) $cat['id']; ?>"><?php echo htmlspecialchars($cat['name_ar'] ?: $cat['name_en']); ?></option>
-                                <?php endforeach; ?>
-                            </optgroup>
-                        <?php endforeach; ?>
-                        <?php if (!empty($catsByDept[0])): ?>
-                            <optgroup label="بدون قسم">
-                                <?php foreach ($catsByDept[0] as $cat): ?>
-                                    <option value="<?php echo (int) $cat['id']; ?>"><?php echo htmlspecialchars($cat['name_ar'] ?: $cat['name_en']); ?></option>
-                                <?php endforeach; ?>
-                            </optgroup>
-                        <?php endif; ?>
-                    <?php else: ?>
-                        <?php foreach ($categories as $cat): ?>
-                            <option value="<?php echo (int) $cat['id']; ?>"><?php echo htmlspecialchars($cat['name_ar'] ?: $cat['name_en']); ?></option>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </select>
-                <?php if (!$hasDepartmentsTable || !$hasCategoryDepartment): ?>
-                    <small style="display:block;color:#f59e0b;margin-top:4px;">لربط جدول <code>categories</code> القديم بالأقسام أو لإعداد أقسام داخلية موحّدة: صفحة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=categories'), ENT_QUOTES, 'UTF-8'); ?>">أقسام داخلية</a>.</small>
-                <?php endif; ?>
-            </div>
-            <?php if ($hasSubcategoriesTable && $hasProductSubcategoryColumn): ?>
-            <div>
-                <label for="subcategory_id">فئة فرعية (اختياري)</label>
-                <select id="subcategory_id">
-                    <option value="">— بدون —</option>
-                </select>
-            </div>
-            <?php endif; ?>
-            </div>
-            <?php endif; ?>
             <div>
                 <label>اسم المنتج (العربي)</label>
                 <input type="text" id="name" required>
@@ -1114,6 +1056,14 @@ function rebuildSubcategoryOptions(preserveId) {
     if (!sel) {
         return;
     }
+    if (sel.tagName !== 'SELECT') {
+        if (preserveId === null || preserveId === '' || preserveId === undefined) {
+            sel.value = '';
+        } else {
+            sel.value = String(preserveId);
+        }
+        return;
+    }
     const catId = parseInt(document.getElementById('category_id').value || '0', 10);
     let want;
     if (preserveId === undefined) {
@@ -1256,7 +1206,7 @@ function resetProductForm() {
     if (ptClear) {
         ptClear.value = '';
     }
-    document.getElementById('category_id').selectedIndex = 0;
+    document.getElementById('category_id').value = '';
     rebuildSubcategoryOptions(null);
     updateProductCatalogHint();
     document.getElementById('price').value = '';
@@ -1997,13 +1947,13 @@ function updateProductCatalogHint() {
     } else if (meta.dept_id > 0) {
         hint.textContent = 'قسم #' + meta.dept_id;
     } else {
-        hint.textContent = 'بدون قسم — عيّن القسم من صفحة الفئات إن لزم';
+        hint.textContent = 'بدون قسم — فعّل الشجرة الموحّدة أو اربط القسم عبر الترحيل';
     }
     refEl.textContent = meta.ref;
 }
 
 const categorySelectEl = document.getElementById('category_id');
-if (categorySelectEl) {
+if (categorySelectEl && categorySelectEl.tagName === 'SELECT') {
     categorySelectEl.addEventListener('change', function () {
         rebuildSubcategoryOptions(null);
         updateProductCatalogHint();
