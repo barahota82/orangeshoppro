@@ -101,8 +101,12 @@ foreach ($cartBogoCatalogCategoryDropdown as $e) {
             <p class="page-subtitle" style="margin:6px 0 10px;line-height:1.45;"><strong>تصنيف موحّد:</strong> لا توجد فئات نشطة في <code dir="ltr">catalog_categories</code> — أدخل <code dir="ltr">id</code> يدوياً أو أنشئ الفروع من صفحة فروع شجرة المنتجات.</p>
             <input type="number" id="cbp_cat" class="admin-inp" min="1" step="1" style="max-width:12rem;" dir="ltr">
             <?php else: ?>
-            <label for="cbp_cat">رقم الفئة القديم على المنتج (<code dir="ltr">categories.id</code>)</label>
-            <input type="number" id="cbp_cat" class="admin-inp" min="1" step="1" style="max-width:12rem;" dir="ltr">
+            <p class="alert-error" style="margin:0 0 10px;line-height:1.55;">
+                عروض «نفس الفئة» تتطلّب <strong>الشجرة الموحّدة</strong> (سجل الترحيل + أقسام في <code dir="ltr">catalog_sections</code>) ثم اختيار أو إدخال <code dir="ltr">catalog_categories.id</code> من
+                <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع شجرة المنتجات</a>.
+                لا يُدعم إدخال <code dir="ltr">categories.id</code> التراثي من هذه الشاشة.
+            </p>
+            <input type="hidden" id="cbp_cat" value="0" aria-hidden="true">
             <?php endif; ?>
         </div>
         <div id="cbp_buy_bundle_wrap" style="grid-column:1/-1;display:none;">

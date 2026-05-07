@@ -161,6 +161,43 @@ if ($unifiedProductList) {
         LEFT JOIN departments d ON d.id = cs_pl.department_id
         ORDER BY p.sort_order ASC, p.id ASC'
     )->fetchAll(PDO::FETCH_ASSOC);
+} elseif (
+    $catalogNavUnified
+    && $hasProductTypesTable
+    && orange_table_has_column($pdo, 'products', 'product_type_id')
+    && orange_table_exists($pdo, 'catalog_subcategories')
+    && orange_table_exists($pdo, 'catalog_categories')
+) {
+    /* شجرة موحّدة مفعّلة لكن غياب قسم/عمود قسم — عرض فئة الكتالوج بدون ربط قسم */
+    $catJ = orange_catalog_admin_sql_join_product_category_display($pdo, 'p', 'pt');
+    $products = $pdo->query(
+        'SELECT p.*, c.name_ar AS category_name, c.id AS catalog_category_display_id,
+            NULL AS category_department_id, NULL AS department_name_ar, NULL AS department_name_en,
+            pt.name_ar AS pt_name_ar_join, pt.name_en AS pt_name_en_join, pt.slug AS pt_slug_join
+        FROM products p
+        LEFT JOIN product_types pt ON pt.id = p.product_type_id'
+        . $catJ . '
+        ORDER BY p.sort_order ASC, p.id ASC'
+    )->fetchAll(PDO::FETCH_ASSOC);
+} elseif ($catalogNavUnified) {
+    /* تفعيل موحّد لكن مخطط غير مكتمل — لا استعلام على categories التراثية */
+    if ($hasProductTypesTable) {
+        $products = $pdo->query(
+            'SELECT p.*, NULL AS category_name, NULL AS catalog_category_display_id,
+            NULL AS category_department_id, NULL AS department_name_ar, NULL AS department_name_en,
+            pt.name_ar AS pt_name_ar_join, pt.name_en AS pt_name_en_join, pt.slug AS pt_slug_join
+            FROM products p
+            LEFT JOIN product_types pt ON pt.id = p.product_type_id
+            ORDER BY p.sort_order ASC, p.id ASC'
+        )->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $products = $pdo->query(
+            'SELECT p.*, NULL AS category_name, NULL AS catalog_category_display_id,
+            NULL AS category_department_id, NULL AS department_name_ar, NULL AS department_name_en
+            FROM products p
+            ORDER BY p.sort_order ASC, p.id ASC'
+        )->fetchAll(PDO::FETCH_ASSOC);
+    }
 } else {
     try {
         $hasDepartmentsTable = (bool) $pdo->query("SHOW TABLES LIKE 'departments'")->fetchColumn();
