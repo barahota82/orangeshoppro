@@ -107,23 +107,19 @@ try {
             json_response(['success' => false, 'message' => 'أدخل رقم فئة صالح لنوع «قطعتان من نفس الفئة»'], 422);
         }
         if ($bogoKind === 'same_category' && $catId > 0) {
-            $unifiedCat = orange_catalog_nav_use_unified($pdo)
-                && orange_table_exists($pdo, 'catalog_categories');
-            if ($unifiedCat) {
-                $chkCc = $pdo->prepare('SELECT id FROM catalog_categories WHERE id = ? LIMIT 1');
-                $chkCc->execute([$catId]);
-                if (!$chkCc->fetchColumn()) {
-                    json_response([
-                        'success' => false,
-                        'message' => 'معرف الفئة لا يتوافق مع الشجرة الموحّدة. استخدم رقمًا من الفئات في «فروع الكتالوج الموحَّد» (catalog_categories)، وليس فئة المتجر القديمة إن لم تكن موحَّدة بنفس المعرف.',
-                    ], 422);
-                }
-            } elseif (orange_table_exists($pdo, 'categories')) {
-                $chkL = $pdo->prepare('SELECT id FROM categories WHERE id = ? LIMIT 1');
-                $chkL->execute([$catId]);
-                if (!$chkL->fetchColumn()) {
-                    json_response(['success' => false, 'message' => 'رقم الفئة غير موجود في جدول الفئات القديم.'], 422);
-                }
+            if (!orange_catalog_nav_use_unified($pdo) || !orange_table_exists($pdo, 'catalog_categories')) {
+                json_response([
+                    'success' => false,
+                    'message' => 'عروض «نفس الفئة» تتطلّب تفعيل الشجرة الموحّدة والتحقق من معرف فئة الكتالوج (catalog_categories) من «فروع شجرة المنتجات».',
+                ], 422);
+            }
+            $chkCc = $pdo->prepare('SELECT id FROM catalog_categories WHERE id = ? LIMIT 1');
+            $chkCc->execute([$catId]);
+            if (!$chkCc->fetchColumn()) {
+                json_response([
+                    'success' => false,
+                    'message' => 'معرف الفئة غير موجود في الشجرة الموحّدة (catalog_categories). استخدم رقماً من «فروع شجرة المنتجات».',
+                ], 422);
             }
         }
         if ($bogoKind === 'buy_bundle') {

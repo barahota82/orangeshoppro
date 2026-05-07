@@ -122,6 +122,46 @@ function orange_catalog_products_sql_join_legacy_categories_derived(PDO $pdo, st
 }
 
 /**
+ * سلسلة LEFT JOIN لعرض صف فئة باسم مستعار `c` (name_ar / name_en) في استعلامات الأدمن عن المنتجات.
+ * - متجر موحّد: `c` = catalog_categories عبر product_type_id (وإن وُجد alias لـ product_types يُمرَّر).
+ * - غير موحّد: categories على p.category_id أو الاشتقاق عبر orange_catalog_products_sql_join_legacy_categories_derived.
+ *
+ * @param string|null $existingProductTypesAlias اسم مستعار لـ product_types إن وُجد مسبقاً في الاستعلام (مثل pt)؛
+ *        null = يُنشأ JOIN داخلي باسم orange_disp_pt عند الحاجة.
+ */
+function orange_catalog_admin_sql_join_product_category_display(PDO $pdo, string $productsAlias = 'p', ?string $existingProductTypesAlias = null): string
+{
+    $p = preg_replace('/[^A-Za-z0-9_]/', '', $productsAlias) ?: 'p';
+    $unified = function_exists('orange_catalog_nav_use_unified') && orange_catalog_nav_use_unified($pdo);
+    if ($unified
+        && orange_table_exists($pdo, 'product_types')
+        && orange_table_exists($pdo, 'catalog_subcategories')
+        && orange_table_exists($pdo, 'catalog_categories')
+        && orange_table_has_column($pdo, 'products', 'product_type_id')
+    ) {
+        $pt = null;
+        if ($existingProductTypesAlias !== null && $existingProductTypesAlias !== '') {
+            $pt = preg_replace('/[^A-Za-z0-9_]/', '', $existingProductTypesAlias);
+        }
+        if ($pt === null || $pt === '') {
+            $pt = 'orange_disp_pt';
+
+            return "\n LEFT JOIN product_types {$pt} ON {$pt}.id = {$p}.product_type_id"
+                . "\n LEFT JOIN catalog_subcategories orange_disp_ucs ON orange_disp_ucs.id = {$pt}.catalog_subcategory_id"
+                . "\n LEFT JOIN catalog_categories c ON c.id = orange_disp_ucs.catalog_category_id";
+        }
+
+        return "\n LEFT JOIN catalog_subcategories orange_disp_ucs ON orange_disp_ucs.id = {$pt}.catalog_subcategory_id"
+            . "\n LEFT JOIN catalog_categories c ON c.id = orange_disp_ucs.catalog_category_id";
+    }
+    if (orange_table_has_column($pdo, 'products', 'category_id')) {
+        return "\n LEFT JOIN categories c ON c.id = {$p}.category_id";
+    }
+
+    return orange_catalog_products_sql_join_legacy_categories_derived($pdo, $p, 'c');
+}
+
+/**
  * عند تعيين أو تبديل المعرف إلى نوع منتج جديد: ورقة **product_types** يجب أن تكون نشطة؛
  * يُستثنى الطلب الذي يترك المعرف كما كان (منتج قائم لا يُغيّر النوع) حتى لا يُقفَل التعديل آليًا بعد تعطيل الورقة.
  *

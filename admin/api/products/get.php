@@ -12,9 +12,7 @@ try {
     orange_catalog_ensure_schema($pdo);
     $productId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-    $catJoinLegacy = orange_table_has_column($pdo, 'products', 'category_id')
-        ? 'LEFT JOIN categories c ON c.id = p.category_id'
-        : orange_catalog_products_sql_join_legacy_categories_derived($pdo, 'p', 'c');
+    $catJoinPart = orange_catalog_admin_sql_join_product_category_display($pdo, 'p', 'pt');
 
     if ($productId > 0) {
         $stmt = $pdo->prepare("
@@ -26,8 +24,8 @@ try {
                    pt.expected_commercial_kind_key AS product_type_expected_commercial_kind_key,
                    pt.expected_sizing_category_key AS product_type_expected_sizing_category_key
             FROM products p
-            {$catJoinLegacy}
             LEFT JOIN product_types pt ON pt.id = p.product_type_id
+            {$catJoinPart}
             WHERE p.id = ?
             LIMIT 1
         ");
@@ -100,8 +98,8 @@ try {
                pt.expected_commercial_kind_key AS product_type_expected_commercial_kind_key,
                pt.expected_sizing_category_key AS product_type_expected_sizing_category_key
         FROM products p
-        {$catJoinLegacy}
         LEFT JOIN product_types pt ON pt.id = p.product_type_id
+        {$catJoinPart}
         ORDER BY p.sort_order ASC, p.id ASC
     ")->fetchAll();
 

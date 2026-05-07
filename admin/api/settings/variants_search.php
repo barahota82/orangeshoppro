@@ -31,87 +31,54 @@ try {
         if ($unifiedFt) {
             $pack = orange_storefront_unified_nav_for_home($pdo);
             $ucats = $pack['categories'] ?? [];
-            if ($ucats !== []) {
-                $departments = $pack['departments'] ?? [];
-                $categories = [];
-                foreach ($ucats as $c) {
-                    if (!is_array($c)) {
+            $departments = $pack['departments'] ?? [];
+            $categories = [];
+            foreach (is_array($ucats) ? $ucats : [] as $c) {
+                if (!is_array($c)) {
+                    continue;
+                }
+                $did = $c['department_id'] ?? null;
+                $categories[] = [
+                    'id' => (int) ($c['id'] ?? 0),
+                    'name_ar' => (string) ($c['name_ar'] ?? ''),
+                    'name_en' => (string) ($c['name_en'] ?? ''),
+                    'department_id' => $did !== null && $did !== '' ? (int) $did : null,
+                ];
+            }
+            $subcategories = [];
+            $subsMap = $pack['subcategoriesByCategory'] ?? [];
+            foreach ($subsMap as $cid => $list) {
+                if (!is_array($list)) {
+                    continue;
+                }
+                foreach ($list as $s) {
+                    if (!is_array($s)) {
                         continue;
                     }
-                    $did = $c['department_id'] ?? null;
-                    $categories[] = [
-                        'id' => (int) ($c['id'] ?? 0),
-                        'name_ar' => (string) ($c['name_ar'] ?? ''),
-                        'name_en' => (string) ($c['name_en'] ?? ''),
-                        'department_id' => $did !== null && $did !== '' ? (int) $did : null,
+                    $scid = (int) ($s['catalog_category_id'] ?? $cid);
+                    $subcategories[] = [
+                        'id' => (int) ($s['id'] ?? 0),
+                        'category_id' => $scid,
+                        'name_ar' => (string) ($s['name_ar'] ?? ''),
+                        'name_en' => (string) ($s['name_en'] ?? ''),
                     ];
                 }
-                $subcategories = [];
-                $subsMap = $pack['subcategoriesByCategory'] ?? [];
-                foreach ($subsMap as $cid => $list) {
-                    if (!is_array($list)) {
-                        continue;
-                    }
-                    foreach ($list as $s) {
-                        if (!is_array($s)) {
-                            continue;
-                        }
-                        $scid = (int) ($s['catalog_category_id'] ?? $cid);
-                        $subcategories[] = [
-                            'id' => (int) ($s['id'] ?? 0),
-                            'category_id' => $scid,
-                            'name_ar' => (string) ($s['name_ar'] ?? ''),
-                            'name_en' => (string) ($s['name_en'] ?? ''),
-                        ];
-                    }
-                }
-                json_response([
-                    'success' => true,
-                    'filter_tree_source' => 'unified',
-                    'departments' => is_array($departments) ? $departments : [],
-                    'categories' => $categories,
-                    'subcategories' => $subcategories,
-                ]);
             }
-        }
-
-        $departments = [];
-        if (orange_table_exists($pdo, 'departments')) {
-            $departments = $pdo->query(
-                'SELECT id, name_ar, name_en FROM departments WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
-            )->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        }
-        $categories = [];
-        if (orange_table_exists($pdo, 'categories')) {
-            $hasDept = orange_table_has_column($pdo, 'categories', 'department_id');
-            $hasCatActive = orange_table_has_column($pdo, 'categories', 'is_active');
-            $deptCol = $hasDept ? 'department_id' : 'NULL AS department_id';
-            $catWhere = $hasCatActive ? ' WHERE is_active = 1' : '';
-            $categories = $pdo->query(
-                "SELECT id, name_ar, name_en, {$deptCol} FROM categories{$catWhere} ORDER BY sort_order ASC, id ASC"
-            )->fetchAll(PDO::FETCH_ASSOC) ?: [];
-            foreach ($categories as &$c) {
-                $c['department_id'] = isset($c['department_id']) && $c['department_id'] !== null
-                    ? (int) $c['department_id']
-                    : null;
-            }
-            unset($c);
-        }
-        $subcategories = [];
-        if (orange_table_exists($pdo, 'subcategories')) {
-            $hasSubActive = orange_table_has_column($pdo, 'subcategories', 'is_active');
-            $subWhere = $hasSubActive ? ' WHERE is_active = 1' : '';
-            $subcategories = $pdo->query(
-                'SELECT id, category_id, name_ar, name_en FROM subcategories' . $subWhere . ' ORDER BY sort_order ASC, id ASC'
-            )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            json_response([
+                'success' => true,
+                'filter_tree_source' => 'unified',
+                'departments' => is_array($departments) ? $departments : [],
+                'categories' => $categories,
+                'subcategories' => $subcategories,
+            ]);
         }
 
         json_response([
             'success' => true,
-            'filter_tree_source' => 'legacy',
-            'departments' => $departments,
-            'categories' => $categories,
-            'subcategories' => $subcategories,
+            'filter_tree_source' => 'none',
+            'departments' => [],
+            'categories' => [],
+            'subcategories' => [],
         ]);
     }
 
@@ -159,29 +126,9 @@ try {
         $sql = 'SELECT pv.id AS variant_id, pv.color, pv.size, pv.stock_quantity,
                        p.id AS product_id, p.name AS product_name, p.name_en AS product_name_en
                 FROM product_variants pv
-                INNER JOIN products p ON p.id = pv.product_id';
+                INNER JOIN products p ON p.id = pv.product_id AND p.is_active = 1
+                WHERE 1=1';
         $params = [];
-
-        $hasCat = orange_table_exists($pdo, 'categories');
-        $joinCatForDept = $hasCat && $departmentId > 0 && orange_table_has_column($pdo, 'categories', 'department_id');
-        if ($joinCatForDept) {
-            $sql .= ' LEFT JOIN categories c ON c.id = p.category_id';
-        }
-
-        $sql .= ' WHERE p.is_active = 1';
-
-        if ($joinCatForDept) {
-            $sql .= ' AND c.department_id = ?';
-            $params[] = $departmentId;
-        }
-        if ($categoryId > 0) {
-            $sql .= ' AND p.category_id = ?';
-            $params[] = $categoryId;
-        }
-        if ($subcategoryId > 0 && orange_table_has_column($pdo, 'products', 'subcategory_id')) {
-            $sql .= ' AND p.subcategory_id = ?';
-            $params[] = $subcategoryId;
-        }
     }
 
     if ($q !== '') {

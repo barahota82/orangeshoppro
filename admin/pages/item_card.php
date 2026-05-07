@@ -15,9 +15,7 @@ if ($productId < 1) {
 
 $pdo = db();
 
-$catJoin = orange_table_has_column($pdo, 'products', 'category_id')
-    ? 'LEFT JOIN categories c ON c.id = p.category_id'
-    : orange_catalog_products_sql_join_legacy_categories_derived($pdo, 'p', 'c');
+$catJoin = orange_catalog_admin_sql_join_product_category_display($pdo, 'p', null);
 
 $stmt = $pdo->prepare("
     SELECT p.*, c.name_ar AS category_name

@@ -135,62 +135,89 @@ if ($catalogAttributesActive !== [] && orange_table_exists($pdo, 'catalog_attrib
 
 $hasDepartmentsTable = false;
 $hasCategoryDepartment = false;
-try {
-    $hasDepartmentsTable = (bool) $pdo->query("SHOW TABLES LIKE 'departments'")->fetchColumn();
-    if ($hasDepartmentsTable) {
-        $colStmt = $pdo->query("SHOW COLUMNS FROM categories LIKE 'department_id'");
-        $hasCategoryDepartment = (bool) $colStmt->fetch();
-    }
-} catch (Throwable $e) {
-    $hasDepartmentsTable = false;
-    $hasCategoryDepartment = false;
-}
-
-$categories = $pdo->query('SELECT * FROM categories ORDER BY sort_order ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
+$categories = [];
 $departmentsForProducts = [];
-if ($hasDepartmentsTable) {
-    $departmentsForProducts = $pdo->query('SELECT * FROM departments ORDER BY sort_order ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
-}
-
 $hasProductTypesTable = orange_table_exists($pdo, 'product_types');
 
-$productCategoryJoin = orange_table_has_column($pdo, 'products', 'category_id')
-    ? 'LEFT JOIN categories c ON c.id = p.category_id'
-    : orange_catalog_products_sql_join_legacy_categories_derived($pdo, 'p', 'c');
+$unifiedProductList = $catalogNavUnified
+    && $hasProductTypesTable
+    && orange_table_has_column($pdo, 'products', 'product_type_id')
+    && orange_table_exists($pdo, 'catalog_subcategories')
+    && orange_table_exists($pdo, 'catalog_categories')
+    && orange_table_exists($pdo, 'catalog_sections')
+    && orange_table_has_column($pdo, 'catalog_categories', 'catalog_section_id');
 
-if ($hasDepartmentsTable && $hasCategoryDepartment) {
+if ($unifiedProductList) {
+    $catJ = orange_catalog_admin_sql_join_product_category_display($pdo, 'p', 'pt');
     $products = $pdo->query(
-        'SELECT p.*, c.name_ar AS category_name, c.department_id AS category_department_id,
-            d.name_ar AS department_name_ar, d.name_en AS department_name_en'
-        . ($hasProductTypesTable
-            ? ',
-            pt.name_ar AS pt_name_ar_join, pt.name_en AS pt_name_en_join, pt.slug AS pt_slug_join'
-            : '')
-        . '
+        'SELECT p.*, c.name_ar AS category_name, c.id AS catalog_category_display_id,
+            cs_pl.department_id AS category_department_id,
+            d.name_ar AS department_name_ar, d.name_en AS department_name_en,
+            pt.name_ar AS pt_name_ar_join, pt.name_en AS pt_name_en_join, pt.slug AS pt_slug_join
         FROM products p
-        ' . $productCategoryJoin . '
-        LEFT JOIN departments d ON d.id = c.department_id'
-        . ($hasProductTypesTable ? '
-        LEFT JOIN product_types pt ON pt.id = p.product_type_id' : '')
-        . '
+        LEFT JOIN product_types pt ON pt.id = p.product_type_id'
+        . $catJ . '
+        LEFT JOIN catalog_sections cs_pl ON cs_pl.id = c.catalog_section_id
+        LEFT JOIN departments d ON d.id = cs_pl.department_id
         ORDER BY p.sort_order ASC, p.id ASC'
     )->fetchAll(PDO::FETCH_ASSOC);
 } else {
-    $products = $pdo->query(
-        'SELECT p.*, c.name_ar AS category_name, NULL AS category_department_id,
-            NULL AS department_name_ar, NULL AS department_name_en'
-        . ($hasProductTypesTable
-            ? ',
+    try {
+        $hasDepartmentsTable = (bool) $pdo->query("SHOW TABLES LIKE 'departments'")->fetchColumn();
+        if ($hasDepartmentsTable) {
+            $colStmt = $pdo->query("SHOW COLUMNS FROM categories LIKE 'department_id'");
+            $hasCategoryDepartment = (bool) $colStmt->fetch();
+        }
+    } catch (Throwable $e) {
+        $hasDepartmentsTable = false;
+        $hasCategoryDepartment = false;
+    }
+
+    $categories = $pdo->query('SELECT * FROM categories ORDER BY sort_order ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
+    if ($hasDepartmentsTable) {
+        $departmentsForProducts = $pdo->query('SELECT * FROM departments ORDER BY sort_order ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    $productCategoryJoin = orange_table_has_column($pdo, 'products', 'category_id')
+        ? 'LEFT JOIN categories c ON c.id = p.category_id'
+        : orange_catalog_products_sql_join_legacy_categories_derived($pdo, 'p', 'c');
+
+    if ($hasDepartmentsTable && $hasCategoryDepartment) {
+        $products = $pdo->query(
+            'SELECT p.*, c.name_ar AS category_name, NULL AS catalog_category_display_id,
+            c.department_id AS category_department_id,
+            d.name_ar AS department_name_ar, d.name_en AS department_name_en'
+            . ($hasProductTypesTable
+                ? ',
             pt.name_ar AS pt_name_ar_join, pt.name_en AS pt_name_en_join, pt.slug AS pt_slug_join'
-            : '')
-        . '
+                : '')
+            . '
+        FROM products p
+        ' . $productCategoryJoin . '
+        LEFT JOIN departments d ON d.id = c.department_id'
+            . ($hasProductTypesTable ? '
+        LEFT JOIN product_types pt ON pt.id = p.product_type_id' : '')
+            . '
+        ORDER BY p.sort_order ASC, p.id ASC'
+        )->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $products = $pdo->query(
+            'SELECT p.*, c.name_ar AS category_name, NULL AS category_department_id,
+            NULL AS department_name_ar, NULL AS department_name_en'
+            . ($hasProductTypesTable
+                ? ',
+            pt.name_ar AS pt_name_ar_join, pt.name_en AS pt_name_en_join, pt.slug AS pt_slug_join'
+                : '')
+            . ',
+            NULL AS catalog_category_display_id
         FROM products p
         ' . $productCategoryJoin
-        . ($hasProductTypesTable ? '
+            . ($hasProductTypesTable ? '
         LEFT JOIN product_types pt ON pt.id = p.product_type_id' : '')
-        . '
+            . '
         ORDER BY p.sort_order ASC, p.id ASC'
-    )->fetchAll(PDO::FETCH_ASSOC);
+        )->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
 $nextProductSort = (int)$pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM products')->fetchColumn();
 if ($nextProductSort < 1) {
@@ -235,46 +262,49 @@ foreach ($families as $f) {
 $hasSubcategoriesTable = false;
 $subcategoriesForJs = [];
 $hasProductSubcategoryColumn = false;
-try {
-    $hasSubcategoriesTable = (bool) $pdo->query("SHOW TABLES LIKE 'subcategories'")->fetchColumn();
-    $hasProductSubcategoryColumn = orange_table_has_column($pdo, 'products', 'subcategory_id');
-    if ($hasSubcategoriesTable && $hasProductSubcategoryColumn) {
-        $subRows = $pdo->query(
-            'SELECT id, category_id, name_ar, name_en FROM subcategories WHERE is_active = 1 ORDER BY category_id ASC, sort_order ASC, id ASC'
-        )->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($subRows as $sr) {
-            $subcategoriesForJs[] = [
-                'id' => (int) $sr['id'],
-                'category_id' => (int) $sr['category_id'],
-                'label' => (string) ($sr['name_ar'] ?: $sr['name_en'] ?: ('#' . $sr['id'])),
-            ];
-        }
-    }
-} catch (Throwable $e) {
-    $hasSubcategoriesTable = false;
-    $subcategoriesForJs = [];
-    $hasProductSubcategoryColumn = false;
-}
-
-/** @var array<int, array{dept_id: int, dept_label: string, ref: string}> */
 $categoryCatalogMeta = [];
-foreach ($categories as $cat) {
-    $cid = (int) $cat['id'];
-    $did = isset($cat['department_id']) && $cat['department_id'] !== null ? (int) $cat['department_id'] : 0;
-    $deptLabel = '';
-    if ($hasDepartmentsTable && $did > 0 && $departmentsForProducts !== []) {
-        foreach ($departmentsForProducts as $d) {
-            if ((int) $d['id'] === $did) {
-                $deptLabel = (string) ($d['name_ar'] ?: $d['name_en'] ?: '');
-                break;
+
+if (!$catalogNavUnified) {
+    try {
+        $hasSubcategoriesTable = (bool) $pdo->query("SHOW TABLES LIKE 'subcategories'")->fetchColumn();
+        $hasProductSubcategoryColumn = orange_table_has_column($pdo, 'products', 'subcategory_id');
+        if ($hasSubcategoriesTable && $hasProductSubcategoryColumn) {
+            $subRows = $pdo->query(
+                'SELECT id, category_id, name_ar, name_en FROM subcategories WHERE is_active = 1 ORDER BY category_id ASC, sort_order ASC, id ASC'
+            )->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($subRows as $sr) {
+                $subcategoriesForJs[] = [
+                    'id' => (int) $sr['id'],
+                    'category_id' => (int) $sr['category_id'],
+                    'label' => (string) ($sr['name_ar'] ?: $sr['name_en'] ?: ('#' . $sr['id'])),
+                ];
             }
         }
+    } catch (Throwable $e) {
+        $hasSubcategoriesTable = false;
+        $subcategoriesForJs = [];
+        $hasProductSubcategoryColumn = false;
     }
-    $categoryCatalogMeta[$cid] = [
-        'dept_id' => $did,
-        'dept_label' => $deptLabel,
-        'ref' => $did . '-' . $cid,
-    ];
+
+    /** @var array<int, array{dept_id: int, dept_label: string, ref: string}> */
+    foreach ($categories as $cat) {
+        $cid = (int) $cat['id'];
+        $did = isset($cat['department_id']) && $cat['department_id'] !== null ? (int) $cat['department_id'] : 0;
+        $deptLabel = '';
+        if ($hasDepartmentsTable && $did > 0 && $departmentsForProducts !== []) {
+            foreach ($departmentsForProducts as $d) {
+                if ((int) $d['id'] === $did) {
+                    $deptLabel = (string) ($d['name_ar'] ?: $d['name_en'] ?: '');
+                    break;
+                }
+            }
+        }
+        $categoryCatalogMeta[$cid] = [
+            'dept_id' => $did,
+            'dept_label' => $deptLabel,
+            'ref' => $did . '-' . $cid,
+        ];
+    }
 }
 
 $unifiedActiveProductsMissingPt = 0;
@@ -652,7 +682,9 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                 <?php
                 $pDeptId = isset($p['category_department_id']) && $p['category_department_id'] !== null
                     ? (int) $p['category_department_id'] : 0;
-                $pCatId = isset($p['category_id']) ? (int) $p['category_id'] : 0;
+                $pCatId = isset($p['catalog_category_display_id']) && (int) $p['catalog_category_display_id'] > 0
+                    ? (int) $p['catalog_category_display_id']
+                    : (isset($p['category_id']) ? (int) $p['category_id'] : 0);
                 $pDeptLabel = (string) ($p['department_name_ar'] ?: $p['department_name_en'] ?: '');
                 if ($pDeptLabel === '') {
                     $pDeptLabel = '—';
