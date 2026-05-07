@@ -296,6 +296,8 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
         <div class="admin-product-tabs" role="tablist" aria-label="أقسام نموذج المنتج">
             <button type="button" class="admin-product-tab is-active" role="tab" id="productTabBtnBasic" aria-controls="productTabPanelBasic" aria-selected="true" data-product-tab="basic">البيانات الأساسية</button>
             <button type="button" class="admin-product-tab" role="tab" id="productTabBtnSizes" aria-controls="productTabPanelSizes" aria-selected="false" data-product-tab="sizes">المقاسات والألوان</button>
+            <button type="button" class="admin-product-tab" role="tab" id="productTabBtnDescription" aria-controls="productTabPanelDescription" aria-selected="false" data-product-tab="description">وصف المنتج</button>
+            <button type="button" class="admin-product-tab" role="tab" id="productTabBtnAttributes" aria-controls="productTabPanelAttributes" aria-selected="false" data-product-tab="attributes">سمات المنتج</button>
             <button type="button" class="admin-product-tab" role="tab" id="productTabBtnImages" aria-controls="productTabPanelImages" aria-selected="false" data-product-tab="images">الصور</button>
             <button type="button" class="admin-product-tab" role="tab" id="productTabBtnVariants" aria-controls="productTabPanelVariants" aria-selected="false" data-product-tab="variants">المتغيرات</button>
         </div>
@@ -378,105 +380,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                 <label for="product_barcode">الباركود (اختياري)</label>
                 <input type="text" id="product_barcode" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="EAN / UPC">
             </div>
-            <div style="grid-column:1/-1;">
-                <label>الوصف (عربي)</label>
-                <textarea id="description" rows="3"></textarea>
-            </div>
-            <div style="grid-column:1/-1;">
-                <label>Description (English)</label>
-                <textarea id="description_en" rows="3"></textarea>
-            </div>
-            <div style="grid-column:1/-1;">
-                <label>Description (Filipino)</label>
-                <textarea id="description_fil" rows="3"></textarea>
-            </div>
-            <div style="grid-column:1/-1;">
-                <label>Description (Hindi)</label>
-                <textarea id="description_hi" rows="3"></textarea>
-            </div>
-            <div style="grid-column:1/-1;">
-                <h4 class="admin-product-subsection-title" style="margin:8px 0 4px;">SEO — عناوين ووصف الميتا (اختياري)</h4>
-            </div>
-            <div>
-                <label for="seo_meta_title_ar">عنوان الميتا (عربي)</label>
-                <input type="text" id="seo_meta_title_ar" maxlength="191">
-            </div>
-            <div>
-                <label for="seo_meta_title_en">Meta title (English)</label>
-                <input type="text" id="seo_meta_title_en" maxlength="191" lang="en" dir="ltr">
-            </div>
-            <div>
-                <label for="seo_meta_title_fil">Meta title (Filipino)</label>
-                <input type="text" id="seo_meta_title_fil" maxlength="191" lang="en" dir="ltr">
-            </div>
-            <div>
-                <label for="seo_meta_title_hi">Meta title (Hindi)</label>
-                <input type="text" id="seo_meta_title_hi" maxlength="191" lang="hi" dir="ltr">
-            </div>
-            <div style="grid-column:1/-1;">
-                <label for="seo_meta_description_ar">وصف الميتا (عربي)</label>
-                <textarea id="seo_meta_description_ar" rows="2"></textarea>
-            </div>
-            <div style="grid-column:1/-1;">
-                <label for="seo_meta_description_en">Meta description (English)</label>
-                <textarea id="seo_meta_description_en" rows="2" lang="en" dir="ltr"></textarea>
-            </div>
-            <div style="grid-column:1/-1;">
-                <label for="seo_meta_description_fil">Meta description (Filipino)</label>
-                <textarea id="seo_meta_description_fil" rows="2" lang="en" dir="ltr"></textarea>
-            </div>
-            <div style="grid-column:1/-1;">
-                <label for="seo_meta_description_hi">Meta description (Hindi)</label>
-                <textarea id="seo_meta_description_hi" rows="2" lang="hi" dir="ltr"></textarea>
-            </div>
-            <?php if ($catalogAttributesActive !== []): ?>
-            <div style="grid-column:1/-1;">
-                <h4 class="admin-product-subsection-title" style="margin:8px 0 4px;">صفات الكتالوج</h4>
-                <?php foreach ($catalogAttributesActive as $cattr): ?>
-                    <?php
-                    $caid = (int) $cattr['id'];
-                    $clabel = htmlspecialchars(
-                        (string) (($cattr['label_ar'] ?: $cattr['label_en']) ?: ($cattr['attribute_key'] ?? '')),
-                        ENT_QUOTES,
-                        'UTF-8'
-                    );
-                    $ckey = htmlspecialchars((string) ($cattr['attribute_key'] ?? ''), ENT_QUOTES, 'UTF-8');
-                    $inputKind = (string) ($cattr['input_kind'] ?? 'text_short');
-                    $pavOpts = $catalogAttrOptionsByAttrId[$caid] ?? [];
-                    ?>
-                    <div class="orange-product-pav-row" style="margin-bottom:10px;">
-                        <label style="display:block;margin-bottom:4px;font-weight:500;"><?php echo $clabel; ?> <small style="color:#94a3b8;font-weight:400;"><?php echo $ckey; ?></small></label>
-                        <?php if ($pavOpts !== []): ?>
-                        <select class="orange-pav-input admin-sort-field" data-catalog-attribute-id="<?php echo $caid; ?>" style="width:100%;max-width:520px;">
-                            <option value="">— بدون —</option>
-                            <?php foreach ($pavOpts as $opt): ?>
-                                <?php
-                                if (! is_array($opt)) {
-                                    continue;
-                                }
-                                $optAr = trim((string) ($opt['label_ar'] ?? ''));
-                                if ($optAr === '') {
-                                    continue;
-                                }
-                                $optEn = trim((string) ($opt['label_en'] ?? ''));
-                                $optDisp = $optAr . ($optEn !== '' ? ' / ' . $optEn : '');
-                                ?>
-                            <option value="<?php echo htmlspecialchars($optAr, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($optDisp, ENT_QUOTES, 'UTF-8'); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                        <?php elseif ($inputKind === 'boolean'): ?>
-                        <select class="orange-pav-input admin-sort-field" data-catalog-attribute-id="<?php echo $caid; ?>" style="width:100%;max-width:520px;">
-                            <option value="">— بدون —</option>
-                            <option value="نعم">نعم</option>
-                            <option value="لا">لا</option>
-                        </select>
-                        <?php else: ?>
-                        <input type="text" class="orange-pav-input" data-catalog-attribute-id="<?php echo $caid; ?>" maxlength="767" dir="auto" autocomplete="off" placeholder="" style="width:100%;max-width:520px;">
-                        <?php endif; ?>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-            <?php endif; ?>
         </div>
         </div>
         </div>
@@ -536,6 +439,120 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
             <div id="colorwaysBox"></div>
             <button type="button" class="btn-secondary" onclick="addColorwayRow()">+ صف لون</button>
         </div>
+        </div>
+        </div>
+
+        <div id="productTabPanelDescription" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnDescription">
+        <div class="admin-product-section">
+        <h4 class="admin-product-subsection-title">وصف المنتج</h4>
+        <div class="form-grid">
+            <div style="grid-column:1/-1;">
+                <label>الوصف (عربي)</label>
+                <textarea id="description" rows="3"></textarea>
+            </div>
+            <div style="grid-column:1/-1;">
+                <label>Description (English)</label>
+                <textarea id="description_en" rows="3"></textarea>
+            </div>
+            <div style="grid-column:1/-1;">
+                <label>Description (Filipino)</label>
+                <textarea id="description_fil" rows="3"></textarea>
+            </div>
+            <div style="grid-column:1/-1;">
+                <label>Description (Hindi)</label>
+                <textarea id="description_hi" rows="3"></textarea>
+            </div>
+            <div style="grid-column:1/-1;">
+                <h4 class="admin-product-subsection-title" style="margin:8px 0 4px;">SEO — عناوين ووصف الميتا (اختياري)</h4>
+            </div>
+            <div>
+                <label for="seo_meta_title_ar">عنوان الميتا (عربي)</label>
+                <input type="text" id="seo_meta_title_ar" maxlength="191">
+            </div>
+            <div>
+                <label for="seo_meta_title_en">Meta title (English)</label>
+                <input type="text" id="seo_meta_title_en" maxlength="191" lang="en" dir="ltr">
+            </div>
+            <div>
+                <label for="seo_meta_title_fil">Meta title (Filipino)</label>
+                <input type="text" id="seo_meta_title_fil" maxlength="191" lang="en" dir="ltr">
+            </div>
+            <div>
+                <label for="seo_meta_title_hi">Meta title (Hindi)</label>
+                <input type="text" id="seo_meta_title_hi" maxlength="191" lang="hi" dir="ltr">
+            </div>
+            <div style="grid-column:1/-1;">
+                <label for="seo_meta_description_ar">وصف الميتا (عربي)</label>
+                <textarea id="seo_meta_description_ar" rows="2"></textarea>
+            </div>
+            <div style="grid-column:1/-1;">
+                <label for="seo_meta_description_en">Meta description (English)</label>
+                <textarea id="seo_meta_description_en" rows="2" lang="en" dir="ltr"></textarea>
+            </div>
+            <div style="grid-column:1/-1;">
+                <label for="seo_meta_description_fil">Meta description (Filipino)</label>
+                <textarea id="seo_meta_description_fil" rows="2" lang="en" dir="ltr"></textarea>
+            </div>
+            <div style="grid-column:1/-1;">
+                <label for="seo_meta_description_hi">Meta description (Hindi)</label>
+                <textarea id="seo_meta_description_hi" rows="2" lang="hi" dir="ltr"></textarea>
+            </div>
+        </div>
+        </div>
+        </div>
+
+        <div id="productTabPanelAttributes" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnAttributes">
+        <div class="admin-product-section">
+        <h4 class="admin-product-subsection-title">سمات المنتج</h4>
+        <?php if ($catalogAttributesActive !== []): ?>
+        <div style="grid-column:1/-1;">
+            <?php foreach ($catalogAttributesActive as $cattr): ?>
+                <?php
+                $caid = (int) $cattr['id'];
+                $clabel = htmlspecialchars(
+                    (string) (($cattr['label_ar'] ?: $cattr['label_en']) ?: ($cattr['attribute_key'] ?? '')),
+                    ENT_QUOTES,
+                    'UTF-8'
+                );
+                $ckey = htmlspecialchars((string) ($cattr['attribute_key'] ?? ''), ENT_QUOTES, 'UTF-8');
+                $inputKind = (string) ($cattr['input_kind'] ?? 'text_short');
+                $pavOpts = $catalogAttrOptionsByAttrId[$caid] ?? [];
+                ?>
+                <div class="orange-product-pav-row" style="margin-bottom:10px;">
+                    <label style="display:block;margin-bottom:4px;font-weight:500;"><?php echo $clabel; ?> <small style="color:#94a3b8;font-weight:400;"><?php echo $ckey; ?></small></label>
+                    <?php if ($pavOpts !== []): ?>
+                    <select class="orange-pav-input admin-sort-field" data-catalog-attribute-id="<?php echo $caid; ?>" style="width:100%;max-width:520px;">
+                        <option value="">— بدون —</option>
+                        <?php foreach ($pavOpts as $opt): ?>
+                            <?php
+                            if (! is_array($opt)) {
+                                continue;
+                            }
+                            $optAr = trim((string) ($opt['label_ar'] ?? ''));
+                            if ($optAr === '') {
+                                continue;
+                            }
+                            $optEn = trim((string) ($opt['label_en'] ?? ''));
+                            $optDisp = $optAr . ($optEn !== '' ? ' / ' . $optEn : '');
+                            ?>
+                        <option value="<?php echo htmlspecialchars($optAr, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($optDisp, ENT_QUOTES, 'UTF-8'); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <?php elseif ($inputKind === 'boolean'): ?>
+                    <select class="orange-pav-input admin-sort-field" data-catalog-attribute-id="<?php echo $caid; ?>" style="width:100%;max-width:520px;">
+                        <option value="">— بدون —</option>
+                        <option value="نعم">نعم</option>
+                        <option value="لا">لا</option>
+                    </select>
+                    <?php else: ?>
+                    <input type="text" class="orange-pav-input" data-catalog-attribute-id="<?php echo $caid; ?>" maxlength="767" dir="auto" autocomplete="off" placeholder="" style="width:100%;max-width:520px;">
+                    <?php endif; ?>
+                </div>
+            <?php endforeach; ?>
+        </div>
+        <?php else: ?>
+        <p style="margin:0;color:#64748b;">لا توجد سمات كتالوج نشطة حالياً.</p>
+        <?php endif; ?>
         </div>
         </div>
 
@@ -1177,6 +1194,8 @@ function productFormShowTab(tab) {
     const map = {
         basic: 'productTabPanelBasic',
         sizes: 'productTabPanelSizes',
+        description: 'productTabPanelDescription',
+        attributes: 'productTabPanelAttributes',
         images: 'productTabPanelImages',
         variants: 'productTabPanelVariants'
     };
