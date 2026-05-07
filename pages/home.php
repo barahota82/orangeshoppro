@@ -32,148 +32,29 @@ $homeHeroFirst = (string)($homeHeroLines[0] ?? '');
 $pdo = db();
 
 /*
- * سياسة التبويبات (الشريط الأفقي): فئات بها منتج نشط فقط — عرض فئة كاملة.
- * القائمة (المينيو): أقسام ← فئات ← تصنيفات فرعية (إن وُجدت) مع اختيار نطاق أضيق.
- * بعد ترحيل التصنيف الموحّد (سجل orange_catalog_data_migration_log) تُحمَّل القائمة من catalog_* + product_type_id.
- * شبكة المنتجات في الوضع الموحّد تعرض فقط السلاسل النشطة: product_types + فروع catalog_* + القسم department.
+ * التنقل والتبويبات: من الشجرة الموحّدة فقط (catalog_* + product_type_id).
+ * لا استعلامات واجهة على جداول categories/subcategories التراثية.
  */
+require_once __DIR__ . '/../includes/catalog_taxonomy_migrate.php';
+
 $sfUnifiedNavPack = orange_storefront_unified_nav_for_home($pdo);
-$useUnifiedHomeNav = ($sfUnifiedNavPack['categories'] ?? []) !== [];
+$navUnified = function_exists('orange_catalog_nav_use_unified') && orange_catalog_nav_use_unified($pdo);
 
-$categoryProductFilter = '
-          AND EXISTS (
-              SELECT 1 FROM products p
-              WHERE p.category_id = c.id AND p.is_active = 1
-          )';
+$departments = $sfUnifiedNavPack['departments'];
+$categories = $sfUnifiedNavPack['categories'];
+$subcategoriesByCategory = $sfUnifiedNavPack['subcategoriesByCategory'];
+$catsByDept = $sfUnifiedNavPack['catsByDept'];
+$categoryToDepartment = $sfUnifiedNavPack['categoryToDepartment'];
 
-if (!$useUnifiedHomeNav) {
-$navTableRows = $pdo->query(
-    "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
-     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('departments','subcategories')"
-);
-$navTableNames = $navTableRows ? $navTableRows->fetchAll(PDO::FETCH_COLUMN) : [];
-$navLower = [];
-foreach ($navTableNames as $tn) {
-    $navLower[strtolower((string) $tn)] = true;
-}
-$hasDepartmentsTable = isset($navLower['departments']);
-$hasSubcategoriesTable = isset($navLower['subcategories']);
+$canUnifiedProductSql = $navUnified
+    && function_exists('orange_table_exists')
+    && orange_table_exists($pdo, 'product_types')
+    && orange_table_exists($pdo, 'catalog_subcategories')
+    && orange_table_exists($pdo, 'catalog_categories')
+    && orange_table_exists($pdo, 'catalog_sections')
+    && orange_table_has_column($pdo, 'products', 'product_type_id');
 
-$departmentActiveFilter = '';
-if ($hasDepartmentsTable) {
-    $departmentActiveFilter = '
-          AND (
-              c.department_id IS NULL
-              OR d.id IS NULL
-              OR d.is_active = 1
-          )';
-}
-
-if ($hasDepartmentsTable) {
-    $categoriesStmt = $pdo->query(
-        "
-        SELECT c.*
-        FROM categories c
-        LEFT JOIN departments d ON d.id = c.department_id
-        WHERE c.is_active = 1
-          " . $departmentActiveFilter . "
-          " . $categoryProductFilter . "
-        ORDER BY c.sort_order ASC, c.id ASC
-    "
-    );
-} else {
-    $categoriesStmt = $pdo->query(
-        "
-        SELECT c.*
-        FROM categories c
-        WHERE c.is_active = 1
-          " . $categoryProductFilter . "
-        ORDER BY c.sort_order ASC, c.id ASC
-    "
-    );
-}
-$categories = $categoriesStmt ? $categoriesStmt->fetchAll() : [];
-
-/** @var array<int,int> */
-$categoryToDepartment = [];
-$departments = [];
-if ($hasDepartmentsTable) {
-    $depListStmt = $pdo->query(
-        '
-        SELECT d.*
-        FROM departments d
-        WHERE d.is_active = 1
-          AND EXISTS (
-              SELECT 1
-              FROM categories c
-              INNER JOIN products p ON p.category_id = c.id AND p.is_active = 1
-              WHERE c.department_id = d.id
-                AND c.is_active = 1
-          )
-        ORDER BY d.sort_order ASC, d.id ASC
-    '
-    );
-    $departments = $depListStmt ? $depListStmt->fetchAll() : [];
-    foreach ($categories as $cat) {
-        $cid = (int) $cat['id'];
-        $categoryToDepartment[$cid] = isset($cat['department_id']) && $cat['department_id'] !== null
-            ? (int) $cat['department_id']
-            : 0;
-    }
-}
-
-/** @var array<int, list<array<string,mixed>>> */
-$subcategoriesByCategory = [];
-if ($hasSubcategoriesTable) {
-    $subStmt = $pdo->query(
-        "
-        SELECT s.*
-        FROM subcategories s
-        WHERE s.is_active = 1
-          AND EXISTS (
-              SELECT 1 FROM products p
-              WHERE p.subcategory_id = s.id AND p.is_active = 1
-          )
-        ORDER BY s.category_id ASC, s.sort_order ASC, s.id ASC
-    "
-    );
-    foreach (($subStmt ? $subStmt->fetchAll() : []) as $srow) {
-        $scid = (int) $srow['category_id'];
-        if (!isset($subcategoriesByCategory[$scid])) {
-            $subcategoriesByCategory[$scid] = [];
-        }
-        $subcategoriesByCategory[$scid][] = $srow;
-    }
-}
-
-/** @var array<int, list<array<string,mixed>>> */
-$catsByDept = [];
-$deptIdsInMenu = $hasDepartmentsTable
-    ? array_map(static fn (array $d): int => (int) $d['id'], $departments)
-    : [];
-foreach ($categories as $cat) {
-    $did = isset($cat['department_id']) && $cat['department_id'] !== null ? (int) $cat['department_id'] : 0;
-    if (!$hasDepartmentsTable) {
-        $did = 0;
-    } elseif ($did > 0 && !in_array($did, $deptIdsInMenu, true)) {
-        $did = 0;
-    }
-    if (!isset($catsByDept[$did])) {
-        $catsByDept[$did] = [];
-    }
-    $catsByDept[$did][] = $cat;
-}
-} else {
-    $departments = $sfUnifiedNavPack['departments'];
-    $categories = $sfUnifiedNavPack['categories'];
-    $subcategoriesByCategory = $sfUnifiedNavPack['subcategoriesByCategory'];
-    $catsByDept = $sfUnifiedNavPack['catsByDept'];
-    $categoryToDepartment = $sfUnifiedNavPack['categoryToDepartment'];
-    $hasDepartmentsTable = true;
-    $hasSubcategoriesTable = true;
-}
-
-if ($useUnifiedHomeNav) {
+if ($canUnifiedProductSql) {
     $productsSql = '
     SELECT p.*, ucs2.department_id AS uf_dept_id, ucc.id AS uf_cat_id, ucs.id AS uf_sub_id
     FROM products p
@@ -267,39 +148,9 @@ $sfHomeFilterSubcategoryId = static function (array $row): int {
     return $u > 0 ? $u : (int) ($row['subcategory_id'] ?? 0);
 };
 
-if ($hasDepartmentsTable && !$useUnifiedHomeNav) {
-    $needDeptLookup = [];
-    foreach ($products as $p) {
-        $cid = (int) ($p['category_id'] ?? 0);
-        if ($cid > 0 && !array_key_exists($cid, $categoryToDepartment)) {
-            $needDeptLookup[$cid] = true;
-        }
-    }
-    foreach ($offers as $op) {
-        $cid = (int) ($op['category_id'] ?? 0);
-        if ($cid > 0 && !array_key_exists($cid, $categoryToDepartment)) {
-            $needDeptLookup[$cid] = true;
-        }
-    }
-    if ($needDeptLookup !== []) {
-        $ids = array_keys($needDeptLookup);
-        $ph = implode(',', array_fill(0, count($ids), '?'));
-        $st = $pdo->prepare('SELECT id, department_id FROM categories WHERE id IN (' . $ph . ')');
-        $st->execute($ids);
-        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            if (!is_array($row)) {
-                continue;
-            }
-            $categoryToDepartment[(int) $row['id']] = isset($row['department_id']) && $row['department_id'] !== null
-                ? (int) $row['department_id']
-                : 0;
-        }
-    }
-}
-
-$storefrontExtraFilterSuffix = function (array $row) use ($categoryToDepartment, $useUnifiedHomeNav, $sfHomeFilterCatalogId, $sfHomeFilterSubcategoryId): string {
+$storefrontExtraFilterSuffix = function (array $row) use ($categoryToDepartment, $navUnified, $sfHomeFilterCatalogId, $sfHomeFilterSubcategoryId): string {
     $parts = [];
-    if ($useUnifiedHomeNav) {
+    if ($navUnified) {
         $fc = $sfHomeFilterCatalogId($row);
         if ($fc > 0) {
             $didDirect = isset($row['uf_dept_id']) && $row['uf_dept_id'] !== null ? (int) $row['uf_dept_id'] : 0;

@@ -3,10 +3,9 @@
 declare(strict_types=1);
 
 /**
- * قائمة منتجات للواجهة/القناة.
- * - عند تفعيل التصنيف الموحّد: category_id يشير إلى catalog_categories.id (مثل تصفية الصفحة الرئيسية الموحّدة).
- * - في المسار القديم: category_id يشير إلى categories.id على المنتج.
- * - فلترة صفات الكتالوج: معاملات attr_{attribute_key}=value (صفات is_filterable فقط).
+ * قائمة منتجات للواجهة/القناة — الشجرة الموحّدة فقط.
+ * category_id في الطلب = catalog_categories.id (تصفية حسب فئة الكتالوج الموحّدة).
+ * فلترة صفات الكتالوج: معاملات attr_{attribute_key}=value (صفات is_filterable فقط).
  */
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
@@ -20,14 +19,23 @@ try {
     $categoryId = isset($_GET['category_id']) ? (int) $_GET['category_id'] : 0;
 
     $unified = function_exists('orange_catalog_nav_use_unified') && orange_catalog_nav_use_unified($pdo);
-
-    if (
-        $unified
+    $canServe = $unified
         && function_exists('orange_table_exists')
         && orange_table_exists($pdo, 'product_types')
         && orange_table_exists($pdo, 'catalog_subcategories')
-    ) {
-        $sql = '
+        && orange_table_has_column($pdo, 'products', 'product_type_id');
+
+    if (!$canServe) {
+        json_response([
+            'success' => true,
+            'products' => [],
+            'unified' => false,
+        ]);
+
+        return;
+    }
+
+    $sql = '
         SELECT p.*
         FROM products p
         INNER JOIN product_types pt ON pt.id = p.product_type_id AND pt.is_active = 1
@@ -37,38 +45,21 @@ try {
         INNER JOIN departments d ON d.id = ucs2.department_id AND d.is_active = 1
         WHERE p.is_active = 1
     ';
-        $params = [];
-        if ($categoryId > 0) {
-            $sql .= ' AND ucc.id = ?';
-            $params[] = $categoryId;
-        }
-        [$sql, $params] = orange_storefront_products_append_attr_filters_sql($pdo, $sql, $params, 'p');
-        $sql .= ' ORDER BY p.sort_order ASC, p.id ASC';
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-    } else {
-        $sql = '
-        SELECT p.*
-        FROM products p
-        INNER JOIN categories c ON c.id = p.category_id AND c.is_active = 1
-        WHERE p.is_active = 1
-    ';
-        $params = [];
-        if ($categoryId > 0) {
-            $sql .= ' AND p.category_id = ?';
-            $params[] = $categoryId;
-        }
-        [$sql, $params] = orange_storefront_products_append_attr_filters_sql($pdo, $sql, $params, 'p');
-        $sql .= ' ORDER BY p.sort_order ASC, p.id ASC';
-
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
+    $params = [];
+    if ($categoryId > 0) {
+        $sql .= ' AND ucc.id = ?';
+        $params[] = $categoryId;
     }
+    [$sql, $params] = orange_storefront_products_append_attr_filters_sql($pdo, $sql, $params, 'p');
+    $sql .= ' ORDER BY p.sort_order ASC, p.id ASC';
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
 
     $products = $stmt->fetchAll();
 
     json_response([
         'success' => true,
+        'unified' => true,
         'products' => $products,
     ]);
 } catch (Throwable $e) {

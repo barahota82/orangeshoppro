@@ -3,9 +3,7 @@
 declare(strict_types=1);
 
 /**
- * قائمة فئات للواجهة/القناة.
- * - عند الشجرة الموحّدة: صفوف من catalog_categories (نفس المعرفات التي يتوقعها get-products الموحَّد كـ category_id).
- * - في المسار القديم: الجدول categories كما كان سابقًا.
+ * قائمة فئات للواجهة/القناة — الشجرة الموحّدة فقط (catalog_categories كما في الصفحة الرئيسية).
  */
 
 require_once __DIR__ . '/../../config.php';
@@ -18,41 +16,11 @@ try {
 
     $pack = orange_storefront_unified_nav_for_home($pdo);
     $unifiedCategories = $pack['categories'] ?? [];
-    if ($unifiedCategories !== []) {
-        json_response([
-            'success' => true,
-            'unified' => true,
-            'categories' => $unifiedCategories,
-        ]);
-    }
-
-    if (!orange_table_has_column($pdo, 'products', 'category_id')) {
-        json_response([
-            'success' => true,
-            'unified' => true,
-            'categories' => [],
-        ]);
-    }
-
-    $sql = "
-        SELECT c.*
-        FROM categories c
-        WHERE c.is_active = 1
-          AND EXISTS (
-              SELECT 1
-              FROM products p
-              WHERE p.category_id = c.id
-                AND p.is_active = 1
-          )
-        ORDER BY c.sort_order ASC, c.id ASC
-    ";
-
-    $categories = $pdo->query($sql)->fetchAll();
 
     json_response([
         'success' => true,
-        'unified' => false,
-        'categories' => $categories,
+        'unified' => true,
+        'categories' => is_array($unifiedCategories) ? $unifiedCategories : [],
     ]);
 } catch (Throwable $e) {
     api_error($e, t('api_request_failed'));
