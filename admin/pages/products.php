@@ -383,7 +383,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                     </div>
                     <div>
                         <label>مسار الشجرة الموحّدة (مقتطف)</label>
-                        <div id="product_department_hint" style="padding:8px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;min-height:20px;">—</div>
+                        <div id="product_department_hint" class="product-basic-field-like">—</div>
                         <small style="display:block;color:#666;margin-top:4px;">مرجع: <code id="product_dept_cat_ref" style="font-size:13px;">—</code></small>
                     </div>
                 </div>

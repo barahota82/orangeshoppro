@@ -2153,6 +2153,35 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     width: 100%;
 }
 
+/* تبويب المنتج — البيانات الأساسية: نفس ارتفاع خانة الاسم لحقول الإدخال والقائمة ومقطع المسار */
+#productTabPanelBasic input:not([type="file"]):not([type="checkbox"]):not([type="radio"]),
+#productTabPanelBasic select {
+    min-height: var(--input-min-h);
+    box-sizing: border-box;
+}
+
+#productTabPanelBasic .product-basic-field-like {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: var(--input-min-h);
+    box-sizing: border-box;
+    padding: 8px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: var(--radius-sm);
+    background: #f8fafc;
+    font-size: 14px;
+    line-height: 1.4;
+    color: var(--text);
+}
+
+#productTabPanelBasic input.admin-sort-field,
+#productTabPanelBasic select.admin-sort-field {
+    min-height: var(--input-min-h);
+    max-width: none;
+    width: 100%;
+}
+
 .admin-product-subsection-title {
     margin: 0 0 12px;
     padding-bottom: 8px;
