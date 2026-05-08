@@ -36,11 +36,13 @@ try {
             json_response(['success' => false, 'message' => 'المنتج غير موجود'], 404);
         }
 
+        $barcodeCol = orange_table_has_column($pdo, 'product_variants', 'barcode') ? 'v.barcode AS variant_barcode' : 'NULL AS variant_barcode';
         $variantStmt = $pdo->prepare("
             SELECT v.id AS variant_id,
                    v.product_colorway_id,
                    v.size_family_size_id,
                    v.stock_quantity,
+                   {$barcodeCol},
                    COALESCE(cw.primary_color_id, 0) AS primary_color_id,
                    COALESCE(cw.secondary_color_id, 0) AS secondary_color_id,
                    COALESCE(cw.primary_pattern_id, 0) AS primary_pattern_id,

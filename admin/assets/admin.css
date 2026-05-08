@@ -2215,6 +2215,15 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     font-variant-numeric: tabular-nums;
 }
 
+.admin-variant-barcode-readonly {
+    display: inline-block;
+    max-width: 11rem;
+    word-break: break-all;
+    font-size: 11px;
+    color: #334155;
+    vertical-align: middle;
+}
+
 .admin-product-subsection-title {
     margin: 0 0 12px;
     padding-bottom: 8px;

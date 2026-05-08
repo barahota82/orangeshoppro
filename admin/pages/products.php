@@ -1312,6 +1312,25 @@ function orangeCopyProductField(elementId) {
     }
 }
 
+function orangeCopyVariantBarcode(btn) {
+    const tr = btn && btn.closest ? btn.closest('tr') : null;
+    const el = tr && tr.querySelector('.v-barcode-display');
+    const v = el && String(el.textContent || '').trim();
+    if (!v || v === '—') {
+        alert('لا يوجد باركود لهذا الصف بعد — احفظ المنتج ثم أعد فتح التعديل أو حدّث الصفحة.');
+        return;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(v).then(function () {
+            alert('تم النسخ.');
+        }).catch(function () {
+            alert('تعذر النسخ من المتصفح — انسخ يدوياً.');
+        });
+    } else {
+        alert('المتصفح لا يدعم النسخ التلقائي — انسخ يدوياً.');
+    }
+}
+
 function adminPublicPath(path) {
     const raw = typeof window.ORANGE_PUBLIC_BASE_PATH === 'string' ? window.ORANGE_PUBLIC_BASE_PATH : '';
     const base = raw.replace(/\/+$/, '');
@@ -1775,6 +1794,7 @@ async function loadProductForEdit(id) {
         if (needMatrix) {
             generateVariants();
             applyVariantStocksFromVm(vm);
+            applyVariantBarcodesFromVm(vm);
         }
         if (needMatrix && !document.querySelectorAll('#variantsBox tbody tr').length) {
             document.getElementById('variantsBox').innerHTML =
@@ -2031,6 +2051,26 @@ function applyVariantStocksFromVm(vm) {
     });
 }
 
+function applyVariantBarcodesFromVm(vm) {
+    const map = {};
+    (vm || []).forEach((r) => {
+        const bc = r.variant_barcode != null ? String(r.variant_barcode).trim() : '';
+        map[adminVariantRowStockKey(r)] = bc;
+    });
+    document.querySelectorAll('#variantsBox tbody tr').forEach((tr) => {
+        const k = adminVariantTrStockKey(tr);
+        const disp = tr.querySelector('.v-barcode-display');
+        if (!disp) {
+            return;
+        }
+        if (Object.prototype.hasOwnProperty.call(map, k) && map[k]) {
+            disp.textContent = map[k];
+        } else {
+            disp.textContent = '—';
+        }
+    });
+}
+
 function sizesForFamily(fid) {
     const fam = (window.ORANGE_FAMILIES || []).find(f => String(f.id) === String(fid));
     return fam && fam.sizes ? fam.sizes : [];
@@ -2217,7 +2257,7 @@ function generateVariants() {
     const thumbCell = adminVariantReferenceThumbHtml();
     let html = '<p class="admin-variants-lead">كل صف يمثل <strong>نفس الصنف</strong> مع دمج لون ونمط اختياري × مقاس. عمود «صورة المرجع» يعكس الصورة الرئيسية الحالية (من تبويب الصور). <strong>الكميات:</strong> لا تُدخل من هنا — بعد الحفظ عالج المخزون من <a href="' + adminPublicPath('/admin/index.php?page=stock') + '">شاشة المخزون</a> (رصيد افتتاحي أو تعديل) أو من <a href="' + adminPublicPath('/admin/index.php?page=purchases') + '">استلام فاتورة شراء</a>.</p>';
     html += '<div class="table-wrap admin-table-wrap-elevated"><table class="admin-table admin-variants-matrix"><thead><tr>';
-    html += '<th class="col-ref-img">صورة المرجع</th><th>اللون</th><th>المقاس</th><th class="col-stock">المخزون الحالي (عرض)</th>';
+    html += '<th class="col-ref-img">صورة المرجع</th><th>اللون</th><th>المقاس</th><th class="col-vbar">باركود المتغير (بعد الحفظ)</th><th class="col-stock">المخزون الحالي (عرض)</th>';
     html += '</tr></thead><tbody>';
     combos.forEach((c, idx) => {
         const sz = sizes.find(x => String(x.id) === String(c.size_family_size_id));
@@ -2244,6 +2284,7 @@ function generateVariants() {
             <td class="td-ref-img">${thumbCell}</td>
             <td>${colorCell}</td>
             <td><span class="admin-variant-size-pill">${szLabel}</span><input type="hidden" class="v-zid" value="${c.size_family_size_id}"></td>
+            <td class="td-vbar"><code class="v-barcode-display admin-variant-barcode-readonly" dir="ltr" lang="en">—</code> <button type="button" class="btn-secondary" style="font-size:11px;padding:2px 8px;" onclick="orangeCopyVariantBarcode(this)">نسخ</button></td>
             <td class="td-stock"><span class="v-stock-display admin-variant-stock-readonly" data-idx="${idx}">0</span><input type="hidden" class="v-stock" value="0" tabindex="-1" autocomplete="off"></td>
         </tr>`;
     });
