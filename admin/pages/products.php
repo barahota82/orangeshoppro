@@ -21,7 +21,8 @@ if (orange_table_exists($pdo, 'product_types')) {
         if ($ptTreeOrder) {
             $productTypesForForm = $pdo->query(
                 'SELECT pt.id, pt.slug, pt.name_ar, pt.name_en,
-                        pt.expected_commercial_kind_key, pt.expected_sizing_category_key
+                        pt.expected_commercial_kind_key, pt.expected_sizing_category_key,
+                        d.id AS department_id, d.name_ar AS department_name_ar, d.name_en AS department_name_en
                  FROM product_types pt
                  INNER JOIN catalog_subcategories csub ON csub.id = pt.catalog_subcategory_id
                  INNER JOIN catalog_categories cc ON cc.id = csub.catalog_category_id
@@ -35,13 +36,32 @@ if (orange_table_exists($pdo, 'product_types')) {
         } else {
             $productTypesForForm = $pdo->query(
                 'SELECT id, slug, name_ar, name_en,
-                        expected_commercial_kind_key, expected_sizing_category_key
+                        expected_commercial_kind_key, expected_sizing_category_key,
+                        NULL AS department_id, NULL AS department_name_ar, NULL AS department_name_en
                  FROM product_types WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
             )->fetchAll(PDO::FETCH_ASSOC);
         }
     } catch (Throwable $e) {
         $productTypesForForm = [];
     }
+}
+$productTypeDepartmentsForForm = [];
+foreach ($productTypesForForm as $ptRow) {
+    if (!is_array($ptRow)) {
+        continue;
+    }
+    $depId = (int) ($ptRow['department_id'] ?? 0);
+    if ($depId <= 0 || isset($productTypeDepartmentsForForm[$depId])) {
+        continue;
+    }
+    $depLabel = trim((string) (($ptRow['department_name_ar'] ?? '') ?: ($ptRow['department_name_en'] ?? '')));
+    if ($depLabel === '') {
+        $depLabel = 'قسم #' . $depId;
+    }
+    $productTypeDepartmentsForForm[$depId] = [
+        'id' => $depId,
+        'label' => $depLabel,
+    ];
 }
 
 $productTypeTrailsForJs = [];
@@ -327,7 +347,17 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                     </div>
                 </div>
             </div>
-            <div style="grid-column:1/-1;" id="product_type_block" class="orange-product-type-block">
+            <div class="orange-product-main-department-block">
+                <label for="product_main_department_id">القسم الرئيسي</label>
+                <select id="product_main_department_id">
+                    <option value="">كل الأقسام</option>
+                    <?php foreach ($productTypeDepartmentsForForm as $ptDep): ?>
+                        <option value="<?php echo (int) ($ptDep['id'] ?? 0); ?>"><?php echo htmlspecialchars((string) ($ptDep['label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <small style="display:block;color:#666;margin-top:4px;">فلترة سريعة لأنواع المنتج داخل القسم.</small>
+            </div>
+            <div id="product_type_block" class="orange-product-type-block">
                 <label for="product_type_id">نوع المنتج (ورقة الشجرة الموحّدة) — مطلوب</label>
                 <select id="product_type_id" required>
                     <option value="">اختر نوع المنتج</option>
@@ -338,13 +368,14 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         $ptLabel = htmlspecialchars((string) (($prt['name_ar'] ?: $prt['name_en']) ?: ('#' . $prt['id'])), ENT_QUOTES, 'UTF-8');
                         $ptExpCk = htmlspecialchars(trim((string) ($prt['expected_commercial_kind_key'] ?? '')), ENT_QUOTES, 'UTF-8');
                         $ptExpSk = htmlspecialchars(trim((string) ($prt['expected_sizing_category_key'] ?? '')), ENT_QUOTES, 'UTF-8');
+                        $ptDeptIdOpt = (int) ($prt['department_id'] ?? 0);
                         $ptTrailTitle = '';
                         if ($catalogNavUnified && $ptIdOpt > 0 && isset($productTypeTrailsForJs[$ptIdOpt]['trail_ar'])) {
                             $ptTrailTitle = trim((string) $productTypeTrailsForJs[$ptIdOpt]['trail_ar']);
                         }
                         $ptTitleAttr = $ptTrailTitle !== '' ? ' title="' . htmlspecialchars($ptTrailTitle, ENT_QUOTES, 'UTF-8') . '"' : '';
                         ?>
-                        <option value="<?php echo $ptIdOpt; ?>" data-slug="<?php echo $ptSlug; ?>" data-expected-kind="<?php echo $ptExpCk; ?>" data-expected-cat="<?php echo $ptExpSk; ?>"<?php echo $ptTitleAttr; ?>><?php echo $ptLabel; ?></option>
+                        <option value="<?php echo $ptIdOpt; ?>" data-slug="<?php echo $ptSlug; ?>" data-expected-kind="<?php echo $ptExpCk; ?>" data-expected-cat="<?php echo $ptExpSk; ?>" data-department-id="<?php echo $ptDeptIdOpt; ?>"<?php echo $ptTitleAttr; ?>><?php echo $ptLabel; ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -735,6 +766,107 @@ const PRODUCT_MSG = {
 /** اعتماد التصنيف الموحّد فقط: التلميح يُحدَّث من الورقة المختارة. */
 function orangeSyncLegacyFieldsFromProductType() {
     updateProductCatalogHint();
+}
+
+const orangeProductTypeOptionSeed = [];
+
+function orangeSeedProductTypeOptions() {
+    if (orangeProductTypeOptionSeed.length) {
+        return;
+    }
+    const ptEl = document.getElementById('product_type_id');
+    if (!ptEl) {
+        return;
+    }
+    Array.from(ptEl.options).forEach(function (opt) {
+        const v = String(opt.value || '').trim();
+        if (v === '') {
+            return;
+        }
+        orangeProductTypeOptionSeed.push({
+            value: v,
+            label: String(opt.textContent || '').trim(),
+            slug: String(opt.getAttribute('data-slug') || ''),
+            expectedKind: String(opt.getAttribute('data-expected-kind') || ''),
+            expectedCat: String(opt.getAttribute('data-expected-cat') || ''),
+            departmentId: parseInt(String(opt.getAttribute('data-department-id') || '0'), 10) || 0,
+            title: String(opt.getAttribute('title') || '')
+        });
+    });
+}
+
+function orangeFindProductTypeSeedById(ptId) {
+    const want = String(parseInt(String(ptId || '0'), 10) || 0);
+    if (want === '0') {
+        return null;
+    }
+    for (let i = 0; i < orangeProductTypeOptionSeed.length; i++) {
+        if (orangeProductTypeOptionSeed[i].value === want) {
+            return orangeProductTypeOptionSeed[i];
+        }
+    }
+    return null;
+}
+
+function orangeSyncMainDepartmentFromProductType() {
+    const depEl = document.getElementById('product_main_department_id');
+    const ptEl = document.getElementById('product_type_id');
+    if (!depEl || !ptEl || !ptEl.value) {
+        return;
+    }
+    orangeSeedProductTypeOptions();
+    const seed = orangeFindProductTypeSeedById(ptEl.value);
+    if (!seed) {
+        return;
+    }
+    const depId = parseInt(String(seed.departmentId || '0'), 10) || 0;
+    depEl.value = depId > 0 ? String(depId) : '';
+}
+
+function orangeApplyProductTypeDepartmentFilter(preserveTypeValue) {
+    const depEl = document.getElementById('product_main_department_id');
+    const ptEl = document.getElementById('product_type_id');
+    if (!ptEl) {
+        return;
+    }
+    orangeSeedProductTypeOptions();
+    const keepVal = preserveTypeValue ? String(ptEl.value || '').trim() : '';
+    const depId = depEl ? (parseInt(depEl.value || '0', 10) || 0) : 0;
+    ptEl.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'اختر نوع المنتج';
+    ptEl.appendChild(placeholder);
+    orangeProductTypeOptionSeed.forEach(function (seed) {
+        const seedDepId = parseInt(String(seed.departmentId || '0'), 10) || 0;
+        if (depId > 0 && seedDepId !== depId) {
+            return;
+        }
+        const opt = document.createElement('option');
+        opt.value = seed.value;
+        opt.textContent = seed.label;
+        if (seed.slug !== '') {
+            opt.setAttribute('data-slug', seed.slug);
+        }
+        if (seed.expectedKind !== '') {
+            opt.setAttribute('data-expected-kind', seed.expectedKind);
+        }
+        if (seed.expectedCat !== '') {
+            opt.setAttribute('data-expected-cat', seed.expectedCat);
+        }
+        opt.setAttribute('data-department-id', String(seedDepId > 0 ? seedDepId : ''));
+        if (seed.title !== '') {
+            opt.setAttribute('title', seed.title);
+        }
+        ptEl.appendChild(opt);
+    });
+    if (keepVal !== '' && Array.from(ptEl.options).some(function (o) { return o.value === keepVal; })) {
+        ptEl.value = keepVal;
+    } else {
+        ptEl.value = '';
+    }
+    orangeSyncLegacyFieldsFromProductType();
+    orangeApplySizeFamilySchemeFilter();
 }
 
 function orangeGetSelectedProductTypeExpectedKind() {
@@ -1159,6 +1291,11 @@ function resetProductForm() {
     document.getElementById('seo_meta_description_en').value = '';
     document.getElementById('seo_meta_description_fil').value = '';
     document.getElementById('seo_meta_description_hi').value = '';
+    const depClear = document.getElementById('product_main_department_id');
+    if (depClear) {
+        depClear.value = '';
+    }
+    orangeApplyProductTypeDepartmentFilter(false);
     const ptClear = document.getElementById('product_type_id');
     if (ptClear) {
         ptClear.value = '';
@@ -1259,10 +1396,26 @@ async function loadProductForEdit(id) {
         const sid = parseInt(p.subcategory_id, 10) || 0;
         rebuildSubcategoryOptions(sid > 0 ? sid : null);
         updateProductCatalogHint();
+        const ptId = parseInt(String(p.product_type_id || '0'), 10) || 0;
+        const depSel = document.getElementById('product_main_department_id');
+        if (depSel) {
+            orangeSeedProductTypeOptions();
+            const seed = orangeFindProductTypeSeedById(ptId);
+            depSel.value = seed && seed.departmentId > 0 ? String(seed.departmentId) : '';
+            orangeApplyProductTypeDepartmentFilter(false);
+        }
         const pte = document.getElementById('product_type_id');
         if (pte) {
-            const ptId = parseInt(String(p.product_type_id || '0'), 10) || 0;
             pte.value = ptId > 0 ? String(ptId) : '';
+            if (ptId > 0 && pte.value !== String(ptId)) {
+                const depSelFallback = document.getElementById('product_main_department_id');
+                if (depSelFallback) {
+                    depSelFallback.value = '';
+                    orangeApplyProductTypeDepartmentFilter(false);
+                    pte.value = String(ptId);
+                }
+            }
+            orangeSyncMainDepartmentFromProductType();
             orangeSyncLegacyFieldsFromProductType();
         }
         document.getElementById('price').value = String(p.price != null ? p.price : '');
@@ -1917,9 +2070,18 @@ if (categorySelectEl && categorySelectEl.tagName === 'SELECT') {
     });
 }
 
+const orangeProductDepartmentSelectEl = document.getElementById('product_main_department_id');
 const orangeProductTypeSelectEl = document.getElementById('product_type_id');
+orangeSeedProductTypeOptions();
+orangeApplyProductTypeDepartmentFilter(false);
+if (orangeProductDepartmentSelectEl) {
+    orangeProductDepartmentSelectEl.addEventListener('change', function () {
+        orangeApplyProductTypeDepartmentFilter(true);
+    });
+}
 if (orangeProductTypeSelectEl) {
     orangeProductTypeSelectEl.addEventListener('change', function () {
+        orangeSyncMainDepartmentFromProductType();
         orangeSyncLegacyFieldsFromProductType();
         orangeApplySizeFamilySchemeFilter();
         if (window.ORANGE_CATALOG_NAV_UNIFIED) {
