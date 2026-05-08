@@ -46,6 +46,8 @@ if (orange_table_exists($pdo, 'product_types')) {
     }
 }
 $productTypeDepartmentsForForm = [];
+/** عند وجود أقسام مرتبطة بأنواع المنتج: خطوة «القسم أولاً» ثم أنواع القسم فقط في الواجهة. */
+$orangeProductTypeDeptStepEnabled = false;
 foreach ($productTypesForForm as $ptRow) {
     if (!is_array($ptRow)) {
         continue;
@@ -63,6 +65,7 @@ foreach ($productTypesForForm as $ptRow) {
         'label' => $depLabel,
     ];
 }
+$orangeProductTypeDeptStepEnabled = $productTypeDepartmentsForForm !== [];
 
 $productTypeTrailsForJs = [];
 if ($catalogNavUnified && orange_table_exists($pdo, 'product_types') && orange_table_exists($pdo, 'catalog_sections')
@@ -381,16 +384,18 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                     </div>
                 </div>
             </div>
+            <?php if ($orangeProductTypeDeptStepEnabled): ?>
             <div class="orange-product-main-department-block">
-                <label for="product_main_department_id">القسم الرئيسي</label>
-                <select id="product_main_department_id">
-                    <option value="">كل الأقسام</option>
+                <label for="product_main_department_id">القسم الرئيسي — مطلوب أولاً</label>
+                <select id="product_main_department_id" required>
+                    <option value="">— اختر القسم الرئيسي —</option>
                     <?php foreach ($productTypeDepartmentsForForm as $ptDep): ?>
                         <option value="<?php echo (int) ($ptDep['id'] ?? 0); ?>"><?php echo htmlspecialchars((string) ($ptDep['label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></option>
                     <?php endforeach; ?>
                 </select>
-                <small style="display:block;color:#666;margin-top:4px;">فلترة سريعة لأنواع المنتج داخل القسم.</small>
+                <small style="display:block;color:#666;margin-top:4px;">اختر القسم أولاً؛ تُعرض بعدها فقط أنواع المنتج التابعة لهذا القسم.</small>
             </div>
+            <?php endif; ?>
             <div id="product_type_block" class="orange-product-type-block">
                 <label for="product_type_id">نوع المنتج (ورقة الشجرة الموحّدة) — مطلوب</label>
                 <select id="product_type_id" required>
@@ -747,6 +752,7 @@ window.ORANGE_FAMILIES = <?php echo json_encode($familiesOut, JSON_UNESCAPED_UNI
 window.ORANGE_SUBCATEGORIES = <?php echo json_encode($subcategoriesForJs, JSON_UNESCAPED_UNICODE); ?>;
 window.ORANGE_CATEGORY_META = <?php echo json_encode($categoryCatalogMeta, JSON_UNESCAPED_UNICODE); ?>;
 window.ORANGE_CATALOG_NAV_UNIFIED = <?php echo $catalogNavUnified ? 'true' : 'false'; ?>;
+window.ORANGE_PT_DEPT_STEP_ENABLED = <?php echo $orangeProductTypeDeptStepEnabled ? 'true' : 'false'; ?>;
 window.ORANGE_PRODUCT_TYPE_TRAIL = <?php echo json_encode($productTypeTrailsForJs, JSON_UNESCAPED_UNICODE); ?>;
 window.PRODUCT_EXTRA_IMAGES = [];
 window.PRODUCT_NEXT_SORT = <?php echo (int)$nextProductSort; ?>;
@@ -804,6 +810,9 @@ function orangeFindProductTypeSeedById(ptId) {
 }
 
 function orangeSyncMainDepartmentFromProductType() {
+    if (window.ORANGE_PT_DEPT_STEP_ENABLED !== true) {
+        return;
+    }
     const depEl = document.getElementById('product_main_department_id');
     const ptEl = document.getElementById('product_type_id');
     if (!depEl || !ptEl || !ptEl.value) {
@@ -826,15 +835,27 @@ function orangeApplyProductTypeDepartmentFilter(preserveTypeValue) {
     }
     orangeSeedProductTypeOptions();
     const keepVal = preserveTypeValue ? String(ptEl.value || '').trim() : '';
+    const depStep = window.ORANGE_PT_DEPT_STEP_ENABLED === true;
     const depId = depEl ? (parseInt(depEl.value || '0', 10) || 0) : 0;
     ptEl.innerHTML = '';
     const placeholder = document.createElement('option');
     placeholder.value = '';
+    if (depStep && depId <= 0) {
+        placeholder.textContent = 'اختر القسم الرئيسي أولاً';
+        ptEl.appendChild(placeholder);
+        ptEl.value = '';
+        orangeSyncLegacyFieldsFromProductType();
+        orangeApplySizeFamilySchemeFilter();
+        return;
+    }
     placeholder.textContent = 'اختر نوع المنتج';
     ptEl.appendChild(placeholder);
     orangeProductTypeOptionSeed.forEach(function (seed) {
         const seedDepId = parseInt(String(seed.departmentId || '0'), 10) || 0;
-        if (depId > 0 && seedDepId !== depId) {
+        if (depStep && depId > 0 && seedDepId !== depId) {
+            return;
+        }
+        if (!depStep && depId > 0 && seedDepId !== depId) {
             return;
         }
         const opt = document.createElement('option');
@@ -1651,14 +1672,19 @@ async function loadProductForEdit(id) {
         if (pte) {
             pte.value = ptId > 0 ? String(ptId) : '';
             if (ptId > 0 && pte.value !== String(ptId)) {
-                const depSelFallback = document.getElementById('product_main_department_id');
-                if (depSelFallback) {
-                    depSelFallback.value = '';
+                orangeSeedProductTypeOptions();
+                const seedRetry = orangeFindProductTypeSeedById(ptId);
+                const depRetry = document.getElementById('product_main_department_id');
+                if (depRetry && seedRetry && parseInt(String(seedRetry.departmentId || '0'), 10) > 0) {
+                    depRetry.value = String(seedRetry.departmentId);
                     orangeApplyProductTypeDepartmentFilter(false);
                     pte.value = String(ptId);
                 }
             }
             orangeSyncMainDepartmentFromProductType();
+            if (window.ORANGE_PT_DEPT_STEP_ENABLED === true) {
+                orangeApplyProductTypeDepartmentFilter(true);
+            }
             orangeSyncLegacyFieldsFromProductType();
         }
         document.getElementById('price').value = String(p.price != null ? p.price : '');
@@ -2075,11 +2101,24 @@ async function saveProduct() {
         }
     }
 
+    if (window.ORANGE_PT_DEPT_STEP_ENABLED === true) {
+        const depSaveEl = document.getElementById('product_main_department_id');
+        const depSaveVal = depSaveEl ? (parseInt(depSaveEl.value || '0', 10) || 0) : 0;
+        if (depSaveVal <= 0) {
+            productFormShowTab('basic');
+            alert('يجب اختيار «القسم الرئيسي» أولاً، ثم نوع المنتج التابع لهذا القسم.');
+            return;
+        }
+    }
     const ptEl = document.getElementById('product_type_id');
     const ptVal = ptEl ? (parseInt(ptEl.value || '0', 10) || 0) : 0;
     if (ptVal <= 0) {
         productFormShowTab('basic');
-        alert('يجب اختيار «نوع المنتج» قبل الحفظ.');
+        if (window.ORANGE_PT_DEPT_STEP_ENABLED === true) {
+            alert('اختر «القسم الرئيسي» ثم «نوع المنتج» من الأنواع المعروضة لهذا القسم فقط.');
+        } else {
+            alert('يجب اختيار «نوع المنتج» قبل الحفظ.');
+        }
         return;
     }
 
@@ -2325,6 +2364,9 @@ if (orangeProductDepartmentSelectEl) {
 if (orangeProductTypeSelectEl) {
     orangeProductTypeSelectEl.addEventListener('change', function () {
         orangeSyncMainDepartmentFromProductType();
+        if (window.ORANGE_PT_DEPT_STEP_ENABLED === true) {
+            orangeApplyProductTypeDepartmentFilter(true);
+        }
         orangeSyncLegacyFieldsFromProductType();
         orangeApplySizeFamilySchemeFilter();
         if (window.ORANGE_CATALOG_NAV_UNIFIED) {
