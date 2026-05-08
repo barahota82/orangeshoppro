@@ -38,6 +38,103 @@ function orange_catalog_resolve_product_classification(PDO $pdo, array $data): a
 }
 
 /**
+ * جزء واحد من كود الصنف: slug لاتيني/أرقام مختصر، أو i{id} عند الفراغ.
+ */
+function orange_catalog_item_code_segment_from_slug(?string $slug, int $id): string
+{
+    $s = strtolower(trim((string) $slug));
+    $s = preg_replace('/[^a-z0-9]+/', '-', $s);
+    $s = trim($s, '-');
+    if ($s !== '') {
+        return strlen($s) > 14 ? substr($s, 0, 14) : $s;
+    }
+
+    return 'i' . max(0, $id);
+}
+
+/**
+ * يولّد كود صنف داخلي من سلسلة الشجرة الموحّدة (قسم ← قسم كتالوج ← فئة ← تحت-فئة ← نوع) + معرف المنتج لضمان التفرد.
+ * يُعاد null إن تعذّر الربط (لا يوجد مسار موحّد لهذا product_type_id).
+ *
+ * @return string|null
+ */
+function orange_catalog_generate_product_item_code_from_tree(PDO $pdo, int $productTypeId, int $productId): ?string
+{
+    if ($productTypeId <= 0 || $productId <= 0) {
+        return null;
+    }
+    foreach (['product_types', 'catalog_subcategories', 'catalog_categories', 'catalog_sections', 'departments'] as $t) {
+        if (! orange_table_exists($pdo, $t)) {
+            return null;
+        }
+    }
+    if (! orange_table_has_column($pdo, 'product_types', 'catalog_subcategory_id')) {
+        return null;
+    }
+
+    $dSlug = orange_table_has_column($pdo, 'departments', 'slug') ? 'd.slug AS dep_slug' : "'' AS dep_slug";
+    $csSlug = orange_table_has_column($pdo, 'catalog_sections', 'slug') ? 'cs.slug AS sec_slug' : "'' AS sec_slug";
+    $ccSlug = orange_table_has_column($pdo, 'catalog_categories', 'slug') ? 'cc.slug AS cat_slug' : "'' AS cat_slug";
+    $csubSlug = orange_table_has_column($pdo, 'catalog_subcategories', 'slug') ? 'csub.slug AS sub_slug' : "'' AS sub_slug";
+    $ptSlug = orange_table_has_column($pdo, 'product_types', 'slug') ? 'pt.slug AS pt_slug' : "'' AS pt_slug";
+
+    try {
+        $st = $pdo->prepare(
+            "SELECT d.id AS dep_id, cs.id AS sec_id, cc.id AS cat_id, csub.id AS sub_id, pt.id AS pt_id,
+                    {$dSlug}, {$csSlug}, {$ccSlug}, {$csubSlug}, {$ptSlug}
+             FROM product_types pt
+             INNER JOIN catalog_subcategories csub ON csub.id = pt.catalog_subcategory_id
+             INNER JOIN catalog_categories cc ON cc.id = csub.catalog_category_id
+             INNER JOIN catalog_sections cs ON cs.id = cc.catalog_section_id
+             INNER JOIN departments d ON d.id = cs.department_id
+             WHERE pt.id = ?
+             LIMIT 1"
+        );
+        $st->execute([$productTypeId]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        return null;
+    }
+    if (! is_array($row)) {
+        return null;
+    }
+
+    $depId = (int) ($row['dep_id'] ?? 0);
+    $secId = (int) ($row['sec_id'] ?? 0);
+    $catId = (int) ($row['cat_id'] ?? 0);
+    $subId = (int) ($row['sub_id'] ?? 0);
+    $ptId = (int) ($row['pt_id'] ?? 0);
+    if ($depId <= 0 || $ptId <= 0) {
+        return null;
+    }
+
+    $p1 = orange_catalog_item_code_segment_from_slug($row['dep_slug'] ?? null, $depId);
+    $p2 = orange_catalog_item_code_segment_from_slug($row['sec_slug'] ?? null, $secId);
+    $p3 = orange_catalog_item_code_segment_from_slug($row['cat_slug'] ?? null, $catId);
+    $p4 = orange_catalog_item_code_segment_from_slug($row['sub_slug'] ?? null, $subId);
+    $p5 = orange_catalog_item_code_segment_from_slug($row['pt_slug'] ?? null, $ptId);
+    $base = implode('-', [$p1, $p2, $p3, $p4, $p5]);
+    $base = trim(preg_replace('/-+/', '-', $base), '-');
+    if ($base === '') {
+        $base = 'pt' . $productTypeId;
+    }
+    $suffix = '-P' . $productId;
+    $maxBase = 64 - strlen($suffix);
+    if ($maxBase < 4) {
+        return 'P' . $productId;
+    }
+    if (strlen($base) > $maxBase) {
+        $base = substr($base, 0, $maxBase);
+        $base = rtrim($base, '-');
+        if ($base === '') {
+            $base = 'pt' . $productTypeId;
+        }
+    }
+
+    return $base . $suffix;
+}
+
+/**
  * سلسلة LEFT JOIN لعرض صف فئة باسم مستعار `c` (name_ar / name_en) في استعلامات الأدمن عن المنتجات.
  * مصدر العرض الموحّد فقط: `c` = catalog_categories عبر product_type_id.
  * عند غياب بنية الشجرة الموحّدة الكاملة تُعاد قيم null دون الرجوع إلى taxonomy legacy.

@@ -180,6 +180,16 @@ try {
         return function_exists('mb_substr') ? mb_substr($s, 0, 64, 'UTF-8') : substr($s, 0, 64);
     };
     $itemCodeUp = $normSku($data['item_code'] ?? '');
+    if (
+        orange_table_has_column($pdo, 'products', 'item_code')
+        && $productTypeIdResolved !== null
+        && $productTypeIdResolved > 0
+    ) {
+        $autoItemUp = orange_catalog_generate_product_item_code_from_tree($pdo, $productTypeIdResolved, $productId);
+        if ($autoItemUp !== null) {
+            $itemCodeUp = $autoItemUp;
+        }
+    }
     $barcodeUp = $normSku($data['barcode'] ?? '');
 
     $setParts = [
@@ -312,7 +322,11 @@ try {
     orange_product_attach_all_active_channels($pdo, $productId);
 
     audit_log('product_update', 'تم تحديث المنتج رقم: ' . $productId, 'products', $productId);
-    json_response(['success' => true, 'message' => 'تم تحديث المنتج']);
+    json_response([
+        'success' => true,
+        'message' => 'تم تحديث المنتج',
+        'item_code' => $itemCodeUp,
+    ]);
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();

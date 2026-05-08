@@ -240,6 +240,19 @@ try {
 
     $productId = (int)$pdo->lastInsertId();
 
+    $itemCodeFinal = $itemCodeIns;
+    if (
+        orange_table_has_column($pdo, 'products', 'item_code')
+        && $productTypeIdResolved !== null
+        && $productTypeIdResolved > 0
+    ) {
+        $autoItem = orange_catalog_generate_product_item_code_from_tree($pdo, $productTypeIdResolved, $productId);
+        if ($autoItem !== null) {
+            $pdo->prepare('UPDATE products SET item_code = ? WHERE id = ?')->execute([$autoItem, $productId]);
+            $itemCodeFinal = $autoItem;
+        }
+    }
+
     $cwMap = orange_product_ensure_colorways($pdo, $productId, $variantsIn, $hasColors);
 
     $variantStmt = $pdo->prepare(
@@ -340,7 +353,12 @@ try {
 
     $pdo->commit();
 
-    json_response(['success' => true, 'message' => 'تم حفظ المنتج بنجاح', 'product_id' => $productId]);
+    json_response([
+        'success' => true,
+        'message' => 'تم حفظ المنتج بنجاح',
+        'product_id' => $productId,
+        'item_code' => $itemCodeFinal,
+    ]);
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();

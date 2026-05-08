@@ -452,8 +452,9 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                 <input type="number" id="cost" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr">
             </div>
             <div>
-                <label for="product_item_code">كود الصنف (اختياري)</label>
-                <input type="text" id="product_item_code" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="SKU">
+                <label for="product_item_code">كود الصنف (تلقائي من الشجرة)</label>
+                <input type="text" id="product_item_code" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="يُولَّد عند الحفظ" readonly>
+                <small style="display:block;color:#666;margin-top:4px;">يُبنى من سلسلة القسم والكتالوج حتى نوع المنتج، ثم ‎-P‎{رقم المنتج} — لا يُعدَّل يدوياً.</small>
             </div>
             <div>
                 <label for="product_barcode">الباركود (اختياري)</label>
