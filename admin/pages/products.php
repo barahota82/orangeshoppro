@@ -366,7 +366,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                 <div class="form-grid product-form-basic-top3-inner">
                     <div class="admin-sort-field-wrap">
                         <label>الترتيب (في المتجر)</label>
-                        <input type="text" id="product_sort_order" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int)$nextProductSort; ?>" readonly tabindex="-1" autocomplete="off" inputmode="numeric">
+                        <input type="text" id="product_sort_order" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int)$nextProductSort; ?>" readonly tabindex="-1" autocomplete="off" inputmode="numeric" dir="ltr" lang="en">
                     </div>
                     <div>
                         <label>مسار الشجرة الموحّدة (مقتطف)</label>

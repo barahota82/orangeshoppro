@@ -2163,6 +2163,28 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     width: 100%;
 }
 
+/* البيانات الأساسية — صفوف الشبكة: المذكور أولاً في العربية يظهر يمين الصف (القالب pattern_dictionary) */
+#productTabPanelBasic .product-form-basic-top3-inner.form-grid,
+#productTabPanelBasic .product-form-basic-top3-inner.form-grid-3 {
+    direction: rtl;
+}
+#productTabPanelBasic .product-form-basic-top3-inner #name {
+    direction: rtl;
+    text-align: right;
+}
+#productTabPanelBasic .product-form-basic-top3-inner #name_en,
+#productTabPanelBasic .product-form-basic-top3-inner #name_fil,
+#productTabPanelBasic .product-form-basic-top3-inner #name_hi {
+    direction: ltr;
+    text-align: left;
+}
+#productTabPanelBasic .product-form-basic-top3-inner .admin-inp-money,
+#productTabPanelBasic .product-form-basic-top3-inner input[dir="ltr"],
+#productTabPanelBasic .product-form-basic-top3-inner textarea[dir="ltr"] {
+    direction: ltr;
+    text-align: left;
+}
+
 /* تبويب المنتج — البيانات الأساسية: نفس ارتفاع خانة الاسم لحقول الإدخال والقائمة ومقطع المسار */
 #productTabPanelBasic input:not([type="file"]):not([type="checkbox"]):not([type="radio"]),
 #productTabPanelBasic select {
