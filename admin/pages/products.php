@@ -445,7 +445,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
         <div id="productTabPanelDescription" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnDescription">
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">وصف المنتج</h4>
-        <div class="form-grid">
+        <div class="form-grid product-form-tab-basic-grid">
             <div style="grid-column:1/-1;">
                 <label>الوصف (عربي)</label>
                 <textarea id="description" rows="3"></textarea>
@@ -504,6 +504,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
         <div id="productTabPanelAttributes" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnAttributes">
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">سمات المنتج</h4>
+        <div class="form-grid product-form-tab-basic-grid">
         <?php if ($catalogAttributesActive !== []): ?>
         <div style="grid-column:1/-1;">
             <?php foreach ($catalogAttributesActive as $cattr): ?>
@@ -551,8 +552,11 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
             <?php endforeach; ?>
         </div>
         <?php else: ?>
-        <p style="margin:0;color:#64748b;">لا توجد سمات كتالوج نشطة حالياً.</p>
+        <div style="grid-column:1/-1;">
+            <p style="margin:0;color:#64748b;">لا توجد سمات كتالوج نشطة حالياً.</p>
+        </div>
         <?php endif; ?>
+        </div>
         </div>
         </div>
 
