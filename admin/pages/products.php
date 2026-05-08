@@ -334,16 +334,16 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         <input type="text" id="product_sort_order" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int)$nextProductSort; ?>" readonly tabindex="-1" autocomplete="off" inputmode="numeric">
                     </div>
                     <div>
+                        <label>مسار الشجرة الموحّدة (مقتطف)</label>
+                        <div id="product_department_hint" style="padding:8px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;min-height:20px;">—</div>
+                        <small style="display:block;color:#666;margin-top:4px;">مرجع: <code id="product_dept_cat_ref" style="font-size:13px;">—</code></small>
+                    </div>
+                    <div>
                         <label>حالة العرض</label>
                         <select id="product_is_active">
                             <option value="1">نشط</option>
                             <option value="0">مخفي</option>
                         </select>
-                    </div>
-                    <div>
-                <label>مسار الشجرة الموحّدة (مقتطف)</label>
-                        <div id="product_department_hint" style="padding:8px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;min-height:20px;">—</div>
-                        <small style="display:block;color:#666;margin-top:4px;">مرجع: <code id="product_dept_cat_ref" style="font-size:13px;">—</code></small>
                     </div>
                 </div>
             </div>
