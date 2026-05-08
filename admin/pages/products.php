@@ -368,7 +368,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
         <h4 class="admin-product-subsection-title">البيانات الأساسية</h4>
         <div class="form-grid product-form-tab-basic-grid">
             <div class="product-form-basic-top3">
-                <div class="form-grid-3 product-form-basic-top3-inner">
+                <div class="form-grid product-form-basic-top3-inner">
                     <div class="admin-sort-field-wrap">
                         <label>الترتيب (في المتجر)</label>
                         <input type="text" id="product_sort_order" class="admin-sort-field admin-sort-field--muted" value="<?php echo (int)$nextProductSort; ?>" readonly tabindex="-1" autocomplete="off" inputmode="numeric">
@@ -377,6 +377,13 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         <label>مسار الشجرة الموحّدة (مقتطف)</label>
                         <div id="product_department_hint" style="padding:8px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;min-height:20px;">—</div>
                         <small style="display:block;color:#666;margin-top:4px;">مرجع: <code id="product_dept_cat_ref" style="font-size:13px;">—</code></small>
+                    </div>
+                </div>
+                <div class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
+                    <div>
+                        <label for="product_item_code">كود الصنف (تلقائي من الشجرة)</label>
+                        <input type="text" id="product_item_code" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="يُولَّد عند الحفظ" readonly>
+                        <small style="display:block;color:#666;margin-top:4px;">يُبنى من سلسلة القسم والكتالوج حتى نوع المنتج، ثم ‎-P‎{رقم المنتج} — لا يُعدَّل يدوياً.</small>
                     </div>
                     <div>
                         <label>حالة العرض</label>
@@ -450,11 +457,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
             <div>
                 <label>التكلفة</label>
                 <input type="number" id="cost" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr">
-            </div>
-            <div>
-                <label for="product_item_code">كود الصنف (تلقائي من الشجرة)</label>
-                <input type="text" id="product_item_code" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="يُولَّد عند الحفظ" readonly>
-                <small style="display:block;color:#666;margin-top:4px;">يُبنى من سلسلة القسم والكتالوج حتى نوع المنتج، ثم ‎-P‎{رقم المنتج} — لا يُعدَّل يدوياً.</small>
             </div>
             <div>
                 <label for="product_barcode">الباركود (اختياري)</label>

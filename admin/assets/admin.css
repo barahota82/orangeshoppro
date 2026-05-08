@@ -2145,7 +2145,7 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     line-height: 1.45;
 }
 
-/* تبويب المنتج — الصف الأول ثلاثي الأعمدة كما في التصميم */
+/* تبويب المنتج — الصفان العلويان (عمودان لكل صف) */
 .product-form-tab-basic-grid > .product-form-basic-top3 {
     grid-column: 1 / -1;
 }
@@ -4598,7 +4598,7 @@ td.tb-col-name,
     .grid-4, .grid-2, .form-grid, .form-grid-3, .coa-layout, .coa-shell__body { grid-template-columns: 1fr; }
     .coa-form-grid { grid-template-columns: 1fr; }
     .coa-shell__tree { border-right: none; border-bottom: 1px solid var(--border, #e2e8f0); min-height: 280px; }
-    .product-form-basic-top3 .form-grid-3 {
+    .product-form-basic-top3 .form-grid {
         grid-template-columns: 1fr;
     }
     .admin-product-form-actions--bar {
