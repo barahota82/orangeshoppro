@@ -361,7 +361,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
         <div id="productTabPanelBasic" class="admin-product-tab-panel is-active" role="tabpanel" aria-labelledby="productTabBtnBasic">
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">البيانات الأساسية</h4>
-        <div class="form-grid product-form-tab-basic-grid">
+        <div class="product-form-tab-basic-layout">
             <div class="product-form-basic-top3">
                 <div class="form-grid product-form-basic-top3-inner">
                     <div class="admin-sort-field-wrap">
@@ -380,7 +380,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                     لن يُسمح بإضافة منتج من هذه الشاشة حتى يُكمل الربط في القاعدة؛ راجع الترحيل والجداول أو استعلام أنواع المنتج مع <code>department_id</code>.
                 </div>
                 <?php endif; ?>
-                <div class="<?php echo $orangeProductTypeDeptStepEnabled ? 'form-grid-3' : 'form-grid'; ?> product-basic-class-row product-form-basic-top3-inner" style="margin-top:12px;">
+                <div class="form-grid product-basic-class-row product-form-basic-top3-inner" style="margin-top:12px;">
                     <?php if ($orangeProductTypeDeptStepEnabled): ?>
                     <div class="product-basic-class-cell">
                         <label for="product_main_department_id">القسم الرئيسي — مطلوب أولاً</label>
@@ -392,7 +392,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         </select>
                     </div>
                     <?php endif; ?>
-                    <div id="product_type_block" class="product-basic-class-cell">
+                    <div id="product_type_block" class="product-basic-class-cell"<?php echo $orangeProductTypeDeptStepEnabled ? '' : ' style="grid-column:1 / -1"'; ?>>
                         <label for="product_type_id">نوع المنتج (ورقة الشجرة الموحّدة) — مطلوب</label>
                         <select id="product_type_id" required>
                             <option value="">اختر نوع المنتج</option>
@@ -414,6 +414,36 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                             <?php endforeach; ?>
                         </select>
                     </div>
+                </div>
+                <div class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
+                    <div>
+                        <label>اسم المنتج (العربي)</label>
+                        <input type="text" id="name" required>
+                    </div>
+                    <div>
+                        <label>English</label>
+                        <input type="text" id="name_en" required>
+                    </div>
+                </div>
+                <div class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
+                    <div>
+                        <label>Filipino</label>
+                        <input type="text" id="name_fil" required>
+                    </div>
+                    <div>
+                        <label>Hindi</label>
+                        <input type="text" id="name_hi" required>
+                    </div>
+                </div>
+                <div class="form-grid form-grid-3 product-form-basic-top3-inner" style="margin-top:12px;">
+                    <div>
+                        <label>السعر</label>
+                        <input type="number" id="price" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr">
+                    </div>
+                    <div>
+                        <label>التكلفة</label>
+                        <input type="number" id="cost" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr">
+                    </div>
                     <div class="product-basic-class-cell">
                         <label for="product_is_active">حالة العرض</label>
                         <select id="product_is_active">
@@ -422,8 +452,8 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         </select>
                     </div>
                 </div>
-                <div id="product_basic_size_family_wrap" class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
-                    <div style="grid-column:1/-1;">
+                <div class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
+                    <div id="product_basic_size_family_wrap">
                         <label for="size_family_id">عائلة المقاسات</label>
                         <select id="size_family_id">
                             <option value="">— بلا مقاسات (اتركها فارغة) —</option>
@@ -438,9 +468,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         </select>
                         <small id="size_family_scheme_hint" style="display:none;margin-top:4px;line-height:1.45;color:#64748b;"></small>
                     </div>
-                </div>
-                <div id="product_basic_size_guide_wrap" class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
-                    <div>
+                    <div id="product_basic_size_guide_wrap">
                         <label for="sizing_guide_scope">دليل المقاس الاسترشادي (عرض)</label>
                         <select id="sizing_guide_scope" disabled>
                             <option value="none">بدون</option>
@@ -448,7 +476,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                             <option value="lower">سفلي</option>
                             <option value="both">علوي وسفلي</option>
                         </select>
-                        <small class="card-hint" style="display:block;margin-top:4px;color:#64748b;">يُفعّل عند اختيار عائلة مقاسات أعلاه. ربط الجداول/الشاشات التفصيلية للدليل يُضاف لاحقاً.</small>
+                        <small class="card-hint" style="display:block;margin-top:4px;color:#64748b;">يُفعّل بعد اختيار عائلة مقاسات في الحقل المجاور. ربط الجداول/الشاشات التفصيلية للدليل يُضاف لاحقاً.</small>
                     </div>
                 </div>
                 <div class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
@@ -467,30 +495,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         <input type="text" id="product_barcode" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="يُولَّد بعد الحفظ" readonly>
                     </div>
                 </div>
-            </div>
-            <div>
-                <label>اسم المنتج (العربي)</label>
-                <input type="text" id="name" required>
-            </div>
-            <div>
-                <label>English</label>
-                <input type="text" id="name_en" required>
-            </div>
-            <div>
-                <label>Filipino</label>
-                <input type="text" id="name_fil" required>
-            </div>
-            <div>
-                <label>Hindi</label>
-                <input type="text" id="name_hi" required>
-            </div>
-            <div>
-                <label>السعر</label>
-                <input type="number" id="price" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr">
-            </div>
-            <div>
-                <label>التكلفة</label>
-                <input type="number" id="cost" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr">
             </div>
         </div>
         </div>

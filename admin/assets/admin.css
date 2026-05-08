@@ -2145,7 +2145,17 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     line-height: 1.45;
 }
 
-/* تبويب المنتج — الصفان العلويان (عمودان لكل صف) */
+/* تبويب المنتج — البيانات الأساسية: عمود واحد (صفوف بالترتيب المطلوب) */
+.product-form-tab-basic-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    width: 100%;
+}
+.product-form-tab-basic-layout > .product-form-basic-top3 {
+    width: 100%;
+}
+/* تبويب المنتج — وصف/سمات: شبكة؛ الصف العلوي يمتد */
 .product-form-tab-basic-grid > .product-form-basic-top3 {
     grid-column: 1 / -1;
 }
