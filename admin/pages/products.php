@@ -350,7 +350,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
 
         <div class="admin-product-tabs" role="tablist" aria-label="أقسام نموذج المنتج">
             <button type="button" class="admin-product-tab is-active" role="tab" id="productTabBtnBasic" aria-controls="productTabPanelBasic" aria-selected="true" data-product-tab="basic">البيانات الأساسية</button>
-            <button type="button" class="admin-product-tab" role="tab" id="productTabBtnSizes" aria-controls="productTabPanelSizes" aria-selected="false" data-product-tab="sizes">المقاسات والألوان</button>
+            <button type="button" class="admin-product-tab" role="tab" id="productTabBtnSizes" aria-controls="productTabPanelSizes" aria-selected="false" data-product-tab="sizes">الألوان</button>
             <button type="button" class="admin-product-tab" role="tab" id="productTabBtnDescription" aria-controls="productTabPanelDescription" aria-selected="false" data-product-tab="description">وصف المنتج</button>
             <button type="button" class="admin-product-tab" role="tab" id="productTabBtnAttributes" aria-controls="productTabPanelAttributes" aria-selected="false" data-product-tab="attributes">سمات المنتج</button>
             <button type="button" class="admin-product-tab" role="tab" id="productTabBtnImages" aria-controls="productTabPanelImages" aria-selected="false" data-product-tab="images">الصور</button>
@@ -422,30 +422,11 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         </select>
                     </div>
                 </div>
-                <div id="product_basic_size_flags_wrap" class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
-                    <div>
-                        <label for="has_sizes">له مقاسات؟</label>
-                        <select id="has_sizes" onchange="onHasFlagsChange()">
-                            <option value="0">لا</option>
-                            <option value="1">نعم</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="sizing_guide_scope">دليل المقاس الاسترشادي (عرض)</label>
-                        <select id="sizing_guide_scope" disabled>
-                            <option value="none">بدون</option>
-                            <option value="upper">علوي</option>
-                            <option value="lower">سفلي</option>
-                            <option value="both">علوي وسفلي</option>
-                        </select>
-                        <small class="card-hint" style="display:block;margin-top:4px;color:#64748b;">يُفعّل عند اختيار «له مقاسات؟ = نعم». ربط الجداول/الشاشات التفصيلية للدليل يُضاف لاحقاً.</small>
-                    </div>
-                </div>
-                <div id="product_basic_size_family_wrap" class="form-grid product-form-basic-top3-inner" style="margin-top:12px;display:none;">
+                <div id="product_basic_size_family_wrap" class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
                     <div style="grid-column:1/-1;">
                         <label for="size_family_id">عائلة المقاسات</label>
-                        <select id="size_family_id" disabled>
-                            <option value="">— اختر العائلة —</option>
+                        <select id="size_family_id">
+                            <option value="">— بلا مقاسات (اتركها فارغة) —</option>
                             <?php foreach ($familiesOut as $f): ?>
                                 <?php
                                 $famSch = htmlspecialchars(trim((string) ($f['size_scheme_key'] ?? '')), ENT_QUOTES, 'UTF-8');
@@ -456,6 +437,18 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                             <?php endforeach; ?>
                         </select>
                         <small id="size_family_scheme_hint" style="display:none;margin-top:4px;line-height:1.45;color:#64748b;"></small>
+                    </div>
+                </div>
+                <div id="product_basic_size_guide_wrap" class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
+                    <div>
+                        <label for="sizing_guide_scope">دليل المقاس الاسترشادي (عرض)</label>
+                        <select id="sizing_guide_scope" disabled>
+                            <option value="none">بدون</option>
+                            <option value="upper">علوي</option>
+                            <option value="lower">سفلي</option>
+                            <option value="both">علوي وسفلي</option>
+                        </select>
+                        <small class="card-hint" style="display:block;margin-top:4px;color:#64748b;">يُفعّل عند اختيار عائلة مقاسات أعلاه. ربط الجداول/الشاشات التفصيلية للدليل يُضاف لاحقاً.</small>
                     </div>
                 </div>
                 <div class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
@@ -505,7 +498,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
 
         <div id="productTabPanelSizes" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnSizes">
         <div class="admin-product-section">
-        <h4 class="admin-product-subsection-title">المقاسات والألوان</h4>
+        <h4 class="admin-product-subsection-title">الألوان</h4>
         <?php if ($colors === []): ?>
         <p style="margin:0 0 12px;padding:10px 12px;background:#fff7ed;border:1px solid #fdba74;border-radius:8px;color:#9a3412;font-size:13px;">قاموس <strong>الألوان</strong> فارغ — لن تظهر خيارات في خلطات اللون. أضف ألواناً من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=color_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">قاموس الألوان</a> قبل تفعيل «له ألوان؟».</p>
         <?php endif; ?>
@@ -526,7 +519,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
             <h4 class="admin-nested-panel__title">مقاسات المنتج (بدون ألوان)</h4>
             <p class="card-hint" style="margin:0 0 10px;font-size:13px;line-height:1.55;">
                 عندما يكون المنتج <strong>بمقاسات فقط دون ألوان</strong>، حدّد المقاسات من العائلة التي اخترتها في <strong>البيانات الأساسية</strong> ثم <strong>توليد المتغيرات</strong>.
-                إذا كان المنتج <strong>له ألوان</strong>، تُحدَّد المقاسات <strong>لكل صف لون</strong> من تبويب المقاسات والألوان (قائمة علامات الصح حسب العائلة).
+                إذا كان المنتج <strong>له ألوان</strong>، تُحدَّد المقاسات <strong>لكل صف لون</strong> من تبويب <strong>الألوان</strong> (قائمة علامات الصح حسب العائلة).
             </p>
             <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center;">
                 <button type="button" class="btn-secondary" style="font-size:12px;padding:4px 10px;" onclick="orangeSizePickSetAll(true)">تحديد الكل</button>
@@ -882,7 +875,7 @@ function orangeApplyProductTypeDepartmentFilter(preserveTypeValue) {
         ptEl.appendChild(placeholder);
         ptEl.value = '';
         orangeSyncLegacyFieldsFromProductType();
-        orangeApplySizeFamilySchemeFilter();
+        onHasFlagsChange();
         return;
     }
     placeholder.textContent = 'اختر نوع المنتج';
@@ -919,7 +912,7 @@ function orangeApplyProductTypeDepartmentFilter(preserveTypeValue) {
         ptEl.value = '';
     }
     orangeSyncLegacyFieldsFromProductType();
-    orangeApplySizeFamilySchemeFilter();
+    onHasFlagsChange();
 }
 
 function orangeGetSelectedProductTypeExpectedKind() {
@@ -940,23 +933,20 @@ function orangeGetSelectedProductTypeExpectedCat() {
     return opt ? String(opt.getAttribute('data-expected-cat') || '').trim() : '';
 }
 
+/** صنف له مقاسات عندما تُختار عائلة مقاسات (لا يعتمد على خانة منفصلة). */
+function orangeProductEffectiveHasSizes() {
+    const famSel = document.getElementById('size_family_id');
+    if (!famSel) {
+        return false;
+    }
+    const v = parseInt(String(famSel.value || '0'), 10) || 0;
+    return v > 0;
+}
+
 function orangeApplySizeFamilySchemeFilter() {
     const famSel = document.getElementById('size_family_id');
     const hint = document.getElementById('size_family_scheme_hint');
     if (!famSel) {
-        return;
-    }
-    const hs = document.getElementById('has_sizes') && document.getElementById('has_sizes').value === '1';
-    if (!hs) {
-        for (let i = 0; i < famSel.options.length; i++) {
-            famSel.options[i].disabled = false;
-        }
-        if (hint) {
-            hint.style.display = 'none';
-            hint.textContent = '';
-        }
-        orangeRefreshSizePickPanel();
-        orangeRefreshAllColorwaySizePickers();
         return;
     }
 
@@ -1659,7 +1649,6 @@ function resetProductForm() {
     document.getElementById('main_image').value = '';
     document.getElementById('main_image_file').value = '';
     adminSetMainImagePreview('');
-    document.getElementById('has_sizes').value = '0';
     document.getElementById('has_colors').value = '0';
     document.getElementById('size_family_id').value = '';
     document.getElementById('sizing_guide_scope').value = 'none';
@@ -1783,7 +1772,6 @@ async function loadProductForEdit(id) {
         }
         document.getElementById('main_image').value = mainFn;
         adminSetMainImagePreview(mainFn);
-        document.getElementById('has_sizes').value = parseInt(p.has_sizes, 10) === 1 ? '1' : '0';
         document.getElementById('has_colors').value = parseInt(p.has_colors, 10) === 1 ? '1' : '0';
         document.getElementById('size_family_id').value = p.size_family_id ? String(p.size_family_id) : '';
         document.getElementById('sizing_guide_scope').value = p.sizing_guide_scope || 'none';
@@ -1795,14 +1783,15 @@ async function loadProductForEdit(id) {
         onHasFlagsChange();
         orangeApplyCatalogAttributeValuesFromProduct(p);
         buildColorwaysForEditFromVm(vm);
-        if (parseInt(p.has_sizes, 10) === 1 && parseInt(p.has_colors, 10) === 1) {
+        const hasSizesEff = orangeProductEffectiveHasSizes();
+        if (hasSizesEff && parseInt(p.has_colors, 10) === 1) {
             orangeApplyColorwaySizesFromVariantMatrix(vm);
         } else {
             orangeApplySizePickFromVariantMatrix(vm);
         }
         const needMatrix =
             parseInt(p.has_colors, 10) === 1 ||
-            parseInt(p.has_sizes, 10) === 1 ||
+            hasSizesEff ||
             (vm && vm.length > 0);
         if (needMatrix) {
             generateVariants();
@@ -1904,26 +1893,34 @@ async function uploadGalleryProductImages() {
 }
 
 function onHasFlagsChange() {
-    const hs = document.getElementById('has_sizes').value === '1';
     const hc = document.getElementById('has_colors').value === '1';
-    document.getElementById('size_family_id').disabled = !hs;
-    const sgScope = document.getElementById('sizing_guide_scope');
-    if (sgScope) {
-        sgScope.disabled = !hs;
+    const famSel = document.getElementById('size_family_id');
+    if (famSel) {
+        famSel.disabled = false;
     }
     const famWrap = document.getElementById('product_basic_size_family_wrap');
     if (famWrap) {
-        famWrap.style.display = hs ? 'block' : 'none';
-    }
-    const cwh = document.getElementById('colorways_sizes_hint');
-    if (cwh) {
-        cwh.style.display = hs && hc ? 'block' : 'none';
+        famWrap.style.display = 'block';
     }
     document.getElementById('colorwaysSection').style.display = hc ? 'block' : 'none';
     if (hc && !document.querySelector('#colorwaysBox .cw-row')) {
         addColorwayRow();
     }
     orangeApplySizeFamilySchemeFilter();
+    const hs = orangeProductEffectiveHasSizes();
+    const sgScope = document.getElementById('sizing_guide_scope');
+    if (sgScope) {
+        if (!hs) {
+            sgScope.value = 'none';
+            sgScope.disabled = true;
+        } else {
+            sgScope.disabled = false;
+        }
+    }
+    const cwh = document.getElementById('colorways_sizes_hint');
+    if (cwh) {
+        cwh.style.display = hs && hc ? 'block' : 'none';
+    }
     if (hs && hc) {
         orangeRefreshAllColorwaySizePickers();
     }
@@ -2006,13 +2003,13 @@ function orangeFillColorwayRowSizes(rowEl) {
     if (!mount) {
         return;
     }
-    const hs = document.getElementById('has_sizes') && document.getElementById('has_sizes').value === '1';
+    const hs = orangeProductEffectiveHasSizes();
     if (!hs) {
         mount.innerHTML = '';
         return;
     }
     const famSel = document.getElementById('size_family_id');
-    const famId = famSel && !famSel.disabled ? (parseInt(famSel.value, 10) || 0) : 0;
+    const famId = famSel ? (parseInt(famSel.value, 10) || 0) : 0;
     if (!famId) {
         mount.innerHTML = '<p class="card-hint" style="margin:0;">اختر <strong>عائلة المقاسات</strong> من تبويب البيانات الأساسية أولاً.</p>';
         return;
@@ -2048,7 +2045,7 @@ function orangeFillColorwayRowSizes(rowEl) {
 }
 
 function orangeRefreshAllColorwaySizePickers() {
-    const hs = document.getElementById('has_sizes') && document.getElementById('has_sizes').value === '1';
+    const hs = orangeProductEffectiveHasSizes();
     const hc = document.getElementById('has_colors') && document.getElementById('has_colors').value === '1';
     if (!hs || !hc) {
         return;
@@ -2059,7 +2056,7 @@ function orangeRefreshAllColorwaySizePickers() {
 }
 
 function orangeApplyColorwaySizesFromVariantMatrix(vm) {
-    const hs = document.getElementById('has_sizes') && document.getElementById('has_sizes').value === '1';
+    const hs = orangeProductEffectiveHasSizes();
     const hc = document.getElementById('has_colors') && document.getElementById('has_colors').value === '1';
     if (!hs || !hc) {
         return;
@@ -2275,7 +2272,7 @@ function orangeRefreshSizePickPanel() {
     if (!panel || !mount) {
         return;
     }
-    const hs = document.getElementById('has_sizes') && document.getElementById('has_sizes').value === '1';
+    const hs = orangeProductEffectiveHasSizes();
     const hc = document.getElementById('has_colors') && document.getElementById('has_colors').value === '1';
     if (hs && hc) {
         panel.style.display = 'none';
@@ -2286,8 +2283,7 @@ function orangeRefreshSizePickPanel() {
         return;
     }
     const famSel = document.getElementById('size_family_id');
-    const famDisabled = famSel && famSel.disabled;
-    const famId = famSel && !famDisabled ? (parseInt(famSel.value, 10) || 0) : 0;
+    const famId = famSel ? (parseInt(famSel.value, 10) || 0) : 0;
     if (!hs || !famId) {
         panel.style.display = 'none';
         mount.innerHTML = '';
@@ -2334,7 +2330,7 @@ function orangeRefreshSizePickPanel() {
 }
 
 function orangeApplySizePickFromVariantMatrix(vm) {
-    const hs = document.getElementById('has_sizes') && document.getElementById('has_sizes').value === '1';
+    const hs = orangeProductEffectiveHasSizes();
     const hc = document.getElementById('has_colors') && document.getElementById('has_colors').value === '1';
     if (!hs) {
         return;
@@ -2387,7 +2383,7 @@ function orangeGetPickedSizesForVariantGen(famId, allSizes) {
 
 function generateVariants() {
     const hasC = document.getElementById('has_colors').value === '1';
-    const hasS = document.getElementById('has_sizes').value === '1';
+    const hasS = orangeProductEffectiveHasSizes();
     const famId = parseInt(document.getElementById('size_family_id').value, 10) || 0;
     const box = document.getElementById('variantsBox');
 
@@ -2560,10 +2556,10 @@ async function saveProduct() {
         return;
     }
 
-    const hsCheck = parseInt(document.getElementById('has_sizes').value || '0', 10) === 1;
+    const hsCheck = orangeProductEffectiveHasSizes();
     if (hsCheck) {
         const sfam = document.getElementById('size_family_id');
-        const sfamId = sfam && !sfam.disabled ? (parseInt(sfam.value || '0', 10) || 0) : 0;
+        const sfamId = sfam ? (parseInt(sfam.value || '0', 10) || 0) : 0;
         if (sfamId <= 0) {
             productFormShowTab('basic');
             alert('اختر عائلة مقاسات من البيانات الأساسية.');
@@ -2631,7 +2627,7 @@ async function saveProduct() {
             price: parseFloat(document.getElementById('price').value || '0'),
             cost: parseFloat(document.getElementById('cost').value || '0'),
             main_image: document.getElementById('main_image').value.trim() || (window.PRODUCT_EXTRA_IMAGES && window.PRODUCT_EXTRA_IMAGES[0] ? window.PRODUCT_EXTRA_IMAGES[0] : ''),
-            has_sizes: parseInt(document.getElementById('has_sizes').value, 10),
+            has_sizes: orangeProductEffectiveHasSizes() ? 1 : 0,
             has_colors: parseInt(document.getElementById('has_colors').value, 10),
             size_family_id: parseInt(document.getElementById('size_family_id').value, 10) || 0,
             sizing_guide_scope: document.getElementById('sizing_guide_scope').value,
@@ -2647,7 +2643,7 @@ async function saveProduct() {
         }
         payload.extra_images = window.PRODUCT_EXTRA_IMAGES || [];
         payload.catalog_attribute_values = orangeCollectCatalogAttributePayload();
-        const hsUp = parseInt(document.getElementById('has_sizes').value, 10) === 1;
+        const hsUp = orangeProductEffectiveHasSizes();
         const hcUp = parseInt(document.getElementById('has_colors').value, 10) === 1;
         const varRowsUp = Array.from(document.querySelectorAll('#variantsBox tbody tr'));
         if ((hsUp || hcUp) && !varRowsUp.length) {
@@ -2725,7 +2721,7 @@ async function saveProduct() {
         price: parseFloat(document.getElementById('price').value || '0'),
         cost: parseFloat(document.getElementById('cost').value || '0'),
         main_image: document.getElementById('main_image').value.trim() || (window.PRODUCT_EXTRA_IMAGES && window.PRODUCT_EXTRA_IMAGES[0] ? window.PRODUCT_EXTRA_IMAGES[0] : ''),
-        has_sizes: parseInt(document.getElementById('has_sizes').value, 10),
+        has_sizes: orangeProductEffectiveHasSizes() ? 1 : 0,
         has_colors: parseInt(document.getElementById('has_colors').value, 10),
         size_family_id: parseInt(document.getElementById('size_family_id').value, 10) || 0,
         sizing_guide_scope: document.getElementById('sizing_guide_scope').value,
@@ -2825,7 +2821,7 @@ if (orangeProductTypeSelectEl) {
             orangeApplyProductTypeDepartmentFilter(true);
         }
         orangeSyncLegacyFieldsFromProductType();
-        orangeApplySizeFamilySchemeFilter();
+        onHasFlagsChange();
         if (window.ORANGE_CATALOG_NAV_UNIFIED) {
             updateProductCatalogHint();
         }
@@ -2834,8 +2830,7 @@ if (orangeProductTypeSelectEl) {
 const orangeSizeFamilySelectEl = document.getElementById('size_family_id');
 if (orangeSizeFamilySelectEl) {
     orangeSizeFamilySelectEl.addEventListener('change', function () {
-        orangeRefreshSizePickPanel();
-        orangeRefreshAllColorwaySizePickers();
+        onHasFlagsChange();
     });
 }
 const orangeColorwaysBoxEl = document.getElementById('colorwaysBox');

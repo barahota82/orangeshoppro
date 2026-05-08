@@ -61,22 +61,21 @@ try {
         json_response(['success' => false, 'message' => orange_arabic_duplicate_blocked_message()], 409);
     }
 
-    $hasSizes = (int)($data['has_sizes'] ?? 0) === 1;
     $hasColors = (int)($data['has_colors'] ?? 0) === 1;
 
     $sizeFamilyId = isset($data['size_family_id']) ? (int)$data['size_family_id'] : 0;
     if ($sizeFamilyId <= 0) {
         $sizeFamilyId = null;
     }
+    $hasSizes = $sizeFamilyId !== null && $sizeFamilyId > 0;
 
     $scope = trim((string)($data['sizing_guide_scope'] ?? 'none'));
     $allowedScopes = ['none', 'upper', 'lower', 'both'];
     if (!in_array($scope, $allowedScopes, true)) {
         $scope = 'none';
     }
-
-    if ($hasSizes && $sizeFamilyId === null) {
-        json_response(['success' => false, 'message' => 'يجب اختيار عائلة مقاسات عند تفعيل المقاسات'], 422);
+    if (!$hasSizes) {
+        $scope = 'none';
     }
 
     $schemeErr = orange_catalog_validate_size_family_matches_product_type(
