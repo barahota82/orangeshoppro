@@ -153,6 +153,40 @@ if ($catalogAttributesActive !== [] && orange_table_exists($pdo, 'catalog_attrib
     }
 }
 
+$catalogAttrDefsForJs = [];
+foreach ($catalogAttributesActive as $caRow) {
+    if (! is_array($caRow)) {
+        continue;
+    }
+    $caid = (int) ($caRow['id'] ?? 0);
+    if ($caid <= 0) {
+        continue;
+    }
+    $label = trim((string) (($caRow['label_ar'] ?: $caRow['label_en']) ?: ($caRow['attribute_key'] ?? '')));
+    $optOut = [];
+    foreach ($catalogAttrOptionsByAttrId[$caid] ?? [] as $opt) {
+        if (! is_array($opt)) {
+            continue;
+        }
+        $optAr = trim((string) ($opt['label_ar'] ?? ''));
+        if ($optAr === '') {
+            continue;
+        }
+        $optEn = trim((string) ($opt['label_en'] ?? ''));
+        $optOut[] = [
+            'v' => $optAr,
+            'd' => $optAr . ($optEn !== '' ? ' / ' . $optEn : ''),
+        ];
+    }
+    $catalogAttrDefsForJs[] = [
+        'id' => $caid,
+        'label' => $label !== '' ? $label : ('#' . $caid),
+        'key' => (string) ($caRow['attribute_key'] ?? ''),
+        'inputKind' => (string) ($caRow['input_kind'] ?? 'text_short'),
+        'options' => $optOut,
+    ];
+}
+
 $hasDepartmentsTable = false;
 $hasCategoryDepartment = false;
 $departmentsForProducts = [];
@@ -538,49 +572,9 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
         <div class="form-grid product-form-tab-basic-grid">
         <?php if ($catalogAttributesActive !== []): ?>
         <div style="grid-column:1/-1;">
-            <?php foreach ($catalogAttributesActive as $cattr): ?>
-                <?php
-                $caid = (int) $cattr['id'];
-                $clabel = htmlspecialchars(
-                    (string) (($cattr['label_ar'] ?: $cattr['label_en']) ?: ($cattr['attribute_key'] ?? '')),
-                    ENT_QUOTES,
-                    'UTF-8'
-                );
-                $ckey = htmlspecialchars((string) ($cattr['attribute_key'] ?? ''), ENT_QUOTES, 'UTF-8');
-                $inputKind = (string) ($cattr['input_kind'] ?? 'text_short');
-                $pavOpts = $catalogAttrOptionsByAttrId[$caid] ?? [];
-                ?>
-                <div class="orange-product-pav-row" style="margin-bottom:10px;">
-                    <label style="display:block;margin-bottom:4px;font-weight:500;"><?php echo $clabel; ?> <small style="color:#94a3b8;font-weight:400;"><?php echo $ckey; ?></small></label>
-                    <?php if ($pavOpts !== []): ?>
-                    <select class="orange-pav-input admin-sort-field" data-catalog-attribute-id="<?php echo $caid; ?>" style="width:100%;max-width:520px;">
-                        <option value="">— بدون —</option>
-                        <?php foreach ($pavOpts as $opt): ?>
-                            <?php
-                            if (! is_array($opt)) {
-                                continue;
-                            }
-                            $optAr = trim((string) ($opt['label_ar'] ?? ''));
-                            if ($optAr === '') {
-                                continue;
-                            }
-                            $optEn = trim((string) ($opt['label_en'] ?? ''));
-                            $optDisp = $optAr . ($optEn !== '' ? ' / ' . $optEn : '');
-                            ?>
-                        <option value="<?php echo htmlspecialchars($optAr, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($optDisp, ENT_QUOTES, 'UTF-8'); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <?php elseif ($inputKind === 'boolean'): ?>
-                    <select class="orange-pav-input admin-sort-field" data-catalog-attribute-id="<?php echo $caid; ?>" style="width:100%;max-width:520px;">
-                        <option value="">— بدون —</option>
-                        <option value="نعم">نعم</option>
-                        <option value="لا">لا</option>
-                    </select>
-                    <?php else: ?>
-                    <input type="text" class="orange-pav-input" data-catalog-attribute-id="<?php echo $caid; ?>" maxlength="767" dir="auto" autocomplete="off" placeholder="" style="width:100%;max-width:520px;">
-                    <?php endif; ?>
-                </div>
-            <?php endforeach; ?>
+            <p style="margin:0 0 10px;font-size:13px;color:#64748b;">لكل سطر: اختر نوع السمة ثم القيمة. استخدم «إضافة سمة أخرى» لصف إضافي.</p>
+            <div id="orangeCatalogAttrRows"></div>
+            <button type="button" class="btn-secondary" id="orangeCatalogAttrAddRowBtn" style="margin-top:6px;">إضافة سمة أخرى</button>
         </div>
         <?php else: ?>
         <div style="grid-column:1/-1;">
@@ -756,6 +750,7 @@ window.ORANGE_CATALOG_NAV_UNIFIED = <?php echo $catalogNavUnified ? 'true' : 'fa
 window.ORANGE_PRODUCT_TYPE_TRAIL = <?php echo json_encode($productTypeTrailsForJs, JSON_UNESCAPED_UNICODE); ?>;
 window.PRODUCT_EXTRA_IMAGES = [];
 window.PRODUCT_NEXT_SORT = <?php echo (int)$nextProductSort; ?>;
+window.ORANGE_CATALOG_ATTR_DEFS = <?php echo json_encode($catalogAttrDefsForJs, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
 
 const PRODUCT_MSG = {
     E_REORDER: 'بيانات الترتيب غير صحيحة',
@@ -950,45 +945,293 @@ function orangeApplySizeFamilySchemeFilter() {
     }
 }
 
+function orangeCatalogAttrDefs() {
+    return Array.isArray(window.ORANGE_CATALOG_ATTR_DEFS) ? window.ORANGE_CATALOG_ATTR_DEFS : [];
+}
+
+function orangeCatalogAttrFindDef(attrId) {
+    const want = String(parseInt(String(attrId || '0'), 10) || 0);
+    if (want === '0') {
+        return null;
+    }
+    const defs = orangeCatalogAttrDefs();
+    for (let i = 0; i < defs.length; i++) {
+        if (String(defs[i].id) === want) {
+            return defs[i];
+        }
+    }
+    return null;
+}
+
+function orangeCatalogAttrClearAllRows() {
+    const mount = document.getElementById('orangeCatalogAttrRows');
+    if (mount) {
+        mount.innerHTML = '';
+    }
+}
+
+function orangeCatalogAttrUpdateRemoveButtons() {
+    const mount = document.getElementById('orangeCatalogAttrRows');
+    if (!mount) {
+        return;
+    }
+    const rows = mount.querySelectorAll('.orange-pav-dynamic-row');
+    const n = rows.length;
+    rows.forEach(function (r) {
+        const btn = r.querySelector('.orange-pav-row-remove');
+        if (btn) {
+            btn.disabled = n <= 1;
+        }
+    });
+}
+
+function orangeCatalogAttrBuildTypeSelect(selectedAttrId) {
+    const sel = document.createElement('select');
+    sel.className = 'orange-pav-type-select admin-sort-field';
+    sel.style.width = '100%';
+    sel.style.maxWidth = '360px';
+    const ph = document.createElement('option');
+    ph.value = '';
+    ph.textContent = '— نوع السمة —';
+    sel.appendChild(ph);
+    orangeCatalogAttrDefs().forEach(function (def) {
+        const o = document.createElement('option');
+        o.value = String(def.id);
+        const k = def.key ? String(def.key) : '';
+        o.textContent = (def.label || k || '#' + def.id) + (k ? ' (' + k + ')' : '');
+        sel.appendChild(o);
+    });
+    const sid = parseInt(String(selectedAttrId || '0'), 10) || 0;
+    if (sid > 0) {
+        sel.value = String(sid);
+    }
+    return sel;
+}
+
+function orangeCatalogAttrFillValueWrap(row, attrId, presetVal) {
+    const wrap = row.querySelector('.orange-pav-value-wrap');
+    if (!wrap) {
+        return;
+    }
+    wrap.innerHTML = '';
+    const labelVal = document.createElement('label');
+    labelVal.textContent = 'القيمة';
+    labelVal.style.display = 'block';
+    labelVal.style.marginBottom = '4px';
+    labelVal.style.fontWeight = '500';
+    wrap.appendChild(labelVal);
+    const aid = parseInt(String(attrId || '0'), 10) || 0;
+    const preset = presetVal != null ? String(presetVal) : '';
+    if (aid <= 0) {
+        const dis = document.createElement('input');
+        dis.type = 'text';
+        dis.disabled = true;
+        dis.className = 'orange-pav-value-input';
+        dis.placeholder = 'اختر نوع السمة أولاً';
+        dis.style.width = '100%';
+        dis.style.maxWidth = '520px';
+        wrap.appendChild(dis);
+        return;
+    }
+    const def = orangeCatalogAttrFindDef(aid);
+    if (!def) {
+        const dis = document.createElement('input');
+        dis.type = 'text';
+        dis.disabled = true;
+        dis.className = 'orange-pav-value-input';
+        dis.value = preset;
+        wrap.appendChild(dis);
+        return;
+    }
+    const opts = def.options && Array.isArray(def.options) ? def.options : [];
+    if (opts.length) {
+        const s = document.createElement('select');
+        s.className = 'orange-pav-value-input admin-sort-field';
+        s.style.width = '100%';
+        s.style.maxWidth = '520px';
+        const o0 = document.createElement('option');
+        o0.value = '';
+        o0.textContent = '— بدون —';
+        s.appendChild(o0);
+        opts.forEach(function (op) {
+            const o = document.createElement('option');
+            o.value = String(op.v || '');
+            o.textContent = String(op.d || op.v || '');
+            s.appendChild(o);
+        });
+        wrap.appendChild(s);
+        if (preset !== '') {
+            s.value = preset;
+            if (s.value !== preset) {
+                s.value = '';
+            }
+        }
+        return;
+    }
+    if (def.inputKind === 'boolean') {
+        const s = document.createElement('select');
+        s.className = 'orange-pav-value-input admin-sort-field';
+        s.style.width = '100%';
+        s.style.maxWidth = '520px';
+        const o0 = document.createElement('option');
+        o0.value = '';
+        o0.textContent = '— بدون —';
+        s.appendChild(o0);
+        ['نعم', 'لا'].forEach(function (t) {
+            const o = document.createElement('option');
+            o.value = t;
+            o.textContent = t;
+            s.appendChild(o);
+        });
+        wrap.appendChild(s);
+        if (preset !== '') {
+            s.value = preset;
+        }
+        return;
+    }
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'orange-pav-value-input';
+    inp.maxLength = 767;
+    inp.dir = 'auto';
+    inp.autocomplete = 'off';
+    inp.style.width = '100%';
+    inp.style.maxWidth = '520px';
+    inp.value = preset;
+    wrap.appendChild(inp);
+}
+
+function orangeCatalogAttrAppendRow(selectedAttrId, presetVal) {
+    const mount = document.getElementById('orangeCatalogAttrRows');
+    if (!mount) {
+        return;
+    }
+    const row = document.createElement('div');
+    row.className = 'orange-pav-dynamic-row';
+    row.style.display = 'flex';
+    row.style.gap = '12px';
+    row.style.alignItems = 'flex-end';
+    row.style.flexWrap = 'wrap';
+    row.style.marginBottom = '12px';
+    const col1 = document.createElement('div');
+    col1.style.flex = '1';
+    col1.style.minWidth = '180px';
+    const lbl1 = document.createElement('label');
+    lbl1.textContent = 'نوع السمة';
+    lbl1.style.display = 'block';
+    lbl1.style.marginBottom = '4px';
+    lbl1.style.fontWeight = '500';
+    const typeSel = orangeCatalogAttrBuildTypeSelect(selectedAttrId);
+    col1.appendChild(lbl1);
+    col1.appendChild(typeSel);
+    const col2 = document.createElement('div');
+    col2.className = 'orange-pav-value-wrap';
+    col2.style.flex = '1.2';
+    col2.style.minWidth = '200px';
+    const btnRm = document.createElement('button');
+    btnRm.type = 'button';
+    btnRm.className = 'btn-secondary orange-pav-row-remove';
+    btnRm.textContent = 'حذف السطر';
+    btnRm.addEventListener('click', function () {
+        orangeCatalogAttrRemoveRow(row);
+    });
+    row.appendChild(col1);
+    row.appendChild(col2);
+    row.appendChild(btnRm);
+    mount.appendChild(row);
+    const aid = parseInt(String(selectedAttrId || '0'), 10) || 0;
+    orangeCatalogAttrFillValueWrap(row, aid, presetVal);
+    typeSel.addEventListener('change', function () {
+        const id = parseInt(typeSel.value || '0', 10) || 0;
+        orangeCatalogAttrFillValueWrap(row, id, '');
+    });
+    orangeCatalogAttrUpdateRemoveButtons();
+}
+
+function orangeCatalogAttrRemoveRow(row) {
+    const mount = document.getElementById('orangeCatalogAttrRows');
+    if (!mount || !row) {
+        return;
+    }
+    row.remove();
+    if (!mount.querySelector('.orange-pav-dynamic-row')) {
+        orangeCatalogAttrAppendRow(0, '');
+    }
+    orangeCatalogAttrUpdateRemoveButtons();
+}
+
+function orangeCatalogAttrAddEmptyRow() {
+    if (!orangeCatalogAttrDefs().length) {
+        return;
+    }
+    orangeCatalogAttrAppendRow(0, '');
+}
+
 function orangeCollectCatalogAttributePayload() {
-    const out = [];
-    document.querySelectorAll('.orange-pav-input').forEach(function (inp) {
-        const id = parseInt(inp.getAttribute('data-catalog-attribute-id') || '0', 10) || 0;
+    const mount = document.getElementById('orangeCatalogAttrRows');
+    if (!mount) {
+        return [];
+    }
+    const byId = new Map();
+    mount.querySelectorAll('.orange-pav-dynamic-row').forEach(function (row) {
+        const typeSel = row.querySelector('.orange-pav-type-select');
+        const id = parseInt(typeSel && typeSel.value ? typeSel.value : '0', 10) || 0;
         if (id <= 0) {
+            return;
+        }
+        const inp = row.querySelector('.orange-pav-value-input');
+        if (!inp || inp.disabled) {
             return;
         }
         const v = String(inp.value || '').trim();
         if (v === '') {
             return;
         }
+        byId.set(id, v);
+    });
+    const out = [];
+    byId.forEach(function (v, id) {
         out.push({ catalog_attribute_id: id, value_raw: v });
     });
     return out;
 }
 
 function orangeClearCatalogAttributeInputs() {
-    document.querySelectorAll('.orange-pav-input').forEach(function (inp) {
-        inp.value = '';
-    });
+    orangeCatalogAttrClearAllRows();
+    if (orangeCatalogAttrDefs().length) {
+        orangeCatalogAttrAppendRow(0, '');
+    }
 }
 
 function orangeApplyCatalogAttributeValuesFromProduct(p) {
-    orangeClearCatalogAttributeInputs();
+    orangeCatalogAttrClearAllRows();
+    if (!orangeCatalogAttrDefs().length) {
+        return;
+    }
     const pavs = p && Array.isArray(p.catalog_attribute_values) ? p.catalog_attribute_values : [];
-    const byId = {};
+    const rows = [];
     pavs.forEach(function (row) {
         const id = parseInt(String(row.catalog_attribute_id || '0'), 10) || 0;
         if (id <= 0) {
             return;
         }
-        byId[id] = row.value_raw != null ? String(row.value_raw) : '';
-    });
-    document.querySelectorAll('.orange-pav-input').forEach(function (inp) {
-        const id = parseInt(inp.getAttribute('data-catalog-attribute-id') || '0', 10) || 0;
-        if (id > 0 && Object.prototype.hasOwnProperty.call(byId, id)) {
-            inp.value = byId[id];
+        const val = row.value_raw != null ? String(row.value_raw) : '';
+        if (String(val).trim() === '') {
+            return;
         }
+        if (!orangeCatalogAttrFindDef(id)) {
+            return;
+        }
+        rows.push({ id: id, val: val });
     });
+    if (rows.length === 0) {
+        orangeCatalogAttrAppendRow(0, '');
+        return;
+    }
+    rows.forEach(function (r) {
+        orangeCatalogAttrAppendRow(r.id, r.val);
+    });
+    orangeCatalogAttrAppendRow(0, '');
 }
 
 function adminEscAttr(s) {
