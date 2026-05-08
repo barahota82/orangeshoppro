@@ -2042,9 +2042,9 @@ function applyVariantStocksFromVm(vm) {
     });
     document.querySelectorAll('#variantsBox tbody tr').forEach((tr) => {
         const k = adminVariantTrStockKey(tr);
-        const inp = tr.querySelector('.v-stock');
-        if (inp && Object.prototype.hasOwnProperty.call(map, k)) {
-            inp.value = String(map[k]);
+        const disp = tr.querySelector('.v-stock-display');
+        if (disp && Object.prototype.hasOwnProperty.call(map, k)) {
+            disp.textContent = String(map[k]);
         }
     });
 }
@@ -2233,9 +2233,9 @@ function generateVariants() {
     }
 
     const thumbCell = adminVariantReferenceThumbHtml();
-    let html = '<p class="admin-variants-lead">كل صف يمثل <strong>نفس الصنف</strong> مع دمج لون ونمط اختياري × مقاس. عمود «صورة المرجع» يعكس الصورة الرئيسية الحالية (من تبويب الصور).</p>';
+    let html = '<p class="admin-variants-lead">كل صف يمثل <strong>نفس الصنف</strong> مع دمج لون ونمط اختياري × مقاس. عمود «صورة المرجع» يعكس الصورة الرئيسية الحالية (من تبويب الصور). <strong>الكميات:</strong> لا تُدخل من هنا — بعد الحفظ عالج المخزون من <a href="' + adminPublicPath('/admin/index.php?page=stock') + '">شاشة المخزون</a> (رصيد افتتاحي أو تعديل) أو من <a href="' + adminPublicPath('/admin/index.php?page=purchases') + '">استلام فاتورة شراء</a>.</p>';
     html += '<div class="table-wrap admin-table-wrap-elevated"><table class="admin-table admin-variants-matrix"><thead><tr>';
-    html += '<th class="col-ref-img">صورة المرجع</th><th>اللون</th><th>المقاس</th><th class="col-stock">مخزون أولي</th>';
+    html += '<th class="col-ref-img">صورة المرجع</th><th>اللون</th><th>المقاس</th><th class="col-stock">المخزون الحالي (عرض)</th>';
     html += '</tr></thead><tbody>';
     combos.forEach((c, idx) => {
         const sz = sizes.find(x => String(x.id) === String(c.size_family_size_id));
@@ -2262,7 +2262,7 @@ function generateVariants() {
             <td class="td-ref-img">${thumbCell}</td>
             <td>${colorCell}</td>
             <td><span class="admin-variant-size-pill">${szLabel}</span><input type="hidden" class="v-zid" value="${c.size_family_size_id}"></td>
-            <td class="td-stock"><input type="number" class="v-stock admin-inp-qty admin-input-narrow" min="0" step="1" value="0" inputmode="numeric" lang="en" dir="ltr" data-idx="${idx}"></td>
+            <td class="td-stock"><span class="v-stock-display admin-variant-stock-readonly" data-idx="${idx}">0</span><input type="hidden" class="v-stock" value="0" tabindex="-1" autocomplete="off"></td>
         </tr>`;
     });
     html += '</tbody></table></div>';

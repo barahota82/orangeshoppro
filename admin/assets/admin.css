@@ -2209,6 +2209,12 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     color: #334155;
 }
 
+.admin-variant-stock-readonly {
+    color: #64748b;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
 .admin-product-subsection-title {
     margin: 0 0 12px;
     padding-bottom: 8px;

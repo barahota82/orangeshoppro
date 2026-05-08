@@ -99,6 +99,9 @@ function orange_product_variant_cw_row_key(array $variant, bool $hasColors): str
 }
 
 /**
+ * يزامن تعريف المتغيرات (لون/مقاس/تسميات) مع الجدول دون تغيير الكميات من الواجهة:
+ * صف موجود يُحافظ على stock_quantity كما في قاعدة البيانات؛ صف جديد يُنشأ بكمية 0.
+ *
  * @param array<int,array<string,mixed>> $variantsIn
  */
 function orange_product_sync_variants_matrix(
@@ -139,13 +142,6 @@ function orange_product_sync_variants_matrix(
             product_id, product_colorway_id, size_family_size_id, size, color, stock_quantity
         ) VALUES (?,?,?,?,?,?)'
     );
-    $movInitial = $pdo->prepare(
-        "INSERT INTO stock_movements (
-            product_id, variant_id, type, qty, old_stock, new_stock, reason, created_at
-        ) VALUES (
-            ?, ?, 'initial_stock', ?, 0, ?, 'Initial stock', NOW()
-        )"
-    );
     $movAdj = $pdo->prepare(
         "INSERT INTO stock_movements (
             product_id, variant_id, type, qty, old_stock, new_stock, reason, created_at
@@ -173,7 +169,7 @@ function orange_product_sync_variants_matrix(
         $spN = $hasColors && $sp > 0 ? $sp : null;
 
         $szId = isset($variant['size_family_size_id']) ? (int) $variant['size_family_size_id'] : 0;
-        $stock = max(0, (int) ($variant['stock_quantity'] ?? 0));
+        /* سياسة المخزون: لا تُحدَّث الكميات من نموذج المنتج — فقط من شاشة المخزون (رصيد افتتاحي/تعديل) أو استلام المشتريات. */
         $sizeFamilySizeId = $hasSizes && $szId > 0 ? $szId : null;
 
         $sizeRow = null;
@@ -203,25 +199,10 @@ function orange_product_sync_variants_matrix(
         if ($rowMatch !== null) {
             $vid = (int) $rowMatch['id'];
             $oldStock = (int) $rowMatch['stock_quantity'];
-            $updVar->execute([$cwId, $sizeFamilySizeId, $szLabel, $colorLabel, $stock, $vid]);
-            $delta = $stock - $oldStock;
-            if ($delta !== 0) {
-                $movAdj->execute([
-                    $productId,
-                    $vid,
-                    $delta,
-                    $oldStock,
-                    $stock,
-                    'تهيئة المتغيرات من تعديل المنتج في الأدمن',
-                ]);
-            }
+            $updVar->execute([$cwId, $sizeFamilySizeId, $szLabel, $colorLabel, $oldStock, $vid]);
             unset($indexed[(string) $fpNew]);
         } else {
-            $insVar->execute([$productId, $cwId, $sizeFamilySizeId, $szLabel, $colorLabel, $stock]);
-            $newId = (int) $pdo->lastInsertId();
-            if ($stock > 0) {
-                $movInitial->execute([$productId, $newId, $stock, $stock]);
-            }
+            $insVar->execute([$productId, $cwId, $sizeFamilySizeId, $szLabel, $colorLabel, 0]);
         }
     }
 

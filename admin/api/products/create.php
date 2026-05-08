@@ -100,7 +100,7 @@ try {
 
     $variantsIn = $data['variants'] ?? null;
     if (!is_array($variantsIn) || count($variantsIn) === 0) {
-        json_response(['success' => false, 'message' => 'يجب توليد صفوف المتغيرات والمخزون'], 422);
+        json_response(['success' => false, 'message' => 'يجب توليد صفوف المتغيرات'], 422);
     }
 
     if ($hasColors) {
@@ -260,13 +260,6 @@ try {
             product_id, product_colorway_id, size_family_size_id, size, color, stock_quantity
         ) VALUES (?,?,?,?,?,?)'
     );
-    $moveStmt = $pdo->prepare(
-        "INSERT INTO stock_movements (
-            product_id, variant_id, type, qty, old_stock, new_stock, reason, created_at
-        ) VALUES (
-            ?, ?, 'initial_stock', ?, 0, ?, 'Initial stock', NOW()
-        )"
-    );
 
     foreach ($variantsIn as $variant) {
         $p = isset($variant['primary_color_id']) ? (int) $variant['primary_color_id'] : 0;
@@ -274,7 +267,8 @@ try {
         $pp = isset($variant['primary_pattern_id']) ? (int) $variant['primary_pattern_id'] : 0;
         $sp = isset($variant['secondary_pattern_id']) ? (int) $variant['secondary_pattern_id'] : 0;
         $szId = isset($variant['size_family_size_id']) ? (int) $variant['size_family_size_id'] : 0;
-        $stock = (int)($variant['stock_quantity'] ?? 0);
+        /* الكمية تُضبط من شاشة المخزون أو استلام المشتريات — لا من نموذج المنتج */
+        $stock = 0;
 
         if (!$hasColors) {
             $cwKey = '-';
@@ -323,9 +317,6 @@ try {
             $colorLabel,
             $stock,
         ]);
-
-        $variantId = (int)$pdo->lastInsertId();
-        $moveStmt->execute([$productId, $variantId, $stock, $stock]);
     }
 
     $extraImages = $data['extra_images'] ?? null;
