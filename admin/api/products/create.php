@@ -351,6 +351,14 @@ try {
         orange_catalog_save_product_attribute_values($pdo, $productId, $data['catalog_attribute_values']);
     }
 
+    $barcodeFinal = null;
+    try {
+        $bcRes = orange_catalog_refresh_product_barcodes($pdo, $productId);
+        $barcodeFinal = $bcRes['product_barcode'] ?? null;
+    } catch (Throwable $e) {
+        $barcodeFinal = null;
+    }
+
     $pdo->commit();
 
     json_response([
@@ -358,6 +366,7 @@ try {
         'message' => 'تم حفظ المنتج بنجاح',
         'product_id' => $productId,
         'item_code' => $itemCodeFinal,
+        'barcode' => $barcodeFinal,
     ]);
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {

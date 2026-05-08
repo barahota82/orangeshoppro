@@ -379,11 +379,16 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         <small style="display:block;color:#666;margin-top:4px;">مرجع: <code id="product_dept_cat_ref" style="font-size:13px;">—</code></small>
                     </div>
                 </div>
-                <div class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
+                <div class="form-grid-3 product-form-basic-top3-inner" style="margin-top:12px;">
                     <div>
                         <label for="product_item_code">كود الصنف (تلقائي من الشجرة)</label>
                         <input type="text" id="product_item_code" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="يُولَّد عند الحفظ" readonly>
                         <small style="display:block;color:#666;margin-top:4px;">يُبنى من سلسلة القسم والكتالوج حتى نوع المنتج، ثم ‎-P‎{رقم المنتج} — لا يُعدَّل يدوياً.</small>
+                    </div>
+                    <div>
+                        <label for="product_barcode">الباركود (تلقائي — بصمة المنتج)</label>
+                        <input type="text" id="product_barcode" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="يُولَّد بعد الحفظ" readonly>
+                        <small style="display:block;color:#666;margin-top:4px;">SHA-256 (64 hex) من: كود الصنف، القسم، النوع، الاسم، السمات، وجميع المتغيرات (مقاس/لون). ليس EAN-13؛ للمسح الداخلي أو ربط الأنظمة.</small>
                     </div>
                     <div>
                         <label>حالة العرض</label>
@@ -457,10 +462,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
             <div>
                 <label>التكلفة</label>
                 <input type="number" id="cost" class="admin-inp-money" step="any" min="0" required inputmode="decimal" lang="en" dir="ltr">
-            </div>
-            <div>
-                <label for="product_barcode">الباركود (اختياري)</label>
-                <input type="text" id="product_barcode" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="EAN / UPC">
             </div>
         </div>
         </div>

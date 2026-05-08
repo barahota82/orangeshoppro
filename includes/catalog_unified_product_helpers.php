@@ -135,6 +135,189 @@ function orange_catalog_generate_product_item_code_from_tree(PDO $pdo, int $prod
 }
 
 /**
+ * يحدّث باركود المنتج وباركود كل متغير من بصمة SHA-256 (64 hex) لمحتوى كانوني
+ * يشمل: كود الصنف، نوع المنتج، القسم، الاسم العربي، السمات، وكل المتغيرات (مقاس ولون/colorway).
+ * لا يُقصد بهذا توليد EAN-13 قياسي؛ الحقل الداخلي varchar(64) يستوعب البصمة فقط.
+ *
+ * @return array{product_barcode:?string, variant_updates:int}
+ */
+function orange_catalog_refresh_product_barcodes(PDO $pdo, int $productId): array
+{
+    $out = ['product_barcode' => null, 'variant_updates' => 0];
+    if ($productId <= 0 || ! orange_table_exists($pdo, 'products')) {
+        return $out;
+    }
+    if (! orange_table_has_column($pdo, 'products', 'barcode')) {
+        return $out;
+    }
+
+    $joinDept = '';
+    if (
+        orange_table_exists($pdo, 'product_types')
+        && orange_table_has_column($pdo, 'products', 'product_type_id')
+        && orange_table_exists($pdo, 'catalog_subcategories')
+        && orange_table_exists($pdo, 'catalog_categories')
+        && orange_table_exists($pdo, 'catalog_sections')
+        && orange_table_exists($pdo, 'departments')
+    ) {
+        $joinDept = '
+            LEFT JOIN product_types orange_bc_pt ON orange_bc_pt.id = p.product_type_id
+            LEFT JOIN catalog_subcategories orange_bc_csub ON orange_bc_csub.id = orange_bc_pt.catalog_subcategory_id
+            LEFT JOIN catalog_categories orange_bc_cc ON orange_bc_cc.id = orange_bc_csub.catalog_category_id
+            LEFT JOIN catalog_sections orange_bc_cs ON orange_bc_cs.id = orange_bc_cc.catalog_section_id
+            LEFT JOIN departments orange_bc_d ON orange_bc_d.id = orange_bc_cs.department_id';
+    }
+
+    try {
+        if ($joinDept === '') {
+            $st = $pdo->prepare(
+                'SELECT p.id, p.name, p.item_code, p.product_type_id, p.has_sizes, p.has_colors, 0 AS dept_id
+                 FROM products p WHERE p.id = ? LIMIT 1'
+            );
+        } else {
+            $st = $pdo->prepare(
+                'SELECT p.id, p.name, p.item_code, p.product_type_id, p.has_sizes, p.has_colors,
+                        COALESCE(orange_bc_d.id, 0) AS dept_id
+                 FROM products p'
+                . $joinDept . '
+                 WHERE p.id = ?
+                 LIMIT 1'
+            );
+        }
+        $st->execute([$productId]);
+        $prow = $st->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        return $out;
+    }
+    if (! is_array($prow)) {
+        return $out;
+    }
+
+    $pid = (int) ($prow['id'] ?? 0);
+    $itemCode = trim((string) ($prow['item_code'] ?? ''));
+    $ptId = (int) ($prow['product_type_id'] ?? 0);
+    $deptId = (int) ($prow['dept_id'] ?? 0);
+    $nameAr = trim((string) ($prow['name'] ?? ''));
+    $hasSizes = (int) ($prow['has_sizes'] ?? 0);
+    $hasColors = (int) ($prow['has_colors'] ?? 0);
+
+    $attrRows = [];
+    if (orange_table_exists($pdo, 'product_attribute_values')) {
+        try {
+            $a = $pdo->prepare(
+                'SELECT catalog_attribute_id, value_raw FROM product_attribute_values WHERE product_id = ? ORDER BY catalog_attribute_id ASC'
+            );
+            $a->execute([$pid]);
+            while ($ar = $a->fetch(PDO::FETCH_ASSOC)) {
+                if (! is_array($ar)) {
+                    continue;
+                }
+                $attrRows[] = [
+                    'id' => (int) ($ar['catalog_attribute_id'] ?? 0),
+                    'v' => trim((string) ($ar['value_raw'] ?? '')),
+                ];
+            }
+        } catch (Throwable $e) {
+            $attrRows = [];
+        }
+    }
+
+    $varRows = [];
+    if (orange_table_exists($pdo, 'product_variants')) {
+        try {
+            $v = $pdo->prepare(
+                'SELECT id, product_colorway_id, size_family_size_id, size, color
+                 FROM product_variants WHERE product_id = ? ORDER BY id ASC'
+            );
+            $v->execute([$pid]);
+            while ($vr = $v->fetch(PDO::FETCH_ASSOC)) {
+                if (! is_array($vr)) {
+                    continue;
+                }
+                $varRows[] = [
+                    'id' => (int) ($vr['id'] ?? 0),
+                    'cw' => isset($vr['product_colorway_id']) && $vr['product_colorway_id'] !== null ? (int) $vr['product_colorway_id'] : null,
+                    'szid' => isset($vr['size_family_size_id']) && $vr['size_family_size_id'] !== null ? (int) $vr['size_family_size_id'] : null,
+                    'sz' => trim((string) ($vr['size'] ?? '')),
+                    'clr' => trim((string) ($vr['color'] ?? '')),
+                ];
+            }
+        } catch (Throwable $e) {
+            $varRows = [];
+        }
+    }
+
+    $encode = static function (array $payload): string {
+        $flags = JSON_UNESCAPED_UNICODE;
+        if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+            $flags |= JSON_INVALID_UTF8_SUBSTITUTE;
+        }
+        $json = json_encode($payload, $flags);
+        if ($json === false) {
+            $json = '{}';
+        }
+
+        return hash('sha256', $json);
+    };
+
+    $productCanon = [
+        'bc_v' => 1,
+        'pid' => $pid,
+        'ic' => $itemCode,
+        'pt' => $ptId,
+        'dep' => $deptId,
+        'n' => $nameAr,
+        'hs' => $hasSizes,
+        'hc' => $hasColors,
+        'attrs' => $attrRows,
+        'vars' => $varRows,
+    ];
+    $productBc = $encode($productCanon);
+    $out['product_barcode'] = $productBc;
+
+    try {
+        $pdo->prepare('UPDATE products SET barcode = ? WHERE id = ? LIMIT 1')->execute([$productBc, $pid]);
+    } catch (Throwable $e) {
+        return $out;
+    }
+
+    if (! orange_table_exists($pdo, 'product_variants') || ! orange_table_has_column($pdo, 'product_variants', 'barcode')) {
+        return $out;
+    }
+
+    $updV = $pdo->prepare('UPDATE product_variants SET barcode = ? WHERE id = ? LIMIT 1');
+    foreach ($varRows as $vr) {
+        $vid = (int) ($vr['id'] ?? 0);
+        if ($vid <= 0) {
+            continue;
+        }
+        $vCanon = [
+            'bc_v' => 1,
+            'pid' => $pid,
+            'vid' => $vid,
+            'ic' => $itemCode,
+            'pt' => $ptId,
+            'dep' => $deptId,
+            'n' => $nameAr,
+            'attrs' => $attrRows,
+            'cw' => $vr['cw'],
+            'szid' => $vr['szid'],
+            'sz' => $vr['sz'],
+            'clr' => $vr['clr'],
+        ];
+        $vbc = $encode($vCanon);
+        try {
+            $updV->execute([$vbc, $vid]);
+            $out['variant_updates']++;
+        } catch (Throwable $e) {
+            continue;
+        }
+    }
+
+    return $out;
+}
+
+/**
  * سلسلة LEFT JOIN لعرض صف فئة باسم مستعار `c` (name_ar / name_en) في استعلامات الأدمن عن المنتجات.
  * مصدر العرض الموحّد فقط: `c` = catalog_categories عبر product_type_id.
  * عند غياب بنية الشجرة الموحّدة الكاملة تُعاد قيم null دون الرجوع إلى taxonomy legacy.
