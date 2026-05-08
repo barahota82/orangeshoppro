@@ -422,6 +422,23 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         </select>
                     </div>
                 </div>
+                <div id="product_basic_size_family_wrap" class="form-grid product-form-basic-top3-inner" style="margin-top:12px;display:none;">
+                    <div style="grid-column:1/-1;">
+                        <label for="size_family_id">عائلة المقاسات</label>
+                        <select id="size_family_id" disabled>
+                            <option value="">— اختر العائلة —</option>
+                            <?php foreach ($familiesOut as $f): ?>
+                                <?php
+                                $famSch = htmlspecialchars(trim((string) ($f['size_scheme_key'] ?? '')), ENT_QUOTES, 'UTF-8');
+                                $famCk = htmlspecialchars(trim((string) ($f['commercial_kind_key'] ?? '')), ENT_QUOTES, 'UTF-8');
+                                $famSk = htmlspecialchars(trim((string) ($f['sizing_category_key'] ?? '')), ENT_QUOTES, 'UTF-8');
+                                ?>
+                                <option value="<?php echo (int)$f['id']; ?>" data-size-scheme="<?php echo $famSch; ?>" data-commercial-kind="<?php echo $famCk; ?>" data-sizing-category="<?php echo $famSk; ?>"><?php echo htmlspecialchars($f['name_ar'] ?: $f['name_en']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small id="size_family_scheme_hint" style="display:none;margin-top:4px;line-height:1.45;color:#64748b;"></small>
+                    </div>
+                </div>
                 <div class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
                     <div>
                         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
@@ -492,21 +509,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                 </select>
             </div>
             <div>
-                <label>عائلة المقاسات</label>
-                <select id="size_family_id" disabled>
-                    <option value="">—</option>
-                    <?php foreach ($familiesOut as $f): ?>
-                        <?php
-                        $famSch = htmlspecialchars(trim((string) ($f['size_scheme_key'] ?? '')), ENT_QUOTES, 'UTF-8');
-                        $famCk = htmlspecialchars(trim((string) ($f['commercial_kind_key'] ?? '')), ENT_QUOTES, 'UTF-8');
-                        $famSk = htmlspecialchars(trim((string) ($f['sizing_category_key'] ?? '')), ENT_QUOTES, 'UTF-8');
-                        ?>
-                        <option value="<?php echo (int)$f['id']; ?>" data-size-scheme="<?php echo $famSch; ?>" data-commercial-kind="<?php echo $famCk; ?>" data-sizing-category="<?php echo $famSk; ?>"><?php echo htmlspecialchars($f['name_ar'] ?: $f['name_en']); ?></option>
-                    <?php endforeach; ?>
-                </select>
-                <small id="size_family_scheme_hint" style="display:none;margin-top:4px;line-height:1.45;color:#64748b;"></small>
-            </div>
-            <div>
                 <label>دليل المقاس الاسترشادي (عرض)</label>
                 <select id="sizing_guide_scope">
                     <option value="none">بدون</option>
@@ -518,12 +520,10 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
         </div>
 
         <div id="product_size_pick_panel" class="card admin-nested-panel" style="display:none;margin-top:12px;">
-            <h4 class="admin-nested-panel__title">أي مقاسات يطبّقها هذا المنتج؟</h4>
+            <h4 class="admin-nested-panel__title">مقاسات المنتج (بدون ألوان)</h4>
             <p class="card-hint" style="margin:0 0 10px;font-size:13px;line-height:1.55;">
-                اختيار <strong>عائلة المقاسات</strong> يعرّف القاموس فقط. حدّد بالأسفل المقاسات المطلوبة لهذا الصنف، ثم من شريط الإجراءات اضغط
-                <strong>توليد المتغيرات</strong> لبناء صفوف اللون/المقاس.
-                <strong>الباركود:</strong> لا يُحسب من «كل العائلة» — بعد <strong>حفظ المنتج</strong> تُحدَّث بصمة المنتج من
-                <strong>صفوف المتغيرات المحفوظة فقط</strong>، ويُخزَّن لكل صف (لون × مقاس) باركود <strong>مختلف</strong> في جدول المتغيرات (مسح المتجر يفضّل باركود المتغير).
+                عندما يكون المنتج <strong>بمقاسات فقط دون ألوان</strong>، حدّد المقاسات من العائلة التي اخترتها في <strong>البيانات الأساسية</strong> ثم <strong>توليد المتغيرات</strong>.
+                إذا كان المنتج <strong>له ألوان</strong>، تُحدَّد المقاسات <strong>لكل صف لون</strong> من تبويب المقاسات والألوان (قائمة علامات الصح حسب العائلة).
             </p>
             <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center;">
                 <button type="button" class="btn-secondary" style="font-size:12px;padding:4px 10px;" onclick="orangeSizePickSetAll(true)">تحديد الكل</button>
@@ -535,6 +535,10 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
 
         <div id="colorwaysSection" class="card admin-nested-panel" style="display:none;">
             <h4 class="admin-nested-panel__title">تركيبات اللون (أساسي / ثانوي اختياري)</h4>
+            <p id="colorways_sizes_hint" class="card-hint" style="display:none;margin:0 0 10px;font-size:13px;line-height:1.55;">
+                لكل صف لون: حدّد بالأسفل <strong>المقاسات المتاحة لهذا اللون</strong> من عائلة المقاسات المختارة في البيانات الأساسية. المقاسات الجديدة في العائلة تظهر هنا تلقائياً بعد تحديث الصفحة.
+                الصفوف المسجّلة مسبقاً تظهر باهتة؛ إن وُجد <strong>مخزون</strong> على متغير لا يُلغى اختياره من هنا.
+            </p>
             <div id="colorwaysBox"></div>
             <button type="button" class="btn-secondary" onclick="addColorwayRow()">+ صف لون</button>
         </div>
@@ -949,6 +953,7 @@ function orangeApplySizeFamilySchemeFilter() {
             hint.textContent = '';
         }
         orangeRefreshSizePickPanel();
+        orangeRefreshAllColorwaySizePickers();
         return;
     }
 
@@ -996,6 +1001,7 @@ function orangeApplySizeFamilySchemeFilter() {
         }
     }
     orangeRefreshSizePickPanel();
+    orangeRefreshAllColorwaySizePickers();
 }
 
 function orangeCatalogAttrDefs() {
@@ -1786,7 +1792,11 @@ async function loadProductForEdit(id) {
         onHasFlagsChange();
         orangeApplyCatalogAttributeValuesFromProduct(p);
         buildColorwaysForEditFromVm(vm);
-        orangeApplySizePickFromVariantMatrix(vm);
+        if (parseInt(p.has_sizes, 10) === 1 && parseInt(p.has_colors, 10) === 1) {
+            orangeApplyColorwaySizesFromVariantMatrix(vm);
+        } else {
+            orangeApplySizePickFromVariantMatrix(vm);
+        }
         const needMatrix =
             parseInt(p.has_colors, 10) === 1 ||
             parseInt(p.has_sizes, 10) === 1 ||
@@ -1894,11 +1904,22 @@ function onHasFlagsChange() {
     const hs = document.getElementById('has_sizes').value === '1';
     const hc = document.getElementById('has_colors').value === '1';
     document.getElementById('size_family_id').disabled = !hs;
+    const famWrap = document.getElementById('product_basic_size_family_wrap');
+    if (famWrap) {
+        famWrap.style.display = hs ? 'block' : 'none';
+    }
+    const cwh = document.getElementById('colorways_sizes_hint');
+    if (cwh) {
+        cwh.style.display = hs && hc ? 'block' : 'none';
+    }
     document.getElementById('colorwaysSection').style.display = hc ? 'block' : 'none';
     if (hc && !document.querySelector('#colorwaysBox .cw-row')) {
         addColorwayRow();
     }
     orangeApplySizeFamilySchemeFilter();
+    if (hs && hc) {
+        orangeRefreshAllColorwaySizePickers();
+    }
 }
 
 function patternOptionsHtml() {
@@ -1963,17 +1984,175 @@ function adminVariantReferenceThumbHtml() {
     );
 }
 
+function orangeColorwayRowKeyFromRow(row) {
+    if (!row) {
+        return '';
+    }
+    const gv = function (sel) {
+        return parseInt((row.querySelector(sel) && row.querySelector(sel).value) || '0', 10) || 0;
+    };
+    return [gv('.cw-p'), gv('.cw-s'), gv('.cw-pp'), gv('.cw-sp')].join(':');
+}
+
+function orangeFillColorwayRowSizes(rowEl) {
+    const mount = rowEl && rowEl.querySelector ? rowEl.querySelector('.cw-sizes-mount') : null;
+    if (!mount) {
+        return;
+    }
+    const hs = document.getElementById('has_sizes') && document.getElementById('has_sizes').value === '1';
+    if (!hs) {
+        mount.innerHTML = '';
+        return;
+    }
+    const famSel = document.getElementById('size_family_id');
+    const famId = famSel && !famSel.disabled ? (parseInt(famSel.value, 10) || 0) : 0;
+    if (!famId) {
+        mount.innerHTML = '<p class="card-hint" style="margin:0;">اختر <strong>عائلة المقاسات</strong> من تبويب البيانات الأساسية أولاً.</p>';
+        return;
+    }
+    const sizes = sizesForFamily(famId);
+    mount.innerHTML = '';
+    const leg = document.createElement('div');
+    leg.className = 'card-hint';
+    leg.style.margin = '0 0 6px';
+    leg.textContent = 'المقاسات المتاحة لهذا اللون (من العائلة):';
+    mount.appendChild(leg);
+    const grid = document.createElement('div');
+    grid.className = 'product-size-pick-grid cw-sizes-grid';
+    sizes.forEach(function (sz) {
+        const sid = parseInt(String(sz.id != null ? sz.id : '0'), 10) || 0;
+        if (sid <= 0) {
+            return;
+        }
+        const wrap = document.createElement('label');
+        wrap.className = 'product-size-pick-item cw-size-lb';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'cw-size-cb';
+        cb.value = String(sid);
+        cb.checked = false;
+        const span = document.createElement('span');
+        span.textContent = String(sz.label_ar || sz.label_en || ('#' + sid)).replace(/</g, '');
+        wrap.appendChild(cb);
+        wrap.appendChild(span);
+        grid.appendChild(wrap);
+    });
+    mount.appendChild(grid);
+}
+
+function orangeRefreshAllColorwaySizePickers() {
+    const hs = document.getElementById('has_sizes') && document.getElementById('has_sizes').value === '1';
+    const hc = document.getElementById('has_colors') && document.getElementById('has_colors').value === '1';
+    if (!hs || !hc) {
+        return;
+    }
+    document.querySelectorAll('#colorwaysBox .cw-row').forEach(function (row) {
+        orangeFillColorwayRowSizes(row);
+    });
+}
+
+function orangeApplyColorwaySizesFromVariantMatrix(vm) {
+    const hs = document.getElementById('has_sizes') && document.getElementById('has_sizes').value === '1';
+    const hc = document.getElementById('has_colors') && document.getElementById('has_colors').value === '1';
+    if (!hs || !hc) {
+        return;
+    }
+    window.ORANGE_CW_SIZE_SILENT = true;
+    try {
+    orangeRefreshAllColorwaySizePickers();
+    const byCw = {};
+    (vm || []).forEach(function (r) {
+        const ck = [
+            parseInt(String(r.primary_color_id != null ? r.primary_color_id : '0'), 10) || 0,
+            parseInt(String(r.secondary_color_id != null ? r.secondary_color_id : '0'), 10) || 0,
+            parseInt(String(r.primary_pattern_id != null ? r.primary_pattern_id : '0'), 10) || 0,
+            parseInt(String(r.secondary_pattern_id != null ? r.secondary_pattern_id : '0'), 10) || 0
+        ].join(':');
+        const z = parseInt(String(r.size_family_size_id != null ? r.size_family_size_id : '0'), 10) || 0;
+        if (z <= 0) {
+            return;
+        }
+        if (!byCw[ck]) {
+            byCw[ck] = {};
+        }
+        const vid = parseInt(String(r.variant_id != null ? r.variant_id : '0'), 10) || 0;
+        const bc = r.variant_barcode != null ? String(r.variant_barcode).trim() : '';
+        const sq = parseInt(String(r.stock_quantity != null ? r.stock_quantity : '0'), 10) || 0;
+        byCw[ck][z] = { vid: vid, hasBarcode: bc !== '', stockQty: sq };
+    });
+    document.querySelectorAll('#colorwaysBox .cw-row').forEach(function (row) {
+        const ck = orangeColorwayRowKeyFromRow(row);
+        const mapZ = byCw[ck] || {};
+        row.querySelectorAll('.cw-size-cb').forEach(function (cb) {
+            const id = parseInt(cb.value, 10) || 0;
+            const meta = mapZ[id];
+            cb.checked = !!meta;
+            cb.classList.toggle('cw-size-cb--persisted', !!(meta && meta.vid > 0));
+            const lb = cb.closest('.cw-size-lb');
+            if (lb) {
+                lb.classList.toggle('cw-size-lb--dim', !!(meta && meta.vid > 0));
+            }
+            cb.removeAttribute('data-variant-id');
+            cb.removeAttribute('data-has-barcode');
+            cb.removeAttribute('data-stock-qty');
+            cb.disabled = false;
+            if (meta && meta.vid > 0) {
+                cb.setAttribute('data-variant-id', String(meta.vid));
+                if (meta.hasBarcode) {
+                    cb.setAttribute('data-has-barcode', '1');
+                }
+                cb.setAttribute('data-stock-qty', String(meta.stockQty || 0));
+                if ((meta.stockQty || 0) > 0) {
+                    cb.disabled = true;
+                    cb.title = 'يوجد مخزون على هذا المتغير — لا يُلغى من هنا';
+                } else {
+                    cb.title = 'مسجّل مسبقاً — يمكن إلغاء التفعيل مع تأكيد عند الحفظ';
+                }
+            } else {
+                cb.title = '';
+            }
+        });
+    });
+    } finally {
+        window.ORANGE_CW_SIZE_SILENT = false;
+    }
+}
+
+function orangeColorwaySizeCheckboxBeforeUncheck(cb) {
+    if (!cb || cb.checked) {
+        return true;
+    }
+    const st = parseInt(cb.getAttribute('data-stock-qty') || '0', 10) || 0;
+    if (st > 0) {
+        cb.checked = true;
+        alert('يوجد مخزون على هذا المتغير — عدّل الرصيد من شاشة المخزون ثم عُد لتعديل التشكيلة.');
+        return false;
+    }
+    const vid = cb.getAttribute('data-variant-id');
+    if (vid) {
+        if (!confirm('هذا المقاس مسجّل لهذا اللون في النظام. إلغاء التفعيل يزيله من مصفوفة المتغيرات عند الحفظ (إن لم يكن له مخزون). متابعة؟')) {
+            cb.checked = true;
+            return false;
+        }
+    }
+    return true;
+}
+
 function addColorwayRow() {
     const box = document.getElementById('colorwaysBox');
     const div = document.createElement('div');
-    div.className = 'cw-row form-grid cw-row--compact';
+    div.className = 'cw-row cw-row--with-sizes';
     div.innerHTML = `
-        <div><label>أساسي</label><select class="cw-p">${colorOptionsHtml()}</select></div>
-        <div><label>ثانوي (اختياري)</label><select class="cw-s">${colorOptionsHtml()}</select></div>
-        <div><label>نمط أساسي (اختياري)</label><select class="cw-pp">${patternOptionsHtml()}</select></div>
-        <div><label>نمط ثانوي (اختياري)</label><select class="cw-sp">${patternOptionsHtml()}</select></div>
+        <div class="cw-row-colors form-grid cw-row--compact">
+            <div><label>أساسي</label><select class="cw-p">${colorOptionsHtml()}</select></div>
+            <div><label>ثانوي (اختياري)</label><select class="cw-s">${colorOptionsHtml()}</select></div>
+            <div><label>نمط أساسي (اختياري)</label><select class="cw-pp">${patternOptionsHtml()}</select></div>
+            <div><label>نمط ثانوي (اختياري)</label><select class="cw-sp">${patternOptionsHtml()}</select></div>
+        </div>
+        <div class="cw-sizes-mount" style="margin-top:10px;width:100%;"></div>
     `;
     box.appendChild(div);
+    orangeFillColorwayRowSizes(div);
 }
 
 function adminVariantRowStockKey(r) {
@@ -2090,6 +2269,15 @@ function orangeRefreshSizePickPanel() {
         return;
     }
     const hs = document.getElementById('has_sizes') && document.getElementById('has_sizes').value === '1';
+    const hc = document.getElementById('has_colors') && document.getElementById('has_colors').value === '1';
+    if (hs && hc) {
+        panel.style.display = 'none';
+        mount.innerHTML = '';
+        if (emptyNote) {
+            emptyNote.style.display = 'none';
+        }
+        return;
+    }
     const famSel = document.getElementById('size_family_id');
     const famDisabled = famSel && famSel.disabled;
     const famId = famSel && !famDisabled ? (parseInt(famSel.value, 10) || 0) : 0;
@@ -2140,7 +2328,11 @@ function orangeRefreshSizePickPanel() {
 
 function orangeApplySizePickFromVariantMatrix(vm) {
     const hs = document.getElementById('has_sizes') && document.getElementById('has_sizes').value === '1';
+    const hc = document.getElementById('has_colors') && document.getElementById('has_colors').value === '1';
     if (!hs) {
+        return;
+    }
+    if (hc) {
         return;
     }
     const famSel = document.getElementById('size_family_id');
@@ -2193,7 +2385,8 @@ function generateVariants() {
     const box = document.getElementById('variantsBox');
 
     if (hasS && !famId) {
-        alert('اختر عائلة مقاسات');
+        productFormShowTab('basic');
+        alert('اختر عائلة مقاسات من البيانات الأساسية.');
         return;
     }
     if (hasC) {
@@ -2204,25 +2397,22 @@ function generateVariants() {
         }
     }
 
-    let sizes = [{ id: 0, label_ar: '', label_en: '' }];
+    let sizeLookupList = [{ id: 0, label_ar: '', label_en: '' }];
     if (hasS) {
-        const allSz = sizesForFamily(famId);
-        if (!allSz.length) {
+        const allSz0 = sizesForFamily(famId);
+        if (!allSz0.length) {
             alert('لا توجد مقاسات في العائلة المختارة');
             return;
         }
-        sizes = orangeGetPickedSizesForVariantGen(famId, allSz);
-        if (!sizes.length) {
-            alert('حدّد مقاساً واحداً على الأقل من قائمة «أي مقاسات يطبّقها هذا المنتج؟» تحت عائلة المقاسات.');
-            return;
-        }
+        sizeLookupList = allSz0;
     }
 
     let combos = [];
     if (!hasC && !hasS) {
         combos.push({ primary_color_id: 0, secondary_color_id: 0, primary_pattern_id: 0, secondary_pattern_id: 0, size_family_size_id: 0, stock: 0 });
     } else if (hasC && hasS) {
-        document.querySelectorAll('#colorwaysBox .cw-row').forEach(row => {
+        let anyCombo = false;
+        document.querySelectorAll('#colorwaysBox .cw-row').forEach(function (row) {
             const p = parseInt(row.querySelector('.cw-p').value, 10) || 0;
             const s = parseInt(row.querySelector('.cw-s').value, 10) || 0;
             const pp = parseInt((row.querySelector('.cw-pp') && row.querySelector('.cw-pp').value) || '0', 10) || 0;
@@ -2230,10 +2420,30 @@ function generateVariants() {
             if (!p) {
                 return;
             }
-            sizes.forEach(sz => {
-                combos.push({ primary_color_id: p, secondary_color_id: s, primary_pattern_id: pp, secondary_pattern_id: sp, size_family_size_id: sz.id, stock: 0 });
+            const cbs = row.querySelectorAll('.cw-size-cb:checked');
+            if (!cbs.length) {
+                return;
+            }
+            anyCombo = true;
+            cbs.forEach(function (cb) {
+                const zid = parseInt(cb.value, 10) || 0;
+                if (zid <= 0) {
+                    return;
+                }
+                combos.push({
+                    primary_color_id: p,
+                    secondary_color_id: s,
+                    primary_pattern_id: pp,
+                    secondary_pattern_id: sp,
+                    size_family_size_id: zid,
+                    stock: 0
+                });
             });
         });
+        if (!anyCombo || !combos.length) {
+            alert('لكل صف لون حدّد مقاساً واحداً على الأقل من قائمة المقاسات أسفل الألوان (واختر عائلة من البيانات الأساسية).');
+            return;
+        }
     } else if (hasC && !hasS) {
         document.querySelectorAll('#colorwaysBox .cw-row').forEach(row => {
             const p = parseInt(row.querySelector('.cw-p').value, 10) || 0;
@@ -2244,7 +2454,12 @@ function generateVariants() {
             combos.push({ primary_color_id: p, secondary_color_id: s, primary_pattern_id: pp, secondary_pattern_id: sp, size_family_size_id: 0, stock: 0 });
         });
     } else if (!hasC && hasS) {
-        sizes.forEach(sz => {
+        const picked = orangeGetPickedSizesForVariantGen(famId, sizeLookupList);
+        if (!picked.length) {
+            alert('حدّد مقاساً واحداً على الأقل من قائمة المقاسات (منتج بمقاسات دون ألوان).');
+            return;
+        }
+        picked.forEach(function (sz) {
             combos.push({ primary_color_id: 0, secondary_color_id: 0, primary_pattern_id: 0, secondary_pattern_id: 0, size_family_size_id: sz.id, stock: 0 });
         });
     }
@@ -2260,7 +2475,7 @@ function generateVariants() {
     html += '<th class="col-ref-img">صورة المرجع</th><th>اللون</th><th>المقاس</th><th class="col-vbar">باركود المتغير (بعد الحفظ)</th><th class="col-stock">المخزون الحالي (عرض)</th>';
     html += '</tr></thead><tbody>';
     combos.forEach((c, idx) => {
-        const sz = sizes.find(x => String(x.id) === String(c.size_family_size_id));
+        const sz = sizeLookupList.find(x => String(x.id) === String(c.size_family_size_id));
         const szLabel = sz ? (sz.label_ar || sz.label_en || ('#' + sz.id)) : '-';
         const p = (window.ORANGE_COLORS || []).find(x => String(x.id) === String(c.primary_color_id));
         const s = (window.ORANGE_COLORS || []).find(x => String(x.id) === String(c.secondary_color_id));
@@ -2340,6 +2555,13 @@ async function saveProduct() {
 
     const hsCheck = parseInt(document.getElementById('has_sizes').value || '0', 10) === 1;
     if (hsCheck) {
+        const sfam = document.getElementById('size_family_id');
+        const sfamId = sfam && !sfam.disabled ? (parseInt(sfam.value || '0', 10) || 0) : 0;
+        if (sfamId <= 0) {
+            productFormShowTab('basic');
+            alert('اختر عائلة مقاسات من البيانات الأساسية.');
+            return;
+        }
         const ptSave = document.getElementById('product_type_id');
         const ptIdSave = ptSave && ptSave.value ? (parseInt(ptSave.value, 10) || 0) : 0;
         if (ptIdSave > 0) {
@@ -2351,7 +2573,7 @@ async function saveProduct() {
                 const fk = fo ? String(fo.getAttribute('data-commercial-kind') || '').trim() : '';
                 const fsk = fo ? String(fo.getAttribute('data-sizing-category') || '').trim() : '';
                 if (expKind !== '' && expCat !== '' && (fk !== expKind || fsk !== expCat)) {
-                    productFormShowTab('sizes');
+                    productFormShowTab('basic');
                     alert('عائلة المقاسات لا تطابق نطاق هرَم نوع المنتج (النوع التجاري «' + expKind + '» / فئة «' + expCat + '»).');
                     return;
                 }
@@ -2606,6 +2828,19 @@ const orangeSizeFamilySelectEl = document.getElementById('size_family_id');
 if (orangeSizeFamilySelectEl) {
     orangeSizeFamilySelectEl.addEventListener('change', function () {
         orangeRefreshSizePickPanel();
+        orangeRefreshAllColorwaySizePickers();
+    });
+}
+const orangeColorwaysBoxEl = document.getElementById('colorwaysBox');
+if (orangeColorwaysBoxEl) {
+    orangeColorwaysBoxEl.addEventListener('change', function (ev) {
+        if (window.ORANGE_CW_SIZE_SILENT) {
+            return;
+        }
+        const t = ev.target;
+        if (t && t.classList && t.classList.contains('cw-size-cb') && !t.checked) {
+            orangeColorwaySizeCheckboxBeforeUncheck(t);
+        }
     });
 }
 rebuildSubcategoryOptions(null);

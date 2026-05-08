@@ -2224,6 +2224,13 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     vertical-align: middle;
 }
 
+.cw-row--with-sizes .cw-row-colors {
+    width: 100%;
+}
+.cw-size-lb--dim {
+    opacity: 0.72;
+}
+
 .admin-product-subsection-title {
     margin: 0 0 12px;
     padding-bottom: 8px;
