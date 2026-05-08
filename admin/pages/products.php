@@ -422,6 +422,25 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         </select>
                     </div>
                 </div>
+                <div id="product_basic_size_flags_wrap" class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
+                    <div>
+                        <label for="has_sizes">له مقاسات؟</label>
+                        <select id="has_sizes" onchange="onHasFlagsChange()">
+                            <option value="0">لا</option>
+                            <option value="1">نعم</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="sizing_guide_scope">دليل المقاس الاسترشادي (عرض)</label>
+                        <select id="sizing_guide_scope" disabled>
+                            <option value="none">بدون</option>
+                            <option value="upper">علوي</option>
+                            <option value="lower">سفلي</option>
+                            <option value="both">علوي وسفلي</option>
+                        </select>
+                        <small class="card-hint" style="display:block;margin-top:4px;color:#64748b;">يُفعّل عند اختيار «له مقاسات؟ = نعم». ربط الجداول/الشاشات التفصيلية للدليل يُضاف لاحقاً.</small>
+                    </div>
+                </div>
                 <div id="product_basic_size_family_wrap" class="form-grid product-form-basic-top3-inner" style="margin-top:12px;display:none;">
                     <div style="grid-column:1/-1;">
                         <label for="size_family_id">عائلة المقاسات</label>
@@ -493,28 +512,12 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
         <?php if ($patterns === [] && orange_table_exists($pdo, 'pattern_dictionary')): ?>
         <p style="margin:0 0 12px;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;color:#64748b;font-size:13px;">قاموس <strong>الأنماط</strong> بلا صفوف نشطة — يمكنك المتابعة بألوان فقط، أو إضافة أنماط من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=pattern_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">أنماط الألوان</a>.</p>
         <?php endif; ?>
-        <div class="form-grid">
+        <div class="form-grid" style="max-width:420px;">
             <div>
-                <label>له مقاسات؟</label>
-                <select id="has_sizes" onchange="onHasFlagsChange()">
-                    <option value="0">لا</option>
-                    <option value="1">نعم</option>
-                </select>
-            </div>
-            <div>
-                <label>له ألوان؟</label>
+                <label for="has_colors">له ألوان؟</label>
                 <select id="has_colors" onchange="onHasFlagsChange()">
                     <option value="0">لا</option>
                     <option value="1">نعم</option>
-                </select>
-            </div>
-            <div>
-                <label>دليل المقاس الاسترشادي (عرض)</label>
-                <select id="sizing_guide_scope">
-                    <option value="none">بدون</option>
-                    <option value="upper">علوي</option>
-                    <option value="lower">سفلي</option>
-                    <option value="both">علوي وسفلي</option>
                 </select>
             </div>
         </div>
@@ -1904,6 +1907,10 @@ function onHasFlagsChange() {
     const hs = document.getElementById('has_sizes').value === '1';
     const hc = document.getElementById('has_colors').value === '1';
     document.getElementById('size_family_id').disabled = !hs;
+    const sgScope = document.getElementById('sizing_guide_scope');
+    if (sgScope) {
+        sgScope.disabled = !hs;
+    }
     const famWrap = document.getElementById('product_basic_size_family_wrap');
     if (famWrap) {
         famWrap.style.display = hs ? 'block' : 'none';
