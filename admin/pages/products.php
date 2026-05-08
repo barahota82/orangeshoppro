@@ -387,47 +387,58 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         <small style="display:block;color:#666;margin-top:4px;">مرجع: <code id="product_dept_cat_ref" style="font-size:13px;">—</code></small>
                     </div>
                 </div>
-                <?php if ($orangeProductTypeDeptStepEnabled): ?>
-                <div class="orange-product-main-department-block" style="margin-top:12px;">
-                    <?php if ($orangeUnifiedDeptCatalogBroken): ?>
-                    <div style="margin-bottom:10px;padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;color:#991b1b;font-size:13px;line-height:1.5;">
-                        التصنيف الموحّد مفعّل لكن لا تظهر <strong>أقسام رئيسية</strong> مربوطة بأنواع المنتج (سلسلة departments ← الأقسام ← … ← الأنواع).
-                        لن يُسمح بإضافة منتج من هذه الشاشة حتى يُكمل الربط في القاعدة؛ راجع الترحيل والجداول أو استعلام أنواع المنتج مع <code>department_id</code>.
-                    </div>
-                    <?php endif; ?>
-                    <label for="product_main_department_id">القسم الرئيسي — مطلوب أولاً</label>
-                    <select id="product_main_department_id" required<?php echo $orangeUnifiedDeptCatalogBroken ? ' disabled' : ''; ?>>
-                        <option value="">— اختر القسم الرئيسي —</option>
-                        <?php foreach ($productTypeDepartmentsForForm as $ptDep): ?>
-                            <option value="<?php echo (int) ($ptDep['id'] ?? 0); ?>"><?php echo htmlspecialchars((string) ($ptDep['label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <small style="display:block;color:#666;margin-top:4px;">اختر القسم أولاً؛ تُعرض بعدها فقط أنواع المنتج التابعة لهذا القسم.</small>
+                <?php if ($orangeProductTypeDeptStepEnabled && $orangeUnifiedDeptCatalogBroken): ?>
+                <div style="margin-top:12px;padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;color:#991b1b;font-size:13px;line-height:1.5;">
+                    التصنيف الموحّد مفعّل لكن لا تظهر <strong>أقسام رئيسية</strong> مربوطة بأنواع المنتج (سلسلة departments ← الأقسام ← … ← الأنواع).
+                    لن يُسمح بإضافة منتج من هذه الشاشة حتى يُكمل الربط في القاعدة؛ راجع الترحيل والجداول أو استعلام أنواع المنتج مع <code>department_id</code>.
                 </div>
                 <?php endif; ?>
-                <div id="product_type_block" class="orange-product-type-block" style="margin-top:12px;">
-                    <label for="product_type_id">نوع المنتج (ورقة الشجرة الموحّدة) — مطلوب</label>
-                    <select id="product_type_id" required>
-                        <option value="">اختر نوع المنتج</option>
-                        <?php foreach ($productTypesForForm as $prt): ?>
-                            <?php
-                            $ptIdOpt = (int) ($prt['id'] ?? 0);
-                            $ptSlug = htmlspecialchars((string) ($prt['slug'] ?? ''), ENT_QUOTES, 'UTF-8');
-                            $ptLabel = htmlspecialchars((string) (($prt['name_ar'] ?: $prt['name_en']) ?: ('#' . $prt['id'])), ENT_QUOTES, 'UTF-8');
-                            $ptExpCk = htmlspecialchars(trim((string) ($prt['expected_commercial_kind_key'] ?? '')), ENT_QUOTES, 'UTF-8');
-                            $ptExpSk = htmlspecialchars(trim((string) ($prt['expected_sizing_category_key'] ?? '')), ENT_QUOTES, 'UTF-8');
-                            $ptDeptIdOpt = (int) ($prt['department_id'] ?? 0);
-                            $ptTrailTitle = '';
-                            if ($catalogNavUnified && $ptIdOpt > 0 && isset($productTypeTrailsForJs[$ptIdOpt]['trail_ar'])) {
-                                $ptTrailTitle = trim((string) $productTypeTrailsForJs[$ptIdOpt]['trail_ar']);
-                            }
-                            $ptTitleAttr = $ptTrailTitle !== '' ? ' title="' . htmlspecialchars($ptTrailTitle, ENT_QUOTES, 'UTF-8') . '"' : '';
-                            ?>
-                            <option value="<?php echo $ptIdOpt; ?>" data-slug="<?php echo $ptSlug; ?>" data-expected-kind="<?php echo $ptExpCk; ?>" data-expected-cat="<?php echo $ptExpSk; ?>" data-department-id="<?php echo $ptDeptIdOpt; ?>"<?php echo $ptTitleAttr; ?>><?php echo $ptLabel; ?></option>
-                        <?php endforeach; ?>
-                    </select>
+                <div class="<?php echo $orangeProductTypeDeptStepEnabled ? 'form-grid-3' : 'form-grid'; ?> product-basic-class-row product-form-basic-top3-inner" style="margin-top:12px;">
+                    <?php if ($orangeProductTypeDeptStepEnabled): ?>
+                    <div class="product-basic-class-cell">
+                        <label for="product_main_department_id">القسم الرئيسي — مطلوب أولاً</label>
+                        <select id="product_main_department_id" required<?php echo $orangeUnifiedDeptCatalogBroken ? ' disabled' : ''; ?>>
+                            <option value="">— اختر القسم الرئيسي —</option>
+                            <?php foreach ($productTypeDepartmentsForForm as $ptDep): ?>
+                                <option value="<?php echo (int) ($ptDep['id'] ?? 0); ?>"><?php echo htmlspecialchars((string) ($ptDep['label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php endif; ?>
+                    <div id="product_type_block" class="product-basic-class-cell">
+                        <label for="product_type_id">نوع المنتج (ورقة الشجرة الموحّدة) — مطلوب</label>
+                        <select id="product_type_id" required>
+                            <option value="">اختر نوع المنتج</option>
+                            <?php foreach ($productTypesForForm as $prt): ?>
+                                <?php
+                                $ptIdOpt = (int) ($prt['id'] ?? 0);
+                                $ptSlug = htmlspecialchars((string) ($prt['slug'] ?? ''), ENT_QUOTES, 'UTF-8');
+                                $ptLabel = htmlspecialchars((string) (($prt['name_ar'] ?: $prt['name_en']) ?: ('#' . $prt['id'])), ENT_QUOTES, 'UTF-8');
+                                $ptExpCk = htmlspecialchars(trim((string) ($prt['expected_commercial_kind_key'] ?? '')), ENT_QUOTES, 'UTF-8');
+                                $ptExpSk = htmlspecialchars(trim((string) ($prt['expected_sizing_category_key'] ?? '')), ENT_QUOTES, 'UTF-8');
+                                $ptDeptIdOpt = (int) ($prt['department_id'] ?? 0);
+                                $ptTrailTitle = '';
+                                if ($catalogNavUnified && $ptIdOpt > 0 && isset($productTypeTrailsForJs[$ptIdOpt]['trail_ar'])) {
+                                    $ptTrailTitle = trim((string) $productTypeTrailsForJs[$ptIdOpt]['trail_ar']);
+                                }
+                                $ptTitleAttr = $ptTrailTitle !== '' ? ' title="' . htmlspecialchars($ptTrailTitle, ENT_QUOTES, 'UTF-8') . '"' : '';
+                                ?>
+                                <option value="<?php echo $ptIdOpt; ?>" data-slug="<?php echo $ptSlug; ?>" data-expected-kind="<?php echo $ptExpCk; ?>" data-expected-cat="<?php echo $ptExpSk; ?>" data-department-id="<?php echo $ptDeptIdOpt; ?>"<?php echo $ptTitleAttr; ?>><?php echo $ptLabel; ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="product-basic-class-cell">
+                        <label for="product_is_active">حالة العرض</label>
+                        <select id="product_is_active">
+                            <option value="1">نشط</option>
+                            <option value="0">مخفي</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="form-grid-3 product-form-basic-top3-inner" style="margin-top:12px;">
+                <?php if ($orangeProductTypeDeptStepEnabled && ! $orangeUnifiedDeptCatalogBroken): ?>
+                <p class="card-hint" style="margin:6px 0 0;">اختر القسم أولاً؛ تُعرض بعدها فقط أنواع المنتج التابعة لهذا القسم.</p>
+                <?php endif; ?>
+                <div class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
                     <div>
                         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
                             <label for="product_item_code" style="margin:0;">كود الصنف (تلقائي من الشجرة)</label>
@@ -443,13 +454,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         </div>
                         <input type="text" id="product_barcode" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="يُولَّد بعد الحفظ" readonly>
                         <small style="display:block;color:#666;margin-top:4px;">بصمة SHA-256 (64 hex) للمنتج ككل؛ للمسح في فاتورة المبيعات. للمقاس/لون استخدم باركود المتغير من قاعدة البيانات لاحقاً.</small>
-                    </div>
-                    <div>
-                        <label>حالة العرض</label>
-                        <select id="product_is_active">
-                            <option value="1">نشط</option>
-                            <option value="0">مخفي</option>
-                        </select>
                     </div>
                 </div>
             </div>
