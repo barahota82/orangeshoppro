@@ -535,6 +535,20 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
             </div>
         </div>
 
+        <div id="product_size_pick_panel" class="card admin-nested-panel" style="display:none;margin-top:12px;">
+            <h4 class="admin-nested-panel__title">أي مقاسات يطبّقها هذا المنتج؟</h4>
+            <p class="card-hint" style="margin:0 0 10px;font-size:13px;line-height:1.55;">
+                اختيار <strong>عائلة المقاسات</strong> يعرّف القاموس فقط. حدّد بالأسفل المقاسات المطلوبة لهذا الصنف، ثم من شريط الإجراءات اضغط
+                <strong>توليد المتغيرات</strong> لبناء صفوف اللون/المقاس.
+            </p>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center;">
+                <button type="button" class="btn-secondary" style="font-size:12px;padding:4px 10px;" onclick="orangeSizePickSetAll(true)">تحديد الكل</button>
+                <button type="button" class="btn-secondary" style="font-size:12px;padding:4px 10px;" onclick="orangeSizePickSetAll(false)">إلغاء الكل</button>
+            </div>
+            <div id="product_size_pick_checkboxes" class="product-size-pick-grid"></div>
+            <p id="product_size_pick_empty" style="display:none;margin:8px 0 0;color:#9a3412;font-size:13px;">لا توجد مقاسات نشطة في هذه العائلة — راجع <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_families'), ENT_QUOTES, 'UTF-8'); ?>">عائلات المقاسات</a>.</p>
+        </div>
+
         <div id="colorwaysSection" class="card admin-nested-panel" style="display:none;">
             <h4 class="admin-nested-panel__title">تركيبات اللون (أساسي / ثانوي اختياري)</h4>
             <div id="colorwaysBox"></div>
@@ -950,6 +964,7 @@ function orangeApplySizeFamilySchemeFilter() {
             hint.style.display = 'none';
             hint.textContent = '';
         }
+        orangeRefreshSizePickPanel();
         return;
     }
 
@@ -996,6 +1011,7 @@ function orangeApplySizeFamilySchemeFilter() {
                 'نوع المنتج المختار بلا نطاق هرَم (1–2) — تظهر كل العائلات النشطة. عند ضبط النوع التجاري وفئة القياس في «أنواع المنتجات» تُصفّى القائمة تلقائياً.';
         }
     }
+    orangeRefreshSizePickPanel();
 }
 
 function orangeCatalogAttrDefs() {
@@ -1767,6 +1783,7 @@ async function loadProductForEdit(id) {
         onHasFlagsChange();
         orangeApplyCatalogAttributeValuesFromProduct(p);
         buildColorwaysForEditFromVm(vm);
+        orangeApplySizePickFromVariantMatrix(vm);
         const needMatrix =
             parseInt(p.has_colors, 10) === 1 ||
             parseInt(p.has_sizes, 10) === 1 ||
@@ -2035,6 +2052,116 @@ function sizesForFamily(fid) {
     return fam && fam.sizes ? fam.sizes : [];
 }
 
+function orangeSizePickSetAll(checked) {
+    document.querySelectorAll('#product_size_pick_checkboxes .product-size-pick-cb').forEach(function (cb) {
+        cb.checked = !!checked;
+    });
+}
+
+function orangeRefreshSizePickPanel() {
+    const panel = document.getElementById('product_size_pick_panel');
+    const mount = document.getElementById('product_size_pick_checkboxes');
+    const emptyNote = document.getElementById('product_size_pick_empty');
+    if (!panel || !mount) {
+        return;
+    }
+    const hs = document.getElementById('has_sizes') && document.getElementById('has_sizes').value === '1';
+    const famSel = document.getElementById('size_family_id');
+    const famDisabled = famSel && famSel.disabled;
+    const famId = famSel && !famDisabled ? (parseInt(famSel.value, 10) || 0) : 0;
+    if (!hs || !famId) {
+        panel.style.display = 'none';
+        mount.innerHTML = '';
+        if (emptyNote) {
+            emptyNote.style.display = 'none';
+        }
+        return;
+    }
+    const sizes = sizesForFamily(famId);
+    panel.style.display = 'block';
+    mount.innerHTML = '';
+    if (!sizes.length) {
+        if (emptyNote) {
+            emptyNote.style.display = 'block';
+        }
+        return;
+    }
+    if (emptyNote) {
+        emptyNote.style.display = 'none';
+    }
+    sizes.forEach(function (sz) {
+        const sid = parseInt(String(sz.id != null ? sz.id : '0'), 10) || 0;
+        if (sid <= 0) {
+            return;
+        }
+        const wrap = document.createElement('label');
+        wrap.className = 'product-size-pick-item';
+        wrap.style.display = 'inline-flex';
+        wrap.style.alignItems = 'center';
+        wrap.style.gap = '6px';
+        wrap.style.cursor = 'pointer';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'product-size-pick-cb';
+        cb.value = String(sid);
+        cb.checked = true;
+        const span = document.createElement('span');
+        const t = String(sz.label_ar || sz.label_en || ('#' + sid)).replace(/</g, '');
+        span.textContent = t;
+        wrap.appendChild(cb);
+        wrap.appendChild(span);
+        mount.appendChild(wrap);
+    });
+}
+
+function orangeApplySizePickFromVariantMatrix(vm) {
+    const hs = document.getElementById('has_sizes') && document.getElementById('has_sizes').value === '1';
+    if (!hs) {
+        return;
+    }
+    const famSel = document.getElementById('size_family_id');
+    const famId = famSel ? (parseInt(famSel.value, 10) || 0) : 0;
+    if (!famId) {
+        return;
+    }
+    orangeRefreshSizePickPanel();
+    const idsInVm = new Set();
+    (vm || []).forEach(function (r) {
+        const z = parseInt(String(r.size_family_size_id != null ? r.size_family_size_id : '0'), 10) || 0;
+        if (z > 0) {
+            idsInVm.add(z);
+        }
+    });
+    if (!idsInVm.size) {
+        return;
+    }
+    document.querySelectorAll('#product_size_pick_checkboxes .product-size-pick-cb').forEach(function (cb) {
+        const id = parseInt(cb.value, 10) || 0;
+        cb.checked = idsInVm.has(id);
+    });
+}
+
+function orangeGetPickedSizesForVariantGen(famId, allSizes) {
+    const mount = document.getElementById('product_size_pick_checkboxes');
+    if (!mount || !mount.querySelector('.product-size-pick-cb')) {
+        return allSizes;
+    }
+    const checked = Array.from(mount.querySelectorAll('.product-size-pick-cb:checked'))
+        .map(function (cb) {
+            return parseInt(cb.value, 10) || 0;
+        })
+        .filter(function (id) {
+            return id > 0;
+        });
+    if (!checked.length) {
+        return [];
+    }
+    const want = new Set(checked);
+    return allSizes.filter(function (sz) {
+        return want.has(parseInt(String(sz.id != null ? sz.id : '0'), 10) || 0);
+    });
+}
+
 function generateVariants() {
     const hasC = document.getElementById('has_colors').value === '1';
     const hasS = document.getElementById('has_sizes').value === '1';
@@ -2055,9 +2182,14 @@ function generateVariants() {
 
     let sizes = [{ id: 0, label_ar: '', label_en: '' }];
     if (hasS) {
-        sizes = sizesForFamily(famId);
-        if (!sizes.length) {
+        const allSz = sizesForFamily(famId);
+        if (!allSz.length) {
             alert('لا توجد مقاسات في العائلة المختارة');
+            return;
+        }
+        sizes = orangeGetPickedSizesForVariantGen(famId, allSz);
+        if (!sizes.length) {
+            alert('حدّد مقاساً واحداً على الأقل من قائمة «أي مقاسات يطبّقها هذا المنتج؟» تحت عائلة المقاسات.');
             return;
         }
     }
@@ -2443,6 +2575,12 @@ if (orangeProductTypeSelectEl) {
         if (window.ORANGE_CATALOG_NAV_UNIFIED) {
             updateProductCatalogHint();
         }
+    });
+}
+const orangeSizeFamilySelectEl = document.getElementById('size_family_id');
+if (orangeSizeFamilySelectEl) {
+    orangeSizeFamilySelectEl.addEventListener('change', function () {
+        orangeRefreshSizePickPanel();
     });
 }
 rebuildSubcategoryOptions(null);

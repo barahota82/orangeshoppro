@@ -2198,6 +2198,17 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     box-sizing: border-box;
 }
 
+.product-size-pick-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    align-items: center;
+}
+.product-size-pick-item {
+    font-size: 14px;
+    color: #334155;
+}
+
 .admin-product-subsection-title {
     margin: 0 0 12px;
     padding-bottom: 8px;
