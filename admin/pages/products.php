@@ -63,8 +63,11 @@ foreach ($productTypesForForm as $ptRow) {
         'label' => $depLabel,
     ];
 }
-/** مع التصنيف الموحّد: لا مسار «قائمة أنواع كاملة بدون قسم» — القسم أولاً ثم أنواع القسم فقط (أو تعطيل حتى يُصلح الربط). */
-$orangeProductTypeDeptStepEnabled = $catalogNavUnified;
+/**
+ * إظهار خطوة «القسم أولاً» وتصفية الأنواع حسب القسم عند: التصنيف الموحّد مفعّل، أو وُجدت أقسام مرتبطة بأنواع المنتج في الاستعلام.
+ * (لا نخفي الخانة فقط لأن إعداد «الواجهة الموحّدة» على السيرفر غير مفعّل بينما البيانات فيها أقسام.)
+ */
+$orangeProductTypeDeptStepEnabled = $catalogNavUnified || $productTypeDepartmentsForForm !== [];
 $orangeUnifiedDeptCatalogBroken = $catalogNavUnified && $productTypeDepartmentsForForm === [];
 
 $productTypeTrailsForJs = [];
@@ -399,7 +402,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         <option value="<?php echo (int) ($ptDep['id'] ?? 0); ?>"><?php echo htmlspecialchars((string) ($ptDep['label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></option>
                     <?php endforeach; ?>
                 </select>
-                <small style="display:block;color:#666;margin-top:4px;">مع التصنيف الموحّد: اختر القسم أولاً؛ تُعرض بعدها فقط أنواع المنتج التابعة لهذا القسم (لا إدخال «على الشجرة» بدون هذا الربط).</small>
+                <small style="display:block;color:#666;margin-top:4px;">اختر القسم أولاً؛ تُعرض بعدها فقط أنواع المنتج التابعة لهذا القسم.</small>
             </div>
             <?php endif; ?>
             <div id="product_type_block" class="orange-product-type-block">
