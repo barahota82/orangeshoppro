@@ -343,11 +343,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
 <div class="card">
     <h3 id="productFormTitle">إضافة / تعديل منتج</h3>
     <p id="productEditHint" style="display:none;margin:0 0 12px;color:#555;font-size:14px;">تعديل البيانات الأساسية. الترتيب في المتجر من الجدول فقط (↑↓ ثم حفظ الترتيب). كميات الألوان والمقاسات من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8'); ?>">المخزون</a>.</p>
-    <?php if (!$catalogNavUnified): ?>
-    <div style="margin-bottom:12px;padding:12px 14px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;">
-        <p style="margin:0;color:#991b1b;line-height:1.55;">تمت إزالة شاشات التصنيف التراثية (<strong>أقسام داخلية</strong> و<strong>الفئة والفروع</strong>) من لوحة التحكم. لتعديل المنتجات بالتصنيف الصحيح فعّل <strong>الشجرة الموحّدة</strong> ثم استخدم <strong>نوع المنتج</strong> فقط. المرجع: <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع شجرة المنتجات</a> و<a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=product_types'), ENT_QUOTES, 'UTF-8'); ?>">أنواع المنتجات</a>.</p>
-    </div>
-    <?php endif; ?>
     <form id="productForm">
         <input type="hidden" id="product_record_id" value="0">
         <input type="hidden" id="category_id" value="">
@@ -366,14 +361,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
         <div id="productTabPanelBasic" class="admin-product-tab-panel is-active" role="tabpanel" aria-labelledby="productTabBtnBasic">
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">البيانات الأساسية</h4>
-        <p class="card-hint" style="margin:-4px 0 14px;line-height:1.55;">
-            بعد الحفظ يمكن استخدام <strong>كود الصنف</strong> أو <strong>باركود المنتج/المتغير</strong> في
-            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=manual_order'), ENT_QUOTES, 'UTF-8'); ?>">فاتورة مبيعات</a>
-            (مسح أو لصق في خانة الكود).
-            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchases'), ENT_QUOTES, 'UTF-8'); ?>">فاتورة شراء</a>
-            الحالية تختار المنتج من القائمة؛ ربط المسح بالمشتريات خطوة لاحقة.
-            مع الألوان/المقاسات يُفضّل مسح <strong>باركود المتغير</strong> من سجل المتغيرات بعد الحفظ.
-        </p>
         <div class="form-grid product-form-tab-basic-grid">
             <div class="product-form-basic-top3">
                 <div class="form-grid product-form-basic-top3-inner">
@@ -435,9 +422,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         </select>
                     </div>
                 </div>
-                <?php if ($orangeProductTypeDeptStepEnabled && ! $orangeUnifiedDeptCatalogBroken): ?>
-                <p class="card-hint" style="margin:6px 0 0;">اختر القسم أولاً؛ تُعرض بعدها فقط أنواع المنتج التابعة لهذا القسم.</p>
-                <?php endif; ?>
                 <div class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
                     <div>
                         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
@@ -445,7 +429,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                             <button type="button" class="btn-secondary" style="font-size:12px;padding:4px 10px;" onclick="orangeCopyProductField('product_item_code')">نسخ</button>
                         </div>
                         <input type="text" id="product_item_code" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="يُولَّد عند الحفظ" readonly>
-                        <small style="display:block;color:#666;margin-top:4px;">يُبنى من سلسلة القسم والكتالوج حتى نوع المنتج، ثم ‎-P‎{رقم المنتج}.</small>
                     </div>
                     <div>
                         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
@@ -453,7 +436,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                             <button type="button" class="btn-secondary" style="font-size:12px;padding:4px 10px;" onclick="orangeCopyProductField('product_barcode')">نسخ</button>
                         </div>
                         <input type="text" id="product_barcode" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="يُولَّد بعد الحفظ" readonly>
-                        <small style="display:block;color:#666;margin-top:4px;">بصمة SHA-256 (64 hex) للمنتج ككل؛ للمسح في فاتورة المبيعات. للمقاس/لون استخدم باركود المتغير من قاعدة البيانات لاحقاً.</small>
                     </div>
                 </div>
             </div>
