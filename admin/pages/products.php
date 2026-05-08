@@ -540,6 +540,8 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
             <p class="card-hint" style="margin:0 0 10px;font-size:13px;line-height:1.55;">
                 اختيار <strong>عائلة المقاسات</strong> يعرّف القاموس فقط. حدّد بالأسفل المقاسات المطلوبة لهذا الصنف، ثم من شريط الإجراءات اضغط
                 <strong>توليد المتغيرات</strong> لبناء صفوف اللون/المقاس.
+                <strong>الباركود:</strong> لا يُحسب من «كل العائلة» — بعد <strong>حفظ المنتج</strong> تُحدَّث بصمة المنتج من
+                <strong>صفوف المتغيرات المحفوظة فقط</strong>، ويُخزَّن لكل صف (لون × مقاس) باركود <strong>مختلف</strong> في جدول المتغيرات (مسح المتجر يفضّل باركود المتغير).
             </p>
             <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center;">
                 <button type="button" class="btn-secondary" style="font-size:12px;padding:4px 10px;" onclick="orangeSizePickSetAll(true)">تحديد الكل</button>
