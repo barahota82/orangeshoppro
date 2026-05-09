@@ -271,6 +271,61 @@ CREATE TABLE `size_family_sizes` (
   KEY `idx_size_family_sizes_tpl_sz` (`scheme_template_size_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE `advisory_sizing_guides` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `size_family_id` int NOT NULL,
+  `scope_kind` varchar(16) NOT NULL,
+  `name_ar` varchar(191) NOT NULL DEFAULT '',
+  `name_en` varchar(191) NOT NULL DEFAULT '',
+  `name_fil` varchar(191) NOT NULL DEFAULT '',
+  `name_hi` varchar(191) NOT NULL DEFAULT '',
+  `sort_order` int NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_advisory_sizing_family_scope` (`size_family_id`,`scope_kind`),
+  KEY `idx_advisory_sizing_guides_family` (`size_family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `advisory_sizing_guide_columns` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `guide_id` int NOT NULL,
+  `sort_order` int NOT NULL DEFAULT 0,
+  `label_ar` varchar(191) NOT NULL DEFAULT '',
+  `label_en` varchar(191) NOT NULL DEFAULT '',
+  `label_fil` varchar(191) NOT NULL DEFAULT '',
+  `label_hi` varchar(191) NOT NULL DEFAULT '',
+  `value_kind` varchar(16) NOT NULL DEFAULT 'text',
+  `unit_hint` varchar(64) NOT NULL DEFAULT '',
+  PRIMARY KEY (`id`),
+  KEY `idx_asgc_guide` (`guide_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `advisory_sizing_guide_rows` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `guide_id` int NOT NULL,
+  `sort_order` int NOT NULL DEFAULT 0,
+  `row_kind` varchar(16) NOT NULL DEFAULT 'data',
+  `size_family_size_id` int DEFAULT NULL,
+  `label_ar` varchar(191) NOT NULL DEFAULT '',
+  `label_en` varchar(191) NOT NULL DEFAULT '',
+  `label_fil` varchar(191) NOT NULL DEFAULT '',
+  `label_hi` varchar(191) NOT NULL DEFAULT '',
+  PRIMARY KEY (`id`),
+  KEY `idx_asgr_guide` (`guide_id`),
+  KEY `idx_asgr_sfs` (`size_family_size_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `advisory_sizing_guide_cells` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `row_id` int NOT NULL,
+  `column_id` int NOT NULL,
+  `cell_value` text,
+  PRIMARY KEY (`id`),
+  KEY `idx_asgcell_row` (`row_id`),
+  KEY `idx_asgcell_col` (`column_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `accounts` (
   `id` int NOT NULL AUTO_INCREMENT,
   `name` varchar(191) NOT NULL,

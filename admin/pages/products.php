@@ -497,6 +497,7 @@ $orangeAdminCardPreviewViewLabel = t('view_product');
                             <option value="upper">علوي</option>
                             <option value="lower">سفلي</option>
                             <option value="both">علوي وسفلي</option>
+                            <option value="single">مفرد (مثل حذاء)</option>
                         </select>
                     </div>
                     <div class="product-basic-class-cell" id="product_basic_has_colors_wrap">

@@ -62,7 +62,7 @@ try {
     }
     $hasSizes = $sizeFamilyId !== null && $sizeFamilyId > 0;
     $scope = trim((string)($data['sizing_guide_scope'] ?? 'none'));
-    $allowedScopes = ['none', 'upper', 'lower', 'both'];
+    $allowedScopes = ['none', 'upper', 'lower', 'both', 'single'];
     if (!in_array($scope, $allowedScopes, true)) {
         $scope = 'none';
     }

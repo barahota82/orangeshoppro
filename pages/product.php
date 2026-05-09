@@ -6,6 +6,7 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/catalog_schema.php';
 require_once __DIR__ . '/../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../includes/catalog_labels.php';
+require_once __DIR__ . '/../includes/advisory_sizing_guides.php';
 require_once __DIR__ . '/../includes/upload_paths.php';
 
 $pdo = db();
@@ -95,13 +96,20 @@ $sizingHintKeys = [
     'upper' => 'sizing_hint_upper',
     'lower' => 'sizing_hint_lower',
     'both' => 'sizing_hint_both',
+    'single' => 'sizing_hint_single',
 ];
 $sizingHintKey = $sizingHintKeys[$scope] ?? '';
 $sizingText = $sizingHintKey !== '' ? t($sizingHintKey) : '';
 
+$sizingKinds = orange_advisory_sizing_product_scope_kinds($scope);
+$advisorySizing = ['use_dynamic' => false, 'sections' => []];
+$sfId = isset($product['size_family_id']) ? (int) $product['size_family_id'] : 0;
+if ($sfId > 0 && $sizingKinds !== []) {
+    $advisorySizing = orange_advisory_sizing_build_sections($pdo, $sfId, $sizingKinds, $lang);
+}
+
 $sizingChartRows = [];
 $sizingShowFoot = false;
-$sfId = isset($product['size_family_id']) ? (int) $product['size_family_id'] : 0;
 if ($sfId > 0 && orange_table_exists($pdo, 'size_family_sizes')) {
     $hasFootCol = orange_table_has_column($pdo, 'size_family_sizes', 'foot_length_cm');
     $cols = 'label_ar, label_en';
@@ -130,7 +138,9 @@ if ($sfId > 0 && orange_table_exists($pdo, 'size_family_sizes')) {
         }
     }
 }
-$showSizingGuide = $scope !== 'none' && ($sizingText !== '' || $sizingChartRows !== []);
+$advisorySizingReady = !empty($advisorySizing['use_dynamic']) && ($advisorySizing['sections'] ?? []) !== [];
+$legacySizingReady = !$advisorySizingReady && $sizingChartRows !== [];
+$showSizingGuide = $scope !== 'none' && ($sizingText !== '' || $advisorySizingReady || $legacySizingReady);
 
 $displayName = storefront_product_display_name($product);
 $displayDesc = storefront_product_display_description($product);
@@ -371,13 +381,55 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
 </div>
 
 <?php if ($showSizingGuide): ?>
-<dialog id="productSizingDialog" class="product-sizing-dialog">
+<dialog id="productSizingDialog" class="product-sizing-dialog<?php echo $advisorySizingReady ? ' product-sizing-dialog--advisory' : ''; ?>">
     <div class="product-sizing-dialog__inner">
         <h3 class="product-sizing-dialog__title"><?php echo htmlspecialchars(t('sizing_guide'), ENT_QUOTES, 'UTF-8'); ?></h3>
         <?php if ($sizingText !== ''): ?>
             <p class="product-sizing-dialog__body"><?php echo htmlspecialchars($sizingText, ENT_QUOTES, 'UTF-8'); ?></p>
         <?php endif; ?>
-        <?php if ($sizingChartRows !== []): ?>
+        <?php if ($advisorySizingReady): ?>
+            <?php foreach ($advisorySizing['sections'] as $sec): ?>
+                <?php
+                $secTitle = trim((string) ($sec['title'] ?? ''));
+                $cols = isset($sec['columns']) && is_array($sec['columns']) ? $sec['columns'] : [];
+                $srows = isset($sec['rows']) && is_array($sec['rows']) ? $sec['rows'] : [];
+                $colCount = max(1, count($cols));
+                ?>
+                <?php if ($secTitle !== ''): ?>
+                    <h4 class="product-sizing-dialog__subtitle"><?php echo htmlspecialchars($secTitle, ENT_QUOTES, 'UTF-8'); ?></h4>
+                <?php endif; ?>
+                <div class="product-sizing-table-wrap" role="region" aria-label="<?php echo htmlspecialchars(t('sizing_guide'), ENT_QUOTES, 'UTF-8'); ?>">
+                    <table class="product-sizing-table">
+                        <thead>
+                            <tr>
+                                <?php foreach ($cols as $col): ?>
+                                    <th scope="col"><?php echo htmlspecialchars((string) ($col['header'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></th>
+                                <?php endforeach; ?>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($srows as $srow): ?>
+                                <?php if (($srow['kind'] ?? '') === 'label'): ?>
+                                    <tr class="product-sizing-table__label-row">
+                                        <td colspan="<?php echo (int) $colCount; ?>"><?php echo htmlspecialchars((string) ($srow['label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                    </tr>
+                                <?php else: ?>
+                                    <tr>
+                                        <?php
+                                        $cells = isset($srow['cells']) && is_array($srow['cells']) ? $srow['cells'] : [];
+                                        for ($ci = 0; $ci < $colCount; $ci++):
+                                            $cv = $cells[$ci] ?? '';
+                                            ?>
+                                            <td><?php echo htmlspecialchars((string) $cv, ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <?php endfor; ?>
+                                    </tr>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endforeach; ?>
+        <?php elseif ($sizingChartRows !== []): ?>
             <div class="product-sizing-table-wrap" role="region" aria-label="<?php echo htmlspecialchars(t('sizing_guide'), ENT_QUOTES, 'UTF-8'); ?>">
                 <table class="product-sizing-table">
                     <thead>

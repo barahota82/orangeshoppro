@@ -1164,6 +1164,22 @@ body.storefront-browse-menu-lock {
     max-width: min(96vw, 520px);
 }
 
+.product-sizing-dialog--advisory:has(.product-sizing-table) {
+    max-width: min(98vw, 720px);
+}
+
+.product-sizing-dialog__subtitle {
+    margin: 16px 0 8px;
+    font-size: 1rem;
+    font-family: var(--font-display);
+}
+
+.product-sizing-table__label-row td {
+    background: color-mix(in srgb, var(--card) 82%, var(--muted));
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
 .product-sizing-table-wrap {
     margin: 0 0 18px;
     overflow-x: auto;
