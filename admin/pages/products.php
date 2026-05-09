@@ -555,6 +555,7 @@ $orangeAdminCardPreviewViewLabel = t('view_product');
                 <label>الصورة الرئيسية — رفع ملف</label>
                 <input type="hidden" id="main_image" value="">
                 <input type="file" id="main_image_file" accept="image/jpeg,image/png,image/webp,image/gif">
+                <button type="button" class="btn-secondary" id="btn_clear_main_image_file_selection" style="margin-top:6px;display:none;">مسح اختيار الملف (قبل الرفع)</button>
                 <button type="button" class="btn-secondary" style="margin-top:8px;" onclick="uploadMainProductImage()">رفع الصورة الرئيسية</button>
                 <div id="main_image_preview_row" class="admin-main-image-preview-row" style="display:none;margin-top:12px;">
                     <div id="main_image_preview" class="admin-main-image-preview-mount"></div>
@@ -567,6 +568,8 @@ $orangeAdminCardPreviewViewLabel = t('view_product');
             <div style="grid-column:1/-1;">
                 <label>صور إضافية للمعرض (عدة ملفات)</label>
                 <input type="file" id="gallery_files" accept="image/jpeg,image/png,image/webp,image/gif" multiple>
+                <button type="button" class="btn-secondary" id="btn_clear_gallery_file_selection" style="margin-top:6px;display:none;">مسح اختيار الملفات (قبل الرفع)</button>
+                <ul id="gallery_files_pending_list" class="admin-product-gallery-upload-list admin-product-gallery-pending-list" style="margin:10px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:10px;"></ul>
                 <button type="button" class="btn-secondary" style="margin-top:8px;" onclick="uploadGalleryProductImages()">رفع صور المعرض</button>
                 <ul id="gallery_upload_list" class="admin-product-gallery-upload-list" style="margin:12px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:10px;"></ul>
             </div>
@@ -577,7 +580,7 @@ $orangeAdminCardPreviewViewLabel = t('view_product');
         <div id="productTabPanelVariants" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnVariants">
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">المتغيرات والباركود</h4>
-        <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">كل منتج — بما فيه <strong>بدون ألوان وبدون مقاسات</strong> — يحتاج <strong>صف بيع واحد على الأقل</strong> في الجدول أدناه؛ يظهر <strong>باركود المتغير</strong> بعد الحفظ. المنتج البسيط = صف واحد (يمكن استخدام «توليد المتغيرات» أو سيُكمَل تلقائياً عند الحفظ إن كان الجدول فارغاً).</p>
+        <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">كل منتج — بما فيه <strong>بدون ألوان وبدون مقاسات</strong> — يحتاج <strong>صف بيع واحد على الأقل</strong> في الجدول أدناه؛ يظهر <strong>باركود المتغير</strong> بعد الحفظ. <strong>منتج جديد:</strong> أكمل البيانات في التبويبات ثم اضغط «توليد المتغيرات»؛ بعد ظهور الجدول يُفعّل «حفظ المنتج». المنتج البسيط = صف واحد في الجدول بعد التوليد.</p>
         <div id="variantsBox"></div>
         </div>
         </div>
@@ -674,8 +677,8 @@ $orangeAdminCardPreviewViewLabel = t('view_product');
         <div class="admin-product-form-actions admin-product-form-actions--bar">
             <div class="actions admin-product-form-actions__buttons">
                 <button type="button" class="btn-secondary" id="btnProductTranslate" onclick="translateProductLocalesFromArabic()">ترجمة تلقائية من العربي</button>
-                <button type="button" id="btnGenerateVariants" onclick="generateVariants()">توليد المتغيرات</button>
-                <button type="button" class="btn-secondary" id="btnSaveProduct" onclick="saveProduct()">حفظ المنتج</button>
+                <button type="button" class="btn" id="btnGenerateVariants" onclick="generateVariants()" disabled>توليد المتغيرات</button>
+                <button type="button" class="btn-secondary" id="btnSaveProduct" onclick="saveProduct()" disabled>حفظ المنتج</button>
                 <button type="button" class="btn-secondary" onclick="resetProductForm()">منتج جديد</button>
             </div>
         </div>
@@ -808,6 +811,9 @@ window.ORANGE_PT_DEPT_STEP_ENABLED = <?php echo $orangeProductTypeDeptStepEnable
 window.ORANGE_PT_DEPT_OPTIONS_COUNT = <?php echo (int) count($productTypeDepartmentsForForm); ?>;
 window.ORANGE_PRODUCT_TYPE_TRAIL = <?php echo json_encode($productTypeTrailsForJs, JSON_UNESCAPED_UNICODE); ?>;
 window.PRODUCT_EXTRA_IMAGES = [];
+window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE = false;
+window.ORANGE_MAIN_PENDING_IMAGE_URL = null;
+window.ORANGE_GALLERY_PENDING_URLS = [];
 window.PRODUCT_NEXT_SORT = <?php echo (int)$nextProductSort; ?>;
 window.ORANGE_CATALOG_ATTR_DEFS = <?php echo json_encode($catalogAttrDefsForJs, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
 window.ORANGE_ADMIN_CARD_PREVIEW_CSS = <?php echo json_encode($orangeAdminCardPreviewCssHref, JSON_UNESCAPED_UNICODE); ?>;
@@ -1017,6 +1023,218 @@ function orangeProductIsSimpleSkuMatrix() {
     return !orangeProductEffectiveHasSizes();
 }
 
+/** منتج جديد (لم يُحفظ بعد) — يُستخدم لتسلسل «توليد المتغيرات» ثم «الحفظ». */
+function orangeProductWizardIsNew() {
+    const id = parseInt(String(document.getElementById('product_record_id') && document.getElementById('product_record_id').value || '0'), 10) || 0;
+    return id <= 0;
+}
+
+function orangeProductInvalidateVariantsReadyForSave() {
+    if (orangeProductWizardIsNew()) {
+        window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE = false;
+        orangeApplyProductWizardActionButtons();
+    }
+}
+
+/**
+ * تحقق موحّد من اكتمال البيانات قبل توليد المتغيرات أو الحفظ (بدون اشتراط جدول المتغيرات).
+ * @returns {null|{tab:string,message:string}}
+ */
+function orangeProductValidateWizardBeforeMatrix() {
+    const nameFields = [
+        { id: 'name', label: 'الاسم العربي' },
+        { id: 'name_en', label: 'English' },
+        { id: 'name_fil', label: 'Filipino' },
+        { id: 'name_hi', label: 'Hindi' }
+    ];
+    for (let i = 0; i < nameFields.length; i++) {
+        const f = nameFields[i];
+        if (!document.getElementById(f.id).value.trim()) {
+            return { tab: 'basic', message: 'يجب إضافة خانة ' + f.label + ' قبل المتابعة.' };
+        }
+    }
+
+    if (window.ORANGE_PT_DEPT_STEP_ENABLED === true) {
+        const depOptCount = parseInt(String(window.ORANGE_PT_DEPT_OPTIONS_COUNT || '0'), 10) || 0;
+        if (depOptCount <= 0) {
+            return {
+                tab: 'basic',
+                message:
+                    'التصنيف الموحّد مفعّل لكن لا توجد أقسام مربوطة بأنواع المنتج في القاعدة — أصلح الربط ثم أعد تحميل الصفحة.'
+            };
+        }
+        const depSaveEl = document.getElementById('product_main_department_id');
+        const depSaveVal = depSaveEl && !depSaveEl.disabled ? (parseInt(depSaveEl.value || '0', 10) || 0) : 0;
+        if (depSaveVal <= 0) {
+            return { tab: 'basic', message: 'يجب اختيار «القسم الرئيسي» أولاً، ثم نوع المنتج التابع لهذا القسم.' };
+        }
+    }
+    const ptEl = document.getElementById('product_type_id');
+    const ptVal = ptEl ? (parseInt(ptEl.value || '0', 10) || 0) : 0;
+    if (ptVal <= 0) {
+        if (window.ORANGE_PT_DEPT_STEP_ENABLED === true) {
+            return { tab: 'basic', message: 'اختر «القسم الرئيسي» ثم «نوع المنتج» من الأنواع المعروضة لهذا القسم فقط.' };
+        }
+        return { tab: 'basic', message: 'يجب اختيار «نوع المنتج» قبل المتابعة.' };
+    }
+
+    const hsCheck = orangeProductEffectiveHasSizes();
+    if (hsCheck) {
+        const sfam = document.getElementById('size_family_id');
+        const sfamId = sfam ? (parseInt(sfam.value || '0', 10) || 0) : 0;
+        if (sfamId <= 0) {
+            return { tab: 'basic', message: 'اختر عائلة مقاسات من البيانات الأساسية.' };
+        }
+        const ptSave = document.getElementById('product_type_id');
+        const ptIdSave = ptSave && ptSave.value ? (parseInt(ptSave.value, 10) || 0) : 0;
+        if (ptIdSave > 0) {
+            const expKind = orangeGetSelectedProductTypeExpectedKind();
+            const expCat = orangeGetSelectedProductTypeExpectedCat();
+            const famSel = document.getElementById('size_family_id');
+            if (famSel && famSel.value) {
+                const fo = famSel.options[famSel.selectedIndex];
+                const fk = fo ? String(fo.getAttribute('data-commercial-kind') || '').trim() : '';
+                const fsk = fo ? String(fo.getAttribute('data-sizing-category') || '').trim() : '';
+                if (expKind !== '' && expCat !== '' && (fk !== expKind || fsk !== expCat)) {
+                    return {
+                        tab: 'basic',
+                        message:
+                            'عائلة المقاسات لا تطابق نطاق هرَم نوع المنتج (النوع التجاري «' +
+                            expKind +
+                            '» / فئة «' +
+                            expCat +
+                            '»).'
+                    };
+                }
+            }
+        }
+    }
+
+    assignMainImageFromGalleryIfEmpty();
+    const mainVal = document.getElementById('main_image').value.trim();
+    const hasAnyImage = mainVal || (window.PRODUCT_EXTRA_IMAGES && window.PRODUCT_EXTRA_IMAGES.length);
+    if (!hasAnyImage) {
+        return { tab: 'images', message: 'ارفع صورة واحدة على الأقل (رئيسية أو معرض) قبل المتابعة.' };
+    }
+
+    const hasColorsUi = document.getElementById('has_colors') && document.getElementById('has_colors').value === '1';
+    const hsForSave = orangeProductEffectiveHasSizes();
+    if (hasColorsUi) {
+        const cwRows = document.querySelectorAll('#colorwaysBox .cw-row');
+        let hasValidColorway = false;
+        cwRows.forEach(function (row) {
+            const pEl = row.querySelector('.cw-p');
+            const pv = pEl ? parseInt(pEl.value || '0', 10) || 0 : 0;
+            if (pv > 0) {
+                hasValidColorway = true;
+            }
+        });
+        if (!hasValidColorway) {
+            return {
+                tab: 'sizes',
+                message: 'الصنف بخيار «له ألوان ؟ = نعم»: أضف صف لوناً واختر لوناً أساسياً من القاموس قبل المتابعة.'
+            };
+        }
+        if (hsForSave) {
+            let allSized = true;
+            cwRows.forEach(function (row) {
+                const pEl = row.querySelector('.cw-p');
+                const pv = pEl ? parseInt(pEl.value || '0', 10) || 0 : 0;
+                if (pv <= 0) {
+                    return;
+                }
+                const cbs = row.querySelectorAll('.cw-size-cb:checked');
+                if (!cbs.length) {
+                    allSized = false;
+                }
+            });
+            if (!allSized) {
+                return {
+                    tab: 'sizes',
+                    message: 'لكل صف لون اخترت له لوناً أساسياً: حدّد مقاساً واحداً على الأقل من قائمة المقاسات تحت الصف قبل المتابعة.'
+                };
+            }
+        }
+    } else if (hsForSave) {
+        const mount = document.getElementById('product_size_pick_checkboxes');
+        const hasPickUi = !!(mount && mount.querySelector('.product-size-pick-cb'));
+        const checkedPick = mount ? mount.querySelectorAll('.product-size-pick-cb:checked').length : 0;
+        if (hasPickUi && checkedPick < 1) {
+            return {
+                tab: 'basic',
+                message: 'اختر مقاساً واحداً على الأقل من قائمة «مقاسات المنتج (بدون ألوان)» في البيانات الأساسية قبل المتابعة.'
+            };
+        }
+        if (!hasPickUi) {
+            const famEl = document.getElementById('size_family_id');
+            const famId0 = famEl ? parseInt(famEl.value || '0', 10) || 0 : 0;
+            const szList0 = famId0 ? sizesForFamily(famId0) : [];
+            if (szList0.length > 0) {
+                return {
+                    tab: 'basic',
+                    message: 'اختر مقاساً واحداً على الأقل من قائمة «مقاسات المنتج (بدون ألوان)» في البيانات الأساسية قبل المتابعة.'
+                };
+            }
+        }
+    }
+
+    return null;
+}
+
+function orangeApplyCatalogAttributeLocks() {
+    const edit = orangeProductBasicRecordIsEdit();
+    const typeOk = orangeProductBasicTypeOk();
+    const unlocked = edit || typeOk;
+    const addBtn = document.getElementById('orangeCatalogAttrAddRowBtn');
+    if (addBtn) {
+        addBtn.disabled = !unlocked;
+    }
+    document.querySelectorAll('#orangeCatalogAttrRows .orange-pav-dynamic-row').forEach(function (row) {
+        const typeSel = row.querySelector('.orange-pav-type-select');
+        const tid = typeSel ? (parseInt(typeSel.value || '0', 10) || 0) : 0;
+        if (typeSel) {
+            typeSel.disabled = !unlocked;
+        }
+        row.querySelectorAll('.orange-pav-value-input').forEach(function (inp) {
+            if (!unlocked) {
+                inp.disabled = true;
+                return;
+            }
+            inp.disabled = tid <= 0;
+        });
+        const rm = row.querySelector('.orange-pav-row-remove');
+        if (rm) {
+            rm.disabled = !unlocked;
+        }
+    });
+    orangeCatalogAttrUpdateRemoveButtons();
+    if (!unlocked) {
+        document.querySelectorAll('#orangeCatalogAttrRows .orange-pav-row-remove').forEach(function (btn) {
+            btn.disabled = true;
+        });
+    }
+}
+
+/** أزرار «توليد المتغيرات» / «حفظ المنتج» لمنتج جديد: توليد بعد اكتمال المعطيات؛ الحفظ بعد توليد ناجح. */
+function orangeApplyProductWizardActionButtons() {
+    const btnGen = document.getElementById('btnGenerateVariants');
+    const btnSave = document.getElementById('btnSaveProduct');
+    if (!btnGen || !btnSave) {
+        return;
+    }
+    if (orangeProductBasicRecordIsEdit()) {
+        btnGen.style.display = 'none';
+        btnGen.disabled = true;
+        btnSave.disabled = false;
+        return;
+    }
+    btnGen.style.display = '';
+    const ok = orangeProductValidateWizardBeforeMatrix() === null;
+    btnGen.disabled = !ok;
+    const canSave = ok && !!window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE;
+    btnSave.disabled = !canSave;
+}
+
 /** تسلسل البيانات الأساسية: قسم ← نوع ← (عربي/إنجليزي/فلبيني/هندي + سعر + تكلفة + حالة العرض) ← بعد سعر وتكلفة صالحين ← عائلة المقاسات و«له ألوان؟» (تعديل = كل الحقول مفعّلة). */
 function orangeApplyProductBasicStepLocks() {
     const edit = orangeProductBasicRecordIsEdit();
@@ -1045,6 +1263,8 @@ function orangeApplyProductBasicStepLocks() {
     });
 
     onHasFlagsChange();
+    orangeApplyCatalogAttributeLocks();
+    orangeApplyProductWizardActionButtons();
 }
 
 function orangeApplySizeFamilySchemeFilter() {
@@ -1296,8 +1516,12 @@ function orangeCatalogAttrAppendRow(selectedAttrId, presetVal) {
     typeSel.addEventListener('change', function () {
         const id = parseInt(typeSel.value || '0', 10) || 0;
         orangeCatalogAttrFillValueWrap(row, id, '');
+        orangeApplyCatalogAttributeLocks();
+        orangeApplyProductWizardActionButtons();
     });
     orangeCatalogAttrUpdateRemoveButtons();
+    orangeApplyCatalogAttributeLocks();
+    orangeApplyProductWizardActionButtons();
 }
 
 function orangeCatalogAttrRemoveRow(row) {
@@ -1310,6 +1534,8 @@ function orangeCatalogAttrRemoveRow(row) {
         orangeCatalogAttrAppendRow(0, '');
     }
     orangeCatalogAttrUpdateRemoveButtons();
+    orangeApplyCatalogAttributeLocks();
+    orangeApplyProductWizardActionButtons();
 }
 
 function orangeCatalogAttrAddEmptyRow() {
@@ -1507,6 +1733,7 @@ function orangeRemoveMainProductImageDesignation() {
     adminSetMainImagePreview(mainEl.value.trim());
     orangeRefreshVariantReferenceThumbs();
     orangeScheduleProductCardPreviewRefresh();
+    orangeProductInvalidateVariantsReadyForSave();
 }
 
 /** معاينة الصورة الرئيسية: يفضّل ‎webp‎ المرافق كما في الواجهة. */
@@ -1896,6 +2123,128 @@ function assignMainImageFromGalleryIfEmpty() {
     adminSetMainImagePreview(fn);
 }
 
+function orangeRevokeMainPendingImageUrl() {
+    if (window.ORANGE_MAIN_PENDING_IMAGE_URL) {
+        try {
+            URL.revokeObjectURL(window.ORANGE_MAIN_PENDING_IMAGE_URL);
+        } catch (e) {}
+        window.ORANGE_MAIN_PENDING_IMAGE_URL = null;
+    }
+}
+
+function orangeRevokeGalleryPendingUrls() {
+    (window.ORANGE_GALLERY_PENDING_URLS || []).forEach(function (u) {
+        try {
+            if (u) {
+                URL.revokeObjectURL(u);
+            }
+        } catch (e) {}
+    });
+    window.ORANGE_GALLERY_PENDING_URLS = [];
+}
+
+/** معاينة ملف الصورة الرئيسية المختار قبل الرفع؛ عند عدم اختيار ملف تُعرض الصورة المرفوعة الحالية إن وُجدت. */
+function orangeRefreshMainImageFileInputPreview() {
+    const inp = document.getElementById('main_image_file');
+    const btnClear = document.getElementById('btn_clear_main_image_file_selection');
+    orangeRevokeMainPendingImageUrl();
+    const mount = document.getElementById('main_image_preview');
+    const row = document.getElementById('main_image_preview_row');
+    if (!mount || !row) {
+        return;
+    }
+    const f = inp && inp.files && inp.files[0];
+    if (f) {
+        window.ORANGE_MAIN_PENDING_IMAGE_URL = URL.createObjectURL(f);
+        const style = 'max-height:160px;max-width:100%;border-radius:8px;border:1px solid #ddd;';
+        mount.innerHTML =
+            '<img alt="" style="' +
+            style +
+            '" src="' +
+            adminEscAttr(window.ORANGE_MAIN_PENDING_IMAGE_URL) +
+            '">';
+        row.style.display = 'flex';
+        if (btnClear) {
+            btnClear.style.display = '';
+        }
+        orangeRefreshVariantReferenceThumbs();
+        orangeScheduleProductCardPreviewRefresh();
+        return;
+    }
+    if (btnClear) {
+        btnClear.style.display = 'none';
+    }
+    adminSetMainImagePreview(document.getElementById('main_image') ? document.getElementById('main_image').value.trim() : '');
+}
+
+function orangeRenderGalleryPendingPreviews() {
+    const inp = document.getElementById('gallery_files');
+    const ul = document.getElementById('gallery_files_pending_list');
+    const btnClr = document.getElementById('btn_clear_gallery_file_selection');
+    orangeRevokeGalleryPendingUrls();
+    if (!ul) {
+        return;
+    }
+    ul.innerHTML = '';
+    const n = inp && inp.files ? inp.files.length : 0;
+    if (!n) {
+        if (btnClr) {
+            btnClr.style.display = 'none';
+        }
+        return;
+    }
+    if (btnClr) {
+        btnClr.style.display = '';
+    }
+    for (let i = 0; i < inp.files.length; i++) {
+        const file = inp.files[i];
+        const url = URL.createObjectURL(file);
+        window.ORANGE_GALLERY_PENDING_URLS.push(url);
+        const li = document.createElement('li');
+        li.className = 'admin-product-gallery-upload-item';
+        const thumbWrap = document.createElement('div');
+        thumbWrap.className = 'admin-product-gallery-upload-thumb';
+        const img = document.createElement('img');
+        img.alt = '';
+        img.style.cssText =
+            'width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid #cbd5e1;display:block;';
+        img.src = url;
+        thumbWrap.appendChild(img);
+        const cap = document.createElement('span');
+        cap.className = 'admin-product-gallery-upload-filename';
+        cap.textContent = file.name || '#' + String(i + 1);
+        cap.setAttribute('dir', 'ltr');
+        const rm = document.createElement('button');
+        rm.type = 'button';
+        rm.className = 'btn-secondary admin-product-gallery-upload-remove';
+        rm.textContent = 'إزالة';
+        const idx = i;
+        rm.addEventListener('click', function () {
+            orangeGalleryPendingRemoveOneAt(idx);
+        });
+        li.appendChild(thumbWrap);
+        li.appendChild(cap);
+        li.appendChild(rm);
+        ul.appendChild(li);
+    }
+}
+
+function orangeGalleryPendingRemoveOneAt(removeIndex) {
+    const inp = document.getElementById('gallery_files');
+    if (!inp || !inp.files || inp.files.length <= removeIndex) {
+        orangeRenderGalleryPendingPreviews();
+        return;
+    }
+    const dt = new DataTransfer();
+    for (let i = 0; i < inp.files.length; i++) {
+        if (i !== removeIndex) {
+            dt.items.add(inp.files[i]);
+        }
+    }
+    inp.files = dt.files;
+    orangeRenderGalleryPendingPreviews();
+}
+
 function renderGalleryUploadList() {
     const ul = document.getElementById('gallery_upload_list');
     if (!ul) {
@@ -1940,6 +2289,7 @@ function renderGalleryUploadList() {
                 }
             }
             renderGalleryUploadList();
+            orangeProductInvalidateVariantsReadyForSave();
         };
         li.appendChild(thumbWrap);
         li.appendChild(cap);
@@ -1966,8 +2316,9 @@ async function uploadMainProductImage() {
             return;
         }
         document.getElementById('main_image').value = j.filename;
-        adminSetMainImagePreview(j.filename);
         inp.value = '';
+        orangeRefreshMainImageFileInputPreview();
+        orangeProductInvalidateVariantsReadyForSave();
     } catch (e) {
         alert('خطأ في الاتصال أثناء الرفع');
     }
@@ -2003,6 +2354,7 @@ function setProductFormEditMode(isEdit) {
 
 function resetProductForm() {
     document.getElementById('product_record_id').value = '0';
+    window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE = false;
     setProductFormEditMode(false);
     document.getElementById('name').value = '';
     document.getElementById('name_en').value = '';
@@ -2044,6 +2396,24 @@ function resetProductForm() {
     }
     document.getElementById('main_image').value = '';
     document.getElementById('main_image_file').value = '';
+    orangeRevokeMainPendingImageUrl();
+    const gfReset = document.getElementById('gallery_files');
+    if (gfReset) {
+        gfReset.value = '';
+    }
+    orangeRevokeGalleryPendingUrls();
+    const gpend = document.getElementById('gallery_files_pending_list');
+    if (gpend) {
+        gpend.innerHTML = '';
+    }
+    const bgf = document.getElementById('btn_clear_gallery_file_selection');
+    if (bgf) {
+        bgf.style.display = 'none';
+    }
+    const bm = document.getElementById('btn_clear_main_image_file_selection');
+    if (bm) {
+        bm.style.display = 'none';
+    }
     adminSetMainImagePreview('');
     document.getElementById('has_colors').value = '0';
     document.getElementById('size_family_id').value = '';
@@ -2107,6 +2477,28 @@ async function loadProductForEdit(id) {
             return;
         }
         const p = j.product;
+        const mifLoad = document.getElementById('main_image_file');
+        if (mifLoad) {
+            mifLoad.value = '';
+        }
+        const gfLoad = document.getElementById('gallery_files');
+        if (gfLoad) {
+            gfLoad.value = '';
+        }
+        orangeRevokeMainPendingImageUrl();
+        orangeRevokeGalleryPendingUrls();
+        const gplLoad = document.getElementById('gallery_files_pending_list');
+        if (gplLoad) {
+            gplLoad.innerHTML = '';
+        }
+        const bgsLoad = document.getElementById('btn_clear_gallery_file_selection');
+        if (bgsLoad) {
+            bgsLoad.style.display = 'none';
+        }
+        const bmsLoad = document.getElementById('btn_clear_main_image_file_selection');
+        if (bmsLoad) {
+            bmsLoad.style.display = 'none';
+        }
         document.getElementById('product_record_id').value = String(p.id);
         setProductFormEditMode(true);
         document.getElementById('product_sort_order').value = String(parseInt(p.sort_order, 10) || 0);
@@ -2297,9 +2689,11 @@ async function uploadGalleryProductImages() {
         }
     }
     inp.value = '';
+    orangeRenderGalleryPendingPreviews();
     assignMainImageFromGalleryIfEmpty();
     renderGalleryUploadList();
     orangeRefreshVariantReferenceThumbs();
+    orangeProductInvalidateVariantsReadyForSave();
 }
 
 function onHasFlagsChange() {
@@ -2343,6 +2737,7 @@ function onHasFlagsChange() {
         orangeRefreshAllColorwaySizePickers();
     }
     orangeScheduleProductCardPreviewRefresh();
+    orangeProductInvalidateVariantsReadyForSave();
 }
 
 function patternOptionsHtml() {
@@ -2840,6 +3235,7 @@ function orangeSizePickSetAll(checked) {
     document.querySelectorAll('#product_size_pick_checkboxes .product-size-pick-cb').forEach(function (cb) {
         cb.checked = !!checked;
     });
+    orangeProductInvalidateVariantsReadyForSave();
 }
 
 function orangeRefreshSizePickPanel() {
@@ -2911,6 +3307,7 @@ function orangeRefreshSizePickPanel() {
         wrap.appendChild(cb);
         wrap.appendChild(span);
         mount.appendChild(wrap);
+        cb.addEventListener('change', orangeProductInvalidateVariantsReadyForSave);
     });
 }
 
@@ -2967,6 +3364,12 @@ function orangeGetPickedSizesForVariantGen(famId, allSizes) {
 }
 
 function generateVariants() {
+    const wizErr = orangeProductValidateWizardBeforeMatrix();
+    if (wizErr) {
+        productFormShowTab(wizErr.tab);
+        alert(wizErr.message);
+        return;
+    }
     assignMainImageFromGalleryIfEmpty();
     const hasC = document.getElementById('has_colors').value === '1';
     const hasS = orangeProductEffectiveHasSizes();
@@ -3099,151 +3502,26 @@ function generateVariants() {
     });
     html += '</tbody></table></div>';
     box.innerHTML = html;
+    if (orangeProductWizardIsNew()) {
+        window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE = true;
+        orangeApplyProductWizardActionButtons();
+    }
     productFormShowTab('variants');
     orangeScheduleProductCardPreviewRefresh();
 }
 
 async function saveProduct() {
-    const nameFields = [
-        { id: 'name', label: 'الاسم العربي' },
-        { id: 'name_en', label: 'English' },
-        { id: 'name_fil', label: 'Filipino' },
-        { id: 'name_hi', label: 'Hindi' }
-    ];
-    for (let i = 0; i < nameFields.length; i++) {
-        const f = nameFields[i];
-        if (!document.getElementById(f.id).value.trim()) {
-            productFormShowTab('basic');
-            alert('يجب إضافة خانة ' + f.label + ' قبل الحفظ');
-            return;
-        }
-    }
-
-    if (window.ORANGE_PT_DEPT_STEP_ENABLED === true) {
-        const depOptCount = parseInt(String(window.ORANGE_PT_DEPT_OPTIONS_COUNT || '0'), 10) || 0;
-        if (depOptCount <= 0) {
-            productFormShowTab('basic');
-            alert(
-                'التصنيف الموحّد مفعّل لكن لا توجد أقسام مربوطة بأنواع المنتج في القاعدة — أصلح الربط (departments ← الشجرة الموحّدة ← أنواع المنتج) ثم أعد تحميل الصفحة.'
-            );
-            return;
-        }
-        const depSaveEl = document.getElementById('product_main_department_id');
-        const depSaveVal = depSaveEl && !depSaveEl.disabled ? (parseInt(depSaveEl.value || '0', 10) || 0) : 0;
-        if (depSaveVal <= 0) {
-            productFormShowTab('basic');
-            alert('يجب اختيار «القسم الرئيسي» أولاً، ثم نوع المنتج التابع لهذا القسم.');
-            return;
-        }
-    }
-    const ptEl = document.getElementById('product_type_id');
-    const ptVal = ptEl ? (parseInt(ptEl.value || '0', 10) || 0) : 0;
-    if (ptVal <= 0) {
-        productFormShowTab('basic');
-        if (window.ORANGE_PT_DEPT_STEP_ENABLED === true) {
-            alert('اختر «القسم الرئيسي» ثم «نوع المنتج» من الأنواع المعروضة لهذا القسم فقط.');
-        } else {
-            alert('يجب اختيار «نوع المنتج» قبل الحفظ.');
-        }
+    const wizErr = orangeProductValidateWizardBeforeMatrix();
+    if (wizErr) {
+        productFormShowTab(wizErr.tab);
+        alert(wizErr.message.replace('قبل المتابعة.', 'قبل الحفظ.'));
         return;
     }
 
-    const hsCheck = orangeProductEffectiveHasSizes();
-    if (hsCheck) {
-        const sfam = document.getElementById('size_family_id');
-        const sfamId = sfam ? (parseInt(sfam.value || '0', 10) || 0) : 0;
-        if (sfamId <= 0) {
-            productFormShowTab('basic');
-            alert('اختر عائلة مقاسات من البيانات الأساسية.');
-            return;
-        }
-        const ptSave = document.getElementById('product_type_id');
-        const ptIdSave = ptSave && ptSave.value ? (parseInt(ptSave.value, 10) || 0) : 0;
-        if (ptIdSave > 0) {
-            const expKind = orangeGetSelectedProductTypeExpectedKind();
-            const expCat = orangeGetSelectedProductTypeExpectedCat();
-            const famSel = document.getElementById('size_family_id');
-            if (famSel && famSel.value) {
-                const fo = famSel.options[famSel.selectedIndex];
-                const fk = fo ? String(fo.getAttribute('data-commercial-kind') || '').trim() : '';
-                const fsk = fo ? String(fo.getAttribute('data-sizing-category') || '').trim() : '';
-                if (expKind !== '' && expCat !== '' && (fk !== expKind || fsk !== expCat)) {
-                    productFormShowTab('basic');
-                    alert('عائلة المقاسات لا تطابق نطاق هرَم نوع المنتج (النوع التجاري «' + expKind + '» / فئة «' + expCat + '»).');
-                    return;
-                }
-            }
-        }
-    }
-
-    assignMainImageFromGalleryIfEmpty();
-    const mainVal = document.getElementById('main_image').value.trim();
-    const hasAnyImage = mainVal || (window.PRODUCT_EXTRA_IMAGES && window.PRODUCT_EXTRA_IMAGES.length);
-    if (!hasAnyImage) {
-        productFormShowTab('images');
-        alert('ارفع صورة واحدة على الأقل قبل الحفظ');
+    if (orangeProductWizardIsNew() && !window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE) {
+        productFormShowTab('variants');
+        alert('اضغط «توليد المتغيرات» أولاً بعد اكتمال البيانات، ثم احفظ.');
         return;
-    }
-
-    const hasColorsUi = document.getElementById('has_colors') && document.getElementById('has_colors').value === '1';
-    const hsForSave = orangeProductEffectiveHasSizes();
-    if (hasColorsUi) {
-        const cwRows = document.querySelectorAll('#colorwaysBox .cw-row');
-        let hasValidColorway = false;
-        cwRows.forEach(function (row) {
-            const pEl = row.querySelector('.cw-p');
-            const pv = pEl ? parseInt(pEl.value || '0', 10) || 0 : 0;
-            if (pv > 0) {
-                hasValidColorway = true;
-            }
-        });
-        if (!hasValidColorway) {
-            productFormShowTab('sizes');
-            alert('الصنف بخيار «له ألوان ؟ = نعم»: أضف صف لوناً واختر لوناً أساسياً من القاموس قبل الحفظ.');
-            return;
-        }
-        if (hsForSave) {
-            let allSized = true;
-            cwRows.forEach(function (row) {
-                const pEl = row.querySelector('.cw-p');
-                const pv = pEl ? parseInt(pEl.value || '0', 10) || 0 : 0;
-                if (pv <= 0) {
-                    return;
-                }
-                const cbs = row.querySelectorAll('.cw-size-cb:checked');
-                if (!cbs.length) {
-                    allSized = false;
-                }
-            });
-            if (!allSized) {
-                productFormShowTab('sizes');
-                alert('لكل صف لون اخترت له لوناً أساسياً: حدّد مقاساً واحداً على الأقل من قائمة المقاسات تحت الصف قبل الحفظ.');
-                return;
-            }
-        }
-    } else if (hsForSave) {
-        const mount = document.getElementById('product_size_pick_checkboxes');
-        const hasPickUi = !!(mount && mount.querySelector('.product-size-pick-cb'));
-        const checkedPick = mount ? mount.querySelectorAll('.product-size-pick-cb:checked').length : 0;
-        if (hasPickUi && checkedPick < 1) {
-            productFormShowTab('basic');
-            alert('اختر مقاساً واحداً على الأقل من قائمة «مقاسات المنتج (بدون ألوان)» في البيانات الأساسية قبل الحفظ.');
-            return;
-        }
-        if (!hasPickUi) {
-            const famEl = document.getElementById('size_family_id');
-            const famId0 = famEl ? parseInt(famEl.value || '0', 10) || 0 : 0;
-            const szList0 = famId0 ? sizesForFamily(famId0) : [];
-            if (szList0.length > 0) {
-                productFormShowTab('basic');
-                alert('اختر مقاساً واحداً على الأقل من قائمة «مقاسات المنتج (بدون ألوان)» في البيانات الأساسية قبل الحفظ.');
-                return;
-            }
-        }
-    }
-
-    if (orangeProductIsSimpleSkuMatrix() && !document.querySelectorAll('#variantsBox tbody tr').length) {
-        generateVariants();
     }
 
     const recordId = parseInt(document.getElementById('product_record_id').value || '0', 10);
@@ -3470,11 +3748,13 @@ orangeSeedProductTypeOptions();
 orangeApplyProductTypeDepartmentFilter(false);
 if (orangeProductDepartmentSelectEl) {
     orangeProductDepartmentSelectEl.addEventListener('change', function () {
+        orangeProductInvalidateVariantsReadyForSave();
         orangeApplyProductTypeDepartmentFilter(true);
     });
 }
 if (orangeProductTypeSelectEl) {
     orangeProductTypeSelectEl.addEventListener('change', function () {
+        orangeProductInvalidateVariantsReadyForSave();
         orangeSyncMainDepartmentFromProductType();
         if (window.ORANGE_PT_DEPT_STEP_ENABLED === true) {
             orangeApplyProductTypeDepartmentFilter(true);
@@ -3489,6 +3769,7 @@ if (orangeProductTypeSelectEl) {
 const orangeSizeFamilySelectEl = document.getElementById('size_family_id');
 if (orangeSizeFamilySelectEl) {
     orangeSizeFamilySelectEl.addEventListener('change', function () {
+        orangeProductInvalidateVariantsReadyForSave();
         orangeApplyProductBasicStepLocks();
     });
 }
@@ -3496,6 +3777,46 @@ const btnRemoveMainProductImage = document.getElementById('btn_remove_main_produ
 if (btnRemoveMainProductImage) {
     btnRemoveMainProductImage.addEventListener('click', function () {
         orangeRemoveMainProductImageDesignation();
+    });
+}
+
+const mainImageFileEl = document.getElementById('main_image_file');
+if (mainImageFileEl) {
+    mainImageFileEl.addEventListener('change', function () {
+        orangeRefreshMainImageFileInputPreview();
+    });
+}
+const btnClearMainImageFileSel = document.getElementById('btn_clear_main_image_file_selection');
+if (btnClearMainImageFileSel) {
+    btnClearMainImageFileSel.addEventListener('click', function () {
+        const inp = document.getElementById('main_image_file');
+        if (inp) {
+            inp.value = '';
+        }
+        orangeRefreshMainImageFileInputPreview();
+    });
+}
+const galleryFilesEl = document.getElementById('gallery_files');
+if (galleryFilesEl) {
+    galleryFilesEl.addEventListener('change', function () {
+        orangeRenderGalleryPendingPreviews();
+    });
+}
+const btnClearGalleryFileSel = document.getElementById('btn_clear_gallery_file_selection');
+if (btnClearGalleryFileSel) {
+    btnClearGalleryFileSel.addEventListener('click', function () {
+        const inp = document.getElementById('gallery_files');
+        if (inp) {
+            inp.value = '';
+        }
+        orangeRenderGalleryPendingPreviews();
+    });
+}
+
+const orangeCatalogAttrAddRowBtnEl = document.getElementById('orangeCatalogAttrAddRowBtn');
+if (orangeCatalogAttrAddRowBtnEl) {
+    orangeCatalogAttrAddRowBtnEl.addEventListener('click', function () {
+        orangeCatalogAttrAddEmptyRow();
     });
 }
 
@@ -3543,12 +3864,16 @@ rebuildSubcategoryOptions(null);
 updateProductCatalogHint();
 
 setProductFormEditMode(false);
+orangeClearCatalogAttributeInputs();
 orangeApplyProductBasicStepLocks();
 
 ['name', 'name_en', 'name_fil', 'name_hi', 'price', 'cost'].forEach(function (id) {
     const el = document.getElementById(id);
     if (el) {
         const refresh = function () {
+            if (id === 'name' || id === 'name_en' || id === 'name_fil' || id === 'name_hi' || id === 'price' || id === 'cost') {
+                orangeProductInvalidateVariantsReadyForSave();
+            }
             orangeApplyProductBasicStepLocks();
             if (id === 'name' || id === 'name_en' || id === 'name_fil' || id === 'name_hi' || id === 'price') {
                 orangeScheduleProductCardPreviewRefresh();

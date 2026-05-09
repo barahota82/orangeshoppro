@@ -2268,6 +2268,13 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     margin-inline-start: auto;
 }
 
+.admin-product-form-actions--bar #btnGenerateVariants:disabled,
+.admin-product-form-actions--bar #btnSaveProduct:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    filter: grayscale(0.2);
+}
+
 .admin-main-image-preview-row {
     display: flex;
     align-items: flex-start;
