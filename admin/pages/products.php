@@ -323,6 +323,9 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
         $unifiedActiveProductsMissingPt = 0;
     }
 }
+
+$orangeAdminCardPreviewCssHref = storefront_public_path('/assets/css/main.css');
+$orangeAdminCardPreviewViewLabel = t('view_product');
 ?>
 <div class="page-title">
     <h1>المنتجات</h1>
@@ -351,10 +354,11 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
         <div class="admin-product-tabs" role="tablist" aria-label="أقسام نموذج المنتج">
             <button type="button" class="admin-product-tab is-active" role="tab" id="productTabBtnBasic" aria-controls="productTabPanelBasic" aria-selected="true" data-product-tab="basic">البيانات الأساسية</button>
             <button type="button" class="admin-product-tab" role="tab" id="productTabBtnSizes" aria-controls="productTabPanelSizes" aria-selected="false" data-product-tab="sizes">الألوان</button>
-            <button type="button" class="admin-product-tab" role="tab" id="productTabBtnDescription" aria-controls="productTabPanelDescription" aria-selected="false" data-product-tab="description">وصف المنتج</button>
-            <button type="button" class="admin-product-tab" role="tab" id="productTabBtnAttributes" aria-controls="productTabPanelAttributes" aria-selected="false" data-product-tab="attributes">سمات المنتج</button>
-            <button type="button" class="admin-product-tab" role="tab" id="productTabBtnImages" aria-controls="productTabPanelImages" aria-selected="false" data-product-tab="images">الصور</button>
+            <button type="button" class="admin-product-tab" role="tab" id="productTabBtnImages" aria-controls="productTabPanelImages" aria-selected="false" data-product-tab="images">صور المنتج العامة</button>
             <button type="button" class="admin-product-tab" role="tab" id="productTabBtnVariants" aria-controls="productTabPanelVariants" aria-selected="false" data-product-tab="variants">المتغيرات والباركود</button>
+            <button type="button" class="admin-product-tab" role="tab" id="productTabBtnAttributes" aria-controls="productTabPanelAttributes" aria-selected="false" data-product-tab="attributes">سمات المنتج</button>
+            <button type="button" class="admin-product-tab" role="tab" id="productTabBtnDescription" aria-controls="productTabPanelDescription" aria-selected="false" data-product-tab="description">وصف المنتج</button>
+            <button type="button" class="admin-product-tab" role="tab" id="productTabBtnCardPreview" aria-controls="productTabPanelCardPreview" aria-selected="false" data-product-tab="cardpreview">معاينة كارت المنتج</button>
         </div>
 
         <div class="admin-product-tab-panels">
@@ -542,6 +546,62 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
         </div>
         </div>
 
+        <div id="productTabPanelImages" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnImages">
+        <div class="admin-product-section">
+        <h4 class="admin-product-subsection-title">صور المنتج العامة</h4>
+        <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">صور <strong>المنتج العامة</strong> (رئيسية + معرض) للقوائم والاحتياط. إن كان المنتج <strong>له ألوان</strong> يمكن إضافة <strong>معرض لكل لون</strong> من تبويب <strong>الألوان</strong> أسفل صف اللون — وإلا يُعرض في المتجر نفس المعرض العام.</p>
+        <div class="form-grid">
+            <div style="grid-column:1/-1;">
+                <label>الصورة الرئيسية — رفع ملف</label>
+                <input type="hidden" id="main_image" value="">
+                <input type="file" id="main_image_file" accept="image/jpeg,image/png,image/webp,image/gif">
+                <button type="button" class="btn-secondary" style="margin-top:8px;" onclick="uploadMainProductImage()">رفع الصورة الرئيسية</button>
+                <div id="main_image_preview_row" class="admin-main-image-preview-row" style="display:none;margin-top:12px;">
+                    <div id="main_image_preview" class="admin-main-image-preview-mount"></div>
+                    <div class="admin-main-image-preview-actions">
+                        <button type="button" class="btn-secondary" id="btn_remove_main_product_image">إزالة الصورة الرئيسية</button>
+                        <span class="admin-main-image-preview-hint card-hint" style="display:block;margin-top:6px;font-size:12px;">تُزال التعيين كرئيسية فقط؛ إن وُجدت صور في المعرض تُختار أولها تلقائياً إن أمكن.</span>
+                    </div>
+                </div>
+            </div>
+            <div style="grid-column:1/-1;">
+                <label>صور إضافية للمعرض (عدة ملفات)</label>
+                <input type="file" id="gallery_files" accept="image/jpeg,image/png,image/webp,image/gif" multiple>
+                <button type="button" class="btn-secondary" style="margin-top:8px;" onclick="uploadGalleryProductImages()">رفع صور المعرض</button>
+                <ul id="gallery_upload_list" class="admin-product-gallery-upload-list" style="margin:12px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:10px;"></ul>
+            </div>
+        </div>
+        </div>
+        </div>
+
+        <div id="productTabPanelVariants" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnVariants">
+        <div class="admin-product-section">
+        <h4 class="admin-product-subsection-title">المتغيرات والباركود</h4>
+        <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">كل منتج — بما فيه <strong>بدون ألوان وبدون مقاسات</strong> — يحتاج <strong>صف بيع واحد على الأقل</strong> في الجدول أدناه؛ يظهر <strong>باركود المتغير</strong> بعد الحفظ. المنتج البسيط = صف واحد (يمكن استخدام «توليد المتغيرات» أو سيُكمَل تلقائياً عند الحفظ إن كان الجدول فارغاً).</p>
+        <div id="variantsBox"></div>
+        </div>
+        </div>
+        </div>
+
+        <div id="productTabPanelAttributes" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnAttributes">
+        <div class="admin-product-section">
+        <h4 class="admin-product-subsection-title">سمات المنتج</h4>
+        <div class="form-grid product-form-tab-basic-grid">
+        <?php if ($catalogAttributesActive !== []): ?>
+        <div style="grid-column:1/-1;">
+            <p style="margin:0 0 10px;font-size:13px;color:#64748b;">لكل سطر: اختر نوع السمة ثم القيمة. استخدم «إضافة سمة أخرى» لصف إضافي.</p>
+            <div id="orangeCatalogAttrRows"></div>
+            <button type="button" class="btn-secondary" id="orangeCatalogAttrAddRowBtn" style="margin-top:6px;">إضافة سمة أخرى</button>
+        </div>
+        <?php else: ?>
+        <div style="grid-column:1/-1;">
+            <p style="margin:0;color:#64748b;">لا توجد سمات كتالوج نشطة حالياً.</p>
+        </div>
+        <?php endif; ?>
+        </div>
+        </div>
+        </div>
+
         <div id="productTabPanelDescription" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnDescription">
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">وصف المنتج</h4>
@@ -601,58 +661,12 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
         </div>
         </div>
 
-        <div id="productTabPanelAttributes" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnAttributes">
+        <div id="productTabPanelCardPreview" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnCardPreview">
         <div class="admin-product-section">
-        <h4 class="admin-product-subsection-title">سمات المنتج</h4>
-        <div class="form-grid product-form-tab-basic-grid">
-        <?php if ($catalogAttributesActive !== []): ?>
-        <div style="grid-column:1/-1;">
-            <p style="margin:0 0 10px;font-size:13px;color:#64748b;">لكل سطر: اختر نوع السمة ثم القيمة. استخدم «إضافة سمة أخرى» لصف إضافي.</p>
-            <div id="orangeCatalogAttrRows"></div>
-            <button type="button" class="btn-secondary" id="orangeCatalogAttrAddRowBtn" style="margin-top:6px;">إضافة سمة أخرى</button>
-        </div>
-        <?php else: ?>
-        <div style="grid-column:1/-1;">
-            <p style="margin:0;color:#64748b;">لا توجد سمات كتالوج نشطة حالياً.</p>
-        </div>
-        <?php endif; ?>
-        </div>
-        </div>
-        </div>
-
-        <div id="productTabPanelImages" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnImages">
-        <div class="admin-product-section">
-        <h4 class="admin-product-subsection-title">الصور</h4>
-        <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">صور <strong>المنتج العامة</strong> (رئيسية + معرض) للقوائم والاحتياط. إن كان المنتج <strong>له ألوان</strong> يمكن إضافة <strong>معرض لكل لون</strong> من تبويب <strong>الألوان</strong> أسفل صف اللون — وإلا يُعرض في المتجر نفس المعرض العام.</p>
-        <div class="form-grid">
-            <div style="grid-column:1/-1;">
-                <label>الصورة الرئيسية — رفع ملف</label>
-                <input type="hidden" id="main_image" value="">
-                <input type="file" id="main_image_file" accept="image/jpeg,image/png,image/webp,image/gif">
-                <button type="button" class="btn-secondary" style="margin-top:8px;" onclick="uploadMainProductImage()">رفع الصورة الرئيسية</button>
-                <div id="main_image_preview_row" class="admin-main-image-preview-row" style="display:none;margin-top:12px;">
-                    <div id="main_image_preview" class="admin-main-image-preview-mount"></div>
-                    <div class="admin-main-image-preview-actions">
-                        <button type="button" class="btn-secondary" id="btn_remove_main_product_image">إزالة الصورة الرئيسية</button>
-                        <span class="admin-main-image-preview-hint card-hint" style="display:block;margin-top:6px;font-size:12px;">تُزال التعيين كرئيسية فقط؛ إن وُجدت صور في المعرض تُختار أولها تلقائياً إن أمكن.</span>
-                    </div>
-                </div>
-            </div>
-            <div style="grid-column:1/-1;">
-                <label>صور إضافية للمعرض (عدة ملفات)</label>
-                <input type="file" id="gallery_files" accept="image/jpeg,image/png,image/webp,image/gif" multiple>
-                <button type="button" class="btn-secondary" style="margin-top:8px;" onclick="uploadGalleryProductImages()">رفع صور المعرض</button>
-                <ul id="gallery_upload_list" class="admin-product-gallery-upload-list" style="margin:12px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:10px;"></ul>
-            </div>
-        </div>
-        </div>
-        </div>
-
-        <div id="productTabPanelVariants" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnVariants">
-        <div class="admin-product-section">
-        <h4 class="admin-product-subsection-title">المتغيرات والباركود</h4>
-        <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">كل منتج — بما فيه <strong>بدون ألوان وبدون مقاسات</strong> — يحتاج <strong>صف بيع واحد على الأقل</strong> في الجدول أدناه؛ يظهر <strong>باركود المتغير</strong> بعد الحفظ. المنتج البسيط = صف واحد (يمكن استخدام «توليد المتغيرات» أو سيُكمَل تلقائياً عند الحفظ إن كان الجدول فارغاً).</p>
-        <div id="variantsBox"></div>
+        <h4 class="admin-product-subsection-title">معاينة كارت المنتج</h4>
+        <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">معاينة تقريبية ل<strong>كارت القائمة</strong> في المتجر (اتجاه RTL ولغة عربية كما في الصفحة الرئيسية). تُحدَّث تلقائياً عند تغيّر الاسم والسعر والصور وصفوف الألوان. شارة «العروض» لا تُعرض هنا لأنها مرتبطة بجدول العروض وليس بنموذج المنتج.</p>
+        <div class="admin-product-card-preview-frame-wrap">
+            <iframe id="orangeAdminProductCardPreviewFrame" class="admin-product-card-preview-frame" title="معاينة كارت المنتج في المتجر"></iframe>
         </div>
         </div>
         </div>
@@ -796,6 +810,8 @@ window.ORANGE_PRODUCT_TYPE_TRAIL = <?php echo json_encode($productTypeTrailsForJ
 window.PRODUCT_EXTRA_IMAGES = [];
 window.PRODUCT_NEXT_SORT = <?php echo (int)$nextProductSort; ?>;
 window.ORANGE_CATALOG_ATTR_DEFS = <?php echo json_encode($catalogAttrDefsForJs, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
+window.ORANGE_ADMIN_CARD_PREVIEW_CSS = <?php echo json_encode($orangeAdminCardPreviewCssHref, JSON_UNESCAPED_UNICODE); ?>;
+window.ORANGE_ADMIN_VIEW_PRODUCT_LABEL = <?php echo json_encode($orangeAdminCardPreviewViewLabel, JSON_UNESCAPED_UNICODE); ?>;
 
 const PRODUCT_MSG = {
     E_REORDER: 'بيانات الترتيب غير صحيحة',
@@ -1377,6 +1393,13 @@ function adminEscAttr(s) {
         .replace(/</g, '&lt;');
 }
 
+function adminEscHtml(s) {
+    return String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
 function orangeCopyProductField(elementId) {
     const el = document.getElementById(elementId);
     const v = el && String(el.value || '').trim();
@@ -1483,6 +1506,7 @@ function orangeRemoveMainProductImageDesignation() {
     assignMainImageFromGalleryIfEmpty();
     adminSetMainImagePreview(mainEl.value.trim());
     orangeRefreshVariantReferenceThumbs();
+    orangeScheduleProductCardPreviewRefresh();
 }
 
 /** معاينة الصورة الرئيسية: يفضّل ‎webp‎ المرافق كما في الواجهة. */
@@ -1498,6 +1522,8 @@ function adminSetMainImagePreview(filename) {
         if (row) {
             row.style.display = 'none';
         }
+        orangeRefreshVariantReferenceThumbs();
+        orangeScheduleProductCardPreviewRefresh();
         return;
     }
     const lower = base.toLowerCase();
@@ -1522,6 +1548,7 @@ function adminSetMainImagePreview(filename) {
         row.style.display = 'flex';
     }
     orangeRefreshVariantReferenceThumbs();
+    orangeScheduleProductCardPreviewRefresh();
 }
 
 /** يحدّث عمود «صورة المرجع» في جدول المتغيرات بعد رفع صور (بدون إعادة توليد). */
@@ -1549,6 +1576,175 @@ function orangeRefreshVariantReferenceThumbs() {
         const sp = vsp ? (parseInt(vsp.value, 10) || 0) : 0;
         td.innerHTML = adminVariantReferenceThumbHtmlForColorway(p, s, pp, sp);
     });
+}
+
+let orangeCardPreviewTimer = null;
+
+function orangeScheduleProductCardPreviewRefresh() {
+    clearTimeout(orangeCardPreviewTimer);
+    orangeCardPreviewTimer = setTimeout(function () {
+        orangeRefreshProductCardPreview();
+    }, 420);
+}
+
+function orangeAdminProductCardPreviewTitle() {
+    const ar = document.getElementById('name') && document.getElementById('name').value.trim();
+    if (ar) {
+        return ar;
+    }
+    const en = document.getElementById('name_en') && document.getElementById('name_en').value.trim();
+    if (en) {
+        return en;
+    }
+    const fil = document.getElementById('name_fil') && document.getElementById('name_fil').value.trim();
+    if (fil) {
+        return fil;
+    }
+    const hi = document.getElementById('name_hi') && document.getElementById('name_hi').value.trim();
+    if (hi) {
+        return hi;
+    }
+    return '—';
+}
+
+function orangeAdminProductCardPreviewImageSrc() {
+    const mainEl = document.getElementById('main_image');
+    const main = mainEl ? mainEl.value.trim() : '';
+    const ex0 =
+        window.PRODUCT_EXTRA_IMAGES && window.PRODUCT_EXTRA_IMAGES[0]
+            ? String(window.PRODUCT_EXTRA_IMAGES[0]).trim()
+            : '';
+    const fn = main || ex0;
+    if (!fn) {
+        return '';
+    }
+    return adminPublicPath('/uploads/products/') + encodeURIComponent(adminProductImageBasename(fn));
+}
+
+function orangeAdminProductCardPreviewPriceFormatted() {
+    const pEl = document.getElementById('price');
+    const raw = pEl ? String(pEl.value || '').trim().replace(',', '.') : '';
+    const n = parseFloat(raw);
+    const v = Number.isFinite(n) && n >= 0 ? n : 0;
+    return v.toFixed(2) + ' KD';
+}
+
+function orangeAdminCwRowDisplayParts(row) {
+    if (!row || !row.querySelector) {
+        return null;
+    }
+    const p = parseInt((row.querySelector('.cw-p') && row.querySelector('.cw-p').value) || '0', 10) || 0;
+    if (!p) {
+        return null;
+    }
+    const s = parseInt((row.querySelector('.cw-s') && row.querySelector('.cw-s').value) || '0', 10) || 0;
+    const pp = parseInt((row.querySelector('.cw-pp') && row.querySelector('.cw-pp').value) || '0', 10) || 0;
+    const sp = parseInt((row.querySelector('.cw-sp') && row.querySelector('.cw-sp').value) || '0', 10) || 0;
+    const pCol = (window.ORANGE_COLORS || []).find(function (x) {
+        return String(x.id) === String(p);
+    });
+    const sCol = (window.ORANGE_COLORS || []).find(function (x) {
+        return String(x.id) === String(s);
+    });
+    let colorLabel = '';
+    if (pCol) {
+        colorLabel += pCol.name_ar || pCol.name_en || '';
+    }
+    if (sCol && (!pCol || String(sCol.id) !== String(pCol.id))) {
+        colorLabel += (colorLabel ? ' + ' : '') + (sCol.name_ar || sCol.name_en || '');
+    }
+    const ppt = (window.ORANGE_PATTERNS || []).find(function (x) {
+        return String(x.id) === String(pp);
+    });
+    const spt = (window.ORANGE_PATTERNS || []).find(function (x) {
+        return String(x.id) === String(sp);
+    });
+    let patPhrase = '';
+    if (ppt) {
+        patPhrase += ppt.name_ar || ppt.name_en || '';
+    }
+    if (spt) {
+        patPhrase += (patPhrase ? ' · ' : '') + (spt.name_ar || spt.name_en || '');
+    }
+    let colorOut = colorLabel || '';
+    let patOut = patPhrase || '';
+    if (patOut && !colorOut) {
+        colorOut = patOut;
+        patOut = '';
+    }
+    if (!colorOut && !patOut) {
+        return null;
+    }
+    return { color: colorOut, pattern: patOut };
+}
+
+function orangeAdminProductCardPreviewVariantMetaHtml() {
+    const hc = document.getElementById('has_colors') && document.getElementById('has_colors').value === '1';
+    if (!hc) {
+        return '';
+    }
+    const lines = [];
+    document.querySelectorAll('#colorwaysBox .cw-row').forEach(function (row) {
+        const parts = orangeAdminCwRowDisplayParts(row);
+        if (!parts) {
+            return;
+        }
+        let line = '<div class="product-card-variant-line">';
+        if (parts.color) {
+            line += '<span class="product-card-color">' + adminEscHtml(parts.color) + '</span>';
+        }
+        if (parts.pattern) {
+            line += '<span class="product-card-pattern">' + adminEscHtml(parts.pattern) + '</span>';
+        }
+        line += '</div>';
+        lines.push(line);
+    });
+    if (!lines.length) {
+        return '';
+    }
+    return '<div class="product-card-variant-meta" dir="auto">' + lines.join('') + '</div>';
+}
+
+/** يعيد بناء iframe المعاينة بنفس أصناف كارت المنتج في المتجر (main.css داخل الإطار). */
+function orangeRefreshProductCardPreview() {
+    const frame = document.getElementById('orangeAdminProductCardPreviewFrame');
+    if (!frame) {
+        return;
+    }
+    const cssUrl = typeof window.ORANGE_ADMIN_CARD_PREVIEW_CSS === 'string' ? window.ORANGE_ADMIN_CARD_PREVIEW_CSS.trim() : '';
+    if (!cssUrl) {
+        frame.srcdoc =
+            '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"></head><body><p>تعذّر تحميل أنماط المعاينة.</p></body></html>';
+        return;
+    }
+    const titlePlain = orangeAdminProductCardPreviewTitle();
+    const title = adminEscHtml(titlePlain);
+    const viewLbl = adminEscHtml(window.ORANGE_ADMIN_VIEW_PRODUCT_LABEL || '');
+    const imgSrc = orangeAdminProductCardPreviewImageSrc();
+    const variantHtml = orangeAdminProductCardPreviewVariantMetaHtml();
+    const priceStr = adminEscHtml(orangeAdminProductCardPreviewPriceFormatted());
+    const imgBlock = imgSrc
+        ? '<div class="product-image-wrap"><img src="' +
+          adminEscAttr(imgSrc) +
+          '" alt="' +
+          title +
+          '" loading="lazy" decoding="async"></div>'
+        : '<div class="product-image-wrap" style="min-height:220px;display:flex;align-items:center;justify-content:center;font-size:0.9rem;color:var(--muted);padding:12px;text-align:center;">لا صورة بعد — أضف صورة من تبويب «صور المنتج العامة»</div>';
+    const doc =
+        '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><link rel="stylesheet" href="' +
+        adminEscAttr(cssUrl) +
+        '"></head><body class="storefront"><div class="products-grid" style="grid-template-columns:minmax(0,300px);justify-content:center;padding:20px 12px 32px;"><article class="product-card">' +
+        imgBlock +
+        '<div class="product-body"><h3>' +
+        title +
+        '</h3>' +
+        variantHtml +
+        '<div class="price-row"><strong>' +
+        priceStr +
+        '</strong></div><a class="btn" href="#" onclick="return false;">' +
+        viewLbl +
+        '</a></div></article></div></body></html>';
+    frame.srcdoc = doc;
 }
 
 let productTranslateTimer = null;
@@ -1579,6 +1775,7 @@ async function translateProductNames(opts = {}) {
         if (t.name_fil) document.getElementById('name_fil').value = t.name_fil;
         if (t.name_hi) document.getElementById('name_hi').value = t.name_hi;
         orangeApplyProductBasicStepLocks();
+        orangeScheduleProductCardPreviewRefresh();
     } catch (e) {
         if (!silent) alert('فشل طلب الترجمة من السيرفر');
     }
@@ -1750,6 +1947,7 @@ function renderGalleryUploadList() {
         ul.appendChild(li);
     });
     orangeRefreshVariantReferenceThumbs();
+    orangeScheduleProductCardPreviewRefresh();
 }
 
 async function uploadMainProductImage() {
@@ -1868,7 +2066,8 @@ function productFormShowTab(tab) {
         description: 'productTabPanelDescription',
         attributes: 'productTabPanelAttributes',
         images: 'productTabPanelImages',
-        variants: 'productTabPanelVariants'
+        variants: 'productTabPanelVariants',
+        cardpreview: 'productTabPanelCardPreview'
     };
     const key = map[tab] ? tab : 'basic';
     const panelId = map[key];
@@ -1882,6 +2081,9 @@ function productFormShowTab(tab) {
     });
     if (key === 'variants') {
         orangeRefreshVariantReferenceThumbs();
+    }
+    if (key === 'cardpreview') {
+        orangeRefreshProductCardPreview();
     }
 }
 
@@ -2008,6 +2210,7 @@ async function loadProductForEdit(id) {
             applyVariantBarcodesFromVm(vm);
         }
         orangeApplyProductBasicStepLocks();
+        orangeScheduleProductCardPreviewRefresh();
         const sortRO = document.getElementById('product_sort_order');
         if (sortRO) {
             sortRO.readOnly = true;
@@ -2139,6 +2342,7 @@ function onHasFlagsChange() {
     if (hs && hc && allowSizeTier) {
         orangeRefreshAllColorwaySizePickers();
     }
+    orangeScheduleProductCardPreviewRefresh();
 }
 
 function patternOptionsHtml() {
@@ -2431,7 +2635,7 @@ function addColorwayRow() {
         <div class="cw-sizes-mount" style="margin-top:10px;width:100%;"></div>
         <div class="cw-row-gallery card-hint" style="margin-top:12px;padding-top:10px;border-top:1px solid #e2e8f0;">
             <strong>صور هذا اللون (اختياري)</strong>
-            <p style="margin:4px 0 8px;font-size:12px;color:#64748b;">تظهر في المتجر عند اختيار هذا اللون؛ إن تُركت فارغة يُستخدم معرض المنتج العام من تبويب الصور.</p>
+            <p style="margin:4px 0 8px;font-size:12px;color:#64748b;">تظهر في المتجر عند اختيار هذا اللون؛ إن تُركت فارغة يُستخدم معرض المنتج العام من تبويب «صور المنتج العامة».</p>
             <input type="file" class="cw-gallery-files" accept="image/jpeg,image/png,image/webp,image/gif" multiple style="display:none">
             <button type="button" class="btn-secondary cw-gallery-upload-btn" style="margin-bottom:8px;">رفع صور لهذا اللون</button>
             <ul class="cw-gallery-list" style="margin:0;padding-inline-start:18px;list-style:none;display:flex;flex-wrap:wrap;gap:8px;"></ul>
@@ -2439,6 +2643,7 @@ function addColorwayRow() {
     `;
     box.appendChild(div);
     orangeFillColorwayRowSizes(div);
+    orangeScheduleProductCardPreviewRefresh();
 }
 
 function orangeColorwayRowCwKey(row) {
@@ -2518,6 +2723,7 @@ async function orangeUploadColorwayGalleryFiles(row, fileList) {
         }
     }
     orangeRefreshVariantReferenceThumbs();
+    orangeScheduleProductCardPreviewRefresh();
 }
 
 function adminVariantRowStockKey(r) {
@@ -2894,6 +3100,7 @@ function generateVariants() {
     html += '</tbody></table></div>';
     box.innerHTML = html;
     productFormShowTab('variants');
+    orangeScheduleProductCardPreviewRefresh();
 }
 
 async function saveProduct() {
@@ -3302,6 +3509,7 @@ if (orangeColorwaysBoxEl) {
                 li.remove();
             }
             orangeRefreshVariantReferenceThumbs();
+            orangeScheduleProductCardPreviewRefresh();
             return;
         }
         const up = ev.target.closest && ev.target.closest('.cw-gallery-upload-btn');
@@ -3328,6 +3536,7 @@ if (orangeColorwaysBoxEl) {
         if (t && t.classList && t.classList.contains('cw-size-cb') && !t.checked) {
             orangeColorwaySizeCheckboxBeforeUncheck(t);
         }
+        orangeScheduleProductCardPreviewRefresh();
     });
 }
 rebuildSubcategoryOptions(null);
@@ -3341,6 +3550,9 @@ orangeApplyProductBasicStepLocks();
     if (el) {
         const refresh = function () {
             orangeApplyProductBasicStepLocks();
+            if (id === 'name' || id === 'name_en' || id === 'name_fil' || id === 'name_hi' || id === 'price') {
+                orangeScheduleProductCardPreviewRefresh();
+            }
         };
         el.addEventListener('input', refresh);
         el.addEventListener('change', refresh);

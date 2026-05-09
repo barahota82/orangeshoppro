@@ -2286,6 +2286,22 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     font-size: 12px;
 }
 
+#productTabPanelCardPreview .admin-product-card-preview-frame-wrap {
+    background: #0f172a;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+    max-width: 100%;
+}
+#productTabPanelCardPreview .admin-product-card-preview-frame {
+    display: block;
+    width: 100%;
+    min-height: 480px;
+    height: min(72vh, 640px);
+    border: 0;
+    background: #050505;
+}
+
 .product-size-pick-grid {
     display: flex;
     flex-wrap: wrap;
