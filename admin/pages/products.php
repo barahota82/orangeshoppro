@@ -1070,9 +1070,7 @@ function orangeProductValidateWizardBeforeMatrix() {
             return { tab: 'basic', message: 'يجب اختيار «القسم الرئيسي» أولاً، ثم نوع المنتج التابع لهذا القسم.' };
         }
     }
-    const ptEl = document.getElementById('product_type_id');
-    const ptVal = ptEl ? (parseInt(ptEl.value || '0', 10) || 0) : 0;
-    if (ptVal <= 0) {
+    if (!orangeProductBasicTypeOk()) {
         if (window.ORANGE_PT_DEPT_STEP_ENABLED === true) {
             return { tab: 'basic', message: 'اختر «القسم الرئيسي» ثم «نوع المنتج» من الأنواع المعروضة لهذا القسم فقط.' };
         }
@@ -1756,6 +1754,7 @@ function adminSetMainImagePreview(filename) {
         }
         orangeRefreshVariantReferenceThumbs();
         orangeScheduleProductCardPreviewRefresh();
+        orangeApplyProductWizardActionButtons();
         return;
     }
     const lower = base.toLowerCase();
@@ -1781,6 +1780,7 @@ function adminSetMainImagePreview(filename) {
     }
     orangeRefreshVariantReferenceThumbs();
     orangeScheduleProductCardPreviewRefresh();
+    orangeApplyProductWizardActionButtons();
 }
 
 /** يحدّث عمود «صورة المرجع» في جدول المتغيرات بعد رفع صور (بدون إعادة توليد). */
@@ -2710,7 +2710,14 @@ function onHasFlagsChange() {
     const allowSizeTier = orangeProductBasicRecordIsEdit() || orangeProductBasicPriceOk();
     const famSel = document.getElementById('size_family_id');
     if (famSel) {
-        famSel.disabled = !allowSizeTier;
+        if (!allowSizeTier) {
+            famSel.disabled = true;
+            if (!orangeProductBasicRecordIsEdit()) {
+                famSel.value = '';
+            }
+        } else {
+            famSel.disabled = false;
+        }
     }
     if (hcEl) {
         hcEl.disabled = !allowSizeTier;
