@@ -876,7 +876,7 @@ function orangeApplyProductTypeDepartmentFilter(preserveTypeValue) {
         ptEl.appendChild(placeholder);
         ptEl.value = '';
         orangeSyncLegacyFieldsFromProductType();
-        onHasFlagsChange();
+        orangeApplyProductBasicStepLocks();
         return;
     }
     placeholder.textContent = 'اختر نوع المنتج';
@@ -913,7 +913,7 @@ function orangeApplyProductTypeDepartmentFilter(preserveTypeValue) {
         ptEl.value = '';
     }
     orangeSyncLegacyFieldsFromProductType();
-    onHasFlagsChange();
+    orangeApplyProductBasicStepLocks();
 }
 
 function orangeGetSelectedProductTypeExpectedKind() {
@@ -942,6 +942,91 @@ function orangeProductEffectiveHasSizes() {
     }
     const v = parseInt(String(famSel.value || '0'), 10) || 0;
     return v > 0;
+}
+
+function orangeProductBasicRecordIsEdit() {
+    const r = document.getElementById('product_record_id');
+    return r ? (parseInt(String(r.value || '0'), 10) || 0) > 0 : false;
+}
+
+function orangeProductBasicDeptOk() {
+    if (window.ORANGE_PT_DEPT_STEP_ENABLED !== true) {
+        return true;
+    }
+    const d = document.getElementById('product_main_department_id');
+    if (!d) {
+        return true;
+    }
+    if (d.disabled) {
+        return true;
+    }
+    return (parseInt(String(d.value || '0'), 10) || 0) > 0;
+}
+
+function orangeProductBasicTypeOk() {
+    const pt = document.getElementById('product_type_id');
+    return !!(pt && !pt.disabled && (parseInt(String(pt.value || '0'), 10) || 0) > 0);
+}
+
+function orangeProductBasicNamesOk() {
+    return ['name', 'name_en', 'name_fil', 'name_hi'].every(function (id) {
+        const el = document.getElementById(id);
+        return el && String(el.value || '').trim() !== '';
+    });
+}
+
+function orangeProductBasicPriceOk() {
+    const pe = document.getElementById('price');
+    const ce = document.getElementById('cost');
+    if (!pe || !ce) {
+        return false;
+    }
+    const ps = String(pe.value || '').trim();
+    const cs = String(ce.value || '').trim();
+    if (ps === '' || cs === '') {
+        return false;
+    }
+    const p = parseFloat(ps);
+    const c = parseFloat(cs);
+    return !isNaN(p) && !isNaN(c) && p >= 0 && c >= 0;
+}
+
+/** تسلسل البيانات الأساسية: قسم ← نوع ← أسماء ← سعر/تكلفة/حالة ← عائلة مقاسات / ألوان (تعديل منتج = كل الحقول مفعّلة). */
+function orangeApplyProductBasicStepLocks() {
+    const edit = orangeProductBasicRecordIsEdit();
+    const deptOk = orangeProductBasicDeptOk();
+    const typeOk = orangeProductBasicTypeOk();
+    const namesOk = orangeProductBasicNamesOk();
+    const priceOk = orangeProductBasicPriceOk();
+
+    const ptEl = document.getElementById('product_type_id');
+    if (ptEl) {
+        ptEl.disabled = edit ? false : !deptOk;
+    }
+
+    ['name', 'name_en', 'name_fil', 'name_hi'].forEach(function (id) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.disabled = edit ? false : !typeOk;
+        }
+    });
+
+    ['price', 'cost'].forEach(function (id) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.disabled = edit ? false : !namesOk;
+        }
+    });
+    const isAct = document.getElementById('product_is_active');
+    if (isAct) {
+        isAct.disabled = edit ? false : !namesOk;
+    }
+
+    document.querySelectorAll('#product_size_pick_panel button[onclick^="orangeSizePickSetAll"]').forEach(function (btn) {
+        btn.disabled = edit ? false : !priceOk;
+    });
+
+    onHasFlagsChange();
 }
 
 function orangeApplySizeFamilySchemeFilter() {
@@ -1655,7 +1740,7 @@ function resetProductForm() {
     window.PRODUCT_EXTRA_IMAGES = [];
     renderGalleryUploadList();
     orangeClearCatalogAttributeInputs();
-    onHasFlagsChange();
+    orangeApplyProductBasicStepLocks();
     productFormShowTab('basic');
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -1777,7 +1862,6 @@ async function loadProductForEdit(id) {
         const vm = Array.isArray(p.variant_matrix_rows) ? p.variant_matrix_rows : [];
         window.PRODUCT_EXTRA_IMAGES = extrasEarly;
         renderGalleryUploadList();
-        onHasFlagsChange();
         orangeApplyCatalogAttributeValuesFromProduct(p);
         buildColorwaysForEditFromVm(vm);
         const hasSizesEff = orangeProductEffectiveHasSizes();
@@ -1799,6 +1883,7 @@ async function loadProductForEdit(id) {
             document.getElementById('variantsBox').innerHTML =
                 '<p class="admin-variants-edit-note">لم تُستخرج المتغيرات — راجع الشاشة ثم استخدم «توليد المتغيرات» وحفظ.</p>';
         }
+        orangeApplyProductBasicStepLocks();
         const sortRO = document.getElementById('product_sort_order');
         if (sortRO) {
             sortRO.readOnly = true;
@@ -1890,24 +1975,32 @@ async function uploadGalleryProductImages() {
 }
 
 function onHasFlagsChange() {
-    const hc = document.getElementById('has_colors').value === '1';
+    const hcEl = document.getElementById('has_colors');
+    const hc = hcEl && hcEl.value === '1';
+    const allowSizeTier = orangeProductBasicRecordIsEdit() || orangeProductBasicPriceOk();
     const famSel = document.getElementById('size_family_id');
     if (famSel) {
-        famSel.disabled = false;
+        famSel.disabled = !allowSizeTier;
+    }
+    if (hcEl) {
+        hcEl.disabled = !allowSizeTier;
     }
     const famWrap = document.getElementById('product_basic_size_family_wrap');
     if (famWrap) {
         famWrap.style.display = 'block';
     }
-    document.getElementById('colorwaysSection').style.display = hc ? 'block' : 'none';
-    if (hc && !document.querySelector('#colorwaysBox .cw-row')) {
+    const colorwaysSec = document.getElementById('colorwaysSection');
+    if (colorwaysSec) {
+        colorwaysSec.style.display = hc && allowSizeTier ? 'block' : 'none';
+    }
+    if (hc && allowSizeTier && !document.querySelector('#colorwaysBox .cw-row')) {
         addColorwayRow();
     }
     orangeApplySizeFamilySchemeFilter();
     const hs = orangeProductEffectiveHasSizes();
     const sgScope = document.getElementById('sizing_guide_scope');
     if (sgScope) {
-        if (!hs) {
+        if (!allowSizeTier || !hs) {
             sgScope.value = 'none';
             sgScope.disabled = true;
         } else {
@@ -1916,9 +2009,9 @@ function onHasFlagsChange() {
     }
     const cwh = document.getElementById('colorways_sizes_hint');
     if (cwh) {
-        cwh.style.display = hs && hc ? 'block' : 'none';
+        cwh.style.display = hs && hc && allowSizeTier ? 'block' : 'none';
     }
-    if (hs && hc) {
+    if (hs && hc && allowSizeTier) {
         orangeRefreshAllColorwaySizePickers();
     }
 }
@@ -2267,6 +2360,14 @@ function orangeRefreshSizePickPanel() {
     const mount = document.getElementById('product_size_pick_checkboxes');
     const emptyNote = document.getElementById('product_size_pick_empty');
     if (!panel || !mount) {
+        return;
+    }
+    const allowSz = orangeProductBasicRecordIsEdit() || orangeProductBasicPriceOk();
+    if (!allowSz) {
+        panel.style.display = 'none';
+        if (emptyNote) {
+            emptyNote.style.display = 'none';
+        }
         return;
     }
     const hs = orangeProductEffectiveHasSizes();
@@ -2870,7 +2971,7 @@ if (orangeProductTypeSelectEl) {
             orangeApplyProductTypeDepartmentFilter(true);
         }
         orangeSyncLegacyFieldsFromProductType();
-        onHasFlagsChange();
+        orangeApplyProductBasicStepLocks();
         if (window.ORANGE_CATALOG_NAV_UNIFIED) {
             updateProductCatalogHint();
         }
@@ -2879,7 +2980,7 @@ if (orangeProductTypeSelectEl) {
 const orangeSizeFamilySelectEl = document.getElementById('size_family_id');
 if (orangeSizeFamilySelectEl) {
     orangeSizeFamilySelectEl.addEventListener('change', function () {
-        onHasFlagsChange();
+        orangeApplyProductBasicStepLocks();
     });
 }
 const orangeColorwaysBoxEl = document.getElementById('colorwaysBox');
@@ -2898,7 +2999,19 @@ rebuildSubcategoryOptions(null);
 updateProductCatalogHint();
 
 setProductFormEditMode(false);
-onHasFlagsChange();
+orangeApplyProductBasicStepLocks();
+
+['name', 'name_en', 'name_fil', 'name_hi', 'price', 'cost'].forEach(function (id) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.addEventListener('input', function () {
+            orangeApplyProductBasicStepLocks();
+        });
+        el.addEventListener('change', function () {
+            orangeApplyProductBasicStepLocks();
+        });
+    }
+});
 
 (function () {
     const style = document.createElement('style');

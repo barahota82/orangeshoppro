@@ -2192,6 +2192,12 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     box-sizing: border-box;
 }
 
+#productTabPanelBasic input:disabled,
+#productTabPanelBasic select:disabled {
+    opacity: 0.68;
+    cursor: not-allowed;
+}
+
 #productTabPanelBasic .product-basic-field-like {
     display: flex;
     align-items: center;
