@@ -584,7 +584,6 @@ $orangeAdminCardPreviewViewLabel = t('view_product');
         <div id="variantsBox"></div>
         </div>
         </div>
-        </div>
 
         <div id="productTabPanelAttributes" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnAttributes">
         <div class="admin-product-section">
@@ -670,6 +669,7 @@ $orangeAdminCardPreviewViewLabel = t('view_product');
         <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">معاينة تقريبية ل<strong>كارت القائمة</strong> في المتجر (اتجاه RTL ولغة عربية كما في الصفحة الرئيسية). تُحدَّث تلقائياً عند تغيّر الاسم والسعر والصور وصفوف الألوان. شارة «العروض» لا تُعرض هنا لأنها مرتبطة بجدول العروض وليس بنموذج المنتج.</p>
         <div class="admin-product-card-preview-frame-wrap">
             <iframe id="orangeAdminProductCardPreviewFrame" class="admin-product-card-preview-frame" title="معاينة كارت المنتج في المتجر"></iframe>
+        </div>
         </div>
         </div>
         </div>
@@ -1113,13 +1113,6 @@ function orangeProductValidateWizardBeforeMatrix() {
         }
     }
 
-    assignMainImageFromGalleryIfEmpty();
-    const mainVal = document.getElementById('main_image').value.trim();
-    const hasAnyImage = mainVal || (window.PRODUCT_EXTRA_IMAGES && window.PRODUCT_EXTRA_IMAGES.length);
-    if (!hasAnyImage) {
-        return { tab: 'images', message: 'ارفع صورة واحدة على الأقل (رئيسية أو معرض) قبل المتابعة.' };
-    }
-
     const hasColorsUi = document.getElementById('has_colors') && document.getElementById('has_colors').value === '1';
     const hsForSave = orangeProductEffectiveHasSizes();
     if (hasColorsUi) {
@@ -1179,6 +1172,26 @@ function orangeProductValidateWizardBeforeMatrix() {
                 };
             }
         }
+    }
+
+    assignMainImageFromGalleryIfEmpty();
+    const mainVal = document.getElementById('main_image').value.trim();
+    const hasGeneralImage = !!(mainVal || (window.PRODUCT_EXTRA_IMAGES && window.PRODUCT_EXTRA_IMAGES.length));
+    let hasColorwayUploadedImage = false;
+    if (hasColorsUi) {
+        document.querySelectorAll('#colorwaysBox .cw-row').forEach(function (row) {
+            const pEl = row.querySelector('.cw-p');
+            const pv = pEl ? parseInt(pEl.value || '0', 10) || 0 : 0;
+            if (pv <= 0) {
+                return;
+            }
+            if (row.querySelector('.cw-gallery-list li[data-fn]')) {
+                hasColorwayUploadedImage = true;
+            }
+        });
+    }
+    if (!hasGeneralImage && !hasColorwayUploadedImage && !hasColorsUi) {
+        return { tab: 'images', message: 'ارفع صورة واحدة على الأقل (رئيسية أو معرض) قبل المتابعة.' };
     }
 
     return null;
@@ -1671,6 +1684,13 @@ function adminPublicPath(path) {
     const base = raw.replace(/\/+$/, '');
     const p = path.charAt(0) === '/' ? path : '/' + path;
     return base + p;
+}
+
+/** مسارات واجهات الأدمن تحت ‎/admin/‎ مع احترام ‎PUBLIC_BASE_PATH‎ (مثلاً نطاق فرعي على الاستضافة). */
+function adminApiPath(path) {
+    const s = String(path || '').trim().replace(/^\/+/, '');
+    const tail = s.indexOf('admin/') === 0 ? s.slice('admin/'.length) : s;
+    return adminPublicPath('/admin/' + tail);
 }
 function adminProductImageBasename(filename) {
     const fn = String(filename || '').trim();
@@ -2317,7 +2337,7 @@ async function uploadMainProductImage() {
     const fd = new FormData();
     fd.append('image', inp.files[0]);
     try {
-        const r = await fetch('/admin/api/uploads/product-image.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+        const r = await fetch(adminApiPath('api/uploads/product-image.php'), { method: 'POST', body: fd, credentials: 'same-origin' });
         const j = await r.json();
         if (!j.success) {
             alert(j.message || 'فشل الرفع');
@@ -2478,7 +2498,7 @@ function productFormShowTab(tab) {
 
 async function loadProductForEdit(id) {
     try {
-        const res = await fetch('/admin/api/products/get.php?id=' + encodeURIComponent(id));
+        const res = await fetch(adminApiPath('api/products/get.php?id=' + encodeURIComponent(id)));
         const j = await res.json();
         if (!j.success || !j.product) {
             alert(j.message || 'تعذر تحميل المنتج');
@@ -2684,7 +2704,7 @@ async function uploadGalleryProductImages() {
         const fd = new FormData();
         fd.append('image', inp.files[i]);
         try {
-            const r = await fetch('/admin/api/uploads/product-image.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+            const r = await fetch(adminApiPath('api/uploads/product-image.php'), { method: 'POST', body: fd, credentials: 'same-origin' });
             const j = await r.json();
             if (j.success && j.filename) {
                 window.PRODUCT_EXTRA_IMAGES.push(j.filename);
@@ -3120,7 +3140,7 @@ async function orangeUploadColorwayGalleryFiles(row, fileList) {
         const fd = new FormData();
         fd.append('image', fileList[i]);
         try {
-            const r = await fetch('/admin/api/uploads/product-image.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+            const r = await fetch(adminApiPath('api/uploads/product-image.php'), { method: 'POST', body: fd, credentials: 'same-origin' });
             const j = await r.json();
             if (j.success && j.filename) {
                 orangeCwGalleryAppendThumb(row, j.filename);
@@ -3134,6 +3154,7 @@ async function orangeUploadColorwayGalleryFiles(row, fileList) {
     }
     orangeRefreshVariantReferenceThumbs();
     orangeScheduleProductCardPreviewRefresh();
+    orangeApplyProductWizardActionButtons();
 }
 
 function adminVariantRowStockKey(r) {
@@ -3873,6 +3894,7 @@ if (orangeColorwaysBoxEl) {
             orangeColorwaySizeCheckboxBeforeUncheck(t);
         }
         orangeScheduleProductCardPreviewRefresh();
+        orangeApplyProductWizardActionButtons();
     });
 }
 rebuildSubcategoryOptions(null);

@@ -2120,7 +2120,7 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     outline-offset: 2px;
 }
 .admin-product-tab-panels {
-    min-height: 120px;
+    min-height: 0;
 }
 .admin-product-tab-panel {
     display: none;
