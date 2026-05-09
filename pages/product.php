@@ -388,15 +388,27 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
             <p class="product-sizing-dialog__body"><?php echo htmlspecialchars($sizingText, ENT_QUOTES, 'UTF-8'); ?></p>
         <?php endif; ?>
         <?php if ($advisorySizingReady): ?>
-            <?php foreach ($advisorySizing['sections'] as $sec): ?>
+            <?php
+            $advSections = $advisorySizing['sections'] ?? [];
+            $advSectionCount = is_array($advSections) ? count($advSections) : 0;
+            ?>
+            <?php foreach ($advSections as $sec): ?>
                 <?php
-                $secTitle = trim((string) ($sec['title'] ?? ''));
                 $cols = isset($sec['columns']) && is_array($sec['columns']) ? $sec['columns'] : [];
                 $srows = isset($sec['rows']) && is_array($sec['rows']) ? $sec['rows'] : [];
                 $colCount = max(1, count($cols));
+                $secKind = strtolower(trim((string) ($sec['scope_kind'] ?? '')));
+                $subKey = '';
+                if ($scope === 'both' && $advSectionCount > 1) {
+                    if ($secKind === 'upper') {
+                        $subKey = 'sizing_guide_section_upper';
+                    } elseif ($secKind === 'lower') {
+                        $subKey = 'sizing_guide_section_lower';
+                    }
+                }
                 ?>
-                <?php if ($secTitle !== ''): ?>
-                    <h4 class="product-sizing-dialog__subtitle"><?php echo htmlspecialchars($secTitle, ENT_QUOTES, 'UTF-8'); ?></h4>
+                <?php if ($subKey !== ''): ?>
+                    <h4 class="product-sizing-dialog__subtitle"><?php echo htmlspecialchars(t($subKey), ENT_QUOTES, 'UTF-8'); ?></h4>
                 <?php endif; ?>
                 <div class="product-sizing-table-wrap" role="region" aria-label="<?php echo htmlspecialchars(t('sizing_guide'), ENT_QUOTES, 'UTF-8'); ?>">
                     <table class="product-sizing-table">

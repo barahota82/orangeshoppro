@@ -208,12 +208,12 @@ try {
                 json_response(['success' => false, 'message' => 'عائلة المقاسات غير موجودة'], 422);
             }
             $nameAr = trim((string) ($data['name_ar'] ?? ''));
-            $nameEn = trim((string) ($data['name_en'] ?? ''));
-            if ($nameAr === '' || $nameEn === '') {
-                json_response(['success' => false, 'message' => 'اسم النموذج عربي وEnglish إلزامي'], 422);
+            if ($nameAr === '') {
+                json_response(['success' => false, 'message' => 'اسم داخلي للنموذج (عربي) إلزامي — للأدمن فقط ولا يُعرض للعميل'], 422);
             }
-            $nameFil = trim((string) ($data['name_fil'] ?? ''));
-            $nameHi = trim((string) ($data['name_hi'] ?? ''));
+            $nameEn = '';
+            $nameFil = '';
+            $nameHi = '';
             $active = (int) ($data['is_active'] ?? 1) === 0 ? 0 : 1;
             $columnsIn = $data['columns'] ?? [];
             $rowsIn = $data['rows'] ?? [];

@@ -88,12 +88,12 @@ if ($sizesJson === false) {
             </select>
         </div>
     </div>
-    <p class="card-hint" style="margin:8px 0;">اسم النموذج يظهر كعنوان فوق الجدول في المتجر حسب لغة العميل.</p>
+    <p class="card-hint" style="margin:8px 0;">
+        <strong>اسم داخلي (عربي فقط):</strong> للتمييز بين النماذج في لوحة التحكم فقط — <strong>لا يُعرض للعميل</strong>.
+        عنوان الحوار للعميل ثابت من الترجمة (مثل «دليل المقاسات» / Size Guide). عند اختيار المنتج «علوي وسفلي» يظهر للعميل عنوان فرعي ثابت «مقاسات علوية» ثم «مقاسات سفلية» حسب الجدول.
+    </p>
     <div class="form-grid" style="max-width:900px;">
-        <div><label for="asg_name_ar">الاسم عربي</label><input type="text" id="asg_name_ar" maxlength="191"></div>
-        <div><label for="asg_name_en">Name EN</label><input type="text" id="asg_name_en" maxlength="191"></div>
-        <div><label for="asg_name_fil">Name Fil</label><input type="text" id="asg_name_fil" maxlength="191"></div>
-        <div><label for="asg_name_hi">Name Hi</label><input type="text" id="asg_name_hi" maxlength="191"></div>
+        <div style="grid-column:1/-1;"><label for="asg_name_ar">اسم النموذج (داخلي — عربي فقط)</label><input type="text" id="asg_name_ar" maxlength="191" placeholder="مثال: علوي قمصان EU"></div>
     </div>
 
     <h4 style="margin-top:20px;">تعريف الأعمدة</h4>
@@ -343,9 +343,6 @@ if ($sizesJson === false) {
         document.getElementById('asg_scope').value = g.scope_kind || 'upper';
         document.getElementById('asg_active').value = String(parseInt(g.is_active, 10) ? 1 : 0);
         document.getElementById('asg_name_ar').value = g.name_ar || '';
-        document.getElementById('asg_name_en').value = g.name_en || '';
-        document.getElementById('asg_name_fil').value = g.name_fil || '';
-        document.getElementById('asg_name_hi').value = g.name_hi || '';
         fillColumns(res.columns || []);
         clearRows();
         (res.rows || []).forEach(function (r) {
@@ -368,9 +365,6 @@ if ($sizesJson === false) {
         document.getElementById('asg_scope').value = 'upper';
         document.getElementById('asg_active').value = '1';
         document.getElementById('asg_name_ar').value = '';
-        document.getElementById('asg_name_en').value = '';
-        document.getElementById('asg_name_fil').value = '';
-        document.getElementById('asg_name_hi').value = '';
         genColRows(3);
         clearRows();
         addDataRow({});
@@ -395,9 +389,6 @@ if ($sizesJson === false) {
             size_family_id: f,
             scope_kind: document.getElementById('asg_scope').value,
             name_ar: document.getElementById('asg_name_ar').value.trim(),
-            name_en: document.getElementById('asg_name_en').value.trim(),
-            name_fil: document.getElementById('asg_name_fil').value.trim(),
-            name_hi: document.getElementById('asg_name_hi').value.trim(),
             is_active: parseInt(document.getElementById('asg_active').value, 10),
             columns: readColumns(),
             rows: readRowsPayload()

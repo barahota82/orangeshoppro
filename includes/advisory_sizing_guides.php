@@ -37,22 +37,6 @@ function orange_advisory_sizing_label_from_row(array $row, string $lang): string
 }
 
 /**
- * @param array<string, mixed> $guide
- */
-function orange_advisory_sizing_guide_title(array $guide, string $lang): string
-{
-    return orange_advisory_sizing_label_from_row(
-        [
-            'label_ar' => (string) ($guide['name_ar'] ?? ''),
-            'label_en' => (string) ($guide['name_en'] ?? ''),
-            'label_fil' => (string) ($guide['name_fil'] ?? ''),
-            'label_hi' => (string) ($guide['name_hi'] ?? ''),
-        ],
-        $lang
-    );
-}
-
-/**
  * @return array<int, array<string, mixed>>
  */
 function orange_advisory_sizing_load_size_rows_map(PDO $pdo, int $familyId, array $sizeIds): array
@@ -234,7 +218,6 @@ function orange_advisory_sizing_build_sections(PDO $pdo, int $familyId, array $k
 
         $sections[] = [
             'scope_kind' => (string) $kind,
-            'title' => orange_advisory_sizing_guide_title($guide, $lang),
             'columns' => $colMeta,
             'rows' => $outRows,
         ];
