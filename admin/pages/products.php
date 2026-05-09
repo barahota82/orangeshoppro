@@ -636,7 +636,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                 <label>صور إضافية للمعرض (عدة ملفات)</label>
                 <input type="file" id="gallery_files" accept="image/jpeg,image/png,image/webp,image/gif" multiple>
                 <button type="button" class="btn-secondary" style="margin-top:8px;" onclick="uploadGalleryProductImages()">رفع صور المعرض</button>
-                <ul id="gallery_upload_list" style="margin:10px 0 0;padding-inline-start:20px;font-size:13px;"></ul>
+                <ul id="gallery_upload_list" class="admin-product-gallery-upload-list" style="margin:12px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:10px;"></ul>
             </div>
         </div>
         </div>
@@ -1622,21 +1622,47 @@ function assignMainImageFromGalleryIfEmpty() {
 
 function renderGalleryUploadList() {
     const ul = document.getElementById('gallery_upload_list');
-    if (!ul) return;
+    if (!ul) {
+        return;
+    }
     ul.innerHTML = '';
-    (window.PRODUCT_EXTRA_IMAGES || []).forEach((name, i) => {
+    const prefix = adminPublicPath('/uploads/products/');
+    (window.PRODUCT_EXTRA_IMAGES || []).forEach(function (name, i) {
+        const fn = String(name || '').trim();
+        if (!fn) {
+            return;
+        }
         const li = document.createElement('li');
-        li.textContent = name + ' ';
+        li.className = 'admin-product-gallery-upload-item';
+        li.style.cssText =
+            'display:inline-flex;align-items:center;gap:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;';
+        const img = document.createElement('img');
+        img.alt = '';
+        img.width = 48;
+        img.height = 48;
+        img.loading = 'lazy';
+        img.style.cssText = 'object-fit:cover;border-radius:6px;border:1px solid #cbd5e1;flex-shrink:0;';
+        img.src = prefix + encodeURIComponent(fn);
+        const cap = document.createElement('span');
+        cap.textContent = fn;
+        cap.setAttribute('dir', 'ltr');
+        cap.setAttribute('lang', 'en');
+        cap.style.cssText = 'font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
         const rm = document.createElement('button');
         rm.type = 'button';
         rm.textContent = 'حذف';
         rm.className = 'btn-secondary';
-        rm.style.marginInlineStart = '8px';
-        rm.onclick = () => {
+        rm.style.fontSize = '11px';
+        rm.style.padding = '2px 8px';
+        rm.onclick = function () {
             const mainEl = document.getElementById('main_image');
-            const removed = window.PRODUCT_EXTRA_IMAGES[i];
+            const removed = fn;
             const wasMain = mainEl && mainEl.value.trim() === removed;
-            window.PRODUCT_EXTRA_IMAGES.splice(i, 1);
+            const arr = window.PRODUCT_EXTRA_IMAGES || [];
+            const j = arr.indexOf(removed);
+            if (j >= 0) {
+                arr.splice(j, 1);
+            }
             if (wasMain) {
                 mainEl.value = '';
                 assignMainImageFromGalleryIfEmpty();
@@ -1646,6 +1672,8 @@ function renderGalleryUploadList() {
             }
             renderGalleryUploadList();
         };
+        li.appendChild(img);
+        li.appendChild(cap);
         li.appendChild(rm);
         ul.appendChild(li);
     });

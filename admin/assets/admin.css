@@ -2236,6 +2236,13 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     box-sizing: border-box;
 }
 
+#productTabPanelImages .admin-product-gallery-upload-list {
+    align-items: flex-start;
+}
+#productTabPanelImages .admin-product-gallery-upload-item {
+    max-width: 100%;
+}
+
 .product-size-pick-grid {
     display: flex;
     flex-wrap: wrap;
