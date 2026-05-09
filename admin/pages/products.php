@@ -354,7 +354,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
             <button type="button" class="admin-product-tab" role="tab" id="productTabBtnDescription" aria-controls="productTabPanelDescription" aria-selected="false" data-product-tab="description">وصف المنتج</button>
             <button type="button" class="admin-product-tab" role="tab" id="productTabBtnAttributes" aria-controls="productTabPanelAttributes" aria-selected="false" data-product-tab="attributes">سمات المنتج</button>
             <button type="button" class="admin-product-tab" role="tab" id="productTabBtnImages" aria-controls="productTabPanelImages" aria-selected="false" data-product-tab="images">الصور</button>
-            <button type="button" class="admin-product-tab" role="tab" id="productTabBtnVariants" aria-controls="productTabPanelVariants" aria-selected="false" data-product-tab="variants">المتغيرات</button>
+            <button type="button" class="admin-product-tab" role="tab" id="productTabBtnVariants" aria-controls="productTabPanelVariants" aria-selected="false" data-product-tab="variants">المتغيرات والباركود</button>
         </div>
 
         <div class="admin-product-tab-panels">
@@ -643,7 +643,8 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
 
         <div id="productTabPanelVariants" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnVariants">
         <div class="admin-product-section">
-        <h4 class="admin-product-subsection-title">المتغيرات</h4>
+        <h4 class="admin-product-subsection-title">المتغيرات والباركود</h4>
+        <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">كل منتج — بما فيه <strong>بدون ألوان وبدون مقاسات</strong> — يحتاج <strong>صف بيع واحد على الأقل</strong> في الجدول أدناه؛ يظهر <strong>باركود المتغير</strong> بعد الحفظ. المنتج البسيط = صف واحد (يمكن استخدام «توليد المتغيرات» أو سيُكمَل تلقائياً عند الحفظ إن كان الجدول فارغاً).</p>
         <div id="variantsBox"></div>
         </div>
         </div>
@@ -982,6 +983,15 @@ function orangeProductBasicPriceOk() {
     const p = parseFloat(ps);
     const c = parseFloat(cs);
     return !isNaN(p) && !isNaN(c) && p >= 0 && c >= 0;
+}
+
+/** منتج بسيط: بلا ألوان وبلا مقاسات — صف بيع واحد (باركود بعد الحفظ). */
+function orangeProductIsSimpleSkuMatrix() {
+    const hcEl = document.getElementById('has_colors');
+    if (hcEl && String(hcEl.value || '') === '1') {
+        return false;
+    }
+    return !orangeProductEffectiveHasSizes();
 }
 
 /** تسلسل البيانات الأساسية: قسم ← نوع ← (عربي/إنجليزي/فلبيني/هندي + سعر + تكلفة + حالة العرض) ← بعد سعر وتكلفة صالحين ← عائلة المقاسات و«له ألوان؟» (تعديل = كل الحقول مفعّلة). */
@@ -1870,6 +1880,11 @@ async function loadProductForEdit(id) {
             document.getElementById('variantsBox').innerHTML =
                 '<p class="admin-variants-edit-note">لم تُستخرج المتغيرات — راجع الشاشة ثم استخدم «توليد المتغيرات» وحفظ.</p>';
         }
+        if (!document.querySelectorAll('#variantsBox tbody tr').length && orangeProductIsSimpleSkuMatrix()) {
+            generateVariants();
+            applyVariantStocksFromVm(vm);
+            applyVariantBarcodesFromVm(vm);
+        }
         orangeApplyProductBasicStepLocks();
         const sortRO = document.getElementById('product_sort_order');
         if (sortRO) {
@@ -2558,7 +2573,7 @@ function generateVariants() {
     }
 
     const thumbCell = adminVariantReferenceThumbHtml();
-    let html = '<p class="admin-variants-lead">كل صف يمثل <strong>نفس الصنف</strong> مع دمج لون ونمط اختياري × مقاس. عمود «صورة المرجع» يعكس الصورة الرئيسية الحالية (من تبويب الصور). <strong>الكميات:</strong> لا تُدخل من هنا — بعد الحفظ عالج المخزون من <a href="' + adminPublicPath('/admin/index.php?page=stock') + '">شاشة المخزون</a> (رصيد افتتاحي أو تعديل) أو من <a href="' + adminPublicPath('/admin/index.php?page=purchases') + '">استلام فاتورة شراء</a>.</p>';
+    let html = '<p class="admin-variants-lead"><strong>منتج بلا ألوان وبلا مقاسات:</strong> صف واحد = SKU واحد وباركود واحد بعد الحفظ. <strong>منتج بلون أو بمقاسات:</strong> كل صف يمثل نفس الصنف مع دمج لون ونمط اختياري × مقاس. عمود «صورة المرجع» يعكس الصورة الرئيسية الحالية (من تبويب الصور). <strong>الكميات:</strong> لا تُدخل من هنا — بعد الحفظ عالج المخزون من <a href="' + adminPublicPath('/admin/index.php?page=stock') + '">شاشة المخزون</a> (رصيد افتتاحي أو تعديل) أو من <a href="' + adminPublicPath('/admin/index.php?page=purchases') + '">استلام فاتورة شراء</a>.</p>';
     html += '<div class="table-wrap admin-table-wrap-elevated"><table class="admin-table admin-variants-matrix"><thead><tr>';
     html += '<th class="col-ref-img">صورة المرجع</th><th>اللون</th><th>المقاس</th><th class="col-vbar">باركود المتغير (بعد الحفظ)</th><th class="col-stock">المخزون الحالي (عرض)</th>';
     html += '</tr></thead><tbody>';
@@ -2735,6 +2750,10 @@ async function saveProduct() {
         }
     }
 
+    if (orangeProductIsSimpleSkuMatrix() && !document.querySelectorAll('#variantsBox tbody tr').length) {
+        generateVariants();
+    }
+
     const recordId = parseInt(document.getElementById('product_record_id').value || '0', 10);
 
     if (recordId > 0) {
@@ -2787,10 +2806,19 @@ async function saveProduct() {
         payload.catalog_attribute_values = orangeCollectCatalogAttributePayload();
         const hsUp = orangeProductEffectiveHasSizes();
         const hcUp = parseInt(document.getElementById('has_colors').value, 10) === 1;
-        const varRowsUp = Array.from(document.querySelectorAll('#variantsBox tbody tr'));
+        let varRowsUp = Array.from(document.querySelectorAll('#variantsBox tbody tr'));
+        if (!varRowsUp.length && orangeProductIsSimpleSkuMatrix()) {
+            generateVariants();
+            varRowsUp = Array.from(document.querySelectorAll('#variantsBox tbody tr'));
+        }
         if ((hsUp || hcUp) && !varRowsUp.length) {
             productFormShowTab('variants');
             alert('ولّد المتغيرات أو حمّل المصفوفة قبل التحديث');
+            return;
+        }
+        if (orangeProductIsSimpleSkuMatrix() && !varRowsUp.length) {
+            productFormShowTab('variants');
+            alert('تعذر تجهيز صف البيع — استخدم «توليد جدول البيع / المتغيرات» ثم احفظ.');
             return;
         }
         if (varRowsUp.length) {
