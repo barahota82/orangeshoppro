@@ -451,8 +451,8 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         </select>
                     </div>
                 </div>
-                <div class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
-                    <div id="product_basic_size_family_wrap">
+                <div class="form-grid form-grid-3 product-basic-class-row product-form-basic-top3-inner" style="margin-top:12px;">
+                    <div id="product_basic_size_family_wrap" class="product-basic-class-cell">
                         <label for="size_family_id">عائلة المقاسات</label>
                         <select id="size_family_id">
                             <option value="">— بلا مقاسات (اتركها فارغة) —</option>
@@ -467,13 +467,20 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         </select>
                         <small id="size_family_scheme_hint" style="display:none;margin-top:4px;line-height:1.45;color:#64748b;"></small>
                     </div>
-                    <div id="product_basic_size_guide_wrap">
+                    <div id="product_basic_size_guide_wrap" class="product-basic-class-cell">
                         <label for="sizing_guide_scope">دليل المقاس الاسترشادي (عرض)</label>
                         <select id="sizing_guide_scope" disabled>
                             <option value="none">بدون</option>
                             <option value="upper">علوي</option>
                             <option value="lower">سفلي</option>
                             <option value="both">علوي وسفلي</option>
+                        </select>
+                    </div>
+                    <div class="product-basic-class-cell" id="product_basic_has_colors_wrap">
+                        <label for="has_colors">له ألوان ؟</label>
+                        <select id="has_colors" onchange="onHasFlagsChange()">
+                            <option value="0">لا</option>
+                            <option value="1">نعم</option>
                         </select>
                     </div>
                 </div>
@@ -507,15 +514,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
         <?php if ($patterns === [] && orange_table_exists($pdo, 'pattern_dictionary')): ?>
         <p style="margin:0 0 12px;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;color:#64748b;font-size:13px;">قاموس <strong>الأنماط</strong> بلا صفوف نشطة — يمكنك المتابعة بألوان فقط، أو إضافة أنماط من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=pattern_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">أنماط الألوان</a>.</p>
         <?php endif; ?>
-        <div class="form-grid" style="max-width:420px;">
-            <div>
-                <label for="has_colors">له ألوان؟</label>
-                <select id="has_colors" onchange="onHasFlagsChange()">
-                    <option value="0">لا</option>
-                    <option value="1">نعم</option>
-                </select>
-            </div>
-        </div>
+        <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">يُضبَط <strong>له ألوان ؟</strong> من تبويب <strong>البيانات الأساسية</strong> (صف: عائلة المقاسات، دليل المقاس الاسترشادي، له ألوان ؟).</p>
 
         <div id="product_size_pick_panel" class="card admin-nested-panel" style="display:none;margin-top:12px;">
             <h4 class="admin-nested-panel__title">مقاسات المنتج (بدون ألوان)</h4>
