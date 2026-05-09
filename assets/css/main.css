@@ -1165,48 +1165,108 @@ body.storefront-browse-menu-lock {
 }
 
 .product-sizing-dialog--advisory:has(.product-sizing-table) {
-    max-width: min(98vw, 720px);
+    max-width: min(98vw, 820px);
 }
 
 .product-sizing-dialog__subtitle {
-    margin: 16px 0 8px;
-    font-size: 1rem;
+    margin: 20px 0 10px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid color-mix(in srgb, var(--text) 12%, transparent);
+    font-size: 0.95rem;
+    font-weight: 700;
     font-family: var(--font-display);
+    color: var(--text);
+    letter-spacing: 0.02em;
 }
 
-.product-sizing-table__label-row td {
-    background: color-mix(in srgb, var(--card) 82%, var(--muted));
-    font-weight: 600;
-    font-size: 0.9rem;
+.product-sizing-dialog__subtitle:first-of-type {
+    margin-top: 4px;
+}
+
+/* لوحة الجدول داخل الحوار */
+.product-sizing-table-panel {
+    margin: 0 0 20px;
+    border-radius: var(--radius-md);
+    border: 1px solid color-mix(in srgb, var(--border) 85%, var(--muted));
+    background: color-mix(in srgb, var(--card) 97%, var(--muted));
+    box-shadow: 0 1px 0 color-mix(in srgb, var(--text) 6%, transparent);
+    overflow: hidden;
+}
+
+.product-sizing-table__label-row td,
+.product-sizing-table__label-cell {
+    background: color-mix(in srgb, var(--card) 78%, var(--muted));
+    font-weight: 700;
+    font-size: 0.88rem;
+    letter-spacing: 0.03em;
+    border-inline-start: 3px solid color-mix(in srgb, var(--text) 35%, var(--muted));
+    padding-block: 10px !important;
 }
 
 .product-sizing-table-wrap {
-    margin: 0 0 18px;
+    margin: 0;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    max-height: min(55vh, 420px);
 }
 
 .product-sizing-table {
     width: 100%;
-    border-collapse: collapse;
-    font-size: 0.92rem;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
+.product-sizing-table--pro {
+    min-width: min(100%, 320px);
 }
 
 .product-sizing-table th,
 .product-sizing-table td {
-    border: 1px solid var(--border);
-    padding: 8px 10px;
+    border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+    padding: 10px 12px;
     text-align: start;
+    vertical-align: middle;
+}
+
+.product-sizing-table--pro thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    box-shadow: 0 1px 0 color-mix(in srgb, var(--text) 10%, transparent);
 }
 
 .product-sizing-table th {
-    background: color-mix(in srgb, var(--card) 88%, var(--muted));
-    font-weight: 600;
-    font-size: 0.88rem;
+    background: color-mix(in srgb, var(--muted) 22%, var(--card));
+    font-weight: 700;
+    font-size: 0.82rem;
+    text-transform: none;
+    white-space: nowrap;
 }
 
-.product-sizing-table tbody tr:nth-child(even) {
+.product-sizing-table__th--num,
+.product-sizing-table__td--num {
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+    unicode-bidi: isolate;
+}
+
+.product-sizing-table__data-row:hover td {
+    background: color-mix(in srgb, var(--card) 88%, var(--muted));
+}
+
+.product-sizing-table__data-row .product-sizing-table__td:first-child {
+    font-weight: 600;
+    background: color-mix(in srgb, var(--card) 96%, var(--muted));
+}
+
+.product-sizing-table tbody tr:nth-child(even):not(.product-sizing-table__label-row) td {
     background: color-mix(in srgb, var(--card) 94%, var(--muted));
+}
+
+.product-sizing-table tbody tr:nth-child(even):not(.product-sizing-table__label-row):hover td {
+    background: color-mix(in srgb, var(--card) 86%, var(--muted));
 }
 
 .product-sizing-dialog__close {

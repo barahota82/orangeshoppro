@@ -113,7 +113,7 @@ function orange_advisory_sizing_build_sections(PDO $pdo, int $familyId, array $k
         }
         $gid = (int) $guide['id'];
         $cSt = $pdo->prepare(
-            'SELECT id, label_ar, label_en, label_fil, label_hi, unit_hint
+            'SELECT id, label_ar, label_en, label_fil, label_hi, unit_hint, value_kind
              FROM advisory_sizing_guide_columns
              WHERE guide_id = ?
              ORDER BY sort_order ASC, id ASC'
@@ -152,9 +152,14 @@ function orange_advisory_sizing_build_sections(PDO $pdo, int $familyId, array $k
             $base = orange_advisory_sizing_label_from_row($c, $lang);
             $header = $base !== '' && $uh !== '' ? $base . ' (' . $uh . ')' : ($base !== '' ? $base : $uh);
 
+            $vk = strtolower(trim((string) ($c['value_kind'] ?? 'text')));
+            if ($vk !== 'number') {
+                $vk = 'text';
+            }
             $colMeta[] = [
                 'id' => (int) $c['id'],
                 'header' => $header !== '' ? $header : '—',
+                'value_kind' => $vk,
             ];
         }
         $firstColId = $colMeta[0]['id'] ?? 0;

@@ -410,64 +410,74 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
                 <?php if ($subKey !== ''): ?>
                     <h4 class="product-sizing-dialog__subtitle"><?php echo htmlspecialchars(t($subKey), ENT_QUOTES, 'UTF-8'); ?></h4>
                 <?php endif; ?>
+                <div class="product-sizing-table-panel">
+                    <div class="product-sizing-table-wrap" role="region" aria-label="<?php echo htmlspecialchars(t('sizing_guide'), ENT_QUOTES, 'UTF-8'); ?>">
+                        <table class="product-sizing-table product-sizing-table--pro">
+                            <thead>
+                                <tr>
+                                    <?php foreach ($cols as $col): ?>
+                                        <?php
+                                        $vk = strtolower(trim((string) ($col['value_kind'] ?? 'text')));
+                                        $thNum = $vk === 'number' ? ' product-sizing-table__th--num' : '';
+                                        ?>
+                                        <th class="product-sizing-table__th<?php echo $thNum; ?>" scope="col"><?php echo htmlspecialchars((string) ($col['header'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></th>
+                                    <?php endforeach; ?>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($srows as $srow): ?>
+                                    <?php if (($srow['kind'] ?? '') === 'label'): ?>
+                                        <tr class="product-sizing-table__label-row">
+                                            <td class="product-sizing-table__label-cell" colspan="<?php echo (int) $colCount; ?>"><?php echo htmlspecialchars((string) ($srow['label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                        </tr>
+                                    <?php else: ?>
+                                        <tr class="product-sizing-table__data-row">
+                                            <?php
+                                            $cells = isset($srow['cells']) && is_array($srow['cells']) ? $srow['cells'] : [];
+                                            for ($ci = 0; $ci < $colCount; $ci++):
+                                                $cv = $cells[$ci] ?? '';
+                                                $colVk = strtolower(trim((string) (($cols[$ci]['value_kind'] ?? 'text')))));
+                                                $tdNum = $colVk === 'number' ? ' product-sizing-table__td--num' : '';
+                                                ?>
+                                                <td class="product-sizing-table__td<?php echo $tdNum; ?>"><?php echo htmlspecialchars((string) $cv, ENT_QUOTES, 'UTF-8'); ?></td>
+                                            <?php endfor; ?>
+                                        </tr>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        <?php elseif ($sizingChartRows !== []): ?>
+            <div class="product-sizing-table-panel">
                 <div class="product-sizing-table-wrap" role="region" aria-label="<?php echo htmlspecialchars(t('sizing_guide'), ENT_QUOTES, 'UTF-8'); ?>">
-                    <table class="product-sizing-table">
+                    <table class="product-sizing-table product-sizing-table--pro">
                         <thead>
                             <tr>
-                                <?php foreach ($cols as $col): ?>
-                                    <th scope="col"><?php echo htmlspecialchars((string) ($col['header'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></th>
-                                <?php endforeach; ?>
+                                <th class="product-sizing-table__th" scope="col"><?php echo htmlspecialchars(t('sizing_col_size'), ENT_QUOTES, 'UTF-8'); ?></th>
+                                <?php if ($sizingShowFoot): ?>
+                                    <th class="product-sizing-table__th product-sizing-table__th--num" scope="col"><?php echo htmlspecialchars(t('sizing_col_foot_cm'), ENT_QUOTES, 'UTF-8'); ?></th>
+                                <?php endif; ?>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($srows as $srow): ?>
-                                <?php if (($srow['kind'] ?? '') === 'label'): ?>
-                                    <tr class="product-sizing-table__label-row">
-                                        <td colspan="<?php echo (int) $colCount; ?>"><?php echo htmlspecialchars((string) ($srow['label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                                    </tr>
-                                <?php else: ?>
-                                    <tr>
-                                        <?php
-                                        $cells = isset($srow['cells']) && is_array($srow['cells']) ? $srow['cells'] : [];
-                                        for ($ci = 0; $ci < $colCount; $ci++):
-                                            $cv = $cells[$ci] ?? '';
-                                            ?>
-                                            <td><?php echo htmlspecialchars((string) $cv, ENT_QUOTES, 'UTF-8'); ?></td>
-                                        <?php endfor; ?>
-                                    </tr>
-                                <?php endif; ?>
+                            <?php foreach ($sizingChartRows as $srow): ?>
+                                <tr class="product-sizing-table__data-row">
+                                    <td class="product-sizing-table__td"><?php echo htmlspecialchars(storefront_size_chart_cell_label($srow), ENT_QUOTES, 'UTF-8'); ?></td>
+                                    <?php if ($sizingShowFoot): ?>
+                                        <td class="product-sizing-table__td product-sizing-table__td--num"><?php
+                                        $fc = $srow['foot_length_cm'] ?? null;
+                                        echo $fc !== null && trim((string) $fc) !== ''
+                                            ? htmlspecialchars((string) $fc, ENT_QUOTES, 'UTF-8')
+                                            : '—';
+                                        ?></td>
+                                    <?php endif; ?>
+                                </tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
-            <?php endforeach; ?>
-        <?php elseif ($sizingChartRows !== []): ?>
-            <div class="product-sizing-table-wrap" role="region" aria-label="<?php echo htmlspecialchars(t('sizing_guide'), ENT_QUOTES, 'UTF-8'); ?>">
-                <table class="product-sizing-table">
-                    <thead>
-                        <tr>
-                            <th scope="col"><?php echo htmlspecialchars(t('sizing_col_size'), ENT_QUOTES, 'UTF-8'); ?></th>
-                            <?php if ($sizingShowFoot): ?>
-                                <th scope="col"><?php echo htmlspecialchars(t('sizing_col_foot_cm'), ENT_QUOTES, 'UTF-8'); ?></th>
-                            <?php endif; ?>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($sizingChartRows as $srow): ?>
-                            <tr>
-                                <td><?php echo htmlspecialchars(storefront_size_chart_cell_label($srow), ENT_QUOTES, 'UTF-8'); ?></td>
-                                <?php if ($sizingShowFoot): ?>
-                                    <td><?php
-                                    $fc = $srow['foot_length_cm'] ?? null;
-                                    echo $fc !== null && trim((string) $fc) !== ''
-                                        ? htmlspecialchars((string) $fc, ENT_QUOTES, 'UTF-8')
-                                        : '—';
-                                    ?></td>
-                                <?php endif; ?>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
             </div>
         <?php endif; ?>
         <form method="dialog">
