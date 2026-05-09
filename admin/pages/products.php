@@ -968,13 +968,6 @@ function orangeProductBasicTypeOk() {
     return !!(pt && !pt.disabled && (parseInt(String(pt.value || '0'), 10) || 0) > 0);
 }
 
-function orangeProductBasicNamesOk() {
-    return ['name', 'name_en', 'name_fil', 'name_hi'].every(function (id) {
-        const el = document.getElementById(id);
-        return el && String(el.value || '').trim() !== '';
-    });
-}
-
 function orangeProductBasicPriceOk() {
     const pe = document.getElementById('price');
     const ce = document.getElementById('cost');
@@ -991,12 +984,11 @@ function orangeProductBasicPriceOk() {
     return !isNaN(p) && !isNaN(c) && p >= 0 && c >= 0;
 }
 
-/** تسلسل البيانات الأساسية: قسم ← نوع ← أسماء ← سعر/تكلفة/حالة ← عائلة مقاسات / ألوان (تعديل منتج = كل الحقول مفعّلة). */
+/** تسلسل البيانات الأساسية: قسم ← نوع ← (عربي/إنجليزي/فلبيني/هندي + سعر + تكلفة + حالة العرض) ← بعد سعر وتكلفة صالحين ← عائلة المقاسات و«له ألوان؟» (تعديل = كل الحقول مفعّلة). */
 function orangeApplyProductBasicStepLocks() {
     const edit = orangeProductBasicRecordIsEdit();
     const deptOk = orangeProductBasicDeptOk();
     const typeOk = orangeProductBasicTypeOk();
-    const namesOk = orangeProductBasicNamesOk();
     const priceOk = orangeProductBasicPriceOk();
 
     const ptEl = document.getElementById('product_type_id');
@@ -1004,22 +996,15 @@ function orangeApplyProductBasicStepLocks() {
         ptEl.disabled = edit ? false : !deptOk;
     }
 
-    ['name', 'name_en', 'name_fil', 'name_hi'].forEach(function (id) {
+    ['name', 'name_en', 'name_fil', 'name_hi', 'price', 'cost'].forEach(function (id) {
         const el = document.getElementById(id);
         if (el) {
             el.disabled = edit ? false : !typeOk;
         }
     });
-
-    ['price', 'cost'].forEach(function (id) {
-        const el = document.getElementById(id);
-        if (el) {
-            el.disabled = edit ? false : !namesOk;
-        }
-    });
     const isAct = document.getElementById('product_is_active');
     if (isAct) {
-        isAct.disabled = edit ? false : !namesOk;
+        isAct.disabled = edit ? false : !typeOk;
     }
 
     document.querySelectorAll('#product_size_pick_panel button[onclick^="orangeSizePickSetAll"]').forEach(function (btn) {
@@ -1486,6 +1471,7 @@ async function translateProductNames(opts = {}) {
         if (t.name_en) document.getElementById('name_en').value = t.name_en;
         if (t.name_fil) document.getElementById('name_fil').value = t.name_fil;
         if (t.name_hi) document.getElementById('name_hi').value = t.name_hi;
+        orangeApplyProductBasicStepLocks();
     } catch (e) {
         if (!silent) alert('فشل طلب الترجمة من السيرفر');
     }
@@ -1497,6 +1483,7 @@ function scheduleProductAutoTranslate() {
         document.getElementById('name_en').value = '';
         document.getElementById('name_fil').value = '';
         document.getElementById('name_hi').value = '';
+        orangeApplyProductBasicStepLocks();
         return;
     }
     clearTimeout(productTranslateTimer);
@@ -3004,12 +2991,15 @@ orangeApplyProductBasicStepLocks();
 ['name', 'name_en', 'name_fil', 'name_hi', 'price', 'cost'].forEach(function (id) {
     const el = document.getElementById(id);
     if (el) {
-        el.addEventListener('input', function () {
+        const refresh = function () {
             orangeApplyProductBasicStepLocks();
+        };
+        el.addEventListener('input', refresh);
+        el.addEventListener('change', refresh);
+        el.addEventListener('paste', function () {
+            queueMicrotask(refresh);
         });
-        el.addEventListener('change', function () {
-            orangeApplyProductBasicStepLocks();
-        });
+        el.addEventListener('cut', refresh);
     }
 });
 
