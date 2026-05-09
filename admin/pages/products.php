@@ -2051,14 +2051,27 @@ function adminColorSwatchHtml(col) {
     return '<span class="admin-color-swatch" style="background:' + bg + '" title="' + name + '"></span>';
 }
 
+function adminVariantReferenceThumbEffectiveFilename() {
+    const mainEl = document.getElementById('main_image');
+    const main = mainEl ? String(mainEl.value || '').trim() : '';
+    if (main) {
+        return main;
+    }
+    const ex = window.PRODUCT_EXTRA_IMAGES || [];
+    if (ex.length && ex[0]) {
+        return String(ex[0]).trim();
+    }
+    return '';
+}
+
 function adminVariantReferenceThumbHtml() {
-    const mainImg = (document.getElementById('main_image') && document.getElementById('main_image').value || '').trim();
+    const mainImg = adminVariantReferenceThumbEffectiveFilename();
     if (!mainImg) {
-        return '<span class="admin-variant-thumb-placeholder" title="ارفع صورة من تبويب الصور">؟</span>';
+        return '<span class="admin-variant-thumb-placeholder" title="ارفع صورة رئيسية أو صور معرض من تبويب الصور">؟</span>';
     }
     const base = adminProductImageBasename(mainImg);
     if (!base) {
-        return '<span class="admin-variant-thumb-placeholder" title="ارفع صورة من تبويب الصور">؟</span>';
+        return '<span class="admin-variant-thumb-placeholder" title="ارفع صورة رئيسية أو صور معرض من تبويب الصور">؟</span>';
     }
     const lower = base.toLowerCase();
     const prefix = adminPublicPath('/uploads/products/');
@@ -2578,6 +2591,7 @@ function orangeGetPickedSizesForVariantGen(famId, allSizes) {
 }
 
 function generateVariants() {
+    assignMainImageFromGalleryIfEmpty();
     const hasC = document.getElementById('has_colors').value === '1';
     const hasS = orangeProductEffectiveHasSizes();
     const famId = parseInt(document.getElementById('size_family_id').value, 10) || 0;
