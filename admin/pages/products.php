@@ -1453,6 +1453,23 @@ function adminSetMainImagePreview(filename) {
             '"></picture>';
     }
     mount.style.display = 'block';
+    orangeRefreshVariantReferenceThumbs();
+}
+
+/** يحدّث عمود «صورة المرجع» في جدول المتغيرات بعد رفع صور (بدون إعادة توليد). */
+function orangeRefreshVariantReferenceThumbs() {
+    const box = document.getElementById('variantsBox');
+    if (!box) {
+        return;
+    }
+    const cells = box.querySelectorAll('tbody tr .td-ref-img');
+    if (!cells.length) {
+        return;
+    }
+    const html = adminVariantReferenceThumbHtml();
+    cells.forEach(function (td) {
+        td.innerHTML = html;
+    });
 }
 
 let productTranslateTimer = null;
@@ -1632,6 +1649,7 @@ function renderGalleryUploadList() {
         li.appendChild(rm);
         ul.appendChild(li);
     });
+    orangeRefreshVariantReferenceThumbs();
 }
 
 async function uploadMainProductImage() {
@@ -1762,6 +1780,9 @@ function productFormShowTab(tab) {
         btn.classList.toggle('is-active', on);
         btn.setAttribute('aria-selected', on ? 'true' : 'false');
     });
+    if (key === 'variants') {
+        orangeRefreshVariantReferenceThumbs();
+    }
 }
 
 (function initProductFormTabs() {
@@ -1975,6 +1996,7 @@ async function uploadGalleryProductImages() {
     inp.value = '';
     assignMainImageFromGalleryIfEmpty();
     renderGalleryUploadList();
+    orangeRefreshVariantReferenceThumbs();
 }
 
 function onHasFlagsChange() {
@@ -2060,6 +2082,13 @@ function adminVariantReferenceThumbEffectiveFilename() {
     const ex = window.PRODUCT_EXTRA_IMAGES || [];
     if (ex.length && ex[0]) {
         return String(ex[0]).trim();
+    }
+    const cwLi = document.querySelector('#colorwaysBox .cw-gallery-list li[data-fn]');
+    if (cwLi) {
+        const fn = String(cwLi.getAttribute('data-fn') || '').trim();
+        if (fn) {
+            return fn;
+        }
     }
     return '';
 }
@@ -2348,6 +2377,7 @@ async function orangeUploadColorwayGalleryFiles(row, fileList) {
             return;
         }
     }
+    orangeRefreshVariantReferenceThumbs();
 }
 
 function adminVariantRowStockKey(r) {
@@ -3119,6 +3149,7 @@ if (orangeColorwaysBoxEl) {
             if (li) {
                 li.remove();
             }
+            orangeRefreshVariantReferenceThumbs();
             return;
         }
         const up = ev.target.closest && ev.target.closest('.cw-gallery-upload-btn');
