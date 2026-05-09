@@ -383,7 +383,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                 <div class="form-grid product-basic-class-row product-form-basic-top3-inner" style="margin-top:12px;">
                     <?php if ($orangeProductTypeDeptStepEnabled): ?>
                     <div class="product-basic-class-cell">
-                        <label for="product_main_department_id">القسم الرئيسي — مطلوب أولاً</label>
+                        <label for="product_main_department_id">القسم الرئيسي</label>
                         <select id="product_main_department_id" required<?php echo $orangeUnifiedDeptCatalogBroken ? ' disabled' : ''; ?>>
                             <option value="">— اختر القسم الرئيسي —</option>
                             <?php foreach ($productTypeDepartmentsForForm as $ptDep): ?>
@@ -393,7 +393,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                     </div>
                     <?php endif; ?>
                     <div id="product_type_block" class="product-basic-class-cell"<?php echo $orangeProductTypeDeptStepEnabled ? '' : ' style="grid-column:1 / -1"'; ?>>
-                        <label for="product_type_id">نوع المنتج (ورقة الشجرة الموحّدة) — مطلوب</label>
+                        <label for="product_type_id">نوع المنتج</label>
                         <select id="product_type_id" required>
                             <option value="">اختر نوع المنتج</option>
                             <?php foreach ($productTypesForForm as $prt): ?>
@@ -482,14 +482,14 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                 <div class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
                     <div>
                         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
-                            <label for="product_item_code" style="margin:0;">كود الصنف (تلقائي من الشجرة)</label>
+                            <label for="product_item_code" style="margin:0;">كود الصنف</label>
                             <button type="button" class="btn-secondary" style="font-size:12px;padding:4px 10px;" onclick="orangeCopyProductField('product_item_code')">نسخ</button>
                         </div>
                         <input type="text" id="product_item_code" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="يُولَّد عند الحفظ" readonly>
                     </div>
                     <div>
                         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
-                            <label for="product_barcode" style="margin:0;">الباركود (بصمة المنتج — بعد الحفظ)</label>
+                            <label for="product_barcode" style="margin:0;">الباركود</label>
                             <button type="button" class="btn-secondary" style="font-size:12px;padding:4px 10px;" onclick="orangeCopyProductField('product_barcode')">نسخ</button>
                         </div>
                         <input type="text" id="product_barcode" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="يُولَّد بعد الحفظ" readonly>
@@ -984,8 +984,8 @@ function orangeApplySizeFamilySchemeFilter() {
     }
 
     if (hint) {
-        hint.style.display = 'block';
         if (expKind !== '' && expCat !== '') {
+            hint.style.display = 'block';
             hint.textContent =
                 'نطاق نوع المنتج على هرَم المقاس: النوع التجاري «' +
                 expKind +
@@ -993,8 +993,8 @@ function orangeApplySizeFamilySchemeFilter() {
                 expCat +
                 '». تُعرض عائلات المقاسات المطابقة لهذا الهرم فقط (أي مخطط مقاس مستوى 3 ضمن نفس الفئة).';
         } else {
-            hint.textContent =
-                'نوع المنتج المختار بلا نطاق هرَم (1–2) — تظهر كل العائلات النشطة. عند ضبط النوع التجاري وفئة القياس في «أنواع المنتجات» تُصفّى القائمة تلقائياً.';
+            hint.style.display = 'none';
+            hint.textContent = '';
         }
     }
     orangeRefreshSizePickPanel();
