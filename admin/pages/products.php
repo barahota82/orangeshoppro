@@ -371,7 +371,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                     <div>
                         <label>مسار الشجرة الموحّدة (مقتطف)</label>
                         <div id="product_department_hint" class="product-basic-field-like">—</div>
-                        <small style="display:block;color:#666;margin-top:4px;">مرجع: <code id="product_dept_cat_ref" style="font-size:13px;">—</code></small>
                     </div>
                 </div>
                 <?php if ($orangeProductTypeDeptStepEnabled && $orangeUnifiedDeptCatalogBroken): ?>
@@ -476,7 +475,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                             <option value="lower">سفلي</option>
                             <option value="both">علوي وسفلي</option>
                         </select>
-                        <small class="card-hint" style="display:block;margin-top:4px;color:#64748b;">يُفعّل بعد اختيار عائلة مقاسات في الحقل المجاور. ربط الجداول/الشاشات التفصيلية للدليل يُضاف لاحقاً.</small>
                     </div>
                 </div>
                 <div class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
@@ -2762,33 +2760,29 @@ document.getElementById('description_en').addEventListener('input', scheduleProd
 
 function updateProductCatalogHint() {
     const hint = document.getElementById('product_department_hint');
-    const refEl = document.getElementById('product_dept_cat_ref');
     const ptEl = document.getElementById('product_type_id');
     const trailMap = window.ORANGE_PRODUCT_TYPE_TRAIL || {};
     if (window.ORANGE_CATALOG_NAV_UNIFIED) {
-        if (!hint || !refEl || !ptEl) {
+        if (!hint || !ptEl) {
             return;
         }
         const pid = parseInt(ptEl.value || '0', 10) || 0;
         const row = trailMap[pid];
         if (!row || !String(row.trail_ar || '').trim()) {
             hint.textContent = pid > 0 ? '— اختر نوع منتج نشط لعرض المسار' : '—';
-            refEl.textContent = pid > 0 ? 'pt-' + pid : '—';
             return;
         }
         hint.textContent = String(row.trail_ar || '').trim();
-        refEl.textContent = 'pt-' + pid;
         return;
     }
     const sel = document.getElementById('category_id');
-    if (!hint || !refEl || !sel) {
+    if (!hint || !sel) {
         return;
     }
     const id = parseInt(sel.value, 10) || 0;
     const meta = window.ORANGE_CATEGORY_META && window.ORANGE_CATEGORY_META[id];
     if (!meta) {
         hint.textContent = '—';
-        refEl.textContent = '—';
         return;
     }
     if (meta.dept_id > 0 && meta.dept_label) {
@@ -2798,7 +2792,6 @@ function updateProductCatalogHint() {
     } else {
         hint.textContent = 'بدون قسم — فعّل الشجرة الموحّدة أو اربط القسم عبر الترحيل';
     }
-    refEl.textContent = meta.ref;
 }
 
 const categorySelectEl = document.getElementById('category_id');
