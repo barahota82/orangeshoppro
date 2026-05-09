@@ -523,7 +523,7 @@ $orangeAdminCardPreviewViewLabel = t('view_product');
         </div>
         </div>
 
-        <div id="productTabPanelSizes" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnSizes">
+        <div id="productTabPanelSizes" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnSizes" hidden>
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">الألوان</h4>
         <?php if ($colors === []): ?>
@@ -546,7 +546,7 @@ $orangeAdminCardPreviewViewLabel = t('view_product');
         </div>
         </div>
 
-        <div id="productTabPanelImages" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnImages">
+        <div id="productTabPanelImages" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnImages" hidden>
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">صور المنتج العامة</h4>
         <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">صور <strong>المنتج العامة</strong> (رئيسية + معرض) للقوائم والاحتياط. إن كان المنتج <strong>له ألوان</strong> يمكن إضافة <strong>معرض لكل لون</strong> من تبويب <strong>الألوان</strong> أسفل صف اللون — وإلا يُعرض في المتجر نفس المعرض العام.</p>
@@ -577,7 +577,7 @@ $orangeAdminCardPreviewViewLabel = t('view_product');
         </div>
         </div>
 
-        <div id="productTabPanelVariants" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnVariants">
+        <div id="productTabPanelVariants" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnVariants" hidden>
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">المتغيرات والباركود</h4>
         <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">كل منتج — بما فيه <strong>بدون ألوان وبدون مقاسات</strong> — يحتاج <strong>صف بيع واحد على الأقل</strong> في الجدول أدناه؛ يظهر <strong>باركود المتغير</strong> بعد الحفظ. <strong>منتج جديد:</strong> أكمل البيانات في التبويبات ثم اضغط «توليد المتغيرات»؛ بعد ظهور الجدول يُفعّل «حفظ المنتج». المنتج البسيط = صف واحد في الجدول بعد التوليد.</p>
@@ -585,7 +585,7 @@ $orangeAdminCardPreviewViewLabel = t('view_product');
         </div>
         </div>
 
-        <div id="productTabPanelAttributes" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnAttributes">
+        <div id="productTabPanelAttributes" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnAttributes" hidden>
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">سمات المنتج</h4>
         <div class="form-grid product-form-tab-basic-grid">
@@ -604,7 +604,7 @@ $orangeAdminCardPreviewViewLabel = t('view_product');
         </div>
         </div>
 
-        <div id="productTabPanelDescription" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnDescription">
+        <div id="productTabPanelDescription" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnDescription" hidden>
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">وصف المنتج</h4>
         <div class="form-grid product-form-tab-basic-grid">
@@ -663,7 +663,7 @@ $orangeAdminCardPreviewViewLabel = t('view_product');
         </div>
         </div>
 
-        <div id="productTabPanelCardPreview" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnCardPreview">
+        <div id="productTabPanelCardPreview" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnCardPreview" hidden>
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">معاينة كارت المنتج</h4>
         <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">معاينة تقريبية ل<strong>كارت القائمة</strong> في المتجر (اتجاه RTL ولغة عربية كما في الصفحة الرئيسية). تُحدَّث تلقائياً عند تغيّر الاسم والسعر والصور وصفوف الألوان. شارة «العروض» لا تُعرض هنا لأنها مرتبطة بجدول العروض وليس بنموذج المنتج.</p>
@@ -2477,7 +2477,13 @@ function productFormShowTab(tab) {
     const key = map[tab] ? tab : 'basic';
     const panelId = map[key];
     document.querySelectorAll('.admin-product-tab-panel').forEach(function (el) {
-        el.classList.toggle('is-active', el.id === panelId);
+        const active = el.id === panelId;
+        el.classList.toggle('is-active', active);
+        if (active) {
+            el.removeAttribute('hidden');
+        } else {
+            el.setAttribute('hidden', 'hidden');
+        }
     });
     document.querySelectorAll('.admin-product-tab').forEach(function (btn) {
         const on = btn.getAttribute('data-product-tab') === key;

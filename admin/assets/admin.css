@@ -2119,14 +2119,27 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     outline: 2px solid var(--primary);
     outline-offset: 2px;
 }
-.admin-product-tab-panels {
+/* لوحات التبويب في خلية شبكية واحدة حتى لا يُحسب ارتفاع اللوحات المخفية (display:none) كمساحة بيضاء */
+#productForm > .admin-product-tab-panels {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, auto);
+    align-content: start;
+    justify-items: stretch;
     min-height: 0;
+    width: 100%;
 }
-.admin-product-tab-panel {
-    display: none;
+#productForm > .admin-product-tab-panels > .admin-product-tab-panel {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    width: 100%;
+    display: none !important;
 }
-.admin-product-tab-panel.is-active {
-    display: block;
+#productForm > .admin-product-tab-panels > .admin-product-tab-panel.is-active {
+    display: block !important;
+    position: relative;
+    z-index: 1;
 }
 .admin-product-section {
     margin-bottom: 28px;
