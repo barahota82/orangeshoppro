@@ -1462,13 +1462,24 @@ function orangeRefreshVariantReferenceThumbs() {
     if (!box) {
         return;
     }
-    const cells = box.querySelectorAll('tbody tr .td-ref-img');
-    if (!cells.length) {
+    const rows = box.querySelectorAll('tbody tr');
+    if (!rows.length) {
         return;
     }
-    const html = adminVariantReferenceThumbHtml();
-    cells.forEach(function (td) {
-        td.innerHTML = html;
+    rows.forEach(function (tr) {
+        const td = tr.querySelector('.td-ref-img');
+        if (!td) {
+            return;
+        }
+        const vp = tr.querySelector('.v-p');
+        const vs = tr.querySelector('.v-s');
+        const vpp = tr.querySelector('.v-pp');
+        const vsp = tr.querySelector('.v-sp');
+        const p = vp ? (parseInt(vp.value, 10) || 0) : 0;
+        const s = vs ? (parseInt(vs.value, 10) || 0) : 0;
+        const pp = vpp ? (parseInt(vpp.value, 10) || 0) : 0;
+        const sp = vsp ? (parseInt(vsp.value, 10) || 0) : 0;
+        td.innerHTML = adminVariantReferenceThumbHtmlForColorway(p, s, pp, sp);
     });
 }
 
@@ -2101,12 +2112,46 @@ function adminColorSwatchHtml(col) {
     return '<span class="admin-color-swatch" style="background:' + bg + '" title="' + name + '"></span>';
 }
 
-function adminVariantReferenceThumbEffectiveFilename() {
+/** يطابق صف الألوان (cw-row) بمفتاح نفس صف المتغير (لون أساسي/ثانوي + نمط). */
+function adminFindColorwayRowByVariantIds(p, s, pp, sp) {
+    const p0 = parseInt(p, 10) || 0;
+    const s0 = parseInt(s, 10) || 0;
+    const pp0 = parseInt(pp, 10) || 0;
+    const sp0 = parseInt(sp, 10) || 0;
+    const rows = document.querySelectorAll('#colorwaysBox .cw-row');
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const rp = parseInt((row.querySelector('.cw-p') && row.querySelector('.cw-p').value) || '0', 10) || 0;
+        const rs = parseInt((row.querySelector('.cw-s') && row.querySelector('.cw-s').value) || '0', 10) || 0;
+        const rpp = parseInt((row.querySelector('.cw-pp') && row.querySelector('.cw-pp').value) || '0', 10) || 0;
+        const rsp = parseInt((row.querySelector('.cw-sp') && row.querySelector('.cw-sp').value) || '0', 10) || 0;
+        if (rp === p0 && rs === s0 && rpp === pp0 && rsp === sp0) {
+            return row;
+        }
+    }
+    return null;
+}
+
+/**
+ * اسم ملف الصورة المعروضة كمرجع لصف متغير (بعد مطابقة صف اللون).
+ * بوجود ألوان: صور معرض ذلك اللون أولاً، ثم الرئيسية، ثم أول صورة معرض عامة.
+ */
+function adminVariantReferenceThumbEffectiveFilenameForColorway(p, s, pp, sp) {
     const hc = document.getElementById('has_colors') && String(document.getElementById('has_colors').value || '') === '1';
     const mainEl = document.getElementById('main_image');
     const main = mainEl ? String(mainEl.value || '').trim() : '';
     if (!hc) {
         return main;
+    }
+    const cwRow = adminFindColorwayRowByVariantIds(p, s, pp, sp);
+    if (cwRow) {
+        const li = cwRow.querySelector('.cw-gallery-list li[data-fn]');
+        if (li) {
+            const fn = String(li.getAttribute('data-fn') || '').trim();
+            if (fn) {
+                return fn;
+            }
+        }
     }
     if (main) {
         return main;
@@ -2115,26 +2160,19 @@ function adminVariantReferenceThumbEffectiveFilename() {
     if (ex.length && ex[0]) {
         return String(ex[0]).trim();
     }
-    const cwLi = document.querySelector('#colorwaysBox .cw-gallery-list li[data-fn]');
-    if (cwLi) {
-        const fn = String(cwLi.getAttribute('data-fn') || '').trim();
-        if (fn) {
-            return fn;
-        }
-    }
     return '';
 }
 
-function adminVariantReferenceThumbHtml() {
+function adminVariantReferenceThumbHtmlForFilename(mainImg) {
     const hc = document.getElementById('has_colors') && String(document.getElementById('has_colors').value || '') === '1';
-    const mainImg = adminVariantReferenceThumbEffectiveFilename();
     const phTitle = hc
         ? 'ارفع صورة رئيسية أو صور معرض من تبويب الصور، أو صور للون من تبويب الألوان'
         : 'ارفع الصورة الرئيسية من تبويب الصور (منتج بلا ألوان)';
-    if (!mainImg) {
+    const trimmed = String(mainImg || '').trim();
+    if (!trimmed) {
         return '<span class="admin-variant-thumb-placeholder" title="' + adminEscAttr(phTitle) + '">؟</span>';
     }
-    const base = adminProductImageBasename(mainImg);
+    const base = adminProductImageBasename(trimmed);
     if (!base) {
         return '<span class="admin-variant-thumb-placeholder" title="' + adminEscAttr(phTitle) + '">؟</span>';
     }
@@ -2157,6 +2195,11 @@ function adminVariantReferenceThumbHtml() {
         adminEscAttr(orig) +
         '" alt="" class="admin-variant-thumb" width="48" height="48" loading="lazy"></picture>'
     );
+}
+
+function adminVariantReferenceThumbHtmlForColorway(p, s, pp, sp) {
+    const fn = adminVariantReferenceThumbEffectiveFilenameForColorway(p, s, pp, sp);
+    return adminVariantReferenceThumbHtmlForFilename(fn);
 }
 
 function orangeColorwayRowKeyFromRow(row) {
@@ -2748,8 +2791,7 @@ function generateVariants() {
         return;
     }
 
-    const thumbCell = adminVariantReferenceThumbHtml();
-    let html = '<p class="admin-variants-lead"><strong>منتج بلا ألوان وبلا مقاسات:</strong> صف واحد = SKU واحد وباركود واحد بعد الحفظ. <strong>منتج بلون أو بمقاسات:</strong> كل صف يمثل نفس الصنف مع دمج لون ونمط اختياري × مقاس. عمود «صورة المرجع» يعكس الصورة الرئيسية الحالية (من تبويب الصور). <strong>الكميات:</strong> لا تُدخل من هنا — بعد الحفظ عالج المخزون من <a href="' + adminPublicPath('/admin/index.php?page=stock') + '">شاشة المخزون</a> (رصيد افتتاحي أو تعديل) أو من <a href="' + adminPublicPath('/admin/index.php?page=purchases') + '">استلام فاتورة شراء</a>.</p>';
+    let html = '<p class="admin-variants-lead"><strong>منتج بلا ألوان وبلا مقاسات:</strong> صف واحد = SKU واحد وباركود واحد بعد الحفظ. <strong>منتج بلون أو بمقاسات:</strong> كل صف يمثل نفس الصنف مع دمج لون ونمط اختياري × مقاس. عمود «صورة المرجع»: عند رفع صور لكل لون من تبويب الألوان تُعرض صورة ذلك اللون لكل صف؛ وإلا تُستخدم الصورة الرئيسية أو معرض الصور العام. <strong>الكميات:</strong> لا تُدخل من هنا — بعد الحفظ عالج المخزون من <a href="' + adminPublicPath('/admin/index.php?page=stock') + '">شاشة المخزون</a> (رصيد افتتاحي أو تعديل) أو من <a href="' + adminPublicPath('/admin/index.php?page=purchases') + '">استلام فاتورة شراء</a>.</p>';
     html += '<div class="table-wrap admin-table-wrap-elevated"><table class="admin-table admin-variants-matrix"><thead><tr>';
     html += '<th class="col-ref-img">صورة المرجع</th><th>اللون</th><th>المقاس</th><th class="col-vbar">باركود المتغير (بعد الحفظ)</th><th class="col-stock">المخزون الحالي (عرض)</th>';
     html += '</tr></thead><tbody>';
@@ -2774,6 +2816,12 @@ function generateVariants() {
         const colorCell = '<div class="admin-variant-color-cell">' + dots + '<span class="admin-variant-color-names">' + colorLabel + '</span></div>' +
             `<input type="hidden" class="v-p" value="${c.primary_color_id}"><input type="hidden" class="v-s" value="${c.secondary_color_id}">` +
             `<input type="hidden" class="v-pp" value="${c.primary_pattern_id || 0}"><input type="hidden" class="v-sp" value="${c.secondary_pattern_id || 0}">`;
+        const thumbCell = adminVariantReferenceThumbHtmlForColorway(
+            c.primary_color_id,
+            c.secondary_color_id,
+            c.primary_pattern_id || 0,
+            c.secondary_pattern_id || 0
+        );
         html += `<tr>
             <td class="td-ref-img">${thumbCell}</td>
             <td>${colorCell}</td>
