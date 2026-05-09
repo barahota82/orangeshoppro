@@ -1190,7 +1190,14 @@ function orangeProductValidateWizardBeforeMatrix() {
             }
         });
     }
-    if (!hasGeneralImage && !hasColorwayUploadedImage && !hasColorsUi) {
+    if (!hasGeneralImage && !hasColorwayUploadedImage) {
+        if (hasColorsUi) {
+            return {
+                tab: 'sizes',
+                message:
+                    'لا توجد صورة عامة للمنتج: إمّا ترفع صورة من تبويب «صور المنتج العامة»، أو ترفع صورة خاصة بأحد ألوان المنتج من تبويب «الألوان» (تحت صف اللون) قبل المتابعة.'
+            };
+        }
         return { tab: 'images', message: 'ارفع صورة واحدة على الأقل (رئيسية أو معرض) قبل المتابعة.' };
     }
 
