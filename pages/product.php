@@ -139,6 +139,34 @@ if ($sfId > 0 && orange_table_exists($pdo, 'size_family_sizes')) {
     }
 }
 $advisorySizingReady = !empty($advisorySizing['use_dynamic']) && ($advisorySizing['sections'] ?? []) !== [];
+$advUxHasLength = false;
+$advUxSystemsMap = [];
+if ($advisorySizingReady) {
+    foreach (($advisorySizing['sections'] ?? []) as $secUx) {
+        foreach (($secUx['columns'] ?? []) as $cUx) {
+            if (($cUx['storage_measure'] ?? '') === 'length_cm') {
+                $advUxHasLength = true;
+            }
+            $dsUx = strtolower(trim((string) ($cUx['display_system'] ?? '')));
+            if ($dsUx !== '') {
+                $advUxSystemsMap[$dsUx] = true;
+            }
+        }
+    }
+}
+$advUxSystemsOrdered = [];
+foreach (['eu', 'uk', 'us'] as $pUx) {
+    if (isset($advUxSystemsMap[$pUx])) {
+        $advUxSystemsOrdered[] = $pUx;
+    }
+}
+foreach (array_keys($advUxSystemsMap) as $pUx) {
+    if (!in_array($pUx, ['eu', 'uk', 'us'], true)) {
+        $advUxSystemsOrdered[] = $pUx;
+    }
+}
+$advUxShowToolbar = $advisorySizingReady && ($advUxHasLength || $advUxSystemsOrdered !== []);
+$advUxDefaultSystem = $advUxSystemsOrdered[0] ?? 'eu';
 $legacySizingReady = !$advisorySizingReady && $sizingChartRows !== [];
 $showSizingGuide = $scope !== 'none' && ($sizingText !== '' || $advisorySizingReady || $legacySizingReady);
 
@@ -392,7 +420,32 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
             $advSections = $advisorySizing['sections'] ?? [];
             $advSectionCount = is_array($advSections) ? count($advSections) : 0;
             ?>
-            <?php foreach ($advSections as $sec): ?>
+            <?php if ($advUxShowToolbar): ?>
+                <div class="product-sizing-adv-toolbar" id="productSizingAdvToolbar">
+                    <?php if ($advUxSystemsOrdered !== []): ?>
+                        <div class="product-sizing-adv-toolbar__field" id="productSizingAdvSysWrap">
+                            <label for="productSizingAdvSys"><?php echo htmlspecialchars(t('sizing_adv_toolbar_system'), ENT_QUOTES, 'UTF-8'); ?></label>
+                            <select id="productSizingAdvSys" class="product-sizing-adv-toolbar__select">
+                                <?php foreach ($advUxSystemsOrdered as $sysOpt): ?>
+                                    <option value="<?php echo htmlspecialchars($sysOpt, ENT_QUOTES, 'UTF-8'); ?>"<?php echo $sysOpt === $advUxDefaultSystem ? ' selected' : ''; ?>>
+                                        <?php echo htmlspecialchars(t('sizing_display_system_' . $sysOpt), ENT_QUOTES, 'UTF-8'); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    <?php endif; ?>
+                    <?php if ($advUxHasLength): ?>
+                        <div class="product-sizing-adv-toolbar__field" id="productSizingAdvUnitWrap">
+                            <label for="productSizingAdvUnit"><?php echo htmlspecialchars(t('sizing_adv_toolbar_unit'), ENT_QUOTES, 'UTF-8'); ?></label>
+                            <select id="productSizingAdvUnit" class="product-sizing-adv-toolbar__select">
+                                <option value="cm"><?php echo htmlspecialchars(t('sizing_unit_cm_short'), ENT_QUOTES, 'UTF-8'); ?></option>
+                                <option value="inch"><?php echo htmlspecialchars(t('sizing_unit_inch_short'), ENT_QUOTES, 'UTF-8'); ?></option>
+                            </select>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+            <?php foreach ($advSections as $secTableIdx => $sec): ?>
                 <?php
                 $cols = isset($sec['columns']) && is_array($sec['columns']) ? $sec['columns'] : [];
                 $srows = isset($sec['rows']) && is_array($sec['rows']) ? $sec['rows'] : [];
@@ -412,15 +465,20 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
                 <?php endif; ?>
                 <div class="product-sizing-table-panel">
                     <div class="product-sizing-table-wrap" role="region" aria-label="<?php echo htmlspecialchars(t('sizing_guide'), ENT_QUOTES, 'UTF-8'); ?>">
-                        <table class="product-sizing-table product-sizing-table--pro">
+                        <table class="product-sizing-table product-sizing-table--pro" data-adv-table="<?php echo (int) $secTableIdx; ?>">
                             <thead>
                                 <tr>
-                                    <?php foreach ($cols as $col): ?>
+                                    <?php foreach ($cols as $ci => $col): ?>
                                         <?php
                                         $vk = strtolower(trim((string) ($col['value_kind'] ?? 'text')));
-                                        $thNum = $vk === 'number' ? ' product-sizing-table__th--num' : '';
+                                        $smCol = (string) ($col['storage_measure'] ?? '');
+                                        $dsCol = strtolower(trim((string) ($col['display_system'] ?? '')));
+                                        $thNum = ($vk === 'number' || $smCol === 'length_cm') ? ' product-sizing-table__th--num' : '';
                                         ?>
-                                        <th class="product-sizing-table__th<?php echo $thNum; ?>" scope="col"><?php echo htmlspecialchars((string) ($col['header'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></th>
+                                        <th class="product-sizing-table__th<?php echo $thNum; ?>"
+                                            scope="col"
+                                            data-adv-col="<?php echo (int) $ci; ?>"
+                                            data-adv-dsys="<?php echo htmlspecialchars($dsCol, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) ($col['header'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></th>
                                     <?php endforeach; ?>
                                 </tr>
                             </thead>
@@ -436,10 +494,24 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
                                             $cells = isset($srow['cells']) && is_array($srow['cells']) ? $srow['cells'] : [];
                                             for ($ci = 0; $ci < $colCount; $ci++):
                                                 $cv = $cells[$ci] ?? '';
-                                                $colVk = strtolower(trim((string) (($cols[$ci]['value_kind'] ?? 'text')))));
-                                                $tdNum = $colVk === 'number' ? ' product-sizing-table__td--num' : '';
+                                                $colMeta = $cols[$ci] ?? [];
+                                                $colVk = strtolower(trim((string) ($colMeta['value_kind'] ?? 'text')));
+                                                $sm = (string) ($colMeta['storage_measure'] ?? '');
+                                                $ds = strtolower(trim((string) ($colMeta['display_system'] ?? '')));
+                                                $cmVal = $sm === 'length_cm' ? orange_advisory_parse_stored_cm((string) $cv) : null;
+                                                $tdNum = ($colVk === 'number' || $sm === 'length_cm') ? ' product-sizing-table__td--num' : '';
+                                                if ($cmVal !== null) {
+                                                    $n = number_format($cmVal, 2, '.', '');
+                                                    $n = rtrim(rtrim($n, '0'), '.');
+                                                    $dispCell = $n . ' ' . t('sizing_unit_cm_short');
+                                                } else {
+                                                    $dispCell = (string) $cv;
+                                                }
                                                 ?>
-                                                <td class="product-sizing-table__td<?php echo $tdNum; ?>"><?php echo htmlspecialchars((string) $cv, ENT_QUOTES, 'UTF-8'); ?></td>
+                                                <td class="product-sizing-table__td<?php echo $tdNum; ?>"
+                                                    data-adv-col="<?php echo (int) $ci; ?>"
+                                                    data-adv-dsys="<?php echo htmlspecialchars($ds, ENT_QUOTES, 'UTF-8'); ?>"
+                                                    <?php if ($cmVal !== null): ?> data-adv-cm="<?php echo htmlspecialchars((string) $cmVal, ENT_QUOTES, 'UTF-8'); ?>"<?php endif; ?>><?php echo htmlspecialchars($dispCell, ENT_QUOTES, 'UTF-8'); ?></td>
                                             <?php endfor; ?>
                                         </tr>
                                     <?php endif; ?>
@@ -485,6 +557,18 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
         </form>
     </div>
 </dialog>
+    <?php if ($advisorySizingReady && $advUxShowToolbar): ?>
+<script>
+window.ORANGE_ADVISORY_UX = {
+    hasLength: <?php echo $advUxHasLength ? 'true' : 'false'; ?>,
+    hasSystems: <?php echo count($advUxSystemsOrdered) > 0 ? 'true' : 'false'; ?>,
+    systems: <?php echo json_encode($advUxSystemsOrdered, JSON_UNESCAPED_UNICODE); ?>,
+    defaultSystem: <?php echo json_encode($advUxDefaultSystem, JSON_UNESCAPED_UNICODE); ?>,
+    labelCm: <?php echo json_encode(t('sizing_unit_cm_short'), JSON_UNESCAPED_UNICODE); ?>,
+    labelInch: <?php echo json_encode(t('sizing_unit_inch_short'), JSON_UNESCAPED_UNICODE); ?>
+};
+</script>
+    <?php endif; ?>
 <?php endif; ?>
 
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/product.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>

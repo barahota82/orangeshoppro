@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/advisory_sizing_guides.php';
 require_admin_api();
 
 /**
@@ -95,7 +96,7 @@ try {
             }
             $gid = (int) $guide['id'];
             $cols = $pdo->prepare(
-                'SELECT id, sort_order, label_ar, label_en, label_fil, label_hi, value_kind, unit_hint
+                'SELECT id, sort_order, label_ar, label_en, label_fil, label_hi, value_kind, unit_hint, storage_measure, display_system
                  FROM advisory_sizing_guide_columns WHERE guide_id = ? ORDER BY sort_order ASC, id ASC'
             );
             $cols->execute([$gid]);
@@ -232,13 +233,21 @@ try {
                     continue;
                 }
                 ++$so;
+                $stMeas = orange_advisory_normalize_storage_measure((string) ($c['storage_measure'] ?? ''));
+                $dispSys = orange_advisory_normalize_display_system((string) ($c['display_system'] ?? ''));
+                $vk = orange_advisory_value_kind_valid($c['value_kind'] ?? 'text');
+                if ($stMeas === 'length_cm') {
+                    $vk = 'number';
+                }
                 $normCols[] = [
                     'label_ar' => $la !== '' ? $la : $le,
                     'label_en' => $le !== '' ? $le : $la,
                     'label_fil' => trim((string) ($c['label_fil'] ?? '')),
                     'label_hi' => trim((string) ($c['label_hi'] ?? '')),
-                    'value_kind' => orange_advisory_value_kind_valid($c['value_kind'] ?? 'text'),
+                    'value_kind' => $vk,
                     'unit_hint' => trim((string) ($c['unit_hint'] ?? '')),
+                    'storage_measure' => $stMeas,
+                    'display_system' => $dispSys,
                     'sort_order' => (int) ($c['sort_order'] ?? 0) > 0 ? (int) $c['sort_order'] : $so,
                 ];
             }
@@ -354,8 +363,8 @@ try {
                 foreach ($normCols as $nc) {
                     $ic = $pdo->prepare(
                         'INSERT INTO advisory_sizing_guide_columns
-                            (guide_id, sort_order, label_ar, label_en, label_fil, label_hi, value_kind, unit_hint)
-                         VALUES (?,?,?,?,?,?,?,?)'
+                            (guide_id, sort_order, label_ar, label_en, label_fil, label_hi, value_kind, unit_hint, storage_measure, display_system)
+                         VALUES (?,?,?,?,?,?,?,?,?,?)'
                     );
                     $ic->execute([
                         $id,
@@ -366,6 +375,8 @@ try {
                         $nc['label_hi'],
                         $nc['value_kind'],
                         $nc['unit_hint'],
+                        $nc['storage_measure'],
+                        $nc['display_system'],
                     ]);
                     $colIdMap[] = (int) $pdo->lastInsertId();
                 }

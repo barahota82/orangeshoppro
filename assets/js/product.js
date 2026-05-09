@@ -147,10 +147,123 @@ function writeCartJson(cart) {
     localStorage.setItem(orangeProductCartStorageKey(), JSON.stringify(cart));
 }
 
+const ORANGE_ADV_SIZING_UNIT_KEY = 'orange_sf_adv_sizing_unit';
+const ORANGE_ADV_SIZING_SYS_KEY = 'orange_sf_adv_sizing_sys';
+
+function orangeAdvisoryFormatMeasureNumber(n) {
+    if (typeof n !== 'number' || Number.isNaN(n)) {
+        return '';
+    }
+    let s = n.toFixed(2);
+    s = s.replace(/\.?0+$/, '');
+    return s;
+}
+
+function orangeAdvisoryApplyUnits(dialog, useInch) {
+    const u = window.ORANGE_ADVISORY_UX;
+    if (!u || !u.hasLength) {
+        return;
+    }
+    const lc = u.labelCm || 'cm';
+    const li = u.labelInch || 'in';
+    dialog.querySelectorAll('td[data-adv-cm]').forEach((td) => {
+        const cm = parseFloat(td.getAttribute('data-adv-cm'), 10);
+        if (Number.isNaN(cm)) {
+            return;
+        }
+        if (!useInch) {
+            td.textContent = `${orangeAdvisoryFormatMeasureNumber(cm)} ${lc}`;
+        } else {
+            const inch = cm / 2.54;
+            td.textContent = `${orangeAdvisoryFormatMeasureNumber(inch)} ${li}`;
+        }
+    });
+}
+
+function orangeAdvisoryColumnVisibleForSystem(el, system) {
+    const ds = (el.getAttribute('data-adv-dsys') || '').toLowerCase().trim();
+    if (ds === '') {
+        return true;
+    }
+    return ds === system;
+}
+
+function orangeAdvisoryApplySystemSelection(dialog, system) {
+    const u = window.ORANGE_ADVISORY_UX;
+    if (!u || !u.hasSystems) {
+        return;
+    }
+    const sys = String(system || '').toLowerCase().trim();
+    dialog.querySelectorAll('table.product-sizing-table--pro').forEach((table) => {
+        const headerCells = table.querySelectorAll('thead tr th');
+        headerCells.forEach((th, idx) => {
+            const hide = !orangeAdvisoryColumnVisibleForSystem(th, sys);
+            th.classList.toggle('product-sizing-col--hidden', hide);
+            table.querySelectorAll('tbody tr.product-sizing-table__data-row').forEach((tr) => {
+                const td = tr.children[idx];
+                if (td) {
+                    td.classList.toggle('product-sizing-col--hidden', hide);
+                }
+            });
+        });
+    });
+}
+
+function orangeAdvisorySizingRefresh(dialog) {
+    const u = window.ORANGE_ADVISORY_UX;
+    if (!u) {
+        return;
+    }
+    const selUnit = dialog.querySelector('#productSizingAdvUnit');
+    const selSys = dialog.querySelector('#productSizingAdvSys');
+    if (selUnit && u.hasLength) {
+        orangeAdvisoryApplyUnits(dialog, selUnit.value === 'inch');
+    }
+    if (selSys && u.hasSystems) {
+        orangeAdvisoryApplySystemSelection(dialog, selSys.value);
+    }
+}
+
+function orangeAdvisorySizingEnsureBound(dialog) {
+    if (dialog.dataset.orangeAdvBound === '1') {
+        orangeAdvisorySizingRefresh(dialog);
+        return;
+    }
+    const u = window.ORANGE_ADVISORY_UX;
+    if (!u) {
+        return;
+    }
+    dialog.dataset.orangeAdvBound = '1';
+    const selUnit = dialog.querySelector('#productSizingAdvUnit');
+    const selSys = dialog.querySelector('#productSizingAdvSys');
+    if (selUnit && u.hasLength) {
+        const stored = localStorage.getItem(ORANGE_ADV_SIZING_UNIT_KEY);
+        if (stored === 'inch' || stored === 'cm') {
+            selUnit.value = stored;
+        }
+        selUnit.addEventListener('change', () => {
+            localStorage.setItem(ORANGE_ADV_SIZING_UNIT_KEY, selUnit.value);
+            orangeAdvisoryApplyUnits(dialog, selUnit.value === 'inch');
+        });
+    }
+    if (selSys && u.hasSystems) {
+        const storedS = localStorage.getItem(ORANGE_ADV_SIZING_SYS_KEY);
+        if (storedS && Array.isArray(u.systems) && u.systems.indexOf(storedS) >= 0) {
+            selSys.value = storedS;
+        }
+        selSys.addEventListener('change', () => {
+            localStorage.setItem(ORANGE_ADV_SIZING_SYS_KEY, selSys.value);
+            orangeAdvisoryApplySystemSelection(dialog, String(selSys.value).toLowerCase());
+        });
+    }
+    orangeAdvisorySizingRefresh(dialog);
+}
+
 function openProductSizingDialog() {
     const d = document.getElementById('productSizingDialog');
     if (d && typeof d.showModal === 'function') {
         d.showModal();
+        orangeAdvisorySizingEnsureBound(d);
     }
 }
 

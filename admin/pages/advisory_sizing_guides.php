@@ -106,7 +106,7 @@ if ($sizesJson === false) {
     </div>
     <div style="overflow-x:auto;">
         <table class="data-table" id="asg_cols_table">
-            <thead><tr><th>ترتيب</th><th>عربي</th><th>EN</th><th>Fil</th><th>Hi</th><th>نوع القيمة</th><th>وحدة (عرض)</th></tr></thead>
+            <thead><tr><th>ترتيب</th><th>عربي</th><th>EN</th><th>Fil</th><th>Hi</th><th>نوع القيمة</th><th>وحدة (عرض)</th><th>تخزين الطول</th><th>عمود النظام</th></tr></thead>
             <tbody id="asg_cols_body"></tbody>
         </table>
     </div>
@@ -163,7 +163,17 @@ if ($sizesJson === false) {
                 '<td><input type="text" class="asg-c-fil" maxlength="191"></td>' +
                 '<td><input type="text" class="asg-c-hi" maxlength="191"></td>' +
                 '<td><select class="asg-c-vk"><option value="text">نص</option><option value="number">رقم</option></select></td>' +
-                '<td><input type="text" class="asg-c-unit" maxlength="64" placeholder="مثال cm"></td>';
+                '<td><input type="text" class="asg-c-unit" maxlength="64" placeholder="مثال cm"></td>' +
+                '<td><select class="asg-c-stor" title="قيمة الطول تُخزَّن بالسم؛ العميل يحوّل للعرض فقط">' +
+                '<option value="">—</option><option value="length_cm">طول بالسم (عرض cm/inch)</option></select></td>' +
+                '<td><select class="asg-c-dsys" title="يظهر للعميل عند اختيار EU/US/UK في المتجر">' +
+                '<option value="">— عام</option><option value="eu">EU</option><option value="uk">UK</option><option value="us">US</option></select></td>';
+            tr.querySelector('.asg-c-stor').addEventListener('change', function () {
+                var vk = tr.querySelector('.asg-c-vk');
+                if (tr.querySelector('.asg-c-stor').value === 'length_cm') {
+                    vk.value = 'number';
+                }
+            });
             tb.appendChild(tr);
         }
     }
@@ -180,7 +190,9 @@ if ($sizesJson === false) {
                 label_fil: tr.querySelector('.asg-c-fil').value.trim(),
                 label_hi: tr.querySelector('.asg-c-hi').value.trim(),
                 value_kind: tr.querySelector('.asg-c-vk').value,
-                unit_hint: tr.querySelector('.asg-c-unit').value.trim()
+                unit_hint: tr.querySelector('.asg-c-unit').value.trim(),
+                storage_measure: tr.querySelector('.asg-c-stor').value,
+                display_system: tr.querySelector('.asg-c-dsys').value
             });
         }
         return out;
@@ -200,6 +212,13 @@ if ($sizesJson === false) {
             tr.querySelector('.asg-c-hi').value = c.label_hi || '';
             tr.querySelector('.asg-c-vk').value = (c.value_kind === 'number') ? 'number' : 'text';
             tr.querySelector('.asg-c-unit').value = c.unit_hint || '';
+            if (tr.querySelector('.asg-c-stor')) {
+                tr.querySelector('.asg-c-stor').value = (c.storage_measure === 'length_cm') ? 'length_cm' : '';
+            }
+            if (tr.querySelector('.asg-c-dsys')) {
+                var ds = (c.display_system || '').toLowerCase();
+                tr.querySelector('.asg-c-dsys').value = ['eu', 'uk', 'us'].indexOf(ds) >= 0 ? ds : '';
+            }
         }
     }
 

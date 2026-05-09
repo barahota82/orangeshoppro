@@ -1183,6 +1183,46 @@ body.storefront-browse-menu-lock {
     margin-top: 4px;
 }
 
+.product-sizing-adv-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 16px;
+    align-items: flex-end;
+    margin: 0 0 16px;
+    padding: 12px 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid color-mix(in srgb, var(--border) 85%, var(--muted));
+    background: color-mix(in srgb, var(--card) 96%, var(--muted));
+}
+
+.product-sizing-adv-toolbar__field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.product-sizing-adv-toolbar__field label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.product-sizing-adv-toolbar__select {
+    min-width: 7.5rem;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm, 6px);
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    font-size: 0.88rem;
+}
+
+.product-sizing-table th.product-sizing-col--hidden,
+.product-sizing-table td.product-sizing-col--hidden {
+    display: none !important;
+}
+
 /* لوحة الجدول داخل الحوار */
 .product-sizing-table-panel {
     margin: 0 0 20px;

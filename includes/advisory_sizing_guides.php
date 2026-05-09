@@ -37,6 +37,46 @@ function orange_advisory_sizing_label_from_row(array $row, string $lang): string
 }
 
 /**
+ * Parses a cell value stored as centimeters (decimal comma/dot allowed).
+ */
+function orange_advisory_parse_stored_cm(string $raw): ?float
+{
+    $s = trim(str_replace(["\u{00A0}", "\u{202F}", '٫', '،'], [' ', ' ', '.', '.'], $raw));
+    $s = str_replace(',', '.', $s);
+    $s = preg_replace('/\s+/u', '', $s) ?? $s;
+    $s = preg_replace('/[^0-9.\-]/u', '', $s) ?? '';
+    if ($s === '' || $s === '-' || $s === '.') {
+        return null;
+    }
+    if (!is_numeric($s)) {
+        return null;
+    }
+    $n = (float) $s;
+
+    return round($n, 6);
+}
+
+/**
+ * @return ''|'eu'|'uk'|'us'
+ */
+function orange_advisory_normalize_display_system(string $raw): string
+{
+    $s = strtolower(trim($raw));
+
+    return in_array($s, ['eu', 'uk', 'us'], true) ? $s : '';
+}
+
+/**
+ * @return ''|'length_cm'
+ */
+function orange_advisory_normalize_storage_measure(string $raw): string
+{
+    $s = strtolower(trim($raw));
+
+    return $s === 'length_cm' ? 'length_cm' : '';
+}
+
+/**
  * @return array<int, array<string, mixed>>
  */
 function orange_advisory_sizing_load_size_rows_map(PDO $pdo, int $familyId, array $sizeIds): array
@@ -113,7 +153,7 @@ function orange_advisory_sizing_build_sections(PDO $pdo, int $familyId, array $k
         }
         $gid = (int) $guide['id'];
         $cSt = $pdo->prepare(
-            'SELECT id, label_ar, label_en, label_fil, label_hi, unit_hint, value_kind
+            'SELECT id, label_ar, label_en, label_fil, label_hi, unit_hint, value_kind, storage_measure, display_system
              FROM advisory_sizing_guide_columns
              WHERE guide_id = ?
              ORDER BY sort_order ASC, id ASC'
@@ -156,10 +196,17 @@ function orange_advisory_sizing_build_sections(PDO $pdo, int $familyId, array $k
             if ($vk !== 'number') {
                 $vk = 'text';
             }
+            $stMeas = orange_advisory_normalize_storage_measure((string) ($c['storage_measure'] ?? ''));
+            $dispSys = orange_advisory_normalize_display_system((string) ($c['display_system'] ?? ''));
+            if ($stMeas === 'length_cm') {
+                $vk = 'number';
+            }
             $colMeta[] = [
                 'id' => (int) $c['id'],
                 'header' => $header !== '' ? $header : '—',
                 'value_kind' => $vk,
+                'storage_measure' => $stMeas,
+                'display_system' => $dispSys,
             ];
         }
         $firstColId = $colMeta[0]['id'] ?? 0;

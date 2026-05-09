@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 28);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 29);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -910,9 +910,24 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             label_hi VARCHAR(191) NOT NULL DEFAULT \'\',
             value_kind VARCHAR(16) NOT NULL DEFAULT \'text\',
             unit_hint VARCHAR(64) NOT NULL DEFAULT \'\',
+            storage_measure VARCHAR(16) NOT NULL DEFAULT \'\',
+            display_system VARCHAR(8) NOT NULL DEFAULT \'\',
             KEY idx_asgc_guide (guide_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
+
+    if (orange_table_exists($pdo, 'advisory_sizing_guide_columns') && !orange_table_has_column($pdo, 'advisory_sizing_guide_columns', 'storage_measure')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE advisory_sizing_guide_columns ADD COLUMN storage_measure VARCHAR(16) NOT NULL DEFAULT \'\' AFTER unit_hint'
+        );
+    }
+    if (orange_table_exists($pdo, 'advisory_sizing_guide_columns') && !orange_table_has_column($pdo, 'advisory_sizing_guide_columns', 'display_system')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE advisory_sizing_guide_columns ADD COLUMN display_system VARCHAR(8) NOT NULL DEFAULT \'\' AFTER storage_measure'
+        );
+    }
 
     orange_catalog_safe_exec($pdo,
         'CREATE TABLE IF NOT EXISTS advisory_sizing_guide_rows (
