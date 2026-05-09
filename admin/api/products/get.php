@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
+require_once __DIR__ . '/../../../includes/product_colorway_images.php';
 require_admin_api('GET');
 
 try {
@@ -70,6 +71,8 @@ try {
                 $product['extra_images'][] = $p;
             }
         }
+
+        $product['colorway_images'] = orange_product_colorway_images_groups_for_admin($pdo, $productId);
 
         $product['catalog_attribute_values'] = [];
         if (orange_table_exists($pdo, 'product_attribute_values') && orange_table_exists($pdo, 'catalog_attributes')) {

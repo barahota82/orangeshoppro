@@ -623,6 +623,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
         <div id="productTabPanelImages" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnImages">
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">الصور</h4>
+        <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">صور <strong>المنتج العامة</strong> (رئيسية + معرض) للقوائم والاحتياط. إن كان المنتج <strong>له ألوان</strong> يمكن إضافة <strong>معرض لكل لون</strong> من تبويب <strong>الألوان</strong> أسفل صف اللون — وإلا يُعرض في المتجر نفس المعرض العام.</p>
         <div class="form-grid">
             <div style="grid-column:1/-1;">
                 <label>الصورة الرئيسية — رفع ملف</label>
@@ -1860,7 +1861,7 @@ async function loadProductForEdit(id) {
         window.PRODUCT_EXTRA_IMAGES = extrasEarly;
         renderGalleryUploadList();
         orangeApplyCatalogAttributeValuesFromProduct(p);
-        buildColorwaysForEditFromVm(vm);
+        buildColorwaysForEditFromVm(vm, Array.isArray(p.colorway_images) ? p.colorway_images : []);
         const hasSizesEff = orangeProductEffectiveHasSizes();
         if (hasSizesEff && parseInt(p.has_colors, 10) === 1) {
             orangeApplyColorwaySizesFromVariantMatrix(vm);
@@ -2246,9 +2247,94 @@ function addColorwayRow() {
             <div><label>نمط ثانوي (اختياري)</label><select class="cw-sp">${patternOptionsHtml()}</select></div>
         </div>
         <div class="cw-sizes-mount" style="margin-top:10px;width:100%;"></div>
+        <div class="cw-row-gallery card-hint" style="margin-top:12px;padding-top:10px;border-top:1px solid #e2e8f0;">
+            <strong>صور هذا اللون (اختياري)</strong>
+            <p style="margin:4px 0 8px;font-size:12px;color:#64748b;">تظهر في المتجر عند اختيار هذا اللون؛ إن تُركت فارغة يُستخدم معرض المنتج العام من تبويب الصور.</p>
+            <input type="file" class="cw-gallery-files" accept="image/jpeg,image/png,image/webp,image/gif" multiple style="display:none">
+            <button type="button" class="btn-secondary cw-gallery-upload-btn" style="margin-bottom:8px;">رفع صور لهذا اللون</button>
+            <ul class="cw-gallery-list" style="margin:0;padding-inline-start:18px;list-style:none;display:flex;flex-wrap:wrap;gap:8px;"></ul>
+        </div>
     `;
     box.appendChild(div);
     orangeFillColorwayRowSizes(div);
+}
+
+function orangeColorwayRowCwKey(row) {
+    if (!row) {
+        return '';
+    }
+    const gv = function (sel) {
+        const el = row.querySelector(sel);
+        return el ? (parseInt(el.value || '0', 10) || 0) : 0;
+    };
+    return [gv('.cw-p'), gv('.cw-s'), gv('.cw-pp'), gv('.cw-sp')].join(':');
+}
+
+function orangeCwGalleryAppendThumb(row, filename) {
+    const ul = row.querySelector('.cw-gallery-list');
+    if (!ul || !filename) {
+        return;
+    }
+    const li = document.createElement('li');
+    li.style.cssText = 'display:inline-flex;align-items:center;gap:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px;font-size:12px;';
+    li.setAttribute('data-fn', filename);
+    const prefix = adminPublicPath('/uploads/products/');
+    li.innerHTML =
+        '<img src="' +
+        adminEscAttr(prefix + encodeURIComponent(filename)) +
+        '" alt="" width="40" height="40" style="object-fit:cover;border-radius:4px;">' +
+        '<span dir="ltr" lang="en">' +
+        adminEscAttr(filename) +
+        '</span>' +
+        '<button type="button" class="btn-secondary cw-gallery-remove" style="font-size:11px;padding:2px 6px;">إزالة</button>';
+    ul.appendChild(li);
+}
+
+function orangeCollectColorwayImagesPayload() {
+    const hc = document.getElementById('has_colors') && document.getElementById('has_colors').value === '1';
+    if (!hc) {
+        return [];
+    }
+    const out = [];
+    document.querySelectorAll('#colorwaysBox .cw-row').forEach(function (row) {
+        const p = parseInt((row.querySelector('.cw-p') && row.querySelector('.cw-p').value) || '0', 10) || 0;
+        if (!p) {
+            return;
+        }
+        const imgs = [];
+        row.querySelectorAll('.cw-gallery-list li[data-fn]').forEach(function (li) {
+            const fn = li.getAttribute('data-fn');
+            if (fn) {
+                imgs.push(fn);
+            }
+        });
+        if (imgs.length) {
+            out.push({ cw_key: orangeColorwayRowCwKey(row), images: imgs });
+        }
+    });
+    return out;
+}
+
+async function orangeUploadColorwayGalleryFiles(row, fileList) {
+    if (!row || !fileList || !fileList.length) {
+        return;
+    }
+    for (let i = 0; i < fileList.length; i++) {
+        const fd = new FormData();
+        fd.append('image', fileList[i]);
+        try {
+            const r = await fetch('/admin/api/uploads/product-image.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+            const j = await r.json();
+            if (j.success && j.filename) {
+                orangeCwGalleryAppendThumb(row, j.filename);
+            } else if (j.message) {
+                alert(j.message);
+            }
+        } catch (e) {
+            alert('خطأ في الاتصال أثناء الرفع');
+            return;
+        }
+    }
 }
 
 function adminVariantRowStockKey(r) {
@@ -2273,7 +2359,7 @@ function adminVariantTrStockKey(tr) {
     return [gv('.v-p'), gv('.v-s'), gv('.v-pp'), gv('.v-sp'), gv('.v-zid')].join(':');
 }
 
-function buildColorwaysForEditFromVm(vm) {
+function buildColorwaysForEditFromVm(vm, colorwayImageGroups) {
     const hc = document.getElementById('has_colors').value === '1';
     if (!hc) {
         return;
@@ -2308,6 +2394,16 @@ function buildColorwaysForEditFromVm(vm) {
         }
         if (spEl) {
             spEl.value = String(parseInt(r.secondary_pattern_id, 10) || 0);
+        }
+        const grp = (colorwayImageGroups || []).find(function (g) {
+            return g && String(g.cw_key || '') === k;
+        });
+        if (grp && Array.isArray(grp.images)) {
+            grp.images.forEach(function (fn) {
+                if (fn) {
+                    orangeCwGalleryAppendThumb(last, String(fn));
+                }
+            });
         }
     });
 }
@@ -2804,6 +2900,7 @@ async function saveProduct() {
         }
         payload.extra_images = window.PRODUCT_EXTRA_IMAGES || [];
         payload.catalog_attribute_values = orangeCollectCatalogAttributePayload();
+        payload.colorway_images = orangeCollectColorwayImagesPayload();
         const hsUp = orangeProductEffectiveHasSizes();
         const hcUp = parseInt(document.getElementById('has_colors').value, 10) === 1;
         let varRowsUp = Array.from(document.querySelectorAll('#variantsBox tbody tr'));
@@ -2907,6 +3004,7 @@ async function saveProduct() {
     }
 
     payload.catalog_attribute_values = orangeCollectCatalogAttributePayload();
+    payload.colorway_images = orangeCollectColorwayImagesPayload();
 
     const res = await postJSON('/admin/api/products/create.php', payload);
     alert(res.message || (res.success ? 'تم الحفظ' : 'فشل'));
@@ -3000,11 +3098,36 @@ if (orangeSizeFamilySelectEl) {
 }
 const orangeColorwaysBoxEl = document.getElementById('colorwaysBox');
 if (orangeColorwaysBoxEl) {
+    orangeColorwaysBoxEl.addEventListener('click', function (ev) {
+        const rm = ev.target.closest && ev.target.closest('.cw-gallery-remove');
+        if (rm) {
+            const li = rm.closest('li');
+            if (li) {
+                li.remove();
+            }
+            return;
+        }
+        const up = ev.target.closest && ev.target.closest('.cw-gallery-upload-btn');
+        if (up) {
+            const row = up.closest('.cw-row');
+            const finp = row && row.querySelector('.cw-gallery-files');
+            if (finp) {
+                finp.click();
+            }
+        }
+    });
     orangeColorwaysBoxEl.addEventListener('change', function (ev) {
+        const t = ev.target;
+        if (t && t.classList && t.classList.contains('cw-gallery-files') && t.files && t.files.length) {
+            const row = t.closest('.cw-row');
+            orangeUploadColorwayGalleryFiles(row, t.files).then(function () {
+                t.value = '';
+            });
+            return;
+        }
         if (window.ORANGE_CW_SIZE_SILENT) {
             return;
         }
-        const t = ev.target;
         if (t && t.classList && t.classList.contains('cw-size-cb') && !t.checked) {
             orangeColorwaySizeCheckboxBeforeUncheck(t);
         }

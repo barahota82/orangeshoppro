@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/product_channels.php';
 require_once __DIR__ . '/../../../includes/catalog_labels.php';
 require_once __DIR__ . '/../../../includes/product_variants_write.php';
+require_once __DIR__ . '/../../../includes/product_colorway_images.php';
 require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
 require_admin_api();
 
@@ -334,6 +335,8 @@ try {
             $imgIns->execute([$productId, $fn]);
         }
     }
+
+    orange_product_sync_colorway_images_from_payload($pdo, $productId, $data['colorway_images'] ?? null, $hasColors);
 
     orange_product_attach_all_active_channels($pdo, $productId);
 

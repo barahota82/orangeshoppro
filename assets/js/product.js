@@ -1,6 +1,111 @@
 let selectedColor = '';
 let selectedSize = '';
 
+let orangeGalleryListenerGen = 0;
+
+function orangeProductEscAttr(s) {
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;');
+}
+
+function orangeProductGalleryReplaceUrls(urls) {
+    const root = document.getElementById('productGallery');
+    if (!root) {
+        return;
+    }
+    const clean = (Array.isArray(urls) ? urls : []).filter(Boolean);
+    if (!clean.length) {
+        return;
+    }
+    orangeGalleryListenerGen += 1;
+    const alt = (window.CURRENT_PRODUCT && window.CURRENT_PRODUCT.name) || '';
+    const n = clean.length;
+    const slides = clean
+        .map(
+            (u) =>
+                '<div class="product-gallery__slide"><img class="product-gallery__img" src="' +
+                orangeProductEscAttr(u) +
+                '" alt="' +
+                orangeProductEscAttr(alt) +
+                '" loading="lazy"></div>'
+        )
+        .join('');
+    let inner = '';
+    if (n <= 1) {
+        inner =
+            '<div class="product-gallery__stage"><div class="product-gallery__viewport" id="productGalleryViewport"><div class="product-gallery__track" id="productGalleryTrack">' +
+            slides +
+            '</div></div></div>';
+    } else {
+        const glPrevLabel = (window.APP_T && window.APP_T.product_gallery_prev) || '';
+        const glNextLabel = (window.APP_T && window.APP_T.product_gallery_next) || '';
+        const glDotsLabel = (window.APP_T && window.APP_T.product_gallery_dots) || '';
+        let dots = '';
+        for (let di = 0; di < n; di++) {
+            dots +=
+                '<button type="button" class="product-gallery__dot' +
+                (di === 0 ? ' is-active' : '') +
+                '" role="tab" aria-selected="' +
+                (di === 0 ? 'true' : 'false') +
+                '" data-index="' +
+                di +
+                '" aria-label="' +
+                (di + 1) +
+                ' / ' +
+                n +
+                '"></button>';
+        }
+        let thumbs = '';
+        clean.forEach((u, ti) => {
+            thumbs +=
+                '<button type="button" class="thumb' +
+                (ti === 0 ? ' active' : '') +
+                '" data-gallery-index="' +
+                ti +
+                '"><img src="' +
+                orangeProductEscAttr(u) +
+                '" alt=""></button>';
+        });
+        inner =
+            '<div class="product-gallery__stage">' +
+            '<button type="button" class="product-gallery__nav product-gallery__nav--prev" id="productGalleryPrev" aria-label="' +
+            orangeProductEscAttr(glPrevLabel) +
+            '"><span aria-hidden="true">‹</span></button>' +
+            '<div class="product-gallery__viewport" id="productGalleryViewport" tabindex="0">' +
+            '<div class="product-gallery__track" id="productGalleryTrack">' +
+            slides +
+            '</div></div>' +
+            '<button type="button" class="product-gallery__nav product-gallery__nav--next" id="productGalleryNext" aria-label="' +
+            orangeProductEscAttr(glNextLabel) +
+            '"><span aria-hidden="true">›</span></button></div>' +
+            '<div class="product-gallery__dots" id="productGalleryDots" role="tablist" aria-label="' +
+            orangeProductEscAttr(glDotsLabel) +
+            '">' +
+            dots +
+            '</div>' +
+            '<div class="thumbs product-gallery__thumbs">' +
+            thumbs +
+            '</div>';
+    }
+    root.innerHTML = inner;
+    root.setAttribute('data-gallery-count', String(n));
+    initProductGallery();
+}
+
+function orangeProductGalleryApplyForSelection() {
+    const p = window.CURRENT_PRODUCT;
+    if (!p || parseInt(p.has_colors, 10) !== 1) {
+        return;
+    }
+    const map = p.colorway_gallery || {};
+    const urls = selectedColor && map[selectedColor] ? map[selectedColor] : [];
+    const fallback = p.default_gallery_urls || [];
+    const use = urls.length ? urls : fallback;
+    orangeProductGalleryReplaceUrls(use);
+}
+
 function orangeProductToast(message, durationMs) {
     if (typeof window.orangeShowToast === 'function') {
         window.orangeShowToast(message, durationMs);
@@ -196,6 +301,7 @@ function selectColor(btn) {
     document.querySelectorAll('.color-chip').forEach((el) => el.classList.remove('active'));
     btn.classList.add('active');
     selectedColor = btn.dataset.color || '';
+    orangeProductGalleryApplyForSelection();
     syncProductQtyLimits();
 }
 
@@ -337,6 +443,7 @@ function initProductGallery() {
     if (!root || !track || !viewport) {
         return;
     }
+    const myGen = orangeGalleryListenerGen;
     const n =
         parseInt(root.getAttribute('data-gallery-count') || '0', 10) ||
         track.querySelectorAll('.product-gallery__slide').length;
@@ -412,6 +519,9 @@ function initProductGallery() {
     );
 
     function onDocKey(e) {
+        if (myGen !== orangeGalleryListenerGen) {
+            return;
+        }
         if (!document.getElementById('productGalleryTrack')) {
             return;
         }

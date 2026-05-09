@@ -207,6 +207,50 @@ foreach ($images as $img) {
     }
 }
 $galleryCount = count($galleryUrls);
+
+$colorwayGalleryByChip = [];
+if ((int) $product['has_colors'] === 1 && orange_table_exists($pdo, 'product_colorway_images')) {
+    $cwIdToChip = [];
+    foreach ($variants as $v) {
+        $cid = isset($v['product_colorway_id']) ? (int) $v['product_colorway_id'] : 0;
+        if ($cid > 0 && !isset($cwIdToChip[$cid])) {
+            $cwIdToChip[$cid] = trim((string) ($v['color'] ?? ''));
+        }
+    }
+    if ($cwIdToChip !== []) {
+        $stPci = $pdo->prepare(
+            'SELECT pci.product_colorway_id, pci.image_path
+             FROM product_colorway_images pci
+             INNER JOIN product_colorways cw ON cw.id = pci.product_colorway_id
+             WHERE cw.product_id = ?
+             ORDER BY pci.product_colorway_id ASC, pci.sort_order ASC, pci.id ASC'
+        );
+        $stPci->execute([$id]);
+        while ($rw = $stPci->fetch(PDO::FETCH_ASSOC)) {
+            if (!is_array($rw)) {
+                continue;
+            }
+            $ccw = isset($rw['product_colorway_id']) ? (int) $rw['product_colorway_id'] : 0;
+            $chip = $cwIdToChip[$ccw] ?? '';
+            if ($chip === '') {
+                continue;
+            }
+            $rel = trim((string) ($rw['image_path'] ?? ''));
+            if ($rel === '') {
+                continue;
+            }
+            $href = storefront_product_image_href($rel);
+            if ($href === '') {
+                continue;
+            }
+            if (!isset($colorwayGalleryByChip[$chip])) {
+                $colorwayGalleryByChip[$chip] = [];
+            }
+            $colorwayGalleryByChip[$chip][] = $href;
+        }
+    }
+}
+
 $glPrevLabel = htmlspecialchars(t('product_gallery_prev'), ENT_QUOTES, 'UTF-8');
 $glNextLabel = htmlspecialchars(t('product_gallery_next'), ENT_QUOTES, 'UTF-8');
 $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
@@ -381,7 +425,9 @@ window.CURRENT_PRODUCT = {
     sizing_guide_scope: <?php echo json_encode($scope, JSON_UNESCAPED_UNICODE); ?>,
     variants: <?php echo json_encode($variants, JSON_UNESCAPED_UNICODE); ?>,
     total_stock_sum: <?php echo (int)$totalStock; ?>,
-    low_stock_threshold: 5
+    low_stock_threshold: 5,
+    colorway_gallery: <?php echo json_encode($colorwayGalleryByChip, JSON_UNESCAPED_UNICODE); ?>,
+    default_gallery_urls: <?php echo json_encode($galleryUrls, JSON_UNESCAPED_UNICODE); ?>
 };
 </script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

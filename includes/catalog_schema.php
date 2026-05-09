@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 26);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 27);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -894,6 +894,16 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_product_colorways_product (product_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+
+    orange_catalog_safe_exec($pdo,
+        'CREATE TABLE IF NOT EXISTS product_colorway_images (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            product_colorway_id INT NOT NULL,
+            image_path VARCHAR(255) NOT NULL,
+            sort_order INT NOT NULL DEFAULT 0,
+            KEY idx_pci_colorway (product_colorway_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
 

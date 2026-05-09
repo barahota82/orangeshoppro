@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/catalog_labels.php';
 require_once __DIR__ . '/../../../includes/product_variants_write.php';
+require_once __DIR__ . '/../../../includes/product_colorway_images.php';
 require_once __DIR__ . '/../../../includes/product_channels.php';
 require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
 require_admin_api();
@@ -312,6 +313,8 @@ try {
             $sizeFamilyId
         );
     }
+
+    orange_product_sync_colorway_images_from_payload($pdo, $productId, $data['colorway_images'] ?? null, $hasColors);
 
     if (array_key_exists('catalog_attribute_values', $data)) {
         orange_catalog_save_product_attribute_values($pdo, $productId, $data['catalog_attribute_values']);
