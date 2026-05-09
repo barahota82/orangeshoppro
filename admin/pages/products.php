@@ -630,7 +630,13 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                 <input type="hidden" id="main_image" value="">
                 <input type="file" id="main_image_file" accept="image/jpeg,image/png,image/webp,image/gif">
                 <button type="button" class="btn-secondary" style="margin-top:8px;" onclick="uploadMainProductImage()">رفع الصورة الرئيسية</button>
-                <div id="main_image_preview" style="display:none;margin-top:10px;"></div>
+                <div id="main_image_preview_row" class="admin-main-image-preview-row" style="display:none;margin-top:12px;">
+                    <div id="main_image_preview" class="admin-main-image-preview-mount"></div>
+                    <div class="admin-main-image-preview-actions">
+                        <button type="button" class="btn-secondary" id="btn_remove_main_product_image">إزالة الصورة الرئيسية</button>
+                        <span class="admin-main-image-preview-hint card-hint" style="display:block;margin-top:6px;font-size:12px;">تُزال التعيين كرئيسية فقط؛ إن وُجدت صور في المعرض تُختار أولها تلقائياً إن أمكن.</span>
+                    </div>
+                </div>
             </div>
             <div style="grid-column:1/-1;">
                 <label>صور إضافية للمعرض (عدة ملفات)</label>
@@ -1422,22 +1428,82 @@ function adminProductImageBasename(filename) {
     const parts = fn.split(/[/\\]/);
     return parts[parts.length - 1] || '';
 }
+
+/** مسارات رفع المنتج (أصلي + webp مرافق) لمعاينات الأدمن. */
+function adminProductImageUploadedUrls(filename) {
+    const base = adminProductImageBasename(filename);
+    if (!base) {
+        return null;
+    }
+    const lower = base.toLowerCase();
+    const prefix = adminPublicPath('/uploads/products/');
+    const orig = prefix + encodeURIComponent(base);
+    if (lower.endsWith('.webp')) {
+        return { orig: orig, webp: null, isWebp: true };
+    }
+    const stem = base.indexOf('.') !== -1 ? base.slice(0, base.lastIndexOf('.')) : base;
+    const webp = prefix + encodeURIComponent(stem + '.webp');
+    return { orig: orig, webp: webp, isWebp: false };
+}
+
+/** HTML مصغّر لصورة مرفوعة (نفس منطق الصورة الرئيسية / تبويب الألوان). */
+function adminProductUploadThumbPictureInnerHtml(filename, sizePx) {
+    const u = adminProductImageUploadedUrls(filename);
+    const wh = parseInt(sizePx, 10) || 48;
+    if (!u) {
+        return '';
+    }
+    const style =
+        'width:' +
+        wh +
+        'px;height:' +
+        wh +
+        'px;object-fit:cover;border-radius:6px;border:1px solid #cbd5e1;flex-shrink:0;display:block;';
+    if (u.isWebp) {
+        return '<img alt="" loading="lazy" style="' + style + '" src="' + adminEscAttr(u.orig) + '">';
+    }
+    return (
+        '<picture class="admin-product-upload-thumb-picture"><source type="image/webp" srcset="' +
+        adminEscAttr(u.webp) +
+        '"><img alt="" loading="lazy" style="' +
+        style +
+        '" src="' +
+        adminEscAttr(u.orig) +
+        '"></picture>'
+    );
+}
+
+/** إلغاء تعيين الصورة الرئيسية الحالية؛ إن وُجدت صور معرض تُختار أولها كرئيسية (انظر assignMainImageFromGalleryIfEmpty). */
+function orangeRemoveMainProductImageDesignation() {
+    const mainEl = document.getElementById('main_image');
+    if (!mainEl || !mainEl.value.trim()) {
+        return;
+    }
+    mainEl.value = '';
+    assignMainImageFromGalleryIfEmpty();
+    adminSetMainImagePreview(mainEl.value.trim());
+    orangeRefreshVariantReferenceThumbs();
+}
+
 /** معاينة الصورة الرئيسية: يفضّل ‎webp‎ المرافق كما في الواجهة. */
 function adminSetMainImagePreview(filename) {
     const mount = document.getElementById('main_image_preview');
+    const row = document.getElementById('main_image_preview_row');
     if (!mount) {
         return;
     }
     const base = adminProductImageBasename(filename);
     if (!base) {
         mount.innerHTML = '';
-        mount.style.display = 'none';
+        if (row) {
+            row.style.display = 'none';
+        }
         return;
     }
     const lower = base.toLowerCase();
     const prefix = adminPublicPath('/uploads/products/');
     const orig = prefix + encodeURIComponent(base);
-    const style = 'max-height:140px;border-radius:8px;border:1px solid #ddd;';
+    const style = 'max-height:160px;max-width:100%;border-radius:8px;border:1px solid #ddd;';
     if (lower.endsWith('.webp')) {
         mount.innerHTML = '<img alt="" style="' + style + '" src="' + adminEscAttr(orig) + '">';
     } else {
@@ -1452,7 +1518,9 @@ function adminSetMainImagePreview(filename) {
             adminEscAttr(orig) +
             '"></picture>';
     }
-    mount.style.display = 'block';
+    if (row) {
+        row.style.display = 'flex';
+    }
     orangeRefreshVariantReferenceThumbs();
 }
 
@@ -1637,34 +1705,25 @@ function renderGalleryUploadList() {
         return;
     }
     ul.innerHTML = '';
-    const prefix = adminPublicPath('/uploads/products/');
-    (window.PRODUCT_EXTRA_IMAGES || []).forEach(function (name, i) {
+    (window.PRODUCT_EXTRA_IMAGES || []).forEach(function (name) {
         const fn = String(name || '').trim();
         if (!fn) {
             return;
         }
         const li = document.createElement('li');
         li.className = 'admin-product-gallery-upload-item';
-        li.style.cssText =
-            'display:inline-flex;align-items:center;gap:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;';
-        const img = document.createElement('img');
-        img.alt = '';
-        img.width = 48;
-        img.height = 48;
-        img.loading = 'lazy';
-        img.style.cssText = 'object-fit:cover;border-radius:6px;border:1px solid #cbd5e1;flex-shrink:0;';
-        img.src = prefix + encodeURIComponent(fn);
+        const thumbWrap = document.createElement('div');
+        thumbWrap.className = 'admin-product-gallery-upload-thumb';
+        thumbWrap.innerHTML = adminProductUploadThumbPictureInnerHtml(fn, 56);
         const cap = document.createElement('span');
+        cap.className = 'admin-product-gallery-upload-filename';
         cap.textContent = fn;
         cap.setAttribute('dir', 'ltr');
         cap.setAttribute('lang', 'en');
-        cap.style.cssText = 'font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
         const rm = document.createElement('button');
         rm.type = 'button';
-        rm.textContent = 'حذف';
-        rm.className = 'btn-secondary';
-        rm.style.fontSize = '11px';
-        rm.style.padding = '2px 8px';
+        rm.textContent = 'إزالة';
+        rm.className = 'btn-secondary admin-product-gallery-upload-remove';
         rm.onclick = function () {
             const mainEl = document.getElementById('main_image');
             const removed = fn;
@@ -1679,11 +1738,13 @@ function renderGalleryUploadList() {
                 assignMainImageFromGalleryIfEmpty();
                 if (!mainEl.value.trim()) {
                     adminSetMainImagePreview('');
+                } else {
+                    adminSetMainImagePreview(mainEl.value.trim());
                 }
             }
             renderGalleryUploadList();
         };
-        li.appendChild(img);
+        li.appendChild(thumbWrap);
         li.appendChild(cap);
         li.appendChild(rm);
         ul.appendChild(li);
@@ -3224,6 +3285,13 @@ if (orangeSizeFamilySelectEl) {
         orangeApplyProductBasicStepLocks();
     });
 }
+const btnRemoveMainProductImage = document.getElementById('btn_remove_main_product_image');
+if (btnRemoveMainProductImage) {
+    btnRemoveMainProductImage.addEventListener('click', function () {
+        orangeRemoveMainProductImageDesignation();
+    });
+}
+
 const orangeColorwaysBoxEl = document.getElementById('colorwaysBox');
 if (orangeColorwaysBoxEl) {
     orangeColorwaysBoxEl.addEventListener('click', function (ev) {

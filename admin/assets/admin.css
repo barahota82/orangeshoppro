@@ -2241,6 +2241,49 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
 }
 #productTabPanelImages .admin-product-gallery-upload-item {
     max-width: 100%;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 8px 12px;
+    flex-wrap: wrap;
+}
+#productTabPanelImages .admin-product-gallery-upload-thumb {
+    flex-shrink: 0;
+    line-height: 0;
+}
+#productTabPanelImages .admin-product-gallery-upload-filename {
+    font-size: 12px;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #334155;
+}
+#productTabPanelImages .admin-product-gallery-upload-remove {
+    font-size: 11px;
+    padding: 2px 8px;
+    margin-inline-start: auto;
+}
+
+.admin-main-image-preview-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+.admin-main-image-preview-mount {
+    line-height: 0;
+    flex-shrink: 0;
+}
+.admin-main-image-preview-actions {
+    flex: 1;
+    min-width: 160px;
+}
+.admin-main-image-preview-actions .btn-secondary {
+    font-size: 12px;
 }
 
 .product-size-pick-grid {
