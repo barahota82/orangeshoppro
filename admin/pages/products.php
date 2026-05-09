@@ -484,6 +484,21 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                         </select>
                     </div>
                 </div>
+
+                <div id="product_size_pick_panel" class="card admin-nested-panel" style="display:none;margin-top:12px;">
+                    <h4 class="admin-nested-panel__title">مقاسات المنتج (بدون ألوان)</h4>
+                    <p class="card-hint" style="margin:0 0 10px;font-size:13px;line-height:1.55;">
+                        عندما يكون المنتج <strong>بمقاسات فقط دون ألوان</strong>، حدّد المقاسات من العائلة التي اخترتها أعلاه ثم <strong>توليد المتغيرات</strong> من تبويب المتغيرات.
+                        إذا كان المنتج <strong>له ألوان</strong>، تُحدَّد المقاسات <strong>لكل صف لون</strong> من تبويب <strong>الألوان</strong>.
+                    </p>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center;">
+                        <button type="button" class="btn-secondary" style="font-size:12px;padding:4px 10px;" onclick="orangeSizePickSetAll(true)">تحديد الكل</button>
+                        <button type="button" class="btn-secondary" style="font-size:12px;padding:4px 10px;" onclick="orangeSizePickSetAll(false)">إلغاء الكل</button>
+                    </div>
+                    <div id="product_size_pick_checkboxes" class="product-size-pick-grid"></div>
+                    <p id="product_size_pick_empty" style="display:none;margin:8px 0 0;color:#9a3412;font-size:13px;">لا توجد مقاسات نشطة في هذه العائلة — راجع <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_families'), ENT_QUOTES, 'UTF-8'); ?>">عائلات المقاسات</a>.</p>
+                </div>
+
                 <div class="form-grid product-form-basic-top3-inner" style="margin-top:12px;">
                     <div>
                         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
@@ -514,21 +529,7 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
         <?php if ($patterns === [] && orange_table_exists($pdo, 'pattern_dictionary')): ?>
         <p style="margin:0 0 12px;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;color:#64748b;font-size:13px;">قاموس <strong>الأنماط</strong> بلا صفوف نشطة — يمكنك المتابعة بألوان فقط، أو إضافة أنماط من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=pattern_dictionary'), ENT_QUOTES, 'UTF-8'); ?>">أنماط الألوان</a>.</p>
         <?php endif; ?>
-        <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">يُضبَط <strong>له ألوان ؟</strong> من تبويب <strong>البيانات الأساسية</strong> (صف: عائلة المقاسات، دليل المقاس الاسترشادي، له ألوان ؟).</p>
-
-        <div id="product_size_pick_panel" class="card admin-nested-panel" style="display:none;margin-top:12px;">
-            <h4 class="admin-nested-panel__title">مقاسات المنتج (بدون ألوان)</h4>
-            <p class="card-hint" style="margin:0 0 10px;font-size:13px;line-height:1.55;">
-                عندما يكون المنتج <strong>بمقاسات فقط دون ألوان</strong>، حدّد المقاسات من العائلة التي اخترتها في <strong>البيانات الأساسية</strong> ثم <strong>توليد المتغيرات</strong>.
-                إذا كان المنتج <strong>له ألوان</strong>، تُحدَّد المقاسات <strong>لكل صف لون</strong> من تبويب <strong>الألوان</strong> (قائمة علامات الصح حسب العائلة).
-            </p>
-            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center;">
-                <button type="button" class="btn-secondary" style="font-size:12px;padding:4px 10px;" onclick="orangeSizePickSetAll(true)">تحديد الكل</button>
-                <button type="button" class="btn-secondary" style="font-size:12px;padding:4px 10px;" onclick="orangeSizePickSetAll(false)">إلغاء الكل</button>
-            </div>
-            <div id="product_size_pick_checkboxes" class="product-size-pick-grid"></div>
-            <p id="product_size_pick_empty" style="display:none;margin:8px 0 0;color:#9a3412;font-size:13px;">لا توجد مقاسات نشطة في هذه العائلة — راجع <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=size_families'), ENT_QUOTES, 'UTF-8'); ?>">عائلات المقاسات</a>.</p>
-        </div>
+        <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">يُضبَط <strong>له ألوان ؟</strong> من تبويب <strong>البيانات الأساسية</strong> (صف: عائلة المقاسات، دليل المقاس الاسترشادي، له ألوان ؟). قائمة <strong>مقاسات المنتج (بدون ألوان)</strong> تظهر هناك عند اختيار عائلة مقاسات مع «لا» للألوان.</p>
 
         <div id="colorwaysSection" class="card admin-nested-panel" style="display:none;">
             <h4 class="admin-nested-panel__title">تركيبات اللون (أساسي / ثانوي اختياري)</h4>
