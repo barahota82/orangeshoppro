@@ -2119,29 +2119,29 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     outline: 2px solid var(--primary);
     outline-offset: 2px;
 }
-/* لوحات التبويب في خلية شبكية واحدة حتى لا يُحسب ارتفاع اللوحات المخفية (display:none) كمساحة بيضاء */
+/* نموذج المنتج: لا نحجز أي ارتفاع زائد فوق محتوى التبويب النشط */
 #productForm > .admin-product-tab-panels {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, auto);
-    align-content: start;
-    justify-items: stretch;
-    min-height: 0;
+    display: block;
+    min-height: 0 !important;
+    margin: 0;
+    padding: 0;
     width: 100%;
 }
 #productForm > .admin-product-tab-panels > .admin-product-tab-panel {
-    grid-column: 1;
-    grid-row: 1;
+    display: none !important;
+    margin: 0;
+    padding: 0;
     min-width: 0;
     width: 100%;
+}
+#productForm > .admin-product-tab-panels > .admin-product-tab-panel[hidden] {
     display: none !important;
 }
 #productForm > .admin-product-tab-panels > .admin-product-tab-panel.is-active {
     display: block !important;
-    position: relative;
-    z-index: 1;
 }
 .admin-product-section {
+    margin-top: 0;
     margin-bottom: 28px;
     padding-bottom: 8px;
     border-bottom: 1px solid var(--border);

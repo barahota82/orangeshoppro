@@ -347,6 +347,26 @@ $orangeAdminCardPreviewViewLabel = t('view_product');
     <h3 id="productFormTitle">إضافة / تعديل منتج</h3>
     <p id="productEditHint" style="display:none;margin:0 0 12px;color:#555;font-size:14px;">تعديل البيانات الأساسية. الترتيب في المتجر من الجدول فقط (↑↓ ثم حفظ الترتيب). كميات الألوان والمقاسات من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8'); ?>">المخزون</a>.</p>
     <form id="productForm">
+        <style id="orangeProductsTabsNoGapFix">
+            #productForm > .admin-product-tab-panels {
+                display: block !important;
+                min-height: 0 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            #productForm > .admin-product-tab-panels > .admin-product-tab-panel {
+                display: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            #productForm > .admin-product-tab-panels > .admin-product-tab-panel.is-active {
+                display: block !important;
+            }
+            #productForm > .admin-product-tab-panels > .admin-product-tab-panel > .admin-product-section {
+                margin-top: 0 !important;
+                padding-top: 0 !important;
+            }
+        </style>
         <input type="hidden" id="product_record_id" value="0">
         <input type="hidden" id="category_id" value="">
         <input type="hidden" id="subcategory_id" value="">
@@ -481,7 +501,7 @@ $orangeAdminCardPreviewViewLabel = t('view_product');
                     </div>
                     <div class="product-basic-class-cell" id="product_basic_has_colors_wrap">
                         <label for="has_colors">له ألوان ؟</label>
-                        <select id="has_colors" onchange="onHasFlagsChange()">
+                        <select id="has_colors" onchange="onHasFlagsChange({ clearGeneratedMatrix: true })">
                             <option value="0">لا</option>
                             <option value="1">نعم</option>
                         </select>
@@ -1034,6 +1054,24 @@ function orangeProductInvalidateVariantsReadyForSave() {
         window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE = false;
         orangeApplyProductWizardActionButtons();
     }
+}
+
+/**
+ * عند تغيير إعدادات تكوين المتغيرات قبل الحفظ (ألوان/مقاسات) يجب
+ * إلغاء مصفوفة التوليد السابقة وإجبار إعادة التوليد من المعطيات الجديدة.
+ */
+function orangeProductClearGeneratedVariantsMatrixIfNeeded() {
+    if (!orangeProductWizardIsNew()) {
+        return;
+    }
+    const box = document.getElementById('variantsBox');
+    if (!box) {
+        return;
+    }
+    if (!box.querySelector('tbody tr')) {
+        return;
+    }
+    box.innerHTML = '';
 }
 
 /**
@@ -2481,20 +2519,48 @@ function productFormShowTab(tab) {
         el.classList.toggle('is-active', active);
         if (active) {
             el.removeAttribute('hidden');
+            el.style.display = 'block';
         } else {
             el.setAttribute('hidden', 'hidden');
+            el.style.display = 'none';
         }
+        el.style.marginTop = '0';
+        el.style.paddingTop = '0';
     });
     document.querySelectorAll('.admin-product-tab').forEach(function (btn) {
         const on = btn.getAttribute('data-product-tab') === key;
         btn.classList.toggle('is-active', on);
         btn.setAttribute('aria-selected', on ? 'true' : 'false');
     });
+    orangeNormalizeProductTabPanelsNoGap();
     if (key === 'variants') {
         orangeRefreshVariantReferenceThumbs();
     }
     if (key === 'cardpreview') {
         orangeRefreshProductCardPreview();
+    }
+}
+
+function orangeNormalizeProductTabPanelsNoGap() {
+    const wrap = document.querySelector('#productForm > .admin-product-tab-panels');
+    if (wrap) {
+        wrap.style.minHeight = '0';
+        wrap.style.height = 'auto';
+        wrap.style.marginTop = '0';
+        wrap.style.paddingTop = '0';
+    }
+    const active = wrap ? wrap.querySelector('.admin-product-tab-panel.is-active') : null;
+    if (!active) {
+        return;
+    }
+    active.style.minHeight = '0';
+    active.style.height = 'auto';
+    active.style.marginTop = '0';
+    active.style.paddingTop = '0';
+    const sec = active.querySelector('.admin-product-section');
+    if (sec) {
+        sec.style.marginTop = '0';
+        sec.style.paddingTop = '0';
     }
 }
 
@@ -2737,7 +2803,7 @@ async function uploadGalleryProductImages() {
     orangeProductInvalidateVariantsReadyForSave();
 }
 
-function onHasFlagsChange() {
+function onHasFlagsChange(options) {
     const hcEl = document.getElementById('has_colors');
     const hc = hcEl && hcEl.value === '1';
     const allowSizeTier = orangeProductBasicRecordIsEdit() || orangeProductBasicPriceOk();
@@ -2783,6 +2849,9 @@ function onHasFlagsChange() {
     }
     if (hs && hc && allowSizeTier) {
         orangeRefreshAllColorwaySizePickers();
+    }
+    if (options && options.clearGeneratedMatrix) {
+        orangeProductClearGeneratedVariantsMatrixIfNeeded();
     }
     orangeScheduleProductCardPreviewRefresh();
     orangeProductInvalidateVariantsReadyForSave();
@@ -3284,6 +3353,7 @@ function orangeSizePickSetAll(checked) {
     document.querySelectorAll('#product_size_pick_checkboxes .product-size-pick-cb').forEach(function (cb) {
         cb.checked = !!checked;
     });
+    orangeProductClearGeneratedVariantsMatrixIfNeeded();
     orangeProductInvalidateVariantsReadyForSave();
 }
 
@@ -3356,7 +3426,10 @@ function orangeRefreshSizePickPanel() {
         wrap.appendChild(cb);
         wrap.appendChild(span);
         mount.appendChild(wrap);
-        cb.addEventListener('change', orangeProductInvalidateVariantsReadyForSave);
+        cb.addEventListener('change', function () {
+            orangeProductClearGeneratedVariantsMatrixIfNeeded();
+            orangeProductInvalidateVariantsReadyForSave();
+        });
     });
 }
 
@@ -3818,6 +3891,7 @@ if (orangeProductTypeSelectEl) {
 const orangeSizeFamilySelectEl = document.getElementById('size_family_id');
 if (orangeSizeFamilySelectEl) {
     orangeSizeFamilySelectEl.addEventListener('change', function () {
+        orangeProductClearGeneratedVariantsMatrixIfNeeded();
         orangeProductInvalidateVariantsReadyForSave();
         orangeApplyProductBasicStepLocks();
     });
@@ -3904,7 +3978,25 @@ if (orangeColorwaysBoxEl) {
             return;
         }
         if (t && t.classList && t.classList.contains('cw-size-cb') && !t.checked) {
-            orangeColorwaySizeCheckboxBeforeUncheck(t);
+            if (!orangeColorwaySizeCheckboxBeforeUncheck(t)) {
+                orangeScheduleProductCardPreviewRefresh();
+                orangeApplyProductWizardActionButtons();
+                return;
+            }
+        }
+        if (
+            t &&
+            t.classList &&
+            (
+                t.classList.contains('cw-p') ||
+                t.classList.contains('cw-s') ||
+                t.classList.contains('cw-pp') ||
+                t.classList.contains('cw-sp') ||
+                t.classList.contains('cw-size-cb')
+            )
+        ) {
+            orangeProductClearGeneratedVariantsMatrixIfNeeded();
+            orangeProductInvalidateVariantsReadyForSave();
         }
         orangeScheduleProductCardPreviewRefresh();
         orangeApplyProductWizardActionButtons();
@@ -3916,6 +4008,7 @@ updateProductCatalogHint();
 setProductFormEditMode(false);
 orangeClearCatalogAttributeInputs();
 orangeApplyProductBasicStepLocks();
+orangeNormalizeProductTabPanelsNoGap();
 
 ['name', 'name_en', 'name_fil', 'name_hi', 'price', 'cost'].forEach(function (id) {
     const el = document.getElementById(id);
