@@ -1038,6 +1038,7 @@ function orangeProductInvalidateVariantsReadyForSave() {
 
 /**
  * تحقق موحّد من اكتمال البيانات قبل توليد المتغيرات أو الحفظ (بدون اشتراط جدول المتغيرات).
+ * يُستعمل لتفعيل زر «توليد المتغيرات» وللتحقق قبل الحفظ — أي نفس الشروط لما قبل المصفوفة.
  * @returns {null|{tab:string,message:string}}
  */
 function orangeProductValidateWizardBeforeMatrix() {
@@ -1076,6 +1077,10 @@ function orangeProductValidateWizardBeforeMatrix() {
             return { tab: 'basic', message: 'اختر «القسم الرئيسي» ثم «نوع المنتج» من الأنواع المعروضة لهذا القسم فقط.' };
         }
         return { tab: 'basic', message: 'يجب اختيار «نوع المنتج» قبل المتابعة.' };
+    }
+
+    if (!orangeProductBasicPriceOk()) {
+        return { tab: 'basic', message: 'أدخل السعر والتكلفة (أرقام ≥ 0) قبل المتابعة.' };
     }
 
     const hsCheck = orangeProductEffectiveHasSizes();
@@ -2169,12 +2174,14 @@ function orangeRefreshMainImageFileInputPreview() {
         }
         orangeRefreshVariantReferenceThumbs();
         orangeScheduleProductCardPreviewRefresh();
+        orangeApplyProductWizardActionButtons();
         return;
     }
     if (btnClear) {
         btnClear.style.display = 'none';
     }
     adminSetMainImagePreview(document.getElementById('main_image') ? document.getElementById('main_image').value.trim() : '');
+    orangeApplyProductWizardActionButtons();
 }
 
 function orangeRenderGalleryPendingPreviews() {
@@ -2298,6 +2305,7 @@ function renderGalleryUploadList() {
     });
     orangeRefreshVariantReferenceThumbs();
     orangeScheduleProductCardPreviewRefresh();
+    orangeApplyProductWizardActionButtons();
 }
 
 async function uploadMainProductImage() {
