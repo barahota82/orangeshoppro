@@ -2321,7 +2321,7 @@ function orangeRefreshSizePickPanel() {
         cb.type = 'checkbox';
         cb.className = 'product-size-pick-cb';
         cb.value = String(sid);
-        cb.checked = true;
+        cb.checked = false;
         const span = document.createElement('span');
         const t = String(sz.label_ar || sz.label_en || ('#' + sid)).replace(/</g, '');
         span.textContent = t;
@@ -2365,7 +2365,7 @@ function orangeApplySizePickFromVariantMatrix(vm) {
 function orangeGetPickedSizesForVariantGen(famId, allSizes) {
     const mount = document.getElementById('product_size_pick_checkboxes');
     if (!mount || !mount.querySelector('.product-size-pick-cb')) {
-        return allSizes;
+        return [];
     }
     const checked = Array.from(mount.querySelectorAll('.product-size-pick-cb:checked'))
         .map(function (cb) {
@@ -2593,6 +2593,63 @@ async function saveProduct() {
         productFormShowTab('images');
         alert('ارفع صورة واحدة على الأقل قبل الحفظ');
         return;
+    }
+
+    const hasColorsUi = document.getElementById('has_colors') && document.getElementById('has_colors').value === '1';
+    const hsForSave = orangeProductEffectiveHasSizes();
+    if (hasColorsUi) {
+        const cwRows = document.querySelectorAll('#colorwaysBox .cw-row');
+        let hasValidColorway = false;
+        cwRows.forEach(function (row) {
+            const pEl = row.querySelector('.cw-p');
+            const pv = pEl ? parseInt(pEl.value || '0', 10) || 0 : 0;
+            if (pv > 0) {
+                hasValidColorway = true;
+            }
+        });
+        if (!hasValidColorway) {
+            productFormShowTab('sizes');
+            alert('الصنف بخيار «له ألوان ؟ = نعم»: أضف صف لوناً واختر لوناً أساسياً من القاموس قبل الحفظ.');
+            return;
+        }
+        if (hsForSave) {
+            let allSized = true;
+            cwRows.forEach(function (row) {
+                const pEl = row.querySelector('.cw-p');
+                const pv = pEl ? parseInt(pEl.value || '0', 10) || 0 : 0;
+                if (pv <= 0) {
+                    return;
+                }
+                const cbs = row.querySelectorAll('.cw-size-cb:checked');
+                if (!cbs.length) {
+                    allSized = false;
+                }
+            });
+            if (!allSized) {
+                productFormShowTab('sizes');
+                alert('لكل صف لون اخترت له لوناً أساسياً: حدّد مقاساً واحداً على الأقل من قائمة المقاسات تحت الصف قبل الحفظ.');
+                return;
+            }
+        }
+    } else if (hsForSave) {
+        const mount = document.getElementById('product_size_pick_checkboxes');
+        const hasPickUi = !!(mount && mount.querySelector('.product-size-pick-cb'));
+        const checkedPick = mount ? mount.querySelectorAll('.product-size-pick-cb:checked').length : 0;
+        if (hasPickUi && checkedPick < 1) {
+            productFormShowTab('basic');
+            alert('اختر مقاساً واحداً على الأقل من قائمة «مقاسات المنتج (بدون ألوان)» في البيانات الأساسية قبل الحفظ.');
+            return;
+        }
+        if (!hasPickUi) {
+            const famEl = document.getElementById('size_family_id');
+            const famId0 = famEl ? parseInt(famEl.value || '0', 10) || 0 : 0;
+            const szList0 = famId0 ? sizesForFamily(famId0) : [];
+            if (szList0.length > 0) {
+                productFormShowTab('basic');
+                alert('اختر مقاساً واحداً على الأقل من قائمة «مقاسات المنتج (بدون ألوان)» في البيانات الأساسية قبل الحفظ.');
+                return;
+            }
+        }
     }
 
     const recordId = parseInt(document.getElementById('product_record_id').value || '0', 10);
