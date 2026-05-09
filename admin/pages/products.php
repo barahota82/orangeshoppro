@@ -465,7 +465,6 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
                                 <option value="<?php echo (int)$f['id']; ?>" data-size-scheme="<?php echo $famSch; ?>" data-commercial-kind="<?php echo $famCk; ?>" data-sizing-category="<?php echo $famSk; ?>"><?php echo htmlspecialchars($f['name_ar'] ?: $f['name_en']); ?></option>
                             <?php endforeach; ?>
                         </select>
-                        <small id="size_family_scheme_hint" style="display:none;margin-top:4px;line-height:1.45;color:#64748b;"></small>
                     </div>
                     <div id="product_basic_size_guide_wrap" class="product-basic-class-cell">
                         <label for="sizing_guide_scope">دليل المقاس الاسترشادي (عرض)</label>
@@ -947,29 +946,36 @@ function orangeProductEffectiveHasSizes() {
 
 function orangeApplySizeFamilySchemeFilter() {
     const famSel = document.getElementById('size_family_id');
-    const hint = document.getElementById('size_family_scheme_hint');
     if (!famSel) {
         return;
     }
 
     const expKind = orangeGetSelectedProductTypeExpectedKind();
     const expCat = orangeGetSelectedProductTypeExpectedCat();
+    const filterOn = expKind !== '' && expCat !== '';
     let currentVal = famSel.value;
     let selectedIsBad = false;
 
     for (let i = 0; i < famSel.options.length; i++) {
         const o = famSel.options[i];
         if (!o.value) {
+            o.hidden = false;
             o.disabled = false;
             continue;
         }
         const fk = String(o.getAttribute('data-commercial-kind') || '').trim();
         const fsk = String(o.getAttribute('data-sizing-category') || '').trim();
         let ok = true;
-        if (expKind !== '' && expCat !== '') {
+        if (filterOn) {
             ok = fk === expKind && fsk === expCat;
         }
-        o.disabled = !ok;
+        if (filterOn) {
+            o.hidden = !ok;
+            o.disabled = false;
+        } else {
+            o.hidden = false;
+            o.disabled = false;
+        }
         if (!ok && o.value === currentVal) {
             selectedIsBad = true;
         }
@@ -977,23 +983,12 @@ function orangeApplySizeFamilySchemeFilter() {
 
     if (selectedIsBad) {
         famSel.value = '';
-    } else if (currentVal && famSel.selectedOptions.length && famSel.selectedOptions[0].disabled) {
+    } else if (
+        currentVal &&
+        famSel.selectedOptions.length &&
+        (famSel.selectedOptions[0].disabled || famSel.selectedOptions[0].hidden)
+    ) {
         famSel.value = '';
-    }
-
-    if (hint) {
-        if (expKind !== '' && expCat !== '') {
-            hint.style.display = 'block';
-            hint.textContent =
-                'نطاق نوع المنتج على هرَم المقاس: النوع التجاري «' +
-                expKind +
-                '» وفئة القياس «' +
-                expCat +
-                '». تُعرض عائلات المقاسات المطابقة لهذا الهرم فقط (أي مخطط مقاس مستوى 3 ضمن نفس الفئة).';
-        } else {
-            hint.style.display = 'none';
-            hint.textContent = '';
-        }
     }
     orangeRefreshSizePickPanel();
     orangeRefreshAllColorwaySizePickers();
