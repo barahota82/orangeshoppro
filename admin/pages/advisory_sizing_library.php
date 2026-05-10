@@ -224,11 +224,25 @@ $enc = static function (array $rows): string {
     };
 
     async function api(payload) {
-        if (typeof postJSON !== 'function') {
-            alert('postJSON غير متاح');
-            return null;
+        if (typeof postJSON === 'function') {
+            return await postJSON(API, payload);
         }
-        return await postJSON(API, payload);
+        try {
+            var r = await fetch(API, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            var text = await r.text();
+            try {
+                return JSON.parse(text);
+            } catch (e2) {
+                return { success: false, message: 'رد السيرفر ليس JSON صالحاً (تحقق من UTF-8 وملف الـ API).' };
+            }
+        } catch (e) {
+            return { success: false, message: e.message || 'تعذر الاتصال بالخادم' };
+        }
     }
 
     function fillBundleSelect(sel, bundles, selectedId) {
@@ -441,9 +455,16 @@ $enc = static function (array $rows): string {
         alert(res.message || 'تم');
     };
 
-    refreshSourceFamilyOptions();
-    loadBundles();
-    loadMaps();
+    function aslbBoot() {
+        refreshSourceFamilyOptions();
+        loadBundles();
+        loadMaps();
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', aslbBoot);
+    } else {
+        aslbBoot();
+    }
 })();
 </script>
 
