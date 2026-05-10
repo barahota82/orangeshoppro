@@ -412,17 +412,24 @@ if ($sizesJson === false) {
         var cellInputs = '';
         for (var j = 0; j < n; j++) {
             var lab = (cols[j] && (cols[j].label_ar || cols[j].label_en)) ? esc(cols[j].label_ar || cols[j].label_en) : ('عمود ' + (j + 1));
-            cellInputs += '<div><label>' + lab + '</label><input type="text" class="asg-cell" data-ix="' + j + '" value="' + esc(cells[j]) + '"></div>';
+            var ph = '';
+            if (j === 0) {
+                ph = ' placeholder="فارغ + ربط = اسم المقاس من العائلة للعميل (لا تكرار)"';
+            }
+            cellInputs += '<div><label>' + lab + '</label><input type="text" class="asg-cell" data-ix="' + j + '"' + ph + ' value="' + esc(cells[j]) + '"></div>';
         }
         div.innerHTML =
             '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">' +
             '<strong>صف بيانات</strong>' +
             '<button type="button" class="btn-secondary asg-rm">حذف الصف</button></div>' +
-            '<div style="margin-top:8px;"><label>ربط بمقاس العائلة (اختياري)</label>' +
-            '<select class="asg-sfs">' + sizeOptionsHtml(sid) + '</select></div>' +
+            '<div style="margin-top:8px;"><label>ربط الصف بمقاس في العائلة</label>' +
+            '<select class="asg-sfs">' + sizeOptionsHtml(sid) + '</select>' +
+            '<span class="card-hint" style="display:block;margin-top:4px;font-size:12px;">بدون ربط: اكتب كل الأعمدة يدوياً. مع ربط: <strong>اترك أول عمود فاضياً</strong> ليُعرض للعميل اسم المقاس من العائلة بلغته — من غير ما تكتبه مرتين.</span></div>' +
+            '<p class="asg-family-hint card-hint" style="display:none;margin:8px 0 0;font-size:12px;line-height:1.5;"></p>' +
             '<div class="form-grid" style="margin-top:10px;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));">' + cellInputs + '</div>';
         div.querySelector('.asg-rm').onclick = function () { div.remove(); };
         wrap.appendChild(div);
+        asgUpdateFamilySizeHint(div);
     }
 
     function addLabelRow(prefill) {
@@ -485,12 +492,72 @@ if ($sizesJson === false) {
         return rows;
     }
 
+    function asgFamilyLabelById(sizeId) {
+        var f = fid();
+        var rows = FAMILY_SIZES[String(f)] || [];
+        for (var i = 0; i < rows.length; i++) {
+            if (parseInt(rows[i].id, 10) === sizeId) {
+                return (rows[i].label_ar || rows[i].label_en || ('#' + sizeId)).replace(/</g, '');
+            }
+        }
+        return '#' + sizeId;
+    }
+
+    function asgUpdateFamilySizeHint(block) {
+        if (!block || block.dataset.rowKind !== 'data') {
+            return;
+        }
+        var hint = block.querySelector('.asg-family-hint');
+        if (!hint) {
+            return;
+        }
+        var sel = block.querySelector('.asg-sfs');
+        var sid = sel ? parseInt(sel.value, 10) || 0 : 0;
+        var firstIn = block.querySelector('.asg-cell[data-ix="0"]');
+        var firstVal = firstIn ? firstIn.value.trim() : '';
+        if (sid <= 0) {
+            hint.style.display = 'none';
+            hint.textContent = '';
+            return;
+        }
+        var name = asgFamilyLabelById(sid);
+        if (firstVal === '') {
+            hint.style.display = 'block';
+            hint.textContent = 'أول عمود فارغ — للعميل سيظهر اسم المقاس من العائلة بلغة الصفحة (مثل: ' + name + '). لا تكتبه هنا مرتين.';
+        } else {
+            hint.style.display = 'block';
+            hint.textContent = 'أول عمود فيه نص — سيُحفظ كما هو للعميل (لن يُستبدل باسم العائلة).';
+        }
+    }
+
+    function asgRefreshAllFamilyHints() {
+        document.querySelectorAll('#asg_rows_box .asg-row-block[data-row-kind="data"]').forEach(asgUpdateFamilySizeHint);
+    }
+
     function refreshSizeSelects() {
         document.querySelectorAll('.asg-sfs').forEach(function (sel) {
             var cur = parseInt(sel.value, 10) || 0;
             sel.innerHTML = sizeOptionsHtml(cur);
         });
+        asgRefreshAllFamilyHints();
     }
+
+    document.getElementById('asg_rows_box').addEventListener('change', function (e) {
+        if (e.target && e.target.classList && e.target.classList.contains('asg-sfs')) {
+            var div = e.target.closest('.asg-row-block');
+            if (div) {
+                asgUpdateFamilySizeHint(div);
+            }
+        }
+    });
+    document.getElementById('asg_rows_box').addEventListener('input', function (e) {
+        if (e.target && e.target.classList && e.target.classList.contains('asg-cell') && e.target.getAttribute('data-ix') === '0') {
+            var div = e.target.closest('.asg-row-block');
+            if (div) {
+                asgUpdateFamilySizeHint(div);
+            }
+        }
+    });
 
     document.getElementById('asg_gen_cols').onclick = function () {
         var n = parseInt(document.getElementById('asg_col_count').value, 10) || 3;
