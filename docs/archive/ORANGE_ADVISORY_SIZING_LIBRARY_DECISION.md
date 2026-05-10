@@ -5,13 +5,14 @@
 
 **الحالة التقنية وقت القرار (للمرجع):** الأدلة الإرشادية في الكود الحالي مربوطة بـ **`size_family_id` + `scope_kind`** (علوي / سفلي / واحد)، والمنتج يحدد **`sizing_guide_scope`** ولا يملك اختيار «دليل حر» من شاشة المنتج.
 
-### تنفيذ مرحلة 1 (مضاف في المستودع)
+### تنفيذ في المستودع (محدَّث)
 
-- **ترحيل:** `scripts/migrations/031_advisory_sizing_library.sql` — جداول `advisory_sizing_library_bundles` و `size_family_advisory_library_map`.
-- **منطق:** `includes/advisory_sizing_library.php` — مزامنة نسخ أدلة من عائلة مصدر الحزمة إلى عائلة مستهلك مع مطابقة المقاسات حسب الترتيب (نفس العدد النشط).
-- **أدمن:** صفحة `admin/pages/advisory_sizing_library.php` و API `admin/api/advisory_sizing_library/manage.php`؛ قائمة: «مكتبة أدلة المقاسات» بجانب «دليل المقاس الاسترشادي».
-- **إرث المنتج:** لا يحتاج عموداً جديداً — المنتج يبقى يستخدم `size_family_id`؛ بعد المزامنة تظهر الأدلة على عائلة المستهلك كاليوم.
-- **لم يُنفَّذ بعد:** قسم/قالب صريحان على الحزمة، وتجاوز دليل على مستوى المنتج (نادر).
+- **ترحيل:** `scripts/migrations/031_advisory_sizing_library.sql` — جداول `advisory_sizing_library_bundles` و `size_family_advisory_library_map`؛ أعمدة **قسم + قالب** تُضاف تلقائياً عبر `orange_catalog_ensure_schema` (مسار سريع + نواة) بـ `ALTER` شرطي إن غابت.
+- **حزمة المكتبة:** `department_id` (قسم رئيسي)، `size_scheme_template_id` (قالب مقاسات)، `commercial_kind_key` (مستوى 1 من القاموس عند توفره)، ثم `source_size_family_id`؛ التحقق يفرض تطابق عائلة المصدر مع **القالب + النوع التجاري**؛ حفظ الربط والمزامنة يفرضان تطابق عائلة المستهلك مع الحزمة.
+- **منطق:** `includes/advisory_sizing_library.php` — `orange_advisory_sizing_library_validate_size_family_matches_bundle` + مزامنة النسخ حسب ترتيب المقاسات.
+- **أدمن:** صفحة `advisory_sizing_library` بخطوات 1→4 ثم حفظ، زر «تصميم الأدلة» يفتح `advisory_sizing_guides&size_family_id=…`؛ القائمة تحت «دليل المقاس الاسترشادي».
+- **إرث المنتج:** بدون عمود جديد — المنتج يبقى على `size_family_id`.
+- **لم يُنفَّذ بعد:** تجاوز دليل على مستوى المنتج (نادر).
 
 ---
 

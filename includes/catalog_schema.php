@@ -727,6 +727,12 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     if ($metaOk || $ckOk) {
         require_once __DIR__ . '/schema_migrations.php';
         orange_schema_run_pending_migrations($pdo);
+        if (orange_table_exists($pdo, 'advisory_sizing_library_bundles') && !orange_table_has_column($pdo, 'advisory_sizing_library_bundles', 'department_id')) {
+            orange_catalog_safe_exec($pdo, 'ALTER TABLE advisory_sizing_library_bundles ADD COLUMN department_id INT NULL DEFAULT NULL AFTER id');
+        }
+        if (orange_table_exists($pdo, 'advisory_sizing_library_bundles') && !orange_table_has_column($pdo, 'advisory_sizing_library_bundles', 'size_scheme_template_id')) {
+            orange_catalog_safe_exec($pdo, 'ALTER TABLE advisory_sizing_library_bundles ADD COLUMN size_scheme_template_id INT NULL DEFAULT NULL AFTER department_id');
+        }
         /* جدول accounts قد يُفرَّغ يدوياً؛ المسار السريع كان يتخطى البذرة فلا تُعاد الجذور الافتراضية */
         orange_catalog_seed_default_accounts_if_empty($pdo);
         orange_catalog_ensure_gl_account_settings_alloc_tables($pdo);
@@ -972,6 +978,8 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_safe_exec($pdo,
         'CREATE TABLE IF NOT EXISTS advisory_sizing_library_bundles (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            department_id INT NULL DEFAULT NULL,
+            size_scheme_template_id INT NULL DEFAULT NULL,
             name_ar VARCHAR(191) NOT NULL DEFAULT \'\',
             name_en VARCHAR(191) NOT NULL DEFAULT \'\',
             commercial_kind_key VARCHAR(32) NOT NULL DEFAULT \'\',
@@ -979,10 +987,19 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             sort_order INT NOT NULL DEFAULT 0,
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_aslb_department (department_id),
+            KEY idx_aslb_tpl (size_scheme_template_id),
             KEY idx_aslb_source_family (source_size_family_id),
             KEY idx_aslb_commercial (commercial_kind_key)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
+
+    if (orange_table_exists($pdo, 'advisory_sizing_library_bundles') && !orange_table_has_column($pdo, 'advisory_sizing_library_bundles', 'department_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE advisory_sizing_library_bundles ADD COLUMN department_id INT NULL DEFAULT NULL AFTER id');
+    }
+    if (orange_table_exists($pdo, 'advisory_sizing_library_bundles') && !orange_table_has_column($pdo, 'advisory_sizing_library_bundles', 'size_scheme_template_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE advisory_sizing_library_bundles ADD COLUMN size_scheme_template_id INT NULL DEFAULT NULL AFTER department_id');
+    }
 
     orange_catalog_safe_exec($pdo,
         'CREATE TABLE IF NOT EXISTS size_family_advisory_library_map (

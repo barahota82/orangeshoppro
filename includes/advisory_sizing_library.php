@@ -316,7 +316,10 @@ function orange_advisory_sizing_library_sync_mapped_consumer(PDO $pdo, int $cons
     if ($bid <= 0) {
         return 'لا يوجد ربط مكتبة لهذه العائلة — احفظ الربط أولاً.';
     }
-    $bSt = $pdo->prepare('SELECT source_size_family_id, commercial_kind_key FROM advisory_sizing_library_bundles WHERE id = ? LIMIT 1');
+    $bSt = $pdo->prepare(
+        'SELECT source_size_family_id, commercial_kind_key, department_id, size_scheme_template_id
+         FROM advisory_sizing_library_bundles WHERE id = ? LIMIT 1'
+    );
     $bSt->execute([$bid]);
     $b = $bSt->fetch(PDO::FETCH_ASSOC);
     if (!is_array($b)) {
@@ -327,15 +330,49 @@ function orange_advisory_sizing_library_sync_mapped_consumer(PDO $pdo, int $cons
         return 'عائلة المصدر في الحزمة غير صالحة.';
     }
 
-    $ckBundle = trim((string) ($b['commercial_kind_key'] ?? ''));
-    if ($ckBundle !== '' && orange_table_exists($pdo, 'size_families')) {
-        $fSt = $pdo->prepare('SELECT commercial_kind_key FROM size_families WHERE id = ? LIMIT 1');
-        $fSt->execute([$consumerFamilyId]);
-        $ckCons = trim((string) $fSt->fetchColumn());
-        if ($ckCons !== '' && $ckCons !== $ckBundle) {
-            return 'النوع التجاري لعائلة المستهلك («' . $ckCons . '») لا يطابق مفتاح الحزمة («' . $ckBundle . '»).';
-        }
+    $alignErr = orange_advisory_sizing_library_validate_size_family_matches_bundle($pdo, $b, $consumerFamilyId);
+    if ($alignErr !== null) {
+        return $alignErr;
     }
 
     return orange_advisory_sizing_library_sync_consumer_from_source($pdo, $srcFam, $consumerFamilyId);
+}
+
+/**
+ * يتحقق أن عائلة مقاسات تطابق سياق الحزمة (نوع تجاري 1 + قالب مقاسات عند تعريفهما على الحزمة).
+ *
+ * @param array<string, mixed> $bundle صف من advisory_sizing_library_bundles
+ */
+function orange_advisory_sizing_library_validate_size_family_matches_bundle(PDO $pdo, array $bundle, int $sizeFamilyId): ?string
+{
+    if ($sizeFamilyId <= 0 || !orange_table_exists($pdo, 'size_families')) {
+        return 'عائلة المقاسات غير صالحة.';
+    }
+    $fSt = $pdo->prepare(
+        'SELECT commercial_kind_key, size_scheme_template_id FROM size_families WHERE id = ? AND is_active = 1 LIMIT 1'
+    );
+    $fSt->execute([$sizeFamilyId]);
+    $fr = $fSt->fetch(PDO::FETCH_ASSOC);
+    if (!is_array($fr)) {
+        return 'عائلة المقاسات غير موجودة أو غير نشطة.';
+    }
+
+    $bCk = trim((string) ($bundle['commercial_kind_key'] ?? ''));
+    $fCk = trim((string) ($fr['commercial_kind_key'] ?? ''));
+    if ($bCk !== '') {
+        if ($fCk === '' || $fCk !== $bCk) {
+            return 'النوع التجاري (مستوى 1) لعائلة المقاسات لا يطابق الحزمة («' . $bCk . '»).';
+        }
+    }
+
+    $bTpl = isset($bundle['size_scheme_template_id']) ? (int) $bundle['size_scheme_template_id'] : 0;
+    if ($bTpl > 0) {
+        $fTpl = isset($fr['size_scheme_template_id']) && $fr['size_scheme_template_id'] !== null
+            ? (int) $fr['size_scheme_template_id'] : 0;
+        if ($fTpl !== $bTpl) {
+            return 'قالب المقاسات لعائلة المقاسات لا يطابق الحزمة — يجب نفس القالب.';
+        }
+    }
+
+    return null;
 }

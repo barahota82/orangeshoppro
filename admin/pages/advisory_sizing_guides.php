@@ -30,6 +30,20 @@ if ($tablesReady) {
     }
 }
 
+$prefSizeFamilyId = isset($_GET['size_family_id']) ? (int) $_GET['size_family_id'] : 0;
+if ($prefSizeFamilyId > 0 && $tablesReady) {
+    $foundPref = false;
+    foreach ($families as $ff) {
+        if ((int) ($ff['id'] ?? 0) === $prefSizeFamilyId) {
+            $foundPref = true;
+            break;
+        }
+    }
+    if (!$foundPref) {
+        $prefSizeFamilyId = 0;
+    }
+}
+
 $sizesJson = json_encode($sizesByFamily, JSON_UNESCAPED_UNICODE);
 if ($sizesJson === false) {
     $sizesJson = '{}';
@@ -143,6 +157,7 @@ if ($sizesJson === false) {
 (function () {
     var ADVISORY_API = '/admin/api/advisory_sizing_guides/manage.php';
     var FAMILY_SIZES = <?php echo $sizesJson; ?>;
+    var PREF_FAMILY = <?php echo (int) $prefSizeFamilyId; ?>;
 
     function fid() {
         return parseInt(document.getElementById('asg_family').value, 10) || 0;
@@ -897,6 +912,13 @@ if ($sizesJson === false) {
     };
 
     genColRows(3);
+    if (PREF_FAMILY > 0) {
+        var asgFamEl = document.getElementById('asg_family');
+        if (asgFamEl) {
+            asgFamEl.value = String(PREF_FAMILY);
+            loadList();
+        }
+    }
 })();
 </script>
 <style>

@@ -19,13 +19,29 @@ try {
     $action = trim((string) ($data['action'] ?? ''));
 
     if ($action === 'list_bundles') {
-        $rows = $pdo->query(
-            'SELECT b.id, b.name_ar, b.name_en, b.commercial_kind_key, b.source_size_family_id, b.sort_order, b.is_active,
-                    sf.name_ar AS source_family_ar, sf.name_en AS source_family_en
-             FROM advisory_sizing_library_bundles b
-             LEFT JOIN size_families sf ON sf.id = b.source_size_family_id
-             ORDER BY b.sort_order ASC, b.id ASC'
-        )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $sql = 'SELECT b.id, b.name_ar, b.name_en, b.commercial_kind_key, b.source_size_family_id, b.sort_order, b.is_active,
+                       b.department_id, b.size_scheme_template_id,
+                       sf.name_ar AS source_family_ar, sf.name_en AS source_family_en ';
+        if (orange_table_exists($pdo, 'departments')) {
+            $sql .= ', d.name_ar AS dept_ar, d.name_en AS dept_en ';
+        } else {
+            $sql .= ', NULL AS dept_ar, NULL AS dept_en ';
+        }
+        if (orange_table_exists($pdo, 'size_scheme_templates')) {
+            $sql .= ', tpl.name_ar AS tpl_ar, tpl.name_en AS tpl_en ';
+        } else {
+            $sql .= ', NULL AS tpl_ar, NULL AS tpl_en ';
+        }
+        $sql .= 'FROM advisory_sizing_library_bundles b
+                LEFT JOIN size_families sf ON sf.id = b.source_size_family_id ';
+        if (orange_table_exists($pdo, 'departments')) {
+            $sql .= 'LEFT JOIN departments d ON d.id = b.department_id ';
+        }
+        if (orange_table_exists($pdo, 'size_scheme_templates')) {
+            $sql .= 'LEFT JOIN size_scheme_templates tpl ON tpl.id = b.size_scheme_template_id ';
+        }
+        $sql .= 'ORDER BY b.sort_order ASC, b.id ASC';
+        $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         json_response(['success' => true, 'bundles' => $rows]);
     }
@@ -38,33 +54,75 @@ try {
         if (strlen($ck) > 32) {
             $ck = substr($ck, 0, 32);
         }
+        $deptId = (int) ($data['department_id'] ?? 0);
+        $tplId = (int) ($data['size_scheme_template_id'] ?? 0);
         $srcFam = (int) ($data['source_size_family_id'] ?? 0);
         $sort = (int) ($data['sort_order'] ?? 0);
         $active = (int) ($data['is_active'] ?? 1) === 1 ? 1 : 0;
         if ($nameAr === '' && $nameEn === '') {
             json_response(['success' => false, 'message' => 'أدخل اسماً عربياً أو إنجليزياً للحزمة.'], 422);
         }
+        if ($deptId <= 0) {
+            json_response(['success' => false, 'message' => 'اختر القسم الرئيسي (الخطوة 1).'], 422);
+        }
+        if ($tplId <= 0) {
+            json_response(['success' => false, 'message' => 'اختر قالب المقاسات (الخطوة 2).'], 422);
+        }
+        if ($ck === '') {
+            json_response(['success' => false, 'message' => 'اختر النوع التجاري — مستوى 1 (الخطوة 3).'], 422);
+        }
         if ($srcFam <= 0) {
-            json_response(['success' => false, 'message' => 'اختر عائلة المصدر (حيث تُحرَّر الأدلة).'], 422);
+            json_response(['success' => false, 'message' => 'اختر عائلة المصدر (الخطوة 4) حيث تُصمَّم الأدلة.'], 422);
+        }
+        if (orange_table_exists($pdo, 'departments')) {
+            $dSt = $pdo->prepare('SELECT id FROM departments WHERE id = ? AND is_active = 1 LIMIT 1');
+            $dSt->execute([$deptId]);
+            if ((int) $dSt->fetchColumn() <= 0) {
+                json_response(['success' => false, 'message' => 'القسم الرئيسي غير موجود أو غير نشط.'], 422);
+            }
+        }
+        if (orange_table_exists($pdo, 'size_scheme_templates')) {
+            $tSt = $pdo->prepare('SELECT id FROM size_scheme_templates WHERE id = ? AND is_active = 1 LIMIT 1');
+            $tSt->execute([$tplId]);
+            if ((int) $tSt->fetchColumn() <= 0) {
+                json_response(['success' => false, 'message' => 'قالب المقاسات غير موجود أو غير نشط.'], 422);
+            }
+        }
+        if (orange_table_exists($pdo, 'commercial_kind_dictionary')) {
+            $kSt = $pdo->prepare('SELECT kind_key FROM commercial_kind_dictionary WHERE kind_key = ? AND is_active = 1 LIMIT 1');
+            $kSt->execute([$ck]);
+            if ($kSt->fetchColumn() === false) {
+                json_response(['success' => false, 'message' => 'مفتاح النوع التجاري غير معرّف في القاموس أو غير نشط.'], 422);
+            }
         }
         $v = $pdo->prepare('SELECT id FROM size_families WHERE id = ? LIMIT 1');
         $v->execute([$srcFam]);
         if ((int) $v->fetchColumn() <= 0) {
             json_response(['success' => false, 'message' => 'عائلة المصدر غير موجودة.'], 422);
         }
+        $bundleProbe = [
+            'commercial_kind_key' => $ck,
+            'size_scheme_template_id' => $tplId,
+            'department_id' => $deptId,
+        ];
+        $align = orange_advisory_sizing_library_validate_size_family_matches_bundle($pdo, $bundleProbe, $srcFam);
+        if ($align !== null) {
+            json_response(['success' => false, 'message' => $align], 422);
+        }
         if ($id > 0) {
             $pdo->prepare(
                 'UPDATE advisory_sizing_library_bundles SET
-                    name_ar = ?, name_en = ?, commercial_kind_key = ?, source_size_family_id = ?, sort_order = ?, is_active = ?
+                    department_id = ?, size_scheme_template_id = ?, name_ar = ?, name_en = ?, commercial_kind_key = ?,
+                    source_size_family_id = ?, sort_order = ?, is_active = ?
                  WHERE id = ?'
-            )->execute([$nameAr, $nameEn, $ck, $srcFam, $sort, $active, $id]);
+            )->execute([$deptId, $tplId, $nameAr, $nameEn, $ck, $srcFam, $sort, $active, $id]);
             json_response(['success' => true, 'id' => $id]);
         }
         $pdo->prepare(
             'INSERT INTO advisory_sizing_library_bundles
-             (name_ar, name_en, commercial_kind_key, source_size_family_id, sort_order, is_active)
-             VALUES (?,?,?,?,?,?)'
-        )->execute([$nameAr, $nameEn, $ck, $srcFam, $sort, $active]);
+             (department_id, size_scheme_template_id, name_ar, name_en, commercial_kind_key, source_size_family_id, sort_order, is_active)
+             VALUES (?,?,?,?,?,?,?,?)'
+        )->execute([$deptId, $tplId, $nameAr, $nameEn, $ck, $srcFam, $sort, $active]);
         json_response(['success' => true, 'id' => (int) $pdo->lastInsertId()]);
     }
 
@@ -106,7 +164,7 @@ try {
         if ((int) $v->fetchColumn() <= 0) {
             json_response(['success' => false, 'message' => 'عائلة المستهلك غير موجودة.'], 422);
         }
-        $v2 = $pdo->prepare('SELECT id, source_size_family_id FROM advisory_sizing_library_bundles WHERE id = ? LIMIT 1');
+        $v2 = $pdo->prepare('SELECT * FROM advisory_sizing_library_bundles WHERE id = ? LIMIT 1');
         $v2->execute([$bundleId]);
         $br = $v2->fetch(PDO::FETCH_ASSOC);
         if (!is_array($br)) {
@@ -114,6 +172,10 @@ try {
         }
         if ((int) ($br['source_size_family_id'] ?? 0) === $consumer) {
             json_response(['success' => false, 'message' => 'عائلة المستهلك لا يمكن أن تكون نفس عائلة مصدر الحزمة.'], 422);
+        }
+        $mapErr = orange_advisory_sizing_library_validate_size_family_matches_bundle($pdo, $br, $consumer);
+        if ($mapErr !== null) {
+            json_response(['success' => false, 'message' => $mapErr], 422);
         }
         $pdo->prepare(
             'INSERT INTO size_family_advisory_library_map (consumer_size_family_id, library_bundle_id)

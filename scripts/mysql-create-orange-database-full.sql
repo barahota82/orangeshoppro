@@ -330,6 +330,8 @@ CREATE TABLE `advisory_sizing_guide_cells` (
 
 CREATE TABLE `advisory_sizing_library_bundles` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `department_id` int DEFAULT NULL,
+  `size_scheme_template_id` int DEFAULT NULL,
   `name_ar` varchar(191) NOT NULL DEFAULT '',
   `name_en` varchar(191) NOT NULL DEFAULT '',
   `commercial_kind_key` varchar(32) NOT NULL DEFAULT '',
@@ -338,6 +340,8 @@ CREATE TABLE `advisory_sizing_library_bundles` (
   `is_active` tinyint(1) NOT NULL DEFAULT '1',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
+  KEY `idx_aslb_department` (`department_id`),
+  KEY `idx_aslb_tpl` (`size_scheme_template_id`),
   KEY `idx_aslb_source_family` (`source_size_family_id`),
   KEY `idx_aslb_commercial` (`commercial_kind_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
