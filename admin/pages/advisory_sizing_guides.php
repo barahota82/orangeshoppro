@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 $pdo = db();
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/advisory_sizing_library.php';
 
 orange_catalog_ensure_schema($pdo);
 
@@ -13,9 +14,17 @@ $tablesReady = orange_table_exists($pdo, 'size_families')
 
 $families = [];
 $sizesByFamily = [];
+$asgDepartments = [];
+$asgTemplates = [];
+$asgCommercialKinds = [];
+$asgBundleScopes = [];
+$asgLibraryReady = false;
 if ($tablesReady) {
     try {
-        $families = $pdo->query('SELECT id, name_ar, name_en FROM size_families WHERE is_active = 1 ORDER BY sort_order ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
+        $families = $pdo->query(
+            'SELECT id, name_ar, name_en, commercial_kind_key, size_scheme_template_id
+             FROM size_families WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
+        )->fetchAll(PDO::FETCH_ASSOC);
         $sStmt = $pdo->query('SELECT id, size_family_id, label_ar, label_en, sort_order FROM size_family_sizes WHERE is_active = 1 ORDER BY size_family_id ASC, sort_order ASC, id ASC');
         foreach ($sStmt->fetchAll(PDO::FETCH_ASSOC) as $s) {
             $fid = (int) $s['size_family_id'];
@@ -24,9 +33,36 @@ if ($tablesReady) {
             }
             $sizesByFamily[$fid][] = $s;
         }
+        if (orange_table_exists($pdo, 'departments')) {
+            $asgDepartments = $pdo->query(
+                'SELECT id, name_ar, name_en FROM departments WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
+            )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        }
+        if (orange_table_exists($pdo, 'size_scheme_templates')) {
+            $asgTemplates = $pdo->query(
+                'SELECT id, name_ar, name_en FROM size_scheme_templates WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
+            )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        }
+        if (orange_table_exists($pdo, 'commercial_kind_dictionary')) {
+            $asgCommercialKinds = $pdo->query(
+                'SELECT kind_key, label_ar, label_en FROM commercial_kind_dictionary WHERE is_active = 1 ORDER BY sort_order ASC, kind_key ASC'
+            )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        }
+        $asgLibraryReady = orange_advisory_sizing_library_tables_ready($pdo);
+        if ($asgLibraryReady && orange_table_exists($pdo, 'advisory_sizing_library_bundles')) {
+            $asgBundleScopes = $pdo->query(
+                'SELECT department_id, size_scheme_template_id, commercial_kind_key, source_size_family_id
+                 FROM advisory_sizing_library_bundles WHERE COALESCE(is_active, 1) = 1'
+            )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        }
     } catch (Throwable $e) {
         $families = [];
         $sizesByFamily = [];
+        $asgDepartments = [];
+        $asgTemplates = [];
+        $asgCommercialKinds = [];
+        $asgBundleScopes = [];
+        $asgLibraryReady = false;
     }
 }
 
@@ -48,6 +84,11 @@ $sizesJson = json_encode($sizesByFamily, JSON_UNESCAPED_UNICODE);
 if ($sizesJson === false) {
     $sizesJson = '{}';
 }
+$asgJson = static function (array $rows): string {
+    $j = json_encode($rows, JSON_UNESCAPED_UNICODE);
+
+    return $j !== false ? $j : '[]';
+};
 ?>
 <div class="page-title">
     <h1>دليل المقاس الاسترشادي (عرض للعميل)</h1>
@@ -61,15 +102,55 @@ if ($sizesJson === false) {
 
 <div class="card" style="border-inline-start:4px solid #0ea5e9;">
     <p class="card-hint" style="margin:0;line-height:1.65;">
-        <strong>أين الاتفاق (قسم → قالب → نوع تجاري 1 → عائلة مصدر)؟</strong>
-        ذلك في صفحة منفصلة: <a href="/admin/index.php?page=advisory_sizing_library"><strong>مكتبة أدلة المقاسات</strong></a>
-        (من القائمة الجانبية تحت المخزن/المقاسات). هناك تُنشأ <strong>الحزمة</strong> بالخطوات 1–4 ثم يُفتح التصميم لهذه الصفحة.
-        <strong>هذه الصفحة</strong> لتحرير <strong>محتوى الجداول</strong> (أعمدة وصفوف) لعائلة مقاسات تختارها أدناه — سواء كانت عائلة مصدر لمكتبة أو عائلة عادية.
+        <strong>هذه الصفحة:</strong> اختيار السياق (قسم → قالب → نوع تجاري 1 → عائلة مصدر) ثم <strong>تسجيل الجدول الاسترشادي</strong> للعميل.
+        <strong>حفظ الحزمة والربط والمزامنة</strong> يبقى من
+        <a href="/admin/index.php?page=advisory_sizing_library"><strong>مكتبة أدلة المقاسات</strong></a>.
     </p>
 </div>
 
 <div class="card">
+    <h3>مسار التصميم (قسم → قالب → نوع تجاري → عائلة مصدر)</h3>
+    <ol class="card-hint" style="margin:0 0 12px;padding-inline-start:1.25rem;line-height:1.6;">
+        <li><strong>القسم الرئيسي</strong> — يضيّق «عائلة المصدر» عندما توجد <strong>حزمة</strong> في المكتبة بنفس القسم والقالب والنوع (إن وُجدت؛ وإلا تُعرض كل العائلات المطابقة للقالب والنوع).</li>
+        <li><strong>قالب المقاسات</strong> و<strong>النوع التجاري (مستوى 1)</strong></li>
+        <li><strong>عائلة المصدر</strong> ثم <strong>تطبيق</strong> لربطها بقائمة «عائلة المقاسات» وتحميل الأدلة.</li>
+    </ol>
+    <div class="form-grid" style="max-width:920px;">
+        <div style="grid-column:1/-1;"><label for="asg_w_dept"><strong>1.</strong> القسم الرئيسي</label>
+            <select id="asg_w_dept"><option value="0">— الكل / بدون تصفية بالقسم —</option>
+                <?php foreach ($asgDepartments as $d): ?>
+                <option value="<?php echo (int) $d['id']; ?>"><?php echo htmlspecialchars((string) ($d['name_ar'] ?: $d['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div style="grid-column:1/-1;"><label for="asg_w_tpl"><strong>2.</strong> قالب المقاسات</label>
+            <select id="asg_w_tpl"><option value="0">— اختر —</option>
+                <?php foreach ($asgTemplates as $t): ?>
+                <option value="<?php echo (int) $t['id']; ?>"><?php echo htmlspecialchars((string) ($t['name_ar'] ?: $t['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div style="grid-column:1/-1;"><label for="asg_w_ck"><strong>3.</strong> النوع التجاري (مستوى 1)</label>
+            <select id="asg_w_ck"><option value="">— اختر —</option>
+                <?php foreach ($asgCommercialKinds as $k): ?>
+                <option value="<?php echo htmlspecialchars((string) $k['kind_key'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) ($k['label_ar'] ?: $k['label_en'] ?: $k['kind_key']), ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div style="grid-column:1/-1;"><label for="asg_w_src"><strong>4.</strong> عائلة المصدر</label>
+            <select id="asg_w_src"><option value="0">— أكمل الخطوات 2 و 3 —</option></select>
+            <span class="card-hint" style="display:block;margin-top:4px;">العائلات التي تطابق القالب والنوع التجاري؛ عند اختيار قسم تُفضّل العائلات المربوطة بحزم المكتبة لذلك القسم إن وُجدت.</span>
+        </div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <button type="button" class="btn" id="asg_w_apply">تطبيق واختيار عائلة المقاسات</button>
+        <span id="asg_w_hint" class="card-hint" style="margin:0;"></span>
+    </div>
+</div>
+
+<div class="card">
     <h3>اختيار عائلة المقاسات</h3>
+    <p class="card-hint" style="margin:0 0 10px;">يمكنك الاختيار مباشرة هنا أو عبر المسار أعلاه. أي عائلة نشطة صالحة لتحرير الأدلة (ليس شرطاً أن تكون «مصدر مكتبة»).</p>
     <div class="form-grid" style="max-width:720px;">
         <div>
             <label for="asg_family">عائلة المقاسات</label>
@@ -167,9 +248,143 @@ if ($sizesJson === false) {
     var ADVISORY_API = '/admin/api/advisory_sizing_guides/manage.php';
     var FAMILY_SIZES = <?php echo $sizesJson; ?>;
     var PREF_FAMILY = <?php echo (int) $prefSizeFamilyId; ?>;
+    var FAMILIES_FULL = <?php echo $asgJson($families); ?>;
+    var BUNDLE_SCOPES = <?php echo $asgJson($asgBundleScopes); ?>;
+    var ASG_LIBRARY_READY = <?php echo $asgLibraryReady ? 'true' : 'false'; ?>;
+
+    async function orangeAdminJsonPost(url, payload) {
+        if (typeof postJSON === 'function') {
+            return await postJSON(url, payload);
+        }
+        try {
+            var r = await fetch(url, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            var text = await r.text();
+            try {
+                return JSON.parse(text);
+            } catch (e2) {
+                return { success: false, message: 'رد السيرفر ليس JSON صالحاً.' };
+            }
+        } catch (e) {
+            return { success: false, message: e.message || 'تعذّر الاتصال بالخادم' };
+        }
+    }
 
     function fid() {
         return parseInt(document.getElementById('asg_family').value, 10) || 0;
+    }
+
+    function refreshWizardSourceFamilies() {
+        var tpl = parseInt(document.getElementById('asg_w_tpl').value, 10) || 0;
+        var ck = (document.getElementById('asg_w_ck').value || '').trim();
+        var dept = parseInt(document.getElementById('asg_w_dept').value, 10) || 0;
+        var sel = document.getElementById('asg_w_src');
+        var prev = parseInt(sel.value, 10) || 0;
+        var hintEl = document.getElementById('asg_w_hint');
+        if (hintEl) {
+            hintEl.textContent = '';
+        }
+        sel.innerHTML = '<option value="0">— اختر —</option>';
+        if (tpl <= 0 || ck === '') {
+            sel.innerHTML = '<option value="0">— أكمل الخطوات 2 و 3 —</option>';
+            return;
+        }
+        var bundleSources = null;
+        if (ASG_LIBRARY_READY && dept > 0 && BUNDLE_SCOPES && BUNDLE_SCOPES.length) {
+            var idMap = {};
+            for (var bs = 0; bs < BUNDLE_SCOPES.length; bs++) {
+                var b = BUNDLE_SCOPES[bs];
+                var bd = parseInt(b.department_id, 10) || 0;
+                var bt = parseInt(b.size_scheme_template_id, 10) || 0;
+                var bck = String(b.commercial_kind_key || '').trim();
+                if (bd === dept && bt === tpl && bck === ck) {
+                    var sid0 = parseInt(b.source_size_family_id, 10) || 0;
+                    if (sid0 > 0) {
+                        idMap[sid0] = true;
+                    }
+                }
+            }
+            var idList = Object.keys(idMap);
+            if (idList.length) {
+                bundleSources = idMap;
+            }
+        }
+        for (var i = 0; i < FAMILIES_FULL.length; i++) {
+            var f = FAMILIES_FULL[i];
+            var fid0 = parseInt(f.id, 10) || 0;
+            var fck = String(f.commercial_kind_key || '').trim();
+            var ftpl = parseInt(f.size_scheme_template_id, 10) || 0;
+            if (fck !== ck || ftpl !== tpl) {
+                continue;
+            }
+            if (bundleSources !== null && !bundleSources[fid0]) {
+                continue;
+            }
+            var o = document.createElement('option');
+            o.value = String(fid0);
+            o.textContent = f.name_ar || f.name_en || ('#' + fid0);
+            if (fid0 === prev) {
+                o.selected = true;
+            }
+            sel.appendChild(o);
+        }
+        if (dept > 0 && bundleSources === null && hintEl && ASG_LIBRARY_READY) {
+            hintEl.textContent = 'لا توجد حزمة مكتبة لهذا القسم مع نفس القالب والنوع — تُعرض كل العائلات المطابقة للقالب والنوع.';
+        }
+    }
+
+    function asgSyncWizardFromFamily(prefId) {
+        prefId = parseInt(prefId, 10) || 0;
+        if (prefId <= 0) {
+            return;
+        }
+        var meta = null;
+        for (var i = 0; i < FAMILIES_FULL.length; i++) {
+            if (parseInt(FAMILIES_FULL[i].id, 10) === prefId) {
+                meta = FAMILIES_FULL[i];
+                break;
+            }
+        }
+        if (!meta) {
+            return;
+        }
+        var tplEl = document.getElementById('asg_w_tpl');
+        var ckEl = document.getElementById('asg_w_ck');
+        var deptEl = document.getElementById('asg_w_dept');
+        if (tplEl) {
+            tplEl.value = String(parseInt(meta.size_scheme_template_id, 10) || 0);
+        }
+        if (ckEl) {
+            ckEl.value = String(meta.commercial_kind_key || '').trim();
+        }
+        if (deptEl && ASG_LIBRARY_READY && BUNDLE_SCOPES && BUNDLE_SCOPES.length) {
+            var foundDept = 0;
+            var t = parseInt(meta.size_scheme_template_id, 10) || 0;
+            var ck = String(meta.commercial_kind_key || '').trim();
+            for (var j = 0; j < BUNDLE_SCOPES.length; j++) {
+                var bx = BUNDLE_SCOPES[j];
+                if ((parseInt(bx.source_size_family_id, 10) || 0) === prefId
+                    && (parseInt(bx.size_scheme_template_id, 10) || 0) === t
+                    && String(bx.commercial_kind_key || '').trim() === ck) {
+                    foundDept = parseInt(bx.department_id, 10) || 0;
+                    if (foundDept > 0) {
+                        break;
+                    }
+                }
+            }
+            if (foundDept > 0) {
+                deptEl.value = String(foundDept);
+            }
+        }
+        refreshWizardSourceFamilies();
+        var srcEl = document.getElementById('asg_w_src');
+        if (srcEl) {
+            srcEl.value = String(prefId);
+        }
     }
 
     function sizeOptionsHtml(selectedId) {
@@ -199,12 +414,6 @@ if ($sizesJson === false) {
         opts = opts || {};
         var silent = !!opts.silent;
         var forceFromArabic = !!opts.forceFromArabic;
-        if (typeof postJSON !== 'function') {
-            if (!silent) {
-                alert('الترجمة غير جاهزة — انتظر اكتمال تحميل الصفحة ثم أعد المحاولة');
-            }
-            return;
-        }
         var arEl = tr.querySelector('.asg-c-ar');
         var enEl = tr.querySelector('.asg-c-en');
         var filEl = tr.querySelector('.asg-c-fil');
@@ -217,7 +426,7 @@ if ($sizesJson === false) {
                 name_ar: arEl.value.trim(),
                 name_en: forceFromArabic ? '' : enEl.value.trim()
             };
-            var res = await postJSON('/admin/api/translate/names.php', payload);
+            var res = await orangeAdminJsonPost('/admin/api/translate/names.php', payload);
             if (!res || !res.success) {
                 if (!silent) {
                     alert((res && res.message) ? res.message : 'فشل الترجمة');
@@ -278,12 +487,6 @@ if ($sizesJson === false) {
         opts = opts || {};
         var silent = !!opts.silent;
         var forceFromArabic = !!opts.forceFromArabic;
-        if (typeof postJSON !== 'function') {
-            if (!silent) {
-                alert('الترجمة غير جاهزة — انتظر اكتمال تحميل الصفحة ثم أعد المحاولة');
-            }
-            return;
-        }
         var arEl = div.querySelector('.asg-l-ar');
         var enEl = div.querySelector('.asg-l-en');
         var filEl = div.querySelector('.asg-l-fil');
@@ -296,7 +499,7 @@ if ($sizesJson === false) {
                 name_ar: arEl.value.trim(),
                 name_en: forceFromArabic ? '' : enEl.value.trim()
             };
-            var res = await postJSON('/admin/api/translate/names.php', payload);
+            var res = await orangeAdminJsonPost('/admin/api/translate/names.php', payload);
             if (!res || !res.success) {
                 if (!silent) {
                     alert((res && res.message) ? res.message : 'فشل الترجمة');
@@ -799,7 +1002,7 @@ if ($sizesJson === false) {
     async function loadList() {
         var f = fid();
         if (f <= 0) { alert('اختر عائلة'); return; }
-        var res = await postJSON(ADVISORY_API, { action: 'list_by_family', size_family_id: f });
+        var res = await orangeAdminJsonPost(ADVISORY_API, { action: 'list_by_family', size_family_id: f });
         if (!res.success) { alert(res.message || 'خطأ'); return; }
         var ul = document.getElementById('asg_list');
         ul.innerHTML = '';
@@ -813,7 +1016,7 @@ if ($sizesJson === false) {
             li.querySelector('.asg-ed').onclick = function () { loadGuide(parseInt(g.id, 10)); };
             li.querySelector('.asg-del').onclick = async function () {
                 if (!confirm('حذف الدليل؟')) return;
-                var r2 = await postJSON(ADVISORY_API, { action: 'delete', id: parseInt(g.id, 10) });
+                var r2 = await orangeAdminJsonPost(ADVISORY_API, { action: 'delete', id: parseInt(g.id, 10) });
                 if (!r2.success) { alert(r2.message || 'خطأ'); return; }
                 loadList();
             };
@@ -823,7 +1026,7 @@ if ($sizesJson === false) {
     }
 
     async function loadGuide(id) {
-        var res = await postJSON(ADVISORY_API, { action: 'get', id: id });
+        var res = await orangeAdminJsonPost(ADVISORY_API, { action: 'get', id: id });
         if (!res.success) { alert(res.message || 'خطأ'); return; }
         var g = res.guide;
         document.getElementById('asg_edit_id').value = String(g.id);
@@ -862,8 +1065,27 @@ if ($sizesJson === false) {
     document.getElementById('asg_load_btn').onclick = loadList;
     document.getElementById('asg_new_btn').onclick = openNew;
 
+    document.getElementById('asg_w_tpl').onchange = refreshWizardSourceFamilies;
+    document.getElementById('asg_w_ck').onchange = refreshWizardSourceFamilies;
+    document.getElementById('asg_w_dept').onchange = refreshWizardSourceFamilies;
+
+    document.getElementById('asg_w_apply').onclick = async function () {
+        var sid = parseInt(document.getElementById('asg_w_src').value, 10) || 0;
+        if (sid <= 0) {
+            alert('اختر عائلة المصدر (الخطوة 4) أولاً');
+            return;
+        }
+        document.getElementById('asg_family').value = String(sid);
+        refreshSizeSelects();
+        await loadList();
+    };
+
     document.getElementById('asg_family').onchange = function () {
         refreshSizeSelects();
+        var v = parseInt(document.getElementById('asg_family').value, 10) || 0;
+        if (v > 0) {
+            asgSyncWizardFromFamily(v);
+        }
     };
 
     function asgValidateRowsBeforeSave(rows) {
@@ -909,7 +1131,7 @@ if ($sizesJson === false) {
             columns: readColumns(),
             rows: rowsPayload
         };
-        var res = await postJSON(ADVISORY_API, payload);
+        var res = await orangeAdminJsonPost(ADVISORY_API, payload);
         if (!res.success) { alert(res.message || 'خطأ'); return; }
         alert('تم الحفظ');
         document.getElementById('asg_edit_id').value = String(res.id || payload.id);
@@ -920,13 +1142,23 @@ if ($sizesJson === false) {
         document.getElementById('asg_editor').style.display = 'none';
     };
 
-    genColRows(3);
-    if (PREF_FAMILY > 0) {
-        var asgFamEl = document.getElementById('asg_family');
-        if (asgFamEl) {
-            asgFamEl.value = String(PREF_FAMILY);
-            loadList();
+    function asgBoot() {
+        genColRows(3);
+        refreshWizardSourceFamilies();
+        if (PREF_FAMILY > 0) {
+            var asgFamEl = document.getElementById('asg_family');
+            if (asgFamEl) {
+                asgFamEl.value = String(PREF_FAMILY);
+                asgSyncWizardFromFamily(PREF_FAMILY);
+                refreshSizeSelects();
+                loadList();
+            }
         }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', asgBoot);
+    } else {
+        asgBoot();
     }
 })();
 </script>
