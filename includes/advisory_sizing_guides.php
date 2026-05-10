@@ -57,6 +57,56 @@ function orange_advisory_parse_stored_cm(string $raw): ?float
 }
 
 /**
+ * يفسّر خلية عمود «تخزين بالسم»: رقم واحد أو نطاق min–max (شرطة عادية أو en dash).
+ *
+ * @return array{0: float, 1: float}|null [lo, hi] بالسم؛ رقم واحد => lo === hi
+ */
+function orange_advisory_parse_stored_cm_span(string $raw): ?array
+{
+    $rawTrim = trim($raw);
+    if ($rawTrim === '') {
+        return null;
+    }
+    $s = preg_replace('/\s*[–—−]\s*/u', '-', $rawTrim) ?? $rawTrim;
+    if (preg_match('/^(.+)-(.+)$/u', $s, $m)) {
+        $a = orange_advisory_parse_stored_cm(trim($m[1]));
+        $b = orange_advisory_parse_stored_cm(trim($m[2]));
+        if ($a === null || $b === null) {
+            return null;
+        }
+        $lo = min($a, $b);
+        $hi = max($a, $b);
+
+        return [$lo, $hi];
+    }
+    $one = orange_advisory_parse_stored_cm($rawTrim);
+    if ($one === null) {
+        return null;
+    }
+
+    return [$one, $one];
+}
+
+/**
+ * @param float $lo
+ * @param float $hi
+ */
+function orange_advisory_format_cm_measure(float $lo, float $hi): string
+{
+    $f = static function (float $n): string {
+        $s = number_format($n, 2, '.', '');
+        $s = rtrim(rtrim($s, '0'), '.');
+
+        return $s;
+    };
+    if (abs($lo - $hi) < 1e-9) {
+        return $f($lo);
+    }
+
+    return $f($lo) . '–' . $f($hi);
+}
+
+/**
  * كود تجميع أعمدة العرض للعميل (مثل eu، uk، us، cn). فارغ = عمود عام يظهر مع أي نظام.
  * يُسمح بأحرف إنجليزية صغيرة وأرقام وشرطة سفلية فقط؛ حتى 32 حرفاً (يتوافق مع عمود القاعدة).
  *

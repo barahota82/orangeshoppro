@@ -489,20 +489,28 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
                                                 $colVk = strtolower(trim((string) ($colMeta['value_kind'] ?? 'text')));
                                                 $sm = (string) ($colMeta['storage_measure'] ?? '');
                                                 $ds = orange_advisory_normalize_display_system((string) ($colMeta['display_system'] ?? ''));
-                                                $cmVal = $sm === 'length_cm' ? orange_advisory_parse_stored_cm((string) $cv) : null;
+                                                $cmSpan = $sm === 'length_cm' ? orange_advisory_parse_stored_cm_span((string) $cv) : null;
                                                 $tdNum = ($colVk === 'number' || $sm === 'length_cm') ? ' product-sizing-table__td--num' : '';
-                                                if ($cmVal !== null) {
-                                                    $n = number_format($cmVal, 2, '.', '');
-                                                    $n = rtrim(rtrim($n, '0'), '.');
-                                                    $dispCell = $n . ' ' . t('sizing_unit_cm_short');
-                                                } else {
-                                                    $dispCell = (string) $cv;
+                                                $dispCell = (string) $cv;
+                                                $cmAttrSingle = '';
+                                                $cmAttrLo = '';
+                                                $cmAttrHi = '';
+                                                if ($cmSpan !== null) {
+                                                    [$cmLo, $cmHi] = $cmSpan;
+                                                    $dispCell = orange_advisory_format_cm_measure($cmLo, $cmHi) . ' ' . t('sizing_unit_cm_short');
+                                                    if (abs($cmLo - $cmHi) < 1e-9) {
+                                                        $cmAttrSingle = (string) $cmLo;
+                                                    } else {
+                                                        $cmAttrLo = (string) $cmLo;
+                                                        $cmAttrHi = (string) $cmHi;
+                                                    }
                                                 }
                                                 ?>
                                                 <td class="product-sizing-table__td<?php echo $tdNum; ?>"
                                                     data-adv-col="<?php echo (int) $ci; ?>"
                                                     data-adv-dsys="<?php echo htmlspecialchars($ds, ENT_QUOTES, 'UTF-8'); ?>"
-                                                    <?php if ($cmVal !== null): ?> data-adv-cm="<?php echo htmlspecialchars((string) $cmVal, ENT_QUOTES, 'UTF-8'); ?>"<?php endif; ?>><?php echo htmlspecialchars($dispCell, ENT_QUOTES, 'UTF-8'); ?></td>
+                                                    <?php if ($cmAttrSingle !== ''): ?> data-adv-cm="<?php echo htmlspecialchars($cmAttrSingle, ENT_QUOTES, 'UTF-8'); ?>"<?php endif; ?>
+                                                    <?php if ($cmAttrLo !== '' && $cmAttrHi !== ''): ?> data-adv-cm-lo="<?php echo htmlspecialchars($cmAttrLo, ENT_QUOTES, 'UTF-8'); ?>" data-adv-cm-hi="<?php echo htmlspecialchars($cmAttrHi, ENT_QUOTES, 'UTF-8'); ?>"<?php endif; ?>><?php echo htmlspecialchars($dispCell, ENT_QUOTES, 'UTF-8'); ?></td>
                                             <?php endfor; ?>
                                         </tr>
                                     <?php endif; ?>

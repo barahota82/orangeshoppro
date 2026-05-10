@@ -159,6 +159,17 @@ function orangeAdvisoryFormatMeasureNumber(n) {
     return s;
 }
 
+function orangeAdvisoryFormatCmSpanText(lo, hi, useInch) {
+    const a = useInch ? lo / 2.54 : lo;
+    const b = useInch ? hi / 2.54 : hi;
+    const fa = orangeAdvisoryFormatMeasureNumber(a);
+    const fb = orangeAdvisoryFormatMeasureNumber(b);
+    if (fa === fb) {
+        return fa;
+    }
+    return `${fa}–${fb}`;
+}
+
 function orangeAdvisoryApplyUnits(dialog, useInch) {
     const u = window.ORANGE_ADVISORY_UX;
     if (!u || !u.hasLength) {
@@ -166,7 +177,16 @@ function orangeAdvisoryApplyUnits(dialog, useInch) {
     }
     const lc = u.labelCm || 'cm';
     const li = u.labelInch || 'in';
-    dialog.querySelectorAll('td[data-adv-cm]').forEach((td) => {
+    dialog.querySelectorAll('td[data-adv-cm-lo][data-adv-cm-hi]').forEach((td) => {
+        const lo = parseFloat(td.getAttribute('data-adv-cm-lo'), 10);
+        const hi = parseFloat(td.getAttribute('data-adv-cm-hi'), 10);
+        if (Number.isNaN(lo) || Number.isNaN(hi)) {
+            return;
+        }
+        const mid = `${orangeAdvisoryFormatCmSpanText(lo, hi, useInch)} ${useInch ? li : lc}`;
+        td.textContent = mid;
+    });
+    dialog.querySelectorAll('td[data-adv-cm]:not([data-adv-cm-lo])').forEach((td) => {
         const cm = parseFloat(td.getAttribute('data-adv-cm'), 10);
         if (Number.isNaN(cm)) {
             return;

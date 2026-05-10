@@ -333,8 +333,8 @@ if ($sizesJson === false) {
                 '<td><input type="text" class="asg-c-hi" maxlength="191"></td>' +
                 '<td><select class="asg-c-vk"><option value="text">نص</option><option value="number">رقم</option></select></td>' +
                 '<td><input type="text" class="asg-c-unit" maxlength="64" placeholder="مثال cm"></td>' +
-                '<td><select class="asg-c-stor" title="قيمة الطول تُخزَّن بالسم؛ العميل يحوّل للعرض فقط">' +
-                '<option value="">—</option><option value="length_cm">طول بالسم (عرض cm/inch)</option></select></td>' +
+                '<td><select class="asg-c-stor" title="قيمة بالسم: رقم واحد أو نطاق مثل 84-88؛ العميل يحوّل cm/inch">' +
+                '<option value="">—</option><option value="length_cm">قياس بالسم — رقم أو نطاق (عرض cm/inch)</option></select></td>' +
                 '<td><input type="text" class="asg-c-dsys" maxlength="32" placeholder="فارغ=عام" title="كود إنجليزي صغير (مثل eu، cn) — يُجمّع أعمدة العرض للعميل" style="width:7rem;"></td>';
             tr.querySelector('.asg-c-stor').addEventListener('change', function () {
                 var vk = tr.querySelector('.asg-c-vk');
