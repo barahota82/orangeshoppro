@@ -118,9 +118,13 @@ if ($sizesJson === false) {
     </div>
 
     <h4 style="margin-top:20px;">صفوف الجدول</h4>
-    <div style="display:flex;gap:8px;margin-bottom:8px;">
+    <p class="card-hint" style="margin:0 0 8px;">
+        <strong>أسهل تسجيل:</strong> بعد تعريف الأعمدة استخدم <strong>«إضافة صف لكل مقاس من العائلة»</strong> — يُنشئ صفاً لكل مقاس نشط ويربطه تلقائياً (بدون تكرار لنفس المقاس). خلّي <strong>أول عمود</strong> اسم المقاس (Alpha) و<strong>اترك خليته فاضية</strong> ليظهر للعميل من العائلة بلغته؛ ثم املأ باقي الأعمدة (EU، الصدر، …).
+    </p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:center;">
         <button type="button" class="btn-secondary" id="asg_row_data">+ صف بيانات</button>
         <button type="button" class="btn-secondary" id="asg_row_label">+ صف عنوان (مجموعة)</button>
+        <button type="button" class="btn" id="asg_bulk_rows" title="يضيف صف بيانات لكل مقاس نشط في العائلة المختارة، مع ربط المقاس وتخطي المربوط مسبقاً">إضافة صف لكل مقاس من العائلة</button>
     </div>
     <div id="asg_rows_box"></div>
 
@@ -496,6 +500,69 @@ if ($sizesJson === false) {
 
     document.getElementById('asg_row_data').onclick = function () { addDataRow({}); refreshSizeSelects(); };
     document.getElementById('asg_row_label').onclick = function () { addLabelRow({}); };
+
+    function asgCollectLinkedSizeIds() {
+        var out = {};
+        document.querySelectorAll('#asg_rows_box .asg-row-block').forEach(function (block) {
+            if (block.dataset.rowKind !== 'data') {
+                return;
+            }
+            var sel = block.querySelector('.asg-sfs');
+            if (!sel) {
+                return;
+            }
+            var v = parseInt(sel.value, 10) || 0;
+            if (v > 0) {
+                out[v] = true;
+            }
+        });
+        return out;
+    }
+
+    document.getElementById('asg_bulk_rows').onclick = function () {
+        var f = fid();
+        if (f <= 0) {
+            alert('اختر عائلة مقاسات أولاً من أعلى الصفحة');
+            return;
+        }
+        var fam = FAMILY_SIZES[String(f)] || [];
+        if (!fam.length) {
+            alert('لا توجد مقاسات نشطة لهذه العائلة — راجع عائلات المقاسات');
+            return;
+        }
+        var cols = readColumns();
+        if (!cols.length) {
+            alert('عرّف الأعمدة أولاً (عدد الأعمدة ثم توليد صفوف العناوين)');
+            return;
+        }
+        var linked = asgCollectLinkedSizeIds();
+        var toAdd = [];
+        for (var i = 0; i < fam.length; i++) {
+            var rid = parseInt(fam[i].id, 10) || 0;
+            if (rid > 0 && !linked[rid]) {
+                toAdd.push(rid);
+            }
+        }
+        if (!toAdd.length) {
+            alert('كل مقاسات العائلة لها صف مربوط بالفعل — لا يوجد جديد للإضافة');
+            return;
+        }
+        if (!confirm('سيتم إضافة ' + toAdd.length + ' صف بيانات، كل صف مربوط بمقاس من العائلة. المتابعة؟')) {
+            return;
+        }
+        var n = Math.max(1, cols.length);
+        function emptyCells() {
+            var a = [];
+            for (var k = 0; k < n; k++) {
+                a.push('');
+            }
+            return a;
+        }
+        for (var j = 0; j < toAdd.length; j++) {
+            addDataRow({ cells: emptyCells(), size_family_size_id: toAdd[j] });
+        }
+        refreshSizeSelects();
+    };
 
     async function loadList() {
         var f = fid();
