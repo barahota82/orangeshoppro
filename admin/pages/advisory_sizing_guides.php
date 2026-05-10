@@ -59,6 +59,15 @@ if ($sizesJson === false) {
 </div>
 <?php else: ?>
 
+<div class="card" style="border-inline-start:4px solid #0ea5e9;">
+    <p class="card-hint" style="margin:0;line-height:1.65;">
+        <strong>أين الاتفاق (قسم → قالب → نوع تجاري 1 → عائلة مصدر)؟</strong>
+        ذلك في صفحة منفصلة: <a href="/admin/index.php?page=advisory_sizing_library"><strong>مكتبة أدلة المقاسات</strong></a>
+        (من القائمة الجانبية تحت المخزن/المقاسات). هناك تُنشأ <strong>الحزمة</strong> بالخطوات 1–4 ثم يُفتح التصميم لهذه الصفحة.
+        <strong>هذه الصفحة</strong> لتحرير <strong>محتوى الجداول</strong> (أعمدة وصفوف) لعائلة مقاسات تختارها أدناه — سواء كانت عائلة مصدر لمكتبة أو عائلة عادية.
+    </p>
+</div>
+
 <div class="card">
     <h3>اختيار عائلة المقاسات</h3>
     <div class="form-grid" style="max-width:720px;">
