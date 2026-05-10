@@ -105,7 +105,7 @@ scripts\install-hooks.ps1
 - **ممنوع** (بطلب المستخدم) الاعتماد على `MYSQL_ATTR_INIT_COMMAND` في `config.php`؛ الترميز مع MySQL عبر `SET NAMES` داخل `catalog_schema`.
 - **سياسة المستخدم:** لا تعديل `config.php` لإضافة دوال مساعدة؛ دوال الطلبات `require_fields` و`generate_order_number` في **`includes/order_helpers.php`**.
 - `inv_test` أُزيل؛ الفاتورة تُحسَّن عند فتحها بدون طلب محدد.
-- **الجداول الإرشادية (مكتبة — مرحلة 1 منفّذة):** التفاصيل في **`docs/archive/ORANGE_ADVISORY_SIZING_LIBRARY_DECISION.md`**؛ ترحيل **`scripts/migrations/031_advisory_sizing_library.sql`** + صفحة أدمن **«مكتبة أدلة المقاسات»** (حزمة = عائلة مصدر، ربط عائلة مستهلك، مزامنة نسخ الأدلة حسب ترتيب المقاسات). التجاوز على المنتج وحقول قسم/قالب على الحزمة لاحقاً.
+- **الجداول الإرشادية (مكتبة):** التفاصيل في **`docs/archive/ORANGE_ADVISORY_SIZING_LIBRARY_DECISION.md`**؛ ترحيل **031** + صفحة **«مكتبة أدلة المقاسات»**: تسلسل **قسم → قالب مقاسات → نوع تجاري 1 → عائلة مصدر** ثم تصميم الأدلة وفتح الدليل بـ `size_family_id`؛ ربط عائلة مستهلك + مزامنة مع تحقق القالب والنوع التجاري. التجاوز على المنتج لاحقاً.
 
 ### أين تُثبَّت طريقة العمل؟
 1. **`IBRAHIM_ORANGE_MASTER.txt`** — دخول موحّد لأي جلسة جديدة.
