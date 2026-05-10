@@ -146,7 +146,7 @@ if ($sizesJson === false) {
     function sizeOptionsHtml(selectedId) {
         var f = fid();
         var rows = FAMILY_SIZES[String(f)] || [];
-        var h = '<option value="0">— بدون ربط / تسمية حرة —</option>';
+        var h = '<option value="0">— اختر المقاس من العائلة —</option>';
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
             var id = parseInt(r.id, 10) || 0;
@@ -422,9 +422,9 @@ if ($sizesJson === false) {
             '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">' +
             '<strong>صف بيانات</strong>' +
             '<button type="button" class="btn-secondary asg-rm">حذف الصف</button></div>' +
-            '<div style="margin-top:8px;"><label>ربط الصف بمقاس في العائلة</label>' +
+            '<div style="margin-top:8px;"><label>المقاس من العائلة <span style="color:#b91c1c;">*</span></label>' +
             '<select class="asg-sfs">' + sizeOptionsHtml(sid) + '</select>' +
-            '<span class="card-hint" style="display:block;margin-top:4px;font-size:12px;">بدون ربط: اكتب كل الأعمدة يدوياً. مع ربط: <strong>اترك أول عمود فاضياً</strong> ليُعرض للعميل اسم المقاس من العائلة بلغته — من غير ما تكتبه مرتين.</span></div>' +
+            '<span class="card-hint" style="display:block;margin-top:4px;font-size:12px;">إلزامي: كل صف بيانات = مقاس واحد من العائلة. <strong>اترك أول عمود فاضياً</strong> ليظهر للعميل اسم المقاس من العائلة بلغته (من غير تكرار).</span></div>' +
             '<p class="asg-family-hint card-hint" style="display:none;margin:8px 0 0;font-size:12px;line-height:1.5;"></p>' +
             '<div class="form-grid" style="margin-top:10px;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));">' + cellInputs + '</div>';
         div.querySelector('.asg-rm').onclick = function () { div.remove(); };
@@ -516,8 +516,8 @@ if ($sizesJson === false) {
         var firstIn = block.querySelector('.asg-cell[data-ix="0"]');
         var firstVal = firstIn ? firstIn.value.trim() : '';
         if (sid <= 0) {
-            hint.style.display = 'none';
-            hint.textContent = '';
+            hint.style.display = 'block';
+            hint.textContent = 'اختر مقاساً من العائلة — إلزامي لكل صف بيانات.';
             return;
         }
         var name = asgFamilyLabelById(sid);
@@ -689,7 +689,6 @@ if ($sizesJson === false) {
         document.getElementById('asg_name_ar').value = '';
         genColRows(3);
         clearRows();
-        addDataRow({});
         refreshSizeSelects();
         document.getElementById('asg_editor').style.display = 'block';
         document.getElementById('asg_editor_title').textContent = 'دليل جديد';
@@ -702,9 +701,39 @@ if ($sizesJson === false) {
         refreshSizeSelects();
     };
 
+    function asgValidateRowsBeforeSave(rows) {
+        var seen = {};
+        var hasData = false;
+        for (var i = 0; i < rows.length; i++) {
+            var r = rows[i];
+            if (!r || r.row_kind !== 'data') {
+                continue;
+            }
+            hasData = true;
+            var sid = parseInt(r.size_family_size_id, 10) || 0;
+            if (sid <= 0) {
+                return 'كل صف بيانات يجب اختيار مقاس من العائلة له (لا يوجد «بدون ربط»). استخدم «إضافة صف لكل مقاس» أو اختر المقاس من القائمة.';
+            }
+            if (seen[sid]) {
+                return 'مقاس العائلة مكرر في أكثر من صف — اربط كل مقاس مرة واحدة فقط.';
+            }
+            seen[sid] = true;
+        }
+        if (!hasData) {
+            return 'أضف صف بيانات واحداً على الأقل (مع اختيار مقاس من العائلة لكل صف).';
+        }
+        return '';
+    }
+
     document.getElementById('asg_save_btn').onclick = async function () {
         var f = fid();
         if (f <= 0) { alert('اختر عائلة'); return; }
+        var rowsPayload = readRowsPayload();
+        var rowErr = asgValidateRowsBeforeSave(rowsPayload);
+        if (rowErr) {
+            alert(rowErr);
+            return;
+        }
         var payload = {
             action: 'save',
             id: parseInt(document.getElementById('asg_edit_id').value, 10) || 0,
@@ -713,7 +742,7 @@ if ($sizesJson === false) {
             name_ar: document.getElementById('asg_name_ar').value.trim(),
             is_active: parseInt(document.getElementById('asg_active').value, 10),
             columns: readColumns(),
-            rows: readRowsPayload()
+            rows: rowsPayload
         };
         var res = await postJSON(ADVISORY_API, payload);
         if (!res.success) { alert(res.message || 'خطأ'); return; }

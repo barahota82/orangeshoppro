@@ -296,6 +296,24 @@ try {
             if ($normRows === []) {
                 json_response(['success' => false, 'message' => 'أضف صفاً واحداً على الأقل'], 422);
             }
+            $hasDataRow = false;
+            $seenFamilySize = [];
+            foreach ($normRows as $nr) {
+                if (($nr['row_kind'] ?? '') === 'data') {
+                    $hasDataRow = true;
+                    $sfsData = (int) ($nr['size_family_size_id'] ?? 0);
+                    if ($sfsData <= 0) {
+                        json_response(['success' => false, 'message' => 'كل صف بيانات يجب ربطه بمقاس من عائلة المقاسات (لا يُقبل صف بيانات بدون مقاس)'], 422);
+                    }
+                    if (isset($seenFamilySize[$sfsData])) {
+                        json_response(['success' => false, 'message' => 'مقاس العائلة مكرر في أكثر من صف بيانات — اربط كل مقاس مرة واحدة'], 422);
+                    }
+                    $seenFamilySize[$sfsData] = true;
+                }
+            }
+            if (!$hasDataRow) {
+                json_response(['success' => false, 'message' => 'أضف صف بيانات واحداً على الأقل مربوطاً بمقاس من العائلة'], 422);
+            }
             foreach ($normRows as $nr) {
                 if ($nr['row_kind'] === 'label' && trim($nr['label_ar']) === '' && trim($nr['label_en']) === '') {
                     json_response(['success' => false, 'message' => 'كل صف عنوان يجب أن يحتوي على نص عربي أو English'], 422);
