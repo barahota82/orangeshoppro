@@ -124,7 +124,7 @@ if ($sizesJson === false) {
 
     <h4 style="margin-top:20px;">صفوف الجدول</h4>
     <p class="card-hint" style="margin:0 0 8px;">
-        <strong>أسهل تسجيل:</strong> بعد تعريف الأعمدة استخدم <strong>«إضافة صف لكل مقاس من العائلة»</strong> — يُنشئ صفاً لكل مقاس نشط ويربطه تلقائياً (بدون تكرار لنفس المقاس). خلّي <strong>أول عمود</strong> اسم المقاس (Alpha) و<strong>اترك خليته فاضية</strong> ليظهر للعميل من العائلة بلغته؛ ثم املأ باقي الأعمدة (EU، الصدر، …).
+        <strong>أسهل تسجيل:</strong> بعد تعريف الأعمدة استخدم <strong>«إضافة صف لكل مقاس من العائلة»</strong> — يُنشئ صفاً لكل مقاس نشط ويربطه تلقائياً. <strong>أول عمود</strong> (مثل Alpha) يُملأ تلقائياً من اسم المقاس في العائلة عند الربط؛ للعميل يُعرض بلغة الصفحة من نفس المصدر. املأ باقي الأعمدة (EU، الصدر، …).
     </p>
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:center;">
         <button type="button" class="btn-secondary" id="asg_row_data">+ صف بيانات</button>
@@ -367,6 +367,7 @@ if ($sizesJson === false) {
             for (var j = 0; j < ins.length; j++) {
                 ins[j].setAttribute('data-ix', String(j));
             }
+            asgSyncFirstDataCellFromFamily(block);
             asgUpdateFamilySizeHint(block);
         });
     }
@@ -534,7 +535,7 @@ if ($sizesJson === false) {
             var lab = (cols[j] && (cols[j].label_ar || cols[j].label_en)) ? esc(cols[j].label_ar || cols[j].label_en) : ('عمود ' + (j + 1));
             var ph = '';
             if (j === 0) {
-                ph = ' placeholder="فارغ + ربط = اسم المقاس من العائلة للعميل (لا تكرار)"';
+                ph = ' placeholder="يُملأ تلقائياً عند اختيار المقاس من العائلة"';
             }
             cellInputs += '<div><label>' + lab + '</label><input type="text" class="asg-cell" data-ix="' + j + '"' + ph + ' value="' + esc(cells[j]) + '"></div>';
         }
@@ -544,7 +545,7 @@ if ($sizesJson === false) {
             '<button type="button" class="btn-secondary asg-rm">حذف الصف</button></div>' +
             '<div style="margin-top:8px;"><label>المقاس من العائلة <span style="color:#b91c1c;">*</span></label>' +
             '<select class="asg-sfs">' + sizeOptionsHtml(sid) + '</select>' +
-            '<span class="card-hint" style="display:block;margin-top:4px;font-size:12px;">إلزامي: كل صف بيانات = مقاس واحد من العائلة. <strong>اترك أول عمود فاضياً</strong> ليظهر للعميل اسم المقاس من العائلة بلغته (من غير تكرار).</span></div>' +
+            '<span class="card-hint" style="display:block;margin-top:4px;font-size:12px;">إلزامي: اختر <strong>المقاس من العائلة</strong> — أول عمود يُحدَّث تلقائياً للمعاينة؛ للعميل يُعرض بلغة المتجر من العائلة.</span></div>' +
             '<p class="asg-family-hint card-hint" style="display:none;margin:8px 0 0;font-size:12px;line-height:1.5;"></p>' +
             '<div class="form-grid" style="margin-top:10px;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));">' + cellInputs + '</div>';
         div.querySelector('.asg-rm').onclick = function () { div.remove(); };
@@ -601,6 +602,9 @@ if ($sizesJson === false) {
                 for (var j = 0; j < ins.length; j++) {
                     cells.push(ins[j].value);
                 }
+                if (sfs > 0 && cells.length > 0) {
+                    cells[0] = '';
+                }
                 rows.push({
                     row_kind: 'data',
                     sort_order: b,
@@ -623,6 +627,28 @@ if ($sizesJson === false) {
         return '#' + sizeId;
     }
 
+    function asgSyncFirstDataCellFromFamily(block) {
+        if (!block || block.dataset.rowKind !== 'data') {
+            return;
+        }
+        var sel = block.querySelector('.asg-sfs');
+        var firstIn = block.querySelector('.asg-cell[data-ix="0"]');
+        if (!firstIn) {
+            return;
+        }
+        var sid = sel ? parseInt(sel.value, 10) || 0 : 0;
+        if (sid > 0) {
+            firstIn.value = asgFamilyLabelById(sid);
+            firstIn.readOnly = true;
+            firstIn.setAttribute('title', 'يُملأ تلقائياً من المقاس المختار؛ للعميل بلغة صفحة المتجر من العائلة');
+            firstIn.classList.add('asg-cell--from-family');
+        } else {
+            firstIn.readOnly = false;
+            firstIn.removeAttribute('title');
+            firstIn.classList.remove('asg-cell--from-family');
+        }
+    }
+
     function asgUpdateFamilySizeHint(block) {
         if (!block || block.dataset.rowKind !== 'data') {
             return;
@@ -633,25 +659,21 @@ if ($sizesJson === false) {
         }
         var sel = block.querySelector('.asg-sfs');
         var sid = sel ? parseInt(sel.value, 10) || 0 : 0;
-        var firstIn = block.querySelector('.asg-cell[data-ix="0"]');
-        var firstVal = firstIn ? firstIn.value.trim() : '';
         if (sid <= 0) {
             hint.style.display = 'block';
             hint.textContent = 'اختر مقاساً من العائلة — إلزامي لكل صف بيانات.';
             return;
         }
         var name = asgFamilyLabelById(sid);
-        if (firstVal === '') {
-            hint.style.display = 'block';
-            hint.textContent = 'أول عمود فارغ — للعميل سيظهر اسم المقاس من العائلة بلغة الصفحة (مثل: ' + name + '). لا تكتبه هنا مرتين.';
-        } else {
-            hint.style.display = 'block';
-            hint.textContent = 'أول عمود فيه نص — سيُحفظ كما هو للعميل (لن يُستبدل باسم العائلة).';
-        }
+        hint.style.display = 'block';
+        hint.textContent = 'أول عمود للمعاينة: «' + name + '» — للعميل يُعرض بلغة صفحة المتجر من العائلة (لا يُحفظ نص العمود الأول في القاعدة).';
     }
 
     function asgRefreshAllFamilyHints() {
-        document.querySelectorAll('#asg_rows_box .asg-row-block[data-row-kind="data"]').forEach(asgUpdateFamilySizeHint);
+        document.querySelectorAll('#asg_rows_box .asg-row-block[data-row-kind="data"]').forEach(function (b) {
+            asgSyncFirstDataCellFromFamily(b);
+            asgUpdateFamilySizeHint(b);
+        });
     }
 
     function refreshSizeSelects() {
@@ -666,14 +688,7 @@ if ($sizesJson === false) {
         if (e.target && e.target.classList && e.target.classList.contains('asg-sfs')) {
             var div = e.target.closest('.asg-row-block');
             if (div) {
-                asgUpdateFamilySizeHint(div);
-            }
-        }
-    });
-    document.getElementById('asg_rows_box').addEventListener('input', function (e) {
-        if (e.target && e.target.classList && e.target.classList.contains('asg-cell') && e.target.getAttribute('data-ix') === '0') {
-            var div = e.target.closest('.asg-row-block');
-            if (div) {
+                asgSyncFirstDataCellFromFamily(div);
                 asgUpdateFamilySizeHint(div);
             }
         }
@@ -888,6 +903,7 @@ if ($sizesJson === false) {
 .asg-guide-list { list-style: none; padding: 0; margin: 0; }
 .asg-guide-list li { margin: 8px 0; padding: 8px; background: #f8fafc; border-radius: 6px; }
 .asg-row-block { margin-bottom: 10px; padding: 12px; }
+input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: default; }
 </style>
 
 <?php endif; ?>

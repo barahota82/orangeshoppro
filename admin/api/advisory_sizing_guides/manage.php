@@ -282,6 +282,9 @@ try {
                 if ($rk === 'data' && count($cells) > count($normCols)) {
                     $cells = array_slice($cells, 0, count($normCols));
                 }
+                if ($rk === 'data' && $sfsId > 0 && $cells !== []) {
+                    $cells[0] = '';
+                }
                 $normRows[] = [
                     'row_kind' => $rk,
                     'sort_order' => (int) ($r['sort_order'] ?? 0) > 0 ? (int) $r['sort_order'] : $rso,

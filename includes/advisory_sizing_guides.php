@@ -341,7 +341,7 @@ function orange_advisory_sizing_build_sections(PDO $pdo, int $familyId, array $k
             foreach ($colMeta as $cm) {
                 $cid = (int) $cm['id'];
                 $raw = $cellMap[$rid][$cid] ?? '';
-                if ($firstColId > 0 && $cid === $firstColId && trim($raw) === '' && $sid > 0 && isset($sizeMap[$sid])) {
+                if ($firstColId > 0 && $cid === $firstColId && $sid > 0 && isset($sizeMap[$sid])) {
                     $raw = orange_advisory_sizing_label_from_row($sizeMap[$sid], $lang);
                 }
                 $cells[] = $raw;
