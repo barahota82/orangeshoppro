@@ -100,6 +100,9 @@ if ($sizesJson === false) {
     <p class="card-hint" style="margin:0 0 8px;">
         <strong>عمود النظام:</strong> كود إنجليزي صغير (حروف وأرقام وشرطة سفلية)، مثل <code>eu</code> أو <code>cn</code> — اتركه فارغاً لعمود يظهر دائماً مع أي نظام. لتسمية مخصّصة في المتجر أضف مفتاح ترجمة <code>sizing_display_system_الكود</code> في الإعدادات.
     </p>
+    <p class="card-hint" style="margin:0 0 8px;">
+        <strong>ترجمة تلقائية:</strong> بعد توقف الكتابة في <strong>عربي / EN</strong> لصفوف <strong>تعريف الأعمدة</strong> ولـ <strong>صف عنوان (مجموعة)</strong> يُستدعى نفس مسار الترجمة كبقية الأدمن (EN + Fil + Hi من العربي؛ وتحديث Fil + Hi من الإنجليزي). خلايا <strong>صف بيانات</strong> لا تُترجم تلقائياً (أرقام/نطاقات).
+    </p>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:8px;">
         <div>
             <label for="asg_col_count">عدد الأعمدة</label>
@@ -159,6 +162,164 @@ if ($sizesJson === false) {
         return s.length > 32 ? s.slice(0, 32) : s;
     }
 
+    async function asgTranslateNamesInRow(tr, opts) {
+        opts = opts || {};
+        var silent = !!opts.silent;
+        var forceFromArabic = !!opts.forceFromArabic;
+        if (typeof postJSON !== 'function') {
+            if (!silent) {
+                alert('الترجمة غير جاهزة — انتظر اكتمال تحميل الصفحة ثم أعد المحاولة');
+            }
+            return;
+        }
+        var arEl = tr.querySelector('.asg-c-ar');
+        var enEl = tr.querySelector('.asg-c-en');
+        var filEl = tr.querySelector('.asg-c-fil');
+        var hiEl = tr.querySelector('.asg-c-hi');
+        if (!arEl || !enEl) {
+            return;
+        }
+        try {
+            var payload = {
+                name_ar: arEl.value.trim(),
+                name_en: forceFromArabic ? '' : enEl.value.trim()
+            };
+            var res = await postJSON('/admin/api/translate/names.php', payload);
+            if (!res || !res.success) {
+                if (!silent) {
+                    alert((res && res.message) ? res.message : 'فشل الترجمة');
+                }
+                return;
+            }
+            var t = res.translations || {};
+            if (t.name_en) {
+                enEl.value = t.name_en;
+            }
+            if (t.name_fil && filEl) {
+                filEl.value = t.name_fil;
+            }
+            if (t.name_hi && hiEl) {
+                hiEl.value = t.name_hi;
+            }
+        } catch (e) {
+            if (!silent) {
+                alert('فشل طلب الترجمة من السيرفر');
+            }
+        }
+    }
+
+    function bindColRowAutoTranslate(tr) {
+        var ar = tr.querySelector('.asg-c-ar');
+        var en = tr.querySelector('.asg-c-en');
+        if (!ar || !en || ar.dataset.asgTranslateBound === '1') {
+            return;
+        }
+        ar.dataset.asgTranslateBound = '1';
+        en.dataset.asgTranslateBound = '1';
+        ar.addEventListener('input', function () {
+            var t = ar.value.trim();
+            if (!t) {
+                tr.querySelector('.asg-c-en').value = '';
+                tr.querySelector('.asg-c-fil').value = '';
+                tr.querySelector('.asg-c-hi').value = '';
+                return;
+            }
+            clearTimeout(ar._asgTrTimer);
+            ar._asgTrTimer = setTimeout(function () {
+                asgTranslateNamesInRow(tr, { silent: true, forceFromArabic: true });
+            }, 650);
+        });
+        en.addEventListener('input', function () {
+            var t = en.value.trim();
+            if (!t) {
+                return;
+            }
+            clearTimeout(en._asgTrTimer);
+            en._asgTrTimer = setTimeout(function () {
+                asgTranslateNamesInRow(tr, { silent: true, forceFromArabic: false });
+            }, 580);
+        });
+    }
+
+    async function asgTranslateNamesInLabelBlock(div, opts) {
+        opts = opts || {};
+        var silent = !!opts.silent;
+        var forceFromArabic = !!opts.forceFromArabic;
+        if (typeof postJSON !== 'function') {
+            if (!silent) {
+                alert('الترجمة غير جاهزة — انتظر اكتمال تحميل الصفحة ثم أعد المحاولة');
+            }
+            return;
+        }
+        var arEl = div.querySelector('.asg-l-ar');
+        var enEl = div.querySelector('.asg-l-en');
+        var filEl = div.querySelector('.asg-l-fil');
+        var hiEl = div.querySelector('.asg-l-hi');
+        if (!arEl || !enEl) {
+            return;
+        }
+        try {
+            var payload = {
+                name_ar: arEl.value.trim(),
+                name_en: forceFromArabic ? '' : enEl.value.trim()
+            };
+            var res = await postJSON('/admin/api/translate/names.php', payload);
+            if (!res || !res.success) {
+                if (!silent) {
+                    alert((res && res.message) ? res.message : 'فشل الترجمة');
+                }
+                return;
+            }
+            var t = res.translations || {};
+            if (t.name_en) {
+                enEl.value = t.name_en;
+            }
+            if (t.name_fil && filEl) {
+                filEl.value = t.name_fil;
+            }
+            if (t.name_hi && hiEl) {
+                hiEl.value = t.name_hi;
+            }
+        } catch (e) {
+            if (!silent) {
+                alert('فشل طلب الترجمة من السيرفر');
+            }
+        }
+    }
+
+    function bindLabelRowAutoTranslate(div) {
+        var ar = div.querySelector('.asg-l-ar');
+        var en = div.querySelector('.asg-l-en');
+        if (!ar || !en || ar.dataset.asgTranslateBound === '1') {
+            return;
+        }
+        ar.dataset.asgTranslateBound = '1';
+        en.dataset.asgTranslateBound = '1';
+        ar.addEventListener('input', function () {
+            var t = ar.value.trim();
+            if (!t) {
+                div.querySelector('.asg-l-en').value = '';
+                div.querySelector('.asg-l-fil').value = '';
+                div.querySelector('.asg-l-hi').value = '';
+                return;
+            }
+            clearTimeout(ar._asgLblTimer);
+            ar._asgLblTimer = setTimeout(function () {
+                asgTranslateNamesInLabelBlock(div, { silent: true, forceFromArabic: true });
+            }, 650);
+        });
+        en.addEventListener('input', function () {
+            var t = en.value.trim();
+            if (!t) {
+                return;
+            }
+            clearTimeout(en._asgLblTimer);
+            en._asgLblTimer = setTimeout(function () {
+                asgTranslateNamesInLabelBlock(div, { silent: true, forceFromArabic: false });
+            }, 580);
+        });
+    }
+
     function genColRows(n) {
         var tb = document.getElementById('asg_cols_body');
         tb.innerHTML = '';
@@ -181,6 +342,7 @@ if ($sizesJson === false) {
                     vk.value = 'number';
                 }
             });
+            bindColRowAutoTranslate(tr);
             tb.appendChild(tr);
         }
     }
@@ -275,6 +437,7 @@ if ($sizesJson === false) {
             '<div><label>Fil</label><input type="text" class="asg-l-fil" maxlength="191" value="' + esc(prefill.label_fil) + '"></div>' +
             '<div><label>Hi</label><input type="text" class="asg-l-hi" maxlength="191" value="' + esc(prefill.label_hi) + '"></div></div>';
         div.querySelector('.asg-rm').onclick = function () { div.remove(); };
+        bindLabelRowAutoTranslate(div);
         wrap.appendChild(div);
     }
 
