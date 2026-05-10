@@ -103,12 +103,17 @@ if ($sizesJson === false) {
     <p class="card-hint" style="margin:0 0 8px;">
         <strong>ترجمة تلقائية:</strong> بعد توقف الكتابة في <strong>عربي / EN</strong> لصفوف <strong>تعريف الأعمدة</strong> ولـ <strong>صف عنوان (مجموعة)</strong> يُستدعى نفس مسار الترجمة كبقية الأدمن (EN + Fil + Hi من العربي؛ وتحديث Fil + Hi من الإنجليزي). خلايا <strong>صف بيانات</strong> لا تُترجم تلقائياً (أرقام/نطاقات).
     </p>
+    <p class="card-hint" style="margin:0 0 8px;">
+        لتغيير عدد الأعمدة <strong>من غير ما تبدأ من الصفر</strong>: استخدم <strong>+ عمود</strong> أو <strong>− حذف آخر عمود</strong> (يحافظ على باقي الأعمدة وصفوف البيانات). زر <strong>«توليد صفوف العناوين»</strong> فقط لما تحب <strong>إعادة بناء</strong> جدول الأعمدة بالكامل حسب الرقم في «عدد الأعمدة».
+    </p>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:8px;">
         <div>
             <label for="asg_col_count">عدد الأعمدة</label>
             <input type="number" id="asg_col_count" min="1" max="24" value="3" style="width:5rem;">
         </div>
         <button type="button" class="btn-secondary" id="asg_gen_cols">توليد صفوف العناوين</button>
+        <button type="button" class="btn-secondary" id="asg_col_add" title="يضيف عموداً جديداً في النهاية ويضيف خلية فارغة لكل صف بيانات">+ عمود</button>
+        <button type="button" class="btn-secondary" id="asg_col_remove" title="يحذف آخر عمود من التعريف وآخر خلية من كل صف بيانات">− حذف آخر عمود</button>
     </div>
     <div style="overflow-x:auto;">
         <table class="data-table" id="asg_cols_table">
@@ -123,7 +128,7 @@ if ($sizesJson === false) {
     </p>
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:center;">
         <button type="button" class="btn-secondary" id="asg_row_data">+ صف بيانات</button>
-        <button type="button" class="btn-secondary" id="asg_row_label">+ صف عنوان (مجموعة)</button>
+        <button type="button" class="btn-secondary" id="asg_row_label" title="سطر عنوان يظهر داخل الدليل للعميل — مفيد لو جدول واحد فيه أكثر من مجموعة أو عنوان فرعي؛ لجدول مسطح واحد غالباً لا تحتاجه">+ صف عنوان (مجموعة)</button>
         <button type="button" class="btn" id="asg_bulk_rows" title="يضيف صف بيانات لكل مقاس نشط في العائلة المختارة، مع ربط المقاس وتخطي المربوط مسبقاً">إضافة صف لكل مقاس من العائلة</button>
     </div>
     <div id="asg_rows_box"></div>
@@ -324,31 +329,146 @@ if ($sizesJson === false) {
         });
     }
 
+    function asgBindColumnStorageChange(tr) {
+        tr.querySelector('.asg-c-stor').addEventListener('change', function () {
+            var vk = tr.querySelector('.asg-c-vk');
+            if (tr.querySelector('.asg-c-stor').value === 'length_cm') {
+                vk.value = 'number';
+            }
+        });
+    }
+
+    function asgCreateColumnRow(sortOrder) {
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+            '<td><input type="number" class="asg-c-sort" value="' + sortOrder + '" style="width:4rem;"></td>' +
+            '<td><input type="text" class="asg-c-ar" maxlength="191"></td>' +
+            '<td><input type="text" class="asg-c-en" maxlength="191"></td>' +
+            '<td><input type="text" class="asg-c-fil" maxlength="191"></td>' +
+            '<td><input type="text" class="asg-c-hi" maxlength="191"></td>' +
+            '<td><select class="asg-c-vk"><option value="text">نص</option><option value="number">رقم</option></select></td>' +
+            '<td><input type="text" class="asg-c-unit" maxlength="64" placeholder="مثال cm"></td>' +
+            '<td><select class="asg-c-stor" title="قيمة بالسم: رقم واحد أو نطاق مثل 84-88؛ العميل يحوّل cm/inch">' +
+            '<option value="">—</option><option value="length_cm">قياس بالسم — رقم أو نطاق (عرض cm/inch)</option></select></td>' +
+            '<td><input type="text" class="asg-c-dsys" maxlength="32" placeholder="فارغ=عام" title="كود إنجليزي صغير (مثل eu، cn) — يُجمّع أعمدة العرض للعميل" style="width:7rem;"></td>';
+        asgBindColumnStorageChange(tr);
+        bindColRowAutoTranslate(tr);
+        return tr;
+    }
+
+    function asgSyncColCountInput() {
+        var n = document.querySelectorAll('#asg_cols_body tr').length;
+        document.getElementById('asg_col_count').value = String(Math.max(1, n));
+    }
+
+    function asgRenumberDataCellIx() {
+        document.querySelectorAll('#asg_rows_box .asg-row-block[data-row-kind="data"]').forEach(function (block) {
+            var ins = block.querySelectorAll('.asg-cell');
+            for (var j = 0; j < ins.length; j++) {
+                ins[j].setAttribute('data-ix', String(j));
+            }
+            asgUpdateFamilySizeHint(block);
+        });
+    }
+
+    function asgAppendCellToAllDataRows(colIndex) {
+        var cols = readColumns();
+        var lab = (cols[colIndex] && (cols[colIndex].label_ar || cols[colIndex].label_en))
+            ? esc(cols[colIndex].label_ar || cols[colIndex].label_en)
+            : ('عمود ' + (colIndex + 1));
+        document.querySelectorAll('#asg_rows_box .asg-row-block[data-row-kind="data"]').forEach(function (block) {
+            var grid = block.querySelector('.form-grid');
+            if (!grid) {
+                return;
+            }
+            var wrap = document.createElement('div');
+            wrap.innerHTML = '<div><label>' + lab + '</label><input type="text" class="asg-cell" data-ix="' + colIndex + '" value=""></div>';
+            if (wrap.firstElementChild) {
+                grid.appendChild(wrap.firstElementChild);
+            }
+        });
+    }
+
+    function asgSyncDataRowCellsToColumnCount() {
+        var n = Math.max(1, document.querySelectorAll('#asg_cols_body tr').length);
+        document.querySelectorAll('#asg_rows_box .asg-row-block[data-row-kind="data"]').forEach(function (block) {
+            var grid = block.querySelector('.form-grid');
+            if (!grid) {
+                return;
+            }
+            var cells = grid.querySelectorAll('.asg-cell');
+            while (cells.length > n) {
+                if (grid.lastElementChild) {
+                    grid.lastElementChild.remove();
+                }
+                cells = grid.querySelectorAll('.asg-cell');
+            }
+            var colsSnap = readColumns();
+            while (cells.length < n) {
+                var j = cells.length;
+                var lab = (colsSnap[j] && (colsSnap[j].label_ar || colsSnap[j].label_en))
+                    ? esc(colsSnap[j].label_ar || colsSnap[j].label_en)
+                    : ('عمود ' + (j + 1));
+                var wrap = document.createElement('div');
+                wrap.innerHTML = '<div><label>' + lab + '</label><input type="text" class="asg-cell" data-ix="' + j + '" value=""></div>';
+                if (wrap.firstElementChild) {
+                    grid.appendChild(wrap.firstElementChild);
+                }
+                cells = grid.querySelectorAll('.asg-cell');
+            }
+        });
+        asgRenumberDataCellIx();
+    }
+
     function genColRows(n) {
         var tb = document.getElementById('asg_cols_body');
         tb.innerHTML = '';
         for (var i = 0; i < n; i++) {
-            var tr = document.createElement('tr');
-            tr.innerHTML =
-                '<td><input type="number" class="asg-c-sort" value="' + (i + 1) + '" style="width:4rem;"></td>' +
-                '<td><input type="text" class="asg-c-ar" maxlength="191"></td>' +
-                '<td><input type="text" class="asg-c-en" maxlength="191"></td>' +
-                '<td><input type="text" class="asg-c-fil" maxlength="191"></td>' +
-                '<td><input type="text" class="asg-c-hi" maxlength="191"></td>' +
-                '<td><select class="asg-c-vk"><option value="text">نص</option><option value="number">رقم</option></select></td>' +
-                '<td><input type="text" class="asg-c-unit" maxlength="64" placeholder="مثال cm"></td>' +
-                '<td><select class="asg-c-stor" title="قيمة بالسم: رقم واحد أو نطاق مثل 84-88؛ العميل يحوّل cm/inch">' +
-                '<option value="">—</option><option value="length_cm">قياس بالسم — رقم أو نطاق (عرض cm/inch)</option></select></td>' +
-                '<td><input type="text" class="asg-c-dsys" maxlength="32" placeholder="فارغ=عام" title="كود إنجليزي صغير (مثل eu، cn) — يُجمّع أعمدة العرض للعميل" style="width:7rem;"></td>';
-            tr.querySelector('.asg-c-stor').addEventListener('change', function () {
-                var vk = tr.querySelector('.asg-c-vk');
-                if (tr.querySelector('.asg-c-stor').value === 'length_cm') {
-                    vk.value = 'number';
-                }
-            });
-            bindColRowAutoTranslate(tr);
-            tb.appendChild(tr);
+            tb.appendChild(asgCreateColumnRow(i + 1));
         }
+        asgSyncColCountInput();
+        asgSyncDataRowCellsToColumnCount();
+    }
+
+    function asgAppendColumnDef() {
+        var tb = document.getElementById('asg_cols_body');
+        var n = tb.querySelectorAll('tr').length;
+        if (n >= 24) {
+            alert('الحد الأقصى 24 عموداً');
+            return;
+        }
+        tb.appendChild(asgCreateColumnRow(n + 1));
+        asgSyncColCountInput();
+        asgAppendCellToAllDataRows(n);
+    }
+
+    function asgRemoveLastColumnDef() {
+        var tb = document.getElementById('asg_cols_body');
+        var trs = tb.querySelectorAll('tr');
+        if (trs.length <= 1) {
+            alert('يجب أن يبقى عمود واحد على الأقل');
+            return;
+        }
+        var lastIx = trs.length - 1;
+        var lastHasData = false;
+        document.querySelectorAll('#asg_rows_box .asg-row-block[data-row-kind="data"]').forEach(function (block) {
+            var ins = block.querySelectorAll('.asg-cell');
+            if (ins[lastIx] && ins[lastIx].value.trim() !== '') {
+                lastHasData = true;
+            }
+        });
+        if (lastHasData && !confirm('آخر عمود فيه قيم في بعض الصفوف — ستُحذف من الصفوف أيضاً. المتابعة؟')) {
+            return;
+        }
+        trs[trs.length - 1].remove();
+        document.querySelectorAll('#asg_rows_box .asg-row-block[data-row-kind="data"]').forEach(function (block) {
+            var grid = block.querySelector('.form-grid');
+            if (grid && grid.lastElementChild) {
+                grid.lastElementChild.remove();
+            }
+        });
+        asgSyncColCountInput();
+        asgRenumberDataCellIx();
     }
 
     function readColumns() {
@@ -560,10 +680,16 @@ if ($sizesJson === false) {
     });
 
     document.getElementById('asg_gen_cols').onclick = function () {
+        var cur = document.querySelectorAll('#asg_cols_body tr').length;
         var n = parseInt(document.getElementById('asg_col_count').value, 10) || 3;
         n = Math.min(24, Math.max(1, n));
+        if (cur > 0 && !confirm('«توليد صفوف العناوين» سيمسح تعريف الأعمدة الحالي ويعيد بناءه (' + n + ' أعمدة). صفوف البيانات تبقى لكن عدد خلاياها قد لا يطابق — يُفضّل استخدام + عمود / − حذف إن كنت تعدّل العدد فقط. المتابعة؟')) {
+            return;
+        }
         genColRows(n);
     };
+    document.getElementById('asg_col_add').onclick = function () { asgAppendColumnDef(); };
+    document.getElementById('asg_col_remove').onclick = function () { asgRemoveLastColumnDef(); };
 
     document.getElementById('asg_row_data').onclick = function () { addDataRow({}); refreshSizeSelects(); };
     document.getElementById('asg_row_label').onclick = function () { addLabelRow({}); };
