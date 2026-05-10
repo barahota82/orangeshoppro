@@ -97,6 +97,9 @@ if ($sizesJson === false) {
     </div>
 
     <h4 style="margin-top:20px;">تعريف الأعمدة</h4>
+    <p class="card-hint" style="margin:0 0 8px;">
+        <strong>عمود النظام:</strong> كود إنجليزي صغير (حروف وأرقام وشرطة سفلية)، مثل <code>eu</code> أو <code>cn</code> — اتركه فارغاً لعمود يظهر دائماً مع أي نظام. لتسمية مخصّصة في المتجر أضف مفتاح ترجمة <code>sizing_display_system_الكود</code> في الإعدادات.
+    </p>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:8px;">
         <div>
             <label for="asg_col_count">عدد الأعمدة</label>
@@ -106,7 +109,7 @@ if ($sizesJson === false) {
     </div>
     <div style="overflow-x:auto;">
         <table class="data-table" id="asg_cols_table">
-            <thead><tr><th>ترتيب</th><th>عربي</th><th>EN</th><th>Fil</th><th>Hi</th><th>نوع القيمة</th><th>وحدة (عرض)</th><th>تخزين الطول</th><th>عمود النظام</th></tr></thead>
+            <thead><tr><th>ترتيب</th><th>عربي</th><th>EN</th><th>Fil</th><th>Hi</th><th>نوع القيمة</th><th>وحدة (عرض)</th><th>تخزين الطول</th><th>عمود النظام (كود)</th></tr></thead>
             <tbody id="asg_cols_body"></tbody>
         </table>
     </div>
@@ -151,6 +154,11 @@ if ($sizesJson === false) {
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
     }
 
+    function asgNormalizeDisplaySystem(s) {
+        s = String(s || '').toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
+        return s.length > 32 ? s.slice(0, 32) : s;
+    }
+
     function genColRows(n) {
         var tb = document.getElementById('asg_cols_body');
         tb.innerHTML = '';
@@ -166,8 +174,7 @@ if ($sizesJson === false) {
                 '<td><input type="text" class="asg-c-unit" maxlength="64" placeholder="مثال cm"></td>' +
                 '<td><select class="asg-c-stor" title="قيمة الطول تُخزَّن بالسم؛ العميل يحوّل للعرض فقط">' +
                 '<option value="">—</option><option value="length_cm">طول بالسم (عرض cm/inch)</option></select></td>' +
-                '<td><select class="asg-c-dsys" title="يظهر للعميل عند اختيار EU/US/UK في المتجر">' +
-                '<option value="">— عام</option><option value="eu">EU</option><option value="uk">UK</option><option value="us">US</option></select></td>';
+                '<td><input type="text" class="asg-c-dsys" maxlength="32" placeholder="فارغ=عام" title="كود إنجليزي صغير (مثل eu، cn) — يُجمّع أعمدة العرض للعميل" style="width:7rem;"></td>';
             tr.querySelector('.asg-c-stor').addEventListener('change', function () {
                 var vk = tr.querySelector('.asg-c-vk');
                 if (tr.querySelector('.asg-c-stor').value === 'length_cm') {
@@ -192,7 +199,7 @@ if ($sizesJson === false) {
                 value_kind: tr.querySelector('.asg-c-vk').value,
                 unit_hint: tr.querySelector('.asg-c-unit').value.trim(),
                 storage_measure: tr.querySelector('.asg-c-stor').value,
-                display_system: tr.querySelector('.asg-c-dsys').value
+                display_system: asgNormalizeDisplaySystem(tr.querySelector('.asg-c-dsys').value)
             });
         }
         return out;
@@ -216,8 +223,7 @@ if ($sizesJson === false) {
                 tr.querySelector('.asg-c-stor').value = (c.storage_measure === 'length_cm') ? 'length_cm' : '';
             }
             if (tr.querySelector('.asg-c-dsys')) {
-                var ds = (c.display_system || '').toLowerCase();
-                tr.querySelector('.asg-c-dsys').value = ['eu', 'uk', 'us'].indexOf(ds) >= 0 ? ds : '';
+                tr.querySelector('.asg-c-dsys').value = asgNormalizeDisplaySystem(c.display_system || '');
             }
         }
     }

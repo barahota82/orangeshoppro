@@ -140,33 +140,24 @@ if ($sfId > 0 && orange_table_exists($pdo, 'size_family_sizes')) {
 }
 $advisorySizingReady = !empty($advisorySizing['use_dynamic']) && ($advisorySizing['sections'] ?? []) !== [];
 $advUxHasLength = false;
-$advUxSystemsMap = [];
+$advUxSystemsOrdered = [];
+$advUxSystemsSeen = [];
 if ($advisorySizingReady) {
     foreach (($advisorySizing['sections'] ?? []) as $secUx) {
         foreach (($secUx['columns'] ?? []) as $cUx) {
             if (($cUx['storage_measure'] ?? '') === 'length_cm') {
                 $advUxHasLength = true;
             }
-            $dsUx = strtolower(trim((string) ($cUx['display_system'] ?? '')));
-            if ($dsUx !== '') {
-                $advUxSystemsMap[$dsUx] = true;
+            $dsUx = orange_advisory_normalize_display_system((string) ($cUx['display_system'] ?? ''));
+            if ($dsUx !== '' && !isset($advUxSystemsSeen[$dsUx])) {
+                $advUxSystemsSeen[$dsUx] = true;
+                $advUxSystemsOrdered[] = $dsUx;
             }
         }
     }
 }
-$advUxSystemsOrdered = [];
-foreach (['eu', 'uk', 'us'] as $pUx) {
-    if (isset($advUxSystemsMap[$pUx])) {
-        $advUxSystemsOrdered[] = $pUx;
-    }
-}
-foreach (array_keys($advUxSystemsMap) as $pUx) {
-    if (!in_array($pUx, ['eu', 'uk', 'us'], true)) {
-        $advUxSystemsOrdered[] = $pUx;
-    }
-}
 $advUxShowToolbar = $advisorySizingReady && ($advUxHasLength || $advUxSystemsOrdered !== []);
-$advUxDefaultSystem = $advUxSystemsOrdered[0] ?? 'eu';
+$advUxDefaultSystem = $advUxSystemsOrdered[0] ?? '';
 $legacySizingReady = !$advisorySizingReady && $sizingChartRows !== [];
 $showSizingGuide = $scope !== 'none' && ($sizingText !== '' || $advisorySizingReady || $legacySizingReady);
 
@@ -428,7 +419,7 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
                             <select id="productSizingAdvSys" class="product-sizing-adv-toolbar__select">
                                 <?php foreach ($advUxSystemsOrdered as $sysOpt): ?>
                                     <option value="<?php echo htmlspecialchars($sysOpt, ENT_QUOTES, 'UTF-8'); ?>"<?php echo $sysOpt === $advUxDefaultSystem ? ' selected' : ''; ?>>
-                                        <?php echo htmlspecialchars(t('sizing_display_system_' . $sysOpt), ENT_QUOTES, 'UTF-8'); ?>
+                                        <?php echo htmlspecialchars(orange_advisory_display_system_storefront_label($sysOpt), ENT_QUOTES, 'UTF-8'); ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -472,7 +463,7 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
                                         <?php
                                         $vk = strtolower(trim((string) ($col['value_kind'] ?? 'text')));
                                         $smCol = (string) ($col['storage_measure'] ?? '');
-                                        $dsCol = strtolower(trim((string) ($col['display_system'] ?? '')));
+                                        $dsCol = orange_advisory_normalize_display_system((string) ($col['display_system'] ?? ''));
                                         $thNum = ($vk === 'number' || $smCol === 'length_cm') ? ' product-sizing-table__th--num' : '';
                                         ?>
                                         <th class="product-sizing-table__th<?php echo $thNum; ?>"
@@ -497,7 +488,7 @@ $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
                                                 $colMeta = $cols[$ci] ?? [];
                                                 $colVk = strtolower(trim((string) ($colMeta['value_kind'] ?? 'text')));
                                                 $sm = (string) ($colMeta['storage_measure'] ?? '');
-                                                $ds = strtolower(trim((string) ($colMeta['display_system'] ?? '')));
+                                                $ds = orange_advisory_normalize_display_system((string) ($colMeta['display_system'] ?? ''));
                                                 $cmVal = $sm === 'length_cm' ? orange_advisory_parse_stored_cm((string) $cv) : null;
                                                 $tdNum = ($colVk === 'number' || $sm === 'length_cm') ? ' product-sizing-table__td--num' : '';
                                                 if ($cmVal !== null) {

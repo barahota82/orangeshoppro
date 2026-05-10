@@ -298,7 +298,7 @@ CREATE TABLE `advisory_sizing_guide_columns` (
   `value_kind` varchar(16) NOT NULL DEFAULT 'text',
   `unit_hint` varchar(64) NOT NULL DEFAULT '',
   `storage_measure` varchar(16) NOT NULL DEFAULT '',
-  `display_system` varchar(8) NOT NULL DEFAULT '',
+  `display_system` varchar(32) NOT NULL DEFAULT '',
   PRIMARY KEY (`id`),
   KEY `idx_asgc_guide` (`guide_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

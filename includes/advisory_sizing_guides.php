@@ -57,13 +57,44 @@ function orange_advisory_parse_stored_cm(string $raw): ?float
 }
 
 /**
- * @return ''|'eu'|'uk'|'us'
+ * كود تجميع أعمدة العرض للعميل (مثل eu، uk، us، cn). فارغ = عمود عام يظهر مع أي نظام.
+ * يُسمح بأحرف إنجليزية صغيرة وأرقام وشرطة سفلية فقط؛ حتى 32 حرفاً (يتوافق مع عمود القاعدة).
+ *
+ * @return non-empty-lowercase-alnum-underscore string, or ''
  */
 function orange_advisory_normalize_display_system(string $raw): string
 {
     $s = strtolower(trim($raw));
+    if ($s === '') {
+        return '';
+    }
+    $s = preg_replace('/[^a-z0-9_]/', '', $s) ?? '';
+    if ($s === '') {
+        return '';
+    }
 
-    return in_array($s, ['eu', 'uk', 'us'], true) ? $s : '';
+    return substr($s, 0, 32);
+}
+
+/**
+ * تسمية خيار «نظام العرض» في المتجر: مفتاح ترجمة sizing_display_system_{code} إن وُجد، وإلا عرض الكود بشكل مقروء.
+ */
+function orange_advisory_display_system_storefront_label(string $sysCode): string
+{
+    $code = orange_advisory_normalize_display_system($sysCode);
+    if ($code === '') {
+        return '';
+    }
+    if (!function_exists('t')) {
+        return strtoupper(str_replace('_', ' ', $code));
+    }
+    $tk = 'sizing_display_system_' . $code;
+    $lab = t($tk);
+    if ($lab !== $tk) {
+        return $lab;
+    }
+
+    return strtoupper(str_replace('_', ' ', $code));
 }
 
 /**
