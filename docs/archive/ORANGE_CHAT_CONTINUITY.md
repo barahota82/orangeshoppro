@@ -105,6 +105,7 @@ scripts\install-hooks.ps1
 - **ممنوع** (بطلب المستخدم) الاعتماد على `MYSQL_ATTR_INIT_COMMAND` في `config.php`؛ الترميز مع MySQL عبر `SET NAMES` داخل `catalog_schema`.
 - **سياسة المستخدم:** لا تعديل `config.php` لإضافة دوال مساعدة؛ دوال الطلبات `require_fields` و`generate_order_number` في **`includes/order_helpers.php`**.
 - `inv_test` أُزيل؛ الفاتورة تُحسَّن عند فتحها بدون طلب محدد.
+- **الجداول الإرشادية (مكتبة — مرحلة 1 منفّذة):** التفاصيل في **`docs/archive/ORANGE_ADVISORY_SIZING_LIBRARY_DECISION.md`**؛ ترحيل **`scripts/migrations/031_advisory_sizing_library.sql`** + صفحة أدمن **«مكتبة أدلة المقاسات»** (حزمة = عائلة مصدر، ربط عائلة مستهلك، مزامنة نسخ الأدلة حسب ترتيب المقاسات). التجاوز على المنتج وحقول قسم/قالب على الحزمة لاحقاً.
 
 ### أين تُثبَّت طريقة العمل؟
 1. **`IBRAHIM_ORANGE_MASTER.txt`** — دخول موحّد لأي جلسة جديدة.
@@ -112,6 +113,7 @@ scripts\install-hooks.ps1
 3. `docs/archive/ORANGE_PROJECT_CONTINUITY.txt` — مؤشر المشروع والمسار.
 4. `.cursor/rules/orange-continuity.mdc` — يوجّه لقراءة الملفات أعلاه.
 5. `docs/archive/ORANGE_CHAT_CONTINUITY.md` — أرشيف تقني وتفاصيل نشر/ترميز.
+6. `docs/archive/ORANGE_ADVISORY_SIZING_LIBRARY_DECISION.md` — **قرار تصميم مستقبلي:** مكتبة أدلة مقاسات + ربط عائلات مقاسات + إرث للمنتج (موثّق 2026-05-10).
 
 ### رفع الملفات بدون كسر الترميز (تلخيص)
 - **الأفضل:** `git push` من الجهاز ثم `git pull` على السيرفر — **ممنوع** لصق PHP في محرر الاستضافة كعادة يومية.

@@ -272,6 +272,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 ['page' => 'sizing_dictionary', 'href' => '/admin/index.php?page=sizing_dictionary', 'label' => 'قاموس هرم المقاسات (1–2)', 'class' => '', 'sub' => false],
                 ['page' => 'size_families', 'href' => '/admin/index.php?page=size_families', 'label' => 'عائلات المقاسات (3–4)', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'advisory_sizing_guides', 'href' => '/admin/index.php?page=advisory_sizing_guides', 'label' => 'دليل المقاس الاسترشادي', 'class' => 'admin-nav-sub', 'sub' => true],
+                ['page' => 'advisory_sizing_library', 'href' => '/admin/index.php?page=advisory_sizing_library', 'label' => 'مكتبة أدلة المقاسات', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'departments', 'href' => '/admin/index.php?page=departments', 'label' => 'الأقسام الرئيسية', 'class' => '', 'sub' => false],
                 ['page' => 'unified_catalog_branches', 'href' => '/admin/index.php?page=unified_catalog_branches', 'label' => 'فروع شجرة المنتجات', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'product_types', 'href' => '/admin/index.php?page=product_types', 'label' => 'أنواع المنتجات الموحدة', 'class' => 'admin-nav-sub', 'sub' => true],
