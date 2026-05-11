@@ -343,7 +343,7 @@ try {
                 $exFam = ($sfEx === null || $sfEx === '') ? 0 : (int) $sfEx;
             }
             if ($exFam > 0 && $boundFamily && $fidRaw !== $exFam) {
-                json_response(['success' => false, 'message' => 'لا يمكن نقل الدليل إلى عائلة أخرى من هنا — استخدم «ربط» للمسودات أو أنشئ نسخة'], 422);
+                json_response(['success' => false, 'message' => 'لا يمكن نقل الدليل إلى عائلة أخرى من الحفظ — استخدم بطاقة «ربط عائلة مستهلك بحزمة المكتبة ثم المزامنة» أو أنشئ نسخة'], 422);
             }
             if ($exFam > 0 && !$boundFamily) {
                 json_response(['success' => false, 'message' => 'لا يمكن إلغاء ربط العائلة من الحفظ — عدّل الدليل من قائمة العائلة'], 422);

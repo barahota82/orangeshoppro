@@ -242,7 +242,7 @@ $asgJson = static function (array $rows): string {
 
 <div class="card" id="asg_draft_card" style="margin-top:16px;">
     <h3 style="margin-top:0;">مكتبة جداول المقاسات الإرشادية</h3>
-    <p class="card-hint" style="margin:0 0 10px;">أدلة بلا عائلة مقاسات صالحة في الكتالوج (مسودات)، أو مرتبطة بعائلة محذوفة/غير نشطة (يتيم) — تظهر هنا حتى تُربط بعائلة من العمود «ربط بعائلة».</p>
+    <p class="card-hint" style="margin:0 0 10px;">سجل للأدلة المحفوظة كمسودات أو اليتيمة (عائلة غير صالحة في القاعدة). عمود «عائلة في القاعدة» يعرض القيمة المحفوظة فقط. <strong>ربط الجدول الإرشادي بعائلة المستهلك</strong> يتم لاحقاً من بطاقة «ربط عائلة مستهلك بحزمة المكتبة ثم المزامنة» (حفظ الربط ثم مزامنة الأدلة) — وليس من جدول المكتبة هنا.</p>
     <div id="asg_draft_load_err" class="alert-error" style="display:none;margin-bottom:10px;"></div>
     <div style="margin-bottom:8px;">
         <button type="button" class="btn-secondary" id="asg_draft_refresh">تحديث الجدول</button>
@@ -259,7 +259,6 @@ $asgJson = static function (array $rows): string {
                     <th>نوع تجاري</th>
                     <th>أعمدة</th>
                     <th>صفوف</th>
-                    <th>ربط بعائلة</th>
                     <th>إجراءات</th>
                 </tr>
             </thead>
@@ -271,6 +270,7 @@ $asgJson = static function (array $rows): string {
 <?php if ($asgLibraryReady): ?>
 <div class="card" id="asg_library_map_card" style="margin-top:16px;">
     <h3 style="margin-top:0;">ربط عائلة مستهلك بحزمة المكتبة ثم المزامنة</h3>
+    <p class="card-hint" style="margin:0 0 12px;">المسار المعتمد لربط الأدلة الإرشادية (مسودات المكتبة / مصدر الحزمة) <strong>بعائلة المستهلك</strong>: اختر عائلة المستهلك وحزمة المكتبة، ثم «حفظ الربط»، ثم «مزامنة الأدلة إلى عائلة المستهلك». بعد المزامنة يمكن فتح التعديل على العائلة المستهدفة لضبط المقاسات والخلايا إن لزم.</p>
     <div class="form-grid" style="max-width:720px;">
         <div style="grid-column:1/-1;"><label for="asg_map_consumer">عائلة المستهلك</label>
             <select id="asg_map_consumer"><option value="0">— اختر —</option>
@@ -288,19 +288,29 @@ $asgJson = static function (array $rows): string {
         <button type="button" class="btn" id="asg_map_sync">مزامنة الأدلة إلى عائلة المستهلك</button>
         <button type="button" class="btn-secondary" id="asg_map_delete">إزالة الربط</button>
     </div>
-    <div style="margin-top:16px;overflow:auto;">
-        <table class="data-table">
-            <thead><tr>
-                <th>عائلة مستهلك</th><th>حزمة</th><th>آخر تحديث</th><th>إجراءات</th>
-            </tr></thead>
-            <tbody id="asg_map_rows"></tbody>
+    <h4 style="margin:20px 0 8px;">روابط المكتبة والأدلة المحفوظة (جدول واحد)</h4>
+    <div style="overflow:auto;">
+        <table class="data-table" id="asg_lib_unified_table">
+            <thead>
+                <tr>
+                    <th>نوع السجل</th>
+                    <th>عائلة المستهلك / #</th>
+                    <th>حزمة المكتبة أو اسم النموذج</th>
+                    <th>آخر تحديث / أعمدة</th>
+                    <th>— / صفوف</th>
+                    <th>إجراءات</th>
+                </tr>
+            </thead>
+            <tbody id="asg_unified_lib_tbody"></tbody>
         </table>
     </div>
 </div>
 <?php endif; ?>
 
+<?php if (!$asgLibraryReady): ?>
 <div class="card" id="asg_guides_table_card" style="margin-top:16px;">
     <h3 style="margin-top:0;">الأدلة المحفوظة لهذه العائلة</h3>
+    <p class="card-hint" style="margin:0 0 10px;">عند تفعيل جداول مكتبة الحزم يُدمج هذا الجدول مع بطاقة «ربط عائلة مستهلك بحزمة المكتبة ثم المزامنة».</p>
     <div id="asg_list_wrap" style="display:block;margin-top:8px;">
         <div style="overflow-x:auto;">
             <table class="data-table" id="asg_guides_table">
@@ -318,6 +328,7 @@ $asgJson = static function (array $rows): string {
         </div>
     </div>
 </div>
+<?php endif; ?>
 
 <script>
 (function () {
@@ -652,11 +663,15 @@ $asgJson = static function (array $rows): string {
             hintEl.textContent = '';
         }
         if (id <= 0) {
-            if (listWrap) {
-                listWrap.style.display = 'block';
-            }
-            if (listTbody) {
-                listTbody.innerHTML = '<tr><td colspan="5" class="card-hint">أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3) لتُعرض هنا الأدلة المربوطة بالعائلة المطابقة. لمسودة جديدة: بعد اكتمال 1–2–3 استخدم «دليل جديد» في أول بطاقة بالصفحة؛ تُعرض المسودات في «مكتبة جداول المقاسات الإرشادية».</td></tr>';
+            if (document.getElementById('asg_unified_lib_tbody')) {
+                await asgRenderUnifiedTable({ silent: true });
+            } else {
+                if (listWrap) {
+                    listWrap.style.display = 'block';
+                }
+                if (listTbody) {
+                    listTbody.innerHTML = '<tr><td colspan="5" class="card-hint">أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3) لتُعرض هنا الأدلة المربوطة بالعائلة المطابقة. لمسودة جديدة: بعد اكتمال 1–2–3 استخدم «دليل جديد» في أول بطاقة بالصفحة؛ تُعرض المسودات في «مكتبة جداول المقاسات الإرشادية».</td></tr>';
+                }
             }
             if (hintEl && tpl > 0 && ck !== '') {
                 hintEl.textContent = 'لا عائلة مطابقة للقالب والنوع.';
@@ -708,6 +723,152 @@ $asgJson = static function (array $rows): string {
     function esc(s) {
         if (!s) return '';
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+    }
+
+    function asgUnifiedSepRow(html) {
+        var tr = document.createElement('tr');
+        tr.className = 'asg-uni-section';
+        tr.innerHTML = '<td colspan="6" class="card-hint asg-uni-section-cell">' + html + '</td>';
+        return tr;
+    }
+
+    async function asgRenderUnifiedTable(opts) {
+        opts = opts || {};
+        var silent = !!opts.silent;
+        var tb = document.getElementById('asg_unified_lib_tbody');
+        if (!tb) {
+            return;
+        }
+        tb.innerHTML = '';
+        tb.appendChild(asgUnifiedSepRow('روابط عائلة المستهلك وحزم المكتبة'));
+        var resMaps = await orangeAdminJsonPost(LIBRARY_API, { action: 'list_maps' });
+        var maps = (resMaps && resMaps.success && resMaps.maps) ? resMaps.maps : [];
+        if (!(resMaps && resMaps.success)) {
+            var trErr = document.createElement('tr');
+            trErr.innerHTML = '<td colspan="6" class="card-hint">تعذّر تحميل روابط المكتبة.</td>';
+            tb.appendChild(trErr);
+        } else if (!maps.length) {
+            var trE = document.createElement('tr');
+            trE.innerHTML = '<td colspan="6" class="card-hint">لا توجد روابط محفوظة — استخدم القوائم أعلاه ثم «حفظ الربط».</td>';
+            tb.appendChild(trE);
+        } else {
+            for (var ri = 0; ri < maps.length; ri++) {
+                var m = maps[ri];
+                var trM = document.createElement('tr');
+                var cons = (m.consumer_ar || m.consumer_en || '');
+                var bun = (m.bundle_display_internal || m.bundle_ar || m.bundle_en || '');
+                var cid = parseInt(m.consumer_size_family_id, 10) || 0;
+                trM.innerHTML =
+                    '<td><span class="card-hint">ربط مكتبة</span></td>' +
+                    '<td>' + esc(cons) + '</td>' +
+                    '<td>' + esc(bun) + '</td>' +
+                    '<td>' + esc(m.updated_at || '—') + '</td>' +
+                    '<td>—</td>' +
+                    '<td><button type="button" class="btn-secondary asg-map-sync-one" data-consumer="' + cid + '">مزامنة</button> ' +
+                    '<button type="button" class="btn-secondary asg-map-unmap" data-consumer="' + cid + '">إزالة ربط</button></td>';
+                tb.appendChild(trM);
+            }
+            tb.querySelectorAll('.asg-map-sync-one').forEach(function (btn) {
+                btn.onclick = async function () {
+                    var cid = parseInt(btn.getAttribute('data-consumer'), 10) || 0;
+                    if (!confirm('نسخ الأدلة من عائلة مصدر الحزمة إلى «' + asgMapFamLabel(cid) + '»؟ سيُستبدل دليل علوي/سفلي/مفرد الموجود على العائلة المستهدفة إن وُجد.')) {
+                        return;
+                    }
+                    var r2 = await orangeAdminJsonPost(LIBRARY_API, { action: 'sync_consumer', consumer_size_family_id: cid });
+                    if (!r2 || !r2.success) {
+                        alert((r2 && r2.message) ? r2.message : 'فشل');
+                        return;
+                    }
+                    alert(r2.message || 'تم');
+                    void asgRenderUnifiedTable({ silent: true });
+                };
+            });
+            tb.querySelectorAll('.asg-map-unmap').forEach(function (btn) {
+                btn.onclick = async function () {
+                    var cid = parseInt(btn.getAttribute('data-consumer'), 10) || 0;
+                    if (!confirm('إزالة ربط العائلة؟')) {
+                        return;
+                    }
+                    var r2 = await orangeAdminJsonPost(LIBRARY_API, { action: 'delete_map', consumer_size_family_id: cid });
+                    if (!r2 || !r2.success) {
+                        alert((r2 && r2.message) ? r2.message : 'فشل');
+                        return;
+                    }
+                    void asgRenderUnifiedTable({ silent: true });
+                };
+            });
+        }
+
+        var fidv = fid();
+        var famLab = fidv > 0 ? asgMapFamLabel(fidv) : '';
+        tb.appendChild(asgUnifiedSepRow(
+            'الأدلة المحفوظة للعائلة الحالية في المعالج'
+            + (fidv > 0 ? (' — ' + esc(famLab) + ' (#' + fidv + ')') : '')
+        ));
+
+        if (fidv <= 0) {
+            ASG_FAMILY_GUIDES_CACHE = [];
+            if (!silent) {
+                if (!asgWizardTripleComplete()) {
+                    alert('أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3) أولاً');
+                } else {
+                    alert('لا توجد عائلة مقاسات مطابقة للمعالج (1–2–3) — يمكن العمل بمسودة من المكتبة؛ في المحرّر تُستخرج أسماء المقاسات من قالب (2). ربط الجدول بعائلة المستهلك من بطاقة «ربط عائلة مستهلك بحزمة المكتبة ثم المزامنة».');
+                }
+            }
+            var trZ = document.createElement('tr');
+            trZ.innerHTML = '<td colspan="6" class="card-hint">أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3) لتُعرض هنا الأدلة المربوطة بالعائلة المطابقة؛ أو راجع قسم روابط المكتبة أعلاه.</td>';
+            tb.appendChild(trZ);
+            asgRefreshGuideSortDisp();
+            return;
+        }
+
+        var res = await orangeAdminJsonPost(ADVISORY_API, { action: 'list_by_family', size_family_id: fidv });
+        if (!res.success) {
+            alert(res.message || 'خطأ');
+            var trE2 = document.createElement('tr');
+            trE2.innerHTML = '<td colspan="6" class="card-hint">تعذّر تحميل أدلة العائلة.</td>';
+            tb.appendChild(trE2);
+            asgRefreshGuideSortDisp();
+            return;
+        }
+        var guides = res.guides || [];
+        ASG_FAMILY_GUIDES_CACHE = guides;
+        if (!guides.length) {
+            var tr0 = document.createElement('tr');
+            tr0.innerHTML = '<td colspan="6" class="card-hint">لا أدلة محفوظة لهذه العائلة بعد.</td>';
+            tb.appendChild(tr0);
+        } else {
+            guides.forEach(function (g) {
+                var gid = parseInt(g.id, 10) || 0;
+                var title = (g.name_ar || g.name_en || ('#' + gid));
+                var cols = parseInt(String(g.columns_count != null ? g.columns_count : '0'), 10) || 0;
+                var rws = parseInt(String(g.rows_count != null ? g.rows_count : '0'), 10) || 0;
+                var trG = document.createElement('tr');
+                trG.innerHTML =
+                    '<td><span class="card-hint">دليل إرشادي</span></td>' +
+                    '<td>' + gid + '</td>' +
+                    '<td>' + esc(title) + '</td>' +
+                    '<td>' + cols + '</td>' +
+                    '<td>' + rws + '</td>' +
+                    '<td><button type="button" class="btn-secondary asg-ed" data-id="' + gid + '">تعديل</button> ' +
+                    '<button type="button" class="btn-secondary asg-del" data-id="' + gid + '">حذف</button></td>';
+                trG.querySelector('.asg-ed').onclick = function () { loadGuide(gid); };
+                trG.querySelector('.asg-del').onclick = async function () {
+                    if (!confirm('حذف الدليل؟')) {
+                        return;
+                    }
+                    var r2 = await orangeAdminJsonPost(ADVISORY_API, { action: 'delete', id: gid });
+                    if (!r2.success) {
+                        alert(r2.message || 'خطأ');
+                        return;
+                    }
+                    void loadList();
+                    void loadDraftList({ silent: true });
+                };
+                tb.appendChild(trG);
+            });
+        }
+        asgRefreshGuideSortDisp();
     }
 
     function asgMaxGuideSort(guides) {
@@ -1245,13 +1406,13 @@ $asgJson = static function (array $rows): string {
         var sid = sel ? parseInt(sel.value, 10) || 0 : 0;
         if (sid < 0) {
             hint.style.display = 'block';
-            hint.textContent = 'صف من قالب المعالج (2) للمعاينة — عند الحفظ كمسودة دون عائلة يُحفظ ربط المقاس 0 حتى تُربط العائلة وتختار مقاساً فعلياً من العائلة.';
+            hint.textContent = 'صف من قالب المعالج (2) للمعاينة — عند الحفظ كمسودة دون عائلة يُحفظ ربط المقاس 0 حتى تُزامَن الأدلة إلى عائلة من بطاقة «ربط عائلة مستهلك بحزمة المكتبة ثم المزامنة»، ثم تختار مقاساً فعلياً من العائلة.';
             return;
         }
         if (sid <= 0) {
             hint.style.display = 'block';
             hint.textContent = fid() <= 0
-                ? 'مسودة بدون عائلة: احفظ الخلايا؛ بعد «ربط بعائلة» اختر المقاس لكل صف أو «إضافة صف لكل مقاس».'
+                ? 'مسودة بدون عائلة: احفظ الخلايا؛ بعد مزامنة الدليل إلى عائلة من بطاقة «ربط عائلة مستهلك بحزمة المكتبة ثم المزامنة» اختر المقاس لكل صف أو «إضافة صف لكل مقاس».'
                 : 'اختر مقاساً من القائمة (مرتبة حسب قالب المعالج 2) — إلزامي لكل صف بيانات.';
             return;
         }
@@ -1368,6 +1529,10 @@ $asgJson = static function (array $rows): string {
 
     async function loadList(opts) {
         opts = opts || {};
+        if (document.getElementById('asg_unified_lib_tbody')) {
+            await asgRenderUnifiedTable(opts);
+            return;
+        }
         var silent = !!opts.silent;
         var listWrap0 = document.getElementById('asg_list_wrap');
         if (listWrap0) {
@@ -1380,7 +1545,7 @@ $asgJson = static function (array $rows): string {
                 if (!asgWizardTripleComplete()) {
                     alert('أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3) أولاً');
                 } else {
-                    alert('لا توجد عائلة مقاسات مطابقة للمعالج (1–2–3) — يمكن العمل بمسودة من المكتبة؛ في المحرّر تُستخرج أسماء المقاسات من قالب (2) حتى يُربط الدليل بعائلة.');
+                    alert('لا توجد عائلة مقاسات مطابقة للمعالج (1–2–3) — يمكن العمل بمسودة من المكتبة؛ في المحرّر تُستخرج أسماء المقاسات من قالب (2). ربط الجدول بعائلة المستهلك من بطاقة «ربط عائلة مستهلك بحزمة المكتبة ثم المزامنة».');
                 }
             }
             asgRefreshGuideSortDisp();
@@ -1435,21 +1600,6 @@ $asgJson = static function (array $rows): string {
         asgRefreshGuideSortDisp();
     }
 
-    function asgFamilyOptionsHtml(selectedId) {
-        selectedId = parseInt(selectedId, 10) || 0;
-        var h = '<option value="0">— اختر عائلة —</option>';
-        for (var fi = 0; fi < FAMILIES_FULL.length; fi++) {
-            var f = FAMILIES_FULL[fi];
-            var idf = parseInt(f.id, 10) || 0;
-            if (idf <= 0) {
-                continue;
-            }
-            var lab = esc(f.name_ar || f.name_en || ('#' + idf));
-            h += '<option value="' + idf + '"' + (idf === selectedId ? ' selected' : '') + '>' + lab + '</option>';
-        }
-        return h;
-    }
-
     async function loadDraftList(opts) {
         opts = opts || {};
         var silent = !!opts.silent;
@@ -1496,15 +1646,13 @@ $asgJson = static function (array $rows): string {
                 '<td><code>' + esc(dCk !== '' ? dCk : '—') + '</code></td>' +
                 '<td>' + cols + '</td>' +
                 '<td>' + rws + '</td>' +
-                '<td><select class="asg-draft-fam-sel" data-guide="' + gid + '" style="max-width:14rem;width:100%;">' + asgFamilyOptionsHtml(0) + '</select> ' +
-                '<button type="button" class="btn asg-draft-bind" data-guide="' + gid + '">ربط</button></td>' +
                 '<td><button type="button" class="btn-secondary asg-draft-ed" data-id="' + gid + '">تعديل</button> ' +
                 '<button type="button" class="btn-secondary asg-draft-del" data-id="' + gid + '">حذف</button></td>';
             tb.appendChild(tr);
         });
         if (!guides.length) {
             var trd = document.createElement('tr');
-            trd.innerHTML = '<td colspan="10" class="card-hint">لا توجد صفوف — بعد اكتمال 1–2–3 استخدم «دليل جديد» ثم احفظ كمسودة.</td>';
+            trd.innerHTML = '<td colspan="9" class="card-hint">لا توجد صفوف — بعد اكتمال 1–2–3 استخدم «دليل جديد» ثم احفظ كمسودة.</td>';
             tb.appendChild(trd);
         }
         asgRefreshGuideSortDisp();
@@ -1543,24 +1691,6 @@ $asgJson = static function (array $rows): string {
                     void loadGuide(eid);
                 }
                 return;
-            }
-            var bindBtn = t.closest('.asg-draft-bind');
-            if (bindBtn) {
-                var gid = parseInt(bindBtn.getAttribute('data-guide'), 10) || 0;
-                var row = bindBtn.closest('tr');
-                var sel = row ? row.querySelector('.asg-draft-fam-sel') : null;
-                var nf = sel ? parseInt(sel.value, 10) || 0 : 0;
-                if (nf <= 0) {
-                    alert('اختر عائلة مقاسات من القائمة');
-                    return;
-                }
-                var r3 = await orangeAdminJsonPost(ADVISORY_API, { action: 'attach_family', guide_id: gid, size_family_id: nf });
-                if (!r3 || !r3.success) {
-                    alert((r3 && r3.message) ? r3.message : 'فشل الربط');
-                    return;
-                }
-                alert(r3.message || 'تم الربط');
-                window.location.reload();
             }
         });
     }
@@ -1712,7 +1842,7 @@ $asgJson = static function (array $rows): string {
             var sid = parseInt(r.size_family_size_id, 10) || 0;
             if (!famOk) {
                 if (sid > 0) {
-                    return 'مسودة بدون عائلة: لا تربط صفاً بمقاس قبل ربط الدليل بعائلة من «مكتبة جداول المقاسات الإرشادية» (أو اختر عائلة في المعالج ثم احفظ).';
+                    return 'مسودة بدون عائلة: لا تربط صفاً بمقاس فعلي قبل مزامنة الدليل إلى عائلة — استخدم بطاقة «ربط عائلة مستهلك بحزمة المكتبة ثم المزامنة»، ثم افتح التعديل على الدليل بعد ارتباطه بالعائلة المستهدفة.';
                 }
             } else {
                 if (sid <= 0) {
@@ -1788,7 +1918,6 @@ $asgJson = static function (array $rows): string {
         }
         await loadList();
         void loadDraftList({ silent: true });
-        void asgLoadLibMaps();
         openNew();
         var ed = document.getElementById('asg_editor');
         if (ed) {
@@ -1845,61 +1974,6 @@ $asgJson = static function (array $rows): string {
         return bundles;
     }
 
-    async function asgLoadLibMaps() {
-        var tbEl = document.getElementById('asg_map_rows');
-        if (!tbEl) {
-            return;
-        }
-        var res = await orangeAdminJsonPost(LIBRARY_API, { action: 'list_maps' });
-        if (!res || !res.success) {
-            return;
-        }
-        var maps = res.maps || [];
-        tbEl.innerHTML = '';
-        for (var ri = 0; ri < maps.length; ri++) {
-            var m = maps[ri];
-            var tr = document.createElement('tr');
-            var cons = (m.consumer_ar || m.consumer_en || '');
-            var bun = (m.bundle_display_internal || m.bundle_ar || m.bundle_en || '');
-            var cid = parseInt(m.consumer_size_family_id, 10) || 0;
-            tr.innerHTML =
-                '<td>' + esc(cons) + '</td>' +
-                '<td>' + esc(bun) + '</td>' +
-                '<td>' + esc(m.updated_at || '') + '</td>' +
-                '<td><button type="button" class="btn-secondary asg-map-sync-one" data-consumer="' + cid + '">مزامنة</button> ' +
-                '<button type="button" class="btn-secondary asg-map-unmap" data-consumer="' + cid + '">إزالة ربط</button></td>';
-            tbEl.appendChild(tr);
-        }
-        tbEl.querySelectorAll('.asg-map-sync-one').forEach(function (btn) {
-            btn.onclick = async function () {
-                var cid = parseInt(btn.getAttribute('data-consumer'), 10) || 0;
-                if (!confirm('نسخ الأدلة من عائلة مصدر الحزمة إلى «' + asgMapFamLabel(cid) + '»؟ سيُستبدل دليل علوي/سفلي/مفرد الموجود على العائلة المستهدفة إن وُجد.')) {
-                    return;
-                }
-                var r2 = await orangeAdminJsonPost(LIBRARY_API, { action: 'sync_consumer', consumer_size_family_id: cid });
-                if (!r2 || !r2.success) {
-                    alert((r2 && r2.message) ? r2.message : 'فشل');
-                    return;
-                }
-                alert(r2.message || 'تم');
-            };
-        });
-        tbEl.querySelectorAll('.asg-map-unmap').forEach(function (btn) {
-            btn.onclick = async function () {
-                var cid = parseInt(btn.getAttribute('data-consumer'), 10) || 0;
-                if (!confirm('إزالة ربط العائلة؟')) {
-                    return;
-                }
-                var r2 = await orangeAdminJsonPost(LIBRARY_API, { action: 'delete_map', consumer_size_family_id: cid });
-                if (!r2 || !r2.success) {
-                    alert((r2 && r2.message) ? r2.message : 'فشل');
-                    return;
-                }
-                void asgLoadLibMaps();
-            };
-        });
-    }
-
     function asgLibMapWire() {
         var btnSave = document.getElementById('asg_map_save');
         if (!btnSave) {
@@ -1914,7 +1988,7 @@ $asgJson = static function (array $rows): string {
                 return;
             }
             alert('تم حفظ الربط');
-            void asgLoadLibMaps();
+            void asgRenderUnifiedTable({ silent: true });
         };
         document.getElementById('asg_map_sync').onclick = async function () {
             var c = parseInt(document.getElementById('asg_map_consumer').value, 10) || 0;
@@ -1931,6 +2005,7 @@ $asgJson = static function (array $rows): string {
                 return;
             }
             alert(res.message || 'تم');
+            void asgRenderUnifiedTable({ silent: true });
         };
         document.getElementById('asg_map_delete').onclick = async function () {
             var c = parseInt(document.getElementById('asg_map_consumer').value, 10) || 0;
@@ -1947,7 +2022,7 @@ $asgJson = static function (array $rows): string {
                 return;
             }
             alert('تم');
-            void asgLoadLibMaps();
+            void asgRenderUnifiedTable({ silent: true });
         };
     }
 
@@ -1961,7 +2036,6 @@ $asgJson = static function (array $rows): string {
         }
         await asgRefreshResolvedContext();
         void asgLoadLibBundlesForMap();
-        void asgLoadLibMaps();
         void loadDraftList({ silent: true });
     }
     asgWireDraftTableDelegation();
@@ -1979,6 +2053,7 @@ $asgJson = static function (array $rows): string {
 <style>
 .asg-row-block { margin-bottom: 10px; padding: 12px; }
 input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: default; }
+.asg-uni-section-cell { background: #f1f5f9; font-weight: 600; padding: 10px 12px !important; }
 </style>
 
 <?php endif; ?>
