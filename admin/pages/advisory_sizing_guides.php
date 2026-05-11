@@ -206,7 +206,7 @@ $asgJson = static function (array $rows): string {
     <input type="hidden" id="asg_scope" value="single">
     <input type="hidden" id="asg_active" value="1">
     <div class="form-grid" style="max-width:900px;">
-        <div style="grid-column:1/-1;"><label for="asg_name_ar">اسم النموذج (داخلي — عربي فقط)</label><input type="text" id="asg_name_ar" maxlength="191" placeholder="مثال: علوي قمصان EU"></div>
+        <div style="grid-column:1/-1;"><label for="asg_name_ar">اسم النموذج (داخلي — عربي فقط) <span style="color:#b91c1c;">*</span></label><input type="text" id="asg_name_ar" maxlength="191" placeholder="مثال: علوي قمصان EU"></div>
     </div>
 
     <h4 style="margin-top:20px;">تعريف الأعمدة</h4>
@@ -221,7 +221,7 @@ $asgJson = static function (array $rows): string {
     </div>
     <div style="overflow-x:auto;">
         <table class="data-table" id="asg_cols_table">
-            <thead><tr><th>ترتيب</th><th>عربي</th><th>EN</th><th>Fil</th><th>Hi</th><th>نوع القيمة</th><th>وحدة (عرض)</th><th>تخزين الطول</th><th>عمود النظام (كود)</th></tr></thead>
+            <thead><tr><th>ترتيب</th><th>عربي <span style="color:#b91c1c;">*</span></th><th>EN <span style="color:#b91c1c;">*</span></th><th>Fil <span style="color:#b91c1c;">*</span></th><th>Hi <span style="color:#b91c1c;">*</span></th><th>نوع القيمة</th><th>وحدة (عرض)</th><th>تخزين الطول</th><th>عمود النظام (كود)</th></tr></thead>
             <tbody id="asg_cols_body"></tbody>
         </table>
     </div>
@@ -1767,19 +1767,25 @@ $asgJson = static function (array $rows): string {
     document.getElementById('asg_w_ck').onchange = asgRefreshResolvedContext;
     document.getElementById('asg_w_dept').onchange = asgRefreshResolvedContext;
 
-    function asgNormColumnCount(cols) {
-        var n = 0;
-        for (var c = 0; c < (cols || []).length; c++) {
-            var a = (cols[c].label_ar || '').trim();
-            var e = (cols[c].label_en || '').trim();
-            if (a !== '' || e !== '') {
-                n++;
+    /** كل صف في جدول تعريف الأعمدة الظاهر: عربي و EN و Fil و Hi إلزامية للحفظ (باقي حقول العمود اختيارية حيث ينطبق). */
+    function asgValidateColumnDefs(cols) {
+        cols = cols || [];
+        if (cols.length <= 0) {
+            return 'عرّف الأعمدة أولاً (عدد الأعمدة ثم «توليد صفوف العناوين»).';
+        }
+        for (var i = 0; i < cols.length; i++) {
+            var a = (cols[i].label_ar || '').trim();
+            var e = (cols[i].label_en || '').trim();
+            var f = (cols[i].label_fil || '').trim();
+            var h = (cols[i].label_hi || '').trim();
+            if (a === '' || e === '' || f === '' || h === '') {
+                return 'في جدول تعريف الأعمدة، الصف ' + (i + 1) + ': أكمل الحقول الإلزامية (عربي، EN، Fil، Hi).';
             }
         }
-        return n;
+        return '';
     }
 
-    /** خلايا الصف بعد تفريغ العمود الأول عند ربط مقاس (مثل الحمولة المرسلة) وبعد حذف أعمدة بلا عنوان — يطابق منطق الحفظ في السيرفر. */
+    /** خلايا الصف بعد تفريغ العمود الأول عند ربط مقاس (مثل الحمولة المرسلة) — يطابق أعمدة الجدول بعد التحقق من عناوين الأعمدة الأربعة. */
     function asgRowCellsEffectiveForSave(r, cols, famOk) {
         var raw = (r && r.cells) ? r.cells.slice() : [];
         while (raw.length < (cols || []).length) {
@@ -1791,11 +1797,6 @@ $asgJson = static function (array $rows): string {
         }
         var eff = [];
         for (var ii = 0; ii < (cols || []).length; ii++) {
-            var ar0 = (cols[ii].label_ar || '').trim();
-            var en0 = (cols[ii].label_en || '').trim();
-            if (ar0 === '' && en0 === '') {
-                continue;
-            }
             eff.push(String(raw[ii] != null ? raw[ii] : '').trim());
         }
         return eff;
@@ -1803,11 +1804,9 @@ $asgJson = static function (array $rows): string {
 
     function asgValidateRowsBeforeSave(rows, cols) {
         cols = cols || [];
-        if (cols.length <= 0) {
-            return 'عرّف الأعمدة أولاً (عدد الأعمدة ثم «توليد صفوف العناوين»).';
-        }
-        if (asgNormColumnCount(cols) <= 0) {
-            return 'أضف عموداً واحداً على الأقل بعناوين (عربي أو English).';
+        var colDefErr = asgValidateColumnDefs(cols);
+        if (colDefErr) {
+            return colDefErr;
         }
         var seen = {};
         var hasData = false;
@@ -1865,6 +1864,11 @@ $asgJson = static function (array $rows): string {
         }
         if (wizardTplId() <= 0 || wizardCk() === '') {
             alert('أكمل قالب المقاسات والنوع التجاري (2 و 3) في بطاقة المعالج — يُحفظان مع الدليل.');
+            return;
+        }
+        var nameAr0 = document.getElementById('asg_name_ar').value.trim();
+        if (nameAr0 === '') {
+            alert('اسم النموذج الداخلي (عربي) إلزامي قبل الحفظ.');
             return;
         }
         var colsPayload = readColumns();

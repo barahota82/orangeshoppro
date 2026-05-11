@@ -426,14 +426,27 @@ try {
             }
             $normCols = [];
             $so = 0;
+            $colNum = 0;
             foreach ($columnsIn as $c) {
                 if (!is_array($c)) {
                     continue;
                 }
+                ++$colNum;
                 $la = trim((string) ($c['label_ar'] ?? ''));
                 $le = trim((string) ($c['label_en'] ?? ''));
-                if ($la === '' && $le === '') {
-                    continue;
+                $lf = trim((string) ($c['label_fil'] ?? ''));
+                $lh = trim((string) ($c['label_hi'] ?? ''));
+                if ($la === '' && $le === '' && $lf === '' && $lh === '') {
+                    json_response([
+                        'success' => false,
+                        'message' => 'في جدول تعريف الأعمدة، الصف ' . $colNum . ' فارغ — أكمل عربي و EN و Fil و Hi أو قلّل عدد الأعمدة.',
+                    ], 422);
+                }
+                if ($la === '' || $le === '' || $lf === '' || $lh === '') {
+                    json_response([
+                        'success' => false,
+                        'message' => 'في جدول تعريف الأعمدة، الصف ' . $colNum . ' ناقص — الحقول الإلزامية: عربي، EN، Fil، Hi.',
+                    ], 422);
                 }
                 ++$so;
                 $stMeas = orange_advisory_normalize_storage_measure((string) ($c['storage_measure'] ?? ''));
@@ -443,10 +456,10 @@ try {
                     $vk = 'number';
                 }
                 $normCols[] = [
-                    'label_ar' => $la !== '' ? $la : $le,
-                    'label_en' => $le !== '' ? $le : $la,
-                    'label_fil' => trim((string) ($c['label_fil'] ?? '')),
-                    'label_hi' => trim((string) ($c['label_hi'] ?? '')),
+                    'label_ar' => $la,
+                    'label_en' => $le,
+                    'label_fil' => $lf,
+                    'label_hi' => $lh,
                     'value_kind' => $vk,
                     'unit_hint' => trim((string) ($c['unit_hint'] ?? '')),
                     'storage_measure' => $stMeas,
@@ -455,7 +468,7 @@ try {
                 ];
             }
             if ($normCols === []) {
-                json_response(['success' => false, 'message' => 'أضف عموداً واحداً على الأقل بعناوين'], 422);
+                json_response(['success' => false, 'message' => 'أضف عموداً واحداً على الأقل في جدول تعريف الأعمدة (عربي، EN، Fil، Hi لكل عمود).'], 422);
             }
             $effFam = 0;
             if ($boundFamily) {
