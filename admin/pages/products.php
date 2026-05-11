@@ -370,6 +370,10 @@ if ($catalogNavUnified && orange_table_exists($pdo, 'products') && orange_table_
 
 $orangeAdminCardPreviewCssHref = storefront_public_path('/assets/css/main.css');
 $orangeAdminCardPreviewViewLabel = t('view_product');
+$orangeAdminSfProductUrlPartsForJs = [
+    'channel' => orange_storefront_default_channel_slug($pdo),
+    'lang' => 'ar',
+];
 ?>
 <div class="page-title">
     <h1>المنتجات</h1>
@@ -727,7 +731,11 @@ $orangeAdminCardPreviewViewLabel = t('view_product');
         <div id="productTabPanelCardPreview" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnCardPreview" hidden>
         <div class="admin-product-section">
         <h4 class="admin-product-subsection-title">معاينة كارت المنتج</h4>
-        <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">معاينة تقريبية ل<strong>كارت القائمة</strong> في المتجر (اتجاه RTL ولغة عربية كما في الصفحة الرئيسية). تُحدَّث تلقائياً عند تغيّر الاسم والسعر والصور وصفوف الألوان. شارة «العروض» لا تُعرض هنا لأنها مرتبطة بجدول العروض وليس بنموذج المنتج.</p>
+        <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">هنا <strong>معاينة ديناميكية لجزء واحد فقط</strong>: <strong>كارت القائمة</strong> في المتجر (RTL وعربية كالرئيسية). تُبنى داخل الصفحة من حقول النموذج وتُحدَّث عند تغيّر الاسم والسعر والصور وصفوف الألوان — وليست تحميلاً لصفحة المنتج الكاملة (<code>product.php</code>) لأن المنتج غير المحفوظ لا يملك معرّفاً في القاعدة، وصفحة الزائر تقرأ من السيرفر. شارة «العروض» لا تُعرض هنا لأنها من جدول العروض. بعد الحفظ أو عند التعديل يظهر رابط لفتح <strong>صفحة المنتج كاملة</strong> كما للزائر.</p>
+        <p id="orangeAdminProductFullPreviewWrap" class="card-hint" style="margin:0 0 12px;display:none;font-size:13px;">
+            <a id="orangeAdminProductFullPreviewLink" class="btn-secondary" href="#" target="_blank" rel="noopener noreferrer">فتح صفحة المنتج كاملة في المتجر (كما للزائر)</a>
+            <span style="display:block;margin-top:6px;color:#64748b;font-size:12px;">يستخدم القناة الافتراضية واللغة العربية في الرابط؛ إن لم يطابق رابطك المعتاد عدّل القناة من شاشة القنوات أو افتح المنتج من الواجهة.</span>
+        </p>
         <div class="admin-product-card-preview-frame-wrap">
             <iframe id="orangeAdminProductCardPreviewFrame" class="admin-product-card-preview-frame" title="معاينة كارت المنتج في المتجر"></iframe>
         </div>
@@ -882,6 +890,7 @@ window.PRODUCT_NEXT_SORT = <?php echo (int)$nextProductSort; ?>;
 window.ORANGE_CATALOG_ATTR_DEFS = <?php echo json_encode($catalogAttrDefsForJs, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
 window.ORANGE_ADMIN_CARD_PREVIEW_CSS = <?php echo json_encode($orangeAdminCardPreviewCssHref, JSON_UNESCAPED_UNICODE); ?>;
 window.ORANGE_ADMIN_VIEW_PRODUCT_LABEL = <?php echo json_encode($orangeAdminCardPreviewViewLabel, JSON_UNESCAPED_UNICODE); ?>;
+window.ORANGE_ADMIN_SF_PRODUCT_URL_PARTS = <?php echo json_encode($orangeAdminSfProductUrlPartsForJs, JSON_UNESCAPED_UNICODE); ?>;
 
 const PRODUCT_MSG = {
     E_REORDER: 'بيانات الترتيب غير صحيحة',
@@ -2046,6 +2055,42 @@ function orangeAdminProductCardPreviewVariantMetaHtml() {
     return '<div class="product-card-variant-meta" dir="auto">' + lines.join('') + '</div>';
 }
 
+/** رابط صفحة المنتج على الواجهة (بعد الحفظ فقط — يحتاج معرفاً في القاعدة). */
+function orangeAdminBuildStorefrontProductPageUrl(productId) {
+    const id = parseInt(String(productId != null ? productId : '0'), 10) || 0;
+    if (id <= 0) {
+        return '';
+    }
+    const parts = window.ORANGE_ADMIN_SF_PRODUCT_URL_PARTS;
+    if (!parts || String(parts.channel || '').trim() === '') {
+        return '';
+    }
+    const q = new URLSearchParams({
+        channel: String(parts.channel).trim(),
+        lang: String(parts.lang || 'ar').trim() || 'ar',
+        id: String(id),
+    });
+    return adminPublicPath('/pages/product.php') + '?' + q.toString();
+}
+
+function orangeAdminRefreshStorefrontProductPageLink() {
+    const wrap = document.getElementById('orangeAdminProductFullPreviewWrap');
+    const a = document.getElementById('orangeAdminProductFullPreviewLink');
+    if (!wrap || !a) {
+        return;
+    }
+    const rid = document.getElementById('product_record_id');
+    const id = rid ? parseInt(String(rid.value || '0'), 10) || 0 : 0;
+    const url = orangeAdminBuildStorefrontProductPageUrl(id);
+    if (!url) {
+        wrap.style.display = 'none';
+        a.setAttribute('href', '#');
+        return;
+    }
+    wrap.style.display = 'block';
+    a.setAttribute('href', url);
+}
+
 /** يعيد بناء iframe المعاينة بنفس أصناف كارت المنتج في المتجر (main.css داخل الإطار). */
 function orangeRefreshProductCardPreview() {
     const frame = document.getElementById('orangeAdminProductCardPreviewFrame');
@@ -2548,6 +2593,7 @@ function resetProductForm() {
     orangeClearCatalogAttributeInputs();
     orangeApplyProductBasicStepLocks();
     productFormShowTab('basic');
+    orangeAdminRefreshStorefrontProductPageLink();
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -2587,6 +2633,7 @@ function productFormShowTab(tab) {
     }
     if (key === 'cardpreview') {
         orangeRefreshProductCardPreview();
+        orangeAdminRefreshStorefrontProductPageLink();
     }
 }
 
@@ -2760,6 +2807,7 @@ async function loadProductForEdit(id) {
         }
         orangeApplyProductBasicStepLocks();
         orangeScheduleProductCardPreviewRefresh();
+        orangeAdminRefreshStorefrontProductPageLink();
         const sortRO = document.getElementById('product_sort_order');
         if (sortRO) {
             sortRO.readOnly = true;
