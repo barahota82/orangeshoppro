@@ -170,7 +170,7 @@ $asgJson = static function (array $rows): string {
     <div class="asg-wizard-toolbar" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;margin-top:14px;width:100%;box-sizing:border-box;direction:rtl;justify-content:flex-start;">
         <div style="flex:1 1 0;min-width:10rem;display:flex;flex-direction:column;gap:4px;">
             <label for="asg_w_dept" style="margin:0;font-size:13px;white-space:nowrap;"><strong>1.</strong> القسم الرئيسي</label>
-            <select id="asg_w_dept" style="width:100%;min-width:0;"><option value="0">— الكل / بدون تصفية بالقسم —</option>
+            <select id="asg_w_dept" style="width:100%;min-width:0;"><option value="0">— اختر —</option>
                 <?php foreach ($asgDepartments as $d): ?>
                 <option value="<?php echo (int) $d['id']; ?>"><?php echo htmlspecialchars((string) ($d['name_ar'] ?: $d['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
                 <?php endforeach; ?>
@@ -1261,7 +1261,7 @@ $asgJson = static function (array $rows): string {
     document.getElementById('asg_bulk_rows').onclick = function () {
         var f = fid();
         if (f <= 0) {
-            alert('أكمل اختيار قالب المقاسات والنوع التجاري (الخطوتان 2 و 3) حتى تُحدَّد عائلة المقاسات تلقائياً');
+            alert('أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3) حتى تُحدَّد عائلة المقاسات تلقائياً');
             return;
         }
         var fam = effectiveFamilySizeRows();
@@ -1314,7 +1314,7 @@ $asgJson = static function (array $rows): string {
         if (f <= 0) {
             ASG_FAMILY_GUIDES_CACHE = [];
             if (!silent) {
-                alert('أكمل اختيار قالب المقاسات والنوع التجاري (2 و 3) أولاً');
+                alert('أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3) أولاً');
             }
             asgRefreshGuideSortDisp();
             return;
