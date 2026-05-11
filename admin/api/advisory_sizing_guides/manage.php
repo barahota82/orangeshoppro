@@ -83,6 +83,64 @@ try {
 
             json_response(['success' => true, 'guides' => is_array($rows) ? $rows : []]);
 
+        case 'list_unbound':
+            $st = $pdo->prepare(
+                'SELECT g.id, g.scope_kind, g.name_ar, g.name_en, g.is_active,
+                    (SELECT COUNT(*) FROM advisory_sizing_guide_columns c WHERE c.guide_id = g.id) AS columns_count,
+                    (SELECT COUNT(*) FROM advisory_sizing_guide_rows r WHERE r.guide_id = g.id) AS rows_count
+                 FROM advisory_sizing_guides g
+                 WHERE g.size_family_id IS NULL OR g.size_family_id = 0
+                 ORDER BY g.id DESC'
+            );
+            $st->execute();
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+
+            json_response(['success' => true, 'guides' => is_array($rows) ? $rows : []]);
+
+        case 'attach_family':
+            $gid = (int) ($data['guide_id'] ?? 0);
+            $nf = (int) ($data['size_family_id'] ?? 0);
+            if ($gid <= 0 || $nf <= 0) {
+                json_response(['success' => false, 'message' => 'معرّف الدليل والعائلة إلزاميان'], 422);
+            }
+            $chkF = $pdo->prepare('SELECT id FROM size_families WHERE id = ? LIMIT 1');
+            $chkF->execute([$nf]);
+            if (!$chkF->fetchColumn()) {
+                json_response(['success' => false, 'message' => 'عائلة المقاسات غير موجودة'], 422);
+            }
+            $gSt = $pdo->prepare('SELECT id, size_family_id FROM advisory_sizing_guides WHERE id = ? LIMIT 1');
+            $gSt->execute([$gid]);
+            $gRow = $gSt->fetch(PDO::FETCH_ASSOC);
+            if (!is_array($gRow)) {
+                json_response(['success' => false, 'message' => 'الدليل غير موجود'], 404);
+            }
+            $curFam = isset($gRow['size_family_id']) && $gRow['size_family_id'] !== null && $gRow['size_family_id'] !== ''
+                ? (int) $gRow['size_family_id'] : 0;
+            if ($curFam > 0) {
+                json_response(['success' => false, 'message' => 'هذا الدليل مربوط بعائلة بالفعل — استخدم التعديل من قائمة العائلة'], 422);
+            }
+            $rSt = $pdo->prepare(
+                'SELECT id, row_kind, size_family_size_id FROM advisory_sizing_guide_rows WHERE guide_id = ? AND row_kind = \'data\''
+            );
+            $rSt->execute([$gid]);
+            $dRows = $rSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            foreach ($dRows as $dr) {
+                if (!is_array($dr)) {
+                    continue;
+                }
+                $sid = (int) ($dr['size_family_size_id'] ?? 0);
+                if ($sid <= 0) {
+                    continue;
+                }
+                $v = $pdo->prepare('SELECT id FROM size_family_sizes WHERE id = ? AND size_family_id = ? LIMIT 1');
+                $v->execute([$sid, $nf]);
+                if (!$v->fetchColumn()) {
+                    json_response(['success' => false, 'message' => 'يوجد صف بيانات مربوط بمقاس لا ينتمي للعائلة المختارة — أفرغ ربط المقاس أو عدّل الصفوف ثم أعد المحاولة'], 422);
+                }
+            }
+            $pdo->prepare('UPDATE advisory_sizing_guides SET size_family_id = ? WHERE id = ?')->execute([$nf, $gid]);
+            json_response(['success' => true, 'message' => 'تم ربط الدليل بالعائلة. افتح التعديل واستخدم «إضافة صف لكل مقاس» إن لزم.']);
+
         case 'get':
             $id = (int) ($data['id'] ?? 0);
             if ($id <= 0) {
@@ -198,9 +256,25 @@ try {
 
         case 'save':
             $id = (int) ($data['id'] ?? 0);
-            $fid = (int) ($data['size_family_id'] ?? 0);
-            if ($fid <= 0) {
-                json_response(['success' => false, 'message' => 'عائلة المقاسات إلزامية'], 422);
+            $fidRaw = (int) ($data['size_family_id'] ?? 0);
+            $boundFamily = $fidRaw > 0;
+            $exGuide = null;
+            $exFam = 0;
+            if ($id > 0) {
+                $own0 = $pdo->prepare('SELECT scope_kind, size_family_id FROM advisory_sizing_guides WHERE id = ? LIMIT 1');
+                $own0->execute([$id]);
+                $exGuide = $own0->fetch(PDO::FETCH_ASSOC);
+                if (!is_array($exGuide)) {
+                    json_response(['success' => false, 'message' => 'غير موجود'], 404);
+                }
+                $sfEx = $exGuide['size_family_id'] ?? null;
+                $exFam = ($sfEx === null || $sfEx === '') ? 0 : (int) $sfEx;
+            }
+            if ($exFam > 0 && $boundFamily && $fidRaw !== $exFam) {
+                json_response(['success' => false, 'message' => 'لا يمكن نقل الدليل إلى عائلة أخرى من هنا — استخدم «ربط» للمسودات أو أنشئ نسخة'], 422);
+            }
+            if ($exFam > 0 && !$boundFamily) {
+                json_response(['success' => false, 'message' => 'لا يمكن إلغاء ربط العائلة من الحفظ — عدّل الدليل من قائمة العائلة'], 422);
             }
             $scopeKind = orange_advisory_scope_kind_valid($data['scope_kind'] ?? '');
             if ($id <= 0) {
@@ -208,18 +282,17 @@ try {
                     $scopeKind = 'single';
                 }
             } elseif ($scopeKind === null) {
-                $psk = $pdo->prepare('SELECT scope_kind FROM advisory_sizing_guides WHERE id = ? LIMIT 1');
-                $psk->execute([$id]);
-                $pr = $psk->fetch(PDO::FETCH_ASSOC);
-                $scopeKind = orange_advisory_scope_kind_valid(is_array($pr) ? ((string) ($pr['scope_kind'] ?? '')) : '') ?? 'single';
+                $scopeKind = orange_advisory_scope_kind_valid(is_array($exGuide) ? ((string) ($exGuide['scope_kind'] ?? '')) : '') ?? 'single';
             }
             if ($scopeKind === null) {
                 $scopeKind = 'single';
             }
-            $chk = $pdo->prepare('SELECT id FROM size_families WHERE id = ? LIMIT 1');
-            $chk->execute([$fid]);
-            if (!$chk->fetchColumn()) {
-                json_response(['success' => false, 'message' => 'عائلة المقاسات غير موجودة'], 422);
+            if ($boundFamily) {
+                $chk = $pdo->prepare('SELECT id FROM size_families WHERE id = ? LIMIT 1');
+                $chk->execute([$fidRaw]);
+                if (!$chk->fetchColumn()) {
+                    json_response(['success' => false, 'message' => 'عائلة المقاسات غير موجودة'], 422);
+                }
             }
             $nameAr = trim((string) ($data['name_ar'] ?? ''));
             if ($nameAr === '') {
@@ -267,6 +340,12 @@ try {
             if ($normCols === []) {
                 json_response(['success' => false, 'message' => 'أضف عموداً واحداً على الأقل بعناوين'], 422);
             }
+            $effFam = 0;
+            if ($boundFamily) {
+                $effFam = $fidRaw;
+            } elseif ($id > 0 && $exFam > 0) {
+                $effFam = $exFam;
+            }
             $normRows = [];
             $rso = 0;
             foreach ($rowsIn as $r) {
@@ -276,14 +355,23 @@ try {
                 $rk = orange_advisory_row_kind_valid($r['row_kind'] ?? 'data');
                 ++$rso;
                 $sfsId = (int) ($r['size_family_size_id'] ?? 0);
-                if ($sfsId > 0) {
-                    $v = $pdo->prepare('SELECT id FROM size_family_sizes WHERE id = ? AND size_family_id = ? LIMIT 1');
-                    $v->execute([$sfsId, $fid]);
-                    if (!$v->fetchColumn()) {
-                        json_response(['success' => false, 'message' => 'مقاس مرتبط غير تابع لنفس العائلة'], 422);
+                if ($effFam > 0) {
+                    if ($sfsId > 0) {
+                        $v = $pdo->prepare('SELECT id FROM size_family_sizes WHERE id = ? AND size_family_id = ? LIMIT 1');
+                        $v->execute([$sfsId, $effFam]);
+                        if (!$v->fetchColumn()) {
+                            json_response(['success' => false, 'message' => 'مقاس مرتبط غير تابع لنفس العائلة'], 422);
+                        }
+                    } elseif ($rk === 'data') {
+                        json_response(['success' => false, 'message' => 'كل صف بيانات يجب ربطه بمقاس من عائلة المقاسات'], 422);
                     }
-                } elseif ($rk === 'data') {
-                    $sfsId = 0;
+                } else {
+                    if ($rk === 'data' && $sfsId > 0) {
+                        json_response(['success' => false, 'message' => 'مسودة بدون عائلة: احذف ربط المقاس من الصفوف أو اربط الدليل بعائلة أولاً'], 422);
+                    }
+                    if ($rk === 'data') {
+                        $sfsId = 0;
+                    }
                 }
                 $cells = $r['cells'] ?? [];
                 if (!is_array($cells)) {
@@ -318,17 +406,21 @@ try {
                 if (($nr['row_kind'] ?? '') === 'data') {
                     $hasDataRow = true;
                     $sfsData = (int) ($nr['size_family_size_id'] ?? 0);
-                    if ($sfsData <= 0) {
-                        json_response(['success' => false, 'message' => 'كل صف بيانات يجب ربطه بمقاس من عائلة المقاسات (لا يُقبل صف بيانات بدون مقاس)'], 422);
+                    if ($effFam > 0) {
+                        if ($sfsData <= 0) {
+                            json_response(['success' => false, 'message' => 'كل صف بيانات يجب ربطه بمقاس من عائلة المقاسات (لا يُقبل صف بيانات بدون مقاس)'], 422);
+                        }
+                        if (isset($seenFamilySize[$sfsData])) {
+                            json_response(['success' => false, 'message' => 'مقاس العائلة مكرر في أكثر من صف بيانات — اربط كل مقاس مرة واحدة'], 422);
+                        }
+                        $seenFamilySize[$sfsData] = true;
+                    } elseif ($sfsData > 0 && isset($seenFamilySize[$sfsData])) {
+                        json_response(['success' => false, 'message' => 'مقاس مكرر في الصفوف'], 422);
                     }
-                    if (isset($seenFamilySize[$sfsData])) {
-                        json_response(['success' => false, 'message' => 'مقاس العائلة مكرر في أكثر من صف بيانات — اربط كل مقاس مرة واحدة'], 422);
-                    }
-                    $seenFamilySize[$sfsData] = true;
                 }
             }
             if (!$hasDataRow) {
-                json_response(['success' => false, 'message' => 'أضف صف بيانات واحداً على الأقل مربوطاً بمقاس من العائلة'], 422);
+                json_response(['success' => false, 'message' => 'أضف صف بيانات واحداً على الأقل'], 422);
             }
             foreach ($normRows as $nr) {
                 if ($nr['row_kind'] === 'label' && trim($nr['label_ar']) === '' && trim($nr['label_en']) === '') {
@@ -339,47 +431,58 @@ try {
             $pdo->beginTransaction();
             try {
                 if ($id <= 0) {
-                    $dupN = $pdo->prepare(
-                        'SELECT id FROM advisory_sizing_guides WHERE size_family_id = ? AND name_ar = ? LIMIT 1'
-                    );
-                    $dupN->execute([$fid, $nameAr]);
+                    if ($boundFamily) {
+                        $dupN = $pdo->prepare(
+                            'SELECT id FROM advisory_sizing_guides WHERE size_family_id = ? AND name_ar = ? LIMIT 1'
+                        );
+                        $dupN->execute([$fidRaw, $nameAr]);
+                    } else {
+                        $dupN = $pdo->prepare(
+                            'SELECT id FROM advisory_sizing_guides WHERE (size_family_id IS NULL OR size_family_id = 0) AND name_ar = ? LIMIT 1'
+                        );
+                        $dupN->execute([$nameAr]);
+                    }
                     if ($dupN->fetchColumn()) {
                         $pdo->rollBack();
-                        json_response(['success' => false, 'message' => 'يوجد بالفعل دليل بنفس الاسم الداخلي لهذه العائلة'], 409);
+                        json_response(['success' => false, 'message' => 'يوجد بالفعل دليل بنفس الاسم الداخلي (لنفس العائلة أو ضمن المسودات)'], 409);
                     }
+                    $famIns = $boundFamily ? $fidRaw : null;
                     $ins = $pdo->prepare(
                         'INSERT INTO advisory_sizing_guides
                             (size_family_id, scope_kind, name_ar, name_en, name_fil, name_hi, sort_order, is_active)
                          VALUES (?,?,?,?,?,?,0,?)'
                     );
-                    $ins->execute([$fid, $scopeKind, $nameAr, $nameEn, $nameFil, $nameHi, $active]);
+                    $ins->execute([$famIns, $scopeKind, $nameAr, $nameEn, $nameFil, $nameHi, $active]);
                     $id = (int) $pdo->lastInsertId();
                 } else {
-                    $own = $pdo->prepare('SELECT id, size_family_id, scope_kind FROM advisory_sizing_guides WHERE id = ? LIMIT 1');
-                    $own->execute([$id]);
-                    $ex = $own->fetch(PDO::FETCH_ASSOC);
-                    if (!is_array($ex)) {
-                        $pdo->rollBack();
-                        json_response(['success' => false, 'message' => 'غير موجود'], 404);
+                    $nextSf = null;
+                    if ($exFam > 0) {
+                        $nextSf = $exFam;
+                    } elseif ($boundFamily) {
+                        $nextSf = $fidRaw;
                     }
-                    if ((int) $ex['size_family_id'] !== $fid) {
-                        $pdo->rollBack();
-                        json_response(['success' => false, 'message' => 'لا يمكن تغيير عائلة المقاسات للسجل الحالي'], 422);
+                    if ($nextSf === null || $nextSf === 0) {
+                        $dupN = $pdo->prepare(
+                            'SELECT id FROM advisory_sizing_guides WHERE (size_family_id IS NULL OR size_family_id = 0) AND name_ar = ? AND id <> ? LIMIT 1'
+                        );
+                        $dupN->execute([$nameAr, $id]);
+                    } else {
+                        $dupN = $pdo->prepare(
+                            'SELECT id FROM advisory_sizing_guides WHERE size_family_id = ? AND name_ar = ? AND id <> ? LIMIT 1'
+                        );
+                        $dupN->execute([$nextSf, $nameAr, $id]);
                     }
-                    $dupN = $pdo->prepare(
-                        'SELECT id FROM advisory_sizing_guides WHERE size_family_id = ? AND name_ar = ? AND id <> ? LIMIT 1'
-                    );
-                    $dupN->execute([$fid, $nameAr, $id]);
                     if ($dupN->fetchColumn()) {
                         $pdo->rollBack();
-                        json_response(['success' => false, 'message' => 'يوجد بالفعل دليل آخر بنفس الاسم الداخلي لهذه العائلة'], 409);
+                        json_response(['success' => false, 'message' => 'يوجد بالفعل دليل آخر بنفس الاسم الداخلي لهذه العائلة أو ضمن المسودات'], 409);
                     }
+                    $bindSf = ($nextSf === null || (int) $nextSf === 0) ? null : (int) $nextSf;
                     $upd = $pdo->prepare(
                         'UPDATE advisory_sizing_guides SET
-                            scope_kind = ?, name_ar = ?, name_en = ?, name_fil = ?, name_hi = ?, is_active = ?
-                         WHERE id = ? AND size_family_id = ?'
+                            size_family_id = ?, scope_kind = ?, name_ar = ?, name_en = ?, name_fil = ?, name_hi = ?, is_active = ?
+                         WHERE id = ?'
                     );
-                    $upd->execute([$scopeKind, $nameAr, $nameEn, $nameFil, $nameHi, $active, $id, $fid]);
+                    $upd->execute([$bindSf, $scopeKind, $nameAr, $nameEn, $nameFil, $nameHi, $active, $id]);
                     $stR2 = $pdo->prepare('SELECT id FROM advisory_sizing_guide_rows WHERE guide_id = ?');
                     $stR2->execute([$id]);
                     $rids2 = $stR2->fetchAll(PDO::FETCH_COLUMN);

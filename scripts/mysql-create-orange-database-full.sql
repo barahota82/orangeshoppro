@@ -273,7 +273,7 @@ CREATE TABLE `size_family_sizes` (
 
 CREATE TABLE `advisory_sizing_guides` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `size_family_id` int NOT NULL,
+  `size_family_id` int DEFAULT NULL,
   `scope_kind` varchar(16) NOT NULL,
   `name_ar` varchar(191) NOT NULL DEFAULT '',
   `name_en` varchar(191) NOT NULL DEFAULT '',

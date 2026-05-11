@@ -200,7 +200,7 @@ $asgJson = static function (array $rows): string {
     <input type="hidden" id="asg_family" value="0">
     <div class="asg-wizard-toolbar" style="display:flex;flex-wrap:nowrap;align-items:flex-end;gap:12px;direction:ltr;justify-content:space-between;width:100%;box-sizing:border-box;margin-top:8px;">
         <div style="flex:0 0 auto;">
-            <button type="button" class="btn" id="asg_new_btn" disabled>دليل جديد</button>
+            <button type="button" class="btn" id="asg_new_btn">دليل جديد</button>
         </div>
         <div class="asg-wizard-fields" style="display:flex;flex-wrap:nowrap;flex:1 1 auto;gap:10px;align-items:flex-end;min-width:0;direction:rtl;justify-content:flex-end;overflow-x:auto;">
             <div style="flex:1 1 0;min-width:10rem;display:flex;flex-direction:column;gap:4px;">
@@ -235,6 +235,7 @@ $asgJson = static function (array $rows): string {
 <div class="card" id="asg_editor" style="display:none;margin-top:16px;">
     <h3 id="asg_editor_title">تعديل دليل</h3>
     <input type="hidden" id="asg_edit_id" value="0">
+    <input type="hidden" id="asg_bound_family" value="">
     <input type="hidden" id="asg_scope" value="single">
     <input type="hidden" id="asg_active" value="1">
     <div class="form-grid" style="max-width:900px;">
@@ -269,6 +270,22 @@ $asgJson = static function (array $rows): string {
     <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
         <button type="button" class="btn" id="asg_save_btn">حفظ</button>
         <button type="button" class="btn-secondary" id="asg_cancel_btn">إلغاء</button>
+    </div>
+</div>
+
+<div class="card" id="asg_draft_card" style="margin-top:16px;">
+    <h3 style="margin-top:0;">مسودات أدلة (غير مربوطة بعائلة بعد)</h3>
+    <p class="card-hint" style="margin:0 0 10px;">احفظ الجدول والأعمدة أولاً بدون اختيار عائلة في المعالج؛ يظهر الدليل هنا. ثم اختر عائلة من القائمة في الصف واضغط «ربط بعائلة» — بعدها يظهر في «الأدلة المحفوظة لهذه العائلة» ويمكن ربط الصفوف بالمقاسات.</p>
+    <div style="margin-bottom:8px;">
+        <button type="button" class="btn-secondary" id="asg_draft_refresh">تحديث قائمة المسودات</button>
+    </div>
+    <div style="overflow-x:auto;">
+        <table class="data-table">
+            <thead><tr>
+                <th>#</th><th>اسم النموذج</th><th>أعمدة</th><th>صفوف</th><th>ربط بعائلة</th><th>إجراءات</th>
+            </tr></thead>
+            <tbody id="asg_draft_tbody"></tbody>
+        </table>
     </div>
 </div>
 
@@ -544,17 +561,18 @@ $asgJson = static function (array $rows): string {
         }
         if (id <= 0) {
             if (nb) {
-                nb.disabled = true;
+                nb.disabled = false;
             }
             if (listWrap) {
                 listWrap.style.display = 'block';
             }
             if (listTbody) {
-                listTbody.innerHTML = '<tr><td colspan="5" class="card-hint">أكمل اختيار قالب المقاسات والنوع التجاري (الخطوتان 2 و 3) لتُعرض الأدلة المحفوظة لهذه العائلة.</td></tr>';
+                listTbody.innerHTML = '<tr><td colspan="5" class="card-hint">أكمل اختيار قالب المقاسات والنوع التجاري (الخطوتان 2 و 3) لتُعرض الأدلة المربوطة بهذه العائلة — أو أنشئ «دليل جديد» كمسودة بدون عائلة وتظهر في الجدول أعلاه.</td></tr>';
             }
             if (hintEl && tpl > 0 && ck !== '') {
                 hintEl.textContent = 'لا عائلة مطابقة للقالب والنوع.';
             }
+            void loadDraftList({ silent: true });
             return;
         }
         if (nb) {
@@ -578,6 +596,7 @@ $asgJson = static function (array $rows): string {
         }
         refreshSizeSelects();
         await loadList({ silent: true });
+        void loadDraftList({ silent: true });
     }
 
     function sizeOptionsHtml(selectedId) {
@@ -1252,7 +1271,9 @@ $asgJson = static function (array $rows): string {
         var sid = sel ? parseInt(sel.value, 10) || 0 : 0;
         if (sid <= 0) {
             hint.style.display = 'block';
-            hint.textContent = 'اختر مقاساً من العائلة — إلزامي لكل صف بيانات.';
+            hint.textContent = fid() <= 0
+                ? 'مسودة بدون عائلة: احفظ الخلايا؛ بعد «ربط بعائلة» اختر المقاس لكل صف أو «إضافة صف لكل مقاس».'
+                : 'اختر مقاساً من العائلة — إلزامي لكل صف بيانات.';
             return;
         }
         var name = asgFamilyLabelById(sid);
@@ -1409,6 +1430,7 @@ $asgJson = static function (array $rows): string {
                     return;
                 }
                 void loadList();
+                void loadDraftList({ silent: true });
             };
             tbody.appendChild(tr);
         });
@@ -1423,15 +1445,108 @@ $asgJson = static function (array $rows): string {
         }
     }
 
+    function asgFamilyOptionsHtml(selectedId) {
+        selectedId = parseInt(selectedId, 10) || 0;
+        var h = '<option value="0">— اختر عائلة —</option>';
+        for (var fi = 0; fi < FAMILIES_FULL.length; fi++) {
+            var f = FAMILIES_FULL[fi];
+            var idf = parseInt(f.id, 10) || 0;
+            if (idf <= 0) {
+                continue;
+            }
+            var lab = esc(f.name_ar || f.name_en || ('#' + idf));
+            h += '<option value="' + idf + '"' + (idf === selectedId ? ' selected' : '') + '>' + lab + '</option>';
+        }
+        return h;
+    }
+
+    async function loadDraftList(opts) {
+        opts = opts || {};
+        var silent = !!opts.silent;
+        var tb = document.getElementById('asg_draft_tbody');
+        if (!tb) {
+            return;
+        }
+        var res = await orangeAdminJsonPost(ADVISORY_API, { action: 'list_unbound' });
+        if (!res || !res.success) {
+            if (!silent) {
+                alert((res && res.message) ? res.message : 'خطأ تحميل المسودات');
+            }
+            return;
+        }
+        tb.innerHTML = '';
+        var guides = res.guides || [];
+        guides.forEach(function (g) {
+            var gid = parseInt(g.id, 10) || 0;
+            var title = (g.name_ar || g.name_en || ('#' + gid));
+            var cols = parseInt(String(g.columns_count != null ? g.columns_count : '0'), 10) || 0;
+            var rws = parseInt(String(g.rows_count != null ? g.rows_count : '0'), 10) || 0;
+            var tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td>' + gid + '</td>' +
+                '<td>' + esc(title) + '</td>' +
+                '<td>' + cols + '</td>' +
+                '<td>' + rws + '</td>' +
+                '<td><select class="asg-draft-fam-sel" data-guide="' + gid + '" style="max-width:14rem;width:100%;">' + asgFamilyOptionsHtml(0) + '</select> ' +
+                '<button type="button" class="btn asg-draft-bind" data-guide="' + gid + '">ربط</button></td>' +
+                '<td><button type="button" class="btn-secondary asg-draft-ed" data-id="' + gid + '">تعديل</button> ' +
+                '<button type="button" class="btn-secondary asg-draft-del" data-id="' + gid + '">حذف</button></td>';
+            tr.querySelector('.asg-draft-ed').onclick = function () { loadGuide(gid); };
+            tr.querySelector('.asg-draft-del').onclick = async function () {
+                if (!confirm('حذف المسودة؟')) {
+                    return;
+                }
+                var r2 = await orangeAdminJsonPost(ADVISORY_API, { action: 'delete', id: gid });
+                if (!r2.success) {
+                    alert(r2.message || 'خطأ');
+                    return;
+                }
+                void loadDraftList();
+                await loadList({ silent: true });
+            };
+            tr.querySelector('.asg-draft-bind').onclick = async function () {
+                var sel = tr.querySelector('.asg-draft-fam-sel');
+                var nf = sel ? parseInt(sel.value, 10) || 0 : 0;
+                if (nf <= 0) {
+                    alert('اختر عائلة مقاسات من القائمة');
+                    return;
+                }
+                var r3 = await orangeAdminJsonPost(ADVISORY_API, { action: 'attach_family', guide_id: gid, size_family_id: nf });
+                if (!r3 || !r3.success) {
+                    alert((r3 && r3.message) ? r3.message : 'فشل الربط');
+                    return;
+                }
+                alert(r3.message || 'تم الربط');
+                window.location.reload();
+            };
+            tb.appendChild(tr);
+        });
+        if (!guides.length) {
+            var trd = document.createElement('tr');
+            trd.innerHTML = '<td colspan="6" class="card-hint">لا توجد مسودات — استخدم «دليل جديد» ثم احفظ دون اختيار عائلة في المعالج (القالب/النوع اختياري للمسودة).</td>';
+            tb.appendChild(trd);
+        }
+    }
+
     async function loadGuide(id) {
         var res = await orangeAdminJsonPost(ADVISORY_API, { action: 'get', id: id });
         if (!res.success) { alert(res.message || 'خطأ'); return; }
         var g = res.guide;
         var famId = parseInt(String(g.size_family_id != null ? g.size_family_id : '0'), 10) || 0;
+        var bf = document.getElementById('asg_bound_family');
+        if (bf) {
+            bf.value = famId > 0 ? String(famId) : '';
+        }
         if (famId > 0) {
             asgPreferFamilyOnce = famId;
             applyWizardFieldsFromFamily(famId);
             await asgRefreshResolvedContext();
+        } else {
+            var hid0 = document.getElementById('asg_family');
+            if (hid0) {
+                hid0.value = '0';
+            }
+            void loadDraftList({ silent: true });
         }
         document.getElementById('asg_edit_id').value = String(g.id);
         document.getElementById('asg_scope').value = g.scope_kind || 'single';
@@ -1453,12 +1568,12 @@ $asgJson = static function (array $rows): string {
     }
 
     function openNew() {
-        var f = fid();
-        if (f <= 0) {
-            alert('أكمل اختيار قالب المقاسات والنوع التجاري (2 و 3) أولاً');
-            return;
-        }
         document.getElementById('asg_edit_id').value = '0';
+        var bf = document.getElementById('asg_bound_family');
+        if (bf) {
+            bf.value = '';
+        }
+        document.getElementById('asg_family').value = '0';
         document.getElementById('asg_scope').value = 'single';
         document.getElementById('asg_active').value = '1';
         document.getElementById('asg_name_ar').value = '';
@@ -1466,7 +1581,7 @@ $asgJson = static function (array $rows): string {
         clearRows();
         refreshSizeSelects();
         document.getElementById('asg_editor').style.display = 'block';
-        document.getElementById('asg_editor_title').textContent = 'دليل جديد';
+        document.getElementById('asg_editor_title').textContent = 'دليل جديد (مسودة — اربط بعائلة لاحقاً من جدول المسودات)';
     }
 
     document.getElementById('asg_new_btn').onclick = openNew;
@@ -1478,6 +1593,7 @@ $asgJson = static function (array $rows): string {
     function asgValidateRowsBeforeSave(rows) {
         var seen = {};
         var hasData = false;
+        var famOk = fid() > 0;
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
             if (!r || r.row_kind !== 'data') {
@@ -1485,24 +1601,32 @@ $asgJson = static function (array $rows): string {
             }
             hasData = true;
             var sid = parseInt(r.size_family_size_id, 10) || 0;
-            if (sid <= 0) {
-                return 'كل صف بيانات يجب اختيار مقاس من العائلة له (لا يوجد «بدون ربط»). استخدم «إضافة صف لكل مقاس» أو اختر المقاس من القائمة.';
+            if (!famOk) {
+                if (sid > 0) {
+                    return 'مسودة بدون عائلة: لا تربط صفاً بمقاس قبل ربط الدليل بعائلة من جدول المسودات (أو اختر عائلة في المعالج ثم احفظ).';
+                }
+            } else {
+                if (sid <= 0) {
+                    return 'كل صف بيانات يجب اختيار مقاس من العائلة له. استخدم «إضافة صف لكل مقاس» أو اختر المقاس من القائمة.';
+                }
+                if (seen[sid]) {
+                    return 'مقاس العائلة مكرر في أكثر من صف — اربط كل مقاس مرة واحدة فقط.';
+                }
+                seen[sid] = true;
             }
-            if (seen[sid]) {
-                return 'مقاس العائلة مكرر في أكثر من صف — اربط كل مقاس مرة واحدة فقط.';
-            }
-            seen[sid] = true;
         }
         if (!hasData) {
-            return 'أضف صف بيانات واحداً على الأقل (مع اختيار مقاس من العائلة لكل صف).';
+            return 'أضف صف بيانات واحداً على الأقل.';
         }
         return '';
     }
 
     document.getElementById('asg_save_btn').onclick = async function () {
         var f = fid();
-        if (f <= 0) {
-            alert('أكمل اختيار قالب المقاسات والنوع التجاري (2 و 3) أولاً');
+        var boundStored = parseInt(document.getElementById('asg_bound_family').value, 10) || 0;
+        var isUnboundContext = boundStored <= 0;
+        if (f <= 0 && !isUnboundContext) {
+            alert('أكمل اختيار قالب المقاسات والنوع التجاري (2 و 3) أولاً، أو افتح مسودة من جدول المسودات');
             return;
         }
         var rowsPayload = readRowsPayload();
@@ -1514,7 +1638,7 @@ $asgJson = static function (array $rows): string {
         var payload = {
             action: 'save',
             id: parseInt(document.getElementById('asg_edit_id').value, 10) || 0,
-            size_family_id: f,
+            size_family_id: f > 0 ? f : 0,
             scope_kind: document.getElementById('asg_scope').value,
             name_ar: document.getElementById('asg_name_ar').value.trim(),
             is_active: parseInt(document.getElementById('asg_active').value, 10),
@@ -1527,7 +1651,12 @@ $asgJson = static function (array $rows): string {
             return;
         }
         alert('تم الحفظ');
+        var bf2 = document.getElementById('asg_bound_family');
+        if (bf2) {
+            bf2.value = f > 0 ? String(f) : '';
+        }
         await loadList();
+        void loadDraftList({ silent: true });
         void asgLoadLibMaps();
         openNew();
         var ed = document.getElementById('asg_editor');
@@ -1703,6 +1832,11 @@ $asgJson = static function (array $rows): string {
         void asgLoadLibBundlesForMap();
         void asgLoadLibMaps();
         asgBundleBoot();
+        void loadDraftList({ silent: true });
+    }
+    var asgDraftRef = document.getElementById('asg_draft_refresh');
+    if (asgDraftRef) {
+        asgDraftRef.onclick = function () { void loadDraftList(); };
     }
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', asgBoot);

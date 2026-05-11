@@ -891,7 +891,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_safe_exec($pdo,
         'CREATE TABLE IF NOT EXISTS advisory_sizing_guides (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            size_family_id INT NOT NULL,
+            size_family_id INT NULL DEFAULT NULL,
             scope_kind VARCHAR(16) NOT NULL,
             name_ar VARCHAR(191) NOT NULL DEFAULT \'\',
             name_en VARCHAR(191) NOT NULL DEFAULT \'\',
@@ -915,6 +915,22 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
                 orange_catalog_safe_exec(
                     $pdo,
                     'ALTER TABLE advisory_sizing_guides DROP INDEX uq_advisory_sizing_family_scope'
+                );
+            }
+        } catch (Throwable $e) {
+            // ignore
+        }
+        try {
+            $nullChk = $pdo->query(
+                "SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'advisory_sizing_guides' AND COLUMN_NAME = 'size_family_id'
+                 LIMIT 1"
+            );
+            $nr = $nullChk ? $nullChk->fetch(PDO::FETCH_ASSOC) : null;
+            if (is_array($nr) && strtoupper((string) ($nr['IS_NULLABLE'] ?? '')) === 'NO') {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'ALTER TABLE advisory_sizing_guides MODIFY COLUMN size_family_id INT NULL DEFAULT NULL'
                 );
             }
         } catch (Throwable $e) {
