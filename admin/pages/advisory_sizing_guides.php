@@ -165,14 +165,8 @@ $asgJson = static function (array $rows): string {
         </div>
     </div>
     <p id="asg_w_hint" class="card-hint" style="margin:12px 0 0;"></p>
-</div>
-
-<div class="card">
-    <h3>الأدلة</h3>
-    <p id="asg_resolved_family_wrap" style="margin:0 0 10px;display:none;font-size:13px;color:#64748b;">
-        <span id="asg_resolved_family_label"></span>
-    </p>
-    <div id="asg_list_wrap" style="margin-top:12px;display:none;">
+    <h4 style="margin:16px 0 8px;">الأدلة</h4>
+    <div id="asg_list_wrap" style="display:none;">
         <ul id="asg_list" class="asg-guide-list"></ul>
     </div>
 </div>
@@ -410,8 +404,6 @@ $asgJson = static function (array $rows): string {
         var id = resolveWizardFamily(prefer);
         var hid = document.getElementById('asg_family');
         var hintEl = document.getElementById('asg_w_hint');
-        var wrap = document.getElementById('asg_resolved_family_wrap');
-        var lab = document.getElementById('asg_resolved_family_label');
         var nb = document.getElementById('asg_new_btn');
         var listWrap = document.getElementById('asg_list_wrap');
         var listUl = document.getElementById('asg_list');
@@ -425,12 +417,6 @@ $asgJson = static function (array $rows): string {
             hintEl.textContent = '';
         }
         if (id <= 0) {
-            if (wrap) {
-                wrap.style.display = 'none';
-            }
-            if (lab) {
-                lab.textContent = '';
-            }
             if (nb) {
                 nb.disabled = true;
             }
@@ -444,19 +430,6 @@ $asgJson = static function (array $rows): string {
                 hintEl.textContent = 'لا عائلة مطابقة للقالب والنوع.';
             }
             return;
-        }
-        var name = '';
-        for (var ii = 0; ii < FAMILIES_FULL.length; ii++) {
-            if (parseInt(FAMILIES_FULL[ii].id, 10) === id) {
-                name = FAMILIES_FULL[ii].name_ar || FAMILIES_FULL[ii].name_en || ('#' + id);
-                break;
-            }
-        }
-        if (wrap) {
-            wrap.style.display = 'block';
-        }
-        if (lab) {
-            lab.textContent = name;
         }
         if (nb) {
             nb.disabled = false;
