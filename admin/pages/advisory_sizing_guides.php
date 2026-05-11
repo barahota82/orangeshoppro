@@ -222,7 +222,14 @@ $asgJson = static function (array $rows): string {
 <div class="card">
     <h3>القسم والقالب والنوع التجاري</h3>
     <input type="hidden" id="asg_family" value="0">
-    <div class="asg-wizard-toolbar" style="display:flex;flex-wrap:nowrap;align-items:flex-end;gap:12px;direction:ltr;justify-content:space-between;width:100%;box-sizing:border-box;margin-top:8px;">
+    <input type="hidden" id="asg_guide_sort" value="0">
+    <div class="asg-wizard-row1" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-top:10px;direction:rtl;justify-content:flex-end;">
+        <div style="flex:0 1 auto;min-width:11rem;display:flex;flex-direction:column;gap:4px;">
+            <label for="asg_guide_sort_disp" style="margin:0;font-size:13px;white-space:nowrap;">ترتيب عرض الدليل (تلقائي)</label>
+            <input type="text" id="asg_guide_sort_disp" readonly class="input-narrow" style="width:100%;max-width:18rem;background:#f1f5f9;cursor:default;" title="للدليل الجديد: يُحسب عند الحفظ. عند التعديل: القيمة المحفوظة.">
+        </div>
+    </div>
+    <div class="asg-wizard-toolbar" style="display:flex;flex-wrap:nowrap;align-items:flex-end;gap:12px;direction:ltr;justify-content:space-between;width:100%;box-sizing:border-box;margin-top:14px;">
         <div style="flex:0 0 auto;">
             <button type="button" class="btn" id="asg_new_btn">دليل جديد</button>
         </div>
@@ -359,6 +366,8 @@ $asgJson = static function (array $rows): string {
     var ASG_LIBRARY_READY = <?php echo $asgLibraryReady ? 'true' : 'false'; ?>;
     var TEMPLATE_SIZE_ROWS = <?php echo $templateSizesJson; ?>;
     var asgPreferFamilyOnce = 0;
+    var ASG_FAMILY_GUIDES_CACHE = [];
+    var ASG_UNBOUND_GUIDES_CACHE = [];
 
     async function orangeAdminJsonPost(url, payload) {
         if (typeof postJSON === 'function') {
@@ -580,7 +589,8 @@ $asgJson = static function (array $rows): string {
             if (hintEl && tpl > 0 && ck !== '') {
                 hintEl.textContent = 'لا عائلة مطابقة للقالب والنوع.';
             }
-            void loadDraftList({ silent: true });
+            await loadDraftList({ silent: true });
+            asgRefreshGuideSortDisp();
             return;
         }
         if (nb) {
@@ -605,6 +615,7 @@ $asgJson = static function (array $rows): string {
         refreshSizeSelects();
         await loadList({ silent: true });
         void loadDraftList({ silent: true });
+        asgRefreshGuideSortDisp();
     }
 
     function sizeOptionsHtml(selectedId) {
@@ -622,6 +633,57 @@ $asgJson = static function (array $rows): string {
     function esc(s) {
         if (!s) return '';
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+    }
+
+    function asgMaxGuideSort(guides) {
+        var m = 0;
+        if (!guides || !guides.length) {
+            return m;
+        }
+        for (var i = 0; i < guides.length; i++) {
+            var v = parseInt(guides[i].sort_order, 10) || 0;
+            if (v > m) {
+                m = v;
+            }
+        }
+        return m;
+    }
+
+    function asgRefreshGuideSortDisp() {
+        var hid = document.getElementById('asg_guide_sort');
+        var disp = document.getElementById('asg_guide_sort_disp');
+        if (!hid || !disp) {
+            return;
+        }
+        var editId = parseInt(document.getElementById('asg_edit_id').value, 10) || 0;
+        if (editId > 0) {
+            var s = parseInt(hid.value, 10) || 0;
+            disp.value = String(s);
+            disp.title = 'الترتيب المحفوظ لهذا الدليل في القاعدة';
+            return;
+        }
+        var f = fid();
+        var next = 1;
+        if (f > 0) {
+            next = asgMaxGuideSort(ASG_FAMILY_GUIDES_CACHE) + 1;
+        } else {
+            var d = wizardDeptId();
+            var t = wizardTplId();
+            var ck = wizardCk();
+            var subset = [];
+            for (var j = 0; j < ASG_UNBOUND_GUIDES_CACHE.length; j++) {
+                var gx = ASG_UNBOUND_GUIDES_CACHE[j];
+                if ((parseInt(gx.department_id, 10) || 0) === d
+                    && (parseInt(gx.size_scheme_template_id, 10) || 0) === t
+                    && String(gx.commercial_kind_key || '').trim() === ck) {
+                    subset.push(gx);
+                }
+            }
+            next = asgMaxGuideSort(subset) + 1;
+        }
+        hid.value = '0';
+        disp.value = 'تلقائي (~' + String(next) + ')';
+        disp.title = 'عند حفظ دليل جديد يُسجَّل هذا الترتيب تلقائياً في قاعدة البيانات';
     }
 
     function asgNormalizeDisplaySystem(s) {
@@ -1228,9 +1290,11 @@ $asgJson = static function (array $rows): string {
         }
         var f = fid();
         if (f <= 0) {
+            ASG_FAMILY_GUIDES_CACHE = [];
             if (!silent) {
                 alert('أكمل اختيار قالب المقاسات والنوع التجاري (2 و 3) أولاً');
             }
+            asgRefreshGuideSortDisp();
             return;
         }
         var res = await orangeAdminJsonPost(ADVISORY_API, { action: 'list_by_family', size_family_id: f });
@@ -1241,6 +1305,7 @@ $asgJson = static function (array $rows): string {
         }
         tbody.innerHTML = '';
         var guides = res.guides || [];
+        ASG_FAMILY_GUIDES_CACHE = guides;
         guides.forEach(function (g) {
             var gid = parseInt(g.id, 10) || 0;
             var title = (g.name_ar || g.name_en || ('#' + gid));
@@ -1278,6 +1343,7 @@ $asgJson = static function (array $rows): string {
         if (listWrap) {
             listWrap.style.display = 'block';
         }
+        asgRefreshGuideSortDisp();
     }
 
     function asgFamilyOptionsHtml(selectedId) {
@@ -1320,6 +1386,7 @@ $asgJson = static function (array $rows): string {
         }
         tb.innerHTML = '';
         var guides = res.guides || [];
+        ASG_UNBOUND_GUIDES_CACHE = guides;
         guides.forEach(function (g) {
             var gid = parseInt(g.id, 10) || 0;
             var title = (g.name_ar || g.name_en || ('#' + gid));
@@ -1351,6 +1418,7 @@ $asgJson = static function (array $rows): string {
             trd.innerHTML = '<td colspan="10" class="card-hint">لا توجد صفوف — استخدم «دليل جديد» ثم احفظ كمسودة.</td>';
             tb.appendChild(trd);
         }
+        asgRefreshGuideSortDisp();
     }
 
     function asgWireDraftTableDelegation() {
@@ -1412,6 +1480,10 @@ $asgJson = static function (array $rows): string {
         var res = await orangeAdminJsonPost(ADVISORY_API, { action: 'get', id: id });
         if (!res.success) { alert(res.message || 'خطأ'); return; }
         var g = res.guide;
+        var gSortEl0 = document.getElementById('asg_guide_sort');
+        if (gSortEl0) {
+            gSortEl0.value = String(parseInt(g.sort_order, 10) || 0);
+        }
         var rawFam = parseInt(String(g.size_family_id != null ? g.size_family_id : '0'), 10) || 0;
         var famInList = false;
         if (rawFam > 0) {
@@ -1474,6 +1546,7 @@ $asgJson = static function (array $rows): string {
         refreshSizeSelects();
         document.getElementById('asg_editor').style.display = 'block';
         document.getElementById('asg_editor_title').textContent = 'تعديل دليل #' + g.id;
+        asgRefreshGuideSortDisp();
         document.getElementById('asg_editor').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
@@ -1484,6 +1557,10 @@ $asgJson = static function (array $rows): string {
             bf.value = '';
         }
         document.getElementById('asg_family').value = '0';
+        var gSortOpen = document.getElementById('asg_guide_sort');
+        if (gSortOpen) {
+            gSortOpen.value = '0';
+        }
         document.getElementById('asg_scope').value = 'single';
         document.getElementById('asg_active').value = '1';
         document.getElementById('asg_name_ar').value = '';
@@ -1492,6 +1569,7 @@ $asgJson = static function (array $rows): string {
         refreshSizeSelects();
         document.getElementById('asg_editor').style.display = 'block';
         document.getElementById('asg_editor_title').textContent = 'دليل جديد (مسودة — اربط بعائلة لاحقاً من جدول المسودات)';
+        asgRefreshGuideSortDisp();
     }
 
     document.getElementById('asg_new_btn').onclick = openNew;

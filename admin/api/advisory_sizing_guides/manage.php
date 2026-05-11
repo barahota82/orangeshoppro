@@ -108,12 +108,12 @@ try {
                 json_response(['success' => false, 'message' => 'اختر عائلة مقاسات'], 422);
             }
             $st = $pdo->prepare(
-                'SELECT g.id, g.scope_kind, g.name_ar, g.name_en, g.is_active,
+                'SELECT g.id, g.scope_kind, g.name_ar, g.name_en, g.is_active, g.sort_order,
                     (SELECT COUNT(*) FROM advisory_sizing_guide_columns c WHERE c.guide_id = g.id) AS columns_count,
                     (SELECT COUNT(*) FROM advisory_sizing_guide_rows r WHERE r.guide_id = g.id) AS rows_count
                  FROM advisory_sizing_guides g
                  WHERE g.size_family_id = ?
-                 ORDER BY CASE g.scope_kind WHEN \'upper\' THEN 1 WHEN \'lower\' THEN 2 WHEN \'single\' THEN 3 ELSE 9 END, g.id ASC'
+                 ORDER BY g.sort_order ASC, CASE g.scope_kind WHEN \'upper\' THEN 1 WHEN \'lower\' THEN 2 WHEN \'single\' THEN 3 ELSE 9 END, g.id ASC'
             );
             $st->execute([$fid]);
             $rows = $st->fetchAll(PDO::FETCH_ASSOC);
@@ -123,14 +123,14 @@ try {
         case 'list_unbound':
             $st = $pdo->prepare(
                 'SELECT g.id, g.scope_kind, g.name_ar, g.name_en, g.is_active, g.size_family_id,
-                    g.department_id, g.size_scheme_template_id, g.commercial_kind_key,
+                    g.department_id, g.size_scheme_template_id, g.commercial_kind_key, g.sort_order,
                     (SELECT COUNT(*) FROM advisory_sizing_guide_columns c WHERE c.guide_id = g.id) AS columns_count,
                     (SELECT COUNT(*) FROM advisory_sizing_guide_rows r WHERE r.guide_id = g.id) AS rows_count
                  FROM advisory_sizing_guides g
                  WHERE g.size_family_id IS NULL
                     OR g.size_family_id = 0
                     OR NOT EXISTS (SELECT 1 FROM size_families sf WHERE sf.id = g.size_family_id)
-                 ORDER BY g.id DESC'
+                 ORDER BY g.sort_order ASC, g.id DESC'
             );
             $st->execute();
             $rows = $st->fetchAll(PDO::FETCH_ASSOC);
@@ -535,6 +535,25 @@ try {
                 }
             }
 
+            $guideSortIns = 0;
+            if ($id <= 0) {
+                if ($boundFamily && $fidRaw > 0) {
+                    $sMx = $pdo->prepare('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM advisory_sizing_guides WHERE size_family_id = ?');
+                    $sMx->execute([$fidRaw]);
+                    $guideSortIns = (int) $sMx->fetchColumn();
+                } else {
+                    $sMx = $pdo->prepare(
+                        'SELECT COALESCE(MAX(sort_order), 0) + 1 FROM advisory_sizing_guides
+                         WHERE (size_family_id IS NULL OR size_family_id = 0)
+                           AND COALESCE(department_id, 0) = ?
+                           AND COALESCE(size_scheme_template_id, 0) = ?
+                           AND commercial_kind_key = ?'
+                    );
+                    $sMx->execute([$deptId, $tplId, $ckKey]);
+                    $guideSortIns = (int) $sMx->fetchColumn();
+                }
+            }
+
             $pdo->beginTransaction();
             try {
                 if ($id <= 0) {
@@ -561,9 +580,9 @@ try {
                     $ins = $pdo->prepare(
                         'INSERT INTO advisory_sizing_guides
                             (size_family_id, department_id, size_scheme_template_id, commercial_kind_key, scope_kind, name_ar, name_en, name_fil, name_hi, sort_order, is_active)
-                         VALUES (?,?,?,?,?,?,?,?,?,0,?)'
+                         VALUES (?,?,?,?,?,?,?,?,?,?,?)'
                     );
-                    $ins->execute([$famIns, $deptIns, $tplIns, $ckKey, $scopeKind, $nameAr, $nameEn, $nameFil, $nameHi, $active]);
+                    $ins->execute([$famIns, $deptIns, $tplIns, $ckKey, $scopeKind, $nameAr, $nameEn, $nameFil, $nameHi, $guideSortIns, $active]);
                     $id = (int) $pdo->lastInsertId();
                 } else {
                     $nextSf = null;
