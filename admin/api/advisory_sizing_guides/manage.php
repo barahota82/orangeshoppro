@@ -121,21 +121,31 @@ try {
             json_response(['success' => true, 'guides' => is_array($rows) ? $rows : []]);
 
         case 'list_unbound':
-            $st = $pdo->prepare(
-                'SELECT g.id, g.scope_kind, g.name_ar, g.name_en, g.is_active, g.size_family_id,
-                    g.department_id, g.size_scheme_template_id, g.commercial_kind_key, g.sort_order,
-                    (SELECT COUNT(*) FROM advisory_sizing_guide_columns c WHERE c.guide_id = g.id) AS columns_count,
-                    (SELECT COUNT(*) FROM advisory_sizing_guide_rows r WHERE r.guide_id = g.id) AS rows_count
-                 FROM advisory_sizing_guides g
-                 WHERE g.size_family_id IS NULL
-                    OR g.size_family_id = 0
-                    OR NOT EXISTS (SELECT 1 FROM size_families sf WHERE sf.id = g.size_family_id)
-                 ORDER BY g.sort_order ASC, g.id DESC'
-            );
-            $st->execute();
-            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+            try {
+                $st = $pdo->prepare(
+                    'SELECT g.id, g.scope_kind, g.name_ar, g.name_en, g.is_active, g.size_family_id,
+                        g.department_id, g.size_scheme_template_id, g.commercial_kind_key, g.sort_order,
+                        (SELECT COUNT(*) FROM advisory_sizing_guide_columns c WHERE c.guide_id = g.id) AS columns_count,
+                        (SELECT COUNT(*) FROM advisory_sizing_guide_rows r WHERE r.guide_id = g.id) AS rows_count
+                     FROM advisory_sizing_guides g
+                     WHERE g.size_family_id IS NULL
+                        OR g.size_family_id = 0
+                        OR NOT EXISTS (SELECT 1 FROM size_families sf WHERE sf.id = g.size_family_id)
+                     ORDER BY g.sort_order ASC, g.id DESC'
+                );
+                $st->execute();
+                $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 
-            json_response(['success' => true, 'guides' => is_array($rows) ? $rows : []]);
+                json_response(['success' => true, 'guides' => is_array($rows) ? $rows : []]);
+            } catch (Throwable $e) {
+                if (function_exists('error_log')) {
+                    error_log('[orange] advisory list_unbound: ' . $e->getMessage());
+                }
+                json_response([
+                    'success' => false,
+                    'message' => 'تعذّر قراءة مسودات المكتبة من القاعدة (تحقق من جداول advisory_sizing_guides وصلاحيات الاتصال).',
+                ], 500);
+            }
 
         case 'attach_family':
             $gid = (int) ($data['guide_id'] ?? 0);
@@ -724,5 +734,8 @@ try {
     if (function_exists('error_log')) {
         error_log('[orange] advisory_sizing_guides/manage: ' . $e->getMessage());
     }
-    json_response(['success' => false, 'message' => 'خطأ داخلي'], 500);
+    json_response([
+        'success' => false,
+        'message' => 'حدث خطأ على الخادم أثناء معالجة الطلب. حدّث الصفحة أو راجع سجل أخطاء PHP إن استمرّ.',
+    ], 500);
 }

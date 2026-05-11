@@ -242,11 +242,7 @@ $asgJson = static function (array $rows): string {
 
 <div class="card" id="asg_draft_card" style="margin-top:16px;">
     <h3 style="margin-top:0;">مكتبة جداول المقاسات الإرشادية</h3>
-    <p class="card-hint" style="margin:0 0 10px;">سجل للأدلة المحفوظة كمسودات أو اليتيمة (عائلة غير صالحة في القاعدة). عمود «عائلة في القاعدة» يعرض القيمة المحفوظة فقط. <strong>ربط الجدول الإرشادي بعائلة المستهلك</strong> يتم لاحقاً من بطاقة «ربط عائلة مستهلك بحزمة المكتبة ثم المزامنة» (حفظ الربط ثم مزامنة الأدلة) — وليس من جدول المكتبة هنا.</p>
     <div id="asg_draft_load_err" class="alert-error" style="display:none;margin-bottom:10px;"></div>
-    <div style="margin-bottom:8px;">
-        <button type="button" class="btn-secondary" id="asg_draft_refresh">تحديث الجدول</button>
-    </div>
     <div style="overflow-x:auto;">
         <table class="data-table">
             <thead>
@@ -270,7 +266,6 @@ $asgJson = static function (array $rows): string {
 <?php if ($asgLibraryReady): ?>
 <div class="card" id="asg_library_map_card" style="margin-top:16px;">
     <h3 style="margin-top:0;">ربط عائلة مستهلك بحزمة المكتبة ثم المزامنة</h3>
-    <p class="card-hint" style="margin:0 0 12px;">المسار المعتمد لربط الأدلة الإرشادية (مسودات المكتبة / مصدر الحزمة) <strong>بعائلة المستهلك</strong>: اختر عائلة المستهلك وحزمة المكتبة، ثم «حفظ الربط»، ثم «مزامنة الأدلة إلى عائلة المستهلك». بعد المزامنة يمكن فتح التعديل على العائلة المستهدفة لضبط المقاسات والخلايا إن لزم.</p>
     <div class="form-grid" style="max-width:720px;">
         <div style="grid-column:1/-1;"><label for="asg_map_consumer">عائلة المستهلك</label>
             <select id="asg_map_consumer"><option value="0">— اختر —</option>
@@ -288,8 +283,7 @@ $asgJson = static function (array $rows): string {
         <button type="button" class="btn" id="asg_map_sync">مزامنة الأدلة إلى عائلة المستهلك</button>
         <button type="button" class="btn-secondary" id="asg_map_delete">إزالة الربط</button>
     </div>
-    <h4 style="margin:20px 0 8px;">روابط المكتبة والأدلة المحفوظة (جدول واحد)</h4>
-    <div style="overflow:auto;">
+    <div style="margin-top:16px;overflow:auto;">
         <table class="data-table" id="asg_lib_unified_table">
             <thead>
                 <tr>
@@ -310,7 +304,6 @@ $asgJson = static function (array $rows): string {
 <?php if (!$asgLibraryReady): ?>
 <div class="card" id="asg_guides_table_card" style="margin-top:16px;">
     <h3 style="margin-top:0;">الأدلة المحفوظة لهذه العائلة</h3>
-    <p class="card-hint" style="margin:0 0 10px;">عند تفعيل جداول مكتبة الحزم يُدمج هذا الجدول مع بطاقة «ربط عائلة مستهلك بحزمة المكتبة ثم المزامنة».</p>
     <div id="asg_list_wrap" style="display:block;margin-top:8px;">
         <div style="overflow-x:auto;">
             <table class="data-table" id="asg_guides_table">
@@ -725,13 +718,6 @@ $asgJson = static function (array $rows): string {
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
     }
 
-    function asgUnifiedSepRow(html) {
-        var tr = document.createElement('tr');
-        tr.className = 'asg-uni-section';
-        tr.innerHTML = '<td colspan="6" class="card-hint asg-uni-section-cell">' + html + '</td>';
-        return tr;
-    }
-
     async function asgRenderUnifiedTable(opts) {
         opts = opts || {};
         var silent = !!opts.silent;
@@ -740,16 +726,15 @@ $asgJson = static function (array $rows): string {
             return;
         }
         tb.innerHTML = '';
-        tb.appendChild(asgUnifiedSepRow('روابط عائلة المستهلك وحزم المكتبة'));
         var resMaps = await orangeAdminJsonPost(LIBRARY_API, { action: 'list_maps' });
         var maps = (resMaps && resMaps.success && resMaps.maps) ? resMaps.maps : [];
         if (!(resMaps && resMaps.success)) {
             var trErr = document.createElement('tr');
-            trErr.innerHTML = '<td colspan="6" class="card-hint">تعذّر تحميل روابط المكتبة.</td>';
+            trErr.innerHTML = '<td colspan="6" style="text-align:center;color:#94a3b8">—</td>';
             tb.appendChild(trErr);
         } else if (!maps.length) {
             var trE = document.createElement('tr');
-            trE.innerHTML = '<td colspan="6" class="card-hint">لا توجد روابط محفوظة — استخدم القوائم أعلاه ثم «حفظ الربط».</td>';
+            trE.innerHTML = '<td colspan="6" style="text-align:center;color:#94a3b8">—</td>';
             tb.appendChild(trE);
         } else {
             for (var ri = 0; ri < maps.length; ri++) {
@@ -800,12 +785,6 @@ $asgJson = static function (array $rows): string {
         }
 
         var fidv = fid();
-        var famLab = fidv > 0 ? asgMapFamLabel(fidv) : '';
-        tb.appendChild(asgUnifiedSepRow(
-            'الأدلة المحفوظة للعائلة الحالية في المعالج'
-            + (fidv > 0 ? (' — ' + esc(famLab) + ' (#' + fidv + ')') : '')
-        ));
-
         if (fidv <= 0) {
             ASG_FAMILY_GUIDES_CACHE = [];
             if (!silent) {
@@ -815,9 +794,6 @@ $asgJson = static function (array $rows): string {
                     alert('لا توجد عائلة مقاسات مطابقة للمعالج (1–2–3) — يمكن العمل بمسودة من المكتبة؛ في المحرّر تُستخرج أسماء المقاسات من قالب (2). ربط الجدول بعائلة المستهلك من بطاقة «ربط عائلة مستهلك بحزمة المكتبة ثم المزامنة».');
                 }
             }
-            var trZ = document.createElement('tr');
-            trZ.innerHTML = '<td colspan="6" class="card-hint">أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3) لتُعرض هنا الأدلة المربوطة بالعائلة المطابقة؛ أو راجع قسم روابط المكتبة أعلاه.</td>';
-            tb.appendChild(trZ);
             asgRefreshGuideSortDisp();
             return;
         }
@@ -826,7 +802,7 @@ $asgJson = static function (array $rows): string {
         if (!res.success) {
             alert(res.message || 'خطأ');
             var trE2 = document.createElement('tr');
-            trE2.innerHTML = '<td colspan="6" class="card-hint">تعذّر تحميل أدلة العائلة.</td>';
+            trE2.innerHTML = '<td colspan="6" style="text-align:center;color:#94a3b8">—</td>';
             tb.appendChild(trE2);
             asgRefreshGuideSortDisp();
             return;
@@ -835,7 +811,7 @@ $asgJson = static function (array $rows): string {
         ASG_FAMILY_GUIDES_CACHE = guides;
         if (!guides.length) {
             var tr0 = document.createElement('tr');
-            tr0.innerHTML = '<td colspan="6" class="card-hint">لا أدلة محفوظة لهذه العائلة بعد.</td>';
+            tr0.innerHTML = '<td colspan="6" style="text-align:center;color:#94a3b8">—</td>';
             tb.appendChild(tr0);
         } else {
             guides.forEach(function (g) {
@@ -1614,11 +1590,13 @@ $asgJson = static function (array $rows): string {
         }
         var res = await orangeAdminJsonPost(ADVISORY_API, { action: 'list_unbound' });
         if (!res || !res.success) {
-            var msg = (res && res.message) ? res.message : 'خطأ تحميل مكتبة جداول المقاسات الإرشادية';
+            var msg = (res && res.message)
+                ? res.message
+                : 'تعذّر تحميل قائمة المسودات من الخادم.';
             if (!silent) {
                 alert(msg);
             } else if (errEl) {
-                errEl.textContent = msg + ' — جرّب «تحديث الجدول» في بطاقة مكتبة جداول المقاسات الإرشادية.';
+                errEl.textContent = msg + ' حدّث الصفحة إن استمرّ الخطأ.';
                 errEl.style.display = 'block';
             }
             return;
@@ -1652,7 +1630,7 @@ $asgJson = static function (array $rows): string {
         });
         if (!guides.length) {
             var trd = document.createElement('tr');
-            trd.innerHTML = '<td colspan="9" class="card-hint">لا توجد صفوف — بعد اكتمال 1–2–3 استخدم «دليل جديد» ثم احفظ كمسودة.</td>';
+            trd.innerHTML = '<td colspan="9" style="text-align:center;color:#94a3b8">—</td>';
             tb.appendChild(trd);
         }
         asgRefreshGuideSortDisp();
@@ -1928,6 +1906,8 @@ $asgJson = static function (array $rows): string {
     document.getElementById('asg_cancel_btn').onclick = function () {
         document.getElementById('asg_editor').style.display = 'none';
         asgNewEditorWizardSig = null;
+        void loadDraftList({ silent: true });
+        void asgRenderUnifiedTable({ silent: true });
     };
 
     function asgMapFamLabel(id) {
@@ -2039,10 +2019,6 @@ $asgJson = static function (array $rows): string {
         void loadDraftList({ silent: true });
     }
     asgWireDraftTableDelegation();
-    var asgDraftRef = document.getElementById('asg_draft_refresh');
-    if (asgDraftRef) {
-        asgDraftRef.onclick = function () { void loadDraftList(); };
-    }
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', asgBoot);
     } else {
@@ -2053,7 +2029,6 @@ $asgJson = static function (array $rows): string {
 <style>
 .asg-row-block { margin-bottom: 10px; padding: 12px; }
 input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: default; }
-.asg-uni-section-cell { background: #f1f5f9; font-weight: 600; padding: 10px 12px !important; }
 </style>
 
 <?php endif; ?>
