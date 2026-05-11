@@ -207,6 +207,179 @@ function orange_advisory_sizing_has_ready_section(PDO $pdo, int $familyId, array
 }
 
 /**
+ * يبني مصفوفة قسم واحد لدليل محمّل مسبقاً (عرض للواجهة).
+ *
+ * @param array<string, mixed> $guide صف advisory_sizing_guides
+ * @return array{scope_kind: string, columns: list<array<string, mixed>>, rows: list<array<string, mixed>>}|null
+ */
+function orange_advisory_sizing_build_section_array_for_guide(PDO $pdo, array $guide, string $lang): ?array
+{
+    if (!isset($guide['id']) || !orange_table_exists($pdo, 'advisory_sizing_guides')) {
+        return null;
+    }
+    $gid = (int) $guide['id'];
+    $familyId = (int) ($guide['size_family_id'] ?? 0);
+    if ($gid <= 0 || $familyId <= 0) {
+        return null;
+    }
+    $scopeOut = strtolower(trim((string) ($guide['scope_kind'] ?? '')));
+    if (!in_array($scopeOut, ['upper', 'lower', 'single'], true)) {
+        $scopeOut = 'single';
+    }
+    $cSt = $pdo->prepare(
+        'SELECT id, label_ar, label_en, label_fil, label_hi, unit_hint, value_kind, storage_measure, display_system
+         FROM advisory_sizing_guide_columns
+         WHERE guide_id = ?
+         ORDER BY sort_order ASC, id ASC'
+    );
+    $cSt->execute([$gid]);
+    $columns = $cSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    if ($columns === []) {
+        return null;
+    }
+    $rSt = $pdo->prepare(
+        'SELECT id, row_kind, size_family_size_id, label_ar, label_en, label_fil, label_hi
+         FROM advisory_sizing_guide_rows
+         WHERE guide_id = ?
+         ORDER BY sort_order ASC, id ASC'
+    );
+    $rSt->execute([$gid]);
+    $rows = $rSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    if ($rows === []) {
+        return null;
+    }
+    $sizeIdsNeeded = [];
+    foreach ($rows as $rw) {
+        $sid = isset($rw['size_family_size_id']) ? (int) $rw['size_family_size_id'] : 0;
+        if ($sid > 0) {
+            $sizeIdsNeeded[] = $sid;
+        }
+    }
+    $sizeMap = orange_advisory_sizing_load_size_rows_map($pdo, $familyId, $sizeIdsNeeded);
+
+    $colMeta = [];
+    foreach ($columns as $c) {
+        if (!is_array($c) || !isset($c['id'])) {
+            continue;
+        }
+        $uh = trim((string) ($c['unit_hint'] ?? ''));
+        $base = orange_advisory_sizing_label_from_row($c, $lang);
+        $header = $base !== '' && $uh !== '' ? $base . ' (' . $uh . ')' : ($base !== '' ? $base : $uh);
+
+        $vk = strtolower(trim((string) ($c['value_kind'] ?? 'text')));
+        if ($vk !== 'number') {
+            $vk = 'text';
+        }
+        $stMeas = orange_advisory_normalize_storage_measure((string) ($c['storage_measure'] ?? ''));
+        $dispSys = orange_advisory_normalize_display_system((string) ($c['display_system'] ?? ''));
+        if ($stMeas === 'length_cm') {
+            $vk = 'number';
+        }
+        $colMeta[] = [
+            'id' => (int) $c['id'],
+            'header' => $header !== '' ? $header : '—',
+            'value_kind' => $vk,
+            'storage_measure' => $stMeas,
+            'display_system' => $dispSys,
+        ];
+    }
+    $firstColId = $colMeta[0]['id'] ?? 0;
+
+    $rowIds = [];
+    foreach ($rows as $rw) {
+        if (is_array($rw) && isset($rw['id'])) {
+            $rowIds[] = (int) $rw['id'];
+        }
+    }
+    $cellMap = [];
+    if ($rowIds !== []) {
+        $in = implode(',', array_fill(0, count($rowIds), '?'));
+        $cellSt = $pdo->prepare(
+            "SELECT row_id, column_id, cell_value
+             FROM advisory_sizing_guide_cells
+             WHERE row_id IN ($in)"
+        );
+        $cellSt->execute($rowIds);
+        while ($ce = $cellSt->fetch(PDO::FETCH_ASSOC)) {
+            if (!is_array($ce)) {
+                continue;
+            }
+            $rid = (int) ($ce['row_id'] ?? 0);
+            $cid = (int) ($ce['column_id'] ?? 0);
+            if ($rid <= 0 || $cid <= 0) {
+                continue;
+            }
+            if (!isset($cellMap[$rid])) {
+                $cellMap[$rid] = [];
+            }
+            $cellMap[$rid][$cid] = (string) ($ce['cell_value'] ?? '');
+        }
+    }
+
+    $outRows = [];
+    foreach ($rows as $rw) {
+        if (!is_array($rw) || !isset($rw['id'])) {
+            continue;
+        }
+        $rid = (int) $rw['id'];
+        $rk = strtolower(trim((string) ($rw['row_kind'] ?? 'data')));
+        if ($rk === 'label') {
+            $lbl = orange_advisory_sizing_label_from_row($rw, $lang);
+            $outRows[] = ['kind' => 'label', 'label' => $lbl];
+
+            continue;
+        }
+        $cells = [];
+        $sid = isset($rw['size_family_size_id']) ? (int) $rw['size_family_size_id'] : 0;
+        foreach ($colMeta as $cm) {
+            $cid = (int) $cm['id'];
+            $raw = $cellMap[$rid][$cid] ?? '';
+            if ($firstColId > 0 && $cid === $firstColId && $sid > 0 && isset($sizeMap[$sid])) {
+                $raw = orange_advisory_sizing_label_from_row($sizeMap[$sid], $lang);
+            }
+            $cells[] = $raw;
+        }
+        $outRows[] = ['kind' => 'data', 'cells' => $cells];
+    }
+
+    return [
+        'scope_kind' => $scopeOut,
+        'columns' => $colMeta,
+        'rows' => $outRows,
+    ];
+}
+
+/**
+ * أقسام العرض من دليل محدد بالمعرّف (منتج يختار نموذجاً داخلياً).
+ *
+ * @return array{use_dynamic: bool, sections: list<array<string, mixed>>}
+ */
+function orange_advisory_sizing_build_sections_for_guide_id(PDO $pdo, int $guideId, int $expectedFamilyId, string $lang): array
+{
+    if ($guideId <= 0 || !orange_table_exists($pdo, 'advisory_sizing_guides')) {
+        return ['use_dynamic' => false, 'sections' => []];
+    }
+    $st = $pdo->prepare('SELECT * FROM advisory_sizing_guides WHERE id = ? LIMIT 1');
+    $st->execute([$guideId]);
+    $guide = $st->fetch(PDO::FETCH_ASSOC);
+    if (!is_array($guide) || !isset($guide['id'])) {
+        return ['use_dynamic' => false, 'sections' => []];
+    }
+    if ($expectedFamilyId > 0 && (int) ($guide['size_family_id'] ?? 0) !== $expectedFamilyId) {
+        return ['use_dynamic' => false, 'sections' => []];
+    }
+    if ((int) ($guide['is_active'] ?? 0) !== 1) {
+        return ['use_dynamic' => false, 'sections' => []];
+    }
+    $sec = orange_advisory_sizing_build_section_array_for_guide($pdo, $guide, $lang);
+    if ($sec === null) {
+        return ['use_dynamic' => false, 'sections' => []];
+    }
+
+    return ['use_dynamic' => true, 'sections' => [$sec]];
+}
+
+/**
  * يبني أقسام العرض للواجهة (عرض فقط).
  *
  * @param list<string> $kinds
@@ -232,128 +405,10 @@ function orange_advisory_sizing_build_sections(PDO $pdo, int $familyId, array $k
         if (!is_array($guide) || !isset($guide['id'])) {
             continue;
         }
-        $gid = (int) $guide['id'];
-        $cSt = $pdo->prepare(
-            'SELECT id, label_ar, label_en, label_fil, label_hi, unit_hint, value_kind, storage_measure, display_system
-             FROM advisory_sizing_guide_columns
-             WHERE guide_id = ?
-             ORDER BY sort_order ASC, id ASC'
-        );
-        $cSt->execute([$gid]);
-        $columns = $cSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        if ($columns === []) {
-            continue;
+        $sec = orange_advisory_sizing_build_section_array_for_guide($pdo, $guide, $lang);
+        if ($sec !== null) {
+            $sections[] = $sec;
         }
-        $rSt = $pdo->prepare(
-            'SELECT id, row_kind, size_family_size_id, label_ar, label_en, label_fil, label_hi
-             FROM advisory_sizing_guide_rows
-             WHERE guide_id = ?
-             ORDER BY sort_order ASC, id ASC'
-        );
-        $rSt->execute([$gid]);
-        $rows = $rSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        if ($rows === []) {
-            continue;
-        }
-        $sizeIdsNeeded = [];
-        foreach ($rows as $rw) {
-            $sid = isset($rw['size_family_size_id']) ? (int) $rw['size_family_size_id'] : 0;
-            if ($sid > 0) {
-                $sizeIdsNeeded[] = $sid;
-            }
-        }
-        $sizeMap = orange_advisory_sizing_load_size_rows_map($pdo, $familyId, $sizeIdsNeeded);
-
-        $colMeta = [];
-        foreach ($columns as $c) {
-            if (!is_array($c) || !isset($c['id'])) {
-                continue;
-            }
-            $uh = trim((string) ($c['unit_hint'] ?? ''));
-            $base = orange_advisory_sizing_label_from_row($c, $lang);
-            $header = $base !== '' && $uh !== '' ? $base . ' (' . $uh . ')' : ($base !== '' ? $base : $uh);
-
-            $vk = strtolower(trim((string) ($c['value_kind'] ?? 'text')));
-            if ($vk !== 'number') {
-                $vk = 'text';
-            }
-            $stMeas = orange_advisory_normalize_storage_measure((string) ($c['storage_measure'] ?? ''));
-            $dispSys = orange_advisory_normalize_display_system((string) ($c['display_system'] ?? ''));
-            if ($stMeas === 'length_cm') {
-                $vk = 'number';
-            }
-            $colMeta[] = [
-                'id' => (int) $c['id'],
-                'header' => $header !== '' ? $header : '—',
-                'value_kind' => $vk,
-                'storage_measure' => $stMeas,
-                'display_system' => $dispSys,
-            ];
-        }
-        $firstColId = $colMeta[0]['id'] ?? 0;
-
-        $rowIds = [];
-        foreach ($rows as $rw) {
-            if (is_array($rw) && isset($rw['id'])) {
-                $rowIds[] = (int) $rw['id'];
-            }
-        }
-        $cellMap = [];
-        if ($rowIds !== []) {
-            $in = implode(',', array_fill(0, count($rowIds), '?'));
-            $cellSt = $pdo->prepare(
-                "SELECT row_id, column_id, cell_value
-                 FROM advisory_sizing_guide_cells
-                 WHERE row_id IN ($in)"
-            );
-            $cellSt->execute($rowIds);
-            while ($ce = $cellSt->fetch(PDO::FETCH_ASSOC)) {
-                if (!is_array($ce)) {
-                    continue;
-                }
-                $rid = (int) ($ce['row_id'] ?? 0);
-                $cid = (int) ($ce['column_id'] ?? 0);
-                if ($rid <= 0 || $cid <= 0) {
-                    continue;
-                }
-                if (!isset($cellMap[$rid])) {
-                    $cellMap[$rid] = [];
-                }
-                $cellMap[$rid][$cid] = (string) ($ce['cell_value'] ?? '');
-            }
-        }
-
-        $outRows = [];
-        foreach ($rows as $rw) {
-            if (!is_array($rw) || !isset($rw['id'])) {
-                continue;
-            }
-            $rid = (int) $rw['id'];
-            $rk = strtolower(trim((string) ($rw['row_kind'] ?? 'data')));
-            if ($rk === 'label') {
-                $lbl = orange_advisory_sizing_label_from_row($rw, $lang);
-                $outRows[] = ['kind' => 'label', 'label' => $lbl];
-
-                continue;
-            }
-            $cells = [];
-            $sid = isset($rw['size_family_size_id']) ? (int) $rw['size_family_size_id'] : 0;
-            foreach ($colMeta as $cm) {
-                $cid = (int) $cm['id'];
-                $raw = $cellMap[$rid][$cid] ?? '';
-                if ($firstColId > 0 && $cid === $firstColId && $sid > 0 && isset($sizeMap[$sid])) {
-                    $raw = orange_advisory_sizing_label_from_row($sizeMap[$sid], $lang);
-                }
-                $cells[] = $raw;
-            }
-            $outRows[] = ['kind' => 'data', 'cells' => $cells];
-        }
-
-        $sections[] = [
-            'scope_kind' => (string) $kind,
-            'columns' => $colMeta,
-            'rows' => $outRows,
-        ];
     }
 
     return ['use_dynamic' => $sections !== [], 'sections' => $sections];

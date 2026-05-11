@@ -78,6 +78,39 @@ try {
     if (!$hasSizes) {
         $scope = 'none';
     }
+    $sizingAdvisoryGuideId = null;
+    if (orange_table_has_column($pdo, 'products', 'sizing_advisory_guide_id')) {
+        $gid = isset($data['sizing_advisory_guide_id']) ? (int) $data['sizing_advisory_guide_id'] : 0;
+        if (!$hasSizes) {
+            $gid = 0;
+        }
+        if ($gid > 0) {
+            if (!orange_table_exists($pdo, 'advisory_sizing_guides')) {
+                json_response(['success' => false, 'message' => 'جداول دليل المقاس غير جاهزة'], 422);
+            }
+            $gst = $pdo->prepare(
+                'SELECT id, size_family_id, scope_kind, is_active FROM advisory_sizing_guides WHERE id = ? LIMIT 1'
+            );
+            $gst->execute([$gid]);
+            $grow = $gst->fetch(PDO::FETCH_ASSOC);
+            $famNeed = $sizeFamilyId !== null ? (int) $sizeFamilyId : 0;
+            if (!is_array($grow) || (int) ($grow['size_family_id'] ?? 0) !== $famNeed) {
+                json_response(['success' => false, 'message' => 'دليل المقاس المختار لا يطابق عائلة المقاسات للمنتج'], 422);
+            }
+            if ((int) ($grow['is_active'] ?? 0) !== 1) {
+                json_response(['success' => false, 'message' => 'دليل المقاس المختار غير نشط'], 422);
+            }
+            $sizingAdvisoryGuideId = $gid;
+            $sk = strtolower(trim((string) ($grow['scope_kind'] ?? '')));
+            if (in_array($sk, ['upper', 'lower', 'single'], true)) {
+                $scope = $sk;
+            } else {
+                $scope = 'single';
+            }
+        } else {
+            $sizingAdvisoryGuideId = null;
+        }
+    }
 
     $schemeErr = orange_catalog_validate_size_family_matches_product_type(
         $pdo,
@@ -209,6 +242,9 @@ try {
     $columnNames[] = 'product_type_id';
     $columnNames[] = 'size_family_id';
     $columnNames[] = 'sizing_guide_scope';
+    if (orange_table_has_column($pdo, 'products', 'sizing_advisory_guide_id')) {
+        $columnNames[] = 'sizing_advisory_guide_id';
+    }
     $columnNames[] = 'price';
     $columnNames[] = 'cost';
     $columnNames[] = 'main_image';
@@ -221,6 +257,9 @@ try {
     $execParams[] = $productTypeIdResolved;
     $execParams[] = $sizeFamilyId;
     $execParams[] = $scope;
+    if (orange_table_has_column($pdo, 'products', 'sizing_advisory_guide_id')) {
+        $execParams[] = $sizingAdvisoryGuideId;
+    }
     $execParams[] = (float) $data['price'];
     $execParams[] = (float) $data['cost'];
     $execParams[] = $mainImage;

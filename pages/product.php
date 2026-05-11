@@ -101,10 +101,33 @@ $sizingHintKeys = [
 $sizingHintKey = $sizingHintKeys[$scope] ?? '';
 $sizingText = $sizingHintKey !== '' ? t($sizingHintKey) : '';
 
-$sizingKinds = orange_advisory_sizing_product_scope_kinds($scope);
-$advisorySizing = ['use_dynamic' => false, 'sections' => []];
 $sfId = isset($product['size_family_id']) ? (int) $product['size_family_id'] : 0;
-if ($sfId > 0 && $sizingKinds !== []) {
+$advisorySizing = ['use_dynamic' => false, 'sections' => []];
+$sizingKinds = orange_advisory_sizing_product_scope_kinds($scope);
+$agProductGuideId = 0;
+if (
+    $sfId > 0
+    && orange_table_exists($pdo, 'products')
+    && orange_table_has_column($pdo, 'products', 'sizing_advisory_guide_id')
+) {
+    $agProductGuideId = (int) ($product['sizing_advisory_guide_id'] ?? 0);
+}
+if ($sfId > 0 && $agProductGuideId > 0) {
+    $advisorySizing = orange_advisory_sizing_build_sections_for_guide_id($pdo, $agProductGuideId, $sfId, $lang);
+    if (!empty($advisorySizing['use_dynamic']) && !empty($advisorySizing['sections'][0])) {
+        $sk = strtolower(trim((string) ($advisorySizing['sections'][0]['scope_kind'] ?? '')));
+        if (in_array($sk, ['upper', 'lower', 'single'], true)) {
+            $scope = $sk;
+        } else {
+            $scope = 'single';
+        }
+        $sizingHintKey = $sizingHintKeys[$scope] ?? '';
+        $sizingText = $sizingHintKey !== '' ? t($sizingHintKey) : '';
+    } else {
+        $advisorySizing = ['use_dynamic' => false, 'sections' => []];
+    }
+}
+if ($sfId > 0 && empty($advisorySizing['use_dynamic']) && $sizingKinds !== []) {
     $advisorySizing = orange_advisory_sizing_build_sections($pdo, $sfId, $sizingKinds, $lang);
 }
 

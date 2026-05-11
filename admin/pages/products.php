@@ -259,6 +259,50 @@ if ($unifiedProductList) {
     }
 }
 
+if (
+    isset($products) && is_array($products) && $products !== []
+    && orange_table_has_column($pdo, 'products', 'sizing_advisory_guide_id')
+    && orange_table_exists($pdo, 'advisory_sizing_guides')
+) {
+    $advGuideIds = [];
+    foreach ($products as $pr) {
+        if (!is_array($pr)) {
+            continue;
+        }
+        $gid = (int) ($pr['sizing_advisory_guide_id'] ?? 0);
+        if ($gid > 0) {
+            $advGuideIds[$gid] = true;
+        }
+    }
+    $advGuideLabelMap = [];
+    if ($advGuideIds !== []) {
+        $idList = array_keys($advGuideIds);
+        $in = implode(',', array_map(static function ($x) {
+            return (string) (int) $x;
+        }, $idList));
+        try {
+            $gl = $pdo->query(
+                "SELECT id, name_ar, name_en FROM advisory_sizing_guides WHERE id IN ($in)"
+            )->fetchAll(PDO::FETCH_ASSOC);
+            foreach (is_array($gl) ? $gl : [] as $gr) {
+                if (!is_array($gr) || !isset($gr['id'])) {
+                    continue;
+                }
+                $advGuideLabelMap[(int) $gr['id']] = trim((string) (($gr['name_ar'] ?: $gr['name_en']) ?: ''));
+            }
+        } catch (Throwable $e) {
+            $advGuideLabelMap = [];
+        }
+    }
+    foreach ($products as $k => $pr) {
+        if (!is_array($pr)) {
+            continue;
+        }
+        $gid = (int) ($pr['sizing_advisory_guide_id'] ?? 0);
+        $products[$k]['_advisory_guide_label'] = $gid > 0 ? ($advGuideLabelMap[$gid] ?? ('#' . $gid)) : '';
+    }
+}
+
 try {
     $hasDepartmentsTable = (bool) $pdo->query("SHOW TABLES LIKE 'departments'")->fetchColumn();
     if ($hasDepartmentsTable) {
@@ -491,14 +535,12 @@ $orangeAdminCardPreviewViewLabel = t('view_product');
                         </select>
                     </div>
                     <div id="product_basic_size_guide_wrap" class="product-basic-class-cell">
-                        <label for="sizing_guide_scope">دليل المقاس الاسترشادي (عرض)</label>
-                        <select id="sizing_guide_scope" disabled>
-                            <option value="none">بدون</option>
-                            <option value="upper">علوي</option>
-                            <option value="lower">سفلي</option>
-                            <option value="both">علوي وسفلي</option>
-                            <option value="single">مفرد (مثل حذاء)</option>
+                        <label for="sizing_advisory_guide_id">دليل المقاس الاسترشادي (عرض)</label>
+                        <select id="sizing_advisory_guide_id" disabled>
+                            <option value="0">بدون</option>
                         </select>
+                        <input type="hidden" id="sizing_guide_scope_legacy" value="none">
+                        <span class="card-hint" style="display:block;margin-top:4px;font-size:12px;color:#64748b;">القائمة تعرض <strong>اسم النموذج الداخلي (عربي)</strong> كما في شاشة أدلة المقاسات — نوع النموذج (علوي/سفلي/مفرد) يُشتق من الدليل نفسه.</span>
                     </div>
                     <div class="product-basic-class-cell" id="product_basic_has_colors_wrap">
                         <label for="has_colors">له ألوان ؟</label>
@@ -743,7 +785,7 @@ $orangeAdminCardPreviewViewLabel = t('view_product');
                     <?php if ($hasProductTypesTable): ?>
                     <th>نوع (موحّد)</th>
                     <?php endif; ?>
-                    <th>دليل مقاس</th>
+                    <th>دليل استرشادي</th>
                     <th>السعر</th>
                     <th>التكلفة</th>
                     <th>الحالة</th>
@@ -795,7 +837,14 @@ $orangeAdminCardPreviewViewLabel = t('view_product');
                     <?php if ($hasProductTypesTable): ?>
                     <td<?php echo $pPtStyle !== '' ? $pPtStyle : ''; ?>><?php echo $pPtCell; ?></td>
                     <?php endif; ?>
-                    <td><?php echo htmlspecialchars((string)($p['sizing_guide_scope'] ?? 'none')); ?></td>
+                    <td><?php
+                    $agl = trim((string) ($p['_advisory_guide_label'] ?? ''));
+                    if ($agl !== '') {
+                        echo htmlspecialchars($agl, ENT_QUOTES, 'UTF-8');
+                    } else {
+                        echo htmlspecialchars((string) ($p['sizing_guide_scope'] ?? 'none'), ENT_QUOTES, 'UTF-8');
+                    }
+                    ?></td>
                     <td><?php echo number_format((float)$p['price'], 2); ?></td>
                     <td><?php echo number_format((float)$p['cost'], 2); ?></td>
                     <td><?php echo (int)$p['is_active'] === 1 ? 'نشط' : 'مخفي'; ?></td>
@@ -2491,7 +2540,16 @@ function resetProductForm() {
     adminSetMainImagePreview('');
     document.getElementById('has_colors').value = '0';
     document.getElementById('size_family_id').value = '';
-    document.getElementById('sizing_guide_scope').value = 'none';
+    const advReset = document.getElementById('sizing_advisory_guide_id');
+    if (advReset) {
+        advReset.innerHTML = '<option value="0">بدون</option>';
+        advReset.value = '0';
+        advReset.disabled = true;
+    }
+    const legReset = document.getElementById('sizing_guide_scope_legacy');
+    if (legReset) {
+        legReset.value = 'none';
+    }
     document.getElementById('product_is_active').value = '1';
     document.getElementById('colorwaysBox').innerHTML = '';
     document.getElementById('variantsBox').innerHTML = '';
@@ -2677,7 +2735,12 @@ async function loadProductForEdit(id) {
         adminSetMainImagePreview(mainFn);
         document.getElementById('has_colors').value = parseInt(p.has_colors, 10) === 1 ? '1' : '0';
         document.getElementById('size_family_id').value = p.size_family_id ? String(p.size_family_id) : '';
-        document.getElementById('sizing_guide_scope').value = p.sizing_guide_scope || 'none';
+        const legLoad = document.getElementById('sizing_guide_scope_legacy');
+        if (legLoad) {
+            legLoad.value = p.sizing_guide_scope || 'none';
+        }
+        const advPick = parseInt(String(p.sizing_advisory_guide_id != null ? p.sizing_advisory_guide_id : '0'), 10) || 0;
+        void orangeProductRefreshAdvisoryGuideSelect(advPick);
         document.getElementById('colorwaysBox').innerHTML = '';
         document.getElementById('variantsBox').innerHTML = '';
         const vm = Array.isArray(p.variant_matrix_rows) ? p.variant_matrix_rows : [];
@@ -2804,6 +2867,91 @@ async function uploadGalleryProductImages() {
     orangeProductInvalidateVariantsReadyForSave();
 }
 
+function orangeProductSizingSaveFields() {
+    const advEl = document.getElementById('sizing_advisory_guide_id');
+    const legEl = document.getElementById('sizing_guide_scope_legacy');
+    const adv = advEl ? parseInt(String(advEl.value || '0'), 10) || 0 : 0;
+    let legacy = 'none';
+    if (legEl && legEl.value) {
+        const v = String(legEl.value).trim();
+        if (['none', 'upper', 'lower', 'both', 'single'].indexOf(v) !== -1) {
+            legacy = v;
+        }
+    }
+    return {
+        sizing_advisory_guide_id: adv,
+        sizing_guide_scope: adv > 0 ? 'none' : legacy,
+    };
+}
+
+async function orangeProductRefreshAdvisoryGuideSelect(preserveId) {
+    const sel = document.getElementById('sizing_advisory_guide_id');
+    if (!sel) {
+        return;
+    }
+    const famEl = document.getElementById('size_family_id');
+    const famId = famEl ? parseInt(String(famEl.value || '0'), 10) || 0 : 0;
+    const wantKeep = preserveId !== undefined && preserveId !== null;
+    const prev = wantKeep ? (parseInt(String(preserveId), 10) || 0) : (parseInt(String(sel.value || '0'), 10) || 0);
+    sel.innerHTML = '<option value="0">بدون</option>';
+    if (!famId) {
+        sel.disabled = true;
+        sel.value = '0';
+        return;
+    }
+    const allowTier = orangeProductBasicRecordIsEdit() || orangeProductBasicPriceOk();
+    const hs = orangeProductEffectiveHasSizes();
+    if (!allowTier || !hs) {
+        sel.disabled = true;
+        sel.value = '0';
+        return;
+    }
+    sel.disabled = false;
+    try {
+        const res = await postJSON(adminApiPath('api/advisory_sizing_guides/manage.php'), {
+            action: 'list_by_family',
+            size_family_id: famId,
+        });
+        if (!res || !res.success) {
+            sel.value = '0';
+            return;
+        }
+        const guides = res.guides || [];
+        guides.forEach(function (g) {
+            const active = parseInt(String(g.is_active != null ? g.is_active : '1'), 10) || 0;
+            if (active !== 1) {
+                return;
+            }
+            const cols = parseInt(String(g.columns_count != null ? g.columns_count : '0'), 10) || 0;
+            const rws = parseInt(String(g.rows_count != null ? g.rows_count : '0'), 10) || 0;
+            if (cols < 1 || rws < 1) {
+                return;
+            }
+            const id = parseInt(String(g.id != null ? g.id : '0'), 10) || 0;
+            if (id <= 0) {
+                return;
+            }
+            const lab = String(g.name_ar || g.name_en || ('#' + id)).replace(/</g, '');
+            const o = document.createElement('option');
+            o.value = String(id);
+            o.textContent = lab;
+            sel.appendChild(o);
+        });
+        if (prev > 0) {
+            const hit = sel.querySelector('option[value="' + prev + '"]');
+            if (hit) {
+                sel.value = String(prev);
+            } else {
+                sel.value = '0';
+            }
+        } else {
+            sel.value = '0';
+        }
+    } catch (e) {
+        sel.value = '0';
+    }
+}
+
 function onHasFlagsChange(options) {
     const hcEl = document.getElementById('has_colors');
     const hc = hcEl && hcEl.value === '1';
@@ -2835,13 +2983,15 @@ function onHasFlagsChange(options) {
     }
     orangeApplySizeFamilySchemeFilter();
     const hs = orangeProductEffectiveHasSizes();
-    const sgScope = document.getElementById('sizing_guide_scope');
-    if (sgScope) {
+    const sgAdv = document.getElementById('sizing_advisory_guide_id');
+    if (sgAdv) {
         if (!allowSizeTier || !hs) {
-            sgScope.value = 'none';
-            sgScope.disabled = true;
+            sgAdv.innerHTML = '<option value="0">بدون</option>';
+            sgAdv.value = '0';
+            sgAdv.disabled = true;
         } else {
-            sgScope.disabled = false;
+            sgAdv.disabled = false;
+            void orangeProductRefreshAdvisoryGuideSelect();
         }
     }
     const cwh = document.getElementById('colorways_sizes_hint');
@@ -3684,7 +3834,7 @@ async function saveProduct() {
             has_sizes: orangeProductEffectiveHasSizes() ? 1 : 0,
             has_colors: parseInt(document.getElementById('has_colors').value, 10),
             size_family_id: parseInt(document.getElementById('size_family_id').value, 10) || 0,
-            sizing_guide_scope: document.getElementById('sizing_guide_scope').value,
+            ...orangeProductSizingSaveFields(),
             sort_order: parseInt(document.getElementById('product_sort_order').value || '0', 10),
             is_active: parseInt(document.getElementById('product_is_active').value, 10),
             item_code: (document.getElementById('product_item_code') && document.getElementById('product_item_code').value.trim()) || '',
@@ -3788,7 +3938,7 @@ async function saveProduct() {
         has_sizes: orangeProductEffectiveHasSizes() ? 1 : 0,
         has_colors: parseInt(document.getElementById('has_colors').value, 10),
         size_family_id: parseInt(document.getElementById('size_family_id').value, 10) || 0,
-        sizing_guide_scope: document.getElementById('sizing_guide_scope').value,
+        ...orangeProductSizingSaveFields(),
         extra_images: window.PRODUCT_EXTRA_IMAGES || [],
         item_code: (document.getElementById('product_item_code') && document.getElementById('product_item_code').value.trim()) || '',
         barcode: (document.getElementById('product_barcode') && document.getElementById('product_barcode').value.trim()) || '',
@@ -3895,6 +4045,7 @@ if (orangeSizeFamilySelectEl) {
         orangeProductClearGeneratedVariantsMatrixIfNeeded();
         orangeProductInvalidateVariantsReadyForSave();
         orangeApplyProductBasicStepLocks();
+        void orangeProductRefreshAdvisoryGuideSelect(0);
     });
 }
 const btnRemoveMainProductImage = document.getElementById('btn_remove_main_product_image');

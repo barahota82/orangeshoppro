@@ -1053,6 +1053,12 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             "ALTER TABLE products ADD COLUMN sizing_guide_scope VARCHAR(16) NOT NULL DEFAULT 'none'"
         );
     }
+    if (orange_table_exists($pdo, 'products') && !orange_table_has_column($pdo, 'products', 'sizing_advisory_guide_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE products ADD COLUMN sizing_advisory_guide_id INT NULL DEFAULT NULL AFTER sizing_guide_scope'
+        );
+    }
     if (orange_table_exists($pdo, 'product_variants') && !orange_table_has_column($pdo, 'product_variants', 'product_colorway_id')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE product_variants ADD COLUMN product_colorway_id INT NULL');
     }
