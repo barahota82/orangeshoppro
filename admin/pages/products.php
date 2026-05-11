@@ -539,7 +539,6 @@ $orangeAdminCardPreviewViewLabel = t('view_product');
                         <select id="sizing_advisory_guide_id" disabled>
                             <option value="0">بدون</option>
                         </select>
-                        <span class="card-hint" style="display:block;margin-top:4px;font-size:12px;color:#64748b;">القائمة: أسماء النماذج الداخلية (عربي) كما في شاشة <strong>أدلة المقاسات الاسترشادية</strong>.</span>
                     </div>
                     <div class="product-basic-class-cell" id="product_basic_has_colors_wrap">
                         <label for="has_colors">له ألوان ؟</label>
