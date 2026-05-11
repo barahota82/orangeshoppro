@@ -491,11 +491,34 @@ $asgJson = static function (array $rows): string {
 
     function effectiveFamilySizeRows() {
         var f = fid();
-        var raw = FAMILY_SIZES[String(f)] || [];
+        var raw = (FAMILY_SIZES[String(f)] || []).slice();
+        /* ترتيب وتصفية المقاسات حسب قالب المعالج (2) — وليس حسب قالب آخر في العائلة. */
         var tpl = wizardTplId();
         var tplList = [];
         if (TEMPLATE_SIZE_ROWS && typeof TEMPLATE_SIZE_ROWS === 'object') {
             tplList = TEMPLATE_SIZE_ROWS[String(tpl)] || [];
+        }
+        var allowedTplSizeIds = {};
+        for (var ai = 0; ai < tplList.length; ai++) {
+            var tsz = parseInt(tplList[ai].id, 10) || 0;
+            if (tsz > 0) {
+                allowedTplSizeIds[tsz] = true;
+            }
+        }
+        if (tpl > 0 && tplList.length > 0 && raw.length > 0) {
+            var hasLinked = false;
+            for (var hi = 0; hi < raw.length; hi++) {
+                if ((parseInt(raw[hi].scheme_template_size_id, 10) || 0) > 0) {
+                    hasLinked = true;
+                    break;
+                }
+            }
+            if (hasLinked) {
+                raw = raw.filter(function (row) {
+                    var sid = parseInt(row.scheme_template_size_id, 10) || 0;
+                    return sid > 0 && Object.prototype.hasOwnProperty.call(allowedTplSizeIds, sid);
+                });
+            }
         }
         if (!tplList.length) {
             return raw.slice().sort(function (a, b) {
@@ -512,10 +535,10 @@ $asgJson = static function (array $rows): string {
         return raw.slice().sort(function (a, b) {
             var ast = parseInt(a.scheme_template_size_id, 10) || 0;
             var bst = parseInt(b.scheme_template_size_id, 10) || 0;
-            var ai = ast > 0 && Object.prototype.hasOwnProperty.call(orderIdx, ast) ? orderIdx[ast] : 9999;
-            var bi = bst > 0 && Object.prototype.hasOwnProperty.call(orderIdx, bst) ? orderIdx[bst] : 9999;
-            if (ai !== bi) {
-                return ai - bi;
+            var aix = ast > 0 && Object.prototype.hasOwnProperty.call(orderIdx, ast) ? orderIdx[ast] : 9999;
+            var bix = bst > 0 && Object.prototype.hasOwnProperty.call(orderIdx, bst) ? orderIdx[bst] : 9999;
+            if (aix !== bix) {
+                return aix - bix;
             }
             return (parseInt(a.sort_order, 10) || 0) - (parseInt(b.sort_order, 10) || 0);
         });
