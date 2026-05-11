@@ -165,10 +165,6 @@ $asgJson = static function (array $rows): string {
         </div>
     </div>
     <p id="asg_w_hint" class="card-hint" style="margin:12px 0 0;"></p>
-    <h4 style="margin:16px 0 8px;">الأدلة</h4>
-    <div id="asg_list_wrap" style="display:none;">
-        <ul id="asg_list" class="asg-guide-list"></ul>
-    </div>
 </div>
 
 <div class="card" id="asg_editor" style="display:none;margin-top:16px;">
@@ -208,6 +204,26 @@ $asgJson = static function (array $rows): string {
     <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
         <button type="button" class="btn" id="asg_save_btn">حفظ</button>
         <button type="button" class="btn-secondary" id="asg_cancel_btn">إلغاء</button>
+    </div>
+</div>
+
+<div class="card" id="asg_guides_table_card" style="margin-top:16px;">
+    <h3 style="margin-top:0;">الأدلة المحفوظة لهذه العائلة</h3>
+    <div id="asg_list_wrap" style="display:none;margin-top:8px;">
+        <div style="overflow-x:auto;">
+            <table class="data-table" id="asg_guides_table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>اسم النموذج (داخلي)</th>
+                        <th>أعمدة</th>
+                        <th>صفوف</th>
+                        <th>إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody id="asg_list_tbody"></tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -406,7 +422,7 @@ $asgJson = static function (array $rows): string {
         var hintEl = document.getElementById('asg_w_hint');
         var nb = document.getElementById('asg_new_btn');
         var listWrap = document.getElementById('asg_list_wrap');
-        var listUl = document.getElementById('asg_list');
+        var listTbody = document.getElementById('asg_list_tbody');
         if (hid) {
             hid.value = id > 0 ? String(id) : '0';
         }
@@ -423,8 +439,8 @@ $asgJson = static function (array $rows): string {
             if (listWrap) {
                 listWrap.style.display = 'none';
             }
-            if (listUl) {
-                listUl.innerHTML = '';
+            if (listTbody) {
+                listTbody.innerHTML = '';
             }
             if (hintEl && tpl > 0 && ck !== '') {
                 hintEl.textContent = 'لا عائلة مطابقة للقالب والنوع.';
@@ -1076,22 +1092,37 @@ $asgJson = static function (array $rows): string {
         }
         var res = await orangeAdminJsonPost(ADVISORY_API, { action: 'list_by_family', size_family_id: f });
         if (!res.success) { alert(res.message || 'خطأ'); return; }
-        var ul = document.getElementById('asg_list');
-        ul.innerHTML = '';
+        var tbody = document.getElementById('asg_list_tbody');
+        if (!tbody) {
+            return;
+        }
+        tbody.innerHTML = '';
         (res.guides || []).forEach(function (g) {
-            var li = document.createElement('li');
-            var title = (g.name_ar || g.name_en || ('#' + g.id));
-            li.innerHTML = esc(title) +
-                ' <button type="button" class="btn-secondary asg-ed" data-id="' + g.id + '">تعديل</button>' +
-                ' <button type="button" class="btn-secondary asg-del" data-id="' + g.id + '">حذف</button>';
-            li.querySelector('.asg-ed').onclick = function () { loadGuide(parseInt(g.id, 10)); };
-            li.querySelector('.asg-del').onclick = async function () {
-                if (!confirm('حذف الدليل؟')) return;
-                var r2 = await orangeAdminJsonPost(ADVISORY_API, { action: 'delete', id: parseInt(g.id, 10) });
-                if (!r2.success) { alert(r2.message || 'خطأ'); return; }
-                loadList();
+            var gid = parseInt(g.id, 10) || 0;
+            var title = (g.name_ar || g.name_en || ('#' + gid));
+            var cols = parseInt(String(g.columns_count != null ? g.columns_count : '0'), 10) || 0;
+            var rws = parseInt(String(g.rows_count != null ? g.rows_count : '0'), 10) || 0;
+            var tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td>' + gid + '</td>' +
+                '<td>' + esc(title) + '</td>' +
+                '<td>' + cols + '</td>' +
+                '<td>' + rws + '</td>' +
+                '<td><button type="button" class="btn-secondary asg-ed" data-id="' + gid + '">تعديل</button> ' +
+                '<button type="button" class="btn-secondary asg-del" data-id="' + gid + '">حذف</button></td>';
+            tr.querySelector('.asg-ed').onclick = function () { loadGuide(gid); };
+            tr.querySelector('.asg-del').onclick = async function () {
+                if (!confirm('حذف الدليل؟')) {
+                    return;
+                }
+                var r2 = await orangeAdminJsonPost(ADVISORY_API, { action: 'delete', id: gid });
+                if (!r2.success) {
+                    alert(r2.message || 'خطأ');
+                    return;
+                }
+                void loadList();
             };
-            ul.appendChild(li);
+            tbody.appendChild(tr);
         });
         document.getElementById('asg_list_wrap').style.display = 'block';
     }
@@ -1189,10 +1220,17 @@ $asgJson = static function (array $rows): string {
             rows: rowsPayload
         };
         var res = await orangeAdminJsonPost(ADVISORY_API, payload);
-        if (!res.success) { alert(res.message || 'خطأ'); return; }
+        if (!res.success) {
+            alert(res.message || 'خطأ');
+            return;
+        }
         alert('تم الحفظ');
-        document.getElementById('asg_edit_id').value = String(res.id || payload.id);
-        loadList();
+        await loadList();
+        openNew();
+        var ed = document.getElementById('asg_editor');
+        if (ed) {
+            ed.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     };
 
     document.getElementById('asg_cancel_btn').onclick = function () {
@@ -1215,8 +1253,6 @@ $asgJson = static function (array $rows): string {
 })();
 </script>
 <style>
-.asg-guide-list { list-style: none; padding: 0; margin: 0; }
-.asg-guide-list li { margin: 8px 0; padding: 8px; background: #f8fafc; border-radius: 6px; }
 .asg-row-block { margin-bottom: 10px; padding: 12px; }
 input.asg-cell--from-family { background: #f1f5f9; color: #475569; cursor: default; }
 </style>
