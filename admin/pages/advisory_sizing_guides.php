@@ -158,20 +158,18 @@ $asgJson = static function (array $rows): string {
 <?php endif; ?>
 
 <div class="card">
-    <h3>القسم والقالب والنوع التجاري</h3>
+    <h3>إنشاء جدول مقاس إرشادي</h3>
     <input type="hidden" id="asg_family" value="0">
     <input type="hidden" id="asg_guide_sort" value="0">
-    <div class="asg-wizard-row1" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-top:10px;direction:rtl;justify-content:flex-end;">
-        <div style="flex:0 1 auto;min-width:11rem;display:flex;flex-direction:column;gap:4px;">
-            <label for="asg_guide_sort_disp" style="margin:0;font-size:13px;white-space:nowrap;">ترتيب عرض الدليل (تلقائي)</label>
-            <input type="text" id="asg_guide_sort_disp" readonly class="input-narrow" style="width:100%;max-width:18rem;background:#f1f5f9;cursor:default;" title="للدليل الجديد: يُحسب عند الحفظ. عند التعديل: القيمة المحفوظة.">
-        </div>
-    </div>
     <div class="asg-wizard-toolbar" style="display:flex;flex-wrap:nowrap;align-items:flex-end;gap:12px;direction:ltr;justify-content:space-between;width:100%;box-sizing:border-box;margin-top:14px;">
         <div style="flex:0 0 auto;">
             <button type="button" class="btn" id="asg_new_btn" disabled title="أكمل اختيار القسم (1) وقالب المقاسات (2) والنوع التجاري (3)">دليل جديد</button>
         </div>
         <div class="asg-wizard-fields" style="display:flex;flex-wrap:nowrap;flex:1 1 auto;gap:10px;align-items:flex-end;min-width:0;direction:rtl;justify-content:flex-end;overflow-x:auto;">
+            <div style="flex:0 0 auto;width:6.5rem;min-width:6rem;display:flex;flex-direction:column;gap:4px;">
+                <label for="asg_guide_sort_disp" style="margin:0;font-size:13px;white-space:nowrap;">ترتيب عرض الدليل (تلقائي)</label>
+                <input type="text" id="asg_guide_sort_disp" readonly class="input-narrow" style="width:100%;box-sizing:border-box;text-align:center;background:#f1f5f9;cursor:default;" title="للدليل الجديد: الرقم التالي في القاعدة (يبدأ من 1 ويزيد 1 بعد كل حفظ). عند التعديل: القيمة المحفوظة.">
+            </div>
             <div style="flex:1 1 0;min-width:10rem;display:flex;flex-direction:column;gap:4px;">
                 <label for="asg_w_dept" style="margin:0;font-size:13px;white-space:nowrap;"><strong>1.</strong> القسم الرئيسي</label>
                 <select id="asg_w_dept" style="width:100%;min-width:0;"><option value="0">— الكل / بدون تصفية بالقسم —</option>
@@ -202,7 +200,7 @@ $asgJson = static function (array $rows): string {
 </div>
 
 <div class="card" id="asg_draft_card" style="margin-top:16px;">
-    <h3 style="margin-top:0;">جدول الأدلة المحفوظة</h3>
+    <h3 style="margin-top:0;">مكتبة جداول المقاسات الإرشادية</h3>
     <p class="card-hint" style="margin:0 0 10px;">أدلة بلا عائلة مقاسات صالحة في الكتالوج (مسودات)، أو مرتبطة بعائلة محذوفة/غير نشطة (يتيم) — تظهر هنا حتى تُربط بعائلة من العمود «ربط بعائلة».</p>
     <div id="asg_draft_load_err" class="alert-error" style="display:none;margin-bottom:10px;"></div>
     <div style="margin-bottom:8px;">
@@ -556,7 +554,7 @@ $asgJson = static function (array $rows): string {
                 listWrap.style.display = 'block';
             }
             if (listTbody) {
-                listTbody.innerHTML = '<tr><td colspan="5" class="card-hint">أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3) لتُعرض هنا الأدلة المربوطة بالعائلة المطابقة. لمسودة جديدة: بعد اكتمال 1–2–3 استخدم «دليل جديد»؛ تُعرض المسودات في «جدول الأدلة المحفوظة» أعلى هذه البطاقة.</td></tr>';
+                listTbody.innerHTML = '<tr><td colspan="5" class="card-hint">أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3) لتُعرض هنا الأدلة المربوطة بالعائلة المطابقة. لمسودة جديدة: بعد اكتمال 1–2–3 استخدم «دليل جديد»؛ تُعرض المسودات في «مكتبة جداول المقاسات الإرشادية» أعلى هذه البطاقة.</td></tr>';
             }
             if (hintEl && tpl > 0 && ck !== '') {
                 hintEl.textContent = 'لا عائلة مطابقة للقالب والنوع.';
@@ -651,8 +649,8 @@ $asgJson = static function (array $rows): string {
             next = asgMaxGuideSort(subset) + 1;
         }
         hid.value = '0';
-        disp.value = 'تلقائي (~' + String(next) + ')';
-        disp.title = 'عند حفظ دليل جديد يُسجَّل هذا الترتيب تلقائياً في قاعدة البيانات';
+        disp.value = String(next);
+        disp.title = 'دليل جديد سيُحفظ بالترتيب ' + String(next) + ' في القاعدة؛ بعد كل حفظ يعرض الحقل التالي (يزيد 1).';
     }
 
     function asgNormalizeDisplaySystem(s) {
@@ -1344,11 +1342,11 @@ $asgJson = static function (array $rows): string {
         }
         var res = await orangeAdminJsonPost(ADVISORY_API, { action: 'list_unbound' });
         if (!res || !res.success) {
-            var msg = (res && res.message) ? res.message : 'خطأ تحميل جدول الأدلة المحفوظة';
+            var msg = (res && res.message) ? res.message : 'خطأ تحميل مكتبة جداول المقاسات الإرشادية';
             if (!silent) {
                 alert(msg);
             } else if (errEl) {
-                errEl.textContent = msg + ' — جرّب «تحديث الجدول» في بطاقة جدول الأدلة المحفوظة.';
+                errEl.textContent = msg + ' — جرّب «تحديث الجدول» في بطاقة مكتبة جداول المقاسات الإرشادية.';
                 errEl.style.display = 'block';
             }
             return;
@@ -1541,7 +1539,7 @@ $asgJson = static function (array $rows): string {
         clearRows();
         refreshSizeSelects();
         document.getElementById('asg_editor').style.display = 'block';
-        document.getElementById('asg_editor_title').textContent = 'دليل جديد (مسودة — اربط بعائلة لاحقاً من «جدول الأدلة المحفوظة»)';
+        document.getElementById('asg_editor_title').textContent = 'دليل جديد (مسودة — اربط بعائلة لاحقاً من «مكتبة جداول المقاسات الإرشادية»)';
         asgRefreshGuideSortDisp();
     }
 
@@ -1564,7 +1562,7 @@ $asgJson = static function (array $rows): string {
             var sid = parseInt(r.size_family_size_id, 10) || 0;
             if (!famOk) {
                 if (sid > 0) {
-                    return 'مسودة بدون عائلة: لا تربط صفاً بمقاس قبل ربط الدليل بعائلة من «جدول الأدلة المحفوظة» (أو اختر عائلة في المعالج ثم احفظ).';
+                    return 'مسودة بدون عائلة: لا تربط صفاً بمقاس قبل ربط الدليل بعائلة من «مكتبة جداول المقاسات الإرشادية» (أو اختر عائلة في المعالج ثم احفظ).';
                 }
             } else {
                 if (sid <= 0) {
@@ -1587,7 +1585,7 @@ $asgJson = static function (array $rows): string {
         var boundStored = parseInt(document.getElementById('asg_bound_family').value, 10) || 0;
         var isUnboundContext = boundStored <= 0;
         if (f <= 0 && !isUnboundContext) {
-            alert('أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3)، أو افتح مسودة من «جدول الأدلة المحفوظة»');
+            alert('أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3)، أو افتح مسودة من «مكتبة جداول المقاسات الإرشادية»');
             return;
         }
         if (wizardDeptId() <= 0) {
