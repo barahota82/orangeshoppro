@@ -161,13 +161,13 @@ $asgJson = static function (array $rows): string {
     <h3 style="margin:0;">إنشاء جدول مقاس إرشادي</h3>
     <input type="hidden" id="asg_family" value="0">
     <input type="hidden" id="asg_guide_sort" value="0">
-    <div class="asg-wizard-row-sort" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-top:12px;width:100%;box-sizing:border-box;direction:rtl;justify-content:flex-end;">
+    <div class="asg-wizard-row-sort" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-top:12px;width:100%;box-sizing:border-box;direction:rtl;justify-content:flex-start;">
         <div style="flex:0 0 auto;width:6.5rem;min-width:6rem;display:flex;flex-direction:column;gap:4px;">
             <label for="asg_guide_sort_disp" style="margin:0;font-size:13px;white-space:nowrap;">ترتيب عرض الدليل (تلقائي)</label>
             <input type="text" id="asg_guide_sort_disp" readonly class="input-narrow" style="width:100%;box-sizing:border-box;text-align:center;background:#f1f5f9;cursor:default;" title="للدليل الجديد: الرقم التالي في القاعدة (يبدأ من 1 ويزيد 1 بعد كل حفظ). عند التعديل: القيمة المحفوظة.">
         </div>
     </div>
-    <div class="asg-wizard-toolbar" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;margin-top:14px;width:100%;box-sizing:border-box;direction:rtl;justify-content:flex-end;">
+    <div class="asg-wizard-toolbar" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;margin-top:14px;width:100%;box-sizing:border-box;direction:rtl;justify-content:flex-start;">
         <div style="flex:1 1 0;min-width:10rem;display:flex;flex-direction:column;gap:4px;">
             <label for="asg_w_dept" style="margin:0;font-size:13px;white-space:nowrap;"><strong>1.</strong> القسم الرئيسي</label>
             <select id="asg_w_dept" style="width:100%;min-width:0;"><option value="0">— الكل / بدون تصفية بالقسم —</option>
