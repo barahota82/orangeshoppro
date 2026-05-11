@@ -158,7 +158,7 @@ $asgJson = static function (array $rows): string {
 <?php endif; ?>
 
 <div class="card">
-    <h3>إنشاء جدول مقاس إرشادي</h3>
+    <h3 style="margin:0;line-height:1.35;">إنشاء جدول مقاس<br>إرشادي</h3>
     <input type="hidden" id="asg_family" value="0">
     <input type="hidden" id="asg_guide_sort" value="0">
     <div class="asg-wizard-toolbar" style="display:flex;flex-wrap:nowrap;align-items:flex-end;gap:12px;direction:ltr;justify-content:space-between;width:100%;box-sizing:border-box;margin-top:14px;">
@@ -197,6 +197,47 @@ $asgJson = static function (array $rows): string {
         </div>
     </div>
     <p id="asg_w_hint" class="card-hint" style="margin:12px 0 0;"></p>
+</div>
+
+<div class="card" id="asg_editor" style="display:none;margin-top:16px;">
+    <h3 id="asg_editor_title">تعديل دليل</h3>
+    <input type="hidden" id="asg_edit_id" value="0">
+    <input type="hidden" id="asg_bound_family" value="">
+    <input type="hidden" id="asg_scope" value="single">
+    <input type="hidden" id="asg_active" value="1">
+    <div class="form-grid" style="max-width:900px;">
+        <div style="grid-column:1/-1;"><label for="asg_name_ar">اسم النموذج (داخلي — عربي فقط)</label><input type="text" id="asg_name_ar" maxlength="191" placeholder="مثال: علوي قمصان EU"></div>
+    </div>
+
+    <h4 style="margin-top:20px;">تعريف الأعمدة</h4>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:8px;">
+        <div>
+            <label for="asg_col_count">عدد الأعمدة</label>
+            <input type="number" id="asg_col_count" min="1" max="24" value="3" style="width:5rem;">
+        </div>
+        <button type="button" class="btn" id="asg_gen_cols">توليد صفوف العناوين</button>
+        <button type="button" class="btn-secondary" id="asg_col_add" title="يضيف عموداً جديداً في النهاية ويضيف خلية فارغة لكل صف بيانات">+ عمود</button>
+        <button type="button" class="btn-secondary" id="asg_col_remove" title="يحذف آخر عمود من التعريف وآخر خلية من كل صف بيانات">− حذف آخر عمود</button>
+    </div>
+    <div style="overflow-x:auto;">
+        <table class="data-table" id="asg_cols_table">
+            <thead><tr><th>ترتيب</th><th>عربي</th><th>EN</th><th>Fil</th><th>Hi</th><th>نوع القيمة</th><th>وحدة (عرض)</th><th>تخزين الطول</th><th>عمود النظام (كود)</th></tr></thead>
+            <tbody id="asg_cols_body"></tbody>
+        </table>
+    </div>
+
+    <h4 style="margin-top:20px;">صفوف الجدول</h4>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:center;">
+        <button type="button" class="btn" id="asg_bulk_rows" title="يضيف صف بيانات لكل مقاس نشط في العائلة المختارة، مع ربط المقاس وتخطي المربوط مسبقاً">إضافة صف لكل مقاس من العائلة</button>
+        <button type="button" class="btn-secondary" id="asg_row_data">+ صف بيانات</button>
+        <button type="button" class="btn-secondary" id="asg_row_label" title="سطر عنوان يظهر داخل الدليل للعميل — مفيد لو جدول واحد فيه أكثر من مجموعة أو عنوان فرعي؛ لجدول مسطح واحد غالباً لا تحتاجه">+ صف عنوان (مجموعة)</button>
+    </div>
+    <div id="asg_rows_box"></div>
+
+    <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button type="button" class="btn" id="asg_save_btn">حفظ</button>
+        <button type="button" class="btn-secondary" id="asg_cancel_btn">إلغاء</button>
+    </div>
 </div>
 
 <div class="card" id="asg_draft_card" style="margin-top:16px;">
@@ -275,47 +316,6 @@ $asgJson = static function (array $rows): string {
                 <tbody id="asg_list_tbody"></tbody>
             </table>
         </div>
-    </div>
-</div>
-
-<div class="card" id="asg_editor" style="display:none;margin-top:16px;">
-    <h3 id="asg_editor_title">تعديل دليل</h3>
-    <input type="hidden" id="asg_edit_id" value="0">
-    <input type="hidden" id="asg_bound_family" value="">
-    <input type="hidden" id="asg_scope" value="single">
-    <input type="hidden" id="asg_active" value="1">
-    <div class="form-grid" style="max-width:900px;">
-        <div style="grid-column:1/-1;"><label for="asg_name_ar">اسم النموذج (داخلي — عربي فقط)</label><input type="text" id="asg_name_ar" maxlength="191" placeholder="مثال: علوي قمصان EU"></div>
-    </div>
-
-    <h4 style="margin-top:20px;">تعريف الأعمدة</h4>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:8px;">
-        <div>
-            <label for="asg_col_count">عدد الأعمدة</label>
-            <input type="number" id="asg_col_count" min="1" max="24" value="3" style="width:5rem;">
-        </div>
-        <button type="button" class="btn" id="asg_gen_cols">توليد صفوف العناوين</button>
-        <button type="button" class="btn-secondary" id="asg_col_add" title="يضيف عموداً جديداً في النهاية ويضيف خلية فارغة لكل صف بيانات">+ عمود</button>
-        <button type="button" class="btn-secondary" id="asg_col_remove" title="يحذف آخر عمود من التعريف وآخر خلية من كل صف بيانات">− حذف آخر عمود</button>
-    </div>
-    <div style="overflow-x:auto;">
-        <table class="data-table" id="asg_cols_table">
-            <thead><tr><th>ترتيب</th><th>عربي</th><th>EN</th><th>Fil</th><th>Hi</th><th>نوع القيمة</th><th>وحدة (عرض)</th><th>تخزين الطول</th><th>عمود النظام (كود)</th></tr></thead>
-            <tbody id="asg_cols_body"></tbody>
-        </table>
-    </div>
-
-    <h4 style="margin-top:20px;">صفوف الجدول</h4>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:center;">
-        <button type="button" class="btn" id="asg_bulk_rows" title="يضيف صف بيانات لكل مقاس نشط في العائلة المختارة، مع ربط المقاس وتخطي المربوط مسبقاً">إضافة صف لكل مقاس من العائلة</button>
-        <button type="button" class="btn-secondary" id="asg_row_data">+ صف بيانات</button>
-        <button type="button" class="btn-secondary" id="asg_row_label" title="سطر عنوان يظهر داخل الدليل للعميل — مفيد لو جدول واحد فيه أكثر من مجموعة أو عنوان فرعي؛ لجدول مسطح واحد غالباً لا تحتاجه">+ صف عنوان (مجموعة)</button>
-    </div>
-    <div id="asg_rows_box"></div>
-
-    <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
-        <button type="button" class="btn" id="asg_save_btn">حفظ</button>
-        <button type="button" class="btn-secondary" id="asg_cancel_btn">إلغاء</button>
     </div>
 </div>
 
@@ -554,7 +554,7 @@ $asgJson = static function (array $rows): string {
                 listWrap.style.display = 'block';
             }
             if (listTbody) {
-                listTbody.innerHTML = '<tr><td colspan="5" class="card-hint">أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3) لتُعرض هنا الأدلة المربوطة بالعائلة المطابقة. لمسودة جديدة: بعد اكتمال 1–2–3 استخدم «دليل جديد»؛ تُعرض المسودات في «مكتبة جداول المقاسات الإرشادية» أعلى هذه البطاقة.</td></tr>';
+                listTbody.innerHTML = '<tr><td colspan="5" class="card-hint">أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3) لتُعرض هنا الأدلة المربوطة بالعائلة المطابقة. لمسودة جديدة: بعد اكتمال 1–2–3 استخدم «دليل جديد» في أول بطاقة بالصفحة؛ تُعرض المسودات في «مكتبة جداول المقاسات الإرشادية».</td></tr>';
             }
             if (hintEl && tpl > 0 && ck !== '') {
                 hintEl.textContent = 'لا عائلة مطابقة للقالب والنوع.';
@@ -1539,7 +1539,7 @@ $asgJson = static function (array $rows): string {
         clearRows();
         refreshSizeSelects();
         document.getElementById('asg_editor').style.display = 'block';
-        document.getElementById('asg_editor_title').textContent = 'دليل جديد (مسودة — اربط بعائلة لاحقاً من «مكتبة جداول المقاسات الإرشادية»)';
+        document.getElementById('asg_editor_title').textContent = 'دليل جديد';
         asgRefreshGuideSortDisp();
     }
 
