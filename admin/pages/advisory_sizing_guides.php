@@ -158,42 +158,42 @@ $asgJson = static function (array $rows): string {
 <?php endif; ?>
 
 <div class="card">
-    <h3 style="margin:0;line-height:1.35;">إنشاء جدول مقاس<br>إرشادي</h3>
+    <h3 style="margin:0;">إنشاء جدول مقاس إرشادي</h3>
     <input type="hidden" id="asg_family" value="0">
     <input type="hidden" id="asg_guide_sort" value="0">
-    <div class="asg-wizard-toolbar" style="display:flex;flex-wrap:nowrap;align-items:flex-end;gap:12px;direction:ltr;justify-content:space-between;width:100%;box-sizing:border-box;margin-top:14px;">
+    <div class="asg-wizard-row-sort" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-top:12px;width:100%;box-sizing:border-box;direction:rtl;justify-content:flex-end;">
+        <div style="flex:0 0 auto;width:6.5rem;min-width:6rem;display:flex;flex-direction:column;gap:4px;">
+            <label for="asg_guide_sort_disp" style="margin:0;font-size:13px;white-space:nowrap;">ترتيب عرض الدليل (تلقائي)</label>
+            <input type="text" id="asg_guide_sort_disp" readonly class="input-narrow" style="width:100%;box-sizing:border-box;text-align:center;background:#f1f5f9;cursor:default;" title="للدليل الجديد: الرقم التالي في القاعدة (يبدأ من 1 ويزيد 1 بعد كل حفظ). عند التعديل: القيمة المحفوظة.">
+        </div>
+    </div>
+    <div class="asg-wizard-toolbar" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;margin-top:14px;width:100%;box-sizing:border-box;direction:rtl;justify-content:flex-end;">
+        <div style="flex:1 1 0;min-width:10rem;display:flex;flex-direction:column;gap:4px;">
+            <label for="asg_w_dept" style="margin:0;font-size:13px;white-space:nowrap;"><strong>1.</strong> القسم الرئيسي</label>
+            <select id="asg_w_dept" style="width:100%;min-width:0;"><option value="0">— الكل / بدون تصفية بالقسم —</option>
+                <?php foreach ($asgDepartments as $d): ?>
+                <option value="<?php echo (int) $d['id']; ?>"><?php echo htmlspecialchars((string) ($d['name_ar'] ?: $d['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div style="flex:1 1 0;min-width:10rem;display:flex;flex-direction:column;gap:4px;">
+            <label for="asg_w_tpl" style="margin:0;font-size:13px;white-space:nowrap;"><strong>2.</strong> قالب المقاسات</label>
+            <select id="asg_w_tpl" style="width:100%;min-width:0;"><option value="0">— اختر —</option>
+                <?php foreach ($asgTemplates as $t): ?>
+                <option value="<?php echo (int) $t['id']; ?>"><?php echo htmlspecialchars((string) ($t['name_ar'] ?: $t['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div style="flex:1 1 0;min-width:10rem;display:flex;flex-direction:column;gap:4px;">
+            <label for="asg_w_ck" style="margin:0;font-size:13px;white-space:nowrap;"><strong>3.</strong> النوع التجاري (مستوى 1)</label>
+            <select id="asg_w_ck" style="width:100%;min-width:0;"><option value="">— اختر —</option>
+                <?php foreach ($asgCommercialKinds as $k): ?>
+                <option value="<?php echo htmlspecialchars((string) $k['kind_key'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) ($k['label_ar'] ?: $k['label_en'] ?: $k['kind_key']), ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
         <div style="flex:0 0 auto;">
             <button type="button" class="btn" id="asg_new_btn" disabled title="أكمل اختيار القسم (1) وقالب المقاسات (2) والنوع التجاري (3)">دليل جديد</button>
-        </div>
-        <div class="asg-wizard-fields" style="display:flex;flex-wrap:nowrap;flex:1 1 auto;gap:10px;align-items:flex-end;min-width:0;direction:rtl;justify-content:flex-end;overflow-x:auto;">
-            <div style="flex:0 0 auto;width:6.5rem;min-width:6rem;display:flex;flex-direction:column;gap:4px;">
-                <label for="asg_guide_sort_disp" style="margin:0;font-size:13px;white-space:nowrap;">ترتيب عرض الدليل (تلقائي)</label>
-                <input type="text" id="asg_guide_sort_disp" readonly class="input-narrow" style="width:100%;box-sizing:border-box;text-align:center;background:#f1f5f9;cursor:default;" title="للدليل الجديد: الرقم التالي في القاعدة (يبدأ من 1 ويزيد 1 بعد كل حفظ). عند التعديل: القيمة المحفوظة.">
-            </div>
-            <div style="flex:1 1 0;min-width:10rem;display:flex;flex-direction:column;gap:4px;">
-                <label for="asg_w_dept" style="margin:0;font-size:13px;white-space:nowrap;"><strong>1.</strong> القسم الرئيسي</label>
-                <select id="asg_w_dept" style="width:100%;min-width:0;"><option value="0">— الكل / بدون تصفية بالقسم —</option>
-                    <?php foreach ($asgDepartments as $d): ?>
-                    <option value="<?php echo (int) $d['id']; ?>"><?php echo htmlspecialchars((string) ($d['name_ar'] ?: $d['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div style="flex:1 1 0;min-width:10rem;display:flex;flex-direction:column;gap:4px;">
-                <label for="asg_w_tpl" style="margin:0;font-size:13px;white-space:nowrap;"><strong>2.</strong> قالب المقاسات</label>
-                <select id="asg_w_tpl" style="width:100%;min-width:0;"><option value="0">— اختر —</option>
-                    <?php foreach ($asgTemplates as $t): ?>
-                    <option value="<?php echo (int) $t['id']; ?>"><?php echo htmlspecialchars((string) ($t['name_ar'] ?: $t['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div style="flex:1 1 0;min-width:10rem;display:flex;flex-direction:column;gap:4px;">
-                <label for="asg_w_ck" style="margin:0;font-size:13px;white-space:nowrap;"><strong>3.</strong> النوع التجاري (مستوى 1)</label>
-                <select id="asg_w_ck" style="width:100%;min-width:0;"><option value="">— اختر —</option>
-                    <?php foreach ($asgCommercialKinds as $k): ?>
-                    <option value="<?php echo htmlspecialchars((string) $k['kind_key'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) ($k['label_ar'] ?: $k['label_en'] ?: $k['kind_key']), ENT_QUOTES, 'UTF-8'); ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
         </div>
     </div>
     <p id="asg_w_hint" class="card-hint" style="margin:12px 0 0;"></p>
