@@ -85,11 +85,13 @@ try {
 
         case 'list_unbound':
             $st = $pdo->prepare(
-                'SELECT g.id, g.scope_kind, g.name_ar, g.name_en, g.is_active,
+                'SELECT g.id, g.scope_kind, g.name_ar, g.name_en, g.is_active, g.size_family_id,
                     (SELECT COUNT(*) FROM advisory_sizing_guide_columns c WHERE c.guide_id = g.id) AS columns_count,
                     (SELECT COUNT(*) FROM advisory_sizing_guide_rows r WHERE r.guide_id = g.id) AS rows_count
                  FROM advisory_sizing_guides g
-                 WHERE g.size_family_id IS NULL OR g.size_family_id = 0
+                 WHERE g.size_family_id IS NULL
+                    OR g.size_family_id = 0
+                    OR NOT EXISTS (SELECT 1 FROM size_families sf WHERE sf.id = g.size_family_id)
                  ORDER BY g.id DESC'
             );
             $st->execute();
@@ -116,8 +118,14 @@ try {
             }
             $curFam = isset($gRow['size_family_id']) && $gRow['size_family_id'] !== null && $gRow['size_family_id'] !== ''
                 ? (int) $gRow['size_family_id'] : 0;
+            $hasValidFamily = false;
             if ($curFam > 0) {
-                json_response(['success' => false, 'message' => 'هذا الدليل مربوط بعائلة بالفعل — استخدم التعديل من قائمة العائلة'], 422);
+                $chkCur = $pdo->prepare('SELECT 1 FROM size_families WHERE id = ? LIMIT 1');
+                $chkCur->execute([$curFam]);
+                $hasValidFamily = (bool) $chkCur->fetchColumn();
+            }
+            if ($hasValidFamily) {
+                json_response(['success' => false, 'message' => 'هذا الدليل مربوط بعائلة موجودة — استخدم التعديل من قائمة العائلة'], 422);
             }
             $rSt = $pdo->prepare(
                 'SELECT id, row_kind, size_family_size_id FROM advisory_sizing_guide_rows WHERE guide_id = ? AND row_kind = \'data\''

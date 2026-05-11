@@ -106,6 +106,26 @@ if ($prefSizeFamilyId > 0 && $tablesReady) {
     }
 }
 
+$asgDraftGuides = [];
+if ($tablesReady
+    && orange_table_exists($pdo, 'advisory_sizing_guides')
+    && orange_table_exists($pdo, 'size_families')) {
+    try {
+        $asgDraftGuides = $pdo->query(
+            'SELECT g.id, g.scope_kind, g.name_ar, g.name_en, g.is_active, g.size_family_id,
+                (SELECT COUNT(*) FROM advisory_sizing_guide_columns c WHERE c.guide_id = g.id) AS columns_count,
+                (SELECT COUNT(*) FROM advisory_sizing_guide_rows r WHERE r.guide_id = g.id) AS rows_count
+             FROM advisory_sizing_guides g
+             WHERE g.size_family_id IS NULL
+                OR g.size_family_id = 0
+                OR NOT EXISTS (SELECT 1 FROM size_families sf WHERE sf.id = g.size_family_id)
+             ORDER BY g.id DESC'
+        )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) {
+        $asgDraftGuides = [];
+    }
+}
+
 $sizesJson = json_encode($sizesByFamily, JSON_UNESCAPED_UNICODE);
 if ($sizesJson === false) {
     $sizesJson = '{}';
@@ -129,6 +149,62 @@ $asgJson = static function (array $rows): string {
     <div class="alert-error">الجداول غير جاهزة. زر <strong>الأدمن</strong> أو أي صفحة كتالوج لتهيئة المخطّط، ثم حدّث.</div>
 </div>
 <?php else: ?>
+
+<div class="card" id="asg_draft_card" style="margin-top:0;margin-bottom:16px;border:2px solid #0ea5e9;">
+    <h2 style="margin:0 0 8px;font-size:1.25rem;">جدول الأدلة المحفوظة دون ربط عائلة (مسودات + يتيم)</h2>
+    <p class="card-hint" style="margin:0 0 10px;">كل ما يُحفظ بلا عائلة صالحة، أو بمعرّف عائلة غير موجود في القاعدة، يظهر هنا فور فتح الصفحة. اختر عائلة من الصف ثم «ربط» — أو «تحديث» لمزامنة القائمة بعد الحفظ.</p>
+    <p id="asg_draft_load_err" class="alert-error" style="display:none;margin:0 0 8px;"></p>
+    <div style="margin-bottom:8px;">
+        <button type="button" class="btn" id="asg_draft_refresh">تحديث الجدول</button>
+    </div>
+    <div style="overflow-x:auto;">
+        <table class="data-table">
+            <thead><tr>
+                <th>#</th><th>اسم النموذج</th><th>عمود size_family_id</th><th>أعمدة</th><th>صفوف</th><th>ربط بعائلة</th><th>إجراءات</th>
+            </tr></thead>
+            <tbody id="asg_draft_tbody">
+                <?php if ($asgDraftGuides === []): ?>
+                <tr><td colspan="7" class="card-hint">لا توجد صفوف في هذا الجدول حالياً — إن كان عندك دليل محفوظ ولا يظهر، تأكد من تشغيل ترحيل العمود <code>size_family_id</code> ليقبل NULL (زر أدمن كتالوج أو ملف <code>032_advisory_sizing_guides_null_size_family.sql</code>).</td></tr>
+                <?php else: ?>
+                    <?php foreach ($asgDraftGuides as $dg): ?>
+                        <?php
+                        $dgId = (int) ($dg['id'] ?? 0);
+                        $dgName = (string) ($dg['name_ar'] ?: $dg['name_en'] ?: ('#' . $dgId));
+                        $dgCols = (int) ($dg['columns_count'] ?? 0);
+                        $dgRows = (int) ($dg['rows_count'] ?? 0);
+                        $dgSf = $dg['size_family_id'] ?? null;
+                        $dgSfDisp = $dgSf === null || $dgSf === '' ? 'NULL' : (string) (int) $dgSf;
+                        ?>
+                <tr data-asg-draft-row="1">
+                    <td><?php echo $dgId; ?></td>
+                    <td><?php echo htmlspecialchars($dgName, ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><code><?php echo htmlspecialchars($dgSfDisp, ENT_QUOTES, 'UTF-8'); ?></code></td>
+                    <td><?php echo $dgCols; ?></td>
+                    <td><?php echo $dgRows; ?></td>
+                    <td>
+                        <select class="asg-draft-fam-sel" data-guide="<?php echo $dgId; ?>" style="max-width:14rem;width:100%;">
+                            <option value="0">— اختر عائلة —</option>
+                            <?php foreach ($families as $fam): ?>
+                                <?php $fidOpt = (int) ($fam['id'] ?? 0); ?>
+                                <?php if ($fidOpt <= 0) {
+                                    continue;
+                                } ?>
+                            <option value="<?php echo $fidOpt; ?>"><?php echo htmlspecialchars((string) ($fam['name_ar'] ?: $fam['name_en'] ?: ('#' . $fidOpt)), ENT_QUOTES, 'UTF-8'); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <button type="button" class="btn asg-draft-bind" data-guide="<?php echo $dgId; ?>">ربط</button>
+                    </td>
+                    <td>
+                        <button type="button" class="btn-secondary asg-draft-ed" data-id="<?php echo $dgId; ?>">تعديل</button>
+                        <button type="button" class="btn-secondary asg-draft-del" data-id="<?php echo $dgId; ?>">حذف</button>
+                    </td>
+                </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
 
 <?php if ($asgCommercialKinds === [] && orange_table_exists($pdo, 'commercial_kind_dictionary')): ?>
 <div class="card" style="margin-bottom:12px;">
@@ -270,22 +346,6 @@ $asgJson = static function (array $rows): string {
     <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
         <button type="button" class="btn" id="asg_save_btn">حفظ</button>
         <button type="button" class="btn-secondary" id="asg_cancel_btn">إلغاء</button>
-    </div>
-</div>
-
-<div class="card" id="asg_draft_card" style="margin-top:16px;">
-    <h3 style="margin-top:0;">مسودات أدلة (غير مربوطة بعائلة بعد)</h3>
-    <p class="card-hint" style="margin:0 0 10px;">احفظ الجدول والأعمدة أولاً بدون اختيار عائلة في المعالج؛ يظهر الدليل هنا. ثم اختر عائلة من القائمة في الصف واضغط «ربط بعائلة» — بعدها يظهر في «الأدلة المحفوظة لهذه العائلة» ويمكن ربط الصفوف بالمقاسات.</p>
-    <div style="margin-bottom:8px;">
-        <button type="button" class="btn-secondary" id="asg_draft_refresh">تحديث قائمة المسودات</button>
-    </div>
-    <div style="overflow-x:auto;">
-        <table class="data-table">
-            <thead><tr>
-                <th>#</th><th>اسم النموذج</th><th>أعمدة</th><th>صفوف</th><th>ربط بعائلة</th><th>إجراءات</th>
-            </tr></thead>
-            <tbody id="asg_draft_tbody"></tbody>
-        </table>
     </div>
 </div>
 
@@ -1464,13 +1524,22 @@ $asgJson = static function (array $rows): string {
         opts = opts || {};
         var silent = !!opts.silent;
         var tb = document.getElementById('asg_draft_tbody');
+        var errEl = document.getElementById('asg_draft_load_err');
         if (!tb) {
             return;
         }
+        if (errEl) {
+            errEl.style.display = 'none';
+            errEl.textContent = '';
+        }
         var res = await orangeAdminJsonPost(ADVISORY_API, { action: 'list_unbound' });
         if (!res || !res.success) {
+            var msg = (res && res.message) ? res.message : 'خطأ تحميل جدول المسودات';
             if (!silent) {
-                alert((res && res.message) ? res.message : 'خطأ تحميل المسودات');
+                alert(msg);
+            } else if (errEl) {
+                errEl.textContent = msg + ' — الجدول أعلاه من تحميل الصفحة؛ جرّب «تحديث الجدول».';
+                errEl.style.display = 'block';
             }
             return;
         }
@@ -1481,31 +1550,67 @@ $asgJson = static function (array $rows): string {
             var title = (g.name_ar || g.name_en || ('#' + gid));
             var cols = parseInt(String(g.columns_count != null ? g.columns_count : '0'), 10) || 0;
             var rws = parseInt(String(g.rows_count != null ? g.rows_count : '0'), 10) || 0;
+            var sfDisp = (g.size_family_id == null || g.size_family_id === '') ? 'NULL' : String(parseInt(g.size_family_id, 10) || 0);
             var tr = document.createElement('tr');
+            tr.setAttribute('data-asg-draft-row', '1');
             tr.innerHTML =
                 '<td>' + gid + '</td>' +
                 '<td>' + esc(title) + '</td>' +
+                '<td><code>' + esc(sfDisp) + '</code></td>' +
                 '<td>' + cols + '</td>' +
                 '<td>' + rws + '</td>' +
                 '<td><select class="asg-draft-fam-sel" data-guide="' + gid + '" style="max-width:14rem;width:100%;">' + asgFamilyOptionsHtml(0) + '</select> ' +
                 '<button type="button" class="btn asg-draft-bind" data-guide="' + gid + '">ربط</button></td>' +
                 '<td><button type="button" class="btn-secondary asg-draft-ed" data-id="' + gid + '">تعديل</button> ' +
                 '<button type="button" class="btn-secondary asg-draft-del" data-id="' + gid + '">حذف</button></td>';
-            tr.querySelector('.asg-draft-ed').onclick = function () { loadGuide(gid); };
-            tr.querySelector('.asg-draft-del').onclick = async function () {
-                if (!confirm('حذف المسودة؟')) {
+            tb.appendChild(tr);
+        });
+        if (!guides.length) {
+            var trd = document.createElement('tr');
+            trd.innerHTML = '<td colspan="7" class="card-hint">لا توجد صفوف — استخدم «دليل جديد» ثم احفظ كمسودة.</td>';
+            tb.appendChild(trd);
+        }
+    }
+
+    function asgWireDraftTableDelegation() {
+        var tb = document.getElementById('asg_draft_tbody');
+        if (!tb || tb.dataset.asgDeleg === '1') {
+            return;
+        }
+        tb.dataset.asgDeleg = '1';
+        tb.addEventListener('click', async function (ev) {
+            var t = ev.target;
+            if (!t || !t.closest) {
+                return;
+            }
+            var delBtn = t.closest('.asg-draft-del');
+            if (delBtn) {
+                var did = parseInt(delBtn.getAttribute('data-id'), 10) || 0;
+                if (!confirm('حذف هذا الدليل؟')) {
                     return;
                 }
-                var r2 = await orangeAdminJsonPost(ADVISORY_API, { action: 'delete', id: gid });
-                if (!r2.success) {
-                    alert(r2.message || 'خطأ');
+                var r2 = await orangeAdminJsonPost(ADVISORY_API, { action: 'delete', id: did });
+                if (!r2 || !r2.success) {
+                    alert((r2 && r2.message) ? r2.message : 'خطأ');
                     return;
                 }
                 void loadDraftList();
                 await loadList({ silent: true });
-            };
-            tr.querySelector('.asg-draft-bind').onclick = async function () {
-                var sel = tr.querySelector('.asg-draft-fam-sel');
+                return;
+            }
+            var edBtn = t.closest('.asg-draft-ed');
+            if (edBtn) {
+                var eid = parseInt(edBtn.getAttribute('data-id'), 10) || 0;
+                if (eid > 0) {
+                    void loadGuide(eid);
+                }
+                return;
+            }
+            var bindBtn = t.closest('.asg-draft-bind');
+            if (bindBtn) {
+                var gid = parseInt(bindBtn.getAttribute('data-guide'), 10) || 0;
+                var row = bindBtn.closest('tr');
+                var sel = row ? row.querySelector('.asg-draft-fam-sel') : null;
                 var nf = sel ? parseInt(sel.value, 10) || 0 : 0;
                 if (nf <= 0) {
                     alert('اختر عائلة مقاسات من القائمة');
@@ -1518,21 +1623,25 @@ $asgJson = static function (array $rows): string {
                 }
                 alert(r3.message || 'تم الربط');
                 window.location.reload();
-            };
-            tb.appendChild(tr);
+            }
         });
-        if (!guides.length) {
-            var trd = document.createElement('tr');
-            trd.innerHTML = '<td colspan="6" class="card-hint">لا توجد مسودات — استخدم «دليل جديد» ثم احفظ دون اختيار عائلة في المعالج (القالب/النوع اختياري للمسودة).</td>';
-            tb.appendChild(trd);
-        }
     }
 
     async function loadGuide(id) {
         var res = await orangeAdminJsonPost(ADVISORY_API, { action: 'get', id: id });
         if (!res.success) { alert(res.message || 'خطأ'); return; }
         var g = res.guide;
-        var famId = parseInt(String(g.size_family_id != null ? g.size_family_id : '0'), 10) || 0;
+        var rawFam = parseInt(String(g.size_family_id != null ? g.size_family_id : '0'), 10) || 0;
+        var famInList = false;
+        if (rawFam > 0) {
+            for (var fxi = 0; fxi < FAMILIES_FULL.length; fxi++) {
+                if (parseInt(FAMILIES_FULL[fxi].id, 10) === rawFam) {
+                    famInList = true;
+                    break;
+                }
+            }
+        }
+        var famId = famInList ? rawFam : 0;
         var bf = document.getElementById('asg_bound_family');
         if (bf) {
             bf.value = famId > 0 ? String(famId) : '';
@@ -1834,6 +1943,7 @@ $asgJson = static function (array $rows): string {
         asgBundleBoot();
         void loadDraftList({ silent: true });
     }
+    asgWireDraftTableDelegation();
     var asgDraftRef = document.getElementById('asg_draft_refresh');
     if (asgDraftRef) {
         asgDraftRef.onclick = function () { void loadDraftList(); };
