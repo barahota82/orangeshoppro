@@ -332,6 +332,59 @@ $asgJson = static function (array $rows): string {
     var asgPreferFamilyOnce = 0;
     var ASG_FAMILY_GUIDES_CACHE = [];
     var ASG_UNBOUND_GUIDES_CACHE = [];
+    /** عند فتح «دليل جديد» (مسودة غير محفوظة): توقيع القسم+القالب+النوع وقت الفتح؛ يُصفّر عند التعديل أو الإغلاق. */
+    var asgNewEditorWizardSig = null;
+
+    function asgWizardSigStr() {
+        return String(wizardDeptId()) + '|' + String(wizardTplId()) + '|' + String(wizardCk());
+    }
+
+    function asgClearNewEditorFormFields() {
+        document.getElementById('asg_edit_id').value = '0';
+        var bf = document.getElementById('asg_bound_family');
+        if (bf) {
+            bf.value = '';
+        }
+        document.getElementById('asg_family').value = '0';
+        var gSortOpen = document.getElementById('asg_guide_sort');
+        if (gSortOpen) {
+            gSortOpen.value = '0';
+        }
+        document.getElementById('asg_scope').value = 'single';
+        document.getElementById('asg_active').value = '1';
+        document.getElementById('asg_name_ar').value = '';
+        genColRows(3);
+        clearRows();
+        refreshSizeSelects();
+        document.getElementById('asg_editor_title').textContent = 'دليل جديد';
+        asgRefreshGuideSortDisp();
+    }
+
+    function asgResetNewEditorCardHidden() {
+        var ed = document.getElementById('asg_editor');
+        if (ed) {
+            ed.style.display = 'none';
+        }
+        asgNewEditorWizardSig = null;
+        asgClearNewEditorFormFields();
+    }
+
+    function asgMaybeResetNewEditorIfWizardChanged() {
+        var ed = document.getElementById('asg_editor');
+        if (!ed || ed.style.display === 'none') {
+            return;
+        }
+        var eid = parseInt(document.getElementById('asg_edit_id').value, 10) || 0;
+        if (eid > 0) {
+            return;
+        }
+        if (asgNewEditorWizardSig === null) {
+            return;
+        }
+        if (!asgWizardTripleComplete() || asgWizardSigStr() !== asgNewEditorWizardSig) {
+            asgResetNewEditorCardHidden();
+        }
+    }
 
     async function orangeAdminJsonPost(url, payload) {
         if (typeof postJSON === 'function') {
@@ -561,6 +614,7 @@ $asgJson = static function (array $rows): string {
             }
             await loadDraftList({ silent: true });
             asgRefreshGuideSortDisp();
+            asgMaybeResetNewEditorIfWizardChanged();
             return;
         }
         if (hintEl && dept > 0 && ASG_LIBRARY_READY && BUNDLE_SCOPES && BUNDLE_SCOPES.length) {
@@ -583,6 +637,7 @@ $asgJson = static function (array $rows): string {
         await loadList({ silent: true });
         void loadDraftList({ silent: true });
         asgRefreshGuideSortDisp();
+        asgMaybeResetNewEditorIfWizardChanged();
     }
 
     function sizeOptionsHtml(selectedId) {
@@ -1444,6 +1499,7 @@ $asgJson = static function (array $rows): string {
     }
 
     async function loadGuide(id) {
+        asgNewEditorWizardSig = null;
         var res = await orangeAdminJsonPost(ADVISORY_API, { action: 'get', id: id });
         if (!res.success) { alert(res.message || 'خطأ'); return; }
         var g = res.guide;
@@ -1522,25 +1578,9 @@ $asgJson = static function (array $rows): string {
             alert('أكمل اختيار القسم (1) وقالب المقاسات (2) والنوع التجاري (3) قبل «دليل جديد».');
             return;
         }
-        document.getElementById('asg_edit_id').value = '0';
-        var bf = document.getElementById('asg_bound_family');
-        if (bf) {
-            bf.value = '';
-        }
-        document.getElementById('asg_family').value = '0';
-        var gSortOpen = document.getElementById('asg_guide_sort');
-        if (gSortOpen) {
-            gSortOpen.value = '0';
-        }
-        document.getElementById('asg_scope').value = 'single';
-        document.getElementById('asg_active').value = '1';
-        document.getElementById('asg_name_ar').value = '';
-        genColRows(3);
-        clearRows();
-        refreshSizeSelects();
+        asgClearNewEditorFormFields();
         document.getElementById('asg_editor').style.display = 'block';
-        document.getElementById('asg_editor_title').textContent = 'دليل جديد';
-        asgRefreshGuideSortDisp();
+        asgNewEditorWizardSig = asgWizardSigStr();
     }
 
     document.getElementById('asg_new_btn').onclick = openNew;
@@ -1691,6 +1731,7 @@ $asgJson = static function (array $rows): string {
 
     document.getElementById('asg_cancel_btn').onclick = function () {
         document.getElementById('asg_editor').style.display = 'none';
+        asgNewEditorWizardSig = null;
     };
 
     function asgMapFamLabel(id) {
