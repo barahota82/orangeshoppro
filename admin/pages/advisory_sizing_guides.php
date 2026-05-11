@@ -227,9 +227,41 @@ $asgJson = static function (array $rows): string {
     </div>
 </div>
 
+<?php if ($asgLibraryReady): ?>
+<div class="card" id="asg_library_map_card" style="margin-top:16px;">
+    <h3 style="margin-top:0;">ربط عائلة مستهلك بحزمة المكتبة ثم المزامنة</h3>
+    <div class="form-grid" style="max-width:720px;">
+        <div style="grid-column:1/-1;"><label for="asg_map_consumer">عائلة المستهلك</label>
+            <select id="asg_map_consumer"><option value="0">— اختر —</option>
+                <?php foreach ($families as $f): ?>
+                <option value="<?php echo (int) $f['id']; ?>"><?php echo htmlspecialchars((string) ($f['name_ar'] ?: $f['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div style="grid-column:1/-1;"><label for="asg_map_bundle">حزمة المكتبة</label>
+            <select id="asg_map_bundle"><option value="0">— اختر —</option></select>
+        </div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button type="button" class="btn" id="asg_map_save">حفظ الربط</button>
+        <button type="button" class="btn" id="asg_map_sync">مزامنة الأدلة إلى عائلة المستهلك</button>
+        <button type="button" class="btn-secondary" id="asg_map_delete">إزالة الربط</button>
+    </div>
+    <div style="margin-top:16px;overflow:auto;">
+        <table class="data-table">
+            <thead><tr>
+                <th>عائلة مستهلك</th><th>حزمة</th><th>آخر تحديث</th><th>إجراءات</th>
+            </tr></thead>
+            <tbody id="asg_map_rows"></tbody>
+        </table>
+    </div>
+</div>
+<?php endif; ?>
+
 <script>
 (function () {
     var ADVISORY_API = '/admin/api/advisory_sizing_guides/manage.php';
+    var LIBRARY_API = '/admin/api/advisory_sizing_library/manage.php';
     var FAMILY_SIZES = <?php echo $sizesJson; ?>;
     var PREF_FAMILY = <?php echo (int) $prefSizeFamilyId; ?>;
     var FAMILIES_FULL = <?php echo $asgJson($families); ?>;
@@ -1243,6 +1275,7 @@ $asgJson = static function (array $rows): string {
         }
         alert('تم الحفظ');
         await loadList();
+        void asgLoadLibMaps();
         openNew();
         var ed = document.getElementById('asg_editor');
         if (ed) {
@@ -1254,6 +1287,158 @@ $asgJson = static function (array $rows): string {
         document.getElementById('asg_editor').style.display = 'none';
     };
 
+    function asgMapFamLabel(id) {
+        id = parseInt(id, 10) || 0;
+        for (var mi = 0; mi < FAMILIES_FULL.length; mi++) {
+            if (parseInt(FAMILIES_FULL[mi].id, 10) === id) {
+                return (FAMILIES_FULL[mi].name_ar || FAMILIES_FULL[mi].name_en || ('#' + id));
+            }
+        }
+        return '#' + id;
+    }
+
+    function asgFillMapBundleSelect(bundles, selectedId) {
+        var sel = document.getElementById('asg_map_bundle');
+        if (!sel) {
+            return;
+        }
+        selectedId = parseInt(selectedId, 10) || 0;
+        sel.innerHTML = '<option value="0">— اختر —</option>';
+        for (var bi = 0; bi < bundles.length; bi++) {
+            var b = bundles[bi];
+            var bid = parseInt(b.id, 10) || 0;
+            var lab = (b.name_ar || b.name_en || ('#' + bid));
+            var o = document.createElement('option');
+            o.value = String(bid);
+            o.textContent = lab;
+            if (bid === selectedId) {
+                o.selected = true;
+            }
+            sel.appendChild(o);
+        }
+    }
+
+    async function asgLoadLibBundlesForMap() {
+        if (!document.getElementById('asg_map_bundle')) {
+            return [];
+        }
+        var res = await orangeAdminJsonPost(LIBRARY_API, { action: 'list_bundles' });
+        if (!res || !res.success) {
+            return [];
+        }
+        var bundles = res.bundles || [];
+        asgFillMapBundleSelect(bundles, parseInt(document.getElementById('asg_map_bundle').value, 10) || 0);
+        return bundles;
+    }
+
+    async function asgLoadLibMaps() {
+        var tbEl = document.getElementById('asg_map_rows');
+        if (!tbEl) {
+            return;
+        }
+        var res = await orangeAdminJsonPost(LIBRARY_API, { action: 'list_maps' });
+        if (!res || !res.success) {
+            return;
+        }
+        var maps = res.maps || [];
+        tbEl.innerHTML = '';
+        for (var ri = 0; ri < maps.length; ri++) {
+            var m = maps[ri];
+            var tr = document.createElement('tr');
+            var cons = (m.consumer_ar || m.consumer_en || '');
+            var bun = (m.bundle_ar || m.bundle_en || '');
+            var cid = parseInt(m.consumer_size_family_id, 10) || 0;
+            tr.innerHTML =
+                '<td>' + esc(cons) + '</td>' +
+                '<td>' + esc(bun) + '</td>' +
+                '<td>' + esc(m.updated_at || '') + '</td>' +
+                '<td><button type="button" class="btn-secondary asg-map-sync-one" data-consumer="' + cid + '">مزامنة</button> ' +
+                '<button type="button" class="btn-secondary asg-map-unmap" data-consumer="' + cid + '">إزالة ربط</button></td>';
+            tbEl.appendChild(tr);
+        }
+        tbEl.querySelectorAll('.asg-map-sync-one').forEach(function (btn) {
+            btn.onclick = async function () {
+                var cid = parseInt(btn.getAttribute('data-consumer'), 10) || 0;
+                if (!confirm('نسخ الأدلة من عائلة مصدر الحزمة إلى «' + asgMapFamLabel(cid) + '»؟ سيُستبدل دليل علوي/سفلي/مفرد الموجود على العائلة المستهدفة إن وُجد.')) {
+                    return;
+                }
+                var r2 = await orangeAdminJsonPost(LIBRARY_API, { action: 'sync_consumer', consumer_size_family_id: cid });
+                if (!r2 || !r2.success) {
+                    alert((r2 && r2.message) ? r2.message : 'فشل');
+                    return;
+                }
+                alert(r2.message || 'تم');
+            };
+        });
+        tbEl.querySelectorAll('.asg-map-unmap').forEach(function (btn) {
+            btn.onclick = async function () {
+                var cid = parseInt(btn.getAttribute('data-consumer'), 10) || 0;
+                if (!confirm('إزالة ربط العائلة؟')) {
+                    return;
+                }
+                var r2 = await orangeAdminJsonPost(LIBRARY_API, { action: 'delete_map', consumer_size_family_id: cid });
+                if (!r2 || !r2.success) {
+                    alert((r2 && r2.message) ? r2.message : 'فشل');
+                    return;
+                }
+                void asgLoadLibMaps();
+            };
+        });
+    }
+
+    function asgLibMapWire() {
+        var btnSave = document.getElementById('asg_map_save');
+        if (!btnSave) {
+            return;
+        }
+        btnSave.onclick = async function () {
+            var c = parseInt(document.getElementById('asg_map_consumer').value, 10) || 0;
+            var b = parseInt(document.getElementById('asg_map_bundle').value, 10) || 0;
+            var res = await orangeAdminJsonPost(LIBRARY_API, { action: 'save_map', consumer_size_family_id: c, library_bundle_id: b });
+            if (!res || !res.success) {
+                alert((res && res.message) ? res.message : 'فشل');
+                return;
+            }
+            alert('تم حفظ الربط');
+            void asgLoadLibMaps();
+        };
+        document.getElementById('asg_map_sync').onclick = async function () {
+            var c = parseInt(document.getElementById('asg_map_consumer').value, 10) || 0;
+            if (c <= 0) {
+                alert('اختر عائلة مستهلك');
+                return;
+            }
+            if (!confirm('مزامنة الأدلة إلى هذه العائلة؟')) {
+                return;
+            }
+            var res = await orangeAdminJsonPost(LIBRARY_API, { action: 'sync_consumer', consumer_size_family_id: c });
+            if (!res || !res.success) {
+                alert((res && res.message) ? res.message : 'فشل');
+                return;
+            }
+            alert(res.message || 'تم');
+        };
+        document.getElementById('asg_map_delete').onclick = async function () {
+            var c = parseInt(document.getElementById('asg_map_consumer').value, 10) || 0;
+            if (c <= 0) {
+                alert('اختر عائلة مستهلك');
+                return;
+            }
+            if (!confirm('إزالة ربط عائلة المستهلك المختارة؟')) {
+                return;
+            }
+            var res = await orangeAdminJsonPost(LIBRARY_API, { action: 'delete_map', consumer_size_family_id: c });
+            if (!res || !res.success) {
+                alert((res && res.message) ? res.message : 'فشل');
+                return;
+            }
+            alert('تم');
+            void asgLoadLibMaps();
+        };
+    }
+
+    asgLibMapWire();
+
     function asgBoot() {
         genColRows(3);
         if (PREF_FAMILY > 0) {
@@ -1261,6 +1446,8 @@ $asgJson = static function (array $rows): string {
             asgPreferFamilyOnce = PREF_FAMILY;
         }
         asgRefreshResolvedContext();
+        void asgLoadLibBundlesForMap();
+        void asgLoadLibMaps();
     }
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', asgBoot);

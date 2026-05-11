@@ -57,7 +57,7 @@ $enc = static function (array $rows): string {
 </div>
 
 <p class="card-hint" style="margin:0 0 12px;">
-    <strong>الاتفاق (الترتيب):</strong> (1) قسم رئيسي → (2) قالب مقاسات → (3) النوع التجاري مستوى 1 → (4) عائلة المصدر ثم حفظ الحزمة → تصميم الجداول من «دليل المقاس الاسترشادي» على عائلة المصدر → (5) ربط عائلة مستهلك بالحزمة ثم <strong>مزامنة</strong>.
+    <strong>الاتفاق (الترتيب):</strong> (1) قسم رئيسي → (2) قالب مقاسات → (3) النوع التجاري مستوى 1 → (4) عائلة المصدر ثم حفظ الحزمة. تصميم الأدلة وربط عائلة المستهلك والمزامنة تُنفَّذ من شاشة واحدة: <strong>دليل المقاس الاسترشادي (عرض للعميل)</strong>.
     المرجع: <code>docs/archive/ORANGE_ADVISORY_SIZING_LIBRARY_DECISION.md</code>
 </p>
 
@@ -121,38 +121,11 @@ $enc = static function (array $rows): string {
     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
         <button type="button" class="btn" id="aslb_save_bundle">حفظ الحزمة</button>
         <button type="button" class="btn-secondary" id="aslb_clear_bundle">تفريغ النموذج</button>
-        <button type="button" class="btn-secondary" id="aslb_open_guides" disabled>فتح «دليل المقاس الاسترشادي» لتصميم الجداول</button>
     </div>
     <div style="margin-top:16px;overflow:auto;">
         <table class="data-table"><thead><tr>
             <th>ترتيب</th><th>قسم</th><th>قالب</th><th>تجاري</th><th>عربي</th><th>EN</th><th>عائلة مصدر</th><th>نشط</th><th>إجراءات</th>
         </tr></thead><tbody id="aslb_bundle_rows"></tbody></table>
-    </div>
-</div>
-
-<div class="card" style="margin-top:16px;">
-    <h3>ربط عائلة مستهلك → حزمة ثم مزامنة (الخطوة 5)</h3>
-    <div class="form-grid" style="max-width:720px;">
-        <div style="grid-column:1/-1;"><label for="aslb_map_consumer">عائلة المستهلك</label>
-            <select id="aslb_map_consumer"><option value="0">— اختر —</option>
-                <?php foreach ($families as $f): ?>
-                <option value="<?php echo (int) $f['id']; ?>"><?php echo htmlspecialchars((string) ($f['name_ar'] ?: $f['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div style="grid-column:1/-1;"><label for="aslb_map_bundle">حزمة المكتبة</label>
-            <select id="aslb_map_bundle"><option value="0">— اختر —</option></select>
-        </div>
-    </div>
-    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
-        <button type="button" class="btn" id="aslb_save_map">حفظ الربط</button>
-        <button type="button" class="btn" id="aslb_sync">مزامنة الأدلة إلى عائلة المستهلك</button>
-        <button type="button" class="btn-secondary" id="aslb_delete_map">إزالة الربط</button>
-    </div>
-    <div style="margin-top:16px;overflow:auto;">
-        <table class="data-table"><thead><tr>
-            <th>عائلة مستهلك</th><th>حزمة</th><th>آخر تحديث</th><th>إجراءات</th>
-        </tr></thead><tbody id="aslb_map_rows"></tbody></table>
     </div>
 </div>
 
@@ -184,7 +157,6 @@ $enc = static function (array $rows): string {
         sel.innerHTML = '<option value="0">— اختر —</option>';
         if (tpl <= 0 || ck === '') {
             sel.innerHTML = '<option value="0">— أكمل الخطوات 2 و 3 —</option>';
-            document.getElementById('aslb_open_guides').disabled = true;
             return;
         }
         for (var i = 0; i < FAMILIES.length; i++) {
@@ -203,25 +175,10 @@ $enc = static function (array $rows): string {
             }
             sel.appendChild(o);
         }
-        updateOpenGuidesBtn();
-    }
-
-    function updateOpenGuidesBtn() {
-        var sid = parseInt(document.getElementById('aslb_src').value, 10) || 0;
-        document.getElementById('aslb_open_guides').disabled = sid <= 0;
     }
 
     document.getElementById('aslb_tpl').onchange = refreshSourceFamilyOptions;
     document.getElementById('aslb_ck').onchange = refreshSourceFamilyOptions;
-    document.getElementById('aslb_src').onchange = updateOpenGuidesBtn;
-
-    document.getElementById('aslb_open_guides').onclick = function () {
-        var sid = parseInt(document.getElementById('aslb_src').value, 10) || 0;
-        if (sid <= 0) {
-            return;
-        }
-        window.open('/admin/index.php?page=advisory_sizing_guides&size_family_id=' + sid, '_blank', 'noopener');
-    };
 
     async function api(payload) {
         if (typeof postJSON === 'function') {
@@ -242,22 +199,6 @@ $enc = static function (array $rows): string {
             }
         } catch (e) {
             return { success: false, message: e.message || 'تعذر الاتصال بالخادم' };
-        }
-    }
-
-    function fillBundleSelect(sel, bundles, selectedId) {
-        sel.innerHTML = '<option value="0">— اختر —</option>';
-        for (var i = 0; i < bundles.length; i++) {
-            var b = bundles[i];
-            var id = parseInt(b.id, 10) || 0;
-            var lab = (b.name_ar || b.name_en || ('#' + id));
-            var o = document.createElement('option');
-            o.value = String(id);
-            o.textContent = lab;
-            if (id === selectedId) {
-                o.selected = true;
-            }
-            sel.appendChild(o);
         }
     }
 
@@ -286,11 +227,9 @@ $enc = static function (array $rows): string {
                 '<td>' + esc(srcLab) + '</td>' +
                 '<td>' + (parseInt(b.is_active, 10) ? 'نعم' : 'لا') + '</td>' +
                 '<td><button type="button" class="btn-secondary aslb-ed" data-id="' + parseInt(b.id, 10) + '">تعديل</button> ' +
-                '<button type="button" class="btn-secondary aslb-guides" data-src="' + parseInt(b.source_size_family_id, 10) + '">تصميم الأدلة</button> ' +
                 '<button type="button" class="btn-secondary aslb-del" data-id="' + parseInt(b.id, 10) + '">حذف</button></td>';
             tb.appendChild(tr);
         }
-        fillBundleSelect(document.getElementById('aslb_map_bundle'), bundles, parseInt(document.getElementById('aslb_map_bundle').value, 10) || 0);
         tb.querySelectorAll('.aslb-ed').forEach(function (btn) {
             btn.onclick = function () {
                 var id = parseInt(btn.getAttribute('data-id'), 10) || 0;
@@ -308,16 +247,7 @@ $enc = static function (array $rows): string {
                 document.getElementById('aslb_ck').value = row.commercial_kind_key || '';
                 refreshSourceFamilyOptions();
                 document.getElementById('aslb_src').value = String(parseInt(row.source_size_family_id, 10) || 0);
-                updateOpenGuidesBtn();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
-            };
-        });
-        tb.querySelectorAll('.aslb-guides').forEach(function (btn) {
-            btn.onclick = function () {
-                var sid = parseInt(btn.getAttribute('data-src'), 10) || 0;
-                if (sid > 0) {
-                    window.open('/admin/index.php?page=advisory_sizing_guides&size_family_id=' + sid, '_blank', 'noopener');
-                }
             };
         });
         tb.querySelectorAll('.aslb-del').forEach(function (btn) {
@@ -332,63 +262,9 @@ $enc = static function (array $rows): string {
                     return;
                 }
                 loadBundles();
-                loadMaps();
             };
         });
         return bundles;
-    }
-
-    async function loadMaps() {
-        var res = await api({ action: 'list_maps' });
-        if (!res || !res.success) {
-            alert((res && res.message) ? res.message : 'خطأ تحميل الربط');
-            return;
-        }
-        var maps = res.maps || [];
-        var tb = document.getElementById('aslb_map_rows');
-        tb.innerHTML = '';
-        for (var i = 0; i < maps.length; i++) {
-            var m = maps[i];
-            var tr = document.createElement('tr');
-            var cons = (m.consumer_ar || m.consumer_en || '');
-            var bun = (m.bundle_ar || m.bundle_en || '');
-            var cid = parseInt(m.consumer_size_family_id, 10) || 0;
-            tr.innerHTML =
-                '<td>' + esc(cons) + '</td>' +
-                '<td>' + esc(bun) + '</td>' +
-                '<td>' + esc(m.updated_at || '') + '</td>' +
-                '<td><button type="button" class="btn-secondary aslb-sync-one" data-consumer="' + cid + '">مزامنة</button> ' +
-                '<button type="button" class="btn-secondary aslb-unmap" data-consumer="' + cid + '">إزالة ربط</button></td>';
-            tb.appendChild(tr);
-        }
-        tb.querySelectorAll('.aslb-sync-one').forEach(function (btn) {
-            btn.onclick = async function () {
-                var cid = parseInt(btn.getAttribute('data-consumer'), 10) || 0;
-                if (!confirm('نسخ الأدلة من عائلة مصدر الحزمة إلى «' + famLabel(cid) + '»؟ سيُستبدل دليل علوي/سفلي/مفرد الموجود على العائلة المستهدفة إن وُجد.')) {
-                    return;
-                }
-                var r2 = await api({ action: 'sync_consumer', consumer_size_family_id: cid });
-                if (!r2 || !r2.success) {
-                    alert((r2 && r2.message) ? r2.message : 'فشل');
-                    return;
-                }
-                alert(r2.message || 'تم');
-            };
-        });
-        tb.querySelectorAll('.aslb-unmap').forEach(function (btn) {
-            btn.onclick = async function () {
-                var cid = parseInt(btn.getAttribute('data-consumer'), 10) || 0;
-                if (!confirm('إزالة ربط العائلة؟')) {
-                    return;
-                }
-                var r2 = await api({ action: 'delete_map', consumer_size_family_id: cid });
-                if (!r2 || !r2.success) {
-                    alert((r2 && r2.message) ? r2.message : 'فشل');
-                    return;
-                }
-                loadMaps();
-            };
-        });
     }
 
     document.getElementById('aslb_save_bundle').onclick = async function () {
@@ -426,39 +302,9 @@ $enc = static function (array $rows): string {
         refreshSourceFamilyOptions();
     };
 
-    document.getElementById('aslb_save_map').onclick = async function () {
-        var c = parseInt(document.getElementById('aslb_map_consumer').value, 10) || 0;
-        var b = parseInt(document.getElementById('aslb_map_bundle').value, 10) || 0;
-        var res = await api({ action: 'save_map', consumer_size_family_id: c, library_bundle_id: b });
-        if (!res || !res.success) {
-            alert((res && res.message) ? res.message : 'فشل');
-            return;
-        }
-        alert('تم حفظ الربط');
-        loadMaps();
-    };
-
-    document.getElementById('aslb_sync').onclick = async function () {
-        var c = parseInt(document.getElementById('aslb_map_consumer').value, 10) || 0;
-        if (c <= 0) {
-            alert('اختر عائلة مستهلك');
-            return;
-        }
-        if (!confirm('مزامنة الأدلة إلى هذه العائلة؟')) {
-            return;
-        }
-        var res = await api({ action: 'sync_consumer', consumer_size_family_id: c });
-        if (!res || !res.success) {
-            alert((res && res.message) ? res.message : 'فشل');
-            return;
-        }
-        alert(res.message || 'تم');
-    };
-
     function aslbBoot() {
         refreshSourceFamilyOptions();
         loadBundles();
-        loadMaps();
     }
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', aslbBoot);
