@@ -143,7 +143,7 @@ try {
                 }
                 json_response([
                     'success' => false,
-                    'message' => 'تعذّر قراءة مسودات المكتبة من القاعدة (تحقق من جداول advisory_sizing_guides وصلاحيات الاتصال).',
+                    'message' => 'تعذّر تحميل مسودات المكتبة.',
                 ], 500);
             }
 

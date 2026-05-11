@@ -1589,16 +1589,19 @@ $asgJson = static function (array $rows): string {
             errEl.textContent = '';
         }
         var res = await orangeAdminJsonPost(ADVISORY_API, { action: 'list_unbound' });
-        if (!res || !res.success) {
+        var okUnbound = res && (res.success === true || res.success === 1 || res.success === '1' || res.success === 'true');
+        if (!okUnbound) {
             var msg = (res && res.message)
-                ? res.message
+                ? String(res.message)
                 : 'تعذّر تحميل قائمة المسودات من الخادم.';
             if (!silent) {
                 alert(msg);
-            } else if (errEl) {
-                errEl.textContent = msg + ' حدّث الصفحة إن استمرّ الخطأ.';
-                errEl.style.display = 'block';
+                if (errEl) {
+                    errEl.textContent = msg;
+                    errEl.style.display = 'block';
+                }
             }
+            /* عند silent لا نُظهر شريط خطأ: التحديث خلفي بعد الحفظ وقد يتزامن مع طلب آخر؛ الجدول يبقى بآخر بيانات ناجحة. */
             return;
         }
         tb.innerHTML = '';
