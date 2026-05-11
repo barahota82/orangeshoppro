@@ -539,8 +539,7 @@ $orangeAdminCardPreviewViewLabel = t('view_product');
                         <select id="sizing_advisory_guide_id" disabled>
                             <option value="0">بدون</option>
                         </select>
-                        <input type="hidden" id="sizing_guide_scope_legacy" value="none">
-                        <span class="card-hint" style="display:block;margin-top:4px;font-size:12px;color:#64748b;">القائمة تعرض <strong>اسم النموذج الداخلي (عربي)</strong> كما في شاشة أدلة المقاسات — نوع النموذج (علوي/سفلي/مفرد) يُشتق من الدليل نفسه.</span>
+                        <span class="card-hint" style="display:block;margin-top:4px;font-size:12px;color:#64748b;">القائمة: أسماء النماذج الداخلية (عربي) كما في شاشة <strong>أدلة المقاسات الاسترشادية</strong>.</span>
                     </div>
                     <div class="product-basic-class-cell" id="product_basic_has_colors_wrap">
                         <label for="has_colors">له ألوان ؟</label>
@@ -839,11 +838,7 @@ $orangeAdminCardPreviewViewLabel = t('view_product');
                     <?php endif; ?>
                     <td><?php
                     $agl = trim((string) ($p['_advisory_guide_label'] ?? ''));
-                    if ($agl !== '') {
-                        echo htmlspecialchars($agl, ENT_QUOTES, 'UTF-8');
-                    } else {
-                        echo htmlspecialchars((string) ($p['sizing_guide_scope'] ?? 'none'), ENT_QUOTES, 'UTF-8');
-                    }
+                    echo htmlspecialchars($agl !== '' ? $agl : 'بدون', ENT_QUOTES, 'UTF-8');
                     ?></td>
                     <td><?php echo number_format((float)$p['price'], 2); ?></td>
                     <td><?php echo number_format((float)$p['cost'], 2); ?></td>
@@ -2546,10 +2541,6 @@ function resetProductForm() {
         advReset.value = '0';
         advReset.disabled = true;
     }
-    const legReset = document.getElementById('sizing_guide_scope_legacy');
-    if (legReset) {
-        legReset.value = 'none';
-    }
     document.getElementById('product_is_active').value = '1';
     document.getElementById('colorwaysBox').innerHTML = '';
     document.getElementById('variantsBox').innerHTML = '';
@@ -2735,10 +2726,6 @@ async function loadProductForEdit(id) {
         adminSetMainImagePreview(mainFn);
         document.getElementById('has_colors').value = parseInt(p.has_colors, 10) === 1 ? '1' : '0';
         document.getElementById('size_family_id').value = p.size_family_id ? String(p.size_family_id) : '';
-        const legLoad = document.getElementById('sizing_guide_scope_legacy');
-        if (legLoad) {
-            legLoad.value = p.sizing_guide_scope || 'none';
-        }
         const advPick = parseInt(String(p.sizing_advisory_guide_id != null ? p.sizing_advisory_guide_id : '0'), 10) || 0;
         void orangeProductRefreshAdvisoryGuideSelect(advPick);
         document.getElementById('colorwaysBox').innerHTML = '';
@@ -2869,18 +2856,10 @@ async function uploadGalleryProductImages() {
 
 function orangeProductSizingSaveFields() {
     const advEl = document.getElementById('sizing_advisory_guide_id');
-    const legEl = document.getElementById('sizing_guide_scope_legacy');
     const adv = advEl ? parseInt(String(advEl.value || '0'), 10) || 0 : 0;
-    let legacy = 'none';
-    if (legEl && legEl.value) {
-        const v = String(legEl.value).trim();
-        if (['none', 'upper', 'lower', 'both', 'single'].indexOf(v) !== -1) {
-            legacy = v;
-        }
-    }
     return {
         sizing_advisory_guide_id: adv,
-        sizing_guide_scope: adv > 0 ? 'none' : legacy,
+        sizing_guide_scope: 'none',
     };
 }
 

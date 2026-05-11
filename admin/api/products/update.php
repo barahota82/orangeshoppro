@@ -102,6 +102,9 @@ try {
             $sizingAdvisoryGuideId = null;
         }
     }
+    if (orange_table_has_column($pdo, 'products', 'sizing_advisory_guide_id') && $sizingAdvisoryGuideId === null) {
+        $scope = 'none';
+    }
     $hasColors = (int)($data['has_colors'] ?? 0) === 1;
 
     $schemeErr = orange_catalog_validate_size_family_matches_product_type(
