@@ -408,6 +408,17 @@ $asgJson = static function (array $rows): string {
             }
             if (foundDept > 0) {
                 deptEl.value = String(foundDept);
+            } else {
+                for (var k = 0; k < BUNDLE_SCOPES.length; k++) {
+                    var by = BUNDLE_SCOPES[k];
+                    if ((parseInt(by.source_size_family_id, 10) || 0) === prefId) {
+                        var d2 = parseInt(by.department_id, 10) || 0;
+                        if (d2 > 0) {
+                            deptEl.value = String(d2);
+                            break;
+                        }
+                    }
+                }
             }
         }
     }
@@ -1131,6 +1142,12 @@ $asgJson = static function (array $rows): string {
         var res = await orangeAdminJsonPost(ADVISORY_API, { action: 'get', id: id });
         if (!res.success) { alert(res.message || 'خطأ'); return; }
         var g = res.guide;
+        var famId = parseInt(String(g.size_family_id != null ? g.size_family_id : '0'), 10) || 0;
+        if (famId > 0) {
+            asgPreferFamilyOnce = famId;
+            applyWizardFieldsFromFamily(famId);
+            asgRefreshResolvedContext();
+        }
         document.getElementById('asg_edit_id').value = String(g.id);
         document.getElementById('asg_scope').value = g.scope_kind || 'single';
         document.getElementById('asg_active').value = String(parseInt(g.is_active, 10) ? 1 : 0);
