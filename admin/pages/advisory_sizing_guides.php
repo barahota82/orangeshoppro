@@ -113,6 +113,7 @@ if ($tablesReady
     try {
         $asgDraftGuides = $pdo->query(
             'SELECT g.id, g.scope_kind, g.name_ar, g.name_en, g.is_active, g.size_family_id,
+                g.department_id, g.size_scheme_template_id, g.commercial_kind_key,
                 (SELECT COUNT(*) FROM advisory_sizing_guide_columns c WHERE c.guide_id = g.id) AS columns_count,
                 (SELECT COUNT(*) FROM advisory_sizing_guide_rows r WHERE r.guide_id = g.id) AS rows_count
              FROM advisory_sizing_guides g
@@ -152,7 +153,7 @@ $asgJson = static function (array $rows): string {
 
 <div class="card" id="asg_draft_card" style="margin-top:0;margin-bottom:16px;border:2px solid #0ea5e9;">
     <h2 style="margin:0 0 8px;font-size:1.25rem;">جدول الأدلة المحفوظة دون ربط عائلة (مسودات + يتيم)</h2>
-    <p class="card-hint" style="margin:0 0 10px;">كل ما يُحفظ بلا عائلة صالحة، أو بمعرّف عائلة غير موجود في القاعدة، يظهر هنا فور فتح الصفحة. اختر عائلة من الصف ثم «ربط» — أو «تحديث» لمزامنة القائمة بعد الحفظ.</p>
+    <p class="card-hint" style="margin:0 0 10px;">يُحفظ مع كل دليل القسم والقالب والنوع التجاري (1–3) قبل ربط العائلة. كل ما يُحفظ بلا عائلة صالحة، أو بمعرّف عائلة غير موجود في القاعدة، يظهر هنا. اختر عائلة من الصف ثم «ربط» — أو «تحديث» لمزامنة القائمة بعد الحفظ.</p>
     <p id="asg_draft_load_err" class="alert-error" style="display:none;margin:0 0 8px;"></p>
     <div style="margin-bottom:8px;">
         <button type="button" class="btn" id="asg_draft_refresh">تحديث الجدول</button>
@@ -160,11 +161,11 @@ $asgJson = static function (array $rows): string {
     <div style="overflow-x:auto;">
         <table class="data-table">
             <thead><tr>
-                <th>#</th><th>اسم النموذج</th><th>عمود size_family_id</th><th>أعمدة</th><th>صفوف</th><th>ربط بعائلة</th><th>إجراءات</th>
+                <th>#</th><th>اسم النموذج</th><th>عمود size_family_id</th><th>قسم</th><th>قالب</th><th>تجاري</th><th>أعمدة</th><th>صفوف</th><th>ربط بعائلة</th><th>إجراءات</th>
             </tr></thead>
             <tbody id="asg_draft_tbody">
                 <?php if ($asgDraftGuides === []): ?>
-                <tr><td colspan="7" class="card-hint">لا توجد صفوف في هذا الجدول حالياً — إن كان عندك دليل محفوظ ولا يظهر، تأكد من تشغيل ترحيل العمود <code>size_family_id</code> ليقبل NULL (زر أدمن كتالوج أو ملف <code>032_advisory_sizing_guides_null_size_family.sql</code>).</td></tr>
+                <tr><td colspan="10" class="card-hint">لا توجد صفوف في هذا الجدول حالياً — إن كان عندك دليل محفوظ ولا يظهر، تأكد من تشغيل ترحيل العمود <code>size_family_id</code> ليقبل NULL (زر أدمن كتالوج أو ملف <code>032_advisory_sizing_guides_null_size_family.sql</code>).</td></tr>
                 <?php else: ?>
                     <?php foreach ($asgDraftGuides as $dg): ?>
                         <?php
@@ -174,11 +175,17 @@ $asgJson = static function (array $rows): string {
                         $dgRows = (int) ($dg['rows_count'] ?? 0);
                         $dgSf = $dg['size_family_id'] ?? null;
                         $dgSfDisp = $dgSf === null || $dgSf === '' ? 'NULL' : (string) (int) $dgSf;
+                        $dgDept = isset($dg['department_id']) ? (int) $dg['department_id'] : 0;
+                        $dgTpl = isset($dg['size_scheme_template_id']) ? (int) $dg['size_scheme_template_id'] : 0;
+                        $dgCk = isset($dg['commercial_kind_key']) ? (string) $dg['commercial_kind_key'] : '';
                         ?>
                 <tr data-asg-draft-row="1">
                     <td><?php echo $dgId; ?></td>
                     <td><?php echo htmlspecialchars($dgName, ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><code><?php echo htmlspecialchars($dgSfDisp, ENT_QUOTES, 'UTF-8'); ?></code></td>
+                    <td><code><?php echo $dgDept > 0 ? (string) $dgDept : '—'; ?></code></td>
+                    <td><code><?php echo $dgTpl > 0 ? (string) $dgTpl : '—'; ?></code></td>
+                    <td><code><?php echo htmlspecialchars($dgCk !== '' ? $dgCk : '—', ENT_QUOTES, 'UTF-8'); ?></code></td>
                     <td><?php echo $dgCols; ?></td>
                     <td><?php echo $dgRows; ?></td>
                     <td>
@@ -1608,12 +1615,18 @@ $asgJson = static function (array $rows): string {
             var cols = parseInt(String(g.columns_count != null ? g.columns_count : '0'), 10) || 0;
             var rws = parseInt(String(g.rows_count != null ? g.rows_count : '0'), 10) || 0;
             var sfDisp = (g.size_family_id == null || g.size_family_id === '') ? 'NULL' : String(parseInt(g.size_family_id, 10) || 0);
+            var dDept = parseInt(g.department_id, 10) || 0;
+            var dTpl = parseInt(g.size_scheme_template_id, 10) || 0;
+            var dCk = String(g.commercial_kind_key || '').trim();
             var tr = document.createElement('tr');
             tr.setAttribute('data-asg-draft-row', '1');
             tr.innerHTML =
                 '<td>' + gid + '</td>' +
                 '<td>' + esc(title) + '</td>' +
                 '<td><code>' + esc(sfDisp) + '</code></td>' +
+                '<td><code>' + (dDept > 0 ? String(dDept) : '—') + '</code></td>' +
+                '<td><code>' + (dTpl > 0 ? String(dTpl) : '—') + '</code></td>' +
+                '<td><code>' + esc(dCk !== '' ? dCk : '—') + '</code></td>' +
                 '<td>' + cols + '</td>' +
                 '<td>' + rws + '</td>' +
                 '<td><select class="asg-draft-fam-sel" data-guide="' + gid + '" style="max-width:14rem;width:100%;">' + asgFamilyOptionsHtml(0) + '</select> ' +
@@ -1624,7 +1637,7 @@ $asgJson = static function (array $rows): string {
         });
         if (!guides.length) {
             var trd = document.createElement('tr');
-            trd.innerHTML = '<td colspan="7" class="card-hint">لا توجد صفوف — استخدم «دليل جديد» ثم احفظ كمسودة.</td>';
+            trd.innerHTML = '<td colspan="10" class="card-hint">لا توجد صفوف — استخدم «دليل جديد» ثم احفظ كمسودة.</td>';
             tb.appendChild(trd);
         }
     }
@@ -1714,6 +1727,26 @@ $asgJson = static function (array $rows): string {
             }
             void loadDraftList({ silent: true });
         }
+        (function applyGuideSavedScopeFromRow(gr) {
+            var gd = parseInt(gr.department_id, 10) || 0;
+            var gt = parseInt(gr.size_scheme_template_id, 10) || 0;
+            var gck = String(gr.commercial_kind_key || '').trim();
+            var deptEl = document.getElementById('asg_w_dept');
+            var tplEl = document.getElementById('asg_w_tpl');
+            var ckEl = document.getElementById('asg_w_ck');
+            if (gt > 0 && tplEl) {
+                tplEl.value = String(gt);
+            }
+            if (gck !== '' && ckEl) {
+                ckEl.value = gck;
+            }
+            if (gd > 0 && deptEl) {
+                deptEl.value = String(gd);
+            }
+        })(g);
+        if (famId > 0) {
+            await asgRefreshResolvedContext();
+        }
         document.getElementById('asg_edit_id').value = String(g.id);
         document.getElementById('asg_scope').value = g.scope_kind || 'single';
         document.getElementById('asg_active').value = String(parseInt(g.is_active, 10) ? 1 : 0);
@@ -1795,6 +1828,14 @@ $asgJson = static function (array $rows): string {
             alert('أكمل اختيار قالب المقاسات والنوع التجاري (2 و 3) أولاً، أو افتح مسودة من جدول المسودات');
             return;
         }
+        if (wizardDeptId() <= 0) {
+            alert('اختر القسم الرئيسي (1) في بطاقة المعالج — يُحفظ مع الدليل قبل أو بعد ربط العائلة.');
+            return;
+        }
+        if (wizardTplId() <= 0 || wizardCk() === '') {
+            alert('أكمل قالب المقاسات والنوع التجاري (2 و 3) في بطاقة المعالج — يُحفظان مع الدليل.');
+            return;
+        }
         var rowsPayload = readRowsPayload();
         var rowErr = asgValidateRowsBeforeSave(rowsPayload);
         if (rowErr) {
@@ -1805,6 +1846,9 @@ $asgJson = static function (array $rows): string {
             action: 'save',
             id: parseInt(document.getElementById('asg_edit_id').value, 10) || 0,
             size_family_id: f > 0 ? f : 0,
+            department_id: wizardDeptId(),
+            size_scheme_template_id: wizardTplId(),
+            commercial_kind_key: wizardCk(),
             scope_kind: document.getElementById('asg_scope').value,
             name_ar: document.getElementById('asg_name_ar').value.trim(),
             is_active: parseInt(document.getElementById('asg_active').value, 10),

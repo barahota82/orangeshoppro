@@ -38,6 +38,43 @@ function orange_advisory_value_kind_valid($raw): string
     return $s === 'number' ? 'number' : 'text';
 }
 
+/** @return string|null رسالة خطأ عربية أو null عند الصحة */
+function orange_advisory_guide_validate_scope_api(PDO $pdo, int $deptId, int $tplId, string $ckKey): ?string
+{
+    if ($deptId <= 0) {
+        return 'اختر القسم الرئيسي (1) — يُحفظ مع الدليل قبل ربط العائلة.';
+    }
+    if ($tplId <= 0) {
+        return 'اختر قالب المقاسات (2) — يُحفظ مع الدليل قبل ربط العائلة.';
+    }
+    if ($ckKey === '') {
+        return 'اختر النوع التجاري — مستوى 1 (3) — يُحفظ مع الدليل قبل ربط العائلة.';
+    }
+    if (orange_table_exists($pdo, 'departments')) {
+        $dSt = $pdo->prepare('SELECT id FROM departments WHERE id = ? AND is_active = 1 LIMIT 1');
+        $dSt->execute([$deptId]);
+        if (!(int) $dSt->fetchColumn()) {
+            return 'القسم الرئيسي غير موجود أو غير نشط.';
+        }
+    }
+    if (orange_table_exists($pdo, 'size_scheme_templates')) {
+        $tSt = $pdo->prepare('SELECT id FROM size_scheme_templates WHERE id = ? AND is_active = 1 LIMIT 1');
+        $tSt->execute([$tplId]);
+        if (!(int) $tSt->fetchColumn()) {
+            return 'قالب المقاسات غير موجود أو غير نشط.';
+        }
+    }
+    if (orange_table_exists($pdo, 'commercial_kind_dictionary')) {
+        $kSt = $pdo->prepare('SELECT kind_key FROM commercial_kind_dictionary WHERE kind_key = ? AND is_active = 1 LIMIT 1');
+        $kSt->execute([$ckKey]);
+        if ($kSt->fetchColumn() === false) {
+            return 'مفتاح النوع التجاري غير معرّف في القاموس أو غير نشط.';
+        }
+    }
+
+    return null;
+}
+
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
@@ -86,6 +123,7 @@ try {
         case 'list_unbound':
             $st = $pdo->prepare(
                 'SELECT g.id, g.scope_kind, g.name_ar, g.name_en, g.is_active, g.size_family_id,
+                    g.department_id, g.size_scheme_template_id, g.commercial_kind_key,
                     (SELECT COUNT(*) FROM advisory_sizing_guide_columns c WHERE c.guide_id = g.id) AS columns_count,
                     (SELECT COUNT(*) FROM advisory_sizing_guide_rows r WHERE r.guide_id = g.id) AS rows_count
                  FROM advisory_sizing_guides g
@@ -110,7 +148,10 @@ try {
             if (!$chkF->fetchColumn()) {
                 json_response(['success' => false, 'message' => 'عائلة المقاسات غير موجودة'], 422);
             }
-            $gSt = $pdo->prepare('SELECT id, size_family_id FROM advisory_sizing_guides WHERE id = ? LIMIT 1');
+            $gSt = $pdo->prepare(
+                'SELECT id, size_family_id, department_id, size_scheme_template_id, commercial_kind_key
+                 FROM advisory_sizing_guides WHERE id = ? LIMIT 1'
+            );
             $gSt->execute([$gid]);
             $gRow = $gSt->fetch(PDO::FETCH_ASSOC);
             if (!is_array($gRow)) {
@@ -126,6 +167,26 @@ try {
             }
             if ($hasValidFamily) {
                 json_response(['success' => false, 'message' => 'هذا الدليل مربوط بعائلة موجودة — استخدم التعديل من قائمة العائلة'], 422);
+            }
+            $gTpl = (int) ($gRow['size_scheme_template_id'] ?? 0);
+            $gCk = trim((string) ($gRow['commercial_kind_key'] ?? ''));
+            if ($gTpl > 0 || $gCk !== '') {
+                $fSt = $pdo->prepare(
+                    'SELECT commercial_kind_key, size_scheme_template_id FROM size_families WHERE id = ? LIMIT 1'
+                );
+                $fSt->execute([$nf]);
+                $fRow = $fSt->fetch(PDO::FETCH_ASSOC);
+                if (!is_array($fRow)) {
+                    json_response(['success' => false, 'message' => 'عائلة المقاسات غير موجودة'], 422);
+                }
+                $famTpl = (int) ($fRow['size_scheme_template_id'] ?? 0);
+                $famCk = trim((string) ($fRow['commercial_kind_key'] ?? ''));
+                if ($gTpl > 0 && $gTpl !== $famTpl) {
+                    json_response(['success' => false, 'message' => 'قالب المقاسات المحفوظ على الدليل لا يطابق عائلة المقاسات المختارة للربط.'], 422);
+                }
+                if ($gCk !== '' && $gCk !== $famCk) {
+                    json_response(['success' => false, 'message' => 'النوع التجاري (مستوى 1) المحفوظ على الدليل لا يطابق عائلة المقاسات المختارة للربط.'], 422);
+                }
             }
             $rSt = $pdo->prepare(
                 'SELECT id, row_kind, size_family_size_id FROM advisory_sizing_guide_rows WHERE guide_id = ? AND row_kind = \'data\''
@@ -269,7 +330,10 @@ try {
             $exGuide = null;
             $exFam = 0;
             if ($id > 0) {
-                $own0 = $pdo->prepare('SELECT scope_kind, size_family_id FROM advisory_sizing_guides WHERE id = ? LIMIT 1');
+                $own0 = $pdo->prepare(
+                    'SELECT scope_kind, size_family_id, department_id, size_scheme_template_id, commercial_kind_key
+                     FROM advisory_sizing_guides WHERE id = ? LIMIT 1'
+                );
                 $own0->execute([$id]);
                 $exGuide = $own0->fetch(PDO::FETCH_ASSOC);
                 if (!is_array($exGuide)) {
@@ -300,6 +364,41 @@ try {
                 $chk->execute([$fidRaw]);
                 if (!$chk->fetchColumn()) {
                     json_response(['success' => false, 'message' => 'عائلة المقاسات غير موجودة'], 422);
+                }
+            }
+            $deptId = (int) ($data['department_id'] ?? 0);
+            $tplId = (int) ($data['size_scheme_template_id'] ?? 0);
+            $ckKey = trim((string) ($data['commercial_kind_key'] ?? ''));
+            if (strlen($ckKey) > 32) {
+                $ckKey = substr($ckKey, 0, 32);
+            }
+            if ($id > 0 && is_array($exGuide)) {
+                if ($deptId <= 0 && isset($exGuide['department_id'])) {
+                    $deptId = (int) $exGuide['department_id'];
+                }
+                if ($tplId <= 0 && isset($exGuide['size_scheme_template_id'])) {
+                    $tplId = (int) $exGuide['size_scheme_template_id'];
+                }
+                if ($ckKey === '' && array_key_exists('commercial_kind_key', $exGuide)) {
+                    $ckKey = trim((string) $exGuide['commercial_kind_key']);
+                }
+            }
+            $scopeErr = orange_advisory_guide_validate_scope_api($pdo, $deptId, $tplId, $ckKey);
+            if ($scopeErr !== null) {
+                json_response(['success' => false, 'message' => $scopeErr], 422);
+            }
+            if ($boundFamily) {
+                $famM = $pdo->prepare(
+                    'SELECT commercial_kind_key, size_scheme_template_id FROM size_families WHERE id = ? LIMIT 1'
+                );
+                $famM->execute([$fidRaw]);
+                $famRow = $famM->fetch(PDO::FETCH_ASSOC);
+                if (is_array($famRow)) {
+                    $famTpl = (int) ($famRow['size_scheme_template_id'] ?? 0);
+                    $famCk = trim((string) ($famRow['commercial_kind_key'] ?? ''));
+                    if ($tplId !== $famTpl || $ckKey !== $famCk) {
+                        json_response(['success' => false, 'message' => 'القالب والنوع التجاري في المعالج يجب أن يطابقا عائلة المقاسات المختارة (معرّف العائلة في الحفظ).'], 422);
+                    }
                 }
             }
             $nameAr = trim((string) ($data['name_ar'] ?? ''));
@@ -446,21 +545,25 @@ try {
                         $dupN->execute([$fidRaw, $nameAr]);
                     } else {
                         $dupN = $pdo->prepare(
-                            'SELECT id FROM advisory_sizing_guides WHERE (size_family_id IS NULL OR size_family_id = 0) AND name_ar = ? LIMIT 1'
+                            'SELECT id FROM advisory_sizing_guides WHERE (size_family_id IS NULL OR size_family_id = 0)
+                             AND name_ar = ? AND COALESCE(department_id,0) = ? AND COALESCE(size_scheme_template_id,0) = ? AND commercial_kind_key = ?
+                             LIMIT 1'
                         );
-                        $dupN->execute([$nameAr]);
+                        $dupN->execute([$nameAr, $deptId, $tplId, $ckKey]);
                     }
                     if ($dupN->fetchColumn()) {
                         $pdo->rollBack();
                         json_response(['success' => false, 'message' => 'يوجد بالفعل دليل بنفس الاسم الداخلي (لنفس العائلة أو ضمن المسودات)'], 409);
                     }
                     $famIns = $boundFamily ? $fidRaw : null;
+                    $deptIns = $deptId > 0 ? $deptId : null;
+                    $tplIns = $tplId > 0 ? $tplId : null;
                     $ins = $pdo->prepare(
                         'INSERT INTO advisory_sizing_guides
-                            (size_family_id, scope_kind, name_ar, name_en, name_fil, name_hi, sort_order, is_active)
-                         VALUES (?,?,?,?,?,?,0,?)'
+                            (size_family_id, department_id, size_scheme_template_id, commercial_kind_key, scope_kind, name_ar, name_en, name_fil, name_hi, sort_order, is_active)
+                         VALUES (?,?,?,?,?,?,?,?,?,0,?)'
                     );
-                    $ins->execute([$famIns, $scopeKind, $nameAr, $nameEn, $nameFil, $nameHi, $active]);
+                    $ins->execute([$famIns, $deptIns, $tplIns, $ckKey, $scopeKind, $nameAr, $nameEn, $nameFil, $nameHi, $active]);
                     $id = (int) $pdo->lastInsertId();
                 } else {
                     $nextSf = null;
@@ -471,9 +574,11 @@ try {
                     }
                     if ($nextSf === null || $nextSf === 0) {
                         $dupN = $pdo->prepare(
-                            'SELECT id FROM advisory_sizing_guides WHERE (size_family_id IS NULL OR size_family_id = 0) AND name_ar = ? AND id <> ? LIMIT 1'
+                            'SELECT id FROM advisory_sizing_guides WHERE (size_family_id IS NULL OR size_family_id = 0)
+                             AND name_ar = ? AND COALESCE(department_id,0) = ? AND COALESCE(size_scheme_template_id,0) = ? AND commercial_kind_key = ?
+                             AND id <> ? LIMIT 1'
                         );
-                        $dupN->execute([$nameAr, $id]);
+                        $dupN->execute([$nameAr, $deptId, $tplId, $ckKey, $id]);
                     } else {
                         $dupN = $pdo->prepare(
                             'SELECT id FROM advisory_sizing_guides WHERE size_family_id = ? AND name_ar = ? AND id <> ? LIMIT 1'
@@ -485,12 +590,15 @@ try {
                         json_response(['success' => false, 'message' => 'يوجد بالفعل دليل آخر بنفس الاسم الداخلي لهذه العائلة أو ضمن المسودات'], 409);
                     }
                     $bindSf = ($nextSf === null || (int) $nextSf === 0) ? null : (int) $nextSf;
+                    $deptIns = $deptId > 0 ? $deptId : null;
+                    $tplIns = $tplId > 0 ? $tplId : null;
                     $upd = $pdo->prepare(
                         'UPDATE advisory_sizing_guides SET
-                            size_family_id = ?, scope_kind = ?, name_ar = ?, name_en = ?, name_fil = ?, name_hi = ?, is_active = ?
+                            size_family_id = ?, department_id = ?, size_scheme_template_id = ?, commercial_kind_key = ?,
+                            scope_kind = ?, name_ar = ?, name_en = ?, name_fil = ?, name_hi = ?, is_active = ?
                          WHERE id = ?'
                     );
-                    $upd->execute([$bindSf, $scopeKind, $nameAr, $nameEn, $nameFil, $nameHi, $active, $id]);
+                    $upd->execute([$bindSf, $deptIns, $tplIns, $ckKey, $scopeKind, $nameAr, $nameEn, $nameFil, $nameHi, $active, $id]);
                     $stR2 = $pdo->prepare('SELECT id FROM advisory_sizing_guide_rows WHERE guide_id = ?');
                     $stR2->execute([$id]);
                     $rids2 = $stR2->fetchAll(PDO::FETCH_COLUMN);

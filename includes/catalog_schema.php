@@ -892,6 +892,9 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         'CREATE TABLE IF NOT EXISTS advisory_sizing_guides (
             id INT AUTO_INCREMENT PRIMARY KEY,
             size_family_id INT NULL DEFAULT NULL,
+            department_id INT NULL DEFAULT NULL,
+            size_scheme_template_id INT NULL DEFAULT NULL,
+            commercial_kind_key VARCHAR(32) NOT NULL DEFAULT \'\',
             scope_kind VARCHAR(16) NOT NULL,
             name_ar VARCHAR(191) NOT NULL DEFAULT \'\',
             name_en VARCHAR(191) NOT NULL DEFAULT \'\',
@@ -935,6 +938,44 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             }
         } catch (Throwable $e) {
             // ignore
+        }
+        if (!orange_table_has_column($pdo, 'advisory_sizing_guides', 'department_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE advisory_sizing_guides ADD COLUMN department_id INT NULL DEFAULT NULL AFTER size_family_id'
+            );
+        }
+        if (!orange_table_has_column($pdo, 'advisory_sizing_guides', 'size_scheme_template_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE advisory_sizing_guides ADD COLUMN size_scheme_template_id INT NULL DEFAULT NULL AFTER department_id'
+            );
+        }
+        if (!orange_table_has_column($pdo, 'advisory_sizing_guides', 'commercial_kind_key')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE advisory_sizing_guides ADD COLUMN commercial_kind_key VARCHAR(32) NOT NULL DEFAULT \'\' AFTER size_scheme_template_id'
+            );
+        }
+        if (orange_table_has_column($pdo, 'advisory_sizing_guides', 'size_scheme_template_id')
+            && orange_table_has_column($pdo, 'advisory_sizing_guides', 'commercial_kind_key')) {
+            try {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'UPDATE advisory_sizing_guides g
+                     INNER JOIN size_families sf ON sf.id = g.size_family_id
+                     SET g.commercial_kind_key = sf.commercial_kind_key,
+                         g.size_scheme_template_id = sf.size_scheme_template_id
+                     WHERE g.size_family_id IS NOT NULL AND g.size_family_id > 0
+                       AND (
+                         g.commercial_kind_key = \'\'
+                         OR g.size_scheme_template_id IS NULL
+                         OR g.size_scheme_template_id = 0
+                       )'
+                );
+            } catch (Throwable $e) {
+                // ignore
+            }
         }
     }
 
