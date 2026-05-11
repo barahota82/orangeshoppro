@@ -132,27 +132,36 @@ $asgJson = static function (array $rows): string {
 
 <div class="card">
     <h3>القسم والقالب والنوع التجاري</h3>
-    <div class="form-grid" style="max-width:920px;">
-        <div style="grid-column:1/-1;"><label for="asg_w_dept"><strong>1.</strong> القسم الرئيسي</label>
-            <select id="asg_w_dept"><option value="0">— الكل / بدون تصفية بالقسم —</option>
-                <?php foreach ($asgDepartments as $d): ?>
-                <option value="<?php echo (int) $d['id']; ?>"><?php echo htmlspecialchars((string) ($d['name_ar'] ?: $d['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
-                <?php endforeach; ?>
-            </select>
+    <input type="hidden" id="asg_family" value="0">
+    <div class="asg-wizard-toolbar" style="display:flex;flex-wrap:nowrap;align-items:flex-end;gap:12px;direction:ltr;justify-content:space-between;width:100%;box-sizing:border-box;margin-top:8px;">
+        <div style="flex:0 0 auto;">
+            <button type="button" class="btn" id="asg_new_btn" disabled>دليل جديد</button>
         </div>
-        <div style="grid-column:1/-1;"><label for="asg_w_tpl"><strong>2.</strong> قالب المقاسات</label>
-            <select id="asg_w_tpl"><option value="0">— اختر —</option>
-                <?php foreach ($asgTemplates as $t): ?>
-                <option value="<?php echo (int) $t['id']; ?>"><?php echo htmlspecialchars((string) ($t['name_ar'] ?: $t['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div style="grid-column:1/-1;"><label for="asg_w_ck"><strong>3.</strong> النوع التجاري (مستوى 1)</label>
-            <select id="asg_w_ck"><option value="">— اختر —</option>
-                <?php foreach ($asgCommercialKinds as $k): ?>
-                <option value="<?php echo htmlspecialchars((string) $k['kind_key'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) ($k['label_ar'] ?: $k['label_en'] ?: $k['kind_key']), ENT_QUOTES, 'UTF-8'); ?></option>
-                <?php endforeach; ?>
-            </select>
+        <div class="asg-wizard-fields" style="display:flex;flex-wrap:nowrap;flex:1 1 auto;gap:10px;align-items:flex-end;min-width:0;direction:rtl;justify-content:flex-end;overflow-x:auto;">
+            <div style="flex:1 1 0;min-width:10rem;display:flex;flex-direction:column;gap:4px;">
+                <label for="asg_w_dept" style="margin:0;font-size:13px;white-space:nowrap;"><strong>1.</strong> القسم الرئيسي</label>
+                <select id="asg_w_dept" style="width:100%;min-width:0;"><option value="0">— الكل / بدون تصفية بالقسم —</option>
+                    <?php foreach ($asgDepartments as $d): ?>
+                    <option value="<?php echo (int) $d['id']; ?>"><?php echo htmlspecialchars((string) ($d['name_ar'] ?: $d['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div style="flex:1 1 0;min-width:10rem;display:flex;flex-direction:column;gap:4px;">
+                <label for="asg_w_tpl" style="margin:0;font-size:13px;white-space:nowrap;"><strong>2.</strong> قالب المقاسات</label>
+                <select id="asg_w_tpl" style="width:100%;min-width:0;"><option value="0">— اختر —</option>
+                    <?php foreach ($asgTemplates as $t): ?>
+                    <option value="<?php echo (int) $t['id']; ?>"><?php echo htmlspecialchars((string) ($t['name_ar'] ?: $t['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div style="flex:1 1 0;min-width:10rem;display:flex;flex-direction:column;gap:4px;">
+                <label for="asg_w_ck" style="margin:0;font-size:13px;white-space:nowrap;"><strong>3.</strong> النوع التجاري (مستوى 1)</label>
+                <select id="asg_w_ck" style="width:100%;min-width:0;"><option value="">— اختر —</option>
+                    <?php foreach ($asgCommercialKinds as $k): ?>
+                    <option value="<?php echo htmlspecialchars((string) $k['kind_key'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) ($k['label_ar'] ?: $k['label_en'] ?: $k['kind_key']), ENT_QUOTES, 'UTF-8'); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
         </div>
     </div>
     <p id="asg_w_hint" class="card-hint" style="margin:12px 0 0;"></p>
@@ -160,15 +169,9 @@ $asgJson = static function (array $rows): string {
 
 <div class="card">
     <h3>الأدلة</h3>
-    <input type="hidden" id="asg_family" value="0">
     <p id="asg_resolved_family_wrap" style="margin:0 0 10px;display:none;font-size:13px;color:#64748b;">
         <span id="asg_resolved_family_label"></span>
     </p>
-    <div class="form-grid" style="max-width:720px;">
-        <div style="align-self:end;">
-            <button type="button" class="btn" id="asg_new_btn" disabled>دليل جديد</button>
-        </div>
-    </div>
     <div id="asg_list_wrap" style="margin-top:12px;display:none;">
         <ul id="asg_list" class="asg-guide-list"></ul>
     </div>
