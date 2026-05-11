@@ -186,7 +186,7 @@ $asgJson = static function (array $rows): string {
             <label for="asg_col_count">عدد الأعمدة</label>
             <input type="number" id="asg_col_count" min="1" max="24" value="3" style="width:5rem;">
         </div>
-        <button type="button" class="btn-secondary" id="asg_gen_cols">توليد صفوف العناوين</button>
+        <button type="button" class="btn" id="asg_gen_cols">توليد صفوف العناوين</button>
         <button type="button" class="btn-secondary" id="asg_col_add" title="يضيف عموداً جديداً في النهاية ويضيف خلية فارغة لكل صف بيانات">+ عمود</button>
         <button type="button" class="btn-secondary" id="asg_col_remove" title="يحذف آخر عمود من التعريف وآخر خلية من كل صف بيانات">− حذف آخر عمود</button>
     </div>
