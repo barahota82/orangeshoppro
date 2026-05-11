@@ -228,7 +228,7 @@ $asgJson = static function (array $rows): string {
 
     <h4 style="margin-top:20px;">صفوف الجدول</h4>
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:center;">
-        <button type="button" class="btn" id="asg_bulk_rows" title="يضيف صف بيانات لكل مقاس نشط في العائلة المختارة، مع ربط المقاس وتخطي المربوط مسبقاً">إضافة صف لكل مقاس من العائلة</button>
+        <button type="button" class="btn" id="asg_bulk_rows" title="يضيف صفاً لكل صف في قالب المقاسات (2) في المعالج، باستخدام مقاسات عائلة المقاسات المطابقة للمعالج، مع تخطي المربوط مسبقاً">إضافة صف لكل مقاس حسب القالب (2)</button>
         <button type="button" class="btn-secondary" id="asg_row_data">+ صف بيانات</button>
         <button type="button" class="btn-secondary" id="asg_row_label" title="سطر عنوان يظهر داخل الدليل للعميل — مفيد لو جدول واحد فيه أكثر من مجموعة أو عنوان فرعي؛ لجدول مسطح واحد غالباً لا تحتاجه">+ صف عنوان (مجموعة)</button>
     </div>
@@ -665,7 +665,7 @@ $asgJson = static function (array $rows): string {
 
     function sizeOptionsHtml(selectedId) {
         var rows = effectiveFamilySizeRows();
-        var h = '<option value="0">— اختر المقاس من العائلة —</option>';
+        var h = '<option value="0">— اختر المقاس (حسب قالب المعالج 2) —</option>';
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
             var id = parseInt(r.id, 10) || 0;
@@ -1088,7 +1088,7 @@ $asgJson = static function (array $rows): string {
             var lab = (cols[j] && (cols[j].label_ar || cols[j].label_en)) ? esc(cols[j].label_ar || cols[j].label_en) : ('عمود ' + (j + 1));
             var ph = '';
             if (j === 0) {
-                ph = ' placeholder="يُملأ تلقائياً عند اختيار المقاس من العائلة"';
+                ph = ' placeholder="يُملأ تلقائياً عند اختيار المقاس (حسب القالب 2)"';
             }
             cellInputs += '<div><label>' + lab + '</label><input type="text" class="asg-cell" data-ix="' + j + '"' + ph + ' value="' + esc(cells[j]) + '"></div>';
         }
@@ -1096,9 +1096,9 @@ $asgJson = static function (array $rows): string {
             '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">' +
             '<strong>صف بيانات</strong>' +
             '<button type="button" class="btn-secondary asg-rm">حذف الصف</button></div>' +
-            '<div style="margin-top:8px;"><label>المقاس من العائلة <span style="color:#b91c1c;">*</span></label>' +
+            '<div style="margin-top:8px;"><label>المقاس <span style="color:#b91c1c;">*</span> <span style="font-size:12px;color:#64748b;">(قالب المقاسات في المعالج — الحقل 2)</span></label>' +
             '<select class="asg-sfs">' + sizeOptionsHtml(sid) + '</select>' +
-            '<span class="card-hint" style="display:block;margin-top:4px;font-size:12px;">إلزامي: اختر <strong>المقاس من العائلة</strong> — أول عمود يُحدَّث تلقائياً للمعاينة؛ للعميل يُعرض بلغة المتجر من العائلة.</span></div>' +
+            '<span class="card-hint" style="display:block;margin-top:4px;font-size:12px;">القائمة مرتبة وتُعرض حسب <strong>قالب المقاسات</strong> الذي اخترته في بطاقة «إنشاء جدول مقاس إرشادي»؛ اختر صف القالب المقابل لعائلة المقاسات المطابقة للمعالج. أول عمود للمعاينة يُحدَّث تلقائياً.</span></div>' +
             '<p class="asg-family-hint card-hint" style="display:none;margin:8px 0 0;font-size:12px;line-height:1.5;"></p>' +
             '<div class="form-grid" style="margin-top:10px;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));">' + cellInputs + '</div>';
         div.querySelector('.asg-rm').onclick = function () { div.remove(); };
@@ -1192,7 +1192,7 @@ $asgJson = static function (array $rows): string {
         if (sid > 0) {
             firstIn.value = asgFamilyLabelById(sid);
             firstIn.readOnly = true;
-            firstIn.setAttribute('title', 'يُملأ تلقائياً من المقاس المختار؛ للعميل بلغة صفحة المتجر من العائلة');
+            firstIn.setAttribute('title', 'يُملأ تلقائياً من المقاس المختار (حسب القالب في المعالج)؛ للعميل بلغة صفحة المتجر');
             firstIn.classList.add('asg-cell--from-family');
         } else {
             firstIn.readOnly = false;
@@ -1215,12 +1215,12 @@ $asgJson = static function (array $rows): string {
             hint.style.display = 'block';
             hint.textContent = fid() <= 0
                 ? 'مسودة بدون عائلة: احفظ الخلايا؛ بعد «ربط بعائلة» اختر المقاس لكل صف أو «إضافة صف لكل مقاس».'
-                : 'اختر مقاساً من العائلة — إلزامي لكل صف بيانات.';
+                : 'اختر مقاساً من القائمة (مرتبة حسب قالب المعالج 2) — إلزامي لكل صف بيانات.';
             return;
         }
         var name = asgFamilyLabelById(sid);
         hint.style.display = 'block';
-        hint.textContent = 'أول عمود للمعاينة: «' + name + '» — للعميل يُعرض بلغة صفحة المتجر من العائلة (لا يُحفظ نص العمود الأول في القاعدة).';
+        hint.textContent = 'أول عمود للمعاينة: «' + name + '» — للعميل بلغة صفحة المتجر (لا يُحفظ نص العمود الأول في القاعدة).';
     }
 
     function asgRefreshAllFamilyHints() {
@@ -1293,7 +1293,7 @@ $asgJson = static function (array $rows): string {
         }
         var fam = effectiveFamilySizeRows();
         if (!fam.length) {
-            alert('لا توجد مقاسات نشطة لهذه العائلة — راجع عائلات المقاسات');
+            alert('لا توجد مقاسات في عائلة المقاسات المطابقة للمعالج مربوطة بقالب المقاسات (2) — راجع عائلات المقاسات وربط المقاسات بصفوف القالب.');
             return;
         }
         var cols = readColumns();
@@ -1310,10 +1310,10 @@ $asgJson = static function (array $rows): string {
             }
         }
         if (!toAdd.length) {
-            alert('كل مقاسات العائلة لها صف مربوط بالفعل — لا يوجد جديد للإضافة');
+            alert('كل المقاسات المعروضة حسب قالب المعالج (2) لها صف مربوط بالفعل — لا يوجد جديد للإضافة');
             return;
         }
-        if (!confirm('سيتم إضافة ' + toAdd.length + ' صف بيانات، كل صف مربوط بمقاس من العائلة. المتابعة؟')) {
+        if (!confirm('سيتم إضافة ' + toAdd.length + ' صف بيانات، كل صف مربوط بمقاس من القائمة (حسب قالب المعالج 2). المتابعة؟')) {
             return;
         }
         var n = Math.max(1, cols.length);
@@ -1680,10 +1680,10 @@ $asgJson = static function (array $rows): string {
                 }
             } else {
                 if (sid <= 0) {
-                    return 'في صف البيانات رقم ' + dataRowNum + ': اختر مقاساً من العائلة من القائمة. لا يُشترط إضافة صفاً لكل مقاس — فقط أكمل الصفوف التي تضيفها.';
+                    return 'في صف البيانات رقم ' + dataRowNum + ': اختر مقاساً من القائمة (مرتبة حسب قالب المعالج 2). لا يُشترط إضافة صفاً لكل مقاس — فقط أكمل الصفوف التي تضيفها.';
                 }
                 if (seen[sid]) {
-                    return 'مقاس العائلة مكرر في أكثر من صف — اربط كل مقاس مرة واحدة فقط.';
+                    return 'نفس المقاس (من القائمة حسب القالب) مكرر في أكثر من صف — اربط كل مقاس مرة واحدة فقط.';
                 }
                 seen[sid] = true;
             }
@@ -1693,7 +1693,7 @@ $asgJson = static function (array $rows): string {
             if (!(famOk && sid > 0 && ne === 1)) {
                 for (var j = startIx; j < ne; j++) {
                     if (effCells[j] === '') {
-                        return 'أكمل جميع خلايا صف البيانات رقم ' + dataRowNum + ' (العمود ' + (j + 1) + ' من أعمدة الجدول المحفوظة). لا يُشترط إضافة صفاً لكل مقاس في العائلة.';
+                        return 'أكمل جميع خلايا صف البيانات رقم ' + dataRowNum + ' (العمود ' + (j + 1) + ' من أعمدة الجدول المحفوظة). لا يُشترط إضافة صفاً لكل مقاس حسب القالب.';
                     }
                 }
             }
