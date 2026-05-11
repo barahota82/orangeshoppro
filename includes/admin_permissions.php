@@ -40,7 +40,6 @@ function orange_admin_page_resource(string $page): string
         'pattern_dictionary' => 'catalog',
         'size_families' => 'catalog',
         'advisory_sizing_guides' => 'catalog',
-        'advisory_sizing_library' => 'catalog',
         'size_scheme_templates' => 'catalog',
         'sizing_dictionary' => 'catalog',
         'catalog_attributes' => 'catalog',

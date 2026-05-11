@@ -130,6 +130,71 @@ $asgJson = static function (array $rows): string {
 </div>
 <?php else: ?>
 
+<?php if ($asgCommercialKinds === [] && orange_table_exists($pdo, 'commercial_kind_dictionary')): ?>
+<div class="card" style="margin-bottom:12px;">
+    <div class="alert-error">قاموس النوع التجاري (مستوى 1) فارغ — عرّف مفاتيحاً في «قاموس هرم المقاسات» قبل حفظ حزم المكتبة أو اختيار النوع في المعالج.</div>
+</div>
+<?php endif; ?>
+
+<?php if ($asgLibraryReady): ?>
+<div class="card" style="margin-bottom:16px;">
+    <h3 style="margin-top:0;">حزم مكتبة أدلة المقاسات (الخطوات 1–4 ثم حفظ)</h3>
+    <p class="card-hint" style="margin:0 0 12px;">تُستخدم لربط القسم بالقالب والنوع التجاري وعائلة المصدر؛ الربط والمزامنة مع عائلة المستهلك من أسفل الصفحة.</p>
+    <ol class="card-hint" style="margin:0 0 12px;padding-inline-start:1.25rem;line-height:1.6;">
+        <li><strong>القسم الرئيسي</strong></li>
+        <li><strong>قالب المقاسات</strong></li>
+        <li><strong>النوع التجاري — مستوى 1</strong> (من القاموس)</li>
+        <li><strong>عائلة المصدر</strong> (مفلترة حسب 2 و 3؛ يجب أن تطابق عائلة المقاسات نفس القالب والنوع التجاري)</li>
+    </ol>
+
+    <div class="form-grid" style="max-width:920px;">
+        <div><label for="aslb_id">معرّف (0 = جديد)</label><input type="number" id="aslb_id" value="0" min="0" class="input-narrow"></div>
+        <div><label for="aslb_sort">ترتيب</label><input type="number" id="aslb_sort" value="0"></div>
+        <div><label for="aslb_active">نشط</label>
+            <select id="aslb_active"><option value="1">نعم</option><option value="0">لا</option></select>
+        </div>
+
+        <div style="grid-column:1/-1;"><label for="aslb_dept"><strong>1.</strong> القسم الرئيسي</label>
+            <select id="aslb_dept"><option value="0">— اختر —</option>
+                <?php foreach ($asgDepartments as $d): ?>
+                <option value="<?php echo (int) $d['id']; ?>"><?php echo htmlspecialchars((string) ($d['name_ar'] ?: $d['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div style="grid-column:1/-1;"><label for="aslb_tpl"><strong>2.</strong> قالب المقاسات</label>
+            <select id="aslb_tpl"><option value="0">— اختر —</option>
+                <?php foreach ($asgTemplates as $t): ?>
+                <option value="<?php echo (int) $t['id']; ?>"><?php echo htmlspecialchars((string) ($t['name_ar'] ?: $t['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div style="grid-column:1/-1;"><label for="aslb_ck"><strong>3.</strong> النوع التجاري (مستوى 1)</label>
+            <select id="aslb_ck"><option value="">— اختر —</option>
+                <?php foreach ($asgCommercialKinds as $k): ?>
+                <option value="<?php echo htmlspecialchars((string) $k['kind_key'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) ($k['label_ar'] ?: $k['label_en'] ?: $k['kind_key']), ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div style="grid-column:1/-1;"><label for="aslb_src"><strong>4.</strong> عائلة المصدر</label>
+            <select id="aslb_src"><option value="0">— أكمل الخطوات 2 و 3 —</option></select>
+            <span class="card-hint" style="display:block;margin-top:4px;">تظهر العائلات التي لها نفس قالب المقاسات ونفس النوع التجاري.</span>
+        </div>
+
+        <div style="grid-column:1/-1;"><label for="aslb_name_ar">اسم الحزمة (عربي)</label><input type="text" id="aslb_name_ar" maxlength="191"></div>
+        <div style="grid-column:1/-1;"><label for="aslb_name_en">اسم الحزمة (EN)</label><input type="text" id="aslb_name_en" maxlength="191"></div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <button type="button" class="btn" id="aslb_save_bundle">حفظ الحزمة</button>
+        <button type="button" class="btn-secondary" id="aslb_clear_bundle">تفريغ النموذج</button>
+    </div>
+    <div style="margin-top:16px;overflow:auto;">
+        <table class="data-table"><thead><tr>
+            <th>ترتيب</th><th>قسم</th><th>قالب</th><th>تجاري</th><th>عربي</th><th>EN</th><th>عائلة مصدر</th><th>نشط</th><th>إجراءات</th>
+        </tr></thead><tbody id="aslb_bundle_rows"></tbody></table>
+    </div>
+</div>
+<?php endif; ?>
+
 <div class="card">
     <h3>القسم والقالب والنوع التجاري</h3>
     <input type="hidden" id="asg_family" value="0">
@@ -209,7 +274,7 @@ $asgJson = static function (array $rows): string {
 
 <div class="card" id="asg_guides_table_card" style="margin-top:16px;">
     <h3 style="margin-top:0;">الأدلة المحفوظة لهذه العائلة</h3>
-    <div id="asg_list_wrap" style="display:none;margin-top:8px;">
+    <div id="asg_list_wrap" style="display:block;margin-top:8px;">
         <div style="overflow-x:auto;">
             <table class="data-table" id="asg_guides_table">
                 <thead>
@@ -455,7 +520,7 @@ $asgJson = static function (array $rows): string {
         }
     }
 
-    function asgRefreshResolvedContext() {
+    async function asgRefreshResolvedContext() {
         var prefer = asgPreferFamilyOnce;
         if (prefer > 0) {
             asgPreferFamilyOnce = 0;
@@ -480,10 +545,10 @@ $asgJson = static function (array $rows): string {
                 nb.disabled = true;
             }
             if (listWrap) {
-                listWrap.style.display = 'none';
+                listWrap.style.display = 'block';
             }
             if (listTbody) {
-                listTbody.innerHTML = '';
+                listTbody.innerHTML = '<tr><td colspan="5" class="card-hint">أكمل اختيار قالب المقاسات والنوع التجاري (الخطوتان 2 و 3) لتُعرض الأدلة المحفوظة لهذه العائلة.</td></tr>';
             }
             if (hintEl && tpl > 0 && ck !== '') {
                 hintEl.textContent = 'لا عائلة مطابقة للقالب والنوع.';
@@ -510,7 +575,7 @@ $asgJson = static function (array $rows): string {
             }
         }
         refreshSizeSelects();
-        void loadList({ silent: true });
+        await loadList({ silent: true });
     }
 
     function sizeOptionsHtml(selectedId) {
@@ -528,6 +593,179 @@ $asgJson = static function (array $rows): string {
     function esc(s) {
         if (!s) return '';
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+    }
+
+    function asgRefreshBundleSrcOpts() {
+        var tplEl = document.getElementById('aslb_tpl');
+        var ckEl = document.getElementById('aslb_ck');
+        var sel = document.getElementById('aslb_src');
+        if (!tplEl || !ckEl || !sel) {
+            return;
+        }
+        var tpl = parseInt(tplEl.value, 10) || 0;
+        var ck = (ckEl.value || '').trim();
+        var prev = parseInt(sel.value, 10) || 0;
+        sel.innerHTML = '<option value="0">— اختر —</option>';
+        if (tpl <= 0 || ck === '') {
+            sel.innerHTML = '<option value="0">— أكمل الخطوات 2 و 3 —</option>';
+            return;
+        }
+        for (var bi = 0; bi < FAMILIES_FULL.length; bi++) {
+            var f = FAMILIES_FULL[bi];
+            var fid = parseInt(f.id, 10) || 0;
+            var fck = String(f.commercial_kind_key || '').trim();
+            var ftpl = parseInt(f.size_scheme_template_id, 10) || 0;
+            if (fck !== ck || ftpl !== tpl) {
+                continue;
+            }
+            var o = document.createElement('option');
+            o.value = String(fid);
+            o.textContent = f.name_ar || f.name_en || ('#' + fid);
+            if (fid === prev) {
+                o.selected = true;
+            }
+            sel.appendChild(o);
+        }
+    }
+
+    function asgBundleSrcFamLabel(id) {
+        id = parseInt(id, 10) || 0;
+        for (var i = 0; i < FAMILIES_FULL.length; i++) {
+            if (parseInt(FAMILIES_FULL[i].id, 10) === id) {
+                return (FAMILIES_FULL[i].name_ar || FAMILIES_FULL[i].name_en || ('#' + id));
+            }
+        }
+        return '#' + id;
+    }
+
+    async function asgLibBundleLoadTable() {
+        var tb = document.getElementById('aslb_bundle_rows');
+        if (!tb) {
+            return [];
+        }
+        var res = await orangeAdminJsonPost(LIBRARY_API, { action: 'list_bundles' });
+        if (!res || !res.success) {
+            alert((res && res.message) ? res.message : 'خطأ تحميل الحزم');
+            return [];
+        }
+        var bundles = res.bundles || [];
+        tb.innerHTML = '';
+        for (var j = 0; j < bundles.length; j++) {
+            var b = bundles[j];
+            var tr = document.createElement('tr');
+            var dept = (b.dept_ar || b.dept_en || '—');
+            var tplLab = (b.tpl_ar || b.tpl_en || '—');
+            var srcLab = asgBundleSrcFamLabel(b.source_size_family_id);
+            tr.innerHTML =
+                '<td>' + esc(String(b.sort_order != null ? b.sort_order : '')) + '</td>' +
+                '<td>' + esc(dept) + '</td>' +
+                '<td>' + esc(tplLab) + '</td>' +
+                '<td><code>' + esc(b.commercial_kind_key || '') + '</code></td>' +
+                '<td>' + esc(b.name_ar) + '</td>' +
+                '<td>' + esc(b.name_en) + '</td>' +
+                '<td>' + esc(srcLab) + '</td>' +
+                '<td>' + (parseInt(b.is_active, 10) ? 'نعم' : 'لا') + '</td>' +
+                '<td><button type="button" class="btn-secondary aslb-ed" data-id="' + parseInt(b.id, 10) + '">تعديل</button> ' +
+                '<button type="button" class="btn-secondary aslb-del" data-id="' + parseInt(b.id, 10) + '">حذف</button></td>';
+            tb.appendChild(tr);
+        }
+        tb.querySelectorAll('.aslb-ed').forEach(function (btn) {
+            btn.onclick = function () {
+                var id = parseInt(btn.getAttribute('data-id'), 10) || 0;
+                var row = bundles.filter(function (x) { return parseInt(x.id, 10) === id; })[0];
+                if (!row) {
+                    return;
+                }
+                document.getElementById('aslb_id').value = String(id);
+                document.getElementById('aslb_sort').value = String(row.sort_order != null ? row.sort_order : 0);
+                document.getElementById('aslb_active').value = parseInt(row.is_active, 10) ? '1' : '0';
+                document.getElementById('aslb_name_ar').value = row.name_ar || '';
+                document.getElementById('aslb_name_en').value = row.name_en || '';
+                document.getElementById('aslb_dept').value = String(parseInt(row.department_id, 10) || 0);
+                document.getElementById('aslb_tpl').value = String(parseInt(row.size_scheme_template_id, 10) || 0);
+                document.getElementById('aslb_ck').value = row.commercial_kind_key || '';
+                asgRefreshBundleSrcOpts();
+                document.getElementById('aslb_src').value = String(parseInt(row.source_size_family_id, 10) || 0);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+        });
+        tb.querySelectorAll('.aslb-del').forEach(function (btn) {
+            btn.onclick = async function () {
+                var id = parseInt(btn.getAttribute('data-id'), 10) || 0;
+                if (!confirm('حذف الحزمة #' + id + '؟')) {
+                    return;
+                }
+                var r2 = await orangeAdminJsonPost(LIBRARY_API, { action: 'delete_bundle', id: id });
+                if (!r2 || !r2.success) {
+                    alert((r2 && r2.message) ? r2.message : 'فشل الحذف');
+                    return;
+                }
+                window.location.reload();
+            };
+        });
+        return bundles;
+    }
+
+    function asgWireBundleForm() {
+        var rowsEl = document.getElementById('aslb_bundle_rows');
+        if (!rowsEl) {
+            return;
+        }
+        var tplEl = document.getElementById('aslb_tpl');
+        var ckEl = document.getElementById('aslb_ck');
+        if (tplEl) {
+            tplEl.onchange = asgRefreshBundleSrcOpts;
+        }
+        if (ckEl) {
+            ckEl.onchange = asgRefreshBundleSrcOpts;
+        }
+        var saveBtn = document.getElementById('aslb_save_bundle');
+        if (saveBtn) {
+            saveBtn.onclick = async function () {
+                var payload = {
+                    action: 'save_bundle',
+                    id: parseInt(document.getElementById('aslb_id').value, 10) || 0,
+                    department_id: parseInt(document.getElementById('aslb_dept').value, 10) || 0,
+                    size_scheme_template_id: parseInt(document.getElementById('aslb_tpl').value, 10) || 0,
+                    commercial_kind_key: document.getElementById('aslb_ck').value.trim(),
+                    name_ar: document.getElementById('aslb_name_ar').value.trim(),
+                    name_en: document.getElementById('aslb_name_en').value.trim(),
+                    source_size_family_id: parseInt(document.getElementById('aslb_src').value, 10) || 0,
+                    sort_order: parseInt(document.getElementById('aslb_sort').value, 10) || 0,
+                    is_active: parseInt(document.getElementById('aslb_active').value, 10) ? 1 : 0
+                };
+                var res = await orangeAdminJsonPost(LIBRARY_API, payload);
+                if (!res || !res.success) {
+                    alert((res && res.message) ? res.message : 'فشل الحفظ');
+                    return;
+                }
+                alert('تم الحفظ');
+                document.getElementById('aslb_id').value = String(res.id || 0);
+                window.location.reload();
+            };
+        }
+        var clr = document.getElementById('aslb_clear_bundle');
+        if (clr) {
+            clr.onclick = function () {
+                document.getElementById('aslb_id').value = '0';
+                document.getElementById('aslb_sort').value = '0';
+                document.getElementById('aslb_active').value = '1';
+                document.getElementById('aslb_name_ar').value = '';
+                document.getElementById('aslb_name_en').value = '';
+                document.getElementById('aslb_dept').value = '0';
+                document.getElementById('aslb_tpl').value = '0';
+                document.getElementById('aslb_ck').value = '';
+                asgRefreshBundleSrcOpts();
+            };
+        }
+    }
+
+    function asgBundleBoot() {
+        if (!document.getElementById('aslb_bundle_rows')) {
+            return;
+        }
+        asgRefreshBundleSrcOpts();
+        void asgLibBundleLoadTable();
     }
 
     function asgNormalizeDisplaySystem(s) {
@@ -1126,6 +1364,10 @@ $asgJson = static function (array $rows): string {
     async function loadList(opts) {
         opts = opts || {};
         var silent = !!opts.silent;
+        var listWrap0 = document.getElementById('asg_list_wrap');
+        if (listWrap0) {
+            listWrap0.style.display = 'block';
+        }
         var f = fid();
         if (f <= 0) {
             if (!silent) {
@@ -1140,7 +1382,8 @@ $asgJson = static function (array $rows): string {
             return;
         }
         tbody.innerHTML = '';
-        (res.guides || []).forEach(function (g) {
+        var guides = res.guides || [];
+        guides.forEach(function (g) {
             var gid = parseInt(g.id, 10) || 0;
             var title = (g.name_ar || g.name_en || ('#' + gid));
             var cols = parseInt(String(g.columns_count != null ? g.columns_count : '0'), 10) || 0;
@@ -1167,7 +1410,15 @@ $asgJson = static function (array $rows): string {
             };
             tbody.appendChild(tr);
         });
-        document.getElementById('asg_list_wrap').style.display = 'block';
+        if (!guides.length) {
+            var tr0 = document.createElement('tr');
+            tr0.innerHTML = '<td colspan="5" class="card-hint">لا أدلة محفوظة لهذه العائلة بعد.</td>';
+            tbody.appendChild(tr0);
+        }
+        var listWrap = document.getElementById('asg_list_wrap');
+        if (listWrap) {
+            listWrap.style.display = 'block';
+        }
     }
 
     async function loadGuide(id) {
@@ -1178,7 +1429,7 @@ $asgJson = static function (array $rows): string {
         if (famId > 0) {
             asgPreferFamilyOnce = famId;
             applyWizardFieldsFromFamily(famId);
-            asgRefreshResolvedContext();
+            await asgRefreshResolvedContext();
         }
         document.getElementById('asg_edit_id').value = String(g.id);
         document.getElementById('asg_scope').value = g.scope_kind || 'single';
@@ -1438,16 +1689,18 @@ $asgJson = static function (array $rows): string {
     }
 
     asgLibMapWire();
+    asgWireBundleForm();
 
-    function asgBoot() {
+    async function asgBoot() {
         genColRows(3);
         if (PREF_FAMILY > 0) {
             applyWizardFieldsFromFamily(PREF_FAMILY);
             asgPreferFamilyOnce = PREF_FAMILY;
         }
-        asgRefreshResolvedContext();
+        await asgRefreshResolvedContext();
         void asgLoadLibBundlesForMap();
         void asgLoadLibMaps();
+        asgBundleBoot();
     }
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', asgBoot);

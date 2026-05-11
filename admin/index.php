@@ -26,7 +26,6 @@ $allowed = [
     'size_families',
     'size_scheme_templates',
     'advisory_sizing_guides',
-    'advisory_sizing_library',
     'catalog_attributes',
     'products',
     'offers',
