@@ -1284,7 +1284,11 @@ $asgJson = static function (array $rows): string {
     document.getElementById('asg_bulk_rows').onclick = function () {
         var f = fid();
         if (f <= 0) {
-            alert('أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3) حتى تُحدَّد عائلة المقاسات تلقائياً');
+            if (!asgWizardTripleComplete()) {
+                alert('أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3) حتى تُحدَّد عائلة المقاسات تلقائياً.');
+            } else {
+                alert('لا عائلة مقاسات تطابق الخيارات (1–2–3) في المعالج — راجع عائلات المقاسات أو ربط حزمة المكتبة لهذا المزيج.');
+            }
             return;
         }
         var fam = effectiveFamilySizeRows();
@@ -1337,7 +1341,11 @@ $asgJson = static function (array $rows): string {
         if (f <= 0) {
             ASG_FAMILY_GUIDES_CACHE = [];
             if (!silent) {
-                alert('أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3) أولاً');
+                if (!asgWizardTripleComplete()) {
+                    alert('أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3) أولاً');
+                } else {
+                    alert('لا عائلة مقاسات تطابق الخيارات (1–2–3) في المعالج — راجع عائلات المقاسات أو ربط حزمة المكتبة.');
+                }
             }
             asgRefreshGuideSortDisp();
             return;
