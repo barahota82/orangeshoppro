@@ -396,6 +396,11 @@ $asgJson = static function (array $rows): string {
         if (tpl <= 0 || ck === '') {
             return 0;
         }
+        /* عائلة صريحة (رابط ?size_family_id= أو فتح دليل): يجب أن تسبق اختيار «مصدر الحزمة»
+           وإلا يُستبدل معرّف عائلة المستهلك بمصدر الحزمة فيُحفظ الدليل لعائلة ويُعرض الجدول لعائلة أخرى. */
+        if (preferredId > 0 && familyMatchesTplCk(preferredId, tpl, ck)) {
+            return preferredId;
+        }
         var dept = wizardDeptId();
         if (ASG_LIBRARY_READY && dept > 0 && BUNDLE_SCOPES && BUNDLE_SCOPES.length) {
             for (var bi = 0; bi < BUNDLE_SCOPES.length; bi++) {
@@ -411,9 +416,6 @@ $asgJson = static function (array $rows): string {
                     return sid;
                 }
             }
-        }
-        if (preferredId > 0 && familyMatchesTplCk(preferredId, tpl, ck)) {
-            return preferredId;
         }
         for (var j = 0; j < FAMILIES_FULL.length; j++) {
             var f = FAMILIES_FULL[j];
