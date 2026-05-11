@@ -143,7 +143,7 @@ $asgJson = static function (array $rows): string {
     <ol class="card-hint" style="margin:0 0 12px;padding-inline-start:1.25rem;line-height:1.6;">
         <li><strong>القسم الرئيسي</strong> (اختياري): عند وجود <strong>حزمة</strong> في المكتبة بنفس القسم والقالب والنوع، تُستخدم عائلة مصدر تلك الحزمة للحفظ في القاعدة.</li>
         <li><strong>قالب المقاسات</strong> و<strong>النوع التجاري (مستوى 1)</strong> — يُحدَّد بهما ترتيب المقاسات من <strong>مقاسات القالب</strong>.</li>
-        <li>بعدها استخدم <strong>تحميل الأدلة</strong> أو <strong>دليل جديد</strong> (يُفعَّلان تلقائياً عند وجود عائلة مطابقة).</li>
+        <li>بعدها تظهر <strong>قائمة الأدلة</strong> تلقائياً؛ استخدم <strong>دليل جديد</strong> لبدء جدول (يُفعَّل عند وجود عائلة مطابقة).</li>
     </ol>
     <div class="form-grid" style="max-width:920px;">
         <div style="grid-column:1/-1;"><label for="asg_w_dept"><strong>1.</strong> القسم الرئيسي</label>
@@ -173,7 +173,7 @@ $asgJson = static function (array $rows): string {
 
 <div class="card">
     <h3>الأدلة لهذا السياق</h3>
-    <p class="card-hint" style="margin:0 0 10px;">عائلة المقاسات المستخدمة للحفظ تُختار <strong>تلقائياً</strong> (أول عائلة نشطة تطابق القالب والنوع؛ أو عائلة مصدر الحزمة عند اختيار قسم ووجود حزمة مطابقة).</p>
+    <p class="card-hint" style="margin:0 0 10px;">عائلة المقاسات المستخدمة للحفظ تُختار <strong>تلقائياً</strong> (أول عائلة نشطة تطابق القالب والنوع؛ أو عائلة مصدر الحزمة عند اختيار قسم ووجود حزمة مطابقة). قائمة الأدلة أدناه <strong>تُحدَّث تلقائياً</strong> عند تغيير القسم أو القالب أو النوع التجاري.</p>
     <input type="hidden" id="asg_family" value="0">
     <p id="asg_resolved_family_wrap" class="card-hint" style="margin:0 0 10px;display:none;">
         <strong>عائلة المقاسات (حفظ في القاعدة):</strong> <span id="asg_resolved_family_label"></span>
@@ -181,7 +181,6 @@ $asgJson = static function (array $rows): string {
     <div class="form-grid" style="max-width:720px;">
         <div style="align-self:end;">
             <button type="button" class="btn" id="asg_new_btn" disabled>دليل جديد</button>
-            <button type="button" class="btn-secondary" id="asg_load_btn" style="margin-inline-start:8px;" disabled>تحميل الأدلة</button>
         </div>
     </div>
     <div id="asg_list_wrap" style="margin-top:12px;display:none;">
@@ -457,7 +456,8 @@ $asgJson = static function (array $rows): string {
         var wrap = document.getElementById('asg_resolved_family_wrap');
         var lab = document.getElementById('asg_resolved_family_label');
         var nb = document.getElementById('asg_new_btn');
-        var lb = document.getElementById('asg_load_btn');
+        var listWrap = document.getElementById('asg_list_wrap');
+        var listUl = document.getElementById('asg_list');
         if (hid) {
             hid.value = id > 0 ? String(id) : '0';
         }
@@ -477,8 +477,11 @@ $asgJson = static function (array $rows): string {
             if (nb) {
                 nb.disabled = true;
             }
-            if (lb) {
-                lb.disabled = true;
+            if (listWrap) {
+                listWrap.style.display = 'none';
+            }
+            if (listUl) {
+                listUl.innerHTML = '';
             }
             if (hintEl && tpl > 0 && ck !== '') {
                 hintEl.textContent = 'لا توجد عائلة مقاسات نشطة تطابق قالب المقاسات والنوع التجاري — عرّف عائلة مقاسات بهذا القالب والنوع أو أضف حزمة في المكتبة.';
@@ -501,9 +504,6 @@ $asgJson = static function (array $rows): string {
         if (nb) {
             nb.disabled = false;
         }
-        if (lb) {
-            lb.disabled = false;
-        }
         if (hintEl && dept > 0 && ASG_LIBRARY_READY && BUNDLE_SCOPES && BUNDLE_SCOPES.length) {
             var gotBundle = false;
             for (var bj = 0; bj < BUNDLE_SCOPES.length; bj++) {
@@ -521,6 +521,7 @@ $asgJson = static function (array $rows): string {
             }
         }
         refreshSizeSelects();
+        void loadList({ silent: true });
     }
 
     function sizeOptionsHtml(selectedId) {
@@ -1133,10 +1134,14 @@ $asgJson = static function (array $rows): string {
         refreshSizeSelects();
     };
 
-    async function loadList() {
+    async function loadList(opts) {
+        opts = opts || {};
+        var silent = !!opts.silent;
         var f = fid();
         if (f <= 0) {
-            alert('أكمل اختيار قالب المقاسات والنوع التجاري (2 و 3) أولاً');
+            if (!silent) {
+                alert('أكمل اختيار قالب المقاسات والنوع التجاري (2 و 3) أولاً');
+            }
             return;
         }
         var res = await orangeAdminJsonPost(ADVISORY_API, { action: 'list_by_family', size_family_id: f });
@@ -1202,7 +1207,6 @@ $asgJson = static function (array $rows): string {
         document.getElementById('asg_editor_title').textContent = 'دليل جديد';
     }
 
-    document.getElementById('asg_load_btn').onclick = loadList;
     document.getElementById('asg_new_btn').onclick = openNew;
 
     document.getElementById('asg_w_tpl').onchange = asgRefreshResolvedContext;
@@ -1273,9 +1277,6 @@ $asgJson = static function (array $rows): string {
             asgPreferFamilyOnce = PREF_FAMILY;
         }
         asgRefreshResolvedContext();
-        if (PREF_FAMILY > 0 && fid() > 0) {
-            loadList();
-        }
     }
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', asgBoot);
