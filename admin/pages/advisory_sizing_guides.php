@@ -130,21 +130,8 @@ $asgJson = static function (array $rows): string {
 </div>
 <?php else: ?>
 
-<div class="card" style="border-inline-start:4px solid #0ea5e9;">
-    <p class="card-hint" style="margin:0;line-height:1.65;">
-        <strong>هذه الصفحة:</strong> اختيار السياق (قسم → قالب → نوع تجاري 1) ثم <strong>دليل جديد</strong> لتسجيل الجدول الاسترشادي وفق مقاسات القالب (عبر عائلة مقاسات تُختار تلقائياً للحفظ).
-        <strong>حفظ الحزمة والربط والمزامنة</strong> يبقى من
-        <a href="/admin/index.php?page=advisory_sizing_library"><strong>مكتبة أدلة المقاسات</strong></a>.
-    </p>
-</div>
-
 <div class="card">
-    <h3>مسار التصميم (قسم → قالب → نوع تجاري)</h3>
-    <ol class="card-hint" style="margin:0 0 12px;padding-inline-start:1.25rem;line-height:1.6;">
-        <li><strong>القسم الرئيسي</strong> (اختياري): عند وجود <strong>حزمة</strong> في المكتبة بنفس القسم والقالب والنوع، تُستخدم عائلة مصدر تلك الحزمة للحفظ في القاعدة.</li>
-        <li><strong>قالب المقاسات</strong> و<strong>النوع التجاري (مستوى 1)</strong> — يُحدَّد بهما ترتيب المقاسات من <strong>مقاسات القالب</strong>.</li>
-        <li>بعدها تظهر <strong>قائمة الأدلة</strong> تلقائياً؛ استخدم <strong>دليل جديد</strong> لبدء جدول (يُفعَّل عند وجود عائلة مطابقة).</li>
-    </ol>
+    <h3>القسم والقالب والنوع التجاري</h3>
     <div class="form-grid" style="max-width:920px;">
         <div style="grid-column:1/-1;"><label for="asg_w_dept"><strong>1.</strong> القسم الرئيسي</label>
             <select id="asg_w_dept"><option value="0">— الكل / بدون تصفية بالقسم —</option>
@@ -172,11 +159,10 @@ $asgJson = static function (array $rows): string {
 </div>
 
 <div class="card">
-    <h3>الأدلة لهذا السياق</h3>
-    <p class="card-hint" style="margin:0 0 10px;">عائلة المقاسات المستخدمة للحفظ تُختار <strong>تلقائياً</strong> (أول عائلة نشطة تطابق القالب والنوع؛ أو عائلة مصدر الحزمة عند اختيار قسم ووجود حزمة مطابقة). قائمة الأدلة أدناه <strong>تُحدَّث تلقائياً</strong> عند تغيير القسم أو القالب أو النوع التجاري.</p>
+    <h3>الأدلة</h3>
     <input type="hidden" id="asg_family" value="0">
-    <p id="asg_resolved_family_wrap" class="card-hint" style="margin:0 0 10px;display:none;">
-        <strong>عائلة المقاسات (حفظ في القاعدة):</strong> <span id="asg_resolved_family_label"></span>
+    <p id="asg_resolved_family_wrap" style="margin:0 0 10px;display:none;font-size:13px;color:#64748b;">
+        <span id="asg_resolved_family_label"></span>
     </p>
     <div class="form-grid" style="max-width:720px;">
         <div style="align-self:end;">
@@ -184,7 +170,6 @@ $asgJson = static function (array $rows): string {
         </div>
     </div>
     <div id="asg_list_wrap" style="margin-top:12px;display:none;">
-        <h4>أدلة مرتبطة بالعائلة</h4>
         <ul id="asg_list" class="asg-guide-list"></ul>
     </div>
 </div>
@@ -199,15 +184,6 @@ $asgJson = static function (array $rows): string {
     </div>
 
     <h4 style="margin-top:20px;">تعريف الأعمدة</h4>
-    <p class="card-hint" style="margin:0 0 8px;">
-        <strong>عمود النظام:</strong> كود إنجليزي صغير (حروف وأرقام وشرطة سفلية)، مثل <code>eu</code> أو <code>cn</code> — اتركه فارغاً لعمود يظهر دائماً مع أي نظام. لتسمية مخصّصة في المتجر أضف مفتاح ترجمة <code>sizing_display_system_الكود</code> في الإعدادات.
-    </p>
-    <p class="card-hint" style="margin:0 0 8px;">
-        <strong>ترجمة تلقائية:</strong> بعد توقف الكتابة في <strong>عربي / EN</strong> لصفوف <strong>تعريف الأعمدة</strong> ولـ <strong>صف عنوان (مجموعة)</strong> يُستدعى نفس مسار الترجمة كبقية الأدمن (EN + Fil + Hi من العربي؛ وتحديث Fil + Hi من الإنجليزي). خلايا <strong>صف بيانات</strong> لا تُترجم تلقائياً (أرقام/نطاقات).
-    </p>
-    <p class="card-hint" style="margin:0 0 8px;">
-        لتغيير عدد الأعمدة <strong>من غير ما تبدأ من الصفر</strong>: استخدم <strong>+ عمود</strong> أو <strong>− حذف آخر عمود</strong> (يحافظ على باقي الأعمدة وصفوف البيانات). زر <strong>«توليد صفوف العناوين»</strong> فقط لما تحب <strong>إعادة بناء</strong> جدول الأعمدة بالكامل حسب الرقم في «عدد الأعمدة».
-    </p>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:8px;">
         <div>
             <label for="asg_col_count">عدد الأعمدة</label>
@@ -225,9 +201,6 @@ $asgJson = static function (array $rows): string {
     </div>
 
     <h4 style="margin-top:20px;">صفوف الجدول</h4>
-    <p class="card-hint" style="margin:0 0 8px;">
-        <strong>أسهل تسجيل:</strong> بعد تعريف الأعمدة استخدم <strong>«إضافة صف لكل مقاس من العائلة»</strong> — يُنشئ صفاً لكل مقاس نشط ويربطه تلقائياً. <strong>أول عمود</strong> (مثل Alpha) يُملأ تلقائياً من اسم المقاس في العائلة عند الربط؛ للعميل يُعرض بلغة الصفحة من نفس المصدر. املأ باقي الأعمدة (EU، الصدر، …).
-    </p>
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:center;">
         <button type="button" class="btn-secondary" id="asg_row_data">+ صف بيانات</button>
         <button type="button" class="btn-secondary" id="asg_row_label" title="سطر عنوان يظهر داخل الدليل للعميل — مفيد لو جدول واحد فيه أكثر من مجموعة أو عنوان فرعي؛ لجدول مسطح واحد غالباً لا تحتاجه">+ صف عنوان (مجموعة)</button>
@@ -465,7 +438,7 @@ $asgJson = static function (array $rows): string {
                 listUl.innerHTML = '';
             }
             if (hintEl && tpl > 0 && ck !== '') {
-                hintEl.textContent = 'لا توجد عائلة مقاسات نشطة تطابق قالب المقاسات والنوع التجاري — عرّف عائلة مقاسات بهذا القالب والنوع أو أضف حزمة في المكتبة.';
+                hintEl.textContent = 'لا عائلة مطابقة للقالب والنوع.';
             }
             return;
         }
@@ -498,7 +471,7 @@ $asgJson = static function (array $rows): string {
                 }
             }
             if (!gotBundle) {
-                hintEl.textContent = 'لا توجد حزمة مكتبة لهذا القسم مع نفس القالب والنوع — تُستخدم أول عائلة مقاسات مطابقة للقالب والنوع.';
+                hintEl.textContent = 'لا حزمة مطابقة لهذا القسم.';
             }
         }
         refreshSizeSelects();
