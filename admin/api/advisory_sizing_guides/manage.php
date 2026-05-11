@@ -199,9 +199,22 @@ try {
         case 'save':
             $id = (int) ($data['id'] ?? 0);
             $fid = (int) ($data['size_family_id'] ?? 0);
+            if ($fid <= 0) {
+                json_response(['success' => false, 'message' => 'عائلة المقاسات إلزامية'], 422);
+            }
             $scopeKind = orange_advisory_scope_kind_valid($data['scope_kind'] ?? '');
-            if ($fid <= 0 || $scopeKind === null) {
-                json_response(['success' => false, 'message' => 'عائلة المقاسات ونوع النموذج (علوي/سفلي/مفرد) إلزاميان'], 422);
+            if ($id <= 0) {
+                if ($scopeKind === null) {
+                    $scopeKind = 'single';
+                }
+            } elseif ($scopeKind === null) {
+                $psk = $pdo->prepare('SELECT scope_kind FROM advisory_sizing_guides WHERE id = ? LIMIT 1');
+                $psk->execute([$id]);
+                $pr = $psk->fetch(PDO::FETCH_ASSOC);
+                $scopeKind = orange_advisory_scope_kind_valid(is_array($pr) ? ((string) ($pr['scope_kind'] ?? '')) : '') ?? 'single';
+            }
+            if ($scopeKind === null) {
+                $scopeKind = 'single';
             }
             $chk = $pdo->prepare('SELECT id FROM size_families WHERE id = ? LIMIT 1');
             $chk->execute([$fid]);
@@ -210,7 +223,7 @@ try {
             }
             $nameAr = trim((string) ($data['name_ar'] ?? ''));
             if ($nameAr === '') {
-                json_response(['success' => false, 'message' => 'اسم داخلي للنموذج (عربي) إلزامي — للأدمن فقط ولا يُعرض للعميل'], 422);
+                json_response(['success' => false, 'message' => 'اسم النموذج الداخلي (عربي) إلزامي'], 422);
             }
             $nameEn = '';
             $nameFil = '';
@@ -326,13 +339,13 @@ try {
             $pdo->beginTransaction();
             try {
                 if ($id <= 0) {
-                    $dup = $pdo->prepare(
-                        'SELECT id FROM advisory_sizing_guides WHERE size_family_id = ? AND scope_kind = ? LIMIT 1'
+                    $dupN = $pdo->prepare(
+                        'SELECT id FROM advisory_sizing_guides WHERE size_family_id = ? AND name_ar = ? LIMIT 1'
                     );
-                    $dup->execute([$fid, $scopeKind]);
-                    if ($dup->fetchColumn()) {
+                    $dupN->execute([$fid, $nameAr]);
+                    if ($dupN->fetchColumn()) {
                         $pdo->rollBack();
-                        json_response(['success' => false, 'message' => 'يوجد بالفعل دليل لنفس العائلة ونفس النوع (علوي/سفلي/مفرد)'], 409);
+                        json_response(['success' => false, 'message' => 'يوجد بالفعل دليل بنفس الاسم الداخلي لهذه العائلة'], 409);
                     }
                     $ins = $pdo->prepare(
                         'INSERT INTO advisory_sizing_guides
@@ -353,15 +366,13 @@ try {
                         $pdo->rollBack();
                         json_response(['success' => false, 'message' => 'لا يمكن تغيير عائلة المقاسات للسجل الحالي'], 422);
                     }
-                    if ((string) $ex['scope_kind'] !== $scopeKind) {
-                        $dup = $pdo->prepare(
-                            'SELECT id FROM advisory_sizing_guides WHERE size_family_id = ? AND scope_kind = ? AND id <> ? LIMIT 1'
-                        );
-                        $dup->execute([$fid, $scopeKind, $id]);
-                        if ($dup->fetchColumn()) {
-                            $pdo->rollBack();
-                            json_response(['success' => false, 'message' => 'نوع النموذج يتعارض مع سجل آخر لنفس العائلة'], 409);
-                        }
+                    $dupN = $pdo->prepare(
+                        'SELECT id FROM advisory_sizing_guides WHERE size_family_id = ? AND name_ar = ? AND id <> ? LIMIT 1'
+                    );
+                    $dupN->execute([$fid, $nameAr, $id]);
+                    if ($dupN->fetchColumn()) {
+                        $pdo->rollBack();
+                        json_response(['success' => false, 'message' => 'يوجد بالفعل دليل آخر بنفس الاسم الداخلي لهذه العائلة'], 409);
                     }
                     $upd = $pdo->prepare(
                         'UPDATE advisory_sizing_guides SET

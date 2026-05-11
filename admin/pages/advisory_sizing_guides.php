@@ -192,27 +192,8 @@ $asgJson = static function (array $rows): string {
 <div class="card" id="asg_editor" style="display:none;margin-top:16px;">
     <h3 id="asg_editor_title">تعديل دليل</h3>
     <input type="hidden" id="asg_edit_id" value="0">
-    <div class="form-grid" style="max-width:900px;">
-        <div>
-            <label for="asg_scope">نوع النموذج</label>
-            <select id="asg_scope">
-                <option value="upper">علوي</option>
-                <option value="lower">سفلي</option>
-                <option value="single">مفرد (مثل حذاء)</option>
-            </select>
-        </div>
-        <div>
-            <label for="asg_active">نشط</label>
-            <select id="asg_active">
-                <option value="1">نعم</option>
-                <option value="0">لا</option>
-            </select>
-        </div>
-    </div>
-    <p class="card-hint" style="margin:8px 0;">
-        <strong>اسم داخلي (عربي فقط):</strong> للتمييز بين النماذج في لوحة التحكم فقط — <strong>لا يُعرض للعميل</strong>.
-        عنوان الحوار للعميل ثابت من الترجمة (مثل «دليل المقاسات» / Size Guide). عند اختيار المنتج «علوي وسفلي» يظهر للعميل عنوان فرعي ثابت «مقاسات علوية» ثم «مقاسات سفلية» حسب الجدول.
-    </p>
+    <input type="hidden" id="asg_scope" value="single">
+    <input type="hidden" id="asg_active" value="1">
     <div class="form-grid" style="max-width:900px;">
         <div style="grid-column:1/-1;"><label for="asg_name_ar">اسم النموذج (داخلي — عربي فقط)</label><input type="text" id="asg_name_ar" maxlength="191" placeholder="مثال: علوي قمصان EU"></div>
     </div>
@@ -1150,8 +1131,7 @@ $asgJson = static function (array $rows): string {
         ul.innerHTML = '';
         (res.guides || []).forEach(function (g) {
             var li = document.createElement('li');
-            var sk = g.scope_kind || '';
-            var title = (g.name_ar || g.name_en || '') + ' — ' + sk;
+            var title = (g.name_ar || g.name_en || ('#' + g.id));
             li.innerHTML = esc(title) +
                 ' <button type="button" class="btn-secondary asg-ed" data-id="' + g.id + '">تعديل</button>' +
                 ' <button type="button" class="btn-secondary asg-del" data-id="' + g.id + '">حذف</button>';
@@ -1172,7 +1152,7 @@ $asgJson = static function (array $rows): string {
         if (!res.success) { alert(res.message || 'خطأ'); return; }
         var g = res.guide;
         document.getElementById('asg_edit_id').value = String(g.id);
-        document.getElementById('asg_scope').value = g.scope_kind || 'upper';
+        document.getElementById('asg_scope').value = g.scope_kind || 'single';
         document.getElementById('asg_active').value = String(parseInt(g.is_active, 10) ? 1 : 0);
         document.getElementById('asg_name_ar').value = g.name_ar || '';
         fillColumns(res.columns || []);
@@ -1197,7 +1177,7 @@ $asgJson = static function (array $rows): string {
             return;
         }
         document.getElementById('asg_edit_id').value = '0';
-        document.getElementById('asg_scope').value = 'upper';
+        document.getElementById('asg_scope').value = 'single';
         document.getElementById('asg_active').value = '1';
         document.getElementById('asg_name_ar').value = '';
         genColRows(3);

@@ -283,7 +283,6 @@ CREATE TABLE `advisory_sizing_guides` (
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_advisory_sizing_family_scope` (`size_family_id`,`scope_kind`),
   KEY `idx_advisory_sizing_guides_family` (`size_family_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
