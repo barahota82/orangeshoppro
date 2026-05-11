@@ -57,7 +57,7 @@ try {
         $deptId = (int) ($data['department_id'] ?? 0);
         $tplId = (int) ($data['size_scheme_template_id'] ?? 0);
         $srcFam = (int) ($data['source_size_family_id'] ?? 0);
-        $sort = (int) ($data['sort_order'] ?? 0);
+        $sortClient = (int) ($data['sort_order'] ?? 0);
         $active = (int) ($data['is_active'] ?? 1) === 1 ? 1 : 0;
         if ($nameAr === '' && $nameEn === '') {
             json_response(['success' => false, 'message' => 'أدخل اسماً عربياً أو إنجليزياً للحزمة.'], 422);
@@ -110,6 +110,7 @@ try {
             json_response(['success' => false, 'message' => $align], 422);
         }
         if ($id > 0) {
+            $sort = $sortClient;
             $pdo->prepare(
                 'UPDATE advisory_sizing_library_bundles SET
                     department_id = ?, size_scheme_template_id = ?, name_ar = ?, name_en = ?, commercial_kind_key = ?,
@@ -118,6 +119,8 @@ try {
             )->execute([$deptId, $tplId, $nameAr, $nameEn, $ck, $srcFam, $sort, $active, $id]);
             json_response(['success' => true, 'id' => $id]);
         }
+        $mxSt = $pdo->query('SELECT COALESCE(MAX(sort_order), 0) FROM advisory_sizing_library_bundles');
+        $sort = (int) ($mxSt ? $mxSt->fetchColumn() : 0) + 1;
         $pdo->prepare(
             'INSERT INTO advisory_sizing_library_bundles
              (department_id, size_scheme_template_id, name_ar, name_en, commercial_kind_key, source_size_family_id, sort_order, is_active)
