@@ -199,9 +199,9 @@ $asgJson = static function (array $rows): string {
 
     <h4 style="margin-top:20px;">صفوف الجدول</h4>
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:center;">
+        <button type="button" class="btn" id="asg_bulk_rows" title="يضيف صف بيانات لكل مقاس نشط في العائلة المختارة، مع ربط المقاس وتخطي المربوط مسبقاً">إضافة صف لكل مقاس من العائلة</button>
         <button type="button" class="btn-secondary" id="asg_row_data">+ صف بيانات</button>
         <button type="button" class="btn-secondary" id="asg_row_label" title="سطر عنوان يظهر داخل الدليل للعميل — مفيد لو جدول واحد فيه أكثر من مجموعة أو عنوان فرعي؛ لجدول مسطح واحد غالباً لا تحتاجه">+ صف عنوان (مجموعة)</button>
-        <button type="button" class="btn" id="asg_bulk_rows" title="يضيف صف بيانات لكل مقاس نشط في العائلة المختارة، مع ربط المقاس وتخطي المربوط مسبقاً">إضافة صف لكل مقاس من العائلة</button>
     </div>
     <div id="asg_rows_box"></div>
 
