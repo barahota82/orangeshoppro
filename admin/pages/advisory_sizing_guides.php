@@ -228,7 +228,7 @@ $asgJson = static function (array $rows): string {
 
     <h4 style="margin-top:20px;">صفوف الجدول</h4>
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:center;">
-        <button type="button" class="btn" id="asg_bulk_rows" title="يضيف صفاً لكل صف في قالب المقاسات (2) في المعالج، باستخدام مقاسات عائلة المقاسات المطابقة للمعالج، مع تخطي المربوط مسبقاً">إضافة صف لكل مقاس حسب القالب (2)</button>
+        <button type="button" class="btn" id="asg_bulk_rows" title="يضيف صفاً لكل صف في قالب المقاسات (2)؛ بلا عائلة مربوطة يُستخدم صف القالب للمعاينة (مسودة)، ومع عائلة مطابقة تُستخدم مقاسات العائلة — مع تخطي ما اختير مسبقاً">إضافة صف لكل مقاس حسب القالب (2)</button>
         <button type="button" class="btn-secondary" id="asg_row_data">+ صف بيانات</button>
         <button type="button" class="btn-secondary" id="asg_row_label" title="سطر عنوان يظهر داخل الدليل للعميل — مفيد لو جدول واحد فيه أكثر من مجموعة أو عنوان فرعي؛ لجدول مسطح واحد غالباً لا تحتاجه">+ صف عنوان (مجموعة)</button>
     </div>
@@ -491,13 +491,39 @@ $asgJson = static function (array $rows): string {
 
     function effectiveFamilySizeRows() {
         var f = fid();
-        var raw = (FAMILY_SIZES[String(f)] || []).slice();
-        /* ترتيب وتصفية المقاسات حسب قالب المعالج (2) — وليس حسب قالب آخر في العائلة. */
         var tpl = wizardTplId();
         var tplList = [];
         if (TEMPLATE_SIZE_ROWS && typeof TEMPLATE_SIZE_ROWS === 'object') {
             tplList = TEMPLATE_SIZE_ROWS[String(tpl)] || [];
         }
+        /* بدون عائلة مربوطة: المقاسات تُستخرج من صفوف قالب المعالج (2) فقط — معرفات سالبة للواجهة؛ الحفظ يرسل 0 للمسودة. */
+        if (f <= 0 && tpl > 0 && tplList.length > 0) {
+            var sortedTpl = tplList.slice().sort(function (a, b) {
+                var so = (parseInt(a.sort_order, 10) || 0) - (parseInt(b.sort_order, 10) || 0);
+                if (so !== 0) {
+                    return so;
+                }
+                return (parseInt(a.id, 10) || 0) - (parseInt(b.id, 10) || 0);
+            });
+            var virt = [];
+            for (var vi = 0; vi < sortedTpl.length; vi++) {
+                var ts = sortedTpl[vi];
+                var tsid = parseInt(ts.id, 10) || 0;
+                if (tsid <= 0) {
+                    continue;
+                }
+                virt.push({
+                    id: -tsid,
+                    label_ar: ts.label_ar,
+                    label_en: ts.label_en,
+                    sort_order: ts.sort_order,
+                    scheme_template_size_id: tsid
+                });
+            }
+            return virt;
+        }
+        var raw = (FAMILY_SIZES[String(f)] || []).slice();
+        /* ترتيب وتصفية المقاسات حسب قالب المعالج (2) — وليس حسب قالب آخر في العائلة. */
         var allowedTplSizeIds = {};
         for (var ai = 0; ai < tplList.length; ai++) {
             var tsz = parseInt(tplList[ai].id, 10) || 0;
@@ -665,12 +691,16 @@ $asgJson = static function (array $rows): string {
 
     function sizeOptionsHtml(selectedId) {
         var rows = effectiveFamilySizeRows();
+        var selN = parseInt(selectedId, 10);
+        if (isNaN(selN)) {
+            selN = 0;
+        }
         var h = '<option value="0">— اختر المقاس (حسب قالب المعالج 2) —</option>';
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
             var id = parseInt(r.id, 10) || 0;
             var lab = (r.label_ar || r.label_en || '').replace(/</g, '');
-            h += '<option value="' + id + '"' + (id === selectedId ? ' selected' : '') + '>' + lab + '</option>';
+            h += '<option value="' + id + '"' + (id === selN ? ' selected' : '') + '>' + lab + '</option>';
         }
         return h;
     }
@@ -1098,11 +1128,12 @@ $asgJson = static function (array $rows): string {
             '<button type="button" class="btn-secondary asg-rm">حذف الصف</button></div>' +
             '<div style="margin-top:8px;"><label>المقاس <span style="color:#b91c1c;">*</span> <span style="font-size:12px;color:#64748b;">(قالب المقاسات في المعالج — الحقل 2)</span></label>' +
             '<select class="asg-sfs">' + sizeOptionsHtml(sid) + '</select>' +
-            '<span class="card-hint" style="display:block;margin-top:4px;font-size:12px;">القائمة مرتبة وتُعرض حسب <strong>قالب المقاسات</strong> الذي اخترته في بطاقة «إنشاء جدول مقاس إرشادي»؛ اختر صف القالب المقابل لعائلة المقاسات المطابقة للمعالج. أول عمود للمعاينة يُحدَّث تلقائياً.</span></div>' +
+            '<span class="card-hint" style="display:block;margin-top:4px;font-size:12px;">القائمة مرتبة من <strong>قالب المقاسات (2)</strong> في المعالج — بلا عائلة مربوطة تُعرض صفوف القالب للمعاينة؛ عند وجود عائلة مطابقة تُعرض مقاسات العائلة المرتبطة بالقالب. أول عمود للمعاينة يُحدَّث تلقائياً عند اختيار مقاس.</span></div>' +
             '<p class="asg-family-hint card-hint" style="display:none;margin:8px 0 0;font-size:12px;line-height:1.5;"></p>' +
             '<div class="form-grid" style="margin-top:10px;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));">' + cellInputs + '</div>';
         div.querySelector('.asg-rm').onclick = function () { div.remove(); };
         wrap.appendChild(div);
+        asgSyncFirstDataCellFromFamily(div);
         asgUpdateFamilySizeHint(div);
     }
 
@@ -1149,15 +1180,16 @@ $asgJson = static function (array $rows): string {
                     cells: []
                 });
             } else {
-                var sfs = parseInt(el.querySelector('.asg-sfs').value, 10) || 0;
+                var sfsRaw = parseInt(el.querySelector('.asg-sfs').value, 10) || 0;
                 var ins = el.querySelectorAll('.asg-cell');
                 var cells = [];
                 for (var j = 0; j < ins.length; j++) {
                     cells.push(ins[j].value);
                 }
-                if (sfs > 0 && cells.length > 0) {
+                if (sfsRaw > 0 && cells.length > 0) {
                     cells[0] = '';
                 }
+                var sfs = sfsRaw < 0 ? 0 : sfsRaw;
                 rows.push({
                     row_kind: 'data',
                     sort_order: b,
@@ -1189,7 +1221,7 @@ $asgJson = static function (array $rows): string {
             return;
         }
         var sid = sel ? parseInt(sel.value, 10) || 0 : 0;
-        if (sid > 0) {
+        if (sid !== 0) {
             firstIn.value = asgFamilyLabelById(sid);
             firstIn.readOnly = true;
             firstIn.setAttribute('title', 'يُملأ تلقائياً من المقاس المختار (حسب القالب في المعالج)؛ للعميل بلغة صفحة المتجر');
@@ -1211,6 +1243,11 @@ $asgJson = static function (array $rows): string {
         }
         var sel = block.querySelector('.asg-sfs');
         var sid = sel ? parseInt(sel.value, 10) || 0 : 0;
+        if (sid < 0) {
+            hint.style.display = 'block';
+            hint.textContent = 'صف من قالب المعالج (2) للمعاينة — عند الحفظ كمسودة دون عائلة يُحفظ ربط المقاس 0 حتى تُربط العائلة وتختار مقاساً فعلياً من العائلة.';
+            return;
+        }
         if (sid <= 0) {
             hint.style.display = 'block';
             hint.textContent = fid() <= 0
@@ -1274,7 +1311,7 @@ $asgJson = static function (array $rows): string {
                 return;
             }
             var v = parseInt(sel.value, 10) || 0;
-            if (v > 0) {
+            if (v !== 0) {
                 out[v] = true;
             }
         });
@@ -1282,18 +1319,17 @@ $asgJson = static function (array $rows): string {
     }
 
     document.getElementById('asg_bulk_rows').onclick = function () {
-        var f = fid();
-        if (f <= 0) {
-            if (!asgWizardTripleComplete()) {
-                alert('أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3) حتى تُحدَّد عائلة المقاسات تلقائياً.');
-            } else {
-                alert('لا عائلة مقاسات تطابق الخيارات (1–2–3) في المعالج — راجع عائلات المقاسات أو ربط حزمة المكتبة لهذا المزيج.');
-            }
+        if (!asgWizardTripleComplete()) {
+            alert('أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3).');
             return;
         }
         var fam = effectiveFamilySizeRows();
         if (!fam.length) {
-            alert('لا توجد مقاسات في عائلة المقاسات المطابقة للمعالج مربوطة بقالب المقاسات (2) — راجع عائلات المقاسات وربط المقاسات بصفوف القالب.');
+            if (wizardTplId() > 0) {
+                alert('لا توجد صفوف مقاس في قالب المقاسات (2) المختار — راجع إعداد القالب.');
+            } else {
+                alert('اختر قالب المقاسات (2) في المعالج.');
+            }
             return;
         }
         var cols = readColumns();
@@ -1305,7 +1341,7 @@ $asgJson = static function (array $rows): string {
         var toAdd = [];
         for (var i = 0; i < fam.length; i++) {
             var rid = parseInt(fam[i].id, 10) || 0;
-            if (rid > 0 && !linked[rid]) {
+            if (rid !== 0 && !linked[rid]) {
                 toAdd.push(rid);
             }
         }
@@ -1344,7 +1380,7 @@ $asgJson = static function (array $rows): string {
                 if (!asgWizardTripleComplete()) {
                     alert('أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3) أولاً');
                 } else {
-                    alert('لا عائلة مقاسات تطابق الخيارات (1–2–3) في المعالج — راجع عائلات المقاسات أو ربط حزمة المكتبة.');
+                    alert('لا توجد عائلة مقاسات مطابقة للمعالج (1–2–3) — يمكن العمل بمسودة من المكتبة؛ في المحرّر تُستخرج أسماء المقاسات من قالب (2) حتى يُربط الدليل بعائلة.');
                 }
             }
             asgRefreshGuideSortDisp();
