@@ -151,68 +151,6 @@ $asgJson = static function (array $rows): string {
 </div>
 <?php else: ?>
 
-<div class="card" id="asg_draft_card" style="margin-top:0;margin-bottom:16px;border:2px solid #0ea5e9;">
-    <h2 style="margin:0 0 8px;font-size:1.25rem;">جدول الأدلة المحفوظة دون ربط عائلة (مسودات + يتيم)</h2>
-    <p class="card-hint" style="margin:0 0 10px;">يُحفظ مع كل دليل القسم والقالب والنوع التجاري (1–3) قبل ربط العائلة. كل ما يُحفظ بلا عائلة صالحة، أو بمعرّف عائلة غير موجود في القاعدة، يظهر هنا. اختر عائلة من الصف ثم «ربط» — أو «تحديث» لمزامنة القائمة بعد الحفظ.</p>
-    <p id="asg_draft_load_err" class="alert-error" style="display:none;margin:0 0 8px;"></p>
-    <div style="margin-bottom:8px;">
-        <button type="button" class="btn" id="asg_draft_refresh">تحديث الجدول</button>
-    </div>
-    <div style="overflow-x:auto;">
-        <table class="data-table">
-            <thead><tr>
-                <th>#</th><th>اسم النموذج</th><th>عمود size_family_id</th><th>قسم</th><th>قالب</th><th>تجاري</th><th>أعمدة</th><th>صفوف</th><th>ربط بعائلة</th><th>إجراءات</th>
-            </tr></thead>
-            <tbody id="asg_draft_tbody">
-                <?php if ($asgDraftGuides === []): ?>
-                <tr><td colspan="10" class="card-hint">لا توجد صفوف في هذا الجدول حالياً — إن كان عندك دليل محفوظ ولا يظهر، تأكد من تشغيل ترحيل العمود <code>size_family_id</code> ليقبل NULL (زر أدمن كتالوج أو ملف <code>032_advisory_sizing_guides_null_size_family.sql</code>).</td></tr>
-                <?php else: ?>
-                    <?php foreach ($asgDraftGuides as $dg): ?>
-                        <?php
-                        $dgId = (int) ($dg['id'] ?? 0);
-                        $dgName = (string) ($dg['name_ar'] ?: $dg['name_en'] ?: ('#' . $dgId));
-                        $dgCols = (int) ($dg['columns_count'] ?? 0);
-                        $dgRows = (int) ($dg['rows_count'] ?? 0);
-                        $dgSf = $dg['size_family_id'] ?? null;
-                        $dgSfDisp = $dgSf === null || $dgSf === '' ? 'NULL' : (string) (int) $dgSf;
-                        $dgDept = isset($dg['department_id']) ? (int) $dg['department_id'] : 0;
-                        $dgTpl = isset($dg['size_scheme_template_id']) ? (int) $dg['size_scheme_template_id'] : 0;
-                        $dgCk = isset($dg['commercial_kind_key']) ? (string) $dg['commercial_kind_key'] : '';
-                        ?>
-                <tr data-asg-draft-row="1">
-                    <td><?php echo $dgId; ?></td>
-                    <td><?php echo htmlspecialchars($dgName, ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><code><?php echo htmlspecialchars($dgSfDisp, ENT_QUOTES, 'UTF-8'); ?></code></td>
-                    <td><code><?php echo $dgDept > 0 ? (string) $dgDept : '—'; ?></code></td>
-                    <td><code><?php echo $dgTpl > 0 ? (string) $dgTpl : '—'; ?></code></td>
-                    <td><code><?php echo htmlspecialchars($dgCk !== '' ? $dgCk : '—', ENT_QUOTES, 'UTF-8'); ?></code></td>
-                    <td><?php echo $dgCols; ?></td>
-                    <td><?php echo $dgRows; ?></td>
-                    <td>
-                        <select class="asg-draft-fam-sel" data-guide="<?php echo $dgId; ?>" style="max-width:14rem;width:100%;">
-                            <option value="0">— اختر عائلة —</option>
-                            <?php foreach ($families as $fam): ?>
-                                <?php $fidOpt = (int) ($fam['id'] ?? 0); ?>
-                                <?php if ($fidOpt <= 0) {
-                                    continue;
-                                } ?>
-                            <option value="<?php echo $fidOpt; ?>"><?php echo htmlspecialchars((string) ($fam['name_ar'] ?: $fam['name_en'] ?: ('#' . $fidOpt)), ENT_QUOTES, 'UTF-8'); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                        <button type="button" class="btn asg-draft-bind" data-guide="<?php echo $dgId; ?>">ربط</button>
-                    </td>
-                    <td>
-                        <button type="button" class="btn-secondary asg-draft-ed" data-id="<?php echo $dgId; ?>">تعديل</button>
-                        <button type="button" class="btn-secondary asg-draft-del" data-id="<?php echo $dgId; ?>">حذف</button>
-                    </td>
-                </tr>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
-
 <?php if ($asgCommercialKinds === [] && orange_table_exists($pdo, 'commercial_kind_dictionary')): ?>
 <div class="card" style="margin-bottom:12px;">
     <div class="alert-error">قاموس النوع التجاري (مستوى 1) فارغ — عرّف مفاتيحاً في «قاموس هرم المقاسات» قبل اختيار النوع في المعالج.</div>
@@ -231,7 +169,7 @@ $asgJson = static function (array $rows): string {
     </div>
     <div class="asg-wizard-toolbar" style="display:flex;flex-wrap:nowrap;align-items:flex-end;gap:12px;direction:ltr;justify-content:space-between;width:100%;box-sizing:border-box;margin-top:14px;">
         <div style="flex:0 0 auto;">
-            <button type="button" class="btn" id="asg_new_btn">دليل جديد</button>
+            <button type="button" class="btn" id="asg_new_btn" disabled title="أكمل اختيار القسم (1) وقالب المقاسات (2) والنوع التجاري (3)">دليل جديد</button>
         </div>
         <div class="asg-wizard-fields" style="display:flex;flex-wrap:nowrap;flex:1 1 auto;gap:10px;align-items:flex-end;min-width:0;direction:rtl;justify-content:flex-end;overflow-x:auto;">
             <div style="flex:1 1 0;min-width:10rem;display:flex;flex-direction:column;gap:4px;">
@@ -261,6 +199,85 @@ $asgJson = static function (array $rows): string {
         </div>
     </div>
     <p id="asg_w_hint" class="card-hint" style="margin:12px 0 0;"></p>
+</div>
+
+<div class="card" id="asg_draft_card" style="margin-top:16px;">
+    <h3 style="margin-top:0;">جدول الأدلة المحفوظة</h3>
+    <p class="card-hint" style="margin:0 0 10px;">أدلة بلا عائلة مقاسات صالحة في الكتالوج (مسودات)، أو مرتبطة بعائلة محذوفة/غير نشطة (يتيم) — تظهر هنا حتى تُربط بعائلة من العمود «ربط بعائلة».</p>
+    <div id="asg_draft_load_err" class="alert-error" style="display:none;margin-bottom:10px;"></div>
+    <div style="margin-bottom:8px;">
+        <button type="button" class="btn-secondary" id="asg_draft_refresh">تحديث الجدول</button>
+    </div>
+    <div style="overflow-x:auto;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>اسم النموذج (داخلي)</th>
+                    <th>عائلة في القاعدة</th>
+                    <th>قسم</th>
+                    <th>قالب</th>
+                    <th>نوع تجاري</th>
+                    <th>أعمدة</th>
+                    <th>صفوف</th>
+                    <th>ربط بعائلة</th>
+                    <th>إجراءات</th>
+                </tr>
+            </thead>
+            <tbody id="asg_draft_tbody"></tbody>
+        </table>
+    </div>
+</div>
+
+<?php if ($asgLibraryReady): ?>
+<div class="card" id="asg_library_map_card" style="margin-top:16px;">
+    <h3 style="margin-top:0;">ربط عائلة مستهلك بحزمة المكتبة ثم المزامنة</h3>
+    <div class="form-grid" style="max-width:720px;">
+        <div style="grid-column:1/-1;"><label for="asg_map_consumer">عائلة المستهلك</label>
+            <select id="asg_map_consumer"><option value="0">— اختر —</option>
+                <?php foreach ($families as $f): ?>
+                <option value="<?php echo (int) $f['id']; ?>"><?php echo htmlspecialchars((string) ($f['name_ar'] ?: $f['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div style="grid-column:1/-1;"><label for="asg_map_bundle">حزمة المكتبة</label>
+            <select id="asg_map_bundle"><option value="0">— اختر —</option></select>
+        </div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button type="button" class="btn" id="asg_map_save">حفظ الربط</button>
+        <button type="button" class="btn" id="asg_map_sync">مزامنة الأدلة إلى عائلة المستهلك</button>
+        <button type="button" class="btn-secondary" id="asg_map_delete">إزالة الربط</button>
+    </div>
+    <div style="margin-top:16px;overflow:auto;">
+        <table class="data-table">
+            <thead><tr>
+                <th>عائلة مستهلك</th><th>حزمة</th><th>آخر تحديث</th><th>إجراءات</th>
+            </tr></thead>
+            <tbody id="asg_map_rows"></tbody>
+        </table>
+    </div>
+</div>
+<?php endif; ?>
+
+<div class="card" id="asg_guides_table_card" style="margin-top:16px;">
+    <h3 style="margin-top:0;">الأدلة المحفوظة لهذه العائلة</h3>
+    <div id="asg_list_wrap" style="display:block;margin-top:8px;">
+        <div style="overflow-x:auto;">
+            <table class="data-table" id="asg_guides_table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>اسم النموذج (داخلي)</th>
+                        <th>أعمدة</th>
+                        <th>صفوف</th>
+                        <th>إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody id="asg_list_tbody"></tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
 <div class="card" id="asg_editor" style="display:none;margin-top:16px;">
@@ -303,57 +320,6 @@ $asgJson = static function (array $rows): string {
         <button type="button" class="btn-secondary" id="asg_cancel_btn">إلغاء</button>
     </div>
 </div>
-
-<div class="card" id="asg_guides_table_card" style="margin-top:16px;">
-    <h3 style="margin-top:0;">الأدلة المحفوظة لهذه العائلة</h3>
-    <div id="asg_list_wrap" style="display:block;margin-top:8px;">
-        <div style="overflow-x:auto;">
-            <table class="data-table" id="asg_guides_table">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>اسم النموذج (داخلي)</th>
-                        <th>أعمدة</th>
-                        <th>صفوف</th>
-                        <th>إجراءات</th>
-                    </tr>
-                </thead>
-                <tbody id="asg_list_tbody"></tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-<?php if ($asgLibraryReady): ?>
-<div class="card" id="asg_library_map_card" style="margin-top:16px;">
-    <h3 style="margin-top:0;">ربط عائلة مستهلك بحزمة المكتبة ثم المزامنة</h3>
-    <div class="form-grid" style="max-width:720px;">
-        <div style="grid-column:1/-1;"><label for="asg_map_consumer">عائلة المستهلك</label>
-            <select id="asg_map_consumer"><option value="0">— اختر —</option>
-                <?php foreach ($families as $f): ?>
-                <option value="<?php echo (int) $f['id']; ?>"><?php echo htmlspecialchars((string) ($f['name_ar'] ?: $f['name_en']), ENT_QUOTES, 'UTF-8'); ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div style="grid-column:1/-1;"><label for="asg_map_bundle">حزمة المكتبة</label>
-            <select id="asg_map_bundle"><option value="0">— اختر —</option></select>
-        </div>
-    </div>
-    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
-        <button type="button" class="btn" id="asg_map_save">حفظ الربط</button>
-        <button type="button" class="btn" id="asg_map_sync">مزامنة الأدلة إلى عائلة المستهلك</button>
-        <button type="button" class="btn-secondary" id="asg_map_delete">إزالة الربط</button>
-    </div>
-    <div style="margin-top:16px;overflow:auto;">
-        <table class="data-table">
-            <thead><tr>
-                <th>عائلة مستهلك</th><th>حزمة</th><th>آخر تحديث</th><th>إجراءات</th>
-            </tr></thead>
-            <tbody id="asg_map_rows"></tbody>
-        </table>
-    </div>
-</div>
-<?php endif; ?>
 
 <script>
 (function () {
@@ -405,6 +371,10 @@ $asgJson = static function (array $rows): string {
 
     function wizardDeptId() {
         return parseInt(document.getElementById('asg_w_dept').value, 10) || 0;
+    }
+
+    function asgWizardTripleComplete() {
+        return wizardDeptId() > 0 && wizardTplId() > 0 && wizardCk() !== '';
     }
 
     function familyMatchesTplCk(famId, tpl, ck) {
@@ -573,18 +543,20 @@ $asgJson = static function (array $rows): string {
         var tpl = wizardTplId();
         var ck = wizardCk();
         var dept = wizardDeptId();
+        var wizOk = asgWizardTripleComplete();
+        if (nb) {
+            nb.disabled = !wizOk;
+            nb.title = wizOk ? '' : 'أكمل اختيار القسم (1) وقالب المقاسات (2) والنوع التجاري (3)';
+        }
         if (hintEl) {
             hintEl.textContent = '';
         }
         if (id <= 0) {
-            if (nb) {
-                nb.disabled = false;
-            }
             if (listWrap) {
                 listWrap.style.display = 'block';
             }
             if (listTbody) {
-                listTbody.innerHTML = '<tr><td colspan="5" class="card-hint">أكمل اختيار قالب المقاسات والنوع التجاري (الخطوتان 2 و 3) لتُعرض الأدلة المربوطة بهذه العائلة — أو أنشئ «دليل جديد» كمسودة بدون عائلة وتظهر في الجدول أعلاه.</td></tr>';
+                listTbody.innerHTML = '<tr><td colspan="5" class="card-hint">أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3) لتُعرض هنا الأدلة المربوطة بالعائلة المطابقة. لمسودة جديدة: بعد اكتمال 1–2–3 استخدم «دليل جديد»؛ تُعرض المسودات في «جدول الأدلة المحفوظة» أعلى هذه البطاقة.</td></tr>';
             }
             if (hintEl && tpl > 0 && ck !== '') {
                 hintEl.textContent = 'لا عائلة مطابقة للقالب والنوع.';
@@ -592,9 +564,6 @@ $asgJson = static function (array $rows): string {
             await loadDraftList({ silent: true });
             asgRefreshGuideSortDisp();
             return;
-        }
-        if (nb) {
-            nb.disabled = false;
         }
         if (hintEl && dept > 0 && ASG_LIBRARY_READY && BUNDLE_SCOPES && BUNDLE_SCOPES.length) {
             var gotBundle = false;
@@ -1375,11 +1344,11 @@ $asgJson = static function (array $rows): string {
         }
         var res = await orangeAdminJsonPost(ADVISORY_API, { action: 'list_unbound' });
         if (!res || !res.success) {
-            var msg = (res && res.message) ? res.message : 'خطأ تحميل جدول المسودات';
+            var msg = (res && res.message) ? res.message : 'خطأ تحميل جدول الأدلة المحفوظة';
             if (!silent) {
                 alert(msg);
             } else if (errEl) {
-                errEl.textContent = msg + ' — الجدول أعلاه من تحميل الصفحة؛ جرّب «تحديث الجدول».';
+                errEl.textContent = msg + ' — جرّب «تحديث الجدول» في بطاقة جدول الأدلة المحفوظة.';
                 errEl.style.display = 'block';
             }
             return;
@@ -1415,7 +1384,7 @@ $asgJson = static function (array $rows): string {
         });
         if (!guides.length) {
             var trd = document.createElement('tr');
-            trd.innerHTML = '<td colspan="10" class="card-hint">لا توجد صفوف — استخدم «دليل جديد» ثم احفظ كمسودة.</td>';
+            trd.innerHTML = '<td colspan="10" class="card-hint">لا توجد صفوف — بعد اكتمال 1–2–3 استخدم «دليل جديد» ثم احفظ كمسودة.</td>';
             tb.appendChild(trd);
         }
         asgRefreshGuideSortDisp();
@@ -1551,6 +1520,10 @@ $asgJson = static function (array $rows): string {
     }
 
     function openNew() {
+        if (!asgWizardTripleComplete()) {
+            alert('أكمل اختيار القسم (1) وقالب المقاسات (2) والنوع التجاري (3) قبل «دليل جديد».');
+            return;
+        }
         document.getElementById('asg_edit_id').value = '0';
         var bf = document.getElementById('asg_bound_family');
         if (bf) {
@@ -1568,7 +1541,7 @@ $asgJson = static function (array $rows): string {
         clearRows();
         refreshSizeSelects();
         document.getElementById('asg_editor').style.display = 'block';
-        document.getElementById('asg_editor_title').textContent = 'دليل جديد (مسودة — اربط بعائلة لاحقاً من جدول المسودات)';
+        document.getElementById('asg_editor_title').textContent = 'دليل جديد (مسودة — اربط بعائلة لاحقاً من «جدول الأدلة المحفوظة»)';
         asgRefreshGuideSortDisp();
     }
 
@@ -1591,7 +1564,7 @@ $asgJson = static function (array $rows): string {
             var sid = parseInt(r.size_family_size_id, 10) || 0;
             if (!famOk) {
                 if (sid > 0) {
-                    return 'مسودة بدون عائلة: لا تربط صفاً بمقاس قبل ربط الدليل بعائلة من جدول المسودات (أو اختر عائلة في المعالج ثم احفظ).';
+                    return 'مسودة بدون عائلة: لا تربط صفاً بمقاس قبل ربط الدليل بعائلة من «جدول الأدلة المحفوظة» (أو اختر عائلة في المعالج ثم احفظ).';
                 }
             } else {
                 if (sid <= 0) {
@@ -1614,7 +1587,7 @@ $asgJson = static function (array $rows): string {
         var boundStored = parseInt(document.getElementById('asg_bound_family').value, 10) || 0;
         var isUnboundContext = boundStored <= 0;
         if (f <= 0 && !isUnboundContext) {
-            alert('أكمل اختيار قالب المقاسات والنوع التجاري (2 و 3) أولاً، أو افتح مسودة من جدول المسودات');
+            alert('أكمل القسم (1) وقالب المقاسات (2) والنوع التجاري (3)، أو افتح مسودة من «جدول الأدلة المحفوظة»');
             return;
         }
         if (wizardDeptId() <= 0) {
