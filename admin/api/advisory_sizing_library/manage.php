@@ -21,7 +21,13 @@ try {
     if ($action === 'list_bundles') {
         $sql = 'SELECT b.id, b.name_ar, b.name_en, b.commercial_kind_key, b.source_size_family_id, b.sort_order, b.is_active,
                        b.department_id, b.size_scheme_template_id,
-                       sf.name_ar AS source_family_ar, sf.name_en AS source_family_en ';
+                       sf.name_ar AS source_family_ar, sf.name_en AS source_family_en,
+                       (SELECT g.name_ar FROM advisory_sizing_guides g
+                         WHERE g.size_family_id = b.source_size_family_id
+                         ORDER BY g.sort_order ASC, g.id ASC LIMIT 1) AS first_guide_name_ar,
+                       (SELECT g.name_en FROM advisory_sizing_guides g
+                         WHERE g.size_family_id = b.source_size_family_id
+                         ORDER BY g.sort_order ASC, g.id ASC LIMIT 1) AS first_guide_name_en ';
         if (orange_table_exists($pdo, 'departments')) {
             $sql .= ', d.name_ar AS dept_ar, d.name_en AS dept_en ';
         } else {
@@ -147,7 +153,17 @@ try {
         $rows = $pdo->query(
             'SELECT m.id, m.consumer_size_family_id, m.library_bundle_id, m.updated_at,
                     cf.name_ar AS consumer_ar, cf.name_en AS consumer_en,
-                    b.name_ar AS bundle_ar, b.name_en AS bundle_en
+                    b.name_ar AS bundle_ar, b.name_en AS bundle_en,
+                    COALESCE(
+                        (SELECT g.name_ar FROM advisory_sizing_guides g
+                         WHERE g.size_family_id = b.source_size_family_id
+                         ORDER BY g.sort_order ASC, g.id ASC LIMIT 1),
+                        b.name_ar,
+                        (SELECT g.name_en FROM advisory_sizing_guides g
+                         WHERE g.size_family_id = b.source_size_family_id
+                         ORDER BY g.sort_order ASC, g.id ASC LIMIT 1),
+                        b.name_en
+                    ) AS bundle_display_internal
              FROM size_family_advisory_library_map m
              INNER JOIN size_families cf ON cf.id = m.consumer_size_family_id
              INNER JOIN advisory_sizing_library_bundles b ON b.id = m.library_bundle_id

@@ -1549,16 +1549,59 @@ $asgJson = static function (array $rows): string {
     document.getElementById('asg_w_ck').onchange = asgRefreshResolvedContext;
     document.getElementById('asg_w_dept').onchange = asgRefreshResolvedContext;
 
-    function asgValidateRowsBeforeSave(rows) {
+    function asgNormColumnCount(cols) {
+        var n = 0;
+        for (var c = 0; c < (cols || []).length; c++) {
+            var a = (cols[c].label_ar || '').trim();
+            var e = (cols[c].label_en || '').trim();
+            if (a !== '' || e !== '') {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    /** خلايا الصف بعد تفريغ العمود الأول عند ربط مقاس (مثل الحمولة المرسلة) وبعد حذف أعمدة بلا عنوان — يطابق منطق الحفظ في السيرفر. */
+    function asgRowCellsEffectiveForSave(r, cols, famOk) {
+        var raw = (r && r.cells) ? r.cells.slice() : [];
+        while (raw.length < (cols || []).length) {
+            raw.push('');
+        }
+        var sid0 = parseInt(r.size_family_size_id, 10) || 0;
+        if (famOk && sid0 > 0 && raw.length > 0) {
+            raw[0] = '';
+        }
+        var eff = [];
+        for (var ii = 0; ii < (cols || []).length; ii++) {
+            var ar0 = (cols[ii].label_ar || '').trim();
+            var en0 = (cols[ii].label_en || '').trim();
+            if (ar0 === '' && en0 === '') {
+                continue;
+            }
+            eff.push(String(raw[ii] != null ? raw[ii] : '').trim());
+        }
+        return eff;
+    }
+
+    function asgValidateRowsBeforeSave(rows, cols) {
+        cols = cols || [];
+        if (cols.length <= 0) {
+            return 'عرّف الأعمدة أولاً (عدد الأعمدة ثم «توليد صفوف العناوين»).';
+        }
+        if (asgNormColumnCount(cols) <= 0) {
+            return 'أضف عموداً واحداً على الأقل بعناوين (عربي أو English).';
+        }
         var seen = {};
         var hasData = false;
         var famOk = fid() > 0;
+        var dataRowNum = 0;
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
             if (!r || r.row_kind !== 'data') {
                 continue;
             }
             hasData = true;
+            dataRowNum++;
             var sid = parseInt(r.size_family_size_id, 10) || 0;
             if (!famOk) {
                 if (sid > 0) {
@@ -1566,12 +1609,22 @@ $asgJson = static function (array $rows): string {
                 }
             } else {
                 if (sid <= 0) {
-                    return 'كل صف بيانات يجب اختيار مقاس من العائلة له. استخدم «إضافة صف لكل مقاس» أو اختر المقاس من القائمة.';
+                    return 'في صف البيانات رقم ' + dataRowNum + ': اختر مقاساً من العائلة من القائمة. لا يُشترط إضافة صفاً لكل مقاس — فقط أكمل الصفوف التي تضيفها.';
                 }
                 if (seen[sid]) {
                     return 'مقاس العائلة مكرر في أكثر من صف — اربط كل مقاس مرة واحدة فقط.';
                 }
                 seen[sid] = true;
+            }
+            var effCells = asgRowCellsEffectiveForSave(r, cols, famOk);
+            var ne = effCells.length;
+            var startIx = (famOk && sid > 0) ? 1 : 0;
+            if (!(famOk && sid > 0 && ne === 1)) {
+                for (var j = startIx; j < ne; j++) {
+                    if (effCells[j] === '') {
+                        return 'أكمل جميع خلايا صف البيانات رقم ' + dataRowNum + ' (العمود ' + (j + 1) + ' من أعمدة الجدول المحفوظة). لا يُشترط إضافة صفاً لكل مقاس في العائلة.';
+                    }
+                }
             }
         }
         if (!hasData) {
@@ -1596,8 +1649,9 @@ $asgJson = static function (array $rows): string {
             alert('أكمل قالب المقاسات والنوع التجاري (2 و 3) في بطاقة المعالج — يُحفظان مع الدليل.');
             return;
         }
+        var colsPayload = readColumns();
         var rowsPayload = readRowsPayload();
-        var rowErr = asgValidateRowsBeforeSave(rowsPayload);
+        var rowErr = asgValidateRowsBeforeSave(rowsPayload, colsPayload);
         if (rowErr) {
             alert(rowErr);
             return;
@@ -1612,7 +1666,7 @@ $asgJson = static function (array $rows): string {
             scope_kind: document.getElementById('asg_scope').value,
             name_ar: document.getElementById('asg_name_ar').value.trim(),
             is_active: parseInt(document.getElementById('asg_active').value, 10),
-            columns: readColumns(),
+            columns: colsPayload,
             rows: rowsPayload
         };
         var res = await orangeAdminJsonPost(ADVISORY_API, payload);
@@ -1659,7 +1713,7 @@ $asgJson = static function (array $rows): string {
         for (var bi = 0; bi < bundles.length; bi++) {
             var b = bundles[bi];
             var bid = parseInt(b.id, 10) || 0;
-            var lab = (b.name_ar || b.name_en || ('#' + bid));
+            var lab = (b.first_guide_name_ar || b.first_guide_name_en || b.name_ar || b.name_en || ('#' + bid));
             var o = document.createElement('option');
             o.value = String(bid);
             o.textContent = lab;
@@ -1698,7 +1752,7 @@ $asgJson = static function (array $rows): string {
             var m = maps[ri];
             var tr = document.createElement('tr');
             var cons = (m.consumer_ar || m.consumer_en || '');
-            var bun = (m.bundle_ar || m.bundle_en || '');
+            var bun = (m.bundle_display_internal || m.bundle_ar || m.bundle_en || '');
             var cid = parseInt(m.consumer_size_family_id, 10) || 0;
             tr.innerHTML =
                 '<td>' + esc(cons) + '</td>' +

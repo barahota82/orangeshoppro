@@ -534,6 +534,30 @@ try {
                     json_response(['success' => false, 'message' => 'كل صف عنوان يجب أن يحتوي على نص عربي أو English'], 422);
                 }
             }
+            $ncol = count($normCols);
+            $dataRowNum = 0;
+            foreach ($normRows as $nr) {
+                if (($nr['row_kind'] ?? '') !== 'data') {
+                    continue;
+                }
+                ++$dataRowNum;
+                $cells = $nr['cells'] ?? [];
+                $sfsData = (int) ($nr['size_family_size_id'] ?? 0);
+                $startIx = ($effFam > 0 && $sfsData > 0) ? 1 : 0;
+                if ($effFam > 0 && $sfsData > 0 && $ncol === 1) {
+                    continue;
+                }
+                for ($jx = $startIx; $jx < $ncol; $jx++) {
+                    if (trim((string) ($cells[$jx] ?? '')) === '') {
+                        json_response([
+                            'success' => false,
+                            'message' => 'أكمل جميع خلايا كل صف بيانات قبل الحفظ (صف بيانات رقم '
+                                . $dataRowNum . '، عمود ' . ($jx + 1)
+                                . '). لا يُشترط إضافة صف لكل مقاس في العائلة.',
+                        ], 422);
+                    }
+                }
+            }
 
             $guideSortIns = 0;
             if ($id <= 0) {
