@@ -558,6 +558,18 @@ try {
                 && orange_table_has_column($pdo, 'size_families', 'size_scheme_template_id')) {
                 $pdo->prepare('UPDATE size_families SET size_scheme_template_id = NULL WHERE size_scheme_template_id = ?')->execute([$id]);
             }
+            if (orange_table_exists($pdo, 'advisory_sizing_guides')
+                && orange_table_has_column($pdo, 'advisory_sizing_guides', 'size_scheme_template_id')) {
+                $pdo->prepare(
+                    'UPDATE advisory_sizing_guides SET size_scheme_template_id = NULL WHERE size_scheme_template_id = ?'
+                )->execute([$id]);
+            }
+            if (orange_table_exists($pdo, 'advisory_sizing_library_bundles')
+                && orange_table_has_column($pdo, 'advisory_sizing_library_bundles', 'size_scheme_template_id')) {
+                $pdo->prepare(
+                    'UPDATE advisory_sizing_library_bundles SET size_scheme_template_id = NULL WHERE size_scheme_template_id = ?'
+                )->execute([$id]);
+            }
             $stDel = $pdo->prepare('SELECT id FROM size_scheme_template_sizes WHERE template_id = ?');
             $stDel->execute([$id]);
             $delTstIds = array_map(
