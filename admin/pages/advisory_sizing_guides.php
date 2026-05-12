@@ -779,7 +779,7 @@ $asgJson = static function (array $rows): string {
             tb.querySelectorAll('.asg-map-sync-one').forEach(function (btn) {
                 btn.onclick = async function () {
                     var cid = parseInt(btn.getAttribute('data-consumer'), 10) || 0;
-                    if (!confirm('نسخ الأدلة من عائلة مصدر الحزمة إلى «' + asgMapFamLabel(cid) + '»؟ سيُستبدل دليل علوي/سفلي/مفرد الموجود على العائلة المستهدفة إن وُجد.')) {
+                    if (!confirm('نسخ الأدلة من حزمة المكتبة إلى «' + asgMapFamLabel(cid) + '»؟ سيُستبدل دليل علوي/سفلي/مفرد الموجود على العائلة المستهدفة إن وُجد.')) {
                         return;
                     }
                     var r2 = await orangeAdminJsonPost(LIBRARY_API, { action: 'sync_consumer', consumer_size_family_id: cid });
@@ -1990,6 +1990,9 @@ $asgJson = static function (array $rows): string {
             return [];
         }
         var bundles = res.bundles || [];
+        if (ASG_LIBRARY_READY) {
+            BUNDLE_SCOPES = bundles.slice();
+        }
         asgFillMapBundleSelect(bundles, parseInt(document.getElementById('asg_map_bundle').value, 10) || 0);
         return bundles;
     }

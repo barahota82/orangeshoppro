@@ -19,6 +19,104 @@ try {
     $action = trim((string) ($data['action'] ?? ''));
 
     if ($action === 'list_bundles') {
+        /* تهيئة تلقائية: إن لم تُحفَظ حزم يدوياً، أنشئ/حدّث حزمة سياق (1–2–3) من أول اسم نموذج داخلي للمسودات غير المربوطة بعائلة. */
+        if (orange_table_exists($pdo, 'advisory_sizing_guides')) {
+            try {
+                $draftRows = $pdo->query(
+                    'SELECT department_id, size_scheme_template_id, commercial_kind_key, name_ar, name_en
+                     FROM advisory_sizing_guides
+                     WHERE (size_family_id IS NULL OR size_family_id = 0)
+                       AND COALESCE(department_id, 0) > 0
+                       AND COALESCE(size_scheme_template_id, 0) > 0
+                       AND commercial_kind_key <> \'\'
+                     ORDER BY COALESCE(department_id, 0) ASC, COALESCE(size_scheme_template_id, 0) ASC,
+                              commercial_kind_key ASC, sort_order ASC, id ASC'
+                )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                $ctxFirst = [];
+                foreach ($draftRows as $dr) {
+                    $dept = (int) ($dr['department_id'] ?? 0);
+                    $tpl = (int) ($dr['size_scheme_template_id'] ?? 0);
+                    $ckx = trim((string) ($dr['commercial_kind_key'] ?? ''));
+                    if ($dept <= 0 || $tpl <= 0 || $ckx === '') {
+                        continue;
+                    }
+                    $ctxKey = $dept . '|' . $tpl . '|' . $ckx;
+                    if (!isset($ctxFirst[$ctxKey])) {
+                        $ctxFirst[$ctxKey] = [
+                            'department_id' => $dept,
+                            'size_scheme_template_id' => $tpl,
+                            'commercial_kind_key' => $ckx,
+                            'name_ar' => trim((string) ($dr['name_ar'] ?? '')),
+                            'name_en' => trim((string) ($dr['name_en'] ?? '')),
+                        ];
+                    }
+                }
+                if ($ctxFirst !== []) {
+                    $existingRows = $pdo->query(
+                        'SELECT id, department_id, size_scheme_template_id, commercial_kind_key, source_size_family_id, name_ar, name_en, is_active
+                         FROM advisory_sizing_library_bundles'
+                    )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                    $ctxExisting = [];
+                    foreach ($existingRows as $er) {
+                        $dept = (int) ($er['department_id'] ?? 0);
+                        $tpl = (int) ($er['size_scheme_template_id'] ?? 0);
+                        $ckx = trim((string) ($er['commercial_kind_key'] ?? ''));
+                        if ($dept <= 0 || $tpl <= 0 || $ckx === '') {
+                            continue;
+                        }
+                        $ctxKey = $dept . '|' . $tpl . '|' . $ckx;
+                        $srcFam = (int) ($er['source_size_family_id'] ?? 0);
+                        if (!isset($ctxExisting[$ctxKey])) {
+                            $ctxExisting[$ctxKey] = $er;
+                        } elseif ((int) ($ctxExisting[$ctxKey]['source_size_family_id'] ?? 0) <= 0 && $srcFam > 0) {
+                            $ctxExisting[$ctxKey] = $er;
+                        }
+                    }
+                    $mxSt = $pdo->query('SELECT COALESCE(MAX(sort_order), 0) FROM advisory_sizing_library_bundles');
+                    $nextSort = (int) ($mxSt ? $mxSt->fetchColumn() : 0);
+                    $insSeed = $pdo->prepare(
+                        'INSERT INTO advisory_sizing_library_bundles
+                         (department_id, size_scheme_template_id, name_ar, name_en, commercial_kind_key, source_size_family_id, sort_order, is_active)
+                         VALUES (?,?,?,?,?,?,?,?)'
+                    );
+                    $updSeed = $pdo->prepare(
+                        'UPDATE advisory_sizing_library_bundles
+                         SET name_ar = ?, name_en = ?, is_active = 1
+                         WHERE id = ?'
+                    );
+                    foreach ($ctxFirst as $ctxKey => $ctx) {
+                        if (!isset($ctxExisting[$ctxKey])) {
+                            ++$nextSort;
+                            $insSeed->execute([
+                                (int) $ctx['department_id'],
+                                (int) $ctx['size_scheme_template_id'],
+                                (string) $ctx['name_ar'],
+                                (string) $ctx['name_en'],
+                                (string) $ctx['commercial_kind_key'],
+                                0,
+                                $nextSort,
+                                1,
+                            ]);
+                            continue;
+                        }
+                        $ex = $ctxExisting[$ctxKey];
+                        $curAr = trim((string) ($ex['name_ar'] ?? ''));
+                        $curEn = trim((string) ($ex['name_en'] ?? ''));
+                        $newAr = $curAr !== '' ? $curAr : (string) $ctx['name_ar'];
+                        $newEn = $curEn !== '' ? $curEn : (string) $ctx['name_en'];
+                        $needUpdate = ($newAr !== $curAr) || ($newEn !== $curEn) || ((int) ($ex['is_active'] ?? 1) === 0);
+                        if ($needUpdate) {
+                            $updSeed->execute([$newAr, $newEn, (int) $ex['id']]);
+                        }
+                    }
+                }
+            } catch (Throwable $seedErr) {
+                if (function_exists('error_log')) {
+                    error_log('[orange] advisory_sizing_library/list_bundles seed: ' . $seedErr->getMessage());
+                }
+            }
+        }
+
         /* اسم العرض: مسودات المكتبة (size_family_id فارغ) تُطابق سياق الحزمة 1–2–3، وليس اشتراط ربط الدليل بعائلة المصدر */
         $sql = 'SELECT b.id, b.name_ar, b.name_en, b.commercial_kind_key, b.source_size_family_id, b.sort_order, b.is_active,
                        b.department_id, b.size_scheme_template_id,
@@ -65,7 +163,7 @@ try {
         if (orange_table_exists($pdo, 'size_scheme_templates')) {
             $sql .= 'LEFT JOIN size_scheme_templates tpl ON tpl.id = b.size_scheme_template_id ';
         }
-        $sql .= 'ORDER BY b.sort_order ASC, b.id ASC';
+        $sql .= 'WHERE COALESCE(b.is_active, 1) = 1 ORDER BY b.sort_order ASC, b.id ASC';
         $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         json_response(['success' => true, 'bundles' => $rows]);
@@ -250,7 +348,7 @@ try {
         if ($err !== null) {
             json_response(['success' => false, 'message' => $err], 422);
         }
-        json_response(['success' => true, 'message' => 'تمت المزامنة: نُسخت الأدلة من عائلة مصدر الحزمة إلى عائلة المستهلك.']);
+        json_response(['success' => true, 'message' => 'تمت المزامنة: نُسخت الأدلة من حزمة المكتبة إلى عائلة المستهلك.']);
     }
 
     json_response(['success' => false, 'message' => 'إجراء غير معروف.'], 400);

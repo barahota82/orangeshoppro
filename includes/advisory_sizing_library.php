@@ -65,6 +65,7 @@ function orange_advisory_sizing_library_delete_guide_cascade(PDO $pdo, int $guid
 
 /**
  * @param array<int, int> $sizeIdMap مصدر => مستهلك (نفس الترتيب لقائمة المقاسات النشطة)
+ * @param list<int>|null $orderedTargetSizeIds ربط بديل حسب ترتيب صفوف البيانات عندما يكون دليل المصدر مسودة بلا size_family_size_id
  *
  * @return int معرّف الدليل الجديد
  */
@@ -72,7 +73,8 @@ function orange_advisory_sizing_library_clone_guide_to_family(
     PDO $pdo,
     int $sourceGuideId,
     int $targetFamilyId,
-    array $sizeIdMap
+    array $sizeIdMap,
+    ?array $orderedTargetSizeIds = null
 ): int {
     $gSt = $pdo->prepare('SELECT * FROM advisory_sizing_guides WHERE id = ? LIMIT 1');
     $gSt->execute([$sourceGuideId]);
@@ -85,13 +87,20 @@ function orange_advisory_sizing_library_clone_guide_to_family(
         throw new RuntimeException('نوع نطاق الدليل غير مدعوم');
     }
 
+    $deptId = isset($g['department_id']) && (int) ($g['department_id'] ?? 0) > 0 ? (int) $g['department_id'] : null;
+    $tplId = isset($g['size_scheme_template_id']) && (int) ($g['size_scheme_template_id'] ?? 0) > 0
+        ? (int) $g['size_scheme_template_id'] : null;
+    $ck = trim((string) ($g['commercial_kind_key'] ?? ''));
     $insG = $pdo->prepare(
         'INSERT INTO advisory_sizing_guides
-         (size_family_id, scope_kind, name_ar, name_en, name_fil, name_hi, sort_order, is_active)
-         VALUES (?,?,?,?,?,?,?,?)'
+         (size_family_id, department_id, size_scheme_template_id, commercial_kind_key, scope_kind, name_ar, name_en, name_fil, name_hi, sort_order, is_active)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?)'
     );
     $insG->execute([
         $targetFamilyId,
+        $deptId,
+        $tplId,
+        $ck,
         $scope,
         (string) ($g['name_ar'] ?? ''),
         (string) ($g['name_en'] ?? ''),
@@ -145,6 +154,14 @@ function orange_advisory_sizing_library_clone_guide_to_family(
     $rSt->execute([$sourceGuideId]);
     $rows = $rSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     $rowMap = [];
+    $fallbackSizeIds = [];
+    foreach ((array) $orderedTargetSizeIds as $szId) {
+        $szN = (int) $szId;
+        if ($szN > 0) {
+            $fallbackSizeIds[] = $szN;
+        }
+    }
+    $fallbackIx = 0;
     $insR = $pdo->prepare(
         'INSERT INTO advisory_sizing_guide_rows
          (guide_id, sort_order, row_kind, size_family_size_id, label_ar, label_en, label_fil, label_hi)
@@ -161,13 +178,19 @@ function orange_advisory_sizing_library_clone_guide_to_family(
         if ($rk === 'label') {
             $newSid = 0;
         } else {
-            if ($sid <= 0) {
-                throw new RuntimeException('صف بيانات في دليل المصدر بدون ربط مقاس');
+            if ($sid > 0 && isset($sizeIdMap[$sid])) {
+                $newSid = (int) $sizeIdMap[$sid];
+            } elseif ($fallbackSizeIds !== []) {
+                if (!isset($fallbackSizeIds[$fallbackIx])) {
+                    throw new RuntimeException('عدد صفوف البيانات في النموذج الداخلي أكبر من عدد مقاسات عائلة المستهلك.');
+                }
+                $newSid = (int) $fallbackSizeIds[$fallbackIx];
+                ++$fallbackIx;
+            } elseif ($sid <= 0) {
+                throw new RuntimeException('صف بيانات في دليل المصدر بدون ربط مقاس.');
+            } else {
+                throw new RuntimeException('مقاس في دليل المصدر لا يطابق خريطة المقاسات بين العائلات.');
             }
-            if (!isset($sizeIdMap[$sid])) {
-                throw new RuntimeException('مقاس في دليل المصدر لا يطابق خريطة المقاسات بين العائلات');
-            }
-            $newSid = (int) $sizeIdMap[$sid];
         }
         $insR->execute([
             $newGuideId,
@@ -309,6 +332,91 @@ function orange_advisory_sizing_library_sync_consumer_from_source(
 }
 
 /**
+ * مزامنة عائلة مستهلك من نماذج مكتبة غير مرتبطة بعائلة (size_family_id = NULL/0)
+ * عبر سياق الحزمة (قسم + قالب + نوع تجاري).
+ *
+ * @param array<string, mixed> $bundle صف من advisory_sizing_library_bundles
+ *
+ * @return string|null
+ */
+function orange_advisory_sizing_library_sync_consumer_from_unbound_context(PDO $pdo, array $bundle, int $consumerFamilyId): ?string
+{
+    $deptId = isset($bundle['department_id']) ? (int) $bundle['department_id'] : 0;
+    $tplId = isset($bundle['size_scheme_template_id']) ? (int) $bundle['size_scheme_template_id'] : 0;
+    $ck = trim((string) ($bundle['commercial_kind_key'] ?? ''));
+    if ($deptId <= 0 || $tplId <= 0 || $ck === '') {
+        return 'الحزمة بلا سياق مكتمل (قسم/قالب/نوع تجاري)؛ لا يمكن القراءة من مكتبة النماذج الداخلية.';
+    }
+
+    $consumerSizeIds = orange_advisory_sizing_library_ordered_size_ids($pdo, $consumerFamilyId);
+    if ($consumerSizeIds === []) {
+        return 'عائلة المستهلك بلا مقاسات نشطة — راجع عائلات المقاسات.';
+    }
+
+    $scopes = orange_advisory_sizing_library_scope_kinds();
+    try {
+        $pdo->beginTransaction();
+        $clonedAny = false;
+        foreach ($scopes as $scope) {
+            $find = $pdo->prepare(
+                'SELECT g.id FROM advisory_sizing_guides g
+                 WHERE (g.size_family_id IS NULL OR g.size_family_id = 0)
+                   AND COALESCE(g.department_id, 0) = ?
+                   AND COALESCE(g.size_scheme_template_id, 0) = ?
+                   AND g.commercial_kind_key = ?
+                   AND g.scope_kind = ?
+                   AND EXISTS (SELECT 1 FROM advisory_sizing_guide_columns c WHERE c.guide_id = g.id)
+                   AND EXISTS (SELECT 1 FROM advisory_sizing_guide_rows r WHERE r.guide_id = g.id AND r.row_kind = \'data\')
+                 ORDER BY g.sort_order ASC, g.id ASC
+                 LIMIT 1'
+            );
+            $find->execute([$deptId, $tplId, $ck, $scope]);
+            $srcGuideId = (int) $find->fetchColumn();
+            if ($srcGuideId <= 0) {
+                continue;
+            }
+            $clonedAny = true;
+
+            $findT = $pdo->prepare(
+                'SELECT id FROM advisory_sizing_guides WHERE size_family_id = ? AND scope_kind = ? LIMIT 1'
+            );
+            $findT->execute([$consumerFamilyId, $scope]);
+            $oldT = (int) $findT->fetchColumn();
+            if ($oldT > 0) {
+                orange_advisory_sizing_library_delete_guide_cascade($pdo, $oldT);
+            }
+
+            orange_advisory_sizing_library_clone_guide_to_family(
+                $pdo,
+                $srcGuideId,
+                $consumerFamilyId,
+                [],
+                $consumerSizeIds
+            );
+        }
+        if (!$clonedAny) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            return 'لا توجد نماذج داخلية جاهزة في مكتبة الجداول الإرشادية لهذا القسم/القالب/النوع التجاري.';
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        if (function_exists('error_log')) {
+            error_log('[orange] advisory_sizing_library unbound sync: ' . $e->getMessage());
+        }
+
+        return 'فشل المزامنة من مكتبة النماذج الداخلية: ' . $e->getMessage();
+    }
+
+    return null;
+}
+
+/**
  * مزامنة عائلة مستهلك حسب الخريطة المحفوظة.
  *
  * @return string|null
@@ -327,7 +435,7 @@ function orange_advisory_sizing_library_sync_mapped_consumer(PDO $pdo, int $cons
         return 'لا يوجد ربط مكتبة لهذه العائلة — احفظ الربط أولاً.';
     }
     $bSt = $pdo->prepare(
-        'SELECT source_size_family_id, commercial_kind_key, department_id, size_scheme_template_id
+        'SELECT id, name_ar, name_en, source_size_family_id, commercial_kind_key, department_id, size_scheme_template_id
          FROM advisory_sizing_library_bundles WHERE id = ? LIMIT 1'
     );
     $bSt->execute([$bid]);
@@ -345,7 +453,11 @@ function orange_advisory_sizing_library_sync_mapped_consumer(PDO $pdo, int $cons
         return $alignErr;
     }
 
-    return orange_advisory_sizing_library_sync_consumer_from_source($pdo, $srcFam, $consumerFamilyId);
+    if ($srcFam > 0) {
+        return orange_advisory_sizing_library_sync_consumer_from_source($pdo, $srcFam, $consumerFamilyId);
+    }
+
+    return orange_advisory_sizing_library_sync_consumer_from_unbound_context($pdo, $b, $consumerFamilyId);
 }
 
 /**
