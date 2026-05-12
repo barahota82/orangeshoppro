@@ -2321,6 +2321,20 @@ table.admin-orders-list-table .orders-row-actions > a.btn {
     border: 0;
     background: #050505;
 }
+#productTabPanelCardPreview .admin-product-preview-mode-row {
+    display: grid;
+    grid-template-columns: minmax(170px, 230px) minmax(260px, 360px) auto;
+    gap: 10px;
+    align-items: end;
+}
+#productTabPanelCardPreview .admin-product-preview-mode-row .btn-secondary {
+    width: max-content;
+}
+@media (max-width: 980px) {
+    #productTabPanelCardPreview .admin-product-preview-mode-row {
+        grid-template-columns: 1fr;
+    }
+}
 
 .product-size-pick-grid {
     display: flex;

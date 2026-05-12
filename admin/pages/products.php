@@ -730,8 +730,18 @@ $orangeAdminSfProductUrlPartsForJs = [
 
         <div id="productTabPanelCardPreview" class="admin-product-tab-panel" role="tabpanel" aria-labelledby="productTabBtnCardPreview" hidden>
         <div class="admin-product-section">
-        <h4 class="admin-product-subsection-title">معاينة كارت المنتج</h4>
-        <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">هنا <strong>معاينة ديناميكية لجزء واحد فقط</strong>: <strong>كارت القائمة</strong> في المتجر (RTL وعربية كالرئيسية). تُبنى داخل الصفحة من حقول النموذج وتُحدَّث عند تغيّر الاسم والسعر والصور وصفوف الألوان — وليست تحميلاً لصفحة المنتج الكاملة (<code>product.php</code>) لأن المنتج غير المحفوظ لا يملك معرّفاً في القاعدة، وصفحة الزائر تقرأ من السيرفر. شارة «العروض» لا تُعرض هنا لأنها من جدول العروض. بعد الحفظ أو عند التعديل يظهر رابط لفتح <strong>صفحة المنتج كاملة</strong> كما للزائر.</p>
+        <h4 class="admin-product-subsection-title">محاكاة بصرية لكارت وصفحة المنتج</h4>
+        <p class="card-hint" style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#64748b;">هذه محاكاة داخل الأدمن بنفس أصناف المتجر (<code>main.css</code>) وتُحدَّث مباشرة من حقول النموذج قبل الحفظ. يمكنك التنقّل بين: <strong>كارت القائمة</strong>، <strong>صفحة المنتج</strong>، و<strong>عرض موبايل</strong>، أو تشغيل <strong>محاكاة شاملة</strong> (قائمة + صفحة منتج). بعد الحفظ يظهر رابط الصفحة الحقيقية كما للزائر.</p>
+        <div class="admin-product-preview-mode-row" style="margin:0 0 12px;">
+            <label for="orangeAdminProductPreviewMode" style="margin:0;">وضع المحاكاة</label>
+            <select id="orangeAdminProductPreviewMode">
+                <option value="flow">محاكاة شاملة (قائمة + صفحة المنتج)</option>
+                <option value="card">كارت القائمة فقط</option>
+                <option value="product">صفحة المنتج (سطح مكتب)</option>
+                <option value="mobile">صفحة المنتج (موبايل)</option>
+            </select>
+            <button type="button" class="btn-secondary" id="orangeAdminProductPreviewRefreshNow">تحديث الآن</button>
+        </div>
         <p id="orangeAdminProductFullPreviewWrap" class="card-hint" style="margin:0 0 12px;display:none;font-size:13px;">
             <a id="orangeAdminProductFullPreviewLink" class="btn-secondary" href="#" target="_blank" rel="noopener noreferrer">فتح صفحة المنتج كاملة في المتجر (كما للزائر)</a>
             <span style="display:block;margin-top:6px;color:#64748b;font-size:12px;">يستخدم القناة الافتراضية واللغة العربية في الرابط؛ إن لم يطابق رابطك المعتاد عدّل القناة من شاشة القنوات أو افتح المنتج من الواجهة.</span>
@@ -1979,6 +1989,63 @@ function orangeAdminProductCardPreviewPriceFormatted() {
     return v.toFixed(2) + ' KD';
 }
 
+function orangeAdminPreviewMode() {
+    const sel = document.getElementById('orangeAdminProductPreviewMode');
+    const mode = sel ? String(sel.value || '').trim().toLowerCase() : '';
+    return (mode === 'card' || mode === 'product' || mode === 'mobile') ? mode : 'flow';
+}
+
+function orangeAdminCollectPreviewGalleryUrls() {
+    const out = [];
+    const seen = Object.create(null);
+    const pushUrl = function (u) {
+        const v = String(u || '').trim();
+        if (!v || seen[v]) {
+            return;
+        }
+        seen[v] = true;
+        out.push(v);
+    };
+    if (window.ORANGE_MAIN_PENDING_IMAGE_URL) {
+        pushUrl(window.ORANGE_MAIN_PENDING_IMAGE_URL);
+    }
+    const curMain = orangeAdminProductCardPreviewImageSrc();
+    if (curMain) {
+        pushUrl(curMain);
+    }
+    (window.ORANGE_GALLERY_PENDING_URLS || []).forEach(function (u) {
+        pushUrl(u);
+    });
+    (window.PRODUCT_EXTRA_IMAGES || []).forEach(function (name) {
+        const fn = String(name || '').trim();
+        if (!fn) {
+            return;
+        }
+        pushUrl(adminPublicPath('/uploads/products/') + encodeURIComponent(adminProductImageBasename(fn)));
+    });
+    return out;
+}
+
+function orangeAdminProductPreviewDescription() {
+    const ar = document.getElementById('description') && document.getElementById('description').value.trim();
+    if (ar) {
+        return ar;
+    }
+    const en = document.getElementById('description_en') && document.getElementById('description_en').value.trim();
+    if (en) {
+        return en;
+    }
+    const fil = document.getElementById('description_fil') && document.getElementById('description_fil').value.trim();
+    if (fil) {
+        return fil;
+    }
+    const hi = document.getElementById('description_hi') && document.getElementById('description_hi').value.trim();
+    if (hi) {
+        return hi;
+    }
+    return '';
+}
+
 function orangeAdminCwRowDisplayParts(row) {
     if (!row || !row.querySelector) {
         return null;
@@ -2055,6 +2122,154 @@ function orangeAdminProductCardPreviewVariantMetaHtml() {
     return '<div class="product-card-variant-meta" dir="auto">' + lines.join('') + '</div>';
 }
 
+function orangeAdminProductPreviewColorOptionsHtml() {
+    const hasColors = document.getElementById('has_colors') && document.getElementById('has_colors').value === '1';
+    if (!hasColors) {
+        return '';
+    }
+    const chips = [];
+    const seen = Object.create(null);
+    document.querySelectorAll('#colorwaysBox .cw-row').forEach(function (row) {
+        const parts = orangeAdminCwRowDisplayParts(row);
+        if (!parts) {
+            return;
+        }
+        const key = String(parts.color || '') + '|' + String(parts.pattern || '');
+        if (seen[key]) {
+            return;
+        }
+        seen[key] = true;
+        let chip = '<button type="button" class="chip color-chip" data-color="' + adminEscAttr(key) + '" onclick="return false;">';
+        if (parts.color) {
+            chip += '<span class="chip-text chip-text--color">' + adminEscHtml(parts.color) + '</span>';
+        }
+        if (parts.pattern) {
+            chip += '<span class="chip-text chip-text--pattern">' + adminEscHtml(parts.pattern) + '</span>';
+        }
+        chip += '</button>';
+        chips.push(chip);
+    });
+    if (!chips.length) {
+        return '<div class="option-block"><label>اللون</label><p class="card-hint" style="margin:6px 0 0;">أضف صف لون من تبويب «الألوان» لتظهر المحاكاة بشكل كامل.</p></div>';
+    }
+    return '<div class="option-block"><label>اللون</label><div class="chips">' + chips.join('') + '</div></div>';
+}
+
+function orangeAdminProductPreviewSizeLabels() {
+    if (!orangeProductEffectiveHasSizes()) {
+        return [];
+    }
+    const famId = parseInt(String(document.getElementById('size_family_id') && document.getElementById('size_family_id').value || '0'), 10) || 0;
+    if (famId <= 0) {
+        return [];
+    }
+    const allSizes = sizesForFamily(famId) || [];
+    const byId = Object.create(null);
+    allSizes.forEach(function (sz) {
+        const sid = parseInt(String(sz && sz.id != null ? sz.id : '0'), 10) || 0;
+        if (sid <= 0) {
+            return;
+        }
+        byId[sid] = String((sz.label_ar || sz.label_en || ('#' + sid)) || '');
+    });
+    const labels = [];
+    const seen = Object.create(null);
+    const addById = function (sid) {
+        const id = parseInt(String(sid || '0'), 10) || 0;
+        if (id <= 0 || seen[id]) {
+            return;
+        }
+        seen[id] = true;
+        labels.push(byId[id] || ('#' + id));
+    };
+    document.querySelectorAll('#product_size_pick_checkboxes .product-size-pick-cb:checked').forEach(function (cb) {
+        addById(cb.value);
+    });
+    document.querySelectorAll('#colorwaysBox .cw-size-cb:checked').forEach(function (cb) {
+        addById(cb.value);
+    });
+    if (!labels.length) {
+        allSizes.forEach(function (sz) {
+            addById(sz && sz.id);
+        });
+    }
+    return labels;
+}
+
+function orangeAdminProductPreviewSizeOptionsHtml() {
+    if (!orangeProductEffectiveHasSizes()) {
+        return '';
+    }
+    const labels = orangeAdminProductPreviewSizeLabels();
+    if (!labels.length) {
+        return '<div class="option-block"><label>المقاس</label><p class="card-hint" style="margin:6px 0 0;">اختر عائلة مقاسات ومقاساً واحداً على الأقل لعرض شرائح المقاس.</p></div>';
+    }
+    const chips = labels.map(function (lb) {
+        return '<button type="button" class="chip size-chip" data-size="' + adminEscAttr(lb) + '" onclick="return false;">' + adminEscHtml(lb) + '</button>';
+    });
+    return '<div class="option-block"><label>المقاس</label><div class="chips">' + chips.join('') + '</div></div>';
+}
+
+function orangeAdminPreviewCardArticleHtml(titleEsc, priceEsc, imgBlock, variantHtml, viewLblEsc) {
+    return '<article class="product-card">' +
+        imgBlock +
+        '<div class="product-body"><h3>' + titleEsc + '</h3>' +
+        variantHtml +
+        '<div class="price-row"><strong>' + priceEsc + '</strong></div><a class="btn" href="#" onclick="return false;">' + viewLblEsc + '</a></div>' +
+        '</article>';
+}
+
+function orangeAdminPreviewProductPageHtml(opts) {
+    const titleEsc = opts.titleEsc;
+    const descEsc = opts.descEsc;
+    const priceEsc = opts.priceEsc;
+    const galleryUrls = Array.isArray(opts.galleryUrls) ? opts.galleryUrls : [];
+    const colorHtml = opts.colorHtml || '';
+    const sizeHtml = opts.sizeHtml || '';
+    const showSizingBtn = !!opts.showSizingBtn;
+    let slides = '';
+    if (galleryUrls.length) {
+        galleryUrls.forEach(function (url) {
+            slides += '<div class="product-gallery__slide"><img class="product-gallery__img" src="' + adminEscAttr(url) + '" alt="' + titleEsc + '" loading="lazy"></div>';
+        });
+    } else {
+        slides = '<div class="product-gallery__slide"><div class="product-gallery__img" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;">لا صورة بعد</div></div>';
+    }
+    let dots = '';
+    let thumbs = '';
+    if (galleryUrls.length > 1) {
+        for (let i = 0; i < galleryUrls.length; i++) {
+            dots += '<button type="button" class="product-gallery__dot' + (i === 0 ? ' is-active' : '') + '" role="tab" aria-selected="' + (i === 0 ? 'true' : 'false') + '" data-index="' + i + '" aria-label="' + (i + 1) + ' / ' + galleryUrls.length + '"></button>';
+            thumbs += '<button type="button" class="thumb' + (i === 0 ? ' active' : '') + '" data-gallery-index="' + i + '"><img src="' + adminEscAttr(galleryUrls[i]) + '" alt=""></button>';
+        }
+    }
+    let descHtml = '';
+    if (descEsc) {
+        descHtml = '<p class="product-desc product-info__desc">' + descEsc.replace(/\n/g, '<br>') + '</p>';
+    }
+    return '<div class="product-page-toolbar product-page-toolbar--dual"><a class="product-page__back" href="#" onclick="return false;">العودة للمتجر</a><a class="product-page__close" href="#" onclick="return false;" aria-label="إغلاق"><span aria-hidden="true">&times;</span></a></div>' +
+        '<div class="product-page card-box">' +
+            '<div class="product-gallery" data-gallery-count="' + String(galleryUrls.length || 1) + '">' +
+                '<div class="product-gallery__stage">' +
+                    (galleryUrls.length > 1 ? '<button type="button" class="product-gallery__nav product-gallery__nav--prev" aria-label="السابق"><span aria-hidden="true">‹</span></button>' : '') +
+                    '<div class="product-gallery__viewport"' + (galleryUrls.length > 1 ? ' tabindex="0"' : '') + '><div class="product-gallery__track">' + slides + '</div></div>' +
+                    (galleryUrls.length > 1 ? '<button type="button" class="product-gallery__nav product-gallery__nav--next" aria-label="التالي"><span aria-hidden="true">›</span></button>' : '') +
+                '</div>' +
+                (galleryUrls.length > 1 ? '<div class="product-gallery__dots" role="tablist" aria-label="مؤشرات الصور">' + dots + '</div><div class="thumbs product-gallery__thumbs">' + thumbs + '</div>' : '') +
+            '</div>' +
+            '<div class="product-info">' +
+                '<h2 class="product-info__title">' + titleEsc + '</h2>' +
+                '<div class="price-row product-info__price"><strong>' + priceEsc + '</strong></div>' +
+                descHtml +
+                colorHtml +
+                sizeHtml +
+                '<div class="option-block qty-block"><label>الكمية</label><div class="qty-control"><button type="button" onclick="return false;">-</button><input type="number" value="1" min="1"><button type="button" onclick="return false;">+</button></div></div>' +
+                (showSizingBtn ? '<div class="option-block product-info__sizing"><button type="button" class="btn-secondary" onclick="return false;">دليل المقاس</button></div>' : '') +
+                '<div class="actions-row product-info__actions"><button type="button" class="btn product-add-cart-btn" onclick="return false;">أضف إلى السلة</button></div>' +
+            '</div>' +
+        '</div>';
+}
+
 /** رابط صفحة المنتج على الواجهة (بعد الحفظ فقط — يحتاج معرفاً في القاعدة). */
 function orangeAdminBuildStorefrontProductPageUrl(productId) {
     const id = parseInt(String(productId != null ? productId : '0'), 10) || 0;
@@ -2091,7 +2306,7 @@ function orangeAdminRefreshStorefrontProductPageLink() {
     a.setAttribute('href', url);
 }
 
-/** يعيد بناء iframe المعاينة بنفس أصناف كارت المنتج في المتجر (main.css داخل الإطار). */
+/** يعيد بناء iframe المحاكاة البصرية (قائمة/صفحة منتج/موبايل) بنفس أصناف المتجر (main.css داخل الإطار). */
 function orangeRefreshProductCardPreview() {
     const frame = document.getElementById('orangeAdminProductCardPreviewFrame');
     if (!frame) {
@@ -2103,11 +2318,23 @@ function orangeRefreshProductCardPreview() {
             '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"></head><body><p>تعذّر تحميل أنماط المعاينة.</p></body></html>';
         return;
     }
+    const mode = orangeAdminPreviewMode();
+    if (mode === 'flow') {
+        frame.style.height = 'min(88vh, 980px)';
+    } else if (mode === 'mobile') {
+        frame.style.height = 'min(84vh, 860px)';
+    } else {
+        frame.style.height = 'min(72vh, 640px)';
+    }
     const titlePlain = orangeAdminProductCardPreviewTitle();
     const title = adminEscHtml(titlePlain);
     const viewLbl = adminEscHtml(window.ORANGE_ADMIN_VIEW_PRODUCT_LABEL || '');
     const imgSrc = orangeAdminProductCardPreviewImageSrc();
+    const galleryUrls = orangeAdminCollectPreviewGalleryUrls();
     const variantHtml = orangeAdminProductCardPreviewVariantMetaHtml();
+    const colorOptionsHtml = orangeAdminProductPreviewColorOptionsHtml();
+    const sizeOptionsHtml = orangeAdminProductPreviewSizeOptionsHtml();
+    const descEsc = adminEscHtml(orangeAdminProductPreviewDescription());
     const priceStr = adminEscHtml(orangeAdminProductCardPreviewPriceFormatted());
     const imgBlock = imgSrc
         ? '<div class="product-image-wrap"><img src="' +
@@ -2116,20 +2343,94 @@ function orangeRefreshProductCardPreview() {
           title +
           '" loading="lazy" decoding="async"></div>'
         : '<div class="product-image-wrap" style="min-height:220px;display:flex;align-items:center;justify-content:center;font-size:0.9rem;color:var(--muted);padding:12px;text-align:center;">لا صورة بعد — أضف صورة من تبويب «صور المنتج العامة»</div>';
+    const cardHtml = orangeAdminPreviewCardArticleHtml(title, priceStr, imgBlock, variantHtml, viewLbl);
+    const productPageHtml = orangeAdminPreviewProductPageHtml({
+        titleEsc: title,
+        descEsc: descEsc,
+        priceEsc: priceStr,
+        galleryUrls: galleryUrls,
+        colorHtml: colorOptionsHtml,
+        sizeHtml: sizeOptionsHtml,
+        showSizingBtn: orangeProductEffectiveHasSizes()
+    });
+    let shellClass = 'admin-preview-mode-card';
+    let contentHtml = '';
+    if (mode === 'product') {
+        shellClass = 'admin-preview-mode-product';
+        contentHtml =
+            '<section class="admin-preview-section">' +
+                '<h3 class="admin-preview-heading">محاكاة صفحة المنتج — سطح مكتب</h3>' +
+                '<div class="container">' + productPageHtml + '</div>' +
+            '</section>';
+    } else if (mode === 'mobile') {
+        shellClass = 'admin-preview-mode-mobile';
+        contentHtml =
+            '<section class="admin-preview-section">' +
+                '<h3 class="admin-preview-heading">محاكاة صفحة المنتج — موبايل</h3>' +
+                '<div class="admin-preview-mobile-wrap"><div class="container">' + productPageHtml + '</div></div>' +
+            '</section>';
+    } else if (mode === 'flow') {
+        shellClass = 'admin-preview-mode-flow';
+        const filler1 = orangeAdminPreviewCardArticleHtml(adminEscHtml('منتج مشابه A'), adminEscHtml('9.90 KD'), '<div class="product-image-wrap" style="min-height:220px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;">صورة</div>', '', viewLbl);
+        const filler2 = orangeAdminPreviewCardArticleHtml(adminEscHtml('منتج مشابه B'), adminEscHtml('7.50 KD'), '<div class="product-image-wrap" style="min-height:220px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;">صورة</div>', '', viewLbl);
+        contentHtml =
+            '<section class="admin-preview-section">' +
+                '<h3 class="admin-preview-heading">1) محاكاة صفحة القوائم (الكروت)</h3>' +
+                '<div class="products-grid admin-preview-products-grid">' + filler1 + cardHtml + filler2 + '</div>' +
+            '</section>' +
+            '<section class="admin-preview-section">' +
+                '<h3 class="admin-preview-heading">2) محاكاة صفحة المنتج بعد فتح الكارت</h3>' +
+                '<div class="container">' + productPageHtml + '</div>' +
+            '</section>';
+    } else {
+        shellClass = 'admin-preview-mode-card';
+        contentHtml =
+            '<section class="admin-preview-section">' +
+                '<h3 class="admin-preview-heading">محاكاة كارت القائمة</h3>' +
+                '<div class="products-grid admin-preview-products-grid admin-preview-products-grid--single">' + cardHtml + '</div>' +
+            '</section>';
+    }
+    const galleryScript =
+        '(function(){' +
+            'function initGallery(g){' +
+                'var track=g.querySelector(".product-gallery__track"); if(!track){return;}' +
+                'var slides=Array.prototype.slice.call(g.querySelectorAll(".product-gallery__slide")); if(!slides.length){return;}' +
+                'var dots=Array.prototype.slice.call(g.querySelectorAll(".product-gallery__dot"));' +
+                'var thumbs=Array.prototype.slice.call(g.querySelectorAll(".thumb"));' +
+                'var prev=g.querySelector(".product-gallery__nav--prev");' +
+                'var next=g.querySelector(".product-gallery__nav--next");' +
+                'var idx=0;' +
+                'function render(){' +
+                    'track.style.transform="translateX(-"+(idx*100)+"%)";' +
+                    'dots.forEach(function(b,i){b.classList.toggle("is-active",i===idx);b.setAttribute("aria-selected",i===idx?"true":"false");});' +
+                    'thumbs.forEach(function(b,i){b.classList.toggle("active",i===idx);});' +
+                '}' +
+                'function go(i){var n=slides.length; if(!n){return;} idx=((i%n)+n)%n; render();}' +
+                'if(prev){prev.addEventListener("click",function(){go(idx-1);});}' +
+                'if(next){next.addEventListener("click",function(){go(idx+1);});}' +
+                'dots.forEach(function(b){b.addEventListener("click",function(){go(parseInt(String(b.getAttribute("data-index")||"0"),10)||0);});});' +
+                'thumbs.forEach(function(b){b.addEventListener("click",function(){go(parseInt(String(b.getAttribute("data-gallery-index")||"0"),10)||0);});});' +
+                'render();' +
+            '}' +
+            'Array.prototype.slice.call(document.querySelectorAll(".product-gallery")).forEach(initGallery);' +
+        '})();';
     const doc =
         '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><link rel="stylesheet" href="' +
         adminEscAttr(cssUrl) +
-        '"></head><body class="storefront"><div class="products-grid" style="grid-template-columns:minmax(0,300px);justify-content:center;padding:20px 12px 32px;"><article class="product-card">' +
-        imgBlock +
-        '<div class="product-body"><h3>' +
-        title +
-        '</h3>' +
-        variantHtml +
-        '<div class="price-row"><strong>' +
-        priceStr +
-        '</strong></div><a class="btn" href="#" onclick="return false;">' +
-        viewLbl +
-        '</a></div></article></div></body></html>';
+        '"><style>' +
+        'body.storefront{background:#f1f5f9;}' +
+        '.admin-preview-shell{padding:16px 12px 28px;min-height:100vh;}' +
+        '.admin-preview-section{margin:0 0 18px;}' +
+        '.admin-preview-heading{margin:0 0 10px;font-size:14px;color:#e2e8f0;background:#0f172a;border-radius:8px;padding:8px 10px;}' +
+        '.admin-preview-products-grid{grid-template-columns:repeat(3,minmax(0,300px));justify-content:center;gap:14px;padding:2px 2px 12px;}' +
+        '.admin-preview-products-grid--single{grid-template-columns:minmax(0,300px);}' +
+        '.admin-preview-mode-mobile .admin-preview-mobile-wrap{max-width:390px;margin:0 auto;padding:0 2px;}' +
+        '.admin-preview-mode-mobile .container{padding-inline:8px;}' +
+        '.admin-preview-mode-product .container,.admin-preview-mode-flow .container{padding-inline:6px;}' +
+        '@media (max-width:980px){.admin-preview-products-grid{grid-template-columns:minmax(0,320px);}}' +
+        '</style></head><body class="storefront ' + shellClass + '"><div class="admin-preview-shell">' +
+        contentHtml +
+        '</div><script>' + galleryScript + '</script></body></html>';
     frame.srcdoc = doc;
 }
 
@@ -4187,6 +4488,18 @@ setProductFormEditMode(false);
 orangeClearCatalogAttributeInputs();
 orangeApplyProductBasicStepLocks();
 orangeNormalizeProductTabPanelsNoGap();
+const orangePreviewModeEl = document.getElementById('orangeAdminProductPreviewMode');
+if (orangePreviewModeEl) {
+    orangePreviewModeEl.addEventListener('change', function () {
+        orangeRefreshProductCardPreview();
+    });
+}
+const orangePreviewRefreshNowBtn = document.getElementById('orangeAdminProductPreviewRefreshNow');
+if (orangePreviewRefreshNowBtn) {
+    orangePreviewRefreshNowBtn.addEventListener('click', function () {
+        orangeRefreshProductCardPreview();
+    });
+}
 
 ['name', 'name_en', 'name_fil', 'name_hi', 'price', 'cost'].forEach(function (id) {
     const el = document.getElementById(id);
@@ -4208,6 +4521,7 @@ orangeNormalizeProductTabPanelsNoGap();
         el.addEventListener('cut', refresh);
     }
 });
+orangeScheduleProductCardPreviewRefresh();
 
 (function () {
     const style = document.createElement('style');
