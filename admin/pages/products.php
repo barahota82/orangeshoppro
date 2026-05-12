@@ -2430,7 +2430,7 @@ function orangeRefreshProductCardPreview() {
         '@media (max-width:980px){.admin-preview-products-grid{grid-template-columns:minmax(0,320px);}}' +
         '</style></head><body class="storefront ' + shellClass + '"><div class="admin-preview-shell">' +
         contentHtml +
-        '</div><script>' + galleryScript + '</script></body></html>';
+        '</div><script>' + galleryScript + '<\/script></body></html>';
     frame.srcdoc = doc;
 }
 
