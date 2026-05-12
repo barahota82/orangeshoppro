@@ -19,15 +19,34 @@ try {
     $action = trim((string) ($data['action'] ?? ''));
 
     if ($action === 'list_bundles') {
+        /* اسم العرض: مسودات المكتبة (size_family_id فارغ) تُطابق سياق الحزمة 1–2–3، وليس اشتراط ربط الدليل بعائلة المصدر */
         $sql = 'SELECT b.id, b.name_ar, b.name_en, b.commercial_kind_key, b.source_size_family_id, b.sort_order, b.is_active,
                        b.department_id, b.size_scheme_template_id,
                        sf.name_ar AS source_family_ar, sf.name_en AS source_family_en,
-                       (SELECT g.name_ar FROM advisory_sizing_guides g
-                         WHERE g.size_family_id = b.source_size_family_id
-                         ORDER BY g.sort_order ASC, g.id ASC LIMIT 1) AS first_guide_name_ar,
-                       (SELECT g.name_en FROM advisory_sizing_guides g
-                         WHERE g.size_family_id = b.source_size_family_id
-                         ORDER BY g.sort_order ASC, g.id ASC LIMIT 1) AS first_guide_name_en ';
+                       COALESCE(
+                         (SELECT g.name_ar FROM advisory_sizing_guides g
+                           WHERE (g.size_family_id IS NULL OR g.size_family_id = 0)
+                             AND COALESCE(g.department_id,0) = COALESCE(b.department_id,0)
+                             AND COALESCE(g.size_scheme_template_id,0) = COALESCE(b.size_scheme_template_id,0)
+                             AND g.commercial_kind_key = b.commercial_kind_key
+                           ORDER BY g.sort_order ASC, g.id ASC LIMIT 1),
+                         (SELECT g.name_ar FROM advisory_sizing_guides g
+                           WHERE g.size_family_id = b.source_size_family_id
+                           ORDER BY g.sort_order ASC, g.id ASC LIMIT 1),
+                         b.name_ar
+                       ) AS first_guide_name_ar,
+                       COALESCE(
+                         (SELECT g.name_en FROM advisory_sizing_guides g
+                           WHERE (g.size_family_id IS NULL OR g.size_family_id = 0)
+                             AND COALESCE(g.department_id,0) = COALESCE(b.department_id,0)
+                             AND COALESCE(g.size_scheme_template_id,0) = COALESCE(b.size_scheme_template_id,0)
+                             AND g.commercial_kind_key = b.commercial_kind_key
+                           ORDER BY g.sort_order ASC, g.id ASC LIMIT 1),
+                         (SELECT g.name_en FROM advisory_sizing_guides g
+                           WHERE g.size_family_id = b.source_size_family_id
+                           ORDER BY g.sort_order ASC, g.id ASC LIMIT 1),
+                         b.name_en
+                       ) AS first_guide_name_en ';
         if (orange_table_exists($pdo, 'departments')) {
             $sql .= ', d.name_ar AS dept_ar, d.name_en AS dept_en ';
         } else {
@@ -156,9 +175,21 @@ try {
                     b.name_ar AS bundle_ar, b.name_en AS bundle_en,
                     COALESCE(
                         (SELECT g.name_ar FROM advisory_sizing_guides g
+                         WHERE (g.size_family_id IS NULL OR g.size_family_id = 0)
+                           AND COALESCE(g.department_id,0) = COALESCE(b.department_id,0)
+                           AND COALESCE(g.size_scheme_template_id,0) = COALESCE(b.size_scheme_template_id,0)
+                           AND g.commercial_kind_key = b.commercial_kind_key
+                         ORDER BY g.sort_order ASC, g.id ASC LIMIT 1),
+                        (SELECT g.name_ar FROM advisory_sizing_guides g
                          WHERE g.size_family_id = b.source_size_family_id
                          ORDER BY g.sort_order ASC, g.id ASC LIMIT 1),
                         b.name_ar,
+                        (SELECT g.name_en FROM advisory_sizing_guides g
+                         WHERE (g.size_family_id IS NULL OR g.size_family_id = 0)
+                           AND COALESCE(g.department_id,0) = COALESCE(b.department_id,0)
+                           AND COALESCE(g.size_scheme_template_id,0) = COALESCE(b.size_scheme_template_id,0)
+                           AND g.commercial_kind_key = b.commercial_kind_key
+                         ORDER BY g.sort_order ASC, g.id ASC LIMIT 1),
                         (SELECT g.name_en FROM advisory_sizing_guides g
                          WHERE g.size_family_id = b.source_size_family_id
                          ORDER BY g.sort_order ASC, g.id ASC LIMIT 1),

@@ -3,7 +3,8 @@
 declare(strict_types=1);
 
 /**
- * مكتبة أدلة المقاسات الاسترشادية: حزمة (عائلة مصدر) + ربط عائلة مستهلك → مزامنسخ للأدلة على عائلة المستهلك.
+ * مكتبة أدلة المقاسات الاسترشادية: حزمة (سياق 1–2–3 + عائلة مصدر للنسخ) + ربط عائلة مستهلك → مزامنة نسخ للأدلة على عائلة المستهلك.
+ * مسودات الأدلة في advisory_sizing_guides قد تكون بلا size_family_id؛ عرض أسماء الحزم يعتمد أولاً على اسم النموذج الداخلي لتلك المسودات عند تطابق السياق، وليس على اشتراط ربط الدليل بعائلة.
  *
  * @see docs/archive/ORANGE_ADVISORY_SIZING_LIBRARY_DECISION.md
  */
@@ -258,6 +259,7 @@ function orange_advisory_sizing_library_sync_consumer_from_source(
     $scopes = orange_advisory_sizing_library_scope_kinds();
     try {
         $pdo->beginTransaction();
+        $clonedAny = false;
         foreach ($scopes as $scope) {
             $find = $pdo->prepare(
                 'SELECT g.id FROM advisory_sizing_guides g
@@ -271,6 +273,7 @@ function orange_advisory_sizing_library_sync_consumer_from_source(
             if ($srcGuideId <= 0) {
                 continue;
             }
+            $clonedAny = true;
 
             $findT = $pdo->prepare(
                 'SELECT id FROM advisory_sizing_guides WHERE size_family_id = ? AND scope_kind = ? LIMIT 1'
@@ -282,6 +285,13 @@ function orange_advisory_sizing_library_sync_consumer_from_source(
             }
 
             orange_advisory_sizing_library_clone_guide_to_family($pdo, $srcGuideId, $consumerFamilyId, $map);
+        }
+        if (!$clonedAny) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            return 'لا توجد أدلة محفوظة على عائلة مصدر الحزمة (علوي/سفلي/مفرد) لنسخها — المزامنة تقرأ من عائلة المصدر فقط. المسودات بلا عائلة في جدول الأدلة تظهر في القوائم بالاسم الداخلي لكن لا تُنسخ حتى تُحفظ نسخة مرتبطة بعائلة المصدر.';
         }
         $pdo->commit();
     } catch (Throwable $e) {

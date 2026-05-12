@@ -343,6 +343,29 @@ $asgJson = static function (array $rows): string {
         return String(wizardDeptId()) + '|' + String(wizardTplId()) + '|' + String(wizardCk());
     }
 
+    /** لقطة معالج 1–2–3 لإعادة تطبيقها بعد حفظ/تحديث قوائم (تجنّب فراغ الحقول أو إخفاء المحرّر). */
+    function asgSnapshotWizardTriple() {
+        return { d: wizardDeptId(), t: wizardTplId(), c: wizardCk() };
+    }
+
+    function asgApplyWizardTriple(snap) {
+        if (!snap) {
+            return;
+        }
+        var de = document.getElementById('asg_w_dept');
+        var te = document.getElementById('asg_w_tpl');
+        var ce = document.getElementById('asg_w_ck');
+        if (de && snap.d > 0) {
+            de.value = String(snap.d);
+        }
+        if (te && snap.t > 0) {
+            te.value = String(snap.t);
+        }
+        if (ce && snap.c !== '') {
+            ce.value = snap.c;
+        }
+    }
+
     function asgClearNewEditorFormFields() {
         document.getElementById('asg_edit_id').value = '0';
         var bf = document.getElementById('asg_bound_family');
@@ -1751,14 +1774,21 @@ $asgJson = static function (array $rows): string {
         document.getElementById('asg_editor').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    function openNew() {
+    function openNew(preserveSnap) {
+        if (preserveSnap && preserveSnap.d > 0 && preserveSnap.t > 0 && preserveSnap.c !== '') {
+            asgApplyWizardTriple(preserveSnap);
+        }
         if (!asgWizardTripleComplete()) {
             alert('أكمل اختيار القسم (1) وقالب المقاسات (2) والنوع التجاري (3) قبل «دليل جديد».');
             return;
         }
         asgClearNewEditorFormFields();
+        if (preserveSnap && preserveSnap.d > 0 && preserveSnap.t > 0 && preserveSnap.c !== '') {
+            asgApplyWizardTriple(preserveSnap);
+        }
         document.getElementById('asg_editor').style.display = 'block';
         asgNewEditorWizardSig = asgWizardSigStr();
+        void asgRefreshGuideSortDisp();
     }
 
     document.getElementById('asg_new_btn').onclick = openNew;
@@ -1896,18 +1926,21 @@ $asgJson = static function (array $rows): string {
             alert(res.message || 'خطأ');
             return;
         }
+        var wizardSnap = asgSnapshotWizardTriple();
         alert('تم الحفظ');
         var bf2 = document.getElementById('asg_bound_family');
         if (bf2) {
             bf2.value = f > 0 ? String(f) : '';
         }
-        await loadList();
-        void loadDraftList({ silent: true });
-        openNew();
+        await loadList({ silent: true });
+        await loadDraftList({ silent: true });
+        asgApplyWizardTriple(wizardSnap);
+        openNew(wizardSnap);
         var ed = document.getElementById('asg_editor');
         if (ed) {
             ed.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
+        void asgRefreshResolvedContext();
     };
 
     document.getElementById('asg_cancel_btn').onclick = function () {
