@@ -254,7 +254,7 @@ $count = count($rows);
     <input type="hidden" id="sup_id" value="0">
     <div class="form-grid">
         <div>
-            <label for="sup_code">كود المورد (اختياري)</label>
+            <label for="sup_code">كود المورد (اختياري — يُولَّد تلقائياً عند تركه فارغاً)</label>
             <input type="text" id="sup_code" maxlength="32" autocomplete="off" dir="ltr" lang="en" placeholder="مثال: V-2001">
         </div>
         <div>
@@ -433,7 +433,10 @@ $count = count($rows);
                     <option value="<?php echo $lid; ?>"><?php echo htmlspecialchars($lab, ENT_QUOTES, 'UTF-8'); ?></option>
                 <?php endforeach; ?>
             </select>
-            <p class="card-hint" style="margin:6px 0 0;">أنشئ حساباً فرعياً تحت جذر الخصوم (مثلاً باسم المورد) من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=chart_of_accounts'), ENT_QUOTES, 'UTF-8'); ?>">دليل الحسابات</a> ثم اختره هنا.</p>
+            <div class="actions" style="margin-top:8px;">
+                <button type="button" class="btn-secondary" onclick="supOpenChartOfAccounts()">فتح دليل الحسابات</button>
+            </div>
+            <p class="card-hint" style="margin:6px 0 0;">أنشئ حساباً فرعياً تحت جذر الخصوم (مثلاً باسم المورد) من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=chart_of_accounts'), ENT_QUOTES, 'UTF-8'); ?>">دليل الحسابات</a> ثم اختره هنا. ويمكنك النقر المزدوج على الحقل لفتح الدليل سريعاً.</p>
         </div>
         <?php endif; ?>
     </div>
@@ -567,6 +570,9 @@ $count = count($rows);
 
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/input-constraints.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
+function supOpenChartOfAccounts() {
+    window.open('/admin/index.php?page=chart_of_accounts', '_blank');
+}
 function supPhoneCountryEl() {
     return document.getElementById('sup_phone_country');
 }
@@ -911,7 +917,11 @@ function supSave() {
     }
     postJSON('/admin/api/suppliers/save.php', payload)
         .then(function (r) {
-            alert(r.message || (r.success ? 'تم' : 'فشل'));
+            var msg = r.message || (r.success ? 'تم' : 'فشل');
+            if (r && r.success && r.code) {
+                msg += '\nكود المورد: ' + r.code;
+            }
+            alert(msg);
             if (r.success) {
                 location.reload();
             }
@@ -1159,6 +1169,12 @@ function supChecklistReset() {
     if (btnAuto) btnAuto.addEventListener('click', supChecklistApplyAuto);
     if (btnCopy) btnCopy.addEventListener('click', supChecklistCopySummary);
     if (btnReset) btnReset.addEventListener('click', supChecklistReset);
+    var payableEl = document.getElementById('sup_payable_account_id');
+    if (payableEl) {
+        payableEl.addEventListener('dblclick', function () {
+            supOpenChartOfAccounts();
+        });
+    }
     var blockEl = document.getElementById('sup_is_blocked');
     if (blockEl) {
         blockEl.addEventListener('change', supToggleBlockReasonField);

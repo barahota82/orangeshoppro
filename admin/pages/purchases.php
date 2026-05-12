@@ -51,10 +51,19 @@ if ($purUnifiedCatalogGrouping) {
 }
 
 $hasSupplierIsActive = orange_table_has_column($pdo, 'suppliers', 'is_active');
+$hasSupplierIsBlocked = orange_table_has_column($pdo, 'suppliers', 'is_blocked');
 $suppliers = $pdo->query(
-    $hasSupplierIsActive
-        ? 'SELECT id, name, phone, is_active FROM suppliers ORDER BY is_active DESC, name ASC'
-        : 'SELECT id, name, phone, 1 AS is_active FROM suppliers ORDER BY name ASC'
+    ($hasSupplierIsActive || $hasSupplierIsBlocked)
+        ? (
+            'SELECT id, name, phone, '
+            . ($hasSupplierIsActive ? 'is_active' : '1 AS is_active') . ', '
+            . ($hasSupplierIsBlocked ? 'is_blocked' : '0 AS is_blocked')
+            . ' FROM suppliers ORDER BY '
+            . ($hasSupplierIsActive ? 'is_active DESC, ' : '')
+            . ($hasSupplierIsBlocked ? 'is_blocked ASC, ' : '')
+            . 'name ASC'
+        )
+        : 'SELECT id, name, phone, 1 AS is_active, 0 AS is_blocked FROM suppliers ORDER BY name ASC'
 )->fetchAll(PDO::FETCH_ASSOC);
 
 $variantsByProduct = [];
@@ -110,12 +119,16 @@ $recent = $pdo->query(
                 <?php foreach ($suppliers as $s): ?>
                     <?php
                     $supIsActive = (int) ($s['is_active'] ?? 1) === 1;
+                    $supIsBlocked = (int) ($s['is_blocked'] ?? 0) === 1;
                     $supLabel = (string) ($s['name'] ?? '');
                     if (!$supIsActive) {
                         $supLabel .= ' (غير نشط)';
                     }
+                    if ($supIsBlocked) {
+                        $supLabel .= ' (محظور)';
+                    }
                     ?>
-                    <option value="<?php echo (int)$s['id']; ?>" <?php echo $supIsActive ? '' : 'disabled'; ?>>
+                    <option value="<?php echo (int)$s['id']; ?>" <?php echo ($supIsActive && !$supIsBlocked) ? '' : 'disabled'; ?>>
                         <?php echo htmlspecialchars($supLabel, ENT_QUOTES, 'UTF-8'); ?>
                     </option>
                 <?php endforeach; ?>

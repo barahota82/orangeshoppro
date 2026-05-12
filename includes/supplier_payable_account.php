@@ -70,23 +70,29 @@ function orange_supplier_assert_active_for_purchase(PDO $pdo, int $supplierId): 
     if (!orange_table_exists($pdo, 'suppliers')) {
         throw new RuntimeException('جدول الموردين غير متوفر.');
     }
-    if (!orange_table_has_column($pdo, 'suppliers', 'is_active')) {
-        $stLegacy = $pdo->prepare('SELECT id FROM suppliers WHERE id = ? LIMIT 1');
-        $stLegacy->execute([$supplierId]);
-        if (! $stLegacy->fetchColumn()) {
-            throw new RuntimeException('المورد غير موجود.');
-        }
+    $hasActive = orange_table_has_column($pdo, 'suppliers', 'is_active');
+    $hasBlocked = orange_table_has_column($pdo, 'suppliers', 'is_blocked');
+    $hasBlockReason = orange_table_has_column($pdo, 'suppliers', 'block_reason');
 
-        return;
-    }
-    $st = $pdo->prepare('SELECT is_active FROM suppliers WHERE id = ? LIMIT 1');
+    $cols = ['id'];
+    $cols[] = $hasActive ? 'is_active' : '1 AS is_active';
+    $cols[] = $hasBlocked ? 'is_blocked' : '0 AS is_blocked';
+    $cols[] = $hasBlockReason ? 'block_reason' : 'NULL AS block_reason';
+    $st = $pdo->prepare('SELECT ' . implode(', ', $cols) . ' FROM suppliers WHERE id = ? LIMIT 1');
     $st->execute([$supplierId]);
-    $raw = $st->fetchColumn();
-    if ($raw === false || $raw === null) {
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
         throw new RuntimeException('المورد غير موجود.');
     }
-    if ((int) $raw !== 1) {
+    if ((int) ($row['is_active'] ?? 1) !== 1) {
         throw new RuntimeException('المورد غير نشط. فعّل المورد أولاً ثم احفظ الفاتورة.');
+    }
+    if ((int) ($row['is_blocked'] ?? 0) === 1) {
+        $reason = trim((string) ($row['block_reason'] ?? ''));
+        if ($reason !== '') {
+            throw new RuntimeException('المورد محظور مؤقتاً: ' . $reason);
+        }
+        throw new RuntimeException('المورد محظور مؤقتاً. ألغِ الحظر أولاً ثم احفظ الفاتورة.');
     }
 }
 

@@ -21,6 +21,41 @@ function orange_supplier_normalize_code(PDO $pdo, $raw): ?string
     return function_exists('mb_substr') ? mb_substr($s, 0, 32, 'UTF-8') : substr($s, 0, 32);
 }
 
+function orange_supplier_next_auto_code(PDO $pdo): ?string
+{
+    if (!orange_table_has_column($pdo, 'suppliers', 'code')) {
+        return null;
+    }
+    $rows = $pdo->query('SELECT code FROM suppliers WHERE code IS NOT NULL AND TRIM(code) <> \'\' ORDER BY id DESC LIMIT 5000')
+        ->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    $max = 0;
+    foreach ($rows as $rawCode) {
+        $c = trim((string) $rawCode);
+        if ($c === '') {
+            continue;
+        }
+        if (preg_match_all('/\d+/', $c, $m) && isset($m[0]) && is_array($m[0])) {
+            foreach ($m[0] as $chunk) {
+                $n = (int) $chunk;
+                if ($n > $max) {
+                    $max = $n;
+                }
+            }
+        }
+    }
+    $start = max(1, $max + 1);
+    $chk = $pdo->prepare('SELECT id FROM suppliers WHERE code = ? LIMIT 1');
+    for ($i = $start; $i < $start + 20000; $i++) {
+        $candidate = 'V-' . str_pad((string) $i, 4, '0', STR_PAD_LEFT);
+        $chk->execute([$candidate]);
+        if (!$chk->fetchColumn()) {
+            return $candidate;
+        }
+    }
+
+    return null;
+}
+
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
@@ -58,6 +93,9 @@ try {
     $hasBlockReason = orange_table_has_column($pdo, 'suppliers', 'block_reason');
     $hasAttachmentsJson = orange_table_has_column($pdo, 'suppliers', 'attachments_json');
     $codeSql = orange_supplier_normalize_code($pdo, $data['code'] ?? '');
+    if ($hasCode && $idIn <= 0 && $codeSql === null) {
+        $codeSql = orange_supplier_next_auto_code($pdo);
+    }
     $phoneRaw = trim((string) ($data['phone'] ?? ''));
     $admCcRaw = trim((string) ($data['phone_country'] ?? ''));
     $pcParsed = orange_storefront_parse_api_phone_country($admCcRaw);
@@ -412,7 +450,7 @@ try {
         $params[] = $idIn;
         $pdo->prepare('UPDATE suppliers SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
         audit_log('supplier_update', 'تحديث مورد #' . $idIn . ' — ' . $name, 'suppliers', $idIn);
-        json_response(['success' => true, 'message' => 'تم تحديث بيانات المورد', 'id' => $idIn]);
+        json_response(['success' => true, 'message' => 'تم تحديث بيانات المورد', 'id' => $idIn, 'code' => $codeSql]);
 
         return;
     }
@@ -547,7 +585,7 @@ try {
     $pdo->prepare($sql)->execute($params);
     $newId = (int) $pdo->lastInsertId();
     audit_log('supplier_create', 'مورد جديد: ' . $name, 'suppliers', $newId);
-    json_response(['success' => true, 'message' => 'تم إضافة المورد', 'id' => $newId]);
+    json_response(['success' => true, 'message' => 'تم إضافة المورد', 'id' => $newId, 'code' => $codeSql]);
 } catch (Throwable $e) {
     orange_admin_api_catch($e, 'تعذر حفظ المورد');
 }
