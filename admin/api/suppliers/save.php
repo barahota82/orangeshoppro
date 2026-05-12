@@ -43,6 +43,20 @@ try {
     $hasPaymentTermsDays = orange_table_has_column($pdo, 'suppliers', 'payment_terms_days');
     $hasTaxProfile = orange_table_has_column($pdo, 'suppliers', 'tax_profile');
     $hasTaxNumber = orange_table_has_column($pdo, 'suppliers', 'tax_number');
+    $hasContactPerson = orange_table_has_column($pdo, 'suppliers', 'contact_person');
+    $hasEmail = orange_table_has_column($pdo, 'suppliers', 'email');
+    $hasCommercialReg = orange_table_has_column($pdo, 'suppliers', 'commercial_reg');
+    $hasAddressLine = orange_table_has_column($pdo, 'suppliers', 'address_line');
+    $hasCityArea = orange_table_has_column($pdo, 'suppliers', 'city_area');
+    $hasOpeningBalance = orange_table_has_column($pdo, 'suppliers', 'opening_balance');
+    $hasCreditLimit = orange_table_has_column($pdo, 'suppliers', 'credit_limit');
+    $hasBankName = orange_table_has_column($pdo, 'suppliers', 'bank_name');
+    $hasBankIban = orange_table_has_column($pdo, 'suppliers', 'bank_iban');
+    $hasBankAccountHolder = orange_table_has_column($pdo, 'suppliers', 'bank_account_holder');
+    $hasPreferredWarehouseId = orange_table_has_column($pdo, 'suppliers', 'preferred_warehouse_id');
+    $hasIsBlocked = orange_table_has_column($pdo, 'suppliers', 'is_blocked');
+    $hasBlockReason = orange_table_has_column($pdo, 'suppliers', 'block_reason');
+    $hasAttachmentsJson = orange_table_has_column($pdo, 'suppliers', 'attachments_json');
     $codeSql = orange_supplier_normalize_code($pdo, $data['code'] ?? '');
     $phoneRaw = trim((string) ($data['phone'] ?? ''));
     $admCcRaw = trim((string) ($data['phone_country'] ?? ''));
@@ -140,6 +154,110 @@ try {
         $taxNumberSql = $taxRaw === '' ? null : (function_exists('mb_substr') ? mb_substr($taxRaw, 0, 64, 'UTF-8') : substr($taxRaw, 0, 64));
     }
 
+    $contactPersonSql = null;
+    if ($hasContactPerson) {
+        $raw = trim((string) ($data['contact_person'] ?? ''));
+        $contactPersonSql = $raw === '' ? null : (function_exists('mb_substr') ? mb_substr($raw, 0, 160, 'UTF-8') : substr($raw, 0, 160));
+    }
+
+    $emailSql = null;
+    if ($hasEmail) {
+        $rawEmail = trim((string) ($data['email'] ?? ''));
+        if ($rawEmail !== '') {
+            if (!filter_var($rawEmail, FILTER_VALIDATE_EMAIL)) {
+                json_response(['success' => false, 'message' => 'البريد الإلكتروني غير صالح'], 422);
+            }
+            $emailSql = $rawEmail;
+        }
+    }
+
+    $commercialRegSql = null;
+    if ($hasCommercialReg) {
+        $raw = trim((string) ($data['commercial_reg'] ?? ''));
+        $commercialRegSql = $raw === '' ? null : (function_exists('mb_substr') ? mb_substr($raw, 0, 64, 'UTF-8') : substr($raw, 0, 64));
+    }
+
+    $addressLineSql = null;
+    if ($hasAddressLine) {
+        $raw = trim((string) ($data['address_line'] ?? ''));
+        $addressLineSql = $raw === '' ? null : (function_exists('mb_substr') ? mb_substr($raw, 0, 255, 'UTF-8') : substr($raw, 0, 255));
+    }
+
+    $cityAreaSql = null;
+    if ($hasCityArea) {
+        $raw = trim((string) ($data['city_area'] ?? ''));
+        $cityAreaSql = $raw === '' ? null : (function_exists('mb_substr') ? mb_substr($raw, 0, 160, 'UTF-8') : substr($raw, 0, 160));
+    }
+
+    $openingBalanceSql = null;
+    if ($hasOpeningBalance) {
+        $raw = $data['opening_balance'] ?? null;
+        if ($raw === '' || $raw === null) {
+            $openingBalanceSql = null;
+        } else {
+            $val = round((float) $raw, 4);
+            $openingBalanceSql = abs($val) > 0.0001 ? $val : null;
+        }
+    }
+
+    $creditLimitSql = null;
+    if ($hasCreditLimit) {
+        $raw = $data['credit_limit'] ?? null;
+        if ($raw === '' || $raw === null) {
+            $creditLimitSql = null;
+        } else {
+            $val = round((float) $raw, 4);
+            if ($val < 0) {
+                json_response(['success' => false, 'message' => 'الحد الائتماني يجب أن يكون رقماً موجباً أو صفراً'], 422);
+            }
+            $creditLimitSql = $val > 0.0001 ? $val : null;
+        }
+    }
+
+    $bankNameSql = null;
+    if ($hasBankName) {
+        $raw = trim((string) ($data['bank_name'] ?? ''));
+        $bankNameSql = $raw === '' ? null : (function_exists('mb_substr') ? mb_substr($raw, 0, 160, 'UTF-8') : substr($raw, 0, 160));
+    }
+
+    $bankIbanSql = null;
+    if ($hasBankIban) {
+        $raw = strtoupper(trim((string) ($data['bank_iban'] ?? '')));
+        $bankIbanSql = $raw === '' ? null : (function_exists('mb_substr') ? mb_substr($raw, 0, 64, 'UTF-8') : substr($raw, 0, 64));
+    }
+
+    $bankAccountHolderSql = null;
+    if ($hasBankAccountHolder) {
+        $raw = trim((string) ($data['bank_account_holder'] ?? ''));
+        $bankAccountHolderSql = $raw === '' ? null : (function_exists('mb_substr') ? mb_substr($raw, 0, 160, 'UTF-8') : substr($raw, 0, 160));
+    }
+
+    $preferredWarehouseSql = null;
+    if ($hasPreferredWarehouseId) {
+        $whRaw = isset($data['preferred_warehouse_id']) ? (int) $data['preferred_warehouse_id'] : 0;
+        $preferredWarehouseSql = $whRaw > 0 ? $whRaw : 1;
+    }
+
+    $isBlockedSql = 0;
+    if ($hasIsBlocked) {
+        $isBlockedSql = ((int) ($data['is_blocked'] ?? 0) === 1) ? 1 : 0;
+    }
+
+    $blockReasonSql = null;
+    if ($hasBlockReason) {
+        $raw = trim((string) ($data['block_reason'] ?? ''));
+        $blockReasonSql = $raw === '' ? null : (function_exists('mb_substr') ? mb_substr($raw, 0, 255, 'UTF-8') : substr($raw, 0, 255));
+    }
+    if (($hasIsBlocked || $hasBlockReason) && $isBlockedSql === 1 && $blockReasonSql === null) {
+        json_response(['success' => false, 'message' => 'سبب الحظر مطلوب عند تفعيل حالة الحظر'], 422);
+    }
+
+    $attachmentsJsonSql = null;
+    if ($hasAttachmentsJson) {
+        $raw = trim((string) ($data['attachments_json'] ?? ''));
+        $attachmentsJsonSql = $raw === '' ? null : (function_exists('mb_substr') ? mb_substr($raw, 0, 8000, 'UTF-8') : substr($raw, 0, 8000));
+    }
+
     if ($phoneSql !== null) {
         if ($idIn > 0) {
             $dup = $pdo->prepare('SELECT id FROM suppliers WHERE phone = ? AND id != ? LIMIT 1');
@@ -235,6 +353,62 @@ try {
             $fields[] = 'tax_number = ?';
             $params[] = $taxNumberSql;
         }
+        if ($hasContactPerson) {
+            $fields[] = 'contact_person = ?';
+            $params[] = $contactPersonSql;
+        }
+        if ($hasEmail) {
+            $fields[] = 'email = ?';
+            $params[] = $emailSql;
+        }
+        if ($hasCommercialReg) {
+            $fields[] = 'commercial_reg = ?';
+            $params[] = $commercialRegSql;
+        }
+        if ($hasAddressLine) {
+            $fields[] = 'address_line = ?';
+            $params[] = $addressLineSql;
+        }
+        if ($hasCityArea) {
+            $fields[] = 'city_area = ?';
+            $params[] = $cityAreaSql;
+        }
+        if ($hasOpeningBalance) {
+            $fields[] = 'opening_balance = ?';
+            $params[] = $openingBalanceSql;
+        }
+        if ($hasCreditLimit) {
+            $fields[] = 'credit_limit = ?';
+            $params[] = $creditLimitSql;
+        }
+        if ($hasBankName) {
+            $fields[] = 'bank_name = ?';
+            $params[] = $bankNameSql;
+        }
+        if ($hasBankIban) {
+            $fields[] = 'bank_iban = ?';
+            $params[] = $bankIbanSql;
+        }
+        if ($hasBankAccountHolder) {
+            $fields[] = 'bank_account_holder = ?';
+            $params[] = $bankAccountHolderSql;
+        }
+        if ($hasPreferredWarehouseId) {
+            $fields[] = 'preferred_warehouse_id = ?';
+            $params[] = $preferredWarehouseSql;
+        }
+        if ($hasIsBlocked) {
+            $fields[] = 'is_blocked = ?';
+            $params[] = $isBlockedSql;
+        }
+        if ($hasBlockReason) {
+            $fields[] = 'block_reason = ?';
+            $params[] = $blockReasonSql;
+        }
+        if ($hasAttachmentsJson) {
+            $fields[] = 'attachments_json = ?';
+            $params[] = $attachmentsJsonSql;
+        }
         $params[] = $idIn;
         $pdo->prepare('UPDATE suppliers SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
         audit_log('supplier_update', 'تحديث مورد #' . $idIn . ' — ' . $name, 'suppliers', $idIn);
@@ -298,6 +472,76 @@ try {
         $cols[] = 'tax_number';
         $placeholders[] = '?';
         $params[] = $taxNumberSql;
+    }
+    if ($hasContactPerson) {
+        $cols[] = 'contact_person';
+        $placeholders[] = '?';
+        $params[] = $contactPersonSql;
+    }
+    if ($hasEmail) {
+        $cols[] = 'email';
+        $placeholders[] = '?';
+        $params[] = $emailSql;
+    }
+    if ($hasCommercialReg) {
+        $cols[] = 'commercial_reg';
+        $placeholders[] = '?';
+        $params[] = $commercialRegSql;
+    }
+    if ($hasAddressLine) {
+        $cols[] = 'address_line';
+        $placeholders[] = '?';
+        $params[] = $addressLineSql;
+    }
+    if ($hasCityArea) {
+        $cols[] = 'city_area';
+        $placeholders[] = '?';
+        $params[] = $cityAreaSql;
+    }
+    if ($hasOpeningBalance) {
+        $cols[] = 'opening_balance';
+        $placeholders[] = '?';
+        $params[] = $openingBalanceSql;
+    }
+    if ($hasCreditLimit) {
+        $cols[] = 'credit_limit';
+        $placeholders[] = '?';
+        $params[] = $creditLimitSql;
+    }
+    if ($hasBankName) {
+        $cols[] = 'bank_name';
+        $placeholders[] = '?';
+        $params[] = $bankNameSql;
+    }
+    if ($hasBankIban) {
+        $cols[] = 'bank_iban';
+        $placeholders[] = '?';
+        $params[] = $bankIbanSql;
+    }
+    if ($hasBankAccountHolder) {
+        $cols[] = 'bank_account_holder';
+        $placeholders[] = '?';
+        $params[] = $bankAccountHolderSql;
+    }
+    if ($hasPreferredWarehouseId) {
+        $cols[] = 'preferred_warehouse_id';
+        $placeholders[] = '?';
+        $params[] = $preferredWarehouseSql;
+    }
+    if ($hasIsBlocked) {
+        $cols[] = 'is_blocked';
+        $placeholders[] = '?';
+        $params[] = $isBlockedSql;
+    }
+    if ($hasBlockReason) {
+        $cols[] = 'block_reason';
+        $placeholders[] = '?';
+        $params[] = $blockReasonSql;
+    }
+    if ($hasAttachmentsJson) {
+        $cols[] = 'attachments_json';
+        $placeholders[] = '?';
+        $params[] = $attachmentsJsonSql;
     }
     $sql = 'INSERT INTO suppliers (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $placeholders) . ')';
     $pdo->prepare($sql)->execute($params);

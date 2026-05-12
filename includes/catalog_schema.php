@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 32);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 33);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -2320,6 +2320,20 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
                 payment_terms_days INT NULL,
                 tax_profile VARCHAR(16) NOT NULL DEFAULT \'exempt\',
                 tax_number VARCHAR(64) NULL,
+                contact_person VARCHAR(160) NULL,
+                email VARCHAR(255) NULL,
+                commercial_reg VARCHAR(64) NULL,
+                address_line VARCHAR(255) NULL,
+                city_area VARCHAR(160) NULL,
+                opening_balance DECIMAL(18,4) NULL,
+                credit_limit DECIMAL(18,4) NULL,
+                bank_name VARCHAR(160) NULL,
+                bank_iban VARCHAR(64) NULL,
+                bank_account_holder VARCHAR(160) NULL,
+                preferred_warehouse_id INT NULL,
+                is_blocked TINYINT(1) NOT NULL DEFAULT 0,
+                block_reason VARCHAR(255) NULL,
+                attachments_json TEXT NULL,
                 notes VARCHAR(255) NULL,
                 payable_account_id INT NULL DEFAULT NULL,
                 created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
@@ -2381,6 +2395,90 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             'ALTER TABLE suppliers ADD COLUMN tax_number VARCHAR(64) NULL DEFAULT NULL AFTER tax_profile'
         );
         orange_catalog_safe_exec($pdo, 'CREATE UNIQUE INDEX uq_suppliers_tax_number ON suppliers (tax_number)');
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'contact_person')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN contact_person VARCHAR(160) NULL DEFAULT NULL AFTER tax_number'
+        );
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'email')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN email VARCHAR(255) NULL DEFAULT NULL AFTER contact_person'
+        );
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'commercial_reg')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN commercial_reg VARCHAR(64) NULL DEFAULT NULL AFTER email'
+        );
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'address_line')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN address_line VARCHAR(255) NULL DEFAULT NULL AFTER commercial_reg'
+        );
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'city_area')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN city_area VARCHAR(160) NULL DEFAULT NULL AFTER address_line'
+        );
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'opening_balance')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN opening_balance DECIMAL(18,4) NULL DEFAULT NULL AFTER city_area'
+        );
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'credit_limit')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN credit_limit DECIMAL(18,4) NULL DEFAULT NULL AFTER opening_balance'
+        );
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'bank_name')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN bank_name VARCHAR(160) NULL DEFAULT NULL AFTER credit_limit'
+        );
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'bank_iban')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN bank_iban VARCHAR(64) NULL DEFAULT NULL AFTER bank_name'
+        );
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'bank_account_holder')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN bank_account_holder VARCHAR(160) NULL DEFAULT NULL AFTER bank_iban'
+        );
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'preferred_warehouse_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN preferred_warehouse_id INT NULL DEFAULT NULL AFTER bank_account_holder'
+        );
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'is_blocked')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN is_blocked TINYINT(1) NOT NULL DEFAULT 0 AFTER preferred_warehouse_id'
+        );
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'block_reason')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN block_reason VARCHAR(255) NULL DEFAULT NULL AFTER is_blocked'
+        );
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'attachments_json')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN attachments_json TEXT NULL AFTER block_reason'
+        );
     }
     if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'payable_account_id')) {
         orange_catalog_safe_exec(

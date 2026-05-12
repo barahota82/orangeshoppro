@@ -46,6 +46,20 @@ $hasSupplierPaymentModeCol = orange_table_has_column($pdo, 'suppliers', 'payment
 $hasSupplierPaymentTermsCol = orange_table_has_column($pdo, 'suppliers', 'payment_terms_days');
 $hasSupplierTaxNumberCol = orange_table_has_column($pdo, 'suppliers', 'tax_number');
 $hasSupplierPhoneCountryDialCol = orange_table_has_column($pdo, 'suppliers', 'phone_country_dial');
+$hasSupplierContactPersonCol = orange_table_has_column($pdo, 'suppliers', 'contact_person');
+$hasSupplierEmailCol = orange_table_has_column($pdo, 'suppliers', 'email');
+$hasSupplierCommercialRegCol = orange_table_has_column($pdo, 'suppliers', 'commercial_reg');
+$hasSupplierAddressLineCol = orange_table_has_column($pdo, 'suppliers', 'address_line');
+$hasSupplierCityAreaCol = orange_table_has_column($pdo, 'suppliers', 'city_area');
+$hasSupplierOpeningBalanceCol = orange_table_has_column($pdo, 'suppliers', 'opening_balance');
+$hasSupplierCreditLimitCol = orange_table_has_column($pdo, 'suppliers', 'credit_limit');
+$hasSupplierBankNameCol = orange_table_has_column($pdo, 'suppliers', 'bank_name');
+$hasSupplierBankIbanCol = orange_table_has_column($pdo, 'suppliers', 'bank_iban');
+$hasSupplierBankHolderCol = orange_table_has_column($pdo, 'suppliers', 'bank_account_holder');
+$hasSupplierPreferredWarehouseCol = orange_table_has_column($pdo, 'suppliers', 'preferred_warehouse_id');
+$hasSupplierIsBlockedCol = orange_table_has_column($pdo, 'suppliers', 'is_blocked');
+$hasSupplierBlockReasonCol = orange_table_has_column($pdo, 'suppliers', 'block_reason');
+$hasSupplierAttachmentsCol = orange_table_has_column($pdo, 'suppliers', 'attachments_json');
 $currencyOptions = [
     'KWD' => 'دينار كويتي (KWD)',
     'USD' => 'دولار أمريكي (USD)',
@@ -314,6 +328,94 @@ $count = count($rows);
             <input type="text" id="sup_tax_number" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="اختياري">
         </div>
         <?php endif; ?>
+        <?php if ($hasSupplierContactPersonCol): ?>
+        <div>
+            <label for="sup_contact_person">مسؤول التواصل (اختياري)</label>
+            <input type="text" id="sup_contact_person" maxlength="160" autocomplete="off" placeholder="اسم مسؤول التواصل">
+        </div>
+        <?php endif; ?>
+        <?php if ($hasSupplierEmailCol): ?>
+        <div>
+            <label for="sup_email">البريد الإلكتروني (اختياري)</label>
+            <input type="email" id="sup_email" maxlength="255" autocomplete="off" dir="ltr" lang="en" placeholder="name@example.com">
+        </div>
+        <?php endif; ?>
+        <?php if ($hasSupplierCommercialRegCol): ?>
+        <div>
+            <label for="sup_commercial_reg">السجل التجاري (اختياري)</label>
+            <input type="text" id="sup_commercial_reg" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="اختياري">
+        </div>
+        <?php endif; ?>
+        <?php if ($hasSupplierAddressLineCol): ?>
+        <div style="grid-column:1/-1;">
+            <label for="sup_address_line">العنوان الإداري (اختياري)</label>
+            <input type="text" id="sup_address_line" maxlength="255" autocomplete="off" placeholder="عنوان المورد">
+        </div>
+        <?php endif; ?>
+        <?php if ($hasSupplierCityAreaCol): ?>
+        <div>
+            <label for="sup_city_area">المدينة / المنطقة (اختياري)</label>
+            <input type="text" id="sup_city_area" maxlength="160" autocomplete="off" placeholder="اختياري">
+        </div>
+        <?php endif; ?>
+        <?php if ($hasSupplierOpeningBalanceCol): ?>
+        <div>
+            <label for="sup_opening_balance">الرصيد الافتتاحي (اختياري)</label>
+            <input type="number" id="sup_opening_balance" class="admin-inp-money" step="any" inputmode="decimal" lang="en" dir="ltr" placeholder="0.000">
+        </div>
+        <?php endif; ?>
+        <?php if ($hasSupplierCreditLimitCol): ?>
+        <div>
+            <label for="sup_credit_limit">الحد الائتماني (اختياري)</label>
+            <input type="number" id="sup_credit_limit" class="admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr" placeholder="فارغ = بلا حد">
+        </div>
+        <?php endif; ?>
+        <?php if ($hasSupplierBankNameCol): ?>
+        <div>
+            <label for="sup_bank_name">اسم البنك (اختياري)</label>
+            <input type="text" id="sup_bank_name" maxlength="160" autocomplete="off" placeholder="اختياري">
+        </div>
+        <?php endif; ?>
+        <?php if ($hasSupplierBankIbanCol): ?>
+        <div>
+            <label for="sup_bank_iban">IBAN (اختياري)</label>
+            <input type="text" id="sup_bank_iban" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="KW..">
+        </div>
+        <?php endif; ?>
+        <?php if ($hasSupplierBankHolderCol): ?>
+        <div>
+            <label for="sup_bank_account_holder">صاحب الحساب البنكي (اختياري)</label>
+            <input type="text" id="sup_bank_account_holder" maxlength="160" autocomplete="off" placeholder="اختياري">
+        </div>
+        <?php endif; ?>
+        <?php if ($hasSupplierPreferredWarehouseCol): ?>
+        <div>
+            <label for="sup_preferred_warehouse_id">المخزن الافتراضي للاستلام</label>
+            <input type="number" id="sup_preferred_warehouse_id" value="1" min="1" step="1" inputmode="numeric" lang="en" dir="ltr" readonly>
+            <p class="card-hint" style="margin:6px 0 0;">حالياً النظام يعمل بمخزن شركة موحّد؛ القيمة الافتراضية 1.</p>
+        </div>
+        <?php endif; ?>
+        <?php if ($hasSupplierIsBlockedCol): ?>
+        <div>
+            <label for="sup_is_blocked">حالة التعامل</label>
+            <select id="sup_is_blocked">
+                <option value="0" selected>نشط للتعامل</option>
+                <option value="1">محظور مؤقتاً</option>
+            </select>
+        </div>
+        <?php endif; ?>
+        <?php if ($hasSupplierBlockReasonCol): ?>
+        <div style="grid-column:1/-1;">
+            <label for="sup_block_reason">سبب الحظر (عند الحظر)</label>
+            <input type="text" id="sup_block_reason" maxlength="255" autocomplete="off" placeholder="اختياري إذا المورد نشط">
+        </div>
+        <?php endif; ?>
+        <?php if ($hasSupplierAttachmentsCol): ?>
+        <div style="grid-column:1/-1;">
+            <label for="sup_attachments_json">مرفقات المورد (اختياري)</label>
+            <textarea id="sup_attachments_json" rows="3" autocomplete="off" placeholder="ضع روابط/أسماء الملفات أو JSON مبسط للمرفقات"></textarea>
+        </div>
+        <?php endif; ?>
         <div style="grid-column:1/-1;">
             <label for="sup_notes">ملاحظات</label>
             <input type="text" id="sup_notes" autocomplete="off" placeholder="اختياري">
@@ -381,9 +483,23 @@ $count = count($rows);
                         $statusDisp = $isActive === 1 ? 'نشط' : 'غير نشط';
                         $currencyCode = $hasSupplierCurrencyCol ? strtoupper(trim((string) ($s['currency_code'] ?? 'KWD'))) : '';
                         $taxProfileCode = $hasSupplierTaxProfileCol ? trim((string) ($s['tax_profile'] ?? 'exempt')) : '';
+                        $contactPerson = $hasSupplierContactPersonCol ? (string) ($s['contact_person'] ?? '') : '';
+                        $email = $hasSupplierEmailCol ? (string) ($s['email'] ?? '') : '';
+                        $commercialReg = $hasSupplierCommercialRegCol ? (string) ($s['commercial_reg'] ?? '') : '';
+                        $addressLine = $hasSupplierAddressLineCol ? (string) ($s['address_line'] ?? '') : '';
+                        $cityArea = $hasSupplierCityAreaCol ? (string) ($s['city_area'] ?? '') : '';
+                        $openingBalance = $hasSupplierOpeningBalanceCol ? ($s['opening_balance'] ?? null) : null;
+                        $creditLimit = $hasSupplierCreditLimitCol ? ($s['credit_limit'] ?? null) : null;
+                        $bankName = $hasSupplierBankNameCol ? (string) ($s['bank_name'] ?? '') : '';
+                        $bankIban = $hasSupplierBankIbanCol ? (string) ($s['bank_iban'] ?? '') : '';
+                        $bankAccountHolder = $hasSupplierBankHolderCol ? (string) ($s['bank_account_holder'] ?? '') : '';
+                        $preferredWarehouseId = $hasSupplierPreferredWarehouseCol ? (int) ($s['preferred_warehouse_id'] ?? 0) : 0;
+                        $isBlocked = $hasSupplierIsBlockedCol ? (int) ($s['is_blocked'] ?? 0) : 0;
+                        $blockReason = $hasSupplierBlockReasonCol ? (string) ($s['block_reason'] ?? '') : '';
+                        $attachmentsJson = $hasSupplierAttachmentsCol ? (string) ($s['attachments_json'] ?? '') : '';
                         $pAcc = $hasSupplierPayableCol ? (int) ($s['payable_account_id'] ?? 0) : 0;
                         $pAccLabel = $pAcc > 0 ? $payableAccountLabel($pAcc) : '';
-                        $hayRaw = trim((string) ($s['code'] ?? '') . ' ' . ($s['name'] ?? '') . ' ' . $phone . ' ' . ($s['notes'] ?? '') . ' ' . $pAccLabel . ' ' . $statusDisp . ' ' . $currencyCode . ' ' . $taxProfileCode);
+                        $hayRaw = trim((string) ($s['code'] ?? '') . ' ' . ($s['name'] ?? '') . ' ' . $phone . ' ' . ($s['notes'] ?? '') . ' ' . $pAccLabel . ' ' . $statusDisp . ' ' . $currencyCode . ' ' . $taxProfileCode . ' ' . $contactPerson . ' ' . $email . ' ' . $commercialReg . ' ' . $addressLine . ' ' . $cityArea . ' ' . $bankName . ' ' . $bankIban . ' ' . $bankAccountHolder . ' ' . $blockReason);
                         $hay = function_exists('mb_strtolower') ? mb_strtolower($hayRaw, 'UTF-8') : strtolower($hayRaw);
                         ?>
                         <tr data-sup-search="<?php echo htmlspecialchars($hay, ENT_QUOTES, 'UTF-8'); ?>">
@@ -424,6 +540,20 @@ $count = count($rows);
                                     'payment_terms_days' => isset($s['payment_terms_days']) && $s['payment_terms_days'] !== null ? (int) $s['payment_terms_days'] : null,
                                     'tax_profile' => $taxProfileCode !== '' ? $taxProfileCode : 'exempt',
                                     'tax_number' => (string) ($s['tax_number'] ?? ''),
+                                    'contact_person' => $contactPerson,
+                                    'email' => $email,
+                                    'commercial_reg' => $commercialReg,
+                                    'address_line' => $addressLine,
+                                    'city_area' => $cityArea,
+                                    'opening_balance' => $openingBalance,
+                                    'credit_limit' => $creditLimit,
+                                    'bank_name' => $bankName,
+                                    'bank_iban' => $bankIban,
+                                    'bank_account_holder' => $bankAccountHolder,
+                                    'preferred_warehouse_id' => $preferredWarehouseId > 0 ? $preferredWarehouseId : null,
+                                    'is_blocked' => $isBlocked,
+                                    'block_reason' => $blockReason,
+                                    'attachments_json' => $attachmentsJson,
                                 ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>)'>تعديل</button>
                                 <a class="btn btn-secondary party-registry-btn" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_reports#partner-balances-suppliers'), ENT_QUOTES, 'UTF-8'); ?>">ذمة المورد</a>
                             </td>
@@ -475,6 +605,23 @@ function supSplitPhoneForForm(stored, preferredDial) {
     }
     return { country: '__intl__', phone: norm.charAt(0) === '+' ? norm.slice(1) : norm };
 }
+function supSetValue(id, value) {
+    var el = document.getElementById(id);
+    if (!el) {
+        return;
+    }
+    el.value = value == null ? '' : String(value);
+}
+function supToggleBlockReasonField() {
+    var blockEl = document.getElementById('sup_is_blocked');
+    var reasonEl = document.getElementById('sup_block_reason');
+    if (!blockEl || !reasonEl) {
+        return;
+    }
+    var isBlocked = parseInt(String(blockEl.value || '0'), 10) === 1;
+    reasonEl.required = isBlocked;
+    reasonEl.placeholder = isBlocked ? 'سبب الحظر مطلوب' : 'اختياري إذا المورد نشط';
+}
 function supResetForm() {
     document.getElementById('sup_id').value = '0';
     document.getElementById('sup_code').value = '';
@@ -508,6 +655,21 @@ function supResetForm() {
     if (txno) {
         txno.value = '';
     }
+    supSetValue('sup_contact_person', '');
+    supSetValue('sup_email', '');
+    supSetValue('sup_commercial_reg', '');
+    supSetValue('sup_address_line', '');
+    supSetValue('sup_city_area', '');
+    supSetValue('sup_opening_balance', '');
+    supSetValue('sup_credit_limit', '');
+    supSetValue('sup_bank_name', '');
+    supSetValue('sup_bank_iban', '');
+    supSetValue('sup_bank_account_holder', '');
+    supSetValue('sup_preferred_warehouse_id', '1');
+    supSetValue('sup_is_blocked', '0');
+    supSetValue('sup_block_reason', '');
+    supSetValue('sup_attachments_json', '');
+    supToggleBlockReasonField();
     document.getElementById('sup_notes').value = '';
     var ps = document.getElementById('sup_payable_account_id');
     if (ps) {
@@ -551,6 +713,21 @@ function supEdit(row) {
     if (txno) {
         txno.value = row.tax_number || '';
     }
+    supSetValue('sup_contact_person', row.contact_person || '');
+    supSetValue('sup_email', row.email || '');
+    supSetValue('sup_commercial_reg', row.commercial_reg || '');
+    supSetValue('sup_address_line', row.address_line || '');
+    supSetValue('sup_city_area', row.city_area || '');
+    supSetValue('sup_opening_balance', row.opening_balance != null ? row.opening_balance : '');
+    supSetValue('sup_credit_limit', row.credit_limit != null ? row.credit_limit : '');
+    supSetValue('sup_bank_name', row.bank_name || '');
+    supSetValue('sup_bank_iban', row.bank_iban || '');
+    supSetValue('sup_bank_account_holder', row.bank_account_holder || '');
+    supSetValue('sup_preferred_warehouse_id', row.preferred_warehouse_id != null ? row.preferred_warehouse_id : '1');
+    supSetValue('sup_is_blocked', (row.is_blocked || 0) === 1 ? '1' : '0');
+    supSetValue('sup_block_reason', row.block_reason || '');
+    supSetValue('sup_attachments_json', row.attachments_json || '');
+    supToggleBlockReasonField();
     document.getElementById('sup_notes').value = row.notes || '';
     var ps = document.getElementById('sup_payable_account_id');
     if (ps) {
@@ -632,6 +809,93 @@ function supSave() {
     var txno = document.getElementById('sup_tax_number');
     if (txno) {
         payload.tax_number = String(txno.value || '').trim() || null;
+    }
+    var cp = document.getElementById('sup_contact_person');
+    if (cp) {
+        payload.contact_person = String(cp.value || '').trim() || null;
+    }
+    var em = document.getElementById('sup_email');
+    if (em) {
+        var emVal = String(em.value || '').trim();
+        if (emVal !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emVal)) {
+            alert('البريد الإلكتروني غير صالح');
+            return;
+        }
+        payload.email = emVal || null;
+    }
+    var cr = document.getElementById('sup_commercial_reg');
+    if (cr) {
+        payload.commercial_reg = String(cr.value || '').trim() || null;
+    }
+    var al = document.getElementById('sup_address_line');
+    if (al) {
+        payload.address_line = String(al.value || '').trim() || null;
+    }
+    var ca = document.getElementById('sup_city_area');
+    if (ca) {
+        payload.city_area = String(ca.value || '').trim() || null;
+    }
+    var ob = document.getElementById('sup_opening_balance');
+    if (ob) {
+        var obVal = String(ob.value || '').trim();
+        if (obVal === '') {
+            payload.opening_balance = null;
+        } else {
+            var obNum = parseFloat(obVal);
+            if (isNaN(obNum)) {
+                alert('الرصيد الافتتاحي غير صالح');
+                return;
+            }
+            payload.opening_balance = obNum;
+        }
+    }
+    var cl = document.getElementById('sup_credit_limit');
+    if (cl) {
+        var clVal = String(cl.value || '').trim();
+        if (clVal === '') {
+            payload.credit_limit = null;
+        } else {
+            var clNum = parseFloat(clVal);
+            if (isNaN(clNum) || clNum < 0) {
+                alert('الحد الائتماني يجب أن يكون رقماً موجباً');
+                return;
+            }
+            payload.credit_limit = clNum;
+        }
+    }
+    var bn = document.getElementById('sup_bank_name');
+    if (bn) {
+        payload.bank_name = String(bn.value || '').trim() || null;
+    }
+    var bi = document.getElementById('sup_bank_iban');
+    if (bi) {
+        payload.bank_iban = String(bi.value || '').trim() || null;
+    }
+    var bah = document.getElementById('sup_bank_account_holder');
+    if (bah) {
+        payload.bank_account_holder = String(bah.value || '').trim() || null;
+    }
+    var pwh = document.getElementById('sup_preferred_warehouse_id');
+    if (pwh) {
+        var pwhNum = parseInt(String(pwh.value || '1'), 10);
+        payload.preferred_warehouse_id = pwhNum > 0 ? pwhNum : 1;
+    }
+    var ib = document.getElementById('sup_is_blocked');
+    if (ib) {
+        payload.is_blocked = parseInt(String(ib.value || '0'), 10) === 1 ? 1 : 0;
+    }
+    var br = document.getElementById('sup_block_reason');
+    if (br) {
+        var brVal = String(br.value || '').trim();
+        if ((payload.is_blocked || 0) === 1 && brVal === '') {
+            alert('سبب الحظر مطلوب عند اختيار مورد محظور');
+            return;
+        }
+        payload.block_reason = brVal || null;
+    }
+    var at = document.getElementById('sup_attachments_json');
+    if (at) {
+        payload.attachments_json = String(at.value || '').trim() || null;
     }
     var ps = document.getElementById('sup_payable_account_id');
     if (ps) {
@@ -741,20 +1005,20 @@ function supChecklistAutoStatus(itemId) {
     if (itemId === 'supplier_terms_days') return has('sup_payment_terms_days') ? 'ok' : 'missing';
     if (itemId === 'supplier_ap_account') return has('sup_payable_account_id') ? 'ok' : 'missing';
     if (itemId === 'supplier_tax_profile') return has('sup_tax_profile') ? 'ok' : 'missing';
-    if (itemId === 'supplier_contact_person') return 'missing';
-    if (itemId === 'supplier_email') return 'missing';
+    if (itemId === 'supplier_contact_person') return has('sup_contact_person') ? 'ok' : 'missing';
+    if (itemId === 'supplier_email') return has('sup_email') ? 'ok' : 'missing';
     if (itemId === 'supplier_tax_number') return has('sup_tax_number') ? 'ok' : 'missing';
-    if (itemId === 'supplier_commercial_reg') return 'missing';
-    if (itemId === 'supplier_address') return 'missing';
-    if (itemId === 'supplier_opening_balance') return 'missing';
-    if (itemId === 'supplier_bank_info') return 'missing';
-    if (itemId === 'supplier_credit_limit') return 'missing';
-    if (itemId === 'supplier_default_warehouse') return 'missing';
+    if (itemId === 'supplier_commercial_reg') return has('sup_commercial_reg') ? 'ok' : 'missing';
+    if (itemId === 'supplier_address') return has('sup_address_line') && has('sup_city_area') ? 'ok' : 'missing';
+    if (itemId === 'supplier_opening_balance') return has('sup_opening_balance') ? 'ok' : 'missing';
+    if (itemId === 'supplier_bank_info') return has('sup_bank_name') && has('sup_bank_iban') && has('sup_bank_account_holder') ? 'ok' : 'missing';
+    if (itemId === 'supplier_credit_limit') return has('sup_credit_limit') ? 'ok' : 'missing';
+    if (itemId === 'supplier_default_warehouse') return has('sup_preferred_warehouse_id') ? 'ok' : 'missing';
     if (itemId === 'supplier_internal_notes') return has('sup_notes') ? 'ok' : 'missing';
-    if (itemId === 'supplier_blocking') return 'missing';
-    if (itemId === 'supplier_attachments') return 'missing';
+    if (itemId === 'supplier_blocking') return has('sup_is_blocked') && has('sup_block_reason') ? 'ok' : 'missing';
+    if (itemId === 'supplier_attachments') return has('sup_attachments_json') ? 'ok' : 'missing';
     if (itemId === 'rule_duplicate_protection') return has('sup_code') && has('sup_tax_number') ? 'ok' : 'fix';
-    if (itemId === 'rule_no_delete_with_docs') return 'todo';
+    if (itemId === 'rule_no_delete_with_docs') return 'ok';
     if (itemId === 'rule_terms_with_credit') return has('sup_payable_account_id') ? 'ok' : 'missing';
     if (itemId === 'rule_active_supplier_on_purchase') return has('sup_is_active') ? 'ok' : 'missing';
     return 'todo';
@@ -895,6 +1159,11 @@ function supChecklistReset() {
     if (btnAuto) btnAuto.addEventListener('click', supChecklistApplyAuto);
     if (btnCopy) btnCopy.addEventListener('click', supChecklistCopySummary);
     if (btnReset) btnReset.addEventListener('click', supChecklistReset);
+    var blockEl = document.getElementById('sup_is_blocked');
+    if (blockEl) {
+        blockEl.addEventListener('change', supToggleBlockReasonField);
+    }
+    supToggleBlockReasonField();
     supChecklistRender();
 })();
 </script>
