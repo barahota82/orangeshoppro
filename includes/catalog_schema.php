@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 30);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 31);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -944,18 +944,21 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
                 $pdo,
                 'ALTER TABLE advisory_sizing_guides ADD COLUMN department_id INT NULL DEFAULT NULL AFTER size_family_id'
             );
+            orange_schema_invalidate_column_check('advisory_sizing_guides', 'department_id');
         }
         if (!orange_table_has_column($pdo, 'advisory_sizing_guides', 'size_scheme_template_id')) {
             orange_catalog_safe_exec(
                 $pdo,
                 'ALTER TABLE advisory_sizing_guides ADD COLUMN size_scheme_template_id INT NULL DEFAULT NULL AFTER department_id'
             );
+            orange_schema_invalidate_column_check('advisory_sizing_guides', 'size_scheme_template_id');
         }
         if (!orange_table_has_column($pdo, 'advisory_sizing_guides', 'commercial_kind_key')) {
             orange_catalog_safe_exec(
                 $pdo,
                 'ALTER TABLE advisory_sizing_guides ADD COLUMN commercial_kind_key VARCHAR(32) NOT NULL DEFAULT \'\' AFTER size_scheme_template_id'
             );
+            orange_schema_invalidate_column_check('advisory_sizing_guides', 'commercial_kind_key');
         }
         if (orange_table_has_column($pdo, 'advisory_sizing_guides', 'size_scheme_template_id')
             && orange_table_has_column($pdo, 'advisory_sizing_guides', 'commercial_kind_key')) {
@@ -1001,12 +1004,14 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             $pdo,
             'ALTER TABLE advisory_sizing_guide_columns ADD COLUMN storage_measure VARCHAR(16) NOT NULL DEFAULT \'\' AFTER unit_hint'
         );
+        orange_schema_invalidate_column_check('advisory_sizing_guide_columns', 'storage_measure');
     }
     if (orange_table_exists($pdo, 'advisory_sizing_guide_columns') && !orange_table_has_column($pdo, 'advisory_sizing_guide_columns', 'display_system')) {
         orange_catalog_safe_exec(
             $pdo,
             'ALTER TABLE advisory_sizing_guide_columns ADD COLUMN display_system VARCHAR(32) NOT NULL DEFAULT \'\' AFTER storage_measure'
         );
+        orange_schema_invalidate_column_check('advisory_sizing_guide_columns', 'display_system');
     }
     if (orange_table_exists($pdo, 'advisory_sizing_guide_columns') && orange_table_has_column($pdo, 'advisory_sizing_guide_columns', 'display_system')) {
         $stDsysMl = $pdo->query(

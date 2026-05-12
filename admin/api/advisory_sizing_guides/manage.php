@@ -93,6 +93,22 @@ function orange_advisory_api_rollback_safe(PDO $pdo): void
  */
 function orange_advisory_api_save_schema_ready(PDO $pdo): ?string
 {
+    // بعد orange_catalog_ensure_schema قد يُضاف عمود في نفس الطلب؛ كاش orange_table_has_column قد يبقى قديماً.
+    $needInvalidate = [
+        ['advisory_sizing_guides', 'department_id'],
+        ['advisory_sizing_guides', 'size_scheme_template_id'],
+        ['advisory_sizing_guides', 'commercial_kind_key'],
+        ['advisory_sizing_guide_columns', 'label_fil'],
+        ['advisory_sizing_guide_columns', 'label_hi'],
+        ['advisory_sizing_guide_columns', 'storage_measure'],
+        ['advisory_sizing_guide_columns', 'display_system'],
+        ['advisory_sizing_guide_rows', 'size_family_size_id'],
+        ['advisory_sizing_guide_cells', 'cell_value'],
+    ];
+    foreach ($needInvalidate as $pair) {
+        orange_schema_invalidate_column_check($pair[0], $pair[1]);
+    }
+
     $need = [
         ['advisory_sizing_guides', 'department_id'],
         ['advisory_sizing_guides', 'size_scheme_template_id'],
