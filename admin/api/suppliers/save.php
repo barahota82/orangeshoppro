@@ -59,6 +59,9 @@ function orange_supplier_next_auto_code(PDO $pdo): ?string
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
+    if (function_exists('orange_catalog_ensure_schema_core')) {
+        orange_catalog_ensure_schema_core($pdo);
+    }
     if (!orange_table_exists($pdo, 'suppliers')) {
         json_response(['success' => false, 'message' => 'جدول الموردين غير متوفر'], 500);
     }

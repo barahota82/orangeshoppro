@@ -4266,6 +4266,7 @@ async function saveProduct() {
         has_colors: parseInt(document.getElementById('has_colors').value, 10),
         size_family_id: parseInt(document.getElementById('size_family_id').value, 10) || 0,
         ...orangeProductSizingSaveFields(),
+        is_active: parseInt(document.getElementById('product_is_active').value, 10),
         extra_images: window.PRODUCT_EXTRA_IMAGES || [],
         item_code: (document.getElementById('product_item_code') && document.getElementById('product_item_code').value.trim()) || '',
         barcode: (document.getElementById('product_barcode') && document.getElementById('product_barcode').value.trim()) || '',

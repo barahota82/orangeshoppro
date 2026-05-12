@@ -63,6 +63,7 @@ try {
     }
 
     $hasColors = (int)($data['has_colors'] ?? 0) === 1;
+    $isActiveSql = ((int) ($data['is_active'] ?? 1) === 1) ? 1 : 0;
 
     $sizeFamilyId = isset($data['size_family_id']) ? (int)$data['size_family_id'] : 0;
     if ($sizeFamilyId <= 0) {
@@ -273,7 +274,8 @@ try {
     $execParams[] = $barcodeIns;
 
     $columnNamesWithMeta = array_merge($columnNames, ['is_active', 'created_at']);
-    $placeholdersBody = implode(', ', array_fill(0, count($execParams), '?')) . ', 1, NOW()';
+    $execParams[] = $isActiveSql;
+    $placeholdersBody = implode(', ', array_fill(0, count($execParams), '?')) . ', NOW()';
     $stmt = $pdo->prepare(
         'INSERT INTO products (' . implode(', ', $columnNamesWithMeta) . ') VALUES (' . $placeholdersBody . ')'
     );

@@ -9,6 +9,14 @@ require_once __DIR__ . '/../../includes/storefront_phone_country_select.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+$supplierSchemaBootstrapError = '';
+if (function_exists('orange_catalog_ensure_schema_core')) {
+    try {
+        orange_catalog_ensure_schema_core($pdo);
+    } catch (Throwable $e) {
+        $supplierSchemaBootstrapError = trim((string) $e->getMessage());
+    }
+}
 
 $leafAccountOptions = [];
 $supplierPayablePickAccounts = [];
@@ -60,6 +68,36 @@ $hasSupplierPreferredWarehouseCol = orange_table_has_column($pdo, 'suppliers', '
 $hasSupplierIsBlockedCol = orange_table_has_column($pdo, 'suppliers', 'is_blocked');
 $hasSupplierBlockReasonCol = orange_table_has_column($pdo, 'suppliers', 'block_reason');
 $hasSupplierAttachmentsCol = orange_table_has_column($pdo, 'suppliers', 'attachments_json');
+$supplierSchemaMissingCols = [];
+$supplierSchemaMap = [
+    'payable_account_id' => $hasSupplierPayableCol,
+    'is_active' => $hasSupplierIsActiveCol,
+    'phone_country_dial' => $hasSupplierPhoneCountryDialCol,
+    'currency_code' => $hasSupplierCurrencyCol,
+    'tax_profile' => $hasSupplierTaxProfileCol,
+    'payment_mode' => $hasSupplierPaymentModeCol,
+    'payment_terms_days' => $hasSupplierPaymentTermsCol,
+    'tax_number' => $hasSupplierTaxNumberCol,
+    'contact_person' => $hasSupplierContactPersonCol,
+    'email' => $hasSupplierEmailCol,
+    'commercial_reg' => $hasSupplierCommercialRegCol,
+    'address_line' => $hasSupplierAddressLineCol,
+    'city_area' => $hasSupplierCityAreaCol,
+    'opening_balance' => $hasSupplierOpeningBalanceCol,
+    'credit_limit' => $hasSupplierCreditLimitCol,
+    'bank_name' => $hasSupplierBankNameCol,
+    'bank_iban' => $hasSupplierBankIbanCol,
+    'bank_account_holder' => $hasSupplierBankHolderCol,
+    'preferred_warehouse_id' => $hasSupplierPreferredWarehouseCol,
+    'is_blocked' => $hasSupplierIsBlockedCol,
+    'block_reason' => $hasSupplierBlockReasonCol,
+    'attachments_json' => $hasSupplierAttachmentsCol,
+];
+foreach ($supplierSchemaMap as $colName => $isAvailable) {
+    if (!$isAvailable) {
+        $supplierSchemaMissingCols[] = $colName;
+    }
+}
 $currencyOptions = [
     'KWD' => 'دينار كويتي (KWD)',
     'USD' => 'دولار أمريكي (USD)',
@@ -116,6 +154,26 @@ $count = count($rows);
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment'), ENT_QUOTES, 'UTF-8'); ?>">سداد فواتير مشتريات آجلة</a>
     </div>
 </div>
+
+<?php if ($supplierSchemaBootstrapError !== '' || $supplierSchemaMissingCols): ?>
+<div class="card" style="border:1px solid #fbbf24; background:#fffbeb; color:#92400e;">
+    <h3 style="margin-top:0;">تنبيه مخطط الموردين</h3>
+    <p class="card-hint" style="margin:6px 0 0; color:#92400e;">
+        تم تشغيل ترقية مخطط الموردين تلقائياً عند فتح الصفحة. إذا استمرت خانات ناقصة، فغالباً ترحيل القاعدة لم يكتمل (صلاحيات ALTER أو كاش PHP).
+    </p>
+    <?php if ($supplierSchemaBootstrapError !== ''): ?>
+        <p class="card-hint" style="margin:6px 0 0; color:#7c2d12;">
+            رسالة النظام: <code dir="ltr"><?php echo htmlspecialchars($supplierSchemaBootstrapError, ENT_QUOTES, 'UTF-8'); ?></code>
+        </p>
+    <?php endif; ?>
+    <?php if ($supplierSchemaMissingCols): ?>
+        <p class="card-hint" style="margin:6px 0 0; color:#7c2d12;">
+            أعمدة لم تظهر بعد في القاعدة:
+            <code dir="ltr"><?php echo htmlspecialchars(implode(', ', $supplierSchemaMissingCols), ENT_QUOTES, 'UTF-8'); ?></code>
+        </p>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
 
 <div class="party-registry-stats">
     <div class="party-registry-stat">

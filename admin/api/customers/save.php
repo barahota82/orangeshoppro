@@ -39,6 +39,7 @@ try {
     $admCcRaw = trim((string) ($data['phone_country'] ?? ''));
     $pcParsed = orange_storefront_parse_api_phone_country($admCcRaw);
     $dialForNational = ($pcParsed['dial'] ?? '') !== '' ? $pcParsed['dial'] : null;
+    $isFullIntl = (bool) ($pcParsed['full_intl'] ?? false);
     $phone = orange_normalize_customer_phone($phoneRaw, $dialForNational, $pcParsed['full_intl']);
     if ($phone === null) {
         json_response(['success' => false, 'message' => 'رقم الهاتف غير صالح. استخدم + أو 00 مع كود الدولة، أو اختر الدولة وأدخل الرقم الوطني (8–14 رقماً مع الكود).'], 422);
@@ -54,7 +55,18 @@ try {
     $hasArea = orange_table_has_column($pdo, 'customers', 'area');
     $hasAddress = orange_table_has_column($pdo, 'customers', 'address');
     $hasEmail = orange_table_has_column($pdo, 'customers', 'email');
+    $hasPhoneCountryDial = orange_table_has_column($pdo, 'customers', 'phone_country_dial');
+    $hasPhoneNational = orange_table_has_column($pdo, 'customers', 'phone_national');
     $codeSql = orange_customer_normalize_code($pdo, $data['code'] ?? '');
+    $phoneDialSql = null;
+    $phoneNationalSql = null;
+    if ($hasPhoneCountryDial) {
+        $phoneDialSql = $isFullIntl ? null : ($dialForNational !== null ? (string) $dialForNational : null);
+    }
+    if ($hasPhoneNational && !$isFullIntl) {
+        $nat = preg_replace('/\D+/', '', $phoneRaw);
+        $phoneNationalSql = ($nat !== null && $nat !== '') ? $nat : null;
+    }
 
     $area = trim((string) ($data['area'] ?? ''));
     $area = function_exists('mb_substr') ? mb_substr($area, 0, 255, 'UTF-8') : substr($area, 0, 255);
@@ -113,6 +125,14 @@ try {
 
         $fields = ['name_ar = ?', 'phone = ?'];
         $params = [$name, $phone];
+        if ($hasPhoneCountryDial) {
+            $fields[] = 'phone_country_dial = ?';
+            $params[] = $phoneDialSql;
+        }
+        if ($hasPhoneNational) {
+            $fields[] = 'phone_national = ?';
+            $params[] = $phoneNationalSql;
+        }
         if ($hasArea) {
             $fields[] = 'area = ?';
             $params[] = $area;
@@ -153,6 +173,14 @@ try {
         $assertCodeUnique($id);
         $fields = ['name_ar = ?'];
         $params = [$name];
+        if ($hasPhoneCountryDial) {
+            $fields[] = 'phone_country_dial = ?';
+            $params[] = $phoneDialSql;
+        }
+        if ($hasPhoneNational) {
+            $fields[] = 'phone_national = ?';
+            $params[] = $phoneNationalSql;
+        }
         if ($hasArea) {
             $fields[] = 'area = ?';
             $params[] = $area;
@@ -189,6 +217,16 @@ try {
     $cols = ['name_ar', 'phone'];
     $placeholders = ['?', '?'];
     $params = [$name, $phone];
+    if ($hasPhoneCountryDial) {
+        $cols[] = 'phone_country_dial';
+        $placeholders[] = '?';
+        $params[] = $phoneDialSql;
+    }
+    if ($hasPhoneNational) {
+        $cols[] = 'phone_national';
+        $placeholders[] = '?';
+        $params[] = $phoneNationalSql;
+    }
     if ($hasArea) {
         $cols[] = 'area';
         $placeholders[] = '?';
