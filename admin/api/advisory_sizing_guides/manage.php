@@ -75,6 +75,70 @@ function orange_advisory_guide_validate_scope_api(PDO $pdo, int $deptId, int $tp
     return null;
 }
 
+function orange_advisory_api_rollback_safe(PDO $pdo): void
+{
+    try {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+    } catch (Throwable $e) {
+        // لا نرمي للأعلى — تجنّب إخفاء سبب الخطأ الأصلي أو كسر json_response
+    }
+}
+
+/**
+ * أعمدة يجب أن تكون موجودة قبل INSERT/UPDATE الحفظ (تجنّب أخطاء SQL غامضة).
+ *
+ * @return string|null null عند الجاهزية، أو رسالة عربية للمستخدم
+ */
+function orange_advisory_api_save_schema_ready(PDO $pdo): ?string
+{
+    $need = [
+        ['advisory_sizing_guides', 'department_id'],
+        ['advisory_sizing_guides', 'size_scheme_template_id'],
+        ['advisory_sizing_guides', 'commercial_kind_key'],
+        ['advisory_sizing_guide_columns', 'label_fil'],
+        ['advisory_sizing_guide_columns', 'label_hi'],
+        ['advisory_sizing_guide_columns', 'storage_measure'],
+        ['advisory_sizing_guide_columns', 'display_system'],
+        ['advisory_sizing_guide_rows', 'size_family_size_id'],
+        ['advisory_sizing_guide_cells', 'cell_value'],
+    ];
+    foreach ($need as $pair) {
+        [$t, $c] = $pair;
+        if (!orange_table_exists($pdo, $t)) {
+            return 'جدول ' . $t . ' غير موجود — حدّث المخطط أو شغّل ترحيل الكتالوج.';
+        }
+        if (!orange_table_has_column($pdo, $t, $c)) {
+            return 'العمود ' . $t . '.' . $c . ' غير موجود — حدّث المخطط أو شغّل includes/catalog_schema على السيرفر.';
+        }
+    }
+
+    return null;
+}
+
+function orange_advisory_api_trunc_utf8(string $s, int $maxLen): string
+{
+    if ($maxLen <= 0) {
+        return '';
+    }
+    if ($s === '') {
+        return '';
+    }
+    if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+        if (mb_strlen($s, 'UTF-8') <= $maxLen) {
+            return $s;
+        }
+
+        return mb_substr($s, 0, $maxLen, 'UTF-8');
+    }
+    if (strlen($s) <= $maxLen) {
+        return $s;
+    }
+
+    return substr($s, 0, $maxLen);
+}
+
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
@@ -328,12 +392,16 @@ try {
                 $pdo->prepare('DELETE FROM advisory_sizing_guides WHERE id = ?')->execute([$id]);
                 $pdo->commit();
             } catch (Throwable $e) {
-                $pdo->rollBack();
+                orange_advisory_api_rollback_safe($pdo);
                 throw $e;
             }
             json_response(['success' => true]);
 
         case 'save':
+            $schemaReady = orange_advisory_api_save_schema_ready($pdo);
+            if ($schemaReady !== null) {
+                json_response(['success' => false, 'message' => $schemaReady], 503);
+            }
             $id = (int) ($data['id'] ?? 0);
             $fidRaw = (int) ($data['size_family_id'] ?? 0);
             $boundFamily = $fidRaw > 0;
@@ -411,7 +479,7 @@ try {
                     }
                 }
             }
-            $nameAr = trim((string) ($data['name_ar'] ?? ''));
+            $nameAr = orange_advisory_api_trunc_utf8(trim((string) ($data['name_ar'] ?? '')), 191);
             if ($nameAr === '') {
                 json_response(['success' => false, 'message' => 'اسم النموذج الداخلي (عربي) إلزامي'], 422);
             }
@@ -456,14 +524,14 @@ try {
                     $vk = 'number';
                 }
                 $normCols[] = [
-                    'label_ar' => $la,
-                    'label_en' => $le,
-                    'label_fil' => $lf,
-                    'label_hi' => $lh,
-                    'value_kind' => $vk,
-                    'unit_hint' => trim((string) ($c['unit_hint'] ?? '')),
-                    'storage_measure' => $stMeas,
-                    'display_system' => $dispSys,
+                    'label_ar' => orange_advisory_api_trunc_utf8($la, 191),
+                    'label_en' => orange_advisory_api_trunc_utf8($le, 191),
+                    'label_fil' => orange_advisory_api_trunc_utf8($lf, 191),
+                    'label_hi' => orange_advisory_api_trunc_utf8($lh, 191),
+                    'value_kind' => orange_advisory_api_trunc_utf8($vk, 16),
+                    'unit_hint' => orange_advisory_api_trunc_utf8(trim((string) ($c['unit_hint'] ?? '')), 64),
+                    'storage_measure' => orange_advisory_api_trunc_utf8($stMeas, 16),
+                    'display_system' => orange_advisory_api_trunc_utf8($dispSys, 32),
                     'sort_order' => (int) ($c['sort_order'] ?? 0) > 0 ? (int) $c['sort_order'] : $so,
                 ];
             }
@@ -520,10 +588,10 @@ try {
                     'row_kind' => $rk,
                     'sort_order' => (int) ($r['sort_order'] ?? 0) > 0 ? (int) $r['sort_order'] : $rso,
                     'size_family_size_id' => $rk === 'data' ? $sfsId : 0,
-                    'label_ar' => trim((string) ($r['label_ar'] ?? '')),
-                    'label_en' => trim((string) ($r['label_en'] ?? '')),
-                    'label_fil' => trim((string) ($r['label_fil'] ?? '')),
-                    'label_hi' => trim((string) ($r['label_hi'] ?? '')),
+                    'label_ar' => orange_advisory_api_trunc_utf8(trim((string) ($r['label_ar'] ?? '')), 191),
+                    'label_en' => orange_advisory_api_trunc_utf8(trim((string) ($r['label_en'] ?? '')), 191),
+                    'label_fil' => orange_advisory_api_trunc_utf8(trim((string) ($r['label_fil'] ?? '')), 191),
+                    'label_hi' => orange_advisory_api_trunc_utf8(trim((string) ($r['label_hi'] ?? '')), 191),
                     'cells' => $rk === 'data' ? $cells : [],
                 ];
             }
@@ -618,7 +686,7 @@ try {
                         $dupN->execute([$nameAr, $deptId, $tplId, $ckKey]);
                     }
                     if ($dupN->fetchColumn()) {
-                        $pdo->rollBack();
+                        orange_advisory_api_rollback_safe($pdo);
                         json_response(['success' => false, 'message' => 'يوجد بالفعل دليل بنفس الاسم الداخلي (لنفس العائلة أو ضمن المسودات)'], 409);
                     }
                     $famIns = $boundFamily ? $fidRaw : null;
@@ -652,7 +720,7 @@ try {
                         $dupN->execute([$nextSf, $nameAr, $id]);
                     }
                     if ($dupN->fetchColumn()) {
-                        $pdo->rollBack();
+                        orange_advisory_api_rollback_safe($pdo);
                         json_response(['success' => false, 'message' => 'يوجد بالفعل دليل آخر بنفس الاسم الداخلي لهذه العائلة أو ضمن المسودات'], 409);
                     }
                     $bindSf = ($nextSf === null || (int) $nextSf === 0) ? null : (int) $nextSf;
@@ -721,7 +789,7 @@ try {
                     $rid = (int) $pdo->lastInsertId();
                     if ($nr['row_kind'] === 'data') {
                         foreach ($colIdMap as $ix => $cid) {
-                            $val = (string) ($nr['cells'][$ix] ?? '');
+                            $val = orange_advisory_api_trunc_utf8((string) ($nr['cells'][$ix] ?? ''), 50000);
                             $pdo->prepare(
                                 'INSERT INTO advisory_sizing_guide_cells (row_id, column_id, cell_value) VALUES (?,?,?)'
                             )->execute([$rid, $cid, $val]);
@@ -731,11 +799,14 @@ try {
 
                 $pdo->commit();
             } catch (Throwable $e) {
-                $pdo->rollBack();
+                orange_advisory_api_rollback_safe($pdo);
                 if (function_exists('error_log')) {
-                    error_log('[orange] advisory_sizing save: ' . $e->getMessage());
+                    error_log(
+                        '[orange] advisory_sizing save: ' . $e->getMessage()
+                        . ' @' . $e->getFile() . ':' . (string) $e->getLine()
+                    );
                 }
-                json_response(['success' => false, 'message' => 'فشل الحفظ'], 500);
+                json_response(['success' => false, 'message' => 'فشل الحفظ — راجع سجل أخطاء PHP على السيرفر (advisory_sizing save).'], 500);
             }
 
             json_response(['success' => true, 'id' => $id]);
@@ -745,7 +816,10 @@ try {
     }
 } catch (Throwable $e) {
     if (function_exists('error_log')) {
-        error_log('[orange] advisory_sizing_guides/manage: ' . $e->getMessage());
+        error_log(
+            '[orange] advisory_sizing_guides/manage: ' . $e->getMessage()
+            . ' @' . $e->getFile() . ':' . (string) $e->getLine()
+        );
     }
     json_response([
         'success' => false,
