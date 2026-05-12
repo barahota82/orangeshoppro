@@ -208,6 +208,31 @@ CREATE TABLE `pattern_dictionary` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE `commercial_kind_dictionary` (
+  `kind_key` varchar(32) NOT NULL,
+  `label_ar` varchar(191) NOT NULL DEFAULT '',
+  `label_en` varchar(191) NOT NULL DEFAULT '',
+  `sort_order` int NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`kind_key`),
+  KEY `idx_ckd_sort` (`sort_order`),
+  KEY `idx_ckd_active` (`is_active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `sizing_category_dictionary` (
+  `commercial_kind_key` varchar(32) NOT NULL,
+  `category_key` varchar(64) NOT NULL,
+  `label_ar` varchar(191) NOT NULL DEFAULT '',
+  `label_en` varchar(191) NOT NULL DEFAULT '',
+  `sort_order` int NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`commercial_kind_key`,`category_key`),
+  KEY `idx_scd_kind_sort` (`commercial_kind_key`,`sort_order`),
+  CONSTRAINT `fk_scd_commercial_kind` FOREIGN KEY (`commercial_kind_key`) REFERENCES `commercial_kind_dictionary` (`kind_key`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `size_families` (
   `id` int NOT NULL AUTO_INCREMENT,
   `name_ar` varchar(191) NOT NULL DEFAULT '',
@@ -274,16 +299,19 @@ CREATE TABLE `size_family_sizes` (
 CREATE TABLE `advisory_sizing_guides` (
   `id` int NOT NULL AUTO_INCREMENT,
   `size_family_id` int DEFAULT NULL,
+  `department_id` int DEFAULT NULL,
+  `size_scheme_template_id` int DEFAULT NULL,
+  `commercial_kind_key` varchar(32) NOT NULL DEFAULT '',
   `scope_kind` varchar(16) NOT NULL,
   `name_ar` varchar(191) NOT NULL DEFAULT '',
-  `name_en` varchar(191) NOT NULL DEFAULT '',
-  `name_fil` varchar(191) NOT NULL DEFAULT '',
-  `name_hi` varchar(191) NOT NULL DEFAULT '',
   `sort_order` int NOT NULL DEFAULT 0,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_advisory_sizing_guides_family` (`size_family_id`)
+  KEY `idx_advisory_sizing_guides_family` (`size_family_id`),
+  KEY `idx_asg_dept` (`department_id`),
+  KEY `idx_asg_tpl` (`size_scheme_template_id`),
+  KEY `idx_asg_ck` (`commercial_kind_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `advisory_sizing_guide_columns` (
@@ -512,6 +540,16 @@ CREATE TABLE `customers` (
   UNIQUE KEY `uq_customers_code` (`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE `delivery_areas` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `name_ar` varchar(191) NOT NULL DEFAULT '',
+  `name_en` varchar(191) NOT NULL DEFAULT '',
+  `sort_order` int NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `suppliers` (
   `id` int NOT NULL AUTO_INCREMENT,
   `code` varchar(32) DEFAULT NULL,
@@ -620,6 +658,7 @@ CREATE TABLE `products` (
   `version` int DEFAULT 1,
   `size_family_id` int DEFAULT NULL,
   `sizing_guide_scope` varchar(16) NOT NULL DEFAULT 'none',
+  `sizing_advisory_guide_id` int DEFAULT NULL,
   `sort_order` int NOT NULL DEFAULT 0,
   `seo_meta_title_ar` varchar(191) NOT NULL DEFAULT '',
   `seo_meta_title_en` varchar(191) NOT NULL DEFAULT '',
@@ -686,6 +725,15 @@ CREATE TABLE `product_colorways` (
   KEY `idx_product_colorways_product` (`product_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE `product_colorway_images` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `product_colorway_id` int NOT NULL,
+  `image_path` varchar(255) NOT NULL,
+  `sort_order` int NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `idx_pci_colorway` (`product_colorway_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `product_variants` (
   `id` int NOT NULL AUTO_INCREMENT,
   `product_id` int NOT NULL,
@@ -735,6 +783,55 @@ CREATE TABLE `cart_promotions` (
   PRIMARY KEY (`id`),
   KEY `idx_cart_promotions_active_min` (`is_active`,`min_subtotal`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `cart_gift_promotions` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `min_subtotal` decimal(18,4) NOT NULL DEFAULT 0.0000,
+  `requires_registered_account` tinyint(1) NOT NULL DEFAULT 0,
+  `gift_kind` varchar(16) NOT NULL DEFAULT 'choice',
+  `fixed_variant_id` int unsigned DEFAULT NULL,
+  `pool_variant_ids` text,
+  `gift_unit_charge_kind` varchar(24) NOT NULL DEFAULT 'free',
+  `gift_unit_charge_value` decimal(18,4) NOT NULL DEFAULT 0.0000,
+  `sort_order` int NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_cart_gift_promo_active_min` (`is_active`,`min_subtotal`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `cart_bogo_promotions` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `bogo_kind` varchar(24) NOT NULL DEFAULT 'same_variant',
+  `category_id` int unsigned DEFAULT NULL,
+  `min_buy_qty` int unsigned NOT NULL DEFAULT 2,
+  `buy_components_json` text,
+  `requires_registered_account` tinyint(1) NOT NULL DEFAULT 0,
+  `gift_kind` varchar(16) NOT NULL DEFAULT 'choice',
+  `fixed_variant_id` int unsigned DEFAULT NULL,
+  `pool_variant_ids` text,
+  `gift_unit_charge_kind` varchar(24) NOT NULL DEFAULT 'free',
+  `gift_unit_charge_value` decimal(18,4) NOT NULL DEFAULT 0.0000,
+  `sort_order` int NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_cart_bogo_active_sort` (`is_active`,`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `cart_combo_promotions` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `title_ar` varchar(191) NOT NULL DEFAULT '',
+  `title_en` varchar(191) NOT NULL DEFAULT '',
+  `components_json` text NOT NULL,
+  `combo_price` decimal(18,4) NOT NULL DEFAULT 0.0000,
+  `requires_registered_account` tinyint(1) NOT NULL DEFAULT 0,
+  `sort_order` int NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_cart_combo_active_sort` (`is_active`,`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `orders` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -1001,6 +1098,21 @@ CREATE TABLE `storefront_accounts` (
   UNIQUE KEY `uq_storefront_accounts_email` (`email`),
   KEY `idx_storefront_accounts_verified` (`email_verified_at`),
   KEY `idx_storefront_accounts_channel` (`registered_channel_slug`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `storefront_copy_lines` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `scope` varchar(32) NOT NULL,
+  `sort_order` int NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `text_ar` varchar(500) NOT NULL DEFAULT '',
+  `text_en` varchar(500) NOT NULL DEFAULT '',
+  `text_fil` varchar(500) NOT NULL DEFAULT '',
+  `text_hi` varchar(500) NOT NULL DEFAULT '',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_sfl_scope_active_sort` (`scope`,`is_active`,`sort_order`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `storefront_phone_merge_requests` (

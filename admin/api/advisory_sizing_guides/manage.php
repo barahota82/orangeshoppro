@@ -188,7 +188,7 @@ try {
                 json_response(['success' => false, 'message' => 'اختر عائلة مقاسات'], 422);
             }
             $st = $pdo->prepare(
-                'SELECT g.id, g.scope_kind, g.name_ar, g.name_en, g.is_active, g.sort_order,
+                'SELECT g.id, g.scope_kind, g.name_ar, g.is_active, g.sort_order,
                     (SELECT COUNT(*) FROM advisory_sizing_guide_columns c WHERE c.guide_id = g.id) AS columns_count,
                     (SELECT COUNT(*) FROM advisory_sizing_guide_rows r WHERE r.guide_id = g.id) AS rows_count
                  FROM advisory_sizing_guides g
@@ -203,7 +203,7 @@ try {
         case 'list_unbound':
             try {
                 $st = $pdo->prepare(
-                    'SELECT g.id, g.scope_kind, g.name_ar, g.name_en, g.is_active, g.size_family_id,
+                    'SELECT g.id, g.scope_kind, g.name_ar, g.is_active, g.size_family_id,
                         g.department_id, g.size_scheme_template_id, g.commercial_kind_key, g.sort_order,
                         (SELECT COUNT(*) FROM advisory_sizing_guide_columns c WHERE c.guide_id = g.id) AS columns_count,
                         (SELECT COUNT(*) FROM advisory_sizing_guide_rows r WHERE r.guide_id = g.id) AS rows_count
@@ -499,9 +499,6 @@ try {
             if ($nameAr === '') {
                 json_response(['success' => false, 'message' => 'اسم النموذج الداخلي (عربي) إلزامي'], 422);
             }
-            $nameEn = '';
-            $nameFil = '';
-            $nameHi = '';
             $active = (int) ($data['is_active'] ?? 1) === 0 ? 0 : 1;
             $columnsIn = $data['columns'] ?? [];
             $rowsIn = $data['rows'] ?? [];
@@ -710,10 +707,10 @@ try {
                     $tplIns = $tplId > 0 ? $tplId : null;
                     $ins = $pdo->prepare(
                         'INSERT INTO advisory_sizing_guides
-                            (size_family_id, department_id, size_scheme_template_id, commercial_kind_key, scope_kind, name_ar, name_en, name_fil, name_hi, sort_order, is_active)
-                         VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+                            (size_family_id, department_id, size_scheme_template_id, commercial_kind_key, scope_kind, name_ar, sort_order, is_active)
+                         VALUES (?,?,?,?,?,?,?,?)'
                     );
-                    $ins->execute([$famIns, $deptIns, $tplIns, $ckKey, $scopeKind, $nameAr, $nameEn, $nameFil, $nameHi, $guideSortIns, $active]);
+                    $ins->execute([$famIns, $deptIns, $tplIns, $ckKey, $scopeKind, $nameAr, $guideSortIns, $active]);
                     $id = (int) $pdo->lastInsertId();
                 } else {
                     $nextSf = null;
@@ -745,10 +742,10 @@ try {
                     $upd = $pdo->prepare(
                         'UPDATE advisory_sizing_guides SET
                             size_family_id = ?, department_id = ?, size_scheme_template_id = ?, commercial_kind_key = ?,
-                            scope_kind = ?, name_ar = ?, name_en = ?, name_fil = ?, name_hi = ?, is_active = ?
+                            scope_kind = ?, name_ar = ?, is_active = ?
                          WHERE id = ?'
                     );
-                    $upd->execute([$bindSf, $deptIns, $tplIns, $ckKey, $scopeKind, $nameAr, $nameEn, $nameFil, $nameHi, $active, $id]);
+                    $upd->execute([$bindSf, $deptIns, $tplIns, $ckKey, $scopeKind, $nameAr, $active, $id]);
                     $stR2 = $pdo->prepare('SELECT id FROM advisory_sizing_guide_rows WHERE guide_id = ?');
                     $stR2->execute([$id]);
                     $rids2 = $stR2->fetchAll(PDO::FETCH_COLUMN);

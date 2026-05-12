@@ -23,7 +23,7 @@ try {
         if (orange_table_exists($pdo, 'advisory_sizing_guides')) {
             try {
                 $draftRows = $pdo->query(
-                    'SELECT department_id, size_scheme_template_id, commercial_kind_key, name_ar, name_en
+                    'SELECT department_id, size_scheme_template_id, commercial_kind_key, name_ar
                      FROM advisory_sizing_guides
                      WHERE (size_family_id IS NULL OR size_family_id = 0)
                        AND COALESCE(department_id, 0) > 0
@@ -47,7 +47,6 @@ try {
                             'size_scheme_template_id' => $tpl,
                             'commercial_kind_key' => $ckx,
                             'name_ar' => trim((string) ($dr['name_ar'] ?? '')),
-                            'name_en' => trim((string) ($dr['name_en'] ?? '')),
                         ];
                     }
                 }
@@ -91,7 +90,7 @@ try {
                                 (int) $ctx['department_id'],
                                 (int) $ctx['size_scheme_template_id'],
                                 (string) $ctx['name_ar'],
-                                (string) $ctx['name_en'],
+                                '',
                                 (string) $ctx['commercial_kind_key'],
                                 0,
                                 $nextSort,
@@ -103,7 +102,7 @@ try {
                         $curAr = trim((string) ($ex['name_ar'] ?? ''));
                         $curEn = trim((string) ($ex['name_en'] ?? ''));
                         $newAr = $curAr !== '' ? $curAr : (string) $ctx['name_ar'];
-                        $newEn = $curEn !== '' ? $curEn : (string) $ctx['name_en'];
+                        $newEn = $curEn;
                         $needUpdate = ($newAr !== $curAr) || ($newEn !== $curEn) || ((int) ($ex['is_active'] ?? 1) === 0);
                         if ($needUpdate) {
                             $updSeed->execute([$newAr, $newEn, (int) $ex['id']]);
@@ -133,18 +132,7 @@ try {
                            ORDER BY g.sort_order ASC, g.id ASC LIMIT 1),
                          b.name_ar
                        ) AS first_guide_name_ar,
-                       COALESCE(
-                         (SELECT g.name_en FROM advisory_sizing_guides g
-                           WHERE (g.size_family_id IS NULL OR g.size_family_id = 0)
-                             AND COALESCE(g.department_id,0) = COALESCE(b.department_id,0)
-                             AND COALESCE(g.size_scheme_template_id,0) = COALESCE(b.size_scheme_template_id,0)
-                             AND g.commercial_kind_key = b.commercial_kind_key
-                           ORDER BY g.sort_order ASC, g.id ASC LIMIT 1),
-                         (SELECT g.name_en FROM advisory_sizing_guides g
-                           WHERE g.size_family_id = b.source_size_family_id
-                           ORDER BY g.sort_order ASC, g.id ASC LIMIT 1),
-                         b.name_en
-                       ) AS first_guide_name_en ';
+                       b.name_en AS first_guide_name_en ';
         if (orange_table_exists($pdo, 'departments')) {
             $sql .= ', d.name_ar AS dept_ar, d.name_en AS dept_en ';
         } else {
@@ -282,15 +270,6 @@ try {
                          WHERE g.size_family_id = b.source_size_family_id
                          ORDER BY g.sort_order ASC, g.id ASC LIMIT 1),
                         b.name_ar,
-                        (SELECT g.name_en FROM advisory_sizing_guides g
-                         WHERE (g.size_family_id IS NULL OR g.size_family_id = 0)
-                           AND COALESCE(g.department_id,0) = COALESCE(b.department_id,0)
-                           AND COALESCE(g.size_scheme_template_id,0) = COALESCE(b.size_scheme_template_id,0)
-                           AND g.commercial_kind_key = b.commercial_kind_key
-                         ORDER BY g.sort_order ASC, g.id ASC LIMIT 1),
-                        (SELECT g.name_en FROM advisory_sizing_guides g
-                         WHERE g.size_family_id = b.source_size_family_id
-                         ORDER BY g.sort_order ASC, g.id ASC LIMIT 1),
                         b.name_en
                     ) AS bundle_display_internal
              FROM size_family_advisory_library_map m

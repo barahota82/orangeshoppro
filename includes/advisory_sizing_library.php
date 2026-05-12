@@ -93,8 +93,8 @@ function orange_advisory_sizing_library_clone_guide_to_family(
     $ck = trim((string) ($g['commercial_kind_key'] ?? ''));
     $insG = $pdo->prepare(
         'INSERT INTO advisory_sizing_guides
-         (size_family_id, department_id, size_scheme_template_id, commercial_kind_key, scope_kind, name_ar, name_en, name_fil, name_hi, sort_order, is_active)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+         (size_family_id, department_id, size_scheme_template_id, commercial_kind_key, scope_kind, name_ar, sort_order, is_active)
+         VALUES (?,?,?,?,?,?,?,?)'
     );
     $insG->execute([
         $targetFamilyId,
@@ -103,9 +103,6 @@ function orange_advisory_sizing_library_clone_guide_to_family(
         $ck,
         $scope,
         (string) ($g['name_ar'] ?? ''),
-        (string) ($g['name_en'] ?? ''),
-        (string) ($g['name_fil'] ?? ''),
-        (string) ($g['name_hi'] ?? ''),
         (int) ($g['sort_order'] ?? 0),
         (int) ($g['is_active'] ?? 1) ? 1 : 0,
     ]);

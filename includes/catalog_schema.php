@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 33);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 34);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -897,9 +897,6 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             commercial_kind_key VARCHAR(32) NOT NULL DEFAULT \'\',
             scope_kind VARCHAR(16) NOT NULL,
             name_ar VARCHAR(191) NOT NULL DEFAULT \'\',
-            name_en VARCHAR(191) NOT NULL DEFAULT \'\',
-            name_fil VARCHAR(191) NOT NULL DEFAULT \'\',
-            name_hi VARCHAR(191) NOT NULL DEFAULT \'\',
             sort_order INT NOT NULL DEFAULT 0,
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
@@ -959,6 +956,27 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
                 'ALTER TABLE advisory_sizing_guides ADD COLUMN commercial_kind_key VARCHAR(32) NOT NULL DEFAULT \'\' AFTER size_scheme_template_id'
             );
             orange_schema_invalidate_column_check('advisory_sizing_guides', 'commercial_kind_key');
+        }
+        if (orange_table_has_column($pdo, 'advisory_sizing_guides', 'name_en')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE advisory_sizing_guides DROP COLUMN name_en'
+            );
+            orange_schema_invalidate_column_check('advisory_sizing_guides', 'name_en');
+        }
+        if (orange_table_has_column($pdo, 'advisory_sizing_guides', 'name_fil')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE advisory_sizing_guides DROP COLUMN name_fil'
+            );
+            orange_schema_invalidate_column_check('advisory_sizing_guides', 'name_fil');
+        }
+        if (orange_table_has_column($pdo, 'advisory_sizing_guides', 'name_hi')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE advisory_sizing_guides DROP COLUMN name_hi'
+            );
+            orange_schema_invalidate_column_check('advisory_sizing_guides', 'name_hi');
         }
         if (orange_table_has_column($pdo, 'advisory_sizing_guides', 'size_scheme_template_id')
             && orange_table_has_column($pdo, 'advisory_sizing_guides', 'commercial_kind_key')) {

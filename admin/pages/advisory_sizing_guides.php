@@ -112,7 +112,7 @@ if ($tablesReady
     && orange_table_exists($pdo, 'size_families')) {
     try {
         $asgDraftGuides = $pdo->query(
-            'SELECT g.id, g.scope_kind, g.name_ar, g.name_en, g.is_active, g.size_family_id,
+            'SELECT g.id, g.scope_kind, g.name_ar, g.is_active, g.size_family_id,
                 g.department_id, g.size_scheme_template_id, g.commercial_kind_key,
                 (SELECT COUNT(*) FROM advisory_sizing_guide_columns c WHERE c.guide_id = g.id) AS columns_count,
                 (SELECT COUNT(*) FROM advisory_sizing_guide_rows r WHERE r.guide_id = g.id) AS rows_count
@@ -839,7 +839,7 @@ $asgJson = static function (array $rows): string {
         } else {
             guides.forEach(function (g) {
                 var gid = parseInt(g.id, 10) || 0;
-                var title = (g.name_ar || g.name_en || ('#' + gid));
+                var title = (g.name_ar || ('#' + gid));
                 var cols = parseInt(String(g.columns_count != null ? g.columns_count : '0'), 10) || 0;
                 var rws = parseInt(String(g.rows_count != null ? g.rows_count : '0'), 10) || 0;
                 var trG = document.createElement('tr');
@@ -1561,7 +1561,7 @@ $asgJson = static function (array $rows): string {
         ASG_FAMILY_GUIDES_CACHE = guides;
         guides.forEach(function (g) {
             var gid = parseInt(g.id, 10) || 0;
-            var title = (g.name_ar || g.name_en || ('#' + gid));
+            var title = (g.name_ar || ('#' + gid));
             var cols = parseInt(String(g.columns_count != null ? g.columns_count : '0'), 10) || 0;
             var rws = parseInt(String(g.rows_count != null ? g.rows_count : '0'), 10) || 0;
             var tr = document.createElement('tr');
@@ -1632,7 +1632,7 @@ $asgJson = static function (array $rows): string {
         ASG_UNBOUND_GUIDES_CACHE = guides;
         guides.forEach(function (g) {
             var gid = parseInt(g.id, 10) || 0;
-            var title = (g.name_ar || g.name_en || ('#' + gid));
+            var title = (g.name_ar || ('#' + gid));
             var cols = parseInt(String(g.columns_count != null ? g.columns_count : '0'), 10) || 0;
             var rws = parseInt(String(g.rows_count != null ? g.rows_count : '0'), 10) || 0;
             var sfDisp = (g.size_family_id == null || g.size_family_id === '') ? 'NULL' : String(parseInt(g.size_family_id, 10) || 0);

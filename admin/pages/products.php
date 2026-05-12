@@ -282,13 +282,13 @@ if (
         }, $idList));
         try {
             $gl = $pdo->query(
-                "SELECT id, name_ar, name_en FROM advisory_sizing_guides WHERE id IN ($in)"
+                "SELECT id, name_ar FROM advisory_sizing_guides WHERE id IN ($in)"
             )->fetchAll(PDO::FETCH_ASSOC);
             foreach (is_array($gl) ? $gl : [] as $gr) {
                 if (!is_array($gr) || !isset($gr['id'])) {
                     continue;
                 }
-                $advGuideLabelMap[(int) $gr['id']] = trim((string) (($gr['name_ar'] ?: $gr['name_en']) ?: ''));
+                $advGuideLabelMap[(int) $gr['id']] = trim((string) ($gr['name_ar'] ?? ''));
             }
         } catch (Throwable $e) {
             $advGuideLabelMap = [];
