@@ -516,13 +516,22 @@ CREATE TABLE `suppliers` (
   `id` int NOT NULL AUTO_INCREMENT,
   `code` varchar(32) DEFAULT NULL,
   `name` varchar(160) NOT NULL DEFAULT '',
+  `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `phone_country_dial` varchar(8) DEFAULT NULL,
+  `phone_national` varchar(32) DEFAULT NULL,
   `phone` varchar(40) DEFAULT NULL,
+  `currency_code` varchar(8) NOT NULL DEFAULT 'KWD',
+  `payment_mode` varchar(16) NOT NULL DEFAULT 'cash',
+  `payment_terms_days` int DEFAULT NULL,
+  `tax_profile` varchar(16) NOT NULL DEFAULT 'exempt',
+  `tax_number` varchar(64) DEFAULT NULL,
   `notes` varchar(255) DEFAULT NULL,
   `payable_account_id` int DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_suppliers_phone` (`phone`),
-  UNIQUE KEY `uq_suppliers_code` (`code`)
+  UNIQUE KEY `uq_suppliers_code` (`code`),
+  UNIQUE KEY `uq_suppliers_tax_number` (`tax_number`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `admins` (

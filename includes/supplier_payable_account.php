@@ -58,6 +58,39 @@ function orange_supplier_required_payable_account_id(PDO $pdo, int $supplierId):
 }
 
 /**
+ * يتحقق أن المورد موجود ونشط ليُستخدم في مستندات الشراء.
+ *
+ * @throws RuntimeException
+ */
+function orange_supplier_assert_active_for_purchase(PDO $pdo, int $supplierId): void
+{
+    if ($supplierId <= 0) {
+        return;
+    }
+    if (!orange_table_exists($pdo, 'suppliers')) {
+        throw new RuntimeException('جدول الموردين غير متوفر.');
+    }
+    if (!orange_table_has_column($pdo, 'suppliers', 'is_active')) {
+        $stLegacy = $pdo->prepare('SELECT id FROM suppliers WHERE id = ? LIMIT 1');
+        $stLegacy->execute([$supplierId]);
+        if (! $stLegacy->fetchColumn()) {
+            throw new RuntimeException('المورد غير موجود.');
+        }
+
+        return;
+    }
+    $st = $pdo->prepare('SELECT is_active FROM suppliers WHERE id = ? LIMIT 1');
+    $st->execute([$supplierId]);
+    $raw = $st->fetchColumn();
+    if ($raw === false || $raw === null) {
+        throw new RuntimeException('المورد غير موجود.');
+    }
+    if ((int) $raw !== 1) {
+        throw new RuntimeException('المورد غير نشط. فعّل المورد أولاً ثم احفظ الفاتورة.');
+    }
+}
+
+/**
  * هل للمورد حساب ذمة مخصّص في الدليل (ورقة ترحيل)؟
  */
 function orange_supplier_has_dedicated_payable_account(PDO $pdo, int $supplierId): bool

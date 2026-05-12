@@ -28,6 +28,14 @@ try {
         json_response(['success' => false, 'message' => 'بيانات الشراء غير صحيحة'], 422);
     }
 
+    if ($supplierId > 0) {
+        try {
+            orange_supplier_assert_active_for_purchase($pdo, $supplierId);
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
     if ($type === 'credit') {
         if ($supplierId <= 0) {
             json_response(['success' => false, 'message' => 'شراء آجل يتطلّب مورداً مربوطاً بحساب ذمة خاص في الدليل.'], 422);

@@ -149,6 +149,17 @@ try {
         json_response(['success' => false, 'message' => 'بيانات التعديل غير صحيحة'], 422);
     }
 
+    if ($supplierId > 0) {
+        try {
+            orange_supplier_assert_active_for_purchase($pdo, $supplierId);
+        } catch (RuntimeException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            json_response(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
     if ($type === 'credit') {
         if ($supplierId <= 0) {
             if ($pdo->inTransaction()) {

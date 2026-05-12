@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 31);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 32);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -2311,17 +2311,76 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 code VARCHAR(32) NULL,
                 name VARCHAR(160) NOT NULL DEFAULT \'\',
+                is_active TINYINT(1) NOT NULL DEFAULT 1,
+                phone_country_dial VARCHAR(8) NULL,
+                phone_national VARCHAR(32) NULL,
                 phone VARCHAR(40) NULL,
+                currency_code VARCHAR(8) NOT NULL DEFAULT \'KWD\',
+                payment_mode VARCHAR(16) NOT NULL DEFAULT \'cash\',
+                payment_terms_days INT NULL,
+                tax_profile VARCHAR(16) NOT NULL DEFAULT \'exempt\',
+                tax_number VARCHAR(64) NULL,
                 notes VARCHAR(255) NULL,
+                payable_account_id INT NULL DEFAULT NULL,
                 created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE KEY uq_suppliers_phone (phone),
-                UNIQUE KEY uq_suppliers_code (code)
+                UNIQUE KEY uq_suppliers_code (code),
+                UNIQUE KEY uq_suppliers_tax_number (tax_number)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
     }
     if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'code')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE suppliers ADD COLUMN code VARCHAR(32) NULL');
         orange_catalog_safe_exec($pdo, 'CREATE UNIQUE INDEX uq_suppliers_code ON suppliers (code)');
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'is_active')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1 AFTER name'
+        );
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'phone_country_dial')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN phone_country_dial VARCHAR(8) NULL DEFAULT NULL AFTER is_active'
+        );
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'phone_national')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN phone_national VARCHAR(32) NULL DEFAULT NULL AFTER phone_country_dial'
+        );
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'currency_code')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN currency_code VARCHAR(8) NOT NULL DEFAULT \'KWD\' AFTER phone'
+        );
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'payment_mode')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN payment_mode VARCHAR(16) NOT NULL DEFAULT \'cash\' AFTER currency_code'
+        );
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'payment_terms_days')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN payment_terms_days INT NULL DEFAULT NULL AFTER payment_mode'
+        );
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'tax_profile')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN tax_profile VARCHAR(16) NOT NULL DEFAULT \'exempt\' AFTER payment_terms_days'
+        );
+    }
+    if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'tax_number')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE suppliers ADD COLUMN tax_number VARCHAR(64) NULL DEFAULT NULL AFTER tax_profile'
+        );
+        orange_catalog_safe_exec($pdo, 'CREATE UNIQUE INDEX uq_suppliers_tax_number ON suppliers (tax_number)');
     }
     if (orange_table_exists($pdo, 'suppliers') && !orange_table_has_column($pdo, 'suppliers', 'payable_account_id')) {
         orange_catalog_safe_exec(

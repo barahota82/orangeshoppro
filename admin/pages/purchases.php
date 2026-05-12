@@ -50,7 +50,12 @@ if ($purUnifiedCatalogGrouping) {
     unset($p);
 }
 
-$suppliers = $pdo->query('SELECT id, name, phone FROM suppliers ORDER BY name ASC')->fetchAll(PDO::FETCH_ASSOC);
+$hasSupplierIsActive = orange_table_has_column($pdo, 'suppliers', 'is_active');
+$suppliers = $pdo->query(
+    $hasSupplierIsActive
+        ? 'SELECT id, name, phone, is_active FROM suppliers ORDER BY is_active DESC, name ASC'
+        : 'SELECT id, name, phone, 1 AS is_active FROM suppliers ORDER BY name ASC'
+)->fetchAll(PDO::FETCH_ASSOC);
 
 $variantsByProduct = [];
 $vRows = $pdo->query(
@@ -103,7 +108,16 @@ $recent = $pdo->query(
             <select id="pur_supplier">
                 <option value="0">— بدون مورد محدد —</option>
                 <?php foreach ($suppliers as $s): ?>
-                    <option value="<?php echo (int)$s['id']; ?>"><?php echo htmlspecialchars((string)$s['name'], ENT_QUOTES, 'UTF-8'); ?></option>
+                    <?php
+                    $supIsActive = (int) ($s['is_active'] ?? 1) === 1;
+                    $supLabel = (string) ($s['name'] ?? '');
+                    if (!$supIsActive) {
+                        $supLabel .= ' (غير نشط)';
+                    }
+                    ?>
+                    <option value="<?php echo (int)$s['id']; ?>" <?php echo $supIsActive ? '' : 'disabled'; ?>>
+                        <?php echo htmlspecialchars($supLabel, ENT_QUOTES, 'UTF-8'); ?>
+                    </option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -125,7 +139,6 @@ $recent = $pdo->query(
     <h2 class="card-title">أسطر الأصناف</h2>
     <?php if ($products === []): ?>
         <p class="card-hint">لا توجد منتجات نشطة لإضافتها. أنشئ منتجات من «المنتجات» أولًا.</p>
-    <?php else: ?>
     <?php else: ?>
     <p class="card-hint" style="margin-top:0;">بنود الفاتورة في جدول داخل إطار واحد؛ بعد اختيار صنف وكمية يُفتح سطر جديد تلقائياً. <kbd class="admin-kbd">Tab</kbd> من «تكلفة الوحدة» لسطر جديد؛ <kbd class="admin-kbd">←</kbd> <kbd class="admin-kbd">→</kbd> <kbd class="admin-kbd">↑</kbd> <kbd class="admin-kbd">↓</kbd> للتنقل بين الخلايا. <?php echo $purUnifiedCatalogGrouping ? 'قائمة الأصناف مُجمَّعة حسب <strong>فئة الشجرة الموحّدة</strong> المستنتجة من نوع المنتج لكل صنف.' : ''; ?></p>
     <div class="admin-doc-frame">

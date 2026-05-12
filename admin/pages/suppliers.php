@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/party_subledger.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
+require_once __DIR__ . '/../../includes/storefront_phone_country_select.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -38,6 +39,38 @@ $payableAccountLabel = static function (int $id) use ($leafAccountOptions, $supp
     return '#' . $id;
 };
 $hasSupplierPayableCol = orange_table_has_column($pdo, 'suppliers', 'payable_account_id');
+$hasSupplierIsActiveCol = orange_table_has_column($pdo, 'suppliers', 'is_active');
+$hasSupplierCurrencyCol = orange_table_has_column($pdo, 'suppliers', 'currency_code');
+$hasSupplierTaxProfileCol = orange_table_has_column($pdo, 'suppliers', 'tax_profile');
+$hasSupplierPaymentModeCol = orange_table_has_column($pdo, 'suppliers', 'payment_mode');
+$hasSupplierPaymentTermsCol = orange_table_has_column($pdo, 'suppliers', 'payment_terms_days');
+$hasSupplierTaxNumberCol = orange_table_has_column($pdo, 'suppliers', 'tax_number');
+$hasSupplierPhoneCountryDialCol = orange_table_has_column($pdo, 'suppliers', 'phone_country_dial');
+$currencyOptions = [
+    'KWD' => 'دينار كويتي (KWD)',
+    'USD' => 'دولار أمريكي (USD)',
+    'SAR' => 'ريال سعودي (SAR)',
+    'AED' => 'درهم إماراتي (AED)',
+    'QAR' => 'ريال قطري (QAR)',
+    'BHD' => 'دينار بحريني (BHD)',
+    'OMR' => 'ريال عُماني (OMR)',
+];
+$paymentModeOptions = [
+    'cash' => 'نقدي',
+    'credit' => 'آجل',
+    'transfer' => 'تحويل',
+];
+$taxProfileOptions = [
+    'exempt' => 'معفى',
+    'taxable' => 'خاضع',
+    'zero' => 'صفر ضريبي',
+];
+$currencyLabel = static function (string $code) use ($currencyOptions): string {
+    return $currencyOptions[$code] ?? $code;
+};
+$taxProfileLabel = static function (string $code) use ($taxProfileOptions): string {
+    return $taxProfileOptions[$code] ?? $code;
+};
 
 $rows = [];
 $totalBalance = 0.0;
@@ -203,7 +236,7 @@ $count = count($rows);
 
 <div class="card">
     <h3>مورد جديد أو تعديل</h3>
-    <p class="card-hint" style="margin-top:0;">الاسم إلزامي. <strong>كود المورد</strong> اختياري وفريد. الهاتف اختياري؛ إن وُجد يجب ألا يتكرر مع مورد آخر.</p>
+    <p class="card-hint" style="margin-top:0;">الاسم إلزامي. <strong>حساب ذمة المورد</strong> إلزامي عند الحفظ. يمكن إيقاف المورد (غير نشط) بدل الحذف، وفاتورة الشراء لا تُحفظ لمورد غير نشط.</p>
     <input type="hidden" id="sup_id" value="0">
     <div class="form-grid">
         <div>
@@ -214,10 +247,73 @@ $count = count($rows);
             <label for="sup_name">اسم المورد</label>
             <input type="text" id="sup_name" autocomplete="off" placeholder="اسم المورد أو الشركة">
         </div>
+        <?php if ($hasSupplierIsActiveCol): ?>
+        <div>
+            <label for="sup_is_active">حالة المورد</label>
+            <select id="sup_is_active">
+                <option value="1" selected>نشط</option>
+                <option value="0">غير نشط</option>
+            </select>
+        </div>
+        <?php endif; ?>
+        <?php if ($hasSupplierPhoneCountryDialCol): ?>
+        <div>
+            <label for="sup_phone_country">كود الدولة (اختياري)</label>
+            <?php orange_storefront_render_phone_country_select('sup_phone_country'); ?>
+        </div>
+        <?php endif; ?>
         <div>
             <label for="sup_phone">الهاتف (اختياري)</label>
-            <input type="text" id="sup_phone" autocomplete="off" dir="ltr" lang="en" placeholder="مثال: 5xxxxxxxx">
+            <input type="text" id="sup_phone" class="js-orange-phone-input" autocomplete="off" dir="ltr" lang="en" placeholder="+965… أو 00… أو رقم وطني مع اختيار الدولة">
         </div>
+        <?php if ($hasSupplierCurrencyCol): ?>
+        <div>
+            <label for="sup_currency_code">العملة الافتراضية <span style="color:#b45309;">*</span></label>
+            <select id="sup_currency_code" required>
+                <?php foreach ($currencyOptions as $curCode => $curLabel): ?>
+                    <option value="<?php echo htmlspecialchars($curCode, ENT_QUOTES, 'UTF-8'); ?>" <?php echo $curCode === 'KWD' ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($curLabel, ENT_QUOTES, 'UTF-8'); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <?php endif; ?>
+        <?php if ($hasSupplierTaxProfileCol): ?>
+        <div>
+            <label for="sup_tax_profile">المعاملة الضريبية <span style="color:#b45309;">*</span></label>
+            <select id="sup_tax_profile" required>
+                <?php foreach ($taxProfileOptions as $taxCode => $taxLabel): ?>
+                    <option value="<?php echo htmlspecialchars($taxCode, ENT_QUOTES, 'UTF-8'); ?>" <?php echo $taxCode === 'exempt' ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($taxLabel, ENT_QUOTES, 'UTF-8'); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <?php endif; ?>
+        <?php if ($hasSupplierPaymentModeCol): ?>
+        <div>
+            <label for="sup_payment_mode">طريقة السداد الافتراضية</label>
+            <select id="sup_payment_mode">
+                <?php foreach ($paymentModeOptions as $modeCode => $modeLabel): ?>
+                    <option value="<?php echo htmlspecialchars($modeCode, ENT_QUOTES, 'UTF-8'); ?>" <?php echo $modeCode === 'cash' ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($modeLabel, ENT_QUOTES, 'UTF-8'); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <?php endif; ?>
+        <?php if ($hasSupplierPaymentTermsCol): ?>
+        <div>
+            <label for="sup_payment_terms_days">أيام السداد (تنبيه اختياري)</label>
+            <input type="number" id="sup_payment_terms_days" min="0" step="1" inputmode="numeric" lang="en" dir="ltr" placeholder="مثال: 30">
+        </div>
+        <?php endif; ?>
+        <?php if ($hasSupplierTaxNumberCol): ?>
+        <div>
+            <label for="sup_tax_number">الرقم الضريبي (اختياري)</label>
+            <input type="text" id="sup_tax_number" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="اختياري">
+        </div>
+        <?php endif; ?>
         <div style="grid-column:1/-1;">
             <label for="sup_notes">ملاحظات</label>
             <input type="text" id="sup_notes" autocomplete="off" placeholder="اختياري">
@@ -263,7 +359,10 @@ $count = count($rows);
                         <th>#</th>
                         <th>الكود</th>
                         <th>الاسم</th>
+                        <?php if ($hasSupplierIsActiveCol): ?><th>الحالة</th><?php endif; ?>
                         <th>الهاتف</th>
+                        <?php if ($hasSupplierCurrencyCol): ?><th>العملة</th><?php endif; ?>
+                        <?php if ($hasSupplierTaxProfileCol): ?><th>الضريبة</th><?php endif; ?>
                         <th>ذمة المورد</th>
                         <?php if ($hasSupplierPayableCol): ?><th>حساب الذمة (دليل)</th><?php endif; ?>
                         <th>مشتريات</th>
@@ -276,17 +375,31 @@ $count = count($rows);
                         $sid = (int) $s['id'];
                         $bal = orange_party_balance_supplier($pdo, $sid);
                         $phone = (string) ($s['phone'] ?? '');
+                        $phoneCountryDial = (string) ($s['phone_country_dial'] ?? '');
                         $codeDisp = isset($s['code']) && (string) $s['code'] !== '' ? (string) $s['code'] : '—';
+                        $isActive = $hasSupplierIsActiveCol ? (int) ($s['is_active'] ?? 1) : 1;
+                        $statusDisp = $isActive === 1 ? 'نشط' : 'غير نشط';
+                        $currencyCode = $hasSupplierCurrencyCol ? strtoupper(trim((string) ($s['currency_code'] ?? 'KWD'))) : '';
+                        $taxProfileCode = $hasSupplierTaxProfileCol ? trim((string) ($s['tax_profile'] ?? 'exempt')) : '';
                         $pAcc = $hasSupplierPayableCol ? (int) ($s['payable_account_id'] ?? 0) : 0;
                         $pAccLabel = $pAcc > 0 ? $payableAccountLabel($pAcc) : '';
-                        $hayRaw = trim((string) ($s['code'] ?? '') . ' ' . ($s['name'] ?? '') . ' ' . $phone . ' ' . ($s['notes'] ?? '') . ' ' . $pAccLabel);
+                        $hayRaw = trim((string) ($s['code'] ?? '') . ' ' . ($s['name'] ?? '') . ' ' . $phone . ' ' . ($s['notes'] ?? '') . ' ' . $pAccLabel . ' ' . $statusDisp . ' ' . $currencyCode . ' ' . $taxProfileCode);
                         $hay = function_exists('mb_strtolower') ? mb_strtolower($hayRaw, 'UTF-8') : strtolower($hayRaw);
                         ?>
                         <tr data-sup-search="<?php echo htmlspecialchars($hay, ENT_QUOTES, 'UTF-8'); ?>">
                             <td><?php echo $sid; ?></td>
                             <td dir="ltr"><?php echo htmlspecialchars($codeDisp, ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><?php echo htmlspecialchars((string) ($s['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                            <?php if ($hasSupplierIsActiveCol): ?>
+                                <td><?php echo $isActive === 1 ? '<span class="badge ok">نشط</span>' : '<span class="badge cancelled">غير نشط</span>'; ?></td>
+                            <?php endif; ?>
                             <td dir="ltr"><?php echo $phone !== '' ? htmlspecialchars($phone, ENT_QUOTES, 'UTF-8') : '—'; ?></td>
+                            <?php if ($hasSupplierCurrencyCol): ?>
+                                <td dir="ltr"><?php echo htmlspecialchars($currencyLabel($currencyCode), ENT_QUOTES, 'UTF-8'); ?></td>
+                            <?php endif; ?>
+                            <?php if ($hasSupplierTaxProfileCol): ?>
+                                <td><?php echo htmlspecialchars($taxProfileLabel($taxProfileCode), ENT_QUOTES, 'UTF-8'); ?></td>
+                            <?php endif; ?>
                             <td dir="ltr"><?php echo number_format($bal, 3); ?></td>
                             <?php if ($hasSupplierPayableCol): ?>
                                 <td><small><?php
@@ -302,8 +415,15 @@ $count = count($rows);
                                     'code' => (string) ($s['code'] ?? ''),
                                     'name' => (string) ($s['name'] ?? ''),
                                     'phone' => $phone,
+                                    'phone_country_dial' => $phoneCountryDial,
                                     'notes' => (string) ($s['notes'] ?? ''),
                                     'payable_account_id' => $pAcc > 0 ? $pAcc : null,
+                                    'is_active' => $isActive,
+                                    'currency_code' => $currencyCode !== '' ? $currencyCode : 'KWD',
+                                    'payment_mode' => (string) ($s['payment_mode'] ?? 'cash'),
+                                    'payment_terms_days' => isset($s['payment_terms_days']) && $s['payment_terms_days'] !== null ? (int) $s['payment_terms_days'] : null,
+                                    'tax_profile' => $taxProfileCode !== '' ? $taxProfileCode : 'exempt',
+                                    'tax_number' => (string) ($s['tax_number'] ?? ''),
                                 ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>)'>تعديل</button>
                                 <a class="btn btn-secondary party-registry-btn" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_reports#partner-balances-suppliers'), ENT_QUOTES, 'UTF-8'); ?>">ذمة المورد</a>
                             </td>
@@ -315,12 +435,79 @@ $count = count($rows);
     <?php endif; ?>
 </div>
 
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/input-constraints.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
+function supPhoneCountryEl() {
+    return document.getElementById('sup_phone_country');
+}
+function supSplitPhoneForForm(stored, preferredDial) {
+    var raw = String(stored || '').trim();
+    var pref = String(preferredDial || '').trim();
+    if (!raw) {
+        return { country: pref || '__intl__', phone: '' };
+    }
+    var digits = raw.replace(/\D/g, '');
+    if (pref && digits.indexOf(pref) === 0) {
+        var byPref = digits.slice(pref.length);
+        if (byPref !== '') {
+            return { country: pref, phone: byPref };
+        }
+    }
+    var normFn = window.orangeNormalizeCustomerPhone;
+    var norm = normFn ? normFn(raw, null) : null;
+    if (!norm) {
+        return { country: pref || '__intl__', phone: raw };
+    }
+    var normDigits = norm.replace(/\D/g, '');
+    var prefs = ['965', '92', '91', '63'];
+    for (var i = 0; i < prefs.length; i++) {
+        var cc = prefs[i];
+        if (normDigits.indexOf(cc) !== 0) {
+            continue;
+        }
+        var nat = normDigits.slice(cc.length);
+        if (nat.length < 4) {
+            continue;
+        }
+        if (normFn && normFn(nat, cc) === norm) {
+            return { country: cc, phone: nat };
+        }
+    }
+    return { country: '__intl__', phone: norm.charAt(0) === '+' ? norm.slice(1) : norm };
+}
 function supResetForm() {
     document.getElementById('sup_id').value = '0';
     document.getElementById('sup_code').value = '';
     document.getElementById('sup_name').value = '';
     document.getElementById('sup_phone').value = '';
+    var cc = supPhoneCountryEl();
+    if (cc) {
+        cc.value = '__intl__';
+    }
+    var ia = document.getElementById('sup_is_active');
+    if (ia) {
+        ia.value = '1';
+    }
+    var ccy = document.getElementById('sup_currency_code');
+    if (ccy) {
+        ccy.value = 'KWD';
+    }
+    var txp = document.getElementById('sup_tax_profile');
+    if (txp) {
+        txp.value = 'exempt';
+    }
+    var pm = document.getElementById('sup_payment_mode');
+    if (pm) {
+        pm.value = 'cash';
+    }
+    var td = document.getElementById('sup_payment_terms_days');
+    if (td) {
+        td.value = '';
+    }
+    var txno = document.getElementById('sup_tax_number');
+    if (txno) {
+        txno.value = '';
+    }
     document.getElementById('sup_notes').value = '';
     var ps = document.getElementById('sup_payable_account_id');
     if (ps) {
@@ -334,7 +521,36 @@ function supEdit(row) {
     document.getElementById('sup_id').value = String(row.id || 0);
     document.getElementById('sup_code').value = row.code || '';
     document.getElementById('sup_name').value = row.name || '';
-    document.getElementById('sup_phone').value = row.phone || '';
+    var split = supSplitPhoneForForm(row.phone || '', row.phone_country_dial || '');
+    var cc = supPhoneCountryEl();
+    if (cc) {
+        cc.value = split.country && split.country !== '' ? split.country : '__intl__';
+    }
+    document.getElementById('sup_phone').value = split.phone || '';
+    var ia = document.getElementById('sup_is_active');
+    if (ia) {
+        ia.value = String((row.is_active || 0) === 1 ? 1 : 0);
+    }
+    var ccy = document.getElementById('sup_currency_code');
+    if (ccy) {
+        ccy.value = row.currency_code || 'KWD';
+    }
+    var txp = document.getElementById('sup_tax_profile');
+    if (txp) {
+        txp.value = row.tax_profile || 'exempt';
+    }
+    var pm = document.getElementById('sup_payment_mode');
+    if (pm) {
+        pm.value = row.payment_mode || 'cash';
+    }
+    var td = document.getElementById('sup_payment_terms_days');
+    if (td) {
+        td.value = row.payment_terms_days != null ? String(row.payment_terms_days) : '';
+    }
+    var txno = document.getElementById('sup_tax_number');
+    if (txno) {
+        txno.value = row.tax_number || '';
+    }
     document.getElementById('sup_notes').value = row.notes || '';
     var ps = document.getElementById('sup_payable_account_id');
     if (ps) {
@@ -350,17 +566,73 @@ function supSave() {
     var id = parseInt(document.getElementById('sup_id').value, 10) || 0;
     var name = document.getElementById('sup_name').value.trim();
     var phone = document.getElementById('sup_phone').value.trim();
+    var ccEl = supPhoneCountryEl();
+    var phoneCountry = ccEl ? String(ccEl.value || '').trim() : '';
+    var intlSel = ccEl && ccEl.tagName === 'SELECT' && phoneCountry === '__intl__';
+    var ccForNorm = intlSel ? null : phoneCountry && phoneCountry !== '__intl__' ? phoneCountry : null;
     var notes = document.getElementById('sup_notes').value.trim();
     if (!name) {
         alert('اسم المورد مطلوب');
         return;
     }
+    if (phone && window.orangeNormalizeCustomerPhone) {
+        var ok = window.orangeNormalizeCustomerPhone(phone, ccForNorm, intlSel);
+        if (!ok) {
+            alert('رقم الهاتف غير صالح. استخدم + أو 00 مع كود الدولة، أو اختر الدولة وأدخل الرقم الوطني.');
+            return;
+        }
+    }
     var payload = {
         name: name,
         phone: phone || null,
         notes: notes || null,
+        phone_country: phoneCountry !== '' ? phoneCountry : null,
         code: (document.getElementById('sup_code') && document.getElementById('sup_code').value.trim()) || null
     };
+    var ia = document.getElementById('sup_is_active');
+    if (ia) {
+        payload.is_active = parseInt(String(ia.value || '1'), 10) === 1 ? 1 : 0;
+    }
+    var ccy = document.getElementById('sup_currency_code');
+    if (ccy) {
+        var cVal = String(ccy.value || '').trim();
+        if (!cVal) {
+            alert('العملة الافتراضية للمورد مطلوبة');
+            return;
+        }
+        payload.currency_code = cVal;
+    }
+    var txp = document.getElementById('sup_tax_profile');
+    if (txp) {
+        var tVal = String(txp.value || '').trim();
+        if (!tVal) {
+            alert('المعاملة الضريبية مطلوبة');
+            return;
+        }
+        payload.tax_profile = tVal;
+    }
+    var pm = document.getElementById('sup_payment_mode');
+    if (pm) {
+        payload.payment_mode = String(pm.value || 'cash');
+    }
+    var td = document.getElementById('sup_payment_terms_days');
+    if (td) {
+        var termsRaw = String(td.value || '').trim();
+        if (termsRaw === '') {
+            payload.payment_terms_days = null;
+        } else {
+            var termsVal = parseInt(termsRaw, 10);
+            if (isNaN(termsVal) || termsVal < 0) {
+                alert('أيام السداد يجب أن تكون رقماً صحيحاً >= 0');
+                return;
+            }
+            payload.payment_terms_days = termsVal;
+        }
+    }
+    var txno = document.getElementById('sup_tax_number');
+    if (txno) {
+        payload.tax_number = String(txno.value || '').trim() || null;
+    }
     var ps = document.getElementById('sup_payable_account_id');
     if (ps) {
         var pv = parseInt(String(ps.value || '0'), 10);
@@ -401,7 +673,7 @@ var SUP_CHECKLIST_ITEMS = [
     { id: 'supplier_phone_country_phone', group: 'أولاً: بنود إلزامية', label: 'كود دولة + هاتف (phone_country + phone)', help: 'اتصال موحد وفق سياسة الهاتف.', priority: 'required' },
     { id: 'supplier_currency', group: 'أولاً: بنود إلزامية', label: 'العملة الافتراضية للمورد (currency_id)', help: 'تحدد عملة الشراء الافتراضية.', priority: 'required' },
     { id: 'supplier_payment_mode', group: 'أولاً: بنود إلزامية', label: 'طريقة السداد الافتراضية (payment_mode)', help: 'نقدي/آجل/تحويل.', priority: 'required' },
-    { id: 'supplier_terms_days', group: 'أولاً: بنود إلزامية', label: 'شروط السداد بالأيام (payment_terms_days)', help: 'مطلوب عند السداد الآجل.', priority: 'required' },
+    { id: 'supplier_terms_days', group: 'ثانياً: بنود مهمة جداً', label: 'شروط السداد بالأيام (payment_terms_days)', help: 'تنبيه تشغيلي عند الآجل (اختياري وليس شرط حفظ).', priority: 'important' },
     { id: 'supplier_ap_account', group: 'أولاً: بنود إلزامية', label: 'حساب ذمة المورد (ap_account_id/payable_account_id)', help: 'حساب ترحيل إلزامي للمورد في الدليل.', priority: 'required' },
     { id: 'supplier_tax_profile', group: 'أولاً: بنود إلزامية', label: 'المعاملة الضريبية (tax_profile)', help: 'خاضع/معفى/صفر + إعداد افتراضي.', priority: 'required' },
     { id: 'supplier_contact_person', group: 'ثانياً: بنود مهمة جداً', label: 'اسم مسؤول التواصل (contact_person)', help: 'اسم شخص التواصل الرئيسي لدى المورد.', priority: 'important' },
@@ -418,7 +690,7 @@ var SUP_CHECKLIST_ITEMS = [
     { id: 'supplier_attachments', group: 'ثالثاً: بنود تشغيلية اختيارية', label: 'مرفقات المورد', help: 'مثل عقد/شهادة ضريبية/مستندات.', priority: 'operational' },
     { id: 'rule_duplicate_protection', group: 'رابعاً: قواعد تحقق لازمة', label: 'منع التكرار (الكود/الرقم الضريبي)', help: 'التحقق عند الحفظ يمنع الإدخال المكرر.', priority: 'required' },
     { id: 'rule_no_delete_with_docs', group: 'رابعاً: قواعد تحقق لازمة', label: 'عدم حذف مورد عليه مستندات', help: 'تعطيل بدل حذف إذا له مشتريات/حركات.', priority: 'required' },
-    { id: 'rule_terms_with_credit', group: 'رابعاً: قواعد تحقق لازمة', label: 'عند آجل: أيام سداد + حساب ذمة إلزامي', help: 'منع حفظ إعداد آجل ناقص.', priority: 'required' },
+    { id: 'rule_terms_with_credit', group: 'رابعاً: قواعد تحقق لازمة', label: 'عند آجل: حساب ذمة إلزامي (أيام السداد تنبيه اختياري)', help: 'منع حفظ آجل بدون حساب ذمة، مع إبقاء أيام السداد كتنبيه.', priority: 'required' },
     { id: 'rule_active_supplier_on_purchase', group: 'رابعاً: قواعد تحقق لازمة', label: 'فواتير الشراء لمورد نشط فقط', help: 'supplier_id صالح ونشط أثناء الحفظ.', priority: 'required' }
 ];
 
@@ -459,19 +731,19 @@ function supChecklistAutoStatus(itemId) {
     var has = function (id) { return !!document.getElementById(id); };
     if (itemId === 'supplier_code_unique') return has('sup_code') ? 'ok' : 'missing';
     if (itemId === 'supplier_name_ar') return has('sup_name') ? 'ok' : 'missing';
-    if (itemId === 'supplier_is_active') return 'missing';
+    if (itemId === 'supplier_is_active') return has('sup_is_active') ? 'ok' : 'missing';
     if (itemId === 'supplier_phone_country_phone') {
         if (!has('sup_phone')) return 'missing';
         return has('sup_phone_country') ? 'ok' : 'fix';
     }
-    if (itemId === 'supplier_currency') return 'missing';
-    if (itemId === 'supplier_payment_mode') return 'missing';
-    if (itemId === 'supplier_terms_days') return 'missing';
+    if (itemId === 'supplier_currency') return has('sup_currency_code') ? 'ok' : 'missing';
+    if (itemId === 'supplier_payment_mode') return has('sup_payment_mode') ? 'ok' : 'missing';
+    if (itemId === 'supplier_terms_days') return has('sup_payment_terms_days') ? 'ok' : 'missing';
     if (itemId === 'supplier_ap_account') return has('sup_payable_account_id') ? 'ok' : 'missing';
-    if (itemId === 'supplier_tax_profile') return 'missing';
+    if (itemId === 'supplier_tax_profile') return has('sup_tax_profile') ? 'ok' : 'missing';
     if (itemId === 'supplier_contact_person') return 'missing';
     if (itemId === 'supplier_email') return 'missing';
-    if (itemId === 'supplier_tax_number') return 'missing';
+    if (itemId === 'supplier_tax_number') return has('sup_tax_number') ? 'ok' : 'missing';
     if (itemId === 'supplier_commercial_reg') return 'missing';
     if (itemId === 'supplier_address') return 'missing';
     if (itemId === 'supplier_opening_balance') return 'missing';
@@ -481,10 +753,10 @@ function supChecklistAutoStatus(itemId) {
     if (itemId === 'supplier_internal_notes') return has('sup_notes') ? 'ok' : 'missing';
     if (itemId === 'supplier_blocking') return 'missing';
     if (itemId === 'supplier_attachments') return 'missing';
-    if (itemId === 'rule_duplicate_protection') return 'fix';
+    if (itemId === 'rule_duplicate_protection') return has('sup_code') && has('sup_tax_number') ? 'ok' : 'fix';
     if (itemId === 'rule_no_delete_with_docs') return 'todo';
-    if (itemId === 'rule_terms_with_credit') return 'missing';
-    if (itemId === 'rule_active_supplier_on_purchase') return 'todo';
+    if (itemId === 'rule_terms_with_credit') return has('sup_payable_account_id') ? 'ok' : 'missing';
+    if (itemId === 'rule_active_supplier_on_purchase') return has('sup_is_active') ? 'ok' : 'missing';
     return 'todo';
 }
 function supChecklistRender() {
