@@ -98,6 +98,33 @@ foreach ($supplierSchemaMap as $colName => $isAvailable) {
         $supplierSchemaMissingCols[] = $colName;
     }
 }
+/*
+ * واجهة الموردين يجب أن تُظهر كل الحقول دائماً للمراجعة/الإدخال،
+ * حتى لو كان عمود القاعدة ناقصاً. سبب نقص الحقول كان اقتران العرض بوجود العمود.
+ * نبقي فحص المخطط للتشخيص، لكن لا نخفي الحقول عن المستخدم.
+ */
+$hasSupplierPayableCol = true;
+$hasSupplierIsActiveCol = true;
+$hasSupplierCurrencyCol = true;
+$hasSupplierTaxProfileCol = true;
+$hasSupplierPaymentModeCol = true;
+$hasSupplierPaymentTermsCol = true;
+$hasSupplierTaxNumberCol = true;
+$hasSupplierPhoneCountryDialCol = true;
+$hasSupplierContactPersonCol = true;
+$hasSupplierEmailCol = true;
+$hasSupplierCommercialRegCol = true;
+$hasSupplierAddressLineCol = true;
+$hasSupplierCityAreaCol = true;
+$hasSupplierOpeningBalanceCol = true;
+$hasSupplierCreditLimitCol = true;
+$hasSupplierBankNameCol = true;
+$hasSupplierBankIbanCol = true;
+$hasSupplierBankHolderCol = true;
+$hasSupplierPreferredWarehouseCol = true;
+$hasSupplierIsBlockedCol = true;
+$hasSupplierBlockReasonCol = true;
+$hasSupplierAttachmentsCol = true;
 $currencyOptions = [
     'KWD' => 'دينار كويتي (KWD)',
     'USD' => 'دولار أمريكي (USD)',
@@ -170,6 +197,9 @@ $count = count($rows);
         <p class="card-hint" style="margin:6px 0 0; color:#7c2d12;">
             أعمدة لم تظهر بعد في القاعدة:
             <code dir="ltr"><?php echo htmlspecialchars(implode(', ', $supplierSchemaMissingCols), ENT_QUOTES, 'UTF-8'); ?></code>
+        </p>
+        <p class="card-hint" style="margin:6px 0 0; color:#7c2d12;">
+            تم إظهار جميع خانات الموردين في الشاشة رغم ذلك. إذا كان عمود ناقصاً، فلن يُحفظ هذا الحقل حتى يكتمل ترحيل المخطط.
         </p>
     <?php endif; ?>
 </div>
