@@ -226,16 +226,6 @@ $count = count($rows);
 <div class="page-title page-title--stacked">
     <div>
         <h1>الموردين</h1>
-        <p class="page-subtitle">
-            إدارة موردي المشتريات: <strong>كود المورد</strong> (فريد تلقائي)، الذمم الدائنة، وعدد مستندات الشراء.
-            مستقبلاً: ربط <strong>مردود المشتريات</strong> بجدول <code dir="ltr">purchase_returns</code> (المورد + مستند الشراء الأصلي).
-            المشتريات من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchases'), ENT_QUOTES, 'UTF-8'); ?>">المشتريات</a>؛ السداد والكشوف من
-            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment'), ENT_QUOTES, 'UTF-8'); ?>">سداد فواتير مشتريات آجلة</a>
-            — <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_reports'), ENT_QUOTES, 'UTF-8'); ?>">تقارير الذمم المالية</a>.
-            <?php if ($hasSupplierPayableCol): ?>
-                <strong>حساب ذمة فرعي</strong> (تحت الخصوم) <strong>إلزامي لكل مورد</strong> — تُرحَّل مشتريات الآجل والسداد على ذلك الحساب فقط، دون استخدام حساب مجمع للموردين في القيود التلقائية.
-            <?php endif; ?>
-        </p>
     </div>
     <div class="actions">
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchases'), ENT_QUOTES, 'UTF-8'); ?>">مستند شراء</a>
@@ -553,7 +543,7 @@ $count = count($rows);
         </div>
         <?php endif; ?>
     </div>
-    <div class="actions" style="margin-top:12px;">
+    <div class="actions admin-actions--start" style="margin-top:12px;">
         <button type="button" onclick="supSave()">حفظ</button>
         <button type="button" class="btn-secondary" onclick="supResetForm()">تفريغ النموذج</button>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchases'), ENT_QUOTES, 'UTF-8'); ?>">مستند شراء</a>
