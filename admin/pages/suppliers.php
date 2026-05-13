@@ -308,7 +308,7 @@ $count = count($rows);
         "sup_r6_credit sup_r6_terms sup_r6_payment sup_r6_currency"
         "sup_r7_notes sup_r7_notes sup_r7_notes sup_r7_notes"
         "sup_r8_bank_name sup_r8_iban sup_r8_iban sup_r8_bank_holder"
-        "sup_r9_tax_profile sup_r9_tax_number sup_r9_commercial .";
+        "sup_r9_tax_profile sup_r9_tax_number sup_r9_commercial sup_r9_attachments";
 }
 #sup_form_grid.suppliers-form-grid.suppliers-form-grid--block-hidden {
     grid-template-areas:
@@ -319,7 +319,7 @@ $count = count($rows);
         "sup_r6_credit sup_r6_terms sup_r6_payment sup_r6_currency"
         "sup_r7_notes sup_r7_notes sup_r7_notes sup_r7_notes"
         "sup_r8_bank_name sup_r8_iban sup_r8_iban sup_r8_bank_holder"
-        "sup_r9_tax_profile sup_r9_tax_number sup_r9_commercial .";
+        "sup_r9_tax_profile sup_r9_tax_number sup_r9_commercial sup_r9_attachments";
 }
 #sup_form_grid.suppliers-form-grid input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]),
 #sup_form_grid.suppliers-form-grid select {
@@ -381,7 +381,7 @@ $count = count($rows);
 #sup_form_grid .sup-grid-r8-iban { grid-area: sup_r8_iban; }
 #sup_form_grid .sup-grid-r8-bank-holder { grid-area: sup_r8_bank_holder; }
 #sup_form_grid .sup-grid-r10-attachments-summary {
-    grid-column: 1 / -1;
+    grid-area: sup_r9_attachments;
     display: flex;
     flex-direction: column;
     gap: 6px;
