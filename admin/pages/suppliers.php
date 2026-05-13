@@ -317,6 +317,9 @@ $count = count($rows);
 #sup_form_grid .sup-grid-r2-name { grid-area: sup_r2_name; }
 #sup_form_grid .sup-grid-r2-balance { grid-area: sup_r2_balance; }
 #sup_form_grid .sup-grid-r2-status { grid-area: sup_r2_status; }
+#sup_form_grid .sup-grid-r2-balance #sup_current_balance {
+    max-width: 100%;
+}
 #sup_form_grid .sup-grid-r3-block-reason { grid-area: sup_r3_block_reason; }
 #sup_form_grid .sup-grid-r3-city { grid-area: sup_r4_city; }
 #sup_form_grid .sup-grid-r3-address { grid-area: sup_r4_address; }
