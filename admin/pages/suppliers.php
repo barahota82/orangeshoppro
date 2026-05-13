@@ -380,6 +380,60 @@ $count = count($rows);
 #sup_form_grid .sup-grid-r8-bank-name { grid-area: sup_r8_bank_name; }
 #sup_form_grid .sup-grid-r8-iban { grid-area: sup_r8_iban; }
 #sup_form_grid .sup-grid-r8-bank-holder { grid-area: sup_r8_bank_holder; }
+#sup_form_grid .sup-grid-r10-attachments {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+#sup_form_grid .sup-attachments-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: end;
+}
+#sup_form_grid .sup-attachments-toolbar button {
+    height: 42px;
+}
+#sup_form_grid .sup-attachments-list {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #ffffff;
+    padding: 8px;
+    min-height: 54px;
+}
+#sup_form_grid .sup-attachment-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 6px;
+    border-bottom: 1px solid #f1f5f9;
+}
+#sup_form_grid .sup-attachment-row:last-child {
+    border-bottom: 0;
+}
+#sup_form_grid .sup-attachment-main {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+#sup_form_grid .sup-attachment-title {
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.35;
+}
+#sup_form_grid .sup-attachment-meta {
+    margin-top: 3px;
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.4;
+}
+#sup_form_grid .sup-attachment-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+}
 @media (max-width: 1200px) {
     #sup_form_grid.suppliers-form-grid {
         grid-template-areas: none !important;
@@ -406,7 +460,8 @@ $count = count($rows);
     #sup_form_grid .sup-grid-r7-commercial,
     #sup_form_grid .sup-grid-r8-bank-name,
     #sup_form_grid .sup-grid-r8-iban,
-    #sup_form_grid .sup-grid-r8-bank-holder {
+    #sup_form_grid .sup-grid-r8-bank-holder,
+    #sup_form_grid .sup-grid-r10-attachments {
         grid-area: auto !important;
     }
     #sup_form_grid .sup-payable-fields {
@@ -421,6 +476,16 @@ $count = count($rows);
     #sup_form_grid .sup-grid-r2-balance,
     #sup_form_grid .sup-grid-r2-status {
         grid-column: auto;
+    }
+    #sup_form_grid .sup-attachments-toolbar {
+        grid-template-columns: 1fr;
+    }
+    #sup_form_grid .sup-attachment-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    #sup_form_grid .sup-attachment-actions {
+        justify-content: flex-start;
     }
 }
 </style>
@@ -588,9 +653,23 @@ $count = count($rows);
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierAttachmentsCol): ?>
-        <div style="grid-column:1/-1;">
-            <label for="sup_attachments_json">مرفقات المورد</label>
-            <textarea id="sup_attachments_json" rows="3" autocomplete="off" placeholder="ضع روابط/أسماء الملفات أو JSON مبسط للمرفقات"></textarea>
+        <div class="sup-grid-r10-attachments" id="sup_attachments_wrap">
+            <label>مرفقات المورد</label>
+            <div class="sup-attachments-toolbar">
+                <div>
+                    <label for="sup_attachment_file">اختر ملف</label>
+                    <input type="file" id="sup_attachment_file" accept=".pdf,image/*">
+                </div>
+                <div>
+                    <label for="sup_attachment_name">اسم الملف</label>
+                    <input type="text" id="sup_attachment_name" maxlength="191" autocomplete="off" placeholder="اختياري (يؤخذ من اسم الملف)">
+                </div>
+                <div class="actions" style="margin:0;">
+                    <button type="button" class="btn-secondary" id="sup_attachment_upload_btn">رفع مرفق</button>
+                </div>
+            </div>
+            <p class="card-hint" id="sup_attachments_hint" style="margin:0;">PDF وصور فقط — حد أقصى 5 مرفقات لكل مورد (حتى 20MB للملف قبل الضغط).</p>
+            <div class="sup-attachments-list" id="sup_attachments_list"></div>
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierPayableCol): ?>
@@ -993,6 +1072,208 @@ function supSetValue(id, value) {
     }
     el.value = value == null ? '' : String(value);
 }
+function supAttachmentRows() {
+    if (!Array.isArray(window.__supAttachmentRows)) {
+        window.__supAttachmentRows = [];
+    }
+    return window.__supAttachmentRows;
+}
+function supAttachmentParseJson(raw) {
+    var txt = String(raw || '').trim();
+    if (!txt) {
+        return [];
+    }
+    var arr = [];
+    try {
+        arr = JSON.parse(txt);
+    } catch (eJson) {
+        return [];
+    }
+    if (!Array.isArray(arr)) {
+        return [];
+    }
+    return arr.filter(function (item) {
+        return item && typeof item === 'object' && String(item.id || '').trim() !== '';
+    }).map(function (item) {
+        return {
+            id: String(item.id || '').trim(),
+            name: String(item.name || '').trim(),
+            path: String(item.path || '').trim(),
+            mime: String(item.mime || '').trim(),
+            size: parseInt(item.size, 10) || 0,
+            uploaded_at: String(item.uploaded_at || '').trim(),
+            original_name: String(item.original_name || '').trim()
+        };
+    });
+}
+function supAttachmentEscapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, function (c) {
+        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+}
+function supAttachmentFmtBytes(bytes) {
+    var n = parseInt(bytes, 10) || 0;
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1048576).toFixed(2) + ' MB';
+}
+function supAttachmentPublicBase() {
+    var base = typeof window.ORANGE_PUBLIC_BASE_PATH === 'string' ? window.ORANGE_PUBLIC_BASE_PATH : '';
+    return base.replace(/\/+$/, '');
+}
+function supAttachmentDownloadUrl(supplierId, attachmentId) {
+    return supAttachmentPublicBase()
+        + '/admin/api/suppliers/attachment-download.php?supplier_id=' + encodeURIComponent(String(supplierId))
+        + '&attachment_id=' + encodeURIComponent(String(attachmentId));
+}
+function supAttachmentSetRows(rows) {
+    window.__supAttachmentRows = Array.isArray(rows) ? rows.slice() : [];
+    supAttachmentRender();
+}
+function supAttachmentLoadFromJson(raw) {
+    supAttachmentSetRows(supAttachmentParseJson(raw));
+}
+function supAttachmentRender() {
+    var list = document.getElementById('sup_attachments_list');
+    var hint = document.getElementById('sup_attachments_hint');
+    var upBtn = document.getElementById('sup_attachment_upload_btn');
+    var supplierId = parseInt((document.getElementById('sup_id') || {}).value || '0', 10) || 0;
+    var rows = supAttachmentRows();
+    var max = 5;
+    if (upBtn) {
+        upBtn.disabled = !(supplierId > 0) || rows.length >= max;
+    }
+    if (hint) {
+        if (!(supplierId > 0)) {
+            hint.textContent = 'احفظ المورد أولاً ثم ارفع المرفقات (PDF وصور فقط، حد أقصى 5 ملفات).';
+        } else {
+            hint.textContent = 'عدد المرفقات: ' + rows.length + ' / ' + max + ' — PDF وصور فقط، حتى 20MB قبل الضغط.';
+        }
+    }
+    if (!list) {
+        return;
+    }
+    if (rows.length === 0) {
+        list.innerHTML = '<div class="card-hint">لا توجد مرفقات حالياً.</div>';
+        return;
+    }
+    list.innerHTML = rows.map(function (item) {
+        var title = String(item.name || item.original_name || 'مرفق').trim();
+        var metaBits = [];
+        if (item.size > 0) {
+            metaBits.push(supAttachmentFmtBytes(item.size));
+        }
+        if (item.mime) {
+            metaBits.push(String(item.mime));
+        }
+        if (item.uploaded_at) {
+            metaBits.push(String(item.uploaded_at).replace('T', ' '));
+        }
+        return ''
+            + '<div class="sup-attachment-row">'
+            + '  <div class="sup-attachment-main">'
+            + '    <div class="sup-attachment-title">' + supAttachmentEscapeHtml(title) + '</div>'
+            + '    <div class="sup-attachment-meta">' + supAttachmentEscapeHtml(metaBits.join(' — ')) + '</div>'
+            + '  </div>'
+            + '  <div class="sup-attachment-actions">'
+            + '    <a class="btn btn-secondary" href="' + supAttachmentDownloadUrl(supplierId, item.id) + '">تحميل</a>'
+            + '    <button type="button" class="btn-danger" data-sup-att-del="' + supAttachmentEscapeHtml(item.id) + '">حذف</button>'
+            + '  </div>'
+            + '</div>';
+    }).join('');
+    list.querySelectorAll('[data-sup-att-del]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var attId = String(btn.getAttribute('data-sup-att-del') || '').trim();
+            if (attId) {
+                supAttachmentDelete(attId);
+            }
+        });
+    });
+}
+function supAttachmentDelete(attachmentId) {
+    var supplierId = parseInt((document.getElementById('sup_id') || {}).value || '0', 10) || 0;
+    if (!(supplierId > 0)) {
+        alert('احفظ المورد أولاً');
+        return;
+    }
+    if (!confirm('سيتم حذف المرفق نهائياً. هل تريد المتابعة؟')) {
+        return;
+    }
+    postJSON('/admin/api/suppliers/attachment-delete.php', {
+        supplier_id: supplierId,
+        attachment_id: attachmentId
+    }).then(function (res) {
+        if (!res || !res.success) {
+            alert((res && res.message) ? res.message : 'تعذر حذف المرفق');
+            return;
+        }
+        supAttachmentSetRows(Array.isArray(res.attachments) ? res.attachments : []);
+        alert(res.message || 'تم حذف المرفق');
+    }).catch(function (err) {
+        alert(err && err.message ? err.message : String(err));
+    });
+}
+async function supAttachmentUpload() {
+    var supplierId = parseInt((document.getElementById('sup_id') || {}).value || '0', 10) || 0;
+    if (!(supplierId > 0)) {
+        alert('احفظ المورد أولاً ثم أضف المرفقات');
+        return;
+    }
+    var rows = supAttachmentRows();
+    if (rows.length >= 5) {
+        alert('الحد الأقصى لمرفقات المورد هو 5 ملفات');
+        return;
+    }
+    var fileEl = document.getElementById('sup_attachment_file');
+    var nameEl = document.getElementById('sup_attachment_name');
+    var btn = document.getElementById('sup_attachment_upload_btn');
+    var file = fileEl && fileEl.files && fileEl.files[0] ? fileEl.files[0] : null;
+    if (!file) {
+        alert('اختر ملفاً للرفع');
+        return;
+    }
+    var fd = new FormData();
+    fd.append('supplier_id', String(supplierId));
+    fd.append('file', file);
+    if (nameEl) {
+        fd.append('attachment_name', String(nameEl.value || '').trim());
+    }
+    if (btn) {
+        btn.disabled = true;
+    }
+    try {
+        var resp = await fetch('/admin/api/suppliers/attachment-upload.php', {
+            method: 'POST',
+            body: fd,
+            credentials: 'same-origin'
+        });
+        var res = {};
+        try {
+            res = await resp.json();
+        } catch (eJson) {
+            res = {};
+        }
+        if (!res || !res.success) {
+            alert((res && res.message) ? res.message : 'تعذر رفع المرفق');
+            return;
+        }
+        supAttachmentSetRows(Array.isArray(res.attachments) ? res.attachments : []);
+        if (fileEl) {
+            fileEl.value = '';
+        }
+        if (nameEl) {
+            nameEl.value = '';
+        }
+        alert(res.message || 'تم رفع المرفق');
+    } catch (eReq) {
+        alert(eReq && eReq.message ? eReq.message : String(eReq));
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+        }
+        supAttachmentRender();
+    }
+}
 function supEnsureCityAreaOption(value) {
     var el = document.getElementById('sup_city_area');
     if (!el || el.tagName !== 'SELECT') {
@@ -1250,7 +1531,7 @@ function supResetForm() {
     supSetValue('sup_bank_account_holder', '');
     supSetValue('sup_preferred_warehouse_id', '1');
     supSetValue('sup_block_reason', '');
-    supSetValue('sup_attachments_json', '');
+    supAttachmentSetRows([]);
     supToggleBlockReasonField();
     document.getElementById('sup_notes').value = '';
     supPayableSetAccount(null);
@@ -1306,7 +1587,7 @@ function supEdit(row) {
     supSetValue('sup_bank_account_holder', row.bank_account_holder || '');
     supSetValue('sup_preferred_warehouse_id', row.preferred_warehouse_id != null ? row.preferred_warehouse_id : '1');
     supSetValue('sup_block_reason', row.block_reason || '');
-    supSetValue('sup_attachments_json', row.attachments_json || '');
+    supAttachmentLoadFromJson(row.attachments_json || '');
     supToggleBlockReasonField();
     supSetCurrentBalance(row.current_balance != null ? row.current_balance : 0);
     document.getElementById('sup_notes').value = row.notes || '';
@@ -1469,10 +1750,6 @@ function supSave() {
         }
         payload.block_reason = statusNow === 'blocked' ? (brVal || null) : null;
     }
-    var at = document.getElementById('sup_attachments_json');
-    if (at) {
-        payload.attachments_json = String(at.value || '').trim() || null;
-    }
     var ps = document.getElementById('sup_payable_account_id');
     if (ps) {
         var pv = parseInt(String(ps.value || '0'), 10);
@@ -1560,12 +1837,36 @@ function supFilterRows() {
             supPayablePickerClose();
         }
     });
+    var attFile = document.getElementById('sup_attachment_file');
+    var attName = document.getElementById('sup_attachment_name');
+    if (attFile) {
+        attFile.addEventListener('change', function () {
+            var f = attFile.files && attFile.files[0] ? attFile.files[0] : null;
+            if (!f || !attName) {
+                return;
+            }
+            var current = String(attName.value || '').trim();
+            if (current !== '') {
+                return;
+            }
+            var raw = String(f.name || '');
+            var dot = raw.lastIndexOf('.');
+            attName.value = dot > 0 ? raw.slice(0, dot) : raw;
+        });
+    }
+    var attUploadBtn = document.getElementById('sup_attachment_upload_btn');
+    if (attUploadBtn) {
+        attUploadBtn.addEventListener('click', function () {
+            supAttachmentUpload();
+        });
+    }
     var statusEl = document.getElementById('sup_status');
     if (statusEl) {
         statusEl.addEventListener('change', supToggleBlockReasonField);
     }
     supPopulateCountryCodes();
     supPopulateCurrencyOptions();
+    supAttachmentSetRows([]);
     supToggleBlockReasonField();
     supEnforceFormVisibility();
     window.addEventListener('resize', supEnforceFormVisibility);

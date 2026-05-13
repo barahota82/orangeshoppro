@@ -53,6 +53,7 @@ try {
         json_response(['success' => false, 'message' => 'جدول الموردين غير متوفر'], 500);
     }
     $data = get_json_input();
+    $attachmentsJsonProvided = is_array($data) && array_key_exists('attachments_json', $data);
     $openingBalanceProvided = is_array($data) && array_key_exists('opening_balance', $data);
     $idIn = (int) ($data['id'] ?? 0);
     $name = trim((string) ($data['name'] ?? ''));
@@ -306,7 +307,7 @@ try {
     }
 
     $attachmentsJsonSql = null;
-    if ($hasAttachmentsJson) {
+    if ($hasAttachmentsJson && $attachmentsJsonProvided) {
         $raw = trim((string) ($data['attachments_json'] ?? ''));
         $attachmentsJsonSql = $raw === '' ? null : (function_exists('mb_substr') ? mb_substr($raw, 0, 8000, 'UTF-8') : substr($raw, 0, 8000));
     }
@@ -449,7 +450,7 @@ try {
             $fields[] = 'block_reason = ?';
             $params[] = $blockReasonSql;
         }
-        if ($hasAttachmentsJson) {
+        if ($hasAttachmentsJson && $attachmentsJsonProvided) {
             $fields[] = 'attachments_json = ?';
             $params[] = $attachmentsJsonSql;
         }
@@ -580,7 +581,7 @@ try {
     if ($hasAttachmentsJson) {
         $cols[] = 'attachments_json';
         $placeholders[] = '?';
-        $params[] = $attachmentsJsonSql;
+        $params[] = $attachmentsJsonProvided ? $attachmentsJsonSql : null;
     }
     $sql = 'INSERT INTO suppliers (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $placeholders) . ')';
     $pdo->prepare($sql)->execute($params);
