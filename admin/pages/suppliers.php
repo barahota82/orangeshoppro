@@ -166,7 +166,7 @@ $count = count($rows);
     <div>
         <h1>الموردين</h1>
         <p class="page-subtitle">
-            إدارة موردي المشتريات: <strong>كود المورد</strong> (فريد اختياري)، الذمم الدائنة، وعدد مستندات الشراء.
+            إدارة موردي المشتريات: <strong>كود المورد</strong> (فريد تلقائي)، الذمم الدائنة، وعدد مستندات الشراء.
             مستقبلاً: ربط <strong>مردود المشتريات</strong> بجدول <code dir="ltr">purchase_returns</code> (المورد + مستند الشراء الأصلي).
             المشتريات من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchases'), ENT_QUOTES, 'UTF-8'); ?>">المشتريات</a>؛ السداد والكشوف من
             <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment'), ENT_QUOTES, 'UTF-8'); ?>">سداد فواتير مشتريات آجلة</a>
@@ -223,8 +223,9 @@ $count = count($rows);
     <input type="hidden" id="sup_id" value="0">
     <div class="form-grid suppliers-form-grid" id="sup_form_grid">
         <div>
-            <label for="sup_code">كود المورد (اختياري — يُولَّد تلقائياً عند تركه فارغاً)</label>
-            <input type="text" id="sup_code" maxlength="32" autocomplete="off" dir="ltr" lang="en" placeholder="مثال: V-2001">
+            <label for="sup_code">كود المورد (تلقائي فقط)</label>
+            <input type="text" id="sup_code" class="admin-sort-field admin-sort-field--muted" maxlength="32" autocomplete="off" dir="ltr" lang="en" placeholder="يُولَّد تلقائياً عند الحفظ" readonly>
+            <p class="card-hint" style="margin:6px 0 0;">هذا الحقل تلقائي فقط ولا يقبل إدخالاً يدوياً.</p>
         </div>
         <div>
             <label for="sup_name">اسم المورد</label>
@@ -768,8 +769,7 @@ function supSave() {
         name: name,
         phone: phone || null,
         notes: notes || null,
-        phone_country: phoneCountry !== '' ? phoneCountry : null,
-        code: (document.getElementById('sup_code') && document.getElementById('sup_code').value.trim()) || null
+        phone_country: phoneCountry !== '' ? phoneCountry : null
     };
     var ia = document.getElementById('sup_is_active');
     if (ia) {

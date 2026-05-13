@@ -8,19 +8,6 @@ require_once __DIR__ . '/../../../includes/phone_validation.php';
 require_once __DIR__ . '/../../../includes/account_tree.php';
 require_admin_api();
 
-function orange_supplier_normalize_code(PDO $pdo, $raw): ?string
-{
-    if (!orange_table_has_column($pdo, 'suppliers', 'code')) {
-        return null;
-    }
-    $s = trim((string) $raw);
-    if ($s === '') {
-        return null;
-    }
-
-    return function_exists('mb_substr') ? mb_substr($s, 0, 32, 'UTF-8') : substr($s, 0, 32);
-}
-
 function orange_supplier_next_auto_code(PDO $pdo): ?string
 {
     if (!orange_table_has_column($pdo, 'suppliers', 'code')) {
@@ -104,8 +91,9 @@ try {
     $hasIsBlocked = orange_table_has_column($pdo, 'suppliers', 'is_blocked');
     $hasBlockReason = orange_table_has_column($pdo, 'suppliers', 'block_reason');
     $hasAttachmentsJson = orange_table_has_column($pdo, 'suppliers', 'attachments_json');
-    $codeSql = orange_supplier_normalize_code($pdo, $data['code'] ?? '');
-    if ($hasCode && $codeSql === null) {
+    // سياسة الموردين: الكود يُولَّد تلقائياً فقط؛ لا نقبل إدخالاً يدوياً من الواجهة.
+    $codeSql = null;
+    if ($hasCode) {
         if ($idIn > 0) {
             $existingCode = trim((string) (($existingSupplierRow['code'] ?? '')));
             $codeSql = $existingCode !== '' ? $existingCode : orange_supplier_next_auto_code($pdo);
