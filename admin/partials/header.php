@@ -322,9 +322,9 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 ['id' => 'accounting', 'title' => 'الحسابات العامة', 'muted' => false, 'items' => $navAccounting],
                 ['id' => 'acct_reports', 'title' => 'التقارير', 'muted' => false, 'items' => $navAccountingReports],
                 ['id' => 'ops', 'title' => 'المخازن', 'muted' => false, 'items' => $navOps],
-                ['id' => 'promotions', 'title' => 'العروض', 'muted' => false, 'items' => $navPromotions],
                 ['id' => 'purchasing', 'title' => 'المشتريات', 'muted' => false, 'items' => $navPurchasing],
                 ['id' => 'sales', 'title' => 'المبيعات', 'muted' => false, 'items' => $navSales],
+                ['id' => 'promotions', 'title' => 'العروض', 'muted' => false, 'items' => $navPromotions],
                 ['id' => 'settings', 'title' => 'الإعدادات العامة', 'muted' => true, 'items' => $navSettings],
             ];
 
@@ -400,9 +400,9 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 $orangeRenderNavSection('accounting', 'الحسابات العامة', $navAccounting);
                 $orangeRenderNavSection('acct_reports', 'التقارير', $navAccountingReports);
                 $orangeRenderNavSection('ops', 'المخازن', $navOps);
-                $orangeRenderNavSection('promotions', 'العروض', $navPromotions);
                 $orangeRenderNavSection('purchasing', 'المشتريات', $navPurchasing);
                 $orangeRenderNavSection('sales', 'المبيعات', $navSales);
+                $orangeRenderNavSection('promotions', 'العروض', $navPromotions);
                 $orangeRenderNavSection('settings', 'الإعدادات العامة', $navSettings);
                 ?>
         </nav>
