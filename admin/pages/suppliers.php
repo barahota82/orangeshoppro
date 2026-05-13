@@ -897,7 +897,7 @@ function supEnforceFormVisibility() {
     var isTablet = !!(window.matchMedia && window.matchMedia('(max-width: 1200px)').matches);
     var cols = isMobile
         ? '1fr'
-        : (isTablet ? '1fr 1fr' : 'minmax(0, 1.5fr) minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr)');
+        : (isTablet ? '1fr 1fr' : 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)');
     grid.style.setProperty('display', 'grid', 'important');
     grid.style.setProperty('grid-template-columns', cols, 'important');
     grid.style.setProperty('gap', '12px 12px', 'important');
