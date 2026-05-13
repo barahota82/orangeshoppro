@@ -217,11 +217,11 @@ $count = count($rows);
     </div>
 </div>
 
-<div class="card">
+<div class="card" id="sup_form_card">
     <h3>مورد جديد أو تعديل</h3>
     <p class="card-hint" style="margin-top:0;">الاسم إلزامي. <strong>حساب ذمة المورد</strong> إلزامي عند الحفظ. يمكن إيقاف المورد (غير نشط) بدل الحذف، وفاتورة الشراء لا تُحفظ لمورد غير نشط.</p>
     <input type="hidden" id="sup_id" value="0">
-    <div class="form-grid">
+    <div class="form-grid suppliers-form-grid" id="sup_form_grid">
         <div>
             <label for="sup_code">كود المورد (اختياري — يُولَّد تلقائياً عند تركه فارغاً)</label>
             <input type="text" id="sup_code" maxlength="32" autocomplete="off" dir="ltr" lang="en" placeholder="مثال: V-2001">
@@ -597,6 +597,36 @@ function supToggleBlockReasonField() {
     reasonEl.required = isBlocked;
     reasonEl.placeholder = isBlocked ? 'سبب الحظر مطلوب' : 'اختياري إذا المورد نشط';
 }
+function supEnforceFormVisibility() {
+    var grid = document.getElementById('sup_form_grid');
+    if (!grid) {
+        return;
+    }
+    var card = document.getElementById('sup_form_card');
+    var isMobile = !!(window.matchMedia && window.matchMedia('(max-width: 991px)').matches);
+    grid.style.setProperty('display', 'grid', 'important');
+    grid.style.setProperty('grid-template-columns', isMobile ? '1fr' : '1fr 1fr', 'important');
+    grid.style.setProperty('gap', '12px 18px', 'important');
+    grid.style.setProperty('overflow', 'visible', 'important');
+    grid.style.setProperty('height', 'auto', 'important');
+    grid.style.setProperty('max-height', 'none', 'important');
+    if (card) {
+        card.style.setProperty('height', 'auto', 'important');
+        card.style.setProperty('max-height', 'none', 'important');
+        card.style.setProperty('overflow', 'visible', 'important');
+    }
+    Array.prototype.forEach.call(grid.children, function (child) {
+        if (!child || child.nodeType !== 1) {
+            return;
+        }
+        child.style.setProperty('display', 'block', 'important');
+        child.style.setProperty('visibility', 'visible', 'important');
+        child.style.setProperty('opacity', '1', 'important');
+        child.style.setProperty('height', 'auto', 'important');
+        child.style.setProperty('max-height', 'none', 'important');
+        child.style.setProperty('overflow', 'visible', 'important');
+    });
+}
 function supResetForm() {
     document.getElementById('sup_id').value = '0';
     document.getElementById('sup_code').value = '';
@@ -920,5 +950,7 @@ function supFilterRows() {
         blockEl.addEventListener('change', supToggleBlockReasonField);
     }
     supToggleBlockReasonField();
+    supEnforceFormVisibility();
+    window.addEventListener('resize', supEnforceFormVisibility);
 })();
 </script>
