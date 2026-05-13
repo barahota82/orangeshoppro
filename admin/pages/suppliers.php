@@ -556,6 +556,8 @@ $count = count($rows);
     <div class="actions" style="margin-top:12px;">
         <button type="button" onclick="supSave()">حفظ</button>
         <button type="button" class="btn-secondary" onclick="supResetForm()">تفريغ النموذج</button>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchases'), ENT_QUOTES, 'UTF-8'); ?>">مستند شراء</a>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment'), ENT_QUOTES, 'UTF-8'); ?>">سداد فواتير مشتريات آجلة</a>
     </div>
 </div>
 
