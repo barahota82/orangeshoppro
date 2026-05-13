@@ -227,10 +227,6 @@ $count = count($rows);
     <div>
         <h1>الموردين</h1>
     </div>
-    <div class="actions">
-        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchases'), ENT_QUOTES, 'UTF-8'); ?>">فاتورة مشتريات</a>
-        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment'), ENT_QUOTES, 'UTF-8'); ?>">سداد فواتير</a>
-    </div>
 </div>
 
 <?php if ($supplierSchemaBootstrapError !== '' || $supplierSchemaMissingCols): ?>
