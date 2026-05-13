@@ -273,26 +273,26 @@ $count = count($rows);
     row-gap: 12px;
     column-gap: 12px;
     grid-template-areas:
-        "sup_r1_code . . ."
-        "sup_r2_name sup_r2_name sup_r2_balance sup_r2_status"
-        "sup_r3_block_reason sup_r3_block_reason sup_r3_block_reason sup_r3_block_reason"
-        "sup_r4_city sup_r4_address sup_r4_address sup_r4_address"
-        "sup_r5_country sup_r5_phone sup_r5_email sup_r5_contact"
-        "sup_r6_credit sup_r6_terms sup_r6_payment sup_r6_currency"
-        "sup_r7_notes sup_r7_notes sup_r7_notes sup_r7_notes"
-        "sup_r8_bank_name sup_r8_iban sup_r8_iban sup_r8_bank_holder"
-        "sup_r9_tax_profile sup_r9_tax_number sup_r9_commercial .";
+        "sup_r1_code . . . ."
+        "sup_r2_name sup_r2_name sup_r2_name sup_r2_balance sup_r2_status"
+        "sup_r3_block_reason sup_r3_block_reason sup_r3_block_reason sup_r3_block_reason sup_r3_block_reason"
+        "sup_r4_city sup_r4_address sup_r4_address sup_r4_address sup_r4_address"
+        "sup_r5_country sup_r5_phone sup_r5_email sup_r5_contact ."
+        "sup_r6_credit sup_r6_terms sup_r6_payment sup_r6_currency ."
+        "sup_r7_notes sup_r7_notes sup_r7_notes sup_r7_notes sup_r7_notes"
+        "sup_r8_bank_name sup_r8_iban sup_r8_iban sup_r8_bank_holder ."
+        "sup_r9_tax_profile sup_r9_tax_number sup_r9_commercial . .";
 }
 #sup_form_grid.suppliers-form-grid.suppliers-form-grid--block-hidden {
     grid-template-areas:
-        "sup_r1_code . . ."
-        "sup_r2_name sup_r2_name sup_r2_balance sup_r2_status"
-        "sup_r4_city sup_r4_address sup_r4_address sup_r4_address"
-        "sup_r5_country sup_r5_phone sup_r5_email sup_r5_contact"
-        "sup_r6_credit sup_r6_terms sup_r6_payment sup_r6_currency"
-        "sup_r7_notes sup_r7_notes sup_r7_notes sup_r7_notes"
-        "sup_r8_bank_name sup_r8_iban sup_r8_iban sup_r8_bank_holder"
-        "sup_r9_tax_profile sup_r9_tax_number sup_r9_commercial .";
+        "sup_r1_code . . . ."
+        "sup_r2_name sup_r2_name sup_r2_name sup_r2_balance sup_r2_status"
+        "sup_r4_city sup_r4_address sup_r4_address sup_r4_address sup_r4_address"
+        "sup_r5_country sup_r5_phone sup_r5_email sup_r5_contact ."
+        "sup_r6_credit sup_r6_terms sup_r6_payment sup_r6_currency ."
+        "sup_r7_notes sup_r7_notes sup_r7_notes sup_r7_notes sup_r7_notes"
+        "sup_r8_bank_name sup_r8_iban sup_r8_iban sup_r8_bank_holder ."
+        "sup_r9_tax_profile sup_r9_tax_number sup_r9_commercial . .";
 }
 #sup_form_grid.suppliers-form-grid input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]),
 #sup_form_grid.suppliers-form-grid select {
@@ -894,7 +894,7 @@ function supEnforceFormVisibility() {
     var isTablet = !!(window.matchMedia && window.matchMedia('(max-width: 1200px)').matches);
     var cols = isMobile
         ? '1fr'
-        : (isTablet ? '1fr 1fr' : 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1.25fr)');
+        : (isTablet ? '1fr 1fr' : 'repeat(5, minmax(0, 1fr))');
     grid.style.setProperty('display', 'grid', 'important');
     grid.style.setProperty('grid-template-columns', cols, 'important');
     grid.style.setProperty('gap', '12px 12px', 'important');
