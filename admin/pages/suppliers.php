@@ -217,13 +217,52 @@ $count = count($rows);
     </div>
 </div>
 
+<style>
+#sup_form_grid.suppliers-form-grid {
+    grid-template-areas:
+        "sup_r1_status sup_r1_currency sup_r1_payment sup_r1_code"
+        "sup_r2_name sup_r2_name sup_r2_name sup_r2_name"
+        "sup_r3_address sup_r3_address sup_r3_city sup_r3_city"
+        "sup_r4_contact sup_r4_email sup_r4_phone sup_r4_country";
+}
+#sup_form_grid .sup-grid-r1-status { grid-area: sup_r1_status; }
+#sup_form_grid .sup-grid-r1-currency { grid-area: sup_r1_currency; }
+#sup_form_grid .sup-grid-r1-payment { grid-area: sup_r1_payment; }
+#sup_form_grid .sup-grid-r1-code { grid-area: sup_r1_code; }
+#sup_form_grid .sup-grid-r2-name { grid-area: sup_r2_name; }
+#sup_form_grid .sup-grid-r3-city { grid-area: sup_r3_city; }
+#sup_form_grid .sup-grid-r3-address { grid-area: sup_r3_address; }
+#sup_form_grid .sup-grid-r4-country { grid-area: sup_r4_country; }
+#sup_form_grid .sup-grid-r4-phone { grid-area: sup_r4_phone; }
+#sup_form_grid .sup-grid-r4-email { grid-area: sup_r4_email; }
+#sup_form_grid .sup-grid-r4-contact { grid-area: sup_r4_contact; }
+@media (max-width: 1200px) {
+    #sup_form_grid.suppliers-form-grid {
+        grid-template-areas: none !important;
+    }
+    #sup_form_grid .sup-grid-r1-status,
+    #sup_form_grid .sup-grid-r1-currency,
+    #sup_form_grid .sup-grid-r1-payment,
+    #sup_form_grid .sup-grid-r1-code,
+    #sup_form_grid .sup-grid-r2-name,
+    #sup_form_grid .sup-grid-r3-city,
+    #sup_form_grid .sup-grid-r3-address,
+    #sup_form_grid .sup-grid-r4-country,
+    #sup_form_grid .sup-grid-r4-phone,
+    #sup_form_grid .sup-grid-r4-email,
+    #sup_form_grid .sup-grid-r4-contact {
+        grid-area: auto !important;
+    }
+}
+</style>
+
 <div class="card" id="sup_form_card">
     <h3>مورد جديد أو تعديل</h3>
     <p class="card-hint" style="margin-top:0;">الاسم إلزامي. <strong>حساب ذمة المورد</strong> إلزامي عند الحفظ. يمكن إيقاف المورد (غير نشط) بدل الحذف، وفاتورة الشراء لا تُحفظ لمورد غير نشط.</p>
     <input type="hidden" id="sup_id" value="0">
     <div class="form-grid suppliers-form-grid" id="sup_form_grid">
         <?php if ($hasSupplierIsActiveCol): ?>
-        <div>
+        <div class="sup-grid-r1-status">
             <label for="sup_is_active">حالة المورد</label>
             <select id="sup_is_active">
                 <option value="1" selected>نشط</option>
@@ -232,7 +271,7 @@ $count = count($rows);
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierCurrencyCol): ?>
-        <div>
+        <div class="sup-grid-r1-currency">
             <label for="sup_currency_code">العملة الافتراضية <span style="color:#b45309;">*</span></label>
             <select id="sup_currency_code" required>
                 <?php foreach ($currencyOptions as $curCode => $curLabel): ?>
@@ -244,7 +283,7 @@ $count = count($rows);
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierPaymentModeCol): ?>
-        <div>
+        <div class="sup-grid-r1-payment">
             <label for="sup_payment_mode">طريقة السداد الافتراضية</label>
             <select id="sup_payment_mode">
                 <?php foreach ($paymentModeOptions as $modeCode => $modeLabel): ?>
@@ -255,22 +294,22 @@ $count = count($rows);
             </select>
         </div>
         <?php endif; ?>
-        <div>
+        <div class="sup-grid-r1-code">
             <label for="sup_code">كود المورد (تلقائي فقط)</label>
             <input type="text" id="sup_code" class="admin-sort-field admin-sort-field--muted" maxlength="32" autocomplete="off" dir="ltr" lang="en" placeholder="يُولَّد تلقائياً عند الحفظ" readonly>
             <p class="card-hint" style="margin:6px 0 0;">هذا الحقل تلقائي فقط ولا يقبل إدخالاً يدوياً.</p>
         </div>
-        <div>
+        <div class="sup-grid-r2-name">
             <label for="sup_name">اسم المورد</label>
             <input type="text" id="sup_name" autocomplete="off" placeholder="اسم المورد أو الشركة">
         </div>
         <?php if ($hasSupplierPhoneCountryDialCol): ?>
-        <div>
+        <div class="sup-grid-r4-country">
             <label for="sup_phone_country">كود الدولة (اختياري)</label>
             <?php orange_storefront_render_phone_country_select('sup_phone_country'); ?>
         </div>
         <?php endif; ?>
-        <div>
+        <div class="sup-grid-r4-phone">
             <label for="sup_phone">الهاتف (اختياري)</label>
             <input type="text" id="sup_phone" class="js-orange-phone-input" autocomplete="off" dir="ltr" lang="en" placeholder="+965… أو 00… أو رقم وطني مع اختيار الدولة">
         </div>
@@ -299,13 +338,13 @@ $count = count($rows);
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierContactPersonCol): ?>
-        <div>
+        <div class="sup-grid-r4-contact">
             <label for="sup_contact_person">مسؤول التواصل (اختياري)</label>
             <input type="text" id="sup_contact_person" maxlength="160" autocomplete="off" placeholder="اسم مسؤول التواصل">
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierEmailCol): ?>
-        <div>
+        <div class="sup-grid-r4-email">
             <label for="sup_email">البريد الإلكتروني (اختياري)</label>
             <input type="email" id="sup_email" maxlength="255" autocomplete="off" dir="ltr" lang="en" placeholder="name@example.com">
         </div>
@@ -317,13 +356,13 @@ $count = count($rows);
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierAddressLineCol): ?>
-        <div style="grid-column:1/-1;">
+        <div class="sup-grid-r3-address">
             <label for="sup_address_line">العنوان الإداري (اختياري)</label>
             <input type="text" id="sup_address_line" maxlength="255" autocomplete="off" placeholder="عنوان المورد">
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierCityAreaCol): ?>
-        <div>
+        <div class="sup-grid-r3-city">
             <label for="sup_city_area">المدينة / المنطقة (اختياري)</label>
             <input type="text" id="sup_city_area" maxlength="160" autocomplete="off" placeholder="اختياري">
         </div>

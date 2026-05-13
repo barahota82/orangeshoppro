@@ -33,7 +33,7 @@ function orange_supplier_next_auto_code(PDO $pdo): ?string
     $start = max(1, $max + 1);
     $chk = $pdo->prepare('SELECT id FROM suppliers WHERE code = ? LIMIT 1');
     for ($i = $start; $i < $start + 20000; $i++) {
-        $candidate = 'V-' . str_pad((string) $i, 4, '0', STR_PAD_LEFT);
+        $candidate = (string) $i;
         $chk->execute([$candidate]);
         if (!$chk->fetchColumn()) {
             return $candidate;
