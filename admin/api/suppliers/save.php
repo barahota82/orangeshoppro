@@ -70,7 +70,7 @@ try {
         }
     }
     $hasPayableAcc = orange_table_has_column($pdo, 'suppliers', 'payable_account_id');
-    $hasIsActive = orange_table_has_column($pdo, 'suppliers', 'is_active');
+    $hasStatus = orange_table_has_column($pdo, 'suppliers', 'status');
     $hasPhoneCountryDial = orange_table_has_column($pdo, 'suppliers', 'phone_country_dial');
     $hasPhoneNational = orange_table_has_column($pdo, 'suppliers', 'phone_national');
     $hasCurrencyCode = orange_table_has_column($pdo, 'suppliers', 'currency_code');
@@ -89,7 +89,6 @@ try {
     $hasBankIban = orange_table_has_column($pdo, 'suppliers', 'bank_iban');
     $hasBankAccountHolder = orange_table_has_column($pdo, 'suppliers', 'bank_account_holder');
     $hasPreferredWarehouseId = orange_table_has_column($pdo, 'suppliers', 'preferred_warehouse_id');
-    $hasIsBlocked = orange_table_has_column($pdo, 'suppliers', 'is_blocked');
     $hasBlockReason = orange_table_has_column($pdo, 'suppliers', 'block_reason');
     $hasAttachmentsJson = orange_table_has_column($pdo, 'suppliers', 'attachments_json');
     // سياسة الموردين: الكود يُولَّد تلقائياً فقط؛ لا نقبل إدخالاً يدوياً من الواجهة.
@@ -146,9 +145,10 @@ try {
         $payableAccountSql = $pRaw;
     }
 
-    $isActiveSql = 1;
-    if ($hasIsActive) {
-        $isActiveSql = ((int) ($data['is_active'] ?? 1) === 1) ? 1 : 0;
+    $statusSql = strtolower(trim((string) ($data['status'] ?? 'active')));
+    $allowedStatuses = ['active', 'inactive', 'blocked'];
+    if (!in_array($statusSql, $allowedStatuses, true)) {
+        json_response(['success' => false, 'message' => 'حالة المورد غير صالحة'], 422);
     }
 
     $currencySql = 'KWD';
@@ -294,17 +294,15 @@ try {
         $preferredWarehouseSql = $whRaw > 0 ? $whRaw : 1;
     }
 
-    $isBlockedSql = 0;
-    if ($hasIsBlocked) {
-        $isBlockedSql = ((int) ($data['is_blocked'] ?? 0) === 1) ? 1 : 0;
-    }
-
     $blockReasonSql = null;
     if ($hasBlockReason) {
         $raw = trim((string) ($data['block_reason'] ?? ''));
         $blockReasonSql = $raw === '' ? null : (function_exists('mb_substr') ? mb_substr($raw, 0, 255, 'UTF-8') : substr($raw, 0, 255));
+        if ($statusSql !== 'blocked') {
+            $blockReasonSql = null;
+        }
     }
-    if (($hasIsBlocked || $hasBlockReason) && $isBlockedSql === 1 && $blockReasonSql === null) {
+    if ($statusSql === 'blocked' && $blockReasonSql === null) {
         json_response(['success' => false, 'message' => 'سبب الحظر مطلوب عند تفعيل حالة الحظر'], 422);
     }
 
@@ -372,9 +370,9 @@ try {
             $fields[] = 'payable_account_id = ?';
             $params[] = $payableAccountSql;
         }
-        if ($hasIsActive) {
-            $fields[] = 'is_active = ?';
-            $params[] = $isActiveSql;
+        if ($hasStatus) {
+            $fields[] = 'status = ?';
+            $params[] = $statusSql;
         }
         if ($hasPhoneCountryDial) {
             $fields[] = 'phone_country_dial = ?';
@@ -448,10 +446,6 @@ try {
             $fields[] = 'preferred_warehouse_id = ?';
             $params[] = $preferredWarehouseSql;
         }
-        if ($hasIsBlocked) {
-            $fields[] = 'is_blocked = ?';
-            $params[] = $isBlockedSql;
-        }
         if ($hasBlockReason) {
             $fields[] = 'block_reason = ?';
             $params[] = $blockReasonSql;
@@ -484,10 +478,10 @@ try {
         $placeholders[] = '?';
         $params[] = $payableAccountSql;
     }
-    if ($hasIsActive) {
-        $cols[] = 'is_active';
+    if ($hasStatus) {
+        $cols[] = 'status';
         $placeholders[] = '?';
-        $params[] = $isActiveSql;
+        $params[] = $statusSql;
     }
     if ($hasPhoneCountryDial) {
         $cols[] = 'phone_country_dial';
@@ -578,11 +572,6 @@ try {
         $cols[] = 'preferred_warehouse_id';
         $placeholders[] = '?';
         $params[] = $preferredWarehouseSql;
-    }
-    if ($hasIsBlocked) {
-        $cols[] = 'is_blocked';
-        $placeholders[] = '?';
-        $params[] = $isBlockedSql;
     }
     if ($hasBlockReason) {
         $cols[] = 'block_reason';

@@ -50,21 +50,30 @@ if ($purUnifiedCatalogGrouping) {
     unset($p);
 }
 
-$hasSupplierIsActive = orange_table_has_column($pdo, 'suppliers', 'is_active');
-$hasSupplierIsBlocked = orange_table_has_column($pdo, 'suppliers', 'is_blocked');
-$suppliers = $pdo->query(
-    ($hasSupplierIsActive || $hasSupplierIsBlocked)
-        ? (
-            'SELECT id, name, phone, '
-            . ($hasSupplierIsActive ? 'is_active' : '1 AS is_active') . ', '
-            . ($hasSupplierIsBlocked ? 'is_blocked' : '0 AS is_blocked')
-            . ' FROM suppliers ORDER BY '
-            . ($hasSupplierIsActive ? 'is_active DESC, ' : '')
-            . ($hasSupplierIsBlocked ? 'is_blocked ASC, ' : '')
-            . 'name ASC'
-        )
-        : 'SELECT id, name, phone, 1 AS is_active, 0 AS is_blocked FROM suppliers ORDER BY name ASC'
-)->fetchAll(PDO::FETCH_ASSOC);
+$hasSupplierStatus = orange_table_has_column($pdo, 'suppliers', 'status');
+$hasSupplierLegacyIsActive = orange_table_has_column($pdo, 'suppliers', 'is_active');
+$hasSupplierLegacyIsBlocked = orange_table_has_column($pdo, 'suppliers', 'is_blocked');
+if ($hasSupplierStatus) {
+    $suppliers = $pdo->query(
+        "SELECT id, name, phone, status
+         FROM suppliers
+         ORDER BY FIELD(status, 'active', 'inactive', 'blocked'), name ASC"
+    )->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $suppliers = $pdo->query(
+        ($hasSupplierLegacyIsActive || $hasSupplierLegacyIsBlocked)
+            ? (
+                'SELECT id, name, phone, '
+                . ($hasSupplierLegacyIsActive ? 'is_active' : '1 AS is_active') . ', '
+                . ($hasSupplierLegacyIsBlocked ? 'is_blocked' : '0 AS is_blocked')
+                . ' FROM suppliers ORDER BY '
+                . ($hasSupplierLegacyIsActive ? 'is_active DESC, ' : '')
+                . ($hasSupplierLegacyIsBlocked ? 'is_blocked ASC, ' : '')
+                . 'name ASC'
+            )
+            : 'SELECT id, name, phone, 1 AS is_active, 0 AS is_blocked FROM suppliers ORDER BY name ASC'
+    )->fetchAll(PDO::FETCH_ASSOC);
+}
 
 $variantsByProduct = [];
 $vRows = $pdo->query(
@@ -118,17 +127,31 @@ $recent = $pdo->query(
                 <option value="0">— بدون مورد محدد —</option>
                 <?php foreach ($suppliers as $s): ?>
                     <?php
-                    $supIsActive = (int) ($s['is_active'] ?? 1) === 1;
-                    $supIsBlocked = (int) ($s['is_blocked'] ?? 0) === 1;
+                    if ($hasSupplierStatus) {
+                        $supStatus = strtolower(trim((string) ($s['status'] ?? 'active')));
+                        if (!in_array($supStatus, ['active', 'inactive', 'blocked'], true)) {
+                            $supStatus = 'active';
+                        }
+                    } else {
+                        $legacyIsBlocked = (int) ($s['is_blocked'] ?? 0) === 1;
+                        $legacyIsActive = (int) ($s['is_active'] ?? 1) === 1;
+                        if ($legacyIsBlocked) {
+                            $supStatus = 'blocked';
+                        } elseif (!$legacyIsActive) {
+                            $supStatus = 'inactive';
+                        } else {
+                            $supStatus = 'active';
+                        }
+                    }
                     $supLabel = (string) ($s['name'] ?? '');
-                    if (!$supIsActive) {
+                    if ($supStatus === 'inactive') {
                         $supLabel .= ' (غير نشط)';
                     }
-                    if ($supIsBlocked) {
-                        $supLabel .= ' (محظور)';
+                    if ($supStatus === 'blocked') {
+                        $supLabel .= ' (محظور مؤقتاً)';
                     }
                     ?>
-                    <option value="<?php echo (int)$s['id']; ?>" <?php echo ($supIsActive && !$supIsBlocked) ? '' : 'disabled'; ?>>
+                    <option value="<?php echo (int)$s['id']; ?>" <?php echo $supStatus === 'active' ? '' : 'disabled'; ?>>
                         <?php echo htmlspecialchars($supLabel, ENT_QUOTES, 'UTF-8'); ?>
                     </option>
                 <?php endforeach; ?>

@@ -70,13 +70,18 @@ function orange_supplier_assert_active_for_purchase(PDO $pdo, int $supplierId): 
     if (!orange_table_exists($pdo, 'suppliers')) {
         throw new RuntimeException('جدول الموردين غير متوفر.');
     }
-    $hasActive = orange_table_has_column($pdo, 'suppliers', 'is_active');
-    $hasBlocked = orange_table_has_column($pdo, 'suppliers', 'is_blocked');
+    $hasStatus = orange_table_has_column($pdo, 'suppliers', 'status');
+    $hasLegacyActive = orange_table_has_column($pdo, 'suppliers', 'is_active');
+    $hasLegacyBlocked = orange_table_has_column($pdo, 'suppliers', 'is_blocked');
     $hasBlockReason = orange_table_has_column($pdo, 'suppliers', 'block_reason');
 
     $cols = ['id'];
-    $cols[] = $hasActive ? 'is_active' : '1 AS is_active';
-    $cols[] = $hasBlocked ? 'is_blocked' : '0 AS is_blocked';
+    if ($hasStatus) {
+        $cols[] = 'status';
+    } else {
+        $cols[] = $hasLegacyActive ? 'is_active' : '1 AS is_active';
+        $cols[] = $hasLegacyBlocked ? 'is_blocked' : '0 AS is_blocked';
+    }
     $cols[] = $hasBlockReason ? 'block_reason' : 'NULL AS block_reason';
     $st = $pdo->prepare('SELECT ' . implode(', ', $cols) . ' FROM suppliers WHERE id = ? LIMIT 1');
     $st->execute([$supplierId]);
@@ -84,10 +89,25 @@ function orange_supplier_assert_active_for_purchase(PDO $pdo, int $supplierId): 
     if (!$row) {
         throw new RuntimeException('المورد غير موجود.');
     }
-    if ((int) ($row['is_active'] ?? 1) !== 1) {
+    $status = 'active';
+    if ($hasStatus) {
+        $statusRaw = strtolower(trim((string) ($row['status'] ?? 'active')));
+        if (in_array($statusRaw, ['active', 'inactive', 'blocked'], true)) {
+            $status = $statusRaw;
+        }
+    } else {
+        $legacyBlocked = (int) ($row['is_blocked'] ?? 0) === 1;
+        $legacyActive = (int) ($row['is_active'] ?? 1) === 1;
+        if ($legacyBlocked) {
+            $status = 'blocked';
+        } elseif (!$legacyActive) {
+            $status = 'inactive';
+        }
+    }
+    if ($status === 'inactive') {
         throw new RuntimeException('المورد غير نشط. فعّل المورد أولاً ثم احفظ الفاتورة.');
     }
-    if ((int) ($row['is_blocked'] ?? 0) === 1) {
+    if ($status === 'blocked') {
         $reason = trim((string) ($row['block_reason'] ?? ''));
         if ($reason !== '') {
             throw new RuntimeException('المورد محظور مؤقتاً: ' . $reason);

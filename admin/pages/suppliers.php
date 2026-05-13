@@ -47,7 +47,7 @@ $payableAccountLabel = static function (int $id) use ($leafAccountOptions, $supp
     return '#' . $id;
 };
 $hasSupplierPayableCol = orange_table_has_column($pdo, 'suppliers', 'payable_account_id');
-$hasSupplierIsActiveCol = orange_table_has_column($pdo, 'suppliers', 'is_active');
+$hasSupplierStatusCol = orange_table_has_column($pdo, 'suppliers', 'status');
 $hasSupplierCurrencyCol = orange_table_has_column($pdo, 'suppliers', 'currency_code');
 $hasSupplierTaxProfileCol = orange_table_has_column($pdo, 'suppliers', 'tax_profile');
 $hasSupplierPaymentModeCol = orange_table_has_column($pdo, 'suppliers', 'payment_mode');
@@ -65,13 +65,12 @@ $hasSupplierBankNameCol = orange_table_has_column($pdo, 'suppliers', 'bank_name'
 $hasSupplierBankIbanCol = orange_table_has_column($pdo, 'suppliers', 'bank_iban');
 $hasSupplierBankHolderCol = orange_table_has_column($pdo, 'suppliers', 'bank_account_holder');
 $hasSupplierPreferredWarehouseCol = orange_table_has_column($pdo, 'suppliers', 'preferred_warehouse_id');
-$hasSupplierIsBlockedCol = orange_table_has_column($pdo, 'suppliers', 'is_blocked');
 $hasSupplierBlockReasonCol = orange_table_has_column($pdo, 'suppliers', 'block_reason');
 $hasSupplierAttachmentsCol = orange_table_has_column($pdo, 'suppliers', 'attachments_json');
 $supplierSchemaMissingCols = [];
 $supplierSchemaMap = [
     'payable_account_id' => $hasSupplierPayableCol,
-    'is_active' => $hasSupplierIsActiveCol,
+    'status' => $hasSupplierStatusCol,
     'phone_country_dial' => $hasSupplierPhoneCountryDialCol,
     'currency_code' => $hasSupplierCurrencyCol,
     'tax_profile' => $hasSupplierTaxProfileCol,
@@ -89,7 +88,6 @@ $supplierSchemaMap = [
     'bank_iban' => $hasSupplierBankIbanCol,
     'bank_account_holder' => $hasSupplierBankHolderCol,
     'preferred_warehouse_id' => $hasSupplierPreferredWarehouseCol,
-    'is_blocked' => $hasSupplierIsBlockedCol,
     'block_reason' => $hasSupplierBlockReasonCol,
     'attachments_json' => $hasSupplierAttachmentsCol,
 ];
@@ -104,7 +102,7 @@ foreach ($supplierSchemaMap as $colName => $isAvailable) {
  * نبقي فحص المخطط للتشخيص، لكن لا نخفي الحقول عن المستخدم.
  */
 $hasSupplierPayableCol = true;
-$hasSupplierIsActiveCol = true;
+$hasSupplierStatusCol = true;
 $hasSupplierCurrencyCol = true;
 $hasSupplierTaxProfileCol = true;
 $hasSupplierPaymentModeCol = true;
@@ -122,7 +120,6 @@ $hasSupplierBankNameCol = true;
 $hasSupplierBankIbanCol = true;
 $hasSupplierBankHolderCol = true;
 $hasSupplierPreferredWarehouseCol = true;
-$hasSupplierIsBlockedCol = true;
 $hasSupplierBlockReasonCol = true;
 $hasSupplierAttachmentsCol = true;
 $currencyOptions = [
@@ -228,7 +225,7 @@ $count = count($rows);
         "sup_r6_notes sup_r6_notes sup_r6_notes sup_r6_notes"
         "sup_r7_tax_profile sup_r7_tax_number sup_r7_commercial ."
         "sup_r8_bank_name sup_r8_iban sup_r8_iban sup_r8_bank_holder"
-        "sup_r9_block_status sup_r9_block_reason sup_r9_block_reason sup_r9_block_reason";
+        "sup_r9_block_reason sup_r9_block_reason sup_r9_block_reason sup_r9_block_reason";
 }
 #sup_form_grid .sup-grid-r1-code { grid-area: sup_r1_code; }
 #sup_form_grid .sup-grid-r2-name { grid-area: sup_r2_name; }
@@ -251,7 +248,6 @@ $count = count($rows);
 #sup_form_grid .sup-grid-r8-bank-name { grid-area: sup_r8_bank_name; }
 #sup_form_grid .sup-grid-r8-iban { grid-area: sup_r8_iban; }
 #sup_form_grid .sup-grid-r8-bank-holder { grid-area: sup_r8_bank_holder; }
-#sup_form_grid .sup-grid-r9-block-status { grid-area: sup_r9_block_status; }
 #sup_form_grid .sup-grid-r9-block-reason { grid-area: sup_r9_block_reason; }
 @media (max-width: 1200px) {
     #sup_form_grid.suppliers-form-grid {
@@ -278,7 +274,6 @@ $count = count($rows);
     #sup_form_grid .sup-grid-r8-bank-name,
     #sup_form_grid .sup-grid-r8-iban,
     #sup_form_grid .sup-grid-r8-bank-holder,
-    #sup_form_grid .sup-grid-r9-block-status,
     #sup_form_grid .sup-grid-r9-block-reason {
         grid-area: auto !important;
     }
@@ -304,12 +299,13 @@ $count = count($rows);
             <label for="sup_current_balance">الرصيد الحالي المستحق للمورد</label>
             <input type="text" id="sup_current_balance" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" value="0.000" readonly>
         </div>
-        <?php if ($hasSupplierIsActiveCol): ?>
+        <?php if ($hasSupplierStatusCol): ?>
         <div class="sup-grid-r2-status">
-            <label for="sup_is_active">حالة المورد</label>
-            <select id="sup_is_active" class="admin-sort-field">
-                <option value="1" selected>نشط</option>
-                <option value="0">غير نشط</option>
+            <label for="sup_status">حالة المورد</label>
+            <select id="sup_status" class="admin-sort-field">
+                <option value="active" selected>نشط</option>
+                <option value="inactive">غير نشط</option>
+                <option value="blocked">محظور مؤقتاً</option>
             </select>
         </div>
         <?php endif; ?>
@@ -429,19 +425,10 @@ $count = count($rows);
             <input type="text" id="sup_bank_account_holder" maxlength="160" autocomplete="off" placeholder="اختياري">
         </div>
         <?php endif; ?>
-        <?php if ($hasSupplierIsBlockedCol): ?>
-        <div class="sup-grid-r9-block-status">
-            <label for="sup_is_blocked">حالة التعامل</label>
-            <select id="sup_is_blocked">
-                <option value="0" selected>نشط للتعامل</option>
-                <option value="1">محظور مؤقتاً</option>
-            </select>
-        </div>
-        <?php endif; ?>
         <?php if ($hasSupplierBlockReasonCol): ?>
         <div class="sup-grid-r9-block-reason">
             <label for="sup_block_reason">سبب الحظر (عند الحظر)</label>
-            <input type="text" id="sup_block_reason" maxlength="255" autocomplete="off" placeholder="اختياري إذا المورد نشط">
+            <input type="text" id="sup_block_reason" maxlength="255" autocomplete="off" placeholder="اختياري إذا المورد غير محظور">
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierAttachmentsCol): ?>
@@ -493,7 +480,7 @@ $count = count($rows);
                         <th>#</th>
                         <th>الكود</th>
                         <th>الاسم</th>
-                        <?php if ($hasSupplierIsActiveCol): ?><th>الحالة</th><?php endif; ?>
+                        <?php if ($hasSupplierStatusCol): ?><th>الحالة</th><?php endif; ?>
                         <th>الهاتف</th>
                         <?php if ($hasSupplierCurrencyCol): ?><th>العملة</th><?php endif; ?>
                         <?php if ($hasSupplierTaxProfileCol): ?><th>الضريبة</th><?php endif; ?>
@@ -511,8 +498,16 @@ $count = count($rows);
                         $phone = (string) ($s['phone'] ?? '');
                         $phoneCountryDial = (string) ($s['phone_country_dial'] ?? '');
                         $codeDisp = isset($s['code']) && (string) $s['code'] !== '' ? (string) $s['code'] : '—';
-                        $isActive = $hasSupplierIsActiveCol ? (int) ($s['is_active'] ?? 1) : 1;
-                        $statusDisp = $isActive === 1 ? 'نشط' : 'غير نشط';
+                        $statusRaw = $hasSupplierStatusCol ? strtolower(trim((string) ($s['status'] ?? 'active'))) : 'active';
+                        if (!in_array($statusRaw, ['active', 'inactive', 'blocked'], true)) {
+                            $statusRaw = 'active';
+                        }
+                        $statusDisp = $statusRaw === 'inactive' ? 'غير نشط' : ($statusRaw === 'blocked' ? 'محظور مؤقتاً' : 'نشط');
+                        $statusBadge = $statusRaw === 'inactive'
+                            ? '<span class="badge cancelled">غير نشط</span>'
+                            : ($statusRaw === 'blocked'
+                                ? '<span class="badge cancelled">محظور مؤقتاً</span>'
+                                : '<span class="badge ok">نشط</span>');
                         $currencyCode = $hasSupplierCurrencyCol ? strtoupper(trim((string) ($s['currency_code'] ?? 'KWD'))) : '';
                         $taxProfileCode = $hasSupplierTaxProfileCol ? trim((string) ($s['tax_profile'] ?? 'exempt')) : '';
                         $contactPerson = $hasSupplierContactPersonCol ? (string) ($s['contact_person'] ?? '') : '';
@@ -525,7 +520,6 @@ $count = count($rows);
                         $bankIban = $hasSupplierBankIbanCol ? (string) ($s['bank_iban'] ?? '') : '';
                         $bankAccountHolder = $hasSupplierBankHolderCol ? (string) ($s['bank_account_holder'] ?? '') : '';
                         $preferredWarehouseId = $hasSupplierPreferredWarehouseCol ? (int) ($s['preferred_warehouse_id'] ?? 0) : 0;
-                        $isBlocked = $hasSupplierIsBlockedCol ? (int) ($s['is_blocked'] ?? 0) : 0;
                         $blockReason = $hasSupplierBlockReasonCol ? (string) ($s['block_reason'] ?? '') : '';
                         $attachmentsJson = $hasSupplierAttachmentsCol ? (string) ($s['attachments_json'] ?? '') : '';
                         $pAcc = $hasSupplierPayableCol ? (int) ($s['payable_account_id'] ?? 0) : 0;
@@ -537,8 +531,8 @@ $count = count($rows);
                             <td><?php echo $sid; ?></td>
                             <td dir="ltr"><?php echo htmlspecialchars($codeDisp, ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><?php echo htmlspecialchars((string) ($s['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                            <?php if ($hasSupplierIsActiveCol): ?>
-                                <td><?php echo $isActive === 1 ? '<span class="badge ok">نشط</span>' : '<span class="badge cancelled">غير نشط</span>'; ?></td>
+                            <?php if ($hasSupplierStatusCol): ?>
+                                <td><?php echo $statusBadge; ?></td>
                             <?php endif; ?>
                             <td dir="ltr"><?php echo $phone !== '' ? htmlspecialchars($phone, ENT_QUOTES, 'UTF-8') : '—'; ?></td>
                             <?php if ($hasSupplierCurrencyCol): ?>
@@ -565,7 +559,7 @@ $count = count($rows);
                                     'phone_country_dial' => $phoneCountryDial,
                                     'notes' => (string) ($s['notes'] ?? ''),
                                     'payable_account_id' => $pAcc > 0 ? $pAcc : null,
-                                    'is_active' => $isActive,
+                                    'status' => $statusRaw,
                                     'currency_code' => $currencyCode !== '' ? $currencyCode : 'KWD',
                                     'payment_mode' => (string) ($s['payment_mode'] ?? 'cash'),
                                     'payment_terms_days' => isset($s['payment_terms_days']) && $s['payment_terms_days'] !== null ? (int) $s['payment_terms_days'] : null,
@@ -581,7 +575,6 @@ $count = count($rows);
                                     'bank_iban' => $bankIban,
                                     'bank_account_holder' => $bankAccountHolder,
                                     'preferred_warehouse_id' => $preferredWarehouseId > 0 ? $preferredWarehouseId : null,
-                                    'is_blocked' => $isBlocked,
                                     'block_reason' => $blockReason,
                                     'attachments_json' => $attachmentsJson,
                                     'current_balance' => round((float) $bal, 3),
@@ -661,14 +654,14 @@ function supSetCurrentBalance(value) {
     el.value = supFormatBalanceValue(value);
 }
 function supToggleBlockReasonField() {
-    var blockEl = document.getElementById('sup_is_blocked');
+    var statusEl = document.getElementById('sup_status');
     var reasonEl = document.getElementById('sup_block_reason');
-    if (!blockEl || !reasonEl) {
+    if (!statusEl || !reasonEl) {
         return;
     }
-    var isBlocked = parseInt(String(blockEl.value || '0'), 10) === 1;
+    var isBlocked = String(statusEl.value || 'active') === 'blocked';
     reasonEl.required = isBlocked;
-    reasonEl.placeholder = isBlocked ? 'سبب الحظر مطلوب' : 'اختياري إذا المورد نشط';
+    reasonEl.placeholder = isBlocked ? 'سبب الحظر مطلوب' : 'اختياري إذا المورد غير محظور';
 }
 function supEnforceFormVisibility() {
     var grid = document.getElementById('sup_form_grid');
@@ -712,9 +705,9 @@ function supResetForm() {
     if (cc) {
         cc.value = '__intl__';
     }
-    var ia = document.getElementById('sup_is_active');
-    if (ia) {
-        ia.value = '1';
+    var statusEl = document.getElementById('sup_status');
+    if (statusEl) {
+        statusEl.value = 'active';
     }
     var ccy = document.getElementById('sup_currency_code');
     if (ccy) {
@@ -746,7 +739,6 @@ function supResetForm() {
     supSetValue('sup_bank_iban', '');
     supSetValue('sup_bank_account_holder', '');
     supSetValue('sup_preferred_warehouse_id', '1');
-    supSetValue('sup_is_blocked', '0');
     supSetValue('sup_block_reason', '');
     supSetValue('sup_attachments_json', '');
     supToggleBlockReasonField();
@@ -769,9 +761,13 @@ function supEdit(row) {
         cc.value = split.country && split.country !== '' ? split.country : '__intl__';
     }
     document.getElementById('sup_phone').value = split.phone || '';
-    var ia = document.getElementById('sup_is_active');
-    if (ia) {
-        ia.value = String((row.is_active || 0) === 1 ? 1 : 0);
+    var statusEl = document.getElementById('sup_status');
+    if (statusEl) {
+        var st = String(row.status || 'active').toLowerCase();
+        if (st !== 'active' && st !== 'inactive' && st !== 'blocked') {
+            st = 'active';
+        }
+        statusEl.value = st;
     }
     var ccy = document.getElementById('sup_currency_code');
     if (ccy) {
@@ -803,7 +799,6 @@ function supEdit(row) {
     supSetValue('sup_bank_iban', row.bank_iban || '');
     supSetValue('sup_bank_account_holder', row.bank_account_holder || '');
     supSetValue('sup_preferred_warehouse_id', row.preferred_warehouse_id != null ? row.preferred_warehouse_id : '1');
-    supSetValue('sup_is_blocked', (row.is_blocked || 0) === 1 ? '1' : '0');
     supSetValue('sup_block_reason', row.block_reason || '');
     supSetValue('sup_attachments_json', row.attachments_json || '');
     supToggleBlockReasonField();
@@ -845,9 +840,14 @@ function supSave() {
         notes: notes || null,
         phone_country: phoneCountry !== '' ? phoneCountry : null
     };
-    var ia = document.getElementById('sup_is_active');
-    if (ia) {
-        payload.is_active = parseInt(String(ia.value || '1'), 10) === 1 ? 1 : 0;
+    var statusEl = document.getElementById('sup_status');
+    if (statusEl) {
+        var statusVal = String(statusEl.value || 'active').toLowerCase();
+        if (statusVal !== 'active' && statusVal !== 'inactive' && statusVal !== 'blocked') {
+            alert('حالة المورد غير صالحة');
+            return;
+        }
+        payload.status = statusVal;
     }
     var ccy = document.getElementById('sup_currency_code');
     if (ccy) {
@@ -945,18 +945,15 @@ function supSave() {
         var pwhNum = parseInt(String(pwh.value || '1'), 10);
         payload.preferred_warehouse_id = pwhNum > 0 ? pwhNum : 1;
     }
-    var ib = document.getElementById('sup_is_blocked');
-    if (ib) {
-        payload.is_blocked = parseInt(String(ib.value || '0'), 10) === 1 ? 1 : 0;
-    }
     var br = document.getElementById('sup_block_reason');
     if (br) {
         var brVal = String(br.value || '').trim();
-        if ((payload.is_blocked || 0) === 1 && brVal === '') {
+        var statusNow = String(payload.status || 'active');
+        if (statusNow === 'blocked' && brVal === '') {
             alert('سبب الحظر مطلوب عند اختيار مورد محظور');
             return;
         }
-        payload.block_reason = brVal || null;
+        payload.block_reason = statusNow === 'blocked' ? (brVal || null) : null;
     }
     var at = document.getElementById('sup_attachments_json');
     if (at) {
@@ -1005,9 +1002,9 @@ function supFilterRows() {
             supOpenChartOfAccounts();
         });
     }
-    var blockEl = document.getElementById('sup_is_blocked');
-    if (blockEl) {
-        blockEl.addEventListener('change', supToggleBlockReasonField);
+    var statusEl = document.getElementById('sup_status');
+    if (statusEl) {
+        statusEl.addEventListener('change', supToggleBlockReasonField);
     }
     supToggleBlockReasonField();
     supEnforceFormVisibility();

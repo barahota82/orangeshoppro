@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 35);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 36);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -720,7 +720,7 @@ function orange_catalog_ensure_suppliers_schema(PDO $pdo): void
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 code VARCHAR(32) NULL,
                 name VARCHAR(160) NOT NULL DEFAULT \'\',
-                is_active TINYINT(1) NOT NULL DEFAULT 1,
+                status VARCHAR(16) NOT NULL DEFAULT \'active\',
                 phone_country_dial VARCHAR(8) NULL,
                 phone_national VARCHAR(32) NULL,
                 phone VARCHAR(40) NULL,
@@ -740,12 +740,12 @@ function orange_catalog_ensure_suppliers_schema(PDO $pdo): void
                 bank_iban VARCHAR(64) NULL,
                 bank_account_holder VARCHAR(160) NULL,
                 preferred_warehouse_id INT NULL,
-                is_blocked TINYINT(1) NOT NULL DEFAULT 0,
                 block_reason VARCHAR(255) NULL,
                 attachments_json TEXT NULL,
                 notes VARCHAR(255) NULL,
                 payable_account_id INT NULL DEFAULT NULL,
                 created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY idx_suppliers_status (status),
                 UNIQUE KEY uq_suppliers_phone (phone),
                 UNIQUE KEY uq_suppliers_code (code),
                 UNIQUE KEY uq_suppliers_tax_number (tax_number)
@@ -774,8 +774,60 @@ function orange_catalog_ensure_suppliers_schema(PDO $pdo): void
         orange_catalog_safe_exec($pdo, 'ALTER TABLE suppliers ADD COLUMN code VARCHAR(32) NULL');
         orange_catalog_safe_exec($pdo, 'CREATE UNIQUE INDEX uq_suppliers_code ON suppliers (code)');
     }
-    if (!orange_table_has_column($pdo, 'suppliers', 'is_active')) {
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE suppliers ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1');
+    if (!orange_table_has_column($pdo, 'suppliers', 'status')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE suppliers ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT \'active\' AFTER name');
+    }
+    $hasLegacySupplierIsActive = orange_table_has_column($pdo, 'suppliers', 'is_active');
+    $hasLegacySupplierIsBlocked = orange_table_has_column($pdo, 'suppliers', 'is_blocked');
+    if (orange_table_has_column($pdo, 'suppliers', 'status')) {
+        if ($hasLegacySupplierIsActive && $hasLegacySupplierIsBlocked) {
+            orange_catalog_safe_exec(
+                $pdo,
+                "UPDATE suppliers
+                 SET status = CASE
+                    WHEN COALESCE(is_blocked, 0) = 1 THEN 'blocked'
+                    WHEN COALESCE(is_active, 1) = 1 THEN 'active'
+                    ELSE 'inactive'
+                 END
+                 WHERE status IS NULL OR TRIM(status) = '' OR LOWER(TRIM(status)) NOT IN ('active', 'inactive', 'blocked')"
+            );
+        } elseif ($hasLegacySupplierIsBlocked) {
+            orange_catalog_safe_exec(
+                $pdo,
+                "UPDATE suppliers
+                 SET status = CASE
+                    WHEN COALESCE(is_blocked, 0) = 1 THEN 'blocked'
+                    ELSE 'active'
+                 END
+                 WHERE status IS NULL OR TRIM(status) = '' OR LOWER(TRIM(status)) NOT IN ('active', 'inactive', 'blocked')"
+            );
+        } elseif ($hasLegacySupplierIsActive) {
+            orange_catalog_safe_exec(
+                $pdo,
+                "UPDATE suppliers
+                 SET status = CASE
+                    WHEN COALESCE(is_active, 1) = 1 THEN 'active'
+                    ELSE 'inactive'
+                 END
+                 WHERE status IS NULL OR TRIM(status) = '' OR LOWER(TRIM(status)) NOT IN ('active', 'inactive', 'blocked')"
+            );
+        }
+        orange_catalog_safe_exec(
+            $pdo,
+            "UPDATE suppliers
+             SET status = CASE
+                WHEN LOWER(TRIM(status)) = 'active' THEN 'active'
+                WHEN LOWER(TRIM(status)) = 'inactive' THEN 'inactive'
+                WHEN LOWER(TRIM(status)) = 'blocked' THEN 'blocked'
+                ELSE 'active'
+             END"
+        );
+    }
+    if (orange_table_has_column($pdo, 'suppliers', 'is_active')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE suppliers DROP COLUMN is_active');
+    }
+    if (orange_table_has_column($pdo, 'suppliers', 'is_blocked')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE suppliers DROP COLUMN is_blocked');
     }
     if (!orange_table_has_column($pdo, 'suppliers', 'phone_country_dial')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE suppliers ADD COLUMN phone_country_dial VARCHAR(8) NULL DEFAULT NULL');
@@ -832,9 +884,6 @@ function orange_catalog_ensure_suppliers_schema(PDO $pdo): void
     if (!orange_table_has_column($pdo, 'suppliers', 'preferred_warehouse_id')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE suppliers ADD COLUMN preferred_warehouse_id INT NULL DEFAULT NULL');
     }
-    if (!orange_table_has_column($pdo, 'suppliers', 'is_blocked')) {
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE suppliers ADD COLUMN is_blocked TINYINT(1) NOT NULL DEFAULT 0');
-    }
     if (!orange_table_has_column($pdo, 'suppliers', 'block_reason')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE suppliers ADD COLUMN block_reason VARCHAR(255) NULL DEFAULT NULL');
     }
@@ -850,7 +899,7 @@ function orange_catalog_ensure_suppliers_schema(PDO $pdo): void
         'phone',
         'notes',
         'code',
-        'is_active',
+        'status',
         'phone_country_dial',
         'phone_national',
         'currency_code',
@@ -869,7 +918,6 @@ function orange_catalog_ensure_suppliers_schema(PDO $pdo): void
         'bank_iban',
         'bank_account_holder',
         'preferred_warehouse_id',
-        'is_blocked',
         'block_reason',
         'attachments_json',
         'payable_account_id',
