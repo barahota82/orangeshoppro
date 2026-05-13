@@ -282,13 +282,11 @@ $count = count($rows);
 
 <div class="card" id="sup_form_card">
     <h3>مورد جديد أو تعديل</h3>
-    <p class="card-hint" style="margin-top:0;">الاسم إلزامي. <strong>حساب ذمة المورد</strong> إلزامي عند الحفظ. يمكن إيقاف المورد (غير نشط) بدل الحذف، وفاتورة الشراء لا تُحفظ لمورد غير نشط.</p>
     <input type="hidden" id="sup_id" value="0">
     <div class="form-grid suppliers-form-grid" id="sup_form_grid">
         <div class="sup-grid-r1-code">
             <label for="sup_code">كود المورد (تلقائي فقط)</label>
             <input type="text" id="sup_code" class="admin-sort-field admin-sort-field--muted" maxlength="32" autocomplete="off" dir="ltr" lang="en" placeholder="يُولَّد تلقائياً عند الحفظ" readonly>
-            <p class="card-hint" style="margin:6px 0 0;">هذا الحقل تلقائي فقط ولا يقبل إدخالاً يدوياً.</p>
         </div>
         <div class="sup-grid-r2-name">
             <label for="sup_name">اسم المورد</label>
@@ -297,7 +295,6 @@ $count = count($rows);
         <div class="sup-grid-r2-balance">
             <label for="sup_current_balance">الرصيد الحالي المستحق للمورد</label>
             <input type="text" id="sup_current_balance" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" value="0.000" readonly>
-            <p class="card-hint" style="margin:6px 0 0;">قراءة فقط — يُحتسب تلقائياً من المشتريات والمردود والسداد وأي حركة تؤثر على ذمة المورد.</p>
         </div>
         <?php if ($hasSupplierIsActiveCol): ?>
         <div class="sup-grid-r2-status">
@@ -428,7 +425,6 @@ $count = count($rows);
         <div>
             <label for="sup_preferred_warehouse_id">المخزن الافتراضي للاستلام</label>
             <input type="number" id="sup_preferred_warehouse_id" value="1" min="1" step="1" inputmode="numeric" lang="en" dir="ltr" readonly>
-            <p class="card-hint" style="margin:6px 0 0;">حالياً النظام يعمل بمخزن شركة موحّد؛ القيمة الافتراضية 1.</p>
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierIsBlockedCol): ?>
@@ -468,7 +464,6 @@ $count = count($rows);
             <div class="actions" style="margin-top:8px;">
                 <button type="button" class="btn-secondary" onclick="supOpenChartOfAccounts()">فتح دليل الحسابات</button>
             </div>
-            <p class="card-hint" style="margin:6px 0 0;">أنشئ حساباً فرعياً تحت جذر الخصوم (مثلاً باسم المورد) من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=chart_of_accounts'), ENT_QUOTES, 'UTF-8'); ?>">دليل الحسابات</a> ثم اختره هنا. ويمكنك النقر المزدوج على الحقل لفتح الدليل سريعاً.</p>
         </div>
         <?php endif; ?>
     </div>
