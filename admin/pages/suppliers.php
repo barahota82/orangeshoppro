@@ -299,7 +299,7 @@ $count = count($rows);
         <?php if ($hasSupplierIsActiveCol): ?>
         <div class="sup-grid-r2-status">
             <label for="sup_is_active">حالة المورد</label>
-            <select id="sup_is_active">
+            <select id="sup_is_active" class="admin-sort-field">
                 <option value="1" selected>نشط</option>
                 <option value="0">غير نشط</option>
             </select>
