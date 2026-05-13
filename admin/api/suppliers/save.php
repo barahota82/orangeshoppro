@@ -53,6 +53,7 @@ try {
         json_response(['success' => false, 'message' => 'جدول الموردين غير متوفر'], 500);
     }
     $data = get_json_input();
+    $openingBalanceProvided = is_array($data) && array_key_exists('opening_balance', $data);
     $idIn = (int) ($data['id'] ?? 0);
     $name = trim((string) ($data['name'] ?? ''));
     if ($name === '') {
@@ -237,12 +238,21 @@ try {
 
     $openingBalanceSql = null;
     if ($hasOpeningBalance) {
-        $raw = $data['opening_balance'] ?? null;
-        if ($raw === '' || $raw === null) {
-            $openingBalanceSql = null;
+        if (!$openingBalanceProvided && $idIn > 0) {
+            $obStmt = $pdo->prepare('SELECT opening_balance FROM suppliers WHERE id = ? LIMIT 1');
+            $obStmt->execute([$idIn]);
+            $openingBalanceSql = $obStmt->fetchColumn();
+            if ($openingBalanceSql === false) {
+                $openingBalanceSql = null;
+            }
         } else {
-            $val = round((float) $raw, 4);
-            $openingBalanceSql = abs($val) > 0.0001 ? $val : null;
+            $raw = $data['opening_balance'] ?? null;
+            if ($raw === '' || $raw === null) {
+                $openingBalanceSql = null;
+            } else {
+                $val = round((float) $raw, 4);
+                $openingBalanceSql = abs($val) > 0.0001 ? $val : null;
+            }
         }
     }
 

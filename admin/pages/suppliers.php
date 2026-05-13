@@ -349,6 +349,11 @@ $count = count($rows);
             <input type="email" id="sup_email" maxlength="255" autocomplete="off" dir="ltr" lang="en" placeholder="name@example.com">
         </div>
         <?php endif; ?>
+        <div style="grid-column:1/-1;">
+            <label for="sup_current_balance">الرصيد الحالي المستحق للمورد</label>
+            <input type="text" id="sup_current_balance" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" value="0.000" readonly>
+            <p class="card-hint" style="margin:6px 0 0;">قراءة فقط — يُحتسب تلقائياً من المشتريات والمردود والسداد وأي حركة تؤثر على ذمة المورد.</p>
+        </div>
         <?php if ($hasSupplierCommercialRegCol): ?>
         <div>
             <label for="sup_commercial_reg">السجل التجاري (اختياري)</label>
@@ -365,12 +370,6 @@ $count = count($rows);
         <div class="sup-grid-r3-city">
             <label for="sup_city_area">المدينة / المنطقة (اختياري)</label>
             <input type="text" id="sup_city_area" maxlength="160" autocomplete="off" placeholder="اختياري">
-        </div>
-        <?php endif; ?>
-        <?php if ($hasSupplierOpeningBalanceCol): ?>
-        <div>
-            <label for="sup_opening_balance">الرصيد الافتتاحي (اختياري)</label>
-            <input type="number" id="sup_opening_balance" class="admin-inp-money" step="any" inputmode="decimal" lang="en" dir="ltr" placeholder="0.000">
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierCreditLimitCol): ?>
@@ -500,7 +499,6 @@ $count = count($rows);
                         $commercialReg = $hasSupplierCommercialRegCol ? (string) ($s['commercial_reg'] ?? '') : '';
                         $addressLine = $hasSupplierAddressLineCol ? (string) ($s['address_line'] ?? '') : '';
                         $cityArea = $hasSupplierCityAreaCol ? (string) ($s['city_area'] ?? '') : '';
-                        $openingBalance = $hasSupplierOpeningBalanceCol ? ($s['opening_balance'] ?? null) : null;
                         $creditLimit = $hasSupplierCreditLimitCol ? ($s['credit_limit'] ?? null) : null;
                         $bankName = $hasSupplierBankNameCol ? (string) ($s['bank_name'] ?? '') : '';
                         $bankIban = $hasSupplierBankIbanCol ? (string) ($s['bank_iban'] ?? '') : '';
@@ -557,7 +555,6 @@ $count = count($rows);
                                     'commercial_reg' => $commercialReg,
                                     'address_line' => $addressLine,
                                     'city_area' => $cityArea,
-                                    'opening_balance' => $openingBalance,
                                     'credit_limit' => $creditLimit,
                                     'bank_name' => $bankName,
                                     'bank_iban' => $bankIban,
@@ -566,6 +563,7 @@ $count = count($rows);
                                     'is_blocked' => $isBlocked,
                                     'block_reason' => $blockReason,
                                     'attachments_json' => $attachmentsJson,
+                                    'current_balance' => round((float) $bal, 3),
                                 ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>)'>تعديل</button>
                                 <a class="btn btn-secondary party-registry-btn" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_reports#partner-balances-suppliers'), ENT_QUOTES, 'UTF-8'); ?>">ذمة المورد</a>
                             </td>
@@ -627,6 +625,20 @@ function supSetValue(id, value) {
     }
     el.value = value == null ? '' : String(value);
 }
+function supFormatBalanceValue(value) {
+    var n = Number(value);
+    if (!isFinite(n)) {
+        n = 0;
+    }
+    return n.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+}
+function supSetCurrentBalance(value) {
+    var el = document.getElementById('sup_current_balance');
+    if (!el) {
+        return;
+    }
+    el.value = supFormatBalanceValue(value);
+}
 function supToggleBlockReasonField() {
     var blockEl = document.getElementById('sup_is_blocked');
     var reasonEl = document.getElementById('sup_block_reason');
@@ -672,6 +684,7 @@ function supEnforceFormVisibility() {
 function supResetForm() {
     document.getElementById('sup_id').value = '0';
     document.getElementById('sup_code').value = '';
+    supSetCurrentBalance(0);
     document.getElementById('sup_name').value = '';
     document.getElementById('sup_phone').value = '';
     var cc = supPhoneCountryEl();
@@ -707,7 +720,6 @@ function supResetForm() {
     supSetValue('sup_commercial_reg', '');
     supSetValue('sup_address_line', '');
     supSetValue('sup_city_area', '');
-    supSetValue('sup_opening_balance', '');
     supSetValue('sup_credit_limit', '');
     supSetValue('sup_bank_name', '');
     supSetValue('sup_bank_iban', '');
@@ -765,7 +777,6 @@ function supEdit(row) {
     supSetValue('sup_commercial_reg', row.commercial_reg || '');
     supSetValue('sup_address_line', row.address_line || '');
     supSetValue('sup_city_area', row.city_area || '');
-    supSetValue('sup_opening_balance', row.opening_balance != null ? row.opening_balance : '');
     supSetValue('sup_credit_limit', row.credit_limit != null ? row.credit_limit : '');
     supSetValue('sup_bank_name', row.bank_name || '');
     supSetValue('sup_bank_iban', row.bank_iban || '');
@@ -775,6 +786,7 @@ function supEdit(row) {
     supSetValue('sup_block_reason', row.block_reason || '');
     supSetValue('sup_attachments_json', row.attachments_json || '');
     supToggleBlockReasonField();
+    supSetCurrentBalance(row.current_balance != null ? row.current_balance : 0);
     document.getElementById('sup_notes').value = row.notes || '';
     var ps = document.getElementById('sup_payable_account_id');
     if (ps) {
@@ -880,20 +892,6 @@ function supSave() {
     var ca = document.getElementById('sup_city_area');
     if (ca) {
         payload.city_area = String(ca.value || '').trim() || null;
-    }
-    var ob = document.getElementById('sup_opening_balance');
-    if (ob) {
-        var obVal = String(ob.value || '').trim();
-        if (obVal === '') {
-            payload.opening_balance = null;
-        } else {
-            var obNum = parseFloat(obVal);
-            if (isNaN(obNum)) {
-                alert('الرصيد الافتتاحي غير صالح');
-                return;
-            }
-            payload.opening_balance = obNum;
-        }
     }
     var cl = document.getElementById('sup_credit_limit');
     if (cl) {
