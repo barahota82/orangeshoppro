@@ -26,8 +26,8 @@ function orange_storefront_render_phone_country_select(string $selectId, string 
     $aria = htmlspecialchars(t('phone_country_label'), ENT_QUOTES, 'UTF-8');
     echo '<select id="' . $id . '" class="' . $clsAttr . '" dir="ltr" autocomplete="tel-country-code" aria-label="' . $aria . '">';
     foreach ($opts as $val => $label) {
-        echo '<option value="' . htmlspecialchars($val, ENT_QUOTES, 'UTF-8') . '">'
-            . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</option>';
+        echo '<option value="' . htmlspecialchars((string) $val, ENT_QUOTES, 'UTF-8') . '">'
+            . htmlspecialchars((string) $label, ENT_QUOTES, 'UTF-8') . '</option>';
     }
     echo '</select>';
 }
