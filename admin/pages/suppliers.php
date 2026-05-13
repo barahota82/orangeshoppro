@@ -380,29 +380,44 @@ $count = count($rows);
 #sup_form_grid .sup-grid-r8-bank-name { grid-area: sup_r8_bank_name; }
 #sup_form_grid .sup-grid-r8-iban { grid-area: sup_r8_iban; }
 #sup_form_grid .sup-grid-r8-bank-holder { grid-area: sup_r8_bank_holder; }
-#sup_form_grid .sup-grid-r10-attachments {
+#sup_form_grid .sup-grid-r10-attachments-summary {
     grid-column: 1 / -1;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
-#sup_form_grid .sup-attachments-toolbar {
+#sup_form_grid .sup-attachments-inline {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+#sup_form_grid #sup_attachments_count {
+    max-width: 120px;
+    text-align: center;
+}
+.sup-attachments-modal__dialog {
+    width: min(920px, calc(100vw - 24px));
+    max-height: calc(100vh - 24px);
+    overflow: auto;
+}
+.sup-attachments-toolbar {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
     gap: 10px;
     align-items: end;
+    margin-bottom: 10px;
 }
-#sup_form_grid .sup-attachments-toolbar button {
+.sup-attachments-toolbar button {
     height: 42px;
 }
-#sup_form_grid .sup-attachments-list {
+.sup-attachments-list {
     border: 1px solid #e5e7eb;
     border-radius: 10px;
     background: #ffffff;
     padding: 8px;
     min-height: 54px;
 }
-#sup_form_grid .sup-attachment-row {
+.sup-attachment-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -410,25 +425,25 @@ $count = count($rows);
     padding: 8px 6px;
     border-bottom: 1px solid #f1f5f9;
 }
-#sup_form_grid .sup-attachment-row:last-child {
+.sup-attachment-row:last-child {
     border-bottom: 0;
 }
-#sup_form_grid .sup-attachment-main {
+.sup-attachment-main {
     min-width: 0;
     flex: 1 1 auto;
 }
-#sup_form_grid .sup-attachment-title {
+.sup-attachment-title {
     font-weight: 600;
     color: #0f172a;
     line-height: 1.35;
 }
-#sup_form_grid .sup-attachment-meta {
+.sup-attachment-meta {
     margin-top: 3px;
     font-size: 12px;
     color: #64748b;
     line-height: 1.4;
 }
-#sup_form_grid .sup-attachment-actions {
+.sup-attachment-actions {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -461,7 +476,7 @@ $count = count($rows);
     #sup_form_grid .sup-grid-r8-bank-name,
     #sup_form_grid .sup-grid-r8-iban,
     #sup_form_grid .sup-grid-r8-bank-holder,
-    #sup_form_grid .sup-grid-r10-attachments {
+    #sup_form_grid .sup-grid-r10-attachments-summary {
         grid-area: auto !important;
     }
     #sup_form_grid .sup-payable-fields {
@@ -477,14 +492,17 @@ $count = count($rows);
     #sup_form_grid .sup-grid-r2-status {
         grid-column: auto;
     }
-    #sup_form_grid .sup-attachments-toolbar {
+    #sup_form_grid .sup-attachments-inline {
+        flex-wrap: wrap;
+    }
+    .sup-attachments-toolbar {
         grid-template-columns: 1fr;
     }
-    #sup_form_grid .sup-attachment-row {
+    .sup-attachment-row {
         flex-direction: column;
         align-items: stretch;
     }
-    #sup_form_grid .sup-attachment-actions {
+    .sup-attachment-actions {
         justify-content: flex-start;
     }
 }
@@ -653,23 +671,12 @@ $count = count($rows);
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierAttachmentsCol): ?>
-        <div class="sup-grid-r10-attachments" id="sup_attachments_wrap">
-            <label>مرفقات المورد</label>
-            <div class="sup-attachments-toolbar">
-                <div>
-                    <label for="sup_attachment_file">اختر ملف</label>
-                    <input type="file" id="sup_attachment_file" accept=".pdf,image/*">
-                </div>
-                <div>
-                    <label for="sup_attachment_name">اسم الملف</label>
-                    <input type="text" id="sup_attachment_name" maxlength="191" autocomplete="off" placeholder="اختياري (يؤخذ من اسم الملف)">
-                </div>
-                <div class="actions" style="margin:0;">
-                    <button type="button" class="btn-secondary" id="sup_attachment_upload_btn">رفع مرفق</button>
-                </div>
+        <div class="sup-grid-r10-attachments-summary" id="sup_attachments_wrap">
+            <label for="sup_attachments_count">عدد المرفقات</label>
+            <div class="sup-attachments-inline">
+                <input type="text" id="sup_attachments_count" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" value="0" readonly>
+                <button type="button" class="btn-secondary" id="sup_attachments_manage_btn">إدارة المرفقات</button>
             </div>
-            <p class="card-hint" id="sup_attachments_hint" style="margin:0;">PDF وصور فقط — حد أقصى 5 مرفقات لكل مورد (حتى 20MB للملف قبل الضغط).</p>
-            <div class="sup-attachments-list" id="sup_attachments_list"></div>
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierPayableCol): ?>
@@ -706,6 +713,35 @@ $count = count($rows);
         <input type="search" id="sup_payable_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بالكود أو الاسم…" autocomplete="off" dir="rtl">
         <ul class="gl-pick-modal__list" id="sup_payable_pick_list"></ul>
         <button type="button" class="btn-secondary" id="sup_payable_pick_close">إغلاق</button>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php if ($hasSupplierAttachmentsCol): ?>
+<div class="gl-pick-modal" id="sup_attachments_modal" hidden aria-hidden="true">
+    <div class="gl-pick-modal__backdrop" id="sup_attachments_backdrop"></div>
+    <div class="gl-pick-modal__dialog sup-attachments-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="sup_attachments_title">
+        <h3 id="sup_attachments_title" class="gl-pick-modal__title">مرفقات المورد</h3>
+        <p class="gl-pick-modal__hint muted" id="sup_attachments_hint" style="margin:0 0 10px;font-size:0.9rem;">
+            PDF وصور فقط — حد أقصى 5 مرفقات لكل مورد (حتى 20MB للملف قبل الضغط).
+        </p>
+        <div class="sup-attachments-toolbar">
+            <div>
+                <label for="sup_attachment_file">اختر ملف</label>
+                <input type="file" id="sup_attachment_file" accept=".pdf,image/*">
+            </div>
+            <div>
+                <label for="sup_attachment_name">اسم الملف</label>
+                <input type="text" id="sup_attachment_name" maxlength="191" autocomplete="off" placeholder="اختياري (يؤخذ من اسم الملف)">
+            </div>
+            <div class="actions" style="margin:0;">
+                <button type="button" class="btn-secondary" id="sup_attachment_upload_btn">رفع مرفق</button>
+            </div>
+        </div>
+        <div class="sup-attachments-list" id="sup_attachments_list"></div>
+        <div class="actions" style="margin-top:12px;">
+            <button type="button" class="btn-secondary" id="sup_attachments_close">إغلاق</button>
+        </div>
     </div>
 </div>
 <?php endif; ?>
@@ -1072,6 +1108,9 @@ function supSetValue(id, value) {
     }
     el.value = value == null ? '' : String(value);
 }
+function supAttachmentSupplierId() {
+    return parseInt((document.getElementById('sup_id') || {}).value || '0', 10) || 0;
+}
 function supAttachmentRows() {
     if (!Array.isArray(window.__supAttachmentRows)) {
         window.__supAttachmentRows = [];
@@ -1133,19 +1172,57 @@ function supAttachmentSetRows(rows) {
 function supAttachmentLoadFromJson(raw) {
     supAttachmentSetRows(supAttachmentParseJson(raw));
 }
+function supAttachmentModalEl() {
+    return document.getElementById('sup_attachments_modal');
+}
+function supAttachmentModalOpen() {
+    var supplierId = supAttachmentSupplierId();
+    if (!(supplierId > 0)) {
+        alert('احفظ المورد أولاً ثم أدر المرفقات');
+        return;
+    }
+    var modal = supAttachmentModalEl();
+    if (!modal) {
+        return;
+    }
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+    supAttachmentRender();
+    var fileEl = document.getElementById('sup_attachment_file');
+    if (fileEl) {
+        fileEl.focus();
+    }
+}
+function supAttachmentModalClose() {
+    var modal = supAttachmentModalEl();
+    if (!modal) {
+        return;
+    }
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+}
 function supAttachmentRender() {
     var list = document.getElementById('sup_attachments_list');
     var hint = document.getElementById('sup_attachments_hint');
     var upBtn = document.getElementById('sup_attachment_upload_btn');
-    var supplierId = parseInt((document.getElementById('sup_id') || {}).value || '0', 10) || 0;
+    var countEl = document.getElementById('sup_attachments_count');
+    var manageBtn = document.getElementById('sup_attachments_manage_btn');
+    var supplierId = supAttachmentSupplierId();
     var rows = supAttachmentRows();
     var max = 5;
+    if (countEl) {
+        countEl.value = String(rows.length);
+    }
+    if (manageBtn) {
+        manageBtn.disabled = !(supplierId > 0);
+        manageBtn.textContent = rows.length > 0 ? ('إدارة المرفقات (' + rows.length + ')') : 'إدارة المرفقات';
+    }
     if (upBtn) {
         upBtn.disabled = !(supplierId > 0) || rows.length >= max;
     }
     if (hint) {
         if (!(supplierId > 0)) {
-            hint.textContent = 'احفظ المورد أولاً ثم ارفع المرفقات (PDF وصور فقط، حد أقصى 5 ملفات).';
+            hint.textContent = 'احفظ المورد أولاً ثم افتح إدارة المرفقات.';
         } else {
             hint.textContent = 'عدد المرفقات: ' + rows.length + ' / ' + max + ' — PDF وصور فقط، حتى 20MB قبل الضغط.';
         }
@@ -1191,7 +1268,7 @@ function supAttachmentRender() {
     });
 }
 function supAttachmentDelete(attachmentId) {
-    var supplierId = parseInt((document.getElementById('sup_id') || {}).value || '0', 10) || 0;
+    var supplierId = supAttachmentSupplierId();
     if (!(supplierId > 0)) {
         alert('احفظ المورد أولاً');
         return;
@@ -1214,7 +1291,7 @@ function supAttachmentDelete(attachmentId) {
     });
 }
 async function supAttachmentUpload() {
-    var supplierId = parseInt((document.getElementById('sup_id') || {}).value || '0', 10) || 0;
+    var supplierId = supAttachmentSupplierId();
     if (!(supplierId > 0)) {
         alert('احفظ المورد أولاً ثم أضف المرفقات');
         return;
@@ -1532,6 +1609,12 @@ function supResetForm() {
     supSetValue('sup_preferred_warehouse_id', '1');
     supSetValue('sup_block_reason', '');
     supAttachmentSetRows([]);
+    supAttachmentModalClose();
+    supSetValue('sup_attachment_name', '');
+    var attFile = document.getElementById('sup_attachment_file');
+    if (attFile) {
+        attFile.value = '';
+    }
     supToggleBlockReasonField();
     document.getElementById('sup_notes').value = '';
     supPayableSetAccount(null);
@@ -1588,6 +1671,12 @@ function supEdit(row) {
     supSetValue('sup_preferred_warehouse_id', row.preferred_warehouse_id != null ? row.preferred_warehouse_id : '1');
     supSetValue('sup_block_reason', row.block_reason || '');
     supAttachmentLoadFromJson(row.attachments_json || '');
+    supAttachmentModalClose();
+    supSetValue('sup_attachment_name', '');
+    var attFile = document.getElementById('sup_attachment_file');
+    if (attFile) {
+        attFile.value = '';
+    }
     supToggleBlockReasonField();
     supSetCurrentBalance(row.current_balance != null ? row.current_balance : 0);
     document.getElementById('sup_notes').value = row.notes || '';
@@ -1832,11 +1921,31 @@ function supFilterRows() {
         if (ev.key !== 'Escape') {
             return;
         }
+        var attModal = document.getElementById('sup_attachments_modal');
+        if (attModal && !attModal.hidden) {
+            supAttachmentModalClose();
+            return;
+        }
         var modal = document.getElementById('sup_payable_pick_modal');
         if (modal && !modal.hidden) {
             supPayablePickerClose();
         }
     });
+    var attManageBtn = document.getElementById('sup_attachments_manage_btn');
+    if (attManageBtn) {
+        attManageBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            supAttachmentModalOpen();
+        });
+    }
+    var attBackdrop = document.getElementById('sup_attachments_backdrop');
+    if (attBackdrop) {
+        attBackdrop.addEventListener('click', supAttachmentModalClose);
+    }
+    var attCloseBtn = document.getElementById('sup_attachments_close');
+    if (attCloseBtn) {
+        attCloseBtn.addEventListener('click', supAttachmentModalClose);
+    }
     var attFile = document.getElementById('sup_attachment_file');
     var attName = document.getElementById('sup_attachment_name');
     if (attFile) {
