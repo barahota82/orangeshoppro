@@ -274,7 +274,7 @@ $count = count($rows);
     column-gap: 12px;
     grid-template-areas:
         "sup_r1_code . . ."
-        "sup_r2_name sup_r2_name sup_r2_balance sup_r2_status"
+        "sup_r2_row sup_r2_row sup_r2_row sup_r2_row"
         "sup_r3_block_reason sup_r3_block_reason sup_r3_block_reason sup_r3_block_reason"
         "sup_r4_city sup_r4_address sup_r4_address sup_r4_address"
         "sup_r5_country sup_r5_phone sup_r5_email sup_r5_contact"
@@ -286,7 +286,7 @@ $count = count($rows);
 #sup_form_grid.suppliers-form-grid.suppliers-form-grid--block-hidden {
     grid-template-areas:
         "sup_r1_code . . ."
-        "sup_r2_name sup_r2_name sup_r2_balance sup_r2_status"
+        "sup_r2_row sup_r2_row sup_r2_row sup_r2_row"
         "sup_r4_city sup_r4_address sup_r4_address sup_r4_address"
         "sup_r5_country sup_r5_phone sup_r5_email sup_r5_contact"
         "sup_r6_credit sup_r6_terms sup_r6_payment sup_r6_currency"
@@ -314,9 +314,21 @@ $count = count($rows);
     cursor: default;
 }
 #sup_form_grid .sup-grid-r1-code { grid-area: sup_r1_code; }
-#sup_form_grid .sup-grid-r2-name { grid-area: sup_r2_name; }
-#sup_form_grid .sup-grid-r2-balance { grid-area: sup_r2_balance; }
-#sup_form_grid .sup-grid-r2-status { grid-area: sup_r2_status; }
+#sup_form_grid .sup-grid-r2-row {
+    grid-area: sup_r2_row;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+}
+#sup_form_grid .sup-grid-r2-row > div {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+#sup_form_grid .sup-grid-r2-name { grid-column: 1 / span 3; }
+#sup_form_grid .sup-grid-r2-balance { grid-column: 4 / span 1; }
+#sup_form_grid .sup-grid-r2-status { grid-column: 5 / span 1; }
 #sup_form_grid .sup-grid-r2-balance #sup_current_balance {
     max-width: 100%;
 }
@@ -343,6 +355,7 @@ $count = count($rows);
         grid-template-areas: none !important;
     }
     #sup_form_grid .sup-grid-r1-code,
+    #sup_form_grid .sup-grid-r2-row,
     #sup_form_grid .sup-grid-r2-name,
     #sup_form_grid .sup-grid-r2-balance,
     #sup_form_grid .sup-grid-r2-status,
@@ -369,6 +382,16 @@ $count = count($rows);
     #sup_form_grid .sup-payable-fields {
         grid-template-columns: 1fr;
     }
+    #sup_form_grid .sup-grid-r2-row {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+    #sup_form_grid .sup-grid-r2-name {
+        grid-column: 1 / -1;
+    }
+    #sup_form_grid .sup-grid-r2-balance,
+    #sup_form_grid .sup-grid-r2-status {
+        grid-column: auto;
+    }
 }
 </style>
 
@@ -383,24 +406,26 @@ $count = count($rows);
             <label for="sup_code">كود المورد</label>
             <input type="text" id="sup_code" class="admin-sort-field admin-sort-field--muted" maxlength="32" autocomplete="off" dir="ltr" lang="en" value="<?php echo htmlspecialchars($nextSupplierCodePreview, ENT_QUOTES, 'UTF-8'); ?>" readonly>
         </div>
-        <div class="sup-grid-r2-name">
-            <label for="sup_name">اسم المورد</label>
-            <input type="text" id="sup_name" autocomplete="off" placeholder="اسم المورد أو الشركة">
+        <div class="sup-grid-r2-row">
+            <div class="sup-grid-r2-name">
+                <label for="sup_name">اسم المورد</label>
+                <input type="text" id="sup_name" autocomplete="off" placeholder="اسم المورد أو الشركة">
+            </div>
+            <div class="sup-grid-r2-balance">
+                <label for="sup_current_balance">الرصيد الحالي المستحق للمورد</label>
+                <input type="text" id="sup_current_balance" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" value="0.000" readonly>
+            </div>
+            <?php if ($hasSupplierStatusCol): ?>
+            <div class="sup-grid-r2-status">
+                <label for="sup_status">حالة المورد</label>
+                <select id="sup_status" class="admin-sort-field">
+                    <option value="active" selected>نشط</option>
+                    <option value="inactive">غير نشط</option>
+                    <option value="blocked">محظور مؤقتاً</option>
+                </select>
+            </div>
+            <?php endif; ?>
         </div>
-        <div class="sup-grid-r2-balance">
-            <label for="sup_current_balance">الرصيد الحالي المستحق للمورد</label>
-            <input type="text" id="sup_current_balance" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" value="0.000" readonly>
-        </div>
-        <?php if ($hasSupplierStatusCol): ?>
-        <div class="sup-grid-r2-status">
-            <label for="sup_status">حالة المورد</label>
-            <select id="sup_status" class="admin-sort-field">
-                <option value="active" selected>نشط</option>
-                <option value="inactive">غير نشط</option>
-                <option value="blocked">محظور مؤقتاً</option>
-            </select>
-        </div>
-        <?php endif; ?>
         <?php if ($hasSupplierPhoneCountryDialCol): ?>
         <div class="sup-grid-r4-country">
             <label for="sup_phone_country">كود الدولة</label>
@@ -920,6 +945,23 @@ function supEnforceFormVisibility() {
         }
         if (child.id === 'sup_block_reason_wrap' && !isBlocked) {
             child.style.setProperty('display', 'none', 'important');
+        } else if (child.classList && child.classList.contains('sup-grid-r2-row')) {
+            var row2Cols = isMobile
+                ? '1fr'
+                : (isTablet
+                    ? 'minmax(0, 1fr) minmax(0, 1fr)'
+                    : 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)');
+            child.style.setProperty('display', 'grid', 'important');
+            child.style.setProperty('grid-template-columns', row2Cols, 'important');
+            child.style.setProperty('gap', '12px 12px', 'important');
+            Array.prototype.forEach.call(child.children, function (rowChild) {
+                if (!rowChild || rowChild.nodeType !== 1) {
+                    return;
+                }
+                rowChild.style.setProperty('display', 'flex', 'important');
+                rowChild.style.setProperty('flex-direction', 'column', 'important');
+                rowChild.style.setProperty('gap', '6px', 'important');
+            });
         } else {
             child.style.setProperty('display', 'flex', 'important');
             child.style.setProperty('flex-direction', 'column', 'important');
