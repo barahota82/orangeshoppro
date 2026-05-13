@@ -12,7 +12,7 @@ require_once __DIR__ . '/../../includes/upload_paths.php';
 /** @var ?\PDO $pdo — يضبطه admin/index.php قبل تضمين هذا الملف؛ تجنّب استدعاء ensure_schema مرتين لكل صفحة أدمن */
 $pdoNav = (isset($pdo) && $pdo instanceof PDO) ? $pdo : db();
 if (!isset($pdo) || !$pdo instanceof PDO) {
-    orange_catalog_ensure_schema($pdoNav);
+orange_catalog_ensure_schema($pdoNav);
 }
 
 $orangeAdminCompanyTitle = '';
@@ -121,7 +121,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
             $orangeNavSectionMeta = static function (array $items) use ($admin, $pdoNav, $orangeNavLinkActive): array {
                 $scan = null;
                 $scan = static function (array $nodes) use (&$scan, $admin, $pdoNav, $orangeNavLinkActive): array {
-                    $anyVisible = false;
+                $anyVisible = false;
                     $hasActive = false;
                     foreach ($nodes as $nl) {
                         if (!empty($nl['group']) && !empty($nl['items']) && is_array($nl['items'])) {
@@ -405,7 +405,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 $orangeRenderNavSection('sales', 'المبيعات', $navSales);
                 $orangeRenderNavSection('settings', 'الإعدادات العامة', $navSettings);
                 ?>
-            </nav>
+        </nav>
         </div>
     </div>
     </div>

@@ -262,19 +262,19 @@ function db(): PDO
     }
 
     if ($pdo === null) {
-        $dsn = 'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4';
+    $dsn = 'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4';
 
-        $pdo = new PDO($dsn, DB_USER, DB_PASS, [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        ]);
+    $pdo = new PDO($dsn, DB_USER, DB_PASS, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    ]);
 
-        // Optional: align timezone + charset with Click
-        try {
-            $pdo->exec("SET time_zone = '+03:00'");
-            $pdo->exec("SET NAMES utf8mb4");
-        } catch (Throwable $e) {
-            // ignore if permissions restrict
+    // Optional: align timezone + charset with Click
+    try {
+        $pdo->exec("SET time_zone = '+03:00'");
+        $pdo->exec("SET NAMES utf8mb4");
+    } catch (Throwable $e) {
+        // ignore if permissions restrict
         }
         $requestDbChecked = $requestId;
     }
