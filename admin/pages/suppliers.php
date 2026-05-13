@@ -244,33 +244,55 @@ $count = count($rows);
 #sup_form_grid.suppliers-form-grid {
     grid-template-areas:
         "sup_r1_code . . ."
-        "sup_r2_name sup_r2_name sup_r2_balance sup_r2_status"
-        "sup_r3_city sup_r3_address sup_r3_address sup_r3_block_reason"
-        "sup_r4_country sup_r4_phone sup_r4_email sup_r4_contact"
-        "sup_r5_credit sup_r5_terms sup_r5_payment sup_r5_currency"
-        "sup_r6_notes sup_r6_notes sup_r6_notes sup_r6_notes"
-        "sup_r7_tax_profile sup_r7_tax_number sup_r7_commercial ."
-        "sup_r8_bank_name sup_r8_iban sup_r8_iban sup_r8_bank_holder";
+        "sup_r2_status sup_r2_balance sup_r2_name sup_r2_name"
+        "sup_r3_block_reason sup_r3_block_reason sup_r3_block_reason sup_r3_block_reason"
+        "sup_r4_city sup_r4_address sup_r4_address sup_r4_address"
+        "sup_r5_country sup_r5_phone sup_r5_email sup_r5_contact"
+        "sup_r6_credit sup_r6_terms sup_r6_payment sup_r6_currency"
+        "sup_r7_notes sup_r7_notes sup_r7_notes sup_r7_notes"
+        "sup_r8_bank_name sup_r8_iban sup_r8_iban sup_r8_bank_holder"
+        "sup_r9_tax_profile sup_r9_tax_number sup_r9_commercial .";
+}
+#sup_form_grid.suppliers-form-grid.suppliers-form-grid--block-hidden {
+    grid-template-areas:
+        "sup_r1_code . . ."
+        "sup_r2_status sup_r2_balance sup_r2_name sup_r2_name"
+        "sup_r4_city sup_r4_address sup_r4_address sup_r4_address"
+        "sup_r5_country sup_r5_phone sup_r5_email sup_r5_contact"
+        "sup_r6_credit sup_r6_terms sup_r6_payment sup_r6_currency"
+        "sup_r7_notes sup_r7_notes sup_r7_notes sup_r7_notes"
+        "sup_r8_bank_name sup_r8_iban sup_r8_iban sup_r8_bank_holder"
+        "sup_r9_tax_profile sup_r9_tax_number sup_r9_commercial .";
+}
+#sup_form_grid.suppliers-form-grid input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]),
+#sup_form_grid.suppliers-form-grid select {
+    height: 42px;
+    min-height: 42px;
+    box-sizing: border-box;
+}
+#sup_form_grid.suppliers-form-grid textarea {
+    min-height: 96px;
+    box-sizing: border-box;
 }
 #sup_form_grid .sup-grid-r1-code { grid-area: sup_r1_code; }
 #sup_form_grid .sup-grid-r2-name { grid-area: sup_r2_name; }
 #sup_form_grid .sup-grid-r2-balance { grid-area: sup_r2_balance; }
 #sup_form_grid .sup-grid-r2-status { grid-area: sup_r2_status; }
-#sup_form_grid .sup-grid-r3-city { grid-area: sup_r3_city; }
-#sup_form_grid .sup-grid-r3-address { grid-area: sup_r3_address; }
 #sup_form_grid .sup-grid-r3-block-reason { grid-area: sup_r3_block_reason; }
-#sup_form_grid .sup-grid-r4-country { grid-area: sup_r4_country; }
-#sup_form_grid .sup-grid-r4-phone { grid-area: sup_r4_phone; }
-#sup_form_grid .sup-grid-r4-email { grid-area: sup_r4_email; }
-#sup_form_grid .sup-grid-r4-contact { grid-area: sup_r4_contact; }
-#sup_form_grid .sup-grid-r5-credit { grid-area: sup_r5_credit; }
-#sup_form_grid .sup-grid-r5-terms { grid-area: sup_r5_terms; }
-#sup_form_grid .sup-grid-r5-payment { grid-area: sup_r5_payment; }
-#sup_form_grid .sup-grid-r5-currency { grid-area: sup_r5_currency; }
-#sup_form_grid .sup-grid-r6-notes { grid-area: sup_r6_notes; }
-#sup_form_grid .sup-grid-r7-tax-profile { grid-area: sup_r7_tax_profile; }
-#sup_form_grid .sup-grid-r7-tax-number { grid-area: sup_r7_tax_number; }
-#sup_form_grid .sup-grid-r7-commercial { grid-area: sup_r7_commercial; }
+#sup_form_grid .sup-grid-r3-city { grid-area: sup_r4_city; }
+#sup_form_grid .sup-grid-r3-address { grid-area: sup_r4_address; }
+#sup_form_grid .sup-grid-r4-country { grid-area: sup_r5_country; }
+#sup_form_grid .sup-grid-r4-phone { grid-area: sup_r5_phone; }
+#sup_form_grid .sup-grid-r4-email { grid-area: sup_r5_email; }
+#sup_form_grid .sup-grid-r4-contact { grid-area: sup_r5_contact; }
+#sup_form_grid .sup-grid-r5-credit { grid-area: sup_r6_credit; }
+#sup_form_grid .sup-grid-r5-terms { grid-area: sup_r6_terms; }
+#sup_form_grid .sup-grid-r5-payment { grid-area: sup_r6_payment; }
+#sup_form_grid .sup-grid-r5-currency { grid-area: sup_r6_currency; }
+#sup_form_grid .sup-grid-r6-notes { grid-area: sup_r7_notes; }
+#sup_form_grid .sup-grid-r7-tax-profile { grid-area: sup_r9_tax_profile; }
+#sup_form_grid .sup-grid-r7-tax-number { grid-area: sup_r9_tax_number; }
+#sup_form_grid .sup-grid-r7-commercial { grid-area: sup_r9_commercial; }
 #sup_form_grid .sup-grid-r8-bank-name { grid-area: sup_r8_bank_name; }
 #sup_form_grid .sup-grid-r8-iban { grid-area: sup_r8_iban; }
 #sup_form_grid .sup-grid-r8-bank-holder { grid-area: sup_r8_bank_holder; }
@@ -365,7 +387,7 @@ $count = count($rows);
         <?php if ($hasSupplierPaymentTermsCol): ?>
         <div class="sup-grid-r5-terms">
             <label for="sup_payment_terms_days">أيام السداد</label>
-            <input type="number" id="sup_payment_terms_days" min="0" step="1" inputmode="numeric" lang="en" dir="ltr" placeholder="مثال: 30">
+            <input type="text" id="sup_payment_terms_days" inputmode="numeric" lang="en" dir="ltr" placeholder="مثال: 30">
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierPaymentModeCol): ?>
@@ -422,7 +444,7 @@ $count = count($rows);
         <?php endif; ?>
         <?php if ($hasSupplierAddressLineCol): ?>
         <div class="sup-grid-r3-address">
-            <label for="sup_address_line">العنوان الإداري (اختياري)</label>
+            <label for="sup_address_line">العنوان</label>
             <input type="text" id="sup_address_line" maxlength="255" autocomplete="off" placeholder="عنوان المورد">
         </div>
         <?php endif; ?>
@@ -458,7 +480,7 @@ $count = count($rows);
         <?php endif; ?>
         <?php if ($hasSupplierAttachmentsCol): ?>
         <div style="grid-column:1/-1;">
-            <label for="sup_attachments_json">مرفقات المورد (اختياري)</label>
+            <label for="sup_attachments_json">مرفقات المورد</label>
             <textarea id="sup_attachments_json" rows="3" autocomplete="off" placeholder="ضع روابط/أسماء الملفات أو JSON مبسط للمرفقات"></textarea>
         </div>
         <?php endif; ?>
@@ -684,12 +706,18 @@ function supToggleBlockReasonField() {
     var statusEl = document.getElementById('sup_status');
     var reasonEl = document.getElementById('sup_block_reason');
     var wrapEl = document.getElementById('sup_block_reason_wrap');
+    var gridEl = document.getElementById('sup_form_grid');
     if (!statusEl || !reasonEl) {
         return;
     }
     var isBlocked = String(statusEl.value || 'active') === 'blocked';
+    if (gridEl && gridEl.classList) {
+        gridEl.classList.toggle('suppliers-form-grid--block-hidden', !isBlocked);
+    }
     if (wrapEl) {
-        wrapEl.style.display = isBlocked ? 'block' : 'none';
+        wrapEl.style.setProperty('display', isBlocked ? 'flex' : 'none', 'important');
+        wrapEl.style.setProperty('flex-direction', 'column', 'important');
+        wrapEl.style.setProperty('gap', '6px', 'important');
     }
     reasonEl.required = isBlocked;
     reasonEl.placeholder = isBlocked ? 'سبب الحظر مطلوب' : 'اختياري إذا المورد غير محظور';
@@ -717,11 +745,22 @@ function supEnforceFormVisibility() {
         card.style.setProperty('max-height', 'none', 'important');
         card.style.setProperty('overflow', 'visible', 'important');
     }
+    var statusEl = document.getElementById('sup_status');
+    var isBlocked = !!statusEl && String(statusEl.value || 'active') === 'blocked';
+    if (grid.classList) {
+        grid.classList.toggle('suppliers-form-grid--block-hidden', !isBlocked);
+    }
     Array.prototype.forEach.call(grid.children, function (child) {
         if (!child || child.nodeType !== 1) {
             return;
         }
-        child.style.setProperty('display', 'block', 'important');
+        if (child.id === 'sup_block_reason_wrap' && !isBlocked) {
+            child.style.setProperty('display', 'none', 'important');
+        } else {
+            child.style.setProperty('display', 'flex', 'important');
+            child.style.setProperty('flex-direction', 'column', 'important');
+            child.style.setProperty('gap', '6px', 'important');
+        }
         child.style.setProperty('visibility', 'visible', 'important');
         child.style.setProperty('opacity', '1', 'important');
         child.style.setProperty('height', 'auto', 'important');
