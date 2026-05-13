@@ -387,13 +387,19 @@ $count = count($rows);
     gap: 6px;
 }
 #sup_form_grid .sup-attachments-inline {
-    display: flex;
-    align-items: center;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 10px;
+    width: 100%;
 }
 #sup_form_grid #sup_attachments_count {
-    max-width: 120px;
+    max-width: none;
+    width: 100%;
     text-align: center;
+}
+#sup_form_grid #sup_attachments_manage_btn {
+    width: 100%;
+    height: 42px;
 }
 .sup-attachments-modal__dialog {
     width: min(920px, calc(100vw - 24px));
@@ -493,7 +499,7 @@ $count = count($rows);
         grid-column: auto;
     }
     #sup_form_grid .sup-attachments-inline {
-        flex-wrap: wrap;
+        grid-template-columns: 1fr;
     }
     .sup-attachments-toolbar {
         grid-template-columns: 1fr;
