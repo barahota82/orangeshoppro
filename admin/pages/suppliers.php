@@ -284,7 +284,7 @@ $count = count($rows);
     column-gap: 12px;
     grid-template-areas:
         "sup_r1_code . . ."
-        "sup_r2_status sup_r2_balance sup_r2_name sup_r2_name"
+        "sup_r2_name sup_r2_name sup_r2_balance sup_r2_status"
         "sup_r3_block_reason sup_r3_block_reason sup_r3_block_reason sup_r3_block_reason"
         "sup_r4_city sup_r4_address sup_r4_address sup_r4_address"
         "sup_r5_country sup_r5_phone sup_r5_email sup_r5_contact"
@@ -296,7 +296,7 @@ $count = count($rows);
 #sup_form_grid.suppliers-form-grid.suppliers-form-grid--block-hidden {
     grid-template-areas:
         "sup_r1_code . . ."
-        "sup_r2_status sup_r2_balance sup_r2_name sup_r2_name"
+        "sup_r2_name sup_r2_name sup_r2_balance sup_r2_status"
         "sup_r4_city sup_r4_address sup_r4_address sup_r4_address"
         "sup_r5_country sup_r5_phone sup_r5_email sup_r5_contact"
         "sup_r6_credit sup_r6_terms sup_r6_payment sup_r6_currency"
