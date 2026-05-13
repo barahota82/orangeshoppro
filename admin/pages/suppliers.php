@@ -222,15 +222,6 @@ $count = count($rows);
     <p class="card-hint" style="margin-top:0;">الاسم إلزامي. <strong>حساب ذمة المورد</strong> إلزامي عند الحفظ. يمكن إيقاف المورد (غير نشط) بدل الحذف، وفاتورة الشراء لا تُحفظ لمورد غير نشط.</p>
     <input type="hidden" id="sup_id" value="0">
     <div class="form-grid suppliers-form-grid" id="sup_form_grid">
-        <div>
-            <label for="sup_code">كود المورد (تلقائي فقط)</label>
-            <input type="text" id="sup_code" class="admin-sort-field admin-sort-field--muted" maxlength="32" autocomplete="off" dir="ltr" lang="en" placeholder="يُولَّد تلقائياً عند الحفظ" readonly>
-            <p class="card-hint" style="margin:6px 0 0;">هذا الحقل تلقائي فقط ولا يقبل إدخالاً يدوياً.</p>
-        </div>
-        <div>
-            <label for="sup_name">اسم المورد</label>
-            <input type="text" id="sup_name" autocomplete="off" placeholder="اسم المورد أو الشركة">
-        </div>
         <?php if ($hasSupplierIsActiveCol): ?>
         <div>
             <label for="sup_is_active">حالة المورد</label>
@@ -240,16 +231,6 @@ $count = count($rows);
             </select>
         </div>
         <?php endif; ?>
-        <?php if ($hasSupplierPhoneCountryDialCol): ?>
-        <div>
-            <label for="sup_phone_country">كود الدولة (اختياري)</label>
-            <?php orange_storefront_render_phone_country_select('sup_phone_country'); ?>
-        </div>
-        <?php endif; ?>
-        <div>
-            <label for="sup_phone">الهاتف (اختياري)</label>
-            <input type="text" id="sup_phone" class="js-orange-phone-input" autocomplete="off" dir="ltr" lang="en" placeholder="+965… أو 00… أو رقم وطني مع اختيار الدولة">
-        </div>
         <?php if ($hasSupplierCurrencyCol): ?>
         <div>
             <label for="sup_currency_code">العملة الافتراضية <span style="color:#b45309;">*</span></label>
@@ -262,18 +243,6 @@ $count = count($rows);
             </select>
         </div>
         <?php endif; ?>
-        <?php if ($hasSupplierTaxProfileCol): ?>
-        <div>
-            <label for="sup_tax_profile">المعاملة الضريبية <span style="color:#b45309;">*</span></label>
-            <select id="sup_tax_profile" required>
-                <?php foreach ($taxProfileOptions as $taxCode => $taxLabel): ?>
-                    <option value="<?php echo htmlspecialchars($taxCode, ENT_QUOTES, 'UTF-8'); ?>" <?php echo $taxCode === 'exempt' ? 'selected' : ''; ?>>
-                        <?php echo htmlspecialchars($taxLabel, ENT_QUOTES, 'UTF-8'); ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <?php endif; ?>
         <?php if ($hasSupplierPaymentModeCol): ?>
         <div>
             <label for="sup_payment_mode">طريقة السداد الافتراضية</label>
@@ -281,6 +250,37 @@ $count = count($rows);
                 <?php foreach ($paymentModeOptions as $modeCode => $modeLabel): ?>
                     <option value="<?php echo htmlspecialchars($modeCode, ENT_QUOTES, 'UTF-8'); ?>" <?php echo $modeCode === 'cash' ? 'selected' : ''; ?>>
                         <?php echo htmlspecialchars($modeLabel, ENT_QUOTES, 'UTF-8'); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <?php endif; ?>
+        <div>
+            <label for="sup_code">كود المورد (تلقائي فقط)</label>
+            <input type="text" id="sup_code" class="admin-sort-field admin-sort-field--muted" maxlength="32" autocomplete="off" dir="ltr" lang="en" placeholder="يُولَّد تلقائياً عند الحفظ" readonly>
+            <p class="card-hint" style="margin:6px 0 0;">هذا الحقل تلقائي فقط ولا يقبل إدخالاً يدوياً.</p>
+        </div>
+        <div>
+            <label for="sup_name">اسم المورد</label>
+            <input type="text" id="sup_name" autocomplete="off" placeholder="اسم المورد أو الشركة">
+        </div>
+        <?php if ($hasSupplierPhoneCountryDialCol): ?>
+        <div>
+            <label for="sup_phone_country">كود الدولة (اختياري)</label>
+            <?php orange_storefront_render_phone_country_select('sup_phone_country'); ?>
+        </div>
+        <?php endif; ?>
+        <div>
+            <label for="sup_phone">الهاتف (اختياري)</label>
+            <input type="text" id="sup_phone" class="js-orange-phone-input" autocomplete="off" dir="ltr" lang="en" placeholder="+965… أو 00… أو رقم وطني مع اختيار الدولة">
+        </div>
+        <?php if ($hasSupplierTaxProfileCol): ?>
+        <div>
+            <label for="sup_tax_profile">المعاملة الضريبية <span style="color:#b45309;">*</span></label>
+            <select id="sup_tax_profile" required>
+                <?php foreach ($taxProfileOptions as $taxCode => $taxLabel): ?>
+                    <option value="<?php echo htmlspecialchars($taxCode, ENT_QUOTES, 'UTF-8'); ?>" <?php echo $taxCode === 'exempt' ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($taxLabel, ENT_QUOTES, 'UTF-8'); ?>
                     </option>
                 <?php endforeach; ?>
             </select>
@@ -605,8 +605,10 @@ function supEnforceFormVisibility() {
     }
     var card = document.getElementById('sup_form_card');
     var isMobile = !!(window.matchMedia && window.matchMedia('(max-width: 991px)').matches);
+    var isTablet = !!(window.matchMedia && window.matchMedia('(max-width: 1200px)').matches);
+    var cols = isMobile ? '1fr' : (isTablet ? '1fr 1fr' : 'repeat(4, minmax(0, 1fr))');
     grid.style.setProperty('display', 'grid', 'important');
-    grid.style.setProperty('grid-template-columns', isMobile ? '1fr' : '1fr 1fr', 'important');
+    grid.style.setProperty('grid-template-columns', cols, 'important');
     grid.style.setProperty('gap', '12px 18px', 'important');
     grid.style.setProperty('overflow', 'visible', 'important');
     grid.style.setProperty('height', 'auto', 'important');
