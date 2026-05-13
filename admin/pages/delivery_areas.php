@@ -7,8 +7,8 @@ orange_catalog_ensure_schema($pdo);
 $hasTable = orange_table_exists($pdo, 'delivery_areas');
 ?>
 <div class="page-title page-title--stacked">
-    <h1>مناطق التوصيل</h1>
-    <p class="page-subtitle">قائمة اختيار للعملاء في العربة والتسجيل والتتبع (سياسة س8). العربية للعرض في الواجهة العربية؛ الإنجليزية للغات الأخرى.</p>
+    <h1>إضافة المحافظة والمنطقة</h1>
+    <p class="page-subtitle">تسجيل موحد للمحافظات/المناطق. عند تفعيل خيار <strong>منطقة توصيل</strong> تظهر للعملاء في العربة/التسجيل/التتبع، وعند إلغاء التفعيل تبقى محفوظة للأدمن فقط (مثل شاشة الموردين).</p>
 </div>
 
 <?php if (!$hasTable): ?>
@@ -18,7 +18,7 @@ $hasTable = orange_table_exists($pdo, 'delivery_areas');
 <?php endif; ?>
 
 <div class="card">
-    <h3>إضافة / تعديل منطقة</h3>
+    <h3>إضافة / تعديل محافظة ومنطقة</h3>
     <input type="hidden" id="da_id" value="0">
     <div class="form-grid">
         <div><label>الاسم العربي</label><input type="text" id="da_name_ar" maxlength="191" autocomplete="off"></div>
@@ -26,7 +26,7 @@ $hasTable = orange_table_exists($pdo, 'delivery_areas');
         <div><label>الترتيب</label><input type="number" id="da_sort_order" value="0" style="max-width:120px;"></div>
         <div style="display:flex;align-items:flex-end;gap:8px;">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="checkbox" id="da_is_active" checked> نشط
+                <input type="checkbox" id="da_is_active" checked> منطقة توصيل
             </label>
         </div>
     </div>
@@ -47,7 +47,7 @@ $hasTable = orange_table_exists($pdo, 'delivery_areas');
                     <th>عربي</th>
                     <th>English</th>
                     <th>ترتيب</th>
-                    <th>نشط</th>
+                    <th>منطقة توصيل</th>
                     <th></th>
                 </tr>
             </thead>
@@ -132,12 +132,13 @@ async function loadDeliveryAreas() {
     tb.innerHTML = '';
     rows.forEach(function (r) {
         const tr = document.createElement('tr');
+        const canDeliver = parseInt(r.is_active, 10) === 1;
         tr.innerHTML =
             '<td>' + escHtml(String(r.id)) + '</td>' +
             '<td>' + escHtml(String(r.name_ar || '')) + '</td>' +
             '<td dir="ltr">' + escHtml(String(r.name_en || '')) + '</td>' +
             '<td>' + escHtml(String(r.sort_order != null ? r.sort_order : '')) + '</td>' +
-            '<td>' + (parseInt(r.is_active, 10) === 1 ? 'نعم' : 'لا') + '</td>' +
+            '<td>' + (canDeliver ? 'منطقة توصيل' : 'غير متاحة للتوصيل') + '</td>' +
             '<td><button type="button" class="btn-secondary" data-da-edit="' + escAttr(String(r.id)) + '">تعديل</button></td>';
         tb.appendChild(tr);
     });

@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/party_subledger.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/storefront_phone_country_select.php';
+require_once __DIR__ . '/../../includes/delivery_areas.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -131,6 +132,36 @@ $hasSupplierBankHolderCol = orange_table_has_column($pdo, 'suppliers', 'bank_acc
 $hasSupplierPreferredWarehouseCol = orange_table_has_column($pdo, 'suppliers', 'preferred_warehouse_id');
 $hasSupplierBlockReasonCol = orange_table_has_column($pdo, 'suppliers', 'block_reason');
 $hasSupplierAttachmentsCol = orange_table_has_column($pdo, 'suppliers', 'attachments_json');
+$supplierAreaOptions = [];
+$deliveryAreaRows = function_exists('orange_delivery_areas_admin_list') ? orange_delivery_areas_admin_list($pdo) : [];
+$seenSupplierAreas = [];
+foreach ($deliveryAreaRows as $daRow) {
+    if (!is_array($daRow)) {
+        continue;
+    }
+    $nameAr = trim((string) ($daRow['name_ar'] ?? ''));
+    $nameEn = trim((string) ($daRow['name_en'] ?? ''));
+    $areaValue = $nameAr !== '' ? $nameAr : $nameEn;
+    if ($areaValue === '') {
+        continue;
+    }
+    $areaKey = function_exists('mb_strtolower') ? mb_strtolower($areaValue, 'UTF-8') : strtolower($areaValue);
+    if (isset($seenSupplierAreas[$areaKey])) {
+        continue;
+    }
+    $seenSupplierAreas[$areaKey] = true;
+    $display = $areaValue;
+    if ($nameAr !== '' && $nameEn !== '' && strcasecmp($nameAr, $nameEn) !== 0) {
+        $display = $nameAr . ' — ' . $nameEn;
+    }
+    if ((int) ($daRow['is_active'] ?? 0) !== 1) {
+        $display .= ' (غير منطقة توصيل حالياً)';
+    }
+    $supplierAreaOptions[] = [
+        'value' => $areaValue,
+        'label' => $display,
+    ];
+}
 $supplierSchemaMissingCols = [];
 $supplierSchemaMap = [
     'payable_account_id' => $hasSupplierPayableCol,
@@ -313,7 +344,7 @@ $count = count($rows);
 #sup_form_grid .sup-grid-r2-row {
     grid-area: sup_r2_row;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.12fr) minmax(0, 1.12fr) minmax(0, 1.12fr) minmax(0, 0.82fr) minmax(0, 0.82fr);
     gap: 12px;
 }
 #sup_form_grid .sup-grid-r2-row > div {
@@ -326,6 +357,9 @@ $count = count($rows);
 #sup_form_grid .sup-grid-r2-balance { grid-column: 4 / span 1; }
 #sup_form_grid .sup-grid-r2-status { grid-column: 5 / span 1; }
 #sup_form_grid .sup-grid-r2-balance #sup_current_balance {
+    max-width: 100%;
+}
+#sup_form_grid .sup-grid-r2-status #sup_status {
     max-width: 100%;
 }
 #sup_form_grid .sup-grid-r3-block-reason { grid-area: sup_r3_block_reason; }
@@ -425,7 +459,9 @@ $count = count($rows);
         <?php if ($hasSupplierPhoneCountryDialCol): ?>
         <div class="sup-grid-r4-country">
             <label for="sup_phone_country">كود الدولة</label>
-            <?php orange_storefront_render_phone_country_select('sup_phone_country'); ?>
+            <select id="sup_phone_country" dir="ltr" autocomplete="tel-country-code">
+                <option value="__intl__">دولي — الرقم كاملاً (+ أو 00)</option>
+            </select>
         </div>
         <?php endif; ?>
         <div class="sup-grid-r4-phone">
@@ -517,7 +553,14 @@ $count = count($rows);
         <?php if ($hasSupplierCityAreaCol): ?>
         <div class="sup-grid-r3-city">
             <label for="sup_city_area">المنطقة</label>
-            <input type="text" id="sup_city_area" maxlength="160" autocomplete="off" placeholder="اختياري">
+            <select id="sup_city_area" autocomplete="address-level1">
+                <option value="">اختياري</option>
+                <?php foreach ($supplierAreaOptions as $areaOpt): ?>
+                    <option value="<?php echo htmlspecialchars((string) $areaOpt['value'], ENT_QUOTES, 'UTF-8'); ?>">
+                        <?php echo htmlspecialchars((string) $areaOpt['label'], ENT_QUOTES, 'UTF-8'); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierBankNameCol): ?>
@@ -719,6 +762,7 @@ $count = count($rows);
     <?php endif; ?>
 </div>
 
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/country-codes.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/input-constraints.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
 var SUP_NEXT_AUTO_CODE = <?php echo json_encode($nextSupplierCodePreview, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
@@ -829,6 +873,72 @@ function supPayablePickerOpen() {
 function supPhoneCountryEl() {
     return document.getElementById('sup_phone_country');
 }
+function supCountryCodeRows() {
+    if (Array.isArray(window.__supCountryCodeRowsCache)) {
+        return window.__supCountryCodeRowsCache;
+    }
+    var src = Array.isArray(window.COUNTRY_CODES) ? window.COUNTRY_CODES : [];
+    var rows = [];
+    src.forEach(function (item) {
+        if (!item) {
+            return;
+        }
+        var dial = String(item.code || '').replace(/\D/g, '');
+        if (!dial) {
+            return;
+        }
+        var country = String(item.country || '').trim();
+        var label = country !== '' ? country + ' (+' + dial + ')' : '+' + dial;
+        rows.push({ dial: dial, label: label });
+    });
+    window.__supCountryCodeRowsCache = rows;
+    return rows;
+}
+function supPopulateCountryCodes() {
+    var el = supPhoneCountryEl();
+    if (!el || el.tagName !== 'SELECT') {
+        return;
+    }
+    var current = String(el.value || '__intl__').trim();
+    if (current !== '__intl__') {
+        current = current.replace(/\D/g, '');
+    }
+    var rows = supCountryCodeRows();
+    if (!rows.length) {
+        el.value = '__intl__';
+        return;
+    }
+    el.innerHTML = '';
+    var intlOpt = document.createElement('option');
+    intlOpt.value = '__intl__';
+    intlOpt.textContent = 'دولي — الرقم كاملاً (+ أو 00)';
+    el.appendChild(intlOpt);
+    rows.forEach(function (row) {
+        var opt = document.createElement('option');
+        opt.value = row.dial;
+        opt.textContent = row.label;
+        el.appendChild(opt);
+    });
+    if (current && current !== '__intl__') {
+        el.value = current;
+    } else {
+        el.value = '__intl__';
+    }
+}
+function supPhoneCountryForApi(selectEl) {
+    if (!selectEl || selectEl.tagName !== 'SELECT') {
+        return null;
+    }
+    var raw = String(selectEl.value || '').trim();
+    if (!raw) {
+        return null;
+    }
+    if (raw === '__intl__') {
+        return '__intl__';
+    }
+    var digits = raw.replace(/\D/g, '');
+    return digits !== '' ? digits : null;
+}
 function supSplitPhoneForForm(stored, preferredDial) {
     var raw = String(stored || '').trim();
     var pref = String(preferredDial || '').trim();
@@ -848,7 +958,19 @@ function supSplitPhoneForForm(stored, preferredDial) {
         return { country: pref || '__intl__', phone: raw };
     }
     var normDigits = norm.replace(/\D/g, '');
-    var prefs = ['965', '92', '91', '63'];
+    var uniq = Object.create(null);
+    var prefs = [];
+    supCountryCodeRows().forEach(function (row) {
+        var cc = String(row.dial || '');
+        if (!cc || uniq[cc]) {
+            return;
+        }
+        uniq[cc] = true;
+        prefs.push(cc);
+    });
+    prefs.sort(function (a, b) {
+        return b.length - a.length;
+    });
     for (var i = 0; i < prefs.length; i++) {
         var cc = prefs[i];
         if (normDigits.indexOf(cc) !== 0) {
@@ -871,6 +993,29 @@ function supSetValue(id, value) {
     }
     el.value = value == null ? '' : String(value);
 }
+function supEnsureCityAreaOption(value) {
+    var el = document.getElementById('sup_city_area');
+    if (!el || el.tagName !== 'SELECT') {
+        return;
+    }
+    var v = String(value || '').trim();
+    if (!v) {
+        return;
+    }
+    var found = false;
+    Array.prototype.forEach.call(el.options, function (opt) {
+        if (String(opt.value || '').trim() === v) {
+            found = true;
+        }
+    });
+    if (found) {
+        return;
+    }
+    var opt = document.createElement('option');
+    opt.value = v;
+    opt.textContent = v;
+    el.appendChild(opt);
+}
 function supFormatBalanceValue(value) {
     var n = Number(value);
     if (!isFinite(n)) {
@@ -884,6 +1029,95 @@ function supSetCurrentBalance(value) {
         return;
     }
     el.value = supFormatBalanceValue(value);
+}
+function supCurrencyDisplayName(code) {
+    var cur = String(code || '').trim().toUpperCase();
+    if (cur === '') {
+        return '';
+    }
+    if (typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function') {
+        try {
+            if (!window.__supCurrencyDisplayNames) {
+                window.__supCurrencyDisplayNames = new Intl.DisplayNames(['ar', 'en'], { type: 'currency' });
+            }
+            var name = window.__supCurrencyDisplayNames.of(cur);
+            if (typeof name === 'string' && name.trim() !== '' && name.toUpperCase() !== cur) {
+                return name.trim();
+            }
+        } catch (eName) {}
+    }
+    return cur;
+}
+function supSetCurrencyValue(code) {
+    var sel = document.getElementById('sup_currency_code');
+    if (!sel) {
+        return;
+    }
+    var wanted = String(code || '').trim().toUpperCase();
+    if (wanted === '') {
+        wanted = 'KWD';
+    }
+    var has = false;
+    Array.prototype.forEach.call(sel.options, function (opt) {
+        if (String(opt.value || '').trim().toUpperCase() === wanted) {
+            has = true;
+        }
+    });
+    if (!has) {
+        var opt = document.createElement('option');
+        opt.value = wanted;
+        var label = supCurrencyDisplayName(wanted);
+        opt.textContent = (label && label !== wanted ? label + ' (' + wanted + ')' : wanted);
+        sel.appendChild(opt);
+    }
+    sel.value = wanted;
+}
+function supPopulateCurrencyOptions() {
+    var sel = document.getElementById('sup_currency_code');
+    if (!sel || sel.tagName !== 'SELECT') {
+        return;
+    }
+    var selected = String(sel.value || 'KWD').trim().toUpperCase();
+    var codes = [];
+    if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
+        try {
+            codes = Intl.supportedValuesOf('currency') || [];
+        } catch (eCodes) {
+            codes = [];
+        }
+    }
+    if (!codes.length) {
+        supSetCurrencyValue(selected);
+        return;
+    }
+    var uniq = Object.create(null);
+    var normalized = [];
+    codes.forEach(function (code) {
+        var up = String(code || '').trim().toUpperCase();
+        if (!/^[A-Z]{3}$/.test(up) || uniq[up]) {
+            return;
+        }
+        uniq[up] = true;
+        normalized.push(up);
+    });
+    if (!uniq.KWD) {
+        uniq.KWD = true;
+        normalized.push('KWD');
+    }
+    if (selected && /^[A-Z]{3}$/.test(selected) && !uniq[selected]) {
+        uniq[selected] = true;
+        normalized.push(selected);
+    }
+    normalized.sort();
+    sel.innerHTML = '';
+    normalized.forEach(function (code) {
+        var opt = document.createElement('option');
+        opt.value = code;
+        var label = supCurrencyDisplayName(code);
+        opt.textContent = (label && label !== code ? label + ' (' + code + ')' : code);
+        sel.appendChild(opt);
+    });
+    supSetCurrencyValue(selected);
 }
 function supToggleBlockReasonField() {
     var statusEl = document.getElementById('sup_status');
@@ -946,7 +1180,7 @@ function supEnforceFormVisibility() {
                 ? '1fr'
                 : (isTablet
                     ? 'minmax(0, 1fr) minmax(0, 1fr)'
-                    : 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)');
+                    : 'minmax(0, 1.12fr) minmax(0, 1.12fr) minmax(0, 1.12fr) minmax(0, 0.82fr) minmax(0, 0.82fr)');
             child.style.setProperty('display', 'grid', 'important');
             child.style.setProperty('grid-template-columns', row2Cols, 'important');
             child.style.setProperty('gap', '12px 12px', 'important');
@@ -978,6 +1212,7 @@ function supResetForm() {
     document.getElementById('sup_phone').value = '';
     var cc = supPhoneCountryEl();
     if (cc) {
+        supPopulateCountryCodes();
         cc.value = '__intl__';
     }
     var statusEl = document.getElementById('sup_status');
@@ -986,7 +1221,7 @@ function supResetForm() {
     }
     var ccy = document.getElementById('sup_currency_code');
     if (ccy) {
-        ccy.value = 'KWD';
+        supSetCurrencyValue('KWD');
     }
     var txp = document.getElementById('sup_tax_profile');
     if (txp) {
@@ -1027,6 +1262,7 @@ function supEdit(row) {
     var split = supSplitPhoneForForm(row.phone || '', row.phone_country_dial || '');
     var cc = supPhoneCountryEl();
     if (cc) {
+        supPopulateCountryCodes();
         cc.value = split.country && split.country !== '' ? split.country : '__intl__';
     }
     document.getElementById('sup_phone').value = split.phone || '';
@@ -1040,7 +1276,7 @@ function supEdit(row) {
     }
     var ccy = document.getElementById('sup_currency_code');
     if (ccy) {
-        ccy.value = row.currency_code || 'KWD';
+        supSetCurrencyValue(row.currency_code || 'KWD');
     }
     var txp = document.getElementById('sup_tax_profile');
     if (txp) {
@@ -1062,6 +1298,7 @@ function supEdit(row) {
     supSetValue('sup_email', row.email || '');
     supSetValue('sup_commercial_reg', row.commercial_reg || '');
     supSetValue('sup_address_line', row.address_line || '');
+    supEnsureCityAreaOption(row.city_area || '');
     supSetValue('sup_city_area', row.city_area || '');
     supSetValue('sup_credit_limit', row.credit_limit != null ? row.credit_limit : '');
     supSetValue('sup_bank_name', row.bank_name || '');
@@ -1096,7 +1333,7 @@ function supSave() {
     var name = document.getElementById('sup_name').value.trim();
     var phone = document.getElementById('sup_phone').value.trim();
     var ccEl = supPhoneCountryEl();
-    var phoneCountry = ccEl ? String(ccEl.value || '').trim() : '';
+    var phoneCountry = ccEl ? supPhoneCountryForApi(ccEl) : null;
     var intlSel = ccEl && ccEl.tagName === 'SELECT' && phoneCountry === '__intl__';
     var ccForNorm = intlSel ? null : phoneCountry && phoneCountry !== '__intl__' ? phoneCountry : null;
     var notes = document.getElementById('sup_notes').value.trim();
@@ -1115,7 +1352,7 @@ function supSave() {
         name: name,
         phone: phone || null,
         notes: notes || null,
-        phone_country: phoneCountry !== '' ? phoneCountry : null
+        phone_country: phoneCountry !== null ? phoneCountry : null
     };
     var statusEl = document.getElementById('sup_status');
     if (statusEl) {
@@ -1128,7 +1365,7 @@ function supSave() {
     }
     var ccy = document.getElementById('sup_currency_code');
     if (ccy) {
-        var cVal = String(ccy.value || '').trim();
+        var cVal = String(ccy.value || '').trim().toUpperCase();
         if (!cVal) {
             alert('العملة الافتراضية للمورد مطلوبة');
             return;
@@ -1327,6 +1564,8 @@ function supFilterRows() {
     if (statusEl) {
         statusEl.addEventListener('change', supToggleBlockReasonField);
     }
+    supPopulateCountryCodes();
+    supPopulateCurrencyOptions();
     supToggleBlockReasonField();
     supEnforceFormVisibility();
     window.addEventListener('resize', supEnforceFormVisibility);

@@ -154,8 +154,7 @@ try {
     $currencySql = 'KWD';
     if ($hasCurrencyCode) {
         $currencyIn = strtoupper(trim((string) ($data['currency_code'] ?? 'KWD')));
-        $allowedCurrencies = ['KWD', 'USD', 'SAR', 'AED', 'QAR', 'BHD', 'OMR'];
-        if ($currencyIn === '' || !in_array($currencyIn, $allowedCurrencies, true)) {
+        if (!preg_match('/^[A-Z]{3}$/', $currencyIn)) {
             json_response(['success' => false, 'message' => 'العملة الافتراضية للمورد غير صالحة'], 422);
         }
         $currencySql = $currencyIn;
