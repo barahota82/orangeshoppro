@@ -32,20 +32,58 @@ if (orange_table_exists($pdo, 'accounts')) {
         }
     }
 }
-$payableAccountLabel = static function (int $id) use ($leafAccountOptions, $supplierPayablePickAccounts): string {
+$payableAccountMeta = static function (int $id) use ($leafAccountOptions, $supplierPayablePickAccounts): array {
     foreach ($supplierPayablePickAccounts as $a) {
         if ((int) $a['id'] === $id) {
-            return (trim((string) ($a['code'] ?? '')) !== '' ? $a['code'] . ' — ' : '') . ($a['name'] ?? '');
+            $code = trim((string) ($a['code'] ?? ''));
+            $name = (string) ($a['name'] ?? '');
+            return [
+                'id' => (int) $id,
+                'code' => $code,
+                'name' => $name,
+                'label' => ($code !== '' ? $code . ' — ' : '') . $name,
+            ];
         }
     }
     foreach ($leafAccountOptions as $a) {
         if ((int) $a['id'] === $id) {
-            return (trim((string) ($a['code'] ?? '')) !== '' ? $a['code'] . ' — ' : '') . ($a['name'] ?? '');
+            $code = trim((string) ($a['code'] ?? ''));
+            $name = (string) ($a['name'] ?? '');
+            return [
+                'id' => (int) $id,
+                'code' => $code,
+                'name' => $name,
+                'label' => ($code !== '' ? $code . ' — ' : '') . $name,
+            ];
         }
     }
 
-    return '#' . $id;
+    return [
+        'id' => (int) $id,
+        'code' => '',
+        'name' => '#' . $id,
+        'label' => '#' . $id,
+    ];
 };
+$payableAccountLabel = static function (int $id) use ($payableAccountMeta): string {
+    $meta = $payableAccountMeta($id);
+    return (string) ($meta['label'] ?? ('#' . $id));
+};
+$supplierPayablePickAccountsPayload = [];
+foreach ($supplierPayablePickAccounts as $a) {
+    $aid = (int) ($a['id'] ?? 0);
+    if ($aid <= 0) {
+        continue;
+    }
+    $acode = trim((string) ($a['code'] ?? ''));
+    $aname = trim((string) ($a['name'] ?? ''));
+    $supplierPayablePickAccountsPayload[] = [
+        'id' => $aid,
+        'code' => $acode,
+        'name' => $aname,
+        'label' => ($acode !== '' ? $acode . ' — ' : '') . $aname,
+    ];
+}
 /**
  * معاينة الكود التالي للمورد في النموذج (للعرض فقط).
  * الحفظ الفعلي يظل عبر منطق API الذي يولّد/يثبّت الكود تلقائياً.
@@ -274,6 +312,15 @@ $count = count($rows);
     min-height: 96px;
     box-sizing: border-box;
 }
+#sup_form_grid .sup-payable-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: 10px 14px;
+}
+#sup_form_grid .sup-payable-fields input[readonly] {
+    background: #f8fafc;
+    cursor: default;
+}
 #sup_form_grid .sup-grid-r1-code { grid-area: sup_r1_code; }
 #sup_form_grid .sup-grid-r2-name { grid-area: sup_r2_name; }
 #sup_form_grid .sup-grid-r2-balance { grid-area: sup_r2_balance; }
@@ -323,6 +370,9 @@ $count = count($rows);
     #sup_form_grid .sup-grid-r8-iban,
     #sup_form_grid .sup-grid-r8-bank-holder {
         grid-area: auto !important;
+    }
+    #sup_form_grid .sup-payable-fields {
+        grid-template-columns: 1fr;
     }
 }
 </style>
@@ -486,19 +536,17 @@ $count = count($rows);
         <?php endif; ?>
         <?php if ($hasSupplierPayableCol): ?>
         <div style="grid-column:1/-1;">
-            <label for="sup_payable_account_id">حساب ذمة المورد في الدليل (إلزامي)</label>
-            <select id="sup_payable_account_id" required>
-                <option value="" disabled selected>— اختر حساب خصوم (ورقة ترحيل) —</option>
-                <?php foreach ($supplierPayablePickAccounts as $acc): ?>
-                    <?php
-                    $lid = (int) $acc['id'];
-                    $lab = (trim((string) ($acc['code'] ?? '')) !== '' ? $acc['code'] . ' — ' : '') . ($acc['name'] ?? '');
-                    ?>
-                    <option value="<?php echo $lid; ?>"><?php echo htmlspecialchars($lab, ENT_QUOTES, 'UTF-8'); ?></option>
-                <?php endforeach; ?>
-            </select>
-            <div class="actions" style="margin-top:8px;">
-                <button type="button" class="btn-secondary" onclick="supOpenChartOfAccounts()">فتح دليل الحسابات</button>
+            <label>حساب ذمة المورد في الدليل (إلزامي)</label>
+            <input type="hidden" id="sup_payable_account_id" value="">
+            <div class="sup-payable-fields">
+                <div>
+                    <label for="sup_payable_account_code">كود الحساب</label>
+                    <input type="text" id="sup_payable_account_code" autocomplete="off" dir="ltr" lang="en" readonly placeholder="نقرتان للاختيار" title="نقرتان للاختيار">
+                </div>
+                <div>
+                    <label for="sup_payable_account_name">اسم الحساب</label>
+                    <input type="text" id="sup_payable_account_name" autocomplete="off" readonly tabindex="-1" placeholder="يُعبأ تلقائياً">
+                </div>
             </div>
         </div>
         <?php endif; ?>
@@ -508,6 +556,19 @@ $count = count($rows);
         <button type="button" class="btn-secondary" onclick="supResetForm()">تفريغ النموذج</button>
     </div>
 </div>
+
+<?php if ($hasSupplierPayableCol): ?>
+<div class="gl-pick-modal" id="sup_payable_pick_modal" hidden aria-hidden="true">
+    <div class="gl-pick-modal__backdrop" id="sup_payable_pick_backdrop"></div>
+    <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="sup_payable_pick_title">
+        <h3 id="sup_payable_pick_title" class="gl-pick-modal__title">اختيار حساب ذمة المورد</h3>
+        <p class="gl-pick-modal__hint muted" style="margin:0 0 8px;font-size:0.9rem;">نقرتان للاختيار</p>
+        <input type="search" id="sup_payable_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بالكود أو الاسم…" autocomplete="off" dir="rtl">
+        <ul class="gl-pick-modal__list" id="sup_payable_pick_list"></ul>
+        <button type="button" class="btn-secondary" id="sup_payable_pick_close">إغلاق</button>
+    </div>
+</div>
+<?php endif; ?>
 
 <div class="card">
     <h3>سجل الموردين</h3>
@@ -570,7 +631,8 @@ $count = count($rows);
                         $blockReason = $hasSupplierBlockReasonCol ? (string) ($s['block_reason'] ?? '') : '';
                         $attachmentsJson = $hasSupplierAttachmentsCol ? (string) ($s['attachments_json'] ?? '') : '';
                         $pAcc = $hasSupplierPayableCol ? (int) ($s['payable_account_id'] ?? 0) : 0;
-                        $pAccLabel = $pAcc > 0 ? $payableAccountLabel($pAcc) : '';
+                        $pAccMeta = $pAcc > 0 ? $payableAccountMeta($pAcc) : ['id' => 0, 'code' => '', 'name' => '', 'label' => ''];
+                        $pAccLabel = (string) ($pAccMeta['label'] ?? '');
                         $hayRaw = trim((string) ($s['code'] ?? '') . ' ' . ($s['name'] ?? '') . ' ' . $phone . ' ' . ($s['notes'] ?? '') . ' ' . $pAccLabel . ' ' . $statusDisp . ' ' . $currencyCode . ' ' . $taxProfileCode . ' ' . $contactPerson . ' ' . $email . ' ' . $commercialReg . ' ' . $addressLine . ' ' . $cityArea . ' ' . $bankName . ' ' . $bankIban . ' ' . $bankAccountHolder . ' ' . $blockReason);
                         $hay = function_exists('mb_strtolower') ? mb_strtolower($hayRaw, 'UTF-8') : strtolower($hayRaw);
                         ?>
@@ -606,6 +668,9 @@ $count = count($rows);
                                     'phone_country_dial' => $phoneCountryDial,
                                     'notes' => (string) ($s['notes'] ?? ''),
                                     'payable_account_id' => $pAcc > 0 ? $pAcc : null,
+                                    'payable_account_code' => (string) ($pAccMeta['code'] ?? ''),
+                                    'payable_account_name' => (string) ($pAccMeta['name'] ?? ''),
+                                    'payable_account_label' => $pAccLabel,
                                     'status' => $statusRaw,
                                     'currency_code' => $currencyCode !== '' ? $currencyCode : 'KWD',
                                     'payment_mode' => (string) ($s['payment_mode'] ?? 'cash'),
@@ -639,9 +704,109 @@ $count = count($rows);
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/input-constraints.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
 var SUP_NEXT_AUTO_CODE = <?php echo json_encode($nextSupplierCodePreview, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+var SUP_PAYABLE_PICK_ACCOUNTS = <?php echo json_encode($supplierPayablePickAccountsPayload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+var supPayablePickSeq = 0;
+var supPayablePickSearchTimer = null;
 
-function supOpenChartOfAccounts() {
-    window.open('/admin/index.php?page=chart_of_accounts', '_blank');
+function supPayableFields() {
+    return {
+        idEl: document.getElementById('sup_payable_account_id'),
+        codeEl: document.getElementById('sup_payable_account_code'),
+        nameEl: document.getElementById('sup_payable_account_name')
+    };
+}
+function supPayableFindById(id) {
+    var wanted = parseInt(String(id || '0'), 10) || 0;
+    if (wanted <= 0) {
+        return null;
+    }
+    for (var i = 0; i < SUP_PAYABLE_PICK_ACCOUNTS.length; i++) {
+        var a = SUP_PAYABLE_PICK_ACCOUNTS[i];
+        if ((parseInt(String(a.id || '0'), 10) || 0) === wanted) {
+            return a;
+        }
+    }
+    return null;
+}
+function supPayableSetAccount(acc) {
+    var f = supPayableFields();
+    if (!f.idEl || !f.codeEl || !f.nameEl) {
+        return;
+    }
+    if (!acc || (parseInt(String(acc.id || '0'), 10) || 0) <= 0) {
+        f.idEl.value = '';
+        f.codeEl.value = '';
+        f.nameEl.value = '';
+        return;
+    }
+    f.idEl.value = String(parseInt(String(acc.id || '0'), 10) || 0);
+    f.codeEl.value = String(acc.code || '');
+    f.nameEl.value = String(acc.name || '');
+}
+function supPayablePickerClose() {
+    var modal = document.getElementById('sup_payable_pick_modal');
+    if (!modal) {
+        return;
+    }
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('gl-pick-open');
+}
+function supPayablePickerRender(q) {
+    var listEl = document.getElementById('sup_payable_pick_list');
+    if (!listEl) {
+        return;
+    }
+    var query = String(q || '').trim().toLowerCase();
+    var rows = SUP_PAYABLE_PICK_ACCOUNTS.filter(function (a) {
+        if (!query) {
+            return true;
+        }
+        var code = String(a.code || '').toLowerCase();
+        var name = String(a.name || '').toLowerCase();
+        var label = String(a.label || '').toLowerCase();
+        return code.indexOf(query) !== -1 || name.indexOf(query) !== -1 || label.indexOf(query) !== -1;
+    });
+    listEl.innerHTML = '';
+    if (rows.length === 0) {
+        listEl.innerHTML = '<li class="gl-pick-empty">لا نتائج</li>';
+        return;
+    }
+    rows.forEach(function (a) {
+        var li = document.createElement('li');
+        li.className = 'gl-pick-item';
+        li.textContent = String(a.label || '');
+        li.setAttribute('role', 'button');
+        li.tabIndex = 0;
+        function chooseAccount() {
+            supPayableSetAccount(a);
+            supPayablePickerClose();
+        }
+        li.addEventListener('click', chooseAccount);
+        li.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter' || ev.key === ' ') {
+                ev.preventDefault();
+                chooseAccount();
+            }
+        });
+        listEl.appendChild(li);
+    });
+}
+function supPayablePickerOpen() {
+    var modal = document.getElementById('sup_payable_pick_modal');
+    var qEl = document.getElementById('sup_payable_pick_q');
+    var listEl = document.getElementById('sup_payable_pick_list');
+    if (!modal || !qEl || !listEl) {
+        return;
+    }
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('gl-pick-open');
+    qEl.value = '';
+    listEl.innerHTML = '';
+    supPayablePickSeq += 1;
+    supPayablePickerRender('');
+    qEl.focus();
 }
 function supPhoneCountryEl() {
     return document.getElementById('sup_phone_country');
@@ -816,13 +981,7 @@ function supResetForm() {
     supSetValue('sup_attachments_json', '');
     supToggleBlockReasonField();
     document.getElementById('sup_notes').value = '';
-    var ps = document.getElementById('sup_payable_account_id');
-    if (ps) {
-        ps.value = '';
-        if (ps.options.length && ps.options[0].disabled) {
-            ps.selectedIndex = 0;
-        }
-    }
+    supPayableSetAccount(null);
 }
 function supEdit(row) {
     document.getElementById('sup_id').value = String(row.id || 0);
@@ -877,13 +1036,21 @@ function supEdit(row) {
     supToggleBlockReasonField();
     supSetCurrentBalance(row.current_balance != null ? row.current_balance : 0);
     document.getElementById('sup_notes').value = row.notes || '';
-    var ps = document.getElementById('sup_payable_account_id');
-    if (ps) {
-        var p = row.payable_account_id != null && row.payable_account_id > 0 ? String(row.payable_account_id) : '';
-        ps.value = p;
-        if (p && ps.value !== p) {
+    var pId = row.payable_account_id != null ? (parseInt(String(row.payable_account_id), 10) || 0) : 0;
+    if (pId > 0) {
+        var fromPick = supPayableFindById(pId);
+        if (fromPick) {
+            supPayableSetAccount(fromPick);
+        } else {
+            supPayableSetAccount({
+                id: pId,
+                code: row.payable_account_code || '',
+                name: row.payable_account_name || row.payable_account_label || ('#' + String(pId))
+            });
             alert('حساب الذمة الحالي غير ضمن قائمة الخصوم — راجع الدليل أو اختر حساباً صالحاً');
         }
+    } else {
+        supPayableSetAccount(null);
     }
     document.getElementById('sup_name').closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -1069,12 +1236,56 @@ function supFilterRows() {
     });
 }
 (function initSuppliersPage() {
-    var payableEl = document.getElementById('sup_payable_account_id');
-    if (payableEl) {
-        payableEl.addEventListener('dblclick', function () {
-            supOpenChartOfAccounts();
+    var payableCodeEl = document.getElementById('sup_payable_account_code');
+    if (payableCodeEl) {
+        payableCodeEl.addEventListener('dblclick', function (e) {
+            e.preventDefault();
+            supPayablePickerOpen();
+        });
+        payableCodeEl.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                supPayablePickerOpen();
+            }
         });
     }
+    var payableNameEl = document.getElementById('sup_payable_account_name');
+    if (payableNameEl) {
+        payableNameEl.addEventListener('dblclick', function (e) {
+            e.preventDefault();
+            supPayablePickerOpen();
+        });
+    }
+    var pickQ = document.getElementById('sup_payable_pick_q');
+    if (pickQ && !pickQ.getAttribute('data-sup-payable-bound')) {
+        pickQ.setAttribute('data-sup-payable-bound', '1');
+        pickQ.addEventListener('input', function () {
+            if (supPayablePickSearchTimer) {
+                clearTimeout(supPayablePickSearchTimer);
+            }
+            supPayablePickSearchTimer = setTimeout(function () {
+                supPayablePickSeq += 1;
+                supPayablePickerRender(pickQ.value || '');
+            }, 220);
+        });
+    }
+    var pickBackdrop = document.getElementById('sup_payable_pick_backdrop');
+    if (pickBackdrop) {
+        pickBackdrop.addEventListener('click', supPayablePickerClose);
+    }
+    var pickClose = document.getElementById('sup_payable_pick_close');
+    if (pickClose) {
+        pickClose.addEventListener('click', supPayablePickerClose);
+    }
+    document.addEventListener('keydown', function (ev) {
+        if (ev.key !== 'Escape') {
+            return;
+        }
+        var modal = document.getElementById('sup_payable_pick_modal');
+        if (modal && !modal.hidden) {
+            supPayablePickerClose();
+        }
+    });
     var statusEl = document.getElementById('sup_status');
     if (statusEl) {
         statusEl.addEventListener('change', supToggleBlockReasonField);
