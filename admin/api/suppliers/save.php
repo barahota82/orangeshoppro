@@ -72,6 +72,15 @@ try {
         json_response(['success' => false, 'message' => 'اسم المورد مطلوب'], 422);
     }
     $hasCode = orange_table_has_column($pdo, 'suppliers', 'code');
+    $existingSupplierRow = null;
+    if ($idIn > 0) {
+        $exSupplier = $pdo->prepare('SELECT id, code FROM suppliers WHERE id = ? LIMIT 1');
+        $exSupplier->execute([$idIn]);
+        $existingSupplierRow = $exSupplier->fetch(PDO::FETCH_ASSOC) ?: null;
+        if (!$existingSupplierRow) {
+            json_response(['success' => false, 'message' => 'المورد غير موجود'], 404);
+        }
+    }
     $hasPayableAcc = orange_table_has_column($pdo, 'suppliers', 'payable_account_id');
     $hasIsActive = orange_table_has_column($pdo, 'suppliers', 'is_active');
     $hasPhoneCountryDial = orange_table_has_column($pdo, 'suppliers', 'phone_country_dial');
@@ -96,8 +105,16 @@ try {
     $hasBlockReason = orange_table_has_column($pdo, 'suppliers', 'block_reason');
     $hasAttachmentsJson = orange_table_has_column($pdo, 'suppliers', 'attachments_json');
     $codeSql = orange_supplier_normalize_code($pdo, $data['code'] ?? '');
-    if ($hasCode && $idIn <= 0 && $codeSql === null) {
-        $codeSql = orange_supplier_next_auto_code($pdo);
+    if ($hasCode && $codeSql === null) {
+        if ($idIn > 0) {
+            $existingCode = trim((string) (($existingSupplierRow['code'] ?? '')));
+            $codeSql = $existingCode !== '' ? $existingCode : orange_supplier_next_auto_code($pdo);
+        } else {
+            $codeSql = orange_supplier_next_auto_code($pdo);
+        }
+        if ($codeSql === null) {
+            json_response(['success' => false, 'message' => 'تعذّر توليد كود المورد تلقائياً. حاول مرة أخرى.'], 500);
+        }
     }
     $phoneRaw = trim((string) ($data['phone'] ?? ''));
     $admCcRaw = trim((string) ($data['phone_country'] ?? ''));
@@ -344,11 +361,6 @@ try {
     };
 
     if ($idIn > 0) {
-        $exRow = $pdo->prepare('SELECT id FROM suppliers WHERE id = ? LIMIT 1');
-        $exRow->execute([$idIn]);
-        if (!$exRow->fetchColumn()) {
-            json_response(['success' => false, 'message' => 'المورد غير موجود'], 404);
-        }
         $assertCodeUnique($idIn);
         $assertTaxNumberUnique($idIn);
 
