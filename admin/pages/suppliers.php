@@ -220,10 +220,10 @@ $count = count($rows);
 <style>
 #sup_form_grid.suppliers-form-grid {
     grid-template-areas:
-        "sup_r1_status sup_r1_currency sup_r1_payment sup_r1_code"
+        "sup_r1_code sup_r1_payment sup_r1_currency sup_r1_status"
         "sup_r2_name sup_r2_name sup_r2_name sup_r2_name"
-        "sup_r3_address sup_r3_address sup_r3_city sup_r3_city"
-        "sup_r4_contact sup_r4_email sup_r4_phone sup_r4_country";
+        "sup_r3_city sup_r3_city sup_r3_address sup_r3_address"
+        "sup_r4_country sup_r4_phone sup_r4_email sup_r4_contact";
 }
 #sup_form_grid .sup-grid-r1-status { grid-area: sup_r1_status; }
 #sup_form_grid .sup-grid-r1-currency { grid-area: sup_r1_currency; }
