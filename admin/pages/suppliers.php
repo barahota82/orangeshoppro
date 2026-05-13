@@ -228,8 +228,8 @@ $count = count($rows);
         <h1>الموردين</h1>
     </div>
     <div class="actions">
-        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchases'), ENT_QUOTES, 'UTF-8'); ?>">مستند شراء</a>
-        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment'), ENT_QUOTES, 'UTF-8'); ?>">سداد فواتير مشتريات آجلة</a>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchases'), ENT_QUOTES, 'UTF-8'); ?>">فاتورة مشتريات</a>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment'), ENT_QUOTES, 'UTF-8'); ?>">سداد فواتير</a>
     </div>
 </div>
 
@@ -273,26 +273,26 @@ $count = count($rows);
     row-gap: 12px;
     column-gap: 12px;
     grid-template-areas:
-        "sup_r1_code . . . ."
-        "sup_r2_name sup_r2_name sup_r2_name sup_r2_balance sup_r2_status"
-        "sup_r3_block_reason sup_r3_block_reason sup_r3_block_reason sup_r3_block_reason sup_r3_block_reason"
-        "sup_r4_city sup_r4_address sup_r4_address sup_r4_address sup_r4_address"
-        "sup_r5_country sup_r5_phone sup_r5_email sup_r5_contact ."
-        "sup_r6_credit sup_r6_terms sup_r6_payment sup_r6_currency ."
-        "sup_r7_notes sup_r7_notes sup_r7_notes sup_r7_notes sup_r7_notes"
-        "sup_r8_bank_name sup_r8_iban sup_r8_iban sup_r8_bank_holder ."
-        "sup_r9_tax_profile sup_r9_tax_number sup_r9_commercial . .";
+        "sup_r1_code . . ."
+        "sup_r2_name sup_r2_name sup_r2_balance sup_r2_status"
+        "sup_r3_block_reason sup_r3_block_reason sup_r3_block_reason sup_r3_block_reason"
+        "sup_r4_city sup_r4_address sup_r4_address sup_r4_address"
+        "sup_r5_country sup_r5_phone sup_r5_email sup_r5_contact"
+        "sup_r6_credit sup_r6_terms sup_r6_payment sup_r6_currency"
+        "sup_r7_notes sup_r7_notes sup_r7_notes sup_r7_notes"
+        "sup_r8_bank_name sup_r8_iban sup_r8_iban sup_r8_bank_holder"
+        "sup_r9_tax_profile sup_r9_tax_number sup_r9_commercial .";
 }
 #sup_form_grid.suppliers-form-grid.suppliers-form-grid--block-hidden {
     grid-template-areas:
-        "sup_r1_code . . . ."
-        "sup_r2_name sup_r2_name sup_r2_name sup_r2_balance sup_r2_status"
-        "sup_r4_city sup_r4_address sup_r4_address sup_r4_address sup_r4_address"
-        "sup_r5_country sup_r5_phone sup_r5_email sup_r5_contact ."
-        "sup_r6_credit sup_r6_terms sup_r6_payment sup_r6_currency ."
-        "sup_r7_notes sup_r7_notes sup_r7_notes sup_r7_notes sup_r7_notes"
-        "sup_r8_bank_name sup_r8_iban sup_r8_iban sup_r8_bank_holder ."
-        "sup_r9_tax_profile sup_r9_tax_number sup_r9_commercial . .";
+        "sup_r1_code . . ."
+        "sup_r2_name sup_r2_name sup_r2_balance sup_r2_status"
+        "sup_r4_city sup_r4_address sup_r4_address sup_r4_address"
+        "sup_r5_country sup_r5_phone sup_r5_email sup_r5_contact"
+        "sup_r6_credit sup_r6_terms sup_r6_payment sup_r6_currency"
+        "sup_r7_notes sup_r7_notes sup_r7_notes sup_r7_notes"
+        "sup_r8_bank_name sup_r8_iban sup_r8_iban sup_r8_bank_holder"
+        "sup_r9_tax_profile sup_r9_tax_number sup_r9_commercial .";
 }
 #sup_form_grid.suppliers-form-grid input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]),
 #sup_form_grid.suppliers-form-grid select {
@@ -545,9 +545,9 @@ $count = count($rows);
     </div>
     <div class="actions admin-actions--start" style="margin-top:12px;">
         <button type="button" onclick="supSave()">حفظ</button>
-        <button type="button" class="btn-secondary" onclick="supResetForm()">تفريغ النموذج</button>
-        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchases'), ENT_QUOTES, 'UTF-8'); ?>">مستند شراء</a>
-        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment'), ENT_QUOTES, 'UTF-8'); ?>">سداد فواتير مشتريات آجلة</a>
+        <button type="button" class="btn-secondary" onclick="supResetForm()">اضافة مورد</button>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchases'), ENT_QUOTES, 'UTF-8'); ?>">فاتورة مشتريات</a>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment'), ENT_QUOTES, 'UTF-8'); ?>">سداد فواتير</a>
     </div>
 </div>
 
@@ -894,7 +894,7 @@ function supEnforceFormVisibility() {
     var isTablet = !!(window.matchMedia && window.matchMedia('(max-width: 1200px)').matches);
     var cols = isMobile
         ? '1fr'
-        : (isTablet ? '1fr 1fr' : 'repeat(5, minmax(0, 1fr))');
+        : (isTablet ? '1fr 1fr' : 'minmax(0, 1.5fr) minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr)');
     grid.style.setProperty('display', 'grid', 'important');
     grid.style.setProperty('grid-template-columns', cols, 'important');
     grid.style.setProperty('gap', '12px 12px', 'important');
