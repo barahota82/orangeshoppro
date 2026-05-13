@@ -313,7 +313,7 @@ $count = count($rows);
     <?php endif; ?>
     <div class="form-grid suppliers-form-grid" id="sup_form_grid">
         <div class="sup-grid-r1-code">
-            <label for="sup_code">كود المورد (تلقائي فقط)</label>
+            <label for="sup_code">كود المورد</label>
             <input type="text" id="sup_code" class="admin-sort-field admin-sort-field--muted" maxlength="32" autocomplete="off" dir="ltr" lang="en" value="<?php echo htmlspecialchars($nextSupplierCodePreview, ENT_QUOTES, 'UTF-8'); ?>" readonly>
         </div>
         <div class="sup-grid-r2-name">
@@ -336,35 +336,35 @@ $count = count($rows);
         <?php endif; ?>
         <?php if ($hasSupplierPhoneCountryDialCol): ?>
         <div class="sup-grid-r4-country">
-            <label for="sup_phone_country">كود الدولة (اختياري)</label>
+            <label for="sup_phone_country">كود الدولة</label>
             <?php orange_storefront_render_phone_country_select('sup_phone_country'); ?>
         </div>
         <?php endif; ?>
         <div class="sup-grid-r4-phone">
-            <label for="sup_phone">الهاتف (اختياري)</label>
+            <label for="sup_phone">الهاتف</label>
             <input type="text" id="sup_phone" class="js-orange-phone-input" autocomplete="off" dir="ltr" lang="en" placeholder="+965… أو 00… أو رقم وطني مع اختيار الدولة">
         </div>
         <?php if ($hasSupplierContactPersonCol): ?>
         <div class="sup-grid-r4-contact">
-            <label for="sup_contact_person">مسؤول التواصل (اختياري)</label>
+            <label for="sup_contact_person">مسؤول التواصل</label>
             <input type="text" id="sup_contact_person" maxlength="160" autocomplete="off" placeholder="اسم مسؤول التواصل">
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierEmailCol): ?>
         <div class="sup-grid-r4-email">
-            <label for="sup_email">البريد الإلكتروني (اختياري)</label>
+            <label for="sup_email">البريد الإلكتروني</label>
             <input type="email" id="sup_email" maxlength="255" autocomplete="off" dir="ltr" lang="en" placeholder="name@example.com">
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierCreditLimitCol): ?>
         <div class="sup-grid-r5-credit">
-            <label for="sup_credit_limit">الحد الائتماني (اختياري)</label>
+            <label for="sup_credit_limit">الحد الائتماني</label>
             <input type="number" id="sup_credit_limit" class="admin-inp-money" step="any" min="0" inputmode="decimal" lang="en" dir="ltr" placeholder="فارغ = بلا حد">
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierPaymentTermsCol): ?>
         <div class="sup-grid-r5-terms">
-            <label for="sup_payment_terms_days">أيام السداد (تنبيه اختياري)</label>
+            <label for="sup_payment_terms_days">أيام السداد</label>
             <input type="number" id="sup_payment_terms_days" min="0" step="1" inputmode="numeric" lang="en" dir="ltr" placeholder="مثال: 30">
         </div>
         <?php endif; ?>
@@ -410,13 +410,13 @@ $count = count($rows);
         <?php endif; ?>
         <?php if ($hasSupplierTaxNumberCol): ?>
         <div class="sup-grid-r7-tax-number">
-            <label for="sup_tax_number">الرقم الضريبي (اختياري)</label>
+            <label for="sup_tax_number">الرقم الضريبي</label>
             <input type="text" id="sup_tax_number" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="اختياري">
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierCommercialRegCol): ?>
         <div class="sup-grid-r7-commercial">
-            <label for="sup_commercial_reg">السجل التجاري (اختياري)</label>
+            <label for="sup_commercial_reg">السجل التجاري</label>
             <input type="text" id="sup_commercial_reg" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="اختياري">
         </div>
         <?php endif; ?>
@@ -428,25 +428,25 @@ $count = count($rows);
         <?php endif; ?>
         <?php if ($hasSupplierCityAreaCol): ?>
         <div class="sup-grid-r3-city">
-            <label for="sup_city_area">المدينة / المنطقة (اختياري)</label>
+            <label for="sup_city_area">المنطقة</label>
             <input type="text" id="sup_city_area" maxlength="160" autocomplete="off" placeholder="اختياري">
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierBankNameCol): ?>
         <div class="sup-grid-r8-bank-name">
-            <label for="sup_bank_name">اسم البنك (اختياري)</label>
+            <label for="sup_bank_name">اسم البنك</label>
             <input type="text" id="sup_bank_name" maxlength="160" autocomplete="off" placeholder="اختياري">
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierBankIbanCol): ?>
         <div class="sup-grid-r8-iban">
-            <label for="sup_bank_iban">IBAN (اختياري)</label>
+            <label for="sup_bank_iban">IBAN</label>
             <input type="text" id="sup_bank_iban" maxlength="64" autocomplete="off" dir="ltr" lang="en" placeholder="KW..">
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierBankHolderCol): ?>
         <div class="sup-grid-r8-bank-holder">
-            <label for="sup_bank_account_holder">صاحب الحساب البنكي (اختياري)</label>
+            <label for="sup_bank_account_holder">صاحب الحساب البنكي</label>
             <input type="text" id="sup_bank_account_holder" maxlength="160" autocomplete="off" placeholder="اختياري">
         </div>
         <?php endif; ?>
