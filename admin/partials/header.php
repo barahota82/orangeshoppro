@@ -277,7 +277,6 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                 ['page' => 'product_types', 'href' => '/admin/index.php?page=product_types', 'label' => 'أنواع المنتجات الموحدة', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'catalog_attributes', 'href' => '/admin/index.php?page=catalog_attributes', 'label' => 'سمات الكتالوج', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'products', 'href' => '/admin/index.php?page=products', 'label' => 'المنتجات', 'class' => '', 'sub' => false],
-                ['page' => 'offers', 'href' => '/admin/index.php?page=offers', 'label' => 'عروض المنتجات', 'class' => '', 'sub' => false],
                 ['page' => 'opening_stock_balances', 'href' => '/admin/index.php?page=opening_stock_balances', 'label' => 'أرصدة أول المدة المخزنية', 'class' => 'admin-nav-sub', 'sub' => true],
             ];
 
@@ -289,6 +288,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
 
             /** عروض العربة / س4 — كانت تحت الإعدادات؛ قائمة منسدلة مستقلة بعنوان «العروض» */
             $navPromotions = [
+                ['page' => 'offers', 'href' => '/admin/index.php?page=offers', 'label' => 'عروض المنتجات', 'class' => '', 'sub' => false],
                 ['page' => 'cart_promotions', 'href' => '/admin/index.php?page=cart_promotions', 'label' => 'عروض مجموع السلة', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'cart_gift_promotions', 'href' => '/admin/index.php?page=cart_gift_promotions', 'label' => 'عروض الهدايا (س4)', 'class' => 'admin-nav-sub', 'sub' => true],
                 ['page' => 'cart_bogo_promotions', 'href' => '/admin/index.php?page=cart_bogo_promotions', 'label' => 'عروض BOGO (س4)', 'class' => 'admin-nav-sub', 'sub' => true],
