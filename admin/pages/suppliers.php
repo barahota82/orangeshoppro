@@ -227,7 +227,8 @@ $count = count($rows);
         "sup_r5_credit sup_r5_terms sup_r5_payment sup_r5_currency"
         "sup_r6_notes sup_r6_notes sup_r6_notes sup_r6_notes"
         "sup_r7_tax_profile sup_r7_tax_number sup_r7_commercial ."
-        "sup_r8_bank_name sup_r8_iban sup_r8_iban sup_r8_bank_holder";
+        "sup_r8_bank_name sup_r8_iban sup_r8_iban sup_r8_bank_holder"
+        "sup_r9_block_status sup_r9_block_reason sup_r9_block_reason sup_r9_block_reason";
 }
 #sup_form_grid .sup-grid-r1-code { grid-area: sup_r1_code; }
 #sup_form_grid .sup-grid-r2-name { grid-area: sup_r2_name; }
@@ -250,6 +251,8 @@ $count = count($rows);
 #sup_form_grid .sup-grid-r8-bank-name { grid-area: sup_r8_bank_name; }
 #sup_form_grid .sup-grid-r8-iban { grid-area: sup_r8_iban; }
 #sup_form_grid .sup-grid-r8-bank-holder { grid-area: sup_r8_bank_holder; }
+#sup_form_grid .sup-grid-r9-block-status { grid-area: sup_r9_block_status; }
+#sup_form_grid .sup-grid-r9-block-reason { grid-area: sup_r9_block_reason; }
 @media (max-width: 1200px) {
     #sup_form_grid.suppliers-form-grid {
         grid-template-areas: none !important;
@@ -274,7 +277,9 @@ $count = count($rows);
     #sup_form_grid .sup-grid-r7-commercial,
     #sup_form_grid .sup-grid-r8-bank-name,
     #sup_form_grid .sup-grid-r8-iban,
-    #sup_form_grid .sup-grid-r8-bank-holder {
+    #sup_form_grid .sup-grid-r8-bank-holder,
+    #sup_form_grid .sup-grid-r9-block-status,
+    #sup_form_grid .sup-grid-r9-block-reason {
         grid-area: auto !important;
     }
 }
@@ -283,6 +288,9 @@ $count = count($rows);
 <div class="card" id="sup_form_card">
     <h3>مورد جديد أو تعديل</h3>
     <input type="hidden" id="sup_id" value="0">
+    <?php if ($hasSupplierPreferredWarehouseCol): ?>
+    <input type="hidden" id="sup_preferred_warehouse_id" value="1">
+    <?php endif; ?>
     <div class="form-grid suppliers-form-grid" id="sup_form_grid">
         <div class="sup-grid-r1-code">
             <label for="sup_code">كود المورد (تلقائي فقط)</label>
@@ -421,14 +429,8 @@ $count = count($rows);
             <input type="text" id="sup_bank_account_holder" maxlength="160" autocomplete="off" placeholder="اختياري">
         </div>
         <?php endif; ?>
-        <?php if ($hasSupplierPreferredWarehouseCol): ?>
-        <div>
-            <label for="sup_preferred_warehouse_id">المخزن الافتراضي للاستلام</label>
-            <input type="number" id="sup_preferred_warehouse_id" value="1" min="1" step="1" inputmode="numeric" lang="en" dir="ltr" readonly>
-        </div>
-        <?php endif; ?>
         <?php if ($hasSupplierIsBlockedCol): ?>
-        <div>
+        <div class="sup-grid-r9-block-status">
             <label for="sup_is_blocked">حالة التعامل</label>
             <select id="sup_is_blocked">
                 <option value="0" selected>نشط للتعامل</option>
@@ -437,7 +439,7 @@ $count = count($rows);
         </div>
         <?php endif; ?>
         <?php if ($hasSupplierBlockReasonCol): ?>
-        <div style="grid-column:1/-1;">
+        <div class="sup-grid-r9-block-reason">
             <label for="sup_block_reason">سبب الحظر (عند الحظر)</label>
             <input type="text" id="sup_block_reason" maxlength="255" autocomplete="off" placeholder="اختياري إذا المورد نشط">
         </div>
