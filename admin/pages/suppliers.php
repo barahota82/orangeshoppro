@@ -793,9 +793,9 @@ $count = count($rows);
     </div>
     <div class="actions admin-actions--start" style="margin-top:12px;">
         <button type="button" onclick="supSave()">حفظ</button>
-        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchases'), ENT_QUOTES, 'UTF-8'); ?>">فاتورة مشتريات</a>
-        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchase_returns'), ENT_QUOTES, 'UTF-8'); ?>">مردود مشتريات</a>
         <button type="button" class="btn-secondary" onclick="supResetForm()">اضافة مورد</button>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchase_returns'), ENT_QUOTES, 'UTF-8'); ?>">مردود مشتريات</a>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchases'), ENT_QUOTES, 'UTF-8'); ?>">فاتورة مشتريات</a>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment'), ENT_QUOTES, 'UTF-8'); ?>">سداد فواتير</a>
         <button type="button" class="btn-secondary" id="sup_open_statement_btn">كشف حساب</button>
         <button type="button" class="btn-secondary" id="sup_open_search_btn">بحث مورد</button>
