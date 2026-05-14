@@ -946,26 +946,10 @@ function supNavRefreshButtons() {
     if (!firstBtn || !prevBtn || !nextBtn || !lastBtn) {
         return;
     }
-    var rows = supNavRows();
-    if (!rows.length) {
-        firstBtn.disabled = true;
-        prevBtn.disabled = true;
-        nextBtn.disabled = true;
-        lastBtn.disabled = true;
-        return;
-    }
-    var idx = supNavCurrentIndex(rows);
-    if (idx < 0) {
-        firstBtn.disabled = false;
-        prevBtn.disabled = false;
-        nextBtn.disabled = false;
-        lastBtn.disabled = false;
-        return;
-    }
-    firstBtn.disabled = idx <= 0;
-    prevBtn.disabled = idx <= 0;
-    nextBtn.disabled = idx >= rows.length - 1;
-    lastBtn.disabled = idx >= rows.length - 1;
+    firstBtn.disabled = false;
+    prevBtn.disabled = false;
+    nextBtn.disabled = false;
+    lastBtn.disabled = false;
 }
 function supNavLoadIndex(index) {
     var rows = supNavRows();
@@ -989,11 +973,16 @@ function supNavLoadIndex(index) {
     supEdit(row);
 }
 function supNavFirst() {
+    if (!supNavRows().length) {
+        alert('لا توجد موردين بعد');
+        return;
+    }
     supNavLoadIndex(0);
 }
 function supNavLast() {
     var rows = supNavRows();
     if (!rows.length) {
+        alert('لا توجد موردين بعد');
         return;
     }
     supNavLoadIndex(rows.length - 1);
@@ -1001,6 +990,7 @@ function supNavLast() {
 function supNavPrev() {
     var rows = supNavRows();
     if (!rows.length) {
+        alert('لا توجد موردين بعد');
         return;
     }
     var idx = supNavCurrentIndex(rows);
@@ -1013,6 +1003,7 @@ function supNavPrev() {
 function supNavNext() {
     var rows = supNavRows();
     if (!rows.length) {
+        alert('لا توجد موردين بعد');
         return;
     }
     var idx = supNavCurrentIndex(rows);
