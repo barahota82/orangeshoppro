@@ -986,6 +986,15 @@ function supCountryCodeRows() {
     window.__supCountryCodeRowsCache = rows;
     return rows;
 }
+function supDefaultCountryDial() {
+    var rows = supCountryCodeRows();
+    for (var i = 0; i < rows.length; i++) {
+        if (String(rows[i].dial || '') === '965') {
+            return '965';
+        }
+    }
+    return rows.length ? String(rows[0].dial || '') : '';
+}
 function supPopulateCountryCodes() {
     var el = supPhoneCountryEl();
     if (!el || el.tagName !== 'SELECT') {
@@ -1011,10 +1020,14 @@ function supPopulateCountryCodes() {
         opt.textContent = row.label;
         el.appendChild(opt);
     });
+    var defaultDial = supDefaultCountryDial();
     if (current) {
         el.value = current;
+        if (!el.value && defaultDial !== '') {
+            el.value = defaultDial;
+        }
     } else {
-        el.value = '';
+        el.value = defaultDial;
     }
 }
 function supPhoneCountryForApi(selectEl) {
@@ -1549,7 +1562,7 @@ function supResetForm() {
     var cc = supPhoneCountryEl();
     if (cc) {
         supPopulateCountryCodes();
-        cc.value = '';
+        cc.value = supDefaultCountryDial();
     }
     var statusEl = document.getElementById('sup_status');
     if (statusEl) {
@@ -1721,7 +1734,7 @@ function supEdit(row) {
     var cc = supPhoneCountryEl();
     if (cc) {
         supPopulateCountryCodes();
-        cc.value = split.country && split.country !== '' ? split.country : '';
+        cc.value = split.country && split.country !== '' ? split.country : supDefaultCountryDial();
     }
     document.getElementById('sup_phone').value = split.phone || '';
     var statusEl = document.getElementById('sup_status');
