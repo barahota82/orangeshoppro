@@ -412,6 +412,10 @@ $count = count($rows);
     background: #f8fafc;
     cursor: default;
 }
+#sup_form_grid .sup-payable-fields input[disabled] {
+    background: #f8fafc;
+    cursor: default;
+}
 #sup_form_grid .sup-grid-r1-code { grid-area: sup_r1_code; }
 #sup_form_grid .sup-grid-r2-row {
     grid-area: sup_r2_row;
@@ -781,7 +785,7 @@ $count = count($rows);
                 </div>
                 <div>
                     <label for="sup_payable_account_name">اسم الحساب</label>
-                    <input type="text" id="sup_payable_account_name" autocomplete="off" readonly tabindex="-1" placeholder="يُعبأ تلقائياً">
+                    <input type="text" id="sup_payable_account_name" class="admin-inp-readonly" autocomplete="off" readonly disabled tabindex="-1" placeholder="يُعبأ تلقائياً" title="يُعبأ تلقائياً">
                 </div>
             </div>
         </div>
@@ -2114,13 +2118,6 @@ function supSave() {
                 e.preventDefault();
                 supPayablePickerOpen();
             }
-        });
-    }
-    var payableNameEl = document.getElementById('sup_payable_account_name');
-    if (payableNameEl) {
-        payableNameEl.addEventListener('dblclick', function (e) {
-            e.preventDefault();
-            supPayablePickerOpen();
         });
     }
     var pickQ = document.getElementById('sup_payable_pick_q');
