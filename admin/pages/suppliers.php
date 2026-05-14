@@ -448,6 +448,11 @@ $count = count($rows);
     height: 42px;
     padding: 0 10px;
 }
+#sup_form_grid .sup-code-nav-search {
+    height: 42px;
+    padding: 0 12px;
+    white-space: nowrap;
+}
 #sup_form_grid .sup-code-nav-btn[disabled] {
     opacity: 0.5;
     cursor: not-allowed;
@@ -657,6 +662,7 @@ $count = count($rows);
                     <button type="button" class="btn-secondary sup-code-nav-btn" id="sup_nav_prev" title="المورد السابق" aria-label="المورد السابق">&lt;</button>
                     <button type="button" class="btn-secondary sup-code-nav-btn" id="sup_nav_next" title="المورد التالي" aria-label="المورد التالي">&gt;</button>
                     <button type="button" class="btn-secondary sup-code-nav-btn" id="sup_nav_last" title="آخر مورد" aria-label="آخر مورد">&gt;&gt;</button>
+                    <button type="button" class="btn-secondary sup-code-nav-search" id="sup_open_search_btn" title="بحث مورد">بحث</button>
                 </div>
             </div>
         </div>
@@ -843,7 +849,6 @@ $count = count($rows);
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchases'), ENT_QUOTES, 'UTF-8'); ?>">فاتورة مشتريات</a>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment'), ENT_QUOTES, 'UTF-8'); ?>">سداد فواتير</a>
         <button type="button" class="btn-secondary" id="sup_open_statement_btn">كشف حساب</button>
-        <button type="button" class="btn-secondary" id="sup_open_search_btn">بحث مورد</button>
     </div>
 </div>
 
