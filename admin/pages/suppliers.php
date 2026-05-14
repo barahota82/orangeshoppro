@@ -66,10 +66,6 @@ $payableAccountMeta = static function (int $id) use ($leafAccountOptions, $suppl
         'label' => '#' . $id,
     ];
 };
-$payableAccountLabel = static function (int $id) use ($payableAccountMeta): string {
-    $meta = $payableAccountMeta($id);
-    return (string) ($meta['label'] ?? ('#' . $id));
-};
 $supplierPayablePickAccountsPayload = [];
 foreach ($supplierPayablePickAccounts as $a) {
     $aid = (int) ($a['id'] ?? 0);
@@ -236,20 +232,92 @@ $taxProfileOptions = [
     'taxable' => 'خاضع',
     'zero' => 'صفر ضريبي',
 ];
-$currencyLabel = static function (string $code) use ($currencyOptions): string {
-    return $currencyOptions[$code] ?? $code;
-};
-$taxProfileLabel = static function (string $code) use ($taxProfileOptions): string {
-    return $taxProfileOptions[$code] ?? $code;
-};
 
 $rows = [];
+$supplierSearchRowsPayload = [];
 $totalBalance = 0.0;
 if (orange_table_exists($pdo, 'suppliers')) {
-    $sql = 'SELECT s.*, (SELECT COUNT(*) FROM purchases p WHERE p.supplier_id = s.id) AS purchase_cnt FROM suppliers s ORDER BY s.name ASC, s.id ASC';
+    $sql = 'SELECT s.* FROM suppliers s ORDER BY s.name ASC, s.id ASC';
     $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
     foreach ($rows as $r) {
-        $totalBalance += orange_party_balance_supplier($pdo, (int) $r['id']);
+        $sid = (int) ($r['id'] ?? 0);
+        if ($sid <= 0) {
+            continue;
+        }
+        $bal = orange_party_balance_supplier($pdo, $sid);
+        $totalBalance += $bal;
+        $statusRaw = strtolower(trim((string) ($r['status'] ?? 'active')));
+        if (!in_array($statusRaw, ['active', 'inactive', 'blocked'], true)) {
+            $statusRaw = 'active';
+        }
+        $currencyCode = strtoupper(trim((string) ($r['currency_code'] ?? 'KWD')));
+        $taxProfileCode = trim((string) ($r['tax_profile'] ?? 'exempt'));
+        $phone = (string) ($r['phone'] ?? '');
+        $contactPerson = (string) ($r['contact_person'] ?? '');
+        $email = (string) ($r['email'] ?? '');
+        $commercialReg = (string) ($r['commercial_reg'] ?? '');
+        $addressLine = (string) ($r['address_line'] ?? '');
+        $cityArea = (string) ($r['city_area'] ?? '');
+        $bankName = (string) ($r['bank_name'] ?? '');
+        $bankIban = (string) ($r['bank_iban'] ?? '');
+        $bankAccountHolder = (string) ($r['bank_account_holder'] ?? '');
+        $blockReason = (string) ($r['block_reason'] ?? '');
+        $attachmentsJson = (string) ($r['attachments_json'] ?? '');
+        $pAcc = (int) ($r['payable_account_id'] ?? 0);
+        $pAccMeta = $pAcc > 0 ? $payableAccountMeta($pAcc) : ['id' => 0, 'code' => '', 'name' => '', 'label' => ''];
+        $pAccLabel = (string) ($pAccMeta['label'] ?? '');
+        $searchHayRaw = trim(
+            (string) ($r['code'] ?? '') . ' ' .
+            (string) ($r['name'] ?? '') . ' ' .
+            $phone . ' ' .
+            (string) ($r['notes'] ?? '') . ' ' .
+            $pAccLabel . ' ' .
+            $statusRaw . ' ' .
+            $currencyCode . ' ' .
+            $taxProfileCode . ' ' .
+            $contactPerson . ' ' .
+            $email . ' ' .
+            $commercialReg . ' ' .
+            $addressLine . ' ' .
+            $cityArea . ' ' .
+            $bankName . ' ' .
+            $bankIban . ' ' .
+            $bankAccountHolder . ' ' .
+            $blockReason
+        );
+        $searchHay = function_exists('mb_strtolower') ? mb_strtolower($searchHayRaw, 'UTF-8') : strtolower($searchHayRaw);
+        $supplierSearchRowsPayload[] = [
+            'id' => $sid,
+            'code' => (string) ($r['code'] ?? ''),
+            'name' => (string) ($r['name'] ?? ''),
+            'phone' => $phone,
+            'phone_country_dial' => (string) ($r['phone_country_dial'] ?? ''),
+            'notes' => (string) ($r['notes'] ?? ''),
+            'payable_account_id' => $pAcc > 0 ? $pAcc : null,
+            'payable_account_code' => (string) ($pAccMeta['code'] ?? ''),
+            'payable_account_name' => (string) ($pAccMeta['name'] ?? ''),
+            'payable_account_label' => $pAccLabel,
+            'status' => $statusRaw,
+            'currency_code' => $currencyCode !== '' ? $currencyCode : 'KWD',
+            'payment_mode' => (string) ($r['payment_mode'] ?? 'cash'),
+            'payment_terms_days' => isset($r['payment_terms_days']) && $r['payment_terms_days'] !== null ? (int) $r['payment_terms_days'] : null,
+            'tax_profile' => $taxProfileCode !== '' ? $taxProfileCode : 'exempt',
+            'tax_number' => (string) ($r['tax_number'] ?? ''),
+            'contact_person' => $contactPerson,
+            'email' => $email,
+            'commercial_reg' => $commercialReg,
+            'address_line' => $addressLine,
+            'city_area' => $cityArea,
+            'credit_limit' => isset($r['credit_limit']) && $r['credit_limit'] !== null ? (float) $r['credit_limit'] : null,
+            'bank_name' => $bankName,
+            'bank_iban' => $bankIban,
+            'bank_account_holder' => $bankAccountHolder,
+            'preferred_warehouse_id' => isset($r['preferred_warehouse_id']) && (int) $r['preferred_warehouse_id'] > 0 ? (int) $r['preferred_warehouse_id'] : null,
+            'block_reason' => $blockReason,
+            'attachments_json' => $attachmentsJson,
+            'current_balance' => round((float) $bal, 3),
+            'search_text' => $searchHay,
+        ];
     }
 }
 $count = count($rows);
@@ -454,6 +522,21 @@ $count = count($rows);
     align-items: center;
     gap: 8px;
     flex: 0 0 auto;
+}
+.sup-search-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.sup-search-item__name {
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.35;
+}
+.sup-search-item__meta {
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.35;
 }
 @media (max-width: 1200px) {
     #sup_form_grid.suppliers-form-grid {
@@ -707,6 +790,8 @@ $count = count($rows);
         <button type="button" class="btn-secondary" onclick="supResetForm()">اضافة مورد</button>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchases'), ENT_QUOTES, 'UTF-8'); ?>">فاتورة مشتريات</a>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment'), ENT_QUOTES, 'UTF-8'); ?>">سداد فواتير</a>
+        <button type="button" class="btn-secondary" id="sup_open_statement_btn">كشف حساب</button>
+        <button type="button" class="btn-secondary" id="sup_open_search_btn">بحث مورد</button>
     </div>
 </div>
 
@@ -752,135 +837,15 @@ $count = count($rows);
 </div>
 <?php endif; ?>
 
-<div class="card">
-    <h3>سجل الموردين</h3>
-    <div class="party-registry-toolbar">
-        <div class="party-registry-search-wrap">
-            <label for="sup_filter" class="party-registry-search-label">بحث</label>
-            <input type="search" id="sup_filter" class="party-registry-search" placeholder="اسم، هاتف، ملاحظات…" autocomplete="off" lang="ar" dir="rtl" oninput="supFilterRows()">
-        </div>
+<div class="gl-pick-modal" id="sup_search_modal" hidden aria-hidden="true">
+    <div class="gl-pick-modal__backdrop" id="sup_search_backdrop"></div>
+    <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="sup_search_title">
+        <h3 id="sup_search_title" class="gl-pick-modal__title">بحث مورد</h3>
+        <p class="gl-pick-modal__hint muted" style="margin:0 0 8px;font-size:0.9rem;">دبل كليك لاختيار المورد وتعبئة النموذج</p>
+        <input type="search" id="sup_search_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بالكود أو الاسم أو الهاتف…" autocomplete="off" dir="rtl">
+        <ul class="gl-pick-modal__list" id="sup_search_list"></ul>
+        <button type="button" class="btn-secondary" id="sup_search_close">إغلاق</button>
     </div>
-    <?php if ($rows === []): ?>
-        <p class="card-hint">لا يوجد موردون بعد — أضف مورداً من النموذج أعلاه ليظهر في قوائم المشتريات.</p>
-    <?php else: ?>
-        <div class="table-wrap">
-            <table class="admin-table party-registry-table">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>الكود</th>
-                        <th>الاسم</th>
-                        <?php if ($hasSupplierStatusCol): ?><th>الحالة</th><?php endif; ?>
-                        <th>الهاتف</th>
-                        <?php if ($hasSupplierCurrencyCol): ?><th>العملة</th><?php endif; ?>
-                        <?php if ($hasSupplierTaxProfileCol): ?><th>الضريبة</th><?php endif; ?>
-                        <th>ذمة المورد</th>
-                        <?php if ($hasSupplierPayableCol): ?><th>حساب الذمة (دليل)</th><?php endif; ?>
-                        <th>مشتريات</th>
-                        <th class="party-registry-col-actions">إجراءات</th>
-                    </tr>
-                </thead>
-                <tbody id="sup_tbody">
-                    <?php foreach ($rows as $s): ?>
-                        <?php
-                        $sid = (int) $s['id'];
-                        $bal = orange_party_balance_supplier($pdo, $sid);
-                        $phone = (string) ($s['phone'] ?? '');
-                        $phoneCountryDial = (string) ($s['phone_country_dial'] ?? '');
-                        $codeDisp = isset($s['code']) && (string) $s['code'] !== '' ? (string) $s['code'] : '—';
-                        $statusRaw = $hasSupplierStatusCol ? strtolower(trim((string) ($s['status'] ?? 'active'))) : 'active';
-                        if (!in_array($statusRaw, ['active', 'inactive', 'blocked'], true)) {
-                            $statusRaw = 'active';
-                        }
-                        $statusDisp = $statusRaw === 'inactive' ? 'غير نشط' : ($statusRaw === 'blocked' ? 'محظور مؤقتاً' : 'نشط');
-                        $statusBadge = $statusRaw === 'inactive'
-                            ? '<span class="badge cancelled">غير نشط</span>'
-                            : ($statusRaw === 'blocked'
-                                ? '<span class="badge cancelled">محظور مؤقتاً</span>'
-                                : '<span class="badge ok">نشط</span>');
-                        $currencyCode = $hasSupplierCurrencyCol ? strtoupper(trim((string) ($s['currency_code'] ?? 'KWD'))) : '';
-                        $taxProfileCode = $hasSupplierTaxProfileCol ? trim((string) ($s['tax_profile'] ?? 'exempt')) : '';
-                        $contactPerson = $hasSupplierContactPersonCol ? (string) ($s['contact_person'] ?? '') : '';
-                        $email = $hasSupplierEmailCol ? (string) ($s['email'] ?? '') : '';
-                        $commercialReg = $hasSupplierCommercialRegCol ? (string) ($s['commercial_reg'] ?? '') : '';
-                        $addressLine = $hasSupplierAddressLineCol ? (string) ($s['address_line'] ?? '') : '';
-                        $cityArea = $hasSupplierCityAreaCol ? (string) ($s['city_area'] ?? '') : '';
-                        $creditLimit = $hasSupplierCreditLimitCol ? ($s['credit_limit'] ?? null) : null;
-                        $bankName = $hasSupplierBankNameCol ? (string) ($s['bank_name'] ?? '') : '';
-                        $bankIban = $hasSupplierBankIbanCol ? (string) ($s['bank_iban'] ?? '') : '';
-                        $bankAccountHolder = $hasSupplierBankHolderCol ? (string) ($s['bank_account_holder'] ?? '') : '';
-                        $preferredWarehouseId = $hasSupplierPreferredWarehouseCol ? (int) ($s['preferred_warehouse_id'] ?? 0) : 0;
-                        $blockReason = $hasSupplierBlockReasonCol ? (string) ($s['block_reason'] ?? '') : '';
-                        $attachmentsJson = $hasSupplierAttachmentsCol ? (string) ($s['attachments_json'] ?? '') : '';
-                        $pAcc = $hasSupplierPayableCol ? (int) ($s['payable_account_id'] ?? 0) : 0;
-                        $pAccMeta = $pAcc > 0 ? $payableAccountMeta($pAcc) : ['id' => 0, 'code' => '', 'name' => '', 'label' => ''];
-                        $pAccLabel = (string) ($pAccMeta['label'] ?? '');
-                        $hayRaw = trim((string) ($s['code'] ?? '') . ' ' . ($s['name'] ?? '') . ' ' . $phone . ' ' . ($s['notes'] ?? '') . ' ' . $pAccLabel . ' ' . $statusDisp . ' ' . $currencyCode . ' ' . $taxProfileCode . ' ' . $contactPerson . ' ' . $email . ' ' . $commercialReg . ' ' . $addressLine . ' ' . $cityArea . ' ' . $bankName . ' ' . $bankIban . ' ' . $bankAccountHolder . ' ' . $blockReason);
-                        $hay = function_exists('mb_strtolower') ? mb_strtolower($hayRaw, 'UTF-8') : strtolower($hayRaw);
-                        ?>
-                        <tr data-sup-search="<?php echo htmlspecialchars($hay, ENT_QUOTES, 'UTF-8'); ?>">
-                            <td><?php echo $sid; ?></td>
-                            <td dir="ltr"><?php echo htmlspecialchars($codeDisp, ENT_QUOTES, 'UTF-8'); ?></td>
-                            <td><?php echo htmlspecialchars((string) ($s['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                            <?php if ($hasSupplierStatusCol): ?>
-                                <td><?php echo $statusBadge; ?></td>
-                            <?php endif; ?>
-                            <td dir="ltr"><?php echo $phone !== '' ? htmlspecialchars($phone, ENT_QUOTES, 'UTF-8') : '—'; ?></td>
-                            <?php if ($hasSupplierCurrencyCol): ?>
-                                <td dir="ltr"><?php echo htmlspecialchars($currencyLabel($currencyCode), ENT_QUOTES, 'UTF-8'); ?></td>
-                            <?php endif; ?>
-                            <?php if ($hasSupplierTaxProfileCol): ?>
-                                <td><?php echo htmlspecialchars($taxProfileLabel($taxProfileCode), ENT_QUOTES, 'UTF-8'); ?></td>
-                            <?php endif; ?>
-                            <td dir="ltr"><?php echo number_format($bal, 3); ?></td>
-                            <?php if ($hasSupplierPayableCol): ?>
-                                <td><small><?php
-                                    echo $pAcc > 0
-                                        ? htmlspecialchars($pAccLabel, ENT_QUOTES, 'UTF-8')
-                                        : '<span class="badge cancelled">بلا حساب ذمة — حدّث المورد</span>';
-                                ?></small></td>
-                            <?php endif; ?>
-                            <td><?php echo (int) ($s['purchase_cnt'] ?? 0); ?></td>
-                            <td class="party-registry-actions">
-                                <button type="button" class="btn-secondary party-registry-btn" onclick='supEdit(<?php echo json_encode([
-                                    'id' => $sid,
-                                    'code' => (string) ($s['code'] ?? ''),
-                                    'name' => (string) ($s['name'] ?? ''),
-                                    'phone' => $phone,
-                                    'phone_country_dial' => $phoneCountryDial,
-                                    'notes' => (string) ($s['notes'] ?? ''),
-                                    'payable_account_id' => $pAcc > 0 ? $pAcc : null,
-                                    'payable_account_code' => (string) ($pAccMeta['code'] ?? ''),
-                                    'payable_account_name' => (string) ($pAccMeta['name'] ?? ''),
-                                    'payable_account_label' => $pAccLabel,
-                                    'status' => $statusRaw,
-                                    'currency_code' => $currencyCode !== '' ? $currencyCode : 'KWD',
-                                    'payment_mode' => (string) ($s['payment_mode'] ?? 'cash'),
-                                    'payment_terms_days' => isset($s['payment_terms_days']) && $s['payment_terms_days'] !== null ? (int) $s['payment_terms_days'] : null,
-                                    'tax_profile' => $taxProfileCode !== '' ? $taxProfileCode : 'exempt',
-                                    'tax_number' => (string) ($s['tax_number'] ?? ''),
-                                    'contact_person' => $contactPerson,
-                                    'email' => $email,
-                                    'commercial_reg' => $commercialReg,
-                                    'address_line' => $addressLine,
-                                    'city_area' => $cityArea,
-                                    'credit_limit' => $creditLimit,
-                                    'bank_name' => $bankName,
-                                    'bank_iban' => $bankIban,
-                                    'bank_account_holder' => $bankAccountHolder,
-                                    'preferred_warehouse_id' => $preferredWarehouseId > 0 ? $preferredWarehouseId : null,
-                                    'block_reason' => $blockReason,
-                                    'attachments_json' => $attachmentsJson,
-                                    'current_balance' => round((float) $bal, 3),
-                                ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>)'>تعديل</button>
-                                <a class="btn btn-secondary party-registry-btn" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_reports#partner-balances-suppliers'), ENT_QUOTES, 'UTF-8'); ?>">ذمة المورد</a>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-    <?php endif; ?>
 </div>
 
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/country-codes.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
@@ -888,8 +853,11 @@ $count = count($rows);
 <script>
 var SUP_NEXT_AUTO_CODE = <?php echo json_encode($nextSupplierCodePreview, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var SUP_PAYABLE_PICK_ACCOUNTS = <?php echo json_encode($supplierPayablePickAccountsPayload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+var SUP_SEARCH_ROWS = <?php echo json_encode($supplierSearchRowsPayload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+var SUP_PARTNER_STATEMENT_URL = <?php echo json_encode(storefront_public_path('/admin/index.php?page=partner_account_statement'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var supPayablePickSeq = 0;
 var supPayablePickSearchTimer = null;
+var supSearchTimer = null;
 
 function supPayableFields() {
     return {
@@ -1625,6 +1593,122 @@ function supResetForm() {
     document.getElementById('sup_notes').value = '';
     supPayableSetAccount(null);
 }
+function supSearchFindById(id) {
+    var wanted = parseInt(String(id || '0'), 10) || 0;
+    if (wanted <= 0) {
+        return null;
+    }
+    for (var i = 0; i < SUP_SEARCH_ROWS.length; i++) {
+        var row = SUP_SEARCH_ROWS[i];
+        if ((parseInt(String(row.id || '0'), 10) || 0) === wanted) {
+            return row;
+        }
+    }
+    return null;
+}
+function supCurrentSupplierRow() {
+    var idEl = document.getElementById('sup_id');
+    var sid = parseInt(String(idEl && idEl.value || '0'), 10) || 0;
+    if (sid <= 0) {
+        return null;
+    }
+    return supSearchFindById(sid);
+}
+function supSearchModalClose() {
+    var modal = document.getElementById('sup_search_modal');
+    if (!modal) {
+        return;
+    }
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('gl-pick-open');
+}
+function supSearchSelect(row) {
+    if (!row || (parseInt(String(row.id || '0'), 10) || 0) <= 0) {
+        return;
+    }
+    supEdit(row);
+    supSearchModalClose();
+}
+function supSearchRender(q) {
+    var listEl = document.getElementById('sup_search_list');
+    if (!listEl) {
+        return;
+    }
+    var query = String(q || '').trim().toLowerCase();
+    var rows = SUP_SEARCH_ROWS.filter(function (row) {
+        if (!query) {
+            return true;
+        }
+        var hay = String(row.search_text || '').toLowerCase();
+        if (hay === '') {
+            hay = (String(row.code || '') + ' ' + String(row.name || '') + ' ' + String(row.phone || '') + ' ' + String(row.notes || '')).toLowerCase();
+        }
+        return hay.indexOf(query) !== -1;
+    });
+    listEl.innerHTML = '';
+    if (rows.length === 0) {
+        listEl.innerHTML = '<li class="gl-pick-empty">لا توجد نتائج</li>';
+        return;
+    }
+    rows.forEach(function (row) {
+        var li = document.createElement('li');
+        li.className = 'gl-pick-item sup-search-item';
+        li.setAttribute('role', 'button');
+        li.tabIndex = 0;
+        var nameEl = document.createElement('span');
+        nameEl.className = 'sup-search-item__name';
+        var code = String(row.code || '').trim();
+        var name = String(row.name || '').trim();
+        nameEl.textContent = (code !== '' ? code + ' — ' : '') + (name !== '' ? name : ('#' + String(row.id || '0')));
+        var metaEl = document.createElement('span');
+        metaEl.className = 'sup-search-item__meta';
+        var phone = String(row.phone || '').trim();
+        var st = String(row.status || 'active').toLowerCase();
+        var statusLabel = st === 'inactive' ? 'غير نشط' : (st === 'blocked' ? 'محظور مؤقتاً' : 'نشط');
+        metaEl.textContent = (phone !== '' ? phone : 'بدون هاتف') + ' • ' + statusLabel;
+        li.appendChild(nameEl);
+        li.appendChild(metaEl);
+        li.addEventListener('dblclick', function () {
+            supSearchSelect(row);
+        });
+        li.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter' || ev.key === ' ') {
+                ev.preventDefault();
+                supSearchSelect(row);
+            }
+        });
+        listEl.appendChild(li);
+    });
+}
+function supSearchModalOpen() {
+    var modal = document.getElementById('sup_search_modal');
+    var qEl = document.getElementById('sup_search_q');
+    var listEl = document.getElementById('sup_search_list');
+    if (!modal || !qEl || !listEl) {
+        return;
+    }
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('gl-pick-open');
+    qEl.value = '';
+    listEl.innerHTML = '';
+    supSearchRender('');
+    qEl.focus();
+}
+function supOpenCurrentSupplierStatement() {
+    var row = supCurrentSupplierRow();
+    if (!row || (parseInt(String(row.id || '0'), 10) || 0) <= 0) {
+        alert('اختر المورد أولاً من زر بحث مورد');
+        return;
+    }
+    var accId = parseInt(String(row.payable_account_id || '0'), 10) || 0;
+    if (accId <= 0) {
+        alert('المورد الحالي بلا حساب ذمة مربوط في الدليل');
+        return;
+    }
+    window.location.href = SUP_PARTNER_STATEMENT_URL + '&account=' + encodeURIComponent(String(accId));
+}
 function supEdit(row) {
     document.getElementById('sup_id').value = String(row.id || 0);
     document.getElementById('sup_code').value = row.code || '';
@@ -1872,15 +1956,6 @@ function supSave() {
             alert(e.message || String(e));
         });
 }
-function supFilterRows() {
-    var q = (document.getElementById('sup_filter') && document.getElementById('sup_filter').value || '')
-        .trim()
-        .toLowerCase();
-    document.querySelectorAll('#sup_tbody tr[data-sup-search]').forEach(function (tr) {
-        var hay = (tr.getAttribute('data-sup-search') || '').toLowerCase();
-        tr.style.display = !q || hay.indexOf(q) !== -1 ? '' : 'none';
-    });
-}
 (function initSuppliersPage() {
     var payableCodeEl = document.getElementById('sup_payable_account_code');
     if (payableCodeEl) {
@@ -1923,8 +1998,47 @@ function supFilterRows() {
     if (pickClose) {
         pickClose.addEventListener('click', supPayablePickerClose);
     }
+    var searchOpenBtn = document.getElementById('sup_open_search_btn');
+    if (searchOpenBtn) {
+        searchOpenBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            supSearchModalOpen();
+        });
+    }
+    var statementBtn = document.getElementById('sup_open_statement_btn');
+    if (statementBtn) {
+        statementBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            supOpenCurrentSupplierStatement();
+        });
+    }
+    var searchBackdrop = document.getElementById('sup_search_backdrop');
+    if (searchBackdrop) {
+        searchBackdrop.addEventListener('click', supSearchModalClose);
+    }
+    var searchClose = document.getElementById('sup_search_close');
+    if (searchClose) {
+        searchClose.addEventListener('click', supSearchModalClose);
+    }
+    var searchQ = document.getElementById('sup_search_q');
+    if (searchQ && !searchQ.getAttribute('data-sup-search-bound')) {
+        searchQ.setAttribute('data-sup-search-bound', '1');
+        searchQ.addEventListener('input', function () {
+            if (supSearchTimer) {
+                clearTimeout(supSearchTimer);
+            }
+            supSearchTimer = setTimeout(function () {
+                supSearchRender(searchQ.value || '');
+            }, 180);
+        });
+    }
     document.addEventListener('keydown', function (ev) {
         if (ev.key !== 'Escape') {
+            return;
+        }
+        var searchModal = document.getElementById('sup_search_modal');
+        if (searchModal && !searchModal.hidden) {
+            supSearchModalClose();
             return;
         }
         var attModal = document.getElementById('sup_attachments_modal');
