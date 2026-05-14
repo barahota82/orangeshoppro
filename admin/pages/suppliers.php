@@ -372,7 +372,7 @@ $count = count($rows);
     row-gap: 12px;
     column-gap: 12px;
     grid-template-areas:
-        "sup_r1_code . . ."
+        "sup_r1_code sup_r1_code sup_r1_code sup_r1_code"
         "sup_r2_row sup_r2_row sup_r2_row sup_r2_row"
         "sup_r3_block_reason sup_r3_block_reason sup_r3_block_reason sup_r3_block_reason"
         "sup_r4_city sup_r4_address sup_r4_address sup_r4_address"
@@ -384,7 +384,7 @@ $count = count($rows);
 }
 #sup_form_grid.suppliers-form-grid.suppliers-form-grid--block-hidden {
     grid-template-areas:
-        "sup_r1_code . . ."
+        "sup_r1_code sup_r1_code sup_r1_code sup_r1_code"
         "sup_r2_row sup_r2_row sup_r2_row sup_r2_row"
         "sup_r4_city sup_r4_address sup_r4_address sup_r4_address"
         "sup_r5_country sup_r5_phone sup_r5_email sup_r5_contact"
@@ -416,7 +416,42 @@ $count = count($rows);
     background: #f8fafc;
     cursor: default;
 }
-#sup_form_grid .sup-grid-r1-code { grid-area: sup_r1_code; }
+#sup_form_grid .sup-grid-r1-code {
+    grid-area: sup_r1_code;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+#sup_form_grid .sup-code-nav-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: end;
+    direction: rtl;
+}
+#sup_form_grid .sup-code-nav-main {
+    min-width: 0;
+}
+#sup_form_grid .sup-code-nav-main input {
+    width: 100%;
+}
+#sup_form_grid .sup-code-nav-btns {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    direction: ltr;
+    margin-inline-start: auto;
+}
+#sup_form_grid .sup-code-nav-btn {
+    min-width: 38px;
+    height: 42px;
+    padding: 0 10px;
+}
+#sup_form_grid .sup-code-nav-btn[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
 #sup_form_grid .sup-grid-r2-row {
     grid-area: sup_r2_row;
     display: grid;
@@ -612,8 +647,18 @@ $count = count($rows);
     <?php endif; ?>
     <div class="form-grid suppliers-form-grid" id="sup_form_grid">
         <div class="sup-grid-r1-code">
-            <label for="sup_code">كود المورد</label>
-            <input type="text" id="sup_code" class="admin-sort-field admin-sort-field--muted" maxlength="32" autocomplete="off" dir="ltr" lang="en" value="<?php echo htmlspecialchars($nextSupplierCodePreview, ENT_QUOTES, 'UTF-8'); ?>" readonly>
+            <div class="sup-code-nav-row">
+                <div class="sup-code-nav-main">
+                    <label for="sup_code">كود المورد</label>
+                    <input type="text" id="sup_code" class="admin-sort-field admin-sort-field--muted" maxlength="32" autocomplete="off" dir="ltr" lang="en" value="<?php echo htmlspecialchars($nextSupplierCodePreview, ENT_QUOTES, 'UTF-8'); ?>" readonly>
+                </div>
+                <div class="sup-code-nav-btns" role="group" aria-label="تنقل بين الموردين">
+                    <button type="button" class="btn-secondary sup-code-nav-btn" id="sup_nav_first" title="أول مورد" aria-label="أول مورد">&lt;&lt;</button>
+                    <button type="button" class="btn-secondary sup-code-nav-btn" id="sup_nav_prev" title="المورد السابق" aria-label="المورد السابق">&lt;</button>
+                    <button type="button" class="btn-secondary sup-code-nav-btn" id="sup_nav_next" title="المورد التالي" aria-label="المورد التالي">&gt;</button>
+                    <button type="button" class="btn-secondary sup-code-nav-btn" id="sup_nav_last" title="آخر مورد" aria-label="آخر مورد">&gt;&gt;</button>
+                </div>
+            </div>
         </div>
         <div class="sup-grid-r2-row">
             <div class="sup-grid-r2-name">
@@ -862,9 +907,121 @@ var SUP_NEXT_AUTO_CODE = <?php echo json_encode($nextSupplierCodePreview, JSON_U
 var SUP_PAYABLE_PICK_ACCOUNTS = <?php echo json_encode($supplierPayablePickAccountsPayload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var SUP_SEARCH_ROWS = <?php echo json_encode($supplierSearchRowsPayload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var SUP_PARTNER_STATEMENT_URL = <?php echo json_encode(storefront_public_path('/admin/index.php?page=partner_account_statement'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+var SUP_NAV_ROWS = SUP_SEARCH_ROWS
+    .slice()
+    .filter(function (row) {
+        return (parseInt(String(row && row.id || '0'), 10) || 0) > 0;
+    })
+    .sort(function (a, b) {
+        var aId = parseInt(String(a && a.id || '0'), 10) || 0;
+        var bId = parseInt(String(b && b.id || '0'), 10) || 0;
+        return aId - bId;
+    });
 var supPayablePickSeq = 0;
 var supPayablePickSearchTimer = null;
 var supSearchTimer = null;
+
+function supNavRows() {
+    return SUP_NAV_ROWS;
+}
+function supNavCurrentIndex(rows) {
+    var idEl = document.getElementById('sup_id');
+    var sid = parseInt(String(idEl && idEl.value || '0'), 10) || 0;
+    if (sid <= 0) {
+        return -1;
+    }
+    for (var i = 0; i < rows.length; i++) {
+        var rid = parseInt(String(rows[i] && rows[i].id || '0'), 10) || 0;
+        if (rid === sid) {
+            return i;
+        }
+    }
+    return -1;
+}
+function supNavRefreshButtons() {
+    var firstBtn = document.getElementById('sup_nav_first');
+    var prevBtn = document.getElementById('sup_nav_prev');
+    var nextBtn = document.getElementById('sup_nav_next');
+    var lastBtn = document.getElementById('sup_nav_last');
+    if (!firstBtn || !prevBtn || !nextBtn || !lastBtn) {
+        return;
+    }
+    var rows = supNavRows();
+    if (!rows.length) {
+        firstBtn.disabled = true;
+        prevBtn.disabled = true;
+        nextBtn.disabled = true;
+        lastBtn.disabled = true;
+        return;
+    }
+    var idx = supNavCurrentIndex(rows);
+    if (idx < 0) {
+        firstBtn.disabled = false;
+        prevBtn.disabled = false;
+        nextBtn.disabled = false;
+        lastBtn.disabled = false;
+        return;
+    }
+    firstBtn.disabled = idx <= 0;
+    prevBtn.disabled = idx <= 0;
+    nextBtn.disabled = idx >= rows.length - 1;
+    lastBtn.disabled = idx >= rows.length - 1;
+}
+function supNavLoadIndex(index) {
+    var rows = supNavRows();
+    if (!rows.length) {
+        return;
+    }
+    var i = parseInt(String(index), 10);
+    if (isNaN(i)) {
+        return;
+    }
+    if (i < 0) {
+        i = 0;
+    }
+    if (i > rows.length - 1) {
+        i = rows.length - 1;
+    }
+    var row = rows[i] || null;
+    if (!row) {
+        return;
+    }
+    supEdit(row);
+}
+function supNavFirst() {
+    supNavLoadIndex(0);
+}
+function supNavLast() {
+    var rows = supNavRows();
+    if (!rows.length) {
+        return;
+    }
+    supNavLoadIndex(rows.length - 1);
+}
+function supNavPrev() {
+    var rows = supNavRows();
+    if (!rows.length) {
+        return;
+    }
+    var idx = supNavCurrentIndex(rows);
+    if (idx < 0) {
+        supNavLoadIndex(rows.length - 1);
+        return;
+    }
+    supNavLoadIndex(idx - 1);
+}
+function supNavNext() {
+    var rows = supNavRows();
+    if (!rows.length) {
+        return;
+    }
+    var idx = supNavCurrentIndex(rows);
+    if (idx < 0) {
+        supNavLoadIndex(0);
+        return;
+    }
+    supNavLoadIndex(idx + 1);
+}
 
 function supPayableFields() {
     return {
@@ -1729,6 +1886,7 @@ function supResetForm() {
     supToggleBlockReasonField();
     document.getElementById('sup_notes').value = '';
     supPayableSetAccount(null);
+    supNavRefreshButtons();
 }
 function supSearchFindById(id) {
     var wanted = parseInt(String(id || '0'), 10) || 0;
@@ -1924,6 +2082,7 @@ function supEdit(row) {
         supPayableSetAccount(null);
     }
     document.getElementById('sup_name').closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    supNavRefreshButtons();
 }
 function supSave() {
     var id = parseInt(document.getElementById('sup_id').value, 10) || 0;
@@ -2156,6 +2315,34 @@ function supSave() {
             supOpenCurrentSupplierStatement();
         });
     }
+    var navFirstBtn = document.getElementById('sup_nav_first');
+    if (navFirstBtn) {
+        navFirstBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            supNavFirst();
+        });
+    }
+    var navPrevBtn = document.getElementById('sup_nav_prev');
+    if (navPrevBtn) {
+        navPrevBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            supNavPrev();
+        });
+    }
+    var navNextBtn = document.getElementById('sup_nav_next');
+    if (navNextBtn) {
+        navNextBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            supNavNext();
+        });
+    }
+    var navLastBtn = document.getElementById('sup_nav_last');
+    if (navLastBtn) {
+        navLastBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            supNavLast();
+        });
+    }
     var searchBackdrop = document.getElementById('sup_search_backdrop');
     if (searchBackdrop) {
         searchBackdrop.addEventListener('click', supSearchModalClose);
@@ -2261,6 +2448,7 @@ function supSave() {
     supAttachmentSetRows([]);
     supToggleBlockReasonField();
     supEnforceFormVisibility();
+    supNavRefreshButtons();
     window.addEventListener('resize', supEnforceFormVisibility);
 })();
 </script>
