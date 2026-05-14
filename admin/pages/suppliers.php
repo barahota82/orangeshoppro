@@ -634,6 +634,7 @@ $count = count($rows);
         <?php if ($hasSupplierPhoneCountryDialCol): ?>
         <div class="sup-grid-r4-country">
             <label for="sup_phone_country">كود الدولة</label>
+            <input type="search" id="sup_phone_country_search" autocomplete="off" dir="ltr" lang="en" placeholder="ابحث باسم الدولة أو +965 أو 965">
             <select id="sup_phone_country" dir="ltr" autocomplete="tel-country-code">
                 <option value="">اختر كود الدولة</option>
             </select>
@@ -965,6 +966,9 @@ function supPayablePickerOpen() {
 function supPhoneCountryEl() {
     return document.getElementById('sup_phone_country');
 }
+function supPhoneCountrySearchEl() {
+    return document.getElementById('sup_phone_country_search');
+}
 function supFlagToRegion(flagValue) {
     var symbols = Array.from(String(flagValue || ''));
     if (symbols.length < 2) {
@@ -1030,6 +1034,28 @@ function supCountryCodeRows() {
     window.__supCountryCodeRowsCache = rows;
     return rows;
 }
+function supCountryRowMatchesQuery(row, queryRaw) {
+    var q = String(queryRaw || '').trim();
+    if (q === '') {
+        return true;
+    }
+    var qLower = q.toLowerCase();
+    var qDigits = q.replace(/\D/g, '');
+    var label = String(row && row.label || '').toLowerCase();
+    if (label.indexOf(qLower) !== -1) {
+        return true;
+    }
+    if (qDigits !== '') {
+        var dial = String(row && row.dial || '');
+        if (dial.indexOf(qDigits) !== -1) {
+            return true;
+        }
+        if (('+' + dial).indexOf('+' + qDigits) !== -1) {
+            return true;
+        }
+    }
+    return false;
+}
 function supDefaultCountryDial() {
     var rows = supCountryCodeRows();
     for (var i = 0; i < rows.length; i++) {
@@ -1039,16 +1065,24 @@ function supDefaultCountryDial() {
     }
     return rows.length ? String(rows[0].dial || '') : '';
 }
-function supPopulateCountryCodes() {
+function supPopulateCountryCodes(searchQuery) {
     var el = supPhoneCountryEl();
     if (!el || el.tagName !== 'SELECT') {
         return;
+    }
+    var qEl = supPhoneCountrySearchEl();
+    var query = String(searchQuery != null ? searchQuery : (qEl ? qEl.value || '' : '')).trim();
+    if (qEl && String(qEl.value || '') !== query) {
+        qEl.value = query;
     }
     var current = String(el.value || '').trim();
     if (current !== '') {
         current = current.replace(/\D/g, '');
     }
-    var rows = supCountryCodeRows();
+    var allRows = supCountryCodeRows();
+    var rows = allRows.filter(function (row) {
+        return supCountryRowMatchesQuery(row, query);
+    });
     el.innerHTML = '';
     var pickOpt = document.createElement('option');
     pickOpt.value = '';
@@ -1056,6 +1090,7 @@ function supPopulateCountryCodes() {
     el.appendChild(pickOpt);
     if (!rows.length) {
         el.value = '';
+        pickOpt.textContent = query === '' ? 'اختر كود الدولة' : 'لا توجد نتائج مطابقة';
         return;
     }
     rows.forEach(function (row) {
@@ -1064,14 +1099,27 @@ function supPopulateCountryCodes() {
         opt.textContent = row.label;
         el.appendChild(opt);
     });
+    var queryDigits = query.replace(/\D/g, '');
     var defaultDial = supDefaultCountryDial();
-    if (current) {
+    var exactByQuery = queryDigits !== '' ? rows.find(function (row) {
+        return String(row.dial || '') === queryDigits;
+    }) : null;
+    var hasCurrent = current !== '' && rows.some(function (row) {
+        return String(row.dial || '') === current;
+    });
+    var hasDefault = defaultDial !== '' && rows.some(function (row) {
+        return String(row.dial || '') === defaultDial;
+    });
+    if (hasCurrent) {
         el.value = current;
-        if (!el.value && defaultDial !== '') {
-            el.value = defaultDial;
-        }
-    } else {
+    } else if (exactByQuery) {
+        el.value = exactByQuery.dial;
+    } else if (query !== '' && rows.length === 1) {
+        el.value = rows[0].dial;
+    } else if (hasDefault) {
         el.value = defaultDial;
+    } else {
+        el.value = rows[0].dial;
     }
 }
 function supPhoneCountryForApi(selectEl) {
@@ -1604,8 +1652,12 @@ function supResetForm() {
     document.getElementById('sup_name').value = '';
     document.getElementById('sup_phone').value = '';
     var cc = supPhoneCountryEl();
+    var ccSearch = supPhoneCountrySearchEl();
+    if (ccSearch) {
+        ccSearch.value = '';
+    }
     if (cc) {
-        supPopulateCountryCodes();
+        supPopulateCountryCodes('');
         cc.value = supDefaultCountryDial();
     }
     var statusEl = document.getElementById('sup_status');
@@ -1776,8 +1828,12 @@ function supEdit(row) {
     document.getElementById('sup_name').value = row.name || '';
     var split = supSplitPhoneForForm(row.phone || '', row.phone_country_dial || '', row.phone_national || '');
     var cc = supPhoneCountryEl();
+    var ccSearch = supPhoneCountrySearchEl();
+    if (ccSearch) {
+        ccSearch.value = '';
+    }
     if (cc) {
-        supPopulateCountryCodes();
+        supPopulateCountryCodes('');
         cc.value = split.country && split.country !== '' ? split.country : supDefaultCountryDial();
     }
     document.getElementById('sup_phone').value = split.phone || '';
@@ -2167,6 +2223,13 @@ function supSave() {
     var statusEl = document.getElementById('sup_status');
     if (statusEl) {
         statusEl.addEventListener('change', supToggleBlockReasonField);
+    }
+    var countrySearch = supPhoneCountrySearchEl();
+    if (countrySearch && !countrySearch.getAttribute('data-sup-country-search-bound')) {
+        countrySearch.setAttribute('data-sup-country-search-bound', '1');
+        countrySearch.addEventListener('input', function () {
+            supPopulateCountryCodes(countrySearch.value || '');
+        });
     }
     supPopulateCountryCodes();
     supPopulateCurrencyOptions();
