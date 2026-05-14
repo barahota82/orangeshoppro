@@ -965,6 +965,49 @@ function supPayablePickerOpen() {
 function supPhoneCountryEl() {
     return document.getElementById('sup_phone_country');
 }
+function supFlagToRegion(flagValue) {
+    var symbols = Array.from(String(flagValue || ''));
+    if (symbols.length < 2) {
+        return '';
+    }
+    var region = '';
+    for (var i = 0; i < 2; i++) {
+        var cp = symbols[i].codePointAt(0);
+        if (typeof cp !== 'number' || cp < 0x1F1E6 || cp > 0x1F1FF) {
+            return '';
+        }
+        region += String.fromCharCode(65 + (cp - 0x1F1E6));
+    }
+    return region;
+}
+function supCountryNameArabic(item) {
+    if (!item) {
+        return '';
+    }
+    var explicit = String(item.country_ar || '').trim();
+    if (explicit !== '') {
+        return explicit;
+    }
+    if (typeof Intl === 'undefined' || typeof Intl.DisplayNames !== 'function') {
+        return '';
+    }
+    var region = supFlagToRegion(item.flag || '');
+    if (!region) {
+        return '';
+    }
+    try {
+        if (!window.__supCountryDisplayNameAr) {
+            window.__supCountryDisplayNameAr = new Intl.DisplayNames(['ar'], { type: 'region' });
+        }
+        var translated = window.__supCountryDisplayNameAr.of(region);
+        if (translated && translated !== region) {
+            return String(translated).trim();
+        }
+    } catch (eDisplayName) {
+        return '';
+    }
+    return '';
+}
 function supCountryCodeRows() {
     if (Array.isArray(window.__supCountryCodeRowsCache)) {
         return window.__supCountryCodeRowsCache;
@@ -979,7 +1022,8 @@ function supCountryCodeRows() {
         if (!dial) {
             return;
         }
-        var country = String(item.country || '').trim();
+        var countryAr = supCountryNameArabic(item);
+        var country = countryAr !== '' ? countryAr : String(item.country || '').trim();
         var label = country !== '' ? country + ' (+' + dial + ')' : '+' + dial;
         rows.push({ dial: dial, label: label });
     });
