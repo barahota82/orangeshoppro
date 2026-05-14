@@ -598,7 +598,6 @@ $count = count($rows);
 </style>
 
 <div class="card" id="sup_form_card">
-    <h3>مورد جديد أو تعديل</h3>
     <input type="hidden" id="sup_id" value="0">
     <?php if ($hasSupplierPreferredWarehouseCol): ?>
     <input type="hidden" id="sup_preferred_warehouse_id" value="1">
