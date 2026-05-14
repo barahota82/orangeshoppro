@@ -115,20 +115,47 @@ try {
     $phoneDialSql = null;
     $phoneNationalSql = null;
     if ($phoneRaw !== '') {
-        $phoneNorm = orange_normalize_customer_phone($phoneRaw, $dialForNational, $isFullIntl);
+        if ($isFullIntl) {
+            json_response([
+                'success' => false,
+                'message' => 'في شاشة الموردين يجب اختيار كود الدولة من القائمة وكتابة الرقم المحلي فقط.',
+            ], 422);
+        }
+        if ($dialForNational === null || $dialForNational === '') {
+            json_response([
+                'success' => false,
+                'message' => 'اختيار كود الدولة إلزامي عند إدخال رقم الهاتف.',
+            ], 422);
+        }
+        if (preg_match('/^\s*(\+|00)/', $phoneRaw)) {
+            json_response([
+                'success' => false,
+                'message' => 'اكتب الهاتف كرقم محلي فقط بدون + أو 00؛ كود الدولة يُؤخذ من القائمة.',
+            ], 422);
+        }
+        $phoneDigitsRaw = preg_replace('/\D+/', '', $phoneRaw);
+        if ($phoneDigitsRaw !== null && $phoneDigitsRaw !== '' && str_starts_with($phoneDigitsRaw, $dialForNational) && strlen($phoneDigitsRaw) > (strlen($dialForNational) + 3)) {
+            json_response([
+                'success' => false,
+                'message' => 'لا تكرر كود الدولة داخل خانة الهاتف؛ اكتب الرقم المحلي فقط.',
+            ], 422);
+        }
+        $phoneNorm = orange_normalize_customer_phone($phoneRaw, $dialForNational, false);
         if ($phoneNorm === null) {
             json_response([
                 'success' => false,
-                'message' => 'رقم الهاتف غير صالح. استخدم + أو 00 مع كود الدولة، أو اختر الدولة وأدخل الرقم الوطني.',
+                'message' => 'رقم الهاتف غير صالح. اكتب الرقم المحلي فقط بعد اختيار كود الدولة.',
             ], 422);
         }
+        $phoneParts = orange_storefront_phone_storage_parts($phoneRaw, $dialForNational);
         $phoneSql = $phoneNorm;
         if ($hasPhoneCountryDial) {
-            $phoneDialSql = $isFullIntl ? null : $dialForNational;
+            $dialPart = (string) ($phoneParts['country_dial'] ?? '');
+            $phoneDialSql = $dialPart !== '' ? $dialPart : $dialForNational;
         }
-        if ($hasPhoneNational && !$isFullIntl) {
-            $nat = preg_replace('/\D+/', '', $phoneRaw);
-            $phoneNationalSql = $nat !== null && $nat !== '' ? $nat : null;
+        if ($hasPhoneNational) {
+            $nat = (string) ($phoneParts['national'] ?? '');
+            $phoneNationalSql = $nat !== '' ? $nat : null;
         }
     }
     $notesRaw = trim((string) ($data['notes'] ?? ''));

@@ -115,6 +115,7 @@ $hasSupplierPaymentModeCol = orange_table_has_column($pdo, 'suppliers', 'payment
 $hasSupplierPaymentTermsCol = orange_table_has_column($pdo, 'suppliers', 'payment_terms_days');
 $hasSupplierTaxNumberCol = orange_table_has_column($pdo, 'suppliers', 'tax_number');
 $hasSupplierPhoneCountryDialCol = orange_table_has_column($pdo, 'suppliers', 'phone_country_dial');
+$hasSupplierPhoneNationalCol = orange_table_has_column($pdo, 'suppliers', 'phone_national');
 $hasSupplierContactPersonCol = orange_table_has_column($pdo, 'suppliers', 'contact_person');
 $hasSupplierEmailCol = orange_table_has_column($pdo, 'suppliers', 'email');
 $hasSupplierCommercialRegCol = orange_table_has_column($pdo, 'suppliers', 'commercial_reg');
@@ -163,6 +164,7 @@ $supplierSchemaMap = [
     'payable_account_id' => $hasSupplierPayableCol,
     'status' => $hasSupplierStatusCol,
     'phone_country_dial' => $hasSupplierPhoneCountryDialCol,
+    'phone_national' => $hasSupplierPhoneNationalCol,
     'currency_code' => $hasSupplierCurrencyCol,
     'tax_profile' => $hasSupplierTaxProfileCol,
     'payment_mode' => $hasSupplierPaymentModeCol,
@@ -200,6 +202,7 @@ $hasSupplierPaymentModeCol = true;
 $hasSupplierPaymentTermsCol = true;
 $hasSupplierTaxNumberCol = true;
 $hasSupplierPhoneCountryDialCol = true;
+$hasSupplierPhoneNationalCol = true;
 $hasSupplierContactPersonCol = true;
 $hasSupplierEmailCol = true;
 $hasSupplierCommercialRegCol = true;
@@ -292,6 +295,7 @@ if (orange_table_exists($pdo, 'suppliers')) {
             'name' => (string) ($r['name'] ?? ''),
             'phone' => $phone,
             'phone_country_dial' => (string) ($r['phone_country_dial'] ?? ''),
+            'phone_national' => (string) ($r['phone_national'] ?? ''),
             'notes' => (string) ($r['notes'] ?? ''),
             'payable_account_id' => $pAcc > 0 ? $pAcc : null,
             'payable_account_code' => (string) ($pAccMeta['code'] ?? ''),
@@ -631,13 +635,13 @@ $count = count($rows);
         <div class="sup-grid-r4-country">
             <label for="sup_phone_country">كود الدولة</label>
             <select id="sup_phone_country" dir="ltr" autocomplete="tel-country-code">
-                <option value="__intl__">دولي — الرقم كاملاً (+ أو 00)</option>
+                <option value="">اختر كود الدولة</option>
             </select>
         </div>
         <?php endif; ?>
         <div class="sup-grid-r4-phone">
             <label for="sup_phone">الهاتف</label>
-            <input type="text" id="sup_phone" class="js-orange-phone-input" autocomplete="off" dir="ltr" lang="en" placeholder="+965… أو 00… أو رقم وطني مع اختيار الدولة">
+            <input type="text" id="sup_phone" class="js-orange-phone-input" autocomplete="off" dir="ltr" lang="en" placeholder="اكتب الرقم المحلي فقط بدون كود الدولة">
         </div>
         <?php if ($hasSupplierContactPersonCol): ?>
         <div class="sup-grid-r4-contact">
@@ -987,30 +991,30 @@ function supPopulateCountryCodes() {
     if (!el || el.tagName !== 'SELECT') {
         return;
     }
-    var current = String(el.value || '__intl__').trim();
-    if (current !== '__intl__') {
+    var current = String(el.value || '').trim();
+    if (current !== '') {
         current = current.replace(/\D/g, '');
     }
     var rows = supCountryCodeRows();
+    el.innerHTML = '';
+    var pickOpt = document.createElement('option');
+    pickOpt.value = '';
+    pickOpt.textContent = 'اختر كود الدولة';
+    el.appendChild(pickOpt);
     if (!rows.length) {
-        el.value = '__intl__';
+        el.value = '';
         return;
     }
-    el.innerHTML = '';
-    var intlOpt = document.createElement('option');
-    intlOpt.value = '__intl__';
-    intlOpt.textContent = 'دولي — الرقم كاملاً (+ أو 00)';
-    el.appendChild(intlOpt);
     rows.forEach(function (row) {
         var opt = document.createElement('option');
         opt.value = row.dial;
         opt.textContent = row.label;
         el.appendChild(opt);
     });
-    if (current && current !== '__intl__') {
+    if (current) {
         el.value = current;
     } else {
-        el.value = '__intl__';
+        el.value = '';
     }
 }
 function supPhoneCountryForApi(selectEl) {
@@ -1021,17 +1025,18 @@ function supPhoneCountryForApi(selectEl) {
     if (!raw) {
         return null;
     }
-    if (raw === '__intl__') {
-        return '__intl__';
-    }
     var digits = raw.replace(/\D/g, '');
     return digits !== '' ? digits : null;
 }
-function supSplitPhoneForForm(stored, preferredDial) {
+function supSplitPhoneForForm(stored, preferredDial, preferredNational) {
     var raw = String(stored || '').trim();
     var pref = String(preferredDial || '').trim();
+    var prefNational = String(preferredNational || '').replace(/\D/g, '');
+    if (prefNational !== '') {
+        return { country: pref || '', phone: prefNational };
+    }
     if (!raw) {
-        return { country: pref || '__intl__', phone: '' };
+        return { country: pref || '', phone: '' };
     }
     var digits = raw.replace(/\D/g, '');
     if (pref && digits.indexOf(pref) === 0) {
@@ -1043,7 +1048,7 @@ function supSplitPhoneForForm(stored, preferredDial) {
     var normFn = window.orangeNormalizeCustomerPhone;
     var norm = normFn ? normFn(raw, null) : null;
     if (!norm) {
-        return { country: pref || '__intl__', phone: raw };
+        return { country: pref || '', phone: raw };
     }
     var normDigits = norm.replace(/\D/g, '');
     var uniq = Object.create(null);
@@ -1072,7 +1077,7 @@ function supSplitPhoneForForm(stored, preferredDial) {
             return { country: cc, phone: nat };
         }
     }
-    return { country: '__intl__', phone: norm.charAt(0) === '+' ? norm.slice(1) : norm };
+    return { country: '', phone: norm.charAt(0) === '+' ? norm.slice(1) : norm };
 }
 function supSetValue(id, value) {
     var el = document.getElementById(id);
@@ -1544,7 +1549,7 @@ function supResetForm() {
     var cc = supPhoneCountryEl();
     if (cc) {
         supPopulateCountryCodes();
-        cc.value = '__intl__';
+        cc.value = '';
     }
     var statusEl = document.getElementById('sup_status');
     if (statusEl) {
@@ -1712,11 +1717,11 @@ function supEdit(row) {
     document.getElementById('sup_id').value = String(row.id || 0);
     document.getElementById('sup_code').value = row.code || '';
     document.getElementById('sup_name').value = row.name || '';
-    var split = supSplitPhoneForForm(row.phone || '', row.phone_country_dial || '');
+    var split = supSplitPhoneForForm(row.phone || '', row.phone_country_dial || '', row.phone_national || '');
     var cc = supPhoneCountryEl();
     if (cc) {
         supPopulateCountryCodes();
-        cc.value = split.country && split.country !== '' ? split.country : '__intl__';
+        cc.value = split.country && split.country !== '' ? split.country : '';
     }
     document.getElementById('sup_phone').value = split.phone || '';
     var statusEl = document.getElementById('sup_status');
@@ -1793,17 +1798,31 @@ function supSave() {
     var phone = document.getElementById('sup_phone').value.trim();
     var ccEl = supPhoneCountryEl();
     var phoneCountry = ccEl ? supPhoneCountryForApi(ccEl) : null;
-    var intlSel = ccEl && ccEl.tagName === 'SELECT' && phoneCountry === '__intl__';
-    var ccForNorm = intlSel ? null : phoneCountry && phoneCountry !== '__intl__' ? phoneCountry : null;
+    var ccForNorm = phoneCountry ? String(phoneCountry) : null;
     var notes = document.getElementById('sup_notes').value.trim();
     if (!name) {
         alert('اسم المورد مطلوب');
         return;
     }
+    if (phone) {
+        if (!ccForNorm) {
+            alert('اختيار كود الدولة إلزامي عند إدخال رقم الهاتف.');
+            return;
+        }
+        if (/^\s*(\+|00)/.test(phone)) {
+            alert('اكتب الهاتف كرقم محلي فقط بدون + أو 00؛ كود الدولة يُؤخذ من القائمة.');
+            return;
+        }
+        var phoneDigits = phone.replace(/\D+/g, '');
+        if (phoneDigits !== '' && phoneDigits.indexOf(ccForNorm) === 0 && phoneDigits.length > ccForNorm.length + 3) {
+            alert('لا تكرر كود الدولة داخل خانة الهاتف؛ اكتب الرقم المحلي فقط.');
+            return;
+        }
+    }
     if (phone && window.orangeNormalizeCustomerPhone) {
-        var ok = window.orangeNormalizeCustomerPhone(phone, ccForNorm, intlSel);
+        var ok = window.orangeNormalizeCustomerPhone(phone, ccForNorm, false);
         if (!ok) {
-            alert('رقم الهاتف غير صالح. استخدم + أو 00 مع كود الدولة، أو اختر الدولة وأدخل الرقم الوطني.');
+            alert('رقم الهاتف غير صالح. اكتب الرقم المحلي فقط بعد اختيار كود الدولة.');
             return;
         }
     }
