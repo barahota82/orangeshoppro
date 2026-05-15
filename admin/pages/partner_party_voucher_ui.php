@@ -63,6 +63,7 @@ if ($ppvIsReceipt) {
 $customers = [];
 $suppliers = [];
 $supplierPayableMap = [];
+$ppvSupplierPickRows = [];
 
 if ($ppvIsReceipt && orange_table_exists($pdo, 'customers')) {
     $customers = $pdo->query('SELECT id, name_ar, phone FROM customers ORDER BY id DESC')->fetchAll(PDO::FETCH_ASSOC);
@@ -89,6 +90,34 @@ foreach ($customers as $c) {
 $supBal = [];
 foreach ($suppliers as $s) {
     $supBal[(int) $s['id']] = orange_party_balance_supplier($pdo, (int) $s['id']);
+}
+if (!$ppvIsReceipt) {
+    foreach ($suppliers as $s) {
+        $sid = (int) ($s['id'] ?? 0);
+        if ($sid <= 0) {
+            continue;
+        }
+        $map = $supplierPayableMap[$sid] ?? ['id' => 0, 'code' => '', 'name' => ''];
+        $supplierName = trim((string) ($s['name'] ?? ''));
+        $supplierPhone = trim((string) ($s['phone'] ?? ''));
+        $accountCode = trim((string) ($map['code'] ?? ''));
+        $accountName = trim((string) ($map['name'] ?? ''));
+        $balance = (float) ($supBal[$sid] ?? 0.0);
+        $searchTextRaw = trim($accountCode . ' ' . $accountName . ' ' . $supplierName . ' ' . $supplierPhone);
+        $searchText = function_exists('mb_strtolower')
+            ? mb_strtolower($searchTextRaw, 'UTF-8')
+            : strtolower($searchTextRaw);
+        $ppvSupplierPickRows[] = [
+            'id' => $sid,
+            'name' => $supplierName,
+            'phone' => $supplierPhone,
+            'balance' => round($balance, 3),
+            'account_id' => (int) ($map['id'] ?? 0),
+            'account_code' => $accountCode,
+            'account_name' => $accountName,
+            'search_text' => $searchText,
+        ];
+    }
 }
 
 $prefillStmtKind = in_array((string) ($_GET['stmt_party_kind'] ?? ''), ['customer', 'supplier'], true)
@@ -139,32 +168,32 @@ if (orange_journal_vouchers_ready($pdo)) {
     <?php endif; ?>
 
     <div class="form-grid">
+        <?php if ($ppvIsReceipt): ?>
         <div style="grid-column:1/-1;">
-            <label for="ppv_party"><?php echo $ppvIsReceipt ? 'العميل' : 'المورد'; ?></label>
+            <label for="ppv_party">العميل</label>
             <select id="ppv_party" class="admin-inp"<?php echo !$ppvReady ? ' disabled' : ''; ?>>
-                <?php if ($ppvIsReceipt): ?>
-                    <?php if (!$customers): ?>
-                        <option value="0">— لا يوجد عملاء —</option>
-                    <?php endif; ?>
-                    <?php foreach ($customers as $c): ?>
-                        <option value="<?php echo (int) $c['id']; ?>">
-                            <?php echo htmlspecialchars($c['name_ar'] . ' — ' . $c['phone'], ENT_QUOTES, 'UTF-8'); ?>
-                            (رصيد <?php echo number_format($custBal[(int) $c['id']] ?? 0, 3); ?>)
-                        </option>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <?php if (!$suppliers): ?>
-                        <option value="0">— لا يوجد موردون —</option>
-                    <?php endif; ?>
-                    <?php foreach ($suppliers as $s): ?>
-                        <option value="<?php echo (int) $s['id']; ?>">
-                            <?php echo htmlspecialchars($s['name'] . ($s['phone'] ? ' — ' . $s['phone'] : ''), ENT_QUOTES, 'UTF-8'); ?>
-                            (ذمة <?php echo number_format($supBal[(int) $s['id']] ?? 0, 3); ?>)
-                        </option>
-                    <?php endforeach; ?>
+                <?php if (!$customers): ?>
+                    <option value="0">— لا يوجد عملاء —</option>
                 <?php endif; ?>
+                <?php foreach ($customers as $c): ?>
+                    <option value="<?php echo (int) $c['id']; ?>">
+                        <?php echo htmlspecialchars($c['name_ar'] . ' — ' . $c['phone'], ENT_QUOTES, 'UTF-8'); ?>
+                        (رصيد <?php echo number_format($custBal[(int) $c['id']] ?? 0, 3); ?>)
+                    </option>
+                <?php endforeach; ?>
             </select>
         </div>
+        <?php else: ?>
+        <input type="hidden" id="ppv_party" value="0">
+        <div>
+            <label for="ppv_supplier_account_code">كود الحساب</label>
+            <input type="text" id="ppv_supplier_account_code" autocomplete="off" dir="ltr" lang="en" readonly placeholder="نقرتان للاختيار" title="نقرتان للاختيار"<?php echo !$ppvReady ? ' disabled' : ''; ?>>
+        </div>
+        <div>
+            <label for="ppv_supplier_name">اسم المورد</label>
+            <input type="text" id="ppv_supplier_name" class="admin-inp-readonly" autocomplete="off" readonly disabled tabindex="-1" placeholder="يُعبأ تلقائياً" title="يُعبأ تلقائياً">
+        </div>
+        <?php endif; ?>
 
         <div class="<?php echo htmlspecialchars($ppvHeaderLineClass, ENT_QUOTES, 'UTF-8'); ?>" style="grid-column:1/-1;">
             <div>
@@ -256,6 +285,19 @@ if (orange_journal_vouchers_ready($pdo)) {
 
 </div>
 
+<?php if (!$ppvIsReceipt): ?>
+<div class="gl-pick-modal ppv-print-hide" id="ppv_supplier_pick_modal" hidden aria-hidden="true">
+    <div class="gl-pick-modal__backdrop" id="ppv_supplier_pick_backdrop"></div>
+    <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="ppv_supplier_pick_title">
+        <h3 id="ppv_supplier_pick_title" class="gl-pick-modal__title">اختيار المورد</h3>
+        <p class="gl-pick-modal__hint muted" style="margin:0 0 8px;font-size:0.9rem;">دبل كليك للاختيار</p>
+        <input type="search" id="ppv_supplier_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بكود الحساب أو اسم الحساب أو اسم المورد…" autocomplete="off" dir="rtl">
+        <ul class="gl-pick-modal__list" id="ppv_supplier_pick_list"></ul>
+        <button type="button" class="btn-secondary" id="ppv_supplier_pick_close">إغلاق</button>
+    </div>
+</div>
+<?php endif; ?>
+
 <script>
 var PPV_IS_RECEIPT = <?php echo $ppvIsReceipt ? 'true' : 'false'; ?>;
 var PPV_API = <?php echo json_encode($ppvApiUrl, JSON_UNESCAPED_UNICODE); ?>;
@@ -265,6 +307,8 @@ var PPV_READY = <?php echo $ppvReady ? 'true' : 'false'; ?>;
 var PPV_PARTY_DEFAULT = <?php echo json_encode($ppvPartyDefaultAcc, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>;
 var PPV_SUPPLIER_PAYABLE = <?php echo json_encode($supplierPayableMap, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>;
 var PPV_PREFILL = <?php echo json_encode($ppvPrefill, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>;
+var PPV_SUPPLIER_PICK_ROWS = <?php echo json_encode($ppvSupplierPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>;
+var ppvSupplierPickTimer = null;
 
 function ppvEscapeHtml(s) {
     return String(s == null ? '')
@@ -295,6 +339,132 @@ function ppvPartyMainRow() {
 
 function ppvCashMainRow() {
     return document.querySelector('#ppv_lines_body tr.jv-line-main[data-jv-cash-locked="1"]');
+}
+
+function ppvPartyIdValue() {
+    var partyEl = document.getElementById('ppv_party');
+    return parseInt(String(partyEl && partyEl.value || '0'), 10) || 0;
+}
+
+function ppvSupplierPickRowById(id) {
+    var wanted = parseInt(String(id || '0'), 10) || 0;
+    if (wanted <= 0) {
+        return null;
+    }
+    for (var i = 0; i < PPV_SUPPLIER_PICK_ROWS.length; i++) {
+        var row = PPV_SUPPLIER_PICK_ROWS[i];
+        if ((parseInt(String(row.id || '0'), 10) || 0) === wanted) {
+            return row;
+        }
+    }
+    return null;
+}
+
+function ppvSupplierSyncUiById(id) {
+    if (PPV_IS_RECEIPT) {
+        return;
+    }
+    var codeEl = document.getElementById('ppv_supplier_account_code');
+    var nameEl = document.getElementById('ppv_supplier_name');
+    if (!codeEl || !nameEl) {
+        return;
+    }
+    var row = ppvSupplierPickRowById(id);
+    if (!row) {
+        codeEl.value = '';
+        nameEl.value = '';
+        return;
+    }
+    codeEl.value = String(row.account_code || '');
+    nameEl.value = String(row.name || '');
+}
+
+function ppvSupplierPickClose() {
+    var modal = document.getElementById('ppv_supplier_pick_modal');
+    if (!modal) {
+        return;
+    }
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('gl-pick-open');
+}
+
+function ppvSupplierPickChoose(row) {
+    if (!row || (parseInt(String(row.id || '0'), 10) || 0) <= 0) {
+        return;
+    }
+    var partyEl = document.getElementById('ppv_party');
+    if (!partyEl) {
+        return;
+    }
+    partyEl.value = String(parseInt(String(row.id || '0'), 10) || 0);
+    ppvSupplierSyncUiById(row.id || 0);
+    ppvSupplierPickClose();
+    ppvOnPartyChanged();
+}
+
+function ppvSupplierPickRender(q) {
+    var listEl = document.getElementById('ppv_supplier_pick_list');
+    if (!listEl) {
+        return;
+    }
+    var query = String(q || '').trim().toLowerCase();
+    var rows = PPV_SUPPLIER_PICK_ROWS.filter(function (row) {
+        if (!query) {
+            return true;
+        }
+        return String(row.search_text || '').toLowerCase().indexOf(query) !== -1;
+    });
+    listEl.innerHTML = '';
+    if (!rows.length) {
+        listEl.innerHTML = '<li class="gl-pick-empty">لا توجد نتائج</li>';
+        return;
+    }
+    rows.forEach(function (row) {
+        var li = document.createElement('li');
+        li.className = 'gl-pick-item';
+        li.setAttribute('role', 'button');
+        li.tabIndex = 0;
+        var label = String(row.account_code || '').trim();
+        var supplierName = String(row.name || '').trim();
+        var accountName = String(row.account_name || '').trim();
+        var phone = String(row.phone || '').trim();
+        var metaParts = [];
+        if (accountName !== '') {
+            metaParts.push(accountName);
+        }
+        if (phone !== '') {
+            metaParts.push(phone);
+        }
+        li.textContent = (label !== '' ? label + ' — ' : '') + supplierName + (metaParts.length ? (' (' + metaParts.join(' • ') + ')') : '');
+        li.addEventListener('dblclick', function () {
+            ppvSupplierPickChoose(row);
+        });
+        li.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter' || ev.key === ' ') {
+                ev.preventDefault();
+                ppvSupplierPickChoose(row);
+            }
+        });
+        listEl.appendChild(li);
+    });
+}
+
+function ppvSupplierPickOpen() {
+    if (PPV_IS_RECEIPT || !PPV_READY) {
+        return;
+    }
+    var modal = document.getElementById('ppv_supplier_pick_modal');
+    var qEl = document.getElementById('ppv_supplier_pick_q');
+    if (!modal || !qEl) {
+        return;
+    }
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('gl-pick-open');
+    qEl.value = '';
+    ppvSupplierPickRender('');
+    qEl.focus();
 }
 
 function ppvSyncTreasury() {
@@ -334,11 +504,22 @@ function ppvRecalc() {
 
 function ppvApplySupplierAccount() {
     if (PPV_IS_RECEIPT) return;
-    var sid = parseInt(String(document.getElementById('ppv_party').value || '0'), 10) || 0;
+    var sid = ppvPartyIdValue();
     var partyTr = ppvPartyMainRow();
-    if (!partyTr || sid <= 0) return;
+    if (!partyTr) return;
+    if (sid <= 0) {
+        partyTr.querySelector('.jv-acc-id').value = '';
+        partyTr.querySelector('.jv-acc-code').value = '';
+        partyTr.querySelector('.jv-acc-name').value = '';
+        return;
+    }
     var m = PPV_SUPPLIER_PAYABLE[sid];
-    if (!m) return;
+    if (!m) {
+        partyTr.querySelector('.jv-acc-id').value = '';
+        partyTr.querySelector('.jv-acc-code').value = '';
+        partyTr.querySelector('.jv-acc-name').value = '';
+        return;
+    }
     partyTr.querySelector('.jv-acc-id').value = String(m.id);
     partyTr.querySelector('.jv-acc-code').value = m.code || '';
     partyTr.querySelector('.jv-acc-name').value = m.name || '';
@@ -462,7 +643,7 @@ function ppvCollectAlloc() {
 }
 
 function ppvLoadAlloc() {
-    var id = parseInt(String(document.getElementById('ppv_party').value || '0'), 10) || 0;
+    var id = ppvPartyIdValue();
     var tb = document.getElementById('ppv_alloc_tbody');
     if (id <= 0) { alert(PPV_IS_RECEIPT ? 'اختر عميلاً' : 'اختر مورداً'); return; }
     tb.innerHTML = '<tr><td colspan="3">جاري التحميل…</td></tr>';
@@ -499,7 +680,7 @@ function ppvGetAmount() {
 
 function ppvSave() {
     if (!PPV_CASH || !PPV_CASH.id) return;
-    var partyId = parseInt(String(document.getElementById('ppv_party').value || '0'), 10) || 0;
+    var partyId = ppvPartyIdValue();
     var amt = ppvGetAmount();
     var dIso = orangeGetDmyValueAsIso(document.getElementById('ppv_date'));
     var desc = document.getElementById('ppv_desc').value.trim();
@@ -545,15 +726,92 @@ function ppvSave() {
     }).catch(function (e) { alert(e.message || String(e)); });
 }
 
+function ppvOnPartyChanged() {
+    if (!PPV_IS_RECEIPT) {
+        ppvSupplierSyncUiById(ppvPartyIdValue());
+        ppvApplySupplierAccount();
+    }
+    var allocTb = document.getElementById('ppv_alloc_tbody');
+    if (allocTb) {
+        allocTb.innerHTML = '';
+    }
+    ppvRecalc();
+}
+
+function ppvApplyPrefill() {
+    if (!PPV_PREFILL || !(parseInt(String(PPV_PREFILL.party_id || '0'), 10) > 0)) {
+        return;
+    }
+    var wanted = parseInt(String(PPV_PREFILL.party_id || '0'), 10) || 0;
+    if (wanted <= 0) {
+        return;
+    }
+    if (PPV_IS_RECEIPT) {
+        var sel = document.getElementById('ppv_party');
+        if (sel && sel.querySelector('option[value="' + wanted + '"]')) {
+            sel.value = String(wanted);
+            ppvOnPartyChanged();
+        }
+        return;
+    }
+    if (ppvSupplierPickRowById(wanted)) {
+        var partyEl = document.getElementById('ppv_party');
+        if (partyEl) {
+            partyEl.value = String(wanted);
+        }
+        ppvSupplierSyncUiById(wanted);
+        ppvOnPartyChanged();
+    }
+}
+
 function ppvBind() {
     var partySel = document.getElementById('ppv_party');
     if (partySel) {
-        partySel.addEventListener('change', function () {
-            if (!PPV_IS_RECEIPT) {
-                ppvApplySupplierAccount();
+        if (PPV_IS_RECEIPT) {
+            partySel.addEventListener('change', ppvOnPartyChanged);
+        }
+    }
+    if (!PPV_IS_RECEIPT) {
+        var supplierCodeEl = document.getElementById('ppv_supplier_account_code');
+        if (supplierCodeEl) {
+            supplierCodeEl.addEventListener('dblclick', function (e) {
+                e.preventDefault();
+                ppvSupplierPickOpen();
+            });
+            supplierCodeEl.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    ppvSupplierPickOpen();
+                }
+            });
+        }
+        var supplierPickBackdrop = document.getElementById('ppv_supplier_pick_backdrop');
+        if (supplierPickBackdrop) {
+            supplierPickBackdrop.addEventListener('click', ppvSupplierPickClose);
+        }
+        var supplierPickClose = document.getElementById('ppv_supplier_pick_close');
+        if (supplierPickClose) {
+            supplierPickClose.addEventListener('click', ppvSupplierPickClose);
+        }
+        var supplierPickQ = document.getElementById('ppv_supplier_pick_q');
+        if (supplierPickQ) {
+            supplierPickQ.addEventListener('input', function () {
+                if (ppvSupplierPickTimer) {
+                    clearTimeout(ppvSupplierPickTimer);
+                }
+                ppvSupplierPickTimer = setTimeout(function () {
+                    ppvSupplierPickRender(supplierPickQ.value || '');
+                }, 180);
+            });
+        }
+        document.addEventListener('keydown', function (ev) {
+            if (ev.key !== 'Escape') {
+                return;
             }
-            document.getElementById('ppv_alloc_tbody').innerHTML = '';
-            ppvRecalc();
+            var modal = document.getElementById('ppv_supplier_pick_modal');
+            if (modal && !modal.hidden) {
+                ppvSupplierPickClose();
+            }
         });
     }
     var bLoad = document.getElementById('ppv_btn_load_alloc');
@@ -570,23 +828,11 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () {
         ppvBuildLines();
         ppvBind();
-        if (PPV_PREFILL && PPV_PREFILL.party_id > 0) {
-            var sel = document.getElementById('ppv_party');
-            if (sel && sel.querySelector('option[value="' + PPV_PREFILL.party_id + '"]')) {
-                sel.value = String(PPV_PREFILL.party_id);
-                sel.dispatchEvent(new Event('change'));
-            }
-        }
+        ppvApplyPrefill();
     });
 } else {
     ppvBuildLines();
     ppvBind();
-    if (PPV_PREFILL && PPV_PREFILL.party_id > 0) {
-        var sel2 = document.getElementById('ppv_party');
-        if (sel2 && sel2.querySelector('option[value="' + PPV_PREFILL.party_id + '"]')) {
-            sel2.value = String(PPV_PREFILL.party_id);
-            sel2.dispatchEvent(new Event('change'));
-        }
-    }
+    ppvApplyPrefill();
 }
 </script>
