@@ -187,7 +187,7 @@ if (orange_journal_vouchers_ready($pdo)) {
         <input type="hidden" id="ppv_party" value="0">
         <div>
             <label for="ppv_supplier_account_code">كود الحساب</label>
-            <input type="text" id="ppv_supplier_account_code" autocomplete="off" dir="ltr" lang="en" readonly placeholder="نقرتان للاختيار" title="نقرتان للاختيار"<?php echo !$ppvReady ? ' disabled' : ''; ?>>
+            <input type="text" id="ppv_supplier_account_code" autocomplete="off" dir="ltr" lang="en" readonly placeholder="نقرتان للاختيار" title="نقرتان للاختيار">
         </div>
         <div>
             <label for="ppv_supplier_name">اسم المورد</label>
@@ -451,7 +451,7 @@ function ppvSupplierPickRender(q) {
 }
 
 function ppvSupplierPickOpen() {
-    if (PPV_IS_RECEIPT || !PPV_READY) {
+    if (PPV_IS_RECEIPT) {
         return;
     }
     var modal = document.getElementById('ppv_supplier_pick_modal');
