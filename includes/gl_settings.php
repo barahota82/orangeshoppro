@@ -80,6 +80,7 @@ function orange_gl_setting_row_short_labels(): array
         'income_summary' => $p . 'أرباح / خسائر السنة الحالية',
         'retained_earnings' => $p . 'الأرباح المحتجزة',
         'legal_reserve' => $p . 'الاحتياطي القانوني',
+        'accounts_payable_parent' => 'اختر الحساب الأب للموردين',
     ];
 }
 
