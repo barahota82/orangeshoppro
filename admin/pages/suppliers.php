@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/party_subledger.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
+require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/storefront_phone_country_select.php';
 require_once __DIR__ . '/../../includes/delivery_areas.php';
 
@@ -26,10 +27,24 @@ if (orange_table_exists($pdo, 'accounts')) {
     $leafAccountOptions = $pdo->query(
         'SELECT a.id, a.code, a.name FROM accounts a WHERE ' . $lw . ' ORDER BY COALESCE(a.code, \'\'), a.name'
     )->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    foreach ($leafAccountOptions as $a) {
-        $aid = (int) $a['id'];
-        if (orange_accounts_account_bs_role($pdo, $aid) === 'liability') {
-            $supplierPayablePickAccounts[] = $a;
+
+    $apParentId = orange_gl_supplier_parent_account_id($pdo);
+    if ($apParentId !== null && $apParentId > 0 && orange_table_has_column($pdo, 'accounts', 'parent_id')) {
+        foreach ($leafAccountOptions as $a) {
+            $aid = (int) $a['id'];
+            $st = $pdo->prepare('SELECT parent_id FROM accounts WHERE id = ? LIMIT 1');
+            $st->execute([$aid]);
+            $pid = (int) $st->fetchColumn();
+            if ($pid === $apParentId) {
+                $supplierPayablePickAccounts[] = $a;
+            }
+        }
+    } else {
+        foreach ($leafAccountOptions as $a) {
+            $aid = (int) $a['id'];
+            if (orange_accounts_account_bs_role($pdo, $aid) === 'liability') {
+                $supplierPayablePickAccounts[] = $a;
+            }
         }
     }
 }

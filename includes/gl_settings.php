@@ -49,6 +49,7 @@ function orange_gl_setting_key_labels(): array
         'income_summary' => 'أرباح / خسائر السنة الحالية (وسيط إقفال) — قيود إقفال القائمة ثم الترحيل للمحتجز',
         'retained_earnings' => 'الأرباح المحتجزة — صافي الدخل أو الخسارة المرحّلة بعد الإقفال',
         'legal_reserve' => 'الاحتياطي القانوني — حقوق ملكية؛ النسبة % تُخصَّم من أرباح السنة الحالية (بعد إقفال القائمة) لاستخدامها في قيود الإقفال لاحقاً',
+        'accounts_payable_parent' => 'الحساب الأب لذمم الموردين — الحسابات الفرعية تحته هي حسابات الموردين',
     ];
 }
 
@@ -107,6 +108,7 @@ function orange_gl_settings_form_key_order(): array
         'income_summary',
         'retained_earnings',
         'legal_reserve',
+        'accounts_payable_parent',
     ];
 }
 
@@ -553,6 +555,24 @@ function orange_gl_cogs_return_account_id(PDO $pdo): int
     }
 
     return orange_gl_cogs_delivery_account_id($pdo);
+}
+
+/**
+ * معرف الحساب الأب لذمم الموردين (لا يُشترط أن يكون ورقة ترحيل — هو حساب أب).
+ * يُقرأ من إعداد accounts_payable_parent في orange_gl_account_settings.
+ *
+ * @return int|null null إذا لم يُربط بعد
+ */
+function orange_gl_supplier_parent_account_id(PDO $pdo): ?int
+{
+    if (!orange_table_exists($pdo, 'orange_gl_account_settings')) {
+        return null;
+    }
+    $stmt = $pdo->prepare('SELECT account_id FROM orange_gl_account_settings WHERE setting_key = ? LIMIT 1');
+    $stmt->execute(['accounts_payable_parent']);
+    $id = (int) $stmt->fetchColumn();
+
+    return $id > 0 ? $id : null;
 }
 
 /**
