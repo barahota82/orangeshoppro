@@ -28,7 +28,7 @@ if (orange_table_exists($pdo, 'accounts')) {
     )->fetchAll(PDO::FETCH_ASSOC) ?: [];
     foreach ($leafAccountOptions as $a) {
         $aid = (int) $a['id'];
-        if (orange_accounts_account_pl_role($pdo, $aid) === 'liability') {
+        if (orange_accounts_account_bs_role($pdo, $aid) === 'liability') {
             $supplierPayablePickAccounts[] = $a;
         }
     }
