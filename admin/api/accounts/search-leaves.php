@@ -18,6 +18,36 @@ try {
     }
 
     $q = trim((string) ($_GET['q'] ?? ''));
+    $mode = trim((string) ($_GET['mode'] ?? ''));
+
+    if ($mode === 'parents') {
+        $hasPar = orange_table_has_column($pdo, 'accounts', 'parent_id');
+        $sql = 'SELECT a.id, a.code, a.name FROM accounts a WHERE EXISTS (SELECT 1 FROM accounts ch WHERE ch.parent_id = a.id)';
+        $params = [];
+        if ($q !== '') {
+            $sql .= ' AND (a.code LIKE ? OR a.name LIKE ?)';
+            $like = '%' . $q . '%';
+            $params[] = $like;
+            $params[] = $like;
+        }
+        $sql .= ' ORDER BY COALESCE(a.code, \'\'), a.name ASC LIMIT 80';
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        $out = [];
+        foreach ($rows as $r) {
+            $id = (int) ($r['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $out[] = [
+                'id' => $id,
+                'code' => (string) ($r['code'] ?? ''),
+                'name' => (string) ($r['name'] ?? ''),
+            ];
+        }
+        json_response(['success' => true, 'accounts' => $out]);
+    }
 
     $cols = 'a.id, a.name, a.code';
     if (orange_table_has_column($pdo, 'accounts', 'parent_id')) {

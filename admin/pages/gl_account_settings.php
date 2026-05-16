@@ -720,7 +720,8 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
     }
     function glPickLoad(q) {
         var mySeq = ++glPickSeq;
-        var url = '/admin/api/accounts/search-leaves.php?q=' + encodeURIComponent(q || '');
+        var mode = activePickKey === 'accounts_payable_parent' ? '&mode=parents' : '';
+        var url = '/admin/api/accounts/search-leaves.php?q=' + encodeURIComponent(q || '') + mode;
         fetch(url, { credentials: 'same-origin', cache: 'no-store' })
             .then(function (r) { return r.json(); })
             .then(function (data) {
