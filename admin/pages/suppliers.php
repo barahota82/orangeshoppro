@@ -26,30 +26,10 @@ if (orange_table_exists($pdo, 'accounts')) {
     $leafAccountOptions = $pdo->query(
         'SELECT a.id, a.code, a.name FROM accounts a WHERE ' . $lw . ' ORDER BY COALESCE(a.code, \'\'), a.name'
     )->fetchAll(PDO::FETCH_ASSOC) ?: [];
-
-    $apParentId = orange_gl_account_id_optional($pdo, 'accounts_payable');
-    if ($apParentId !== null && $apParentId > 0) {
-        $apDescendantIds = [$apParentId];
-        for ($depth = 0; $depth < 10; ++$depth) {
-            $placeholders = implode(',', array_fill(0, count($apDescendantIds), '?'));
-            $chSt = $pdo->prepare(
-                "SELECT id FROM accounts WHERE parent_id IN ($placeholders) AND id NOT IN ($placeholders)"
-            );
-            $chSt->execute(array_merge($apDescendantIds, $apDescendantIds));
-            $newIds = $chSt->fetchAll(PDO::FETCH_COLUMN) ?: [];
-            if ($newIds === []) {
-                break;
-            }
-            foreach ($newIds as $nid) {
-                $apDescendantIds[] = (int) $nid;
-            }
-        }
-        $apDescendantSet = array_flip($apDescendantIds);
-        foreach ($leafAccountOptions as $a) {
-            $aid = (int) $a['id'];
-            if (isset($apDescendantSet[$aid]) && $aid !== $apParentId) {
-                $supplierPayablePickAccounts[] = $a;
-            }
+    foreach ($leafAccountOptions as $a) {
+        $aid = (int) $a['id'];
+        if (orange_accounts_account_bs_role($pdo, $aid) === 'liability') {
+            $supplierPayablePickAccounts[] = $a;
         }
     }
 }
