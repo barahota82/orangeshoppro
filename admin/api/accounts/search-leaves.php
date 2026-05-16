@@ -22,6 +22,9 @@ try {
 
     if ($mode === 'parents') {
         $hasPar = orange_table_has_column($pdo, 'accounts', 'parent_id');
+        if (!$hasPar) {
+            json_response(['success' => true, 'accounts' => []]);
+        }
         $sql = 'SELECT a.id, a.code, a.name FROM accounts a WHERE EXISTS (SELECT 1 FROM accounts ch WHERE ch.parent_id = a.id)';
         $params = [];
         if ($q !== '') {
@@ -30,7 +33,7 @@ try {
             $params[] = $like;
             $params[] = $like;
         }
-        $sql .= ' ORDER BY COALESCE(a.code, \'\'), a.name ASC LIMIT 80';
+        $sql .= ' ORDER BY COALESCE(a.code, \'\'), a.name ASC LIMIT 500';
         $st = $pdo->prepare($sql);
         $st->execute($params);
         $rows = $st->fetchAll(PDO::FETCH_ASSOC);

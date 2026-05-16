@@ -126,7 +126,7 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
                         </td>
                         <td class="gl-td-name">
                             <div class="gl-name-row">
-                                <button type="button" class="gl-search-btn" title="بحث — حسابات فرعية فقط" aria-label="بحث">🔍</button>
+                                <button type="button" class="gl-search-btn" title="<?php echo $key === 'accounts_payable_parent' ? 'بحث — حسابات الأب فقط' : 'بحث — حسابات فرعية فقط'; ?>" aria-label="بحث">🔍</button>
                                 <input type="text" class="gl-inp-name" readonly value="<?php echo htmlspecialchars($name, ENT_QUOTES, 'UTF-8'); ?>" aria-label="اسم الحساب"<?php echo $aid > 0 ? ' disabled' : ''; ?> tabindex="<?php echo $aid > 0 ? '-1' : '0'; ?>">
                             </div>
                         </td>
