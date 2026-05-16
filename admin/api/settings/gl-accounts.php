@@ -92,11 +92,23 @@ try {
             json_response(['success' => false, 'message' => 'حساب غير صالح: ' . $key], 422);
         }
         if (!orange_accounts_account_is_posting_leaf($pdo, $aid)) {
-            $pdo->rollBack();
-            json_response([
-                'success' => false,
-                'message' => 'يُقبل ربط القيود التلقائية مع حساب فرعي (ورقة ترحيل) فقط — ليس جذراً أو مجلداً: ' . $key,
-            ], 422);
+            if ($key === 'accounts_payable_parent') {
+                $chkHasChildren = $pdo->prepare('SELECT 1 FROM accounts WHERE parent_id = ? LIMIT 1');
+                $chkHasChildren->execute([$aid]);
+                if (!$chkHasChildren->fetch()) {
+                    $pdo->rollBack();
+                    json_response([
+                        'success' => false,
+                        'message' => 'الحساب المختار ليس حساباً أباً (لا توجد حسابات فرعية تحته): ' . $key,
+                    ], 422);
+                }
+            } else {
+                $pdo->rollBack();
+                json_response([
+                    'success' => false,
+                    'message' => 'يُقبل ربط القيود التلقائية مع حساب فرعي (ورقة ترحيل) فقط — ليس جذراً أو مجلداً: ' . $key,
+                ], 422);
+            }
         }
         $up->execute($hasJtCol ? [$key, $aid] : [$key, $aid]);
     }
