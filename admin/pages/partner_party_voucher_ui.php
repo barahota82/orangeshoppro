@@ -146,6 +146,26 @@ if (orange_journal_vouchers_ready($pdo)) {
     }
 }
 ?>
+<style>
+.ppv-supplier-pick-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: 10px 14px;
+}
+.ppv-supplier-pick-fields input[readonly] {
+    background: #f8fafc;
+    cursor: default;
+}
+.ppv-supplier-pick-fields input[disabled] {
+    background: #f8fafc;
+    cursor: default;
+}
+@media (max-width: 600px) {
+    .ppv-supplier-pick-fields {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
 <div class="page-title page-title--stacked ppv-print-hide">
     <div>
         <h1><?php echo htmlspecialchars($ppvTitle, ENT_QUOTES, 'UTF-8'); ?></h1>
@@ -185,13 +205,18 @@ if (orange_journal_vouchers_ready($pdo)) {
         </div>
         <?php else: ?>
         <input type="hidden" id="ppv_party" value="0">
-        <div>
-            <label for="ppv_supplier_account_code">كود الحساب</label>
-            <input type="text" id="ppv_supplier_account_code" autocomplete="off" dir="ltr" lang="en" readonly placeholder="نقرتان للاختيار" title="نقرتان للاختيار">
-        </div>
-        <div>
-            <label for="ppv_supplier_name">اسم المورد</label>
-            <input type="text" id="ppv_supplier_name" class="admin-inp-readonly" autocomplete="off" readonly disabled tabindex="-1" placeholder="يُعبأ تلقائياً" title="يُعبأ تلقائياً">
+        <div style="grid-column:1/-1;">
+            <label>ربط حساب المورد بالدليل المحاسبي</label>
+            <div class="ppv-supplier-pick-fields">
+                <div>
+                    <label for="ppv_supplier_account_code">كود الحساب</label>
+                    <input type="text" id="ppv_supplier_account_code" autocomplete="off" dir="ltr" lang="en" readonly placeholder="نقرتان للاختيار" title="نقرتان للاختيار">
+                </div>
+                <div>
+                    <label for="ppv_supplier_name">اسم المورد</label>
+                    <input type="text" id="ppv_supplier_name" class="admin-inp-readonly" autocomplete="off" readonly disabled tabindex="-1" placeholder="يُعبأ تلقائياً" title="يُعبأ تلقائياً">
+                </div>
+            </div>
         </div>
         <?php endif; ?>
 
