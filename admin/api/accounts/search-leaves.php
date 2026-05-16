@@ -22,10 +22,19 @@ try {
 
     if ($mode === 'parents') {
         $hasPar = orange_table_has_column($pdo, 'accounts', 'parent_id');
-        if (!$hasPar) {
+        $hasGrp = orange_table_has_column($pdo, 'accounts', 'is_group');
+        if (!$hasPar && !$hasGrp) {
             json_response(['success' => true, 'accounts' => []]);
         }
-        $sql = 'SELECT a.id, a.code, a.name FROM accounts a WHERE EXISTS (SELECT 1 FROM accounts ch WHERE ch.parent_id = a.id)';
+        $conditions = [];
+        if ($hasPar) {
+            $conditions[] = 'EXISTS (SELECT 1 FROM accounts ch WHERE ch.parent_id = a.id)';
+        }
+        if ($hasGrp) {
+            $conditions[] = 'a.is_group = 1';
+        }
+        $where = '(' . implode(' OR ', $conditions) . ')';
+        $sql = 'SELECT a.id, a.code, a.name FROM accounts a WHERE ' . $where;
         $params = [];
         if ($q !== '') {
             $sql .= ' AND (a.code LIKE ? OR a.name LIKE ?)';
