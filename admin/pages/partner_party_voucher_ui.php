@@ -311,7 +311,7 @@ var PPV_SUPPLIER_PICK_ROWS = <?php echo json_encode($ppvSupplierPickRows, JSON_U
 var ppvSupplierPickTimer = null;
 
 function ppvEscapeHtml(s) {
-    return String(s == null ? '')
+    return String(s == null ? '' : s)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
