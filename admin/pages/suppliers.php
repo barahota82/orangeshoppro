@@ -875,7 +875,7 @@ $count = count($rows);
         <button type="button" class="btn-secondary" onclick="supResetForm()">اضافة مورد</button>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchase_returns'), ENT_QUOTES, 'UTF-8'); ?>">مردود مشتريات</a>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchases'), ENT_QUOTES, 'UTF-8'); ?>">فاتورة مشتريات</a>
-        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment'), ENT_QUOTES, 'UTF-8'); ?>">سداد فواتير</a>
+        <button type="button" class="btn-secondary" id="sup_open_payment_btn">سداد فواتير</button>
         <button type="button" class="btn-secondary" id="sup_open_statement_btn">كشف حساب</button>
     </div>
 </div>
@@ -2028,6 +2028,15 @@ function supOpenCurrentSupplierStatement() {
     }
     window.location.href = SUP_PARTNER_STATEMENT_URL + '&account=' + encodeURIComponent(String(accId));
 }
+function supOpenCurrentSupplierPayment() {
+    var row = supCurrentSupplierRow();
+    if (!row || (parseInt(String(row.id || '0'), 10) || 0) <= 0) {
+        alert('اختر المورد أولاً');
+        return;
+    }
+    var sid = parseInt(String(row.id || '0'), 10) || 0;
+    window.location.href = '/admin/index.php?page=partner_supplier_payment&stmt_party_kind=supplier&stmt_party_id=' + encodeURIComponent(String(sid));
+}
 function supEdit(row) {
     document.getElementById('sup_id').value = String(row.id || 0);
     document.getElementById('sup_code').value = row.code || '';
@@ -2337,6 +2346,13 @@ function supSave() {
         statementBtn.addEventListener('click', function (e) {
             e.preventDefault();
             supOpenCurrentSupplierStatement();
+        });
+    }
+    var paymentBtn = document.getElementById('sup_open_payment_btn');
+    if (paymentBtn) {
+        paymentBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            supOpenCurrentSupplierPayment();
         });
     }
     var navFirstBtn = document.getElementById('sup_nav_first');
