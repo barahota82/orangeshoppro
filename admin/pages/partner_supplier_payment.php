@@ -184,6 +184,9 @@ $ppvReady = $ppvCashLock !== null;
 .jv-search-field input { width: 100%; box-sizing: border-box; }
 .jv-search-field--id { flex: 0 0 7rem; }
 .jv-search-field--date { flex: 0 0 11rem; }
+.jv-search-field--ref { flex: 1 1 0; min-width: 7rem; }
+.jv-search-field--full { width: 100%; }
+.jv-search-modal__row--desc { width: 100%; }
 .jv-search-modal__actions { margin: 0 0 16px; }
 .jv-search-table-wrap { max-height: min(40vh, 22rem); overflow: auto; border: 1px solid #e4e4e7; border-radius: 8px; }
 .jv-search-results-table { margin: 0; font-size: 0.9rem; }
