@@ -30,12 +30,25 @@ if (orange_table_exists($pdo, 'accounts')) {
 
     $apParentId = orange_gl_supplier_parent_account_id($pdo);
     if ($apParentId !== null && $apParentId > 0 && orange_table_has_column($pdo, 'accounts', 'parent_id')) {
+        $apDescendantIds = [$apParentId];
+        for ($depth = 0; $depth < 10; ++$depth) {
+            $placeholders = implode(',', array_fill(0, count($apDescendantIds), '?'));
+            $chSt = $pdo->prepare(
+                "SELECT id FROM accounts WHERE parent_id IN ($placeholders) AND id NOT IN ($placeholders)"
+            );
+            $chSt->execute(array_merge($apDescendantIds, $apDescendantIds));
+            $newIds = $chSt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+            if ($newIds === []) {
+                break;
+            }
+            foreach ($newIds as $nid) {
+                $apDescendantIds[] = (int) $nid;
+            }
+        }
+        $apDescendantSet = array_flip($apDescendantIds);
         foreach ($leafAccountOptions as $a) {
             $aid = (int) $a['id'];
-            $st = $pdo->prepare('SELECT parent_id FROM accounts WHERE id = ? LIMIT 1');
-            $st->execute([$aid]);
-            $pid = (int) $st->fetchColumn();
-            if ($pid === $apParentId) {
+            if (isset($apDescendantSet[$aid]) && $aid !== $apParentId) {
                 $supplierPayablePickAccounts[] = $a;
             }
         }
