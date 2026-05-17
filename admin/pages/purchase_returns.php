@@ -135,8 +135,11 @@ if ($glAccStmt) {
 $prefillSupplierId = 0;
 $prefillStmtId = (int) ($_GET['stmt_party_id'] ?? 0);
 $prefillStmtKind = trim((string) ($_GET['stmt_party_kind'] ?? ''));
+$prefillSupplierDirect = (int) ($_GET['supplier_id'] ?? 0);
 if ($prefillStmtKind === 'supplier' && $prefillStmtId > 0) {
     $prefillSupplierId = $prefillStmtId;
+} elseif ($prefillSupplierDirect > 0) {
+    $prefillSupplierId = $prefillSupplierDirect;
 }
 
 $pr2TodayDmy = orange_format_date_dmY(date('Y-m-d'));
