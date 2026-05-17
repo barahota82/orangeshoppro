@@ -92,12 +92,35 @@ foreach ($suppliers as $s) {
     $supBal[(int) $s['id']] = orange_party_balance_supplier($pdo, (int) $s['id']);
 }
 if (!$ppvIsReceipt) {
+    $ppvApParentId = orange_gl_supplier_parent_account_id($pdo);
+    $ppvApDescendantSet = [];
+    if ($ppvApParentId !== null && $ppvApParentId > 0 && orange_table_has_column($pdo, 'accounts', 'parent_id')) {
+        $ppvApDescIds = [$ppvApParentId];
+        for ($depth = 0; $depth < 10; ++$depth) {
+            $ph = implode(',', array_fill(0, count($ppvApDescIds), '?'));
+            $chSt = $pdo->prepare("SELECT id FROM accounts WHERE parent_id IN ($ph) AND id NOT IN ($ph)");
+            $chSt->execute(array_merge($ppvApDescIds, $ppvApDescIds));
+            $newIds = $chSt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+            if ($newIds === []) {
+                break;
+            }
+            foreach ($newIds as $nid) {
+                $ppvApDescIds[] = (int) $nid;
+            }
+        }
+        $ppvApDescendantSet = array_flip($ppvApDescIds);
+    }
+
     foreach ($suppliers as $s) {
         $sid = (int) ($s['id'] ?? 0);
         if ($sid <= 0) {
             continue;
         }
         $map = $supplierPayableMap[$sid] ?? ['id' => 0, 'code' => '', 'name' => ''];
+        $mapAccountId = (int) ($map['id'] ?? 0);
+        if ($ppvApDescendantSet !== [] && ($mapAccountId <= 0 || !isset($ppvApDescendantSet[$mapAccountId]))) {
+            continue;
+        }
         $supplierName = trim((string) ($s['name'] ?? ''));
         $supplierPhone = trim((string) ($s['phone'] ?? ''));
         $accountCode = trim((string) ($map['code'] ?? ''));
@@ -112,7 +135,7 @@ if (!$ppvIsReceipt) {
             'name' => $supplierName,
             'phone' => $supplierPhone,
             'balance' => round($balance, 3),
-            'account_id' => (int) ($map['id'] ?? 0),
+            'account_id' => $mapAccountId,
             'account_code' => $accountCode,
             'account_name' => $accountName,
             'search_text' => $searchText,
