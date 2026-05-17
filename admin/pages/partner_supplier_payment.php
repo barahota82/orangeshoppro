@@ -240,10 +240,11 @@ $ppvReady = $ppvCashLock !== null;
 
     <!-- ٤ — أزرار -->
     <div class="actions admin-doc-lines-toolbar jv-doc-toolbar jv-print-hide" style="margin-top:16px;">
+        <span></span>
         <div class="jv-toolbar-primary-group">
-            <button type="button" id="spay_btn_new">سند جديد</button>
+            <button type="button" id="spay_btn_new" title="إدخال سند جديد">سند جديد</button>
             <button type="button" class="btn-secondary" id="spay_btn_delete" title="حذف السند المعروض" disabled>حذف السند</button>
-            <button type="button" class="btn-secondary" id="spay_btn_print">طباعة السند</button>
+            <button type="button" class="btn-secondary" id="spay_btn_print" title="طباعة السند">طباعة السند</button>
             <button type="button" id="spay_btn_save"<?php echo !$ppvReady ? ' disabled' : ''; ?>>حفظ السند</button>
         </div>
     </div>
@@ -258,6 +259,48 @@ $ppvReady = $ppvCashLock !== null;
         <input type="search" id="spay_supplier_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بكود الحساب أو اسم المورد…" autocomplete="off" dir="rtl">
         <ul class="gl-pick-modal__list" id="spay_supplier_pick_list"></ul>
         <button type="button" class="btn-secondary" id="spay_supplier_pick_close">إغلاق</button>
+    </div>
+</div>
+
+<!-- Search Modal -->
+<div id="spay_search_modal" class="jv-search-modal jv-print-hide" style="display:none;" aria-hidden="true" role="dialog" aria-labelledby="spay_search_modal_title">
+    <div class="jv-search-modal__backdrop" id="spay_search_modal_backdrop"></div>
+    <div class="jv-search-modal__panel">
+        <div class="jv-search-modal__head">
+            <h3 id="spay_search_modal_title" class="jv-search-modal__title">بحث في سندات سداد الموردين</h3>
+        </div>
+        <div class="jv-search-modal__body">
+            <div class="jv-search-modal__form">
+                <div class="jv-search-modal__row jv-search-modal__row--fields">
+                    <div class="jv-search-field jv-search-field--id">
+                        <label for="spay_search_id_from">رقم القيد — من</label>
+                        <input type="number" id="spay_search_id_from" class="admin-inp" min="1" step="1" dir="ltr" lang="en">
+                    </div>
+                    <div class="jv-search-field jv-search-field--id">
+                        <label for="spay_search_id_to">رقم القيد — إلى</label>
+                        <input type="number" id="spay_search_id_to" class="admin-inp" min="1" step="1" dir="ltr" lang="en">
+                    </div>
+                    <div class="jv-search-field jv-search-field--date">
+                        <label for="spay_search_date_from">تاريخ السند — من</label>
+                        <input type="text" id="spay_search_date_from" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off">
+                    </div>
+                    <div class="jv-search-field jv-search-field--date">
+                        <label for="spay_search_date_to">تاريخ السند — إلى</label>
+                        <input type="text" id="spay_search_date_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off">
+                    </div>
+                </div>
+                <div class="jv-search-modal__row">
+                    <button type="button" id="spay_search_btn" class="btn-secondary">بحث</button>
+                    <button type="button" id="spay_search_close" class="btn-secondary">إغلاق</button>
+                </div>
+            </div>
+            <div class="jv-search-modal__results">
+                <table class="admin-table">
+                    <thead><tr><th>رقم</th><th>التاريخ</th><th>المرجع</th><th>البيان</th><th>المبلغ</th></tr></thead>
+                    <tbody id="spay_search_results"></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -530,6 +573,88 @@ $ppvReady = $ppvCashLock !== null;
         }).catch(function (e) { alert(e.message || String(e)); });
     }
 
+    // Navigation & Search
+    var navVoucherIds = [];
+    var navCurrentIdx = -1;
+    var loadedVoucherId = 0;
+
+    function navLoadList() {
+        postJSON('/admin/api/partners/supplier-payment-list.php', { entry_type: 'supplier_payment' }).then(function (r) {
+            if (r.success && r.ids) { navVoucherIds = r.ids; }
+        }).catch(function () {});
+    }
+
+    function navGoTo(voucherId) {
+        if (!voucherId || voucherId <= 0) return;
+        postJSON('/admin/api/partners/supplier-payment-load.php', { voucher_id: voucherId }).then(function (r) {
+            if (!r.success) { alert(r.message || 'تعذر تحميل السند'); return; }
+            loadedVoucherId = voucherId;
+            navCurrentIdx = navVoucherIds.indexOf(voucherId);
+            displayLoadedVoucher(r);
+        }).catch(function (e) { alert(e.message || String(e)); });
+    }
+
+    function displayLoadedVoucher(r) {
+        document.getElementById('spay_number_preview').value = String(r.voucher_id || loadedVoucherId);
+        document.getElementById('spay_ref').value = r.reference || '';
+        if (r.voucher_date) {
+            document.getElementById('spay_date').value = r.voucher_date_dmy || r.voucher_date || '';
+        }
+        document.getElementById('spay_desc').value = r.description || '';
+        document.getElementById('spay_tot_debit').value = (parseFloat(r.total || '0') || 0).toFixed(3);
+        document.getElementById('spay_tot_credit').value = (parseFloat(r.total || '0') || 0).toFixed(3);
+        if (r.supplier_id) {
+            selectSupplier(parseInt(String(r.supplier_id), 10) || 0);
+        }
+        document.getElementById('spay_btn_delete').disabled = false;
+    }
+
+    function navFirst() { if (navVoucherIds.length) navGoTo(navVoucherIds[0]); }
+    function navPrev() {
+        if (navCurrentIdx > 0) navGoTo(navVoucherIds[navCurrentIdx - 1]);
+        else if (navVoucherIds.length) navGoTo(navVoucherIds[0]);
+    }
+    function navNext() {
+        if (navCurrentIdx >= 0 && navCurrentIdx < navVoucherIds.length - 1) navGoTo(navVoucherIds[navCurrentIdx + 1]);
+        else if (navVoucherIds.length) navGoTo(navVoucherIds[navVoucherIds.length - 1]);
+    }
+    function navLast() { if (navVoucherIds.length) navGoTo(navVoucherIds[navVoucherIds.length - 1]); }
+
+    function searchOpen() {
+        var modal = document.getElementById('spay_search_modal');
+        if (modal) { modal.style.display = ''; modal.setAttribute('aria-hidden', 'false'); }
+    }
+    function searchClose() {
+        var modal = document.getElementById('spay_search_modal');
+        if (modal) { modal.style.display = 'none'; modal.setAttribute('aria-hidden', 'true'); }
+    }
+    function searchRun() {
+        var idFrom = parseInt(document.getElementById('spay_search_id_from').value) || 0;
+        var idTo = parseInt(document.getElementById('spay_search_id_to').value) || 0;
+        var dateFrom = orangeGetDmyValueAsIso(document.getElementById('spay_search_date_from')) || '';
+        var dateTo = orangeGetDmyValueAsIso(document.getElementById('spay_search_date_to')) || '';
+        var tbody = document.getElementById('spay_search_results');
+        tbody.innerHTML = '<tr><td colspan="5">جاري البحث…</td></tr>';
+        postJSON('/admin/api/partners/supplier-payment-search.php', {
+            entry_type: 'supplier_payment', id_from: idFrom, id_to: idTo, date_from: dateFrom, date_to: dateTo
+        }).then(function (r) {
+            tbody.innerHTML = '';
+            if (!r.success || !r.results || !r.results.length) {
+                tbody.innerHTML = '<tr><td colspan="5" class="muted">لا نتائج</td></tr>';
+                return;
+            }
+            r.results.forEach(function (v) {
+                var tr = document.createElement('tr');
+                tr.style.cursor = 'pointer';
+                tr.innerHTML = '<td>' + esc(String(v.id)) + '</td><td>' + esc(v.voucher_date || '') + '</td><td>' + esc(v.reference || '') + '</td><td>' + esc(v.description || '') + '</td><td dir="ltr">' + (parseFloat(v.total || '0') || 0).toFixed(3) + '</td>';
+                tr.addEventListener('dblclick', function () { navGoTo(v.id); searchClose(); });
+                tbody.appendChild(tr);
+            });
+        }).catch(function (e) {
+            tbody.innerHTML = '<tr><td colspan="5">' + esc(e.message || String(e)) + '</td></tr>';
+        });
+    }
+
     // Init
     function init() {
         var codeEl = document.getElementById('spay_supplier_code');
@@ -558,6 +683,26 @@ $ppvReady = $ppvCashLock !== null;
         document.getElementById('spay_btn_save').addEventListener('click', save);
         document.getElementById('spay_btn_new').addEventListener('click', function () { location.reload(); });
         document.getElementById('spay_btn_print').addEventListener('click', function () { window.print(); });
+        document.getElementById('spay_btn_delete').addEventListener('click', function () {
+            if (!loadedVoucherId || loadedVoucherId <= 0) { alert('لا يوجد سند معروض للحذف'); return; }
+            if (!confirm('هل تريد حذف السند رقم ' + loadedVoucherId + '؟')) return;
+            postJSON('/admin/api/partners/supplier-payment-delete.php', { voucher_id: loadedVoucherId }).then(function (r) {
+                if (r.success) { alert(r.message || 'تم الحذف'); location.reload(); }
+                else { alert(r.message || 'فشل الحذف'); }
+            }).catch(function (e) { alert(e.message || String(e)); });
+        });
+
+        document.getElementById('spay_nav_first').addEventListener('click', navFirst);
+        document.getElementById('spay_nav_prev').addEventListener('click', navPrev);
+        document.getElementById('spay_nav_next').addEventListener('click', navNext);
+        document.getElementById('spay_nav_last').addEventListener('click', navLast);
+        document.getElementById('spay_btn_search').addEventListener('click', searchOpen);
+
+        document.getElementById('spay_search_btn').addEventListener('click', searchRun);
+        document.getElementById('spay_search_close').addEventListener('click', searchClose);
+        document.getElementById('spay_search_modal_backdrop').addEventListener('click', searchClose);
+
+        navLoadList();
 
         if (SPAY_PREFILL_SUPPLIER > 0) {
             selectSupplier(SPAY_PREFILL_SUPPLIER);
