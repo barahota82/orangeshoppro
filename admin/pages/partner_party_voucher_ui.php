@@ -228,19 +228,6 @@ if (orange_journal_vouchers_ready($pdo)) {
         </div>
         <?php else: ?>
         <input type="hidden" id="ppv_party" value="0">
-        <div style="grid-column:1/-1;">
-            <label>ربط حساب المورد بالدليل المحاسبي</label>
-            <div class="ppv-supplier-pick-fields">
-                <div>
-                    <label for="ppv_supplier_account_code">كود الحساب</label>
-                    <input type="text" id="ppv_supplier_account_code" autocomplete="off" dir="ltr" lang="en" readonly placeholder="نقرتان للاختيار" title="نقرتان للاختيار">
-                </div>
-                <div>
-                    <label for="ppv_supplier_name">اسم المورد</label>
-                    <input type="text" id="ppv_supplier_name" class="admin-inp-readonly" autocomplete="off" readonly disabled tabindex="-1" placeholder="يُعبأ تلقائياً" title="يُعبأ تلقائياً">
-                </div>
-            </div>
-        </div>
         <?php endif; ?>
 
         <div class="<?php echo htmlspecialchars($ppvHeaderLineClass, ENT_QUOTES, 'UTF-8'); ?>" style="grid-column:1/-1;">
@@ -412,19 +399,23 @@ function ppvSupplierSyncUiById(id) {
     if (PPV_IS_RECEIPT) {
         return;
     }
-    var codeEl = document.getElementById('ppv_supplier_account_code');
-    var nameEl = document.getElementById('ppv_supplier_name');
-    if (!codeEl || !nameEl) {
+    var partyTr = ppvPartyMainRow();
+    if (!partyTr) {
         return;
     }
+    var codeEl = partyTr.querySelector('.jv-acc-code');
+    var nameEl = partyTr.querySelector('.jv-acc-name');
+    var idEl = partyTr.querySelector('.jv-acc-id');
     var row = ppvSupplierPickRowById(id);
     if (!row) {
-        codeEl.value = '';
-        nameEl.value = '';
+        if (codeEl) codeEl.value = '';
+        if (nameEl) nameEl.value = '';
+        if (idEl) idEl.value = '';
         return;
     }
-    codeEl.value = String(row.account_code || '');
-    nameEl.value = String(row.name || '');
+    if (codeEl) codeEl.value = String(row.account_code || '');
+    if (nameEl) nameEl.value = String(row.account_name || row.name || '');
+    if (idEl) idEl.value = String(row.account_id || '');
 }
 
 function ppvSupplierPickClose() {
@@ -632,7 +623,7 @@ function ppvBuildLines() {
         }
         trMain.innerHTML = '<td class="jv-acc-code-cell">' +
             '<input type="hidden" class="jv-acc-id" value="' + pid + '">' +
-            '<input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="' + ppvEscapeHtml(pcode) + '" readonly tabindex="-1">' +
+            '<input type="text" class="jv-acc-code admin-inp" value="' + ppvEscapeHtml(pcode) + '" readonly placeholder="نقرتان للاختيار" title="نقرتان للاختيار" style="cursor:pointer;">' +
             '</td>' +
             '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + ppvEscapeHtml(pname) + '" readonly tabindex="-1"></td>' +
             amtCells +
@@ -657,6 +648,19 @@ function ppvBuildLines() {
         addPartyPair();
         addCashPair();
         ppvApplySupplierAccount();
+        var partyCodeEl = document.querySelector('#ppv_lines_body tr[data-ppv-party="1"] .jv-acc-code');
+        if (partyCodeEl) {
+            partyCodeEl.addEventListener('dblclick', function (e) {
+                e.preventDefault();
+                ppvSupplierPickOpen();
+            });
+            partyCodeEl.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    ppvSupplierPickOpen();
+                }
+            });
+        }
     }
 
     var descEl = document.getElementById('ppv_desc');
@@ -820,19 +824,6 @@ function ppvBind() {
         }
     }
     if (!PPV_IS_RECEIPT) {
-        var supplierCodeEl = document.getElementById('ppv_supplier_account_code');
-        if (supplierCodeEl) {
-            supplierCodeEl.addEventListener('dblclick', function (e) {
-                e.preventDefault();
-                ppvSupplierPickOpen();
-            });
-            supplierCodeEl.addEventListener('keydown', function (e) {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    ppvSupplierPickOpen();
-                }
-            });
-        }
         var supplierPickBackdrop = document.getElementById('ppv_supplier_pick_backdrop');
         if (supplierPickBackdrop) {
             supplierPickBackdrop.addEventListener('click', ppvSupplierPickClose);
