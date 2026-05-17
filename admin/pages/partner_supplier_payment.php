@@ -289,16 +289,18 @@ $ppvReady = $ppvCashLock !== null;
                         <input type="text" id="spay_search_date_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off">
                     </div>
                 </div>
-                <div class="jv-search-modal__row">
-                    <button type="button" id="spay_search_btn" class="btn-secondary">بحث</button>
-                    <button type="button" id="spay_search_close" class="btn-secondary">إغلاق</button>
+                <div class="jv-search-modal__row jv-search-modal__actions">
+                    <button type="button" id="spay_search_btn">بحث</button>
+                    <button type="button" class="btn-secondary" id="spay_search_close">إغلاق</button>
                 </div>
             </div>
             <div class="jv-search-modal__results">
-                <table class="admin-table">
-                    <thead><tr><th>رقم</th><th>التاريخ</th><th>المرجع</th><th>البيان</th><th>المبلغ</th></tr></thead>
-                    <tbody id="spay_search_results"></tbody>
-                </table>
+                <div class="jv-search-table-wrap">
+                    <table class="admin-table jv-search-results-table">
+                        <thead><tr><th>رقم</th><th>التاريخ</th><th>المرجع</th><th>البيان</th><th>المبلغ</th></tr></thead>
+                        <tbody id="spay_search_results"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -573,70 +575,117 @@ $ppvReady = $ppvCashLock !== null;
         }).catch(function (e) { alert(e.message || String(e)); });
     }
 
-    // Navigation & Search
-    var navVoucherIds = [];
-    var navCurrentIdx = -1;
-    var loadedVoucherId = 0;
+    // Navigation & Search — uses /admin/api/journal/manage.php like سند الصرف
+    var spayBrowseId = null;
 
-    function navLoadList() {
-        postJSON('/admin/api/partners/supplier-payment-list.php', { entry_type: 'supplier_payment' }).then(function (r) {
-            if (r.success && r.ids) { navVoucherIds = r.ids; }
-        }).catch(function () {});
-    }
-
-    function navGoTo(voucherId) {
-        if (!voucherId || voucherId <= 0) return;
-        postJSON('/admin/api/partners/supplier-payment-load.php', { voucher_id: voucherId }).then(function (r) {
-            if (!r.success) { alert(r.message || 'تعذر تحميل السند'); return; }
-            loadedVoucherId = voucherId;
-            navCurrentIdx = navVoucherIds.indexOf(voucherId);
-            displayLoadedVoucher(r);
+    function spayNav(where) {
+        var payload = {
+            action: 'nav_manual',
+            entry_type: 'supplier_payment',
+            where: where,
+            current_id: spayBrowseId || 0
+        };
+        postJSON('/admin/api/journal/manage.php', payload).then(function (r) {
+            if (!r.success || !r.id) {
+                alert(r.message || 'لا توجد سندات من هذا النوع بعد');
+                return;
+            }
+            spayLoadVoucher(r.id);
         }).catch(function (e) { alert(e.message || String(e)); });
     }
 
-    function displayLoadedVoucher(r) {
-        document.getElementById('spay_number_preview').value = String(r.voucher_id || loadedVoucherId);
-        document.getElementById('spay_ref').value = r.reference || '';
-        if (r.voucher_date) {
-            document.getElementById('spay_date').value = r.voucher_date_dmy || r.voucher_date || '';
-        }
-        document.getElementById('spay_desc').value = r.description || '';
-        document.getElementById('spay_tot_debit').value = (parseFloat(r.total || '0') || 0).toFixed(3);
-        document.getElementById('spay_tot_credit').value = (parseFloat(r.total || '0') || 0).toFixed(3);
-        if (r.supplier_id) {
-            selectSupplier(parseInt(String(r.supplier_id), 10) || 0);
-        }
+    function spayLoadVoucher(id) {
+        postJSON('/admin/api/journal/manage.php', { action: 'get', id: id, entry_type: 'supplier_payment' }).then(function (r) {
+            if (!r.success || !r.voucher) {
+                alert(r.message || 'تعذر تحميل السند');
+                return;
+            }
+            spayBrowseId = r.voucher.id;
+            spayDisplayVoucher(r);
+        }).catch(function (e) { alert(e.message || String(e)); });
+    }
+
+    function spayDisplayVoucher(r) {
+        var v = r.voucher;
+        document.getElementById('spay_number_preview').value = String(v.voucher_serial || v.id || '');
+        document.getElementById('spay_ref').value = v.reference || '';
+        document.getElementById('spay_date').value = v.voucher_date_dmy || v.voucher_date || '';
+        document.getElementById('spay_desc').value = v.description || '';
+        var total = 0;
+        (r.lines || []).forEach(function (l) { total += parseFloat(String(l.debit || '0')) || 0; });
+        document.getElementById('spay_tot_debit').value = total.toFixed(3);
+        document.getElementById('spay_tot_credit').value = total.toFixed(3);
         document.getElementById('spay_btn_delete').disabled = false;
+
+        // Load supplier from subledger
+        if (r.party_supplier_id) {
+            selectSupplier(parseInt(String(r.party_supplier_id), 10) || 0);
+        }
+
+        // Rebuild journal lines from loaded voucher
+        var tb = document.getElementById('spay_jv_body');
+        if (tb && r.lines) {
+            tb.innerHTML = '';
+            r.lines.forEach(function (l) {
+                var tr = document.createElement('tr');
+                tr.className = 'jv-line-main';
+                var accId = parseInt(String(l.account_id || '0'), 10) || 0;
+                var accCode = '', accName = '';
+                if (r.accounts_by_id && r.accounts_by_id[String(accId)]) {
+                    accCode = r.accounts_by_id[String(accId)].code || '';
+                    accName = r.accounts_by_id[String(accId)].name || '';
+                }
+                var d = parseFloat(String(l.debit || '0')) || 0;
+                var c = parseFloat(String(l.credit || '0')) || 0;
+                tr.innerHTML = '<td><input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="' + esc(accCode) + '" readonly tabindex="-1"></td>' +
+                    '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + esc(accName + (l.memo ? ' — ' + l.memo : '')) + '" readonly tabindex="-1"></td>' +
+                    '<td><input type="number" class="admin-inp-money" value="' + (d > 0 ? d.toFixed(3) : '0.000') + '" readonly tabindex="-1" dir="ltr" lang="en"></td>' +
+                    '<td><input type="number" class="admin-inp-money" value="' + (c > 0 ? c.toFixed(3) : '0.000') + '" readonly tabindex="-1" dir="ltr" lang="en"></td>';
+                tb.appendChild(tr);
+            });
+        }
     }
 
-    function navFirst() { if (navVoucherIds.length) navGoTo(navVoucherIds[0]); }
-    function navPrev() {
-        if (navCurrentIdx > 0) navGoTo(navVoucherIds[navCurrentIdx - 1]);
-        else if (navVoucherIds.length) navGoTo(navVoucherIds[0]);
+    function spayDeleteVoucher() {
+        if (!spayBrowseId) {
+            alert('لا يوجد سند محفوظ للحذف');
+            return;
+        }
+        if (!confirm('تأكيد حذف هذا السند؟ لا يمكن التراجع.')) {
+            return;
+        }
+        postJSON('/admin/api/journal/manage.php', { action: 'delete', id: spayBrowseId }).then(function (r) {
+            if (r.success) {
+                alert(r.message || 'تم الحذف');
+                location.reload();
+                return;
+            }
+            alert(r.message || 'فشل الحذف');
+        }).catch(function (e) { alert(e.message || String(e)); });
     }
-    function navNext() {
-        if (navCurrentIdx >= 0 && navCurrentIdx < navVoucherIds.length - 1) navGoTo(navVoucherIds[navCurrentIdx + 1]);
-        else if (navVoucherIds.length) navGoTo(navVoucherIds[navVoucherIds.length - 1]);
-    }
-    function navLast() { if (navVoucherIds.length) navGoTo(navVoucherIds[navVoucherIds.length - 1]); }
 
-    function searchOpen() {
-        var modal = document.getElementById('spay_search_modal');
-        if (modal) { modal.style.display = ''; modal.setAttribute('aria-hidden', 'false'); }
+    function spaySearchOpen() {
+        var m = document.getElementById('spay_search_modal');
+        if (m) { m.style.display = 'flex'; m.setAttribute('aria-hidden', 'false'); }
     }
-    function searchClose() {
-        var modal = document.getElementById('spay_search_modal');
-        if (modal) { modal.style.display = 'none'; modal.setAttribute('aria-hidden', 'true'); }
+    function spaySearchClose() {
+        var m = document.getElementById('spay_search_modal');
+        if (m) { m.style.display = 'none'; m.setAttribute('aria-hidden', 'true'); }
     }
-    function searchRun() {
+    function spaySearchRun() {
         var idFrom = parseInt(document.getElementById('spay_search_id_from').value) || 0;
         var idTo = parseInt(document.getElementById('spay_search_id_to').value) || 0;
         var dateFrom = orangeGetDmyValueAsIso(document.getElementById('spay_search_date_from')) || '';
         var dateTo = orangeGetDmyValueAsIso(document.getElementById('spay_search_date_to')) || '';
         var tbody = document.getElementById('spay_search_results');
         tbody.innerHTML = '<tr><td colspan="5">جاري البحث…</td></tr>';
-        postJSON('/admin/api/partners/supplier-payment-search.php', {
-            entry_type: 'supplier_payment', id_from: idFrom, id_to: idTo, date_from: dateFrom, date_to: dateTo
+        postJSON('/admin/api/journal/manage.php', {
+            action: 'search',
+            entry_type: 'supplier_payment',
+            id_from: idFrom > 0 ? idFrom : undefined,
+            id_to: idTo > 0 ? idTo : undefined,
+            date_from: dateFrom || undefined,
+            date_to: dateTo || undefined
         }).then(function (r) {
             tbody.innerHTML = '';
             if (!r.success || !r.results || !r.results.length) {
@@ -646,14 +695,23 @@ $ppvReady = $ppvCashLock !== null;
             r.results.forEach(function (v) {
                 var tr = document.createElement('tr');
                 tr.style.cursor = 'pointer';
-                tr.innerHTML = '<td>' + esc(String(v.id)) + '</td><td>' + esc(v.voucher_date || '') + '</td><td>' + esc(v.reference || '') + '</td><td>' + esc(v.description || '') + '</td><td dir="ltr">' + (parseFloat(v.total || '0') || 0).toFixed(3) + '</td>';
-                tr.addEventListener('dblclick', function () { navGoTo(v.id); searchClose(); });
+                tr.innerHTML = '<td>' + esc(String(v.voucher_serial || v.id)) + '</td><td>' + esc(v.voucher_date_dmy || v.voucher_date || '') + '</td><td>' + esc(v.reference || '') + '</td><td>' + esc(v.description || '') + '</td><td dir="ltr">' + (parseFloat(v.total || '0') || 0).toFixed(3) + '</td>';
+                tr.addEventListener('dblclick', function () { spayLoadVoucher(v.id); spaySearchClose(); });
                 tbody.appendChild(tr);
             });
         }).catch(function (e) {
             tbody.innerHTML = '<tr><td colspan="5">' + esc(e.message || String(e)) + '</td></tr>';
         });
     }
+
+    document.addEventListener('mousedown', function (ev) {
+        var m = document.getElementById('spay_search_modal');
+        if (!m || m.style.display !== 'flex') return;
+        var panel = m.querySelector('.jv-search-modal__panel');
+        if (panel && (panel === ev.target || panel.contains(ev.target))) return;
+        if (ev.target.closest && ev.target.closest('#spay_btn_search')) return;
+        spaySearchClose();
+    }, true);
 
     // Init
     function init() {
@@ -683,26 +741,17 @@ $ppvReady = $ppvCashLock !== null;
         document.getElementById('spay_btn_save').addEventListener('click', save);
         document.getElementById('spay_btn_new').addEventListener('click', function () { location.reload(); });
         document.getElementById('spay_btn_print').addEventListener('click', function () { window.print(); });
-        document.getElementById('spay_btn_delete').addEventListener('click', function () {
-            if (!loadedVoucherId || loadedVoucherId <= 0) { alert('لا يوجد سند معروض للحذف'); return; }
-            if (!confirm('هل تريد حذف السند رقم ' + loadedVoucherId + '؟')) return;
-            postJSON('/admin/api/partners/supplier-payment-delete.php', { voucher_id: loadedVoucherId }).then(function (r) {
-                if (r.success) { alert(r.message || 'تم الحذف'); location.reload(); }
-                else { alert(r.message || 'فشل الحذف'); }
-            }).catch(function (e) { alert(e.message || String(e)); });
-        });
+        document.getElementById('spay_btn_delete').addEventListener('click', spayDeleteVoucher);
 
-        document.getElementById('spay_nav_first').addEventListener('click', navFirst);
-        document.getElementById('spay_nav_prev').addEventListener('click', navPrev);
-        document.getElementById('spay_nav_next').addEventListener('click', navNext);
-        document.getElementById('spay_nav_last').addEventListener('click', navLast);
-        document.getElementById('spay_btn_search').addEventListener('click', searchOpen);
+        document.getElementById('spay_nav_first').addEventListener('click', function () { spayNav('first'); });
+        document.getElementById('spay_nav_prev').addEventListener('click', function () { spayNav('prev'); });
+        document.getElementById('spay_nav_next').addEventListener('click', function () { spayNav('next'); });
+        document.getElementById('spay_nav_last').addEventListener('click', function () { spayNav('last'); });
+        document.getElementById('spay_btn_search').addEventListener('click', spaySearchOpen);
 
-        document.getElementById('spay_search_btn').addEventListener('click', searchRun);
-        document.getElementById('spay_search_close').addEventListener('click', searchClose);
-        document.getElementById('spay_search_modal_backdrop').addEventListener('click', searchClose);
-
-        navLoadList();
+        document.getElementById('spay_search_btn').addEventListener('click', spaySearchRun);
+        document.getElementById('spay_search_close').addEventListener('click', spaySearchClose);
+        document.getElementById('spay_search_modal_backdrop').addEventListener('click', spaySearchClose);
 
         if (SPAY_PREFILL_SUPPLIER > 0) {
             selectSupplier(SPAY_PREFILL_SUPPLIER);
