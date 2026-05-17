@@ -199,6 +199,15 @@ $ppvReady = $ppvCashLock !== null;
                 <label for="spay_tot_credit">مجموع الدائن</label>
                 <input type="text" id="spay_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000" dir="ltr" lang="en">
             </div>
+            <div class="jv-voucher-nav-cell jv-print-hide">
+                <div class="jv-voucher-nav-btns" role="group" aria-label="تنقل بين السندات">
+                    <button type="button" class="btn-secondary jv-nav-btn" id="spay_nav_first" title="أول سند" aria-label="أول سند">&lt;&lt;</button>
+                    <button type="button" class="btn-secondary jv-nav-btn" id="spay_nav_prev" title="السند السابق" aria-label="السند السابق">&lt;</button>
+                    <button type="button" class="btn-secondary jv-nav-btn" id="spay_nav_next" title="السند التالي" aria-label="السند التالي">&gt;</button>
+                    <button type="button" class="btn-secondary jv-nav-btn" id="spay_nav_last" title="آخر سند" aria-label="آخر سند">&gt;&gt;</button>
+                    <button type="button" class="btn-secondary jv-nav-search" id="spay_btn_search" title="بحث عن سند">بحث</button>
+                </div>
+            </div>
         </div>
 
         <div style="margin-bottom:12px;">
@@ -232,9 +241,10 @@ $ppvReady = $ppvCashLock !== null;
     <!-- ٤ — أزرار -->
     <div class="actions admin-doc-lines-toolbar jv-doc-toolbar jv-print-hide" style="margin-top:16px;">
         <div class="jv-toolbar-primary-group">
+            <button type="button" id="spay_btn_new">سند جديد</button>
+            <button type="button" class="btn-secondary" id="spay_btn_delete" title="حذف السند المعروض" disabled>حذف السند</button>
+            <button type="button" class="btn-secondary" id="spay_btn_print">طباعة السند</button>
             <button type="button" id="spay_btn_save"<?php echo !$ppvReady ? ' disabled' : ''; ?>>حفظ السند</button>
-            <button type="button" class="btn-secondary" id="spay_btn_new">سند جديد</button>
-            <button type="button" class="btn-secondary" id="spay_btn_print">طباعة</button>
         </div>
     </div>
 </div>
