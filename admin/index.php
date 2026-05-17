@@ -38,6 +38,7 @@ $allowed = [
     'purchases',
     'purchases_v2',
     'purchase_returns',
+    'purchase_returns_v2',
     'stock',
     'item_card',
     'chart_of_accounts',
