@@ -847,7 +847,7 @@ $count = count($rows);
         <button type="button" class="btn-secondary" onclick="supResetForm()">اضافة مورد</button>
         <button type="button" class="btn-secondary" id="sup_open_purchase_btn">فاتورة مشتريات</button>
         <button type="button" class="btn-secondary" id="sup_open_purchase_return_btn">مردود مشتريات</button>
-        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment'), ENT_QUOTES, 'UTF-8'); ?>">سداد فواتير</a>
+        <button type="button" class="btn-secondary" id="sup_open_payment_btn">سداد فواتير</button>
         <button type="button" class="btn-secondary" id="sup_open_statement_btn">كشف حساب</button>
     </div>
 </div>
@@ -1990,7 +1990,7 @@ function supSearchModalOpen() {
 function supOpenCurrentSupplierStatement() {
     var row = supCurrentSupplierRow();
     if (!row || (parseInt(String(row.id || '0'), 10) || 0) <= 0) {
-        alert('اختر المورد أولاً من زر بحث مورد');
+        alert('اختر المورد أولاً');
         return;
     }
     var accId = parseInt(String(row.payable_account_id || '0'), 10) || 0;
@@ -2316,7 +2316,7 @@ function supSave() {
             e.preventDefault();
             var row = supCurrentSupplierRow();
             if (!row || (parseInt(String(row.id || '0'), 10) || 0) <= 0) { alert('اختر المورد أولاً'); return; }
-            window.location.href = '/admin/index.php?page=purchases_v2&supplier_id=' + encodeURIComponent(String(row.id));
+            window.location.href = '/admin/index.php?page=purchases&supplier_id=' + encodeURIComponent(String(row.id));
         });
     }
     var purchaseReturnBtn = document.getElementById('sup_open_purchase_return_btn');
@@ -2325,7 +2325,16 @@ function supSave() {
             e.preventDefault();
             var row = supCurrentSupplierRow();
             if (!row || (parseInt(String(row.id || '0'), 10) || 0) <= 0) { alert('اختر المورد أولاً'); return; }
-            window.location.href = '/admin/index.php?page=purchase_returns_v2&supplier_id=' + encodeURIComponent(String(row.id));
+            window.location.href = '/admin/index.php?page=purchase_returns&supplier_id=' + encodeURIComponent(String(row.id));
+        });
+    }
+    var paymentBtn = document.getElementById('sup_open_payment_btn');
+    if (paymentBtn) {
+        paymentBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            var row = supCurrentSupplierRow();
+            if (!row || (parseInt(String(row.id || '0'), 10) || 0) <= 0) { alert('اختر المورد أولاً'); return; }
+            window.location.href = '/admin/index.php?page=partner_supplier_payment&stmt_party_kind=supplier&stmt_party_id=' + encodeURIComponent(String(row.id));
         });
     }
     var navFirstBtn = document.getElementById('sup_nav_first');
