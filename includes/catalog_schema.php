@@ -2890,6 +2890,20 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         orange_catalog_safe_exec($pdo, 'UPDATE purchase_items SET qty_received = qty');
     }
 
+    if (orange_table_exists($pdo, 'purchase_items') && !orange_table_has_column($pdo, 'purchase_items', 'discount_raw')) {
+        orange_catalog_safe_exec($pdo, "ALTER TABLE purchase_items ADD COLUMN discount_raw VARCHAR(32) NOT NULL DEFAULT ''");
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE purchase_items ADD COLUMN discount_amount DECIMAL(18,4) NOT NULL DEFAULT 0');
+    }
+
+    if (orange_table_exists($pdo, 'purchases') && !orange_table_has_column($pdo, 'purchases', 'invoice_discount_raw')) {
+        orange_catalog_safe_exec($pdo, "ALTER TABLE purchases ADD COLUMN invoice_discount_raw VARCHAR(32) NOT NULL DEFAULT ''");
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE purchases ADD COLUMN invoice_discount_amount DECIMAL(18,4) NOT NULL DEFAULT 0');
+    }
+
+    if (orange_table_exists($pdo, 'purchases') && !orange_table_has_column($pdo, 'purchases', 'subtotal')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE purchases ADD COLUMN subtotal DECIMAL(18,4) NOT NULL DEFAULT 0');
+    }
+
     if (orange_table_exists($pdo, 'company_settings') && !orange_table_has_column($pdo, 'company_settings', 'vat_number')) {
         orange_catalog_safe_exec(
             $pdo,
