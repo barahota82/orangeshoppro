@@ -115,6 +115,81 @@ if (orange_journal_vouchers_ready($pdo)) {
 $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_settings');
 $ppvReady = $ppvCashLock !== null;
 ?>
+<style>
+.jv-search-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10060;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    direction: rtl;
+}
+.jv-search-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+}
+.jv-search-modal__panel {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: min(96vw, 58rem);
+    max-height: calc(100vh - 32px);
+    overflow: auto;
+    background: #fff;
+    border: 1px solid #e4e4e7;
+    border-radius: 10px;
+    box-shadow: 0 20px 50px rgba(0,0,0,.18);
+}
+.jv-search-modal__head {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px 16px;
+    border-bottom: 1px solid #e4e4e7;
+}
+.jv-search-modal__title { margin: 0; font-size: 1.05rem; text-align: center; }
+.jv-search-modal__body { padding: 14px 16px 18px; }
+.jv-search-modal__form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+.jv-search-modal__row--fields {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    gap: 10px;
+    width: 100%;
+    overflow-x: auto;
+    box-sizing: border-box;
+    padding-bottom: 2px;
+}
+.jv-search-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+.jv-search-field label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.jv-search-field input { width: 100%; box-sizing: border-box; }
+.jv-search-field--id { flex: 0 0 7rem; }
+.jv-search-field--date { flex: 0 0 11rem; }
+.jv-search-modal__actions { margin: 0 0 16px; }
+.jv-search-table-wrap { max-height: min(40vh, 22rem); overflow: auto; border: 1px solid #e4e4e7; border-radius: 8px; }
+.jv-search-results-table { margin: 0; font-size: 0.9rem; }
+.jv-search-results-table tbody tr { cursor: pointer; }
+.jv-search-results-table tbody tr:hover { background: #f4f4f5; }
+</style>
 <div class="page-title page-title--stacked jv-print-hide">
     <div><h1><?php echo htmlspecialchars($ppvTitle, ENT_QUOTES, 'UTF-8'); ?></h1></div>
 </div>
