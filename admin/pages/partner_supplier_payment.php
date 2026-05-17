@@ -349,11 +349,11 @@ $ppvReady = $ppvCashLock !== null;
                 <div class="jv-search-modal__row jv-search-modal__row--fields">
                     <div class="jv-search-field jv-search-field--id">
                         <label for="spay_search_id_from">رقم القيد — من</label>
-                        <input type="number" id="spay_search_id_from" class="admin-inp" min="1" step="1" dir="ltr" lang="en">
+                        <input type="number" id="spay_search_id_from" class="admin-inp" min="1" step="1" placeholder="" dir="ltr" lang="en">
                     </div>
                     <div class="jv-search-field jv-search-field--id">
                         <label for="spay_search_id_to">رقم القيد — إلى</label>
-                        <input type="number" id="spay_search_id_to" class="admin-inp" min="1" step="1" dir="ltr" lang="en">
+                        <input type="number" id="spay_search_id_to" class="admin-inp" min="1" step="1" placeholder="" dir="ltr" lang="en">
                     </div>
                     <div class="jv-search-field jv-search-field--date">
                         <label for="spay_search_date_from">تاريخ السند — من</label>
@@ -363,16 +363,33 @@ $ppvReady = $ppvCashLock !== null;
                         <label for="spay_search_date_to">تاريخ السند — إلى</label>
                         <input type="text" id="spay_search_date_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off">
                     </div>
+                    <div class="jv-search-field jv-search-field--ref">
+                        <label for="spay_search_ref">المرجع (يحتوي النص)</label>
+                        <input type="text" id="spay_search_ref" class="admin-inp" placeholder="" autocomplete="off" dir="auto">
+                    </div>
                 </div>
-                <div class="jv-search-modal__row jv-search-modal__actions">
-                    <button type="button" id="spay_search_btn">بحث</button>
-                    <button type="button" class="btn-secondary" id="spay_search_close">إغلاق</button>
+                <div class="jv-search-modal__row jv-search-modal__row--desc">
+                    <div class="jv-search-field jv-search-field--full">
+                        <label for="spay_search_desc">بيان القيد العام (يحتوي النص)</label>
+                        <input type="text" id="spay_search_desc" class="admin-inp" placeholder="" autocomplete="off" dir="auto">
+                    </div>
                 </div>
             </div>
+            <div class="actions jv-search-modal__actions">
+                <button type="button" id="spay_search_btn">تنفيذ البحث</button>
+            </div>
             <div class="jv-search-modal__results">
-                <div class="jv-search-table-wrap">
+                <div class="table-wrap jv-search-table-wrap">
                     <table class="admin-table jv-search-results-table">
-                        <thead><tr><th>رقم</th><th>التاريخ</th><th>المرجع</th><th>البيان</th><th>المبلغ</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th>رقم</th>
+                                <th>تاريخ السند</th>
+                                <th>المرجع</th>
+                                <th>البيان</th>
+                                <th>مبلغ القيد</th>
+                            </tr>
+                        </thead>
                         <tbody id="spay_search_results"></tbody>
                     </table>
                 </div>
@@ -752,16 +769,21 @@ $ppvReady = $ppvCashLock !== null;
         var idTo = parseInt(document.getElementById('spay_search_id_to').value) || 0;
         var dateFrom = orangeGetDmyValueAsIso(document.getElementById('spay_search_date_from')) || '';
         var dateTo = orangeGetDmyValueAsIso(document.getElementById('spay_search_date_to')) || '';
+        var ref = (document.getElementById('spay_search_ref').value || '').trim();
+        var desc = (document.getElementById('spay_search_desc').value || '').trim();
         var tbody = document.getElementById('spay_search_results');
         tbody.innerHTML = '<tr><td colspan="5">جاري البحث…</td></tr>';
-        postJSON('/admin/api/journal/manage.php', {
+        var payload = {
             action: 'search',
-            entry_type: 'supplier_payment',
-            id_from: idFrom > 0 ? idFrom : undefined,
-            id_to: idTo > 0 ? idTo : undefined,
-            date_from: dateFrom || undefined,
-            date_to: dateTo || undefined
-        }).then(function (r) {
+            entry_type: 'supplier_payment'
+        };
+        if (idFrom > 0) payload.id_from = idFrom;
+        if (idTo > 0) payload.id_to = idTo;
+        if (dateFrom) payload.date_from = dateFrom;
+        if (dateTo) payload.date_to = dateTo;
+        if (ref) payload.reference = ref;
+        if (desc) payload.description = desc;
+        postJSON('/admin/api/journal/manage.php', payload).then(function (r) {
             tbody.innerHTML = '';
             if (!r.success || !r.results || !r.results.length) {
                 tbody.innerHTML = '<tr><td colspan="5" class="muted">لا نتائج</td></tr>';
@@ -825,7 +847,6 @@ $ppvReady = $ppvCashLock !== null;
         document.getElementById('spay_btn_search').addEventListener('click', spaySearchOpen);
 
         document.getElementById('spay_search_btn').addEventListener('click', spaySearchRun);
-        document.getElementById('spay_search_close').addEventListener('click', spaySearchClose);
         document.getElementById('spay_search_modal_backdrop').addEventListener('click', spaySearchClose);
 
         if (SPAY_PREFILL_SUPPLIER > 0) {
