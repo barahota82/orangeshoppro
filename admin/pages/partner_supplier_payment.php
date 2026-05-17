@@ -127,7 +127,9 @@ $ppvReady = $ppvCashLock !== null;
 
 <div class="card jv-print-area">
     <h3 class="card-title"><?php echo htmlspecialchars($ppvTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
-    <div class="form-grid">
+
+    <!-- ١ — المورد + خيار الدفعة المقدمة -->
+    <div class="form-grid" style="margin-bottom:16px;">
         <div style="grid-column:1/-1;">
             <label for="spay_supplier_code">المورد</label>
             <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:10px 14px;">
@@ -136,8 +138,43 @@ $ppvReady = $ppvCashLock !== null;
             </div>
             <input type="hidden" id="spay_supplier_id" value="0">
         </div>
+        <div style="grid-column:1/-1;" class="form-check jv-print-hide">
+            <label><input type="checkbox" id="spay_advance_mode"<?php echo !$ppvReady ? ' disabled' : ''; ?>>
+                السماح بدفع يزيد عن الذمة (دفعة مقدمة للمورد)
+            </label>
+        </div>
+    </div>
 
-        <div class="jv-voucher-header-line jv-voucher-header-line--nav" style="grid-column:1/-1;">
+    <!-- ٢ — جدول الفواتير -->
+    <div id="spay_invoices_section">
+        <div class="table-wrap">
+            <table class="admin-table" id="spay_invoices_table">
+                <thead>
+                    <tr>
+                        <th>الفاتورة</th>
+                        <th>المبلغ الأصلي</th>
+                        <th>المتبقي</th>
+                        <th>مبلغ السداد</th>
+                    </tr>
+                </thead>
+                <tbody id="spay_invoices_body">
+                    <tr><td colspan="4" class="muted" style="text-align:center;padding:12px;">اختر المورد أولاً</td></tr>
+                </tbody>
+                <tfoot id="spay_invoices_foot" hidden>
+                    <tr style="font-weight:700;background:#f9fafb;border-top:2px solid #e2e8f0;">
+                        <td colspan="3">المجموع</td>
+                        <td id="spay_invoices_total" dir="ltr" lang="en">0.000</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <!-- ٣ — القيد المحاسبي -->
+    <div style="margin-top:20px;padding-top:14px;border-top:2px solid #e2e8f0;">
+        <h4 style="font-size:0.9rem;font-weight:600;color:#444;margin:0 0 10px;">القيد المحاسبي</h4>
+
+        <div class="jv-voucher-header-line jv-voucher-header-line--nav" style="margin-bottom:12px;">
             <div>
                 <label for="spay_number_preview">رقم القيد</label>
                 <input type="text" id="spay_number_preview" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;text-align:center;" value="<?php echo (int) $nextVoucherNo; ?>">
@@ -162,50 +199,47 @@ $ppvReady = $ppvCashLock !== null;
                 <label for="spay_tot_credit">مجموع الدائن</label>
                 <input type="text" id="spay_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000" dir="ltr" lang="en">
             </div>
-            <div class="jv-voucher-nav-cell jv-print-hide">
-                <div class="jv-voucher-nav-btns" role="group" aria-label="إجراءات السند">
-                    <button type="button" id="spay_btn_save"<?php echo !$ppvReady ? ' disabled' : ''; ?>>حفظ السند</button>
-                    <button type="button" class="btn-secondary" id="spay_btn_new">سند جديد</button>
-                    <button type="button" class="btn-secondary" id="spay_btn_print">طباعة</button>
-                </div>
-            </div>
         </div>
 
-        <div style="grid-column:1/-1;">
+        <div style="margin-bottom:12px;">
             <label for="spay_desc">البيان</label>
-            <input type="text" id="spay_desc" placeholder="بيان السداد"<?php echo !$ppvReady ? ' disabled' : ''; ?>>
+            <input type="text" id="spay_desc" placeholder="بيان السداد" value=""<?php echo !$ppvReady ? ' disabled' : ''; ?>>
         </div>
 
-        <div style="grid-column:1/-1;" class="form-check jv-print-hide">
-            <label><input type="checkbox" id="spay_advance_mode"<?php echo !$ppvReady ? ' disabled' : ''; ?>>
-                السماح بدفع يزيد عن الذمة (دفعة مقدمة للمورد)
-            </label>
+        <div class="admin-doc-frame">
+            <div class="table-wrap">
+                <table class="admin-table admin-doc-lines-table jv-lines-table">
+                    <colgroup>
+                        <col class="jv-col-code">
+                        <col class="jv-col-name">
+                        <col class="jv-col-amt">
+                        <col class="jv-col-amt">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>كود الحساب</th>
+                            <th>اسم الحساب</th>
+                            <th>مدين</th>
+                            <th>دائن</th>
+                        </tr>
+                    </thead>
+                    <tbody id="spay_jv_body"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
-    <div class="admin-doc-frame">
-        <div class="table-wrap">
-            <table class="admin-table admin-doc-lines-table jv-lines-table">
-                <colgroup>
-                    <col class="jv-col-code">
-                    <col class="jv-col-name">
-                    <col class="jv-col-amt">
-                    <col class="jv-col-amt">
-                </colgroup>
-                <thead>
-                    <tr>
-                        <th>كود الحساب</th>
-                        <th>اسم الحساب</th>
-                        <th>مدين</th>
-                        <th>دائن</th>
-                    </tr>
-                </thead>
-                <tbody id="spay_lines_body"></tbody>
-            </table>
+    <!-- ٤ — أزرار -->
+    <div class="actions admin-doc-lines-toolbar jv-doc-toolbar jv-print-hide" style="margin-top:16px;">
+        <div class="jv-toolbar-primary-group">
+            <button type="button" id="spay_btn_save"<?php echo !$ppvReady ? ' disabled' : ''; ?>>حفظ السند</button>
+            <button type="button" class="btn-secondary" id="spay_btn_new">سند جديد</button>
+            <button type="button" class="btn-secondary" id="spay_btn_print">طباعة</button>
         </div>
     </div>
 </div>
 
+<!-- Supplier Picker Modal -->
 <div class="gl-pick-modal jv-print-hide" id="spay_supplier_pick_modal" hidden aria-hidden="true">
     <div class="gl-pick-modal__backdrop" id="spay_supplier_pick_backdrop"></div>
     <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="spay_supplier_pick_title">
@@ -227,7 +261,7 @@ $ppvReady = $ppvCashLock !== null;
     var SPAY_PREFILL_SUPPLIER = <?php echo (int) $ppvPrefillSupplierId; ?>;
 
     var currentSupplierId = 0;
-    var currentInvoiceLines = [];
+    var currentInvoices = [];
 
     function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
@@ -237,6 +271,11 @@ $ppvReady = $ppvCashLock !== null;
             if ((parseInt(String(SPAY_SUPPLIER_PICK_ROWS[i].id || '0'), 10) || 0) === id) return SPAY_SUPPLIER_PICK_ROWS[i];
         }
         return null;
+    }
+
+    function isAdvanceMode() {
+        var cb = document.getElementById('spay_advance_mode');
+        return cb && cb.checked;
     }
 
     function selectSupplier(id) {
@@ -249,7 +288,9 @@ $ppvReady = $ppvCashLock !== null;
             if (codeEl) codeEl.value = '';
             if (nameEl) nameEl.value = '';
             if (idEl) idEl.value = '0';
-            renderLines();
+            currentInvoices = [];
+            renderInvoices();
+            renderJournal();
             return;
         }
         currentSupplierId = parseInt(String(row.id), 10) || 0;
@@ -259,41 +300,97 @@ $ppvReady = $ppvCashLock !== null;
         loadInvoices();
     }
 
-    function isAdvanceMode() {
-        var cb = document.getElementById('spay_advance_mode');
-        return cb && cb.checked;
-    }
-
     function loadInvoices() {
-        if (currentSupplierId <= 0 || isAdvanceMode()) {
-            currentInvoiceLines = [];
-            renderLines();
+        if (currentSupplierId <= 0) {
+            currentInvoices = [];
+            renderInvoices();
+            renderJournal();
             return;
         }
         postJSON('/admin/api/partners/open-items.php', { party_kind: 'supplier', party_id: currentSupplierId }).then(function (r) {
-            if (!r.success) {
-                currentInvoiceLines = [];
-                renderLines();
-                return;
+            if (!r.success) { currentInvoices = []; }
+            else {
+                currentInvoices = (r.items || []).map(function (it) {
+                    return { ref_type: it.ref_type, ref_id: it.ref_id, label: it.label, original: parseFloat(String(it.original || it.open || '0')) || 0, open: parseFloat(String(it.open || '0')) || 0, amount: 0 };
+                });
             }
-            currentInvoiceLines = (r.items || []).map(function (it) {
-                return { ref_type: it.ref_type, ref_id: it.ref_id, label: it.label, open: parseFloat(String(it.open || '0')) || 0, amount: 0 };
-            });
-            renderLines();
+            renderInvoices();
+            renderJournal();
         }).catch(function () {
-            currentInvoiceLines = [];
-            renderLines();
+            currentInvoices = [];
+            renderInvoices();
+            renderJournal();
         });
     }
 
-    function renderLines() {
-        var tb = document.getElementById('spay_lines_body');
+    function renderInvoices() {
+        var section = document.getElementById('spay_invoices_section');
+        var tbody = document.getElementById('spay_invoices_body');
+        var tfoot = document.getElementById('spay_invoices_foot');
+        if (!section || !tbody || !tfoot) return;
+
+        if (isAdvanceMode()) {
+            section.hidden = true;
+            return;
+        }
+        section.hidden = false;
+
+        if (currentSupplierId <= 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="muted" style="text-align:center;padding:12px;">اختر المورد أولاً</td></tr>';
+            tfoot.hidden = true;
+            return;
+        }
+        if (currentInvoices.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="muted" style="text-align:center;padding:12px;">لا توجد فواتير آجلة مفتوحة لهذا المورد</td></tr>';
+            tfoot.hidden = true;
+            return;
+        }
+
+        tbody.innerHTML = '';
+        tfoot.hidden = false;
+        currentInvoices.forEach(function (inv, idx) {
+            var tr = document.createElement('tr');
+            tr.innerHTML = '<td>' + esc(inv.label) + '</td>' +
+                '<td dir="ltr" lang="en">' + inv.original.toFixed(3) + '</td>' +
+                '<td dir="ltr" lang="en">' + inv.open.toFixed(3) + '</td>' +
+                '<td><input type="number" class="spay-inv-amt admin-inp-money" step="any" min="0" max="' + inv.open.toFixed(3) + '" placeholder="0.000" inputmode="decimal" lang="en" dir="ltr" data-idx="' + idx + '"></td>';
+            tbody.appendChild(tr);
+            tr.querySelector('.spay-inv-amt').addEventListener('input', function () {
+                currentInvoices[idx].amount = parseFloat(this.value) || 0;
+                updateInvoiceTotal();
+                renderJournal();
+            });
+        });
+        updateInvoiceTotal();
+    }
+
+    function updateInvoiceTotal() {
+        var total = 0;
+        currentInvoices.forEach(function (inv) { total += inv.amount; });
+        var el = document.getElementById('spay_invoices_total');
+        if (el) el.textContent = total.toFixed(3);
+    }
+
+    function getTotal() {
+        if (isAdvanceMode()) {
+            var inp = document.querySelector('#spay_jv_body [data-spay-advance="1"] .spay-adv-amt');
+            return parseFloat(inp ? inp.value : '0') || 0;
+        }
+        var t = 0;
+        currentInvoices.forEach(function (inv) { t += inv.amount; });
+        return t;
+    }
+
+    function renderJournal() {
+        var tb = document.getElementById('spay_jv_body');
         if (!tb || !SPAY_READY || !SPAY_CASH) return;
         tb.innerHTML = '';
 
         var map = SPAY_SUPPLIER_PAYABLE[String(currentSupplierId)] || { id: 0, code: '', name: '' };
         var accCode = map.code || '';
         var accName = map.name || '';
+        var supplierRow = supplierById(currentSupplierId);
+        var supplierName = supplierRow ? supplierRow.name : '';
 
         if (isAdvanceMode()) {
             var tr = document.createElement('tr');
@@ -301,57 +398,43 @@ $ppvReady = $ppvCashLock !== null;
             tr.setAttribute('data-spay-advance', '1');
             tr.innerHTML = '<td><input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="' + esc(accCode) + '" readonly tabindex="-1"></td>' +
                 '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + esc(accName) + '" readonly tabindex="-1"></td>' +
-                '<td><input type="number" class="spay-amt admin-inp-money" step="any" min="0" placeholder="مبلغ الدفعة" inputmode="decimal" lang="en" dir="ltr"></td>' +
+                '<td><input type="number" class="spay-adv-amt admin-inp-money" step="any" min="0" placeholder="مبلغ الدفعة" inputmode="decimal" lang="en" dir="ltr"></td>' +
                 '<td><input type="number" class="admin-inp-money" value="0.000" readonly tabindex="-1" dir="ltr" lang="en"></td>';
             tb.appendChild(tr);
-            tr.querySelector('.spay-amt').addEventListener('input', recalc);
+            tr.querySelector('.spay-adv-amt').addEventListener('input', function () { recalcTotals(); });
         } else {
-            currentInvoiceLines.forEach(function (inv, idx) {
+            currentInvoices.forEach(function (inv) {
+                if (inv.amount <= 0) return;
                 var tr = document.createElement('tr');
                 tr.className = 'jv-line-main';
-                tr.setAttribute('data-ref-type', inv.ref_type);
-                tr.setAttribute('data-ref-id', String(inv.ref_id));
                 tr.innerHTML = '<td><input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="' + esc(accCode) + '" readonly tabindex="-1"></td>' +
-                    '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + esc(accName + ' — ' + inv.label + ' (متبقي ' + inv.open.toFixed(3) + ')') + '" readonly tabindex="-1"></td>' +
-                    '<td><input type="number" class="spay-amt admin-inp-money" step="any" min="0" max="' + inv.open.toFixed(3) + '" placeholder="0.000" inputmode="decimal" lang="en" dir="ltr" data-idx="' + idx + '"></td>' +
+                    '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + esc(supplierName + ' — ' + inv.label) + '" readonly tabindex="-1"></td>' +
+                    '<td><input type="number" class="admin-inp-money" value="' + inv.amount.toFixed(3) + '" readonly tabindex="-1" dir="ltr" lang="en"></td>' +
                     '<td><input type="number" class="admin-inp-money" value="0.000" readonly tabindex="-1" dir="ltr" lang="en"></td>';
                 tb.appendChild(tr);
-                tr.querySelector('.spay-amt').addEventListener('input', function () {
-                    var v = parseFloat(this.value) || 0;
-                    currentInvoiceLines[idx].amount = v;
-                    recalc();
-                });
             });
-            if (currentInvoiceLines.length === 0 && currentSupplierId > 0) {
-                var emptyTr = document.createElement('tr');
-                emptyTr.innerHTML = '<td colspan="4" class="muted" style="text-align:center;padding:12px;">لا توجد فواتير آجلة مفتوحة لهذا المورد</td>';
-                tb.appendChild(emptyTr);
-            }
         }
 
+        var total = getTotal();
         var cashTr = document.createElement('tr');
         cashTr.className = 'jv-line-main jv-line-cash-locked';
         cashTr.innerHTML = '<td><input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="' + esc(SPAY_CASH.code || '') + '" readonly tabindex="-1"></td>' +
             '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + esc(SPAY_CASH.name || '') + '" readonly tabindex="-1"></td>' +
             '<td><input type="number" class="admin-inp-money" value="0.000" readonly tabindex="-1" dir="ltr" lang="en"></td>' +
-            '<td><input type="number" class="spay-cash-credit admin-inp-money" value="0.000" readonly tabindex="-1" dir="ltr" lang="en"></td>';
+            '<td><input type="number" class="admin-inp-money" value="' + total.toFixed(3) + '" readonly tabindex="-1" dir="ltr" lang="en"></td>';
         tb.appendChild(cashTr);
-        recalc();
+        recalcTotals();
     }
 
-    function recalc() {
-        var total = 0;
-        document.querySelectorAll('#spay_lines_body .spay-amt').forEach(function (inp) {
-            total += parseFloat(inp.value) || 0;
-        });
-        var cashEl = document.querySelector('#spay_lines_body .spay-cash-credit');
-        if (cashEl) cashEl.value = total.toFixed(3);
+    function recalcTotals() {
+        var total = getTotal();
         var dEl = document.getElementById('spay_tot_debit');
         var cEl = document.getElementById('spay_tot_credit');
         if (dEl) dEl.value = total.toFixed(3);
         if (cEl) cEl.value = total.toFixed(3);
     }
 
+    // Picker
     function pickerOpen() {
         var modal = document.getElementById('spay_supplier_pick_modal');
         var qEl = document.getElementById('spay_supplier_pick_q');
@@ -393,6 +476,7 @@ $ppvReady = $ppvCashLock !== null;
         });
     }
 
+    // Save
     function save() {
         if (!SPAY_CASH || !SPAY_CASH.id) return;
         var sid = currentSupplierId;
@@ -405,11 +489,11 @@ $ppvReady = $ppvCashLock !== null;
         var allocations = [];
 
         if (advance) {
-            var advInp = document.querySelector('#spay_lines_body [data-spay-advance="1"] .spay-amt');
+            var advInp = document.querySelector('#spay_jv_body [data-spay-advance="1"] .spay-adv-amt');
             totalAmt = parseFloat(advInp ? advInp.value : '0') || 0;
             if (totalAmt <= 0) { alert('أدخل مبلغ الدفعة المقدمة'); return; }
         } else {
-            currentInvoiceLines.forEach(function (inv) {
+            currentInvoices.forEach(function (inv) {
                 if (inv.amount > 0) {
                     totalAmt += inv.amount;
                     allocations.push({ ref_type: inv.ref_type, ref_id: inv.ref_id, amount: inv.amount });
@@ -436,6 +520,7 @@ $ppvReady = $ppvCashLock !== null;
         }).catch(function (e) { alert(e.message || String(e)); });
     }
 
+    // Init
     function init() {
         var codeEl = document.getElementById('spay_supplier_code');
         if (codeEl) {
@@ -456,7 +541,8 @@ $ppvReady = $ppvCashLock !== null;
         }
 
         document.getElementById('spay_advance_mode').addEventListener('change', function () {
-            renderLines();
+            renderInvoices();
+            renderJournal();
         });
 
         document.getElementById('spay_btn_save').addEventListener('click', save);
@@ -466,7 +552,8 @@ $ppvReady = $ppvCashLock !== null;
         if (SPAY_PREFILL_SUPPLIER > 0) {
             selectSupplier(SPAY_PREFILL_SUPPLIER);
         } else {
-            renderLines();
+            renderInvoices();
+            renderJournal();
         }
     }
 
