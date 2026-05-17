@@ -253,14 +253,14 @@ try {
                 'date' => $now,
                 'account_debit' => $glB['debit'],
                 'account_credit' => $glB['credit'],
-                'amount' => $computedTotal,
+                'amount' => $netTotal,
                 'reference' => $purRef,
                 'description' => $glB['voucher_description'],
                 'entry_type' => 'purchase',
             ]);
 
             if ($glB['legacy_ap_subledger']) {
-                orange_purchase_record_ap_subledger($pdo, $purchaseId, $supplierId, $type, $computedTotal);
+                orange_purchase_record_ap_subledger($pdo, $purchaseId, $supplierId, $type, $netTotal);
             }
         }
     }
