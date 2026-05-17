@@ -2072,7 +2072,6 @@ function supEdit(row) {
                 code: row.payable_account_code || '',
                 name: row.payable_account_name || row.payable_account_label || ('#' + String(pId))
             });
-            alert('حساب الذمة الحالي غير ضمن قائمة الخصوم — راجع الدليل أو اختر حساباً صالحاً');
         }
     } else {
         supPayableSetAccount(null);
