@@ -5,7 +5,6 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/party_subledger.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
-require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/storefront_phone_country_select.php';
 require_once __DIR__ . '/../../includes/delivery_areas.php';
 
@@ -27,37 +26,10 @@ if (orange_table_exists($pdo, 'accounts')) {
     $leafAccountOptions = $pdo->query(
         'SELECT a.id, a.code, a.name FROM accounts a WHERE ' . $lw . ' ORDER BY COALESCE(a.code, \'\'), a.name'
     )->fetchAll(PDO::FETCH_ASSOC) ?: [];
-
-    $apParentId = orange_gl_supplier_parent_account_id($pdo);
-    if ($apParentId !== null && $apParentId > 0 && orange_table_has_column($pdo, 'accounts', 'parent_id')) {
-        $apDescendantIds = [$apParentId];
-        for ($depth = 0; $depth < 10; ++$depth) {
-            $placeholders = implode(',', array_fill(0, count($apDescendantIds), '?'));
-            $chSt = $pdo->prepare(
-                "SELECT id FROM accounts WHERE parent_id IN ($placeholders) AND id NOT IN ($placeholders)"
-            );
-            $chSt->execute(array_merge($apDescendantIds, $apDescendantIds));
-            $newIds = $chSt->fetchAll(PDO::FETCH_COLUMN) ?: [];
-            if ($newIds === []) {
-                break;
-            }
-            foreach ($newIds as $nid) {
-                $apDescendantIds[] = (int) $nid;
-            }
-        }
-        $apDescendantSet = array_flip($apDescendantIds);
-        foreach ($leafAccountOptions as $a) {
-            $aid = (int) $a['id'];
-            if (isset($apDescendantSet[$aid]) && $aid !== $apParentId) {
-                $supplierPayablePickAccounts[] = $a;
-            }
-        }
-    } else {
-        foreach ($leafAccountOptions as $a) {
-            $aid = (int) $a['id'];
-            if (orange_accounts_account_bs_role($pdo, $aid) === 'liability') {
-                $supplierPayablePickAccounts[] = $a;
-            }
+    foreach ($leafAccountOptions as $a) {
+        $aid = (int) $a['id'];
+        if (orange_accounts_account_pl_role($pdo, $aid) === 'liability') {
+            $supplierPayablePickAccounts[] = $a;
         }
     }
 }
@@ -873,9 +845,9 @@ $count = count($rows);
     <div class="actions admin-actions--start" style="margin-top:12px;">
         <button type="button" onclick="supSave()">حفظ</button>
         <button type="button" class="btn-secondary" onclick="supResetForm()">اضافة مورد</button>
-        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchase_returns'), ENT_QUOTES, 'UTF-8'); ?>">مردود مشتريات</a>
-        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=purchases'), ENT_QUOTES, 'UTF-8'); ?>">فاتورة مشتريات</a>
-        <button type="button" class="btn-secondary" id="sup_open_payment_btn">سداد فواتير</button>
+        <button type="button" class="btn-secondary" id="sup_open_purchase_btn">فاتورة مشتريات</button>
+        <button type="button" class="btn-secondary" id="sup_open_purchase_return_btn">مردود مشتريات</button>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_supplier_payment'), ENT_QUOTES, 'UTF-8'); ?>">سداد فواتير</a>
         <button type="button" class="btn-secondary" id="sup_open_statement_btn">كشف حساب</button>
     </div>
 </div>
@@ -2028,15 +2000,6 @@ function supOpenCurrentSupplierStatement() {
     }
     window.location.href = SUP_PARTNER_STATEMENT_URL + '&account=' + encodeURIComponent(String(accId));
 }
-function supOpenCurrentSupplierPayment() {
-    var row = supCurrentSupplierRow();
-    if (!row || (parseInt(String(row.id || '0'), 10) || 0) <= 0) {
-        alert('اختر المورد أولاً');
-        return;
-    }
-    var sid = parseInt(String(row.id || '0'), 10) || 0;
-    window.location.href = '/admin/index.php?page=partner_supplier_payment&stmt_party_kind=supplier&stmt_party_id=' + encodeURIComponent(String(sid));
-}
 function supEdit(row) {
     document.getElementById('sup_id').value = String(row.id || 0);
     document.getElementById('sup_code').value = row.code || '';
@@ -2348,11 +2311,22 @@ function supSave() {
             supOpenCurrentSupplierStatement();
         });
     }
-    var paymentBtn = document.getElementById('sup_open_payment_btn');
-    if (paymentBtn) {
-        paymentBtn.addEventListener('click', function (e) {
+    var purchaseBtn = document.getElementById('sup_open_purchase_btn');
+    if (purchaseBtn) {
+        purchaseBtn.addEventListener('click', function (e) {
             e.preventDefault();
-            supOpenCurrentSupplierPayment();
+            var row = supCurrentSupplierRow();
+            if (!row || (parseInt(String(row.id || '0'), 10) || 0) <= 0) { alert('اختر المورد أولاً'); return; }
+            window.location.href = '/admin/index.php?page=purchases_v2&supplier_id=' + encodeURIComponent(String(row.id));
+        });
+    }
+    var purchaseReturnBtn = document.getElementById('sup_open_purchase_return_btn');
+    if (purchaseReturnBtn) {
+        purchaseReturnBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            var row = supCurrentSupplierRow();
+            if (!row || (parseInt(String(row.id || '0'), 10) || 0) <= 0) { alert('اختر المورد أولاً'); return; }
+            window.location.href = '/admin/index.php?page=purchase_returns_v2&supplier_id=' + encodeURIComponent(String(row.id));
         });
     }
     var navFirstBtn = document.getElementById('sup_nav_first');

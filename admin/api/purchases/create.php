@@ -55,18 +55,75 @@ try {
 
     $pdo->beginTransaction();
 
+    $hasPiDiscount = orange_table_has_column($pdo, 'purchase_items', 'discount_raw');
+    $hasInvDiscount = orange_table_has_column($pdo, 'purchases', 'invoice_discount_raw');
+    $hasSubtotal = orange_table_has_column($pdo, 'purchases', 'subtotal');
+
     $computedTotal = 0.0;
-    foreach ($items as $item) {
+    foreach ($items as &$item) {
         $qty = (int)($item['qty'] ?? 0);
         $cost = (float)($item['cost'] ?? 0);
         if ($qty <= 0 || $cost < 0) {
             throw new RuntimeException('عنصر شراء غير صالح');
         }
-        $computedTotal += ($qty * $cost);
+        $lineGross = $qty * $cost;
+        $discountRaw = trim((string)($item['discount_raw'] ?? ''));
+        $discountAmt = 0.0;
+        if ($discountRaw !== '') {
+            if (str_ends_with($discountRaw, '%')) {
+                $pct = (float) rtrim($discountRaw, '%');
+                $discountAmt = round($lineGross * $pct / 100, 4);
+            } else {
+                $discountAmt = round((float) $discountRaw, 4);
+            }
+            if ($discountAmt < 0) {
+                $discountAmt = 0.0;
+            }
+            if ($discountAmt > $lineGross) {
+                $discountAmt = $lineGross;
+            }
+        }
+        $item['_discount_raw'] = $discountRaw;
+        $item['_discount_amount'] = $discountAmt;
+        $computedTotal += ($lineGross - $discountAmt);
     }
+    unset($item);
 
-    $stmt = $pdo->prepare("INSERT INTO purchases (supplier_id, total, type, notes) VALUES (?, ?, ?, ?)");
-    $stmt->execute([$supplierId > 0 ? $supplierId : null, $computedTotal, $type, $notes]);
+    $subtotal = $computedTotal;
+    $invoiceDiscountRaw = trim((string)($data['invoice_discount_raw'] ?? ''));
+    $invoiceDiscountAmt = 0.0;
+    if ($invoiceDiscountRaw !== '') {
+        if (str_ends_with($invoiceDiscountRaw, '%')) {
+            $pct = (float) rtrim($invoiceDiscountRaw, '%');
+            $invoiceDiscountAmt = round($subtotal * $pct / 100, 4);
+        } else {
+            $invoiceDiscountAmt = round((float) $invoiceDiscountRaw, 4);
+        }
+        if ($invoiceDiscountAmt < 0) {
+            $invoiceDiscountAmt = 0.0;
+        }
+        if ($invoiceDiscountAmt > $subtotal) {
+            $invoiceDiscountAmt = $subtotal;
+        }
+    }
+    $netTotal = $subtotal - $invoiceDiscountAmt;
+
+    $insertCols = 'supplier_id, total, type, notes';
+    $insertPlaceholders = '?, ?, ?, ?';
+    $insertValues = [$supplierId > 0 ? $supplierId : null, $netTotal, $type, $notes];
+    if ($hasSubtotal) {
+        $insertCols .= ', subtotal';
+        $insertPlaceholders .= ', ?';
+        $insertValues[] = $subtotal;
+    }
+    if ($hasInvDiscount) {
+        $insertCols .= ', invoice_discount_raw, invoice_discount_amount';
+        $insertPlaceholders .= ', ?, ?';
+        $insertValues[] = $invoiceDiscountRaw;
+        $insertValues[] = $invoiceDiscountAmt;
+    }
+    $stmt = $pdo->prepare("INSERT INTO purchases ($insertCols) VALUES ($insertPlaceholders)");
+    $stmt->execute($insertValues);
     $purchaseId = (int)$pdo->lastInsertId();
 
     $hasPiVariant = orange_table_has_column($pdo, 'purchase_items', 'variant_id');
@@ -86,27 +143,55 @@ try {
             (int)($item['variant_id'] ?? 0)
         );
 
+        $lineDiscRaw = (string)($item['_discount_raw'] ?? '');
+        $lineDiscAmt = (float)($item['_discount_amount'] ?? 0);
+
         if ($hasPiVariant && $hasPiQtyReceived) {
-            $pdo->prepare(
-                'INSERT INTO purchase_items (purchase_id, product_id, variant_id, qty, qty_received, cost) VALUES (?, ?, ?, ?, ?, ?)'
-            )->execute([$purchaseId, $productId, $variantId, $qty, $qty, $cost]);
+            $sql = 'INSERT INTO purchase_items (purchase_id, product_id, variant_id, qty, qty_received, cost';
+            $vals = [$purchaseId, $productId, $variantId, $qty, $qty, $cost];
+            if ($hasPiDiscount) {
+                $sql .= ', discount_raw, discount_amount';
+                $vals[] = $lineDiscRaw;
+                $vals[] = $lineDiscAmt;
+            }
+            $sql .= ') VALUES (' . implode(',', array_fill(0, count($vals), '?')) . ')';
+            $pdo->prepare($sql)->execute($vals);
             $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ? AND product_id = ?')
                 ->execute([$qty, $variantId, $productId]);
         } elseif ($hasPiVariant) {
-            $pdo->prepare(
-                'INSERT INTO purchase_items (purchase_id, product_id, variant_id, qty, cost) VALUES (?, ?, ?, ?, ?)'
-            )->execute([$purchaseId, $productId, $variantId, $qty, $cost]);
+            $sql = 'INSERT INTO purchase_items (purchase_id, product_id, variant_id, qty, cost';
+            $vals = [$purchaseId, $productId, $variantId, $qty, $cost];
+            if ($hasPiDiscount) {
+                $sql .= ', discount_raw, discount_amount';
+                $vals[] = $lineDiscRaw;
+                $vals[] = $lineDiscAmt;
+            }
+            $sql .= ') VALUES (' . implode(',', array_fill(0, count($vals), '?')) . ')';
+            $pdo->prepare($sql)->execute($vals);
             $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ?')
                 ->execute([$qty, $variantId]);
         } elseif ($hasPiQtyReceived) {
-            $pdo->prepare(
-                'INSERT INTO purchase_items (purchase_id, product_id, qty, qty_received, cost) VALUES (?, ?, ?, ?, ?)'
-            )->execute([$purchaseId, $productId, $qty, $qty, $cost]);
+            $sql = 'INSERT INTO purchase_items (purchase_id, product_id, qty, qty_received, cost';
+            $vals = [$purchaseId, $productId, $qty, $qty, $cost];
+            if ($hasPiDiscount) {
+                $sql .= ', discount_raw, discount_amount';
+                $vals[] = $lineDiscRaw;
+                $vals[] = $lineDiscAmt;
+            }
+            $sql .= ') VALUES (' . implode(',', array_fill(0, count($vals), '?')) . ')';
+            $pdo->prepare($sql)->execute($vals);
             $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ? AND product_id = ?')
                 ->execute([$qty, $variantId, $productId]);
         } else {
-            $pdo->prepare("INSERT INTO purchase_items (purchase_id, product_id, qty, cost) VALUES (?, ?, ?, ?)")
-                ->execute([$purchaseId, $productId, $qty, $cost]);
+            $sql = 'INSERT INTO purchase_items (purchase_id, product_id, qty, cost';
+            $vals = [$purchaseId, $productId, $qty, $cost];
+            if ($hasPiDiscount) {
+                $sql .= ', discount_raw, discount_amount';
+                $vals[] = $lineDiscRaw;
+                $vals[] = $lineDiscAmt;
+            }
+            $sql .= ') VALUES (' . implode(',', array_fill(0, count($vals), '?')) . ')';
+            $pdo->prepare($sql)->execute($vals);
             $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ?')
                 ->execute([$qty, $variantId]);
         }
@@ -117,7 +202,7 @@ try {
         $type,
         $supplierId,
         $purchaseId,
-        $computedTotal
+        $netTotal
     );
 
     $purRef = 'PUR-' . $purchaseId;
