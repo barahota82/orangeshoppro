@@ -549,7 +549,7 @@ $ppvReady = $ppvCashLock !== null;
             tr.innerHTML = '<td><input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="' + esc(accCode) + '" readonly tabindex="-1"></td>' +
                 '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + esc(accName) + '" readonly tabindex="-1"></td>' +
                 '<td><input type="number" class="spay-adv-amt admin-inp-money" step="any" min="0" placeholder="مبلغ الدفعة" inputmode="decimal" lang="en" dir="ltr"></td>' +
-                '<td><input type="text" class="admin-inp-money" value="0.000" readonly tabindex="-1" dir="ltr" lang="en"></td>';
+                '<td><input type="text" class="admin-inp-money" value="0.000" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>';
             tb.appendChild(tr);
             tr.querySelector('.spay-adv-amt').addEventListener('input', function () { recalcTotals(); });
         } else {
@@ -559,8 +559,8 @@ $ppvReady = $ppvCashLock !== null;
                 tr.className = 'jv-line-main';
                 tr.innerHTML = '<td><input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="' + esc(accCode) + '" readonly tabindex="-1"></td>' +
                     '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + esc(supplierName + ' — ' + inv.label) + '" readonly tabindex="-1"></td>' +
-                    '<td><input type="text" class="admin-inp-money" value="' + inv.amount.toFixed(3) + '" readonly tabindex="-1" dir="ltr" lang="en"></td>' +
-                    '<td><input type="text" class="admin-inp-money" value="0.000" readonly tabindex="-1" dir="ltr" lang="en"></td>';
+                    '<td><input type="text" class="admin-inp-money" value="' + inv.amount.toFixed(3) + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>' +
+                    '<td><input type="text" class="admin-inp-money" value="0.000" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>';
                 tb.appendChild(tr);
             });
         }
@@ -570,8 +570,8 @@ $ppvReady = $ppvCashLock !== null;
         cashTr.className = 'jv-line-main jv-line-cash-locked';
         cashTr.innerHTML = '<td><input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="' + esc(SPAY_CASH.code || '') + '" readonly tabindex="-1"></td>' +
             '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + esc(SPAY_CASH.name || '') + '" readonly tabindex="-1"></td>' +
-            '<td><input type="text" class="admin-inp-money" value="0.000" readonly tabindex="-1" dir="ltr" lang="en"></td>' +
-            '<td><input type="text" class="admin-inp-money" value="' + total.toFixed(3) + '" readonly tabindex="-1" dir="ltr" lang="en"></td>';
+            '<td><input type="text" class="admin-inp-money" value="0.000" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>' +
+            '<td><input type="text" class="admin-inp-money" value="' + total.toFixed(3) + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>';
         tb.appendChild(cashTr);
         recalcTotals();
     }
@@ -743,8 +743,8 @@ $ppvReady = $ppvCashLock !== null;
                 var c = parseFloat(String(l.credit || '0')) || 0;
                 tr.innerHTML = '<td><input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="' + esc(accCode) + '" readonly tabindex="-1"></td>' +
                     '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + esc(accName + (l.memo ? ' — ' + l.memo : '')) + '" readonly tabindex="-1"></td>' +
-                    '<td><input type="text" class="admin-inp-money" value="' + (d > 0 ? d.toFixed(3) : '0.000') + '" readonly tabindex="-1" dir="ltr" lang="en"></td>' +
-                    '<td><input type="text" class="admin-inp-money" value="' + (c > 0 ? c.toFixed(3) : '0.000') + '" readonly tabindex="-1" dir="ltr" lang="en"></td>';
+                    '<td><input type="text" class="admin-inp-money" value="' + (d > 0 ? d.toFixed(3) : '0.000') + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>' +
+                    '<td><input type="text" class="admin-inp-money" value="' + (c > 0 ? c.toFixed(3) : '0.000') + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>';
                 tb.appendChild(tr);
             });
         }
