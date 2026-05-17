@@ -19,7 +19,7 @@ orange_catalog_ensure_schema($pdo);
 
 $ppvIsReceipt = $ppvKind === 'customer_receipt';
 $ppvTitle = $ppvIsReceipt ? 'سداد فواتير مبيعات آجلة' : 'سداد فواتير مشتريات آجلة';
-$ppvCardTitle = $ppvIsReceipt ? 'سداد فواتير مبيعات آجلة (خزينة ↔ عملاء آجل)' : 'سداد فواتير مشتريات آجلة (ذمة مورد ↔ خزينة)';
+$ppvCardTitle = $ppvIsReceipt ? 'سداد فواتير مبيعات آجلة (خزينة ↔ عملاء آجل)' : 'سداد فواتير مشتريات آجلة';
 $ppvApiUrl = $ppvIsReceipt
     ? '/admin/api/partners/customer-receipt.php'
     : '/admin/api/partners/supplier-payment.php';
