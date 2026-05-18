@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/phone_validation.php';
+require_once __DIR__ . '/../../../includes/delivery_areas.php';
 require_admin_api();
 
 /**
@@ -57,6 +58,7 @@ try {
     $hasEmail = orange_table_has_column($pdo, 'customers', 'email');
     $hasPhoneCountryDial = orange_table_has_column($pdo, 'customers', 'phone_country_dial');
     $hasPhoneNational = orange_table_has_column($pdo, 'customers', 'phone_national');
+    $hasDeliveryArea = orange_table_has_column($pdo, 'customers', 'delivery_area_id');
     $codeSql = orange_customer_normalize_code($pdo, $data['code'] ?? '');
     $phoneDialSql = null;
     $phoneNationalSql = null;
@@ -70,6 +72,25 @@ try {
 
     $area = trim((string) ($data['area'] ?? ''));
     $area = function_exists('mb_substr') ? mb_substr($area, 0, 255, 'UTF-8') : substr($area, 0, 255);
+    $deliveryAreaIdSql = null;
+    if ($hasDeliveryArea && array_key_exists('delivery_area_id', $data) && $data['delivery_area_id'] !== null && $data['delivery_area_id'] !== '') {
+        $daIdRaw = (int) $data['delivery_area_id'];
+        if ($daIdRaw > 0) {
+            $daExists = $pdo->prepare('SELECT id, name_ar, name_en FROM delivery_areas WHERE id = ? LIMIT 1');
+            $daExists->execute([$daIdRaw]);
+            $daRowSql = $daExists->fetch(PDO::FETCH_ASSOC);
+            if (!$daRowSql) {
+                json_response(['success' => false, 'message' => 'منطقة التوصيل غير موجودة'], 422);
+            }
+            $deliveryAreaIdSql = $daIdRaw;
+            if ($area === '') {
+                $area = trim((string) ($daRowSql['name_ar'] ?? ''));
+                if ($area === '') {
+                    $area = trim((string) ($daRowSql['name_en'] ?? ''));
+                }
+            }
+        }
+    }
     $address = trim((string) ($data['address'] ?? ''));
     $address = function_exists('mb_substr') ? mb_substr($address, 0, 2000, 'UTF-8') : substr($address, 0, 2000);
     $emailIn = trim((string) ($data['email'] ?? ''));
@@ -137,6 +158,10 @@ try {
             $fields[] = 'area = ?';
             $params[] = $area;
         }
+        if ($hasDeliveryArea) {
+            $fields[] = 'delivery_area_id = ?';
+            $params[] = $deliveryAreaIdSql;
+        }
         if ($hasAddress) {
             $fields[] = 'address = ?';
             $params[] = $address;
@@ -185,6 +210,10 @@ try {
             $fields[] = 'area = ?';
             $params[] = $area;
         }
+        if ($hasDeliveryArea) {
+            $fields[] = 'delivery_area_id = ?';
+            $params[] = $deliveryAreaIdSql;
+        }
         if ($hasAddress) {
             $fields[] = 'address = ?';
             $params[] = $address;
@@ -231,6 +260,11 @@ try {
         $cols[] = 'area';
         $placeholders[] = '?';
         $params[] = $area;
+    }
+    if ($hasDeliveryArea) {
+        $cols[] = 'delivery_area_id';
+        $placeholders[] = '?';
+        $params[] = $deliveryAreaIdSql;
     }
     if ($hasAddress) {
         $cols[] = 'address';

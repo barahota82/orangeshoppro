@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 36);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 37);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -2541,6 +2541,16 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             'ALTER TABLE customers ADD COLUMN phone_national VARCHAR(32) NULL DEFAULT NULL AFTER phone_country_dial'
         );
     }
+    if (orange_table_exists($pdo, 'customers') && !orange_table_has_column($pdo, 'customers', 'delivery_area_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE customers ADD COLUMN delivery_area_id INT UNSIGNED NULL DEFAULT NULL AFTER area'
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE INDEX idx_customers_delivery_area ON customers (delivery_area_id)'
+        );
+    }
 
     orange_catalog_ensure_suppliers_schema($pdo);
 
@@ -3321,6 +3331,16 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         orange_catalog_safe_exec(
             $pdo,
             'ALTER TABLE storefront_accounts ADD COLUMN customer_notes TEXT NULL DEFAULT NULL'
+        );
+    }
+    if (orange_table_exists($pdo, 'storefront_accounts') && !orange_table_has_column($pdo, 'storefront_accounts', 'customer_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE storefront_accounts ADD COLUMN customer_id INT NULL DEFAULT NULL'
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE INDEX idx_storefront_accounts_customer ON storefront_accounts (customer_id)'
         );
     }
 

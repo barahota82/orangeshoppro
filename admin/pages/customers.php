@@ -6,9 +6,21 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/party_subledger.php';
 require_once __DIR__ . '/../../includes/storefront_phone_country_select.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
+require_once __DIR__ . '/../../includes/delivery_areas.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+
+$adminDeliveryAreas = orange_delivery_areas_admin_list($pdo);
+$hasCustomerDaCol = orange_table_exists($pdo, 'customers') && orange_table_has_column($pdo, 'customers', 'delivery_area_id');
+
+$adminDaIndex = [];
+foreach ($adminDeliveryAreas as $da) {
+    $daId = (int) ($da['id'] ?? 0);
+    if ($daId > 0) {
+        $adminDaIndex[$daId] = $da;
+    }
+}
 
 $rows = [];
 $totalBalance = 0.0;
@@ -83,7 +95,34 @@ $count = count($rows);
         </div>
         <div>
             <label for="cust_area">المنطقة</label>
-            <input type="text" id="cust_area" maxlength="255" autocomplete="off" placeholder="المنطقة">
+            <?php if ($hasCustomerDaCol && $adminDeliveryAreas !== []): ?>
+                <select id="cust_area" autocomplete="off">
+                    <option value="">— اختر منطقة —</option>
+                    <?php foreach ($adminDeliveryAreas as $da):
+                        $daId = (int) ($da['id'] ?? 0);
+                        if ($daId <= 0) {
+                            continue;
+                        }
+                        $daName = trim((string) ($da['name_ar'] ?? ''));
+                        if ($daName === '') {
+                            $daName = trim((string) ($da['name_en'] ?? ''));
+                        }
+                        $daActive = (int) ($da['is_active'] ?? 0) === 1;
+                        $label = $daName !== '' ? $daName : ('#' . $daId);
+                        if (!$daActive) {
+                            $label .= ' (معطّلة)';
+                        }
+                        ?>
+                        <option value="<?php echo $daId; ?>" data-name="<?php echo htmlspecialchars($daName, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="card-hint" style="margin:6px 0 0;">القائمة من «مناطق التوصيل». لإضافة منطقة افتح <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=delivery_areas'), ENT_QUOTES, 'UTF-8'); ?>">مناطق التوصيل</a>.</p>
+            <?php else: ?>
+                <input type="text" id="cust_area" maxlength="255" autocomplete="off" placeholder="المنطقة">
+                <?php if ($hasCustomerDaCol): ?>
+                    <p class="card-hint" style="margin:6px 0 0;color:#b45309;">لا توجد مناطق توصيل بعد — أضف منطقة من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=delivery_areas'), ENT_QUOTES, 'UTF-8'); ?>">مناطق التوصيل</a> حتى تظهر القائمة هنا.</p>
+                <?php endif; ?>
+            <?php endif; ?>
         </div>
         <div style="grid-column:1/-1;">
             <label for="cust_address">العنوان</label>
@@ -139,7 +178,18 @@ $count = count($rows);
                         $lim = isset($c['credit_limit']) && $c['credit_limit'] !== null && (float) $c['credit_limit'] > 0
                             ? number_format((float) $c['credit_limit'], 3) : '—';
                         $codeDisp = (string) ($c['code'] ?? '');
+                        $custDaId = $hasCustomerDaCol && isset($c['delivery_area_id']) ? (int) $c['delivery_area_id'] : 0;
                         $areaDisp = (string) ($c['area'] ?? '');
+                        if ($custDaId > 0 && isset($adminDaIndex[$custDaId])) {
+                            $daRow = $adminDaIndex[$custDaId];
+                            $daName = trim((string) ($daRow['name_ar'] ?? ''));
+                            if ($daName === '') {
+                                $daName = trim((string) ($daRow['name_en'] ?? ''));
+                            }
+                            if ($daName !== '') {
+                                $areaDisp = $daName;
+                            }
+                        }
                         $emailDisp = (string) ($c['email'] ?? '');
                         $hayRaw = trim(
                             (string) ($c['name_ar'] ?? '')
@@ -173,7 +223,8 @@ $count = count($rows);
                                     'code' => $codeDisp,
                                     'name_ar' => (string) ($c['name_ar'] ?? ''),
                                     'phone' => (string) ($c['phone'] ?? ''),
-                                    'area' => $areaDisp,
+                                    'area' => (string) ($c['area'] ?? ''),
+                                    'delivery_area_id' => $custDaId > 0 ? $custDaId : null,
                                     'address' => (string) ($c['address'] ?? ''),
                                     'email' => $emailDisp,
                                     'credit_limit' => $c['credit_limit'] ?? null,
@@ -222,6 +273,13 @@ function custSplitPhoneForForm(stored) {
     }
     return { country: '__intl__', phone: norm.charAt(0) === '+' ? norm.slice(1) : norm };
 }
+function custAreaEl() {
+    return document.getElementById('cust_area');
+}
+function custAreaIsSelect() {
+    var el = custAreaEl();
+    return !!(el && el.tagName === 'SELECT');
+}
 function custResetForm() {
     document.getElementById('cust_id').value = '0';
     document.getElementById('cust_code').value = '';
@@ -232,7 +290,10 @@ function custResetForm() {
         cc.value = '__intl__';
     }
     document.getElementById('cust_email').value = '';
-    document.getElementById('cust_area').value = '';
+    var areaEl = custAreaEl();
+    if (areaEl) {
+        areaEl.value = '';
+    }
     document.getElementById('cust_address').value = '';
     document.getElementById('cust_limit').value = '';
     document.getElementById('cust_notes').value = '';
@@ -248,7 +309,18 @@ function custEdit(row) {
     }
     document.getElementById('cust_phone').value = split.phone || '';
     document.getElementById('cust_email').value = row.email || '';
-    document.getElementById('cust_area').value = row.area || '';
+    var areaEl = custAreaEl();
+    if (areaEl) {
+        if (custAreaIsSelect()) {
+            var daId = row.delivery_area_id != null && row.delivery_area_id !== ''
+                ? String(row.delivery_area_id)
+                : '';
+            var matchOpt = daId !== '' ? areaEl.querySelector('option[value="' + daId + '"]') : null;
+            areaEl.value = matchOpt ? daId : '';
+        } else {
+            areaEl.value = row.area || '';
+        }
+    }
     document.getElementById('cust_address').value = row.address || '';
     var lim = row.credit_limit;
     document.getElementById('cust_limit').value =
@@ -265,7 +337,25 @@ function custSave() {
     var intlSel = ccEl && ccEl.tagName === 'SELECT' && phoneCountry === '__intl__';
     var ccForNorm = intlSel ? null : phoneCountry && phoneCountry !== '__intl__' ? phoneCountry : null;
     var email = document.getElementById('cust_email').value.trim();
-    var area = document.getElementById('cust_area').value.trim();
+    var areaElForSave = custAreaEl();
+    var areaIsSelect = custAreaIsSelect();
+    var area = '';
+    var deliveryAreaId = null;
+    if (areaElForSave) {
+        if (areaIsSelect) {
+            var daId = parseInt(areaElForSave.value, 10) || 0;
+            if (daId > 0) {
+                deliveryAreaId = daId;
+                var selOpt = areaElForSave.options[areaElForSave.selectedIndex];
+                if (selOpt) {
+                    var dn = selOpt.getAttribute('data-name') || selOpt.textContent || '';
+                    area = String(dn).trim();
+                }
+            }
+        } else {
+            area = String(areaElForSave.value || '').trim();
+        }
+    }
     var address = document.getElementById('cust_address').value.trim();
     var limRaw = document.getElementById('cust_limit').value.trim();
     var notes = document.getElementById('cust_notes').value.trim();
@@ -289,6 +379,7 @@ function custSave() {
         phone: phone,
         phone_country: phoneCountry !== '' ? phoneCountry : null,
         area: area,
+        delivery_area_id: deliveryAreaId,
         address: address,
         email: email || null,
         notes: notes || null,

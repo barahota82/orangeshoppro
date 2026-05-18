@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/catalog_schema.php';
 require_once __DIR__ . '/../includes/storefront_account.php';
+require_once __DIR__ . '/../includes/party_subledger.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -17,6 +18,14 @@ if ($token !== '' && orange_table_exists($pdo, 'storefront_accounts')) {
 }
 
 if (!empty($result['ok']) && !empty($result['account_id'])) {
+    // س15: عند تأكيد البريد لأول مرة، أنشئ/حدّث صف العميل في customers واربط customer_id.
+    try {
+        orange_sync_storefront_account_to_customer($pdo, (int) $result['account_id']);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] verify-email customer sync: ' . $e->getMessage());
+        }
+    }
     storefront_account_login($pdo, (int) $result['account_id']);
 }
 

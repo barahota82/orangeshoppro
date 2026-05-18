@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/gl_account_aging.php';
+require_once __DIR__ . '/../../includes/party_subledger.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -100,6 +101,9 @@ if (orange_table_exists($pdo, 'company_settings')) {
 }
 
 $accountId = isset($_GET['account']) ? (int) $_GET['account'] : 0;
+$customerId = isset($_GET['customer']) ? (int) $_GET['customer'] : 0;
+$modeRaw = strtolower(trim((string) ($_GET['mode'] ?? '')));
+$isCustomerMode = ($modeRaw === 'customer') || ($customerId > 0);
 $dateFromRaw = trim((string) ($_GET['date_from'] ?? ''));
 $dateToRaw = trim((string) ($_GET['date_to'] ?? ''));
 
@@ -138,6 +142,7 @@ if ($dateFromYmd > $dateToYmd) {
 }
 
 $useVouchers = orange_journal_vouchers_ready($pdo);
+$partySubledgerReady = orange_party_subledger_ready($pdo);
 
 $openingBal = 0.0;
 $rows = [];
@@ -148,9 +153,20 @@ $err = '';
 $agingReport = null;
 $stmtFilterNoMatch = false;
 
-if ($accountId > 0 && ! orange_accounts_account_is_posting_leaf($pdo, $accountId)) {
-    $err = 'يُعرض كشف الحساب للحسابات الفرعية (ورقة ترحيل) فقط.';
-    $accountId = 0;
+if ($isCustomerMode) {
+    $accountId = 0; // وضع العميل: لا نستعمل الحساب
+    if (!$partySubledgerReady) {
+        $err = 'سجل الذمم غير جاهز بعد.';
+    }
+    if (!orange_table_exists($pdo, 'customers')) {
+        $err = 'جدول العملاء غير متوفر.';
+        $customerId = 0;
+    }
+} else {
+    if ($accountId > 0 && ! orange_accounts_account_is_posting_leaf($pdo, $accountId)) {
+        $err = 'يُعرض كشف الحساب للحسابات الفرعية (ورقة ترحيل) فقط.';
+        $accountId = 0;
+    }
 }
 
 $accCode = '';
@@ -163,7 +179,76 @@ foreach ($accounts as $a) {
     }
 }
 
-if ($useVouchers && $accountId > 0 && $err === '') {
+// س15 + بند 10: تحميل بيانات العميل عند وضع العميل لعرضها في النموذج والترويسة.
+$custCodeDisp = '';
+$custNameDisp = '';
+$custPhoneDisp = '';
+if ($isCustomerMode && $customerId > 0 && $err === '' && orange_table_exists($pdo, 'customers')) {
+    $custCols = 'name_ar AS name, phone';
+    if (orange_table_has_column($pdo, 'customers', 'code')) {
+        $custCols .= ', code';
+    }
+    $custLoad = $pdo->prepare('SELECT ' . $custCols . ' FROM customers WHERE id = ? LIMIT 1');
+    $custLoad->execute([$customerId]);
+    $custRow = $custLoad->fetch(PDO::FETCH_ASSOC);
+    if (!$custRow) {
+        $err = 'العميل غير موجود.';
+        $customerId = 0;
+    } else {
+        $custNameDisp = trim((string) ($custRow['name'] ?? ''));
+        $custPhoneDisp = trim((string) ($custRow['phone'] ?? ''));
+        $custCodeDisp = trim((string) ($custRow['code'] ?? ''));
+    }
+}
+
+if ($isCustomerMode && $customerId > 0 && $err === '') {
+    try {
+        // الرصيد الافتتاحي قبل التاريخ من
+        $stOpenCust = $pdo->prepare(
+            'SELECT COALESCE(SUM(ps.debit - ps.credit), 0) AS bal
+             FROM party_subledger ps
+             INNER JOIN journal_vouchers jv ON jv.id = ps.voucher_id
+             WHERE ps.party_kind = ? AND ps.party_id = ? AND DATE(jv.voucher_date) < ?'
+        );
+        $stOpenCust->execute(['customer', $customerId, $dateFromYmd]);
+        $openingBal = (float) $stOpenCust->fetchColumn();
+
+        $hasSerial = orange_table_has_column($pdo, 'journal_vouchers', 'voucher_serial')
+            && orange_table_has_column($pdo, 'journal_vouchers', 'journal_serial_bucket');
+        $jvCols = 'jv.id AS voucher_id, jv.voucher_date, jv.reference, jv.description, jv.entry_type';
+        if ($hasSerial) {
+            $jvCols .= ', jv.voucher_serial, jv.journal_serial_bucket';
+        }
+        $stLcust = $pdo->prepare(
+            "SELECT ps.debit, ps.credit, ps.memo AS line_memo, ps.id AS line_no, ps.ref_type, ps.ref_id, $jvCols
+             FROM party_subledger ps
+             INNER JOIN journal_vouchers jv ON jv.id = ps.voucher_id
+             WHERE ps.party_kind = ? AND ps.party_id = ?
+               AND DATE(jv.voucher_date) >= ?
+               AND DATE(jv.voucher_date) <= ?
+             ORDER BY jv.voucher_date ASC, jv.id ASC, ps.id ASC"
+        );
+        $stLcust->execute(['customer', $customerId, $dateFromYmd, $dateToYmd]);
+        $rawLinesCust = $stLcust->fetchAll(PDO::FETCH_ASSOC);
+        $balCust = $openingBal;
+        foreach ($rawLinesCust as $ln) {
+            if (! orange_gas_stmt_line_matches($ln, $filtDc, $filtPost)) {
+                continue;
+            }
+            $d = (float) $ln['debit'];
+            $c = (float) $ln['credit'];
+            $sumDebitPeriod += $d;
+            $sumCreditPeriod += $c;
+            $balCust += ($d - $c);
+            $ln['balance'] = $balCust;
+            $rows[] = $ln;
+        }
+        $closingBal = $rows === [] ? $openingBal : (float) ($rows[count($rows) - 1]['balance'] ?? $openingBal);
+        $stmtFilterNoMatch = $rawLinesCust !== [] && $rows === [];
+    } catch (Throwable $e) {
+        $err = 'تعذر قراءة حركات العميل.';
+    }
+} elseif ($useVouchers && $accountId > 0 && $err === '') {
     try {
         $stOpen = $pdo->prepare(
             'SELECT COALESCE(SUM(jl.debit - jl.credit), 0) AS bal
@@ -227,21 +312,36 @@ if ($useVouchers && $accountId > 0 && $err === '') {
         <form method="get" id="gas_acc_stmt_form" class="gas-acc-stmt-filter-form">
             <input type="hidden" name="page" value="partner_account_statement">
             <input type="hidden" name="account" id="gas_account_id" value="<?php echo (int) $accountId; ?>">
+            <input type="hidden" name="customer" id="gas_customer_id" value="<?php echo (int) $customerId; ?>">
+            <input type="hidden" name="mode" id="gas_mode" value="<?php echo $isCustomerMode ? 'customer' : 'account'; ?>">
+            <?php
+            $codeLabel = $isCustomerMode ? 'كود/هاتف العميل' : 'كود الحساب';
+            $nameLabel = $isCustomerMode ? 'اسم العميل' : 'اسم الحساب';
+            $codeValShown = $isCustomerMode ? ($custCodeDisp !== '' ? $custCodeDisp : $custPhoneDisp) : $accCode;
+            $nameValShown = $isCustomerMode ? $custNameDisp : $accNameOnly;
+            $codePlaceholder = 'نقرتان للاختيار';
+            ?>
             <div class="gas-acc-stmt-toolbar-wrap">
                 <div class="gas-acc-stmt-toolbar gas-acc-stmt-toolbar--main-center">
                     <div class="gas-acc-stmt-field gas-acc-stmt-field--code">
-                        <label for="gas_acc_code">كود الحساب</label>
+                        <label for="gas_acc_code"><?php echo htmlspecialchars($codeLabel, ENT_QUOTES, 'UTF-8'); ?></label>
                         <input type="text" id="gas_acc_code" name="_gas_acc_code_dummy" autocomplete="off" readonly
                             class="admin-inp jv-acc-code gas-acc-stmt-acc-code-input"
-                            placeholder="نقرتان للاختيار"
-                            title="نقرتان للاختيار"
-                            value="<?php echo htmlspecialchars($accCode, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
+                            placeholder="<?php echo htmlspecialchars($codePlaceholder, ENT_QUOTES, 'UTF-8'); ?>"
+                            title="<?php echo htmlspecialchars($codePlaceholder, ENT_QUOTES, 'UTF-8'); ?>"
+                            value="<?php echo htmlspecialchars($codeValShown, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
                     </div>
                     <div class="gas-acc-stmt-field gas-acc-stmt-field--name">
-                        <label for="gas_acc_name">اسم الحساب</label>
+                        <label for="gas_acc_name"><?php echo htmlspecialchars($nameLabel, ENT_QUOTES, 'UTF-8'); ?></label>
                         <input type="text" id="gas_acc_name" name="_gas_acc_name_dummy" tabindex="-1" readonly autocomplete="off"
                             class="admin-inp gas-acc-stmt-acc-name-input"
-                            placeholder="—" title="يُعبأ بعد اختيار الحساب" value="<?php echo htmlspecialchars($accNameOnly, ENT_QUOTES, 'UTF-8'); ?>">
+                            placeholder="—" title="يُعبأ بعد اختيار الحساب/العميل" value="<?php echo htmlspecialchars($nameValShown, ENT_QUOTES, 'UTF-8'); ?>">
+                    </div>
+                    <div class="gas-acc-stmt-field gas-acc-stmt-field--cust-toggle" style="display:flex;align-items:flex-end;">
+                        <label class="gas-opt-chip gas-opt-chip--solo" style="margin:0;">
+                            <input type="checkbox" id="gas_cust_mode_toggle"<?php echo $isCustomerMode ? ' checked' : ''; ?>>
+                            حساب عميل
+                        </label>
                     </div>
                     <div class="gas-acc-stmt-field gas-acc-stmt-field--date gas-acc-stmt-field--dmy">
                         <label for="gas_from">من تاريخ</label>
@@ -251,9 +351,15 @@ if ($useVouchers && $accountId > 0 && $err === '') {
                         <label for="gas_to">إلى تاريخ</label>
                         <input type="text" name="date_to" id="gas_to" class="admin-inp orange-inp-dmy" value="<?php echo htmlspecialchars($dateToRaw, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" autocomplete="off" required>
                     </div>
+                    <?php
+                    $showStatement = $err === '' && (
+                        ($isCustomerMode && $customerId > 0 && $partySubledgerReady) ||
+                        (!$isCustomerMode && $accountId > 0 && $useVouchers)
+                    );
+                    ?>
                     <div class="gas-acc-stmt-actions">
                         <button type="submit">استخراج الكشف</button>
-                        <?php if ($accountId > 0 && $err === '' && $useVouchers): ?>
+                        <?php if ($showStatement): ?>
                             <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
                         <?php endif; ?>
                     </div>
@@ -305,6 +411,17 @@ if ($useVouchers && $accountId > 0 && $err === '') {
             <input type="search" id="gas_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بالكود أو الاسم…" autocomplete="off" dir="rtl">
             <ul class="gl-pick-modal__list" id="gas_pick_list"></ul>
             <button type="button" class="btn-secondary" id="gas_pick_close">إغلاق</button>
+        </div>
+    </div>
+
+    <div class="gl-pick-modal gl-acc-stmt-no-print" id="gas_cust_pick_modal" hidden aria-hidden="true">
+        <div class="gl-pick-modal__backdrop" id="gas_cust_pick_backdrop"></div>
+        <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="gas_cust_pick_title">
+            <h3 id="gas_cust_pick_title" class="gl-pick-modal__title">اختيار عميل</h3>
+            <p class="gl-pick-modal__hint muted" style="margin:0 0 8px;font-size:0.9rem;">ابحث بالاسم / الهاتف / الكود — نقرتان للاختيار</p>
+            <input type="search" id="gas_cust_pick_q" class="gl-pick-modal__search admin-inp" placeholder="اسم العميل، هاتف، أو كود…" autocomplete="off" dir="rtl">
+            <ul class="gl-pick-modal__list" id="gas_cust_pick_list"></ul>
+            <button type="button" class="btn-secondary" id="gas_cust_pick_close">إغلاق</button>
         </div>
     </div>
 
@@ -392,12 +509,146 @@ if ($useVouchers && $accountId > 0 && $err === '') {
             pickQ.focus();
         }
 
+        // س15 + بند 10: picker العملاء (وضع العميل).
+        var gasCustSeq = 0;
+        var gasCustSearchTimer = null;
+
+        function gasCustomerModeActive() {
+            var tg = document.getElementById('gas_cust_mode_toggle');
+            return !!(tg && tg.checked);
+        }
+
+        function gasCustPickLoad(q) {
+            var mySeq = ++gasCustSeq;
+            var url = '/admin/api/customers/search.php?q=' + encodeURIComponent(q || '');
+            var pickList = document.getElementById('gas_cust_pick_list');
+            if (!pickList) {
+                return;
+            }
+            fetch(url, { credentials: 'same-origin', cache: 'no-store' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (mySeq !== gasCustSeq) {
+                        return;
+                    }
+                    if (!data.success) {
+                        pickList.innerHTML = '<li class="gl-pick-empty">' + (data.message || 'تعذر التحميل') + '</li>';
+                        return;
+                    }
+                    var custs = data.customers || [];
+                    if (custs.length === 0) {
+                        pickList.innerHTML = '<li class="gl-pick-empty">لا نتائج</li>';
+                        return;
+                    }
+                    pickList.innerHTML = '';
+                    custs.forEach(function (c) {
+                        var li = document.createElement('li');
+                        li.className = 'gl-pick-item';
+                        var code = c.code || '';
+                        var phone = c.phone || '';
+                        var leftRef = code !== '' ? code : phone;
+                        var nameDisp = c.name || '—';
+                        var areaDisp = c.area ? (' — ' + c.area) : '';
+                        li.textContent = (leftRef ? leftRef + ' — ' : '') + nameDisp + areaDisp;
+                        li.setAttribute('role', 'button');
+                        li.tabIndex = 0;
+                        function gasCustChoose() {
+                            var hid = document.getElementById('gas_customer_id');
+                            var cd = document.getElementById('gas_acc_code');
+                            var nm = document.getElementById('gas_acc_name');
+                            var mode = document.getElementById('gas_mode');
+                            var accHid = document.getElementById('gas_account_id');
+                            if (hid) { hid.value = String(c.id || '0'); }
+                            if (accHid) { accHid.value = '0'; }
+                            if (cd) { cd.value = code !== '' ? code : phone; }
+                            if (nm) { nm.value = nameDisp; }
+                            if (mode) { mode.value = 'customer'; }
+                            gasCustPickClose();
+                        }
+                        li.addEventListener('click', gasCustChoose);
+                        li.addEventListener('keydown', function (ev) {
+                            if (ev.key === 'Enter' || ev.key === ' ') {
+                                ev.preventDefault();
+                                gasCustChoose();
+                            }
+                        });
+                        pickList.appendChild(li);
+                    });
+                })
+                .catch(function (e) {
+                    pickList.innerHTML = '<li class="gl-pick-empty">' + (e.message || String(e)) + '</li>';
+                });
+        }
+
+        function gasCustPickClose() {
+            var pm = document.getElementById('gas_cust_pick_modal');
+            if (pm) {
+                pm.hidden = true;
+                pm.setAttribute('aria-hidden', 'true');
+            }
+            document.body.classList.remove('gl-pick-open');
+        }
+
+        function gasCustPickOpen() {
+            var pm = document.getElementById('gas_cust_pick_modal');
+            var pickQ = document.getElementById('gas_cust_pick_q');
+            var pickList = document.getElementById('gas_cust_pick_list');
+            if (!pm || !pickQ || !pickList) {
+                return;
+            }
+            pickQ.value = '';
+            pickList.innerHTML = '';
+            gasCustPickLoad('');
+            pm.hidden = false;
+            pm.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('gl-pick-open');
+            pickQ.focus();
+        }
+
+        function gasApplyToggleMode() {
+            var on = gasCustomerModeActive();
+            var modeEl = document.getElementById('gas_mode');
+            if (modeEl) {
+                modeEl.value = on ? 'customer' : 'account';
+            }
+            // عند التبديل من/إلى وضع العميل: تفريغ الاختيار السابق لتفادي خلط الأنواع.
+            var accHid = document.getElementById('gas_account_id');
+            var custHid = document.getElementById('gas_customer_id');
+            var cd = document.getElementById('gas_acc_code');
+            var nm = document.getElementById('gas_acc_name');
+            if (on) {
+                if (accHid) { accHid.value = '0'; }
+            } else {
+                if (custHid) { custHid.value = '0'; }
+            }
+            // تحديث labels الحقول البصرية (placeholder الرسالة) بدون تعديل HTML النص:
+            if (cd) {
+                cd.placeholder = on ? 'نقرتان لاختيار عميل' : 'نقرتان لاختيار حساب';
+            }
+            // إن كان للحقل قيمة قبل التبديل، أفرّغ الاسم/الكود لتجنب تضليل المستخدم.
+            // (الاختيار الجديد سيُعبأ من الـ picker)
+            var prevCode = cd ? cd.value : '';
+            var prevName = nm ? nm.value : '';
+            if (prevCode || prevName) {
+                // فقط افرّغ لو لم يكن المعرف الحالي مطابقاً للوضع.
+                var hidForMode = on ? (custHid ? custHid.value : '0') : (accHid ? accHid.value : '0');
+                if (!hidForMode || hidForMode === '0') {
+                    if (cd) { cd.value = ''; }
+                    if (nm) { nm.value = ''; }
+                }
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function () {
             var cd = document.getElementById('gas_acc_code');
             if (cd) {
                 cd.addEventListener('dblclick', function (e) {
                     e.preventDefault();
-                    gasPickOpen();
+                    if (gasCustomerModeActive()) {
+                        gasCustPickOpen();
+                    } else {
+                        gasPickOpen();
+                    }
                 });
             }
             var pickQ = document.getElementById('gas_pick_q');
@@ -412,6 +663,18 @@ if ($useVouchers && $accountId > 0 && $err === '') {
                     }, 280);
                 });
             }
+            var custPickQ = document.getElementById('gas_cust_pick_q');
+            if (custPickQ && !custPickQ.getAttribute('data-gas-bound')) {
+                custPickQ.setAttribute('data-gas-bound', '1');
+                custPickQ.addEventListener('input', function () {
+                    if (gasCustSearchTimer) {
+                        clearTimeout(gasCustSearchTimer);
+                    }
+                    gasCustSearchTimer = setTimeout(function () {
+                        gasCustPickLoad(custPickQ.value.trim());
+                    }, 280);
+                });
+            }
             var bd = document.getElementById('gas_pick_backdrop');
             var closer = document.getElementById('gas_pick_close');
             if (bd) {
@@ -419,6 +682,18 @@ if ($useVouchers && $accountId > 0 && $err === '') {
             }
             if (closer) {
                 closer.addEventListener('click', gasPickClose);
+            }
+            var bdC = document.getElementById('gas_cust_pick_backdrop');
+            var closerC = document.getElementById('gas_cust_pick_close');
+            if (bdC) {
+                bdC.addEventListener('click', gasCustPickClose);
+            }
+            if (closerC) {
+                closerC.addEventListener('click', gasCustPickClose);
+            }
+            var toggleEl = document.getElementById('gas_cust_mode_toggle');
+            if (toggleEl) {
+                toggleEl.addEventListener('change', gasApplyToggleMode);
             }
             document.addEventListener('keydown', function gasPickEsc(ev) {
                 if (ev.key !== 'Escape') {
@@ -428,12 +703,16 @@ if ($useVouchers && $accountId > 0 && $err === '') {
                 if (gm && !gm.hidden) {
                     gasPickClose();
                 }
+                var gmC = document.getElementById('gas_cust_pick_modal');
+                if (gmC && !gmC.hidden) {
+                    gasCustPickClose();
+                }
             }, true);
         });
     })();
     </script>
 
-    <?php if ($accountId > 0 && $err === '' && $useVouchers): ?>
+    <?php if ($showStatement): ?>
 
     <div class="card admin-fy-card gl-acc-stmt-print">
         <div class="gl-acc-stmt-print-sheet">
@@ -446,9 +725,19 @@ if ($useVouchers && $accountId > 0 && $err === '') {
                     <span class="gl-acc-stmt-print-title-en" lang="en" dir="ltr">STATMENT OF ACCOUNT</span>
                 </h2>
             </header>
+            <?php
+                $printCodeKey = $isCustomerMode ? 'كــود/هـاتـف الـعـمـيـل' : 'رقـــم الحســاب';
+                $printNameKey = $isCustomerMode ? 'اســم الـعـمـيـل' : 'اسم الحســـــــــاب';
+                $printCodeVal = $isCustomerMode
+                    ? ($custCodeDisp !== '' ? $custCodeDisp : ($custPhoneDisp !== '' ? $custPhoneDisp : '—'))
+                    : ($accCode !== '' ? $accCode : '—');
+                $printNameVal = $isCustomerMode
+                    ? ($custNameDisp !== '' ? $custNameDisp : '—')
+                    : ($accNameOnly !== '' ? $accNameOnly : '—');
+            ?>
             <div class="gl-acc-stmt-print-grid">
-                <div class="gl-acc-stmt-print-row"><span class="gl-acc-stmt-print-k">رقـــم الحســاب</span><span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($accCode !== '' ? $accCode : '—', ENT_QUOTES, 'UTF-8'); ?></span></div>
-                <div class="gl-acc-stmt-print-row"><span class="gl-acc-stmt-print-k">اسم الحســـــــــاب</span><span class="gl-acc-stmt-print-v"><?php echo htmlspecialchars($accNameOnly !== '' ? $accNameOnly : '—', ENT_QUOTES, 'UTF-8'); ?></span></div>
+                <div class="gl-acc-stmt-print-row"><span class="gl-acc-stmt-print-k"><?php echo htmlspecialchars($printCodeKey, ENT_QUOTES, 'UTF-8'); ?></span><span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($printCodeVal, ENT_QUOTES, 'UTF-8'); ?></span></div>
+                <div class="gl-acc-stmt-print-row"><span class="gl-acc-stmt-print-k"><?php echo htmlspecialchars($printNameKey, ENT_QUOTES, 'UTF-8'); ?></span><span class="gl-acc-stmt-print-v"><?php echo htmlspecialchars($printNameVal, ENT_QUOTES, 'UTF-8'); ?></span></div>
                 <div class="gl-acc-stmt-print-row gl-acc-stmt-print-row--dates">
                     <span class="gl-acc-stmt-print-k">من تاريخ</span><span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($dateFromRaw, ENT_QUOTES, 'UTF-8'); ?></span>
                     <span class="gl-acc-stmt-print-k">الى تاريخ</span><span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($dateToRaw, ENT_QUOTES, 'UTF-8'); ?></span>
@@ -579,9 +868,9 @@ if ($useVouchers && $accountId > 0 && $err === '') {
             </div>
         </div>
     </div>
-    <?php elseif ($accountId <= 0 && $useVouchers): ?>
+    <?php elseif ($err === '' && (($isCustomerMode && $customerId <= 0) || (!$isCustomerMode && $accountId <= 0 && $useVouchers))): ?>
         <div class="card admin-fy-card gl-acc-stmt-no-print">
-            <p class="card-hint">اختر الحساب ونطاق التواريخ ثم «استخراج الكشف».</p>
+            <p class="card-hint"><?php echo $isCustomerMode ? 'اختر العميل ونطاق التواريخ ثم «استخراج الكشف».' : 'اختر الحساب ونطاق التواريخ ثم «استخراج الكشف».'; ?></p>
         </div>
     <?php endif; ?>
 </div>
