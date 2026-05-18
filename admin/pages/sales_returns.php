@@ -3,49 +3,86 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/date_format.php';
+require_once __DIR__ . '/../../includes/catalog_schema.php';
 
 $pdo = db();
+orange_catalog_ensure_schema($pdo);
 
+// س13: جدول customers يستخدم name_ar وليس name — اختيار العمود الصحيح ديناميكياً.
 $hasCustomers = orange_table_exists($pdo, 'customers');
 $customers = [];
 if ($hasCustomers) {
-    $customers = $pdo->query('SELECT id, name, phone FROM customers ORDER BY name ASC')->fetchAll(PDO::FETCH_ASSOC);
+    $custNameCol = orange_table_has_column($pdo, 'customers', 'name_ar') ? 'name_ar' : (orange_table_has_column($pdo, 'customers', 'name') ? 'name' : 'name_ar');
+    try {
+        $customers = $pdo->query("SELECT id, $custNameCol AS name, phone FROM customers ORDER BY $custNameCol ASC")->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        $customers = [];
+        if (function_exists('error_log')) {
+            error_log('[orange] sales_returns customers list: ' . $e->getMessage());
+        }
+    }
 }
 
-$products = $pdo->query(
-    'SELECT id, name, price, cost, has_colors, has_sizes FROM products WHERE is_active = 1 ORDER BY name ASC'
-)->fetchAll(PDO::FETCH_ASSOC);
+$products = [];
+try {
+    $products = $pdo->query(
+        'SELECT id, name, price, cost, has_colors, has_sizes FROM products WHERE is_active = 1 ORDER BY name ASC'
+    )->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+    if (function_exists('error_log')) {
+        error_log('[orange] sales_returns products list: ' . $e->getMessage());
+    }
+}
 
 $variantsByProduct = [];
-$vRows = $pdo->query(
-    'SELECT id, product_id, color, size FROM product_variants ORDER BY product_id ASC, id ASC'
-)->fetchAll(PDO::FETCH_ASSOC);
-foreach ($vRows as $vr) {
-    $pid = (int) $vr['product_id'];
-    if (!isset($variantsByProduct[$pid])) {
-        $variantsByProduct[$pid] = [];
+try {
+    $vRows = $pdo->query(
+        'SELECT id, product_id, color, size FROM product_variants ORDER BY product_id ASC, id ASC'
+    )->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($vRows as $vr) {
+        $pid = (int) $vr['product_id'];
+        if (!isset($variantsByProduct[$pid])) {
+            $variantsByProduct[$pid] = [];
+        }
+        $c = trim((string) ($vr['color'] ?? ''));
+        $s = trim((string) ($vr['size'] ?? ''));
+        $label = ($c !== '' || $s !== '')
+            ? trim($c . ($c !== '' && $s !== '' ? ' / ' : '') . $s)
+            : ('#' . (int) $vr['id']);
+        $variantsByProduct[$pid][] = [
+            'id' => (int) $vr['id'],
+            'label' => $label,
+        ];
     }
-    $c = trim((string) ($vr['color'] ?? ''));
-    $s = trim((string) ($vr['size'] ?? ''));
-    $label = ($c !== '' || $s !== '')
-        ? trim($c . ($c !== '' && $s !== '' ? ' / ' : '') . $s)
-        : ('#' . (int) $vr['id']);
-    $variantsByProduct[$pid][] = [
-        'id' => (int) $vr['id'],
-        'label' => $label,
-    ];
+} catch (Throwable $e) {
+    if (function_exists('error_log')) {
+        error_log('[orange] sales_returns variants list: ' . $e->getMessage());
+    }
 }
 
-$recentSql = 'SELECT sr.*';
-if ($hasCustomers) {
-    $recentSql .= ', c.name AS customer_name';
+// س13: تحقق وجود sales_returns + اسم عمود customers الصحيح (name_ar).
+$recent = [];
+$hasSalesReturns = orange_table_exists($pdo, 'sales_returns');
+if ($hasSalesReturns) {
+    $recentSql = 'SELECT sr.*';
+    if ($hasCustomers) {
+        $custNameColRecent = orange_table_has_column($pdo, 'customers', 'name_ar') ? 'name_ar' : (orange_table_has_column($pdo, 'customers', 'name') ? 'name' : 'name_ar');
+        $recentSql .= ', c.' . $custNameColRecent . ' AS customer_name';
+    }
+    $recentSql .= ' FROM sales_returns sr';
+    if ($hasCustomers) {
+        $recentSql .= ' LEFT JOIN customers c ON c.id = sr.customer_id';
+    }
+    $recentSql .= ' ORDER BY sr.id DESC LIMIT 50';
+    try {
+        $recent = $pdo->query($recentSql)->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        $recent = [];
+        if (function_exists('error_log')) {
+            error_log('[orange] sales_returns recent list: ' . $e->getMessage());
+        }
+    }
 }
-$recentSql .= ' FROM sales_returns sr';
-if ($hasCustomers) {
-    $recentSql .= ' LEFT JOIN customers c ON c.id = sr.customer_id';
-}
-$recentSql .= ' ORDER BY sr.id DESC LIMIT 50';
-$recent = $pdo->query($recentSql)->fetchAll(PDO::FETCH_ASSOC);
 
 function sr_channel_label(string $t): string
 {
