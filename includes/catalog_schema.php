@@ -3342,6 +3342,30 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             $pdo,
             'CREATE INDEX idx_storefront_accounts_customer ON storefront_accounts (customer_id)'
         );
+        // س15: backfill لمرة واحدة — كل حساب مفعَّل (email_verified_at IS NOT NULL) ينشئ/يربط صفه في customers.
+        try {
+            require_once __DIR__ . '/party_subledger.php';
+            $bf = $pdo->query(
+                'SELECT id FROM storefront_accounts
+                 WHERE email_verified_at IS NOT NULL AND customer_id IS NULL
+                   AND customer_phone IS NOT NULL AND customer_phone <> \'\''
+            );
+            if ($bf) {
+                while ($accIdToSync = $bf->fetchColumn()) {
+                    try {
+                        orange_sync_storefront_account_to_customer($pdo, (int) $accIdToSync);
+                    } catch (Throwable $eInner) {
+                        if (function_exists('error_log')) {
+                            error_log('[orange] backfill sync acc #' . (int) $accIdToSync . ': ' . $eInner->getMessage());
+                        }
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] backfill storefront_accounts→customers: ' . $e->getMessage());
+            }
+        }
     }
 
     if (!orange_table_exists($pdo, 'storefront_phone_merge_requests')) {

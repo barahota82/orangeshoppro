@@ -93,12 +93,25 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
         return;
     }
 
+    // س15: كل عميل (نقدي/آجل/أونلاين) يظهر بشاشة العملاء عند التسليم — مع إثراء البيانات من الطلب.
     $customerIdForAr = 0;
-    if ($isCredit && orange_table_exists($pdo, 'customers')) {
-        $customerIdForAr = orange_ensure_customer(
+    if (orange_table_exists($pdo, 'customers')) {
+        $orderProfile = [
+            'area' => (string) ($order['area'] ?? ''),
+            'delivery_area_id' => isset($order['delivery_area_id']) && (int) $order['delivery_area_id'] > 0
+                ? (int) $order['delivery_area_id'] : null,
+            'address' => (string) ($order['address'] ?? ''),
+            'email' => isset($order['customer_email']) ? (string) $order['customer_email'] : '',
+            'phone_country_dial' => orange_table_has_column($pdo, 'orders', 'phone_country_dial')
+                ? (isset($order['phone_country_dial']) ? (string) $order['phone_country_dial'] : null) : null,
+            'phone_national' => orange_table_has_column($pdo, 'orders', 'phone_national')
+                ? (isset($order['phone_national']) ? (string) $order['phone_national'] : null) : null,
+        ];
+        $customerIdForAr = orange_ensure_customer_with_profile(
             $pdo,
             (string) ($order['customer_name'] ?? ''),
-            (string) ($order['phone'] ?? '')
+            (string) ($order['phone'] ?? ''),
+            $orderProfile
         );
         if ($customerIdForAr > 0 && orange_table_has_column($pdo, 'orders', 'customer_id')) {
             $pdo->prepare('UPDATE orders SET customer_id = ? WHERE id = ?')->execute([
@@ -219,6 +232,38 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
                         $saleFour = orange_gl_cash_delivery_sale_four_lines($pdo, $salesAmount, $memoSaleLeg, $memoCashLeg);
                     }
                 }
+                // س15: للنقدي/الأونلاين بعد التسليم — سطران في party_subledger (دخل وخرج) لكشف حساب العميل = رصيد صفر.
+                $cashAfterJson = null;
+                if ($customerIdForAr > 0) {
+                    $cashSaleMemo = $isOnline
+                        ? 'مبيعات أونلاين — تسليم'
+                        : 'مبيعات نقدي — تسليم';
+                    $cashCollectMemo = $isOnline
+                        ? 'تحصيل أونلاين فوري — تسليم'
+                        : 'تحصيل نقدي فوري — تسليم';
+                    $cashAfterJson = json_encode([
+                        'party_subledger_entries' => [
+                            [
+                                'party_kind' => 'customer',
+                                'party_id' => $customerIdForAr,
+                                'debit' => $salesAmount,
+                                'credit' => 0.0,
+                                'ref_type' => 'order',
+                                'ref_id' => (int) $order['id'],
+                                'memo' => $cashSaleMemo,
+                            ],
+                            [
+                                'party_kind' => 'customer',
+                                'party_id' => $customerIdForAr,
+                                'debit' => 0.0,
+                                'credit' => $salesAmount,
+                                'ref_type' => 'order',
+                                'ref_id' => (int) $order['id'],
+                                'memo' => $cashCollectMemo,
+                            ],
+                        ],
+                    ], JSON_UNESCAPED_UNICODE);
+                }
                 if (orange_gl_use_pending_queue($pdo)) {
                     orange_gl_pending_enqueue_multi(
                         $pdo,
@@ -229,16 +274,46 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
                         $now,
                         $saleDesc,
                         'order_delivery_sale',
-                        null
+                        $cashAfterJson
                     );
                 } else {
-                    orange_voucher_post($pdo, [
+                    $vCashSale = orange_voucher_post($pdo, [
                         'voucher_date' => $now,
                         'document_entered_at' => $now,
                         'reference' => $saleRef,
                         'description' => $saleDesc,
                         'entry_type' => 'order_delivery_sale',
                     ], $saleFour['lines']);
+                    if ($customerIdForAr > 0 && is_int($vCashSale) && $vCashSale > 0) {
+                        $cashSaleMemoDirect = $isOnline
+                            ? 'مبيعات أونلاين — تسليم'
+                            : 'مبيعات نقدي — تسليم';
+                        $cashCollectMemoDirect = $isOnline
+                            ? 'تحصيل أونلاين فوري — تسليم'
+                            : 'تحصيل نقدي فوري — تسليم';
+                        orange_party_subledger_record(
+                            $pdo,
+                            'customer',
+                            $customerIdForAr,
+                            $vCashSale,
+                            $salesAmount,
+                            0.0,
+                            'order',
+                            (int) $order['id'],
+                            $cashSaleMemoDirect
+                        );
+                        orange_party_subledger_record(
+                            $pdo,
+                            'customer',
+                            $customerIdForAr,
+                            $vCashSale,
+                            0.0,
+                            $salesAmount,
+                            'order',
+                            (int) $order['id'],
+                            $cashCollectMemoDirect
+                        );
+                    }
                 }
             } elseif (orange_gl_use_pending_queue($pdo)) {
                 $afterJson = null;

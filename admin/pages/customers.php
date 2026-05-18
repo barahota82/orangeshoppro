@@ -230,6 +230,7 @@ $count = count($rows);
                                     'credit_limit' => $c['credit_limit'] ?? null,
                                     'notes' => (string) ($c['notes'] ?? ''),
                                 ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>)'>تعديل</button>
+                                <a class="btn btn-secondary party-registry-btn" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_account_statement&mode=customer&customer=' . $cid), ENT_QUOTES, 'UTF-8'); ?>">كشف حساب</a>
                                 <a class="btn btn-secondary party-registry-btn" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_reports#partner-balances-customers'), ENT_QUOTES, 'UTF-8'); ?>">ذمة العميل</a>
                             </td>
                         </tr>

@@ -55,15 +55,28 @@ if (orange_table_exists($pdo, 'suppliers')) {
     $suppliers = $pdo->query('SELECT id, name, phone FROM suppliers ORDER BY name ASC')->fetchAll(PDO::FETCH_ASSOC);
     foreach ($suppliers as $s) {
         $sid = (int) $s['id'];
-        $aid = orange_supplier_payable_account_id($pdo, $sid);
-        $st = $pdo->prepare('SELECT id, code, name FROM accounts WHERE id = ? LIMIT 1');
-        $st->execute([$aid]);
-        $arow = $st->fetch(PDO::FETCH_ASSOC);
-        $supplierPayableMap[$sid] = [
-            'id' => $arow ? (int) $arow['id'] : $aid,
-            'code' => $arow ? (string) ($arow['code'] ?? '') : '',
-            'name' => $arow ? (string) ($arow['name'] ?? '') : ('#' . $aid),
-        ];
+        // س13: لا يجوز أن يكسر مورد واحد (بإعداد accounts_payable مفقود/غير ورقة) كل الشاشة.
+        $aid = 0;
+        try {
+            $aid = orange_supplier_payable_account_id($pdo, $sid);
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] purchase_returns supplier payable resolve #' . $sid . ': ' . $e->getMessage());
+            }
+            $aid = 0;
+        }
+        if ($aid > 0) {
+            $st = $pdo->prepare('SELECT id, code, name FROM accounts WHERE id = ? LIMIT 1');
+            $st->execute([$aid]);
+            $arow = $st->fetch(PDO::FETCH_ASSOC);
+            $supplierPayableMap[$sid] = [
+                'id' => $arow ? (int) $arow['id'] : $aid,
+                'code' => $arow ? (string) ($arow['code'] ?? '') : '',
+                'name' => $arow ? (string) ($arow['name'] ?? '') : ('#' . $aid),
+            ];
+        } else {
+            $supplierPayableMap[$sid] = ['id' => 0, 'code' => '', 'name' => ''];
+        }
     }
 }
 
@@ -118,8 +131,23 @@ foreach ($suppliers as $s) {
 }
 
 /* ── GL accounts ───────────────────────────────────────────────────── */
-$inventoryAccId = orange_gl_account_id_optional($pdo, 'inventory');
-$cashAccId = orange_gl_account_id_optional($pdo, 'cash');
+// س13: التقاط استثناءات «ليس ورقة ترحيل» لئلا تكسر الشاشة قبل HTML — يعالجها $pr2Ready.
+$inventoryAccId = null;
+$cashAccId = null;
+try {
+    $inventoryAccId = orange_gl_account_id_optional($pdo, 'inventory');
+} catch (Throwable $e) {
+    if (function_exists('error_log')) {
+        error_log('[orange] purchase_returns inventory account: ' . $e->getMessage());
+    }
+}
+try {
+    $cashAccId = orange_gl_account_id_optional($pdo, 'cash');
+} catch (Throwable $e) {
+    if (function_exists('error_log')) {
+        error_log('[orange] purchase_returns cash account: ' . $e->getMessage());
+    }
+}
 
 $pr2GlAccounts = [];
 $glAccStmt = $pdo->query('SELECT id, code, name FROM accounts ORDER BY code ASC');
