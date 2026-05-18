@@ -24,6 +24,44 @@ function orange_customer_normalize_code(PDO $pdo, $raw): ?string
     return function_exists('mb_substr') ? mb_substr($s, 0, 32, 'UTF-8') : substr($s, 0, 32);
 }
 
+/**
+ * س15: توليد كود عميل تسلسلي تلقائي (نفس آلية الموردين). أعلى رقم موجود في any code + 1، ثم تحقق فريد.
+ */
+function orange_customer_next_auto_code(PDO $pdo): ?string
+{
+    if (!orange_table_has_column($pdo, 'customers', 'code')) {
+        return null;
+    }
+    $rows = $pdo->query('SELECT code FROM customers WHERE code IS NOT NULL AND TRIM(code) <> \'\' ORDER BY id DESC LIMIT 5000')
+        ->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    $max = 0;
+    foreach ($rows as $rawCode) {
+        $c = trim((string) $rawCode);
+        if ($c === '') {
+            continue;
+        }
+        if (preg_match_all('/\d+/', $c, $m) && isset($m[0]) && is_array($m[0])) {
+            foreach ($m[0] as $chunk) {
+                $n = (int) $chunk;
+                if ($n > $max) {
+                    $max = $n;
+                }
+            }
+        }
+    }
+    $start = max(1, $max + 1);
+    $chk = $pdo->prepare('SELECT id FROM customers WHERE code = ? LIMIT 1');
+    for ($i = $start; $i < $start + 20000; $i++) {
+        $candidate = (string) $i;
+        $chk->execute([$candidate]);
+        if (!$chk->fetchColumn()) {
+            return $candidate;
+        }
+    }
+
+    return null;
+}
+
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
@@ -60,6 +98,31 @@ try {
     $hasPhoneNational = orange_table_has_column($pdo, 'customers', 'phone_national');
     $hasDeliveryArea = orange_table_has_column($pdo, 'customers', 'delivery_area_id');
     $codeSql = orange_customer_normalize_code($pdo, $data['code'] ?? '');
+    // س15: عند الإنشاء (id = 0) ولا كود مدخل، نولّد كوداً تلقائياً تسلسلياً.
+    // عند التعديل، نحافظ على كود الصف القائم إن كان فارغاً في الطلب.
+    if ($hasCode) {
+        if ($idIn <= 0) {
+            if ($codeSql === null) {
+                $codeSql = orange_customer_next_auto_code($pdo);
+                if ($codeSql === null) {
+                    json_response(['success' => false, 'message' => 'تعذر توليد كود العميل التلقائي'], 500);
+                }
+            }
+        } else {
+            // تعديل: إن لم يُرسَل كود، احتفظ بالكود الحالي للعميل.
+            if ($codeSql === null) {
+                $exSt = $pdo->prepare('SELECT code FROM customers WHERE id = ? LIMIT 1');
+                $exSt->execute([$idIn]);
+                $existingCode = $exSt->fetchColumn();
+                if ($existingCode !== false && $existingCode !== null && trim((string) $existingCode) !== '') {
+                    $codeSql = trim((string) $existingCode);
+                } else {
+                    // عميل قديم بلا كود: نولّد كوداً الآن.
+                    $codeSql = orange_customer_next_auto_code($pdo);
+                }
+            }
+        }
+    }
     $phoneDialSql = null;
     $phoneNationalSql = null;
     if ($hasPhoneCountryDial) {
@@ -185,7 +248,7 @@ try {
         $params[] = $idIn;
         $pdo->prepare('UPDATE customers SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
         audit_log('customer_update', 'تحديث عميل #' . $idIn . ' — ' . $phone, 'customers', $idIn);
-        json_response(['success' => true, 'message' => 'تم تحديث بيانات العميل', 'id' => $idIn]);
+        json_response(['success' => true, 'message' => 'تم تحديث بيانات العميل', 'id' => $idIn, 'code' => $codeSql]);
 
         return;
     }
@@ -237,7 +300,7 @@ try {
         $params[] = $id;
         $pdo->prepare('UPDATE customers SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
         audit_log('customer_update', 'تحديث عميل: ' . $phone, 'customers', $id);
-        json_response(['success' => true, 'message' => 'تم تحديث بيانات العميل', 'id' => $id]);
+        json_response(['success' => true, 'message' => 'تم تحديث بيانات العميل', 'id' => $id, 'code' => $codeSql]);
 
         return;
     }
@@ -295,7 +358,7 @@ try {
     $pdo->prepare($sql)->execute($params);
     $newId = (int) $pdo->lastInsertId();
     audit_log('customer_create', 'عميل جديد: ' . $phone, 'customers', $newId);
-    json_response(['success' => true, 'message' => 'تم إضافة العميل', 'id' => $newId]);
+    json_response(['success' => true, 'message' => 'تم إضافة العميل', 'id' => $newId, 'code' => $codeSql]);
 } catch (Throwable $e) {
     orange_admin_api_catch($e, 'تعذر حفظ العميل');
 }
