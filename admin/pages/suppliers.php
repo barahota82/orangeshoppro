@@ -658,6 +658,7 @@ $count = count($rows);
                     <input type="text" id="sup_code" class="admin-sort-field admin-sort-field--muted" maxlength="32" autocomplete="off" dir="ltr" lang="en" value="<?php echo htmlspecialchars($nextSupplierCodePreview, ENT_QUOTES, 'UTF-8'); ?>" readonly>
                 </div>
                 <div class="sup-code-nav-btns" role="group" aria-label="تنقل بين الموردين">
+                    <button type="button" class="btn-secondary sup-code-nav-btn" id="sup_code_edit_btn" title="تعديل الكود يدوياً">تعديل الكود</button>
                     <button type="button" class="btn-secondary sup-code-nav-btn" id="sup_nav_first" title="أول مورد" aria-label="أول مورد">&lt;&lt;</button>
                     <button type="button" class="btn-secondary sup-code-nav-btn" id="sup_nav_prev" title="المورد السابق" aria-label="المورد السابق">&lt;</button>
                     <button type="button" class="btn-secondary sup-code-nav-btn" id="sup_nav_next" title="المورد التالي" aria-label="المورد التالي">&gt;</button>
@@ -849,6 +850,7 @@ $count = count($rows);
         <button type="button" class="btn-secondary" id="sup_open_purchase_return_btn">مردود مشتريات</button>
         <button type="button" class="btn-secondary" id="sup_open_payment_btn">سداد فواتير</button>
         <button type="button" class="btn-secondary" id="sup_open_statement_btn">كشف حساب</button>
+        <button type="button" class="btn-secondary" id="sup_print_btn">طباعة بطاقة</button>
     </div>
 </div>
 
@@ -912,6 +914,7 @@ var SUP_NEXT_AUTO_CODE = <?php echo json_encode($nextSupplierCodePreview, JSON_U
 var SUP_PAYABLE_PICK_ACCOUNTS = <?php echo json_encode($supplierPayablePickAccountsPayload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var SUP_SEARCH_ROWS = <?php echo json_encode($supplierSearchRowsPayload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var SUP_PARTNER_STATEMENT_URL = <?php echo json_encode(storefront_public_path('/admin/index.php?page=partner_account_statement'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+var SUP_PRINT_URL = <?php echo json_encode(storefront_public_path('/admin/api/suppliers/print-card.php'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var SUP_NAV_ROWS = SUP_SEARCH_ROWS
     .slice()
     .filter(function (row) {
@@ -1828,7 +1831,12 @@ function supEnforceFormVisibility() {
 }
 function supResetForm() {
     document.getElementById('sup_id').value = '0';
-    document.getElementById('sup_code').value = String(SUP_NEXT_AUTO_CODE || '1');
+    var codeElR = document.getElementById('sup_code');
+    if (codeElR) {
+        codeElR.value = String(SUP_NEXT_AUTO_CODE || '1');
+        codeElR.readOnly = true;
+        codeElR.classList.add('admin-sort-field--muted');
+    }
     supSetCurrentBalance(0);
     document.getElementById('sup_name').value = '';
     document.getElementById('sup_phone').value = '';
@@ -2000,9 +2008,39 @@ function supOpenCurrentSupplierStatement() {
     }
     window.location.href = SUP_PARTNER_STATEMENT_URL + '&account=' + encodeURIComponent(String(accId));
 }
+function supPrintCurrentCard() {
+    var row = supCurrentSupplierRow();
+    if (!row || (parseInt(String(row.id || '0'), 10) || 0) <= 0) {
+        alert('اختر المورد أولاً');
+        return;
+    }
+    window.open(SUP_PRINT_URL + '?supplier_id=' + encodeURIComponent(String(row.id)), '_blank');
+}
+function supToggleCodeEdit() {
+    var codeEl = document.getElementById('sup_code');
+    if (!codeEl) return;
+    var willEdit = codeEl.readOnly;
+    if (willEdit) {
+        if (!window.confirm('تحذير: تعديل كود مورد قائم قد يكسر تقارير قديمة.\nهل أنت متأكد؟')) {
+            return;
+        }
+        codeEl.readOnly = false;
+        codeEl.classList.remove('admin-sort-field--muted');
+        codeEl.focus();
+        codeEl.select();
+    } else {
+        codeEl.readOnly = true;
+        codeEl.classList.add('admin-sort-field--muted');
+    }
+}
 function supEdit(row) {
     document.getElementById('sup_id').value = String(row.id || 0);
-    document.getElementById('sup_code').value = row.code || '';
+    var codeEl3 = document.getElementById('sup_code');
+    if (codeEl3) {
+        codeEl3.value = row.code || '';
+        codeEl3.readOnly = true;
+        codeEl3.classList.add('admin-sort-field--muted');
+    }
     document.getElementById('sup_name').value = row.name || '';
     var split = supSplitPhoneForForm(row.phone || '', row.phone_country_dial || '', row.phone_national || '');
     var cc = supPhoneCountryEl();
@@ -2113,12 +2151,15 @@ function supSave() {
             return;
         }
     }
+    var codeEl2 = document.getElementById('sup_code');
+    var codeVal = codeEl2 && !codeEl2.readOnly ? String(codeEl2.value || '').trim() : '';
     var payload = {
         name: name,
         phone: phone || null,
         notes: notes || null,
         phone_country: phoneCountry !== null ? phoneCountry : null
     };
+    if (codeVal !== '') payload.code = codeVal;
     var statusEl = document.getElementById('sup_status');
     if (statusEl) {
         var statusVal = String(statusEl.value || 'active').toLowerCase();
@@ -2308,6 +2349,20 @@ function supSave() {
         statementBtn.addEventListener('click', function (e) {
             e.preventDefault();
             supOpenCurrentSupplierStatement();
+        });
+    }
+    var printBtn = document.getElementById('sup_print_btn');
+    if (printBtn) {
+        printBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            supPrintCurrentCard();
+        });
+    }
+    var codeEditBtn = document.getElementById('sup_code_edit_btn');
+    if (codeEditBtn) {
+        codeEditBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            supToggleCodeEdit();
         });
     }
     var purchaseBtn = document.getElementById('sup_open_purchase_btn');

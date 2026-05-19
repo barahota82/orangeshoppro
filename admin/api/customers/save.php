@@ -97,6 +97,8 @@ try {
     $hasPhoneCountryDial = orange_table_has_column($pdo, 'customers', 'phone_country_dial');
     $hasPhoneNational = orange_table_has_column($pdo, 'customers', 'phone_national');
     $hasDeliveryArea = orange_table_has_column($pdo, 'customers', 'delivery_area_id');
+    $hasStatus = orange_table_has_column($pdo, 'customers', 'status');
+    $hasBlockReason = orange_table_has_column($pdo, 'customers', 'block_reason');
     $codeSql = orange_customer_normalize_code($pdo, $data['code'] ?? '');
     // س15: عند الإنشاء (id = 0) ولا كود مدخل، نولّد كوداً تلقائياً تسلسلياً.
     // عند التعديل، نحافظ على كود الصف القائم إن كان فارغاً في الطلب.
@@ -196,6 +198,25 @@ try {
     $notesRaw = trim((string) ($data['notes'] ?? ''));
     $notesSql = $notesRaw === '' ? null : (function_exists('mb_substr') ? mb_substr($notesRaw, 0, 60000, 'UTF-8') : substr($notesRaw, 0, 60000));
 
+    // س15: حالة العميل + سبب الحظر.
+    $statusSql = 'active';
+    if ($hasStatus && array_key_exists('status', $data)) {
+        $stRaw = strtolower(trim((string) $data['status']));
+        if (in_array($stRaw, ['active', 'inactive', 'blocked'], true)) {
+            $statusSql = $stRaw;
+        }
+    }
+    $blockReasonSql = null;
+    if ($hasBlockReason) {
+        if ($statusSql === 'blocked') {
+            $brRaw = trim((string) ($data['block_reason'] ?? ''));
+            if ($brRaw === '') {
+                json_response(['success' => false, 'message' => 'سبب الحظر مطلوب عند حظر العميل'], 422);
+            }
+            $blockReasonSql = function_exists('mb_substr') ? mb_substr($brRaw, 0, 255, 'UTF-8') : substr($brRaw, 0, 255);
+        }
+    }
+
     $assertCodeUnique = static function (int $excludeId) use ($pdo, $codeSql, $hasCode): void {
         if (!$hasCode || $codeSql === null) {
             return;
@@ -263,6 +284,14 @@ try {
             $fields[] = 'code = ?';
             $params[] = $codeSql;
         }
+        if ($hasStatus) {
+            $fields[] = 'status = ?';
+            $params[] = $statusSql;
+        }
+        if ($hasBlockReason) {
+            $fields[] = 'block_reason = ?';
+            $params[] = $blockReasonSql;
+        }
         $params[] = $idIn;
         $pdo->prepare('UPDATE customers SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
         audit_log('customer_update', 'تحديث عميل #' . $idIn . ' — ' . $phone, 'customers', $idIn);
@@ -314,6 +343,14 @@ try {
         if ($hasCode) {
             $fields[] = 'code = ?';
             $params[] = $codeSql;
+        }
+        if ($hasStatus) {
+            $fields[] = 'status = ?';
+            $params[] = $statusSql;
+        }
+        if ($hasBlockReason) {
+            $fields[] = 'block_reason = ?';
+            $params[] = $blockReasonSql;
         }
         $params[] = $id;
         $pdo->prepare('UPDATE customers SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
@@ -371,6 +408,16 @@ try {
         $cols[] = 'code';
         $placeholders[] = '?';
         $params[] = $codeSql;
+    }
+    if ($hasStatus) {
+        $cols[] = 'status';
+        $placeholders[] = '?';
+        $params[] = $statusSql;
+    }
+    if ($hasBlockReason) {
+        $cols[] = 'block_reason';
+        $placeholders[] = '?';
+        $params[] = $blockReasonSql;
     }
     $sql = 'INSERT INTO customers (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $placeholders) . ')';
     $pdo->prepare($sql)->execute($params);

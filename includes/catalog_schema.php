@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 37);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 38);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -2549,6 +2549,29 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         orange_catalog_safe_exec(
             $pdo,
             'CREATE INDEX idx_customers_delivery_area ON customers (delivery_area_id)'
+        );
+    }
+    // س15 + تطوير شاشة العملاء الاحترافية: حالة العميل، سبب الحظر، مرفقات.
+    if (orange_table_exists($pdo, 'customers') && !orange_table_has_column($pdo, 'customers', 'status')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            "ALTER TABLE customers ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'active'"
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE INDEX idx_customers_status ON customers (status)'
+        );
+    }
+    if (orange_table_exists($pdo, 'customers') && !orange_table_has_column($pdo, 'customers', 'block_reason')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE customers ADD COLUMN block_reason VARCHAR(255) NULL DEFAULT NULL'
+        );
+    }
+    if (orange_table_exists($pdo, 'customers') && !orange_table_has_column($pdo, 'customers', 'attachments_json')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE customers ADD COLUMN attachments_json TEXT NULL DEFAULT NULL'
         );
     }
 

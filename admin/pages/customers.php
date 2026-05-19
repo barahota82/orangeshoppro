@@ -28,6 +28,9 @@ $hasCustomerLimitCol = orange_table_has_column($pdo, 'customers', 'credit_limit'
 $hasCustomerPhoneCountryDialCol = orange_table_has_column($pdo, 'customers', 'phone_country_dial');
 $hasCustomerPhoneNationalCol = orange_table_has_column($pdo, 'customers', 'phone_national');
 $hasCustomerDeliveryAreaCol = orange_table_has_column($pdo, 'customers', 'delivery_area_id');
+$hasCustomerStatusCol = orange_table_has_column($pdo, 'customers', 'status');
+$hasCustomerBlockReasonCol = orange_table_has_column($pdo, 'customers', 'block_reason');
+$hasCustomerAttachmentsCol = orange_table_has_column($pdo, 'customers', 'attachments_json');
 
 $adminDeliveryAreas = orange_delivery_areas_admin_list($pdo);
 $adminDaIndex = [];
@@ -127,7 +130,7 @@ if (orange_table_exists($pdo, 'customers')) {
         }
     }
 
-    // إحصاءات الطلبات لكل عميل.
+    // إحصاءات الطلبات لكل عميل + تفصيل حسب نوع الفاتورة (نقدي/آجل/أونلاين) — س15-2.
     $orderStatsByCustomerId = [];
     if (orange_table_exists($pdo, 'orders') && orange_table_has_column($pdo, 'orders', 'customer_id')) {
         try {
@@ -143,7 +146,71 @@ if (orange_table_exists($pdo, 'customers')) {
                         $orderStatsByCustomerId[$cid] = [
                             'count' => (int) ($oRow['cnt'] ?? 0),
                             'last_at' => (string) ($oRow['last_at'] ?? ''),
+                            'cash' => 0,
+                            'credit' => 0,
+                            'online' => 0,
                         ];
+                    }
+                }
+            }
+            // تفصيل حسب payment_terms (cash/credit) + source للأونلاين — استعلامان منفصلان لتجنّب تعقيد GROUP BY.
+            $hasPaymentTerms = orange_table_has_column($pdo, 'orders', 'payment_terms');
+            $hasSource = orange_table_has_column($pdo, 'orders', 'source');
+            $hasChannelId = orange_table_has_column($pdo, 'orders', 'channel_id');
+            // 1) تفصيل النقدي/الآجل (payment_terms)
+            if ($hasPaymentTerms) {
+                $dSt1 = $pdo->query(
+                    'SELECT customer_id, payment_terms, COUNT(*) AS cnt
+                     FROM orders WHERE customer_id IS NOT NULL AND customer_id > 0
+                     GROUP BY customer_id, payment_terms'
+                );
+                if ($dSt1) {
+                    while ($dRow = $dSt1->fetch(PDO::FETCH_ASSOC)) {
+                        $cid = (int) ($dRow['customer_id'] ?? 0);
+                        if ($cid <= 0 || !isset($orderStatsByCustomerId[$cid])) {
+                            continue;
+                        }
+                        $pt = strtolower(trim((string) ($dRow['payment_terms'] ?? 'cash')));
+                        $cnt = (int) ($dRow['cnt'] ?? 0);
+                        if ($pt === 'credit') {
+                            $orderStatsByCustomerId[$cid]['credit'] += $cnt;
+                        } else {
+                            $orderStatsByCustomerId[$cid]['cash'] += $cnt;
+                        }
+                    }
+                }
+            } else {
+                foreach ($orderStatsByCustomerId as $cid => &$st) {
+                    $st['cash'] = (int) ($st['count'] ?? 0);
+                }
+                unset($st);
+            }
+            // 2) تفصيل الأونلاين (source/storefront أو channel_id غير NULL) — يُعدّل التفصيل أعلاه (نضمن أن online لا يُحتسب مرتين).
+            if ($hasSource || $hasChannelId) {
+                $cond = $hasSource ? "source IN ('online','storefront')" : 'channel_id IS NOT NULL';
+                $dSt2 = $pdo->query(
+                    "SELECT customer_id, COUNT(*) AS cnt
+                     FROM orders WHERE customer_id IS NOT NULL AND customer_id > 0 AND $cond
+                     GROUP BY customer_id"
+                );
+                if ($dSt2) {
+                    while ($dRow = $dSt2->fetch(PDO::FETCH_ASSOC)) {
+                        $cid = (int) ($dRow['customer_id'] ?? 0);
+                        if ($cid <= 0 || !isset($orderStatsByCustomerId[$cid])) {
+                            continue;
+                        }
+                        $cnt = (int) ($dRow['cnt'] ?? 0);
+                        $orderStatsByCustomerId[$cid]['online'] = $cnt;
+                        // اقتطاع من النقدي/الآجل (الأونلاين له toggled كقناة + قد يحمل payment_terms="cash"؛ نعتبر الأونلاين أولوية للتفصيل البصري).
+                        if ($cnt > 0) {
+                            $remaining = max(0, (int) $orderStatsByCustomerId[$cid]['cash'] - $cnt);
+                            $consumed = (int) $orderStatsByCustomerId[$cid]['cash'] - $remaining;
+                            $orderStatsByCustomerId[$cid]['cash'] = $remaining;
+                            if ($consumed < $cnt) {
+                                $stillFromCredit = $cnt - $consumed;
+                                $orderStatsByCustomerId[$cid]['credit'] = max(0, (int) $orderStatsByCustomerId[$cid]['credit'] - $stillFromCredit);
+                            }
+                        }
                     }
                 }
             }
@@ -188,6 +255,11 @@ if (orange_table_exists($pdo, 'customers')) {
         );
         $searchHay = function_exists('mb_strtolower') ? mb_strtolower($searchHayRaw, 'UTF-8') : strtolower($searchHayRaw);
 
+        $statusRaw = strtolower(trim((string) ($r['status'] ?? 'active')));
+        if (!in_array($statusRaw, ['active', 'inactive', 'blocked'], true)) {
+            $statusRaw = 'active';
+        }
+
         $customerSearchRowsPayload[] = [
             'id' => $cid,
             'code' => (string) ($r['code'] ?? ''),
@@ -204,9 +276,15 @@ if (orange_table_exists($pdo, 'customers')) {
             'credit_limit' => isset($r['credit_limit']) && $r['credit_limit'] !== null && (float) $r['credit_limit'] > 0
                 ? (float) $r['credit_limit'] : null,
             'notes' => (string) ($r['notes'] ?? ''),
+            'status' => $statusRaw,
+            'block_reason' => (string) ($r['block_reason'] ?? ''),
+            'attachments_json' => (string) ($r['attachments_json'] ?? ''),
             'current_balance' => round((float) $bal, 3),
             'orders_count' => (int) ($stats['count'] ?? 0),
             'orders_last_at' => (string) ($stats['last_at'] ?? ''),
+            'orders_cash' => (int) ($stats['cash'] ?? 0),
+            'orders_credit' => (int) ($stats['credit'] ?? 0),
+            'orders_online' => (int) ($stats['online'] ?? 0),
             'storefront_account_id' => $sfAcc ? (int) $sfAcc['id'] : null,
             'storefront_account_email' => $sfAcc ? (string) $sfAcc['email'] : '',
             'storefront_account_verified' => $sfAcc ? (bool) $sfAcc['verified'] : false,
@@ -256,11 +334,25 @@ $count = count($customerRows);
     column-gap: 12px;
     grid-template-areas:
         "cus_r1_code cus_r1_code cus_r1_code cus_r1_code"
-        "cus_r2_name cus_r2_name cus_r2_balance cus_r2_orders"
+        "cus_r2_name cus_r2_name cus_r2_balance cus_r2_status"
+        "cus_r3_country cus_r3_phone cus_r3_email cus_r3_credit"
+        "cus_r4_address cus_r4_address cus_r4_address cus_r4_area"
+        "cus_r4b_block_reason cus_r4b_block_reason cus_r4b_block_reason cus_r4b_block_reason"
+        "cus_r5_notes cus_r5_notes cus_r5_notes cus_r5_notes"
+        "cus_r6_orders cus_r6_orders cus_r6_orders cus_r6_orders"
+        "cus_r7_sf cus_r7_sf cus_r7_sf cus_r7_sf"
+        "cus_r8_attachments cus_r8_attachments cus_r8_attachments cus_r8_attachments";
+}
+#cus_form_grid.customers-form-grid.customers-form-grid--block-hidden {
+    grid-template-areas:
+        "cus_r1_code cus_r1_code cus_r1_code cus_r1_code"
+        "cus_r2_name cus_r2_name cus_r2_balance cus_r2_status"
         "cus_r3_country cus_r3_phone cus_r3_email cus_r3_credit"
         "cus_r4_address cus_r4_address cus_r4_address cus_r4_area"
         "cus_r5_notes cus_r5_notes cus_r5_notes cus_r5_notes"
-        "cus_r6_sf cus_r6_sf cus_r6_sf cus_r6_sf";
+        "cus_r6_orders cus_r6_orders cus_r6_orders cus_r6_orders"
+        "cus_r7_sf cus_r7_sf cus_r7_sf cus_r7_sf"
+        "cus_r8_attachments cus_r8_attachments cus_r8_attachments cus_r8_attachments";
 }
 #cus_form_grid.customers-form-grid input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]),
 #cus_form_grid.customers-form-grid select {
@@ -327,12 +419,103 @@ $count = count($customerRows);
     gap: 6px;
     min-width: 0;
 }
-#cus_form_grid .cus-grid-r2-orders {
-    grid-area: cus_r2_orders;
+#cus_form_grid .cus-grid-r2-status {
+    grid-area: cus_r2_status;
     display: flex;
     flex-direction: column;
     gap: 6px;
     min-width: 0;
+}
+#cus_form_grid .cus-grid-r4b-block-reason {
+    grid-area: cus_r4b_block_reason;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+#cus_form_grid .cus-grid-r6-orders {
+    grid-area: cus_r6_orders;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+#cus_form_grid .cus-orders-breakdown {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+}
+#cus_form_grid .cus-orders-breakdown__item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 10px;
+    border: 1px solid #e4e4e7;
+    border-radius: 8px;
+    background: #f8fafc;
+    font-size: 0.85rem;
+}
+#cus_form_grid .cus-orders-breakdown__label {
+    color: #64748b;
+}
+#cus_form_grid .cus-orders-breakdown__val {
+    color: #0f172a;
+    font-weight: 700;
+    font-size: 1.05rem;
+    text-align: center;
+}
+#cus_form_grid .cus-grid-r8-attachments {
+    grid-area: cus_r8_attachments;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+#cus_form_grid .cus-attachments-inline {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+}
+#cus_form_grid .cus-attachments-inline input[readonly] {
+    background: #f4f6f9;
+    cursor: default;
+}
+.cus-attachments-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+}
+.cus-attachments-toolbar > div {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.cus-attachments-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 320px;
+    overflow-y: auto;
+}
+.cus-attachment-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 1px solid #e4e4e7;
+    border-radius: 8px;
+}
+.cus-attachment-actions {
+    display: flex;
+    gap: 6px;
+}
+#cus_form_grid .cus-area-current-hint {
+    margin: 4px 0 0;
+    font-size: 0.85rem;
+    color: #b45309;
 }
 #cus_form_grid .cus-grid-r3-country {
     grid-area: cus_r3_country;
@@ -383,8 +566,8 @@ $count = count($customerRows);
     gap: 6px;
     min-width: 0;
 }
-#cus_form_grid .cus-grid-r6-sf {
-    grid-area: cus_r6_sf;
+#cus_form_grid .cus-grid-r7-sf {
+    grid-area: cus_r7_sf;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -434,12 +617,18 @@ $count = count($customerRows);
         grid-template-areas:
             "cus_r1_code cus_r1_code"
             "cus_r2_name cus_r2_name"
-            "cus_r2_balance cus_r2_orders"
+            "cus_r2_balance cus_r2_status"
             "cus_r3_country cus_r3_phone"
             "cus_r3_email cus_r3_credit"
             "cus_r4_address cus_r4_area"
+            "cus_r4b_block_reason cus_r4b_block_reason"
             "cus_r5_notes cus_r5_notes"
-            "cus_r6_sf cus_r6_sf";
+            "cus_r6_orders cus_r6_orders"
+            "cus_r7_sf cus_r7_sf"
+            "cus_r8_attachments cus_r8_attachments";
+    }
+    #cus_form_grid .cus-orders-breakdown {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     }
 }
 @media (max-width: 768px) {
@@ -449,15 +638,24 @@ $count = count($customerRows);
             "cus_r1_code"
             "cus_r2_name"
             "cus_r2_balance"
-            "cus_r2_orders"
+            "cus_r2_status"
             "cus_r3_country"
             "cus_r3_phone"
             "cus_r3_email"
             "cus_r3_credit"
             "cus_r4_area"
             "cus_r4_address"
+            "cus_r4b_block_reason"
             "cus_r5_notes"
-            "cus_r6_sf";
+            "cus_r6_orders"
+            "cus_r7_sf"
+            "cus_r8_attachments";
+    }
+    #cus_form_grid .cus-orders-breakdown {
+        grid-template-columns: 1fr;
+    }
+    .cus-attachments-toolbar {
+        grid-template-columns: 1fr;
     }
 }
 </style>
@@ -473,6 +671,7 @@ $count = count($customerRows);
                     <input type="text" id="cus_code" class="admin-sort-field admin-sort-field--muted" maxlength="32" autocomplete="off" dir="ltr" lang="en" value="<?php echo htmlspecialchars($nextCustomerCodePreview, ENT_QUOTES, 'UTF-8'); ?>" readonly>
                 </div>
                 <div class="cus-code-nav-btns" role="group" aria-label="تنقل بين العملاء">
+                    <button type="button" class="btn-secondary cus-code-nav-btn" id="cus_code_edit_btn" title="تعديل الكود يدوياً">تعديل الكود</button>
                     <button type="button" class="btn-secondary cus-code-nav-btn" id="cus_nav_first" title="أول عميل" aria-label="أول عميل">&lt;&lt;</button>
                     <button type="button" class="btn-secondary cus-code-nav-btn" id="cus_nav_prev" title="العميل السابق" aria-label="العميل السابق">&lt;</button>
                     <button type="button" class="btn-secondary cus-code-nav-btn" id="cus_nav_next" title="العميل التالي" aria-label="العميل التالي">&gt;</button>
@@ -490,10 +689,16 @@ $count = count($customerRows);
             <label for="cus_current_balance">رصيد الذمة (مدين)</label>
             <input type="text" id="cus_current_balance" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" value="0.000" readonly>
         </div>
-        <div class="cus-grid-r2-orders">
-            <label for="cus_orders_count">عدد الطلبات</label>
-            <input type="text" id="cus_orders_count" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" value="0" readonly>
+        <?php if ($hasCustomerStatusCol): ?>
+        <div class="cus-grid-r2-status">
+            <label for="cus_status">حالة العميل</label>
+            <select id="cus_status">
+                <option value="active" selected>نشط</option>
+                <option value="inactive">غير نشط</option>
+                <option value="blocked">محظور مؤقتاً</option>
+            </select>
         </div>
+        <?php endif; ?>
 
         <div class="cus-grid-r3-country">
             <label for="cus_phone_country">كود الدولة</label>
@@ -532,7 +737,15 @@ $count = count($customerRows);
                     </option>
                 <?php endforeach; ?>
             </select>
+            <p id="cus_area_current_hint" class="cus-area-current-hint" hidden></p>
         </div>
+
+        <?php if ($hasCustomerBlockReasonCol): ?>
+        <div id="cus_block_reason_wrap" class="cus-grid-r4b-block-reason" style="display:none;">
+            <label for="cus_block_reason">سبب الحظر (عند الحظر)</label>
+            <input type="text" id="cus_block_reason" maxlength="255" autocomplete="off" placeholder="اختياري إذا العميل غير محظور">
+        </div>
+        <?php endif; ?>
 
         <?php if ($hasCustomerNotesCol): ?>
         <div class="cus-grid-r5-notes">
@@ -541,12 +754,44 @@ $count = count($customerRows);
         </div>
         <?php endif; ?>
 
-        <div class="cus-grid-r6-sf">
+        <div class="cus-grid-r6-orders">
+            <label>تفصيل الطلبات حسب نوع الفاتورة</label>
+            <div class="cus-orders-breakdown">
+                <div class="cus-orders-breakdown__item">
+                    <span class="cus-orders-breakdown__label">إجمالي</span>
+                    <span class="cus-orders-breakdown__val" id="cus_orders_count" dir="ltr">0</span>
+                </div>
+                <div class="cus-orders-breakdown__item">
+                    <span class="cus-orders-breakdown__label">نقدي (أدمن)</span>
+                    <span class="cus-orders-breakdown__val" id="cus_orders_cash" dir="ltr">0</span>
+                </div>
+                <div class="cus-orders-breakdown__item">
+                    <span class="cus-orders-breakdown__label">آجل (أدمن)</span>
+                    <span class="cus-orders-breakdown__val" id="cus_orders_credit" dir="ltr">0</span>
+                </div>
+                <div class="cus-orders-breakdown__item">
+                    <span class="cus-orders-breakdown__label">أونلاين</span>
+                    <span class="cus-orders-breakdown__val" id="cus_orders_online" dir="ltr">0</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="cus-grid-r7-sf">
             <label>حساب الواجهة (مزامنة تلقائية)</label>
             <div id="cus_sf_banner" class="cus-sf-banner is-empty">
                 <span>لا حساب واجهة مربوط حالياً.</span>
             </div>
         </div>
+
+        <?php if ($hasCustomerAttachmentsCol): ?>
+        <div class="cus-grid-r8-attachments" id="cus_attachments_wrap">
+            <label for="cus_attachments_count">عدد المرفقات</label>
+            <div class="cus-attachments-inline">
+                <input type="text" id="cus_attachments_count" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" value="0" readonly>
+                <button type="button" class="btn-secondary" id="cus_attachments_manage_btn">إدارة المرفقات</button>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
     <div class="actions admin-actions--start" style="margin-top:12px;">
         <button type="button" onclick="cusSave()">حفظ</button>
@@ -554,9 +799,41 @@ $count = count($customerRows);
         <button type="button" class="btn-secondary" id="cus_open_sales_btn">فاتورة مبيعات</button>
         <button type="button" class="btn-secondary" id="cus_open_sales_return_btn">مردود مبيعات</button>
         <button type="button" class="btn-secondary" id="cus_open_receipt_btn">قبض من العميل</button>
+        <button type="button" class="btn-secondary" id="cus_open_orders_btn">طلباته</button>
         <button type="button" class="btn-secondary" id="cus_open_statement_btn">كشف حساب</button>
+        <button type="button" class="btn-secondary" id="cus_print_btn">طباعة بطاقة</button>
+        <button type="button" class="btn-danger" id="cus_delete_btn">حذف</button>
     </div>
 </div>
+
+<?php if ($hasCustomerAttachmentsCol): ?>
+<div class="gl-pick-modal" id="cus_attachments_modal" hidden aria-hidden="true">
+    <div class="gl-pick-modal__backdrop" id="cus_attachments_backdrop"></div>
+    <div class="gl-pick-modal__dialog cus-attachments-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="cus_attachments_title">
+        <h3 id="cus_attachments_title" class="gl-pick-modal__title">مرفقات العميل</h3>
+        <p class="gl-pick-modal__hint muted" id="cus_attachments_hint" style="margin:0 0 10px;font-size:0.9rem;">
+            PDF وصور فقط — حد أقصى 5 مرفقات لكل عميل (حتى 20MB للملف قبل الضغط).
+        </p>
+        <div class="cus-attachments-toolbar">
+            <div>
+                <label for="cus_attachment_file">اختر ملف</label>
+                <input type="file" id="cus_attachment_file" accept=".pdf,image/*">
+            </div>
+            <div>
+                <label for="cus_attachment_name">اسم الملف</label>
+                <input type="text" id="cus_attachment_name" maxlength="191" autocomplete="off" placeholder="اختياري (يؤخذ من اسم الملف)">
+            </div>
+            <div class="actions" style="margin:0;">
+                <button type="button" class="btn-secondary" id="cus_attachment_upload_btn">رفع مرفق</button>
+            </div>
+        </div>
+        <div class="cus-attachments-list" id="cus_attachments_list"></div>
+        <div class="actions" style="margin-top:12px;">
+            <button type="button" class="btn-secondary" id="cus_attachments_close">إغلاق</button>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <div class="gl-pick-modal" id="cus_search_modal" hidden aria-hidden="true">
     <div class="gl-pick-modal__backdrop" id="cus_search_backdrop"></div>
@@ -577,6 +854,8 @@ var CUS_PARTNER_STATEMENT_URL = <?php echo json_encode(storefront_public_path('/
 var CUS_MANUAL_ORDER_URL = <?php echo json_encode(storefront_public_path('/admin/index.php?page=manual_order'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var CUS_RECEIPT_URL = <?php echo json_encode(storefront_public_path('/admin/index.php?page=partner_customer_receipt'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var CUS_SALES_RETURN_URL = <?php echo json_encode(storefront_public_path('/admin/index.php?page=sales_returns'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+var CUS_ORDERS_URL = <?php echo json_encode(storefront_public_path('/admin/index.php?page=orders'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+var CUS_PRINT_URL = <?php echo json_encode(storefront_public_path('/admin/api/customers/print-card.php'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var CUS_NAV_ROWS = CUS_SEARCH_ROWS
     .slice()
     .filter(function (row) {
@@ -620,12 +899,73 @@ function cusSetCurrentBalance(value) {
     if (isNaN(n)) n = 0;
     el.value = n.toFixed(3);
 }
-function cusSetOrdersCount(value) {
-    var el = document.getElementById('cus_orders_count');
+function cusSetOrdersBreakdown(total, cash, credit, online) {
+    var ids = {
+        'cus_orders_count': total,
+        'cus_orders_cash': cash,
+        'cus_orders_credit': credit,
+        'cus_orders_online': online
+    };
+    for (var key in ids) {
+        if (!Object.prototype.hasOwnProperty.call(ids, key)) continue;
+        var el = document.getElementById(key);
+        if (!el) continue;
+        var n = parseInt(String(ids[key] || 0), 10);
+        if (isNaN(n)) n = 0;
+        if (el.tagName === 'INPUT') {
+            el.value = String(n);
+        } else {
+            el.textContent = String(n);
+        }
+    }
+}
+function cusToggleBlockReason() {
+    var statusEl = document.getElementById('cus_status');
+    var reasonEl = document.getElementById('cus_block_reason');
+    var wrapEl = document.getElementById('cus_block_reason_wrap');
+    var gridEl = document.getElementById('cus_form_grid');
+    if (!statusEl) return;
+    var isBlocked = String(statusEl.value || 'active') === 'blocked';
+    if (gridEl && gridEl.classList) {
+        gridEl.classList.toggle('customers-form-grid--block-hidden', !isBlocked);
+    }
+    if (wrapEl) {
+        wrapEl.style.setProperty('display', isBlocked ? 'flex' : 'none', 'important');
+    }
+    if (reasonEl) {
+        reasonEl.required = isBlocked;
+        reasonEl.placeholder = isBlocked ? 'سبب الحظر مطلوب' : 'اختياري إذا العميل غير محظور';
+        if (!isBlocked) reasonEl.value = '';
+    }
+}
+function cusUpdateAreaCurrentHint(row) {
+    var hint = document.getElementById('cus_area_current_hint');
+    if (!hint) return;
+    var areaEl = cusAreaEl();
+    if (!areaEl) { hint.hidden = true; return; }
+    var saved = String((row && (row.area || row.delivery_area_name)) || '').trim();
+    var matched = String(areaEl.value || '').trim();
+    if (saved === '' || matched !== '') {
+        hint.hidden = true;
+        return;
+    }
+    hint.hidden = false;
+    hint.textContent = 'المنطقة المسجّلة سابقاً: ' + saved + ' — غير موجودة في القائمة الحالية';
+}
+function cusUpdateAttachmentsCount(jsonStr) {
+    var el = document.getElementById('cus_attachments_count');
     if (!el) return;
-    var n = parseInt(String(value || 0), 10);
-    if (isNaN(n)) n = 0;
-    el.value = String(n);
+    var arr = cusAttachmentsParse(jsonStr);
+    el.value = String(arr.length);
+}
+function cusAttachmentsParse(jsonStr) {
+    var raw = String(jsonStr || '').trim();
+    if (raw === '') return [];
+    try {
+        var parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+    } catch (e) { /* ignore */ }
+    return [];
 }
 
 function cusNavRows() {
@@ -827,41 +1167,68 @@ function cusSplitPhoneForForm(stored) {
 function cusResetForm() {
     document.getElementById('cus_id').value = '0';
     document.getElementById('cus_storefront_account_id').value = '0';
-    document.getElementById('cus_code').value = String(CUS_NEXT_AUTO_CODE || '1');
+    var codeEl = document.getElementById('cus_code');
+    if (codeEl) {
+        codeEl.value = String(CUS_NEXT_AUTO_CODE || '1');
+        codeEl.readOnly = true;
+        codeEl.classList.add('admin-sort-field--muted');
+    }
     document.getElementById('cus_name').value = '';
     document.getElementById('cus_phone').value = '';
     var cc = cusPhoneCountryEl();
     if (cc) cc.value = '__intl__';
+    var statusEl = document.getElementById('cus_status');
+    if (statusEl) statusEl.value = 'active';
+    var brEl = document.getElementById('cus_block_reason');
+    if (brEl) brEl.value = '';
     var emEl = document.getElementById('cus_email');
     if (emEl) emEl.value = '';
     var addrEl = document.getElementById('cus_address');
     if (addrEl) addrEl.value = '';
     cusAreaSetValue('');
+    var hint = document.getElementById('cus_area_current_hint');
+    if (hint) hint.hidden = true;
     var limEl = document.getElementById('cus_credit_limit');
     if (limEl) limEl.value = '';
     var notesEl = document.getElementById('cus_notes');
     if (notesEl) notesEl.value = '';
     cusSetCurrentBalance(0);
-    cusSetOrdersCount(0);
+    cusSetOrdersBreakdown(0, 0, 0, 0);
     cusSfBannerSet(null);
+    cusAttachmentSetRows([]);
+    cusAttachmentModalClose();
+    cusToggleBlockReason();
     cusNavRefreshButtons();
 }
 function cusEdit(row) {
     document.getElementById('cus_id').value = String(row.id || 0);
     document.getElementById('cus_storefront_account_id').value = String(row.storefront_account_id || 0);
-    document.getElementById('cus_code').value = String(row.code || '');
+    var codeEl = document.getElementById('cus_code');
+    if (codeEl) {
+        codeEl.value = String(row.code || '');
+        codeEl.readOnly = true;
+        codeEl.classList.add('admin-sort-field--muted');
+    }
     document.getElementById('cus_name').value = String(row.name_ar || '');
     var split = cusSplitPhoneForForm(row.phone || '');
     var ccEl = cusPhoneCountryEl();
     if (ccEl) ccEl.value = split.country && split.country !== '' ? split.country : '__intl__';
     document.getElementById('cus_phone').value = split.phone || '';
+    var statusEl = document.getElementById('cus_status');
+    if (statusEl) {
+        var st = String(row.status || 'active').toLowerCase();
+        if (st !== 'active' && st !== 'inactive' && st !== 'blocked') st = 'active';
+        statusEl.value = st;
+    }
+    var brEl = document.getElementById('cus_block_reason');
+    if (brEl) brEl.value = String(row.block_reason || '');
     var emEl = document.getElementById('cus_email');
     if (emEl) emEl.value = String(row.email || '');
     var addrEl = document.getElementById('cus_address');
     if (addrEl) addrEl.value = String(row.address || '');
-    // المنطقة بنمط الموردين: قيمة = نص الاسم. نفضّل اسم delivery_area المرتبط (لو موجود) ثم area المحفوظ.
     var areaNameForForm = String(row.delivery_area_name || row.area || '').trim();
     cusAreaSetValue(areaNameForForm);
+    cusUpdateAreaCurrentHint(row);
     var limEl = document.getElementById('cus_credit_limit');
     if (limEl) {
         var lim = row.credit_limit;
@@ -870,8 +1237,15 @@ function cusEdit(row) {
     var notesEl = document.getElementById('cus_notes');
     if (notesEl) notesEl.value = String(row.notes || '');
     cusSetCurrentBalance(row.current_balance != null ? row.current_balance : 0);
-    cusSetOrdersCount(row.orders_count != null ? row.orders_count : 0);
+    cusSetOrdersBreakdown(
+        row.orders_count != null ? row.orders_count : 0,
+        row.orders_cash != null ? row.orders_cash : 0,
+        row.orders_credit != null ? row.orders_credit : 0,
+        row.orders_online != null ? row.orders_online : 0
+    );
     cusSfBannerSet(row);
+    cusAttachmentLoadFromJson(row.attachments_json || '');
+    cusToggleBlockReason();
     var cardEl = document.getElementById('cus_form_card');
     if (cardEl) cardEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     cusNavRefreshButtons();
@@ -907,6 +1281,17 @@ function cusSave() {
         alert('بريد إلكتروني غير صالح');
         return;
     }
+    var statusEl = document.getElementById('cus_status');
+    var statusVal = statusEl ? String(statusEl.value || 'active').toLowerCase() : 'active';
+    if (!['active', 'inactive', 'blocked'].includes(statusVal)) statusVal = 'active';
+    var brEl = document.getElementById('cus_block_reason');
+    var brVal = brEl ? String(brEl.value || '').trim() : '';
+    if (statusVal === 'blocked' && brVal === '') {
+        alert('سبب الحظر مطلوب عند اختيار محظور مؤقتاً');
+        return;
+    }
+    var codeEl2 = document.getElementById('cus_code');
+    var codeVal = codeEl2 && !codeEl2.readOnly ? String(codeEl2.value || '').trim() : '';
     var payload = {
         name_ar: name || 'عميل',
         phone: phone,
@@ -914,8 +1299,11 @@ function cusSave() {
         area: area,
         address: address,
         email: email || null,
-        notes: notes || null
+        notes: notes || null,
+        status: statusVal,
+        block_reason: statusVal === 'blocked' ? brVal : null
     };
+    if (codeVal !== '') payload.code = codeVal;
     if (id > 0) payload.id = id;
     if (limRaw === '') {
         payload.credit_limit = null;
@@ -966,6 +1354,171 @@ function cusOpenCurrentSalesReturn() {
     }
     window.location.href = CUS_SALES_RETURN_URL + '&customer_id=' + encodeURIComponent(String(row.id));
 }
+function cusOpenCurrentOrders() {
+    var row = cusCurrentRow();
+    if (!row || (parseInt(String(row.id || '0'), 10) || 0) <= 0) {
+        alert('اختر العميل أولاً');
+        return;
+    }
+    window.location.href = CUS_ORDERS_URL + '&customer_id=' + encodeURIComponent(String(row.id));
+}
+function cusPrintCurrentCard() {
+    var row = cusCurrentRow();
+    if (!row || (parseInt(String(row.id || '0'), 10) || 0) <= 0) {
+        alert('اختر العميل أولاً');
+        return;
+    }
+    window.open(CUS_PRINT_URL + '?customer_id=' + encodeURIComponent(String(row.id)), '_blank');
+}
+function cusDeleteCurrent() {
+    var row = cusCurrentRow();
+    if (!row || (parseInt(String(row.id || '0'), 10) || 0) <= 0) {
+        alert('اختر العميل أولاً');
+        return;
+    }
+    if (!window.confirm('حذف العميل «' + (row.name_ar || ('#' + row.id)) + '» نهائياً؟\nشرط: العميل بلا رصيد ذمة + بلا طلبات + بلا حساب واجهة.')) {
+        return;
+    }
+    postJSON('/admin/api/customers/delete.php', { id: row.id })
+        .then(function (r) {
+            alert(r.message || (r.success ? 'تم الحذف' : 'فشل الحذف'));
+            if (r.success) location.reload();
+        })
+        .catch(function (e) { alert(e.message || String(e)); });
+}
+function cusToggleCodeEdit() {
+    var codeEl = document.getElementById('cus_code');
+    if (!codeEl) return;
+    var willEdit = codeEl.readOnly;
+    if (willEdit) {
+        if (!window.confirm('تحذير: تعديل كود عميل قائم قد يكسر تقارير قديمة.\nهل أنت متأكد؟')) {
+            return;
+        }
+        codeEl.readOnly = false;
+        codeEl.classList.remove('admin-sort-field--muted');
+        codeEl.focus();
+        codeEl.select();
+    } else {
+        codeEl.readOnly = true;
+        codeEl.classList.add('admin-sort-field--muted');
+    }
+}
+
+// المرفقات (نسخ نمط الموردين).
+function cusAttachmentInputs() {
+    return {
+        file: document.getElementById('cus_attachment_file'),
+        name: document.getElementById('cus_attachment_name')
+    };
+}
+function cusAttachmentModalOpen() {
+    var idEl = document.getElementById('cus_id');
+    var cid = parseInt(String(idEl && idEl.value || '0'), 10) || 0;
+    if (cid <= 0) {
+        alert('احفظ العميل أولاً قبل إدارة المرفقات');
+        return;
+    }
+    var modal = document.getElementById('cus_attachments_modal');
+    if (!modal) return;
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('gl-pick-open');
+}
+function cusAttachmentModalClose() {
+    var modal = document.getElementById('cus_attachments_modal');
+    if (!modal) return;
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('gl-pick-open');
+}
+function cusAttachmentSetRows(arr) {
+    var list = document.getElementById('cus_attachments_list');
+    if (!list) return;
+    list.innerHTML = '';
+    var rows = Array.isArray(arr) ? arr : [];
+    if (rows.length === 0) {
+        list.innerHTML = '<p class="muted" style="margin:0;">لا توجد مرفقات.</p>';
+        return;
+    }
+    rows.forEach(function (att) {
+        var row = document.createElement('div');
+        row.className = 'cus-attachment-row';
+        var label = document.createElement('div');
+        var displayName = String(att.name || att.file || '').trim();
+        var ts = String(att.created_at || '').trim();
+        label.innerHTML = '<strong>' + cusEsc(displayName) + '</strong>' + (ts ? '<br><span class="muted" style="font-size:0.8rem;">' + cusEsc(ts) + '</span>' : '');
+        var actions = document.createElement('div');
+        actions.className = 'cus-attachment-actions';
+        if (att.url) {
+            var openBtn = document.createElement('a');
+            openBtn.className = 'btn-secondary';
+            openBtn.href = att.url;
+            openBtn.target = '_blank';
+            openBtn.textContent = 'فتح';
+            actions.appendChild(openBtn);
+        }
+        var delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'btn-danger';
+        delBtn.textContent = 'حذف';
+        delBtn.addEventListener('click', function () {
+            cusAttachmentDelete(att);
+        });
+        actions.appendChild(delBtn);
+        row.appendChild(label);
+        row.appendChild(actions);
+        list.appendChild(row);
+    });
+    cusUpdateAttachmentsCount(JSON.stringify(rows));
+}
+function cusAttachmentLoadFromJson(jsonStr) {
+    cusAttachmentSetRows(cusAttachmentsParse(jsonStr));
+}
+function cusAttachmentUpload() {
+    var idEl = document.getElementById('cus_id');
+    var cid = parseInt(String(idEl && idEl.value || '0'), 10) || 0;
+    if (cid <= 0) {
+        alert('احفظ العميل أولاً');
+        return;
+    }
+    var inp = cusAttachmentInputs();
+    if (!inp.file || !inp.file.files || !inp.file.files[0]) {
+        alert('اختر ملفاً أولاً');
+        return;
+    }
+    var fd = new FormData();
+    fd.append('customer_id', String(cid));
+    fd.append('file', inp.file.files[0]);
+    if (inp.name && inp.name.value.trim() !== '') fd.append('name', inp.name.value.trim());
+    fetch('/admin/api/customers/attachment-upload.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        body: fd
+    })
+        .then(function (r) { return r.json(); })
+        .then(function (r) {
+            if (!r.success) { alert(r.message || 'فشل رفع المرفق'); return; }
+            if (inp.file) inp.file.value = '';
+            if (inp.name) inp.name.value = '';
+            cusAttachmentSetRows(r.attachments || []);
+        })
+        .catch(function (e) { alert(e.message || String(e)); });
+}
+function cusAttachmentDelete(att) {
+    var idEl = document.getElementById('cus_id');
+    var cid = parseInt(String(idEl && idEl.value || '0'), 10) || 0;
+    if (cid <= 0) return;
+    if (!window.confirm('حذف المرفق «' + (att.name || att.file) + '»؟')) return;
+    postJSON('/admin/api/customers/attachment-delete.php', {
+        customer_id: cid,
+        file: att.file || ''
+    })
+        .then(function (r) {
+            if (!r.success) { alert(r.message || 'فشل حذف المرفق'); return; }
+            cusAttachmentSetRows(r.attachments || []);
+        })
+        .catch(function (e) { alert(e.message || String(e)); });
+}
 
 (function initCustomersPage() {
     var searchOpenBtn = document.getElementById('cus_open_search_btn');
@@ -987,6 +1540,55 @@ function cusOpenCurrentSalesReturn() {
     var receiptBtn = document.getElementById('cus_open_receipt_btn');
     if (receiptBtn) {
         receiptBtn.addEventListener('click', function (e) { e.preventDefault(); cusOpenCurrentReceipt(); });
+    }
+    var ordersBtn = document.getElementById('cus_open_orders_btn');
+    if (ordersBtn) {
+        ordersBtn.addEventListener('click', function (e) { e.preventDefault(); cusOpenCurrentOrders(); });
+    }
+    var printBtn = document.getElementById('cus_print_btn');
+    if (printBtn) {
+        printBtn.addEventListener('click', function (e) { e.preventDefault(); cusPrintCurrentCard(); });
+    }
+    var delBtn = document.getElementById('cus_delete_btn');
+    if (delBtn) {
+        delBtn.addEventListener('click', function (e) { e.preventDefault(); cusDeleteCurrent(); });
+    }
+    var codeEditBtn = document.getElementById('cus_code_edit_btn');
+    if (codeEditBtn) {
+        codeEditBtn.addEventListener('click', function (e) { e.preventDefault(); cusToggleCodeEdit(); });
+    }
+    var statusEl = document.getElementById('cus_status');
+    if (statusEl) {
+        statusEl.addEventListener('change', cusToggleBlockReason);
+    }
+    var attManageBtn = document.getElementById('cus_attachments_manage_btn');
+    if (attManageBtn) {
+        attManageBtn.addEventListener('click', function (e) { e.preventDefault(); cusAttachmentModalOpen(); });
+    }
+    var attBackdrop = document.getElementById('cus_attachments_backdrop');
+    if (attBackdrop) {
+        attBackdrop.addEventListener('click', cusAttachmentModalClose);
+    }
+    var attClose = document.getElementById('cus_attachments_close');
+    if (attClose) {
+        attClose.addEventListener('click', cusAttachmentModalClose);
+    }
+    var attUploadBtn = document.getElementById('cus_attachment_upload_btn');
+    if (attUploadBtn) {
+        attUploadBtn.addEventListener('click', function (e) { e.preventDefault(); cusAttachmentUpload(); });
+    }
+    var attFile = document.getElementById('cus_attachment_file');
+    var attName = document.getElementById('cus_attachment_name');
+    if (attFile) {
+        attFile.addEventListener('change', function () {
+            var f = attFile.files && attFile.files[0] ? attFile.files[0] : null;
+            if (!f || !attName) return;
+            var current = String(attName.value || '').trim();
+            if (current !== '') return;
+            var raw = String(f.name || '');
+            var dot = raw.lastIndexOf('.');
+            attName.value = dot > 0 ? raw.slice(0, dot) : raw;
+        });
     }
     var navFirstBtn = document.getElementById('cus_nav_first');
     if (navFirstBtn) navFirstBtn.addEventListener('click', function (e) { e.preventDefault(); cusNavFirst(); });
@@ -1012,18 +1614,22 @@ function cusOpenCurrentSalesReturn() {
     document.addEventListener('keydown', function (ev) {
         if (ev.key !== 'Escape') return;
         var searchModal = document.getElementById('cus_search_modal');
-        if (searchModal && !searchModal.hidden) { cusSearchModalClose(); }
+        if (searchModal && !searchModal.hidden) { cusSearchModalClose(); return; }
+        var attModal = document.getElementById('cus_attachments_modal');
+        if (attModal && !attModal.hidden) { cusAttachmentModalClose(); }
     });
 
-    // دبل كليك على خانة الكود يفتح modal البحث (للسرعة).
+    // دبل كليك على خانة الكود يفتح modal البحث (للسرعة) — فقط إذا الحقل readonly.
     var codeEl = document.getElementById('cus_code');
     if (codeEl) {
         codeEl.addEventListener('dblclick', function (e) {
+            if (!codeEl.readOnly) return; // إذا في وضع التعديل، لا نفتح البحث.
             e.preventDefault();
             cusSearchModalOpen();
         });
     }
 
+    cusToggleBlockReason();
     cusNavRefreshButtons();
 })();
 </script>

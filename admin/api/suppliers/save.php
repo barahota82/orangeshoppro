@@ -94,8 +94,17 @@ try {
     $hasAttachmentsJson = orange_table_has_column($pdo, 'suppliers', 'attachments_json');
     // سياسة الموردين: الكود يُولَّد تلقائياً فقط؛ لا نقبل إدخالاً يدوياً من الواجهة.
     $codeSql = null;
+    $codeManualRaw = isset($data['code']) ? trim((string) $data['code']) : '';
     if ($hasCode) {
-        if ($idIn > 0) {
+        if ($codeManualRaw !== '') {
+            $codeSql = function_exists('mb_substr') ? mb_substr($codeManualRaw, 0, 32, 'UTF-8') : substr($codeManualRaw, 0, 32);
+            $codeDupSql = 'SELECT id FROM suppliers WHERE code = ?' . ($idIn > 0 ? ' AND id != ?' : '') . ' LIMIT 1';
+            $codeDupSt = $pdo->prepare($codeDupSql);
+            $codeDupSt->execute($idIn > 0 ? [$codeSql, $idIn] : [$codeSql]);
+            if ($codeDupSt->fetchColumn()) {
+                json_response(['success' => false, 'message' => 'كود المورد مستخدم بالفعل من قبل مورد آخر'], 409);
+            }
+        } elseif ($idIn > 0) {
             $existingCode = trim((string) (($existingSupplierRow['code'] ?? '')));
             $codeSql = $existingCode !== '' ? $existingCode : orange_supplier_next_auto_code($pdo);
         } else {

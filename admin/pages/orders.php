@@ -19,12 +19,28 @@ if (!in_array($payFilter, ['all', 'cash', 'credit', 'online'], true)) {
     $payFilter = 'all';
 }
 
+// س15 + شاشة العملاء: فلتر `?customer_id=ID` (prefill من زر «طلباته»).
+$customerFilterId = isset($_GET['customer_id']) ? (int) $_GET['customer_id'] : 0;
+$customerFilterName = '';
+$hasOrdersCustomerCol = orange_table_has_column($pdo, 'orders', 'customer_id');
+if ($customerFilterId > 0 && $hasOrdersCustomerCol && orange_table_exists($pdo, 'customers')) {
+    $stCust = $pdo->prepare('SELECT name_ar FROM customers WHERE id = ? LIMIT 1');
+    $stCust->execute([$customerFilterId]);
+    $custRow = $stCust->fetch(PDO::FETCH_ASSOC);
+    if ($custRow) {
+        $customerFilterName = (string) ($custRow['name_ar'] ?? '');
+    } else {
+        $customerFilterId = 0;
+    }
+}
+
 $sql = '
     SELECT o.*, c.name AS channel_name
     FROM orders o
     LEFT JOIN channels c ON c.id = o.channel_id
     WHERE 1=1
 ';
+$sqlParams = [];
 if ($sourceFilter === 'website') {
     $sql .= " AND (o.order_source IS NULL OR o.order_source = '' OR o.order_source = 'website')";
 } elseif ($sourceFilter === 'company') {
@@ -37,13 +53,23 @@ if ($payFilter === 'cash') {
 } elseif ($payFilter === 'online') {
     $sql .= " AND o.payment_terms = 'online'";
 }
+if ($customerFilterId > 0 && $hasOrdersCustomerCol) {
+    $sql .= ' AND o.customer_id = ?';
+    $sqlParams[] = $customerFilterId;
+}
 
 $sql .= ' ORDER BY o.id DESC';
 
 try {
-    $orders = $pdo->query($sql)->fetchAll();
+    if ($sqlParams === []) {
+        $orders = $pdo->query($sql)->fetchAll();
+    } else {
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($sqlParams);
+        $orders = $stmt->fetchAll();
+    }
 } catch (Throwable $e) {
-    if ($sourceFilter !== 'all' || $payFilter !== 'all') {
+    if ($sourceFilter !== 'all' || $payFilter !== 'all' || $customerFilterId > 0) {
         $sql = '
             SELECT o.*, c.name AS channel_name
             FROM orders o
@@ -117,6 +143,13 @@ function orange_admin_orders_action_buttons(array $o): void
 
 <div class="card admin-fy-card">
     <h3 class="card-title">قائمة الطلبات</h3>
+    <?php if ($customerFilterId > 0): ?>
+    <div class="card-hint" style="margin:0 0 12px;padding:8px 12px;border:1px solid #93c5fd;background:#eff6ff;color:#1e3a8a;border-radius:8px;">
+        <strong>عرض طلبات العميل:</strong>
+        <?php echo htmlspecialchars($customerFilterName !== '' ? $customerFilterName : ('#' . $customerFilterId), ENT_QUOTES, 'UTF-8'); ?>
+        — <a href="<?php echo htmlspecialchars($ordersIndex, ENT_QUOTES, 'UTF-8'); ?>?page=orders">إزالة الفلتر</a>
+    </div>
+    <?php endif; ?>
     <div class="admin-toolbar" role="region" aria-label="تصفية الطلبات">
         <label class="admin-toolbar__field">
             <span>تصفية حسب المصدر</span>
