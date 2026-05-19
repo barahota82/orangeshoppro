@@ -6,7 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/customer_attachments.php';
 
-require_admin();
+require_admin_api();
 
 try {
     $pdo = db();

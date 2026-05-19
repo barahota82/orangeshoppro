@@ -7,7 +7,7 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
 
-require_admin();
+require_admin_page();
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
