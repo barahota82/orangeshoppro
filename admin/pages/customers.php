@@ -334,7 +334,8 @@ $count = count($customerRows);
  * ترتيب الحقول كما طلب المالك (RTL → القارئ يبدأ من اليمين):
  * r1: كود العميل (تلقائي) — full width مع شريط التنقل
  * r2: كود الدولة | الهاتف | حد الائتمان | رصيد الذمة | حالة العميل  (5 أعمدة)
- * r3: اسم العميل | الرقم المدني | البريد الإلكتروني | عدد المرفقات | إدارة المرفقات  (5 أعمدة)
+ * r3: اسم العميل | الرقم المدني | البريد الإلكتروني | المرفقات (عداد + زر داخل label واحد)  (5 grid: 1+1+1+2)
+ *     — نفس نمط suppliers.php سطر «المعاملة الضريبية»: خلية المرفقات بـ sub-grid 1fr 1fr.
  * r4: المنطقة | العنوان  (1 + 4 spans)
  * r4b: سبب الحظر (full — يظهر فقط عند حالة محظور)
  * r5: ملاحظات (full)
@@ -349,7 +350,7 @@ $count = count($customerRows);
     grid-template-areas:
         "cus_r1_code cus_r1_code cus_r1_code cus_r1_code cus_r1_code"
         "cus_r2_country cus_r2_phone cus_r2_credit cus_r2_balance cus_r2_status"
-        "cus_r3_name cus_r3_civil cus_r3_email cus_r3_att_count cus_r3_att_manage"
+        "cus_r3_name cus_r3_civil cus_r3_email cus_r3_attachments cus_r3_attachments"
         "cus_r4_area cus_r4_address cus_r4_address cus_r4_address cus_r4_address"
         "cus_r4b_block_reason cus_r4b_block_reason cus_r4b_block_reason cus_r4b_block_reason cus_r4b_block_reason"
         "cus_r5_notes cus_r5_notes cus_r5_notes cus_r5_notes cus_r5_notes"
@@ -360,7 +361,7 @@ $count = count($customerRows);
     grid-template-areas:
         "cus_r1_code cus_r1_code cus_r1_code cus_r1_code cus_r1_code"
         "cus_r2_country cus_r2_phone cus_r2_credit cus_r2_balance cus_r2_status"
-        "cus_r3_name cus_r3_civil cus_r3_email cus_r3_att_count cus_r3_att_manage"
+        "cus_r3_name cus_r3_civil cus_r3_email cus_r3_attachments cus_r3_attachments"
         "cus_r4_area cus_r4_address cus_r4_address cus_r4_address cus_r4_address"
         "cus_r5_notes cus_r5_notes cus_r5_notes cus_r5_notes cus_r5_notes"
         "cus_r6_orders cus_r6_orders cus_r6_orders cus_r6_orders cus_r6_orders"
@@ -425,9 +426,29 @@ $count = count($customerRows);
 #cus_form_grid .cus-grid-r3-name        { grid-area: cus_r3_name;        display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 #cus_form_grid .cus-grid-r3-civil       { grid-area: cus_r3_civil;       display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 #cus_form_grid .cus-grid-r3-email       { grid-area: cus_r3_email;       display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-#cus_form_grid .cus-grid-r3-att-count   { grid-area: cus_r3_att_count;   display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-#cus_form_grid .cus-grid-r3-att-manage  { grid-area: cus_r3_att_manage;  display: flex; flex-direction: column; gap: 6px; min-width: 0; justify-content: flex-end; }
-#cus_form_grid .cus-grid-r3-att-manage button { width: 100%; }
+#cus_form_grid .cus-grid-r3-attachments {
+    grid-area: cus_r3_attachments;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+/* sub-grid (عداد + زر) داخل خلية المرفقات — نفس نمط suppliers.php */
+#cus_form_grid .cus-attachments-inline {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px;
+    width: 100%;
+}
+#cus_form_grid #cus_attachments_count {
+    max-width: none;
+    width: 100%;
+    text-align: center;
+}
+#cus_form_grid #cus_attachments_manage_btn {
+    width: 100%;
+    height: 42px;
+}
 #cus_form_grid .cus-grid-r4-area    { grid-area: cus_r4_area;    display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 #cus_form_grid .cus-grid-r4-address { grid-area: cus_r4_address; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 #cus_form_grid .cus-grid-r4b-block-reason {
@@ -565,8 +586,7 @@ $count = count($customerRows);
             "cus_r2_credit cus_r2_balance"
             "cus_r2_status cus_r2_status"
             "cus_r3_name cus_r3_civil"
-            "cus_r3_email cus_r3_att_count"
-            "cus_r3_att_manage cus_r3_att_manage"
+            "cus_r3_email cus_r3_attachments"
             "cus_r4_area cus_r4_address"
             "cus_r4b_block_reason cus_r4b_block_reason"
             "cus_r5_notes cus_r5_notes"
@@ -580,8 +600,7 @@ $count = count($customerRows);
             "cus_r2_credit cus_r2_balance"
             "cus_r2_status cus_r2_status"
             "cus_r3_name cus_r3_civil"
-            "cus_r3_email cus_r3_att_count"
-            "cus_r3_att_manage cus_r3_att_manage"
+            "cus_r3_email cus_r3_attachments"
             "cus_r4_area cus_r4_address"
             "cus_r5_notes cus_r5_notes"
             "cus_r6_orders cus_r6_orders"
@@ -604,8 +623,7 @@ $count = count($customerRows);
             "cus_r3_name"
             "cus_r3_civil"
             "cus_r3_email"
-            "cus_r3_att_count"
-            "cus_r3_att_manage"
+            "cus_r3_attachments"
             "cus_r4_area"
             "cus_r4_address"
             "cus_r4b_block_reason"
@@ -624,8 +642,7 @@ $count = count($customerRows);
             "cus_r3_name"
             "cus_r3_civil"
             "cus_r3_email"
-            "cus_r3_att_count"
-            "cus_r3_att_manage"
+            "cus_r3_attachments"
             "cus_r4_area"
             "cus_r4_address"
             "cus_r5_notes"
@@ -710,13 +727,12 @@ $count = count($customerRows);
         </div>
         <?php endif; ?>
         <?php if ($hasCustomerAttachmentsCol): ?>
-        <div class="cus-grid-r3-att-count">
+        <div class="cus-grid-r3-attachments" id="cus_attachments_wrap">
             <label for="cus_attachments_count">عدد المرفقات</label>
-            <input type="text" id="cus_attachments_count" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" value="0" readonly>
-        </div>
-        <div class="cus-grid-r3-att-manage">
-            <label>&nbsp;</label>
-            <button type="button" class="btn-secondary" id="cus_attachments_manage_btn">إدارة المرفقات</button>
+            <div class="cus-attachments-inline">
+                <input type="text" id="cus_attachments_count" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" value="0" readonly>
+                <button type="button" class="btn-secondary" id="cus_attachments_manage_btn">إدارة المرفقات</button>
+            </div>
         </div>
         <?php endif; ?>
 
