@@ -350,7 +350,7 @@ $count = count($customerRows);
     grid-template-areas:
         "cus_r1_code cus_r1_code cus_r1_code cus_r1_code cus_r1_code"
         "cus_r2_country cus_r2_phone cus_r2_credit cus_r2_balance cus_r2_status"
-        "cus_r3_name cus_r3_civil cus_r3_email cus_r3_attachments cus_r3_attachments"
+        "cus_r3_all cus_r3_all cus_r3_all cus_r3_all cus_r3_all"
         "cus_r4_area cus_r4_address cus_r4_address cus_r4_address cus_r4_address"
         "cus_r4b_block_reason cus_r4b_block_reason cus_r4b_block_reason cus_r4b_block_reason cus_r4b_block_reason"
         "cus_r5_notes cus_r5_notes cus_r5_notes cus_r5_notes cus_r5_notes"
@@ -361,11 +361,18 @@ $count = count($customerRows);
     grid-template-areas:
         "cus_r1_code cus_r1_code cus_r1_code cus_r1_code cus_r1_code"
         "cus_r2_country cus_r2_phone cus_r2_credit cus_r2_balance cus_r2_status"
-        "cus_r3_name cus_r3_civil cus_r3_email cus_r3_attachments cus_r3_attachments"
+        "cus_r3_all cus_r3_all cus_r3_all cus_r3_all cus_r3_all"
         "cus_r4_area cus_r4_address cus_r4_address cus_r4_address cus_r4_address"
         "cus_r5_notes cus_r5_notes cus_r5_notes cus_r5_notes cus_r5_notes"
         "cus_r6_orders cus_r6_orders cus_r6_orders cus_r6_orders cus_r6_orders"
         "cus_r7_sf cus_r7_sf cus_r7_sf cus_r7_sf cus_r7_sf";
+}
+/* r3 صف مستقل بـ 4 أعمدة × 25% (نسخة طبق الأصل من سطر «المعاملة الضريبية» في الموردين). */
+#cus_form_grid .cus-grid-r3-all {
+    grid-area: cus_r3_all;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 12px;
 }
 #cus_form_grid.customers-form-grid input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]),
 #cus_form_grid.customers-form-grid select {
@@ -423,16 +430,9 @@ $count = count($customerRows);
 #cus_form_grid .cus-grid-r2-credit  { grid-area: cus_r2_credit;  display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 #cus_form_grid .cus-grid-r2-balance { grid-area: cus_r2_balance; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 #cus_form_grid .cus-grid-r2-status  { grid-area: cus_r2_status;  display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-#cus_form_grid .cus-grid-r3-name        { grid-area: cus_r3_name;        display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-#cus_form_grid .cus-grid-r3-civil       { grid-area: cus_r3_civil;       display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-#cus_form_grid .cus-grid-r3-email       { grid-area: cus_r3_email;       display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-#cus_form_grid .cus-grid-r3-attachments {
-    grid-area: cus_r3_attachments;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 0;
-}
+/* خلايا داخل r3-all — كل واحدة flex column (label + input/select) بلا grid-area لأنها داخل الـ sub-grid. */
+#cus_form_grid .cus-grid-r3-cell        { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+#cus_form_grid .cus-grid-r3-attachments { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 /* sub-grid (عداد + زر) داخل خلية المرفقات — نفس نمط suppliers.php */
 #cus_form_grid .cus-attachments-inline {
     display: grid;
@@ -585,8 +585,7 @@ $count = count($customerRows);
             "cus_r2_country cus_r2_phone"
             "cus_r2_credit cus_r2_balance"
             "cus_r2_status cus_r2_status"
-            "cus_r3_name cus_r3_civil"
-            "cus_r3_email cus_r3_attachments"
+            "cus_r3_all cus_r3_all"
             "cus_r4_area cus_r4_address"
             "cus_r4b_block_reason cus_r4b_block_reason"
             "cus_r5_notes cus_r5_notes"
@@ -599,12 +598,14 @@ $count = count($customerRows);
             "cus_r2_country cus_r2_phone"
             "cus_r2_credit cus_r2_balance"
             "cus_r2_status cus_r2_status"
-            "cus_r3_name cus_r3_civil"
-            "cus_r3_email cus_r3_attachments"
+            "cus_r3_all cus_r3_all"
             "cus_r4_area cus_r4_address"
             "cus_r5_notes cus_r5_notes"
             "cus_r6_orders cus_r6_orders"
             "cus_r7_sf cus_r7_sf";
+    }
+    #cus_form_grid .cus-grid-r3-all {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     }
     #cus_form_grid .cus-orders-breakdown {
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -620,10 +621,7 @@ $count = count($customerRows);
             "cus_r2_credit"
             "cus_r2_balance"
             "cus_r2_status"
-            "cus_r3_name"
-            "cus_r3_civil"
-            "cus_r3_email"
-            "cus_r3_attachments"
+            "cus_r3_all"
             "cus_r4_area"
             "cus_r4_address"
             "cus_r4b_block_reason"
@@ -639,15 +637,15 @@ $count = count($customerRows);
             "cus_r2_credit"
             "cus_r2_balance"
             "cus_r2_status"
-            "cus_r3_name"
-            "cus_r3_civil"
-            "cus_r3_email"
-            "cus_r3_attachments"
+            "cus_r3_all"
             "cus_r4_area"
             "cus_r4_address"
             "cus_r5_notes"
             "cus_r6_orders"
             "cus_r7_sf";
+    }
+    #cus_form_grid .cus-grid-r3-all {
+        grid-template-columns: 1fr;
     }
     #cus_form_grid .cus-orders-breakdown {
         grid-template-columns: 1fr;
@@ -709,32 +707,34 @@ $count = count($customerRows);
         </div>
         <?php endif; ?>
 
-        <!-- الصف 3: اسم العميل | الرقم المدني | البريد الإلكتروني -->
-        <div class="cus-grid-r3-name">
-            <label for="cus_name">اسم العميل</label>
-            <input type="text" id="cus_name" autocomplete="off" placeholder="اسم العميل" maxlength="255">
-        </div>
-        <?php if ($hasCustomerCivilIdCol): ?>
-        <div class="cus-grid-r3-civil">
-            <label for="cus_civil_id">الرقم المدني / الإقامة</label>
-            <input type="text" id="cus_civil_id" maxlength="20" autocomplete="off" dir="ltr" lang="en" placeholder="اختياري — فريد إذا أُدخل">
-        </div>
-        <?php endif; ?>
-        <?php if ($hasCustomerEmailCol): ?>
-        <div class="cus-grid-r3-email">
-            <label for="cus_email">البريد الإلكتروني</label>
-            <input type="email" id="cus_email" autocomplete="off" dir="ltr" lang="en" placeholder="اختياري">
-        </div>
-        <?php endif; ?>
-        <?php if ($hasCustomerAttachmentsCol): ?>
-        <div class="cus-grid-r3-attachments" id="cus_attachments_wrap">
-            <label for="cus_attachments_count">عدد المرفقات</label>
-            <div class="cus-attachments-inline">
-                <input type="text" id="cus_attachments_count" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" value="0" readonly>
-                <button type="button" class="btn-secondary" id="cus_attachments_manage_btn">إدارة المرفقات</button>
+        <!-- الصف 3: 4 خلايا متساوية (25% × 4) مطابقة لنمط الموردين -->
+        <div class="cus-grid-r3-all">
+            <div class="cus-grid-r3-cell">
+                <label for="cus_name">اسم العميل</label>
+                <input type="text" id="cus_name" autocomplete="off" placeholder="اسم العميل" maxlength="255">
             </div>
+            <?php if ($hasCustomerCivilIdCol): ?>
+            <div class="cus-grid-r3-cell">
+                <label for="cus_civil_id">الرقم المدني / الإقامة</label>
+                <input type="text" id="cus_civil_id" maxlength="20" autocomplete="off" dir="ltr" lang="en" placeholder="اختياري — فريد إذا أُدخل">
+            </div>
+            <?php endif; ?>
+            <?php if ($hasCustomerEmailCol): ?>
+            <div class="cus-grid-r3-cell">
+                <label for="cus_email">البريد الإلكتروني</label>
+                <input type="email" id="cus_email" autocomplete="off" dir="ltr" lang="en" placeholder="اختياري">
+            </div>
+            <?php endif; ?>
+            <?php if ($hasCustomerAttachmentsCol): ?>
+            <div class="cus-grid-r3-attachments" id="cus_attachments_wrap">
+                <label for="cus_attachments_count">عدد المرفقات</label>
+                <div class="cus-attachments-inline">
+                    <input type="text" id="cus_attachments_count" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" value="0" readonly>
+                    <button type="button" class="btn-secondary" id="cus_attachments_manage_btn">إدارة المرفقات</button>
+                </div>
+            </div>
+            <?php endif; ?>
         </div>
-        <?php endif; ?>
 
         <!-- الصف 4: المنطقة | العنوان -->
         <div class="cus-grid-r4-area">
