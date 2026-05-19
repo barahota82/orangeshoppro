@@ -34,6 +34,18 @@ try {
     }
 }
 
+// س15 — prefill عميل من شاشة العملاء عبر ?customer_id=ID
+$srPrefillCustomerId = 0;
+$prefillCustomerIdRaw = isset($_GET['customer_id']) ? (int) $_GET['customer_id'] : 0;
+if ($prefillCustomerIdRaw > 0 && $hasCustomers) {
+    foreach ($customers as $cRow) {
+        if ((int) ($cRow['id'] ?? 0) === $prefillCustomerIdRaw) {
+            $srPrefillCustomerId = $prefillCustomerIdRaw;
+            break;
+        }
+    }
+}
+
 $variantsByProduct = [];
 try {
     $vRows = $pdo->query(
@@ -112,8 +124,11 @@ function sr_channel_label(string $t): string
             <label id="sr_customer_label">العميل</label>
             <select id="sr_customer" <?php echo !$hasCustomers ? 'disabled' : ''; ?>>
                 <option value="0">— بدون عميل —</option>
-                <?php foreach ($customers as $c): ?>
-                    <option value="<?php echo (int) $c['id']; ?>"><?php echo htmlspecialchars((string) $c['name'], ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php foreach ($customers as $c):
+                    $cId = (int) $c['id'];
+                    $selected = ($srPrefillCustomerId > 0 && $cId === $srPrefillCustomerId) ? ' selected' : '';
+                    ?>
+                    <option value="<?php echo $cId; ?>"<?php echo $selected; ?>><?php echo htmlspecialchars((string) $c['name'], ENT_QUOTES, 'UTF-8'); ?></option>
                 <?php endforeach; ?>
             </select>
             <?php if (!$hasCustomers): ?>

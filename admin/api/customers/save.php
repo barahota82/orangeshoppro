@@ -136,22 +136,40 @@ try {
     $area = trim((string) ($data['area'] ?? ''));
     $area = function_exists('mb_substr') ? mb_substr($area, 0, 255, 'UTF-8') : substr($area, 0, 255);
     $deliveryAreaIdSql = null;
-    if ($hasDeliveryArea && array_key_exists('delivery_area_id', $data) && $data['delivery_area_id'] !== null && $data['delivery_area_id'] !== '') {
-        $daIdRaw = (int) $data['delivery_area_id'];
-        if ($daIdRaw > 0) {
-            $daExists = $pdo->prepare('SELECT id, name_ar, name_en FROM delivery_areas WHERE id = ? LIMIT 1');
-            $daExists->execute([$daIdRaw]);
-            $daRowSql = $daExists->fetch(PDO::FETCH_ASSOC);
-            if (!$daRowSql) {
-                json_response(['success' => false, 'message' => 'منطقة التوصيل غير موجودة'], 422);
-            }
-            $deliveryAreaIdSql = $daIdRaw;
-            if ($area === '') {
-                $area = trim((string) ($daRowSql['name_ar'] ?? ''));
+    // توحيد مع شاشة الموردين: الواجهة ترسل اسم المنطقة نصاً في `area`.
+    // نحاول مطابقة الاسم بـ delivery_areas للحصول على FK (يدعم تقارير المبيعات حسب المنطقة).
+    // الواجهة العامة (الأونلاين) قد ترسل `delivery_area_id` صريحاً — نحترمه أيضاً.
+    if ($hasDeliveryArea) {
+        if (array_key_exists('delivery_area_id', $data) && $data['delivery_area_id'] !== null && $data['delivery_area_id'] !== '') {
+            $daIdRaw = (int) $data['delivery_area_id'];
+            if ($daIdRaw > 0) {
+                $daExists = $pdo->prepare('SELECT id, name_ar, name_en FROM delivery_areas WHERE id = ? LIMIT 1');
+                $daExists->execute([$daIdRaw]);
+                $daRowSql = $daExists->fetch(PDO::FETCH_ASSOC);
+                if (!$daRowSql) {
+                    json_response(['success' => false, 'message' => 'منطقة التوصيل غير موجودة'], 422);
+                }
+                $deliveryAreaIdSql = $daIdRaw;
                 if ($area === '') {
-                    $area = trim((string) ($daRowSql['name_en'] ?? ''));
+                    $area = trim((string) ($daRowSql['name_ar'] ?? ''));
+                    if ($area === '') {
+                        $area = trim((string) ($daRowSql['name_en'] ?? ''));
+                    }
                 }
             }
+        } elseif ($area !== '') {
+            // البحث عن منطقة بنفس الاسم (name_ar أولاً ثم name_en) — تشمل المعطّلة (الأدمن قد يستخدمها لعميل تاريخي).
+            $daByName = $pdo->prepare(
+                'SELECT id, name_ar, name_en FROM delivery_areas
+                 WHERE name_ar = ? OR name_en = ?
+                 ORDER BY is_active DESC, id ASC LIMIT 1'
+            );
+            $daByName->execute([$area, $area]);
+            $daRowByName = $daByName->fetch(PDO::FETCH_ASSOC);
+            if ($daRowByName) {
+                $deliveryAreaIdSql = (int) $daRowByName['id'];
+            }
+            // لو لم نجد منطقة بنفس الاسم: نحفظ النص فقط بدون FK (مرونة الأدمن).
         }
     }
     $address = trim((string) ($data['address'] ?? ''));

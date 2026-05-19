@@ -38,6 +38,38 @@ foreach ($adminDeliveryAreas as $da) {
     }
 }
 
+// س15 + توحيد مع شاشة الموردين: قائمة خيارات المنطقة بنفس بناء suppliers.php (value = نص الاسم؛ label يجمع الاسم العربي والإنجليزي ووسم المعطّلة).
+$customerAreaOptions = [];
+$seenCustomerAreas = [];
+foreach ($adminDeliveryAreas as $daRow) {
+    if (!is_array($daRow)) {
+        continue;
+    }
+    $nameAr = trim((string) ($daRow['name_ar'] ?? ''));
+    $nameEn = trim((string) ($daRow['name_en'] ?? ''));
+    $areaValue = $nameAr !== '' ? $nameAr : $nameEn;
+    if ($areaValue === '') {
+        continue;
+    }
+    $areaKey = function_exists('mb_strtolower') ? mb_strtolower($areaValue, 'UTF-8') : strtolower($areaValue);
+    if (isset($seenCustomerAreas[$areaKey])) {
+        continue;
+    }
+    $seenCustomerAreas[$areaKey] = true;
+    $display = $areaValue;
+    if ($nameAr !== '' && $nameEn !== '' && strcasecmp($nameAr, $nameEn) !== 0) {
+        $display = $nameAr . ' — ' . $nameEn;
+    }
+    if ((int) ($daRow['is_active'] ?? 0) !== 1) {
+        $display .= ' (غير منطقة توصيل حالياً)';
+    }
+    $customerAreaOptions[] = [
+        'value' => $areaValue,
+        'label' => $display,
+        'da_id' => (int) ($daRow['id'] ?? 0),
+    ];
+}
+
 /**
  * س15: معاينة كود العميل التالي (للعرض فقط؛ التثبيت في API).
  */
@@ -491,31 +523,15 @@ $count = count($customerRows);
         </div>
         <?php endif; ?>
         <div class="cus-grid-r4-area">
-            <label for="cus_area">المنطقة</label>
-            <?php if ($hasCustomerDeliveryAreaCol && $adminDeliveryAreas !== []): ?>
-                <select id="cus_area" autocomplete="off">
-                    <option value="">— اختر منطقة —</option>
-                    <?php foreach ($adminDeliveryAreas as $da):
-                        $daId = (int) ($da['id'] ?? 0);
-                        if ($daId <= 0) {
-                            continue;
-                        }
-                        $daName = trim((string) ($da['name_ar'] ?? ''));
-                        if ($daName === '') {
-                            $daName = trim((string) ($da['name_en'] ?? ''));
-                        }
-                        $daActive = (int) ($da['is_active'] ?? 0) === 1;
-                        $label = $daName !== '' ? $daName : ('#' . $daId);
-                        if (!$daActive) {
-                            $label .= ' (معطّلة)';
-                        }
-                        ?>
-                        <option value="<?php echo $daId; ?>" data-name="<?php echo htmlspecialchars($daName, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?></option>
-                    <?php endforeach; ?>
-                </select>
-            <?php else: ?>
-                <input type="text" id="cus_area" maxlength="255" autocomplete="off" placeholder="المنطقة">
-            <?php endif; ?>
+            <label for="cus_city_area">المنطقة</label>
+            <select id="cus_city_area" autocomplete="address-level1">
+                <option value="">اختياري</option>
+                <?php foreach ($customerAreaOptions as $areaOpt): ?>
+                    <option value="<?php echo htmlspecialchars((string) $areaOpt['value'], ENT_QUOTES, 'UTF-8'); ?>">
+                        <?php echo htmlspecialchars((string) $areaOpt['label'], ENT_QUOTES, 'UTF-8'); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
         </div>
 
         <?php if ($hasCustomerNotesCol): ?>
@@ -536,6 +552,7 @@ $count = count($customerRows);
         <button type="button" onclick="cusSave()">حفظ</button>
         <button type="button" class="btn-secondary" onclick="cusResetForm()">عميل جديد</button>
         <button type="button" class="btn-secondary" id="cus_open_sales_btn">فاتورة مبيعات</button>
+        <button type="button" class="btn-secondary" id="cus_open_sales_return_btn">مردود مبيعات</button>
         <button type="button" class="btn-secondary" id="cus_open_receipt_btn">قبض من العميل</button>
         <button type="button" class="btn-secondary" id="cus_open_statement_btn">كشف حساب</button>
     </div>
@@ -559,6 +576,7 @@ var CUS_SEARCH_ROWS = <?php echo json_encode($customerSearchRowsPayload, JSON_UN
 var CUS_PARTNER_STATEMENT_URL = <?php echo json_encode(storefront_public_path('/admin/index.php?page=partner_account_statement'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var CUS_MANUAL_ORDER_URL = <?php echo json_encode(storefront_public_path('/admin/index.php?page=manual_order'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var CUS_RECEIPT_URL = <?php echo json_encode(storefront_public_path('/admin/index.php?page=partner_customer_receipt'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+var CUS_SALES_RETURN_URL = <?php echo json_encode(storefront_public_path('/admin/index.php?page=sales_returns'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var CUS_NAV_ROWS = CUS_SEARCH_ROWS
     .slice()
     .filter(function (row) {
@@ -575,11 +593,25 @@ function cusPhoneCountryEl() {
     return document.getElementById('cus_phone_country');
 }
 function cusAreaEl() {
-    return document.getElementById('cus_area');
+    return document.getElementById('cus_city_area');
 }
-function cusAreaIsSelect() {
+/**
+ * يطابق نمط الموردين: المنطقة select مع قيم نصية (الاسم).
+ * يحاول مطابقة الاسم في القائمة عند التحديث؛ لو لم يجد، يبقى فارغاً (Default «اختياري»).
+ */
+function cusAreaSetValue(value) {
     var el = cusAreaEl();
-    return !!(el && el.tagName === 'SELECT');
+    if (!el) return;
+    var name = String(value == null ? '' : value).trim();
+    if (name === '') { el.value = ''; return; }
+    for (var i = 0; i < el.options.length; i++) {
+        if (String(el.options[i].value || '') === name) {
+            el.value = name;
+            return;
+        }
+    }
+    // لو الاسم خارج القائمة (نظرياً مستحيل ما دامت من نفس delivery_areas): نُبقي «اختياري».
+    el.value = '';
 }
 function cusSetCurrentBalance(value) {
     var el = document.getElementById('cus_current_balance');
@@ -804,8 +836,7 @@ function cusResetForm() {
     if (emEl) emEl.value = '';
     var addrEl = document.getElementById('cus_address');
     if (addrEl) addrEl.value = '';
-    var areaEl = cusAreaEl();
-    if (areaEl) areaEl.value = '';
+    cusAreaSetValue('');
     var limEl = document.getElementById('cus_credit_limit');
     if (limEl) limEl.value = '';
     var notesEl = document.getElementById('cus_notes');
@@ -828,16 +859,9 @@ function cusEdit(row) {
     if (emEl) emEl.value = String(row.email || '');
     var addrEl = document.getElementById('cus_address');
     if (addrEl) addrEl.value = String(row.address || '');
-    var areaEl = cusAreaEl();
-    if (areaEl) {
-        if (cusAreaIsSelect()) {
-            var daId = row.delivery_area_id != null && row.delivery_area_id !== '' ? String(row.delivery_area_id) : '';
-            var matchOpt = daId !== '' ? areaEl.querySelector('option[value="' + daId + '"]') : null;
-            areaEl.value = matchOpt ? daId : '';
-        } else {
-            areaEl.value = String(row.area || '');
-        }
-    }
+    // المنطقة بنمط الموردين: قيمة = نص الاسم. نفضّل اسم delivery_area المرتبط (لو موجود) ثم area المحفوظ.
+    var areaNameForForm = String(row.delivery_area_name || row.area || '').trim();
+    cusAreaSetValue(areaNameForForm);
     var limEl = document.getElementById('cus_credit_limit');
     if (limEl) {
         var lim = row.credit_limit;
@@ -865,25 +889,9 @@ function cusSave() {
     var email = emEl ? emEl.value.trim() : '';
     var addrEl = document.getElementById('cus_address');
     var address = addrEl ? addrEl.value.trim() : '';
+    // نمط الموردين: نُرسل اسم المنطقة نصاً؛ السيرفر يبحث عن delivery_area_id المطابق.
     var areaElForSave = cusAreaEl();
-    var areaIsSelect = cusAreaIsSelect();
-    var area = '';
-    var deliveryAreaId = null;
-    if (areaElForSave) {
-        if (areaIsSelect) {
-            var daIdVal = parseInt(areaElForSave.value, 10) || 0;
-            if (daIdVal > 0) {
-                deliveryAreaId = daIdVal;
-                var selOpt = areaElForSave.options[areaElForSave.selectedIndex];
-                if (selOpt) {
-                    var dn = selOpt.getAttribute('data-name') || selOpt.textContent || '';
-                    area = String(dn).trim();
-                }
-            }
-        } else {
-            area = String(areaElForSave.value || '').trim();
-        }
-    }
+    var area = areaElForSave ? String(areaElForSave.value || '').trim() : '';
     var limRaw = (document.getElementById('cus_credit_limit') || { value: '' }).value.trim();
     var notesEl = document.getElementById('cus_notes');
     var notes = notesEl ? notesEl.value.trim() : '';
@@ -904,7 +912,6 @@ function cusSave() {
         phone: phone,
         phone_country: phoneCountry !== '' ? phoneCountry : null,
         area: area,
-        delivery_area_id: deliveryAreaId,
         address: address,
         email: email || null,
         notes: notes || null
@@ -951,6 +958,14 @@ function cusOpenCurrentReceipt() {
     }
     window.location.href = CUS_RECEIPT_URL + '&stmt_party_kind=customer&stmt_party_id=' + encodeURIComponent(String(row.id));
 }
+function cusOpenCurrentSalesReturn() {
+    var row = cusCurrentRow();
+    if (!row || (parseInt(String(row.id || '0'), 10) || 0) <= 0) {
+        alert('اختر العميل أولاً');
+        return;
+    }
+    window.location.href = CUS_SALES_RETURN_URL + '&customer_id=' + encodeURIComponent(String(row.id));
+}
 
 (function initCustomersPage() {
     var searchOpenBtn = document.getElementById('cus_open_search_btn');
@@ -964,6 +979,10 @@ function cusOpenCurrentReceipt() {
     var salesBtn = document.getElementById('cus_open_sales_btn');
     if (salesBtn) {
         salesBtn.addEventListener('click', function (e) { e.preventDefault(); cusOpenCurrentSalesInvoice(); });
+    }
+    var salesReturnBtn = document.getElementById('cus_open_sales_return_btn');
+    if (salesReturnBtn) {
+        salesReturnBtn.addEventListener('click', function (e) { e.preventDefault(); cusOpenCurrentSalesReturn(); });
     }
     var receiptBtn = document.getElementById('cus_open_receipt_btn');
     if (receiptBtn) {
