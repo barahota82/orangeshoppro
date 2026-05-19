@@ -38,6 +38,7 @@ try {
     $hasDial = orange_table_has_column($pdo, 'customers', 'phone_country_dial');
     $hasNat = orange_table_has_column($pdo, 'customers', 'phone_national');
     $hasDaId = orange_table_has_column($pdo, 'customers', 'delivery_area_id');
+    $hasCivilId = orange_table_has_column($pdo, 'customers', 'civil_id');
 
     // النمط المختصر (للـ picker القديم في partner_account_statement).
     if (!$full) {
@@ -188,6 +189,7 @@ try {
             'phone_country_dial' => $hasDial ? (string) ($r['phone_country_dial'] ?? '') : '',
             'phone_national' => $hasNat ? (string) ($r['phone_national'] ?? '') : '',
             'email' => $hasEmail ? (string) ($r['email'] ?? '') : '',
+            'civil_id' => $hasCivilId ? (string) ($r['civil_id'] ?? '') : '',
             'area' => $hasArea ? (string) ($r['area'] ?? '') : '',
             'delivery_area_id' => $daId > 0 ? $daId : null,
             'delivery_area_name' => $daName,

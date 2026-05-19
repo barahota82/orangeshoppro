@@ -31,6 +31,7 @@ $hasCustomerDeliveryAreaCol = orange_table_has_column($pdo, 'customers', 'delive
 $hasCustomerStatusCol = orange_table_has_column($pdo, 'customers', 'status');
 $hasCustomerBlockReasonCol = orange_table_has_column($pdo, 'customers', 'block_reason');
 $hasCustomerAttachmentsCol = orange_table_has_column($pdo, 'customers', 'attachments_json');
+$hasCustomerCivilIdCol = orange_table_has_column($pdo, 'customers', 'civil_id');
 
 $adminDeliveryAreas = orange_delivery_areas_admin_list($pdo);
 $adminDaIndex = [];
@@ -249,6 +250,7 @@ if (orange_table_exists($pdo, 'customers')) {
             (string) ($r['name_ar'] ?? '') . ' ' .
             (string) ($r['phone'] ?? '') . ' ' .
             (string) ($r['email'] ?? '') . ' ' .
+            (string) ($r['civil_id'] ?? '') . ' ' .
             (string) ($r['area'] ?? '') . ' ' .
             $daName . ' ' .
             (string) ($r['notes'] ?? '')
@@ -275,6 +277,7 @@ if (orange_table_exists($pdo, 'customers')) {
             'address' => (string) ($r['address'] ?? ''),
             'credit_limit' => isset($r['credit_limit']) && $r['credit_limit'] !== null && (float) $r['credit_limit'] > 0
                 ? (float) $r['credit_limit'] : null,
+            'civil_id' => (string) ($r['civil_id'] ?? ''),
             'notes' => (string) ($r['notes'] ?? ''),
             'status' => $statusRaw,
             'block_reason' => (string) ($r['block_reason'] ?? ''),
@@ -327,32 +330,44 @@ $count = count($customerRows);
 </div>
 
 <style>
+/*
+ * ترتيب الحقول كما طلب المالك (يقرأ يميناً → يساراً في RTL):
+ * r1: كود العميل (تلقائي) — full width مع شريط التنقل
+ * r2: كود الدولة | الهاتف | حد الائتمان | رصيد الذمة | حالة العميل  (5 أعمدة)
+ * r3: اسم العميل | الرقم المدني | البريد الإلكتروني  (3 أعمدة في 5 grid → name=2 spans, civil=2 spans, email=1 span)
+ * r4: المنطقة | العنوان  (المنطقة=1 span, العنوان=4 spans)
+ * r4b: سبب الحظر (full — يظهر فقط عند حالة محظور)
+ * r5: ملاحظات (full)
+ * r6: تفصيل الطلبات (full — أقسام معلوماتية)
+ * r7: لافتة حساب الواجهة (full)
+ * r8: عداد المرفقات (full)
+ */
 #cus_form_grid.customers-form-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
     row-gap: 12px;
     column-gap: 12px;
     grid-template-areas:
-        "cus_r1_code cus_r1_code cus_r1_code cus_r1_code"
-        "cus_r2_name cus_r2_name cus_r2_balance cus_r2_status"
-        "cus_r3_country cus_r3_phone cus_r3_email cus_r3_credit"
-        "cus_r4_address cus_r4_address cus_r4_address cus_r4_area"
-        "cus_r4b_block_reason cus_r4b_block_reason cus_r4b_block_reason cus_r4b_block_reason"
-        "cus_r5_notes cus_r5_notes cus_r5_notes cus_r5_notes"
-        "cus_r6_orders cus_r6_orders cus_r6_orders cus_r6_orders"
-        "cus_r7_sf cus_r7_sf cus_r7_sf cus_r7_sf"
-        "cus_r8_attachments cus_r8_attachments cus_r8_attachments cus_r8_attachments";
+        "cus_r1_code cus_r1_code cus_r1_code cus_r1_code cus_r1_code"
+        "cus_r2_country cus_r2_phone cus_r2_credit cus_r2_balance cus_r2_status"
+        "cus_r3_name cus_r3_name cus_r3_civil cus_r3_civil cus_r3_email"
+        "cus_r4_area cus_r4_address cus_r4_address cus_r4_address cus_r4_address"
+        "cus_r4b_block_reason cus_r4b_block_reason cus_r4b_block_reason cus_r4b_block_reason cus_r4b_block_reason"
+        "cus_r5_notes cus_r5_notes cus_r5_notes cus_r5_notes cus_r5_notes"
+        "cus_r6_orders cus_r6_orders cus_r6_orders cus_r6_orders cus_r6_orders"
+        "cus_r7_sf cus_r7_sf cus_r7_sf cus_r7_sf cus_r7_sf"
+        "cus_r8_attachments cus_r8_attachments cus_r8_attachments cus_r8_attachments cus_r8_attachments";
 }
 #cus_form_grid.customers-form-grid.customers-form-grid--block-hidden {
     grid-template-areas:
-        "cus_r1_code cus_r1_code cus_r1_code cus_r1_code"
-        "cus_r2_name cus_r2_name cus_r2_balance cus_r2_status"
-        "cus_r3_country cus_r3_phone cus_r3_email cus_r3_credit"
-        "cus_r4_address cus_r4_address cus_r4_address cus_r4_area"
-        "cus_r5_notes cus_r5_notes cus_r5_notes cus_r5_notes"
-        "cus_r6_orders cus_r6_orders cus_r6_orders cus_r6_orders"
-        "cus_r7_sf cus_r7_sf cus_r7_sf cus_r7_sf"
-        "cus_r8_attachments cus_r8_attachments cus_r8_attachments cus_r8_attachments";
+        "cus_r1_code cus_r1_code cus_r1_code cus_r1_code cus_r1_code"
+        "cus_r2_country cus_r2_phone cus_r2_credit cus_r2_balance cus_r2_status"
+        "cus_r3_name cus_r3_name cus_r3_civil cus_r3_civil cus_r3_email"
+        "cus_r4_area cus_r4_address cus_r4_address cus_r4_address cus_r4_address"
+        "cus_r5_notes cus_r5_notes cus_r5_notes cus_r5_notes cus_r5_notes"
+        "cus_r6_orders cus_r6_orders cus_r6_orders cus_r6_orders cus_r6_orders"
+        "cus_r7_sf cus_r7_sf cus_r7_sf cus_r7_sf cus_r7_sf"
+        "cus_r8_attachments cus_r8_attachments cus_r8_attachments cus_r8_attachments cus_r8_attachments";
 }
 #cus_form_grid.customers-form-grid input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]),
 #cus_form_grid.customers-form-grid select {
@@ -405,27 +420,16 @@ $count = count($customerRows);
     opacity: 0.5;
     cursor: not-allowed;
 }
-#cus_form_grid .cus-grid-r2-name {
-    grid-area: cus_r2_name;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 0;
-}
-#cus_form_grid .cus-grid-r2-balance {
-    grid-area: cus_r2_balance;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 0;
-}
-#cus_form_grid .cus-grid-r2-status {
-    grid-area: cus_r2_status;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 0;
-}
+#cus_form_grid .cus-grid-r2-country { grid-area: cus_r2_country; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+#cus_form_grid .cus-grid-r2-phone   { grid-area: cus_r2_phone;   display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+#cus_form_grid .cus-grid-r2-credit  { grid-area: cus_r2_credit;  display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+#cus_form_grid .cus-grid-r2-balance { grid-area: cus_r2_balance; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+#cus_form_grid .cus-grid-r2-status  { grid-area: cus_r2_status;  display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+#cus_form_grid .cus-grid-r3-name    { grid-area: cus_r3_name;    display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+#cus_form_grid .cus-grid-r3-civil   { grid-area: cus_r3_civil;   display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+#cus_form_grid .cus-grid-r3-email   { grid-area: cus_r3_email;   display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+#cus_form_grid .cus-grid-r4-area    { grid-area: cus_r4_area;    display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+#cus_form_grid .cus-grid-r4-address { grid-area: cus_r4_address; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 #cus_form_grid .cus-grid-r4b-block-reason {
     grid-area: cus_r4b_block_reason;
     display: flex;
@@ -517,48 +521,6 @@ $count = count($customerRows);
     font-size: 0.85rem;
     color: #b45309;
 }
-#cus_form_grid .cus-grid-r3-country {
-    grid-area: cus_r3_country;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 0;
-}
-#cus_form_grid .cus-grid-r3-phone {
-    grid-area: cus_r3_phone;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 0;
-}
-#cus_form_grid .cus-grid-r3-email {
-    grid-area: cus_r3_email;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 0;
-}
-#cus_form_grid .cus-grid-r3-credit {
-    grid-area: cus_r3_credit;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 0;
-}
-#cus_form_grid .cus-grid-r4-address {
-    grid-area: cus_r4_address;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 0;
-}
-#cus_form_grid .cus-grid-r4-area {
-    grid-area: cus_r4_area;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 0;
-}
 #cus_form_grid .cus-grid-r5-notes {
     grid-area: cus_r5_notes;
     display: flex;
@@ -616,12 +578,27 @@ $count = count($customerRows);
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         grid-template-areas:
             "cus_r1_code cus_r1_code"
-            "cus_r2_name cus_r2_name"
-            "cus_r2_balance cus_r2_status"
-            "cus_r3_country cus_r3_phone"
-            "cus_r3_email cus_r3_credit"
-            "cus_r4_address cus_r4_area"
+            "cus_r2_country cus_r2_phone"
+            "cus_r2_credit cus_r2_balance"
+            "cus_r2_status cus_r2_status"
+            "cus_r3_name cus_r3_name"
+            "cus_r3_civil cus_r3_email"
+            "cus_r4_area cus_r4_address"
             "cus_r4b_block_reason cus_r4b_block_reason"
+            "cus_r5_notes cus_r5_notes"
+            "cus_r6_orders cus_r6_orders"
+            "cus_r7_sf cus_r7_sf"
+            "cus_r8_attachments cus_r8_attachments";
+    }
+    #cus_form_grid.customers-form-grid.customers-form-grid--block-hidden {
+        grid-template-areas:
+            "cus_r1_code cus_r1_code"
+            "cus_r2_country cus_r2_phone"
+            "cus_r2_credit cus_r2_balance"
+            "cus_r2_status cus_r2_status"
+            "cus_r3_name cus_r3_name"
+            "cus_r3_civil cus_r3_email"
+            "cus_r4_area cus_r4_address"
             "cus_r5_notes cus_r5_notes"
             "cus_r6_orders cus_r6_orders"
             "cus_r7_sf cus_r7_sf"
@@ -636,16 +613,35 @@ $count = count($customerRows);
         grid-template-columns: 1fr;
         grid-template-areas:
             "cus_r1_code"
-            "cus_r2_name"
+            "cus_r2_country"
+            "cus_r2_phone"
+            "cus_r2_credit"
             "cus_r2_balance"
             "cus_r2_status"
-            "cus_r3_country"
-            "cus_r3_phone"
+            "cus_r3_name"
+            "cus_r3_civil"
             "cus_r3_email"
-            "cus_r3_credit"
             "cus_r4_area"
             "cus_r4_address"
             "cus_r4b_block_reason"
+            "cus_r5_notes"
+            "cus_r6_orders"
+            "cus_r7_sf"
+            "cus_r8_attachments";
+    }
+    #cus_form_grid.customers-form-grid.customers-form-grid--block-hidden {
+        grid-template-areas:
+            "cus_r1_code"
+            "cus_r2_country"
+            "cus_r2_phone"
+            "cus_r2_credit"
+            "cus_r2_balance"
+            "cus_r2_status"
+            "cus_r3_name"
+            "cus_r3_civil"
+            "cus_r3_email"
+            "cus_r4_area"
+            "cus_r4_address"
             "cus_r5_notes"
             "cus_r6_orders"
             "cus_r7_sf"
@@ -681,10 +677,21 @@ $count = count($customerRows);
             </div>
         </div>
 
-        <div class="cus-grid-r2-name">
-            <label for="cus_name">اسم العميل</label>
-            <input type="text" id="cus_name" autocomplete="off" placeholder="اسم العميل" maxlength="255">
+        <!-- الصف 2: كود الدولة | الهاتف | حد الائتمان | رصيد الذمة | حالة العميل (RTL: العين تبدأ يميناً) -->
+        <div class="cus-grid-r2-country">
+            <label for="cus_phone_country">كود الدولة</label>
+            <?php orange_storefront_render_phone_country_select('cus_phone_country'); ?>
         </div>
+        <div class="cus-grid-r2-phone">
+            <label for="cus_phone">الهاتف <span style="color:#b45309;">*</span></label>
+            <input type="text" id="cus_phone" class="js-orange-phone-input" maxlength="24" autocomplete="off" dir="ltr" lang="en" placeholder="+965… أو 00… أو رقم وطني مع اختيار الدولة">
+        </div>
+        <?php if ($hasCustomerLimitCol): ?>
+        <div class="cus-grid-r2-credit">
+            <label for="cus_credit_limit">حد الائتمان</label>
+            <input type="number" id="cus_credit_limit" class="admin-inp-money" step="any" min="0" value="" placeholder="فارغ = بلا حد" inputmode="decimal" lang="en" dir="ltr">
+        </div>
+        <?php endif; ?>
         <div class="cus-grid-r2-balance">
             <label for="cus_current_balance">رصيد الذمة (مدين)</label>
             <input type="text" id="cus_current_balance" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" value="0.000" readonly>
@@ -700,33 +707,25 @@ $count = count($customerRows);
         </div>
         <?php endif; ?>
 
-        <div class="cus-grid-r3-country">
-            <label for="cus_phone_country">كود الدولة</label>
-            <?php orange_storefront_render_phone_country_select('cus_phone_country'); ?>
+        <!-- الصف 3: اسم العميل | الرقم المدني | البريد الإلكتروني -->
+        <div class="cus-grid-r3-name">
+            <label for="cus_name">اسم العميل</label>
+            <input type="text" id="cus_name" autocomplete="off" placeholder="اسم العميل" maxlength="255">
         </div>
-        <div class="cus-grid-r3-phone">
-            <label for="cus_phone">الهاتف <span style="color:#b45309;">*</span></label>
-            <input type="text" id="cus_phone" class="js-orange-phone-input" maxlength="24" autocomplete="off" dir="ltr" lang="en" placeholder="+965… أو 00… أو رقم وطني مع اختيار الدولة">
+        <?php if ($hasCustomerCivilIdCol): ?>
+        <div class="cus-grid-r3-civil">
+            <label for="cus_civil_id">الرقم المدني / الإقامة</label>
+            <input type="text" id="cus_civil_id" maxlength="20" autocomplete="off" dir="ltr" lang="en" placeholder="اختياري — فريد إذا أُدخل">
         </div>
+        <?php endif; ?>
         <?php if ($hasCustomerEmailCol): ?>
         <div class="cus-grid-r3-email">
             <label for="cus_email">البريد الإلكتروني</label>
             <input type="email" id="cus_email" autocomplete="off" dir="ltr" lang="en" placeholder="اختياري">
         </div>
         <?php endif; ?>
-        <?php if ($hasCustomerLimitCol): ?>
-        <div class="cus-grid-r3-credit">
-            <label for="cus_credit_limit">حد الائتمان</label>
-            <input type="number" id="cus_credit_limit" class="admin-inp-money" step="any" min="0" value="" placeholder="فارغ = بلا حد" inputmode="decimal" lang="en" dir="ltr">
-        </div>
-        <?php endif; ?>
 
-        <?php if ($hasCustomerAddressCol): ?>
-        <div class="cus-grid-r4-address">
-            <label for="cus_address">العنوان</label>
-            <input type="text" id="cus_address" autocomplete="off" placeholder="عنوان التوصيل" maxlength="2000">
-        </div>
-        <?php endif; ?>
+        <!-- الصف 4: المنطقة | العنوان -->
         <div class="cus-grid-r4-area">
             <label for="cus_city_area">المنطقة</label>
             <select id="cus_city_area" autocomplete="address-level1">
@@ -739,6 +738,12 @@ $count = count($customerRows);
             </select>
             <p id="cus_area_current_hint" class="cus-area-current-hint" hidden></p>
         </div>
+        <?php if ($hasCustomerAddressCol): ?>
+        <div class="cus-grid-r4-address">
+            <label for="cus_address">العنوان</label>
+            <input type="text" id="cus_address" autocomplete="off" placeholder="عنوان التوصيل" maxlength="2000">
+        </div>
+        <?php endif; ?>
 
         <?php if ($hasCustomerBlockReasonCol): ?>
         <div id="cus_block_reason_wrap" class="cus-grid-r4b-block-reason" style="display:none;">
@@ -1183,6 +1188,8 @@ function cusResetForm() {
     if (brEl) brEl.value = '';
     var emEl = document.getElementById('cus_email');
     if (emEl) emEl.value = '';
+    var civilEl = document.getElementById('cus_civil_id');
+    if (civilEl) civilEl.value = '';
     var addrEl = document.getElementById('cus_address');
     if (addrEl) addrEl.value = '';
     cusAreaSetValue('');
@@ -1224,6 +1231,8 @@ function cusEdit(row) {
     if (brEl) brEl.value = String(row.block_reason || '');
     var emEl = document.getElementById('cus_email');
     if (emEl) emEl.value = String(row.email || '');
+    var civilEl = document.getElementById('cus_civil_id');
+    if (civilEl) civilEl.value = String(row.civil_id || '');
     var addrEl = document.getElementById('cus_address');
     if (addrEl) addrEl.value = String(row.address || '');
     var areaNameForForm = String(row.delivery_area_name || row.area || '').trim();
@@ -1263,6 +1272,8 @@ function cusSave() {
     var email = emEl ? emEl.value.trim() : '';
     var addrEl = document.getElementById('cus_address');
     var address = addrEl ? addrEl.value.trim() : '';
+    var civilEl = document.getElementById('cus_civil_id');
+    var civilId = civilEl ? civilEl.value.trim() : '';
     // نمط الموردين: نُرسل اسم المنطقة نصاً؛ السيرفر يبحث عن delivery_area_id المطابق.
     var areaElForSave = cusAreaEl();
     var area = areaElForSave ? String(areaElForSave.value || '').trim() : '';
@@ -1299,6 +1310,7 @@ function cusSave() {
         area: area,
         address: address,
         email: email || null,
+        civil_id: civilId !== '' ? civilId : null,
         notes: notes || null,
         status: statusVal,
         block_reason: statusVal === 'blocked' ? brVal : null

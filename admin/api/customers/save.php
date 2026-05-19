@@ -99,6 +99,7 @@ try {
     $hasDeliveryArea = orange_table_has_column($pdo, 'customers', 'delivery_area_id');
     $hasStatus = orange_table_has_column($pdo, 'customers', 'status');
     $hasBlockReason = orange_table_has_column($pdo, 'customers', 'block_reason');
+    $hasCivilId = orange_table_has_column($pdo, 'customers', 'civil_id');
     $codeSql = orange_customer_normalize_code($pdo, $data['code'] ?? '');
     // س15: عند الإنشاء (id = 0) ولا كود مدخل، نولّد كوداً تلقائياً تسلسلياً.
     // عند التعديل، نحافظ على كود الصف القائم إن كان فارغاً في الطلب.
@@ -217,6 +218,28 @@ try {
         }
     }
 
+    // س15: الرقم المدني/الإقامة — اختياري، فريد لو أدخل. نقبل أرقاماً وأحرف لاتينية فقط (بعض الإقامات الخليجية تستخدم حروف).
+    $civilIdSql = null;
+    if ($hasCivilId && array_key_exists('civil_id', $data) && $data['civil_id'] !== null) {
+        $cidRaw = trim((string) $data['civil_id']);
+        if ($cidRaw !== '') {
+            // نظافة بسيطة: أرقام + حروف لاتينية + شرطة فقط، حد أقصى 20.
+            $cidClean = preg_replace('/[^A-Za-z0-9\-]/', '', $cidRaw);
+            $cidClean = function_exists('mb_substr') ? mb_substr((string) $cidClean, 0, 20, 'UTF-8') : substr((string) $cidClean, 0, 20);
+            if ((string) $cidClean === '') {
+                json_response(['success' => false, 'message' => 'الرقم المدني غير صالح (يقبل أرقام وحروف لاتينية فقط)'], 422);
+            }
+            $civilIdSql = (string) $cidClean;
+            // فحص تفرّد.
+            $civilDupSql = 'SELECT id FROM customers WHERE civil_id = ?' . ($idIn > 0 ? ' AND id != ?' : '') . ' LIMIT 1';
+            $civilDupSt = $pdo->prepare($civilDupSql);
+            $civilDupSt->execute($idIn > 0 ? [$civilIdSql, $idIn] : [$civilIdSql]);
+            if ($civilDupSt->fetchColumn()) {
+                json_response(['success' => false, 'message' => 'الرقم المدني مسجّل لعميل آخر'], 409);
+            }
+        }
+    }
+
     $assertCodeUnique = static function (int $excludeId) use ($pdo, $codeSql, $hasCode): void {
         if (!$hasCode || $codeSql === null) {
             return;
@@ -292,6 +315,10 @@ try {
             $fields[] = 'block_reason = ?';
             $params[] = $blockReasonSql;
         }
+        if ($hasCivilId) {
+            $fields[] = 'civil_id = ?';
+            $params[] = $civilIdSql;
+        }
         $params[] = $idIn;
         $pdo->prepare('UPDATE customers SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
         audit_log('customer_update', 'تحديث عميل #' . $idIn . ' — ' . $phone, 'customers', $idIn);
@@ -351,6 +378,10 @@ try {
         if ($hasBlockReason) {
             $fields[] = 'block_reason = ?';
             $params[] = $blockReasonSql;
+        }
+        if ($hasCivilId) {
+            $fields[] = 'civil_id = ?';
+            $params[] = $civilIdSql;
         }
         $params[] = $id;
         $pdo->prepare('UPDATE customers SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
@@ -418,6 +449,11 @@ try {
         $cols[] = 'block_reason';
         $placeholders[] = '?';
         $params[] = $blockReasonSql;
+    }
+    if ($hasCivilId) {
+        $cols[] = 'civil_id';
+        $placeholders[] = '?';
+        $params[] = $civilIdSql;
     }
     $sql = 'INSERT INTO customers (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $placeholders) . ')';
     $pdo->prepare($sql)->execute($params);

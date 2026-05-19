@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 38);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 39);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -2572,6 +2572,17 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         orange_catalog_safe_exec(
             $pdo,
             'ALTER TABLE customers ADD COLUMN attachments_json TEXT NULL DEFAULT NULL'
+        );
+    }
+    // س15: الرقم المدني (Civil ID / Iqama) — اختياري لكن فريد إذا أدخل. UNIQUE في MySQL يقبل تعدد NULL.
+    if (orange_table_exists($pdo, 'customers') && !orange_table_has_column($pdo, 'customers', 'civil_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE customers ADD COLUMN civil_id VARCHAR(20) NULL DEFAULT NULL'
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE UNIQUE INDEX uq_customers_civil_id ON customers (civil_id)'
         );
     }
 
