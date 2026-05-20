@@ -241,10 +241,15 @@ document.getElementById('ctry_name_en').addEventListener('input', function () {
 <style>
 .ctry-form-grid {
     display: grid;
-    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-template-columns:
+        minmax(8rem, 1.15fr)
+        minmax(4.5rem, 0.65fr)
+        minmax(5rem, 0.75fr)
+        minmax(4rem, 0.55fr)
+        minmax(0, 2.9fr);
     grid-template-areas:
-        "ar ar ar ar ar ar ar ar ar ar ar ar"
-        "active active currency currency code code en en en sort sort sort";
+        "ar ar ar ar ar"
+        "active currency code sort en";
     gap: 14px 18px;
     direction: ltr;
 }
