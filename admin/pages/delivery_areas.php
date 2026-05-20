@@ -13,6 +13,17 @@ $adminCountries = orange_countries_admin_list($pdo);
 $adminCountryId = orange_admin_context_country_id($pdo);
 $adminCountryRow = orange_country_row_by_id($pdo, $adminCountryId, false);
 $activeAreasCount = $hasAreasTable ? orange_delivery_areas_count_active($pdo, $adminCountryId) : 0;
+$daDefaultGovernorateId = 0;
+$daNextSortOrder = (int) orange_delivery_areas_next_sort_order($pdo, $adminCountryId, 0);
+if ($hasGovTable && $adminCountryId > 0) {
+    $daGovernoratesInitial = orange_delivery_governorates_admin_list($pdo, $adminCountryId);
+    if ($daGovernoratesInitial !== []) {
+        $daDefaultGovernorateId = (int) ($daGovernoratesInitial[0]['id'] ?? 0);
+        if ($daDefaultGovernorateId > 0) {
+            $daNextSortOrder = orange_delivery_areas_next_sort_order($pdo, $adminCountryId, $daDefaultGovernorateId);
+        }
+    }
+}
 ?>
 <div class="page-title page-title--stacked">
     <h1>محافظات ومناطق التوصيل</h1>
@@ -123,7 +134,8 @@ $activeAreasCount = $hasAreasTable ? orange_delivery_areas_count_active($pdo, $a
         <div class="da-area-sort">
             <label for="da_sort_order">الترتيب</label>
             <input type="number" id="da_sort_order" class="admin-sort-field admin-sort-field--muted"
-                value="" disabled tabindex="-1" aria-readonly="true">
+                value="<?php echo (int) $daNextSortOrder; ?>"
+                disabled tabindex="-1" aria-readonly="true">
         </div>
         <div class="da-area-active">
             <label for="da_is_active" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:1.4rem;">
@@ -209,6 +221,23 @@ let daGovernoratesCache = [];
 let daDeliveryAreasCache = [];
 var dgSortStep = <?php echo (int) orange_delivery_governorates_sort_order_step(); ?>;
 var daSortStep = dgSortStep;
+var daDefaultGovernorateId = <?php echo (int) $daDefaultGovernorateId; ?>;
+
+function daIsNewAreaForm() {
+    var idEl = document.getElementById('da_id');
+    return !idEl || parseInt(idEl.value, 10) <= 0;
+}
+
+function daAutoSelectGovernorateForNew() {
+    var sel = document.getElementById('da_governorate_id');
+    if (!sel || !daIsNewAreaForm()) return;
+    if (sel.value) return;
+    if (daGovernoratesCache.length > 0) {
+        sel.value = String(daGovernoratesCache[0].id);
+    } else if (daDefaultGovernorateId > 0) {
+        sel.value = String(daDefaultGovernorateId);
+    }
+}
 
 function dgComputeNextSort() {
     var max = 0;
@@ -251,6 +280,10 @@ function refreshDaSortPreview() {
     if (parseInt(idEl.value, 10) > 0) return;
     var govId = daSelectedGovernorateId();
     var hasGovSel = !!document.getElementById('da_governorate_id');
+    if (hasGovSel && govId <= 0) {
+        daAutoSelectGovernorateForNew();
+        govId = daSelectedGovernorateId();
+    }
     if (hasGovSel && govId <= 0) {
         sortEl.value = '';
         return;
@@ -340,7 +373,11 @@ async function loadGovernorates() {
             opt.textContent = label + (parseInt(g.is_active, 10) === 1 ? '' : ' (غير نشطة)');
             sel.appendChild(opt);
         });
-        if (cur) sel.value = cur;
+        if (cur && daGovernoratesCache.some(function (g) { return String(g.id) === String(cur); })) {
+            sel.value = cur;
+        } else {
+            daAutoSelectGovernorateForNew();
+        }
     }
     daGovernoratesCache.forEach(function (g) {
         const tr = document.createElement('tr');
@@ -363,6 +400,7 @@ async function loadGovernorates() {
         });
     });
     refreshDgSortPreview();
+    refreshDaSortPreview();
 }
 
 async function saveGovernorate() {
@@ -388,7 +426,10 @@ function resetDeliveryAreaForm() {
     document.getElementById('da_name_en').value = '';
     document.getElementById('da_is_active').checked = true;
     const sel = document.getElementById('da_governorate_id');
-    if (sel) sel.value = '';
+    if (sel) {
+        sel.value = '';
+        daAutoSelectGovernorateForNew();
+    }
     refreshDaSortPreview();
 }
 
