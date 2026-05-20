@@ -63,6 +63,57 @@ function orange_countries_normalize_code(string $raw): string
 }
 
 /**
+ * رموز ISO 4217 الافتراضية لرمز الدولة (حروف صغيرة) — يُوسَّع عند فتح أسواق جديدة.
+ *
+ * @return array<string, string>
+ */
+function orange_countries_currency_map(): array
+{
+    return [
+        'kw' => 'KWD',
+        'eg' => 'EGP',
+        'ae' => 'AED',
+        'sa' => 'SAR',
+        'bh' => 'BHD',
+        'qa' => 'QAR',
+        'om' => 'OMR',
+        'jo' => 'JOD',
+        'lb' => 'LBP',
+        'iq' => 'IQD',
+        'ma' => 'MAD',
+        'tn' => 'TND',
+        'dz' => 'DZD',
+        'ly' => 'LYD',
+        'sd' => 'SDG',
+        'ye' => 'YER',
+    ];
+}
+
+/** عملة تلقائية من رمز الدولة؛ فارغ إن لم يُعرَف الرمز في الخريطة. */
+function orange_countries_currency_for_code(string $code): string
+{
+    $code = orange_countries_normalize_code($code);
+    if ($code === '') {
+        return '';
+    }
+    $map = orange_countries_currency_map();
+    $cur = $map[$code] ?? '';
+
+    return strtoupper($cur);
+}
+
+/** ترتيب السجل التالي عند إضافة دولة (MAX + 1). */
+function orange_countries_next_sort_order(PDO $pdo): int
+{
+    if (!orange_table_exists($pdo, 'countries')) {
+        return 1;
+    }
+    $next = (int) $pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM countries')->fetchColumn();
+
+    return $next > 0 ? $next : 1;
+}
+
+/**
  * @return array{id:int, code:string, name_ar:string, name_en:string, currency_code:string, is_active:int}|null
  */
 function orange_country_row_by_code(PDO $pdo, string $code, bool $requireActive = false): ?array

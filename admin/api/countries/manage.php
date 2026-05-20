@@ -40,8 +40,7 @@ try {
         $code = orange_countries_normalize_code((string) ($data['code'] ?? ''));
         $nameAr = orange_country_api_str($data['name_ar'] ?? '', 191);
         $nameEn = orange_country_api_str($data['name_en'] ?? '', 191);
-        $currency = strtoupper(orange_country_api_str($data['currency_code'] ?? '', 8));
-        $sortOrder = (int) ($data['sort_order'] ?? 0);
+        $currency = orange_countries_currency_for_code($code);
         $isActive = !empty($data['is_active']) ? 1 : 0;
 
         if ($code === '' || strlen($code) > 8) {
@@ -51,7 +50,10 @@ try {
             json_response(['success' => false, 'message' => 'الاسم العربي مطلوب'], 422);
         }
         if ($currency === '') {
-            json_response(['success' => false, 'message' => 'رمز العملة مطلوب'], 422);
+            json_response([
+                'success' => false,
+                'message' => 'لا توجد عملة تلقائية لرمز الدولة — استخدم رمزاً معرّفاً (مثل kw أو eg أو ae أو sa)',
+            ], 422);
         }
 
         if ($id > 0) {
@@ -61,15 +63,16 @@ try {
                 json_response(['success' => false, 'message' => 'رمز الدولة مستخدم'], 409);
             }
             $st = $pdo->prepare(
-                'UPDATE countries SET code = ?, name_ar = ?, name_en = ?, currency_code = ?, sort_order = ?, is_active = ? WHERE id = ?'
+                'UPDATE countries SET code = ?, name_ar = ?, name_en = ?, currency_code = ?, is_active = ? WHERE id = ?'
             );
-            $st->execute([$code, $nameAr, $nameEn, $currency, $sortOrder, $isActive, $id]);
+            $st->execute([$code, $nameAr, $nameEn, $currency, $isActive, $id]);
         } else {
             $dup = $pdo->prepare('SELECT id FROM countries WHERE code = ? LIMIT 1');
             $dup->execute([$code]);
             if ($dup->fetch()) {
                 json_response(['success' => false, 'message' => 'رمز الدولة مستخدم'], 409);
             }
+            $sortOrder = orange_countries_next_sort_order($pdo);
             $st = $pdo->prepare(
                 'INSERT INTO countries (code, name_ar, name_en, currency_code, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?)'
             );
