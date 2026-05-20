@@ -63,7 +63,7 @@ foreach ($countries as $c) {
         <div class="ctry-sort">
             <label for="ctry_sort">الترتيب</label>
             <input type="number" id="ctry_sort" class="admin-sort-field admin-sort-field--muted"
-                value="<?php echo $editRow ? (int) ($editRow['sort_order'] ?? 0) : ''; ?>"
+                value="<?php echo $editRow ? (int) ($editRow['sort_order'] ?? 0) : (int) orange_countries_next_sort_order($pdo); ?>"
                 disabled tabindex="-1" aria-readonly="true">
         </div>
         <div class="ctry-active">
@@ -135,7 +135,6 @@ async function deriveCountryFields() {
     if (!ar) {
         if (codeEl) codeEl.value = '';
         if (curEl) curEl.value = '';
-        if (sortEl) sortEl.value = '';
         return;
     }
     try {
@@ -149,8 +148,8 @@ async function deriveCountryFields() {
         }
         if (codeEl) codeEl.value = res.code ? res.code : '';
         if (curEl) curEl.value = res.currency_code ? res.currency_code : '';
-        if (sortEl) {
-            sortEl.value = (res.code && res.next_sort_order) ? String(res.next_sort_order) : '';
+        if (sortEl && res.next_sort_order) {
+            sortEl.value = String(res.next_sort_order);
         }
     } catch (e) {
         /* صامت في المعاينة */
@@ -192,7 +191,6 @@ function scheduleCountryFromAr() {
         document.getElementById('ctry_name_en').value = '';
         document.getElementById('ctry_code').value = '';
         document.getElementById('ctry_currency').value = '';
-        document.getElementById('ctry_sort').value = '';
         return;
     }
     clearTimeout(ctryArTimer);

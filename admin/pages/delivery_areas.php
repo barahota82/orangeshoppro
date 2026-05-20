@@ -62,7 +62,8 @@ $activeAreasCount = $hasAreasTable ? orange_delivery_areas_count_active($pdo, $a
         <div class="da-gov-sort">
             <label for="dg_sort_order">الترتيب</label>
             <input type="number" id="dg_sort_order" class="admin-sort-field admin-sort-field--muted"
-                value="" disabled tabindex="-1" aria-readonly="true">
+                value="<?php echo (int) orange_delivery_governorates_next_sort_order($pdo, $adminCountryId); ?>"
+                disabled tabindex="-1" aria-readonly="true">
         </div>
         <div class="da-gov-active">
             <label for="dg_is_active" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:1.4rem;">
