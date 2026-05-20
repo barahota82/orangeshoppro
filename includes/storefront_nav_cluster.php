@@ -6,6 +6,10 @@ if (!isset($channel, $lang, $channelSlug, $pageKind, $storefrontExtra, $langOpts
     return;
 }
 
+$countryOptions = $countryOptions ?? [];
+$countryCode = $countryCode ?? '';
+$countryLabel = $countryLabel ?? '';
+
 $clusterPart = $SF_NAV_CLUSTER_PART ?? '';
 
 $waHref = storefront_whatsapp_href($channel);
@@ -53,6 +57,45 @@ $renderLangHeader = static function () use ($langOpts, $lang, $channelSlug, $pag
                 </details>
     <?php
 };
+
+if ($clusterPart === 'country') {
+    $countryAria = htmlspecialchars(function_exists('t') ? t('storefront_country') : 'Country', ENT_QUOTES, 'UTF-8');
+    if (count($countryOptions) < 2) {
+        return;
+    }
+    echo '<nav class="lang-dropdown-nav country-dropdown-nav" aria-label="' . $countryAria . '">';
+    ?>
+                <details class="lang-dropdown country-dropdown">
+                    <summary class="lang-dropdown__summary" aria-label="<?php echo $countryAria; ?>">
+                        <span class="lang-dropdown__current"><?php echo htmlspecialchars($countryLabel, ENT_QUOTES, 'UTF-8'); ?></span>
+                        <span class="lang-dropdown__chev" aria-hidden="true"></span>
+                    </summary>
+                    <ul class="lang-dropdown__list">
+                        <?php foreach ($countryOptions as $co) {
+                            $cc = (string) ($co['code'] ?? '');
+                            if ($cc === '') {
+                                continue;
+                            }
+                            $href = htmlspecialchars(storefront_country_switch_href($cc, $lang), ENT_QUOTES, 'UTF-8');
+                            $isActive = $cc === $countryCode;
+                            $label = (string) ($co['name'] ?? $cc);
+                            ?>
+                        <li>
+                            <a class="lang-dropdown__option<?php echo $isActive ? ' is-active' : ''; ?>"
+                               href="<?php echo $href; ?>"
+                               <?php echo $isActive ? 'aria-current="true"' : ''; ?>>
+                                <span class="lang-dropdown__check" aria-hidden="true"><?php echo $isActive ? '✓' : ''; ?></span>
+                                <span class="lang-dropdown__label"><?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?></span>
+                            </a>
+                        </li>
+                        <?php } ?>
+                    </ul>
+                </details>
+    <?php
+    echo '</nav>';
+
+    return;
+}
 
 if ($clusterPart === 'lang') {
     echo '<nav class="lang-dropdown-nav" aria-label="' . $langAria . '">';

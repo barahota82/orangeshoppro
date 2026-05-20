@@ -16,6 +16,8 @@ orange_catalog_ensure_storefront_read_bootstrap(db());
 orange_send_html_no_cache_headers();
 
 extract(storefront_toolbar_state());
+require_once __DIR__ . '/countries.php';
+orange_storefront_send_country_cookie($countryCode ?? orange_storefront_current_country_code(db()));
 orange_storefront_send_channel_cookie($channelSlug);
 orange_storefront_send_lang_cookie($lang);
 
@@ -216,6 +218,9 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
         window.APP_TAGLINE_CYCLE = <?php echo json_encode($taglineCycle, JSON_UNESCAPED_UNICODE); ?>;
         window.APP_CHANNEL_ID = <?php echo (int)($channel['id'] ?? 0); ?>;
         window.APP_CHANNEL_SLUG = <?php echo json_encode($channelSlug, JSON_UNESCAPED_UNICODE); ?>;
+        window.APP_COUNTRY_ID = <?php echo (int)($countryId ?? 0); ?>;
+        window.APP_COUNTRY_CODE = <?php echo json_encode($countryCode ?? '', JSON_UNESCAPED_UNICODE); ?>;
+        window.APP_COUNTRY_CURRENCY = <?php echo json_encode($countryCurrency ?? '', JSON_UNESCAPED_UNICODE); ?>;
         window.ORANGE_ACCOUNT_CHANNEL = <?php echo json_encode($orangeAccountChannelForJs, JSON_UNESCAPED_UNICODE); ?>;
         window.ORANGE_SF_LOGGED_IN = <?php echo $orangeSfLoggedInForJs ? 'true' : 'false'; ?>;
         window.STOREFRONT_BASE = <?php echo json_encode(PUBLIC_BASE_PATH, JSON_UNESCAPED_UNICODE); ?>;
@@ -396,6 +401,15 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
             </div>
         </div>
         <div class="header-actions-cluster">
+            <?php if (!empty($countryOptions) && count($countryOptions) > 0): ?>
+            <div class="header-actions header-actions--country">
+                <?php
+                $SF_NAV_PLACEMENT = 'header';
+                $SF_NAV_CLUSTER_PART = 'country';
+                include __DIR__ . '/storefront_nav_cluster.php';
+                ?>
+            </div>
+            <?php endif; ?>
             <div class="header-actions header-actions--lang">
                 <?php
                 $SF_NAV_PLACEMENT = 'header';

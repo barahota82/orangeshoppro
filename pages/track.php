@@ -10,7 +10,8 @@ $pdoTrack = db();
 orange_catalog_ensure_schema($pdoTrack);
 
 include __DIR__ . '/../includes/header.php';
-$trackDeliveryAreas = orange_delivery_areas_storefront_payload($pdoTrack, $lang);
+$trackDeliveryAreaGroups = orange_delivery_areas_storefront_groups($pdoTrack, $lang);
+$trackDeliveryAreas = orange_delivery_areas_flatten_groups($trackDeliveryAreaGroups);
 
 $trackHomeUrl = storefront_url('home', $channelSlug, $lang);
 $waHref = storefront_whatsapp_href($channel, '');
@@ -88,7 +89,7 @@ $orangeMyOrderUi = [
                 <div class="field track-signup-cta__field">
                     <label for="trackSignupArea"><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <?php if (count($trackDeliveryAreas) > 0): ?>
-                    <?php echo orange_storefront_delivery_area_select_markup('trackSignupArea', $trackDeliveryAreas, true, 'area'); ?>
+                    <?php echo orange_storefront_delivery_area_select_markup('trackSignupArea', null, true, 'area', '', $trackDeliveryAreaGroups); ?>
                     <?php else: ?>
                     <select id="trackSignupArea" name="area" class="js-orange-delivery-area-unavailable" autocomplete="address-level1" disabled aria-describedby="trackSignupAreaUnavailableHelp">
                         <option value=""><?php echo htmlspecialchars(t('checkout_select_area'), ENT_QUOTES, 'UTF-8'); ?></option>

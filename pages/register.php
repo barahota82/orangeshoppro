@@ -23,7 +23,8 @@ $ORANGE_STOREFRONT_META_DESCRIPTION = t('storefront_register_intro');
 
 include __DIR__ . '/../includes/header.php';
 
-$registerDeliveryAreas = orange_delivery_areas_storefront_payload($pdo, $lang);
+$registerDeliveryAreaGroups = orange_delivery_areas_storefront_groups($pdo, $lang);
+$registerDeliveryAreas = orange_delivery_areas_flatten_groups($registerDeliveryAreaGroups);
 $acc = current_storefront_account($pdo);
 $registerHref = storefront_url('register', $channelSlug, $lang);
 $homeHref = storefront_url('home', $channelSlug, $lang);
@@ -120,7 +121,7 @@ $homeHref = storefront_url('home', $channelSlug, $lang);
                 <div class="field track-signup-cta__field">
                     <label for="reg_area"><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <?php if (count($registerDeliveryAreas) > 0): ?>
-                    <?php echo orange_storefront_delivery_area_select_markup('reg_area', $registerDeliveryAreas, true, 'area'); ?>
+                    <?php echo orange_storefront_delivery_area_select_markup('reg_area', null, true, 'area', '', $registerDeliveryAreaGroups); ?>
                     <?php else: ?>
                     <select id="reg_area" name="area" class="js-orange-delivery-area-unavailable" autocomplete="address-level1" disabled aria-describedby="regAreaUnavailableHelp">
                         <option value=""><?php echo htmlspecialchars(t('checkout_select_area'), ENT_QUOTES, 'UTF-8'); ?></option>

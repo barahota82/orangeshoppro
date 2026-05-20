@@ -1,7 +1,7 @@
 Orange — بوابة واحدة: القراءات الإلزامية قبل أي تنفيذ
 ====================================================
 المسار: ORANGE_AGENT_READ_FIRST.txt (جذر المستودع بجانب IBRAHIM_ORANGE_MASTER.txt)
-آخر تحديث: 2026-04-26
+آخر تحديث: 2026-05-20
 
 الاستخدام
 -------
@@ -24,8 +24,9 @@ Orange — بوابة واحدة: القراءات الإلزامية قبل أ�
 5. **`scripts/orange_db.sql`** — **عند نطاق مخطط قاعدة بيانات أو ترحيل؛ إن وُجد محلياً** (مراجعة «الحقيقة»؛ إن غاب لا تُفترَض من Git وحدَه — راجع `IBRAHIM_ORANGE_MASTER.txt` قسم قاعدة البيانات).
 6. **`docs/archive/ORANGE_AGENT_QA_REFERENCE.txt`** — عند الحاجة (نشر، مخطط، أسئلة تشغيلية).
 7. **`docs/archive/ORANGE_UNIFIED_TAXONOMY_AND_CATALOG_ERD.txt`** — **قراءة كاملة عند نطاق أقسام/شجرة منتجات/صفات أو ربط تصنيف بالكتالوج (قبل أي Patch لتصنيف المنتج).** سياسة موجزة: **`docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** قسم «تاسعاً».
+8. **`docs/archive/ORANGE_OWNER_MULTICOUNTRY_VISION.txt`** — **قراءة كاملة عند نطاق دولة / قنوات لكل دولة / محافظات ومناطق متعددة الدول / فتح سوق / صلاحيات أدمن حسب الدولة** (قرارات مالك؛ التنفيذ البرمجي قد لا يزال قيد المستقبل).
 
-ثم: **قراءة كاملة** لقائمة **`.cursor/rules/orange-continuity.mdc`** (المحتوى الكامل للقائمة المرقّمة 0–8 و5b و5c).
+ثم: **قراءة كاملة** لقائمة **`.cursor/rules/orange-continuity.mdc`** (المحتوى الكامل للقائمة المرقّمة 0–8 و5b و5c و5m).
 
 ---
 ب) قائمة الاستمرارية المرقّمة (من `orange-continuity.mdc`)
@@ -39,6 +40,7 @@ Orange — بوابة واحدة: القراءات الإلزامية قبل أ�
 **5b.** `docs/archive/ORANGE_AGENT_QA_REFERENCE.txt` — عند الحاجة  
 **5tax.** `docs/archive/ORANGE_UNIFIED_TAXONOMY_AND_CATALOG_ERD.txt` — **قراءة كاملة** عند نطاق **تصنيف موحّد / شجرة منتجات / صفات** (قبل Patch كتالوج؛ انظر أيضاً **`ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** قسم «تاسعاً»).  
 **5c.** `docs/archive/ORANGE_ACCOUNTING_MAPPING_AND_REPORT_HANDOFF.txt` — **قراءة كاملة** عند نطاق **محاسبة داخلية / دليل حسابات / تقارير مالية / ترحيل GL**؛ ويُكمِّل **`docs/ACCOUNTING_REPORTING_POLICY_V2.md`** (تلخيص سياسة التقارير v2 حيث ينطبق)  
+**5m.** `docs/archive/ORANGE_OWNER_MULTICOUNTRY_VISION.txt` — **قراءة كاملة** عند نطاق **دولة / قنوات لكل دولة / محافظات ومناطق / فتح سوق / صلاحيات حسب الدولة**  
 **6.** `docs/archive/ORANGE_PROJECT_CONTINUITY.txt`  
 **7.** `docs/archive/ORANGE_TECH_REFERENCE.txt`  
 **8.** `docs/archive/ORANGE_PROJECT_COMPLETION_ROADMAP.txt` — تنفيذ ما ينطبق منها **بحسب نطاق المالك** لا كل المراحل دفعةً واحدةً دون توجيه  

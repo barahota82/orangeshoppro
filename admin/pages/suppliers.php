@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/party_subledger.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/storefront_phone_country_select.php';
 require_once __DIR__ . '/../../includes/delivery_areas.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -130,7 +131,10 @@ $hasSupplierPreferredWarehouseCol = orange_table_has_column($pdo, 'suppliers', '
 $hasSupplierBlockReasonCol = orange_table_has_column($pdo, 'suppliers', 'block_reason');
 $hasSupplierAttachmentsCol = orange_table_has_column($pdo, 'suppliers', 'attachments_json');
 $supplierAreaOptions = [];
-$deliveryAreaRows = function_exists('orange_delivery_areas_admin_list') ? orange_delivery_areas_admin_list($pdo) : [];
+$supplierAdminCountryId = orange_admin_context_country_id($pdo);
+$deliveryAreaRows = function_exists('orange_delivery_areas_admin_list')
+    ? orange_delivery_areas_admin_list($pdo, $supplierAdminCountryId)
+    : [];
 $seenSupplierAreas = [];
 foreach ($deliveryAreaRows as $daRow) {
     if (!is_array($daRow)) {
@@ -150,6 +154,10 @@ foreach ($deliveryAreaRows as $daRow) {
     $display = $areaValue;
     if ($nameAr !== '' && $nameEn !== '' && strcasecmp($nameAr, $nameEn) !== 0) {
         $display = $nameAr . ' — ' . $nameEn;
+    }
+    $govLabel = trim((string) ($daRow['governorate_name_ar'] ?? ''));
+    if ($govLabel !== '') {
+        $display .= ' — ' . $govLabel;
     }
     if ((int) ($daRow['is_active'] ?? 0) !== 1) {
         $display .= ' (غير منطقة توصيل حالياً)';

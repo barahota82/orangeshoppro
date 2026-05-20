@@ -4,10 +4,23 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
-$channels = $pdo->query('SELECT * FROM channels ORDER BY id ASC')->fetchAll();
+$countriesList = orange_countries_admin_list($pdo);
+$defaultCountryId = orange_countries_default_id($pdo);
+if (orange_channels_has_country_column($pdo) && orange_table_exists($pdo, 'countries')) {
+    $channels = $pdo->query(
+        'SELECT c.*, co.code AS country_code, co.name_ar AS country_name_ar
+         FROM channels c
+         LEFT JOIN countries co ON co.id = c.country_id
+         ORDER BY c.country_id ASC, c.id ASC'
+    )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+} else {
+    $channels = $pdo->query('SELECT * FROM channels ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+$channelKinds = orange_channel_kinds_allowed();
 
 $editId = isset($_GET['edit']) ? (int) $_GET['edit'] : 0;
 $editRow = null;
@@ -35,6 +48,34 @@ $editIsActive = $editRow ? (int) ($editRow['is_active'] ?? 1) : 1;
     <input type="hidden" id="channel_id" value="<?php echo $editRow ? (int) $editRow['id'] : ''; ?>">
     <input type="hidden" id="channel_logo" value="<?php echo htmlspecialchars($initialLogo, ENT_QUOTES, 'UTF-8'); ?>">
     <div class="form-grid">
+        <div>
+            <label for="channel_country_id">الدولة <span style="color:#b45309;">*</span></label>
+            <select id="channel_country_id" required>
+                <?php foreach ($countriesList as $co): ?>
+                    <?php
+                    $coId = (int) ($co['id'] ?? 0);
+                    $sel = $editRow
+                        ? ((int) ($editRow['country_id'] ?? 0) === $coId)
+                        : ($coId === $defaultCountryId);
+                    ?>
+                <option value="<?php echo $coId; ?>"<?php echo $sel ? ' selected' : ''; ?>>
+                    <?php echo htmlspecialchars((string) ($co['name_ar'] ?? '') . ' (' . (string) ($co['code'] ?? '') . ')', ENT_QUOTES, 'UTF-8'); ?>
+                </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div>
+            <label for="channel_kind">نوع القناة</label>
+            <select id="channel_kind">
+                <?php
+                $editKind = $editRow ? orange_channel_kind_normalize((string) ($editRow['channel_kind'] ?? 'other')) : 'other';
+                foreach ($channelKinds as $k):
+                    $kLabel = $k === 'web' ? 'ويب' : ($k === 'whatsapp' ? 'واتساب' : 'أخرى');
+                    ?>
+                <option value="<?php echo htmlspecialchars($k, ENT_QUOTES, 'UTF-8'); ?>"<?php echo $editKind === $k ? ' selected' : ''; ?>><?php echo htmlspecialchars($kLabel, ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
         <div>
             <label>اسم الواجهة</label>
             <input type="text" id="channel_name" placeholder="مثال: متجر إنستغرام" value="<?php echo $editRow ? htmlspecialchars((string) $editRow['name'], ENT_QUOTES, 'UTF-8') : ''; ?>">
@@ -78,6 +119,8 @@ $editIsActive = $editRow ? (int) ($editRow['is_active'] ?? 1) : 1;
             <thead>
                 <tr>
                     <th>#</th>
+                    <th>الدولة</th>
+                    <th>النوع</th>
                     <th>الاسم</th>
                     <th>اختصار URL</th>
                     <th>Slug داخلي</th>
@@ -92,6 +135,11 @@ $editIsActive = $editRow ? (int) ($editRow['is_active'] ?? 1) : 1;
                 <?php foreach ($channels as $ch): ?>
                 <tr>
                     <td><?php echo (int) $ch['id']; ?></td>
+                    <td><?php echo htmlspecialchars((string) ($ch['country_name_ar'] ?? $ch['country_code'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php
+                    $k = orange_channel_kind_normalize((string) ($ch['channel_kind'] ?? 'other'));
+                    echo $k === 'web' ? 'ويب' : ($k === 'whatsapp' ? 'واتساب' : 'أخرى');
+                    ?></td>
                     <td><?php echo htmlspecialchars($ch['name']); ?></td>
                     <td><code dir="ltr"><?php echo htmlspecialchars((string) ($ch['path_segment'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
                     <td><code dir="ltr"><?php echo htmlspecialchars($ch['slug']); ?></code></td>
@@ -195,7 +243,9 @@ async function saveChannel() {
         path_segment: document.getElementById('channel_path_segment').value.trim(),
         logo: document.getElementById('channel_logo').value.trim(),
         whatsapp_number: document.getElementById('channel_whatsapp').value.trim(),
-        is_active: actSel && actSel.value === '0' ? 0 : 1
+        is_active: actSel && actSel.value === '0' ? 0 : 1,
+        country_id: parseInt((document.getElementById('channel_country_id') || {}).value, 10) || 0,
+        channel_kind: (document.getElementById('channel_kind') || {}).value || 'other'
     };
     if (idEl && idEl.value) {
         var n = parseInt(idEl.value, 10);

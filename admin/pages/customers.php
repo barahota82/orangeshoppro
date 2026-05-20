@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/party_subledger.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/customer_attachments.php';
 require_once __DIR__ . '/../../includes/delivery_areas.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $cusAttachmentMaxCount = orange_customer_attachment_max_count();
 
@@ -35,7 +36,8 @@ $hasCustomerBlockReasonCol = orange_table_has_column($pdo, 'customers', 'block_r
 $hasCustomerAttachmentsCol = orange_table_has_column($pdo, 'customers', 'attachments_json');
 $hasCustomerCivilIdCol = orange_table_has_column($pdo, 'customers', 'civil_id');
 
-$adminDeliveryAreas = orange_delivery_areas_admin_list($pdo);
+$adminCountryId = orange_admin_context_country_id($pdo);
+$adminDeliveryAreas = orange_delivery_areas_admin_list($pdo, $adminCountryId);
 $adminDaIndex = [];
 foreach ($adminDeliveryAreas as $da) {
     $daId = (int) ($da['id'] ?? 0);
@@ -65,6 +67,10 @@ foreach ($adminDeliveryAreas as $daRow) {
     $display = $areaValue;
     if ($nameAr !== '' && $nameEn !== '' && strcasecmp($nameAr, $nameEn) !== 0) {
         $display = $nameAr . ' — ' . $nameEn;
+    }
+    $govLabel = trim((string) ($daRow['governorate_name_ar'] ?? ''));
+    if ($govLabel !== '') {
+        $display .= ' — ' . $govLabel;
     }
     if ((int) ($daRow['is_active'] ?? 0) !== 1) {
         $display .= ' (غير منطقة توصيل حالياً)';

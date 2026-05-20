@@ -435,39 +435,59 @@ function orange_storefront_legacy_slug_aliases(): array
     return ['orange' => 'tiktok', 'blue' => 'online', 'black' => 'web'];
 }
 
-/** أول قناة نشطة حسب id — افتراضي للمتجر عند غياب كوكي/قناة. */
-function orange_storefront_default_channel_slug(PDO $pdo): string
+/** أول قناة نشطة حسب id — افتراضي للمتجر عند غياب كوكي/قناة (ضمن الدولة الحالية إن وُجد country_id). */
+function orange_storefront_default_channel_slug(PDO $pdo, ?int $countryId = null): string
 {
-    static $memo = null;
-    if ($memo !== null) {
-        return $memo;
+    require_once __DIR__ . '/includes/countries.php';
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_storefront_current_country_id($pdo);
+    }
+    $cacheKey = 'c' . (int) $countryId;
+    static $memoByCountry = [];
+    if (isset($memoByCountry[$cacheKey])) {
+        return $memoByCountry[$cacheKey];
     }
     try {
-        $v = $pdo->query('SELECT slug FROM channels WHERE is_active = 1 ORDER BY id ASC LIMIT 1')->fetchColumn();
+        if ($countryId > 0 && orange_channels_has_country_column($pdo)) {
+            $st = $pdo->prepare('SELECT slug FROM channels WHERE is_active = 1 AND country_id = ? ORDER BY id ASC LIMIT 1');
+            $st->execute([$countryId]);
+            $v = $st->fetchColumn();
+        } else {
+            $v = $pdo->query('SELECT slug FROM channels WHERE is_active = 1 ORDER BY id ASC LIMIT 1')->fetchColumn();
+        }
         if ($v !== false && $v !== null && (string) $v !== '') {
-            $memo = (string) $v;
+            $memoByCountry[$cacheKey] = (string) $v;
 
-            return $memo;
+            return $memoByCountry[$cacheKey];
         }
     } catch (Throwable $e) {
     }
-    $memo = 'tiktok';
+    $memoByCountry[$cacheKey] = 'tiktok';
 
-    return $memo;
+    return $memoByCountry[$cacheKey];
 }
 
 /**
  * يضمن slug نشطاً في الجدول؛ يطبّق aliases القديمة ثم الافتراضي.
  */
-function orange_storefront_normalize_channel_slug(PDO $pdo, string $raw): string
+function orange_storefront_normalize_channel_slug(PDO $pdo, string $raw, ?int $countryId = null): string
 {
+    require_once __DIR__ . '/includes/countries.php';
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_storefront_current_country_id($pdo);
+    }
     $slug = strtolower((string) (preg_replace('/[^a-z0-9\-]/i', '', trim($raw)) ?? ''));
     if ($slug === '') {
-        return orange_storefront_default_channel_slug($pdo);
+        return orange_storefront_default_channel_slug($pdo, $countryId);
     }
     try {
-        $st = $pdo->prepare('SELECT slug FROM channels WHERE slug = ? AND is_active = 1 LIMIT 1');
-        $st->execute([$slug]);
+        if ($countryId > 0 && orange_channels_has_country_column($pdo)) {
+            $st = $pdo->prepare('SELECT slug FROM channels WHERE slug = ? AND is_active = 1 AND country_id = ? LIMIT 1');
+            $st->execute([$slug, $countryId]);
+        } else {
+            $st = $pdo->prepare('SELECT slug FROM channels WHERE slug = ? AND is_active = 1 LIMIT 1');
+            $st->execute([$slug]);
+        }
         $found = $st->fetchColumn();
         if ($found !== false && $found !== null && (string) $found !== '') {
             return (string) $found;
@@ -475,7 +495,11 @@ function orange_storefront_normalize_channel_slug(PDO $pdo, string $raw): string
         $aliases = orange_storefront_legacy_slug_aliases();
         if (isset($aliases[$slug])) {
             $cand = $aliases[$slug];
-            $st->execute([$cand]);
+            if ($countryId > 0 && orange_channels_has_country_column($pdo)) {
+                $st->execute([$cand, $countryId]);
+            } else {
+                $st->execute([$cand]);
+            }
             $found2 = $st->fetchColumn();
             if ($found2 !== false && $found2 !== null && (string) $found2 !== '') {
                 return (string) $found2;
@@ -484,17 +508,26 @@ function orange_storefront_normalize_channel_slug(PDO $pdo, string $raw): string
     } catch (Throwable $e) {
     }
 
-    return orange_storefront_default_channel_slug($pdo);
+    return orange_storefront_default_channel_slug($pdo, $countryId);
 }
 
-function orange_storefront_channel_slug_is_active(PDO $pdo, string $slug): bool
+function orange_storefront_channel_slug_is_active(PDO $pdo, string $slug, ?int $countryId = null): bool
 {
     if ($slug === '') {
         return false;
     }
+    require_once __DIR__ . '/includes/countries.php';
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_storefront_current_country_id($pdo);
+    }
     try {
-        $st = $pdo->prepare('SELECT 1 FROM channels WHERE slug = ? AND is_active = 1 LIMIT 1');
-        $st->execute([$slug]);
+        if ($countryId > 0 && orange_channels_has_country_column($pdo)) {
+            $st = $pdo->prepare('SELECT 1 FROM channels WHERE slug = ? AND is_active = 1 AND country_id = ? LIMIT 1');
+            $st->execute([$slug, $countryId]);
+        } else {
+            $st = $pdo->prepare('SELECT 1 FROM channels WHERE slug = ? AND is_active = 1 LIMIT 1');
+            $st->execute([$slug]);
+        }
 
         return (bool) $st->fetchColumn();
     } catch (Throwable $e) {
@@ -521,21 +554,30 @@ function orange_storefront_channel_slug_from_request_path(PDO $pdo): ?string
     return orange_channel_slug_for_path_segment($pdo, $seg, true);
 }
 
-function orange_channel_slug_for_path_segment(PDO $pdo, string $pathSegment, bool $requireActive = true): ?string
+function orange_channel_slug_for_path_segment(PDO $pdo, string $pathSegment, bool $requireActive = true, ?int $countryId = null): ?string
 {
+    require_once __DIR__ . '/includes/countries.php';
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_storefront_current_country_id($pdo);
+    }
     $s = strtolower((string) (preg_replace('/[^a-z0-9\-]/i', '', $pathSegment) ?? ''));
     if ($s === '') {
         return null;
     }
     $sql = 'SELECT slug FROM channels WHERE path_segment = ?';
+    $params = [$s];
     if ($requireActive) {
         $sql .= ' AND is_active = 1';
+    }
+    if ($countryId > 0 && orange_channels_has_country_column($pdo)) {
+        $sql .= ' AND country_id = ?';
+        $params[] = $countryId;
     }
     $sql .= ' LIMIT 1';
     for ($attempt = 0; $attempt < 2; $attempt++) {
         try {
             $st = $pdo->prepare($sql);
-            $st->execute([$s]);
+            $st->execute($params);
             $row = $st->fetchColumn();
             if ($row !== false && $row !== null && (string) $row !== '') {
                 return (string) $row;
@@ -562,18 +604,28 @@ function orange_channel_slug_for_path_segment(PDO $pdo, string $pathSegment, boo
     return null;
 }
 
-function orange_channel_path_segment_for_slug(PDO $pdo, string $slug): ?string
+function orange_channel_path_segment_for_slug(PDO $pdo, string $slug, ?int $countryId = null): ?string
 {
+    require_once __DIR__ . '/includes/countries.php';
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_storefront_current_country_id($pdo);
+    }
     $s = strtolower((string) (preg_replace('/[^a-z0-9\-]/i', '', $slug) ?? ''));
     if ($s === '') {
         return null;
     }
     $slugSql =
-        'SELECT path_segment FROM channels WHERE slug = ? AND is_active = 1 AND path_segment IS NOT NULL AND path_segment <> \'\' LIMIT 1';
+        'SELECT path_segment FROM channels WHERE slug = ? AND is_active = 1 AND path_segment IS NOT NULL AND path_segment <> \'\'';
+    $params = [$s];
+    if ($countryId > 0 && orange_channels_has_country_column($pdo)) {
+        $slugSql .= ' AND country_id = ?';
+        $params[] = $countryId;
+    }
+    $slugSql .= ' LIMIT 1';
     for ($attempt = 0; $attempt < 2; $attempt++) {
         try {
             $st = $pdo->prepare($slugSql);
-            $st->execute([$s]);
+            $st->execute($params);
             $row = $st->fetchColumn();
             if ($row !== false && $row !== null && (string) $row !== '') {
                 return (string) $row;
@@ -614,8 +666,15 @@ function orange_storefront_path_maps_for_js(PDO $pdo): array
     $pathToSlug = [];
     $slugToPath = [];
     $validSlugs = [];
+    require_once __DIR__ . '/includes/countries.php';
+    $countryId = orange_storefront_current_country_id($pdo);
     try {
-        $q = $pdo->query('SELECT slug, path_segment FROM channels WHERE is_active = 1');
+        if ($countryId > 0 && orange_channels_has_country_column($pdo)) {
+            $q = $pdo->prepare('SELECT slug, path_segment FROM channels WHERE is_active = 1 AND country_id = ?');
+            $q->execute([$countryId]);
+        } else {
+            $q = $pdo->query('SELECT slug, path_segment FROM channels WHERE is_active = 1');
+        }
         if ($q) {
             while ($row = $q->fetch(PDO::FETCH_ASSOC)) {
                 $sl = strtolower((string) ($row['slug'] ?? ''));
@@ -740,19 +799,21 @@ function orange_storefront_send_lang_cookie(string $lang): void
 function current_channel_slug(): string
 {
     $pdo = db();
-    $def = orange_storefront_default_channel_slug($pdo);
+    require_once __DIR__ . '/includes/countries.php';
+    $countryId = orange_storefront_current_country_id($pdo);
+    $def = orange_storefront_default_channel_slug($pdo, $countryId);
     if (isset($_GET['channel']) && (string) $_GET['channel'] !== '') {
         $s = preg_replace('/[^a-z0-9\-]/i', '', (string) $_GET['channel']);
 
-        return $s !== '' ? orange_storefront_normalize_channel_slug($pdo, $s) : $def;
+        return $s !== '' ? orange_storefront_normalize_channel_slug($pdo, $s, $countryId) : $def;
     }
     $fromPath = orange_storefront_channel_slug_from_request_path($pdo);
     if ($fromPath !== null && $fromPath !== '') {
-        return orange_storefront_normalize_channel_slug($pdo, $fromPath);
+        return orange_storefront_normalize_channel_slug($pdo, $fromPath, $countryId);
     }
     $fromCookie = orange_storefront_read_saved_channel_slug();
     if ($fromCookie !== null) {
-        return $fromCookie;
+        return orange_storefront_normalize_channel_slug($pdo, $fromCookie, $countryId);
     }
 
     return $def;
@@ -760,9 +821,17 @@ function current_channel_slug(): string
 
 function get_channel_by_slug(string $slug): ?array {
     $pdo = db();
-    $stmt = $pdo->prepare("SELECT * FROM channels WHERE slug = ? AND is_active = 1 LIMIT 1");
-    $stmt->execute([$slug]);
+    require_once __DIR__ . '/includes/countries.php';
+    $countryId = orange_storefront_current_country_id($pdo);
+    if ($countryId > 0 && orange_channels_has_country_column($pdo)) {
+        $stmt = $pdo->prepare('SELECT * FROM channels WHERE slug = ? AND is_active = 1 AND country_id = ? LIMIT 1');
+        $stmt->execute([$slug, $countryId]);
+    } else {
+        $stmt = $pdo->prepare('SELECT * FROM channels WHERE slug = ? AND is_active = 1 LIMIT 1');
+        $stmt->execute([$slug]);
+    }
     $row = $stmt->fetch();
+
     return $row ?: null;
 }
 
@@ -967,11 +1036,16 @@ function storefront_toolbar_state(): array {
     if ($memo !== null) {
         return $memo;
     }
+    require_once __DIR__ . '/includes/countries.php';
+    $pdoTb = db();
     $lang = current_lang();
+    $countryId = orange_storefront_current_country_id($pdoTb);
+    $countryCode = orange_storefront_current_country_code($pdoTb);
+    $countryRow = orange_country_row_by_id($pdoTb, $countryId, false)
+        ?? orange_country_row_by_code($pdoTb, $countryCode, false);
     $slug = current_channel_slug();
     $channel = get_channel_by_slug($slug);
-    $pdoTb = db();
-    $defSlug = orange_storefront_default_channel_slug($pdoTb);
+    $defSlug = orange_storefront_default_channel_slug($pdoTb, $countryId);
     if (!$channel) {
         $channel = [
             'id' => 0,
@@ -992,6 +1066,9 @@ function storefront_toolbar_state(): array {
     }
     $langOpts = storefront_lang_options();
     $currentLangLabel = (string)($langOpts[$lang]['label'] ?? $lang);
+    $countryOptions = orange_countries_storefront_active($pdoTb, $lang);
+    $countryLabel = $countryRow !== null ? orange_country_label_from_row($countryRow, $lang) : $countryCode;
+    $countryCurrency = $countryRow !== null ? strtoupper(trim((string) ($countryRow['currency_code'] ?? ''))) : '';
 
     $memo = [
         'channel' => $channel,
@@ -1001,9 +1078,38 @@ function storefront_toolbar_state(): array {
         'storefrontExtra' => $storefrontExtra,
         'langOpts' => $langOpts,
         'currentLangLabel' => $currentLangLabel,
+        'countryId' => $countryId,
+        'countryCode' => $countryCode,
+        'countryLabel' => $countryLabel,
+        'countryCurrency' => $countryCurrency,
+        'countryOptions' => $countryOptions,
     ];
 
     return $memo;
+}
+
+/**
+ * رابط تبديل الدولة مع الحفاظ على مسار الصفحة الحالي.
+ */
+function storefront_country_switch_href(string $countryCode, ?string $lang = null): string
+{
+    $code = function_exists('orange_countries_normalize_code')
+        ? orange_countries_normalize_code($countryCode)
+        : strtolower(trim($countryCode));
+    if ($code === '') {
+        return '';
+    }
+    $params = $_GET;
+    $params['country'] = $code;
+    if ($lang !== null && $lang !== '') {
+        $params['lang'] = $lang;
+    }
+    $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH);
+    if (!is_string($path) || $path === '') {
+        $path = '/';
+    }
+
+    return $path . '?' . http_build_query($params);
 }
 
 /** wa.me link for channel WhatsApp (digits only). */
@@ -1381,6 +1487,8 @@ function get_translations(): array {
             'added' => 'Added to cart',
             'category_products' => 'Products',
             'language' => 'Language',
+            'storefront_country' => 'Country',
+            'storefront_country_select' => 'Select country',
             'storefront_brand' => 'Orange Company',
             'whatsapp' => 'WhatsApp',
             'tabs_scroll_prev' => 'Scroll categories left',
@@ -1645,6 +1753,8 @@ function get_translations(): array {
             'added' => 'تمت الإضافة إلى السلة',
             'category_products' => 'المنتجات',
             'language' => 'اللغة',
+            'storefront_country' => 'الدولة',
+            'storefront_country_select' => 'اختر الدولة',
             'storefront_brand' => 'Orange Company',
             'whatsapp' => 'واتساب',
             'tabs_scroll_prev' => 'تحريك أقسام التصنيف لليسار',
@@ -1908,6 +2018,8 @@ function get_translations(): array {
             'added' => 'Naidagdag sa cart',
             'category_products' => 'Mga Produkto',
             'language' => 'Wika',
+            'storefront_country' => 'Bansa',
+            'storefront_country_select' => 'Pumili ng bansa',
             'storefront_brand' => 'Orange Company',
             'whatsapp' => 'WhatsApp',
             'tabs_scroll_prev' => 'I-scroll ang mga kategorya pakaliwa',
@@ -2172,6 +2284,8 @@ function get_translations(): array {
             'added' => 'कार्ट में जोड़ा गया',
             'category_products' => 'उत्पाद',
             'language' => 'भाषा',
+            'storefront_country' => 'देश',
+            'storefront_country_select' => 'देश चुनें',
             'storefront_brand' => 'Orange Company',
             'whatsapp' => 'WhatsApp',
             'tabs_scroll_prev' => 'श्रेणियाँ बाईं ओर स्क्रॉल करें',

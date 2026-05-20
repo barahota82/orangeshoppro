@@ -13,7 +13,8 @@ $cartSfAccount = current_storefront_account($pdoCartAcc);
 $cartSfLoggedIn = $cartSfAccount !== null;
 
 include __DIR__ . '/../includes/header.php';
-$orangeDeliveryAreasStorefront = orange_delivery_areas_storefront_payload($pdoCartAcc, $lang);
+$orangeDeliveryAreaGroups = orange_delivery_areas_storefront_groups($pdoCartAcc, $lang);
+$orangeDeliveryAreasStorefront = orange_delivery_areas_flatten_groups($orangeDeliveryAreaGroups);
 $cartHomeUrl = storefront_url('home', $channelSlug, $lang);
 $tabBasketLabel = t('cart_tab_basket');
 $tabOrdersLabel = t('cart_tab_my_orders');
@@ -128,7 +129,7 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
                 <div class="field">
                     <label for="customer_area"><?php echo htmlspecialchars(t('area'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <?php if (count($orangeDeliveryAreasStorefront) > 0): ?>
-                    <?php echo orange_storefront_delivery_area_select_markup('customer_area', $orangeDeliveryAreasStorefront, true, 'customer_area'); ?>
+                    <?php echo orange_storefront_delivery_area_select_markup('customer_area', null, true, 'customer_area', '', $orangeDeliveryAreaGroups); ?>
                     <?php else: ?>
                     <select id="customer_area" class="js-orange-delivery-area-unavailable" autocomplete="address-level1" disabled aria-describedby="customerAreaUnavailableHelp">
                         <option value=""><?php echo htmlspecialchars(t('checkout_select_area'), ENT_QUOTES, 'UTF-8'); ?></option>

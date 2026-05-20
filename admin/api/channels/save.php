@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 function channels_ensure_warehouse_column(PDO $pdo): void
@@ -20,17 +21,26 @@ function channels_ensure_warehouse_column(PDO $pdo): void
 /**
  * Slug فريد لجدول channels (للـ ?channel= والكوكي). عند التعديل: استثناء صف بالمعرّف الحالي.
  */
-function channels_next_unique_slug(PDO $pdo, string $base, ?int $exceptChannelId = null): string
+function channels_next_unique_slug(PDO $pdo, string $base, ?int $exceptChannelId = null, int $countryId = 0): string
 {
     $b = strtolower((string) preg_replace('/[^a-z0-9\-]/i', '', $base));
     if ($b === '') {
         $b = 'channel';
     }
+    $hasCountry = $countryId > 0 && orange_channels_has_country_column($pdo);
     for ($i = 0; $i < 500; $i++) {
         $try = $i === 0 ? $b : $b . '-' . $i;
         if ($exceptChannelId !== null) {
-            $st = $pdo->prepare('SELECT id FROM channels WHERE slug = ? AND id <> ? LIMIT 1');
-            $st->execute([$try, $exceptChannelId]);
+            if ($hasCountry) {
+                $st = $pdo->prepare('SELECT id FROM channels WHERE slug = ? AND country_id = ? AND id <> ? LIMIT 1');
+                $st->execute([$try, $countryId, $exceptChannelId]);
+            } else {
+                $st = $pdo->prepare('SELECT id FROM channels WHERE slug = ? AND id <> ? LIMIT 1');
+                $st->execute([$try, $exceptChannelId]);
+            }
+        } elseif ($hasCountry) {
+            $st = $pdo->prepare('SELECT id FROM channels WHERE slug = ? AND country_id = ? LIMIT 1');
+            $st->execute([$try, $countryId]);
         } else {
             $st = $pdo->prepare('SELECT id FROM channels WHERE slug = ? LIMIT 1');
             $st->execute([$try]);
@@ -90,6 +100,16 @@ try {
     $name = trim((string) $data['name']);
     $wa = trim((string) $data['whatsapp_number']);
     $wh = 1;
+    $countryId = (int) ($data['country_id'] ?? 0);
+    if ($countryId <= 0) {
+        $countryId = orange_countries_default_id($pdo);
+    }
+    if ($countryId <= 0) {
+        json_response(['success' => false, 'message' => 'الدولة مطلوبة'], 422);
+    }
+    $channelKind = orange_channel_kind_normalize((string) ($data['channel_kind'] ?? 'other'));
+    $hasCountryCol = orange_channels_has_country_column($pdo);
+    $hasKindCol = orange_table_has_column($pdo, 'channels', 'channel_kind');
 
     $rawAct = $data['is_active'] ?? null;
     $isActive = 1;
@@ -107,21 +127,38 @@ try {
         $oldSlug = (string) ($row['slug'] ?? '');
         $oldPath = (string) ($row['path_segment'] ?? '');
 
-        $dupPath = $pdo->prepare('SELECT id FROM channels WHERE path_segment = ? AND id <> ? LIMIT 1');
-        $dupPath->execute([$pathSeg, $id]);
+        if ($hasCountryCol) {
+            $dupPath = $pdo->prepare('SELECT id FROM channels WHERE path_segment = ? AND country_id = ? AND id <> ? LIMIT 1');
+            $dupPath->execute([$pathSeg, $countryId, $id]);
+        } else {
+            $dupPath = $pdo->prepare('SELECT id FROM channels WHERE path_segment = ? AND id <> ? LIMIT 1');
+            $dupPath->execute([$pathSeg, $id]);
+        }
         if ($dupPath->fetch()) {
-            json_response(['success' => false, 'message' => 'اختصار الرابط مستخدم بالفعل'], 409);
+            json_response(['success' => false, 'message' => 'اختصار الرابط مستخدم بالفعل لهذه الدولة'], 409);
         }
 
         $newSlug = $oldSlug;
         if ($pathSeg !== $oldPath) {
-            $newSlug = channels_next_unique_slug($pdo, $pathSeg, $id);
+            $newSlug = channels_next_unique_slug($pdo, $pathSeg, $id, $countryId);
         }
 
-        $upd = $pdo->prepare(
-            'UPDATE channels SET name = ?, slug = ?, path_segment = ?, logo = ?, whatsapp_number = ?, warehouse_number = ?, is_active = ? WHERE id = ?'
-        );
-        $upd->execute([$name, $newSlug, $pathSeg, $logo, $wa, $wh, $isActive, $id]);
+        if ($hasCountryCol && $hasKindCol) {
+            $upd = $pdo->prepare(
+                'UPDATE channels SET name = ?, slug = ?, path_segment = ?, logo = ?, whatsapp_number = ?, warehouse_number = ?, is_active = ?, country_id = ?, channel_kind = ? WHERE id = ?'
+            );
+            $upd->execute([$name, $newSlug, $pathSeg, $logo, $wa, $wh, $isActive, $countryId, $channelKind, $id]);
+        } elseif ($hasCountryCol) {
+            $upd = $pdo->prepare(
+                'UPDATE channels SET name = ?, slug = ?, path_segment = ?, logo = ?, whatsapp_number = ?, warehouse_number = ?, is_active = ?, country_id = ? WHERE id = ?'
+            );
+            $upd->execute([$name, $newSlug, $pathSeg, $logo, $wa, $wh, $isActive, $countryId, $id]);
+        } else {
+            $upd = $pdo->prepare(
+                'UPDATE channels SET name = ?, slug = ?, path_segment = ?, logo = ?, whatsapp_number = ?, warehouse_number = ?, is_active = ? WHERE id = ?'
+            );
+            $upd->execute([$name, $newSlug, $pathSeg, $logo, $wa, $wh, $isActive, $id]);
+        }
 
         if ($newSlug !== $oldSlug) {
             channels_sync_storefront_accounts_slug($pdo, $oldSlug, $newSlug);
@@ -135,19 +172,38 @@ try {
         ]);
     }
 
-    $dupPath = $pdo->prepare('SELECT 1 FROM channels WHERE path_segment = ? LIMIT 1');
-    $dupPath->execute([$pathSeg]);
+    if ($hasCountryCol) {
+        $dupPath = $pdo->prepare('SELECT 1 FROM channels WHERE path_segment = ? AND country_id = ? LIMIT 1');
+        $dupPath->execute([$pathSeg, $countryId]);
+    } else {
+        $dupPath = $pdo->prepare('SELECT 1 FROM channels WHERE path_segment = ? LIMIT 1');
+        $dupPath->execute([$pathSeg]);
+    }
     if ($dupPath->fetch()) {
-        json_response(['success' => false, 'message' => 'اختصار الرابط مستخدم بالفعل'], 409);
+        json_response(['success' => false, 'message' => 'اختصار الرابط مستخدم بالفعل لهذه الدولة'], 409);
     }
 
-    $slug = channels_next_unique_slug($pdo, $pathSeg);
+    $slug = channels_next_unique_slug($pdo, $pathSeg, null, $countryId);
 
-    $stmt = $pdo->prepare(
-        'INSERT INTO channels (name, slug, path_segment, logo, whatsapp_number, warehouse_number, is_active)
-         VALUES (?, ?, ?, ?, ?, ?, ?)'
-    );
-    $stmt->execute([$name, $slug, $pathSeg, $logo, $wa, $wh, $isActive]);
+    if ($hasCountryCol && $hasKindCol) {
+        $stmt = $pdo->prepare(
+            'INSERT INTO channels (name, slug, path_segment, logo, whatsapp_number, warehouse_number, is_active, country_id, channel_kind)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        );
+        $stmt->execute([$name, $slug, $pathSeg, $logo, $wa, $wh, $isActive, $countryId, $channelKind]);
+    } elseif ($hasCountryCol) {
+        $stmt = $pdo->prepare(
+            'INSERT INTO channels (name, slug, path_segment, logo, whatsapp_number, warehouse_number, is_active, country_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        );
+        $stmt->execute([$name, $slug, $pathSeg, $logo, $wa, $wh, $isActive, $countryId]);
+    } else {
+        $stmt = $pdo->prepare(
+            'INSERT INTO channels (name, slug, path_segment, logo, whatsapp_number, warehouse_number, is_active)
+             VALUES (?, ?, ?, ?, ?, ?, ?)'
+        );
+        $stmt->execute([$name, $slug, $pathSeg, $logo, $wa, $wh, $isActive]);
+    }
 
     json_response(['success' => true, 'message' => 'تم حفظ الواجهة', 'slug' => $slug, 'path_segment' => $pathSeg]);
 } catch (Throwable $e) {

@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 39);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 41);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3018,6 +3018,9 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     }
     orange_catalog_migrate_legacy_storefront_copy_lines($pdo);
 
+    orange_catalog_migrate_countries_foundation_v40($pdo);
+    orange_catalog_migrate_governorates_v41($pdo);
+
     if (!orange_table_exists($pdo, 'delivery_areas')) {
         orange_catalog_safe_exec(
             $pdo,
@@ -3685,6 +3688,245 @@ function orange_catalog_migrate_legacy_storefront_copy_lines(PDO $pdo): void
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] migrate storefront_copy_lines: ' . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * أساس تعدد الدول (المرحلة 1): countries + country_id على القنوات والمناطق — الكويت فقط نشطة في البداية.
+ */
+function orange_catalog_migrate_countries_foundation_v40(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    $marker = 'php_countries_foundation_v40';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (!orange_table_exists($pdo, 'countries')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE IF NOT EXISTS countries (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                code VARCHAR(8) NOT NULL,
+                name_ar VARCHAR(191) NOT NULL DEFAULT \'\',
+                name_en VARCHAR(191) NOT NULL DEFAULT \'\',
+                currency_code VARCHAR(8) NOT NULL DEFAULT \'\',
+                sort_order INT NOT NULL DEFAULT 0,
+                is_active TINYINT(1) NOT NULL DEFAULT 1,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_countries_code (code)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
+    $seedCountries = [
+        ['kw', 'الكويت', 'Kuwait', 'KWD', 10, 1],
+        ['eg', 'مصر', 'Egypt', 'EGP', 20, 0],
+        ['ae', 'الإمارات', 'United Arab Emirates', 'AED', 30, 0],
+        ['sa', 'السعودية', 'Saudi Arabia', 'SAR', 40, 0],
+    ];
+    foreach ($seedCountries as $sc) {
+        $stChk = $pdo->prepare('SELECT id FROM countries WHERE code = ? LIMIT 1');
+        $stChk->execute([$sc[0]]);
+        if (!$stChk->fetch()) {
+            $ins = $pdo->prepare(
+                'INSERT INTO countries (code, name_ar, name_en, currency_code, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?)'
+            );
+            $ins->execute([$sc[0], $sc[1], $sc[2], $sc[3], $sc[4], $sc[5]]);
+        }
+    }
+
+    $kwId = 0;
+    $stKw = $pdo->prepare('SELECT id FROM countries WHERE code = ? LIMIT 1');
+    $stKw->execute(['kw']);
+    $kwRow = $stKw->fetch(PDO::FETCH_ASSOC);
+    if ($kwRow) {
+        $kwId = (int) $kwRow['id'];
+    }
+
+    if (orange_table_exists($pdo, 'channels')) {
+        if (!orange_table_has_column($pdo, 'channels', 'country_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE channels ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
+            );
+        }
+        if (!orange_table_has_column($pdo, 'channels', 'channel_kind')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                "ALTER TABLE channels ADD COLUMN channel_kind VARCHAR(32) NOT NULL DEFAULT 'other' AFTER country_id"
+            );
+        }
+        if ($kwId > 0) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE channels SET country_id = ' . (int) $kwId . ' WHERE country_id IS NULL OR country_id = 0'
+            );
+        }
+        orange_catalog_safe_exec(
+            $pdo,
+            "UPDATE channels SET channel_kind = 'web' WHERE channel_kind = 'other' AND LOWER(COALESCE(path_segment, '')) IN ('web', 'online')"
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            "UPDATE channels SET channel_kind = 'whatsapp' WHERE channel_kind = 'other' AND LOWER(COALESCE(path_segment, '')) = 'tiktok'"
+        );
+
+        foreach (['uq_channels_slug', 'uq_channels_path_segment'] as $ix) {
+            $chk = $pdo->prepare(
+                'SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = \'channels\' AND INDEX_NAME = ? LIMIT 1'
+            );
+            $chk->execute([$ix]);
+            if ($chk->fetchColumn()) {
+                orange_catalog_safe_exec($pdo, 'ALTER TABLE channels DROP INDEX `' . str_replace('`', '``', $ix) . '`');
+            }
+        }
+        $chkComp = $pdo->prepare(
+            'SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = \'channels\' AND INDEX_NAME = ? LIMIT 1'
+        );
+        $chkComp->execute(['uq_channels_country_slug']);
+        if (!$chkComp->fetchColumn()) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'CREATE UNIQUE INDEX uq_channels_country_slug ON channels (country_id, slug)'
+            );
+        }
+        $chkComp->execute(['uq_channels_country_path']);
+        if (!$chkComp->fetchColumn()) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'CREATE UNIQUE INDEX uq_channels_country_path ON channels (country_id, path_segment)'
+            );
+        }
+    }
+
+    if (orange_table_exists($pdo, 'delivery_areas')) {
+        if (!orange_table_has_column($pdo, 'delivery_areas', 'country_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE delivery_areas ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
+            );
+        }
+        if ($kwId > 0) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE delivery_areas SET country_id = ' . (int) $kwId . ' WHERE country_id IS NULL OR country_id = 0'
+            );
+        }
+    }
+
+    try {
+        $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+        $ins->execute([$marker]);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] countries_foundation_v40 marker: ' . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * محافظات التوصيل + ربط المناطق (المرحلة ب): delivery_governorates + delivery_areas.governorate_id.
+ */
+function orange_catalog_migrate_governorates_v41(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    require_once __DIR__ . '/delivery_areas.php';
+    $marker = 'php_governorates_v41';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (!orange_table_exists($pdo, 'delivery_governorates')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE IF NOT EXISTS delivery_governorates (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                country_id INT UNSIGNED NOT NULL,
+                name_ar VARCHAR(191) NOT NULL DEFAULT \'\',
+                name_en VARCHAR(191) NOT NULL DEFAULT \'\',
+                sort_order INT NOT NULL DEFAULT 0,
+                is_active TINYINT(1) NOT NULL DEFAULT 1,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY idx_delivery_governorates_country (country_id),
+                KEY idx_delivery_governorates_country_active (country_id, is_active, sort_order)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
+    if (orange_table_exists($pdo, 'delivery_areas')
+        && !orange_table_has_column($pdo, 'delivery_areas', 'governorate_id')
+    ) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE delivery_areas ADD COLUMN governorate_id INT UNSIGNED NULL DEFAULT NULL AFTER country_id'
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE INDEX idx_delivery_areas_governorate_id ON delivery_areas (governorate_id)'
+        );
+    }
+
+    if (orange_table_exists($pdo, 'countries') && orange_table_exists($pdo, 'delivery_governorates')) {
+        $countryRows = $pdo->query('SELECT id FROM countries ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        foreach ($countryRows as $cRow) {
+            $cid = (int) ($cRow['id'] ?? 0);
+            if ($cid > 0 && function_exists('orange_delivery_governorate_ensure_default')) {
+                orange_delivery_governorate_ensure_default($pdo, $cid);
+            }
+        }
+    }
+
+    if (orange_table_exists($pdo, 'delivery_areas')
+        && orange_table_has_column($pdo, 'delivery_areas', 'governorate_id')
+        && orange_table_has_column($pdo, 'delivery_areas', 'country_id')
+    ) {
+        $orphans = $pdo->query(
+            'SELECT DISTINCT country_id FROM delivery_areas WHERE governorate_id IS NULL AND country_id IS NOT NULL AND country_id > 0'
+        )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        foreach ($orphans as $o) {
+            $cid = (int) ($o['country_id'] ?? 0);
+            if ($cid <= 0 || !function_exists('orange_delivery_governorate_ensure_default')) {
+                continue;
+            }
+            $gid = orange_delivery_governorate_ensure_default($pdo, $cid);
+            if ($gid > 0) {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'UPDATE delivery_areas SET governorate_id = ' . (int) $gid
+                    . ' WHERE country_id = ' . (int) $cid
+                    . ' AND (governorate_id IS NULL OR governorate_id = 0)'
+                );
+            }
+        }
+        $noCountry = $pdo->query(
+            'SELECT id FROM delivery_areas WHERE governorate_id IS NULL OR governorate_id = 0 LIMIT 1'
+        )->fetchColumn();
+        if ($noCountry && function_exists('orange_countries_default_id')) {
+            $kwId = orange_countries_default_id($pdo);
+            if ($kwId > 0) {
+                $gid = orange_delivery_governorate_ensure_default($pdo, $kwId);
+                if ($gid > 0) {
+                    orange_catalog_safe_exec(
+                        $pdo,
+                        'UPDATE delivery_areas SET country_id = ' . (int) $kwId
+                        . ', governorate_id = ' . (int) $gid
+                        . ' WHERE governorate_id IS NULL OR governorate_id = 0'
+                    );
+                }
+            }
+        }
+    }
+
+    try {
+        $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+        $ins->execute([$marker]);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] governorates_v41 marker: ' . $e->getMessage());
         }
     }
 }
