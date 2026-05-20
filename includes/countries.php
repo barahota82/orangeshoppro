@@ -59,11 +59,26 @@ function orange_storefront_country_cookie_name(): string
 
 function orange_countries_normalize_code(string $raw): string
 {
-    return strtolower((string) (preg_replace('/[^a-z0-9]/', '', trim($raw)) ?? ''));
+    $code = strtolower((string) (preg_replace('/[^a-z0-9]/', '', trim($raw)) ?? ''));
+    $legacy = [
+        'ae' => 'uae',
+        'sa' => 'ksa',
+    ];
+
+    return $legacy[$code] ?? $code;
+}
+
+/** عرض الرمز بأحرف كبيرة (UAE, KSA, KW, …). */
+function orange_countries_display_code(string $code): string
+{
+    $code = orange_countries_normalize_code($code);
+
+    return $code !== '' ? strtoupper($code) : '';
 }
 
 /**
- * سجل الدول المعروفة: رمز، عملة، أسماء (مصدر واحد للاشتقاق التلقائي).
+ * سجل الدول المعروفة: رمز السوق (اختصار معروف)، عملة، أسماء.
+ * أمثلة: KW، EG، UAE، KSA — وليس ae/sa الداخلية ISO alpha-2.
  *
  * @return array<string, array{currency:string, name_ar:string, name_en:string}>
  */
@@ -72,8 +87,8 @@ function orange_countries_catalog_registry(): array
     return [
         'kw' => ['currency' => 'KWD', 'name_ar' => 'الكويت', 'name_en' => 'Kuwait'],
         'eg' => ['currency' => 'EGP', 'name_ar' => 'مصر', 'name_en' => 'Egypt'],
-        'ae' => ['currency' => 'AED', 'name_ar' => 'الإمارات', 'name_en' => 'United Arab Emirates'],
-        'sa' => ['currency' => 'SAR', 'name_ar' => 'السعودية', 'name_en' => 'Saudi Arabia'],
+        'uae' => ['currency' => 'AED', 'name_ar' => 'الإمارات', 'name_en' => 'United Arab Emirates'],
+        'ksa' => ['currency' => 'SAR', 'name_ar' => 'السعودية', 'name_en' => 'Saudi Arabia'],
         'bh' => ['currency' => 'BHD', 'name_ar' => 'البحرين', 'name_en' => 'Bahrain'],
         'qa' => ['currency' => 'QAR', 'name_ar' => 'قطر', 'name_en' => 'Qatar'],
         'om' => ['currency' => 'OMR', 'name_ar' => 'عُمان', 'name_en' => 'Oman'],
@@ -86,6 +101,7 @@ function orange_countries_catalog_registry(): array
         'ly' => ['currency' => 'LYD', 'name_ar' => 'ليبيا', 'name_en' => 'Libya'],
         'sd' => ['currency' => 'SDG', 'name_ar' => 'السودان', 'name_en' => 'Sudan'],
         'ye' => ['currency' => 'YER', 'name_ar' => 'اليمن', 'name_en' => 'Yemen'],
+        'tr' => ['currency' => 'TRY', 'name_ar' => 'تركيا', 'name_en' => 'Turkey'],
     ];
 }
 
@@ -146,12 +162,15 @@ function orange_countries_normalize_name_en_key(string $nameEn): string
 function orange_countries_en_code_aliases(): array
 {
     return [
-        'unitedarabemirates' => 'ae',
-        'uae' => 'ae',
-        'theemirates' => 'ae',
-        'saudiarabia' => 'sa',
-        'kingdomofsaudiarabia' => 'sa',
-        'ksa' => 'sa',
+        'unitedarabemirates' => 'uae',
+        'uae' => 'uae',
+        'theemirates' => 'uae',
+        'emirates' => 'uae',
+        'saudiarabia' => 'ksa',
+        'kingdomofsaudiarabia' => 'ksa',
+        'ksa' => 'ksa',
+        'turkey' => 'tr',
+        'turkiye' => 'tr',
     ];
 }
 

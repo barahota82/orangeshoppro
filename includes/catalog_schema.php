@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 41);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 42);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3020,6 +3020,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
 
     orange_catalog_migrate_countries_foundation_v40($pdo);
     orange_catalog_migrate_governorates_v41($pdo);
+    orange_catalog_migrate_country_market_codes_v42($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
         orange_catalog_safe_exec(
@@ -3927,6 +3928,40 @@ function orange_catalog_migrate_governorates_v41(PDO $pdo): void
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] governorates_v41 marker: ' . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * رموز أسواق الدول: اختصارات معروفة (uae, ksa) بدل ISO alpha-2 الداخلي (ae, sa) حيث يلزم.
+ */
+function orange_catalog_migrate_country_market_codes_v42(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    $marker = 'php_country_market_codes_v42';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (orange_table_exists($pdo, 'countries')) {
+        $map = ['ae' => 'uae', 'sa' => 'ksa'];
+        foreach ($map as $from => $to) {
+            $stChk = $pdo->prepare('SELECT id FROM countries WHERE code = ? LIMIT 1');
+            $stChk->execute([$to]);
+            if ($stChk->fetch()) {
+                continue;
+            }
+            $stUp = $pdo->prepare('UPDATE countries SET code = ? WHERE code = ? LIMIT 1');
+            $stUp->execute([$to, $from]);
+        }
+    }
+
+    try {
+        $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+        $ins->execute([$marker]);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] country_market_codes_v42 marker: ' . $e->getMessage());
         }
     }
 }

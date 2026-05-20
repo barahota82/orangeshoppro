@@ -43,7 +43,7 @@ try {
 
         json_response([
             'success' => true,
-            'code' => $code,
+            'code' => orange_countries_display_code($code),
             'currency_code' => $currency,
             'next_sort_order' => orange_countries_next_sort_order($pdo),
         ]);
@@ -70,7 +70,7 @@ try {
         if ($code === '' || strlen($code) > 8) {
             json_response([
                 'success' => false,
-                'message' => 'لا يوجد رمز تلقائي لهذا الاسم — استخدم اسماً معرّفاً (مثل الكويت أو مصر أو الإمارات أو السعودية)',
+                'message' => 'لا يوجد رمز تلقائي لهذا الاسم — استخدم اسماً معرّفاً (مثل الكويت أو مصر أو الإمارات أو السعودية أو تركيا)',
             ], 422);
         }
         if ($nameAr === '') {
@@ -79,7 +79,7 @@ try {
         if ($currency === '') {
             json_response([
                 'success' => false,
-                'message' => 'لا توجد عملة تلقائية لرمز الدولة — استخدم رمزاً معرّفاً (مثل kw أو eg أو ae أو sa)',
+                'message' => 'لا توجد عملة تلقائية لرمز الدولة — استخدم اسماً معرّفاً في السجل',
             ], 422);
         }
 

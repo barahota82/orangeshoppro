@@ -43,7 +43,7 @@ foreach ($countries as $c) {
             <label for="ctry_code">رمز الدولة</label>
             <input type="text" id="ctry_code" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" maxlength="8"
                 autocomplete="off" readonly tabindex="-1" aria-readonly="true"
-                value="<?php echo $editRow ? htmlspecialchars((string) $editRow['code'], ENT_QUOTES, 'UTF-8') : ''; ?>">
+                value="<?php echo $editRow ? htmlspecialchars(orange_countries_display_code((string) $editRow['code']), ENT_QUOTES, 'UTF-8') : ''; ?>">
         </div>
         <div class="ctry-currency">
             <label for="ctry_currency">رمز العملة</label>
@@ -103,7 +103,7 @@ foreach ($countries as $c) {
                 <?php foreach ($countries as $row): ?>
                 <tr>
                     <td><?php echo (int) $row['id']; ?></td>
-                    <td dir="ltr"><code><?php echo htmlspecialchars((string) $row['code'], ENT_QUOTES, 'UTF-8'); ?></code></td>
+                    <td dir="ltr"><code><?php echo htmlspecialchars(orange_countries_display_code((string) $row['code']), ENT_QUOTES, 'UTF-8'); ?></code></td>
                     <td><?php echo htmlspecialchars((string) $row['name_ar'], ENT_QUOTES, 'UTF-8'); ?></td>
                     <td dir="ltr"><?php echo htmlspecialchars((string) $row['name_en'], ENT_QUOTES, 'UTF-8'); ?></td>
                     <td dir="ltr"><?php echo htmlspecialchars((string) $row['currency_code'], ENT_QUOTES, 'UTF-8'); ?></td>
