@@ -38,12 +38,6 @@ foreach ($countries as $c) {
             <input type="text" id="ctry_name_ar" maxlength="191" autocomplete="off"
                 value="<?php echo $editRow ? htmlspecialchars((string) $editRow['name_ar'], ENT_QUOTES, 'UTF-8') : ''; ?>">
         </div>
-        <div class="ctry-sort">
-            <label for="ctry_sort">الترتيب</label>
-            <input type="number" id="ctry_sort" class="admin-sort-field admin-sort-field--muted"
-                value="<?php echo $editRow ? (int) ($editRow['sort_order'] ?? 0) : ''; ?>"
-                disabled tabindex="-1" aria-readonly="true">
-        </div>
         <div class="ctry-en">
             <label for="ctry_name_en">English</label>
             <input type="text" id="ctry_name_en" dir="ltr" lang="en" maxlength="191" autocomplete="off"
@@ -65,6 +59,12 @@ foreach ($countries as $c) {
                     echo htmlspecialchars($autoCur !== '' ? $autoCur : (string) ($editRow['currency_code'] ?? ''), ENT_QUOTES, 'UTF-8');
                 }
                 ?>">
+        </div>
+        <div class="ctry-sort">
+            <label for="ctry_sort">الترتيب</label>
+            <input type="number" id="ctry_sort" class="admin-sort-field admin-sort-field--muted"
+                value="<?php echo $editRow ? (int) ($editRow['sort_order'] ?? 0) : ''; ?>"
+                disabled tabindex="-1" aria-readonly="true">
         </div>
         <div class="ctry-active">
             <label for="ctry_is_active" class="ctry-active-label">
@@ -243,13 +243,13 @@ document.getElementById('ctry_name_en').addEventListener('input', function () {
     display: grid;
     grid-template-columns:
         minmax(8rem, 1.15fr)
-        minmax(4.5rem, 0.65fr)
         minmax(5rem, 0.75fr)
-        minmax(4rem, 0.55fr)
-        minmax(0, 2.9fr);
+        minmax(5rem, 0.75fr)
+        minmax(0, 1.8fr)
+        minmax(5rem, 0.75fr);
     grid-template-areas:
         "ar ar ar ar ar"
-        "active currency code sort en";
+        "active currency code en sort";
     gap: 14px 18px;
     direction: ltr;
 }
@@ -267,7 +267,8 @@ document.getElementById('ctry_name_en').addEventListener('input', function () {
 .ctry-form-grid input { direction: rtl; text-align: right; }
 .ctry-form-grid #ctry_name_en,
 .ctry-form-grid #ctry_code,
-.ctry-form-grid #ctry_currency { direction: ltr; text-align: left; }
+.ctry-form-grid #ctry_currency,
+.ctry-form-grid #ctry_sort { direction: ltr; text-align: left; }
 .ctry-form-grid .ctry-active-label {
     display: flex;
     align-items: center;
@@ -282,8 +283,8 @@ document.getElementById('ctry_name_en').addEventListener('input', function () {
         grid-template-columns: 1fr;
         grid-template-areas:
             "ar"
-            "sort"
             "en"
+            "sort"
             "code"
             "currency"
             "active";
