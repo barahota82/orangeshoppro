@@ -333,13 +333,12 @@ $count = count($customerRows);
  * ترتيب الحقول كما طلب المالك (RTL → القارئ يبدأ من اليمين):
  * r1: كود العميل (تلقائي) — full width مع شريط التنقل
  * r2: كود الدولة | الهاتف | حد الائتمان | رصيد الذمة | حالة العميل  (5 أعمدة)
- * r3: اسم العميل | الرقم المدني | البريد الإلكتروني | المرفقات (عداد + زر داخل label واحد)  (5 grid: 1+1+1+2)
- *     — نفس نمط suppliers.php سطر «المعاملة الضريبية»: خلية المرفقات بـ sub-grid 1fr 1fr.
- * r4: المنطقة | العنوان  (1 + 4 spans)
- * r4b: سبب الحظر (full — يظهر فقط عند حالة محظور)
- * r5: ملاحظات (full)
- * r6: تفصيل الطلبات (full)
- * r7: لافتة حساب الواجهة (full)
+ * r3: سبب الحظر (full — يظهر فقط عند «محظور مؤقتاً»، نمط suppliers.php)
+ * r4: اسم العميل | الرقم المدني | البريد | المرفقات  (5 grid: 1+1+1+2)
+ * r5: المنطقة | العنوان  (1 + 4 spans)
+ * r6: ملاحظات (full)
+ * r7: تفصيل الطلبات (full)
+ * r8: لافتة حساب الواجهة (full)
  */
 #cus_form_grid.customers-form-grid {
     display: grid;
@@ -349,26 +348,26 @@ $count = count($customerRows);
     grid-template-areas:
         "cus_r1_code cus_r1_code cus_r1_code cus_r1_code cus_r1_code"
         "cus_r2_country cus_r2_phone cus_r2_credit cus_r2_balance cus_r2_status"
-        "cus_r3_all cus_r3_all cus_r3_all cus_r3_all cus_r3_all"
-        "cus_r4_area cus_r4_address cus_r4_address cus_r4_address cus_r4_address"
-        "cus_r4b_block_reason cus_r4b_block_reason cus_r4b_block_reason cus_r4b_block_reason cus_r4b_block_reason"
-        "cus_r5_notes cus_r5_notes cus_r5_notes cus_r5_notes cus_r5_notes"
-        "cus_r6_orders cus_r6_orders cus_r6_orders cus_r6_orders cus_r6_orders"
-        "cus_r7_sf cus_r7_sf cus_r7_sf cus_r7_sf cus_r7_sf";
+        "cus_r3_block_reason cus_r3_block_reason cus_r3_block_reason cus_r3_block_reason cus_r3_block_reason"
+        "cus_r4_all cus_r4_all cus_r4_all cus_r4_all cus_r4_all"
+        "cus_r5_area cus_r5_address cus_r5_address cus_r5_address cus_r5_address"
+        "cus_r6_notes cus_r6_notes cus_r6_notes cus_r6_notes cus_r6_notes"
+        "cus_r7_orders cus_r7_orders cus_r7_orders cus_r7_orders cus_r7_orders"
+        "cus_r8_sf cus_r8_sf cus_r8_sf cus_r8_sf cus_r8_sf";
 }
 #cus_form_grid.customers-form-grid.customers-form-grid--block-hidden {
     grid-template-areas:
         "cus_r1_code cus_r1_code cus_r1_code cus_r1_code cus_r1_code"
         "cus_r2_country cus_r2_phone cus_r2_credit cus_r2_balance cus_r2_status"
-        "cus_r3_all cus_r3_all cus_r3_all cus_r3_all cus_r3_all"
-        "cus_r4_area cus_r4_address cus_r4_address cus_r4_address cus_r4_address"
-        "cus_r5_notes cus_r5_notes cus_r5_notes cus_r5_notes cus_r5_notes"
-        "cus_r6_orders cus_r6_orders cus_r6_orders cus_r6_orders cus_r6_orders"
-        "cus_r7_sf cus_r7_sf cus_r7_sf cus_r7_sf cus_r7_sf";
+        "cus_r4_all cus_r4_all cus_r4_all cus_r4_all cus_r4_all"
+        "cus_r5_area cus_r5_address cus_r5_address cus_r5_address cus_r5_address"
+        "cus_r6_notes cus_r6_notes cus_r6_notes cus_r6_notes cus_r6_notes"
+        "cus_r7_orders cus_r7_orders cus_r7_orders cus_r7_orders cus_r7_orders"
+        "cus_r8_sf cus_r8_sf cus_r8_sf cus_r8_sf cus_r8_sf";
 }
 /* r3 صف مستقل بـ 4 أعمدة × 25% (نسخة طبق الأصل من سطر «المعاملة الضريبية» في الموردين). */
 #cus_form_grid .cus-grid-r3-all {
-    grid-area: cus_r3_all;
+    grid-area: cus_r4_all;
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
     column-gap: 12px;
@@ -448,17 +447,24 @@ $count = count($customerRows);
     width: 100%;
     height: 42px;
 }
-#cus_form_grid .cus-grid-r4-area    { grid-area: cus_r4_area;    display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-#cus_form_grid .cus-grid-r4-address { grid-area: cus_r4_address; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-#cus_form_grid .cus-grid-r4b-block-reason {
-    grid-area: cus_r4b_block_reason;
+#cus_form_grid .cus-grid-r3-block-reason {
+    grid-area: cus_r3_block_reason;
     display: flex;
     flex-direction: column;
     gap: 6px;
     min-width: 0;
 }
-#cus_form_grid .cus-grid-r6-orders {
-    grid-area: cus_r6_orders;
+#cus_form_grid .cus-grid-r5-area    { grid-area: cus_r5_area;    display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+#cus_form_grid .cus-grid-r5-address { grid-area: cus_r5_address; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+#cus_form_grid .cus-grid-r6-notes {
+    grid-area: cus_r6_notes;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+#cus_form_grid .cus-grid-r7-orders {
+    grid-area: cus_r7_orders;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -524,15 +530,8 @@ $count = count($customerRows);
     font-size: 0.85rem;
     color: #b45309;
 }
-#cus_form_grid .cus-grid-r5-notes {
-    grid-area: cus_r5_notes;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 0;
-}
-#cus_form_grid .cus-grid-r7-sf {
-    grid-area: cus_r7_sf;
+#cus_form_grid .cus-grid-r8-sf {
+    grid-area: cus_r8_sf;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -584,12 +583,12 @@ $count = count($customerRows);
             "cus_r2_country cus_r2_phone"
             "cus_r2_credit cus_r2_balance"
             "cus_r2_status cus_r2_status"
-            "cus_r3_all cus_r3_all"
-            "cus_r4_area cus_r4_address"
-            "cus_r4b_block_reason cus_r4b_block_reason"
-            "cus_r5_notes cus_r5_notes"
-            "cus_r6_orders cus_r6_orders"
-            "cus_r7_sf cus_r7_sf";
+            "cus_r4_all cus_r4_all"
+            "cus_r5_area cus_r5_address"
+            "cus_r3_block_reason cus_r3_block_reason"
+            "cus_r6_notes cus_r6_notes"
+            "cus_r7_orders cus_r7_orders"
+            "cus_r8_sf cus_r8_sf";
     }
     #cus_form_grid.customers-form-grid.customers-form-grid--block-hidden {
         grid-template-areas:
@@ -597,11 +596,11 @@ $count = count($customerRows);
             "cus_r2_country cus_r2_phone"
             "cus_r2_credit cus_r2_balance"
             "cus_r2_status cus_r2_status"
-            "cus_r3_all cus_r3_all"
-            "cus_r4_area cus_r4_address"
-            "cus_r5_notes cus_r5_notes"
-            "cus_r6_orders cus_r6_orders"
-            "cus_r7_sf cus_r7_sf";
+            "cus_r4_all cus_r4_all"
+            "cus_r5_area cus_r5_address"
+            "cus_r6_notes cus_r6_notes"
+            "cus_r7_orders cus_r7_orders"
+            "cus_r8_sf cus_r8_sf";
     }
     #cus_form_grid .cus-grid-r3-all {
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -620,13 +619,13 @@ $count = count($customerRows);
             "cus_r2_credit"
             "cus_r2_balance"
             "cus_r2_status"
-            "cus_r3_all"
-            "cus_r4_area"
-            "cus_r4_address"
-            "cus_r4b_block_reason"
-            "cus_r5_notes"
-            "cus_r6_orders"
-            "cus_r7_sf";
+            "cus_r4_all"
+            "cus_r5_area"
+            "cus_r5_address"
+            "cus_r3_block_reason"
+            "cus_r6_notes"
+            "cus_r7_orders"
+            "cus_r8_sf";
     }
     #cus_form_grid.customers-form-grid.customers-form-grid--block-hidden {
         grid-template-areas:
@@ -636,12 +635,12 @@ $count = count($customerRows);
             "cus_r2_credit"
             "cus_r2_balance"
             "cus_r2_status"
-            "cus_r3_all"
-            "cus_r4_area"
-            "cus_r4_address"
-            "cus_r5_notes"
-            "cus_r6_orders"
-            "cus_r7_sf";
+            "cus_r4_all"
+            "cus_r5_area"
+            "cus_r5_address"
+            "cus_r6_notes"
+            "cus_r7_orders"
+            "cus_r8_sf";
     }
     #cus_form_grid .cus-grid-r3-all {
         grid-template-columns: 1fr;
@@ -707,7 +706,14 @@ $count = count($customerRows);
         </div>
         <?php endif; ?>
 
-        <!-- الصف 3: 4 خلايا متساوية (25% × 4) مطابقة لنمط الموردين -->
+        <?php if ($hasCustomerBlockReasonCol): ?>
+        <div id="cus_block_reason_wrap" class="cus-grid-r3-block-reason" style="display:none;">
+            <label for="cus_block_reason">سبب الحظر (عند الحظر)</label>
+            <input type="text" id="cus_block_reason" maxlength="255" autocomplete="off" placeholder="اختياري إذا العميل غير محظور">
+        </div>
+        <?php endif; ?>
+
+        <!-- الصف 4: 4 خلايا متساوية (25% × 4) مطابقة لنمط الموردين -->
         <div class="cus-grid-r3-all">
             <div class="cus-grid-r3-cell">
                 <label for="cus_name">اسم العميل</label>
@@ -736,8 +742,8 @@ $count = count($customerRows);
             <?php endif; ?>
         </div>
 
-        <!-- الصف 4: المنطقة | العنوان -->
-        <div class="cus-grid-r4-area">
+        <!-- الصف 5: المنطقة | العنوان -->
+        <div class="cus-grid-r5-area">
             <label for="cus_city_area">المنطقة</label>
             <select id="cus_city_area" autocomplete="address-level1">
                 <option value="">اختياري</option>
@@ -750,27 +756,20 @@ $count = count($customerRows);
             <p id="cus_area_current_hint" class="cus-area-current-hint" hidden></p>
         </div>
         <?php if ($hasCustomerAddressCol): ?>
-        <div class="cus-grid-r4-address">
+        <div class="cus-grid-r5-address">
             <label for="cus_address">العنوان</label>
             <input type="text" id="cus_address" autocomplete="off" placeholder="عنوان التوصيل" maxlength="2000">
         </div>
         <?php endif; ?>
 
-        <?php if ($hasCustomerBlockReasonCol): ?>
-        <div id="cus_block_reason_wrap" class="cus-grid-r4b-block-reason" style="display:none;">
-            <label for="cus_block_reason">سبب الحظر (عند الحظر)</label>
-            <input type="text" id="cus_block_reason" maxlength="255" autocomplete="off" placeholder="اختياري إذا العميل غير محظور">
-        </div>
-        <?php endif; ?>
-
         <?php if ($hasCustomerNotesCol): ?>
-        <div class="cus-grid-r5-notes">
+        <div class="cus-grid-r6-notes">
             <label for="cus_notes">ملاحظات (تتراكم تلقائياً من الطلبات)</label>
             <textarea id="cus_notes" rows="3" autocomplete="off" placeholder="ملاحظات يدوية + أسطر تلقائية من كل طلب ويب"></textarea>
         </div>
         <?php endif; ?>
 
-        <div class="cus-grid-r6-orders">
+        <div class="cus-grid-r7-orders">
             <label>تفصيل الطلبات حسب نوع الفاتورة</label>
             <div class="cus-orders-breakdown">
                 <div class="cus-orders-breakdown__item">
@@ -792,7 +791,7 @@ $count = count($customerRows);
             </div>
         </div>
 
-        <div class="cus-grid-r7-sf">
+        <div class="cus-grid-r8-sf">
             <label>حساب الواجهة (مزامنة تلقائية)</label>
             <div id="cus_sf_banner" class="cus-sf-banner is-empty">
                 <span>لا حساب واجهة مربوط حالياً.</span>
@@ -934,18 +933,22 @@ function cusToggleBlockReason() {
     var reasonEl = document.getElementById('cus_block_reason');
     var wrapEl = document.getElementById('cus_block_reason_wrap');
     var gridEl = document.getElementById('cus_form_grid');
-    if (!statusEl) return;
+    if (!statusEl || !reasonEl) {
+        return;
+    }
     var isBlocked = String(statusEl.value || 'active') === 'blocked';
     if (gridEl && gridEl.classList) {
         gridEl.classList.toggle('customers-form-grid--block-hidden', !isBlocked);
     }
     if (wrapEl) {
         wrapEl.style.setProperty('display', isBlocked ? 'flex' : 'none', 'important');
+        wrapEl.style.setProperty('flex-direction', 'column', 'important');
+        wrapEl.style.setProperty('gap', '6px', 'important');
     }
-    if (reasonEl) {
-        reasonEl.required = isBlocked;
-        reasonEl.placeholder = isBlocked ? 'سبب الحظر مطلوب' : 'اختياري إذا العميل غير محظور';
-        if (!isBlocked) reasonEl.value = '';
+    reasonEl.required = isBlocked;
+    reasonEl.placeholder = isBlocked ? 'سبب الحظر مطلوب' : 'اختياري إذا العميل غير محظور';
+    if (!isBlocked) {
+        reasonEl.value = '';
     }
 }
 function cusUpdateAreaCurrentHint(row) {
