@@ -684,7 +684,7 @@ $count = count($customerRows);
         </div>
         <div class="cus-grid-r2-phone">
             <label for="cus_phone">الهاتف <span style="color:#b45309;">*</span></label>
-            <input type="text" id="cus_phone" class="js-orange-phone-input" maxlength="24" autocomplete="off" dir="ltr" lang="en" placeholder="+965… أو 00… أو رقم وطني مع اختيار الدولة">
+            <input type="text" id="cus_phone" class="js-orange-phone-input" maxlength="24" autocomplete="off" dir="ltr" lang="en" placeholder="اكتب الرقم المحلي فقط بدون كود الدولة">
         </div>
         <?php if ($hasCustomerLimitCol): ?>
         <div class="cus-grid-r2-credit">
@@ -1183,7 +1183,8 @@ function cusResetForm() {
     document.getElementById('cus_name').value = '';
     document.getElementById('cus_phone').value = '';
     var cc = cusPhoneCountryEl();
-    if (cc) cc.value = '__intl__';
+    // نمط الموردين: الكويت كافتراضي بدل «دولي كامل» — يمنع تنبيه «اختيار كود الدولة إلزامي» في كل عميل جديد.
+    if (cc) cc.value = '965';
     var statusEl = document.getElementById('cus_status');
     if (statusEl) statusEl.value = 'active';
     var brEl = document.getElementById('cus_block_reason');
@@ -1283,10 +1284,24 @@ function cusSave() {
     var notesEl = document.getElementById('cus_notes');
     var notes = notesEl ? notesEl.value.trim() : '';
     if (!phone) { alert('الهاتف مطلوب'); return; }
+    // س15 + نمط الموردين: خانة الهاتف للرقم الوطني فقط؛ كود الدولة من القائمة منفصل وإلزامي.
+    if (!ccForNorm) {
+        alert('اختيار كود الدولة إلزامي. اكتب الرقم الوطني فقط في خانة الهاتف.');
+        return;
+    }
+    if (/^\s*(\+|00)/.test(phone)) {
+        alert('اكتب الهاتف كرقم محلي فقط بدون + أو 00؛ كود الدولة يُؤخذ من القائمة.');
+        return;
+    }
+    var phoneDigits = phone.replace(/\D+/g, '');
+    if (phoneDigits !== '' && phoneDigits.indexOf(ccForNorm) === 0 && phoneDigits.length > ccForNorm.length + 3) {
+        alert('لا تكرر كود الدولة داخل خانة الهاتف؛ اكتب الرقم المحلي فقط.');
+        return;
+    }
     if (window.orangeNormalizeCustomerPhone) {
-        var ok = window.orangeNormalizeCustomerPhone(phone, ccForNorm, intlSel);
+        var ok = window.orangeNormalizeCustomerPhone(phone, ccForNorm, false);
         if (!ok) {
-            alert('رقم الهاتف غير صالح. استخدم + أو 00 مع كود الدولة، أو اختر الدولة وأدخل الرقم الوطني (8–14 رقماً مع الكود).');
+            alert('رقم الهاتف غير صالح. اكتب الرقم المحلي فقط بعد اختيار كود الدولة.');
             return;
         }
     }
