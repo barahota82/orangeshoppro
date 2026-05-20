@@ -9,9 +9,7 @@ $pdo = db();
 orange_catalog_ensure_schema($pdo);
 $countries = orange_countries_admin_list($pdo);
 $hasTable = orange_table_exists($pdo, 'countries');
-$nextSort = $hasTable ? orange_countries_next_sort_order($pdo) : 1;
-
-$currencyMapJson = json_encode(orange_countries_currency_map(), JSON_UNESCAPED_UNICODE) ?: '{}';
+$nextSort = $hasTable ? orange_countries_next_sort_order($pdo) : orange_countries_sort_order_step();
 $editId = isset($_GET['edit']) ? (int) $_GET['edit'] : 0;
 $editRow = null;
 foreach ($countries as $c) {
@@ -37,10 +35,20 @@ foreach ($countries as $c) {
     <input type="hidden" id="ctry_id" value="<?php echo $editRow ? (int) $editRow['id'] : '0'; ?>">
     <div class="form-grid">
         <div>
-            <label for="ctry_code">رمز الدولة <span style="color:#b45309;">*</span></label>
-            <input type="text" id="ctry_code" dir="ltr" lang="en" maxlength="8" placeholder="kw" autocomplete="off"
-                value="<?php echo $editRow ? htmlspecialchars((string) $editRow['code'], ENT_QUOTES, 'UTF-8') : ''; ?>"
-                <?php echo $editRow ? 'readonly' : ''; ?>>
+            <label for="ctry_name_ar">الاسم العربي <span style="color:#b45309;">*</span></label>
+            <input type="text" id="ctry_name_ar" maxlength="191" autocomplete="off"
+                value="<?php echo $editRow ? htmlspecialchars((string) $editRow['name_ar'], ENT_QUOTES, 'UTF-8') : ''; ?>">
+        </div>
+        <div>
+            <label for="ctry_name_en">English (تلقائي)</label>
+            <input type="text" id="ctry_name_en" dir="ltr" lang="en" maxlength="191" autocomplete="off"
+                value="<?php echo $editRow ? htmlspecialchars((string) $editRow['name_en'], ENT_QUOTES, 'UTF-8') : ''; ?>">
+        </div>
+        <div>
+            <label for="ctry_code">رمز الدولة (تلقائي)</label>
+            <input type="text" id="ctry_code" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" maxlength="8"
+                placeholder="kw" autocomplete="off" readonly tabindex="-1" aria-readonly="true"
+                value="<?php echo $editRow ? htmlspecialchars((string) $editRow['code'], ENT_QUOTES, 'UTF-8') : ''; ?>">
         </div>
         <div>
             <label for="ctry_currency">رمز العملة (تلقائي)</label>
@@ -52,16 +60,6 @@ foreach ($countries as $c) {
                     echo htmlspecialchars($autoCur !== '' ? $autoCur : (string) ($editRow['currency_code'] ?? ''), ENT_QUOTES, 'UTF-8');
                 }
                 ?>">
-        </div>
-        <div>
-            <label for="ctry_name_ar">الاسم العربي <span style="color:#b45309;">*</span></label>
-            <input type="text" id="ctry_name_ar" maxlength="191" autocomplete="off"
-                value="<?php echo $editRow ? htmlspecialchars((string) $editRow['name_ar'], ENT_QUOTES, 'UTF-8') : ''; ?>">
-        </div>
-        <div>
-            <label for="ctry_name_en">English</label>
-            <input type="text" id="ctry_name_en" dir="ltr" lang="en" maxlength="191" autocomplete="off"
-                value="<?php echo $editRow ? htmlspecialchars((string) $editRow['name_en'], ENT_QUOTES, 'UTF-8') : ''; ?>">
         </div>
         <div>
             <label for="ctry_sort">الترتيب (تلقائي)</label>
@@ -123,21 +121,46 @@ foreach ($countries as $c) {
 <script>
 var ctryArTimer = null;
 var ctryEnTimer = null;
-var ctryCurrencyMap = <?php echo $currencyMapJson; ?>;
+var ctryDeriveTimer = null;
+var ctryIsNew = <?php echo $editRow ? 'false' : 'true'; ?>;
 
-function applyCountryCurrencyFromCode() {
+async function deriveCountryFields() {
+    if (!ctryIsNew) {
+        return;
+    }
+    var ar = document.getElementById('ctry_name_ar').value.trim();
+    var en = document.getElementById('ctry_name_en').value.trim();
     var codeEl = document.getElementById('ctry_code');
     var curEl = document.getElementById('ctry_currency');
-    if (!codeEl || !curEl || codeEl.readOnly) {
+    var sortEl = document.getElementById('ctry_sort');
+    if (!ar && !en) {
+        if (codeEl) codeEl.value = '';
+        if (curEl) curEl.value = '';
         return;
     }
-    var code = String(codeEl.value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (!code) {
-        curEl.value = '';
-        return;
+    try {
+        var res = await postJSON('/admin/api/countries/manage.php', {
+            action: 'derive',
+            name_ar: ar,
+            name_en: en
+        });
+        if (!res || !res.success) {
+            return;
+        }
+        if (codeEl && res.code) codeEl.value = res.code;
+        if (curEl && res.currency_code) curEl.value = res.currency_code;
+        if (sortEl && res.next_sort_order) sortEl.value = String(res.next_sort_order);
+    } catch (e) {
+        /* صامت في المعاينة */
     }
-    var cur = ctryCurrencyMap[code] || '';
-    curEl.value = cur ? String(cur).toUpperCase() : '';
+}
+
+function scheduleCountryDerive() {
+    if (!ctryIsNew) return;
+    clearTimeout(ctryDeriveTimer);
+    ctryDeriveTimer = setTimeout(function () {
+        deriveCountryFields();
+    }, 350);
 }
 
 async function translateCountryNames(opts) {
@@ -155,6 +178,7 @@ async function translateCountryNames(opts) {
         }
         var t = res.translations || {};
         if (t.name_en) document.getElementById('ctry_name_en').value = t.name_en;
+        await deriveCountryFields();
     } catch (e) {
         if (!silent) alert('فشل طلب الترجمة');
     }
@@ -164,6 +188,8 @@ function scheduleCountryFromAr() {
     var ar = document.getElementById('ctry_name_ar').value.trim();
     if (!ar) {
         document.getElementById('ctry_name_en').value = '';
+        document.getElementById('ctry_code').value = '';
+        document.getElementById('ctry_currency').value = '';
         return;
     }
     clearTimeout(ctryArTimer);
@@ -183,6 +209,7 @@ function scheduleCountryFromEn() {
 
 async function translateCountryFromAr() {
     await translateCountryNames({ silent: false, forceFromArabic: true });
+    await deriveCountryFields();
 }
 
 function resetCountryForm() {
@@ -192,7 +219,6 @@ async function saveCountry() {
     var res = await postJSON('/admin/api/countries/manage.php', {
         action: 'save',
         id: parseInt(document.getElementById('ctry_id').value, 10) || 0,
-        code: document.getElementById('ctry_code').value.trim(),
         name_ar: document.getElementById('ctry_name_ar').value.trim(),
         name_en: document.getElementById('ctry_name_en').value.trim(),
         is_active: document.getElementById('ctry_is_active').checked ? 1 : 0
@@ -203,11 +229,15 @@ async function saveCountry() {
     }
 }
 
-document.getElementById('ctry_name_ar').addEventListener('input', scheduleCountryFromAr);
-document.getElementById('ctry_name_en').addEventListener('input', scheduleCountryFromEn);
-var ctryCodeEl = document.getElementById('ctry_code');
-if (ctryCodeEl && !ctryCodeEl.readOnly) {
-    ctryCodeEl.addEventListener('input', applyCountryCurrencyFromCode);
-    applyCountryCurrencyFromCode();
+document.getElementById('ctry_name_ar').addEventListener('input', function () {
+    scheduleCountryFromAr();
+    scheduleCountryDerive();
+});
+document.getElementById('ctry_name_en').addEventListener('input', function () {
+    scheduleCountryFromEn();
+    scheduleCountryDerive();
+});
+if (ctryIsNew) {
+    deriveCountryFields();
 }
 </script>

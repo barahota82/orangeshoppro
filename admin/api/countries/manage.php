@@ -35,16 +35,43 @@ try {
         json_response(['success' => true, 'data' => orange_countries_admin_list($pdo)]);
     }
 
-    if ($action === 'save') {
-        $id = (int) ($data['id'] ?? 0);
-        $code = orange_countries_normalize_code((string) ($data['code'] ?? ''));
+    if ($action === 'derive') {
         $nameAr = orange_country_api_str($data['name_ar'] ?? '', 191);
         $nameEn = orange_country_api_str($data['name_en'] ?? '', 191);
-        $currency = orange_countries_currency_for_code($code);
+        $code = orange_countries_code_for_names($nameAr, $nameEn);
+        $currency = $code !== '' ? orange_countries_currency_for_code($code) : '';
+
+        json_response([
+            'success' => true,
+            'code' => $code,
+            'currency_code' => $currency,
+            'next_sort_order' => orange_countries_next_sort_order($pdo),
+        ]);
+    }
+
+    if ($action === 'save') {
+        $id = (int) ($data['id'] ?? 0);
+        $nameAr = orange_country_api_str($data['name_ar'] ?? '', 191);
+        $nameEn = orange_country_api_str($data['name_en'] ?? '', 191);
         $isActive = !empty($data['is_active']) ? 1 : 0;
 
+        if ($id > 0) {
+            $existing = orange_country_row_by_id($pdo, $id);
+            if ($existing === null) {
+                json_response(['success' => false, 'message' => 'الدولة غير موجودة'], 404);
+            }
+            $code = orange_countries_normalize_code((string) ($existing['code'] ?? ''));
+        } else {
+            $code = orange_countries_code_for_names($nameAr, $nameEn);
+        }
+
+        $currency = orange_countries_currency_for_code($code);
+
         if ($code === '' || strlen($code) > 8) {
-            json_response(['success' => false, 'message' => 'رمز الدولة مطلوب (حروف إنجليزية، مثل kw)'], 422);
+            json_response([
+                'success' => false,
+                'message' => 'لا يوجد رمز تلقائي لهذا الاسم — استخدم اسماً معرّفاً (مثل الكويت أو مصر أو الإمارات أو السعودية)',
+            ], 422);
         }
         if ($nameAr === '') {
             json_response(['success' => false, 'message' => 'الاسم العربي مطلوب'], 422);

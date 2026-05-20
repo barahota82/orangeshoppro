@@ -63,30 +63,43 @@ function orange_countries_normalize_code(string $raw): string
 }
 
 /**
- * رموز ISO 4217 الافتراضية لرمز الدولة (حروف صغيرة) — يُوسَّع عند فتح أسواق جديدة.
+ * سجل الدول المعروفة: رمز، عملة، أسماء (مصدر واحد للاشتقاق التلقائي).
  *
+ * @return array<string, array{currency:string, name_ar:string, name_en:string}>
+ */
+function orange_countries_catalog_registry(): array
+{
+    return [
+        'kw' => ['currency' => 'KWD', 'name_ar' => 'الكويت', 'name_en' => 'Kuwait'],
+        'eg' => ['currency' => 'EGP', 'name_ar' => 'مصر', 'name_en' => 'Egypt'],
+        'ae' => ['currency' => 'AED', 'name_ar' => 'الإمارات', 'name_en' => 'United Arab Emirates'],
+        'sa' => ['currency' => 'SAR', 'name_ar' => 'السعودية', 'name_en' => 'Saudi Arabia'],
+        'bh' => ['currency' => 'BHD', 'name_ar' => 'البحرين', 'name_en' => 'Bahrain'],
+        'qa' => ['currency' => 'QAR', 'name_ar' => 'قطر', 'name_en' => 'Qatar'],
+        'om' => ['currency' => 'OMR', 'name_ar' => 'عُمان', 'name_en' => 'Oman'],
+        'jo' => ['currency' => 'JOD', 'name_ar' => 'الأردن', 'name_en' => 'Jordan'],
+        'lb' => ['currency' => 'LBP', 'name_ar' => 'لبنان', 'name_en' => 'Lebanon'],
+        'iq' => ['currency' => 'IQD', 'name_ar' => 'العراق', 'name_en' => 'Iraq'],
+        'ma' => ['currency' => 'MAD', 'name_ar' => 'المغرب', 'name_en' => 'Morocco'],
+        'tn' => ['currency' => 'TND', 'name_ar' => 'تونس', 'name_en' => 'Tunisia'],
+        'dz' => ['currency' => 'DZD', 'name_ar' => 'الجزائر', 'name_en' => 'Algeria'],
+        'ly' => ['currency' => 'LYD', 'name_ar' => 'ليبيا', 'name_en' => 'Libya'],
+        'sd' => ['currency' => 'SDG', 'name_ar' => 'السودان', 'name_en' => 'Sudan'],
+        'ye' => ['currency' => 'YER', 'name_ar' => 'اليمن', 'name_en' => 'Yemen'],
+    ];
+}
+
+/**
  * @return array<string, string>
  */
 function orange_countries_currency_map(): array
 {
-    return [
-        'kw' => 'KWD',
-        'eg' => 'EGP',
-        'ae' => 'AED',
-        'sa' => 'SAR',
-        'bh' => 'BHD',
-        'qa' => 'QAR',
-        'om' => 'OMR',
-        'jo' => 'JOD',
-        'lb' => 'LBP',
-        'iq' => 'IQD',
-        'ma' => 'MAD',
-        'tn' => 'TND',
-        'dz' => 'DZD',
-        'ly' => 'LYD',
-        'sd' => 'SDG',
-        'ye' => 'YER',
-    ];
+    $map = [];
+    foreach (orange_countries_catalog_registry() as $code => $row) {
+        $map[$code] = $row['currency'];
+    }
+
+    return $map;
 }
 
 /** عملة تلقائية من رمز الدولة؛ فارغ إن لم يُعرَف الرمز في الخريطة. */
@@ -102,15 +115,73 @@ function orange_countries_currency_for_code(string $code): string
     return strtoupper($cur);
 }
 
-/** ترتيب السجل التالي عند إضافة دولة (MAX + 1). */
+function orange_countries_sort_order_step(): int
+{
+    return 10;
+}
+
+/** ترتيب السجل التالي عند إضافة دولة (خطوة 10: 10، 20، 30، …). */
 function orange_countries_next_sort_order(PDO $pdo): int
 {
+    $step = orange_countries_sort_order_step();
     if (!orange_table_exists($pdo, 'countries')) {
-        return 1;
+        return $step;
     }
-    $next = (int) $pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM countries')->fetchColumn();
+    $max = (int) $pdo->query('SELECT COALESCE(MAX(sort_order), 0) FROM countries')->fetchColumn();
+    if ($max <= 0) {
+        return $step;
+    }
 
-    return $next > 0 ? $next : 1;
+    return $max + $step;
+}
+
+function orange_countries_normalize_name_en_key(string $nameEn): string
+{
+    return strtolower((string) (preg_replace('/[^a-z0-9]/', '', trim($nameEn)) ?? ''));
+}
+
+/**
+ * @return array<string, string>
+ */
+function orange_countries_en_code_aliases(): array
+{
+    return [
+        'unitedarabemirates' => 'ae',
+        'uae' => 'ae',
+        'theemirates' => 'ae',
+        'saudiarabia' => 'sa',
+        'kingdomofsaudiarabia' => 'sa',
+        'ksa' => 'sa',
+    ];
+}
+
+/** رمز الدولة من الاسم العربي/الإنجليزي؛ فارغ إن لم يُعرَف في السجل. */
+function orange_countries_code_for_names(string $nameAr, string $nameEn): string
+{
+    if (!function_exists('orange_normalize_arabic_name')) {
+        require_once __DIR__ . '/arabic_name_duplicate.php';
+    }
+    $arNorm = orange_normalize_arabic_name(trim($nameAr));
+    $enKey = orange_countries_normalize_name_en_key($nameEn);
+
+    foreach (orange_countries_catalog_registry() as $code => $row) {
+        if ($arNorm !== '' && orange_normalize_arabic_name((string) $row['name_ar']) === $arNorm) {
+            return $code;
+        }
+        $rowEn = orange_countries_normalize_name_en_key((string) $row['name_en']);
+        if ($enKey !== '' && $rowEn !== '' && $enKey === $rowEn) {
+            return $code;
+        }
+    }
+
+    if ($enKey !== '') {
+        $aliases = orange_countries_en_code_aliases();
+        if (isset($aliases[$enKey])) {
+            return $aliases[$enKey];
+        }
+    }
+
+    return '';
 }
 
 /**
