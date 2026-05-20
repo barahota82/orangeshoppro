@@ -386,6 +386,43 @@ function orange_party_aging_buckets(PDO $pdo, string $partyKind, int $partyId, ?
 }
 
 /**
+ * رسالة موحّدة عند محاولة بيع آجل لعميل بلا رقم مدني مسجّل.
+ */
+function orange_credit_sale_requires_civil_id_message(): string
+{
+    return 'لا يمكن حفظ فاتورة آجل: سجّل الرقم المدني للعميل أولاً من شاشة «العملاء».';
+}
+
+/**
+ * **س15:** فاتورة المبيعات الآجل تتطلّب عميلاً مسجّلاً برقم مدني (الحقل اختياري عند حفظ العميل فقط).
+ *
+ * @return array{ok: bool, message: string}
+ */
+function orange_customer_credit_sale_civil_check(PDO $pdo, int $customerId, string $phoneNorm): array
+{
+    if (!orange_table_exists($pdo, 'customers') || !orange_table_has_column($pdo, 'customers', 'civil_id')) {
+        return ['ok' => true, 'message' => ''];
+    }
+
+    $row = null;
+    if ($customerId > 0) {
+        $st = $pdo->prepare('SELECT id, civil_id FROM customers WHERE id = ? LIMIT 1');
+        $st->execute([$customerId]);
+        $row = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+    } elseif (trim($phoneNorm) !== '') {
+        $st = $pdo->prepare('SELECT id, civil_id FROM customers WHERE phone = ? LIMIT 1');
+        $st->execute([trim($phoneNorm)]);
+        $row = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    if (!$row || trim((string) ($row['civil_id'] ?? '')) === '') {
+        return ['ok' => false, 'message' => orange_credit_sale_requires_civil_id_message()];
+    }
+
+    return ['ok' => true, 'message' => ''];
+}
+
+/**
  * يضمن وجود سجل عميل بالرقم المُطبَّع، ويُحدِّث الاسم.
  *
  * **س15:** الإثراء الاختياري عبر `orange_ensure_customer_with_profile()` لنقل المنطقة/العنوان/البريد

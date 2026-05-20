@@ -121,6 +121,17 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
         }
     }
 
+    if ($isCredit) {
+        $civilChk = orange_customer_credit_sale_civil_check(
+            $pdo,
+            $customerIdForAr,
+            (string) ($order['phone'] ?? '')
+        );
+        if (!$civilChk['ok']) {
+            throw new RuntimeException($civilChk['message']);
+        }
+    }
+
     $creditSaleTotal = 0.0;
     foreach ($items as $item) {
         $creditSaleTotal = round($creditSaleTotal + orange_order_item_line_net($item), 4);

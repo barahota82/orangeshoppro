@@ -132,7 +132,7 @@ h2 { font-size: 1rem; margin: 16px 0 6px; }
         <div class="v ltr"><?php echo htmlspecialchars((string) ($row['phone'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></div>
         <div class="k">البريد</div>
         <div class="v ltr"><?php echo htmlspecialchars((string) ($row['email'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></div>
-        <div class="k">الرقم المدني / الإقامة</div>
+        <div class="k">الرقم المدني</div>
         <div class="v ltr"><?php echo htmlspecialchars((string) ($row['civil_id'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></div>
         <div class="k">الحالة</div>
         <div class="v"><?php echo htmlspecialchars($statusLabel, ENT_QUOTES, 'UTF-8'); ?></div>

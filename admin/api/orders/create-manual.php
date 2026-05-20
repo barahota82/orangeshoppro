@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/order_fulfillment.php';
 require_once __DIR__ . '/../../../includes/phone_validation.php';
+require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_admin_api();
 
 try {
@@ -25,7 +26,16 @@ try {
         ], 422);
     }
     if (!is_array($data['items']) || count($data['items']) === 0) {
-        json_response(['success' => false, 'message' => 'أضف سطرًا واحدًا على الأقل من المنتجات المسجّلة'], 422);
+        json_response(['success' => false, 'message' => 'أضف سطرًا واحدًا على الأقل من المنتجات المسجّرة'], 422);
+    }
+
+    $paymentTerms = orange_normalize_payment_terms($data['payment_terms'] ?? 'cash');
+    if ($paymentTerms === 'credit') {
+        $customerIdIn = (int) ($data['customer_id'] ?? 0);
+        $civilChk = orange_customer_credit_sale_civil_check($pdo, $customerIdIn, $phoneNorm);
+        if (!$civilChk['ok']) {
+            json_response(['success' => false, 'message' => $civilChk['message']], 422);
+        }
     }
 
     foreach ($data['items'] as $item) {
@@ -119,7 +129,6 @@ try {
         json_response(['success' => false, 'message' => 'أضف سطرًا واحدًا على الأقل من المنتجات المسجّلة'], 422);
     }
 
-    $paymentTerms = orange_normalize_payment_terms($data['payment_terms'] ?? 'cash');
     $hasSource = orange_table_has_column($pdo, 'orders', 'order_source');
     $hasPay = orange_table_has_column($pdo, 'orders', 'payment_terms');
     $hasAmountPaidCol = orange_table_has_column($pdo, 'orders', 'amount_paid');

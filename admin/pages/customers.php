@@ -715,7 +715,7 @@ $count = count($customerRows);
             </div>
             <?php if ($hasCustomerCivilIdCol): ?>
             <div class="cus-grid-r3-cell">
-                <label for="cus_civil_id">الرقم المدني / الإقامة</label>
+                <label for="cus_civil_id">الرقم المدني</label>
                 <input type="text" id="cus_civil_id" maxlength="20" autocomplete="off" dir="ltr" lang="en" placeholder="اختياري — فريد إذا أُدخل">
             </div>
             <?php endif; ?>

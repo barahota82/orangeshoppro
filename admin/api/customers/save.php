@@ -218,7 +218,7 @@ try {
         }
     }
 
-    // س15: الرقم المدني/الإقامة — اختياري، فريد لو أدخل. نقبل أرقاماً وأحرف لاتينية فقط (بعض الإقامات الخليجية تستخدم حروف).
+    // س15: الرقم المدني — اختياري عند حفظ العميل، فريد لو أُدخل؛ إلزامي قبل فاتورة آجل (create-manual + order_fulfillment).
     $civilIdSql = null;
     if ($hasCivilId && array_key_exists('civil_id', $data) && $data['civil_id'] !== null) {
         $cidRaw = trim((string) $data['civil_id']);
