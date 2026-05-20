@@ -241,15 +241,10 @@ document.getElementById('ctry_name_en').addEventListener('input', function () {
 <style>
 .ctry-form-grid {
     display: grid;
-    grid-template-columns:
-        minmax(8rem, 1.15fr)
-        minmax(5rem, 0.75fr)
-        minmax(5rem, 0.75fr)
-        minmax(0, 1.8fr)
-        minmax(5rem, 0.75fr);
+    grid-template-columns: repeat(12, minmax(0, 1fr));
     grid-template-areas:
-        "ar ar ar ar ar"
-        "active currency code en sort";
+        "ar ar ar ar ar ar ar ar ar ar ar ar"
+        "sort sort en en en en code code currency currency active active";
     gap: 14px 18px;
     direction: ltr;
 }
@@ -260,6 +255,7 @@ document.getElementById('ctry_name_en').addEventListener('input', function () {
     grid-area: active;
     display: flex;
     align-items: flex-end;
+    justify-content: flex-end;
 }
 .ctry-form-grid .ctry-ar { grid-area: ar; }
 .ctry-form-grid .ctry-en { grid-area: en; }
@@ -272,11 +268,14 @@ document.getElementById('ctry_name_en').addEventListener('input', function () {
 .ctry-form-grid .ctry-active-label {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 8px;
     cursor: pointer;
     margin: 0;
     width: 100%;
     min-height: var(--input-min-h, 36px);
+    direction: rtl;
+    text-align: right;
 }
 @media (max-width: 900px) {
     .ctry-form-grid {
