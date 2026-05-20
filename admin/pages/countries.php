@@ -33,11 +33,21 @@ foreach ($countries as $c) {
     <h3><?php echo $editRow ? 'تعديل دولة' : 'إضافة دولة'; ?></h3>
     <input type="hidden" id="ctry_id" value="<?php echo $editRow ? (int) $editRow['id'] : '0'; ?>">
     <div class="form-grid ctry-form-grid">
+        <div class="ctry-ar">
+            <label for="ctry_name_ar">الاسم العربي <span style="color:#b45309;">*</span></label>
+            <input type="text" id="ctry_name_ar" maxlength="191" autocomplete="off"
+                value="<?php echo $editRow ? htmlspecialchars((string) $editRow['name_ar'], ENT_QUOTES, 'UTF-8') : ''; ?>">
+        </div>
         <div class="ctry-sort">
             <label for="ctry_sort">الترتيب</label>
             <input type="number" id="ctry_sort" class="admin-sort-field admin-sort-field--muted"
                 value="<?php echo $editRow ? (int) ($editRow['sort_order'] ?? 0) : ''; ?>"
                 disabled tabindex="-1" aria-readonly="true">
+        </div>
+        <div class="ctry-en">
+            <label for="ctry_name_en">English</label>
+            <input type="text" id="ctry_name_en" dir="ltr" lang="en" maxlength="191" autocomplete="off"
+                value="<?php echo $editRow ? htmlspecialchars((string) $editRow['name_en'], ENT_QUOTES, 'UTF-8') : ''; ?>">
         </div>
         <div class="ctry-code">
             <label for="ctry_code">رمز الدولة</label>
@@ -61,16 +71,6 @@ foreach ($countries as $c) {
                 <input type="checkbox" id="ctry_is_active" <?php echo !$editRow || (int) ($editRow['is_active'] ?? 0) === 1 ? 'checked' : ''; ?>>
                 نشطة في واجهة المتجر
             </label>
-        </div>
-        <div class="ctry-ar">
-            <label for="ctry_name_ar">الاسم العربي <span style="color:#b45309;">*</span></label>
-            <input type="text" id="ctry_name_ar" maxlength="191" autocomplete="off"
-                value="<?php echo $editRow ? htmlspecialchars((string) $editRow['name_ar'], ENT_QUOTES, 'UTF-8') : ''; ?>">
-        </div>
-        <div class="ctry-en">
-            <label for="ctry_name_en">English</label>
-            <input type="text" id="ctry_name_en" dir="ltr" lang="en" maxlength="191" autocomplete="off"
-                value="<?php echo $editRow ? htmlspecialchars((string) $editRow['name_en'], ENT_QUOTES, 'UTF-8') : ''; ?>">
         </div>
     </div>
     <div class="admin-form-actions" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;">
@@ -243,8 +243,8 @@ document.getElementById('ctry_name_en').addEventListener('input', function () {
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
     grid-template-areas:
-        "active active currency currency code code sort sort sort sort sort sort"
-        "en en en en en en ar ar ar ar ar ar";
+        "ar ar ar ar ar ar ar ar ar ar ar ar"
+        "active active currency currency code code en en en sort sort sort";
     gap: 14px 18px;
     direction: ltr;
 }
@@ -276,12 +276,12 @@ document.getElementById('ctry_name_en').addEventListener('input', function () {
     .ctry-form-grid {
         grid-template-columns: 1fr;
         grid-template-areas:
+            "ar"
             "sort"
+            "en"
             "code"
             "currency"
-            "active"
-            "ar"
-            "en";
+            "active";
     }
 }
 </style>
