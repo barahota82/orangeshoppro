@@ -51,7 +51,6 @@ try {
         $id = (int) ($data['id'] ?? 0);
         $nameAr = da_str191($data['name_ar'] ?? '');
         $nameEn = da_str191($data['name_en'] ?? '');
-        $sortOrder = (int) ($data['sort_order'] ?? 0);
         $isActive = !empty($data['is_active']) ? 1 : 0;
 
         if ($nameAr === '') {
@@ -63,10 +62,11 @@ try {
 
         if ($id > 0) {
             $st = $pdo->prepare(
-                'UPDATE delivery_governorates SET name_ar = ?, name_en = ?, sort_order = ?, is_active = ?, country_id = ? WHERE id = ?'
+                'UPDATE delivery_governorates SET name_ar = ?, name_en = ?, is_active = ?, country_id = ? WHERE id = ?'
             );
-            $st->execute([$nameAr, $nameEn, $sortOrder, $isActive, $countryId, $id]);
+            $st->execute([$nameAr, $nameEn, $isActive, $countryId, $id]);
         } else {
+            $sortOrder = orange_delivery_governorates_next_sort_order($pdo, $countryId);
             $st = $pdo->prepare(
                 'INSERT INTO delivery_governorates (country_id, name_ar, name_en, sort_order, is_active) VALUES (?, ?, ?, ?, ?)'
             );
@@ -85,7 +85,6 @@ try {
         $governorateId = (int) ($data['governorate_id'] ?? 0);
         $nameAr = da_str191($data['name_ar'] ?? '');
         $nameEn = da_str191($data['name_en'] ?? '');
-        $sortOrder = (int) ($data['sort_order'] ?? 0);
         $isActive = !empty($data['is_active']) ? 1 : 0;
 
         if ($nameAr === '') {
@@ -111,21 +110,22 @@ try {
         if ($id > 0) {
             if ($hasCountryCol && $hasGovCol) {
                 $st = $pdo->prepare(
-                    'UPDATE delivery_areas SET name_ar = ?, name_en = ?, sort_order = ?, is_active = ?, country_id = ?, governorate_id = ? WHERE id = ?'
+                    'UPDATE delivery_areas SET name_ar = ?, name_en = ?, is_active = ?, country_id = ?, governorate_id = ? WHERE id = ?'
                 );
-                $st->execute([$nameAr, $nameEn, $sortOrder, $isActive, $countryId, $governorateId, $id]);
+                $st->execute([$nameAr, $nameEn, $isActive, $countryId, $governorateId, $id]);
             } elseif ($hasCountryCol) {
                 $st = $pdo->prepare(
-                    'UPDATE delivery_areas SET name_ar = ?, name_en = ?, sort_order = ?, is_active = ?, country_id = ? WHERE id = ?'
+                    'UPDATE delivery_areas SET name_ar = ?, name_en = ?, is_active = ?, country_id = ? WHERE id = ?'
                 );
-                $st->execute([$nameAr, $nameEn, $sortOrder, $isActive, $countryId, $id]);
+                $st->execute([$nameAr, $nameEn, $isActive, $countryId, $id]);
             } else {
                 $st = $pdo->prepare(
-                    'UPDATE delivery_areas SET name_ar = ?, name_en = ?, sort_order = ?, is_active = ? WHERE id = ?'
+                    'UPDATE delivery_areas SET name_ar = ?, name_en = ?, is_active = ? WHERE id = ?'
                 );
-                $st->execute([$nameAr, $nameEn, $sortOrder, $isActive, $id]);
+                $st->execute([$nameAr, $nameEn, $isActive, $id]);
             }
         } else {
+            $sortOrder = orange_delivery_areas_next_sort_order($pdo, $countryId, $governorateId);
             if ($hasCountryCol && $hasGovCol) {
                 $st = $pdo->prepare(
                     'INSERT INTO delivery_areas (name_ar, name_en, sort_order, is_active, country_id, governorate_id) VALUES (?, ?, ?, ?, ?, ?)'

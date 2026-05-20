@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 42);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 43);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3021,6 +3021,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_countries_foundation_v40($pdo);
     orange_catalog_migrate_governorates_v41($pdo);
     orange_catalog_migrate_country_market_codes_v42($pdo);
+    orange_catalog_migrate_country_sort_renumber_v43($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
         orange_catalog_safe_exec(
@@ -3722,10 +3723,10 @@ function orange_catalog_migrate_countries_foundation_v40(PDO $pdo): void
     }
 
     $seedCountries = [
-        ['kw', 'الكويت', 'Kuwait', 'KWD', 10, 1],
-        ['eg', 'مصر', 'Egypt', 'EGP', 20, 0],
-        ['ae', 'الإمارات', 'United Arab Emirates', 'AED', 30, 0],
-        ['sa', 'السعودية', 'Saudi Arabia', 'SAR', 40, 0],
+        ['kw', 'الكويت', 'Kuwait', 'KWD', 1, 1],
+        ['eg', 'مصر', 'Egypt', 'EGP', 2, 0],
+        ['ae', 'الإمارات', 'United Arab Emirates', 'AED', 3, 0],
+        ['sa', 'السعودية', 'Saudi Arabia', 'SAR', 4, 0],
     ];
     foreach ($seedCountries as $sc) {
         $stChk = $pdo->prepare('SELECT id FROM countries WHERE code = ? LIMIT 1');
@@ -3962,6 +3963,38 @@ function orange_catalog_migrate_country_market_codes_v42(PDO $pdo): void
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] country_market_codes_v42 marker: ' . $e->getMessage());
+        }
+    }
+}
+
+/** إعادة ترقيم sort_order للدول: 1، 2، 3، … (بدل 10، 20، 30، …). */
+function orange_catalog_migrate_country_sort_renumber_v43(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    $marker = 'php_country_sort_renumber_v43';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (orange_table_exists($pdo, 'countries')) {
+        $rows = $pdo->query('SELECT id FROM countries ORDER BY sort_order ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $next = 1;
+        $up = $pdo->prepare('UPDATE countries SET sort_order = ? WHERE id = ? LIMIT 1');
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $up->execute([$next, $id]);
+                ++$next;
+            }
+        }
+    }
+
+    try {
+        $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+        $ins->execute([$marker]);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] country_sort_renumber_v43 marker: ' . $e->getMessage());
         }
     }
 }

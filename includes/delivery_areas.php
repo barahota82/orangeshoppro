@@ -10,6 +10,59 @@ function orange_delivery_governorates_table_exists(PDO $pdo): bool
     return orange_table_exists($pdo, 'delivery_governorates');
 }
 
+function orange_delivery_governorates_sort_order_step(): int
+{
+    return 1;
+}
+
+/** ترتيب المحافظة التالي ضمن الدولة (خطوة 10). */
+function orange_delivery_governorates_next_sort_order(PDO $pdo, int $countryId): int
+{
+    $step = orange_delivery_governorates_sort_order_step();
+    if (!orange_delivery_governorates_table_exists($pdo) || $countryId <= 0) {
+        return $step;
+    }
+    $st = $pdo->prepare('SELECT COALESCE(MAX(sort_order), 0) FROM delivery_governorates WHERE country_id = ?');
+    $st->execute([$countryId]);
+    $max = (int) $st->fetchColumn();
+    if ($max <= 0) {
+        return $step;
+    }
+
+    return $max + $step;
+}
+
+function orange_delivery_areas_sort_order_step(): int
+{
+    return orange_delivery_governorates_sort_order_step();
+}
+
+/** ترتيب المنطقة التالي (خطوة 10) — ضمن المحافظة إن وُجدت وإلا ضمن الدولة. */
+function orange_delivery_areas_next_sort_order(PDO $pdo, int $countryId, int $governorateId = 0): int
+{
+    $step = orange_delivery_areas_sort_order_step();
+    if (!orange_table_exists($pdo, 'delivery_areas')) {
+        return $step;
+    }
+    $hasGovCol = orange_delivery_areas_has_governorate_column($pdo);
+    $hasCountryCol = orange_delivery_areas_has_country_column($pdo);
+    if ($hasGovCol && $governorateId > 0) {
+        $st = $pdo->prepare('SELECT COALESCE(MAX(sort_order), 0) FROM delivery_areas WHERE governorate_id = ?');
+        $st->execute([$governorateId]);
+    } elseif ($hasCountryCol && $countryId > 0) {
+        $st = $pdo->prepare('SELECT COALESCE(MAX(sort_order), 0) FROM delivery_areas WHERE country_id = ?');
+        $st->execute([$countryId]);
+    } else {
+        $st = $pdo->query('SELECT COALESCE(MAX(sort_order), 0) FROM delivery_areas');
+    }
+    $max = $st ? (int) $st->fetchColumn() : 0;
+    if ($max <= 0) {
+        return $step;
+    }
+
+    return $max + $step;
+}
+
 function orange_delivery_areas_has_governorate_column(PDO $pdo): bool
 {
     return orange_table_exists($pdo, 'delivery_areas')

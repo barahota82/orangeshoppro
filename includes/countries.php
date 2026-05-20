@@ -133,10 +133,10 @@ function orange_countries_currency_for_code(string $code): string
 
 function orange_countries_sort_order_step(): int
 {
-    return 10;
+    return 1;
 }
 
-/** ترتيب السجل التالي عند إضافة دولة (خطوة 10: 10، 20، 30، …). */
+/** ترتيب السجل التالي عند إضافة دولة (MAX + 1). */
 function orange_countries_next_sort_order(PDO $pdo): int
 {
     $step = orange_countries_sort_order_step();
