@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/party_subledger.php';
-require_once __DIR__ . '/../../includes/storefront_phone_country_select.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/delivery_areas.php';
 
@@ -680,7 +679,8 @@ $count = count($customerRows);
         <!-- الصف 2: كود الدولة | الهاتف | حد الائتمان | رصيد الذمة | حالة العميل (RTL: العين تبدأ يميناً) -->
         <div class="cus-grid-r2-country">
             <label for="cus_phone_country">كود الدولة</label>
-            <?php orange_storefront_render_phone_country_select('cus_phone_country'); ?>
+            <input type="search" id="cus_phone_country" list="cus_phone_country_list" autocomplete="off" dir="ltr" lang="en" placeholder="اكتب اسم الدولة أو +965 أو 965">
+            <datalist id="cus_phone_country_list"></datalist>
         </div>
         <div class="cus-grid-r2-phone">
             <label for="cus_phone">الهاتف <span style="color:#b45309;">*</span></label>
@@ -853,8 +853,11 @@ $count = count($customerRows);
     </div>
 </div>
 
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/country-codes.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin-phone-country.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/input-constraints.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
+window.ORANGE_ADMIN_PHONE_INTL_LABEL = <?php echo json_encode(t('phone_country_full_international'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var CUS_NEXT_AUTO_CODE = <?php echo json_encode($nextCustomerCodePreview, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var CUS_SEARCH_ROWS = <?php echo json_encode($customerSearchRowsPayload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var CUS_PARTNER_STATEMENT_URL = <?php echo json_encode(storefront_public_path('/admin/index.php?page=partner_account_statement'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
@@ -1153,22 +1156,16 @@ function cusEsc(s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function cusSplitPhoneForForm(stored) {
-    var raw = String(stored || '').trim();
-    if (!raw) return { country: '__intl__', phone: '' };
-    var normFn = window.orangeNormalizeCustomerPhone;
-    var norm = normFn ? normFn(raw, null) : null;
-    if (!norm) return { country: '__intl__', phone: raw };
-    var digits = norm.replace(/\D/g, '');
-    var prefs = ['965', '92', '91', '63'];
-    for (var i = 0; i < prefs.length; i++) {
-        var cc = prefs[i];
-        if (digits.indexOf(cc) !== 0) continue;
-        var nat = digits.slice(cc.length);
-        if (nat.length < 8) continue;
-        if (normFn && normFn(nat, cc) === norm) return { country: cc, phone: nat };
+function cusSplitPhoneForForm(stored, preferredDial, preferredNational) {
+    if (window.orangeAdminPhoneCountry) {
+        return window.orangeAdminPhoneCountry.splitPhoneForForm(
+            stored,
+            preferredDial || '',
+            preferredNational || '',
+            true
+        );
     }
-    return { country: '__intl__', phone: norm.charAt(0) === '+' ? norm.slice(1) : norm };
+    return { country: '965', phone: String(stored || '').trim() };
 }
 
 function cusResetForm() {
@@ -1183,8 +1180,9 @@ function cusResetForm() {
     document.getElementById('cus_name').value = '';
     document.getElementById('cus_phone').value = '';
     var cc = cusPhoneCountryEl();
-    // نمط الموردين: الكويت كافتراضي بدل «دولي كامل» — يمنع تنبيه «اختيار كود الدولة إلزامي» في كل عميل جديد.
-    if (cc) cc.value = '965';
+    if (cc && window.orangeAdminPhoneCountry) {
+        window.orangeAdminPhoneCountry.setInputByDial(cc, window.orangeAdminPhoneCountry.defaultCountryDial(), true);
+    }
     var statusEl = document.getElementById('cus_status');
     if (statusEl) statusEl.value = 'active';
     var brEl = document.getElementById('cus_block_reason');
@@ -1220,9 +1218,12 @@ function cusEdit(row) {
         codeEl.classList.add('admin-sort-field--muted');
     }
     document.getElementById('cus_name').value = String(row.name_ar || '');
-    var split = cusSplitPhoneForForm(row.phone || '');
+    var split = cusSplitPhoneForForm(row.phone || '', row.phone_country_dial || '', row.phone_national || '');
     var ccEl = cusPhoneCountryEl();
-    if (ccEl) ccEl.value = split.country && split.country !== '' ? split.country : '__intl__';
+    if (ccEl && window.orangeAdminPhoneCountry) {
+        var ccSet = split.country && split.country !== '' ? split.country : window.orangeAdminPhoneCountry.defaultCountryDial();
+        window.orangeAdminPhoneCountry.setInputByDial(ccEl, ccSet, true);
+    }
     document.getElementById('cus_phone').value = split.phone || '';
     var statusEl = document.getElementById('cus_status');
     if (statusEl) {
@@ -1268,9 +1269,11 @@ function cusSave() {
     var name = document.getElementById('cus_name').value.trim();
     var phone = document.getElementById('cus_phone').value.trim();
     var ccEl = cusPhoneCountryEl();
-    var phoneCountry = ccEl ? String(ccEl.value || '').trim() : '';
-    var intlSel = ccEl && ccEl.tagName === 'SELECT' && phoneCountry === '__intl__';
-    var ccForNorm = intlSel ? null : phoneCountry && phoneCountry !== '__intl__' ? phoneCountry : null;
+    var phoneCountry = window.orangeAdminPhoneCountry && ccEl
+        ? window.orangeAdminPhoneCountry.forApi(ccEl, true)
+        : null;
+    var intlSel = phoneCountry === '__intl__';
+    var ccForNorm = intlSel ? null : phoneCountry;
     var emEl = document.getElementById('cus_email');
     var email = emEl ? emEl.value.trim() : '';
     var addrEl = document.getElementById('cus_address');
@@ -1284,24 +1287,31 @@ function cusSave() {
     var notesEl = document.getElementById('cus_notes');
     var notes = notesEl ? notesEl.value.trim() : '';
     if (!phone) { alert('الهاتف مطلوب'); return; }
-    // س15 + نمط الموردين: خانة الهاتف للرقم الوطني فقط؛ كود الدولة من القائمة منفصل وإلزامي.
-    if (!ccForNorm) {
-        alert('اختيار كود الدولة إلزامي. اكتب الرقم الوطني فقط في خانة الهاتف.');
+    if (!intlSel && !ccForNorm) {
+        alert('اختيار كود الدولة إلزامي. اكتب الرقم الوطني فقط في خانة الهاتف، أو اختر «دولي» للرقم الكامل.');
         return;
     }
-    if (/^\s*(\+|00)/.test(phone)) {
-        alert('اكتب الهاتف كرقم محلي فقط بدون + أو 00؛ كود الدولة يُؤخذ من القائمة.');
-        return;
-    }
-    var phoneDigits = phone.replace(/\D+/g, '');
-    if (phoneDigits !== '' && phoneDigits.indexOf(ccForNorm) === 0 && phoneDigits.length > ccForNorm.length + 3) {
-        alert('لا تكرر كود الدولة داخل خانة الهاتف؛ اكتب الرقم المحلي فقط.');
-        return;
-    }
-    if (window.orangeNormalizeCustomerPhone) {
-        var ok = window.orangeNormalizeCustomerPhone(phone, ccForNorm, false);
-        if (!ok) {
-            alert('رقم الهاتف غير صالح. اكتب الرقم المحلي فقط بعد اختيار كود الدولة.');
+    if (!intlSel) {
+        if (/^\s*(\+|00)/.test(phone)) {
+            alert('اكتب الهاتف كرقم محلي فقط بدون + أو 00؛ كود الدولة يُؤخذ من القائمة.');
+            return;
+        }
+        var phoneDigits = phone.replace(/\D+/g, '');
+        if (phoneDigits !== '' && phoneDigits.indexOf(ccForNorm) === 0 && phoneDigits.length > ccForNorm.length + 3) {
+            alert('لا تكرر كود الدولة داخل خانة الهاتف؛ اكتب الرقم المحلي فقط.');
+            return;
+        }
+        if (window.orangeNormalizeCustomerPhone) {
+            var ok = window.orangeNormalizeCustomerPhone(phone, ccForNorm, false);
+            if (!ok) {
+                alert('رقم الهاتف غير صالح. اكتب الرقم المحلي فقط بعد اختيار كود الدولة.');
+                return;
+            }
+        }
+    } else if (window.orangeNormalizeCustomerPhone) {
+        var okIntl = window.orangeNormalizeCustomerPhone(phone, null, true);
+        if (!okIntl) {
+            alert('رقم الهاتف غير صالح. استخدم + أو 00 مع كود الدولة، أو اختر دولة وأدخل الرقم الوطني.');
             return;
         }
     }
@@ -1323,7 +1333,7 @@ function cusSave() {
     var payload = {
         name_ar: name || 'عميل',
         phone: phone,
-        phone_country: phoneCountry !== '' ? phoneCountry : null,
+        phone_country: phoneCountry != null && phoneCountry !== '' ? phoneCountry : null,
         area: area,
         address: address,
         email: email || null,
@@ -1656,6 +1666,20 @@ function cusAttachmentDelete(att) {
             e.preventDefault();
             cusSearchModalOpen();
         });
+    }
+
+    var countryEl = cusPhoneCountryEl();
+    var countryListEl = document.getElementById('cus_phone_country_list');
+    if (countryEl && countryListEl && window.orangeAdminPhoneCountry) {
+        window.orangeAdminPhoneCountry.bindInput(countryEl, countryListEl, true);
+        window.orangeAdminPhoneCountry.populateDatalist(countryEl, countryListEl, '', true);
+        if (String(countryEl.value || '').trim() === '') {
+            window.orangeAdminPhoneCountry.setInputByDial(
+                countryEl,
+                window.orangeAdminPhoneCountry.defaultCountryDial(),
+                true
+            );
+        }
     }
 
     cusToggleBlockReason();

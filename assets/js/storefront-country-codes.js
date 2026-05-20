@@ -4,6 +4,55 @@
  * Delivery: app.js calls orangeAttachSearchableCombobox after building the select.
  */
 (function () {
+    function storefrontFlagToRegion(flagValue) {
+        var symbols = Array.from(String(flagValue || ''));
+        if (symbols.length < 2) {
+            return '';
+        }
+        var region = '';
+        for (var i = 0; i < 2; i++) {
+            var cp = symbols[i].codePointAt(0);
+            if (typeof cp !== 'number' || cp < 0x1f1e6 || cp > 0x1f1ff) {
+                return '';
+            }
+            region += String.fromCharCode(65 + (cp - 0x1f1e6));
+        }
+        return region;
+    }
+
+    /** Country name for combobox: Arabic when APP_LANG=ar, else English from COUNTRY_CODES. */
+    function orangeStorefrontCountryLabel(c) {
+        if (!c) {
+            return '';
+        }
+        var lang = String((window.APP_LANG || 'en')).toLowerCase();
+        if (lang === 'ar') {
+            var explicit = String(c.country_ar || '').trim();
+            if (explicit !== '') {
+                return explicit;
+            }
+            if (typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function') {
+                var region = storefrontFlagToRegion(c.flag || '');
+                if (region) {
+                    try {
+                        if (!window.__orangeSfCountryDisplayNameAr) {
+                            window.__orangeSfCountryDisplayNameAr = new Intl.DisplayNames(['ar'], {
+                                type: 'region',
+                            });
+                        }
+                        var translated = window.__orangeSfCountryDisplayNameAr.of(region);
+                        if (translated && translated !== region) {
+                            return String(translated).trim();
+                        }
+                    } catch (eAr) {
+                        /* fall through */
+                    }
+                }
+            }
+        }
+        return String(c.country || '').trim();
+    }
+
     function defaultMatchRow(row, needle) {
         if (!needle) {
             return true;
@@ -396,14 +445,20 @@
             if (!needle) {
                 return true;
             }
-            var c = String(row.country || '').toLowerCase();
-            if (c.indexOf(needle) === 0) {
-                return true;
-            }
-            var parts = c.split(/[\s\-–—']+/);
-            for (var i = 0; i < parts.length; i++) {
-                if (parts[i] && parts[i].indexOf(needle) === 0) {
+            var names = [String(row.country || ''), String(row.countryEn || '')];
+            for (var ni = 0; ni < names.length; ni++) {
+                var c = names[ni].toLowerCase();
+                if (!c) {
+                    continue;
+                }
+                if (c.indexOf(needle) === 0) {
                     return true;
+                }
+                var parts = c.split(/[\s\-–—'،,]+/);
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i] && parts[i].indexOf(needle) === 0) {
+                        return true;
+                    }
                 }
             }
             if (/^\d+$/.test(needle) && row.codeDigits.indexOf(needle) === 0) {
@@ -442,17 +497,19 @@
                 return { c: c, i: i };
             })
             .sort(function (a, b) {
-                return String(a.c.country).localeCompare(String(b.c.country));
+                return orangeStorefrontCountryLabel(a.c).localeCompare(orangeStorefrontCountryLabel(b.c));
             });
         var rowsForCombo = [];
         sorted.forEach(function (row) {
             var c = row.c;
             var i = row.i;
-            var label = (c.flag ? c.flag + ' ' : '') + c.country + ' (' + c.code + ')';
+            var countryName = orangeStorefrontCountryLabel(c);
+            var label = (c.flag ? c.flag + ' ' : '') + countryName + ' (' + c.code + ')';
             rowsForCombo.push({
                 value: String(i),
                 label: label,
-                country: c.country,
+                country: countryName,
+                countryEn: String(c.country || '').trim(),
                 codeDigits: String(c.code).replace(/\D/g, ''),
             });
             var opt = document.createElement('option');
