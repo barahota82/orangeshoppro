@@ -35,9 +35,12 @@ try {
     }
 
     $attachments = orange_customer_attachment_decode_list((string) ($customer['attachments_json'] ?? ''));
-    $maxAttachments = 5;
+    $maxAttachments = orange_customer_attachment_max_count();
     if (count($attachments) >= $maxAttachments) {
-        json_response(['success' => false, 'message' => 'الحد الأقصى لمرفقات العميل هو 5 ملفات'], 422);
+        json_response([
+            'success' => false,
+            'message' => 'الحد الأقصى لمرفقات العميل هو ' . $maxAttachments . ' ملفات',
+        ], 422);
     }
 
     if (!isset($_FILES['file']) || !is_array($_FILES['file'])) {

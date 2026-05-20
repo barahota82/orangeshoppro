@@ -11,6 +11,12 @@ require_once __DIR__ . '/supplier_attachments.php';
  * ونوفّر دوال خاصة لمسار وقراءة قائمة المرفقات.
  */
 
+/** أقصى عدد مرفقات لكل عميل (شاشة العملاء + API). */
+function orange_customer_attachment_max_count(): int
+{
+    return 10;
+}
+
 function orange_customer_attachment_upload_root(): string
 {
     return orange_project_root_path() . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'customers';

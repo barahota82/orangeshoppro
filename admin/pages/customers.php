@@ -5,7 +5,10 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/party_subledger.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
+require_once __DIR__ . '/../../includes/customer_attachments.php';
 require_once __DIR__ . '/../../includes/delivery_areas.php';
+
+$cusAttachmentMaxCount = orange_customer_attachment_max_count();
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -822,7 +825,7 @@ $count = count($customerRows);
     <div class="gl-pick-modal__dialog cus-attachments-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="cus_attachments_title">
         <h3 id="cus_attachments_title" class="gl-pick-modal__title">مرفقات العميل</h3>
         <p class="gl-pick-modal__hint muted" id="cus_attachments_hint" style="margin:0 0 10px;font-size:0.9rem;">
-            PDF وصور فقط — حد أقصى 5 مرفقات لكل عميل (حتى 20MB للملف قبل الضغط).
+            PDF وصور فقط — حد أقصى <?php echo (int) $cusAttachmentMaxCount; ?> مرفقات لكل عميل (حتى 20MB للملف قبل الضغط).
         </p>
         <div class="cus-attachments-toolbar">
             <div>
@@ -861,6 +864,7 @@ $count = count($customerRows);
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/input-constraints.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
 window.ORANGE_ADMIN_PHONE_INTL_LABEL = <?php echo json_encode(t('phone_country_full_international'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+var CUS_ATTACHMENT_MAX = <?php echo (int) $cusAttachmentMaxCount; ?>;
 var CUS_NEXT_AUTO_CODE = <?php echo json_encode($nextCustomerCodePreview, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var CUS_SEARCH_ROWS = <?php echo json_encode($customerSearchRowsPayload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var CUS_PARTNER_STATEMENT_URL = <?php echo json_encode(storefront_public_path('/admin/index.php?page=partner_account_statement'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
@@ -1070,7 +1074,7 @@ function cusAttachmentRender() {
     var manageBtn = document.getElementById('cus_attachments_manage_btn');
     var customerId = cusAttachmentCustomerId();
     var rows = cusAttachmentRows();
-    var max = 5;
+    var max = typeof CUS_ATTACHMENT_MAX === 'number' && CUS_ATTACHMENT_MAX > 0 ? CUS_ATTACHMENT_MAX : 10;
     if (countEl) {
         countEl.value = String(rows.length);
     }
@@ -1661,8 +1665,9 @@ function cusAttachmentUpload() {
         return;
     }
     var rows = cusAttachmentRows();
-    if (rows.length >= 5) {
-        alert('الحد الأقصى لمرفقات العميل هو 5 ملفات');
+    var maxAtt = typeof CUS_ATTACHMENT_MAX === 'number' && CUS_ATTACHMENT_MAX > 0 ? CUS_ATTACHMENT_MAX : 10;
+    if (rows.length >= maxAtt) {
+        alert('الحد الأقصى لمرفقات العميل هو ' + maxAtt + ' ملفات');
         return;
     }
     var fileEl = document.getElementById('cus_attachment_file');
