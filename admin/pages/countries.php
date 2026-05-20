@@ -9,7 +9,6 @@ $pdo = db();
 orange_catalog_ensure_schema($pdo);
 $countries = orange_countries_admin_list($pdo);
 $hasTable = orange_table_exists($pdo, 'countries');
-$nextSort = $hasTable ? orange_countries_next_sort_order($pdo) : orange_countries_sort_order_step();
 $editId = isset($_GET['edit']) ? (int) $_GET['edit'] : 0;
 $editRow = null;
 foreach ($countries as $c) {
@@ -33,27 +32,23 @@ foreach ($countries as $c) {
 <div class="card">
     <h3><?php echo $editRow ? 'تعديل دولة' : 'إضافة دولة'; ?></h3>
     <input type="hidden" id="ctry_id" value="<?php echo $editRow ? (int) $editRow['id'] : '0'; ?>">
-    <div class="form-grid">
-        <div>
-            <label for="ctry_name_ar">الاسم العربي <span style="color:#b45309;">*</span></label>
-            <input type="text" id="ctry_name_ar" maxlength="191" autocomplete="off"
-                value="<?php echo $editRow ? htmlspecialchars((string) $editRow['name_ar'], ENT_QUOTES, 'UTF-8') : ''; ?>">
+    <div class="form-grid ctry-form-grid">
+        <div class="ctry-sort">
+            <label for="ctry_sort">الترتيب</label>
+            <input type="number" id="ctry_sort" class="admin-sort-field admin-sort-field--muted"
+                value="<?php echo $editRow ? (int) ($editRow['sort_order'] ?? 0) : ''; ?>"
+                disabled tabindex="-1" aria-readonly="true">
         </div>
-        <div>
-            <label for="ctry_name_en">English (تلقائي)</label>
-            <input type="text" id="ctry_name_en" dir="ltr" lang="en" maxlength="191" autocomplete="off"
-                value="<?php echo $editRow ? htmlspecialchars((string) $editRow['name_en'], ENT_QUOTES, 'UTF-8') : ''; ?>">
-        </div>
-        <div>
-            <label for="ctry_code">رمز الدولة (تلقائي)</label>
+        <div class="ctry-code">
+            <label for="ctry_code">رمز الدولة</label>
             <input type="text" id="ctry_code" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" maxlength="8"
-                placeholder="kw" autocomplete="off" readonly tabindex="-1" aria-readonly="true"
+                autocomplete="off" readonly tabindex="-1" aria-readonly="true"
                 value="<?php echo $editRow ? htmlspecialchars((string) $editRow['code'], ENT_QUOTES, 'UTF-8') : ''; ?>">
         </div>
-        <div>
-            <label for="ctry_currency">رمز العملة (تلقائي)</label>
+        <div class="ctry-currency">
+            <label for="ctry_currency">رمز العملة</label>
             <input type="text" id="ctry_currency" class="admin-sort-field admin-sort-field--muted" dir="ltr" maxlength="8"
-                placeholder="KWD" autocomplete="off" readonly tabindex="-1" aria-readonly="true"
+                autocomplete="off" readonly tabindex="-1" aria-readonly="true"
                 value="<?php
                 if ($editRow) {
                     $autoCur = orange_countries_currency_for_code((string) ($editRow['code'] ?? ''));
@@ -61,22 +56,26 @@ foreach ($countries as $c) {
                 }
                 ?>">
         </div>
-        <div>
-            <label for="ctry_sort">الترتيب (تلقائي)</label>
-            <input type="number" id="ctry_sort" class="admin-sort-field admin-sort-field--muted"
-                value="<?php echo $editRow ? (int) ($editRow['sort_order'] ?? 0) : (int) $nextSort; ?>"
-                disabled style="max-width:120px;" tabindex="-1" aria-readonly="true">
-        </div>
-        <div style="display:flex;align-items:flex-end;">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <div class="ctry-active">
+            <label for="ctry_is_active" class="ctry-active-label">
                 <input type="checkbox" id="ctry_is_active" <?php echo !$editRow || (int) ($editRow['is_active'] ?? 0) === 1 ? 'checked' : ''; ?>>
                 نشطة في واجهة المتجر
             </label>
         </div>
+        <div class="ctry-ar">
+            <label for="ctry_name_ar">الاسم العربي <span style="color:#b45309;">*</span></label>
+            <input type="text" id="ctry_name_ar" maxlength="191" autocomplete="off"
+                value="<?php echo $editRow ? htmlspecialchars((string) $editRow['name_ar'], ENT_QUOTES, 'UTF-8') : ''; ?>">
+        </div>
+        <div class="ctry-en">
+            <label for="ctry_name_en">English</label>
+            <input type="text" id="ctry_name_en" dir="ltr" lang="en" maxlength="191" autocomplete="off"
+                value="<?php echo $editRow ? htmlspecialchars((string) $editRow['name_en'], ENT_QUOTES, 'UTF-8') : ''; ?>">
+        </div>
     </div>
     <div class="admin-form-actions" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;">
         <button type="button" onclick="saveCountry()" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ</button>
-        <button type="button" class="btn-secondary" onclick="translateCountryFromAr()" <?php echo !$hasTable ? 'disabled' : ''; ?>>ترجمة تلقائية من العربي</button>
+        <button type="button" class="btn-secondary" onclick="translateCountryFromAr()" <?php echo !$hasTable ? 'disabled' : ''; ?>>ترجمة من العربي</button>
         <button type="button" class="btn-secondary" onclick="resetCountryForm()">جديد</button>
         <?php if ($editRow): ?>
         <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=countries'), ENT_QUOTES, 'UTF-8'); ?>">إلغاء التعديل</a>
@@ -133,9 +132,10 @@ async function deriveCountryFields() {
     var codeEl = document.getElementById('ctry_code');
     var curEl = document.getElementById('ctry_currency');
     var sortEl = document.getElementById('ctry_sort');
-    if (!ar && !en) {
+    if (!ar) {
         if (codeEl) codeEl.value = '';
         if (curEl) curEl.value = '';
+        if (sortEl) sortEl.value = '';
         return;
     }
     try {
@@ -147,9 +147,11 @@ async function deriveCountryFields() {
         if (!res || !res.success) {
             return;
         }
-        if (codeEl && res.code) codeEl.value = res.code;
-        if (curEl && res.currency_code) curEl.value = res.currency_code;
-        if (sortEl && res.next_sort_order) sortEl.value = String(res.next_sort_order);
+        if (codeEl) codeEl.value = res.code ? res.code : '';
+        if (curEl) curEl.value = res.currency_code ? res.currency_code : '';
+        if (sortEl) {
+            sortEl.value = (res.code && res.next_sort_order) ? String(res.next_sort_order) : '';
+        }
     } catch (e) {
         /* صامت في المعاينة */
     }
@@ -190,6 +192,7 @@ function scheduleCountryFromAr() {
         document.getElementById('ctry_name_en').value = '';
         document.getElementById('ctry_code').value = '';
         document.getElementById('ctry_currency').value = '';
+        document.getElementById('ctry_sort').value = '';
         return;
     }
     clearTimeout(ctryArTimer);
@@ -229,15 +232,56 @@ async function saveCountry() {
     }
 }
 
-document.getElementById('ctry_name_ar').addEventListener('input', function () {
-    scheduleCountryFromAr();
-    scheduleCountryDerive();
-});
+document.getElementById('ctry_name_ar').addEventListener('input', scheduleCountryFromAr);
 document.getElementById('ctry_name_en').addEventListener('input', function () {
     scheduleCountryFromEn();
     scheduleCountryDerive();
 });
-if (ctryIsNew) {
-    deriveCountryFields();
-}
 </script>
+<style>
+.ctry-form-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-template-areas:
+        "active active currency currency code code sort sort sort sort sort sort"
+        "en en en en en en ar ar ar ar ar ar";
+    gap: 14px 18px;
+    direction: ltr;
+}
+.ctry-form-grid .ctry-sort { grid-area: sort; }
+.ctry-form-grid .ctry-code { grid-area: code; }
+.ctry-form-grid .ctry-currency { grid-area: currency; }
+.ctry-form-grid .ctry-active {
+    grid-area: active;
+    display: flex;
+    align-items: flex-end;
+}
+.ctry-form-grid .ctry-ar { grid-area: ar; }
+.ctry-form-grid .ctry-en { grid-area: en; }
+.ctry-form-grid label,
+.ctry-form-grid input { direction: rtl; text-align: right; }
+.ctry-form-grid #ctry_name_en,
+.ctry-form-grid #ctry_code,
+.ctry-form-grid #ctry_currency { direction: ltr; text-align: left; }
+.ctry-form-grid .ctry-active-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    margin: 0;
+    width: 100%;
+    min-height: var(--input-min-h, 36px);
+}
+@media (max-width: 900px) {
+    .ctry-form-grid {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "sort"
+            "code"
+            "currency"
+            "active"
+            "ar"
+            "en";
+    }
+}
+</style>
