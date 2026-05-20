@@ -177,6 +177,14 @@ try {
     }
     $address = trim((string) ($data['address'] ?? ''));
     $address = function_exists('mb_substr') ? mb_substr($address, 0, 2000, 'UTF-8') : substr($address, 0, 2000);
+
+    if ($hasArea && $area === '') {
+        json_response(['success' => false, 'message' => 'المنطقة مطلوبة — اختر منطقة من القائمة.'], 422);
+    }
+    if ($hasAddress && $address === '') {
+        json_response(['success' => false, 'message' => 'العنوان مطلوب'], 422);
+    }
+
     $emailIn = trim((string) ($data['email'] ?? ''));
     $emailSql = null;
     if ($emailIn !== '') {

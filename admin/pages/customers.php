@@ -751,9 +751,9 @@ $count = count($customerRows);
 
         <!-- الصف 5: المنطقة | العنوان -->
         <div class="cus-grid-r5-area">
-            <label for="cus_city_area">المنطقة</label>
-            <select id="cus_city_area" autocomplete="address-level1">
-                <option value="">اختياري</option>
+            <label for="cus_city_area">المنطقة <span style="color:#b45309;">*</span></label>
+            <select id="cus_city_area" autocomplete="address-level1" required>
+                <option value="">اختر منطقة</option>
                 <?php foreach ($customerAreaOptions as $areaOpt): ?>
                     <option value="<?php echo htmlspecialchars((string) $areaOpt['value'], ENT_QUOTES, 'UTF-8'); ?>">
                         <?php echo htmlspecialchars((string) $areaOpt['label'], ENT_QUOTES, 'UTF-8'); ?>
@@ -764,8 +764,8 @@ $count = count($customerRows);
         </div>
         <?php if ($hasCustomerAddressCol): ?>
         <div class="cus-grid-r5-address">
-            <label for="cus_address">العنوان</label>
-            <input type="text" id="cus_address" autocomplete="off" placeholder="عنوان التوصيل" maxlength="2000">
+            <label for="cus_address">العنوان <span style="color:#b45309;">*</span></label>
+            <input type="text" id="cus_address" autocomplete="off" placeholder="عنوان التوصيل" maxlength="2000" required>
         </div>
         <?php endif; ?>
 
@@ -1475,6 +1475,20 @@ function cusSave() {
     }
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         alert('بريد إلكتروني غير صالح');
+        return;
+    }
+    if (areaElForSave && area === '') {
+        alert('المنطقة مطلوبة — اختر منطقة من القائمة.');
+        if (areaElForSave.focus) {
+            areaElForSave.focus();
+        }
+        return;
+    }
+    if (addrEl && address === '') {
+        alert('العنوان مطلوب');
+        if (addrEl.focus) {
+            addrEl.focus();
+        }
         return;
     }
     var statusEl = document.getElementById('cus_status');
