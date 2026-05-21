@@ -34,6 +34,13 @@ try {
     $paymentTerms = orange_normalize_payment_terms($data['payment_terms'] ?? 'cash');
     if ($paymentTerms === 'credit') {
         $customerIdIn = (int) ($data['customer_id'] ?? 0);
+        if ($customerIdIn > 0) {
+            try {
+                orange_admin_assert_entity_country($pdo, 'customers', $customerIdIn);
+            } catch (RuntimeException $e) {
+                json_response(['success' => false, 'message' => $e->getMessage()], 403);
+            }
+        }
         $civilChk = orange_customer_credit_sale_civil_check($pdo, $customerIdIn, $phoneNorm);
         if (!$civilChk['ok']) {
             json_response(['success' => false, 'message' => $civilChk['message']], 422);
@@ -45,15 +52,27 @@ try {
         if ($pidCheck <= 0) {
             json_response(['success' => false, 'message' => 'يُقبل فقط بيع منتجات مسجّلة في «المنتجات» — لا بند نصي أو سعر يدوي بدون صنف'], 422);
         }
+        try {
+            orange_admin_assert_entity_country($pdo, 'products', $pidCheck);
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 403);
+        }
+    }
+
+    $channelId = (int) $data['channel_id'];
+    try {
+        orange_admin_assert_row_country($pdo, 'channels', $channelId);
+    } catch (RuntimeException $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
     $channelStmt = $pdo->prepare('SELECT id FROM channels WHERE id = ? AND is_active = 1 LIMIT 1');
-    $channelStmt->execute([(int)$data['channel_id']]);
+    $channelStmt->execute([$channelId]);
     if (!$channelStmt->fetchColumn()) {
         json_response(['success' => false, 'message' => 'قناة غير صالحة'], 422);
     }
 
-    $orderCountryId = orange_country_id_for_channel($pdo, (int) $data['channel_id']);
+    $orderCountryId = orange_country_id_for_channel($pdo, $channelId);
     $orderWarehouseId = orange_warehouse_default_id_for_country($pdo, $orderCountryId);
 
     $pdo->beginTransaction();

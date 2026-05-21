@@ -175,6 +175,24 @@ try {
         }
     }
 
+    try {
+        if ($customerId > 0) {
+            orange_admin_assert_entity_country($pdo, 'customers', $customerId);
+        }
+        if ($orderIdOpt > 0) {
+            orange_admin_assert_entity_country($pdo, 'orders', $orderIdOpt);
+        }
+        foreach ($items as $item) {
+            $productId = (int) ($item['product_id'] ?? 0);
+            if ($productId > 0) {
+                orange_admin_assert_entity_country($pdo, 'products', $productId);
+            }
+        }
+    } catch (RuntimeException $e) {
+        $pdo->rollBack();
+        json_response(['success' => false, 'message' => $e->getMessage()], 403);
+    }
+
     $totals = apply_sales_return_items($pdo, $returnId, $items);
     $revenueTotal = $totals['revenue'];
     $cogsTotal = $totals['cogs'];

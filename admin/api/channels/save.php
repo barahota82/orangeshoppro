@@ -101,7 +101,10 @@ try {
     $wa = trim((string) $data['whatsapp_number']);
     $wh = 1;
     $countryId = (int) ($data['country_id'] ?? 0);
-    if ($countryId <= 0) {
+    $ctxCountry = orange_admin_context_country_id($pdo);
+    if ($ctxCountry > 0) {
+        $countryId = $ctxCountry;
+    } elseif ($countryId <= 0) {
         $countryId = orange_countries_default_id($pdo);
     }
     if ($countryId <= 0) {
@@ -118,6 +121,11 @@ try {
     }
 
     if ($id > 0) {
+        try {
+            orange_admin_assert_row_country($pdo, 'channels', $id);
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 403);
+        }
         $load = $pdo->prepare('SELECT id, slug, path_segment FROM channels WHERE id = ? LIMIT 1');
         $load->execute([$id]);
         $row = $load->fetch(PDO::FETCH_ASSOC);

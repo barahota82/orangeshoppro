@@ -165,6 +165,24 @@ try {
         }
     }
 
+    try {
+        if ($supplierId > 0) {
+            orange_admin_assert_entity_country($pdo, 'suppliers', $supplierId);
+        }
+        if ($purchaseIdOpt > 0) {
+            orange_admin_assert_entity_country($pdo, 'purchases', $purchaseIdOpt);
+        }
+        foreach ($items as $item) {
+            $productId = (int) ($item['product_id'] ?? 0);
+            if ($productId > 0) {
+                orange_admin_assert_entity_country($pdo, 'products', $productId);
+            }
+        }
+    } catch (RuntimeException $e) {
+        $pdo->rollBack();
+        json_response(['success' => false, 'message' => $e->getMessage()], 403);
+    }
+
     $newTotal = apply_purchase_return_items($pdo, $returnId, $items);
     $pdo->prepare(
         'UPDATE purchase_returns SET purchase_id = ?, supplier_id = ?, type = ?, total = ?, notes = ? WHERE id = ?'

@@ -172,4 +172,6 @@ ORANGE — رؤية المالك: تعدد الدول والقنوات والج�
 
 **تنفيذ (13 — مرحلة 11 — عروض السلة + قنوات + مردودات):** ترحيل **`orange_catalog_migrate_country_cart_promotions_v48`** (`country_id` على **`cart_promotions`**, **`cart_gift_promotions`**, **`cart_bogo_promotions`**, **`cart_combo_promotions`**)؛ **`includes/cart_promotion_country.php`** + فلترة/حفظ scoped في **`admin/api/cart_*_promotions/manage.php`** و**`includes/cart_*.php`**؛ فلترة **`admin/pages/offers.php`** و**`channels.php`**؛ **`orange_admin_assert_row_country`** على **`channels/toggle-active`**؛ assert على **`sales_returns/get`** و**`purchase_returns/get`**؛ فلترة قائمة **`sales_returns`** الأخيرة بالدولة.
 
+**تنفيذ (13 — مرحلة 12 — assert تشغيلي):** **`channels/save`** (assert + قفل **`country_id`** لسياق الأدمن)؛ **`orders/create-manual`** (قناة + منتجات + عميل آجل)؛ **`delivery_areas/manage`** (assert على تعديل محافظة/منطقة)؛ **`sales_returns/update`** و**`purchase_returns/update`** (assert عميل/طلب/مورد/شراء + منتجات البنود).
+
 نهاية الملف.

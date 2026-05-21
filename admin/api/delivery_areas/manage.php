@@ -58,6 +58,11 @@ try {
         }
 
         if ($id > 0) {
+            try {
+                orange_admin_assert_row_country($pdo, 'delivery_governorates', $id);
+            } catch (RuntimeException $e) {
+                json_response(['success' => false, 'message' => $e->getMessage()], 403);
+            }
             $st = $pdo->prepare(
                 'UPDATE delivery_governorates SET name_ar = ?, name_en = ?, is_active = ?, country_id = ? WHERE id = ?'
             );
@@ -105,6 +110,11 @@ try {
         $hasCountryCol = orange_delivery_areas_has_country_column($pdo);
 
         if ($id > 0) {
+            try {
+                orange_admin_assert_row_country($pdo, 'delivery_areas', $id);
+            } catch (RuntimeException $e) {
+                json_response(['success' => false, 'message' => $e->getMessage()], 403);
+            }
             if ($hasCountryCol && $hasGovCol) {
                 $st = $pdo->prepare(
                     'UPDATE delivery_areas SET name_ar = ?, name_en = ?, is_active = ?, country_id = ?, governorate_id = ? WHERE id = ?'
