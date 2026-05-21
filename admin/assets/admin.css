@@ -46,8 +46,9 @@
     --admin-drawer-link-sub-pad-start: 18px;
     --admin-mega-grid-gap: 10px;
     /** عدد الأعمدة في لوحة التنقل المنسدلة (زر ثابت لكل خلية) */
-    --admin-mega-grid-cols: 6;
+    --admin-mega-grid-cols: 1;
     --admin-mega-grid-col-min: 210px;
+    --admin-mega-panel-width: 380px;
     --admin-mega-trigger-max-w: 22rem;
     /** عرض حقول الترتيب (تلقائي/عرض المتجر…) — موحد عبر لوحة الإدارة */
     --admin-sort-field-max-w: 220px;
@@ -222,7 +223,7 @@ a { text-decoration: none; color: inherit; }
     position: fixed;
     inset: 0;
     z-index: 170;
-    background: rgba(15, 23, 42, 0.38);
+    background: rgba(15, 23, 42, 0.12);
     border: none;
     padding: 0;
     margin: 0;
@@ -232,20 +233,22 @@ a { text-decoration: none; color: inherit; }
     display: none !important;
 }
 .admin-mega-panel {
-    position: absolute;
-    left: 8px;
-    right: 8px;
-    top: 0;
-    /* فوق admin-mega-backdrop (170) وإلا النقرات تُلتقط كلها بالخلفية المعتمة */
+    position: fixed;
+    top: auto;
+    left: auto;
+    right: auto;
+    width: min(var(--admin-mega-panel-width), calc(100vw - 16px));
+    min-width: 280px;
+    max-width: min(420px, calc(100vw - 16px));
+    /* فوق admin-mega-backdrop (170) */
     z-index: 180;
     pointer-events: auto;
-    padding: 14px 16px 18px;
-    border-radius: 0 0 var(--radius) var(--radius);
+    padding: 12px 14px 14px;
+    border-radius: var(--radius);
     border: 1px solid rgba(255, 255, 255, 0.12);
-    border-top: none;
     background: #0f172a;
     background-image: var(--sidebar-bg);
-    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
     max-height: min(72vh, 520px);
     overflow-y: auto;
     scrollbar-width: thin;
@@ -344,6 +347,7 @@ a { text-decoration: none; color: inherit; }
 }
 .admin-mega-dropdown {
     display: inline-flex;
+    position: relative;
 }
 .admin-mega-trigger {
     display: inline-flex;

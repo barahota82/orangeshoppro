@@ -418,12 +418,40 @@ function orangeAdminOfferSuggestAfterWarnings(r) {
             return;
         }
 
+        function positionMegaPanel(panel, trig) {
+            if (!panel || !trig) {
+                return;
+            }
+            var prevVis = panel.style.visibility;
+            panel.style.visibility = 'hidden';
+            panel.removeAttribute('hidden');
+            var tr = trig.getBoundingClientRect();
+            var pw = panel.offsetWidth || 380;
+            var ph = panel.offsetHeight || 320;
+            var gap = 6;
+            var pad = 8;
+            var top = tr.bottom + gap;
+            if (top + ph > window.innerHeight - pad) {
+                top = Math.max(pad, tr.top - ph - gap);
+            }
+            var isRtl = (document.documentElement.getAttribute('dir') || '').toLowerCase() === 'rtl';
+            var left = isRtl ? (tr.right - pw) : tr.left;
+            left = Math.max(pad, Math.min(left, window.innerWidth - pw - pad));
+            panel.style.top = Math.round(top) + 'px';
+            panel.style.left = Math.round(left) + 'px';
+            panel.style.right = 'auto';
+            panel.style.visibility = prevVis || '';
+        }
+
         function closeAll() {
             triggers.forEach(function (t) {
                 t.setAttribute('aria-expanded', 'false');
             });
             panels.forEach(function (p) {
                 p.setAttribute('hidden', '');
+                p.style.top = '';
+                p.style.left = '';
+                p.style.right = '';
             });
             if (backdrop) {
                 backdrop.setAttribute('hidden', '');
@@ -437,6 +465,7 @@ function orangeAdminOfferSuggestAfterWarnings(r) {
             var trig = document.querySelector('.admin-mega-trigger[data-mega-panel="' + id + '"]');
             if (panel && trig) {
                 panel.removeAttribute('hidden');
+                positionMegaPanel(panel, trig);
                 trig.setAttribute('aria-expanded', 'true');
                 if (backdrop) {
                     backdrop.removeAttribute('hidden');
@@ -444,6 +473,19 @@ function orangeAdminOfferSuggestAfterWarnings(r) {
                 }
             }
         }
+
+        window.addEventListener('resize', function () {
+            panels.forEach(function (p) {
+                if (p.hasAttribute('hidden')) {
+                    return;
+                }
+                var id = (p.id || '').replace(/^mega-panel-/, '');
+                var trig = document.querySelector('.admin-mega-trigger[data-mega-panel="' + id + '"]');
+                if (trig) {
+                    positionMegaPanel(p, trig);
+                }
+            });
+        });
 
         triggers.forEach(function (tr) {
             tr.addEventListener('click', function (e) {
