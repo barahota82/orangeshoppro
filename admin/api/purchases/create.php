@@ -34,6 +34,11 @@ try {
         } catch (RuntimeException $e) {
             json_response(['success' => false, 'message' => $e->getMessage()], 422);
         }
+        try {
+            orange_admin_assert_entity_country($pdo, 'suppliers', $supplierId);
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 403);
+        }
     }
 
     if ($type === 'credit') {

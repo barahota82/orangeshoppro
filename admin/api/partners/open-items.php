@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/party_allocations.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -22,11 +23,21 @@ try {
         if (!$chk->fetch()) {
             json_response(['success' => false, 'message' => 'العميل غير موجود'], 404);
         }
+        try {
+            orange_admin_assert_entity_country($pdo, 'customers', $partyId);
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 403);
+        }
     } else {
         $chk = $pdo->prepare('SELECT id FROM suppliers WHERE id = ? LIMIT 1');
         $chk->execute([$partyId]);
         if (!$chk->fetch()) {
             json_response(['success' => false, 'message' => 'المورد غير موجود'], 404);
+        }
+        try {
+            orange_admin_assert_entity_country($pdo, 'suppliers', $partyId);
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 403);
         }
     }
     $items = orange_party_open_documents($pdo, $partyKind, $partyId);

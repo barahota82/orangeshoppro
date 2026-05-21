@@ -166,4 +166,6 @@ ORANGE — رؤية المالك: تعدد الدول والقنوات والج�
 
 **تنفيذ (13 — product_channels ضمن الدولة):** **`orange_product_attach_all_active_channels`** و**`orange_product_assert_channel_same_country`** في **`includes/product_channels.php`**.
 
+**تنفيذ (13 — مرحلة 9 — ذمم ومردودات ومخزن):** فلترة **`orange_partner_summary_report`** و**`orange_partner_gl_reconcile`** بالدولة؛ **`assert`** على **`partners/aging`**, **`open-items`**, مرفقات العملاء/الموردين، **`sales_returns/create`**, **`purchase_returns/create`**, **`purchases/create`** (مورد)؛ أرقام مردود **`SR-{code}-`**, **`PR-{code}-`**؛ مخزن الدولة في **`sales_return_helpers`** و**`purchase_return_helpers`**.
+
 نهاية الملف.

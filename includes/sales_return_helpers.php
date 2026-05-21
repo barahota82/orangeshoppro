@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/purchase_helpers.php';
+require_once __DIR__ . '/countries.php';
+require_once __DIR__ . '/warehouses.php';
 
 /**
  * صافي سطر مردود مبيعات (سعر × كمية − خصم السطر).
@@ -35,12 +37,19 @@ function orange_sales_return_resolve_unit_cost(PDO $pdo, int $productId, float $
 }
 
 /**
- * زيادة المخزون عند قبول مرتجع من عميل.
+ * زيادة المخزون عند قبول مرتجع من عميل (مخزن دولة المنتج).
  */
 function orange_sales_return_add_line_stock(PDO $pdo, int $productId, int $variantId, int $qty): void
 {
     if ($productId <= 0 || $variantId <= 0 || $qty <= 0) {
         throw new RuntimeException('بيانات سطر مردود مخزون غير صالحة');
+    }
+    $countryId = orange_product_country_id($pdo, $productId);
+    $warehouseId = orange_warehouse_default_id_for_country($pdo, $countryId);
+    if ($warehouseId > 0 && orange_warehouses_table_exists($pdo)) {
+        orange_warehouse_apply_variant_delta($pdo, $warehouseId, $variantId, $qty, 0);
+
+        return;
     }
     $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ? AND product_id = ?')
         ->execute([$qty, $variantId, $productId]);
@@ -54,6 +63,13 @@ function orange_sales_return_add_line_stock(PDO $pdo, int $productId, int $varia
 function orange_sales_return_undo_line_stock(PDO $pdo, int $productId, int $variantId, int $qty): void
 {
     if ($productId <= 0 || $variantId <= 0 || $qty <= 0) {
+        return;
+    }
+    $countryId = orange_product_country_id($pdo, $productId);
+    $warehouseId = orange_warehouse_default_id_for_country($pdo, $countryId);
+    if ($warehouseId > 0 && orange_warehouses_table_exists($pdo)) {
+        orange_warehouse_apply_variant_delta($pdo, $warehouseId, $variantId, -$qty, 0);
+
         return;
     }
     $vStmt = $pdo->prepare(

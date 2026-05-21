@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/purchase_return_helpers.php';
 require_once __DIR__ . '/../../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../../includes/purchase_gl_accounts.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -49,12 +50,39 @@ try {
 
     $pdo->beginTransaction();
 
+    $returnCountryId = orange_admin_context_country_id($pdo);
+
     if ($purchaseIdOpt > 0) {
         $chk = $pdo->prepare('SELECT id FROM purchases WHERE id = ? LIMIT 1');
         $chk->execute([$purchaseIdOpt]);
         if (!$chk->fetch()) {
             $pdo->rollBack();
             json_response(['success' => false, 'message' => 'فاتورة الشراء المرجعية غير موجودة'], 422);
+        }
+        try {
+            orange_admin_assert_entity_country($pdo, 'purchases', $purchaseIdOpt);
+        } catch (RuntimeException $e) {
+            $pdo->rollBack();
+            json_response(['success' => false, 'message' => $e->getMessage()], 403);
+        }
+        if (orange_table_has_country_id($pdo, 'purchases')) {
+            $pc = $pdo->prepare('SELECT country_id FROM purchases WHERE id = ? LIMIT 1');
+            $pc->execute([$purchaseIdOpt]);
+            $returnCountryId = (int) ($pc->fetchColumn() ?: $returnCountryId);
+        }
+    }
+
+    if ($supplierId > 0) {
+        try {
+            orange_admin_assert_entity_country($pdo, 'suppliers', $supplierId);
+        } catch (RuntimeException $e) {
+            $pdo->rollBack();
+            json_response(['success' => false, 'message' => $e->getMessage()], 403);
+        }
+        if (orange_table_has_country_id($pdo, 'suppliers')) {
+            $sc = $pdo->prepare('SELECT country_id FROM suppliers WHERE id = ? LIMIT 1');
+            $sc->execute([$supplierId]);
+            $returnCountryId = (int) ($sc->fetchColumn() ?: $returnCountryId);
         }
     }
 
@@ -82,7 +110,7 @@ try {
         $notes !== '' ? $notes : null,
     ]);
     $returnId = (int) $pdo->lastInsertId();
-    $retRef = 'PR-' . $returnId;
+    $retRef = orange_country_document_ref($pdo, 'PR', $returnId, $returnCountryId);
     $pdo->prepare('UPDATE purchase_returns SET return_number = ? WHERE id = ?')->execute([$retRef, $returnId]);
 
     $hasVariant = orange_table_has_column($pdo, 'purchase_return_items', 'variant_id');
@@ -93,6 +121,11 @@ try {
         $cost = (float) ($item['cost'] ?? 0);
         if ($productId <= 0 || $qty <= 0) {
             throw new RuntimeException('عنصر مردود غير مكتمل');
+        }
+        try {
+            orange_admin_assert_entity_country($pdo, 'products', $productId);
+        } catch (RuntimeException $e) {
+            throw new RuntimeException($e->getMessage());
         }
         $variantId = orange_purchase_resolve_variant_id(
             $pdo,

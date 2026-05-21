@@ -287,15 +287,21 @@ function orange_party_customer_credit_limit(PDO $pdo, int $customerId): ?float
 /**
  * @return array{as_of:string, customers:list<array<string, mixed>>, suppliers:list<array<string, mixed>>}
  */
-function orange_partner_summary_report(PDO $pdo, bool $includeAging): array
+function orange_partner_summary_report(PDO $pdo, bool $includeAging, ?int $countryId = null): array
 {
     orange_catalog_ensure_schema($pdo);
+    require_once __DIR__ . '/countries.php';
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_admin_context_country_id($pdo);
+    }
+    $custCountrySql = orange_sql_country_and_fragment($pdo, 'customers', 'customers', $countryId);
+    $supCountrySql = orange_sql_country_and_fragment($pdo, 'suppliers', 'suppliers', $countryId);
 
     $custCols = 'id, name_ar, phone';
     if (orange_table_has_column($pdo, 'customers', 'credit_limit')) {
         $custCols .= ', credit_limit';
     }
-    $customers = $pdo->query('SELECT ' . $custCols . ' FROM customers ORDER BY name_ar ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
+    $customers = $pdo->query('SELECT ' . $custCols . ' FROM customers WHERE 1=1' . $custCountrySql . ' ORDER BY name_ar ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
     $customersOut = [];
     foreach ($customers as $c) {
         $id = (int) $c['id'];
@@ -322,7 +328,7 @@ function orange_partner_summary_report(PDO $pdo, bool $includeAging): array
     }
 
     $suppliers = orange_table_exists($pdo, 'suppliers')
-        ? $pdo->query('SELECT id, name, phone FROM suppliers ORDER BY name ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC)
+        ? $pdo->query('SELECT id, name, phone FROM suppliers WHERE 1=1' . $supCountrySql . ' ORDER BY name ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC)
         : [];
     $suppliersOut = [];
     foreach ($suppliers as $s) {
@@ -350,10 +356,14 @@ function orange_partner_summary_report(PDO $pdo, bool $includeAging): array
 /**
  * @return array<string, mixed>|null
  */
-function orange_partner_gl_reconcile(PDO $pdo, int $fyId): ?array
+function orange_partner_gl_reconcile(PDO $pdo, int $fyId, ?int $countryId = null): ?array
 {
     if ($fyId <= 0 || !orange_journal_vouchers_ready($pdo)) {
         return null;
+    }
+    require_once __DIR__ . '/countries.php';
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_admin_context_country_id($pdo);
     }
 
     $arId = orange_gl_account_id($pdo, 'ar_credit');
@@ -375,14 +385,34 @@ function orange_partner_gl_reconcile(PDO $pdo, int $fyId): ?array
     $subAr = 0.0;
     $subAp = 0.0;
     if (orange_table_exists($pdo, 'party_subledger')) {
-        $st = $pdo->query(
-            "SELECT COALESCE(SUM(debit - credit), 0) FROM party_subledger WHERE party_kind = 'customer'"
-        );
-        $subAr = round((float) $st->fetchColumn(), 4);
-        $st2 = $pdo->query(
-            "SELECT COALESCE(SUM(credit - debit), 0) FROM party_subledger WHERE party_kind = 'supplier'"
-        );
-        $subAp = round((float) $st2->fetchColumn(), 4);
+        if ($countryId > 0 && orange_table_has_country_id($pdo, 'customers')) {
+            $st = $pdo->prepare(
+                "SELECT COALESCE(SUM(ps.debit - ps.credit), 0) FROM party_subledger ps
+                 INNER JOIN customers c ON c.id = ps.party_id
+                 WHERE ps.party_kind = 'customer' AND c.country_id = ?"
+            );
+            $st->execute([$countryId]);
+            $subAr = round((float) $st->fetchColumn(), 4);
+        } else {
+            $st = $pdo->query(
+                "SELECT COALESCE(SUM(debit - credit), 0) FROM party_subledger WHERE party_kind = 'customer'"
+            );
+            $subAr = round((float) $st->fetchColumn(), 4);
+        }
+        if ($countryId > 0 && orange_table_has_country_id($pdo, 'suppliers')) {
+            $st2 = $pdo->prepare(
+                "SELECT COALESCE(SUM(ps.credit - ps.debit), 0) FROM party_subledger ps
+                 INNER JOIN suppliers s ON s.id = ps.party_id
+                 WHERE ps.party_kind = 'supplier' AND s.country_id = ?"
+            );
+            $st2->execute([$countryId]);
+            $subAp = round((float) $st2->fetchColumn(), 4);
+        } else {
+            $st2 = $pdo->query(
+                "SELECT COALESCE(SUM(credit - debit), 0) FROM party_subledger WHERE party_kind = 'supplier'"
+            );
+            $subAp = round((float) $st2->fetchColumn(), 4);
+        }
     }
 
     return [

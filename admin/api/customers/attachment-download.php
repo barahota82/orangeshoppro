@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/customer_attachments.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 
 require_admin_api();
 
@@ -27,6 +28,12 @@ try {
     if (!$row) {
         http_response_code(404);
         exit('Not found');
+    }
+    try {
+        orange_admin_assert_entity_country($pdo, 'customers', $customerId);
+    } catch (RuntimeException $e) {
+        http_response_code(403);
+        exit('Forbidden');
     }
     $list = orange_customer_attachment_decode_list((string) ($row['attachments_json'] ?? ''));
     $found = null;

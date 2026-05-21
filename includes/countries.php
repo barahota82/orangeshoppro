@@ -621,6 +621,37 @@ function orange_country_provision_operational(PDO $pdo, int $countryId): array
     return $out;
 }
 
+function orange_product_country_id(PDO $pdo, int $productId): int
+{
+    if ($productId <= 0) {
+        return orange_countries_default_id($pdo);
+    }
+    if (!orange_table_has_country_id($pdo, 'products')) {
+        return orange_countries_default_id($pdo);
+    }
+    $st = $pdo->prepare('SELECT country_id FROM products WHERE id = ? LIMIT 1');
+    $st->execute([$productId]);
+    $cid = (int) ($st->fetchColumn() ?: 0);
+
+    return $cid > 0 ? $cid : orange_countries_default_id($pdo);
+}
+
+function orange_country_document_ref(PDO $pdo, string $prefix, int $serial, int $countryId): string
+{
+    $prefix = strtoupper(trim($prefix));
+    if ($countryId > 0) {
+        $row = orange_country_row_by_id($pdo, $countryId, false);
+        if ($row !== null) {
+            $code = strtoupper(orange_countries_normalize_code((string) ($row['code'] ?? '')));
+            if ($code !== '') {
+                return $prefix . '-' . $code . '-' . $serial;
+            }
+        }
+    }
+
+    return $prefix . '-' . $serial;
+}
+
 /**
  * @throws RuntimeException
  */

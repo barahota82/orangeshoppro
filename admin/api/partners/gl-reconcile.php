@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../../includes/party_allocations.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -19,7 +20,7 @@ try {
             $fyId = (int) $years[0]['id'];
         }
     }
-    $rep = orange_partner_gl_reconcile($pdo, $fyId);
+    $rep = orange_partner_gl_reconcile($pdo, $fyId, orange_admin_context_country_id($pdo));
     if ($rep === null) {
         json_response([
             'success' => false,
