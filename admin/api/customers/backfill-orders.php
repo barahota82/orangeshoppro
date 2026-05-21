@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -18,16 +19,34 @@ try {
     }
 
     $hasPay = orange_table_has_column($pdo, 'orders', 'payment_terms');
-    $sql = 'SELECT id, customer_name, phone FROM orders WHERE TRIM(phone) <> \'\' AND (customer_id IS NULL OR customer_id = 0)';
+    $hasOrderCountry = orange_table_has_country_id($pdo, 'orders');
+    $ctxCountry = orange_admin_context_country_id($pdo);
+    $sql = 'SELECT id, customer_name, phone';
+    if ($hasOrderCountry) {
+        $sql .= ', country_id';
+    }
+    $sql .= ' FROM orders WHERE TRIM(phone) <> \'\' AND (customer_id IS NULL OR customer_id = 0)';
+    $params = [];
     if ($hasPay) {
         $sql .= " AND LOWER(TRIM(COALESCE(payment_terms, 'cash'))) = 'credit'";
     }
-    $st = $pdo->query($sql);
+    if ($hasOrderCountry && $ctxCountry > 0) {
+        $sql .= ' AND country_id = ?';
+        $params[] = $ctxCountry;
+    }
+    $st = $pdo->prepare($sql);
+    $st->execute($params);
     $rows = $st->fetchAll(PDO::FETCH_ASSOC);
     $updated = 0;
     foreach ($rows as $r) {
         $oid = (int) $r['id'];
-        $cid = orange_ensure_customer($pdo, (string) ($r['customer_name'] ?? ''), (string) ($r['phone'] ?? ''));
+        $orderCountryId = $hasOrderCountry ? (int) ($r['country_id'] ?? 0) : 0;
+        $cid = orange_ensure_customer(
+            $pdo,
+            (string) ($r['customer_name'] ?? ''),
+            (string) ($r['phone'] ?? ''),
+            $orderCountryId > 0 ? $orderCountryId : null
+        );
         if ($cid > 0) {
             $pdo->prepare('UPDATE orders SET customer_id = ? WHERE id = ?')->execute([$cid, $oid]);
             ++$updated;

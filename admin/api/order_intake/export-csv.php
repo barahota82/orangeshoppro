@@ -9,6 +9,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/admin_permissions.php';
+require_once __DIR__ . '/../../../includes/order_intake_queue.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -31,14 +33,21 @@ try {
         $status = 'all';
     }
 
-    $sql = 'SELECT id, public_token, status, order_id, order_number, error_message, attempts, created_at, updated_at, payload_json
-            FROM order_intake_queue WHERE 1=1';
+    $intakeScope = orange_order_intake_sql_country_scope($pdo, 'oiq');
+    $sql = 'SELECT oiq.id, oiq.public_token, oiq.status, oiq.order_id, oiq.order_number, oiq.error_message, oiq.attempts, oiq.created_at, oiq.updated_at, oiq.payload_json
+            FROM order_intake_queue oiq';
     $params = [];
+    if ($intakeScope !== null) {
+        $sql .= $intakeScope['join'] . ' WHERE 1=1' . $intakeScope['where'];
+        $params = $intakeScope['params'];
+    } else {
+        $sql .= ' WHERE 1=1';
+    }
     if ($status !== 'all') {
-        $sql .= ' AND status = ?';
+        $sql .= ' AND oiq.status = ?';
         $params[] = $status;
     }
-    $sql .= ' ORDER BY id DESC LIMIT 8000';
+    $sql .= ' ORDER BY oiq.id DESC LIMIT 8000';
 
     $st = $pdo->prepare($sql);
     $st->execute($params);

@@ -8,6 +8,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/order_intake_queue.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -21,12 +23,26 @@ try {
     $max = (int) ($data['max'] ?? 25);
     $max = max(1, min(200, $max));
 
-    $upd = $pdo->prepare(
-        "UPDATE order_intake_queue SET status = 'pending', error_message = NULL, attempts = 0,
+    $scope = orange_order_intake_sql_country_scope($pdo, 'oiq');
+    if ($scope !== null) {
+        $upd = $pdo->prepare(
+            'UPDATE order_intake_queue oiq'
+            . $scope['join']
+            . " SET oiq.status = 'pending', oiq.error_message = NULL, oiq.attempts = 0,
+         oiq.order_id = NULL, oiq.order_number = NULL, oiq.whatsapp_url = NULL, oiq.whatsapp_number = NULL
+         WHERE oiq.status = 'failed'"
+            . $scope['where']
+            . " ORDER BY oiq.id ASC LIMIT {$max}"
+        );
+        $upd->execute($scope['params']);
+    } else {
+        $upd = $pdo->prepare(
+            "UPDATE order_intake_queue SET status = 'pending', error_message = NULL, attempts = 0,
          order_id = NULL, order_number = NULL, whatsapp_url = NULL, whatsapp_number = NULL
          WHERE status = 'failed' ORDER BY id ASC LIMIT {$max}"
-    );
-    $upd->execute();
+        );
+        $upd->execute();
+    }
     $n = $upd->rowCount();
 
     audit_log(

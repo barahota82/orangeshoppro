@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
+require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/order_intake_queue.php';
 
 /**
  * @param array<int, array<string, mixed>> $rows
@@ -88,11 +90,23 @@ $counts = ['pending' => 0, 'failed' => 0, 'completed' => 0, 'total' => 0];
 $rows = [];
 
 if (orange_table_exists($pdo, 'order_intake_queue')) {
+    $intakeScope = orange_order_intake_sql_country_scope($pdo, 'oiq');
     try {
-        $cst = $pdo->query(
-            "SELECT status, COUNT(*) AS c FROM order_intake_queue GROUP BY status"
-        )->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($cst as $c) {
+        if ($intakeScope !== null) {
+            $cst = $pdo->prepare(
+                'SELECT oiq.status, COUNT(*) AS c FROM order_intake_queue oiq'
+                . $intakeScope['join']
+                . ' WHERE 1=1'
+                . $intakeScope['where']
+                . ' GROUP BY oiq.status'
+            );
+            $cst->execute($intakeScope['params']);
+        } else {
+            $cst = $pdo->query(
+                'SELECT status, COUNT(*) AS c FROM order_intake_queue GROUP BY status'
+            );
+        }
+        foreach ($cst->fetchAll(PDO::FETCH_ASSOC) as $c) {
             $k = (string) ($c['status'] ?? '');
             $counts[$k] = (int) ($c['c'] ?? 0);
             $counts['total'] += (int) ($c['c'] ?? 0);
@@ -101,14 +115,20 @@ if (orange_table_exists($pdo, 'order_intake_queue')) {
         $counts = ['pending' => 0, 'failed' => 0, 'completed' => 0, 'total' => 0];
     }
 
-    $sql = 'SELECT id, public_token, status, order_id, order_number, error_message, attempts, created_at, updated_at, payload_json
-            FROM order_intake_queue WHERE 1=1';
+    $sql = 'SELECT oiq.id, oiq.public_token, oiq.status, oiq.order_id, oiq.order_number, oiq.error_message, oiq.attempts, oiq.created_at, oiq.updated_at, oiq.payload_json
+            FROM order_intake_queue oiq';
     $params = [];
+    if ($intakeScope !== null) {
+        $sql .= $intakeScope['join'] . ' WHERE 1=1' . $intakeScope['where'];
+        $params = $intakeScope['params'];
+    } else {
+        $sql .= ' WHERE 1=1';
+    }
     if ($statusFilter !== 'all') {
-        $sql .= ' AND status = ?';
+        $sql .= ' AND oiq.status = ?';
         $params[] = $statusFilter;
     }
-    $sql .= ' ORDER BY id DESC LIMIT 250';
+    $sql .= ' ORDER BY oiq.id DESC LIMIT 250';
     $st = $pdo->prepare($sql);
     $st->execute($params);
     $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];

@@ -5,6 +5,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/admin_permissions.php';
+require_once __DIR__ . '/../../../includes/order_intake_queue.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -36,6 +38,12 @@ try {
     }
     if (($row['status'] ?? '') !== 'failed') {
         json_response(['success' => false, 'message' => 'يُسمح بحذف صفوف بحالة «فاشل» فقط'], 422);
+    }
+
+    try {
+        orange_admin_assert_order_intake_id($pdo, $id);
+    } catch (RuntimeException $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
     $del = $pdo->prepare("DELETE FROM order_intake_queue WHERE id = ? AND status = 'failed'");

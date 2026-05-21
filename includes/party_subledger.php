@@ -428,7 +428,7 @@ function orange_customer_credit_sale_civil_check(PDO $pdo, int $customerId, stri
  * **س15:** الإثراء الاختياري عبر `orange_ensure_customer_with_profile()` لنقل المنطقة/العنوان/البريد
  * مع سياسة عدم الكتابة فوق حقل غير فارغ بقيمة فارغة، وعدم تغيير الكود/الملاحظات.
  */
-function orange_ensure_customer(PDO $pdo, string $nameAr, string $phone): int
+function orange_ensure_customer(PDO $pdo, string $nameAr, string $phone, ?int $countryId = null): int
 {
     require_once __DIR__ . '/phone_validation.php';
     orange_catalog_ensure_schema($pdo);
@@ -441,15 +441,25 @@ function orange_ensure_customer(PDO $pdo, string $nameAr, string $phone): int
     }
     $phone = $phoneNorm;
     $nameAr = trim($nameAr);
-    $st = $pdo->prepare('SELECT id FROM customers WHERE phone = ? LIMIT 1');
-    $st->execute([$phone]);
+    $hasCustCountry = orange_table_has_country_id($pdo, 'customers');
+    if ($hasCustCountry && $countryId !== null && $countryId > 0) {
+        $st = $pdo->prepare('SELECT id FROM customers WHERE phone = ? AND country_id = ? LIMIT 1');
+        $st->execute([$phone, $countryId]);
+    } else {
+        $st = $pdo->prepare('SELECT id FROM customers WHERE phone = ? LIMIT 1');
+        $st->execute([$phone]);
+    }
     $id = $st->fetchColumn();
     if ($id) {
         $pdo->prepare('UPDATE customers SET name_ar = ? WHERE id = ?')->execute([$nameAr !== '' ? $nameAr : 'عميل', (int) $id]);
 
         return (int) $id;
     }
-    $pdo->prepare('INSERT INTO customers (name_ar, phone) VALUES (?, ?)')->execute([$nameAr ?: 'عميل', $phone]);
+    if ($hasCustCountry && $countryId !== null && $countryId > 0) {
+        $pdo->prepare('INSERT INTO customers (name_ar, phone, country_id) VALUES (?, ?, ?)')->execute([$nameAr ?: 'عميل', $phone, $countryId]);
+    } else {
+        $pdo->prepare('INSERT INTO customers (name_ar, phone) VALUES (?, ?)')->execute([$nameAr ?: 'عميل', $phone]);
+    }
 
     return (int) $pdo->lastInsertId();
 }

@@ -5,6 +5,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/admin_permissions.php';
+require_once __DIR__ . '/../../../includes/order_intake_queue.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -31,16 +33,38 @@ try {
     $completedDays = max(1, min(3650, $completedDays));
     $failedDays = max(1, min(3650, $failedDays));
 
-    $delCompleted = $pdo->prepare(
-        "DELETE FROM order_intake_queue WHERE status = 'completed' AND created_at < DATE_SUB(NOW(), INTERVAL ? DAY) LIMIT {$maxRows}"
-    );
-    $delCompleted->execute([$completedDays]);
-    $nCompleted = $delCompleted->rowCount();
+    $scope = orange_order_intake_sql_country_scope($pdo, 'oiq');
+    if ($scope !== null) {
+        $delCompleted = $pdo->prepare(
+            'DELETE oiq FROM order_intake_queue oiq'
+            . $scope['join']
+            . " WHERE oiq.status = 'completed' AND oiq.created_at < DATE_SUB(NOW(), INTERVAL ? DAY)"
+            . $scope['where']
+            . " LIMIT {$maxRows}"
+        );
+        $delCompleted->execute(array_merge([$completedDays], $scope['params']));
+        $nCompleted = $delCompleted->rowCount();
 
-    $delFailed = $pdo->prepare(
-        "DELETE FROM order_intake_queue WHERE status = 'failed' AND updated_at < DATE_SUB(NOW(), INTERVAL ? DAY) LIMIT {$maxRows}"
-    );
-    $delFailed->execute([$failedDays]);
+        $delFailed = $pdo->prepare(
+            'DELETE oiq FROM order_intake_queue oiq'
+            . $scope['join']
+            . " WHERE oiq.status = 'failed' AND oiq.updated_at < DATE_SUB(NOW(), INTERVAL ? DAY)"
+            . $scope['where']
+            . " LIMIT {$maxRows}"
+        );
+        $delFailed->execute(array_merge([$failedDays], $scope['params']));
+    } else {
+        $delCompleted = $pdo->prepare(
+            "DELETE FROM order_intake_queue WHERE status = 'completed' AND created_at < DATE_SUB(NOW(), INTERVAL ? DAY) LIMIT {$maxRows}"
+        );
+        $delCompleted->execute([$completedDays]);
+        $nCompleted = $delCompleted->rowCount();
+
+        $delFailed = $pdo->prepare(
+            "DELETE FROM order_intake_queue WHERE status = 'failed' AND updated_at < DATE_SUB(NOW(), INTERVAL ? DAY) LIMIT {$maxRows}"
+        );
+        $delFailed->execute([$failedDays]);
+    }
     $nFailed = $delFailed->rowCount();
 
     audit_log(

@@ -20,7 +20,7 @@ try {
 
     $processed = 0;
     for ($i = 0; $i < $count; ++$i) {
-        if (!orange_order_intake_process_next($pdo)) {
+        if (!orange_order_intake_process_next($pdo, true)) {
             break;
         }
         ++$processed;

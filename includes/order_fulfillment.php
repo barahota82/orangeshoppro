@@ -576,10 +576,15 @@ function orange_order_reverse_completed_fulfillment(PDO $pdo, int $orderId, stri
             $customerIdForAr = (int) ($order['customer_id'] ?? 0);
         }
         if ($customerIdForAr <= 0) {
+            $orderCountryId = 0;
+            if (orange_table_has_country_id($pdo, 'orders')) {
+                $orderCountryId = (int) ($order['country_id'] ?? 0);
+            }
             $customerIdForAr = orange_ensure_customer(
                 $pdo,
                 (string) ($order['customer_name'] ?? ''),
-                (string) ($order['phone'] ?? '')
+                (string) ($order['phone'] ?? ''),
+                $orderCountryId > 0 ? $orderCountryId : null
             );
         }
     }

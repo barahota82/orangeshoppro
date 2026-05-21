@@ -42,6 +42,110 @@ function orange_order_intake_error_for_queue(Throwable $e): string
 }
 
 /**
+ * دولة صف الطابور: قناة الحمولة، ثم الطلب المرتبط، ثم الدولة الافتراضية.
+ *
+ * @param array<string, mixed> $row
+ */
+function orange_order_intake_row_country_id(PDO $pdo, array $row): int
+{
+    $payload = json_decode((string) ($row['payload_json'] ?? ''), true);
+    if (is_array($payload) && isset($payload['channel_id'])) {
+        $chCid = orange_country_id_for_channel($pdo, (int) $payload['channel_id']);
+        if ($chCid > 0) {
+            return $chCid;
+        }
+    }
+    $orderId = (int) ($row['order_id'] ?? 0);
+    if ($orderId > 0 && orange_table_has_country_id($pdo, 'orders')) {
+        $st = $pdo->prepare('SELECT country_id FROM orders WHERE id = ? LIMIT 1');
+        $st->execute([$orderId]);
+        $oc = (int) ($st->fetchColumn() ?: 0);
+        if ($oc > 0) {
+            return $oc;
+        }
+    }
+
+    return orange_countries_default_id($pdo);
+}
+
+/**
+ * @param array<string, mixed> $row
+ */
+function orange_order_intake_row_matches_context(PDO $pdo, array $row, ?int $contextCountryId = null): bool
+{
+    if ($contextCountryId === null) {
+        $contextCountryId = orange_admin_context_country_id($pdo);
+    }
+    if ($contextCountryId <= 0) {
+        return true;
+    }
+
+    return orange_order_intake_row_country_id($pdo, $row) === $contextCountryId;
+}
+
+/**
+ * @throws RuntimeException
+ */
+function orange_admin_assert_order_intake_id(PDO $pdo, int $queueId): void
+{
+    $ctx = orange_admin_context_country_id($pdo);
+    if ($ctx <= 0 || $queueId <= 0) {
+        return;
+    }
+    $st = $pdo->prepare('SELECT id, payload_json, order_id FROM order_intake_queue WHERE id = ? LIMIT 1');
+    $st->execute([$queueId]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        throw new RuntimeException('صف الطابور غير موجود.');
+    }
+    if (!orange_order_intake_row_matches_context($pdo, $row, $ctx)) {
+        throw new RuntimeException('السجل لا يتبع الدولة المختارة في لوحة التحكم.');
+    }
+}
+
+/**
+ * @param array<int, array<string, mixed>> $rows
+ * @return array<int, array<string, mixed>>
+ */
+function orange_order_intake_filter_rows_by_context(PDO $pdo, array $rows): array
+{
+    $ctx = orange_admin_context_country_id($pdo);
+    if ($ctx <= 0) {
+        return $rows;
+    }
+
+    return array_values(array_filter(
+        $rows,
+        static fn (array $r): bool => orange_order_intake_row_matches_context($pdo, $r, $ctx)
+    ));
+}
+
+/**
+ * فلترة SQL لطابور الطلبات حسب channel_id في payload_json (بند 13).
+ *
+ * @return array{join:string, where:string, params:list<int>}|null
+ */
+function orange_order_intake_sql_country_scope(PDO $pdo, string $alias = 'oiq', ?int $countryId = null): ?array
+{
+    if ($countryId === null) {
+        $countryId = orange_admin_context_country_id($pdo);
+    }
+    if ($countryId <= 0 || !orange_channels_has_country_column($pdo)) {
+        return null;
+    }
+    $defaultCid = orange_countries_default_id($pdo);
+    $a = trim($alias) !== '' ? trim($alias) : 'oiq';
+    $chAlias = $a . '_ch';
+
+    return [
+        'join' => ' LEFT JOIN channels ' . $chAlias . ' ON ' . $chAlias . '.id = CAST(JSON_UNQUOTE(JSON_EXTRACT('
+            . $a . '.payload_json, \'$.channel_id\')) AS UNSIGNED) ',
+        'where' => ' AND COALESCE(NULLIF(' . $chAlias . '.country_id, 0), ' . (int) $defaultCid . ') = ? ',
+        'params' => [$countryId],
+    ];
+}
+
+/**
  * Upsert customer by phone for storefront checkout (phone = unique key for the customer row).
  * Updates name, area, address, email from the latest order; appends order notes to customer notes.
  */
@@ -574,16 +678,26 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
 
 /**
  * Process the oldest pending intake job (FIFO). Uses one transaction with SAVEPOINT so order failure marks the queue row failed.
+ *
+ * @param bool $respectAdminCountry when true, only dequeue rows for orange_admin_context_country_id()
  */
-function orange_order_intake_process_next(PDO $pdo): bool
+function orange_order_intake_process_next(PDO $pdo, bool $respectAdminCountry = false): bool
 {
     $pdo->beginTransaction();
     $qid = 0;
     try {
+        $scope = $respectAdminCountry ? orange_order_intake_sql_country_scope($pdo, 'oiq') : null;
+        $join = $scope['join'] ?? '';
+        $whereExtra = $scope['where'] ?? '';
+        $scopeParams = $scope['params'] ?? [];
         $sel = $pdo->prepare(
-            "SELECT id, payload_json FROM order_intake_queue WHERE status = 'pending' ORDER BY id ASC LIMIT 1 FOR UPDATE"
+            'SELECT oiq.id, oiq.payload_json FROM order_intake_queue oiq'
+            . $join
+            . " WHERE oiq.status = 'pending'"
+            . $whereExtra
+            . ' ORDER BY oiq.id ASC LIMIT 1 FOR UPDATE'
         );
-        $sel->execute();
+        $sel->execute($scopeParams);
         $row = $sel->fetch(PDO::FETCH_ASSOC);
         if (!$row) {
             $pdo->commit();

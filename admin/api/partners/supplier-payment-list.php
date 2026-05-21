@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -15,10 +16,13 @@ try {
         json_response(['success' => true, 'ids' => []]);
     }
 
+    $countryBind = orange_gl_voucher_country_bind($pdo, 'jv');
     $st = $pdo->prepare(
-        "SELECT id FROM journal_vouchers WHERE entry_type = 'supplier_payment' ORDER BY id ASC"
+        "SELECT jv.id FROM journal_vouchers jv WHERE jv.entry_type = 'supplier_payment'"
+        . $countryBind['sql']
+        . ' ORDER BY jv.id ASC'
     );
-    $st->execute();
+    $st->execute($countryBind['params']);
     $ids = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN) ?: []);
 
     json_response(['success' => true, 'ids' => $ids]);

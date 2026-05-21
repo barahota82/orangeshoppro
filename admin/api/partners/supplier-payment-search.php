@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -39,6 +40,12 @@ try {
     if ($dateTo !== '') {
         $where[] = 'v.voucher_date <= ?';
         $params[] = $dateTo;
+    }
+
+    $countryBind = orange_gl_voucher_country_bind($pdo, 'v');
+    if ($countryBind['sql'] !== '') {
+        $where[] = ltrim($countryBind['sql'], ' AND ');
+        $params = array_merge($params, $countryBind['params']);
     }
 
     $sql = 'SELECT v.id, v.voucher_date, v.reference, v.description,

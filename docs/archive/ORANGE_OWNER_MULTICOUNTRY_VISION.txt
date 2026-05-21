@@ -168,4 +168,6 @@ ORANGE — رؤية المالك: تعدد الدول والقنوات والج�
 
 **تنفيذ (13 — مرحلة 9 — ذمم ومردودات ومخزن):** فلترة **`orange_partner_summary_report`** و**`orange_partner_gl_reconcile`** بالدولة؛ **`assert`** على **`partners/aging`**, **`open-items`**, مرفقات العملاء/الموردين، **`sales_returns/create`**, **`purchase_returns/create`**, **`purchases/create`** (مورد)؛ أرقام مردود **`SR-{code}-`**, **`PR-{code}-`**؛ مخزن الدولة في **`sales_return_helpers`** و**`purchase_return_helpers`**.
 
+**تنفيذ (13 — مرحلة 10 — طابور الطلبات + سندات المورد + backfill):** **`orange_order_intake_sql_country_scope`** + **`orange_admin_assert_order_intake_id`** في **`includes/order_intake_queue.php`**؛ فلترة شاشة/APIs الطابور (**`order_intake_queue`**, **`retry`**, **`delete`**, **`cleanup`**, **`retry-bulk-failed`**, **`export-csv`**, **`process-next`** scoped)؛ **`orange_gl_voucher_country_bind`** على **`partners/supplier-payment-list`** و**`supplier-payment-search`**؛ **`customers/backfill-orders`** + **`orange_ensure_customer(..., countryId)`** scoped بالدولة.
+
 نهاية الملف.
