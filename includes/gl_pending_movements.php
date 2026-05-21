@@ -91,6 +91,48 @@ function orange_gl_pending_apply_country_from_hook(array &$vh, ?string $hookJson
     }
 }
 
+function orange_gl_pending_hook_country_id(?string $hookJson): int
+{
+    if ($hookJson === null || trim($hookJson) === '') {
+        return 0;
+    }
+    $decoded = json_decode($hookJson, true);
+    if (!is_array($decoded)) {
+        return 0;
+    }
+
+    return isset($decoded['_country_id']) ? (int) $decoded['_country_id'] : 0;
+}
+
+function orange_gl_pending_row_visible_for_country(array $row, int $ctxCountryId): bool
+{
+    if ($ctxCountryId <= 0) {
+        return true;
+    }
+    $hookCid = orange_gl_pending_hook_country_id(trim((string) ($row['after_post_json'] ?? '')));
+    if ($hookCid <= 0) {
+        return true;
+    }
+
+    return $hookCid === $ctxCountryId;
+}
+
+/**
+ * @throws RuntimeException
+ */
+function orange_gl_pending_assert_admin_country(PDO $pdo, array $row): void
+{
+    require_once __DIR__ . '/countries.php';
+    $ctx = orange_admin_context_country_id($pdo);
+    if ($ctx <= 0) {
+        return;
+    }
+    $hookCid = orange_gl_pending_hook_country_id(trim((string) ($row['after_post_json'] ?? '')));
+    if ($hookCid > 0 && $hookCid !== $ctx) {
+        throw new RuntimeException('الحركة لا تتبع الدولة المختارة في لوحة التحكم.');
+    }
+}
+
 function orange_gl_after_post_json_with_country(?string $afterJson, int $countryId): ?string
 {
     if ($countryId <= 0) {
@@ -338,7 +380,17 @@ function orange_gl_pending_list(PDO $pdo, string $status, ?string $dateFrom, ?st
     $st->execute($params);
     $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 
-    return is_array($rows) ? $rows : [];
+    $rows = is_array($rows) ? $rows : [];
+    require_once __DIR__ . '/countries.php';
+    $ctxCountryId = orange_admin_context_country_id($pdo);
+    if ($ctxCountryId > 0) {
+        $rows = array_values(array_filter(
+            $rows,
+            static fn (array $r): bool => orange_gl_pending_row_visible_for_country($r, $ctxCountryId)
+        ));
+    }
+
+    return $rows;
 }
 
 /**
@@ -439,6 +491,7 @@ function orange_gl_pending_post_by_ids(PDO $pdo, array $ids): array
                 $pdo->rollBack();
                 continue;
             }
+            orange_gl_pending_assert_admin_country($pdo, $row);
             $desc = (string) $row['description'];
             $multi = (int) ($row['multi_line'] ?? 0) === 1;
             $linesRaw = trim((string) ($row['voucher_lines_json'] ?? ''));
@@ -539,6 +592,7 @@ function orange_gl_pending_unpost_by_ids(PDO $pdo, array $ids): array
                 $pdo->rollBack();
                 continue;
             }
+            orange_gl_pending_assert_admin_country($pdo, $row);
             $vid = (int) ($row['journal_voucher_id'] ?? 0);
             if ($vid <= 0) {
                 $pdo->prepare(
@@ -700,6 +754,7 @@ function orange_gl_pending_movement_preview(PDO $pdo, int $pendingId): array
     if (!$row) {
         throw new InvalidArgumentException('الحركة غير موجودة.');
     }
+    orange_gl_pending_assert_admin_country($pdo, $row);
     $meta = [
         'id' => (int) $row['id'],
         'reference' => (string) ($row['reference'] ?? ''),

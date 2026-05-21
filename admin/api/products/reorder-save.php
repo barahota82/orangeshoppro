@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -19,10 +20,11 @@ try {
     $u = $pdo->prepare('UPDATE products SET sort_order = ? WHERE id = ?');
     $sort = 1;
     foreach ($ids as $id) {
-        $id = (int)$id;
+        $id = (int) $id;
         if ($id > 0) {
+            orange_admin_assert_entity_country($pdo, 'products', $id);
             $u->execute([$sort, $id]);
-            $sort++;
+            ++$sort;
         }
     }
     $pdo->commit();

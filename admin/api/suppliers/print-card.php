@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 
 require_admin_page();
 
@@ -28,6 +29,12 @@ $row = $st->fetch(PDO::FETCH_ASSOC);
 if (!$row) {
     http_response_code(404);
     exit('Supplier not found');
+}
+try {
+    orange_admin_assert_entity_country($pdo, 'suppliers', $supplierId);
+} catch (RuntimeException $e) {
+    http_response_code(403);
+    exit($e->getMessage());
 }
 
 $companyName = '';

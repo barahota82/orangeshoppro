@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 /**
@@ -21,6 +22,9 @@ try {
 
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
+
+    $adminCountryId = orange_admin_context_country_id($pdo);
+    $custCountryFilter = orange_sql_filter_country_id($pdo, 'customers', 'c', $adminCountryId);
 
     if (!orange_table_exists($pdo, 'customers')) {
         json_response(['success' => false, 'message' => 'جدول العملاء غير متوفر'], 500);
@@ -51,6 +55,11 @@ try {
         }
         $sql = 'SELECT ' . $cols . ' FROM customers c';
         $params = [];
+        $whereParts = [];
+        if ($custCountryFilter !== null) {
+            $whereParts[] = ltrim($custCountryFilter['sql'], ' AND ');
+            $params[] = $custCountryFilter['param'];
+        }
         if ($q !== '') {
             $like = '%' . $q . '%';
             $conds = ['c.name_ar LIKE ?', 'c.phone LIKE ?'];
@@ -60,7 +69,10 @@ try {
                 $conds[] = 'c.code LIKE ?';
                 $params[] = $like;
             }
-            $sql .= ' WHERE (' . implode(' OR ', $conds) . ')';
+            $whereParts[] = '(' . implode(' OR ', $conds) . ')';
+        }
+        if ($whereParts !== []) {
+            $sql .= ' WHERE ' . implode(' AND ', $whereParts);
         }
         $sql .= ' ORDER BY c.id DESC LIMIT 80';
         $st = $pdo->prepare($sql);
@@ -92,7 +104,18 @@ try {
     // اسم المنطقة عند ربطه بـ delivery_area_id.
     $areaIndex = [];
     if ($hasDaId && orange_table_exists($pdo, 'delivery_areas')) {
-        $daSt = $pdo->query('SELECT id, name_ar, name_en, is_active FROM delivery_areas');
+        $daSql = 'SELECT id, name_ar, name_en, is_active FROM delivery_areas';
+        $daParams = [];
+        if (orange_delivery_areas_has_country_column($pdo) && $adminCountryId > 0) {
+            $daSql .= ' WHERE country_id = ?';
+            $daParams[] = $adminCountryId;
+        }
+        if ($daParams === []) {
+            $daSt = $pdo->query($daSql);
+        } else {
+            $daSt = $pdo->prepare($daSql);
+            $daSt->execute($daParams);
+        }
         if ($daSt) {
             while ($daRow = $daSt->fetch(PDO::FETCH_ASSOC)) {
                 $areaIndex[(int) $daRow['id']] = [
@@ -104,7 +127,20 @@ try {
         }
     }
 
-    $cust = $pdo->query('SELECT c.* FROM customers c ORDER BY c.id ASC')->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $custListSql = 'SELECT c.* FROM customers c WHERE 1=1';
+    $custListParams = [];
+    if ($custCountryFilter !== null) {
+        $custListSql .= $custCountryFilter['sql'];
+        $custListParams[] = $custCountryFilter['param'];
+    }
+    $custListSql .= ' ORDER BY c.id ASC';
+    if ($custListParams === []) {
+        $cust = $pdo->query($custListSql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } else {
+        $custListSt = $pdo->prepare($custListSql);
+        $custListSt->execute($custListParams);
+        $cust = $custListSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
 
     // معرّفات حسابات الواجهة والمعرّفات الكاملة (load once).
     $sfAccountByCustomerId = [];
@@ -129,10 +165,12 @@ try {
     $orderStatsByCustomerId = [];
     if ($hasOrdersLink) {
         try {
+            $ordersCountrySql = orange_sql_country_and_fragment($pdo, 'orders', '', $adminCountryId);
             $oSt = $pdo->query(
                 'SELECT customer_id, COUNT(*) AS cnt, MAX(created_at) AS last_at
-                 FROM orders WHERE customer_id IS NOT NULL AND customer_id > 0
-                 GROUP BY customer_id'
+                 FROM orders WHERE customer_id IS NOT NULL AND customer_id > 0'
+                . $ordersCountrySql
+                . ' GROUP BY customer_id'
             );
             if ($oSt) {
                 while ($oRow = $oSt->fetch(PDO::FETCH_ASSOC)) {

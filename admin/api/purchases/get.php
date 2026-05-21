@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 $purchaseId = (int) ($_GET['purchase_id'] ?? 0);
@@ -23,6 +24,11 @@ $st->execute([$purchaseId]);
 $purchase = $st->fetch(PDO::FETCH_ASSOC);
 if (!$purchase) {
     json_response(['success' => false, 'message' => 'الفاتورة غير موجودة'], 404);
+}
+try {
+    orange_admin_assert_entity_country($pdo, 'purchases', $purchaseId);
+} catch (RuntimeException $e) {
+    json_response(['success' => false, 'message' => $e->getMessage()], 403);
 }
 
 $purRef = 'PUR-' . $purchaseId;

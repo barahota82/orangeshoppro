@@ -4,11 +4,24 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/upload_paths.php';
+require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 
 require_admin_api();
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     json_response(['success' => false, 'message' => 'Method not allowed'], 405);
+}
+
+$productId = (int) ($_POST['product_id'] ?? $_GET['product_id'] ?? 0);
+if ($productId > 0) {
+    $pdo = db();
+    orange_catalog_ensure_schema($pdo);
+    try {
+        orange_admin_assert_entity_country($pdo, 'products', $productId);
+    } catch (RuntimeException $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 403);
+    }
 }
 
 if (!isset($_FILES['image']) || !is_array($_FILES['image'])) {
