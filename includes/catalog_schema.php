@@ -4175,6 +4175,34 @@ function orange_catalog_country_gl_accounts_v49_satisfied(PDO $pdo): bool
 }
 
 /**
+ * ربط السجلات القديمة (country_id NULL/0) بدولة الكويت — بعد إضافة العمود.
+ */
+function orange_catalog_backfill_kuwait_country_ids(PDO $pdo, int $kwId): void
+{
+    if ($kwId <= 0) {
+        return;
+    }
+    $tables = [
+        'customers', 'suppliers', 'purchases', 'products',
+        'journal_vouchers', 'channels', 'delivery_areas',
+        'cart_promotions', 'cart_gift_promotions', 'cart_bogo_promotions', 'cart_combo_promotions',
+        'storefront_accounts', 'admins',
+        'orange_gl_account_settings', 'orange_gl_setting_alloc',
+        'orders', 'stock_movements', 'accounts',
+    ];
+    foreach ($tables as $tbl) {
+        if (!orange_table_exists($pdo, $tbl) || !orange_table_has_column($pdo, $tbl, 'country_id')) {
+            continue;
+        }
+        orange_catalog_safe_exec(
+            $pdo,
+            'UPDATE ' . $tbl . ' SET country_id = ' . (int) $kwId
+            . ' WHERE country_id IS NULL OR country_id = 0'
+        );
+    }
+}
+
+/**
  * إصلاح idempotent: يضيف country_id ويملأ الكويت — يُشغَّل كل مرة حتى لو سُجّل الترحيل سابقاً وفشل ALTER.
  */
 function orange_catalog_ensure_country_id_columns(PDO $pdo): void
@@ -4203,13 +4231,6 @@ function orange_catalog_ensure_country_id_columns(PDO $pdo): void
             );
             orange_schema_invalidate_column_check($tbl, 'country_id');
         }
-        if ($kwId > 0) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'UPDATE ' . $tbl . ' SET country_id = ' . (int) $kwId
-                . ' WHERE country_id IS NULL OR country_id = 0'
-            );
-        }
     }
 
     if (orange_table_exists($pdo, 'orders')) {
@@ -4229,21 +4250,15 @@ function orange_catalog_ensure_country_id_columns(PDO $pdo): void
             orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_orders_warehouse_id ON orders (warehouse_id)');
             orange_schema_invalidate_column_check('orders', 'warehouse_id');
         }
-        if ($kwId > 0) {
+        if ($kwId > 0 && orange_table_exists($pdo, 'warehouses')) {
             orange_catalog_safe_exec(
                 $pdo,
-                'UPDATE orders SET country_id = ' . (int) $kwId . ' WHERE country_id IS NULL OR country_id = 0'
+                'UPDATE orders o
+                 INNER JOIN warehouses w ON w.country_id = ' . (int) $kwId . ' AND w.is_default = 1
+                 SET o.warehouse_id = w.id
+                 WHERE (o.warehouse_id IS NULL OR o.warehouse_id = 0)
+                   AND (o.country_id = ' . (int) $kwId . ' OR o.country_id IS NULL)'
             );
-            if (orange_table_exists($pdo, 'warehouses')) {
-                orange_catalog_safe_exec(
-                    $pdo,
-                    'UPDATE orders o
-                     INNER JOIN warehouses w ON w.country_id = ' . (int) $kwId . ' AND w.is_default = 1
-                     SET o.warehouse_id = w.id
-                     WHERE (o.warehouse_id IS NULL OR o.warehouse_id = 0)
-                       AND (o.country_id = ' . (int) $kwId . ' OR o.country_id IS NULL)'
-                );
-            }
         }
     }
 
@@ -4264,12 +4279,7 @@ function orange_catalog_ensure_country_id_columns(PDO $pdo): void
             orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_stock_movements_warehouse_id ON stock_movements (warehouse_id)');
             orange_schema_invalidate_column_check('stock_movements', 'warehouse_id');
         }
-        if ($kwId > 0) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'UPDATE stock_movements SET country_id = ' . (int) $kwId . ' WHERE country_id IS NULL OR country_id = 0'
-            );
-            if (orange_table_exists($pdo, 'warehouses')) {
+        if ($kwId > 0 && orange_table_exists($pdo, 'warehouses')) {
                 orange_catalog_safe_exec(
                     $pdo,
                     'UPDATE stock_movements sm
@@ -4277,7 +4287,6 @@ function orange_catalog_ensure_country_id_columns(PDO $pdo): void
                      SET sm.warehouse_id = w.id
                      WHERE (sm.warehouse_id IS NULL OR sm.warehouse_id = 0)'
                 );
-            }
         }
     }
 
@@ -4293,14 +4302,9 @@ function orange_catalog_ensure_country_id_columns(PDO $pdo): void
             );
             orange_schema_invalidate_column_check('accounts', 'country_id');
         }
-        if ($kwId > 0) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'UPDATE accounts SET country_id = ' . (int) $kwId
-                . ' WHERE country_id IS NULL OR country_id = 0'
-            );
-        }
     }
+
+    orange_catalog_backfill_kuwait_country_ids($pdo, $kwId);
 }
 
 /** مرة واحدة لكل طلب — يُستدعى حتى عند تخطّي بوابة APCu/OK flag. */

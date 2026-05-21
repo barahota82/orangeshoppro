@@ -320,12 +320,32 @@ if (orange_table_exists($pdo, 'suppliers')) {
     }
 }
 $count = count($rows);
+$supplierCtxCountryRow = orange_country_row_by_id($pdo, $supplierAdminCountryId, false);
+$supplierCtxCountryLabel = '';
+if (is_array($supplierCtxCountryRow)) {
+    $supplierCtxCountryLabel = trim((string) ($supplierCtxCountryRow['name_ar'] ?? ''));
+    if ($supplierCtxCountryLabel === '') {
+        $supplierCtxCountryLabel = trim((string) ($supplierCtxCountryRow['name_en'] ?? ''));
+    }
+}
+$supplierKwCountryId = orange_countries_default_id($pdo);
 ?>
 <div class="page-title page-title--stacked">
     <div>
         <h1>الموردين</h1>
     </div>
 </div>
+
+<?php if ($count === 0 && orange_table_has_country_id($pdo, 'suppliers')): ?>
+<div class="card-hint" style="margin:0 0 14px;padding:12px 14px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;color:#0c4a6e;line-height:1.55;">
+    لا موردين في سياق <strong><?php echo htmlspecialchars($supplierCtxCountryLabel !== '' ? $supplierCtxCountryLabel : orange_admin_context_country_code($pdo), ENT_QUOTES, 'UTF-8'); ?></strong>.
+    <?php if ($supplierAdminCountryId !== $supplierKwCountryId): ?>
+    بيانات الكويت الحالية تظهر عند اختيار <strong>الكويت</strong> من قائمة «الدولة» أعلى لوحة التحكم.
+    <?php else: ?>
+    إن كان لديك موردون سابقاً واختفوا بعد ترحيل الدول، حدّث الصفحة بعد <code dir="ltr">git pull</code> — النظام يربط السجلات القديمة بالكويت تلقائياً.
+    <?php endif; ?>
+</div>
+<?php endif; ?>
 
 <?php if ($supplierSchemaBootstrapError !== '' || $supplierSchemaMissingCols): ?>
 <div class="card" style="border:1px solid #fbbf24; background:#fffbeb; color:#92400e;">

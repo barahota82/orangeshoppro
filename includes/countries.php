@@ -610,7 +610,7 @@ function orange_table_has_country_id(PDO $pdo, string $table): bool
 }
 
 /**
- * @return array{sql:string, param:int}|null
+ * @return array{sql:string, param:int, params:list<int>}|null
  */
 function orange_sql_filter_country_id(PDO $pdo, string $table, string $alias, int $countryId): ?array
 {
@@ -618,8 +618,20 @@ function orange_sql_filter_country_id(PDO $pdo, string $table, string $alias, in
         return null;
     }
     $col = trim($alias) !== '' ? trim($alias) . '.country_id' : $table . '.country_id';
+    $kwId = orange_countries_default_id($pdo);
+    if ($kwId > 0 && $countryId === $kwId) {
+        return [
+            'sql' => ' AND (' . $col . ' = ? OR ' . $col . ' IS NULL OR ' . $col . ' = 0)',
+            'param' => $countryId,
+            'params' => [$countryId],
+        ];
+    }
 
-    return ['sql' => ' AND ' . $col . ' = ?', 'param' => $countryId];
+    return [
+        'sql' => ' AND ' . $col . ' = ?',
+        'param' => $countryId,
+        'params' => [$countryId],
+    ];
 }
 
 /**
@@ -634,6 +646,13 @@ function orange_accounts_sql_country_filter(PDO $pdo, string $alias = 'a', ?int 
         return null;
     }
     $col = trim($alias) !== '' ? trim($alias) . '.country_id' : 'accounts.country_id';
+    $kwId = orange_countries_default_id($pdo);
+    if ($kwId > 0 && $countryId === $kwId) {
+        return [
+            'sql' => ' AND (' . $col . ' = ? OR ' . $col . ' IS NULL OR ' . $col . ' = 0)',
+            'params' => [$countryId],
+        ];
+    }
 
     return ['sql' => ' AND ' . $col . ' = ?', 'params' => [$countryId]];
 }
