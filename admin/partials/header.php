@@ -40,13 +40,21 @@ $orangeAdminActiveCountriesNav = array_values(array_filter(
     $orangeAdminCountriesNav,
     static fn (array $row): bool => (int) ($row['is_active'] ?? 0) === 1
 ));
-$orangeAdminCountryCodeNav = 'kw';
+$orangeAdminCountryCodeNav = orange_admin_context_country_code($pdoNav);
+$orangeAdminCountryLabelNav = $orangeAdminCountryCodeNav;
 foreach ($orangeAdminCountriesNav as $ocNav) {
     if ((int) ($ocNav['id'] ?? 0) === $orangeAdminCountryIdNav) {
-        $orangeAdminCountryCodeNav = (string) ($ocNav['code'] ?? 'kw');
+        $ocLabel = trim((string) ($ocNav['name_ar'] ?? ''));
+        if ($ocLabel === '') {
+            $ocLabel = trim((string) ($ocNav['name_en'] ?? ''));
+        }
+        if ($ocLabel !== '') {
+            $orangeAdminCountryLabelNav = $ocLabel;
+        }
         break;
     }
 }
+$orangeAdminCountryScopeReady = orange_admin_country_scope_ready($pdoNav);
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl"<?php echo $orangeSchemaDegradedAttr; ?>>
@@ -54,6 +62,8 @@ foreach ($orangeAdminCountriesNav as $ocNav) {
     <meta charset="UTF-8">
     <title><?php echo htmlspecialchars($orangeAdminCompanyTitle !== '' ? $orangeAdminCompanyTitle . ' — لوحة التحكم' : 'لوحة التحكم', ENT_QUOTES, 'UTF-8'); ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="orange-admin-country" content="<?php echo htmlspecialchars($orangeAdminCountryCodeNav, ENT_QUOTES, 'UTF-8'); ?>">
+    <meta name="orange-admin-country-id" content="<?php echo (int) $orangeAdminCountryIdNav; ?>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
@@ -62,6 +72,17 @@ foreach ($orangeAdminCountriesNav as $ocNav) {
     window.ORANGE_PUBLIC_BASE_PATH = <?php echo json_encode(PUBLIC_BASE_PATH, JSON_UNESCAPED_UNICODE); ?>;
     /** منع تكرار الإرسال: postJSON يعطّل الزر (آخر نقرة أو زر إرسال النموذج) ما لم يُستثنَ بـ data-no-post-guard. */
     window.ORANGE_POSTJSON_INFER_SUBMITTER = true;
+    window.orangeAdminSwitchCountry = function (sel) {
+        if (!sel || !sel.form) {
+            return;
+        }
+        var code = String(sel.value || '').trim();
+        if (code) {
+            var secure = location.protocol === 'https:' ? '; Secure' : '';
+            document.cookie = 'orange_ad_country=' + encodeURIComponent(code) + '; path=/; max-age=' + (3600 * 24 * 400) + '; SameSite=Lax' + secure;
+        }
+        sel.form.submit();
+    };
     </script>
     <script src="<?php echo htmlspecialchars(storefront_public_path(admin_asset_url('/admin/assets/admin.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?php echo htmlspecialchars(storefront_public_path(admin_asset_url('/admin/assets/admin-date-dmy.js')), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
@@ -86,13 +107,14 @@ foreach ($orangeAdminCountriesNav as $ocNav) {
                 </div>
             </div>
             <?php if ($orangeAdminCountryLockedId <= 0 && count($orangeAdminActiveCountriesNav) >= 1): ?>
-            <div class="admin-topbar-country" style="margin-inline-start:auto;display:flex;align-items:center;gap:8px;">
+            <form method="get" action="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php'), ENT_QUOTES, 'UTF-8'); ?>" class="admin-topbar-country" style="margin-inline-start:auto;display:flex;align-items:center;gap:8px;">
+                <input type="hidden" name="page" value="<?php echo htmlspecialchars($orangeAdminPage, ENT_QUOTES, 'UTF-8'); ?>">
                 <label for="admin_topbar_country" style="font-size:13px;color:#64748b;white-space:nowrap;">الدولة</label>
-                <select id="admin_topbar_country" style="min-width:140px;padding:6px 8px;border-radius:8px;border:1px solid #cbd5e1;"
+                <select id="admin_topbar_country" name="admin_country" style="min-width:140px;padding:6px 8px;border-radius:8px;border:1px solid #cbd5e1;"
                     <?php echo count($orangeAdminActiveCountriesNav) <= 1 ? 'disabled title="دولة نشطة واحدة حالياً"' : ''; ?>
-                    onchange="(function(sel){var u=new URL(window.location.href);if(sel.value){u.searchParams.set('admin_country',sel.value);}else{u.searchParams.delete('admin_country');}window.location.href=u.toString();})(this)">
+                    onchange="orangeAdminSwitchCountry(this)">
                     <?php foreach ($orangeAdminActiveCountriesNav as $ocOpt):
-                        $ocCode = (string) ($ocOpt['code'] ?? '');
+                        $ocCode = orange_countries_normalize_code((string) ($ocOpt['code'] ?? ''));
                         if ($ocCode === '') {
                             continue;
                         }
@@ -107,7 +129,10 @@ foreach ($orangeAdminCountriesNav as $ocNav) {
                     </option>
                     <?php endforeach; ?>
                 </select>
-            </div>
+                <span class="admin-topbar-country-ctx" style="font-size:12px;color:#334155;white-space:nowrap;" title="سياق البيانات الحالي">
+                    سياق: <?php echo htmlspecialchars($orangeAdminCountryLabelNav, ENT_QUOTES, 'UTF-8'); ?>
+                </span>
+            </form>
             <?php endif; ?>
             <?php
             /**
@@ -430,6 +455,11 @@ foreach ($orangeAdminCountriesNav as $ocNav) {
             ?>
         </div>
     </header>
+    <?php if (!$orangeAdminCountryScopeReady): ?>
+    <div class="admin-country-scope-warn" role="status" style="margin:0;padding:10px 16px;background:#fef3c7;color:#92400e;font-size:13px;line-height:1.5;border-bottom:1px solid #fcd34d;">
+        تنبيه: أعمدة <code dir="ltr">country_id</code> غير مكتملة على جداول الموردين/العملاء/الحسابات — فصل الدول لن يظهر حتى يكتمل ترحيل المخطط. حدّث الملفات على السيرفر ثم افتح أي صفحة أدمن لإكمال الترحيل التلقائي.
+    </div>
+    <?php endif; ?>
     <div id="admin-nav-drawer" class="admin-nav-drawer" hidden>
         <div class="admin-nav-drawer-inner">
             <nav class="admin-sidebar-nav" aria-label="القائمة — جوال">

@@ -132,13 +132,27 @@ function postJSON(url, payload, opts) {
         submitter.setAttribute('data-orange-postjson-busy', '1');
     }
 
+    var adminCountryHdr = '';
+    try {
+        var countryMeta = document.querySelector('meta[name="orange-admin-country"]');
+        if (countryMeta) {
+            adminCountryHdr = String(countryMeta.getAttribute('content') || '').trim();
+        }
+    } catch (eMeta) {
+        adminCountryHdr = '';
+    }
+    var fetchHeaders = {
+        'Content-Type': 'application/json',
+        Accept: 'application/json'
+    };
+    if (adminCountryHdr) {
+        fetchHeaders['X-Orange-Admin-Country'] = adminCountryHdr;
+    }
+
     var chain = fetch(url, {
         method: 'POST',
         credentials: 'same-origin',
-        headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json'
-        },
+        headers: fetchHeaders,
         body: JSON.stringify(payload)
     })
         .then(async (r) => {
