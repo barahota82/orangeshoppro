@@ -345,6 +345,93 @@ a { text-decoration: none; color: inherit; }
     color: #fff;
     border-color: rgba(253, 186, 116, 0.45);
 }
+.admin-mega-dropdown--country {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.admin-topbar-country-mega {
+    display: inline-flex;
+    align-items: center;
+    margin: 0;
+    flex-shrink: 0;
+}
+.admin-topbar-country-mega__label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #94a3b8;
+    white-space: nowrap;
+}
+.admin-topbar-country-select {
+    display: inline-flex;
+    align-items: center;
+    margin: 0;
+    padding: var(--admin-topbar-nav-pad-y) 28px var(--admin-topbar-nav-pad-y) var(--admin-topbar-nav-pad-x);
+    min-height: var(--admin-topbar-nav-min-h);
+    min-width: 9rem;
+    max-width: min(14rem, 100%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: var(--radius-sm);
+    background-color: rgba(255, 255, 255, 0.06);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23e2e8f0' d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: left 10px center;
+    background-size: 10px 6px;
+    color: #e2e8f0;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: inherit;
+    line-height: 1.35;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+[dir="rtl"] .admin-topbar-country-select {
+    background-position: left 10px center;
+    padding-inline-start: var(--admin-topbar-nav-pad-x);
+    padding-inline-end: 28px;
+}
+.admin-topbar-country-select:hover:not(:disabled) {
+    background-color: rgba(249, 115, 22, 0.22);
+    border-color: rgba(253, 186, 116, 0.45);
+    color: #fff;
+}
+.admin-topbar-country-select:focus {
+    outline: none;
+}
+.admin-topbar-country-select:focus-visible {
+    outline: 2px solid #fdba74;
+    outline-offset: 2px;
+}
+.admin-topbar-country-select:disabled {
+    opacity: 0.72;
+    cursor: default;
+}
+.admin-nav-country-drawer {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.admin-nav-country-drawer__label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 12px;
+    font-weight: 800;
+    color: #94a3b8;
+}
+.admin-nav-country-drawer__select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.06);
+    color: #f1f5f9;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+}
 .admin-mega-dropdown {
     display: inline-flex;
     position: relative;

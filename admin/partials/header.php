@@ -36,10 +36,6 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
 $orangeAdminCountryIdNav = orange_admin_context_country_id($pdoNav);
 $orangeAdminCountryLockedId = orange_admin_session_locked_country_id();
 $orangeAdminCountriesNav = orange_countries_admin_list($pdoNav);
-$orangeAdminActiveCountriesNav = array_values(array_filter(
-    $orangeAdminCountriesNav,
-    static fn (array $row): bool => (int) ($row['is_active'] ?? 0) === 1
-));
 $orangeAdminCountryCodeNav = orange_admin_context_country_code($pdoNav);
 $orangeAdminCountryLabelNav = $orangeAdminCountryCodeNav;
 foreach ($orangeAdminCountriesNav as $ocNav) {
@@ -106,34 +102,6 @@ $orangeAdminCountryScopeReady = orange_admin_country_scope_ready($pdoNav);
                     <div class="admin-sidebar-brand__subtitle">لوحة التحكم المؤسسية</div>
                 </div>
             </div>
-            <?php if ($orangeAdminCountryLockedId <= 0 && count($orangeAdminActiveCountriesNav) >= 1): ?>
-            <form method="get" action="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php'), ENT_QUOTES, 'UTF-8'); ?>" class="admin-topbar-country" style="margin-inline-start:auto;display:flex;align-items:center;gap:8px;">
-                <input type="hidden" name="page" value="<?php echo htmlspecialchars($orangeAdminPage, ENT_QUOTES, 'UTF-8'); ?>">
-                <label for="admin_topbar_country" style="font-size:13px;color:#64748b;white-space:nowrap;">الدولة</label>
-                <select id="admin_topbar_country" name="admin_country" style="min-width:140px;padding:6px 8px;border-radius:8px;border:1px solid #cbd5e1;"
-                    <?php echo count($orangeAdminActiveCountriesNav) <= 1 ? 'disabled title="دولة نشطة واحدة حالياً"' : ''; ?>
-                    onchange="orangeAdminSwitchCountry(this)">
-                    <?php foreach ($orangeAdminActiveCountriesNav as $ocOpt):
-                        $ocCode = orange_countries_normalize_code((string) ($ocOpt['code'] ?? ''));
-                        if ($ocCode === '') {
-                            continue;
-                        }
-                        $ocLabel = trim((string) ($ocOpt['name_ar'] ?? ''));
-                        if ($ocLabel === '') {
-                            $ocLabel = (string) ($ocOpt['name_en'] ?? $ocCode);
-                        }
-                        ?>
-                    <option value="<?php echo htmlspecialchars($ocCode, ENT_QUOTES, 'UTF-8'); ?>"
-                        <?php echo $ocCode === $orangeAdminCountryCodeNav ? 'selected' : ''; ?>>
-                        <?php echo htmlspecialchars($ocLabel, ENT_QUOTES, 'UTF-8'); ?>
-                    </option>
-                    <?php endforeach; ?>
-                </select>
-                <span class="admin-topbar-country-ctx" style="font-size:12px;color:#334155;white-space:nowrap;" title="سياق البيانات الحالي">
-                    سياق: <?php echo htmlspecialchars($orangeAdminCountryLabelNav, ENT_QUOTES, 'UTF-8'); ?>
-                </span>
-            </form>
-            <?php endif; ?>
             <?php
             /**
              * دوال الميجا وجوال تُقيِّم نشاط الرابط بالاعتماد على ?page فقط؛
@@ -479,6 +447,39 @@ $orangeAdminCountryScopeReady = orange_admin_country_scope_ready($pdoNav);
                 echo '<span class="admin-mega-trigger__chev" aria-hidden="true">▼</span>';
                 echo '</button></div>';
             }
+            if ($orangeAdminCountryLockedId <= 0 && orange_admin_is_global($admin) && count($orangeAdminCountriesNav) >= 1):
+                $orangeCountrySelectDisabled = count($orangeAdminCountriesNav) <= 1;
+                ?>
+            <form method="get" action="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php'), ENT_QUOTES, 'UTF-8'); ?>" class="admin-topbar-country-mega">
+                <input type="hidden" name="page" value="<?php echo htmlspecialchars($orangeAdminPage, ENT_QUOTES, 'UTF-8'); ?>">
+                <div class="admin-mega-dropdown admin-mega-dropdown--country">
+                    <label for="admin_topbar_country" class="admin-topbar-country-mega__label">الدولة</label>
+                    <select id="admin_topbar_country" name="admin_country" class="admin-topbar-country-select"
+                        aria-label="اختيار الدولة — سياق شاشات الأدمن"
+                        <?php echo $orangeCountrySelectDisabled ? 'disabled title="دولة واحدة مسجّلة حالياً"' : ''; ?>
+                        onchange="orangeAdminSwitchCountry(this)">
+                        <?php foreach ($orangeAdminCountriesNav as $ocOpt):
+                            $ocCode = orange_countries_normalize_code((string) ($ocOpt['code'] ?? ''));
+                            if ($ocCode === '') {
+                                continue;
+                            }
+                            $ocLabel = trim((string) ($ocOpt['name_ar'] ?? ''));
+                            if ($ocLabel === '') {
+                                $ocLabel = (string) ($ocOpt['name_en'] ?? $ocCode);
+                            }
+                            if ((int) ($ocOpt['is_active'] ?? 0) !== 1) {
+                                $ocLabel .= ' (غير نشطة)';
+                            }
+                            ?>
+                        <option value="<?php echo htmlspecialchars($ocCode, ENT_QUOTES, 'UTF-8'); ?>"
+                            <?php echo $ocCode === $orangeAdminCountryCodeNav ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars($ocLabel, ENT_QUOTES, 'UTF-8'); ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </form>
+            <?php endif;
             echo '</nav>';
             ?>
             <div class="admin-topbar-actions">
@@ -533,6 +534,37 @@ $orangeAdminCountryScopeReady = orange_admin_country_scope_ready($pdoNav);
                 $orangeRenderNavSection('warehouse', 'المخازن والمشتريات', $navWarehousePurchasing);
                 $orangeRenderNavSection('sales', 'المبيعات والعروض', $navSalesPromotions);
                 $orangeRenderNavSection('settings', 'الإعدادات', $navSettings);
+                if ($orangeAdminCountryLockedId <= 0 && orange_admin_is_global($admin) && count($orangeAdminCountriesNav) >= 1):
+                    ?>
+                <div class="admin-nav-country-drawer">
+                    <form method="get" action="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php'), ENT_QUOTES, 'UTF-8'); ?>" class="admin-nav-country-drawer__form">
+                        <input type="hidden" name="page" value="<?php echo htmlspecialchars($orangeAdminPage, ENT_QUOTES, 'UTF-8'); ?>">
+                        <label for="admin_drawer_country" class="admin-nav-country-drawer__label">الدولة — سياق الأدمن</label>
+                        <select id="admin_drawer_country" name="admin_country" class="admin-nav-country-drawer__select"
+                            <?php echo count($orangeAdminCountriesNav) <= 1 ? 'disabled' : ''; ?>
+                            onchange="orangeAdminSwitchCountry(this)">
+                            <?php foreach ($orangeAdminCountriesNav as $ocOpt):
+                                $ocCode = orange_countries_normalize_code((string) ($ocOpt['code'] ?? ''));
+                                if ($ocCode === '') {
+                                    continue;
+                                }
+                                $ocLabel = trim((string) ($ocOpt['name_ar'] ?? ''));
+                                if ($ocLabel === '') {
+                                    $ocLabel = (string) ($ocOpt['name_en'] ?? $ocCode);
+                                }
+                                if ((int) ($ocOpt['is_active'] ?? 0) !== 1) {
+                                    $ocLabel .= ' (غير نشطة)';
+                                }
+                                ?>
+                            <option value="<?php echo htmlspecialchars($ocCode, ENT_QUOTES, 'UTF-8'); ?>"
+                                <?php echo $ocCode === $orangeAdminCountryCodeNav ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($ocLabel, ENT_QUOTES, 'UTF-8'); ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </form>
+                </div>
+                <?php endif;
                 ?>
         </nav>
         </div>
