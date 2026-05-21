@@ -598,18 +598,20 @@ function orange_country_provision_operational(PDO $pdo, int $countryId): array
         $slug = $slug . '-' . $countryId;
     }
 
+    $defaultWhNum = 1;
+
     if (orange_table_has_column($pdo, 'channels', 'channel_kind')) {
         $ins = $pdo->prepare(
             'INSERT INTO channels (name, slug, path_segment, logo, whatsapp_number, warehouse_number, is_active, country_id, channel_kind)
-             VALUES (?, ?, ?, \'\', \'\', \'\', 1, ?, \'web\')'
+             VALUES (?, ?, ?, \'\', \'\', ?, 1, ?, \'web\')'
         );
-        $ins->execute([$chName, $slug, $pathSegment, $countryId]);
+        $ins->execute([$chName, $slug, $pathSegment, $defaultWhNum, $countryId]);
     } else {
         $ins = $pdo->prepare(
             'INSERT INTO channels (name, slug, path_segment, logo, whatsapp_number, warehouse_number, is_active, country_id)
-             VALUES (?, ?, ?, \'\', \'\', \'\', 1, ?)'
+             VALUES (?, ?, ?, \'\', \'\', ?, 1, ?)'
         );
-        $ins->execute([$chName, $slug, $pathSegment, $countryId]);
+        $ins->execute([$chName, $slug, $pathSegment, $defaultWhNum, $countryId]);
     }
     $cid = (int) $pdo->lastInsertId();
     $out['channel_id'] = $cid;

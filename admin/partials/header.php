@@ -85,12 +85,13 @@ foreach ($orangeAdminCountriesNav as $ocNav) {
                     <div class="admin-sidebar-brand__subtitle">لوحة التحكم المؤسسية</div>
                 </div>
             </div>
-            <?php if (count($orangeAdminActiveCountriesNav) > 1 && $orangeAdminCountryLockedId <= 0): ?>
+            <?php if ($orangeAdminCountryLockedId <= 0 && count($orangeAdminActiveCountriesNav) >= 1): ?>
             <div class="admin-topbar-country" style="margin-inline-start:auto;display:flex;align-items:center;gap:8px;">
                 <label for="admin_topbar_country" style="font-size:13px;color:#64748b;white-space:nowrap;">الدولة</label>
                 <select id="admin_topbar_country" style="min-width:140px;padding:6px 8px;border-radius:8px;border:1px solid #cbd5e1;"
+                    <?php echo count($orangeAdminActiveCountriesNav) <= 1 ? 'disabled title="دولة نشطة واحدة حالياً"' : ''; ?>
                     onchange="(function(sel){var u=new URL(window.location.href);if(sel.value){u.searchParams.set('admin_country',sel.value);}else{u.searchParams.delete('admin_country');}window.location.href=u.toString();})(this)">
-                    <?php foreach ($orangeAdminCountriesNav as $ocOpt):
+                    <?php foreach ($orangeAdminActiveCountriesNav as $ocOpt):
                         $ocCode = (string) ($ocOpt['code'] ?? '');
                         if ($ocCode === '') {
                             continue;
