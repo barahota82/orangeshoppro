@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 $pdo = db();
@@ -18,6 +19,18 @@ $st->execute([$returnId]);
 $header = $st->fetch(PDO::FETCH_ASSOC);
 if (!$header) {
     json_response(['success' => false, 'message' => 'غير موجود'], 404);
+}
+
+try {
+    $srCustomerId = (int) ($header['customer_id'] ?? 0);
+    $srOrderId = (int) ($header['order_id'] ?? 0);
+    if ($srCustomerId > 0) {
+        orange_admin_assert_entity_country($pdo, 'customers', $srCustomerId);
+    } elseif ($srOrderId > 0) {
+        orange_admin_assert_entity_country($pdo, 'orders', $srOrderId);
+    }
+} catch (RuntimeException $e) {
+    json_response(['success' => false, 'message' => $e->getMessage()], 403);
 }
 
 $hasV = orange_table_has_column($pdo, 'sales_return_items', 'variant_id');

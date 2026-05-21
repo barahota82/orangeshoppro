@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 47);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 48);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3026,6 +3026,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_country_scope_v45($pdo);
     orange_catalog_migrate_country_accounts_v46($pdo);
     orange_catalog_migrate_country_gl_v47($pdo);
+    orange_catalog_migrate_country_cart_promotions_v48($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
         orange_catalog_safe_exec(
@@ -4367,6 +4368,61 @@ function orange_catalog_migrate_country_gl_v47(PDO $pdo): void
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] country_gl_v47 marker: ' . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * بند 13: country_id على جداول عروض السلة — ترحيل الكويت.
+ */
+function orange_catalog_migrate_country_cart_promotions_v48(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    $marker = 'php_country_cart_promotions_v48';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    $kwId = 0;
+    if (orange_table_exists($pdo, 'countries')) {
+        $stKw = $pdo->prepare('SELECT id FROM countries WHERE code = ? LIMIT 1');
+        $stKw->execute(['kw']);
+        $kwRow = $stKw->fetch(PDO::FETCH_ASSOC);
+        if (is_array($kwRow)) {
+            $kwId = (int) ($kwRow['id'] ?? 0);
+        }
+    }
+
+    $tables = ['cart_promotions', 'cart_gift_promotions', 'cart_bogo_promotions', 'cart_combo_promotions'];
+    foreach ($tables as $tbl) {
+        if (!orange_table_exists($pdo, $tbl)) {
+            continue;
+        }
+        if (!orange_table_has_column($pdo, $tbl, 'country_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE ' . $tbl . ' ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
+            );
+            orange_catalog_safe_exec(
+                $pdo,
+                'CREATE INDEX idx_' . $tbl . '_country_id ON ' . $tbl . ' (country_id)'
+            );
+        }
+        if ($kwId > 0) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE ' . $tbl . ' SET country_id = ' . (int) $kwId
+                . ' WHERE country_id IS NULL OR country_id = 0'
+            );
+        }
+    }
+
+    try {
+        $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+        $ins->execute([$marker]);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] country_cart_promotions_v48 marker: ' . $e->getMessage());
         }
     }
 }

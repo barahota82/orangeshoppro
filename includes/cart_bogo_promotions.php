@@ -7,6 +7,7 @@ require_once __DIR__ . '/catalog_taxonomy_migrate.php';
 require_once __DIR__ . '/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/cart_gift_promotions.php';
 require_once __DIR__ . '/cart_combo_promotions.php';
+require_once __DIR__ . '/cart_promotion_country.php';
 
 /**
  * سعر وحدة بند هدية BOGO بعد تطبيق سياسة التسعير الجزئي (مجاني / نسبة من التجزئة / سعر ثابت / خصم مبلغ من التجزئة).
@@ -109,13 +110,13 @@ function orange_cart_bogo_promotions_admin_list(PDO $pdo): array
     if (!orange_table_exists($pdo, 'cart_bogo_promotions')) {
         return [];
     }
-    $st = $pdo->query(
+    $cid = orange_cart_promotion_admin_country_id($pdo);
+    $bind = orange_cart_promotion_sql_bind($pdo, 'cart_bogo_promotions', '', $cid);
+    $st = $pdo->prepare(
         'SELECT id, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids, gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active
-         FROM cart_bogo_promotions ORDER BY sort_order ASC, id ASC'
+         FROM cart_bogo_promotions WHERE 1=1' . $bind['sql'] . ' ORDER BY sort_order ASC, id ASC'
     );
-    if (!$st) {
-        return [];
-    }
+    $st->execute($bind['params']);
     $out = [];
     while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
         $fix = isset($row['fixed_variant_id']) ? (int) $row['fixed_variant_id'] : 0;
@@ -146,20 +147,20 @@ function orange_cart_bogo_promotions_admin_list(PDO $pdo): array
  * @param list<array{product:array<string,mixed>,qty:int,color:string,size:string,variant_id:int,price:float,cost:float}> $validatedItems
  * @return array<string,mixed>|null
  */
-function orange_cart_bogo_promotion_select_rule(PDO $pdo, array $validatedItems, bool $buyerRegistered): ?array
+function orange_cart_bogo_promotion_select_rule(PDO $pdo, array $validatedItems, bool $buyerRegistered, ?int $countryId = null): ?array
 {
     if (!orange_table_exists($pdo, 'cart_bogo_promotions') || count($validatedItems) === 0) {
         return null;
     }
-    $st = $pdo->query(
+    $cid = orange_cart_promotion_storefront_country_id($pdo, $countryId);
+    $bind = orange_cart_promotion_sql_bind($pdo, 'cart_bogo_promotions', '', $cid);
+    $st = $pdo->prepare(
         "SELECT id, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids, gift_unit_charge_kind, gift_unit_charge_value
          FROM cart_bogo_promotions
-         WHERE is_active = 1
+         WHERE is_active = 1" . $bind['sql'] . "
          ORDER BY sort_order ASC, id ASC"
     );
-    if (!$st) {
-        return null;
-    }
+    $st->execute($bind['params']);
     while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
         if ((int) ($row['requires_registered_account'] ?? 0) === 1 && !$buyerRegistered) {
             continue;
@@ -207,13 +208,14 @@ function orange_cart_bogo_promotion_select_rule(PDO $pdo, array $validatedItems,
 function orange_cart_bogo_register_unlock_teaser_applies(
     PDO $pdo,
     array $validatedItems,
-    bool $buyerIsRegistered
+    bool $buyerIsRegistered,
+    ?int $countryId = null
 ): bool {
     if ($buyerIsRegistered || count($validatedItems) === 0) {
         return false;
     }
-    $asGuest = orange_cart_bogo_promotion_select_rule($pdo, $validatedItems, false);
-    $asReg = orange_cart_bogo_promotion_select_rule($pdo, $validatedItems, true);
+    $asGuest = orange_cart_bogo_promotion_select_rule($pdo, $validatedItems, false, $countryId);
+    $asReg = orange_cart_bogo_promotion_select_rule($pdo, $validatedItems, true, $countryId);
     if ($asReg === null) {
         return false;
     }

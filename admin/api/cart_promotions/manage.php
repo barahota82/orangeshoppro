@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/cart_promotions.php';
+require_once __DIR__ . '/../../../includes/cart_promotion_country.php';
 require_admin_api();
 
 /**
@@ -53,6 +54,12 @@ try {
             json_response(['success' => false, 'message' => 'الخصم لا يجب أن يتجاوز الحد الأدنى للمجموع'], 422);
         }
 
+        try {
+            $insertCountryId = orange_cart_promotion_prepare_admin_save($pdo, 'cart_promotions', $id);
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 403);
+        }
+
         if ($id > 0) {
             $st = $pdo->prepare(
                 'UPDATE cart_promotions SET min_subtotal = ?, discount_amount = ?, requires_registered_account = ?, sort_order = ?, is_active = ? WHERE id = ?'
@@ -60,9 +67,9 @@ try {
             $st->execute([$minSub, $disc, $reqReg, $sortOrder, $isActive, $id]);
         } else {
             $st = $pdo->prepare(
-                'INSERT INTO cart_promotions (min_subtotal, discount_amount, requires_registered_account, sort_order, is_active) VALUES (?, ?, ?, ?, ?)'
+                'INSERT INTO cart_promotions (country_id, min_subtotal, discount_amount, requires_registered_account, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?)'
             );
-            $st->execute([$minSub, $disc, $reqReg, $sortOrder, $isActive]);
+            $st->execute([$insertCountryId, $minSub, $disc, $reqReg, $sortOrder, $isActive]);
         }
 
         json_response(['success' => true, 'message' => 'تم حفظ عرض السلة']);

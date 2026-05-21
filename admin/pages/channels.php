@@ -10,11 +10,14 @@ $pdo = db();
 orange_catalog_ensure_schema($pdo);
 $countriesList = orange_countries_admin_list($pdo);
 $defaultCountryId = orange_countries_default_id($pdo);
+$channelsCountryId = orange_admin_context_country_id($pdo);
+$channelsCountrySql = orange_sql_country_and_fragment($pdo, 'channels', 'c', $channelsCountryId);
 if (orange_channels_has_country_column($pdo) && orange_table_exists($pdo, 'countries')) {
     $channels = $pdo->query(
         'SELECT c.*, co.code AS country_code, co.name_ar AS country_name_ar
          FROM channels c
          LEFT JOIN countries co ON co.id = c.country_id
+         WHERE 1=1' . $channelsCountrySql . '
          ORDER BY c.country_id ASC, c.id ASC'
     )->fetchAll(PDO::FETCH_ASSOC) ?: [];
 } else {
@@ -22,6 +25,7 @@ if (orange_channels_has_country_column($pdo) && orange_table_exists($pdo, 'count
 }
 $channelKinds = orange_channel_kinds_allowed();
 
+$channelFormDefaultCountryId = $channelsCountryId > 0 ? $channelsCountryId : $defaultCountryId;
 $editId = isset($_GET['edit']) ? (int) $_GET['edit'] : 0;
 $editRow = null;
 foreach ($channels as $c) {
@@ -56,7 +60,7 @@ $editIsActive = $editRow ? (int) ($editRow['is_active'] ?? 1) : 1;
                     $coId = (int) ($co['id'] ?? 0);
                     $sel = $editRow
                         ? ((int) ($editRow['country_id'] ?? 0) === $coId)
-                        : ($coId === $defaultCountryId);
+                        : ($coId === $channelFormDefaultCountryId);
                     ?>
                 <option value="<?php echo $coId; ?>"<?php echo $sel ? ' selected' : ''; ?>>
                     <?php echo htmlspecialchars((string) ($co['name_ar'] ?? '') . ' (' . (string) ($co['code'] ?? '') . ')', ENT_QUOTES, 'UTF-8'); ?>

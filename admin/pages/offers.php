@@ -2,10 +2,15 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../includes/countries.php';
+
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
 require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
+
+$offersCountryId = orange_admin_context_country_id($pdo);
+$offersProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $offersCountryId);
 
 $catalogNavUnified = function_exists('orange_catalog_nav_use_unified') && orange_catalog_nav_use_unified($pdo);
 if (
@@ -23,12 +28,12 @@ if (
         INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id AND ucc.is_active = 1
         INNER JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id AND ucs2.is_active = 1
         INNER JOIN departments d ON d.id = ucs2.department_id AND d.is_active = 1
-        WHERE p.is_active = 1
+        WHERE p.is_active = 1' . $offersProductsCountrySql . '
         ORDER BY p.name ASC
     '
     )->fetchAll();
 } else {
-    $products = $pdo->query("SELECT id, name FROM products WHERE is_active = 1 ORDER BY name ASC")->fetchAll();
+    $products = $pdo->query('SELECT id, name FROM products WHERE is_active = 1' . $offersProductsCountrySql . ' ORDER BY name ASC')->fetchAll();
 }
 
 $offers = $pdo->query(
@@ -36,6 +41,7 @@ $offers = $pdo->query(
     SELECT o.*, p.name AS product_name
     FROM offers o
     INNER JOIN products p ON p.id = o.product_id
+    WHERE 1=1' . $offersProductsCountrySql . '
     ORDER BY o.id DESC
 '
 )->fetchAll();

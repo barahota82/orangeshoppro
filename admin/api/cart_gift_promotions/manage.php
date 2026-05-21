@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/cart_gift_promotions.php';
+require_once __DIR__ . '/../../../includes/cart_promotion_country.php';
 require_admin_api();
 
 /**
@@ -97,6 +98,12 @@ try {
             json_response(['success' => false, 'message' => 'قيمة التسعير الجزئي للهدية لا يمكن أن تكون سالبة'], 422);
         }
 
+        try {
+            $insertCountryId = orange_cart_promotion_prepare_admin_save($pdo, 'cart_gift_promotions', $id);
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 403);
+        }
+
         if ($id > 0) {
             $st = $pdo->prepare(
                 'UPDATE cart_gift_promotions SET min_subtotal = ?, requires_registered_account = ?, gift_kind = ?, fixed_variant_id = ?, pool_variant_ids = ?, gift_unit_charge_kind = ?, gift_unit_charge_value = ?, sort_order = ?, is_active = ? WHERE id = ?'
@@ -115,9 +122,10 @@ try {
             ]);
         } else {
             $st = $pdo->prepare(
-                'INSERT INTO cart_gift_promotions (min_subtotal, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids, gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                'INSERT INTO cart_gift_promotions (country_id, min_subtotal, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids, gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
             $st->execute([
+                $insertCountryId,
                 $minSub,
                 $reqReg,
                 $giftKind,

@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../../includes/catalog_taxonomy_migrate.php';
 require_once __DIR__ . '/../../../includes/cart_gift_promotions.php';
 require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/cart_bogo_promotions.php';
+require_once __DIR__ . '/../../../includes/cart_promotion_country.php';
 require_admin_api();
 
 /**
@@ -203,6 +204,12 @@ try {
 
         $catSql = $bogoKind === 'same_category' && $catId > 0 ? $catId : null;
 
+        try {
+            $insertCountryId = orange_cart_promotion_prepare_admin_save($pdo, 'cart_bogo_promotions', $id);
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 403);
+        }
+
         if ($id > 0) {
             $st = $pdo->prepare(
                 'UPDATE cart_bogo_promotions SET bogo_kind = ?, category_id = ?, min_buy_qty = ?, buy_components_json = ?, requires_registered_account = ?, gift_kind = ?, fixed_variant_id = ?, pool_variant_ids = ?, gift_unit_charge_kind = ?, gift_unit_charge_value = ?, sort_order = ?, is_active = ? WHERE id = ?'
@@ -224,9 +231,10 @@ try {
             ]);
         } else {
             $st = $pdo->prepare(
-                'INSERT INTO cart_bogo_promotions (bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids, gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                'INSERT INTO cart_bogo_promotions (country_id, bogo_kind, category_id, min_buy_qty, buy_components_json, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids, gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
             $st->execute([
+                $insertCountryId,
                 $bogoKind,
                 $catSql,
                 $minBuy,

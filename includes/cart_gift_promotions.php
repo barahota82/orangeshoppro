@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/cart_promo_gift_charge.php';
+require_once __DIR__ . '/cart_promotion_country.php';
 
 /**
  * أعلى سعر وحدة ممكن لهدية ترويجية في معاينة العربة (هدية مجموع سلة أو BOGO).
@@ -83,13 +84,13 @@ function orange_cart_gift_promotions_admin_list(PDO $pdo): array
     if (!orange_table_exists($pdo, 'cart_gift_promotions')) {
         return [];
     }
-    $st = $pdo->query(
+    $cid = orange_cart_promotion_admin_country_id($pdo);
+    $bind = orange_cart_promotion_sql_bind($pdo, 'cart_gift_promotions', '', $cid);
+    $st = $pdo->prepare(
         'SELECT id, min_subtotal, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids, gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active
-         FROM cart_gift_promotions ORDER BY sort_order ASC, id ASC'
+         FROM cart_gift_promotions WHERE 1=1' . $bind['sql'] . ' ORDER BY sort_order ASC, id ASC'
     );
-    if (!$st) {
-        return [];
-    }
+    $st->execute($bind['params']);
     $out = [];
     while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
         $fix = isset($row['fixed_variant_id']) ? (int) $row['fixed_variant_id'] : 0;
@@ -116,20 +117,20 @@ function orange_cart_gift_promotions_admin_list(PDO $pdo): array
  *
  * @return array{id:int,gift_kind:string,fixed_variant_id:?int,pool_variant_ids:list<int>}|null
  */
-function orange_cart_gift_promotion_select_rule(PDO $pdo, float $subtotal, bool $buyerRegistered): ?array
+function orange_cart_gift_promotion_select_rule(PDO $pdo, float $subtotal, bool $buyerRegistered, ?int $countryId = null): ?array
 {
     if (!orange_table_exists($pdo, 'cart_gift_promotions')) {
         return null;
     }
-    $st = $pdo->query(
+    $cid = orange_cart_promotion_storefront_country_id($pdo, $countryId);
+    $bind = orange_cart_promotion_sql_bind($pdo, 'cart_gift_promotions', '', $cid);
+    $st = $pdo->prepare(
         "SELECT id, min_subtotal, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids, gift_unit_charge_kind, gift_unit_charge_value
          FROM cart_gift_promotions
-         WHERE is_active = 1
+         WHERE is_active = 1" . $bind['sql'] . "
          ORDER BY min_subtotal DESC, id DESC"
     );
-    if (!$st) {
-        return null;
-    }
+    $st->execute($bind['params']);
     while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
         $min = (float) ($row['min_subtotal'] ?? 0);
         if ($subtotal + 0.00001 < $min) {
@@ -293,13 +294,14 @@ function orange_cart_gift_register_unlock_teaser_applies(
     PDO $pdo,
     float $subtotal,
     bool $buyerIsRegistered,
-    array $validatedItems
+    array $validatedItems,
+    ?int $countryId = null
 ): bool {
     if ($buyerIsRegistered || $subtotal <= 0) {
         return false;
     }
-    $asGuest = orange_cart_gift_promotion_select_rule($pdo, $subtotal, false);
-    $asReg = orange_cart_gift_promotion_select_rule($pdo, $subtotal, true);
+    $asGuest = orange_cart_gift_promotion_select_rule($pdo, $subtotal, false, $countryId);
+    $asReg = orange_cart_gift_promotion_select_rule($pdo, $subtotal, true, $countryId);
     if ($asReg === null) {
         return false;
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 
 require_admin_api();
 
@@ -22,6 +23,12 @@ try {
     $chk->execute([$id]);
     if (!$chk->fetch()) {
         json_response(['success' => false, 'message' => 'القناة غير موجودة'], 404);
+    }
+
+    try {
+        orange_admin_assert_row_country($pdo, 'channels', $id);
+    } catch (RuntimeException $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
     $st = $pdo->prepare('UPDATE channels SET is_active = ? WHERE id = ?');

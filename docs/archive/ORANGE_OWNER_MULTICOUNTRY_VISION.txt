@@ -170,4 +170,6 @@ ORANGE — رؤية المالك: تعدد الدول والقنوات والج�
 
 **تنفيذ (13 — مرحلة 10 — طابور الطلبات + سندات المورد + backfill):** **`orange_order_intake_sql_country_scope`** + **`orange_admin_assert_order_intake_id`** في **`includes/order_intake_queue.php`**؛ فلترة شاشة/APIs الطابور (**`order_intake_queue`**, **`retry`**, **`delete`**, **`cleanup`**, **`retry-bulk-failed`**, **`export-csv`**, **`process-next`** scoped)؛ **`orange_gl_voucher_country_bind`** على **`partners/supplier-payment-list`** و**`supplier-payment-search`**؛ **`customers/backfill-orders`** + **`orange_ensure_customer(..., countryId)`** scoped بالدولة.
 
+**تنفيذ (13 — مرحلة 11 — عروض السلة + قنوات + مردودات):** ترحيل **`orange_catalog_migrate_country_cart_promotions_v48`** (`country_id` على **`cart_promotions`**, **`cart_gift_promotions`**, **`cart_bogo_promotions`**, **`cart_combo_promotions`**)؛ **`includes/cart_promotion_country.php`** + فلترة/حفظ scoped في **`admin/api/cart_*_promotions/manage.php`** و**`includes/cart_*.php`**؛ فلترة **`admin/pages/offers.php`** و**`channels.php`**؛ **`orange_admin_assert_row_country`** على **`channels/toggle-active`**؛ assert على **`sales_returns/get`** و**`purchase_returns/get`**؛ فلترة قائمة **`sales_returns`** الأخيرة بالدولة.
+
 نهاية الملف.

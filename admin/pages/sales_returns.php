@@ -90,6 +90,9 @@ if ($hasSalesReturns) {
     if ($hasCustomers) {
         $recentSql .= ' LEFT JOIN customers c ON c.id = sr.customer_id';
     }
+    if ($srCountryId > 0 && $hasCustomers && orange_table_has_country_id($pdo, 'customers')) {
+        $recentSql .= ' WHERE c.country_id = ' . (int) $srCountryId;
+    }
     $recentSql .= ' ORDER BY sr.id DESC LIMIT 50';
     try {
         $recent = $pdo->query($recentSql)->fetchAll(PDO::FETCH_ASSOC);

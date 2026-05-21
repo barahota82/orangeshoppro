@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
+require_once __DIR__ . '/cart_promotion_country.php';
 
 /**
  * @return list<array{id:int, min_subtotal:float, discount_amount:float, requires_registered_account:int, sort_order:int, is_active:int}>
@@ -12,12 +13,15 @@ function orange_cart_promotions_admin_list(PDO $pdo): array
     if (!orange_table_exists($pdo, 'cart_promotions')) {
         return [];
     }
-    $st = $pdo->query(
+    $cid = orange_cart_promotion_admin_country_id($pdo);
+    $bind = orange_cart_promotion_sql_bind($pdo, 'cart_promotions', '', $cid);
+    $st = $pdo->prepare(
         'SELECT id, min_subtotal, discount_amount, requires_registered_account, sort_order, is_active
-         FROM cart_promotions ORDER BY sort_order ASC, id ASC'
+         FROM cart_promotions WHERE 1=1' . $bind['sql'] . ' ORDER BY sort_order ASC, id ASC'
     );
+    $st->execute($bind['params']);
 
-    return $st ? $st->fetchAll(PDO::FETCH_ASSOC) : [];
+    return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
 }
 
 /**
@@ -26,20 +30,20 @@ function orange_cart_promotions_admin_list(PDO $pdo): array
  *
  * @return array{id:int, discount:float, min_subtotal:float}|null
  */
-function orange_cart_promotion_resolve(PDO $pdo, float $subtotal, bool $buyerIsRegistered): ?array
+function orange_cart_promotion_resolve(PDO $pdo, float $subtotal, bool $buyerIsRegistered, ?int $countryId = null): ?array
 {
     if (!orange_table_exists($pdo, 'cart_promotions')) {
         return null;
     }
-    $st = $pdo->query(
+    $cid = orange_cart_promotion_storefront_country_id($pdo, $countryId);
+    $bind = orange_cart_promotion_sql_bind($pdo, 'cart_promotions', '', $cid);
+    $st = $pdo->prepare(
         "SELECT id, min_subtotal, discount_amount, requires_registered_account
          FROM cart_promotions
-         WHERE is_active = 1
+         WHERE is_active = 1" . $bind['sql'] . "
          ORDER BY min_subtotal DESC, discount_amount DESC, id DESC"
     );
-    if (!$st) {
-        return null;
-    }
+    $st->execute($bind['params']);
     while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
         $min = (float) ($row['min_subtotal'] ?? 0);
         if ($subtotal + 0.00001 < $min) {
@@ -69,17 +73,20 @@ function orange_cart_promotion_resolve(PDO $pdo, float $subtotal, bool $buyerIsR
  *
  * @return array{min_subtotal: float, discount_amount: float}|null
  */
-function orange_cart_promotion_best_registered_only_match(PDO $pdo, float $subtotal): ?array
+function orange_cart_promotion_best_registered_only_match(PDO $pdo, float $subtotal, ?int $countryId = null): ?array
 {
     if (!orange_table_exists($pdo, 'cart_promotions')) {
         return null;
     }
-    $st = $pdo->query(
+    $cid = orange_cart_promotion_storefront_country_id($pdo, $countryId);
+    $bind = orange_cart_promotion_sql_bind($pdo, 'cart_promotions', '', $cid);
+    $st = $pdo->prepare(
         "SELECT min_subtotal, discount_amount
          FROM cart_promotions
-         WHERE is_active = 1 AND requires_registered_account = 1
+         WHERE is_active = 1 AND requires_registered_account = 1" . $bind['sql'] . "
          ORDER BY min_subtotal DESC, discount_amount DESC, id DESC"
     );
+    $st->execute($bind['params']);
     if (!$st) {
         return null;
     }
@@ -107,14 +114,14 @@ function orange_cart_promotion_best_registered_only_match(PDO $pdo, float $subto
  *
  * @return array{you_save_extra: float, discount_amount: float, min_subtotal: float}|null
  */
-function orange_cart_promotion_register_incentive_teaser(PDO $pdo, float $subtotal, bool $buyerIsRegistered): ?array
+function orange_cart_promotion_register_incentive_teaser(PDO $pdo, float $subtotal, bool $buyerIsRegistered, ?int $countryId = null): ?array
 {
     if ($buyerIsRegistered || $subtotal <= 0) {
         return null;
     }
-    $guestPromo = orange_cart_promotion_resolve($pdo, $subtotal, false);
+    $guestPromo = orange_cart_promotion_resolve($pdo, $subtotal, false, $countryId);
     $guestDisc = $guestPromo !== null ? (float) $guestPromo['discount'] : 0.0;
-    $regOnly = orange_cart_promotion_best_registered_only_match($pdo, $subtotal);
+    $regOnly = orange_cart_promotion_best_registered_only_match($pdo, $subtotal, $countryId);
     if ($regOnly === null) {
         return null;
     }

@@ -469,16 +469,16 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
     }
 
     $buyerRegistered = $sfaLink !== null && $sfaLink > 0;
-    $comboPick = orange_cart_combo_best_match($pdo, $validatedItems, $buyerRegistered);
+    $comboPick = orange_cart_combo_best_match($pdo, $validatedItems, $buyerRegistered, $orderCountryId);
     $comboDiscount = $comboPick !== null ? (float) $comboPick['discount'] : 0.0;
     $comboId = $comboPick !== null ? (int) $comboPick['id'] : null;
     $netAfterCombo = max(0.0, round($subtotal - $comboDiscount, 4));
-    $promoPick = orange_cart_promotion_resolve($pdo, $netAfterCombo, $buyerRegistered);
+    $promoPick = orange_cart_promotion_resolve($pdo, $netAfterCombo, $buyerRegistered, $orderCountryId);
     $promoDiscount = $promoPick !== null ? (float) $promoPick['discount'] : 0.0;
     $promoId = $promoPick !== null ? (int) $promoPick['id'] : null;
     $orderTotal = max(0.0, round($netAfterCombo - $promoDiscount, 4));
 
-    $promoBundle = orange_storefront_build_promotional_gift_lines($pdo, $data, $validatedItems, $subtotal, $buyerRegistered);
+    $promoBundle = orange_storefront_build_promotional_gift_lines($pdo, $data, $validatedItems, $subtotal, $buyerRegistered, $orderCountryId);
     $giftLine = $promoBundle['giftLine'];
     $giftPromoId = $promoBundle['giftPromoId'];
     $giftVariantId = $promoBundle['giftVariantId'];

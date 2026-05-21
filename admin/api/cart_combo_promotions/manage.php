@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/cart_combo_promotions.php';
+require_once __DIR__ . '/../../../includes/cart_promotion_country.php';
 require_admin_api();
 
 /**
@@ -111,6 +112,12 @@ try {
             json_response(['success' => false, 'message' => 'تعذر ترميز مكوّنات الكومبو'], 422);
         }
 
+        try {
+            $insertCountryId = orange_cart_promotion_prepare_admin_save($pdo, 'cart_combo_promotions', $id);
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 403);
+        }
+
         if ($id > 0) {
             $st = $pdo->prepare(
                 'UPDATE cart_combo_promotions SET title_ar = ?, title_en = ?, components_json = ?, combo_price = ?, requires_registered_account = ?, sort_order = ?, is_active = ? WHERE id = ?'
@@ -118,9 +125,9 @@ try {
             $st->execute([$titleAr, $titleEn, $json, $comboPrice, $reqReg, $sortOrder, $isActive, $id]);
         } else {
             $st = $pdo->prepare(
-                'INSERT INTO cart_combo_promotions (title_ar, title_en, components_json, combo_price, requires_registered_account, sort_order, is_active) VALUES (?,?,?,?,?,?,?)'
+                'INSERT INTO cart_combo_promotions (country_id, title_ar, title_en, components_json, combo_price, requires_registered_account, sort_order, is_active) VALUES (?,?,?,?,?,?,?,?)'
             );
-            $st->execute([$titleAr, $titleEn, $json, $comboPrice, $reqReg, $sortOrder, $isActive]);
+            $st->execute([$insertCountryId, $titleAr, $titleEn, $json, $comboPrice, $reqReg, $sortOrder, $isActive]);
         }
 
         json_response(['success' => true, 'message' => 'تم حفظ عرض الكومبو']);

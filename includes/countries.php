@@ -672,3 +672,23 @@ function orange_admin_assert_entity_country(PDO $pdo, string $table, int $entity
         throw new RuntimeException('السجل لا يتبع الدولة المختارة في لوحة التحكم.');
     }
 }
+
+/**
+ * @throws RuntimeException
+ */
+function orange_admin_assert_row_country(PDO $pdo, string $table, int $rowId): void
+{
+    if ($rowId <= 0 || !orange_table_has_country_id($pdo, $table)) {
+        return;
+    }
+    $ctx = orange_admin_context_country_id($pdo);
+    if ($ctx <= 0) {
+        return;
+    }
+    $st = $pdo->prepare('SELECT country_id FROM `' . $table . '` WHERE id = ? LIMIT 1');
+    $st->execute([$rowId]);
+    $rowCid = (int) ($st->fetchColumn() ?: 0);
+    if ($rowCid > 0 && $rowCid !== $ctx) {
+        throw new RuntimeException('السجل لا يتبع الدولة المختارة في لوحة التحكم.');
+    }
+}
