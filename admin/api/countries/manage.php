@@ -93,6 +93,7 @@ try {
                 'UPDATE countries SET code = ?, name_ar = ?, name_en = ?, currency_code = ?, is_active = ? WHERE id = ?'
             );
             $st->execute([$code, $nameAr, $nameEn, $currency, $isActive, $id]);
+            $countryId = $id;
         } else {
             $dup = $pdo->prepare('SELECT id FROM countries WHERE code = ? LIMIT 1');
             $dup->execute([$code]);
@@ -104,9 +105,20 @@ try {
                 'INSERT INTO countries (code, name_ar, name_en, currency_code, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?)'
             );
             $st->execute([$code, $nameAr, $nameEn, $currency, $sortOrder, $isActive]);
+            $countryId = (int) $pdo->lastInsertId();
         }
 
-        json_response(['success' => true, 'message' => 'تم حفظ الدولة']);
+        $provision = null;
+        if ($isActive === 1 && $countryId > 0) {
+            $provision = orange_country_provision_operational($pdo, $countryId);
+        }
+
+        json_response([
+            'success' => true,
+            'message' => 'تم حفظ الدولة',
+            'country_id' => $countryId,
+            'provision' => $provision,
+        ]);
     }
 
     json_response(['success' => false, 'message' => 'إجراء غير معروف'], 422);

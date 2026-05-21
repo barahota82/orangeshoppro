@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -22,6 +23,11 @@ try {
     $row = $st->fetch(PDO::FETCH_ASSOC);
     if (!$row) {
         json_response(['success' => false, 'message' => 'الطلب غير موجود'], 404);
+    }
+    try {
+        orange_admin_assert_entity_country($pdo, 'orders', $orderId);
+    } catch (RuntimeException $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
     $total = max(0.0, (float) ($row['total'] ?? 0));
     $paid = max(0.0, (float) ($data['amount_paid'] ?? 0));

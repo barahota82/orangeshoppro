@@ -156,4 +156,10 @@ ORANGE — رؤية المالك: تعدد الدول والقنوات والج�
 
 **تنفيذ (13 — مرحلة 5 — GL scoped):** ترحيل **`orange_catalog_migrate_country_gl_v47`** (`journal_vouchers.country_id`)؛ **`orange_gl_voucher_country_bind`** + **`orange_journal_voucher_stamp_country`** في **`includes/journal_voucher.php`**؛ فلترة تقارير/مجاميع GL؛ فلترة شاشات أدمن تشغيلية متبقية (**`dashboard`**, **`reports`**, **`stock`**, **`manual_order`**, **`sales_returns`**, **`purchase_returns`**, **`channel_analytics`**, شاشات الذمم**)؛ **`country_id`** على قيود تسليم الطلب عبر **`includes/order_fulfillment.php`** و**`includes/gl_pending_movements.php`**.
 
+**تنفيذ (13 — مرحلة 7 — صلاحيات أدمن الدولة):** حقل **`admins.country_id`** في **`admin/api/admins/save.php`** و**`admin/api/admins/list.php`** و**`admin/pages/admin_users.php`** (NULL = أدمن عام؛ قيمة = فريق دولة)؛ يكمّل قفل الجلسة **`admin_country_lock`** المذكور في مرحلة 4–6.
+
+**تنفيذ (13 — مرحلة 8 — تفعيل دولة + تهيئة تشغيلية):** **`orange_country_provision_operational`** في **`includes/countries.php`** (مخزن افتراضي + قناة ويب `{code}-web` idempotent)؛ يُستدعى من **`admin/api/countries/manage.php`** عند **`is_active=1`**؛ نسخ كتalog لكل دولة **لاحقاً**.
+
+**تنفيذ (13 — حماية API + تفرد ضمن الدولة):** **`orange_admin_assert_entity_country`** على مسارات التعديل/الحذف (**`orders/update`**, **`orders/update-status`**, **`orders/update-payment`**, **`customers/save`**, **`customers/delete`**, **`suppliers/save`**, **`products/update`**, **`products/delete`**, **`products/toggle`**, **`purchases/update`**, **`purchases/lines`**, مردودات المبيعات/المشتريات، شاشات الذمم)؛ تفرد **`phone`/`code`/`civil_id`** (عملاء) و**`phone`/`code`/`tax_number`** (موردون) **ضمن `country_id`** في **`save`** APIs؛ فلترة موردي التقرير المالي في **`admin/pages/financial_report.php`**.
+
 نهاية الملف.

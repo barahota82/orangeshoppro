@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../../includes/party_allocations.php';
 require_once __DIR__ . '/../../../includes/document_sequences.php';
 require_once __DIR__ . '/../../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -37,6 +38,11 @@ try {
     $chk->execute([$supplierId]);
     if (!$chk->fetch()) {
         json_response(['success' => false, 'message' => 'المورد غير موجود'], 404);
+    }
+    try {
+        orange_admin_assert_entity_country($pdo, 'suppliers', $supplierId);
+    } catch (RuntimeException $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
     $allowExcess = !empty($data['allow_excess']);

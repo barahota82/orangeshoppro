@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../../includes/purchase_return_helpers.php';
 require_once __DIR__ . '/../../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../../includes/purchase_gl_accounts.php';
 require_once __DIR__ . '/../../../includes/journal_write.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 function reverse_purchase_return_stock(PDO $pdo, int $returnId): void
@@ -90,6 +91,14 @@ try {
     $row = $st->fetch(PDO::FETCH_ASSOC);
     if (!$row) {
         json_response(['success' => false, 'message' => 'مردود المشتريات غير موجود'], 404);
+    }
+    try {
+        $prSupplierId = (int) ($row['supplier_id'] ?? 0);
+        if ($prSupplierId > 0) {
+            orange_admin_assert_entity_country($pdo, 'suppliers', $prSupplierId);
+        }
+    } catch (RuntimeException $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
     $retRef = 'PR-' . $returnId;

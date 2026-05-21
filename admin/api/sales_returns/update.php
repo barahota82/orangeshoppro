@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/sales_return_helpers.php';
 require_once __DIR__ . '/../../../includes/purchase_helpers.php';
 require_once __DIR__ . '/../../../includes/sales_gl_accounts.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 function reverse_sales_return_stock(PDO $pdo, int $returnId): void
@@ -105,6 +106,17 @@ try {
     $row = $st->fetch(PDO::FETCH_ASSOC);
     if (!$row) {
         json_response(['success' => false, 'message' => 'غير موجود'], 404);
+    }
+    try {
+        $srCustomerId = (int) ($row['customer_id'] ?? 0);
+        $srOrderId = (int) ($row['order_id'] ?? 0);
+        if ($srCustomerId > 0) {
+            orange_admin_assert_entity_country($pdo, 'customers', $srCustomerId);
+        } elseif ($srOrderId > 0) {
+            orange_admin_assert_entity_country($pdo, 'orders', $srOrderId);
+        }
+    } catch (RuntimeException $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
     $refRev = 'SR-' . $returnId . '-RS';

@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/party_allocations.php';
 require_once __DIR__ . '/../../../includes/document_sequences.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -36,6 +37,11 @@ try {
     $chk->execute([$customerId]);
     if (!$chk->fetch()) {
         json_response(['success' => false, 'message' => 'العميل غير موجود'], 404);
+    }
+    try {
+        orange_admin_assert_entity_country($pdo, 'customers', $customerId);
+    } catch (RuntimeException $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
     $allowExcess = !empty($data['allow_excess']);

@@ -104,6 +104,11 @@ try {
     if (!$purchase) {
         json_response(['success' => false, 'message' => 'عملية الشراء غير موجودة'], 404);
     }
+    try {
+        orange_admin_assert_entity_country($pdo, 'purchases', $purchaseId);
+    } catch (RuntimeException $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 403);
+    }
 
     $purRef = 'PUR-' . $purchaseId;
     $accRow = orange_accounting_row_by_reference($pdo, $purRef);

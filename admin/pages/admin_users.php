@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $dbAu = db();
 orange_catalog_ensure_schema($dbAu);
 $labels = orange_admin_resource_labels();
+$auCountries = orange_countries_admin_list($dbAu);
 ?>
 <div class="page-title page-title--stacked">
     <div>
@@ -39,6 +41,17 @@ $labels = orange_admin_resource_labels();
             <div class="form-check">
                 <label><input type="checkbox" id="au_super"> مشرف عام (كل الصلاحيات)</label>
             </div>
+            <div>
+                <label for="au_country">دولة الفريق (فارغ = أدمن عام متعدد الدول)</label>
+                <select id="au_country">
+                    <option value="">— عام —</option>
+                    <?php foreach ($auCountries as $auC): ?>
+                    <option value="<?php echo (int) ($auC['id'] ?? 0); ?>">
+                        <?php echo htmlspecialchars(trim((string) ($auC['name_ar'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
         </div>
         <div class="actions" style="margin-top:12px;">
             <button type="button" onclick="saveAdmin()">حفظ المستخدم</button>
@@ -49,7 +62,7 @@ $labels = orange_admin_resource_labels();
         <h3 class="card-title">قائمة المستخدمين</h3>
         <div class="table-wrap">
             <table>
-                <thead><tr><th>#</th><th>الدخول</th><th>الاسم</th><th>نشط</th><th>مشرف</th><th></th></tr></thead>
+                <thead><tr><th>#</th><th>الدخول</th><th>الاسم</th><th>الدولة</th><th>نشط</th><th>مشرف</th><th></th></tr></thead>
                 <tbody id="au_list_tbody"></tbody>
             </table>
         </div>
@@ -89,6 +102,11 @@ function resetAdminForm() {
     document.getElementById('au_pass').value = '';
     document.getElementById('au_active').checked = true;
     document.getElementById('au_super').checked = false;
+    var auCountry = document.getElementById('au_country');
+    if (auCountry) {
+        auCountry.value = '';
+        auCountry.disabled = false;
+    }
     document.getElementById('perm_target_id').value = '0';
     document.getElementById('perm_matrix_tbody').innerHTML = '';
 }
@@ -125,6 +143,7 @@ function loadAdmins() {
             var tr = document.createElement('tr');
             tr.innerHTML =
                 '<td>' + a.id + '</td><td>' + escapeHtml(a.username) + '</td><td>' + escapeHtml(a.display_name || '') + '</td>' +
+                '<td>' + escapeHtml(a.country_label || '—') + '</td>' +
                 '<td>' + (a.is_active == 1 ? 'نعم' : '') + '</td><td>' + (a.is_superuser == 1 ? 'نعم' : '') + '</td>' +
                 '<td><button type="button" class="btn-secondary" onclick="pickAdmin(' + a.id + ')">اختيار</button></td>';
             tb.appendChild(tr);
@@ -144,6 +163,17 @@ function pickAdmin(id) {
         document.getElementById('au_pass').value = '';
         document.getElementById('au_active').checked = a.is_active == 1;
         document.getElementById('au_super').checked = a.is_superuser == 1;
+        var auCountry = document.getElementById('au_country');
+        if (auCountry) {
+            auCountry.value = a.is_superuser == 1 ? '' : String(a.country_id || '');
+            auCountry.disabled = a.is_superuser == 1;
+        }
+        document.getElementById('au_super').onchange = function () {
+            if (auCountry) {
+                auCountry.disabled = this.checked;
+                if (this.checked) auCountry.value = '';
+            }
+        };
         var pm = (r.permissions_by_admin && r.permissions_by_admin[id]) ? r.permissions_by_admin[id] : {};
         if (a.is_superuser == 1) {
             document.getElementById('perm_matrix_tbody').innerHTML = '<tr><td colspan="4" class="muted">مشرف عام — كل الصلاحيات.</td></tr>';
@@ -162,7 +192,8 @@ function saveAdmin() {
         display_name: document.getElementById('au_name').value.trim(),
         password: document.getElementById('au_pass').value,
         is_active: document.getElementById('au_active').checked,
-        is_superuser: document.getElementById('au_super').checked
+        is_superuser: document.getElementById('au_super').checked,
+        country_id: document.getElementById('au_country') ? (parseInt(document.getElementById('au_country').value, 10) || 0) : 0
     };
     if (!payload.username) { alert('اسم الدخول مطلوب'); return; }
     postJSON('/admin/api/admins/save.php', payload).then(function (r) {

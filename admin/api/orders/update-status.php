@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/order_stock.php';
 require_once __DIR__ . '/../../../includes/order_fulfillment.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -30,6 +31,7 @@ try {
     if (!$order) {
         throw new RuntimeException('الطلب غير موجود');
     }
+    orange_admin_assert_entity_country($pdo, 'orders', $orderId);
 
     $prevStatus = (string) ($order['status'] ?? '');
 

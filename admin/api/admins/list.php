@@ -5,15 +5,29 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/admin_permissions.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
-    $stmt = $pdo->query(
-        'SELECT id, username, display_name, is_active, is_superuser, created_at FROM admins ORDER BY id ASC'
-    );
+    $cols = 'id, username, display_name, is_active, is_superuser, created_at';
+    if (orange_table_has_column($pdo, 'admins', 'country_id')) {
+        $cols .= ', country_id';
+    }
+    $stmt = $pdo->query('SELECT ' . $cols . ' FROM admins ORDER BY id ASC');
     $admins = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $countryLabels = [];
+    if (orange_table_exists($pdo, 'countries')) {
+        foreach (orange_countries_admin_list($pdo) as $cRow) {
+            $countryLabels[(int) ($cRow['id'] ?? 0)] = trim((string) ($cRow['name_ar'] ?? ''));
+        }
+    }
+    foreach ($admins as &$aRow) {
+        $cid = isset($aRow['country_id']) ? (int) $aRow['country_id'] : 0;
+        $aRow['country_label'] = $cid > 0 ? ($countryLabels[$cid] ?? ('#' . $cid)) : '';
+    }
+    unset($aRow);
     $perms = [];
     if (orange_table_exists($pdo, 'admin_permissions')) {
         $p = $pdo->query('SELECT admin_id, resource_key, can_view, can_edit, can_delete FROM admin_permissions');

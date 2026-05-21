@@ -353,8 +353,16 @@ try {
 
     if ($phoneSql !== null) {
         if ($idIn > 0) {
-            $dup = $pdo->prepare('SELECT id FROM suppliers WHERE phone = ? AND id != ? LIMIT 1');
-            $dup->execute([$phoneSql, $idIn]);
+            if ($hasSupplierCountry && $supplierAdminCountryId > 0) {
+                $dup = $pdo->prepare('SELECT id FROM suppliers WHERE phone = ? AND country_id = ? AND id != ? LIMIT 1');
+                $dup->execute([$phoneSql, $supplierAdminCountryId, $idIn]);
+            } else {
+                $dup = $pdo->prepare('SELECT id FROM suppliers WHERE phone = ? AND id != ? LIMIT 1');
+                $dup->execute([$phoneSql, $idIn]);
+            }
+        } elseif ($hasSupplierCountry && $supplierAdminCountryId > 0) {
+            $dup = $pdo->prepare('SELECT id FROM suppliers WHERE phone = ? AND country_id = ? LIMIT 1');
+            $dup->execute([$phoneSql, $supplierAdminCountryId]);
         } else {
             $dup = $pdo->prepare('SELECT id FROM suppliers WHERE phone = ? LIMIT 1');
             $dup->execute([$phoneSql]);
@@ -364,13 +372,21 @@ try {
         }
     }
 
-    $assertCodeUnique = static function (int $excludeId) use ($pdo, $codeSql, $hasCode): void {
+    $assertCodeUnique = static function (int $excludeId) use ($pdo, $codeSql, $hasCode, $hasSupplierCountry, $supplierAdminCountryId): void {
         if (!$hasCode || $codeSql === null) {
             return;
         }
         if ($excludeId > 0) {
-            $cd = $pdo->prepare('SELECT id FROM suppliers WHERE code = ? AND id != ? LIMIT 1');
-            $cd->execute([$codeSql, $excludeId]);
+            if ($hasSupplierCountry && $supplierAdminCountryId > 0) {
+                $cd = $pdo->prepare('SELECT id FROM suppliers WHERE code = ? AND country_id = ? AND id != ? LIMIT 1');
+                $cd->execute([$codeSql, $supplierAdminCountryId, $excludeId]);
+            } else {
+                $cd = $pdo->prepare('SELECT id FROM suppliers WHERE code = ? AND id != ? LIMIT 1');
+                $cd->execute([$codeSql, $excludeId]);
+            }
+        } elseif ($hasSupplierCountry && $supplierAdminCountryId > 0) {
+            $cd = $pdo->prepare('SELECT id FROM suppliers WHERE code = ? AND country_id = ? LIMIT 1');
+            $cd->execute([$codeSql, $supplierAdminCountryId]);
         } else {
             $cd = $pdo->prepare('SELECT id FROM suppliers WHERE code = ? LIMIT 1');
             $cd->execute([$codeSql]);
@@ -379,13 +395,21 @@ try {
             json_response(['success' => false, 'message' => 'كود المورد مستخدم بالفعل'], 409);
         }
     };
-    $assertTaxNumberUnique = static function (int $excludeId) use ($pdo, $taxNumberSql, $hasTaxNumber): void {
+    $assertTaxNumberUnique = static function (int $excludeId) use ($pdo, $taxNumberSql, $hasTaxNumber, $hasSupplierCountry, $supplierAdminCountryId): void {
         if (!$hasTaxNumber || $taxNumberSql === null) {
             return;
         }
         if ($excludeId > 0) {
-            $tx = $pdo->prepare('SELECT id FROM suppliers WHERE tax_number = ? AND id != ? LIMIT 1');
-            $tx->execute([$taxNumberSql, $excludeId]);
+            if ($hasSupplierCountry && $supplierAdminCountryId > 0) {
+                $tx = $pdo->prepare('SELECT id FROM suppliers WHERE tax_number = ? AND country_id = ? AND id != ? LIMIT 1');
+                $tx->execute([$taxNumberSql, $supplierAdminCountryId, $excludeId]);
+            } else {
+                $tx = $pdo->prepare('SELECT id FROM suppliers WHERE tax_number = ? AND id != ? LIMIT 1');
+                $tx->execute([$taxNumberSql, $excludeId]);
+            }
+        } elseif ($hasSupplierCountry && $supplierAdminCountryId > 0) {
+            $tx = $pdo->prepare('SELECT id FROM suppliers WHERE tax_number = ? AND country_id = ? LIMIT 1');
+            $tx->execute([$taxNumberSql, $supplierAdminCountryId]);
         } else {
             $tx = $pdo->prepare('SELECT id FROM suppliers WHERE tax_number = ? LIMIT 1');
             $tx->execute([$taxNumberSql]);
@@ -396,6 +420,11 @@ try {
     };
 
     if ($idIn > 0) {
+        try {
+            orange_admin_assert_entity_country($pdo, 'suppliers', $idIn);
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 403);
+        }
         $assertCodeUnique($idIn);
         $assertTaxNumberUnique($idIn);
 

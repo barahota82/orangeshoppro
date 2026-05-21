@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 $purchaseId = (int) ($_GET['purchase_id'] ?? 0);
@@ -22,6 +23,11 @@ $st = $pdo->prepare('SELECT id FROM purchases WHERE id = ? LIMIT 1');
 $st->execute([$purchaseId]);
 if (!$st->fetchColumn()) {
     json_response(['success' => false, 'message' => 'الفاتورة غير موجودة'], 404);
+}
+try {
+    orange_admin_assert_entity_country($pdo, 'purchases', $purchaseId);
+} catch (RuntimeException $e) {
+    json_response(['success' => false, 'message' => $e->getMessage()], 403);
 }
 
 $base = 'SELECT pi.id AS item_id, pi.product_id, pi.qty, pi.qty_received, pr.name AS product_name';

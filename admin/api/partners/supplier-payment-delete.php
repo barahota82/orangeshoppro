@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/party_allocations.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -25,6 +26,11 @@ try {
     $st->execute([$voucherId]);
     if (!$st->fetch()) {
         json_response(['success' => false, 'message' => 'السند غير موجود أو ليس سند سداد مورد'], 404);
+    }
+    try {
+        orange_admin_assert_entity_country($pdo, 'journal_vouchers', $voucherId);
+    } catch (RuntimeException $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
     $pdo->beginTransaction();

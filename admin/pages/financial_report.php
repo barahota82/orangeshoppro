@@ -166,8 +166,9 @@ if ($useVouchers && is_array($fyRow) && isset($fyRow['end_date']) && trim((strin
 $dedicatedSupplierPayableByPartyId = [];
 $supplierFySubrowsByAccountId = [];
 if ($useVouchers && $fyId > 0 && orange_table_has_column($pdo, 'suppliers', 'payable_account_id')) {
+    $frSuppliersCountrySql = orange_sql_country_and_fragment($pdo, 'suppliers', 'suppliers', orange_admin_context_country_id($pdo));
     $supPayRows = $pdo->query(
-        'SELECT id, payable_account_id FROM suppliers WHERE payable_account_id IS NOT NULL AND payable_account_id > 0'
+        'SELECT id, payable_account_id FROM suppliers WHERE payable_account_id IS NOT NULL AND payable_account_id > 0' . $frSuppliersCountrySql
     );
     if ($supPayRows) {
         foreach ($supPayRows->fetchAll(PDO::FETCH_ASSOC) as $sr) {

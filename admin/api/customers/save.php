@@ -260,22 +260,40 @@ try {
             }
             $civilIdSql = (string) $cidClean;
             // فحص تفرّد.
-            $civilDupSql = 'SELECT id FROM customers WHERE civil_id = ?' . ($idIn > 0 ? ' AND id != ?' : '') . ' LIMIT 1';
+            $civilDupSql = 'SELECT id FROM customers WHERE civil_id = ?';
+            $civilDupParams = [$civilIdSql];
+            if ($hasCustCountry && $adminCountryId > 0) {
+                $civilDupSql .= ' AND country_id = ?';
+                $civilDupParams[] = $adminCountryId;
+            }
+            if ($idIn > 0) {
+                $civilDupSql .= ' AND id != ?';
+                $civilDupParams[] = $idIn;
+            }
+            $civilDupSql .= ' LIMIT 1';
             $civilDupSt = $pdo->prepare($civilDupSql);
-            $civilDupSt->execute($idIn > 0 ? [$civilIdSql, $idIn] : [$civilIdSql]);
+            $civilDupSt->execute($civilDupParams);
             if ($civilDupSt->fetchColumn()) {
                 json_response(['success' => false, 'message' => 'الرقم المدني مسجّل لعميل آخر'], 409);
             }
         }
     }
 
-    $assertCodeUnique = static function (int $excludeId) use ($pdo, $codeSql, $hasCode): void {
+    $assertCodeUnique = static function (int $excludeId) use ($pdo, $codeSql, $hasCode, $hasCustCountry, $adminCountryId): void {
         if (!$hasCode || $codeSql === null) {
             return;
         }
         if ($excludeId > 0) {
-            $cd = $pdo->prepare('SELECT id FROM customers WHERE code = ? AND id != ? LIMIT 1');
-            $cd->execute([$codeSql, $excludeId]);
+            if ($hasCustCountry && $adminCountryId > 0) {
+                $cd = $pdo->prepare('SELECT id FROM customers WHERE code = ? AND country_id = ? AND id != ? LIMIT 1');
+                $cd->execute([$codeSql, $adminCountryId, $excludeId]);
+            } else {
+                $cd = $pdo->prepare('SELECT id FROM customers WHERE code = ? AND id != ? LIMIT 1');
+                $cd->execute([$codeSql, $excludeId]);
+            }
+        } elseif ($hasCustCountry && $adminCountryId > 0) {
+            $cd = $pdo->prepare('SELECT id FROM customers WHERE code = ? AND country_id = ? LIMIT 1');
+            $cd->execute([$codeSql, $adminCountryId]);
         } else {
             $cd = $pdo->prepare('SELECT id FROM customers WHERE code = ? LIMIT 1');
             $cd->execute([$codeSql]);
@@ -286,13 +304,23 @@ try {
     };
 
     if ($idIn > 0) {
+        try {
+            orange_admin_assert_entity_country($pdo, 'customers', $idIn);
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 403);
+        }
         $exRow = $pdo->prepare('SELECT id FROM customers WHERE id = ? LIMIT 1');
         $exRow->execute([$idIn]);
         if (!$exRow->fetchColumn()) {
             json_response(['success' => false, 'message' => 'العميل غير موجود'], 404);
         }
-        $dup = $pdo->prepare('SELECT id FROM customers WHERE phone = ? AND id != ? LIMIT 1');
-        $dup->execute([$phone, $idIn]);
+        if ($hasCustCountry && $adminCountryId > 0) {
+            $dup = $pdo->prepare('SELECT id FROM customers WHERE phone = ? AND country_id = ? AND id != ? LIMIT 1');
+            $dup->execute([$phone, $adminCountryId, $idIn]);
+        } else {
+            $dup = $pdo->prepare('SELECT id FROM customers WHERE phone = ? AND id != ? LIMIT 1');
+            $dup->execute([$phone, $idIn]);
+        }
         if ($dup->fetchColumn()) {
             json_response(['success' => false, 'message' => 'هاتف مسجّل لعميل آخر'], 409);
         }
@@ -356,8 +384,13 @@ try {
         return;
     }
 
-    $st = $pdo->prepare('SELECT id FROM customers WHERE phone = ? LIMIT 1');
-    $st->execute([$phone]);
+    if ($hasCustCountry && $adminCountryId > 0) {
+        $st = $pdo->prepare('SELECT id FROM customers WHERE phone = ? AND country_id = ? LIMIT 1');
+        $st->execute([$phone, $adminCountryId]);
+    } else {
+        $st = $pdo->prepare('SELECT id FROM customers WHERE phone = ? LIMIT 1');
+        $st->execute([$phone]);
+    }
     $ex = $st->fetchColumn();
     if ($ex) {
         $id = (int) $ex;

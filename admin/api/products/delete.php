@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -18,6 +20,14 @@ try {
     if (!$productStmt->fetch()) {
         $pdo->rollBack();
         json_response(['success' => false, 'message' => 'المنتج غير موجود'], 404);
+    }
+    try {
+        orange_admin_assert_entity_country($pdo, 'products', $productId);
+    } catch (RuntimeException $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
     $pdo->prepare("DELETE FROM offers WHERE product_id = ?")->execute([$productId]);

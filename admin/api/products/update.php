@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../../includes/product_variants_write.php';
 require_once __DIR__ . '/../../../includes/product_colorway_images.php';
 require_once __DIR__ . '/../../../includes/product_channels.php';
 require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -20,6 +21,11 @@ try {
     $productId = (int)($data['id'] ?? 0);
     if ($productId <= 0) {
         json_response(['success' => false, 'message' => 'معرف المنتج مطلوب'], 422);
+    }
+    try {
+        orange_admin_assert_entity_country($pdo, 'products', $productId);
+    } catch (RuntimeException $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
     if (empty($data['name']) || !isset($data['price']) || !isset($data['cost'])) {

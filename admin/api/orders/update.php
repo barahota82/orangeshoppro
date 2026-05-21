@@ -5,6 +5,7 @@ require_once __DIR__ . '/../../../includes/order_stock.php';
 require_once __DIR__ . '/../../../includes/order_fulfillment.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
 require_once __DIR__ . '/../../../includes/phone_validation.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -21,6 +22,11 @@ try {
     $order = $stmt->fetch();
     if (!$order) {
         json_response(['success' => false, 'message' => 'الطلب غير موجود'], 404);
+    }
+    try {
+        orange_admin_assert_entity_country($pdo, 'orders', $id);
+    } catch (RuntimeException $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
     $status = trim((string)($data['status'] ?? $order['status']));

@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -25,6 +26,11 @@ try {
     $voucher = $st->fetch(PDO::FETCH_ASSOC);
     if (!$voucher) {
         json_response(['success' => false, 'message' => 'السند غير موجود'], 404);
+    }
+    try {
+        orange_admin_assert_entity_country($pdo, 'journal_vouchers', $voucherId);
+    } catch (RuntimeException $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
     $lines = $pdo->prepare('SELECT account_id, debit, credit, memo FROM journal_lines WHERE voucher_id = ? ORDER BY id ASC');

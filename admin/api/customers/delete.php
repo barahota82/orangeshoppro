@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 /**
@@ -31,6 +32,11 @@ try {
     $row = $exSt->fetch(PDO::FETCH_ASSOC);
     if (!$row) {
         json_response(['success' => false, 'message' => 'العميل غير موجود'], 404);
+    }
+    try {
+        orange_admin_assert_entity_country($pdo, 'customers', $idIn);
+    } catch (RuntimeException $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
     // 1) فحص رصيد الذمة.
