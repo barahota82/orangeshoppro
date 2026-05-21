@@ -449,9 +449,9 @@ $orangeAdminCountryScopeReady = orange_admin_country_scope_ready($pdoNav);
             ];
 
             $orangeNavMegaSections = [
+                ['id' => 'accounting', 'title' => 'الحسابات والتقارير', 'muted' => false, 'items' => $navAccountingAll],
                 ['id' => 'warehouse', 'title' => 'المخازن والمشتريات', 'muted' => false, 'items' => $navWarehousePurchasing],
                 ['id' => 'sales', 'title' => 'المبيعات والعروض', 'muted' => false, 'items' => $navSalesPromotions],
-                ['id' => 'accounting', 'title' => 'الحسابات والتقارير', 'muted' => false, 'items' => $navAccountingAll],
                 ['id' => 'settings', 'title' => 'الإعدادات', 'muted' => true, 'items' => $navSettings],
             ];
 
@@ -529,9 +529,9 @@ $orangeAdminCountryScopeReady = orange_admin_country_scope_ready($pdoNav);
                 foreach ($navDashboard as $nl) {
                     $orangeRenderNavLink($nl);
                 }
+                $orangeRenderNavSection('accounting', 'الحسابات والتقارير', $navAccountingAll);
                 $orangeRenderNavSection('warehouse', 'المخازن والمشتريات', $navWarehousePurchasing);
                 $orangeRenderNavSection('sales', 'المبيعات والعروض', $navSalesPromotions);
-                $orangeRenderNavSection('accounting', 'الحسابات والتقارير', $navAccountingAll);
                 $orangeRenderNavSection('settings', 'الإعدادات', $navSettings);
                 ?>
         </nav>
