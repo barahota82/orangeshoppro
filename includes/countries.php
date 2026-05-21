@@ -761,83 +761,15 @@ function orange_delivery_areas_has_country_column(PDO $pdo): bool
 }
 
 /**
- * بند 13.9 — تهيئة تشغيلية عند تفعيل دولة: مخزن افتراضي + قناة ويب (idempotent).
+ * بند 13.9 — تهيئة تشغيلية كاملة عند تفعيل دولة (idempotent).
  *
- * @return array{warehouse_id:int, channel_id:int, created_warehouse:bool, created_channel:bool}
+ * @return array<string,mixed>
  */
 function orange_country_provision_operational(PDO $pdo, int $countryId): array
 {
-    $out = [
-        'warehouse_id' => 0,
-        'channel_id' => 0,
-        'created_warehouse' => false,
-        'created_channel' => false,
-    ];
-    if ($countryId <= 0) {
-        return $out;
-    }
-    require_once __DIR__ . '/warehouses.php';
-    $row = orange_country_row_by_id($pdo, $countryId, false);
-    if ($row === null) {
-        return $out;
-    }
+    require_once __DIR__ . '/country_provision.php';
 
-    $whBefore = 0;
-    if (orange_table_exists($pdo, 'warehouses')) {
-        $stWh = $pdo->prepare('SELECT id FROM warehouses WHERE country_id = ? LIMIT 1');
-        $stWh->execute([$countryId]);
-        $whBefore = (int) ($stWh->fetchColumn() ?: 0);
-    }
-    $wid = orange_warehouse_ensure_default_for_country($pdo, $countryId);
-    $out['warehouse_id'] = $wid;
-    $out['created_warehouse'] = $whBefore <= 0 && $wid > 0;
-
-    if (!orange_table_exists($pdo, 'channels') || !orange_channels_has_country_column($pdo)) {
-        return $out;
-    }
-    $stCh = $pdo->prepare('SELECT id FROM channels WHERE country_id = ? ORDER BY id ASC LIMIT 1');
-    $stCh->execute([$countryId]);
-    $existingCh = (int) ($stCh->fetchColumn() ?: 0);
-    if ($existingCh > 0) {
-        $out['channel_id'] = $existingCh;
-    } else {
-        $code = orange_countries_normalize_code((string) ($row['code'] ?? ''));
-        $nameAr = trim((string) ($row['name_ar'] ?? ''));
-        $nameEn = trim((string) ($row['name_en'] ?? ''));
-        $chName = $nameAr !== '' ? ($nameAr . ' — ويب') : ($nameEn !== '' ? $nameEn . ' — web' : 'Web');
-        $slug = $code !== '' ? $code . '-web' : ('c' . $countryId . '-web');
-        $pathSegment = 'web';
-
-        $dupSlug = $pdo->prepare('SELECT id FROM channels WHERE country_id = ? AND slug = ? LIMIT 1');
-        $dupSlug->execute([$countryId, $slug]);
-        if ($dupSlug->fetchColumn()) {
-            $slug = $slug . '-' . $countryId;
-        }
-
-        $defaultWhNum = 1;
-
-        if (orange_table_has_column($pdo, 'channels', 'channel_kind')) {
-            $ins = $pdo->prepare(
-                'INSERT INTO channels (name, slug, path_segment, logo, whatsapp_number, warehouse_number, is_active, country_id, channel_kind)
-                 VALUES (?, ?, ?, \'\', \'\', ?, 1, ?, \'web\')'
-            );
-            $ins->execute([$chName, $slug, $pathSegment, $defaultWhNum, $countryId]);
-        } else {
-            $ins = $pdo->prepare(
-                'INSERT INTO channels (name, slug, path_segment, logo, whatsapp_number, warehouse_number, is_active, country_id)
-                 VALUES (?, ?, ?, \'\', \'\', ?, 1, ?)'
-            );
-            $ins->execute([$chName, $slug, $pathSegment, $defaultWhNum, $countryId]);
-        }
-        $cid = (int) $pdo->lastInsertId();
-        $out['channel_id'] = $cid;
-        $out['created_channel'] = $cid > 0;
-    }
-
-    require_once __DIR__ . '/country_catalog_copy.php';
-    $out['catalog_copy'] = orange_country_copy_catalog_from_source($pdo, $countryId);
-
-    return $out;
+    return orange_country_provision_full($pdo, $countryId);
 }
 
 function orange_product_country_id(PDO $pdo, int $productId): int

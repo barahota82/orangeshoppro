@@ -160,7 +160,7 @@ $orangeAdminCountryScopeReady = orange_admin_country_scope_ready($pdoNav);
                 if (!orange_admin_nav_visible($admin, $pdoNav, $nl['page'])) {
                     return;
                 }
-                $pinAcct = ($megaSectionId === 'acct_reports' && $orange_nav_acct_reports_need_client_active($nl));
+                $pinAcct = ($megaSectionId === 'accounting' && $orange_nav_acct_reports_need_client_active($nl));
                 $active = !$pinAcct && $orangeNavLinkActive($nl);
                 $cls = trim($nl['class'] . ' admin-mega-link' . ($active ? ' is-active' : ''));
                 $pinAttr = $pinAcct ? ' data-orange-admin-nav-pin="acct-reports"' : '';
@@ -171,7 +171,7 @@ $orangeAdminCountryScopeReady = orange_admin_country_scope_ready($pdoNav);
                 if (!orange_admin_nav_visible($admin, $pdoNav, $nl['page'])) {
                     return;
                 }
-                $pinAcct = ($navSectionId === 'acct_reports' && $orange_nav_acct_reports_need_client_active($nl));
+                $pinAcct = ($navSectionId === 'accounting' && $orange_nav_acct_reports_need_client_active($nl));
                 $active = !$pinAcct && $orangeNavLinkActive($nl);
                 $cls = trim($nl['class'] . ($active ? ' is-active' : ''));
                 $pinAttr = $pinAcct ? ' data-orange-admin-nav-pin="acct-reports"' : '';
@@ -293,104 +293,166 @@ $orangeAdminCountryScopeReady = orange_admin_country_scope_ready($pdoNav);
             ];
 
 
-            /* التقارير المحاسبية — المسميات والترتيب حسب طلب العميل */
-            $navAccountingReports = [
-                ['page' => 'journal_voucher_reports', 'href' => '/admin/index.php?page=journal_voucher_reports', 'label' => 'تقارير السندات', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'partner_account_statement', 'href' => '/admin/index.php?page=partner_account_statement', 'label' => 'كشف حساب', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'chart_of_accounts', 'href' => '/admin/index.php?page=chart_of_accounts', 'label' => 'قائمة الحسابات', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report#report-account-balances', 'label' => 'أرصدة الحسابات', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'report_gl_account_monthly', 'href' => '/admin/index.php?page=report_gl_account_monthly', 'label' => 'الحركة الشهرية لحساب', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'partner_reports', 'href' => '/admin/index.php?page=partner_reports#partner-balances-customers', 'label' => 'أرصدة العملاء (ذمم)', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'partner_reports', 'href' => '/admin/index.php?page=partner_reports#partner-balances-suppliers', 'label' => 'أرصدة الموردين (ذمم)', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'report_income_statement', 'href' => '/admin/index.php?page=report_income_statement', 'label' => 'أرباح وخسائر', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'report_trading_account', 'href' => '/admin/index.php?page=report_trading_account', 'label' => 'قائمة حسابات المتاجرة', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'report_pl_monthly', 'href' => '/admin/index.php?page=report_pl_monthly', 'label' => 'قائمة إيرادات ومصروفات شهرية', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'report_pl_compare_years', 'href' => '/admin/index.php?page=report_pl_compare_years', 'label' => 'أرباح وخسائر مقارنة بين السنوات', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'report_trial_balance', 'href' => '/admin/index.php?page=report_trial_balance', 'label' => 'ميزان المراجعة', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report#report-balance-sheet', 'label' => 'الميزانية', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report', 'label' => 'التقارير المالية (الصفحة كاملة)', 'class' => '', 'sub' => false],
+            /* 4 قوائم منسدلة + إعدادات — مجموعات فرعية داخل كل قائمة */
+            $navWarehousePurchasing = [
+                [
+                    'group' => true,
+                    'title' => 'المخزون',
+                    'items' => [
+                        ['page' => 'stock', 'href' => '/admin/index.php?page=stock', 'label' => 'المستودع', 'class' => '', 'sub' => false],
+                        ['page' => 'opening_stock_balances', 'href' => '/admin/index.php?page=opening_stock_balances', 'label' => 'أرصدة أول المدة المخزنية', 'class' => 'admin-nav-sub', 'sub' => true],
+                    ],
+                ],
+                [
+                    'group' => true,
+                    'title' => 'المشتريات',
+                    'items' => [
+                        ['page' => 'suppliers', 'href' => '/admin/index.php?page=suppliers', 'label' => 'الموردين', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'purchases', 'href' => '/admin/index.php?page=purchases', 'label' => 'المشتريات', 'class' => '', 'sub' => false],
+                        ['page' => 'purchase_returns', 'href' => '/admin/index.php?page=purchase_returns', 'label' => 'مردود المشتريات', 'class' => '', 'sub' => false],
+                    ],
+                ],
+                [
+                    'group' => true,
+                    'title' => 'هيكل الكتalog والمنتجات',
+                    'items' => [
+                        ['page' => 'departments', 'href' => '/admin/index.php?page=departments', 'label' => 'الأقسام الرئيسية', 'class' => '', 'sub' => false],
+                        ['page' => 'unified_catalog_branches', 'href' => '/admin/index.php?page=unified_catalog_branches', 'label' => 'فروع شجرة المنتجات', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'product_types', 'href' => '/admin/index.php?page=product_types', 'label' => 'أنواع المنتجات الموحدة', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'catalog_attributes', 'href' => '/admin/index.php?page=catalog_attributes', 'label' => 'سمات الكتalog', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'color_dictionary', 'href' => '/admin/index.php?page=color_dictionary', 'label' => 'قاموس الألوان', 'class' => '', 'sub' => false],
+                        ['page' => 'pattern_dictionary', 'href' => '/admin/index.php?page=pattern_dictionary', 'label' => 'أنماط الألوان', 'class' => '', 'sub' => false],
+                        ['page' => 'size_scheme_templates', 'href' => '/admin/index.php?page=size_scheme_templates', 'label' => 'قوالب المقاسات', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'sizing_dictionary', 'href' => '/admin/index.php?page=sizing_dictionary', 'label' => 'قاموس هرم المقاسات (1–2)', 'class' => '', 'sub' => false],
+                        ['page' => 'size_families', 'href' => '/admin/index.php?page=size_families', 'label' => 'عائلات المقاسات (3–4)', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'advisory_sizing_guides', 'href' => '/admin/index.php?page=advisory_sizing_guides', 'label' => 'دليل المقاس الاسترشادي', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'products', 'href' => '/admin/index.php?page=products', 'label' => 'المنتجات', 'class' => '', 'sub' => false],
+                    ],
+                ],
             ];
 
-            /* الحسابات العامة: الدليل ثم الإعدادات والسنوات والترحيل وأرصدة أول المدة ثم سند قيد/قبض/صرف/سندات أخرى ثم سداد فواتير الآجل */
-            $navAccounting = [
-                ['page' => 'chart_of_accounts', 'href' => '/admin/index.php?page=chart_of_accounts', 'label' => 'الدليل المحاسبي', 'class' => '', 'sub' => false],
-                ['page' => 'journal_types', 'href' => '/admin/index.php?page=journal_types', 'label' => 'أنواع اليوميات', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'gl_account_settings', 'href' => '/admin/index.php?page=gl_account_settings', 'label' => 'حسابات القيود التلقائية', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'fiscal_years', 'href' => '/admin/index.php?page=fiscal_years', 'label' => 'السنوات المالية', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'gl_posting', 'href' => '/admin/index.php?page=gl_posting', 'label' => 'إقفال الحركات (ترحيل)', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'opening_balances', 'href' => '/admin/index.php?page=opening_balances', 'label' => 'أرصدة أول المدة المالية', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'journal_entries', 'href' => '/admin/index.php?page=journal_entries', 'label' => 'سند قيد', 'class' => '', 'sub' => false],
-                ['page' => 'receipt_voucher', 'href' => '/admin/index.php?page=receipt_voucher', 'label' => 'سند قبض', 'class' => '', 'sub' => false],
-                ['page' => 'payment_voucher', 'href' => '/admin/index.php?page=payment_voucher', 'label' => 'سند صرف', 'class' => '', 'sub' => false],
-                ['page' => 'other_vouchers', 'href' => '/admin/index.php?page=other_vouchers', 'label' => 'سندات أخرى', 'class' => '', 'sub' => false],
-                ['page' => 'partner_customer_receipt', 'href' => '/admin/index.php?page=partner_customer_receipt', 'label' => 'سداد فواتير مبيعات آجلة', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'partner_supplier_payment', 'href' => '/admin/index.php?page=partner_supplier_payment', 'label' => 'سداد فواتير مشتريات آجلة', 'class' => 'admin-nav-sub', 'sub' => true],
+            $navSalesPromotions = [
+                [
+                    'group' => true,
+                    'title' => 'العملاء والطلبات',
+                    'items' => [
+                        ['page' => 'customers', 'href' => '/admin/index.php?page=customers', 'label' => 'العملاء', 'class' => '', 'sub' => false],
+                        ['page' => 'orders', 'href' => '/admin/index.php?page=orders', 'label' => 'الطلبات', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'reserved_orders', 'href' => '/admin/index.php?page=reserved_orders', 'label' => 'طلبات محجوزة (مخزون)', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'order_intake_queue', 'href' => '/admin/index.php?page=order_intake_queue', 'label' => 'طابور الطلبات', 'class' => 'admin-nav-sub', 'sub' => true],
+                    ],
+                ],
+                [
+                    'group' => true,
+                    'title' => 'الفواتير والمردود',
+                    'items' => [
+                        ['page' => 'invoice', 'href' => '/admin/index.php?page=invoice', 'label' => 'فاتورة أونلاين', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'manual_order', 'href' => '/admin/index.php?page=manual_order', 'label' => 'فاتورة مبيعات', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'sales_returns', 'href' => '/admin/index.php?page=sales_returns', 'label' => 'مردود المبيعات', 'class' => '', 'sub' => false],
+                    ],
+                ],
+                [
+                    'group' => true,
+                    'title' => 'العروض',
+                    'items' => [
+                        ['page' => 'offers', 'href' => '/admin/index.php?page=offers', 'label' => 'عروض المنتجات', 'class' => '', 'sub' => false],
+                        ['page' => 'cart_promotions', 'href' => '/admin/index.php?page=cart_promotions', 'label' => 'عروض مجموع السلة', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'cart_gift_promotions', 'href' => '/admin/index.php?page=cart_gift_promotions', 'label' => 'عروض الهدايا (س4)', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'cart_bogo_promotions', 'href' => '/admin/index.php?page=cart_bogo_promotions', 'label' => 'عروض BOGO (س4)', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'cart_combo_promotions', 'href' => '/admin/index.php?page=cart_combo_promotions', 'label' => 'عروض الكومبو', 'class' => 'admin-nav-sub', 'sub' => true],
+                    ],
+                ],
+                [
+                    'group' => true,
+                    'title' => 'تقارير المبيعات',
+                    'items' => [
+                        ['page' => 'reports', 'href' => '/admin/index.php?page=reports', 'label' => 'تقارير المبيعات', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'channel_analytics', 'href' => '/admin/index.php?page=channel_analytics', 'label' => 'تحليل القنوات', 'class' => 'admin-nav-sub', 'sub' => true],
+                    ],
+                ],
             ];
 
-            /* ترتيب المخازن حسب مسار الإدخال المتفق عليه (مستودع/ألوان/مقاسات ثم شجرة ثم منتجات ثم تراث) */
-            $navOps = [
-                ['page' => 'stock', 'href' => '/admin/index.php?page=stock', 'label' => 'المستودع', 'class' => '', 'sub' => false],
-                ['page' => 'color_dictionary', 'href' => '/admin/index.php?page=color_dictionary', 'label' => 'قاموس الألوان', 'class' => '', 'sub' => false],
-                ['page' => 'pattern_dictionary', 'href' => '/admin/index.php?page=pattern_dictionary', 'label' => 'أنماط الألوان', 'class' => '', 'sub' => false],
-                ['page' => 'size_scheme_templates', 'href' => '/admin/index.php?page=size_scheme_templates', 'label' => 'قوالب المقاسات', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'sizing_dictionary', 'href' => '/admin/index.php?page=sizing_dictionary', 'label' => 'قاموس هرم المقاسات (1–2)', 'class' => '', 'sub' => false],
-                ['page' => 'size_families', 'href' => '/admin/index.php?page=size_families', 'label' => 'عائلات المقاسات (3–4)', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'advisory_sizing_guides', 'href' => '/admin/index.php?page=advisory_sizing_guides', 'label' => 'دليل المقاس الاسترشادي', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'departments', 'href' => '/admin/index.php?page=departments', 'label' => 'الأقسام الرئيسية', 'class' => '', 'sub' => false],
-                ['page' => 'unified_catalog_branches', 'href' => '/admin/index.php?page=unified_catalog_branches', 'label' => 'فروع شجرة المنتجات', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'product_types', 'href' => '/admin/index.php?page=product_types', 'label' => 'أنواع المنتجات الموحدة', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'catalog_attributes', 'href' => '/admin/index.php?page=catalog_attributes', 'label' => 'سمات الكتالوج', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'products', 'href' => '/admin/index.php?page=products', 'label' => 'المنتجات', 'class' => '', 'sub' => false],
-                ['page' => 'opening_stock_balances', 'href' => '/admin/index.php?page=opening_stock_balances', 'label' => 'أرصدة أول المدة المخزنية', 'class' => 'admin-nav-sub', 'sub' => true],
-            ];
-
-            $navPurchasing = [
-                ['page' => 'suppliers', 'href' => '/admin/index.php?page=suppliers', 'label' => 'الموردين', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'purchases', 'href' => '/admin/index.php?page=purchases', 'label' => 'المشتريات', 'class' => '', 'sub' => false],
-                ['page' => 'purchase_returns', 'href' => '/admin/index.php?page=purchase_returns', 'label' => 'مردود المشتريات', 'class' => '', 'sub' => false],
-            ];
-
-            /** عروض العربة / س4 — كانت تحت الإعدادات؛ قائمة منسدلة مستقلة بعنوان «العروض» */
-            $navPromotions = [
-                ['page' => 'offers', 'href' => '/admin/index.php?page=offers', 'label' => 'عروض المنتجات', 'class' => '', 'sub' => false],
-                ['page' => 'cart_promotions', 'href' => '/admin/index.php?page=cart_promotions', 'label' => 'عروض مجموع السلة', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'cart_gift_promotions', 'href' => '/admin/index.php?page=cart_gift_promotions', 'label' => 'عروض الهدايا (س4)', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'cart_bogo_promotions', 'href' => '/admin/index.php?page=cart_bogo_promotions', 'label' => 'عروض BOGO (س4)', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'cart_combo_promotions', 'href' => '/admin/index.php?page=cart_combo_promotions', 'label' => 'عروض الكومبو', 'class' => 'admin-nav-sub', 'sub' => true],
-            ];
-
-            $navSales = [
-                ['page' => 'customers', 'href' => '/admin/index.php?page=customers', 'label' => 'العملاء', 'class' => '', 'sub' => false],
-                ['page' => 'orders', 'href' => '/admin/index.php?page=orders', 'label' => 'الطلبات', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'sales_returns', 'href' => '/admin/index.php?page=sales_returns', 'label' => 'مردود المبيعات', 'class' => '', 'sub' => false],
-                ['page' => 'reserved_orders', 'href' => '/admin/index.php?page=reserved_orders', 'label' => 'طلبات محجوزة (مخزون)', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'order_intake_queue', 'href' => '/admin/index.php?page=order_intake_queue', 'label' => 'طابور الطلبات', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'invoice', 'href' => '/admin/index.php?page=invoice', 'label' => 'فاتورة أونلاين', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'manual_order', 'href' => '/admin/index.php?page=manual_order', 'label' => 'فاتورة مبيعات', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'reports', 'href' => '/admin/index.php?page=reports', 'label' => 'تقارير المبيعات', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'channel_analytics', 'href' => '/admin/index.php?page=channel_analytics', 'label' => 'تحليل القنوات', 'class' => 'admin-nav-sub', 'sub' => true],
+            $navAccountingAll = [
+                [
+                    'group' => true,
+                    'title' => 'الإعداد والدليل',
+                    'items' => [
+                        ['page' => 'chart_of_accounts', 'href' => '/admin/index.php?page=chart_of_accounts', 'label' => 'الدليل المحاسبي', 'class' => '', 'sub' => false],
+                        ['page' => 'gl_account_settings', 'href' => '/admin/index.php?page=gl_account_settings', 'label' => 'حسابات القيود التلقائية', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'journal_types', 'href' => '/admin/index.php?page=journal_types', 'label' => 'أنواع اليوميات', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'fiscal_years', 'href' => '/admin/index.php?page=fiscal_years', 'label' => 'السنوات المالية', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'gl_posting', 'href' => '/admin/index.php?page=gl_posting', 'label' => 'إقفال الحركات (ترحيل)', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'opening_balances', 'href' => '/admin/index.php?page=opening_balances', 'label' => 'أرصدة أول المدة المالية', 'class' => 'admin-nav-sub', 'sub' => true],
+                    ],
+                ],
+                [
+                    'group' => true,
+                    'title' => 'السندات والذمم',
+                    'items' => [
+                        ['page' => 'journal_entries', 'href' => '/admin/index.php?page=journal_entries', 'label' => 'سند قيد', 'class' => '', 'sub' => false],
+                        ['page' => 'receipt_voucher', 'href' => '/admin/index.php?page=receipt_voucher', 'label' => 'سند قبض', 'class' => '', 'sub' => false],
+                        ['page' => 'payment_voucher', 'href' => '/admin/index.php?page=payment_voucher', 'label' => 'سند صرف', 'class' => '', 'sub' => false],
+                        ['page' => 'other_vouchers', 'href' => '/admin/index.php?page=other_vouchers', 'label' => 'سندات أخرى', 'class' => '', 'sub' => false],
+                        ['page' => 'partner_customer_receipt', 'href' => '/admin/index.php?page=partner_customer_receipt', 'label' => 'سداد فواتير مبيعات آجلة', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'partner_supplier_payment', 'href' => '/admin/index.php?page=partner_supplier_payment', 'label' => 'سداد فواتير مشتريات آجلة', 'class' => 'admin-nav-sub', 'sub' => true],
+                    ],
+                ],
+                [
+                    'group' => true,
+                    'title' => 'التقارير',
+                    'items' => [
+                        ['page' => 'journal_voucher_reports', 'href' => '/admin/index.php?page=journal_voucher_reports', 'label' => 'تقارير السندات', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'partner_account_statement', 'href' => '/admin/index.php?page=partner_account_statement', 'label' => 'كشف حساب', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report#report-account-balances', 'label' => 'أرصدة الحسابات', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'report_gl_account_monthly', 'href' => '/admin/index.php?page=report_gl_account_monthly', 'label' => 'الحركة الشهرية لحساب', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'partner_reports', 'href' => '/admin/index.php?page=partner_reports#partner-balances-customers', 'label' => 'أرصدة العملاء (ذمم)', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'partner_reports', 'href' => '/admin/index.php?page=partner_reports#partner-balances-suppliers', 'label' => 'أرصدة الموردين (ذمم)', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'report_income_statement', 'href' => '/admin/index.php?page=report_income_statement', 'label' => 'أرباح وخسائر', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'report_trading_account', 'href' => '/admin/index.php?page=report_trading_account', 'label' => 'قائمة حسابات المتاجرة', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'report_pl_monthly', 'href' => '/admin/index.php?page=report_pl_monthly', 'label' => 'قائمة إيرادات ومصروفات شهرية', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'report_pl_compare_years', 'href' => '/admin/index.php?page=report_pl_compare_years', 'label' => 'أرباح وخسائر مقارنة بين السنوات', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'report_trial_balance', 'href' => '/admin/index.php?page=report_trial_balance', 'label' => 'ميزان المراجعة', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report#report-balance-sheet', 'label' => 'الميزانية', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report', 'label' => 'التقارير المالية (الصفحة كاملة)', 'class' => '', 'sub' => false],
+                    ],
+                ],
             ];
 
             $navSettings = [
-                ['page' => 'company_settings', 'href' => '/admin/index.php?page=company_settings', 'label' => 'بيانات الشركة', 'class' => '', 'sub' => false],
-                ['page' => 'storefront_hero', 'href' => '/admin/index.php?page=storefront_hero', 'label' => 'بانر الصفحة الرئيسية', 'class' => '', 'sub' => false],
-                ['page' => 'storefront_merge_requests', 'href' => '/admin/index.php?page=storefront_merge_requests', 'label' => 'دمج هاتف التسجيل (س15)', 'class' => '', 'sub' => false],
-                ['page' => 'countries', 'href' => '/admin/index.php?page=countries', 'label' => 'الدول', 'class' => '', 'sub' => false],
-                ['page' => 'delivery_areas', 'href' => '/admin/index.php?page=delivery_areas', 'label' => 'محافظات ومناطق التوصيل', 'class' => '', 'sub' => false],
-                ['page' => 'channels', 'href' => '/admin/index.php?page=channels', 'label' => 'قنوات العملاء', 'class' => '', 'sub' => false],
-                ['page' => 'company_documents', 'href' => '/admin/index.php?page=company_documents', 'label' => 'أرشيف المستندات', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'admin_users', 'href' => '/admin/index.php?page=admin_users', 'label' => 'المستخدمون والصلاحيات', 'class' => 'admin-nav-sub', 'sub' => true],
-                ['page' => 'logs', 'href' => '/admin/index.php?page=logs', 'label' => 'سجل النشاط', 'class' => 'admin-nav-sub', 'sub' => true],
+                [
+                    'group' => true,
+                    'title' => 'الشركة',
+                    'items' => [
+                        ['page' => 'company_settings', 'href' => '/admin/index.php?page=company_settings', 'label' => 'بيانات الشركة', 'class' => '', 'sub' => false],
+                        ['page' => 'company_documents', 'href' => '/admin/index.php?page=company_documents', 'label' => 'أرشيف المستندات', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'logs', 'href' => '/admin/index.php?page=logs', 'label' => 'سجل النشاط', 'class' => 'admin-nav-sub', 'sub' => true],
+                    ],
+                ],
+                [
+                    'group' => true,
+                    'title' => 'الأسواق (مشرف عام)',
+                    'items' => [
+                        ['page' => 'countries', 'href' => '/admin/index.php?page=countries', 'label' => 'الدول', 'class' => '', 'sub' => false],
+                        ['page' => 'admin_users', 'href' => '/admin/index.php?page=admin_users', 'label' => 'المستخدمون والصلاحيات', 'class' => 'admin-nav-sub', 'sub' => true],
+                    ],
+                ],
+                [
+                    'group' => true,
+                    'title' => 'السوق الحالي',
+                    'items' => [
+                        ['page' => 'channels', 'href' => '/admin/index.php?page=channels', 'label' => 'قنوات العملاء', 'class' => '', 'sub' => false],
+                        ['page' => 'delivery_areas', 'href' => '/admin/index.php?page=delivery_areas', 'label' => 'محافظات ومناطق التوصيل', 'class' => '', 'sub' => false],
+                        ['page' => 'storefront_hero', 'href' => '/admin/index.php?page=storefront_hero', 'label' => 'بانر الصفحة الرئيسية', 'class' => '', 'sub' => false],
+                        ['page' => 'storefront_merge_requests', 'href' => '/admin/index.php?page=storefront_merge_requests', 'label' => 'دمج هاتف التسجيل (س15)', 'class' => '', 'sub' => false],
+                    ],
+                ],
             ];
 
             $orangeNavMegaSections = [
-                ['id' => 'accounting', 'title' => 'الحسابات العامة', 'muted' => false, 'items' => $navAccounting],
-                ['id' => 'acct_reports', 'title' => 'التقارير', 'muted' => false, 'items' => $navAccountingReports],
-                ['id' => 'ops', 'title' => 'المخازن', 'muted' => false, 'items' => $navOps],
-                ['id' => 'purchasing', 'title' => 'المشتريات', 'muted' => false, 'items' => $navPurchasing],
-                ['id' => 'sales', 'title' => 'المبيعات', 'muted' => false, 'items' => $navSales],
-                ['id' => 'promotions', 'title' => 'العروض', 'muted' => false, 'items' => $navPromotions],
-                ['id' => 'settings', 'title' => 'الإعدادات العامة', 'muted' => true, 'items' => $navSettings],
+                ['id' => 'warehouse', 'title' => 'المخازن والمشتريات', 'muted' => false, 'items' => $navWarehousePurchasing],
+                ['id' => 'sales', 'title' => 'المبيعات والعروض', 'muted' => false, 'items' => $navSalesPromotions],
+                ['id' => 'accounting', 'title' => 'الحسابات والتقارير', 'muted' => false, 'items' => $navAccountingAll],
+                ['id' => 'settings', 'title' => 'الإعدادات', 'muted' => true, 'items' => $navSettings],
             ];
 
             echo '<nav class="admin-topbar-mega" aria-label="التنقل السريع">';
@@ -467,13 +529,10 @@ $orangeAdminCountryScopeReady = orange_admin_country_scope_ready($pdoNav);
                 foreach ($navDashboard as $nl) {
                     $orangeRenderNavLink($nl);
                 }
-                $orangeRenderNavSection('accounting', 'الحسابات العامة', $navAccounting);
-                $orangeRenderNavSection('acct_reports', 'التقارير', $navAccountingReports);
-                $orangeRenderNavSection('ops', 'المخازن', $navOps);
-                $orangeRenderNavSection('purchasing', 'المشتريات', $navPurchasing);
-                $orangeRenderNavSection('sales', 'المبيعات', $navSales);
-                $orangeRenderNavSection('promotions', 'العروض', $navPromotions);
-                $orangeRenderNavSection('settings', 'الإعدادات العامة', $navSettings);
+                $orangeRenderNavSection('warehouse', 'المخازن والمشتريات', $navWarehousePurchasing);
+                $orangeRenderNavSection('sales', 'المبيعات والعروض', $navSalesPromotions);
+                $orangeRenderNavSection('accounting', 'الحسابات والتقارير', $navAccountingAll);
+                $orangeRenderNavSection('settings', 'الإعدادات', $navSettings);
                 ?>
         </nav>
         </div>

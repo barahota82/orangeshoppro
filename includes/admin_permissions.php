@@ -254,6 +254,17 @@ function orange_admin_require_page(array $admin, PDO $pdo, string $page): void
             . '<h1>إدارة المستخدمين للمشرف العام فقط</h1><p><a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=dashboard'), ENT_QUOTES, 'UTF-8') . '">الرئيسية</a></p></body></html>';
         exit;
     }
+    if ($page === 'countries') {
+        require_once __DIR__ . '/countries.php';
+        require_once __DIR__ . '/country_provision.php';
+        if (!orange_admin_can_manage_countries($admin)) {
+            header('Content-Type: text/html; charset=UTF-8');
+            http_response_code(403);
+            echo '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>ممنوع</title></head><body style="font-family:Cairo,sans-serif;padding:2rem;">'
+                . '<h1>إدارة الدول والتهيئة الكاملة للمشرف العام فقط</h1><p><a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=dashboard'), ENT_QUOTES, 'UTF-8') . '">الرئيسية</a></p></body></html>';
+            exit;
+        }
+    }
     $res = orange_admin_page_resource($page);
     if (!orange_admin_may($admin, $pdo, $res, 'view')) {
         header('Content-Type: text/html; charset=UTF-8');
@@ -274,6 +285,15 @@ function orange_admin_enforce_api(array $admin, PDO $pdo): void
 
         return;
     }
+    if (str_contains($path, '/admin/api/countries/')) {
+        require_once __DIR__ . '/countries.php';
+        require_once __DIR__ . '/country_provision.php';
+        if (!orange_admin_can_manage_countries($admin)) {
+            json_response(['success' => false, 'message' => 'إدارة الدول للمشرف العام فقط'], 403);
+        }
+
+        return;
+    }
     $resource = orange_admin_resolve_api_resource_from_script();
     $action = orange_admin_api_action_from_request();
     if (!orange_admin_may($admin, $pdo, $resource, $action)) {
@@ -285,6 +305,12 @@ function orange_admin_nav_visible(array $admin, PDO $pdo, string $page): bool
 {
     if ($page === 'admin_users') {
         return orange_admin_is_superuser($admin);
+    }
+    if ($page === 'countries') {
+        require_once __DIR__ . '/countries.php';
+        require_once __DIR__ . '/country_provision.php';
+
+        return orange_admin_can_manage_countries($admin);
     }
     $res = orange_admin_page_resource($page);
 

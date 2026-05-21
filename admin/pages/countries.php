@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/country_provision.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -11,16 +12,18 @@ $countries = orange_countries_admin_list($pdo);
 $hasTable = orange_table_exists($pdo, 'countries');
 $editId = isset($_GET['edit']) ? (int) $_GET['edit'] : 0;
 $editRow = null;
+$editProvision = null;
 foreach ($countries as $c) {
     if ($editId > 0 && (int) ($c['id'] ?? 0) === $editId) {
         $editRow = $c;
+        $editProvision = orange_country_provision_status($pdo, $editId);
         break;
     }
 }
 ?>
 <div class="page-title page-title--stacked">
     <h1>الدول</h1>
-    <p class="page-subtitle">أسواق المتجر: عملة، تفعيل للواجهة، وربط القنوات ومناطق التوصيل. حالياً يُفضّل إبقاء <strong>الكويت</strong> فقط نشطة حتى اكتمال التشغيل المحلي، ثم تفعيل مصر والإمارات والسعودية لاحقاً.</p>
+    <p class="page-subtitle">المشرف العام يضيف دولة ويُفعّلها — يُنشأ تلقائياً: مخزن، قنوات (مثل الكويت)، كتalog، دليل حسابات، إعدادات GL، ومحافظة توصيل افتراضية. ثم أضف مستخدم فريق الدولة ليعمل داخل نطاقها.</p>
 </div>
 
 <?php if (!$hasTable): ?>
@@ -79,9 +82,48 @@ foreach ($countries as $c) {
         <button type="button" class="btn-secondary" onclick="resetCountryForm()">جديد</button>
         <?php if ($editRow): ?>
         <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=countries'), ENT_QUOTES, 'UTF-8'); ?>">إلغاء التعديل</a>
+        <button type="button" class="btn-secondary" onclick="runCountryProvision(<?php echo (int) $editRow['id']; ?>)">تهيئة تشغيلية كاملة</button>
         <?php endif; ?>
     </div>
+    <?php if ($editRow && is_array($editProvision)): ?>
+    <div class="ctry-provision-box" style="margin-top:16px;padding:12px 14px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;">
+        <strong>جاهزية شاشات الأدمن</strong>
+        <ul class="ctry-provision-list" style="margin:8px 0 0;padding-right:18px;line-height:1.7;">
+            <li><?php echo !empty($editProvision['warehouse']) ? '✓' : '○'; ?> مخزن</li>
+            <li><?php echo (int) ($editProvision['channels_count'] ?? 0) > 0 ? '✓' : '○'; ?> قنوات (<?php echo (int) ($editProvision['channels_count'] ?? 0); ?>)</li>
+            <li><?php echo (int) ($editProvision['products_count'] ?? 0) > 0 ? '✓' : '○'; ?> منتجات (<?php echo (int) ($editProvision['products_count'] ?? 0); ?>)</li>
+            <li><?php echo (int) ($editProvision['accounts_count'] ?? 0) > 0 ? '✓' : '○'; ?> دليل حسابات (<?php echo (int) ($editProvision['accounts_count'] ?? 0); ?>)</li>
+            <li><?php echo (int) ($editProvision['gl_settings_count'] ?? 0) > 0 ? '✓' : '○'; ?> إعدادات GL (<?php echo (int) ($editProvision['gl_settings_count'] ?? 0); ?>)</li>
+            <li><?php echo !empty($editProvision['has_governorate']) ? '✓' : '○'; ?> محافظة توصيل</li>
+            <li><?php echo (int) ($editProvision['team_users_count'] ?? 0) > 0 ? '✓' : '○'; ?> مستخدمو فريق (<?php echo (int) ($editProvision['team_users_count'] ?? 0); ?>)</li>
+        </ul>
+    </div>
+    <?php endif; ?>
 </div>
+
+<?php if ($editRow): ?>
+<div class="card">
+    <h3>مستخدم فريق الدولة</h3>
+    <p class="page-subtitle" style="margin-top:0;">يُقفل على هذه الدولة فقط — لا يرى مبدّل الدول في الهيدر.</p>
+    <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+        <div>
+            <label for="ctry_team_user">اسم الدخول</label>
+            <input type="text" id="ctry_team_user" autocomplete="off" dir="ltr">
+        </div>
+        <div>
+            <label for="ctry_team_name">الاسم الظاهر</label>
+            <input type="text" id="ctry_team_name" autocomplete="off">
+        </div>
+        <div>
+            <label for="ctry_team_pass">كلمة المرور</label>
+            <input type="password" id="ctry_team_pass" autocomplete="new-password">
+        </div>
+    </div>
+    <div class="admin-form-actions" style="margin-top:12px;">
+        <button type="button" onclick="createCountryTeamUser(<?php echo (int) $editRow['id']; ?>)">إنشاء مستخدم الفريق</button>
+    </div>
+</div>
+<?php endif; ?>
 
 <div class="card">
     <h3>القائمة</h3>
@@ -96,11 +138,27 @@ foreach ($countries as $c) {
                     <th>عملة</th>
                     <th>ترتيب</th>
                     <th>نشطة</th>
+                    <th>جاهزية</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($countries as $row): ?>
+                <?php foreach ($countries as $row):
+                    $rowProv = orange_country_provision_status($pdo, (int) ($row['id'] ?? 0));
+                    $readyCount = 0;
+                    if (!empty($rowProv['warehouse'])) {
+                        $readyCount++;
+                    }
+                    if ((int) ($rowProv['channels_count'] ?? 0) > 0) {
+                        $readyCount++;
+                    }
+                    if ((int) ($rowProv['accounts_count'] ?? 0) > 0) {
+                        $readyCount++;
+                    }
+                    if ((int) ($rowProv['products_count'] ?? 0) > 0) {
+                        $readyCount++;
+                    }
+                    ?>
                 <tr>
                     <td><?php echo (int) $row['id']; ?></td>
                     <td dir="ltr"><code><?php echo htmlspecialchars(orange_countries_display_code((string) $row['code']), ENT_QUOTES, 'UTF-8'); ?></code></td>
@@ -109,6 +167,7 @@ foreach ($countries as $c) {
                     <td dir="ltr"><?php echo htmlspecialchars((string) $row['currency_code'], ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo (int) ($row['sort_order'] ?? 0); ?></td>
                     <td><?php echo (int) ($row['is_active'] ?? 0) === 1 ? 'نعم' : 'لا'; ?></td>
+                    <td><?php echo $readyCount; ?>/4</td>
                     <td><a class="btn-secondary" href="?page=countries&amp;edit=<?php echo (int) $row['id']; ?>">تعديل</a></td>
                 </tr>
                 <?php endforeach; ?>
@@ -216,6 +275,44 @@ async function translateCountryFromAr() {
 function resetCountryForm() {
     window.location.href = <?php echo json_encode(storefront_public_path('/admin/index.php?page=countries'), JSON_UNESCAPED_UNICODE); ?>;
 }
+function showProvisionReport(res) {
+    var lines = (res && res.provision_lines) ? res.provision_lines : [];
+    var msg = (res && res.message) ? res.message : '';
+    if (lines.length) {
+        alert(msg + '\n\n' + lines.join('\n'));
+    } else {
+        alert(msg || (res.success ? 'تم' : 'فشل'));
+    }
+}
+
+async function runCountryProvision(countryId) {
+    if (!countryId) return;
+    var res = await postJSON('/admin/api/countries/manage.php', {
+        action: 'provision',
+        country_id: countryId
+    });
+    showProvisionReport(res);
+    if (res.success) {
+        window.location.reload();
+    }
+}
+
+async function createCountryTeamUser(countryId) {
+    if (!countryId) return;
+    var res = await postJSON('/admin/api/countries/manage.php', {
+        action: 'create_team_user',
+        country_id: countryId,
+        username: document.getElementById('ctry_team_user').value.trim(),
+        display_name: document.getElementById('ctry_team_name').value.trim(),
+        password: document.getElementById('ctry_team_pass').value
+    });
+    alert(res.message || (res.success ? 'تم' : 'فشل'));
+    if (res.success) {
+        document.getElementById('ctry_team_pass').value = '';
+        window.location.reload();
+    }
+}
+
 async function saveCountry() {
     var res = await postJSON('/admin/api/countries/manage.php', {
         action: 'save',
@@ -224,7 +321,7 @@ async function saveCountry() {
         name_en: document.getElementById('ctry_name_en').value.trim(),
         is_active: document.getElementById('ctry_is_active').checked ? 1 : 0
     });
-    alert(res.message || (res.success ? 'تم' : 'فشل'));
+    showProvisionReport(res);
     if (res.success) {
         window.location.reload();
     }
