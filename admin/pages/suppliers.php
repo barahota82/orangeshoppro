@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/party_subledger.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
+require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/storefront_phone_country_select.php';
 require_once __DIR__ . '/../../includes/delivery_areas.php';
 require_once __DIR__ . '/../../includes/countries.php';
@@ -16,19 +17,63 @@ if (!isset($pdo) || !$pdo instanceof PDO) {
     orange_catalog_ensure_country_id_columns_once($pdo);
 }
 $supplierSchemaBootstrapError = '';
+$supplierBootstrapError = '';
+$supplierAdminCountryId = orange_admin_context_country_id($pdo);
 
 $leafAccountOptions = [];
 $supplierPayablePickAccounts = [];
-if (orange_table_exists($pdo, 'accounts')) {
-    $lw = orange_accounts_posting_leaf_where_sql($pdo, 'a');
-    $leafAccountOptions = $pdo->query(
-        'SELECT a.id, a.code, a.name FROM accounts a WHERE ' . $lw . ' ORDER BY COALESCE(a.code, \'\'), a.name'
-    )->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    foreach ($leafAccountOptions as $a) {
-        $aid = (int) $a['id'];
-        if (orange_accounts_account_pl_role($pdo, $aid) === 'liability') {
-            $supplierPayablePickAccounts[] = $a;
+try {
+    if (orange_table_exists($pdo, 'accounts')) {
+        $apPickIds = [];
+        $apParentId = orange_gl_supplier_parent_account_id($pdo);
+        if ($apParentId !== null && $apParentId > 0 && orange_table_has_column($pdo, 'accounts', 'parent_id')) {
+            $apPickIds = [(int) $apParentId];
+            for ($apDepth = 0; $apDepth < 10; ++$apDepth) {
+                $apPh = implode(',', array_fill(0, count($apPickIds), '?'));
+                $apChSt = $pdo->prepare(
+                    'SELECT id FROM accounts WHERE parent_id IN (' . $apPh . ') AND id NOT IN (' . $apPh . ')'
+                );
+                $apChSt->execute(array_merge($apPickIds, $apPickIds));
+                $apNewIds = $apChSt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+                if ($apNewIds === []) {
+                    break;
+                }
+                foreach ($apNewIds as $apNewId) {
+                    $apPickIds[] = (int) $apNewId;
+                }
+            }
         }
+        $lw = orange_accounts_posting_leaf_where_sql($pdo, 'a');
+        if ($apPickIds !== []) {
+            $apPh = implode(',', array_fill(0, count($apPickIds), '?'));
+            $acctSql = 'SELECT a.id, a.code, a.name FROM accounts a WHERE a.id IN (' . $apPh . ') AND (' . $lw . ')';
+            $acctParams = $apPickIds;
+        } else {
+            $acctSql = 'SELECT a.id, a.code, a.name FROM accounts a WHERE ' . $lw;
+            $acctParams = [];
+        }
+        $acctCountryFilter = orange_accounts_sql_country_filter($pdo, 'a', $supplierAdminCountryId);
+        if ($acctCountryFilter !== null) {
+            $acctSql .= $acctCountryFilter['sql'];
+            $acctParams = array_merge($acctParams, $acctCountryFilter['params']);
+        }
+        $acctSql .= ' ORDER BY COALESCE(a.code, \'\'), a.name';
+        if ($acctParams === []) {
+            $leafAccountOptions = $pdo->query($acctSql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } else {
+            $acctSt = $pdo->prepare($acctSql);
+            $acctSt->execute($acctParams);
+            $leafAccountOptions = $acctSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        }
+        $supplierPayablePickAccounts = $leafAccountOptions;
+    }
+} catch (Throwable $e) {
+    $supplierBootstrapError = trim($e->getMessage());
+    if ($supplierBootstrapError === '') {
+        $supplierBootstrapError = 'تعذّر تحميل حسابات ذمة الموردين.';
+    }
+    if (function_exists('error_log')) {
+        error_log('[orange] suppliers accounts bootstrap: ' . $supplierBootstrapError);
     }
 }
 $payableAccountMeta = static function (int $id) use ($leafAccountOptions, $supplierPayablePickAccounts): array {
@@ -83,7 +128,6 @@ foreach ($supplierPayablePickAccounts as $a) {
  * معاينة الكود التالي للمورد في النموذج (للعرض فقط).
  * الحفظ الفعلي يظل عبر منطق API الذي يولّد/يثبّت الكود تلقائياً.
  */
-$supplierAdminCountryId = orange_admin_context_country_id($pdo);
 $nextSupplierCodePreview = '1';
 if (orange_table_exists($pdo, 'suppliers') && orange_table_has_column($pdo, 'suppliers', 'code')) {
     if (orange_table_has_country_id($pdo, 'suppliers') && $supplierAdminCountryId > 0) {
@@ -223,13 +267,14 @@ $taxProfileOptions = [
 $rows = [];
 $supplierSearchRowsPayload = [];
 $totalBalance = 0.0;
+try {
 if (orange_table_exists($pdo, 'suppliers')) {
     $sql = 'SELECT s.* FROM suppliers s WHERE 1=1';
     $supplierParams = [];
     $supplierCountryFilter = orange_sql_filter_country_id($pdo, 'suppliers', 's', $supplierAdminCountryId);
     if ($supplierCountryFilter !== null) {
         $sql .= $supplierCountryFilter['sql'];
-        $supplierParams[] = $supplierCountryFilter['param'];
+        $supplierParams = $supplierCountryFilter['params'];
     }
     $sql .= ' ORDER BY s.name ASC, s.id ASC';
     if ($supplierParams === []) {
@@ -321,6 +366,20 @@ if (orange_table_exists($pdo, 'suppliers')) {
         ];
     }
 }
+} catch (Throwable $e) {
+    if ($supplierBootstrapError === '') {
+        $supplierBootstrapError = trim($e->getMessage());
+    }
+    if ($supplierBootstrapError === '') {
+        $supplierBootstrapError = 'تعذّر تحميل قائمة الموردين.';
+    }
+    if (function_exists('error_log')) {
+        error_log('[orange] suppliers list bootstrap: ' . $supplierBootstrapError);
+    }
+    $rows = [];
+    $supplierSearchRowsPayload = [];
+    $totalBalance = 0.0;
+}
 $count = count($rows);
 $supplierCtxCountryRow = orange_country_row_by_id($pdo, $supplierAdminCountryId, false);
 $supplierCtxCountryLabel = '';
@@ -338,7 +397,14 @@ $supplierKwCountryId = orange_countries_default_id($pdo);
     </div>
 </div>
 
-<?php if ($count === 0 && orange_table_has_country_id($pdo, 'suppliers')): ?>
+<?php if ($supplierBootstrapError !== ''): ?>
+<div class="card" style="margin:0 0 14px;padding:12px 14px;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;color:#991b1b;line-height:1.55;">
+    تعذّر تحميل جزء من شاشة الموردين. راجع سجل PHP على السيرفر أو «حسابات القيود التلقائية» / «accounts_payable_parent».
+    <code dir="ltr" style="display:block;margin-top:8px;font-size:0.85rem;"><?php echo htmlspecialchars($supplierBootstrapError, ENT_QUOTES, 'UTF-8'); ?></code>
+</div>
+<?php endif; ?>
+
+<?php if ($count === 0 && $supplierBootstrapError === '' && orange_table_has_country_id($pdo, 'suppliers')): ?>
 <div class="card-hint" style="margin:0 0 14px;padding:12px 14px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;color:#0c4a6e;line-height:1.55;">
     لا موردين في سياق <strong><?php echo htmlspecialchars($supplierCtxCountryLabel !== '' ? $supplierCtxCountryLabel : orange_admin_context_country_code($pdo), ENT_QUOTES, 'UTF-8'); ?></strong>.
     <?php if ($supplierAdminCountryId !== $supplierKwCountryId): ?>
