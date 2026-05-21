@@ -447,14 +447,15 @@ $orangeAdminCountryScopeReady = orange_admin_country_scope_ready($pdoNav);
                 echo '<span class="admin-mega-trigger__chev" aria-hidden="true">▼</span>';
                 echo '</button></div>';
             }
-            if ($orangeAdminCountryLockedId <= 0 && orange_admin_is_global($admin) && count($orangeAdminCountriesNav) >= 1):
+            echo '</nav>';
+            if (orange_admin_show_country_switcher($admin) && count($orangeAdminCountriesNav) >= 1):
                 $orangeCountrySelectDisabled = count($orangeAdminCountriesNav) <= 1;
                 ?>
             <form method="get" action="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php'), ENT_QUOTES, 'UTF-8'); ?>" class="admin-topbar-country-mega">
                 <input type="hidden" name="page" value="<?php echo htmlspecialchars($orangeAdminPage, ENT_QUOTES, 'UTF-8'); ?>">
                 <div class="admin-mega-dropdown admin-mega-dropdown--country">
                     <label for="admin_topbar_country" class="admin-topbar-country-mega__label">الدولة</label>
-                    <select id="admin_topbar_country" name="admin_country" class="admin-topbar-country-select"
+                    <select id="admin_topbar_country" name="admin_country" class="admin-topbar-country-select admin-mega-trigger admin-mega-trigger--country"
                         aria-label="اختيار الدولة — سياق شاشات الأدمن"
                         <?php echo $orangeCountrySelectDisabled ? 'disabled title="دولة واحدة مسجّلة حالياً"' : ''; ?>
                         onchange="orangeAdminSwitchCountry(this)">
@@ -479,9 +480,8 @@ $orangeAdminCountryScopeReady = orange_admin_country_scope_ready($pdoNav);
                     </select>
                 </div>
             </form>
-            <?php endif;
-            echo '</nav>';
-            ?>
+            <?php endif; ?>
+            <?php
             <div class="admin-topbar-actions">
                 <div class="admin-user">
                     <span class="admin-user__label">المستخدم</span>
@@ -534,7 +534,7 @@ $orangeAdminCountryScopeReady = orange_admin_country_scope_ready($pdoNav);
                 $orangeRenderNavSection('warehouse', 'المخازن والمشتريات', $navWarehousePurchasing);
                 $orangeRenderNavSection('sales', 'المبيعات والعروض', $navSalesPromotions);
                 $orangeRenderNavSection('settings', 'الإعدادات', $navSettings);
-                if ($orangeAdminCountryLockedId <= 0 && orange_admin_is_global($admin) && count($orangeAdminCountriesNav) >= 1):
+                if (orange_admin_show_country_switcher($admin) && count($orangeAdminCountriesNav) >= 1):
                     ?>
                 <div class="admin-nav-country-drawer">
                     <form method="get" action="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php'), ENT_QUOTES, 'UTF-8'); ?>" class="admin-nav-country-drawer__form">

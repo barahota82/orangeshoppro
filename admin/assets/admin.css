@@ -351,7 +351,7 @@ a { text-decoration: none; color: inherit; }
     gap: 6px;
 }
 .admin-topbar-country-mega {
-    display: inline-flex;
+    display: none;
     align-items: center;
     margin: 0;
     flex-shrink: 0;
@@ -407,6 +407,11 @@ a { text-decoration: none; color: inherit; }
 .admin-topbar-country-select:disabled {
     opacity: 0.72;
     cursor: default;
+}
+.admin-mega-trigger--country {
+    min-width: 10rem;
+    max-width: 14rem;
+    cursor: pointer;
 }
 .admin-nav-country-drawer {
     margin-top: 14px;
@@ -533,6 +538,9 @@ a { text-decoration: none; color: inherit; }
 @media (min-width: 992px) {
     .admin-topbar-mega {
         display: flex;
+    }
+    .admin-topbar-country-mega {
+        display: inline-flex;
     }
     .admin-menu-toggle {
         display: none !important;
