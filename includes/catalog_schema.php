@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 43);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 44);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3022,6 +3022,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_governorates_v41($pdo);
     orange_catalog_migrate_country_market_codes_v42($pdo);
     orange_catalog_migrate_country_sort_renumber_v43($pdo);
+    orange_catalog_migrate_country_warehouses_v44($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
         orange_catalog_safe_exec(
@@ -3995,6 +3996,134 @@ function orange_catalog_migrate_country_sort_renumber_v43(PDO $pdo): void
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] country_sort_renumber_v43 marker: ' . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * مخازن لكل دولة + warehouse_variant_stock — ترحيل كميات الكويت من product_variants (بند 13.1).
+ */
+function orange_catalog_migrate_country_warehouses_v44(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    $marker = 'php_country_warehouses_v44';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (!orange_table_exists($pdo, 'warehouses')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE IF NOT EXISTS warehouses (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                country_id INT UNSIGNED NOT NULL,
+                name_ar VARCHAR(191) NOT NULL DEFAULT \'\',
+                name_en VARCHAR(191) NOT NULL DEFAULT \'\',
+                is_default TINYINT(1) NOT NULL DEFAULT 0,
+                is_active TINYINT(1) NOT NULL DEFAULT 1,
+                sort_order INT NOT NULL DEFAULT 0,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY idx_warehouses_country (country_id),
+                KEY idx_warehouses_country_default (country_id, is_default, is_active)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
+    if (!orange_table_exists($pdo, 'warehouse_variant_stock')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE IF NOT EXISTS warehouse_variant_stock (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                warehouse_id INT UNSIGNED NOT NULL,
+                variant_id INT NOT NULL,
+                quantity INT NOT NULL DEFAULT 0,
+                updated_at DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_wvs_wh_variant (warehouse_id, variant_id),
+                KEY idx_wvs_variant (variant_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
+    if (orange_table_exists($pdo, 'countries') && orange_table_exists($pdo, 'warehouses')) {
+        $countries = $pdo->query(
+            'SELECT id, name_ar, name_en FROM countries ORDER BY sort_order ASC, id ASC'
+        )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $insWh = $pdo->prepare(
+            'INSERT INTO warehouses (country_id, name_ar, name_en, is_default, is_active, sort_order)
+             SELECT ?, ?, ?, 1, 1, 1 FROM DUAL
+             WHERE NOT EXISTS (SELECT 1 FROM warehouses w WHERE w.country_id = ? LIMIT 1)'
+        );
+        foreach ($countries as $cRow) {
+            if (!is_array($cRow)) {
+                continue;
+            }
+            $cid = (int) ($cRow['id'] ?? 0);
+            if ($cid <= 0) {
+                continue;
+            }
+            $nameAr = trim((string) ($cRow['name_ar'] ?? ''));
+            $nameEn = trim((string) ($cRow['name_en'] ?? ''));
+            if ($nameAr === '') {
+                $nameAr = 'المخزن الرئيسي';
+            }
+            if ($nameEn === '') {
+                $nameEn = 'Main warehouse';
+            }
+            $insWh->execute([
+                $cid,
+                $nameAr . ' — مخزن رئيسي',
+                $nameEn . ' — main',
+                $cid,
+            ]);
+        }
+    }
+
+    if (
+        orange_table_exists($pdo, 'warehouse_variant_stock')
+        && orange_table_exists($pdo, 'warehouses')
+        && orange_table_exists($pdo, 'product_variants')
+        && orange_table_exists($pdo, 'countries')
+    ) {
+        $stKw = $pdo->prepare('SELECT id FROM countries WHERE code = ? LIMIT 1');
+        $stKw->execute(['kw']);
+        $kwRow = $stKw->fetch(PDO::FETCH_ASSOC);
+        $kwId = is_array($kwRow) ? (int) ($kwRow['id'] ?? 0) : 0;
+        if ($kwId > 0) {
+            $stWh = $pdo->prepare(
+                'SELECT id FROM warehouses WHERE country_id = ? ORDER BY is_default DESC, id ASC LIMIT 1'
+            );
+            $stWh->execute([$kwId]);
+            $whId = (int) ($stWh->fetchColumn() ?: 0);
+            if ($whId > 0) {
+                $variants = $pdo->query(
+                    'SELECT id, stock_quantity FROM product_variants'
+                )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                $insStock = $pdo->prepare(
+                    'INSERT INTO warehouse_variant_stock (warehouse_id, variant_id, quantity)
+                     VALUES (?, ?, ?)
+                     ON DUPLICATE KEY UPDATE quantity = VALUES(quantity)'
+                );
+                foreach ($variants as $vRow) {
+                    if (!is_array($vRow)) {
+                        continue;
+                    }
+                    $vid = (int) ($vRow['id'] ?? 0);
+                    if ($vid <= 0) {
+                        continue;
+                    }
+                    $qty = (int) ($vRow['stock_quantity'] ?? 0);
+                    $insStock->execute([$whId, $vid, $qty]);
+                }
+            }
+        }
+    }
+
+    try {
+        $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+        $ins->execute([$marker]);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] country_warehouses_v44 marker: ' . $e->getMessage());
         }
     }
 }
