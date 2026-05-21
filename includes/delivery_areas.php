@@ -318,21 +318,27 @@ function orange_delivery_areas_sort_rows_by_lang(array &$rows, string $lang): vo
 }
 
 /**
- * خيارات المنطقة في الأدمن (موردين/عملاء): اسم المنطقة فقط، مرتبة أبجدياً بالعربي.
+ * خيارات المنطقة في الأدمن.
  *
- * @return list<array{value:string, label:string, da_id:int}>
+ * @param 'supplier'|'customer' $context supplier: نشطة فقط بدون وسوم؛ customer: الكل مع وسم المعطّلة في القائمة
+ * @return list<array{value:string, label:string, da_id:int, is_active:int}>
  */
-function orange_delivery_areas_admin_select_options(PDO $pdo, int $countryId): array
+function orange_delivery_areas_admin_select_options(PDO $pdo, int $countryId, string $context = 'customer'): array
 {
     if ($countryId <= 0) {
         return [];
     }
+    $context = $context === 'supplier' ? 'supplier' : 'customer';
     $rows = orange_delivery_areas_admin_list($pdo, $countryId);
     orange_delivery_areas_sort_rows_by_lang($rows, 'ar');
     $seen = [];
     $options = [];
     foreach ($rows as $daRow) {
         if (!is_array($daRow)) {
+            continue;
+        }
+        $isActive = (int) ($daRow['is_active'] ?? 0) === 1;
+        if ($context === 'supplier' && !$isActive) {
             continue;
         }
         $nameAr = trim((string) ($daRow['name_ar'] ?? ''));
@@ -347,13 +353,14 @@ function orange_delivery_areas_admin_select_options(PDO $pdo, int $countryId): a
         }
         $seen[$areaKey] = true;
         $label = $nameAr !== '' ? $nameAr : $nameEn;
-        if ((int) ($daRow['is_active'] ?? 0) !== 1) {
+        if ($context === 'customer' && !$isActive) {
             $label .= ' (غير منطقة توصيل حالياً)';
         }
         $options[] = [
             'value' => $areaValue,
             'label' => $label,
             'da_id' => (int) ($daRow['id'] ?? 0),
+            'is_active' => $isActive ? 1 : 0,
         ];
     }
 

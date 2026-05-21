@@ -46,7 +46,7 @@ foreach ($adminDeliveryAreas as $da) {
     }
 }
 
-$customerAreaOptions = orange_delivery_areas_admin_select_options($pdo, $adminCountryId);
+$customerAreaOptions = orange_delivery_areas_admin_select_options($pdo, $adminCountryId, 'customer');
 
 /**
  * س15: معاينة كود العميل التالي (للعرض فقط؛ التثبيت في API).
@@ -727,7 +727,9 @@ $count = count($customerRows);
             <select id="cus_city_area" autocomplete="address-level1" required>
                 <option value="">اختر منطقة</option>
                 <?php foreach ($customerAreaOptions as $areaOpt): ?>
-                    <option value="<?php echo htmlspecialchars((string) $areaOpt['value'], ENT_QUOTES, 'UTF-8'); ?>">
+                    <option value="<?php echo htmlspecialchars((string) $areaOpt['value'], ENT_QUOTES, 'UTF-8'); ?>"
+                        data-list-label="<?php echo htmlspecialchars((string) $areaOpt['label'], ENT_QUOTES, 'UTF-8'); ?>"
+                        <?php echo (int) ($areaOpt['is_active'] ?? 0) !== 1 ? 'data-inactive="1"' : ''; ?>>
                         <?php echo htmlspecialchars((string) $areaOpt['label'], ENT_QUOTES, 'UTF-8'); ?>
                     </option>
                 <?php endforeach; ?>
@@ -863,6 +865,33 @@ function cusPhoneCountryEl() {
 function cusAreaEl() {
     return document.getElementById('cus_city_area');
 }
+function cusAreaRestoreListLabels() {
+    var el = cusAreaEl();
+    if (!el) return;
+    for (var i = 0; i < el.options.length; i++) {
+        var opt = el.options[i];
+        var full = opt.getAttribute('data-list-label');
+        if (full) {
+            opt.textContent = full;
+        }
+    }
+}
+function cusAreaShowSelectedNameOnly() {
+    var el = cusAreaEl();
+    if (!el || el.selectedIndex < 0) return;
+    var opt = el.options[el.selectedIndex];
+    if (!opt || !String(opt.value || '').trim()) return;
+    opt.textContent = String(opt.value || '').trim();
+}
+function cusAreaBindSelectDisplay() {
+    var el = cusAreaEl();
+    if (!el || el.dataset.cusAreaDisplayBound === '1') return;
+    el.dataset.cusAreaDisplayBound = '1';
+    el.addEventListener('focus', cusAreaRestoreListLabels);
+    el.addEventListener('mousedown', cusAreaRestoreListLabels);
+    el.addEventListener('change', cusAreaShowSelectedNameOnly);
+    el.addEventListener('blur', cusAreaShowSelectedNameOnly);
+}
 /**
  * يطابق نمط الموردين: المنطقة select مع قيم نصية (الاسم).
  * يحاول مطابقة الاسم في القائمة عند التحديث؛ لو لم يجد، يبقى فارغاً (Default «اختياري»).
@@ -870,11 +899,13 @@ function cusAreaEl() {
 function cusAreaSetValue(value) {
     var el = cusAreaEl();
     if (!el) return;
+    cusAreaRestoreListLabels();
     var name = String(value == null ? '' : value).trim();
     if (name === '') { el.value = ''; return; }
     for (var i = 0; i < el.options.length; i++) {
         if (String(el.options[i].value || '') === name) {
             el.value = name;
+            cusAreaShowSelectedNameOnly();
             return;
         }
     }
@@ -1828,6 +1859,7 @@ function cusAttachmentUpload() {
         }
     }
 
+    cusAreaBindSelectDisplay();
     cusToggleBlockReason();
     cusNavRefreshButtons();
 })();
