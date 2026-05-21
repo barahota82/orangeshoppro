@@ -181,7 +181,15 @@ $daNextSortOrder = $hasGovTable
 </div>
 
 <div class="card">
-    <h3>قائمة المناطق</h3>
+    <div class="da-areas-list-head">
+        <h3>قائمة المناطق</h3>
+        <?php if ($hasGovTable): ?>
+        <label for="da_list_all" class="da-list-all-label">
+            <input type="checkbox" id="da_list_all" checked disabled>
+            الكل
+        </label>
+        <?php endif; ?>
+    </div>
     <div class="table-wrap">
         <table>
             <thead>
@@ -254,6 +262,27 @@ $daNextSortOrder = $hasGovTable
     .da-area-en { grid-area: en; }
     .da-area-sort { grid-area: sort; }
     .da-area-active { grid-area: active; }
+    .da-areas-list-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px 20px;
+        margin-bottom: 12px;
+    }
+    .da-areas-list-head h3 {
+        margin: 0;
+    }
+    .da-list-all-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        margin: 0;
+        user-select: none;
+    }
+    .da-list-all-label input:disabled {
+        cursor: not-allowed;
+    }
     @media (max-width: 720px) {
         .da-gov-form-grid,
         .da-area-form-grid {
@@ -298,6 +327,65 @@ function daSelectedGovernorateId() {
     var sel = document.getElementById('da_governorate_id');
     if (!sel) return 0;
     return parseInt(sel.value, 10) || 0;
+}
+
+function daSyncListAllCheckbox() {
+    var allCb = document.getElementById('da_list_all');
+    if (!allCb) return;
+    var govId = daSelectedGovernorateId();
+    if (govId <= 0) {
+        allCb.checked = true;
+        allCb.disabled = true;
+    } else {
+        allCb.disabled = false;
+    }
+}
+
+function daAreasForList() {
+    var rows = daDeliveryAreasCache || [];
+    var allCb = document.getElementById('da_list_all');
+    if (!allCb || allCb.checked) {
+        return rows;
+    }
+    var govId = daSelectedGovernorateId();
+    if (govId <= 0) {
+        return rows;
+    }
+    return rows.filter(function (r) {
+        return parseInt(r.governorate_id, 10) === govId;
+    });
+}
+
+var daHasGovCol = <?php echo $hasGovTable ? 'true' : 'false'; ?>;
+
+function renderDeliveryAreasTable() {
+    var tb = document.getElementById('da_tbody');
+    if (!tb) return;
+    var rows = daAreasForList();
+    tb.innerHTML = '';
+    rows.forEach(function (r) {
+        var tr = document.createElement('tr');
+        var canDeliver = parseInt(r.is_active, 10) === 1;
+        var html = '<td>' + escHtml(String(r.id)) + '</td>';
+        if (daHasGovCol) {
+            html += '<td>' + escHtml(String(r.governorate_name_ar || r.governorate_name_en || '—')) + '</td>';
+        }
+        html +=
+            '<td>' + escHtml(String(r.name_ar || '')) + '</td>' +
+            '<td dir="ltr">' + escHtml(String(r.name_en || '')) + '</td>' +
+            '<td>' + escHtml(String(r.sort_order != null ? r.sort_order : '')) + '</td>' +
+            '<td>' + (canDeliver ? 'منطقة توصيل' : 'غير متاحة للتوصيل') + '</td>' +
+            '<td><button type="button" class="btn-secondary" data-da-edit="' + escAttr(String(r.id)) + '">تعديل</button></td>';
+        tr.innerHTML = html;
+        tb.appendChild(tr);
+    });
+    bindDeliveryAreaEditButtons();
+}
+
+function onDaGovernorateChange() {
+    daSyncListAllCheckbox();
+    refreshDaSortPreview();
+    renderDeliveryAreasTable();
 }
 
 function daComputeNextSort() {
@@ -472,7 +560,9 @@ function resetDeliveryAreaForm() {
     document.getElementById('da_is_active').checked = true;
     const sel = document.getElementById('da_governorate_id');
     if (sel) sel.value = '';
+    daSyncListAllCheckbox();
     refreshDaSortPreview();
+    renderDeliveryAreasTable();
 }
 
 function editDeliveryArea(row) {
@@ -485,6 +575,8 @@ function editDeliveryArea(row) {
     if (sel && row.governorate_id) {
         sel.value = String(row.governorate_id);
     }
+    daSyncListAllCheckbox();
+    refreshDaSortPreview();
     document.querySelector('.da-area-form-grid').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -503,27 +595,9 @@ async function loadDeliveryAreas() {
         refreshDaSortPreview();
         return;
     }
-    const rows = res.data || [];
-    daDeliveryAreasCache = rows;
-    tb.innerHTML = '';
-    const hasGovCol = <?php echo $hasGovTable ? 'true' : 'false'; ?>;
-    rows.forEach(function (r) {
-        const tr = document.createElement('tr');
-        const canDeliver = parseInt(r.is_active, 10) === 1;
-        let html = '<td>' + escHtml(String(r.id)) + '</td>';
-        if (hasGovCol) {
-            html += '<td>' + escHtml(String(r.governorate_name_ar || r.governorate_name_en || '—')) + '</td>';
-        }
-        html +=
-            '<td>' + escHtml(String(r.name_ar || '')) + '</td>' +
-            '<td dir="ltr">' + escHtml(String(r.name_en || '')) + '</td>' +
-            '<td>' + escHtml(String(r.sort_order != null ? r.sort_order : '')) + '</td>' +
-            '<td>' + (canDeliver ? 'منطقة توصيل' : 'غير متاحة للتوصيل') + '</td>' +
-            '<td><button type="button" class="btn-secondary" data-da-edit="' + escAttr(String(r.id)) + '">تعديل</button></td>';
-        tr.innerHTML = html;
-        tb.appendChild(tr);
-    });
-    bindDeliveryAreaEditButtons();
+    daDeliveryAreasCache = res.data || [];
+    daSyncListAllCheckbox();
+    renderDeliveryAreasTable();
     refreshDaSortPreview();
 }
 
@@ -626,11 +700,14 @@ const dgEn = document.getElementById('dg_name_en');
 if (dgAr) dgAr.addEventListener('input', scheduleDgFromAr);
 if (dgEn) dgEn.addEventListener('input', scheduleDgFromEn);
 const daGovSel = document.getElementById('da_governorate_id');
-if (daGovSel) daGovSel.addEventListener('change', refreshDaSortPreview);
+if (daGovSel) daGovSel.addEventListener('change', onDaGovernorateChange);
+const daListAll = document.getElementById('da_list_all');
+if (daListAll) daListAll.addEventListener('change', renderDeliveryAreasTable);
 
 (async function daInit() {
     try {
         bindGovernorateEditButtons();
+        daSyncListAllCheckbox();
         bindDeliveryAreaEditButtons();
         refreshDgSortPreview();
         refreshDaSortPreview();
