@@ -481,7 +481,6 @@ $orangeAdminCountryScopeReady = orange_admin_country_scope_ready($pdoNav);
                 </div>
             </form>
             <?php endif; ?>
-            <?php
             <div class="admin-topbar-actions">
                 <div class="admin-user">
                     <span class="admin-user__label">المستخدم</span>
