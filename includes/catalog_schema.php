@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 48);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 49);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3028,6 +3028,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_country_gl_v47($pdo);
     orange_catalog_migrate_country_cart_promotions_v48($pdo);
     orange_catalog_migrate_country_gl_accounts_v49($pdo);
+    orange_catalog_ensure_country_id_columns($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
         orange_catalog_safe_exec(
@@ -4133,6 +4134,167 @@ function orange_catalog_migrate_country_warehouses_v44(PDO $pdo): void
     }
 }
 
+/** معرّف دولة الكويت للترحيل والإصلاح — 0 إن لم تُوجَد. */
+function orange_catalog_resolve_kuwait_country_id(PDO $pdo): int
+{
+    if (!orange_table_exists($pdo, 'countries')) {
+        return 0;
+    }
+    $stKw = $pdo->prepare('SELECT id FROM countries WHERE code = ? LIMIT 1');
+    $stKw->execute(['kw']);
+    $kwRow = $stKw->fetch(PDO::FETCH_ASSOC);
+
+    return is_array($kwRow) ? (int) ($kwRow['id'] ?? 0) : 0;
+}
+
+/** هل اكتملت أعمدة country_id لنطاق v45 (جداول التشغيل الأساسية)؟ */
+function orange_catalog_country_scope_v45_satisfied(PDO $pdo): bool
+{
+    foreach (['customers', 'suppliers', 'purchases', 'products'] as $tbl) {
+        if (orange_table_exists($pdo, $tbl) && !orange_table_has_column($pdo, $tbl, 'country_id')) {
+            return false;
+        }
+    }
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'country_id')) {
+        return false;
+    }
+    if (orange_table_exists($pdo, 'stock_movements') && !orange_table_has_column($pdo, 'stock_movements', 'country_id')) {
+        return false;
+    }
+
+    return true;
+}
+
+/** هل accounts.country_id موجود (v49)؟ */
+function orange_catalog_country_gl_accounts_v49_satisfied(PDO $pdo): bool
+{
+    return !orange_table_exists($pdo, 'accounts')
+        || orange_table_has_column($pdo, 'accounts', 'country_id');
+}
+
+/**
+ * إصلاح idempotent: يضيف country_id ويملأ الكويت — يُشغَّل كل مرة حتى لو سُجّل الترحيل سابقاً وفشل ALTER.
+ * (الموردين/العملاء/الحسابات/المنتجات/المشتريات/الطلبات/حركات المخزون)
+ */
+function orange_catalog_ensure_country_id_columns(PDO $pdo): void
+{
+    $kwId = orange_catalog_resolve_kuwait_country_id($pdo);
+
+    foreach (['customers', 'suppliers', 'purchases', 'products'] as $tbl) {
+        if (!orange_table_exists($pdo, $tbl)) {
+            continue;
+        }
+        if (!orange_table_has_column($pdo, $tbl, 'country_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE ' . $tbl . ' ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
+            );
+            orange_catalog_safe_exec(
+                $pdo,
+                'CREATE INDEX idx_' . $tbl . '_country_id ON ' . $tbl . ' (country_id)'
+            );
+            orange_schema_invalidate_column_check($tbl, 'country_id');
+        }
+        if ($kwId > 0) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE ' . $tbl . ' SET country_id = ' . (int) $kwId
+                . ' WHERE country_id IS NULL OR country_id = 0'
+            );
+        }
+    }
+
+    if (orange_table_exists($pdo, 'orders')) {
+        if (!orange_table_has_column($pdo, 'orders', 'country_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE orders ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
+            );
+            orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_orders_country_id ON orders (country_id)');
+            orange_schema_invalidate_column_check('orders', 'country_id');
+        }
+        if (!orange_table_has_column($pdo, 'orders', 'warehouse_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE orders ADD COLUMN warehouse_id INT UNSIGNED NULL DEFAULT NULL AFTER country_id'
+            );
+            orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_orders_warehouse_id ON orders (warehouse_id)');
+            orange_schema_invalidate_column_check('orders', 'warehouse_id');
+        }
+        if ($kwId > 0) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE orders SET country_id = ' . (int) $kwId . ' WHERE country_id IS NULL OR country_id = 0'
+            );
+            if (orange_table_exists($pdo, 'warehouses')) {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'UPDATE orders o
+                     INNER JOIN warehouses w ON w.country_id = ' . (int) $kwId . ' AND w.is_default = 1
+                     SET o.warehouse_id = w.id
+                     WHERE (o.warehouse_id IS NULL OR o.warehouse_id = 0)
+                       AND (o.country_id = ' . (int) $kwId . ' OR o.country_id IS NULL)'
+                );
+            }
+        }
+    }
+
+    if (orange_table_exists($pdo, 'stock_movements')) {
+        if (!orange_table_has_column($pdo, 'stock_movements', 'country_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE stock_movements ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
+            );
+            orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_stock_movements_country_id ON stock_movements (country_id)');
+            orange_schema_invalidate_column_check('stock_movements', 'country_id');
+        }
+        if (!orange_table_has_column($pdo, 'stock_movements', 'warehouse_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE stock_movements ADD COLUMN warehouse_id INT UNSIGNED NULL DEFAULT NULL AFTER country_id'
+            );
+            orange_catalog_safe_exec($pdo, 'CREATE INDEX idx_stock_movements_warehouse_id ON stock_movements (warehouse_id)');
+            orange_schema_invalidate_column_check('stock_movements', 'warehouse_id');
+        }
+        if ($kwId > 0) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE stock_movements SET country_id = ' . (int) $kwId . ' WHERE country_id IS NULL OR country_id = 0'
+            );
+            if (orange_table_exists($pdo, 'warehouses')) {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'UPDATE stock_movements sm
+                     INNER JOIN warehouses w ON w.country_id = ' . (int) $kwId . ' AND w.is_default = 1
+                     SET sm.warehouse_id = w.id
+                     WHERE (sm.warehouse_id IS NULL OR sm.warehouse_id = 0)'
+                );
+            }
+        }
+    }
+
+    if (orange_table_exists($pdo, 'accounts')) {
+        if (!orange_table_has_column($pdo, 'accounts', 'country_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE accounts ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
+            );
+            orange_catalog_safe_exec(
+                $pdo,
+                'CREATE INDEX idx_accounts_country_id ON accounts (country_id)'
+            );
+            orange_schema_invalidate_column_check('accounts', 'country_id');
+        }
+        if ($kwId > 0) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE accounts SET country_id = ' . (int) $kwId
+                . ' WHERE country_id IS NULL OR country_id = 0'
+            );
+        }
+    }
+}
+
 /**
  * بند 13.9(2): country_id (+ warehouse_id على orders/stock_movements) — ترحيل الكويت.
  */
@@ -4244,8 +4406,12 @@ function orange_catalog_migrate_country_scope_v45(PDO $pdo): void
     }
 
     try {
-        $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
-        $ins->execute([$marker]);
+        if (orange_catalog_country_scope_v45_satisfied($pdo)) {
+            $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+            $ins->execute([$marker]);
+        } elseif (function_exists('error_log')) {
+            error_log('[orange] country_scope_v45: marker skipped — country_id columns still missing after migration');
+        }
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] country_scope_v45 marker: ' . $e->getMessage());
@@ -4525,8 +4691,12 @@ function orange_catalog_migrate_country_gl_accounts_v49(PDO $pdo): void
     }
 
     try {
-        $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
-        $ins->execute([$marker]);
+        if (orange_catalog_country_gl_accounts_v49_satisfied($pdo)) {
+            $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+            $ins->execute([$marker]);
+        } elseif (function_exists('error_log')) {
+            error_log('[orange] country_gl_accounts_v49: marker skipped — accounts.country_id still missing after migration');
+        }
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] country_gl_accounts_v49 marker: ' . $e->getMessage());

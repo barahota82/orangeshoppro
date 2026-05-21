@@ -457,7 +457,7 @@ $orangeAdminCountryScopeReady = orange_admin_country_scope_ready($pdoNav);
     </header>
     <?php if (!$orangeAdminCountryScopeReady): ?>
     <div class="admin-country-scope-warn" role="status" style="margin:0;padding:10px 16px;background:#fef3c7;color:#92400e;font-size:13px;line-height:1.5;border-bottom:1px solid #fcd34d;">
-        تنبيه: أعمدة <code dir="ltr">country_id</code> غير مكتملة على جداول الموردين/العملاء/الحسابات — فصل الدول لن يظهر حتى يكتمل ترحيل المخطط. حدّث الملفات على السيرفر ثم افتح أي صفحة أدمن لإكمال الترحيل التلقائي.
+        تنبيه: أعمدة <code dir="ltr">country_id</code> غير مكتملة على جداول الموردين/العملاء/الحسابات — فصل الدول معطّل. حدّث الملفات ثم أعد تحميل هذه الصفحة؛ إن استمر التنبيه فتحقق من صلاحيات مستخدم قاعدة البيانات على <code dir="ltr">ALTER TABLE</code> أو راجع سجل أخطاء PHP على السيرفر.
     </div>
     <?php endif; ?>
     <div id="admin-nav-drawer" class="admin-nav-drawer" hidden>
