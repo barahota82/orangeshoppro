@@ -78,7 +78,7 @@ if (!in_array($page, $allowed, true)) {
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
-orange_catalog_ensure_country_id_columns($pdo);
+orange_catalog_ensure_country_id_columns_once($pdo);
 require_once __DIR__ . '/../includes/countries.php';
 orange_admin_bootstrap_country_context($pdo);
 orange_admin_require_page($admin, $pdo, $page);

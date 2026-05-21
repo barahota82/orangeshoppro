@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 49);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 50);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3028,7 +3028,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_country_gl_v47($pdo);
     orange_catalog_migrate_country_cart_promotions_v48($pdo);
     orange_catalog_migrate_country_gl_accounts_v49($pdo);
-    orange_catalog_ensure_country_id_columns($pdo);
+    orange_catalog_migrate_country_repair_v50($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
         orange_catalog_safe_exec(
@@ -3469,6 +3469,8 @@ function orange_run_migrations(PDO $pdo, ?int $_currentDbVersion = null): void
  */
 function orange_schema_check_and_bootstrap(PDO $pdo): void
 {
+    orange_catalog_ensure_country_id_columns_once($pdo);
+
     static $gateOk = false;
     if ($gateOk) {
         return;
@@ -4174,13 +4176,19 @@ function orange_catalog_country_gl_accounts_v49_satisfied(PDO $pdo): bool
 
 /**
  * إصلاح idempotent: يضيف country_id ويملأ الكويت — يُشغَّل كل مرة حتى لو سُجّل الترحيل سابقاً وفشل ALTER.
- * (الموردين/العملاء/الحسابات/المنتجات/المشتريات/الطلبات/حركات المخزون)
  */
 function orange_catalog_ensure_country_id_columns(PDO $pdo): void
 {
     $kwId = orange_catalog_resolve_kuwait_country_id($pdo);
 
-    foreach (['customers', 'suppliers', 'purchases', 'products'] as $tbl) {
+    $tablesCountryOnly = [
+        'customers', 'suppliers', 'purchases', 'products',
+        'journal_vouchers', 'channels', 'delivery_areas',
+        'cart_promotions', 'cart_gift_promotions', 'cart_bogo_promotions', 'cart_combo_promotions',
+        'storefront_accounts', 'admins',
+        'orange_gl_account_settings', 'orange_gl_setting_alloc',
+    ];
+    foreach ($tablesCountryOnly as $tbl) {
         if (!orange_table_exists($pdo, $tbl)) {
             continue;
         }
@@ -4295,6 +4303,61 @@ function orange_catalog_ensure_country_id_columns(PDO $pdo): void
     }
 }
 
+/** مرة واحدة لكل طلب — يُستدعى حتى عند تخطّي بوابة APCu/OK flag. */
+function orange_catalog_ensure_country_id_columns_once(PDO $pdo): void
+{
+    static $ran = false;
+    if ($ran) {
+        return;
+    }
+    $ran = true;
+    orange_catalog_ensure_country_id_columns($pdo);
+}
+
+/** تسجيل علامة ترحيل إن لم تكن مسجّلة (إصلاح سجل كاذب). */
+function orange_catalog_schema_insert_migration_marker(PDO $pdo, string $filename): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    orange_schema_migrations_ensure_table($pdo);
+    if (orange_schema_migration_already_applied($pdo, $filename)) {
+        return;
+    }
+    try {
+        $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+        $ins->execute([$filename]);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] migration marker insert ' . $filename . ': ' . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * v50 — إصلاح country_id + مزامنة سجل الترحيل مع orange_db.sql / السيرفر.
+ */
+function orange_catalog_migrate_country_repair_v50(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    $marker = 'php_country_repair_v50';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    orange_catalog_ensure_country_id_columns($pdo);
+
+    if (orange_catalog_country_scope_v45_satisfied($pdo)) {
+        orange_catalog_schema_insert_migration_marker($pdo, 'php_country_scope_v45');
+    }
+    if (orange_catalog_country_gl_accounts_v49_satisfied($pdo)) {
+        orange_catalog_schema_insert_migration_marker($pdo, 'php_country_gl_accounts_v49');
+    }
+
+    if (orange_catalog_country_scope_v45_satisfied($pdo)
+        && orange_catalog_country_gl_accounts_v49_satisfied($pdo)) {
+        orange_catalog_schema_insert_migration_marker($pdo, $marker);
+    }
+}
+
 /**
  * بند 13.9(2): country_id (+ warehouse_id على orders/stock_movements) — ترحيل الكويت.
  */
@@ -4303,6 +4366,10 @@ function orange_catalog_migrate_country_scope_v45(PDO $pdo): void
     require_once __DIR__ . '/schema_migrations.php';
     $marker = 'php_country_scope_v45';
     if (orange_schema_migration_already_applied($pdo, $marker)) {
+        if (!orange_catalog_country_scope_v45_satisfied($pdo)) {
+            orange_catalog_ensure_country_id_columns($pdo);
+        }
+
         return;
     }
 
@@ -4602,6 +4669,10 @@ function orange_catalog_migrate_country_gl_accounts_v49(PDO $pdo): void
     require_once __DIR__ . '/schema_migrations.php';
     $marker = 'php_country_gl_accounts_v49';
     if (orange_schema_migration_already_applied($pdo, $marker)) {
+        if (!orange_catalog_country_gl_accounts_v49_satisfied($pdo)) {
+            orange_catalog_ensure_country_id_columns($pdo);
+        }
+
         return;
     }
 
