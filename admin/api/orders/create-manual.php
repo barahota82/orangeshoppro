@@ -124,7 +124,9 @@ try {
             if (!$variant) {
                 throw new RuntimeException('لم يُعثر على متغير للمنتج: ' . $product['name']);
             }
-            if ((int)$variant['stock_quantity'] < $qty) {
+            $variantId = (int) $variant['id'];
+            $available = orange_warehouse_effective_variant_stock($pdo, $variantId, $orderCountryId);
+            if ($available < $qty) {
                 throw new RuntimeException('مخزون غير كافٍ: ' . $product['name']);
             }
         } else {

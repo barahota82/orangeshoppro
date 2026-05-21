@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/admin_permissions.php';
-require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/stock_alerts.php';
+require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/order_intake_queue.php';
+require_once __DIR__ . '/../../includes/warehouses.php';
 
 /** @var array<string, mixed> $admin — من admin/index.php */
 $pdo = db();
@@ -24,10 +26,12 @@ $pendingOrders = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'p
 $productsCount = (int)$pdo->query("SELECT COUNT(*) FROM products WHERE 1=1" . orange_sql_country_and_fragment($pdo, 'products', 'products', $dashCountryId))->fetchColumn();
 
 $lowStockThDash = orange_stock_low_alert_threshold();
+$wQtyDash = orange_warehouse_effective_qty_sql($pdo, $dashCountryId, 'pv', 'wvs_dash');
 $stLowDash = $pdo->prepare(
     'SELECT COUNT(*) FROM product_variants pv
-     INNER JOIN products p ON p.id = pv.product_id
-     WHERE p.is_active = 1 AND pv.stock_quantity <= ?' . $dashProductsSql
+     INNER JOIN products p ON p.id = pv.product_id'
+    . $wQtyDash['join']
+    . ' WHERE p.is_active = 1 AND ' . $wQtyDash['expr'] . ' <= ?' . $dashProductsSql
 );
 $stLowDash->execute([$lowStockThDash]);
 $lowStockVariantsDash = (int) $stLowDash->fetchColumn();
@@ -38,12 +42,22 @@ $intakeQueueVisible = orange_admin_may($admin, $pdo, 'sales', 'view')
     && orange_table_exists($pdo, 'order_intake_queue');
 if ($intakeQueueVisible) {
     try {
-        $intakePending = (int) $pdo->query(
-            "SELECT COUNT(*) FROM order_intake_queue WHERE status = 'pending'"
-        )->fetchColumn();
-        $intakeFailed = (int) $pdo->query(
-            "SELECT COUNT(*) FROM order_intake_queue WHERE status = 'failed'"
-        )->fetchColumn();
+        $intakeScope = orange_order_intake_sql_country_scope($pdo, 'oiq', $dashCountryId);
+        $intakeJoin = $intakeScope !== null ? $intakeScope['join'] : '';
+        $intakeWhere = $intakeScope !== null ? $intakeScope['where'] : '';
+        $intakeParams = $intakeScope !== null ? $intakeScope['params'] : [];
+        $stPending = $pdo->prepare(
+            'SELECT COUNT(*) FROM order_intake_queue oiq' . $intakeJoin
+            . " WHERE oiq.status = 'pending'" . $intakeWhere
+        );
+        $stPending->execute($intakeParams);
+        $intakePending = (int) $stPending->fetchColumn();
+        $stFailed = $pdo->prepare(
+            'SELECT COUNT(*) FROM order_intake_queue oiq' . $intakeJoin
+            . " WHERE oiq.status = 'failed'" . $intakeWhere
+        );
+        $stFailed->execute($intakeParams);
+        $intakeFailed = (int) $stFailed->fetchColumn();
     } catch (Throwable $e) {
         $intakePending = 0;
         $intakeFailed = 0;

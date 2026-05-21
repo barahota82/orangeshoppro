@@ -176,4 +176,6 @@ ORANGE — رؤية المالك: تعدد الدول والقنوات والج�
 
 **تنفيذ (13 — مرحلة 13 — سندات الذمم browse scoped):** **`admin/api/journal/manage.php`** — أنواع **`supplier_payment`** / **`customer_receipt`** في التنقل/البحث/العرض؛ alias **`search`→`search_manual`**؛ **`party_customer_id`** / **`party_supplier_id`** في **`get`**؛ **`orange_journal_voucher_assert_admin_context`** على **`get`**؛ **`orange_gl_voucher_country_bind`** على **`nav_manual`**؛ **`admin/api/partners/customer-receipt-list.php`** و**`customer-receipt-search.php`** (parity مع سندات المورد)؛ شاشة **`partner_party_voucher_ui.php`** (سداد العملاء) — تنقل/بحث/حذف scoped بالدولة.
 
+**تنفيذ (13 — مرحلة 14 — مخزون فعلي §13.1):** **`orange_warehouse_effective_qty_sql`** في **`includes/warehouses.php`**؛ قراءة الرصيد عبر **`orange_warehouse_effective_variant_stock`** في **`api/cart/stock-limits.php`**, **`admin/api/orders/create-manual.php`**, **`admin/pages/manual_order.php`** (فلترة متغيرات الدولة)؛ عرض/تنبيه low-stock من **`warehouse_variant_stock`** في **`admin/pages/stock.php`**, **`admin/pages/dashboard.php`**, **`admin/api/reports/stats.php`**؛ **`orange_admin_assert_entity_country`** على **`admin/api/stock/adjust.php`**؛ فلترة طابور الطلبات في **`dashboard`**؛ **`orange_admin_assert_row_country`** اختياري على **`admin/api/channels/upload-logo.php`** عند تمرير **`channel_id`**.
+
 نهاية الملف.

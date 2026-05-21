@@ -296,6 +296,37 @@ function orange_warehouse_context_for_country(PDO $pdo, int $countryId): array
 }
 
 /**
+ * JOIN + تعبير SQL للرصيد الفعلي (warehouse_variant_stock مع fallback legacy — §13.1).
+ *
+ * @return array{join:string, expr:string, warehouse_id:int}
+ */
+function orange_warehouse_effective_qty_sql(
+    PDO $pdo,
+    int $countryId,
+    string $pvAlias = 'pv',
+    string $wvsAlias = 'wvs_country_stock'
+): array {
+    $warehouseId = orange_warehouse_default_id_for_country($pdo, $countryId);
+    if ($warehouseId <= 0 || !orange_warehouses_table_exists($pdo)) {
+        return [
+            'join' => '',
+            'expr' => $pvAlias . '.stock_quantity',
+            'warehouse_id' => 0,
+        ];
+    }
+    $wid = (int) $warehouseId;
+    $join = ' LEFT JOIN warehouse_variant_stock ' . $wvsAlias
+        . ' ON ' . $wvsAlias . '.warehouse_id = ' . $wid
+        . ' AND ' . $wvsAlias . '.variant_id = ' . $pvAlias . '.id ';
+
+    return [
+        'join' => $join,
+        'expr' => 'COALESCE(' . $wvsAlias . '.quantity, ' . $pvAlias . '.stock_quantity)',
+        'warehouse_id' => $wid,
+    ];
+}
+
+/**
  * @param array<string, mixed> $order
  * @return array{country_id:int, warehouse_id:int}
  */

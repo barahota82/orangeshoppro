@@ -30,6 +30,11 @@ try {
         json_response(['success' => false, 'message' => 'Variant غير موجود'], 404);
     }
 
+    $productId = (int) ($variant['product_id'] ?? 0);
+    if ($productId > 0) {
+        orange_admin_assert_entity_country($pdo, 'products', $productId);
+    }
+
     $countryId = orange_admin_context_country_id($pdo);
     $warehouseId = orange_warehouse_default_id_for_country($pdo, $countryId);
 

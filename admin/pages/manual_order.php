@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
+require_once __DIR__ . '/../../includes/warehouses.php';
 require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
@@ -56,7 +57,12 @@ $products = $pdo->query(
 )->fetchAll(PDO::FETCH_ASSOC);
 }
 
-$variants = $pdo->query('SELECT * FROM product_variants ORDER BY product_id ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
+$variants = $pdo->query(
+    'SELECT pv.* FROM product_variants pv
+     INNER JOIN products p ON p.id = pv.product_id
+     WHERE 1=1' . $moProductsCountrySql . '
+     ORDER BY pv.product_id ASC, pv.id ASC'
+)->fetchAll(PDO::FETCH_ASSOC);
 $variantsByProduct = [];
 foreach ($variants as $v) {
     $pid = (int) $v['product_id'];
@@ -146,7 +152,7 @@ foreach ($products as $p) {
             $base = 'P' . $pid . '-V' . $vid;
         }
         $code = $allocPickCode($base, $codesLower);
-        $avail = (int) ($v['stock_quantity'] ?? 0);
+        $avail = orange_warehouse_effective_variant_stock($pdo, $vid, $moCountryId);
         $res = (int) ($moPendingReservedByVariant[$vid] ?? 0);
         $pickRows[] = [
             'code' => $code,

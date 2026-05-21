@@ -4,11 +4,24 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/upload_paths.php';
+require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/catalog_schema.php';
 
 require_admin_api();
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     json_response(['success' => false, 'message' => 'Method not allowed'], 405);
+}
+
+$channelId = (int) ($_POST['channel_id'] ?? $_GET['channel_id'] ?? 0);
+if ($channelId > 0) {
+    $pdo = db();
+    orange_catalog_ensure_schema($pdo);
+    try {
+        orange_admin_assert_row_country($pdo, 'channels', $channelId);
+    } catch (RuntimeException $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 403);
+    }
 }
 
 if (!isset($_FILES['image']) || !is_array($_FILES['image'])) {

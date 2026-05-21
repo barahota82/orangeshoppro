@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../includes/stock_alerts.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/warehouses.php';
 
 $pdo = db();
 
@@ -13,18 +14,27 @@ $stockCountryId = orange_admin_context_country_id($pdo);
 $stockProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $stockCountryId);
 
 $lowStockTh = orange_stock_low_alert_threshold();
+$wQtyStock = orange_warehouse_effective_qty_sql($pdo, $stockCountryId, 'pv', 'wvs_low');
 $stLowList = $pdo->prepare(
-    'SELECT pv.id AS variant_id, pv.stock_quantity, pv.color, pv.size, p.id AS product_id, p.name AS product_name
+    'SELECT pv.id AS variant_id, ' . $wQtyStock['expr'] . ' AS stock_quantity, pv.color, pv.size, p.id AS product_id, p.name AS product_name
      FROM product_variants pv
-     INNER JOIN products p ON p.id = pv.product_id
-     WHERE p.is_active = 1 AND pv.stock_quantity <= ?' . $stockProductsCountrySql . '
-     ORDER BY pv.stock_quantity ASC, p.name ASC, pv.id ASC'
+     INNER JOIN products p ON p.id = pv.product_id'
+    . $wQtyStock['join']
+    . ' WHERE p.is_active = 1 AND ' . $wQtyStock['expr'] . ' <= ?' . $stockProductsCountrySql . '
+     ORDER BY ' . $wQtyStock['expr'] . ' ASC, p.name ASC, pv.id ASC'
 );
 $stLowList->execute([$lowStockTh]);
 $lowStockRows = $stLowList->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
 $itemList = [];
 $catJoin = orange_catalog_admin_sql_join_product_category_display($pdo, 'p', null);
+$stockWhId = orange_warehouse_default_id_for_country($pdo, $stockCountryId);
+$totalStockSub = ($stockWhId > 0 && orange_warehouses_table_exists($pdo))
+    ? '(SELECT COALESCE(SUM(COALESCE(wvs_sum.quantity, pv2.stock_quantity)), 0)
+        FROM product_variants pv2
+        LEFT JOIN warehouse_variant_stock wvs_sum ON wvs_sum.warehouse_id = ' . (int) $stockWhId . ' AND wvs_sum.variant_id = pv2.id
+        WHERE pv2.product_id = p.id)'
+    : '(SELECT COALESCE(SUM(pv.stock_quantity), 0) FROM product_variants pv WHERE pv.product_id = p.id)';
 try {
     $itemList = $pdo->query("
     SELECT
@@ -34,7 +44,7 @@ try {
         p.is_active,
         c.name_ar AS category_name,
         (SELECT COUNT(*) FROM product_variants pv WHERE pv.product_id = p.id) AS variant_count,
-        (SELECT COALESCE(SUM(pv.stock_quantity), 0) FROM product_variants pv WHERE pv.product_id = p.id) AS total_stock
+        {$totalStockSub} AS total_stock
     FROM products p
     {$catJoin}
     WHERE 1=1{$stockProductsCountrySql}
@@ -44,13 +54,22 @@ try {
     $itemList = [];
 }
 
+$wQtyRows = orange_warehouse_effective_qty_sql($pdo, $stockCountryId, 'pv', 'wvs_rows');
 $rows = $pdo->query("
-    SELECT pv.*, p.name AS product_name
+    SELECT pv.*, p.name AS product_name, " . $wQtyRows['expr'] . " AS stock_quantity_effective
     FROM product_variants pv
-    INNER JOIN products p ON p.id = pv.product_id
+    INNER JOIN products p ON p.id = pv.product_id"
+    . $wQtyRows['join']
+    . "
     WHERE 1=1{$stockProductsCountrySql}
     ORDER BY p.name ASC, pv.color ASC, pv.size ASC, pv.id ASC
 ")->fetchAll(PDO::FETCH_ASSOC);
+foreach ($rows as &$stockRow) {
+    if (isset($stockRow['stock_quantity_effective'])) {
+        $stockRow['stock_quantity'] = (int) $stockRow['stock_quantity_effective'];
+    }
+}
+unset($stockRow);
 ?>
 <div class="page-title page-title--stacked">
     <div>
