@@ -401,7 +401,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
             </div>
         </div>
         <div class="header-actions-cluster">
-            <?php if (!empty($countryOptions) && count($countryOptions) > 0): ?>
+            <?php if (!empty($countryOptions) && count($countryOptions) >= 2): ?>
             <div class="header-actions header-actions--country">
                 <?php
                 $SF_NAV_PLACEMENT = 'header';

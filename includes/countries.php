@@ -281,7 +281,7 @@ function orange_storefront_read_saved_country_code(): ?string
 }
 
 /**
- * كود الدولة الحالية للواجهة: ?country= ثم الكوكي ثم الكويت.
+ * كود الدولة الحالية للواجهة: ?country= ثم قناة الطلب (§13.7) ثم الكوكي ثم الافتراضي.
  */
 function orange_storefront_current_country_code(PDO $pdo): string
 {
@@ -293,6 +293,15 @@ function orange_storefront_current_country_code(PDO $pdo): string
         $fromGet = orange_countries_normalize_code((string) $_GET['country']);
         if ($fromGet !== '' && orange_country_row_by_code($pdo, $fromGet, true) !== null) {
             $memo = $fromGet;
+
+            return $memo;
+        }
+    }
+    if (function_exists('orange_storefront_country_code_from_request_channel')) {
+        $fromChannel = orange_storefront_country_code_from_request_channel($pdo);
+        if ($fromChannel !== null && $fromChannel !== ''
+            && orange_country_row_by_code($pdo, $fromChannel, true) !== null) {
+            $memo = $fromChannel;
 
             return $memo;
         }

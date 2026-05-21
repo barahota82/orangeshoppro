@@ -54,8 +54,14 @@ try {
     $channelSlug = isset($data['channel']) ? (string) $data['channel'] : '';
     $channelSlug = orange_storefront_valid_channel_slug($pdo, $channelSlug);
 
-    $channelRowSt = $pdo->prepare('SELECT id FROM channels WHERE slug = ? AND is_active = 1 LIMIT 1');
-    $channelRowSt->execute([$channelSlug]);
+    $sfCountryId = orange_storefront_current_country_id($pdo);
+    if ($sfCountryId > 0 && orange_channels_has_country_column($pdo)) {
+        $channelRowSt = $pdo->prepare('SELECT id FROM channels WHERE slug = ? AND is_active = 1 AND country_id = ? LIMIT 1');
+        $channelRowSt->execute([$channelSlug, $sfCountryId]);
+    } else {
+        $channelRowSt = $pdo->prepare('SELECT id FROM channels WHERE slug = ? AND is_active = 1 LIMIT 1');
+        $channelRowSt->execute([$channelSlug]);
+    }
     $channelIdForCountry = (int) ($channelRowSt->fetchColumn() ?: 0);
     $accountCountryId = orange_country_id_for_channel($pdo, $channelIdForCountry);
     $hasAccountCountryCol = orange_table_has_column($pdo, 'storefront_accounts', 'country_id');

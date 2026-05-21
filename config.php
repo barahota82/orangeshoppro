@@ -554,6 +554,91 @@ function orange_storefront_channel_slug_from_request_path(PDO $pdo): ?string
     return orange_channel_slug_for_path_segment($pdo, $seg, true);
 }
 
+/**
+ * عند تعدد قنوات بنفس path_segment/slug في دول مختلفة: يفضّل كوكي الدولة ثم الافتراضي.
+ *
+ * @param list<int> $countryIds
+ */
+function orange_storefront_disambiguate_channel_country_ids(PDO $pdo, array $countryIds): int
+{
+    $countryIds = array_values(array_unique(array_filter(
+        array_map(static fn ($id): int => (int) $id, $countryIds),
+        static fn (int $id): bool => $id > 0
+    )));
+    if ($countryIds === []) {
+        return 0;
+    }
+    if (count($countryIds) === 1) {
+        return $countryIds[0];
+    }
+    require_once __DIR__ . '/includes/countries.php';
+    $fromCookie = orange_storefront_read_saved_country_code();
+    if ($fromCookie !== null) {
+        $row = orange_country_row_by_code($pdo, $fromCookie, true);
+        if ($row !== null && in_array((int) $row['id'], $countryIds, true)) {
+            return (int) $row['id'];
+        }
+    }
+
+    return orange_countries_default_id($pdo);
+}
+
+/**
+ * §13.7 — استنتاج دولة الواجهة من رابط القناة (مسار قصير أو ?channel=) بلا فلترة country_id مسبقة.
+ */
+function orange_storefront_country_code_from_request_channel(PDO $pdo): ?string
+{
+    require_once __DIR__ . '/includes/countries.php';
+    if (!orange_channels_has_country_column($pdo)) {
+        return null;
+    }
+    $countryId = 0;
+
+    if (isset($_GET['channel']) && (string) $_GET['channel'] !== '') {
+        $slug = strtolower((string) (preg_replace('/[^a-z0-9\-]/i', '', (string) $_GET['channel']) ?? ''));
+        if ($slug !== '') {
+            $st = $pdo->prepare('SELECT country_id FROM channels WHERE slug = ? AND is_active = 1');
+            $st->execute([$slug]);
+            $ids = [];
+            while ($cid = $st->fetchColumn()) {
+                $ids[] = (int) $cid;
+            }
+            $countryId = orange_storefront_disambiguate_channel_country_ids($pdo, $ids);
+        }
+    }
+
+    if ($countryId <= 0) {
+        $primary = orange_storefront_request_primary_path_segment();
+        if ($primary !== null && $primary !== '') {
+            $seg = strtolower($primary);
+            foreach (orange_storefront_reserved_path_segments() as $rs) {
+                if ($seg === strtolower((string) $rs)) {
+                    return null;
+                }
+            }
+            $st = $pdo->prepare('SELECT country_id FROM channels WHERE path_segment = ? AND is_active = 1');
+            $st->execute([$seg]);
+            $ids = [];
+            while ($cid = $st->fetchColumn()) {
+                $ids[] = (int) $cid;
+            }
+            if ($ids !== []) {
+                $countryId = orange_storefront_disambiguate_channel_country_ids($pdo, $ids);
+            }
+        }
+    }
+
+    if ($countryId <= 0) {
+        return null;
+    }
+    $row = orange_country_row_by_id($pdo, $countryId, true);
+    if ($row === null) {
+        return null;
+    }
+
+    return orange_countries_normalize_code((string) ($row['code'] ?? ''));
+}
+
 function orange_channel_slug_for_path_segment(PDO $pdo, string $pathSegment, bool $requireActive = true, ?int $countryId = null): ?string
 {
     require_once __DIR__ . '/includes/countries.php';
