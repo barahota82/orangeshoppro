@@ -2,6 +2,25 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/catalog_schema.php';
+
+/**
+ * @throws RuntimeException
+ */
+function orange_purchase_apply_variant_stock_increase(PDO $pdo, int $variantId, int $qty, ?int $countryId = null): void
+{
+    if ($variantId <= 0 || $qty <= 0) {
+        return;
+    }
+    require_once __DIR__ . '/countries.php';
+    require_once __DIR__ . '/warehouses.php';
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_admin_context_country_id($pdo);
+    }
+    $warehouseId = orange_warehouse_default_id_for_country($pdo, $countryId);
+    orange_warehouse_apply_variant_delta($pdo, $warehouseId, $variantId, $qty, 0);
+}
+
 /**
  * Resolve which product_variants row a purchase line updates (one variant only — correct stock).
  *

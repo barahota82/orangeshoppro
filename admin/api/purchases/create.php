@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/purchase_helpers.php';
 require_once __DIR__ . '/../../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../../includes/purchase_gl_accounts.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -108,9 +109,16 @@ try {
     }
     $netTotal = $subtotal - $invoiceDiscountAmt;
 
+    $purchaseCountryId = orange_admin_context_country_id($pdo);
+
     $insertCols = 'supplier_id, total, type, notes';
     $insertPlaceholders = '?, ?, ?, ?';
     $insertValues = [$supplierId > 0 ? $supplierId : null, $netTotal, $type, $notes];
+    if (orange_table_has_country_id($pdo, 'purchases') && $purchaseCountryId > 0) {
+        $insertCols .= ', country_id';
+        $insertPlaceholders .= ', ?';
+        $insertValues[] = $purchaseCountryId;
+    }
     if ($hasSubtotal) {
         $insertCols .= ', subtotal';
         $insertPlaceholders .= ', ?';
@@ -156,8 +164,7 @@ try {
             }
             $sql .= ') VALUES (' . implode(',', array_fill(0, count($vals), '?')) . ')';
             $pdo->prepare($sql)->execute($vals);
-            $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ? AND product_id = ?')
-                ->execute([$qty, $variantId, $productId]);
+            orange_purchase_apply_variant_stock_increase($pdo, $variantId, $qty, $purchaseCountryId);
         } elseif ($hasPiVariant) {
             $sql = 'INSERT INTO purchase_items (purchase_id, product_id, variant_id, qty, cost';
             $vals = [$purchaseId, $productId, $variantId, $qty, $cost];
@@ -168,8 +175,7 @@ try {
             }
             $sql .= ') VALUES (' . implode(',', array_fill(0, count($vals), '?')) . ')';
             $pdo->prepare($sql)->execute($vals);
-            $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ?')
-                ->execute([$qty, $variantId]);
+            orange_purchase_apply_variant_stock_increase($pdo, $variantId, $qty, $purchaseCountryId);
         } elseif ($hasPiQtyReceived) {
             $sql = 'INSERT INTO purchase_items (purchase_id, product_id, qty, qty_received, cost';
             $vals = [$purchaseId, $productId, $qty, $qty, $cost];
@@ -180,8 +186,7 @@ try {
             }
             $sql .= ') VALUES (' . implode(',', array_fill(0, count($vals), '?')) . ')';
             $pdo->prepare($sql)->execute($vals);
-            $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ? AND product_id = ?')
-                ->execute([$qty, $variantId, $productId]);
+            orange_purchase_apply_variant_stock_increase($pdo, $variantId, $qty, $purchaseCountryId);
         } else {
             $sql = 'INSERT INTO purchase_items (purchase_id, product_id, qty, cost';
             $vals = [$purchaseId, $productId, $qty, $cost];
@@ -192,8 +197,7 @@ try {
             }
             $sql .= ') VALUES (' . implode(',', array_fill(0, count($vals), '?')) . ')';
             $pdo->prepare($sql)->execute($vals);
-            $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ?')
-                ->execute([$qty, $variantId]);
+            orange_purchase_apply_variant_stock_increase($pdo, $variantId, $qty, $purchaseCountryId);
         }
     }
 

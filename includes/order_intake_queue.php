@@ -11,6 +11,8 @@ require_once __DIR__ . '/storefront_cart_items.php';
 require_once __DIR__ . '/cart_promotions.php';
 require_once __DIR__ . '/cart_combo_promotions.php';
 require_once __DIR__ . '/storefront_checkout_promo_lines.php';
+require_once __DIR__ . '/countries.php';
+require_once __DIR__ . '/warehouses.php';
 
 function orange_order_intake_snip_message(string $msg, int $max = 500): string
 {
@@ -53,10 +55,14 @@ function orange_storefront_upsert_customer_from_checkout(
     string $address,
     string $emailRaw,
     string $orderNotes,
-    string $orderNumber
+    string $orderNumber,
+    ?int $countryId = null
 ): ?int {
     if (!orange_table_exists($pdo, 'customers')) {
         return null;
+    }
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_storefront_current_country_id($pdo);
     }
     $phone = trim($phone);
     if ($phone === '') {
@@ -84,13 +90,19 @@ function orange_storefront_upsert_customer_from_checkout(
     $hasEmail = orange_table_has_column($pdo, 'customers', 'email');
     $hasCustDial = orange_table_has_column($pdo, 'customers', 'phone_country_dial');
     $hasCustNat = orange_table_has_column($pdo, 'customers', 'phone_national');
+    $hasCustCountry = orange_table_has_country_id($pdo, 'customers');
     $dialSql = ($phoneCountryDial !== null && $phoneCountryDial !== '') ? substr(preg_replace('/\D+/', '', $phoneCountryDial), 0, 8) : null;
     $dialSql = ($dialSql !== null && $dialSql !== '') ? $dialSql : null;
     $natSql = ($phoneNational !== null && $phoneNational !== '') ? substr(preg_replace('/\D+/', '', $phoneNational), 0, 32) : null;
     $natSql = ($natSql !== null && $natSql !== '') ? $natSql : null;
 
-    $find = $pdo->prepare('SELECT id, notes FROM customers WHERE phone = ? LIMIT 1');
-    $find->execute([$phone]);
+    if ($hasCustCountry && $countryId > 0) {
+        $find = $pdo->prepare('SELECT id, notes FROM customers WHERE phone = ? AND country_id = ? LIMIT 1');
+        $find->execute([$phone, $countryId]);
+    } else {
+        $find = $pdo->prepare('SELECT id, notes FROM customers WHERE phone = ? LIMIT 1');
+        $find->execute([$phone]);
+    }
     $existing = $find->fetch(PDO::FETCH_ASSOC);
 
     $mergeNotes = static function (?string $prev, string $line): string {
@@ -144,6 +156,11 @@ function orange_storefront_upsert_customer_from_checkout(
     $cols = ['name_ar', 'phone'];
     $placeholders = ['?', '?'];
     $params = [$nameAr, $phone];
+    if ($hasCustCountry && $countryId > 0) {
+        $cols[] = 'country_id';
+        $placeholders[] = '?';
+        $params[] = $countryId;
+    }
     if ($hasArea) {
         $cols[] = 'area';
         $placeholders[] = '?';
@@ -181,8 +198,16 @@ function orange_storefront_upsert_customer_from_checkout(
     } catch (PDOException $e) {
         $dup = (int) (($e->errorInfo[1] ?? 0));
         if ($dup === 1062 || str_contains($e->getMessage(), 'Duplicate')) {
-            $find2 = $pdo->prepare('SELECT id, notes FROM customers WHERE phone = ? LIMIT 1');
-            $find2->execute([$phone]);
+            $find2 = $pdo->prepare(
+                $hasCustCountry && $countryId > 0
+                    ? 'SELECT id, notes FROM customers WHERE phone = ? AND country_id = ? LIMIT 1'
+                    : 'SELECT id, notes FROM customers WHERE phone = ? LIMIT 1'
+            );
+            if ($hasCustCountry && $countryId > 0) {
+                $find2->execute([$phone, $countryId]);
+            } else {
+                $find2->execute([$phone]);
+            }
             $ex2 = $find2->fetch(PDO::FETCH_ASSOC);
             if ($ex2 !== false && $ex2 !== null) {
                 $id = (int) $ex2['id'];
@@ -375,8 +400,12 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         trim((string) $data['address']),
         trim((string) $data['email']),
         isset($data['notes']) ? trim((string) $data['notes']) : '',
-        $orderNumber
+        $orderNumber,
+        orange_country_id_for_channel($pdo, (int) $data['channel_id'])
     );
+
+    $orderCountryId = orange_country_id_for_channel($pdo, (int) $data['channel_id']);
+    $orderWarehouseId = orange_warehouse_default_id_for_country($pdo, $orderCountryId);
 
     $hasOrdDial = orange_table_has_column($pdo, 'orders', 'phone_country_dial');
     $hasOrdNat = orange_table_has_column($pdo, 'orders', 'phone_national');
@@ -466,6 +495,16 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         $params[] = $bogoPromoId !== null && $bogoPromoId > 0 ? $bogoPromoId : null;
         $params[] = $bogoGiftVariantId !== null && $bogoGiftVariantId > 0 ? $bogoGiftVariantId : null;
     }
+    if (orange_table_has_country_id($pdo, 'orders') && $orderCountryId > 0) {
+        $cols .= ', country_id';
+        $ph .= ', ?';
+        $params[] = $orderCountryId;
+    }
+    if (orange_table_has_column($pdo, 'orders', 'warehouse_id') && $orderWarehouseId > 0) {
+        $cols .= ', warehouse_id';
+        $ph .= ', ?';
+        $params[] = $orderWarehouseId;
+    }
     $cols .= ', created_at';
     $ph .= ', NOW()';
 
@@ -476,7 +515,7 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
 
     orange_storefront_insert_order_items_for_order($pdo, $orderId, $linesForStock);
 
-    orange_order_apply_pending_stock_reservation($pdo, $orderNumber, $linesForStock);
+    orange_order_apply_pending_stock_reservation($pdo, $orderNumber, $linesForStock, $orderCountryId, $orderWarehouseId);
 
     $messageLines = [];
     $messageLines[] = "Order Number: {$orderNumber}";

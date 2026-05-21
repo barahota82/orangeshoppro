@@ -9,6 +9,7 @@ $orangeAdminPage = isset($page) ? (string) $page : 'dashboard';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
+require_once __DIR__ . '/../../includes/countries.php';
 /** @var ?\PDO $pdo — يضبطه admin/index.php قبل تضمين هذا الملف؛ تجنّب استدعاء ensure_schema مرتين لكل صفحة أدمن */
 $pdoNav = (isset($pdo) && $pdo instanceof PDO) ? $pdo : db();
 if (!isset($pdo) || !$pdo instanceof PDO) {
@@ -32,6 +33,15 @@ try {
 $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_DEGRADED)
     ? ' data-orange-schema-degraded="1"'
     : '';
+$orangeAdminCountryIdNav = orange_admin_context_country_id($pdoNav);
+$orangeAdminCountriesNav = orange_countries_admin_list($pdoNav);
+$orangeAdminCountryCodeNav = 'kw';
+foreach ($orangeAdminCountriesNav as $ocNav) {
+    if ((int) ($ocNav['id'] ?? 0) === $orangeAdminCountryIdNav) {
+        $orangeAdminCountryCodeNav = (string) ($ocNav['code'] ?? 'kw');
+        break;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl"<?php echo $orangeSchemaDegradedAttr; ?>>
@@ -70,6 +80,29 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
                     <div class="admin-sidebar-brand__subtitle">لوحة التحكم المؤسسية</div>
                 </div>
             </div>
+            <?php if (count($orangeAdminCountriesNav) > 0): ?>
+            <div class="admin-topbar-country" style="margin-inline-start:auto;display:flex;align-items:center;gap:8px;">
+                <label for="admin_topbar_country" style="font-size:13px;color:#64748b;white-space:nowrap;">الدولة</label>
+                <select id="admin_topbar_country" style="min-width:140px;padding:6px 8px;border-radius:8px;border:1px solid #cbd5e1;"
+                    onchange="(function(sel){var u=new URL(window.location.href);if(sel.value){u.searchParams.set('admin_country',sel.value);}else{u.searchParams.delete('admin_country');}window.location.href=u.toString();})(this)">
+                    <?php foreach ($orangeAdminCountriesNav as $ocOpt):
+                        $ocCode = (string) ($ocOpt['code'] ?? '');
+                        if ($ocCode === '') {
+                            continue;
+                        }
+                        $ocLabel = trim((string) ($ocOpt['name_ar'] ?? ''));
+                        if ($ocLabel === '') {
+                            $ocLabel = (string) ($ocOpt['name_en'] ?? $ocCode);
+                        }
+                        ?>
+                    <option value="<?php echo htmlspecialchars($ocCode, ENT_QUOTES, 'UTF-8'); ?>"
+                        <?php echo $ocCode === $orangeAdminCountryCodeNav ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($ocLabel, ENT_QUOTES, 'UTF-8'); ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <?php endif; ?>
             <?php
             /**
              * دوال الميجا وجوال تُقيِّم نشاط الرابط بالاعتماد على ?page فقط؛

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/order_helpers.php';
 require_once __DIR__ . '/catalog_schema.php';
+require_once __DIR__ . '/warehouses.php';
 
 /**
  * Stock reference key shared by reservation / fulfillment / release (matches journal ref prefix).
@@ -25,26 +26,28 @@ function orange_order_has_pending_stock_reservation(PDO $pdo, string $orderNumbe
 
 /**
  * Decrement variant stock for a web/WhatsApp checkout (pending order). Idempotent per order reference.
- * Policy + triggers: docs/archive/ORANGE_STOCK_ORDER_POLICY.txt §2 — called from
- * `orange_storefront_execute_checkout_payload()` (includes/order_intake_queue.php) and from
- * `api/orders/amend-order-items.php` after `orange_order_release_pending_stock_reservation()`.
  *
  * @param array<int,array{product:array<string,mixed>,qty:int,color:string,size:string,variant_id:int,price:float,cost:float}> $validatedItems
  */
-function orange_order_apply_pending_stock_reservation(PDO $pdo, string $orderNumber, array $validatedItems): void
-{
+function orange_order_apply_pending_stock_reservation(
+    PDO $pdo,
+    string $orderNumber,
+    array $validatedItems,
+    ?int $countryId = null,
+    ?int $warehouseId = null
+): void {
     $ref = orange_order_stock_reference($orderNumber);
     if (orange_order_has_pending_stock_reservation($pdo, $orderNumber)) {
         return;
     }
 
-    $moveStmt = $pdo->prepare("
-        INSERT INTO stock_movements (
-            product_id, variant_id, type, qty, old_stock, new_stock, reason, created_at, reference
-        ) VALUES (
-            ?, ?, 'pending_order', ?, ?, ?, 'Checkout reserve', NOW(), ?
-        )
-    ");
+    require_once __DIR__ . '/countries.php';
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_storefront_current_country_id($pdo);
+    }
+    if ($warehouseId === null || $warehouseId <= 0) {
+        $warehouseId = orange_warehouse_default_id_for_country($pdo, $countryId);
+    }
 
     foreach ($validatedItems as $row) {
         $vid = (int)($row['variant_id'] ?? 0);
@@ -56,29 +59,18 @@ function orange_order_apply_pending_stock_reservation(PDO $pdo, string $orderNum
             continue;
         }
 
-        $vStmt = $pdo->prepare('SELECT stock_quantity FROM product_variants WHERE id = ? LIMIT 1 FOR UPDATE');
-        $vStmt->execute([$vid]);
-        $oldStock = (int)$vStmt->fetchColumn();
-        if ($oldStock < $qty) {
-            throw new RuntimeException('Insufficient stock for product: ' . (string)($row['product']['name'] ?? ''));
-        }
-        $newStock = $oldStock - $qty;
-
-        $upd = $pdo->prepare(
-            'UPDATE product_variants SET stock_quantity = ? WHERE id = ? AND stock_quantity >= ?'
-        );
-        $upd->execute([$newStock, $vid, $qty]);
-        if ($upd->rowCount() !== 1) {
-            throw new RuntimeException('Stock update failed for product: ' . (string)($row['product']['name'] ?? ''));
-        }
-
-        $moveStmt->execute([
-            (int)$row['product']['id'],
-            $vid,
-            $qty,
-            $oldStock,
-            $newStock,
-            $ref,
+        $stockChange = orange_warehouse_apply_variant_delta($pdo, $warehouseId, $vid, -$qty, 0);
+        orange_stock_movement_insert($pdo, [
+            'product_id' => (int)$row['product']['id'],
+            'variant_id' => $vid,
+            'type' => 'pending_order',
+            'qty' => $qty,
+            'old_stock' => $stockChange['old'],
+            'new_stock' => $stockChange['new'],
+            'reason' => 'Checkout reserve',
+            'reference' => $ref,
+            'country_id' => $countryId,
+            'warehouse_id' => $warehouseId > 0 ? $warehouseId : null,
         ]);
     }
 }
@@ -101,17 +93,22 @@ function orange_order_release_pending_stock_reservation(PDO $pdo, array $order):
         return;
     }
 
+    require_once __DIR__ . '/countries.php';
+    $countryId = isset($order['country_id']) ? (int) $order['country_id'] : 0;
+    $warehouseId = isset($order['warehouse_id']) ? (int) $order['warehouse_id'] : 0;
+    if ($countryId <= 0 && isset($order['channel_id'])) {
+        $countryId = orange_country_id_for_channel($pdo, (int) $order['channel_id']);
+    }
+    if ($countryId <= 0) {
+        $countryId = orange_storefront_current_country_id($pdo);
+    }
+    if ($warehouseId <= 0) {
+        $warehouseId = orange_warehouse_default_id_for_country($pdo, $countryId);
+    }
+
     $itemsStmt = $pdo->prepare('SELECT * FROM order_items WHERE order_id = ?');
     $itemsStmt->execute([(int)$order['id']]);
     $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-
-    $moveStmt = $pdo->prepare("
-        INSERT INTO stock_movements (
-            product_id, variant_id, type, qty, old_stock, new_stock, reason, created_at, reference
-        ) VALUES (
-            ?, ?, 'order_release', ?, ?, ?, 'Order cancelled / rejected', NOW(), ?
-        )
-    ");
 
     foreach ($items as $item) {
         $variant = orange_order_resolve_variant_from_item($pdo, $item);
@@ -120,20 +117,18 @@ function orange_order_release_pending_stock_reservation(PDO $pdo, array $order):
         }
         $vid = (int)$variant['id'];
         $qty = (int)$item['qty'];
-        $vStmt = $pdo->prepare('SELECT stock_quantity FROM product_variants WHERE id = ? LIMIT 1 FOR UPDATE');
-        $vStmt->execute([$vid]);
-        $oldStock = (int)$vStmt->fetchColumn();
-        $newStock = $oldStock + $qty;
-
-        $pdo->prepare('UPDATE product_variants SET stock_quantity = ? WHERE id = ?')->execute([$newStock, $vid]);
-
-        $moveStmt->execute([
-            (int)$item['product_id'],
-            $vid,
-            $qty,
-            $oldStock,
-            $newStock,
-            $ref,
+        $stockChange = orange_warehouse_apply_variant_delta($pdo, $warehouseId, $vid, $qty, 0);
+        orange_stock_movement_insert($pdo, [
+            'product_id' => (int)$item['product_id'],
+            'variant_id' => $vid,
+            'type' => 'order_release',
+            'qty' => $qty,
+            'old_stock' => $stockChange['old'],
+            'new_stock' => $stockChange['new'],
+            'reason' => 'Order cancelled / rejected',
+            'reference' => $ref,
+            'country_id' => $countryId,
+            'warehouse_id' => $warehouseId > 0 ? $warehouseId : null,
         ]);
     }
 
@@ -143,17 +138,18 @@ function orange_order_release_pending_stock_reservation(PDO $pdo, array $order):
 }
 
 /**
- * تسمية عربية لنوع حركة المخزون (للعرض في الواجهات).
- */
-/**
  * طلبات لديها حركات مخزون type = pending_order (حجز نشط) — س28.
  *
  * @return list<array<string,mixed>>
  */
-function orange_admin_orders_with_pending_stock_reservations(PDO $pdo): array
+function orange_admin_orders_with_pending_stock_reservations(PDO $pdo, ?int $countryId = null): array
 {
     if (!orange_table_exists($pdo, 'stock_movements') || !orange_table_exists($pdo, 'orders')) {
         return [];
+    }
+    require_once __DIR__ . '/countries.php';
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_admin_context_country_id($pdo);
     }
     try {
         $sql = '
@@ -171,11 +167,21 @@ function orange_admin_orders_with_pending_stock_reservations(PDO $pdo): array
                 WHERE sm.reference = CONCAT(\'ORDER-\', o.order_number)
                   AND sm.type = \'pending_order\'
                 LIMIT 1
-            )
-            ORDER BY o.created_at DESC, o.id DESC
-        ';
+            )';
+        $params = [];
+        $countryFilter = orange_sql_filter_country_id($pdo, 'orders', 'o', $countryId);
+        if ($countryFilter !== null) {
+            $sql .= $countryFilter['sql'];
+            $params[] = $countryFilter['param'];
+        }
+        $sql .= ' ORDER BY o.created_at DESC, o.id DESC';
+        if ($params === []) {
+            return $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        }
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
 
-        return $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] orange_admin_orders_with_pending_stock_reservations: ' . $e->getMessage());

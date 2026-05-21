@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/phone_validation.php';
 require_once __DIR__ . '/../../../includes/account_tree.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 function orange_supplier_next_auto_code(PDO $pdo): ?string
@@ -52,6 +53,8 @@ try {
     if (!orange_table_exists($pdo, 'suppliers')) {
         json_response(['success' => false, 'message' => 'جدول الموردين غير متوفر'], 500);
     }
+    $supplierAdminCountryId = orange_admin_context_country_id($pdo);
+    $hasSupplierCountry = orange_table_has_country_id($pdo, 'suppliers');
     $data = get_json_input();
     $attachmentsJsonProvided = is_array($data) && array_key_exists('attachments_json', $data);
     $openingBalanceProvided = is_array($data) && array_key_exists('opening_balance', $data);
@@ -504,6 +507,11 @@ try {
     $cols = ['name', 'phone', 'notes'];
     $placeholders = ['?', '?', '?'];
     $params = [$name, $phoneSql, $notesSql];
+    if ($hasSupplierCountry && $supplierAdminCountryId > 0) {
+        $cols[] = 'country_id';
+        $placeholders[] = '?';
+        $params[] = $supplierAdminCountryId;
+    }
     if ($hasCode) {
         $cols[] = 'code';
         $placeholders[] = '?';

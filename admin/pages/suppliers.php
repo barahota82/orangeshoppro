@@ -213,8 +213,21 @@ $rows = [];
 $supplierSearchRowsPayload = [];
 $totalBalance = 0.0;
 if (orange_table_exists($pdo, 'suppliers')) {
-    $sql = 'SELECT s.* FROM suppliers s ORDER BY s.name ASC, s.id ASC';
-    $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $sql = 'SELECT s.* FROM suppliers s WHERE 1=1';
+    $supplierParams = [];
+    $supplierCountryFilter = orange_sql_filter_country_id($pdo, 'suppliers', 's', $supplierAdminCountryId);
+    if ($supplierCountryFilter !== null) {
+        $sql .= $supplierCountryFilter['sql'];
+        $supplierParams[] = $supplierCountryFilter['param'];
+    }
+    $sql .= ' ORDER BY s.name ASC, s.id ASC';
+    if ($supplierParams === []) {
+        $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } else {
+        $supplierSt = $pdo->prepare($sql);
+        $supplierSt->execute($supplierParams);
+        $rows = $supplierSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
     foreach ($rows as $r) {
         $sid = (int) ($r['id'] ?? 0);
         if ($sid <= 0) {

@@ -1,9 +1,13 @@
 <?php
 require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/warehouses.php';
 require_admin_api();
 
 try {
     $pdo = db();
+    orange_catalog_ensure_schema($pdo);
     $data = get_json_input();
 
     $variantId = (int)($data['variant_id'] ?? 0);
@@ -26,28 +30,23 @@ try {
         json_response(['success' => false, 'message' => 'Variant غير موجود'], 404);
     }
 
-    $oldStock = (int)$variant['stock_quantity'];
+    $countryId = orange_admin_context_country_id($pdo);
+    $warehouseId = orange_warehouse_default_id_for_country($pdo, $countryId);
 
     $pdo->beginTransaction();
 
-    $pdo->prepare("UPDATE product_variants SET stock_quantity = ? WHERE id = ?")
-        ->execute([$newStock, $variantId]);
+    $stockChange = orange_warehouse_set_variant_quantity($pdo, $warehouseId, $variantId, $newStock);
 
-    $moveStmt = $pdo->prepare("
-        INSERT INTO stock_movements (
-            product_id, variant_id, type, qty, old_stock, new_stock, reason, created_at
-        ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, NOW()
-        )
-    ");
-    $moveStmt->execute([
-        (int)$variant['product_id'],
-        $variantId,
-        $movementType,
-        abs($newStock - $oldStock),
-        $oldStock,
-        $newStock,
-        $reason
+    orange_stock_movement_insert($pdo, [
+        'product_id' => (int)$variant['product_id'],
+        'variant_id' => $variantId,
+        'type' => $movementType,
+        'qty' => abs($stockChange['new'] - $stockChange['old']),
+        'old_stock' => $stockChange['old'],
+        'new_stock' => $stockChange['new'],
+        'reason' => $reason,
+        'country_id' => $countryId > 0 ? $countryId : null,
+        'warehouse_id' => $warehouseId > 0 ? $warehouseId : null,
     ]);
 
     $pdo->commit();

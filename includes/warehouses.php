@@ -151,3 +151,146 @@ function orange_warehouse_effective_variant_stock(PDO $pdo, int $variantId, ?int
 
     return $legacy !== false && $legacy !== null ? (int) $legacy : 0;
 }
+
+/**
+ * @return array{old:int, new:int}
+ */
+function orange_warehouse_apply_variant_delta(
+    PDO $pdo,
+    int $warehouseId,
+    int $variantId,
+    int $delta,
+    int $minQty = 0
+): array {
+    if ($warehouseId <= 0 || $variantId <= 0) {
+        throw new RuntimeException('Invalid warehouse stock target');
+    }
+    if (!orange_warehouses_table_exists($pdo)) {
+        $st = $pdo->prepare('SELECT stock_quantity FROM product_variants WHERE id = ? LIMIT 1 FOR UPDATE');
+        $st->execute([$variantId]);
+        $old = (int) ($st->fetchColumn() ?: 0);
+        $new = $old + $delta;
+        if ($new < $minQty) {
+            throw new RuntimeException('Insufficient stock');
+        }
+        $pdo->prepare('UPDATE product_variants SET stock_quantity = ? WHERE id = ?')->execute([$new, $variantId]);
+
+        return ['old' => $old, 'new' => $new];
+    }
+
+    $sel = $pdo->prepare(
+        'SELECT quantity FROM warehouse_variant_stock WHERE warehouse_id = ? AND variant_id = ? LIMIT 1 FOR UPDATE'
+    );
+    $sel->execute([$warehouseId, $variantId]);
+    $old = (int) ($sel->fetchColumn() ?: 0);
+    $new = $old + $delta;
+    if ($new < $minQty) {
+        throw new RuntimeException('Insufficient stock');
+    }
+    $pdo->prepare(
+        'INSERT INTO warehouse_variant_stock (warehouse_id, variant_id, quantity)
+         VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE quantity = VALUES(quantity)'
+    )->execute([$warehouseId, $variantId, $new]);
+    orange_warehouse_sync_legacy_variant_quantity($pdo, $warehouseId, $variantId, $new);
+
+    return ['old' => $old, 'new' => $new];
+}
+
+function orange_warehouse_set_variant_quantity(PDO $pdo, int $warehouseId, int $variantId, int $newQty): array
+{
+    if ($warehouseId <= 0 || $variantId <= 0) {
+        throw new RuntimeException('Invalid warehouse stock target');
+    }
+    if ($newQty < 0) {
+        $newQty = 0;
+    }
+    if (!orange_warehouses_table_exists($pdo)) {
+        $st = $pdo->prepare('SELECT stock_quantity FROM product_variants WHERE id = ? LIMIT 1 FOR UPDATE');
+        $st->execute([$variantId]);
+        $old = (int) ($st->fetchColumn() ?: 0);
+        $pdo->prepare('UPDATE product_variants SET stock_quantity = ? WHERE id = ?')->execute([$newQty, $variantId]);
+
+        return ['old' => $old, 'new' => $newQty];
+    }
+
+    $sel = $pdo->prepare(
+        'SELECT quantity FROM warehouse_variant_stock WHERE warehouse_id = ? AND variant_id = ? LIMIT 1 FOR UPDATE'
+    );
+    $sel->execute([$warehouseId, $variantId]);
+    $old = (int) ($sel->fetchColumn() ?: 0);
+    $pdo->prepare(
+        'INSERT INTO warehouse_variant_stock (warehouse_id, variant_id, quantity)
+         VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE quantity = VALUES(quantity)'
+    )->execute([$warehouseId, $variantId, $newQty]);
+    orange_warehouse_sync_legacy_variant_quantity($pdo, $warehouseId, $variantId, $newQty);
+
+    return ['old' => $old, 'new' => $newQty];
+}
+
+/** مرحلة انتقالية: مزامنة product_variants مع مخزن الكويت الافتراضي (بند 13.1). */
+function orange_warehouse_sync_legacy_variant_quantity(PDO $pdo, int $warehouseId, int $variantId, int $qty): void
+{
+    if (!orange_table_exists($pdo, 'product_variants') || !orange_table_exists($pdo, 'warehouses')) {
+        return;
+    }
+    $wh = orange_warehouse_row_by_id($pdo, $warehouseId);
+    if ($wh === null || (int) ($wh['is_default'] ?? 0) !== 1) {
+        return;
+    }
+    $kwId = orange_countries_default_id($pdo);
+    if ((int) ($wh['country_id'] ?? 0) !== $kwId) {
+        return;
+    }
+    $pdo->prepare('UPDATE product_variants SET stock_quantity = ? WHERE id = ? LIMIT 1')
+        ->execute([$qty, $variantId]);
+}
+
+/**
+ * @param array<string, mixed> $fields product_id, variant_id, type, qty, old_stock, new_stock, reason, reference?, country_id?, warehouse_id?
+ */
+function orange_stock_movement_insert(PDO $pdo, array $fields): void
+{
+    if (!orange_table_exists($pdo, 'stock_movements')) {
+        return;
+    }
+    $cols = ['product_id', 'variant_id', 'type', 'qty', 'old_stock', 'new_stock', 'reason', 'created_at'];
+    $vals = [
+        (int) ($fields['product_id'] ?? 0),
+        (int) ($fields['variant_id'] ?? 0),
+        (string) ($fields['type'] ?? ''),
+        (int) ($fields['qty'] ?? 0),
+        (int) ($fields['old_stock'] ?? 0),
+        (int) ($fields['new_stock'] ?? 0),
+        (string) ($fields['reason'] ?? ''),
+    ];
+    $ph = ['?', '?', '?', '?', '?', '?', '?', 'NOW()'];
+    if (orange_table_has_column($pdo, 'stock_movements', 'reference')) {
+        $cols[] = 'reference';
+        $vals[] = isset($fields['reference']) ? (string) $fields['reference'] : null;
+        $ph[] = '?';
+    }
+    if (orange_table_has_column($pdo, 'stock_movements', 'country_id')) {
+        $cols[] = 'country_id';
+        $vals[] = isset($fields['country_id']) ? (int) $fields['country_id'] : null;
+        $ph[] = '?';
+    }
+    if (orange_table_has_column($pdo, 'stock_movements', 'warehouse_id')) {
+        $cols[] = 'warehouse_id';
+        $vals[] = isset($fields['warehouse_id']) ? (int) $fields['warehouse_id'] : null;
+        $ph[] = '?';
+    }
+    $sql = 'INSERT INTO stock_movements (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $ph) . ')';
+    $pdo->prepare($sql)->execute($vals);
+}
+
+function orange_warehouse_context_for_country(PDO $pdo, int $countryId): array
+{
+    if ($countryId <= 0) {
+        $countryId = orange_storefront_current_country_id($pdo);
+    }
+    $warehouseId = orange_warehouse_default_id_for_country($pdo, $countryId);
+
+    return ['country_id' => $countryId, 'warehouse_id' => $warehouseId];
+}

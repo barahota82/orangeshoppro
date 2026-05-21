@@ -9,6 +9,8 @@ require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/order_fulfillment.php';
 require_once __DIR__ . '/../../../includes/phone_validation.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
+require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/warehouses.php';
 require_admin_api();
 
 try {
@@ -135,6 +137,9 @@ try {
     $amountPaidIn = max(0.0, (float) ($data['amount_paid'] ?? 0));
     $amountPaidIn = min($amountPaidIn, $total);
 
+    $orderCountryId = orange_country_id_for_channel($pdo, (int)$data['channel_id']);
+    $orderWarehouseId = orange_warehouse_default_id_for_country($pdo, $orderCountryId);
+
     $cols = 'order_number, customer_name, phone, area, address, notes, channel_id, status, total';
     $ph = '?, ?, ?, ?, ?, ?, ?, \'completed\', ?';
     $params = [
@@ -161,6 +166,16 @@ try {
         $cols .= ', amount_paid';
         $ph .= ', ?';
         $params[] = $amountPaidIn;
+    }
+    if (orange_table_has_country_id($pdo, 'orders') && $orderCountryId > 0) {
+        $cols .= ', country_id';
+        $ph .= ', ?';
+        $params[] = $orderCountryId;
+    }
+    if (orange_table_has_column($pdo, 'orders', 'warehouse_id') && $orderWarehouseId > 0) {
+        $cols .= ', warehouse_id';
+        $ph .= ', ?';
+        $params[] = $orderWarehouseId;
     }
     $cols .= ', created_at';
     $ph .= ', NOW()';

@@ -3,8 +3,10 @@
 require_once __DIR__ . '/../../includes/order_helpers.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
+$adminCountryId = orange_admin_context_country_id($pdo);
 $hasOrderInvoiceCol = orange_table_has_column($pdo, 'orders', 'invoice_number');
 $hasCartPromoDiscountCol = orange_table_has_column($pdo, 'orders', 'cart_promotion_discount');
 $hasCartComboDiscountCol = orange_table_has_column($pdo, 'orders', 'cart_combo_discount');
@@ -56,6 +58,11 @@ if ($payFilter === 'cash') {
 if ($customerFilterId > 0 && $hasOrdersCustomerCol) {
     $sql .= ' AND o.customer_id = ?';
     $sqlParams[] = $customerFilterId;
+}
+$ordersCountryFilter = orange_sql_filter_country_id($pdo, 'orders', 'o', $adminCountryId);
+if ($ordersCountryFilter !== null) {
+    $sql .= $ordersCountryFilter['sql'];
+    $sqlParams[] = $ordersCountryFilter['param'];
 }
 
 $sql .= ' ORDER BY o.id DESC';

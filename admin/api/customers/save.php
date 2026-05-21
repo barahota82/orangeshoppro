@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/phone_validation.php';
 require_once __DIR__ . '/../../../includes/delivery_areas.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 /**
@@ -27,13 +28,28 @@ function orange_customer_normalize_code(PDO $pdo, $raw): ?string
 /**
  * س15: توليد كود عميل تسلسلي تلقائي (نفس آلية الموردين). أعلى رقم موجود في any code + 1، ثم تحقق فريد.
  */
-function orange_customer_next_auto_code(PDO $pdo): ?string
+function orange_customer_next_auto_code(PDO $pdo, ?int $countryId = null): ?string
 {
     if (!orange_table_has_column($pdo, 'customers', 'code')) {
         return null;
     }
-    $rows = $pdo->query('SELECT code FROM customers WHERE code IS NOT NULL AND TRIM(code) <> \'\' ORDER BY id DESC LIMIT 5000')
-        ->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    require_once __DIR__ . '/../../includes/countries.php';
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_admin_context_country_id($pdo);
+    }
+    if (orange_table_has_country_id($pdo, 'customers') && $countryId > 0) {
+        $st = $pdo->prepare(
+            'SELECT code FROM customers WHERE country_id = ? AND code IS NOT NULL AND TRIM(code) <> \'\'
+             ORDER BY id DESC LIMIT 5000'
+        );
+        $st->execute([$countryId]);
+        $rows = $st->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        $chk = $pdo->prepare('SELECT id FROM customers WHERE code = ? AND country_id = ? LIMIT 1');
+    } else {
+        $rows = $pdo->query('SELECT code FROM customers WHERE code IS NOT NULL AND TRIM(code) <> \'\' ORDER BY id DESC LIMIT 5000')
+            ->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        $chk = $pdo->prepare('SELECT id FROM customers WHERE code = ? LIMIT 1');
+    }
     $max = 0;
     foreach ($rows as $rawCode) {
         $c = trim((string) $rawCode);
@@ -50,10 +66,13 @@ function orange_customer_next_auto_code(PDO $pdo): ?string
         }
     }
     $start = max(1, $max + 1);
-    $chk = $pdo->prepare('SELECT id FROM customers WHERE code = ? LIMIT 1');
     for ($i = $start; $i < $start + 20000; $i++) {
         $candidate = (string) $i;
-        $chk->execute([$candidate]);
+        if (orange_table_has_country_id($pdo, 'customers') && $countryId > 0) {
+            $chk->execute([$candidate, $countryId]);
+        } else {
+            $chk->execute([$candidate]);
+        }
         if (!$chk->fetchColumn()) {
             return $candidate;
         }
@@ -68,6 +87,8 @@ try {
     if (!orange_table_exists($pdo, 'customers')) {
         json_response(['success' => false, 'message' => 'جدول العملاء غير متوفر'], 500);
     }
+    $adminCountryId = orange_admin_context_country_id($pdo);
+    $hasCustCountry = orange_table_has_country_id($pdo, 'customers');
     $data = get_json_input();
     $idIn = (int) ($data['id'] ?? 0);
     $name = trim((string) ($data['name_ar'] ?? ''));
@@ -106,7 +127,7 @@ try {
     if ($hasCode) {
         if ($idIn <= 0) {
             if ($codeSql === null) {
-                $codeSql = orange_customer_next_auto_code($pdo);
+                $codeSql = orange_customer_next_auto_code($pdo, $adminCountryId);
                 if ($codeSql === null) {
                     json_response(['success' => false, 'message' => 'تعذر توليد كود العميل التلقائي'], 500);
                 }
@@ -121,7 +142,7 @@ try {
                     $codeSql = trim((string) $existingCode);
                 } else {
                     // عميل قديم بلا كود: نولّد كوداً الآن.
-                    $codeSql = orange_customer_next_auto_code($pdo);
+                    $codeSql = orange_customer_next_auto_code($pdo, $adminCountryId);
                 }
             }
         }
@@ -403,6 +424,11 @@ try {
     $cols = ['name_ar', 'phone'];
     $placeholders = ['?', '?'];
     $params = [$name, $phone];
+    if ($hasCustCountry && $adminCountryId > 0) {
+        $cols[] = 'country_id';
+        $placeholders[] = '?';
+        $params[] = $adminCountryId;
+    }
     if ($hasPhoneCountryDial) {
         $cols[] = 'phone_country_dial';
         $placeholders[] = '?';

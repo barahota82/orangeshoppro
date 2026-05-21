@@ -53,9 +53,18 @@ $customerAreaOptions = orange_delivery_areas_admin_select_options($pdo, $adminCo
  */
 $nextCustomerCodePreview = '1';
 if (orange_table_exists($pdo, 'customers') && $hasCustomerCodeCol) {
-    $codeRows = $pdo->query(
-        'SELECT code FROM customers WHERE code IS NOT NULL AND TRIM(code) <> \'\' ORDER BY id DESC LIMIT 5000'
-    )->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    if (orange_table_has_country_id($pdo, 'customers') && $adminCountryId > 0) {
+        $codeSt = $pdo->prepare(
+            'SELECT code FROM customers WHERE country_id = ? AND code IS NOT NULL AND TRIM(code) <> \'\'
+             ORDER BY id DESC LIMIT 5000'
+        );
+        $codeSt->execute([$adminCountryId]);
+        $codeRows = $codeSt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    } else {
+        $codeRows = $pdo->query(
+            'SELECT code FROM customers WHERE code IS NOT NULL AND TRIM(code) <> \'\' ORDER BY id DESC LIMIT 5000'
+        )->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    }
     $maxCodeNum = 0;
     foreach ($codeRows as $rawCode) {
         $code = trim((string) $rawCode);
@@ -79,7 +88,21 @@ $customerRows = [];
 $customerSearchRowsPayload = [];
 $totalCustomersBalance = 0.0;
 if (orange_table_exists($pdo, 'customers')) {
-    $customerRows = $pdo->query('SELECT c.* FROM customers c ORDER BY c.id ASC')->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $custListSql = 'SELECT c.* FROM customers c WHERE 1=1';
+    $custListParams = [];
+    $custCountryFilter = orange_sql_filter_country_id($pdo, 'customers', 'c', $adminCountryId);
+    if ($custCountryFilter !== null) {
+        $custListSql .= $custCountryFilter['sql'];
+        $custListParams[] = $custCountryFilter['param'];
+    }
+    $custListSql .= ' ORDER BY c.id ASC';
+    if ($custListParams === []) {
+        $customerRows = $pdo->query($custListSql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } else {
+        $custListSt = $pdo->prepare($custListSql);
+        $custListSt->execute($custListParams);
+        $customerRows = $custListSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
 
     // معرّفات حسابات الواجهة (storefront_accounts) لكل عميل (لو مربوطة).
     $sfAccountByCustomerId = [];

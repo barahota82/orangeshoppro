@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/order_helpers.php';
 require_once __DIR__ . '/catalog_unified_product_helpers.php';
+require_once __DIR__ . '/warehouses.php';
+require_once __DIR__ . '/countries.php';
 
 /**
  * التحقق من بنود السلة وحساب المجموع الفرعي. عند checkout استخدم lockVariants=true داخل معاملة.
@@ -18,6 +20,7 @@ function orange_storefront_validate_cart_items_core(PDO $pdo, array $items, bool
     }
 
     $lockSql = $lockVariants ? ' FOR UPDATE' : '';
+    $stockCountryId = orange_storefront_current_country_id($pdo);
 
     $subtotal = 0.0;
     /** @var array<int, int> $variantQtyAccumulated */
@@ -68,7 +71,8 @@ function orange_storefront_validate_cart_items_core(PDO $pdo, array $items, bool
 
             $vId = (int) $variant['id'];
             $alreadyRequested = $variantQtyAccumulated[$vId] ?? 0;
-            if ((int) $variant['stock_quantity'] < $alreadyRequested + $qty) {
+            $available = orange_warehouse_effective_variant_stock($pdo, $vId, $stockCountryId);
+            if ($available < $alreadyRequested + $qty) {
                 throw new RuntimeException('Insufficient stock for product: ' . $product['name']);
             }
             $variantQtyAccumulated[$vId] = $alreadyRequested + $qty;
@@ -83,7 +87,8 @@ function orange_storefront_validate_cart_items_core(PDO $pdo, array $items, bool
             }
             $vId = (int) $variant['id'];
             $alreadyRequested = $variantQtyAccumulated[$vId] ?? 0;
-            if ((int) $variant['stock_quantity'] < $alreadyRequested + $qty) {
+            $available = orange_warehouse_effective_variant_stock($pdo, $vId, $stockCountryId);
+            if ($available < $alreadyRequested + $qty) {
                 throw new RuntimeException('Insufficient stock for product: ' . $product['name']);
             }
             $variantQtyAccumulated[$vId] = $alreadyRequested + $qty;

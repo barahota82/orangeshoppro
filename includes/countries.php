@@ -373,18 +373,103 @@ function orange_country_label_from_row(array $row, string $lang): string
     return $en !== '' ? $en : $ar;
 }
 
-/** سياق الدولة في الأدمن: ?admin_country= ثم الكويت. */
+/** سياق الدولة في الأدمن: ?admin_country= ثم كوكي orange_ad_country ثم الكويت. */
+function orange_admin_country_cookie_name(): string
+{
+    return 'orange_ad_country';
+}
+
+function orange_admin_read_saved_country_code(): ?string
+{
+    $name = orange_admin_country_cookie_name();
+    if (!isset($_COOKIE[$name])) {
+        return null;
+    }
+    $code = orange_countries_normalize_code((string) $_COOKIE[$name]);
+
+    return $code !== '' ? $code : null;
+}
+
+function orange_admin_send_country_cookie(string $countryCode): void
+{
+    $code = orange_countries_normalize_code($countryCode);
+    if ($code === '' || headers_sent()) {
+        return;
+    }
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
+    setcookie(orange_admin_country_cookie_name(), $code, [
+        'expires' => time() + 3600 * 24 * 400,
+        'path' => '/',
+        'secure' => $https,
+        'httponly' => false,
+        'samesite' => 'Lax',
+    ]);
+}
+
 function orange_admin_context_country_id(PDO $pdo): int
 {
+    static $memo = null;
+    if ($memo !== null) {
+        return $memo;
+    }
     if (isset($_GET['admin_country']) && (string) $_GET['admin_country'] !== '') {
         $code = orange_countries_normalize_code((string) $_GET['admin_country']);
         $row = orange_country_row_by_code($pdo, $code, false);
         if ($row !== null) {
-            return (int) $row['id'];
+            orange_admin_send_country_cookie($code);
+            $memo = (int) $row['id'];
+
+            return $memo;
+        }
+    }
+    $fromCookie = orange_admin_read_saved_country_code();
+    if ($fromCookie !== null) {
+        $row = orange_country_row_by_code($pdo, $fromCookie, false);
+        if ($row !== null) {
+            $memo = (int) $row['id'];
+
+            return $memo;
+        }
+    }
+    $memo = orange_countries_default_id($pdo);
+
+    return $memo;
+}
+
+function orange_table_has_country_id(PDO $pdo, string $table): bool
+{
+    return orange_table_exists($pdo, $table) && orange_table_has_column($pdo, $table, 'country_id');
+}
+
+/**
+ * @return array{sql:string, param:int}|null
+ */
+function orange_sql_filter_country_id(PDO $pdo, string $table, string $alias, int $countryId): ?array
+{
+    if ($countryId <= 0 || !orange_table_has_country_id($pdo, $table)) {
+        return null;
+    }
+    $col = trim($alias) !== '' ? trim($alias) . '.country_id' : $table . '.country_id';
+
+    return ['sql' => ' AND ' . $col . ' = ?', 'param' => $countryId];
+}
+
+function orange_country_id_for_channel(PDO $pdo, int $channelId): int
+{
+    if ($channelId <= 0) {
+        return orange_storefront_current_country_id($pdo);
+    }
+    if (orange_channels_has_country_column($pdo)) {
+        $st = $pdo->prepare('SELECT country_id FROM channels WHERE id = ? LIMIT 1');
+        $st->execute([$channelId]);
+        $cid = (int) ($st->fetchColumn() ?: 0);
+        if ($cid > 0) {
+            return $cid;
         }
     }
 
-    return orange_countries_default_id($pdo);
+    return orange_storefront_current_country_id($pdo);
 }
 
 /**

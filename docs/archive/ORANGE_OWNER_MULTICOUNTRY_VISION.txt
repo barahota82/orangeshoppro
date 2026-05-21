@@ -150,4 +150,6 @@ ORANGE — رؤية المالك: تعدد الدول والقنوات والج�
 
 **تنفيذ (13 — مرحلة 1 — مخازن):** ترحيل **`orange_catalog_migrate_country_warehouses_v44`** في `includes/catalog_schema.php`؛ مساعدات **`includes/warehouses.php`**.
 
+**تنفيذ (13 — مرحلة 2–3 — country_id + مخزن الدولة):** ترحيل **`orange_catalog_migrate_country_scope_v45`**؛ **`country_id`** على `orders`, `customers`, `suppliers`, `purchases`, `products`, `stock_movements` (+ `warehouse_id` على `orders`/`stock_movements`)؛ ربط حجز/إضافة المخزون عبر **`includes/warehouses.php`** في **`includes/order_stock.php`**, **`admin/api/stock/adjust.php`**, **`admin/api/purchases/create.php`**, **`includes/storefront_cart_items.php`**؛ سياق أدمن **`orange_admin_context_country_id`** (كوكي `orange_ad_country`) + مبدّل الدولة في **`admin/partials/header.php`**؛ فلترة قوائم **`orders`**, **`customers`**, **`suppliers`**.
+
 نهاية الملف.
