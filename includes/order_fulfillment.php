@@ -32,6 +32,9 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
     $itemsStmt->execute([$orderId]);
     $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
 
+    $stockCtx = orange_warehouse_context_for_order($pdo, $order);
+    $ofGlCountryId = (int) ($stockCtx['country_id'] ?? 0);
+
     $paymentTerms = 'cash';
     if (orange_table_has_column($pdo, 'orders', 'payment_terms')) {
         $paymentTerms = orange_normalize_payment_terms($order['payment_terms'] ?? 'cash');
@@ -39,7 +42,7 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
     $isCredit = ($paymentTerms === 'credit');
     $isOnline = orange_order_delivery_sale_uses_online_revenue_account($pdo, $order);
 
-    $inventoryId = orange_gl_account_id($pdo, 'inventory');
+    $inventoryId = orange_gl_account_id($pdo, 'inventory', $ofGlCountryId);
 
     $revenueRule = null;
     if ($isOnline) {
@@ -58,23 +61,23 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
         $salesId = 0;
     } elseif ($isCredit) {
         if ($revenueRule !== null) {
-            $debitReceivable = orange_gl_account_id($pdo, $revenueRule['debit_key']);
-            $salesId = orange_gl_account_id($pdo, $revenueRule['credit_key']);
+            $debitReceivable = orange_gl_account_id($pdo, $revenueRule['debit_key'], $ofGlCountryId);
+            $salesId = orange_gl_account_id($pdo, $revenueRule['credit_key'], $ofGlCountryId);
         } else {
-            $debitReceivable = orange_gl_account_id($pdo, 'ar_credit');
-            $salesId = orange_gl_account_id($pdo, 'sales_revenue_credit');
+            $debitReceivable = orange_gl_account_id($pdo, 'ar_credit', $ofGlCountryId);
+            $salesId = orange_gl_account_id($pdo, 'sales_revenue_credit', $ofGlCountryId);
         }
     } else {
         $debitReceivable = 0;
         $salesId = 0;
     }
 
-    $cogsDeliveryId = orange_gl_cogs_delivery_account_id($pdo);
+    $cogsDeliveryId = orange_gl_cogs_delivery_account_id($pdo, $ofGlCountryId);
     $cogsDebitId = $cogsDeliveryId;
     $cogsCreditId = $inventoryId;
     if ($cogsRule !== null) {
-        $cogsDebitId = orange_gl_account_id($pdo, $cogsRule['debit_key']);
-        $cogsCreditId = orange_gl_account_id($pdo, $cogsRule['credit_key']);
+        $cogsDebitId = orange_gl_account_id($pdo, $cogsRule['debit_key'], $ofGlCountryId);
+        $cogsCreditId = orange_gl_account_id($pdo, $cogsRule['credit_key'], $ofGlCountryId);
     }
 
     $orderNumber = (string)($order['order_number'] ?? '');
@@ -152,7 +155,6 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
     }
 
     $stockCtx = orange_warehouse_context_for_order($pdo, $order);
-    $ofGlCountryId = $stockCtx['country_id'];
 
     foreach ($items as $idx => $item) {
         $variant = orange_order_resolve_variant_from_item($pdo, $item);
@@ -532,6 +534,9 @@ function orange_order_reverse_completed_fulfillment(PDO $pdo, int $orderId, stri
     $itemsStmt->execute([$orderId]);
     $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
+    $stockCtx = orange_warehouse_context_for_order($pdo, $order);
+    $ofGlCountryId = (int) ($stockCtx['country_id'] ?? 0);
+
     $paymentTerms = 'cash';
     if (orange_table_has_column($pdo, 'orders', 'payment_terms')) {
         $paymentTerms = orange_normalize_payment_terms($order['payment_terms'] ?? 'cash');
@@ -550,22 +555,22 @@ function orange_order_reverse_completed_fulfillment(PDO $pdo, int $orderId, stri
     $cogsRuleCodeRev = $isOnline ? 'CGO' : ($isCredit ? 'CGT' : 'CGC');
     $cogsRuleRev = orange_gl_order_delivery_setting_keys_from_rule($pdo, $cogsRuleCodeRev);
 
-    $inventoryId = orange_gl_account_id($pdo, 'inventory');
+    $inventoryId = orange_gl_account_id($pdo, 'inventory', $ofGlCountryId);
     $cogsInventoryDebitOnReturn = $inventoryId;
     if ($cogsRuleRev !== null) {
-        $cogsInventoryDebitOnReturn = orange_gl_account_id($pdo, $cogsRuleRev['credit_key']);
+        $cogsInventoryDebitOnReturn = orange_gl_account_id($pdo, $cogsRuleRev['credit_key'], $ofGlCountryId);
     }
 
     if ($isOnline) {
-        $debitReceivable = orange_gl_account_id($pdo, 'cash');
+        $debitReceivable = orange_gl_account_id($pdo, 'cash', $ofGlCountryId);
         $salesId = orange_gl_order_return_sale_debit_account_id($pdo, 'online');
     } elseif ($isCredit) {
         $debitReceivable = $revenueRuleRev !== null
-            ? orange_gl_account_id($pdo, $revenueRuleRev['debit_key'])
-            : orange_gl_account_id($pdo, 'ar_credit');
+            ? orange_gl_account_id($pdo, $revenueRuleRev['debit_key'], $ofGlCountryId)
+            : orange_gl_account_id($pdo, 'ar_credit', $ofGlCountryId);
         $salesId = orange_gl_order_return_sale_debit_account_id($pdo, 'credit');
     } else {
-        $debitReceivable = orange_gl_account_id($pdo, 'cash');
+        $debitReceivable = orange_gl_account_id($pdo, 'cash', $ofGlCountryId);
         $salesId = orange_gl_order_return_sale_debit_account_id($pdo, 'cash');
     }
     $cogsReturnId = orange_gl_cogs_return_account_id($pdo);
@@ -592,8 +597,6 @@ function orange_order_reverse_completed_fulfillment(PDO $pdo, int $orderId, stri
     $srcLabel = 'ORDER-' . $orderNumber;
     $stockRef = orange_order_stock_reference($orderNumber);
     $now = date('Y-m-d H:i:s');
-    $stockCtx = orange_warehouse_context_for_order($pdo, $order);
-    $ofGlCountryId = $stockCtx['country_id'];
 
     foreach ($items as $idx => $item) {
         $variant = orange_order_resolve_variant_from_item($pdo, $item);

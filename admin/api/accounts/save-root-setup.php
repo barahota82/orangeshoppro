@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/account_tree.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -33,12 +34,19 @@ try {
         $hasNameEn = orange_table_has_column($pdo, 'accounts', 'name_en');
         $hasSuspended = orange_table_has_column($pdo, 'accounts', 'is_suspended');
         $hasNb = orange_table_has_column($pdo, 'accounts', 'normal_balance');
+        $hasCountryId = orange_table_has_column($pdo, 'accounts', 'country_id');
+        $writeCountryId = orange_accounts_resolve_country_id_for_write($pdo, null);
 
         if ($id <= 0) {
             // كود الجذر الجديد دائماً من النظام: أكبر كود رقمي للجذور + 1 (لا إدخال يدوي).
             $code = orange_accounts_suggest_child_code($pdo, null);
-            $dup = $pdo->prepare('SELECT id FROM accounts WHERE code = ? LIMIT 1');
-            $dup->execute([$code]);
+            if ($hasCountryId && $writeCountryId > 0) {
+                $dup = $pdo->prepare('SELECT id FROM accounts WHERE code = ? AND country_id = ? LIMIT 1');
+                $dup->execute([$code, $writeCountryId]);
+            } else {
+                $dup = $pdo->prepare('SELECT id FROM accounts WHERE code = ? LIMIT 1');
+                $dup->execute([$code]);
+            }
             if ($dup->fetch()) {
                 json_response(['success' => false, 'message' => 'الكود مستخدم لحساب آخر'], 409);
             }
@@ -62,6 +70,10 @@ try {
                 $cols[] = 'normal_balance';
                 $vals[] = null;
             }
+            if ($hasCountryId && $writeCountryId > 0) {
+                $cols[] = 'country_id';
+                $vals[] = $writeCountryId;
+            }
             $ph = implode(',', array_fill(0, count($cols), '?'));
             $pdo->prepare('INSERT INTO accounts (' . implode(',', $cols) . ') VALUES (' . $ph . ')')->execute($vals);
             $newId = (int) $pdo->lastInsertId();
@@ -75,6 +87,11 @@ try {
         if (!$ex) {
             json_response(['success' => false, 'message' => 'الحساب غير موجود'], 404);
         }
+        try {
+            orange_admin_assert_entity_country($pdo, 'accounts', $id);
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 403);
+        }
         $pid = isset($ex['parent_id']) ? (int) $ex['parent_id'] : 0;
         if ($pid > 0) {
             json_response(['success' => false, 'message' => 'هذا ليس حساباً جذرياً'], 422);
@@ -84,8 +101,17 @@ try {
         // الكود لا يُعدَّل من شاشة الإعداد: يبقى كما في القاعدة، أو يُولَّد لو كان فارغاً.
         $code = $oldCode !== '' ? $oldCode : orange_accounts_suggest_child_code($pdo, null);
 
-        $dup = $pdo->prepare('SELECT id FROM accounts WHERE code = ? AND id <> ? LIMIT 1');
-        $dup->execute([$code, $id]);
+        $dupCountryId = orange_account_country_id($pdo, $id);
+        if ($dupCountryId <= 0) {
+            $dupCountryId = $writeCountryId;
+        }
+        if ($hasCountryId && $dupCountryId > 0) {
+            $dup = $pdo->prepare('SELECT id FROM accounts WHERE code = ? AND country_id = ? AND id <> ? LIMIT 1');
+            $dup->execute([$code, $dupCountryId, $id]);
+        } else {
+            $dup = $pdo->prepare('SELECT id FROM accounts WHERE code = ? AND id <> ? LIMIT 1');
+            $dup->execute([$code, $id]);
+        }
         if ($dup->fetch()) {
             json_response(['success' => false, 'message' => 'الكود مستخدم لحساب آخر'], 409);
         }

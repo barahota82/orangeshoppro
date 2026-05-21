@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/account_tree.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -21,6 +22,11 @@ try {
         $chk->execute([$parentId]);
         if (!$chk->fetch()) {
             json_response(['success' => false, 'message' => 'الحساب الأب غير موجود'], 404);
+        }
+        try {
+            orange_admin_assert_entity_country($pdo, 'accounts', $parentId);
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 403);
         }
         if (orange_accounts_node_depth($pdo, $parentId) >= orange_accounts_max_tree_depth()) {
             json_response(['success' => false, 'message' => 'لا يمكن إضافة فرع تحت المستوى الخامس — أقصى عمق خمسة مستويات'], 422);

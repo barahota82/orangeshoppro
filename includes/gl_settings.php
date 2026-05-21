@@ -6,6 +6,17 @@ require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/account_tree.php';
 require_once __DIR__ . '/journal_types.php';
 require_once __DIR__ . '/upload_paths.php';
+require_once __DIR__ . '/countries.php';
+
+function orange_gl_settings_effective_country_id(PDO $pdo, ?int $countryId = null): int
+{
+    if ($countryId !== null && $countryId > 0) {
+        return $countryId;
+    }
+    $ctx = orange_admin_context_country_id($pdo);
+
+    return $ctx > 0 ? $ctx : orange_countries_default_id($pdo);
+}
 
 /**
  * ربط الحسابات الأساسية (مفاتيح ثابتة) بحسابات الدليل — يُضبط من لوحة الإدارة.
@@ -336,15 +347,21 @@ function orange_gl_journal_rule_dropdown_key_order(array $current): array
 /**
  * نسبة مئوية (0–100) مربوطة ببند إعداد — تُخزَّن في orange_gl_setting_alloc (مثل نسبة الاحتياطي من أرباح السنة الحالية).
  */
-function orange_gl_setting_alloc_percent(PDO $pdo, string $settingKey): float
+function orange_gl_setting_alloc_percent(PDO $pdo, string $settingKey, ?int $countryId = null): float
 {
     orange_catalog_ensure_schema($pdo);
     orange_catalog_ensure_gl_account_settings_alloc_tables($pdo);
     if (trim($settingKey) === '' || ! orange_table_exists($pdo, 'orange_gl_setting_alloc')) {
         return 0.0;
     }
-    $st = $pdo->prepare('SELECT percent_value FROM orange_gl_setting_alloc WHERE setting_key = ? LIMIT 1');
-    $st->execute([$settingKey]);
+    $cid = orange_gl_settings_effective_country_id($pdo, $countryId);
+    if ($cid > 0 && orange_table_has_column($pdo, 'orange_gl_setting_alloc', 'country_id')) {
+        $st = $pdo->prepare('SELECT percent_value FROM orange_gl_setting_alloc WHERE setting_key = ? AND country_id = ? LIMIT 1');
+        $st->execute([$settingKey, $cid]);
+    } else {
+        $st = $pdo->prepare('SELECT percent_value FROM orange_gl_setting_alloc WHERE setting_key = ? LIMIT 1');
+        $st->execute([$settingKey]);
+    }
     $v = $st->fetchColumn();
     if ($v === false || $v === null) {
         return 0.0;
@@ -381,7 +398,7 @@ function orange_gl_legacy_name_fallbacks(): array
     return orange_gl_legacy_code_fallbacks();
 }
 
-function orange_gl_resolve_legacy_account_id(PDO $pdo, string $key): int
+function orange_gl_resolve_legacy_account_id(PDO $pdo, string $key, ?int $countryId = null): int
 {
     if (!orange_table_exists($pdo, 'accounts') || !orange_table_has_column($pdo, 'accounts', 'code')) {
         return 0;
@@ -394,10 +411,16 @@ function orange_gl_resolve_legacy_account_id(PDO $pdo, string $key): int
     if ($code === '') {
         return 0;
     }
-    $stmt = $pdo->prepare(
-        'SELECT a.id FROM accounts a WHERE a.code = ? AND ' . orange_accounts_posting_leaf_where_sql($pdo, 'a') . ' LIMIT 1'
-    );
-    $stmt->execute([$code]);
+    $cid = orange_gl_settings_effective_country_id($pdo, $countryId);
+    $sql = 'SELECT a.id FROM accounts a WHERE a.code = ? AND ' . orange_accounts_posting_leaf_where_sql($pdo, 'a');
+    $params = [$code];
+    if ($cid > 0 && orange_table_has_country_id($pdo, 'accounts')) {
+        $sql .= ' AND a.country_id = ?';
+        $params[] = $cid;
+    }
+    $sql .= ' LIMIT 1';
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
     $id = (int) $stmt->fetchColumn();
 
     return $id > 0 ? $id : 0;
@@ -411,9 +434,11 @@ function orange_gl_resolve_legacy_account_id(PDO $pdo, string $key): int
 /**
  * نفس منطق orange_gl_account_id لكن بدون استثناء — إن لم يُربط المفتاح يُعاد null.
  */
-function orange_gl_account_id_optional(PDO $pdo, string $key): ?int
+function orange_gl_account_id_optional(PDO $pdo, string $key, ?int $countryId = null): ?int
 {
     static $cache = [];
+    $cid = orange_gl_settings_effective_country_id($pdo, $countryId);
+    $cacheKey = $cid . ':' . $key;
     $assertLeaf = static function (int $accountId) use ($pdo, $key): void {
         if ($accountId <= 0 || !orange_accounts_account_is_posting_leaf($pdo, $accountId)) {
             $labels = orange_gl_setting_key_labels();
@@ -423,54 +448,63 @@ function orange_gl_account_id_optional(PDO $pdo, string $key): ?int
             );
         }
     };
-    if (array_key_exists($key, $cache)) {
-        $v = $cache[$key];
+    if (array_key_exists($cacheKey, $cache)) {
+        $v = $cache[$cacheKey];
         if ($v !== null && $v > 0) {
             $assertLeaf((int) $v);
         }
 
-        return $cache[$key];
+        return $cache[$cacheKey];
     }
 
     if (!orange_table_exists($pdo, 'orange_gl_account_settings')) {
-        $legacy = orange_gl_resolve_legacy_account_id($pdo, $key);
+        $legacy = orange_gl_resolve_legacy_account_id($pdo, $key, $cid);
         if ($legacy > 0) {
             $assertLeaf($legacy);
-            $cache[$key] = $legacy;
+            $cache[$cacheKey] = $legacy;
 
             return $legacy;
         }
-        $cache[$key] = null;
+        $cache[$cacheKey] = null;
 
         return null;
     }
 
-    $stmt = $pdo->prepare('SELECT account_id FROM orange_gl_account_settings WHERE setting_key = ? LIMIT 1');
-    $stmt->execute([$key]);
+    if (orange_table_has_column($pdo, 'orange_gl_account_settings', 'country_id')) {
+        $stmt = $pdo->prepare(
+            'SELECT account_id FROM orange_gl_account_settings WHERE setting_key = ? AND country_id = ? LIMIT 1'
+        );
+        $stmt->execute([$key, $cid]);
+    } else {
+        $stmt = $pdo->prepare('SELECT account_id FROM orange_gl_account_settings WHERE setting_key = ? LIMIT 1');
+        $stmt->execute([$key]);
+    }
     $id = (int) $stmt->fetchColumn();
     if ($id > 0) {
         $assertLeaf($id);
-        $cache[$key] = $id;
+        $cache[$cacheKey] = $id;
 
         return $id;
     }
 
-    $legacy = orange_gl_resolve_legacy_account_id($pdo, $key);
+    $legacy = orange_gl_resolve_legacy_account_id($pdo, $key, $cid);
     if ($legacy > 0) {
         $assertLeaf($legacy);
-        $cache[$key] = $legacy;
+        $cache[$cacheKey] = $legacy;
 
         return $legacy;
     }
 
-    $cache[$key] = null;
+    $cache[$cacheKey] = null;
 
     return null;
 }
 
-function orange_gl_account_id(PDO $pdo, string $key): int
+function orange_gl_account_id(PDO $pdo, string $key, ?int $countryId = null): int
 {
     static $cache = [];
+    $cid = orange_gl_settings_effective_country_id($pdo, $countryId);
+    $cacheKey = $cid . ':' . $key;
     $assertLeaf = static function (int $accountId) use ($pdo, $key): void {
         if ($accountId <= 0 || !orange_accounts_account_is_posting_leaf($pdo, $accountId)) {
             $labels = orange_gl_setting_key_labels();
@@ -480,17 +514,17 @@ function orange_gl_account_id(PDO $pdo, string $key): int
             );
         }
     };
-    if (isset($cache[$key])) {
-        $assertLeaf($cache[$key]);
+    if (isset($cache[$cacheKey])) {
+        $assertLeaf($cache[$cacheKey]);
 
-        return $cache[$key];
+        return $cache[$cacheKey];
     }
 
     if (!orange_table_exists($pdo, 'orange_gl_account_settings')) {
-        $legacy = orange_gl_resolve_legacy_account_id($pdo, $key);
+        $legacy = orange_gl_resolve_legacy_account_id($pdo, $key, $cid);
         if ($legacy > 0) {
             $assertLeaf($legacy);
-            $cache[$key] = $legacy;
+            $cache[$cacheKey] = $legacy;
 
             return $legacy;
         }
@@ -499,20 +533,27 @@ function orange_gl_account_id(PDO $pdo, string $key): int
         );
     }
 
-    $stmt = $pdo->prepare('SELECT account_id FROM orange_gl_account_settings WHERE setting_key = ? LIMIT 1');
-    $stmt->execute([$key]);
-    $id = (int)$stmt->fetchColumn();
+    if (orange_table_has_column($pdo, 'orange_gl_account_settings', 'country_id')) {
+        $stmt = $pdo->prepare(
+            'SELECT account_id FROM orange_gl_account_settings WHERE setting_key = ? AND country_id = ? LIMIT 1'
+        );
+        $stmt->execute([$key, $cid]);
+    } else {
+        $stmt = $pdo->prepare('SELECT account_id FROM orange_gl_account_settings WHERE setting_key = ? LIMIT 1');
+        $stmt->execute([$key]);
+    }
+    $id = (int) $stmt->fetchColumn();
     if ($id > 0) {
         $assertLeaf($id);
-        $cache[$key] = $id;
+        $cache[$cacheKey] = $id;
 
         return $id;
     }
 
-    $legacy = orange_gl_resolve_legacy_account_id($pdo, $key);
+    $legacy = orange_gl_resolve_legacy_account_id($pdo, $key, $cid);
     if ($legacy > 0) {
         $assertLeaf($legacy);
-        $cache[$key] = $legacy;
+        $cache[$cacheKey] = $legacy;
 
         return $legacy;
     }
@@ -529,10 +570,10 @@ function orange_gl_account_id(PDO $pdo, string $key): int
  *
  * @throws RuntimeException
  */
-function orange_gl_cogs_delivery_account_id(PDO $pdo): int
+function orange_gl_cogs_delivery_account_id(PDO $pdo, ?int $countryId = null): int
 {
     foreach (['cogs', 'cogs_cash', 'cogs_credit', 'cogs_online'] as $key) {
-        $id = orange_gl_account_id_optional($pdo, $key);
+        $id = orange_gl_account_id_optional($pdo, $key, $countryId);
         if ($id !== null && $id > 0) {
             return $id;
         }

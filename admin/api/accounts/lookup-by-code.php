@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/account_tree.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -29,10 +30,17 @@ try {
     }
 
     $hasPar = orange_table_has_column($pdo, 'accounts', 'parent_id');
-    $sql = 'SELECT a.id, a.name, a.code FROM accounts a WHERE a.code = ? AND ' . orange_accounts_posting_leaf_where_sql($pdo, 'a') . ' LIMIT 1';
+    $countryFilter = orange_accounts_sql_country_filter($pdo, 'a');
+    $sql = 'SELECT a.id, a.name, a.code FROM accounts a WHERE a.code = ? AND ' . orange_accounts_posting_leaf_where_sql($pdo, 'a');
+    $params = [$code];
+    if ($countryFilter !== null) {
+        $sql .= $countryFilter['sql'];
+        $params = array_merge($params, $countryFilter['params']);
+    }
+    $sql .= ' LIMIT 1';
 
     $st = $pdo->prepare($sql);
-    $st->execute([$code]);
+    $st->execute($params);
     $row = $st->fetch(PDO::FETCH_ASSOC);
     if (! $row) {
         $msg = $hasPar

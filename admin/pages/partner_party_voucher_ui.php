@@ -172,7 +172,20 @@ $ppvPostingLeafCt = 0;
 if (orange_journal_vouchers_ready($pdo)) {
     $ppvLw = orange_accounts_posting_leaf_where_sql($pdo, 'a');
     try {
-        $ppvPostingLeafCt = (int) $pdo->query("SELECT COUNT(*) FROM accounts a WHERE $ppvLw")->fetchColumn();
+        $ppvCountSql = "SELECT COUNT(*) FROM accounts a WHERE $ppvLw";
+        $ppvCountParams = [];
+        $ppvAcctFilter = orange_accounts_sql_country_filter($pdo, 'a');
+        if ($ppvAcctFilter !== null) {
+            $ppvCountSql .= $ppvAcctFilter['sql'];
+            $ppvCountParams = $ppvAcctFilter['params'];
+        }
+        if ($ppvCountParams !== []) {
+            $ppvCountSt = $pdo->prepare($ppvCountSql);
+            $ppvCountSt->execute($ppvCountParams);
+            $ppvPostingLeafCt = (int) $ppvCountSt->fetchColumn();
+        } else {
+            $ppvPostingLeafCt = (int) $pdo->query($ppvCountSql)->fetchColumn();
+        }
     } catch (Throwable $e) {
         $ppvPostingLeafCt = 0;
     }

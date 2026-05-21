@@ -502,6 +502,77 @@ function orange_sql_filter_country_id(PDO $pdo, string $table, string $alias, in
     return ['sql' => ' AND ' . $col . ' = ?', 'param' => $countryId];
 }
 
+/**
+ * @return array{sql:string,params:list<int>}|null
+ */
+function orange_accounts_sql_country_filter(PDO $pdo, string $alias = 'a', ?int $countryId = null): ?array
+{
+    if ($countryId === null) {
+        $countryId = orange_admin_context_country_id($pdo);
+    }
+    if ($countryId <= 0 || !orange_table_has_country_id($pdo, 'accounts')) {
+        return null;
+    }
+    $col = trim($alias) !== '' ? trim($alias) . '.country_id' : 'accounts.country_id';
+
+    return ['sql' => ' AND ' . $col . ' = ?', 'params' => [$countryId]];
+}
+
+function orange_accounts_resolve_country_id_for_write(PDO $pdo, ?int $parentId): int
+{
+    if ($parentId !== null && $parentId > 0 && orange_table_has_country_id($pdo, 'accounts')) {
+        $st = $pdo->prepare('SELECT country_id FROM accounts WHERE id = ? LIMIT 1');
+        $st->execute([$parentId]);
+        $pid = (int) ($st->fetchColumn() ?: 0);
+        if ($pid > 0) {
+            return $pid;
+        }
+    }
+    $ctx = orange_admin_context_country_id($pdo);
+    if ($ctx > 0) {
+        return $ctx;
+    }
+
+    return orange_countries_default_id($pdo);
+}
+
+function orange_account_country_id(PDO $pdo, int $accountId): int
+{
+    if ($accountId <= 0 || !orange_table_has_country_id($pdo, 'accounts')) {
+        return 0;
+    }
+    $st = $pdo->prepare('SELECT country_id FROM accounts WHERE id = ? LIMIT 1');
+    $st->execute([$accountId]);
+
+    return (int) ($st->fetchColumn() ?: 0);
+}
+
+/**
+ * @throws RuntimeException
+ */
+function orange_gl_assert_voucher_accounts_country(PDO $pdo, array $accountIds, int $voucherCountryId): void
+{
+    if ($voucherCountryId <= 0 || !orange_table_has_country_id($pdo, 'accounts')) {
+        return;
+    }
+    $accountIds = array_values(array_unique(array_filter(
+        array_map(static fn ($id): int => (int) $id, $accountIds),
+        static fn (int $id): bool => $id > 0
+    )));
+    if ($accountIds === []) {
+        return;
+    }
+    $ph = implode(',', array_fill(0, count($accountIds), '?'));
+    $st = $pdo->prepare(
+        'SELECT id FROM accounts WHERE id IN (' . $ph . ') AND country_id = ?'
+    );
+    $st->execute(array_merge($accountIds, [$voucherCountryId]));
+    $ok = $st->fetchAll(PDO::FETCH_COLUMN);
+    if (count($ok) !== count($accountIds)) {
+        throw new RuntimeException('أحد حسابات السند لا يتبع الدولة المختارة في لوحة التحكم.');
+    }
+}
+
 function orange_country_id_for_channel(PDO $pdo, int $channelId): int
 {
     if ($channelId <= 0) {
@@ -666,7 +737,7 @@ function orange_country_document_ref(PDO $pdo, string $prefix, int $serial, int 
  */
 function orange_admin_assert_entity_country(PDO $pdo, string $table, int $entityId): void
 {
-    $allowed = ['orders', 'customers', 'suppliers', 'purchases', 'products', 'journal_vouchers'];
+    $allowed = ['orders', 'customers', 'suppliers', 'purchases', 'products', 'journal_vouchers', 'accounts'];
     if (!in_array($table, $allowed, true) || $entityId <= 0 || !orange_table_has_country_id($pdo, $table)) {
         return;
     }

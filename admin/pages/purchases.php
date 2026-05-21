@@ -130,7 +130,20 @@ $cashAccId = orange_gl_account_id_optional($pdo, 'cash');
 $purchaseDiscountAccId = orange_gl_account_id_optional($pdo, 'purchase_discount');
 
 $pv2GlAccounts = [];
-$glAccStmt = $pdo->query('SELECT id, code, name FROM accounts ORDER BY code ASC');
+$pv2AcctFilter = orange_accounts_sql_country_filter($pdo, '');
+$pv2AcctSql = 'SELECT id, code, name FROM accounts WHERE 1=1';
+$pv2AcctParams = [];
+if ($pv2AcctFilter !== null) {
+    $pv2AcctSql .= $pv2AcctFilter['sql'];
+    $pv2AcctParams = $pv2AcctFilter['params'];
+}
+$pv2AcctSql .= ' ORDER BY code ASC';
+if ($pv2AcctParams !== []) {
+    $glAccStmt = $pdo->prepare($pv2AcctSql);
+    $glAccStmt->execute($pv2AcctParams);
+} else {
+    $glAccStmt = $pdo->query($pv2AcctSql);
+}
 if ($glAccStmt) {
     while ($r = $glAccStmt->fetch(PDO::FETCH_ASSOC)) {
         $pv2GlAccounts[(int) $r['id']] = [

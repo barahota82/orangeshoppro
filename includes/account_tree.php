@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/report_line_master.php';
+require_once __DIR__ . '/countries.php';
 
 /**
  * مخطط الدليل الرقمي (موحّد في النظام): المستوى الأول = أكواد رقمية 1…N، وأول مستوى للترحيل يبدأ من N+1 (افتراضياً 1–10 ثم من 11).
@@ -404,9 +405,21 @@ function orange_accounts_flat(PDO $pdo): array
     }
 
     try {
-        $rows = $pdo->query(
-            'SELECT ' . $cols . ' FROM ' . $from . ' ORDER BY COALESCE(a.code, \'\'), a.id'
-        )->fetchAll(PDO::FETCH_ASSOC);
+        $sql = 'SELECT ' . $cols . ' FROM ' . $from . ' WHERE 1=1';
+        $params = [];
+        $countryFilter = orange_accounts_sql_country_filter($pdo, 'a');
+        if ($countryFilter !== null) {
+            $sql .= $countryFilter['sql'];
+            $params = $countryFilter['params'];
+        }
+        $sql .= ' ORDER BY COALESCE(a.code, \'\'), a.id';
+        if ($params === []) {
+            $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            $st = $pdo->prepare($sql);
+            $st->execute($params);
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        }
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] orange_accounts_flat: ' . $e->getMessage());
@@ -677,10 +690,20 @@ function orange_accounts_suggest_child_code(PDO $pdo, ?int $parentId): string
 {
     orange_catalog_ensure_schema($pdo);
     if ($parentId === null || $parentId <= 0) {
-        $st = $pdo->query(
-            "SELECT code FROM accounts WHERE (parent_id IS NULL OR parent_id = 0)
-             AND code IS NOT NULL AND code <> '' AND code REGEXP '^[0-9]+$'"
-        );
+        $rootSql = "SELECT code FROM accounts WHERE (parent_id IS NULL OR parent_id = 0)
+             AND code IS NOT NULL AND code <> '' AND code REGEXP '^[0-9]+$'";
+        $rootParams = [];
+        $countryFilter = orange_accounts_sql_country_filter($pdo, '');
+        if ($countryFilter !== null) {
+            $rootSql .= str_replace('.country_id', 'country_id', $countryFilter['sql']);
+            $rootParams = $countryFilter['params'];
+        }
+        if ($rootParams === []) {
+            $st = $pdo->query($rootSql);
+        } else {
+            $st = $pdo->prepare($rootSql);
+            $st->execute($rootParams);
+        }
         $max = 0;
         foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $c) {
             $max = max($max, (int) $c);
@@ -868,9 +891,20 @@ function orange_accounts_roots_ordered(PDO $pdo): array
     if ($hasNameEn) {
         $cols .= ', name_en';
     }
-    $sql = 'SELECT ' . $cols . ' FROM accounts WHERE (parent_id IS NULL OR parent_id = 0)'
-        . " ORDER BY CASE WHEN code REGEXP '^[0-9]+$' THEN 0 ELSE 1 END, CAST(code AS UNSIGNED), code, id";
-    $stmt = $pdo->query($sql);
+    $sql = 'SELECT ' . $cols . ' FROM accounts WHERE (parent_id IS NULL OR parent_id = 0)';
+    $params = [];
+    $countryFilter = orange_accounts_sql_country_filter($pdo, '');
+    if ($countryFilter !== null) {
+        $sql .= str_replace('.country_id', 'country_id', $countryFilter['sql']);
+        $params = $countryFilter['params'];
+    }
+    $sql .= " ORDER BY CASE WHEN code REGEXP '^[0-9]+$' THEN 0 ELSE 1 END, CAST(code AS UNSIGNED), code, id";
+    if ($params === []) {
+        $stmt = $pdo->query($sql);
+    } else {
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+    }
     if ($stmt === false) {
         return [];
     }

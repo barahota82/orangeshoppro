@@ -3027,6 +3027,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_country_accounts_v46($pdo);
     orange_catalog_migrate_country_gl_v47($pdo);
     orange_catalog_migrate_country_cart_promotions_v48($pdo);
+    orange_catalog_migrate_country_gl_accounts_v49($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
         orange_catalog_safe_exec(
@@ -4423,6 +4424,112 @@ function orange_catalog_migrate_country_cart_promotions_v48(PDO $pdo): void
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] country_cart_promotions_v48 marker: ' . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * بند 13.5 — مرحلة 18: accounts.country_id + إعدادات القيود التلقائية per country.
+ */
+function orange_catalog_migrate_country_gl_accounts_v49(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    $marker = 'php_country_gl_accounts_v49';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    $kwId = 0;
+    if (orange_table_exists($pdo, 'countries')) {
+        $stKw = $pdo->prepare('SELECT id FROM countries WHERE code = ? LIMIT 1');
+        $stKw->execute(['kw']);
+        $kwRow = $stKw->fetch(PDO::FETCH_ASSOC);
+        if (is_array($kwRow)) {
+            $kwId = (int) ($kwRow['id'] ?? 0);
+        }
+    }
+
+    if (orange_table_exists($pdo, 'accounts')) {
+        if (!orange_table_has_column($pdo, 'accounts', 'country_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE accounts ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
+            );
+            orange_catalog_safe_exec(
+                $pdo,
+                'CREATE INDEX idx_accounts_country_id ON accounts (country_id)'
+            );
+        }
+        if ($kwId > 0) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE accounts SET country_id = ' . (int) $kwId
+                . ' WHERE country_id IS NULL OR country_id = 0'
+            );
+        }
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE accounts DROP INDEX uq_accounts_code');
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE UNIQUE INDEX uq_accounts_country_code ON accounts (country_id, code)'
+        );
+    }
+
+    if (orange_table_exists($pdo, 'orange_gl_account_settings')) {
+        if (!orange_table_has_column($pdo, 'orange_gl_account_settings', 'country_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE orange_gl_account_settings ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER setting_key'
+            );
+        }
+        if ($kwId > 0) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE orange_gl_account_settings SET country_id = ' . (int) $kwId
+                . ' WHERE country_id IS NULL OR country_id = 0'
+            );
+        }
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE orange_gl_account_settings DROP PRIMARY KEY');
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE orange_gl_account_settings MODIFY country_id INT UNSIGNED NOT NULL'
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE orange_gl_account_settings ADD PRIMARY KEY (setting_key, country_id)'
+        );
+    }
+
+    if (orange_table_exists($pdo, 'orange_gl_setting_alloc')) {
+        if (!orange_table_has_column($pdo, 'orange_gl_setting_alloc', 'country_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE orange_gl_setting_alloc ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER setting_key'
+            );
+        }
+        if ($kwId > 0) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE orange_gl_setting_alloc SET country_id = ' . (int) $kwId
+                . ' WHERE country_id IS NULL OR country_id = 0'
+            );
+        }
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE orange_gl_setting_alloc DROP PRIMARY KEY');
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE orange_gl_setting_alloc MODIFY country_id INT UNSIGNED NOT NULL'
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE orange_gl_setting_alloc ADD PRIMARY KEY (setting_key, country_id)'
+        );
+    }
+
+    try {
+        $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+        $ins->execute([$marker]);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] country_gl_accounts_v49 marker: ' . $e->getMessage());
         }
     }
 }

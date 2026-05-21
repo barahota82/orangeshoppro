@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -18,7 +19,20 @@ $acctIdxPostingLeafCt = 0;
 if (orange_journal_vouchers_ready($pdo)) {
     $acctIdxLw = orange_accounts_posting_leaf_where_sql($pdo, 'a');
     try {
-        $acctIdxPostingLeafCt = (int) $pdo->query("SELECT COUNT(*) FROM accounts a WHERE $acctIdxLw")->fetchColumn();
+        $acctIdxSql = "SELECT COUNT(*) FROM accounts a WHERE $acctIdxLw";
+        $acctIdxParams = [];
+        $acctIdxFilter = orange_accounts_sql_country_filter($pdo, 'a');
+        if ($acctIdxFilter !== null) {
+            $acctIdxSql .= $acctIdxFilter['sql'];
+            $acctIdxParams = $acctIdxFilter['params'];
+        }
+        if ($acctIdxParams !== []) {
+            $acctIdxSt = $pdo->prepare($acctIdxSql);
+            $acctIdxSt->execute($acctIdxParams);
+            $acctIdxPostingLeafCt = (int) $acctIdxSt->fetchColumn();
+        } else {
+            $acctIdxPostingLeafCt = (int) $pdo->query($acctIdxSql)->fetchColumn();
+        }
     } catch (Throwable $e) {
         $acctIdxPostingLeafCt = 0;
     }

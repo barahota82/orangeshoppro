@@ -198,6 +198,7 @@ function orange_financial_expense_account_line_breakdown(PDO $pdo, int $fiscalYe
 }
 
 require_once __DIR__ . '/account_tree.php';
+require_once __DIR__ . '/countries.php';
 
 /**
  * صفوف حسابات الترحيل مع عنوان سطر تقرير مرجعي (عند وجود report_line_id ومخططه).
@@ -230,9 +231,21 @@ function orange_financial_report_leaf_accounts_with_mapping(PDO $pdo): array
     }
 
     try {
-        $rows = $pdo->query(
-            'SELECT ' . $cols . ' FROM accounts a' . $join . ' WHERE ' . $lw . ' ORDER BY COALESCE(a.code, \'\'), a.name ASC'
-        )->fetchAll(PDO::FETCH_ASSOC);
+        $sql = 'SELECT ' . $cols . ' FROM accounts a' . $join . ' WHERE ' . $lw;
+        $params = [];
+        $countryFilter = orange_accounts_sql_country_filter($pdo, 'a');
+        if ($countryFilter !== null) {
+            $sql .= $countryFilter['sql'];
+            $params = $countryFilter['params'];
+        }
+        $sql .= ' ORDER BY COALESCE(a.code, \'\'), a.name ASC';
+        if ($params !== []) {
+            $st = $pdo->prepare($sql);
+            $st->execute($params);
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+        }
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange_financial_report_leaf_accounts_with_mapping] ' . $e->getMessage());

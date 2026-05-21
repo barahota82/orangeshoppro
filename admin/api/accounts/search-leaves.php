@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/account_tree.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -17,6 +18,7 @@ try {
         json_response(['success' => false, 'message' => 'جدول الحسابات غير متوفر'], 500);
     }
 
+    $countryFilter = orange_accounts_sql_country_filter($pdo, 'a');
     $q = trim((string) ($_GET['q'] ?? ''));
     $mode = trim((string) ($_GET['mode'] ?? ''));
 
@@ -41,6 +43,10 @@ try {
             $like = '%' . $q . '%';
             $params[] = $like;
             $params[] = $like;
+        }
+        if ($countryFilter !== null) {
+            $sql .= $countryFilter['sql'];
+            $params = array_merge($params, $countryFilter['params']);
         }
         $sql .= ' ORDER BY COALESCE(a.code, \'\'), a.name ASC LIMIT 500';
         $st = $pdo->prepare($sql);
@@ -78,6 +84,10 @@ try {
             $like = '%' . $q . '%';
             $params[] = $like;
             $params[] = $like;
+        }
+        if ($countryFilter !== null) {
+            $sql .= $countryFilter['sql'];
+            $params = array_merge($params, $countryFilter['params']);
         }
         $sql .= ' ORDER BY COALESCE(a.code, \'\'), a.name ASC LIMIT 500';
         $st = $pdo->prepare($sql);
@@ -125,6 +135,10 @@ try {
         $like = '%' . $q . '%';
         $params[] = $like;
         $params[] = $like;
+    }
+    if ($countryFilter !== null) {
+        $sql .= $countryFilter['sql'];
+        $params = array_merge($params, $countryFilter['params']);
     }
     $sql .= ' ORDER BY COALESCE(a.code, \'\'), a.name ASC LIMIT 80';
 

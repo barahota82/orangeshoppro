@@ -31,7 +31,21 @@ foreach ($years as $y) {
     }
 }
 
-$accounts = $pdo->query('SELECT id, name, code FROM accounts ORDER BY COALESCE(code, \'\'), name')->fetchAll(PDO::FETCH_ASSOC);
+$acctCountryFilter = orange_accounts_sql_country_filter($pdo, '');
+$acctSql = 'SELECT id, name, code FROM accounts WHERE 1=1';
+$acctParams = [];
+if ($acctCountryFilter !== null) {
+    $acctSql .= $acctCountryFilter['sql'];
+    $acctParams = $acctCountryFilter['params'];
+}
+$acctSql .= ' ORDER BY COALESCE(code, \'\'), name';
+if ($acctParams !== []) {
+    $acctSt = $pdo->prepare($acctSql);
+    $acctSt->execute($acctParams);
+    $accounts = $acctSt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $accounts = $pdo->query($acctSql)->fetchAll(PDO::FETCH_ASSOC);
+}
 $accountLabelById = [];
 foreach ($accounts as $a) {
     $aid = (int) $a['id'];
@@ -44,7 +58,20 @@ $useVouchers = orange_journal_vouchers_ready($pdo);
 $frPostingLeafWhere = orange_accounts_posting_leaf_where_sql($pdo, 'a');
 $financialReportPostingLeafCt = 0;
 try {
-    $financialReportPostingLeafCt = (int) $pdo->query("SELECT COUNT(*) FROM accounts a WHERE $frPostingLeafWhere")->fetchColumn();
+    $frCountSql = "SELECT COUNT(*) FROM accounts a WHERE $frPostingLeafWhere";
+    $frCountParams = [];
+    $frAcctFilter = orange_accounts_sql_country_filter($pdo, 'a');
+    if ($frAcctFilter !== null) {
+        $frCountSql .= $frAcctFilter['sql'];
+        $frCountParams = $frAcctFilter['params'];
+    }
+    if ($frCountParams !== []) {
+        $frCountSt = $pdo->prepare($frCountSql);
+        $frCountSt->execute($frCountParams);
+        $financialReportPostingLeafCt = (int) $frCountSt->fetchColumn();
+    } else {
+        $financialReportPostingLeafCt = (int) $pdo->query($frCountSql)->fetchColumn();
+    }
 } catch (Throwable $e) {
     $financialReportPostingLeafCt = 0;
 }

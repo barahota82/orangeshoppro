@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
+require_once __DIR__ . '/countries.php';
 require_once __DIR__ . '/fiscal_years.php';
 require_once __DIR__ . '/journal_types.php';
 
@@ -435,6 +436,13 @@ function orange_voucher_post(PDO $pdo, array $header, array $lines): int
         throw new InvalidArgumentException('السند غير متوازن: مجموع المدين ' . $totalD . ' ≠ مجموع الدائن ' . $totalC);
     }
 
+    $voucherCountryId = orange_journal_voucher_resolve_country_id($pdo, $header);
+    orange_gl_assert_voucher_accounts_country(
+        $pdo,
+        array_column($norm, 'account_id'),
+        $voucherCountryId
+    );
+
     $fyId = orange_fiscal_require_open_for_posting($pdo, $date);
 
     $overrideJt = isset($header['journal_type_id']) ? (int) $header['journal_type_id'] : 0;
@@ -677,6 +685,13 @@ function orange_voucher_update_multiline(PDO $pdo, int $voucherId, array $header
     if (round($totalD - $totalC, 4) !== 0.0) {
         throw new InvalidArgumentException('السند غير متوازن: مجموع المدين ' . $totalD . ' ≠ مجموع الدائن ' . $totalC);
     }
+
+    $voucherCountryId = orange_journal_voucher_resolve_country_id($pdo, $header);
+    orange_gl_assert_voucher_accounts_country(
+        $pdo,
+        array_column($norm, 'account_id'),
+        $voucherCountryId
+    );
 
     $fyId = orange_fiscal_require_open_for_posting($pdo, $date);
     $chk = $pdo->prepare('SELECT id FROM accounts WHERE id = ? LIMIT 1');

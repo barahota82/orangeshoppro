@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/journal_types.php';
 require_once __DIR__ . '/../../includes/date_format.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -19,7 +20,20 @@ $glPostingLeafCt = 0;
 if ($glPostingVouchersReady) {
     $glPlw = orange_accounts_posting_leaf_where_sql($pdo, 'a');
     try {
-        $glPostingLeafCt = (int) $pdo->query("SELECT COUNT(*) FROM accounts a WHERE $glPlw")->fetchColumn();
+        $glCountSql = "SELECT COUNT(*) FROM accounts a WHERE $glPlw";
+        $glCountParams = [];
+        $glAcctFilter = orange_accounts_sql_country_filter($pdo, 'a');
+        if ($glAcctFilter !== null) {
+            $glCountSql .= $glAcctFilter['sql'];
+            $glCountParams = $glAcctFilter['params'];
+        }
+        if ($glCountParams !== []) {
+            $glCountSt = $pdo->prepare($glCountSql);
+            $glCountSt->execute($glCountParams);
+            $glPostingLeafCt = (int) $glCountSt->fetchColumn();
+        } else {
+            $glPostingLeafCt = (int) $pdo->query($glCountSql)->fetchColumn();
+        }
     } catch (Throwable $e) {
         $glPostingLeafCt = 0;
     }

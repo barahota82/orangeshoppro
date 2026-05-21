@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../includes/accounting_report_mapping.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/date_format.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -91,9 +92,21 @@ if (
 }
 
 $leafWhere = orange_accounts_posting_leaf_where_sql($pdo, 'a');
-$accountsLeaf = $pdo->query(
-    "SELECT a.id, a.name, a.code FROM accounts a WHERE $leafWhere ORDER BY COALESCE(a.code, ''), a.name"
-)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+$tbAcctSql = "SELECT a.id, a.name, a.code FROM accounts a WHERE $leafWhere";
+$tbAcctParams = [];
+$tbAcctFilter = orange_accounts_sql_country_filter($pdo, 'a');
+if ($tbAcctFilter !== null) {
+    $tbAcctSql .= $tbAcctFilter['sql'];
+    $tbAcctParams = $tbAcctFilter['params'];
+}
+$tbAcctSql .= " ORDER BY COALESCE(a.code, ''), a.name";
+if ($tbAcctParams !== []) {
+    $tbAcctSt = $pdo->prepare($tbAcctSql);
+    $tbAcctSt->execute($tbAcctParams);
+    $accountsLeaf = $tbAcctSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+} else {
+    $accountsLeaf = $pdo->query($tbAcctSql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
 
 $leafIdsForMap = [];
 foreach ($accountsLeaf as $al) {

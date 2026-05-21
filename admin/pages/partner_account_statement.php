@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/gl_account_aging.php';
 require_once __DIR__ . '/../../includes/party_subledger.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -88,9 +89,21 @@ $todayDmY = orange_format_date_dmY(date('Y-m-d'));
 $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 
 $leafWhere = orange_accounts_posting_leaf_where_sql($pdo, 'a');
-$accounts = $pdo->query(
-    "SELECT a.id, a.name, a.code FROM accounts a WHERE $leafWhere ORDER BY COALESCE(a.code, ''), a.name"
-)->fetchAll(PDO::FETCH_ASSOC);
+$pasAcctSql = "SELECT a.id, a.name, a.code FROM accounts a WHERE $leafWhere";
+$pasAcctParams = [];
+$pasAcctFilter = orange_accounts_sql_country_filter($pdo, 'a');
+if ($pasAcctFilter !== null) {
+    $pasAcctSql .= $pasAcctFilter['sql'];
+    $pasAcctParams = $pasAcctFilter['params'];
+}
+$pasAcctSql .= " ORDER BY COALESCE(a.code, ''), a.name";
+if ($pasAcctParams !== []) {
+    $pasAcctSt = $pdo->prepare($pasAcctSql);
+    $pasAcctSt->execute($pasAcctParams);
+    $accounts = $pasAcctSt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $accounts = $pdo->query($pasAcctSql)->fetchAll(PDO::FETCH_ASSOC);
+}
 
 $companyNameAr = '';
 if (orange_table_exists($pdo, 'company_settings')) {
