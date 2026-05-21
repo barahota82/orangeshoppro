@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 45);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 46);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3024,6 +3024,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_country_sort_renumber_v43($pdo);
     orange_catalog_migrate_country_warehouses_v44($pdo);
     orange_catalog_migrate_country_scope_v45($pdo);
+    orange_catalog_migrate_country_accounts_v46($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
         orange_catalog_safe_exec(
@@ -4245,6 +4246,75 @@ function orange_catalog_migrate_country_scope_v45(PDO $pdo): void
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] country_scope_v45 marker: ' . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * بند 13.6 + 13.8: storefront_accounts.country_id + admins.country_id.
+ */
+function orange_catalog_migrate_country_accounts_v46(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    $marker = 'php_country_accounts_v46';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    $kwId = 0;
+    if (orange_table_exists($pdo, 'countries')) {
+        $stKw = $pdo->prepare('SELECT id FROM countries WHERE code = ? LIMIT 1');
+        $stKw->execute(['kw']);
+        $kwRow = $stKw->fetch(PDO::FETCH_ASSOC);
+        if (is_array($kwRow)) {
+            $kwId = (int) ($kwRow['id'] ?? 0);
+        }
+    }
+
+    if (orange_table_exists($pdo, 'storefront_accounts')) {
+        if (!orange_table_has_column($pdo, 'storefront_accounts', 'country_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE storefront_accounts ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
+            );
+            orange_catalog_safe_exec(
+                $pdo,
+                'CREATE INDEX idx_storefront_accounts_country_id ON storefront_accounts (country_id)'
+            );
+        }
+        if ($kwId > 0) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE storefront_accounts SET country_id = ' . (int) $kwId
+                . ' WHERE country_id IS NULL OR country_id = 0'
+            );
+        }
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE storefront_accounts DROP INDEX uq_storefront_accounts_email');
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE UNIQUE INDEX uq_storefront_accounts_email_country ON storefront_accounts (email, country_id)'
+        );
+    }
+
+    if (orange_table_exists($pdo, 'admins')) {
+        if (!orange_table_has_column($pdo, 'admins', 'country_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE admins ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
+            );
+            orange_catalog_safe_exec(
+                $pdo,
+                'CREATE INDEX idx_admins_country_id ON admins (country_id)'
+            );
+        }
+    }
+
+    try {
+        $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+        $ins->execute([$marker]);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] country_accounts_v46 marker: ' . $e->getMessage());
         }
     }
 }

@@ -2561,6 +2561,23 @@ function admin_login(int $adminId): void {
         session_regenerate_id(true);
     }
     $_SESSION['admin_id'] = $adminId;
+    unset($_SESSION['admin_country_lock']);
+    try {
+        $pdo = db();
+        require_once __DIR__ . '/includes/catalog_schema.php';
+        if (orange_table_exists($pdo, 'admins') && orange_table_has_column($pdo, 'admins', 'country_id')) {
+            $st = $pdo->prepare('SELECT country_id FROM admins WHERE id = ? AND is_active = 1 LIMIT 1');
+            $st->execute([$adminId]);
+            $cid = (int) ($st->fetchColumn() ?: 0);
+            if ($cid > 0) {
+                $_SESSION['admin_country_lock'] = $cid;
+            }
+        }
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] admin_login country_lock: ' . $e->getMessage());
+        }
+    }
 }
 
 function admin_logout(): void {

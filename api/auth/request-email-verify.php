@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../includes/orange_mail.php';
 require_once __DIR__ . '/../../includes/phone_validation.php';
 require_once __DIR__ . '/../../includes/delivery_areas.php';
 require_once __DIR__ . '/../../includes/storefront_order_email.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 try {
     $pdo = db();
@@ -53,6 +54,12 @@ try {
     $channelSlug = isset($data['channel']) ? (string) $data['channel'] : '';
     $channelSlug = orange_storefront_valid_channel_slug($pdo, $channelSlug);
 
+    $channelRowSt = $pdo->prepare('SELECT id FROM channels WHERE slug = ? AND is_active = 1 LIMIT 1');
+    $channelRowSt->execute([$channelSlug]);
+    $channelIdForCountry = (int) ($channelRowSt->fetchColumn() ?: 0);
+    $accountCountryId = orange_country_id_for_channel($pdo, $channelIdForCountry);
+    $hasAccountCountryCol = orange_table_has_column($pdo, 'storefront_accounts', 'country_id');
+
     /** @var list<array<string, mixed>>|null */
     $trackSignupItemsForMail = null;
 
@@ -67,6 +74,12 @@ try {
         $orderRow = $ost->fetch(PDO::FETCH_ASSOC);
         if (!$orderRow) {
             json_response(['success' => false, 'code' => 'order_not_found', 'message' => t('track_order_not_found')], 404);
+        }
+        if ($hasAccountCountryCol) {
+            $oc = (int) ($orderRow['country_id'] ?? 0);
+            if ($oc > 0) {
+                $accountCountryId = $oc;
+            }
         }
         if (!orange_order_phones_match_for_lookup($orderVerifyPhone, (string) ($orderRow['phone'] ?? ''))) {
             json_response(['success' => false, 'code' => 'order_link_mismatch', 'message' => t('track_signup_order_mismatch')], 404);
@@ -241,10 +254,19 @@ try {
         }
     }
 
-    $st = $pdo->prepare(
-        'SELECT id, email_verified_at, verify_email_sent_at, registered_channel_slug FROM storefront_accounts WHERE email = ? LIMIT 1'
-    );
-    $st->execute([$email]);
+    $st = $hasAccountCountryCol
+        ? $pdo->prepare(
+            'SELECT id, email_verified_at, verify_email_sent_at, registered_channel_slug
+             FROM storefront_accounts WHERE email = ? AND country_id = ? LIMIT 1'
+        )
+        : $pdo->prepare(
+            'SELECT id, email_verified_at, verify_email_sent_at, registered_channel_slug FROM storefront_accounts WHERE email = ? LIMIT 1'
+        );
+    if ($hasAccountCountryCol) {
+        $st->execute([$email, $accountCountryId]);
+    } else {
+        $st->execute([$email]);
+    }
     $row = $st->fetch(PDO::FETCH_ASSOC);
 
     if ($row && !empty($row['email_verified_at'])) {
@@ -287,6 +309,11 @@ try {
                 $iv .= ', ?';
                 $ip[] = $customerPhoneNational;
             }
+            if ($hasAccountCountryCol) {
+                $ic .= ', country_id';
+                $iv .= ', ?';
+                $ip[] = $accountCountryId;
+            }
             $ic .= ', customer_delivery_area_id, customer_area, customer_address, customer_notes, verify_token_hash, verify_token_expires_at, verify_email_sent_at';
             $iv .= ', ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 48 HOUR), NOW()';
             array_push(
@@ -312,6 +339,11 @@ try {
                 $ic .= ', customer_phone_national';
                 $iv .= ', ?';
                 $ip[] = $customerPhoneNational;
+            }
+            if ($hasAccountCountryCol) {
+                $ic .= ', country_id';
+                $iv .= ', ?';
+                $ip[] = $accountCountryId;
             }
             $ic .= ', customer_area, customer_address, customer_notes, verify_token_hash, verify_token_expires_at, verify_email_sent_at';
             $iv .= ', ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 48 HOUR), NOW()';

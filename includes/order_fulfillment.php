@@ -11,6 +11,7 @@ require_once __DIR__ . '/gl_pending_movements.php';
 require_once __DIR__ . '/journal_write.php';
 require_once __DIR__ . '/party_subledger.php';
 require_once __DIR__ . '/party_allocations.php';
+require_once __DIR__ . '/warehouses.php';
 
 /**
  * Stock + accounting when an order is marked completed (website or company manual).
@@ -150,49 +151,33 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
         }
     }
 
+    $stockCtx = orange_warehouse_context_for_order($pdo, $order);
+
     foreach ($items as $idx => $item) {
         $variant = orange_order_resolve_variant_from_item($pdo, $item);
 
         if ($variant && !$stockAlreadyReserved) {
-            $oldStock = (int)$variant['stock_quantity'];
-            $newStock = max(0, $oldStock - (int)$item['qty']);
+            $qty = (int) $item['qty'];
             $pidForStock = isset($item['product_id']) ? (int) $item['product_id'] : 0;
-
-            $pdo->prepare('UPDATE product_variants SET stock_quantity = ? WHERE id = ?')
-                ->execute([$newStock, (int)$variant['id']]);
-
-            if (orange_table_has_column($pdo, 'stock_movements', 'reference')) {
-                $moveStmt = $pdo->prepare("
-                    INSERT INTO stock_movements (
-                        product_id, variant_id, type, qty, old_stock, new_stock, reason, created_at, reference
-                    ) VALUES (
-                        ?, ?, 'delivered_order', ?, ?, ?, 'Order delivered', NOW(), ?
-                    )
-                ");
-                $moveStmt->execute([
-                    $pidForStock,
-                    (int) $variant['id'],
-                    (int) $item['qty'],
-                    $oldStock,
-                    $newStock,
-                    $ref,
-                ]);
-            } else {
-                $moveStmt = $pdo->prepare("
-                    INSERT INTO stock_movements (
-                        product_id, variant_id, type, qty, old_stock, new_stock, reason, created_at
-                    ) VALUES (
-                        ?, ?, 'delivered_order', ?, ?, ?, 'Order delivered', NOW()
-                    )
-                ");
-                $moveStmt->execute([
-                    $pidForStock,
-                    (int) $variant['id'],
-                    (int) $item['qty'],
-                    $oldStock,
-                    $newStock,
-                ]);
-            }
+            $stockChange = orange_warehouse_apply_variant_delta(
+                $pdo,
+                $stockCtx['warehouse_id'],
+                (int) $variant['id'],
+                -$qty,
+                0
+            );
+            orange_stock_movement_insert($pdo, [
+                'product_id' => $pidForStock,
+                'variant_id' => (int) $variant['id'],
+                'type' => 'delivered_order',
+                'qty' => $qty,
+                'old_stock' => $stockChange['old'],
+                'new_stock' => $stockChange['new'],
+                'reason' => 'Order delivered',
+                'reference' => $ref,
+                'country_id' => $stockCtx['country_id'],
+                'warehouse_id' => $stockCtx['warehouse_id'],
+            ]);
         }
 
         $salesAmount = orange_order_item_line_net($item);
@@ -598,49 +583,31 @@ function orange_order_reverse_completed_fulfillment(PDO $pdo, int $orderId, stri
     $srcLabel = 'ORDER-' . $orderNumber;
     $stockRef = orange_order_stock_reference($orderNumber);
     $now = date('Y-m-d H:i:s');
+    $stockCtx = orange_warehouse_context_for_order($pdo, $order);
 
     foreach ($items as $idx => $item) {
         $variant = orange_order_resolve_variant_from_item($pdo, $item);
         $qty = (int) ($item['qty'] ?? 0);
         if ($variant && $qty > 0) {
-            $vStmt = $pdo->prepare('SELECT stock_quantity FROM product_variants WHERE id = ? LIMIT 1 FOR UPDATE');
-            $vStmt->execute([(int) $variant['id']]);
-            $oldStock = (int) $vStmt->fetchColumn();
-            $newStock = $oldStock + $qty;
-            $pdo->prepare('UPDATE product_variants SET stock_quantity = ? WHERE id = ?')
-                ->execute([$newStock, (int) $variant['id']]);
-            if (orange_table_has_column($pdo, 'stock_movements', 'reference')) {
-                $moveStmt = $pdo->prepare("
-                    INSERT INTO stock_movements (
-                        product_id, variant_id, type, qty, old_stock, new_stock, reason, created_at, reference
-                    ) VALUES (
-                        ?, ?, 'order_return', ?, ?, ?, 'Order completed reversed', NOW(), ?
-                    )
-                ");
-                $moveStmt->execute([
-                    isset($item['product_id']) ? (int) $item['product_id'] : 0,
-                    (int) $variant['id'],
-                    $qty,
-                    $oldStock,
-                    $newStock,
-                    $stockRef,
-                ]);
-            } else {
-                $moveStmt = $pdo->prepare("
-                    INSERT INTO stock_movements (
-                        product_id, variant_id, type, qty, old_stock, new_stock, reason, created_at
-                    ) VALUES (
-                        ?, ?, 'order_return', ?, ?, ?, 'Order completed reversed', NOW()
-                    )
-                ");
-                $moveStmt->execute([
-                    isset($item['product_id']) ? (int) $item['product_id'] : 0,
-                    (int) $variant['id'],
-                    $qty,
-                    $oldStock,
-                    $newStock,
-                ]);
-            }
+            $stockChange = orange_warehouse_apply_variant_delta(
+                $pdo,
+                $stockCtx['warehouse_id'],
+                (int) $variant['id'],
+                $qty,
+                0
+            );
+            orange_stock_movement_insert($pdo, [
+                'product_id' => isset($item['product_id']) ? (int) $item['product_id'] : 0,
+                'variant_id' => (int) $variant['id'],
+                'type' => 'order_return',
+                'qty' => $qty,
+                'old_stock' => $stockChange['old'],
+                'new_stock' => $stockChange['new'],
+                'reason' => 'Order completed reversed',
+                'reference' => $stockRef,
+                'country_id' => $stockCtx['country_id'],
+                'warehouse_id' => $stockCtx['warehouse_id'],
+            ]);
         }
 
         $salesAmount = orange_order_item_line_net($item);

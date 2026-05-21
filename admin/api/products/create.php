@@ -273,6 +273,12 @@ try {
     $execParams[] = $itemCodeIns;
     $execParams[] = $barcodeIns;
 
+    if (orange_table_has_column($pdo, 'products', 'country_id')) {
+        require_once __DIR__ . '/../../../includes/countries.php';
+        $columnNames[] = 'country_id';
+        $execParams[] = orange_admin_context_country_id($pdo);
+    }
+
     $columnNamesWithMeta = array_merge($columnNames, ['is_active', 'created_at']);
     $execParams[] = $isActiveSql;
     $placeholdersBody = implode(', ', array_fill(0, count($execParams), '?')) . ', NOW()';

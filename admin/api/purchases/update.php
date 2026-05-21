@@ -14,7 +14,7 @@ require_once __DIR__ . '/../../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../../includes/purchase_gl_accounts.php';
 require_admin_api();
 
-function reverse_purchase_stock(PDO $pdo, int $purchaseId): void
+function reverse_purchase_stock(PDO $pdo, int $purchaseId, int $countryId): void
 {
     $hasV = orange_table_has_column($pdo, 'purchase_items', 'variant_id');
     $hasRecv = orange_table_has_column($pdo, 'purchase_items', 'qty_received');
@@ -44,13 +44,11 @@ function reverse_purchase_stock(PDO $pdo, int $purchaseId): void
         if ($vid <= 0) {
             $vid = orange_purchase_resolve_variant_id($pdo, $pid, 0);
         }
-        $pdo->prepare(
-            'UPDATE product_variants SET stock_quantity = GREATEST(stock_quantity - ?, 0) WHERE id = ? AND product_id = ?'
-        )->execute([$qty, $vid, $pid]);
+        orange_purchase_apply_variant_stock_decrease($pdo, $vid, $qty, $countryId);
     }
 }
 
-function apply_purchase_items(PDO $pdo, int $purchaseId, array $items): float
+function apply_purchase_items(PDO $pdo, int $purchaseId, array $items, int $countryId): float
 {
     $hasV = orange_table_has_column($pdo, 'purchase_items', 'variant_id');
     $hasRecv = orange_table_has_column($pdo, 'purchase_items', 'qty_received');
@@ -72,26 +70,19 @@ function apply_purchase_items(PDO $pdo, int $purchaseId, array $items): float
             $pdo->prepare(
                 'INSERT INTO purchase_items (purchase_id, product_id, variant_id, qty, qty_received, cost) VALUES (?, ?, ?, ?, ?, ?)'
             )->execute([$purchaseId, $productId, $variantId, $qty, $qty, $cost]);
-            $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ? AND product_id = ?')
-                ->execute([$qty, $variantId, $productId]);
         } elseif ($hasV) {
             $pdo->prepare(
                 'INSERT INTO purchase_items (purchase_id, product_id, variant_id, qty, cost) VALUES (?, ?, ?, ?, ?)'
             )->execute([$purchaseId, $productId, $variantId, $qty, $cost]);
-            $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ?')
-                ->execute([$qty, $variantId]);
         } elseif ($hasRecv) {
             $pdo->prepare(
                 'INSERT INTO purchase_items (purchase_id, product_id, qty, qty_received, cost) VALUES (?, ?, ?, ?, ?)'
             )->execute([$purchaseId, $productId, $qty, $qty, $cost]);
-            $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ? AND product_id = ?')
-                ->execute([$qty, $variantId, $productId]);
         } else {
             $pdo->prepare("INSERT INTO purchase_items (purchase_id, product_id, qty, cost) VALUES (?, ?, ?, ?)")
                 ->execute([$purchaseId, $productId, $qty, $cost]);
-            $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE id = ?')
-                ->execute([$qty, $variantId]);
         }
+        orange_purchase_apply_variant_stock_increase($pdo, $variantId, $qty, $countryId);
     }
 
     return $total;
@@ -125,7 +116,12 @@ try {
     }
 
     $pdo->beginTransaction();
-    reverse_purchase_stock($pdo, $purchaseId);
+    require_once __DIR__ . '/../../../includes/countries.php';
+    $purchaseCountryId = (int) ($purchase['country_id'] ?? 0);
+    if ($purchaseCountryId <= 0) {
+        $purchaseCountryId = orange_admin_context_country_id($pdo);
+    }
+    reverse_purchase_stock($pdo, $purchaseId, $purchaseCountryId);
     $pdo->prepare("DELETE FROM purchase_items WHERE purchase_id = ?")->execute([$purchaseId]);
 
     if ($action === 'delete') {
@@ -187,7 +183,7 @@ try {
         }
     }
 
-    $newTotal = apply_purchase_items($pdo, $purchaseId, $items);
+    $newTotal = apply_purchase_items($pdo, $purchaseId, $items, $purchaseCountryId);
     $pdo->prepare("UPDATE purchases SET supplier_id = ?, total = ?, type = ?, notes = ?, updated_at = NOW() WHERE id = ?")
         ->execute([$supplierId > 0 ? $supplierId : null, $newTotal, $type, $notes, $purchaseId]);
 

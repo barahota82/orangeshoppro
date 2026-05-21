@@ -21,6 +21,7 @@ require_once __DIR__ . '/../includes/catalog_schema.php';
 orange_catalog_ensure_schema(db());
 require_once __DIR__ . '/../includes/catalog_labels.php';
 require_once __DIR__ . '/../includes/catalog_unified_nav.php';
+require_once __DIR__ . '/../includes/countries.php';
 
 include __DIR__ . '/../includes/header.php';
 
@@ -54,6 +55,9 @@ $canUnifiedProductSql = $navUnified
     && orange_table_exists($pdo, 'catalog_sections')
     && orange_table_has_column($pdo, 'products', 'product_type_id');
 
+$sfHomeCountryId = orange_storefront_current_country_id($pdo);
+$homeProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $sfHomeCountryId);
+
 if ($canUnifiedProductSql) {
     $productsSql = '
     SELECT p.*, ucs2.department_id AS uf_dept_id, ucc.id AS uf_cat_id, ucs.id AS uf_sub_id
@@ -63,7 +67,7 @@ if ($canUnifiedProductSql) {
     INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id AND ucc.is_active = 1
     INNER JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id AND ucs2.is_active = 1
     INNER JOIN departments d ON d.id = ucs2.department_id AND d.is_active = 1
-    WHERE p.is_active = 1
+    WHERE p.is_active = 1' . $homeProductsCountrySql . '
     ORDER BY p.sort_order ASC, p.id ASC
 ';
     $offersSql = '
@@ -76,21 +80,21 @@ if ($canUnifiedProductSql) {
     INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id AND ucc.is_active = 1
     INNER JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id AND ucs2.is_active = 1
     INNER JOIN departments d ON d.id = ucs2.department_id AND d.is_active = 1
-    WHERE o.is_active = 1 AND p.is_active = 1
+    WHERE o.is_active = 1 AND p.is_active = 1' . $homeProductsCountrySql . '
     ORDER BY p.sort_order ASC, p.id ASC, o.id ASC
 ';
 } else {
     $productsSql = '
     SELECT p.*
     FROM products p
-    WHERE p.is_active = 1
+    WHERE p.is_active = 1' . $homeProductsCountrySql . '
     ORDER BY p.sort_order ASC, p.id ASC
 ';
     $offersSql = '
     SELECT o.discount, p.*
     FROM offers o
     INNER JOIN products p ON p.id = o.product_id
-    WHERE o.is_active = 1 AND p.is_active = 1
+    WHERE o.is_active = 1 AND p.is_active = 1' . $homeProductsCountrySql . '
     ORDER BY p.sort_order ASC, p.id ASC, o.id ASC
 ';
 }

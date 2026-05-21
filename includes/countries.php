@@ -407,10 +407,48 @@ function orange_admin_send_country_cookie(string $countryCode): void
     ]);
 }
 
+/** دولة مقفلة على جلسة الأدمن (فريق دولة — بند 13.8). */
+function orange_admin_session_locked_country_id(): int
+{
+    if (empty($_SESSION['admin_country_lock'])) {
+        return 0;
+    }
+
+    return (int) $_SESSION['admin_country_lock'];
+}
+
+function orange_admin_is_global(?array $admin): bool
+{
+    if (is_array($admin) && array_key_exists('country_id', $admin)) {
+        return (int) ($admin['country_id'] ?? 0) <= 0;
+    }
+
+    return orange_admin_session_locked_country_id() <= 0;
+}
+
+/**
+ * SQL آمن للاستعلامات بدون prepare: AND alias.country_id = N
+ */
+function orange_sql_country_and_fragment(PDO $pdo, string $table, string $alias, int $countryId): string
+{
+    if ($countryId <= 0 || !orange_table_has_country_id($pdo, $table)) {
+        return '';
+    }
+    $col = trim($alias) !== '' ? trim($alias) . '.country_id' : $table . '.country_id';
+
+    return ' AND ' . $col . ' = ' . (int) $countryId;
+}
+
 function orange_admin_context_country_id(PDO $pdo): int
 {
     static $memo = null;
     if ($memo !== null) {
+        return $memo;
+    }
+    $locked = orange_admin_session_locked_country_id();
+    if ($locked > 0) {
+        $memo = $locked;
+
         return $memo;
     }
     if (isset($_GET['admin_country']) && (string) $_GET['admin_country'] !== '') {

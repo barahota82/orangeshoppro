@@ -294,3 +294,21 @@ function orange_warehouse_context_for_country(PDO $pdo, int $countryId): array
 
     return ['country_id' => $countryId, 'warehouse_id' => $warehouseId];
 }
+
+/**
+ * @param array<string, mixed> $order
+ * @return array{country_id:int, warehouse_id:int}
+ */
+function orange_warehouse_context_for_order(PDO $pdo, array $order): array
+{
+    $countryId = (int) ($order['country_id'] ?? 0);
+    if ($countryId <= 0) {
+        $countryId = orange_countries_default_id($pdo);
+    }
+    $warehouseId = (int) ($order['warehouse_id'] ?? 0);
+    if ($warehouseId <= 0) {
+        $warehouseId = orange_warehouse_default_id_for_country($pdo, $countryId);
+    }
+
+    return ['country_id' => $countryId, 'warehouse_id' => $warehouseId];
+}

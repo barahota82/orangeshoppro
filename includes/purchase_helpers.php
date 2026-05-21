@@ -9,7 +9,20 @@ require_once __DIR__ . '/catalog_schema.php';
  */
 function orange_purchase_apply_variant_stock_increase(PDO $pdo, int $variantId, int $qty, ?int $countryId = null): void
 {
-    if ($variantId <= 0 || $qty <= 0) {
+    orange_purchase_apply_variant_stock_delta($pdo, $variantId, $qty, $countryId);
+}
+
+function orange_purchase_apply_variant_stock_decrease(PDO $pdo, int $variantId, int $qty, ?int $countryId = null): void
+{
+    if ($qty <= 0) {
+        return;
+    }
+    orange_purchase_apply_variant_stock_delta($pdo, $variantId, -$qty, $countryId);
+}
+
+function orange_purchase_apply_variant_stock_delta(PDO $pdo, int $variantId, int $delta, ?int $countryId = null): void
+{
+    if ($variantId <= 0 || $delta === 0) {
         return;
     }
     require_once __DIR__ . '/countries.php';
@@ -18,7 +31,7 @@ function orange_purchase_apply_variant_stock_increase(PDO $pdo, int $variantId, 
         $countryId = orange_admin_context_country_id($pdo);
     }
     $warehouseId = orange_warehouse_default_id_for_country($pdo, $countryId);
-    orange_warehouse_apply_variant_delta($pdo, $warehouseId, $variantId, $qty, 0);
+    orange_warehouse_apply_variant_delta($pdo, $warehouseId, $variantId, $delta, 0);
 }
 
 /**

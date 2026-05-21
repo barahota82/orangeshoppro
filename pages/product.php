@@ -8,14 +8,24 @@ require_once __DIR__ . '/../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../includes/catalog_labels.php';
 require_once __DIR__ . '/../includes/advisory_sizing_guides.php';
 require_once __DIR__ . '/../includes/upload_paths.php';
+require_once __DIR__ . '/../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+$sfProductCountryId = orange_storefront_current_country_id($pdo);
 
 $stmt = $pdo->prepare("SELECT * FROM products WHERE id = ? AND is_active = 1 LIMIT 1");
 $stmt->execute([$id]);
 $product = $stmt->fetch();
+if (
+    $product !== false
+    && is_array($product)
+    && orange_table_has_column($pdo, 'products', 'country_id')
+    && (int) ($product['country_id'] ?? 0) !== $sfProductCountryId
+) {
+    $product = false;
+}
 if (
     $product !== false
     && is_array($product)

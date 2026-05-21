@@ -34,6 +34,7 @@ $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_
     ? ' data-orange-schema-degraded="1"'
     : '';
 $orangeAdminCountryIdNav = orange_admin_context_country_id($pdoNav);
+$orangeAdminCountryLockedId = orange_admin_session_locked_country_id();
 $orangeAdminCountriesNav = orange_countries_admin_list($pdoNav);
 $orangeAdminCountryCodeNav = 'kw';
 foreach ($orangeAdminCountriesNav as $ocNav) {
@@ -80,7 +81,7 @@ foreach ($orangeAdminCountriesNav as $ocNav) {
                     <div class="admin-sidebar-brand__subtitle">لوحة التحكم المؤسسية</div>
                 </div>
             </div>
-            <?php if (count($orangeAdminCountriesNav) > 0): ?>
+            <?php if (count($orangeAdminCountriesNav) > 0 && $orangeAdminCountryLockedId <= 0): ?>
             <div class="admin-topbar-country" style="margin-inline-start:auto;display:flex;align-items:center;gap:8px;">
                 <label for="admin_topbar_country" style="font-size:13px;color:#64748b;white-space:nowrap;">الدولة</label>
                 <select id="admin_topbar_country" style="min-width:140px;padding:6px 8px;border-radius:8px;border:1px solid #cbd5e1;"

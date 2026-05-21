@@ -5,9 +5,13 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
 require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+
+$adminCountryId = orange_admin_context_country_id($pdo);
+$productsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $adminCountryId);
 
 $catalogNavUnified = orange_catalog_nav_use_unified($pdo);
 
@@ -218,6 +222,7 @@ if ($unifiedProductList) {
         . $catJ . '
         LEFT JOIN catalog_sections cs_pl ON cs_pl.id = c.catalog_section_id
         LEFT JOIN departments d ON d.id = cs_pl.department_id
+        WHERE 1=1' . $productsCountrySql . '
         ORDER BY p.sort_order ASC, p.id ASC'
     )->fetchAll(PDO::FETCH_ASSOC);
 } elseif (
@@ -236,6 +241,7 @@ if ($unifiedProductList) {
         FROM products p
         LEFT JOIN product_types pt ON pt.id = p.product_type_id'
         . $catJ . '
+        WHERE 1=1' . $productsCountrySql . '
         ORDER BY p.sort_order ASC, p.id ASC'
     )->fetchAll(PDO::FETCH_ASSOC);
 } else {
@@ -247,6 +253,7 @@ if ($unifiedProductList) {
             pt.name_ar AS pt_name_ar_join, pt.name_en AS pt_name_en_join, pt.slug AS pt_slug_join
             FROM products p
             LEFT JOIN product_types pt ON pt.id = p.product_type_id
+            WHERE 1=1' . $productsCountrySql . '
             ORDER BY p.sort_order ASC, p.id ASC'
         )->fetchAll(PDO::FETCH_ASSOC);
     } else {
@@ -254,6 +261,7 @@ if ($unifiedProductList) {
             'SELECT p.*, NULL AS category_name, NULL AS catalog_category_display_id,
             NULL AS category_department_id, NULL AS department_name_ar, NULL AS department_name_en
             FROM products p
+            WHERE 1=1' . $productsCountrySql . '
             ORDER BY p.sort_order ASC, p.id ASC'
         )->fetchAll(PDO::FETCH_ASSOC);
     }

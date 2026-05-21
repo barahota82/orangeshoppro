@@ -10,9 +10,14 @@ require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/supplier_payable_account.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+
+$adminCountryId = orange_admin_context_country_id($pdo);
+$purchasesProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $adminCountryId);
+$purchasesSuppliersCountrySql = orange_sql_country_and_fragment($pdo, 'suppliers', 'suppliers', $adminCountryId);
 
 /* ── Products (with item_code / barcode when available) ────────────── */
 $pv2ProdCols = 'p.id, p.name, p.cost, p.has_colors, p.has_sizes';
@@ -23,7 +28,7 @@ if (orange_table_has_column($pdo, 'products', 'barcode')) {
     $pv2ProdCols .= ', p.barcode';
 }
 $products = $pdo->query(
-    "SELECT $pv2ProdCols FROM products p WHERE p.is_active = 1 ORDER BY p.name ASC"
+    "SELECT $pv2ProdCols FROM products p WHERE p.is_active = 1" . $purchasesProductsCountrySql . ' ORDER BY p.name ASC'
 )->fetchAll(PDO::FETCH_ASSOC);
 
 /* ── Variants by product ───────────────────────────────────────────── */
@@ -52,7 +57,9 @@ $suppliers = [];
 $supplierPayableMap = [];
 $pv2SupplierPickRows = [];
 if (orange_table_exists($pdo, 'suppliers')) {
-    $suppliers = $pdo->query('SELECT id, name, phone FROM suppliers ORDER BY name ASC')->fetchAll(PDO::FETCH_ASSOC);
+    $suppliers = $pdo->query(
+        'SELECT id, name, phone FROM suppliers WHERE 1=1' . $purchasesSuppliersCountrySql . ' ORDER BY name ASC'
+    )->fetchAll(PDO::FETCH_ASSOC);
     foreach ($suppliers as $s) {
         $sid = (int) $s['id'];
         $aid = orange_supplier_payable_account_id($pdo, $sid);

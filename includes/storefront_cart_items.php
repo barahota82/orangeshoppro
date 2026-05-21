@@ -37,6 +37,12 @@ function orange_storefront_validate_cart_items_core(PDO $pdo, array $items, bool
         if (!$product) {
             throw new RuntimeException('Product not found: ' . (int) $item['id']);
         }
+        if (
+            orange_table_has_column($pdo, 'products', 'country_id')
+            && (int) ($product['country_id'] ?? 0) !== $stockCountryId
+        ) {
+            throw new RuntimeException(function_exists('t') ? t('product_not_found') : 'Product not available');
+        }
         if (!orange_storefront_product_in_active_unified_chain($pdo, (int) $product['id'])) {
             throw new RuntimeException(function_exists('t') ? t('product_not_found') : 'Product not available');
         }

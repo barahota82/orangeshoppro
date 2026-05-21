@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
 require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 try {
     $pdo = db();
@@ -35,6 +36,9 @@ try {
         return;
     }
 
+    $sfCountryId = orange_storefront_current_country_id($pdo);
+    $productsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $sfCountryId);
+
     $sql = '
         SELECT p.*
         FROM products p
@@ -43,7 +47,7 @@ try {
         INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id AND ucc.is_active = 1
         INNER JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id AND ucs2.is_active = 1
         INNER JOIN departments d ON d.id = ucs2.department_id AND d.is_active = 1
-        WHERE p.is_active = 1
+        WHERE p.is_active = 1' . $productsCountrySql . '
     ';
     $params = [];
     if ($categoryId > 0) {
