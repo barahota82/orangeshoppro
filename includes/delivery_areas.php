@@ -202,10 +202,12 @@ function orange_delivery_areas_storefront_payload(PDO $pdo, string $lang, ?int $
     if (!$st) {
         return [];
     }
+    $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    orange_delivery_areas_sort_rows_by_lang($rows, $lang);
     $out = [];
-    while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+    foreach ($rows as $row) {
         $out[] = [
-            'id' => (int) $row['id'],
+            'id' => (int) ($row['id'] ?? 0),
             'name' => orange_delivery_area_label_from_row($row, $lang),
         ];
     }
@@ -225,6 +227,95 @@ function orange_delivery_area_label_from_row(array $row, string $lang): string
     }
 
     return $en !== '' ? $en : $ar;
+}
+
+function orange_delivery_areas_compare_names(string $a, string $b, string $lang = 'ar'): int
+{
+    $a = trim($a);
+    $b = trim($b);
+    $locale = $lang === 'ar' ? 'ar' : 'en';
+    if (class_exists('Collator', false)) {
+        $col = new Collator($locale);
+        if ($col instanceof Collator) {
+            $cmp = $col->compare($a, $b);
+            if (is_int($cmp)) {
+                return $cmp;
+            }
+        }
+    }
+    $aKey = function_exists('mb_strtolower') ? mb_strtolower($a, 'UTF-8') : strtolower($a);
+    $bKey = function_exists('mb_strtolower') ? mb_strtolower($b, 'UTF-8') : strtolower($b);
+
+    return strcmp($aKey, $bKey);
+}
+
+/**
+ * @param list<array<string, mixed>> $rows
+ */
+function orange_delivery_areas_sort_rows_by_lang(array &$rows, string $lang): void
+{
+    $sortLang = $lang === 'ar' ? 'ar' : 'en';
+    usort($rows, static function (array $a, array $b) use ($sortLang): int {
+        $nameArKey = 'name_ar';
+        $nameEnKey = 'name_en';
+        $keyA = $sortLang === 'ar'
+            ? trim((string) ($a[$nameArKey] ?? ''))
+            : trim((string) ($a[$nameEnKey] ?? ''));
+        $keyB = $sortLang === 'ar'
+            ? trim((string) ($b[$nameArKey] ?? ''))
+            : trim((string) ($b[$nameEnKey] ?? ''));
+        if ($keyA === '') {
+            $keyA = trim((string) ($a[$nameEnKey] ?? ''));
+        }
+        if ($keyB === '') {
+            $keyB = trim((string) ($b[$nameEnKey] ?? ''));
+        }
+
+        return orange_delivery_areas_compare_names($keyA, $keyB, $sortLang);
+    });
+}
+
+/**
+ * خيارات المنطقة في الأدمن (موردين/عملاء): اسم المنطقة فقط، مرتبة أبجدياً بالعربي.
+ *
+ * @return list<array{value:string, label:string, da_id:int}>
+ */
+function orange_delivery_areas_admin_select_options(PDO $pdo, int $countryId): array
+{
+    if ($countryId <= 0) {
+        return [];
+    }
+    $rows = orange_delivery_areas_admin_list($pdo, $countryId);
+    orange_delivery_areas_sort_rows_by_lang($rows, 'ar');
+    $seen = [];
+    $options = [];
+    foreach ($rows as $daRow) {
+        if (!is_array($daRow)) {
+            continue;
+        }
+        $nameAr = trim((string) ($daRow['name_ar'] ?? ''));
+        $nameEn = trim((string) ($daRow['name_en'] ?? ''));
+        $areaValue = $nameAr !== '' ? $nameAr : $nameEn;
+        if ($areaValue === '') {
+            continue;
+        }
+        $areaKey = function_exists('mb_strtolower') ? mb_strtolower($areaValue, 'UTF-8') : strtolower($areaValue);
+        if (isset($seen[$areaKey])) {
+            continue;
+        }
+        $seen[$areaKey] = true;
+        $label = $nameAr !== '' ? $nameAr : $nameEn;
+        if ((int) ($daRow['is_active'] ?? 0) !== 1) {
+            $label .= ' (غير منطقة توصيل حالياً)';
+        }
+        $options[] = [
+            'value' => $areaValue,
+            'label' => $label,
+            'da_id' => (int) ($daRow['id'] ?? 0),
+        ];
+    }
+
+    return $options;
 }
 
 function orange_delivery_areas_count_active(PDO $pdo, ?int $countryId = null): int
@@ -459,8 +550,37 @@ function orange_delivery_areas_storefront_groups(PDO $pdo, string $lang, ?int $c
                 ['name_ar' => (string) ($row['a_name_ar'] ?? ''), 'name_en' => (string) ($row['a_name_en'] ?? '')],
                 $lang
             ),
+            'name_ar' => (string) ($row['a_name_ar'] ?? ''),
+            'name_en' => (string) ($row['a_name_en'] ?? ''),
         ];
     }
+    $sortLang = $lang === 'ar' ? 'ar' : 'en';
+    foreach ($groups as &$group) {
+        if (!isset($group['areas']) || !is_array($group['areas'])) {
+            continue;
+        }
+        usort($group['areas'], static function (array $a, array $b) use ($sortLang): int {
+            $keyA = $sortLang === 'ar'
+                ? trim((string) ($a['name_ar'] ?? ''))
+                : trim((string) ($a['name_en'] ?? ''));
+            $keyB = $sortLang === 'ar'
+                ? trim((string) ($b['name_ar'] ?? ''))
+                : trim((string) ($b['name_en'] ?? ''));
+            if ($keyA === '') {
+                $keyA = trim((string) ($a['name'] ?? ''));
+            }
+            if ($keyB === '') {
+                $keyB = trim((string) ($b['name'] ?? ''));
+            }
+
+            return orange_delivery_areas_compare_names($keyA, $keyB, $sortLang);
+        });
+        foreach ($group['areas'] as &$areaRow) {
+            unset($areaRow['name_ar'], $areaRow['name_en']);
+        }
+        unset($areaRow);
+    }
+    unset($group);
 
     return $groups;
 }

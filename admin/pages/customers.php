@@ -46,41 +46,7 @@ foreach ($adminDeliveryAreas as $da) {
     }
 }
 
-// س15 + توحيد مع شاشة الموردين: قائمة خيارات المنطقة بنفس بناء suppliers.php (value = نص الاسم؛ label يجمع الاسم العربي والإنجليزي ووسم المعطّلة).
-$customerAreaOptions = [];
-$seenCustomerAreas = [];
-foreach ($adminDeliveryAreas as $daRow) {
-    if (!is_array($daRow)) {
-        continue;
-    }
-    $nameAr = trim((string) ($daRow['name_ar'] ?? ''));
-    $nameEn = trim((string) ($daRow['name_en'] ?? ''));
-    $areaValue = $nameAr !== '' ? $nameAr : $nameEn;
-    if ($areaValue === '') {
-        continue;
-    }
-    $areaKey = function_exists('mb_strtolower') ? mb_strtolower($areaValue, 'UTF-8') : strtolower($areaValue);
-    if (isset($seenCustomerAreas[$areaKey])) {
-        continue;
-    }
-    $seenCustomerAreas[$areaKey] = true;
-    $display = $areaValue;
-    if ($nameAr !== '' && $nameEn !== '' && strcasecmp($nameAr, $nameEn) !== 0) {
-        $display = $nameAr . ' — ' . $nameEn;
-    }
-    $govLabel = trim((string) ($daRow['governorate_name_ar'] ?? ''));
-    if ($govLabel !== '') {
-        $display .= ' — ' . $govLabel;
-    }
-    if ((int) ($daRow['is_active'] ?? 0) !== 1) {
-        $display .= ' (غير منطقة توصيل حالياً)';
-    }
-    $customerAreaOptions[] = [
-        'value' => $areaValue,
-        'label' => $display,
-        'da_id' => (int) ($daRow['id'] ?? 0),
-    ];
-}
+$customerAreaOptions = orange_delivery_areas_admin_select_options($pdo, $adminCountryId);
 
 /**
  * س15: معاينة كود العميل التالي (للعرض فقط؛ التثبيت في API).

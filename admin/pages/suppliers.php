@@ -130,43 +130,8 @@ $hasSupplierBankHolderCol = orange_table_has_column($pdo, 'suppliers', 'bank_acc
 $hasSupplierPreferredWarehouseCol = orange_table_has_column($pdo, 'suppliers', 'preferred_warehouse_id');
 $hasSupplierBlockReasonCol = orange_table_has_column($pdo, 'suppliers', 'block_reason');
 $hasSupplierAttachmentsCol = orange_table_has_column($pdo, 'suppliers', 'attachments_json');
-$supplierAreaOptions = [];
 $supplierAdminCountryId = orange_admin_context_country_id($pdo);
-$deliveryAreaRows = function_exists('orange_delivery_areas_admin_list')
-    ? orange_delivery_areas_admin_list($pdo, $supplierAdminCountryId)
-    : [];
-$seenSupplierAreas = [];
-foreach ($deliveryAreaRows as $daRow) {
-    if (!is_array($daRow)) {
-        continue;
-    }
-    $nameAr = trim((string) ($daRow['name_ar'] ?? ''));
-    $nameEn = trim((string) ($daRow['name_en'] ?? ''));
-    $areaValue = $nameAr !== '' ? $nameAr : $nameEn;
-    if ($areaValue === '') {
-        continue;
-    }
-    $areaKey = function_exists('mb_strtolower') ? mb_strtolower($areaValue, 'UTF-8') : strtolower($areaValue);
-    if (isset($seenSupplierAreas[$areaKey])) {
-        continue;
-    }
-    $seenSupplierAreas[$areaKey] = true;
-    $display = $areaValue;
-    if ($nameAr !== '' && $nameEn !== '' && strcasecmp($nameAr, $nameEn) !== 0) {
-        $display = $nameAr . ' — ' . $nameEn;
-    }
-    $govLabel = trim((string) ($daRow['governorate_name_ar'] ?? ''));
-    if ($govLabel !== '') {
-        $display .= ' — ' . $govLabel;
-    }
-    if ((int) ($daRow['is_active'] ?? 0) !== 1) {
-        $display .= ' (غير منطقة توصيل حالياً)';
-    }
-    $supplierAreaOptions[] = [
-        'value' => $areaValue,
-        'label' => $display,
-    ];
-}
+$supplierAreaOptions = orange_delivery_areas_admin_select_options($pdo, $supplierAdminCountryId);
 $supplierSchemaMissingCols = [];
 $supplierSchemaMap = [
     'payable_account_id' => $hasSupplierPayableCol,
