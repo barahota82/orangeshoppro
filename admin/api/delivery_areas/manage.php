@@ -32,10 +32,7 @@ try {
         json_response(['success' => false, 'message' => 'جدول delivery_areas غير جاهز'], 422);
     }
 
-    $countryId = (int) ($data['country_id'] ?? 0);
-    if ($countryId <= 0) {
-        $countryId = orange_admin_context_country_id($pdo);
-    }
+    $countryId = orange_delivery_areas_api_country_id($pdo, is_array($data) ? $data : []);
 
     if ($action === 'list_governorates') {
         json_response([

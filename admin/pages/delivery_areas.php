@@ -488,6 +488,12 @@ async function loadGovernorates() {
         return;
     }
     daGovernoratesCache = res.data || [];
+    if (daGovernoratesCache.length === 0 && tb.querySelector('tr')) {
+        bindGovernorateEditButtons();
+        refreshDgSortPreview();
+        refreshDaSortPreview();
+        return;
+    }
     tb.innerHTML = '';
     const sel = document.getElementById('da_governorate_id');
     if (sel) {
@@ -596,6 +602,12 @@ async function loadDeliveryAreas() {
         return;
     }
     daDeliveryAreasCache = res.data || [];
+    if (daDeliveryAreasCache.length === 0 && tb.querySelector('tr')) {
+        daSyncListAllCheckbox();
+        bindDeliveryAreaEditButtons();
+        refreshDaSortPreview();
+        return;
+    }
     daSyncListAllCheckbox();
     renderDeliveryAreasTable();
     refreshDaSortPreview();

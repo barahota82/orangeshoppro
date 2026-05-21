@@ -162,6 +162,70 @@ function orange_delivery_areas_admin_list(PDO $pdo, ?int $countryId = null): arr
 }
 
 /**
+ * مناطق نشطة للدولة (يشمل الربط عبر المحافظة إن country_id على المنطقة ناقص).
+ *
+ * @return list<array{id:int, name_ar:string, name_en:string}>
+ */
+function orange_delivery_areas_storefront_active_rows(PDO $pdo, int $countryId): array
+{
+    if (!orange_table_exists($pdo, 'delivery_areas') || $countryId <= 0) {
+        return [];
+    }
+    $hasCountry = orange_delivery_areas_has_country_column($pdo);
+    $hasGov = orange_delivery_areas_has_governorate_column($pdo)
+        && orange_delivery_governorates_table_exists($pdo);
+    if ($hasCountry && $hasGov) {
+        $st = $pdo->prepare(
+            'SELECT a.id, a.name_ar, a.name_en
+             FROM delivery_areas a
+             LEFT JOIN delivery_governorates g ON g.id = a.governorate_id
+             WHERE a.is_active = 1
+               AND (g.id IS NULL OR g.is_active = 1)
+               AND (a.country_id = ? OR g.country_id = ?)'
+        );
+        $st->execute([$countryId, $countryId]);
+    } elseif ($hasCountry) {
+        $st = $pdo->prepare(
+            'SELECT id, name_ar, name_en FROM delivery_areas WHERE is_active = 1 AND country_id = ?'
+        );
+        $st->execute([$countryId]);
+    } else {
+        $st = $pdo->query(
+            'SELECT id, name_ar, name_en FROM delivery_areas WHERE is_active = 1'
+        );
+    }
+    if (!$st) {
+        return [];
+    }
+
+    return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+/**
+ * @param array<string, mixed> $data
+ */
+function orange_delivery_areas_api_country_id(PDO $pdo, array $data): int
+{
+    $countryId = (int) ($data['country_id'] ?? 0);
+    if ($countryId > 0) {
+        return $countryId;
+    }
+    if (isset($_GET['admin_country']) && (string) $_GET['admin_country'] !== '') {
+        return orange_admin_context_country_id($pdo);
+    }
+    $ref = (string) ($_SERVER['HTTP_REFERER'] ?? '');
+    if ($ref !== '' && preg_match('/[?&]admin_country=([^&]+)/', $ref, $m)) {
+        $code = orange_countries_normalize_code(rawurldecode((string) $m[1]));
+        $row = orange_country_row_by_code($pdo, $code, false);
+        if ($row !== null) {
+            return (int) ($row['id'] ?? 0);
+        }
+    }
+
+    return orange_admin_context_country_id($pdo);
+}
+
+/**
  * مناطق نشطة للواجهة: id + اسم حسب لغة العرض (عربي = name_ar، غيره = name_en مع احتياط name_ar).
  *
  * @return list<array{id:int, name:string}>
@@ -176,33 +240,7 @@ function orange_delivery_areas_storefront_payload(PDO $pdo, string $lang, ?int $
         require_once __DIR__ . '/countries.php';
         $countryId = orange_storefront_current_country_id($pdo);
     }
-    $hasCountry = orange_delivery_areas_has_country_column($pdo);
-    $hasGov = orange_delivery_areas_has_governorate_column($pdo)
-        && orange_delivery_governorates_table_exists($pdo);
-    if ($hasCountry && $countryId > 0 && $hasGov) {
-        $st = $pdo->prepare(
-            'SELECT a.id, a.name_ar, a.name_en
-             FROM delivery_areas a
-             INNER JOIN delivery_governorates g ON g.id = a.governorate_id AND g.is_active = 1
-             WHERE a.is_active = 1 AND a.country_id = ?
-             ORDER BY g.sort_order ASC, g.id ASC, a.sort_order ASC, a.id ASC'
-        );
-        $st->execute([$countryId]);
-    } elseif ($hasCountry && $countryId > 0) {
-        $st = $pdo->prepare(
-            'SELECT id, name_ar, name_en FROM delivery_areas WHERE is_active = 1 AND country_id = ?
-             ORDER BY sort_order ASC, id ASC'
-        );
-        $st->execute([$countryId]);
-    } else {
-        $st = $pdo->query(
-            'SELECT id, name_ar, name_en FROM delivery_areas WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
-        );
-    }
-    if (!$st) {
-        return [];
-    }
-    $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $rows = orange_delivery_areas_storefront_active_rows($pdo, $countryId);
     orange_delivery_areas_sort_rows_by_lang($rows, $lang);
     $out = [];
     foreach ($rows as $row) {
@@ -235,12 +273,16 @@ function orange_delivery_areas_compare_names(string $a, string $b, string $lang 
     $b = trim($b);
     $locale = $lang === 'ar' ? 'ar' : 'en';
     if (class_exists('Collator', false)) {
-        $col = new Collator($locale);
-        if ($col instanceof Collator) {
-            $cmp = $col->compare($a, $b);
-            if (is_int($cmp)) {
-                return $cmp;
+        try {
+            $col = new Collator($locale);
+            if ($col instanceof Collator) {
+                $cmp = $col->compare($a, $b);
+                if (is_int($cmp)) {
+                    return $cmp;
+                }
             }
+        } catch (Throwable $e) {
+            /* fallback below */
         }
     }
     $aKey = function_exists('mb_strtolower') ? mb_strtolower($a, 'UTF-8') : strtolower($a);
@@ -496,93 +538,29 @@ function orange_delivery_areas_storefront_groups(PDO $pdo, string $lang, ?int $c
     }
     $lang = preg_match('/^(ar|en|fil|hi)$/', $lang) ? $lang : 'en';
     if ($countryId === null || $countryId <= 0) {
+        require_once __DIR__ . '/countries.php';
         $countryId = orange_storefront_current_country_id($pdo);
     }
-    if (!orange_delivery_areas_has_governorate_column($pdo) || !orange_delivery_governorates_table_exists($pdo)) {
-        $flat = orange_delivery_areas_storefront_payload($pdo, $lang, $countryId);
-        if ($flat === []) {
-            return [];
-        }
-
-        return [
-            [
-                'governorate_id' => 0,
-                'governorate_name' => '',
-                'areas' => $flat,
-            ],
+    $rows = orange_delivery_areas_storefront_active_rows($pdo, $countryId);
+    orange_delivery_areas_sort_rows_by_lang($rows, $lang);
+    $areas = [];
+    foreach ($rows as $row) {
+        $areas[] = [
+            'id' => (int) ($row['id'] ?? 0),
+            'name' => orange_delivery_area_label_from_row($row, $lang),
         ];
     }
-    $st = $pdo->prepare(
-        'SELECT g.id AS governorate_id, g.name_ar AS g_name_ar, g.name_en AS g_name_en,
-                a.id AS area_id, a.name_ar AS a_name_ar, a.name_en AS a_name_en
-         FROM delivery_governorates g
-         INNER JOIN delivery_areas a ON a.governorate_id = g.id AND a.is_active = 1
-         WHERE g.country_id = ? AND g.is_active = 1 AND a.country_id = ?
-         ORDER BY g.sort_order ASC, g.id ASC, a.sort_order ASC, a.id ASC'
-    );
-    $st->execute([$countryId, $countryId]);
-    $groups = [];
-    $index = [];
-    while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
-        $gid = (int) ($row['governorate_id'] ?? 0);
-        if ($gid <= 0) {
-            continue;
-        }
-        if (!isset($index[$gid])) {
-            $gLabel = orange_delivery_area_label_from_row(
-                ['name_ar' => (string) ($row['g_name_ar'] ?? ''), 'name_en' => (string) ($row['g_name_en'] ?? '')],
-                $lang
-            );
-            $index[$gid] = count($groups);
-            $groups[] = [
-                'governorate_id' => $gid,
-                'governorate_name' => $gLabel,
-                'areas' => [],
-            ];
-        }
-        $aid = (int) ($row['area_id'] ?? 0);
-        if ($aid <= 0) {
-            continue;
-        }
-        $groups[$index[$gid]]['areas'][] = [
-            'id' => $aid,
-            'name' => orange_delivery_area_label_from_row(
-                ['name_ar' => (string) ($row['a_name_ar'] ?? ''), 'name_en' => (string) ($row['a_name_en'] ?? '')],
-                $lang
-            ),
-            'name_ar' => (string) ($row['a_name_ar'] ?? ''),
-            'name_en' => (string) ($row['a_name_en'] ?? ''),
-        ];
+    if ($areas === []) {
+        return [];
     }
-    $sortLang = $lang === 'ar' ? 'ar' : 'en';
-    foreach ($groups as &$group) {
-        if (!isset($group['areas']) || !is_array($group['areas'])) {
-            continue;
-        }
-        usort($group['areas'], static function (array $a, array $b) use ($sortLang): int {
-            $keyA = $sortLang === 'ar'
-                ? trim((string) ($a['name_ar'] ?? ''))
-                : trim((string) ($a['name_en'] ?? ''));
-            $keyB = $sortLang === 'ar'
-                ? trim((string) ($b['name_ar'] ?? ''))
-                : trim((string) ($b['name_en'] ?? ''));
-            if ($keyA === '') {
-                $keyA = trim((string) ($a['name'] ?? ''));
-            }
-            if ($keyB === '') {
-                $keyB = trim((string) ($b['name'] ?? ''));
-            }
 
-            return orange_delivery_areas_compare_names($keyA, $keyB, $sortLang);
-        });
-        foreach ($group['areas'] as &$areaRow) {
-            unset($areaRow['name_ar'], $areaRow['name_en']);
-        }
-        unset($areaRow);
-    }
-    unset($group);
-
-    return $groups;
+    return [
+        [
+            'governorate_id' => 0,
+            'governorate_name' => '',
+            'areas' => $areas,
+        ],
+    ];
 }
 
 /**
