@@ -86,11 +86,21 @@ foreach ($supplierPayablePickAccounts as $a) {
  * معاينة الكود التالي للمورد في النموذج (للعرض فقط).
  * الحفظ الفعلي يظل عبر منطق API الذي يولّد/يثبّت الكود تلقائياً.
  */
+$supplierAdminCountryId = orange_admin_context_country_id($pdo);
 $nextSupplierCodePreview = '1';
 if (orange_table_exists($pdo, 'suppliers') && orange_table_has_column($pdo, 'suppliers', 'code')) {
-    $codeRows = $pdo->query(
-        'SELECT code FROM suppliers WHERE code IS NOT NULL AND TRIM(code) <> \'\' ORDER BY id DESC LIMIT 5000'
-    )->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    if (orange_table_has_country_id($pdo, 'suppliers') && $supplierAdminCountryId > 0) {
+        $supCodeSt = $pdo->prepare(
+            'SELECT code FROM suppliers WHERE country_id = ? AND code IS NOT NULL AND TRIM(code) <> \'\'
+             ORDER BY id DESC LIMIT 5000'
+        );
+        $supCodeSt->execute([$supplierAdminCountryId]);
+        $codeRows = $supCodeSt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    } else {
+        $codeRows = $pdo->query(
+            'SELECT code FROM suppliers WHERE code IS NOT NULL AND TRIM(code) <> \'\' ORDER BY id DESC LIMIT 5000'
+        )->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    }
     $maxCodeNum = 0;
     foreach ($codeRows as $rawCode) {
         $code = trim((string) $rawCode);
@@ -130,7 +140,6 @@ $hasSupplierBankHolderCol = orange_table_has_column($pdo, 'suppliers', 'bank_acc
 $hasSupplierPreferredWarehouseCol = orange_table_has_column($pdo, 'suppliers', 'preferred_warehouse_id');
 $hasSupplierBlockReasonCol = orange_table_has_column($pdo, 'suppliers', 'block_reason');
 $hasSupplierAttachmentsCol = orange_table_has_column($pdo, 'suppliers', 'attachments_json');
-$supplierAdminCountryId = orange_admin_context_country_id($pdo);
 $supplierAreaOptions = orange_delivery_areas_admin_select_options($pdo, $supplierAdminCountryId, 'supplier');
 $supplierSchemaMissingCols = [];
 $supplierSchemaMap = [

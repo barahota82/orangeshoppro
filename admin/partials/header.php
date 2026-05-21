@@ -131,7 +131,7 @@ foreach ($orangeAdminCountriesNav as $ocNav) {
             };
 
             /** @param array<string, mixed> $nl */
-            $orangeRenderNavLinkMega = static function (array $nl, string $megaSectionId = '') use ($admin, $pdoNav, $orangeNavLinkActive, $orange_nav_acct_reports_need_client_active): void {
+            $orangeRenderNavLinkMega = static function (array $nl, string $megaSectionId = '') use ($admin, $pdoNav, $orangeNavLinkActive, $orange_nav_acct_reports_need_client_active, $orangeAdminCountryCodeNav, $orangeAdminCountryLockedId): void {
                 if (!orange_admin_nav_visible($admin, $pdoNav, $nl['page'])) {
                     return;
                 }
@@ -139,10 +139,10 @@ foreach ($orangeAdminCountriesNav as $ocNav) {
                 $active = !$pinAcct && $orangeNavLinkActive($nl);
                 $cls = trim($nl['class'] . ' admin-mega-link' . ($active ? ' is-active' : ''));
                 $pinAttr = $pinAcct ? ' data-orange-admin-nav-pin="acct-reports"' : '';
-                echo '<a href="' . htmlspecialchars(storefront_public_path((string) $nl['href']), ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '"' . $pinAttr . '>' . htmlspecialchars($nl['label'], ENT_QUOTES, 'UTF-8') . '</a>';
+                echo '<a href="' . htmlspecialchars(orange_admin_public_href_with_country((string) $nl['href'], $orangeAdminCountryCodeNav, $orangeAdminCountryLockedId), ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '"' . $pinAttr . '>' . htmlspecialchars($nl['label'], ENT_QUOTES, 'UTF-8') . '</a>';
             };
 
-            $orangeRenderNavLink = static function (array $nl, string $navSectionId = '') use ($admin, $pdoNav, $orangeNavLinkActive, $orange_nav_acct_reports_need_client_active): void {
+            $orangeRenderNavLink = static function (array $nl, string $navSectionId = '') use ($admin, $pdoNav, $orangeNavLinkActive, $orange_nav_acct_reports_need_client_active, $orangeAdminCountryCodeNav, $orangeAdminCountryLockedId): void {
                 if (!orange_admin_nav_visible($admin, $pdoNav, $nl['page'])) {
                     return;
                 }
@@ -150,7 +150,7 @@ foreach ($orangeAdminCountriesNav as $ocNav) {
                 $active = !$pinAcct && $orangeNavLinkActive($nl);
                 $cls = trim($nl['class'] . ($active ? ' is-active' : ''));
                 $pinAttr = $pinAcct ? ' data-orange-admin-nav-pin="acct-reports"' : '';
-                echo '<a href="' . htmlspecialchars(storefront_public_path((string) $nl['href']), ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '"' . $pinAttr . '>' . htmlspecialchars($nl['label'], ENT_QUOTES, 'UTF-8') . '</a>';
+                echo '<a href="' . htmlspecialchars(orange_admin_public_href_with_country((string) $nl['href'], $orangeAdminCountryCodeNav, $orangeAdminCountryLockedId), ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '"' . $pinAttr . '>' . htmlspecialchars($nl['label'], ENT_QUOTES, 'UTF-8') . '</a>';
             };
 
             /**
@@ -375,7 +375,7 @@ foreach ($orangeAdminCountriesNav as $ocNav) {
                 }
                 $active = $orangeNavLinkActive($nl);
                 $cls = 'admin-topbar-mega-home' . ($active ? ' is-active' : '');
-                echo '<a href="' . htmlspecialchars(storefront_public_path((string) $nl['href']), ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($nl['label'], ENT_QUOTES, 'UTF-8') . '</a>';
+                echo '<a href="' . htmlspecialchars(orange_admin_public_href_with_country((string) $nl['href'], $orangeAdminCountryCodeNav, $orangeAdminCountryLockedId), ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($nl['label'], ENT_QUOTES, 'UTF-8') . '</a>';
             }
             foreach ($orangeNavMegaSections as $sec) {
                 [$anyVis, $hasAct] = $orangeNavSectionMeta($sec['items']);

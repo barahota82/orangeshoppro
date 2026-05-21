@@ -9,13 +9,27 @@ require_once __DIR__ . '/../../../includes/account_tree.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
-function orange_supplier_next_auto_code(PDO $pdo): ?string
+function orange_supplier_next_auto_code(PDO $pdo, ?int $countryId = null): ?string
 {
     if (!orange_table_has_column($pdo, 'suppliers', 'code')) {
         return null;
     }
-    $rows = $pdo->query('SELECT code FROM suppliers WHERE code IS NOT NULL AND TRIM(code) <> \'\' ORDER BY id DESC LIMIT 5000')
-        ->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_admin_context_country_id($pdo);
+    }
+    if (orange_table_has_country_id($pdo, 'suppliers') && $countryId > 0) {
+        $st = $pdo->prepare(
+            'SELECT code FROM suppliers WHERE country_id = ? AND code IS NOT NULL AND TRIM(code) <> \'\'
+             ORDER BY id DESC LIMIT 5000'
+        );
+        $st->execute([$countryId]);
+        $rows = $st->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        $chk = $pdo->prepare('SELECT id FROM suppliers WHERE code = ? AND country_id = ? LIMIT 1');
+    } else {
+        $rows = $pdo->query('SELECT code FROM suppliers WHERE code IS NOT NULL AND TRIM(code) <> \'\' ORDER BY id DESC LIMIT 5000')
+            ->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        $chk = $pdo->prepare('SELECT id FROM suppliers WHERE code = ? LIMIT 1');
+    }
     $max = 0;
     foreach ($rows as $rawCode) {
         $c = trim((string) $rawCode);
@@ -32,10 +46,13 @@ function orange_supplier_next_auto_code(PDO $pdo): ?string
         }
     }
     $start = max(1, $max + 1);
-    $chk = $pdo->prepare('SELECT id FROM suppliers WHERE code = ? LIMIT 1');
     for ($i = $start; $i < $start + 20000; $i++) {
         $candidate = (string) $i;
-        $chk->execute([$candidate]);
+        if (orange_table_has_country_id($pdo, 'suppliers') && $countryId > 0) {
+            $chk->execute([$candidate, $countryId]);
+        } else {
+            $chk->execute([$candidate]);
+        }
         if (!$chk->fetchColumn()) {
             return $candidate;
         }
@@ -109,9 +126,9 @@ try {
             }
         } elseif ($idIn > 0) {
             $existingCode = trim((string) (($existingSupplierRow['code'] ?? '')));
-            $codeSql = $existingCode !== '' ? $existingCode : orange_supplier_next_auto_code($pdo);
+            $codeSql = $existingCode !== '' ? $existingCode : orange_supplier_next_auto_code($pdo, $supplierAdminCountryId);
         } else {
-            $codeSql = orange_supplier_next_auto_code($pdo);
+            $codeSql = orange_supplier_next_auto_code($pdo, $supplierAdminCountryId);
         }
         if ($codeSql === null) {
             json_response(['success' => false, 'message' => 'تعذّر توليد كود المورد تلقائياً. حاول مرة أخرى.'], 500);

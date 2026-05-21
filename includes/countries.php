@@ -465,15 +465,29 @@ function orange_admin_context_country_id(PDO $pdo): int
         $row = orange_country_row_by_code($pdo, $code, false);
         if ($row !== null) {
             orange_admin_send_country_cookie($code);
+            $_SESSION['admin_country_ctx'] = (int) $row['id'];
             $memo = (int) $row['id'];
 
             return $memo;
+        }
+    }
+    if (!empty($_SESSION['admin_country_ctx'])) {
+        $sessCid = (int) $_SESSION['admin_country_ctx'];
+        if ($sessCid > 0) {
+            $sessRow = orange_country_row_by_id($pdo, $sessCid, false);
+            if ($sessRow !== null) {
+                $memo = $sessCid;
+
+                return $memo;
+            }
+            unset($_SESSION['admin_country_ctx']);
         }
     }
     $fromCookie = orange_admin_read_saved_country_code();
     if ($fromCookie !== null) {
         $row = orange_country_row_by_code($pdo, $fromCookie, false);
         if ($row !== null) {
+            $_SESSION['admin_country_ctx'] = (int) $row['id'];
             $memo = (int) $row['id'];
 
             return $memo;
@@ -482,6 +496,31 @@ function orange_admin_context_country_id(PDO $pdo): int
     $memo = orange_countries_default_id($pdo);
 
     return $memo;
+}
+
+/**
+ * يلحق admin_country= بروابط الأدمن (أدمن عام) لثبات السياق مع التنقل.
+ */
+function orange_admin_href_with_country(string $href, string $countryCode, int $lockedCountryId = 0): string
+{
+    if ($lockedCountryId > 0) {
+        return $href;
+    }
+    $code = orange_countries_normalize_code($countryCode);
+    if ($code === '') {
+        return $href;
+    }
+    if (str_contains($href, 'admin_country=')) {
+        return $href;
+    }
+    $sep = str_contains($href, '?') ? '&' : '?';
+
+    return $href . $sep . 'admin_country=' . rawurlencode($code);
+}
+
+function orange_admin_public_href_with_country(string $href, string $countryCode, int $lockedCountryId = 0): string
+{
+    return storefront_public_path(orange_admin_href_with_country($href, $countryCode, $lockedCountryId));
 }
 
 function orange_table_has_country_id(PDO $pdo, string $table): bool
