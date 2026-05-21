@@ -10,9 +10,14 @@ require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/supplier_payable_account.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+
+$prCountryId = orange_admin_context_country_id($pdo);
+$prProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $prCountryId);
+$prSuppliersCountrySql = orange_sql_country_and_fragment($pdo, 'suppliers', 'suppliers', $prCountryId);
 
 /* ── Products (with item_code / barcode when available) ────────────── */
 $pr2ProdCols = 'p.id, p.name, p.cost, p.has_colors, p.has_sizes';
@@ -23,7 +28,7 @@ if (orange_table_has_column($pdo, 'products', 'barcode')) {
     $pr2ProdCols .= ', p.barcode';
 }
 $products = $pdo->query(
-    "SELECT $pr2ProdCols FROM products p WHERE p.is_active = 1 ORDER BY p.name ASC"
+    "SELECT $pr2ProdCols FROM products p WHERE p.is_active = 1" . $prProductsCountrySql . ' ORDER BY p.name ASC'
 )->fetchAll(PDO::FETCH_ASSOC);
 
 /* ── Variants by product ───────────────────────────────────────────── */
@@ -52,7 +57,9 @@ $suppliers = [];
 $supplierPayableMap = [];
 $pr2SupplierPickRows = [];
 if (orange_table_exists($pdo, 'suppliers')) {
-    $suppliers = $pdo->query('SELECT id, name, phone FROM suppliers ORDER BY name ASC')->fetchAll(PDO::FETCH_ASSOC);
+    $suppliers = $pdo->query(
+        'SELECT id, name, phone FROM suppliers WHERE 1=1' . $prSuppliersCountrySql . ' ORDER BY name ASC'
+    )->fetchAll(PDO::FETCH_ASSOC);
     foreach ($suppliers as $s) {
         $sid = (int) $s['id'];
         // س13: لا يجوز أن يكسر مورد واحد (بإعداد accounts_payable مفقود/غير ورقة) كل الشاشة.

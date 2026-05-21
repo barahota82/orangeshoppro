@@ -540,3 +540,24 @@ function orange_delivery_areas_has_country_column(PDO $pdo): bool
 {
     return orange_table_exists($pdo, 'delivery_areas') && orange_table_has_column($pdo, 'delivery_areas', 'country_id');
 }
+
+/**
+ * @throws RuntimeException
+ */
+function orange_admin_assert_entity_country(PDO $pdo, string $table, int $entityId): void
+{
+    $allowed = ['orders', 'customers', 'suppliers', 'purchases', 'products', 'journal_vouchers'];
+    if (!in_array($table, $allowed, true) || $entityId <= 0 || !orange_table_has_country_id($pdo, $table)) {
+        return;
+    }
+    $ctx = orange_admin_context_country_id($pdo);
+    if ($ctx <= 0) {
+        return;
+    }
+    $st = $pdo->prepare('SELECT country_id FROM `' . $table . '` WHERE id = ? LIMIT 1');
+    $st->execute([$entityId]);
+    $rowCid = (int) ($st->fetchColumn() ?: 0);
+    if ($rowCid > 0 && $rowCid !== $ctx) {
+        throw new RuntimeException('السجل لا يتبع الدولة المختارة في لوحة التحكم.');
+    }
+}

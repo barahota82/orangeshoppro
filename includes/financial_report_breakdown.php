@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/journal_voucher.php';
 require_once __DIR__ . '/party_subledger.php';
+require_once __DIR__ . '/countries.php';
 
 /**
  * معرف حساب ذمم الموردين دون إيقاف الصفحة إن كان الربط ناقصاً.
@@ -38,17 +39,18 @@ function orange_financial_supplier_fy_subledger(PDO $pdo, int $fiscalYearId): ar
         ? 'COALESCE(NULLIF(TRIM(s.name), \'\'), CONCAT(\'مورد #\', ps.party_id))'
         : 'CONCAT(\'مورد #\', ps.party_id)';
     $joinSup = $hasSuppliers ? 'LEFT JOIN suppliers s ON s.id = ps.party_id' : '';
+    $countryBind = orange_gl_voucher_country_bind($pdo, 'jv');
     $sql = "SELECT ps.party_id AS party_id, {$nameExpr} AS party_name,
             COALESCE(SUM(ps.debit), 0) AS d, COALESCE(SUM(ps.credit), 0) AS c
          FROM party_subledger ps
          INNER JOIN journal_vouchers jv ON jv.id = ps.voucher_id
          {$joinSup}
-         WHERE ps.party_kind = 'supplier' AND jv.fiscal_year_id = ?
+         WHERE ps.party_kind = 'supplier' AND jv.fiscal_year_id = ?{$countryBind['sql']}
          GROUP BY ps.party_id, {$nameExpr}
          HAVING d > 0.0001 OR c > 0.0001
          ORDER BY party_name ASC";
     $st = $pdo->prepare($sql);
-    $st->execute([$fiscalYearId]);
+    $st->execute(array_merge([$fiscalYearId], $countryBind['params']));
     $out = [];
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
         $d = round((float) $r['d'], 4);
@@ -81,17 +83,18 @@ function orange_financial_supplier_balance_until_date(PDO $pdo, string $endDateI
         ? 'COALESCE(NULLIF(TRIM(s.name), \'\'), CONCAT(\'مورد #\', ps.party_id))'
         : 'CONCAT(\'مورد #\', ps.party_id)';
     $joinSup = $hasSuppliers ? 'LEFT JOIN suppliers s ON s.id = ps.party_id' : '';
+    $countryBind = orange_gl_voucher_country_bind($pdo, 'jv');
     $sql = "SELECT ps.party_id AS party_id, {$nameExpr} AS party_name,
             COALESCE(SUM(ps.credit - ps.debit), 0) AS bal
          FROM party_subledger ps
          INNER JOIN journal_vouchers jv ON jv.id = ps.voucher_id
          {$joinSup}
-         WHERE ps.party_kind = 'supplier' AND DATE(jv.voucher_date) <= DATE(?)
+         WHERE ps.party_kind = 'supplier' AND DATE(jv.voucher_date) <= DATE(?){$countryBind['sql']}
          GROUP BY ps.party_id, {$nameExpr}
          HAVING ABS(bal) > 0.0001
          ORDER BY party_name ASC";
     $st = $pdo->prepare($sql);
-    $st->execute([$endDateInclusive]);
+    $st->execute(array_merge([$endDateInclusive], $countryBind['params']));
     $out = [];
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
         $out[] = [
@@ -120,19 +123,20 @@ function orange_financial_registered_expenses_fy(PDO $pdo, int $fiscalYearId): a
         ? 'COALESCE(NULLIF(TRIM(e.name), \'\'), NULLIF(TRIM(jl.memo), \'\'), NULLIF(TRIM(jv.description), \'\'), jv.reference)'
         : 'COALESCE(NULLIF(TRIM(jl.memo), \'\'), NULLIF(TRIM(jv.description), \'\'), jv.reference)';
 
+    $countryBind = orange_gl_voucher_country_bind($pdo, 'jv');
     $sql = "SELECT jl.account_id AS account_id,
             {$labelExpr} AS expense_label,
             COALESCE(SUM(jl.debit), 0) AS amt
          FROM journal_vouchers jv
          INNER JOIN journal_lines jl ON jl.voucher_id = jv.id AND jl.debit > 0.0001
          {$joinExp}
-         WHERE jv.fiscal_year_id = ? AND jv.entry_type = 'expense'
+         WHERE jv.fiscal_year_id = ? AND jv.entry_type = 'expense'{$countryBind['sql']}
          GROUP BY jl.account_id, {$labelExpr}
          HAVING amt > 0.0001
          ORDER BY expense_label ASC, jl.account_id ASC";
 
     $st = $pdo->prepare($sql);
-    $st->execute([$fiscalYearId]);
+    $st->execute(array_merge([$fiscalYearId], $countryBind['params']));
     $out = [];
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
         $out[] = [
@@ -161,6 +165,7 @@ function orange_financial_expense_account_line_breakdown(PDO $pdo, int $fiscalYe
         return [];
     }
     $placeholders = implode(',', array_fill(0, count($expenseAccountIds), '?'));
+    $countryBind = orange_gl_voucher_country_bind($pdo, 'jv');
     $subExpr = "COALESCE(NULLIF(TRIM(jl.memo), ''), NULLIF(TRIM(jv.description), ''), '—')";
     $sql = "SELECT jl.account_id AS account_id,
             {$subExpr} AS sublabel,
@@ -169,11 +174,11 @@ function orange_financial_expense_account_line_breakdown(PDO $pdo, int $fiscalYe
          INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
          WHERE jv.fiscal_year_id = ?
            AND jl.account_id IN ({$placeholders})
-           AND jv.entry_type NOT IN ('opening_balance', 'year_end_close')
+           AND jv.entry_type NOT IN ('opening_balance', 'year_end_close'){$countryBind['sql']}
          GROUP BY jl.account_id, {$subExpr}
          HAVING d > 0.0001 OR c > 0.0001
          ORDER BY jl.account_id ASC, sublabel ASC";
-    $params = array_merge([$fiscalYearId], $expenseAccountIds);
+    $params = array_merge([$fiscalYearId], $expenseAccountIds, $countryBind['params']);
     $st = $pdo->prepare($sql);
     $st->execute($params);
     $out = [];

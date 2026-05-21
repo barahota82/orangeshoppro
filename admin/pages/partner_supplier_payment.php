@@ -9,9 +9,13 @@ require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/supplier_payable_account.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+
+$ppvCountryId = orange_admin_context_country_id($pdo);
+$ppvSuppliersCountrySql = orange_sql_country_and_fragment($pdo, 'suppliers', 'suppliers', $ppvCountryId);
 
 $ppvTitle = 'سداد فواتير مشتريات آجلة';
 $ppvApiUrl = '/admin/api/partners/supplier-payment.php';
@@ -38,7 +42,9 @@ $suppliers = [];
 $supplierPayableMap = [];
 $ppvSupplierPickRows = [];
 if (orange_table_exists($pdo, 'suppliers')) {
-    $suppliers = $pdo->query('SELECT id, name, phone FROM suppliers ORDER BY name ASC')->fetchAll(PDO::FETCH_ASSOC);
+    $suppliers = $pdo->query(
+        'SELECT id, name, phone FROM suppliers WHERE 1=1' . $ppvSuppliersCountrySql . ' ORDER BY name ASC'
+    )->fetchAll(PDO::FETCH_ASSOC);
     foreach ($suppliers as $s) {
         $sid = (int) $s['id'];
         $aid = orange_supplier_payable_account_id($pdo, $sid);

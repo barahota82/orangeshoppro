@@ -4,9 +4,16 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/date_format.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+
+$caCountryId = orange_admin_context_country_id($pdo);
+$caOrdersCountrySql = orange_sql_country_and_fragment($pdo, 'orders', 'o', $caCountryId);
+$caChannelsCountrySql = orange_channels_has_country_column($pdo)
+    ? orange_sql_country_and_fragment($pdo, 'channels', 'c', $caCountryId)
+    : '';
 
 $fromRaw = isset($_GET['from']) ? trim((string) $_GET['from']) : '';
 $toRaw = isset($_GET['to']) ? trim((string) $_GET['to']) : '';
@@ -20,7 +27,7 @@ $toIn = $toOk ? orange_format_date_dmY($toYmd) : $toRaw;
 /**
  * @return array{0: string, 1: list<mixed>}
  */
-function orange_channel_analytics_join_orders_on(bool $fromOk, string $fromYmd, bool $toOk, string $toYmd): array
+function orange_channel_analytics_join_orders_on(bool $fromOk, string $fromYmd, bool $toOk, string $toYmd, string $ordersCountrySql = ''): array
 {
     $on = 'o.channel_id = c.id';
     $params = [];
@@ -32,11 +39,12 @@ function orange_channel_analytics_join_orders_on(bool $fromOk, string $fromYmd, 
         $on .= ' AND o.created_at <= ?';
         $params[] = $toYmd . ' 23:59:59';
     }
+    $on .= $ordersCountrySql;
 
     return [$on, $params];
 }
 
-[$joinOn, $joinParams] = orange_channel_analytics_join_orders_on($fromOk, $fromYmd, $toOk, $toYmd);
+[$joinOn, $joinParams] = orange_channel_analytics_join_orders_on($fromOk, $fromYmd, $toOk, $toYmd, $caOrdersCountrySql);
 
 $sqlChannels = "
     SELECT
@@ -49,6 +57,7 @@ $sqlChannels = "
         COALESCE(SUM(CASE WHEN o.status = 'completed' THEN o.total END), 0) AS revenue_completed
     FROM channels c
     LEFT JOIN orders o ON {$joinOn}
+    WHERE 1=1{$caChannelsCountrySql}
     GROUP BY c.id, c.name, c.slug, c.is_active
     ORDER BY revenue_completed DESC, cnt_completed DESC, cnt_all DESC
 ";
@@ -72,7 +81,7 @@ $orphanSql = '
         SUM(CASE WHEN status = \'completed\' THEN 1 ELSE 0 END) AS cnt_completed,
         COALESCE(SUM(CASE WHEN status = \'completed\' THEN total END), 0) AS revenue_completed
     FROM orders
-    WHERE (channel_id IS NULL OR channel_id = 0)
+    WHERE (channel_id IS NULL OR channel_id = 0)' . orange_sql_country_and_fragment($pdo, 'orders', 'orders', $caCountryId) . '
 ';
 $orphanParams = [];
 if ($fromOk) {
@@ -103,7 +112,7 @@ if ($toOk) {
     $topSql .= ' AND o.created_at <= ?';
     $topParams[] = $toYmd . ' 23:59:59';
 }
-$topSql .= ' GROUP BY o.channel_id, oi.product_name ORDER BY o.channel_id ASC, qty_sum DESC';
+$topSql .= $caOrdersCountrySql . ' GROUP BY o.channel_id, oi.product_name ORDER BY o.channel_id ASC, qty_sum DESC';
 
 $stTop = $pdo->prepare($topSql);
 $stTop->execute($topParams);

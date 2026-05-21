@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 46);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 47);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3025,6 +3025,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_country_warehouses_v44($pdo);
     orange_catalog_migrate_country_scope_v45($pdo);
     orange_catalog_migrate_country_accounts_v46($pdo);
+    orange_catalog_migrate_country_gl_v47($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
         orange_catalog_safe_exec(
@@ -4315,6 +4316,57 @@ function orange_catalog_migrate_country_accounts_v46(PDO $pdo): void
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] country_accounts_v46 marker: ' . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * بند 13.5: journal_vouchers.country_id — فصل GL بالدولة.
+ */
+function orange_catalog_migrate_country_gl_v47(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    $marker = 'php_country_gl_v47';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    $kwId = 0;
+    if (orange_table_exists($pdo, 'countries')) {
+        $stKw = $pdo->prepare('SELECT id FROM countries WHERE code = ? LIMIT 1');
+        $stKw->execute(['kw']);
+        $kwRow = $stKw->fetch(PDO::FETCH_ASSOC);
+        if (is_array($kwRow)) {
+            $kwId = (int) ($kwRow['id'] ?? 0);
+        }
+    }
+
+    if (orange_table_exists($pdo, 'journal_vouchers')) {
+        if (!orange_table_has_column($pdo, 'journal_vouchers', 'country_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE journal_vouchers ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER fiscal_year_id'
+            );
+            orange_catalog_safe_exec(
+                $pdo,
+                'CREATE INDEX idx_journal_vouchers_country_id ON journal_vouchers (country_id)'
+            );
+        }
+        if ($kwId > 0) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE journal_vouchers SET country_id = ' . (int) $kwId
+                . ' WHERE country_id IS NULL OR country_id = 0'
+            );
+        }
+    }
+
+    try {
+        $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+        $ins->execute([$marker]);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] country_gl_v47 marker: ' . $e->getMessage());
         }
     }
 }

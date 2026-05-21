@@ -10,9 +10,12 @@ require_once __DIR__ . '/../../includes/accounting_report_mapping.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/financial_report_breakdown.php';
 require_once __DIR__ . '/../../includes/supplier_payable_account.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+
+$frCountryBind = orange_gl_voucher_country_bind($pdo, 'jv');
 
 $years = orange_fiscal_years_list($pdo);
 $fyId = isset($_GET['fy']) ? (int)$_GET['fy'] : 0;
@@ -63,10 +66,10 @@ if ($stmtAccountId > 0 && $useVouchers && $fyId > 0) {
         'SELECT jl.debit, jl.credit, jl.memo, jl.line_no, jv.voucher_date, jv.reference, jv.description, jv.id AS voucher_id
          FROM journal_lines jl
          INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
-         WHERE jl.account_id = ? AND jv.fiscal_year_id = ?
+         WHERE jl.account_id = ? AND jv.fiscal_year_id = ?' . $frCountryBind['sql'] . '
          ORDER BY jv.voucher_date ASC, jv.id ASC, jl.line_no ASC'
     );
-    $stL->execute([$stmtAccountId, $fyId]);
+    $stL->execute(array_merge([$stmtAccountId, $fyId], $frCountryBind['params']));
     $bal = 0.0;
     foreach ($stL->fetchAll(PDO::FETCH_ASSOC) as $ln) {
         $d = (float) $ln['debit'];

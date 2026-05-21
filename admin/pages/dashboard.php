@@ -5,24 +5,29 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/stock_alerts.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 /** @var array<string, mixed> $admin — من admin/index.php */
 $pdo = db();
+$dashCountryId = orange_admin_context_country_id($pdo);
+$dashOrdersSql = orange_sql_country_and_fragment($pdo, 'orders', 'orders', $dashCountryId);
+$dashOrdersAliasSql = orange_sql_country_and_fragment($pdo, 'orders', 'o', $dashCountryId);
+$dashProductsSql = orange_sql_country_and_fragment($pdo, 'products', 'p', $dashCountryId);
 if (!orange_admin_is_superuser($admin) && orange_admin_permissions_matrix($pdo, (int) $admin['id']) === []) {
     echo '<div class="card" style="border:1px solid #f59e0b; background:#fffbeb; margin-bottom:16px;">'
         . '<p style="margin:0;"><strong>تنبيه:</strong> حسابك بدون صلاحيات مفصّلة بعد. يمكنك عرض هذه الصفحة فقط حتى يحدّد المشرف العام صلاحياتك من «المستخدمون والصلاحيات»، أو يُفعَّل لك عمود <code>is_superuser = 1</code> في قاعدة البيانات.</p>'
         . '</div>';
 }
-$ordersToday = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE DATE(created_at) = CURDATE()")->fetchColumn();
-$salesToday = (float)$pdo->query("SELECT COALESCE(SUM(total),0) FROM orders WHERE DATE(created_at) = CURDATE()")->fetchColumn();
-$pendingOrders = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'pending'")->fetchColumn();
-$productsCount = (int)$pdo->query("SELECT COUNT(*) FROM products")->fetchColumn();
+$ordersToday = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE DATE(created_at) = CURDATE()" . $dashOrdersSql)->fetchColumn();
+$salesToday = (float)$pdo->query("SELECT COALESCE(SUM(total),0) FROM orders WHERE DATE(created_at) = CURDATE()" . $dashOrdersSql)->fetchColumn();
+$pendingOrders = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'pending'" . $dashOrdersSql)->fetchColumn();
+$productsCount = (int)$pdo->query("SELECT COUNT(*) FROM products WHERE 1=1" . orange_sql_country_and_fragment($pdo, 'products', 'products', $dashCountryId))->fetchColumn();
 
 $lowStockThDash = orange_stock_low_alert_threshold();
 $stLowDash = $pdo->prepare(
     'SELECT COUNT(*) FROM product_variants pv
      INNER JOIN products p ON p.id = pv.product_id
-     WHERE p.is_active = 1 AND pv.stock_quantity <= ?'
+     WHERE p.is_active = 1 AND pv.stock_quantity <= ?' . $dashProductsSql
 );
 $stLowDash->execute([$lowStockThDash]);
 $lowStockVariantsDash = (int) $stLowDash->fetchColumn();

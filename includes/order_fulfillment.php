@@ -152,6 +152,7 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
     }
 
     $stockCtx = orange_warehouse_context_for_order($pdo, $order);
+    $ofGlCountryId = $stockCtx['country_id'];
 
     foreach ($items as $idx => $item) {
         $variant = orange_order_resolve_variant_from_item($pdo, $item);
@@ -260,6 +261,7 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
                         ],
                     ], JSON_UNESCAPED_UNICODE);
                 }
+                $cashAfterJson = orange_gl_after_post_json_with_country($cashAfterJson, $ofGlCountryId);
                 if (orange_gl_use_pending_queue($pdo)) {
                     orange_gl_pending_enqueue_multi(
                         $pdo,
@@ -279,6 +281,7 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
                         'reference' => $saleRef,
                         'description' => $saleDesc,
                         'entry_type' => 'order_delivery_sale',
+                        'country_id' => $ofGlCountryId,
                     ], $saleFour['lines']);
                     if ($customerIdForAr > 0 && is_int($vCashSale) && $vCashSale > 0) {
                         $cashSaleMemoDirect = $isOnline
@@ -336,7 +339,7 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
                     'amount' => $salesAmount,
                     'description' => $saleDesc,
                     'entry_type' => 'order_delivery_sale',
-                    'after_post_json' => $afterJson,
+                    'after_post_json' => orange_gl_after_post_json_with_country($afterJson, $ofGlCountryId),
                 ]);
             } else {
                 $vSale = orange_journal_insert_line($pdo, [
@@ -376,6 +379,7 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
                     'amount' => $costAmount,
                     'description' => $cogsDesc,
                     'entry_type' => 'order_delivery_cogs',
+                    'after_post_json' => orange_gl_after_post_json_with_country(null, $ofGlCountryId),
                 ]);
             } else {
                 orange_journal_insert_line($pdo, [
@@ -584,6 +588,7 @@ function orange_order_reverse_completed_fulfillment(PDO $pdo, int $orderId, stri
     $stockRef = orange_order_stock_reference($orderNumber);
     $now = date('Y-m-d H:i:s');
     $stockCtx = orange_warehouse_context_for_order($pdo, $order);
+    $ofGlCountryId = $stockCtx['country_id'];
 
     foreach ($items as $idx => $item) {
         $variant = orange_order_resolve_variant_from_item($pdo, $item);
@@ -655,7 +660,7 @@ function orange_order_reverse_completed_fulfillment(PDO $pdo, int $orderId, stri
                     'amount' => $salesAmount,
                     'description' => $saleDesc,
                     'entry_type' => 'order_return_sale',
-                    'after_post_json' => $afterJson,
+                    'after_post_json' => orange_gl_after_post_json_with_country($afterJson, $ofGlCountryId),
                 ]);
             } else {
                 $vSale = orange_journal_insert_line($pdo, [
@@ -695,6 +700,7 @@ function orange_order_reverse_completed_fulfillment(PDO $pdo, int $orderId, stri
                     'amount' => $costAmount,
                     'description' => $cogsDesc,
                     'entry_type' => 'order_return_cogs',
+                    'after_post_json' => orange_gl_after_post_json_with_country(null, $ofGlCountryId),
                 ]);
             } else {
                 orange_journal_insert_line($pdo, [

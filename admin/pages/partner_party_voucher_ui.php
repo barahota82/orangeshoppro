@@ -13,9 +13,14 @@ require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/supplier_payable_account.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+
+$ppvCountryId = orange_admin_context_country_id($pdo);
+$ppvCustomersCountrySql = orange_sql_country_and_fragment($pdo, 'customers', 'customers', $ppvCountryId);
+$ppvSuppliersCountrySql = orange_sql_country_and_fragment($pdo, 'suppliers', 'suppliers', $ppvCountryId);
 
 $ppvIsReceipt = $ppvKind === 'customer_receipt';
 $ppvTitle = $ppvIsReceipt ? 'سداد فواتير مبيعات آجلة' : 'سداد فواتير مشتريات آجلة';
@@ -66,9 +71,13 @@ $supplierPayableMap = [];
 $ppvSupplierPickRows = [];
 
 if ($ppvIsReceipt && orange_table_exists($pdo, 'customers')) {
-    $customers = $pdo->query('SELECT id, name_ar, phone FROM customers ORDER BY id DESC')->fetchAll(PDO::FETCH_ASSOC);
+    $customers = $pdo->query(
+        'SELECT id, name_ar, phone FROM customers WHERE 1=1' . $ppvCustomersCountrySql . ' ORDER BY id DESC'
+    )->fetchAll(PDO::FETCH_ASSOC);
 } elseif (!$ppvIsReceipt && orange_table_exists($pdo, 'suppliers')) {
-    $suppliers = $pdo->query('SELECT id, name, phone FROM suppliers ORDER BY name ASC')->fetchAll(PDO::FETCH_ASSOC);
+    $suppliers = $pdo->query(
+        'SELECT id, name, phone FROM suppliers WHERE 1=1' . $ppvSuppliersCountrySql . ' ORDER BY name ASC'
+    )->fetchAll(PDO::FETCH_ASSOC);
     foreach ($suppliers as $s) {
         $sid = (int) $s['id'];
         $aid = orange_supplier_payable_account_id($pdo, $sid);

@@ -2,11 +2,17 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../includes/countries.php';
+
 $pdo = db();
-$totalOrders = (int)$pdo->query("SELECT COUNT(*) FROM orders")->fetchColumn();
-$totalSales = (float)$pdo->query("SELECT COALESCE(SUM(total),0) FROM orders WHERE status = 'completed'")->fetchColumn();
-$pending = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'pending'")->fetchColumn();
-$completed = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'completed'")->fetchColumn();
+$reportsCountryId = orange_admin_context_country_id($pdo);
+$reportsOrdersSql = orange_sql_country_and_fragment($pdo, 'orders', 'orders', $reportsCountryId);
+$reportsOrdersAliasSql = orange_sql_country_and_fragment($pdo, 'orders', 'o', $reportsCountryId);
+
+$totalOrders = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE 1=1" . $reportsOrdersSql)->fetchColumn();
+$totalSales = (float)$pdo->query("SELECT COALESCE(SUM(total),0) FROM orders WHERE status = 'completed'" . $reportsOrdersSql)->fetchColumn();
+$pending = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'pending'" . $reportsOrdersSql)->fetchColumn();
+$completed = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'completed'" . $reportsOrdersSql)->fetchColumn();
 
 /** @var list<array{area_label: string, order_count: int, revenue_kd: float}> */
 $salesByArea = [];
@@ -17,7 +23,7 @@ if (orange_table_exists($pdo, 'orders')) {
         $sqlArea = "SELECT {$areaExpr} AS area_label, COUNT(*) AS order_count, COALESCE(SUM(o.total), 0) AS revenue_kd
             FROM orders o
             LEFT JOIN delivery_areas da ON da.id = o.delivery_area_id
-            WHERE o.status = 'completed'
+            WHERE o.status = 'completed'" . $reportsOrdersAliasSql . "
             GROUP BY {$areaExpr}
             ORDER BY revenue_kd DESC";
         $salesByArea = $pdo->query($sqlArea)->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -25,7 +31,7 @@ if (orange_table_exists($pdo, 'orders')) {
         $areaExpr = "COALESCE(NULLIF(TRIM(o.area), ''), '—')";
         $sqlArea = "SELECT {$areaExpr} AS area_label, COUNT(*) AS order_count, COALESCE(SUM(o.total), 0) AS revenue_kd
             FROM orders o
-            WHERE o.status = 'completed'
+            WHERE o.status = 'completed'" . $reportsOrdersAliasSql . "
             GROUP BY {$areaExpr}
             ORDER BY revenue_kd DESC";
         $salesByArea = $pdo->query($sqlArea)->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -36,7 +42,7 @@ $topProducts = $pdo->query("
     SELECT oi.product_name, SUM(oi.qty) AS total_qty
     FROM order_items oi
     INNER JOIN orders o ON o.id = oi.order_id
-    WHERE o.status = 'completed'
+    WHERE o.status = 'completed'" . $reportsOrdersAliasSql . "
     GROUP BY oi.product_name
     ORDER BY total_qty DESC
     LIMIT 10

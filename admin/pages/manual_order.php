@@ -4,11 +4,20 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
-$channels = $pdo->query('SELECT id, name FROM channels WHERE is_active = 1 ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+$moCountryId = orange_admin_context_country_id($pdo);
+$moProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $moCountryId);
+$moChannelsCountrySql = orange_channels_has_country_column($pdo)
+    ? orange_sql_country_and_fragment($pdo, 'channels', 'channels', $moCountryId)
+    : '';
+
+$channels = $pdo->query(
+    'SELECT id, name FROM channels WHERE is_active = 1' . $moChannelsCountrySql . ' ORDER BY id ASC'
+)->fetchAll(PDO::FETCH_ASSOC);
 
 $prodCols = 'id, name, price, cost, has_colors, has_sizes';
 $pProdCols = 'p.id, p.name, p.price, p.cost, p.has_colors, p.has_sizes';
@@ -37,13 +46,13 @@ if (
         INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id AND ucc.is_active = 1
         INNER JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id AND ucs2.is_active = 1
         INNER JOIN departments d ON d.id = ucs2.department_id AND d.is_active = 1
-        WHERE p.is_active = 1
+        WHERE p.is_active = 1' . $moProductsCountrySql . '
         ORDER BY p.name ASC
     "
     )->fetchAll(PDO::FETCH_ASSOC);
 } else {
 $products = $pdo->query(
-        "SELECT $prodCols FROM products WHERE is_active = 1 ORDER BY name ASC"
+        "SELECT $prodCols FROM products WHERE is_active = 1" . orange_sql_country_and_fragment($pdo, 'products', 'products', $moCountryId) . ' ORDER BY name ASC'
 )->fetchAll(PDO::FETCH_ASSOC);
 }
 

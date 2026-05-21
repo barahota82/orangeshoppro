@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+
+$srCountryId = orange_admin_context_country_id($pdo);
+$srCustomersCountrySql = orange_sql_country_and_fragment($pdo, 'customers', 'customers', $srCountryId);
+$srProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'products', $srCountryId);
 
 // س13: جدول customers يستخدم name_ar وليس name — اختيار العمود الصحيح ديناميكياً.
 $hasCustomers = orange_table_exists($pdo, 'customers');
@@ -14,7 +19,7 @@ $customers = [];
 if ($hasCustomers) {
     $custNameCol = orange_table_has_column($pdo, 'customers', 'name_ar') ? 'name_ar' : (orange_table_has_column($pdo, 'customers', 'name') ? 'name' : 'name_ar');
     try {
-        $customers = $pdo->query("SELECT id, $custNameCol AS name, phone FROM customers ORDER BY $custNameCol ASC")->fetchAll(PDO::FETCH_ASSOC);
+        $customers = $pdo->query("SELECT id, $custNameCol AS name, phone FROM customers WHERE 1=1" . $srCustomersCountrySql . " ORDER BY $custNameCol ASC")->fetchAll(PDO::FETCH_ASSOC);
     } catch (Throwable $e) {
         $customers = [];
         if (function_exists('error_log')) {
@@ -26,7 +31,7 @@ if ($hasCustomers) {
 $products = [];
 try {
     $products = $pdo->query(
-        'SELECT id, name, price, cost, has_colors, has_sizes FROM products WHERE is_active = 1 ORDER BY name ASC'
+        'SELECT id, name, price, cost, has_colors, has_sizes FROM products WHERE is_active = 1' . $srProductsCountrySql . ' ORDER BY name ASC'
     )->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {
     if (function_exists('error_log')) {

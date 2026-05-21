@@ -12,6 +12,74 @@ function orange_journal_vouchers_ready(PDO $pdo): bool
 }
 
 /**
+ * @return array{sql:string, params:list<int>}
+ */
+function orange_gl_voucher_country_bind(PDO $pdo, string $jvAlias = 'jv', ?int $countryId = null): array
+{
+    if (!orange_table_has_country_id($pdo, 'journal_vouchers')) {
+        return ['sql' => '', 'params' => []];
+    }
+    if ($countryId === null) {
+        require_once __DIR__ . '/countries.php';
+        $countryId = orange_admin_context_country_id($pdo);
+    }
+    if ($countryId <= 0) {
+        return ['sql' => '', 'params' => []];
+    }
+    $col = trim($jvAlias) !== '' ? trim($jvAlias) . '.country_id' : 'journal_vouchers.country_id';
+
+    return ['sql' => ' AND ' . $col . ' = ?', 'params' => [$countryId]];
+}
+
+function orange_journal_voucher_resolve_country_id(PDO $pdo, array $header): int
+{
+    if (!orange_table_has_country_id($pdo, 'journal_vouchers')) {
+        return 0;
+    }
+    if (isset($header['country_id']) && (int) $header['country_id'] > 0) {
+        return (int) $header['country_id'];
+    }
+    require_once __DIR__ . '/countries.php';
+
+    return orange_admin_context_country_id($pdo);
+}
+
+function orange_journal_voucher_stamp_country(PDO $pdo, int $voucherId, array $header): void
+{
+    if ($voucherId <= 0 || !orange_table_has_country_id($pdo, 'journal_vouchers')) {
+        return;
+    }
+    $cid = orange_journal_voucher_resolve_country_id($pdo, $header);
+    if ($cid <= 0) {
+        return;
+    }
+    $pdo->prepare(
+        'UPDATE journal_vouchers SET country_id = ? WHERE id = ? AND (country_id IS NULL OR country_id = 0)'
+    )->execute([$cid, $voucherId]);
+}
+
+/**
+ * @throws RuntimeException
+ */
+function orange_journal_voucher_assert_admin_context(PDO $pdo, int $voucherId): void
+{
+    if ($voucherId <= 0 || !orange_table_has_country_id($pdo, 'journal_vouchers')) {
+        return;
+    }
+    require_once __DIR__ . '/countries.php';
+    $ctx = orange_admin_context_country_id($pdo);
+    if ($ctx <= 0) {
+        return;
+    }
+    $st = $pdo->prepare('SELECT country_id FROM journal_vouchers WHERE id = ? LIMIT 1');
+    $st->execute([$voucherId]);
+    $rowCid = (int) ($st->fetchColumn() ?: 0);
+    if ($rowCid > 0 && $rowCid !== $ctx) {
+        throw new RuntimeException('السند لا يتبع الدولة المختارة في لوحة التحكم.');
+    }
+}
+
+/**
  * @return array<string, mixed>|null
  */
 function orange_voucher_by_reference(PDO $pdo, string $reference): ?array
@@ -470,6 +538,7 @@ function orange_voucher_post(PDO $pdo, array $header, array $lines): int
             )->execute([$date, $referenceSql, $description, $entryType, $fyId]);
         }
         $vid = (int) $pdo->lastInsertId();
+        orange_journal_voucher_stamp_country($pdo, $vid, $header);
 
         $ins = $pdo->prepare(
             'INSERT INTO journal_lines (voucher_id, line_no, account_id, debit, credit, memo) VALUES (?,?,?,?,?,?)'
@@ -664,6 +733,11 @@ function orange_voucher_account_totals(PDO $pdo, int $fiscalYearId, array $exclu
             INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
             WHERE jv.fiscal_year_id = ?';
     $params = [$fiscalYearId];
+    $countryBind = orange_gl_voucher_country_bind($pdo, 'jv');
+    $sql .= $countryBind['sql'];
+    foreach ($countryBind['params'] as $cp) {
+        $params[] = $cp;
+    }
     if ($excludeEntryTypes !== []) {
         $placeholders = implode(',', array_fill(0, count($excludeEntryTypes), '?'));
         $sql .= ' AND jv.entry_type NOT IN (' . $placeholders . ')';
@@ -712,6 +786,11 @@ function orange_voucher_account_totals_by_voucher_date_range(
             INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
             WHERE DATE(jv.voucher_date) >= ? AND DATE(jv.voucher_date) <= ?';
     $params = [$dateFromYmd, $dateToYmd];
+    $countryBind = orange_gl_voucher_country_bind($pdo, 'jv');
+    $sql .= $countryBind['sql'];
+    foreach ($countryBind['params'] as $cp) {
+        $params[] = $cp;
+    }
     if ($excludeEntryTypes !== []) {
         $placeholders = implode(',', array_fill(0, count($excludeEntryTypes), '?'));
         $sql .= ' AND jv.entry_type NOT IN (' . $placeholders . ')';
@@ -756,6 +835,11 @@ function orange_voucher_account_totals_strictly_before_date(
             INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
             WHERE DATE(jv.voucher_date) < ?';
     $params = [$beforeDateYmd];
+    $countryBind = orange_gl_voucher_country_bind($pdo, 'jv');
+    $sql .= $countryBind['sql'];
+    foreach ($countryBind['params'] as $cp) {
+        $params[] = $cp;
+    }
     if ($excludeEntryTypes !== []) {
         $placeholders = implode(',', array_fill(0, count($excludeEntryTypes), '?'));
         $sql .= ' AND jv.entry_type NOT IN (' . $placeholders . ')';

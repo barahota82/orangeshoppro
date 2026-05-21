@@ -671,15 +671,16 @@ try {
             json_response(['success' => false, 'message' => 'حدّد معيار بحث واحد على الأقل (رقم، تاريخ، مرجع، أو بيان)'], 422);
         }
 
+        $countryBind = orange_gl_voucher_country_bind($pdo, 'jv');
         $sql = 'SELECT jv.*,
             (SELECT COALESCE(SUM(jl.debit), 0) FROM journal_lines jl WHERE jl.voucher_id = jv.id) AS voucher_total
             FROM journal_vouchers jv
-            WHERE ' . implode(' AND ', $parts)
+            WHERE ' . implode(' AND ', $parts) . $countryBind['sql']
             . (orange_table_has_column($pdo, 'journal_vouchers', 'voucher_serial')
                 ? ' ORDER BY COALESCE(jv.voucher_serial, jv.id) DESC, jv.id DESC LIMIT 300'
                 : ' ORDER BY jv.id DESC LIMIT 300');
         $st = $pdo->prepare($sql);
-        $st->execute($params);
+        $st->execute(array_merge($params, $countryBind['params']));
         $rows = [];
         while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
             $vd = (string) ($row['voucher_date'] ?? '');
@@ -711,6 +712,12 @@ try {
     $v = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$v) {
         json_response(['success' => false, 'message' => 'السند غير موجود'], 404);
+    }
+
+    try {
+        orange_journal_voucher_assert_admin_context($pdo, $id);
+    } catch (RuntimeException $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
     if (orange_fiscal_is_closed_for_voucher($pdo, $v)) {

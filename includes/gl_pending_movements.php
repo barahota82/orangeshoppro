@@ -77,6 +77,37 @@ function orange_gl_pending_remove_forward_fulfillment(PDO $pdo, string $orderNum
  *   after_post_json?:string|null
  * } $row
  */
+function orange_gl_pending_apply_country_from_hook(array &$vh, ?string $hookJson): void
+{
+    if ($hookJson === null || trim($hookJson) === '') {
+        return;
+    }
+    $decoded = json_decode($hookJson, true);
+    if (!is_array($decoded)) {
+        return;
+    }
+    if (isset($decoded['_country_id']) && (int) $decoded['_country_id'] > 0) {
+        $vh['country_id'] = (int) $decoded['_country_id'];
+    }
+}
+
+function orange_gl_after_post_json_with_country(?string $afterJson, int $countryId): ?string
+{
+    if ($countryId <= 0) {
+        return $afterJson !== null && trim($afterJson) !== '' ? $afterJson : null;
+    }
+    $base = [];
+    if ($afterJson !== null && trim($afterJson) !== '') {
+        $decoded = json_decode($afterJson, true);
+        if (is_array($decoded)) {
+            $base = $decoded;
+        }
+    }
+    $base['_country_id'] = $countryId;
+
+    return json_encode($base, JSON_UNESCAPED_UNICODE);
+}
+
 function orange_gl_pending_enqueue_simple(PDO $pdo, array $row): int
 {
     orange_catalog_ensure_schema($pdo);
@@ -434,6 +465,7 @@ function orange_gl_pending_post_by_ids(PDO $pdo, array $ids): array
                 if ($jtHint > 0) {
                     $vh['journal_type_id'] = $jtHint;
                 }
+                orange_gl_pending_apply_country_from_hook($vh, $hook);
                 $vid = orange_voucher_post($pdo, $vh, $decoded);
             } else {
                 $docEntered = trim((string) ($row['created_at'] ?? ''));
@@ -451,6 +483,7 @@ function orange_gl_pending_post_by_ids(PDO $pdo, array $ids): array
                 if ($jtHintSimple > 0) {
                     $vh2['journal_type_id'] = $jtHintSimple;
                 }
+                orange_gl_pending_apply_country_from_hook($vh2, $hook);
                 $vid = orange_voucher_post($pdo, $vh2, [
                     ['account_id' => (int) $row['account_debit'], 'debit' => (float) $row['amount'], 'credit' => 0.0, 'memo' => $desc],
                     ['account_id' => (int) $row['account_credit'], 'debit' => 0.0, 'credit' => (float) $row['amount'], 'memo' => $desc],
