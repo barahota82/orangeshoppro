@@ -7,6 +7,8 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/catalog_taxonomy_migrate.php';
 require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/catalog_unified_nav.php';
+require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/warehouses.php';
 require_admin_api();
 
 /**
@@ -95,22 +97,28 @@ try {
     $categoryId = (int) ($raw['category_id'] ?? 0);
     $subcategoryId = (int) ($raw['subcategory_id'] ?? 0);
 
+    $pickerCountryId = orange_admin_context_country_id($pdo);
+    $pickerCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $pickerCountryId);
+    $wQtyPicker = orange_warehouse_effective_qty_sql($pdo, $pickerCountryId, 'pv', 'wvs_pick');
+
     $unifiedPicker = function_exists('orange_catalog_nav_use_unified') && orange_catalog_nav_use_unified($pdo)
         && orange_table_exists($pdo, 'product_types')
         && orange_table_exists($pdo, 'catalog_subcategories');
 
     if ($unifiedPicker) {
         /* قائمة الشجرة تُحمَّل عبر filter_tree من catalog_*؛ التصفية تستخدم معرفات ucc.id / ucs.id / d.id. */
-        $sql = 'SELECT pv.id AS variant_id, pv.color, pv.size, pv.stock_quantity,
+        $sql = 'SELECT pv.id AS variant_id, pv.color, pv.size, ' . $wQtyPicker['expr'] . ' AS stock_quantity,
                        p.id AS product_id, p.name AS product_name, p.name_en AS product_name_en
                 FROM product_variants pv
-                INNER JOIN products p ON p.id = pv.product_id AND p.is_active = 1
+                INNER JOIN products p ON p.id = pv.product_id AND p.is_active = 1'
+                . $wQtyPicker['join']
+                . '
                 INNER JOIN product_types pt ON pt.id = p.product_type_id AND pt.is_active = 1
                 INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id AND ucs.is_active = 1
                 INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id AND ucc.is_active = 1
                 INNER JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id AND ucs2.is_active = 1
                 INNER JOIN departments d ON d.id = ucs2.department_id AND d.is_active = 1
-                WHERE 1=1';
+                WHERE 1=1' . $pickerCountrySql;
         $params = [];
         if ($subcategoryId > 0) {
             $sql .= ' AND ucs.id = ?';
@@ -123,11 +131,13 @@ try {
             $params[] = $departmentId;
         }
     } else {
-        $sql = 'SELECT pv.id AS variant_id, pv.color, pv.size, pv.stock_quantity,
+        $sql = 'SELECT pv.id AS variant_id, pv.color, pv.size, ' . $wQtyPicker['expr'] . ' AS stock_quantity,
                        p.id AS product_id, p.name AS product_name, p.name_en AS product_name_en
                 FROM product_variants pv
-                INNER JOIN products p ON p.id = pv.product_id AND p.is_active = 1
-                WHERE 1=1';
+                INNER JOIN products p ON p.id = pv.product_id AND p.is_active = 1'
+                . $wQtyPicker['join']
+                . '
+                WHERE 1=1' . $pickerCountrySql;
         $params = [];
     }
 

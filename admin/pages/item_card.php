@@ -6,6 +6,8 @@ require_once __DIR__ . '/../../includes/order_stock.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
+require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/warehouses.php';
 
 $productId = (int)($_GET['product_id'] ?? 0);
 if ($productId < 1) {
@@ -14,6 +16,14 @@ if ($productId < 1) {
 }
 
 $pdo = db();
+$icCountryId = orange_admin_context_country_id($pdo);
+
+try {
+    orange_admin_assert_entity_country($pdo, 'products', $productId);
+} catch (RuntimeException $e) {
+    echo '<div class="card"><p class="alert-error">' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8') . '</p><a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8') . '">العودة للمستودع</a></div>';
+    return;
+}
 
 $catJoin = orange_catalog_admin_sql_join_product_category_display($pdo, 'p', null);
 
@@ -37,6 +47,14 @@ $variants = $pdo->prepare("
 ");
 $variants->execute([$productId]);
 $variants = $variants->fetchAll(PDO::FETCH_ASSOC);
+foreach ($variants as &$icVarRow) {
+    $icVarRow['stock_quantity'] = orange_warehouse_effective_variant_stock(
+        $pdo,
+        (int) ($icVarRow['id'] ?? 0),
+        $icCountryId
+    );
+}
+unset($icVarRow);
 
 $movements = $pdo->prepare("
     SELECT sm.*, pv.color AS variant_color, pv.size AS variant_size

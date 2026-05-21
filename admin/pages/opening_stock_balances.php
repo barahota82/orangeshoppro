@@ -3,16 +3,25 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/warehouses.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
-$rows = $pdo->query("
-    SELECT pv.*, p.name AS product_name
-    FROM product_variants pv
-    INNER JOIN products p ON p.id = pv.product_id
-    ORDER BY p.name ASC, pv.color ASC, pv.size ASC, pv.id ASC
-")->fetchAll(PDO::FETCH_ASSOC);
+$osbCountryId = orange_admin_context_country_id($pdo);
+$osbProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $osbCountryId);
+$wQtyOsb = orange_warehouse_effective_qty_sql($pdo, $osbCountryId, 'pv', 'wvs_osb');
+
+$rows = $pdo->query(
+    'SELECT pv.id, pv.color, pv.size, p.name AS product_name, '
+    . $wQtyOsb['expr'] . ' AS stock_quantity
+     FROM product_variants pv
+     INNER JOIN products p ON p.id = pv.product_id'
+    . $wQtyOsb['join']
+    . ' WHERE 1=1' . $osbProductsCountrySql . '
+     ORDER BY p.name ASC, pv.color ASC, pv.size ASC, pv.id ASC'
+)->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <div class="admin-fy-shell" dir="rtl">
     <h1 class="admin-fy-shell__title">أرصدة أول المدة المخزنية</h1>
@@ -26,7 +35,7 @@ $rows = $pdo->query("
     <h3 class="card-title">كميات المخزون الافتتاحية (حسب المتغير)</h3>
     <p class="muted" style="margin:0 0 10px;">
         أدخل <strong>الكمية الجديدة</strong> ثم اضغط <strong>تسجيل الرصيد الافتتاحي</strong> للصف. يُسجَّل النوع «رصيد افتتاحي» في حركات المخزون (كما في المستودع).
-        الكميات: <strong>أعداد صحيحة فقط</strong>، بدون سالب.
+        الكميات: <strong>أعداد صحيحة فقط</strong>، بدون سالب. الرصيد المعروض من <strong>مخزن الدولة</strong> الحالي في الأدمن.
     </p>
     <div class="table-wrap admin-fy-table-wrap">
         <table class="admin-fy-table">

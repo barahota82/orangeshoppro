@@ -4,6 +4,58 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/catalog_labels.php';
+require_once __DIR__ . '/countries.php';
+require_once __DIR__ . '/warehouses.php';
+
+/**
+ * تصفير مخزن المتغير عند إزالة صف من المصفوفة (مخزن الدولة أو legacy).
+ */
+function orange_product_variant_zero_stock_on_matrix_remove(
+    PDO $pdo,
+    int $productId,
+    int $variantId,
+    int $oldStock,
+    string $reason,
+    int $countryId,
+    int $warehouseId,
+    bool $useWarehouse,
+    PDOStatement $movAdj
+): void {
+    if ($oldStock <= 0 && !$useWarehouse) {
+        $pdo->prepare('UPDATE product_variants SET stock_quantity = 0 WHERE id = ? LIMIT 1')->execute([$variantId]);
+
+        return;
+    }
+    if ($useWarehouse) {
+        $chg = orange_warehouse_set_variant_quantity($pdo, $warehouseId, $variantId, 0);
+        if ($oldStock > 0) {
+            orange_stock_movement_insert($pdo, [
+                'product_id' => $productId,
+                'variant_id' => $variantId,
+                'type' => 'manual_adjustment',
+                'qty' => abs($chg['new'] - $chg['old']),
+                'old_stock' => $chg['old'],
+                'new_stock' => $chg['new'],
+                'reason' => $reason,
+                'country_id' => $countryId > 0 ? $countryId : null,
+                'warehouse_id' => $warehouseId > 0 ? $warehouseId : null,
+            ]);
+        }
+
+        return;
+    }
+    if ($oldStock > 0) {
+        $movAdj->execute([
+            $productId,
+            $variantId,
+            -$oldStock,
+            $oldStock,
+            0,
+            $reason,
+        ]);
+    }
+    $pdo->prepare('UPDATE product_variants SET stock_quantity = 0 WHERE id = ? LIMIT 1')->execute([$variantId]);
+}
 
 /**
  * @param array<int,array<string,mixed>> $variantRows
@@ -113,6 +165,9 @@ function orange_product_sync_variants_matrix(
     ?int $sizeFamilyId
 ): void {
     $cwMap = orange_product_ensure_colorways($pdo, $productId, $variantsIn, $hasColors);
+    $productCountryId = orange_product_country_id($pdo, $productId);
+    $productWarehouseId = orange_warehouse_default_id_for_country($pdo, $productCountryId);
+    $useWarehouse = $productWarehouseId > 0 && orange_warehouses_table_exists($pdo);
 
     $lst = $pdo->prepare(
         'SELECT v.id, v.stock_quantity, v.product_colorway_id, v.size_family_size_id,
@@ -132,7 +187,9 @@ function orange_product_sync_variants_matrix(
         $fp = $cwKeyDb . '|' . $sid;
         $indexed[(string) $fp] = [
             'id' => (int) $rw['id'],
-            'stock_quantity' => (int) $rw['stock_quantity'],
+            'stock_quantity' => $useWarehouse
+                ? orange_warehouse_effective_variant_stock($pdo, (int) $rw['id'], $productCountryId)
+                : (int) $rw['stock_quantity'],
             'product_colorway_id' => isset($rw['product_colorway_id']) ? (int) $rw['product_colorway_id'] : null,
         ];
     }
@@ -203,6 +260,10 @@ function orange_product_sync_variants_matrix(
             unset($indexed[(string) $fpNew]);
         } else {
             $insVar->execute([$productId, $cwId, $sizeFamilySizeId, $szLabel, $colorLabel, 0]);
+            $newVid = (int) $pdo->lastInsertId();
+            if ($useWarehouse && $newVid > 0) {
+                orange_warehouse_set_variant_quantity($pdo, $productWarehouseId, $newVid, 0);
+            }
         }
     }
 
@@ -215,34 +276,34 @@ function orange_product_sync_variants_matrix(
         $mCntStmt->execute([$vid]);
         $mCnt = (int) $mCntStmt->fetchColumn();
         if ($mCnt > 0) {
-            if ($oldStock > 0) {
-                $movAdj->execute([
-                    $productId,
-                    $vid,
-                    -$oldStock,
-                    $oldStock,
-                    0,
-                    'إزالة مجموعة من مصفوفة المتغيرات (الأدمن) — حفظ السجل التاريخي',
-                ]);
-            }
-            $pdo->prepare('UPDATE product_variants SET stock_quantity = 0 WHERE id = ? LIMIT 1')->execute([$vid]);
+            orange_product_variant_zero_stock_on_matrix_remove(
+                $pdo,
+                $productId,
+                $vid,
+                $oldStock,
+                'إزالة مجموعة من مصفوفة المتغيرات (الأدمن) — حفظ السجل التاريخي',
+                $productCountryId,
+                $productWarehouseId,
+                $useWarehouse,
+                $movAdj
+            );
 
             continue;
         }
         try {
             $pdo->prepare('DELETE FROM product_variants WHERE id = ? LIMIT 1')->execute([$vid]);
         } catch (Throwable $e) {
-            if ($oldStock > 0) {
-                $movAdj->execute([
-                    $productId,
-                    $vid,
-                    -$oldStock,
-                    $oldStock,
-                    0,
-                    'تعذر حذف المتغير — تصفير المخزون',
-                ]);
-            }
-            $pdo->prepare('UPDATE product_variants SET stock_quantity = 0 WHERE id = ? LIMIT 1')->execute([$vid]);
+            orange_product_variant_zero_stock_on_matrix_remove(
+                $pdo,
+                $productId,
+                $vid,
+                $oldStock,
+                'تعذر حذف المتغير — تصفير المخزون',
+                $productCountryId,
+                $productWarehouseId,
+                $useWarehouse,
+                $movAdj
+            );
         }
     }
 

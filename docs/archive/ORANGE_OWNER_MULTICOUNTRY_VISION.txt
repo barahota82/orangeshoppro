@@ -1,7 +1,7 @@
 ORANGE — رؤية المالك: تعدد الدول والقنوات والجغرافيا
 ========================================================
-آخر تحديث: 2026-05-20 (+ بند 13 فصل تشغيلي كامل — قرار مالك محادثة 2026-05-20)
-الحالة: **قرارات مالك مُثبَّتة** — التنفيذ البرمجي **جزئي** (أساس الدول/قنوات/مناطق/محافظات؛ **بند 13** قيد التنفيذ من مرحلة مخازن فما فوق).
+آخر تحديث: 2026-05-20 (+ بند 13؛ **v44–v56**؛ **مرحلة 15 منفّذة**؛ متبقي **16–19**)
+الحالة: **قرارات مالك مُثبَّتة** — **بند 13 مراحل 1–15 منفّذة**؛ المتبقي **4 مراحل (16–19)** للفصل الكامل (انظر **§14–§15**).
 
 الغرض
 ------
@@ -125,6 +125,7 @@ ORANGE — رؤية المالك: تعدد الدول والقنوات والج�
 **13.5 محاسبة (GL)**
 - **`journal_vouchers.country_id`** (و/أو **`accounts.country_id`** للفصل القوي) — تقارير مالية **لا تخلط** دولتين.
 - **ممنوع** قيد يجمع حساباً تشغيلياً من دولة أخرى.
+- **قرار مالك (2026-05-20 — تأكيد بعد v55):** **دليل حسابات منفصل لكل دولة** — **`accounts.country_id`** إلزامي في التنفيذ المتبقي (**§15 — مرحلة 18**)؛ لا يكفي **`journal_vouchers.country_id`** وحده للفصل الكامل.
 
 **13.6 حساب الواجهة (تسجيل البريد)**
 - **فصل كامل:** **`UNIQUE (email, country_id)`** على `storefront_accounts` — نفس البريد **يُسمح** في دولتين **كحسابين منفصلين**.
@@ -177,5 +178,80 @@ ORANGE — رؤية المالك: تعدد الدول والقنوات والج�
 **تنفيذ (13 — مرحلة 13 — سندات الذمم browse scoped):** **`admin/api/journal/manage.php`** — أنواع **`supplier_payment`** / **`customer_receipt`** في التنقل/البحث/العرض؛ alias **`search`→`search_manual`**؛ **`party_customer_id`** / **`party_supplier_id`** في **`get`**؛ **`orange_journal_voucher_assert_admin_context`** على **`get`**؛ **`orange_gl_voucher_country_bind`** على **`nav_manual`**؛ **`admin/api/partners/customer-receipt-list.php`** و**`customer-receipt-search.php`** (parity مع سندات المورد)؛ شاشة **`partner_party_voucher_ui.php`** (سداد العملاء) — تنقل/بحث/حذف scoped بالدولة.
 
 **تنفيذ (13 — مرحلة 14 — مخزون فعلي §13.1):** **`orange_warehouse_effective_qty_sql`** في **`includes/warehouses.php`**؛ قراءة الرصيد عبر **`orange_warehouse_effective_variant_stock`** في **`api/cart/stock-limits.php`**, **`admin/api/orders/create-manual.php`**, **`admin/pages/manual_order.php`** (فلترة متغيرات الدولة)؛ عرض/تنبيه low-stock من **`warehouse_variant_stock`** في **`admin/pages/stock.php`**, **`admin/pages/dashboard.php`**, **`admin/api/reports/stats.php`**؛ **`orange_admin_assert_entity_country`** على **`admin/api/stock/adjust.php`**؛ فلترة طابور الطلبات في **`dashboard`**؛ **`orange_admin_assert_row_country`** اختياري على **`admin/api/channels/upload-logo.php`** عند تمرير **`channel_id`**.
+
+---
+
+14) ملخص ما تم + استراحة (قرار مالك — 2026-05-20)
+---------------------------------------------------
+**قرار مالك — دليل المحاسبة:** **منفصل لكل دولة** (`accounts.country_id`) — يُنفَّذ في **§15 مرحلة 18** (انظر **13.5**).
+
+**Git (مرجع نشر):** تراكم **v44–v55** على **`main`** — آخر commit مرحلة 14: **`5572ec7`** (Country separation v55).
+
+**ما تم — بند 13 (مراحل تنفيذ 1–14):**
+
+| مرحلة | نطاق مختصر | ترحيل / مرجع |
+|-------|------------|--------------|
+| 1 | مخازن + `warehouses` / `warehouse_variant_stock` | v44 |
+| 2–3 | `country_id` + مخزن الدولة على الطلبات/عملاء/موردين/مشتريات/حركات | v45 |
+| 4–6 | منتجات scoped + `storefront_accounts` + `admins.country_id` + تسليم | v46 |
+| 5 (GL) | `journal_vouchers.country_id` + تقارير/شاشات GL scoped | v47 |
+| 7 | صلاحيات فريق الدولة (أدمن) | v46+ |
+| 8 | تهيئة دولة (`provision` + نسخ كتalog) | `countries.php` / `country_catalog_copy.php` |
+| حماية API | assert + تفرد phone/code ضمن الدولة | متفرق v48–v53 |
+| 9 | ذمم + مردودات + مخزن مردود | v49–v50 |
+| 10 | طابور طلبات + سندات مورد + backfill | v51 |
+| 11 | عروض سلة + قنوات + مردودات get | v48, v52 |
+| 12 | assert تشغيلي (قنوات، طلب يدوي، مناطق، مردودات update) | v53 |
+| 13 | browse سندات ذمم (قبض/صرف) scoped | v54 |
+| 14 | قراءة/عرض مخزون فعلي من المخزن | v55 |
+| 15 | إغلاق مسارات مخزون §13.1 المتبقية | v56 |
+
+**ما تم — خارج جدول §13 (جزئي من §10):** أساس **`countries`** + **`channels.country_id`** + سياق أدمن + محافظات/مناطق الكويت (§9–§10 مرحلة 1–2 جزئي).
+
+**حالة (استراحة):** الفصل **التشغيلي الأساسي** للكويت **جاهز للتشغيل**؛ **مرحلة 15 منفّذة**؛ المتبقي **مراحل 16–19** للفصل الكامل. عند العودة: ابدأ **بالمرحلة 16** بالترتيب أدناه — **لا** تفترض اكتمال المشروع من Git وحده دون مطابقة هذه القائمة.
+
+---
+
+15) المراحل المتبقية (15–19) — استكمال فصل الدول الكامل
+--------------------------------------------------------
+**مصدر:** قرار مالك (2026-05-20) + مراجعة وكيل بعد v55. **الهدف:** إغلاق فجوات §13.1 و§13.5 و§13.7 وassert ثانوي، ثم **دليل حسابات منفصل**، ثم إنهاء المرحلة الانتقالية للمخزون.
+
+**ترتيب التنفيذ الموصى عند العودة:** **15 → 16 → 17 → 18 → 19** (مرحلة 18 كبيرة — لا تبدأ قبل إغلاق 15–17 إلا بتوجيه صريح من المالك).
+
+**مرحلة 15 — إغلاق مسارات المخزون §13.1 (متبقي):**
+- **`admin/pages/item_card.php`**, **`admin/pages/opening_stock_balances.php`** — عرض/تعديل الرصيد من **`warehouse_variant_stock`** (مخزن الدولة) لا **`product_variants.stock_quantity`** مباشرة.
+- **`includes/cart_gift_promotions.php`** (و/أو APIs الهدايا) — فحص مخزون الهدية scoped بالدولة.
+- **`includes/product_variants_write.php`**, **`admin/api/settings/variants_search.php`**, **`admin/assets/admin-variant-picker.js`** — قراءة/كتابة متسقة مع المخزن.
+- **`admin/api/products/get.php`** / شاشة المنتجات — عرض رصيد effective حيث يلزم.
+- **معيار إنجاز:** لا مسار بيع/شراء/تعديل/عرض **حساس** يعتمد على **`stock_quantity`** وحده خارج مزامنة الكويت الانتقالية.
+
+**تنفيذ (13 — مرحلة 15 — مخزون §13.1 متبقي):** **`item_card.php`**, **`opening_stock_balances.php`** — رصيد effective + assert منتج؛ **`cart_gift_promotions.php`** — **`orange_warehouse_effective_variant_stock`** + **`countryId`** اختياري؛ **`product_variants_write.php`** — تصفير/إنشاء عبر المخزن؛ **`variants_search.php`**, **`products/get.php`** — فلترة دولة + رصيد effective؛ **`admin-variant-picker.js`** يستهلك **`variants_search`** (لا تغيير JS).
+
+**مرحلة 16 — مراجعة assert + شاشات/APIs ثانوية:**
+- مسح **`admin/api/**`** و**`admin/pages/**`** لمسارات بلا **`orange_admin_assert_*`** أو **`orange_sql_country_*`** حيث يُعدَّل/يُعرض كيان scoped.
+- أمثلة مراجعة: **`variants_search`**, **`item_card`**, **`opening_stock_balances`**, **`channel_analytics`**, مرفقات/طباعة بطاقات، أي تقرير فرعي في **`admin/api/reports/**`**.
+- **معيار إنجاز:** قائمة مسارات مُراجَعة + assert أو فلترة موثّقة؛ لا cross-country write.
+
+**مرحلة 17 — واجهة §13.7 + سياسة s11 (متعدد الدول نشط):**
+- **§13.7:** قائمة اختيار الدولة في الشريط عند **>1 دولة `is_active`**؛ إخفاؤها عند دولة واحدة؛ الدولة من **`channels.country_id`** عند الدخول برابط قناة.
+- **`ORANGE_STOREFRONT_POLICY_REFERENCE.txt`:** التأكد أن **س11** و**«تنفيذ»** متسقة مع **`UNIQUE(email, country_id)`** (v46) — مراجعة نص «حساب واحد» القديم إن بقي مُربكاً.
+- **معيار إنجاز:** سيناريو دولتين نشطتين في الواجهة + تسجيل بريد منفصل per country يعمل.
+
+**مرحلة 18 — دليل حسابات منفصل (`accounts.country_id`) — §13.5 (قرار مالك):**
+- ترحيل **`accounts.country_id`** (+ فهارس؛ ربط حسابات الكويت الحالية بـ **`country_id` الكويت**).
+- **`orange_gl_account_*`** / **`admin/pages/accounts`**, **`admin/api/accounts/**`**, **`includes/gl_settings.php`**, **`includes/account_tree.php`** — فلترة وإنشاء scoped؛ منع قيد يستخدم حساباً من دولة أخرى (مع **`journal_vouchers.country_id`**).
+- **`orange_gl_account_id_optional`** / إعدادات القيود التلقائية — **نسخة لكل دولة** أو ربط mapping per country.
+- تقارير GL (**`financial_report`**, **`reports`**, **`dashboard`**) — لا خلط حسابات دولتين.
+- **معيار إنجاز:** شجرتا دليل (أو أكثر) معزولتان؛ قيد + تقرير في سياق دولة واحدة فقط.
+
+**مرحلة 19 — إنهاء المرحلة الانتقالية للمخزون §13.1:**
+- **`warehouse_variant_stock`** = **مصدر الحقيقة الوحيد** داخل كل دولة.
+- إيقاف/تضييق **`orange_warehouse_sync_legacy_variant_quantity`** (مزامنة **`product_variants.stock_quantity`** مع مخزن الكويت فقط) بعد اكتمال مرحلة 15.
+- توثيق: **`product_variants.stock_quantity`** للعرض legacy أو **deprecated** — حسب قرار المالك عند التنفيذ.
+- **معيار إنجاز:** تعديل مخزون في مصر (مثلاً) **لا** يغيّر **`stock_quantity`** على متغير كتalog الكويت.
+
+**بعد 15–19 (تشغيل — ليس «مرحلة كود» إلزامية):** تفعيل دول جديدة (§10 مرحلة 5): مصر → الإمارات → السعودية عبر **`admin/api/countries/manage.php`** + **`orange_country_provision_operational`** + **`orange_country_copy_catalog_from_source`**.
+
+**خارج نطاق 15–19 (مؤجّل برؤية الملف):** عملة لكل دولة (§3)؛ دفع إلكتروني (§7)؛ كتalog موحّد ضخم — **`ORANGE_UNIFIED_TAXONOMY_AND_CATALOG_ERD.txt`**.
 
 نهاية الملف.

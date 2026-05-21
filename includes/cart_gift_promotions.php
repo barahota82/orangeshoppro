@@ -6,6 +6,7 @@ require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/cart_promo_gift_charge.php';
 require_once __DIR__ . '/cart_promotion_country.php';
+require_once __DIR__ . '/warehouses.php';
 
 /**
  * أعلى سعر وحدة ممكن لهدية ترويجية في معاينة العربة (هدية مجموع سلة أو BOGO).
@@ -191,8 +192,10 @@ function orange_cart_gift_promotion_pool_options(
     PDO $pdo,
     array $poolIds,
     array $validatedItems,
-    bool $lockVariants
+    bool $lockVariants,
+    ?int $countryId = null
 ): array {
+    $stockCountryId = orange_cart_promotion_storefront_country_id($pdo, $countryId);
     $lockSql = $lockVariants ? ' FOR UPDATE' : '';
     $out = [];
     foreach ($poolIds as $vid) {
@@ -217,7 +220,7 @@ function orange_cart_gift_promotion_pool_options(
             continue;
         }
         $used = orange_cart_gift_variant_usage_in_lines($validatedItems, $vid);
-        $stock = (int) ($v['stock_quantity'] ?? 0);
+        $stock = orange_warehouse_effective_variant_stock($pdo, $vid, $stockCountryId);
         if ($stock < $used + 1) {
             continue;
         }
@@ -244,8 +247,10 @@ function orange_storefront_build_gift_order_line(
     int $variantId,
     array $validatedItems,
     bool $lockVariants,
-    ?float $forcedUnitPrice = null
+    ?float $forcedUnitPrice = null,
+    ?int $countryId = null
 ): array {
+    $stockCountryId = orange_cart_promotion_storefront_country_id($pdo, $countryId);
     $lockSql = $lockVariants ? ' FOR UPDATE' : '';
     $vStmt = $pdo->prepare('SELECT * FROM product_variants WHERE id = ? LIMIT 1' . $lockSql);
     $vStmt->execute([$variantId]);
@@ -263,7 +268,7 @@ function orange_storefront_build_gift_order_line(
         throw new RuntimeException(function_exists('t') ? t('checkout_gift_variant_invalid') : 'Invalid gift item.');
     }
     $used = orange_cart_gift_variant_usage_in_lines($validatedItems, $variantId);
-    $stock = (int) ($variant['stock_quantity'] ?? 0);
+    $stock = orange_warehouse_effective_variant_stock($pdo, $variantId, $stockCountryId);
     if ($stock < $used + 1) {
         throw new RuntimeException(function_exists('t') ? t('checkout_gift_out_of_stock') : 'Gift item out of stock.');
     }

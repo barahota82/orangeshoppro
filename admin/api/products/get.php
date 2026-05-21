@@ -6,12 +6,15 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/product_colorway_images.php';
+require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/warehouses.php';
 require_admin_api('GET');
 
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
     $productId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+    $adminStockCountryId = orange_admin_context_country_id($pdo);
 
     $catJoinPart = orange_catalog_admin_sql_join_product_category_display($pdo, 'p', 'pt');
 
@@ -37,6 +40,12 @@ try {
             json_response(['success' => false, 'message' => 'المنتج غير موجود'], 404);
         }
 
+        try {
+            orange_admin_assert_entity_country($pdo, 'products', $productId);
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 403);
+        }
+
         $barcodeCol = orange_table_has_column($pdo, 'product_variants', 'barcode') ? 'v.barcode AS variant_barcode' : 'NULL AS variant_barcode';
         $variantStmt = $pdo->prepare("
             SELECT v.id AS variant_id,
@@ -56,6 +65,17 @@ try {
         ");
         $variantStmt->execute([$productId]);
         $product['variants'] = $variantStmt->fetchAll();
+        foreach ($product['variants'] as &$variantRow) {
+            if (!is_array($variantRow)) {
+                continue;
+            }
+            $variantRow['stock_quantity'] = orange_warehouse_effective_variant_stock(
+                $pdo,
+                (int) ($variantRow['variant_id'] ?? 0),
+                $adminStockCountryId
+            );
+        }
+        unset($variantRow);
         /** @var list<array<string,mixed>> */
         $product['variant_matrix_rows'] = $product['variants'];
 
