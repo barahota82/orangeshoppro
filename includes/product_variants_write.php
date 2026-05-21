@@ -152,7 +152,7 @@ function orange_product_variant_cw_row_key(array $variant, bool $hasColors): str
 
 /**
  * يزامن تعريف المتغيرات (لون/مقاس/تسميات) مع الجدول دون تغيير الكميات من الواجهة:
- * صف موجود يُحافظ على stock_quantity كما في قاعدة البيانات؛ صف جديد يُنشأ بكمية 0.
+ * صف موجود يُحافظ على الرصيد في المخزن (أو stock_quantity legacy عند غياب جداول المخزن).
  *
  * @param array<int,array<string,mixed>> $variantsIn
  */
@@ -209,6 +209,9 @@ function orange_product_sync_variants_matrix(
     $updVar = $pdo->prepare(
         'UPDATE product_variants SET product_colorway_id = ?, size_family_size_id = ?, size = ?, color = ?, stock_quantity = ? WHERE id = ? LIMIT 1'
     );
+    $updVarMeta = $pdo->prepare(
+        'UPDATE product_variants SET product_colorway_id = ?, size_family_size_id = ?, size = ?, color = ? WHERE id = ? LIMIT 1'
+    );
 
     foreach ($variantsIn as $variant) {
         $cwRowKey = orange_product_variant_cw_row_key($variant, $hasColors);
@@ -256,7 +259,11 @@ function orange_product_sync_variants_matrix(
         if ($rowMatch !== null) {
             $vid = (int) $rowMatch['id'];
             $oldStock = (int) $rowMatch['stock_quantity'];
-            $updVar->execute([$cwId, $sizeFamilySizeId, $szLabel, $colorLabel, $oldStock, $vid]);
+            if ($useWarehouse) {
+                $updVarMeta->execute([$cwId, $sizeFamilySizeId, $szLabel, $colorLabel, $vid]);
+            } else {
+                $updVar->execute([$cwId, $sizeFamilySizeId, $szLabel, $colorLabel, $oldStock, $vid]);
+            }
             unset($indexed[(string) $fpNew]);
         } else {
             $insVar->execute([$productId, $cwId, $sizeFamilySizeId, $szLabel, $colorLabel, 0]);

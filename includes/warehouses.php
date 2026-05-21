@@ -121,7 +121,19 @@ function orange_warehouse_variant_stock_quantity(PDO $pdo, int $warehouseId, int
 }
 
 /**
- * يقرأ من warehouse_variant_stock إن وُجد؛ وإلا product_variants.stock_quantity (انتقال).
+ * §13.1 مرحلة 19: fallback إلى product_variants.stock_quantity للكويت (مرآة legacy) فقط.
+ */
+function orange_warehouse_legacy_stock_fallback_enabled(PDO $pdo, int $countryId): bool
+{
+    if ($countryId <= 0) {
+        $countryId = orange_countries_default_id($pdo);
+    }
+
+    return $countryId > 0 && $countryId === orange_countries_default_id($pdo);
+}
+
+/**
+ * يقرأ من warehouse_variant_stock (مصدر الحقيقة)؛ fallback legacy للكويت فقط عند غياب صف المخزن.
  */
 function orange_warehouse_effective_variant_stock(PDO $pdo, int $variantId, ?int $countryId = null): int
 {
@@ -141,8 +153,14 @@ function orange_warehouse_effective_variant_stock(PDO $pdo, int $variantId, ?int
         if ($q !== false && $q !== null) {
             return (int) $q;
         }
+        if (!orange_warehouse_legacy_stock_fallback_enabled($pdo, $countryId)) {
+            return 0;
+        }
     }
     if (!orange_table_exists($pdo, 'product_variants')) {
+        return 0;
+    }
+    if (!orange_warehouse_legacy_stock_fallback_enabled($pdo, $countryId)) {
         return 0;
     }
     $st = $pdo->prepare('SELECT stock_quantity FROM product_variants WHERE id = ? LIMIT 1');
@@ -229,7 +247,10 @@ function orange_warehouse_set_variant_quantity(PDO $pdo, int $warehouseId, int $
     return ['old' => $old, 'new' => $newQty];
 }
 
-/** مرحلة انتقالية: مزامنة product_variants مع مخزن الكويت الافتراضي (بند 13.1). */
+/**
+ * مرآة legacy: product_variants.stock_quantity تُحدَّث فقط من مخزن الكويت الافتراضي (§13.1 مرحلة 19).
+ * دول أخرى لا تلمس العمود — مصدر الحقيقة warehouse_variant_stock.
+ */
 function orange_warehouse_sync_legacy_variant_quantity(PDO $pdo, int $warehouseId, int $variantId, int $qty): void
 {
     if (!orange_table_exists($pdo, 'product_variants') || !orange_table_exists($pdo, 'warehouses')) {
@@ -296,7 +317,7 @@ function orange_warehouse_context_for_country(PDO $pdo, int $countryId): array
 }
 
 /**
- * JOIN + تعبير SQL للرصيد الفعلي (warehouse_variant_stock مع fallback legacy — §13.1).
+ * JOIN + تعبير SQL للرصيد الفعلي — warehouse_variant_stock؛ fallback legacy للكويت فقط (§13.1).
  *
  * @return array{join:string, expr:string, warehouse_id:int}
  */
@@ -308,9 +329,11 @@ function orange_warehouse_effective_qty_sql(
 ): array {
     $warehouseId = orange_warehouse_default_id_for_country($pdo, $countryId);
     if ($warehouseId <= 0 || !orange_warehouses_table_exists($pdo)) {
+        $legacyOnly = orange_warehouse_legacy_stock_fallback_enabled($pdo, $countryId);
+
         return [
             'join' => '',
-            'expr' => $pvAlias . '.stock_quantity',
+            'expr' => $legacyOnly ? ($pvAlias . '.stock_quantity') : '0',
             'warehouse_id' => 0,
         ];
     }
@@ -318,10 +341,13 @@ function orange_warehouse_effective_qty_sql(
     $join = ' LEFT JOIN warehouse_variant_stock ' . $wvsAlias
         . ' ON ' . $wvsAlias . '.warehouse_id = ' . $wid
         . ' AND ' . $wvsAlias . '.variant_id = ' . $pvAlias . '.id ';
+    $expr = orange_warehouse_legacy_stock_fallback_enabled($pdo, $countryId)
+        ? 'COALESCE(' . $wvsAlias . '.quantity, ' . $pvAlias . '.stock_quantity)'
+        : 'COALESCE(' . $wvsAlias . '.quantity, 0)';
 
     return [
         'join' => $join,
-        'expr' => 'COALESCE(' . $wvsAlias . '.quantity, ' . $pvAlias . '.stock_quantity)',
+        'expr' => $expr,
         'warehouse_id' => $wid,
     ];
 }

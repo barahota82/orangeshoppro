@@ -1,7 +1,7 @@
 ORANGE — رؤية المالك: تعدد الدول والقنوات والجغرافيا
 ========================================================
-آخر تحديث: 2026-05-20 (+ بند 13؛ **v44–v59**؛ **مرحلة 18 منفّذة**؛ متبقي **19**)
-الحالة: **قرارات مالك مُثبَّتة** — **بند 13 مراحل 1–18 منفّذة**؛ المتبقي **مرحلة 19** للفصل الكامل (انظر **§14–§15**).
+آخر تحديث: 2026-05-20 (+ بند 13؛ **v44–v60**؛ **مرحلة 19 منفّذة**؛ فصل الدول **15–19 مكتمل**)
+الحالة: **قرارات مالك مُثبَّتة** — **بند 13 مراحل 1–19 منفّذة**؛ فصل الدول الكامل (§15) **مغلق**؛ التالي **تشغيل** (تفعيل دول جديدة §10).
 
 الغرض
 ------
@@ -107,7 +107,7 @@ ORANGE — رؤية المالك: تعدد الدول والقنوات والج�
 - جدول **`warehouses`** (تابع لـ `country_id`؛ مخزن افتراضي لكل دولة).
 - جدول **`warehouse_variant_stock`** (كمية لكل متغير في مخزن).
 - **ترحيل الكويت:** نقل `product_variants.stock_quantity` الحالي إلى مخزن الكويت الافتراضي عند أول ترحيل.
-- **المرحلة الانتقالية:** يُسمح مؤقتاً ببقاء `product_variants.stock_quantity` متزامناً مع المخزن الافتراضي للكويت حتى اكتمال ربط كل مسارات البيع/الشراء/التعديل — ثم يصبح مصدر الحقيقة **`warehouse_variant_stock`** داخل نطاق الدولة.
+- **المرحلة الانتقالية (انتهت — مرحلة 19):** **`warehouse_variant_stock`** مصدر الحقيقة لكل دولة؛ **`product_variants.stock_quantity`** مرآة legacy **للكويت فقط** (مزامنة عبر **`orange_warehouse_sync_legacy_variant_quantity`**).
 - **القناة** لا تملك مخزناً؛ **الدولة** تملك المخزن.
 
 **13.2 منتجات**
@@ -212,7 +212,7 @@ ORANGE — رؤية المالك: تعدد الدول والقنوات والج�
 
 **ما تم — خارج جدول §13 (جزئي من §10):** أساس **`countries`** + **`channels.country_id`** + سياق أدمن + محافظات/مناطق الكويت (§9–§10 مرحلة 1–2 جزئي).
 
-**حالة (استراحة):** الفصل **التشغيلي الأساسي** للكويت **جاهز للتشغيل**؛ **مرحلة 18 منفّذة**؛ المتبقي **مرحلة 19** للفصل الكامل. عند العودة: ابدأ **بالمرحلة 19** (إنهاء المرحلة الانتقالية للمخزون) — **لا** تفترض اكتمال المشروع من Git وحده دون مطابقة هذه القائمة.
+**حالة (استراحة):** الفصل **التشغيلي الكامل** **15–19 منفّذ**؛ **`warehouse_variant_stock`** مصدر الحقيقة per country؛ **`stock_quantity`** legacy mirror للكويت فقط. التالي: **تفعيل دول جديدة** (§10) — **لا** تفترض اكتمال المشروع من Git وحده دون مطابقة الأرشيف.
 
 ---
 
@@ -220,9 +220,11 @@ ORANGE — رؤية المالك: تعدد الدول والقنوات والج�
 --------------------------------------------------------
 **مصدر:** قرار مالك (2026-05-20) + مراجعة وكيل بعد v55. **الهدف:** إغلاق فجوات §13.1 و§13.5 و§13.7 وassert ثانوي، ثم **دليل حسابات منفصل**، ثم إنهاء المرحلة الانتقالية للمخزون.
 
-**ترتيب التنفيذ الموصى عند العودة:** **19** (مرحلة 19 — إنهاء المرحلة الانتقالية للمخزون §13.1).
+**ترتيب التنفيذ الموصى عند العودة:** **تشغيل** — تفعيل دول (§10 مرحلة 5)؛ لا مرحلة كود **15–19** متبقية.
 
-**تنفيذ (13 — مرحلة 18 — دليل حسابات per country §13.5):** ترحيل **`orange_catalog_migrate_country_gl_accounts_v49`** — **`accounts.country_id`** + **`uq_accounts_country_code`**؛ backfill KW؛ **`orange_gl_account_settings`** + **`orange_gl_setting_alloc`** PK مركّب **`(setting_key, country_id)`**؛ **`includes/countries.php`** — **`orange_accounts_sql_country_filter`**, **`orange_gl_assert_voucher_accounts_country`**, assert **`accounts`**؛ **`account_tree.php`** — شجرة/جذور/اقتراح كود scoped؛ **`gl_settings.php`** — قراءة ربط القيود per country؛ **`journal_voucher.php`** — منع حسابات دولة أخرى؛ **`order_fulfillment.php`** — **`countryId`** لاستدعاءات GL؛ **`admin/api/accounts/**`** — إنشاء/حذف/بحث scoped؛ **`admin/api/settings/gl-accounts.php`** — get/save per country؛ تقارير **`financial_report`**, **`report_trial_balance`**, **`partner_account_statement`**, **`gl_posting`**, **`accounting_reports_index`**, **`purchases`**, **`partner_party_voucher_ui`** — قوائم/عدّ حسابات scoped؛ **`financial_report_breakdown.php`**.
+**تنفيذ (13 — مرحلة 19 — إنهاء المرحلة الانتقالية للمخزون §13.1):** **`orange_warehouse_legacy_stock_fallback_enabled`** في **`includes/warehouses.php`** — fallback **`stock_quantity`** للكويت فقط؛ **`orange_warehouse_effective_variant_stock`** + **`orange_warehouse_effective_qty_sql`** بدون legacy لغير KW؛ **`orange_warehouse_sync_legacy_variant_quantity`** — مرآة KW فقط (مُقيَّدة مسبقاً)؛ **`product_variants_write.php`** — لا كتابة **`stock_quantity`** عند **`useWarehouse`**؛ **`admin/pages/stock.php`** — مجموع المخزون عبر **`effective_qty_sql`**؛ **`pages/product.php`** — عرض رصيد effective للواجهة.
+
+**تنفيذ (13 — مرحلة 18 — دليل حسابات per country §13.5):** ترحيل **`orange_catalog_migrate_country_gl_accounts_v49`** — **`accounts.country_id`** + **`uq_accounts_country_code`**؛ backfill KW؛ **`orange_gl_account_settings`** + **`orange_gl_setting_alloc`** PK مركّب **`(setting_key, country_id)`**؛ **`includes/countries.php`** — **`orange_accounts_sql_country_filter`**, **`orange_gl_assert_voucher_accounts_country`**, assert **`accounts`**؛ **`account_tree.php`** — شجرة/جذور/اقتراح كود scoped؛ **`gl_settings.php`** — قراءة ربط القيود per country؛ **`journal_voucher.php`** — منع حسابات دولة أخرى؛ **`order_fulfillment.php`** — **`countryId`** لاستدعاءات GL؛ **`admin/api/accounts/**`** — إنشاء/حذف/بحث scoped؛ **`admin/api/settings/gl-accounts.php`** — get/save per country؛ تقارير GL scoped؛ **`financial_report_breakdown.php`**.
 
 **مرحلة 15 — إغلاق مسارات المخزون §13.1 (متبقي):**
 - **`admin/pages/item_card.php`**, **`admin/pages/opening_stock_balances.php`** — عرض/تعديل الرصيد من **`warehouse_variant_stock`** (مخزن الدولة) لا **`product_variants.stock_quantity`** مباشرة.
@@ -258,9 +260,11 @@ ORANGE — رؤية المالك: تعدد الدول والقنوات والج�
 
 **مرحلة 19 — إنهاء المرحلة الانتقالية للمخزون §13.1:**
 - **`warehouse_variant_stock`** = **مصدر الحقيقة الوحيد** داخل كل دولة.
-- إيقاف/تضييق **`orange_warehouse_sync_legacy_variant_quantity`** (مزامنة **`product_variants.stock_quantity`** مع مخزن الكويت فقط) بعد اكتمال مرحلة 15.
-- توثيق: **`product_variants.stock_quantity`** للعرض legacy أو **deprecated** — حسب قرار المالك عند التنفيذ.
-- **معيار إنجاز:** تعديل مخزون في مصر (مثلاً) **لا** يغيّر **`stock_quantity`** على متغير كتalog الكويت.
+- **`orange_warehouse_sync_legacy_variant_quantity`** — مرآة **`product_variants.stock_quantity`** **لمخزن الكويت الافتراضي فقط**.
+- **`product_variants.stock_quantity`** — **deprecated** خارج الكويت؛ للعرض legacy في KW عند غياب صف مخزن.
+- **معيار إنجاز:** تعديل مخزون في مصر (مثلاً) **لا** يغيّر **`stock_quantity`** على متغير الكتalog.
+
+**تنفيذ (13 — مرحلة 19):** انظر فقرة **«تنفيذ (13 — مرحلة 19 — …)»** أعلاه في §15.
 
 **بعد 15–19 (تشغيل — ليس «مرحلة كود» إلزامية):** تفعيل دول جديدة (§10 مرحلة 5): مصر → الإمارات → السعودية عبر **`admin/api/countries/manage.php`** + **`orange_country_provision_operational`** + **`orange_country_copy_catalog_from_source`**.
 

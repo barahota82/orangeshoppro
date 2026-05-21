@@ -28,13 +28,11 @@ $lowStockRows = $stLowList->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
 $itemList = [];
 $catJoin = orange_catalog_admin_sql_join_product_category_display($pdo, 'p', null);
-$stockWhId = orange_warehouse_default_id_for_country($pdo, $stockCountryId);
-$totalStockSub = ($stockWhId > 0 && orange_warehouses_table_exists($pdo))
-    ? '(SELECT COALESCE(SUM(COALESCE(wvs_sum.quantity, pv2.stock_quantity)), 0)
-        FROM product_variants pv2
-        LEFT JOIN warehouse_variant_stock wvs_sum ON wvs_sum.warehouse_id = ' . (int) $stockWhId . ' AND wvs_sum.variant_id = pv2.id
-        WHERE pv2.product_id = p.id)'
-    : '(SELECT COALESCE(SUM(pv.stock_quantity), 0) FROM product_variants pv WHERE pv.product_id = p.id)';
+$wQtyTotal = orange_warehouse_effective_qty_sql($pdo, $stockCountryId, 'pv2', 'wvs_sum');
+$totalStockSub = '(SELECT COALESCE(SUM(' . $wQtyTotal['expr'] . '), 0)
+    FROM product_variants pv2'
+    . $wQtyTotal['join']
+    . ' WHERE pv2.product_id = p.id)';
 try {
     $itemList = $pdo->query("
     SELECT

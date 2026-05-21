@@ -9,6 +9,7 @@ require_once __DIR__ . '/../includes/catalog_labels.php';
 require_once __DIR__ . '/../includes/advisory_sizing_guides.php';
 require_once __DIR__ . '/../includes/upload_paths.php';
 require_once __DIR__ . '/../includes/countries.php';
+require_once __DIR__ . '/../includes/warehouses.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -92,6 +93,15 @@ $variantsStmt = $pdo->prepare(
 );
 $variantsStmt->execute([$id]);
 $variants = $variantsStmt->fetchAll();
+foreach ($variants as $vi => $vRow) {
+    if (!is_array($vRow)) {
+        continue;
+    }
+    $vid = (int) ($vRow['id'] ?? 0);
+    if ($vid > 0) {
+        $variants[$vi]['stock_quantity'] = orange_warehouse_effective_variant_stock($pdo, $vid, $sfProductCountryId);
+    }
+}
 
 $colorChipOrder = [];
 /** @var array<string, array{color: string, pattern: string}> */
