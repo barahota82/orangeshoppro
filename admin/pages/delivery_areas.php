@@ -16,6 +16,9 @@ $activeAreasCount = $hasAreasTable ? orange_delivery_areas_count_active($pdo, $a
 $daGovernoratesList = ($hasGovTable && $adminCountryId > 0)
     ? orange_delivery_governorates_admin_list($pdo, $adminCountryId)
     : [];
+$daAreasList = $hasAreasTable
+    ? orange_delivery_areas_admin_list($pdo, $adminCountryId > 0 ? $adminCountryId : null)
+    : [];
 $daNextSortOrder = $hasGovTable
     ? ''
     : (string) (int) orange_delivery_areas_next_sort_order($pdo, $adminCountryId, 0);
@@ -192,7 +195,32 @@ $daNextSortOrder = $hasGovTable
                     <th></th>
                 </tr>
             </thead>
-            <tbody id="da_tbody"></tbody>
+            <tbody id="da_tbody">
+                <?php foreach ($daAreasList as $aRow): ?>
+                <?php
+                $aid = (int) ($aRow['id'] ?? 0);
+                $aActive = (int) ($aRow['is_active'] ?? 0) === 1;
+                $govLabel = trim((string) ($aRow['governorate_name_ar'] ?? ''));
+                if ($govLabel === '') {
+                    $govLabel = trim((string) ($aRow['governorate_name_en'] ?? ''));
+                }
+                if ($govLabel === '') {
+                    $govLabel = '—';
+                }
+                ?>
+                <tr>
+                    <td><?php echo $aid; ?></td>
+                    <?php if ($hasGovTable): ?>
+                    <td><?php echo htmlspecialchars($govLabel, ENT_QUOTES, 'UTF-8'); ?></td>
+                    <?php endif; ?>
+                    <td><?php echo htmlspecialchars((string) ($aRow['name_ar'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td dir="ltr"><?php echo htmlspecialchars((string) ($aRow['name_en'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo (int) ($aRow['sort_order'] ?? 0); ?></td>
+                    <td><?php echo $aActive ? 'منطقة توصيل' : 'غير متاحة للتوصيل'; ?></td>
+                    <td><button type="button" class="btn-secondary" data-da-edit="<?php echo $aid; ?>">تعديل</button></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
         </table>
     </div>
 </div>
@@ -245,7 +273,7 @@ let daEnTimer = null;
 let dgArTimer = null;
 let dgEnTimer = null;
 let daGovernoratesCache = <?php echo json_encode($daGovernoratesList, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
-let daDeliveryAreasCache = [];
+let daDeliveryAreasCache = <?php echo json_encode(array_values($daAreasList), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var dgSortStep = <?php echo (int) orange_delivery_governorates_sort_order_step(); ?>;
 var daSortStep = dgSortStep;
 
@@ -461,18 +489,22 @@ function editDeliveryArea(row) {
 }
 
 async function loadDeliveryAreas() {
+    const tb = document.getElementById('da_tbody');
+    if (!tb) return;
     const res = await postJSON('/admin/api/delivery_areas/manage.php', {
         action: 'list',
         country_id: daCountryId()
     });
-    if (!res.success) {
-        alert(res.message || 'خطأ');
+    if (!res || !res.success) {
+        if (res && res.message) {
+            alert(res.message);
+        }
+        bindDeliveryAreaEditButtons();
+        refreshDaSortPreview();
         return;
     }
     const rows = res.data || [];
     daDeliveryAreasCache = rows;
-    const tb = document.getElementById('da_tbody');
-    if (!tb) return;
     tb.innerHTML = '';
     const hasGovCol = <?php echo $hasGovTable ? 'true' : 'false'; ?>;
     rows.forEach(function (r) {
@@ -491,14 +523,20 @@ async function loadDeliveryAreas() {
         tr.innerHTML = html;
         tb.appendChild(tr);
     });
+    bindDeliveryAreaEditButtons();
+    refreshDaSortPreview();
+}
+
+function bindDeliveryAreaEditButtons() {
+    const tb = document.getElementById('da_tbody');
+    if (!tb) return;
     tb.querySelectorAll('[data-da-edit]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             const id = parseInt(btn.getAttribute('data-da-edit'), 10);
-            const row = rows.find(function (x) { return parseInt(x.id, 10) === id; });
+            const row = daDeliveryAreasCache.find(function (x) { return parseInt(x.id, 10) === id; });
             if (row) editDeliveryArea(row);
         });
     });
-    refreshDaSortPreview();
 }
 
 async function saveDeliveryArea() {
@@ -593,12 +631,15 @@ if (daGovSel) daGovSel.addEventListener('change', refreshDaSortPreview);
 (async function daInit() {
     try {
         bindGovernorateEditButtons();
+        bindDeliveryAreaEditButtons();
         refreshDgSortPreview();
         refreshDaSortPreview();
         if (document.getElementById('dg_tbody') && daGovernoratesCache.length === 0) {
             await loadGovernorates();
         }
-        await loadDeliveryAreas();
+        if (document.getElementById('da_tbody') && daDeliveryAreasCache.length === 0) {
+            await loadDeliveryAreas();
+        }
     } catch (e) {
         console.error('delivery_areas init', e);
     }

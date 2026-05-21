@@ -139,16 +139,17 @@ function orange_delivery_areas_admin_list(PDO $pdo, ?int $countryId = null): arr
                         g.name_ar AS governorate_name_ar, g.name_en AS governorate_name_en
                  FROM delivery_areas a
                  LEFT JOIN delivery_governorates g ON g.id = a.governorate_id
-                 WHERE a.country_id = ?
+                 WHERE a.country_id = ? OR g.country_id = ?
                  ORDER BY g.sort_order ASC, g.id ASC, a.sort_order ASC, a.id ASC'
             );
+            $st->execute([$countryId, $countryId]);
         } else {
             $st = $pdo->prepare(
                 'SELECT id, name_ar, name_en, sort_order, is_active, country_id
                  FROM delivery_areas WHERE country_id = ? ORDER BY sort_order ASC, id ASC'
             );
+            $st->execute([$countryId]);
         }
-        $st->execute([$countryId]);
 
         return $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
     }
