@@ -9,16 +9,13 @@ require_once __DIR__ . '/../../includes/storefront_phone_country_select.php';
 require_once __DIR__ . '/../../includes/delivery_areas.php';
 require_once __DIR__ . '/../../includes/countries.php';
 
-$pdo = db();
-orange_catalog_ensure_schema($pdo);
-$supplierSchemaBootstrapError = '';
-if (function_exists('orange_catalog_ensure_schema_core')) {
-    try {
-        orange_catalog_ensure_schema_core($pdo);
-    } catch (Throwable $e) {
-        $supplierSchemaBootstrapError = trim((string) $e->getMessage());
-    }
+if (!isset($pdo) || !$pdo instanceof PDO) {
+    require_once __DIR__ . '/../../includes/catalog_schema.php';
+    $pdo = db();
+    orange_catalog_ensure_schema($pdo);
+    orange_catalog_ensure_country_id_columns_once($pdo);
 }
+$supplierSchemaBootstrapError = '';
 
 $leafAccountOptions = [];
 $supplierPayablePickAccounts = [];
@@ -90,11 +87,16 @@ $supplierAdminCountryId = orange_admin_context_country_id($pdo);
 $nextSupplierCodePreview = '1';
 if (orange_table_exists($pdo, 'suppliers') && orange_table_has_column($pdo, 'suppliers', 'code')) {
     if (orange_table_has_country_id($pdo, 'suppliers') && $supplierAdminCountryId > 0) {
-        $supCodeSt = $pdo->prepare(
-            'SELECT code FROM suppliers WHERE country_id = ? AND code IS NOT NULL AND TRIM(code) <> \'\'
-             ORDER BY id DESC LIMIT 5000'
-        );
-        $supCodeSt->execute([$supplierAdminCountryId]);
+        $supCodeCountryFilter = orange_sql_filter_country_id($pdo, 'suppliers', '', $supplierAdminCountryId);
+        $supCodeSql = 'SELECT code FROM suppliers WHERE code IS NOT NULL AND TRIM(code) <> \'\'';
+        $supCodeParams = [];
+        if ($supCodeCountryFilter !== null) {
+            $supCodeSql .= $supCodeCountryFilter['sql'];
+            $supCodeParams = $supCodeCountryFilter['params'];
+        }
+        $supCodeSql .= ' ORDER BY id DESC LIMIT 5000';
+        $supCodeSt = $pdo->prepare($supCodeSql);
+        $supCodeSt->execute($supCodeParams);
         $codeRows = $supCodeSt->fetchAll(PDO::FETCH_COLUMN) ?: [];
     } else {
         $codeRows = $pdo->query(

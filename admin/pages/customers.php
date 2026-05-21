@@ -11,16 +11,13 @@ require_once __DIR__ . '/../../includes/countries.php';
 
 $cusAttachmentMaxCount = orange_customer_attachment_max_count();
 
-$pdo = db();
-orange_catalog_ensure_schema($pdo);
-$customerSchemaBootstrapError = '';
-if (function_exists('orange_catalog_ensure_schema_core')) {
-    try {
-        orange_catalog_ensure_schema_core($pdo);
-    } catch (Throwable $e) {
-        $customerSchemaBootstrapError = trim((string) $e->getMessage());
-    }
+if (!isset($pdo) || !$pdo instanceof PDO) {
+    require_once __DIR__ . '/../../includes/catalog_schema.php';
+    $pdo = db();
+    orange_catalog_ensure_schema($pdo);
+    orange_catalog_ensure_country_id_columns_once($pdo);
 }
+$customerSchemaBootstrapError = '';
 
 $hasCustomerCodeCol = orange_table_has_column($pdo, 'customers', 'code');
 $hasCustomerAreaCol = orange_table_has_column($pdo, 'customers', 'area');
