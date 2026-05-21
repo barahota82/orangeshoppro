@@ -45,6 +45,13 @@ try {
         json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
+    $supCountryId = 0;
+    if (orange_table_has_country_id($pdo, 'suppliers')) {
+        $stSc = $pdo->prepare('SELECT country_id FROM suppliers WHERE id = ? LIMIT 1');
+        $stSc->execute([$supplierId]);
+        $supCountryId = (int) ($stSc->fetchColumn() ?: 0);
+    }
+
     $allowExcess = !empty($data['allow_excess']);
     $apBal = orange_party_balance_supplier($pdo, $supplierId);
     if ($apBal <= 0.0001) {
@@ -67,7 +74,7 @@ try {
     }
     $cashId = orange_gl_account_id($pdo, 'cash');
 
-    $seq = orange_sequence_next($pdo, 'spay_' . date('Ymd'));
+    $seq = orange_sequence_next($pdo, 'spay_' . date('Ymd'), $supCountryId);
     $ref = 'SPAY-' . $supplierId . '-' . date('Ymd') . '-' . str_pad((string) $seq, 5, '0', STR_PAD_LEFT);
 
     $pdo->beginTransaction();

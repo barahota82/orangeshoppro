@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -18,6 +19,11 @@ try {
     $ch->execute([$pid]);
     if (!$ch->fetchColumn()) {
         json_response(['success' => false, 'message' => 'المنتج غير موجود أو غير نشط'], 422);
+    }
+    try {
+        orange_admin_assert_entity_country($pdo, 'products', $pid);
+    } catch (RuntimeException $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
     if (!orange_storefront_product_in_active_unified_chain($pdo, $pid)) {
         json_response([

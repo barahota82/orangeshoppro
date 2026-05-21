@@ -158,8 +158,12 @@ ORANGE — رؤية المالك: تعدد الدول والقنوات والج�
 
 **تنفيذ (13 — مرحلة 7 — صلاحيات أدمن الدولة):** حقل **`admins.country_id`** في **`admin/api/admins/save.php`** و**`admin/api/admins/list.php`** و**`admin/pages/admin_users.php`** (NULL = أدمن عام؛ قيمة = فريق دولة)؛ يكمّل قفل الجلسة **`admin_country_lock`** المذكور في مرحلة 4–6.
 
-**تنفيذ (13 — مرحلة 8 — تفعيل دولة + تهيئة تشغيلية):** **`orange_country_provision_operational`** في **`includes/countries.php`** (مخزن افتراضي + قناة ويب `{code}-web` idempotent)؛ يُستدعى من **`admin/api/countries/manage.php`** عند **`is_active=1`**؛ نسخ كتalog لكل دولة **لاحقاً**.
+**تنفيذ (13 — مرحلة 8 — تفعيل دولة + تهيئة تشغيلية):** **`orange_country_provision_operational`** في **`includes/countries.php`** (مخزن افتراضي + قناة ويب `{code}-web` idempotent)؛ يُستدعى من **`admin/api/countries/manage.php`** عند **`is_active=1`**؛ **`orange_country_copy_catalog_from_source`** في **`includes/country_catalog_copy.php`** (نسخ كتalog idempotent من الكويت؛ مخزون صفر).
 
-**تنفيذ (13 — حماية API + تفرد ضمن الدولة):** **`orange_admin_assert_entity_country`** على مسارات التعديل/الحذف (**`orders/update`**, **`orders/update-status`**, **`orders/update-payment`**, **`customers/save`**, **`customers/delete`**, **`suppliers/save`**, **`products/update`**, **`products/delete`**, **`products/toggle`**, **`purchases/update`**, **`purchases/lines`**, مردودات المبيعات/المشتريات، شاشات الذمم)؛ تفرد **`phone`/`code`/`civil_id`** (عملاء) و**`phone`/`code`/`tax_number`** (موردون) **ضمن `country_id`** في **`save`** APIs؛ فلترة موردي التقرير المالي في **`admin/pages/financial_report.php`**.
+**تنفيذ (13 — حماية API + تفرد ضمن الدولة):** **`orange_admin_assert_entity_country`** على مسارات التعديل/الحذف (**`orders/update`**, **`orders/update-status`**, **`orders/update-payment`**, **`customers/save`**, **`customers/delete`**, **`suppliers/save`**, **`products/update`**, **`products/delete`**, **`products/toggle`**, **`purchases/update`**, **`purchases/lines`**, مردودات المبيعات/المشتريات، شاشات الذمم، **`offers/save`**)؛ تفرد **`phone`/`code`/`civil_id`** (عملاء) و**`phone`/`code`/`tax_number`** (موردون) **ضمن `country_id`** في **`save`** APIs؛ فلترة موردي التقرير المالي في **`admin/pages/financial_report.php`**.
+
+**تنفيذ (13 — تسلسلات ضمن الدولة):** **`orange_sequence_next(..., $countryId)`** في **`includes/document_sequences.php`**؛ **`orange_generate_order_number_for_country`** + بادئة كود الدولة في **`includes/order_helpers.php`**؛ فواتير **`sales_invoice`** وسندات الذمم scoped بالدولة.
+
+**تنفيذ (13 — product_channels ضمن الدولة):** **`orange_product_attach_all_active_channels`** و**`orange_product_assert_channel_same_country`** في **`includes/product_channels.php`**.
 
 نهاية الملف.

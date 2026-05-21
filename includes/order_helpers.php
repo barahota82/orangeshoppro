@@ -13,9 +13,30 @@ function require_fields(array $data, array $keys): void
     }
 }
 
-function generate_order_number(): string
+function generate_order_number(?string $countryCode = null): string
 {
-    return 'ORD-' . date('Ymd-His') . '-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
+    $cc = $countryCode !== null ? strtoupper(preg_replace('/[^A-Z0-9]/', '', $countryCode)) : '';
+    $prefix = 'ORD';
+    if ($cc !== '') {
+        $prefix .= '-' . $cc;
+    }
+
+    return $prefix . '-' . date('Ymd-His') . '-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
+}
+
+function orange_generate_order_number_for_country(PDO $pdo, int $countryId): string
+{
+    if ($countryId <= 0) {
+        return generate_order_number();
+    }
+    require_once __DIR__ . '/countries.php';
+    $row = orange_country_row_by_id($pdo, $countryId, false);
+    if ($row === null) {
+        return generate_order_number();
+    }
+    $code = orange_countries_normalize_code((string) ($row['code'] ?? ''));
+
+    return generate_order_number($code !== '' ? $code : null);
 }
 
 function clean_whatsapp_number(string $raw): string

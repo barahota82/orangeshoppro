@@ -146,9 +146,9 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 
 **تنفيذ (س9):** لا يُعتبر الحساب «مفعّلاً» إلا بعد تعبئة `storefront_accounts.email_verified_at`؛ الرابط في البريد يُعالَج في `pages/verify-email.php` عبر `orange_storefront_verify_email_token` في `includes/storefront_account.php`؛ تسجيل الدخول للواجهة بعد التحقق عبر `storefront_account_login` (يقتصر على حسابات مُحقَّقة).
 **تنفيذ (س10):** عند طلب التحقق من البريد يُخزَّن `registered_channel_slug` لقناة الواجهة الحالية في `api/auth/request-email-verify.php` (`INSERT` / `UPDATE` مع `COALESCE(registered_channel_slug, ?)` للاحتفاظ بأول قناة مُثبَّتة إن وُجدت)؛ الجدول `storefront_accounts` والعمود `registered_channel_slug`.
-**تنفيذ (س11):** بريد واحد = حساب واحد: قيد `UNIQUE` على `storefront_accounts.email` في ترحيل `includes/catalog_schema.php`؛ منطق `api/auth/request-email-verify.php` يبحث بالبريد ويحدّث الصف أو ينشئ صفاً جديداً دون ازدواج.
+**تنفيذ (س11):** بريد واحد = حساب واحد **ضمن نفس الدولة**: قيد **`UNIQUE (email, country_id)`** على `storefront_accounts` (ترحيل v46 في **`includes/catalog_schema.php`**)؛ منطق **`api/auth/request-email-verify.php`** يبحث بالبريد **+ `country_id` القناة** ويحدّث/ينشئ دون ازدواج داخل الدولة؛ **يُسمح** بنفس البريد في دولتين كحسابين منفصلين.
 
-**تعديل مالك (فصل كامل بين الدول — 2026-05-20):** **`UNIQUE (email, country_id)`** — نفس البريد **مسموح** في **دولتين** كحسابين واجهة **منفصلين**. **يُلغي** صياغة «حساب واحد» أعلاه **عند تنفيذ** البند **13.6** في `ORANGE_OWNER_MULTICOUNTRY_VISION.txt`. **تنفيذ:** لم يُفعَّل بعد في المخطط/الكود — ما زال `UNIQUE(email)` حتى ترحيل 13.6.
+**تعديل مالك (فصل كامل بين الدول — 2026-05-20):** **`UNIQUE (email, country_id)`** — نفس البريد **مسموح** في **دولتين** كحسابين واجهة **منفصلين**. **يُلغي** صياغة «حساب واحد» عالمياً أعلاه **داخل نطاق الدولة الواحدة** — **تنفيذ:** ترحيل v46 + **`api/auth/request-email-verify.php`** scoped بالدولة.
 
 
 --------------------------------------------------------------------

@@ -29,7 +29,7 @@ function orange_invoice_assign_number_if_needed(PDO $pdo, array &$order, int $or
 
             return;
         }
-        $next = orange_sequence_next($pdo, 'sales_invoice');
+        $next = orange_sequence_next($pdo, 'sales_invoice', (int) ($order['country_id'] ?? 0));
         $formatted = 'INV-' . str_pad((string) $next, 6, '0', STR_PAD_LEFT);
         $upd = $pdo->prepare('UPDATE orders SET invoice_number = ? WHERE id = ?');
         $upd->execute([$formatted, $orderId]);

@@ -581,41 +581,42 @@ function orange_country_provision_operational(PDO $pdo, int $countryId): array
     $existingCh = (int) ($stCh->fetchColumn() ?: 0);
     if ($existingCh > 0) {
         $out['channel_id'] = $existingCh;
-
-        return $out;
-    }
-
-    $code = orange_countries_normalize_code((string) ($row['code'] ?? ''));
-    $nameAr = trim((string) ($row['name_ar'] ?? ''));
-    $nameEn = trim((string) ($row['name_en'] ?? ''));
-    $chName = $nameAr !== '' ? ($nameAr . ' — ويب') : ($nameEn !== '' ? $nameEn . ' — web' : 'Web');
-    $slug = $code !== '' ? $code . '-web' : ('c' . $countryId . '-web');
-    $pathSegment = 'web';
-
-    $dupSlug = $pdo->prepare('SELECT id FROM channels WHERE country_id = ? AND slug = ? LIMIT 1');
-    $dupSlug->execute([$countryId, $slug]);
-    if ($dupSlug->fetchColumn()) {
-        $slug = $slug . '-' . $countryId;
-    }
-
-    $defaultWhNum = 1;
-
-    if (orange_table_has_column($pdo, 'channels', 'channel_kind')) {
-        $ins = $pdo->prepare(
-            'INSERT INTO channels (name, slug, path_segment, logo, whatsapp_number, warehouse_number, is_active, country_id, channel_kind)
-             VALUES (?, ?, ?, \'\', \'\', ?, 1, ?, \'web\')'
-        );
-        $ins->execute([$chName, $slug, $pathSegment, $defaultWhNum, $countryId]);
     } else {
-        $ins = $pdo->prepare(
-            'INSERT INTO channels (name, slug, path_segment, logo, whatsapp_number, warehouse_number, is_active, country_id)
-             VALUES (?, ?, ?, \'\', \'\', ?, 1, ?)'
-        );
-        $ins->execute([$chName, $slug, $pathSegment, $defaultWhNum, $countryId]);
+        $code = orange_countries_normalize_code((string) ($row['code'] ?? ''));
+        $nameAr = trim((string) ($row['name_ar'] ?? ''));
+        $nameEn = trim((string) ($row['name_en'] ?? ''));
+        $chName = $nameAr !== '' ? ($nameAr . ' — ويب') : ($nameEn !== '' ? $nameEn . ' — web' : 'Web');
+        $slug = $code !== '' ? $code . '-web' : ('c' . $countryId . '-web');
+        $pathSegment = 'web';
+
+        $dupSlug = $pdo->prepare('SELECT id FROM channels WHERE country_id = ? AND slug = ? LIMIT 1');
+        $dupSlug->execute([$countryId, $slug]);
+        if ($dupSlug->fetchColumn()) {
+            $slug = $slug . '-' . $countryId;
+        }
+
+        $defaultWhNum = 1;
+
+        if (orange_table_has_column($pdo, 'channels', 'channel_kind')) {
+            $ins = $pdo->prepare(
+                'INSERT INTO channels (name, slug, path_segment, logo, whatsapp_number, warehouse_number, is_active, country_id, channel_kind)
+                 VALUES (?, ?, ?, \'\', \'\', ?, 1, ?, \'web\')'
+            );
+            $ins->execute([$chName, $slug, $pathSegment, $defaultWhNum, $countryId]);
+        } else {
+            $ins = $pdo->prepare(
+                'INSERT INTO channels (name, slug, path_segment, logo, whatsapp_number, warehouse_number, is_active, country_id)
+                 VALUES (?, ?, ?, \'\', \'\', ?, 1, ?)'
+            );
+            $ins->execute([$chName, $slug, $pathSegment, $defaultWhNum, $countryId]);
+        }
+        $cid = (int) $pdo->lastInsertId();
+        $out['channel_id'] = $cid;
+        $out['created_channel'] = $cid > 0;
     }
-    $cid = (int) $pdo->lastInsertId();
-    $out['channel_id'] = $cid;
-    $out['created_channel'] = $cid > 0;
+
+    require_once __DIR__ . '/country_catalog_copy.php';
+    $out['catalog_copy'] = orange_country_copy_catalog_from_source($pdo, $countryId);
 
     return $out;
 }

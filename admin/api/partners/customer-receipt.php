@@ -44,6 +44,13 @@ try {
         json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
+    $custCountryId = 0;
+    if (orange_table_has_country_id($pdo, 'customers')) {
+        $stCc = $pdo->prepare('SELECT country_id FROM customers WHERE id = ? LIMIT 1');
+        $stCc->execute([$customerId]);
+        $custCountryId = (int) ($stCc->fetchColumn() ?: 0);
+    }
+
     $allowExcess = !empty($data['allow_excess']);
     $arBal = orange_party_balance_customer($pdo, $customerId);
     if (!$allowExcess && $arBal > 0.0001 && $amount > $arBal + 0.02) {
@@ -59,7 +66,7 @@ try {
     $arId = orange_gl_account_id($pdo, 'ar_credit');
     $cashId = orange_gl_account_id($pdo, 'cash');
 
-    $seq = orange_sequence_next($pdo, 'crec_' . date('Ymd'));
+    $seq = orange_sequence_next($pdo, 'crec_' . date('Ymd'), $custCountryId);
     $ref = 'CREC-' . $customerId . '-' . date('Ymd') . '-' . str_pad((string) $seq, 5, '0', STR_PAD_LEFT);
 
     $pdo->beginTransaction();

@@ -347,7 +347,9 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         throw new RuntimeException('Invalid channel');
     }
 
-    $orderNumber = generate_order_number();
+    $orderCountryId = orange_country_id_for_channel($pdo, (int) $data['channel_id']);
+    $orderWarehouseId = orange_warehouse_default_id_for_country($pdo, $orderCountryId);
+    $orderNumber = orange_generate_order_number_for_country($pdo, $orderCountryId);
 
     [$subtotal, $validatedItems] = orange_storefront_validate_cart_items_core($pdo, $data['items'], true);
 
@@ -403,9 +405,6 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         $orderNumber,
         orange_country_id_for_channel($pdo, (int) $data['channel_id'])
     );
-
-    $orderCountryId = orange_country_id_for_channel($pdo, (int) $data['channel_id']);
-    $orderWarehouseId = orange_warehouse_default_id_for_country($pdo, $orderCountryId);
 
     $hasOrdDial = orange_table_has_column($pdo, 'orders', 'phone_country_dial');
     $hasOrdNat = orange_table_has_column($pdo, 'orders', 'phone_national');

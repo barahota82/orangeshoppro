@@ -53,9 +53,12 @@ try {
         json_response(['success' => false, 'message' => 'قناة غير صالحة'], 422);
     }
 
+    $orderCountryId = orange_country_id_for_channel($pdo, (int) $data['channel_id']);
+    $orderWarehouseId = orange_warehouse_default_id_for_country($pdo, $orderCountryId);
+
     $pdo->beginTransaction();
 
-    $orderNumber = generate_order_number();
+    $orderNumber = orange_generate_order_number_for_country($pdo, $orderCountryId);
     $total = 0.0;
     $validatedItems = [];
 
@@ -136,9 +139,6 @@ try {
     $hasAmountPaidCol = orange_table_has_column($pdo, 'orders', 'amount_paid');
     $amountPaidIn = max(0.0, (float) ($data['amount_paid'] ?? 0));
     $amountPaidIn = min($amountPaidIn, $total);
-
-    $orderCountryId = orange_country_id_for_channel($pdo, (int)$data['channel_id']);
-    $orderWarehouseId = orange_warehouse_default_id_for_country($pdo, $orderCountryId);
 
     $cols = 'order_number, customer_name, phone, area, address, notes, channel_id, status, total';
     $ph = '?, ?, ?, ?, ?, ?, ?, \'completed\', ?';

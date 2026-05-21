@@ -6,8 +6,9 @@ require_once __DIR__ . '/catalog_schema.php';
 
 /**
  * تسلسل آمن مع عدة مستخدمين: صف واحد لكل scope، زيادة ذرّية عبر ON DUPLICATE KEY UPDATE.
+ * عند تمرير countryId يُضاف لاحقة _c{N} للفصل بين الدول (§13.4).
  */
-function orange_sequence_next(PDO $pdo, string $scope): int
+function orange_sequence_next(PDO $pdo, string $scope, ?int $countryId = null): int
 {
     orange_catalog_ensure_schema($pdo);
     if (!orange_table_exists($pdo, 'document_sequences')) {
@@ -16,6 +17,9 @@ function orange_sequence_next(PDO $pdo, string $scope): int
     $scope = preg_replace('/[^a-zA-Z0-9_\-]/', '', $scope);
     if ($scope === '') {
         throw new InvalidArgumentException('scope فارغ');
+    }
+    if ($countryId !== null && $countryId > 0) {
+        $scope .= '_c' . (int) $countryId;
     }
     $pdo->prepare(
         'INSERT INTO document_sequences (scope, last_value) VALUES (?, 1)
