@@ -273,10 +273,22 @@ if (orange_journal_vouchers_ready($pdo)) {
                 <input type="text" id="ppv_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000" dir="ltr" lang="en">
             </div>
             <div class="jv-voucher-nav-cell jv-print-hide">
+                <?php if ($ppvIsReceipt): ?>
+                <div class="jv-voucher-nav-btns" role="group" aria-label="تنقل بين السندات">
+                    <button type="button" class="btn-secondary jv-nav-btn" id="ppv_nav_first" title="أول سند" aria-label="أول سند">&lt;&lt;</button>
+                    <button type="button" class="btn-secondary jv-nav-btn" id="ppv_nav_prev" title="السند السابق" aria-label="السند السابق">&lt;</button>
+                    <button type="button" class="btn-secondary jv-nav-btn" id="ppv_nav_next" title="السند التالي" aria-label="السند التالي">&gt;</button>
+                    <button type="button" class="btn-secondary jv-nav-btn" id="ppv_nav_last" title="آخر سند" aria-label="آخر سند">&gt;&gt;</button>
+                    <button type="button" class="btn-secondary jv-nav-search" id="ppv_btn_search_vouchers" title="بحث عن سند">بحث</button>
+                </div>
+                <?php endif; ?>
                 <div class="jv-voucher-nav-btns ppv-voucher-action-btns" role="group" aria-label="إجراءات السند">
                     <button type="button" id="ppv_btn_save"<?php echo !$ppvReady ? ' disabled' : ''; ?>>حفظ السند</button>
                     <button type="button" class="btn-secondary jv-nav-search" id="ppv_btn_print" title="طباعة">طباعة السند</button>
                     <button type="button" class="btn-secondary jv-nav-search" id="ppv_btn_new" title="سند جديد">سند جديد</button>
+                    <?php if ($ppvIsReceipt): ?>
+                    <button type="button" class="btn-secondary" id="ppv_btn_delete" title="حذف السند المعروض" disabled>حذف السند</button>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -342,6 +354,68 @@ if (orange_journal_vouchers_ready($pdo)) {
 </div>
 <?php endif; ?>
 
+<?php if ($ppvIsReceipt): ?>
+<div id="ppv_search_modal" class="jv-search-modal ppv-print-hide" style="display:none;" aria-hidden="true" role="dialog" aria-labelledby="ppv_search_modal_title">
+    <div class="jv-search-modal__backdrop" id="ppv_search_modal_backdrop"></div>
+    <div class="jv-search-modal__panel">
+        <div class="jv-search-modal__head">
+            <h3 id="ppv_search_modal_title" class="jv-search-modal__title">بحث في سندات سداد العملاء</h3>
+        </div>
+        <div class="jv-search-modal__body">
+            <div class="jv-search-modal__form">
+                <div class="jv-search-modal__row jv-search-modal__row--fields">
+                    <div class="jv-search-field jv-search-field--id">
+                        <label for="ppv_search_id_from">رقم القيد — من</label>
+                        <input type="number" id="ppv_search_id_from" class="admin-inp" min="1" step="1" placeholder="" dir="ltr" lang="en">
+                    </div>
+                    <div class="jv-search-field jv-search-field--id">
+                        <label for="ppv_search_id_to">رقم القيد — إلى</label>
+                        <input type="number" id="ppv_search_id_to" class="admin-inp" min="1" step="1" placeholder="" dir="ltr" lang="en">
+                    </div>
+                    <div class="jv-search-field jv-search-field--date">
+                        <label for="ppv_search_date_from">تاريخ السند — من</label>
+                        <input type="text" id="ppv_search_date_from" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off">
+                    </div>
+                    <div class="jv-search-field jv-search-field--date">
+                        <label for="ppv_search_date_to">تاريخ السند — إلى</label>
+                        <input type="text" id="ppv_search_date_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off">
+                    </div>
+                    <div class="jv-search-field jv-search-field--ref">
+                        <label for="ppv_search_ref">المرجع (يحتوي النص)</label>
+                        <input type="text" id="ppv_search_ref" class="admin-inp" placeholder="" autocomplete="off" dir="auto">
+                    </div>
+                </div>
+                <div class="jv-search-modal__row jv-search-modal__row--desc">
+                    <div class="jv-search-field jv-search-field--full">
+                        <label for="ppv_search_desc">بيان القيد العام (يحتوي النص)</label>
+                        <input type="text" id="ppv_search_desc" class="admin-inp" placeholder="" autocomplete="off" dir="auto">
+                    </div>
+                </div>
+            </div>
+            <div class="actions jv-search-modal__actions">
+                <button type="button" id="ppv_search_btn">تنفيذ البحث</button>
+            </div>
+            <div class="jv-search-modal__results">
+                <div class="table-wrap jv-search-table-wrap">
+                    <table class="admin-table jv-search-results-table">
+                        <thead>
+                            <tr>
+                                <th>رقم</th>
+                                <th>تاريخ السند</th>
+                                <th>المرجع</th>
+                                <th>البيان</th>
+                                <th>المبلغ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ppv_search_results"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <script>
 var PPV_IS_RECEIPT = <?php echo $ppvIsReceipt ? 'true' : 'false'; ?>;
 var PPV_API = <?php echo json_encode($ppvApiUrl, JSON_UNESCAPED_UNICODE); ?>;
@@ -352,7 +426,9 @@ var PPV_PARTY_DEFAULT = <?php echo json_encode($ppvPartyDefaultAcc, JSON_UNESCAP
 var PPV_SUPPLIER_PAYABLE = <?php echo json_encode($supplierPayableMap, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>;
 var PPV_PREFILL = <?php echo json_encode($ppvPrefill, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>;
 var PPV_SUPPLIER_PICK_ROWS = <?php echo json_encode($ppvSupplierPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>;
+var PPV_BROWSE_ENTRY_TYPE = <?php echo json_encode($ppvIsReceipt ? 'customer_receipt' : 'supplier_payment', JSON_UNESCAPED_UNICODE); ?>;
 var ppvSupplierPickTimer = null;
+var ppvBrowseId = null;
 
 function ppvEscapeHtml(s) {
     return String(s == null ? '' : s)
@@ -825,6 +901,218 @@ function ppvApplyPrefill() {
     }
 }
 
+function ppvNav(where) {
+    if (!PPV_IS_RECEIPT) {
+        return;
+    }
+    postJSON('/admin/api/journal/manage.php', {
+        action: 'nav_manual',
+        entry_type: PPV_BROWSE_ENTRY_TYPE,
+        where: where,
+        current_id: ppvBrowseId || 0
+    }).then(function (r) {
+        if (!r.success || !r.id) {
+            alert(r.message || 'لا توجد سندات من هذا النوع بعد');
+            return;
+        }
+        ppvLoadVoucher(r.id);
+    }).catch(function (e) { alert(e.message || String(e)); });
+}
+
+function ppvLoadVoucher(id) {
+    if (!PPV_IS_RECEIPT) {
+        return;
+    }
+    postJSON('/admin/api/journal/manage.php', {
+        action: 'get',
+        id: id,
+        entry_type: PPV_BROWSE_ENTRY_TYPE
+    }).then(function (r) {
+        if (!r.success || !r.voucher) {
+            alert(r.message || 'تعذر تحميل السند');
+            return;
+        }
+        ppvBrowseId = r.voucher.id;
+        ppvDisplayBrowseVoucher(r);
+    }).catch(function (e) { alert(e.message || String(e)); });
+}
+
+function ppvDisplayBrowseVoucher(r) {
+    var v = r.voucher;
+    var numEl = document.getElementById('ppv_number_preview');
+    if (numEl) {
+        numEl.value = String(v.voucher_serial || v.display_voucher_no || v.id || '');
+    }
+    var refEl = document.getElementById('ppv_ref');
+    if (refEl) refEl.value = v.reference || '';
+    var dateEl = document.getElementById('ppv_date');
+    if (dateEl) dateEl.value = v.voucher_date_dmy || v.voucher_date || '';
+    var descEl = document.getElementById('ppv_desc');
+    if (descEl) descEl.value = v.description || '';
+    if (r.party_customer_id) {
+        var sel = document.getElementById('ppv_party');
+        if (sel) {
+            sel.value = String(parseInt(String(r.party_customer_id), 10) || 0);
+        }
+    }
+    var total = 0;
+    (r.lines || []).forEach(function (l) {
+        total += parseFloat(String(l.debit || '0')) || 0;
+    });
+    var dEl = document.getElementById('ppv_tot_debit');
+    var cEl = document.getElementById('ppv_tot_credit');
+    if (dEl) dEl.value = total.toFixed(3);
+    if (cEl) cEl.value = total.toFixed(3);
+    var tb = document.getElementById('ppv_lines_body');
+    if (tb && r.lines) {
+        tb.innerHTML = '';
+        r.lines.forEach(function (l) {
+            var tr = document.createElement('tr');
+            tr.className = 'jv-line-main';
+            var d = parseFloat(String(l.debit || '0')) || 0;
+            var c = parseFloat(String(l.credit || '0')) || 0;
+            var memo = l.memo || '';
+            var nameTxt = (l.name || '') + (memo ? ' — ' + memo : '');
+            tr.innerHTML = '<td><input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="' + ppvEscapeHtml(l.code || '') + '" readonly tabindex="-1"></td>' +
+                '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + ppvEscapeHtml(nameTxt) + '" readonly tabindex="-1"></td>' +
+                '<td><input type="text" class="admin-inp-money" value="' + (d > 0 ? d.toFixed(3) : '0.000') + '" readonly dir="ltr" lang="en"></td>' +
+                '<td><input type="text" class="admin-inp-money" value="' + (c > 0 ? c.toFixed(3) : '0.000') + '" readonly dir="ltr" lang="en"></td>' +
+                '<td></td>';
+            tb.appendChild(tr);
+        });
+    }
+    var allocTb = document.getElementById('ppv_alloc_tbody');
+    if (allocTb) {
+        allocTb.innerHTML = '';
+    }
+    var btnDel = document.getElementById('ppv_btn_delete');
+    if (btnDel) {
+        btnDel.disabled = false;
+    }
+}
+
+function ppvDeleteVoucher() {
+    if (!PPV_IS_RECEIPT || !ppvBrowseId) {
+        alert('لا يوجد سند محفوظ للحذف');
+        return;
+    }
+    if (!confirm('تأكيد حذف هذا السند؟ لا يمكن التراجع.')) {
+        return;
+    }
+    postJSON('/admin/api/journal/manage.php', { action: 'delete', id: ppvBrowseId }).then(function (r) {
+        if (r.success) {
+            alert(r.message || 'تم الحذف');
+            location.reload();
+            return;
+        }
+        alert(r.message || 'فشل الحذف');
+    }).catch(function (e) { alert(e.message || String(e)); });
+}
+
+function ppvSearchOpen() {
+    var m = document.getElementById('ppv_search_modal');
+    if (m) {
+        m.style.display = 'flex';
+        m.setAttribute('aria-hidden', 'false');
+    }
+}
+
+function ppvSearchClose() {
+    var m = document.getElementById('ppv_search_modal');
+    if (m) {
+        m.style.display = 'none';
+        m.setAttribute('aria-hidden', 'true');
+    }
+}
+
+function ppvSearchRun() {
+    if (!PPV_IS_RECEIPT) {
+        return;
+    }
+    var idFrom = parseInt(document.getElementById('ppv_search_id_from').value, 10) || 0;
+    var idTo = parseInt(document.getElementById('ppv_search_id_to').value, 10) || 0;
+    var dateFrom = orangeGetDmyValueAsIso(document.getElementById('ppv_search_date_from')) || '';
+    var dateTo = orangeGetDmyValueAsIso(document.getElementById('ppv_search_date_to')) || '';
+    var ref = (document.getElementById('ppv_search_ref').value || '').trim();
+    var desc = (document.getElementById('ppv_search_desc').value || '').trim();
+    var tbody = document.getElementById('ppv_search_results');
+    if (!tbody) {
+        return;
+    }
+    tbody.innerHTML = '<tr><td colspan="5">جاري البحث…</td></tr>';
+    var payload = {
+        action: 'search_manual',
+        entry_type: PPV_BROWSE_ENTRY_TYPE
+    };
+    if (idFrom > 0) payload.id_from = idFrom;
+    if (idTo > 0) payload.id_to = idTo;
+    if (dateFrom) payload.date_from = dateFrom;
+    if (dateTo) payload.date_to = dateTo;
+    if (ref) payload.reference = ref;
+    if (desc) payload.description = desc;
+    postJSON('/admin/api/journal/manage.php', payload).then(function (r) {
+        tbody.innerHTML = '';
+        var rows = (r.results && r.results.length) ? r.results : (r.rows || []);
+        if (!r.success || !rows.length) {
+            tbody.innerHTML = '<tr><td colspan="5" class="muted">لا نتائج</td></tr>';
+            return;
+        }
+        rows.forEach(function (v) {
+            var tr = document.createElement('tr');
+            tr.style.cursor = 'pointer';
+            var amt = parseFloat(String(v.amount != null ? v.amount : v.total || '0')) || 0;
+            tr.innerHTML = '<td>' + ppvEscapeHtml(String(v.display_no || v.voucher_serial || v.id)) + '</td>' +
+                '<td>' + ppvEscapeHtml(v.voucher_date_dmy || v.voucher_date || '') + '</td>' +
+                '<td>' + ppvEscapeHtml(v.reference || '') + '</td>' +
+                '<td>' + ppvEscapeHtml(v.description || '') + '</td>' +
+                '<td dir="ltr">' + amt.toFixed(3) + '</td>';
+            tr.addEventListener('dblclick', function () {
+                ppvLoadVoucher(v.id);
+                ppvSearchClose();
+            });
+            tbody.appendChild(tr);
+        });
+    }).catch(function (e) {
+        tbody.innerHTML = '<tr><td colspan="5">' + ppvEscapeHtml(e.message || String(e)) + '</td></tr>';
+    });
+}
+
+function ppvBindBrowse() {
+    if (!PPV_IS_RECEIPT) {
+        return;
+    }
+    var navFirst = document.getElementById('ppv_nav_first');
+    if (navFirst) navFirst.addEventListener('click', function () { ppvNav('first'); });
+    var navPrev = document.getElementById('ppv_nav_prev');
+    if (navPrev) navPrev.addEventListener('click', function () { ppvNav('prev'); });
+    var navNext = document.getElementById('ppv_nav_next');
+    if (navNext) navNext.addEventListener('click', function () { ppvNav('next'); });
+    var navLast = document.getElementById('ppv_nav_last');
+    if (navLast) navLast.addEventListener('click', function () { ppvNav('last'); });
+    var btnSearch = document.getElementById('ppv_btn_search_vouchers');
+    if (btnSearch) btnSearch.addEventListener('click', ppvSearchOpen);
+    var btnSearchRun = document.getElementById('ppv_search_btn');
+    if (btnSearchRun) btnSearchRun.addEventListener('click', ppvSearchRun);
+    var searchBackdrop = document.getElementById('ppv_search_modal_backdrop');
+    if (searchBackdrop) searchBackdrop.addEventListener('click', ppvSearchClose);
+    var btnDelete = document.getElementById('ppv_btn_delete');
+    if (btnDelete) btnDelete.addEventListener('click', ppvDeleteVoucher);
+    document.addEventListener('mousedown', function (ev) {
+        var m = document.getElementById('ppv_search_modal');
+        if (!m || m.style.display !== 'flex') {
+            return;
+        }
+        var panel = m.querySelector('.jv-search-modal__panel');
+        if (panel && (panel === ev.target || panel.contains(ev.target))) {
+            return;
+        }
+        if (ev.target.closest && ev.target.closest('#ppv_btn_search_vouchers')) {
+            return;
+        }
+        ppvSearchClose();
+    }, true);
+}
+
 function ppvBind() {
     var partySel = document.getElementById('ppv_party');
     if (partySel) {
@@ -870,6 +1158,7 @@ function ppvBind() {
     if (bNew) bNew.addEventListener('click', function () { location.reload(); });
     var bPr = document.getElementById('ppv_btn_print');
     if (bPr) bPr.addEventListener('click', function () { window.print(); });
+    ppvBindBrowse();
 }
 
 if (document.readyState === 'loading') {

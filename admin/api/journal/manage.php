@@ -20,6 +20,24 @@ function orange_journal_manage_ui_entry_types(): array
     return ['manual', 'other_voucher', 'receipt_voucher', 'payment_voucher'];
 }
 
+/**
+ * @return list<string>
+ */
+function orange_journal_manage_partner_entry_types(): array
+{
+    return ['supplier_payment', 'customer_receipt'];
+}
+
+function orange_journal_manage_resolve_browse_entry_type(array $data, string $fallback = 'manual'): string
+{
+    $t = trim((string) ($data['entry_type'] ?? ''));
+    if ($t !== '' && in_array($t, orange_journal_manage_partner_entry_types(), true)) {
+        return $t;
+    }
+
+    return orange_journal_manage_resolve_ui_entry_type($data, $fallback);
+}
+
 function orange_journal_manage_resolve_ui_entry_type(array $data, string $fallback): string
 {
     $t = trim((string) ($data['entry_type'] ?? $fallback));
@@ -204,6 +222,9 @@ try {
     orange_catalog_ensure_schema($pdo);
     $data = get_json_input();
     $action = trim((string)($data['action'] ?? 'update'));
+    if ($action === 'search') {
+        $action = 'search_manual';
+    }
 
     if ($action === 'create') {
         $description = trim((string)($data['description'] ?? ''));
@@ -359,7 +380,7 @@ try {
     }
 
     if ($action === 'get') {
-        $etReq = orange_journal_manage_resolve_ui_entry_type($data, 'manual');
+        $etReq = orange_journal_manage_resolve_browse_entry_type($data, 'manual');
         $gid = (int)($data['id'] ?? 0);
         if ($gid <= 0) {
             json_response(['success' => false, 'message' => 'معرف السند مطلوب'], 422);
@@ -376,6 +397,11 @@ try {
         $v = $st->fetch(PDO::FETCH_ASSOC);
         if (!$v) {
             json_response(['success' => false, 'message' => 'السند غير موجود'], 404);
+        }
+        try {
+            orange_journal_voucher_assert_admin_context($pdo, $gid);
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 403);
         }
         if ($etReq === 'other_voucher') {
             $allowedGet = orange_journal_manage_other_voucher_browse_entry_types($pdo, $jtFilterGet);
@@ -419,12 +445,32 @@ try {
         }
         $vEtLock = (string) ($v['entry_type'] ?? '');
         $editableV = !in_array($vEtLock, orange_gl_entry_types_delete_locked_from_journal_ui(), true);
+        $partyCustomerId = 0;
+        $partySupplierId = 0;
+        if (orange_table_exists($pdo, 'party_subledger')) {
+            $ps = $pdo->prepare(
+                'SELECT party_kind, party_id FROM party_subledger WHERE voucher_id = ? ORDER BY id ASC LIMIT 1'
+            );
+            $ps->execute([$gid]);
+            $psRow = $ps->fetch(PDO::FETCH_ASSOC);
+            if (is_array($psRow)) {
+                $pk = (string) ($psRow['party_kind'] ?? '');
+                $pid = (int) ($psRow['party_id'] ?? 0);
+                if ($pk === 'customer' && $pid > 0) {
+                    $partyCustomerId = $pid;
+                } elseif ($pk === 'supplier' && $pid > 0) {
+                    $partySupplierId = $pid;
+                }
+            }
+        }
         json_response([
             'success' => true,
             'voucher' => [
                 'id' => (int) $v['id'],
                 'voucher_serial' => (int) ($v['voucher_serial'] ?? 0),
                 'display_voucher_no' => orange_journal_voucher_display_number($v),
+                'voucher_date' => strlen($vd) >= 10 ? orange_format_date_dmY(substr($vd, 0, 10)) : '',
+                'voucher_date_dmy' => strlen($vd) >= 10 ? orange_format_date_dmY(substr($vd, 0, 10)) : '',
                 'date' => $dateForInput,
                 'reference' => (string)($v['reference'] ?? ''),
                 'description' => (string)($v['description'] ?? ''),
@@ -432,6 +478,8 @@ try {
                 'entry_type' => (string) ($v['entry_type'] ?? ''),
                 'editable' => $editableV,
             ],
+            'party_customer_id' => $partyCustomerId,
+            'party_supplier_id' => $partySupplierId,
             'lines' => $lines,
         ]);
 
@@ -439,7 +487,8 @@ try {
     }
 
     if ($action === 'nav_manual') {
-        $et = orange_journal_manage_resolve_ui_entry_type($data, 'manual');
+        require_once __DIR__ . '/../../../includes/countries.php';
+        $et = orange_journal_manage_resolve_browse_entry_type($data, 'manual');
         $jtNav = 0;
         $navTypes = [$et];
         $etFrag = 'entry_type = ?';
@@ -452,6 +501,13 @@ try {
             [$etFrag, $navTypes] = orange_journal_manage_entry_type_sql_fragment($navTypes);
         }
         $etFragJv = preg_replace('/\bentry_type\b/', 'jv.entry_type', $etFrag);
+        $countryBindPlain = orange_gl_voucher_country_bind($pdo, '');
+        $countryBindJv = orange_gl_voucher_country_bind($pdo, 'jv');
+        if ($countryBindPlain['sql'] !== '') {
+            $etFrag .= ltrim($countryBindPlain['sql'], ' AND ');
+            $etFragJv .= $countryBindJv['sql'];
+            $navTypes = array_merge($navTypes, $countryBindPlain['params']);
+        }
         $where = trim((string)($data['where'] ?? ''));
         $currentId = (int) ($data['current_id'] ?? 0);
         if (!orange_journal_vouchers_ready($pdo)) {
@@ -587,7 +643,7 @@ try {
         if (!orange_journal_vouchers_ready($pdo)) {
             json_response(['success' => false, 'message' => 'جداول السندات غير جاهزة'], 422);
         }
-        $et = orange_journal_manage_resolve_ui_entry_type($data, 'manual');
+        $et = orange_journal_manage_resolve_browse_entry_type($data, 'manual');
         $jtSearch = 0;
         $searchTypes = [$et];
         $etSearchFrag = 'entry_type = ?';
@@ -697,7 +753,7 @@ try {
                 'entry_type_label' => orange_gl_entry_type_label_ar($etRow),
             ];
         }
-        json_response(['success' => true, 'rows' => $rows]);
+        json_response(['success' => true, 'rows' => $rows, 'results' => $rows]);
 
         return;
     }

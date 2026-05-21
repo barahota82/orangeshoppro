@@ -174,4 +174,6 @@ ORANGE — رؤية المالك: تعدد الدول والقنوات والج�
 
 **تنفيذ (13 — مرحلة 12 — assert تشغيلي):** **`channels/save`** (assert + قفل **`country_id`** لسياق الأدمن)؛ **`orders/create-manual`** (قناة + منتجات + عميل آجل)؛ **`delivery_areas/manage`** (assert على تعديل محافظة/منطقة)؛ **`sales_returns/update`** و**`purchase_returns/update`** (assert عميل/طلب/مورد/شراء + منتجات البنود).
 
+**تنفيذ (13 — مرحلة 13 — سندات الذمم browse scoped):** **`admin/api/journal/manage.php`** — أنواع **`supplier_payment`** / **`customer_receipt`** في التنقل/البحث/العرض؛ alias **`search`→`search_manual`**؛ **`party_customer_id`** / **`party_supplier_id`** في **`get`**؛ **`orange_journal_voucher_assert_admin_context`** على **`get`**؛ **`orange_gl_voucher_country_bind`** على **`nav_manual`**؛ **`admin/api/partners/customer-receipt-list.php`** و**`customer-receipt-search.php`** (parity مع سندات المورد)؛ شاشة **`partner_party_voucher_ui.php`** (سداد العملاء) — تنقل/بحث/حذف scoped بالدولة.
+
 نهاية الملف.
