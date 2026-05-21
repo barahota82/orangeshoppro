@@ -13,6 +13,9 @@ $adminCountries = orange_countries_admin_list($pdo);
 $adminCountryId = orange_admin_context_country_id($pdo);
 $adminCountryRow = orange_country_row_by_id($pdo, $adminCountryId, false);
 $activeAreasCount = $hasAreasTable ? orange_delivery_areas_count_active($pdo, $adminCountryId) : 0;
+$daGovernoratesList = ($hasGovTable && $adminCountryId > 0)
+    ? orange_delivery_governorates_admin_list($pdo, $adminCountryId)
+    : [];
 $daNextSortOrder = $hasGovTable
     ? ''
     : (string) (int) orange_delivery_areas_next_sort_order($pdo, $adminCountryId, 0);
@@ -96,7 +99,23 @@ $daNextSortOrder = $hasGovTable
                     <th></th>
                 </tr>
             </thead>
-            <tbody id="dg_tbody"></tbody>
+            <tbody id="dg_tbody">
+                <?php foreach ($daGovernoratesList as $gRow): ?>
+                <?php
+                $gid = (int) ($gRow['id'] ?? 0);
+                $gActive = (int) ($gRow['is_active'] ?? 0) === 1;
+                ?>
+                <tr>
+                    <td><?php echo $gid; ?></td>
+                    <td><?php echo htmlspecialchars((string) ($gRow['name_ar'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td dir="ltr"><?php echo htmlspecialchars((string) ($gRow['name_en'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo (int) ($gRow['sort_order'] ?? 0); ?></td>
+                    <td><?php echo $gActive ? 'نعم' : 'لا'; ?></td>
+                    <td><?php echo (int) ($gRow['areas_count'] ?? 0); ?></td>
+                    <td><button type="button" class="btn-secondary" data-dg-edit="<?php echo $gid; ?>">تعديل</button></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
         </table>
     </div>
 </div>
@@ -112,6 +131,22 @@ $daNextSortOrder = $hasGovTable
             <label for="da_governorate_id">المحافظة <span style="color:#b45309;">*</span></label>
             <select id="da_governorate_id" required>
                 <option value="">اختر محافظة</option>
+                <?php foreach ($daGovernoratesList as $gRow): ?>
+                <?php
+                $gid = (int) ($gRow['id'] ?? 0);
+                $gLabel = trim((string) ($gRow['name_ar'] ?? ''));
+                if ($gLabel === '') {
+                    $gLabel = trim((string) ($gRow['name_en'] ?? ''));
+                }
+                if ($gLabel === '') {
+                    $gLabel = (string) $gid;
+                }
+                if ((int) ($gRow['is_active'] ?? 0) !== 1) {
+                    $gLabel .= ' (غير نشطة)';
+                }
+                ?>
+                <option value="<?php echo $gid; ?>"><?php echo htmlspecialchars($gLabel, ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
             </select>
         </div>
         <?php endif; ?>
@@ -209,7 +244,7 @@ let daArTimer = null;
 let daEnTimer = null;
 let dgArTimer = null;
 let dgEnTimer = null;
-let daGovernoratesCache = [];
+let daGovernoratesCache = <?php echo json_encode($daGovernoratesList, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 let daDeliveryAreasCache = [];
 var dgSortStep = <?php echo (int) orange_delivery_governorates_sort_order_step(); ?>;
 var daSortStep = dgSortStep;
@@ -327,8 +362,13 @@ async function loadGovernorates() {
         action: 'list_governorates',
         country_id: daCountryId()
     });
-    if (!res.success) {
-        alert(res.message || 'خطأ');
+    if (!res || !res.success) {
+        if (res && res.message) {
+            alert(res.message);
+        }
+        bindGovernorateEditButtons();
+        refreshDgSortPreview();
+        refreshDaSortPreview();
         return;
     }
     daGovernoratesCache = res.data || [];
@@ -346,6 +386,8 @@ async function loadGovernorates() {
         });
         if (cur && daGovernoratesCache.some(function (g) { return String(g.id) === String(cur); })) {
             sel.value = cur;
+        } else {
+            sel.value = '';
         }
     }
     daGovernoratesCache.forEach(function (g) {
@@ -361,6 +403,14 @@ async function loadGovernorates() {
             '<td><button type="button" class="btn-secondary" data-dg-edit="' + escAttr(String(g.id)) + '">تعديل</button></td>';
         tb.appendChild(tr);
     });
+    bindGovernorateEditButtons();
+    refreshDgSortPreview();
+    refreshDaSortPreview();
+}
+
+function bindGovernorateEditButtons() {
+    const tb = document.getElementById('dg_tbody');
+    if (!tb) return;
     tb.querySelectorAll('[data-dg-edit]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             const id = parseInt(btn.getAttribute('data-dg-edit'), 10);
@@ -368,8 +418,6 @@ async function loadGovernorates() {
             if (row) editGovernorate(row);
         });
     });
-    refreshDgSortPreview();
-    refreshDaSortPreview();
 }
 
 async function saveGovernorate() {
@@ -478,6 +526,7 @@ async function saveDeliveryArea() {
     alert(res.message || (res.success ? 'تم' : 'فشل'));
     if (res.success) {
         resetDeliveryAreaForm();
+        loadGovernorates();
         loadDeliveryAreas();
     }
 }
@@ -542,11 +591,16 @@ const daGovSel = document.getElementById('da_governorate_id');
 if (daGovSel) daGovSel.addEventListener('change', refreshDaSortPreview);
 
 (async function daInit() {
-    if (document.getElementById('dg_tbody')) {
-        await loadGovernorates();
-    } else {
-        daGovernoratesCache = [];
+    try {
+        bindGovernorateEditButtons();
+        refreshDgSortPreview();
+        refreshDaSortPreview();
+        if (document.getElementById('dg_tbody') && daGovernoratesCache.length === 0) {
+            await loadGovernorates();
+        }
+        await loadDeliveryAreas();
+    } catch (e) {
+        console.error('delivery_areas init', e);
     }
-    await loadDeliveryAreas();
 })();
 </script>
