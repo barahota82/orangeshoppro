@@ -3016,7 +3016,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
     }
-    orange_catalog_migrate_legacy_storefront_copy_lines($pdo);
+    /* legacy copy_lines migrate: بعد v52 (country_id) — انظر orange_catalog_migrate_legacy_storefront_copy_lines */
 
     orange_catalog_migrate_countries_foundation_v40($pdo);
     orange_catalog_migrate_governorates_v41($pdo);
@@ -3034,6 +3034,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_gl_journal_type_rules_country_v53($pdo);
     orange_catalog_migrate_gl_settings_journal_type_remap_v54($pdo);
     orange_catalog_migrate_channel_country_default_v55($pdo);
+    orange_catalog_migrate_legacy_storefront_copy_lines($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
         orange_catalog_safe_exec(
@@ -3691,7 +3692,7 @@ function orange_catalog_seed_storefront_copy_defaults_if_empty(PDO $pdo): void
 }
 
 /**
- * ترحيل من storefront_home_hero إلى storefront_copy_lines — لكل نطاق على حدة (لا يتوقف إن وُجدت صفوف لنطاق آخر).
+ * ترحيل من storefront_home_hero إلى storefront_copy_lines — للدولة الافتراضية (الكويت) فقط؛ scoped بـ country_id بعد v52 (GAP-08).
  */
 function orange_catalog_migrate_legacy_storefront_copy_lines(PDO $pdo): void
 {
@@ -3699,15 +3700,29 @@ function orange_catalog_migrate_legacy_storefront_copy_lines(PDO $pdo): void
         return;
     }
 
+    require_once __DIR__ . '/countries.php';
+    $scoped = orange_table_has_column($pdo, 'storefront_copy_lines', 'country_id');
+    $countryId = $scoped ? orange_countries_default_id($pdo) : null;
+    if ($scoped && ($countryId === null || $countryId <= 0)) {
+        return;
+    }
+
     try {
-        if (orange_catalog_count_storefront_copy_scope($pdo, 'home_hero') === 0
+        if (orange_catalog_count_storefront_copy_scope($pdo, 'home_hero', $countryId) === 0
             && orange_table_exists($pdo, 'storefront_home_hero')) {
             $row = $pdo->query('SELECT * FROM storefront_home_hero WHERE id = 1 LIMIT 1')->fetch(PDO::FETCH_ASSOC);
             if (is_array($row)) {
-                $ins = $pdo->prepare(
-                    'INSERT INTO storefront_copy_lines (scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi)
-                     VALUES (?, ?, 1, ?, ?, ?, ?)'
-                );
+                if ($scoped) {
+                    $ins = $pdo->prepare(
+                        'INSERT INTO storefront_copy_lines (country_id, scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi)
+                         VALUES (?, ?, ?, 1, ?, ?, ?, ?)'
+                    );
+                } else {
+                    $ins = $pdo->prepare(
+                        'INSERT INTO storefront_copy_lines (scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi)
+                         VALUES (?, ?, 1, ?, ?, ?, ?)'
+                    );
+                }
                 for ($i = 1; $i <= 3; ++$i) {
                     $ar = trim((string) ($row['line_' . $i . '_ar'] ?? ''));
                     $en = trim((string) ($row['line_' . $i . '_en'] ?? ''));
@@ -3716,12 +3731,16 @@ function orange_catalog_migrate_legacy_storefront_copy_lines(PDO $pdo): void
                     if ($ar === '' && $en === '' && $fil === '' && $hi === '') {
                         continue;
                     }
-                    $ins->execute(['home_hero', $i, $ar, $en, $fil, $hi]);
+                    if ($scoped) {
+                        $ins->execute([$countryId, 'home_hero', $i, $ar, $en, $fil, $hi]);
+                    } else {
+                        $ins->execute(['home_hero', $i, $ar, $en, $fil, $hi]);
+                    }
                 }
             }
         }
 
-        if (orange_catalog_count_storefront_copy_scope($pdo, 'header_tagline') === 0
+        if (orange_catalog_count_storefront_copy_scope($pdo, 'header_tagline', $countryId) === 0
             && orange_table_exists($pdo, 'storefront_home_hero')) {
             $row = $pdo->query('SELECT * FROM storefront_home_hero WHERE id = 1 LIMIT 1')->fetch(PDO::FETCH_ASSOC);
             if (is_array($row)) {
@@ -3730,11 +3749,19 @@ function orange_catalog_migrate_legacy_storefront_copy_lines(PDO $pdo): void
                 $hfil = trim((string) ($row['header_tagline_fil'] ?? ''));
                 $hhi = trim((string) ($row['header_tagline_hi'] ?? ''));
                 if ($har !== '' || $hen !== '' || $hfil !== '' || $hhi !== '') {
-                    $ins = $pdo->prepare(
-                        'INSERT INTO storefront_copy_lines (scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi)
-                         VALUES (?, ?, 1, ?, ?, ?, ?)'
-                    );
-                    $ins->execute(['header_tagline', 1, $har, $hen, $hfil, $hhi]);
+                    if ($scoped) {
+                        $ins = $pdo->prepare(
+                            'INSERT INTO storefront_copy_lines (country_id, scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi)
+                             VALUES (?, ?, ?, 1, ?, ?, ?, ?)'
+                        );
+                        $ins->execute([$countryId, 'header_tagline', 1, $har, $hen, $hfil, $hhi]);
+                    } else {
+                        $ins = $pdo->prepare(
+                            'INSERT INTO storefront_copy_lines (scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi)
+                             VALUES (?, ?, 1, ?, ?, ?, ?)'
+                        );
+                        $ins->execute(['header_tagline', 1, $har, $hen, $hfil, $hhi]);
+                    }
                 }
             }
         }

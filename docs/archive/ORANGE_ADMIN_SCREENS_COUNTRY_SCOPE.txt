@@ -204,11 +204,12 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
   إغلاق: find scoped بـ storefront_accounts.country_id (أو JOIN channels)؛ request-email-verify يمرّر accountCountryId + channelSlug؛ سياسة مثبتة في ORANGE_STOREFRONT_POLICY_REFERENCE س15.
 
 [GAP-08] منخفض — legacy migrate storefront_copy_lines
-  حالة: [معلّق]
+  حالة: [منتهٍ]
   المشكلة:
   - orange_catalog_migrate_legacy_storefront_copy_lines() INSERT بدون country_id؛ count scope بلا country.
   الملفات: includes/catalog_schema.php
   معيار الإغلاق: country_id في INSERT/count بعد v52؛ أو تعطيل المسار إن obsolete.
+  إغلاق: استدعاء الترحيل بعد v52/v55؛ COUNT/INSERT scoped بـ orange_countries_default_id() (الكويت) عند وجود عمود country_id؛ seed يبقى scoped كما في v52-S4.
 
 [GAP-09] تدقيق مستمر — مسارات GL/سندات/تقارير
   حالة: [معلّق]
@@ -220,8 +221,7 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
 ج — توصيات الأولوية (ترتيب التنفيذ للمالك)
 ----------------------------------------------------------------------
 
-1. GAP-08 — legacy migrate (إن وُجدت حاجة)
-2. GAP-09 — تدقيق مستمر
+1. GAP-09 — تدقيق مستمر
 
 ----------------------------------------------------------------------
 د — سجل إغلاق (يُملأ عند إنهاء كل بند)
@@ -234,3 +234,4 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
 [2026-05-20] GAP-05 — orange_fiscal_is_closed_for_voucher fallback scoped بـ country_id السند.
 [2026-05-20] GAP-06 — opening_balances save/delete/page + fiscal require/find scoped بـ ctxCountryId.
 [2026-05-20] GAP-07 — merge phone find scoped بـ country_id القناة؛ قرار المالك: القناة=الدولة بلا تبديل واجهة؛ الهاتف فريد per country لا globally.
+[2026-05-20] GAP-08 — legacy storefront_copy_lines migrate: COUNT/INSERT scoped بـ country_id (KW default)؛ يُستدعى بعد v52.
