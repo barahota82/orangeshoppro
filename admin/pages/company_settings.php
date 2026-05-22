@@ -1,10 +1,40 @@
 <?php
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/company_settings.php';
+require_once __DIR__ . '/../../includes/admin_settings_country.php';
+require_once __DIR__ . '/../../includes/countries.php';
+
 $pdo = db();
-$hasTable = (bool)$pdo->query("SHOW TABLES LIKE 'company_settings'")->fetchColumn();
+orange_catalog_ensure_schema($pdo);
+$hasTable = orange_table_exists($pdo, 'company_settings');
+
+$csCountryId = orange_admin_settings_effective_country_id($pdo);
+$csCountryRow = orange_country_row_by_id($pdo, $csCountryId, false);
+$csCountryLabel = trim((string) ($csCountryRow['name_ar'] ?? ''));
+if ($csCountryLabel === '' && $csCountryRow !== null) {
+    $csCountryLabel = trim((string) ($csCountryRow['name_en'] ?? ''));
+}
+if ($csCountryLabel === '') {
+    $csCountryLabel = orange_countries_display_code(orange_admin_context_country_code($pdo));
+}
+$csScoped = orange_company_settings_has_country_column($pdo);
 ?>
 <div class="page-title page-title--stacked">
     <h1>بيانات الشركة</h1>
     <p class="page-subtitle">الهوية والعنوان وبيانات الفاتورة الضريبية تظهر للعملاء والمستندات الرسمية.</p>
+    <?php if ($csScoped && $csCountryId > 0): ?>
+    <p class="card-hint" style="margin:0.35rem 0 0;line-height:1.55;">
+        سياق الدولة: <strong><?php echo htmlspecialchars($csCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong>
+        — بيانات الشركة المعروضة لهذه الدولة فقط. إن ظهرت بيانات الكويت فعدّلها هنا لبيانات مصر (قد تكون نُسخت عند الإنشاء).
+    </p>
+    <?php elseif (!$csScoped): ?>
+    <p class="card-hint" style="margin:0;color:#92400e;">
+        تنبيه: عمود <code dir="ltr">country_id</code> غير مفعّل بعد على جدول بيانات الشركة.
+    </p>
+    <?php endif; ?>
 </div>
 
 <?php if (!$hasTable): ?>
