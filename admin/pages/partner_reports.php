@@ -7,9 +7,11 @@ require_once __DIR__ . '/../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../includes/party_allocations.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
+require_once __DIR__ . '/../../includes/accounting_report_money.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+$reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 
 $includeAging = isset($_GET['aging']) && $_GET['aging'] === '1';
 $report = orange_partner_summary_report($pdo, $includeAging);
@@ -41,8 +43,8 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
             $c['id'],
             $c['name_ar'],
             $c['phone'],
-            number_format((float) $c['balance'], 4, '.', ''),
-            $c['credit_limit'] !== null ? number_format((float) $c['credit_limit'], 4, '.', '') : '',
+            orange_accounting_report_format_amount((float) $c['balance'], $reportMoney),
+            $c['credit_limit'] !== null ? orange_accounting_report_format_amount((float) $c['credit_limit'], $reportMoney) : '',
             !empty($c['over_limit']) ? 'نعم' : '',
         ]);
     }
@@ -52,7 +54,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
             $s['id'],
             $s['name'],
             $s['phone'],
-            number_format((float) $s['balance'], 4, '.', ''),
+            orange_accounting_report_format_amount((float) $s['balance'], $reportMoney),
             '',
             '',
         ]);
@@ -110,15 +112,15 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
             <tbody>
                 <tr>
                     <td>عملاء آجل (مدين − دائن)</td>
-                    <td><?php echo number_format((float) $reconcile['gl']['ar_net_dr_minus_cr'], 3); ?></td>
-                    <td><?php echo number_format((float) $reconcile['subledger']['customers_dr_minus_cr'], 3); ?></td>
-                    <td><?php echo number_format((float) $reconcile['variance']['ar'], 3); ?></td>
+                    <td><?php echo orange_accounting_report_format_amount((float) $reconcile['gl']['ar_net_dr_minus_cr'], $reportMoney); ?></td>
+                    <td><?php echo orange_accounting_report_format_amount((float) $reconcile['subledger']['customers_dr_minus_cr'], $reportMoney); ?></td>
+                    <td><?php echo orange_accounting_report_format_amount((float) $reconcile['variance']['ar'], $reportMoney); ?></td>
                 </tr>
                 <tr>
                     <td>موردين (دائن − مدين)</td>
-                    <td><?php echo number_format((float) $reconcile['gl']['ap_net_cr_minus_dr'], 3); ?></td>
-                    <td><?php echo number_format((float) $reconcile['subledger']['suppliers_cr_minus_dr'], 3); ?></td>
-                    <td><?php echo number_format((float) $reconcile['variance']['ap'], 3); ?></td>
+                    <td><?php echo orange_accounting_report_format_amount((float) $reconcile['gl']['ap_net_cr_minus_dr'], $reportMoney); ?></td>
+                    <td><?php echo orange_accounting_report_format_amount((float) $reconcile['subledger']['suppliers_cr_minus_dr'], $reportMoney); ?></td>
+                    <td><?php echo orange_accounting_report_format_amount((float) $reconcile['variance']['ap'], $reportMoney); ?></td>
                 </tr>
             </tbody>
         </table>
@@ -147,11 +149,11 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
                         <td><?php echo (int) $c['id']; ?></td>
                         <td><?php echo htmlspecialchars((string) $c['name_ar'], ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars((string) $c['phone'], ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo number_format((float) $c['balance'], 3); ?></td>
-                        <td><?php echo $c['credit_limit'] !== null ? number_format((float) $c['credit_limit'], 3) : '—'; ?></td>
+                        <td><?php echo orange_accounting_report_format_amount((float) $c['balance'], $reportMoney); ?></td>
+                        <td><?php echo $c['credit_limit'] !== null ? orange_accounting_report_format_amount((float) $c['credit_limit'], $reportMoney) : '—'; ?></td>
                         <td><?php echo !empty($c['over_limit']) ? 'نعم' : ''; ?></td>
                         <?php if ($includeAging && isset($c['aging']['buckets'])): ?>
-                            <td><?php echo number_format((float) ($c['aging']['buckets']['days_91_plus'] ?? 0), 3); ?></td>
+                            <td><?php echo orange_accounting_report_format_amount((float) ($c['aging']['buckets']['days_91_plus'] ?? 0), $reportMoney); ?></td>
                         <?php elseif ($includeAging): ?>
                             <td>—</td>
                         <?php endif; ?>
@@ -178,9 +180,9 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
                         <td><?php echo (int) $s['id']; ?></td>
                         <td><?php echo htmlspecialchars((string) $s['name'], ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars((string) ($s['phone'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo number_format((float) $s['balance'], 3); ?></td>
+                        <td><?php echo orange_accounting_report_format_amount((float) $s['balance'], $reportMoney); ?></td>
                         <?php if ($includeAging && isset($s['aging']['buckets'])): ?>
-                            <td><?php echo number_format((float) ($s['aging']['buckets']['days_91_plus'] ?? 0), 3); ?></td>
+                            <td><?php echo orange_accounting_report_format_amount((float) ($s['aging']['buckets']['days_91_plus'] ?? 0), $reportMoney); ?></td>
                         <?php elseif ($includeAging): ?>
                             <td>—</td>
                         <?php endif; ?>

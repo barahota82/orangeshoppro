@@ -11,9 +11,11 @@ require_once __DIR__ . '/../../includes/financial_report_breakdown.php';
 require_once __DIR__ . '/../../includes/accounting_report_mapping.php';
 require_once __DIR__ . '/../../includes/accounting_pl_statement_rows.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
+require_once __DIR__ . '/../../includes/accounting_report_money.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+$reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 
 $normalizeYm = static function (string $raw): ?string {
     $raw = trim($raw);
@@ -202,8 +204,8 @@ $companyNameAr = orange_company_settings_name_ar($pdo);
 
 $hasPlData = $revenueLines !== [] || $cogsLines !== [] || $expenseLines !== [];
 
-$fmt5 = static function (float $v): string {
-    return number_format($v, 4);
+$reportFmt = static function (float $v) use ($reportMoney): string {
+    return orange_accounting_report_format_amount($v, $reportMoney);
 };
 
 ?>
@@ -306,18 +308,18 @@ $fmt5 = static function (float $v): string {
                                 <tr>
                                     <td class="gl-acc-stmt-col-num" dir="ltr"><?php echo htmlspecialchars((string) ($rl['code'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                                     <td><?php echo htmlspecialchars((string) ($rl['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                                    <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($rl['opening'] ?? 0)); ?></td>
-                                    <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($rl['period'] ?? 0)); ?></td>
-                                    <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($rl['closing'] ?? 0)); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($rl['opening'] ?? 0)); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($rl['period'] ?? 0)); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($rl['closing'] ?? 0)); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
                         <tr class="ta-report-subtotal ta-report-subtotal--sales">
                             <td class="gl-acc-stmt-col-num muted">—</td>
                             <td>اجمالى مبيعات</td>
-                            <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalRevOpening); ?></td>
-                            <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalRevPeriod); ?></td>
-                            <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalRevClosing); ?></td>
+                            <td class="gl-acc-stmt-col-num"><?php echo $reportFmt($totalRevOpening); ?></td>
+                            <td class="gl-acc-stmt-col-num"><?php echo $reportFmt($totalRevPeriod); ?></td>
+                            <td class="gl-acc-stmt-col-num"><?php echo $reportFmt($totalRevClosing); ?></td>
                         </tr>
 
                         <tr class="ta-report-section">
@@ -330,26 +332,26 @@ $fmt5 = static function (float $v): string {
                                 <tr>
                                     <td class="gl-acc-stmt-col-num" dir="ltr"><?php echo htmlspecialchars((string) ($cl['code'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                                     <td><?php echo htmlspecialchars((string) ($cl['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                                    <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($cl['opening'] ?? 0)); ?></td>
-                                    <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($cl['period'] ?? 0)); ?></td>
-                                    <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($cl['closing'] ?? 0)); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($cl['opening'] ?? 0)); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($cl['period'] ?? 0)); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($cl['closing'] ?? 0)); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
                         <tr class="ta-report-subtotal ta-report-subtotal--cogs">
                             <td class="gl-acc-stmt-col-num muted">—</td>
                             <td>اجمالى تكلفة مبيعات</td>
-                            <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalCogsOpening); ?></td>
-                            <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalCogsPeriod); ?></td>
-                            <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalCogsClosing); ?></td>
+                            <td class="gl-acc-stmt-col-num"><?php echo $reportFmt($totalCogsOpening); ?></td>
+                            <td class="gl-acc-stmt-col-num"><?php echo $reportFmt($totalCogsPeriod); ?></td>
+                            <td class="gl-acc-stmt-col-num"><?php echo $reportFmt($totalCogsClosing); ?></td>
                         </tr>
 
                         <tr class="ta-report-grand">
                             <td class="gl-acc-stmt-col-num muted">—</td>
                             <td><strong>مجمل الربح</strong></td>
-                            <td class="gl-acc-stmt-col-num"><strong><?php echo $fmt5($grossOpening); ?></strong></td>
-                            <td class="gl-acc-stmt-col-num"><strong><?php echo $fmt5($grossPeriod); ?></strong></td>
-                            <td class="gl-acc-stmt-col-num"><strong><?php echo $fmt5($grossClosing); ?></strong></td>
+                            <td class="gl-acc-stmt-col-num"><strong><?php echo $reportFmt($grossOpening); ?></strong></td>
+                            <td class="gl-acc-stmt-col-num"><strong><?php echo $reportFmt($grossPeriod); ?></strong></td>
+                            <td class="gl-acc-stmt-col-num"><strong><?php echo $reportFmt($grossClosing); ?></strong></td>
                         </tr>
 
                         <?php if ($expenseLines === []): ?>
@@ -368,18 +370,18 @@ $fmt5 = static function (float $v): string {
                                     <tr>
                                         <td class="gl-acc-stmt-col-num" dir="ltr"><?php echo htmlspecialchars((string) ($ex['code'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                                         <td><?php echo htmlspecialchars((string) ($ex['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                                        <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($ex['opening'] ?? 0)); ?></td>
-                                        <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($ex['period'] ?? 0)); ?></td>
-                                        <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($ex['closing'] ?? 0)); ?></td>
+                                        <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($ex['opening'] ?? 0)); ?></td>
+                                        <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($ex['period'] ?? 0)); ?></td>
+                                        <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($ex['closing'] ?? 0)); ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                             <?php endif; ?>
                             <tr class="ta-report-subtotal ta-report-subtotal--exp">
                                 <td class="gl-acc-stmt-col-num muted">—</td>
                                 <td>اجمالى مصروفات مباشرة</td>
-                                <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalExpDirOpening); ?></td>
-                                <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalExpDirPeriod); ?></td>
-                                <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalExpDirClosing); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $reportFmt($totalExpDirOpening); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $reportFmt($totalExpDirPeriod); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $reportFmt($totalExpDirClosing); ?></td>
                             </tr>
                             <tr class="ta-report-section ta-report-section--sub">
                                 <td colspan="5">مصروفات غير مباشرة</td>
@@ -391,18 +393,18 @@ $fmt5 = static function (float $v): string {
                                     <tr>
                                         <td class="gl-acc-stmt-col-num" dir="ltr"><?php echo htmlspecialchars((string) ($ex['code'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                                         <td><?php echo htmlspecialchars((string) ($ex['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                                        <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($ex['opening'] ?? 0)); ?></td>
-                                        <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($ex['period'] ?? 0)); ?></td>
-                                        <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($ex['closing'] ?? 0)); ?></td>
+                                        <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($ex['opening'] ?? 0)); ?></td>
+                                        <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($ex['period'] ?? 0)); ?></td>
+                                        <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($ex['closing'] ?? 0)); ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                             <?php endif; ?>
                             <tr class="ta-report-subtotal ta-report-subtotal--exp">
                                 <td class="gl-acc-stmt-col-num muted">—</td>
                                 <td>اجمالى مصروفات غير مباشرة</td>
-                                <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalExpIndOpening); ?></td>
-                                <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalExpIndPeriod); ?></td>
-                                <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalExpIndClosing); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $reportFmt($totalExpIndOpening); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $reportFmt($totalExpIndPeriod); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $reportFmt($totalExpIndClosing); ?></td>
                             </tr>
                         <?php else: ?>
                             <tr class="ta-report-section">
@@ -412,26 +414,26 @@ $fmt5 = static function (float $v): string {
                                 <tr>
                                     <td class="gl-acc-stmt-col-num" dir="ltr"><?php echo htmlspecialchars((string) ($ex['code'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                                     <td><?php echo htmlspecialchars((string) ($ex['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                                    <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($ex['opening'] ?? 0)); ?></td>
-                                    <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($ex['period'] ?? 0)); ?></td>
-                                    <td class="gl-acc-stmt-col-num"><?php echo $fmt5((float) ($ex['closing'] ?? 0)); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($ex['opening'] ?? 0)); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($ex['period'] ?? 0)); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($ex['closing'] ?? 0)); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                             <tr class="ta-report-subtotal ta-report-subtotal--exp">
                                 <td class="gl-acc-stmt-col-num muted">—</td>
                                 <td>إجمالي المصروفات</td>
-                                <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalExpOpening); ?></td>
-                                <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalExpPeriod); ?></td>
-                                <td class="gl-acc-stmt-col-num"><?php echo $fmt5($totalExpClosing); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $reportFmt($totalExpOpening); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $reportFmt($totalExpPeriod); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $reportFmt($totalExpClosing); ?></td>
                             </tr>
                         <?php endif; ?>
 
                         <tr class="ta-report-grand ta-report-grand--net">
                             <td class="gl-acc-stmt-col-num muted">—</td>
                             <td><strong>صافى ربح الفترة</strong></td>
-                            <td class="gl-acc-stmt-col-num"><strong><?php echo $fmt5($netOpening); ?></strong></td>
-                            <td class="gl-acc-stmt-col-num"><strong><?php echo $fmt5($netPeriod); ?></strong></td>
-                            <td class="gl-acc-stmt-col-num"><strong><?php echo $fmt5($netClosing); ?></strong></td>
+                            <td class="gl-acc-stmt-col-num"><strong><?php echo $reportFmt($netOpening); ?></strong></td>
+                            <td class="gl-acc-stmt-col-num"><strong><?php echo $reportFmt($netPeriod); ?></strong></td>
+                            <td class="gl-acc-stmt-col-num"><strong><?php echo $reportFmt($netClosing); ?></strong></td>
                         </tr>
                     </tbody>
                 </table>

@@ -12,10 +12,12 @@ require_once __DIR__ . '/../../includes/financial_report_breakdown.php';
 require_once __DIR__ . '/../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
+require_once __DIR__ . '/../../includes/date_format.php';
+require_once __DIR__ . '/../../includes/accounting_report_money.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
-$frMoney = orange_admin_currency_context($pdo);
+$frMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 
 $frCountryBind = orange_gl_voucher_country_bind($pdo, 'jv');
 
@@ -348,16 +350,16 @@ $bsCheck = round($bsAssets - ($bsLiab + $bsEquity), 2);
                                     <br><small class="muted"><?php echo htmlspecialchars($sr['memo'], ENT_QUOTES, 'UTF-8'); ?></small>
                                 <?php endif; ?>
                             </td>
-                            <td><?php echo number_format((float) ($sr['debit'] ?? 0), 4); ?></td>
-                            <td><?php echo number_format((float) ($sr['credit'] ?? 0), 4); ?></td>
-                            <td><?php echo number_format((float) ($sr['balance'] ?? 0), 4); ?></td>
+                            <td><?php echo orange_accounting_report_format_amount((float) ($sr['debit'] ?? 0), $frMoney); ?></td>
+                            <td><?php echo orange_accounting_report_format_amount((float) ($sr['credit'] ?? 0), $frMoney); ?></td>
+                            <td><?php echo orange_accounting_report_format_amount((float) ($sr['balance'] ?? 0), $frMoney); ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
                 <tfoot>
                     <tr>
                         <th colspan="6">رصيد نهاية الفترة</th>
-                        <th><?php echo number_format($statementClosing, 4); ?></th>
+                        <th><?php echo orange_accounting_report_format_amount($statementClosing, $frMoney); ?></th>
                     </tr>
                 </tfoot>
             </table>

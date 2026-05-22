@@ -9,9 +9,11 @@ require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
+require_once __DIR__ . '/../../includes/accounting_report_money.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+$reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 
 $accountId = isset($_GET['account']) ? (int) $_GET['account'] : 0;
 
@@ -444,7 +446,7 @@ $companyNameAr = orange_company_settings_name_ar($pdo);
                         <td class="gl-acc-stmt-col-num">ـــــــــــ</td>
                         <td class="gl-acc-stmt-col-num">ـــــــــــ</td>
                         <td class="gl-acc-stmt-col-num">ـــــــــــ</td>
-                        <td class="gl-acc-stmt-col-num"><?php echo number_format($openingBal, 4); ?></td>
+                        <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount($openingBal, $reportMoney); ?></td>
                     </tr>
                     <?php if ($monthlyRows === []): ?>
                         <tr>
@@ -454,10 +456,10 @@ $companyNameAr = orange_company_settings_name_ar($pdo);
                         <?php foreach ($monthlyRows as $mr): ?>
                             <tr>
                                 <td><?php echo htmlspecialchars($glMonthlyMonthLabelAr((string) ($mr['ym'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td class="gl-acc-stmt-col-num"><?php echo number_format((float) ($mr['sum_debit'] ?? 0), 4); ?></td>
-                                <td class="gl-acc-stmt-col-num"><?php echo number_format((float) ($mr['sum_credit'] ?? 0), 4); ?></td>
-                                <td class="gl-acc-stmt-col-num"><?php echo number_format((float) ($mr['net_month'] ?? 0), 4); ?></td>
-                                <td class="gl-acc-stmt-col-num"><?php echo number_format((float) ($mr['balance_eom'] ?? 0), 4); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount((float) ($mr['sum_debit'] ?? 0), $reportMoney); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount((float) ($mr['sum_credit'] ?? 0), $reportMoney); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount((float) ($mr['net_month'] ?? 0), $reportMoney); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount((float) ($mr['balance_eom'] ?? 0), $reportMoney); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -465,10 +467,10 @@ $companyNameAr = orange_company_settings_name_ar($pdo);
                 <tfoot>
                     <tr class="gl-acc-stmt-foot-label">
                         <td class="gl-acc-stmt-foot-total-title">الإجمالى</td>
-                        <td class="gl-acc-stmt-col-num"><?php echo number_format($totalDebitPeriod, 4); ?></td>
-                        <td class="gl-acc-stmt-col-num"><?php echo number_format($totalCreditPeriod, 4); ?></td>
-                        <td class="gl-acc-stmt-col-num"><?php echo number_format($totalNetPeriod, 4); ?></td>
-                        <td class="gl-acc-stmt-col-num"><?php echo number_format($closingBal, 4); ?></td>
+                        <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount($totalDebitPeriod, $reportMoney); ?></td>
+                        <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount($totalCreditPeriod, $reportMoney); ?></td>
+                        <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount($totalNetPeriod, $reportMoney); ?></td>
+                        <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount($closingBal, $reportMoney); ?></td>
                     </tr>
                 </tfoot>
             </table>

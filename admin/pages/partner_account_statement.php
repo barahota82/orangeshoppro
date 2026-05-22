@@ -12,9 +12,11 @@ require_once __DIR__ . '/../../includes/gl_account_aging.php';
 require_once __DIR__ . '/../../includes/party_subledger.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
+require_once __DIR__ . '/../../includes/accounting_report_money.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+$reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 
 $pasCtxCountryId = orange_admin_context_country_id($pdo);
 $pasJvCountryBind = orange_gl_voucher_country_bind($pdo, 'jv', $pasCtxCountryId);
@@ -790,9 +792,9 @@ if ($isCustomerMode && $customerId > 0 && $err === '') {
                             <td>—</td>
                             <td dir="ltr">—</td>
                             <td>رصيد افتتاحى</td>
-                            <td class="gl-acc-stmt-col-num"><?php echo number_format(0.0, 4); ?></td>
-                            <td class="gl-acc-stmt-col-num"><?php echo number_format(0.0, 4); ?></td>
-                            <td class="gl-acc-stmt-col-num"><?php echo number_format($openingBal, 4); ?></td>
+                            <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount(0.0, $reportMoney); ?></td>
+                            <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount(0.0, $reportMoney); ?></td>
+                            <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount($openingBal, $reportMoney); ?></td>
                         </tr>
                         <?php if ($stmtFilterNoMatch): ?>
                             <tr><td colspan="7" class="muted">يوجد على الحساب حركات في هذه الفترة لكن لا يوجد سطر يطابق خيارات العرض (مدين/دائن أو مرحّل/غير مرحّل).</td></tr>
@@ -805,9 +807,9 @@ if ($isCustomerMode && $customerId > 0 && $err === '') {
                                     <td><?php echo htmlspecialchars(orange_gl_entry_type_label_ar((string) ($sr['entry_type'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
                                     <td dir="ltr" class="gl-acc-stmt-col-ref"><?php echo htmlspecialchars(orange_partner_account_stmt_gl_voucher_display($sr), ENT_QUOTES, 'UTF-8'); ?></td>
                                     <td><?php echo htmlspecialchars(orange_partner_account_stmt_gl_line_text($sr), ENT_QUOTES, 'UTF-8'); ?></td>
-                                    <td class="gl-acc-stmt-col-num"><?php echo number_format((float) ($sr['debit'] ?? 0), 4); ?></td>
-                                    <td class="gl-acc-stmt-col-num"><?php echo number_format((float) ($sr['credit'] ?? 0), 4); ?></td>
-                                    <td class="gl-acc-stmt-col-num"><?php echo number_format((float) ($sr['balance'] ?? 0), 4); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount((float) ($sr['debit'] ?? 0), $reportMoney); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount((float) ($sr['credit'] ?? 0), $reportMoney); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount((float) ($sr['balance'] ?? 0), $reportMoney); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -815,9 +817,9 @@ if ($isCustomerMode && $customerId > 0 && $err === '') {
                     <tfoot>
                         <tr class="gl-acc-stmt-foot-label">
                             <td colspan="4" class="gl-acc-stmt-foot-total-title">الإجمالى</td>
-                            <td class="gl-acc-stmt-col-num"><?php echo number_format($sumDebitPeriod, 4); ?></td>
-                            <td class="gl-acc-stmt-col-num"><?php echo number_format($sumCreditPeriod, 4); ?></td>
-                            <td class="gl-acc-stmt-col-num"><?php echo number_format($closingBal, 4); ?></td>
+                            <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount($sumDebitPeriod, $reportMoney); ?></td>
+                            <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount($sumCreditPeriod, $reportMoney); ?></td>
+                            <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount($closingBal, $reportMoney); ?></td>
                         </tr>
                     </tfoot>
                 </table>
@@ -843,7 +845,7 @@ if ($isCustomerMode && $customerId > 0 && $err === '') {
                                         ?>
                                         <tr>
                                             <td><?php echo htmlspecialchars($lb, ENT_QUOTES, 'UTF-8'); ?></td>
-                                            <td class="gl-acc-stmt-col-num"><?php echo number_format((float) $amt, 4); ?></td>
+                                            <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount((float) $amt, $reportMoney); ?></td>
                                         </tr>
                                         <?php
                                     }
@@ -853,12 +855,12 @@ if ($isCustomerMode && $customerId > 0 && $err === '') {
                                     <tfoot>
                                         <tr>
                                             <td>رصيد الحساب (مجموع مدين − دائن حتى تاريخ «إلى الفترة»)</td>
-                                            <td class="gl-acc-stmt-col-num"><?php echo number_format((float) ($agingReport['balance'] ?? 0), 4); ?></td>
+                                            <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount((float) ($agingReport['balance'] ?? 0), $reportMoney); ?></td>
                                         </tr>
                                         <?php if ((float) ($agingReport['prepayment'] ?? 0) > 0.0001): ?>
                                             <tr>
                                                 <td>رصيد دائن (لصالح الطرف الآخر) — عندما يكون الرصيد سالباً وفق الدفتر</td>
-                                                <td class="gl-acc-stmt-col-num"><?php echo number_format((float) ($agingReport['prepayment'] ?? 0), 4); ?></td>
+                                                <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount((float) ($agingReport['prepayment'] ?? 0), $reportMoney); ?></td>
                                             </tr>
                                         <?php endif; ?>
                                     </tfoot>

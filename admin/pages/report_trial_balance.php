@@ -10,9 +10,11 @@ require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
+require_once __DIR__ . '/../../includes/accounting_report_money.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+$reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 
 $normalizeYm = static function (string $raw): ?string {
     $raw = trim($raw);
@@ -183,8 +185,8 @@ $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 
 $companyNameAr = orange_company_settings_name_ar($pdo);
 
-$nf = static function (float $v): string {
-    return number_format($v, 4);
+$reportFmt = static function (float $v) use ($reportMoney): string {
+    return orange_accounting_report_format_amount($v, $reportMoney);
 };
 
 ?>
@@ -300,12 +302,12 @@ $nf = static function (float $v): string {
                                     <td><?php echo htmlspecialchars((string) ($r['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                                     <td class="tb-col-map muted" lang="ar"><?php echo htmlspecialchars((string) ($r['sec_label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                                     <td class="tb-col-map muted" lang="ar"><?php echo htmlspecialchars((string) ($r['line_label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                                    <td class="gl-acc-stmt-col-num"><?php echo $nf((float) ($r['op_deb'] ?? 0)); ?></td>
-                                    <td class="gl-acc-stmt-col-num"><?php echo $nf((float) ($r['op_cred'] ?? 0)); ?></td>
-                                    <td class="gl-acc-stmt-col-num"><?php echo $nf((float) ($r['per_deb'] ?? 0)); ?></td>
-                                    <td class="gl-acc-stmt-col-num"><?php echo $nf((float) ($r['per_cred'] ?? 0)); ?></td>
-                                    <td class="gl-acc-stmt-col-num"><?php echo $nf((float) ($r['end_deb'] ?? 0)); ?></td>
-                                    <td class="gl-acc-stmt-col-num"><?php echo $nf((float) ($r['end_cred'] ?? 0)); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($r['op_deb'] ?? 0)); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($r['op_cred'] ?? 0)); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($r['per_deb'] ?? 0)); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($r['per_cred'] ?? 0)); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($r['end_deb'] ?? 0)); ?></td>
+                                    <td class="gl-acc-stmt-col-num"><?php echo $reportFmt((float) ($r['end_cred'] ?? 0)); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -314,12 +316,12 @@ $nf = static function (float $v): string {
                         <tfoot>
                             <tr class="tb-report-total">
                                 <td class="muted" colspan="4">الإجمــــــــــــــــــــــــــــــــــــــــالى</td>
-                                <td class="gl-acc-stmt-col-num"><?php echo $nf($sum_od); ?></td>
-                                <td class="gl-acc-stmt-col-num"><?php echo $nf($sum_oc); ?></td>
-                                <td class="gl-acc-stmt-col-num"><?php echo $nf($sum_pd); ?></td>
-                                <td class="gl-acc-stmt-col-num"><?php echo $nf($sum_pc); ?></td>
-                                <td class="gl-acc-stmt-col-num"><?php echo $nf($sum_ed); ?></td>
-                                <td class="gl-acc-stmt-col-num"><?php echo $nf($sum_ec); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $reportFmt($sum_od); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $reportFmt($sum_oc); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $reportFmt($sum_pd); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $reportFmt($sum_pc); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $reportFmt($sum_ed); ?></td>
+                                <td class="gl-acc-stmt-col-num"><?php echo $reportFmt($sum_ec); ?></td>
                             </tr>
                         </tfoot>
                     <?php endif; ?>
@@ -327,7 +329,7 @@ $nf = static function (float $v): string {
             </div>
             <?php if ($rowsTb !== []): ?>
                 <p class="card-hint tb-diff-hint muted" style="margin:10px 0 4px;font-size:0.88rem;text-align:right;">
-                    فرق نهاية المدى (مدين − دائن): <strong dir="ltr"><?php echo $nf($sum_ed - $sum_ec); ?></strong>
+                    فرق نهاية المدى (مدين − دائن): <strong dir="ltr"><?php echo $reportFmt($sum_ed - $sum_ec); ?></strong>
                     — يجب أن يقترب من الصفر مع اكتمال القيود.
                 </p>
             <?php endif; ?>

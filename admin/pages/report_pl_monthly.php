@@ -10,9 +10,11 @@ require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
+require_once __DIR__ . '/../../includes/accounting_report_money.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+$reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 
 $normalizeYm = static function (string $raw): ?string {
     $raw = trim($raw);
@@ -353,7 +355,7 @@ $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 
 $companyNameAr = orange_company_settings_name_ar($pdo);
 
-$fmt = static fn (float $v): string => number_format($v, 4);
+$reportFmt = static fn (float $v): string => orange_accounting_report_format_amount($v, $reportMoney);
 
 $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 1 : 0;
 
@@ -452,7 +454,7 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
             <h2 class="pl-month-print-title gl-acc-stmt-print-title">
                 <span class="gl-acc-stmt-print-title-ar"><?php echo htmlspecialchars($reportTitleLine($dmFrom, $dmTo), ENT_QUOTES, 'UTF-8'); ?></span>
             </h2>
-            <p class="pl-month-pl-profit" lang="ar">ربح &nbsp;&nbsp;<?php echo htmlspecialchars($fmt($rabeh), ENT_QUOTES, 'UTF-8'); ?></p>
+            <p class="pl-month-pl-profit" lang="ar">ربح &nbsp;&nbsp;<?php echo htmlspecialchars($reportFmt($rabeh), ENT_QUOTES, 'UTF-8'); ?></p>
             <p class="pl-month-subtitle" lang="ar"><?php echo htmlspecialchars($subtitleLine($dmFrom, $dmTo), ENT_QUOTES, 'UTF-8'); ?></p>
             <div class="pl-month-meta-row" lang="ar">
                 <span><?php echo $monthLabelEscaped; ?></span>
@@ -482,7 +484,7 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
                                     ?>
                                     <tr>
                                         <?php if ($lv !== null): ?>
-                                            <td class="gl-acc-stmt-col-num pl-m-num"><?php echo htmlspecialchars($fmt((float) $lv['cell']), ENT_QUOTES, 'UTF-8'); ?></td>
+                                            <td class="gl-acc-stmt-col-num pl-m-num"><?php echo htmlspecialchars($reportFmt((float) $lv['cell']), ENT_QUOTES, 'UTF-8'); ?></td>
                                             <td><?php echo htmlspecialchars((string) $lv['name'], ENT_QUOTES, 'UTF-8'); ?></td>
                                             <td dir="ltr" class="tb-col-code"><?php echo htmlspecialchars((string) $lv['code'], ENT_QUOTES, 'UTF-8'); ?></td>
                                         <?php else: ?>
@@ -496,7 +498,7 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
                             <tfoot>
                                 <tr class="pl-month-tfoot-totals">
                                     <?php /** @phpstan-ignore-next-line */ ?>
-                                    <td class="gl-acc-stmt-col-num pl-m-num"><?php echo htmlspecialchars($fmt((float) $tot['sum_rev']), ENT_QUOTES, 'UTF-8'); ?></td>
+                                    <td class="gl-acc-stmt-col-num pl-m-num"><?php echo htmlspecialchars($reportFmt((float) $tot['sum_rev']), ENT_QUOTES, 'UTF-8'); ?></td>
                                     <th colspan="2" style="text-align:center;">الإجمالي</th>
                                 </tr>
                             </tfoot>
@@ -521,7 +523,7 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
                                     ?>
                                     <tr>
                                         <?php if ($rv !== null): ?>
-                                            <td class="gl-acc-stmt-col-num pl-m-num"><?php echo htmlspecialchars($fmt((float) $rv['cell']), ENT_QUOTES, 'UTF-8'); ?></td>
+                                            <td class="gl-acc-stmt-col-num pl-m-num"><?php echo htmlspecialchars($reportFmt((float) $rv['cell']), ENT_QUOTES, 'UTF-8'); ?></td>
                                             <td><?php echo htmlspecialchars((string) $rv['name'], ENT_QUOTES, 'UTF-8'); ?></td>
                                             <td dir="ltr" class="tb-col-code"><?php echo htmlspecialchars((string) $rv['code'], ENT_QUOTES, 'UTF-8'); ?></td>
                                         <?php else: ?>
@@ -535,7 +537,7 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
                             <tfoot>
                                 <tr class="pl-month-tfoot-totals">
                                     <?php /** @phpstan-ignore-next-line */ ?>
-                                    <td class="gl-acc-stmt-col-num pl-m-num"><?php echo htmlspecialchars($fmt((float) $tot['sum_out']), ENT_QUOTES, 'UTF-8'); ?></td>
+                                    <td class="gl-acc-stmt-col-num pl-m-num"><?php echo htmlspecialchars($reportFmt((float) $tot['sum_out']), ENT_QUOTES, 'UTF-8'); ?></td>
                                     <th colspan="2" style="text-align:center;">الإجمالي</th>
                                 </tr>
                             </tfoot>

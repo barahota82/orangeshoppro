@@ -11,9 +11,11 @@ require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
+require_once __DIR__ . '/../../includes/accounting_report_money.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+$reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 
 $years = orange_fiscal_years_list($pdo);
 
@@ -184,9 +186,9 @@ $todayDmY = orange_format_date_dmY(date('Y-m-d'));
                         <tr>
                             <td><?php echo htmlspecialchars((string) ($rs['label_ar'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><small><?php echo htmlspecialchars((string) ($rs['period'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></small></td>
-                            <td class="gl-acc-stmt-col-num" dir="ltr"><?php echo number_format((float) ($rs['revenue'] ?? 0), 2); ?></td>
-                            <td class="gl-acc-stmt-col-num" dir="ltr"><?php echo number_format((float) ($rs['cogs_expense'] ?? 0), 2); ?></td>
-                            <td class="gl-acc-stmt-col-num" dir="ltr"><strong><?php echo number_format((float) ($rs['net'] ?? 0), 2); ?></strong></td>
+                            <td class="gl-acc-stmt-col-num" dir="ltr"><?php echo orange_accounting_report_format_amount((float) ($rs['revenue'] ?? 0), $reportMoney); ?></td>
+                            <td class="gl-acc-stmt-col-num" dir="ltr"><?php echo orange_accounting_report_format_amount((float) ($rs['cogs_expense'] ?? 0), $reportMoney); ?></td>
+                            <td class="gl-acc-stmt-col-num" dir="ltr"><strong><?php echo orange_accounting_report_format_amount((float) ($rs['net'] ?? 0), $reportMoney); ?></strong></td>
                             <td><?php echo ! empty($rs['is_closed']) ? 'مغلقة' : 'مفتوحة'; ?></td>
                         </tr>
                     <?php endforeach; ?>

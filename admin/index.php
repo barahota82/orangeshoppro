@@ -89,5 +89,30 @@ $orangeAdminMoneyZero = orange_admin_money_zero_string((int) $orangeAdminMoney['
 $orangeAdminMoneyStep = orange_admin_money_input_step((int) $orangeAdminMoney['decimals']);
 
 include __DIR__ . '/partials/header.php';
-include __DIR__ . '/pages/' . $page . '.php';
+$pageFile = __DIR__ . '/pages/' . $page . '.php';
+if (!is_readable($pageFile)) {
+    echo '<div class="card"><p class="muted">الصفحة غير موجودة: '
+        . htmlspecialchars($page, ENT_QUOTES, 'UTF-8') . '</p></div>';
+} else {
+    try {
+        include $pageFile;
+    } catch (Throwable $adminPageError) {
+        if (function_exists('error_log')) {
+            error_log(
+                '[orange admin page ' . $page . '] '
+                . $adminPageError->getMessage()
+                . ' @ '
+                . $adminPageError->getFile()
+                . ':'
+                . $adminPageError->getLine()
+            );
+        }
+        echo '<div class="card" style="border:1px solid #dc2626;background:#fef2f2;">';
+        echo '<h3 style="margin-top:0;">تعذّر تحميل الصفحة</h3>';
+        echo '<p>' . htmlspecialchars($adminPageError->getMessage(), ENT_QUOTES, 'UTF-8') . '</p>';
+        echo '<p class="muted" style="font-size:0.85rem;margin-bottom:0;">'
+            . htmlspecialchars($page, ENT_QUOTES, 'UTF-8') . '</p>';
+        echo '</div>';
+    }
+}
 include __DIR__ . '/partials/footer.php';
