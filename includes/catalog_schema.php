@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 56);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 57);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3054,6 +3054,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_gl_settings_journal_type_remap_v54($pdo);
     orange_catalog_migrate_channel_country_default_v55($pdo);
     orange_catalog_migrate_document_currency_v56($pdo);
+    orange_catalog_migrate_supplier_country_currency_v57($pdo);
     orange_catalog_migrate_legacy_storefront_copy_lines($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
@@ -4941,6 +4942,63 @@ function orange_catalog_migrate_document_currency_v56(PDO $pdo): void
             'UPDATE ' . $tbl . ' SET currency_code = ' . $pdo->quote($kwCur)
             . ' WHERE currency_code IS NULL OR currency_code = \'\''
         );
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v57 — مزامنة currency_code للموردين (وعملاء إن وُجد) مع عملة country_id.
+ */
+function orange_catalog_migrate_supplier_country_currency_v57(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    require_once __DIR__ . '/currency.php';
+    $marker = 'php_supplier_country_currency_v57';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    $tables = ['suppliers'];
+    if (orange_table_exists($pdo, 'customers') && orange_table_has_column($pdo, 'customers', 'currency_code')) {
+        $tables[] = 'customers';
+    }
+
+    if (!orange_table_exists($pdo, 'countries')) {
+        orange_catalog_schema_insert_migration_marker($pdo, $marker);
+
+        return;
+    }
+
+    $countryRows = $pdo->query('SELECT id, code, currency_code FROM countries')->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    foreach ($countryRows as $cRow) {
+        $countryId = (int) ($cRow['id'] ?? 0);
+        if ($countryId <= 0) {
+            continue;
+        }
+        $cur = strtoupper(trim((string) ($cRow['currency_code'] ?? '')));
+        if ($cur === '' || !preg_match('/^[A-Z]{3}$/', $cur)) {
+            $cur = orange_countries_currency_for_code((string) ($cRow['code'] ?? ''));
+        }
+        if ($cur === '' || !preg_match('/^[A-Z]{3}$/', $cur)) {
+            continue;
+        }
+        foreach ($tables as $tbl) {
+            if (!orange_table_exists($pdo, $tbl)
+                || !orange_table_has_column($pdo, $tbl, 'currency_code')
+                || !orange_table_has_column($pdo, $tbl, 'country_id')) {
+                continue;
+            }
+            try {
+                $pdo->prepare(
+                    'UPDATE ' . $tbl . ' SET currency_code = ? WHERE country_id = ?'
+                )->execute([$cur, $countryId]);
+            } catch (Throwable $e) {
+                if (function_exists('error_log')) {
+                    error_log('[orange] v57 ' . $tbl . ' currency sync: ' . $e->getMessage());
+                }
+            }
+        }
     }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);

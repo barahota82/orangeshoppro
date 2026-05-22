@@ -3,9 +3,13 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/currency.php';
 
 $pdo = db();
 $reportsCountryId = orange_admin_context_country_id($pdo);
+$reportsCurrencyCode = orange_admin_context_currency_code($pdo);
+$reportsCurrencyDecimals = orange_currency_decimals_for_code($reportsCurrencyCode);
+$reportsCurrencyUnit = orange_currency_display_unit($reportsCurrencyCode);
 $reportsOrdersSql = orange_sql_country_and_fragment($pdo, 'orders', 'orders', $reportsCountryId);
 $reportsOrdersAliasSql = orange_sql_country_and_fragment($pdo, 'orders', 'o', $reportsCountryId);
 
@@ -56,7 +60,7 @@ $topProducts = $pdo->query("
 
 <div class="grid-4">
     <div class="card stat-card"><h3>إجمالي الطلبات</h3><div class="value"><?php echo $totalOrders; ?></div></div>
-    <div class="card stat-card"><h3>إجمالي المبيعات</h3><div class="value"><?php echo number_format($totalSales,2); ?> KD</div></div>
+    <div class="card stat-card"><h3>إجمالي المبيعات</h3><div class="value"><?php echo number_format($totalSales, $reportsCurrencyDecimals); ?> <?php echo htmlspecialchars($reportsCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></div></div>
     <div class="card stat-card"><h3>Pending</h3><div class="value"><?php echo $pending; ?></div></div>
     <div class="card stat-card"><h3>Delivered</h3><div class="value"><?php echo $completed; ?></div>    </div>
 </div>
@@ -74,7 +78,7 @@ $topProducts = $pdo->query("
                 <tr>
                     <th>المنطقة</th>
                     <th>عدد الطلبات</th>
-                    <th>إجمالي الإيراد (KD)</th>
+                    <th>إجمالي الإيراد (<?php echo htmlspecialchars($reportsCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?>)</th>
                 </tr>
             </thead>
             <tbody>
@@ -82,7 +86,7 @@ $topProducts = $pdo->query("
                 <tr>
                     <td><?php echo htmlspecialchars((string)($ar['area_label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo (int)($ar['order_count'] ?? 0); ?></td>
-                    <td><?php echo number_format((float)($ar['revenue_kd'] ?? 0), 3); ?></td>
+                    <td><?php echo number_format((float)($ar['revenue_kd'] ?? 0), $reportsCurrencyDecimals); ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>

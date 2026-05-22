@@ -11,12 +11,14 @@ require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/currency.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
 $adminCountryId = orange_admin_context_country_id($pdo);
 $adminDefaultCurrency = orange_admin_context_currency_code($pdo);
+$adminCurrencyUnit = orange_currency_display_unit($adminDefaultCurrency);
 $purchasesProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $adminCountryId);
 $purchasesSuppliersCountrySql = orange_sql_country_and_fragment($pdo, 'suppliers', 'suppliers', $adminCountryId);
 
@@ -499,7 +501,12 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
 
     function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
     function accInfo(id) { var a = PV2_GL_ACCOUNTS[String(id)]; return a || { code: '', name: '#' + id }; }
-    function fmt3(n) { return (parseFloat(n) || 0).toFixed(3); }
+    function fmt3(n) {
+        if (window.OrangeMoney && typeof window.OrangeMoney.formatAmount === 'function') {
+            return window.OrangeMoney.formatAmount(n);
+        }
+        return (parseFloat(n) || 0).toFixed(3);
+    }
 
     /* ── Product lookup by code/barcode ─────────────────────────────── */
     function findProductByCode(code) {

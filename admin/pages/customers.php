@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/customer_attachments.php';
 require_once __DIR__ . '/../../includes/delivery_areas.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/currency.php';
 
 $cusAttachmentMaxCount = orange_customer_attachment_max_count();
 
@@ -36,6 +37,8 @@ $hasCustomerCivilIdCol = orange_table_has_column($pdo, 'customers', 'civil_id');
 $adminCountryId = orange_admin_context_country_id($pdo);
 $adminDefaultPhoneDial = orange_admin_context_phone_dial($pdo);
 $adminDefaultCurrency = orange_admin_context_currency_code($pdo);
+$adminCurrencyDecimals = orange_currency_decimals_for_code($adminDefaultCurrency);
+$adminCurrencyUnit = orange_currency_display_unit($adminDefaultCurrency);
 $adminDeliveryAreas = orange_delivery_areas_admin_list($pdo, $adminCountryId);
 $adminDaIndex = [];
 foreach ($adminDeliveryAreas as $da) {
@@ -321,8 +324,8 @@ $count = count($customerRows);
     </div>
     <div class="party-registry-stat">
         <span class="party-registry-stat__label">مجموع أرصدة الذمم (مدين)</span>
-        <span class="party-registry-stat__val" dir="ltr"><?php echo number_format($totalCustomersBalance, 3); ?></span>
-        <span class="party-registry-stat__unit">KD</span>
+        <span class="party-registry-stat__val" dir="ltr"><?php echo number_format($totalCustomersBalance, $adminCurrencyDecimals); ?></span>
+        <span class="party-registry-stat__unit"><?php echo htmlspecialchars($adminCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
     </div>
 </div>
 
@@ -870,6 +873,7 @@ var CUS_RECEIPT_URL = <?php echo json_encode(storefront_public_path('/admin/inde
 var CUS_SALES_RETURN_URL = <?php echo json_encode(storefront_public_path('/admin/index.php?page=sales_returns'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var CUS_ORDERS_URL = <?php echo json_encode(storefront_public_path('/admin/index.php?page=orders'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var CUS_PRINT_URL = <?php echo json_encode(storefront_public_path('/admin/api/customers/print-card.php'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+var CUS_CURRENCY_UNIT = <?php echo json_encode($adminCurrencyUnit, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var CUS_NAV_ROWS = CUS_SEARCH_ROWS
     .slice()
     .filter(function (row) {
@@ -1286,7 +1290,7 @@ function cusSearchRender(q) {
         metaEl.className = 'cus-search-item__meta';
         var phone = String(row.phone || '').trim();
         var bal = (typeof row.current_balance === 'number') ? row.current_balance : 0;
-        metaEl.textContent = (phone !== '' ? phone : 'بدون هاتف') + ' • رصيد: ' + bal.toFixed(3) + ' KD';
+        metaEl.textContent = (phone !== '' ? phone : 'بدون هاتف') + ' • رصيد: ' + ((window.OrangeMoney && window.OrangeMoney.formatAmount) ? window.OrangeMoney.formatAmount(bal) : bal.toFixed(3)) + ' ' + (typeof CUS_CURRENCY_UNIT === 'string' ? CUS_CURRENCY_UNIT : 'KD');
         li.appendChild(nameEl);
         li.appendChild(metaEl);
         li.addEventListener('dblclick', function () { cusSearchSelect(row); });

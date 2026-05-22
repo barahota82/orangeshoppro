@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/storefront_phone_country_select.php';
 require_once __DIR__ . '/../../includes/delivery_areas.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/currency.php';
 
 if (!isset($pdo) || !$pdo instanceof PDO) {
     require_once __DIR__ . '/../../includes/catalog_schema.php';
@@ -21,6 +22,8 @@ $supplierBootstrapError = '';
 $supplierAdminCountryId = orange_admin_context_country_id($pdo);
 $supplierDefaultPhoneDial = orange_admin_context_phone_dial($pdo);
 $supplierDefaultCurrency = orange_admin_context_currency_code($pdo);
+$supplierCurrencyDecimals = orange_currency_decimals_for_code($supplierDefaultCurrency);
+$supplierCurrencyUnit = orange_currency_display_unit($supplierDefaultCurrency);
 
 $leafAccountOptions = [];
 $supplierPayablePickAccounts = [];
@@ -246,15 +249,7 @@ $hasSupplierBankHolderCol = true;
 $hasSupplierPreferredWarehouseCol = true;
 $hasSupplierBlockReasonCol = true;
 $hasSupplierAttachmentsCol = true;
-$currencyOptions = [
-    'KWD' => 'دينار كويتي (KWD)',
-    'USD' => 'دولار أمريكي (USD)',
-    'SAR' => 'ريال سعودي (SAR)',
-    'AED' => 'درهم إماراتي (AED)',
-    'QAR' => 'ريال قطري (QAR)',
-    'BHD' => 'دينار بحريني (BHD)',
-    'OMR' => 'ريال عُماني (OMR)',
-];
+$currencyOptions = orange_currency_admin_select_options($pdo, $supplierDefaultCurrency);
 $paymentModeOptions = [
     'cash' => 'نقدي',
     'credit' => 'آجل',
@@ -297,7 +292,7 @@ if (orange_table_exists($pdo, 'suppliers')) {
         if (!in_array($statusRaw, ['active', 'inactive', 'blocked'], true)) {
             $statusRaw = 'active';
         }
-        $currencyCode = strtoupper(trim((string) ($r['currency_code'] ?? $supplierDefaultCurrency)));
+        $currencyCode = $supplierDefaultCurrency;
         $taxProfileCode = trim((string) ($r['tax_profile'] ?? 'exempt'));
         $phone = (string) ($r['phone'] ?? '');
         $contactPerson = (string) ($r['contact_person'] ?? '');
@@ -448,8 +443,8 @@ $supplierKwCountryId = orange_countries_default_id($pdo);
     </div>
     <div class="party-registry-stat">
         <span class="party-registry-stat__label">مجموع ذمم الموردين</span>
-        <span class="party-registry-stat__val" dir="ltr"><?php echo number_format($totalBalance, 3); ?></span>
-        <span class="party-registry-stat__unit">KD</span>
+        <span class="party-registry-stat__val" dir="ltr"><?php echo number_format($totalBalance, $supplierCurrencyDecimals); ?></span>
+        <span class="party-registry-stat__unit"><?php echo htmlspecialchars($supplierCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
     </div>
 </div>
 
@@ -1397,7 +1392,9 @@ function supAdminDefaultCurrency() {
             return mc;
         }
     }
-    return 'KWD';
+    return (window.OrangeMoney && typeof window.OrangeMoney.currencyCode === 'function')
+        ? window.OrangeMoney.currencyCode()
+        : 'KWD';
 }
 function supDefaultCountryDial() {
     return supAdminDefaultPhoneDial();
@@ -1763,7 +1760,8 @@ function supFormatBalanceValue(value) {
     if (!isFinite(n)) {
         n = 0;
     }
-    return n.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+    var dec = (window.OrangeMoney && typeof window.OrangeMoney.DECIMALS === 'number') ? window.OrangeMoney.DECIMALS : 3;
+    return n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
 }
 function supSetCurrentBalance(value) {
     var el = document.getElementById('sup_current_balance');
@@ -1819,7 +1817,8 @@ function supPopulateCurrencyOptions() {
     if (!sel || sel.tagName !== 'SELECT') {
         return;
     }
-    var selected = String(sel.value || supAdminDefaultCurrency()).trim().toUpperCase();
+    var ctxCur = supAdminDefaultCurrency();
+    var selected = ctxCur;
     var codes = [];
     if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
         try {
@@ -2177,7 +2176,7 @@ function supEdit(row) {
     }
     var ccy = document.getElementById('sup_currency_code');
     if (ccy) {
-        supSetCurrencyValue(row.currency_code || supAdminDefaultCurrency());
+        supSetCurrencyValue(supAdminDefaultCurrency());
     }
     var txp = document.getElementById('sup_tax_profile');
     if (txp) {
@@ -2289,12 +2288,7 @@ function supSave() {
     }
     var ccy = document.getElementById('sup_currency_code');
     if (ccy) {
-        var cVal = String(ccy.value || '').trim().toUpperCase();
-        if (!cVal) {
-            alert('العملة الافتراضية للمورد مطلوبة');
-            return;
-        }
-        payload.currency_code = cVal;
+        payload.currency_code = supAdminDefaultCurrency();
     }
     var txp = document.getElementById('sup_tax_profile');
     if (txp) {

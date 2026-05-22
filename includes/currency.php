@@ -21,6 +21,86 @@ function orange_currency_decimals_for_code(string $currencyCode): int
     return isset($three[$code]) ? 3 : 2;
 }
 
+/** وحدة العرض المختصرة في الأدمن (KWD → KD محلياً؛ غير ذلك رمز ISO). */
+function orange_currency_display_unit(string $currencyCode): string
+{
+    $code = strtoupper(trim($currencyCode));
+
+    return $code === 'KWD' ? 'KD' : ($code !== '' ? $code : 'KWD');
+}
+
+/**
+ * @return array<string, string> ISO => تسمية عربية للقوائم
+ */
+function orange_currency_option_labels(): array
+{
+    return [
+        'KWD' => 'دينار كويتي (KWD)',
+        'EGP' => 'جنيه مصري (EGP)',
+        'SAR' => 'ريال سعودي (SAR)',
+        'AED' => 'درهم إماراتي (AED)',
+        'QAR' => 'ريال قطري (QAR)',
+        'BHD' => 'دينار بحريني (BHD)',
+        'OMR' => 'ريال عُماني (OMR)',
+        'JOD' => 'دينار أردني (JOD)',
+        'LBP' => 'ليرة لبنانية (LBP)',
+        'IQD' => 'دينار عراقي (IQD)',
+        'MAD' => 'درهم مغربي (MAD)',
+        'TND' => 'دينار تونسي (TND)',
+        'DZD' => 'دينار جزائري (DZD)',
+        'LYD' => 'دينار ليبي (LYD)',
+        'SDG' => 'جنيه سوداني (SDG)',
+        'YER' => 'ريال يمني (YER)',
+        'TRY' => 'ليرة تركية (TRY)',
+        'USD' => 'دولار أمريكي (USD)',
+    ];
+}
+
+function orange_currency_option_label(string $currencyCode): string
+{
+    $code = strtoupper(trim($currencyCode));
+    if ($code === '') {
+        return '';
+    }
+    $labels = orange_currency_option_labels();
+
+    return $labels[$code] ?? ($code . ' (' . $code . ')');
+}
+
+/**
+ * خيارات select في الأدmin — عملة السياق أولاً ثم عملات الأسواق المرجعية.
+ *
+ * @return array<string, string>
+ */
+function orange_currency_admin_select_options(PDO $pdo, ?string $primaryCode = null): array
+{
+    $primary = strtoupper(trim($primaryCode ?? orange_admin_context_currency_code($pdo)));
+    if ($primary === '' || !preg_match('/^[A-Z]{3}$/', $primary)) {
+        $primary = 'KWD';
+    }
+    $options = [$primary => orange_currency_option_label($primary)];
+    foreach (orange_countries_currency_map() as $code) {
+        $cur = strtoupper(trim((string) $code));
+        if ($cur === '' || !preg_match('/^[A-Z]{3}$/', $cur) || isset($options[$cur])) {
+            continue;
+        }
+        $options[$cur] = orange_currency_option_label($cur);
+    }
+
+    return $options;
+}
+
+function orange_format_money_amount(float $amount, string $currencyCode, bool $withUnit = true): string
+{
+    $dec = orange_currency_decimals_for_code($currencyCode);
+    $formatted = number_format($amount, $dec, '.', ',');
+    if (!$withUnit) {
+        return $formatted;
+    }
+
+    return $formatted . ' ' . orange_currency_display_unit($currencyCode);
+}
+
 /**
  * عملة الدفتر (functional) لدولة محددة — من countries ثم الخريطة المرجعية.
  */

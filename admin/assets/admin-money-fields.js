@@ -15,6 +15,34 @@
 
     var DECIMALS = readAdminCurrencyDecimals();
 
+    function readAdminCurrencyCode() {
+        var m = document.querySelector('meta[name="orange-admin-currency"]');
+        if (!m) {
+            return 'KWD';
+        }
+        var c = String(m.getAttribute('content') || '').trim().toUpperCase();
+        return /^[A-Z]{3}$/.test(c) ? c : 'KWD';
+    }
+
+    function readAdminCurrencyUnit() {
+        var m = document.querySelector('meta[name="orange-admin-currency-unit"]');
+        if (m) {
+            var u = String(m.getAttribute('content') || '').trim();
+            if (u !== '') {
+                return u;
+            }
+        }
+        return readAdminCurrencyCode() === 'KWD' ? 'KD' : readAdminCurrencyCode();
+    }
+
+    function formatMoneyAmount(n) {
+        var x = parseFloat(n);
+        if (isNaN(x)) {
+            x = 0;
+        }
+        return x.toFixed(DECIMALS);
+    }
+
     function parseQtyRaw(el) {
         return String(el && el.value != null ? el.value : '').trim();
     }
@@ -368,6 +396,9 @@
 
     global.OrangeMoney = {
         DECIMALS: DECIMALS,
+        currencyCode: readAdminCurrencyCode,
+        currencyUnit: readAdminCurrencyUnit,
+        formatAmount: formatMoneyAmount,
         parseRaw: parseRaw,
         cleanMoneyInput: cleanMoneyInput,
         companionZero: companionZero,

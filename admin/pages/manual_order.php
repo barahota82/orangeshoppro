@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
 require_once __DIR__ . '/../../includes/warehouses.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/currency.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -13,6 +14,8 @@ orange_catalog_ensure_schema($pdo);
 $moCountryId = orange_admin_context_country_id($pdo);
 $moDefaultPhoneDial = orange_admin_context_phone_dial($pdo);
 $moDefaultCurrency = orange_admin_context_currency_code($pdo);
+$moCurrencyUnit = orange_currency_display_unit($moDefaultCurrency);
+$moCurrencyDecimals = orange_currency_decimals_for_code($moDefaultCurrency);
 $moProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $moCountryId);
 $moChannelsCountrySql = orange_channels_has_country_column($pdo)
     ? orange_sql_country_and_fragment($pdo, 'channels', 'channels', $moCountryId)
@@ -256,17 +259,17 @@ foreach ($products as $p) {
             <div class="mo-invoice-summary__cell">
                 <span class="mo-invoice-summary__label">المجموع قبل الخصم</span>
                 <span class="mo-invoice-summary__val" id="mo_live_gross">0.000</span>
-                <span class="mo-invoice-summary__unit">KD</span>
+                <span class="mo-invoice-summary__unit"><?php echo htmlspecialchars($moCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
             </div>
             <div class="mo-invoice-summary__cell">
                 <span class="mo-invoice-summary__label">مجموع الخصومات</span>
                 <span class="mo-invoice-summary__val" id="mo_live_discsum">0.000</span>
-                <span class="mo-invoice-summary__unit">KD</span>
+                <span class="mo-invoice-summary__unit"><?php echo htmlspecialchars($moCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
             </div>
             <div class="mo-invoice-summary__cell mo-invoice-summary__cell--net">
                 <span class="mo-invoice-summary__label">صافي الفاتورة</span>
                 <span class="mo-invoice-summary__val mo-invoice-summary__val--net" id="mo_live_net">0.000</span>
-                <span class="mo-invoice-summary__unit">KD</span>
+                <span class="mo-invoice-summary__unit"><?php echo htmlspecialchars($moCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
             </div>
         </div>
         <p class="mo-invoice-summary__hint" id="mo_live_paid_hint"></p>
@@ -309,6 +312,7 @@ foreach ($products as $p) {
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin-phone-country.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
 var MO_PICK_ROWS = <?php echo json_encode($pickRows, JSON_UNESCAPED_UNICODE); ?>;
+var MO_CURRENCY_UNIT = <?php echo json_encode($moCurrencyUnit, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 
 function moNormCodeKey(s) {
     s = String(s || '').trim();
@@ -345,6 +349,9 @@ function moFmtKd(n) {
     var x = Number(n);
     if (!isFinite(x)) {
         x = 0;
+    }
+    if (window.OrangeMoney && typeof window.OrangeMoney.formatAmount === 'function') {
+        return window.OrangeMoney.formatAmount(x);
     }
     return x.toFixed(3);
 }
@@ -492,9 +499,9 @@ function moRecalcTotals() {
             hint.textContent =
                 'المدفوع الآن: ' +
                 moFmtKd(paid) +
-                ' KD — الباقي بعد المدفوع: ' +
+                ' ' + MO_CURRENCY_UNIT + ' — الباقي بعد المدفوع: ' +
                 moFmtKd(bal) +
-                ' KD (يُثبَّت رسمياً عند الحفظ).';
+                ' ' + MO_CURRENCY_UNIT + ' (يُثبَّت رسمياً عند الحفظ).';
         } else {
             hint.textContent = '';
         }

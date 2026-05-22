@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/currency.php';
 require_once __DIR__ . '/../../../includes/company_settings.php';
 
 require_admin_page();
@@ -41,6 +42,15 @@ try {
 $companyName = orange_company_settings_name_ar($pdo);
 
 $balance = orange_party_balance_supplier($pdo, $supplierId);
+$printCurrencyCode = orange_admin_context_currency_code($pdo);
+if (orange_table_has_column($pdo, 'suppliers', 'country_id')) {
+    $supCid = (int) ($row['country_id'] ?? 0);
+    if ($supCid > 0) {
+        $printCurrencyCode = orange_country_functional_currency_code($pdo, $supCid);
+    }
+}
+$printCurrencyUnit = orange_currency_display_unit($printCurrencyCode);
+$printCurrencyDecimals = orange_currency_decimals_for_code($printCurrencyCode);
 $payableAccountLabel = '—';
 $payableId = isset($row['payable_account_id']) ? (int) $row['payable_account_id'] : 0;
 if ($payableId > 0 && orange_table_exists($pdo, 'accounts')) {
@@ -123,7 +133,7 @@ h2 { font-size: 1rem; margin: 16px 0 6px; }
         <div class="k">العنوان</div>
         <div class="v"><?php echo htmlspecialchars((string) ($row['address_line'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></div>
         <div class="k">العملة</div>
-        <div class="v ltr"><?php echo htmlspecialchars((string) ($row['currency_code'] ?? 'KWD'), ENT_QUOTES, 'UTF-8'); ?></div>
+        <div class="v ltr"><?php echo htmlspecialchars($printCurrencyCode, ENT_QUOTES, 'UTF-8'); ?></div>
         <div class="k">المعاملة الضريبية</div>
         <div class="v"><?php echo htmlspecialchars((string) ($row['tax_profile'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></div>
         <div class="k">طريقة السداد</div>
@@ -131,9 +141,9 @@ h2 { font-size: 1rem; margin: 16px 0 6px; }
         <div class="k">أيام السداد</div>
         <div class="v ltr"><?php echo isset($row['payment_terms_days']) && $row['payment_terms_days'] !== null ? (int) $row['payment_terms_days'] : '—'; ?></div>
         <div class="k">حد الائتمان</div>
-        <div class="v ltr"><?php echo isset($row['credit_limit']) && $row['credit_limit'] !== null && (float) $row['credit_limit'] > 0 ? number_format((float) $row['credit_limit'], 3) . ' KD' : '—'; ?></div>
+        <div class="v ltr"><?php echo isset($row['credit_limit']) && $row['credit_limit'] !== null && (float) $row['credit_limit'] > 0 ? number_format((float) $row['credit_limit'], $printCurrencyDecimals) . ' ' . htmlspecialchars($printCurrencyUnit, ENT_QUOTES, 'UTF-8') : '—'; ?></div>
         <div class="k">الرصيد المستحق للمورد</div>
-        <div class="v ltr"><?php echo number_format((float) $balance, 3) . ' KD'; ?></div>
+        <div class="v ltr"><?php echo number_format((float) $balance, $printCurrencyDecimals) . ' ' . htmlspecialchars($printCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></div>
         <div class="k">حساب الذمة</div>
         <div class="v"><?php echo htmlspecialchars($payableAccountLabel, ENT_QUOTES, 'UTF-8'); ?></div>
     </div>

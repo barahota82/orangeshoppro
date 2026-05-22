@@ -5,12 +5,15 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/currency.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
 $srCountryId = orange_admin_context_country_id($pdo);
 $srDefaultCurrency = orange_admin_context_currency_code($pdo);
+$srCurrencyUnit = orange_currency_display_unit($srDefaultCurrency);
+$srCurrencyDecimals = orange_currency_decimals_for_code($srDefaultCurrency);
 $srCustomersCountrySql = orange_sql_country_and_fragment($pdo, 'customers', 'customers', $srCountryId);
 $srProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'products', $srCountryId);
 
@@ -193,7 +196,7 @@ function sr_channel_label(string $t): string
         <button type="button" class="btn-secondary" onclick="srAddLine()">+ سطر</button>
         <button type="button" id="sr_submit_btn" onclick="srSubmit()">حفظ مردود المبيعات</button>
     </div>
-    <p class="card-hint" style="margin-top:12px;margin-bottom:0;"><strong>صافي الإيراد (تقديري):</strong> <span id="sr_total_preview">0.00</span> KD</p>
+    <p class="card-hint" style="margin-top:12px;margin-bottom:0;"><strong>صافي الإيراد (تقديري):</strong> <span id="sr_total_preview">0.00</span> <?php echo htmlspecialchars($srCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
 
 <div class="card">
@@ -220,7 +223,7 @@ function sr_channel_label(string $t): string
                     <td><?php echo htmlspecialchars(orange_format_datetime_dmY_hi((string) ($r['created_at'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo htmlspecialchars((string) ($r['customer_name'] ?? ($r['customer_id'] ? '#' . (int) $r['customer_id'] : '—')), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo htmlspecialchars(sr_channel_label((string) ($r['type'] ?? 'cash')), ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo number_format((float) ($r['total'] ?? 0), 2); ?> KD</td>
+                    <td><?php echo number_format((float) ($r['total'] ?? 0), $srCurrencyDecimals); ?> <?php echo htmlspecialchars($srCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></td>
                     <td dir="ltr"><?php echo !empty($r['order_id']) ? (int) $r['order_id'] : '—'; ?></td>
                     <td>
                         <button type="button" class="btn-secondary" onclick="srEdit(<?php echo (int) $r['id']; ?>)">تعديل</button>
