@@ -34,6 +34,8 @@ $hasCustomerAttachmentsCol = orange_table_has_column($pdo, 'customers', 'attachm
 $hasCustomerCivilIdCol = orange_table_has_column($pdo, 'customers', 'civil_id');
 
 $adminCountryId = orange_admin_context_country_id($pdo);
+$adminDefaultPhoneDial = orange_admin_context_phone_dial($pdo);
+$adminDefaultCurrency = orange_admin_context_currency_code($pdo);
 $adminDeliveryAreas = orange_delivery_areas_admin_list($pdo, $adminCountryId);
 $adminDaIndex = [];
 foreach ($adminDeliveryAreas as $da) {
@@ -296,6 +298,7 @@ $count = count($customerRows);
 <div class="page-title page-title--stacked">
     <div>
         <h1>العملاء</h1>
+        <p class="card-hint" style="margin:0.35rem 0 0;">سياق الدولة — كود الهاتف الافتراضي <strong dir="ltr">+<?php echo htmlspecialchars($adminDefaultPhoneDial, ENT_QUOTES, 'UTF-8'); ?></strong> عند «عميل جديد».</p>
     </div>
 </div>
 
@@ -1346,7 +1349,7 @@ function cusSplitPhoneForForm(stored, preferredDial, preferredNational) {
             true
         );
     }
-    return { country: '965', phone: String(stored || '').trim() };
+    return { country: pref || (window.orangeAdminPhoneCountry ? window.orangeAdminPhoneCountry.defaultCountryDial() : '965'), phone: String(stored || '').trim() };
 }
 
 function cusResetForm() {

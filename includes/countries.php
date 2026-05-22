@@ -131,6 +131,64 @@ function orange_countries_currency_for_code(string $code): string
     return strtoupper($cur);
 }
 
+/**
+ * رقم الاتصال الدولي (أرقام فقط) لرمز سوق Orange (kw، eg، uae، …).
+ */
+function orange_countries_phone_dial_by_market_code(string $code): string
+{
+    static $map = [
+        'kw' => '965',
+        'eg' => '20',
+        'uae' => '971',
+        'ksa' => '966',
+        'bh' => '973',
+        'qa' => '974',
+        'om' => '968',
+        'jo' => '962',
+        'lb' => '961',
+        'iq' => '964',
+        'ma' => '212',
+        'tn' => '216',
+        'dz' => '213',
+        'ly' => '218',
+        'sd' => '249',
+        'ye' => '967',
+        'tr' => '90',
+    ];
+    $code = orange_countries_normalize_code($code);
+
+    return $map[$code] ?? '';
+}
+
+/** كود الاتصال الافتراضي من مبدّل دولة الأدmin. */
+function orange_admin_context_phone_dial(PDO $pdo): string
+{
+    $dial = orange_countries_phone_dial_by_market_code(orange_admin_context_country_code($pdo));
+
+    return $dial !== '' ? $dial : '965';
+}
+
+/** عملة السوق من مبدّل دولة الأدmin (جدول countries ثم الخريطة المرجعية). */
+function orange_admin_context_currency_code(PDO $pdo): string
+{
+    $id = orange_admin_context_country_id($pdo);
+    if ($id > 0 && orange_table_exists($pdo, 'countries')) {
+        $row = orange_country_row_by_id($pdo, $id, false);
+        if ($row !== null) {
+            $fromDb = strtoupper(trim((string) ($row['currency_code'] ?? '')));
+            if ($fromDb !== '' && preg_match('/^[A-Z]{3}$/', $fromDb)) {
+                return $fromDb;
+            }
+        }
+    }
+    $fromMap = orange_countries_currency_for_code(orange_admin_context_country_code($pdo));
+    if ($fromMap !== '' && preg_match('/^[A-Z]{3}$/', $fromMap)) {
+        return $fromMap;
+    }
+
+    return 'KWD';
+}
+
 function orange_countries_sort_order_step(): int
 {
     return 1;

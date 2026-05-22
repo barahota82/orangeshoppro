@@ -50,6 +50,8 @@ foreach ($orangeAdminCountriesNav as $ocNav) {
     }
 }
 $orangeAdminCountryScopeReady = orange_admin_country_scope_ready($pdoNav);
+$orangeAdminPhoneDialNav = orange_admin_context_phone_dial($pdoNav);
+$orangeAdminCurrencyNav = orange_admin_context_currency_code($pdoNav);
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl"<?php echo $orangeSchemaDegradedAttr; ?>>
@@ -59,6 +61,8 @@ $orangeAdminCountryScopeReady = orange_admin_country_scope_ready($pdoNav);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="orange-admin-country" content="<?php echo htmlspecialchars($orangeAdminCountryCodeNav, ENT_QUOTES, 'UTF-8'); ?>">
     <meta name="orange-admin-country-id" content="<?php echo (int) $orangeAdminCountryIdNav; ?>">
+    <meta name="orange-admin-phone-dial" content="<?php echo htmlspecialchars($orangeAdminPhoneDialNav, ENT_QUOTES, 'UTF-8'); ?>">
+    <meta name="orange-admin-currency" content="<?php echo htmlspecialchars($orangeAdminCurrencyNav, ENT_QUOTES, 'UTF-8'); ?>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">

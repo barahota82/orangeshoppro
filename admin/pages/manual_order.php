@@ -11,6 +11,8 @@ $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
 $moCountryId = orange_admin_context_country_id($pdo);
+$moDefaultPhoneDial = orange_admin_context_phone_dial($pdo);
+$moDefaultCurrency = orange_admin_context_currency_code($pdo);
 $moProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $moCountryId);
 $moChannelsCountrySql = orange_channels_has_country_column($pdo)
     ? orange_sql_country_and_fragment($pdo, 'channels', 'channels', $moCountryId)
@@ -173,13 +175,22 @@ foreach ($products as $p) {
 <div class="page-title page-title--stacked">
     <h1>فاتورة مبيعات</h1>
     <p class="page-subtitle">مستند بيع داخلي مرتبط بالعميل والقناة. <strong>كل بند</strong> يُربَط بصنف مسجّل: <strong>كود الصنف</strong> أو <strong>الباركود</strong> (حقلا <code dir="ltr">item_code</code> و<code dir="ltr">barcode</code> في قاعدة البيانات، أو كود تلقائي مثل P12) مع اللون/المقاس عند وجود متغيرات. حقول <strong>سعر الوحدة</strong> و<strong>الخصم</strong> تتبع تنسيق المبالغ (ثلاث خانات عشرية، ويسمح الخصم بالقيم السالبة كزيادة). بعد الحفظ تفتح الفاتورة الرسمية.</p>
+    <p class="card-hint" style="margin:0.35rem 0 0;line-height:1.55;">
+        سياق الدولة: المبالغ بعملة <strong><?php echo htmlspecialchars($moDefaultCurrency, ENT_QUOTES, 'UTF-8'); ?></strong> — كود الهاتف الافتراضي
+        <strong dir="ltr">+<?php echo htmlspecialchars($moDefaultPhoneDial, ENT_QUOTES, 'UTF-8'); ?></strong> (من مبدّل الدولة في الشريط).
+    </p>
 </div>
 
 <div class="card">
     <h3>بيانات العميل</h3>
     <div class="form-grid">
         <div><label>الاسم</label><input type="text" id="mo_name" required></div>
-        <div><label>الهاتف</label><input type="text" id="mo_phone" required></div>
+        <div>
+            <label for="mo_phone_country">كود الدولة</label>
+            <input type="search" id="mo_phone_country" list="mo_phone_country_list" autocomplete="off" dir="ltr" lang="en" placeholder="اكتب اسم الدولة أو +965 أو 965" required>
+            <datalist id="mo_phone_country_list"></datalist>
+        </div>
+        <div><label for="mo_phone">الهاتف (محلي فقط)</label><input type="text" id="mo_phone" class="js-orange-phone-input" maxlength="24" autocomplete="off" dir="ltr" lang="en" placeholder="اكتب الرقم المحلي فقط بدون كود الدولة" required></div>
         <div><label>المنطقة</label><input type="text" id="mo_area"></div>
         <div><label>العنوان</label><input type="text" id="mo_address"></div>
         <div style="grid-column:1/-1;"><label>ملاحظات</label><input type="text" id="mo_notes"></div>
@@ -294,6 +305,8 @@ foreach ($products as $p) {
     </div>
 </div>
 
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/country-codes.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin-phone-country.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
 var MO_PICK_ROWS = <?php echo json_encode($pickRows, JSON_UNESCAPED_UNICODE); ?>;
 
@@ -771,10 +784,29 @@ function moBindLinesBody() {
 
 function moSubmit() {
     var name = document.getElementById('mo_name').value.trim();
+    var ccEl = document.getElementById('mo_phone_country');
     var phone = document.getElementById('mo_phone').value.trim();
     var channel = parseInt(document.getElementById('mo_channel').value, 10) || 0;
     if (!name || !phone) {
         alert('الاسم والهاتف مطلوبان');
+        return;
+    }
+    if (!ccEl || !window.orangeAdminPhoneCountry) {
+        alert('كود الدولة غير جاهز — أعد تحميل الصفحة');
+        return;
+    }
+    var phoneCountry = window.orangeAdminPhoneCountry.forApi(ccEl, false);
+    if (!phoneCountry) {
+        alert('اختيار كود الدولة إلزامي');
+        return;
+    }
+    if (/^\s*(\+|00)/.test(phone)) {
+        alert('اكتب الهاتف كرقم محلي فقط بدون + أو 00');
+        return;
+    }
+    var phoneDigits = phone.replace(/\D/g, '');
+    if (phoneDigits !== '' && phoneCountry !== '__intl__' && phoneDigits.indexOf(phoneCountry) === 0 && phoneDigits.length > (phoneCountry.length + 3)) {
+        alert('لا تكرر كود الدولة داخل خانة الهاتف');
         return;
     }
     if (!channel) {
@@ -815,6 +847,7 @@ function moSubmit() {
     postJSON('/admin/api/orders/create-manual.php', {
         customer_name: name,
         phone: phone,
+        phone_country: phoneCountry,
         area: document.getElementById('mo_area').value.trim(),
         address: document.getElementById('mo_address').value.trim(),
         notes: document.getElementById('mo_notes').value.trim(),
@@ -836,6 +869,13 @@ moAddLine();
 moBindLinesBody();
 moSyncTrailingRows();
 (function () {
+    var ccEl = document.getElementById('mo_phone_country');
+    var ccList = document.getElementById('mo_phone_country_list');
+    if (ccEl && ccList && window.orangeAdminPhoneCountry) {
+        window.orangeAdminPhoneCountry.bindInput(ccEl, ccList, false);
+        window.orangeAdminPhoneCountry.populateDatalist(ccEl, ccList, '', false);
+        window.orangeAdminPhoneCountry.setInputByDial(ccEl, window.orangeAdminPhoneCountry.defaultCountryDial(), false);
+    }
     var mp = document.getElementById('mo_paid');
     if (mp) {
         mp.addEventListener('input', moRecalcTotals);

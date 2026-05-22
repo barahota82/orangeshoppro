@@ -20,7 +20,30 @@ try {
 
     require_fields($data, ['customer_name', 'phone', 'channel_id', 'items']);
     $phoneRawIn = trim((string) ($data['phone'] ?? ''));
-    $phoneNorm = orange_normalize_customer_phone($phoneRawIn, null);
+    $ctxDial = orange_admin_context_phone_dial($pdo);
+    $phoneCountryRaw = trim((string) ($data['phone_country'] ?? ''));
+    $pcParsed = orange_storefront_parse_api_phone_country($phoneCountryRaw !== '' ? $phoneCountryRaw : $ctxDial);
+    if (!empty($pcParsed['full_intl'])) {
+        json_response([
+            'success' => false,
+            'message' => 'في فاتورة المبيعات اختر كود الدولة من القائمة واكتب الرقم المحلي فقط.',
+        ], 422);
+    }
+    $dialForNational = ($pcParsed['dial'] ?? '') !== '' ? (string) $pcParsed['dial'] : $ctxDial;
+    if ($phoneRawIn !== '' && $dialForNational === '') {
+        json_response(['success' => false, 'message' => 'اختيار كود الدولة إلزامي عند إدخال رقم الهاتف.'], 422);
+    }
+    if ($phoneRawIn !== '' && preg_match('/^\s*(\+|00)/', $phoneRawIn)) {
+        json_response([
+            'success' => false,
+            'message' => 'اكتب الهاتف كرقم محلي فقط بدون + أو 00؛ كود الدولة يُؤخذ من القائمة.',
+        ], 422);
+    }
+    $phoneNorm = orange_normalize_customer_phone(
+        $phoneRawIn,
+        $dialForNational !== '' ? $dialForNational : null,
+        false
+    );
     if ($phoneNorm === null) {
         json_response([
             'success' => false,

@@ -195,7 +195,28 @@
         inputEl.value = label !== '' ? label : '+' + dial;
     }
 
+    function adminContextPhoneDial() {
+        if (typeof window.ORANGE_ADMIN_DEFAULT_PHONE_DIAL === 'string') {
+            var w = String(window.ORANGE_ADMIN_DEFAULT_PHONE_DIAL || '').replace(/\D/g, '');
+            if (w !== '') {
+                return w;
+            }
+        }
+        var meta = document.querySelector('meta[name="orange-admin-phone-dial"]');
+        if (meta) {
+            var m = String(meta.getAttribute('content') || '').replace(/\D/g, '');
+            if (m !== '') {
+                return m;
+            }
+        }
+        return '';
+    }
+
     function defaultCountryDial() {
+        var ctx = adminContextPhoneDial();
+        if (ctx !== '') {
+            return ctx;
+        }
         var rows = countryCodeRows(false);
         for (var i = 0; i < rows.length; i++) {
             if (String(rows[i].dial || '') === '965') {

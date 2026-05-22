@@ -10,6 +10,7 @@ $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
 $srCountryId = orange_admin_context_country_id($pdo);
+$srDefaultCurrency = orange_admin_context_currency_code($pdo);
 $srCustomersCountrySql = orange_sql_country_and_fragment($pdo, 'customers', 'customers', $srCountryId);
 $srProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'products', $srCountryId);
 
@@ -117,6 +118,7 @@ function sr_channel_label(string $t): string
     <div>
         <h1>مردود مبيعات</h1>
         <p class="page-subtitle">تسجيل إرجاع بضاعة من العميل؛ <strong>يُزاد المخزون فور الحفظ</strong> ويُولَّد قيد إيراد/تكلفة بمراجع <code dir="ltr">SR-{id}-RS</code> و <code dir="ltr">SR-{id}-RC</code> حسب «حسابات القيود التلقائية» (نقدي / أونلاين / آجل).</p>
+        <p class="card-hint" style="margin:0.35rem 0 0;">سياق الدولة — المبالغ بعملة <strong><?php echo htmlspecialchars($srDefaultCurrency, ENT_QUOTES, 'UTF-8'); ?></strong>.</p>
     </div>
 </div>
 

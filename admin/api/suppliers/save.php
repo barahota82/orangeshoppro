@@ -208,9 +208,10 @@ try {
         json_response(['success' => false, 'message' => 'حالة المورد غير صالحة'], 422);
     }
 
-    $currencySql = 'KWD';
+    $currencySql = orange_admin_context_currency_code($pdo);
     if ($hasCurrencyCode) {
-        $currencyIn = strtoupper(trim((string) ($data['currency_code'] ?? 'KWD')));
+        $defaultCurrency = $currencySql;
+        $currencyIn = strtoupper(trim((string) ($data['currency_code'] ?? $defaultCurrency)));
         if (!preg_match('/^[A-Z]{3}$/', $currencyIn)) {
             json_response(['success' => false, 'message' => 'العملة الافتراضية للمورد غير صالحة'], 422);
         }

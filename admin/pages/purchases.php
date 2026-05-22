@@ -16,6 +16,7 @@ $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
 $adminCountryId = orange_admin_context_country_id($pdo);
+$adminDefaultCurrency = orange_admin_context_currency_code($pdo);
 $purchasesProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $adminCountryId);
 $purchasesSuppliersCountrySql = orange_sql_country_and_fragment($pdo, 'suppliers', 'suppliers', $adminCountryId);
 
@@ -254,7 +255,10 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
 </style>
 
 <div class="page-title page-title--stacked jv-print-hide">
-    <div><h1>فاتورة شراء</h1></div>
+    <div>
+        <h1>فاتورة شراء</h1>
+        <p class="card-hint" style="margin:0.35rem 0 0;">سياق الدولة — المبالغ والقيود بعملة <strong><?php echo htmlspecialchars($adminDefaultCurrency, ENT_QUOTES, 'UTF-8'); ?></strong>؛ الموردون والمنتجات لهذه الدولة فقط.</p>
+    </div>
 </div>
 
 <?php if (!$pv2Ready): ?>

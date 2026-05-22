@@ -19,6 +19,8 @@ if (!isset($pdo) || !$pdo instanceof PDO) {
 $supplierSchemaBootstrapError = '';
 $supplierBootstrapError = '';
 $supplierAdminCountryId = orange_admin_context_country_id($pdo);
+$supplierDefaultPhoneDial = orange_admin_context_phone_dial($pdo);
+$supplierDefaultCurrency = orange_admin_context_currency_code($pdo);
 
 $leafAccountOptions = [];
 $supplierPayablePickAccounts = [];
@@ -295,7 +297,7 @@ if (orange_table_exists($pdo, 'suppliers')) {
         if (!in_array($statusRaw, ['active', 'inactive', 'blocked'], true)) {
             $statusRaw = 'active';
         }
-        $currencyCode = strtoupper(trim((string) ($r['currency_code'] ?? 'KWD')));
+        $currencyCode = strtoupper(trim((string) ($r['currency_code'] ?? $supplierDefaultCurrency)));
         $taxProfileCode = trim((string) ($r['tax_profile'] ?? 'exempt'));
         $phone = (string) ($r['phone'] ?? '');
         $contactPerson = (string) ($r['contact_person'] ?? '');
@@ -344,7 +346,7 @@ if (orange_table_exists($pdo, 'suppliers')) {
             'payable_account_name' => (string) ($pAccMeta['name'] ?? ''),
             'payable_account_label' => $pAccLabel,
             'status' => $statusRaw,
-            'currency_code' => $currencyCode !== '' ? $currencyCode : 'KWD',
+            'currency_code' => $currencyCode !== '' ? $currencyCode : $supplierDefaultCurrency,
             'payment_mode' => (string) ($r['payment_mode'] ?? 'cash'),
             'payment_terms_days' => isset($r['payment_terms_days']) && $r['payment_terms_days'] !== null ? (int) $r['payment_terms_days'] : null,
             'tax_profile' => $taxProfileCode !== '' ? $taxProfileCode : 'exempt',
@@ -394,6 +396,7 @@ $supplierKwCountryId = orange_countries_default_id($pdo);
 <div class="page-title page-title--stacked">
     <div>
         <h1>الموردين</h1>
+        <p class="card-hint" style="margin:0.35rem 0 0;">سياق الدولة — كود الهاتف <strong dir="ltr">+<?php echo htmlspecialchars($supplierDefaultPhoneDial, ENT_QUOTES, 'UTF-8'); ?></strong> والعملة <strong><?php echo htmlspecialchars($supplierDefaultCurrency, ENT_QUOTES, 'UTF-8'); ?></strong> عند «إضافة مورد».</p>
     </div>
 </div>
 
@@ -822,7 +825,7 @@ $supplierKwCountryId = orange_countries_default_id($pdo);
             <label for="sup_currency_code">العملة الافتراضية <span style="color:#b45309;">*</span></label>
             <select id="sup_currency_code" required>
                 <?php foreach ($currencyOptions as $curCode => $curLabel): ?>
-                    <option value="<?php echo htmlspecialchars($curCode, ENT_QUOTES, 'UTF-8'); ?>" <?php echo $curCode === 'KWD' ? 'selected' : ''; ?>>
+                    <option value="<?php echo htmlspecialchars($curCode, ENT_QUOTES, 'UTF-8'); ?>" <?php echo $curCode === $supplierDefaultCurrency ? 'selected' : ''; ?>>
                         <?php echo htmlspecialchars($curLabel, ENT_QUOTES, 'UTF-8'); ?>
                     </option>
                 <?php endforeach; ?>
@@ -994,6 +997,8 @@ $supplierKwCountryId = orange_countries_default_id($pdo);
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/input-constraints.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
 var SUP_NEXT_AUTO_CODE = <?php echo json_encode($nextSupplierCodePreview, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+var SUP_ADMIN_DEFAULT_PHONE_DIAL = <?php echo json_encode($supplierDefaultPhoneDial, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+var SUP_ADMIN_DEFAULT_CURRENCY = <?php echo json_encode($supplierDefaultCurrency, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var SUP_PAYABLE_PICK_ACCOUNTS = <?php echo json_encode($supplierPayablePickAccountsPayload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var SUP_SEARCH_ROWS = <?php echo json_encode($supplierSearchRowsPayload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var SUP_PARTNER_STATEMENT_URL = <?php echo json_encode(storefront_public_path('/admin/index.php?page=partner_account_statement'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
@@ -1359,14 +1364,43 @@ function supSetPhoneCountryByDial(dialRaw) {
     var label = supCountryLabelByDial(dial);
     el.value = label !== '' ? label : ('+' + dial);
 }
-function supDefaultCountryDial() {
-    var rows = supCountryCodeRows();
-    for (var i = 0; i < rows.length; i++) {
-        if (String(rows[i].dial || '') === '965') {
-            return '965';
+function supAdminDefaultPhoneDial() {
+    if (typeof SUP_ADMIN_DEFAULT_PHONE_DIAL === 'string') {
+        var w = String(SUP_ADMIN_DEFAULT_PHONE_DIAL || '').replace(/\D/g, '');
+        if (w !== '') {
+            return w;
         }
     }
-    return rows.length ? String(rows[0].dial || '') : '';
+    if (window.orangeAdminPhoneCountry && typeof window.orangeAdminPhoneCountry.defaultCountryDial === 'function') {
+        return window.orangeAdminPhoneCountry.defaultCountryDial();
+    }
+    var meta = document.querySelector('meta[name="orange-admin-phone-dial"]');
+    if (meta) {
+        var m = String(meta.getAttribute('content') || '').replace(/\D/g, '');
+        if (m !== '') {
+            return m;
+        }
+    }
+    return '965';
+}
+function supAdminDefaultCurrency() {
+    if (typeof SUP_ADMIN_DEFAULT_CURRENCY === 'string') {
+        var c = String(SUP_ADMIN_DEFAULT_CURRENCY || '').trim().toUpperCase();
+        if (/^[A-Z]{3}$/.test(c)) {
+            return c;
+        }
+    }
+    var meta = document.querySelector('meta[name="orange-admin-currency"]');
+    if (meta) {
+        var mc = String(meta.getAttribute('content') || '').trim().toUpperCase();
+        if (/^[A-Z]{3}$/.test(mc)) {
+            return mc;
+        }
+    }
+    return 'KWD';
+}
+function supDefaultCountryDial() {
+    return supAdminDefaultPhoneDial();
 }
 function supPopulateCountryCodes(searchQuery) {
     var el = supPhoneCountryEl();
@@ -1763,7 +1797,7 @@ function supSetCurrencyValue(code) {
     }
     var wanted = String(code || '').trim().toUpperCase();
     if (wanted === '') {
-        wanted = 'KWD';
+        wanted = supAdminDefaultCurrency();
     }
     var has = false;
     Array.prototype.forEach.call(sel.options, function (opt) {
@@ -1785,7 +1819,7 @@ function supPopulateCurrencyOptions() {
     if (!sel || sel.tagName !== 'SELECT') {
         return;
     }
-    var selected = String(sel.value || 'KWD').trim().toUpperCase();
+    var selected = String(sel.value || supAdminDefaultCurrency()).trim().toUpperCase();
     var codes = [];
     if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
         try {
@@ -1808,9 +1842,10 @@ function supPopulateCurrencyOptions() {
         uniq[up] = true;
         normalized.push(up);
     });
-    if (!uniq.KWD) {
-        uniq.KWD = true;
-        normalized.push('KWD');
+    var ctxCur = supAdminDefaultCurrency();
+    if (!uniq[ctxCur]) {
+        uniq[ctxCur] = true;
+        normalized.push(ctxCur);
     }
     if (selected && /^[A-Z]{3}$/.test(selected) && !uniq[selected]) {
         uniq[selected] = true;
@@ -1934,7 +1969,7 @@ function supResetForm() {
     }
     var ccy = document.getElementById('sup_currency_code');
     if (ccy) {
-        supSetCurrencyValue('KWD');
+        supSetCurrencyValue(supAdminDefaultCurrency());
     }
     var txp = document.getElementById('sup_tax_profile');
     if (txp) {
@@ -2142,7 +2177,7 @@ function supEdit(row) {
     }
     var ccy = document.getElementById('sup_currency_code');
     if (ccy) {
-        supSetCurrencyValue(row.currency_code || 'KWD');
+        supSetCurrencyValue(row.currency_code || supAdminDefaultCurrency());
     }
     var txp = document.getElementById('sup_tax_profile');
     if (txp) {
