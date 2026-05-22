@@ -356,11 +356,11 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
             </div>
             <div>
                 <label for="pr2_tot_debit">مجموع المدين</label>
-                <input type="text" id="pr2_tot_debit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000" dir="ltr" lang="en">
+                <input type="text" id="pr2_tot_debit" readonly class="admin-inp-readonly jv-tot-readonly admin-inp-money" value="<?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
             </div>
             <div>
                 <label for="pr2_tot_credit">مجموع الدائن</label>
-                <input type="text" id="pr2_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000" dir="ltr" lang="en">
+                <input type="text" id="pr2_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly admin-inp-money" value="<?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
             </div>
             <div class="jv-voucher-nav-cell jv-print-hide">
                 <div class="jv-voucher-nav-btns" role="group" aria-label="تنقل بين السندات">
@@ -594,7 +594,7 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
             li.className = 'gl-pick-item';
             li.setAttribute('role', 'button');
             li.tabIndex = 0;
-            li.textContent = (r.account_code ? r.account_code + ' — ' : '') + r.name + (r.phone ? ' (' + r.phone + ')' : '') + ' [رصيد ' + r.balance.toFixed(3) + ']';
+            li.textContent = (r.account_code ? r.account_code + ' — ' : '') + r.name + (r.phone ? ' (' + r.phone + ')' : '') + ' [رصيد ' + orangeFmtMoney(r.balance) + ']';
             li.addEventListener('dblclick', function () { selectSupplier(r.id); pickerClose(); });
             li.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { selectSupplier(r.id); pickerClose(); } });
             listEl.appendChild(li);
@@ -628,8 +628,8 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
             '<td><select class="pr2-product" style="min-width:10rem;">' + productOptionsHtml() + '</select></td>' +
             '<td><select class="pr2-variant"></select></td>' +
             '<td><input type="number" class="pr2-qty admin-inp-qty" min="1" step="1" value="1" inputmode="numeric" lang="en" dir="ltr"></td>' +
-            '<td><input type="number" class="pr2-cost admin-inp-money" min="0" step="any" value="0.000" inputmode="decimal" lang="en" dir="ltr"></td>' +
-            '<td><input type="text" class="pr2-line-total admin-inp-money" value="0.000" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>' +
+            '<td><input type="number" class="pr2-cost admin-inp-money" min="0" step="any" value="' + fmtZero() + '" inputmode="decimal" lang="en" dir="ltr"></td>' +
+            '<td><input type="text" class="pr2-line-total admin-inp-money" value="' + fmtZero() + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>' +
             '<td><button type="button" class="btn-secondary admin-doc-line-remove" title="حذف">&times;</button></td>';
         tb.appendChild(tr);
         renumberRows();
@@ -646,7 +646,7 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
             tr.querySelector('.pr2-barcode').value = '';
             tr.querySelector('.pr2-product').value = '';
             tr.querySelector('.pr2-qty').value = '1';
-            tr.querySelector('.pr2-cost').value = '0.000';
+            tr.querySelector('.pr2-cost').value = fmtZero();
             updateVariantCell(tr.querySelector('.pr2-product'));
             syncTrailing();
             recalcAll();
@@ -776,8 +776,8 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
         if (netTotal <= 0) {
             var dEl = document.getElementById('pr2_tot_debit');
             var cEl = document.getElementById('pr2_tot_credit');
-            if (dEl) dEl.value = '0.000';
-            if (cEl) cEl.value = '0.000';
+            if (dEl) dEl.value = fmtZero();
+            if (cEl) cEl.value = fmtZero();
             return;
         }
 

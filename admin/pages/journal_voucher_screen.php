@@ -133,12 +133,12 @@ $jvHeaderLineClass = 'jv-voucher-header-line' . ($jvNavReady ? ' jv-voucher-head
             </div>
             <div>
                 <label for="jv_tot_debit">مجموع المدين</label>
-                <input type="text" id="jv_tot_debit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000"
+                <input type="text" id="jv_tot_debit" readonly class="admin-inp-readonly jv-tot-readonly" value="<?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?>"
                     title="إجمالي المدين من أسطر السند" dir="ltr" lang="en" inputmode="decimal">
             </div>
             <div>
                 <label for="jv_tot_credit">مجموع الدائن</label>
-                <input type="text" id="jv_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000"
+                <input type="text" id="jv_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly" value="<?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?>"
                     title="إجمالي الدائن من أسطر السند" dir="ltr" lang="en" inputmode="decimal">
             </div>
             <?php if ($jvNavReady): ?>
@@ -442,8 +442,8 @@ function jvCashLockSyncTreasuryAmount() {
             }
             sumCre += parseFloat(String(tr.querySelector('.jv-c').value || '0').replace(',', '.')) || 0;
         });
-        dEl.value = sumCre > 0 ? sumCre.toFixed(3) : '';
-        cEl.value = '0.000';
+        dEl.value = sumCre > 0 ? orangeFmtMoney(sumCre) : '';
+        cEl.value = orangeMoneyZero();
     } else {
         var sumDeb = 0;
         jvAllMainRows(tb).forEach(function (tr) {
@@ -452,8 +452,8 @@ function jvCashLockSyncTreasuryAmount() {
             }
             sumDeb += parseFloat(String(tr.querySelector('.jv-d').value || '0').replace(',', '.')) || 0;
         });
-        dEl.value = '0.000';
-        cEl.value = sumDeb > 0 ? sumDeb.toFixed(3) : '';
+        dEl.value = orangeMoneyZero();
+        cEl.value = sumDeb > 0 ? orangeFmtMoney(sumDeb) : '';
     }
 }
 
@@ -474,7 +474,7 @@ function jvCashLockApplyLineAmountUi(mainTr) {
             dEl.title = 'يُحسب تلقائياً من مجموع دائن الحسابات الأخرى';
             cEl.readOnly = true;
             cEl.setAttribute('tabindex', '-1');
-            cEl.value = '0.000';
+            cEl.value = orangeMoneyZero();
         } else {
             cEl.readOnly = true;
             cEl.setAttribute('tabindex', '-1');
@@ -483,7 +483,7 @@ function jvCashLockApplyLineAmountUi(mainTr) {
             dEl.readOnly = true;
             dEl.setAttribute('tabindex', '-1');
             dEl.classList.add('admin-inp-readonly');
-            dEl.value = '0.000';
+            dEl.value = orangeMoneyZero();
         }
         return;
     }
@@ -788,7 +788,7 @@ function jvSearchRenderRows(rows) {
             etCell +
             '<td>' + jvEscapeHtml(r.reference) + '</td>' +
             '<td class="jv-search-col-desc">' + jvEscapeHtml(r.description) + '</td>' +
-            '<td dir="ltr">' + jvEscapeHtml(amt.toFixed(3)) + '</td>';
+            '<td dir="ltr">' + jvEscapeHtml(orangeFmtMoney(amt)) + '</td>';
         tr.addEventListener('dblclick', function () {
             var vid = parseInt(tr.getAttribute('data-vid'), 10) || 0;
             if (vid > 0) {
@@ -883,9 +883,9 @@ function jvAddCashLockedRow() {
     var amtCells;
     if (jvCashLockIsReceipt()) {
         amtCells = '<td><input type="number" class="jv-d admin-inp-money" step="any" min="0" value="" placeholder="تلقائي" inputmode="decimal" lang="en" dir="ltr" title="يُملأ تلقائياً من مجموع الدائن"></td>' +
-            '<td><input type="number" class="jv-c admin-inp-money" step="any" min="0" value="0.000" placeholder="0.000" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1" title="دائن الخزينة في القبض = صفر"></td>';
+            '<td><input type="number" class="jv-c admin-inp-money" step="any" min="0" value="' + orangeMoneyZero() + '" placeholder="' + orangeMoneyZero() + '" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1" title="دائن الخزينة في القبض = صفر"></td>';
     } else {
-        amtCells = '<td><input type="number" class="jv-d admin-inp-money" step="any" min="0" value="0.000" placeholder="0.000" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1" title="مدين الخزينة في الصرف = صفر"></td>' +
+        amtCells = '<td><input type="number" class="jv-d admin-inp-money" step="any" min="0" value="' + orangeMoneyZero() + '" placeholder="' + orangeMoneyZero() + '" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1" title="مدين الخزينة في الصرف = صفر"></td>' +
             '<td><input type="number" class="jv-c admin-inp-money" step="any" min="0" value="" placeholder="تلقائي" inputmode="decimal" lang="en" dir="ltr" title="يُملأ تلقائياً من مجموع المدين"></td>';
     }
     trMain.innerHTML = '<td class="jv-acc-code-cell">' +
@@ -1125,13 +1125,13 @@ function jvFillMainFromLine(main, ln) {
     main.querySelector('.jv-acc-name').value = ln.name || '';
     var deb = parseFloat(String(ln.debit || 0));
     var cre = parseFloat(String(ln.credit || 0));
-    main.querySelector('.jv-d').value = deb > 0 ? deb.toFixed(3) : '';
-    main.querySelector('.jv-c').value = cre > 0 ? cre.toFixed(3) : '';
+    main.querySelector('.jv-d').value = deb > 0 ? orangeFmtMoney(deb) : '';
+    main.querySelector('.jv-c').value = cre > 0 ? orangeFmtMoney(cre) : '';
     if (main.getAttribute('data-jv-cash-locked') === '1') {
         if (jvCashLockIsPayment()) {
-            main.querySelector('.jv-d').value = '0.000';
+            main.querySelector('.jv-d').value = orangeMoneyZero();
         } else {
-            main.querySelector('.jv-c').value = '0.000';
+            main.querySelector('.jv-c').value = orangeMoneyZero();
         }
     }
     if (memo) {
@@ -1314,11 +1314,15 @@ function jvRecalc() {
     });
     var elD = document.getElementById('jv_tot_debit');
     var elC = document.getElementById('jv_tot_credit');
-    if (elD) {
-        elD.value = sd.toFixed(3);
-    }
-    if (elC) {
-        elC.value = sc.toFixed(3);
+    if (window.OrangeMoney && window.OrangeMoney.setJvTotals) {
+        window.OrangeMoney.setJvTotals(elD, elC, sd, sc);
+    } else {
+        if (elD) {
+            elD.value = orangeFmtMoney(sd);
+        }
+        if (elC) {
+            elC.value = orangeFmtMoney(sc);
+        }
     }
 }
 

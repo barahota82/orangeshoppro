@@ -279,11 +279,11 @@ if (orange_journal_vouchers_ready($pdo)) {
             </div>
             <div>
                 <label for="ppv_tot_debit">مجموع المدين</label>
-                <input type="text" id="ppv_tot_debit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000" dir="ltr" lang="en">
+                <input type="text" id="ppv_tot_debit" readonly class="admin-inp-readonly jv-tot-readonly" value="<?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
             </div>
             <div>
                 <label for="ppv_tot_credit">مجموع الدائن</label>
-                <input type="text" id="ppv_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000" dir="ltr" lang="en">
+                <input type="text" id="ppv_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly" value="<?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
             </div>
             <div class="jv-voucher-nav-cell jv-print-hide">
                 <?php if ($ppvIsReceipt): ?>
@@ -616,12 +616,12 @@ function ppvSyncTreasury() {
     if (!dEl || !cEl || !pd || !pc) return;
     if (PPV_IS_RECEIPT) {
         var cre = parseFloat(String(pc.value || '0').replace(',', '.')) || 0;
-        dEl.value = cre > 0 ? cre.toFixed(3) : '';
-        cEl.value = '0.000';
+        dEl.value = cre > 0 ? orangeFmtMoney(cre) : '';
+        cEl.value = orangeMoneyZero();
     } else {
         var deb = parseFloat(String(pd.value || '0').replace(',', '.')) || 0;
-        cEl.value = deb > 0 ? deb.toFixed(3) : '';
-        dEl.value = '0.000';
+        cEl.value = deb > 0 ? orangeFmtMoney(deb) : '';
+        dEl.value = orangeMoneyZero();
     }
 }
 
@@ -635,8 +635,12 @@ function ppvRecalc() {
     });
     var elD = document.getElementById('ppv_tot_debit');
     var elC = document.getElementById('ppv_tot_credit');
-    if (elD) elD.value = sd.toFixed(3);
-    if (elC) elC.value = sc.toFixed(3);
+    if (window.OrangeMoney && window.OrangeMoney.setJvTotals) {
+        window.OrangeMoney.setJvTotals(elD, elC, sd, sc);
+    } else {
+        if (elD) elD.value = orangeFmtMoney(sd);
+        if (elC) elC.value = orangeFmtMoney(sc);
+    }
 }
 
 function ppvApplySupplierAccount() {
@@ -677,9 +681,9 @@ function ppvBuildLines() {
         var amtCells;
         if (PPV_IS_RECEIPT) {
             amtCells = '<td><input type="number" class="jv-d admin-inp-money" step="any" min="0" value="" placeholder="تلقائي" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1" title="من مبلغ ذمة العميل"></td>' +
-                '<td><input type="number" class="jv-c admin-inp-money" step="any" min="0" value="0.000" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1"></td>';
+                '<td><input type="number" class="jv-c admin-inp-money" step="any" min="0" value="' + orangeMoneyZero() + '" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1"></td>';
         } else {
-            amtCells = '<td><input type="number" class="jv-d admin-inp-money" step="any" min="0" value="0.000" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1"></td>' +
+            amtCells = '<td><input type="number" class="jv-d admin-inp-money" step="any" min="0" value="' + orangeMoneyZero() + '" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1"></td>' +
                 '<td><input type="number" class="jv-c admin-inp-money" step="any" min="0" value="" placeholder="تلقائي" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1" title="من مبلغ ذمة المورد"></td>';
         }
         trMain.innerHTML = '<td class="jv-acc-code-cell">' +
@@ -713,11 +717,11 @@ function ppvBuildLines() {
         }
         var amtCells;
         if (PPV_IS_RECEIPT) {
-            amtCells = '<td><input type="number" class="jv-d admin-inp-money" step="any" min="0" value="0.000" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1"></td>' +
+            amtCells = '<td><input type="number" class="jv-d admin-inp-money" step="any" min="0" value="' + orangeMoneyZero() + '" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1"></td>' +
                 '<td><input type="number" class="jv-c admin-inp-money" step="any" min="0" value="" placeholder="مبلغ القبض" inputmode="decimal" lang="en" dir="ltr"></td>';
         } else {
             amtCells = '<td><input type="number" class="jv-d admin-inp-money" step="any" min="0" value="" placeholder="مبلغ الصرف" inputmode="decimal" lang="en" dir="ltr"></td>' +
-                '<td><input type="number" class="jv-c admin-inp-money" step="any" min="0" value="0.000" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1"></td>';
+                '<td><input type="number" class="jv-c admin-inp-money" step="any" min="0" value="' + orangeMoneyZero() + '" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1"></td>';
         }
         trMain.innerHTML = '<td class="jv-acc-code-cell">' +
             '<input type="hidden" class="jv-acc-id" value="' + pid + '">' +
@@ -808,7 +812,7 @@ function ppvLoadAlloc() {
             var tr = document.createElement('tr');
             tr.setAttribute('data-ref-type', it.ref_type);
             tr.setAttribute('data-ref-id', String(it.ref_id));
-            tr.innerHTML = '<td>' + ppvEscapeHtml(it.label) + '</td><td>' + Number(it.open).toFixed(3) + '</td><td><input type="number" class="alloc-amt admin-inp-money" step="any" min="0" placeholder="0.000" inputmode="decimal" lang="en" dir="ltr"></td>';
+            tr.innerHTML = '<td>' + ppvEscapeHtml(it.label) + '</td><td>' + orangeFmtMoney(Number(it.open)) + '</td><td><input type="number" class="alloc-amt admin-inp-money" step="any" min="0" placeholder="' + orangeMoneyZero() + '" inputmode="decimal" lang="en" dir="ltr"></td>';
             tb.appendChild(tr);
         });
         if (!items.length) {
@@ -841,7 +845,7 @@ function ppvSave() {
     var allocs = ppvCollectAlloc();
     var sumA = allocs.reduce(function (a, x) { return a + x.amount; }, 0);
     if (allocs.length && sumA > amt + 0.02) {
-        alert('مجموع التخصيصات (' + sumA.toFixed(3) + ') يتجاوز مبلغ السند (' + amt.toFixed(3) + ')');
+        alert('مجموع التخصيصات (' + orangeFmtMoney(sumA) + ') يتجاوز مبلغ السند (' + orangeFmtMoney(amt) + ')');
         return;
     }
     var payload;
@@ -974,8 +978,12 @@ function ppvDisplayBrowseVoucher(r) {
     });
     var dEl = document.getElementById('ppv_tot_debit');
     var cEl = document.getElementById('ppv_tot_credit');
-    if (dEl) dEl.value = total.toFixed(3);
-    if (cEl) cEl.value = total.toFixed(3);
+    if (window.OrangeMoney && window.OrangeMoney.setJvTotals) {
+        window.OrangeMoney.setJvTotals(dEl, cEl, total, total);
+    } else {
+        if (dEl) dEl.value = orangeFmtMoney(total);
+        if (cEl) cEl.value = orangeFmtMoney(total);
+    }
     var tb = document.getElementById('ppv_lines_body');
     if (tb && r.lines) {
         tb.innerHTML = '';
@@ -988,8 +996,8 @@ function ppvDisplayBrowseVoucher(r) {
             var nameTxt = (l.name || '') + (memo ? ' — ' + memo : '');
             tr.innerHTML = '<td><input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="' + ppvEscapeHtml(l.code || '') + '" readonly tabindex="-1"></td>' +
                 '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + ppvEscapeHtml(nameTxt) + '" readonly tabindex="-1"></td>' +
-                '<td><input type="text" class="admin-inp-money" value="' + (d > 0 ? d.toFixed(3) : '0.000') + '" readonly dir="ltr" lang="en"></td>' +
-                '<td><input type="text" class="admin-inp-money" value="' + (c > 0 ? c.toFixed(3) : '0.000') + '" readonly dir="ltr" lang="en"></td>' +
+                '<td><input type="text" class="admin-inp-money" value="' + (d > 0 ? orangeFmtMoney(d) : orangeMoneyZero()) + '" readonly dir="ltr" lang="en"></td>' +
+                '<td><input type="text" class="admin-inp-money" value="' + (c > 0 ? orangeFmtMoney(c) : orangeMoneyZero()) + '" readonly dir="ltr" lang="en"></td>' +
                 '<td></td>';
             tb.appendChild(tr);
         });
@@ -1078,7 +1086,7 @@ function ppvSearchRun() {
                 '<td>' + ppvEscapeHtml(v.voucher_date_dmy || v.voucher_date || '') + '</td>' +
                 '<td>' + ppvEscapeHtml(v.reference || '') + '</td>' +
                 '<td>' + ppvEscapeHtml(v.description || '') + '</td>' +
-                '<td dir="ltr">' + amt.toFixed(3) + '</td>';
+                '<td dir="ltr">' + orangeFmtMoney(amt) + '</td>';
             tr.addEventListener('dblclick', function () {
                 ppvLoadVoucher(v.id);
                 ppvSearchClose();

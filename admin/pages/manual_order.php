@@ -525,9 +525,9 @@ function moLineRowHtml() {
         '<td class="mo-cell-name"><input type="text" class="mo-name admin-inp" readonly tabindex="-1" placeholder="—"></td>' +
         '<td class="mo-cell-var"><input type="text" class="mo-var-label admin-inp" readonly tabindex="-1" placeholder="—"></td>' +
         '<td class="mo-col-qty"><input type="number" class="mo-q admin-inp-qty" min="1" step="1" value="1" inputmode="numeric" lang="en" dir="ltr"></td>' +
-        '<td class="mo-col-money"><input type="text" class="mo-price admin-inp-money" data-money-allow-zero readonly tabindex="-1" inputmode="decimal" lang="en" dir="ltr" placeholder="0.000" value="0.000"></td>' +
-        '<td class="mo-col-money"><input type="text" class="mo-disc admin-inp-money" data-money-allow-zero data-money-allow-negative inputmode="decimal" lang="en" dir="ltr" placeholder="0.000" value="0.000"></td>' +
-        '<td class="mo-col-net"><input type="text" class="mo-line-net" readonly tabindex="-1" value="0.000" lang="en" dir="ltr"></td>' +
+        '<td class="mo-col-money"><input type="text" class="mo-price admin-inp-money" data-money-allow-zero readonly tabindex="-1" inputmode="decimal" lang="en" dir="ltr" placeholder="' + moFmtKd(0) + '" value="' + moFmtKd(0) + '"></td>' +
+        '<td class="mo-col-money"><input type="text" class="mo-disc admin-inp-money" data-money-allow-zero data-money-allow-negative inputmode="decimal" lang="en" dir="ltr" placeholder="' + moFmtKd(0) + '" value="' + moFmtKd(0) + '"></td>' +
+        '<td class="mo-col-net"><input type="text" class="mo-line-net" readonly tabindex="-1" value="' + moFmtKd(0) + '" lang="en" dir="ltr"></td>' +
         '<td class="mo-col-del"><button type="button" class="mo-row-delete" onclick="moRemoveRow(this)" title="حذف السطر" aria-label="حذف السطر">' +
         '<svg class="mo-icon mo-icon--trash" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>' +
         '</button></td>'

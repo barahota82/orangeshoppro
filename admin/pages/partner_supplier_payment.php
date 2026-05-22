@@ -277,11 +277,11 @@ $ppvReady = $ppvCashLock !== null;
             </div>
             <div>
                 <label for="spay_tot_debit">مجموع المدين</label>
-                <input type="text" id="spay_tot_debit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000" dir="ltr" lang="en">
+                <input type="text" id="spay_tot_debit" readonly class="admin-inp-readonly jv-tot-readonly" value="<?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
             </div>
             <div>
                 <label for="spay_tot_credit">مجموع الدائن</label>
-                <input type="text" id="spay_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000" dir="ltr" lang="en">
+                <input type="text" id="spay_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly" value="<?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
             </div>
             <div class="jv-voucher-nav-cell jv-print-hide">
                 <div class="jv-voucher-nav-btns" role="group" aria-label="تنقل بين السندات">
@@ -507,9 +507,9 @@ $ppvReady = $ppvCashLock !== null;
         currentInvoices.forEach(function (inv, idx) {
             var tr = document.createElement('tr');
             tr.innerHTML = '<td>' + esc(inv.label) + '</td>' +
-                '<td dir="ltr" lang="en">' + inv.original.toFixed(3) + '</td>' +
-                '<td dir="ltr" lang="en">' + inv.open.toFixed(3) + '</td>' +
-                '<td><input type="number" class="spay-inv-amt admin-inp-money" step="any" min="0" max="' + inv.open.toFixed(3) + '" placeholder="0.000" inputmode="decimal" lang="en" dir="ltr" data-idx="' + idx + '"></td>';
+                '<td dir="ltr" lang="en">' + orangeFmtMoney(inv.original) + '</td>' +
+                '<td dir="ltr" lang="en">' + orangeFmtMoney(inv.open) + '</td>' +
+                '<td><input type="number" class="spay-inv-amt admin-inp-money" step="any" min="0" max="' + orangeFmtMoney(inv.open) + '" placeholder="' + orangeMoneyZero() + '" inputmode="decimal" lang="en" dir="ltr" data-idx="' + idx + '"></td>';
             tbody.appendChild(tr);
             tr.querySelector('.spay-inv-amt').addEventListener('input', function () {
                 currentInvoices[idx].amount = parseFloat(this.value) || 0;
@@ -524,7 +524,7 @@ $ppvReady = $ppvCashLock !== null;
         var total = 0;
         currentInvoices.forEach(function (inv) { total += inv.amount; });
         var el = document.getElementById('spay_invoices_total');
-        if (el) el.textContent = total.toFixed(3);
+        if (el) el.textContent = orangeFmtMoney(total);
     }
 
     function getTotal() {
@@ -555,7 +555,7 @@ $ppvReady = $ppvCashLock !== null;
             tr.innerHTML = '<td><input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="' + esc(accCode) + '" readonly tabindex="-1"></td>' +
                 '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + esc(accName) + '" readonly tabindex="-1"></td>' +
                 '<td><input type="number" class="spay-adv-amt admin-inp-money" step="any" min="0" placeholder="مبلغ الدفعة" inputmode="decimal" lang="en" dir="ltr"></td>' +
-                '<td><input type="text" class="admin-inp-money" value="0.000" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>';
+                '<td><input type="text" class="admin-inp-money" value="' + orangeMoneyZero() + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>';
             tb.appendChild(tr);
             tr.querySelector('.spay-adv-amt').addEventListener('input', function () { recalcTotals(); });
         } else {
@@ -565,8 +565,8 @@ $ppvReady = $ppvCashLock !== null;
                 tr.className = 'jv-line-main';
                 tr.innerHTML = '<td><input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="' + esc(accCode) + '" readonly tabindex="-1"></td>' +
                     '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + esc(supplierName + ' — ' + inv.label) + '" readonly tabindex="-1"></td>' +
-                    '<td><input type="text" class="admin-inp-money" value="' + inv.amount.toFixed(3) + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>' +
-                    '<td><input type="text" class="admin-inp-money" value="0.000" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>';
+                    '<td><input type="text" class="admin-inp-money" value="' + orangeFmtMoney(inv.amount) + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>' +
+                    '<td><input type="text" class="admin-inp-money" value="' + orangeMoneyZero() + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>';
                 tb.appendChild(tr);
             });
         }
@@ -576,8 +576,8 @@ $ppvReady = $ppvCashLock !== null;
         cashTr.className = 'jv-line-main jv-line-cash-locked';
         cashTr.innerHTML = '<td><input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="' + esc(SPAY_CASH.code || '') + '" readonly tabindex="-1"></td>' +
             '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + esc(SPAY_CASH.name || '') + '" readonly tabindex="-1"></td>' +
-            '<td><input type="text" class="admin-inp-money" value="0.000" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>' +
-            '<td><input type="text" class="admin-inp-money" value="' + total.toFixed(3) + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>';
+            '<td><input type="text" class="admin-inp-money" value="' + orangeMoneyZero() + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>' +
+            '<td><input type="text" class="admin-inp-money" value="' + orangeFmtMoney(total) + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>';
         tb.appendChild(cashTr);
         recalcTotals();
     }
@@ -586,15 +586,19 @@ $ppvReady = $ppvCashLock !== null;
         var total = getTotal();
         var dEl = document.getElementById('spay_tot_debit');
         var cEl = document.getElementById('spay_tot_credit');
-        if (dEl) dEl.value = total.toFixed(3);
-        if (cEl) cEl.value = total.toFixed(3);
+        if (window.OrangeMoney && window.OrangeMoney.setJvTotals) {
+            window.OrangeMoney.setJvTotals(dEl, cEl, total, total);
+        } else {
+            if (dEl) dEl.value = orangeFmtMoney(total);
+            if (cEl) cEl.value = orangeFmtMoney(total);
+        }
         // Update cash line
         var cashTr = document.querySelector('#spay_jv_body .jv-line-cash-locked');
         if (cashTr) {
             var cells = cashTr.querySelectorAll('input.admin-inp-money');
             if (cells.length >= 2) {
-                cells[0].value = '0.000';
-                cells[1].value = total.toFixed(3);
+                cells[0].value = orangeMoneyZero();
+                cells[1].value = orangeFmtMoney(total);
             }
         }
     }
@@ -634,7 +638,7 @@ $ppvReady = $ppvCashLock !== null;
             li.className = 'gl-pick-item';
             li.setAttribute('role', 'button');
             li.tabIndex = 0;
-            li.textContent = (r.account_code ? r.account_code + ' — ' : '') + r.name + (r.phone ? ' (' + r.phone + ')' : '') + ' [رصيد ' + r.balance.toFixed(3) + ']';
+            li.textContent = (r.account_code ? r.account_code + ' — ' : '') + r.name + (r.phone ? ' (' + r.phone + ')' : '') + ' [رصيد ' + orangeFmtMoney(r.balance) + ']';
             li.addEventListener('dblclick', function () { selectSupplier(r.id); pickerClose(); });
             li.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { selectSupplier(r.id); pickerClose(); } });
             listEl.appendChild(li);
@@ -723,8 +727,12 @@ $ppvReady = $ppvCashLock !== null;
         document.getElementById('spay_desc').value = v.description || '';
         var total = 0;
         (r.lines || []).forEach(function (l) { total += parseFloat(String(l.debit || '0')) || 0; });
-        document.getElementById('spay_tot_debit').value = total.toFixed(3);
-        document.getElementById('spay_tot_credit').value = total.toFixed(3);
+        if (window.OrangeMoney && window.OrangeMoney.setJvTotals) {
+            window.OrangeMoney.setJvTotals('spay_tot_debit', 'spay_tot_credit', total, total);
+        } else {
+            document.getElementById('spay_tot_debit').value = orangeFmtMoney(total);
+            document.getElementById('spay_tot_credit').value = orangeFmtMoney(total);
+        }
         document.getElementById('spay_btn_delete').disabled = false;
 
         // Load supplier from subledger
@@ -749,8 +757,8 @@ $ppvReady = $ppvCashLock !== null;
                 var c = parseFloat(String(l.credit || '0')) || 0;
                 tr.innerHTML = '<td><input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="' + esc(accCode) + '" readonly tabindex="-1"></td>' +
                     '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + esc(accName + (l.memo ? ' — ' + l.memo : '')) + '" readonly tabindex="-1"></td>' +
-                    '<td><input type="text" class="admin-inp-money" value="' + (d > 0 ? d.toFixed(3) : '0.000') + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>' +
-                    '<td><input type="text" class="admin-inp-money" value="' + (c > 0 ? c.toFixed(3) : '0.000') + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>';
+                    '<td><input type="text" class="admin-inp-money" value="' + (d > 0 ? orangeFmtMoney(d) : orangeMoneyZero()) + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>' +
+                    '<td><input type="text" class="admin-inp-money" value="' + (c > 0 ? orangeFmtMoney(c) : orangeMoneyZero()) + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>';
                 tb.appendChild(tr);
             });
         }
@@ -810,7 +818,7 @@ $ppvReady = $ppvCashLock !== null;
             r.results.forEach(function (v) {
                 var tr = document.createElement('tr');
                 tr.style.cursor = 'pointer';
-                tr.innerHTML = '<td>' + esc(String(v.voucher_serial || v.id)) + '</td><td>' + esc(v.voucher_date_dmy || v.voucher_date || '') + '</td><td>' + esc(v.reference || '') + '</td><td>' + esc(v.description || '') + '</td><td dir="ltr">' + (parseFloat(v.total || '0') || 0).toFixed(3) + '</td>';
+                tr.innerHTML = '<td>' + esc(String(v.voucher_serial || v.id)) + '</td><td>' + esc(v.voucher_date_dmy || v.voucher_date || '') + '</td><td>' + esc(v.reference || '') + '</td><td>' + esc(v.description || '') + '</td><td dir="ltr">' + orangeFmtMoney(parseFloat(v.total || '0') || 0) + '</td>';
                 tr.addEventListener('dblclick', function () { spayLoadVoucher(v.id); spaySearchClose(); });
                 tbody.appendChild(tr);
             });

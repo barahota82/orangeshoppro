@@ -603,7 +603,7 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
             li.className = 'gl-pick-item';
             li.setAttribute('role', 'button');
             li.tabIndex = 0;
-            li.textContent = (r.account_code ? r.account_code + ' — ' : '') + r.name + (r.phone ? ' (' + r.phone + ')' : '') + ' [رصيد ' + r.balance.toFixed(3) + ']';
+            li.textContent = (r.account_code ? r.account_code + ' — ' : '') + r.name + (r.phone ? ' (' + r.phone + ')' : '') + ' [رصيد ' + orangeFmtMoney(r.balance) + ']';
             li.addEventListener('dblclick', function () { selectSupplier(r.id); pickerClose(); });
             li.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { selectSupplier(r.id); pickerClose(); } });
             listEl.appendChild(li);
@@ -637,9 +637,9 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
             '<td><select class="pv2-product" style="min-width:10rem;">' + productOptionsHtml() + '</select></td>' +
             '<td><select class="pv2-variant"></select></td>' +
             '<td><input type="number" class="pv2-qty admin-inp-qty" min="1" step="1" value="1" inputmode="numeric" lang="en" dir="ltr"></td>' +
-            '<td><input type="number" class="pv2-cost admin-inp-money" min="0" step="any" value="0.000" inputmode="decimal" lang="en" dir="ltr"></td>' +
+            '<td><input type="number" class="pv2-cost admin-inp-money" min="0" step="any" value="' + fmtZero() + '" inputmode="decimal" lang="en" dir="ltr"></td>' +
             '<td><input type="text" class="pv2-discount admin-inp" placeholder="0" dir="ltr" lang="en" autocomplete="off" style="width:100%;"></td>' +
-            '<td><input type="text" class="pv2-line-total admin-inp-money" value="0.000" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>' +
+            '<td><input type="text" class="pv2-line-total admin-inp-money" value="' + fmtZero() + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>' +
             '<td><button type="button" class="btn-secondary admin-doc-line-remove" title="حذف">&times;</button></td>';
         tb.appendChild(tr);
         renumberRows();
@@ -656,7 +656,7 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
             tr.querySelector('.pv2-barcode').value = '';
             tr.querySelector('.pv2-product').value = '';
             tr.querySelector('.pv2-qty').value = '1';
-            tr.querySelector('.pv2-cost').value = '0.000';
+            tr.querySelector('.pv2-cost').value = fmtZero();
             tr.querySelector('.pv2-discount').value = '';
             updateVariantCell(tr.querySelector('.pv2-product'));
             syncTrailing();
@@ -797,8 +797,8 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
         if (netTotal <= 0) {
             var dEl = document.getElementById('pv2_tot_debit');
             var cEl = document.getElementById('pv2_tot_credit');
-            if (dEl) dEl.value = '0.000';
-            if (cEl) cEl.value = '0.000';
+            if (dEl) dEl.value = fmtZero();
+            if (cEl) cEl.value = fmtZero();
             return;
         }
 

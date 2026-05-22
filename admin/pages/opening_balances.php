@@ -216,12 +216,12 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
             </div>
             <div>
                 <label for="ob_tot_debit">مجموع المدين</label>
-                <input type="text" id="ob_tot_debit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000"
+                <input type="text" id="ob_tot_debit" readonly class="admin-inp-readonly jv-tot-readonly" value="<?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?>"
                     title="إجمالي المدين من أسطر السند" dir="ltr" lang="en" inputmode="decimal">
             </div>
             <div>
                 <label for="ob_tot_credit">مجموع الدائن</label>
-                <input type="text" id="ob_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000"
+                <input type="text" id="ob_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly" value="<?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?>"
                     title="إجمالي الدائن من أسطر السند" dir="ltr" lang="en" inputmode="decimal">
             </div>
             <div class="jv-voucher-nav-cell jv-print-hide">
@@ -629,7 +629,7 @@ var OB_SAVED_VOUCHER_ID = <?php echo (int) $obVid; ?>;
             var cre = parseFloat(preset.credit) || 0;
             var OM = window.OrangeMoney;
             var dec = OM ? OM.DECIMALS : 3;
-            var cz = OM ? OM.companionZero() : '0.000';
+            var cz = OM ? OM.zeroAmount() : orangeMoneyZero();
             if (deb > 0) {
                 if (d) {
                     d.value = deb.toFixed(dec);
@@ -655,14 +655,18 @@ var OB_SAVED_VOUCHER_ID = <?php echo (int) $obVid; ?>;
             sd += parseFloat(String((tr.querySelector('.ob-d') || {}).value || '0').replace(',', '.'));
             sc += parseFloat(String((tr.querySelector('.ob-c') || {}).value || '0').replace(',', '.'));
         });
-        var dec = window.OrangeMoney ? window.OrangeMoney.DECIMALS : 3;
         var elD = document.getElementById('ob_tot_debit');
         var elC = document.getElementById('ob_tot_credit');
-        if (elD) {
-            elD.value = sd.toFixed(dec);
-        }
-        if (elC) {
-            elC.value = sc.toFixed(dec);
+        if (window.OrangeMoney && window.OrangeMoney.setJvTotals) {
+            window.OrangeMoney.setJvTotals(elD, elC, sd, sc);
+        } else {
+            var dec = window.OrangeMoney ? window.OrangeMoney.DECIMALS : 3;
+            if (elD) {
+                elD.value = sd.toFixed(dec);
+            }
+            if (elC) {
+                elC.value = sc.toFixed(dec);
+            }
         }
     };
     window.obSave = function () {

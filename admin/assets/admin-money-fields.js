@@ -65,6 +65,35 @@
         return readAdminMoneyZero();
     }
 
+    /** مبلغ موجب مُنسَّق، أو فارغ إن كان ≤ 0 (حقول مدين/دائن في السطر). */
+    function formatPositiveOrEmpty(n) {
+        var x = parseFloat(n);
+        if (isNaN(x) || x <= 0) {
+            return '';
+        }
+        return formatMoneyAmount(x);
+    }
+
+    function setMoneyInputValue(el, amount) {
+        if (!el) {
+            return;
+        }
+        el.value = formatMoneyAmount(amount);
+    }
+
+    function setJvTotals(debitElOrId, creditElOrId, sumDebit, sumCredit) {
+        var d =
+            typeof debitElOrId === 'string'
+                ? document.getElementById(debitElOrId)
+                : debitElOrId;
+        var c =
+            typeof creditElOrId === 'string'
+                ? document.getElementById(creditElOrId)
+                : creditElOrId;
+        setMoneyInputValue(d, sumDebit);
+        setMoneyInputValue(c, sumCredit);
+    }
+
     function isZeroishMoneyText(s) {
         s = String(s || '').trim().replace(',', '.');
         return s === '' || s === '0' || /^0\.0+$/.test(s);
@@ -78,7 +107,7 @@
         }
         var z = zeroMoneyAmount();
         var step = readAdminMoneyStep();
-        root.querySelectorAll('input.admin-inp-money').forEach(function (el) {
+        root.querySelectorAll('input.admin-inp-money, input.jv-tot-readonly, input.mo-line-net').forEach(function (el) {
             var ph = String(el.getAttribute('placeholder') || '');
             if (isZeroishMoneyText(ph)) {
                 el.setAttribute('placeholder', z);
@@ -455,7 +484,10 @@
         currencyCode: readAdminCurrencyCode,
         currencyUnit: readAdminCurrencyUnit,
         formatAmount: formatMoneyAmount,
+        formatPositiveOrEmpty: formatPositiveOrEmpty,
         zeroAmount: zeroMoneyAmount,
+        setInputValue: setMoneyInputValue,
+        setJvTotals: setJvTotals,
         inputStep: readAdminMoneyStep,
         normalizeUi: normalizeMoneyUi,
         parseRaw: parseRaw,

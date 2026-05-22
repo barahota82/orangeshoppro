@@ -698,7 +698,7 @@ $count = count($customerRows);
         <?php endif; ?>
         <div class="cus-grid-r2-balance">
             <label for="cus_current_balance">رصيد الذمة (مدين)</label>
-            <input type="text" id="cus_current_balance" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" value="0.000" readonly>
+            <input type="text" id="cus_current_balance" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" value="<?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?>" readonly>
         </div>
         <?php if ($hasCustomerStatusCol): ?>
         <div class="cus-grid-r2-status">
@@ -1295,7 +1295,7 @@ function cusSearchRender(q) {
         metaEl.className = 'cus-search-item__meta';
         var phone = String(row.phone || '').trim();
         var bal = (typeof row.current_balance === 'number') ? row.current_balance : 0;
-        metaEl.textContent = (phone !== '' ? phone : 'بدون هاتف') + ' • رصيد: ' + ((window.OrangeMoney && window.OrangeMoney.formatAmount) ? window.OrangeMoney.formatAmount(bal) : bal.toFixed(3)) + ' ' + (typeof CUS_CURRENCY_UNIT === 'string' ? CUS_CURRENCY_UNIT : 'KD');
+        metaEl.textContent = (phone !== '' ? phone : 'بدون هاتف') + ' • رصيد: ' + orangeFmtMoney(bal) + ' ' + (typeof CUS_CURRENCY_UNIT === 'string' ? CUS_CURRENCY_UNIT : 'KD');
         li.appendChild(nameEl);
         li.appendChild(metaEl);
         li.addEventListener('dblclick', function () { cusSearchSelect(row); });
