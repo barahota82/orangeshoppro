@@ -93,6 +93,7 @@ function orange_admin_page_resource(string $page): string
         'cart_bogo_promotions' => 'settings',
         'cart_combo_promotions' => 'settings',
         'channels' => 'settings',
+        'countries' => 'settings',
         'company_documents' => 'settings',
         'admin_users' => 'admin_users',
     ];
@@ -143,6 +144,7 @@ function orange_admin_api_folder_resource(string $folder): string
         'cart_bogo_promotions' => 'settings',
         'cart_combo_promotions' => 'settings',
         'storefront' => 'settings',
+        'countries' => 'settings',
         'admins' => 'admin_users',
     ];
 
@@ -221,9 +223,32 @@ function orange_admin_is_superuser(array $admin): bool
     return (int) ($admin['is_superuser'] ?? 0) === 1;
 }
 
-function orange_admin_may(array $admin, PDO $pdo, string $resource, string $action): bool
+/**
+ * مشرف عام — وصول كامل: superuser أو admins.country_id فارغ (بند 13.8).
+ * فريق دولة (country_id محدد + غير superuser) لا يُعامَل كمشرف عام.
+ */
+function orange_admin_has_full_access(array $admin): bool
 {
     if (orange_admin_is_superuser($admin)) {
+        return true;
+    }
+    require_once __DIR__ . '/countries.php';
+    if (orange_admin_session_locked_country_id() > 0) {
+        return false;
+    }
+
+    return orange_admin_is_global($admin);
+}
+
+/** إدارة الدول والتهيئة الكاملة — للمشرف العام فقط. */
+function orange_admin_can_manage_countries(array $admin): bool
+{
+    return orange_admin_has_full_access($admin);
+}
+
+function orange_admin_may(array $admin, PDO $pdo, string $resource, string $action): bool
+{
+    if (orange_admin_has_full_access($admin)) {
         return true;
     }
     $matrix = orange_admin_permissions_matrix($pdo, (int) $admin['id']);
@@ -255,8 +280,6 @@ function orange_admin_require_page(array $admin, PDO $pdo, string $page): void
         exit;
     }
     if ($page === 'countries') {
-        require_once __DIR__ . '/countries.php';
-        require_once __DIR__ . '/country_provision.php';
         if (!orange_admin_can_manage_countries($admin)) {
             header('Content-Type: text/html; charset=UTF-8');
             http_response_code(403);
@@ -286,8 +309,6 @@ function orange_admin_enforce_api(array $admin, PDO $pdo): void
         return;
     }
     if (str_contains($path, '/admin/api/countries/')) {
-        require_once __DIR__ . '/countries.php';
-        require_once __DIR__ . '/country_provision.php';
         if (!orange_admin_can_manage_countries($admin)) {
             json_response(['success' => false, 'message' => 'إدارة الدول للمشرف العام فقط'], 403);
         }
@@ -301,18 +322,10 @@ function orange_admin_enforce_api(array $admin, PDO $pdo): void
     }
 }
 
-/** مبدّل سياق الدولة في الشريط — مشرف عام أو superuser؛ لا يظهر لفريق دولة المقفول. */
+/** مبدّل سياق الدولة في الشريط — للمشرف العام فقط. */
 function orange_admin_show_country_switcher(array $admin): bool
 {
-    require_once __DIR__ . '/countries.php';
-    if (orange_admin_session_locked_country_id() > 0) {
-        return false;
-    }
-    if (orange_admin_is_superuser($admin)) {
-        return true;
-    }
-
-    return orange_admin_is_global($admin);
+    return orange_admin_has_full_access($admin);
 }
 
 function orange_admin_nav_visible(array $admin, PDO $pdo, string $page): bool
@@ -321,9 +334,6 @@ function orange_admin_nav_visible(array $admin, PDO $pdo, string $page): bool
         return orange_admin_is_superuser($admin);
     }
     if ($page === 'countries') {
-        require_once __DIR__ . '/countries.php';
-        require_once __DIR__ . '/country_provision.php';
-
         return orange_admin_can_manage_countries($admin);
     }
     $res = orange_admin_page_resource($page);

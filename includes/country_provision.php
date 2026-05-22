@@ -9,18 +9,6 @@ require_once __DIR__ . '/country_catalog_copy.php';
 require_once __DIR__ . '/delivery_areas.php';
 
 /**
- * المشرف العام (superuser + بدون country_id) فقط يدير الدول والتهيئة الكاملة.
- */
-function orange_admin_can_manage_countries(array $admin): bool
-{
-    if (!function_exists('orange_admin_is_superuser') || !orange_admin_is_superuser($admin)) {
-        return false;
-    }
-
-    return orange_admin_is_global($admin);
-}
-
-/**
  * @return array{
  *   warehouse:bool,
  *   channels_count:int,
