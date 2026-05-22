@@ -3,6 +3,13 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/supplier_payable_account.php';
+require_once __DIR__ . '/gl_settings.php';
+require_once __DIR__ . '/journal_types.php';
+
+function orange_purchase_gl_country_id(PDO $pdo, ?int $countryId): int
+{
+    return orange_gl_settings_effective_country_id($pdo, $countryId);
+}
 
 /**
  * حزمة ترحيل فاتورة مشتريات: قيد بسيط أو سند بأربعة أسطر (نقدي + مورد عبر الذمة).
@@ -24,24 +31,28 @@ function orange_gl_purchase_invoice_posting_bundle(
     string $purchaseType,
     int $supplierId,
     int $purchaseId,
-    float $amount
+    float $amount,
+    ?int $countryId = null
 ): array {
     if (!in_array($purchaseType, ['cash', 'credit'], true)) {
         throw new RuntimeException('نوع الشراء غير صالح');
     }
 
     $amount = round($amount, 4);
+    $glCountryId = orange_purchase_gl_country_id($pdo, $countryId);
+    $glAcct = static fn (string $key): int => orange_gl_account_id($pdo, $key, $glCountryId);
+    $jtByCode = static fn (string $code): int => orange_journal_type_id_by_code($pdo, $code, $glCountryId);
 
     if ($purchaseType === 'credit') {
         if ($supplierId <= 0) {
             throw new RuntimeException('شراء آجل يتطلّب مورداً مربوطاً بحساب ذمة.');
         }
         $apId = orange_supplier_required_payable_account_id($pdo, $supplierId);
-        $pinId = orange_journal_type_id_by_code($pdo, 'PIN');
+        $pinId = $jtByCode('PIN');
         $rule = ($pinId > 0) ? orange_gl_journal_type_rule_for_terms($pdo, $pinId, 'credit') : null;
 
         if ($rule === null) {
-            $inventoryId = orange_gl_account_id($pdo, 'inventory');
+            $inventoryId = $glAcct('inventory');
             $debitAssetId = $inventoryId;
             $sync = $supplierId > 0 && $apId > 0;
             $after = null;
@@ -77,8 +88,8 @@ function orange_gl_purchase_invoice_posting_bundle(
                 'قاعدة فاتورة مشتريات آجل تتطلّب بند المدين — راجع «حسابات القيود التلقائية».'
             );
         }
-        $d = orange_gl_account_id($pdo, $dk);
-        $c = $ck !== '' ? orange_gl_account_id($pdo, $ck) : $apId;
+        $d = $glAcct($dk);
+        $c = $ck !== '' ? $glAcct($ck) : $apId;
         if ($c <= 0) {
             throw new RuntimeException('تعذر تحديد حساب الدائن — اربط ذمة المورد أو بند الدائن في القاعدة.');
         }
@@ -115,11 +126,11 @@ function orange_gl_purchase_invoice_posting_bundle(
     // نقدي + مورد: مرور على ذمة المورد ثم الخزينة (سند واحد بأربعة أسطر).
     if ($supplierId > 0) {
         $apId = orange_supplier_required_payable_account_id($pdo, $supplierId);
-        $pinId = orange_journal_type_id_by_code($pdo, 'PIN');
+        $pinId = $jtByCode('PIN');
         $rule = ($pinId > 0) ? orange_gl_journal_type_rule_for_terms($pdo, $pinId, 'cash') : null;
         if ($rule === null) {
-            $purchaseDebit = orange_gl_account_id($pdo, 'inventory');
-            $cashCredit = orange_gl_account_id($pdo, 'cash');
+            $purchaseDebit = $glAcct('inventory');
+            $cashCredit = $glAcct('cash');
         } else {
             $dk = trim((string) ($rule['debit_setting_key'] ?? ''));
             $ck = trim((string) ($rule['credit_setting_key'] ?? ''));
@@ -128,8 +139,8 @@ function orange_gl_purchase_invoice_posting_bundle(
                     'قاعدة فاتورة مشتريات نقدي غير مكتملة — راجع «حسابات القيود التلقائية» (قسم ٢).'
                 );
             }
-            $purchaseDebit = orange_gl_account_id($pdo, $dk);
-            $cashCredit = orange_gl_account_id($pdo, $ck);
+            $purchaseDebit = $glAcct($dk);
+            $cashCredit = $glAcct($ck);
         }
         if ($purchaseDebit === $apId || $cashCredit === $apId) {
             throw new RuntimeException(
@@ -187,11 +198,11 @@ function orange_gl_purchase_invoice_posting_bundle(
     }
 
     // نقدي بدون مورد: قيد مباشر للخزينة.
-    $pinId = orange_journal_type_id_by_code($pdo, 'PIN');
+    $pinId = $jtByCode('PIN');
     $rule = ($pinId > 0) ? orange_gl_journal_type_rule_for_terms($pdo, $pinId, 'cash') : null;
     if ($rule === null) {
-        $inventoryId = orange_gl_account_id($pdo, 'inventory');
-        $cashId = orange_gl_account_id($pdo, 'cash');
+        $inventoryId = $glAcct('inventory');
+        $cashId = $glAcct('cash');
 
         return [
             'is_multi' => false,
@@ -210,8 +221,8 @@ function orange_gl_purchase_invoice_posting_bundle(
             'قاعدة فاتورة مشتريات نقدي غير مكتملة — راجع «حسابات القيود التلقائية» (قسم ٢).'
         );
     }
-    $d = orange_gl_account_id($pdo, $dk);
-    $c = orange_gl_account_id($pdo, $ck);
+    $d = $glAcct($dk);
+    $c = $glAcct($ck);
     if ($d === $c) {
         throw new RuntimeException('في قاعدة المشتريات النقدي يجب أن يختلف المدين عن الدائن.');
     }
@@ -247,24 +258,28 @@ function orange_gl_purchase_return_posting_bundle(
     string $returnType,
     int $supplierId,
     int $returnId,
-    float $amount
+    float $amount,
+    ?int $countryId = null
 ): array {
     if (!in_array($returnType, ['cash', 'credit'], true)) {
         throw new RuntimeException('نوع مردود المشتريات غير صالح');
     }
 
     $amount = round($amount, 4);
+    $glCountryId = orange_purchase_gl_country_id($pdo, $countryId);
+    $glAcct = static fn (string $key): int => orange_gl_account_id($pdo, $key, $glCountryId);
+    $jtByCode = static fn (string $code): int => orange_journal_type_id_by_code($pdo, $code, $glCountryId);
 
     if ($returnType === 'credit') {
         if ($supplierId <= 0) {
             throw new RuntimeException('مردود مشتريات آجل يتطلّب مورداً مربوطاً بحساب ذمة.');
         }
         $apId = orange_supplier_required_payable_account_id($pdo, $supplierId);
-        $pdnId = orange_journal_type_id_by_code($pdo, 'PDN');
+        $pdnId = $jtByCode('PDN');
         $rule = ($pdnId > 0) ? orange_gl_journal_type_rule_for_terms($pdo, $pdnId, 'credit') : null;
 
         if ($rule === null) {
-            $inventoryId = orange_gl_account_id($pdo, 'inventory');
+            $inventoryId = $glAcct('inventory');
             $sync = $supplierId > 0 && $apId > 0;
             $after = null;
             if ($sync && $amount > 0.0001) {
@@ -299,8 +314,8 @@ function orange_gl_purchase_return_posting_bundle(
                 'قاعدة مردود مشتريات آجل تتطلّب بند الدائن — راجع «حسابات القيود التلقائية».'
             );
         }
-        $d = $dk !== '' ? orange_gl_account_id($pdo, $dk) : $apId;
-        $c = orange_gl_account_id($pdo, $ck);
+        $d = $dk !== '' ? $glAcct($dk) : $apId;
+        $c = $glAcct($ck);
         if ($c <= 0) {
             throw new RuntimeException('تعذر تحديد حساب الدائن في قاعدة مردود المشتريات الآجل.');
         }
@@ -337,11 +352,11 @@ function orange_gl_purchase_return_posting_bundle(
     // نقدي + مورد: استرداد نقدي عبر ذمة المورد (أربعة أسطر معكوسة عن شراء نقدي).
     if ($supplierId > 0) {
         $apId = orange_supplier_required_payable_account_id($pdo, $supplierId);
-        $pdnId = orange_journal_type_id_by_code($pdo, 'PDN');
+        $pdnId = $jtByCode('PDN');
         $rule = ($pdnId > 0) ? orange_gl_journal_type_rule_for_terms($pdo, $pdnId, 'cash') : null;
         if ($rule === null) {
-            $inventoryCr = orange_gl_account_id($pdo, 'inventory');
-            $cashDr = orange_gl_account_id($pdo, 'cash');
+            $inventoryCr = $glAcct('inventory');
+            $cashDr = $glAcct('cash');
         } else {
             $dk = trim((string) ($rule['debit_setting_key'] ?? ''));
             $ck = trim((string) ($rule['credit_setting_key'] ?? ''));
@@ -351,8 +366,8 @@ function orange_gl_purchase_return_posting_bundle(
                 );
             }
             // نفس دلالة PIN نقدي: dk = جانب المخزون/المشتريات، ck = النقدية — السند معكوس محاسبياً.
-            $inventoryCr = orange_gl_account_id($pdo, $dk);
-            $cashDr = orange_gl_account_id($pdo, $ck);
+            $inventoryCr = $glAcct($dk);
+            $cashDr = $glAcct($ck);
         }
         if ($cashDr === $apId || $inventoryCr === $apId) {
             throw new RuntimeException(
@@ -411,11 +426,11 @@ function orange_gl_purchase_return_posting_bundle(
     }
 
     // نقدي بدون مورد: مدين نقدية، دائن مخزون (عكس شراء نقدي مباشر).
-    $pdnId = orange_journal_type_id_by_code($pdo, 'PDN');
+    $pdnId = $jtByCode('PDN');
     $rule = ($pdnId > 0) ? orange_gl_journal_type_rule_for_terms($pdo, $pdnId, 'cash') : null;
     if ($rule === null) {
-        $cashId = orange_gl_account_id($pdo, 'cash');
-        $inventoryId = orange_gl_account_id($pdo, 'inventory');
+        $cashId = $glAcct('cash');
+        $inventoryId = $glAcct('inventory');
 
         return [
             'is_multi' => false,
@@ -435,8 +450,8 @@ function orange_gl_purchase_return_posting_bundle(
         );
     }
     // عكس سطر شراء نقدي بدون مورد: مدين ck (نقد)، دائن dk (مخزون).
-    $cashSide = orange_gl_account_id($pdo, $ck);
-    $invSide = orange_gl_account_id($pdo, $dk);
+    $cashSide = $glAcct($ck);
+    $invSide = $glAcct($dk);
     if ($cashSide === $invSide) {
         throw new RuntimeException('في قاعدة مردود المشتريات النقدي يجب أن يختلف المدين عن الدائن.');
     }

@@ -147,7 +147,7 @@ try {
         }
     }
 
-    $glB = orange_gl_purchase_return_posting_bundle($pdo, $type, $supplierId, $returnId, $computedTotal);
+    $glB = orange_gl_purchase_return_posting_bundle($pdo, $type, $supplierId, $returnId, $computedTotal, $returnCountryId);
     $now = date('Y-m-d H:i:s');
     $afterJson = $glB['after_post'] !== null
         ? json_encode($glB['after_post'], JSON_UNESCAPED_UNICODE)

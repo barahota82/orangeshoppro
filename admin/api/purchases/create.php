@@ -211,7 +211,8 @@ try {
         $type,
         $supplierId,
         $purchaseId,
-        $netTotal
+        $netTotal,
+        $purchaseCountryId
     );
 
     $purRef = 'PUR-' . $purchaseId;

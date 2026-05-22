@@ -198,7 +198,19 @@ try {
     orange_purchase_return_remove_accounting($pdo, $retRef);
     orange_gl_pending_remove_by_reference($pdo, $retRef);
 
-    $glB = orange_gl_purchase_return_posting_bundle($pdo, $type, $supplierId, $returnId, $newTotal);
+    $returnCountryId = orange_admin_context_country_id($pdo);
+    if ($purchaseIdOpt > 0 && orange_table_has_country_id($pdo, 'purchases')) {
+        $pc = $pdo->prepare('SELECT country_id FROM purchases WHERE id = ? LIMIT 1');
+        $pc->execute([$purchaseIdOpt]);
+        $returnCountryId = (int) ($pc->fetchColumn() ?: $returnCountryId);
+    }
+    if ($supplierId > 0 && orange_table_has_country_id($pdo, 'suppliers')) {
+        $sc = $pdo->prepare('SELECT country_id FROM suppliers WHERE id = ? LIMIT 1');
+        $sc->execute([$supplierId]);
+        $returnCountryId = (int) ($sc->fetchColumn() ?: $returnCountryId);
+    }
+
+    $glB = orange_gl_purchase_return_posting_bundle($pdo, $type, $supplierId, $returnId, $newTotal, $returnCountryId);
     $now = date('Y-m-d H:i:s');
     $afterJson = $glB['after_post'] !== null
         ? json_encode($glB['after_post'], JSON_UNESCAPED_UNICODE)
