@@ -121,9 +121,9 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
   - admin/api/settings/storefront_copy_lines.php
   - **استثناء:** admin/pages/storefront_hero.php — انظر GAP-03
 
-[v52-S5] storefront_phone_merge_requests — قائمة + تأكيد WA scoped
+[v52-S5] storefront_phone_merge_requests — قائمة + تأكيد WA scoped + find هاتف per country (GAP-07)
   - admin/pages/storefront_merge_requests.php؛ admin/api/storefront/merge_request_confirm_wa.php
-  - includes/storefront_phone_merge.php (country_id عند الإنشاء)
+  - includes/storefront_phone_merge.php (country_id عند الإنشاء؛ find scoped — قرار المالك: القناة=الدولة)
 
 [v52-S6] country_provision — نسخ journal_types / fiscal_years / company_settings / storefront_copy_lines
   - includes/country_provision.php (orange_country_copy_*)
@@ -195,11 +195,13 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
   إغلاق: ctxCountryId في save/delete/page؛ fiscal list/find scoped؛ country_id على orange_voucher_post.
 
 [GAP-07] منخفض — دمج هاتف س15: بحث حساب مفعّl globally
-  حالة: [معلّق]
+  حالة: [منتهٍ]
   المشكلة:
   - orange_storefront_find_verified_account_by_phone() يمسح كل storefront_accounts — قد يطابق دولة أخرى.
   الملفات: includes/storefront_phone_merge.php؛ api/auth/request-email-verify.php
   معيار الإغلاق: قرار المالك (scoped بالقناة/الدولة vs global) + تنفيذ مطابق.
+  قرار المالك (2026-05): **القناة = الدولة** — لا تبديل بين الدول من واجهة المتجر؛ الهاتف المفعّل فريد **داخل country_id القناة** (ليس globally).
+  إغلاق: find scoped بـ storefront_accounts.country_id (أو JOIN channels)؛ request-email-verify يمرّر accountCountryId + channelSlug؛ سياسة مثبتة في ORANGE_STOREFRONT_POLICY_REFERENCE س15.
 
 [GAP-08] منخفض — legacy migrate storefront_copy_lines
   حالة: [معلّق]
@@ -218,9 +220,8 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
 ج — توصيات الأولوية (ترتيب التنفيذ للمالك)
 ----------------------------------------------------------------------
 
-1. GAP-07 — قرار سياسة + تنفيذ merge phone
-2. GAP-08 — legacy migrate (إن وُجدت حاجة)
-3. GAP-09 — تدقيق مستمر
+1. GAP-08 — legacy migrate (إن وُجدت حاجة)
+2. GAP-09 — تدقيق مستمر
 
 ----------------------------------------------------------------------
 د — سجل إغلاق (يُملأ عند إنهاء كل بند)
@@ -232,3 +233,4 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
 [2026-05-20] GAP-04 — purchase/return GL posting bundles + APIs تمرّر country_id للـ journal types و GL accounts.
 [2026-05-20] GAP-05 — orange_fiscal_is_closed_for_voucher fallback scoped بـ country_id السند.
 [2026-05-20] GAP-06 — opening_balances save/delete/page + fiscal require/find scoped بـ ctxCountryId.
+[2026-05-20] GAP-07 — merge phone find scoped بـ country_id القناة؛ قرار المالك: القناة=الدولة بلا تبديل واجهة؛ الهاتف فريد per country لا globally.

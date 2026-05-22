@@ -25,22 +25,51 @@ function orange_storefront_merge_request_country_id(PDO $pdo, ?string $channelSl
 }
 
 /**
- * س15 — حساب مفعّل بنفس الهاتف: دمج بيانات الملف بعد تأكيد واتساب (يدوي من الأدمن) ثم تطبيق العميل.
+ * س15 — حساب مفعّل بنفس الهاتف **ضمن دولة القناة** (قرار المالك 2026-05: القناة = الدولة؛ لا تبديل دول من الواجهة).
  *
  * @return array<string, mixed>|null
  */
-function orange_storefront_find_verified_account_by_phone(PDO $pdo, string $normalizedPhone): ?array
-{
+function orange_storefront_find_verified_account_by_phone(
+    PDO $pdo,
+    string $normalizedPhone,
+    ?int $countryId = null,
+    ?string $channelSlug = null
+): ?array {
     if (trim($normalizedPhone) === '') {
         return null;
     }
+    $cid = $countryId !== null && $countryId > 0
+        ? $countryId
+        : orange_storefront_merge_request_country_id($pdo, $channelSlug);
     try {
-        $st = $pdo->query(
-            "SELECT * FROM storefront_accounts
-             WHERE email_verified_at IS NOT NULL
-               AND customer_phone IS NOT NULL
-               AND TRIM(customer_phone) <> ''"
-        );
+        if (orange_table_has_column($pdo, 'storefront_accounts', 'country_id') && $cid > 0) {
+            $st = $pdo->prepare(
+                "SELECT * FROM storefront_accounts
+                 WHERE country_id = ?
+                   AND email_verified_at IS NOT NULL
+                   AND customer_phone IS NOT NULL
+                   AND TRIM(customer_phone) <> ''"
+            );
+            $st->execute([$cid]);
+        } elseif (orange_table_exists($pdo, 'channels')
+            && orange_table_has_column($pdo, 'channels', 'country_id')
+            && $cid > 0) {
+            $st = $pdo->prepare(
+                "SELECT sa.* FROM storefront_accounts sa
+                 INNER JOIN channels ch ON ch.slug = sa.registered_channel_slug AND ch.country_id = ?
+                 WHERE sa.email_verified_at IS NOT NULL
+                   AND sa.customer_phone IS NOT NULL
+                   AND TRIM(sa.customer_phone) <> ''"
+            );
+            $st->execute([$cid]);
+        } else {
+            $st = $pdo->query(
+                "SELECT * FROM storefront_accounts
+                 WHERE email_verified_at IS NOT NULL
+                   AND customer_phone IS NOT NULL
+                   AND TRIM(customer_phone) <> ''"
+            );
+        }
         if (!$st) {
             return null;
         }

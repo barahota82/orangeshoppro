@@ -212,7 +212,7 @@ try {
 
     if (!$trackCtx) {
         require_once __DIR__ . '/../../includes/storefront_phone_merge.php';
-        $dupAcc = orange_storefront_find_verified_account_by_phone($pdo, $customerPhone);
+        $dupAcc = orange_storefront_find_verified_account_by_phone($pdo, $customerPhone, $accountCountryId, $channelSlug);
         if ($dupAcc !== null && orange_table_exists($pdo, 'storefront_phone_merge_requests')) {
             $dupEmailRaw = (string) ($dupAcc['email'] ?? '');
             $dupEmail = orange_storefront_normalize_email($dupEmailRaw) ?? strtolower(trim($dupEmailRaw));
