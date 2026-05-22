@@ -3029,6 +3029,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_country_cart_promotions_v48($pdo);
     orange_catalog_migrate_country_gl_accounts_v49($pdo);
     orange_catalog_migrate_country_repair_v50($pdo);
+    orange_catalog_migrate_department_countries_v51($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
         orange_catalog_safe_exec(
@@ -4360,6 +4361,57 @@ function orange_catalog_migrate_country_repair_v50(PDO $pdo): void
         && orange_catalog_country_gl_accounts_v49_satisfied($pdo)) {
         orange_catalog_schema_insert_migration_marker($pdo, $marker);
     }
+}
+
+/**
+ * v51 — تفعيل الأقسام per country (department_countries) مع backfill من is_active العام.
+ */
+function orange_catalog_migrate_department_countries_v51(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    $marker = 'php_department_countries_v51';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (!orange_table_exists($pdo, 'department_countries')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE department_countries (
+                department_id INT NOT NULL,
+                country_id INT UNSIGNED NOT NULL,
+                is_active TINYINT(1) NOT NULL DEFAULT 0,
+                PRIMARY KEY (department_id, country_id),
+                KEY idx_department_countries_country (country_id, is_active)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
+    if (orange_table_exists($pdo, 'departments')
+        && orange_table_exists($pdo, 'countries')
+        && orange_table_exists($pdo, 'department_countries')) {
+        $depts = $pdo->query('SELECT id, is_active FROM departments')->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $countries = $pdo->query('SELECT id FROM countries')->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $ins = $pdo->prepare(
+            'INSERT IGNORE INTO department_countries (department_id, country_id, is_active) VALUES (?, ?, ?)'
+        );
+        foreach ($depts as $d) {
+            $did = (int) ($d['id'] ?? 0);
+            if ($did <= 0) {
+                continue;
+            }
+            $masterActive = (int) ($d['is_active'] ?? 0) === 1;
+            foreach ($countries as $c) {
+                $cid = (int) ($c['id'] ?? 0);
+                if ($cid <= 0) {
+                    continue;
+                }
+                $ins->execute([$did, $cid, $masterActive ? 1 : 0]);
+            }
+        }
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
 }
 
 /**

@@ -3,9 +3,11 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
+require_once __DIR__ . '/../../../includes/department_countries.php';
 require_admin_api();
 
 try {
+    orange_department_countries_require_global_admin();
     $pdo = db();
     $data = get_json_input();
 
@@ -76,6 +78,11 @@ try {
             'INSERT INTO departments (name_en, name_ar, slug, is_active, sort_order) VALUES (?, ?, ?, 1, ?)'
         );
         $stmt->execute([$nameEn, $nameAr, $candidate, $sort]);
+    }
+
+    $newId = (int) $pdo->lastInsertId();
+    if ($newId > 0) {
+        orange_department_countries_seed_inactive_all($pdo, $newId);
     }
 
     json_response(['success' => true, 'message' => 'تم حفظ القسم', 'slug' => $candidate]);

@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
 require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/department_countries.php';
 
 try {
     $pdo = db();
@@ -38,6 +39,7 @@ try {
 
     $sfCountryId = orange_storefront_current_country_id($pdo);
     $productsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $sfCountryId);
+    $depActiveSql = orange_department_country_active_sql($pdo, 'd', $sfCountryId);
 
     $sql = '
         SELECT p.*
@@ -46,7 +48,7 @@ try {
         INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id AND ucs.is_active = 1
         INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id AND ucc.is_active = 1
         INNER JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id AND ucs2.is_active = 1
-        INNER JOIN departments d ON d.id = ucs2.department_id AND d.is_active = 1
+        INNER JOIN departments d ON d.id = ucs2.department_id AND (' . $depActiveSql . ')
         WHERE p.is_active = 1' . $productsCountrySql . '
     ';
     $params = [];

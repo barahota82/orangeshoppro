@@ -1,0 +1,82 @@
+ORANGE — سياسة شاشات الأدmin: عام vs دولة
+Last updated: 2026-05-20 (قرار المالك — جلسة تعدد الدول)
+
+الغرض
+- مرجع ثابت: أي شاشة في لوحة التحكم «عامة» (shared) وأيها «دولية» (scoped بمبدّل الدولة أو country_id).
+- يُقرأ مع ORANGE_OWNER_MULTICOUNTRY_VISION.txt و country_provision.
+
+ملاحظة
+- «دولة» = البيانات أو التفعيل يتغيّر حسب سياق الدولة (مبدّل المشرف العام أو country_id على السجل).
+- «عام» = واحد للشركة/الكتalog المرجعي؛ لا يُفترض duplicate per country (إلا where noted).
+
+----------------------------------------------------------------------
+قرار المالك — جدول الشاشات (2026-05-20)
+----------------------------------------------------------------------
+
+الرئيسية
+- dashboard — دولة
+
+المخازن والمشتريات
+- stock, opening_stock_balances, item_card, suppliers, purchases, purchase_returns — دولة
+
+هيكل الكتalog والمنتجات (عام — ما عدا المنتجات)
+- departments — عام + تفعيل per دولة (department_countries؛ انظر أسفل)
+- unified_catalog_branches, product_types, catalog_attributes — عام
+- color_dictionary, pattern_dictionary, size_scheme_templates, sizing_dictionary, size_families, advisory_sizing_guides — عام
+- products — دولة
+
+المبيعات والعروض
+- customers, orders, reserved_orders, order_intake_queue, invoice, manual_order, sales_returns — دولة
+- offers, cart_promotions, cart_gift_promotions, cart_bogo_promotions, cart_combo_promotions — دولة
+- reports, channel_analytics — دولة
+
+الحسابات والتقارير — إعداد/دليل
+- chart_of_accounts, gl_account_settings, journal_types, fiscal_years, gl_posting, opening_balances — دولة (قرار المالك؛ جزء منها لا يزال يحتاج تنفيذ/ترحيل schema)
+
+الحسابات — سندات
+- journal_entries, receipt_voucher, payment_voucher, other_vouchers — دولة
+- partner_customer_receipt, partner_supplier_payment — دولة
+
+الحسابات — تقارير
+- journal_voucher_reports, partner_account_statement, financial_report, report_gl_account_monthly — دولة
+- partner_reports (عملاء/موردين) — دولة
+- report_income_statement, report_trading_account, report_pl_monthly, report_pl_compare_years, report_trial_balance — دولة
+- accounting_reports_index — عام (فهرس روابط فقط)
+
+الإعدادات — شركة
+- company_settings — دولة (قرار المالك؛ تنفيذ schema pending)
+- company_documents, logs — عام
+
+الإعدادات — أسواق
+- countries, admin_users — عام
+
+الإعدادات — السوق الحالي
+- channels, delivery_areas, storefront_hero, storefront_merge_requests — دولة (storefront_* قرار المالك؛ تنفيذ pending)
+
+----------------------------------------------------------------------
+الأقسام (departments) — سياسة خاصة (2026-05-20)
+----------------------------------------------------------------------
+
+- الشجرة والأسماء والترتيب: عام — المشرف العام يضيف/يعدّل.
+- التفعيل في المتجر: per دولة عبر جدول department_countries (department_id, country_id, is_active).
+- المشرف العام فقط: من مبدّل الدولة في الشريط → نشط/مخفي «في هذه الدولة».
+- فريق الدولة: يرى كل الأقسام للقراءة؛ لا يغيّر التفعيل per دولة.
+- departments.is_active (master): مخفي من الكتalog بالكامل في كل الدول.
+- قسم جديد: يُسجَّل في department_countries غير نشط في **كل** الدول حتى يفعّله المشرف العام لكل دولة.
+- إنشاء كامل لدولة: ينسخ خريطة تفعيل الأقسام من دولة المصدر (افتراضياً الكويت).
+
+تنفيذ (2026-05-20)
+- includes/department_countries.php
+- migration php_department_countries_v51 في catalog_schema.php
+- admin/api/departments/toggle-country.php
+- admin/pages/departments.php
+- storefront: catalog_unified_nav.php، api/products/get-products.php، get-attribute-facets.php
+- country_provision: orange_department_countries_copy_from_source
+
+----------------------------------------------------------------------
+فجوات تنفيذ معروفة (بعد قرار المالك)
+----------------------------------------------------------------------
+
+- journal_types, fiscal_years, company_settings per country — قرار المالك «دولة»؛ schema/UI لم يُكتمل بعد.
+- storefront_hero, storefront_merge_requests per country — قرار المالك «دولة»؛ pending.
+- مراجعة شاشات محاسبة/سندات للتأكد من فلترة country_id على كل الاستعلامات.

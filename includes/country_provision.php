@@ -487,6 +487,14 @@ function orange_country_provision_full(PDO $pdo, int $countryId, ?int $sourceCou
         $idMap
     );
 
+    require_once __DIR__ . '/department_countries.php';
+    $out['departments_copy'] = orange_department_countries_copy_from_source($pdo, $countryId, $sourceCountryId);
+    if ((int) ($out['departments_copy']['copied'] ?? 0) <= 0) {
+        orange_department_countries_seed_for_new_country($pdo, $countryId, false);
+        $out['departments_copy']['reason'] = 'seeded_inactive';
+        $out['departments_copy']['skipped'] = false;
+    }
+
     if (orange_delivery_governorates_table_exists($pdo)) {
         $govBefore = 0;
         $stG = $pdo->prepare('SELECT id FROM delivery_governorates WHERE country_id = ? ORDER BY sort_order ASC, id ASC LIMIT 1');

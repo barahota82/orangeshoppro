@@ -1,9 +1,11 @@
 <?php
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
+require_once __DIR__ . '/../../../includes/department_countries.php';
 require_admin_api();
 
 try {
+    orange_department_countries_require_global_admin();
     $pdo = db();
     $data = get_json_input();
     $id = (int)($data['id'] ?? 0);

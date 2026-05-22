@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_taxonomy_migrate.php';
+require_once __DIR__ . '/department_countries.php';
+require_once __DIR__ . '/countries.php';
 
 /**
  * بيانات التنقل بعد ترحيل التصنيف الموحّد — استعلامات محصورة، لا شجرة عرض ثانية خارج الجاهزية.
@@ -15,8 +17,14 @@ require_once __DIR__ . '/catalog_taxonomy_migrate.php';
  *   categoryToDepartment: array<int, int>,
  * }
  */
-function orange_storefront_unified_nav_for_home(PDO $pdo): array
+function orange_storefront_unified_nav_for_home(PDO $pdo, ?int $countryId = null): array
 {
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_storefront_current_country_id($pdo);
+    }
+    $depActiveD = orange_department_country_active_sql($pdo, 'd', $countryId);
+    $depActiveDp = orange_department_country_active_sql($pdo, 'd_p', $countryId);
+    $depActiveD2 = orange_department_country_active_sql($pdo, 'd2', $countryId);
     $empty = [
         'departments' => [],
         'categories' => [],
@@ -46,7 +54,7 @@ function orange_storefront_unified_nav_for_home(PDO $pdo): array
                 AND ucs.is_active = 1
                 AND ucs.catalog_category_id = cc.id
               INNER JOIN catalog_sections sec_p ON sec_p.id = cc.catalog_section_id AND sec_p.is_active = 1
-              INNER JOIN departments d_p ON d_p.id = sec_p.department_id AND d_p.is_active = 1
+              INNER JOIN departments d_p ON d_p.id = sec_p.department_id AND (' . $depActiveDp . ')
               WHERE p.is_active = 1
           )';
 
@@ -54,7 +62,7 @@ function orange_storefront_unified_nav_for_home(PDO $pdo): array
           AND (
               cs.department_id IS NULL
               OR d.id IS NULL
-              OR d.is_active = 1
+              OR (' . $depActiveD . ')
           )';
 
     $categoriesSql =
@@ -88,7 +96,7 @@ function orange_storefront_unified_nav_for_home(PDO $pdo): array
                   INNER JOIN products p ON p.product_type_id = pt.id AND pt.is_active = 1 AND p.is_active = 1
                   INNER JOIN catalog_categories cc2 ON cc2.id = s.catalog_category_id AND cc2.is_active = 1
                   INNER JOIN catalog_sections sec2 ON sec2.id = cc2.catalog_section_id AND sec2.is_active = 1
-                  INNER JOIN departments d2 ON d2.id = sec2.department_id AND d2.is_active = 1
+                  INNER JOIN departments d2 ON d2.id = sec2.department_id AND (' . $depActiveD2 . ')
                   WHERE pt.catalog_subcategory_id = s.id
               )
             ORDER BY s.catalog_category_id ASC, s.sort_order ASC, s.id ASC
@@ -129,7 +137,7 @@ function orange_storefront_unified_nav_for_home(PDO $pdo): array
         '
         SELECT d.*
         FROM departments d
-        WHERE d.is_active = 1
+        WHERE (' . $depActiveD . ')
           AND EXISTS (
               SELECT 1
               FROM catalog_sections cs

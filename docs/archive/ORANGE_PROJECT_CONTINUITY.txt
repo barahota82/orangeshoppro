@@ -10,6 +10,7 @@ PURPOSE
 - **خارطة استكمال المشروع (خطوات مرحلية موحّدة):** ORANGE_PROJECT_COMPLETION_ROADMAP.txt
 - **مؤجّل بقرار المالك:** إعادة صياغة ومناقشة **س4 (سياسة العروض)** في `ORANGE_STOREFRONT_POLICY_REFERENCE.txt` إلى ما بعد إتمام مراجعة باقي بنود المرجع؛ **لا توسعة نطاق تنفيذ جديد خاصة بالعروض** في الجلسات الحالية حتى اعتماد صياغة نهائية — المسارات والشاشات الموجودة في الكود تبقى المرجع التشغيلي حتى ذلك الحين.
 - **منجز (أدمن — س5):** بطاقة «قارب على النفاذ» في `admin/pages/dashboard.php` تُظهر عدد المتغيرات للمنتجات النشطة ذات المخزون ≤ `orange_stock_low_alert_threshold()` (نفس منطق صفحة المستودع)؛ سبق أن استُخدمت متغيرات PHP غير معرّفة فتعطّل البطاقة لمن لديه صلاحية المخزن.
+- **منجز (أدمن — تعدد دول 2026-05-20):** سياسة شاشات عام/دولة في **`docs/archive/ORANGE_ADMIN_SCREENS_COUNTRY_SCOPE.txt`**؛ تفعيل الأقسام per دولة (`department_countries`، v51، `departments.php`، `toggle-country.php`).
 - **منجز (واجهة — خارج س4):** عند وجود مناطق نشطة، حقل المنطقة يُعرض كقائمة `<select>` مُولَّدة من الخادم في `pages/cart.php` و`pages/register.php` و`pages/track.php` عبر `orange_storefront_delivery_area_select_markup()` في `includes/delivery_areas.php` (مطابقة **س8** و**س20**؛ بلا اعتماد على استبدال حقل نصّي بـ JS فقط). عند التحميل يُفعَّل نفس **البحث/الفلترة** كقائمة الدول (`orangeEnhanceDeliveryAreaSelect` في `assets/js/app.js` + `orangeAttachSearchableCombobox`).
 - **الحركات المحاسبية وإقفالها وشاشة الترحيل (سياسة متفق عليها):** ORANGE_GL_MOVEMENTS_AND_POSTING_POLICY.txt
 - Partner AR/AP subledger (ذمم العملاء والموردين): read ORANGE_PARTNER_SUBLEDGER_REFERENCE.txt for full technical handoff.
@@ -27,6 +28,7 @@ ALSO SEE (existing refs)
 - ORANGE_STOCK_ORDER_POLICY.txt -> stock unit = variant; reserve/deduct; purchases receipt; safety rules.
 - ORANGE_GL_MOVEMENTS_AND_POSTING_POLICY.txt -> حركات غير مثبتة، شاشة إقفال موحّدة، تصميم إعدادات القيود، قيود مركّبة، فك ترحيل انتقائي (سياسة مشروع).
 - ORANGE_PROJECT_COMPLETION_ROADMAP.txt -> خارطة طريق موحّدة من المرحلة 0 إلى الإغلاق الرسمي + روابط المرجعيات.
+- ORANGE_ADMIN_SCREENS_COUNTRY_SCOPE.txt -> قرار المالك: أي شاشة أدمن عام vs دولة + سياسة الأقسام (department_countries).
 - IBRAHIM_ORANGE_MASTER.txt -> ورقة دخول موحّدة (إبراهيم): أسبقية الوثائق، ترميز/نشر، مسار D:\orange، روابط باقي الملفات.
 
 ----------------------------------------------------------------------

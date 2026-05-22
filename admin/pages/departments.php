@@ -1,5 +1,26 @@
 <?php
+require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/department_countries.php';
+require_once __DIR__ . '/../../includes/admin_permissions.php';
+
 $pdo = db();
+orange_catalog_ensure_schema($pdo);
+
+/** @var array<string,mixed> $admin من admin/index.php */
+$depAdmin = isset($admin) && is_array($admin) ? $admin : [];
+$depCanManageGlobal = $depAdmin !== [] && orange_admin_has_full_access($depAdmin);
+$depCountryId = orange_admin_context_country_id($pdo);
+$depCountryRow = orange_country_row_by_id($pdo, $depCountryId, false);
+$depCountryLabel = trim((string) ($depCountryRow['name_ar'] ?? ''));
+if ($depCountryLabel === '' && $depCountryRow !== null) {
+    $depCountryLabel = trim((string) ($depCountryRow['name_en'] ?? ''));
+}
+if ($depCountryLabel === '') {
+    $depCountryLabel = orange_countries_display_code(orange_admin_context_country_code($pdo));
+}
+$depCountryActiveMap = orange_department_countries_active_map($pdo, $depCountryId);
+
 $hasDepartmentsTable = (bool)$pdo->query("SHOW TABLES LIKE 'departments'")->fetchColumn();
 $departments = [];
 $hasNameFil = false;
@@ -38,15 +59,29 @@ if ($hasDepartmentsTable) {
 ?>
 <div class="page-title">
     <h1>الأقسام الرئيسية</h1>
+    <?php if ($depCountryId > 0): ?>
+    <p class="card-hint" style="margin:0.35rem 0 0;">
+        <?php if ($depCanManageGlobal): ?>
+        سياق الدولة: <strong><?php echo htmlspecialchars($depCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong>
+        — الأسماء والترتيب <strong>عام</strong> للكل؛ عمود «في <?php echo htmlspecialchars($depCountryLabel, ENT_QUOTES, 'UTF-8'); ?>» للتفعيل في هذه الدولة فقط.
+        <?php else: ?>
+        عرض للقراءة — التفعيل per دولة يخص <strong>المشرف العام</strong> (الدولة: <?php echo htmlspecialchars($depCountryLabel, ENT_QUOTES, 'UTF-8'); ?>).
+        <?php endif; ?>
+    </p>
+    <?php endif; ?>
 </div>
 
 <?php if (!$hasDepartmentsTable): ?>
 <div class="card">
     <div class="alert-error">جدول <code>departments</code> غير موجود. أضفه في قاعدة البيانات لتفعيل الشاشة.</div>
 </div>
+<?php elseif (!$depCanManageGlobal): ?>
+<div class="card" style="border:1px solid #e2e8f0;background:#f8fafc;margin-bottom:12px;">
+    <p class="card-hint" style="margin:0;line-height:1.55;">قائمة الأقسام أدناه <strong>للقراءة</strong> — إضافة الأقسام وتفعيلها في الدول للمشرف العام فقط.</p>
+</div>
 <?php endif; ?>
 
-<div class="card">
+<?php if ($depCanManageGlobal): ?>
     <h3>إضافة / تعديل قسم</h3>
     <input type="hidden" id="dept_record_id" value="0">
     <div class="form-grid dep-form-grid">
@@ -84,12 +119,15 @@ if ($hasDepartmentsTable) {
         <button type="button" class="btn-secondary" onclick="resetDepartmentForm()">جديد</button>
     </div>
 </div>
+<?php endif; ?>
 
 <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
         <h3 style="margin:0;">قائمة الأقسام</h3>
         <div class="actions">
+            <?php if ($depCanManageGlobal): ?>
             <button type="button" class="btn-secondary" onclick="saveDepartmentsOrder()">حفظ الترتيب</button>
+            <?php endif; ?>
         </div>
     </div>
     <div class="table-wrap cat-dep-list-wrap" data-list="departments" style="margin-top:10px;">
@@ -103,30 +141,41 @@ if ($hasDepartmentsTable) {
                     <th>Hindi</th>
                     <th>Slug</th>
                     <th>الترتيب</th>
-                    <th>الحالة</th>
+                    <th>الكتalog</th>
+                    <?php if ($depCountryId > 0): ?>
+                    <th>في <?php echo htmlspecialchars($depCountryLabel, ENT_QUOTES, 'UTF-8'); ?></th>
+                    <?php endif; ?>
                     <th class="dep-ops-col">إجراءات</th>
                 </tr>
             </thead>
             <tbody id="departmentsTbody">
-                <?php foreach ($departments as $dep): ?>
-                <tr data-id="<?php echo (int)$dep['id']; ?>">
-                    <td><?php echo (int)$dep['id']; ?></td>
+                <?php foreach ($departments as $dep):
+                    $depId = (int) $dep['id'];
+                    $depMasterActive = (int) ($dep['is_active'] ?? 0) === 1;
+                    $depCountryActive = !empty($depCountryActiveMap[$depId]);
+                    ?>
+                <tr data-id="<?php echo $depId; ?>">
+                    <td><?php echo $depId; ?></td>
                     <td><?php echo htmlspecialchars((string)$dep['name_ar']); ?></td>
                     <td><?php echo htmlspecialchars((string)$dep['name_en']); ?></td>
                     <td><?php echo htmlspecialchars((string)$dep['name_fil_safe']); ?></td>
                     <td><?php echo htmlspecialchars((string)$dep['name_hi_safe']); ?></td>
                     <td><?php echo htmlspecialchars((string)$dep['slug']); ?></td>
                     <td><?php echo (int)$dep['sort_order']; ?></td>
-                    <td><?php echo (int)$dep['is_active'] === 1 ? 'ظاهر' : 'مخفي'; ?></td>
+                    <td><?php echo $depMasterActive ? 'مفعّل' : 'مخفي كلياً'; ?></td>
+                    <?php if ($depCountryId > 0): ?>
+                    <td><?php echo $depCountryActive ? 'نشط' : 'مخفي'; ?></td>
+                    <?php endif; ?>
                     <td class="dep-row-ops">
                         <div class="dep-ops-wrap">
+                            <?php if ($depCanManageGlobal): ?>
                             <div class="dep-ops-arrows">
                                 <button type="button" class="btn-secondary dep-btn-reorder" onclick="moveDepartmentRow(this,'up')" aria-label="أعلى">↑</button>
                                 <button type="button" class="btn-secondary dep-btn-reorder" onclick="moveDepartmentRow(this,'down')" aria-label="أسفل">↓</button>
                             </div>
                             <div class="dep-ops-main">
                                 <button type="button" class="btn-secondary dep-edit-btn" data-dep-json="<?php echo htmlspecialchars(json_encode([
-                                    'id' => (int)$dep['id'],
+                                    'id' => $depId,
                                     'name_ar' => (string)$dep['name_ar'],
                                     'name_en' => (string)$dep['name_en'],
                                     'name_fil' => (string)$dep['name_fil_safe'],
@@ -134,10 +183,18 @@ if ($hasDepartmentsTable) {
                                     'slug' => (string)$dep['slug'],
                                     'sort_order' => (int)$dep['sort_order'],
                                 ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button>
-                                <button type="button" class="dep-btn-toggle" onclick="toggleDepartment(<?php echo (int)$dep['id']; ?>, <?php echo (int)$dep['is_active']; ?>)">
-                                    <?php echo (int)$dep['is_active'] === 1 ? 'إخفاء' : 'إظهار'; ?>
+                                <?php if ($depCountryId > 0): ?>
+                                <button type="button" class="dep-btn-toggle-country" onclick="toggleDepartmentCountry(<?php echo $depId; ?>, <?php echo $depCountryActive ? 1 : 0; ?>)">
+                                    <?php echo $depCountryActive ? 'إخفاء هنا' : 'تفعيل هنا'; ?>
+                                </button>
+                                <?php endif; ?>
+                                <button type="button" class="dep-btn-toggle-master" onclick="toggleDepartmentMaster(<?php echo $depId; ?>, <?php echo $depMasterActive ? 1 : 0; ?>)">
+                                    <?php echo $depMasterActive ? 'إخفاء كلياً' : 'تفعيل كلياً'; ?>
                                 </button>
                             </div>
+                            <?php else: ?>
+                            <span class="muted" style="font-size:0.9rem;">—</span>
+                            <?php endif; ?>
                         </div>
                     </td>
                 </tr>
@@ -305,7 +362,16 @@ async function saveDepartment() {
     }
 }
 
-async function toggleDepartment(id, isActive) {
+async function toggleDepartmentCountry(id, isActive) {
+    const res = await postJSON('/admin/api/departments/toggle-country.php', {
+        id: id,
+        is_active: isActive ? 0 : 1
+    });
+    alert(res.message || (res.success ? 'تم التعديل' : 'فشل التعديل'));
+    if (res.success) location.reload();
+}
+
+async function toggleDepartmentMaster(id, isActive) {
     const res = await postJSON('/admin/api/departments/toggle.php', {
         id: id,
         is_active: isActive ? 0 : 1

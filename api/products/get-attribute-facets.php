@@ -11,6 +11,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
+require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/department_countries.php';
 
 try {
     $pdo = db();
@@ -32,6 +34,8 @@ try {
     $facets = [];
 
     if ($unified) {
+        $sfCountryId = orange_storefront_current_country_id($pdo);
+        $depActiveSql = orange_department_country_active_sql($pdo, 'd', $sfCountryId);
         $sql = '
             SELECT ca.attribute_key AS k, ca.label_ar, ca.label_en, ca.label_fil, ca.label_hi,
                    pav.value_raw AS v,
@@ -43,7 +47,7 @@ try {
             INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id AND ucs.is_active = 1
             INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id AND ucc.is_active = 1
             INNER JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id AND ucs2.is_active = 1
-            INNER JOIN departments d ON d.id = ucs2.department_id AND d.is_active = 1
+            INNER JOIN departments d ON d.id = ucs2.department_id AND (' . $depActiveSql . ')
             WHERE ca.is_active = 1 AND ca.is_filterable = 1
         ';
         $params = [];
