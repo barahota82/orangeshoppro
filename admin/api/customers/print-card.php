@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/company_settings.php';
 
 require_admin_page();
 
@@ -38,13 +39,7 @@ try {
     exit($e->getMessage());
 }
 
-$companyName = '';
-if (orange_table_exists($pdo, 'company_settings')) {
-    $cs = $pdo->query('SELECT company_name_ar FROM company_settings ORDER BY id ASC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
-    if (is_array($cs)) {
-        $companyName = trim((string) ($cs['company_name_ar'] ?? ''));
-    }
-}
+$companyName = orange_company_settings_name_ar($pdo);
 
 $balance = orange_party_balance_customer($pdo, $customerId);
 $daName = '';

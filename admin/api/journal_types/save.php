@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/journal_types.php';
+require_once __DIR__ . '/../../../includes/admin_settings_country.php';
 require_admin_api();
 
 try {
@@ -16,14 +17,21 @@ try {
 
     $data = get_json_input();
     $action = trim((string) ($data['action'] ?? ''));
+    $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
+    $scoped = orange_journal_types_has_country_column($pdo);
 
     if ($action === 'delete') {
         $id = (int) ($data['id'] ?? 0);
         if ($id <= 0) {
             json_response(['success' => false, 'message' => 'المعرف مطلوب'], 422);
         }
-        $d = $pdo->prepare('DELETE FROM journal_types WHERE id = ?');
-        $d->execute([$id]);
+        if ($scoped) {
+            $d = $pdo->prepare('DELETE FROM journal_types WHERE id = ? AND country_id = ?');
+            $d->execute([$id, $ctxCountryId]);
+        } else {
+            $d = $pdo->prepare('DELETE FROM journal_types WHERE id = ?');
+            $d->execute([$id]);
+        }
         if ($d->rowCount() === 0) {
             json_response(['success' => false, 'message' => 'السجل غير موجود'], 404);
         }
@@ -79,40 +87,60 @@ try {
             json_response(['success' => false, 'message' => 'لا توجد صفوف صالحة للحفظ'], 422);
         }
 
-        $dupOther = $pdo->prepare('SELECT id FROM journal_types WHERE code = ? AND id <> ? LIMIT 1');
-        $dupAny = $pdo->prepare('SELECT id FROM journal_types WHERE code = ? LIMIT 1');
+        $dupOther = $scoped
+            ? $pdo->prepare('SELECT id FROM journal_types WHERE country_id = ? AND code = ? AND id <> ? LIMIT 1')
+            : $pdo->prepare('SELECT id FROM journal_types WHERE code = ? AND id <> ? LIMIT 1');
+        $dupAny = $scoped
+            ? $pdo->prepare('SELECT id FROM journal_types WHERE country_id = ? AND code = ? LIMIT 1')
+            : $pdo->prepare('SELECT id FROM journal_types WHERE code = ? LIMIT 1');
 
         $pdo->beginTransaction();
         try {
-            $ins = $pdo->prepare(
-                'INSERT INTO journal_types (code, name_ar, name_en, sort_order) VALUES (?,?,?,?)'
-            );
-            $upd = $pdo->prepare(
-                'UPDATE journal_types SET code = ?, name_ar = ?, name_en = ?, sort_order = ? WHERE id = ?'
-            );
+            $ins = $scoped
+                ? $pdo->prepare('INSERT INTO journal_types (country_id, code, name_ar, name_en, sort_order) VALUES (?,?,?,?,?)')
+                : $pdo->prepare('INSERT INTO journal_types (code, name_ar, name_en, sort_order) VALUES (?,?,?,?)');
+            $upd = $scoped
+                ? $pdo->prepare('UPDATE journal_types SET code = ?, name_ar = ?, name_en = ?, sort_order = ? WHERE id = ? AND country_id = ?')
+                : $pdo->prepare('UPDATE journal_types SET code = ?, name_ar = ?, name_en = ?, sort_order = ? WHERE id = ?');
 
             foreach ($normalized as $idx => $row) {
                 $ord = $idx + 1;
                 $id = (int) $row['id'];
                 $code = $row['code'];
                 if ($id > 0) {
-                    $dupOther->execute([$code, $id]);
+                    if ($scoped) {
+                        $dupOther->execute([$ctxCountryId, $code, $id]);
+                    } else {
+                        $dupOther->execute([$code, $id]);
+                    }
                     if ($dupOther->fetch()) {
                         $pdo->rollBack();
                         json_response(['success' => false, 'message' => 'الترميز «' . $code . '» مستخدم في سجل آخر'], 422);
                     }
-                    $upd->execute([$code, $row['name_ar'], $row['name_en'], $ord, $id]);
+                    if ($scoped) {
+                        $upd->execute([$code, $row['name_ar'], $row['name_en'], $ord, $id, $ctxCountryId]);
+                    } else {
+                        $upd->execute([$code, $row['name_ar'], $row['name_en'], $ord, $id]);
+                    }
                     if ($upd->rowCount() === 0) {
                         $pdo->rollBack();
                         json_response(['success' => false, 'message' => 'سجل غير موجود للتحديث: #' . $id], 422);
                     }
                 } else {
-                    $dupAny->execute([$code]);
+                    if ($scoped) {
+                        $dupAny->execute([$ctxCountryId, $code]);
+                    } else {
+                        $dupAny->execute([$code]);
+                    }
                     if ($dupAny->fetch()) {
                         $pdo->rollBack();
                         json_response(['success' => false, 'message' => 'الترميز «' . $code . '» موجود مسبقاً'], 422);
                     }
-                    $ins->execute([$code, $row['name_ar'], $row['name_en'], $ord]);
+                    if ($scoped) {
+                        $ins->execute([$ctxCountryId, $code, $row['name_ar'], $row['name_en'], $ord]);
+                    } else {
+                        $ins->execute([$code, $row['name_ar'], $row['name_en'], $ord]);
+                    }
                 }
             }
 

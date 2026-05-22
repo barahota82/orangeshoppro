@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../includes/order_helpers.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/document_sequences.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
+require_once __DIR__ . '/../../includes/company_settings.php';
 
 /**
  * @param array<string, mixed> $order
@@ -64,7 +65,7 @@ function orange_invoice_logo_url(string $raw): string
 /**
  * @return array<string, string>
  */
-function orange_invoice_load_company(PDO $pdo): array
+function orange_invoice_load_company(PDO $pdo, ?int $countryId = null): array
 {
     $defaults = [
         'company_name_ar' => '',
@@ -78,11 +79,8 @@ function orange_invoice_load_company(PDO $pdo): array
     ];
     try {
         orange_catalog_ensure_schema($pdo);
-        if (!orange_table_exists($pdo, 'company_settings')) {
-            return $defaults;
-        }
-        $row = $pdo->query('SELECT * FROM company_settings ORDER BY id ASC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
-        if (!$row) {
+        $row = orange_company_settings_row($pdo, $countryId);
+        if (!is_array($row)) {
             return $defaults;
         }
 
@@ -135,7 +133,7 @@ if ($orderId > 0) {
         $it = $pdo->prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY id ASC');
         $it->execute([$orderId]);
         $items = $it->fetchAll(PDO::FETCH_ASSOC);
-        $companyProfile = orange_invoice_load_company($pdo);
+        $companyProfile = orange_invoice_load_company($pdo, (int) ($order['country_id'] ?? 0) ?: null);
         orange_invoice_assign_number_if_needed($pdo, $order, $orderId);
         foreach ($items as $row) {
             $linesSubtotal += orange_order_item_line_net($row);

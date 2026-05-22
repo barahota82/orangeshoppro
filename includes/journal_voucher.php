@@ -270,17 +270,17 @@ function orange_journal_voucher_display_number(array $voucherRow): int
  *
  * @return array{journal_type_id:int|null,journal_serial_bucket:string}
  */
-function orange_journal_voucher_resolve_serial_meta(PDO $pdo, string $entryType, ?int $overrideJournalTypeId = null): array
+function orange_journal_voucher_resolve_serial_meta(PDO $pdo, string $entryType, ?int $overrideJournalTypeId = null, ?int $countryId = null): array
 {
     orange_catalog_ensure_schema($pdo);
-    orange_journal_types_sync_canonical_defaults($pdo);
+    orange_journal_types_sync_canonical_defaults($pdo, $countryId);
     $ov = (int) ($overrideJournalTypeId ?? 0);
     if ($ov > 0) {
         return ['journal_type_id' => $ov, 'journal_serial_bucket' => 'JT' . $ov];
     }
     $code = orange_journal_type_code_from_entry_type($entryType);
     if ($code !== '') {
-        $jid = orange_journal_type_id_by_code($pdo, $code);
+        $jid = orange_journal_type_id_by_code($pdo, $code, $countryId);
         if ($jid > 0) {
             return ['journal_type_id' => $jid, 'journal_serial_bucket' => 'JT' . $jid];
         }
@@ -329,7 +329,9 @@ function orange_journal_vouchers_backfill_serial_numbers(PDO $pdo): void
         return;
     }
     $rows = $pdo->query(
-        'SELECT id, entry_type, fiscal_year_id, voucher_date FROM journal_vouchers WHERE voucher_serial <= 0 OR TRIM(COALESCE(journal_serial_bucket,\'\')) = \'\' ORDER BY COALESCE(fiscal_year_id,0) ASC, id ASC'
+        'SELECT id, entry_type, fiscal_year_id, voucher_date'
+        . (orange_table_has_country_id($pdo, 'journal_vouchers') ? ', country_id' : '')
+        . ' FROM journal_vouchers WHERE voucher_serial <= 0 OR TRIM(COALESCE(journal_serial_bucket,\'\')) = \'\' ORDER BY COALESCE(fiscal_year_id,0) ASC, id ASC'
     )->fetchAll(PDO::FETCH_ASSOC);
     if ($rows === []) {
         return;
@@ -347,12 +349,15 @@ function orange_journal_vouchers_backfill_serial_numbers(PDO $pdo): void
         if ($et === '') {
             $et = 'general';
         }
-        $meta = orange_journal_voucher_resolve_serial_meta($pdo, $et, null);
+        $voucherCountryId = orange_table_has_country_id($pdo, 'journal_vouchers')
+            ? (int) ($r['country_id'] ?? 0)
+            : 0;
+        $meta = orange_journal_voucher_resolve_serial_meta($pdo, $et, null, $voucherCountryId > 0 ? $voucherCountryId : null);
         $fyId = (int) ($r['fiscal_year_id'] ?? 0);
         $vdRaw = trim((string) ($r['voucher_date'] ?? ''));
         if ($fyId <= 0 && $vdRaw !== '') {
             orange_catalog_ensure_schema($pdo);
-            $fy = orange_fiscal_find_for_date($pdo, $vdRaw);
+            $fy = orange_fiscal_find_for_date($pdo, $vdRaw, $voucherCountryId > 0 ? $voucherCountryId : null);
             if ($fy) {
                 $fyId = (int) ($fy['id']);
                 $pdo->prepare(
@@ -443,13 +448,14 @@ function orange_voucher_post(PDO $pdo, array $header, array $lines): int
         $voucherCountryId
     );
 
-    $fyId = orange_fiscal_require_open_for_posting($pdo, $date);
+    $fyId = orange_fiscal_require_open_for_posting($pdo, $date, $voucherCountryId > 0 ? $voucherCountryId : null);
 
     $overrideJt = isset($header['journal_type_id']) ? (int) $header['journal_type_id'] : 0;
     $metaSerial = orange_journal_voucher_resolve_serial_meta(
         $pdo,
         $entryType,
-        $overrideJt > 0 ? $overrideJt : null
+        $overrideJt > 0 ? $overrideJt : null,
+        $voucherCountryId > 0 ? $voucherCountryId : null
     );
     $hasSerialCols = orange_table_has_column($pdo, 'journal_vouchers', 'voucher_serial')
         && orange_table_has_column($pdo, 'journal_vouchers', 'journal_serial_bucket');
@@ -693,7 +699,7 @@ function orange_voucher_update_multiline(PDO $pdo, int $voucherId, array $header
         $voucherCountryId
     );
 
-    $fyId = orange_fiscal_require_open_for_posting($pdo, $date);
+    $fyId = orange_fiscal_require_open_for_posting($pdo, $date, $voucherCountryId > 0 ? $voucherCountryId : null);
     $chk = $pdo->prepare('SELECT id FROM accounts WHERE id = ? LIMIT 1');
 
     $hasUpdatedAt = orange_table_has_column($pdo, 'journal_vouchers', 'updated_at');

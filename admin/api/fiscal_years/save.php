@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../../includes/year_end_close.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
+require_once __DIR__ . '/../../../includes/admin_settings_country.php';
 require_admin_api();
 
 /**
@@ -36,6 +37,8 @@ try {
 
     $data = get_json_input();
     $action = trim((string) ($data['action'] ?? ''));
+    $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
+    $fyScoped = orange_fiscal_years_has_country_column($pdo);
 
     if ($action === 'delete') {
         $id = (int) ($data['id'] ?? 0);
@@ -45,8 +48,13 @@ try {
         if (orange_fiscal_year_has_journal_activity($pdo, $id)) {
             json_response(['success' => false, 'message' => 'لا يمكن حذف سنة عليها قيود أو مستندات'], 422);
         }
-        $d = $pdo->prepare('DELETE FROM fiscal_years WHERE id = ?');
-        $d->execute([$id]);
+        if ($fyScoped) {
+            $d = $pdo->prepare('DELETE FROM fiscal_years WHERE id = ? AND country_id = ?');
+            $d->execute([$id, $ctxCountryId]);
+        } else {
+            $d = $pdo->prepare('DELETE FROM fiscal_years WHERE id = ?');
+            $d->execute([$id]);
+        }
         if ($d->rowCount() === 0) {
             json_response(['success' => false, 'message' => 'السنة غير موجودة'], 404);
         }
@@ -105,8 +113,12 @@ try {
         $pdo->beginTransaction();
         try {
             $selPrev = $pdo->prepare('SELECT is_closed, closed_at FROM fiscal_years WHERE id = ? LIMIT 1');
-            $ins = $pdo->prepare('INSERT INTO fiscal_years (label_ar, start_date, end_date, is_closed) VALUES (?, ?, ?, ?)');
-            $upd = $pdo->prepare('UPDATE fiscal_years SET label_ar = ?, start_date = ?, end_date = ?, is_closed = ?, closed_at = ? WHERE id = ?');
+            $ins = $fyScoped
+                ? $pdo->prepare('INSERT INTO fiscal_years (country_id, label_ar, start_date, end_date, is_closed) VALUES (?, ?, ?, ?, ?)')
+                : $pdo->prepare('INSERT INTO fiscal_years (label_ar, start_date, end_date, is_closed) VALUES (?, ?, ?, ?)');
+            $upd = $fyScoped
+                ? $pdo->prepare('UPDATE fiscal_years SET label_ar = ?, start_date = ?, end_date = ?, is_closed = ?, closed_at = ? WHERE id = ? AND country_id = ?')
+                : $pdo->prepare('UPDATE fiscal_years SET label_ar = ?, start_date = ?, end_date = ?, is_closed = ?, closed_at = ? WHERE id = ?');
 
             foreach ($normalized as $row) {
                 $id = (int) $row['id'];
@@ -114,7 +126,7 @@ try {
                 $closedAt = null;
 
                 if ($id > 0) {
-                    if (orange_fiscal_range_overlaps_existing($pdo, $row['start_date'], $row['end_date'], $id)) {
+                    if (orange_fiscal_range_overlaps_existing($pdo, $row['start_date'], $row['end_date'], $id, $ctxCountryId)) {
                         $pdo->rollBack();
                         json_response(['success' => false, 'message' => 'فترة تتقاطع مع سنة أخرى في القاعدة'], 422);
                     }
@@ -139,25 +151,47 @@ try {
                     } else {
                         $closedAt = null;
                     }
-                    $upd->execute([
-                        $row['label_ar'],
-                        $row['start_date'],
-                        $row['end_date'],
-                        $isClosed,
-                        $closedAt,
-                        $id,
-                    ]);
+                    if ($fyScoped) {
+                        $upd->execute([
+                            $row['label_ar'],
+                            $row['start_date'],
+                            $row['end_date'],
+                            $isClosed,
+                            $closedAt,
+                            $id,
+                            $ctxCountryId,
+                        ]);
+                    } else {
+                        $upd->execute([
+                            $row['label_ar'],
+                            $row['start_date'],
+                            $row['end_date'],
+                            $isClosed,
+                            $closedAt,
+                            $id,
+                        ]);
+                    }
                 } else {
-                    if (orange_fiscal_range_overlaps_existing($pdo, $row['start_date'], $row['end_date'], null)) {
+                    if (orange_fiscal_range_overlaps_existing($pdo, $row['start_date'], $row['end_date'], null, $ctxCountryId)) {
                         $pdo->rollBack();
                         json_response(['success' => false, 'message' => 'فترة تتقاطع مع سنة أخرى في القاعدة'], 422);
                     }
-                    $ins->execute([
-                        $row['label_ar'],
-                        $row['start_date'],
-                        $row['end_date'],
-                        $isClosed,
-                    ]);
+                    if ($fyScoped) {
+                        $ins->execute([
+                            $ctxCountryId,
+                            $row['label_ar'],
+                            $row['start_date'],
+                            $row['end_date'],
+                            $isClosed,
+                        ]);
+                    } else {
+                        $ins->execute([
+                            $row['label_ar'],
+                            $row['start_date'],
+                            $row['end_date'],
+                            $isClosed,
+                        ]);
+                    }
                     if ($isClosed === 1) {
                         $newId = (int) $pdo->lastInsertId();
                         $pdo->prepare('UPDATE fiscal_years SET closed_at = NOW() WHERE id = ?')->execute([$newId]);
@@ -258,11 +292,16 @@ try {
         if ($start > $end) {
             json_response(['success' => false, 'message' => 'تاريخ البداية يجب أن يكون قبل أو يساوي نهاية السنة'], 422);
         }
-        if (orange_fiscal_range_overlaps_existing($pdo, $start, $end, null)) {
+        if (orange_fiscal_range_overlaps_existing($pdo, $start, $end, null, $ctxCountryId)) {
             json_response(['success' => false, 'message' => 'الفترة تتقاطع مع سنة مالية أخرى — عدّل التواريخ'], 422);
         }
-        $ins = $pdo->prepare('INSERT INTO fiscal_years (label_ar, start_date, end_date, is_closed) VALUES (?, ?, ?, 0)');
-        $ins->execute([$label, $start, $end]);
+        if ($fyScoped) {
+            $ins = $pdo->prepare('INSERT INTO fiscal_years (country_id, label_ar, start_date, end_date, is_closed) VALUES (?, ?, ?, ?, 0)');
+            $ins->execute([$ctxCountryId, $label, $start, $end]);
+        } else {
+            $ins = $pdo->prepare('INSERT INTO fiscal_years (label_ar, start_date, end_date, is_closed) VALUES (?, ?, ?, 0)');
+            $ins->execute([$label, $start, $end]);
+        }
         $newId = (int) $pdo->lastInsertId();
         audit_log('fiscal_year_create', 'تم إنشاء سنة مالية: ' . $label, 'fiscal_years', $newId);
         json_response(['success' => true, 'message' => 'تم إنشاء السنة المالية', 'id' => $newId]);

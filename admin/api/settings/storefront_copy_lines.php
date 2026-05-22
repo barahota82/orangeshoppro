@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/admin_settings_country.php';
+require_once __DIR__ . '/../../../includes/storefront_hero.php';
 
 require_admin_api();
 
@@ -38,10 +40,15 @@ function storefront_copy_line_str($v): string
     return mb_substr($s, 0, 500, 'UTF-8');
 }
 
-function storefront_copy_next_sort_order(PDO $pdo, string $scope): int
+function storefront_copy_next_sort_order(PDO $pdo, string $scope, int $countryId): int
 {
-    $st = $pdo->prepare('SELECT COALESCE(MAX(sort_order), 0) FROM storefront_copy_lines WHERE scope = ?');
-    $st->execute([$scope]);
+    if (orange_storefront_copy_has_country_column($pdo) && $countryId > 0) {
+        $st = $pdo->prepare('SELECT COALESCE(MAX(sort_order), 0) FROM storefront_copy_lines WHERE country_id = ? AND scope = ?');
+        $st->execute([$countryId, $scope]);
+    } else {
+        $st = $pdo->prepare('SELECT COALESCE(MAX(sort_order), 0) FROM storefront_copy_lines WHERE scope = ?');
+        $st->execute([$scope]);
+    }
 
     return (int) $st->fetchColumn() + 1;
 }
@@ -49,10 +56,15 @@ function storefront_copy_next_sort_order(PDO $pdo, string $scope): int
 /**
  * @return list<int>
  */
-function storefront_copy_ordered_ids_for_scope(PDO $pdo, string $scope): array
+function storefront_copy_ordered_ids_for_scope(PDO $pdo, string $scope, int $countryId): array
 {
-    $st = $pdo->prepare('SELECT id FROM storefront_copy_lines WHERE scope = ? ORDER BY sort_order ASC, id ASC');
-    $st->execute([$scope]);
+    if (orange_storefront_copy_has_country_column($pdo) && $countryId > 0) {
+        $st = $pdo->prepare('SELECT id FROM storefront_copy_lines WHERE country_id = ? AND scope = ? ORDER BY sort_order ASC, id ASC');
+        $st->execute([$countryId, $scope]);
+    } else {
+        $st = $pdo->prepare('SELECT id FROM storefront_copy_lines WHERE scope = ? ORDER BY sort_order ASC, id ASC');
+        $st->execute([$scope]);
+    }
     $rows = $st->fetchAll(PDO::FETCH_ASSOC);
     if (!is_array($rows)) {
         return [];
@@ -75,16 +87,25 @@ try {
 
     $data = storefront_copy_req_data();
     $action = trim((string) ($data['action'] ?? ''));
+    $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
+    $copyScoped = orange_storefront_copy_has_country_column($pdo);
 
     if ($action === 'list') {
         $scope = storefront_copy_norm_scope($data['scope'] ?? '');
         if ($scope === null) {
             json_response(['success' => false, 'message' => 'نطاق غير صالح'], 422);
         }
-        $st = $pdo->prepare(
-            'SELECT * FROM storefront_copy_lines WHERE scope = ? ORDER BY sort_order ASC, id ASC'
-        );
-        $st->execute([$scope]);
+        if ($copyScoped) {
+            $st = $pdo->prepare(
+                'SELECT * FROM storefront_copy_lines WHERE country_id = ? AND scope = ? ORDER BY sort_order ASC, id ASC'
+            );
+            $st->execute([$ctxCountryId, $scope]);
+        } else {
+            $st = $pdo->prepare(
+                'SELECT * FROM storefront_copy_lines WHERE scope = ? ORDER BY sort_order ASC, id ASC'
+            );
+            $st->execute([$scope]);
+        }
         $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 
         json_response(['success' => true, 'data' => is_array($rows) ? $rows : []]);
@@ -106,25 +127,44 @@ try {
         }
 
         if ($id > 0) {
-            $chk = $pdo->prepare('SELECT id, sort_order FROM storefront_copy_lines WHERE id = ? AND scope = ? LIMIT 1');
-            $chk->execute([$id, $scope]);
+            if ($copyScoped) {
+                $chk = $pdo->prepare('SELECT id, sort_order FROM storefront_copy_lines WHERE id = ? AND country_id = ? AND scope = ? LIMIT 1');
+                $chk->execute([$id, $ctxCountryId, $scope]);
+            } else {
+                $chk = $pdo->prepare('SELECT id, sort_order FROM storefront_copy_lines WHERE id = ? AND scope = ? LIMIT 1');
+                $chk->execute([$id, $scope]);
+            }
             $existing = $chk->fetch(PDO::FETCH_ASSOC);
             if (!is_array($existing)) {
                 json_response(['success' => false, 'message' => 'السجل غير موجود'], 404);
             }
             $sort = (int) ($existing['sort_order'] ?? 0);
-            $st = $pdo->prepare(
-                'UPDATE storefront_copy_lines SET sort_order = ?, is_active = ?, text_ar = ?, text_en = ?, text_fil = ?, text_hi = ? WHERE id = ? AND scope = ?'
-            );
-            $st->execute([$sort, $isActive, $textAr, $textEn, $textFil, $textHi, $id, $scope]);
+            if ($copyScoped) {
+                $st = $pdo->prepare(
+                    'UPDATE storefront_copy_lines SET sort_order = ?, is_active = ?, text_ar = ?, text_en = ?, text_fil = ?, text_hi = ? WHERE id = ? AND country_id = ? AND scope = ?'
+                );
+                $st->execute([$sort, $isActive, $textAr, $textEn, $textFil, $textHi, $id, $ctxCountryId, $scope]);
+            } else {
+                $st = $pdo->prepare(
+                    'UPDATE storefront_copy_lines SET sort_order = ?, is_active = ?, text_ar = ?, text_en = ?, text_fil = ?, text_hi = ? WHERE id = ? AND scope = ?'
+                );
+                $st->execute([$sort, $isActive, $textAr, $textEn, $textFil, $textHi, $id, $scope]);
+            }
             json_response(['success' => true, 'message' => 'تم حفظ التعديلات', 'id' => $id]);
         }
 
-        $sort = storefront_copy_next_sort_order($pdo, $scope);
-        $st = $pdo->prepare(
-            'INSERT INTO storefront_copy_lines (scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi) VALUES (?, ?, ?, ?, ?, ?, ?)'
-        );
-        $st->execute([$scope, $sort, $isActive, $textAr, $textEn, $textFil, $textHi]);
+        $sort = storefront_copy_next_sort_order($pdo, $scope, $ctxCountryId);
+        if ($copyScoped) {
+            $st = $pdo->prepare(
+                'INSERT INTO storefront_copy_lines (country_id, scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            );
+            $st->execute([$ctxCountryId, $scope, $sort, $isActive, $textAr, $textEn, $textFil, $textHi]);
+        } else {
+            $st = $pdo->prepare(
+                'INSERT INTO storefront_copy_lines (scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi) VALUES (?, ?, ?, ?, ?, ?, ?)'
+            );
+            $st->execute([$scope, $sort, $isActive, $textAr, $textEn, $textFil, $textHi]);
+        }
         $newId = (int) $pdo->lastInsertId();
         json_response(['success' => true, 'message' => 'تمت الإضافة', 'id' => $newId]);
     }
@@ -136,7 +176,7 @@ try {
         if ($scope === null || $id <= 0 || ($dir !== 'up' && $dir !== 'down')) {
             json_response(['success' => false, 'message' => 'بيانات غير صالحة'], 422);
         }
-        $ids = storefront_copy_ordered_ids_for_scope($pdo, $scope);
+        $ids = storefront_copy_ordered_ids_for_scope($pdo, $scope, $ctxCountryId);
         if ($ids === []) {
             json_response(['success' => false, 'message' => 'لا توجد بيانات'], 404);
         }
@@ -159,9 +199,15 @@ try {
         $ids[$swapIdx] = $tmp;
         $pdo->beginTransaction();
         try {
-            $u = $pdo->prepare('UPDATE storefront_copy_lines SET sort_order = ? WHERE id = ? AND scope = ?');
+            $u = $copyScoped
+                ? $pdo->prepare('UPDATE storefront_copy_lines SET sort_order = ? WHERE id = ? AND country_id = ? AND scope = ?')
+                : $pdo->prepare('UPDATE storefront_copy_lines SET sort_order = ? WHERE id = ? AND scope = ?');
             foreach ($ids as $i => $rowId) {
-                $u->execute([$i + 1, $rowId, $scope]);
+                if ($copyScoped) {
+                    $u->execute([$i + 1, $rowId, $ctxCountryId, $scope]);
+                } else {
+                    $u->execute([$i + 1, $rowId, $scope]);
+                }
             }
             $pdo->commit();
         } catch (Throwable $e) {
@@ -177,8 +223,13 @@ try {
         if ($id <= 0 || $scope === null) {
             json_response(['success' => false, 'message' => 'بيانات غير صالحة'], 422);
         }
-        $st = $pdo->prepare('DELETE FROM storefront_copy_lines WHERE id = ? AND scope = ?');
-        $st->execute([$id, $scope]);
+        if ($copyScoped) {
+            $st = $pdo->prepare('DELETE FROM storefront_copy_lines WHERE id = ? AND country_id = ? AND scope = ?');
+            $st->execute([$id, $ctxCountryId, $scope]);
+        } else {
+            $st = $pdo->prepare('DELETE FROM storefront_copy_lines WHERE id = ? AND scope = ?');
+            $st->execute([$id, $scope]);
+        }
         json_response(['success' => true, 'message' => 'تم الحذف']);
     }
 
@@ -189,13 +240,23 @@ try {
         if ($id <= 0 || $scope === null || ($isActive !== 0 && $isActive !== 1)) {
             json_response(['success' => false, 'message' => 'بيانات غير صالحة'], 422);
         }
-        $chk = $pdo->prepare('SELECT id FROM storefront_copy_lines WHERE id = ? AND scope = ? LIMIT 1');
-        $chk->execute([$id, $scope]);
+        if ($copyScoped) {
+            $chk = $pdo->prepare('SELECT id FROM storefront_copy_lines WHERE id = ? AND country_id = ? AND scope = ? LIMIT 1');
+            $chk->execute([$id, $ctxCountryId, $scope]);
+        } else {
+            $chk = $pdo->prepare('SELECT id FROM storefront_copy_lines WHERE id = ? AND scope = ? LIMIT 1');
+            $chk->execute([$id, $scope]);
+        }
         if (!$chk->fetch()) {
             json_response(['success' => false, 'message' => 'السجل غير موجود'], 404);
         }
-        $st = $pdo->prepare('UPDATE storefront_copy_lines SET is_active = ? WHERE id = ? AND scope = ?');
-        $st->execute([$isActive, $id, $scope]);
+        if ($copyScoped) {
+            $st = $pdo->prepare('UPDATE storefront_copy_lines SET is_active = ? WHERE id = ? AND country_id = ? AND scope = ?');
+            $st->execute([$isActive, $id, $ctxCountryId, $scope]);
+        } else {
+            $st = $pdo->prepare('UPDATE storefront_copy_lines SET is_active = ? WHERE id = ? AND scope = ?');
+            $st->execute([$isActive, $id, $scope]);
+        }
         json_response([
             'success' => true,
             'message' => $isActive === 1 ? 'تم التفعيل' : 'تم الإخفاء',

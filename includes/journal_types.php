@@ -3,14 +3,31 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
+require_once __DIR__ . '/admin_settings_country.php';
+
+function orange_journal_types_has_country_column(PDO $pdo): bool
+{
+    return orange_table_exists($pdo, 'journal_types')
+        && orange_table_has_column($pdo, 'journal_types', 'country_id');
+}
 
 /**
  * @return list<array<string, mixed>>
  */
-function orange_journal_types_list(PDO $pdo): array
+function orange_journal_types_list(PDO $pdo, ?int $countryId = null): array
 {
     if (!orange_table_exists($pdo, 'journal_types')) {
         return [];
+    }
+    if (orange_journal_types_has_country_column($pdo)) {
+        $cid = orange_admin_settings_effective_country_id($pdo, $countryId);
+        orange_journal_types_sync_canonical_defaults($pdo, $cid);
+        $st = $pdo->prepare(
+            'SELECT * FROM journal_types WHERE country_id = ? ORDER BY sort_order ASC, id ASC'
+        );
+        $st->execute([$cid]);
+
+        return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     return $pdo->query('SELECT * FROM journal_types ORDER BY sort_order ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
@@ -60,46 +77,74 @@ function orange_journal_types_canonical_rows(): array
 }
 
 /**
- * دمج قائمة الأنواع المرجعية في الجدول: يحدّث الأسماء والترتيب للأكواد الموجودة ويُدخل الناقص.
- * يُفعَّل تلقائياً من مسار المخطط السريع وبعد أول نجاح في نفس طلب PHP لا يُكرَّر (static).
+ * دمج قائمة الأنواع المرجعية في الجدول لدولة واحدة.
  *
  * @throws Throwable عند فشل المعاملة
  */
-function orange_journal_types_merge_canonical_defaults(PDO $pdo): void
+function orange_journal_types_merge_canonical_defaults(PDO $pdo, ?int $countryId = null): void
 {
-    static $completedOk = false;
-    if ($completedOk) {
-        return;
-    }
+    static $completedOk = [];
     if (!orange_table_exists($pdo, 'journal_types')) {
         return;
     }
 
+    $scoped = orange_journal_types_has_country_column($pdo);
+    $cid = $scoped ? orange_admin_settings_effective_country_id($pdo, $countryId) : 0;
+    $cacheKey = $scoped ? (string) $cid : 'legacy';
+    if (isset($completedOk[$cacheKey])) {
+        return;
+    }
+    if ($scoped && $cid <= 0) {
+        return;
+    }
+
     $rows = orange_journal_types_canonical_rows();
-    $sel = $pdo->prepare('SELECT id FROM journal_types WHERE code = ? LIMIT 1');
-    $ins = $pdo->prepare(
-        'INSERT INTO journal_types (code, name_ar, name_en, sort_order) VALUES (?,?,?,?)'
-    );
-    $upd = $pdo->prepare(
-        'UPDATE journal_types SET name_ar = ?, name_en = ?, sort_order = ? WHERE id = ?'
-    );
+    if ($scoped) {
+        $sel = $pdo->prepare('SELECT id FROM journal_types WHERE country_id = ? AND code = ? LIMIT 1');
+        $ins = $pdo->prepare(
+            'INSERT INTO journal_types (country_id, code, name_ar, name_en, sort_order) VALUES (?,?,?,?,?)'
+        );
+        $upd = $pdo->prepare(
+            'UPDATE journal_types SET name_ar = ?, name_en = ?, sort_order = ? WHERE id = ? AND country_id = ?'
+        );
+    } else {
+        $sel = $pdo->prepare('SELECT id FROM journal_types WHERE code = ? LIMIT 1');
+        $ins = $pdo->prepare(
+            'INSERT INTO journal_types (code, name_ar, name_en, sort_order) VALUES (?,?,?,?)'
+        );
+        $upd = $pdo->prepare(
+            'UPDATE journal_types SET name_ar = ?, name_en = ?, sort_order = ? WHERE id = ?'
+        );
+    }
 
     $pdo->beginTransaction();
     try {
         foreach ($rows as $idx => $r) {
             $ord = $idx + 1;
             $code = $r[0];
-            $sel->execute([$code]);
+            if ($scoped) {
+                $sel->execute([$cid, $code]);
+            } else {
+                $sel->execute([$code]);
+            }
             $id = $sel->fetchColumn();
             if ($id !== false && (int) $id > 0) {
-                $upd->execute([$r[1], $r[2], $ord, (int) $id]);
+                if ($scoped) {
+                    $upd->execute([$r[1], $r[2], $ord, (int) $id, $cid]);
+                } else {
+                    $upd->execute([$r[1], $r[2], $ord, (int) $id]);
+                }
             } else {
-                $ins->execute([$code, $r[1], $r[2], $ord]);
+                if ($scoped) {
+                    $ins->execute([$cid, $code, $r[1], $r[2], $ord]);
+                } else {
+                    $ins->execute([$code, $r[1], $r[2], $ord]);
+                }
             }
         }
-        orange_journal_types_retire_obsolete_exp_type($pdo);
+        orange_journal_types_retire_obsolete_exp_type($pdo, $scoped ? $cid : null);
         $pdo->commit();
-        $completedOk = true;
+        $completedOk[$cacheKey] = true;
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
@@ -109,15 +154,25 @@ function orange_journal_types_merge_canonical_defaults(PDO $pdo): void
 }
 
 /**
- * إزالة نوع اليومية EXP (قيد مصروف) بعد الاعتماد على سند الصرف؛ يُنظّف القواعد والارتباطات ثم يحذف الصف.
+ * إزالة نوع اليومية EXP (قيد مصروف) بعد الاعتماد على سند الصرف.
  */
-function orange_journal_types_retire_obsolete_exp_type(PDO $pdo): void
+function orange_journal_types_retire_obsolete_exp_type(PDO $pdo, ?int $countryId = null): void
 {
     if (!orange_table_exists($pdo, 'journal_types')) {
         return;
     }
-    $st = $pdo->prepare('SELECT id FROM journal_types WHERE UPPER(TRIM(code)) = ? LIMIT 1');
-    $st->execute(['EXP']);
+    $scoped = orange_journal_types_has_country_column($pdo);
+    if ($scoped) {
+        $cid = orange_admin_settings_effective_country_id($pdo, $countryId);
+        if ($cid <= 0) {
+            return;
+        }
+        $st = $pdo->prepare('SELECT id FROM journal_types WHERE country_id = ? AND UPPER(TRIM(code)) = ? LIMIT 1');
+        $st->execute([$cid, 'EXP']);
+    } else {
+        $st = $pdo->prepare('SELECT id FROM journal_types WHERE UPPER(TRIM(code)) = ? LIMIT 1');
+        $st->execute(['EXP']);
+    }
     $raw = $st->fetchColumn();
     if ($raw === false || $raw === null) {
         return;
@@ -137,22 +192,26 @@ function orange_journal_types_retire_obsolete_exp_type(PDO $pdo): void
 
 /**
  * يضمن وجود الصفوف المرجعية وترتيبها (يُستدعى من catalog_schema).
- * مرة واحدة لكل طلب HTTP كحد أقصى لتفادي تكرار المعاملة عند عدة استدعاءات ensure_schema.
  */
-function orange_journal_types_sync_canonical_defaults(PDO $pdo): void
+function orange_journal_types_sync_canonical_defaults(PDO $pdo, ?int $countryId = null): void
 {
-    static $done = false;
-    if ($done || !orange_table_exists($pdo, 'journal_types')) {
+    static $done = [];
+    if (!orange_table_exists($pdo, 'journal_types')) {
+        return;
+    }
+    $scoped = orange_journal_types_has_country_column($pdo);
+    $cid = $scoped ? orange_admin_settings_effective_country_id($pdo, $countryId) : 0;
+    $cacheKey = $scoped ? (string) $cid : 'legacy';
+    if (isset($done[$cacheKey])) {
         return;
     }
 
-    orange_journal_types_merge_canonical_defaults($pdo);
-    $done = true;
+    orange_journal_types_merge_canonical_defaults($pdo, $scoped ? $cid : null);
+    $done[$cacheKey] = true;
 }
 
 /**
  * Map journal_types.code (canonical) to orange_gl_pending_movements.entry_type values.
- * Unknown or unmapped codes return [] (caller should not apply entry_type filter).
  *
  * @return list<string>
  */
@@ -182,6 +241,7 @@ function orange_gl_entry_types_for_journal_type_code(string $code): array
         'CGR' => ['order_return_cogs'],
         'COR' => ['order_return_cogs'],
     ];
+
     return $map[$code] ?? [];
 }
 
@@ -199,6 +259,7 @@ function orange_gl_entry_types_for_journal_type_id(PDO $pdo, int $journalTypeId)
     if ($code === '') {
         return [];
     }
+
     return orange_gl_entry_types_for_journal_type_code($code);
 }
 
@@ -217,15 +278,21 @@ function orange_journal_type_code_by_id(PDO $pdo, int $id): string
     return orange_journal_type_normalize_code((string) $c);
 }
 
-function orange_journal_type_id_by_code(PDO $pdo, string $code): int
+function orange_journal_type_id_by_code(PDO $pdo, string $code, ?int $countryId = null): int
 {
     $norm = orange_journal_type_normalize_code($code);
     if ($norm === '' || !orange_table_exists($pdo, 'journal_types')) {
         return 0;
     }
-    orange_journal_types_sync_canonical_defaults($pdo);
-    $st = $pdo->prepare('SELECT id FROM journal_types WHERE code = ? LIMIT 1');
-    $st->execute([$norm]);
+    orange_journal_types_sync_canonical_defaults($pdo, $countryId);
+    if (orange_journal_types_has_country_column($pdo)) {
+        $cid = orange_admin_settings_effective_country_id($pdo, $countryId);
+        $st = $pdo->prepare('SELECT id FROM journal_types WHERE country_id = ? AND code = ? LIMIT 1');
+        $st->execute([$cid, $norm]);
+    } else {
+        $st = $pdo->prepare('SELECT id FROM journal_types WHERE code = ? LIMIT 1');
+        $st->execute([$norm]);
+    }
     $id = $st->fetchColumn();
 
     return ($id !== false && $id !== null) ? (int) $id : 0;
@@ -233,7 +300,6 @@ function orange_journal_type_id_by_code(PDO $pdo, string $code): int
 
 /**
  * مطابقة كود journal_types من entry_type عندما يكون المسار فريداً.
- * القيم الفارغة تعني أن النوع يشارك عدة يوميات (مثل order_delivery_sale) — يُستخدم دلو تسلسل منفصل.
  */
 function orange_journal_type_code_from_entry_type(string $entryType): string
 {

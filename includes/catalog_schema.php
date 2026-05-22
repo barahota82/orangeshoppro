@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 50);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 52);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3030,6 +3030,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_country_gl_accounts_v49($pdo);
     orange_catalog_migrate_country_repair_v50($pdo);
     orange_catalog_migrate_department_countries_v51($pdo);
+    orange_catalog_migrate_country_admin_settings_v52($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
         orange_catalog_safe_exec(
@@ -3554,11 +3555,16 @@ function orange_catalog_ensure_schema(PDO $pdo): void
 /**
  * عدد صفوف نطاق معيّن في storefront_copy_lines.
  */
-function orange_catalog_count_storefront_copy_scope(PDO $pdo, string $scope): int
+function orange_catalog_count_storefront_copy_scope(PDO $pdo, string $scope, ?int $countryId = null): int
 {
     try {
-        $st = $pdo->prepare('SELECT COUNT(*) FROM storefront_copy_lines WHERE scope = ?');
-        $st->execute([$scope]);
+        if (orange_table_has_column($pdo, 'storefront_copy_lines', 'country_id') && $countryId !== null && $countryId > 0) {
+            $st = $pdo->prepare('SELECT COUNT(*) FROM storefront_copy_lines WHERE country_id = ? AND scope = ?');
+            $st->execute([$countryId, $scope]);
+        } else {
+            $st = $pdo->prepare('SELECT COUNT(*) FROM storefront_copy_lines WHERE scope = ?');
+            $st->execute([$scope]);
+        }
 
         return (int) $st->fetchColumn();
     } catch (Throwable $e) {
@@ -3612,33 +3618,67 @@ function orange_catalog_seed_storefront_copy_defaults_if_empty(PDO $pdo): void
         return;
     }
 
+    require_once __DIR__ . '/countries.php';
+    $countryId = orange_countries_default_id($pdo);
+    $scoped = orange_table_has_column($pdo, 'storefront_copy_lines', 'country_id');
+    if ($scoped && $countryId <= 0) {
+        return;
+    }
+
     $defaults = orange_catalog_builtin_storefront_copy_defaults();
 
     try {
-        if (orange_catalog_count_storefront_copy_scope($pdo, 'home_hero') === 0) {
-            $ins = $pdo->prepare(
-                'INSERT INTO storefront_copy_lines (scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi)
-                 VALUES (?, ?, 1, ?, ?, ?, ?)'
-            );
+        if (orange_catalog_count_storefront_copy_scope($pdo, 'home_hero', $scoped ? $countryId : null) === 0) {
+            if ($scoped) {
+                $ins = $pdo->prepare(
+                    'INSERT INTO storefront_copy_lines (country_id, scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi)
+                     VALUES (?, ?, ?, 1, ?, ?, ?, ?)'
+                );
+            } else {
+                $ins = $pdo->prepare(
+                    'INSERT INTO storefront_copy_lines (scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi)
+                     VALUES (?, ?, 1, ?, ?, ?, ?)'
+                );
+            }
             foreach ($defaults['home_hero'] as $idx => $line) {
-                $ins->execute([
-                    'home_hero',
-                    $idx + 1,
-                    $line['ar'],
-                    $line['en'],
-                    $line['fil'],
-                    $line['hi'],
-                ]);
+                if ($scoped) {
+                    $ins->execute([
+                        $countryId,
+                        'home_hero',
+                        $idx + 1,
+                        $line['ar'],
+                        $line['en'],
+                        $line['fil'],
+                        $line['hi'],
+                    ]);
+                } else {
+                    $ins->execute([
+                        'home_hero',
+                        $idx + 1,
+                        $line['ar'],
+                        $line['en'],
+                        $line['fil'],
+                        $line['hi'],
+                    ]);
+                }
             }
         }
 
-        if (orange_catalog_count_storefront_copy_scope($pdo, 'header_tagline') === 0) {
+        if (orange_catalog_count_storefront_copy_scope($pdo, 'header_tagline', $scoped ? $countryId : null) === 0) {
             $t = $defaults['header_tagline'];
-            $ins = $pdo->prepare(
-                'INSERT INTO storefront_copy_lines (scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi)
-                 VALUES (?, ?, 1, ?, ?, ?, ?)'
-            );
-            $ins->execute(['header_tagline', 1, $t['ar'], $t['en'], $t['fil'], $t['hi']]);
+            if ($scoped) {
+                $ins = $pdo->prepare(
+                    'INSERT INTO storefront_copy_lines (country_id, scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi)
+                     VALUES (?, ?, ?, 1, ?, ?, ?, ?)'
+                );
+                $ins->execute([$countryId, 'header_tagline', 1, $t['ar'], $t['en'], $t['fil'], $t['hi']]);
+            } else {
+                $ins = $pdo->prepare(
+                    'INSERT INTO storefront_copy_lines (scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi)
+                     VALUES (?, ?, 1, ?, ?, ?, ?)'
+                );
+                $ins->execute(['header_tagline', 1, $t['ar'], $t['en'], $t['fil'], $t['hi']]);
+            }
         }
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
@@ -4407,6 +4447,178 @@ function orange_catalog_migrate_department_countries_v51(PDO $pdo): void
                     continue;
                 }
                 $ins->execute([$did, $cid, $masterActive ? 1 : 0]);
+            }
+        }
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v52 — journal_types، fiscal_years، company_settings، storefront_copy_lines، merge_requests per country.
+ */
+function orange_catalog_migrate_country_admin_settings_v52(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    $marker = 'php_country_admin_settings_v52';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    require_once __DIR__ . '/countries.php';
+    $kwId = orange_countries_default_id($pdo);
+
+    if (orange_table_exists($pdo, 'journal_types') && !orange_table_has_column($pdo, 'journal_types', 'country_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE journal_types ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
+        );
+        if ($kwId > 0) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE journal_types SET country_id = ' . (int) $kwId . ' WHERE country_id IS NULL OR country_id = 0'
+            );
+        }
+        try {
+            orange_catalog_safe_exec($pdo, 'ALTER TABLE journal_types DROP INDEX uq_journal_types_code');
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] v52 drop uq_journal_types_code: ' . $e->getMessage());
+            }
+        }
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE journal_types MODIFY country_id INT UNSIGNED NOT NULL');
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE UNIQUE INDEX uq_journal_types_country_code ON journal_types (country_id, code)'
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE INDEX idx_journal_types_country_sort ON journal_types (country_id, sort_order)'
+        );
+    }
+
+    if (orange_table_exists($pdo, 'fiscal_years') && !orange_table_has_column($pdo, 'fiscal_years', 'country_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE fiscal_years ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
+        );
+        if ($kwId > 0) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE fiscal_years SET country_id = ' . (int) $kwId . ' WHERE country_id IS NULL OR country_id = 0'
+            );
+        }
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE fiscal_years MODIFY country_id INT UNSIGNED NOT NULL');
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE INDEX idx_fiscal_years_country_range ON fiscal_years (country_id, start_date, end_date)'
+        );
+    }
+
+    if (orange_table_exists($pdo, 'company_settings') && !orange_table_has_column($pdo, 'company_settings', 'country_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE company_settings ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
+        );
+        if ($kwId > 0) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE company_settings SET country_id = ' . (int) $kwId . ' WHERE country_id IS NULL OR country_id = 0'
+            );
+        }
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE company_settings MODIFY country_id INT UNSIGNED NOT NULL');
+        try {
+            orange_catalog_safe_exec(
+                $pdo,
+                'CREATE UNIQUE INDEX uq_company_settings_country ON company_settings (country_id)'
+            );
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] v52 uq_company_settings_country: ' . $e->getMessage());
+            }
+        }
+    }
+
+    if (orange_table_exists($pdo, 'storefront_copy_lines') && !orange_table_has_column($pdo, 'storefront_copy_lines', 'country_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE storefront_copy_lines ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
+        );
+        if ($kwId > 0) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE storefront_copy_lines SET country_id = ' . (int) $kwId . ' WHERE country_id IS NULL OR country_id = 0'
+            );
+        }
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE storefront_copy_lines MODIFY country_id INT UNSIGNED NOT NULL');
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE INDEX idx_storefront_copy_country_scope ON storefront_copy_lines (country_id, scope, is_active, sort_order)'
+        );
+    }
+
+    if (orange_table_exists($pdo, 'storefront_phone_merge_requests')
+        && !orange_table_has_column($pdo, 'storefront_phone_merge_requests', 'country_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE storefront_phone_merge_requests ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
+        );
+        if ($kwId > 0) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE storefront_phone_merge_requests SET country_id = ' . (int) $kwId
+                . ' WHERE country_id IS NULL OR country_id = 0'
+            );
+            if (orange_table_exists($pdo, 'channels') && orange_table_has_column($pdo, 'channels', 'country_id')) {
+                orange_catalog_safe_exec(
+                    $pdo,
+                    'UPDATE storefront_phone_merge_requests r
+                     INNER JOIN channels c ON c.slug = r.proposed_channel_slug AND c.country_id > 0
+                     SET r.country_id = c.country_id
+                     WHERE r.proposed_channel_slug IS NOT NULL AND TRIM(r.proposed_channel_slug) <> \'\''
+                );
+            }
+        }
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE storefront_phone_merge_requests MODIFY country_id INT UNSIGNED NOT NULL DEFAULT 0'
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE INDEX idx_spmr_country ON storefront_phone_merge_requests (country_id, expires_at)'
+        );
+    }
+
+    if ($kwId > 0 && orange_table_exists($pdo, 'countries')) {
+        require_once __DIR__ . '/country_provision.php';
+        $countryRows = $pdo->query('SELECT id FROM countries')->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        foreach ($countryRows as $crow) {
+            $cid = (int) ($crow['id'] ?? 0);
+            if ($cid <= 0 || $cid === $kwId) {
+                continue;
+            }
+            orange_country_copy_journal_types_from_source($pdo, $cid, $kwId);
+            orange_country_copy_fiscal_years_from_source($pdo, $cid, $kwId);
+            orange_country_copy_company_settings_from_source($pdo, $cid, $kwId);
+            orange_country_copy_storefront_copy_lines_from_source($pdo, $cid, $kwId);
+        }
+    }
+
+    if (orange_table_exists($pdo, 'journal_types') && orange_table_has_column($pdo, 'journal_types', 'country_id')) {
+        require_once __DIR__ . '/journal_types.php';
+        if (orange_table_exists($pdo, 'countries')) {
+            $countryRows = $pdo->query('SELECT id FROM countries')->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            foreach ($countryRows as $crow) {
+                $cid = (int) ($crow['id'] ?? 0);
+                if ($cid > 0) {
+                    try {
+                        orange_journal_types_merge_canonical_defaults($pdo, $cid);
+                    } catch (Throwable $e) {
+                        if (function_exists('error_log')) {
+                            error_log('[orange] v52 journal_types merge cid=' . $cid . ': ' . $e->getMessage());
+                        }
+                    }
+                }
             }
         }
     }

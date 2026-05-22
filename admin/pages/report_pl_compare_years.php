@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/company_settings.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -85,13 +86,7 @@ if ($useVouchers && $selectedFyIds !== []) {
     }
 }
 
-$companyNameAr = '';
-if (orange_table_exists($pdo, 'company_settings')) {
-    $cs = $pdo->query('SELECT company_name_ar FROM company_settings ORDER BY id ASC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
-    if (is_array($cs)) {
-        $companyNameAr = trim((string) ($cs['company_name_ar'] ?? ''));
-    }
-}
+$companyNameAr = orange_company_settings_name_ar($pdo);
 
 $todayDmY = orange_format_date_dmY(date('Y-m-d'));
 

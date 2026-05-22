@@ -5,6 +5,24 @@ declare(strict_types=1);
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/order_helpers.php';
 require_once __DIR__ . '/storefront_account.php';
+require_once __DIR__ . '/countries.php';
+
+function orange_storefront_merge_request_country_id(PDO $pdo, ?string $channelSlug): int
+{
+    $slug = trim((string) $channelSlug);
+    if ($slug !== ''
+        && orange_table_exists($pdo, 'channels')
+        && orange_table_has_column($pdo, 'channels', 'country_id')) {
+        $st = $pdo->prepare('SELECT country_id FROM channels WHERE slug = ? LIMIT 1');
+        $st->execute([$slug]);
+        $cid = (int) ($st->fetchColumn() ?: 0);
+        if ($cid > 0) {
+            return $cid;
+        }
+    }
+
+    return orange_storefront_current_country_id($pdo);
+}
 
 /**
  * س15 — حساب مفعّل بنفس الهاتف: دمج بيانات الملف بعد تأكيد واتساب (يدوي من الأدمن) ثم تطبيق العميل.
@@ -97,30 +115,59 @@ function orange_storefront_create_phone_merge_request(
     if ($ch === '') {
         $ch = null;
     }
+    $mergeCountryId = orange_storefront_merge_request_country_id($pdo, $ch ?? '');
+    $hasCountryCol = orange_table_has_column($pdo, 'storefront_phone_merge_requests', 'country_id');
 
-    $ins = $pdo->prepare(
-        'INSERT INTO storefront_phone_merge_requests (
-            storefront_account_id, phone_normalized, proposed_email, proposed_channel_slug,
-            proposed_name, proposed_delivery_area_id, proposed_area, proposed_address, proposed_notes,
-            proposed_phone_country_dial, proposed_phone_national,
-            merge_token_hash, expires_at
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)'
-    );
-    $ins->execute([
-        $accountId,
-        substr($phoneNormalized, 0, 64),
-        substr($proposedEmailNorm, 0, 255),
-        $ch,
-        $customerName !== '' ? $customerName : null,
-        $deliveryAreaId !== null && $deliveryAreaId > 0 ? $deliveryAreaId : null,
-        $customerArea !== '' ? $customerArea : null,
-        $customerAddress !== '' ? $customerAddress : null,
-        $customerNotes !== '' ? $customerNotes : null,
-        $phoneCountryDial !== null && $phoneCountryDial !== '' ? substr($phoneCountryDial, 0, 8) : null,
-        $phoneNational !== null && $phoneNational !== '' ? substr($phoneNational, 0, 32) : null,
-        $hash,
-        $expires,
-    ]);
+    if ($hasCountryCol) {
+        $ins = $pdo->prepare(
+            'INSERT INTO storefront_phone_merge_requests (
+                country_id, storefront_account_id, phone_normalized, proposed_email, proposed_channel_slug,
+                proposed_name, proposed_delivery_area_id, proposed_area, proposed_address, proposed_notes,
+                proposed_phone_country_dial, proposed_phone_national,
+                merge_token_hash, expires_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+        );
+        $ins->execute([
+            $mergeCountryId,
+            $accountId,
+            substr($phoneNormalized, 0, 64),
+            substr($proposedEmailNorm, 0, 255),
+            $ch,
+            $customerName !== '' ? $customerName : null,
+            $deliveryAreaId !== null && $deliveryAreaId > 0 ? $deliveryAreaId : null,
+            $customerArea !== '' ? $customerArea : null,
+            $customerAddress !== '' ? $customerAddress : null,
+            $customerNotes !== '' ? $customerNotes : null,
+            $phoneCountryDial !== null && $phoneCountryDial !== '' ? substr($phoneCountryDial, 0, 8) : null,
+            $phoneNational !== null && $phoneNational !== '' ? substr($phoneNational, 0, 32) : null,
+            $hash,
+            $expires,
+        ]);
+    } else {
+        $ins = $pdo->prepare(
+            'INSERT INTO storefront_phone_merge_requests (
+                storefront_account_id, phone_normalized, proposed_email, proposed_channel_slug,
+                proposed_name, proposed_delivery_area_id, proposed_area, proposed_address, proposed_notes,
+                proposed_phone_country_dial, proposed_phone_national,
+                merge_token_hash, expires_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)'
+        );
+        $ins->execute([
+            $accountId,
+            substr($phoneNormalized, 0, 64),
+            substr($proposedEmailNorm, 0, 255),
+            $ch,
+            $customerName !== '' ? $customerName : null,
+            $deliveryAreaId !== null && $deliveryAreaId > 0 ? $deliveryAreaId : null,
+            $customerArea !== '' ? $customerArea : null,
+            $customerAddress !== '' ? $customerAddress : null,
+            $customerNotes !== '' ? $customerNotes : null,
+            $phoneCountryDial !== null && $phoneCountryDial !== '' ? substr($phoneCountryDial, 0, 8) : null,
+            $phoneNational !== null && $phoneNational !== '' ? substr($phoneNational, 0, 32) : null,
+            $hash,
+            $expires,
+        ]);
+    }
 
     return ['plain_token' => $token, 'id' => (int) $pdo->lastInsertId()];
 }

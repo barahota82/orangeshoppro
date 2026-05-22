@@ -1,5 +1,5 @@
 ORANGE — سياسة شاشات الأدmin: عام vs دولة
-Last updated: 2026-05-20 (قرار المالك — جلسة تعدد الدول)
+Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفيذ)
 
 الغرض
 - مرجع ثابت: أي شاشة في لوحة التحكم «عامة» (shared) وأيها «دولية» (scoped بمبدّل الدولة أو country_id).
@@ -31,7 +31,7 @@ Last updated: 2026-05-20 (قرار المالك — جلسة تعدد الدول
 - reports, channel_analytics — دولة
 
 الحسابات والتقارير — إعداد/دليل
-- chart_of_accounts, gl_account_settings, journal_types, fiscal_years, gl_posting, opening_balances — دولة (قرار المالك؛ جزء منها لا يزال يحتاج تنفيذ/ترحيل schema)
+- chart_of_accounts, gl_account_settings, journal_types, fiscal_years, gl_posting, opening_balances — دولة
 
 الحسابات — سندات
 - journal_entries, receipt_voucher, payment_voucher, other_vouchers — دولة
@@ -44,14 +44,24 @@ Last updated: 2026-05-20 (قرار المالك — جلسة تعدد الدول
 - accounting_reports_index — عام (فهرس روابط فقط)
 
 الإعدادات — شركة
-- company_settings — دولة (قرار المالك؛ تنفيذ schema pending)
+- company_settings — دولة
 - company_documents, logs — عام
 
 الإعدادات — أسواق
 - countries, admin_users — عام
 
 الإعدادات — السوق الحالي
-- channels, delivery_areas, storefront_hero, storefront_merge_requests — دولة (storefront_* قرار المالك؛ تنفيذ pending)
+- channels, delivery_areas, storefront_hero, storefront_merge_requests — دولة
+
+----------------------------------------------------------------------
+تنفيذ v52 — journal_types / fiscal_years / company_settings / storefront (2026-05-20)
+----------------------------------------------------------------------
+
+- migration php_country_admin_settings_v52 في catalog_schema.php
+- includes/admin_settings_country.php، includes/company_settings.php
+- journal_types، fiscal_years، company_settings، storefront_copy_lines، storefront_phone_merge_requests scoped بـ country_id
+- country_provision: نسخ journal_types / fiscal_years / company_settings / storefront_copy_lines من دولة المصدر
+- admin APIs + storefront reads + تقارير/فاتورة/هيدر الأدمن
 
 ----------------------------------------------------------------------
 الأقسام (departments) — سياسة خاصة (2026-05-20)
@@ -77,6 +87,142 @@ Last updated: 2026-05-20 (قرار المالك — جلسة تعدد الدول
 فجوات تنفيذ معروفة (بعد قرار المالك)
 ----------------------------------------------------------------------
 
-- journal_types, fiscal_years, company_settings per country — قرار المالك «دولة»؛ schema/UI لم يُكتمل بعد.
-- storefront_hero, storefront_merge_requests per country — قرار المالك «دولة»؛ pending.
-- مراجعة شاشات محاسبة/سندات للتأكد من فلترة country_id على كل الاستعلامات.
+- مراجعة شاشات محاسبة/سندات للتأكد من فلترة country_id على كل الاستعلامات (تدقيق مستمر — بند GAP-09 أدناه).
+
+----------------------------------------------------------------------
+مراجعة ثغرات ما بعد v52 — قائمة تنفيذ (2026-05-20)
+----------------------------------------------------------------------
+
+الغرض
+- مرجع للمالك والوكيل: ما يُفترض أنه **سليم** بعد v52، وما **ما زال مفتوحاً**، و**ترتيب الإصلاح**.
+- عند سؤال «إيه اتصلح وإيه لسه»: قارِن حالة كل بند (**معلّق | جاري | منتهٍ**) في هذا القسم.
+- **حالة الكود (2026-05-20):** تنفيذ v52 في فرع العمل المحلي؛ **لم يُ commit / deploy** بعد آخر commit `57b666f` — يُنشر بـ `git pull` بعد commit.
+
+كيف تُحدَّث الحالة
+- غيّر `[معلّق]` إلى `[منتهٍ]` مع سطر «تنفيذ: …» (مسارات/ commit) عند الإغلاق.
+- لا تحذف البنود المنتهية — انقل ملخصاً إلى «سجل إغلاق» في أسفل القسم إن لزم.
+
+----------------------------------------------------------------------
+أ — ما يبدو سليماً (baseline v52 — لا يُعاد فتحه إلا بفحص يثبت خللاً)
+----------------------------------------------------------------------
+
+[v52-S1] journal_types — list/API/save + merge canonical per country_id
+  - includes/journal_types.php؛ admin/api/journal_types/save.php؛ admin/pages/journal_types.php
+
+[v52-S2] fiscal_years — list/API/save + overlap per country
+  - includes/fiscal_years.php؛ admin/api/fiscal_years/save.php؛ admin/pages/fiscal_years.php
+
+[v52-S3] company_settings — صف per country
+  - includes/company_settings.php؛ admin/api/settings/company.php
+  - تقارير + admin/partials/header.php + admin/pages/invoice.php (حسب country_id الطلب)
+
+[v52-S4] storefront_copy_lines — قراءة الواجهة + API أدمن scoped
+  - includes/storefront_hero.php (home_hero + header_tagline)
+  - admin/api/settings/storefront_copy_lines.php
+  - **استثناء:** admin/pages/storefront_hero.php — انظر GAP-03
+
+[v52-S5] storefront_phone_merge_requests — قائمة + تأكيد WA scoped
+  - admin/pages/storefront_merge_requests.php؛ admin/api/storefront/merge_request_confirm_wa.php
+  - includes/storefront_phone_merge.php (country_id عند الإنشاء)
+
+[v52-S6] country_provision — نسخ journal_types / fiscal_years / company_settings / storefront_copy_lines
+  - includes/country_provision.php (orange_country_copy_*)
+  - **استثناء:** journal_type_id في GL — انظر GAP-02
+
+[v52-S7] orange_gl_account_settings + alloc — per country (جلسة سابقة)
+  - includes/gl_settings.php؛ admin/api/settings/gl-accounts.php (get/save للحسابات per country_id)
+
+[v52-S8] document_sequences — فصل per country (`scope_c{N}`)
+  - includes/document_sequences.php
+
+[v52-S9] departments per country (v51)
+  - department_countries؛ departments.php؛ toggle-country.php
+
+----------------------------------------------------------------------
+ب — ثغرات مفتوحة (مرتبة للتنفيذ واحداً تلو الآخر)
+----------------------------------------------------------------------
+
+[GAP-01] حرج — orange_gl_journal_type_rules جدول **عام** بدون country_id
+  حالة: [معلّق]
+  المشكلة:
+  - القواعد (PIN/PDN/CSI/…) مربوطة بـ journal_type_id؛ بعد v52 كل دولة لها IDs مختلفة لنفس code.
+  - admin/api/settings/gl-accounts.php: `DELETE FROM orange_gl_journal_type_rules` يمسح **كل** الدول عند حفظ دولة واحدة.
+  - orange_gl_journal_type_rules_list() و orange_gl_posting_linked_journal_types() بلا فلترة دولة.
+  الملفات: includes/gl_settings.php؛ includes/catalog_schema.php (CREATE rules)؛ admin/api/settings/gl-accounts.php؛ admin/pages/gl_account_settings.php؛ admin/pages/gl_posting.php
+  معيار الإغلاق: country_id على القواعد (أو ربط عبر code+country)؛ حذف/حفظ scoped؛ قراءة/ترحيل per سياق الدولة؛ provision ينسخ القواعد للدولة الجديدة.
+
+[GAP-02] حرج — country_provision ينسخ journal_type_id خاطئ في GL settings
+  حالة: [معلّق]
+  المشكلة:
+  - orange_country_copy_gl_settings_from_source() ينسخ journal_type_id من المصدر كما هو.
+  - نسخ journal_types للهدف يحدث **بعد** GL → IDs المصدر ≠ IDs الهدف.
+  الملفات: includes/country_provision.php (ترتيب النسخ أو remap بالكود)
+  معيار الإغلاق: remap journal_type_id عبر code+country_id؛ أو نسخ journal_types **قبل** GL ثم remap.
+
+[GAP-03] متوسط — admin/pages/storefront_hero.php بلا country_id
+  حالة: [معلّق]
+  المشكلة:
+  - SELECT من storefront_copy_lines WHERE scope فقط — يخلط صفوف كل الدول.
+  - ?edit=id بدون تحقق country_id.
+  الملفات: admin/pages/storefront_hero.php
+  معيار الإغلاق: نفس منطق admin/api/settings/storefront_copy_lines.php + orange_admin_settings_effective_country_id().
+
+[GAP-04] متوسط — purchase_gl_accounts بلا country_id صريح للمشتريات
+  حالة: [معلّق]
+  المشكلة:
+  - orange_journal_type_id_by_code($pdo, 'PIN'|'PDN') يعتمد سياق الأدmin لا purchase.country_id.
+  الملفات: includes/purchase_gl_accounts.php؛ admin/api/purchases/create.php؛ update.php؛ purchase_returns/*
+  معيار الإغلاق: تمرير country_id من سجل الشراء/المورد إلى lookup نوع اليومية و GL.
+
+[GAP-05] متوسط — orange_fiscal_is_closed_for_voucher fallback بلا دولة السند
+  حالة: [معلّق]
+  المشكلة:
+  - عند غياب fiscal_year_id: orange_fiscal_find_for_date($pdo, $d) بدون country_id من journal_vouchers.
+  الملفات: includes/journal_voucher.php
+  معيار الإغلاق: تمرير country_id من صف السند عند fallback.
+
+[GAP-06] متوسط — opening_balances API بلا country_id صريح للسنة المالية
+  حالة: [معلّق]
+  المشكلة:
+  - orange_fiscal_require_open_for_posting() في save/delete بدون country_id (يعتمد سياق الأدmin فقط).
+  الملفات: admin/api/opening_balances/save.php؛ delete.php؛ admin/pages/opening_balances.php (fyPeek)
+  معيار الإغلاق: تمرير orange_admin_settings_effective_country_id أو country_id السند.
+
+[GAP-07] منخفض — دمج هاتف س15: بحث حساب مفعّl globally
+  حالة: [معلّق]
+  المشكلة:
+  - orange_storefront_find_verified_account_by_phone() يمسح كل storefront_accounts — قد يطابق دولة أخرى.
+  الملفات: includes/storefront_phone_merge.php؛ api/auth/request-email-verify.php
+  معيار الإغلاق: قرار المالك (scoped بالقناة/الدولة vs global) + تنفيذ مطابق.
+
+[GAP-08] منخفض — legacy migrate storefront_copy_lines
+  حالة: [معلّق]
+  المشكلة:
+  - orange_catalog_migrate_legacy_storefront_copy_lines() INSERT بدون country_id؛ count scope بلا country.
+  الملفات: includes/catalog_schema.php
+  معيار الإغلاق: country_id في INSERT/count بعد v52؛ أو تعطيل المسار إن obsolete.
+
+[GAP-09] تدقيق مستمر — مسارات GL/سندات/تقارير
+  حالة: [معلّق]
+  المشكلة:
+  - مراجعة يدوية أن كل استعلام journal_vouchers / accounts / pending يفلتر country_id حيث يلزم.
+  معيار الإغلاق: قائمة مسارات مُفحوصة + لا فجوات في س25/س26/أداء (ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT).
+
+----------------------------------------------------------------------
+ج — توصيات الأولوية (ترتيب التنفيذ للمالك)
+----------------------------------------------------------------------
+
+1. GAP-01 — قواعد orange_gl_journal_type_rules (يمنع كسر مصر عند حفظ الكويت)
+2. GAP-02 — provision remap journal_type_id
+3. GAP-03 — storefront_hero.php أدمن
+4. GAP-04 — purchases GL country_id
+5. GAP-05 + GAP-06 — fiscal fallback + opening balances
+6. GAP-07 — قرار سياسة + تنفيذ merge phone
+7. GAP-08 — legacy migrate (إن وُجدت حاجة)
+8. GAP-09 — تدقيق مستمر
+
+----------------------------------------------------------------------
+د — سجل إغلاق (يُملأ عند إنهاء كل بند)
+----------------------------------------------------------------------
+
+(فارغ — 2026-05-20)

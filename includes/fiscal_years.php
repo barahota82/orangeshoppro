@@ -3,14 +3,31 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
+require_once __DIR__ . '/admin_settings_country.php';
+require_once __DIR__ . '/countries.php';
+
+function orange_fiscal_years_has_country_column(PDO $pdo): bool
+{
+    return orange_table_exists($pdo, 'fiscal_years')
+        && orange_table_has_column($pdo, 'fiscal_years', 'country_id');
+}
 
 /**
  * @return list<array<string, mixed>>
  */
-function orange_fiscal_years_list(PDO $pdo): array
+function orange_fiscal_years_list(PDO $pdo, ?int $countryId = null): array
 {
     if (!orange_table_exists($pdo, 'fiscal_years')) {
         return [];
+    }
+    if (orange_fiscal_years_has_country_column($pdo)) {
+        $cid = orange_admin_settings_effective_country_id($pdo, $countryId);
+        $st = $pdo->prepare(
+            'SELECT * FROM fiscal_years WHERE country_id = ? ORDER BY start_date DESC, id DESC'
+        );
+        $st->execute([$cid]);
+
+        return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     return $pdo->query('SELECT * FROM fiscal_years ORDER BY start_date DESC, id DESC')->fetchAll(PDO::FETCH_ASSOC);
@@ -19,16 +36,24 @@ function orange_fiscal_years_list(PDO $pdo): array
 /**
  * @return array<string, mixed>|null
  */
-function orange_fiscal_find_for_date(PDO $pdo, string $dateYmdOrDatetime): ?array
+function orange_fiscal_find_for_date(PDO $pdo, string $dateYmdOrDatetime, ?int $countryId = null): ?array
 {
     if (!orange_table_exists($pdo, 'fiscal_years')) {
         return null;
     }
     $d = substr($dateYmdOrDatetime, 0, 10);
-    $st = $pdo->prepare(
-        'SELECT * FROM fiscal_years WHERE ? BETWEEN start_date AND end_date ORDER BY id DESC LIMIT 1'
-    );
-    $st->execute([$d]);
+    if (orange_fiscal_years_has_country_column($pdo)) {
+        $cid = orange_admin_settings_effective_country_id($pdo, $countryId);
+        $st = $pdo->prepare(
+            'SELECT * FROM fiscal_years WHERE country_id = ? AND ? BETWEEN start_date AND end_date ORDER BY id DESC LIMIT 1'
+        );
+        $st->execute([$cid, $d]);
+    } else {
+        $st = $pdo->prepare(
+            'SELECT * FROM fiscal_years WHERE ? BETWEEN start_date AND end_date ORDER BY id DESC LIMIT 1'
+        );
+        $st->execute([$d]);
+    }
     $row = $st->fetch(PDO::FETCH_ASSOC);
 
     return $row ?: null;
@@ -39,10 +64,10 @@ function orange_fiscal_find_for_date(PDO $pdo, string $dateYmdOrDatetime): ?arra
  *
  * @throws RuntimeException
  */
-function orange_fiscal_require_open_for_posting(PDO $pdo, string $datetime): int
+function orange_fiscal_require_open_for_posting(PDO $pdo, string $datetime, ?int $countryId = null): int
 {
     orange_catalog_ensure_schema($pdo);
-    $row = orange_fiscal_find_for_date($pdo, $datetime);
+    $row = orange_fiscal_find_for_date($pdo, $datetime, $countryId);
     if (!$row) {
         throw new RuntimeException(
             'لا توجد سنة مالية تغطي تاريخ القيد. عرّف السنة من «السنوات المالية».'
@@ -59,7 +84,7 @@ function orange_fiscal_require_open_for_posting(PDO $pdo, string $datetime): int
     return (int) $row['id'];
 }
 
-function orange_fiscal_is_closed_for_entry(PDO $pdo, array $journalRow): bool
+function orange_fiscal_is_closed_for_entry(PDO $pdo, array $journalRow, ?int $countryId = null): bool
 {
     orange_catalog_ensure_schema($pdo);
     $fyId = (int) ($journalRow['fiscal_year_id'] ?? 0);
@@ -71,30 +96,44 @@ function orange_fiscal_is_closed_for_entry(PDO $pdo, array $journalRow): bool
         return $c === 1;
     }
     $d = (string) ($journalRow['date'] ?? '');
-    $fy = orange_fiscal_find_for_date($pdo, $d);
+    $fy = orange_fiscal_find_for_date($pdo, $d, $countryId);
 
     return $fy ? ((int) $fy['is_closed'] === 1) : false;
 }
 
 /**
- * السنة المالية التالية لإقفال ملخص الدخل إلى المحتجز: يُفضّل أن يكون أولها = نهاية السنة الحالية + يوم واحد.
+ * السنة المالية التالية لإقفال ملخص الدخل إلى المحتجز.
  *
  * @return array<string, mixed>|null
  */
-function orange_fiscal_year_next_after_end(PDO $pdo, string $endDateYmd): ?array
+function orange_fiscal_year_next_after_end(PDO $pdo, string $endDateYmd, ?int $countryId = null): ?array
 {
     if (! orange_table_exists($pdo, 'fiscal_years') || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $endDateYmd)) {
         return null;
     }
     $nextDay = date('Y-m-d', strtotime($endDateYmd . ' +1 day'));
-    $st = $pdo->prepare('SELECT * FROM fiscal_years WHERE start_date = ? ORDER BY id ASC LIMIT 1');
-    $st->execute([$nextDay]);
+    $scoped = orange_fiscal_years_has_country_column($pdo);
+    $cid = $scoped ? orange_admin_settings_effective_country_id($pdo, $countryId) : 0;
+    if ($scoped && $cid > 0) {
+        $st = $pdo->prepare('SELECT * FROM fiscal_years WHERE country_id = ? AND start_date = ? ORDER BY id ASC LIMIT 1');
+        $st->execute([$cid, $nextDay]);
+    } else {
+        $st = $pdo->prepare('SELECT * FROM fiscal_years WHERE start_date = ? ORDER BY id ASC LIMIT 1');
+        $st->execute([$nextDay]);
+    }
     $row = $st->fetch(PDO::FETCH_ASSOC);
     if ($row) {
         return $row;
     }
-    $st = $pdo->prepare('SELECT * FROM fiscal_years WHERE start_date > ? ORDER BY start_date ASC, id ASC LIMIT 1');
-    $st->execute([$endDateYmd]);
+    if ($scoped && $cid > 0) {
+        $st = $pdo->prepare(
+            'SELECT * FROM fiscal_years WHERE country_id = ? AND start_date > ? ORDER BY start_date ASC, id ASC LIMIT 1'
+        );
+        $st->execute([$cid, $endDateYmd]);
+    } else {
+        $st = $pdo->prepare('SELECT * FROM fiscal_years WHERE start_date > ? ORDER BY start_date ASC, id ASC LIMIT 1');
+        $st->execute([$endDateYmd]);
+    }
     $row = $st->fetch(PDO::FETCH_ASSOC);
 
     return $row ?: null;
@@ -103,13 +142,19 @@ function orange_fiscal_year_next_after_end(PDO $pdo, string $endDateYmd): ?array
 /**
  * تداخل النطاقات: يوجد صف يقطع المدى [start,end]؟
  */
-function orange_fiscal_range_overlaps_existing(PDO $pdo, string $start, string $end, ?int $exceptId = null): bool
+function orange_fiscal_range_overlaps_existing(PDO $pdo, string $start, string $end, ?int $exceptId = null, ?int $countryId = null): bool
 {
     if (!orange_table_exists($pdo, 'fiscal_years')) {
         return false;
     }
+    $scoped = orange_fiscal_years_has_country_column($pdo);
+    $cid = $scoped ? orange_admin_settings_effective_country_id($pdo, $countryId) : 0;
     $sql = 'SELECT COUNT(*) FROM fiscal_years WHERE NOT (end_date < ? OR start_date > ?)';
     $params = [$start, $end];
+    if ($scoped && $cid > 0) {
+        $sql .= ' AND country_id = ?';
+        $params[] = $cid;
+    }
     if ($exceptId !== null && $exceptId > 0) {
         $sql .= ' AND id <> ?';
         $params[] = $exceptId;
@@ -142,4 +187,16 @@ function orange_fiscal_year_has_journal_activity(PDO $pdo, int $fiscalYearId): b
     }
 
     return false;
+}
+
+function orange_fiscal_year_country_id(PDO $pdo, int $fiscalYearId): int
+{
+    if ($fiscalYearId <= 0 || !orange_fiscal_years_has_country_column($pdo)) {
+        return 0;
+    }
+    $st = $pdo->prepare('SELECT country_id FROM fiscal_years WHERE id = ? LIMIT 1');
+    $st->execute([$fiscalYearId]);
+    $cid = (int) ($st->fetchColumn() ?: 0);
+
+    return $cid > 0 ? $cid : orange_countries_default_id($pdo);
 }

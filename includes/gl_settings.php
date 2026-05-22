@@ -214,7 +214,7 @@ function orange_gl_order_delivery_setting_keys_from_rule(PDO $pdo, string $journ
     if ($code === '' || !in_array($code, $allowed, true)) {
         return null;
     }
-    $jtId = orange_journal_type_id_by_code($pdo, $code);
+    $jtId = orange_journal_type_id_by_code($pdo, $code, orange_gl_settings_effective_country_id($pdo));
     if ($jtId <= 0) {
         return null;
     }

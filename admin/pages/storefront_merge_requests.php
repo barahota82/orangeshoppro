@@ -4,17 +4,34 @@ declare(strict_types=1);
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+require_once __DIR__ . '/../../includes/admin_settings_country.php';
+
 $rows = [];
 $hasTable = orange_table_exists($pdo, 'storefront_phone_merge_requests');
+$ctxCountryId = orange_admin_settings_effective_country_id($pdo);
+$hasCountryCol = $hasTable && orange_table_has_column($pdo, 'storefront_phone_merge_requests', 'country_id');
+
 if ($hasTable) {
-    $q = $pdo->query(
-        "SELECT r.*, a.email AS account_email
-         FROM storefront_phone_merge_requests r
-         INNER JOIN storefront_accounts a ON a.id = r.storefront_account_id
-         WHERE r.consumed_at IS NULL AND r.expires_at > NOW()
-         ORDER BY r.created_at DESC
-         LIMIT 100"
-    );
+    if ($hasCountryCol && $ctxCountryId > 0) {
+        $q = $pdo->prepare(
+            "SELECT r.*, a.email AS account_email
+             FROM storefront_phone_merge_requests r
+             INNER JOIN storefront_accounts a ON a.id = r.storefront_account_id
+             WHERE r.country_id = ? AND r.consumed_at IS NULL AND r.expires_at > NOW()
+             ORDER BY r.created_at DESC
+             LIMIT 100"
+        );
+        $q->execute([$ctxCountryId]);
+    } else {
+        $q = $pdo->query(
+            "SELECT r.*, a.email AS account_email
+             FROM storefront_phone_merge_requests r
+             INNER JOIN storefront_accounts a ON a.id = r.storefront_account_id
+             WHERE r.consumed_at IS NULL AND r.expires_at > NOW()
+             ORDER BY r.created_at DESC
+             LIMIT 100"
+        );
+    }
     $rows = $q ? $q->fetchAll(PDO::FETCH_ASSOC) : [];
 }
 ?>

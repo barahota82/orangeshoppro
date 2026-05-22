@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/gl_account_aging.php';
 require_once __DIR__ . '/../../includes/party_subledger.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/company_settings.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -105,13 +106,7 @@ if ($pasAcctParams !== []) {
     $accounts = $pdo->query($pasAcctSql)->fetchAll(PDO::FETCH_ASSOC);
 }
 
-$companyNameAr = '';
-if (orange_table_exists($pdo, 'company_settings')) {
-    $cs = $pdo->query('SELECT company_name_ar FROM company_settings ORDER BY id ASC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
-    if (is_array($cs)) {
-        $companyNameAr = trim((string) ($cs['company_name_ar'] ?? ''));
-    }
-}
+$companyNameAr = orange_company_settings_name_ar($pdo);
 
 $accountId = isset($_GET['account']) ? (int) $_GET['account'] : 0;
 $customerId = isset($_GET['customer']) ? (int) $_GET['customer'] : 0;

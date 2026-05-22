@@ -396,6 +396,300 @@ function orange_country_accounts_sort_by_depth(array $rows): array
 }
 
 /**
+ * @return array{skipped:bool, reason:string, copied:int, source_country_id:int, target_country_id:int}
+ */
+function orange_country_copy_journal_types_from_source(PDO $pdo, int $targetCountryId, ?int $sourceCountryId = null): array
+{
+    $out = [
+        'skipped' => true,
+        'reason' => '',
+        'copied' => 0,
+        'source_country_id' => 0,
+        'target_country_id' => $targetCountryId,
+    ];
+    if ($targetCountryId <= 0
+        || !orange_table_exists($pdo, 'journal_types')
+        || !orange_table_has_column($pdo, 'journal_types', 'country_id')) {
+        $out['reason'] = 'no_table';
+
+        return $out;
+    }
+    $sourceCountryId = $sourceCountryId !== null && $sourceCountryId > 0
+        ? $sourceCountryId
+        : orange_countries_default_id($pdo);
+    $out['source_country_id'] = $sourceCountryId;
+    if ($sourceCountryId <= 0 || $sourceCountryId === $targetCountryId) {
+        $out['reason'] = 'no_source';
+
+        return $out;
+    }
+    $stCnt = $pdo->prepare('SELECT COUNT(*) FROM journal_types WHERE country_id = ?');
+    $stCnt->execute([$targetCountryId]);
+    if ((int) $stCnt->fetchColumn() > 0) {
+        $out['reason'] = 'target_has_rows';
+
+        return $out;
+    }
+    $stSrc = $pdo->prepare('SELECT code, name_ar, name_en, sort_order FROM journal_types WHERE country_id = ? ORDER BY sort_order ASC, id ASC');
+    $stSrc->execute([$sourceCountryId]);
+    $rows = $stSrc->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    if ($rows === []) {
+        $out['reason'] = 'source_empty';
+
+        return $out;
+    }
+    $ins = $pdo->prepare(
+        'INSERT INTO journal_types (country_id, code, name_ar, name_en, sort_order) VALUES (?,?,?,?,?)'
+    );
+    foreach ($rows as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        try {
+            $ins->execute([
+                $targetCountryId,
+                (string) ($row['code'] ?? ''),
+                (string) ($row['name_ar'] ?? ''),
+                (string) ($row['name_en'] ?? ''),
+                (int) ($row['sort_order'] ?? 0),
+            ]);
+            $out['copied']++;
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] copy journal_types: ' . $e->getMessage());
+            }
+        }
+    }
+    $out['skipped'] = $out['copied'] <= 0;
+    $out['reason'] = $out['copied'] > 0 ? 'copied' : 'copy_failed';
+
+    return $out;
+}
+
+/**
+ * @return array{skipped:bool, reason:string, copied:int, source_country_id:int, target_country_id:int}
+ */
+function orange_country_copy_fiscal_years_from_source(PDO $pdo, int $targetCountryId, ?int $sourceCountryId = null): array
+{
+    $out = [
+        'skipped' => true,
+        'reason' => '',
+        'copied' => 0,
+        'source_country_id' => 0,
+        'target_country_id' => $targetCountryId,
+    ];
+    if ($targetCountryId <= 0
+        || !orange_table_exists($pdo, 'fiscal_years')
+        || !orange_table_has_column($pdo, 'fiscal_years', 'country_id')) {
+        $out['reason'] = 'no_table';
+
+        return $out;
+    }
+    $sourceCountryId = $sourceCountryId !== null && $sourceCountryId > 0
+        ? $sourceCountryId
+        : orange_countries_default_id($pdo);
+    $out['source_country_id'] = $sourceCountryId;
+    if ($sourceCountryId <= 0 || $sourceCountryId === $targetCountryId) {
+        $out['reason'] = 'no_source';
+
+        return $out;
+    }
+    $stCnt = $pdo->prepare('SELECT COUNT(*) FROM fiscal_years WHERE country_id = ?');
+    $stCnt->execute([$targetCountryId]);
+    if ((int) $stCnt->fetchColumn() > 0) {
+        $out['reason'] = 'target_has_rows';
+
+        return $out;
+    }
+    $stSrc = $pdo->prepare(
+        'SELECT label_ar, start_date, end_date, is_closed, closed_at FROM fiscal_years WHERE country_id = ? ORDER BY start_date ASC, id ASC'
+    );
+    $stSrc->execute([$sourceCountryId]);
+    $rows = $stSrc->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    if ($rows === []) {
+        $out['reason'] = 'source_empty';
+
+        return $out;
+    }
+    $ins = $pdo->prepare(
+        'INSERT INTO fiscal_years (country_id, label_ar, start_date, end_date, is_closed, closed_at) VALUES (?,?,?,?,?,?)'
+    );
+    foreach ($rows as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        try {
+            $ins->execute([
+                $targetCountryId,
+                (string) ($row['label_ar'] ?? ''),
+                (string) ($row['start_date'] ?? ''),
+                (string) ($row['end_date'] ?? ''),
+                (int) ($row['is_closed'] ?? 0),
+                $row['closed_at'] ?? null,
+            ]);
+            $out['copied']++;
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] copy fiscal_years: ' . $e->getMessage());
+            }
+        }
+    }
+    $out['skipped'] = $out['copied'] <= 0;
+    $out['reason'] = $out['copied'] > 0 ? 'copied' : 'copy_failed';
+
+    return $out;
+}
+
+/**
+ * @return array{skipped:bool, reason:string, copied:int, source_country_id:int, target_country_id:int}
+ */
+function orange_country_copy_company_settings_from_source(PDO $pdo, int $targetCountryId, ?int $sourceCountryId = null): array
+{
+    $out = [
+        'skipped' => true,
+        'reason' => '',
+        'copied' => 0,
+        'source_country_id' => 0,
+        'target_country_id' => $targetCountryId,
+    ];
+    if ($targetCountryId <= 0
+        || !orange_table_exists($pdo, 'company_settings')
+        || !orange_table_has_column($pdo, 'company_settings', 'country_id')) {
+        $out['reason'] = 'no_table';
+
+        return $out;
+    }
+    $sourceCountryId = $sourceCountryId !== null && $sourceCountryId > 0
+        ? $sourceCountryId
+        : orange_countries_default_id($pdo);
+    $out['source_country_id'] = $sourceCountryId;
+    if ($sourceCountryId <= 0 || $sourceCountryId === $targetCountryId) {
+        $out['reason'] = 'no_source';
+
+        return $out;
+    }
+    $stCnt = $pdo->prepare('SELECT COUNT(*) FROM company_settings WHERE country_id = ?');
+    $stCnt->execute([$targetCountryId]);
+    if ((int) $stCnt->fetchColumn() > 0) {
+        $out['reason'] = 'target_has_rows';
+
+        return $out;
+    }
+    $stSrc = $pdo->prepare('SELECT * FROM company_settings WHERE country_id = ? LIMIT 1');
+    $stSrc->execute([$sourceCountryId]);
+    $row = $stSrc->fetch(PDO::FETCH_ASSOC);
+    if (!is_array($row)) {
+        $out['reason'] = 'source_empty';
+
+        return $out;
+    }
+    $ins = $pdo->prepare(
+        'INSERT INTO company_settings (country_id, company_name_ar, company_name_en, company_logo, commercial_register, phones, address, vat_number, invoice_footer)
+         VALUES (?,?,?,?,?,?,?,?,?)'
+    );
+    try {
+        $ins->execute([
+            $targetCountryId,
+            (string) ($row['company_name_ar'] ?? ''),
+            (string) ($row['company_name_en'] ?? ''),
+            (string) ($row['company_logo'] ?? ''),
+            (string) ($row['commercial_register'] ?? ''),
+            (string) ($row['phones'] ?? ''),
+            (string) ($row['address'] ?? ''),
+            (string) ($row['vat_number'] ?? ''),
+            $row['invoice_footer'] ?? null,
+        ]);
+        $out['copied'] = 1;
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] copy company_settings: ' . $e->getMessage());
+        }
+    }
+    $out['skipped'] = $out['copied'] <= 0;
+    $out['reason'] = $out['copied'] > 0 ? 'copied' : 'copy_failed';
+
+    return $out;
+}
+
+/**
+ * @return array{skipped:bool, reason:string, copied:int, source_country_id:int, target_country_id:int}
+ */
+function orange_country_copy_storefront_copy_lines_from_source(PDO $pdo, int $targetCountryId, ?int $sourceCountryId = null): array
+{
+    $out = [
+        'skipped' => true,
+        'reason' => '',
+        'copied' => 0,
+        'source_country_id' => 0,
+        'target_country_id' => $targetCountryId,
+    ];
+    if ($targetCountryId <= 0
+        || !orange_table_exists($pdo, 'storefront_copy_lines')
+        || !orange_table_has_column($pdo, 'storefront_copy_lines', 'country_id')) {
+        $out['reason'] = 'no_table';
+
+        return $out;
+    }
+    $sourceCountryId = $sourceCountryId !== null && $sourceCountryId > 0
+        ? $sourceCountryId
+        : orange_countries_default_id($pdo);
+    $out['source_country_id'] = $sourceCountryId;
+    if ($sourceCountryId <= 0 || $sourceCountryId === $targetCountryId) {
+        $out['reason'] = 'no_source';
+
+        return $out;
+    }
+    $stCnt = $pdo->prepare('SELECT COUNT(*) FROM storefront_copy_lines WHERE country_id = ?');
+    $stCnt->execute([$targetCountryId]);
+    if ((int) $stCnt->fetchColumn() > 0) {
+        $out['reason'] = 'target_has_rows';
+
+        return $out;
+    }
+    $stSrc = $pdo->prepare(
+        'SELECT scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi
+         FROM storefront_copy_lines WHERE country_id = ? ORDER BY scope ASC, sort_order ASC, id ASC'
+    );
+    $stSrc->execute([$sourceCountryId]);
+    $rows = $stSrc->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    if ($rows === []) {
+        $out['reason'] = 'source_empty';
+
+        return $out;
+    }
+    $ins = $pdo->prepare(
+        'INSERT INTO storefront_copy_lines (country_id, scope, sort_order, is_active, text_ar, text_en, text_fil, text_hi)
+         VALUES (?,?,?,?,?,?,?,?)'
+    );
+    foreach ($rows as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        try {
+            $ins->execute([
+                $targetCountryId,
+                (string) ($row['scope'] ?? ''),
+                (int) ($row['sort_order'] ?? 0),
+                (int) ($row['is_active'] ?? 1),
+                (string) ($row['text_ar'] ?? ''),
+                (string) ($row['text_en'] ?? ''),
+                (string) ($row['text_fil'] ?? ''),
+                (string) ($row['text_hi'] ?? ''),
+            ]);
+            $out['copied']++;
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] copy storefront_copy_lines: ' . $e->getMessage());
+            }
+        }
+    }
+    $out['skipped'] = $out['copied'] <= 0;
+    $out['reason'] = $out['copied'] > 0 ? 'copied' : 'copy_failed';
+
+    return $out;
+}
+
+/**
  * تهيئة تشغيلية كاملة لدولة جديدة — idempotent (يتخطى ما وُجد مسبقاً).
  *
  * @return array<string,mixed>
@@ -413,6 +707,10 @@ function orange_country_provision_full(PDO $pdo, int $countryId, ?int $sourceCou
         'gl_settings_copy' => [],
         'governorate_id' => 0,
         'created_governorate' => false,
+        'journal_types_copy' => [],
+        'fiscal_years_copy' => [],
+        'company_settings_copy' => [],
+        'storefront_copy_lines_copy' => [],
     ];
     if ($countryId <= 0) {
         return $out;
@@ -494,6 +792,11 @@ function orange_country_provision_full(PDO $pdo, int $countryId, ?int $sourceCou
         $out['departments_copy']['reason'] = 'seeded_inactive';
         $out['departments_copy']['skipped'] = false;
     }
+
+    $out['journal_types_copy'] = orange_country_copy_journal_types_from_source($pdo, $countryId, $sourceCountryId);
+    $out['fiscal_years_copy'] = orange_country_copy_fiscal_years_from_source($pdo, $countryId, $sourceCountryId);
+    $out['company_settings_copy'] = orange_country_copy_company_settings_from_source($pdo, $countryId, $sourceCountryId);
+    $out['storefront_copy_lines_copy'] = orange_country_copy_storefront_copy_lines_from_source($pdo, $countryId, $sourceCountryId);
 
     if (orange_delivery_governorates_table_exists($pdo)) {
         $govBefore = 0;

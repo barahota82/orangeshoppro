@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/company_settings.php';
 /** @var ?\PDO $pdo — يضبطه admin/index.php قبل تضمين هذا الملف؛ تجنّب استدعاء ensure_schema مرتين لكل صفحة أدمن */
 $pdoNav = (isset($pdo) && $pdo instanceof PDO) ? $pdo : db();
 if (!isset($pdo) || !$pdo instanceof PDO) {
@@ -18,13 +19,11 @@ orange_catalog_ensure_schema($pdoNav);
 
 $orangeAdminCompanyTitle = '';
 try {
-    if (orange_table_exists($pdoNav, 'company_settings')) {
-        $br = $pdoNav->query('SELECT company_name_ar, company_name_en FROM company_settings ORDER BY id ASC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
-        if ($br) {
-            $orangeAdminCompanyTitle = trim((string) ($br['company_name_ar'] ?? ''));
-            if ($orangeAdminCompanyTitle === '') {
-                $orangeAdminCompanyTitle = trim((string) ($br['company_name_en'] ?? ''));
-            }
+    $br = orange_company_settings_row($pdoNav);
+    if (is_array($br)) {
+        $orangeAdminCompanyTitle = trim((string) ($br['company_name_ar'] ?? ''));
+        if ($orangeAdminCompanyTitle === '') {
+            $orangeAdminCompanyTitle = trim((string) ($br['company_name_en'] ?? ''));
         }
     }
 } catch (Throwable $e) {

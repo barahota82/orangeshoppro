@@ -149,7 +149,6 @@ if ($obVoucherDateDisp === '' && $fyId > 0) {
 $obNumberDisplay = $obVid > 0 ? $obVid : $obNumberPreview;
 $obAdminIndexUrl = storefront_public_path('/admin/index.php');
 
-$obLeafWhere = orange_accounts_posting_leaf_where_sql($pdo, 'a');
 $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
 
 ?>

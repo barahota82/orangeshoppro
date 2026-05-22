@@ -3,6 +3,13 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
+require_once __DIR__ . '/admin_settings_country.php';
+
+function orange_storefront_copy_has_country_column(PDO $pdo): bool
+{
+    return orange_table_exists($pdo, 'storefront_copy_lines')
+        && orange_table_has_column($pdo, 'storefront_copy_lines', 'country_id');
+}
 
 /**
  * لاحقة عمود اللغة في الجدول القديم storefront_home_hero (احتياطي).
@@ -74,15 +81,26 @@ function orange_storefront_copy_pad_rotation(array $lines): array
  *
  * @return list<string>
  */
-function orange_storefront_home_hero_lines_resolved(PDO $pdo, string $lang): array
+function orange_storefront_home_hero_lines_resolved(PDO $pdo, string $lang, ?int $countryId = null): array
 {
     $out = [];
+    $forStorefront = $countryId === null;
+    $cid = $forStorefront
+        ? orange_storefront_settings_country_id($pdo)
+        : orange_admin_settings_effective_country_id($pdo, $countryId);
     try {
         if (orange_table_exists($pdo, 'storefront_copy_lines')) {
-            $st = $pdo->prepare(
-                'SELECT * FROM storefront_copy_lines WHERE scope = ? AND is_active = 1 ORDER BY sort_order ASC, id ASC'
-            );
-            $st->execute(['home_hero']);
+            if (orange_storefront_copy_has_country_column($pdo) && $cid > 0) {
+                $st = $pdo->prepare(
+                    'SELECT * FROM storefront_copy_lines WHERE country_id = ? AND scope = ? AND is_active = 1 ORDER BY sort_order ASC, id ASC'
+                );
+                $st->execute([$cid, 'home_hero']);
+            } else {
+                $st = $pdo->prepare(
+                    'SELECT * FROM storefront_copy_lines WHERE scope = ? AND is_active = 1 ORDER BY sort_order ASC, id ASC'
+                );
+                $st->execute(['home_hero']);
+            }
             while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
                 if (!is_array($row)) {
                     break;
@@ -119,9 +137,9 @@ function orange_storefront_home_hero_lines_resolved(PDO $pdo, string $lang): arr
 }
 
 /**
- * استخراج نصوص تناوب الهيدر من صف واحد بترتيث ثابت: عربي → إنجليزي → فلبيني → هندي (تخطي الفارغ).
+ * استخراج نصوص تناوب الهيدر من صف واحد بترتيب ثابت: عربي → إنجليزي → فلبيني → هندي (تخطي الفارغ).
  *
- * @param array<string, mixed> $row صف storefront_copy_lines أو أعمدة legacy للهيدر
+ * @param array<string, mixed> $row
  *
  * @return list<string>
  */
@@ -146,24 +164,35 @@ function orange_storefront_header_tagline_row_lang_cycle(array $row): array
 }
 
 /**
- * جمل التناوب تحت الشعار: لكل صف نشط header_tagline يُعرض التناوب بكل اللغات غير الفارغة
- * بالترتيب عربي → إنجليزي → فلبيني → هندي (ثم الصف التالي بنفس المنطق).
+ * جمل التناوب تحت الشعار: لكل صف نشط header_tagline يُعرض التناوب بكل اللغات غير الفارغة.
  *
  * @return list<string>
  */
-function orange_storefront_header_tagline_cycle_resolved(PDO $pdo): array
+function orange_storefront_header_tagline_cycle_resolved(PDO $pdo, ?int $countryId = null): array
 {
-    static $cached = null;
-    if ($cached !== null) {
-        return $cached;
+    static $cached = [];
+    $forStorefront = $countryId === null;
+    $cid = $forStorefront
+        ? orange_storefront_settings_country_id($pdo)
+        : orange_admin_settings_effective_country_id($pdo, $countryId);
+    $cacheKey = ($forStorefront ? 'sf:' : 'adm:') . (string) $cid;
+    if (isset($cached[$cacheKey])) {
+        return $cached[$cacheKey];
     }
     $out = [];
     try {
         if (orange_table_exists($pdo, 'storefront_copy_lines')) {
-            $st = $pdo->prepare(
-                'SELECT * FROM storefront_copy_lines WHERE scope = ? AND is_active = 1 ORDER BY sort_order ASC, id ASC'
-            );
-            $st->execute(['header_tagline']);
+            if (orange_storefront_copy_has_country_column($pdo) && $cid > 0) {
+                $st = $pdo->prepare(
+                    'SELECT * FROM storefront_copy_lines WHERE country_id = ? AND scope = ? AND is_active = 1 ORDER BY sort_order ASC, id ASC'
+                );
+                $st->execute([$cid, 'header_tagline']);
+            } else {
+                $st = $pdo->prepare(
+                    'SELECT * FROM storefront_copy_lines WHERE scope = ? AND is_active = 1 ORDER BY sort_order ASC, id ASC'
+                );
+                $st->execute(['header_tagline']);
+            }
             while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
                 if (!is_array($row)) {
                     break;
@@ -196,12 +225,12 @@ function orange_storefront_header_tagline_cycle_resolved(PDO $pdo): array
     }
 
     if ($out === []) {
-        $cached = ['', ''];
+        $cached[$cacheKey] = ['', ''];
 
-        return $cached;
+        return $cached[$cacheKey];
     }
 
-    $cached = orange_storefront_copy_pad_rotation($out);
+    $cached[$cacheKey] = orange_storefront_copy_pad_rotation($out);
 
-    return $cached;
+    return $cached[$cacheKey];
 }

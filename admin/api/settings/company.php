@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../../includes/admin_settings_country.php';
+require_once __DIR__ . '/../../../includes/company_settings.php';
 require_admin_api();
 
 function req_data() {
@@ -28,12 +30,12 @@ try {
 
     $data = req_data();
     $action = trim((string)($data['action'] ?? 'get'));
+    $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
 
     if ($action === 'get') {
-        $row = $pdo->query("SELECT * FROM company_settings ORDER BY id ASC LIMIT 1")->fetch();
+        $row = orange_company_settings_row($pdo, $ctxCountryId);
         if (!$row) {
-            $pdo->exec("INSERT INTO company_settings (company_name_ar, company_name_en, company_logo, commercial_register, phones, address, vat_number, invoice_footer) VALUES ('', '', '', '', '', '', '', NULL)");
-            $row = $pdo->query("SELECT * FROM company_settings ORDER BY id ASC LIMIT 1")->fetch();
+            $row = orange_company_settings_ensure_row($pdo, $ctxCountryId);
         }
         json_response(['success' => true, 'data' => $row]);
     }
@@ -49,13 +51,21 @@ try {
         $invoiceFooter = trim((string)($data['invoice_footer'] ?? ''));
         $invoiceFooterDb = $invoiceFooter === '' ? null : $invoiceFooter;
 
-        $row = $pdo->query("SELECT id FROM company_settings ORDER BY id ASC LIMIT 1")->fetch();
-        if ($row) {
-            $stmt = $pdo->prepare("UPDATE company_settings SET company_name_ar=?, company_name_en=?, company_logo=?, commercial_register=?, phones=?, address=?, vat_number=?, invoice_footer=? WHERE id=?");
-            $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $invoiceFooterDb, (int)$row['id']]);
+        orange_company_settings_ensure_row($pdo, $ctxCountryId);
+        if (orange_company_settings_has_country_column($pdo)) {
+            $stmt = $pdo->prepare(
+                "UPDATE company_settings SET company_name_ar=?, company_name_en=?, company_logo=?, commercial_register=?, phones=?, address=?, vat_number=?, invoice_footer=? WHERE country_id=?"
+            );
+            $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $invoiceFooterDb, $ctxCountryId]);
         } else {
-            $stmt = $pdo->prepare("INSERT INTO company_settings (company_name_ar, company_name_en, company_logo, commercial_register, phones, address, vat_number, invoice_footer) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $invoiceFooterDb]);
+            $row = $pdo->query("SELECT id FROM company_settings ORDER BY id ASC LIMIT 1")->fetch();
+            if ($row) {
+                $stmt = $pdo->prepare("UPDATE company_settings SET company_name_ar=?, company_name_en=?, company_logo=?, commercial_register=?, phones=?, address=?, vat_number=?, invoice_footer=? WHERE id=?");
+                $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $invoiceFooterDb, (int)$row['id']]);
+            } else {
+                $stmt = $pdo->prepare("INSERT INTO company_settings (company_name_ar, company_name_en, company_logo, commercial_register, phones, address, vat_number, invoice_footer) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $invoiceFooterDb]);
+            }
         }
 
         json_response(['success' => true, 'message' => 'تم حفظ بيانات الشركة']);
