@@ -92,6 +92,8 @@ try {
     $settings = isset($data['settings']) && is_array($data['settings']) ? $data['settings'] : [];
     $hasJtCol = orange_table_has_column($pdo, 'orange_gl_account_settings', 'journal_type_id');
     $hasRulesTable = orange_table_exists($pdo, 'orange_gl_journal_type_rules');
+    $hasRulesCountry = orange_gl_journal_type_rules_has_country_column($pdo);
+    $jtCountryScoped = orange_table_has_column($pdo, 'journal_types', 'country_id');
 
     $pdo->beginTransaction();
     $up = $hasGlCountry
@@ -189,13 +191,30 @@ try {
             $pdo->rollBack();
             json_response(['success' => false, 'message' => 'قواعد أنواع اليومية غير صالحة'], 422);
         }
-        $chkJt = orange_table_exists($pdo, 'journal_types')
-            ? $pdo->prepare('SELECT id FROM journal_types WHERE id = ? LIMIT 1')
-            : null;
-        $pdo->exec('DELETE FROM orange_gl_journal_type_rules');
-        $insRule = $pdo->prepare(
-            'INSERT INTO orange_gl_journal_type_rules (journal_type_id, payment_terms, debit_setting_key, credit_setting_key) VALUES (?,?,?,?)'
-        );
+        $chkJt = null;
+        if (orange_table_exists($pdo, 'journal_types')) {
+            $chkJt = ($jtCountryScoped && $glCountryId > 0)
+                ? $pdo->prepare('SELECT id FROM journal_types WHERE id = ? AND country_id = ? LIMIT 1')
+                : $pdo->prepare('SELECT id FROM journal_types WHERE id = ? LIMIT 1');
+        }
+        if ($hasRulesCountry && $glCountryId > 0) {
+            $pdo->prepare('DELETE FROM orange_gl_journal_type_rules WHERE country_id = ?')->execute([$glCountryId]);
+            $insRule = $pdo->prepare(
+                'INSERT INTO orange_gl_journal_type_rules (country_id, journal_type_id, payment_terms, debit_setting_key, credit_setting_key) VALUES (?,?,?,?,?)'
+            );
+        } else {
+            $pdo->exec('DELETE FROM orange_gl_journal_type_rules');
+            $insRule = $pdo->prepare(
+                'INSERT INTO orange_gl_journal_type_rules (journal_type_id, payment_terms, debit_setting_key, credit_setting_key) VALUES (?,?,?,?)'
+            );
+        }
+        $insertJournalRule = static function (int $jt, string $pt, string $dk, string $ck) use ($insRule, $hasRulesCountry, $glCountryId): void {
+            if ($hasRulesCountry && $glCountryId > 0) {
+                $insRule->execute([$glCountryId, $jt, $pt, $dk, $ck]);
+            } else {
+                $insRule->execute([$jt, $pt, $dk, $ck]);
+            }
+        };
         $seenRule = [];
         foreach ($rawRules as $rule) {
             if (!is_array($rule)) {
@@ -220,7 +239,7 @@ try {
                 $pdo->rollBack();
                 json_response(['success' => false, 'message' => 'جدول أنواع اليوميات غير متوفر'], 422);
             }
-            $chkJt->execute([$jt]);
+            $chkJt->execute(($jtCountryScoped && $glCountryId > 0) ? [$jt, $glCountryId] : [$jt]);
             if (!$chkJt->fetch()) {
                 $pdo->rollBack();
                 json_response(['success' => false, 'message' => 'نوع يومية غير صالح في قواعد الربط.'], 422);
@@ -297,7 +316,7 @@ try {
                         ], 422);
                     }
                 }
-                $insRule->execute([$jt, $pt, $dk, $ck]);
+                $insertJournalRule($jt, $pt, $dk, $ck);
 
                 continue;
             }
@@ -345,7 +364,7 @@ try {
                         ], 422);
                     }
                 }
-                $insRule->execute([$jt, $pt, $dk, $ck]);
+                $insertJournalRule($jt, $pt, $dk, $ck);
 
                 continue;
             }
@@ -376,7 +395,7 @@ try {
                     'message' => 'اربط حساباً للبندين في الجدول العلوي قبل حفظ قاعدة المدين/الدائن.',
                 ], 422);
             }
-            $insRule->execute([$jt, $pt, $dk, $ck]);
+            $insertJournalRule($jt, $pt, $dk, $ck);
         }
     }
 

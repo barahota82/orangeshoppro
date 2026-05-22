@@ -124,23 +124,40 @@ function orange_gl_settings_form_key_order(): array
     ];
 }
 
+function orange_gl_journal_type_rules_has_country_column(PDO $pdo): bool
+{
+    return orange_table_exists($pdo, 'orange_gl_journal_type_rules')
+        && orange_table_has_column($pdo, 'orange_gl_journal_type_rules', 'country_id');
+}
+
 /**
  * قواعد ربط نوع اليومية ببند مدين وبند دائن (مفاتيح من القسم العلوي).
  *
  * @return list<array<string, mixed>>
  */
-function orange_gl_journal_type_rules_list(PDO $pdo): array
+function orange_gl_journal_type_rules_list(PDO $pdo, ?int $countryId = null): array
 {
     orange_catalog_ensure_schema($pdo);
     if (!orange_table_exists($pdo, 'orange_gl_journal_type_rules')) {
         return [];
     }
+    $cid = orange_gl_settings_effective_country_id($pdo, $countryId);
     try {
-        $st = $pdo->query(
-            'SELECT journal_type_id, payment_terms, debit_setting_key, credit_setting_key
-             FROM orange_gl_journal_type_rules
-             ORDER BY journal_type_id ASC, payment_terms ASC'
-        );
+        if (orange_gl_journal_type_rules_has_country_column($pdo) && $cid > 0) {
+            $st = $pdo->prepare(
+                'SELECT journal_type_id, payment_terms, debit_setting_key, credit_setting_key
+                 FROM orange_gl_journal_type_rules
+                 WHERE country_id = ?
+                 ORDER BY journal_type_id ASC, payment_terms ASC'
+            );
+            $st->execute([$cid]);
+        } else {
+            $st = $pdo->query(
+                'SELECT journal_type_id, payment_terms, debit_setting_key, credit_setting_key
+                 FROM orange_gl_journal_type_rules
+                 ORDER BY journal_type_id ASC, payment_terms ASC'
+            );
+        }
 
         return $st ? $st->fetchAll(PDO::FETCH_ASSOC) : [];
     } catch (Throwable $e) {
@@ -173,11 +190,24 @@ function orange_gl_journal_type_rule_for_terms(PDO $pdo, int $journalTypeId, str
         return null;
     }
     try {
-        $st = $pdo->prepare(
-            'SELECT debit_setting_key, credit_setting_key FROM orange_gl_journal_type_rules
-             WHERE journal_type_id = ? AND payment_terms = ? LIMIT 1'
-        );
-        $st->execute([$journalTypeId, $pt]);
+        if (orange_gl_journal_type_rules_has_country_column($pdo)
+            && orange_table_exists($pdo, 'journal_types')
+            && orange_table_has_column($pdo, 'journal_types', 'country_id')) {
+            $st = $pdo->prepare(
+                'SELECT r.debit_setting_key, r.credit_setting_key
+                 FROM orange_gl_journal_type_rules r
+                 INNER JOIN journal_types jt ON jt.id = r.journal_type_id AND jt.id = ?
+                 WHERE r.journal_type_id = ? AND r.payment_terms = ? AND r.country_id = jt.country_id
+                 LIMIT 1'
+            );
+            $st->execute([$journalTypeId, $journalTypeId, $pt]);
+        } else {
+            $st = $pdo->prepare(
+                'SELECT debit_setting_key, credit_setting_key FROM orange_gl_journal_type_rules
+                 WHERE journal_type_id = ? AND payment_terms = ? LIMIT 1'
+            );
+            $st->execute([$journalTypeId, $pt]);
+        }
         $row = $st->fetch(PDO::FETCH_ASSOC);
 
         return $row !== false ? $row : null;
@@ -236,20 +266,39 @@ function orange_gl_order_delivery_setting_keys_from_rule(PDO $pdo, string $journ
  *
  * @return list<array<string, mixed>>
  */
-function orange_gl_posting_linked_journal_types(PDO $pdo): array
+function orange_gl_posting_linked_journal_types(PDO $pdo, ?int $countryId = null): array
 {
     orange_catalog_ensure_schema($pdo);
     if (!orange_table_exists($pdo, 'journal_types')) {
         return [];
     }
+    $cid = orange_gl_settings_effective_country_id($pdo, $countryId);
+    $jtScoped = orange_table_has_column($pdo, 'journal_types', 'country_id');
+    $rulesScoped = orange_gl_journal_type_rules_has_country_column($pdo);
+    $glScoped = orange_table_has_column($pdo, 'orange_gl_account_settings', 'country_id');
     try {
         if (orange_table_exists($pdo, 'orange_gl_journal_type_rules')) {
-            $st = $pdo->query(
-                'SELECT DISTINCT jt.id, jt.code, jt.name_ar, jt.sort_order
-                 FROM orange_gl_journal_type_rules r
-                 INNER JOIN journal_types jt ON jt.id = r.journal_type_id
-                 ORDER BY jt.sort_order ASC, jt.id ASC'
-            );
+            if ($rulesScoped && $cid > 0) {
+                $sql = 'SELECT DISTINCT jt.id, jt.code, jt.name_ar, jt.sort_order
+                        FROM orange_gl_journal_type_rules r
+                        INNER JOIN journal_types jt ON jt.id = r.journal_type_id
+                        WHERE r.country_id = ?';
+                $params = [$cid];
+                if ($jtScoped) {
+                    $sql .= ' AND jt.country_id = ?';
+                    $params[] = $cid;
+                }
+                $sql .= ' ORDER BY jt.sort_order ASC, jt.id ASC';
+                $st = $pdo->prepare($sql);
+                $st->execute($params);
+            } else {
+                $st = $pdo->query(
+                    'SELECT DISTINCT jt.id, jt.code, jt.name_ar, jt.sort_order
+                     FROM orange_gl_journal_type_rules r
+                     INNER JOIN journal_types jt ON jt.id = r.journal_type_id
+                     ORDER BY jt.sort_order ASC, jt.id ASC'
+                );
+            }
             $fromRules = $st ? $st->fetchAll(PDO::FETCH_ASSOC) : [];
             if ($fromRules !== []) {
                 return $fromRules;
@@ -259,13 +308,28 @@ function orange_gl_posting_linked_journal_types(PDO $pdo): array
             || !orange_table_has_column($pdo, 'orange_gl_account_settings', 'journal_type_id')) {
             return [];
         }
-        $st = $pdo->query(
-            'SELECT DISTINCT jt.id, jt.code, jt.name_ar, jt.sort_order
-             FROM orange_gl_account_settings g
-             INNER JOIN journal_types jt ON jt.id = g.journal_type_id
-             WHERE g.journal_type_id IS NOT NULL AND g.journal_type_id > 0
-             ORDER BY jt.sort_order ASC, jt.id ASC'
-        );
+        if ($glScoped && $cid > 0) {
+            $sql = 'SELECT DISTINCT jt.id, jt.code, jt.name_ar, jt.sort_order
+                    FROM orange_gl_account_settings g
+                    INNER JOIN journal_types jt ON jt.id = g.journal_type_id
+                    WHERE g.journal_type_id IS NOT NULL AND g.journal_type_id > 0 AND g.country_id = ?';
+            $params = [$cid];
+            if ($jtScoped) {
+                $sql .= ' AND jt.country_id = ?';
+                $params[] = $cid;
+            }
+            $sql .= ' ORDER BY jt.sort_order ASC, jt.id ASC';
+            $st = $pdo->prepare($sql);
+            $st->execute($params);
+        } else {
+            $st = $pdo->query(
+                'SELECT DISTINCT jt.id, jt.code, jt.name_ar, jt.sort_order
+                 FROM orange_gl_account_settings g
+                 INNER JOIN journal_types jt ON jt.id = g.journal_type_id
+                 WHERE g.journal_type_id IS NOT NULL AND g.journal_type_id > 0
+                 ORDER BY jt.sort_order ASC, jt.id ASC'
+            );
+        }
 
         return $st ? $st->fetchAll(PDO::FETCH_ASSOC) : [];
     } catch (Throwable $e) {

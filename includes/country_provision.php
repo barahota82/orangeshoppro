@@ -469,6 +469,96 @@ function orange_country_copy_journal_types_from_source(PDO $pdo, int $targetCoun
 /**
  * @return array{skipped:bool, reason:string, copied:int, source_country_id:int, target_country_id:int}
  */
+function orange_country_copy_gl_journal_type_rules_from_source(PDO $pdo, int $targetCountryId, ?int $sourceCountryId = null): array
+{
+    $out = [
+        'skipped' => true,
+        'reason' => '',
+        'copied' => 0,
+        'source_country_id' => 0,
+        'target_country_id' => $targetCountryId,
+    ];
+    if ($targetCountryId <= 0
+        || !orange_table_exists($pdo, 'orange_gl_journal_type_rules')
+        || !orange_table_has_column($pdo, 'orange_gl_journal_type_rules', 'country_id')
+        || !orange_table_exists($pdo, 'journal_types')
+        || !orange_table_has_column($pdo, 'journal_types', 'country_id')) {
+        $out['reason'] = 'no_table';
+
+        return $out;
+    }
+    $sourceCountryId = $sourceCountryId !== null && $sourceCountryId > 0
+        ? $sourceCountryId
+        : orange_countries_default_id($pdo);
+    $out['source_country_id'] = $sourceCountryId;
+    if ($sourceCountryId <= 0 || $sourceCountryId === $targetCountryId) {
+        $out['reason'] = 'no_source';
+
+        return $out;
+    }
+    $stCnt = $pdo->prepare('SELECT COUNT(*) FROM orange_gl_journal_type_rules WHERE country_id = ?');
+    $stCnt->execute([$targetCountryId]);
+    if ((int) $stCnt->fetchColumn() > 0) {
+        $out['reason'] = 'target_has_rows';
+
+        return $out;
+    }
+    $stSrc = $pdo->prepare(
+        'SELECT jt.code, r.payment_terms, r.debit_setting_key, r.credit_setting_key
+         FROM orange_gl_journal_type_rules r
+         INNER JOIN journal_types jt ON jt.id = r.journal_type_id
+         WHERE r.country_id = ?
+         ORDER BY r.id ASC'
+    );
+    $stSrc->execute([$sourceCountryId]);
+    $rows = $stSrc->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    if ($rows === []) {
+        $out['reason'] = 'source_empty';
+
+        return $out;
+    }
+    $stTgtJt = $pdo->prepare('SELECT id FROM journal_types WHERE country_id = ? AND code = ? LIMIT 1');
+    $ins = $pdo->prepare(
+        'INSERT INTO orange_gl_journal_type_rules (country_id, journal_type_id, payment_terms, debit_setting_key, credit_setting_key)
+         VALUES (?,?,?,?,?)'
+    );
+    foreach ($rows as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $code = trim((string) ($row['code'] ?? ''));
+        if ($code === '') {
+            continue;
+        }
+        $stTgtJt->execute([$targetCountryId, $code]);
+        $tgtJtId = (int) ($stTgtJt->fetchColumn() ?: 0);
+        if ($tgtJtId <= 0) {
+            continue;
+        }
+        try {
+            $ins->execute([
+                $targetCountryId,
+                $tgtJtId,
+                (string) ($row['payment_terms'] ?? ''),
+                (string) ($row['debit_setting_key'] ?? ''),
+                (string) ($row['credit_setting_key'] ?? ''),
+            ]);
+            $out['copied']++;
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] copy gl_journal_type_rules ' . $code . ': ' . $e->getMessage());
+            }
+        }
+    }
+    $out['skipped'] = $out['copied'] <= 0;
+    $out['reason'] = $out['copied'] > 0 ? 'copied' : 'copy_failed';
+
+    return $out;
+}
+
+/**
+ * @return array{skipped:bool, reason:string, copied:int, source_country_id:int, target_country_id:int}
+ */
 function orange_country_copy_fiscal_years_from_source(PDO $pdo, int $targetCountryId, ?int $sourceCountryId = null): array
 {
     $out = [
@@ -794,6 +884,7 @@ function orange_country_provision_full(PDO $pdo, int $countryId, ?int $sourceCou
     }
 
     $out['journal_types_copy'] = orange_country_copy_journal_types_from_source($pdo, $countryId, $sourceCountryId);
+    $out['gl_journal_type_rules_copy'] = orange_country_copy_gl_journal_type_rules_from_source($pdo, $countryId, $sourceCountryId);
     $out['fiscal_years_copy'] = orange_country_copy_fiscal_years_from_source($pdo, $countryId, $sourceCountryId);
     $out['company_settings_copy'] = orange_country_copy_company_settings_from_source($pdo, $countryId, $sourceCountryId);
     $out['storefront_copy_lines_copy'] = orange_country_copy_storefront_copy_lines_from_source($pdo, $countryId, $sourceCountryId);

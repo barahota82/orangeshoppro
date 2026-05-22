@@ -143,13 +143,14 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
 ----------------------------------------------------------------------
 
 [GAP-01] حرج — orange_gl_journal_type_rules جدول **عام** بدون country_id
-  حالة: [معلّق]
+  حالة: [منتهٍ]
   المشكلة:
   - القواعد (PIN/PDN/CSI/…) مربوطة بـ journal_type_id؛ بعد v52 كل دولة لها IDs مختلفة لنفس code.
   - admin/api/settings/gl-accounts.php: `DELETE FROM orange_gl_journal_type_rules` يمسح **كل** الدول عند حفظ دولة واحدة.
   - orange_gl_journal_type_rules_list() و orange_gl_posting_linked_journal_types() بلا فلترة دولة.
   الملفات: includes/gl_settings.php؛ includes/catalog_schema.php (CREATE rules)؛ admin/api/settings/gl-accounts.php؛ admin/pages/gl_account_settings.php؛ admin/pages/gl_posting.php
   معيار الإغلاق: country_id على القواعد (أو ربط عبر code+country)؛ حذف/حفظ scoped؛ قراءة/ترحيل per سياق الدولة؛ provision ينسخ القواعد للدولة الجديدة.
+  إغلاق: v53 — country_id + uq_ojtr_country_jt_terms؛ gl-accounts save/delete scoped؛ gl_settings list/posting/rule_for_terms؛ country_provision copy بعد journal_types.
 
 [GAP-02] حرج — country_provision ينسخ journal_type_id خاطئ في GL settings
   حالة: [معلّق]
@@ -212,17 +213,16 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
 ج — توصيات الأولوية (ترتيب التنفيذ للمالك)
 ----------------------------------------------------------------------
 
-1. GAP-01 — قواعد orange_gl_journal_type_rules (يمنع كسر مصر عند حفظ الكويت)
-2. GAP-02 — provision remap journal_type_id
-3. GAP-03 — storefront_hero.php أدمن
-4. GAP-04 — purchases GL country_id
-5. GAP-05 + GAP-06 — fiscal fallback + opening balances
-6. GAP-07 — قرار سياسة + تنفيذ merge phone
-7. GAP-08 — legacy migrate (إن وُجدت حاجة)
-8. GAP-09 — تدقيق مستمر
+1. GAP-02 — provision remap journal_type_id
+2. GAP-03 — storefront_hero.php أدمن
+3. GAP-04 — purchases GL country_id
+4. GAP-05 + GAP-06 — fiscal fallback + opening balances
+5. GAP-07 — قرار سياسة + تنفيذ merge phone
+6. GAP-08 — legacy migrate (إن وُجدت حاجة)
+7. GAP-09 — تدقيق مستمر
 
 ----------------------------------------------------------------------
 د — سجل إغلاق (يُملأ عند إنهاء كل بند)
 ----------------------------------------------------------------------
 
-(فارغ — 2026-05-20)
+[2026-05-20] GAP-01 — v53 orange_gl_journal_type_rules per country؛ gl-accounts scoped save؛ gl_settings filtered reads/posting؛ country_provision copy rules (remap journal_type by code).

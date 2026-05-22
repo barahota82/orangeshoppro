@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 52);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 53);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3031,6 +3031,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_country_repair_v50($pdo);
     orange_catalog_migrate_department_countries_v51($pdo);
     orange_catalog_migrate_country_admin_settings_v52($pdo);
+    orange_catalog_migrate_gl_journal_type_rules_country_v53($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
         orange_catalog_safe_exec(
@@ -4620,6 +4621,83 @@ function orange_catalog_migrate_country_admin_settings_v52(PDO $pdo): void
                     }
                 }
             }
+        }
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v53 — orange_gl_journal_type_rules per country (GAP-01).
+ */
+function orange_catalog_migrate_gl_journal_type_rules_country_v53(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    $marker = 'php_gl_journal_type_rules_country_v53';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (!orange_table_exists($pdo, 'orange_gl_journal_type_rules')) {
+        orange_catalog_schema_insert_migration_marker($pdo, $marker);
+
+        return;
+    }
+
+    require_once __DIR__ . '/countries.php';
+    $kwId = orange_countries_default_id($pdo);
+
+    if (!orange_table_has_column($pdo, 'orange_gl_journal_type_rules', 'country_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE orange_gl_journal_type_rules ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
+        );
+        orange_schema_invalidate_column_check('orange_gl_journal_type_rules', 'country_id');
+
+        if (orange_table_exists($pdo, 'journal_types')
+            && orange_table_has_column($pdo, 'journal_types', 'country_id')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE orange_gl_journal_type_rules r
+                 INNER JOIN journal_types jt ON jt.id = r.journal_type_id
+                 SET r.country_id = jt.country_id
+                 WHERE r.country_id IS NULL OR r.country_id = 0'
+            );
+        }
+        if ($kwId > 0) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE orange_gl_journal_type_rules SET country_id = ' . (int) $kwId
+                . ' WHERE country_id IS NULL OR country_id = 0'
+            );
+        }
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE orange_gl_journal_type_rules MODIFY country_id INT UNSIGNED NOT NULL');
+        try {
+            orange_catalog_safe_exec($pdo, 'ALTER TABLE orange_gl_journal_type_rules DROP INDEX uq_ojtr_jt_terms');
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] v53 drop uq_ojtr_jt_terms: ' . $e->getMessage());
+            }
+        }
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE UNIQUE INDEX uq_ojtr_country_jt_terms ON orange_gl_journal_type_rules (country_id, journal_type_id, payment_terms)'
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE INDEX idx_ojtr_country ON orange_gl_journal_type_rules (country_id)'
+        );
+    }
+
+    if ($kwId > 0 && orange_table_exists($pdo, 'countries')) {
+        require_once __DIR__ . '/country_provision.php';
+        $countryRows = $pdo->query('SELECT id FROM countries')->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        foreach ($countryRows as $crow) {
+            $cid = (int) ($crow['id'] ?? 0);
+            if ($cid <= 0 || $cid === $kwId) {
+                continue;
+            }
+            orange_country_copy_gl_journal_type_rules_from_source($pdo, $cid, $kwId);
         }
     }
 
