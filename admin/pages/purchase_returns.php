@@ -179,7 +179,7 @@ $pr2NowDmy = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 
 $nextVoucherNo = 1;
 if (orange_journal_vouchers_ready($pdo)) {
-    $nextVoucherNo = (int) $pdo->query('SELECT COALESCE(MAX(id),0) + 1 FROM journal_vouchers')->fetchColumn();
+    $nextVoucherNo = orange_gl_voucher_next_id_preview($pdo, $prCountryId);
 }
 
 $pr2Ready = ($inventoryAccId !== null && $inventoryAccId > 0 && $cashAccId !== null && $cashAccId > 0);

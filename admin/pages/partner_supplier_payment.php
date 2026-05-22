@@ -115,7 +115,7 @@ $ppvPrefillSupplierId = ($prefillStmtKind === 'supplier' && $prefillStmtId > 0) 
 
 $nextVoucherNo = 1;
 if (orange_journal_vouchers_ready($pdo)) {
-    $nextVoucherNo = (int) $pdo->query('SELECT COALESCE(MAX(id),0) + 1 FROM journal_vouchers')->fetchColumn();
+    $nextVoucherNo = orange_gl_voucher_next_id_preview($pdo, $ppvCountryId);
 }
 
 $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_settings');

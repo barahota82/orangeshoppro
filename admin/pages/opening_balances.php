@@ -104,7 +104,7 @@ if (orange_journal_vouchers_ready($pdo)) {
         $obMeta = orange_journal_voucher_resolve_serial_meta($pdo, 'opening_balance', null);
         $obNumberPreview = orange_journal_voucher_next_serial($pdo, $obFyForSerial, $obMeta['journal_serial_bucket']);
     } else {
-        $obNumberPreview = (int) $pdo->query('SELECT COALESCE(MAX(id),0) + 1 FROM journal_vouchers')->fetchColumn();
+        $obNumberPreview = orange_gl_voucher_next_id_preview($pdo, $ctxCountryId);
     }
 }
 

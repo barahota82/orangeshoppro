@@ -32,6 +32,23 @@ function orange_gl_voucher_country_bind(PDO $pdo, string $jvAlias = 'jv', ?int $
     return ['sql' => ' AND ' . $col . ' = ?', 'params' => [$countryId]];
 }
 
+/** معاينة رقم السند (MAX(id)+1) ضمن دولة الأدمن — للعرض فقط (GAP-09). */
+function orange_gl_voucher_next_id_preview(PDO $pdo, ?int $countryId = null): int
+{
+    if (!orange_journal_vouchers_ready($pdo)) {
+        return 1;
+    }
+    $bind = orange_gl_voucher_country_bind($pdo, 'jv', $countryId);
+    $sql = 'SELECT COALESCE(MAX(jv.id), 0) + 1 FROM journal_vouchers jv WHERE 1=1' . $bind['sql'];
+    if ($bind['params'] === []) {
+        return (int) $pdo->query($sql)->fetchColumn();
+    }
+    $st = $pdo->prepare($sql);
+    $st->execute($bind['params']);
+
+    return (int) $st->fetchColumn();
+}
+
 function orange_journal_voucher_resolve_country_id(PDO $pdo, array $header): int
 {
     if (!orange_table_has_country_id($pdo, 'journal_vouchers')) {

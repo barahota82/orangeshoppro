@@ -87,7 +87,7 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
 فجوات تنفيذ معروفة (بعد قرار المالك)
 ----------------------------------------------------------------------
 
-- مراجعة شاشات محاسبة/سندات للتأكد من فلترة country_id على كل الاستعلامات (تدقيق مستمر — بند GAP-09 أدناه).
+- ~~مراجعة شاشات محاسبة/سندات للتأكد من فلترة country_id على كل الاستعلامات (تدقيق مستمر — بند GAP-09 أدناه).~~ **GAP-09 — جولة 1 (2026-05-20): [منتهٍ]** — انظر قائمة التدقيق في GAP-09؛ إعادة المراجعة عند شاشة GL جديدة أو دولة جديدة.
 
 ----------------------------------------------------------------------
 مراجعة ثغرات ما بعد v52 — قائمة تنفيذ (2026-05-20)
@@ -212,16 +212,29 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
   إغلاق: استدعاء الترحيل بعد v52/v55؛ COUNT/INSERT scoped بـ orange_countries_default_id() (الكويت) عند وجود عمود country_id؛ seed يبقى scoped كما في v52-S4.
 
 [GAP-09] تدقيق مستمر — مسارات GL/سندات/تقارير
-  حالة: [معلّق]
+  حالة: [منتهٍ — جولة 1 / 2026-05-20]
   المشكلة:
   - مراجعة يدوية أن كل استعلام journal_vouchers / accounts / pending يفلتر country_id حيث يلزم.
   معيار الإغلاق: قائمة مسارات مُفحوصة + لا فجوات في س25/س26/أداء (ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT).
+  قائمة تدقيق (جولة 1 — 2026-05-20):
+  - journal/manage.php — orange_gl_voucher_country_bind() في list/nav
+  - journal_voucher_reports.php — DISTINCT entry_type scoped (فلتر القائمة المنسدلة)
+  - journal_voucher_screen.php — fiscal_find_for_date + معاينة رقم scoped؛ orange_accounts_count_posting_leaves scoped
+  - opening_balances.php — معاينة رقم scoped (fallback نادر)
+  - partner_supplier_payment.php / purchases.php / purchase_returns.php — معاينة رقم scoped (عرض فقط)
+  - financial_report / trial balance / PL / GL monthly — bind/filter موجود (baseline v52)
+  - gl_pending — orange_gl_pending_row_visible_for_country (فلتر PHP؛ ≤500 صف — مقبول)
+  - accounts_fetch + gl_settings/posting — GAP-01 v53 scoped
+  - s25/s26 storefront — **لم تُمس** (ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT)
+  إغلاق جولة 1: لا فجوات حرجة (cross-country write أو تقارير مجمّعة مختلطة)؛ البنود المنخفضة أُصلحت.
+  تنفيذ (جولة 1): orange_gl_voucher_next_id_preview() في includes/journal_voucher.php؛ journal_voucher_reports.php؛ journal_voucher_screen.php؛ opening_balances.php؛ partner_supplier_payment.php؛ purchases.php؛ purchase_returns.php.
+  إعادة التدقيق: عند شاشة GL جديدة أو دولة جديدة — يُحدَّث هذا البند (جولة 2+).
 
 ----------------------------------------------------------------------
 ج — توصيات الأولوية (ترتيب التنفيذ للمالك)
 ----------------------------------------------------------------------
 
-1. GAP-09 — تدقيق مستمر
+(لا ثغرات GAP مفتوحة في قائمة «ب» — GAP-09 جولة 1 منتهية؛ إعادة تدقيق عند توسّع GL/دولة جديدة.)
 
 ----------------------------------------------------------------------
 د — سجل إغلاق (يُملأ عند إنهاء كل بند)
@@ -235,3 +248,4 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
 [2026-05-20] GAP-06 — opening_balances save/delete/page + fiscal require/find scoped بـ ctxCountryId.
 [2026-05-20] GAP-07 — merge phone find scoped بـ country_id القناة؛ قرار المالك: القناة=الدولة بلا تبديل واجهة؛ الهاتف فريد per country لا globally.
 [2026-05-20] GAP-08 — legacy storefront_copy_lines migrate: COUNT/INSERT scoped بـ country_id (KW default)؛ يُستدعى بعد v52.
+[2026-05-20] GAP-09 — جولة 1: تدقيق GL/سندات/تقارير؛ orange_gl_voucher_next_id_preview؛ معاينة أرقام scoped؛ قائمة تدقيق في GAP-09.

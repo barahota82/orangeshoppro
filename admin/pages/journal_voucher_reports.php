@@ -38,8 +38,17 @@ if ($entryTypeFilter !== '' && !preg_match('/^[a-zA-Z0-9_\-]+$/', $entryTypeFilt
 $typeLabels = orange_gl_entry_type_labels_map();
 try {
     if (orange_journal_vouchers_ready($pdo)) {
-        $dist = $pdo->query('SELECT DISTINCT entry_type FROM journal_vouchers ORDER BY entry_type')->fetchAll(PDO::FETCH_COLUMN);
-        foreach ($dist as $t) {
+        $jvCountryBindDist = orange_gl_voucher_country_bind($pdo, 'jv');
+        $sqlDist = 'SELECT DISTINCT jv.entry_type FROM journal_vouchers jv WHERE 1=1' . $jvCountryBindDist['sql']
+            . ' ORDER BY jv.entry_type';
+        if ($jvCountryBindDist['params'] === []) {
+            $dist = $pdo->query($sqlDist)->fetchAll(PDO::FETCH_COLUMN);
+        } else {
+            $stDist = $pdo->prepare($sqlDist);
+            $stDist->execute($jvCountryBindDist['params']);
+            $dist = $stDist->fetchAll(PDO::FETCH_COLUMN);
+        }
+        foreach ($dist ?: [] as $t) {
             $t = (string) $t;
             if ($t !== '' && !array_key_exists($t, $typeLabels)) {
                 $typeLabels[$t] = $t;

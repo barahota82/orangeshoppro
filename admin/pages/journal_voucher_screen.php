@@ -12,9 +12,12 @@ require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+
+$jvScreenCountryId = orange_admin_context_country_id($pdo);
 
 $jvCashLock = null;
 $jvPageEt = (string) ($jvPageEntryType ?? '');
@@ -44,7 +47,7 @@ if ($jvPageEt === 'other_voucher') {
 $nextJournalVoucherNo = 1;
 if (orange_journal_vouchers_ready($pdo)) {
     orange_journal_types_sync_canonical_defaults($pdo);
-    $fyPeek = orange_fiscal_find_for_date($pdo, date('Y-m-d'));
+    $fyPeek = orange_fiscal_find_for_date($pdo, date('Y-m-d'), $jvScreenCountryId > 0 ? $jvScreenCountryId : null);
     $fyPeekId = $fyPeek ? (int) $fyPeek['id'] : 0;
     $etPeek = isset($jvPageEntryType) ? (string) $jvPageEntryType : '';
     if (
@@ -53,17 +56,13 @@ if (orange_journal_vouchers_ready($pdo)) {
         && orange_table_has_column($pdo, 'journal_vouchers', 'voucher_serial')
     ) {
         if ($etPeek === 'other_voucher') {
-            $nextJournalVoucherNo = (int) $pdo->query(
-                'SELECT COALESCE(MAX(id),0) + 1 FROM journal_vouchers'
-            )->fetchColumn();
+            $nextJournalVoucherNo = orange_gl_voucher_next_id_preview($pdo, $jvScreenCountryId);
         } else {
             $jm = orange_journal_voucher_resolve_serial_meta($pdo, $etPeek, null);
             $nextJournalVoucherNo = orange_journal_voucher_next_serial($pdo, $fyPeekId, $jm['journal_serial_bucket']);
         }
     } else {
-        $nextJournalVoucherNo = (int) $pdo->query(
-            'SELECT COALESCE(MAX(id),0) + 1 FROM journal_vouchers'
-        )->fetchColumn();
+        $nextJournalVoucherNo = orange_gl_voucher_next_id_preview($pdo, $jvScreenCountryId);
     }
 }
 $jvFormDocumentEnteredDisplay = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
@@ -71,12 +70,7 @@ $jvFormVoucherDateDisplay = orange_format_date_dmY(date('Y-m-d'));
 $jvNavReady = orange_journal_vouchers_ready($pdo);
 $jvPostingLeafCt = 0;
 if ($jvNavReady) {
-    $jvLw = orange_accounts_posting_leaf_where_sql($pdo, 'a');
-    try {
-        $jvPostingLeafCt = (int) $pdo->query("SELECT COUNT(*) FROM accounts a WHERE $jvLw")->fetchColumn();
-    } catch (Throwable $e) {
-        $jvPostingLeafCt = 0;
-    }
+    $jvPostingLeafCt = orange_accounts_count_posting_leaves($pdo, $jvScreenCountryId > 0 ? $jvScreenCountryId : null);
 }
 $jvHeaderLineClass = 'jv-voucher-header-line' . ($jvNavReady ? ' jv-voucher-header-line--nav' : '');
 ?>
