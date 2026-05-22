@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../../includes/gl_settings.php';
 require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/fiscal_years.php';
+require_once __DIR__ . '/../../../includes/admin_settings_country.php';
 require_admin_api();
 
 try {
@@ -17,13 +18,15 @@ try {
         json_response(['success' => false, 'message' => 'جداول السندات غير جاهزة'], 500);
     }
 
+    $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
+
     $data = get_json_input();
     $dateIso = trim((string) ($data['voucher_date'] ?? ''));
     if ($dateIso === '' || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateIso)) {
         json_response(['success' => false, 'message' => 'تاريخ السند مطلوب لتحديد السنة المالية'], 422);
     }
     try {
-        $fyId = orange_fiscal_require_open_for_posting($pdo, $dateIso . ' 12:00:00');
+        $fyId = orange_fiscal_require_open_for_posting($pdo, $dateIso . ' 12:00:00', $ctxCountryId);
     } catch (Throwable $e) {
         json_response(['success' => false, 'message' => $e->getMessage()], 422);
     }

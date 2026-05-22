@@ -179,18 +179,20 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
   إغلاق: countryId على posting bundles؛ glAcct/jtByCode per purchase/return country؛ callers تمرّر purchaseCountryId/returnCountryId.
 
 [GAP-05] متوسط — orange_fiscal_is_closed_for_voucher fallback بلا دولة السند
-  حالة: [معلّق]
+  حالة: [منتهٍ]
   المشكلة:
   - عند غياب fiscal_year_id: orange_fiscal_find_for_date($pdo, $d) بدون country_id من journal_vouchers.
   الملفات: includes/journal_voucher.php
   معيار الإغلاق: تمرير country_id من صف السند عند fallback.
+  إغلاق: orange_journal_voucher_resolve_country_id() → orange_fiscal_find_for_date عند fallback.
 
 [GAP-06] متوسط — opening_balances API بلا country_id صريح للسنة المالية
-  حالة: [معلّق]
+  حالة: [منتهٍ]
   المشكلة:
   - orange_fiscal_require_open_for_posting() في save/delete بدون country_id (يعتمد سياق الأدmin فقط).
   الملفات: admin/api/opening_balances/save.php؛ delete.php؛ admin/pages/opening_balances.php (fyPeek)
   معيار الإغلاق: تمرير orange_admin_settings_effective_country_id أو country_id السند.
+  إغلاق: ctxCountryId في save/delete/page؛ fiscal list/find scoped؛ country_id على orange_voucher_post.
 
 [GAP-07] منخفض — دمج هاتف س15: بحث حساب مفعّl globally
   حالة: [معلّق]
@@ -216,10 +218,9 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
 ج — توصيات الأولوية (ترتيب التنفيذ للمالك)
 ----------------------------------------------------------------------
 
-1. GAP-05 + GAP-06 — fiscal fallback + opening balances
-2. GAP-07 — قرار سياسة + تنفيذ merge phone
-3. GAP-08 — legacy migrate (إن وُجدت حاجة)
-4. GAP-09 — تدقيق مستمر
+1. GAP-07 — قرار سياسة + تنفيذ merge phone
+2. GAP-08 — legacy migrate (إن وُجدت حاجة)
+3. GAP-09 — تدقيق مستمر
 
 ----------------------------------------------------------------------
 د — سجل إغلاق (يُملأ عند إنهاء كل بند)
@@ -229,3 +230,5 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
 [2026-05-20] GAP-02 — v54 repair gl_account_settings journal_type_id؛ provision journal_types قبل GL + remap by code.
 [2026-05-20] GAP-03 — storefront_hero.php list/edit scoped بـ country_id + تلميح سياق الدولة.
 [2026-05-20] GAP-04 — purchase/return GL posting bundles + APIs تمرّر country_id للـ journal types و GL accounts.
+[2026-05-20] GAP-05 — orange_fiscal_is_closed_for_voucher fallback scoped بـ country_id السند.
+[2026-05-20] GAP-06 — opening_balances save/delete/page + fiscal require/find scoped بـ ctxCountryId.

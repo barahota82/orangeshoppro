@@ -5,6 +5,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/fiscal_years.php';
+require_once __DIR__ . '/../../includes/admin_settings_country.php';
+require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
@@ -12,7 +14,17 @@ require_once __DIR__ . '/../../includes/account_tree.php';
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
-$years = array_values(array_filter(orange_fiscal_years_list($pdo), static fn ($y) => (int) ($y['is_closed'] ?? 0) === 0));
+$ctxCountryId = orange_admin_settings_effective_country_id($pdo);
+$ctxCountryRow = orange_country_row_by_id($pdo, $ctxCountryId, false);
+$ctxCountryLabel = trim((string) ($ctxCountryRow['name_ar'] ?? ''));
+if ($ctxCountryLabel === '' && $ctxCountryRow !== null) {
+    $ctxCountryLabel = trim((string) ($ctxCountryRow['name_en'] ?? ''));
+}
+if ($ctxCountryLabel === '') {
+    $ctxCountryLabel = orange_countries_display_code(orange_admin_context_country_code($pdo));
+}
+
+$years = array_values(array_filter(orange_fiscal_years_list($pdo, $ctxCountryId), static fn ($y) => (int) ($y['is_closed'] ?? 0) === 0));
 
 $obFyRanges = [];
 foreach ($years as $y) {
@@ -52,7 +64,7 @@ $isYearOpenAndListed = static function (?array $row) use ($years): bool {
 };
 
 if ($years !== []) {
-    $fyTry = orange_fiscal_find_for_date($pdo, $bootstrapIso);
+    $fyTry = orange_fiscal_find_for_date($pdo, $bootstrapIso, $ctxCountryId);
     if ($isYearOpenAndListed($fyTry)) {
         $fyRowSel = $fyTry;
         $fyId = (int) $fyRowSel['id'];
@@ -62,7 +74,7 @@ if ($years !== []) {
         if (strlen($bootstrapIso) !== 10) {
             $bootstrapIso = date('Y-m-d');
         }
-        $fyTry2 = orange_fiscal_find_for_date($pdo, $bootstrapIso);
+        $fyTry2 = orange_fiscal_find_for_date($pdo, $bootstrapIso, $ctxCountryId);
         if ($isYearOpenAndListed($fyTry2)) {
             $fyRowSel = $fyTry2;
             $fyId = (int) $fyRowSel['id'];
@@ -155,6 +167,9 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
 <div class="page-title page-title--stacked jv-print-hide">
     <div>
         <h1>أرصدة أول المدة المالية</h1>
+        <?php if ($ctxCountryId > 0 && orange_fiscal_years_has_country_column($pdo)): ?>
+        <p class="card-hint" style="margin:0.35rem 0 0;">سياق الدولة: <strong><?php echo htmlspecialchars($ctxCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong> — السنوات المالية والسند الافتتاحي لهذه الدولة فقط.</p>
+        <?php endif; ?>
     </div>
 </div>
 

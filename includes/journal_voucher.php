@@ -107,8 +107,8 @@ function orange_fiscal_is_closed_for_voucher(PDO $pdo, array $voucherRow): bool
         return (int) $st->fetchColumn() === 1;
     }
     $d = (string) ($voucherRow['voucher_date'] ?? '');
-
-    $fy = orange_fiscal_find_for_date($pdo, $d);
+    $countryId = orange_journal_voucher_resolve_country_id($pdo, $voucherRow);
+    $fy = orange_fiscal_find_for_date($pdo, $d, $countryId > 0 ? $countryId : null);
 
     return $fy ? ((int) $fy['is_closed'] === 1) : false;
 }

@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../../includes/account_tree.php';
 require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/fiscal_years.php';
+require_once __DIR__ . '/../../../includes/admin_settings_country.php';
 require_admin_api();
 
 try {
@@ -17,6 +18,8 @@ try {
     if (!orange_journal_vouchers_ready($pdo)) {
         json_response(['success' => false, 'message' => 'جداول السندات غير جاهزة'], 500);
     }
+
+    $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
 
     $data = get_json_input();
     $statement = trim((string)($data['statement'] ?? ''));
@@ -33,7 +36,7 @@ try {
         json_response(['success' => false, 'message' => 'تاريخ السند مطلوب بصيغة صحيحة (يوم/شهر/سنة)'], 422);
     }
     try {
-        $fyId = orange_fiscal_require_open_for_posting($pdo, $dateIso . ' 12:00:00');
+        $fyId = orange_fiscal_require_open_for_posting($pdo, $dateIso . ' 12:00:00', $ctxCountryId);
     } catch (Throwable $e) {
         json_response(['success' => false, 'message' => $e->getMessage()], 422);
     }
@@ -100,6 +103,7 @@ try {
                 'reference' => $obRef,
                 'description' => $statement,
                 'entry_type' => 'opening_balance',
+                'country_id' => $ctxCountryId,
             ], $norm);
         }
 
