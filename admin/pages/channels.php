@@ -37,6 +37,8 @@ foreach ($channels as $c) {
 $pubBase = PUBLIC_BASE_PATH === '' ? '' : PUBLIC_BASE_PATH;
 $initialLogo = $editRow ? trim((string) ($editRow['logo'] ?? '')) : '';
 $editIsActive = $editRow ? (int) ($editRow['is_active'] ?? 1) : 1;
+$editIsCountryDefault = $editRow ? (int) ($editRow['is_country_default'] ?? 0) : 0;
+$hasCountryDefaultCol = orange_channels_has_country_default_column($pdo);
 ?>
 <div class="page-title">
     <h1>الواجهات (قنوات العملاء)</h1>
@@ -49,6 +51,9 @@ $editIsActive = $editRow ? (int) ($editRow['is_active'] ?? 1) : 1;
     <h3><?php echo $editRow ? 'تعديل واجهة' : 'إضافة واجهة'; ?></h3>
     <p class="card-hint" style="margin:0 0 0.75rem;">اختصار الرابط يظهر في عنوان الموقع مثل <code>/tiktok</code> — عند <strong>تغييره</strong> يُحدَّث تلقائياً الـ <strong>slug الداخلي</strong> (لـ <code>?channel=</code> والكوكي). اسم الواجهة فقط لا يغيّر الـ slug.</p>
     <p class="card-hint" style="margin:0 0 0.75rem;"><strong>حالة الظهور:</strong> الواجهة <strong>غير النشطة</strong> لا يعمل لها مسار الاختصار العام ولا تُقبل في كوكي/خرائط المتجر للزوار. رابط <strong>معاينة الواجهة</strong> من الجدول يفتحها للمراجعة (بعد تسجيل دخول الأدمن) حتى وهي متوقفة.</p>
+    <?php if ($hasCountryDefaultCol): ?>
+    <p class="card-hint" style="margin:0 0 0.75rem;"><strong>القناة الرئيسية للدولة:</strong> يُحوَّل الزائر الذي يفتح جذر الموقع (<code dir="ltr">/</code>) من دولة نشطة تلقائياً إلى هذه القناة (حسب موقعه الجغرافي). قناة رئيسية واحدة لكل دولة.</p>
+    <?php endif; ?>
     <input type="hidden" id="channel_id" value="<?php echo $editRow ? (int) $editRow['id'] : ''; ?>">
     <input type="hidden" id="channel_logo" value="<?php echo htmlspecialchars($initialLogo, ENT_QUOTES, 'UTF-8'); ?>">
     <div class="form-grid">
@@ -107,6 +112,15 @@ $editIsActive = $editRow ? (int) ($editRow['is_active'] ?? 1) : 1;
                 <option value="0" <?php echo $editIsActive === 0 ? ' selected' : ''; ?>>متوقف — مخفي عن الزوار</option>
             </select>
         </div>
+        <?php if ($hasCountryDefaultCol): ?>
+        <div>
+            <label for="channel_is_country_default">قناة رئيسية للدولة</label>
+            <select id="channel_is_country_default">
+                <option value="0" <?php echo $editIsCountryDefault === 0 ? ' selected' : ''; ?>>لا</option>
+                <option value="1" <?php echo $editIsCountryDefault === 1 ? ' selected' : ''; ?>>نعم — تحويل الزائر من / لهذه القناة</option>
+            </select>
+        </div>
+        <?php endif; ?>
     </div>
     <div class="actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
         <button type="button" onclick="saveChannel()"><?php echo $editRow ? 'حفظ التعديلات' : 'حفظ الواجهة'; ?></button>
@@ -128,6 +142,7 @@ $editIsActive = $editRow ? (int) ($editRow['is_active'] ?? 1) : 1;
                     <th>الاسم</th>
                     <th>اختصار URL</th>
                     <th>Slug داخلي</th>
+                    <?php if ($hasCountryDefaultCol): ?><th>رئيسية</th><?php endif; ?>
                     <th>الواتساب</th>
                     <th>معاينة الواجهة</th>
                     <th>الحالة</th>
@@ -147,6 +162,9 @@ $editIsActive = $editRow ? (int) ($editRow['is_active'] ?? 1) : 1;
                     <td><?php echo htmlspecialchars($ch['name']); ?></td>
                     <td><code dir="ltr"><?php echo htmlspecialchars((string) ($ch['path_segment'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
                     <td><code dir="ltr"><?php echo htmlspecialchars($ch['slug']); ?></code></td>
+                    <?php if ($hasCountryDefaultCol): ?>
+                    <td><?php echo (int) ($ch['is_country_default'] ?? 0) === 1 ? 'نعم' : '—'; ?></td>
+                    <?php endif; ?>
                     <td><?php echo htmlspecialchars($ch['whatsapp_number']); ?></td>
                     <td dir="ltr"><?php
                     $ps = trim((string) ($ch['path_segment'] ?? ''));
@@ -251,6 +269,10 @@ async function saveChannel() {
         country_id: parseInt((document.getElementById('channel_country_id') || {}).value, 10) || 0,
         channel_kind: (document.getElementById('channel_kind') || {}).value || 'other'
     };
+    var defEl = document.getElementById('channel_is_country_default');
+    if (defEl) {
+        payload.is_country_default = defEl.value === '1' ? 1 : 0;
+    }
     if (idEl && idEl.value) {
         var n = parseInt(idEl.value, 10);
         if (n > 0) payload.id = n;

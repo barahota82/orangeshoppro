@@ -286,6 +286,12 @@ function orange_storefront_read_saved_country_code(): ?string
 function orange_storefront_current_country_code(PDO $pdo): string
 {
     static $memo = null;
+    if (!empty($GLOBALS['orange_storefront_country_override'])) {
+        $forced = orange_countries_normalize_code((string) $GLOBALS['orange_storefront_country_override']);
+        if ($forced !== '' && orange_country_row_by_code($pdo, $forced, false) !== null) {
+            return $forced;
+        }
+    }
     if ($memo !== null) {
         return $memo;
     }
@@ -753,6 +759,22 @@ function orange_channel_kind_normalize(string $raw): string
 function orange_channels_has_country_column(PDO $pdo): bool
 {
     return orange_table_exists($pdo, 'channels') && orange_table_has_column($pdo, 'channels', 'country_id');
+}
+
+function orange_channels_has_country_default_column(PDO $pdo): bool
+{
+    return orange_table_exists($pdo, 'channels') && orange_table_has_column($pdo, 'channels', 'is_country_default');
+}
+
+/** يثبت دولة الطلب (مثلاً بعد Geo على جذر الموقع) دون ?country= في الرابط. */
+function orange_storefront_set_country_override(?string $code): void
+{
+    if ($code === null || trim($code) === '') {
+        unset($GLOBALS['orange_storefront_country_override']);
+
+        return;
+    }
+    $GLOBALS['orange_storefront_country_override'] = orange_countries_normalize_code($code);
 }
 
 function orange_delivery_areas_has_country_column(PDO $pdo): bool

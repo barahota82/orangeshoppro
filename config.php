@@ -86,6 +86,9 @@ define(
  */
 define('ORANGE_STOREFRONT_PREVIEW_TOKEN', trim((string) ($env['ORANGE_STOREFRONT_PREVIEW_TOKEN'] ?? '')));
 
+/** اختياري: تجاوز Geo للتطوير المحلي (مثل kw) — راجع .env.example.php */
+define('ORANGE_STOREFRONT_GEO_OVERRIDE', trim((string) ($env['ORANGE_STOREFRONT_GEO_OVERRIDE'] ?? '')));
+
 /** ترحيل المخطط: سلسلة صارمة 001.sql…NNN.sql تُحدّث orange_schema_meta خطوة بخطوة (كل DDL في SQL) — الافتراضي false (آمن مع جسم PHP). */
 $__strictNum = $env['ORANGE_STRICT_NUMBERED_SQL_MIGRATIONS'] ?? false;
 define(
@@ -442,19 +445,49 @@ function orange_storefront_default_channel_slug(PDO $pdo, ?int $countryId = null
     if ($countryId === null || $countryId <= 0) {
         $countryId = orange_storefront_current_country_id($pdo);
     }
-    $cacheKey = 'c' . (int) $countryId;
+    $main = orange_storefront_main_channel_slug_for_country($pdo, $countryId);
+    if ($main !== null && $main !== '') {
+        return $main;
+    }
+
+    return 'tiktok';
+}
+
+/**
+ * القناة الرئيسية للدولة (is_country_default) — null إن لا توجد قناة نشطة.
+ */
+function orange_storefront_main_channel_slug_for_country(PDO $pdo, int $countryId): ?string
+{
+    if ($countryId <= 0 || !orange_table_exists($pdo, 'channels')) {
+        return null;
+    }
     static $memoByCountry = [];
-    if (isset($memoByCountry[$cacheKey])) {
+    $cacheKey = 'c' . $countryId;
+    if (array_key_exists($cacheKey, $memoByCountry)) {
         return $memoByCountry[$cacheKey];
     }
     try {
-        if ($countryId > 0 && orange_channels_has_country_column($pdo)) {
-            $st = $pdo->prepare('SELECT slug FROM channels WHERE is_active = 1 AND country_id = ? ORDER BY id ASC LIMIT 1');
+        $hasDefault = orange_channels_has_country_default_column($pdo);
+        $hasCountry = orange_channels_has_country_column($pdo);
+        if ($hasCountry) {
+            if ($hasDefault) {
+                $st = $pdo->prepare(
+                    'SELECT slug FROM channels
+                     WHERE is_active = 1 AND country_id = ?
+                     ORDER BY is_country_default DESC, id ASC LIMIT 1'
+                );
+            } else {
+                $st = $pdo->prepare(
+                    'SELECT slug FROM channels
+                     WHERE is_active = 1 AND country_id = ?
+                     ORDER BY id ASC LIMIT 1'
+                );
+            }
             $st->execute([$countryId]);
-            $v = $st->fetchColumn();
         } else {
-            $v = $pdo->query('SELECT slug FROM channels WHERE is_active = 1 ORDER BY id ASC LIMIT 1')->fetchColumn();
+            $st = $pdo->query('SELECT slug FROM channels WHERE is_active = 1 ORDER BY id ASC LIMIT 1');
         }
+        $v = $st ? $st->fetchColumn() : false;
         if ($v !== false && $v !== null && (string) $v !== '') {
             $memoByCountry[$cacheKey] = (string) $v;
 
@@ -462,9 +495,9 @@ function orange_storefront_default_channel_slug(PDO $pdo, ?int $countryId = null
         }
     } catch (Throwable $e) {
     }
-    $memoByCountry[$cacheKey] = 'tiktok';
+    $memoByCountry[$cacheKey] = null;
 
-    return $memoByCountry[$cacheKey];
+    return null;
 }
 
 /**

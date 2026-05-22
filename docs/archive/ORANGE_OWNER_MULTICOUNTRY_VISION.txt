@@ -133,9 +133,14 @@ ORANGE — رؤية المالك: تعدد الدول والقنوات والج�
 
 **13.7 الواجهة (متجر)**
 - **الدولة تُثبت من رابط القناة** (`channels.country_id`) — العميل **لا يُلزَم** باختيار الدولة عند الدخول من رابط تسويق.
-- **قائمة اختيار الدولة** في الشريط: تظهر عند **أكثر من دولة نشطة**؛ تُخفى عند **دولة واحدة** (مثل الكويت وحدها اليوم).
+- **قائمة اختيار الدولة** في الشريط: **مخفية** (قرار مالك 2026-05-20) — لا مبدّل دولة للزائر.
+- **جذر الموقع `/`:** يُستنتج موقع الزائر (Geo من رؤوس CDN/الاستضافة) → إن كانت **دولة نشطة** (`countries.is_active = 1`) يُحوَّل إلى **القناة الرئيسية** لتلك الدولة (`channels.is_country_default = 1` — واحدة لكل دولة، يختارها الأدمن).
+- **دولة غير نشطة أو غير مضافة للموقع:** لا يُفتح المتجر من `/` — صفحة «الخدمة غير متاحة في منطقتك».
+- **استثناء:** **رابط قناة مباشر** (مسار قصير / `?channel=`) يفتح المتجر **دائماً** بغض النظر عن Geo أو نشاط الدولة في القائمة (القناة تحدد السياق).
 
 **تنفيذ (13 — §13.7 — مرحلة 17):** **`orange_storefront_country_code_from_request_channel`** في **`config.php`** (مسار قصير / **`?channel=`** → **`channels.country_id`**) قبل كوكي الدولة في **`orange_storefront_current_country_code`**؛ مبدّل الدولة **`storefront_nav_cluster.php`** + **`includes/header.php`** (يظهر عند **`count($countryOptions) >= 2`**)؛ **`storefront_country_switch_href`**؛ تسجيل البريد scoped **`api/auth/request-email-verify.php`**؛ سياسة **س11** في **`ORANGE_STOREFRONT_POLICY_REFERENCE.txt`**.
+
+**تنفيذ (13 — §13.7 — Geo + قناة رئيسية — v55):** **`channels.is_country_default`** (ترحيل **`orange_catalog_migrate_channel_country_default_v55`**)؛ **`orange_storefront_main_channel_slug_for_country`** + **`orange_storefront_default_channel_slug`** في **`config.php`**؛ **`includes/storefront_geo.php`** (Geo + **`ORANGE_STOREFRONT_GEO_OVERRIDE`**)؛ **`includes/storefront_entry.php`** + **`index.php`** (جذر `/`)؛ **`pages/region-unavailable.php`**؛ **`admin/pages/channels.php`** + **`admin/api/channels/save.php`**؛ سياسة **س31** في **`ORANGE_STOREFRONT_POLICY_REFERENCE.txt`**.
 
 **13.8 الأدمن والصلاحيات**
 - **أدمن عام:** `admin_users.country_id IS NULL` — مبدّل دولة في الهيدر؛ يرى حركات الدولة المختارة فقط في كل شاشة.

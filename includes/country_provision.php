@@ -120,7 +120,9 @@ function orange_country_copy_channels_from_source(PDO $pdo, int $targetCountryId
     }
 
     $hasKind = orange_table_has_column($pdo, 'channels', 'channel_kind');
+    $hasDefault = orange_table_has_column($pdo, 'channels', 'is_country_default');
     $defaultWhNum = 1;
+    $copyIndex = 0;
 
     foreach ($rows as $row) {
         if (!is_array($row)) {
@@ -136,12 +138,16 @@ function orange_country_copy_channels_from_source(PDO $pdo, int $targetCountryId
         if ($hasKind && !isset($row['channel_kind'])) {
             $row['channel_kind'] = 'web';
         }
+        if ($hasDefault) {
+            $row['is_country_default'] = $copyIndex === 0 ? 1 : 0;
+        }
 
         $cols = array_keys($row);
         $sql = 'INSERT INTO channels (`' . implode('`, `', $cols) . '`) VALUES (' . implode(', ', array_fill(0, count($cols), '?')) . ')';
         try {
             $pdo->prepare($sql)->execute(array_values($row));
             $out['channels_copied']++;
+            $copyIndex++;
         } catch (Throwable $e) {
             if (function_exists('error_log')) {
                 error_log('[orange] country channel copy: ' . $e->getMessage());

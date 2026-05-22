@@ -119,6 +119,15 @@ try {
     if ($rawAct !== null) {
         $isActive = ((int) $rawAct === 1 || $rawAct === true || $rawAct === '1') ? 1 : 0;
     }
+    $hasDefaultCol = orange_table_has_column($pdo, 'channels', 'is_country_default');
+    $rawDefault = $data['is_country_default'] ?? null;
+    $isCountryDefault = 0;
+    if ($hasDefaultCol && $rawDefault !== null) {
+        $isCountryDefault = ((int) $rawDefault === 1 || $rawDefault === true || $rawDefault === '1') ? 1 : 0;
+    }
+    if ($hasDefaultCol && $isCountryDefault === 1 && $isActive !== 1) {
+        json_response(['success' => false, 'message' => 'القناة الرئيسية يجب أن تكون نشطة'], 422);
+    }
 
     if ($id > 0) {
         try {
@@ -153,19 +162,43 @@ try {
 
         if ($hasCountryCol && $hasKindCol) {
             $upd = $pdo->prepare(
-                'UPDATE channels SET name = ?, slug = ?, path_segment = ?, logo = ?, whatsapp_number = ?, warehouse_number = ?, is_active = ?, country_id = ?, channel_kind = ? WHERE id = ?'
+                'UPDATE channels SET name = ?, slug = ?, path_segment = ?, logo = ?, whatsapp_number = ?, warehouse_number = ?, is_active = ?, country_id = ?, channel_kind = ?'
+                . ($hasDefaultCol ? ', is_country_default = ?' : '') . ' WHERE id = ?'
             );
-            $upd->execute([$name, $newSlug, $pathSeg, $logo, $wa, $wh, $isActive, $countryId, $channelKind, $id]);
+            $params = [$name, $newSlug, $pathSeg, $logo, $wa, $wh, $isActive, $countryId, $channelKind];
+            if ($hasDefaultCol) {
+                $params[] = $isCountryDefault;
+            }
+            $params[] = $id;
+            $upd->execute($params);
         } elseif ($hasCountryCol) {
             $upd = $pdo->prepare(
-                'UPDATE channels SET name = ?, slug = ?, path_segment = ?, logo = ?, whatsapp_number = ?, warehouse_number = ?, is_active = ?, country_id = ? WHERE id = ?'
+                'UPDATE channels SET name = ?, slug = ?, path_segment = ?, logo = ?, whatsapp_number = ?, warehouse_number = ?, is_active = ?, country_id = ?'
+                . ($hasDefaultCol ? ', is_country_default = ?' : '') . ' WHERE id = ?'
             );
-            $upd->execute([$name, $newSlug, $pathSeg, $logo, $wa, $wh, $isActive, $countryId, $id]);
+            $params = [$name, $newSlug, $pathSeg, $logo, $wa, $wh, $isActive, $countryId];
+            if ($hasDefaultCol) {
+                $params[] = $isCountryDefault;
+            }
+            $params[] = $id;
+            $upd->execute($params);
         } else {
             $upd = $pdo->prepare(
-                'UPDATE channels SET name = ?, slug = ?, path_segment = ?, logo = ?, whatsapp_number = ?, warehouse_number = ?, is_active = ? WHERE id = ?'
+                'UPDATE channels SET name = ?, slug = ?, path_segment = ?, logo = ?, whatsapp_number = ?, warehouse_number = ?, is_active = ?'
+                . ($hasDefaultCol ? ', is_country_default = ?' : '') . ' WHERE id = ?'
             );
-            $upd->execute([$name, $newSlug, $pathSeg, $logo, $wa, $wh, $isActive, $id]);
+            $params = [$name, $newSlug, $pathSeg, $logo, $wa, $wh, $isActive];
+            if ($hasDefaultCol) {
+                $params[] = $isCountryDefault;
+            }
+            $params[] = $id;
+            $upd->execute($params);
+        }
+
+        if ($hasDefaultCol && $isCountryDefault === 1) {
+            $pdo->prepare(
+                'UPDATE channels SET is_country_default = 0 WHERE country_id = ? AND id <> ?'
+            )->execute([$countryId, $id]);
         }
 
         if ($newSlug !== $oldSlug) {
@@ -194,23 +227,47 @@ try {
     $slug = channels_next_unique_slug($pdo, $pathSeg, null, $countryId);
 
     if ($hasCountryCol && $hasKindCol) {
-        $stmt = $pdo->prepare(
-            'INSERT INTO channels (name, slug, path_segment, logo, whatsapp_number, warehouse_number, is_active, country_id, channel_kind)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-        );
-        $stmt->execute([$name, $slug, $pathSeg, $logo, $wa, $wh, $isActive, $countryId, $channelKind]);
+        $cols = 'name, slug, path_segment, logo, whatsapp_number, warehouse_number, is_active, country_id, channel_kind';
+        $vals = '?, ?, ?, ?, ?, ?, ?, ?, ?';
+        $params = [$name, $slug, $pathSeg, $logo, $wa, $wh, $isActive, $countryId, $channelKind];
+        if ($hasDefaultCol) {
+            $cols .= ', is_country_default';
+            $vals .= ', ?';
+            $params[] = $isCountryDefault;
+        }
+        $stmt = $pdo->prepare('INSERT INTO channels (' . $cols . ') VALUES (' . $vals . ')');
+        $stmt->execute($params);
     } elseif ($hasCountryCol) {
-        $stmt = $pdo->prepare(
-            'INSERT INTO channels (name, slug, path_segment, logo, whatsapp_number, warehouse_number, is_active, country_id)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-        );
-        $stmt->execute([$name, $slug, $pathSeg, $logo, $wa, $wh, $isActive, $countryId]);
+        $cols = 'name, slug, path_segment, logo, whatsapp_number, warehouse_number, is_active, country_id';
+        $vals = '?, ?, ?, ?, ?, ?, ?, ?';
+        $params = [$name, $slug, $pathSeg, $logo, $wa, $wh, $isActive, $countryId];
+        if ($hasDefaultCol) {
+            $cols .= ', is_country_default';
+            $vals .= ', ?';
+            $params[] = $isCountryDefault;
+        }
+        $stmt = $pdo->prepare('INSERT INTO channels (' . $cols . ') VALUES (' . $vals . ')');
+        $stmt->execute($params);
     } else {
-        $stmt = $pdo->prepare(
-            'INSERT INTO channels (name, slug, path_segment, logo, whatsapp_number, warehouse_number, is_active)
-             VALUES (?, ?, ?, ?, ?, ?, ?)'
-        );
-        $stmt->execute([$name, $slug, $pathSeg, $logo, $wa, $wh, $isActive]);
+        $cols = 'name, slug, path_segment, logo, whatsapp_number, warehouse_number, is_active';
+        $vals = '?, ?, ?, ?, ?, ?, ?';
+        $params = [$name, $slug, $pathSeg, $logo, $wa, $wh, $isActive];
+        if ($hasDefaultCol) {
+            $cols .= ', is_country_default';
+            $vals .= ', ?';
+            $params[] = $isCountryDefault;
+        }
+        $stmt = $pdo->prepare('INSERT INTO channels (' . $cols . ') VALUES (' . $vals . ')');
+        $stmt->execute($params);
+    }
+
+    if ($hasDefaultCol && $isCountryDefault === 1) {
+        $newId = (int) $pdo->lastInsertId();
+        if ($newId > 0) {
+            $pdo->prepare(
+                'UPDATE channels SET is_country_default = 0 WHERE country_id = ? AND id <> ?'
+            )->execute([$countryId, $newId]);
+        }
     }
 
     json_response(['success' => true, 'message' => 'تم حفظ الواجهة', 'slug' => $slug, 'path_segment' => $pathSeg]);

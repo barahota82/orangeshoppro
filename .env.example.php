@@ -37,6 +37,9 @@ return [
     // اختياري (قديم): رابط يدوي بـ ?sf_preview= — روابط الجدول في الأدمن تستخدم جلسة بدون إظهار سر في عنوان المتجر
     // 'ORANGE_STOREFRONT_PREVIEW_TOKEN' => 'غيّر_إلى_سلسلة_عشوائية_طويلة_لا_تشاركها_علناً',
 
+    // اختياري: تجاوز Geo على جذر الموقع / للتطوير المحلي (kw، eg، …)
+    // 'ORANGE_STOREFRONT_GEO_OVERRIDE' => 'kw',
+
     // اختياري — ترحيل المخطط (راجع docs/archive/ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.txt):
     // سلسلة صارمة 001.sql…NNN.sql مع تحديث orange_schema_meta بعد كل ملف (كل DDL في SQL). الافتراضي false.
     // 'ORANGE_STRICT_NUMBERED_SQL_MIGRATIONS' => true,

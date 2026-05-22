@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 54);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 55);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3033,6 +3033,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_country_admin_settings_v52($pdo);
     orange_catalog_migrate_gl_journal_type_rules_country_v53($pdo);
     orange_catalog_migrate_gl_settings_journal_type_remap_v54($pdo);
+    orange_catalog_migrate_channel_country_default_v55($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
         orange_catalog_safe_exec(
@@ -4738,6 +4739,62 @@ function orange_catalog_migrate_gl_settings_journal_type_remap_v54(PDO $pdo): vo
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] v54 gl_settings journal_type remap: ' . $e->getMessage());
+        }
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v55 — is_country_default على channels (قناة رئيسية لكل دولة — Geo + جذر الموقع).
+ */
+function orange_catalog_migrate_channel_country_default_v55(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    $marker = 'php_channel_country_default_v55';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (orange_table_exists($pdo, 'channels')
+        && !orange_table_has_column($pdo, 'channels', 'is_country_default')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE channels ADD COLUMN is_country_default TINYINT(1) NOT NULL DEFAULT 0 AFTER is_active'
+        );
+    }
+
+    if (orange_table_exists($pdo, 'channels')
+        && orange_table_has_column($pdo, 'channels', 'is_country_default')
+        && orange_table_has_column($pdo, 'channels', 'country_id')) {
+        try {
+            $countries = $pdo->query('SELECT DISTINCT country_id FROM channels WHERE country_id IS NOT NULL AND country_id > 0')
+                ->fetchAll(PDO::FETCH_COLUMN) ?: [];
+            foreach ($countries as $cid) {
+                $countryId = (int) $cid;
+                if ($countryId <= 0) {
+                    continue;
+                }
+                $has = $pdo->prepare(
+                    'SELECT 1 FROM channels WHERE country_id = ? AND is_country_default = 1 LIMIT 1'
+                );
+                $has->execute([$countryId]);
+                if ($has->fetch()) {
+                    continue;
+                }
+                $first = $pdo->prepare(
+                    'SELECT id FROM channels WHERE country_id = ? AND is_active = 1 ORDER BY id ASC LIMIT 1'
+                );
+                $first->execute([$countryId]);
+                $chId = (int) ($first->fetchColumn() ?: 0);
+                if ($chId > 0) {
+                    $pdo->prepare('UPDATE channels SET is_country_default = 1 WHERE id = ?')->execute([$chId]);
+                }
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] v55 channel country default backfill: ' . $e->getMessage());
+            }
         }
     }
 
