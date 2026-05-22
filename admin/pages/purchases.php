@@ -12,9 +12,9 @@ require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
-$pdo = db();
-orange_catalog_ensure_schema($pdo);
+$pdo = orange_admin_page_pdo();
 
 $adminCountryId = orange_admin_context_country_id($pdo);
 $adminDefaultCurrency = orange_admin_context_currency_code($pdo);
@@ -65,7 +65,14 @@ if (orange_table_exists($pdo, 'suppliers')) {
     )->fetchAll(PDO::FETCH_ASSOC);
     foreach ($suppliers as $s) {
         $sid = (int) $s['id'];
-        $aid = orange_supplier_payable_account_id($pdo, $sid);
+        try {
+            $aid = orange_supplier_payable_account_id($pdo, $sid);
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] purchases supplier #' . $sid . ': ' . $e->getMessage());
+            }
+            $aid = 0;
+        }
         $st = $pdo->prepare('SELECT id, code, name FROM accounts WHERE id = ? LIMIT 1');
         $st->execute([$aid]);
         $arow = $st->fetch(PDO::FETCH_ASSOC);

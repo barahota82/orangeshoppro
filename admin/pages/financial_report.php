@@ -14,9 +14,9 @@ require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/accounting_report_money.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
-$pdo = db();
-orange_catalog_ensure_schema($pdo);
+$pdo = orange_admin_page_pdo();
 $frMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 
 $frCountryBind = orange_gl_voucher_country_bind($pdo, 'jv');

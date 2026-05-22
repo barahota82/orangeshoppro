@@ -11,9 +11,9 @@ require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
-$pdo = db();
-orange_catalog_ensure_schema($pdo);
+$pdo = orange_admin_page_pdo();
 
 $prCountryId = orange_admin_context_country_id($pdo);
 $prDefaultCurrency = orange_admin_context_currency_code($pdo);

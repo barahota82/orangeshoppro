@@ -10,9 +10,9 @@ require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
-$pdo = db();
-orange_catalog_ensure_schema($pdo);
+$pdo = orange_admin_page_pdo();
 
 $ppvCountryId = orange_admin_context_country_id($pdo);
 $ppvSuppliersCountrySql = orange_sql_country_and_fragment($pdo, 'suppliers', 'suppliers', $ppvCountryId);
@@ -23,7 +23,14 @@ $ppvApiUrl = '/admin/api/partners/supplier-payment.php';
 $partnerUiTodayDmy = orange_format_date_dmY(date('Y-m-d'));
 $ppvFormDocumentEnteredDisplay = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 
-$cashAccId = orange_gl_account_id_optional($pdo, 'cash');
+$cashAccId = null;
+try {
+    $cashAccId = orange_gl_account_id_optional($pdo, 'cash');
+} catch (Throwable $e) {
+    if (function_exists('error_log')) {
+        error_log('[orange] partner_supplier_payment cash account: ' . $e->getMessage());
+    }
+}
 $ppvCashLock = null;
 if ($cashAccId !== null && $cashAccId > 0) {
     $stCash = $pdo->prepare('SELECT id, code, name FROM accounts WHERE id = ? LIMIT 1');
@@ -47,7 +54,14 @@ if (orange_table_exists($pdo, 'suppliers')) {
     )->fetchAll(PDO::FETCH_ASSOC);
     foreach ($suppliers as $s) {
         $sid = (int) $s['id'];
-        $aid = orange_supplier_payable_account_id($pdo, $sid);
+        try {
+            $aid = orange_supplier_payable_account_id($pdo, $sid);
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] partner_supplier_payment supplier #' . $sid . ': ' . $e->getMessage());
+            }
+            $aid = 0;
+        }
         $st = $pdo->prepare('SELECT id, code, name FROM accounts WHERE id = ? LIMIT 1');
         $st->execute([$aid]);
         $arow = $st->fetch(PDO::FETCH_ASSOC);

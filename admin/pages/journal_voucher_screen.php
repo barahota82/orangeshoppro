@@ -13,16 +13,23 @@ require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
-$pdo = db();
-orange_catalog_ensure_schema($pdo);
+$pdo = orange_admin_page_pdo();
 
 $jvScreenCountryId = orange_admin_context_country_id($pdo);
 
 $jvCashLock = null;
 $jvPageEt = (string) ($jvPageEntryType ?? '');
 if ($jvPageEt === 'receipt_voucher' || $jvPageEt === 'payment_voucher') {
-    $cashAccId = orange_gl_account_id_optional($pdo, 'cash');
+    $cashAccId = null;
+    try {
+        $cashAccId = orange_gl_account_id_optional($pdo, 'cash');
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] journal_voucher_screen cash account: ' . $e->getMessage());
+        }
+    }
     if ($cashAccId !== null && $cashAccId > 0) {
         $stCash = $pdo->prepare('SELECT id, code, name FROM accounts WHERE id = ? LIMIT 1');
         $stCash->execute([(int) $cashAccId]);

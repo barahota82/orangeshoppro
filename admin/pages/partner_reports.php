@@ -8,9 +8,9 @@ require_once __DIR__ . '/../../includes/party_allocations.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/accounting_report_money.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
-$pdo = db();
-orange_catalog_ensure_schema($pdo);
+$pdo = orange_admin_page_pdo();
 $reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 
 $includeAging = isset($_GET['aging']) && $_GET['aging'] === '1';

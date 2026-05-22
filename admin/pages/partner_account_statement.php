@@ -13,9 +13,9 @@ require_once __DIR__ . '/../../includes/party_subledger.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
 require_once __DIR__ . '/../../includes/accounting_report_money.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
-$pdo = db();
-orange_catalog_ensure_schema($pdo);
+$pdo = orange_admin_page_pdo();
 $reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 
 $pasCtxCountryId = orange_admin_context_country_id($pdo);

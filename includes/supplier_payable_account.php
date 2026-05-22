@@ -13,18 +13,32 @@ require_once __DIR__ . '/gl_settings.php';
  */
 function orange_supplier_payable_account_id(PDO $pdo, int $supplierId): int
 {
+    $fallbackPayable = static function () use ($pdo): int {
+        try {
+            $id = orange_gl_account_id_optional($pdo, 'accounts_payable');
+
+            return ($id !== null && $id > 0) ? (int) $id : 0;
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] supplier payable fallback accounts_payable: ' . $e->getMessage());
+            }
+
+            return 0;
+        }
+    };
+
     if ($supplierId <= 0 || !orange_table_has_column($pdo, 'suppliers', 'payable_account_id')) {
-        return orange_gl_account_id($pdo, 'accounts_payable');
+        return $fallbackPayable();
     }
     $st = $pdo->prepare('SELECT payable_account_id FROM suppliers WHERE id = ? LIMIT 1');
     $st->execute([$supplierId]);
     $raw = $st->fetchColumn();
     if ($raw === false || $raw === null) {
-        return orange_gl_account_id($pdo, 'accounts_payable');
+        return $fallbackPayable();
     }
     $aid = (int) $raw;
     if ($aid <= 0 || !orange_accounts_account_is_posting_leaf($pdo, $aid)) {
-        return orange_gl_account_id($pdo, 'accounts_payable');
+        return $fallbackPayable();
     }
 
     return $aid;
@@ -142,7 +156,17 @@ function orange_supplier_has_dedicated_payable_account(PDO $pdo, int $supplierId
  */
 function orange_supplier_payable_gl_account_ids_for_reconcile(PDO $pdo): array
 {
-    $ids = [orange_gl_account_id($pdo, 'accounts_payable')];
+    $ids = [];
+    try {
+        $ap = orange_gl_account_id_optional($pdo, 'accounts_payable');
+        if ($ap !== null && $ap > 0) {
+            $ids[] = (int) $ap;
+        }
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] supplier reconcile accounts_payable: ' . $e->getMessage());
+        }
+    }
     if (!orange_table_has_column($pdo, 'suppliers', 'payable_account_id')) {
         return array_values(array_unique(array_filter($ids, static fn (int $i): bool => $i > 0)));
     }
