@@ -83,6 +83,11 @@ require_once __DIR__ . '/../includes/countries.php';
 orange_admin_bootstrap_country_context($pdo);
 orange_admin_require_page($admin, $pdo, $page);
 
+require_once __DIR__ . '/../includes/currency.php';
+$orangeAdminMoney = orange_admin_currency_context($pdo);
+$orangeAdminMoneyZero = orange_admin_money_zero_string((int) $orangeAdminMoney['decimals']);
+$orangeAdminMoneyStep = orange_admin_money_input_step((int) $orangeAdminMoney['decimals']);
+
 include __DIR__ . '/partials/header.php';
 include __DIR__ . '/pages/' . $page . '.php';
 include __DIR__ . '/partials/footer.php';

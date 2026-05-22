@@ -325,8 +325,8 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
             <input type="text" id="pv2_invoice_discount" placeholder="0 أو 5%" dir="ltr" lang="en" style="width:8rem;" autocomplete="off"<?php echo !$pv2Ready ? ' disabled' : ''; ?>>
         </div>
         <div style="flex:1 1 auto;text-align:left;direction:ltr;font-size:0.95rem;line-height:1.8;">
-            <span style="color:#64748b;">إجمالي البنود:</span> <strong id="pv2_subtotal" dir="ltr" lang="en">0.000</strong><br>
-            <span style="color:#64748b;">صافي الفاتورة:</span> <strong id="pv2_net_total" dir="ltr" lang="en" style="color:#059669;">0.000</strong>
+            <span style="color:#64748b;">إجمالي البنود:</span> <strong id="pv2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span style="color:#64748b;">صافي الفاتورة:</span> <strong id="pv2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#059669;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
         </div>
     </div>
 
@@ -353,11 +353,11 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
             </div>
             <div>
                 <label for="pv2_tot_debit">مجموع المدين</label>
-                <input type="text" id="pv2_tot_debit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000" dir="ltr" lang="en">
+                <input type="text" id="pv2_tot_debit" readonly class="admin-inp-readonly jv-tot-readonly admin-inp-money" value="<?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
             </div>
             <div>
                 <label for="pv2_tot_credit">مجموع الدائن</label>
-                <input type="text" id="pv2_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly" value="0.000" dir="ltr" lang="en">
+                <input type="text" id="pv2_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly admin-inp-money" value="<?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
             </div>
             <div class="jv-voucher-nav-cell jv-print-hide">
                 <div class="jv-voucher-nav-btns" role="group" aria-label="تنقل بين السندات">
@@ -502,10 +502,18 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
     function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
     function accInfo(id) { var a = PV2_GL_ACCOUNTS[String(id)]; return a || { code: '', name: '#' + id }; }
     function fmt3(n) {
-        if (window.OrangeMoney && typeof window.OrangeMoney.formatAmount === 'function') {
-            return window.OrangeMoney.formatAmount(n);
+        var f = window.orangeFmtMoney || (window.OrangeMoney && window.OrangeMoney.formatAmount);
+        if (f) {
+            return f(n);
         }
-        return (parseFloat(n) || 0).toFixed(3);
+        var d = (window.ORANGE_ADMIN_MONEY && window.ORANGE_ADMIN_MONEY.decimals) || 3;
+        return (parseFloat(n) || 0).toFixed(d);
+    }
+    function fmtZero() {
+        if (window.orangeMoneyZero) {
+            return window.orangeMoneyZero();
+        }
+        return fmt3(0);
     }
 
     /* ── Product lookup by code/barcode ─────────────────────────────── */
@@ -849,8 +857,8 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
             tr.className = 'jv-line-main';
             tr.innerHTML = '<td><input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="' + esc(l.code) + '" readonly tabindex="-1"></td>' +
                 '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + esc(l.name) + '" readonly tabindex="-1"></td>' +
-                '<td><input type="text" class="admin-inp-money" value="' + (l.debit > 0 ? fmt3(l.debit) : '0.000') + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>' +
-                '<td><input type="text" class="admin-inp-money" value="' + (l.credit > 0 ? fmt3(l.credit) : '0.000') + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>';
+                '<td><input type="text" class="admin-inp-money" value="' + (l.debit > 0 ? fmt3(l.debit) : fmtZero()) + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>' +
+                '<td><input type="text" class="admin-inp-money" value="' + (l.credit > 0 ? fmt3(l.credit) : fmtZero()) + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>';
             tb.appendChild(tr);
         });
 
@@ -973,8 +981,8 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
                 var c = parseFloat(String(l.credit || '0')) || 0;
                 tr.innerHTML = '<td><input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="' + esc(ai.code || '') + '" readonly tabindex="-1"></td>' +
                     '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + esc((ai.name || '') + (l.memo ? ' — ' + l.memo : '')) + '" readonly tabindex="-1"></td>' +
-                    '<td><input type="text" class="admin-inp-money" value="' + (d > 0 ? fmt3(d) : '0.000') + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>' +
-                    '<td><input type="text" class="admin-inp-money" value="' + (c > 0 ? fmt3(c) : '0.000') + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>';
+                    '<td><input type="text" class="admin-inp-money" value="' + (d > 0 ? fmt3(d) : fmtZero()) + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>' +
+                    '<td><input type="text" class="admin-inp-money" value="' + (c > 0 ? fmt3(c) : fmtZero()) + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>';
                 tb.appendChild(tr);
             });
         }

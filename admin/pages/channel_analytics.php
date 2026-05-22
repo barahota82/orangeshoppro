@@ -204,7 +204,7 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
                     <td><?php echo (int) ($cr['cnt_all'] ?? 0); ?></td>
                     <td><?php echo (int) ($cr['cnt_completed'] ?? 0); ?></td>
                     <td><?php echo number_format((float) ($cr['revenue_completed'] ?? 0), $caMoney['decimals']); ?></td>
-                    <td><?php echo number_format((float) ($cr['_avg_basket'] ?? 0), 3); ?></td>
+                    <td><?php echo number_format((float) ($cr['_avg_basket'] ?? 0), $caMoney['decimals']); ?></td>
                     <td><?php
                     if ($top) {
                         echo htmlspecialchars($top['product_name'], ENT_QUOTES, 'UTF-8')

@@ -755,7 +755,7 @@ $supplierKwCountryId = orange_countries_default_id($pdo);
             </div>
             <div class="sup-grid-r2-balance">
                 <label for="sup_current_balance">الرصيد الحالي المستحق للمورد</label>
-                <input type="text" id="sup_current_balance" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" value="0.000" readonly>
+                <input type="text" id="sup_current_balance" class="admin-sort-field admin-sort-field--muted" dir="ltr" lang="en" value="<?php echo htmlspecialchars($orangeAdminMoneyZero ?? orange_admin_money_zero($pdo), ENT_QUOTES, 'UTF-8'); ?>" readonly>
             </div>
             <?php if ($hasSupplierStatusCol): ?>
             <div class="sup-grid-r2-status">

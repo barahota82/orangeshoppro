@@ -390,8 +390,8 @@ window.addEventListener('load', function () {
     <h3 class="card-title">أرباح وخسائر (ملخّص تقريبي)</h3>
     <p class="card-hint">استبعاد أرصدة الافتتاح وقيود إقفال السنة. التصنيف يعتمد أولاً على حقول الدليل ثم جذر الحساب؛ ما لا يُصنَّف كإيراد/تكلفة/مصروف لا يُدخل هنا.</p>
     <div class="grid-2">
-        <div class="stat-card"><h3>إجمالي الإيرادات (طبيعة دائنة)</h3><div class="value"><?php echo number_format($plRevenue, 2); ?></div></div>
-        <div class="stat-card"><h3>إجمالي المصروفات والتكلفة</h3><div class="value"><?php echo number_format($plExpense, 2); ?></div></div>
+        <div class="stat-card"><h3>إجمالي الإيرادات (طبيعة دائنة)</h3><div class="value"><?php echo number_format($plRevenue, $frMoney['decimals']); ?></div></div>
+        <div class="stat-card"><h3>إجمالي المصروفات والتكلفة</h3><div class="value"><?php echo number_format($plExpense, $frMoney['decimals']); ?></div></div>
     </div>
     <p id="report-net-result" style="scroll-margin-top:92px;margin:14px 0 0;font-size:1.1rem;"><strong>أرباح وخسائر (صافي الدخل):</strong> <?php echo orange_format_money_for_context($frMoney, $netIncome); ?></p>
     <?php if ($useVouchers && $fyId > 0 && $registeredExpenses !== []): ?>
@@ -410,7 +410,7 @@ window.addEventListener('load', function () {
                         <tr>
                             <td><?php echo htmlspecialchars($re['label'], ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><small><?php echo htmlspecialchars($accountLabelById[$re['account_id']] ?? ('#' . $re['account_id']), ENT_QUOTES, 'UTF-8'); ?></small></td>
-                            <td><?php echo number_format($re['amount'], 2); ?></td>
+                            <td><?php echo number_format($re['amount'], $frMoney['decimals']); ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -423,10 +423,10 @@ window.addEventListener('load', function () {
     <h3 class="card-title">الميزانية العمومية (مبسطة)</h3>
     <p class="card-hint">أصول = مدين − دائن | خصوم وحقوق = دائن − مدين (للحسابات المصنفة فقط).</p>
     <div class="grid-2">
-        <div class="stat-card"><h3>الأصول</h3><div class="value"><?php echo number_format($bsAssets, 2); ?></div></div>
-        <div class="stat-card"><h3>الخصوم</h3><div class="value"><?php echo number_format($bsLiab, 2); ?></div></div>
+        <div class="stat-card"><h3>الأصول</h3><div class="value"><?php echo number_format($bsAssets, $frMoney['decimals']); ?></div></div>
+        <div class="stat-card"><h3>الخصوم</h3><div class="value"><?php echo number_format($bsLiab, $frMoney['decimals']); ?></div></div>
     </div>
-    <div class="stat-card" style="margin-top:14px;"><h3>حقوق الملكية</h3><div class="value"><?php echo number_format($bsEquity, 2); ?></div></div>
+    <div class="stat-card" style="margin-top:14px;"><h3>حقوق الملكية</h3><div class="value"><?php echo number_format($bsEquity, $frMoney['decimals']); ?></div></div>
     <?php if ($useVouchers && $fyId > 0 && $supplierBsBalances !== []): ?>
         <h4 class="card-title" style="margin-top:18px;font-size:1rem;">تفصيل ذمم الموردين (رصيد دائن حتى نهاية السنة)</h4>
         <p class="card-hint">من دفتر الأطراف المرتبط بالسندات؛ إن وُجدت قيود على حساب الموردين دون تسجيل طرف قد لا يظهر هنا.</p>
@@ -442,7 +442,7 @@ window.addEventListener('load', function () {
                     <?php foreach ($supplierBsBalances as $sb): ?>
                         <tr>
                             <td><?php echo htmlspecialchars($sb['name'], ENT_QUOTES, 'UTF-8'); ?></td>
-                            <td><?php echo number_format($sb['balance'], 2); ?></td>
+                            <td><?php echo number_format($sb['balance'], $frMoney['decimals']); ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -451,9 +451,9 @@ window.addEventListener('load', function () {
     <?php endif; ?>
     <p class="card-hint" style="margin-top:12px;">
         <?php if (abs($bsCheck) < 0.05): ?>
-            <span class="badge approved">أصول ≈ خصوم + حقوق (فرق <?php echo number_format($bsCheck, 2); ?>)</span>
+            <span class="badge approved">أصول ≈ خصوم + حقوق (فرق <?php echo number_format($bsCheck, $frMoney['decimals']); ?>)</span>
         <?php else: ?>
-            <span class="badge cancelled">فرق محاسبي: <?php echo number_format($bsCheck, 2); ?> — راجع التصنيف أو أرصدة الافتتاح أو القيود غير الموزونة.</span>
+            <span class="badge cancelled">فرق محاسبي: <?php echo number_format($bsCheck, $frMoney['decimals']); ?> — راجع التصنيف أو أرصدة الافتتاح أو القيود غير الموزونة.</span>
         <?php endif; ?>
     </p>
 </div>
@@ -463,9 +463,9 @@ window.addEventListener('load', function () {
     <h3 id="report-trial-balance" class="card-title" style="scroll-margin-top:92px;">ميزان المراجعة</h3>
     <p class="card-hint">
         <?php if ($balanced): ?>
-            <span class="badge approved">المدين والدائن متطابقان (<?php echo number_format($sumDebit, 2); ?>)</span>
+            <span class="badge approved">المدين والدائن متطابقان (<?php echo number_format($sumDebit, $frMoney['decimals']); ?>)</span>
         <?php else: ?>
-            <span class="badge cancelled">فرق: <?php echo number_format($sumDebit - $sumCredit, 2); ?></span>
+            <span class="badge cancelled">فرق: <?php echo number_format($sumDebit - $sumCredit, $frMoney['decimals']); ?></span>
         <?php endif; ?>
         — أسطر «↳» تفصيل: ذمم موردين تستخدم المجمع، أو مورد له حساب ذمة في الدليل (تحت حسابه)، أو بيان/مذكرة ضمن حسابات المصروف؛ الإجماليات في التذييل للصفوف الرئيسية فقط.
     </p>
@@ -488,9 +488,9 @@ window.addEventListener('load', function () {
                         <td><?php echo htmlspecialchars($r['label'], ENT_QUOTES, 'UTF-8'); ?></td>
                         <td class="muted"><?php echo htmlspecialchars((string) ($r['sec_label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td class="muted"><?php echo htmlspecialchars((string) ($r['line_label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo number_format($r['debit'], 2); ?></td>
-                        <td><?php echo number_format($r['credit'], 2); ?></td>
-                        <td><?php echo number_format($r['net'], 2); ?></td>
+                        <td><?php echo number_format($r['debit'], $frMoney['decimals']); ?></td>
+                        <td><?php echo number_format($r['credit'], $frMoney['decimals']); ?></td>
+                        <td><?php echo number_format($r['net'], $frMoney['decimals']); ?></td>
                     </tr>
                     <?php if ($apAccountId > 0 && $rid === $apAccountId && $supplierFyDetail !== []): ?>
                         <?php foreach ($supplierFyDetail as $sd): ?>
@@ -499,9 +499,9 @@ window.addEventListener('load', function () {
                             } ?>
                             <tr class="fin-report-subrow">
                                 <td colspan="3" style="padding-right:1.75rem;"><span class="muted">↳ <?php echo htmlspecialchars($sd['name'], ENT_QUOTES, 'UTF-8'); ?></span> <small class="muted">(ذمة مورد)</small></td>
-                                <td><?php echo number_format($sd['debit'], 2); ?></td>
-                                <td><?php echo number_format($sd['credit'], 2); ?></td>
-                                <td><?php echo number_format($sd['net'], 2); ?></td>
+                                <td><?php echo number_format($sd['debit'], $frMoney['decimals']); ?></td>
+                                <td><?php echo number_format($sd['credit'], $frMoney['decimals']); ?></td>
+                                <td><?php echo number_format($sd['net'], $frMoney['decimals']); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -509,9 +509,9 @@ window.addEventListener('load', function () {
                         <?php foreach ($supplierFySubrowsByAccountId[$rid] as $sd): ?>
                             <tr class="fin-report-subrow">
                                 <td style="padding-right:1.75rem;"><span class="muted">↳ <?php echo htmlspecialchars($sd['name'], ENT_QUOTES, 'UTF-8'); ?></span> <small class="muted">(ذمة مورد — حساب دليل)</small></td>
-                                <td><?php echo number_format($sd['debit'], 2); ?></td>
-                                <td><?php echo number_format($sd['credit'], 2); ?></td>
-                                <td><?php echo number_format($sd['net'], 2); ?></td>
+                                <td><?php echo number_format($sd['debit'], $frMoney['decimals']); ?></td>
+                                <td><?php echo number_format($sd['credit'], $frMoney['decimals']); ?></td>
+                                <td><?php echo number_format($sd['net'], $frMoney['decimals']); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -519,9 +519,9 @@ window.addEventListener('load', function () {
                         <?php foreach ($expenseTbBreakdown[$rid] as $ex): ?>
                             <tr class="fin-report-subrow">
                                 <td colspan="3" style="padding-right:1.75rem;"><span class="muted">↳ <?php echo htmlspecialchars($ex['sublabel'], ENT_QUOTES, 'UTF-8'); ?></span></td>
-                                <td><?php echo number_format($ex['debit'], 2); ?></td>
-                                <td><?php echo number_format($ex['credit'], 2); ?></td>
-                                <td><?php echo number_format($ex['debit'] - $ex['credit'], 2); ?></td>
+                                <td><?php echo number_format($ex['debit'], $frMoney['decimals']); ?></td>
+                                <td><?php echo number_format($ex['credit'], $frMoney['decimals']); ?></td>
+                                <td><?php echo number_format($ex['debit'] - $ex['credit'], $frMoney['decimals']); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -530,9 +530,9 @@ window.addEventListener('load', function () {
             <tfoot>
                 <tr>
                     <th colspan="3">الإجمالي</th>
-                    <th><?php echo number_format($sumDebit, 2); ?></th>
-                    <th><?php echo number_format($sumCredit, 2); ?></th>
-                    <th><?php echo number_format($sumDebit - $sumCredit, 2); ?></th>
+                    <th><?php echo number_format($sumDebit, $frMoney['decimals']); ?></th>
+                    <th><?php echo number_format($sumCredit, $frMoney['decimals']); ?></th>
+                    <th><?php echo number_format($sumDebit - $sumCredit, $frMoney['decimals']); ?></th>
                 </tr>
             </tfoot>
         </table>

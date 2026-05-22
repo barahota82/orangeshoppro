@@ -258,17 +258,17 @@ foreach ($products as $p) {
             </div>
             <div class="mo-invoice-summary__cell">
                 <span class="mo-invoice-summary__label">المجموع قبل الخصم</span>
-                <span class="mo-invoice-summary__val" id="mo_live_gross">0.000</span>
+                <span class="mo-invoice-summary__val admin-money-display" id="mo_live_gross"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></span>
                 <span class="mo-invoice-summary__unit"><?php echo htmlspecialchars($moCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
             </div>
             <div class="mo-invoice-summary__cell">
                 <span class="mo-invoice-summary__label">مجموع الخصومات</span>
-                <span class="mo-invoice-summary__val" id="mo_live_discsum">0.000</span>
+                <span class="mo-invoice-summary__val admin-money-display" id="mo_live_discsum"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></span>
                 <span class="mo-invoice-summary__unit"><?php echo htmlspecialchars($moCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
             </div>
             <div class="mo-invoice-summary__cell mo-invoice-summary__cell--net">
                 <span class="mo-invoice-summary__label">صافي الفاتورة</span>
-                <span class="mo-invoice-summary__val mo-invoice-summary__val--net" id="mo_live_net">0.000</span>
+                <span class="mo-invoice-summary__val mo-invoice-summary__val--net admin-money-display" id="mo_live_net"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></span>
                 <span class="mo-invoice-summary__unit"><?php echo htmlspecialchars($moCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></span>
             </div>
         </div>
@@ -353,7 +353,8 @@ function moFmtKd(n) {
     if (window.OrangeMoney && typeof window.OrangeMoney.formatAmount === 'function') {
         return window.OrangeMoney.formatAmount(x);
     }
-    return x.toFixed(3);
+    var d = (window.ORANGE_ADMIN_MONEY && window.ORANGE_ADMIN_MONEY.decimals) || 3;
+    return x.toFixed(d);
 }
 
 function moParseMoneyEl(el) {

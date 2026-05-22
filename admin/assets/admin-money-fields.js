@@ -5,6 +5,10 @@
     'use strict';
 
     function readAdminCurrencyDecimals() {
+        if (window.ORANGE_ADMIN_MONEY && typeof window.ORANGE_ADMIN_MONEY.decimals === 'number') {
+            var od = window.ORANGE_ADMIN_MONEY.decimals;
+            return od === 2 || od === 3 ? od : 3;
+        }
         var m = document.querySelector('meta[name="orange-admin-currency-decimals"]');
         if (!m) {
             return 3;
@@ -14,6 +18,20 @@
     }
 
     var DECIMALS = readAdminCurrencyDecimals();
+
+    function readAdminMoneyZero() {
+        if (window.ORANGE_ADMIN_MONEY && typeof window.ORANGE_ADMIN_MONEY.zero === 'string') {
+            return window.ORANGE_ADMIN_MONEY.zero;
+        }
+        return (0).toFixed(DECIMALS);
+    }
+
+    function readAdminMoneyStep() {
+        if (window.ORANGE_ADMIN_MONEY && typeof window.ORANGE_ADMIN_MONEY.step === 'string') {
+            return window.ORANGE_ADMIN_MONEY.step;
+        }
+        return DECIMALS === 3 ? '0.001' : '0.01';
+    }
 
     function readAdminCurrencyCode() {
         var m = document.querySelector('meta[name="orange-admin-currency"]');
@@ -41,6 +59,42 @@
             x = 0;
         }
         return x.toFixed(DECIMALS);
+    }
+
+    function zeroMoneyAmount() {
+        return readAdminMoneyZero();
+    }
+
+    function isZeroishMoneyText(s) {
+        s = String(s || '').trim().replace(',', '.');
+        return s === '' || s === '0' || /^0\.0+$/.test(s);
+    }
+
+    /** تطبيع placeholders/قيم الصفر وstep — تلقائي لكل حقول المبالغ في الأدمن. */
+    function normalizeMoneyUi(root) {
+        root = root || document;
+        if (!root.querySelectorAll) {
+            return;
+        }
+        var z = zeroMoneyAmount();
+        var step = readAdminMoneyStep();
+        root.querySelectorAll('input.admin-inp-money').forEach(function (el) {
+            var ph = String(el.getAttribute('placeholder') || '');
+            if (isZeroishMoneyText(ph)) {
+                el.setAttribute('placeholder', z);
+            }
+            if (el.type === 'number' || el.getAttribute('type') === 'number') {
+                el.setAttribute('step', step);
+            }
+            if (isZeroishMoneyText(el.value)) {
+                el.value = z;
+            }
+        });
+        root.querySelectorAll('.admin-money-display, [data-orange-money-display]').forEach(function (el) {
+            if (isZeroishMoneyText(el.textContent)) {
+                el.textContent = z;
+            }
+        });
     }
 
     function parseQtyRaw(el) {
@@ -302,6 +356,7 @@
 
     function bootstrap(root) {
         root = root || document;
+        normalizeMoneyUi(root);
         root.querySelectorAll('tr').forEach(tryWireTr);
         root.querySelectorAll('input.admin-inp-money').forEach(function (el) {
             if (!el.getAttribute('data-orange-money-wired')) {
@@ -334,6 +389,7 @@
                         n.querySelectorAll('tr').forEach(tryWireTr);
                         wireNewMoneyInputs(n);
                         wireNewQtyInputs(n);
+                        normalizeMoneyUi(n);
                     }
                 });
             });
@@ -399,6 +455,9 @@
         currencyCode: readAdminCurrencyCode,
         currencyUnit: readAdminCurrencyUnit,
         formatAmount: formatMoneyAmount,
+        zeroAmount: zeroMoneyAmount,
+        inputStep: readAdminMoneyStep,
+        normalizeUi: normalizeMoneyUi,
         parseRaw: parseRaw,
         cleanMoneyInput: cleanMoneyInput,
         companionZero: companionZero,
@@ -406,6 +465,11 @@
         attachSingle: attachSingle,
         bootstrap: bootstrap
     };
+
+    global.fmt3 = formatMoneyAmount;
+    global.fmtMoney = formatMoneyAmount;
+    global.orangeFmtMoney = formatMoneyAmount;
+    global.orangeMoneyZero = zeroMoneyAmount;
 
     global.OrangeQty = {
         parseQtyRaw: parseQtyRaw,

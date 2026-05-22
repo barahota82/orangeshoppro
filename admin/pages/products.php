@@ -867,8 +867,8 @@ $orangeAdminSfProductUrlPartsForJs = [
                     $agl = trim((string) ($p['_advisory_guide_label'] ?? ''));
                     echo htmlspecialchars($agl !== '' ? $agl : 'بدون', ENT_QUOTES, 'UTF-8');
                     ?></td>
-                    <td><?php echo number_format((float)$p['price'], 2); ?></td>
-                    <td><?php echo number_format((float)$p['cost'], 2); ?></td>
+                    <td><?php echo number_format((float) $p['price'], $prodMoney['decimals']); ?></td>
+                    <td><?php echo number_format((float) $p['cost'], $prodMoney['decimals']); ?></td>
                     <td><?php echo (int)$p['is_active'] === 1 ? 'نشط' : 'مخفي'; ?></td>
                     <td class="prod-row-ops">
                         <div class="prod-ops-wrap">

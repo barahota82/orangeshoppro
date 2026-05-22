@@ -76,6 +76,13 @@ $orangeAdminCurrencyUnitNav = orange_currency_display_unit($orangeAdminCurrencyN
     window.ORANGE_PUBLIC_BASE_PATH = <?php echo json_encode(PUBLIC_BASE_PATH, JSON_UNESCAPED_UNICODE); ?>;
     /** منع تكرار الإرسال: postJSON يعطّل الزر (آخر نقرة أو زر إرسال النموذج) ما لم يُستثنَ بـ data-no-post-guard. */
     window.ORANGE_POSTJSON_INFER_SUBMITTER = true;
+    window.ORANGE_ADMIN_MONEY = {
+        code: <?php echo json_encode($orangeAdminCurrencyNav, JSON_UNESCAPED_UNICODE); ?>,
+        unit: <?php echo json_encode($orangeAdminCurrencyUnitNav, JSON_UNESCAPED_UNICODE); ?>,
+        decimals: <?php echo (int) $orangeAdminCurrencyDecimalsNav; ?>,
+        zero: <?php echo json_encode(isset($orangeAdminMoneyZero) ? $orangeAdminMoneyZero : orange_admin_money_zero_string((int) $orangeAdminCurrencyDecimalsNav), JSON_UNESCAPED_UNICODE); ?>,
+        step: <?php echo json_encode(isset($orangeAdminMoneyStep) ? $orangeAdminMoneyStep : orange_admin_money_input_step((int) $orangeAdminCurrencyDecimalsNav), JSON_UNESCAPED_UNICODE); ?>
+    };
     window.orangeAdminSwitchCountry = function (sel) {
         if (!sel || !sel.form) {
             return;

@@ -944,7 +944,12 @@ function cusSetCurrentBalance(value) {
     if (!el) return;
     var n = parseFloat(String(value || 0));
     if (isNaN(n)) n = 0;
-    el.value = n.toFixed(3);
+    if (window.OrangeMoney && typeof window.OrangeMoney.formatAmount === 'function') {
+        el.value = window.OrangeMoney.formatAmount(n);
+        return;
+    }
+    var d = (window.ORANGE_ADMIN_MONEY && window.ORANGE_ADMIN_MONEY.decimals) || 3;
+    el.value = n.toFixed(d);
 }
 function cusSetOrdersBreakdown(total, cash, credit, online) {
     var ids = {

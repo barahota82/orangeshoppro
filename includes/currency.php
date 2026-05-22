@@ -162,6 +162,39 @@ function orange_format_money_for_context(array $ctx, float $amount, bool $withUn
     return $formatted . ' ' . (string) $ctx['unit'];
 }
 
+/** step لحقول number[type=money] حسب عملة السياق. */
+function orange_admin_money_input_step(int $decimals): string
+{
+    return $decimals === 3 ? '0.001' : '0.01';
+}
+
+/** نص صفر بكسور العملة (0.000 أو 0.00 …). */
+function orange_admin_money_zero_string(int $decimals): string
+{
+    return number_format(0, $decimals, '.', '');
+}
+
+function orange_admin_number_format(PDO $pdo, float $amount): string
+{
+    $ctx = orange_admin_currency_context($pdo);
+
+    return number_format($amount, (int) $ctx['decimals'], '.', ',');
+}
+
+function orange_admin_money_zero(PDO $pdo): string
+{
+    $ctx = orange_admin_currency_context($pdo);
+
+    return orange_admin_money_zero_string((int) $ctx['decimals']);
+}
+
+function orange_admin_money_step(PDO $pdo): string
+{
+    $ctx = orange_admin_currency_context($pdo);
+
+    return orange_admin_money_input_step((int) $ctx['decimals']);
+}
+
 /**
  * عملة الدفتر (functional) لدولة محددة — من countries ثم الخريطة المرجعية.
  */

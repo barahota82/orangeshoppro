@@ -582,12 +582,12 @@ $invFmt = static function (float $amount, bool $withUnit = true) use ($invMoney)
         <?php if ($linesMismatch): ?>
             <div class="invoice-warn">تنبيه: <?php
             if ($cartComboDisc > 0.00001 || $cartPromoDisc > 0.00001) {
-                echo 'المتوقع من البنود بعد الخصومات: ' . number_format($linesSubtotal, 2);
+                echo 'المتوقع من البنود بعد الخصومات: ' . orange_format_money_for_context($invMoney, $linesSubtotal, false);
                 if ($cartComboDisc > 0.00001) {
-                    echo ' − كومبو ' . number_format($cartComboDisc, 2);
+                    echo ' − كومبو ' . orange_format_money_for_context($invMoney, $cartComboDisc, false);
                 }
                 if ($cartPromoDisc > 0.00001) {
-                    echo ' − عرض السلة ' . number_format($cartPromoDisc, 2);
+                    echo ' − عرض السلة ' . orange_format_money_for_context($invMoney, $cartPromoDisc, false);
                 }
                 echo ' = ' . $invFmt($linesExpectedNet) . ' — ';
             } else {
@@ -671,7 +671,7 @@ $invFmt = static function (float $amount, bool $withUnit = true) use ($invMoney)
             <p style="margin:0;font-size:0.85rem;color:#64748b;">لتسجيل ما دفعه العميل (لا يغيّر إجمالي الفاتورة).</p>
             <div class="row-pay">
                 <label for="inv_amount_paid_inp" style="font-weight:600;">مدفوع (<?php echo htmlspecialchars($invCurUnit, ENT_QUOTES, 'UTF-8'); ?>)</label>
-                <input type="number" id="inv_amount_paid_inp" step="0.001" min="0" lang="en" dir="ltr"
+                <input type="number" id="inv_amount_paid_inp" step="<?php echo htmlspecialchars($orangeAdminMoneyStep ?? orange_admin_money_step($pdo), ENT_QUOTES, 'UTF-8'); ?>" min="0" lang="en" dir="ltr"
                     value="<?php echo htmlspecialchars((string) $amountPaidVal, ENT_QUOTES, 'UTF-8'); ?>">
                 <button type="button" class="btn-secondary" onclick="invSaveAmountPaid()">حفظ</button>
             </div>
