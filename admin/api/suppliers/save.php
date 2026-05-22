@@ -210,12 +210,10 @@ try {
 
     $currencySql = orange_admin_context_currency_code($pdo);
     if ($hasCurrencyCode) {
-        $defaultCurrency = $currencySql;
-        $currencyIn = strtoupper(trim((string) ($data['currency_code'] ?? $defaultCurrency)));
-        if (!preg_match('/^[A-Z]{3}$/', $currencyIn)) {
-            json_response(['success' => false, 'message' => 'العملة الافتراضية للمورد غير صالحة'], 422);
+        $currencyIn = strtoupper(trim((string) ($data['currency_code'] ?? '')));
+        if ($currencyIn !== '' && $currencyIn !== $currencySql) {
+            json_response(['success' => false, 'message' => 'عملة المورد يجب أن تطابق عملة الدولة المختارة في لوحة التحكم.'], 422);
         }
-        $currencySql = $currencyIn;
     }
 
     $paymentModeSql = 'cash';

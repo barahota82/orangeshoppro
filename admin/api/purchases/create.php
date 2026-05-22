@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../../includes/purchase_helpers.php';
 require_once __DIR__ . '/../../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../../includes/purchase_gl_accounts.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/currency.php';
 require_admin_api();
 
 try {
@@ -135,6 +136,14 @@ try {
         $insertValues[] = $invoiceDiscountRaw;
         $insertValues[] = $invoiceDiscountAmt;
     }
+    orange_sql_append_document_currency_code(
+        $pdo,
+        'purchases',
+        $purchaseCountryId,
+        $insertCols,
+        $insertPlaceholders,
+        $insertValues
+    );
     $stmt = $pdo->prepare("INSERT INTO purchases ($insertCols) VALUES ($insertPlaceholders)");
     $stmt->execute($insertValues);
     $purchaseId = (int)$pdo->lastInsertId();

@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 55);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 56);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3053,6 +3053,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_gl_journal_type_rules_country_v53($pdo);
     orange_catalog_migrate_gl_settings_journal_type_remap_v54($pdo);
     orange_catalog_migrate_channel_country_default_v55($pdo);
+    orange_catalog_migrate_document_currency_v56($pdo);
     orange_catalog_migrate_legacy_storefront_copy_lines($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
@@ -4842,6 +4843,104 @@ function orange_catalog_migrate_channel_country_default_v55(PDO $pdo): void
                 error_log('[orange] v55 channel country default backfill: ' . $e->getMessage());
             }
         }
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v56 — currency_code على سندات GL والمستندات التجارية (عملة محلية لكل دولة).
+ */
+function orange_catalog_migrate_document_currency_v56(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    require_once __DIR__ . '/currency.php';
+    $marker = 'php_document_currency_v56';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    $tables = [
+        'journal_vouchers',
+        'orders',
+        'purchases',
+        'sales_returns',
+        'purchase_returns',
+    ];
+    foreach ($tables as $tbl) {
+        if (!orange_table_exists($pdo, $tbl)) {
+            continue;
+        }
+        if (!orange_table_has_column($pdo, $tbl, 'currency_code')) {
+            $after = orange_table_has_column($pdo, $tbl, 'country_id') ? 'country_id' : 'id';
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE ' . $tbl . ' ADD COLUMN currency_code CHAR(3) NULL DEFAULT NULL AFTER ' . $after
+            );
+        }
+    }
+
+    if (orange_table_exists($pdo, 'journal_vouchers')
+        && orange_table_has_column($pdo, 'journal_vouchers', 'currency_code')
+        && orange_table_has_column($pdo, 'journal_vouchers', 'country_id')
+        && orange_table_exists($pdo, 'countries')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'UPDATE journal_vouchers j
+             INNER JOIN countries c ON c.id = j.country_id
+             SET j.currency_code = UPPER(TRIM(c.currency_code))
+             WHERE (j.currency_code IS NULL OR j.currency_code = \'\')
+               AND c.currency_code IS NOT NULL AND TRIM(c.currency_code) <> \'\''
+        );
+    }
+
+    $docTables = ['orders', 'purchases', 'sales_returns', 'purchase_returns'];
+    foreach ($docTables as $tbl) {
+        if (!orange_table_exists($pdo, $tbl)
+            || !orange_table_has_column($pdo, $tbl, 'currency_code')
+            || !orange_table_has_column($pdo, $tbl, 'country_id')
+            || !orange_table_exists($pdo, 'countries')) {
+            continue;
+        }
+        orange_catalog_safe_exec(
+            $pdo,
+            'UPDATE ' . $tbl . ' d
+             INNER JOIN countries c ON c.id = d.country_id
+             SET d.currency_code = UPPER(TRIM(c.currency_code))
+             WHERE (d.currency_code IS NULL OR d.currency_code = \'\')
+               AND c.currency_code IS NOT NULL AND TRIM(c.currency_code) <> \'\''
+        );
+    }
+
+    if (orange_table_exists($pdo, 'journal_vouchers')
+        && orange_table_has_column($pdo, 'journal_vouchers', 'currency_code')) {
+        $kwCur = 'KWD';
+        if (orange_table_exists($pdo, 'countries')) {
+            $stKw = $pdo->prepare('SELECT currency_code FROM countries WHERE code = ? LIMIT 1');
+            $stKw->execute(['kw']);
+            $kwRow = strtoupper(trim((string) ($stKw->fetchColumn() ?: '')));
+            if ($kwRow !== '' && preg_match('/^[A-Z]{3}$/', $kwRow)) {
+                $kwCur = $kwRow;
+            }
+        }
+        orange_catalog_safe_exec(
+            $pdo,
+            'UPDATE journal_vouchers SET currency_code = ' . $pdo->quote($kwCur)
+            . ' WHERE currency_code IS NULL OR currency_code = \'\''
+        );
+    }
+
+    foreach ($docTables as $tbl) {
+        if (!orange_table_exists($pdo, $tbl)
+            || !orange_table_has_column($pdo, $tbl, 'currency_code')) {
+            continue;
+        }
+        $kwCur = 'KWD';
+        orange_catalog_safe_exec(
+            $pdo,
+            'UPDATE ' . $tbl . ' SET currency_code = ' . $pdo->quote($kwCur)
+            . ' WHERE currency_code IS NULL OR currency_code = \'\''
+        );
     }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);

@@ -12,6 +12,7 @@ require_once __DIR__ . '/cart_promotions.php';
 require_once __DIR__ . '/cart_combo_promotions.php';
 require_once __DIR__ . '/storefront_checkout_promo_lines.php';
 require_once __DIR__ . '/countries.php';
+require_once __DIR__ . '/currency.php';
 require_once __DIR__ . '/warehouses.php';
 
 function orange_order_intake_snip_message(string $msg, int $max = 500): string
@@ -608,6 +609,14 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
         $ph .= ', ?';
         $params[] = $orderWarehouseId;
     }
+    orange_sql_append_document_currency_code(
+        $pdo,
+        'orders',
+        $orderCountryId,
+        $cols,
+        $ph,
+        $params
+    );
     $cols .= ', created_at';
     $ph .= ', NOW()';
 

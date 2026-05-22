@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/countries.php';
+require_once __DIR__ . '/currency.php';
 require_once __DIR__ . '/fiscal_years.php';
 require_once __DIR__ . '/journal_types.php';
 
@@ -97,15 +98,32 @@ function orange_journal_voucher_resolve_country_id(PDO $pdo, array $header): int
 function orange_journal_voucher_stamp_country(PDO $pdo, int $voucherId, array $header): void
 {
     if ($voucherId <= 0 || !orange_table_has_country_id($pdo, 'journal_vouchers')) {
+        orange_journal_voucher_stamp_currency($pdo, $voucherId, $header);
+
         return;
     }
     $cid = orange_journal_voucher_resolve_country_id($pdo, $header);
     if ($cid <= 0) {
+        orange_journal_voucher_stamp_currency($pdo, $voucherId, $header);
+
         return;
     }
     $pdo->prepare(
         'UPDATE journal_vouchers SET country_id = ? WHERE id = ? AND (country_id IS NULL OR country_id = 0)'
     )->execute([$cid, $voucherId]);
+    orange_journal_voucher_stamp_currency($pdo, $voucherId, $header);
+}
+
+function orange_journal_voucher_stamp_currency(PDO $pdo, int $voucherId, array $header): void
+{
+    if ($voucherId <= 0 || !orange_table_has_column($pdo, 'journal_vouchers', 'currency_code')) {
+        return;
+    }
+    $cid = orange_journal_voucher_resolve_country_id($pdo, $header);
+    $cur = orange_gl_functional_currency_code($pdo, $cid > 0 ? $cid : null);
+    $pdo->prepare(
+        'UPDATE journal_vouchers SET currency_code = ? WHERE id = ? AND (currency_code IS NULL OR currency_code = \'\')'
+    )->execute([$cur, $voucherId]);
 }
 
 /**
@@ -121,11 +139,22 @@ function orange_journal_voucher_assert_admin_context(PDO $pdo, int $voucherId): 
     if ($ctx <= 0) {
         return;
     }
-    $st = $pdo->prepare('SELECT country_id FROM journal_vouchers WHERE id = ? LIMIT 1');
+    $st = $pdo->prepare('SELECT country_id, currency_code FROM journal_vouchers WHERE id = ? LIMIT 1');
     $st->execute([$voucherId]);
-    $rowCid = (int) ($st->fetchColumn() ?: 0);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        return;
+    }
+    $rowCid = (int) ($row['country_id'] ?? 0);
     if ($rowCid > 0 && $rowCid !== $ctx) {
         throw new RuntimeException('السند لا يتبع الدولة المختارة في لوحة التحكم.');
+    }
+    if (orange_table_has_column($pdo, 'journal_vouchers', 'currency_code')) {
+        $ctxCur = orange_admin_context_currency_code($pdo);
+        $rowCur = strtoupper(trim((string) ($row['currency_code'] ?? '')));
+        if ($rowCur !== '' && $rowCur !== $ctxCur) {
+            throw new RuntimeException('عملة السند لا تطابق عملة الدولة المختارة في لوحة التحكم.');
+        }
     }
 }
 
@@ -464,14 +493,17 @@ function orange_voucher_post(PDO $pdo, array $header, array $lines): int
         $entryType = 'general';
     }
 
+    $voucherCountryId = orange_journal_voucher_resolve_country_id($pdo, $header);
+    $currencyCode = orange_gl_functional_currency_code($pdo, $voucherCountryId > 0 ? $voucherCountryId : null);
+
     $totalD = 0.0;
     $totalC = 0.0;
     $norm = [];
     $lineNo = 0;
     foreach ($lines as $ln) {
         $aid = (int) ($ln['account_id'] ?? 0);
-        $d = round((float) ($ln['debit'] ?? 0), 4);
-        $c = round((float) ($ln['credit'] ?? 0), 4);
+        $d = orange_gl_round_money((float) ($ln['debit'] ?? 0), $currencyCode);
+        $c = orange_gl_round_money((float) ($ln['credit'] ?? 0), $currencyCode);
         if ($aid <= 0) {
             throw new InvalidArgumentException('حساب غير صالح في سطر السند.');
         }
@@ -495,11 +527,10 @@ function orange_voucher_post(PDO $pdo, array $header, array $lines): int
     if ($norm === []) {
         throw new InvalidArgumentException('السند بدون أسطر.');
     }
-    if (round($totalD - $totalC, 4) !== 0.0) {
+    if (!orange_gl_money_is_balanced($totalD, $totalC, $currencyCode)) {
         throw new InvalidArgumentException('السند غير متوازن: مجموع المدين ' . $totalD . ' ≠ مجموع الدائن ' . $totalC);
     }
 
-    $voucherCountryId = orange_journal_voucher_resolve_country_id($pdo, $header);
     orange_gl_assert_voucher_accounts_country(
         $pdo,
         array_column($norm, 'account_id'),
@@ -715,14 +746,17 @@ function orange_voucher_update_multiline(PDO $pdo, int $voucherId, array $header
     $reference = array_key_exists('reference', $header) ? trim((string) $header['reference']) : '';
     $referenceSql = $reference === '' ? null : $reference;
 
+    $voucherCountryId = orange_journal_voucher_resolve_country_id($pdo, $header);
+    $currencyCode = orange_gl_functional_currency_code($pdo, $voucherCountryId > 0 ? $voucherCountryId : null);
+
     $totalD = 0.0;
     $totalC = 0.0;
     $norm = [];
     $lineNo = 0;
     foreach ($postLines as $ln) {
         $aid = (int) ($ln['account_id'] ?? 0);
-        $d = round((float) ($ln['debit'] ?? 0), 4);
-        $c = round((float) ($ln['credit'] ?? 0), 4);
+        $d = orange_gl_round_money((float) ($ln['debit'] ?? 0), $currencyCode);
+        $c = orange_gl_round_money((float) ($ln['credit'] ?? 0), $currencyCode);
         if ($aid <= 0) {
             throw new InvalidArgumentException('حساب غير صالح في سطر السند.');
         }
@@ -746,11 +780,10 @@ function orange_voucher_update_multiline(PDO $pdo, int $voucherId, array $header
     if ($norm === []) {
         throw new InvalidArgumentException('السند بدون أسطر.');
     }
-    if (round($totalD - $totalC, 4) !== 0.0) {
+    if (!orange_gl_money_is_balanced($totalD, $totalC, $currencyCode)) {
         throw new InvalidArgumentException('السند غير متوازن: مجموع المدين ' . $totalD . ' ≠ مجموع الدائن ' . $totalC);
     }
 
-    $voucherCountryId = orange_journal_voucher_resolve_country_id($pdo, $header);
     orange_gl_assert_voucher_accounts_country(
         $pdo,
         array_column($norm, 'account_id'),
@@ -787,6 +820,7 @@ function orange_voucher_update_multiline(PDO $pdo, int $voucherId, array $header
                 $row['memo'] === '' ? null : $row['memo'],
             ]);
         }
+        orange_journal_voucher_stamp_currency($pdo, $voucherId, $header);
         $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {

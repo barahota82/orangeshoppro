@@ -13,6 +13,7 @@ require_once __DIR__ . '/../../../includes/sales_return_helpers.php';
 require_once __DIR__ . '/../../../includes/purchase_helpers.php';
 require_once __DIR__ . '/../../../includes/sales_gl_accounts.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/currency.php';
 require_admin_api();
 
 try {
@@ -141,6 +142,10 @@ try {
         $notes !== '' ? $notes : null,
     ]);
     $returnId = (int) $pdo->lastInsertId();
+    if (orange_table_has_column($pdo, 'sales_returns', 'currency_code')) {
+        $retCur = orange_gl_functional_currency_code($pdo, $returnCountryId);
+        $pdo->prepare('UPDATE sales_returns SET currency_code = ? WHERE id = ?')->execute([$retCur, $returnId]);
+    }
     $retNum = orange_country_document_ref($pdo, 'SR', $returnId, $returnCountryId);
     $pdo->prepare('UPDATE sales_returns SET return_number = ? WHERE id = ?')->execute([$retNum, $returnId]);
 

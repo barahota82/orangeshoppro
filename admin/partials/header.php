@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
+require_once __DIR__ . '/../../includes/currency.php';
 /** @var ?\PDO $pdo — يضبطه admin/index.php قبل تضمين هذا الملف؛ تجنّب استدعاء ensure_schema مرتين لكل صفحة أدمن */
 $pdoNav = (isset($pdo) && $pdo instanceof PDO) ? $pdo : db();
 if (!isset($pdo) || !$pdo instanceof PDO) {
@@ -52,6 +53,7 @@ foreach ($orangeAdminCountriesNav as $ocNav) {
 $orangeAdminCountryScopeReady = orange_admin_country_scope_ready($pdoNav);
 $orangeAdminPhoneDialNav = orange_admin_context_phone_dial($pdoNav);
 $orangeAdminCurrencyNav = orange_admin_context_currency_code($pdoNav);
+$orangeAdminCurrencyDecimalsNav = orange_currency_decimals_for_code($orangeAdminCurrencyNav);
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl"<?php echo $orangeSchemaDegradedAttr; ?>>
@@ -63,6 +65,7 @@ $orangeAdminCurrencyNav = orange_admin_context_currency_code($pdoNav);
     <meta name="orange-admin-country-id" content="<?php echo (int) $orangeAdminCountryIdNav; ?>">
     <meta name="orange-admin-phone-dial" content="<?php echo htmlspecialchars($orangeAdminPhoneDialNav, ENT_QUOTES, 'UTF-8'); ?>">
     <meta name="orange-admin-currency" content="<?php echo htmlspecialchars($orangeAdminCurrencyNav, ENT_QUOTES, 'UTF-8'); ?>">
+    <meta name="orange-admin-currency-decimals" content="<?php echo (int) $orangeAdminCurrencyDecimalsNav; ?>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">

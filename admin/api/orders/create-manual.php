@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../../includes/order_fulfillment.php';
 require_once __DIR__ . '/../../../includes/phone_validation.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/currency.php';
 require_once __DIR__ . '/../../../includes/warehouses.php';
 require_admin_api();
 
@@ -221,6 +222,14 @@ try {
         $ph .= ', ?';
         $params[] = $orderWarehouseId;
     }
+    orange_sql_append_document_currency_code(
+        $pdo,
+        'orders',
+        $orderCountryId,
+        $cols,
+        $ph,
+        $params
+    );
     $cols .= ', created_at';
     $ph .= ', NOW()';
 

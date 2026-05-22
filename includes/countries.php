@@ -172,14 +172,10 @@ function orange_admin_context_phone_dial(PDO $pdo): string
 function orange_admin_context_currency_code(PDO $pdo): string
 {
     $id = orange_admin_context_country_id($pdo);
-    if ($id > 0 && orange_table_exists($pdo, 'countries')) {
-        $row = orange_country_row_by_id($pdo, $id, false);
-        if ($row !== null) {
-            $fromDb = strtoupper(trim((string) ($row['currency_code'] ?? '')));
-            if ($fromDb !== '' && preg_match('/^[A-Z]{3}$/', $fromDb)) {
-                return $fromDb;
-            }
-        }
+    if ($id > 0) {
+        require_once __DIR__ . '/currency.php';
+
+        return orange_country_functional_currency_code($pdo, $id);
     }
     $fromMap = orange_countries_currency_for_code(orange_admin_context_country_code($pdo));
     if ($fromMap !== '' && preg_match('/^[A-Z]{3}$/', $fromMap)) {

@@ -4,7 +4,16 @@
 (function (global) {
     'use strict';
 
-    var DECIMALS = 3;
+    function readAdminCurrencyDecimals() {
+        var m = document.querySelector('meta[name="orange-admin-currency-decimals"]');
+        if (!m) {
+            return 3;
+        }
+        var n = parseInt(String(m.getAttribute('content') || ''), 10);
+        return n === 2 || n === 3 ? n : 3;
+    }
+
+    var DECIMALS = readAdminCurrencyDecimals();
 
     function parseQtyRaw(el) {
         return String(el && el.value != null ? el.value : '').trim();
