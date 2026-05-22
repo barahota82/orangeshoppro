@@ -3,6 +3,11 @@
 -- =============================================================================
 -- الهدف: مفاتيح أجنبية + تنظيف يتامى بحيث ترفض MariaDB/MySQL بيانات مكسورة.
 --
+-- ملاحظة post-v52 (تعدد الدول):
+--   JOIN على accounts / journal_vouchers هنا **بالمعرّف (PK)** لفحص اليتامى والقيود —
+--   ليس استعلام list/report. لا يُفلتر country_id لأن المرجع = id محدد.
+--   لتشخيص يتامى **ضمن دولة**: استخدم (0b) أدناه مع @country_id.
+--
 -- قبل التشغيل:
 --   1) نسخة احتياطية كاملة (mysqldump أو أداة الاستضافة).
 --   2) يُفضّل تنفيذ `mysql-day1-hardening.sql.txt` ثم `mysql-day1-hardening-part2.sql`
@@ -27,6 +32,19 @@ SET FOREIGN_KEY_CHECKS = 0;
 --   LEFT JOIN products p ON p.id = cw.product_id WHERE p.id IS NULL;
 -- SELECT COUNT(*) AS bad_sfs FROM size_family_sizes s
 --   LEFT JOIN size_families f ON f.id = s.size_family_id WHERE f.id IS NULL;
+
+-- -----------------------------------------------------------------------------
+-- (0b) فحوصات يتامى scoped بدولة (post-v52 — اختياري)
+-- -----------------------------------------------------------------------------
+-- SET @country_id := (SELECT id FROM countries WHERE code = 'KW' LIMIT 1);
+-- SET @cid := CAST(@country_id AS UNSIGNED);
+-- SELECT COUNT(*) AS bad_jl_country FROM journal_lines jl
+--   INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
+--   LEFT JOIN accounts a ON a.id = jl.account_id AND a.country_id = jv.country_id
+--   WHERE jv.country_id = @cid AND jl.account_id IS NOT NULL AND a.id IS NULL;
+-- SELECT COUNT(*) AS bad_og_debit_country FROM orange_gl_pending_movements og
+--   LEFT JOIN accounts a ON a.id = og.account_debit AND a.country_id = @cid
+--   WHERE og.account_debit IS NOT NULL AND a.id IS NULL;
 
 -- -----------------------------------------------------------------------------
 -- (1) تنظيف يتامى (آمن قدر الإمكان: NULL حيث العمود يسمح، وإلا حذف صفوف بلا مرجع)

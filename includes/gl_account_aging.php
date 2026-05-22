@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/journal_voucher.php';
+
 /**
  * تقسيم «أعمار» مديونية/التزام الحساب في الدفتر العام وفق أسطر القيد لهذا الحساب فقط،
  * بافتراض تسوية المراكز المتعاكسة بالأقدمية (FIFO) من حركة الحساب فقط — لا ربط بحساب طرف (عميل/مورد).
@@ -73,7 +75,7 @@ function orange_gl_dual_fifo_apply_net(array &$debtPieces, array &$credPieces, f
 /**
  * @return array<string, mixed>
  */
-function orange_gl_account_statement_aging_buckets(PDO $pdo, int $accountId, string $asOfYmd): array
+function orange_gl_account_statement_aging_buckets(PDO $pdo, int $accountId, string $asOfYmd, ?int $countryId = null): array
 {
     $labels = orange_gl_account_aging_bucket_labels_ar();
     $empty = [
@@ -99,14 +101,16 @@ function orange_gl_account_statement_aging_buckets(PDO $pdo, int $accountId, str
     $asOf = preg_match('/^\d{4}-\d{2}-\d{2}$/', $asOfYmd) ? $asOfYmd : date('Y-m-d');
     $empty['as_of'] = $asOf;
 
+    $jvBind = orange_gl_voucher_country_bind($pdo, 'jv', $countryId);
+
     try {
         $stBal = $pdo->prepare(
             'SELECT COALESCE(SUM(jl.debit - jl.credit), 0) AS bal
              FROM journal_lines jl
              INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
-             WHERE jl.account_id = ? AND DATE(jv.voucher_date) <= ?'
+             WHERE jl.account_id = ? AND DATE(jv.voucher_date) <= ?' . $jvBind['sql']
         );
-        $stBal->execute([$accountId, $asOf]);
+        $stBal->execute(array_merge([$accountId, $asOf], $jvBind['params']));
         $balance = round((float) $stBal->fetchColumn(), 4);
 
         $stL = $pdo->prepare(
@@ -114,10 +118,10 @@ function orange_gl_account_statement_aging_buckets(PDO $pdo, int $accountId, str
                     DATE(jv.voucher_date) AS vd
              FROM journal_lines jl
              INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
-             WHERE jl.account_id = ? AND DATE(jv.voucher_date) <= ?
-             ORDER BY jv.voucher_date ASC, jv.id ASC, jl.line_no ASC"
+             WHERE jl.account_id = ? AND DATE(jv.voucher_date) <= ?" . $jvBind['sql'] . '
+             ORDER BY jv.voucher_date ASC, jv.id ASC, jl.line_no ASC'
         );
-        $stL->execute([$accountId, $asOf]);
+        $stL->execute(array_merge([$accountId, $asOf], $jvBind['params']));
         $rows = $stL->fetchAll(PDO::FETCH_ASSOC);
 
         /** @var list<array{amt:float,date:string}> $debtPieces */

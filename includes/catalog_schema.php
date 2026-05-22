@@ -500,8 +500,17 @@ function orange_catalog_seed_default_accounts_if_empty(PDO $pdo): void
     if (!orange_table_exists($pdo, 'accounts')) {
         return;
     }
+    require_once __DIR__ . '/countries.php';
+    $hasCountry = orange_table_has_column($pdo, 'accounts', 'country_id');
+    $seedCountryId = $hasCountry ? orange_countries_default_id($pdo) : 0;
     try {
-        $cnt = (int) $pdo->query('SELECT COUNT(*) FROM accounts')->fetchColumn();
+        if ($hasCountry && $seedCountryId > 0) {
+            $stCnt = $pdo->prepare('SELECT COUNT(*) FROM accounts WHERE country_id = ?');
+            $stCnt->execute([$seedCountryId]);
+            $cnt = (int) $stCnt->fetchColumn();
+        } else {
+            $cnt = (int) $pdo->query('SELECT COUNT(*) FROM accounts')->fetchColumn();
+        }
         if ($cnt > 0) {
             return;
         }
@@ -539,7 +548,13 @@ function orange_catalog_seed_default_accounts_if_empty(PDO $pdo): void
         return;
     }
     try {
-        $cnt2 = (int) $pdo->query('SELECT COUNT(*) FROM accounts')->fetchColumn();
+        if ($hasCountry && $seedCountryId > 0) {
+            $stCnt2 = $pdo->prepare('SELECT COUNT(*) FROM accounts WHERE country_id = ?');
+            $stCnt2->execute([$seedCountryId]);
+            $cnt2 = (int) $stCnt2->fetchColumn();
+        } else {
+            $cnt2 = (int) $pdo->query('SELECT COUNT(*) FROM accounts')->fetchColumn();
+        }
         if ($cnt2 > 0) {
             return;
         }
@@ -548,6 +563,10 @@ function orange_catalog_seed_default_accounts_if_empty(PDO $pdo): void
             $vals = [$r['name']];
             $cols[] = 'code';
             $vals[] = $r['code'];
+            if ($hasCountry && $seedCountryId > 0) {
+                $cols[] = 'country_id';
+                $vals[] = $seedCountryId;
+            }
             if ($hasPar) {
                 $cols[] = 'parent_id';
                 $vals[] = null;

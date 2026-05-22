@@ -49,6 +49,38 @@ function orange_gl_voucher_next_id_preview(PDO $pdo, ?int $countryId = null): in
     return (int) $st->fetchColumn();
 }
 
+/** هل وُجد سند بمرجع LIKE ضمن دولة السياق؟ (GAP-09) */
+function orange_gl_voucher_reference_like_exists(PDO $pdo, string $likePattern, ?int $countryId = null): bool
+{
+    if (!orange_journal_vouchers_ready($pdo) || trim($likePattern) === '') {
+        return false;
+    }
+    $bind = orange_gl_voucher_country_bind($pdo, '', $countryId);
+    $st = $pdo->prepare(
+        'SELECT 1 FROM journal_vouchers WHERE reference LIKE ?' . $bind['sql'] . ' LIMIT 1'
+    );
+    $st->execute(array_merge([$likePattern], $bind['params']));
+
+    return (bool) $st->fetchColumn();
+}
+
+/**
+ * @return list<string>
+ */
+function orange_gl_voucher_select_references_like(PDO $pdo, string $likePattern, ?int $countryId = null): array
+{
+    if (!orange_journal_vouchers_ready($pdo) || trim($likePattern) === '') {
+        return [];
+    }
+    $bind = orange_gl_voucher_country_bind($pdo, '', $countryId);
+    $st = $pdo->prepare(
+        'SELECT reference FROM journal_vouchers WHERE reference LIKE ?' . $bind['sql'] . ' ORDER BY id ASC'
+    );
+    $st->execute(array_merge([$likePattern], $bind['params']));
+
+    return $st->fetchAll(PDO::FETCH_COLUMN) ?: [];
+}
+
 function orange_journal_voucher_resolve_country_id(PDO $pdo, array $header): int
 {
     if (!orange_table_has_country_id($pdo, 'journal_vouchers')) {
@@ -100,13 +132,16 @@ function orange_journal_voucher_assert_admin_context(PDO $pdo, int $voucherId): 
 /**
  * @return array<string, mixed>|null
  */
-function orange_voucher_by_reference(PDO $pdo, string $reference): ?array
+function orange_voucher_by_reference(PDO $pdo, string $reference, ?int $countryId = null): ?array
 {
     if (!orange_journal_vouchers_ready($pdo)) {
         return null;
     }
-    $st = $pdo->prepare('SELECT * FROM journal_vouchers WHERE reference = ? ORDER BY id DESC LIMIT 1');
-    $st->execute([$reference]);
+    $bind = orange_gl_voucher_country_bind($pdo, '', $countryId);
+    $st = $pdo->prepare(
+        'SELECT * FROM journal_vouchers WHERE reference = ?' . $bind['sql'] . ' ORDER BY id DESC LIMIT 1'
+    );
+    $st->execute(array_merge([$reference], $bind['params']));
 
     $row = $st->fetch(PDO::FETCH_ASSOC);
 
@@ -133,12 +168,12 @@ function orange_fiscal_is_closed_for_voucher(PDO $pdo, array $voucherRow): bool
 /**
  * @throws RuntimeException
  */
-function orange_voucher_delete_by_reference(PDO $pdo, string $reference): void
+function orange_voucher_delete_by_reference(PDO $pdo, string $reference, ?int $countryId = null): void
 {
     if (!orange_journal_vouchers_ready($pdo)) {
         return;
     }
-    $v = orange_voucher_by_reference($pdo, $reference);
+    $v = orange_voucher_by_reference($pdo, $reference, $countryId);
     if (!$v) {
         return;
     }
@@ -181,11 +216,21 @@ function orange_purchase_remove_accounting(PDO $pdo, string $purchaseReference):
  *
  * @throws RuntimeException
  */
-function orange_purchase_remove_receive_accounting(PDO $pdo, int $purchaseId): void
+function orange_purchase_remove_receive_accounting(PDO $pdo, int $purchaseId, ?int $countryId = null): void
 {
     orange_catalog_ensure_schema($pdo);
     if ($purchaseId <= 0) {
         return;
+    }
+    if ($countryId === null || $countryId <= 0) {
+        if (orange_table_exists($pdo, 'purchases') && orange_table_has_column($pdo, 'purchases', 'country_id')) {
+            $stP = $pdo->prepare('SELECT country_id FROM purchases WHERE id = ? LIMIT 1');
+            $stP->execute([$purchaseId]);
+            $countryId = (int) ($stP->fetchColumn() ?: 0);
+        }
+        if ($countryId <= 0) {
+            $countryId = orange_admin_context_country_id($pdo);
+        }
     }
     $like = 'PUR-' . $purchaseId . '-RCV-%';
     if (orange_table_exists($pdo, 'orange_gl_pending_movements')) {
@@ -196,15 +241,11 @@ function orange_purchase_remove_receive_accounting(PDO $pdo, int $purchaseId): v
     if (!orange_journal_vouchers_ready($pdo)) {
         return;
     }
-    $st = $pdo->prepare(
-        'SELECT reference FROM journal_vouchers WHERE reference LIKE ? ORDER BY id ASC'
-    );
-    $st->execute([$like]);
-    $refs = $st->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    $refs = orange_gl_voucher_select_references_like($pdo, $like, $countryId > 0 ? $countryId : null);
     foreach ($refs as $ref) {
         $r = trim((string) $ref);
         if ($r !== '') {
-            orange_voucher_delete_by_reference($pdo, $r);
+            orange_voucher_delete_by_reference($pdo, $r, $countryId > 0 ? $countryId : null);
         }
     }
 }

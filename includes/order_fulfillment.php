@@ -86,7 +86,7 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
     $stockAlreadyReserved = $orderNumber !== ''
         && orange_order_has_pending_stock_reservation($pdo, $orderNumber);
 
-    if ($orderNumber !== '' && orange_order_fulfillment_vouchers_exist($pdo, $orderNumber)) {
+    if ($orderNumber !== '' && orange_order_fulfillment_vouchers_exist($pdo, $orderNumber, $ofGlCountryId > 0 ? $ofGlCountryId : null)) {
         if ($stockAlreadyReserved) {
             $pdo->prepare(
                 "UPDATE stock_movements SET type = 'pending_order_fulfilled'
@@ -408,13 +408,13 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
 /**
  * هل وُجدت محاسبة تسليم للطلب (سندات مرحّلة أو صفوف معلّقة مبيعات/تكلفة)؟
  */
-function orange_order_forward_delivery_accounting_exists(PDO $pdo, string $orderNumber): bool
+function orange_order_forward_delivery_accounting_exists(PDO $pdo, string $orderNumber, ?int $countryId = null): bool
 {
     $orderNumber = trim($orderNumber);
     if ($orderNumber === '') {
         return false;
     }
-    if (orange_order_fulfillment_vouchers_exist($pdo, $orderNumber)) {
+    if (orange_order_fulfillment_vouchers_exist($pdo, $orderNumber, $countryId)) {
         return true;
     }
     if (!orange_table_exists($pdo, 'orange_gl_pending_movements')) {
@@ -467,7 +467,7 @@ function orange_order_has_active_delivered_stock(PDO $pdo, string $orderNumber):
     return (bool) $st->fetchColumn();
 }
 
-function orange_order_return_fulfillment_recorded(PDO $pdo, string $orderNumber): bool
+function orange_order_return_fulfillment_recorded(PDO $pdo, string $orderNumber, ?int $countryId = null): bool
 {
     $orderNumber = trim($orderNumber);
     if ($orderNumber === '') {
@@ -484,10 +484,7 @@ function orange_order_return_fulfillment_recorded(PDO $pdo, string $orderNumber)
         }
     }
     if (function_exists('orange_journal_vouchers_ready') && orange_journal_vouchers_ready($pdo)) {
-        $st = $pdo->prepare('SELECT 1 FROM journal_vouchers WHERE reference LIKE ? LIMIT 1');
-        $st->execute([$like]);
-
-        return (bool) $st->fetchColumn();
+        return orange_gl_voucher_reference_like_exists($pdo, $like, $countryId);
     }
 
     return false;
@@ -516,15 +513,24 @@ function orange_order_reverse_completed_fulfillment(PDO $pdo, int $orderId, stri
     if ($orderNumber === '') {
         return;
     }
-    if (orange_order_return_fulfillment_recorded($pdo, $orderNumber)) {
+    $orderCountryId = 0;
+    if (orange_table_has_country_id($pdo, 'orders')) {
+        $orderCountryId = (int) ($order['country_id'] ?? 0);
+    }
+    if ($orderCountryId <= 0) {
+        $stockCtxEarly = orange_warehouse_context_for_order($pdo, $order);
+        $orderCountryId = (int) ($stockCtxEarly['country_id'] ?? 0);
+    }
+    $orderCountryArg = $orderCountryId > 0 ? $orderCountryId : null;
+    if (orange_order_return_fulfillment_recorded($pdo, $orderNumber, $orderCountryArg)) {
         return;
     }
 
-    $anyForward = orange_order_forward_delivery_accounting_exists($pdo, $orderNumber)
+    $anyForward = orange_order_forward_delivery_accounting_exists($pdo, $orderNumber, $orderCountryArg)
         || orange_order_has_fulfilled_web_reserve($pdo, $orderNumber)
         || orange_order_has_active_delivered_stock($pdo, $orderNumber);
     orange_gl_pending_remove_forward_fulfillment($pdo, $orderNumber);
-    $hadPostedSale = orange_order_fulfillment_vouchers_exist($pdo, $orderNumber);
+    $hadPostedSale = orange_order_fulfillment_vouchers_exist($pdo, $orderNumber, $orderCountryArg);
 
     if (!$anyForward) {
         return;

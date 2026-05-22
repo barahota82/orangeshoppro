@@ -31,9 +31,13 @@ try {
             $acctSt->execute($acctFilter['params']);
             $accounts = $acctSt->fetchAll(PDO::FETCH_ASSOC);
         } else {
-            $accounts = $pdo->query(
-                'SELECT id, name, code FROM accounts ORDER BY COALESCE(code, \'\') ASC, name ASC'
-            )->fetchAll(PDO::FETCH_ASSOC);
+            $accounts = orange_accounts_fetch(
+                $pdo,
+                'SELECT id, name, code FROM accounts WHERE 1=1 ORDER BY COALESCE(code, \'\') ASC, name ASC',
+                [],
+                '',
+                $glCountryId > 0 ? $glCountryId : null
+            );
         }
 
         $current = [];

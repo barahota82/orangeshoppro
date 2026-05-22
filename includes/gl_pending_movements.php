@@ -6,6 +6,7 @@ require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/journal_voucher.php';
 require_once __DIR__ . '/party_subledger.php';
 require_once __DIR__ . '/party_allocations.php';
+require_once __DIR__ . '/countries.php';
 
 /**
  * طابور الحركات المعلّقة — تعطيله مؤقتاً عبر ORANGE_GL_IMMEDIATE_POSTING=1 في .env.php (على السيرفر).
@@ -699,7 +700,19 @@ function orange_gl_resolve_json_lines_for_preview(PDO $pdo, array $decoded): arr
     }
     $in = implode(',', array_map('strval', array_keys($ids)));
     $map = [];
-    $st = $pdo->query('SELECT id, COALESCE(code, \'\') AS code, name FROM accounts WHERE id IN (' . $in . ')');
+    $acctSql = 'SELECT id, COALESCE(code, \'\') AS code, name FROM accounts WHERE id IN (' . $in . ')';
+    $acctParams = [];
+    $acctFilter = orange_accounts_sql_country_filter($pdo, '');
+    if ($acctFilter !== null) {
+        $acctSql .= str_replace('.country_id', 'country_id', $acctFilter['sql']);
+        $acctParams = $acctFilter['params'];
+    }
+    if ($acctParams === []) {
+        $st = $pdo->query($acctSql);
+    } else {
+        $st = $pdo->prepare($acctSql);
+        $st->execute($acctParams);
+    }
     if ($st) {
         while ($a = $st->fetch(PDO::FETCH_ASSOC)) {
             $map[(int) $a['id']] = [
@@ -832,14 +845,12 @@ function orange_gl_pending_movement_preview(PDO $pdo, int $pendingId): array
 /**
  * وُجدت سندات تسليم لهذا الطلب (ترحيل فوري سابق أو مزيج).
  */
-function orange_order_fulfillment_vouchers_exist(PDO $pdo, string $orderNumber): bool
+function orange_order_fulfillment_vouchers_exist(PDO $pdo, string $orderNumber, ?int $countryId = null): bool
 {
     if ($orderNumber === '' || !orange_journal_vouchers_ready($pdo)) {
         return false;
     }
     $like = 'ORDER-' . $orderNumber . '-S-%';
-    $st = $pdo->prepare('SELECT 1 FROM journal_vouchers WHERE reference LIKE ? LIMIT 1');
-    $st->execute([$like]);
 
-    return (bool) $st->fetchColumn();
+    return orange_gl_voucher_reference_like_exists($pdo, $like, $countryId);
 }

@@ -16,6 +16,9 @@ require_once __DIR__ . '/../../includes/company_settings.php';
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
+$pasCtxCountryId = orange_admin_context_country_id($pdo);
+$pasJvCountryBind = orange_gl_voucher_country_bind($pdo, 'jv', $pasCtxCountryId);
+
 /**
  * تمرير أسطر القيد لفلاتر مدين/دائن ونوع الترحيل (يدوي مقابل نظام التشغيل).
  *
@@ -216,9 +219,9 @@ if ($isCustomerMode && $customerId > 0 && $err === '') {
             'SELECT COALESCE(SUM(ps.debit - ps.credit), 0) AS bal
              FROM party_subledger ps
              INNER JOIN journal_vouchers jv ON jv.id = ps.voucher_id
-             WHERE ps.party_kind = ? AND ps.party_id = ? AND DATE(jv.voucher_date) < ?'
+             WHERE ps.party_kind = ? AND ps.party_id = ? AND DATE(jv.voucher_date) < ?' . $pasJvCountryBind['sql']
         );
-        $stOpenCust->execute(['customer', $customerId, $dateFromYmd]);
+        $stOpenCust->execute(array_merge(['customer', $customerId, $dateFromYmd], $pasJvCountryBind['params']));
         $openingBal = (float) $stOpenCust->fetchColumn();
 
         $hasSerial = orange_table_has_column($pdo, 'journal_vouchers', 'voucher_serial')
@@ -233,10 +236,10 @@ if ($isCustomerMode && $customerId > 0 && $err === '') {
              INNER JOIN journal_vouchers jv ON jv.id = ps.voucher_id
              WHERE ps.party_kind = ? AND ps.party_id = ?
                AND DATE(jv.voucher_date) >= ?
-               AND DATE(jv.voucher_date) <= ?
-             ORDER BY jv.voucher_date ASC, jv.id ASC, ps.id ASC"
+               AND DATE(jv.voucher_date) <= ?" . $pasJvCountryBind['sql'] . '
+             ORDER BY jv.voucher_date ASC, jv.id ASC, ps.id ASC'
         );
-        $stLcust->execute(['customer', $customerId, $dateFromYmd, $dateToYmd]);
+        $stLcust->execute(array_merge(['customer', $customerId, $dateFromYmd, $dateToYmd], $pasJvCountryBind['params']));
         $rawLinesCust = $stLcust->fetchAll(PDO::FETCH_ASSOC);
         $balCust = $openingBal;
         foreach ($rawLinesCust as $ln) {
@@ -262,9 +265,9 @@ if ($isCustomerMode && $customerId > 0 && $err === '') {
             'SELECT COALESCE(SUM(jl.debit - jl.credit), 0) AS bal
              FROM journal_lines jl
              INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
-             WHERE jl.account_id = ? AND DATE(jv.voucher_date) < ?'
+             WHERE jl.account_id = ? AND DATE(jv.voucher_date) < ?' . $pasJvCountryBind['sql']
         );
-        $stOpen->execute([$accountId, $dateFromYmd]);
+        $stOpen->execute(array_merge([$accountId, $dateFromYmd], $pasJvCountryBind['params']));
         $openingBal = (float) $stOpen->fetchColumn();
 
         $hasSerial = orange_table_has_column($pdo, 'journal_vouchers', 'voucher_serial')
@@ -279,10 +282,10 @@ if ($isCustomerMode && $customerId > 0 && $err === '') {
              INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
              WHERE jl.account_id = ?
                AND DATE(jv.voucher_date) >= ?
-               AND DATE(jv.voucher_date) <= ?
-             ORDER BY jv.voucher_date ASC, jv.id ASC, jl.line_no ASC"
+               AND DATE(jv.voucher_date) <= ?" . $pasJvCountryBind['sql'] . '
+             ORDER BY jv.voucher_date ASC, jv.id ASC, jl.line_no ASC'
         );
-        $stL->execute([$accountId, $dateFromYmd, $dateToYmd]);
+        $stL->execute(array_merge([$accountId, $dateFromYmd, $dateToYmd], $pasJvCountryBind['params']));
         $rawLines = $stL->fetchAll(PDO::FETCH_ASSOC);
         $bal = $openingBal;
         foreach ($rawLines as $ln) {
@@ -301,7 +304,7 @@ if ($isCustomerMode && $customerId > 0 && $err === '') {
         $stmtFilterNoMatch = $rawLines !== [] && $rows === [];
 
         if ($showAging) {
-            $agingReport = orange_gl_account_statement_aging_buckets($pdo, $accountId, $dateToYmd);
+            $agingReport = orange_gl_account_statement_aging_buckets($pdo, $accountId, $dateToYmd, $pasCtxCountryId);
         }
     } catch (Throwable $e) {
         $err = 'تعذر قراءة الحركات.';

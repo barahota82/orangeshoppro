@@ -180,20 +180,21 @@ function orange_sales_return_record_ar_subledger(
  * @param 'customer'|'supplier' $partyKind
  * @return list<array<string, mixed>>
  */
-function orange_party_statement_lines(PDO $pdo, string $partyKind, int $partyId): array
+function orange_party_statement_lines(PDO $pdo, string $partyKind, int $partyId, ?int $countryId = null): array
 {
     if (!orange_party_subledger_ready($pdo) || $partyId <= 0 || !in_array($partyKind, ['customer', 'supplier'], true)) {
         return [];
     }
+    $jvBind = orange_gl_voucher_country_bind($pdo, 'jv', $countryId);
     $st = $pdo->prepare(
         'SELECT ps.debit, ps.credit, ps.memo, ps.ref_type, ps.ref_id,
                 jv.voucher_date, jv.reference, jv.entry_type, jv.description AS voucher_description
          FROM party_subledger ps
          INNER JOIN journal_vouchers jv ON jv.id = ps.voucher_id
-         WHERE ps.party_kind = ? AND ps.party_id = ?
+         WHERE ps.party_kind = ? AND ps.party_id = ?' . $jvBind['sql'] . '
          ORDER BY jv.voucher_date ASC, jv.id ASC, ps.id ASC'
     );
-    $st->execute([$partyKind, $partyId]);
+    $st->execute(array_merge([$partyKind, $partyId], $jvBind['params']));
     $rows = $st->fetchAll(PDO::FETCH_ASSOC);
     $out = [];
     $run = 0.0;
@@ -230,19 +231,20 @@ function orange_party_statement_lines(PDO $pdo, string $partyKind, int $partyId)
  * @param 'customer'|'supplier' $partyKind
  * @return list<array<string, mixed>>
  */
-function orange_party_subledger_movement_rows(PDO $pdo, string $partyKind, int $partyId): array
+function orange_party_subledger_movement_rows(PDO $pdo, string $partyKind, int $partyId, ?int $countryId = null): array
 {
     if (!orange_party_subledger_ready($pdo) || $partyId <= 0 || !in_array($partyKind, ['customer', 'supplier'], true)) {
         return [];
     }
+    $jvBind = orange_gl_voucher_country_bind($pdo, 'jv', $countryId);
     $st = $pdo->prepare(
         'SELECT ps.debit, ps.credit, jv.voucher_date
          FROM party_subledger ps
          INNER JOIN journal_vouchers jv ON jv.id = ps.voucher_id
-         WHERE ps.party_kind = ? AND ps.party_id = ?
+         WHERE ps.party_kind = ? AND ps.party_id = ?' . $jvBind['sql'] . '
          ORDER BY jv.voucher_date ASC, jv.id ASC, ps.id ASC'
     );
-    $st->execute([$partyKind, $partyId]);
+    $st->execute(array_merge([$partyKind, $partyId], $jvBind['params']));
 
     return $st->fetchAll(PDO::FETCH_ASSOC);
 }

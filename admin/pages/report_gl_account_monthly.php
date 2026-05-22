@@ -79,6 +79,7 @@ $lastDayOfYm = static function (string $ym): string {
 };
 
 $useVouchers = orange_journal_vouchers_ready($pdo);
+$glmJvCountryBind = orange_gl_voucher_country_bind($pdo, 'jv');
 $monthlyRows = [];
 $periodLabel = '';
 $periodYmFrom = '';
@@ -137,11 +138,11 @@ if (
          INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
          WHERE jl.account_id = ?
            AND DATE(jv.voucher_date) >= ?
-           AND DATE(jv.voucher_date) <= ?
+           AND DATE(jv.voucher_date) <= ?' . $glmJvCountryBind['sql'] . '
          GROUP BY ym
          ORDER BY ym ASC'
     );
-    $st->execute([$accountId, $periodDateFrom, $periodDateTo]);
+    $st->execute(array_merge([$accountId, $periodDateFrom, $periodDateTo], $glmJvCountryBind['params']));
     $monthlyRows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
 }
 
@@ -155,9 +156,9 @@ if (
          FROM journal_lines jl
          INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
          WHERE jl.account_id = ?
-           AND DATE(jv.voucher_date) < ?'
+           AND DATE(jv.voucher_date) < ?' . $glmJvCountryBind['sql']
     );
-    $stOb->execute([$accountId, $periodDateFrom]);
+    $stOb->execute(array_merge([$accountId, $periodDateFrom], $glmJvCountryBind['params']));
     $obl = $stOb->fetch(PDO::FETCH_ASSOC);
     if (is_array($obl)) {
         $openingBal = (float) $obl['sd'] - (float) $obl['sc'];

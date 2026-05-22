@@ -81,6 +81,7 @@ $monthLabelExcel = static function (string $ym): string {
 };
 
 $useVouchers = orange_journal_vouchers_ready($pdo);
+$plmJvCountryBind = orange_gl_voucher_country_bind($pdo, 'jv');
 
 $periodYmFrom = '';
 $periodYmTo = '';
@@ -211,9 +212,9 @@ if (
              INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
              WHERE jl.account_id IN ($ph)
                AND DATE(jv.voucher_date) >= ?
-               AND DATE(jv.voucher_date) <= ?
+               AND DATE(jv.voucher_date) <= ?" . $plmJvCountryBind['sql'] . '
              GROUP BY jl.account_id, ym";
-        $params = array_merge($ids, [$periodDateFrom, $periodDateTo]);
+        $params = array_merge($ids, [$periodDateFrom, $periodDateTo], $plmJvCountryBind['params']);
         $st = $pdo->prepare($sql);
         $st->execute($params);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $rw) {

@@ -613,7 +613,7 @@ function orange_accounts_posting_leaf_where_sql(PDO $pdo, string $alias = 'a'): 
  * @param list<array<string, mixed>> $rows صفوف من الاستعلام (يجب أن تتضمن parent_id / is_group عند توفر العمود)
  * @return list<array{id: int, code: string, name: string}>
  */
-function orange_accounts_filter_rows_for_leaf_search(PDO $pdo, array $rows): array
+function orange_accounts_filter_rows_for_leaf_search(PDO $pdo, array $rows, ?int $countryId = null): array
 {
     if ($rows === []) {
         return [];
@@ -623,7 +623,19 @@ function orange_accounts_filter_rows_for_leaf_search(PDO $pdo, array $rows): arr
 
     $idsWithChildren = [];
     if ($hasPar) {
-        $pq = $pdo->query('SELECT DISTINCT parent_id FROM accounts WHERE COALESCE(parent_id, 0) > 0');
+        $parentSql = 'SELECT DISTINCT parent_id FROM accounts WHERE COALESCE(parent_id, 0) > 0';
+        $parentParams = [];
+        $countryFilter = orange_accounts_sql_country_filter($pdo, '', $countryId);
+        if ($countryFilter !== null) {
+            $parentSql .= str_replace('.country_id', 'country_id', $countryFilter['sql']);
+            $parentParams = $countryFilter['params'];
+        }
+        if ($parentParams === []) {
+            $pq = $pdo->query($parentSql);
+        } else {
+            $pq = $pdo->prepare($parentSql);
+            $pq->execute($parentParams);
+        }
         if ($pq !== false) {
             foreach ($pq->fetchAll(PDO::FETCH_COLUMN) as $p) {
                 $idsWithChildren[(int) $p] = true;
@@ -672,7 +684,7 @@ function orange_accounts_filter_rows_for_leaf_search(PDO $pdo, array $rows): arr
  * @param list<int> $ids
  * @return array<int, true>
  */
-function orange_accounts_posting_leaf_id_set(PDO $pdo, array $ids): array
+function orange_accounts_posting_leaf_id_set(PDO $pdo, array $ids, ?int $countryId = null): array
 {
     $ids = array_values(array_unique(array_filter(array_map(static fn ($x) => (int) $x, $ids), static fn ($x) => $x > 0)));
     if ($ids === []) {
@@ -680,8 +692,14 @@ function orange_accounts_posting_leaf_id_set(PDO $pdo, array $ids): array
     }
     $ph = implode(',', array_fill(0, count($ids), '?'));
     $sql = 'SELECT a.id, a.code FROM accounts a WHERE a.id IN (' . $ph . ') AND ' . orange_accounts_posting_leaf_where_sql($pdo, 'a');
+    $params = $ids;
+    $countryFilter = orange_accounts_sql_country_filter($pdo, 'a', $countryId);
+    if ($countryFilter !== null) {
+        $sql .= $countryFilter['sql'];
+        $params = array_merge($params, $countryFilter['params']);
+    }
     $st = $pdo->prepare($sql);
-    $st->execute($ids);
+    $st->execute($params);
     $ok = [];
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $id = (int) ($row['id'] ?? 0);
