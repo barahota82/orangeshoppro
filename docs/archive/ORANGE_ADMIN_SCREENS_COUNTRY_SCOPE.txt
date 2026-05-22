@@ -153,12 +153,13 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
   إغلاق: v53 — country_id + uq_ojtr_country_jt_terms؛ gl-accounts save/delete scoped؛ gl_settings list/posting/rule_for_terms؛ country_provision copy بعد journal_types.
 
 [GAP-02] حرج — country_provision ينسخ journal_type_id خاطئ في GL settings
-  حالة: [معلّق]
+  حالة: [منتهٍ]
   المشكلة:
   - orange_country_copy_gl_settings_from_source() ينسخ journal_type_id من المصدر كما هو.
   - نسخ journal_types للهدف يحدث **بعد** GL → IDs المصدر ≠ IDs الهدف.
   الملفات: includes/country_provision.php (ترتيب النسخ أو remap بالكود)
   معيار الإغلاق: remap journal_type_id عبر code+country_id؛ أو نسخ journal_types **قبل** GL ثم remap.
+  إغلاق: v54 repair + provision — journal_types قبل GL؛ orange_country_remap_journal_type_id_for_target() عند النسخ.
 
 [GAP-03] متوسط — admin/pages/storefront_hero.php بلا country_id
   حالة: [معلّق]
@@ -213,16 +214,16 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
 ج — توصيات الأولوية (ترتيب التنفيذ للمالك)
 ----------------------------------------------------------------------
 
-1. GAP-02 — provision remap journal_type_id
-2. GAP-03 — storefront_hero.php أدمن
-3. GAP-04 — purchases GL country_id
-4. GAP-05 + GAP-06 — fiscal fallback + opening balances
-5. GAP-07 — قرار سياسة + تنفيذ merge phone
-6. GAP-08 — legacy migrate (إن وُجدت حاجة)
-7. GAP-09 — تدقيق مستمر
+1. GAP-03 — storefront_hero.php أدمن
+2. GAP-04 — purchases GL country_id
+3. GAP-05 + GAP-06 — fiscal fallback + opening balances
+4. GAP-07 — قرار سياسة + تنفيذ merge phone
+5. GAP-08 — legacy migrate (إن وُجدت حاجة)
+6. GAP-09 — تدقيق مستمر
 
 ----------------------------------------------------------------------
 د — سجل إغلاق (يُملأ عند إنهاء كل بند)
 ----------------------------------------------------------------------
 
 [2026-05-20] GAP-01 — v53 orange_gl_journal_type_rules per country؛ gl-accounts scoped save؛ gl_settings filtered reads/posting؛ country_provision copy rules (remap journal_type by code).
+[2026-05-20] GAP-02 — v54 repair gl_account_settings journal_type_id؛ provision journal_types قبل GL + remap by code.

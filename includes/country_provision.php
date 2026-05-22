@@ -242,6 +242,28 @@ function orange_country_copy_accounts_from_source(PDO $pdo, int $targetCountryId
 }
 
 /**
+ * يعيد journal_type_id للدولة الهدف عبر code (GAP-02).
+ */
+function orange_country_remap_journal_type_id_for_target(PDO $pdo, int $sourceJournalTypeId, int $targetCountryId): ?int
+{
+    if ($sourceJournalTypeId <= 0 || $targetCountryId <= 0 || !orange_table_exists($pdo, 'journal_types')) {
+        return null;
+    }
+    require_once __DIR__ . '/journal_types.php';
+    $code = orange_journal_type_code_by_id($pdo, $sourceJournalTypeId);
+    if ($code === '') {
+        return null;
+    }
+    if (orange_journal_types_has_country_column($pdo)) {
+        $tgtId = orange_journal_type_id_by_code($pdo, $code, $targetCountryId);
+
+        return $tgtId > 0 ? $tgtId : null;
+    }
+
+    return $sourceJournalTypeId;
+}
+
+/**
  * @param array<int,int> $accountIdMap
  * @return array{skipped:bool, reason:string, settings_copied:int, alloc_copied:int}
  */
@@ -294,13 +316,20 @@ function orange_country_copy_gl_settings_from_source(
                 }
                 $srcAcct = (int) ($r['account_id'] ?? 0);
                 $tgtAcct = $srcAcct > 0 && isset($accountIdMap[$srcAcct]) ? (int) $accountIdMap[$srcAcct] : $srcAcct;
+                $tgtJt = null;
+                if ($hasJt) {
+                    $srcJt = (int) ($r['journal_type_id'] ?? 0);
+                    if ($srcJt > 0) {
+                        $tgtJt = orange_country_remap_journal_type_id_for_target($pdo, $srcJt, $targetCountryId);
+                    }
+                }
                 try {
                     if ($hasJt) {
                         $ins = $pdo->prepare(
                             'INSERT INTO orange_gl_account_settings (setting_key, country_id, account_id, journal_type_id)
                              VALUES (?, ?, ?, ?)'
                         );
-                        $ins->execute([$key, $targetCountryId, $tgtAcct > 0 ? $tgtAcct : null, $r['journal_type_id'] ?? null]);
+                        $ins->execute([$key, $targetCountryId, $tgtAcct > 0 ? $tgtAcct : null, $tgtJt !== null && $tgtJt > 0 ? $tgtJt : null]);
                     } else {
                         $ins = $pdo->prepare(
                             'INSERT INTO orange_gl_account_settings (setting_key, country_id, account_id)
@@ -868,6 +897,7 @@ function orange_country_provision_full(PDO $pdo, int $countryId, ?int $sourceCou
     $out['catalog_copy'] = orange_country_copy_catalog_from_source($pdo, $countryId, $sourceCountryId);
     $out['accounts_copy'] = orange_country_copy_accounts_from_source($pdo, $countryId, $sourceCountryId);
     $idMap = is_array($out['accounts_copy']['id_map'] ?? null) ? $out['accounts_copy']['id_map'] : [];
+    $out['journal_types_copy'] = orange_country_copy_journal_types_from_source($pdo, $countryId, $sourceCountryId);
     $out['gl_settings_copy'] = orange_country_copy_gl_settings_from_source(
         $pdo,
         $countryId,
@@ -883,7 +913,6 @@ function orange_country_provision_full(PDO $pdo, int $countryId, ?int $sourceCou
         $out['departments_copy']['skipped'] = false;
     }
 
-    $out['journal_types_copy'] = orange_country_copy_journal_types_from_source($pdo, $countryId, $sourceCountryId);
     $out['gl_journal_type_rules_copy'] = orange_country_copy_gl_journal_type_rules_from_source($pdo, $countryId, $sourceCountryId);
     $out['fiscal_years_copy'] = orange_country_copy_fiscal_years_from_source($pdo, $countryId, $sourceCountryId);
     $out['company_settings_copy'] = orange_country_copy_company_settings_from_source($pdo, $countryId, $sourceCountryId);

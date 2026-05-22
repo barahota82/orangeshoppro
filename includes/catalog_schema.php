@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 53);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 54);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3032,6 +3032,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_department_countries_v51($pdo);
     orange_catalog_migrate_country_admin_settings_v52($pdo);
     orange_catalog_migrate_gl_journal_type_rules_country_v53($pdo);
+    orange_catalog_migrate_gl_settings_journal_type_remap_v54($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
         orange_catalog_safe_exec(
@@ -4698,6 +4699,45 @@ function orange_catalog_migrate_gl_journal_type_rules_country_v53(PDO $pdo): voi
                 continue;
             }
             orange_country_copy_gl_journal_type_rules_from_source($pdo, $cid, $kwId);
+        }
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v54 — إصلاح journal_type_id في orange_gl_account_settings بعد فصل الدول (GAP-02).
+ */
+function orange_catalog_migrate_gl_settings_journal_type_remap_v54(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    $marker = 'php_gl_settings_journal_type_remap_v54';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (!orange_table_exists($pdo, 'orange_gl_account_settings')
+        || !orange_table_has_column($pdo, 'orange_gl_account_settings', 'journal_type_id')
+        || !orange_table_has_column($pdo, 'orange_gl_account_settings', 'country_id')
+        || !orange_table_exists($pdo, 'journal_types')
+        || !orange_table_has_column($pdo, 'journal_types', 'country_id')) {
+        orange_catalog_schema_insert_migration_marker($pdo, $marker);
+
+        return;
+    }
+
+    try {
+        $pdo->exec(
+            'UPDATE orange_gl_account_settings g
+             INNER JOIN journal_types jt_src ON jt_src.id = g.journal_type_id
+             INNER JOIN journal_types jt_tgt ON jt_tgt.country_id = g.country_id AND jt_tgt.code = jt_src.code
+             SET g.journal_type_id = jt_tgt.id
+             WHERE g.journal_type_id IS NOT NULL AND g.journal_type_id > 0
+               AND jt_src.country_id <> g.country_id'
+        );
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] v54 gl_settings journal_type remap: ' . $e->getMessage());
         }
     }
 
