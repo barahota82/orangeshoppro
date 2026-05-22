@@ -236,7 +236,7 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
   - scripts/gap09_gl_country_audit.ps1 (Windows) أو scripts/gap09_gl_country_audit.php (PHP CLI)
   - مخرجات: docs/exports/GAP09_GL_country_audit_{summary,detail,by_file}_YYYY-MM-DD.csv
   - آخر مسح: 182 موضع / 53 ملف — OK 163 | LOW 0 | MAINT 19 | **HIGH 0**
-  - LOW سابقاً (j3): search-leaves / opening_balances / account_tree — مُراجَعة j4: scoped أو PK (لا فجوة)
+  - MAINT في CSV = سكript SQL يدوي **غير scoped**؛ السكriptات الأربعة post-v52 تظهر **OK** (note: MAINT script — country scoped) بعد j4.
 
 ----------------------------------------------------------------------
 ج — توصيات الأولوية (ترتيب التنفيذ للمالك)

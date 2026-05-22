@@ -16,6 +16,7 @@ $okSignals = [
     'country_id',
     'orange_gl_voucher_country_bind',
     'orange_accounts_fetch',
+    'orange_accounts_sql_country_filter',
     'orange_accounts_filter',
     'orange_accounts_count_posting_leaves',
     'orange_accounts_posting_leaf',
@@ -34,6 +35,20 @@ $okSignals = [
     'orange_fiscal_',
     'per country',
     'scoped',
+];
+
+$maintScopedSignals = [
+    '@country_id',
+    '@cid',
+    '@has_acct_country',
+    '@has_jv_country',
+    'country_id = ',
+    'jv.country_id',
+    'a.country_id = c.id',
+    'c.country_id = a.country_id',
+    'post-v52',
+    'per country',
+    'SIGNAL SQLSTATE',
 ];
 
 $iterator = new RecursiveIteratorIterator(
@@ -61,6 +76,18 @@ foreach ($iterator as $file) {
         continue;
     }
 
+    $fileText = implode("\n", $lines);
+    $isMaintPath = (bool) preg_match('#^scripts/(migrations/|maintenance_|mysql-)#', $rel);
+    $isMaintScoped = false;
+    if ($isMaintPath) {
+        foreach ($maintScopedSignals as $sig) {
+            if (stripos($fileText, $sig) !== false) {
+                $isMaintScoped = true;
+                break;
+            }
+        }
+    }
+
     foreach ($lines as $i => $line) {
         $isJv = (bool) preg_match($patterns[0], $line);
         $isAcc = (bool) preg_match($patterns[1], $line);
@@ -75,9 +102,14 @@ foreach ($iterator as $file) {
         $risk = 'LOW';
         $note = 'Review — entity-scoped or legacy path';
 
-        if (preg_match('#^scripts/(migrations/|maintenance_|mysql-)#', $rel)) {
-            $risk = 'MAINT';
-            $note = 'Migration/maintenance script';
+        if ($isMaintPath) {
+            if ($isMaintScoped) {
+                $risk = 'OK';
+                $note = 'MAINT script — country scoped (manual run only)';
+            } else {
+                $risk = 'MAINT';
+                $note = 'MAINT script — review country scope';
+            }
         } elseif (preg_match('#includes/countries\.php|includes/country_provision\.php#', $rel)) {
             $risk = 'OK';
             $note = 'Explicit country filter or wrapper';

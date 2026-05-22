@@ -16,6 +16,11 @@ $okSignals = @(
     'WHERE id =', 'WHERE a.id =', 'WHERE jv.id =',
     'fiscal_year', 'orange_fiscal_', 'per country', 'scoped'
 )
+$maintScopedSignals = @(
+    '@country_id', '@cid', '@has_acct_country', '@has_jv_country',
+    'country_id = ', 'jv.country_id', 'a.country_id = c.id', 'c.country_id = a.country_id',
+    'post-v52', 'per country', 'SIGNAL SQLSTATE'
+)
 
 $detail = New-Object System.Collections.Generic.List[object]
 $byFile = @{}
@@ -28,6 +33,17 @@ Get-ChildItem -Path $root -Recurse -Include *.php, *.sql -File | Where-Object {
 } | ForEach-Object {
     $rel = $_.FullName.Substring($root.Length + 1).Replace('\', '/')
     $lines = Get-Content -LiteralPath $_.FullName -Encoding UTF8
+    $fileText = $lines -join [Environment]::NewLine
+    $isMaintPath = $rel -match '^scripts/(migrations/|maintenance_|mysql-)'
+    $isMaintScoped = $false
+    if ($isMaintPath) {
+        foreach ($sig in $maintScopedSignals) {
+            if ($fileText -like "*$sig*") {
+                $isMaintScoped = $true
+                break
+            }
+        }
+    }
     for ($i = 0; $i -lt $lines.Count; $i++) {
         $line = $lines[$i]
         $isJv = $patterns[0].IsMatch($line)
@@ -41,9 +57,14 @@ Get-ChildItem -Path $root -Recurse -Include *.php, *.sql -File | Where-Object {
         $risk = 'LOW'
         $note = 'Review — entity-scoped or legacy path'
 
-        if ($rel -match '^scripts/(migrations/|maintenance_|mysql-)') {
-            $risk = 'MAINT'
-            $note = 'Migration/maintenance script'
+        if ($isMaintPath) {
+            if ($isMaintScoped) {
+                $risk = 'OK'
+                $note = 'MAINT script — country scoped (manual run only)'
+            } else {
+                $risk = 'MAINT'
+                $note = 'MAINT script — review country scope'
+            }
         }
         elseif ($rel -match 'includes/countries\.php|includes/country_provision\.php') {
             $risk = 'OK'
