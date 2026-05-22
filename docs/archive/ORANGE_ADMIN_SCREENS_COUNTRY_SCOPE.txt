@@ -212,7 +212,7 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
   إغلاق: استدعاء الترحيل بعد v52/v55؛ COUNT/INSERT scoped بـ orange_countries_default_id() (الكويت) عند وجود عمود country_id؛ seed يبقى scoped كما في v52-S4.
 
 [GAP-09] تدقيق مستمر — مسارات GL/سندات/تقارير
-  حالة: [منتهٍ — جولة 2 / 2026-05-20]
+  حالة: [منتهٍ — جولة 3 / 2026-05-20] — **تدقيق مستمر** (إعادة مسح عند GL جديد أو دولة جديدة)
   المشكلة:
   - مراجعة يدوية أن كل استعلام journal_vouchers / accounts / pending يفلتر country_id حيث يلزم.
   معيار الإغلاق: قائمة مسارات مُفحوصة + لا فجوات في س25/س26/أداء (ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT).
@@ -231,13 +231,18 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
   تدقيق عميق (2026-05-20): مسح 168 موضع FROM/JOIN — 0 HIGH؛ CSV: docs/exports/GAP09_gl_country_audit_2026-05-20.csv
   تنفيذ (جولة 2): orange_gl_voucher_country_bind على JOIN jv في party_subledger.php؛ partner_account_statement.php؛ report_gl_account_monthly.php؛ report_pl_monthly.php؛ gl_account_aging.php؛ orange_voucher_by_reference() scoped.
   تنفيذ (جولة 3): LOW remainder — gl-accounts.php؛ account_tree leaf filter؛ catalog_schema seed per country؛ gl_pending preview accounts؛ journal_voucher reference LIKE helpers؛ order_fulfillment country on voucher checks.
-  إعادة التدقيق: عند شاشة GL جديدة أو دولة جديدة — يُحدَّث هذا البند (جولة 3+).
+  إعادة التدقيق: عند شاشة GL جديدة أو دولة جديدة — يُحدَّث هذا البند (جولة 4+).
+  أداة مسح (جولة 4 — 2026-05-22):
+  - scripts/gap09_gl_country_audit.ps1 (Windows) أو scripts/gap09_gl_country_audit.php (PHP CLI)
+  - مخرجات: docs/exports/GAP09_GL_country_audit_{summary,detail,by_file}_YYYY-MM-DD.csv
+  - آخر مسح: 182 موضع / 53 ملف — OK 163 | LOW 0 | MAINT 19 | **HIGH 0**
+  - LOW سابقاً (j3): search-leaves / opening_balances / account_tree — مُراجَعة j4: scoped أو PK (لا فجوة)
 
 ----------------------------------------------------------------------
 ج — توصيات الأولوية (ترتيب التنفيذ للمالك)
 ----------------------------------------------------------------------
 
-(لا ثغرات GAP مفتوحة في قائمة «ب» — GAP-09 جولة 2 منتهية؛ إعادة تدقيق عند توسّع GL/دولة جديدة.)
+(لا ثغرات GAP مفتوحة في قائمة «ب» — GAP-09 جولة 3 منتهية + مسح j4 بلا HIGH؛ إعادة تدقيق عند توسّع GL/دولة جديدة.)
 
 ----------------------------------------------------------------------
 د — سجل إغلاق (يُملأ عند إنهاء كل بند)
@@ -254,3 +259,4 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
 [2026-05-20] GAP-09 — جولة 1: تدقيق GL/سندات/تقارير؛ orange_gl_voucher_next_id_preview؛ معاينة أرقام scoped؛ قائمة تدقيق في GAP-09.
 [2026-05-20] GAP-09 — جولة 2: jv.country_id bind على party statement / GL monthly / PL monthly / aging / voucher_by_reference؛ تدقيق عميق + CSV.
 [2026-05-20] GAP-09 — جولة 3: LOW remainder — gl-accounts fetch fallback؛ account_tree scoped parent_id؛ catalog_schema seed per country؛ gl_pending/order_fulfillment reference LIKE scoped.
+[2026-05-22] GAP-09 — جولة 4 (تدقيق مستمر): مسح 182 موضع — 0 HIGH / 0 LOW؛ scripts/gap09_gl_country_audit.ps1؛ CSV docs/exports/GAP09_*_2026-05-22.csv.

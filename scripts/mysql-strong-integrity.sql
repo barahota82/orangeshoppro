@@ -23,28 +23,63 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
+-- post-v52 (اختياري — فحوصات/تنظيف scoped بدولة):
+--   SET @country_id := (SELECT id FROM countries WHERE code = 'KW' LIMIT 1);
+
+SET @country_id := NULL;
+
+SET @has_acct_country := (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'accounts'
+      AND COLUMN_NAME = 'country_id'
+);
+SET @has_jv_country := (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'journal_vouchers'
+      AND COLUMN_NAME = 'country_id'
+);
+
+SET @cid := IF(@country_id IS NULL, 0, CAST(@country_id AS UNSIGNED));
+
 -- -----------------------------------------------------------------------------
--- (0) فحوصات تشخيصية — شغّلها وحدها أولاً إن أحببت؛ يجب أن ترجع 0 صفوف قبل القيود
+-- (0) فحوصات تشخيصية — شغّلها وحدها أولاً؛ يجب أن ترجع 0 صفوف قبل القيود
 -- -----------------------------------------------------------------------------
--- SELECT COUNT(*) AS bad_jl FROM journal_lines jl
---   LEFT JOIN accounts a ON a.id = jl.account_id WHERE jl.account_id IS NOT NULL AND a.id IS NULL;
+SET @sql_diag_jl := IF(
+    @has_jv_country > 0 AND @has_acct_country > 0 AND @cid > 0,
+    CONCAT(
+        'SELECT COUNT(*) AS bad_jl_country FROM journal_lines jl ',
+        'INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id ',
+        'LEFT JOIN accounts a ON a.id = jl.account_id AND a.country_id = jv.country_id ',
+        'WHERE jv.country_id = ', @cid, ' AND jl.account_id IS NOT NULL AND a.id IS NULL'
+    ),
+    'SELECT COUNT(*) AS bad_jl FROM journal_lines jl LEFT JOIN accounts a ON a.id = jl.account_id WHERE jl.account_id IS NOT NULL AND a.id IS NULL'
+);
+PREPARE p_diag_jl FROM @sql_diag_jl;
+EXECUTE p_diag_jl;
+DEALLOCATE PREPARE p_diag_jl;
+
 -- SELECT COUNT(*) AS bad_pcw FROM product_colorways cw
 --   LEFT JOIN products p ON p.id = cw.product_id WHERE p.id IS NULL;
 -- SELECT COUNT(*) AS bad_sfs FROM size_family_sizes s
 --   LEFT JOIN size_families f ON f.id = s.size_family_id WHERE f.id IS NULL;
 
 -- -----------------------------------------------------------------------------
--- (0b) فحوصات يتامى scoped بدولة (post-v52 — اختياري)
+-- (0b) فحوصات يتامى scoped بدولة (post-v52 — عند @country_id > 0)
 -- -----------------------------------------------------------------------------
--- SET @country_id := (SELECT id FROM countries WHERE code = 'KW' LIMIT 1);
--- SET @cid := CAST(@country_id AS UNSIGNED);
--- SELECT COUNT(*) AS bad_jl_country FROM journal_lines jl
---   INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
---   LEFT JOIN accounts a ON a.id = jl.account_id AND a.country_id = jv.country_id
---   WHERE jv.country_id = @cid AND jl.account_id IS NOT NULL AND a.id IS NULL;
--- SELECT COUNT(*) AS bad_og_debit_country FROM orange_gl_pending_movements og
---   LEFT JOIN accounts a ON a.id = og.account_debit AND a.country_id = @cid
---   WHERE og.account_debit IS NOT NULL AND a.id IS NULL;
+SET @sql_diag_og := IF(
+    @has_acct_country > 0 AND @cid > 0,
+    CONCAT(
+        'SELECT COUNT(*) AS bad_og_debit_country FROM orange_gl_pending_movements og ',
+        'LEFT JOIN accounts a ON a.id = og.account_debit AND a.country_id = ', @cid, ' ',
+        'WHERE og.account_debit IS NOT NULL AND a.id IS NULL'
+    ),
+    'SELECT 0 AS bad_og_debit_country'
+);
+PREPARE p_diag_og FROM @sql_diag_og;
+EXECUTE p_diag_og;
+DEALLOCATE PREPARE p_diag_og;
 
 -- -----------------------------------------------------------------------------
 -- (1) تنظيف يتامى (آمن قدر الإمكان: NULL حيث العمود يسمح، وإلا حذف صفوف بلا مرجع)
@@ -77,7 +112,13 @@ LEFT JOIN `orders` o ON o.id = q.order_id
 SET q.order_id = NULL
 WHERE q.order_id IS NOT NULL AND o.id IS NULL;
 
--- مصروفات: حساب مصروف غير موجود
+-- طابور الترحيل المحاسبي: سند غير موجود (PK — global)
+UPDATE `orange_gl_pending_movements` og
+LEFT JOIN `journal_vouchers` jv ON jv.id = og.journal_voucher_id
+SET og.journal_voucher_id = NULL
+WHERE og.journal_voucher_id IS NOT NULL AND jv.id IS NULL;
+
+-- مصروفات: حساب مصروف غير موجود (PK — global؛ post-v52: id فريد عبر الدول)
 UPDATE `expenses` e
 LEFT JOIN `accounts` a ON a.id = e.expense_account_id
 SET e.expense_account_id = NULL
@@ -110,7 +151,6 @@ DELETE pi FROM `purchase_return_items` pi
 LEFT JOIN `purchase_returns` pr ON pr.id = pi.purchase_return_id
 WHERE pr.id IS NULL;
 
--- منع إدراج product_id غير صالح: احذف البنود اليتيمة أو أصلحها يدوياً
 DELETE pi FROM `purchase_return_items` pi
 LEFT JOIN `products` p ON p.id = pi.product_id
 WHERE p.id IS NULL;
@@ -148,12 +188,6 @@ UPDATE `sales_return_items` si
 LEFT JOIN `product_variants` v ON v.id = si.variant_id
 SET si.variant_id = NULL
 WHERE si.variant_id IS NOT NULL AND v.id IS NULL;
-
--- طابور الترحيل المحاسبي: سند غير موجود
-UPDATE `orange_gl_pending_movements` og
-LEFT JOIN `journal_vouchers` jv ON jv.id = og.journal_voucher_id
-SET og.journal_voucher_id = NULL
-WHERE og.journal_voucher_id IS NOT NULL AND jv.id IS NULL;
 
 -- -----------------------------------------------------------------------------
 -- (2) journal_lines.account_id → accounts
