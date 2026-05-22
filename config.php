@@ -2651,11 +2651,12 @@ function admin_login(int $adminId): void {
         $pdo = db();
         require_once __DIR__ . '/includes/catalog_schema.php';
         if (orange_table_exists($pdo, 'admins') && orange_table_has_column($pdo, 'admins', 'country_id')) {
-            $st = $pdo->prepare('SELECT country_id FROM admins WHERE id = ? AND is_active = 1 LIMIT 1');
+            $st = $pdo->prepare('SELECT country_id, is_superuser FROM admins WHERE id = ? AND is_active = 1 LIMIT 1');
             $st->execute([$adminId]);
-            $cid = (int) ($st->fetchColumn() ?: 0);
-            if ($cid > 0) {
-                $_SESSION['admin_country_lock'] = $cid;
+            $row = $st->fetch(PDO::FETCH_ASSOC);
+            if (is_array($row)) {
+                require_once __DIR__ . '/includes/admin_permissions.php';
+                orange_admin_sync_session_country_lock($row);
             }
         }
     } catch (Throwable $e) {
@@ -2692,6 +2693,9 @@ function require_admin_page(): array {
         header('Location: ' . storefront_public_path('/admin/login.php'));
         exit;
     }
+    require_once __DIR__ . '/includes/admin_permissions.php';
+    orange_admin_sync_session_country_lock($admin);
+
     return $admin;
 }
 
@@ -2708,6 +2712,7 @@ function require_admin_api(): void {
     }
     require_once __DIR__ . '/includes/catalog_schema.php';
     require_once __DIR__ . '/includes/admin_permissions.php';
+    orange_admin_sync_session_country_lock($admin);
     orange_catalog_ensure_schema($pdo);
     orange_catalog_ensure_country_id_columns_once($pdo);
     require_once __DIR__ . '/includes/countries.php';

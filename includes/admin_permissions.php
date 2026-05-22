@@ -226,18 +226,33 @@ function orange_admin_is_superuser(array $admin): bool
 /**
  * مشرف عام — وصول كامل: superuser أو admins.country_id فارغ (بند 13.8).
  * فريق دولة (country_id محدد + غير superuser) لا يُعامَل كمشرف عام.
+ * يعتمد على سجل admins فقط — لا على admin_country_lock في الجلسة.
  */
 function orange_admin_has_full_access(array $admin): bool
 {
     if (orange_admin_is_superuser($admin)) {
         return true;
     }
-    require_once __DIR__ . '/countries.php';
-    if (orange_admin_session_locked_country_id() > 0) {
-        return false;
-    }
 
-    return orange_admin_is_global($admin);
+    return (int) ($admin['country_id'] ?? 0) <= 0;
+}
+
+/**
+ * يزامن قفل سياق الدولة: فريق دولة فقط؛ المشرف العام يختار من المبدّل (كوكي/GET).
+ */
+function orange_admin_sync_session_country_lock(array $admin): void
+{
+    if (orange_admin_has_full_access($admin)) {
+        unset($_SESSION['admin_country_lock']);
+
+        return;
+    }
+    $cid = (int) ($admin['country_id'] ?? 0);
+    if ($cid > 0) {
+        $_SESSION['admin_country_lock'] = $cid;
+    } else {
+        unset($_SESSION['admin_country_lock']);
+    }
 }
 
 /** إدارة الدول والتهيئة الكاملة — للمشرف العام فقط. */
