@@ -162,12 +162,13 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
   إغلاق: v54 repair + provision — journal_types قبل GL؛ orange_country_remap_journal_type_id_for_target() عند النسخ.
 
 [GAP-03] متوسط — admin/pages/storefront_hero.php بلا country_id
-  حالة: [معلّق]
+  حالة: [منتهٍ]
   المشكلة:
   - SELECT من storefront_copy_lines WHERE scope فقط — يخلط صفوف كل الدول.
   - ?edit=id بدون تحقق country_id.
   الملفات: admin/pages/storefront_hero.php
   معيار الإغلاق: نفس منطق admin/api/settings/storefront_copy_lines.php + orange_admin_settings_effective_country_id().
+  إغلاق: list/edit scoped بـ country_id؛ تلميح سياق الدولة في الشاشة؛ API كان scoped مسبقاً.
 
 [GAP-04] متوسط — purchase_gl_accounts بلا country_id صريح للمشتريات
   حالة: [معلّق]
@@ -214,12 +215,11 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
 ج — توصيات الأولوية (ترتيب التنفيذ للمالك)
 ----------------------------------------------------------------------
 
-1. GAP-03 — storefront_hero.php أدمن
-2. GAP-04 — purchases GL country_id
-3. GAP-05 + GAP-06 — fiscal fallback + opening balances
-4. GAP-07 — قرار سياسة + تنفيذ merge phone
-5. GAP-08 — legacy migrate (إن وُجدت حاجة)
-6. GAP-09 — تدقيق مستمر
+1. GAP-04 — purchases GL country_id
+2. GAP-05 + GAP-06 — fiscal fallback + opening balances
+3. GAP-07 — قرار سياسة + تنفيذ merge phone
+4. GAP-08 — legacy migrate (إن وُجدت حاجة)
+5. GAP-09 — تدقيق مستمر
 
 ----------------------------------------------------------------------
 د — سجل إغلاق (يُملأ عند إنهاء كل بند)
@@ -227,3 +227,4 @@ Last updated: 2026-05-20 (مراجعة ثغرات post-v52 + قائمة تنفي
 
 [2026-05-20] GAP-01 — v53 orange_gl_journal_type_rules per country؛ gl-accounts scoped save؛ gl_settings filtered reads/posting؛ country_provision copy rules (remap journal_type by code).
 [2026-05-20] GAP-02 — v54 repair gl_account_settings journal_type_id؛ provision journal_types قبل GL + remap by code.
+[2026-05-20] GAP-03 — storefront_hero.php list/edit scoped بـ country_id + تلميح سياق الدولة.

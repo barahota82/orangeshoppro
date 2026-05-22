@@ -3,24 +3,50 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/admin_settings_country.php';
+require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/storefront_hero.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 $hasTable = orange_table_exists($pdo, 'storefront_copy_lines');
+$ctxCountryId = orange_admin_settings_effective_country_id($pdo);
+$copyScoped = orange_storefront_copy_has_country_column($pdo);
+$ctxCountryRow = orange_country_row_by_id($pdo, $ctxCountryId, false);
+$ctxCountryLabel = trim((string) ($ctxCountryRow['name_ar'] ?? ''));
+if ($ctxCountryLabel === '' && $ctxCountryRow !== null) {
+    $ctxCountryLabel = trim((string) ($ctxCountryRow['name_en'] ?? ''));
+}
+if ($ctxCountryLabel === '') {
+    $ctxCountryLabel = orange_countries_display_code(orange_admin_context_country_code($pdo));
+}
 
 /** @var list<array<string, mixed>> $heroLines */
 $heroLines = [];
 /** @var list<array<string, mixed>> $headerLines */
 $headerLines = [];
 if ($hasTable) {
-    $qh = $pdo->query(
-        "SELECT * FROM storefront_copy_lines WHERE scope = 'home_hero' ORDER BY sort_order ASC, id ASC"
-    );
-    $heroLines = $qh ? ($qh->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
-    $qt = $pdo->query(
-        "SELECT * FROM storefront_copy_lines WHERE scope = 'header_tagline' ORDER BY sort_order ASC, id ASC"
-    );
-    $headerLines = $qt ? ($qt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+    if ($copyScoped && $ctxCountryId > 0) {
+        $qh = $pdo->prepare(
+            "SELECT * FROM storefront_copy_lines WHERE country_id = ? AND scope = 'home_hero' ORDER BY sort_order ASC, id ASC"
+        );
+        $qh->execute([$ctxCountryId]);
+        $heroLines = $qh->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $qt = $pdo->prepare(
+            "SELECT * FROM storefront_copy_lines WHERE country_id = ? AND scope = 'header_tagline' ORDER BY sort_order ASC, id ASC"
+        );
+        $qt->execute([$ctxCountryId]);
+        $headerLines = $qt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } else {
+        $qh = $pdo->query(
+            "SELECT * FROM storefront_copy_lines WHERE scope = 'home_hero' ORDER BY sort_order ASC, id ASC"
+        );
+        $heroLines = $qh ? ($qh->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+        $qt = $pdo->query(
+            "SELECT * FROM storefront_copy_lines WHERE scope = 'header_tagline' ORDER BY sort_order ASC, id ASC"
+        );
+        $headerLines = $qt ? ($qt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+    }
 }
 
 $editId = isset($_GET['edit']) ? (int) $_GET['edit'] : 0;
@@ -29,8 +55,13 @@ $heroEdit = null;
 /** @var array<string, mixed>|null $headerEdit */
 $headerEdit = null;
 if ($editId > 0 && $hasTable) {
-    $st = $pdo->prepare('SELECT * FROM storefront_copy_lines WHERE id = ? LIMIT 1');
-    $st->execute([$editId]);
+    if ($copyScoped && $ctxCountryId > 0) {
+        $st = $pdo->prepare('SELECT * FROM storefront_copy_lines WHERE id = ? AND country_id = ? LIMIT 1');
+        $st->execute([$editId, $ctxCountryId]);
+    } else {
+        $st = $pdo->prepare('SELECT * FROM storefront_copy_lines WHERE id = ? LIMIT 1');
+        $st->execute([$editId]);
+    }
     $er = $st->fetch(PDO::FETCH_ASSOC);
     if (is_array($er)) {
         if (($er['scope'] ?? '') === 'home_hero') {
@@ -43,12 +74,13 @@ if ($editId > 0 && $hasTable) {
 
 $heroEditActive = $heroEdit ? (int) ($heroEdit['is_active'] ?? 1) : 1;
 $headerEditActive = $headerEdit ? (int) ($headerEdit['is_active'] ?? 1) : 1;
-
-require_once __DIR__ . '/../../includes/storefront_hero.php';
 ?>
 <div class="page-title page-title--stacked">
     <h1>بانر الصفحة الرئيسية</h1>
     <p class="page-subtitle">أضف جمل الـ hero والتناوب تحت الشعار في الهيدر: جدول في الأسفل، تعديل، حذف، وإخفاء/تفعيل. <strong>ترتيب العرض</strong> يُضبط تلقائياً عند الإضافة؛ لإعادة الترتيب استخدم «أعلى / أسفل» في الجدول. جمل <strong>الـ hero</strong> تظهر للزائر حسب <strong>لغة واجهته</strong>؛ جمل <strong>الهيدر</strong> تتناوب للجميع بترتيب اللغات في كل صف: عربي ثم إنجليزي ثم فلبيني ثم هندي (الحقول الفارغة تُستبعد من الدورة).</p>
+    <?php if ($copyScoped && $ctxCountryId > 0): ?>
+    <p class="card-hint" style="margin:0.35rem 0 0;">سياق الدولة: <strong><?php echo htmlspecialchars($ctxCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong> — الجمل المعروضة والمحفوظة لهذه الدولة فقط.</p>
+    <?php endif; ?>
 </div>
 
 <?php if (!$hasTable): ?>
