@@ -157,14 +157,11 @@ try {
 }
 
 $pr2GlAccounts = [];
-$glAccStmt = $pdo->query('SELECT id, code, name FROM accounts ORDER BY code ASC');
-if ($glAccStmt) {
-    while ($r = $glAccStmt->fetch(PDO::FETCH_ASSOC)) {
-        $pr2GlAccounts[(int) $r['id']] = [
-            'code' => (string) ($r['code'] ?? ''),
-            'name' => (string) ($r['name'] ?? ''),
-        ];
-    }
+foreach (orange_accounts_fetch($pdo, 'SELECT a.id, a.code, a.name FROM accounts a WHERE 1=1 ORDER BY a.code ASC', [], 'a') as $r) {
+    $pr2GlAccounts[(int) $r['id']] = [
+        'code' => (string) ($r['code'] ?? ''),
+        'name' => (string) ($r['name'] ?? ''),
+    ];
 }
 
 $prefillSupplierId = 0;

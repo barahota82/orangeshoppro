@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/date_format.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -52,12 +53,7 @@ asort($typeLabels, SORT_STRING);
 
 $jvrPostingLeafCt = 0;
 if (orange_journal_vouchers_ready($pdo)) {
-    $jvrLw = orange_accounts_posting_leaf_where_sql($pdo, 'a');
-    try {
-        $jvrPostingLeafCt = (int) $pdo->query("SELECT COUNT(*) FROM accounts a WHERE $jvrLw")->fetchColumn();
-    } catch (Throwable $e) {
-        $jvrPostingLeafCt = 0;
-    }
+    $jvrPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
 }
 
 $vouchers = [];
@@ -66,15 +62,25 @@ $accMap = [];
 
 if (orange_journal_vouchers_ready($pdo)) {
     $hasGrp = orange_table_has_column($pdo, 'accounts', 'is_group');
-    $accCols = $hasGrp ? 'id, name, code, is_group' : 'id, name, code';
-    $accounts = $pdo->query('SELECT ' . $accCols . ' FROM accounts ORDER BY COALESCE(code, \'\'), name')->fetchAll(PDO::FETCH_ASSOC);
+    $accCols = $hasGrp ? 'a.id, a.name, a.code, a.is_group' : 'a.id, a.name, a.code';
+    $accounts = orange_accounts_fetch(
+        $pdo,
+        'SELECT ' . $accCols . ' FROM accounts a WHERE 1=1 ORDER BY COALESCE(a.code, \'\'), a.name',
+        [],
+        'a'
+    );
     foreach ($accounts as $a) {
         $accMap[(int) $a['id']] = trim((string) ($a['code'] ?? '')) !== '' ? $a['code'] . ' — ' . $a['name'] : $a['name'];
     }
 
-    $sql = 'SELECT * FROM journal_vouchers
-            WHERE DATE(voucher_date) >= ? AND DATE(voucher_date) <= ?';
+    $jvCountryBind = orange_gl_voucher_country_bind($pdo, 'jv');
+    $sql = 'SELECT * FROM journal_vouchers jv
+            WHERE DATE(jv.voucher_date) >= ? AND DATE(jv.voucher_date) <= ?';
     $params = [$dateFrom, $dateTo];
+    $sql .= $jvCountryBind['sql'];
+    foreach ($jvCountryBind['params'] as $cp) {
+        $params[] = $cp;
+    }
     if ($entryTypeFilter !== '') {
         $sql .= ' AND entry_type = ?';
         $params[] = $entryTypeFilter;

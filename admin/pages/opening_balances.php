@@ -150,12 +150,7 @@ $obNumberDisplay = $obVid > 0 ? $obVid : $obNumberPreview;
 $obAdminIndexUrl = storefront_public_path('/admin/index.php');
 
 $obLeafWhere = orange_accounts_posting_leaf_where_sql($pdo, 'a');
-$obPostingLeafCt = 0;
-try {
-    $obPostingLeafCt = (int) $pdo->query("SELECT COUNT(*) FROM accounts a WHERE $obLeafWhere")->fetchColumn();
-} catch (Throwable $e) {
-    $obPostingLeafCt = 0;
-}
+$obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
 
 ?>
 <div class="page-title page-title--stacked jv-print-hide">

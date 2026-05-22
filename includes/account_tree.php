@@ -432,6 +432,47 @@ function orange_accounts_flat(PDO $pdo): array
 }
 
 /**
+ * استعلام accounts مع فلتر country_id من سياق الأدمن.
+ *
+ * @param list<mixed> $params
+ * @return list<array<string, mixed>>
+ */
+function orange_accounts_fetch(PDO $pdo, string $sqlWithWhere, array $params = [], string $alias = 'a', ?int $countryId = null): array
+{
+    $filter = orange_accounts_sql_country_filter($pdo, $alias, $countryId);
+    if ($filter !== null) {
+        $sqlWithWhere .= $filter['sql'];
+        $params = array_merge($params, $filter['params']);
+    }
+    if ($params === []) {
+        return $pdo->query($sqlWithWhere)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+    $st = $pdo->prepare($sqlWithWhere);
+    $st->execute($params);
+
+    return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+function orange_accounts_count_posting_leaves(PDO $pdo, ?int $countryId = null): int
+{
+    $lw = orange_accounts_posting_leaf_where_sql($pdo, 'a');
+    $sql = "SELECT COUNT(*) FROM accounts a WHERE $lw";
+    $params = [];
+    $filter = orange_accounts_sql_country_filter($pdo, 'a', $countryId);
+    if ($filter !== null) {
+        $sql .= $filter['sql'];
+        $params = $filter['params'];
+    }
+    if ($params === []) {
+        return (int) $pdo->query($sql)->fetchColumn();
+    }
+    $st = $pdo->prepare($sql);
+    $st->execute($params);
+
+    return (int) $st->fetchColumn();
+}
+
+/**
  * @param list<array<string, mixed>> $flat
  * @return list<array<string, mixed>>
  */

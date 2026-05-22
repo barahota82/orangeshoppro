@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../includes/accounting_report_mapping.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/date_format.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -126,9 +127,12 @@ $monthList = $iterateYmRange($periodYmFrom, $periodYmTo);
 $showZeros = isset($_GET['show_zeros']) && (string) $_GET['show_zeros'] === '1';
 
 $leafWhere = orange_accounts_posting_leaf_where_sql($pdo, 'a');
-$accountsLeaf = $pdo->query(
-    "SELECT a.id, a.name, a.code FROM accounts a WHERE $leafWhere ORDER BY COALESCE(a.code, ''), a.name"
-)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+$accountsLeaf = orange_accounts_fetch(
+    $pdo,
+    "SELECT a.id, a.name, a.code FROM accounts a WHERE $leafWhere ORDER BY COALESCE(a.code, ''), a.name",
+    [],
+    'a'
+);
 
 $leafIdsPl = [];
 foreach ($accountsLeaf as $al) {

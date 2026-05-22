@@ -8,26 +8,22 @@ require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/accounting_report_mapping.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/date_format.php';
+require_once __DIR__ . '/../../includes/account_tree.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
 $years = orange_fiscal_years_list($pdo);
 
-$accounts = $pdo->query('SELECT id FROM accounts ORDER BY COALESCE(code, \'\'), name')->fetchAll(PDO::FETCH_ASSOC);
+$accounts = orange_accounts_fetch($pdo, 'SELECT a.id FROM accounts a WHERE 1=1 ORDER BY COALESCE(a.code, \'\'), a.name', [], 'a');
 $ids = [];
 foreach ($accounts as $a) {
     $ids[] = (int) ($a['id'] ?? 0);
 }
 $mapById = orange_accounts_report_mapping_by_ids($pdo, $ids);
 
-$leafWhereCmp = orange_accounts_posting_leaf_where_sql($pdo, 'a');
-$cmpPostingLeafCt = 0;
-try {
-    $cmpPostingLeafCt = (int) $pdo->query("SELECT COUNT(*) FROM accounts a WHERE $leafWhereCmp")->fetchColumn();
-} catch (Throwable $e) {
-    $cmpPostingLeafCt = 0;
-}
+$cmpPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
 
 $useVouchers = orange_journal_vouchers_ready($pdo);
 

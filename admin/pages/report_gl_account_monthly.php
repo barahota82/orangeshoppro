@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/date_format.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -14,9 +15,12 @@ orange_catalog_ensure_schema($pdo);
 $accountId = isset($_GET['account']) ? (int) $_GET['account'] : 0;
 
 $leafWhere = orange_accounts_posting_leaf_where_sql($pdo, 'a');
-$accounts = $pdo->query(
-    "SELECT a.id, a.name, a.code FROM accounts a WHERE $leafWhere ORDER BY COALESCE(a.code, ''), a.name"
-)->fetchAll(PDO::FETCH_ASSOC);
+$accounts = orange_accounts_fetch(
+    $pdo,
+    "SELECT a.id, a.name, a.code FROM accounts a WHERE $leafWhere ORDER BY COALESCE(a.code, ''), a.name",
+    [],
+    'a'
+);
 
 $accLabel = '';
 $accCodeDisp = '';

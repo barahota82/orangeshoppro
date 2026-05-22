@@ -7,36 +7,57 @@ require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/journal_types.php';
+require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/country_provision.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 orange_catalog_ensure_gl_account_settings_alloc_tables($pdo);
 
+$glCountryId = orange_gl_settings_effective_country_id($pdo);
+$glCountryRow = orange_country_row_by_id($pdo, $glCountryId, false);
+$glCountryLabel = trim((string) ($glCountryRow['name_ar'] ?? ''));
+if ($glCountryLabel === '' && $glCountryRow !== null) {
+    $glCountryLabel = trim((string) ($glCountryRow['name_en'] ?? ''));
+}
+if ($glCountryLabel === '') {
+    $glCountryLabel = orange_countries_display_code(orange_admin_context_country_code($pdo));
+}
+$glProvStatus = orange_country_provision_status($pdo, $glCountryId);
+$glCountryNeedsProvision = (int) ($glProvStatus['accounts_count'] ?? 0) === 0
+    && (int) ($glProvStatus['gl_settings_count'] ?? 0) === 0;
+
 $glSetPostingLeafCt = 0;
 if (orange_journal_vouchers_ready($pdo)) {
-    $glSetLw = orange_accounts_posting_leaf_where_sql($pdo, 'a');
-    try {
-        $glSetPostingLeafCt = (int) $pdo->query("SELECT COUNT(*) FROM accounts a WHERE $glSetLw")->fetchColumn();
-    } catch (Throwable $e) {
-        $glSetPostingLeafCt = 0;
-    }
+    $glSetPostingLeafCt = orange_accounts_count_posting_leaves($pdo, $glCountryId);
 }
 
-$accountsRows = $pdo->query(
-    'SELECT id, name, code FROM accounts ORDER BY COALESCE(code, \'\'), name ASC'
-)->fetchAll(PDO::FETCH_ASSOC);
+$accountsRows = orange_accounts_fetch(
+    $pdo,
+    'SELECT a.id, a.name, a.code FROM accounts a WHERE 1=1',
+    [],
+    'a',
+    $glCountryId
+);
+$accountsRows = array_values(array_filter($accountsRows, static function (array $a): bool {
+    return trim((string) ($a['name'] ?? '')) !== '' || trim((string) ($a['code'] ?? '')) !== '';
+}));
+usort($accountsRows, static function (array $a, array $b): int {
+    $ca = (string) ($a['code'] ?? '');
+    $cb = (string) ($b['code'] ?? '');
+    $cmp = strcmp($ca, $cb);
+    if ($cmp !== 0) {
+        return $cmp;
+    }
+
+    return strcmp((string) ($a['name'] ?? ''), (string) ($b['name'] ?? ''));
+});
 $byId = [];
 foreach ($accountsRows as $a) {
     $byId[(int) $a['id']] = $a;
 }
 
-$current = [];
-if (orange_table_exists($pdo, 'orange_gl_account_settings')) {
-    $rows = $pdo->query('SELECT setting_key, account_id FROM orange_gl_account_settings')->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($rows as $r) {
-        $current[(string) $r['setting_key']] = (int) $r['account_id'];
-    }
-}
+$current = orange_gl_settings_bindings_map($pdo, $glCountryId);
 
 $journalTypesList = orange_journal_types_list($pdo);
 $rowTitles = orange_gl_setting_row_short_labels();
@@ -76,7 +97,18 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
 ?>
 <div class="page-title">
     <h1>حسابات القيود التلقائية</h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;">سياق الدولة: <strong><?php echo htmlspecialchars($glCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong> — الربط والدليل المعروضان لهذه الدولة فقط.</p>
 </div>
+
+<?php if ($glCountryNeedsProvision): ?>
+<div class="card" style="border:1px solid #93c5fd;background:#eff6ff;margin-bottom:12px;">
+    <p class="card-hint" style="margin:0;line-height:1.55;">
+        <strong>دولة جديدة:</strong> لم يُنسَخ بعد دليل الحسابات وربط القيود التلقائية لـ <?php echo htmlspecialchars($glCountryLabel, ENT_QUOTES, 'UTF-8'); ?>.
+        من <a href="<?php echo htmlspecialchars(orange_admin_public_href_with_country('/admin/index.php?page=countries', orange_admin_context_country_code($pdo)), ENT_QUOTES, 'UTF-8'); ?>">الدول</a>
+        شغّل <strong>إنشاء كامل</strong> (ينسخ المخزن، القنوات، الكتalog، الدليل، وربط GL من الكويت كنقطة بداية) ثم عدّل ما يلزم.
+    </p>
+</div>
+<?php endif; ?>
 
 <?php if (orange_journal_vouchers_ready($pdo) && $glSetPostingLeafCt === 0): ?>
 <div class="card" style="border:1px solid #fcd34d;background:#fffbeb;margin-bottom:12px;">

@@ -345,6 +345,34 @@ function orange_gl_journal_rule_dropdown_key_order(array $current): array
 }
 
 /**
+ * @return array<string, int> setting_key => account_id لسياق الدولة الحالي (أو المحددة)
+ */
+function orange_gl_settings_bindings_map(PDO $pdo, ?int $countryId = null): array
+{
+    orange_catalog_ensure_gl_account_settings_alloc_tables($pdo);
+    $current = [];
+    if (!orange_table_exists($pdo, 'orange_gl_account_settings')) {
+        return $current;
+    }
+    $cid = orange_gl_settings_effective_country_id($pdo, $countryId);
+    if ($cid > 0 && orange_table_has_column($pdo, 'orange_gl_account_settings', 'country_id')) {
+        $st = $pdo->prepare('SELECT setting_key, account_id FROM orange_gl_account_settings WHERE country_id = ?');
+        $st->execute([$cid]);
+    } else {
+        $st = $pdo->query('SELECT setting_key, account_id FROM orange_gl_account_settings');
+    }
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) ?: [] as $r) {
+        $key = trim((string) ($r['setting_key'] ?? ''));
+        if ($key === '') {
+            continue;
+        }
+        $current[$key] = (int) ($r['account_id'] ?? 0);
+    }
+
+    return $current;
+}
+
+/**
  * نسبة مئوية (0–100) مربوطة ببند إعداد — تُخزَّن في orange_gl_setting_alloc (مثل نسبة الاحتياطي من أرباح السنة الحالية).
  */
 function orange_gl_setting_alloc_percent(PDO $pdo, string $settingKey, ?int $countryId = null): float
