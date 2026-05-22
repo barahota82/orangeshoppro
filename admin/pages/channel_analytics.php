@@ -5,11 +5,12 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/currency.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
-
 $caCountryId = orange_admin_context_country_id($pdo);
+$caMoney = orange_admin_currency_context($pdo);
 $caOrdersCountrySql = orange_sql_country_and_fragment($pdo, 'orders', 'o', $caCountryId);
 $caChannelsCountrySql = orange_channels_has_country_column($pdo)
     ? orange_sql_country_and_fragment($pdo, 'channels', 'c', $caCountryId)
@@ -179,7 +180,7 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
                     <th>Slug</th>
                     <th>طلبات (كل الحالات)</th>
                     <th>طلبات مكتملة</th>
-                    <th>إيراد مكتمل (KD)</th>
+                    <th>إيراد مكتمل (<?php echo htmlspecialchars($caMoney['unit'], ENT_QUOTES, 'UTF-8'); ?>)</th>
                     <th>متوسط سلة مكتملة</th>
                     <th>أكثر منتج (كمية)</th>
                     <th>إيراد ذلك المنتج (تقريبي)</th>
@@ -202,7 +203,7 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
                     <td><code><?php echo htmlspecialchars((string) ($cr['slug'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
                     <td><?php echo (int) ($cr['cnt_all'] ?? 0); ?></td>
                     <td><?php echo (int) ($cr['cnt_completed'] ?? 0); ?></td>
-                    <td><?php echo number_format((float) ($cr['revenue_completed'] ?? 0), 3); ?></td>
+                    <td><?php echo number_format((float) ($cr['revenue_completed'] ?? 0), $caMoney['decimals']); ?></td>
                     <td><?php echo number_format((float) ($cr['_avg_basket'] ?? 0), 3); ?></td>
                     <td><?php
                     if ($top) {
@@ -212,7 +213,7 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
                         echo '—';
                     }
                     ?></td>
-                    <td><?php echo $top ? number_format($top['revenue_lines'], 3) : '—'; ?></td>
+                    <td><?php echo $top ? number_format($top['revenue_lines'], $caMoney['decimals']) : '—'; ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -230,7 +231,7 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
     <ul style="line-height:1.7;">
         <li>إجمالي الطلبات: <strong><?php echo (int) $orphan['cnt_all']; ?></strong></li>
         <li>مكتملة: <strong><?php echo (int) $orphan['cnt_completed']; ?></strong></li>
-        <li>إيراد مكتمل: <strong><?php echo number_format((float) $orphan['revenue_completed'], 3); ?> KD</strong></li>
+        <li>إيراد مكتمل: <strong><?php echo orange_format_money_for_context($caMoney, (float) $orphan['revenue_completed']); ?></strong></li>
     </ul>
     <p><a class="btn btn-secondary" href="<?php echo htmlspecialchars($ordersUrl, ENT_QUOTES, 'UTF-8'); ?>">الطلبات</a></p>
 </div>

@@ -4,9 +4,11 @@ require_once __DIR__ . '/../../includes/order_helpers.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/currency.php';
 
 $pdo = db();
 $adminCountryId = orange_admin_context_country_id($pdo);
+$ordersMoney = orange_admin_currency_context($pdo);
 $hasOrderInvoiceCol = orange_table_has_column($pdo, 'orders', 'invoice_number');
 $hasCartPromoDiscountCol = orange_table_has_column($pdo, 'orders', 'cart_promotion_discount');
 $hasCartComboDiscountCol = orange_table_has_column($pdo, 'orders', 'cart_combo_discount');
@@ -222,7 +224,7 @@ function orange_admin_orders_action_buttons(array $o): void
                     <td class="col-orders-phone"><?php echo htmlspecialchars((string)($o['phone'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo htmlspecialchars((string)($o['channel_name'] ?: '-'), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php
-                        echo number_format((float)($o['total'] ?? 0), 2) . ' KD';
+                        echo orange_format_money_for_context($ordersMoney, (float) ($o['total'] ?? 0));
                         if ($hasCartComboDiscountCol) {
                             $cd = (float)($o['cart_combo_discount'] ?? 0);
                             if ($cd > 0.00001) {

@@ -94,11 +94,72 @@ function orange_format_money_amount(float $amount, string $currencyCode, bool $w
 {
     $dec = orange_currency_decimals_for_code($currencyCode);
     $formatted = number_format($amount, $dec, '.', ',');
+
     if (!$withUnit) {
         return $formatted;
     }
 
     return $formatted . ' ' . orange_currency_display_unit($currencyCode);
+}
+
+/**
+ * @return array{code:string, unit:string, decimals:int}
+ */
+function orange_admin_currency_context(PDO $pdo): array
+{
+    $code = orange_admin_context_currency_code($pdo);
+
+    return [
+        'code' => $code,
+        'unit' => orange_currency_display_unit($code),
+        'decimals' => orange_currency_decimals_for_code($code),
+    ];
+}
+
+/**
+ * عملة مستند (طلب/فاتورة) من currency_code أو country_id ثم سياق الأدمن.
+ *
+ * @param array<string, mixed>|null $orderRow
+ * @return array{code:string, unit:string, decimals:int}
+ */
+function orange_order_currency_context(PDO $pdo, ?array $orderRow = null): array
+{
+    if (is_array($orderRow)) {
+        $fromOrder = strtoupper(trim((string) ($orderRow['currency_code'] ?? '')));
+        if ($fromOrder !== '' && preg_match('/^[A-Z]{3}$/', $fromOrder)) {
+            return [
+                'code' => $fromOrder,
+                'unit' => orange_currency_display_unit($fromOrder),
+                'decimals' => orange_currency_decimals_for_code($fromOrder),
+            ];
+        }
+        $cid = (int) ($orderRow['country_id'] ?? 0);
+        if ($cid > 0) {
+            $code = orange_country_functional_currency_code($pdo, $cid);
+
+            return [
+                'code' => $code,
+                'unit' => orange_currency_display_unit($code),
+                'decimals' => orange_currency_decimals_for_code($code),
+            ];
+        }
+    }
+
+    return orange_admin_currency_context($pdo);
+}
+
+/**
+ * @param array{code:string, unit:string, decimals:int} $ctx
+ */
+function orange_format_money_for_context(array $ctx, float $amount, bool $withUnit = true): string
+{
+    $formatted = number_format($amount, (int) $ctx['decimals'], '.', ',');
+
+    if (!$withUnit) {
+        return $formatted;
+    }
+
+    return $formatted . ' ' . (string) $ctx['unit'];
 }
 
 /**

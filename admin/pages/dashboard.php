@@ -6,12 +6,14 @@ require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/stock_alerts.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/order_intake_queue.php';
 require_once __DIR__ . '/../../includes/warehouses.php';
 
 /** @var array<string, mixed> $admin — من admin/index.php */
 $pdo = db();
 $dashCountryId = orange_admin_context_country_id($pdo);
+$dashMoney = orange_admin_currency_context($pdo);
 $dashOrdersSql = orange_sql_country_and_fragment($pdo, 'orders', 'orders', $dashCountryId);
 $dashOrdersAliasSql = orange_sql_country_and_fragment($pdo, 'orders', 'o', $dashCountryId);
 $dashProductsSql = orange_sql_country_and_fragment($pdo, 'products', 'p', $dashCountryId);
@@ -76,7 +78,7 @@ if ($intakeQueueVisible) {
     </div>
     <div class="card stat-card">
         <h3>مبيعات اليوم</h3>
-        <div class="value"><?php echo number_format($salesToday, 2); ?> KD</div>
+        <div class="value"><?php echo orange_format_money_for_context($dashMoney, $salesToday); ?></div>
     </div>
     <div class="card stat-card">
         <h3>طلبات قيد الانتظار</h3>

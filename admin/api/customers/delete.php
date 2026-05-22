@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/currency.php';
 require_admin_api();
 
 /**
@@ -41,10 +42,11 @@ try {
 
     // 1) فحص رصيد الذمة.
     $balance = orange_party_balance_customer($pdo, $idIn);
+    $custMoney = orange_admin_currency_context($pdo);
     if (abs((float) $balance) > 0.001) {
         json_response([
             'success' => false,
-            'message' => 'لا يمكن الحذف: العميل عليه رصيد ذمة (' . number_format((float) $balance, 3) . ' KD). سوّ الحساب أولاً.',
+            'message' => 'لا يمكن الحذف: العميل عليه رصيد ذمة (' . orange_format_money_for_context($custMoney, (float) $balance) . '). سوّ الحساب أولاً.',
         ], 409);
     }
 

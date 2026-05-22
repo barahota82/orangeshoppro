@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/currency.php';
 require_once __DIR__ . '/../../../includes/company_settings.php';
 
 require_admin_page();
@@ -42,6 +43,7 @@ try {
 $companyName = orange_company_settings_name_ar($pdo);
 
 $balance = orange_party_balance_customer($pdo, $customerId);
+$custMoney = orange_admin_currency_context($pdo);
 $daName = '';
 if (orange_table_has_column($pdo, 'customers', 'delivery_area_id') && (int) ($row['delivery_area_id'] ?? 0) > 0) {
     $daSt = $pdo->prepare('SELECT name_ar, name_en FROM delivery_areas WHERE id = ? LIMIT 1');
@@ -148,9 +150,9 @@ h2 { font-size: 1rem; margin: 16px 0 6px; }
         <div class="k">العنوان</div>
         <div class="v"><?php echo htmlspecialchars((string) ($row['address'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></div>
         <div class="k">حد الائتمان</div>
-        <div class="v ltr"><?php echo isset($row['credit_limit']) && $row['credit_limit'] !== null && (float) $row['credit_limit'] > 0 ? number_format((float) $row['credit_limit'], 3) . ' KD' : '—'; ?></div>
+        <div class="v ltr"><?php echo isset($row['credit_limit']) && $row['credit_limit'] !== null && (float) $row['credit_limit'] > 0 ? orange_format_money_for_context($custMoney, (float) $row['credit_limit']) : '—'; ?></div>
         <div class="k">رصيد الذمة (مدين)</div>
-        <div class="v ltr"><?php echo number_format((float) $balance, 3) . ' KD'; ?></div>
+        <div class="v ltr"><?php echo orange_format_money_for_context($custMoney, (float) $balance); ?></div>
     </div>
 </div>
 

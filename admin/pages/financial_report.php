@@ -11,9 +11,11 @@ require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/financial_report_breakdown.php';
 require_once __DIR__ . '/../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/currency.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+$frMoney = orange_admin_currency_context($pdo);
 
 $frCountryBind = orange_gl_voucher_country_bind($pdo, 'jv');
 
@@ -391,7 +393,7 @@ window.addEventListener('load', function () {
         <div class="stat-card"><h3>إجمالي الإيرادات (طبيعة دائنة)</h3><div class="value"><?php echo number_format($plRevenue, 2); ?></div></div>
         <div class="stat-card"><h3>إجمالي المصروفات والتكلفة</h3><div class="value"><?php echo number_format($plExpense, 2); ?></div></div>
     </div>
-    <p id="report-net-result" style="scroll-margin-top:92px;margin:14px 0 0;font-size:1.1rem;"><strong>أرباح وخسائر (صافي الدخل):</strong> <?php echo number_format($netIncome, 2); ?> KD</p>
+    <p id="report-net-result" style="scroll-margin-top:92px;margin:14px 0 0;font-size:1.1rem;"><strong>أرباح وخسائر (صافي الدخل):</strong> <?php echo orange_format_money_for_context($frMoney, $netIncome); ?></p>
     <?php if ($useVouchers && $fyId > 0 && $registeredExpenses !== []): ?>
         <h4 class="card-title" style="margin-top:18px;font-size:1rem;">تفصيل المصروفات المسجّلة (بالبند)</h4>
         <div class="table-wrap">

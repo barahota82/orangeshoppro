@@ -6,11 +6,13 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
 require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/currency.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
 $adminCountryId = orange_admin_context_country_id($pdo);
+$prodMoney = orange_admin_currency_context($pdo);
 $productsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $adminCountryId);
 
 $catalogNavUnified = orange_catalog_nav_use_unified($pdo);
@@ -891,6 +893,7 @@ $orangeAdminSfProductUrlPartsForJs = [
 
 <script>
 window.ORANGE_PUBLIC_BASE_PATH = <?php echo json_encode(PUBLIC_BASE_PATH === '' ? '' : rtrim(PUBLIC_BASE_PATH, '/'), JSON_UNESCAPED_UNICODE); ?>;
+window.ORANGE_ADMIN_CURRENCY_UNIT = <?php echo json_encode($prodMoney['unit'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_COLORS = <?php echo json_encode($colors, JSON_UNESCAPED_UNICODE); ?>;
 window.ORANGE_PATTERNS = <?php echo json_encode($patterns, JSON_UNESCAPED_UNICODE); ?>;
 window.ORANGE_FAMILIES = <?php echo json_encode($familiesOut, JSON_UNESCAPED_UNICODE); ?>;
@@ -1994,7 +1997,13 @@ function orangeAdminProductCardPreviewPriceFormatted() {
     const raw = pEl ? String(pEl.value || '').trim().replace(',', '.') : '';
     const n = parseFloat(raw);
     const v = Number.isFinite(n) && n >= 0 ? n : 0;
-    return v.toFixed(2) + ' KD';
+    const unit = (typeof window.ORANGE_ADMIN_CURRENCY_UNIT === 'string' && window.ORANGE_ADMIN_CURRENCY_UNIT !== '')
+        ? window.ORANGE_ADMIN_CURRENCY_UNIT
+        : ((window.OrangeMoney && typeof window.OrangeMoney.currencyUnit === 'function') ? window.OrangeMoney.currencyUnit() : 'KD');
+    if (window.OrangeMoney && typeof window.OrangeMoney.formatAmount === 'function') {
+        return window.OrangeMoney.formatAmount(v) + ' ' + unit;
+    }
+    return v.toFixed(2) + ' ' + unit;
 }
 
 function orangeAdminPreviewMode() {
@@ -2379,8 +2388,9 @@ function orangeRefreshProductCardPreview() {
             '</section>';
     } else if (mode === 'flow') {
         shellClass = 'admin-preview-mode-flow';
-        const filler1 = orangeAdminPreviewCardArticleHtml(adminEscHtml('منتج مشابه A'), adminEscHtml('9.90 KD'), '<div class="product-image-wrap" style="min-height:220px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;">صورة</div>', '', viewLbl);
-        const filler2 = orangeAdminPreviewCardArticleHtml(adminEscHtml('منتج مشابه B'), adminEscHtml('7.50 KD'), '<div class="product-image-wrap" style="min-height:220px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;">صورة</div>', '', viewLbl);
+        const previewUnit = (typeof window.ORANGE_ADMIN_CURRENCY_UNIT === 'string' && window.ORANGE_ADMIN_CURRENCY_UNIT !== '') ? window.ORANGE_ADMIN_CURRENCY_UNIT : 'KD';
+        const filler1 = orangeAdminPreviewCardArticleHtml(adminEscHtml('منتج مشابه A'), adminEscHtml('9.90 ' + previewUnit), '<div class="product-image-wrap" style="min-height:220px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;">صورة</div>', '', viewLbl);
+        const filler2 = orangeAdminPreviewCardArticleHtml(adminEscHtml('منتج مشابه B'), adminEscHtml('7.50 ' + previewUnit), '<div class="product-image-wrap" style="min-height:220px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;">صورة</div>', '', viewLbl);
         contentHtml =
             '<section class="admin-preview-section">' +
                 '<h3 class="admin-preview-heading">1) محاكاة صفحة القوائم (الكروت)</h3>' +

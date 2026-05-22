@@ -5,6 +5,8 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/document_sequences.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
+require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/currency.php';
 
 /**
  * @param array<string, mixed> $order
@@ -171,6 +173,12 @@ if ($order && orange_table_has_column($pdo, 'orders', 'amount_paid')) {
     $amountPaidVal = max(0.0, (float) ($order['amount_paid'] ?? 0));
 }
 $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 0.0;
+$invMoney = orange_order_currency_context($pdo, is_array($order) ? $order : null);
+$invCurUnit = (string) $invMoney['unit'];
+$invCurDec = (int) $invMoney['decimals'];
+$invFmt = static function (float $amount, bool $withUnit = true) use ($invMoney): string {
+    return orange_format_money_for_context($invMoney, $amount, $withUnit);
+};
 ?>
 <div class="admin-fy-shell invoice-admin-shell" dir="rtl">
     <h1 class="admin-fy-shell__title">فاتورة أونلاين</h1>
@@ -409,7 +417,7 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
                     ?></td>
                     <td><?php echo htmlspecialchars((string)$r['customer_name'], ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo htmlspecialchars(orange_order_payment_terms_label_ar($r['payment_terms'] ?? 'cash'), ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo number_format((float)$r['total'], 2); ?> KD</td>
+                    <td><?php echo $invFmt((float) $r['total']); ?></td>
                     <td><?php
                         $rst = strtolower(trim((string) ($r['status'] ?? '')));
                         echo htmlspecialchars($orderStatusAr[$rst] ?? (string) ($r['status'] ?? ''), ENT_QUOTES, 'UTF-8');
@@ -581,11 +589,11 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
                 if ($cartPromoDisc > 0.00001) {
                     echo ' − عرض السلة ' . number_format($cartPromoDisc, 2);
                 }
-                echo ' = ' . number_format($linesExpectedNet, 2) . ' KD — ';
+                echo ' = ' . $invFmt($linesExpectedNet) . ' — ';
             } else {
-                echo 'صافي البنود ' . number_format($linesSubtotal, 2) . ' KD — ';
+                echo 'صافي البنود ' . $invFmt($linesSubtotal) . ' — ';
             }
-            ?>لا يطابق إجمالي الطلب المحفوظ (<?php echo number_format($orderTotalVal, 2); ?> KD). راجع الطلب أو الخصومات.</div>
+            ?>لا يطابق إجمالي الطلب المحفوظ (<?php echo $invFmt($orderTotalVal); ?>). راجع الطلب أو الخصومات.</div>
         <?php endif; ?>
 
         <table class="invoice-table">
@@ -614,9 +622,9 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
                         <td><?php echo htmlspecialchars((string)($row['color'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars((string)($row['size'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td class="num"><?php echo (int)$row['qty']; ?></td>
-                        <td class="num"><?php echo number_format((float)$row['price'], 3); ?> KD</td>
-                        <td class="num"><?php echo $disc > 0.0001 ? number_format($disc, 3) . ' KD' : '—'; ?></td>
-                        <td class="num"><?php echo number_format($lineNet, 3); ?> KD</td>
+                        <td class="num"><?php echo $invFmt((float) $row['price']); ?></td>
+                        <td class="num"><?php echo $disc > 0.0001 ? $invFmt($disc) : '—'; ?></td>
+                        <td class="num"><?php echo $invFmt($lineNet); ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -626,32 +634,32 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
             <div class="invoice-totals-inner">
                 <div class="invoice-totals-row">
                     <span>صافي البنود</span>
-                    <span><?php echo number_format($linesSubtotal, 3); ?> KD</span>
+                    <span><?php echo $invFmt($linesSubtotal); ?></span>
                 </div>
                 <?php if ($cartComboDisc > 0.00001): ?>
                 <div class="invoice-totals-row invoice-totals-row--cart-promo">
                     <span>خصم كومبو</span>
-                    <span>−<?php echo number_format($cartComboDisc, 3); ?> KD</span>
+                    <span>−<?php echo $invFmt($cartComboDisc); ?></span>
                 </div>
                 <?php endif; ?>
                 <?php if ($cartPromoDisc > 0.00001): ?>
                 <div class="invoice-totals-row invoice-totals-row--cart-promo">
                     <span>خصم عرض السلة</span>
-                    <span>−<?php echo number_format($cartPromoDisc, 3); ?> KD</span>
+                    <span>−<?php echo $invFmt($cartPromoDisc); ?></span>
                 </div>
                 <?php endif; ?>
                 <div class="invoice-totals-row grand">
                     <span>إجمالي الفاتورة</span>
-                    <span><?php echo number_format($orderTotalVal, 3); ?> KD</span>
+                    <span><?php echo $invFmt($orderTotalVal); ?></span>
                 </div>
                 <?php if (orange_table_has_column($pdo, 'orders', 'amount_paid')): ?>
                 <div class="invoice-totals-row">
                     <span>مدفوع</span>
-                    <span><?php echo number_format($amountPaidVal, 3); ?> KD</span>
+                    <span><?php echo $invFmt($amountPaidVal); ?></span>
                 </div>
                 <div class="invoice-totals-row grand" style="border-top:1px dashed #cbd5e1;margin-top:0.35rem;padding-top:0.45rem;">
                     <span>الباقي</span>
-                    <span><?php echo number_format($balanceDueVal, 3); ?> KD</span>
+                    <span><?php echo $invFmt($balanceDueVal); ?></span>
                 </div>
                 <?php endif; ?>
             </div>
@@ -662,16 +670,17 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
             <h3>تحديث المدفوع</h3>
             <p style="margin:0;font-size:0.85rem;color:#64748b;">لتسجيل ما دفعه العميل (لا يغيّر إجمالي الفاتورة).</p>
             <div class="row-pay">
-                <label for="inv_amount_paid_inp" style="font-weight:600;">مدفوع (KD)</label>
+                <label for="inv_amount_paid_inp" style="font-weight:600;">مدفوع (<?php echo htmlspecialchars($invCurUnit, ENT_QUOTES, 'UTF-8'); ?>)</label>
                 <input type="number" id="inv_amount_paid_inp" step="0.001" min="0" lang="en" dir="ltr"
                     value="<?php echo htmlspecialchars((string) $amountPaidVal, ENT_QUOTES, 'UTF-8'); ?>">
                 <button type="button" class="btn-secondary" onclick="invSaveAmountPaid()">حفظ</button>
             </div>
-            <p class="card-hint" style="margin:8px 0 0;font-size:0.82rem;">الباقي بعد التعديل: <strong id="inv_balance_live"><?php echo number_format($balanceDueVal, 3); ?></strong> KD</p>
+            <p class="card-hint" style="margin:8px 0 0;font-size:0.82rem;">الباقي بعد التعديل: <strong id="inv_balance_live"><?php echo orange_format_money_for_context($invMoney, $balanceDueVal, false); ?></strong> <?php echo htmlspecialchars($invCurUnit, ENT_QUOTES, 'UTF-8'); ?></p>
         </div>
         <script>
         (function () {
             var total = <?php echo json_encode($orderTotalVal); ?>;
+            var invDec = <?php echo (int) $invCurDec; ?>;
             var inp = document.getElementById('inv_amount_paid_inp');
             var live = document.getElementById('inv_balance_live');
             function syncLive() {
@@ -679,8 +688,9 @@ $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 
                 var p = parseFloat(String(inp.value || '0').replace(',', '.')) || 0;
                 if (p < 0) p = 0;
                 if (p > total) p = total;
-                var bal = Math.max(0, Math.round((total - p) * 1000) / 1000);
-                live.textContent = bal.toFixed(3);
+                var factor = Math.pow(10, invDec);
+                var bal = Math.max(0, Math.round((total - p) * factor) / factor);
+                live.textContent = bal.toFixed(invDec);
             }
             if (inp) {
                 inp.addEventListener('input', syncLive);
