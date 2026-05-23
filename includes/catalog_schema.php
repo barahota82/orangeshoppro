@@ -3066,6 +3066,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_document_currency_v56($pdo);
     orange_catalog_migrate_supplier_country_currency_v57($pdo);
     orange_catalog_migrate_journal_types_non_default_purge_v58($pdo);
+    orange_catalog_migrate_journal_types_country_scope_repair_v59($pdo);
     orange_catalog_migrate_legacy_storefront_copy_lines($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
@@ -4517,6 +4518,52 @@ function orange_catalog_migrate_department_countries_v51(PDO $pdo): void
 }
 
 /**
+ * يضمن عمود country_id على journal_types (آمن لإعادة التشغيل — يُستدعى من v52 و v59).
+ */
+function orange_catalog_ensure_journal_types_country_id_column(PDO $pdo): bool
+{
+    if (!orange_table_exists($pdo, 'journal_types')) {
+        return false;
+    }
+    if (orange_table_has_column($pdo, 'journal_types', 'country_id')) {
+        return true;
+    }
+
+    require_once __DIR__ . '/countries.php';
+    $kwId = orange_countries_default_id($pdo);
+
+    orange_catalog_safe_exec(
+        $pdo,
+        'ALTER TABLE journal_types ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
+    );
+    if ($kwId > 0) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'UPDATE journal_types SET country_id = ' . (int) $kwId . ' WHERE country_id IS NULL OR country_id = 0'
+        );
+    }
+    try {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE journal_types DROP INDEX uq_journal_types_code');
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] journal_types drop uq_journal_types_code: ' . $e->getMessage());
+        }
+    }
+    orange_catalog_safe_exec($pdo, 'ALTER TABLE journal_types MODIFY country_id INT UNSIGNED NOT NULL');
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE UNIQUE INDEX uq_journal_types_country_code ON journal_types (country_id, code)'
+    );
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE INDEX idx_journal_types_country_sort ON journal_types (country_id, sort_order)'
+    );
+    orange_schema_invalidate_column_check('journal_types', 'country_id');
+
+    return orange_table_has_column($pdo, 'journal_types', 'country_id');
+}
+
+/**
  * v52 — journal_types، fiscal_years، company_settings، storefront_copy_lines، merge_requests per country.
  */
 function orange_catalog_migrate_country_admin_settings_v52(PDO $pdo): void
@@ -4530,34 +4577,7 @@ function orange_catalog_migrate_country_admin_settings_v52(PDO $pdo): void
     require_once __DIR__ . '/countries.php';
     $kwId = orange_countries_default_id($pdo);
 
-    if (orange_table_exists($pdo, 'journal_types') && !orange_table_has_column($pdo, 'journal_types', 'country_id')) {
-        orange_catalog_safe_exec(
-            $pdo,
-            'ALTER TABLE journal_types ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER id'
-        );
-        if ($kwId > 0) {
-            orange_catalog_safe_exec(
-                $pdo,
-                'UPDATE journal_types SET country_id = ' . (int) $kwId . ' WHERE country_id IS NULL OR country_id = 0'
-            );
-        }
-        try {
-            orange_catalog_safe_exec($pdo, 'ALTER TABLE journal_types DROP INDEX uq_journal_types_code');
-        } catch (Throwable $e) {
-            if (function_exists('error_log')) {
-                error_log('[orange] v52 drop uq_journal_types_code: ' . $e->getMessage());
-            }
-        }
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE journal_types MODIFY country_id INT UNSIGNED NOT NULL');
-        orange_catalog_safe_exec(
-            $pdo,
-            'CREATE UNIQUE INDEX uq_journal_types_country_code ON journal_types (country_id, code)'
-        );
-        orange_catalog_safe_exec(
-            $pdo,
-            'CREATE INDEX idx_journal_types_country_sort ON journal_types (country_id, sort_order)'
-        );
-    }
+    orange_catalog_ensure_journal_types_country_id_column($pdo);
 
     if (orange_table_exists($pdo, 'fiscal_years') && !orange_table_has_column($pdo, 'fiscal_years', 'country_id')) {
         orange_catalog_safe_exec(
@@ -5026,8 +5046,18 @@ function orange_catalog_migrate_journal_types_non_default_purge_v58(PDO $pdo): v
         return;
     }
 
-    if (!orange_table_exists($pdo, 'journal_types')
-        || !orange_table_has_column($pdo, 'journal_types', 'country_id')) {
+    if (!orange_table_exists($pdo, 'journal_types')) {
+        orange_catalog_schema_insert_migration_marker($pdo, $marker);
+
+        return;
+    }
+
+    orange_catalog_ensure_journal_types_country_id_column($pdo);
+
+    if (!orange_table_has_column($pdo, 'journal_types', 'country_id')) {
+        if (function_exists('error_log')) {
+            error_log('[orange] v58 journal_types purge skipped: country_id column missing');
+        }
         orange_catalog_schema_insert_migration_marker($pdo, $marker);
 
         return;
@@ -5042,6 +5072,42 @@ function orange_catalog_migrate_journal_types_non_default_purge_v58(PDO $pdo): v
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] v58 journal_types purge: ' . $e->getMessage());
+        }
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v59 — إصلاح country_id إن غاب + إعادة حذف أنواع غير الكويت (بعد v58 أو v52 ناقص).
+ */
+function orange_catalog_migrate_journal_types_country_scope_repair_v59(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    $marker = 'php_journal_types_country_scope_repair_v59';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (!orange_table_exists($pdo, 'journal_types')) {
+        orange_catalog_schema_insert_migration_marker($pdo, $marker);
+
+        return;
+    }
+
+    orange_catalog_ensure_journal_types_country_id_column($pdo);
+
+    if (orange_table_has_column($pdo, 'journal_types', 'country_id')) {
+        require_once __DIR__ . '/journal_types.php';
+        try {
+            $purged = orange_journal_types_purge_non_auto_seed_countries($pdo);
+            if ($purged !== [] && function_exists('error_log')) {
+                error_log('[orange] v59 journal_types purge non-default: ' . json_encode($purged, JSON_UNESCAPED_UNICODE));
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] v59 journal_types purge: ' . $e->getMessage());
+            }
         }
     }
 

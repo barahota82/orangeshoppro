@@ -37,8 +37,11 @@ function orange_journal_types_list(PDO $pdo, ?int $countryId = null): array
     if (!orange_table_exists($pdo, 'journal_types')) {
         return [];
     }
+    $cid = orange_admin_settings_effective_country_id($pdo, $countryId);
     if (orange_journal_types_has_country_column($pdo)) {
-        $cid = orange_admin_settings_effective_country_id($pdo, $countryId);
+        if ($cid <= 0) {
+            return [];
+        }
         $st = $pdo->prepare(
             'SELECT * FROM journal_types WHERE country_id = ? ORDER BY sort_order ASC, id ASC'
         );
@@ -47,7 +50,14 @@ function orange_journal_types_list(PDO $pdo, ?int $countryId = null): array
         return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
-    return $pdo->query('SELECT * FROM journal_types ORDER BY sort_order ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
+    /* جدول قديم بلا country_id: لا تعرض الكatalog العام إلا للدولة الافتراضية (الكويت). */
+    require_once __DIR__ . '/countries.php';
+    $defaultId = orange_countries_default_id($pdo);
+    if ($defaultId > 0 && $cid > 0 && $cid !== $defaultId) {
+        return [];
+    }
+
+    return $pdo->query('SELECT * FROM journal_types ORDER BY sort_order ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC) ?: [];
 }
 
 /**

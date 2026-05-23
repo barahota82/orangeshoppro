@@ -10,7 +10,7 @@ require_once __DIR__ . '/../../includes/countries.php';
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
-$jtCountryId = orange_admin_settings_effective_country_id($pdo);
+$jtCountryId = orange_admin_context_country_id($pdo);
 $jtCountryRow = orange_country_row_by_id($pdo, $jtCountryId, false);
 $jtCountryLabel = trim((string) ($jtCountryRow['name_ar'] ?? ''));
 if ($jtCountryLabel === '' && $jtCountryRow !== null) {
