@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../../includes/gl_settings.php';
 require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 /**
@@ -172,48 +173,72 @@ function orange_journal_manage_normalize_multiline_body(PDO $pdo, array $linesIn
 }
 
 /**
- * سند القبض: أول سطر يجب أن يكون حساب النقدية (الخزينة) من الإعدادات، مديناً بلا دائن.
+ * @return int|null معرف حساب الخزينة للدولة الحالية (إعدادات GL + احتياط الربط).
+ */
+function orange_journal_manage_resolve_cash_account_id(PDO $pdo): ?int
+{
+    $countryId = orange_admin_context_country_id($pdo);
+    $cashCountryId = $countryId > 0 ? $countryId : null;
+    $cashAccId = null;
+    try {
+        $cashAccId = orange_gl_account_id_optional($pdo, 'cash', $cashCountryId);
+    } catch (Throwable $e) {
+        $cashAccId = null;
+    }
+    if ($cashAccId === null || $cashAccId <= 0) {
+        $bindings = orange_gl_settings_bindings_map($pdo, $cashCountryId);
+        $rawCash = (int) ($bindings['cash'] ?? 0);
+        if ($rawCash > 0) {
+            $cashAccId = $rawCash;
+        }
+    }
+
+    return ($cashAccId !== null && $cashAccId > 0) ? (int) $cashAccId : null;
+}
+
+/**
+ * سند القبض: آخر سطر يجب أن يكون حساب النقدية (الخزينة) من الإعدادات، مديناً بلا دائن.
  *
  * @param list<array{account_id:int,debit:float,credit:float,memo:string}> $postLines
  */
-function orange_journal_manage_assert_receipt_cash_first_line(PDO $pdo, string $entryTypeNorm, array $postLines): void
+function orange_journal_manage_assert_receipt_cash_last_line(PDO $pdo, string $entryTypeNorm, array $postLines): void
 {
     if ($entryTypeNorm !== 'receipt_voucher' || $postLines === []) {
         return;
     }
-    $cashId = orange_gl_account_id_optional($pdo, 'cash');
+    $cashId = orange_journal_manage_resolve_cash_account_id($pdo);
     if ($cashId === null || $cashId <= 0) {
         json_response(['success' => false, 'message' => 'اربط حساب النقدية (الخزينة) في إعدادات القيود التلقائية لاستخدام سند القبض.'], 422);
     }
-    $first = $postLines[0];
-    if ((int) $first['account_id'] !== (int) $cashId) {
-        json_response(['success' => false, 'message' => 'سند القبض يجب أن يبدأ بسطر حساب الخزينة (النقدية) كما في الشاشة.'], 422);
+    $last = $postLines[count($postLines) - 1];
+    if ((int) $last['account_id'] !== (int) $cashId) {
+        json_response(['success' => false, 'message' => 'سند القبض يجب أن ينتهي بسطر حساب الخزينة (النقدية) كما في الشاشة.'], 422);
     }
-    if ((float) $first['debit'] <= 0.0 || (float) $first['credit'] > 0.0) {
-        json_response(['success' => false, 'message' => 'السطر الأول في سند القبض (الخزينة) يجب أن يكون مديناً بمبلغ القبض دون دائن.'], 422);
+    if ((float) $last['debit'] <= 0.0 || (float) $last['credit'] > 0.0) {
+        json_response(['success' => false, 'message' => 'السطر الأخير في سند القبض (الخزينة) يجب أن يكون مديناً بمبلغ القبض دون دائن.'], 422);
     }
 }
 
 /**
- * سند الصرف: آخر سطر يجب أن يكون حساب النقدية (الخزينة) من الإعدادات، دائناً بلا مدين.
+ * سند الصرف: أول سطر يجب أن يكون حساب النقدية (الخزينة) من الإعدادات، دائناً بلا مدين.
  *
  * @param list<array{account_id:int,debit:float,credit:float,memo:string}> $postLines
  */
-function orange_journal_manage_assert_payment_cash_last_line(PDO $pdo, string $entryTypeNorm, array $postLines): void
+function orange_journal_manage_assert_payment_cash_first_line(PDO $pdo, string $entryTypeNorm, array $postLines): void
 {
     if ($entryTypeNorm !== 'payment_voucher' || $postLines === []) {
         return;
     }
-    $cashId = orange_gl_account_id_optional($pdo, 'cash');
+    $cashId = orange_journal_manage_resolve_cash_account_id($pdo);
     if ($cashId === null || $cashId <= 0) {
         json_response(['success' => false, 'message' => 'اربط حساب النقدية (الخزينة) في إعدادات القيود التلقائية لاستخدام سند الصرف.'], 422);
     }
-    $last = $postLines[count($postLines) - 1];
-    if ((int) $last['account_id'] !== (int) $cashId) {
-        json_response(['success' => false, 'message' => 'سند الصرف يجب أن ينتهي بسطر حساب الخزينة (النقدية) كما في الشاشة.'], 422);
+    $first = $postLines[0];
+    if ((int) $first['account_id'] !== (int) $cashId) {
+        json_response(['success' => false, 'message' => 'سند الصرف يجب أن يبدأ بسطر حساب الخزينة (النقدية) كما في الشاشة.'], 422);
     }
-    if ((float) $last['credit'] <= 0.0 || (float) $last['debit'] > 0.0) {
-        json_response(['success' => false, 'message' => 'السطر الأخير في سند الصرف (الخزينة) يجب أن يكون دائناً بمبلغ الصرف دون مدين.'], 422);
+    if ((float) $first['credit'] <= 0.0 || (float) $first['debit'] > 0.0) {
+        json_response(['success' => false, 'message' => 'السطر الأول في سند الصرف (الخزينة) يجب أن يكون دائناً بمبلغ الصرف دون مدين.'], 422);
     }
 }
 
@@ -260,8 +285,8 @@ try {
         $linesIn = $data['lines'] ?? null;
         if (is_array($linesIn) && count($linesIn) >= 2) {
             $postLines = orange_journal_manage_normalize_multiline_body($pdo, $linesIn);
-            orange_journal_manage_assert_receipt_cash_first_line($pdo, $entryTypeNorm, $postLines);
-            orange_journal_manage_assert_payment_cash_last_line($pdo, $entryTypeNorm, $postLines);
+            orange_journal_manage_assert_receipt_cash_last_line($pdo, $entryTypeNorm, $postLines);
+            orange_journal_manage_assert_payment_cash_first_line($pdo, $entryTypeNorm, $postLines);
             if (orange_gl_use_pending_queue($pdo)) {
                 $refOut = $reference !== '' ? $reference : ('JM-' . str_replace(['.', ' '], '', uniqid('', true)));
                 try {
@@ -805,8 +830,8 @@ try {
             json_response(['success' => false, 'message' => 'يُشترط سطران صالحان على الأقل في السند'], 422);
         }
         $postLinesUp = orange_journal_manage_normalize_multiline_body($pdo, $linesInUp);
-        orange_journal_manage_assert_receipt_cash_first_line($pdo, $entryTypeV, $postLinesUp);
-        orange_journal_manage_assert_payment_cash_last_line($pdo, $entryTypeV, $postLinesUp);
+        orange_journal_manage_assert_receipt_cash_last_line($pdo, $entryTypeV, $postLinesUp);
+        orange_journal_manage_assert_payment_cash_first_line($pdo, $entryTypeV, $postLinesUp);
 
         $descriptionUp = trim((string) ($data['description'] ?? ''));
         $referenceUp = trim((string) ($data['reference'] ?? ''));

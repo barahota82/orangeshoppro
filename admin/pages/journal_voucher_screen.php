@@ -22,12 +22,20 @@ $jvScreenCountryId = orange_admin_context_country_id($pdo);
 $jvCashLock = null;
 $jvPageEt = (string) ($jvPageEntryType ?? '');
 if ($jvPageEt === 'receipt_voucher' || $jvPageEt === 'payment_voucher') {
+    $cashCountryId = $jvScreenCountryId > 0 ? $jvScreenCountryId : null;
     $cashAccId = null;
     try {
-        $cashAccId = orange_gl_account_id_optional($pdo, 'cash');
+        $cashAccId = orange_gl_account_id_optional($pdo, 'cash', $cashCountryId);
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] journal_voucher_screen cash account: ' . $e->getMessage());
+        }
+    }
+    if ($cashAccId === null || $cashAccId <= 0) {
+        $bindings = orange_gl_settings_bindings_map($pdo, $cashCountryId);
+        $rawCash = (int) ($bindings['cash'] ?? 0);
+        if ($rawCash > 0) {
+            $cashAccId = $rawCash;
         }
     }
     if ($cashAccId !== null && $cashAccId > 0) {
@@ -39,7 +47,8 @@ if ($jvPageEt === 'receipt_voucher' || $jvPageEt === 'payment_voucher') {
                 'id' => (int) $cashRow['id'],
                 'code' => (string) ($cashRow['code'] ?? ''),
                 'name' => (string) ($cashRow['name'] ?? ''),
-                'placement' => $jvPageEt === 'receipt_voucher' ? 'first' : 'last',
+                /* قبض: الخزينة آخر سطر. صرف: الخزينة أول سطر. */
+                'placement' => $jvPageEt === 'receipt_voucher' ? 'last' : 'first',
             ];
         }
     }
@@ -391,6 +400,9 @@ $jvHeaderLineClass = 'jv-voucher-header-line' . ($jvNavReady ? ' jv-voucher-head
 .jv-search-results-table { margin: 0; font-size: 0.9rem; }
 .jv-search-results-table tbody tr { cursor: pointer; }
 .jv-search-results-table tbody tr:hover { background: #f4f4f5; }
+.jv-line-cash-locked td { background: #ecfdf5; }
+.jv-line-cash-locked .jv-acc-code,
+.jv-line-cash-locked .jv-acc-name { font-weight: 600; }
 </style>
 
 <script>
@@ -406,11 +418,19 @@ function jvCashLockPlacement() {
     return (JV_CASH_LOCK && JV_CASH_LOCK.placement) ? String(JV_CASH_LOCK.placement) : '';
 }
 
-function jvCashLockIsReceipt() {
+function jvVoucherIsReceipt() {
+    return JV_ENTRY_TYPE === 'receipt_voucher';
+}
+
+function jvVoucherIsPayment() {
+    return JV_ENTRY_TYPE === 'payment_voucher';
+}
+
+function jvCashLineFirst() {
     return jvCashLockActive() && jvCashLockPlacement() === 'first';
 }
 
-function jvCashLockIsPayment() {
+function jvCashLineLast() {
     return jvCashLockActive() && jvCashLockPlacement() === 'last';
 }
 
@@ -441,7 +461,7 @@ function jvCashLockSyncTreasuryAmount() {
     if (!dEl || !cEl) {
         return;
     }
-    if (jvCashLockIsReceipt()) {
+    if (jvVoucherIsReceipt()) {
         var sumCre = 0;
         jvAllMainRows(tb).forEach(function (tr) {
             if (tr.getAttribute('data-jv-cash-locked') === '1') {
@@ -474,7 +494,7 @@ function jvCashLockApplyLineAmountUi(mainTr) {
         return;
     }
     if (mainTr.getAttribute('data-jv-cash-locked') === '1') {
-        if (jvCashLockIsReceipt()) {
+        if (jvVoucherIsReceipt()) {
             dEl.readOnly = true;
             dEl.setAttribute('tabindex', '-1');
             dEl.classList.add('admin-inp-readonly');
@@ -494,7 +514,7 @@ function jvCashLockApplyLineAmountUi(mainTr) {
         }
         return;
     }
-    if (jvCashLockIsReceipt()) {
+    if (jvVoucherIsReceipt()) {
         dEl.value = '';
         dEl.readOnly = true;
         dEl.setAttribute('tabindex', '-1');
@@ -888,7 +908,7 @@ function jvAddCashLockedRow() {
     trMain.setAttribute('data-jv-pair', pair);
     trMain.setAttribute('data-jv-cash-locked', '1');
     var amtCells;
-    if (jvCashLockIsReceipt()) {
+    if (jvVoucherIsReceipt()) {
         amtCells = '<td><input type="number" class="jv-d admin-inp-money" step="any" min="0" value="" placeholder="تلقائي" inputmode="decimal" lang="en" dir="ltr" title="يُملأ تلقائياً من مجموع الدائن"></td>' +
             '<td><input type="number" class="jv-c admin-inp-money" step="any" min="0" value="' + orangeMoneyZero() + '" placeholder="' + orangeMoneyZero() + '" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1" title="دائن الخزينة في القبض = صفر"></td>';
     } else {
@@ -908,8 +928,13 @@ function jvAddCashLockedRow() {
     trMemo.innerHTML = '<td colspan="5">' +
         '<input type="text" id="jv_m_' + pair + '" class="jv-m admin-inp" value="" placeholder="بيان سطر الخزينة" autocomplete="off">' +
         '</td>';
-    tb.appendChild(trMain);
-    tb.appendChild(trMemo);
+    if (jvCashLineFirst()) {
+        tb.insertBefore(trMain, tb.firstChild);
+        tb.insertBefore(trMemo, trMain.nextSibling);
+    } else {
+        tb.appendChild(trMain);
+        tb.appendChild(trMemo);
+    }
     jvCashLockApplyLineAmountUi(trMain);
     jvRecalc();
 }
@@ -937,7 +962,7 @@ function jvAddRow() {
     var codeInp = trMain.querySelector('.jv-acc-code');
     codeInp.addEventListener('dblclick', function (e) { e.preventDefault(); jvAcctPickerOpen(codeInp); });
     var cashAnchor = tb.querySelector('tr.jv-line-main[data-jv-cash-locked="1"]');
-    if (jvCashLockIsPayment() && cashAnchor) {
+    if (jvCashLineLast() && cashAnchor) {
         tb.insertBefore(trMain, cashAnchor);
         tb.insertBefore(trMemo, cashAnchor);
     } else {
@@ -995,7 +1020,7 @@ function jvRowIsBlank(mainTr) {
 
 function jvTrimExtraTrailingBlanks() {
     var tb = document.getElementById('jv_lines_body');
-    if (jvCashLockIsPayment()) {
+    if (jvCashLineLast()) {
         for (;;) {
             var mainsP = jvAllMainRows(tb);
             var manual = mainsP.filter(function (m) { return m.getAttribute('data-jv-cash-locked') !== '1'; });
@@ -1034,10 +1059,10 @@ function jvSyncTrailingRows() {
     var tb = document.getElementById('jv_lines_body');
     var mains = jvAllMainRows(tb);
     if (mains.length === 0) {
-        if (jvCashLockIsReceipt()) {
+        if (jvCashLineFirst()) {
             jvAddCashLockedRow();
             jvAddRow();
-        } else if (jvCashLockIsPayment()) {
+        } else if (jvCashLineLast()) {
             jvAddRow();
             jvAddCashLockedRow();
         } else {
@@ -1045,7 +1070,24 @@ function jvSyncTrailingRows() {
         }
         return;
     }
-    if (jvCashLockIsPayment()) {
+    if (jvCashLineFirst()) {
+        var cashElFirst = tb.querySelector('tr.jv-line-main[data-jv-cash-locked="1"]');
+        if (!cashElFirst) {
+            jvAddCashLockedRow();
+        }
+        mains = jvAllMainRows(tb);
+        var manualFirst = mains.filter(function (m) { return m.getAttribute('data-jv-cash-locked') !== '1'; });
+        if (manualFirst.length === 0) {
+            jvAddRow();
+            return;
+        }
+        var lastManualFirst = manualFirst[manualFirst.length - 1];
+        if (!jvRowIsBlank(lastManualFirst)) {
+            jvAddRow();
+        }
+        return;
+    }
+    if (jvCashLineLast()) {
         var cashEl = tb.querySelector('tr.jv-line-main[data-jv-cash-locked="1"]');
         if (!cashEl) {
             jvAddCashLockedRow();
@@ -1098,7 +1140,7 @@ function jvBindLinesBody() {
             return;
         }
         var mains = jvAllMainRows(tb);
-        var lastMain = jvCashLockIsPayment() ? jvLastManualMainRow(mains) : mains[mains.length - 1];
+        var lastMain = jvCashLineLast() ? jvLastManualMainRow(mains) : mains[mains.length - 1];
         var lastMemo = lastMain ? jvMemoRow(lastMain) : null;
         if (!lastMemo || tr !== lastMemo) {
             return;
@@ -1106,7 +1148,7 @@ function jvBindLinesBody() {
         e.preventDefault();
         jvSyncTrailingRows();
         var mains2 = jvAllMainRows(tb);
-        var nextMain = jvCashLockIsPayment() ? jvLastManualMainRow(mains2) : mains2[mains2.length - 1];
+        var nextMain = jvCashLineLast() ? jvLastManualMainRow(mains2) : mains2[mains2.length - 1];
         var codeInp = nextMain && nextMain.querySelector('.jv-acc-code');
         if (codeInp) {
             codeInp.focus();
@@ -1135,10 +1177,10 @@ function jvFillMainFromLine(main, ln) {
     main.querySelector('.jv-d').value = deb > 0 ? orangeFmtMoney(deb) : '';
     main.querySelector('.jv-c').value = cre > 0 ? orangeFmtMoney(cre) : '';
     if (main.getAttribute('data-jv-cash-locked') === '1') {
-        if (jvCashLockIsPayment()) {
-            main.querySelector('.jv-d').value = orangeMoneyZero();
-        } else {
+        if (jvVoucherIsReceipt()) {
             main.querySelector('.jv-c').value = orangeMoneyZero();
+        } else {
+            main.querySelector('.jv-d').value = orangeMoneyZero();
         }
     }
     if (memo) {
@@ -1204,7 +1246,7 @@ function jvApplyVoucherPayload(r) {
             }
         });
         if (cashLines.length > 0) {
-            if (jvCashLockIsReceipt()) {
+            if (jvCashLineFirst()) {
                 jvAddCashLockedRow();
                 jvFillMainFromLine(jvAllMainRows(tb)[0], cashLines[0]);
                 for (var ci = 1; ci < cashLines.length; ci++) {
@@ -1215,17 +1257,22 @@ function jvApplyVoucherPayload(r) {
                     jvAddRow();
                     jvFillMainFromLine(jvAllMainRows(tb)[jvAllMainRows(tb).length - 1], ln);
                 });
-            } else {
-                jvAddCashLockedRow();
+            } else if (jvCashLineLast()) {
                 otherLines.forEach(function (ln) {
                     jvAddRow();
-                    jvFillMainFromLine(jvLastManualMainRow(jvAllMainRows(tb)), ln);
+                    jvFillMainFromLine(jvLastManualMainRow(jvAllMainRows(tb)) || jvAllMainRows(tb)[jvAllMainRows(tb).length - 1], ln);
                 });
+                jvAddCashLockedRow();
                 jvFillMainFromLine(jvAllMainRows(tb)[jvAllMainRows(tb).length - 1], cashLines[0]);
                 for (var cj = 1; cj < cashLines.length; cj++) {
                     jvAddRow();
                     jvFillMainFromLine(jvLastManualMainRow(jvAllMainRows(tb)), cashLines[cj]);
                 }
+            } else {
+                lines.forEach(function (ln) {
+                    jvAddRow();
+                    jvFillMainFromLine(jvAllMainRows(tb)[jvAllMainRows(tb).length - 1], ln);
+                });
             }
         } else {
             lines.forEach(function (ln) {
@@ -1374,23 +1421,24 @@ function jvSubmit() {
     }
     if (JV_ENTRY_TYPE === 'receipt_voucher' && JV_CASH_LOCK && JV_CASH_LOCK.id) {
         var cidR = parseInt(String(JV_CASH_LOCK.id), 10);
-        if (lines.length < 1 || (parseInt(String(lines[0].account_id), 10) || 0) !== cidR) {
-            alert('سند القبض يجب أن يبدأ بسطر الخزينة (النقدية) كما في الشاشة');
+        var lastReceipt = lines[lines.length - 1];
+        if (lines.length < 1 || !lastReceipt || (parseInt(String(lastReceipt.account_id), 10) || 0) !== cidR) {
+            alert('سند القبض يجب أن ينتهي بسطر الخزينة (النقدية) كما في الشاشة');
             return;
         }
-        if (lines[0].debit <= 0 || lines[0].credit > 0) {
+        if (lastReceipt.debit <= 0 || lastReceipt.credit > 0) {
             alert('سند القبض: سطر الخزينة مدين فقط (يُجمع من دائن الحسابات الأخرى)');
             return;
         }
     }
     if (JV_ENTRY_TYPE === 'payment_voucher' && JV_CASH_LOCK && JV_CASH_LOCK.id) {
         var cidP = parseInt(String(JV_CASH_LOCK.id), 10);
-        if (lines.length < 1 || (parseInt(String(lines[lines.length - 1].account_id), 10) || 0) !== cidP) {
-            alert('سند الصرف يجب أن ينتهي بسطر الخزينة (النقدية) كما في الشاشة');
+        var firstPayment = lines[0];
+        if (lines.length < 1 || !firstPayment || (parseInt(String(firstPayment.account_id), 10) || 0) !== cidP) {
+            alert('سند الصرف يجب أن يبدأ بسطر الخزينة (النقدية) كما في الشاشة');
             return;
         }
-        var lastLn = lines[lines.length - 1];
-        if (lastLn.credit <= 0 || lastLn.debit > 0) {
+        if (firstPayment.credit <= 0 || firstPayment.debit > 0) {
             alert('سند الصرف: سطر الخزينة دائن فقط (يُجمع من مدين الحسابات الأخرى)');
             return;
         }
@@ -1436,10 +1484,10 @@ function jvSubmit() {
 }
 
 jvBindLinesBody();
-if (jvCashLockIsReceipt()) {
+if (jvCashLineFirst()) {
     jvAddCashLockedRow();
     jvAddRow();
-} else if (jvCashLockIsPayment()) {
+} else if (jvCashLineLast()) {
     jvAddRow();
     jvAddCashLockedRow();
 } else {
