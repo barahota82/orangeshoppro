@@ -11,22 +11,35 @@ function orange_journal_types_has_country_column(PDO $pdo): bool
         && orange_table_has_column($pdo, 'journal_types', 'country_id');
 }
 
+function orange_journal_types_country_count(PDO $pdo): int
+{
+    if (!orange_table_exists($pdo, 'countries')) {
+        return 0;
+    }
+
+    return (int) $pdo->query('SELECT COUNT(*) FROM countries')->fetchColumn();
+}
+
 /**
  * هل تُبذَر الأنواع المرجعية (OBV، JE، …) تلقائياً لهذه الدولة؟
  * فقط الدولة الافتراضية (الكويت) — باقي الدول تُملأ عبر «إنشاء كامل» من شاشة الدول.
  */
 function orange_journal_types_should_auto_seed(PDO $pdo, ?int $countryId = null): bool
 {
-    if (!orange_journal_types_has_country_column($pdo)) {
-        return true;
-    }
+    require_once __DIR__ . '/countries.php';
     $cid = orange_admin_settings_effective_country_id($pdo, $countryId);
     if ($cid <= 0) {
         return false;
     }
     $defaultId = orange_countries_default_id($pdo);
+    if ($defaultId <= 0) {
+        return false;
+    }
+    if (!orange_journal_types_has_country_column($pdo)) {
+        return $cid === $defaultId;
+    }
 
-    return $defaultId > 0 && $cid === $defaultId;
+    return $cid === $defaultId;
 }
 
 /**
@@ -37,7 +50,11 @@ function orange_journal_types_list(PDO $pdo, ?int $countryId = null): array
     if (!orange_table_exists($pdo, 'journal_types')) {
         return [];
     }
+    require_once __DIR__ . '/countries.php';
     $cid = orange_admin_settings_effective_country_id($pdo, $countryId);
+    $defaultId = orange_countries_default_id($pdo);
+    $multiCountry = orange_journal_types_country_count($pdo) > 1;
+
     if (orange_journal_types_has_country_column($pdo)) {
         if ($cid <= 0) {
             return [];
@@ -46,14 +63,16 @@ function orange_journal_types_list(PDO $pdo, ?int $countryId = null): array
             'SELECT * FROM journal_types WHERE country_id = ? ORDER BY sort_order ASC, id ASC'
         );
         $st->execute([$cid]);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-        return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return array_values(array_filter(
+            $rows,
+            static fn (array $r): bool => (int) ($r['country_id'] ?? 0) === $cid
+        ));
     }
 
-    /* جدول قديم بلا country_id: لا تعرض الكatalog العام إلا للدولة الافتراضية (الكويت). */
-    require_once __DIR__ . '/countries.php';
-    $defaultId = orange_countries_default_id($pdo);
-    if ($defaultId > 0 && $cid > 0 && $cid !== $defaultId) {
+    /* جدول قديم بلا country_id: في بيئة متعددة الدول لا يُعرض الكatalog العام إلا للكويت. */
+    if ($multiCountry && ($defaultId <= 0 || $cid <= 0 || $cid !== $defaultId)) {
         return [];
     }
 
@@ -121,7 +140,13 @@ function orange_journal_types_merge_canonical_defaults(PDO $pdo, ?int $countryId
     if (isset($completedOk[$cacheKey])) {
         return;
     }
+    if (!$scoped && orange_journal_types_country_count($pdo) > 1) {
+        return;
+    }
     if ($scoped && $cid <= 0) {
+        return;
+    }
+    if (!orange_journal_types_should_auto_seed($pdo, $scoped ? $cid : $countryId)) {
         return;
     }
 
@@ -245,6 +270,15 @@ function orange_journal_types_purge_country(PDO $pdo, int $countryId): int
     }
 
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    if (orange_table_exists($pdo, 'orange_gl_journal_type_rules')) {
+        if (orange_table_has_column($pdo, 'orange_gl_journal_type_rules', 'country_id')) {
+            $pdo->prepare('DELETE FROM orange_gl_journal_type_rules WHERE country_id = ?')->execute([$countryId]);
+        } else {
+            $pdo->prepare(
+                'DELETE FROM orange_gl_journal_type_rules WHERE journal_type_id IN (' . $placeholders . ')'
+            )->execute($ids);
+        }
+    }
     if (orange_table_exists($pdo, 'journal_vouchers')
         && orange_table_has_column($pdo, 'journal_vouchers', 'journal_type_id')) {
         $pdo->prepare(
@@ -295,6 +329,64 @@ function orange_journal_types_purge_non_auto_seed_countries(PDO $pdo): array
 }
 
 /**
+ * حذف كل أنواع اليوميات لغير الدولة الافتراضية (الكويت) — ترحيل/إصلاح v52.
+ *
+ * @return int عدد الصفوف المحذوفة
+ */
+function orange_journal_types_strip_all_non_default_countries(PDO $pdo): int
+{
+    if (!orange_journal_types_has_country_column($pdo)) {
+        return 0;
+    }
+    require_once __DIR__ . '/countries.php';
+    $defaultId = orange_countries_default_id($pdo);
+    if ($defaultId <= 0) {
+        return 0;
+    }
+
+    if (orange_table_exists($pdo, 'orange_gl_journal_type_rules')
+        && orange_table_has_column($pdo, 'orange_gl_journal_type_rules', 'country_id')) {
+        $pdo->prepare('DELETE FROM orange_gl_journal_type_rules WHERE country_id <> ?')->execute([$defaultId]);
+    }
+
+    $stIds = $pdo->prepare('SELECT id FROM journal_types WHERE country_id <> ?');
+    $stIds->execute([$defaultId]);
+    $ids = [];
+    foreach ($stIds->fetchAll(PDO::FETCH_COLUMN) ?: [] as $rawId) {
+        $id = (int) $rawId;
+        if ($id > 0) {
+            $ids[] = $id;
+        }
+    }
+    if ($ids !== []) {
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        if (orange_table_exists($pdo, 'journal_vouchers')
+            && orange_table_has_column($pdo, 'journal_vouchers', 'journal_type_id')) {
+            $pdo->prepare(
+                'UPDATE journal_vouchers SET journal_type_id = NULL WHERE journal_type_id IN (' . $placeholders . ')'
+            )->execute($ids);
+        }
+        if (orange_table_exists($pdo, 'orange_gl_pending_movements')
+            && orange_table_has_column($pdo, 'orange_gl_pending_movements', 'journal_type_id')) {
+            $pdo->prepare(
+                'UPDATE orange_gl_pending_movements SET journal_type_id = NULL WHERE journal_type_id IN (' . $placeholders . ')'
+            )->execute($ids);
+        }
+        if (orange_table_exists($pdo, 'orange_gl_journal_type_rules')
+            && !orange_table_has_column($pdo, 'orange_gl_journal_type_rules', 'country_id')) {
+            $pdo->prepare(
+                'DELETE FROM orange_gl_journal_type_rules WHERE journal_type_id IN (' . $placeholders . ')'
+            )->execute($ids);
+        }
+    }
+
+    $del = $pdo->prepare('DELETE FROM journal_types WHERE country_id <> ?');
+    $del->execute([$defaultId]);
+
+    return (int) $del->rowCount();
+}
+
+/**
  * يضمن وجود الصفوف المرجعية وترتيبها (يُستدعى من catalog_schema).
  */
 function orange_journal_types_sync_canonical_defaults(PDO $pdo, ?int $countryId = null, bool $force = false): void
@@ -305,7 +397,10 @@ function orange_journal_types_sync_canonical_defaults(PDO $pdo, ?int $countryId 
     }
     $scoped = orange_journal_types_has_country_column($pdo);
     $cid = $scoped ? orange_admin_settings_effective_country_id($pdo, $countryId) : 0;
-    if ($scoped && !$force && !orange_journal_types_should_auto_seed($pdo, $cid)) {
+    if (!$force && !orange_journal_types_should_auto_seed($pdo, $scoped ? $cid : $countryId)) {
+        return;
+    }
+    if (!$scoped && orange_journal_types_country_count($pdo) > 1) {
         return;
     }
     $cacheKey = $scoped ? (string) $cid : 'legacy';

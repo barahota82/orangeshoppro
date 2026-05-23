@@ -978,10 +978,8 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         require_once __DIR__ . '/journal_types.php';
         try {
             $jtDefaultCid = orange_countries_default_id($pdo);
-            if ($jtDefaultCid > 0) {
+            if ($jtDefaultCid > 0 && orange_journal_types_should_auto_seed($pdo, $jtDefaultCid)) {
                 orange_journal_types_merge_canonical_defaults($pdo, $jtDefaultCid);
-            } else {
-                orange_journal_types_merge_canonical_defaults($pdo);
             }
         } catch (Throwable $e) {
             if (function_exists('error_log')) {
@@ -3067,6 +3065,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_supplier_country_currency_v57($pdo);
     orange_catalog_migrate_journal_types_non_default_purge_v58($pdo);
     orange_catalog_migrate_journal_types_country_scope_repair_v59($pdo);
+    orange_catalog_migrate_journal_types_strip_non_kw_v60($pdo);
     orange_catalog_migrate_legacy_storefront_copy_lines($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
@@ -5107,6 +5106,43 @@ function orange_catalog_migrate_journal_types_country_scope_repair_v59(PDO $pdo)
         } catch (Throwable $e) {
             if (function_exists('error_log')) {
                 error_log('[orange] v59 journal_types purge: ' . $e->getMessage());
+            }
+        }
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v60 — حذف صريح لكل journal_types خارج الكويت (إصلاح v52 + عرض موحّد خاطئ).
+ */
+function orange_catalog_migrate_journal_types_strip_non_kw_v60(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    $marker = 'php_journal_types_strip_non_kw_v60';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (!orange_table_exists($pdo, 'journal_types')) {
+        orange_catalog_schema_insert_migration_marker($pdo, $marker);
+
+        return;
+    }
+
+    orange_catalog_ensure_journal_types_country_id_column($pdo);
+    orange_schema_invalidate_column_check('journal_types', 'country_id');
+
+    if (orange_table_has_column($pdo, 'journal_types', 'country_id')) {
+        require_once __DIR__ . '/journal_types.php';
+        try {
+            $deleted = orange_journal_types_strip_all_non_default_countries($pdo);
+            if ($deleted > 0 && function_exists('error_log')) {
+                error_log('[orange] v60 journal_types strip non-KW deleted=' . $deleted);
+            }
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] v60 journal_types strip: ' . $e->getMessage());
             }
         }
     }

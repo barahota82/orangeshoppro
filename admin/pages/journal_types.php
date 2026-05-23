@@ -9,6 +9,8 @@ require_once __DIR__ . '/../../includes/countries.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+orange_catalog_ensure_journal_types_country_id_column($pdo);
+orange_schema_invalidate_column_check('journal_types', 'country_id');
 
 $jtCountryId = orange_admin_context_country_id($pdo);
 $jtCountryRow = orange_country_row_by_id($pdo, $jtCountryId, false);
