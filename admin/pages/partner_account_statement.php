@@ -749,21 +749,26 @@ $showStatementShell = ($err === '');
                     ? ($custNameDisp !== '' ? $custNameDisp : '—')
                     : ($accNameOnly !== '' ? $accNameOnly : '—');
             ?>
-            <div class="gl-acc-stmt-print-grid">
-                <div class="gl-acc-stmt-print-row">
-                    <span class="gl-acc-stmt-print-k"><?php echo htmlspecialchars($printCodeKey, ENT_QUOTES, 'UTF-8'); ?></span>
-                    <span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($printCodeVal, ENT_QUOTES, 'UTF-8'); ?></span>
-                </div>
-                <div class="gl-acc-stmt-print-row">
-                    <span class="gl-acc-stmt-print-k"><?php echo htmlspecialchars($printNameKey, ENT_QUOTES, 'UTF-8'); ?></span>
-                    <span class="gl-acc-stmt-print-v"><?php echo htmlspecialchars($printNameVal, ENT_QUOTES, 'UTF-8'); ?></span>
-                </div>
-                <div class="gl-acc-stmt-print-row gl-acc-stmt-print-row--dates">
-                    <span class="gl-acc-stmt-print-k">من تاريخ</span><span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($dateFromRaw, ENT_QUOTES, 'UTF-8'); ?></span>
-                    <span class="gl-acc-stmt-print-k">الى تاريخ</span><span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($dateToRaw, ENT_QUOTES, 'UTF-8'); ?></span>
-                    <span class="gl-acc-stmt-print-k">تاريخ الكشف</span><span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($todayDmY, ENT_QUOTES, 'UTF-8'); ?></span>
-                </div>
-            </div>
+            <table class="gl-acc-stmt-print-meta">
+                <tbody>
+                    <tr>
+                        <th scope="row"><?php echo htmlspecialchars($printCodeKey, ENT_QUOTES, 'UTF-8'); ?></th>
+                        <td dir="ltr"><?php echo htmlspecialchars($printCodeVal, ENT_QUOTES, 'UTF-8'); ?></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php echo htmlspecialchars($printNameKey, ENT_QUOTES, 'UTF-8'); ?></th>
+                        <td><?php echo htmlspecialchars($printNameVal, ENT_QUOTES, 'UTF-8'); ?></td>
+                    </tr>
+                    <tr class="gl-acc-stmt-print-meta-row--dates">
+                        <th scope="row">من تاريخ</th>
+                        <td dir="ltr"><?php echo htmlspecialchars($dateFromRaw, ENT_QUOTES, 'UTF-8'); ?></td>
+                        <th scope="row">الى تاريخ</th>
+                        <td dir="ltr"><?php echo htmlspecialchars($dateToRaw, ENT_QUOTES, 'UTF-8'); ?></td>
+                        <th scope="row">تاريخ الكشف</th>
+                        <td dir="ltr"><?php echo htmlspecialchars($todayDmY, ENT_QUOTES, 'UTF-8'); ?></td>
+                    </tr>
+                </tbody>
+            </table>
             <?php if ($showStatement && ($filtDc !== 'all' || $filtPost !== 'all')): ?>
                 <p class="gl-acc-stmt-filter-note muted">تصفية معروضة: <?php
                     $bits = [];
