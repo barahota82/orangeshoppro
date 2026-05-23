@@ -4243,14 +4243,10 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     display: grid;
     grid-template-columns: minmax(180px, 34%) 1fr;
     gap: 0.65rem;
-    align-items: baseline;
+    align-items: center;
     padding: 0.45rem 0.65rem;
     border-bottom: 1px solid #e2e8f0;
     font-size: 0.95rem;
-}
-.gl-acc-stmt-print-row--account {
-    grid-template-columns: auto minmax(5.5rem, 11rem) auto minmax(8rem, 1fr);
-    gap: 0.35rem 0.75rem;
 }
 .gl-acc-stmt-print-row:last-child {
     border-bottom: none;
@@ -4259,10 +4255,12 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     font-weight: 600;
     color: var(--text-secondary, #475569);
     font-size: 0.86rem;
+    text-align: center;
 }
 .gl-acc-stmt-print-v {
     font-weight: 600;
     word-break: break-word;
+    text-align: center;
 }
 .gl-acc-stmt-table-wrap {
     margin-top: 0.25rem;
@@ -4304,13 +4302,10 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     display: grid;
     grid-template-columns: auto minmax(5rem, 1fr) auto minmax(5rem, 1fr) auto minmax(5rem, 1fr);
     gap: 0.35rem 0.65rem;
-    align-items: baseline;
+    align-items: center;
 }
 
 @media (max-width: 640px) {
-    .gl-acc-stmt-print-row--account {
-        grid-template-columns: auto 1fr;
-    }
     .gl-acc-stmt-print-row--dates {
         grid-template-columns: auto 1fr;
     }
