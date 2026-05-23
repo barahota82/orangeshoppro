@@ -273,16 +273,21 @@ try {
         if ($date === null) {
             json_response(['success' => false, 'message' => 'تاريخ السند غير صالح'], 422);
         }
-        $entryTypeNorm = orange_journal_manage_resolve_ui_entry_type($data, 'manual');
+        $entryTypeRaw = trim((string) ($data['entry_type'] ?? 'manual'));
         $jtId = (int) ($data['journal_type_id'] ?? 0);
-        if ($entryTypeNorm === 'other_voucher' && $jtId <= 0) {
-            json_response(['success' => true, 'reference' => '', 'voucher_serial' => 0]);
+        if (in_array($entryTypeRaw, orange_journal_manage_partner_entry_types(), true)) {
+            $entryTypeForPreview = $entryTypeRaw;
+        } else {
+            $entryTypeNorm = orange_journal_manage_resolve_ui_entry_type($data, 'manual');
+            if ($entryTypeNorm === 'other_voucher' && $jtId <= 0) {
+                json_response(['success' => true, 'reference' => '', 'voucher_serial' => 0]);
 
-            return;
-        }
-        $entryTypeForPreview = $entryTypeNorm;
-        if ($entryTypeNorm === 'other_voucher') {
-            $entryTypeForPreview = orange_journal_manage_store_entry_type_for_other_voucher_screen($pdo, $jtId);
+                return;
+            }
+            $entryTypeForPreview = $entryTypeNorm;
+            if ($entryTypeNorm === 'other_voucher') {
+                $entryTypeForPreview = orange_journal_manage_store_entry_type_for_other_voucher_screen($pdo, $jtId);
+            }
         }
         $countryId = orange_admin_context_country_id($pdo);
         try {

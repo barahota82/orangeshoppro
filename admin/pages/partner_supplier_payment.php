@@ -127,9 +127,27 @@ $prefillStmtId = (int) ($_GET['stmt_party_id'] ?? 0);
 $prefillStmtKind = trim((string) ($_GET['stmt_party_kind'] ?? ''));
 $ppvPrefillSupplierId = ($prefillStmtKind === 'supplier' && $prefillStmtId > 0) ? $prefillStmtId : 0;
 
-$nextVoucherNo = 1;
+$nextVoucherNo = 0;
+$spayRefPreview = '';
 if (orange_journal_vouchers_ready($pdo)) {
-    $nextVoucherNo = orange_gl_voucher_next_id_preview($pdo, $ppvCountryId);
+    orange_journal_types_sync_canonical_defaults($pdo, $ppvCountryId > 0 ? $ppvCountryId : null);
+    $fyPeek = orange_fiscal_find_for_date($pdo, date('Y-m-d'), $ppvCountryId > 0 ? $ppvCountryId : null);
+    $fyPeekId = $fyPeek ? (int) $fyPeek['id'] : 0;
+    if (
+        $fyPeekId > 0
+        && orange_table_has_column($pdo, 'journal_vouchers', 'voucher_serial')
+    ) {
+        $spayMeta = orange_journal_voucher_resolve_serial_meta($pdo, 'supplier_payment', null, $ppvCountryId > 0 ? $ppvCountryId : null);
+        $nextVoucherNo = orange_journal_voucher_next_serial($pdo, $fyPeekId, $spayMeta['journal_serial_bucket']);
+        $spayRefPreview = orange_voucher_auto_reference_preview(
+            $pdo,
+            'supplier_payment',
+            $fyPeekId,
+            $ppvCountryId > 0 ? $ppvCountryId : null
+        );
+    } else {
+        $nextVoucherNo = orange_gl_voucher_next_id_preview($pdo, $ppvCountryId);
+    }
 }
 
 $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_settings');
@@ -275,7 +293,7 @@ $ppvReady = $ppvCashLock !== null;
         <div class="jv-voucher-header-line jv-voucher-header-line--nav" style="margin-bottom:12px;">
             <div>
                 <label for="spay_number_preview">رقم القيد</label>
-                <input type="text" id="spay_number_preview" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;text-align:center;" value="<?php echo (int) $nextVoucherNo; ?>">
+                <input type="text" id="spay_number_preview" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;text-align:center;" value="<?php echo $nextVoucherNo > 0 ? (int) $nextVoucherNo : ''; ?>" title="التسلسل ضمن نوع سند صرف المورد والسنة المالية">
             </div>
             <div>
                 <label for="spay_date">تاريخ السند</label>
@@ -283,7 +301,7 @@ $ppvReady = $ppvCashLock !== null;
             </div>
             <div>
                 <label for="spay_ref">المرجع</label>
-                <input type="text" id="spay_ref" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;" value="—" title="يُخصَّص تلقائياً عند الحفظ">
+                <input type="text" id="spay_ref" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;" value="<?php echo htmlspecialchars($spayRefPreview, ENT_QUOTES, 'UTF-8'); ?>" title="يُولَّد تلقائياً: SPR-رمز الدولة-رقم القيد" dir="ltr" lang="en" autocomplete="off">
             </div>
             <div>
                 <label for="spay_document_entered">تاريخ المستند</label>
@@ -432,6 +450,31 @@ $ppvReady = $ppvCashLock !== null;
 
     var currentSupplierId = 0;
     var currentInvoices = [];
+
+    function spaySyncRefPreview() {
+        if (spayBrowseId) {
+            return;
+        }
+        var refEl = document.getElementById('spay_ref');
+        var numEl = document.getElementById('spay_number_preview');
+        var dateEl = document.getElementById('spay_date');
+        var dIso = dateEl && typeof orangeGetDmyValueAsIso === 'function' ? orangeGetDmyValueAsIso(dateEl) : '';
+        postJSON('/admin/api/journal/manage.php', {
+            action: 'reference_preview',
+            date: dIso || undefined,
+            entry_type: 'supplier_payment'
+        }).then(function (r) {
+            if (!r || !r.success) {
+                return;
+            }
+            if (refEl) {
+                refEl.value = r.reference || '';
+            }
+            if (numEl) {
+                numEl.value = r.voucher_serial > 0 ? String(r.voucher_serial) : '';
+            }
+        }).catch(function () {});
+    }
 
     function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
@@ -888,6 +931,17 @@ $ppvReady = $ppvCashLock !== null;
 
         document.getElementById('spay_search_btn').addEventListener('click', spaySearchRun);
         document.getElementById('spay_search_modal_backdrop').addEventListener('click', spaySearchClose);
+
+        var spayDateEl = document.getElementById('spay_date');
+        if (spayDateEl && !spayDateEl.getAttribute('data-spay-ref-bound')) {
+            spayDateEl.setAttribute('data-spay-ref-bound', '1');
+            spayDateEl.addEventListener('blur', function () {
+                if (typeof orangeNormalizeDmyInput === 'function') {
+                    orangeNormalizeDmyInput(spayDateEl);
+                }
+                spaySyncRefPreview();
+            });
+        }
 
         if (SPAY_PREFILL_SUPPLIER > 0) {
             selectSupplier(SPAY_PREFILL_SUPPLIER);
