@@ -130,6 +130,9 @@ if (strcmp($periodDateFrom, $periodDateTo) <= 0) {
 $monthList = $iterateYmRange($periodYmFrom, $periodYmTo);
 $showZeros = isset($_GET['show_zeros']) && (string) $_GET['show_zeros'] === '1';
 
+/** عند التفعيل: استبعاد سندات entry_type = year_end_close من حركة الفترة. */
+$ignoreClosingEntries = !isset($_GET['ignore_close']) || (string) $_GET['ignore_close'] === '1';
+
 $leafWhere = orange_accounts_posting_leaf_where_sql($pdo, 'a');
 $accountsLeaf = orange_accounts_fetch(
     $pdo,
@@ -206,6 +209,7 @@ if (
 
     if ($ids !== []) {
         $ph = implode(',', array_fill(0, count($ids), '?'));
+        $entryTypeExcludeSql = $ignoreClosingEntries ? " AND jv.entry_type NOT IN ('year_end_close')" : '';
         $sql = "SELECT jl.account_id,
                 DATE_FORMAT(jv.voucher_date, '%Y-%m') AS ym,
                 COALESCE(SUM(jl.debit), 0) AS d,
@@ -214,8 +218,8 @@ if (
              INNER JOIN journal_vouchers jv ON jv.id = jl.voucher_id
              WHERE jl.account_id IN ($ph)
                AND DATE(jv.voucher_date) >= ?
-               AND DATE(jv.voucher_date) <= ?" . $plmJvCountryBind['sql'] . '
-             GROUP BY jl.account_id, ym";
+               AND DATE(jv.voucher_date) <= ?" . $entryTypeExcludeSql . $plmJvCountryBind['sql'] . '
+             GROUP BY jl.account_id, ym';
         $params = array_merge($ids, [$periodDateFrom, $periodDateTo], $plmJvCountryBind['params']);
         $st = $pdo->prepare($sql);
         $st->execute($params);
@@ -369,7 +373,7 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
         <form method="get" class="gas-acc-stmt-filter-form" id="pl_m_form">
             <input type="hidden" name="page" value="report_pl_monthly">
             <div class="gas-acc-stmt-toolbar-wrap">
-                <div class="gas-acc-stmt-toolbar ta-report-toolbar ta-report-toolbar--pl-extra gas-acc-stmt-toolbar--main-center">
+                <div class="gas-acc-stmt-toolbar ta-report-toolbar ta-report-toolbar--pl-monthly-filters gas-acc-stmt-toolbar--main-center">
                     <div class="gas-acc-stmt-field gl-m-stmt-field--month">
                         <label for="pl_m_month_from">من شهر</label>
                         <input type="month" name="m_from" id="pl_m_month_from" class="admin-inp"
@@ -390,7 +394,7 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
                             title="انقر الحقل؛ في منتقي المتصفّح انقر سنة الشهر أو استخدم الأسهم لتغيير السنة (2000–2100)."
                             autocomplete="off">
                     </div>
-                    <label class="gas-acc-stmt-field" style="align-items:flex-start;margin-top:0.15rem;">
+                    <label class="gas-acc-stmt-field pl-monthly-show-zeros-field" style="align-items:flex-start;margin-top:0.15rem;">
                         <input type="checkbox" name="show_zeros" value="1" <?php echo $showZeros ? 'checked' : ''; ?> style="margin-top:6px;margin-left:6px;">
                         <span>عرض كل الحسابات حتى بدون حركة في ذلك الشهر</span>
                     </label>
@@ -400,7 +404,19 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
                             <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
                         <?php endif; ?>
                     </div>
+                    <label class="gas-acc-stmt-field is-ignore-close-field" title="قيود الإقفال السنوي (YEC) تُصفّر الإيرادات والمصروفات — فعِّل هذا الخيار لاستبعادها من أرقام التقرير إذا كان المدى الزمني يشمل تاريخ الإقفال.">
+                        <input type="hidden" name="ignore_close" value="0">
+                        <input type="checkbox" name="ignore_close" value="1" id="pl_m_ignore_close" <?php echo $ignoreClosingEntries ? 'checked' : ''; ?>>
+                        <span>تجاهل قيود الإقفال</span>
+                    </label>
                 </div>
+                <p class="card-hint muted gl-acc-stmt-no-print is-ignore-close-hint" style="margin:8px 0 0;text-align:left;">
+                    <?php if ($ignoreClosingEntries): ?>
+                        <strong>مفعّل:</strong> سندات الإقفال السنوي (YEC) <strong>مستبعدة</strong> من حركة الفترة — لعرض الإيرادات والمصروفات الشهرية دون تأثير الإقفال.
+                    <?php else: ?>
+                        <strong>غير مفعّل:</strong> سندات الإقفال ضمن المدى <strong>مُضمَّنة</strong> في الأرقام (قد تُصفّر حسابات الإيراد والتكلفة إذا وقع الإقفال داخل الفترة).
+                    <?php endif; ?>
+                </p>
             </div>
         </form>
     </div>
@@ -456,6 +472,9 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
             </h2>
             <p class="pl-month-pl-profit" lang="ar">ربح &nbsp;&nbsp;<?php echo htmlspecialchars($reportFmt($rabeh), ENT_QUOTES, 'UTF-8'); ?></p>
             <p class="pl-month-subtitle" lang="ar"><?php echo htmlspecialchars($subtitleLine($dmFrom, $dmTo), ENT_QUOTES, 'UTF-8'); ?></p>
+            <?php if ($ignoreClosingEntries): ?>
+                <p class="gl-acc-stmt-print-note muted" style="margin:4px 0 0;font-size:12px;">باستبعاد قيود الإقفال السنوي (YEC) من حركة الفترة.</p>
+            <?php endif; ?>
             <div class="pl-month-meta-row" lang="ar">
                 <span><?php echo $monthLabelEscaped; ?></span>
                 <?php if ($yearStr !== ''): ?>

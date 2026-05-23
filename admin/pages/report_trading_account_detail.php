@@ -94,6 +94,10 @@ if (strcmp($periodDateFrom, $periodDateTo) <= 0) {
     $periodLabel = $periodDateFrom . ' — ' . $periodDateTo;
 }
 
+/** عند التفعيل: استبعاد سندات entry_type = year_end_close من الفترة ورصيد أولها. */
+$ignoreClosingEntries = !isset($_GET['ignore_close']) || (string) $_GET['ignore_close'] === '1';
+$plExcludeEntryTypes = $ignoreClosingEntries ? ['year_end_close'] : [];
+
 $tbRange = [];
 $tbBefore = [];
 if (
@@ -101,8 +105,8 @@ if (
     && $periodDateFrom !== '' && $periodDateTo !== ''
     && strcmp($periodDateFrom, $periodDateTo) <= 0
 ) {
-    $tbRange = orange_voucher_account_totals_by_voucher_date_range($pdo, $periodDateFrom, $periodDateTo, []);
-    $tbBefore = orange_voucher_account_totals_strictly_before_date($pdo, $periodDateFrom, []);
+    $tbRange = orange_voucher_account_totals_by_voucher_date_range($pdo, $periodDateFrom, $periodDateTo, $plExcludeEntryTypes);
+    $tbBefore = orange_voucher_account_totals_strictly_before_date($pdo, $periodDateFrom, $plExcludeEntryTypes);
 }
 
 $accountsLeaf = orange_financial_report_leaf_accounts_with_mapping($pdo);
@@ -171,7 +175,7 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
         <form method="get" class="gas-acc-stmt-filter-form" id="ta_report_form">
             <input type="hidden" name="page" value="<?php echo htmlspecialchars($taPageQuery, ENT_QUOTES, 'UTF-8'); ?>">
             <div class="gas-acc-stmt-toolbar-wrap">
-                <div class="gas-acc-stmt-toolbar ta-report-toolbar gas-acc-stmt-toolbar--main-center">
+                <div class="gas-acc-stmt-toolbar ta-report-toolbar ta-report-toolbar--is-ignore-left gas-acc-stmt-toolbar--main-center">
                     <div class="gas-acc-stmt-field gl-m-stmt-field--month">
                         <label for="ta_m_month_from">من شهر</label>
                         <input type="month" name="m_from" id="ta_m_month_from" class="admin-inp"
@@ -198,12 +202,24 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
                             <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
                         <?php endif; ?>
                     </div>
+                    <label class="gas-acc-stmt-field is-ignore-close-field" title="قيود الإقفال السنوي (YEC) تُصفّر الإيرادات والمصروفات — فعِّل هذا الخيار لاستبعادها من أرقام التقرير إذا كان المدى الزمني يشمل تاريخ الإقفال.">
+                        <input type="hidden" name="ignore_close" value="0">
+                        <input type="checkbox" name="ignore_close" value="1" id="ta_ignore_close" <?php echo $ignoreClosingEntries ? 'checked' : ''; ?>>
+                        <span>تجاهل قيود الإقفال</span>
+                    </label>
                 </div>
+                <p class="card-hint muted gl-acc-stmt-no-print is-ignore-close-hint" style="margin:8px 0 0;text-align:left;">
+                    <?php if ($ignoreClosingEntries): ?>
+                        <strong>مفعّل:</strong> سندات الإقفال السنوي (YEC) <strong>مستبعدة</strong> من حركة الفترة ورصيد أولها — لعرض نتيجة المتاجرة دون تأثير الإقفال.
+                    <?php else: ?>
+                        <strong>غير مفعّل:</strong> سندات الإقفال ضمن المدى <strong>مُضمَّنة</strong> في الأرقام (قد تُصفّر حسابات الإيراد والتكلفة إذا وقع الإقفال داخل الفترة).
+                    <?php endif; ?>
+                </p>
             </div>
         </form>
         <p class="muted gas-acc-stmt-toolbar" style="margin-top:10px;margin-bottom:0;font-size:12px;">
             <a href="<?php echo htmlspecialchars(
-                '?page=' . rawurlencode($taPageQuery) . '&m_from=' . rawurlencode($periodYmFrom) . '&m_to=' . rawurlencode($periodYmTo) . '&diag=1',
+                '?page=' . rawurlencode($taPageQuery) . '&m_from=' . rawurlencode($periodYmFrom) . '&m_to=' . rawurlencode($periodYmTo) . '&ignore_close=' . ($ignoreClosingEntries ? '1' : '0') . '&diag=1',
                 ENT_QUOTES,
                 'UTF-8'
             ); ?>">تشخيص (عدادات المصدر)</a>
@@ -253,6 +269,9 @@ echo htmlspecialchars((string) ($diagPayload !== false ? $diagPayload : '{}'), E
                 <h2 class="gl-acc-stmt-print-title ta-report-print-title">
                     <span class="gl-acc-stmt-print-title-ar" lang="ar"><?php echo htmlspecialchars($taHeadingAr, ENT_QUOTES, 'UTF-8'); ?> عن الفترة من <?php echo htmlspecialchars($reportDateFromDmY, ENT_QUOTES, 'UTF-8'); ?> إلـى&nbsp;<?php echo htmlspecialchars($reportDateToDmY, ENT_QUOTES, 'UTF-8'); ?></span>
                 </h2>
+                <?php if ($ignoreClosingEntries): ?>
+                    <p class="gl-acc-stmt-print-note muted" style="margin:4px 0 0;font-size:12px;">باستبعاد قيود الإقفال السنوي (YEC) من حركة الفترة ورصيد أولها.</p>
+                <?php endif; ?>
             </header>
             <div class="gl-acc-stmt-print-grid">
                 <div class="gl-acc-stmt-print-row gl-acc-stmt-print-row--dates">
