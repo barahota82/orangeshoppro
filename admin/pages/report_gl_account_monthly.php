@@ -205,6 +205,12 @@ $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 
 $companyNameAr = orange_company_settings_name_ar($pdo);
 
+$showMonthlyReport = $useVouchers && $accountId > 0 && $periodLabel !== '';
+/** هيكل التقرير (ترويسة + جدول) يظهر دائماً؛ البيانات تُملأ بعد اختيار الحساب و«عرض». */
+$showMonthlyReportShell = $useVouchers && $periodLabel !== '';
+
+$printCodeVal = $accCodeDisp !== '' ? $accCodeDisp : '—';
+$printNameVal = $accNameDisp !== '' ? $accNameDisp : '—';
 
 ?>
 <div class="admin-fy-shell" dir="rtl">
@@ -254,7 +260,7 @@ $companyNameAr = orange_company_settings_name_ar($pdo);
                     </div>
                     <div class="gas-acc-stmt-actions">
                         <button type="submit">عرض</button>
-                        <?php if ($useVouchers && $accountId > 0 && $periodLabel !== ''): ?>
+                        <?php if ($showMonthlyReport): ?>
                             <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
                         <?php endif; ?>
                     </div>
@@ -405,11 +411,11 @@ $companyNameAr = orange_company_settings_name_ar($pdo);
 <div class="card admin-fy-card">
     <p class="muted">سندات اليومية غير جاهزة بعد — لا يمكن عرض التقرير.</p>
 </div>
-<?php elseif ($accountId <= 0): ?>
+<?php elseif ($periodLabel === ''): ?>
 <div class="card admin-fy-card">
-    <p class="card-hint">اختر حساباً ثم اضغط «عرض».</p>
+    <p class="muted">تعذّر حساب مدى التقويم لهذه الجلسة.</p>
 </div>
-<?php elseif ($periodLabel !== ''): ?>
+<?php elseif ($showMonthlyReportShell): ?>
 <div class="card admin-fy-card gl-acc-stmt-print">
     <div class="gl-acc-stmt-print-sheet gl-m-monthly-print-sheet">
         <header class="gl-acc-stmt-print-banner">
@@ -421,8 +427,8 @@ $companyNameAr = orange_company_settings_name_ar($pdo);
             </h2>
         </header>
         <div class="gl-acc-stmt-print-grid">
-            <div class="gl-acc-stmt-print-row"><span class="gl-acc-stmt-print-k">رقـــم الحســاب</span><span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($accCodeDisp !== '' ? $accCodeDisp : '—', ENT_QUOTES, 'UTF-8'); ?></span></div>
-            <div class="gl-acc-stmt-print-row"><span class="gl-acc-stmt-print-k">اسم الحســـــــــاب</span><span class="gl-acc-stmt-print-v"><?php echo htmlspecialchars($accNameDisp !== '' ? $accNameDisp : ($accLabel !== '' ? $accLabel : '—'), ENT_QUOTES, 'UTF-8'); ?></span></div>
+            <div class="gl-acc-stmt-print-row gl-acc-stmt-print-row--pair"><span class="gl-acc-stmt-print-k">رقـــم الحســاب</span><span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($printCodeVal, ENT_QUOTES, 'UTF-8'); ?></span></div>
+            <div class="gl-acc-stmt-print-row gl-acc-stmt-print-row--pair"><span class="gl-acc-stmt-print-k">اسم الحســـــــــاب</span><span class="gl-acc-stmt-print-v"><?php echo htmlspecialchars($printNameVal, ENT_QUOTES, 'UTF-8'); ?></span></div>
             <div class="gl-acc-stmt-print-row gl-acc-stmt-print-row--dates">
                 <span class="gl-acc-stmt-print-k">من تاريخ</span><span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($reportDateFromDmY, ENT_QUOTES, 'UTF-8'); ?></span>
                 <span class="gl-acc-stmt-print-k">الى تاريخ</span><span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($reportDateToDmY, ENT_QUOTES, 'UTF-8'); ?></span>
@@ -446,9 +452,13 @@ $companyNameAr = orange_company_settings_name_ar($pdo);
                         <td class="gl-acc-stmt-col-num">ـــــــــــ</td>
                         <td class="gl-acc-stmt-col-num">ـــــــــــ</td>
                         <td class="gl-acc-stmt-col-num">ـــــــــــ</td>
-                        <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount($openingBal, $reportMoney); ?></td>
+                        <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount($showMonthlyReport ? $openingBal : 0.0, $reportMoney); ?></td>
                     </tr>
-                    <?php if ($monthlyRows === []): ?>
+                    <?php if (!$showMonthlyReport): ?>
+                        <tr class="gl-acc-stmt-row-placeholder gl-acc-stmt-no-print">
+                            <td colspan="5" class="muted">اختر حساباً ثم اضغط «عرض» لعرض الحركة الشهرية.</td>
+                        </tr>
+                    <?php elseif ($monthlyRows === []): ?>
                         <tr>
                             <td colspan="5" class="muted">لا حركة على هذا الحساب في الأشهر المحددة (حسب تاريخ السند في المدّة المختارة) بعد الرصيد الافتتاحي.</td>
                         </tr>
@@ -467,10 +477,10 @@ $companyNameAr = orange_company_settings_name_ar($pdo);
                 <tfoot>
                     <tr class="gl-acc-stmt-foot-label">
                         <td class="gl-acc-stmt-foot-total-title">الإجمالى</td>
-                        <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount($totalDebitPeriod, $reportMoney); ?></td>
-                        <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount($totalCreditPeriod, $reportMoney); ?></td>
-                        <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount($totalNetPeriod, $reportMoney); ?></td>
-                        <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount($closingBal, $reportMoney); ?></td>
+                        <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount($showMonthlyReport ? $totalDebitPeriod : 0.0, $reportMoney); ?></td>
+                        <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount($showMonthlyReport ? $totalCreditPeriod : 0.0, $reportMoney); ?></td>
+                        <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount($showMonthlyReport ? $totalNetPeriod : 0.0, $reportMoney); ?></td>
+                        <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount($showMonthlyReport ? $closingBal : 0.0, $reportMoney); ?></td>
                     </tr>
                 </tfoot>
             </table>
@@ -479,10 +489,6 @@ $companyNameAr = orange_company_settings_name_ar($pdo);
             <p class="gl-acc-stmt-print-metafoot" dir="ltr">تاريخ ووقت الطباعة: <?php echo htmlspecialchars($printDatetime, ENT_QUOTES, 'UTF-8'); ?> — صفحة 1 من 1</p>
         </div>
     </div>
-</div>
-<?php else: ?>
-<div class="card admin-fy-card">
-    <p class="muted">تعذّر حساب مدى التقويم لهذه الجلسة.</p>
 </div>
 <?php endif; ?>
 
