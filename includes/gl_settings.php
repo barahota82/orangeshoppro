@@ -437,6 +437,36 @@ function orange_gl_settings_bindings_map(PDO $pdo, ?int $countryId = null): arra
 }
 
 /**
+ * account_id المربوط في orange_gl_account_settings دون التحقق من «ورقة ترحيل» — للعرض في الشاشات.
+ */
+function orange_gl_setting_bound_account_id_raw(PDO $pdo, string $key, ?int $countryId = null): int
+{
+    orange_catalog_ensure_gl_account_settings_alloc_tables($pdo);
+    if (!orange_table_exists($pdo, 'orange_gl_account_settings')) {
+        return 0;
+    }
+    $key = trim($key);
+    if ($key === '') {
+        return 0;
+    }
+    $cid = orange_gl_settings_effective_country_id($pdo, $countryId);
+    if ($cid > 0 && orange_table_has_column($pdo, 'orange_gl_account_settings', 'country_id')) {
+        $st = $pdo->prepare(
+            'SELECT account_id FROM orange_gl_account_settings WHERE setting_key = ? AND country_id = ? LIMIT 1'
+        );
+        $st->execute([$key, $cid]);
+        $id = (int) $st->fetchColumn();
+
+        return $id > 0 ? $id : 0;
+    }
+    $st = $pdo->prepare('SELECT account_id FROM orange_gl_account_settings WHERE setting_key = ? LIMIT 1');
+    $st->execute([$key]);
+    $id = (int) $st->fetchColumn();
+
+    return $id > 0 ? $id : 0;
+}
+
+/**
  * نسبة مئوية (0–100) مربوطة ببند إعداد — تُخزَّن في orange_gl_setting_alloc (مثل نسبة الاحتياطي من أرباح السنة الحالية).
  */
 function orange_gl_setting_alloc_percent(PDO $pdo, string $settingKey, ?int $countryId = null): float

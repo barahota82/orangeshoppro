@@ -177,23 +177,12 @@ function orange_journal_manage_normalize_multiline_body(PDO $pdo, array $linesIn
  */
 function orange_journal_manage_resolve_cash_account_id(PDO $pdo): ?int
 {
-    $countryId = orange_admin_context_country_id($pdo);
-    $cashCountryId = $countryId > 0 ? $countryId : null;
-    $cashAccId = null;
-    try {
-        $cashAccId = orange_gl_account_id_optional($pdo, 'cash', $cashCountryId);
-    } catch (Throwable $e) {
-        $cashAccId = null;
-    }
-    if ($cashAccId === null || $cashAccId <= 0) {
-        $bindings = orange_gl_settings_bindings_map($pdo, $cashCountryId);
-        $rawCash = (int) ($bindings['cash'] ?? 0);
-        if ($rawCash > 0) {
-            $cashAccId = $rawCash;
-        }
+    $acc = orange_journal_voucher_resolve_cash_account($pdo, orange_admin_context_country_id($pdo));
+    if ($acc === null || (int) ($acc['id'] ?? 0) <= 0) {
+        return null;
     }
 
-    return ($cashAccId !== null && $cashAccId > 0) ? (int) $cashAccId : null;
+    return (int) $acc['id'];
 }
 
 /**

@@ -973,3 +973,135 @@ function orange_voucher_account_totals_strictly_before_date(
 
     return $out;
 }
+
+/**
+ * @return array{id:int,code:string,name:string}|null
+ */
+function orange_journal_voucher_map_cash_account_for_country(PDO $pdo, int $accountId, int $preferCountryId): ?array
+{
+    if ($accountId <= 0 || !orange_table_exists($pdo, 'accounts')) {
+        return null;
+    }
+    $cols = 'id, code, name';
+    if (orange_table_has_country_id($pdo, 'accounts')) {
+        $cols .= ', country_id';
+    }
+    $st = $pdo->prepare('SELECT ' . $cols . ' FROM accounts WHERE id = ? LIMIT 1');
+    $st->execute([$accountId]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        return null;
+    }
+    if ($preferCountryId > 0 && orange_table_has_country_id($pdo, 'accounts')) {
+        $accCountry = (int) ($row['country_id'] ?? 0);
+        if ($accCountry > 0 && $accCountry !== $preferCountryId) {
+            $code = trim((string) ($row['code'] ?? ''));
+            if ($code !== '') {
+                $stMap = $pdo->prepare(
+                    'SELECT id, code, name FROM accounts WHERE code = ? AND country_id = ? LIMIT 1'
+                );
+                $stMap->execute([$code, $preferCountryId]);
+                $mapped = $stMap->fetch(PDO::FETCH_ASSOC);
+                if ($mapped) {
+                    $row = $mapped;
+                }
+            }
+        }
+    }
+    $id = (int) ($row['id'] ?? 0);
+    if ($id <= 0) {
+        return null;
+    }
+
+    return [
+        'id' => $id,
+        'code' => (string) ($row['code'] ?? ''),
+        'name' => (string) ($row['name'] ?? ''),
+    ];
+}
+
+/**
+ * حساب الخزينة لسند قبض/صرف — يحاول الدولة الحالية ثم الافتراضية ثم أي ربط cash في الإعدادات.
+ *
+ * @return array{id:int,code:string,name:string}|null
+ */
+function orange_journal_voucher_resolve_cash_account(PDO $pdo, ?int $countryId = null): ?array
+{
+    require_once __DIR__ . '/gl_settings.php';
+
+    orange_catalog_ensure_schema($pdo);
+    $ctxCountry = ($countryId !== null && $countryId > 0)
+        ? $countryId
+        : orange_admin_context_country_id($pdo);
+
+    $tryCountries = [];
+    if ($ctxCountry > 0) {
+        $tryCountries[] = $ctxCountry;
+    }
+    $defaultId = orange_countries_default_id($pdo);
+    if ($defaultId > 0 && !in_array($defaultId, $tryCountries, true)) {
+        $tryCountries[] = $defaultId;
+    }
+
+    $accountIds = [];
+    foreach ($tryCountries as $cid) {
+        try {
+            $opt = orange_gl_account_id_optional($pdo, 'cash', $cid);
+            if ($opt !== null && $opt > 0) {
+                $accountIds[] = (int) $opt;
+            }
+        } catch (Throwable $e) {
+            // عرض الشاشة: لا نمنع سطر الخزينة إذا كان الربط ليس «ورقة ترحيل» بعد.
+        }
+        $raw = orange_gl_setting_bound_account_id_raw($pdo, 'cash', $cid);
+        if ($raw > 0) {
+            $accountIds[] = $raw;
+        }
+    }
+
+    if (orange_table_exists($pdo, 'orange_gl_account_settings')) {
+        $stAny = $pdo->query(
+            "SELECT account_id FROM orange_gl_account_settings
+             WHERE setting_key = 'cash' AND account_id > 0
+             ORDER BY country_id ASC"
+        );
+        foreach ($stAny->fetchAll(PDO::FETCH_ASSOC) ?: [] as $r) {
+            $accountIds[] = (int) ($r['account_id'] ?? 0);
+        }
+    }
+
+    $seen = [];
+    foreach ($accountIds as $accId) {
+        if ($accId <= 0 || isset($seen[$accId])) {
+            continue;
+        }
+        $seen[$accId] = true;
+        $row = orange_journal_voucher_map_cash_account_for_country($pdo, $accId, $ctxCountry);
+        if ($row !== null) {
+            return $row;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * @return array{id:int,code:string,name:string,placement:string}|null
+ */
+function orange_journal_voucher_cash_lock_for_screen(PDO $pdo, string $entryType, ?int $countryId = null): ?array
+{
+    if (!in_array($entryType, ['receipt_voucher', 'payment_voucher'], true)) {
+        return null;
+    }
+    $acc = orange_journal_voucher_resolve_cash_account($pdo, $countryId);
+    if ($acc === null || (int) ($acc['id'] ?? 0) <= 0) {
+        return null;
+    }
+
+    return [
+        'id' => (int) $acc['id'],
+        'code' => (string) ($acc['code'] ?? ''),
+        'name' => (string) ($acc['name'] ?? ''),
+        'placement' => $entryType === 'receipt_voucher' ? 'last' : 'first',
+    ];
+}

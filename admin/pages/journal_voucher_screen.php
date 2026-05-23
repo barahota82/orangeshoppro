@@ -19,40 +19,12 @@ $pdo = orange_admin_page_pdo();
 
 $jvScreenCountryId = orange_admin_context_country_id($pdo);
 
-$jvCashLock = null;
 $jvPageEt = (string) ($jvPageEntryType ?? '');
-if ($jvPageEt === 'receipt_voucher' || $jvPageEt === 'payment_voucher') {
-    $cashCountryId = $jvScreenCountryId > 0 ? $jvScreenCountryId : null;
-    $cashAccId = null;
-    try {
-        $cashAccId = orange_gl_account_id_optional($pdo, 'cash', $cashCountryId);
-    } catch (Throwable $e) {
-        if (function_exists('error_log')) {
-            error_log('[orange] journal_voucher_screen cash account: ' . $e->getMessage());
-        }
-    }
-    if ($cashAccId === null || $cashAccId <= 0) {
-        $bindings = orange_gl_settings_bindings_map($pdo, $cashCountryId);
-        $rawCash = (int) ($bindings['cash'] ?? 0);
-        if ($rawCash > 0) {
-            $cashAccId = $rawCash;
-        }
-    }
-    if ($cashAccId !== null && $cashAccId > 0) {
-        $stCash = $pdo->prepare('SELECT id, code, name FROM accounts WHERE id = ? LIMIT 1');
-        $stCash->execute([(int) $cashAccId]);
-        $cashRow = $stCash->fetch(PDO::FETCH_ASSOC);
-        if ($cashRow) {
-            $jvCashLock = [
-                'id' => (int) $cashRow['id'],
-                'code' => (string) ($cashRow['code'] ?? ''),
-                'name' => (string) ($cashRow['name'] ?? ''),
-                /* قبض: الخزينة آخر سطر. صرف: الخزينة أول سطر. */
-                'placement' => $jvPageEt === 'receipt_voucher' ? 'last' : 'first',
-            ];
-        }
-    }
-}
+$jvCashLock = orange_journal_voucher_cash_lock_for_screen(
+    $pdo,
+    $jvPageEt,
+    $jvScreenCountryId > 0 ? $jvScreenCountryId : null
+);
 $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_settings');
 
 $jvPostingLinkedJournalTypes = [];
@@ -89,6 +61,54 @@ if ($jvNavReady) {
     $jvPostingLeafCt = orange_accounts_count_posting_leaves($pdo, $jvScreenCountryId > 0 ? $jvScreenCountryId : null);
 }
 $jvHeaderLineClass = 'jv-voucher-header-line' . ($jvNavReady ? ' jv-voucher-header-line--nav' : '');
+$jvInitLinePairSeq = 0;
+$jvMoneyZeroEsc = htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8');
+$jvIsReceiptVoucherEt = $jvPageEt === 'receipt_voucher';
+$jvEchoJvCashLine = static function (array $lock) use (&$jvInitLinePairSeq, $jvMoneyZeroEsc, $jvIsReceiptVoucherEt): void {
+    $jvInitLinePairSeq++;
+    $pair = 'jv' . (string) $jvInitLinePairSeq;
+    $id = (int) ($lock['id'] ?? 0);
+    $code = htmlspecialchars((string) ($lock['code'] ?? ''), ENT_QUOTES, 'UTF-8');
+    $name = htmlspecialchars((string) ($lock['name'] ?? ''), ENT_QUOTES, 'UTF-8');
+    if ($jvIsReceiptVoucherEt) {
+        $amtCells = '<td><input type="number" class="jv-d admin-inp-money admin-inp-readonly" step="any" min="0" value="" placeholder="تلقائي" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1" title="يُحسب تلقائياً من مجموع الدائن"></td>'
+            . '<td><input type="number" class="jv-c admin-inp-money admin-inp-readonly" step="any" min="0" value="' . $jvMoneyZeroEsc . '" placeholder="' . $jvMoneyZeroEsc . '" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1"></td>';
+    } else {
+        $amtCells = '<td><input type="number" class="jv-d admin-inp-money admin-inp-readonly" step="any" min="0" value="' . $jvMoneyZeroEsc . '" placeholder="' . $jvMoneyZeroEsc . '" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1"></td>'
+            . '<td><input type="number" class="jv-c admin-inp-money admin-inp-readonly" step="any" min="0" value="" placeholder="تلقائي" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1" title="يُحسب تلقائياً من مجموع المدين"></td>';
+    }
+    echo '<tr class="jv-line-main jv-line-cash-locked" data-jv-pair="', $pair, '" data-jv-cash-locked="1">',
+        '<td class="jv-acc-code-cell"><input type="hidden" class="jv-acc-id" value="', (string) $id, '">',
+        '<input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="', $code, '" readonly tabindex="-1" title="حساب الخزينة — ثابت"></td>',
+        '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="', $name, '" readonly tabindex="-1" title="حساب الخزينة — ثابت"></td>',
+        $amtCells,
+        '<td><span class="muted" style="display:inline-block;padding:8px 0;" aria-hidden="true">—</span></td>',
+        '</tr>';
+    echo '<tr class="jv-line-memo" data-jv-pair="', $pair, '"><td colspan="5">',
+        '<input type="text" id="jv_m_', $pair, '" class="jv-m admin-inp" value="" placeholder="بيان سطر الخزينة" autocomplete="off">',
+        '</td></tr>';
+};
+$jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroEsc, $jvIsReceiptVoucherEt): void {
+    $jvInitLinePairSeq++;
+    $pair = 'jv' . (string) $jvInitLinePairSeq;
+    if ($jvIsReceiptVoucherEt) {
+        $amtCells = '<td><input type="number" class="jv-d admin-inp-money admin-inp-readonly" step="any" min="0" value="" placeholder="' . $jvMoneyZeroEsc . '" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1" title="في سند القبض يُسجَّل الدائن فقط"></td>'
+            . '<td><input type="number" class="jv-c admin-inp-money" step="any" min="0" value="" placeholder="' . $jvMoneyZeroEsc . '" inputmode="decimal" lang="en" dir="ltr"></td>';
+    } else {
+        $amtCells = '<td><input type="number" class="jv-d admin-inp-money" step="any" min="0" value="" placeholder="' . $jvMoneyZeroEsc . '" inputmode="decimal" lang="en" dir="ltr"></td>'
+            . '<td><input type="number" class="jv-c admin-inp-money admin-inp-readonly" step="any" min="0" value="" placeholder="' . $jvMoneyZeroEsc . '" inputmode="decimal" lang="en" dir="ltr" readonly tabindex="-1" title="في سند الصرف يُسجَّل المدين فقط"></td>';
+    }
+    echo '<tr class="jv-line-main" data-jv-pair="', $pair, '">',
+        '<td class="jv-acc-code-cell"><input type="hidden" class="jv-acc-id" value="">',
+        '<input type="text" class="jv-acc-code admin-inp" value="" placeholder="نقرتان للاختيار" autocomplete="off"></td>',
+        '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="" readonly tabindex="-1"></td>',
+        $amtCells,
+        '<td><button type="button" class="btn-secondary admin-doc-line-remove" onclick="jvRemoveRow(this)">حذف</button></td>',
+        '</tr>';
+    echo '<tr class="jv-line-memo" data-jv-pair="', $pair, '"><td colspan="5">',
+        '<input type="text" id="jv_m_', $pair, '" class="jv-m admin-inp" value="" placeholder="البيان" autocomplete="off">',
+        '</td></tr>';
+};
 ?>
 <div class="page-title page-title--stacked jv-print-hide">
     <div>
@@ -193,7 +213,21 @@ $jvHeaderLineClass = 'jv-voucher-header-line' . ($jvNavReady ? ' jv-voucher-head
                         <th class="admin-doc-col-actions" aria-label="حذف السطر"></th>
                     </tr>
                 </thead>
-                <tbody id="jv_lines_body"></tbody>
+                <tbody id="jv_lines_body">
+                <?php
+                if ($jvCashLock !== null) {
+                    if (($jvCashLock['placement'] ?? '') === 'first') {
+                        ($jvEchoJvCashLine)($jvCashLock);
+                    }
+                    ($jvEchoJvManualLine)();
+                    if (($jvCashLock['placement'] ?? '') === 'last') {
+                        ($jvEchoJvCashLine)($jvCashLock);
+                    }
+                } elseif ($jvPageEt === 'receipt_voucher' || $jvPageEt === 'payment_voucher') {
+                    ($jvEchoJvManualLine)();
+                }
+                ?>
+                </tbody>
             </table>
         </div>
     </div>
@@ -538,7 +572,7 @@ function jvCashLockApplyLineAmountUi(mainTr) {
 var jvAcctPickerAnchor = null;
 var jvPickSeq = 0;
 var jvPickSearchTimer = null;
-var jvPairSeq = 0;
+var jvPairSeq = <?php echo (int) $jvInitLinePairSeq; ?>;
 var jvViewMode = false;
 var jvBrowseId = null;
 var jvBrowseEntryType = null;
@@ -1116,6 +1150,15 @@ function jvBindLinesBody() {
         return;
     }
     tb.setAttribute('data-jv-bound', '1');
+    tb.querySelectorAll('tr.jv-line-main:not([data-jv-cash-locked="1"]) .jv-acc-code').forEach(function (codeInp) {
+        if (codeInp.readOnly) {
+            return;
+        }
+        codeInp.addEventListener('dblclick', function (e) {
+            e.preventDefault();
+            jvAcctPickerOpen(codeInp);
+        });
+    });
     tb.addEventListener('input', function () {
         jvSyncTrailingRows();
         jvRecalc();
@@ -1484,14 +1527,22 @@ function jvSubmit() {
 }
 
 jvBindLinesBody();
-if (jvCashLineFirst()) {
-    jvAddCashLockedRow();
-    jvAddRow();
-} else if (jvCashLineLast()) {
-    jvAddRow();
-    jvAddCashLockedRow();
-} else {
-    jvAddRow();
+var jvLinesBodyEl = document.getElementById('jv_lines_body');
+if (jvLinesBodyEl) {
+    jvAllMainRows(jvLinesBodyEl).forEach(function (tr) {
+        jvCashLockApplyLineAmountUi(tr);
+    });
+}
+if (jvLinesBodyEl && jvAllMainRows(jvLinesBodyEl).length === 0) {
+    if (jvCashLineFirst()) {
+        jvAddCashLockedRow();
+        jvAddRow();
+    } else if (jvCashLineLast()) {
+        jvAddRow();
+        jvAddCashLockedRow();
+    } else {
+        jvAddRow();
+    }
 }
 jvSyncTrailingRows();
 
