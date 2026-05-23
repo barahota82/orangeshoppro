@@ -4249,13 +4249,16 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     font-size: 0.95rem;
 }
 .gl-acc-stmt-print-row--pair {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: auto auto 1fr;
+    gap: 0.65rem 1rem;
 }
 .gl-acc-stmt-print-row--pair .gl-acc-stmt-print-k {
     text-align: right;
+    white-space: nowrap;
 }
 .gl-acc-stmt-print-row--pair .gl-acc-stmt-print-v {
     text-align: center;
+    min-width: 8rem;
 }
 .gl-acc-stmt-print-row:last-child {
     border-bottom: none;
