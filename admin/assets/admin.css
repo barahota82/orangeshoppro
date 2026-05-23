@@ -4413,6 +4413,11 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     flex-shrink: 0;
 }
 
+.is-ignore-close-hint {
+    max-width: 100%;
+    line-height: 1.5;
+}
+
 .ta-report-print-title .gl-acc-stmt-print-title-ar {
     line-height: 1.45;
     padding: 0 0.35rem;
