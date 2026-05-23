@@ -4255,7 +4255,7 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     font-weight: 600;
     color: var(--text-secondary, #475569);
     font-size: 0.86rem;
-    text-align: center;
+    text-align: right;
 }
 .gl-acc-stmt-print-v {
     font-weight: 600;
