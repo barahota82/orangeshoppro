@@ -4233,40 +4233,6 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     letter-spacing: 0.04em;
     color: var(--muted-text, #64748b);
 }
-.gl-acc-stmt-print-meta {
-    width: 100%;
-    margin: 0.75rem 0 0.5rem;
-    border-collapse: collapse;
-    table-layout: fixed;
-    border: 1px solid #cbd5e1;
-    font-size: 0.95rem;
-}
-.gl-acc-stmt-print-meta th,
-.gl-acc-stmt-print-meta td {
-    border: 1px solid #e2e8f0;
-    padding: 0.45rem 0.55rem;
-    vertical-align: middle;
-}
-.gl-acc-stmt-print-meta th {
-    width: 50%;
-    text-align: right;
-    font-weight: 600;
-    color: var(--text-secondary, #475569);
-    font-size: 0.86rem;
-    background: #fafafa;
-}
-.gl-acc-stmt-print-meta td {
-    width: 50%;
-    text-align: center;
-    font-weight: 600;
-    word-break: break-word;
-}
-.gl-acc-stmt-print-meta-row--dates th {
-    width: 11%;
-}
-.gl-acc-stmt-print-meta-row--dates td {
-    width: 22%;
-}
 .gl-acc-stmt-print-grid {
     margin: 0.75rem 0 0.5rem;
     border: 1px solid #cbd5e1;
