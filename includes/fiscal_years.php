@@ -200,3 +200,54 @@ function orange_fiscal_year_country_id(PDO $pdo, int $fiscalYearId): int
 
     return $cid > 0 ? $cid : orange_countries_default_id($pdo);
 }
+
+/** رمز السوق للعرض في مرجع OB (KW، EG، UAE، KSA، …). */
+function orange_opening_balance_country_code(PDO $pdo, ?int $countryId = null): string
+{
+    if ($countryId === null || $countryId <= 0) {
+        if (function_exists('orange_admin_context_country_id')) {
+            $countryId = orange_admin_context_country_id($pdo);
+        }
+    }
+    if ($countryId > 0) {
+        $row = orange_country_row_by_id($pdo, $countryId, false);
+        if ($row !== null) {
+            $raw = trim((string) ($row['code'] ?? ''));
+            if ($raw !== '') {
+                return orange_countries_display_code($raw);
+            }
+        }
+    }
+
+    return orange_countries_display_code(orange_admin_context_country_code($pdo));
+}
+
+/** مرجع سند رصيد افتتاحي: OB-KW-1، OB-EG-2، … (الجزء الأخير = id السنة المالية). */
+function orange_opening_balance_reference(PDO $pdo, int $fyId, ?int $countryId = null): string
+{
+    if ($fyId <= 0) {
+        return '';
+    }
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_fiscal_year_country_id($pdo, $fyId);
+    }
+    $cc = orange_opening_balance_country_code($pdo, $countryId > 0 ? $countryId : null);
+    if ($cc === '') {
+        $cc = 'XX';
+    }
+
+    return 'OB-' . $cc . '-' . $fyId;
+}
+
+/** مرجع قديم قبل رمز الدولة: OB-{fyId}. */
+function orange_opening_balance_reference_legacy(int $fyId): string
+{
+    return $fyId > 0 ? 'OB-' . $fyId : '';
+}
+
+function orange_opening_balance_clear_pending_refs(PDO $pdo, int $fyId, ?int $countryId = null): void
+{
+    require_once __DIR__ . '/gl_pending_movements.php';
+    orange_gl_pending_remove_by_reference($pdo, orange_opening_balance_reference_legacy($fyId));
+    orange_gl_pending_remove_by_reference($pdo, orange_opening_balance_reference($pdo, $fyId, $countryId));
+}

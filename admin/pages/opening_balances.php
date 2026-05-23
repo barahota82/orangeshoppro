@@ -92,7 +92,8 @@ if ($years !== []) {
 $obVid = 0;
 $obInitial = [];
 $obStatement = '';
-$obRef = $fyId > 0 ? 'OB-' . $fyId : '';
+$obRef = $fyId > 0 ? orange_opening_balance_reference($pdo, $fyId, $ctxCountryId) : '';
+$obCountryCode = orange_opening_balance_country_code($pdo, $ctxCountryId);
 $obVoucherDateDisp = strlen($bootstrapIso) === 10 ? orange_format_date_dmY($bootstrapIso) : '';
 $obDocEnteredDisp = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 $obNumberPreview = 1;
@@ -132,6 +133,10 @@ if ($fyId > 0 && $fyRowSel !== null && orange_journal_vouchers_ready($pdo)) {
             }
             if ($docAt !== '') {
                 $obDocEnteredDisp = orange_format_datetime_dmY_hi($docAt);
+            }
+            $refFromDb = trim((string) ($vh['reference'] ?? ''));
+            if ($refFromDb !== '') {
+                $obRef = $refFromDb;
             }
         }
         $lst = $pdo->prepare(
@@ -206,7 +211,7 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
                 <label for="ob_ref">المرجع</label>
                 <input type="text" id="ob_ref" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;" tabindex="-1"
                     value="<?php echo htmlspecialchars($obRef, ENT_QUOTES, 'UTF-8'); ?>"
-                    title="يُولَّد تلقائياً من السنة المالية (OB-رقم السنة)" dir="ltr" lang="en" autocomplete="off">
+                    title="يُولَّد تلقائياً: OB-رمز الدولة-رقم السنة (مثل OB-KW-1)" dir="ltr" lang="en" autocomplete="off">
             </div>
             <div>
                 <label for="ob_document_entered">تاريخ المستند</label>
@@ -279,6 +284,7 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
 
 <script>
 var OB_PAGE_FY = <?php echo (int) $fyId; ?>;
+var OB_COUNTRY_CODE = <?php echo json_encode($obCountryCode, JSON_UNESCAPED_UNICODE); ?>;
 var OB_FY_RANGES = <?php echo json_encode($obFyRanges, JSON_UNESCAPED_UNICODE); ?>;
 var OB_ADMIN_INDEX = <?php echo json_encode($obAdminIndexUrl, JSON_UNESCAPED_UNICODE); ?>;
 var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
@@ -311,7 +317,7 @@ var OB_SAVED_VOUCHER_ID = <?php echo (int) $obVid; ?>;
         var iso = typeof orangeGetDmyValueAsIso === 'function' ? orangeGetDmyValueAsIso(obDateEl) : '';
         var fyResolved = obResolveFyIdFromIso(iso);
         var fyDisp = fyResolved > 0 ? fyResolved : (typeof OB_PAGE_FY !== 'undefined' && OB_PAGE_FY > 0 ? OB_PAGE_FY : 0);
-        refEl.value = fyDisp > 0 ? 'OB-' + fyDisp : '';
+        refEl.value = fyDisp > 0 ? ('OB-' + (OB_COUNTRY_CODE || 'XX') + '-' + fyDisp) : '';
         return { iso: iso, fy: fyResolved };
     }
 

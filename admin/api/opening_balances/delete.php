@@ -39,7 +39,7 @@ try {
         foreach ($ids as $oldId) {
             $pdo->prepare('DELETE FROM journal_vouchers WHERE id = ?')->execute([(int) $oldId]);
         }
-        orange_gl_pending_remove_by_reference($pdo, 'OB-' . $fyId);
+        orange_opening_balance_clear_pending_refs($pdo, $fyId, $ctxCountryId);
         $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {

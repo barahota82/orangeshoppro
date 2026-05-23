@@ -79,10 +79,10 @@ try {
             $pdo->prepare('DELETE FROM journal_vouchers WHERE id = ?')->execute([(int)$oldId]);
         }
 
-        orange_gl_pending_remove_by_reference($pdo, 'OB-' . $fyId);
+        orange_opening_balance_clear_pending_refs($pdo, $fyId, $ctxCountryId);
 
         $obDate = $dateIso . ' 10:00:00';
-        $obRef = 'OB-' . $fyId;
+        $obRef = orange_opening_balance_reference($pdo, $fyId, $ctxCountryId);
         if ($useQueue) {
             $pendingOb = orange_gl_pending_enqueue_multi(
                 $pdo,
