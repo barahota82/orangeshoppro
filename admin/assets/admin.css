@@ -4583,12 +4583,13 @@ td.tb-col-name,
     grid-template-columns:
         minmax(5.25rem, 7rem)
         minmax(12rem, 1fr)
+        minmax(8.25rem, 10rem)
         minmax(9.5rem, 11.5rem)
         minmax(9.5rem, 11.5rem)
         auto;
     gap: 12px 14px;
     align-items: end;
-    min-width: 900px;
+    min-width: min(1020px, 100%);
 }
 .gas-acc-stmt-toolbar > .gas-acc-stmt-field {
     min-width: 0;
