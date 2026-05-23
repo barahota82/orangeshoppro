@@ -704,7 +704,7 @@ function orange_gl_resolve_json_lines_for_preview(PDO $pdo, array $decoded): arr
     $acctParams = [];
     $acctFilter = orange_accounts_sql_country_filter($pdo, '');
     if ($acctFilter !== null) {
-        $acctSql .= str_replace('.country_id', 'country_id', $acctFilter['sql']);
+        $acctSql .= $acctFilter['sql'];
         $acctParams = $acctFilter['params'];
     }
     if ($acctParams === []) {

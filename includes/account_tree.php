@@ -627,7 +627,7 @@ function orange_accounts_filter_rows_for_leaf_search(PDO $pdo, array $rows, ?int
         $parentParams = [];
         $countryFilter = orange_accounts_sql_country_filter($pdo, '', $countryId);
         if ($countryFilter !== null) {
-            $parentSql .= str_replace('.country_id', 'country_id', $countryFilter['sql']);
+            $parentSql .= $countryFilter['sql'];
             $parentParams = $countryFilter['params'];
         }
         if ($parentParams === []) {
@@ -754,7 +754,7 @@ function orange_accounts_suggest_child_code(PDO $pdo, ?int $parentId): string
         $rootParams = [];
         $countryFilter = orange_accounts_sql_country_filter($pdo, '');
         if ($countryFilter !== null) {
-            $rootSql .= str_replace('.country_id', 'country_id', $countryFilter['sql']);
+            $rootSql .= $countryFilter['sql'];
             $rootParams = $countryFilter['params'];
         }
         if ($rootParams === []) {
@@ -954,7 +954,7 @@ function orange_accounts_roots_ordered(PDO $pdo): array
     $params = [];
     $countryFilter = orange_accounts_sql_country_filter($pdo, '');
     if ($countryFilter !== null) {
-        $sql .= str_replace('.country_id', 'country_id', $countryFilter['sql']);
+        $sql .= $countryFilter['sql'];
         $params = $countryFilter['params'];
     }
     $sql .= " ORDER BY CASE WHEN code REGEXP '^[0-9]+$' THEN 0 ELSE 1 END, CAST(code AS UNSIGNED), code, id";

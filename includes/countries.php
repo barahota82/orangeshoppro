@@ -705,7 +705,7 @@ function orange_accounts_sql_country_filter(PDO $pdo, string $alias = 'a', ?int 
     if ($countryId <= 0 || !orange_table_has_country_id($pdo, 'accounts')) {
         return null;
     }
-    $col = trim($alias) !== '' ? trim($alias) . '.country_id' : 'accounts.country_id';
+    $col = trim($alias) !== '' ? trim($alias) . '.country_id' : 'country_id';
     $kwId = orange_countries_default_id($pdo);
     if ($kwId > 0 && $countryId === $kwId) {
         return [
