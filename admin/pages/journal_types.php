@@ -21,23 +21,9 @@ if ($jtCountryLabel === '') {
 }
 $jtScoped = orange_journal_types_has_country_column($pdo);
 
-$types = orange_journal_types_list($pdo);
-/*
- * عادةً تملأ الأنواع المرجعية عبر orange_journal_types_sync_canonical_defaults داخل ensure_schema.
- * إن بقي الجدول فارغاً (فشل سابق نادر، أو قاعدة قديمة)، نُعيد دمج القائمة المرجعية هنا صراحةً
- * حتى تظهر صفوف بمعرّفات حقيقية — دون الاعتماد على صف واجهي بـ id=0.
- */
-if ($types === []) {
-    try {
-        orange_journal_types_merge_canonical_defaults($pdo);
-        $types = orange_journal_types_list($pdo);
-    } catch (Throwable $e) {
-        if (function_exists('error_log')) {
-            error_log('[orange] journal_types page merge: ' . $e->getMessage());
-        }
-    }
-}
+$types = orange_journal_types_list($pdo, $jtCountryId);
 $jtShowEmptyHint = ($types === []);
+$jtCanAutoSeed = orange_journal_types_should_auto_seed($pdo, $jtCountryId);
 ?>
 <div class="fy-years-page" dir="rtl">
     <h1 class="fy-years-page__title">أنواع اليوميات</h1>
@@ -45,7 +31,11 @@ $jtShowEmptyHint = ($types === []);
     <p class="card-hint" style="margin:0.35rem 0 0.75rem;line-height:1.55;">
         سياق الدولة: <strong><?php echo htmlspecialchars($jtCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong>
         — الأنواع المعروضة والمحفوظة لهذه الدولة فقط.
-        القائمة المرجعية (OBV، JE، RV، …) <strong>متطابقة بالأسماء</strong> بين الدول؛ عند «إنشاء كامل» لمصر تُنسخ نسخة مستقلة من الكويت كبداية — التعديل هنا لا يغيّر الكويت.
+        <?php if ($jtCanAutoSeed): ?>
+        القائمة المرجعية (OBV، JE، RV، …) تُبذَر تلقائياً للدولة الافتراضية (الكويت) عند الحاجة.
+        <?php else: ?>
+        <strong>لا تُبذَر تلقائياً هنا.</strong> لنسخ الأنواع من الكويت: شاشة <strong>الدول</strong> → «إنشاء كامل» للدولة.
+        <?php endif; ?>
     </p>
     <?php elseif (!$jtScoped): ?>
     <p class="card-hint" style="margin:0.35rem 0 0.75rem;color:#92400e;">
@@ -56,9 +46,13 @@ $jtShowEmptyHint = ($types === []);
     <div class="card fy-years-card fy-print-area">
         <?php if ($jtShowEmptyHint): ?>
             <p class="card-hint" style="margin:0 0 0.75rem;">
-                لا توجد صفوف في القاعدة بعد — أضف نوعاً واضغط <strong>حفظ</strong> لإنشاء السجلات،
-                أو أعد <strong>تحميل الصفحة</strong> لإعادة محاولة استيراد الأنواع المرجعية تلقائياً.
-                عند الحفظ، الصفوف ذات المعرف 0 تُدرج كسجلات جديدة في الجدول ثم تُحدَّث الصفحة.
+                <?php if ($jtCanAutoSeed): ?>
+                لا توجد صفوف في القاعدة بعد — أضف نوعاً واضغط <strong>حفظ</strong>،
+                أو أعد تحميل الصفحة لإعادة محاولة استيراد الأنواع المرجعية للكويت.
+                <?php else: ?>
+                لا توجد أنواع يوميات لهذه الدولة — هذا متوقَّع قبل «إنشاء كامل» من شاشة <strong>الدول</strong>.
+                يمكنك أيضاً إضافة أنواع يدوياً هنا ثم <strong>حفظ</strong>.
+                <?php endif; ?>
             </p>
         <?php endif; ?>
         <div class="table-wrap fy-years-table-wrap">

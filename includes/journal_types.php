@@ -12,6 +12,24 @@ function orange_journal_types_has_country_column(PDO $pdo): bool
 }
 
 /**
+ * هل تُبذَر الأنواع المرجعية (OBV، JE، …) تلقائياً لهذه الدولة؟
+ * فقط الدولة الافتراضية (الكويت) — باقي الدول تُملأ عبر «إنشاء كامل» من شاشة الدول.
+ */
+function orange_journal_types_should_auto_seed(PDO $pdo, ?int $countryId = null): bool
+{
+    if (!orange_journal_types_has_country_column($pdo)) {
+        return true;
+    }
+    $cid = orange_admin_settings_effective_country_id($pdo, $countryId);
+    if ($cid <= 0) {
+        return false;
+    }
+    $defaultId = orange_countries_default_id($pdo);
+
+    return $defaultId > 0 && $cid === $defaultId;
+}
+
+/**
  * @return list<array<string, mixed>>
  */
 function orange_journal_types_list(PDO $pdo, ?int $countryId = null): array
@@ -21,7 +39,6 @@ function orange_journal_types_list(PDO $pdo, ?int $countryId = null): array
     }
     if (orange_journal_types_has_country_column($pdo)) {
         $cid = orange_admin_settings_effective_country_id($pdo, $countryId);
-        orange_journal_types_sync_canonical_defaults($pdo, $cid);
         $st = $pdo->prepare(
             'SELECT * FROM journal_types WHERE country_id = ? ORDER BY sort_order ASC, id ASC'
         );
@@ -193,7 +210,7 @@ function orange_journal_types_retire_obsolete_exp_type(PDO $pdo, ?int $countryId
 /**
  * يضمن وجود الصفوف المرجعية وترتيبها (يُستدعى من catalog_schema).
  */
-function orange_journal_types_sync_canonical_defaults(PDO $pdo, ?int $countryId = null): void
+function orange_journal_types_sync_canonical_defaults(PDO $pdo, ?int $countryId = null, bool $force = false): void
 {
     static $done = [];
     if (!orange_table_exists($pdo, 'journal_types')) {
@@ -201,6 +218,9 @@ function orange_journal_types_sync_canonical_defaults(PDO $pdo, ?int $countryId 
     }
     $scoped = orange_journal_types_has_country_column($pdo);
     $cid = $scoped ? orange_admin_settings_effective_country_id($pdo, $countryId) : 0;
+    if ($scoped && !$force && !orange_journal_types_should_auto_seed($pdo, $cid)) {
+        return;
+    }
     $cacheKey = $scoped ? (string) $cid : 'legacy';
     if (isset($done[$cacheKey])) {
         return;

@@ -977,7 +977,12 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         orange_catalog_ensure_gl_account_settings_alloc_tables($pdo);
         require_once __DIR__ . '/journal_types.php';
         try {
-            orange_journal_types_merge_canonical_defaults($pdo);
+            $jtDefaultCid = orange_countries_default_id($pdo);
+            if ($jtDefaultCid > 0) {
+                orange_journal_types_merge_canonical_defaults($pdo, $jtDefaultCid);
+            } else {
+                orange_journal_types_merge_canonical_defaults($pdo);
+            }
         } catch (Throwable $e) {
             if (function_exists('error_log')) {
                 error_log('[orange] canonical journal_types merge (fast path): ' . $e->getMessage());
@@ -2317,7 +2322,12 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     if (orange_table_exists($pdo, 'journal_types')) {
         require_once __DIR__ . '/journal_types.php';
         try {
-            orange_journal_types_sync_canonical_defaults($pdo);
+            $jtDefaultCid = orange_countries_default_id($pdo);
+            if ($jtDefaultCid > 0 && orange_journal_types_has_country_column($pdo)) {
+                orange_journal_types_sync_canonical_defaults($pdo, $jtDefaultCid);
+            } else {
+                orange_journal_types_sync_canonical_defaults($pdo);
+            }
         } catch (Throwable $e) {
             if (function_exists('error_log')) {
                 error_log('[orange] journal_types sync: ' . $e->getMessage());
