@@ -750,8 +750,12 @@ $showStatementShell = ($err === '');
                     : ($accNameOnly !== '' ? $accNameOnly : '—');
             ?>
             <div class="gl-acc-stmt-print-grid">
-                <div class="gl-acc-stmt-print-row"><span class="gl-acc-stmt-print-k"><?php echo htmlspecialchars($printCodeKey, ENT_QUOTES, 'UTF-8'); ?></span><span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($printCodeVal, ENT_QUOTES, 'UTF-8'); ?></span></div>
-                <div class="gl-acc-stmt-print-row"><span class="gl-acc-stmt-print-k"><?php echo htmlspecialchars($printNameKey, ENT_QUOTES, 'UTF-8'); ?></span><span class="gl-acc-stmt-print-v"><?php echo htmlspecialchars($printNameVal, ENT_QUOTES, 'UTF-8'); ?></span></div>
+                <div class="gl-acc-stmt-print-row gl-acc-stmt-print-row--account">
+                    <span class="gl-acc-stmt-print-k"><?php echo htmlspecialchars($printCodeKey, ENT_QUOTES, 'UTF-8'); ?></span>
+                    <span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($printCodeVal, ENT_QUOTES, 'UTF-8'); ?></span>
+                    <span class="gl-acc-stmt-print-k"><?php echo htmlspecialchars($printNameKey, ENT_QUOTES, 'UTF-8'); ?></span>
+                    <span class="gl-acc-stmt-print-v"><?php echo htmlspecialchars($printNameVal, ENT_QUOTES, 'UTF-8'); ?></span>
+                </div>
                 <div class="gl-acc-stmt-print-row gl-acc-stmt-print-row--dates">
                     <span class="gl-acc-stmt-print-k">من تاريخ</span><span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($dateFromRaw, ENT_QUOTES, 'UTF-8'); ?></span>
                     <span class="gl-acc-stmt-print-k">الى تاريخ</span><span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($dateToRaw, ENT_QUOTES, 'UTF-8'); ?></span>

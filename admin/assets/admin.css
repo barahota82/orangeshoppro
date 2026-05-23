@@ -4248,6 +4248,10 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     border-bottom: 1px solid #e2e8f0;
     font-size: 0.95rem;
 }
+.gl-acc-stmt-print-row--account {
+    grid-template-columns: auto minmax(5.5rem, 11rem) auto minmax(8rem, 1fr);
+    gap: 0.35rem 0.75rem;
+}
 .gl-acc-stmt-print-row:last-child {
     border-bottom: none;
 }
@@ -4304,6 +4308,9 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 }
 
 @media (max-width: 640px) {
+    .gl-acc-stmt-print-row--account {
+        grid-template-columns: auto 1fr;
+    }
     .gl-acc-stmt-print-row--dates {
         grid-template-columns: auto 1fr;
     }
