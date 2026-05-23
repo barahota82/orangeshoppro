@@ -267,6 +267,51 @@ try {
         $action = 'search_manual';
     }
 
+    if ($action === 'reference_preview') {
+        $dateRaw = trim((string) ($data['date'] ?? ''));
+        $date = orange_normalize_admin_posted_datetime($dateRaw !== '' ? $dateRaw : date('Y-m-d'));
+        if ($date === null) {
+            json_response(['success' => false, 'message' => 'تاريخ السند غير صالح'], 422);
+        }
+        $entryTypeNorm = orange_journal_manage_resolve_ui_entry_type($data, 'manual');
+        $jtId = (int) ($data['journal_type_id'] ?? 0);
+        if ($entryTypeNorm === 'other_voucher' && $jtId <= 0) {
+            json_response(['success' => true, 'reference' => '', 'voucher_serial' => 0]);
+
+            return;
+        }
+        $entryTypeForPreview = $entryTypeNorm;
+        if ($entryTypeNorm === 'other_voucher') {
+            $entryTypeForPreview = orange_journal_manage_store_entry_type_for_other_voucher_screen($pdo, $jtId);
+        }
+        $countryId = orange_admin_context_country_id($pdo);
+        try {
+            $fyId = orange_fiscal_require_open_for_posting($pdo, $date, $countryId > 0 ? $countryId : null);
+        } catch (Throwable $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+        $meta = orange_journal_voucher_resolve_serial_meta(
+            $pdo,
+            $entryTypeForPreview,
+            $jtId > 0 ? $jtId : null,
+            $countryId > 0 ? $countryId : null
+        );
+        $serial = orange_journal_voucher_next_serial($pdo, $fyId, $meta['journal_serial_bucket']);
+        $jid = isset($meta['journal_type_id']) && $meta['journal_type_id'] !== null
+            ? (int) $meta['journal_type_id']
+            : ($jtId > 0 ? $jtId : null);
+        $ref = orange_voucher_auto_reference(
+            $pdo,
+            $entryTypeForPreview,
+            $serial,
+            $countryId > 0 ? $countryId : null,
+            $jid
+        );
+        json_response(['success' => true, 'reference' => $ref, 'voucher_serial' => $serial]);
+
+        return;
+    }
+
     if ($action === 'create') {
         $description = trim((string)($data['description'] ?? ''));
         $entryTypeNorm = orange_journal_manage_resolve_ui_entry_type($data, 'manual');

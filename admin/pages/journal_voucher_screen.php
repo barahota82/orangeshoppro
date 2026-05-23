@@ -45,7 +45,7 @@ if (orange_journal_vouchers_ready($pdo)) {
         && orange_table_has_column($pdo, 'journal_vouchers', 'voucher_serial')
     ) {
         if ($etPeek === 'other_voucher') {
-            $nextJournalVoucherNo = orange_gl_voucher_next_id_preview($pdo, $jvScreenCountryId);
+            $nextJournalVoucherNo = 0;
         } else {
             $jm = orange_journal_voucher_resolve_serial_meta($pdo, $etPeek, null);
             $nextJournalVoucherNo = orange_journal_voucher_next_serial($pdo, $fyPeekId, $jm['journal_serial_bucket']);
@@ -163,8 +163,8 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
             <div>
                 <label for="jv_number_preview">رقم القيد</label>
                 <input type="text" id="jv_number_preview" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;text-align:center;"
-                    value="<?php echo (int) $nextJournalVoucherNo; ?>"
-                    title="يُخصَّص تلقائياً من النظام عند الحفظ (تسلسل قاعدة البيانات)">
+                    value="<?php echo $nextJournalVoucherNo > 0 ? (int) $nextJournalVoucherNo : ''; ?>"
+                    title="يُخصَّص تلقائياً من النظام عند الحفظ (تسلسل ضمن نوع اليومية والسنة)">
             </div>
             <div>
                 <label for="jv_date">تاريخ السند</label>
@@ -466,7 +466,35 @@ var JV_NUMBER_PREVIEW = <?php echo (int) $nextJournalVoucherNo; ?>;
 
 function jvSyncRefPreview() {
     var refEl = document.getElementById('jv_ref');
+    var numEl = document.getElementById('jv_number_preview');
     if (!refEl || jvBrowseId) {
+        return;
+    }
+    if (JV_OTHER_VOUCHER_BROWSE) {
+        var jtId = jvJournalTypeFilterId();
+        if (jtId <= 0) {
+            refEl.value = '';
+            if (numEl) {
+                numEl.value = '';
+            }
+            return;
+        }
+        var dateEl = document.getElementById('jv_date');
+        var dIso = dateEl && typeof orangeGetDmyValueAsIso === 'function' ? orangeGetDmyValueAsIso(dateEl) : '';
+        postJSON('/admin/api/journal/manage.php', {
+            action: 'reference_preview',
+            date: dIso || undefined,
+            entry_type: JV_ENTRY_TYPE,
+            journal_type_id: jtId
+        }).then(function (r) {
+            if (!r || !r.success) {
+                return;
+            }
+            refEl.value = r.reference || '';
+            if (numEl) {
+                numEl.value = r.voucher_serial > 0 ? String(r.voucher_serial) : '';
+            }
+        }).catch(function () {});
         return;
     }
     var code = JV_TYPE_CODE || 'JE';
@@ -1000,7 +1028,20 @@ jvSearchModalBind();
     var sel = document.getElementById('jv_journal_type_filter');
     if (sel && !sel.getAttribute('data-jv-bound')) {
         sel.setAttribute('data-jv-bound', '1');
-        sel.addEventListener('change', jvApplyOtherVoucherBrowseGateUi);
+        sel.addEventListener('change', function () {
+            jvApplyOtherVoucherBrowseGateUi();
+            jvSyncRefPreview();
+        });
+    }
+    var jvDateEl = document.getElementById('jv_date');
+    if (jvDateEl && JV_OTHER_VOUCHER_BROWSE && !jvDateEl.getAttribute('data-jv-ref-bound')) {
+        jvDateEl.setAttribute('data-jv-ref-bound', '1');
+        jvDateEl.addEventListener('blur', function () {
+            if (typeof orangeNormalizeDmyInput === 'function') {
+                orangeNormalizeDmyInput(jvDateEl);
+            }
+            jvSyncRefPreview();
+        });
     }
 })();
 
