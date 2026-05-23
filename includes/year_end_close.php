@@ -23,12 +23,10 @@ function orange_fiscal_year_end_accounting_close(PDO $pdo, int $fiscalYearId, ?i
     if (!orange_journal_vouchers_ready($pdo)) {
         throw new RuntimeException('جداول السندات غير متوفرة.');
     }
-    $refPl = 'YEC-PL-' . $fiscalYearId;
-    $refRe = 'YEC-RE-' . $fiscalYearId;
-    $refLr = 'YEC-LR-' . $fiscalYearId;
-    $refLegacy = 'YEC-' . $fiscalYearId;
-    $stChk = $pdo->prepare('SELECT id FROM journal_vouchers WHERE reference IN (?,?,?,?) LIMIT 1');
-    $stChk->execute([$refPl, $refRe, $refLr, $refLegacy]);
+    $stChk = $pdo->prepare(
+        'SELECT id FROM journal_vouchers WHERE fiscal_year_id = ? AND entry_type = ? LIMIT 1'
+    );
+    $stChk->execute([$fiscalYearId, 'year_end_close']);
     if ($stChk->fetch()) {
         throw new RuntimeException('تم تنفيذ الإقفال المحاسبي لهذه السنة مسبقاً.');
     }
@@ -149,7 +147,6 @@ function orange_fiscal_year_end_accounting_close(PDO $pdo, int $fiscalYearId, ?i
     $endDate = (string) $fy['end_date'];
     orange_voucher_post($pdo, [
         'voucher_date' => $endDate . ' 18:00:00',
-        'reference' => $refPl,
         'description' => 'إقفال سنة مالية — إيرادات ومصروفات إلى ملخص الدخل',
         'entry_type' => 'year_end_close',
     ], $plLines);
@@ -157,7 +154,6 @@ function orange_fiscal_year_end_accounting_close(PDO $pdo, int $fiscalYearId, ?i
     if ($reLines !== []) {
         orange_voucher_post($pdo, [
             'voucher_date' => $endDate . ' 19:00:00',
-            'reference' => $refRe,
             'description' => 'إقفال سنة مالية — من ملخص الدخل إلى الأرباح المحتجزة',
             'entry_type' => 'year_end_close',
         ], $reLines);
@@ -172,7 +168,6 @@ function orange_fiscal_year_end_accounting_close(PDO $pdo, int $fiscalYearId, ?i
                     if ($reserveAmt >= $eps) {
                         orange_voucher_post($pdo, [
                             'voucher_date' => $endDate . ' 19:30:00',
-                            'reference' => $refLr,
                             'description' => 'إقفال سنة مالية — تخصيص احتياطي قانوني من مبلغ الترحيل للمحتجز',
                             'entry_type' => 'year_end_close',
                         ], [
@@ -214,14 +209,10 @@ function orange_fiscal_year_reopen(PDO $pdo, int $fiscalYearId): array
     try {
         $removed = 0;
         if (orange_journal_vouchers_ready($pdo)) {
-            $refPl = 'YEC-PL-' . $fiscalYearId;
-            $refRe = 'YEC-RE-' . $fiscalYearId;
-            $refLr = 'YEC-LR-' . $fiscalYearId;
-            $refLegacy = 'YEC-' . $fiscalYearId;
             $st = $pdo->prepare(
-                'SELECT id FROM journal_vouchers WHERE reference IN (?,?,?,?) OR (fiscal_year_id = ? AND entry_type = ?)'
+                'SELECT id FROM journal_vouchers WHERE fiscal_year_id = ? AND entry_type = ?'
             );
-            $st->execute([$refPl, $refRe, $refLr, $refLegacy, $fiscalYearId, 'year_end_close']);
+            $st->execute([$fiscalYearId, 'year_end_close']);
             /** @var list<int> $ids */
             $ids = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN) ?: []);
             $ids = array_values(array_unique(array_filter($ids, static function (int $i): bool {

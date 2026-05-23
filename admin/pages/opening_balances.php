@@ -211,7 +211,7 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
                 <label for="ob_ref">المرجع</label>
                 <input type="text" id="ob_ref" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;" tabindex="-1"
                     value="<?php echo htmlspecialchars($obRef, ENT_QUOTES, 'UTF-8'); ?>"
-                    title="يُولَّد تلقائياً: OB-رمز الدولة-رقم السنة (مثل OB-KW-1)" dir="ltr" lang="en" autocomplete="off">
+                    title="يُولَّد تلقائياً: OBV-رمز الدولة-رقم القيد (مثل OBV-KW-1)" dir="ltr" lang="en" autocomplete="off">
             </div>
             <div>
                 <label for="ob_document_entered">تاريخ المستند</label>
@@ -285,6 +285,8 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
 <script>
 var OB_PAGE_FY = <?php echo (int) $fyId; ?>;
 var OB_COUNTRY_CODE = <?php echo json_encode($obCountryCode, JSON_UNESCAPED_UNICODE); ?>;
+var OB_NUMBER_PREVIEW = <?php echo (int) $obNumberPreview; ?>;
+var OB_TYPE_CODE = 'OBV';
 var OB_FY_RANGES = <?php echo json_encode($obFyRanges, JSON_UNESCAPED_UNICODE); ?>;
 var OB_ADMIN_INDEX = <?php echo json_encode($obAdminIndexUrl, JSON_UNESCAPED_UNICODE); ?>;
 var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
@@ -317,7 +319,8 @@ var OB_SAVED_VOUCHER_ID = <?php echo (int) $obVid; ?>;
         var iso = typeof orangeGetDmyValueAsIso === 'function' ? orangeGetDmyValueAsIso(obDateEl) : '';
         var fyResolved = obResolveFyIdFromIso(iso);
         var fyDisp = fyResolved > 0 ? fyResolved : (typeof OB_PAGE_FY !== 'undefined' && OB_PAGE_FY > 0 ? OB_PAGE_FY : 0);
-        refEl.value = fyDisp > 0 ? ('OB-' + (OB_COUNTRY_CODE || 'XX') + '-' + fyDisp) : '';
+        var serial = typeof OB_NUMBER_PREVIEW !== 'undefined' && OB_NUMBER_PREVIEW > 0 ? OB_NUMBER_PREVIEW : 1;
+        refEl.value = fyDisp > 0 ? ((OB_TYPE_CODE || 'OBV') + '-' + (OB_COUNTRY_CODE || 'XX') + '-' + serial) : '';
         return { iso: iso, fy: fyResolved };
     }
 

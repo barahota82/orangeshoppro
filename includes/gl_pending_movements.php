@@ -850,7 +850,22 @@ function orange_order_fulfillment_vouchers_exist(PDO $pdo, string $orderNumber, 
     if ($orderNumber === '' || !orange_journal_vouchers_ready($pdo)) {
         return false;
     }
-    $like = 'ORDER-' . $orderNumber . '-S-%';
+    $st = $pdo->prepare('SELECT id FROM orders WHERE order_number = ? LIMIT 1');
+    $st->execute([$orderNumber]);
+    $orderId = (int) $st->fetchColumn();
+    if ($orderId > 0 && orange_table_exists($pdo, 'party_subledger')) {
+        $jvBind = orange_gl_voucher_country_bind($pdo, 'jv', $countryId);
+        $sql = "SELECT 1 FROM party_subledger ps
+                INNER JOIN journal_vouchers jv ON jv.id = ps.voucher_id
+                WHERE ps.ref_type = 'order' AND ps.ref_id = ?
+                  AND jv.entry_type IN ('order_delivery_sale','order_delivery_cogs')" . $jvBind['sql'] . ' LIMIT 1';
+        $chk = $pdo->prepare($sql);
+        $chk->execute(array_merge([$orderId], $jvBind['params']));
+        if ($chk->fetchColumn()) {
+            return true;
+        }
+    }
+    $likeLegacy = 'ORDER-' . $orderNumber . '-S-%';
 
-    return orange_gl_voucher_reference_like_exists($pdo, $like, $countryId);
+    return orange_gl_voucher_reference_like_exists($pdo, $likeLegacy, $countryId);
 }

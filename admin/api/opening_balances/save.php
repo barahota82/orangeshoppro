@@ -82,13 +82,13 @@ try {
         orange_opening_balance_clear_pending_refs($pdo, $fyId, $ctxCountryId);
 
         $obDate = $dateIso . ' 10:00:00';
-        $obRef = orange_opening_balance_reference($pdo, $fyId, $ctxCountryId);
+        $obPendingKey = orange_gl_pending_source_key('opening_balance', $fyId);
         if ($useQueue) {
             $pendingOb = orange_gl_pending_enqueue_multi(
                 $pdo,
                 $norm,
-                $obRef,
-                $obRef,
+                $obPendingKey,
+                'OBV-' . orange_opening_balance_country_code($pdo, $ctxCountryId),
                 $obDate,
                 $obDate,
                 $statement,
@@ -100,7 +100,6 @@ try {
         } else {
             orange_voucher_post($pdo, [
                 'voucher_date' => $obDate,
-                'reference' => $obRef,
                 'description' => $statement,
                 'entry_type' => 'opening_balance',
                 'country_id' => $ctxCountryId,

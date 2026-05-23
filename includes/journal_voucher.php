@@ -215,15 +215,33 @@ function orange_voucher_delete_by_reference(PDO $pdo, string $reference, ?int $c
 /**
  * حذف قيد المشتريات (سند أو الجدول القديم journal_entries).
  *
+ * @param int|string $purchaseIdOrLegacyRef معرف الفاتورة أو مرجع قديم PUR-{id}
+ *
  * @throws RuntimeException
  */
-function orange_purchase_remove_accounting(PDO $pdo, string $purchaseReference): void
+function orange_purchase_remove_accounting(PDO $pdo, int|string $purchaseIdOrLegacyRef, ?int $countryId = null): void
 {
     orange_catalog_ensure_schema($pdo);
+    $purchaseId = 0;
+    $legacyRef = '';
+    if (is_int($purchaseIdOrLegacyRef)) {
+        $purchaseId = $purchaseIdOrLegacyRef;
+    } elseif (preg_match('/^PUR-(\d+)$/i', trim((string) $purchaseIdOrLegacyRef), $m)) {
+        $purchaseId = (int) $m[1];
+        $legacyRef = trim((string) $purchaseIdOrLegacyRef);
+    } else {
+        $legacyRef = trim((string) $purchaseIdOrLegacyRef);
+    }
     if (orange_journal_vouchers_ready($pdo)) {
-        $v = orange_voucher_by_reference($pdo, $purchaseReference);
+        $v = null;
+        if ($purchaseId > 0) {
+            $v = orange_voucher_find_by_document($pdo, 'purchase', $purchaseId, 'purchase', $countryId);
+        }
+        if ($v === null && $legacyRef !== '') {
+            $v = orange_voucher_by_reference($pdo, $legacyRef, $countryId);
+        }
         if ($v) {
-            orange_voucher_delete_by_reference($pdo, $purchaseReference);
+            orange_voucher_delete_by_reference($pdo, (string) ($v['reference'] ?? ''), $countryId);
 
             return;
         }
@@ -232,12 +250,16 @@ function orange_purchase_remove_accounting(PDO $pdo, string $purchaseReference):
         return;
     }
     $st = $pdo->prepare('SELECT * FROM journal_entries WHERE reference = ? LIMIT 1');
-    $st->execute([$purchaseReference]);
+    $lookupRef = $legacyRef !== '' ? $legacyRef : ($purchaseId > 0 ? 'PUR-' . $purchaseId : '');
+    if ($lookupRef === '') {
+        return;
+    }
+    $st->execute([$lookupRef]);
     $j = $st->fetch(PDO::FETCH_ASSOC);
     if ($j && orange_fiscal_is_closed_for_entry($pdo, $j)) {
         throw new RuntimeException('لا يمكن حذف قيد شراء في سنة مالية مغلقة.');
     }
-    $pdo->prepare('DELETE FROM journal_entries WHERE reference = ?')->execute([$purchaseReference]);
+    $pdo->prepare('DELETE FROM journal_entries WHERE reference = ?')->execute([$lookupRef]);
 }
 
 /**
@@ -261,32 +283,67 @@ function orange_purchase_remove_receive_accounting(PDO $pdo, int $purchaseId, ?i
             $countryId = orange_admin_context_country_id($pdo);
         }
     }
-    $like = 'PUR-' . $purchaseId . '-RCV-%';
+    $likeLegacy = 'PUR-' . $purchaseId . '-RCV-%';
+    $srcPrefix = 'src:purchase_receive:' . $purchaseId;
     if (orange_table_exists($pdo, 'orange_gl_pending_movements')) {
         $pdo->prepare(
-            "DELETE FROM orange_gl_pending_movements WHERE reference LIKE ? AND entry_type = 'purchase_receive'"
-        )->execute([$like]);
+            "DELETE FROM orange_gl_pending_movements WHERE entry_type = 'purchase_receive'
+             AND (reference LIKE ? OR reference LIKE ?)"
+        )->execute([$likeLegacy, $srcPrefix . '%']);
     }
     if (!orange_journal_vouchers_ready($pdo)) {
         return;
     }
-    $refs = orange_gl_voucher_select_references_like($pdo, $like, $countryId > 0 ? $countryId : null);
+    $refs = orange_gl_voucher_select_references_like($pdo, $likeLegacy, $countryId > 0 ? $countryId : null);
     foreach ($refs as $ref) {
         $r = trim((string) $ref);
         if ($r !== '') {
             orange_voucher_delete_by_reference($pdo, $r, $countryId > 0 ? $countryId : null);
         }
     }
+    if (orange_table_exists($pdo, 'orange_gl_pending_movements')) {
+        $stV = $pdo->prepare(
+            'SELECT journal_voucher_id FROM orange_gl_pending_movements
+             WHERE reference LIKE ? AND journal_voucher_id IS NOT NULL AND journal_voucher_id > 0'
+        );
+        $stV->execute([$srcPrefix . '%']);
+        foreach ($stV->fetchAll(PDO::FETCH_COLUMN) ?: [] as $vidRaw) {
+            $v = orange_voucher_by_id($pdo, (int) $vidRaw);
+            if ($v !== null) {
+                orange_voucher_delete_by_reference($pdo, (string) ($v['reference'] ?? ''), $countryId > 0 ? $countryId : null);
+            }
+        }
+    }
 }
 
 /**
- * حذف قيد مردود المشتريات (نفس منطق حذف قيد الشراء حسب المرجع).
+ * حذف قيد مردود المشتريات (نفس منطق حذف قيد الشراء حسب المصدر).
  *
  * @throws RuntimeException
  */
-function orange_purchase_return_remove_accounting(PDO $pdo, string $returnReference): void
+function orange_purchase_return_remove_accounting(PDO $pdo, int|string $returnIdOrLegacyRef, ?int $countryId = null): void
 {
-    orange_purchase_remove_accounting($pdo, $returnReference);
+    $returnId = 0;
+    $legacyRef = '';
+    if (is_int($returnIdOrLegacyRef)) {
+        $returnId = $returnIdOrLegacyRef;
+    } elseif (preg_match('/^PR-(\d+)$/i', trim((string) $returnIdOrLegacyRef), $m)) {
+        $returnId = (int) $m[1];
+        $legacyRef = trim((string) $returnIdOrLegacyRef);
+    } else {
+        $legacyRef = trim((string) $returnIdOrLegacyRef);
+    }
+    if ($returnId > 0) {
+        $v = orange_voucher_find_by_document($pdo, 'purchase_return', $returnId, 'purchase_return', $countryId);
+        if ($v !== null) {
+            orange_voucher_delete_by_reference($pdo, (string) ($v['reference'] ?? ''), $countryId);
+
+            return;
+        }
+    }
+    if ($legacyRef !== '') {
+        orange_purchase_remove_accounting($pdo, $legacyRef, $countryId);
+    }
 }
 
 /**
@@ -294,16 +351,28 @@ function orange_purchase_return_remove_accounting(PDO $pdo, string $returnRefere
  *
  * @throws RuntimeException
  */
-function orange_sales_return_remove_accounting(PDO $pdo, int $returnId): void
+function orange_sales_return_remove_accounting(PDO $pdo, int $returnId, ?int $countryId = null): void
 {
     orange_catalog_ensure_schema($pdo);
+    foreach (['order_return_sale', 'order_return_cogs'] as $et) {
+        $suffix = $et === 'order_return_cogs' ? 'cogs' : 'sale';
+        $v = orange_voucher_find_by_document($pdo, 'sales_return', $returnId, $et, $countryId, $suffix);
+        if ($v !== null) {
+            orange_voucher_delete_by_reference($pdo, (string) ($v['reference'] ?? ''), $countryId);
+        }
+    }
     $rs = 'SR-' . $returnId . '-RS';
     $rc = 'SR-' . $returnId . '-RC';
     if (orange_table_exists($pdo, 'orange_gl_pending_movements')) {
-        $pdo->prepare('DELETE FROM orange_gl_pending_movements WHERE reference IN (?,?)')->execute([$rs, $rc]);
+        $pdo->prepare('DELETE FROM orange_gl_pending_movements WHERE reference IN (?,?,?,?)')->execute([
+            $rs,
+            $rc,
+            orange_gl_pending_source_key('sales_return', $returnId, 'sale'),
+            orange_gl_pending_source_key('sales_return', $returnId, 'cogs'),
+        ]);
     }
-    orange_purchase_remove_accounting($pdo, $rs);
-    orange_purchase_remove_accounting($pdo, $rc);
+    orange_purchase_remove_accounting($pdo, $rs, $countryId);
+    orange_purchase_remove_accounting($pdo, $rc, $countryId);
 }
 
 /**
@@ -350,6 +419,281 @@ function orange_journal_voucher_display_number(array $voucherRow): int
     $vs = isset($voucherRow['voucher_serial']) ? (int) $voucherRow['voucher_serial'] : 0;
 
     return $vs > 0 ? $vs : (int) ($voucherRow['id'] ?? 0);
+}
+
+/** رمز السوق في مرجع السند (KW، EG، UAE، …). */
+function orange_voucher_country_display_code(PDO $pdo, ?int $countryId = null): string
+{
+    return orange_opening_balance_country_code($pdo, $countryId);
+}
+
+function orange_voucher_journal_type_code(
+    PDO $pdo,
+    string $entryType,
+    ?int $journalTypeId = null,
+    ?int $countryId = null
+): string {
+    $jtId = (int) ($journalTypeId ?? 0);
+    if ($jtId > 0) {
+        $fromId = orange_journal_type_code_by_id($pdo, $jtId);
+        if ($fromId !== '') {
+            return $fromId;
+        }
+    }
+    $fromEt = orange_journal_type_code_from_entry_type($entryType);
+    if ($fromEt !== '') {
+        return $fromEt;
+    }
+
+    return 'JE';
+}
+
+/** مرجع السند: {كود نوع اليومية}-{رمز الدولة}-{voucher_serial}. */
+function orange_voucher_auto_reference(
+    PDO $pdo,
+    string $entryType,
+    int $voucherSerial,
+    ?int $countryId = null,
+    ?int $journalTypeId = null
+): string {
+    $code = orange_voucher_journal_type_code($pdo, $entryType, $journalTypeId, $countryId);
+    $cc = orange_voucher_country_display_code($pdo, $countryId);
+    if ($cc === '') {
+        $cc = 'XX';
+    }
+    $serial = $voucherSerial > 0 ? $voucherSerial : 1;
+
+    return $code . '-' . $cc . '-' . $serial;
+}
+
+/** معاينة المرجع قبل الحفظ (التسلسل التالي ضمن السنة ونوع اليومية). */
+function orange_voucher_auto_reference_preview(
+    PDO $pdo,
+    string $entryType,
+    int $fyId,
+    ?int $countryId = null,
+    ?int $journalTypeId = null
+): string {
+    if ($fyId <= 0) {
+        return '';
+    }
+    $meta = orange_journal_voucher_resolve_serial_meta(
+        $pdo,
+        $entryType,
+        ($journalTypeId ?? 0) > 0 ? (int) $journalTypeId : null,
+        $countryId
+    );
+    $next = orange_journal_voucher_next_serial($pdo, $fyId, $meta['journal_serial_bucket']);
+    $jid = isset($meta['journal_type_id']) && $meta['journal_type_id'] !== null
+        ? (int) $meta['journal_type_id']
+        : (($journalTypeId ?? 0) > 0 ? (int) $journalTypeId : null);
+
+    return orange_voucher_auto_reference($pdo, $entryType, $next, $countryId, $jid);
+}
+
+/**
+ * مفتاح داخلي لصف طابور GL — المرجع المحاسبي يُولَّد عند الترحيل في orange_voucher_post.
+ */
+function orange_gl_pending_source_key(string $refType, int $refId, string $suffix = ''): string
+{
+    $t = strtolower(trim($refType));
+    if ($t === '' || $refId <= 0) {
+        throw new InvalidArgumentException('مفتاح مصدر الطابور غير صالح.');
+    }
+    $key = 'src:' . $t . ':' . $refId;
+    $suffix = trim($suffix);
+    if ($suffix !== '') {
+        $key .= ':' . $suffix;
+    }
+
+    return $key;
+}
+
+/**
+ * @return array<string, mixed>|null
+ */
+function orange_voucher_find_by_document(
+    PDO $pdo,
+    string $refType,
+    int $refId,
+    ?string $entryType = null,
+    ?int $countryId = null,
+    string $suffix = ''
+): ?array {
+    orange_catalog_ensure_schema($pdo);
+    if ($refId <= 0 || trim($refType) === '') {
+        return null;
+    }
+    if (orange_table_exists($pdo, 'party_subledger')) {
+        $jvBind = orange_gl_voucher_country_bind($pdo, 'jv', $countryId);
+        $sql = 'SELECT jv.* FROM journal_vouchers jv
+                INNER JOIN party_subledger ps ON ps.voucher_id = jv.id
+                WHERE ps.ref_type = ? AND ps.ref_id = ?' . $jvBind['sql'];
+        $params = [$refType, $refId];
+        if ($entryType !== null && trim($entryType) !== '') {
+            $sql .= ' AND jv.entry_type = ?';
+            $params[] = trim($entryType);
+        }
+        $sql .= ' ORDER BY jv.id DESC LIMIT 1';
+        $st = $pdo->prepare($sql);
+        $st->execute(array_merge($params, $jvBind['params']));
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if ($row) {
+            return $row;
+        }
+    }
+    if (orange_table_exists($pdo, 'orange_gl_pending_movements')) {
+        $srcKey = orange_gl_pending_source_key($refType, $refId, $suffix);
+        $stP = $pdo->prepare(
+            'SELECT journal_voucher_id FROM orange_gl_pending_movements
+             WHERE reference = ? AND journal_voucher_id IS NOT NULL AND journal_voucher_id > 0
+             ORDER BY id DESC LIMIT 1'
+        );
+        $stP->execute([$srcKey]);
+        $vid = (int) $stP->fetchColumn();
+        if ($vid > 0) {
+            $v = orange_voucher_by_id($pdo, $vid);
+            if ($v !== null) {
+                if ($entryType === null || trim($entryType) === '' || trim((string) ($v['entry_type'] ?? '')) === trim($entryType)) {
+                    return $v;
+                }
+            }
+        }
+    }
+    $legacy = orange_voucher_legacy_reference_for_document($refType, $refId, $suffix, $entryType);
+    if ($legacy !== '') {
+        return orange_voucher_by_reference($pdo, $legacy, $countryId);
+    }
+
+    return null;
+}
+
+/**
+ * @return list<array<string, mixed>>
+ */
+function orange_voucher_list_by_document(
+    PDO $pdo,
+    string $refType,
+    int $refId,
+    ?array $entryTypes = null,
+    ?int $countryId = null
+): array {
+    orange_catalog_ensure_schema($pdo);
+    if ($refId <= 0 || trim($refType) === '') {
+        return [];
+    }
+    $found = [];
+    $seen = [];
+    $add = static function (?array $row) use (&$found, &$seen): void {
+        if ($row === null) {
+            return;
+        }
+        $id = (int) ($row['id'] ?? 0);
+        if ($id <= 0 || isset($seen[$id])) {
+            return;
+        }
+        $seen[$id] = true;
+        $found[] = $row;
+    };
+    if ($entryTypes === null || $entryTypes === []) {
+        $add(orange_voucher_find_by_document($pdo, $refType, $refId, null, $countryId));
+    } else {
+        foreach ($entryTypes as $et) {
+            $add(orange_voucher_find_by_document($pdo, $refType, $refId, (string) $et, $countryId));
+        }
+    }
+    if (orange_table_exists($pdo, 'orange_gl_pending_movements')) {
+        $like = 'src:' . strtolower(trim($refType)) . ':' . $refId . '%';
+        $stP = $pdo->prepare(
+            'SELECT journal_voucher_id FROM orange_gl_pending_movements
+             WHERE reference LIKE ? AND journal_voucher_id IS NOT NULL AND journal_voucher_id > 0'
+        );
+        $stP->execute([$like]);
+        foreach ($stP->fetchAll(PDO::FETCH_COLUMN) ?: [] as $vidRaw) {
+            $vid = (int) $vidRaw;
+            if ($vid <= 0) {
+                continue;
+            }
+            $v = orange_voucher_by_id($pdo, $vid);
+            if ($v === null) {
+                continue;
+            }
+            if ($entryTypes !== null && $entryTypes !== []) {
+                $etV = trim((string) ($v['entry_type'] ?? ''));
+                if (!in_array($etV, $entryTypes, true)) {
+                    continue;
+                }
+            }
+            $add($v);
+        }
+    }
+    foreach (orange_voucher_legacy_references_for_document($refType, $refId) as $legacyRef) {
+        $add(orange_voucher_by_reference($pdo, $legacyRef, $countryId));
+    }
+
+    return $found;
+}
+
+function orange_voucher_legacy_reference_for_document(
+    string $refType,
+    int $refId,
+    string $suffix = '',
+    ?string $entryType = null
+): string {
+    $t = strtolower(trim($refType));
+    if ($t === 'purchase' && ($entryType === null || $entryType === 'purchase')) {
+        return 'PUR-' . $refId;
+    }
+    if ($t === 'purchase_return' && ($entryType === null || $entryType === 'purchase_return')) {
+        return 'PR-' . $refId;
+    }
+    if ($t === 'sales_return') {
+        $sfx = strtolower(trim($suffix));
+        if ($sfx === 'cogs' || $entryType === 'order_return_cogs') {
+            return 'SR-' . $refId . '-RC';
+        }
+
+        return 'SR-' . $refId . '-RS';
+    }
+    if ($t === 'opening_balance') {
+        return 'OB-' . $refId;
+    }
+
+    return '';
+}
+
+/**
+ * @return list<string>
+ */
+function orange_voucher_legacy_references_for_document(string $refType, int $refId): array
+{
+    $t = strtolower(trim($refType));
+    if ($t === 'purchase') {
+        return ['PUR-' . $refId];
+    }
+    if ($t === 'purchase_return') {
+        return ['PR-' . $refId];
+    }
+    if ($t === 'sales_return') {
+        return ['SR-' . $refId . '-RS', 'SR-' . $refId . '-RC'];
+    }
+    if ($t === 'opening_balance') {
+        return ['OB-' . $refId];
+    }
+
+    return [];
+}
+
+function orange_voucher_by_id(PDO $pdo, int $voucherId): ?array
+{
+    if ($voucherId <= 0 || !orange_journal_vouchers_ready($pdo)) {
+        return null;
+    }
+    $st = $pdo->prepare('SELECT * FROM journal_vouchers WHERE id = ? LIMIT 1');
+    $st->execute([$voucherId]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+
+    return $row ?: null;
 }
 
 /**
@@ -486,8 +830,6 @@ function orange_voucher_post(PDO $pdo, array $header, array $lines): int
     if ($description === '') {
         throw new InvalidArgumentException('بيان السند مطلوب.');
     }
-    $reference = array_key_exists('reference', $header) ? trim((string) $header['reference']) : '';
-    $referenceSql = $reference === '' ? null : $reference;
     $entryType = trim((string) ($header['entry_type'] ?? 'general'));
     if ($entryType === '') {
         $entryType = 'general';
@@ -573,6 +915,13 @@ function orange_voucher_post(PDO $pdo, array $header, array $lines): int
             $nextSerial = orange_journal_voucher_next_serial($pdo, $fyId, $metaSerial['journal_serial_bucket']);
         }
         $bucket = $metaSerial['journal_serial_bucket'];
+        $referenceSql = orange_voucher_auto_reference(
+            $pdo,
+            $entryType,
+            $nextSerial,
+            $voucherCountryId > 0 ? $voucherCountryId : null,
+            $jidSerial
+        );
 
         $inserted = false;
         $lastErr = null;
@@ -624,6 +973,13 @@ function orange_voucher_post(PDO $pdo, array $header, array $lines): int
                         throw $e;
                     }
                     $nextSerial = orange_journal_voucher_next_serial($pdo, $fyId, $bucket);
+                    $referenceSql = orange_voucher_auto_reference(
+                        $pdo,
+                        $entryType,
+                        $nextSerial,
+                        $voucherCountryId > 0 ? $voucherCountryId : null,
+                        $jidSerial
+                    );
                 }
             }
             if (!$inserted) {
@@ -632,15 +988,39 @@ function orange_voucher_post(PDO $pdo, array $header, array $lines): int
                     : new RuntimeException('تعذر تعيين رقم قيد لتسلسل اليومية.');
             }
         } elseif (orange_table_has_column($pdo, 'journal_vouchers', 'document_entered_at')) {
+            $referenceSql = orange_voucher_auto_reference(
+                $pdo,
+                $entryType,
+                1,
+                $voucherCountryId > 0 ? $voucherCountryId : null,
+                null
+            );
             $pdo->prepare(
                 'INSERT INTO journal_vouchers (voucher_date, document_entered_at, reference, description, entry_type, fiscal_year_id) VALUES (?,?,?,?,?,?)'
             )->execute([$date, $docEntered, $referenceSql, $description, $entryType, $fyId]);
         } else {
+            $referenceSql = orange_voucher_auto_reference(
+                $pdo,
+                $entryType,
+                1,
+                $voucherCountryId > 0 ? $voucherCountryId : null,
+                null
+            );
             $pdo->prepare(
                 'INSERT INTO journal_vouchers (voucher_date, reference, description, entry_type, fiscal_year_id) VALUES (?,?,?,?,?)'
             )->execute([$date, $referenceSql, $description, $entryType, $fyId]);
         }
         $vid = (int) $pdo->lastInsertId();
+        if (!$hasSerialCols && $vid > 0) {
+            $referenceSql = orange_voucher_auto_reference(
+                $pdo,
+                $entryType,
+                $vid,
+                $voucherCountryId > 0 ? $voucherCountryId : null,
+                null
+            );
+            $pdo->prepare('UPDATE journal_vouchers SET reference = ? WHERE id = ?')->execute([$referenceSql, $vid]);
+        }
         orange_journal_voucher_stamp_country($pdo, $vid, $header);
 
         $ins = $pdo->prepare(
@@ -701,7 +1081,6 @@ function orange_journal_insert_line(PDO $pdo, array $row): int
 
     return orange_voucher_post($pdo, [
         'voucher_date' => $date,
-        'reference' => $reference !== '' ? $reference : null,
         'description' => $description,
         'entry_type' => $entryType !== '' ? $entryType : 'general',
     ], [
@@ -726,9 +1105,10 @@ function orange_voucher_update_multiline(PDO $pdo, int $voucherId, array $header
     if ($voucherId <= 0) {
         throw new InvalidArgumentException('معرف السند غير صالح.');
     }
-    $ex = $pdo->prepare('SELECT id FROM journal_vouchers WHERE id = ? LIMIT 1');
+    $ex = $pdo->prepare('SELECT id, reference FROM journal_vouchers WHERE id = ? LIMIT 1');
     $ex->execute([$voucherId]);
-    if (!$ex->fetch()) {
+    $existing = $ex->fetch(PDO::FETCH_ASSOC);
+    if (!$existing) {
         throw new InvalidArgumentException('السند غير موجود.');
     }
 
@@ -743,8 +1123,10 @@ function orange_voucher_update_multiline(PDO $pdo, int $voucherId, array $header
     if ($description === '') {
         throw new InvalidArgumentException('بيان السند مطلوب.');
     }
-    $reference = array_key_exists('reference', $header) ? trim((string) $header['reference']) : '';
-    $referenceSql = $reference === '' ? null : $reference;
+    $referenceSql = trim((string) ($existing['reference'] ?? ''));
+    if ($referenceSql === '') {
+        $referenceSql = null;
+    }
 
     $voucherCountryId = orange_journal_voucher_resolve_country_id($pdo, $header);
     $currencyCode = orange_gl_functional_currency_code($pdo, $voucherCountryId > 0 ? $voucherCountryId : null);

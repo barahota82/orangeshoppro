@@ -33,6 +33,7 @@ if ($jvPageEt === 'other_voucher') {
 }
 
 $nextJournalVoucherNo = 1;
+$fyPeekId = 0;
 if (orange_journal_vouchers_ready($pdo)) {
     orange_journal_types_sync_canonical_defaults($pdo);
     $fyPeek = orange_fiscal_find_for_date($pdo, date('Y-m-d'), $jvScreenCountryId > 0 ? $jvScreenCountryId : null);
@@ -56,6 +57,20 @@ if (orange_journal_vouchers_ready($pdo)) {
 $jvFormDocumentEnteredDisplay = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 $jvFormVoucherDateDisplay = orange_format_date_dmY(date('Y-m-d'));
 $jvNavReady = orange_journal_vouchers_ready($pdo);
+$jvCountryCode = orange_voucher_country_display_code($pdo, $jvScreenCountryId > 0 ? $jvScreenCountryId : null);
+$jvTypeCode = orange_journal_type_code_from_entry_type($jvPageEt);
+if ($jvTypeCode === '' && $jvPageEt !== '') {
+    $jvTypeCode = 'JE';
+}
+$jvRefPreview = '';
+if ($fyPeekId > 0 && $jvPageEt !== '' && $jvPageEt !== 'other_voucher') {
+    $jvRefPreview = orange_voucher_auto_reference_preview(
+        $pdo,
+        $jvPageEt,
+        $fyPeekId,
+        $jvScreenCountryId > 0 ? $jvScreenCountryId : null
+    );
+}
 $jvPostingLeafCt = 0;
 if ($jvNavReady) {
     $jvPostingLeafCt = orange_accounts_count_posting_leaves($pdo, $jvScreenCountryId > 0 ? $jvScreenCountryId : null);
@@ -158,8 +173,10 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
                     title="تاريخ محاسبي للسند — يوم/شهر/سنة" dir="ltr" lang="en" autocomplete="off">
             </div>
             <div>
-                <label for="jv_ref">المرجع <span class="muted" style="font-weight:normal;">(اختياري)</span></label>
-                <input type="text" id="jv_ref" autocomplete="off">
+                <label for="jv_ref">المرجع</label>
+                <input type="text" id="jv_ref" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;" tabindex="-1"
+                    value="<?php echo htmlspecialchars($jvRefPreview, ENT_QUOTES, 'UTF-8'); ?>"
+                    title="يُولَّد تلقائياً: كود نوع اليومية-رمز الدولة-رقم القيد" dir="ltr" lang="en" autocomplete="off">
             </div>
             <div>
                 <label for="jv_document_entered">تاريخ المستند</label>
@@ -443,6 +460,19 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
 var JV_ENTRY_TYPE = <?php echo json_encode($jvPageEntryType, JSON_UNESCAPED_UNICODE); ?>;
 var JV_OTHER_VOUCHER_BROWSE = <?php echo $jvPageEt === 'other_voucher' ? 'true' : 'false'; ?>;
 var JV_CASH_LOCK = <?php echo json_encode($jvCashLock, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>;
+var JV_COUNTRY_CODE = <?php echo json_encode($jvCountryCode, JSON_UNESCAPED_UNICODE); ?>;
+var JV_TYPE_CODE = <?php echo json_encode($jvTypeCode, JSON_UNESCAPED_UNICODE); ?>;
+var JV_NUMBER_PREVIEW = <?php echo (int) $nextJournalVoucherNo; ?>;
+
+function jvSyncRefPreview() {
+    var refEl = document.getElementById('jv_ref');
+    if (!refEl || jvBrowseId) {
+        return;
+    }
+    var code = JV_TYPE_CODE || 'JE';
+    var serial = JV_NUMBER_PREVIEW > 0 ? JV_NUMBER_PREVIEW : 1;
+    refEl.value = code + '-' + (JV_COUNTRY_CODE || 'XX') + '-' + serial;
+}
 
 function jvCashLockActive() {
     return !!(JV_CASH_LOCK && JV_CASH_LOCK.id);
@@ -1539,7 +1569,6 @@ function jvSubmit() {
     jvPurgeIncompleteLinesBeforeSave();
     jvCashLockSyncTreasuryAmount();
     var dIso = orangeGetDmyValueAsIso(document.getElementById('jv_date'));
-    var ref = document.getElementById('jv_ref').value.trim();
     var desc = document.getElementById('jv_desc').value.trim();
     if (!dIso || !desc) {
         alert('التاريخ والبيان مطلوبان (التاريخ بصيغة يوم/شهر/سنة)');
@@ -1609,7 +1638,6 @@ function jvSubmit() {
     var savePayload = {
         action: (jvBrowseId && !jvViewMode) ? 'update' : 'create',
         date: dIso,
-        reference: ref,
         description: desc,
         entry_type: JV_ENTRY_TYPE,
         lines: lines
@@ -1682,5 +1710,6 @@ jvSyncTrailingRows();
         pb.addEventListener('click', jvPrintVoucher);
     }
     jvApplyOtherVoucherBrowseGateUi();
+    jvSyncRefPreview();
 })();
 </script>

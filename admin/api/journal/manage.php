@@ -269,7 +269,6 @@ try {
 
     if ($action === 'create') {
         $description = trim((string)($data['description'] ?? ''));
-        $reference = trim((string)($data['reference'] ?? ''));
         $entryTypeNorm = orange_journal_manage_resolve_ui_entry_type($data, 'manual');
         $dateRaw = trim((string)($data['date'] ?? ''));
         $date = orange_normalize_admin_posted_datetime($dateRaw);
@@ -304,13 +303,13 @@ try {
             orange_journal_manage_assert_receipt_cash_last_line($pdo, $entryTypeNorm, $postLines);
             orange_journal_manage_assert_payment_cash_first_line($pdo, $entryTypeNorm, $postLines);
             if (orange_gl_use_pending_queue($pdo)) {
-                $refOut = $reference !== '' ? $reference : ('JM-' . str_replace(['.', ' '], '', uniqid('', true)));
+                $refOut = 'src:journal:' . str_replace(['.', ' '], '', uniqid('', true));
                 try {
                     $pendingId = orange_gl_pending_enqueue_multi(
                         $pdo,
                         $postLines,
                         $refOut,
-                        $refOut,
+                        mb_substr($description, 0, 120),
                         $date,
                         $date,
                         $description,
@@ -321,8 +320,8 @@ try {
                 } catch (Throwable $e) {
                     orange_admin_api_catch($e, 'تعذر إضافة السند', 422);
                 }
-                if ($pendingId <= 0 && $reference !== '') {
-                    json_response(['success' => false, 'message' => 'المرجع مسجّل مسبقاً في طابور الترحيل أو غير صالح'], 422);
+                if ($pendingId <= 0) {
+                    json_response(['success' => false, 'message' => 'تعذر إدراج السند في طابور الترحيل'], 422);
                 }
                 audit_log('journal_create', 'سند يدوي متعدد الأسطر (معلّق) مرجع: ' . $refOut, 'orange_gl_pending_movements', $pendingId);
                 json_response([
@@ -338,7 +337,6 @@ try {
                 $vid = orange_voucher_post($pdo, array_merge($headerExtra, [
                     'voucher_date' => $date,
                     'document_entered_at' => date('Y-m-d H:i:s'),
-                    'reference' => $reference !== '' ? $reference : null,
                     'description' => $description,
                     'entry_type' => $entryTypeForPost,
                 ]), $postLines);
@@ -367,11 +365,11 @@ try {
             }
         }
         if (orange_gl_use_pending_queue($pdo)) {
-            $refOut = $reference !== '' ? $reference : ('JM-' . str_replace(['.', ' '], '', uniqid('', true)));
+            $refOut = 'src:journal:' . str_replace(['.', ' '], '', uniqid('', true));
             try {
                 $simpleRow = [
                     'reference' => $refOut,
-                    'source_label' => $refOut,
+                    'source_label' => mb_substr($description, 0, 120),
                     'movement_at' => $date,
                     'voucher_date' => $date,
                     'account_debit' => $accountDebit,
@@ -387,8 +385,8 @@ try {
             } catch (Throwable $e) {
                 orange_admin_api_catch($e, 'تعذر إضافة السند', 422);
             }
-            if ($pendingId <= 0 && $reference !== '') {
-                json_response(['success' => false, 'message' => 'المرجع مسجّل مسبقاً في طابور الترحيل أو غير صالح'], 422);
+            if ($pendingId <= 0) {
+                json_response(['success' => false, 'message' => 'تعذر إدراج السند في طابور الترحيل'], 422);
             }
             audit_log('journal_create', 'سند يدوي (معلّق) مرجع: ' . $refOut, 'orange_gl_pending_movements', $pendingId);
             json_response([
@@ -404,7 +402,6 @@ try {
             $vid = orange_voucher_post($pdo, array_merge($headerExtra, [
                 'voucher_date' => $date,
                 'document_entered_at' => date('Y-m-d H:i:s'),
-                'reference' => $reference !== '' ? $reference : null,
                 'description' => $description,
                 'entry_type' => $entryTypeForPost,
             ]), [
@@ -850,7 +847,6 @@ try {
         orange_journal_manage_assert_payment_cash_first_line($pdo, $entryTypeV, $postLinesUp);
 
         $descriptionUp = trim((string) ($data['description'] ?? ''));
-        $referenceUp = trim((string) ($data['reference'] ?? ''));
         $dateRawUp = trim((string) ($data['date'] ?? ''));
         $dateUp = orange_normalize_admin_posted_datetime($dateRawUp);
         if ($dateUp === null) {
@@ -873,7 +869,6 @@ try {
         try {
             orange_voucher_update_multiline($pdo, $id, [
                 'voucher_date' => $dateUp,
-                'reference' => $referenceUp,
                 'description' => $descriptionUp,
             ], $postLinesUp);
         } catch (InvalidArgumentException $e) {

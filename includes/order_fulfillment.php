@@ -55,6 +55,9 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
 
     $cogsRuleCode = $isOnline ? 'CGO' : ($isCredit ? 'CGT' : 'CGC');
     $cogsRule = orange_gl_order_delivery_setting_keys_from_rule($pdo, $cogsRuleCode);
+    $saleJtCode = $isOnline ? 'OSI' : ($isCredit ? 'SIN' : 'CSI');
+    $saleJtId = orange_journal_type_id_by_code($pdo, $saleJtCode, $ofGlCountryId);
+    $cogsJtId = orange_journal_type_id_by_code($pdo, $cogsRuleCode, $ofGlCountryId);
 
     if ($isOnline) {
         $debitReceivable = 0;
@@ -188,8 +191,8 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
 
         $now = date('Y-m-d H:i:s');
         $lineKey = isset($item['id']) ? (string) (int) $item['id'] : (string) $idx;
-        $saleRef = 'ORDER-' . $order['order_number'] . '-S-' . $lineKey;
-        $cogsRef = 'ORDER-' . $order['order_number'] . '-C-' . $lineKey;
+        $salePendingKey = orange_gl_pending_source_key('order', (int) $order['id'], 'sale-' . $lineKey);
+        $cogsPendingKey = orange_gl_pending_source_key('order', (int) $order['id'], 'cogs-' . $lineKey);
         $saleDesc = $isOnline
             ? 'قيد مبيعات أونلاين — تسليم'
             : ($isCredit ? 'قيد مبيعات آجل — تسليم' : 'قيد مبيعات نقدي — تسليم');
@@ -268,7 +271,7 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
                     orange_gl_pending_enqueue_multi(
                         $pdo,
                         $saleFour['lines'],
-                        $saleRef,
+                        $salePendingKey,
                         $srcLabel,
                         $now,
                         $now,
@@ -280,9 +283,9 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
                     $vCashSale = orange_voucher_post($pdo, [
                         'voucher_date' => $now,
                         'document_entered_at' => $now,
-                        'reference' => $saleRef,
                         'description' => $saleDesc,
                         'entry_type' => 'order_delivery_sale',
+                        'journal_type_id' => $saleJtId > 0 ? $saleJtId : null,
                         'country_id' => $ofGlCountryId,
                     ], $saleFour['lines']);
                     if ($customerIdForAr > 0 && is_int($vCashSale) && $vCashSale > 0) {
@@ -332,7 +335,7 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
                     ], JSON_UNESCAPED_UNICODE);
                 }
                 orange_gl_pending_enqueue_simple($pdo, [
-                    'reference' => $saleRef,
+                    'reference' => $salePendingKey,
                     'source_label' => $srcLabel,
                     'movement_at' => $now,
                     'voucher_date' => $now,
@@ -344,14 +347,16 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
                     'after_post_json' => orange_gl_after_post_json_with_country($afterJson, $ofGlCountryId),
                 ]);
             } else {
-                $vSale = orange_journal_insert_line($pdo, [
-                    'date' => $now,
-                    'account_debit' => $debitReceivable,
-                    'account_credit' => $salesId,
-                    'amount' => $salesAmount,
-                    'reference' => $saleRef,
+                $vSale = orange_voucher_post($pdo, [
+                    'voucher_date' => $now,
+                    'document_entered_at' => $now,
                     'description' => $saleDesc,
                     'entry_type' => 'order_delivery_sale',
+                    'journal_type_id' => $saleJtId > 0 ? $saleJtId : null,
+                    'country_id' => $ofGlCountryId,
+                ], [
+                    ['account_id' => $debitReceivable, 'debit' => $salesAmount, 'credit' => 0, 'memo' => $saleDesc],
+                    ['account_id' => $salesId, 'debit' => 0, 'credit' => $salesAmount, 'memo' => $saleDesc],
                 ]);
                 if ($isCredit && $customerIdForAr > 0) {
                     orange_party_subledger_record(
@@ -372,7 +377,7 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
         if ($costAmount > 0.0001) {
             if (orange_gl_use_pending_queue($pdo)) {
                 orange_gl_pending_enqueue_simple($pdo, [
-                    'reference' => $cogsRef,
+                    'reference' => $cogsPendingKey,
                     'source_label' => $srcLabel,
                     'movement_at' => $now,
                     'voucher_date' => $now,
@@ -384,14 +389,16 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
                     'after_post_json' => orange_gl_after_post_json_with_country(null, $ofGlCountryId),
                 ]);
             } else {
-                orange_journal_insert_line($pdo, [
-                    'date' => $now,
-                    'account_debit' => $cogsDebitId,
-                    'account_credit' => $cogsCreditId,
-                    'amount' => $costAmount,
-                    'reference' => $cogsRef,
+                orange_voucher_post($pdo, [
+                    'voucher_date' => $now,
+                    'document_entered_at' => $now,
                     'description' => $cogsDesc,
                     'entry_type' => 'order_delivery_cogs',
+                    'journal_type_id' => $cogsJtId > 0 ? $cogsJtId : null,
+                    'country_id' => $ofGlCountryId,
+                ], [
+                    ['account_id' => $cogsDebitId, 'debit' => $costAmount, 'credit' => 0, 'memo' => $cogsDesc],
+                    ['account_id' => $cogsCreditId, 'debit' => 0, 'credit' => $costAmount, 'memo' => $cogsDesc],
                 ]);
             }
         }

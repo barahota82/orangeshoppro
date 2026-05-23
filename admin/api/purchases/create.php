@@ -224,7 +224,8 @@ try {
         $purchaseCountryId
     );
 
-    $purRef = 'PUR-' . $purchaseId;
+    $pendingKey = orange_gl_pending_source_key('purchase', $purchaseId);
+    $srcLabel = 'PIN-' . $purchaseId;
     $now = date('Y-m-d H:i:s');
     $afterJson = $glB['after_post'] !== null
         ? json_encode($glB['after_post'], JSON_UNESCAPED_UNICODE)
@@ -235,8 +236,8 @@ try {
             orange_gl_pending_enqueue_multi(
                 $pdo,
                 $glB['lines'],
-                $purRef,
-                $purRef,
+                $pendingKey,
+                $srcLabel,
                 $now,
                 $now,
                 $glB['voucher_description'],
@@ -245,8 +246,8 @@ try {
             );
         } else {
             orange_gl_pending_enqueue_simple($pdo, [
-                'reference' => $purRef,
-                'source_label' => $purRef,
+                'reference' => $pendingKey,
+                'source_label' => $srcLabel,
                 'movement_at' => $now,
                 'voucher_date' => $now,
                 'account_debit' => $glB['debit'],
@@ -262,9 +263,9 @@ try {
             $vid = orange_voucher_post($pdo, [
                 'voucher_date' => $now,
                 'document_entered_at' => $now,
-                'reference' => $purRef,
                 'description' => $glB['voucher_description'],
                 'entry_type' => 'purchase',
+                'country_id' => $purchaseCountryId,
             ], $glB['lines']);
             orange_gl_apply_voucher_after_post_hooks($pdo, $vid, $afterJson);
         } else {
@@ -273,7 +274,6 @@ try {
                 'account_debit' => $glB['debit'],
                 'account_credit' => $glB['credit'],
                 'amount' => $netTotal,
-                'reference' => $purRef,
                 'description' => $glB['voucher_description'],
                 'entry_type' => 'purchase',
             ]);

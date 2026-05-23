@@ -101,8 +101,8 @@ try {
         json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
-    $retRef = 'PR-' . $returnId;
-    $accRow = orange_accounting_row_by_reference($pdo, $retRef);
+    $accRow = orange_voucher_find_by_document($pdo, 'purchase_return', $returnId, 'purchase_return')
+        ?? orange_accounting_row_by_reference($pdo, 'PR-' . $returnId);
     if (orange_accounting_is_locked($pdo, $accRow)) {
         json_response([
             'success' => false,
@@ -116,8 +116,8 @@ try {
     $pdo->prepare('DELETE FROM purchase_return_items WHERE purchase_return_id = ?')->execute([$returnId]);
 
     if ($action === 'delete') {
-        orange_purchase_return_remove_accounting($pdo, $retRef);
-        orange_gl_pending_remove_by_reference($pdo, $retRef);
+        orange_purchase_return_remove_accounting($pdo, $returnId);
+        orange_gl_pending_remove_by_reference($pdo, orange_gl_pending_source_key('purchase_return', $returnId));
         $pdo->prepare('DELETE FROM purchase_returns WHERE id = ?')->execute([$returnId]);
         $pdo->commit();
         audit_log('purchase_return_delete', 'تم حذف مردود مشتريات رقم: ' . $returnId, 'purchase_returns', $returnId);
@@ -195,8 +195,8 @@ try {
         $returnId,
     ]);
 
-    orange_purchase_return_remove_accounting($pdo, $retRef);
-    orange_gl_pending_remove_by_reference($pdo, $retRef);
+    orange_purchase_return_remove_accounting($pdo, $returnId);
+    orange_gl_pending_remove_by_reference($pdo, orange_gl_pending_source_key('purchase_return', $returnId));
 
     $returnCountryId = orange_admin_context_country_id($pdo);
     if ($purchaseIdOpt > 0 && orange_table_has_country_id($pdo, 'purchases')) {
@@ -211,6 +211,8 @@ try {
     }
 
     $glB = orange_gl_purchase_return_posting_bundle($pdo, $type, $supplierId, $returnId, $newTotal, $returnCountryId);
+    $pendingKey = orange_gl_pending_source_key('purchase_return', $returnId);
+    $srcLabel = trim((string) ($row['return_number'] ?? ('PR-' . $returnId)));
     $now = date('Y-m-d H:i:s');
     $afterJson = $glB['after_post'] !== null
         ? json_encode($glB['after_post'], JSON_UNESCAPED_UNICODE)
@@ -221,8 +223,8 @@ try {
             orange_gl_pending_enqueue_multi(
                 $pdo,
                 $glB['lines'],
-                $retRef,
-                $retRef,
+                $pendingKey,
+                $srcLabel,
                 $now,
                 $now,
                 $glB['voucher_description'],
@@ -231,8 +233,8 @@ try {
             );
         } else {
             orange_gl_pending_enqueue_simple($pdo, [
-                'reference' => $retRef,
-                'source_label' => $retRef,
+                'reference' => $pendingKey,
+                'source_label' => $srcLabel,
                 'movement_at' => $now,
                 'voucher_date' => $now,
                 'account_debit' => $glB['debit'],
@@ -248,9 +250,9 @@ try {
             $vid = orange_voucher_post($pdo, [
                 'voucher_date' => $now,
                 'document_entered_at' => $now,
-                'reference' => $retRef,
                 'description' => $glB['voucher_description'],
                 'entry_type' => 'purchase_return',
+                'country_id' => $returnCountryId,
             ], $glB['lines']);
             orange_gl_apply_voucher_after_post_hooks($pdo, $vid, $afterJson);
         } else {
@@ -259,7 +261,6 @@ try {
                 'account_debit' => $glB['debit'],
                 'account_credit' => $glB['credit'],
                 'amount' => $newTotal,
-                'reference' => $retRef,
                 'description' => $glB['voucher_description'],
                 'entry_type' => 'purchase_return',
             ]);

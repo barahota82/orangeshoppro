@@ -119,8 +119,8 @@ try {
         json_response(['success' => false, 'message' => $e->getMessage()], 403);
     }
 
-    $refRev = 'SR-' . $returnId . '-RS';
-    $accRow = orange_accounting_row_by_reference($pdo, $refRev);
+    $accRow = orange_voucher_find_by_document($pdo, 'sales_return', $returnId, 'order_return_sale', null, 'sale')
+        ?? orange_accounting_row_by_reference($pdo, 'SR-' . $returnId . '-RS');
     if (orange_accounting_is_locked($pdo, $accRow)) {
         json_response([
             'success' => false,
@@ -212,7 +212,8 @@ try {
 
     $retNum = 'SR-' . $returnId;
     $now = date('Y-m-d H:i:s');
-    $refCogs = 'SR-' . $returnId . '-RC';
+    $pendingRev = orange_gl_pending_source_key('sales_return', $returnId, 'sale');
+    $pendingCogs = orange_gl_pending_source_key('sales_return', $returnId, 'cogs');
 
     if ($revenueTotal > 0.0001) {
         $glRev = orange_gl_sales_return_revenue_bundle($pdo, $channel, $customerId, $returnId, $revenueTotal);
@@ -221,7 +222,7 @@ try {
             : null;
         if (orange_gl_use_pending_queue($pdo)) {
             orange_gl_pending_enqueue_simple($pdo, [
-                'reference' => $refRev,
+                'reference' => $pendingRev,
                 'source_label' => $retNum,
                 'movement_at' => $now,
                 'voucher_date' => $now,
@@ -238,7 +239,6 @@ try {
                 'account_debit' => $glRev['debit'],
                 'account_credit' => $glRev['credit'],
                 'amount' => $revenueTotal,
-                'reference' => $refRev,
                 'description' => $glRev['voucher_description'],
                 'entry_type' => 'order_return_sale',
             ]);
@@ -253,7 +253,7 @@ try {
         $cogsDesc = 'مردود تكلفة مبيعات — مستند مردود';
         if (orange_gl_use_pending_queue($pdo)) {
             orange_gl_pending_enqueue_simple($pdo, [
-                'reference' => $refCogs,
+                'reference' => $pendingCogs,
                 'source_label' => $retNum,
                 'movement_at' => $now,
                 'voucher_date' => $now,
@@ -269,7 +269,6 @@ try {
                 'account_debit' => $glCogs['debit'],
                 'account_credit' => $glCogs['credit'],
                 'amount' => $cogsTotal,
-                'reference' => $refCogs,
                 'description' => $cogsDesc,
                 'entry_type' => 'order_return_cogs',
             ]);

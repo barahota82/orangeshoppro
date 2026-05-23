@@ -75,7 +75,7 @@ try {
     $cashId = orange_gl_account_id($pdo, 'cash');
 
     $seq = orange_sequence_next($pdo, 'spay_' . date('Ymd'), $supCountryId);
-    $ref = 'SPAY-' . $supplierId . '-' . date('Ymd') . '-' . str_pad((string) $seq, 5, '0', STR_PAD_LEFT);
+    $pendingKey = 'src:supplier_payment:' . $supplierId . ':' . date('Ymd') . ':' . str_pad((string) $seq, 5, '0', STR_PAD_LEFT);
 
     $pdo->beginTransaction();
     try {
@@ -99,7 +99,7 @@ try {
                 ];
             }
             $pendingId = orange_gl_pending_enqueue_simple($pdo, [
-                'reference' => $ref,
+                'reference' => $pendingKey,
                 'source_label' => 'SPAY-' . $supplierId,
                 'movement_at' => $date,
                 'voucher_date' => $date,
@@ -122,9 +122,9 @@ try {
 
         $vid = orange_voucher_post($pdo, [
             'voucher_date' => $date,
-            'reference' => $ref,
             'description' => $description,
             'entry_type' => 'supplier_payment',
+            'country_id' => $supCountryId > 0 ? $supCountryId : null,
         ], [
             ['account_id' => $apId, 'debit' => $amount, 'credit' => 0, 'memo' => 'تخفيض ذمة مورد'],
             ['account_id' => $cashId, 'debit' => 0, 'credit' => $amount, 'memo' => 'صرف نقدي'],

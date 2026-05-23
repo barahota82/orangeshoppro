@@ -222,7 +222,7 @@ function orange_opening_balance_country_code(PDO $pdo, ?int $countryId = null): 
     return orange_countries_display_code(orange_admin_context_country_code($pdo));
 }
 
-/** مرجع سند رصيد افتتاحي: OB-KW-1، OB-EG-2، … (الجزء الأخير = id السنة المالية). */
+/** مرجع سند رصيد افتتاحي: OBV-KW-1، OBV-EG-2، … (الجزء الأخير = voucher_serial). */
 function orange_opening_balance_reference(PDO $pdo, int $fyId, ?int $countryId = null): string
 {
     if ($fyId <= 0) {
@@ -231,15 +231,19 @@ function orange_opening_balance_reference(PDO $pdo, int $fyId, ?int $countryId =
     if ($countryId === null || $countryId <= 0) {
         $countryId = orange_fiscal_year_country_id($pdo, $fyId);
     }
-    $cc = orange_opening_balance_country_code($pdo, $countryId > 0 ? $countryId : null);
-    if ($cc === '') {
-        $cc = 'XX';
+    if (!function_exists('orange_voucher_auto_reference_preview')) {
+        require_once __DIR__ . '/journal_voucher.php';
     }
 
-    return 'OB-' . $cc . '-' . $fyId;
+    return orange_voucher_auto_reference_preview(
+        $pdo,
+        'opening_balance',
+        $fyId,
+        $countryId > 0 ? $countryId : null
+    );
 }
 
-/** مرجع قديم قبل رمز الدولة: OB-{fyId}. */
+/** مراجع قديمة قبل OBV/رمز الدولة. */
 function orange_opening_balance_reference_legacy(int $fyId): string
 {
     return $fyId > 0 ? 'OB-' . $fyId : '';
@@ -248,6 +252,12 @@ function orange_opening_balance_reference_legacy(int $fyId): string
 function orange_opening_balance_clear_pending_refs(PDO $pdo, int $fyId, ?int $countryId = null): void
 {
     require_once __DIR__ . '/gl_pending_movements.php';
+    if (!function_exists('orange_gl_pending_source_key')) {
+        require_once __DIR__ . '/journal_voucher.php';
+    }
     orange_gl_pending_remove_by_reference($pdo, orange_opening_balance_reference_legacy($fyId));
     orange_gl_pending_remove_by_reference($pdo, orange_opening_balance_reference($pdo, $fyId, $countryId));
+    if ($fyId > 0) {
+        orange_gl_pending_remove_by_reference($pdo, orange_gl_pending_source_key('opening_balance', $fyId));
+    }
 }

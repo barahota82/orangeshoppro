@@ -97,7 +97,10 @@ function orange_purchase_record_ap_subledger(
     if ($purchaseType !== 'credit' || $supplierId <= 0 || $total <= 0.0001) {
         return;
     }
-    $v = orange_voucher_by_reference($pdo, 'PUR-' . $purchaseId);
+    $v = orange_voucher_find_by_document($pdo, 'purchase', $purchaseId, 'purchase');
+    if (!$v) {
+        $v = orange_voucher_by_reference($pdo, 'PUR-' . $purchaseId);
+    }
     if (!$v) {
         return;
     }
@@ -127,7 +130,10 @@ function orange_purchase_return_record_ap_subledger(
     if ($returnType !== 'credit' || $supplierId <= 0 || $total <= 0.0001) {
         return;
     }
-    $v = orange_voucher_by_reference($pdo, 'PR-' . $returnId);
+    $v = orange_voucher_find_by_document($pdo, 'purchase_return', $returnId, 'purchase_return');
+    if (!$v) {
+        $v = orange_voucher_by_reference($pdo, 'PR-' . $returnId);
+    }
     if (!$v) {
         return;
     }
@@ -157,7 +163,10 @@ function orange_sales_return_record_ar_subledger(
     if ($channel !== 'credit' || $customerId <= 0 || $total <= 0.0001) {
         return;
     }
-    $v = orange_voucher_by_reference($pdo, 'SR-' . $returnId . '-RS');
+    $v = orange_voucher_find_by_document($pdo, 'sales_return', $returnId, 'order_return_sale', null, 'sale');
+    if (!$v) {
+        $v = orange_voucher_by_reference($pdo, 'SR-' . $returnId . '-RS');
+    }
     if (!$v) {
         return;
     }
