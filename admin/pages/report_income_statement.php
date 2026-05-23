@@ -245,7 +245,9 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
                     </div>
                     <div class="gas-acc-stmt-actions">
                         <button type="submit">عرض</button>
-                        <button type="button" class="btn-secondary" onclick="window.print()"<?php echo $useVouchers ? '' : ' disabled title="سندات اليومية غير جاهزة بعد"'; ?>>طباعة</button>
+                        <?php if ($useVouchers && $periodLabel !== ''): ?>
+                            <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
+                        <?php endif; ?>
                     </div>
                     <label class="gas-acc-stmt-field is-ignore-close-field" title="قيود الإقفال السنوي (YEC) تُصفّر الإيرادات والمصروفات — فعِّل هذا الخيار لاستبعادها من أرقام التقرير إذا كان المدى الزمني يشمل تاريخ الإقفال.">
                         <input type="hidden" name="ignore_close" value="0">

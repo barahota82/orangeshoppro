@@ -4403,7 +4403,7 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     grid-template-columns:
         minmax(9.25rem, 10.75rem)
         minmax(9.25rem, 10.75rem)
-        minmax(10.5rem, auto)
+        auto
         minmax(11rem, 1fr);
 }
 
@@ -4420,12 +4420,6 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
 .ta-report-toolbar--is-ignore-left .is-ignore-close-field input[type="checkbox"] {
     margin: 0;
     flex-shrink: 0;
-}
-
-.ta-report-toolbar--is-ignore-left .gas-acc-stmt-actions {
-    flex-shrink: 0;
-    min-width: 10.5rem;
-    justify-content: flex-end;
 }
 
 .ta-report-toolbar--pl-monthly-filters .is-ignore-close-field {
