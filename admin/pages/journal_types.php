@@ -106,6 +106,7 @@ $jtCanAutoSeed = orange_journal_types_should_auto_seed($pdo, $jtCountryId);
 
 <script>
 (function () {
+    var jtCanAutoSeed = <?php echo $jtCanAutoSeed ? 'true' : 'false'; ?>;
     function jtNormalizeCode(s) {
         s = String(s || '').trim().toUpperCase().replace(/\s+/g, '');
         return s.replace(/[^A-Z0-9]/g, '');
@@ -135,7 +136,7 @@ $jtCanAutoSeed = orange_journal_types_should_auto_seed($pdo, $jtCountryId);
 
         function renumberRows() {
             var rows = tbody.querySelectorAll('tr[data-jt-row]');
-            if (rows.length === 0) {
+            if (rows.length === 0 && jtCanAutoSeed) {
                 jtAddDefaultOpeningRow();
                 rows = tbody.querySelectorAll('tr[data-jt-row]');
             }

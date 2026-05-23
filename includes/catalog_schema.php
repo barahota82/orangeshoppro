@@ -3065,6 +3065,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_channel_country_default_v55($pdo);
     orange_catalog_migrate_document_currency_v56($pdo);
     orange_catalog_migrate_supplier_country_currency_v57($pdo);
+    orange_catalog_migrate_journal_types_non_default_purge_v58($pdo);
     orange_catalog_migrate_legacy_storefront_copy_lines($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
@@ -5008,6 +5009,39 @@ function orange_catalog_migrate_supplier_country_currency_v57(PDO $pdo): void
                     error_log('[orange] v57 ' . $tbl . ' currency sync: ' . $e->getMessage());
                 }
             }
+        }
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * v58 — إزالة أنواع اليوميات المبذورة لغير الكويت (ترحيل v52 كان ينسخ/يدمج للكل).
+ */
+function orange_catalog_migrate_journal_types_non_default_purge_v58(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    $marker = 'php_journal_types_non_default_purge_v58';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (!orange_table_exists($pdo, 'journal_types')
+        || !orange_table_has_column($pdo, 'journal_types', 'country_id')) {
+        orange_catalog_schema_insert_migration_marker($pdo, $marker);
+
+        return;
+    }
+
+    require_once __DIR__ . '/journal_types.php';
+    try {
+        $purged = orange_journal_types_purge_non_auto_seed_countries($pdo);
+        if ($purged !== [] && function_exists('error_log')) {
+            error_log('[orange] v58 journal_types purge non-default: ' . json_encode($purged, JSON_UNESCAPED_UNICODE));
+        }
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] v58 journal_types purge: ' . $e->getMessage());
         }
     }
 
