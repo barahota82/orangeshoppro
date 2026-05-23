@@ -4390,6 +4390,29 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
         auto;
 }
 
+.ta-report-toolbar.ta-report-toolbar--is-ignore-left.gas-acc-stmt-toolbar {
+    grid-template-columns:
+        minmax(9.25rem, 10.75rem)
+        minmax(9.25rem, 10.75rem)
+        auto
+        minmax(11rem, 1fr);
+}
+
+.ta-report-toolbar--is-ignore-left .is-ignore-close-field {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    padding-bottom: 1px;
+    margin: 0;
+    white-space: nowrap;
+}
+
+.ta-report-toolbar--is-ignore-left .is-ignore-close-field input[type="checkbox"] {
+    margin: 0;
+    flex-shrink: 0;
+}
+
 .ta-report-print-title .gl-acc-stmt-print-title-ar {
     line-height: 1.45;
     padding: 0 0.35rem;

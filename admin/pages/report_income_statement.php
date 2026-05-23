@@ -222,7 +222,7 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
         <form method="get" class="gas-acc-stmt-filter-form" id="is_report_form">
             <input type="hidden" name="page" value="report_income_statement">
             <div class="gas-acc-stmt-toolbar-wrap">
-                <div class="gas-acc-stmt-toolbar ta-report-toolbar gas-acc-stmt-toolbar--main-center">
+                <div class="gas-acc-stmt-toolbar ta-report-toolbar ta-report-toolbar--is-ignore-left gas-acc-stmt-toolbar--main-center">
                     <div class="gas-acc-stmt-field gl-m-stmt-field--month">
                         <label for="is_m_month_from">من شهر</label>
                         <input type="month" name="m_from" id="is_m_month_from" class="admin-inp"
@@ -243,17 +243,17 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
                             title="انقر الحقل؛ في منتقي المتصفّح انقر سنة الشهر أو استخدم الأسهم لتغيير السنة (2000–2100)."
                             autocomplete="off">
                     </div>
-                    <label class="gas-acc-stmt-field" style="align-items:flex-start;margin-top:0.15rem;">
-                        <input type="hidden" name="ignore_close" value="0">
-                        <input type="checkbox" name="ignore_close" value="1" id="is_ignore_close" <?php echo $ignoreClosingEntries ? 'checked' : ''; ?> style="margin-top:6px;margin-left:6px;">
-                        <span>تجاهل قيود الإقفال</span>
-                    </label>
                     <div class="gas-acc-stmt-actions">
                         <button type="submit">عرض</button>
                         <?php if ($useVouchers && $periodLabel !== ''): ?>
                             <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
                         <?php endif; ?>
                     </div>
+                    <label class="gas-acc-stmt-field is-ignore-close-field">
+                        <input type="hidden" name="ignore_close" value="0">
+                        <input type="checkbox" name="ignore_close" value="1" id="is_ignore_close" <?php echo $ignoreClosingEntries ? 'checked' : ''; ?>>
+                        <span>تجاهل قيود الإقفال</span>
+                    </label>
                 </div>
             </div>
         </form>
