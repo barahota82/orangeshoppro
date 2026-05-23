@@ -315,6 +315,13 @@ if ($isCustomerMode && $customerId > 0 && $err === '') {
     $err = 'سندات اليومية غير جاهزة بعد.';
 }
 
+$showStatement = $err === '' && (
+    ($isCustomerMode && $customerId > 0 && $partySubledgerReady) ||
+    (!$isCustomerMode && $accountId > 0 && $useVouchers)
+);
+/** هيكل الكشف (ترويسة + جدول) يظهر دائماً؛ البيانات تُملأ بعد اختيار الحساب/العميل و«استخراج الكشف». */
+$showStatementShell = ($err === '');
+
 ?>
 <div class="admin-fy-shell" dir="rtl">
     <div class="gl-acc-stmt-no-print">
@@ -364,12 +371,6 @@ if ($isCustomerMode && $customerId > 0 && $err === '') {
                         <label for="gas_to">إلى تاريخ</label>
                         <input type="text" name="date_to" id="gas_to" class="admin-inp orange-inp-dmy" value="<?php echo htmlspecialchars($dateToRaw, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" autocomplete="off" required>
                     </div>
-                    <?php
-                    $showStatement = $err === '' && (
-                        ($isCustomerMode && $customerId > 0 && $partySubledgerReady) ||
-                        (!$isCustomerMode && $accountId > 0 && $useVouchers)
-                    );
-                    ?>
                     <div class="gas-acc-stmt-actions">
                         <button type="submit">استخراج الكشف</button>
                         <?php if ($showStatement): ?>
@@ -725,7 +726,7 @@ if ($isCustomerMode && $customerId > 0 && $err === '') {
     })();
     </script>
 
-    <?php if ($showStatement): ?>
+    <?php if ($showStatementShell): ?>
 
     <div class="card admin-fy-card gl-acc-stmt-print">
         <div class="gl-acc-stmt-print-sheet">
@@ -757,7 +758,7 @@ if ($isCustomerMode && $customerId > 0 && $err === '') {
                     <span class="gl-acc-stmt-print-k">تاريخ الكشف</span><span class="gl-acc-stmt-print-v" dir="ltr"><?php echo htmlspecialchars($todayDmY, ENT_QUOTES, 'UTF-8'); ?></span>
                 </div>
             </div>
-            <?php if ($filtDc !== 'all' || $filtPost !== 'all'): ?>
+            <?php if ($showStatement && ($filtDc !== 'all' || $filtPost !== 'all')): ?>
                 <p class="gl-acc-stmt-filter-note muted">تصفية معروضة: <?php
                     $bits = [];
                     if ($filtDc === 'debit') {
@@ -796,7 +797,9 @@ if ($isCustomerMode && $customerId > 0 && $err === '') {
                             <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount(0.0, $reportMoney); ?></td>
                             <td class="gl-acc-stmt-col-num"><?php echo orange_accounting_report_format_amount($openingBal, $reportMoney); ?></td>
                         </tr>
-                        <?php if ($stmtFilterNoMatch): ?>
+                        <?php if (!$showStatement): ?>
+                            <tr class="gl-acc-stmt-row-placeholder gl-acc-stmt-no-print"><td colspan="7" class="muted"><?php echo $isCustomerMode ? 'اختر العميل ونطاق التواريخ ثم «استخراج الكشف» لعرض الحركات.' : 'اختر الحساب ونطاق التواريخ ثم «استخراج الكشف» لعرض الحركات.'; ?></td></tr>
+                        <?php elseif ($stmtFilterNoMatch): ?>
                             <tr><td colspan="7" class="muted">يوجد على الحساب حركات في هذه الفترة لكن لا يوجد سطر يطابق خيارات العرض (مدين/دائن أو مرحّل/غير مرحّل).</td></tr>
                         <?php elseif ($rows === []): ?>
                             <tr><td colspan="7" class="muted">لا حركة على هذا الحساب في هذه الفترة بعد الرصيد الافتتاحي.</td></tr>
@@ -824,7 +827,7 @@ if ($isCustomerMode && $customerId > 0 && $err === '') {
                     </tfoot>
                 </table>
             </div>
-            <?php if ($showAging): ?>
+            <?php if ($showStatement && $showAging): ?>
                 <?php if ($agingReport !== null && is_array($agingReport)): ?>
                     <div class="gl-acc-stmt-aging-wrap">
                         <h3 class="gl-acc-stmt-aging-title">توزيع الرصيد زمنياً (أعمار الرصيد، FIFO) حتى <?php echo htmlspecialchars(orange_format_date_dmY((string) ($agingReport['as_of'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></h3>
@@ -881,9 +884,5 @@ if ($isCustomerMode && $customerId > 0 && $err === '') {
             </div>
         </div>
     </div>
-    <?php elseif ($err === '' && (($isCustomerMode && $customerId <= 0) || (!$isCustomerMode && $accountId <= 0 && $useVouchers))): ?>
-        <div class="card admin-fy-card gl-acc-stmt-no-print">
-            <p class="card-hint"><?php echo $isCustomerMode ? 'اختر العميل ونطاق التواريخ ثم «استخراج الكشف».' : 'اختر الحساب ونطاق التواريخ ثم «استخراج الكشف».'; ?></p>
-        </div>
     <?php endif; ?>
 </div>
