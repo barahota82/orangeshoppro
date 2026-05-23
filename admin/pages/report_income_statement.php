@@ -87,6 +87,10 @@ if (strcmp($periodDateFrom, $periodDateTo) <= 0) {
     $periodLabel = $periodDateFrom . ' — ' . $periodDateTo;
 }
 
+/** عند التفعيل: استبعاد سندات entry_type = year_end_close من الفترة ورصيد أولها. */
+$ignoreClosingEntries = !isset($_GET['ignore_close']) || (string) $_GET['ignore_close'] === '1';
+$plExcludeEntryTypes = $ignoreClosingEntries ? ['year_end_close'] : [];
+
 $tbRange = [];
 $tbBefore = [];
 if (
@@ -94,8 +98,8 @@ if (
     && $periodDateFrom !== '' && $periodDateTo !== ''
     && strcmp($periodDateFrom, $periodDateTo) <= 0
 ) {
-    $tbRange = orange_voucher_account_totals_by_voucher_date_range($pdo, $periodDateFrom, $periodDateTo, []);
-    $tbBefore = orange_voucher_account_totals_strictly_before_date($pdo, $periodDateFrom, []);
+    $tbRange = orange_voucher_account_totals_by_voucher_date_range($pdo, $periodDateFrom, $periodDateTo, $plExcludeEntryTypes);
+    $tbBefore = orange_voucher_account_totals_strictly_before_date($pdo, $periodDateFrom, $plExcludeEntryTypes);
 }
 
 $accountsLeaf = orange_financial_report_leaf_accounts_with_mapping($pdo);
@@ -239,6 +243,11 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
                             title="انقر الحقل؛ في منتقي المتصفّح انقر سنة الشهر أو استخدم الأسهم لتغيير السنة (2000–2100)."
                             autocomplete="off">
                     </div>
+                    <label class="gas-acc-stmt-field" style="align-items:flex-start;margin-top:0.15rem;">
+                        <input type="hidden" name="ignore_close" value="0">
+                        <input type="checkbox" name="ignore_close" value="1" id="is_ignore_close" <?php echo $ignoreClosingEntries ? 'checked' : ''; ?> style="margin-top:6px;margin-left:6px;">
+                        <span>تجاهل قيود الإقفال</span>
+                    </label>
                     <div class="gas-acc-stmt-actions">
                         <button type="submit">عرض</button>
                         <?php if ($useVouchers && $periodLabel !== ''): ?>
