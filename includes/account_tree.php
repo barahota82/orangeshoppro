@@ -879,6 +879,82 @@ function orange_accounts_depth_by_id(array $flat): array
 }
 
 /**
+ * تسمية مستوى الشجرة (1 = جذر الدليل) — مطابق لعرض «الدليل المحاسبي».
+ */
+function orange_accounts_tree_level_label_ar(int $depthFromRoot): string
+{
+    $level = $depthFromRoot + 1;
+    $labels = [
+        1 => 'المستوى الأول',
+        2 => 'المستوى الثاني',
+        3 => 'المستوى الثالث',
+        4 => 'المستوى الرابع',
+        5 => 'المستوى الخامس',
+    ];
+
+    return $labels[$level] ?? ('المستوى ' . $level);
+}
+
+/** رئيسي / فرعي من is_group. */
+function orange_accounts_group_state_label_ar(array $accountRow): string
+{
+    if (!isset($accountRow['is_group'])) {
+        return '—';
+    }
+
+    return (int) ($accountRow['is_group'] ?? 0) === 1 ? 'رئيسي' : 'فرعي';
+}
+
+/** طبيعة الحساب (مدين/دائن) — للحسابات الفرعية فقط. */
+function orange_accounts_normal_balance_label_ar(array $accountRow): string
+{
+    if (isset($accountRow['is_group']) && (int) ($accountRow['is_group'] ?? 0) === 1) {
+        return '';
+    }
+    $nb = strtolower(trim((string) ($accountRow['normal_balance'] ?? '')));
+    if ($nb === 'debit') {
+        return 'مدين';
+    }
+    if ($nb === 'credit') {
+        return 'دائن';
+    }
+
+    return '';
+}
+
+/**
+ * @param list<array<string, mixed>> $flat
+ * @return list<array<string, mixed>>
+ */
+function orange_accounts_report_list_rows(PDO $pdo, array $flat): array
+{
+    if ($flat === []) {
+        return [];
+    }
+    $depthById = orange_accounts_depth_by_id($flat);
+    $out = [];
+    foreach ($flat as $r) {
+        $id = (int) ($r['id'] ?? 0);
+        if ($id <= 0) {
+            continue;
+        }
+        $depth = $depthById[$id] ?? 0;
+        $code = trim((string) ($r['code'] ?? ''));
+        $out[] = [
+            'id' => $id,
+            'code' => $code,
+            'name' => trim((string) ($r['name'] ?? '')),
+            'level_label' => orange_accounts_tree_level_label_ar($depth),
+            'group_label' => orange_accounts_group_state_label_ar($r),
+            'nature_label' => orange_accounts_normal_balance_label_ar($r),
+            'is_group' => isset($r['is_group']) && (int) $r['is_group'] === 1,
+        ];
+    }
+
+    return $out;
+}
+
+/**
  * سبب منع حذف الحساب أو null إن كان مسموحاً (جذر أو فرع).
  * لا يُطبَّق حظرٌ على «أول أربعة جذور» — يكفي خلو الحساب من الفروع والحركات والربط في الإعدادات.
  *

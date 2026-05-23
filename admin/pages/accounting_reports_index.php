@@ -121,7 +121,12 @@ $financialWithFy = $financialBase . (isset($_GET['fy']) && (int) $_GET['fy'] > 0
                     <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=chart_of_accounts', ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
                 </tr>
                 <tr>
-                    <td>أرصدة الحسابات / ميزان المراجعة (تقويمي: من شهر إلى شهر)</td>
+                    <td>قائمة الحسابات (توضيحية — كود، اسم، مستوى، رئيسي/فرعي)</td>
+                    <td><span class="badge approved">جاهز</span></td>
+                    <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=report_account_list', ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
+                </tr>
+                <tr>
+                    <td>ميزان المراجعة (تقويمي: من شهر إلى شهر)</td>
                     <td><span class="badge approved">جاهز</span></td>
                     <td>
                         <a href="<?php echo htmlspecialchars($baseAdmin . '?page=report_trial_balance', ENT_QUOTES, 'UTF-8'); ?>">شاشة ميزان المراجعة</a>

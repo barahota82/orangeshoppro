@@ -58,6 +58,7 @@ $allowed = [
     'gl_posting',
     'accounting_reports_index',
     'report_gl_account_monthly',
+    'report_account_list',
     'report_trading_account',
     'report_trial_balance',
     'report_income_statement',
