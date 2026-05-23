@@ -14,6 +14,28 @@ $pdo = orange_admin_page_pdo();
 $reportMoney = orange_accounting_report_money($pdo, isset($orangeAdminMoney) ? $orangeAdminMoney : null);
 
 $includeAging = isset($_GET['aging']) && $_GET['aging'] === '1';
+$partnerViewRaw = isset($_GET['view']) ? strtolower(trim((string) $_GET['view'])) : '';
+$partnerView = in_array($partnerViewRaw, ['customers', 'suppliers'], true) ? $partnerViewRaw : 'all';
+$showPartnerCustomers = $partnerView === 'all' || $partnerView === 'customers';
+$showPartnerSuppliers = $partnerView === 'all' || $partnerView === 'suppliers';
+$partnerReportsUrl = static function (array $extra = []) use ($partnerView, $includeAging): string {
+    $q = ['page' => 'partner_reports'];
+    if ($partnerView !== 'all') {
+        $q['view'] = $partnerView;
+    }
+    if ($includeAging) {
+        $q['aging'] = '1';
+    }
+    foreach ($extra as $k => $v) {
+        if ($v === null || $v === '') {
+            unset($q[$k]);
+        } else {
+            $q[$k] = $v;
+        }
+    }
+
+    return storefront_public_path('/admin/index.php?' . http_build_query($q));
+};
 $report = orange_partner_summary_report($pdo, $includeAging);
 
 $years = orange_fiscal_years_list($pdo);
@@ -33,50 +55,65 @@ try {
 
 if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     header('Content-Type: text/csv; charset=UTF-8');
-    header('Content-Disposition: attachment; filename="partner-balances-' . $report['as_of'] . '.csv"');
+    $csvSuffix = $partnerView === 'all' ? 'all' : $partnerView;
+    header('Content-Disposition: attachment; filename="partner-balances-' . $csvSuffix . '-' . $report['as_of'] . '.csv"');
     echo "\xEF\xBB\xBF";
     $out = fopen('php://output', 'w');
     fputcsv($out, ['نوع', 'المعرّف', 'الاسم', 'الهاتف', 'الرصيد', 'حد ائتمان', 'تجاوز حد']);
-    foreach ($report['customers'] as $c) {
-        fputcsv($out, [
-            'عميل',
-            $c['id'],
-            $c['name_ar'],
-            $c['phone'],
-            orange_accounting_report_format_amount((float) $c['balance'], $reportMoney),
-            $c['credit_limit'] !== null ? orange_accounting_report_format_amount((float) $c['credit_limit'], $reportMoney) : '',
-            !empty($c['over_limit']) ? 'نعم' : '',
-        ]);
+    if ($showPartnerCustomers) {
+        foreach ($report['customers'] as $c) {
+            fputcsv($out, [
+                'عميل',
+                $c['id'],
+                $c['name_ar'],
+                $c['phone'],
+                orange_accounting_report_format_amount((float) $c['balance'], $reportMoney),
+                $c['credit_limit'] !== null ? orange_accounting_report_format_amount((float) $c['credit_limit'], $reportMoney) : '',
+                !empty($c['over_limit']) ? 'نعم' : '',
+            ]);
+        }
     }
-    foreach ($report['suppliers'] as $s) {
-        fputcsv($out, [
-            'مورد',
-            $s['id'],
-            $s['name'],
-            $s['phone'],
-            orange_accounting_report_format_amount((float) $s['balance'], $reportMoney),
-            '',
-            '',
-        ]);
+    if ($showPartnerSuppliers) {
+        foreach ($report['suppliers'] as $s) {
+            fputcsv($out, [
+                'مورد',
+                $s['id'],
+                $s['name'],
+                $s['phone'],
+                orange_accounting_report_format_amount((float) $s['balance'], $reportMoney),
+                '',
+                '',
+            ]);
+        }
     }
     fclose($out);
     exit;
 }
 ?>
 <div class="admin-fy-shell" dir="rtl">
-    <h1 class="admin-fy-shell__title">تقارير الذمم الشاملة</h1>
-    <p class="admin-fy-shell__lead">
-        ملخص أرصدة كل العملاء والموردين، مطابقة أرصدة الدليل مع دفتر الذمم، وتصدير CSV.
-    </p>
+    <?php if ($partnerView === 'customers'): ?>
+        <h1 class="admin-fy-shell__title">أرصدة العملاء (ذمم)</h1>
+        <p class="admin-fy-shell__lead">ملخص أرصدة العملاء فقط — مطابقة الدليل، أعمار الذمم اختياري، وتصدير CSV.</p>
+    <?php elseif ($partnerView === 'suppliers'): ?>
+        <h1 class="admin-fy-shell__title">أرصدة الموردين (ذمم)</h1>
+        <p class="admin-fy-shell__lead">ملخص أرصدة الموردين فقط — مطابقة الدليل، أعمار الذمم اختياري، وتصدير CSV.</p>
+    <?php else: ?>
+        <h1 class="admin-fy-shell__title">تقارير الذمم الشاملة</h1>
+        <p class="admin-fy-shell__lead">
+            ملخص أرصدة كل العملاء والموردين، مطابقة أرصدة الدليل مع دفتر الذمم، وتصدير CSV.
+        </p>
+    <?php endif; ?>
 
 <div class="card admin-fy-card">
     <h3 class="card-title">خيارات العرض</h3>
     <div class="actions" style="flex-wrap:wrap; gap:8px;">
-        <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_reports' . ($includeAging ? '' : '&aging=1')), ENT_QUOTES, 'UTF-8'); ?>">
+        <a class="btn-secondary" href="<?php echo htmlspecialchars($partnerReportsUrl(['aging' => $includeAging ? null : '1']), ENT_QUOTES, 'UTF-8'); ?>">
             <?php echo $includeAging ? 'إخفاء أعمار الذمم (أسرع)' : 'إظهار أعمار الذمم (أبطأ)'; ?>
         </a>
-        <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=partner_reports&export=csv' . ($includeAging ? '&aging=1' : '')), ENT_QUOTES, 'UTF-8'); ?>">تنزيل CSV</a>
+        <a class="btn-secondary" href="<?php echo htmlspecialchars($partnerReportsUrl(['export' => 'csv']), ENT_QUOTES, 'UTF-8'); ?>">تنزيل CSV</a>
+        <?php if ($showPartnerCustomers): ?>
         <button type="button" class="btn-secondary" onclick="backfillOrders()">ربط طلبات آجل بعملاء (هاتف)</button>
+        <?php endif; ?>
     </div>
     <p class="card-hint muted" style="margin-top:10px;">اعتباراً من <?php echo htmlspecialchars($report['as_of'], ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
@@ -92,6 +129,9 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     <h3 class="card-title">مطابقة الدليل مع دفتر الذمم</h3>
     <form method="get" class="form-grid" style="max-width:420px;">
         <input type="hidden" name="page" value="partner_reports">
+        <?php if ($partnerView !== 'all'): ?>
+            <input type="hidden" name="view" value="<?php echo htmlspecialchars($partnerView, ENT_QUOTES, 'UTF-8'); ?>">
+        <?php endif; ?>
         <?php if ($includeAging): ?><input type="hidden" name="aging" value="1"><?php endif; ?>
         <div>
             <label for="fy_sel">السنة المالية</label>
@@ -110,18 +150,22 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
                 <tr><th>البند</th><th>دفتر الأستاذ (سنة مالية)</th><th>دفتر الذمم</th><th>الفرق</th></tr>
             </thead>
             <tbody>
+                <?php if ($showPartnerCustomers): ?>
                 <tr>
                     <td>عملاء آجل (مدين − دائن)</td>
                     <td><?php echo orange_accounting_report_format_amount((float) $reconcile['gl']['ar_net_dr_minus_cr'], $reportMoney); ?></td>
                     <td><?php echo orange_accounting_report_format_amount((float) $reconcile['subledger']['customers_dr_minus_cr'], $reportMoney); ?></td>
                     <td><?php echo orange_accounting_report_format_amount((float) $reconcile['variance']['ar'], $reportMoney); ?></td>
                 </tr>
+                <?php endif; ?>
+                <?php if ($showPartnerSuppliers): ?>
                 <tr>
                     <td>موردين (دائن − مدين)</td>
                     <td><?php echo orange_accounting_report_format_amount((float) $reconcile['gl']['ap_net_cr_minus_dr'], $reportMoney); ?></td>
                     <td><?php echo orange_accounting_report_format_amount((float) $reconcile['subledger']['suppliers_cr_minus_dr'], $reportMoney); ?></td>
                     <td><?php echo orange_accounting_report_format_amount((float) $reconcile['variance']['ap'], $reportMoney); ?></td>
                 </tr>
+                <?php endif; ?>
             </tbody>
         </table>
     </div>
@@ -133,6 +177,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 </div>
 <?php endif; ?>
 
+<?php if ($showPartnerCustomers): ?>
 <div class="card admin-fy-card" id="partner-balances-customers">
     <h3 class="card-title">أرصدة العملاء</h3>
     <div class="table-wrap admin-fy-table-wrap">
@@ -163,7 +208,9 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
         </table>
     </div>
 </div>
+<?php endif; ?>
 
+<?php if ($showPartnerSuppliers): ?>
 <div class="card admin-fy-card" id="partner-balances-suppliers">
     <h3 class="card-title">أرصدة الموردين</h3>
     <div class="table-wrap admin-fy-table-wrap">
@@ -192,6 +239,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
         </table>
     </div>
 </div>
+<?php endif; ?>
 
 </div>
 

@@ -574,16 +574,22 @@ function orangeAdminOfferSuggestAfterWarnings(r) {
                 var wParams = new URLSearchParams(wSearch);
                 var linkAging = lParams.get('aging') === '1';
                 var winAging = wParams.get('aging') === '1';
-                if (linkAging) return winAging;
-                if (!linkAging && winAging) return false;
+                if (linkAging !== winAging) return false;
 
-                var lhPr = stripHash(lu.hash);
-                var whPr = stripHash(ww.hash);
+                var linkView = lParams.get('view') || '';
+                var winView = wParams.get('view') || '';
+                if (!linkView) {
+                    var lhLegacy = stripHash(lu.hash);
+                    if (lhLegacy === 'partner-balances-customers') linkView = 'customers';
+                    if (lhLegacy === 'partner-balances-suppliers') linkView = 'suppliers';
+                }
+                if (!winView) {
+                    var whLegacy = stripHash(ww.hash);
+                    if (whLegacy === 'partner-balances-customers') winView = 'customers';
+                    if (whLegacy === 'partner-balances-suppliers') winView = 'suppliers';
+                }
 
-                /** رابط قائمة لا يحدد # — يطبق على أعلى الصفحة فقط بدون مرساة في العنوان */
-                if (!lhPr) return !whPr;
-
-                return lhPr === whPr;
+                return linkView === winView;
             }
         } catch (e) {
             return false;

@@ -86,9 +86,9 @@ $financialWithFy = $financialBase . (isset($_GET['fy']) && (int) $_GET['fy'] > 0
                     <td>
                         <a href="<?php echo htmlspecialchars($baseAdmin . '?page=partner_reports', ENT_QUOTES, 'UTF-8'); ?>">فتح الكل</a>
                         —
-                        <a href="<?php echo htmlspecialchars($baseAdmin . '?page=partner_reports#partner-balances-customers', ENT_QUOTES, 'UTF-8'); ?>">عملاء</a>
+                        <a href="<?php echo htmlspecialchars($baseAdmin . '?page=partner_reports&view=customers', ENT_QUOTES, 'UTF-8'); ?>">عملاء</a>
                         —
-                        <a href="<?php echo htmlspecialchars($baseAdmin . '?page=partner_reports#partner-balances-suppliers', ENT_QUOTES, 'UTF-8'); ?>">موردين</a>
+                        <a href="<?php echo htmlspecialchars($baseAdmin . '?page=partner_reports&view=suppliers', ENT_QUOTES, 'UTF-8'); ?>">موردين</a>
                         —
                         <a href="<?php echo htmlspecialchars($baseAdmin . '?page=partner_reports&amp;aging=1', ENT_QUOTES, 'UTF-8'); ?>">مع أعمار الذمم</a>
                     </td>
