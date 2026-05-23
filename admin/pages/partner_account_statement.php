@@ -335,9 +335,9 @@ $showStatementShell = ($err === '');
             <input type="hidden" name="customer" id="gas_customer_id" value="<?php echo (int) $customerId; ?>">
             <input type="hidden" name="mode" id="gas_mode" value="<?php echo $isCustomerMode ? 'customer' : 'account'; ?>">
             <?php
-            $codeLabel = $isCustomerMode ? 'كود/هاتف العميل' : 'كود الحساب';
+            $codeLabel = $isCustomerMode ? 'كود العميل' : 'كود الحساب';
             $nameLabel = $isCustomerMode ? 'اسم العميل' : 'اسم الحساب';
-            $codeValShown = $isCustomerMode ? ($custCodeDisp !== '' ? $custCodeDisp : $custPhoneDisp) : $accCode;
+            $codeValShown = $isCustomerMode ? $custCodeDisp : $accCode;
             $nameValShown = $isCustomerMode ? $custNameDisp : $accNameOnly;
             $codePlaceholder = 'نقرتان للاختيار';
             ?>
@@ -574,7 +574,7 @@ $showStatementShell = ($err === '');
                             var accHid = document.getElementById('gas_account_id');
                             if (hid) { hid.value = String(c.id || '0'); }
                             if (accHid) { accHid.value = '0'; }
-                            if (cd) { cd.value = code !== '' ? code : phone; }
+                            if (cd) { cd.value = code; }
                             if (nm) { nm.value = nameDisp; }
                             if (mode) { mode.value = 'customer'; }
                             gasCustPickClose();
@@ -636,6 +636,14 @@ $showStatementShell = ($err === '');
                 if (custHid) { custHid.value = '0'; }
             }
             // تحديث labels الحقول البصرية (placeholder الرسالة) بدون تعديل HTML النص:
+            var codeLbl = document.querySelector('label[for="gas_acc_code"]');
+            var nameLbl = document.querySelector('label[for="gas_acc_name"]');
+            if (codeLbl) {
+                codeLbl.textContent = on ? 'كود العميل' : 'كود الحساب';
+            }
+            if (nameLbl) {
+                nameLbl.textContent = on ? 'اسم العميل' : 'اسم الحساب';
+            }
             if (cd) {
                 cd.placeholder = on ? 'نقرتان لاختيار عميل' : 'نقرتان لاختيار حساب';
             }
@@ -740,10 +748,10 @@ $showStatementShell = ($err === '');
                 </h2>
             </header>
             <?php
-                $printCodeKey = $isCustomerMode ? 'كــود/هـاتـف الـعـمـيـل' : 'رقـــم الحســاب';
+                $printCodeKey = $isCustomerMode ? 'كــود الـعـمـيـل' : 'رقـــم الحســاب';
                 $printNameKey = $isCustomerMode ? 'اســم الـعـمـيـل' : 'اسم الحســـــــــاب';
                 $printCodeVal = $isCustomerMode
-                    ? ($custCodeDisp !== '' ? $custCodeDisp : ($custPhoneDisp !== '' ? $custPhoneDisp : '—'))
+                    ? ($custCodeDisp !== '' ? $custCodeDisp : '—')
                     : ($accCode !== '' ? $accCode : '—');
                 $printNameVal = $isCustomerMode
                     ? ($custNameDisp !== '' ? $custNameDisp : '—')
