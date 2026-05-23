@@ -727,8 +727,75 @@ function jvAcctPickerApply(a) {
         tr.querySelector('.jv-acc-name').value = a.name || '';
     }
     jvAcctPickerClose();
-    jvSyncTrailingRows();
     jvRecalc();
+}
+
+function jvAdvanceFromLastManualMemo(e) {
+    var tb = document.getElementById('jv_lines_body');
+    if (!tb || !e || !e.target) {
+        return false;
+    }
+    var ta = e.target;
+    if (!ta.classList || !ta.classList.contains('jv-m')) {
+        return false;
+    }
+    var tr = ta.closest('tr');
+    if (!tr || tr.parentElement !== tb || !tr.classList.contains('jv-line-memo')) {
+        return false;
+    }
+    var mains = jvAllMainRows(tb);
+    var lastMain = jvCashLineLast() ? jvLastManualMainRow(mains) : mains[mains.length - 1];
+    var lastMemo = lastMain ? jvMemoRow(lastMain) : null;
+    if (!lastMemo || tr !== lastMemo || !jvRowHasAmount(lastMain)) {
+        return false;
+    }
+    e.preventDefault();
+    jvEnsureLineStructure();
+    var manuals = jvManualMainRows(tb);
+    var lastIdx = manuals.indexOf(lastMain);
+    var follower = (lastIdx >= 0 && lastIdx < manuals.length - 1) ? manuals[lastIdx + 1] : null;
+    if (follower && jvRowIsBlank(follower)) {
+        var existingCode = follower.querySelector('.jv-acc-code');
+        if (existingCode && !existingCode.readOnly) {
+            existingCode.focus();
+        }
+        return true;
+    }
+    jvAddRow();
+    var mains2 = jvAllMainRows(tb);
+    var nextMain = jvCashLineLast() ? jvLastManualMainRow(mains2) : mains2[mains2.length - 1];
+    var codeInp = nextMain && nextMain.querySelector('.jv-acc-code');
+    if (codeInp && !codeInp.readOnly) {
+        codeInp.focus();
+    }
+    return true;
+}
+
+function jvFocusMemoFromAmountField(e) {
+    if (!e || !e.target) {
+        return false;
+    }
+    var ta = e.target;
+    if (!ta.classList || (!ta.classList.contains('jv-d') && !ta.classList.contains('jv-c'))) {
+        return false;
+    }
+    if (ta.readOnly) {
+        return false;
+    }
+    var mainTr = ta.closest('tr.jv-line-main');
+    if (!mainTr || mainTr.getAttribute('data-jv-cash-locked') === '1') {
+        return false;
+    }
+    if (!jvRowHasAmount(mainTr)) {
+        return false;
+    }
+    e.preventDefault();
+    var memo = jvMemoRow(mainTr);
+    var mi = memo ? memo.querySelector('.jv-m') : null;
+    if (mi) {
+        mi.focus();
+    }
+    return true;
 }
 
 function jvAcctPickerOpen(anchorInput) {
@@ -1016,7 +1083,8 @@ function jvRemoveRow(btn) {
     if (main.getAttribute('data-jv-cash-locked') === '1') {
         return;
     }
-    if (jvAllMainRows(tb).length <= 1) {
+    var manualRows = jvManualMainRows(tb);
+    if (manualRows.length <= 1) {
         var memo = jvMemoRow(main);
         main.querySelector('.jv-acc-id').value = '';
         main.querySelector('.jv-acc-code').value = '';
@@ -1028,13 +1096,28 @@ function jvRemoveRow(btn) {
                 mi.value = '';
             }
         }
-        jvSyncTrailingRows();
+        jvEnsureLineStructure();
         jvRecalc();
         return;
     }
     jvRemovePair(main);
-    jvSyncTrailingRows();
+    jvEnsureLineStructure();
     jvRecalc();
+}
+
+function jvManualMainRows(tb) {
+    return jvAllMainRows(tb).filter(function (m) {
+        return m.getAttribute('data-jv-cash-locked') !== '1';
+    });
+}
+
+function jvRowHasAmount(mainTr) {
+    if (!mainTr || !mainTr.classList.contains('jv-line-main')) {
+        return false;
+    }
+    var deb = parseFloat(String(mainTr.querySelector('.jv-d').value || '0').replace(',', '.')) || 0;
+    var cre = parseFloat(String(mainTr.querySelector('.jv-c').value || '0').replace(',', '.')) || 0;
+    return deb > 0 || cre > 0;
 }
 
 function jvRowIsBlank(mainTr) {
@@ -1052,44 +1135,44 @@ function jvRowIsBlank(mainTr) {
     return acc <= 0 && deb <= 0 && cre <= 0 && memo === '';
 }
 
-function jvTrimExtraTrailingBlanks() {
+function jvTrimExtraManualBlanks() {
     var tb = document.getElementById('jv_lines_body');
-    if (jvCashLineLast()) {
-        for (;;) {
-            var mainsP = jvAllMainRows(tb);
-            var manual = mainsP.filter(function (m) { return m.getAttribute('data-jv-cash-locked') !== '1'; });
-            if (manual.length < 2) {
-                return;
-            }
-            var a = manual[manual.length - 2];
-            var b = manual[manual.length - 1];
-            if (jvRowIsBlank(a) && jvRowIsBlank(b)) {
-                jvRemovePair(a);
-            } else {
-                return;
-            }
+    if (!tb) {
+        return;
+    }
+    for (;;) {
+        var manuals = jvManualMainRows(tb);
+        if (manuals.length < 2) {
+            break;
+        }
+        var a = manuals[manuals.length - 2];
+        var b = manuals[manuals.length - 1];
+        if (jvRowIsBlank(a) && jvRowIsBlank(b)) {
+            jvRemovePair(a);
+        } else {
+            break;
         }
     }
     for (;;) {
-        var mains = jvAllMainRows(tb);
-        if (mains.length < 2) {
-            return;
+        var manuals2 = jvManualMainRows(tb);
+        if (manuals2.length < 2) {
+            break;
         }
-        var a2 = mains[mains.length - 2];
-        var b2 = mains[mains.length - 1];
-        if (jvRowIsBlank(a2) && jvRowIsBlank(b2)) {
-            jvRemovePair(a2);
+        var last = manuals2[manuals2.length - 1];
+        var prev = manuals2[manuals2.length - 2];
+        if (jvRowIsBlank(last) && !jvRowHasAmount(prev)) {
+            jvRemovePair(last);
         } else {
-            return;
+            break;
         }
     }
 }
 
-function jvSyncTrailingRows() {
+function jvEnsureLineStructure() {
     if (jvViewMode) {
         return;
     }
-    jvTrimExtraTrailingBlanks();
+    jvTrimExtraManualBlanks();
     var tb = document.getElementById('jv_lines_body');
     var mains = jvAllMainRows(tb);
     if (mains.length === 0) {
@@ -1109,14 +1192,7 @@ function jvSyncTrailingRows() {
         if (!cashElFirst) {
             jvAddCashLockedRow();
         }
-        mains = jvAllMainRows(tb);
-        var manualFirst = mains.filter(function (m) { return m.getAttribute('data-jv-cash-locked') !== '1'; });
-        if (manualFirst.length === 0) {
-            jvAddRow();
-            return;
-        }
-        var lastManualFirst = manualFirst[manualFirst.length - 1];
-        if (!jvRowIsBlank(lastManualFirst)) {
+        if (jvManualMainRows(tb).length === 0) {
             jvAddRow();
         }
         return;
@@ -1126,22 +1202,18 @@ function jvSyncTrailingRows() {
         if (!cashEl) {
             jvAddCashLockedRow();
         }
-        mains = jvAllMainRows(tb);
-        var manualMains = mains.filter(function (m) { return m.getAttribute('data-jv-cash-locked') !== '1'; });
-        if (manualMains.length === 0) {
-            jvAddRow();
-            return;
-        }
-        var lastManual = manualMains[manualMains.length - 1];
-        if (!jvRowIsBlank(lastManual)) {
+        if (jvManualMainRows(tb).length === 0) {
             jvAddRow();
         }
         return;
     }
-    var last = mains[mains.length - 1];
-    if (!jvRowIsBlank(last)) {
+    if (mains.length === 0) {
         jvAddRow();
     }
+}
+
+function jvSyncTrailingRows() {
+    jvEnsureLineStructure();
 }
 
 function jvBindLinesBody() {
@@ -1168,6 +1240,15 @@ function jvBindLinesBody() {
         jvRecalc();
     });
     tb.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            if (jvFocusMemoFromAmountField(e)) {
+                return;
+            }
+            if (jvAdvanceFromLastManualMemo(e)) {
+                jvRecalc();
+                return;
+            }
+        }
         if (e.key !== 'Tab' || e.shiftKey) {
             return;
         }
@@ -1182,19 +1263,8 @@ function jvBindLinesBody() {
         if (!tr.classList.contains('jv-line-memo') || !ta.classList.contains('jv-m')) {
             return;
         }
-        var mains = jvAllMainRows(tb);
-        var lastMain = jvCashLineLast() ? jvLastManualMainRow(mains) : mains[mains.length - 1];
-        var lastMemo = lastMain ? jvMemoRow(lastMain) : null;
-        if (!lastMemo || tr !== lastMemo) {
-            return;
-        }
-        e.preventDefault();
-        jvSyncTrailingRows();
-        var mains2 = jvAllMainRows(tb);
-        var nextMain = jvCashLineLast() ? jvLastManualMainRow(mains2) : mains2[mains2.length - 1];
-        var codeInp = nextMain && nextMain.querySelector('.jv-acc-code');
-        if (codeInp) {
-            codeInp.focus();
+        if (jvAdvanceFromLastManualMemo(e)) {
+            jvRecalc();
         }
     });
 }
