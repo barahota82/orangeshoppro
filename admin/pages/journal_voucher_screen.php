@@ -1493,6 +1493,40 @@ function jvRecalc() {
     }
 }
 
+function jvLineHasRegisteredAccount(mainTr) {
+    if (!mainTr) {
+        return false;
+    }
+    if (mainTr.getAttribute('data-jv-cash-locked') === '1') {
+        return true;
+    }
+    var acc = parseInt(mainTr.querySelector('.jv-acc-id').value, 10) || 0;
+    var code = (mainTr.querySelector('.jv-acc-code').value || '').trim();
+    var name = (mainTr.querySelector('.jv-acc-name').value || '').trim();
+    return acc > 0 && (code !== '' || name !== '');
+}
+
+/** قبل الحفظ: إزالة الأسطر بدون حساب مسجّل أو بدون مبلغ (ما عدا الخزينة). */
+function jvPurgeIncompleteLinesBeforeSave() {
+    var tb = document.getElementById('jv_lines_body');
+    if (!tb) {
+        return;
+    }
+    var removeList = [];
+    jvAllMainRows(tb).forEach(function (tr) {
+        if (tr.getAttribute('data-jv-cash-locked') === '1') {
+            return;
+        }
+        if (!jvLineHasRegisteredAccount(tr) || !jvRowHasAmount(tr)) {
+            removeList.push(tr);
+        }
+    });
+    removeList.forEach(function (tr) {
+        jvRemovePair(tr);
+    });
+    jvEnsureLineStructure();
+}
+
 function jvSubmit() {
     if (jvViewMode) {
         return;
@@ -1501,6 +1535,8 @@ function jvSubmit() {
         alert(jvOtherVoucherBrowseBlockedMsg() + ' — مطلوب أيضاً قبل حفظ سند جديد.');
         return;
     }
+    jvCashLockSyncTreasuryAmount();
+    jvPurgeIncompleteLinesBeforeSave();
     jvCashLockSyncTreasuryAmount();
     var dIso = orangeGetDmyValueAsIso(document.getElementById('jv_date'));
     var ref = document.getElementById('jv_ref').value.trim();
@@ -1512,16 +1548,20 @@ function jvSubmit() {
     var lines = [];
     var memoAbort = false;
     document.querySelectorAll('#jv_lines_body tr.jv-line-main').forEach(function (tr) {
+        if (!jvLineHasRegisteredAccount(tr)) {
+            return;
+        }
         var acc = parseInt(tr.querySelector('.jv-acc-id').value, 10) || 0;
         var deb = parseFloat(String(tr.querySelector('.jv-d').value || '0').replace(',', '.'));
         var cre = parseFloat(String(tr.querySelector('.jv-c').value || '0').replace(',', '.'));
         var memoTr = jvMemoRow(tr);
         var memo = memoTr ? memoTr.querySelector('.jv-m').value.trim() : '';
-        if (acc <= 0) return;
         if (deb > 0 && cre > 0) {
             cre = 0;
         }
-        if (deb <= 0 && cre <= 0) return;
+        if (deb <= 0 && cre <= 0) {
+            return;
+        }
         if (memo === '') {
             alert('البيان مطلوب لكل سطر يحتوي مبلغاً');
             memoAbort = true;
@@ -1563,7 +1603,7 @@ function jvSubmit() {
     var sd = lines.reduce(function (a, x) { return a + x.debit; }, 0);
     var sc = lines.reduce(function (a, x) { return a + x.credit; }, 0);
     if (Math.abs(sd - sc) > 0.001) {
-        alert('السند غير متوازن');
+        alert('السند غير متوازن: مجموع المدين (' + orangeFmtMoney(sd) + ') يجب أن يساوي مجموع الدائن (' + orangeFmtMoney(sc) + ')');
         return;
     }
     var savePayload = {

@@ -150,6 +150,19 @@ function orange_journal_manage_normalize_multiline_body(PDO $pdo, array $linesIn
         if ($aid <= 0 || ($d <= 0 && $c <= 0)) {
             continue;
         }
+        $accSt = $pdo->prepare('SELECT code, name FROM accounts WHERE id = ? LIMIT 1');
+        $accSt->execute([$aid]);
+        $accRow = $accSt->fetch(PDO::FETCH_ASSOC);
+        if (!$accRow) {
+            continue;
+        }
+        $accLabel = trim((string) ($accRow['name'] ?? ''));
+        if ($accLabel === '') {
+            $accLabel = trim((string) ($accRow['code'] ?? ''));
+        }
+        if ($accLabel === '') {
+            continue;
+        }
         if (($ln['memo'] ?? '') === '') {
             json_response(['success' => false, 'message' => 'بيان كل سطر مطلوب'], 422);
         }
@@ -157,6 +170,20 @@ function orange_journal_manage_normalize_multiline_body(PDO $pdo, array $linesIn
     }
     if (count($postLines) < 2) {
         json_response(['success' => false, 'message' => 'يُشترط سطران صالحان على الأقل في السند'], 422);
+    }
+    $totalDebit = 0.0;
+    $totalCredit = 0.0;
+    foreach ($postLines as $ln) {
+        $totalDebit += (float) ($ln['debit'] ?? 0);
+        $totalCredit += (float) ($ln['credit'] ?? 0);
+    }
+    require_once __DIR__ . '/../../../includes/currency.php';
+    $cc = orange_gl_functional_currency_code($pdo, orange_admin_context_country_id($pdo));
+    if (!orange_gl_money_is_balanced($totalDebit, $totalCredit, $cc)) {
+        json_response([
+            'success' => false,
+            'message' => 'السند غير متوازن: مجموع المدين يجب أن يساوي مجموع الدائن',
+        ], 422);
     }
     if (orange_table_has_column($pdo, 'accounts', 'is_group')) {
         foreach ($postLines as $ln) {
