@@ -4422,6 +4422,11 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     flex-shrink: 0;
 }
 
+.ta-report-toolbar--is-ignore-left .gas-acc-stmt-actions {
+    flex-shrink: 0;
+    min-width: 9.5rem;
+}
+
 .ta-report-toolbar--pl-monthly-filters .is-ignore-close-field {
     display: flex;
     align-items: center;

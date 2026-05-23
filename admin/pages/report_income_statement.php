@@ -206,6 +206,9 @@ $printDatetime = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
 
 $companyNameAr = orange_company_settings_name_ar($pdo);
 
+/** أزرار عرض/طباعة في الشريط — مثل قائمة المتاجرة (طباعة ظاهرة وليست بعد «استخراج»). */
+$showReportToolbarActions = $useVouchers;
+
 $hasPlData = $revenueLines !== [] || $cogsLines !== [] || $expenseLines !== [];
 
 $reportFmt = static function (float $v) use ($reportMoney): string {
@@ -245,7 +248,7 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
                     </div>
                     <div class="gas-acc-stmt-actions">
                         <button type="submit">عرض</button>
-                        <?php if ($useVouchers && $periodLabel !== ''): ?>
+                        <?php if ($showReportToolbarActions): ?>
                             <button type="button" class="btn-secondary" onclick="window.print()">طباعة</button>
                         <?php endif; ?>
                     </div>
