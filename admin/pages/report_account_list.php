@@ -32,14 +32,14 @@ $doPrint = isset($_GET['print']) && (string) $_GET['print'] === '1';
             <h2 class="gl-acc-stmt-print-title ral-print-title">قائمة الحسابات</h2>
         </header>
         <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
-            <table class="admin-fy-table gl-acc-stmt-table ral-account-list-table">
+            <table class="admin-fy-table gl-acc-stmt-table ral-account-list-table" dir="rtl">
                 <thead>
                     <tr>
-                        <th>طبيعة الحساب</th>
-                        <th>رئيسي / فرعي</th>
-                        <th>مستوى الحساب</th>
+                        <th class="gl-acc-stmt-col-num ral-col-code">كــود الحســاب</th>
                         <th>اســــــم الحســــــاب</th>
-                        <th class="ral-col-code">كــود الحســاب</th>
+                        <th>مستوى الحساب</th>
+                        <th>رئيسي / فرعي</th>
+                        <th>طبيعة الحساب</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -48,11 +48,11 @@ $doPrint = isset($_GET['print']) && (string) $_GET['print'] === '1';
                     <?php else: ?>
                         <?php foreach ($listRows as $lr): ?>
                             <tr class="<?php echo !empty($lr['is_group']) ? 'ral-row-group' : 'ral-row-leaf'; ?>">
-                                <td><?php echo htmlspecialchars((string) ($lr['nature_label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td><?php echo htmlspecialchars((string) ($lr['group_label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td><?php echo htmlspecialchars((string) ($lr['level_label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td class="gl-acc-stmt-col-num ral-col-code" dir="ltr" lang="en"><?php echo htmlspecialchars((string) ($lr['code'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars((string) ($lr['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td class="ral-col-code" dir="ltr" lang="en"><?php echo htmlspecialchars((string) ($lr['code'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td><?php echo htmlspecialchars((string) ($lr['level_label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td><?php echo htmlspecialchars((string) ($lr['group_label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td><?php echo htmlspecialchars((string) ($lr['nature_label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -63,7 +63,12 @@ $doPrint = isset($_GET['print']) && (string) $_GET['print'] === '1';
     </div>
 </div>
 <style>
+.ral-account-list-table { direction: rtl; }
 .ral-account-list-table .ral-col-code { text-align: center; white-space: nowrap; }
+.ral-account-list-table th,
+.ral-account-list-table td { text-align: center; }
+.ral-account-list-table th:nth-child(2),
+.ral-account-list-table td:nth-child(2) { text-align: right; }
 .ral-row-group td { font-weight: 600; }
 .ral-row-leaf td { font-weight: 400; }
 @media print {
