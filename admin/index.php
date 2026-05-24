@@ -71,7 +71,11 @@ $allowed = [
     'company_documents',
     'channel_analytics',
     'invoice',
-    'order_intake_queue'
+    'order_intake_queue',
+    'delivery_agents',
+    'delivery_agent_handover',
+    'delivery_order_search',
+    'online_orders_final_posting',
 ];
 if (!in_array($page, $allowed, true)) {
     $page = 'dashboard';

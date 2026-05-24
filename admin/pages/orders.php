@@ -5,13 +5,20 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
+require_once __DIR__ . '/../../includes/delivery_agents.php';
 
 $pdo = db();
 $adminCountryId = orange_admin_context_country_id($pdo);
 $ordersMoney = orange_admin_currency_context($pdo);
 $hasOrderInvoiceCol = orange_table_has_column($pdo, 'orders', 'invoice_number');
+$hasDeliveryAgentCol = orange_table_has_column($pdo, 'orders', 'delivery_agent_id');
 $hasCartPromoDiscountCol = orange_table_has_column($pdo, 'orders', 'cart_promotion_discount');
 $hasCartComboDiscountCol = orange_table_has_column($pdo, 'orders', 'cart_combo_discount');
+
+$agentFilterId = isset($_GET['agent_id']) ? (int) $_GET['agent_id'] : 0;
+$deliveryAgents = ($hasDeliveryAgentCol && orange_table_exists($pdo, 'delivery_agents'))
+    ? orange_delivery_agents_admin_list($pdo, $adminCountryId > 0 ? $adminCountryId : null)
+    : [];
 
 $sourceFilter = isset($_GET['source']) ? trim((string)$_GET['source']) : 'all';
 if (!in_array($sourceFilter, ['all', 'website', 'company'], true)) {
@@ -39,10 +46,18 @@ if ($customerFilterId > 0 && $hasOrdersCustomerCol && orange_table_exists($pdo, 
 }
 
 $sql = '
-    SELECT o.*, c.name AS channel_name
+    SELECT o.*, c.name AS channel_name';
+if ($hasDeliveryAgentCol && orange_table_exists($pdo, 'delivery_agents')) {
+    $sql .= ', da.name_ar AS delivery_agent_name';
+}
+$sql .= '
     FROM orders o
-    LEFT JOIN channels c ON c.id = o.channel_id
-    WHERE 1=1
+    LEFT JOIN channels c ON c.id = o.channel_id';
+if ($hasDeliveryAgentCol && orange_table_exists($pdo, 'delivery_agents')) {
+    $sql .= ' LEFT JOIN delivery_agents da ON da.id = o.delivery_agent_id';
+}
+$sql .= '
+    WHERE o.status <> \'completed\'
 ';
 $sqlParams = [];
 if ($sourceFilter === 'website') {
@@ -60,6 +75,10 @@ if ($payFilter === 'cash') {
 if ($customerFilterId > 0 && $hasOrdersCustomerCol) {
     $sql .= ' AND o.customer_id = ?';
     $sqlParams[] = $customerFilterId;
+}
+if ($agentFilterId > 0 && $hasDeliveryAgentCol) {
+    $sql .= ' AND o.delivery_agent_id = ?';
+    $sqlParams[] = $agentFilterId;
 }
 $ordersCountryFilter = orange_sql_filter_country_id($pdo, 'orders', 'o', $adminCountryId);
 if ($ordersCountryFilter !== null) {
@@ -147,6 +166,11 @@ function orange_admin_orders_action_buttons(array $o): void
         if (orange_admin_may($admin, $pdo, 'sales', 'view') && orange_table_exists($pdo, 'order_intake_queue')) {
             echo ' — <a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=order_intake_queue'), ENT_QUOTES, 'UTF-8') . '">طابور طلبات الموقع (قبل إنشاء الطلب)</a>';
         }
+        if (orange_admin_may($admin, $pdo, 'sales', 'view')) {
+            echo ' — <a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=online_orders_final_posting'), ENT_QUOTES, 'UTF-8') . '">طلبات أونلاين — إنشاء القيود</a>';
+            echo ' — <a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=delivery_agent_handover'), ENT_QUOTES, 'UTF-8') . '">تسليم المندوب</a>';
+            echo ' — <a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=delivery_order_search'), ENT_QUOTES, 'UTF-8') . '">بحث التسليم</a>';
+        }
         ?>
     </p>
 
@@ -177,6 +201,22 @@ function orange_admin_orders_action_buttons(array $o): void
                 <option value="online" <?php echo $payFilter === 'online' ? 'selected' : ''; ?>>أونلاين</option>
             </select>
         </label>
+        <?php if ($deliveryAgents !== []): ?>
+        <label class="admin-toolbar__field">
+            <span>مندوب التوصيل</span>
+            <select id="orders-agent-filter" aria-label="فلتر مندوب">
+                <option value="0">الكل</option>
+                <?php foreach ($deliveryAgents as $dag): ?>
+                <?php $daid = (int) ($dag['id'] ?? 0); ?>
+                <option value="<?php echo $daid; ?>"<?php echo $daid === $agentFilterId ? ' selected' : ''; ?>><?php echo htmlspecialchars(orange_delivery_agent_display_name($dag), ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <?php if ($agentFilterId > 0): ?>
+        <button type="button" class="btn-secondary" id="orders-bulk-on-way">بالطريق للكل</button>
+        <button type="button" class="btn-success" id="orders-bulk-completed">تم التوصيل للكل</button>
+        <?php endif; ?>
+        <?php endif; ?>
     </div>
     <div class="table-wrap">
         <table class="admin-orders-list-table">
@@ -189,6 +229,7 @@ function orange_admin_orders_action_buttons(array $o): void
                     <th class="col-orders-customer">العميل</th>
                     <th class="col-orders-phone">الهاتف</th>
                     <th title="تتبّع مصدر الطلب فقط — المخزون للشركة واحد">قناة العملاء</th>
+                    <?php if ($hasDeliveryAgentCol): ?><th>المندوب</th><?php endif; ?>
                     <th>الإجمالي</th>
                     <th>الحالة</th>
                     <th class="col-orders-actions">التحكم</th>
@@ -223,6 +264,12 @@ function orange_admin_orders_action_buttons(array $o): void
                     <td class="col-orders-customer"><?php echo htmlspecialchars((string)($o['customer_name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td class="col-orders-phone"><?php echo htmlspecialchars((string)($o['phone'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo htmlspecialchars((string)($o['channel_name'] ?: '-'), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <?php if ($hasDeliveryAgentCol): ?>
+                    <td><?php
+                        $dan = trim((string) ($o['delivery_agent_name'] ?? ''));
+                        echo $dan !== '' ? htmlspecialchars($dan, ENT_QUOTES, 'UTF-8') : '—';
+                    ?></td>
+                    <?php endif; ?>
                     <td><?php
                         echo orange_format_money_for_context($ordersMoney, (float) ($o['total'] ?? 0));
                         if ($hasCartComboDiscountCol) {
@@ -261,6 +308,7 @@ function orange_admin_orders_action_buttons(array $o): void
 (function () {
     var srcSel = document.getElementById('orders-source-filter');
     var paySel = document.getElementById('orders-pay-filter');
+    var agentSel = document.getElementById('orders-agent-filter');
     if (!srcSel || !paySel) return;
     var base = <?php echo json_encode($ordersIndex, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     function go() {
@@ -269,10 +317,38 @@ function orange_admin_orders_action_buttons(array $o): void
         var q = 'page=orders';
         if (src !== 'all') q += '&source=' + encodeURIComponent(src);
         if (pay !== 'all') q += '&pay=' + encodeURIComponent(pay);
+        if (agentSel && parseInt(agentSel.value, 10) > 0) {
+            q += '&agent_id=' + encodeURIComponent(agentSel.value);
+        }
         window.location.href = base + (base.indexOf('?') === -1 ? '?' : '&') + q;
     }
     srcSel.addEventListener('change', go);
     paySel.addEventListener('change', go);
+    if (agentSel) agentSel.addEventListener('change', go);
+
+    var agentId = <?php echo (int) $agentFilterId; ?>;
+    var bulkOnWay = document.getElementById('orders-bulk-on-way');
+    var bulkDone = document.getElementById('orders-bulk-completed');
+    if (bulkOnWay && agentId > 0) {
+        bulkOnWay.addEventListener('click', function () {
+            if (!confirm('تغيير كل الطلبات الظاهرة (approved) لهذا المندوب إلى «بالطريق»؟')) return;
+            postJSON('/admin/api/orders/bulk-update-status.php', { agent_id: agentId, status: 'on_the_way' })
+                .then(function (res) {
+                    alert(res.message || (res.success ? 'تم' : 'فشل'));
+                    if (res.success) location.reload();
+                });
+        });
+    }
+    if (bulkDone && agentId > 0) {
+        bulkDone.addEventListener('click', function () {
+            if (!confirm('تأكيد «تم التوصيل للكل» للطلبات الظاهرة (on_the_way) — مخزون فقط بدون قيود؟')) return;
+            postJSON('/admin/api/orders/bulk-update-status.php', { agent_id: agentId, status: 'completed' })
+                .then(function (res) {
+                    alert(res.message || (res.success ? 'تم' : 'فشل'));
+                    if (res.success) location.reload();
+                });
+        });
+    }
 })();
 async function updateOrderStatus(orderId, status, currentStatus) {
     if (currentStatus === undefined || currentStatus === null) {
@@ -280,10 +356,10 @@ async function updateOrderStatus(orderId, status, currentStatus) {
     }
     if (status === 'rejected') {
         if (currentStatus === 'completed') {
-            if (!confirm('الطلب مكتمل: سيتم إرجاع المخزون وعكس قيود التسليم المرحّلة أو حذف المعلّق، وتعليم حجز الويب/التسليم كملغى عند الانطباق. المتابعة؟')) {
-                return;
-            }
-        } else if (!confirm('تأكيد رفض هذا الطلب؟')) {
+            alert('لا يمكن رفض طلب مُسلَّم — استخدم مردود المبيعات.');
+            return;
+        }
+        if (!confirm('تأكيد رفض هذا الطلب؟')) {
             return;
         }
     }

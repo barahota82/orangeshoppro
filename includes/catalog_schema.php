@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 59);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 60);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3258,6 +3258,37 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         orange_catalog_safe_exec(
             $pdo,
             'ALTER TABLE orders ADD COLUMN completed_at DATETIME NULL DEFAULT NULL'
+        );
+    }
+
+    if (!orange_table_exists($pdo, 'delivery_agents')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE IF NOT EXISTS delivery_agents (
+                id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                country_id INT UNSIGNED NOT NULL,
+                name_ar VARCHAR(191) NOT NULL,
+                name_en VARCHAR(191) NULL DEFAULT NULL,
+                phone VARCHAR(32) NULL DEFAULT NULL,
+                status VARCHAR(16) NOT NULL DEFAULT \'active\',
+                sort_order INT NOT NULL DEFAULT 0,
+                notes TEXT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY idx_delivery_agents_country (country_id),
+                KEY idx_delivery_agents_status (status)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'delivery_agent_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE orders ADD COLUMN delivery_agent_id INT UNSIGNED NULL DEFAULT NULL'
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE INDEX idx_orders_delivery_agent_id ON orders (delivery_agent_id)'
         );
     }
     if (orange_table_exists($pdo, 'order_items')) {
