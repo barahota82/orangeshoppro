@@ -409,6 +409,17 @@ function orange_accounting_is_locked(PDO $pdo, ?array $row): bool
     return orange_fiscal_is_closed_for_entry($pdo, $row);
 }
 
+/** SQL fragment: exclude voided journal vouchers from GL totals (§9.6). */
+function orange_journal_voucher_sql_exclude_void(PDO $pdo, string $jvAlias = 'jv'): string
+{
+    if (! orange_table_exists($pdo, 'journal_vouchers')
+        || ! orange_table_has_column($pdo, 'journal_vouchers', 'is_void')) {
+        return '';
+    }
+
+    return ' AND (' . $jvAlias . '.is_void = 0 OR ' . $jvAlias . '.is_void IS NULL)';
+}
+
 /**
  * رقم العرض اليومية: التسلسل داخل سنة المالية وحسب دليل اليومية؛ يُكمِّل إلى id قبل التعبئة القديمة.
  *
@@ -1233,6 +1244,7 @@ function orange_voucher_account_totals(PDO $pdo, int $fiscalYearId, array $exclu
     foreach ($countryBind['params'] as $cp) {
         $params[] = $cp;
     }
+    $sql .= orange_journal_voucher_sql_exclude_void($pdo, 'jv');
     if ($excludeEntryTypes !== []) {
         $placeholders = implode(',', array_fill(0, count($excludeEntryTypes), '?'));
         $sql .= ' AND jv.entry_type NOT IN (' . $placeholders . ')';
@@ -1286,6 +1298,7 @@ function orange_voucher_account_totals_by_voucher_date_range(
     foreach ($countryBind['params'] as $cp) {
         $params[] = $cp;
     }
+    $sql .= orange_journal_voucher_sql_exclude_void($pdo, 'jv');
     if ($excludeEntryTypes !== []) {
         $placeholders = implode(',', array_fill(0, count($excludeEntryTypes), '?'));
         $sql .= ' AND jv.entry_type NOT IN (' . $placeholders . ')';
@@ -1335,6 +1348,7 @@ function orange_voucher_account_totals_strictly_before_date(
     foreach ($countryBind['params'] as $cp) {
         $params[] = $cp;
     }
+    $sql .= orange_journal_voucher_sql_exclude_void($pdo, 'jv');
     if ($excludeEntryTypes !== []) {
         $placeholders = implode(',', array_fill(0, count($excludeEntryTypes), '?'));
         $sql .= ' AND jv.entry_type NOT IN (' . $placeholders . ')';

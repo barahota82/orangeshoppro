@@ -113,7 +113,7 @@ $fyGlRetainedBrief = $fyAccountBrief($pdo, $fyGlRetainedId);
                         </td>
                         <td class="fy-col-acct-close fy-col-center">
                             <?php if ($closed): ?>
-                                <button type="button" class="fy-btn-reopen btn-secondary" title="حذف سند الإقفال المحاسبي وإعادة فتح السنة">فك الإقفال…</button>
+                                <button type="button" class="fy-btn-reopen btn-secondary" title="void سند YEC وإعادة فتح السنة">فك الإقفال…</button>
                             <?php else: ?>
                                 <button type="button" class="fy-btn-acct-close btn-secondary" title="إغلاق السنة مع خيارات الإقفال">إقفال…</button>
                             <?php endif; ?>
@@ -141,8 +141,7 @@ $fyGlRetainedBrief = $fyAccountBrief($pdo, $fyGlRetainedId);
     <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="fy_close_main_title">
         <h3 id="fy_close_main_title" class="gl-pick-modal__title">إقفال سنة مالية</h3>
         <p class="muted" style="margin:0 0 12px;font-size:0.9rem;line-height:1.45;">
-            عند تفعيل الإقفال المحاسبي ووجود إيرادات/مصروفات مصنّفة: <strong>YEC-PL</strong> بآخر يوم السنة إلى حساب <strong>أرباح / خسائر السنة الحالية</strong>؛
-            ثم <strong>YEC-RE</strong> إلى <strong>الأرباح المحتجزة</strong>؛ وعند الربح مع نسبة محفوظة <strong>YEC-LR</strong> (احتياطي قانوني).
+            عند تفعيل الإقفال المحاسبي ووجود إيرادات/مصروفات مصنّفة: يُنشأ <strong>سند YEC واحد</strong> (PL → RE → LR) وتُوجَّه لشاشة <strong>قيود الإقفال السنوية</strong> للمراجعة ثم <strong>حفظ = إقفال</strong>.
             حسابا الوسيط والمحتجزة يُؤخذان من <strong>حسابات القيود التلقائية</strong> إن وُجد ربطهما هناك.
         </p>
         <label class="fy-close-check-label" style="display:flex;align-items:center;gap:8px;margin-bottom:14px;cursor:pointer;">
@@ -386,6 +385,10 @@ $fyGlRetainedBrief = $fyAccountBrief($pdo, $fyGlRetainedId);
                         alert(r.message || (r.success ? 'تم' : 'فشل'));
                         if (r.success) {
                             fyCloseMainClose();
+                            if (r.redirect) {
+                                window.location.href = r.redirect;
+                                return;
+                            }
                             location.reload();
                         }
                     })
@@ -404,13 +407,17 @@ $fyGlRetainedBrief = $fyAccountBrief($pdo, $fyGlRetainedId);
                 if (rid <= 0) {
                     return;
                 }
-                if (!confirm('فك إقفال هذه السنة؟\n\nسيتم حذف سندات الإقفال (YEC-PL وYEC-RE وYEC-LR إن وُجد، أو السند القديم YEC-)، وإعادة فتح السنة.\nإن وُجدت أرصدة أول مدة للسنة التالية مُرحَّلة، راجعها بعد التصحيح.')) {
+                if (!confirm('فك إقفال هذه السنة؟\n\nسيتم إلغاء (void) سند YEC وإعادة فتح السنة للتصحيح من شاشة «قيود الإقفال السنوية».\nإن وُجدت أرصدة أول مدة للسنة التالية مُرحَّلة، راجعها بعد التصحيح.')) {
                     return;
                 }
                 postJSON('/admin/api/fiscal_years/save.php', { action: 'reopen', id: rid })
                     .then(function (r) {
                         alert(r.message || (r.success ? 'تم' : 'فشل'));
                         if (r.success) {
+                            if (r.redirect) {
+                                window.location.href = r.redirect;
+                                return;
+                            }
                             location.reload();
                         }
                     })

@@ -232,7 +232,30 @@ try {
         $pdo->beginTransaction();
         try {
             if ($accountingClose) {
-                orange_fiscal_year_end_accounting_close($pdo, $id, $incomeSummaryAccountId, $retainedEarningsAccountId);
+                $prep = orange_year_end_close_prepare_draft($pdo, $id, $incomeSummaryAccountId, $retainedEarningsAccountId);
+                $vid = (int) ($prep['voucher_id'] ?? 0);
+                if ($vid > 0) {
+                    $pdo->commit();
+                    audit_log('fiscal_year_yec_prepare', 'تجهيز YEC للسنة #' . $id, 'journal_vouchers', $vid);
+                    json_response([
+                        'success' => true,
+                        'message' => 'تم تجهيز سند الإقفال — راجع الأسطر ثم احفظ لإغلاق السنة.',
+                        'voucher_id' => $vid,
+                        'redirect' => storefront_public_path('/admin/index.php?page=year_end_close_vouchers&id=' . $vid),
+                    ]);
+                }
+                $u = $pdo->prepare('UPDATE fiscal_years SET is_closed = 1, closed_at = NOW() WHERE id = ? AND is_closed = 0');
+                $u->execute([$id]);
+                if ($u->rowCount() === 0) {
+                    $pdo->rollBack();
+                    json_response(['success' => false, 'message' => 'تعذر إغلاق السنة (غير موجودة أو مغلقة مسبقاً)'], 422);
+                }
+                $pdo->commit();
+                audit_log('fiscal_year_close', 'إغلاق سنة #' . $id . ' بلا قيود YEC (لا إيراد/مصروف)', 'fiscal_years', $id);
+                json_response([
+                    'success' => true,
+                    'message' => 'لا توجد إيرادات/مصروفات للإقفال — تم إغلاق السنة إدارياً.',
+                ]);
             }
             $u = $pdo->prepare('UPDATE fiscal_years SET is_closed = 1, closed_at = NOW() WHERE id = ? AND is_closed = 0');
             $u->execute([$id]);
@@ -250,9 +273,7 @@ try {
         audit_log('fiscal_year_close', 'تم إغلاق سنة مالية رقم: ' . $id, 'fiscal_years', $id);
         json_response([
             'success' => true,
-            'message' => $accountingClose
-                ? 'تم الإقفال المحاسبي (إن وُجدت إيرادات/مصروفات مصنفة) ثم إغلاق السنة.'
-                : 'تم إغلاق السنة إدارياً دون قيود إقفال تلقائية.',
+            'message' => 'تم إغلاق السنة إدارياً دون قيود إقفال تلقائية.',
         ]);
     }
 
@@ -269,16 +290,22 @@ try {
             }
             orange_gl_api_catch_json($e, 'تعذر فك إقفال السنة');
         }
-        $n = (int) ($info['removed_year_end_vouchers'] ?? 0);
-        audit_log('fiscal_year_reopen', 'فك إقفال سنة مالية #' . $id . ' — حذف سندات إقفال: ' . $n, 'fiscal_years', $id);
+        $n = (int) ($info['voided_year_end_vouchers'] ?? 0);
+        $vid = (int) ($info['voucher_id'] ?? 0);
+        audit_log('fiscal_year_reopen', 'فك إقفال سنة #' . $id . ' — void YEC: ' . $n, 'fiscal_years', $id);
         $hint = ' راجع أرصدة أول المدة للسنة التالية إن كانت مُرحَّلة.';
+        $redirect = $vid > 0
+            ? storefront_public_path('/admin/index.php?page=year_end_close_vouchers&id=' . $vid)
+            : null;
         json_response([
             'success' => true,
             'message' => ($n > 0
-                ? 'تم حذف ' . $n . ' سند إقفال محاسبي وإعادة فتح السنة.'
-                : 'تم إعادة فتح السنة (لم يُوجد سند إقفال محاسبي — إغلاق إداري أو بلا قيود).')
+                ? 'تم إلغاء ' . $n . ' سند إقفال (void) وإعادة فتح السنة — صحّح السند ثم احفظ من جديد.'
+                : 'تم إعادة فتح السنة (إغلاق إداري أو بلا قيود).')
                 . $hint,
-            'removed_year_end_vouchers' => $n,
+            'voided_year_end_vouchers' => $n,
+            'voucher_id' => $vid,
+            'redirect' => $redirect,
         ]);
     }
 

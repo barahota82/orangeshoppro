@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 62);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 63);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3311,6 +3311,31 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         orange_catalog_safe_exec(
             $pdo,
             'ALTER TABLE company_settings ADD COLUMN opening_stock_locked TINYINT(1) NOT NULL DEFAULT 0'
+        );
+    }
+
+    if (orange_table_exists($pdo, 'journal_vouchers') && !orange_table_has_column($pdo, 'journal_vouchers', 'is_void')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE journal_vouchers ADD COLUMN is_void TINYINT(1) NOT NULL DEFAULT 0'
+        );
+    }
+    if (orange_table_exists($pdo, 'journal_vouchers') && !orange_table_has_column($pdo, 'journal_vouchers', 'voided_at')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE journal_vouchers ADD COLUMN voided_at DATETIME NULL DEFAULT NULL'
+        );
+    }
+    if (orange_table_exists($pdo, 'journal_vouchers') && !orange_table_has_column($pdo, 'journal_vouchers', 'yec_locked')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE journal_vouchers ADD COLUMN yec_locked TINYINT(1) NOT NULL DEFAULT 0'
+        );
+    }
+    if (orange_table_exists($pdo, 'journal_lines') && !orange_table_has_column($pdo, 'journal_lines', 'yec_phase')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            "ALTER TABLE journal_lines ADD COLUMN yec_phase VARCHAR(8) NULL DEFAULT NULL AFTER memo"
         );
     }
 

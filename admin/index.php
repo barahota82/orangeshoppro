@@ -50,6 +50,7 @@ $allowed = [
     'partner_reports',
     'gl_account_settings',
     'journal_entries',
+    'year_end_close_vouchers',
     'receipt_voucher',
     'payment_voucher',
     'other_vouchers',

@@ -17,6 +17,11 @@ require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = orange_admin_page_pdo();
 
+$jvYecMode = !empty($jvYecMode);
+if ($jvYecMode) {
+    require_once __DIR__ . '/../../includes/year_end_close.php';
+}
+
 $jvScreenCountryId = orange_admin_context_country_id($pdo);
 
 $jvPageEt = (string) ($jvPageEntryType ?? '');
@@ -139,6 +144,15 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
 
 <div class="card jv-print-area">
     <h3 class="card-title"><?php echo htmlspecialchars($jvPageCardTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
+    <?php if ($jvYecMode): ?>
+    <p class="card-hint jv-print-hide" style="margin:0 0 10px;line-height:1.55;">
+        سند <strong>YEC واحد</strong> لكل سنة (PL → RE → LR). <strong>حفظ = إقفال</strong> السنة — راجع الأسطر قبل الحفظ؛ الطباعة بعد الحفظ فقط.
+    </p>
+    <label class="jv-print-hide" style="display:flex;align-items:center;gap:8px;margin:0 0 12px;cursor:default;">
+        <input type="checkbox" id="jv_yec_locked" disabled>
+        <span><strong>قيد مغلق</strong> — يُفعَّل تلقائياً بعد الحفظ الناجح</span>
+    </label>
+    <?php endif; ?>
     <?php if ((($jvPageEntryType ?? '') === 'receipt_voucher' || ($jvPageEntryType ?? '') === 'payment_voucher') && $jvCashLock === null): ?>
     <p class="card-hint jv-print-hide" style="margin:0 0 12px;">اربط حساب <strong>الخزينة / النقدية</strong> من <a href="<?php echo htmlspecialchars($jvGlSettingsUrl, ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a> (بند النقدية) لاستخدام سند القبض أو سند الصرف بسطر خزينة ثابت.</p>
     <?php endif; ?>
@@ -254,7 +268,7 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
             <button type="button" id="jv_btn_new_sheet" title="إدخال سند جديد">سند جديد</button>
             <button type="button" class="btn-secondary" id="jv_btn_delete_voucher" title="حذف السند المعروض" disabled>حذف السند</button>
             <button type="button" class="btn-secondary" id="jv_btn_print_voucher" title="احفظ السند أولاً — الطباعة بعد الحفظ فقط" disabled>طباعة السند</button>
-            <button type="button" id="jv_btn_save" onclick="jvSubmit()">حفظ السند</button>
+            <button type="button" id="jv_btn_save" onclick="jvSubmit()"><?php echo $jvYecMode ? 'حفظ وإقفال السنة' : 'حفظ السند'; ?></button>
         </div>
     </div>
 </div>
@@ -454,9 +468,14 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
 .jv-line-cash-locked td { background: #ecfdf5; }
 .jv-line-cash-locked .jv-acc-code,
 .jv-line-cash-locked .jv-acc-name { font-weight: 600; }
+.jv-yec-phase-row td { background: #f0f9ff; font-weight: 700; text-align: center; padding: 10px 8px; border-top: 2px solid #bae6fd; }
 </style>
 
 <script>
+var JV_YEC_MODE = <?php echo $jvYecMode ? 'true' : 'false'; ?>;
+var JV_YEC_API = '/admin/api/year_end_close/manage.php';
+var JV_YEC_LOAD_ID = <?php echo (int) ($jvYecLoadVoucherId ?? 0); ?>;
+var JV_PHASE_LABELS = <?php echo json_encode($jvYecMode ? orange_year_end_close_phase_labels() : [], JSON_UNESCAPED_UNICODE); ?>;
 var JV_ENTRY_TYPE = <?php echo json_encode($jvPageEntryType, JSON_UNESCAPED_UNICODE); ?>;
 var JV_OTHER_VOUCHER_BROWSE = <?php echo $jvPageEt === 'other_voucher' ? 'true' : 'false'; ?>;
 var JV_CASH_LOCK = <?php echo json_encode($jvCashLock, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>;
@@ -1348,6 +1367,27 @@ function jvClearLinesBody() {
     jvPairSeq = 0;
 }
 
+function jvYecInsertPhaseRow(tb, phaseCode) {
+    if (!JV_YEC_MODE || !phaseCode || !tb) {
+        return;
+    }
+    var label = (JV_PHASE_LABELS && JV_PHASE_LABELS[phaseCode]) ? JV_PHASE_LABELS[phaseCode] : phaseCode;
+    var tr = document.createElement('tr');
+    tr.className = 'jv-yec-phase-row jv-print-hide';
+    tr.setAttribute('data-yec-phase-header', phaseCode);
+    tr.innerHTML = '<td colspan="5">' + jvEscapeHtml(label) + '</td>';
+    tb.appendChild(tr);
+}
+
+function jvYecSyncLockedCheckbox(locked) {
+    var el = document.getElementById('jv_yec_locked');
+    if (el) {
+        el.checked = !!locked;
+    }
+}
+
+var jvYecLocked = false;
+
 function jvFillMainFromLine(main, ln) {
     if (!main || !ln) {
         return;
@@ -1369,6 +1409,9 @@ function jvFillMainFromLine(main, ln) {
     }
     if (memo) {
         memo.querySelector('.jv-m').value = ln.memo || '';
+    }
+    if (ln.yec_phase) {
+        main.setAttribute('data-yec-phase', ln.yec_phase);
     }
     jvCashLockApplyLineAmountUi(main);
 }
@@ -1411,6 +1454,8 @@ function jvApplyVoucherPayload(r) {
     jvViewMode = !canEdit;
     jvBrowseId = r.voucher.id;
     jvBrowseEntryType = r.voucher.entry_type ? String(r.voucher.entry_type) : null;
+    jvYecSyncLockedCheckbox(!!(r.voucher.yec_locked));
+    jvYecLocked = !!(r.voucher.yec_locked);
     document.getElementById('jv_number_preview').value = String(r.voucher.display_voucher_no != null ? r.voucher.display_voucher_no : r.voucher.id);
     document.getElementById('jv_date').value = orangeIsoDateToDmy(r.voucher.date || '');
     document.getElementById('jv_ref').value = r.voucher.reference || '';
@@ -1466,7 +1511,12 @@ function jvApplyVoucherPayload(r) {
             });
         }
     } else {
+        var lastPhase = '';
         lines.forEach(function (ln) {
+            if (JV_YEC_MODE && ln.yec_phase && ln.yec_phase !== lastPhase) {
+                jvYecInsertPhaseRow(tb, ln.yec_phase);
+                lastPhase = ln.yec_phase;
+            }
             jvAddRow();
             jvFillMainFromLine(jvAllMainRows(tb)[jvAllMainRows(tb).length - 1], ln);
         });
@@ -1481,11 +1531,15 @@ function jvLoadVoucherFromApi(id) {
         alert(jvOtherVoucherBrowseBlockedMsg());
         return;
     }
-    var getPayload = { action: 'get', id: id, entry_type: JV_ENTRY_TYPE };
+    var apiUrl = JV_YEC_MODE ? JV_YEC_API : '/admin/api/journal/manage.php';
+    var getPayload = { action: 'get', id: id };
+    if (!JV_YEC_MODE) {
+        getPayload.entry_type = JV_ENTRY_TYPE;
+    }
     if (JV_OTHER_VOUCHER_BROWSE) {
         getPayload.journal_type_id = jvJournalTypeFilterId();
     }
-    postJSON('/admin/api/journal/manage.php', getPayload).then(function (r) {
+    postJSON(apiUrl, getPayload).then(function (r) {
         if (!r.success || !r.voucher) {
             if (!orangeAdminOfferSuggestOnFailure(r, 'تعذر العرض')) {
                 alert(r.message || 'فشل');
@@ -1522,6 +1576,9 @@ function jvSyncPrintButton() {
         return;
     }
     var ok = !!jvBrowseId;
+    if (JV_YEC_MODE) {
+        ok = ok && jvYecLocked;
+    }
     pb.disabled = !ok;
     pb.title = ok ? 'طباعة السند' : 'احفظ السند أولاً — الطباعة بعد الحفظ فقط (§10)';
 }
@@ -1652,7 +1709,11 @@ function jvSubmit() {
             memoAbort = true;
             return;
         }
-        lines.push({ account_id: acc, debit: deb, credit: cre, memo: memo });
+        var lineObj = { account_id: acc, debit: deb, credit: cre, memo: memo };
+        if (JV_YEC_MODE) {
+            lineObj.yec_phase = tr.getAttribute('data-yec-phase') || '';
+        }
+        lines.push(lineObj);
     });
     if (memoAbort) {
         return;
@@ -1689,6 +1750,30 @@ function jvSubmit() {
     var sc = lines.reduce(function (a, x) { return a + x.credit; }, 0);
     if (Math.abs(sd - sc) > 0.001) {
         alert('السند غير متوازن: مجموع المدين (' + orangeFmtMoney(sd) + ') يجب أن يساوي مجموع الدائن (' + orangeFmtMoney(sc) + ')');
+        return;
+    }
+    if (JV_YEC_MODE) {
+        if (!jvBrowseId) {
+            alert('لا يوجد سند YEC — ابدأ من «السنوات المالية» → إقفال…');
+            return;
+        }
+        if (!confirm('تأكيد حفظ سند الإقفال وإغلاق السنة المالية؟')) {
+            return;
+        }
+        postJSON(JV_YEC_API, {
+            action: 'finalize',
+            id: jvBrowseId,
+            date: dIso,
+            description: desc,
+            lines: lines
+        }).then(function (r) {
+            if (r.success) {
+                alert(r.message || 'تم');
+                jvLoadVoucherFromApi(jvBrowseId);
+                return;
+            }
+            alert(r.message || 'فشل');
+        }).catch(function (e) { alert(e.message || String(e)); });
         return;
     }
     var savePayload = {
@@ -1769,4 +1854,15 @@ jvSyncTrailingRows();
     jvSyncRefPreview();
     jvSyncPrintButton();
 })();
+if (JV_YEC_MODE && JV_YEC_LOAD_ID > 0) {
+    jvLoadVoucherFromApi(JV_YEC_LOAD_ID);
+}
+if (JV_YEC_MODE) {
+    ['jv_btn_delete_voucher', 'jv_btn_new_sheet', 'jv_nav_first', 'jv_nav_prev', 'jv_nav_next', 'jv_nav_last', 'jv_btn_open_search'].forEach(function (hid) {
+        var el = document.getElementById(hid);
+        if (el) {
+            el.style.display = 'none';
+        }
+    });
+}
 </script>

@@ -875,7 +875,7 @@ function orange_gl_journal_delete_blocked_message_ar(string $entryType): string
         $label = $et !== '' ? $et : 'سند نظامي';
     }
     $hints = [
-        'year_end_close' => 'يُدار من مسار إقفال السنة المالية.',
+        'year_end_close' => 'يُدار من شاشة «قيود الإقفال السنوية» — ابدأ من «السنوات المالية».',
         'opening_balance' => 'عدّل من شاشة «الأرصدة الافتتاحية».',
         'order_delivery_sale' => 'للتصحيح: «ترحيل الحركات» (فك ترحيل) أو مسار الطلب.',
         'order_delivery_cogs' => 'كما سبق — تكلفة التسليم مرتبطة بالطابور أو الطلب.',
@@ -905,7 +905,7 @@ function orange_gl_journal_delete_blocked_admin_link(string $entryType): ?array
     $et = trim($entryType);
     $map = [
         'opening_balance' => ['page' => 'opening_balances', 'label' => 'الأرصدة الافتتاحية'],
-        'year_end_close' => ['page' => 'fiscal_years', 'label' => 'السنوات المالية / الإقفال'],
+        'year_end_close' => ['page' => 'year_end_close_vouchers', 'label' => 'قيود الإقفال السنوية'],
         'purchase' => ['page' => 'purchases', 'label' => 'المشتريات'],
         'purchase_receive' => ['page' => 'purchases', 'label' => 'المشتريات'],
         'purchase_return' => ['page' => 'purchase_returns', 'label' => 'مردود المشتريات'],
