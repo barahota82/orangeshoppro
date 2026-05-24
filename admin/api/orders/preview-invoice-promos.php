@@ -15,7 +15,6 @@ try {
 
     $orderId = (int) ($data['order_id'] ?? 0);
     $changes = $data['changes'] ?? [];
-    $markCompleted = !empty($data['mark_completed']);
     $adminRestores = $data['admin_restores'] ?? [];
 
     if ($orderId <= 0 || !is_array($changes)) {
@@ -35,25 +34,9 @@ try {
         ];
     }
 
-    $pdo->beginTransaction();
-    $result = orange_invoice_edit_apply(
-        $pdo,
-        $orderId,
-        $normalized,
-        $markCompleted,
-        is_array($adminRestores) ? $adminRestores : []
-    );
-    $pdo->commit();
+    $preview = orange_invoice_edit_preview($pdo, $orderId, $normalized, is_array($adminRestores) ? $adminRestores : []);
 
-    json_response([
-        'success' => true,
-        'message' => $markCompleted ? 'تم الحفظ وتم التسليم' : 'تم حفظ التعديل',
-        'total' => $result['total'],
-        'promo_summary' => $result['promo_summary'],
-    ]);
+    json_response(array_merge(['success' => true], $preview));
 } catch (Throwable $e) {
-    if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
-        $pdo->rollBack();
-    }
-    orange_admin_api_catch($e, 'تعذر حفظ تعديل الفاتورة');
+    orange_admin_api_catch($e, 'تعذر معاينة العروض');
 }

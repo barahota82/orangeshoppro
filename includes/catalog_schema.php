@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 60);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 61);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3289,6 +3289,18 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         orange_catalog_safe_exec(
             $pdo,
             'CREATE INDEX idx_orders_delivery_agent_id ON orders (delivery_agent_id)'
+        );
+    }
+    if (orange_table_exists($pdo, 'orders') && !orange_table_has_column($pdo, 'orders', 'promo_admin_override')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE orders ADD COLUMN promo_admin_override TEXT NULL DEFAULT NULL'
+        );
+    }
+    if (orange_table_exists($pdo, 'order_items') && !orange_table_has_column($pdo, 'order_items', 'combo_group_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE order_items ADD COLUMN combo_group_id INT UNSIGNED NULL DEFAULT NULL'
         );
     }
     if (orange_table_exists($pdo, 'order_items')) {

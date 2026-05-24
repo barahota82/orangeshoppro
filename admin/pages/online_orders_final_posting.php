@@ -15,6 +15,8 @@ orange_catalog_ensure_schema($pdo);
 $adminCountryId = orange_admin_context_country_id($pdo);
 $ordersMoney = orange_admin_currency_context($pdo);
 $agentFilter = isset($_GET['agent_id']) ? (int) $_GET['agent_id'] : 0;
+$dateFrom = trim((string) ($_GET['date_from'] ?? ''));
+$dateTo = trim((string) ($_GET['date_to'] ?? ''));
 $agents = orange_table_exists($pdo, 'delivery_agents')
     ? orange_delivery_agents_admin_list($pdo, $adminCountryId > 0 ? $adminCountryId : null)
     : [];
@@ -35,6 +37,14 @@ if ($cf !== null) {
 if ($agentFilter > 0 && orange_table_has_column($pdo, 'orders', 'delivery_agent_id')) {
     $sql .= ' AND o.delivery_agent_id = ?';
     $params[] = $agentFilter;
+}
+if ($dateFrom !== '' && orange_table_has_column($pdo, 'orders', 'completed_at')) {
+    $sql .= ' AND o.completed_at >= ?';
+    $params[] = $dateFrom . (strlen($dateFrom) <= 10 ? ' 00:00:00' : '');
+}
+if ($dateTo !== '' && orange_table_has_column($pdo, 'orders', 'completed_at')) {
+    $sql .= ' AND o.completed_at <= ?';
+    $params[] = $dateTo . (strlen($dateTo) <= 10 ? ' 23:59:59' : '');
 }
 $sql .= ' ORDER BY o.completed_at DESC, o.id DESC';
 $st = $pdo->prepare($sql);
@@ -62,6 +72,15 @@ foreach ($candidates as $o) {
 
 <div class="card admin-fy-card">
     <div class="admin-toolbar" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:12px;">
+        <label class="admin-toolbar__field">
+            <span>من تاريخ التسليم</span>
+            <input type="date" id="ofp_date_from" value="<?php echo htmlspecialchars(strlen($dateFrom) >= 10 ? substr($dateFrom, 0, 10) : $dateFrom, ENT_QUOTES, 'UTF-8'); ?>">
+        </label>
+        <label class="admin-toolbar__field">
+            <span>إلى تاريخ التسليم</span>
+            <input type="date" id="ofp_date_to" value="<?php echo htmlspecialchars(strlen($dateTo) >= 10 ? substr($dateTo, 0, 10) : $dateTo, ENT_QUOTES, 'UTF-8'); ?>">
+        </label>
+        <button type="button" class="btn-secondary" onclick="ofpApplyFilters()">تطبيق الفلتر</button>
         <?php if ($agents !== []): ?>
         <label class="admin-toolbar__field">
             <span>فلتر مندوب</span>
@@ -129,9 +148,23 @@ foreach ($candidates as $o) {
 })();
 
 function ofpApplyAgentFilter(val) {
+    ofpNavigate({ agent_id: val });
+}
+
+function ofpApplyFilters() {
+    ofpNavigate({
+        agent_id: document.getElementById('ofp_agent_filter') ? document.getElementById('ofp_agent_filter').value : '0',
+        date_from: (document.getElementById('ofp_date_from') || {}).value || '',
+        date_to: (document.getElementById('ofp_date_to') || {}).value || ''
+    });
+}
+
+function ofpNavigate(opts) {
     var base = <?php echo json_encode(storefront_public_path('/admin/index.php'), JSON_UNESCAPED_UNICODE); ?>;
     var q = 'page=online_orders_final_posting';
-    if (parseInt(val, 10) > 0) q += '&agent_id=' + encodeURIComponent(val);
+    if (parseInt(opts.agent_id, 10) > 0) q += '&agent_id=' + encodeURIComponent(opts.agent_id);
+    if (opts.date_from) q += '&date_from=' + encodeURIComponent(opts.date_from);
+    if (opts.date_to) q += '&date_to=' + encodeURIComponent(opts.date_to);
     window.location.href = base + (base.indexOf('?') >= 0 ? '&' : '?') + q;
 }
 

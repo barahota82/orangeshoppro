@@ -12,10 +12,9 @@ orange_catalog_ensure_schema($pdo);
 
 $orderId = isset($_GET['order_id']) ? (int) $_GET['order_id'] : 0;
 $order = null;
-$items = [];
 $paidItems = [];
-$giftItems = [];
 $err = '';
+$storedRestores = [];
 
 if ($orderId > 0) {
     $st = $pdo->prepare('SELECT * FROM orders WHERE id = ? LIMIT 1');
@@ -26,13 +25,12 @@ if ($orderId > 0) {
     } elseif (!in_array((string) ($order['status'] ?? ''), orange_invoice_edit_allowed_statuses(), true)) {
         $err = 'الطلب غير مؤهل للتعديل في هذه الحالة';
     } else {
+        $storedRestores = orange_invoice_edit_read_stored_restores($order);
         $it = $pdo->prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY id ASC');
         $it->execute([$orderId]);
         $items = $it->fetchAll(PDO::FETCH_ASSOC) ?: [];
         foreach ($items as $row) {
-            if (orange_invoice_edit_is_gift_line($pdo, $row, $order)) {
-                $giftItems[] = $row;
-            } else {
+            if (!orange_invoice_edit_is_gift_line($pdo, $row, $order)) {
                 $paidItems[] = $row;
             }
         }
@@ -40,13 +38,22 @@ if ($orderId > 0) {
 }
 
 $money = orange_admin_currency_context($pdo);
-$comboDisc = (float) ($order['cart_combo_discount'] ?? 0);
-$promoDisc = (float) ($order['cart_promotion_discount'] ?? 0);
+$moneyDec = (int) ($money['decimals'] ?? 3);
 ?>
+<style>
+.ie-promo-panel { margin-top:16px;padding:12px;border:1px solid #e2e8f0;border-radius:8px;background:#fff; }
+.ie-promo-panel--dropped { border-color:#fecaca;background:#fef2f2; }
+.ie-promo-row { display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 0;border-bottom:1px solid #f1f5f9; }
+.ie-promo-row:last-child { border-bottom:none; }
+.ie-badge-ok { color:#15803d;font-weight:600; }
+.ie-badge-no { color:#b91c1c;font-weight:600; }
+.ie-badge-override { font-size:0.8rem;color:#7c3aed;background:#f5f3ff;padding:2px 8px;border-radius:4px; }
+</style>
+
 <div class="admin-fy-shell" dir="rtl">
     <h1 class="admin-fy-shell__title">تعديل بنود الطلب (أونلاين)</h1>
     <p class="admin-fy-shell__lead">
-        مرتجع جزئي قبل التسليم — تعديل الكميات يُعيد حساب العروض تلقائياً (§13.11.9.7).
+        مرتجع جزئي قبل التسليم — معاينة فورية للعروض (§13.11.9.7.6–7).
         <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=delivery_order_search'), ENT_QUOTES, 'UTF-8'); ?>">بحث التسليم</a>
     </p>
 
@@ -71,7 +78,7 @@ $promoDisc = (float) ($order['cart_promotion_discount'] ?? 0);
                     <th>السعر</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="ie_paid_body">
                 <?php foreach ($paidItems as $row): ?>
                 <tr data-item-id="<?php echo (int) ($row['id'] ?? 0); ?>">
                     <td><?php echo htmlspecialchars((string) ($row['product_name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
@@ -84,22 +91,16 @@ $promoDisc = (float) ($order['cart_promotion_discount'] ?? 0);
         </table>
     </div>
 
-    <div class="card-hint" style="margin-top:16px;padding:12px;border:1px solid #e2e8f0;border-radius:8px;">
-        <strong>ملخص العروض (بعد الحفظ):</strong>
-        <ul style="margin:8px 0 0;padding-right:1.2rem;">
-            <?php if ($comboDisc > 0.00001): ?>
-            <li>خصم كومبو: −<?php echo htmlspecialchars(number_format($comboDisc, 3), ENT_QUOTES, 'UTF-8'); ?></li>
-            <?php endif; ?>
-            <?php if ($promoDisc > 0.00001): ?>
-            <li>خصم السلة: −<?php echo htmlspecialchars(number_format($promoDisc, 3), ENT_QUOTES, 'UTF-8'); ?></li>
-            <?php endif; ?>
-            <?php foreach ($giftItems as $g): ?>
-            <li>هدية/BOGO: <?php echo htmlspecialchars((string) ($g['product_name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?> × <?php echo (int) ($g['qty'] ?? 0); ?></li>
-            <?php endforeach; ?>
-            <?php if ($comboDisc <= 0.00001 && $promoDisc <= 0.00001 && $giftItems === []): ?>
-            <li class="muted">—</li>
-            <?php endif; ?>
-        </ul>
+    <div class="ie-promo-panel" id="ie_active_panel">
+        <strong>ملخص العروض — الفاتورة النشطة</strong>
+        <div id="ie_active_list" style="margin-top:8px;"><p class="muted">جاري المعاينة…</p></div>
+        <p style="margin:10px 0 0;"><strong>الإجمالي المتوقع:</strong> <span id="ie_total_preview">—</span></p>
+    </div>
+
+    <div class="ie-promo-panel ie-promo-panel--dropped" id="ie_dropped_panel" style="display:none;">
+        <strong>سقط من الفاتورة</strong>
+        <p class="muted" style="margin:4px 0 8px;font-size:0.88rem;">بنود/عروض ستُزال لعدم تحقق الشرط — «ارجع للفاتورة» = استثناء إدارة (§13.11.9.7.7).</p>
+        <div id="ie_dropped_list"></div>
     </div>
 
     <div class="admin-form-actions" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:16px;">
@@ -110,18 +111,116 @@ $promoDisc = (float) ($order['cart_promotion_discount'] ?? 0);
 </div>
 
 <script>
+(function () {
+    var orderId = <?php echo (int) $orderId; ?>;
+    var adminRestores = <?php echo json_encode($storedRestores, JSON_UNESCAPED_UNICODE); ?>;
+    window.ieAdminRestores = adminRestores;
+    var previewTimer = null;
+    var moneyDec = <?php echo (int) $moneyDec; ?>;
+
+    function collectChanges() {
+        var changes = [];
+        document.querySelectorAll('#ie_paid_body tr[data-item-id]').forEach(function (tr) {
+            var id = parseInt(tr.getAttribute('data-item-id'), 10);
+            var inp = tr.querySelector('.ie-qty');
+            if (!id || !inp) return;
+            changes.push({ item_id: id, qty: parseInt(inp.value, 10) || 0 });
+        });
+        return changes;
+    }
+
+    function fmtMoney(n) {
+        return (parseFloat(n) || 0).toFixed(moneyDec);
+    }
+
+    function renderPromoRow(row, showRestore) {
+        var deliver = row.deliver !== false;
+        var html = '<div class="ie-promo-row" data-kind="' + (row.kind || '') + '">';
+        html += '<span>' + (row.label || row.kind || '') + '</span>';
+        if (row.condition_text) {
+            html += '<span class="muted" style="font-size:0.85rem;">(' + row.condition_text + ')</span>';
+        }
+        html += deliver
+            ? '<span class="ie-badge-ok">✅ يُسلَّم</span>'
+            : '<span class="ie-badge-no">❌ لا تُسلَّم</span>';
+        if (row.admin_override) {
+            html += '<span class="ie-badge-override">استثناء إدارة</span>';
+        }
+        if (showRestore) {
+            html += '<button type="button" class="btn-secondary" style="margin-right:auto;" onclick="invoiceEditRestore(\'' + row.kind + '\')">ارجع للفاتورة</button>';
+        }
+        html += '</div>';
+        return html;
+    }
+
+    window.invoiceEditRestore = function (kind) {
+        if (!kind || adminRestores.indexOf(kind) >= 0) return;
+        adminRestores.push(kind);
+        window.ieAdminRestores = adminRestores;
+        invoiceEditPreviewNow();
+    };
+
+    window.invoiceEditPreviewNow = async function () {
+        var activeEl = document.getElementById('ie_active_list');
+        var droppedEl = document.getElementById('ie_dropped_list');
+        var droppedPanel = document.getElementById('ie_dropped_panel');
+        var totalEl = document.getElementById('ie_total_preview');
+        try {
+            var res = await postJSON('/admin/api/orders/preview-invoice-promos.php', {
+                order_id: orderId,
+                changes: collectChanges(),
+                admin_restores: adminRestores
+            });
+            if (!res.success) {
+                activeEl.innerHTML = '<p class="alert-error">' + (res.message || 'فشل المعاينة') + '</p>';
+                return;
+            }
+            var active = res.active || [];
+            if (active.length === 0) {
+                activeEl.innerHTML = '<p class="muted">— لا عروض نشطة —</p>';
+            } else {
+                activeEl.innerHTML = active.map(function (r) { return renderPromoRow(r, false); }).join('');
+            }
+            var dropped = res.dropped || [];
+            if (dropped.length === 0) {
+                droppedPanel.style.display = 'none';
+            } else {
+                droppedPanel.style.display = 'block';
+                droppedEl.innerHTML = dropped.map(function (r) { return renderPromoRow(r, true); }).join('');
+            }
+            totalEl.textContent = fmtMoney(res.total);
+        } catch (e) {
+            activeEl.innerHTML = '<p class="alert-error">' + (e.message || String(e)) + '</p>';
+        }
+    };
+
+    function schedulePreview() {
+        if (previewTimer) clearTimeout(previewTimer);
+        previewTimer = setTimeout(invoiceEditPreviewNow, 650);
+    }
+
+    document.querySelectorAll('.ie-qty').forEach(function (inp) {
+        inp.addEventListener('input', schedulePreview);
+        inp.addEventListener('change', schedulePreview);
+    });
+
+    invoiceEditPreviewNow();
+})();
+
 async function invoiceEditSave(completeAfter) {
     var changes = [];
-    document.querySelectorAll('tr[data-item-id]').forEach(function (tr) {
+    document.querySelectorAll('#ie_paid_body tr[data-item-id]').forEach(function (tr) {
         var id = parseInt(tr.getAttribute('data-item-id'), 10);
         var inp = tr.querySelector('.ie-qty');
         if (!id || !inp) return;
         changes.push({ item_id: id, qty: parseInt(inp.value, 10) || 0 });
     });
     if (!confirm(completeAfter ? 'حفظ التعديل ثم «تم التسليم» (مخزون فقط)؟' : 'حفظ التعديل؟')) return;
+    var restores = window.ieAdminRestores || [];
     var res = await postJSON('/admin/api/orders/amend-invoice-items.php', {
         order_id: <?php echo (int) $orderId; ?>,
         changes: changes,
+        admin_restores: restores,
         mark_completed: completeAfter ? 1 : 0
     });
     alert(res.message || (res.success ? 'تم' : 'فشل'));
