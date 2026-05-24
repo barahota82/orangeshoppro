@@ -360,7 +360,7 @@ $ppvReady = $ppvCashLock !== null;
         <div class="jv-toolbar-primary-group">
             <button type="button" id="spay_btn_new" title="إدخال سند جديد">سند جديد</button>
             <button type="button" class="btn-secondary" id="spay_btn_delete" title="حذف السند المعروض" disabled>حذف السند</button>
-            <button type="button" class="btn-secondary" id="spay_btn_print" title="طباعة السند">طباعة السند</button>
+            <button type="button" class="btn-secondary" id="spay_btn_print" title="احفظ السند أولاً — الطباعة بعد الحفظ فقط" disabled>طباعة السند</button>
             <button type="button" id="spay_btn_save"<?php echo !$ppvReady ? ' disabled' : ''; ?>>حفظ السند</button>
         </div>
     </div>
@@ -749,6 +749,16 @@ $ppvReady = $ppvCashLock !== null;
     // Navigation & Search — uses /admin/api/journal/manage.php like سند الصرف
     var spayBrowseId = null;
 
+    function spaySyncPrintButton() {
+        var pb = document.getElementById('spay_btn_print');
+        if (!pb) {
+            return;
+        }
+        var ok = !!spayBrowseId;
+        pb.disabled = !ok;
+        pb.title = ok ? 'طباعة السند' : 'احفظ السند أولاً — الطباعة بعد الحفظ فقط (§10)';
+    }
+
     function spayNav(where) {
         var payload = {
             action: 'nav_manual',
@@ -791,6 +801,7 @@ $ppvReady = $ppvCashLock !== null;
             document.getElementById('spay_tot_credit').value = orangeFmtMoney(total);
         }
         document.getElementById('spay_btn_delete').disabled = false;
+        spaySyncPrintButton();
 
         // Load supplier from subledger
         if (r.party_supplier_id) {
@@ -920,7 +931,13 @@ $ppvReady = $ppvCashLock !== null;
 
         document.getElementById('spay_btn_save').addEventListener('click', save);
         document.getElementById('spay_btn_new').addEventListener('click', function () { location.reload(); });
-        document.getElementById('spay_btn_print').addEventListener('click', function () { window.print(); });
+        document.getElementById('spay_btn_print').addEventListener('click', function () {
+            if (!spayBrowseId) {
+                alert('احفظ السند أولاً قبل الطباعة.');
+                return;
+            }
+            window.print();
+        });
         document.getElementById('spay_btn_delete').addEventListener('click', spayDeleteVoucher);
 
         document.getElementById('spay_nav_first').addEventListener('click', function () { spayNav('first'); });
@@ -949,6 +966,7 @@ $ppvReady = $ppvCashLock !== null;
             renderInvoices();
             renderJournal();
         }
+        spaySyncPrintButton();
     }
 
     if (document.readyState === 'loading') {

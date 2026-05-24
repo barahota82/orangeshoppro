@@ -253,7 +253,7 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
         <div class="jv-toolbar-primary-group">
             <button type="button" id="jv_btn_new_sheet" title="إدخال سند جديد">سند جديد</button>
             <button type="button" class="btn-secondary" id="jv_btn_delete_voucher" title="حذف السند المعروض" disabled>حذف السند</button>
-            <button type="button" class="btn-secondary" id="jv_btn_print_voucher" title="طباعة السند">طباعة السند</button>
+            <button type="button" class="btn-secondary" id="jv_btn_print_voucher" title="احفظ السند أولاً — الطباعة بعد الحفظ فقط" disabled>طباعة السند</button>
             <button type="button" id="jv_btn_save" onclick="jvSubmit()">حفظ السند</button>
         </div>
     </div>
@@ -1393,6 +1393,7 @@ function jvApplyViewModeUi() {
     if (delVBtn) {
         delVBtn.disabled = !jvBrowseId;
     }
+    jvSyncPrintButton();
     document.querySelectorAll('#jv_lines_body input').forEach(function (inp) {
         inp.readOnly = ro;
     });
@@ -1515,7 +1516,21 @@ function jvDeleteVoucher() {
     }).catch(function (e) { alert(e.message || String(e)); });
 }
 
+function jvSyncPrintButton() {
+    var pb = document.getElementById('jv_btn_print_voucher');
+    if (!pb) {
+        return;
+    }
+    var ok = !!jvBrowseId;
+    pb.disabled = !ok;
+    pb.title = ok ? 'طباعة السند' : 'احفظ السند أولاً — الطباعة بعد الحفظ فقط (§10)';
+}
+
 function jvPrintVoucher() {
+    if (!jvBrowseId) {
+        alert('احفظ السند أولاً قبل الطباعة.');
+        return;
+    }
     window.print();
 }
 
@@ -1752,5 +1767,6 @@ jvSyncTrailingRows();
     }
     jvApplyOtherVoucherBrowseGateUi();
     jvSyncRefPreview();
+    jvSyncPrintButton();
 })();
 </script>

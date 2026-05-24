@@ -349,7 +349,7 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
         <div class="jv-toolbar-primary-group">
             <button type="button" id="crec_btn_new" title="إدخال سند جديد">سند جديد</button>
             <button type="button" class="btn-secondary" id="crec_btn_delete" title="حذف السند المعروض" disabled>حذف السند</button>
-            <button type="button" class="btn-secondary" id="crec_btn_print" title="طباعة السند">طباعة السند</button>
+            <button type="button" class="btn-secondary" id="crec_btn_print" title="احفظ السند أولاً — الطباعة بعد الحفظ فقط" disabled>طباعة السند</button>
             <button type="button" id="crec_btn_save"<?php echo !$ppvReady ? ' disabled' : ''; ?>>حفظ السند</button>
         </div>
     </div>
@@ -736,6 +736,16 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
     // Navigation & Search — uses /admin/api/journal/manage.php like سند الصرف
     var crecBrowseId = null;
 
+    function crecSyncPrintButton() {
+        var pb = document.getElementById('crec_btn_print');
+        if (!pb) {
+            return;
+        }
+        var ok = !!crecBrowseId;
+        pb.disabled = !ok;
+        pb.title = ok ? 'طباعة السند' : 'احفظ السند أولاً — الطباعة بعد الحفظ فقط (§10)';
+    }
+
     function crecNav(where) {
         var payload = {
             action: 'nav_manual',
@@ -778,6 +788,7 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
             document.getElementById('crec_tot_credit').value = orangeFmtMoney(total);
         }
         document.getElementById('crec_btn_delete').disabled = false;
+        crecSyncPrintButton();
 
         // Load customer from subledger
         if (r.party_customer_id) {
@@ -907,7 +918,13 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
 
         document.getElementById('crec_btn_save').addEventListener('click', save);
         document.getElementById('crec_btn_new').addEventListener('click', function () { location.reload(); });
-        document.getElementById('crec_btn_print').addEventListener('click', function () { window.print(); });
+        document.getElementById('crec_btn_print').addEventListener('click', function () {
+            if (!crecBrowseId) {
+                alert('احفظ السند أولاً قبل الطباعة.');
+                return;
+            }
+            window.print();
+        });
         document.getElementById('crec_btn_delete').addEventListener('click', crecDeleteVoucher);
 
         document.getElementById('crec_nav_first').addEventListener('click', function () { crecNav('first'); });
@@ -936,6 +953,7 @@ $ppvReady = $ppvCashLock !== null && $ppvArLock !== null;
             renderInvoices();
             renderJournal();
         }
+        crecSyncPrintButton();
     }
 
     if (document.readyState === 'loading') {
