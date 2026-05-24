@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 61);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 62);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3305,6 +3305,13 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     }
     if (orange_table_exists($pdo, 'order_items')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE order_items MODIFY COLUMN product_id INT NULL');
+    }
+
+    if (orange_table_exists($pdo, 'company_settings') && !orange_table_has_column($pdo, 'company_settings', 'opening_stock_locked')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE company_settings ADD COLUMN opening_stock_locked TINYINT(1) NOT NULL DEFAULT 0'
+        );
     }
 
     if (!orange_table_exists($pdo, 'expenses')) {

@@ -7,10 +7,12 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/warehouses.php';
+require_once __DIR__ . '/../../includes/opening_stock_lock.php';
 
 $pdo = db();
 
 $stockCountryId = orange_admin_context_country_id($pdo);
+$openingStockLocked = orange_opening_stock_is_locked($pdo, $stockCountryId);
 $stockProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $stockCountryId);
 
 $lowStockTh = orange_stock_low_alert_threshold();
@@ -179,7 +181,9 @@ unset($stockRow);
                     </td>
                     <td class="stock-actions">
                         <button type="button" class="btn btn-secondary" onclick="adjustStock(<?php echo (int)$r['id']; ?>, 'manual_adjustment')">حفظ التعديل</button>
+                        <?php if (!$openingStockLocked): ?>
                         <button type="button" class="btn btn-outline" onclick="adjustStock(<?php echo (int)$r['id']; ?>, 'opening_balance')">رصيد افتتاحي</button>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>

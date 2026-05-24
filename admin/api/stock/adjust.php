@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/warehouses.php';
+require_once __DIR__ . '/../../../includes/opening_stock_lock.php';
 require_admin_api();
 
 try {
@@ -21,6 +22,10 @@ try {
     $reason = $reasonIn !== ''
         ? $reasonIn
         : ($movementType === 'opening_balance' ? 'رصيد افتتاحي' : 'تعديل يدوي للمخزون');
+
+    if ($movementType === 'opening_balance' && orange_opening_stock_is_locked($pdo)) {
+        json_response(['success' => false, 'message' => 'رصيد المخزون الافتتاحي مقفول — افتح الإقفال من شاشة أرصدة أول المدة المخزنية'], 422);
+    }
 
     $stmt = $pdo->prepare("SELECT * FROM product_variants WHERE id = ? LIMIT 1");
     $stmt->execute([$variantId]);

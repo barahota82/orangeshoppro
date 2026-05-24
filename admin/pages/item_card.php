@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/warehouses.php';
+require_once __DIR__ . '/../../includes/opening_stock_lock.php';
 
 $productId = (int)($_GET['product_id'] ?? 0);
 if ($productId < 1) {
@@ -17,6 +18,7 @@ if ($productId < 1) {
 
 $pdo = db();
 $icCountryId = orange_admin_context_country_id($pdo);
+$openingStockLocked = orange_opening_stock_is_locked($pdo, $icCountryId);
 
 try {
     orange_admin_assert_entity_country($pdo, 'products', $productId);
@@ -124,7 +126,9 @@ $img = storefront_product_image_href((string) ($product['main_image'] ?? ''));
                     </td>
                     <td class="stock-actions">
                         <button type="button" class="btn btn-secondary" onclick="cardAdjustStock(<?php echo (int)$v['id']; ?>, 'manual_adjustment')">تعديل رصيد</button>
+                        <?php if (!$openingStockLocked): ?>
                         <button type="button" class="btn btn-outline" onclick="cardAdjustStock(<?php echo (int)$v['id']; ?>, 'opening_balance')">رصيد افتتاحي</button>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>

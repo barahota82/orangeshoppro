@@ -5,11 +5,13 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/warehouses.php';
+require_once __DIR__ . '/../../includes/opening_stock_lock.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
 $osbCountryId = orange_admin_context_country_id($pdo);
+$openingStockLocked = orange_opening_stock_is_locked($pdo, $osbCountryId);
 $osbProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $osbCountryId);
 $wQtyOsb = orange_warehouse_effective_qty_sql($pdo, $osbCountryId, 'pv', 'wvs_osb');
 
@@ -30,6 +32,20 @@ $rows = $pdo->query(
         <strong>ليست إدخالاً دورياً يومياً</strong> — التشغيل العادي يستخدم شاشة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8'); ?>">المستودع</a> أو حركات الشراء والبيع.
         الأرصدة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=opening_balances'), ENT_QUOTES, 'UTF-8'); ?>">المالية الافتتاحية</a> تُسجَّل في شاشة منفصلة.
     </p>
+
+<?php if ($openingStockLocked): ?>
+    <div class="alert-warning" style="margin-bottom:12px;">
+        <strong>مقفول:</strong> لا يمكن تسجيل أو تعديل أرصدة افتتاحية مخزنية لهذه الدولة. أزل الإقفال أدناه إذا احتجت إدخالاً إضافياً.
+    </div>
+<?php endif; ?>
+
+<div class="card admin-fy-card" style="margin-bottom:12px;">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="osbLockToggle" <?php echo $openingStockLocked ? 'checked' : ''; ?>>
+        <span><strong>مقفول</strong> — منع أي رصيد افتتاحي مخزني جديد (حسب دولة الأدمن الحالية)</span>
+    </label>
+    <p class="muted" style="margin:8px 0 0;">بعد إقفال الأرصدة الافتتاحية يُعطَّل الإدخال هنا وفي المستودع وبطاقة الصنف.</p>
+</div>
 
 <div class="card admin-fy-card">
     <h3 class="card-title">كميات المخزون الافتتاحية (حسب المتغير)</h3>
@@ -57,10 +73,10 @@ $rows = $pdo->query(
                     <td><?php echo htmlspecialchars((string) ($r['size'] ?: '—'), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo (int) $r['stock_quantity']; ?></td>
                     <td>
-                        <input type="number" min="0" step="1" class="input-stock admin-inp-qty" inputmode="numeric" lang="en" dir="ltr" id="osb_<?php echo (int) $r['id']; ?>" value="<?php echo (int) $r['stock_quantity']; ?>" aria-label="كمية رصيد افتتاحي">
+                        <input type="number" min="0" step="1" class="input-stock admin-inp-qty" inputmode="numeric" lang="en" dir="ltr" id="osb_<?php echo (int) $r['id']; ?>" value="<?php echo (int) $r['stock_quantity']; ?>" aria-label="كمية رصيد افتتاحي"<?php echo $openingStockLocked ? ' disabled' : ''; ?>>
                     </td>
                     <td class="stock-actions">
-                        <button type="button" class="btn-secondary" onclick="osbSaveRow(<?php echo (int) $r['id']; ?>)">تسجيل الرصيد الافتتاحي</button>
+                        <button type="button" class="btn-secondary" onclick="osbSaveRow(<?php echo (int) $r['id']; ?>)"<?php echo $openingStockLocked ? ' disabled' : ''; ?>>تسجيل الرصيد الافتتاحي</button>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -75,7 +91,35 @@ $rows = $pdo->query(
 </div>
 
 <script>
+var osbOpeningLocked = <?php echo $openingStockLocked ? 'true' : 'false'; ?>;
+
+document.getElementById('osbLockToggle').addEventListener('change', function () {
+    var locked = this.checked;
+    var msg = locked
+        ? 'إقفال رصيد المخزون الافتتاحي؟ لن يُسمح بإدخال أرصدة افتتاحية جديدة.'
+        : 'فك إقفال رصيد المخزون الافتتاحي؟';
+    if (!confirm(msg)) {
+        this.checked = !locked;
+        return;
+    }
+    postJSON('/admin/api/stock/opening-stock-lock.php', { locked: locked }).then(function (res) {
+        alert(res.message || (res.success ? 'تم' : 'فشل'));
+        if (res.success) {
+            location.reload();
+        } else {
+            document.getElementById('osbLockToggle').checked = !locked;
+        }
+    }).catch(function (e) {
+        alert(e.message || String(e));
+        document.getElementById('osbLockToggle').checked = !locked;
+    });
+});
+
 function osbSaveRow(variantId) {
+    if (osbOpeningLocked) {
+        alert('رصيد المخزون الافتتاحي مقفول');
+        return;
+    }
     var el = document.getElementById('osb_' + variantId);
     var stock = parseInt(el && el.value ? el.value : '0', 10);
     if (isNaN(stock) || stock < 0) {
