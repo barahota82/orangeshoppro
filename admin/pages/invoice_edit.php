@@ -14,6 +14,7 @@ $orderId = isset($_GET['order_id']) ? (int) $_GET['order_id'] : 0;
 $order = null;
 $paidItems = [];
 $comboGroups = [];
+$bogoBundleGroups = [];
 $standaloneItems = [];
 $err = '';
 $storedRestores = [];
@@ -36,9 +37,10 @@ if ($orderId > 0) {
                 $paidItems[] = $row;
             }
         }
-        $comboLayout = orange_invoice_edit_combo_layout($pdo, $order, $paidItems);
-        $comboGroups = $comboLayout['groups'];
-        $standaloneItems = $comboLayout['standalone'];
+        $framesLayout = orange_invoice_edit_paid_frames_layout($pdo, $order, $paidItems);
+        $comboGroups = $framesLayout['combo_groups'];
+        $bogoBundleGroups = $framesLayout['bogo_bundle_groups'];
+        $standaloneItems = $framesLayout['standalone'];
     }
 }
 
@@ -59,6 +61,11 @@ $moneyDec = (int) ($money['decimals'] ?? 3);
 .ie-combo-frame__footer { display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid #cbd5e1; }
 .ie-combo-frame__price { font-weight:700;color:#0f172a; }
 .ie-combo-qty-ro { width:64px;background:#f1f5f9;cursor:not-allowed; }
+.ie-bogo-frame { margin:0 0 16px;padding:12px 14px;border:2px solid #86efac;border-radius:10px;background:#f0fdf4; }
+.ie-bogo-frame__title { margin:0 0 8px;font-weight:700;color:#166534; }
+.ie-bogo-frame__hint { margin:0 0 10px;font-size:0.88rem;color:#64748b; }
+.ie-bogo-frame__footer { display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid #bbf7d0; }
+.ie-bogo-frame__price { font-weight:700;color:#0f172a; }
 </style>
 
 <div class="admin-fy-shell" dir="rtl">
@@ -118,6 +125,42 @@ $moneyDec = (int) ($money['decimals'] ?? 3);
     </div>
     <?php endforeach; ?>
 
+    <?php foreach ($bogoBundleGroups as $bg): ?>
+    <div class="ie-bogo-frame" data-bogo-group="<?php echo (int) ($bg['group_id'] ?? 2); ?>">
+        <p class="ie-bogo-frame__title"><?php echo htmlspecialchars((string) ($bg['title'] ?? 'حزمة شراء BOGO'), ENT_QUOTES, 'UTF-8'); ?></p>
+        <p class="ie-bogo-frame__hint">إطار حزمة شراء BOGO — الكل أو لا شيء. بنود بالتجزئة؛ لا يُعدَّل مكوّن واحد.</p>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>الصنف</th>
+                        <th>لون/مقاس</th>
+                        <th>الكمية</th>
+                        <th>السعر</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($bg['items'] as $row): ?>
+                    <tr data-item-id="<?php echo (int) ($row['id'] ?? 0); ?>" data-bogo-member="1">
+                        <td><?php echo htmlspecialchars((string) ($row['product_name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars(trim((string) ($row['color'] ?? '') . ' / ' . (string) ($row['size'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td>
+                            <input type="number" class="ie-combo-qty-ro" value="<?php echo (int) ($row['qty'] ?? 0); ?>" readonly tabindex="-1" aria-readonly="true">
+                            <input type="hidden" class="ie-qty" value="<?php echo (int) ($row['qty'] ?? 0); ?>">
+                        </td>
+                        <td><?php echo orange_format_money_for_context($money, (float) ($row['price'] ?? 0)); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <div class="ie-bogo-frame__footer">
+            <span class="ie-bogo-frame__price">مجموع التجزئة: <?php echo orange_format_money_for_context($money, (float) ($bg['total_price'] ?? 0)); ?></span>
+            <button type="button" class="btn-secondary ie-bogo-return-all" data-item-ids="<?php echo htmlspecialchars(implode(',', array_map('strval', $bg['item_ids'] ?? [])), ENT_QUOTES, 'UTF-8'); ?>">إرجاع الحزمة كاملة</button>
+        </div>
+    </div>
+    <?php endforeach; ?>
+
     <?php if ($standaloneItems !== []): ?>
     <div class="table-wrap">
         <table>
@@ -141,7 +184,7 @@ $moneyDec = (int) ($money['decimals'] ?? 3);
             </tbody>
         </table>
     </div>
-    <?php elseif ($comboGroups === []): ?>
+    <?php elseif ($comboGroups === [] && $bogoBundleGroups === []): ?>
     <div class="table-wrap">
         <table>
             <thead>
@@ -273,11 +316,15 @@ $moneyDec = (int) ($money['decimals'] ?? 3);
         inp.addEventListener('change', schedulePreview);
     });
 
-    document.querySelectorAll('.ie-combo-return-all').forEach(function (btn) {
+    document.querySelectorAll('.ie-combo-return-all, .ie-bogo-return-all').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var ids = (btn.getAttribute('data-item-ids') || '').split(',').map(function (s) { return parseInt(s, 10); }).filter(function (n) { return n > 0; });
             if (!ids.length) return;
-            if (!confirm('إرجاع الحزمة كاملة (كومbo) — حذف كل مكوّناتها من الطلب؟')) return;
+            var isBogo = btn.classList.contains('ie-bogo-return-all');
+            var msg = isBogo
+                ? 'إرجاع حزمة شراء BOGO كاملة — حذف كل مكوّناتها من الطلب؟'
+                : 'إرجاع الحزمة كاملة (كومbo) — حذف كل مكوّناتها من الطلب؟';
+            if (!confirm(msg)) return;
             ids.forEach(function (id) {
                 var tr = document.querySelector('tr[data-item-id="' + id + '"]');
                 if (!tr) return;

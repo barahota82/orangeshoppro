@@ -161,7 +161,7 @@ function dosOpenPick(orderId) {
 
 async function dosCancelOrder(orderId) {
     if (!confirm('إلغاء الطلب (مرتجع كامل) — cancelled؟')) return;
-    var res = await postJSON('/admin/api/orders/update-status.php', { order_id: orderId, status: 'cancelled' });
+    var res = await postJSON('/admin/api/orders/cancel-from-delivery.php', { order_id: orderId });
     alert(res.message || (res.success ? 'تم' : 'فشل'));
     if (res.success) location.reload();
 }
