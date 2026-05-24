@@ -35,6 +35,8 @@ try {
 
     $prevStatus = (string) ($order['status'] ?? '');
 
+    orange_order_guard_status_transition($prevStatus, $status);
+
     if (
         in_array($status, ['cancelled', 'rejected'], true)
         && in_array($prevStatus, ['pending', 'approved', 'on_the_way'], true)
@@ -42,14 +44,16 @@ try {
         orange_order_release_pending_stock_reservation($pdo, $order);
     }
 
-    $pdo->prepare("UPDATE orders SET status = ? WHERE id = ?")->execute([$status, $orderId]);
+    $setCompletedAt = ($status === 'completed' && $prevStatus !== 'completed'
+        && orange_table_has_column($pdo, 'orders', 'completed_at'));
+    if ($setCompletedAt) {
+        $pdo->prepare('UPDATE orders SET status = ?, completed_at = NOW() WHERE id = ?')->execute([$status, $orderId]);
+    } else {
+        $pdo->prepare('UPDATE orders SET status = ? WHERE id = ?')->execute([$status, $orderId]);
+    }
 
     if ($status === 'completed' && $prevStatus !== 'completed') {
         orange_complete_order_fulfillment($pdo, $orderId);
-    }
-
-    if ($prevStatus === 'completed' && in_array($status, ['cancelled', 'rejected'], true)) {
-        orange_order_reverse_completed_fulfillment($pdo, $orderId, $prevStatus, $status);
     }
 
     $pdo->commit();

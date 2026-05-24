@@ -14,7 +14,8 @@ require_once __DIR__ . '/party_allocations.php';
 require_once __DIR__ . '/warehouses.php';
 
 /**
- * Stock + accounting when an order is marked completed (website or company manual).
+ * Stock + customer enrichment when an order is marked completed (website or company manual).
+ * GL posting is separate — see orange_post_order_delivery_accounting() (§13.4).
  * Caller must have set orders.status = completed before calling.
  */
 function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
@@ -33,55 +34,12 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
     $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
 
     $stockCtx = orange_warehouse_context_for_order($pdo, $order);
-    $ofGlCountryId = (int) ($stockCtx['country_id'] ?? 0);
 
     $paymentTerms = 'cash';
     if (orange_table_has_column($pdo, 'orders', 'payment_terms')) {
         $paymentTerms = orange_normalize_payment_terms($order['payment_terms'] ?? 'cash');
     }
     $isCredit = ($paymentTerms === 'credit');
-    $isOnline = orange_order_delivery_sale_uses_online_revenue_account($pdo, $order);
-
-    $inventoryId = orange_gl_account_id($pdo, 'inventory', $ofGlCountryId);
-
-    $revenueRule = null;
-    if ($isOnline) {
-        $revenueRule = orange_gl_order_delivery_setting_keys_from_rule($pdo, 'OSI');
-    } elseif ($isCredit) {
-        $revenueRule = orange_gl_order_delivery_setting_keys_from_rule($pdo, 'SIN');
-    } else {
-        $revenueRule = orange_gl_order_delivery_setting_keys_from_rule($pdo, 'CSI');
-    }
-
-    $cogsRuleCode = $isOnline ? 'CGO' : ($isCredit ? 'CGT' : 'CGC');
-    $cogsRule = orange_gl_order_delivery_setting_keys_from_rule($pdo, $cogsRuleCode);
-    $saleJtCode = $isOnline ? 'OSI' : ($isCredit ? 'SIN' : 'CSI');
-    $saleJtId = orange_journal_type_id_by_code($pdo, $saleJtCode, $ofGlCountryId);
-    $cogsJtId = orange_journal_type_id_by_code($pdo, $cogsRuleCode, $ofGlCountryId);
-
-    if ($isOnline) {
-        $debitReceivable = 0;
-        $salesId = 0;
-    } elseif ($isCredit) {
-        if ($revenueRule !== null) {
-            $debitReceivable = orange_gl_account_id($pdo, $revenueRule['debit_key'], $ofGlCountryId);
-            $salesId = orange_gl_account_id($pdo, $revenueRule['credit_key'], $ofGlCountryId);
-        } else {
-            $debitReceivable = orange_gl_account_id($pdo, 'ar_credit', $ofGlCountryId);
-            $salesId = orange_gl_account_id($pdo, 'sales_revenue_credit', $ofGlCountryId);
-        }
-    } else {
-        $debitReceivable = 0;
-        $salesId = 0;
-    }
-
-    $cogsDeliveryId = orange_gl_cogs_delivery_account_id($pdo, $ofGlCountryId);
-    $cogsDebitId = $cogsDeliveryId;
-    $cogsCreditId = $inventoryId;
-    if ($cogsRule !== null) {
-        $cogsDebitId = orange_gl_account_id($pdo, $cogsRule['debit_key'], $ofGlCountryId);
-        $cogsCreditId = orange_gl_account_id($pdo, $cogsRule['credit_key'], $ofGlCountryId);
-    }
 
     $orderNumber = (string)($order['order_number'] ?? '');
     $ref = orange_order_stock_reference($orderNumber);
@@ -89,14 +47,7 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
     $stockAlreadyReserved = $orderNumber !== ''
         && orange_order_has_pending_stock_reservation($pdo, $orderNumber);
 
-    if ($orderNumber !== '' && orange_order_fulfillment_vouchers_exist($pdo, $orderNumber, $ofGlCountryId > 0 ? $ofGlCountryId : null)) {
-        if ($stockAlreadyReserved) {
-            $pdo->prepare(
-                "UPDATE stock_movements SET type = 'pending_order_fulfilled'
-                 WHERE reference = ? AND type = 'pending_order'"
-            )->execute([$ref]);
-        }
-
+    if ($orderNumber !== '' && orange_order_stock_fulfillment_already_done($pdo, $orderNumber, $stockAlreadyReserved)) {
         return;
     }
 
@@ -159,7 +110,7 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
 
     $stockCtx = orange_warehouse_context_for_order($pdo, $order);
 
-    foreach ($items as $idx => $item) {
+    foreach ($items as $item) {
         $variant = orange_order_resolve_variant_from_item($pdo, $item);
 
         if ($variant && !$stockAlreadyReserved) {
@@ -185,7 +136,136 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
                 'warehouse_id' => $stockCtx['warehouse_id'],
             ]);
         }
+    }
 
+    if ($stockAlreadyReserved) {
+        $pdo->prepare(
+            "UPDATE stock_movements SET type = 'pending_order_fulfilled'
+             WHERE reference = ? AND type = 'pending_order'"
+        )->execute([$ref]);
+    }
+}
+
+/**
+ * هل اكتمل تأكيد مخزون التسليم (حجز ويب مُنجَز أو خصم delivered_order)؟
+ */
+function orange_order_stock_fulfillment_already_done(PDO $pdo, string $orderNumber, bool $stockAlreadyReserved): bool
+{
+    $orderNumber = trim($orderNumber);
+    if ($orderNumber === '') {
+        return false;
+    }
+    if ($stockAlreadyReserved && orange_order_has_fulfilled_web_reserve($pdo, $orderNumber)) {
+        return true;
+    }
+
+    return orange_order_has_active_delivered_stock($pdo, $orderNumber);
+}
+
+/**
+ * §13.7 — ممنوعات تغيير الحالة بعد التسليم.
+ */
+function orange_order_guard_status_transition(string $prevStatus, string $newStatus): void
+{
+    if ($prevStatus !== 'completed') {
+        return;
+    }
+    if (in_array($newStatus, ['cancelled', 'rejected', 'pending', 'approved', 'on_the_way'], true)) {
+        throw new RuntimeException(
+            'لا يمكن تغيير حالة طلب مُسلَّم من هذه الشاشة — استخدم مردود المبيعات للمرتجعات بعد التسليم.'
+        );
+    }
+}
+
+/**
+ * GL + party_subledger for a completed order — §13.5 «إنشاء القيود» (outside gl_posting queue).
+ * Caller must ensure stock fulfillment already ran (orange_complete_order_fulfillment).
+ */
+function orange_post_order_delivery_accounting(PDO $pdo, int $orderId): void
+{
+    orange_catalog_ensure_schema($pdo);
+
+    $orderStmt = $pdo->prepare('SELECT * FROM orders WHERE id = ? LIMIT 1');
+    $orderStmt->execute([$orderId]);
+    $order = $orderStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$order || ($order['status'] ?? '') !== 'completed') {
+        throw new RuntimeException('الطلب غير مكتمل أو غير موجود');
+    }
+
+    $orderNumber = (string) ($order['order_number'] ?? '');
+    $stockCtx = orange_warehouse_context_for_order($pdo, $order);
+    $ofGlCountryId = (int) ($stockCtx['country_id'] ?? 0);
+
+    if ($orderNumber !== '' && orange_order_forward_delivery_accounting_exists($pdo, $orderNumber, $ofGlCountryId > 0 ? $ofGlCountryId : null)) {
+        return;
+    }
+
+    $itemsStmt = $pdo->prepare('SELECT * FROM order_items WHERE order_id = ?');
+    $itemsStmt->execute([$orderId]);
+    $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $paymentTerms = 'cash';
+    if (orange_table_has_column($pdo, 'orders', 'payment_terms')) {
+        $paymentTerms = orange_normalize_payment_terms($order['payment_terms'] ?? 'cash');
+    }
+    $isCredit = ($paymentTerms === 'credit');
+    $isOnline = orange_order_delivery_sale_uses_online_revenue_account($pdo, $order);
+
+    $inventoryId = orange_gl_account_id($pdo, 'inventory', $ofGlCountryId);
+
+    $revenueRule = null;
+    if ($isOnline) {
+        $revenueRule = orange_gl_order_delivery_setting_keys_from_rule($pdo, 'OSI');
+    } elseif ($isCredit) {
+        $revenueRule = orange_gl_order_delivery_setting_keys_from_rule($pdo, 'SIN');
+    } else {
+        $revenueRule = orange_gl_order_delivery_setting_keys_from_rule($pdo, 'CSI');
+    }
+
+    $cogsRuleCode = $isOnline ? 'CGO' : ($isCredit ? 'CGT' : 'CGC');
+    $cogsRule = orange_gl_order_delivery_setting_keys_from_rule($pdo, $cogsRuleCode);
+    $saleJtCode = $isOnline ? 'OSI' : ($isCredit ? 'SIN' : 'CSI');
+    $saleJtId = orange_journal_type_id_by_code($pdo, $saleJtCode, $ofGlCountryId);
+    $cogsJtId = orange_journal_type_id_by_code($pdo, $cogsRuleCode, $ofGlCountryId);
+
+    if ($isOnline) {
+        $debitReceivable = 0;
+        $salesId = 0;
+    } elseif ($isCredit) {
+        if ($revenueRule !== null) {
+            $debitReceivable = orange_gl_account_id($pdo, $revenueRule['debit_key'], $ofGlCountryId);
+            $salesId = orange_gl_account_id($pdo, $revenueRule['credit_key'], $ofGlCountryId);
+        } else {
+            $debitReceivable = orange_gl_account_id($pdo, 'ar_credit', $ofGlCountryId);
+            $salesId = orange_gl_account_id($pdo, 'sales_revenue_credit', $ofGlCountryId);
+        }
+    } else {
+        $debitReceivable = 0;
+        $salesId = 0;
+    }
+
+    $cogsDeliveryId = orange_gl_cogs_delivery_account_id($pdo, $ofGlCountryId);
+    $cogsDebitId = $cogsDeliveryId;
+    $cogsCreditId = $inventoryId;
+    if ($cogsRule !== null) {
+        $cogsDebitId = orange_gl_account_id($pdo, $cogsRule['debit_key'], $ofGlCountryId);
+        $cogsCreditId = orange_gl_account_id($pdo, $cogsRule['credit_key'], $ofGlCountryId);
+    }
+
+    $customerIdForAr = 0;
+    if (orange_table_has_column($pdo, 'orders', 'customer_id')) {
+        $customerIdForAr = (int) ($order['customer_id'] ?? 0);
+    }
+    if ($customerIdForAr <= 0 && orange_table_exists($pdo, 'customers')) {
+        $customerIdForAr = orange_ensure_customer(
+            $pdo,
+            (string) ($order['customer_name'] ?? ''),
+            (string) ($order['phone'] ?? '')
+        );
+    }
+
+    foreach ($items as $idx => $item) {
+        $variant = orange_order_resolve_variant_from_item($pdo, $item);
         $salesAmount = orange_order_item_line_net($item);
         $costAmount = $variant ? round((float) $item['cost'] * (int) $item['qty'], 4) : 0.0;
 
@@ -234,7 +314,6 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
                         $saleFour = orange_gl_cash_delivery_sale_four_lines($pdo, $salesAmount, $memoSaleLeg, $memoCashLeg);
                     }
                 }
-                // س15: للنقدي/الأونلاين بعد التسليم — سطران في party_subledger (دخل وخرج) لكشف حساب العميل = رصيد صفر.
                 $cashAfterJson = null;
                 if ($customerIdForAr > 0) {
                     $cashSaleMemo = $isOnline
@@ -402,13 +481,6 @@ function orange_complete_order_fulfillment(PDO $pdo, int $orderId): void
                 ]);
             }
         }
-    }
-
-    if ($stockAlreadyReserved) {
-        $pdo->prepare(
-            "UPDATE stock_movements SET type = 'pending_order_fulfilled'
-             WHERE reference = ? AND type = 'pending_order'"
-        )->execute([$ref]);
     }
 }
 
