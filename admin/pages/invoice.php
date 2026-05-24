@@ -20,28 +20,17 @@ function orange_invoice_assign_number_if_needed(PDO $pdo, array &$order, int $or
     if ($invNum !== '') {
         return;
     }
+    // §13.5.7.3 — أونلاين: لا INV-O عند طباعة invoice.php؛ INV-C عند create-manual؛ INV-O عند «إنشاء القiود».
+    $src = trim((string) ($order['order_source'] ?? 'website'));
+    if ($src !== 'company') {
+        return;
+    }
     try {
-        $pdo->beginTransaction();
-        $lock = $pdo->prepare('SELECT invoice_number FROM orders WHERE id = ? FOR UPDATE');
-        $lock->execute([$orderId]);
-        $current = $lock->fetchColumn();
-        $curStr = $current !== false ? trim((string) $current) : '';
-        if ($curStr !== '') {
-            $order['invoice_number'] = $curStr;
-            $pdo->commit();
-
-            return;
-        }
-        $next = orange_sequence_next($pdo, 'sales_invoice', (int) ($order['country_id'] ?? 0));
-        $formatted = 'INV-' . str_pad((string) $next, 6, '0', STR_PAD_LEFT);
-        $upd = $pdo->prepare('UPDATE orders SET invoice_number = ? WHERE id = ?');
-        $upd->execute([$formatted, $orderId]);
-        $order['invoice_number'] = $formatted;
-        $pdo->commit();
+        orange_order_assign_inv_c_if_needed($pdo, $orderId, $order);
+        $st = $pdo->prepare('SELECT invoice_number FROM orders WHERE id = ? LIMIT 1');
+        $st->execute([$orderId]);
+        $order['invoice_number'] = trim((string) ($st->fetchColumn() ?: ''));
     } catch (Throwable $e) {
-        if ($pdo->inTransaction()) {
-            $pdo->rollBack();
-        }
         if (function_exists('error_log')) {
             error_log('[orange] invoice number assign: ' . $e->getMessage());
         }
@@ -97,6 +86,10 @@ orange_catalog_ensure_schema($pdo);
 
 $orderId = isset($_GET['order_id']) ? (int)$_GET['order_id'] : 0;
 $orderNumberLookup = isset($_GET['order_number']) ? trim((string)$_GET['order_number']) : '';
+$invoiceCopy = isset($_GET['copy']) ? strtolower(trim((string) $_GET['copy'])) : '';
+if (!in_array($invoiceCopy, ['customer', 'receipt'], true)) {
+    $invoiceCopy = 'customer';
+}
 
 if ($orderId <= 0 && $orderNumberLookup !== '') {
     $st = $pdo->prepare('SELECT id FROM orders WHERE order_number = ? LIMIT 1');
@@ -492,10 +485,12 @@ $invFmt = static function (float $amount, bool $withUnit = true) use ($invMoney)
     $ost = strtolower(trim((string) ($order['status'] ?? '')));
     $statusLabel = $orderStatusAr[$ost] ?? (string) ($order['status'] ?? '');
     $ptAr = 'بيع ' . orange_order_payment_terms_label_ar($order['payment_terms'] ?? 'cash');
+    $copyLabelAr = $invoiceCopy === 'receipt' ? 'نسخة التوقيع بالاستلام' : 'نسخة العميل';
 ?>
 
 <div class="invoice-workflow-bar" role="region" aria-label="إجراءات الفاتورة">
     <div class="invoice-workflow-bar__meta">
+        <div><span class="invoice-workflow-bar__pending"><?php echo htmlspecialchars($copyLabelAr, ENT_QUOTES, 'UTF-8'); ?></span></div>
         <?php if ($formalInv !== ''): ?>
             <div>
                 <span class="invoice-workflow-bar__number">رقم الفاتورة: <strong><?php echo htmlspecialchars($formalInv, ENT_QUOTES, 'UTF-8'); ?></strong></span>
@@ -512,6 +507,10 @@ $invFmt = static function (float $amount, bool $withUnit = true) use ($invMoney)
     </div>
     <div class="invoice-workflow-bar__actions">
         <button type="button" class="btn" onclick="window.print()">طباعة / PDF</button>
+        <?php if ($orderId > 0): ?>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=invoice&order_id=' . $orderId . '&copy=customer'), ENT_QUOTES, 'UTF-8'); ?>">نسخة العميل</a>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=invoice&order_id=' . $orderId . '&copy=receipt'), ENT_QUOTES, 'UTF-8'); ?>">نسخة التوقيع</a>
+        <?php endif; ?>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=manual_order'), ENT_QUOTES, 'UTF-8'); ?>">+ فاتورة مبيعات</a>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">الطلبات</a>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=invoice'), ENT_QUOTES, 'UTF-8'); ?>">فاتورة أخرى</a>
@@ -715,6 +714,18 @@ $invFmt = static function (float $amount, bool $withUnit = true) use ($invMoney)
 
         <?php if ($footerLegal !== ''): ?>
             <div class="invoice-footer-legal"><?php echo nl2br(htmlspecialchars($footerLegal, ENT_QUOTES, 'UTF-8')); ?></div>
+        <?php endif; ?>
+
+        <?php if ($invoiceCopy === 'receipt'): ?>
+        <div class="invoice-panel" style="margin-top:1.5rem;border:2px dashed #64748b;padding:1rem;">
+            <h3 style="margin-top:0;">استلام البضاعة</h3>
+            <p style="margin:0 0 1rem;font-size:0.9rem;color:#475569;">أقرّ باستلام البنود أعلاه كاملة وبالحالة المذكورة.</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                <div><strong>اسم المستلم:</strong> ___________________________</div>
+                <div><strong>التاريخ:</strong> ___________________________</div>
+            </div>
+            <div style="margin-top:1.5rem;"><strong>التوقيع:</strong> ___________________________</div>
+        </div>
         <?php endif; ?>
 
         <div class="invoice-actions">

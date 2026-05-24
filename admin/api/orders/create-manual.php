@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../includes/order_helpers.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/order_fulfillment.php';
+require_once __DIR__ . '/../../../includes/document_sequences.php';
 require_once __DIR__ . '/../../../includes/phone_validation.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/countries.php';
@@ -279,6 +280,12 @@ try {
     }
 
     orange_complete_order_fulfillment($pdo, $orderId);
+
+    $ordSt = $pdo->prepare('SELECT * FROM orders WHERE id = ? LIMIT 1');
+    $ordSt->execute([$orderId]);
+    $orderRow = $ordSt->fetch(PDO::FETCH_ASSOC) ?: [];
+    orange_order_assign_inv_c_if_needed($pdo, $orderId, $orderRow);
+    orange_post_order_delivery_accounting($pdo, $orderId);
 
     $pdo->commit();
 

@@ -74,6 +74,8 @@ $statusAr = [
             </select>
         </label>
         <button type="button" onclick="handoverSave()">حفظ التوزيع</button>
+        <button type="button" class="btn-secondary" onclick="handoverPrintManifest()">طباعة الورقة</button>
+        <button type="button" class="btn-secondary" onclick="handoverPrintInvoices()">طباعة فواتير الدفعة</button>
         <button type="button" class="btn-secondary" onclick="handoverShowRemaining()">توزيع الباقي</button>
         <label style="display:flex;align-items:center;gap:6px;">
             <input type="checkbox" id="ho_select_all"> تحديد الكل
@@ -155,6 +157,28 @@ async function handoverSave() {
     var res = await postJSON('/admin/api/orders/handover-to-agent.php', { agent_id: agentId, order_ids: ids });
     alert(res.message || (res.success ? 'تم' : 'فشل'));
     if (res.success) location.reload();
+}
+
+function handoverPrintManifest() {
+    var agentId = parseInt(document.getElementById('ho_agent_id').value, 10) || 0;
+    var ids = handoverSelectedIds();
+    if (!ids.length) { alert('حدّد طلباً واحداً على الأقل'); return; }
+    var base = <?php echo json_encode(storefront_public_path('/admin/index.php'), JSON_UNESCAPED_UNICODE); ?>;
+    var q = 'page=delivery_handover_manifest&order_ids=' + encodeURIComponent(ids.join(','));
+    if (agentId > 0) q += '&agent_id=' + encodeURIComponent(String(agentId));
+    window.open(base + (base.indexOf('?') >= 0 ? '&' : '?') + q, '_blank', 'noopener');
+}
+
+function handoverPrintInvoices() {
+    var ids = handoverSelectedIds();
+    if (!ids.length) { alert('حدّد طلباً واحداً على الأقل'); return; }
+    var base = <?php echo json_encode(storefront_public_path('/admin/index.php'), JSON_UNESCAPED_UNICODE); ?>;
+    ids.forEach(function (id, idx) {
+        setTimeout(function () {
+            window.open(base + (base.indexOf('?') >= 0 ? '&' : '?') + 'page=invoice&order_id=' + encodeURIComponent(String(id)) + '&copy=customer', '_blank', 'noopener');
+            window.open(base + (base.indexOf('?') >= 0 ? '&' : '?') + 'page=invoice&order_id=' + encodeURIComponent(String(id)) + '&copy=receipt', '_blank', 'noopener');
+        }, idx * 400);
+    });
 }
 </script>
 <?php endif; ?>

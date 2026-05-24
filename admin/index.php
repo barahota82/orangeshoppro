@@ -75,7 +75,11 @@ $allowed = [
     'delivery_agents',
     'delivery_agent_handover',
     'delivery_order_search',
+    'invoice_edit',
+    'delivery_handover_manifest',
     'online_orders_final_posting',
+    'online_invoices',
+    'sales_invoices',
 ];
 if (!in_array($page, $allowed, true)) {
     $page = 'dashboard';

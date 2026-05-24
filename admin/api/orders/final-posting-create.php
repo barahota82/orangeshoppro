@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/order_fulfillment.php';
+require_once __DIR__ . '/../../../includes/document_sequences.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
@@ -40,24 +41,25 @@ try {
     foreach ($orderIds as $orderId) {
         orange_admin_assert_entity_country($pdo, 'orders', $orderId);
 
-        $st = $pdo->prepare('SELECT id, order_number, status FROM orders WHERE id = ? LIMIT 1');
+        $st = $pdo->prepare('SELECT * FROM orders WHERE id = ? LIMIT 1');
         $st->execute([$orderId]);
-        $row = $st->fetch(PDO::FETCH_ASSOC);
-        if (!$row) {
+        $orderRow = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$orderRow) {
             throw new RuntimeException('طلب غير موجود: #' . $orderId);
         }
-        if (($row['status'] ?? '') !== 'completed') {
+        if (($orderRow['status'] ?? '') !== 'completed') {
             throw new RuntimeException(
-                'الطلب ' . (string) ($row['order_number'] ?? $orderId) . ' ليس في حالة «تم التسليم»'
+                'الطلب ' . (string) ($orderRow['order_number'] ?? $orderId) . ' ليس في حالة «تم التسليم»'
             );
         }
 
-        $orderNumber = (string) ($row['order_number'] ?? '');
+        $orderNumber = (string) ($orderRow['order_number'] ?? '');
         if ($orderNumber !== '' && orange_order_forward_delivery_accounting_exists($pdo, $orderNumber)) {
             $skipped[] = $orderId;
             continue;
         }
 
+        orange_order_assign_inv_o_if_needed($pdo, $orderId, $orderRow);
         orange_post_order_delivery_accounting($pdo, $orderId);
         $posted[] = $orderId;
     }

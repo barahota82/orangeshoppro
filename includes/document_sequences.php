@@ -30,3 +30,62 @@ function orange_sequence_next(PDO $pdo, string $scope, ?int $countryId = null): 
 
     return (int) $st->fetchColumn();
 }
+
+/**
+ * تنسيق فاتورة مبيعات INV-C / INV-O مع كود الدولة (§13.5.7.2).
+ */
+function orange_format_sales_invoice_number(PDO $pdo, string $kind, int $countryId): string
+{
+    require_once __DIR__ . '/countries.php';
+    $kind = strtolower(trim($kind));
+    $scope = $kind === 'online' ? 'sales_invoice_online' : 'sales_invoice_company';
+    $prefix = $kind === 'online' ? 'INV-O' : 'INV-C';
+    $code = 'KW';
+    if ($countryId > 0) {
+        $row = orange_country_row_by_id($pdo, $countryId, false);
+        if (is_array($row)) {
+            $code = orange_countries_normalize_code((string) ($row['code'] ?? 'KW'));
+        }
+    }
+    $next = orange_sequence_next($pdo, $scope, $countryId > 0 ? $countryId : null);
+
+    return $prefix . '-' . $code . '-' . str_pad((string) $next, 6, '0', STR_PAD_LEFT);
+}
+
+/**
+ * يخصّص INV-O للطلب إن لم يكن له رقم فاتورة بعد.
+ */
+function orange_order_assign_inv_o_if_needed(PDO $pdo, int $orderId, array $order): string
+{
+    if (!orange_table_has_column($pdo, 'orders', 'invoice_number')) {
+        return '';
+    }
+    $existing = trim((string) ($order['invoice_number'] ?? ''));
+    if ($existing !== '') {
+        return $existing;
+    }
+    $countryId = (int) ($order['country_id'] ?? 0);
+    $formatted = orange_format_sales_invoice_number($pdo, 'online', $countryId);
+    $pdo->prepare('UPDATE orders SET invoice_number = ? WHERE id = ?')->execute([$formatted, $orderId]);
+
+    return $formatted;
+}
+
+/**
+ * يخصّص INV-C لطلب شركة إن لم يكن له رقم فاتورة بعد.
+ */
+function orange_order_assign_inv_c_if_needed(PDO $pdo, int $orderId, array $order): string
+{
+    if (!orange_table_has_column($pdo, 'orders', 'invoice_number')) {
+        return '';
+    }
+    $existing = trim((string) ($order['invoice_number'] ?? ''));
+    if ($existing !== '') {
+        return $existing;
+    }
+    $countryId = (int) ($order['country_id'] ?? 0);
+    $formatted = orange_format_sales_invoice_number($pdo, 'company', $countryId);
+    $pdo->prepare('UPDATE orders SET invoice_number = ? WHERE id = ?')->execute([$formatted, $orderId]);
+
+    return $formatted;
+}

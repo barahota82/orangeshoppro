@@ -325,6 +325,7 @@ $orangeAdminCurrencyUnitNav = orange_currency_display_unit($orangeAdminCurrencyN
                         ['page' => 'online_orders_final_posting', 'href' => '/admin/index.php?page=online_orders_final_posting', 'label' => 'طلبات أونلاين — القيود', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'delivery_agent_handover', 'href' => '/admin/index.php?page=delivery_agent_handover', 'label' => 'تسليم المندوب', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'delivery_order_search', 'href' => '/admin/index.php?page=delivery_order_search', 'label' => 'بحث التسليم', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'delivery_handover_manifest', 'href' => '/admin/index.php?page=delivery_handover_manifest', 'label' => 'ورقة المندوب', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'delivery_agents', 'href' => '/admin/index.php?page=delivery_agents', 'label' => 'مناديب التوصيل', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'order_intake_queue', 'href' => '/admin/index.php?page=order_intake_queue', 'label' => 'طابور الطلبات', 'class' => 'admin-nav-sub', 'sub' => true],
                     ],
@@ -334,6 +335,8 @@ $orangeAdminCurrencyUnitNav = orange_currency_display_unit($orangeAdminCurrencyN
                     'title' => 'الفواتير والمردود',
                     'items' => [
                         ['page' => 'invoice', 'href' => '/admin/index.php?page=invoice', 'label' => 'فاتورة أونلاين', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'online_invoices', 'href' => '/admin/index.php?page=online_invoices', 'label' => 'فواتير أونلاين', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'sales_invoices', 'href' => '/admin/index.php?page=sales_invoices', 'label' => 'فواتير مبيعات', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'manual_order', 'href' => '/admin/index.php?page=manual_order', 'label' => 'فاتورة مبيعات', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'sales_returns', 'href' => '/admin/index.php?page=sales_returns', 'label' => 'مردود المبيعات', 'class' => '', 'sub' => false],
                     ],

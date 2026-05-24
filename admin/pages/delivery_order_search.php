@@ -86,6 +86,7 @@ $indexBase = storefront_public_path('/admin/index.php');
                     <td><?php echo htmlspecialchars($st, ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo orange_format_money_for_context($ordersMoney, (float) ($o['total'] ?? 0)); ?></td>
                     <td class="actions">
+                        <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=invoice_edit&order_id=' . $oid), ENT_QUOTES, 'UTF-8'); ?>">تعديل جزئي</a>
                         <button type="button" class="btn-danger" onclick="dosCancelOrder(<?php echo $oid; ?>)">إلغاء (مرتجع كامل)</button>
                         <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=invoice&order_id=' . $oid), ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener">طباعة</a>
                     </td>
@@ -94,7 +95,7 @@ $indexBase = storefront_public_path('/admin/index.php');
             </tbody>
         </table>
     </div>
-    <p class="card-hint" style="margin-top:10px;">تعديل جزئي (<code>invoice_edit</code>) — قيد التنفيذ في مرحلة B6.</p>
+    <p class="card-hint" style="margin-top:10px;">مرتجع جزئي → <strong>تعديل جزئي</strong> يفتح <code>invoice_edit</code> (إعادة حساب العروض + «حفظ + تم التسليم»).</p>
     <?php endif; ?>
     <?php endif; ?>
 </div>
