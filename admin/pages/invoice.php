@@ -175,7 +175,7 @@ $invFmt = static function (float $amount, bool $withUnit = true) use ($invMoney)
 ?>
 <div class="admin-fy-shell invoice-admin-shell" dir="rtl">
     <h1 class="admin-fy-shell__title">فاتورة أونلاين</h1>
-    <p class="admin-fy-shell__lead">مستند للعميل من <strong>طلب محفوظ</strong> — رقم فاتورة مسلسل (<code>INV-</code>) يُخصَّص تلقائياً في النظام عند أول فتح لهذه الصفحة (لا زر «حفظ» منفصل). بعدها: <strong>طباعة / PDF</strong> من الشريط أعلاه أو <kbd class="admin-kbd">Ctrl</kbd>+<kbd class="admin-kbd">P</kbd>.</p>
+    <p class="admin-fy-shell__lead">مستند تشغيلي للعميل من <strong>طلب محفوظ</strong> — للطباعة عند التسليم (manifest / مندوب). <strong>الفاتورة الرسمية أونلاين (<code>INV-O-</code>)</strong> تُخصَّص عند «إنشاء القيود» فقط؛ <strong>فاتورة شركة (<code>INV-C-</code>)</strong> عند حفظ «فاتورة مبيعات». بعد التحميل: <strong>طباعة / PDF</strong> من الشريط أعلاه أو <kbd class="admin-kbd">Ctrl</kbd>+<kbd class="admin-kbd">P</kbd>.</p>
 
 <style>
     .invoice-doc {
@@ -499,10 +499,15 @@ $invFmt = static function (float $amount, bool $withUnit = true) use ($invMoney)
             <div class="invoice-workflow-bar__order">مرتبط بالطلب: <strong><?php echo htmlspecialchars((string)$order['order_number'], ENT_QUOTES, 'UTF-8'); ?></strong> — لا يتغيّر الرقم بعد التخصيص.</div>
         <?php else: ?>
             <div>
-                <span class="invoice-workflow-bar__number">رقم الفاتورة: <strong style="color:#94a3b8;font-weight:600;">سيُخصَّص الآن…</strong></span>
-                <span class="invoice-workflow-bar__pending">أول عرض للصفحة</span>
+                <?php if ($orderSrc === 'company'): ?>
+                <span class="invoice-workflow-bar__number">رقم الفاتورة: <strong style="color:#94a3b8;font-weight:600;">سيُخصَّص <code>INV-C-</code>…</strong></span>
+                <span class="invoice-workflow-bar__pending">أول عرض — طلب شركة</span>
+                <?php else: ?>
+                <span class="invoice-workflow-bar__number">رقم الفاتورة الرسمية: <strong style="color:#94a3b8;font-weight:600;">—</strong></span>
+                <span class="invoice-workflow-bar__pending">يُخصَّص <code>INV-O-</code> عند «إنشاء القيود»</span>
+                <?php endif; ?>
             </div>
-            <div class="invoice-workflow-bar__order">بعد التحميل يظهر <code>INV-</code> تلقائياً ويُحفظ على الطلب <?php echo htmlspecialchars((string)$order['order_number'], ENT_QUOTES, 'UTF-8'); ?>.</div>
+            <div class="invoice-workflow-bar__order">مستند تسليم للطلب <?php echo htmlspecialchars((string)$order['order_number'], ENT_QUOTES, 'UTF-8'); ?> — <?php echo $orderSrc === 'company' ? 'يُخصَّص <code>INV-C-</code> تلقائياً عند أول فتح.' : 'بدون رقم فاتورة رسمية حتى الترحيل المحاسبي.'; ?></div>
         <?php endif; ?>
     </div>
     <div class="invoice-workflow-bar__actions">
