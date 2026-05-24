@@ -1373,7 +1373,7 @@ function jvYecInsertPhaseRow(tb, phaseCode) {
     }
     var label = (JV_PHASE_LABELS && JV_PHASE_LABELS[phaseCode]) ? JV_PHASE_LABELS[phaseCode] : phaseCode;
     var tr = document.createElement('tr');
-    tr.className = 'jv-yec-phase-row jv-print-hide';
+    tr.className = 'jv-yec-phase-row';
     tr.setAttribute('data-yec-phase-header', phaseCode);
     tr.innerHTML = '<td colspan="5">' + jvEscapeHtml(label) + '</td>';
     tb.appendChild(tr);

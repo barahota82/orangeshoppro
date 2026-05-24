@@ -115,8 +115,211 @@ function orange_invoice_edit_is_bogo_gift_line(PDO $pdo, array $item, array $ord
 }
 
 /**
- * @param array<int, array<string, mixed>> $items
- * @return list<array{product:array<string,mixed>,qty:int,color:string,size:string,variant_id:int,price:float,cost:float}>
+ * تخطيط بنود مدفوعة: إطار كومbo (§13.11.9.7.6-أ) + بنود مستقلة.
+ *
+ * @param list<array<string, mixed>> $paidItems
+ *
+ * @return array{
+ *   groups: list<array{
+ *     group_id:int,promo_id:int,title:string,combo_price:float,bundle_qty:int,
+ *     total_price:float,item_ids:list<int>,items:list<array<string,mixed>>,condition_text:string
+ *   }>,
+ *   standalone: list<array<string, mixed>>
+ * }
+ */
+function orange_invoice_edit_combo_layout(PDO $pdo, array $order, array $paidItems): array
+{
+    $empty = ['groups' => [], 'standalone' => $paidItems];
+    $comboId = (int) ($order['cart_combo_promotion_id'] ?? 0);
+    if ($comboId <= 0 || $paidItems === [] || ! orange_table_exists($pdo, 'cart_combo_promotions')) {
+        return $empty;
+    }
+
+    $st = $pdo->prepare(
+        'SELECT id, title_ar, combo_price, components_json FROM cart_combo_promotions WHERE id = ? LIMIT 1'
+    );
+    $st->execute([$comboId]);
+    $promo = $st->fetch(PDO::FETCH_ASSOC);
+    if (! $promo) {
+        return $empty;
+    }
+
+    $comps = orange_cart_combo_parse_components_json($promo['components_json'] ?? null);
+    if (count($comps) < 2) {
+        return $empty;
+    }
+
+    /** @var array<int, int> $needByVid qty per bundle */
+    $needByVid = [];
+    foreach ($comps as $c) {
+        $needByVid[(int) $c['variant_id']] = (int) $c['qty'];
+    }
+
+    /** @var array<int, list<array<string, mixed>>> $byVid */
+    $byVid = [];
+    foreach ($paidItems as $row) {
+        $vid = (int) ($row['variant_id'] ?? 0);
+        if ($vid <= 0) {
+            continue;
+        }
+        $byVid[$vid][] = $row;
+    }
+
+    foreach ($needByVid as $vid => $need) {
+        if ($need <= 0 || ! isset($byVid[$vid])) {
+            return $empty;
+        }
+    }
+
+    $bundles = PHP_INT_MAX;
+    foreach ($needByVid as $vid => $need) {
+        $totalQty = 0;
+        foreach ($byVid[$vid] as $row) {
+            $totalQty += (int) ($row['qty'] ?? 0);
+        }
+        if ($totalQty < $need) {
+            return $empty;
+        }
+        $bundles = min($bundles, intdiv($totalQty, $need));
+    }
+    if ($bundles < 1 || $bundles === PHP_INT_MAX) {
+        return $empty;
+    }
+
+    /** @var array<int, true> $comboItemIds */
+    $comboItemIds = [];
+    foreach ($needByVid as $vid => $needPerBundle) {
+        $remaining = $needPerBundle * $bundles;
+        foreach ($byVid[$vid] as $row) {
+            if ($remaining <= 0) {
+                break;
+            }
+            $iid = (int) ($row['id'] ?? 0);
+            if ($iid > 0) {
+                $comboItemIds[$iid] = true;
+            }
+            $remaining -= (int) ($row['qty'] ?? 0);
+        }
+    }
+
+    if ($comboItemIds === []) {
+        return $empty;
+    }
+
+    $comboRows = [];
+    $standalone = [];
+    foreach ($paidItems as $row) {
+        $iid = (int) ($row['id'] ?? 0);
+        if ($iid > 0 && isset($comboItemIds[$iid])) {
+            $comboRows[] = $row;
+        } else {
+            $standalone[] = $row;
+        }
+    }
+
+    $title = trim((string) ($promo['title_ar'] ?? ''));
+    if ($title === '') {
+        $title = 'حزمة كومbo';
+    }
+    $comboPrice = (float) ($promo['combo_price'] ?? 0);
+
+    return [
+        'groups' => [[
+            'group_id' => 1,
+            'promo_id' => $comboId,
+            'title' => $title,
+            'combo_price' => $comboPrice,
+            'bundle_qty' => $bundles,
+            'total_price' => round($comboPrice * $bundles, 4),
+            'item_ids' => array_map('intval', array_keys($comboItemIds)),
+            'items' => $comboRows,
+            'condition_text' => 'إطار كومbo — الكل أو لا شيء',
+        ]],
+        'standalone' => $standalone,
+    ];
+}
+
+/**
+ * @param array<int, array<string, mixed>> $byId
+ * @param list<array{item_id:int, qty:int}> $changes
+ */
+function orange_invoice_edit_validate_combo_all_or_nothing(
+    PDO $pdo,
+    array $order,
+    array $byId,
+    array $changes
+): void {
+    $paid = [];
+    foreach ($byId as $row) {
+        if (! orange_invoice_edit_is_gift_line($pdo, $row, $order)) {
+            $paid[] = $row;
+        }
+    }
+    $layout = orange_invoice_edit_combo_layout($pdo, $order, $paid);
+    if ($layout['groups'] === []) {
+        return;
+    }
+
+    foreach ($layout['groups'] as $group) {
+        $itemIds = $group['item_ids'];
+        /** @var array<int, int> $newQtys */
+        $newQtys = [];
+        foreach ($itemIds as $iid) {
+            $newQtys[$iid] = (int) ($byId[$iid]['qty'] ?? 0);
+        }
+        foreach ($changes as $chg) {
+            $iid = (int) ($chg['item_id'] ?? 0);
+            if (in_array($iid, $itemIds, true)) {
+                $newQtys[$iid] = (int) ($chg['qty'] ?? 0);
+            }
+        }
+
+        $allZero = true;
+        $anyChanged = false;
+        foreach ($itemIds as $iid) {
+            $old = (int) ($byId[$iid]['qty'] ?? 0);
+            $nw = $newQtys[$iid] ?? 0;
+            if ($nw > 0) {
+                $allZero = false;
+            }
+            if ($nw !== $old) {
+                $anyChanged = true;
+            }
+        }
+
+        if (! $anyChanged) {
+            continue;
+        }
+        if (! $allZero) {
+            throw new RuntimeException(
+                'كومbo: الكل أو لا شيء — لا يمكن تعديل مكوّن واحد. استخدم «إرجاع الحزمة كاملة» أو عدّل البنود خارج الإطار.'
+            );
+        }
+    }
+}
+
+/**
+ * @param list<int> $comboItemIds
+ */
+function orange_invoice_edit_stamp_combo_group(PDO $pdo, int $orderId, array $comboItemIds, int $groupId = 1): void
+{
+    if (! orange_table_has_column($pdo, 'order_items', 'combo_group_id')) {
+        return;
+    }
+    $pdo->prepare('UPDATE order_items SET combo_group_id = NULL WHERE order_id = ?')
+        ->execute([$orderId]);
+    if ($comboItemIds === []) {
+        return;
+    }
+    $ph = implode(',', array_fill(0, count($comboItemIds), '?'));
+    $pdo->prepare(
+        "UPDATE order_items SET combo_group_id = ? WHERE order_id = ? AND id IN ($ph)"
+    )->execute(array_merge([$groupId, $orderId], $comboItemIds));
+}
+
+/**
+ * @param list<array<string, mixed>> $paidItems
+ * @return list<array<string, mixed>>
  */
 function orange_invoice_edit_paid_lines_to_validated(PDO $pdo, array $items, array $order): array
 {
@@ -262,11 +465,25 @@ function orange_invoice_edit_prior_snapshot(PDO $pdo, array $order, array $allIt
     $comboId = (int) ($order['cart_combo_promotion_id'] ?? 0);
     $comboDisc = (float) ($order['cart_combo_discount'] ?? 0);
     if ($comboId > 0 && $comboDisc > 0.00001) {
+        $paidForLayout = [];
+        foreach ($allItems as $item) {
+            if (! orange_invoice_edit_is_gift_line($pdo, $item, $order)) {
+                $paidForLayout[] = $item;
+            }
+        }
+        $layout = orange_invoice_edit_combo_layout($pdo, $order, $paidForLayout);
+        $comboLabel = 'خصم كومبو: −' . number_format($comboDisc, 3);
+        if ($layout['groups'] !== []) {
+            $g0 = $layout['groups'][0];
+            $comboLabel = (string) ($g0['title'] ?? 'كومبو')
+                . ' — ' . number_format((float) ($g0['total_price'] ?? 0), 3)
+                . ' (×' . (int) ($g0['bundle_qty'] ?? 1) . ' حزمة)';
+        }
         $snap['combo'] = [
             'kind' => 'combo',
             'id' => $comboId,
             'discount' => $comboDisc,
-            'label' => 'خصم كومبو: −' . number_format($comboDisc, 3),
+            'label' => $comboLabel,
             'condition_text' => 'إطار كومبو — الكل أو لا شيء',
         ];
     }
@@ -541,6 +758,8 @@ function orange_invoice_edit_preview(PDO $pdo, int $orderId, array $changes, arr
         $byId[(int) ($row['id'] ?? 0)] = $row;
     }
 
+    orange_invoice_edit_validate_combo_all_or_nothing($pdo, $order, $byId, $changes);
+
     $priorSnap = orange_invoice_edit_prior_snapshot($pdo, $order, $allItems);
     $sim = orange_invoice_edit_simulate_item_qty($byId, $changes);
     foreach ($sim as $id => $item) {
@@ -611,6 +830,8 @@ function orange_invoice_edit_apply(PDO $pdo, int $orderId, array $changes, bool 
 
     $priorSnap = orange_invoice_edit_prior_snapshot($pdo, $order, $allItems);
     $adminRestores = orange_invoice_edit_decode_admin_restores($adminRestores);
+
+    orange_invoice_edit_validate_combo_all_or_nothing($pdo, $order, $byId, $changes);
 
     foreach ($changes as $chg) {
         $itemId = (int) ($chg['item_id'] ?? 0);
@@ -708,6 +929,16 @@ function orange_invoice_edit_apply(PDO $pdo, int $orderId, array $changes, bool 
     }
     $updParams[] = $orderId;
     $pdo->prepare('UPDATE orders SET ' . implode(', ', $setParts) . ' WHERE id = ?')->execute($updParams);
+
+    $remainingPaid = [];
+    foreach ($byId as $row) {
+        if (! orange_invoice_edit_is_gift_line($pdo, $row, $order)) {
+            $remainingPaid[] = $row;
+        }
+    }
+    $postLayout = orange_invoice_edit_combo_layout($pdo, $order, $remainingPaid);
+    $comboStampIds = $postLayout['groups'][0]['item_ids'] ?? [];
+    orange_invoice_edit_stamp_combo_group($pdo, $orderId, $comboStampIds);
 
     if ($markCompleted) {
         $pdo->prepare('UPDATE orders SET status = ?, completed_at = NOW() WHERE id = ?')

@@ -13,6 +13,8 @@ orange_catalog_ensure_schema($pdo);
 $orderId = isset($_GET['order_id']) ? (int) $_GET['order_id'] : 0;
 $order = null;
 $paidItems = [];
+$comboGroups = [];
+$standaloneItems = [];
 $err = '';
 $storedRestores = [];
 
@@ -34,6 +36,9 @@ if ($orderId > 0) {
                 $paidItems[] = $row;
             }
         }
+        $comboLayout = orange_invoice_edit_combo_layout($pdo, $order, $paidItems);
+        $comboGroups = $comboLayout['groups'];
+        $standaloneItems = $comboLayout['standalone'];
     }
 }
 
@@ -48,6 +53,12 @@ $moneyDec = (int) ($money['decimals'] ?? 3);
 .ie-badge-ok { color:#15803d;font-weight:600; }
 .ie-badge-no { color:#b91c1c;font-weight:600; }
 .ie-badge-override { font-size:0.8rem;color:#7c3aed;background:#f5f3ff;padding:2px 8px;border-radius:4px; }
+.ie-combo-frame { margin:0 0 16px;padding:12px 14px;border:2px solid #93c5fd;border-radius:10px;background:#f8fafc; }
+.ie-combo-frame__title { margin:0 0 8px;font-weight:700;color:#1e40af; }
+.ie-combo-frame__hint { margin:0 0 10px;font-size:0.88rem;color:#64748b; }
+.ie-combo-frame__footer { display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid #cbd5e1; }
+.ie-combo-frame__price { font-weight:700;color:#0f172a; }
+.ie-combo-qty-ro { width:64px;background:#f1f5f9;cursor:not-allowed; }
 </style>
 
 <div class="admin-fy-shell" dir="rtl">
@@ -68,6 +79,46 @@ $moneyDec = (int) ($money['decimals'] ?? 3);
         — <?php echo htmlspecialchars((string) ($order['customer_name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></p>
 
     <h3 class="card-title">بنود مدفوعة</h3>
+
+    <?php foreach ($comboGroups as $cg): ?>
+    <div class="ie-combo-frame" data-combo-group="<?php echo (int) ($cg['group_id'] ?? 1); ?>">
+        <p class="ie-combo-frame__title"><?php echo htmlspecialchars((string) ($cg['title'] ?? 'كومبو'), ENT_QUOTES, 'UTF-8'); ?></p>
+        <p class="ie-combo-frame__hint">إطار كومبو — الكل أو لا شيء. لا يُعدَّل مكوّن واحد؛ «إرجاع الحزمة كاملة» فقط.</p>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>الصنف</th>
+                        <th>لون/مقاس</th>
+                        <th>الكمية</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($cg['items'] as $row): ?>
+                    <tr data-item-id="<?php echo (int) ($row['id'] ?? 0); ?>" data-combo-member="1">
+                        <td><?php echo htmlspecialchars((string) ($row['product_name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars(trim((string) ($row['color'] ?? '') . ' / ' . (string) ($row['size'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td>
+                            <input type="number" class="ie-combo-qty-ro" value="<?php echo (int) ($row['qty'] ?? 0); ?>" readonly tabindex="-1" aria-readonly="true">
+                            <input type="hidden" class="ie-qty" value="<?php echo (int) ($row['qty'] ?? 0); ?>">
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <div class="ie-combo-frame__footer">
+            <span class="ie-combo-frame__price">سعر الحزمة: <?php echo orange_format_money_for_context($money, (float) ($cg['total_price'] ?? 0)); ?>
+                <?php if ((int) ($cg['bundle_qty'] ?? 1) > 1): ?>
+                    <span class="muted">(<?php echo (int) $cg['bundle_qty']; ?> × <?php echo orange_format_money_for_context($money, (float) ($cg['combo_price'] ?? 0)); ?>)</span>
+                <?php endif; ?>
+            </span>
+            <button type="button" class="btn-secondary ie-combo-return-all" data-item-ids="<?php echo htmlspecialchars(implode(',', array_map('strval', $cg['item_ids'] ?? [])), ENT_QUOTES, 'UTF-8'); ?>">إرجاع الحزمة كاملة</button>
+        </div>
+    </div>
+    <?php endforeach; ?>
+
+    <?php if ($standaloneItems !== []): ?>
     <div class="table-wrap">
         <table>
             <thead>
@@ -79,7 +130,7 @@ $moneyDec = (int) ($money['decimals'] ?? 3);
                 </tr>
             </thead>
             <tbody id="ie_paid_body">
-                <?php foreach ($paidItems as $row): ?>
+                <?php foreach ($standaloneItems as $row): ?>
                 <tr data-item-id="<?php echo (int) ($row['id'] ?? 0); ?>">
                     <td><?php echo htmlspecialchars((string) ($row['product_name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                     <td><?php echo htmlspecialchars(trim((string) ($row['color'] ?? '') . ' / ' . (string) ($row['size'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
@@ -90,6 +141,24 @@ $moneyDec = (int) ($money['decimals'] ?? 3);
             </tbody>
         </table>
     </div>
+    <?php elseif ($comboGroups === []): ?>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>الصنف</th>
+                    <th>لون/مقاس</th>
+                    <th>الكمية</th>
+                    <th>السعر</th>
+                </tr>
+            </thead>
+            <tbody id="ie_paid_body"></tbody>
+        </table>
+        <p class="muted">لا توجد بنود مدفوعة.</p>
+    </div>
+    <?php else: ?>
+    <tbody id="ie_paid_body" hidden aria-hidden="true"></tbody>
+    <?php endif; ?>
 
     <div class="ie-promo-panel" id="ie_active_panel">
         <strong>ملخص العروض — الفاتورة النشطة</strong>
@@ -120,7 +189,7 @@ $moneyDec = (int) ($money['decimals'] ?? 3);
 
     function collectChanges() {
         var changes = [];
-        document.querySelectorAll('#ie_paid_body tr[data-item-id]').forEach(function (tr) {
+        document.querySelectorAll('tr[data-item-id]').forEach(function (tr) {
             var id = parseInt(tr.getAttribute('data-item-id'), 10);
             var inp = tr.querySelector('.ie-qty');
             if (!id || !inp) return;
@@ -204,12 +273,29 @@ $moneyDec = (int) ($money['decimals'] ?? 3);
         inp.addEventListener('change', schedulePreview);
     });
 
+    document.querySelectorAll('.ie-combo-return-all').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var ids = (btn.getAttribute('data-item-ids') || '').split(',').map(function (s) { return parseInt(s, 10); }).filter(function (n) { return n > 0; });
+            if (!ids.length) return;
+            if (!confirm('إرجاع الحزمة كاملة (كومbo) — حذف كل مكوّناتها من الطلب؟')) return;
+            ids.forEach(function (id) {
+                var tr = document.querySelector('tr[data-item-id="' + id + '"]');
+                if (!tr) return;
+                var hid = tr.querySelector('.ie-qty');
+                var ro = tr.querySelector('.ie-combo-qty-ro');
+                if (hid) hid.value = '0';
+                if (ro) ro.value = '0';
+            });
+            invoiceEditPreviewNow();
+        });
+    });
+
     invoiceEditPreviewNow();
 })();
 
 async function invoiceEditSave(completeAfter) {
     var changes = [];
-    document.querySelectorAll('#ie_paid_body tr[data-item-id]').forEach(function (tr) {
+    document.querySelectorAll('tr[data-item-id]').forEach(function (tr) {
         var id = parseInt(tr.getAttribute('data-item-id'), 10);
         var inp = tr.querySelector('.ie-qty');
         if (!id || !inp) return;
