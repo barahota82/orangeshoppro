@@ -24,6 +24,10 @@ try {
     $type = trim((string)($data['type'] ?? ''));
     $items = isset($data['items']) && is_array($data['items']) ? $data['items'] : [];
     $notes = trim((string)($data['notes'] ?? ''));
+    $supplierInvoiceNumber = trim((string)($data['supplier_invoice_number'] ?? ''));
+    if ($supplierInvoiceNumber !== '' && mb_strlen($supplierInvoiceNumber) > 64) {
+        json_response(['success' => false, 'message' => 'رقم فاتورة المورد طويل جداً (64 حرفاً كحد أقصى)'], 422);
+    }
 
     if (!in_array($type, ['cash', 'credit'], true) || count($items) === 0) {
         json_response(['success' => false, 'message' => 'بيانات الشراء غير صحيحة'], 422);
@@ -117,9 +121,15 @@ try {
 
     $purchaseCountryId = orange_admin_context_country_id($pdo);
 
+    $hasSupplierInvoiceCol = orange_table_has_column($pdo, 'purchases', 'supplier_invoice_number');
     $insertCols = 'supplier_id, total, type, notes';
     $insertPlaceholders = '?, ?, ?, ?';
     $insertValues = [$supplierId > 0 ? $supplierId : null, $netTotal, $type, $notes];
+    if ($hasSupplierInvoiceCol) {
+        $insertCols = 'supplier_id, supplier_invoice_number, total, type, notes';
+        $insertPlaceholders = '?, ?, ?, ?, ?';
+        array_splice($insertValues, 1, 0, [$supplierInvoiceNumber !== '' ? $supplierInvoiceNumber : null]);
+    }
     if (orange_table_has_country_id($pdo, 'purchases') && $purchaseCountryId > 0) {
         $insertCols .= ', country_id';
         $insertPlaceholders .= ', ?';

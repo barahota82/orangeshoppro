@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 64);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 65);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -2974,6 +2974,13 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
 
     if (orange_table_exists($pdo, 'purchases') && !orange_table_has_column($pdo, 'purchases', 'subtotal')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE purchases ADD COLUMN subtotal DECIMAL(18,4) NOT NULL DEFAULT 0');
+    }
+
+    if (orange_table_exists($pdo, 'purchases') && !orange_table_has_column($pdo, 'purchases', 'supplier_invoice_number')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            "ALTER TABLE purchases ADD COLUMN supplier_invoice_number VARCHAR(64) NULL DEFAULT NULL AFTER supplier_id"
+        );
     }
 
     if (orange_table_exists($pdo, 'company_settings') && !orange_table_has_column($pdo, 'company_settings', 'vat_number')) {

@@ -19,7 +19,12 @@ if (!orange_table_has_column($pdo, 'purchase_items', 'qty_received')) {
     json_response(['success' => false, 'message' => 'قاعدة البيانات تحتاج ترقية (qty_received)'], 500);
 }
 
-$st = $pdo->prepare('SELECT id, supplier_id, type, notes, total FROM purchases WHERE id = ? LIMIT 1');
+$hasSupplierInvoiceCol = orange_table_has_column($pdo, 'purchases', 'supplier_invoice_number');
+$purCols = 'id, supplier_id, type, notes, total';
+if ($hasSupplierInvoiceCol) {
+    $purCols = 'id, supplier_id, supplier_invoice_number, type, notes, total';
+}
+$st = $pdo->prepare("SELECT $purCols FROM purchases WHERE id = ? LIMIT 1");
 $st->execute([$purchaseId]);
 $purchase = $st->fetch(PDO::FETCH_ASSOC);
 if (!$purchase) {
@@ -92,6 +97,9 @@ json_response([
         'supplier_id' => $purchase['supplier_id'] !== null ? (int) $purchase['supplier_id'] : 0,
         'type' => (string) $purchase['type'],
         'notes' => (string) ($purchase['notes'] ?? ''),
+        'supplier_invoice_number' => $hasSupplierInvoiceCol
+            ? trim((string) ($purchase['supplier_invoice_number'] ?? ''))
+            : '',
         'total' => (float) $purchase['total'],
     ],
     'items' => $items,

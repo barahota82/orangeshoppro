@@ -280,7 +280,7 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
     <h3 class="card-title">فاتورة شراء</h3>
 
     <!-- ١ — المورد -->
-    <div class="form-grid" style="margin-bottom:16px;">
+    <div class="form-grid" style="margin-bottom:12px;">
         <div style="grid-column:1/-1;">
             <label for="pv2_supplier_code">المورد</label>
             <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:10px 14px;">
@@ -289,16 +289,24 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
             </div>
             <input type="hidden" id="pv2_supplier_id" value="0">
         </div>
+    </div>
+
+    <!-- ٢ — رقم فاتورة المورد، ملاحظات، نوع الشراء -->
+    <div class="form-grid form-grid-3" style="margin-bottom:16px;">
+        <div>
+            <label for="pv2_supplier_invoice">رقم فاتورة المورد</label>
+            <input type="text" id="pv2_supplier_invoice" placeholder="رقم فاتورة المورد" dir="ltr" lang="en" autocomplete="off" maxlength="64"<?php echo !$pv2Ready ? ' disabled' : ''; ?>>
+        </div>
+        <div>
+            <label for="pv2_notes">ملاحظات</label>
+            <input type="text" id="pv2_notes" placeholder="شروط، ملاحظات إضافية، …"<?php echo !$pv2Ready ? ' disabled' : ''; ?>>
+        </div>
         <div>
             <label for="pv2_type">نوع الشراء</label>
             <select id="pv2_type"<?php echo !$pv2Ready ? ' disabled' : ''; ?>>
                 <option value="cash">نقدي</option>
                 <option value="credit">آجل</option>
             </select>
-        </div>
-        <div style="grid-column:1/-1;">
-            <label for="pv2_notes">ملاحظات</label>
-            <input type="text" id="pv2_notes" placeholder="رقم فاتورة المورد، شروط، …"<?php echo !$pv2Ready ? ' disabled' : ''; ?>>
         </div>
     </div>
 
@@ -881,6 +889,7 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
         var supplierId = parseInt(document.getElementById('pv2_supplier_id').value, 10) || 0;
         var purType = document.getElementById('pv2_type').value;
         var notes = (document.getElementById('pv2_notes').value || '').trim();
+        var supplierInvoice = (document.getElementById('pv2_supplier_invoice').value || '').trim();
 
         if (purType === 'credit' && supplierId <= 0) {
             alert('شراء آجل يتطلّب مورداً.');
@@ -916,6 +925,7 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
             supplier_id: supplierId,
             type: purType,
             notes: notes,
+            supplier_invoice_number: supplierInvoice,
             items: items,
             invoice_discount_raw: invDiscRaw,
             invoice_discount_amount: invDiscAmt

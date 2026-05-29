@@ -143,6 +143,16 @@ try {
     $type = trim((string)($data['type'] ?? $purchase['type']));
     $supplierId = (int)($data['supplier_id'] ?? (int)$purchase['supplier_id']);
     $notes = trim((string)($data['notes'] ?? (string)$purchase['notes']));
+    $hasSupplierInvoiceCol = orange_table_has_column($pdo, 'purchases', 'supplier_invoice_number');
+    $supplierInvoiceNumber = array_key_exists('supplier_invoice_number', $data)
+        ? trim((string)($data['supplier_invoice_number'] ?? ''))
+        : trim((string)($purchase['supplier_invoice_number'] ?? ''));
+    if ($supplierInvoiceNumber !== '' && mb_strlen($supplierInvoiceNumber) > 64) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        json_response(['success' => false, 'message' => 'رقم فاتورة المورد طويل جداً (64 حرفاً كحد أقصى)'], 422);
+    }
     $items = isset($data['items']) && is_array($data['items']) ? $data['items'] : [];
     if (!in_array($type, ['cash', 'credit'], true) || count($items) === 0) {
         if ($pdo->inTransaction()) {
@@ -190,8 +200,21 @@ try {
     }
 
     $newTotal = apply_purchase_items($pdo, $purchaseId, $items, $purchaseCountryId);
-    $pdo->prepare("UPDATE purchases SET supplier_id = ?, total = ?, type = ?, notes = ?, updated_at = NOW() WHERE id = ?")
-        ->execute([$supplierId > 0 ? $supplierId : null, $newTotal, $type, $notes, $purchaseId]);
+    if ($hasSupplierInvoiceCol) {
+        $pdo->prepare(
+            'UPDATE purchases SET supplier_id = ?, supplier_invoice_number = ?, total = ?, type = ?, notes = ?, updated_at = NOW() WHERE id = ?'
+        )->execute([
+            $supplierId > 0 ? $supplierId : null,
+            $supplierInvoiceNumber !== '' ? $supplierInvoiceNumber : null,
+            $newTotal,
+            $type,
+            $notes,
+            $purchaseId,
+        ]);
+    } else {
+        $pdo->prepare('UPDATE purchases SET supplier_id = ?, total = ?, type = ?, notes = ?, updated_at = NOW() WHERE id = ?')
+            ->execute([$supplierId > 0 ? $supplierId : null, $newTotal, $type, $notes, $purchaseId]);
+    }
 
     orange_purchase_remove_receive_accounting($pdo, $purchaseId);
     orange_purchase_remove_accounting($pdo, $purchaseId, $purchaseCountryId > 0 ? $purchaseCountryId : null);
