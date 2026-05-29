@@ -432,6 +432,28 @@ function orange_accounts_flat(PDO $pdo): array
 }
 
 /**
+ * يُدرِج SQL (مثل فلتر country) قبل ORDER BY / GROUP BY / LIMIT … لا في نهاية السطر.
+ */
+function orange_sql_inject_before_tail_clauses(string $sql, string $fragment): string
+{
+    if ($fragment === '') {
+        return $sql;
+    }
+    if (preg_match(
+        '/\s+(ORDER\s+BY|GROUP\s+BY|HAVING|LIMIT|OFFSET|FOR\s+UPDATE|LOCK\s+IN\s+SHARE\s+MODE)\b/i',
+        $sql,
+        $m,
+        PREG_OFFSET_CAPTURE
+    )) {
+        $pos = (int) $m[0][1];
+
+        return substr($sql, 0, $pos) . $fragment . substr($sql, $pos);
+    }
+
+    return $sql . $fragment;
+}
+
+/**
  * استعلام accounts مع فلتر country_id من سياق الأدمن.
  *
  * @param list<mixed> $params
@@ -441,7 +463,7 @@ function orange_accounts_fetch(PDO $pdo, string $sqlWithWhere, array $params = [
 {
     $filter = orange_accounts_sql_country_filter($pdo, $alias, $countryId);
     if ($filter !== null) {
-        $sqlWithWhere .= $filter['sql'];
+        $sqlWithWhere = orange_sql_inject_before_tail_clauses($sqlWithWhere, $filter['sql']);
         $params = array_merge($params, $filter['params']);
     }
     if ($params === []) {
