@@ -261,18 +261,9 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
 .jv-search-results-table { margin: 0; font-size: 0.9rem; }
 .jv-search-results-table tbody tr { cursor: pointer; }
 .jv-search-results-table tbody tr:hover { background: #f4f4f5; }
-/* صف 2 — فاتورة شراء: تصغير الجانبين بنفس القيمة → يُضاف العرض لملاحظات (0.65 + 1.7 + 0.65 = 3fr) */
-.pv2-header-row2 {
-    --pv2-row2-side-shrink: 0.35fr;
-    grid-template-columns:
-        minmax(0, calc(1fr - var(--pv2-row2-side-shrink)))
-        minmax(0, calc(1fr + 2 * var(--pv2-row2-side-shrink)))
-        minmax(0, calc(1fr - var(--pv2-row2-side-shrink)));
-}
-@media (max-width: 720px) {
-    .pv2-header-row2 {
-        grid-template-columns: 1fr;
-    }
+/* صف 2 — 3 خانات في سطر واحد: تصغير الجانبين 0.35fr → ملاحظات +0.7fr (0.65 + 1.7 + 0.65 = 3fr) */
+.form-grid.form-grid-3.pv2-header-row2 {
+    grid-template-columns: minmax(6.5rem, 0.65fr) minmax(0, 1.7fr) minmax(5.5rem, 0.65fr);
 }
 </style>
 
