@@ -261,6 +261,19 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
 .jv-search-results-table { margin: 0; font-size: 0.9rem; }
 .jv-search-results-table tbody tr { cursor: pointer; }
 .jv-search-results-table tbody tr:hover { background: #f4f4f5; }
+/* صف 2 — فاتورة شراء: تصغير الجانبين بنفس القيمة → يُضاف العرض لملاحظات (0.65 + 1.7 + 0.65 = 3fr) */
+.pv2-header-row2 {
+    --pv2-row2-side-shrink: 0.35fr;
+    grid-template-columns:
+        minmax(0, calc(1fr - var(--pv2-row2-side-shrink)))
+        minmax(0, calc(1fr + 2 * var(--pv2-row2-side-shrink)))
+        minmax(0, calc(1fr - var(--pv2-row2-side-shrink)));
+}
+@media (max-width: 720px) {
+    .pv2-header-row2 {
+        grid-template-columns: 1fr;
+    }
+}
 </style>
 
 <div class="page-title page-title--stacked jv-print-hide">
@@ -292,7 +305,7 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
     </div>
 
     <!-- ٢ — رقم فاتورة المورد، ملاحظات، نوع الشراء -->
-    <div class="form-grid form-grid-3" style="margin-bottom:16px;">
+    <div class="form-grid form-grid-3 pv2-header-row2" style="margin-bottom:16px;">
         <div>
             <label for="pv2_supplier_invoice">رقم فاتورة المورد</label>
             <input type="text" id="pv2_supplier_invoice" placeholder="رقم فاتورة المورد" dir="ltr" lang="en" autocomplete="off" maxlength="64"<?php echo !$pv2Ready ? ' disabled' : ''; ?>>
