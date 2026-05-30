@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../includes/order_helpers.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/order_fulfillment.php';
+require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/document_sequences.php';
 require_once __DIR__ . '/../../../includes/phone_validation.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
@@ -289,11 +290,26 @@ try {
 
     $pdo->commit();
 
+    $ofCountryId = (int) ($orderRow['country_id'] ?? 0);
+    if ($ofCountryId <= 0) {
+        $ofCountryId = orange_admin_context_country_id($pdo);
+    }
+    $paymentTerms = trim((string) ($orderRow['payment_terms'] ?? 'cash'));
+    $isCredit = $paymentTerms === 'credit';
+    $isOnline = orange_order_delivery_sale_uses_online_revenue_account($pdo, $orderRow);
+    $saleJtCode = $isOnline ? 'OSI' : ($isCredit ? 'SIN' : 'CSI');
+    $cogsJtCode = $isOnline ? 'CGO' : ($isCredit ? 'CGT' : 'CGC');
+    $voucherLinks = orange_gl_posting_voucher_links($pdo, 'order', $orderId, [
+        ['entry_type' => 'order_delivery_sale', 'journal_type_code' => $saleJtCode, 'label' => 'قيد المبيعات'],
+        ['entry_type' => 'order_delivery_cogs', 'journal_type_code' => $cogsJtCode, 'label' => 'قيد تكلفة المبيعات'],
+    ], $ofCountryId > 0 ? $ofCountryId : null);
+
     json_response([
         'success' => true,
         'message' => 'تم تسجيل فاتورة الشركة',
         'order_id' => $orderId,
         'order_number' => $orderNumber,
+        'voucher_links' => $voucherLinks,
     ]);
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {

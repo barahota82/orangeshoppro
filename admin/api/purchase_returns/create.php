@@ -213,7 +213,15 @@ try {
 
     $pdo->commit();
     audit_log('purchase_return_create', 'تم إنشاء مردود مشتريات رقم: ' . $returnId, 'purchase_returns', $returnId);
-    json_response(['success' => true, 'message' => 'تم حفظ مردود المشتريات', 'purchase_return_id' => $returnId]);
+    $voucherLinks = orange_gl_posting_voucher_links($pdo, 'purchase_return', $returnId, [
+        ['entry_type' => 'purchase_return', 'journal_type_code' => 'PDN', 'label' => 'قيد مردود المشتريات'],
+    ], $returnCountryId);
+    json_response([
+        'success' => true,
+        'message' => 'تم حفظ مردود المشتريات',
+        'purchase_return_id' => $returnId,
+        'voucher_links' => $voucherLinks,
+    ]);
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();

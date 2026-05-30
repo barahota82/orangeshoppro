@@ -244,7 +244,18 @@ try {
 
     $pdo->commit();
     audit_log('sales_return_create', 'تم إنشاء مردود مبيعات رقم: ' . $returnId, 'sales_returns', $returnId);
-    json_response(['success' => true, 'message' => 'تم حفظ مردود المبيعات', 'sales_return_id' => $returnId]);
+    $revJtCode = $channel === 'credit' ? 'SRR' : ($channel === 'online' ? 'OSR' : 'SCR');
+    $cogsJtCode = $channel === 'credit' ? 'CGR' : ($channel === 'online' ? 'COR' : 'CSR');
+    $voucherLinks = orange_gl_posting_voucher_links($pdo, 'sales_return', $returnId, [
+        ['entry_type' => 'order_return_sale', 'journal_type_code' => $revJtCode, 'label' => 'قيد مردود المبيعات', 'suffix' => 'sale'],
+        ['entry_type' => 'order_return_cogs', 'journal_type_code' => $cogsJtCode, 'label' => 'قيد تكلفة المردود', 'suffix' => 'cogs'],
+    ], $returnCountryId);
+    json_response([
+        'success' => true,
+        'message' => 'تم حفظ مردود المبيعات',
+        'sales_return_id' => $returnId,
+        'voucher_links' => $voucherLinks,
+    ]);
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();

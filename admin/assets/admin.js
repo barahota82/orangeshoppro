@@ -299,6 +299,61 @@ function getJSON(url) {
  * @param {string} [fallbackMsg]
  * @returns {boolean} true إذا وُجد suggest وعُرض الحوار
  */
+/**
+ * بعد حفظ فاتورة/مردود: عرض خيار فتح القيد في «سندات أخرى» للطباعة.
+ * @param {object} res استجابة API (voucher_links)
+ * @param {function} [onSkip] يُستدعى عند الرفض أو عدم وجود رابط
+ * @returns {boolean} true إذا انتقل المستخدم للقيد
+ */
+function orangeAdminOfferOpenGlVoucherAfterSave(res, onSkip) {
+    var links = res && res.voucher_links;
+    if (!links || !links.length) {
+        if (typeof onSkip === 'function') {
+            onSkip();
+        }
+        return false;
+    }
+    var primary = null;
+    var i;
+    for (i = 0; i < links.length; i++) {
+        if (links[i].voucher_id > 0) {
+            primary = links[i];
+            break;
+        }
+    }
+    if (!primary) {
+        for (i = 0; i < links.length; i++) {
+            if (links[i].journal_type_id > 0) {
+                primary = links[i];
+                break;
+            }
+        }
+    }
+    if (!primary) {
+        if (typeof onSkip === 'function') {
+            onSkip();
+        }
+        return false;
+    }
+    var pub = typeof window.ORANGE_PUBLIC_BASE_PATH === 'string'
+        ? window.ORANGE_PUBLIC_BASE_PATH.replace(/\/+$/, '')
+        : '';
+    var url = pub + '/admin/index.php?page=other_vouchers&journal_type_id='
+        + encodeURIComponent(String(primary.journal_type_id));
+    if (primary.voucher_id > 0) {
+        url += '&voucher_id=' + encodeURIComponent(String(primary.voucher_id));
+    }
+    var msg = (res && res.message) ? res.message : 'تم الحفظ';
+    if (window.confirm(msg + '\n\nفتح القيد في «سندات أخرى» للطباعة؟')) {
+        window.location.href = url;
+        return true;
+    }
+    if (typeof onSkip === 'function') {
+        onSkip();
+    }
+    return false;
+}
+
 function orangeAdminOfferSuggestOnFailure(r, fallbackMsg) {
     if (!r || r.success) {
         return false;

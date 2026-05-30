@@ -864,8 +864,19 @@ function moSubmit() {
         amount_paid: paid,
         items: items
     }).then(function (res) {
-        alert(res.message || (res.success ? 'تم' : 'فشل'));
-        if (res.success && res.order_id) {
+        if (!res.success) {
+            alert(res.message || 'فشل');
+            return;
+        }
+        if (res.order_id) {
+            if (typeof orangeAdminOfferOpenGlVoucherAfterSave === 'function') {
+                if (orangeAdminOfferOpenGlVoucherAfterSave(res, function () {
+                    var __pub = typeof window.ORANGE_PUBLIC_BASE_PATH === 'string' ? window.ORANGE_PUBLIC_BASE_PATH.replace(/\/+$/, '') : '';
+                    location.href = __pub + '/admin/index.php?page=invoice&order_id=' + encodeURIComponent(String(res.order_id));
+                })) {
+                    return;
+                }
+            }
             var __pub = typeof window.ORANGE_PUBLIC_BASE_PATH === 'string' ? window.ORANGE_PUBLIC_BASE_PATH.replace(/\/+$/, '') : '';
             location.href = __pub + '/admin/index.php?page=invoice&order_id=' + encodeURIComponent(String(res.order_id));
         }

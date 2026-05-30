@@ -7,8 +7,6 @@ require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
 require_once __DIR__ . '/../../includes/party_subledger.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
-require_once __DIR__ . '/../../includes/journal_voucher.php';
-require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
@@ -157,14 +155,6 @@ try {
     }
 }
 
-$pr2GlAccounts = [];
-foreach (orange_accounts_fetch($pdo, 'SELECT a.id, a.code, a.name FROM accounts a WHERE 1=1 ORDER BY a.code ASC', [], 'a') as $r) {
-    $pr2GlAccounts[(int) $r['id']] = [
-        'code' => (string) ($r['code'] ?? ''),
-        'name' => (string) ($r['name'] ?? ''),
-    ];
-}
-
 $prefillSupplierId = 0;
 $prefillStmtId = (int) ($_GET['stmt_party_id'] ?? 0);
 $prefillStmtKind = trim((string) ($_GET['stmt_party_kind'] ?? ''));
@@ -175,110 +165,25 @@ if ($prefillStmtKind === 'supplier' && $prefillStmtId > 0) {
     $prefillSupplierId = $prefillSupplierDirect;
 }
 
-$pr2TodayDmy = orange_format_date_dmY(date('Y-m-d'));
-$pr2NowDmy = orange_format_datetime_dmY_hi(date('Y-m-d H:i:s'));
-
-$nextVoucherNo = 1;
-if (orange_journal_vouchers_ready($pdo)) {
-    $nextVoucherNo = orange_gl_voucher_next_id_preview($pdo, $prCountryId);
-}
-
 $pr2Ready = ($inventoryAccId !== null && $inventoryAccId > 0 && $cashAccId !== null && $cashAccId > 0);
 $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_settings');
+$otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers');
 ?>
-<style>
-.jv-search-modal {
-    position: fixed;
-    inset: 0;
-    z-index: 10060;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
-    box-sizing: border-box;
-    direction: rtl;
-}
-.jv-search-modal__backdrop {
-    position: absolute;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.45);
-}
-.jv-search-modal__panel {
-    position: relative;
-    z-index: 1;
-    width: 100%;
-    max-width: min(96vw, 58rem);
-    max-height: calc(100vh - 32px);
-    overflow: auto;
-    background: #fff;
-    border: 1px solid #e4e4e7;
-    border-radius: 10px;
-    box-shadow: 0 20px 50px rgba(0,0,0,.18);
-}
-.jv-search-modal__head {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 14px 16px;
-    border-bottom: 1px solid #e4e4e7;
-}
-.jv-search-modal__title { margin: 0; font-size: 1.05rem; text-align: center; }
-.jv-search-modal__body { padding: 14px 16px 18px; }
-.jv-search-modal__form {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin-bottom: 12px;
-}
-.jv-search-modal__row--fields {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    align-items: flex-end;
-    gap: 10px;
-    width: 100%;
-    overflow-x: auto;
-    box-sizing: border-box;
-    padding-bottom: 2px;
-}
-.jv-search-field {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 0;
-}
-.jv-search-field label {
-    font-size: 0.78rem;
-    font-weight: 600;
-    white-space: nowrap;
-}
-.jv-search-field input { width: 100%; box-sizing: border-box; }
-.jv-search-field--id { flex: 0 0 7rem; }
-.jv-search-field--date { flex: 0 0 11rem; }
-.jv-search-field--ref { flex: 1 1 0; min-width: 7rem; }
-.jv-search-field--full { width: 100%; }
-.jv-search-modal__row--desc { width: 100%; }
-.jv-search-modal__actions { margin: 0 0 16px; }
-.jv-search-table-wrap { max-height: min(40vh, 22rem); overflow: auto; border: 1px solid #e4e4e7; border-radius: 8px; }
-.jv-search-results-table { margin: 0; font-size: 0.9rem; }
-.jv-search-results-table tbody tr { cursor: pointer; }
-.jv-search-results-table tbody tr:hover { background: #f4f4f5; }
-</style>
 
-<div class="page-title page-title--stacked jv-print-hide">
+<div class="page-title page-title--stacked">
     <div>
         <h1>مردود مشتريات</h1>
-        <p class="card-hint" style="margin:0.35rem 0 0;">سياق الدولة — المبالغ بعملة <strong><?php echo htmlspecialchars($prDefaultCurrency, ENT_QUOTES, 'UTF-8'); ?></strong>.</p>
+        <p class="card-hint" style="margin:0.35rem 0 0;">سياق الدولة — المبالغ بعملة <strong><?php echo htmlspecialchars($prDefaultCurrency, ENT_QUOTES, 'UTF-8'); ?></strong>. يُولَّد القيد المحاسبي تلقائياً ويُعرض في <a href="<?php echo htmlspecialchars($otherVouchersUrl, ENT_QUOTES, 'UTF-8'); ?>">سندات أخرى</a>.</p>
     </div>
 </div>
 
 <?php if (!$pr2Ready): ?>
-<div class="card jv-print-hide" style="border:1px solid #fcd34d;background:#fffbeb;margin-bottom:12px;">
+<div class="card" style="border:1px solid #fcd34d;background:#fffbeb;margin-bottom:12px;">
     <p class="card-hint" style="margin:0;line-height:1.55;">اربط حساب <strong>المخزون</strong> و<strong>الخزينة / النقدية</strong> من <a href="<?php echo htmlspecialchars($jvGlSettingsUrl, ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a>.</p>
 </div>
 <?php endif; ?>
 
-<div class="card jv-print-area">
+<div class="card">
     <h3 class="card-title">مردود مشتريات</h3>
 
     <!-- ١ — المورد -->
@@ -333,88 +238,18 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
         </div>
     </div>
 
-    <!-- ٤ — القيد المحاسبي -->
-    <div style="margin-top:20px;padding-top:14px;border-top:2px solid #e2e8f0;">
-        <h4 style="font-size:0.9rem;font-weight:600;color:#444;margin:0 0 10px;">القيد المحاسبي</h4>
-
-        <div class="jv-voucher-header-line jv-voucher-header-line--nav" style="margin-bottom:12px;">
-            <div>
-                <label for="pr2_number_preview">رقم القيد</label>
-                <input type="text" id="pr2_number_preview" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;text-align:center;" value="<?php echo (int) $nextVoucherNo; ?>">
-            </div>
-            <div>
-                <label for="pr2_date">تاريخ السند</label>
-                <input type="text" id="pr2_date" class="admin-inp orange-inp-dmy" value="<?php echo htmlspecialchars($pr2TodayDmy, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en" autocomplete="off"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
-            </div>
-            <div>
-                <label for="pr2_ref">المرجع</label>
-                <input type="text" id="pr2_ref" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;" value="—" title="يُخصَّص تلقائياً عند الحفظ">
-            </div>
-            <div>
-                <label for="pr2_document_entered">تاريخ المستند</label>
-                <input type="text" id="pr2_document_entered" readonly class="admin-inp-readonly" style="background:#f4f4f5;cursor:default;" value="<?php echo htmlspecialchars($pr2NowDmy, ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
-            </div>
-            <div>
-                <label for="pr2_tot_debit">مجموع المدين</label>
-                <input type="text" id="pr2_tot_debit" readonly class="admin-inp-readonly jv-tot-readonly admin-inp-money" value="<?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
-            </div>
-            <div>
-                <label for="pr2_tot_credit">مجموع الدائن</label>
-                <input type="text" id="pr2_tot_credit" readonly class="admin-inp-readonly jv-tot-readonly admin-inp-money" value="<?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?>" dir="ltr" lang="en">
-            </div>
-            <div class="jv-voucher-nav-cell jv-print-hide">
-                <div class="jv-voucher-nav-btns" role="group" aria-label="تنقل بين السندات">
-                    <button type="button" class="btn-secondary jv-nav-btn" id="pr2_nav_first" title="أول سند" aria-label="أول سند">&lt;&lt;</button>
-                    <button type="button" class="btn-secondary jv-nav-btn" id="pr2_nav_prev" title="السند السابق" aria-label="السند السابق">&lt;</button>
-                    <button type="button" class="btn-secondary jv-nav-btn" id="pr2_nav_next" title="السند التالي" aria-label="السند التالي">&gt;</button>
-                    <button type="button" class="btn-secondary jv-nav-btn" id="pr2_nav_last" title="آخر سند" aria-label="آخر سند">&gt;&gt;</button>
-                    <button type="button" class="btn-secondary jv-nav-search" id="pr2_btn_search" title="بحث عن سند">بحث</button>
-                </div>
-            </div>
-        </div>
-
-        <div style="margin-bottom:12px;">
-            <label for="pr2_desc">البيان</label>
-            <input type="text" id="pr2_desc" placeholder="بيان القيد المحاسبي" value=""<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
-        </div>
-
-        <div class="admin-doc-frame">
-            <div class="table-wrap">
-                <table class="admin-table admin-doc-lines-table jv-lines-table">
-                    <colgroup>
-                        <col class="jv-col-code">
-                        <col class="jv-col-name">
-                        <col class="jv-col-amt">
-                        <col class="jv-col-amt">
-                    </colgroup>
-                    <thead>
-                        <tr>
-                            <th>كود الحساب</th>
-                            <th>اسم الحساب</th>
-                            <th>مدين</th>
-                            <th>دائن</th>
-                        </tr>
-                    </thead>
-                    <tbody id="pr2_jv_body"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- ٥ — أزرار -->
-    <div class="actions admin-doc-lines-toolbar jv-doc-toolbar jv-print-hide" style="margin-top:16px;">
+    <!-- ٤ — أزرار -->
+    <div class="actions admin-doc-lines-toolbar" style="margin-top:16px;">
         <span></span>
         <div class="jv-toolbar-primary-group">
-            <button type="button" id="pr2_btn_new" title="إدخال سند جديد">سند جديد</button>
-            <button type="button" class="btn-secondary" id="pr2_btn_delete" title="حذف السند المعروض" disabled>حذف</button>
-            <button type="button" class="btn-secondary" id="pr2_btn_print" title="طباعة السند">طباعة</button>
+            <button type="button" id="pr2_btn_new" title="مردود جديد">مردود جديد</button>
             <button type="button" id="pr2_btn_save"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>حفظ</button>
         </div>
     </div>
 </div>
 
 <!-- Supplier Picker Modal -->
-<div class="gl-pick-modal jv-print-hide" id="pr2_supplier_pick_modal" hidden aria-hidden="true">
+<div class="gl-pick-modal" id="pr2_supplier_pick_modal" hidden aria-hidden="true">
     <div class="gl-pick-modal__backdrop" id="pr2_supplier_pick_backdrop"></div>
     <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="pr2_supplier_pick_title">
         <h3 id="pr2_supplier_pick_title" class="gl-pick-modal__title">اختيار المورد</h3>
@@ -422,67 +257,6 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
         <input type="search" id="pr2_supplier_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بكود الحساب أو اسم المورد…" autocomplete="off" dir="rtl">
         <ul class="gl-pick-modal__list" id="pr2_supplier_pick_list"></ul>
         <button type="button" class="btn-secondary" id="pr2_supplier_pick_close">إغلاق</button>
-    </div>
-</div>
-
-<!-- Search Modal -->
-<div id="pr2_search_modal" class="jv-search-modal jv-print-hide" style="display:none;" aria-hidden="true" role="dialog" aria-labelledby="pr2_search_modal_title">
-    <div class="jv-search-modal__backdrop" id="pr2_search_modal_backdrop"></div>
-    <div class="jv-search-modal__panel">
-        <div class="jv-search-modal__head">
-            <h3 id="pr2_search_modal_title" class="jv-search-modal__title">بحث في مردودات المشتريات</h3>
-        </div>
-        <div class="jv-search-modal__body">
-            <div class="jv-search-modal__form">
-                <div class="jv-search-modal__row jv-search-modal__row--fields">
-                    <div class="jv-search-field jv-search-field--id">
-                        <label for="pr2_search_id_from">رقم القيد — من</label>
-                        <input type="number" id="pr2_search_id_from" class="admin-inp" min="1" step="1" placeholder="" dir="ltr" lang="en">
-                    </div>
-                    <div class="jv-search-field jv-search-field--id">
-                        <label for="pr2_search_id_to">رقم القيد — إلى</label>
-                        <input type="number" id="pr2_search_id_to" class="admin-inp" min="1" step="1" placeholder="" dir="ltr" lang="en">
-                    </div>
-                    <div class="jv-search-field jv-search-field--date">
-                        <label for="pr2_search_date_from">تاريخ السند — من</label>
-                        <input type="text" id="pr2_search_date_from" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off">
-                    </div>
-                    <div class="jv-search-field jv-search-field--date">
-                        <label for="pr2_search_date_to">تاريخ السند — إلى</label>
-                        <input type="text" id="pr2_search_date_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off">
-                    </div>
-                    <div class="jv-search-field jv-search-field--ref">
-                        <label for="pr2_search_ref">المرجع (يحتوي النص)</label>
-                        <input type="text" id="pr2_search_ref" class="admin-inp" placeholder="" autocomplete="off" dir="auto">
-                    </div>
-                </div>
-                <div class="jv-search-modal__row jv-search-modal__row--desc">
-                    <div class="jv-search-field jv-search-field--full">
-                        <label for="pr2_search_desc">بيان القيد العام (يحتوي النص)</label>
-                        <input type="text" id="pr2_search_desc" class="admin-inp" placeholder="" autocomplete="off" dir="auto">
-                    </div>
-                </div>
-            </div>
-            <div class="actions jv-search-modal__actions">
-                <button type="button" id="pr2_search_btn">تنفيذ البحث</button>
-            </div>
-            <div class="jv-search-modal__results">
-                <div class="table-wrap jv-search-table-wrap">
-                    <table class="admin-table jv-search-results-table">
-                        <thead>
-                            <tr>
-                                <th>رقم</th>
-                                <th>تاريخ السند</th>
-                                <th>المرجع</th>
-                                <th>البيان</th>
-                                <th>مبلغ القيد</th>
-                            </tr>
-                        </thead>
-                        <tbody id="pr2_search_results"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 
@@ -494,15 +268,10 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
     var PR2_SUPPLIER_PAYABLE = <?php echo json_encode($supplierPayableMap, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var PR2_PREFILL_SUPPLIER = <?php echo (int) $prefillSupplierId; ?>;
     var PR2_READY = <?php echo $pr2Ready ? 'true' : 'false'; ?>;
-    var PR2_GL_ACCOUNTS = <?php echo json_encode($pr2GlAccounts, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
-    var PR2_INV_ACC = <?php echo (int) ($inventoryAccId ?? 0); ?>;
-    var PR2_CASH_ACC = <?php echo (int) ($cashAccId ?? 0); ?>;
 
     var currentSupplierId = 0;
-    var browseId = null;
 
     function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-    function accInfo(id) { var a = PR2_GL_ACCOUNTS[String(id)]; return a || { code: '', name: '#' + id }; }
     function fmt3(n) {
         var f = window.orangeFmtMoney || (window.OrangeMoney && window.OrangeMoney.formatAmount);
         if (f) {
@@ -557,7 +326,6 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
             if (nameEl) nameEl.value = row.name || '';
             if (idEl) idEl.value = String(currentSupplierId);
         }
-        rebuildJournal();
     }
 
     function pickerOpen() {
@@ -761,65 +529,6 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
         }
         var ntEl = document.getElementById('pr2_net_total');
         if (ntEl) ntEl.textContent = fmt3(total);
-        rebuildJournal();
-    }
-
-    /* ── Journal entry (reverse of purchase — auto-built, readonly) ── */
-    function rebuildJournal() {
-        var tb = document.getElementById('pr2_jv_body');
-        if (!tb || !PR2_READY) return;
-        tb.innerHTML = '';
-
-        var netTotal = parseFloat(document.getElementById('pr2_net_total').textContent) || 0;
-        var retType = document.getElementById('pr2_type').value;
-
-        if (netTotal <= 0) {
-            var dEl = document.getElementById('pr2_tot_debit');
-            var cEl = document.getElementById('pr2_tot_credit');
-            if (dEl) dEl.value = fmtZero();
-            if (cEl) cEl.value = fmtZero();
-            return;
-        }
-
-        var invAcc = accInfo(PR2_INV_ACC);
-        var cashAcc = accInfo(PR2_CASH_ACC);
-
-        var lines = [];
-
-        if (retType === 'credit') {
-            var map = PR2_SUPPLIER_PAYABLE[String(currentSupplierId)] || { id: 0, code: '', name: '' };
-            var apAcc = map.id > 0 ? accInfo(map.id) : { code: '?', name: 'ذمة مورد' };
-            lines.push({ code: apAcc.code, name: apAcc.name + ' — مردود آجل', debit: netTotal, credit: 0 });
-            lines.push({ code: invAcc.code, name: invAcc.name, debit: 0, credit: netTotal });
-        } else if (currentSupplierId > 0) {
-            var map2 = PR2_SUPPLIER_PAYABLE[String(currentSupplierId)] || { id: 0, code: '', name: '' };
-            var apAcc2 = map2.id > 0 ? accInfo(map2.id) : { code: '?', name: 'ذمة مورد' };
-            lines.push({ code: apAcc2.code, name: apAcc2.name + ' — مردود', debit: netTotal, credit: 0 });
-            lines.push({ code: invAcc.code, name: invAcc.name, debit: 0, credit: netTotal });
-            lines.push({ code: cashAcc.code, name: cashAcc.name + ' — استرداد نقدي', debit: netTotal, credit: 0 });
-            lines.push({ code: apAcc2.code, name: apAcc2.name + ' — سداد مردود', debit: 0, credit: netTotal });
-        } else {
-            lines.push({ code: cashAcc.code, name: cashAcc.name + ' — استرداد نقدي', debit: netTotal, credit: 0 });
-            lines.push({ code: invAcc.code, name: invAcc.name, debit: 0, credit: netTotal });
-        }
-
-        var totD = 0, totC = 0;
-        lines.forEach(function (l) {
-            totD += l.debit;
-            totC += l.credit;
-            var tr = document.createElement('tr');
-            tr.className = 'jv-line-main';
-            tr.innerHTML = '<td><input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="' + esc(l.code) + '" readonly tabindex="-1"></td>' +
-                '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + esc(l.name) + '" readonly tabindex="-1"></td>' +
-                '<td><input type="text" class="admin-inp-money" value="' + (l.debit > 0 ? fmt3(l.debit) : fmtZero()) + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>' +
-                '<td><input type="text" class="admin-inp-money" value="' + (l.credit > 0 ? fmt3(l.credit) : fmtZero()) + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>';
-            tb.appendChild(tr);
-        });
-
-        var dEl2 = document.getElementById('pr2_tot_debit');
-        var cEl2 = document.getElementById('pr2_tot_credit');
-        if (dEl2) dEl2.value = fmt3(totD);
-        if (cEl2) cEl2.value = fmt3(totC);
     }
 
     /* ── Save ───────────────────────────────────────────────────────── */
@@ -861,138 +570,19 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
 
         postJSON('/admin/api/purchase_returns/create.php', payload).then(function (res) {
             if (res.success) {
-                alert(res.message || 'تم حفظ مردود المشتريات');
-                location.reload();
+                if (typeof orangeAdminOfferOpenGlVoucherAfterSave === 'function') {
+                    orangeAdminOfferOpenGlVoucherAfterSave(res, function () {
+                        location.reload();
+                    });
+                } else {
+                    alert(res.message || 'تم حفظ مردود المشتريات');
+                    location.reload();
+                }
                 return;
             }
             if (typeof orangeAdminOfferSuggestOnFailure === 'function' && orangeAdminOfferSuggestOnFailure(res, 'فشل')) return;
             alert(res.message || 'فشل');
         }).catch(function (e) { alert(e.message || String(e)); });
-    }
-
-    /* ── Navigation ─────────────────────────────────────────────────── */
-    function nav(where) {
-        var payload = {
-            action: 'nav_manual',
-            entry_type: 'purchase_return',
-            where: where,
-            current_id: browseId || 0
-        };
-        postJSON('/admin/api/journal/manage.php', payload).then(function (r) {
-            if (!r.success || !r.id) {
-                alert(r.message || 'لا توجد سندات من هذا النوع بعد');
-                return;
-            }
-            loadVoucher(r.id);
-        }).catch(function (e) { alert(e.message || String(e)); });
-    }
-
-    function loadVoucher(id) {
-        postJSON('/admin/api/journal/manage.php', { action: 'get', id: id, entry_type: 'purchase_return' }).then(function (r) {
-            if (!r.success || !r.voucher) {
-                alert(r.message || 'تعذر تحميل السند');
-                return;
-            }
-            browseId = r.voucher.id;
-            displayVoucher(r);
-        }).catch(function (e) { alert(e.message || String(e)); });
-    }
-
-    function displayVoucher(r) {
-        var v = r.voucher;
-        document.getElementById('pr2_number_preview').value = String(v.voucher_serial || v.id || '');
-        document.getElementById('pr2_ref').value = v.reference || '';
-        document.getElementById('pr2_date').value = v.voucher_date_dmy || v.voucher_date || '';
-        document.getElementById('pr2_desc').value = v.description || '';
-        var total = 0;
-        (r.lines || []).forEach(function (l) { total += parseFloat(String(l.debit || '0')) || 0; });
-        document.getElementById('pr2_tot_debit').value = fmt3(total);
-        document.getElementById('pr2_tot_credit').value = fmt3(total);
-        document.getElementById('pr2_btn_delete').disabled = false;
-
-        if (r.party_supplier_id) {
-            selectSupplier(parseInt(String(r.party_supplier_id), 10) || 0);
-        }
-
-        var tb = document.getElementById('pr2_jv_body');
-        if (tb && r.lines) {
-            tb.innerHTML = '';
-            r.lines.forEach(function (l) {
-                var tr = document.createElement('tr');
-                tr.className = 'jv-line-main';
-                var accId = parseInt(String(l.account_id || '0'), 10) || 0;
-                var ai = (r.accounts_by_id && r.accounts_by_id[String(accId)]) ? r.accounts_by_id[String(accId)] : { code: '', name: '' };
-                var d = parseFloat(String(l.debit || '0')) || 0;
-                var c = parseFloat(String(l.credit || '0')) || 0;
-                tr.innerHTML = '<td><input type="text" class="jv-acc-code admin-inp admin-inp-readonly" value="' + esc(ai.code || '') + '" readonly tabindex="-1"></td>' +
-                    '<td><input type="text" class="jv-acc-name admin-inp admin-inp-readonly" value="' + esc((ai.name || '') + (l.memo ? ' — ' + l.memo : '')) + '" readonly tabindex="-1"></td>' +
-                    '<td><input type="text" class="admin-inp-money" value="' + (d > 0 ? fmt3(d) : fmtZero()) + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>' +
-                    '<td><input type="text" class="admin-inp-money" value="' + (c > 0 ? fmt3(c) : fmtZero()) + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>';
-                tb.appendChild(tr);
-            });
-        }
-    }
-
-    function deleteVoucher() {
-        if (!browseId) {
-            alert('لا يوجد سند محفوظ للحذف');
-            return;
-        }
-        if (!confirm('تأكيد حذف هذا السند؟ لا يمكن التراجع.')) return;
-        postJSON('/admin/api/journal/manage.php', { action: 'delete', id: browseId }).then(function (r) {
-            if (r.success) {
-                alert(r.message || 'تم الحذف');
-                location.reload();
-                return;
-            }
-            alert(r.message || 'فشل الحذف');
-        }).catch(function (e) { alert(e.message || String(e)); });
-    }
-
-    /* ── Search modal ───────────────────────────────────────────────── */
-    function searchOpen() {
-        var m = document.getElementById('pr2_search_modal');
-        if (m) { m.style.display = 'flex'; m.setAttribute('aria-hidden', 'false'); }
-    }
-    function searchClose() {
-        var m = document.getElementById('pr2_search_modal');
-        if (m) { m.style.display = 'none'; m.setAttribute('aria-hidden', 'true'); }
-    }
-    function searchRun() {
-        var idFrom = parseInt(document.getElementById('pr2_search_id_from').value) || 0;
-        var idTo = parseInt(document.getElementById('pr2_search_id_to').value) || 0;
-        var dateFrom = (typeof orangeGetDmyValueAsIso === 'function') ? orangeGetDmyValueAsIso(document.getElementById('pr2_search_date_from')) || '' : '';
-        var dateTo = (typeof orangeGetDmyValueAsIso === 'function') ? orangeGetDmyValueAsIso(document.getElementById('pr2_search_date_to')) || '' : '';
-        var ref = (document.getElementById('pr2_search_ref').value || '').trim();
-        var desc = (document.getElementById('pr2_search_desc').value || '').trim();
-        var tbody = document.getElementById('pr2_search_results');
-        tbody.innerHTML = '<tr><td colspan="5">جاري البحث…</td></tr>';
-        var payload = {
-            action: 'search',
-            entry_type: 'purchase_return'
-        };
-        if (idFrom > 0) payload.id_from = idFrom;
-        if (idTo > 0) payload.id_to = idTo;
-        if (dateFrom) payload.date_from = dateFrom;
-        if (dateTo) payload.date_to = dateTo;
-        if (ref) payload.reference = ref;
-        if (desc) payload.description = desc;
-        postJSON('/admin/api/journal/manage.php', payload).then(function (r) {
-            tbody.innerHTML = '';
-            if (!r.success || !r.results || !r.results.length) {
-                tbody.innerHTML = '<tr><td colspan="5" class="muted">لا نتائج</td></tr>';
-                return;
-            }
-            r.results.forEach(function (v) {
-                var tr = document.createElement('tr');
-                tr.style.cursor = 'pointer';
-                tr.innerHTML = '<td>' + esc(String(v.voucher_serial || v.id)) + '</td><td>' + esc(v.voucher_date_dmy || v.voucher_date || '') + '</td><td>' + esc(v.reference || '') + '</td><td>' + esc(v.description || '') + '</td><td dir="ltr">' + fmt3(v.total || 0) + '</td>';
-                tr.addEventListener('dblclick', function () { loadVoucher(v.id); searchClose(); });
-                tbody.appendChild(tr);
-            });
-        }).catch(function (e) {
-            tbody.innerHTML = '<tr><td colspan="5">' + esc(e.message || String(e)) + '</td></tr>';
-        });
     }
 
     /* ── Init & bindings ────────────────────────────────────────────── */
@@ -1015,30 +605,8 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
             });
         }
 
-        document.getElementById('pr2_type').addEventListener('change', function () { rebuildJournal(); });
-
         document.getElementById('pr2_btn_save').addEventListener('click', save);
         document.getElementById('pr2_btn_new').addEventListener('click', function () { location.reload(); });
-        document.getElementById('pr2_btn_print').addEventListener('click', function () { window.print(); });
-        document.getElementById('pr2_btn_delete').addEventListener('click', deleteVoucher);
-
-        document.getElementById('pr2_nav_first').addEventListener('click', function () { nav('first'); });
-        document.getElementById('pr2_nav_prev').addEventListener('click', function () { nav('prev'); });
-        document.getElementById('pr2_nav_next').addEventListener('click', function () { nav('next'); });
-        document.getElementById('pr2_nav_last').addEventListener('click', function () { nav('last'); });
-        document.getElementById('pr2_btn_search').addEventListener('click', searchOpen);
-
-        document.getElementById('pr2_search_btn').addEventListener('click', searchRun);
-        document.getElementById('pr2_search_modal_backdrop').addEventListener('click', searchClose);
-
-        document.addEventListener('mousedown', function (ev) {
-            var m = document.getElementById('pr2_search_modal');
-            if (!m || m.style.display !== 'flex') return;
-            var panel = m.querySelector('.jv-search-modal__panel');
-            if (panel && (panel === ev.target || panel.contains(ev.target))) return;
-            if (ev.target.closest && ev.target.closest('#pr2_btn_search')) return;
-            searchClose();
-        }, true);
 
         var tb = document.getElementById('pr2_lines_body');
         if (tb) {
@@ -1091,8 +659,6 @@ $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_sett
 
         if (PR2_PREFILL_SUPPLIER > 0) {
             selectSupplier(PR2_PREFILL_SUPPLIER);
-        } else {
-            rebuildJournal();
         }
     }
 

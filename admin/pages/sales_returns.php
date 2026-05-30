@@ -473,8 +473,14 @@ function srSubmit() {
     }
     postJSON(url, payload).then(function (res) {
         if (res.success) {
-            alert(res.message || 'تم');
-            location.reload();
+            if (typeof orangeAdminOfferOpenGlVoucherAfterSave === 'function') {
+                orangeAdminOfferOpenGlVoucherAfterSave(res, function () {
+                    location.reload();
+                });
+            } else {
+                alert(res.message || 'تم');
+                location.reload();
+            }
             return;
         }
         if (!orangeAdminOfferSuggestOnFailure(res, 'فشل')) {

@@ -645,6 +645,46 @@ function orange_voucher_list_by_document(
     return $found;
 }
 
+/**
+ * روابط فتح القيود المُولَّدة في «سندات أخرى» بعد حفظ مستند تشغيلي.
+ *
+ * @param list<array{entry_type:string,journal_type_code:string,label?:string,suffix?:string}> $specs
+ * @return list<array{voucher_id:int,journal_type_id:int,entry_type:string,label:string,journal_type_code:string}>
+ */
+function orange_gl_posting_voucher_links(
+    PDO $pdo,
+    string $refType,
+    int $refId,
+    array $specs,
+    ?int $countryId = null
+): array {
+    $out = [];
+    foreach ($specs as $spec) {
+        $et = trim((string) ($spec['entry_type'] ?? ''));
+        $code = strtoupper(trim((string) ($spec['journal_type_code'] ?? '')));
+        $label = trim((string) ($spec['label'] ?? $code));
+        $suffix = trim((string) ($spec['suffix'] ?? ''));
+        if ($et === '' || $code === '') {
+            continue;
+        }
+        $v = orange_voucher_find_by_document($pdo, $refType, $refId, $et, $countryId, $suffix);
+        $vid = $v !== null ? (int) ($v['id'] ?? 0) : 0;
+        $jtId = $v !== null ? (int) ($v['journal_type_id'] ?? 0) : 0;
+        if ($jtId <= 0) {
+            $jtId = orange_journal_type_id_by_code($pdo, $code, $countryId);
+        }
+        $out[] = [
+            'voucher_id' => $vid,
+            'journal_type_id' => $jtId,
+            'entry_type' => $et,
+            'label' => $label !== '' ? $label : $code,
+            'journal_type_code' => $code,
+        ];
+    }
+
+    return $out;
+}
+
 function orange_voucher_legacy_reference_for_document(
     string $refType,
     int $refId,

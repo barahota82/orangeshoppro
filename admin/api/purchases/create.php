@@ -296,7 +296,15 @@ try {
 
     $pdo->commit();
     audit_log('purchase_create', 'تم إنشاء فاتورة شراء رقم: ' . $purchaseId, 'purchases', $purchaseId);
-    json_response(['success' => true, 'message' => 'تم حفظ عملية الشراء', 'purchase_id' => $purchaseId]);
+    $voucherLinks = orange_gl_posting_voucher_links($pdo, 'purchase', $purchaseId, [
+        ['entry_type' => 'purchase', 'journal_type_code' => 'PIN', 'label' => 'قيد فاتورة الشراء'],
+    ], $purchaseCountryId);
+    json_response([
+        'success' => true,
+        'message' => 'تم حفظ عملية الشراء',
+        'purchase_id' => $purchaseId,
+        'voucher_links' => $voucherLinks,
+    ]);
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();

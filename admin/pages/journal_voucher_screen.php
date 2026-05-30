@@ -475,6 +475,8 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
 var JV_YEC_MODE = <?php echo $jvYecMode ? 'true' : 'false'; ?>;
 var JV_YEC_API = '/admin/api/year_end_close/manage.php';
 var JV_YEC_LOAD_ID = <?php echo (int) ($jvYecLoadVoucherId ?? 0); ?>;
+var JV_DEEP_LOAD_ID = <?php echo (int) ($jvDeepLoadVoucherId ?? 0); ?>;
+var JV_DEEP_LOAD_JT = <?php echo (int) ($jvDeepLoadJournalTypeId ?? 0); ?>;
 var JV_PHASE_LABELS = <?php echo json_encode($jvYecMode ? orange_year_end_close_phase_labels() : [], JSON_UNESCAPED_UNICODE); ?>;
 var JV_ENTRY_TYPE = <?php echo json_encode($jvPageEntryType, JSON_UNESCAPED_UNICODE); ?>;
 var JV_OTHER_VOUCHER_BROWSE = <?php echo $jvPageEt === 'other_voucher' ? 'true' : 'false'; ?>;
@@ -1857,6 +1859,20 @@ jvSyncTrailingRows();
 if (JV_YEC_MODE && JV_YEC_LOAD_ID > 0) {
     jvLoadVoucherFromApi(JV_YEC_LOAD_ID);
 }
+(function jvDeepLoadFromQuery() {
+    if (!JV_OTHER_VOUCHER_BROWSE) {
+        return;
+    }
+    var sel = document.getElementById('jv_journal_type_filter');
+    if (sel && JV_DEEP_LOAD_JT > 0) {
+        sel.value = String(JV_DEEP_LOAD_JT);
+        jvApplyOtherVoucherBrowseGateUi();
+        jvSyncRefPreview();
+    }
+    if (JV_DEEP_LOAD_ID > 0) {
+        jvLoadVoucherFromApi(JV_DEEP_LOAD_ID);
+    }
+})();
 if (JV_YEC_MODE) {
     ['jv_btn_delete_voucher', 'jv_btn_new_sheet', 'jv_nav_first', 'jv_nav_prev', 'jv_nav_next', 'jv_nav_last', 'jv_btn_open_search'].forEach(function (hid) {
         var el = document.getElementById(hid);
