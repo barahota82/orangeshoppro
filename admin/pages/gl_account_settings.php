@@ -105,7 +105,7 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
     <p class="card-hint" style="margin:0;line-height:1.55;">
         <strong>دولة جديدة:</strong> لم يُنسَخ بعد دليل الحسابات وربط القيود التلقائية لـ <?php echo htmlspecialchars($glCountryLabel, ENT_QUOTES, 'UTF-8'); ?>.
         من <a href="<?php echo htmlspecialchars(orange_admin_public_href_with_country('/admin/index.php?page=countries', orange_admin_context_country_code($pdo)), ENT_QUOTES, 'UTF-8'); ?>">الدول</a>
-        شغّل <strong>إنشاء كامل</strong> (ينسخ المخزن، القنوات، الكتalog، الدليل، وربط GL من الكويت كنقطة بداية) ثم عدّل ما يلزم.
+        شغّل <strong>إنشاء كامل</strong> (ينسخ المخزن، القنوات، الكتالوج، الدليل، وربط GL من الكويت كنقطة بداية) ثم عدّل ما يلزم.
     </p>
 </div>
 <?php endif; ?>

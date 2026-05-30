@@ -141,7 +141,7 @@ if ($hasDepartmentsTable) {
                     <th>Hindi</th>
                     <th>Slug</th>
                     <th>الترتيب</th>
-                    <th>الكتalog</th>
+                    <th>الكتالوج</th>
                     <?php if ($depCountryId > 0): ?>
                     <th>في <?php echo htmlspecialchars($depCountryLabel, ENT_QUOTES, 'UTF-8'); ?></th>
                     <?php endif; ?>

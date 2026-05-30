@@ -17,7 +17,7 @@ try {
         (int) ($data['id'] ?? 0),
     ]);
 
-    json_response(['success' => true, 'message' => 'تم تحديث حالة القسم في الكتalog العام']);
+    json_response(['success' => true, 'message' => 'تم تحديث حالة القسم في الكتالوج العام']);
 } catch (Throwable $e) {
     orange_admin_api_catch($e, 'تعذر تحديث حالة القسم');
 }

@@ -297,12 +297,12 @@ $orangeAdminCurrencyUnitNav = orange_currency_display_unit($orangeAdminCurrencyN
                 ],
                 [
                     'group' => true,
-                    'title' => 'هيكل الكتalog والمنتجات',
+                    'title' => 'هيكل الكتالوج والمنتجات',
                     'items' => [
                         ['page' => 'departments', 'href' => '/admin/index.php?page=departments', 'label' => 'الأقسام الرئيسية', 'class' => '', 'sub' => false],
                         ['page' => 'unified_catalog_branches', 'href' => '/admin/index.php?page=unified_catalog_branches', 'label' => 'فروع شجرة المنتجات', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'product_types', 'href' => '/admin/index.php?page=product_types', 'label' => 'أنواع المنتجات الموحدة', 'class' => 'admin-nav-sub', 'sub' => true],
-                        ['page' => 'catalog_attributes', 'href' => '/admin/index.php?page=catalog_attributes', 'label' => 'سمات الكتalog', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'catalog_attributes', 'href' => '/admin/index.php?page=catalog_attributes', 'label' => 'سمات الكتالوج', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'color_dictionary', 'href' => '/admin/index.php?page=color_dictionary', 'label' => 'قاموس الألوان', 'class' => '', 'sub' => false],
                         ['page' => 'pattern_dictionary', 'href' => '/admin/index.php?page=pattern_dictionary', 'label' => 'أنماط الألوان', 'class' => '', 'sub' => false],
                         ['page' => 'size_scheme_templates', 'href' => '/admin/index.php?page=size_scheme_templates', 'label' => 'قوالب المقاسات', 'class' => 'admin-nav-sub', 'sub' => true],

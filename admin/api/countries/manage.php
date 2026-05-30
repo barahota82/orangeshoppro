@@ -61,7 +61,7 @@ function orange_country_provision_human_lines(array $provision): array
     if (is_array($cat) && (int) ($cat['products_copied'] ?? 0) > 0) {
         $lines[] = 'منتجات منسوخة: ' . (int) $cat['products_copied'];
     } elseif (is_array($cat) && ($cat['reason'] ?? '') !== '') {
-        $lines[] = 'الكتalog: ' . ($labels[(string) $cat['reason']] ?? (string) $cat['reason']);
+        $lines[] = 'الكتالوج: ' . ($labels[(string) $cat['reason']] ?? (string) $cat['reason']);
     }
     $ac = $provision['accounts_copy'] ?? [];
     if (is_array($ac) && (int) ($ac['accounts_copied'] ?? 0) > 0) {
