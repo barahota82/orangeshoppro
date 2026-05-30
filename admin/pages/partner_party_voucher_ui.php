@@ -15,6 +15,7 @@ require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
+require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 
 $pdo = orange_admin_page_pdo();
 
@@ -246,6 +247,7 @@ if (orange_journal_vouchers_ready($pdo)) {
 
 <div class="card ppv-print-area">
     <h3 class="card-title"><?php echo htmlspecialchars($ppvCardTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
+    <?php orange_edit_lock_ui_toolbar(['prefix' => 'ppv', 'doc_kind' => $ppvKind, 'country_id' => $ppvCountryId]); ?>
     <?php if ($ppvCashLock === null): ?>
     <p class="card-hint ppv-print-hide" style="margin:0 0 12px;">اربط حساب <strong>الخزينة / النقدية</strong> من <a href="<?php echo htmlspecialchars($jvGlSettingsUrl, ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a>.</p>
     <?php endif; ?>
@@ -463,6 +465,8 @@ var PPV_SUPPLIER_PICK_ROWS = <?php echo json_encode($ppvSupplierPickRows, JSON_U
 var PPV_BROWSE_ENTRY_TYPE = <?php echo json_encode($ppvIsReceipt ? 'customer_receipt' : 'supplier_payment', JSON_UNESCAPED_UNICODE); ?>;
 var ppvSupplierPickTimer = null;
 var ppvBrowseId = null;
+var PPV_COUNTRY_ID = <?php echo (int) $ppvCountryId; ?>;
+var ppvEditLockCtl = null;
 
 function ppvEscapeHtml(s) {
     return String(s == null ? '' : s)
@@ -1031,6 +1035,7 @@ function ppvDisplayBrowseVoucher(r) {
     if (btnDel) {
         btnDel.disabled = false;
     }
+    if (ppvEditLockCtl) ppvEditLockCtl.refresh();
 }
 
 function ppvDeleteVoucher() {
@@ -1208,10 +1213,26 @@ if (document.readyState === 'loading') {
         ppvBuildLines();
         ppvBind();
         ppvApplyPrefill();
+        if (window.OrangeEditLock) {
+            ppvEditLockCtl = OrangeEditLock.bind({
+                prefix: 'ppv',
+                docKind: PPV_BROWSE_ENTRY_TYPE,
+                countryId: PPV_COUNTRY_ID,
+                getEntityId: function () { return ppvBrowseId || 0; }
+            });
+        }
     });
 } else {
     ppvBuildLines();
     ppvBind();
     ppvApplyPrefill();
+    if (window.OrangeEditLock) {
+        ppvEditLockCtl = OrangeEditLock.bind({
+            prefix: 'ppv',
+            docKind: PPV_BROWSE_ENTRY_TYPE,
+            countryId: PPV_COUNTRY_ID,
+            getEntityId: function () { return ppvBrowseId || 0; }
+        });
+    }
 }
 </script>

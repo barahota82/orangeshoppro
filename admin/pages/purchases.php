@@ -13,6 +13,7 @@ require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 require_once __DIR__ . '/../../includes/purchase_doc_product_pick.php';
+require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 
 $pdo = orange_admin_page_pdo();
 
@@ -221,6 +222,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 
 <div class="card jv-print-area">
     <h3 class="card-title">فاتورة شراء <span id="pv2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
+    <?php orange_edit_lock_ui_toolbar(['prefix' => 'pv2', 'doc_kind' => 'purchase', 'country_id' => $adminCountryId]); ?>
 
     <!-- ١ — مسلسل الفاتورة + المورد -->
     <div class="form-grid pv2-supplier-row" style="margin-bottom:12px;">
@@ -427,6 +429,8 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     var PV2_PREFILL_SUPPLIER = <?php echo (int) $prefillSupplierId; ?>;
     var PV2_READY = <?php echo $pv2Ready ? 'true' : 'false'; ?>;
     var PV2_NAV_READY = <?php echo $pv2NavReady ? 'true' : 'false'; ?>;
+    var PV2_COUNTRY_ID = <?php echo (int) $adminCountryId; ?>;
+    var pv2EditLockCtl = null;
     var PV2_DOC_SERIAL_PREVIEW = <?php echo json_encode($pv2DocSerialPreview, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
 
     var currentSupplierId = 0;
@@ -796,6 +800,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         if (browsePurchaseId <= 0) {
             pv2SetDocSerial(PV2_DOC_SERIAL_PREVIEW || '');
         }
+        if (pv2EditLockCtl) pv2EditLockCtl.refresh();
     }
 
     function pv2SetViewMode(on) {
@@ -850,6 +855,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         }
         recalcAll();
         pv2SetViewMode(true);
+        if (pv2EditLockCtl) pv2EditLockCtl.refresh();
     }
 
     function pv2LoadPurchase(id) {
@@ -1100,6 +1106,15 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 
         if (PV2_PREFILL_SUPPLIER > 0) {
             selectSupplier(PV2_PREFILL_SUPPLIER);
+        }
+
+        if (window.OrangeEditLock) {
+            pv2EditLockCtl = OrangeEditLock.bind({
+                prefix: 'pv2',
+                docKind: 'purchase',
+                countryId: PV2_COUNTRY_ID,
+                getEntityId: function () { return browsePurchaseId; }
+            });
         }
     }
 

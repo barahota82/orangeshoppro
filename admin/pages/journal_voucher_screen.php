@@ -14,6 +14,7 @@ require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
+require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 
 $pdo = orange_admin_page_pdo();
 
@@ -183,6 +184,7 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
 
 <div class="card jv-print-area">
     <h3 class="card-title"><?php echo htmlspecialchars($jvPageCardTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
+    <?php if (!$jvYecMode): orange_edit_lock_ui_toolbar(['prefix' => 'jv', 'doc_kind' => 'journal_voucher', 'country_id' => $jvScreenCountryId]); endif; ?>
     <?php if ($jvYecMode): ?>
     <label class="jv-print-hide" style="display:flex;align-items:center;gap:8px;margin:0 0 12px;cursor:default;">
         <input type="checkbox" id="jv_yec_locked" disabled>
@@ -693,6 +695,14 @@ var jvPairSeq = <?php echo (int) $jvInitLinePairSeq; ?>;
 var jvViewMode = false;
 var jvBrowseId = null;
 var jvBrowseEntryType = null;
+var JV_COUNTRY_ID = <?php echo (int) $jvScreenCountryId; ?>;
+var jvEditLockCtl = null;
+
+function jvEditLockKind() {
+    if (jvBrowseEntryType === 'customer_receipt') return 'customer_receipt';
+    if (jvBrowseEntryType === 'supplier_payment') return 'supplier_payment';
+    return 'journal_voucher';
+}
 
 function jvJournalTypeFilterId() {
     var s = document.getElementById('jv_journal_type_filter');
@@ -1597,6 +1607,7 @@ function jvApplyVoucherPayload(r) {
     jvApplyViewModeUi();
     jvRecalc();
     jvSearchModalClose();
+    if (jvEditLockCtl) jvEditLockCtl.refresh();
 }
 
 function jvLoadVoucherFromApi(id) {
@@ -1948,6 +1959,15 @@ if (JV_YEC_MODE && JV_YEC_LOAD_ID > 0) {
     }
     if (JV_DEEP_LOAD_ID > 0) {
         jvLoadVoucherFromApi(JV_DEEP_LOAD_ID);
+    }
+    if (!JV_YEC_MODE && window.OrangeEditLock) {
+        jvEditLockCtl = OrangeEditLock.bind({
+            prefix: 'jv',
+            docKind: 'journal_voucher',
+            getDocKind: jvEditLockKind,
+            countryId: JV_COUNTRY_ID,
+            getEntityId: function () { return jvBrowseId || 0; }
+        });
     }
 })();
 if (JV_YEC_MODE) {

@@ -13,6 +13,7 @@ require_once __DIR__ . '/../../../includes/sales_return_helpers.php';
 require_once __DIR__ . '/../../../includes/purchase_helpers.php';
 require_once __DIR__ . '/../../../includes/sales_gl_accounts.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/edit_lock.php';
 require_admin_api();
 
 function reverse_sales_return_stock(PDO $pdo, int $returnId): void
@@ -107,6 +108,23 @@ try {
     if (!$row) {
         json_response(['success' => false, 'message' => 'غير موجود'], 404);
     }
+    $admin = current_admin();
+    if (!$admin) {
+        json_response(['success' => false, 'message' => 'غير مصرح'], 401);
+    }
+    $returnCountryLock = orange_edit_lock_country_for_sales_return($pdo, $row);
+    try {
+        orange_edit_lock_assert_may_mutate(
+            $pdo,
+            $admin,
+            'sales_return',
+            $returnId,
+            $action === 'delete' ? 'delete' : 'edit',
+            $returnCountryLock
+        );
+    } catch (RuntimeException $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 422);
+    }
     try {
         $srCustomerId = (int) ($row['customer_id'] ?? 0);
         $srOrderId = (int) ($row['order_id'] ?? 0);
@@ -136,6 +154,8 @@ try {
     if ($action === 'delete') {
         orange_sales_return_remove_accounting($pdo, $returnId);
         $pdo->prepare('DELETE FROM sales_returns WHERE id = ?')->execute([$returnId]);
+        orange_edit_lock_unregister($pdo, 'sales_return', $returnId, $returnCountryLock);
+        orange_edit_lock_log_mutation($pdo, 'sales_return', $returnId, 'delete');
         $pdo->commit();
         audit_log('sales_return_delete', 'تم حذف مردود مبيعات رقم: ' . $returnId, 'sales_returns', $returnId);
         json_response(['success' => true, 'message' => 'تم حذف مردود المبيعات']);
@@ -276,6 +296,19 @@ try {
     }
 
     $pdo->commit();
+    $retNumSaved = trim((string) ($row['return_number'] ?? ('SR-' . $returnId)));
+    orange_edit_lock_register_sales_return(
+        $pdo,
+        $returnId,
+        orange_edit_lock_country_for_sales_return($pdo, [
+            'order_id' => $orderIdOpt > 0 ? $orderIdOpt : null,
+            'customer_id' => $customerId > 0 ? $customerId : null,
+        ]),
+        $revenueTotal,
+        $retNumSaved,
+        $now
+    );
+    orange_edit_lock_log_mutation($pdo, 'sales_return', $returnId, 'edit');
     audit_log('sales_return_update', 'تم تعديل مردود مبيعات رقم: ' . $returnId, 'sales_returns', $returnId);
     json_response(['success' => true, 'message' => 'تم تحديث مردود المبيعات']);
 } catch (Throwable $e) {

@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../../includes/admin_settings_country.php';
+require_once __DIR__ . '/../../../includes/edit_lock.php';
 require_admin_api();
 
 try {
@@ -31,6 +32,16 @@ try {
         json_response(['success' => false, 'message' => $e->getMessage()], 422);
     }
 
+    $admin = current_admin();
+    if (!$admin) {
+        json_response(['success' => false, 'message' => 'غير مصرح'], 401);
+    }
+    try {
+        orange_edit_lock_assert_may_mutate($pdo, $admin, 'opening_balance', $fyId, 'delete', $ctxCountryId);
+    } catch (RuntimeException $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 422);
+    }
+
     $pdo->beginTransaction();
     try {
         $ex = $pdo->prepare('SELECT id FROM journal_vouchers WHERE fiscal_year_id = ? AND entry_type = ?');
@@ -40,6 +51,8 @@ try {
             $pdo->prepare('DELETE FROM journal_vouchers WHERE id = ?')->execute([(int) $oldId]);
         }
         orange_opening_balance_clear_pending_refs($pdo, $fyId, $ctxCountryId);
+        orange_edit_lock_unregister($pdo, 'opening_balance', $fyId, $ctxCountryId);
+        orange_edit_lock_log_mutation($pdo, 'opening_balance', $fyId, 'delete');
         $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {

@@ -20,6 +20,7 @@ function orange_edit_lock_doc_kinds(): array
         'journal_voucher' => ['label_ar' => 'سند قيد', 'resource' => 'accounting', 'filter_group' => 'accounting'],
         'customer_receipt' => ['label_ar' => 'سند قبض عميل', 'resource' => 'partners', 'filter_group' => 'partners'],
         'supplier_payment' => ['label_ar' => 'سند صرف مورد', 'resource' => 'partners', 'filter_group' => 'partners'],
+        'opening_balance' => ['label_ar' => 'رصيد افتتاحي', 'resource' => 'accounting', 'filter_group' => 'accounting'],
     ];
 }
 
@@ -218,9 +219,21 @@ function orange_edit_lock_set_by_registry_ids(PDO $pdo, array $admin, array $reg
             continue;
         }
         $cid = isset($row['country_id']) ? (int) $row['country_id'] : 0;
+        $docKindRow = (string) ($row['doc_kind'] ?? '');
         if ($cid > 0) {
             try {
-                orange_admin_assert_entity_country($pdo, orange_edit_lock_table_for_kind((string) $row['doc_kind']), (int) $row['entity_id']);
+                if ($docKindRow === 'opening_balance') {
+                    $assertId = (int) ($row['journal_voucher_id'] ?? 0);
+                    if ($assertId > 0) {
+                        orange_admin_assert_entity_country($pdo, 'journal_vouchers', $assertId);
+                    }
+                } else {
+                    orange_admin_assert_entity_country(
+                        $pdo,
+                        orange_edit_lock_table_for_kind($docKindRow),
+                        (int) $row['entity_id']
+                    );
+                }
             } catch (RuntimeException $e) {
                 $errors[] = $e->getMessage();
                 continue;
@@ -263,6 +276,7 @@ function orange_edit_lock_table_for_kind(string $kind): string
         'purchase_return' => 'purchase_returns',
         'sales_return' => 'sales_returns',
         'journal_voucher' => 'journal_vouchers',
+        'opening_balance' => 'journal_vouchers',
         default => 'journal_vouchers',
     };
 }
@@ -288,8 +302,66 @@ function orange_edit_lock_sync_period(PDO $pdo, ?string $dateFrom, ?string $date
             orange_edit_lock_sync_sales_returns($pdo, $df, $dt);
         } elseif ($kind === 'journal_voucher' && orange_table_exists($pdo, 'journal_vouchers')) {
             orange_edit_lock_sync_journal_vouchers($pdo, $df, $dt);
+        } elseif ($kind === 'opening_balance' && orange_table_exists($pdo, 'journal_vouchers')) {
+            orange_edit_lock_sync_opening_balances($pdo, $df, $dt);
         }
     }
+}
+
+/**
+ * @param array<string,mixed> $row
+ */
+function orange_edit_lock_country_for_purchase_return(PDO $pdo, array $row): ?int
+{
+    $purchaseId = (int) ($row['purchase_id'] ?? 0);
+    if ($purchaseId > 0 && orange_table_has_country_id($pdo, 'purchases')) {
+        $st = $pdo->prepare('SELECT country_id FROM purchases WHERE id = ? LIMIT 1');
+        $st->execute([$purchaseId]);
+        $cid = (int) ($st->fetchColumn() ?: 0);
+        if ($cid > 0) {
+            return $cid;
+        }
+    }
+    $supplierId = (int) ($row['supplier_id'] ?? 0);
+    if ($supplierId > 0 && orange_table_has_country_id($pdo, 'suppliers')) {
+        $st = $pdo->prepare('SELECT country_id FROM suppliers WHERE id = ? LIMIT 1');
+        $st->execute([$supplierId]);
+        $cid = (int) ($st->fetchColumn() ?: 0);
+        if ($cid > 0) {
+            return $cid;
+        }
+    }
+    $ctx = orange_admin_context_country_id($pdo);
+
+    return $ctx > 0 ? $ctx : null;
+}
+
+/**
+ * @param array<string,mixed> $row
+ */
+function orange_edit_lock_country_for_sales_return(PDO $pdo, array $row): ?int
+{
+    $orderId = (int) ($row['order_id'] ?? 0);
+    if ($orderId > 0 && orange_table_has_country_id($pdo, 'orders')) {
+        $st = $pdo->prepare('SELECT country_id FROM orders WHERE id = ? LIMIT 1');
+        $st->execute([$orderId]);
+        $cid = (int) ($st->fetchColumn() ?: 0);
+        if ($cid > 0) {
+            return $cid;
+        }
+    }
+    $customerId = (int) ($row['customer_id'] ?? 0);
+    if ($customerId > 0 && orange_table_has_country_id($pdo, 'customers')) {
+        $st = $pdo->prepare('SELECT country_id FROM customers WHERE id = ? LIMIT 1');
+        $st->execute([$customerId]);
+        $cid = (int) ($st->fetchColumn() ?: 0);
+        if ($cid > 0) {
+            return $cid;
+        }
+    }
+    $ctx = orange_admin_context_country_id($pdo);
+
+    return $ctx > 0 ? $ctx : null;
 }
 
 function orange_edit_lock_sync_purchases(PDO $pdo, ?string $df, ?string $dt): void
@@ -336,7 +408,8 @@ function orange_edit_lock_sync_purchases(PDO $pdo, ?string $df, ?string $dt): vo
 
 function orange_edit_lock_sync_purchase_returns(PDO $pdo, ?string $df, ?string $dt): void
 {
-    $sql = 'SELECT pr.id, pr.country_id, pr.total, pr.created_at FROM purchase_returns pr WHERE 1=1';
+    $sql = 'SELECT pr.id, pr.total, pr.created_at, pr.return_number, pr.purchase_id, pr.supplier_id
+            FROM purchase_returns pr WHERE 1=1';
     $params = [];
     if ($df !== null) {
         $sql .= ' AND pr.created_at >= ?';
@@ -355,12 +428,16 @@ function orange_edit_lock_sync_purchase_returns(PDO $pdo, ?string $df, ?string $
         if ($rid <= 0) {
             continue;
         }
-        $cid = (int) ($row['country_id'] ?? 0);
+        $cid = orange_edit_lock_country_for_purchase_return($pdo, $row);
+        $ref = trim((string) ($row['return_number'] ?? ''));
+        if ($ref === '') {
+            $ref = 'PRTN-' . $rid;
+        }
         orange_edit_lock_register($pdo, [
             'doc_kind' => 'purchase_return',
             'entity_id' => $rid,
-            'country_id' => $cid > 0 ? $cid : null,
-            'reference' => 'PRTN-' . $rid,
+            'country_id' => $cid,
+            'reference' => $ref,
             'label_ar' => 'مردود مشتريات #' . $rid,
             'amount' => (float) ($row['total'] ?? 0),
             'saved_at' => (string) ($row['created_at'] ?? date('Y-m-d H:i:s')),
@@ -370,7 +447,8 @@ function orange_edit_lock_sync_purchase_returns(PDO $pdo, ?string $df, ?string $
 
 function orange_edit_lock_sync_sales_returns(PDO $pdo, ?string $df, ?string $dt): void
 {
-    $sql = 'SELECT sr.id, sr.country_id, sr.total, sr.created_at FROM sales_returns sr WHERE 1=1';
+    $sql = 'SELECT sr.id, sr.total, sr.created_at, sr.return_number, sr.order_id, sr.customer_id
+            FROM sales_returns sr WHERE 1=1';
     $params = [];
     if ($df !== null) {
         $sql .= ' AND sr.created_at >= ?';
@@ -389,15 +467,62 @@ function orange_edit_lock_sync_sales_returns(PDO $pdo, ?string $df, ?string $dt)
         if ($rid <= 0) {
             continue;
         }
-        $cid = (int) ($row['country_id'] ?? 0);
+        $cid = orange_edit_lock_country_for_sales_return($pdo, $row);
+        $ref = trim((string) ($row['return_number'] ?? ''));
+        if ($ref === '') {
+            $ref = 'SR-' . $rid;
+        }
         orange_edit_lock_register($pdo, [
             'doc_kind' => 'sales_return',
             'entity_id' => $rid,
-            'country_id' => $cid > 0 ? $cid : null,
-            'reference' => 'SR-' . $rid,
+            'country_id' => $cid,
+            'reference' => $ref,
             'label_ar' => 'مردود مبيعات #' . $rid,
             'amount' => (float) ($row['total'] ?? 0),
             'saved_at' => (string) ($row['created_at'] ?? date('Y-m-d H:i:s')),
+        ]);
+    }
+}
+
+function orange_edit_lock_sync_opening_balances(PDO $pdo, ?string $df, ?string $dt): void
+{
+    if (!orange_table_exists($pdo, 'journal_vouchers')) {
+        return;
+    }
+    require_once __DIR__ . '/fiscal_years.php';
+    $sql = "SELECT j.id, j.country_id, j.fiscal_year_id, j.description, j.voucher_date
+            FROM journal_vouchers j
+            WHERE j.entry_type = 'opening_balance' AND (j.is_void IS NULL OR j.is_void = 0)";
+    $params = [];
+    if ($df !== null) {
+        $sql .= ' AND j.voucher_date >= ?';
+        $params[] = $df;
+    }
+    if ($dt !== null) {
+        $sql .= ' AND j.voucher_date <= ?';
+        $params[] = $dt;
+    }
+    $st = $params !== [] ? $pdo->prepare($sql) : $pdo->query($sql);
+    if ($params !== []) {
+        $st->execute($params);
+    }
+    while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+        $fyId = (int) ($row['fiscal_year_id'] ?? 0);
+        if ($fyId <= 0) {
+            continue;
+        }
+        $cid = (int) ($row['country_id'] ?? 0);
+        $vid = (int) ($row['id'] ?? 0);
+        orange_edit_lock_register($pdo, [
+            'doc_kind' => 'opening_balance',
+            'entity_id' => $fyId,
+            'country_id' => $cid > 0 ? $cid : null,
+            'reference' => orange_opening_balance_reference($pdo, $fyId, $cid > 0 ? $cid : null),
+            'label_ar' => trim((string) ($row['description'] ?? '')) !== ''
+                ? trim((string) $row['description'])
+                : ('رصيد افتتاحي — سنة #' . $fyId),
+            'saved_at' => (string) ($row['voucher_date'] ?? date('Y-m-d H:i:s')),
+            'journal_voucher_id' => $vid > 0 ? $vid : null,
         ]);
     }
 }
@@ -429,6 +554,9 @@ function orange_edit_lock_sync_journal_vouchers(PDO $pdo, ?string $df, ?string $
             continue;
         }
         $et = trim((string) ($row['entry_type'] ?? ''));
+        if ($et === 'opening_balance') {
+            continue;
+        }
         $kind = 'journal_voucher';
         if ($et === 'customer_receipt') {
             $kind = 'customer_receipt';
@@ -577,6 +705,24 @@ function orange_edit_lock_log_mutation(PDO $pdo, string $kind, int $entityId, st
     );
 }
 
+function orange_edit_lock_unregister(PDO $pdo, string $kind, int $entityId, ?int $countryId = null): void
+{
+    orange_catalog_ensure_schema($pdo);
+    if (!orange_table_exists($pdo, 'orange_edit_lock_registry')) {
+        return;
+    }
+    $cid = ($countryId !== null && $countryId > 0) ? $countryId : null;
+    if ($cid === null) {
+        $pdo->prepare(
+            'DELETE FROM orange_edit_lock_registry WHERE doc_kind = ? AND entity_id = ? AND (country_id IS NULL OR country_id = 0)'
+        )->execute([$kind, $entityId]);
+    } else {
+        $pdo->prepare(
+            'DELETE FROM orange_edit_lock_registry WHERE doc_kind = ? AND entity_id = ? AND country_id = ?'
+        )->execute([$kind, $entityId, $cid]);
+    }
+}
+
 function orange_edit_lock_register_purchase(PDO $pdo, int $purchaseId, int $countryId, float $total, ?string $savedAt = null): void
 {
     $vid = null;
@@ -636,5 +782,65 @@ function orange_edit_lock_register_voucher(PDO $pdo, array $voucherRow): void
         'label_ar' => trim((string) ($voucherRow['description'] ?? '')) !== '' ? trim((string) $voucherRow['description']) : ('سند #' . $vid),
         'saved_at' => (string) ($voucherRow['voucher_date'] ?? date('Y-m-d H:i:s')),
         'journal_voucher_id' => $vid,
+    ]);
+}
+
+function orange_edit_lock_register_purchase_return(
+    PDO $pdo,
+    int $returnId,
+    ?int $countryId,
+    float $total,
+    ?string $reference = null,
+    ?string $savedAt = null
+): void {
+    $ref = $reference !== null && trim($reference) !== '' ? trim($reference) : ('PRTN-' . $returnId);
+    orange_edit_lock_register($pdo, [
+        'doc_kind' => 'purchase_return',
+        'entity_id' => $returnId,
+        'country_id' => ($countryId !== null && $countryId > 0) ? $countryId : null,
+        'reference' => $ref,
+        'label_ar' => 'مردود مشتريات #' . $returnId,
+        'amount' => $total,
+        'saved_at' => $savedAt,
+    ]);
+}
+
+function orange_edit_lock_register_sales_return(
+    PDO $pdo,
+    int $returnId,
+    ?int $countryId,
+    float $total,
+    ?string $reference = null,
+    ?string $savedAt = null
+): void {
+    $ref = $reference !== null && trim($reference) !== '' ? trim($reference) : ('SR-' . $returnId);
+    orange_edit_lock_register($pdo, [
+        'doc_kind' => 'sales_return',
+        'entity_id' => $returnId,
+        'country_id' => ($countryId !== null && $countryId > 0) ? $countryId : null,
+        'reference' => $ref,
+        'label_ar' => 'مردود مبيعات #' . $returnId,
+        'amount' => $total,
+        'saved_at' => $savedAt,
+    ]);
+}
+
+function orange_edit_lock_register_opening_balance(
+    PDO $pdo,
+    int $fiscalYearId,
+    ?int $countryId,
+    string $label,
+    ?int $voucherId = null,
+    ?string $savedAt = null
+): void {
+    require_once __DIR__ . '/fiscal_years.php';
+    orange_edit_lock_register($pdo, [
+        'doc_kind' => 'opening_balance',
+        'entity_id' => $fiscalYearId,
+        'country_id' => ($countryId !== null && $countryId > 0) ? $countryId : null,
+        'reference' => orange_opening_balance_reference($pdo, $fiscalYearId, ($countryId !== null && $countryId > 0) ? $countryId : null),
+        'label_ar' => trim($label) !== '' ? trim($label) : ('رصيد افتتاحي — سنة #' . $fiscalYearId),
+        'saved_at' => $savedAt,
+        'journal_voucher_id' => ($voucherId !== null && $voucherId > 0) ? $voucherId : null,
     ]);
 }

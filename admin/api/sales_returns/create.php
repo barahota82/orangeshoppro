@@ -14,6 +14,7 @@ require_once __DIR__ . '/../../../includes/purchase_helpers.php';
 require_once __DIR__ . '/../../../includes/sales_gl_accounts.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/currency.php';
+require_once __DIR__ . '/../../../includes/edit_lock.php';
 require_admin_api();
 
 try {
@@ -243,6 +244,14 @@ try {
     }
 
     $pdo->commit();
+    orange_edit_lock_register_sales_return(
+        $pdo,
+        $returnId,
+        $returnCountryId > 0 ? $returnCountryId : null,
+        $revenueTotal,
+        $retNum,
+        $now
+    );
     audit_log('sales_return_create', 'تم إنشاء مردود مبيعات رقم: ' . $returnId, 'sales_returns', $returnId);
     $revJtCode = $channel === 'credit' ? 'SRR' : ($channel === 'online' ? 'OSR' : 'SCR');
     $cogsJtCode = $channel === 'credit' ? 'CGR' : ($channel === 'online' ? 'COR' : 'CSR');

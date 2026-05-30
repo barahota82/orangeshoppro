@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 require_once __DIR__ . '/../../includes/purchase_doc_product_pick.php';
+require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 
 $pdo = orange_admin_page_pdo();
 
@@ -258,6 +259,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 
 <div class="card jv-print-area">
     <h3 class="card-title">مردود مشتريات <span id="pr2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
+    <?php orange_edit_lock_ui_toolbar(['prefix' => 'pr2', 'doc_kind' => 'purchase_return', 'country_id' => $prCountryId]); ?>
 
     <!-- ١ — مسلسل الفاتورة + المورد -->
     <div class="form-grid pr2-supplier-row" style="margin-bottom:12px;">
@@ -469,6 +471,8 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     var PR2_PREFILL_SUPPLIER = <?php echo (int) $prefillSupplierId; ?>;
     var PR2_READY = <?php echo $pr2Ready ? 'true' : 'false'; ?>;
     var PR2_NAV_READY = <?php echo $pr2NavReady ? 'true' : 'false'; ?>;
+    var PR2_COUNTRY_ID = <?php echo (int) $prCountryId; ?>;
+    var pr2EditLockCtl = null;
     var PR2_DOC_SERIAL_PREVIEW = <?php echo json_encode($pr2DocSerialPreview, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
 
     var browseReturnId = 0;
@@ -877,6 +881,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         if (browseReturnId <= 0) {
             pr2SetDocSerial(PR2_DOC_SERIAL_PREVIEW || '');
         }
+        if (pr2EditLockCtl) pr2EditLockCtl.refresh();
     }
 
     function pr2SetViewMode(on) {
@@ -989,6 +994,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         }
         recalcAll();
         pr2SetViewMode(true);
+        if (pr2EditLockCtl) pr2EditLockCtl.refresh();
     }
 
     function pr2LoadReturn(id) {
@@ -1246,6 +1252,15 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 
         if (PR2_PREFILL_SUPPLIER > 0) {
             selectSupplier(PR2_PREFILL_SUPPLIER);
+        }
+
+        if (window.OrangeEditLock) {
+            pr2EditLockCtl = OrangeEditLock.bind({
+                prefix: 'pr2',
+                docKind: 'purchase_return',
+                countryId: PR2_COUNTRY_ID,
+                getEntityId: function () { return browseReturnId; }
+            });
         }
 
         pr2SyncToolbar();

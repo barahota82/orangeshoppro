@@ -14,6 +14,7 @@ require_once __DIR__ . '/../../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../../includes/purchase_gl_accounts.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/currency.php';
+require_once __DIR__ . '/../../../includes/edit_lock.php';
 require_admin_api();
 
 try {
@@ -272,6 +273,14 @@ try {
     }
 
     $pdo->commit();
+    orange_edit_lock_register_purchase_return(
+        $pdo,
+        $returnId,
+        $returnCountryId > 0 ? $returnCountryId : null,
+        $netTotal,
+        $retRef,
+        $now
+    );
     audit_log('purchase_return_create', 'تم إنشاء مردود مشتريات رقم: ' . $returnId, 'purchase_returns', $returnId);
     $voucherLinks = orange_gl_posting_voucher_links($pdo, 'purchase_return', $returnId, [
         ['entry_type' => 'purchase_return', 'journal_type_code' => 'PDN', 'label' => 'قيد مردود المشتريات'],

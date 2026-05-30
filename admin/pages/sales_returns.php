@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
+require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -127,6 +128,7 @@ function sr_channel_label(string $t): string
 
 <div class="card" id="sr_edit_banner" hidden>
     <p class="card-hint" style="margin:0 0 10px;"><strong>وضع التعديل</strong> — مردود <span id="sr_edit_banner_id"></span>.</p>
+    <?php orange_edit_lock_ui_toolbar(['prefix' => 'sr', 'doc_kind' => 'sales_return', 'country_id' => $srCountryId, 'class' => 'edit-lock-toolbar']); ?>
     <button type="button" class="btn-secondary" onclick="srCancelEdit()">إلغاء التعديل</button>
 </div>
 
@@ -240,6 +242,8 @@ function sr_channel_label(string $t): string
 var SR_PRODUCTS = <?php echo json_encode($products, JSON_UNESCAPED_UNICODE); ?>;
 var SR_VARIANTS_BY_PID = <?php echo json_encode($variantsByProduct, JSON_UNESCAPED_UNICODE); ?>;
 var SR_EDIT_ID = 0;
+var SR_COUNTRY_ID = <?php echo (int) $srCountryId; ?>;
+var srEditLockCtl = null;
 var SR_HAS_CUSTOMERS = <?php echo $hasCustomers ? 'true' : 'false'; ?>;
 
 function srEsc(s) {
@@ -381,6 +385,7 @@ function srCancelEdit() {
     var tb = document.getElementById('sr_lines_body');
     if (tb) tb.innerHTML = '';
     srAddLine();
+    if (srEditLockCtl) srEditLockCtl.refresh();
 }
 
 function srEdit(id) {
@@ -416,6 +421,7 @@ function srEdit(id) {
         }
         srRecalcPreview();
         document.getElementById('sr_edit_banner_id').textContent = '#' + id;
+        if (srEditLockCtl) srEditLockCtl.refresh();
         window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 }
@@ -507,5 +513,13 @@ if (document.getElementById('sr_lines_body')) {
     srOnChannelChange();
     srAddLine();
     srBindLinesBody();
+    if (window.OrangeEditLock) {
+        srEditLockCtl = OrangeEditLock.bind({
+            prefix: 'sr',
+            docKind: 'sales_return',
+            countryId: SR_COUNTRY_ID,
+            getEntityId: function () { return SR_EDIT_ID; }
+        });
+    }
 }
 </script>

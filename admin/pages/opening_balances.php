@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
+require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -190,6 +191,7 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
 <?php if ($fyId > 0 && $years !== []): ?>
 <div class="card jv-print-area ob-opening-card">
     <h3 class="card-title">سند رصيد افتتاحي</h3>
+    <?php orange_edit_lock_ui_toolbar(['prefix' => 'ob', 'doc_kind' => 'opening_balance', 'country_id' => $ctxCountryId]); ?>
     <div class="form-grid">
         <div class="jv-voucher-header-line jv-voucher-header-line--nav" style="grid-column:1/-1;">
             <div>
@@ -288,6 +290,8 @@ var OB_FY_RANGES = <?php echo json_encode($obFyRanges, JSON_UNESCAPED_UNICODE); 
 var OB_ADMIN_INDEX = <?php echo json_encode($obAdminIndexUrl, JSON_UNESCAPED_UNICODE); ?>;
 var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
 var OB_SAVED_VOUCHER_ID = <?php echo (int) $obVid; ?>;
+var OB_COUNTRY_ID = <?php echo (int) $ctxCountryId; ?>;
+var obEditLockCtl = null;
 
 (function () {
     var obSaveInFlight = false;
@@ -842,6 +846,16 @@ var OB_SAVED_VOUCHER_ID = <?php echo (int) $obVid; ?>;
         }
         if (pickClose) {
             pickClose.addEventListener('click', obClosePick);
+        }
+        if (window.OrangeEditLock) {
+            obEditLockCtl = OrangeEditLock.bind({
+                prefix: 'ob',
+                docKind: 'opening_balance',
+                countryId: OB_COUNTRY_ID,
+                getEntityId: function () {
+                    return (OB_PAGE_FY > 0 && OB_SAVED_VOUCHER_ID > 0) ? OB_PAGE_FY : 0;
+                }
+            });
         }
         obWireDateReload();
         obSyncRefFromDate();

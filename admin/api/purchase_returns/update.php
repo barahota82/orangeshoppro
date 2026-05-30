@@ -13,6 +13,7 @@ require_once __DIR__ . '/../../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../../includes/purchase_gl_accounts.php';
 require_once __DIR__ . '/../../../includes/journal_write.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/edit_lock.php';
 require_admin_api();
 
 function reverse_purchase_return_stock(PDO $pdo, int $returnId): void
@@ -92,6 +93,23 @@ try {
     if (!$row) {
         json_response(['success' => false, 'message' => 'مردود المشتريات غير موجود'], 404);
     }
+    $admin = current_admin();
+    if (!$admin) {
+        json_response(['success' => false, 'message' => 'غير مصرح'], 401);
+    }
+    $returnCountryLock = orange_edit_lock_country_for_purchase_return($pdo, $row);
+    try {
+        orange_edit_lock_assert_may_mutate(
+            $pdo,
+            $admin,
+            'purchase_return',
+            $returnId,
+            $action === 'delete' ? 'delete' : 'edit',
+            $returnCountryLock
+        );
+    } catch (RuntimeException $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 422);
+    }
     try {
         $prSupplierId = (int) ($row['supplier_id'] ?? 0);
         if ($prSupplierId > 0) {
@@ -119,6 +137,8 @@ try {
         orange_purchase_return_remove_accounting($pdo, $returnId);
         orange_gl_pending_remove_by_reference($pdo, orange_gl_pending_source_key('purchase_return', $returnId));
         $pdo->prepare('DELETE FROM purchase_returns WHERE id = ?')->execute([$returnId]);
+        orange_edit_lock_unregister($pdo, 'purchase_return', $returnId, $returnCountryLock);
+        orange_edit_lock_log_mutation($pdo, 'purchase_return', $returnId, 'delete');
         $pdo->commit();
         audit_log('purchase_return_delete', 'تم حذف مردود مشتريات رقم: ' . $returnId, 'purchase_returns', $returnId);
         json_response(['success' => true, 'message' => 'تم حذف مردود المشتريات']);
@@ -271,6 +291,15 @@ try {
     }
 
     $pdo->commit();
+    orange_edit_lock_register_purchase_return(
+        $pdo,
+        $returnId,
+        $returnCountryId > 0 ? $returnCountryId : null,
+        $newTotal,
+        $srcLabel,
+        $now
+    );
+    orange_edit_lock_log_mutation($pdo, 'purchase_return', $returnId, 'edit');
     audit_log('purchase_return_update', 'تم تعديل مردود مشتريات رقم: ' . $returnId, 'purchase_returns', $returnId);
     json_response(['success' => true, 'message' => 'تم تحديث مردود المشتريات']);
 } catch (Throwable $e) {

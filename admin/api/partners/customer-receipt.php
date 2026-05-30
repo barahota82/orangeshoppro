@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../../includes/party_allocations.php';
 require_once __DIR__ . '/../../../includes/document_sequences.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/edit_lock.php';
 require_admin_api();
 
 try {
@@ -125,6 +126,13 @@ try {
         orange_party_subledger_record($pdo, 'customer', $customerId, $vid, 0, $amount, 'receipt_ar', null, $description);
 
         orange_party_insert_payment_allocations($pdo, 'customer', $customerId, $vid, $amount, $allocLines);
+
+        $vSt = $pdo->prepare('SELECT * FROM journal_vouchers WHERE id = ? LIMIT 1');
+        $vSt->execute([$vid]);
+        $vRow = $vSt->fetch(PDO::FETCH_ASSOC);
+        if ($vRow) {
+            orange_edit_lock_register_voucher($pdo, $vRow);
+        }
 
         $pdo->commit();
     } catch (Throwable $e) {

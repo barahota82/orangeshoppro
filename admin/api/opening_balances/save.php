@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../../includes/admin_settings_country.php';
+require_once __DIR__ . '/../../../includes/edit_lock.php';
 require_admin_api();
 
 try {
@@ -38,6 +39,16 @@ try {
     try {
         $fyId = orange_fiscal_require_open_for_posting($pdo, $dateIso . ' 12:00:00', $ctxCountryId);
     } catch (Throwable $e) {
+        json_response(['success' => false, 'message' => $e->getMessage()], 422);
+    }
+
+    $admin = current_admin();
+    if (!$admin) {
+        json_response(['success' => false, 'message' => 'غير مصرح'], 401);
+    }
+    try {
+        orange_edit_lock_assert_may_mutate($pdo, $admin, 'opening_balance', $fyId, 'edit', $ctxCountryId);
+    } catch (RuntimeException $e) {
         json_response(['success' => false, 'message' => $e->getMessage()], 422);
     }
 
@@ -113,6 +124,20 @@ try {
         }
         throw $e;
     }
+
+    $obVid = 0;
+    $exOb = $pdo->prepare('SELECT id FROM journal_vouchers WHERE fiscal_year_id = ? AND entry_type = ? LIMIT 1');
+    $exOb->execute([$fyId, 'opening_balance']);
+    $obVid = (int) ($exOb->fetchColumn() ?: 0);
+    orange_edit_lock_register_opening_balance(
+        $pdo,
+        $fyId,
+        $ctxCountryId,
+        $statement,
+        $obVid > 0 ? $obVid : null,
+        $dateIso . ' 10:00:00'
+    );
+    orange_edit_lock_log_mutation($pdo, 'opening_balance', $fyId, 'edit');
 
     audit_log('opening_balance_save', 'تم حفظ أرصدة افتتاحية للسنة ' . $fyId, 'journal_vouchers', $fyId);
     $msg = isset($useQueue) && $useQueue
