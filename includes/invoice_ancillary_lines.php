@@ -478,3 +478,208 @@ function orange_invoice_ancillary_extra_lines_totals(array $extraLines): array
 
     return ['debit' => round($debit, 4), 'credit' => round($credit, 4)];
 }
+
+/**
+ * @return array<string, array{label_ar: string, side: string, contexts: list<string>}>
+ */
+function orange_invoice_ancillary_purchase_line_kind_catalog(): array
+{
+    $all = orange_invoice_ancillary_line_kind_catalog();
+    $out = [];
+    foreach ($all as $key => $meta) {
+        if (str_starts_with($key, 'purchase_') && $key !== 'purchase_debit_asset') {
+            $out[$key] = $meta;
+        }
+    }
+
+    return $out;
+}
+
+/**
+ * @return list<array<string, mixed>>
+ */
+function orange_invoice_ancillary_parse_request_lines(array $data, string $docKind): array
+{
+    $raw = $data['extra_lines'] ?? $data['ancillary_lines'] ?? [];
+    if (!is_array($raw)) {
+        return [];
+    }
+    $out = [];
+    foreach ($raw as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $amount = round((float) ($row['amount'] ?? 0), 4);
+        if ($amount <= 0.0001) {
+            continue;
+        }
+        $accountId = (int) ($row['account_id'] ?? 0);
+        $lineKind = trim((string) ($row['line_kind'] ?? ''));
+        if ($accountId <= 0 || !orange_invoice_ancillary_line_kind_is_valid($lineKind)) {
+            continue;
+        }
+        $out[] = [
+            'account_id' => $accountId,
+            'line_kind' => $lineKind,
+            'amount' => $amount,
+            'label_ar' => trim((string) ($row['label_ar'] ?? '')),
+            'show_on_print' => !empty($row['show_on_print']) ? 1 : 0,
+            'preset_id' => isset($row['preset_id']) && (int) $row['preset_id'] > 0
+                ? (int) $row['preset_id']
+                : null,
+        ];
+    }
+
+    return $out;
+}
+
+/**
+ * @param array<string, mixed>|null $afterPost
+ * @return array<string, mixed>|null
+ */
+function orange_gl_after_post_scale_payable_amount(?array $afterPost, float $oldAmount, float $newAmount): ?array
+{
+    if ($afterPost === null || abs($oldAmount - $newAmount) < 0.0001) {
+        return $afterPost;
+    }
+    $scaleEntry = static function (array &$entry) use ($oldAmount, $newAmount): void {
+        foreach (['debit', 'credit'] as $side) {
+            if (!isset($entry[$side])) {
+                continue;
+            }
+            $v = round((float) $entry[$side], 4);
+            if ($v > 0.0001 && abs($v - $oldAmount) < 0.0002) {
+                $entry[$side] = $newAmount;
+            }
+        }
+    };
+    if (isset($afterPost['party_subledger']) && is_array($afterPost['party_subledger'])) {
+        $scaleEntry($afterPost['party_subledger']);
+    }
+    if (isset($afterPost['party_subledger_entries']) && is_array($afterPost['party_subledger_entries'])) {
+        foreach ($afterPost['party_subledger_entries'] as &$entry) {
+            if (is_array($entry)) {
+                $scaleEntry($entry);
+            }
+        }
+        unset($entry);
+    }
+
+    return $afterPost;
+}
+
+/**
+ * @param array<string, mixed> $line
+ */
+function orange_gl_posting_line_scale_amount(array &$line, float $oldAmount, float $newAmount): void
+{
+    foreach (['debit', 'credit'] as $side) {
+        if (!isset($line[$side])) {
+            continue;
+        }
+        $v = round((float) $line[$side], 4);
+        if ($v > 0.0001 && abs($v - $oldAmount) < 0.0002) {
+            $line[$side] = $newAmount;
+        }
+    }
+}
+
+/**
+ * دمج بنود الفاتورة الإضافية في حزمة ترحيل GL (مشتريات/مبيعات — v1 مشتريات).
+ *
+ * @param array{
+ *   is_multi: bool,
+ *   lines: list<array{account_id:int,debit:float,credit:float,memo:string}>,
+ *   debit: int,
+ *   credit: int,
+ *   voucher_description: string,
+ *   after_post: array|null,
+ *   legacy_ap_subledger?: bool
+ * } $glB
+ * @param list<array<string, mixed>> $extraLines
+ * @return array<string, mixed>
+ *
+ * @throws RuntimeException
+ */
+function orange_gl_posting_bundle_apply_invoice_ancillary(
+    array $glB,
+    array $extraLines,
+    float $itemsNetAmount
+): array {
+    if ($extraLines === []) {
+        return $glB;
+    }
+    $ancRows = orange_invoice_ancillary_extra_lines_journal_rows($extraLines);
+    if ($ancRows === []) {
+        return $glB;
+    }
+    $itemsNetAmount = round($itemsNetAmount, 4);
+    $totals = orange_invoice_ancillary_extra_lines_totals($extraLines);
+    $delta = round($totals['debit'] - $totals['credit'], 4);
+    $payable = round($itemsNetAmount + $delta, 4);
+    if ($payable < -0.0001) {
+        throw new RuntimeException('مجموع البنود الإضافية يجعل صافي الذمة سالباً.');
+    }
+
+    if (!$glB['is_multi']) {
+        $debitAcct = (int) ($glB['debit'] ?? 0);
+        $creditAcct = (int) ($glB['credit'] ?? 0);
+        if ($debitAcct <= 0 || $creditAcct <= 0) {
+            throw new RuntimeException('تعذر بناء قيد مركّب — حسابات الترحيل الأساسية غير مكتملة.');
+        }
+        $lines = [
+            [
+                'account_id' => $debitAcct,
+                'debit' => $itemsNetAmount,
+                'credit' => 0.0,
+                'memo' => 'فاتورة مشتريات — أصناف',
+            ],
+        ];
+        foreach ($ancRows as $row) {
+            $lines[] = $row;
+        }
+        $lines[] = [
+            'account_id' => $creditAcct,
+            'debit' => 0.0,
+            'credit' => $payable,
+            'memo' => 'فاتورة مشtريات — ذمة/نقد',
+        ];
+        $glB['is_multi'] = true;
+        $glB['lines'] = $lines;
+        $glB['debit'] = 0;
+        $glB['credit'] = 0;
+    } else {
+        foreach ($glB['lines'] as &$line) {
+            if (is_array($line)) {
+                orange_gl_posting_line_scale_amount($line, $itemsNetAmount, $payable);
+            }
+        }
+        unset($line);
+        $glB['lines'] = array_merge($glB['lines'], $ancRows);
+    }
+
+    if ($glB['after_post'] !== null) {
+        $glB['after_post'] = orange_gl_after_post_scale_payable_amount(
+            $glB['after_post'],
+            $itemsNetAmount,
+            $payable
+        );
+    }
+
+    return $glB;
+}
+
+/**
+ * @param list<array<string, mixed>> $extraLines
+ */
+function orange_invoice_ancillary_purchase_payable_total(float $itemsNetAmount, array $extraLines): float
+{
+    $itemsNetAmount = round($itemsNetAmount, 4);
+    if ($extraLines === []) {
+        return $itemsNetAmount;
+    }
+    $totals = orange_invoice_ancillary_extra_lines_totals($extraLines);
+    $delta = round($totals['debit'] - $totals['credit'], 4);
+
+    return round($itemsNetAmount + $delta, 4);
+}

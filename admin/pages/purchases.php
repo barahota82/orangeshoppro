@@ -14,6 +14,7 @@ require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 require_once __DIR__ . '/../../includes/purchase_doc_product_pick.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
+require_once __DIR__ . '/../../includes/invoice_ancillary_lines.php';
 
 $pdo = orange_admin_page_pdo();
 
@@ -125,6 +126,13 @@ $pv2DocSerialPreview = $pv2NavReady
     : '';
 $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_settings');
 $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers');
+$pv2PurchaseLineKinds = [];
+foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $kindMeta) {
+    $pv2PurchaseLineKinds[] = [
+        'key' => $kindKey,
+        'label_ar' => (string) ($kindMeta['label_ar'] ?? $kindKey),
+    ];
+}
 ?>
 <style>
 .jv-search-modal {
@@ -206,6 +214,35 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 .form-grid.pv2-supplier-row {
     grid-template-columns: minmax(7rem, 0.75fr) minmax(0, 1fr) minmax(0, 2fr);
 }
+.pv2-extra-source-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.pv2-extra-source-tabs button {
+    flex: 1 1 auto;
+}
+.pv2-extra-source-tabs button.is-active {
+    font-weight: 700;
+    border-color: #2563eb;
+}
+.pv2-extra-line-kind-row {
+    margin: 10px 0;
+}
+.gl-pick-item.is-selected {
+    background: #eff6ff;
+    outline: 1px solid #2563eb;
+}
+@media print {
+    .pv2-extra-skip-print {
+        display: none !important;
+    }
+    .jv-print-area .pv2-extra-lines-table thead th.admin-doc-col-actions,
+    .jv-print-area .pv2-extra-lines-table tr.pv2-extra-line td:last-child {
+        display: none !important;
+    }
+}
 </style>
 
 <div class="page-title page-title--stacked">
@@ -285,6 +322,29 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         </div>
     </div>
 
+    <!-- بنود إضافية (GL مركّب) -->
+    <h4 style="font-size:0.9rem;font-weight:600;color:#444;margin:18px 0 10px;">بنود إضافية</h4>
+    <div class="admin-doc-frame">
+        <div class="table-wrap">
+            <table class="admin-table admin-doc-lines-table pv2-extra-lines-table">
+                <thead>
+                    <tr>
+                        <th class="pur-col-idx" style="width:2.5rem;">#</th>
+                        <th style="min-width:12rem;">الحساب / البند</th>
+                        <th style="width:7rem;">المبلغ</th>
+                        <th style="width:6rem;">يظهر بالطباعة</th>
+                        <th style="min-width:8rem;">تسمية طباعة</th>
+                        <th class="admin-doc-col-actions jv-print-hide" aria-label="حذف" style="width:3rem;"></th>
+                    </tr>
+                </thead>
+                <tbody id="pv2_extra_lines_body"></tbody>
+            </table>
+        </div>
+    </div>
+    <div class="actions jv-print-hide" style="margin-top:10px;">
+        <button type="button" class="btn-secondary" id="pv2_btn_add_extra"<?php echo !$pv2Ready ? ' disabled' : ''; ?>>إضافة بند</button>
+    </div>
+
     <!-- ٣ — خصم الفاتورة + المجاميع -->
     <div style="margin-top:14px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px;">
         <div style="flex:0 0 auto;">
@@ -311,6 +371,32 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             <button type="button" class="btn-secondary" id="pv2_btn_print" title="طباعة الفاتورة المعروضة" disabled>طباعة</button>
             <button type="button" class="btn-secondary" id="pv2_btn_new" title="فاتورة جديدة">فاتورة جديدة</button>
             <button type="button" id="pv2_btn_save"<?php echo !$pv2Ready ? ' disabled' : ''; ?>>حفظ</button>
+        </div>
+    </div>
+</div>
+
+<!-- Ancillary account picker -->
+<div class="gl-pick-modal" id="pv2_extra_pick_modal" hidden aria-hidden="true">
+    <div class="gl-pick-modal__backdrop" id="pv2_extra_pick_backdrop"></div>
+    <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="pv2_extra_pick_title">
+        <h3 id="pv2_extra_pick_title" class="gl-pick-modal__title">اختيار حساب — بند إضافي</h3>
+        <div class="pv2-extra-source-tabs" role="tablist">
+            <button type="button" class="btn-secondary is-active" id="pv2_extra_tab_presets" data-source="presets">القائمة المحفوظة</button>
+            <button type="button" class="btn-secondary" id="pv2_extra_tab_coa" data-source="coa">الدليل المحاسبي</button>
+        </div>
+        <div class="pv2-extra-line-kind-row" id="pv2_extra_line_kind_wrap" hidden>
+            <label for="pv2_extra_line_kind">نوع البند</label>
+            <select id="pv2_extra_line_kind" class="admin-inp">
+                <?php foreach ($pv2PurchaseLineKinds as $lk): ?>
+                <option value="<?php echo htmlspecialchars((string) $lk['key'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) $lk['label_ar'], ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <input type="search" id="pv2_extra_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث…" autocomplete="off" dir="rtl">
+        <ul class="gl-pick-modal__list" id="pv2_extra_pick_list"></ul>
+        <div class="actions" style="margin-top:10px;flex-wrap:wrap;gap:8px;">
+            <button type="button" class="btn-secondary" id="pv2_extra_add_to_presets" hidden>أضف إلى القائمة</button>
+            <button type="button" class="btn-secondary" id="pv2_extra_pick_close">إغلاق</button>
         </div>
     </div>
 </div>
@@ -432,11 +518,14 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     var PV2_COUNTRY_ID = <?php echo (int) $adminCountryId; ?>;
     var pv2EditLockCtl = null;
     var PV2_DOC_SERIAL_PREVIEW = <?php echo json_encode($pv2DocSerialPreview, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
+    var PV2_PURCHASE_LINE_KINDS = <?php echo json_encode($pv2PurchaseLineKinds, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
 
     var currentSupplierId = 0;
     var browsePurchaseId = 0;
     var pv2ViewMode = false;
     var pv2ProductPick = null;
+    var pv2ExtraPickSource = 'presets';
+    var pv2ExtraPickSelected = null;
 
     function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
     function fmt3(n) {
@@ -777,6 +866,285 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         if (ntEl) ntEl.textContent = fmt3(netTotal);
     }
 
+    /* ── Extra invoice lines ─────────────────────────────────────── */
+    function pv2ExtraLineKindLabel(key) {
+        key = String(key || '');
+        for (var i = 0; i < PV2_PURCHASE_LINE_KINDS.length; i++) {
+            if (PV2_PURCHASE_LINE_KINDS[i].key === key) return PV2_PURCHASE_LINE_KINDS[i].label_ar || key;
+        }
+        return key;
+    }
+
+    function pv2ExtraAccountLabel(row) {
+        var code = String(row.account_code || '').trim();
+        var name = String(row.account_name || row.label_ar || '').trim();
+        if (code && name) return code + ' — ' + name;
+        return name || code || ('#' + (row.account_id || ''));
+    }
+
+    function pv2ExtraLineRowHtml() {
+        return '<td class="pur-col-idx"></td>'
+            + '<td><span class="pv2-extra-account-label"></span>'
+            + '<input type="hidden" class="pv2-extra-account-id" value="">'
+            + '<input type="hidden" class="pv2-extra-line-kind" value="">'
+            + '<input type="hidden" class="pv2-extra-preset-id" value="0"></td>'
+            + '<td><input type="number" class="pv2-extra-amount admin-inp-money" min="0" step="any" value="' + fmtZero() + '" inputmode="decimal" lang="en" dir="ltr"></td>'
+            + '<td style="text-align:center;"><input type="checkbox" class="pv2-extra-print" title="يظهر في الفاتورة المطبوعة"></td>'
+            + '<td><input type="text" class="pv2-extra-label admin-inp" placeholder="اختياري" dir="auto"></td>'
+            + '<td class="jv-print-hide"><button type="button" class="btn-secondary admin-doc-line-remove" title="حذف">&times;</button></td>';
+    }
+
+    function pv2RenumberExtraRows() {
+        var tb = document.getElementById('pv2_extra_lines_body');
+        if (!tb) return;
+        var rows = tb.querySelectorAll('tr.pv2-extra-line');
+        for (var i = 0; i < rows.length; i++) {
+            var c = rows[i].querySelector('.pur-col-idx');
+            if (c) c.textContent = String(i + 1);
+        }
+    }
+
+    function pv2SyncExtraPrintClass(tr) {
+        if (!tr) return;
+        var show = tr.querySelector('.pv2-extra-print');
+        if (show && show.checked) {
+            tr.classList.remove('pv2-extra-skip-print');
+        } else {
+            tr.classList.add('pv2-extra-skip-print');
+        }
+    }
+
+    function pv2FillExtraLineRow(tr, row) {
+        if (!tr || !row) return;
+        var aid = parseInt(String(row.account_id || '0'), 10) || 0;
+        tr.querySelector('.pv2-extra-account-id').value = String(aid);
+        tr.querySelector('.pv2-extra-line-kind').value = String(row.line_kind || '');
+        tr.querySelector('.pv2-extra-preset-id').value = String(parseInt(String(row.preset_id || '0'), 10) || 0);
+        var lbl = tr.querySelector('.pv2-extra-account-label');
+        if (lbl) lbl.textContent = pv2ExtraAccountLabel(row);
+        var amt = tr.querySelector('.pv2-extra-amount');
+        if (amt) amt.value = fmt3(row.amount || 0);
+        var pr = tr.querySelector('.pv2-extra-print');
+        if (pr) pr.checked = !!row.show_on_print;
+        var la = tr.querySelector('.pv2-extra-label');
+        if (la) la.value = row.label_ar || '';
+        pv2SyncExtraPrintClass(tr);
+    }
+
+    function pv2AddExtraLine(row) {
+        var tb = document.getElementById('pv2_extra_lines_body');
+        if (!tb) return;
+        var tr = document.createElement('tr');
+        tr.className = 'pv2-extra-line pv2-extra-skip-print';
+        tr.innerHTML = pv2ExtraLineRowHtml();
+        tb.appendChild(tr);
+        if (row) pv2FillExtraLineRow(tr, row);
+        pv2RenumberExtraRows();
+    }
+
+    function pv2ClearExtraLines() {
+        var tb = document.getElementById('pv2_extra_lines_body');
+        if (tb) tb.innerHTML = '';
+    }
+
+    function pv2LoadExtraLines(lines) {
+        pv2ClearExtraLines();
+        (lines || []).forEach(function (row) { pv2AddExtraLine(row); });
+    }
+
+    function pv2CollectExtraLines() {
+        var out = [];
+        var tb = document.getElementById('pv2_extra_lines_body');
+        if (!tb) return out;
+        tb.querySelectorAll('tr.pv2-extra-line').forEach(function (tr) {
+            var accountId = parseInt(tr.querySelector('.pv2-extra-account-id').value, 10) || 0;
+            var lineKind = (tr.querySelector('.pv2-extra-line-kind').value || '').trim();
+            var amount = parseFloat(tr.querySelector('.pv2-extra-amount').value) || 0;
+            if (accountId <= 0 || !lineKind || amount <= 0) return;
+            out.push({
+                account_id: accountId,
+                line_kind: lineKind,
+                amount: amount,
+                label_ar: (tr.querySelector('.pv2-extra-label').value || '').trim(),
+                show_on_print: tr.querySelector('.pv2-extra-print').checked ? 1 : 0,
+                preset_id: parseInt(tr.querySelector('.pv2-extra-preset-id').value, 10) || 0
+            });
+        });
+        return out;
+    }
+
+    function pv2ExtraPickSetSource(source) {
+        pv2ExtraPickSource = source === 'coa' ? 'coa' : 'presets';
+        pv2ExtraPickSelected = null;
+        var tabP = document.getElementById('pv2_extra_tab_presets');
+        var tabC = document.getElementById('pv2_extra_tab_coa');
+        if (tabP) tabP.classList.toggle('is-active', pv2ExtraPickSource === 'presets');
+        if (tabC) tabC.classList.toggle('is-active', pv2ExtraPickSource === 'coa');
+        var kindWrap = document.getElementById('pv2_extra_line_kind_wrap');
+        var addPresets = document.getElementById('pv2_extra_add_to_presets');
+        if (kindWrap) kindWrap.hidden = pv2ExtraPickSource !== 'coa';
+        if (addPresets) addPresets.hidden = pv2ExtraPickSource !== 'coa';
+        pv2ExtraPickRender(document.getElementById('pv2_extra_pick_q').value || '');
+    }
+
+    function pv2ExtraPickOpen() {
+        if (pv2ViewMode) return;
+        var modal = document.getElementById('pv2_extra_pick_modal');
+        var qEl = document.getElementById('pv2_extra_pick_q');
+        if (!modal || !qEl) return;
+        pv2ExtraPickSetSource('presets');
+        modal.hidden = false;
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('gl-pick-open');
+        qEl.value = '';
+        pv2ExtraPickRender('');
+        qEl.focus();
+    }
+
+    function pv2ExtraPickClose() {
+        var modal = document.getElementById('pv2_extra_pick_modal');
+        if (!modal) return;
+        modal.hidden = true;
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('gl-pick-open');
+        pv2ExtraPickSelected = null;
+    }
+
+    function pv2ExtraPickConfirm(row) {
+        if (!row) return;
+        if (pv2ExtraPickSource === 'coa') {
+            var kindEl = document.getElementById('pv2_extra_line_kind');
+            var lineKind = kindEl ? (kindEl.value || '').trim() : '';
+            if (!lineKind) {
+                alert('اختر نوع البند.');
+                return;
+            }
+            pv2AddExtraLine({
+                account_id: row.account_id || row.id,
+                account_code: row.account_code || row.code || '',
+                account_name: row.account_name || row.name || '',
+                line_kind: lineKind,
+                amount: 0,
+                show_on_print: false,
+                label_ar: row.name || row.account_name || '',
+                preset_id: 0
+            });
+        } else {
+            pv2AddExtraLine({
+                account_id: row.account_id,
+                account_code: row.account_code,
+                account_name: row.account_name,
+                line_kind: row.line_kind,
+                amount: 0,
+                show_on_print: !!row.default_show_on_print,
+                label_ar: row.label_ar || row.account_name || '',
+                preset_id: row.id || 0
+            });
+        }
+        pv2ExtraPickClose();
+    }
+
+    function pv2ExtraPickRender(q) {
+        var listEl = document.getElementById('pv2_extra_pick_list');
+        if (!listEl) return;
+        listEl.innerHTML = '<li class="gl-pick-empty">جاري التحميل…</li>';
+        q = String(q || '').trim();
+        if (pv2ExtraPickSource === 'presets') {
+            var url = '/admin/api/invoice-ancillary/presets-list.php?invoice_context=purchase'
+                + (q ? ('&q=' + encodeURIComponent(q)) : '');
+            fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' }, cache: 'no-store' })
+                .then(function (r) { return r.json(); })
+                .then(function (res) {
+                    listEl.innerHTML = '';
+                    var rows = (res && res.presets) ? res.presets : [];
+                    if (!rows.length) {
+                        listEl.innerHTML = '<li class="gl-pick-empty">لا نتائج في القائمة المحفوظة</li>';
+                        return;
+                    }
+                    rows.forEach(function (row) {
+                        var li = document.createElement('li');
+                        li.className = 'gl-pick-item';
+                        li.setAttribute('role', 'button');
+                        li.tabIndex = 0;
+                        li.textContent = pv2ExtraAccountLabel(row) + ' — ' + pv2ExtraLineKindLabel(row.line_kind);
+                        li.addEventListener('dblclick', function () { pv2ExtraPickConfirm(row); });
+                        li.addEventListener('keydown', function (ev) {
+                            if (ev.key === 'Enter') pv2ExtraPickConfirm(row);
+                        });
+                        listEl.appendChild(li);
+                    });
+                })
+                .catch(function (e) {
+                    listEl.innerHTML = '<li class="gl-pick-empty">' + esc(e.message || String(e)) + '</li>';
+                });
+            return;
+        }
+        var coaUrl = '/admin/api/accounts/search-leaves.php?q=' + encodeURIComponent(q || '');
+        fetch(coaUrl, { credentials: 'same-origin', headers: { 'Accept': 'application/json' }, cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                listEl.innerHTML = '';
+                var rows = (res && res.accounts) ? res.accounts : [];
+                if (!rows.length) {
+                    listEl.innerHTML = '<li class="gl-pick-empty">لا نتائج في الدليل</li>';
+                    return;
+                }
+                    rows.forEach(function (row) {
+                    var li = document.createElement('li');
+                    li.className = 'gl-pick-item';
+                    li.setAttribute('role', 'button');
+                    li.tabIndex = 0;
+                    var mapped = {
+                        account_id: row.id,
+                        account_code: row.code,
+                        account_name: row.name
+                    };
+                    li.textContent = pv2ExtraAccountLabel(mapped);
+                    li.addEventListener('click', function () {
+                        pv2ExtraPickSelected = mapped;
+                        listEl.querySelectorAll('.gl-pick-item').forEach(function (n) {
+                            n.classList.remove('is-selected');
+                        });
+                        li.classList.add('is-selected');
+                    });
+                    li.addEventListener('dblclick', function () { pv2ExtraPickConfirm(mapped); });
+                    li.addEventListener('keydown', function (ev) {
+                        if (ev.key === 'Enter') pv2ExtraPickConfirm(mapped);
+                    });
+                    listEl.appendChild(li);
+                });
+            })
+            .catch(function (e) {
+                listEl.innerHTML = '<li class="gl-pick-empty">' + esc(e.message || String(e)) + '</li>';
+            });
+    }
+
+    function pv2ExtraAddToPresets() {
+        if (pv2ExtraPickSource !== 'coa' || !pv2ExtraPickSelected) {
+            alert('اختر حساباً من الدليل أولاً (نقرة واحدة ثم «أضف إلى القائمة»).');
+            return;
+        }
+        var kindEl = document.getElementById('pv2_extra_line_kind');
+        var lineKind = kindEl ? (kindEl.value || '').trim() : '';
+        if (!lineKind) {
+            alert('اختر نوع البند.');
+            return;
+        }
+        postJSON('/admin/api/invoice-ancillary/preset-save.php', {
+            account_id: pv2ExtraPickSelected.account_id,
+            line_kind: lineKind,
+            invoice_context: 'purchase',
+            label_ar: pv2ExtraPickSelected.account_name || '',
+            default_show_on_print: false
+        }).then(function (res) {
+            if (!res || !res.success) {
+                alert((res && res.message) || 'تعذر الحفظ');
+                return;
+            }
+            alert(res.message || 'تمت الإضافة للقائمة');
+        }).catch(function (e) { alert(e.message || String(e)); });
+    }
+
     function pv2SetDocSerial(value) {
         var el = document.getElementById('pv2_doc_serial');
         if (el) el.value = String(value || '');
@@ -791,7 +1159,13 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         var sb = document.getElementById('pv2_btn_save');
         if (sb) {
             sb.disabled = !PV2_READY || pv2ViewMode;
-            sb.title = pv2ViewMode ? 'وضع العرض — استخدم «فاتورة جديدة» للإدخال' : 'حفظ فاتورة جديدة';
+            if (browsePurchaseId > 0 && !pv2ViewMode) {
+                sb.title = 'حفظ التعديلات';
+            } else if (pv2ViewMode) {
+                sb.title = 'وضع العرض — فك القفل للتعديل';
+            } else {
+                sb.title = 'حفظ فاتورة جديدة';
+            }
         }
         var lbl = document.getElementById('pv2_browse_label');
         if (lbl) {
@@ -816,6 +1190,8 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
                 }
                 el.disabled = pv2ViewMode || (!PV2_READY && el.id !== 'pv2_supplier_code');
             });
+            var addExtra = document.getElementById('pv2_btn_add_extra');
+            if (addExtra) addExtra.disabled = pv2ViewMode || !PV2_READY;
         }
         pv2SyncToolbar();
     }
@@ -853,6 +1229,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             }
             syncTrailing();
         }
+        pv2LoadExtraLines(res.extra_lines || []);
         recalcAll();
         pv2SetViewMode(true);
         if (pv2EditLockCtl) pv2EditLockCtl.refresh();
@@ -934,6 +1311,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 
     function pv2ResetNew() {
         browsePurchaseId = 0;
+        pv2ClearExtraLines();
         pv2SetViewMode(false);
         location.reload();
     }
@@ -983,10 +1361,17 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             supplier_invoice_number: supplierInvoice,
             items: items,
             invoice_discount_raw: invDiscRaw,
-            invoice_discount_amount: invDiscAmt
+            invoice_discount_amount: invDiscAmt,
+            extra_lines: pv2CollectExtraLines()
         };
 
-        postJSON('/admin/api/purchases/create.php', payload).then(function (res) {
+        var apiUrl = '/admin/api/purchases/create.php';
+        if (browsePurchaseId > 0) {
+            apiUrl = '/admin/api/purchases/update.php';
+            payload.id = browsePurchaseId;
+        }
+
+        postJSON(apiUrl, payload).then(function (res) {
             if (res.success) {
                 if (typeof orangeAdminOfferOpenGlVoucherAfterSave === 'function') {
                     orangeAdminOfferOpenGlVoucherAfterSave(res, function () {
@@ -1054,6 +1439,41 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 
         document.getElementById('pv2_btn_save').addEventListener('click', save);
         document.getElementById('pv2_btn_new').addEventListener('click', pv2ResetNew);
+        var addExtraBtn = document.getElementById('pv2_btn_add_extra');
+        if (addExtraBtn) addExtraBtn.addEventListener('click', pv2ExtraPickOpen);
+        document.getElementById('pv2_extra_pick_backdrop').addEventListener('click', pv2ExtraPickClose);
+        document.getElementById('pv2_extra_pick_close').addEventListener('click', pv2ExtraPickClose);
+        document.getElementById('pv2_extra_tab_presets').addEventListener('click', function () { pv2ExtraPickSetSource('presets'); });
+        document.getElementById('pv2_extra_tab_coa').addEventListener('click', function () { pv2ExtraPickSetSource('coa'); });
+        document.getElementById('pv2_extra_add_to_presets').addEventListener('click', pv2ExtraAddToPresets);
+        var extraPickQ = document.getElementById('pv2_extra_pick_q');
+        var extraPickTimer = null;
+        if (extraPickQ) {
+            extraPickQ.addEventListener('input', function () {
+                if (extraPickTimer) clearTimeout(extraPickTimer);
+                extraPickTimer = setTimeout(function () { pv2ExtraPickRender(extraPickQ.value || ''); }, 200);
+            });
+        }
+        var extraTb = document.getElementById('pv2_extra_lines_body');
+        if (extraTb) {
+            extraTb.addEventListener('click', function (e) {
+                if (e.target && e.target.classList.contains('admin-doc-line-remove')) {
+                    var tr = e.target.closest('tr');
+                    if (tr) tr.remove();
+                    pv2RenumberExtraRows();
+                }
+            });
+            extraTb.addEventListener('change', function (e) {
+                if (e.target && e.target.classList.contains('pv2-extra-print')) {
+                    pv2SyncExtraPrintClass(e.target.closest('tr'));
+                }
+            });
+        }
+        document.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Escape') {
+                pv2ExtraPickClose();
+            }
+        });
         document.getElementById('pv2_btn_print').addEventListener('click', function () {
             if (browsePurchaseId <= 0) {
                 alert('افتح فاتورة محفوظة للطباعة.');
@@ -1113,7 +1533,12 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
                 prefix: 'pv2',
                 docKind: 'purchase',
                 countryId: PV2_COUNTRY_ID,
-                getEntityId: function () { return browsePurchaseId; }
+                getEntityId: function () { return browsePurchaseId; },
+                onLockedChange: function (locked) {
+                    if (browsePurchaseId > 0) {
+                        pv2SetViewMode(!!locked);
+                    }
+                }
             });
         }
     }

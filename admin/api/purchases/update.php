@@ -13,6 +13,7 @@ require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/purchase_helpers.php';
 require_once __DIR__ . '/../../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../../includes/purchase_gl_accounts.php';
+require_once __DIR__ . '/../../../includes/invoice_ancillary_lines.php';
 require_admin_api();
 
 function reverse_purchase_stock(PDO $pdo, int $purchaseId, int $countryId): void
@@ -151,6 +152,11 @@ try {
         orange_purchase_remove_receive_accounting($pdo, $purchaseId);
         orange_purchase_remove_accounting($pdo, $purchaseId, $purchaseCountryId > 0 ? $purchaseCountryId : null);
         orange_gl_pending_remove_by_reference($pdo, orange_gl_pending_source_key('purchase', $purchaseId));
+        orange_invoice_ancillary_extra_lines_delete_for_doc(
+            $pdo,
+            orange_invoice_ancillary_doc_kind_purchase(),
+            $purchaseId
+        );
         $pdo->prepare("DELETE FROM purchases WHERE id = ?")->execute([$purchaseId]);
         $pdo->commit();
         audit_log('purchase_delete', 'تم حذف فاتورة شراء رقم: ' . $purchaseId, 'purchases', $purchaseId);
@@ -233,6 +239,24 @@ try {
             ->execute([$supplierId > 0 ? $supplierId : null, $newTotal, $type, $notes, $purchaseId]);
     }
 
+    $extraInput = orange_invoice_ancillary_parse_request_lines(
+        $data,
+        orange_invoice_ancillary_doc_kind_purchase()
+    );
+    orange_invoice_ancillary_extra_lines_replace_for_doc(
+        $pdo,
+        orange_invoice_ancillary_doc_kind_purchase(),
+        $purchaseId,
+        $purchaseCountryId,
+        $extraInput
+    );
+    $savedExtra = orange_invoice_ancillary_extra_lines_for_doc(
+        $pdo,
+        orange_invoice_ancillary_doc_kind_purchase(),
+        $purchaseId
+    );
+    $payableTotal = orange_invoice_ancillary_purchase_payable_total($newTotal, $savedExtra);
+
     orange_purchase_remove_receive_accounting($pdo, $purchaseId);
     orange_purchase_remove_accounting($pdo, $purchaseId, $purchaseCountryId > 0 ? $purchaseCountryId : null);
     orange_gl_pending_remove_by_reference($pdo, orange_gl_pending_source_key('purchase', $purchaseId));
@@ -245,6 +269,7 @@ try {
         $newTotal,
         $purchaseCountryId
     );
+    $glB = orange_gl_posting_bundle_apply_invoice_ancillary($glB, $savedExtra, $newTotal);
     $pendingKey = orange_gl_pending_source_key('purchase', $purchaseId);
     $srcLabel = 'PIN-' . $purchaseId;
     $now = date('Y-m-d H:i:s');
@@ -273,7 +298,7 @@ try {
                 'voucher_date' => $now,
                 'account_debit' => $glB['debit'],
                 'account_credit' => $glB['credit'],
-                'amount' => $newTotal,
+                'amount' => $payableTotal,
                 'description' => $glB['voucher_description'],
                 'entry_type' => 'purchase',
                 'after_post_json' => $afterJson,
@@ -294,19 +319,19 @@ try {
                 'date' => $now,
                 'account_debit' => $glB['debit'],
                 'account_credit' => $glB['credit'],
-                'amount' => $newTotal,
+                'amount' => $payableTotal,
                 'description' => $glB['voucher_description'],
                 'entry_type' => 'purchase',
             ]);
 
             if ($glB['legacy_ap_subledger']) {
-                orange_purchase_record_ap_subledger($pdo, $purchaseId, $supplierId, $type, $newTotal);
+                orange_purchase_record_ap_subledger($pdo, $purchaseId, $supplierId, $type, $payableTotal);
             }
         }
     }
 
     $pdo->commit();
-    orange_edit_lock_register_purchase($pdo, $purchaseId, $purchaseCountryId, $newTotal, $now);
+    orange_edit_lock_register_purchase($pdo, $purchaseId, $purchaseCountryId, $payableTotal, $now);
     orange_edit_lock_log_mutation($pdo, 'purchase', $purchaseId, 'edit');
     audit_log('purchase_update', 'تم تعديل فاتورة شراء رقم: ' . $purchaseId, 'purchases', $purchaseId);
     json_response(['success' => true, 'message' => 'تم تعديل عملية الشراء']);

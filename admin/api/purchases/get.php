@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
+require_once __DIR__ . '/../../../includes/invoice_ancillary_lines.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
@@ -111,6 +112,28 @@ foreach ($rows as $row) {
     ];
 }
 
+$extraLines = orange_invoice_ancillary_extra_lines_for_doc(
+    $pdo,
+    orange_invoice_ancillary_doc_kind_purchase(),
+    $purchaseId
+);
+$extraOut = [];
+foreach ($extraLines as $row) {
+    $extraOut[] = [
+        'id' => (int) ($row['id'] ?? 0),
+        'account_id' => (int) ($row['account_id'] ?? 0),
+        'account_code' => (string) ($row['account_code'] ?? ''),
+        'account_name' => (string) ($row['account_name'] ?? ''),
+        'line_kind' => (string) ($row['line_kind'] ?? ''),
+        'amount' => (float) ($row['amount'] ?? 0),
+        'label_ar' => (string) ($row['label_ar'] ?? ''),
+        'show_on_print' => (int) ($row['show_on_print'] ?? 0) === 1,
+        'preset_id' => isset($row['preset_id']) && (int) $row['preset_id'] > 0
+            ? (int) $row['preset_id']
+            : 0,
+    ];
+}
+
 json_response([
     'success' => true,
     'purchase' => [
@@ -133,5 +156,6 @@ json_response([
         'invoice_discount_amount' => $hasInvDiscount ? (float) ($purchase['invoice_discount_amount'] ?? 0) : 0.0,
     ],
     'items' => $items,
+    'extra_lines' => $extraOut,
     'has_received_stock' => $hasReceived,
 ]);

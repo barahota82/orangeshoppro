@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/purchase_helpers.php';
 require_once __DIR__ . '/../../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../../includes/purchase_gl_accounts.php';
+require_once __DIR__ . '/../../../includes/invoice_ancillary_lines.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/currency.php';
 require_admin_api();
@@ -226,6 +227,24 @@ try {
         }
     }
 
+    $extraInput = orange_invoice_ancillary_parse_request_lines(
+        $data,
+        orange_invoice_ancillary_doc_kind_purchase()
+    );
+    orange_invoice_ancillary_extra_lines_replace_for_doc(
+        $pdo,
+        orange_invoice_ancillary_doc_kind_purchase(),
+        $purchaseId,
+        $purchaseCountryId,
+        $extraInput
+    );
+    $savedExtra = orange_invoice_ancillary_extra_lines_for_doc(
+        $pdo,
+        orange_invoice_ancillary_doc_kind_purchase(),
+        $purchaseId
+    );
+    $payableTotal = orange_invoice_ancillary_purchase_payable_total($netTotal, $savedExtra);
+
     $glB = orange_gl_purchase_invoice_posting_bundle(
         $pdo,
         $type,
@@ -234,6 +253,7 @@ try {
         $netTotal,
         $purchaseCountryId
     );
+    $glB = orange_gl_posting_bundle_apply_invoice_ancillary($glB, $savedExtra, $netTotal);
 
     $pendingKey = orange_gl_pending_source_key('purchase', $purchaseId);
     $srcLabel = 'PIN-' . $purchaseId;
@@ -263,7 +283,7 @@ try {
                 'voucher_date' => $now,
                 'account_debit' => $glB['debit'],
                 'account_credit' => $glB['credit'],
-                'amount' => $computedTotal,
+                'amount' => $payableTotal,
                 'description' => $glB['voucher_description'],
                 'entry_type' => 'purchase',
                 'after_post_json' => $afterJson,
@@ -284,19 +304,19 @@ try {
                 'date' => $now,
                 'account_debit' => $glB['debit'],
                 'account_credit' => $glB['credit'],
-                'amount' => $netTotal,
+                'amount' => $payableTotal,
                 'description' => $glB['voucher_description'],
                 'entry_type' => 'purchase',
             ]);
 
             if ($glB['legacy_ap_subledger']) {
-                orange_purchase_record_ap_subledger($pdo, $purchaseId, $supplierId, $type, $netTotal);
+                orange_purchase_record_ap_subledger($pdo, $purchaseId, $supplierId, $type, $payableTotal);
             }
         }
     }
 
     $pdo->commit();
-    orange_edit_lock_register_purchase($pdo, $purchaseId, $purchaseCountryId, $computedTotal, $now);
+    orange_edit_lock_register_purchase($pdo, $purchaseId, $purchaseCountryId, $payableTotal, $now);
     audit_log('purchase_create', 'تم إنشاء فاتورة شراء رقم: ' . $purchaseId, 'purchases', $purchaseId);
     $voucherLinks = orange_gl_posting_voucher_links($pdo, 'purchase', $purchaseId, [
         ['entry_type' => 'purchase', 'journal_type_code' => 'PIN', 'label' => 'قيد فاتورة الشراء'],
