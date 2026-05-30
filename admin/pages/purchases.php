@@ -12,6 +12,8 @@ require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
+require_once __DIR__ . '/../../includes/purchase_doc_product_pick.php';
+
 $pdo = orange_admin_page_pdo();
 
 $adminCountryId = orange_admin_context_country_id($pdo);
@@ -20,38 +22,7 @@ $adminCurrencyUnit = orange_currency_display_unit($adminDefaultCurrency);
 $purchasesProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $adminCountryId);
 $purchasesSuppliersCountrySql = orange_sql_country_and_fragment($pdo, 'suppliers', 'suppliers', $adminCountryId);
 
-/* ── Products (with item_code / barcode when available) ────────────── */
-$pv2ProdCols = 'p.id, p.name, p.cost, p.has_colors, p.has_sizes';
-if (orange_table_has_column($pdo, 'products', 'item_code')) {
-    $pv2ProdCols .= ', p.item_code';
-}
-if (orange_table_has_column($pdo, 'products', 'barcode')) {
-    $pv2ProdCols .= ', p.barcode';
-}
-$products = $pdo->query(
-    "SELECT $pv2ProdCols FROM products p WHERE p.is_active = 1" . $purchasesProductsCountrySql . ' ORDER BY p.name ASC'
-)->fetchAll(PDO::FETCH_ASSOC);
-
-/* ── Variants by product ───────────────────────────────────────────── */
-$variantsByProduct = [];
-$vRows = $pdo->query(
-    'SELECT id, product_id, color, size FROM product_variants ORDER BY product_id ASC, id ASC'
-)->fetchAll(PDO::FETCH_ASSOC);
-foreach ($vRows as $vr) {
-    $pid = (int) $vr['product_id'];
-    if (!isset($variantsByProduct[$pid])) {
-        $variantsByProduct[$pid] = [];
-    }
-    $c = trim((string) ($vr['color'] ?? ''));
-    $s = trim((string) ($vr['size'] ?? ''));
-    $label = ($c !== '' || $s !== '')
-        ? trim($c . ($c !== '' && $s !== '' ? ' / ' : '') . $s)
-        : ('#' . (int) $vr['id']);
-    $variantsByProduct[$pid][] = [
-        'id' => (int) $vr['id'],
-        'label' => $label,
-    ];
-}
+$pv2PickRows = orange_purchase_doc_product_pick_rows($pdo, $adminCountryId);
 
 /* ── Suppliers (same filter as partner_supplier_payment) ───────────── */
 $suppliers = [];
@@ -298,9 +269,9 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
                 <thead>
                     <tr>
                         <th class="pur-col-idx" style="width:2.5rem;">#</th>
-                        <th style="min-width:8rem;">كود-باركود</th>
-                        <th style="min-width:10rem;">الصنف</th>
-                        <th style="min-width:8rem;">المتغير (لون/مقاس)</th>
+                        <th style="min-width:8rem;">كود / باركود</th>
+                        <th style="min-width:10rem;">اسم الصنف</th>
+                        <th style="min-width:8rem;">اللون / المقاس</th>
                         <th style="width:5rem;">الكمية</th>
                         <th style="width:6rem;">تكلفة الوحدة</th>
                         <th style="width:6rem;">خصم</th>
@@ -352,6 +323,31 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         <input type="search" id="pv2_supplier_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بكود الحساب أو اسم المورد…" autocomplete="off" dir="rtl">
         <ul class="gl-pick-modal__list" id="pv2_supplier_pick_list"></ul>
         <button type="button" class="btn-secondary" id="pv2_supplier_pick_close">إغلاق</button>
+    </div>
+</div>
+
+<!-- Product pick modal -->
+<div id="pv2_product_pick_modal" class="mo-pick-modal" hidden>
+    <div class="mo-pick-modal__backdrop" id="pv2_product_pick_backdrop"></div>
+    <div class="mo-pick-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="pv2_product_pick_title">
+        <h4 id="pv2_product_pick_title" class="mo-pick-modal__title">اختيار صنف</h4>
+        <input type="search" id="pv2_product_pick_filter" class="admin-inp mo-pick-modal__search" placeholder="ابحث بالكود أو الاسم أو اللون أو المقاس…" autocomplete="off" lang="ar" dir="rtl">
+        <div class="mo-pick-modal__scroller table-wrap">
+            <table class="admin-table mo-pick-table">
+                <thead>
+                    <tr>
+                        <th>الكود</th>
+                        <th>الباركود</th>
+                        <th>الاسم</th>
+                        <th>اللون</th>
+                        <th>المقاس</th>
+                        <th class="mo-pick-num-h">التكلفة</th>
+                    </tr>
+                </thead>
+                <tbody id="pv2_product_pick_body"></tbody>
+            </table>
+        </div>
+        <p class="card-hint mo-pick-modal__hint">انقر نقراً مزدوجاً على السطر للاختيار — أو امسح الباركود في خانة الكود.</p>
     </div>
 </div>
 
@@ -423,10 +419,10 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     </div>
 </div>
 
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_purchase_doc_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
 (function () {
-    var PV2_PRODUCTS = <?php echo json_encode($products, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
-    var PV2_VARIANTS = <?php echo json_encode($variantsByProduct, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
+    var PV2_PICK_ROWS = <?php echo json_encode($pv2PickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var PV2_SUPPLIER_PICK_ROWS = <?php echo json_encode($pv2SupplierPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var PV2_SUPPLIER_PAYABLE = <?php echo json_encode($supplierPayableMap, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var PV2_PREFILL_SUPPLIER = <?php echo (int) $prefillSupplierId; ?>;
@@ -437,6 +433,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     var currentSupplierId = 0;
     var browsePurchaseId = 0;
     var pv2ViewMode = false;
+    var pv2ProductPick = null;
 
     function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
     function fmt3(n) {
@@ -452,20 +449,6 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             return window.orangeMoneyZero();
         }
         return fmt3(0);
-    }
-
-    /* ── Product lookup by code/barcode ─────────────────────────────── */
-    function findProductByCode(code) {
-        code = String(code || '').trim();
-        if (!code) return null;
-        var lower = code.toLowerCase();
-        for (var i = 0; i < PV2_PRODUCTS.length; i++) {
-            var p = PV2_PRODUCTS[i];
-            var ic = String(p.item_code || '').trim().toLowerCase();
-            var bc = String(p.barcode || '').trim().toLowerCase();
-            if ((ic && ic === lower) || (bc && bc === lower)) return p;
-        }
-        return null;
     }
 
     /* ── Discount parsing ───────────────────────────────────────────── */
@@ -548,19 +531,18 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     }
 
     /* ── Dynamic rows ───────────────────────────────────────────────── */
-    function variantOptionsHtml(pid) {
-        var list = (PV2_VARIANTS && PV2_VARIANTS[String(pid)]) ? PV2_VARIANTS[String(pid)] : [];
-        if (!list.length) return '<option value="0">— لا متغيرات —</option>';
-        return list.map(function (v) {
-            return '<option value="' + v.id + '">' + esc(v.label) + '</option>';
-        }).join('');
-    }
-
-    function productOptionsHtml() {
-        var blank = '<option value="">' + esc('— اختر صنفاً —') + '</option>';
-        return blank + PV2_PRODUCTS.map(function (p) {
-            return '<option value="' + p.id + '" data-cost="' + (parseFloat(p.cost) || 0) + '">' + esc(p.name) + '</option>';
-        }).join('');
+    function lineRowHtml() {
+        return '<td class="pur-col-idx"></td>' +
+            '<td><input type="text" class="pv2-code admin-inp" placeholder="كود أو باركود" dir="ltr" lang="en" autocomplete="off" style="width:100%;" title="امسح الباركود أو دبل كليك للبحث">' +
+            '<input type="hidden" class="pv2-product-id" value="">' +
+            '<input type="hidden" class="pv2-variant-id" value="0"></td>' +
+            '<td><input type="text" class="pv2-name admin-inp-readonly" readonly disabled tabindex="-1" placeholder="—"></td>' +
+            '<td><input type="text" class="pv2-var-label admin-inp-readonly" readonly disabled tabindex="-1" placeholder="—"></td>' +
+            '<td><input type="number" class="pv2-qty admin-inp-qty" min="1" step="1" value="1" inputmode="numeric" lang="en" dir="ltr"></td>' +
+            '<td><input type="number" class="pv2-cost admin-inp-money" min="0" step="any" value="' + fmtZero() + '" inputmode="decimal" lang="en" dir="ltr"></td>' +
+            '<td><input type="text" class="pv2-discount admin-inp" placeholder="0" dir="ltr" lang="en" autocomplete="off" style="width:100%;"></td>' +
+            '<td><input type="text" class="pv2-line-total admin-inp-money" value="' + fmtZero() + '" readonly data-money-allow-zero tabindex="0" dir="ltr" lang="en"></td>' +
+            '<td><button type="button" class="btn-secondary admin-doc-line-remove" title="حذف">&times;</button></td>';
     }
 
     function addLine() {
@@ -568,21 +550,20 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         if (!tb) return;
         var tr = document.createElement('tr');
         tr.className = 'pv2-line';
-        tr.innerHTML =
-            '<td class="pur-col-idx"></td>' +
-            '<td><input type="text" class="pv2-barcode admin-inp" placeholder="كود/باركود" dir="ltr" lang="en" autocomplete="off" style="width:100%;"></td>' +
-            '<td><select class="pv2-product" style="min-width:10rem;">' + productOptionsHtml() + '</select></td>' +
-            '<td><select class="pv2-variant"></select></td>' +
-            '<td><input type="number" class="pv2-qty admin-inp-qty" min="1" step="1" value="1" inputmode="numeric" lang="en" dir="ltr"></td>' +
-            '<td><input type="number" class="pv2-cost admin-inp-money" min="0" step="any" value="' + fmtZero() + '" inputmode="decimal" lang="en" dir="ltr"></td>' +
-            '<td><input type="text" class="pv2-discount admin-inp" placeholder="0" dir="ltr" lang="en" autocomplete="off" style="width:100%;"></td>' +
-            '<td><input type="text" class="pv2-line-total admin-inp-money" value="' + fmtZero() + '" readonly data-money-allow-zero tabindex="0" dir="ltr" lang="en"></td>' +
-            '<td><button type="button" class="btn-secondary admin-doc-line-remove" title="حذف">&times;</button></td>';
+        tr.innerHTML = lineRowHtml();
         tb.appendChild(tr);
         renumberRows();
-        var sel = tr.querySelector('.pv2-product');
-        if (sel) updateVariantCell(sel);
         recalcAll();
+    }
+
+    function clearLineRow(tr) {
+        if (pv2ProductPick) {
+            pv2ProductPick.clearLine(tr);
+        }
+        var qEl = tr.querySelector('.pv2-qty');
+        if (qEl) qEl.value = '1';
+        var dEl = tr.querySelector('.pv2-discount');
+        if (dEl) dEl.value = '';
     }
 
     function removeLine(btn) {
@@ -590,12 +571,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         if (!tb) return;
         if (tb.querySelectorAll('tr').length <= 1) {
             var tr = btn.closest('tr');
-            tr.querySelector('.pv2-barcode').value = '';
-            tr.querySelector('.pv2-product').value = '';
-            tr.querySelector('.pv2-qty').value = '1';
-            tr.querySelector('.pv2-cost').value = fmtZero();
-            tr.querySelector('.pv2-discount').value = '';
-            updateVariantCell(tr.querySelector('.pv2-product'));
+            clearLineRow(tr);
             syncTrailing();
             recalcAll();
             return;
@@ -617,14 +593,14 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     }
 
     function rowIsBlank(tr) {
-        var pid = parseInt(tr.querySelector('.pv2-product').value, 10) || 0;
+        var pid = parseInt(tr.querySelector('.pv2-product-id').value, 10) || 0;
         if (pid > 0) return false;
-        var code = (tr.querySelector('.pv2-barcode').value || '').trim();
+        var code = (tr.querySelector('.pv2-code').value || '').trim();
         return code === '';
     }
 
     function rowIsComplete(tr) {
-        var pid = parseInt(tr.querySelector('.pv2-product').value, 10) || 0;
+        var pid = parseInt(tr.querySelector('.pv2-product-id').value, 10) || 0;
         if (pid <= 0) return false;
         var q = parseInt(tr.querySelector('.pv2-qty').value, 10) || 0;
         if (q < 1) return false;
@@ -634,9 +610,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 
     function pv2LineNavFields(tr) {
         return [
-            tr.querySelector('.pv2-barcode'),
-            tr.querySelector('.pv2-product'),
-            tr.querySelector('.pv2-variant'),
+            tr.querySelector('.pv2-code'),
             tr.querySelector('.pv2-qty'),
             tr.querySelector('.pv2-cost'),
             tr.querySelector('.pv2-discount'),
@@ -679,7 +653,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         }
         var nextTr = rows[idx + 1];
         if (!nextTr) return;
-        pv2FocusLineField(nextTr.querySelector('.pv2-barcode'));
+        pv2FocusLineField(nextTr.querySelector('.pv2-code'));
     }
 
     function pv2OnLineKeydown(e) {
@@ -690,20 +664,20 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         if (!ta) return;
         var tr = ta.closest('tr');
         if (!tr || !tr.classList.contains('pv2-line')) return;
-        var isNav = ta.classList.contains('pv2-barcode')
-            || ta.classList.contains('pv2-product')
-            || ta.classList.contains('pv2-variant')
+        var isNav = ta.classList.contains('pv2-code')
             || ta.classList.contains('pv2-qty')
             || ta.classList.contains('pv2-cost')
             || ta.classList.contains('pv2-discount')
             || ta.classList.contains('pv2-line-total');
         if (!isNav) return;
 
-        if (ta.classList.contains('pv2-barcode') && e.key === 'Enter') {
+        if (ta.classList.contains('pv2-code') && e.key === 'Enter') {
             e.preventDefault();
-            onBarcodeBlurOrEnter(ta);
+            if (pv2ProductPick) {
+                pv2ProductPick.resolveCodeForRow(tr);
+            }
             recalcAll();
-            pv2FocusNextInRow(tr, ta);
+            pv2FocusLineField(tr.querySelector('.pv2-qty'));
             return;
         }
         if (ta.classList.contains('pv2-line-total')) {
@@ -719,6 +693,12 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         }
         e.preventDefault();
         pv2FocusNextInRow(tr, ta);
+    }
+
+    function resolveCodeForRow(tr) {
+        if (!pv2ProductPick) return;
+        pv2ProductPick.resolveCodeForRow(tr);
+        recalcAll();
     }
 
     function trimExtraTrailing() {
@@ -748,49 +728,26 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         if (rowIsComplete(last)) addLine();
     }
 
-    function updateVariantCell(sel) {
-        var row = sel.closest('tr');
-        var pid = parseInt(sel.value, 10) || 0;
-        var vsel = row.querySelector('.pv2-variant');
-        if (vsel) vsel.innerHTML = variantOptionsHtml(pid);
-    }
-
-    function onProductChanged(sel) {
-        var row = sel.closest('tr');
-        var pid = parseInt(sel.value, 10) || 0;
-        var opt = sel.options[sel.selectedIndex];
-        var cost = opt ? parseFloat(opt.getAttribute('data-cost') || '0') : 0;
-        var costInp = row.querySelector('.pv2-cost');
-        if (costInp && pid > 0) costInp.value = fmt3(cost);
-        updateVariantCell(sel);
-        var barcodeInp = row.querySelector('.pv2-barcode');
-        if (barcodeInp && pid > 0) {
-            var prod = null;
-            for (var i = 0; i < PV2_PRODUCTS.length; i++) {
-                if (PV2_PRODUCTS[i].id === pid || String(PV2_PRODUCTS[i].id) === String(pid)) { prod = PV2_PRODUCTS[i]; break; }
-            }
-            if (prod) {
-                barcodeInp.value = prod.item_code || prod.barcode || '';
-            }
+    function pv2FillLineRow(tr, item) {
+        var pickRow = pv2ProductPick
+            ? pv2ProductPick.findPickRowByIds(item.product_id, item.variant_id || 0)
+            : null;
+        if (pickRow && pv2ProductPick) {
+            pv2ProductPick.applyPick(tr, pickRow);
+        } else if (pv2ProductPick) {
+            pv2ProductPick.clearLine(tr);
+            var pidEl = tr.querySelector('.pv2-product-id');
+            var vidEl = tr.querySelector('.pv2-variant-id');
+            if (pidEl) pidEl.value = String(item.product_id || '');
+            if (vidEl) vidEl.value = String(item.variant_id || '0');
         }
-        recalcAll();
+        var qEl = tr.querySelector('.pv2-qty');
+        if (qEl) qEl.value = String(item.qty || 1);
+        var cEl = tr.querySelector('.pv2-cost');
+        if (cEl) cEl.value = fmt3(item.cost || 0);
+        var dEl = tr.querySelector('.pv2-discount');
+        if (dEl) dEl.value = item.discount_raw || '';
     }
-
-    function onBarcodeBlurOrEnter(inp) {
-        var code = (inp.value || '').trim();
-        if (!code) return;
-        var prod = findProductByCode(code);
-        if (!prod) return;
-        var row = inp.closest('tr');
-        var sel = row.querySelector('.pv2-product');
-        if (sel) {
-            sel.value = String(prod.id);
-            onProductChanged(sel);
-        }
-        recalcAll();
-    }
-
-    /* ── Recalculate ────────────────────────────────────────────────── */
     function recalcAll() {
         var tb = document.getElementById('pv2_lines_body');
         if (!tb) return;
@@ -857,32 +814,6 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             });
         }
         pv2SyncToolbar();
-    }
-
-    function pv2FillLineRow(tr, item) {
-        var bc = tr.querySelector('.pv2-barcode');
-        var sel = tr.querySelector('.pv2-product');
-        if (sel) {
-            sel.value = String(item.product_id || '');
-            updateVariantCell(sel);
-        }
-        var vsel = tr.querySelector('.pv2-variant');
-        if (vsel && item.variant_id) {
-            vsel.value = String(item.variant_id);
-        }
-        if (bc) {
-            var prod = null;
-            for (var i = 0; i < PV2_PRODUCTS.length; i++) {
-                if (PV2_PRODUCTS[i].id === item.product_id) { prod = PV2_PRODUCTS[i]; break; }
-            }
-            if (prod) bc.value = prod.item_code || prod.barcode || '';
-        }
-        var qEl = tr.querySelector('.pv2-qty');
-        if (qEl) qEl.value = String(item.qty || 1);
-        var cEl = tr.querySelector('.pv2-cost');
-        if (cEl) cEl.value = fmt3(item.cost || 0);
-        var dEl = tr.querySelector('.pv2-discount');
-        if (dEl) dEl.value = item.discount_raw || '';
     }
 
     function pv2ApplyPurchasePayload(res) {
@@ -1021,8 +952,8 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         var items = [];
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
-            var pid = parseInt(r.querySelector('.pv2-product').value, 10) || 0;
-            var vid = parseInt(r.querySelector('.pv2-variant').value, 10) || 0;
+            var pid = parseInt(r.querySelector('.pv2-product-id').value, 10) || 0;
+            var vid = parseInt(r.querySelector('.pv2-variant-id').value, 10) || 0;
             var q = parseInt(r.querySelector('.pv2-qty').value, 10) || 0;
             var c = parseFloat(r.querySelector('.pv2-cost').value) || 0;
             var discRaw = (r.querySelector('.pv2-discount').value || '').trim();
@@ -1069,6 +1000,33 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 
     /* ── Init & bindings ────────────────────────────────────────────── */
     function init() {
+        if (window.OrangePurchaseDocProductPick) {
+            pv2ProductPick = window.OrangePurchaseDocProductPick.create({
+                pickRows: PV2_PICK_ROWS,
+                codeClass: 'pv2-code',
+                fmtMoney: fmt3,
+                isViewMode: function () { return pv2ViewMode; },
+                modalIds: {
+                    root: 'pv2_product_pick_modal',
+                    backdrop: 'pv2_product_pick_backdrop',
+                    filter: 'pv2_product_pick_filter',
+                    body: 'pv2_product_pick_body'
+                },
+                selectors: {
+                    code: '.pv2-code',
+                    productId: '.pv2-product-id',
+                    variantId: '.pv2-variant-id',
+                    name: '.pv2-name',
+                    varLabel: '.pv2-var-label',
+                    cost: '.pv2-cost'
+                },
+                onAfterResolve: function (tr) {
+                    recalcAll();
+                }
+            });
+            pv2ProductPick.bindModal();
+        }
+
         var codeEl = document.getElementById('pv2_supplier_code');
         if (codeEl) {
             codeEl.addEventListener('dblclick', function (e) { e.preventDefault(); pickerOpen(); });
@@ -1119,20 +1077,17 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 
         var tb = document.getElementById('pv2_lines_body');
         if (tb) {
-            tb.addEventListener('change', function (e) {
-                if (e.target && e.target.classList.contains('pv2-product')) {
-                    onProductChanged(e.target);
-                }
-                recalcAll();
-            });
+            if (pv2ProductPick) {
+                pv2ProductPick.bindLinesBody(tb);
+            }
             tb.addEventListener('input', function (e) {
-                if (e.target && e.target.classList.contains('pv2-barcode')) return;
+                if (e.target && e.target.classList.contains('pv2-code')) return;
                 recalcAll();
             });
             tb.addEventListener('keydown', pv2OnLineKeydown);
             tb.addEventListener('focusout', function (e) {
-                if (e.target && e.target.classList.contains('pv2-barcode')) {
-                    onBarcodeBlurOrEnter(e.target);
+                if (e.target && e.target.classList.contains('pv2-code')) {
+                    resolveCodeForRow(e.target.closest('tr'));
                 }
             });
             tb.addEventListener('click', function (e) {
