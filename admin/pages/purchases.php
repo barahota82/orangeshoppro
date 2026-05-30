@@ -215,6 +215,12 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 .form-grid.form-grid-3.pv2-header-row2 {
     grid-template-columns: minmax(6.5rem, 0.65fr) minmax(0, 1.7fr) minmax(5.5rem, 0.65fr);
 }
+.form-grid.form-grid-3.pv2-header-row2 input[type="text"],
+.form-grid.form-grid-3.pv2-header-row2 select {
+    height: var(--input-min-h);
+    min-height: var(--input-min-h);
+    box-sizing: border-box;
+}
 </style>
 
 <div class="page-title page-title--stacked">
