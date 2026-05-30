@@ -3721,6 +3721,8 @@ function orange_catalog_runtime_light_hooks(PDO $pdo): void
     try {
         require_once __DIR__ . '/product_channels.php';
         orange_product_channels_ensure_missing_links($pdo);
+        require_once __DIR__ . '/catalog_kw_product_types_seed.php';
+        orange_catalog_ensure_kw_product_types($pdo);
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] orange_catalog_runtime_light_hooks: ' . $e->getMessage());

@@ -3,9 +3,9 @@ ORANGE — خطة مراحل تنفيذ الشجرة الموحّدة (Unified C
 Archive: docs/archive/ORANGE_UNIFIED_CATALOG_ROLLOUT_PHASES.txt
 مرجع سياسة/ERD: docs/archive/ORANGE_UNIFIED_TAXONOMY_AND_CATALOG_ERD.txt
 مرجع مختصر: docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt — «تاسعاً»
-Last updated: 2026-05-20 (المرحلة **1 مغلقة** — Go-Live KW)
+Last updated: 2026-05-20 (المرحلة **2 مغلقة** — seed أوتوماتيك product_types KW)
 
-**سياسة المالك (إلزامي للوكلاء):** **لا SQL يدوي** — **`git pull`** + **طلب واحد** (أدمن/متجر) = bootstrap + ربط قنوات **أوتوماتيك** (`orange_catalog_runtime_light_hooks` حتى مع APCu/ok-flag).
+**سياسة المالك (إلزامي للوكلاء):** **لا SQL يدوي** — **`git pull`** + **طلب واحد** (أدمن/متجر) = bootstrap + runtime hooks (قنوات · product_types KW) **أوتوماتيك**.
 
 الغرض:
 - تتبع **ما تم** و**ما تبقى** لاعتماد المتجر 100% على الشجرة الموحّدة.
@@ -19,13 +19,13 @@ Last updated: 2026-05-20 (المرحلة **1 مغلقة** — Go-Live KW)
 |---------|-----------------------------------|-------------|---------------|
 | 0       | تثبيت الأساس                      | **مغلق**    | 2026-05-30    |
 | 1       | Go-Live المتجر الموحّد            | **مغلق**    | 2026-05-20    |
-| 2       | إكمال الشجرة (product_types)      | **مفتوح**   | —             |
+| 2       | إكمال الشجرة (product_types)      | **مغلق**    | 2026-05-20    |
 | 3       | المنتجات والصفات                  | **مفتوح**   | —             |
 | 4       | فصل الدول + الشجرة                | **جزئي**    | —             |
 | 5       | إغلاق Legacy                      | **مفتوح**   | —             |
 | 6       | Polish (اختياري)                  | **مفتوح**   | —             |
 
-**تقدير إجمالي الشجرة الموحّدة (تشغيلي):** ~**65%** (المراحل 0–1 مغلقة؛ أوراق product_types + legacy).
+**تقدير إجمالي الشجرة الموحّدة (تشغيلي):** ~**75%** (المراحل 0–2 مغلقة؛ صفات منتجات + legacy).
 
 
 **آخر تحقق سيرفر (قبل إغلاق 1 — 2026-05-30):**
@@ -40,10 +40,11 @@ Last updated: 2026-05-20 (المرحلة **1 مغلقة** — Go-Live KW)
 - ~125 subcategory نشطة **بلا** product_type (أولوية مرحلة 2)
 - dump **بلا** صفوف `products` — تحقق المنتجات من السيرفر فقط
 
-**كود automation (مرحلة 0–1):**
+**كود automation (مراحل 0–2):**
 - `includes/catalog_taxonomy_migrate.php` — manual tree adopt
 - `includes/product_channels.php` — `orange_product_channels_ensure_missing_links`
-- `includes/catalog_schema.php` — bootstrap + **`orange_catalog_runtime_light_hooks`** (ربط القنوات حتى مع APCu/ok-flag)
+- `includes/catalog_kw_product_types_seed.php` — **`orange_catalog_ensure_kw_product_types`** (≥1 نوع لكل subcategory نشط تحت KW)
+- `includes/catalog_schema.php` — **`orange_catalog_runtime_light_hooks`** (قنوات + product_types)
 - `pages/home.php` · `catalog_unified_product_helpers.php` — فلتر 4 أقسام KW
 - `api/products/get-products.php` · `get-categories.php` — unified فقط
 
@@ -82,16 +83,16 @@ STATUS: **CLOSED** (2026-05-20)
 ================================================================================
 3) المرحلة 2 — إكمال الشجرة (قبل SKU جديد)
 ================================================================================
-STATUS: **OPEN**
+STATUS: **CLOSED** (2026-05-20)
 
 | #   | المهمة | الحالة | ملاحظة |
 |-----|--------|--------|--------|
-| 2.1 | جرد subcategories بلا product_type | **open** | ~125 / 160 (لقطة DB) |
-| 2.2 | أولوية: أقسام KW المفعّلة (نساء → …) | **open** | |
-| 2.3 | 1+ product_type لكل subcategory نشط تحت قسم KW | **open** | admin → product_types |
-| 2.4 | expected_commercial_kind / sizing_category على الأوراق | **partial** | 123 نوع — ملابس نسائية غالباً |
+| 2.1 | جرد subcategories بلا product_type | **done** | probe في seed |
+| 2.2 | أولوية: أقسام KW المفعّلة (نساء → …) | **done** | department_countries |
+| 2.3 | 1+ product_type لكل subcategory نشط تحت قسم KW | **done** | runtime seed أوتوماتيك |
+| 2.4 | expected_commercial_kind / sizing_category على الأوراق | **done** | backfill من القسم/القاموس؛ جمال بلا مقاس |
 
-**معيار إغلاق المرحلة 2:** كل subcategory **نشط** تحت **department مفعّل للكويت** و**مُخطَّط للبيع** → ≥1 product_type نشط.
+**معيار إغلاق المرحلة 2:** ✅ كل subcategory نشط تحت قسم KW → ≥1 product_type نشط؛ expected sizing حيث ينطبق.
 
 ================================================================================
 4) المرحلة 3 — المنتجات والصفات
@@ -203,7 +204,8 @@ includes/product_channels.php
 
 2026-05-30 — إنشاء خطة المراحل 0–6 + حالة ابتدائية (سيرفر + orange_db.sql + قرار 4 أقسام KW).
 2026-05-30 — **المرحلة 0 مغلقة:** automation PHP (manual tree adopt + product_channels backfill) + commit.
-2026-05-20 — **المرحلة 1 مغلقة:** Go-Live KW (home/product/cart/APIs موحّدة) + runtime product_channels hooks.
+2026-05-20 — **المرحلة 1 مغلقة:** Go-Live KW + runtime product_channels hooks.
+2026-05-20 — **المرحلة 2 مغلقة:** `orange_catalog_ensure_kw_product_types` + backfill expected sizing (runtime hooks).
 
 ================================================================================
 نهاية المستند

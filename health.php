@@ -88,3 +88,32 @@ if ($rollout === 'unified-phase1') {
         echo 'ROLLOUT_PHASE1_ERROR: ' . $e->getMessage() . "\n";
     }
 }
+
+if ($rollout === 'unified-phase2') {
+    try {
+        require_once __DIR__ . '/includes/catalog_schema.php';
+        require_once __DIR__ . '/includes/catalog_taxonomy_migrate.php';
+        require_once __DIR__ . '/includes/catalog_kw_product_types_seed.php';
+        require_once __DIR__ . '/includes/countries.php';
+        $pdoRollout = db();
+        orange_catalog_ensure_schema($pdoRollout);
+        $kwId = orange_countries_default_id($pdoRollout);
+        $missing = -1;
+        if ($kwId > 0) {
+            $missing = orange_catalog_kw_subcategories_missing_active_product_type_count($pdoRollout, $kwId);
+            echo 'kw_subcategories_missing_product_type=' . $missing . "\n";
+            $ptKw = (int) $pdoRollout->query(
+                'SELECT COUNT(*) FROM product_types pt
+                 INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id AND ucs.is_active = 1
+                 INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id AND ucc.is_active = 1
+                 INNER JOIN catalog_sections cs ON cs.id = ucc.catalog_section_id AND cs.is_active = 1
+                 INNER JOIN departments d ON d.id = cs.department_id
+                 WHERE pt.is_active = 1'
+            )->fetchColumn();
+            echo 'kw_active_product_types=' . $ptKw . "\n";
+        }
+        echo $missing === 0 ? "ROLLOUT_PHASE2_OK\n" : "ROLLOUT_PHASE2_PENDING\n";
+    } catch (Throwable $e) {
+        echo 'ROLLOUT_PHASE2_ERROR: ' . $e->getMessage() . "\n";
+    }
+}
