@@ -169,8 +169,9 @@ manual_order / create-manual.php — [منتهٍ] — INV-C + GL عند الحف
 [GAP-ACC-08] ~~module expenses GL (غائب)~~ → **ملغى/تراثي** — المصروفات = **سند صرف** (payment_voucher / PV)؛ لا شاشة expenses مستقلة.
 [GAP-ACC-09] منخفض — accounting_reports_index: تحديث شارات (pl_compare → جاهز)
 [GAP-ACC-10] مستقبل — تدفقات نقدية، أبعاد تحليلية، تسويات (policy v2 §3)
-[GAP-ACC-11] توضيح — التقارير = journal_vouchers مرحّلة؛ المعلق في gl_posting فقط؛ §13/YEC استثناءان موثّقان
+[GAP-ACC-11] توضيح — التقارير = journal_vouchers مرحّلة؛ المعلق في gl_posting فقط؛ §13/YEC استثناءان موثّقان — **→ يُستبدل/يُدمج مع GAP-ACC-14 عند تنفيذ إقفال التعديلات**
 [GAP-ACC-13] منخفض — YEC: تلميع بحث/تصفّح داخل year_end_close_vouchers (اختياري)
+[GAP-ACC-14] ~~قرار مالك~~ → **[مغلق — منتهٍ 2026-05-20]** — **«إقفال التعديلات»** (`edit_lock` rev 67): قفل/فك + صلاحيات + audit؛ طابور GL معطّل افتراضياً؛ **`docs/archive/ORANGE_EDIT_LOCK_POLICY.txt`**
 
 ================================================================================
 6) خطة إغلاق إلى 100% (مقترحة — محدّثة 2026-05-20)

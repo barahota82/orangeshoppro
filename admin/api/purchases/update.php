@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
 require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
+require_once __DIR__ . '/../../../includes/edit_lock.php';
 require_once __DIR__ . '/../../../includes/journal_write.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
@@ -114,6 +115,22 @@ try {
     $purchaseCountryId = (int) ($purchase['country_id'] ?? 0);
     if ($purchaseCountryId <= 0) {
         $purchaseCountryId = orange_admin_context_country_id($pdo);
+    }
+
+    $adminRow = current_admin();
+    if ($adminRow) {
+        try {
+            orange_edit_lock_assert_may_mutate(
+                $pdo,
+                $adminRow,
+                'purchase',
+                $purchaseId,
+                $action === 'delete' ? 'delete' : 'edit',
+                $purchaseCountryId > 0 ? $purchaseCountryId : null
+            );
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 422);
+        }
     }
 
     $accRow = orange_voucher_find_by_document($pdo, 'purchase', $purchaseId, 'purchase', $purchaseCountryId > 0 ? $purchaseCountryId : null)
@@ -289,6 +306,8 @@ try {
     }
 
     $pdo->commit();
+    orange_edit_lock_register_purchase($pdo, $purchaseId, $purchaseCountryId, $newTotal, $now);
+    orange_edit_lock_log_mutation($pdo, 'purchase', $purchaseId, 'edit');
     audit_log('purchase_update', 'تم تعديل فاتورة شراء رقم: ' . $purchaseId, 'purchases', $purchaseId);
     json_response(['success' => true, 'message' => 'تم تعديل عملية الشراء']);
 } catch (Throwable $e) {

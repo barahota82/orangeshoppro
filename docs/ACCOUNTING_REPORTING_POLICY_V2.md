@@ -31,6 +31,7 @@ Screens updated toward mapping-first grouping include **Trading** and **Income S
 
 | Module | Scope |
 |--------|--------|
+| **Edit lock (GAP-ACC-14)** | **Implemented rev 67** — `edit_lock` screen; immediate GL default |
 | **Analytical dimensions** | v1 **implemented (ACC-10 phase 4):** `branch` + `channel` dimensions; optional `dimension_value_id` on journal lines; `report_analytical` P&amp;L or GL movement by dimension value. Extend codes only by owner decision. |
 | **Reconciliation** | Bank + inventory reconciliation **implemented (ACC-10 phases 2–3)**; AR aging etc. remain adjacent work. |
 

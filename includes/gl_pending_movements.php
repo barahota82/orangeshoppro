@@ -9,7 +9,9 @@ require_once __DIR__ . '/party_allocations.php';
 require_once __DIR__ . '/countries.php';
 
 /**
- * طابور الحركات المعلّقة — تعطيله مؤقتاً عبر ORANGE_GL_IMMEDIATE_POSTING=1 في .env.php (على السيرفر).
+ * طابور الحركات المعلّقة — **افتراضي: معطّل** (ترحيل فوري — ORANGE_EDIT_LOCK_POLICY §5).
+ * تفعيل الطابور (legacy): ORANGE_GL_USE_PENDING_QUEUE=1 في .env.php
+ * أو تعطيل صريح: ORANGE_GL_IMMEDIATE_POSTING=1
  */
 function orange_gl_use_pending_queue(PDO $pdo): bool
 {
@@ -19,6 +21,10 @@ function orange_gl_use_pending_queue(PDO $pdo): bool
     }
     $im = $env['ORANGE_GL_IMMEDIATE_POSTING'] ?? false;
     if ($im === true || $im === 1 || $im === '1' || strtolower((string) $im) === 'true') {
+        return false;
+    }
+    $useQueue = $env['ORANGE_GL_USE_PENDING_QUEUE'] ?? false;
+    if ($useQueue !== true && $useQueue !== 1 && $useQueue !== '1' && strtolower((string) $useQueue) !== 'true') {
         return false;
     }
 

@@ -77,6 +77,7 @@ function orange_admin_page_resource(string $page): string
         'journal_voucher_reports' => 'accounting',
         'journal_types' => 'accounting',
         'gl_posting' => 'accounting',
+        'edit_lock' => 'accounting',
         'financial_report' => 'accounting',
         'accounting_reports_index' => 'accounting',
         'report_gl_account_monthly' => 'accounting',
@@ -144,6 +145,7 @@ function orange_admin_api_folder_resource(string $folder): string
         'year_end_close' => 'accounting',
         'system' => 'accounting',
         'gl' => 'accounting',
+        'edit-lock' => 'accounting',
         'fiscal_years' => 'accounting',
         'opening_balances' => 'accounting',
         'bank-reconciliation' => 'accounting',
@@ -219,7 +221,7 @@ function orange_admin_permissions_matrix(PDO $pdo, int $adminId): array
         return [];
     }
     $st = $pdo->prepare(
-        'SELECT resource_key, can_view, can_edit, can_delete FROM admin_permissions WHERE admin_id = ?'
+        'SELECT resource_key, can_view, can_edit, can_delete, can_lock, can_unlock FROM admin_permissions WHERE admin_id = ?'
     );
     $st->execute([$adminId]);
     $out = [];
@@ -229,6 +231,8 @@ function orange_admin_permissions_matrix(PDO $pdo, int $adminId): array
             'can_view' => (int) $row['can_view'] === 1,
             'can_edit' => (int) $row['can_edit'] === 1,
             'can_delete' => (int) $row['can_delete'] === 1,
+            'can_lock' => (int) ($row['can_lock'] ?? 0) === 1,
+            'can_unlock' => (int) ($row['can_unlock'] ?? 0) === 1,
         ];
     }
     $cache[$adminId] = $out;
@@ -300,6 +304,12 @@ function orange_admin_may(array $admin, PDO $pdo, string $resource, string $acti
     if ($action === 'edit') {
         return $row['can_edit'];
     }
+    if ($action === 'lock') {
+        return !empty($row['can_lock']);
+    }
+    if ($action === 'unlock') {
+        return !empty($row['can_unlock']);
+    }
 
     return $row['can_view'];
 }
@@ -335,6 +345,13 @@ function orange_admin_require_page(array $admin, PDO $pdo, string $page): void
 function orange_admin_enforce_api(array $admin, PDO $pdo): void
 {
     $path = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_FILENAME'] ?? ''));
+    if (str_contains($path, '/admin/api/edit-lock/')) {
+        if (!orange_admin_may($admin, $pdo, 'accounting', 'view')) {
+            json_response(['success' => false, 'message' => 'لا تملك صلاحية عرض إقفال التعديلات'], 403);
+        }
+
+        return;
+    }
     if (str_contains($path, '/admin/api/admins/')) {
         if (!orange_admin_is_superuser($admin)) {
             json_response(['success' => false, 'message' => 'إدارة المستخدمين متاحة للمشرف العام فقط'], 403);

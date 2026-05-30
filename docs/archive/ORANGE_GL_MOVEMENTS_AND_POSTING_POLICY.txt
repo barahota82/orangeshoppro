@@ -150,3 +150,14 @@ ENGLISH — Suggested implementation phases (optional order)
 5. Dynamic mapping UI/API for invoice ancillaries if not folded into catalog.
 
 ================================================================================
+14) قرار مالك 2026-05-20 — «إقفال التعديلات» (GAP-ACC-14 — منفَّذ rev 67)
+================================================================================
+ARABIC
+- **مرجع canonical:** **`docs/archive/ORANGE_EDIT_LOCK_POLICY.txt`**
+- **§1–§2 (طابور GL):** **superseded** — ترحيل فوري افتراضي؛ `gl_posting` → redirect إلى **`edit_lock`**
+- **ما لا يتغيّر:** §9 YEC، §10، §11، §13 (مسارات GL خاصة)
+
+ENGLISH
+- Edit Lock implemented; GL pending queue opt-in only (`ORANGE_GL_USE_PENDING_QUEUE` in `.env.php`).
+
+================================================================================

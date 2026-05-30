@@ -91,7 +91,7 @@ if ($initialJson === false) {
 
     <p class="actions gl-acc-stmt-no-print" style="margin:0 0 16px;">
         <button type="button" class="btn-secondary" id="br_btn_new">جلسة جديدة</button>
-        <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=gl_posting'), ENT_QUOTES, 'UTF-8'); ?>">إقفال الحركات</a>
+        <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=edit_lock'), ENT_QUOTES, 'UTF-8'); ?>">إقفال التعديلات</a>
     </p>
 
     <div class="card" style="margin-bottom:16px;">

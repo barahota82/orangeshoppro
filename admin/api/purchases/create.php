@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
+require_once __DIR__ . '/../../../includes/edit_lock.php';
 require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_write.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
@@ -295,6 +296,7 @@ try {
     }
 
     $pdo->commit();
+    orange_edit_lock_register_purchase($pdo, $purchaseId, $purchaseCountryId, $computedTotal, $now);
     audit_log('purchase_create', 'تم إنشاء فاتورة شراء رقم: ' . $purchaseId, 'purchases', $purchaseId);
     $voucherLinks = orange_gl_posting_voucher_links($pdo, 'purchase', $purchaseId, [
         ['entry_type' => 'purchase', 'journal_type_code' => 'PIN', 'label' => 'قيد فاتورة الشراء'],

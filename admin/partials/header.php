@@ -373,7 +373,7 @@ $orangeAdminCurrencyUnitNav = orange_currency_display_unit($orangeAdminCurrencyN
                         ['page' => 'analytical_dimensions', 'href' => '/admin/index.php?page=analytical_dimensions', 'label' => 'الأبعاد التحليلية', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'journal_types', 'href' => '/admin/index.php?page=journal_types', 'label' => 'أنواع اليوميات', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'fiscal_years', 'href' => '/admin/index.php?page=fiscal_years', 'label' => 'السنوات المالية', 'class' => 'admin-nav-sub', 'sub' => true],
-                        ['page' => 'gl_posting', 'href' => '/admin/index.php?page=gl_posting', 'label' => 'إقفال الحركات (ترحيل)', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'edit_lock', 'href' => '/admin/index.php?page=edit_lock', 'label' => 'إقفال التعديلات', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'opening_balances', 'href' => '/admin/index.php?page=opening_balances', 'label' => 'أرصدة أول المدة المالية', 'class' => 'admin-nav-sub', 'sub' => true],
                     ],
                 ],

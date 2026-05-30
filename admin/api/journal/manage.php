@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
+require_once __DIR__ . '/../../../includes/edit_lock.php';
 require_once __DIR__ . '/../../../includes/gl_pending_movements.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
@@ -395,6 +396,12 @@ try {
                 orange_admin_api_catch($e, 'تعذر إضافة السند', 422);
             }
             audit_log('journal_create', 'تم إنشاء سند محاسبي رقم: ' . $vid, 'journal_vouchers', $vid);
+            $vNew = $pdo->prepare('SELECT * FROM journal_vouchers WHERE id = ? LIMIT 1');
+            $vNew->execute([$vid]);
+            $vRowNew = $vNew->fetch(PDO::FETCH_ASSOC);
+            if ($vRowNew) {
+                orange_edit_lock_register_voucher($pdo, $vRowNew);
+            }
             json_response(['success' => true, 'message' => 'تم إضافة السند', 'id' => $vid]);
 
             return;
@@ -463,6 +470,12 @@ try {
             orange_admin_api_catch($e, 'تعذر إضافة السند', 422);
         }
         audit_log('journal_create', 'تم إنشاء سند محاسبي رقم: ' . $vid, 'journal_vouchers', $vid);
+        $vNew2 = $pdo->prepare('SELECT * FROM journal_vouchers WHERE id = ? LIMIT 1');
+        $vNew2->execute([$vid]);
+        $vRowNew2 = $vNew2->fetch(PDO::FETCH_ASSOC);
+        if ($vRowNew2) {
+            orange_edit_lock_register_voucher($pdo, $vRowNew2);
+        }
         json_response(['success' => true, 'message' => 'تم إضافة السند', 'id' => $vid]);
 
         return;
@@ -907,6 +920,23 @@ try {
         json_response($blocked, 422);
     }
 
+    $jvKind = orange_edit_lock_kind_for_entry_type($entryTypeV);
+    $adminJv = current_admin();
+    if ($adminJv) {
+        try {
+            orange_edit_lock_assert_may_mutate(
+                $pdo,
+                $adminJv,
+                $jvKind,
+                $id,
+                $action === 'delete' ? 'delete' : 'edit',
+                isset($v['country_id']) ? (int) $v['country_id'] : null
+            );
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
     if ($action === 'update') {
         $etReqUp = orange_journal_manage_resolve_ui_entry_type($data, 'manual');
         $linesInUp = $data['lines'] ?? null;
@@ -948,6 +978,13 @@ try {
             orange_admin_api_catch($e, 'تعذر تحديث السند', 422);
         }
         audit_log('journal_update', 'تم تحديث سند محاسبي رقم: ' . $id, 'journal_vouchers', $id);
+        $vFresh = $pdo->prepare('SELECT * FROM journal_vouchers WHERE id = ? LIMIT 1');
+        $vFresh->execute([$id]);
+        $vRow = $vFresh->fetch(PDO::FETCH_ASSOC);
+        if ($vRow) {
+            orange_edit_lock_register_voucher($pdo, $vRow);
+            orange_edit_lock_log_mutation($pdo, $jvKind, $id, 'edit');
+        }
         json_response(['success' => true, 'message' => 'تم تحديث السند', 'id' => $id]);
 
         return;

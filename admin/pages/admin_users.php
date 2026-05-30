@@ -72,7 +72,7 @@ $auCountries = orange_countries_admin_list($dbAu);
 
 <div class="card">
     <h3 class="card-title">صلاحيات المستخدم المختار</h3>
-    <p class="card-hint muted">لا تُطبَّق على المشرف العام. «تعديل» يشمل الإنشاء والحفظ عبر واجهات البرمجة؛ «حذف» لعمليات الحذف.</p>
+        <p class="card-hint muted">«تعديل» يشمل الإنشاء والحفظ؛ «قفل/فك» لإقفال التعديلات (GAP-ACC-14).</p>
     <input type="hidden" id="perm_target_id" value="0">
     <div class="table-wrap">
         <table>
@@ -82,6 +82,8 @@ $auCountries = orange_countries_admin_list($dbAu);
                     <th>عرض</th>
                     <th>تعديل</th>
                     <th>حذف</th>
+                    <th>قفل</th>
+                    <th>فك قفل</th>
                 </tr>
             </thead>
             <tbody id="perm_matrix_tbody"></tbody>
@@ -123,7 +125,9 @@ function renderPermMatrix(adminId, existing) {
             '<td>' + escapeHtml(AU_LABELS[key]) + '</td>' +
             '<td><input type="checkbox" class="p-v" data-k="' + key + '"' + (ex.can_view ? ' checked' : '') + '></td>' +
             '<td><input type="checkbox" class="p-e" data-k="' + key + '"' + (ex.can_edit ? ' checked' : '') + '></td>' +
-            '<td><input type="checkbox" class="p-d" data-k="' + key + '"' + (ex.can_delete ? ' checked' : '') + '></td>';
+            '<td><input type="checkbox" class="p-d" data-k="' + key + '"' + (ex.can_delete ? ' checked' : '') + '></td>' +
+            '<td><input type="checkbox" class="p-l" data-k="' + key + '"' + (ex.can_lock ? ' checked' : '') + '></td>' +
+            '<td><input type="checkbox" class="p-u" data-k="' + key + '"' + (ex.can_unlock ? ' checked' : '') + '></td>';
         tb.appendChild(tr);
     });
 }
@@ -176,7 +180,7 @@ function pickAdmin(id) {
         };
         var pm = (r.permissions_by_admin && r.permissions_by_admin[id]) ? r.permissions_by_admin[id] : {};
         if (a.is_superuser == 1) {
-            document.getElementById('perm_matrix_tbody').innerHTML = '<tr><td colspan="4" class="muted">مشرف عام — كل الصلاحيات.</td></tr>';
+            document.getElementById('perm_matrix_tbody').innerHTML = '<tr><td colspan="6" class="muted">مشرف عام — كل الصلاحيات.</td></tr>';
             document.getElementById('perm_target_id').value = '0';
         } else {
             renderPermMatrix(id, pm);
@@ -213,7 +217,9 @@ function savePermissions() {
         matrix[k] = {
             can_view: tr.querySelector('.p-v').checked,
             can_edit: tr.querySelector('.p-e').checked,
-            can_delete: tr.querySelector('.p-d').checked
+            can_delete: tr.querySelector('.p-d').checked,
+            can_lock: tr.querySelector('.p-l') ? tr.querySelector('.p-l').checked : false,
+            can_unlock: tr.querySelector('.p-u') ? tr.querySelector('.p-u').checked : false
         };
     });
     postJSON('/admin/api/admins/permissions-save.php', { admin_id: aid, permissions: matrix }).then(function (r) {
