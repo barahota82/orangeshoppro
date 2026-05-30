@@ -103,7 +103,7 @@ opening_stock_balances (admin/pages/opening_stock_balances.php) — **مخازن
 - APIs: admin/api/stock/adjust.php, admin/api/stock/opening-stock-lock.php
 - includes/opening_stock_lock.php
 - الحالة: **[منتهٍ §11]** — كميات بلا GL؛ checkbox «مقفول» per دولة؛ adjust محمي؛ UI في stock/item_card
-- ثغرات: لا GL للقيمة (by design — OBV مالي منفصل)
+- **سياسة §11 (نهائي):** كميات **فقط** — **لا GL** — **لا ربط** بـ OBV؛ الأرصدة المالية تُدخل يدوياً من `opening_balances` (انظر ORANGE_GL_MOVEMENTS §11)
 
 accounting_reports_index (admin/pages/accounting_reports_index.php) — **بلا nav**
 - الحالة: [مرجع جزئي] — **شارة pl_compare_years ما زالت «تطوير لاحق»** بينما الشاشة في nav [GAP-ACC-09]
@@ -427,6 +427,7 @@ manual_order / create-manual.php — [منتهٍ] — INV-C + GL عند الحف
 
 2026-05-20 — A1 §10: طباعة بعد الحفظ (a0125b9).
 2026-05-20 — A3 §11: opening_stock_locked + API + حماية adjust (d0406c4، rev 62).
+2026-05-20 — §11 **نهائي:** فصل مطلق مخزني/مالي؛ **مُلغى** جسر «قيمة مخزون → OBV» (ORANGE_GL_MOVEMENTS §11).
 2026-05-20 — A2 §9: YEC + year_end_close_vouchers + fiscal flow + void (3c49ce3، rev 63).
 2026-05-20 — B1–B8 §13: فصل GL، مناديب، handover، posting، INV-O/C، invoice_edit (3e78020…aa80700).
 2026-05-20 — §13.8: ترحيل INV- legacy (0f98a06، rev 64). س29 محدّث في ORANGE_STOREFRONT_POLICY_REFERENCE.

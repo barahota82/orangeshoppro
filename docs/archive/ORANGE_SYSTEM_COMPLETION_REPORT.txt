@@ -1,7 +1,9 @@
 ORANGE — تقرير اكتمال النظام الشامل (أدمن + GL + §13 + مراجع)
 Archive: docs/archive/ORANGE_SYSTEM_COMPLETION_REPORT.txt
-Last updated: 2026-05-20 (navAccountingAll 100% · ACC-10 v2 100% · system ~94%)
-Canvas companion (مثبت بجانب الدردشة):
+Last updated: 2026-05-20 (§13.13 مغلق · §11 مخزني/مالي منفصلان · system ~95%)
+Canvas companion (تقرير شامل):
+  .cursor/projects/d-orange/canvases/orange-system-full-project.canvas.tsx
+Canvas محاسبة فرعي:
   .cursor/projects/d-orange/canvases/admin-accounting-reports-completion.canvas.tsx
 تفصيل محاسبي فرعي: docs/archive/ORANGE_ADMIN_ACCOUNTING_REPORTS_STATUS.txt
 
@@ -16,7 +18,7 @@ Canvas companion (مثبت بجانب الدردشة):
 منهجية (2026-05-20):
 - قراءة admin/partials/header.php (قوائم nav الفعلية)
 - admin/index.php ($allowed)
-- includes/catalog_schema.php → ORANGE_CATALOG_SCHEMA_PHP_REVISION = **64**
+- includes/catalog_schema.php → ORANGE_CATALOG_SCHEMA_PHP_REVISION = **68**
 - مسارات GL: gl_pending_movements.php، journal_voucher.php، year_end_close.php، order_fulfillment.php
 - commits main: 0f98a06 (INV legacy + rev 64)، aa80700 (cancel-from-delivery + BOGO frame)
 - أرشيف: ORANGE_GL_MOVEMENTS §8–§13، ORANGE_STOREFRONT_POLICY_REFERENCE، COMPLETION_ROADMAP phases 3–6
@@ -37,7 +39,7 @@ Schema rev 64: ترحيل أرقام INV- القديمة → INV-O / INV-C.
 | الإعدادات (navSettings)              | **90%** | تشغيلي |
 | واجهة المتجر (سياسة س1–س30)          | **~88%** | STOREFRONT_POLICY_REFERENCE |
 | **navAccountingAll + policy v2**     | **100%**| ACC-10 منتهٍ |
-| **النظام الكامل (5 mega-nav)**       | **~96%**| المتجر يخفّض المتوسط |
+| **النظام الكامل (5 mega-nav)**       | **~95%**| المتجر ~88% يخفّض المتوسط |
 
 §12.1 — منتهٍ في الكود:
 
@@ -68,7 +70,7 @@ Lane B — ترحيل مباشر (by design — **خارج** gl_posting):
 
 Lane C — بلا GL:
   - completed = مخزون فقط (قبل final posting)
-  - opening_stock_balances = كميات بلا قيد (§11؛ OBV مالي منفصل)
+  - opening_stock_balances = كميات بلا قيد (§11 — **بلا ربط OBV**؛ المالي من `opening_balances` يدوياً)
 
 ORANGE_GL_IMMEDIATE_POSTING=1 على السيرفر = bypass تطويري — ليس بالضرورة «ثغرة».
 
@@ -127,24 +129,28 @@ channels, delivery_areas, storefront_hero, merge_requests               [منت�
 فجوات: بنود بلا «تنفيذ» في المرجع — تُغلق عند «كمّل العمل» على الواجهة.
 
 ================================================================================
-8) GAP-ACC — قائمة محدّثة
+8) GAP-ACC — قائمة محدّثة (2026-05-20 — متزامن مع ACCT_ARCHIVE)
 ================================================================================
 
-[GAP-ACC-01] Lane A — تدقيق orange_voucher_post() (استثناء §9/§13)
-[GAP-ACC-03] تعديل journal/manage على سند مرحّل vs repost
-[GAP-ACC-05] ~~partner_account_statement — وضع مورد~~ → **مغلق 2026-05-20** — المورد = حساب فرعي بالدليل (`payable_account_id`)؛ الكشف عبر `?account=` أو من الموردين — لا mode=supplier
-[GAP-ACC-06] صلاحيات post vs unpost
-[GAP-ACC-07] بنود فاتورة — قرار معتمد → ORANGE_INVOICE_ANCILLARY_LINES_POLICY.txt (تنفيذ مفتوح)
-[GAP-ACC-08] ~~module مصروفات GL (غائب)~~ → **ملغى/تراثي** — المصروفات = **سند صرف** (payment_voucher / PV)
-[GAP-ACC-09] accounting_reports_index — **منتهٍ** (شارات ACC-10)
-[GAP-ACC-10] تدفقات نقدية + تسويات + أبعاد — **مغلق 2026-05-20** (مراحل 0–4 §6b)
-[GAP-ACC-11] ملاحظة UX gl_posting (YEC + §13 خارج الشاشة)
-[GAP-ACC-13] YEC تلميع بحث (اختياري)
+**GAP-ACC = 0 مفتوح (حرج).** الباقي اختياري/تجميلي:
 
-مغلقة: GAP-ACC-04 YEC | GAP-ACC-05 كشف مورد | GAP-ACC-12 §13 | GAP-ACC-10 ACC-10 | GAP-ACC-02 **ملغى** | GAP-ACC-08 **تراثي/PV**
+[GAP-ACC-01] Lane A — **تراثي opt-in** — لا يمنع إن الطابور off
+[GAP-ACC-02] ~~استلام مشتريات~~ → **ملغى**
+[GAP-ACC-03] تعديل مرحّل → **مغلق** (in-place بعد فك edit_lock)
+[GAP-ACC-04] YEC → **مغلق** rev 63
+[GAP-ACC-05] كشف مورد → **مغلق** (حساب فرعي بالدليل)
+[GAP-ACC-06] صلاحيات lock → **منتهٍ** rev 67
+[GAP-ACC-07] بنود فاتورة → **0–3 منتهية**؛ **مرحلة 4 VAT اختياري**
+[GAP-ACC-08] ~~expenses module~~ → **ملغى/تراثي** (PV)
+[GAP-ACC-09] accounting_reports_index — **شارة pl_compare** (تجميلي)
+[GAP-ACC-10] ACC-10 → **مغلق** (مراحل 0–4)
+[GAP-ACC-11] gl_posting UX → **مغلق** (ACC-14 redirect)
+[GAP-ACC-12] §13 → **مغلق** B0–B8 + §13.13 O-01…O-14
+[GAP-ACC-13] YEC بحث → **منتهٍ**
+[GAP-ACC-14] edit_lock → **مغلق**
 
 ================================================================================
-9) خطة الإغلاق — 93% → 100%
+9) خطة الإغلاق — ~95% → 100%
 ================================================================================
 
 **100% تشغيلي:** ACC-07 مرحلة 4 VAT اختياري
@@ -174,4 +180,5 @@ ORANGE_STOREFRONT_POLICY_REFERENCE.txt | COMPLETION_ROADMAP phases 3–6
 2026-05-20 — GAP-ACC-08: **ملغى/تراثي** — لا module مصروفات منفصل؛ التسجيل = سند صرف (PV).
 2026-05-20 — GAP-ACC-10 خيار د: إحالة ترتيب التنفيذ إلى ORANGE_ADMIN **§6b** (معلق قرارات المالك).
 2026-05-20 — GAP-ACC-10 **منتهٍ:** مراحل 0–4 (تدفقات، بنك، مخزون، أبعاد، تقرير تحليلي)؛ rev 66.
-2026-05-20 — percentages sync canvas: accounting+v2 = 100%; system-wide ~94%.
+2026-05-20 — §13.13 O-01…O-14 مغلق؛ nav «التوصيل والتسليم» (7c78a04)؛ system ~95%؛ Canvas شامل orange-system-full-project.
+2026-05-20 — §11 **نهائي:** مخزون افتتاحي = كميات فقط؛ OBV مالي منفصل يدوي؛ **مُلغى** أي جسر بينهما (ORANGE_GL_MOVEMENTS §11).
