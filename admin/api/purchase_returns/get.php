@@ -43,6 +43,23 @@ $items = $it->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
 json_response([
     'success' => true,
-    'purchase_return' => $header,
-    'items' => $items,
+    'purchase_return' => [
+        'id' => (int) ($header['id'] ?? 0),
+        'supplier_id' => $header['supplier_id'] !== null ? (int) $header['supplier_id'] : 0,
+        'purchase_id' => isset($header['purchase_id']) && $header['purchase_id'] !== null
+            ? (int) $header['purchase_id']
+            : 0,
+        'type' => (string) ($header['type'] ?? ''),
+        'notes' => (string) ($header['notes'] ?? ''),
+        'total' => (float) ($header['total'] ?? 0),
+        'return_number' => (string) ($header['return_number'] ?? ''),
+    ],
+    'items' => array_map(static function (array $row): array {
+        return [
+            'product_id' => (int) ($row['product_id'] ?? 0),
+            'variant_id' => isset($row['variant_id']) ? (int) $row['variant_id'] : 0,
+            'qty' => (int) ($row['qty'] ?? 0),
+            'cost' => (float) ($row['cost'] ?? 0),
+        ];
+    }, $items),
 ]);

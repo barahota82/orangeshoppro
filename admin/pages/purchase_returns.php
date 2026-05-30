@@ -166,9 +166,74 @@ if ($prefillStmtKind === 'supplier' && $prefillStmtId > 0) {
 }
 
 $pr2Ready = ($inventoryAccId !== null && $inventoryAccId > 0 && $cashAccId !== null && $cashAccId > 0);
+$pr2NavReady = orange_table_exists($pdo, 'purchase_returns');
 $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_settings');
 $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers');
 ?>
+<style>
+.jv-search-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10060;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    direction: rtl;
+}
+.jv-search-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+}
+.jv-search-modal__panel {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: min(96vw, 58rem);
+    max-height: calc(100vh - 32px);
+    overflow: auto;
+    background: #fff;
+    border: 1px solid #e4e4e7;
+    border-radius: 10px;
+    box-shadow: 0 20px 50px rgba(0,0,0,.18);
+}
+.jv-search-modal__head {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px 16px;
+    border-bottom: 1px solid #e4e4e7;
+}
+.jv-search-modal__title { margin: 0; font-size: 1.05rem; text-align: center; }
+.jv-search-modal__body { padding: 14px 16px 18px; }
+.jv-search-modal__form { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.jv-search-modal__row--fields {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    gap: 10px;
+    width: 100%;
+    overflow-x: auto;
+}
+.jv-search-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.jv-search-field label { font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+.jv-search-field input { width: 100%; box-sizing: border-box; }
+.jv-search-field--id { flex: 0 0 7rem; }
+.jv-search-field--date { flex: 0 0 11rem; }
+.jv-search-field--ref { flex: 1 1 0; min-width: 7rem; }
+.jv-search-field--full { width: 100%; }
+.jv-search-modal__actions { margin: 0 0 16px; }
+.jv-search-table-wrap { max-height: min(40vh, 22rem); overflow: auto; border: 1px solid #e4e4e7; border-radius: 8px; }
+.jv-search-results-table { margin: 0; font-size: 0.9rem; }
+.jv-search-results-table tbody tr { cursor: pointer; }
+.jv-search-results-table tbody tr:hover { background: #f4f4f5; }
+.form-grid.form-grid-3.pr2-header-row2 {
+    grid-template-columns: minmax(6.5rem, 0.65fr) minmax(0, 1.7fr) minmax(5.5rem, 0.65fr);
+}
+</style>
 
 <div class="page-title page-title--stacked">
     <div>
@@ -183,11 +248,11 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 </div>
 <?php endif; ?>
 
-<div class="card">
-    <h3 class="card-title">مردود مشتريات</h3>
+<div class="card jv-print-area">
+    <h3 class="card-title">مردود مشتريات <span id="pr2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
 
     <!-- ١ — المورد -->
-    <div class="form-grid" style="margin-bottom:16px;">
+    <div class="form-grid" style="margin-bottom:12px;">
         <div style="grid-column:1/-1;">
             <label for="pr2_supplier_code">المورد</label>
             <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:10px 14px;">
@@ -196,6 +261,18 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             </div>
             <input type="hidden" id="pr2_supplier_id" value="0">
         </div>
+    </div>
+
+    <!-- ٢ — فاتورة الشراء المرجعية، ملاحظات، نوع المردود -->
+    <div class="form-grid form-grid-3 pr2-header-row2" style="margin-bottom:16px;">
+        <div>
+            <label for="pr2_purchase_ref">فاتورة الشراء المرجعية</label>
+            <input type="text" id="pr2_purchase_ref" placeholder="PUR- أو رقم" dir="ltr" lang="en" autocomplete="off"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
+        </div>
+        <div>
+            <label for="pr2_notes">ملاحظات</label>
+            <input type="text" id="pr2_notes" placeholder="رقم إذن الإرجاع، شروط، …"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
+        </div>
         <div>
             <label for="pr2_type">نوع المردود</label>
             <select id="pr2_type"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
@@ -203,13 +280,9 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
                 <option value="credit">آجل</option>
             </select>
         </div>
-        <div style="grid-column:1/-1;">
-            <label for="pr2_notes">ملاحظات</label>
-            <input type="text" id="pr2_notes" placeholder="رقم إذن الإرجاع، شروط، …"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
-        </div>
     </div>
 
-    <!-- ٢ — أسطر الأصناف -->
+    <!-- ٣ — أسطر الأصناف -->
     <h4 style="font-size:0.9rem;font-weight:600;color:#444;margin:0 0 10px;">أسطر الأصناف</h4>
     <div class="admin-doc-frame">
         <div class="table-wrap">
@@ -239,10 +312,18 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     </div>
 
     <!-- ٤ — أزرار -->
-    <div class="actions admin-doc-lines-toolbar" style="margin-top:16px;">
+    <div class="actions admin-doc-lines-toolbar jv-doc-toolbar jv-print-hide" style="margin-top:16px;">
         <span></span>
         <div class="jv-toolbar-primary-group">
-            <button type="button" id="pr2_btn_new" title="مردود جديد">مردود جديد</button>
+            <div class="jv-voucher-nav-btns" role="group" aria-label="تنقل بين مردودات المشتريات">
+                <button type="button" class="btn-secondary jv-nav-btn" id="pr2_nav_first" title="أول مردود" aria-label="أول مردود">&lt;&lt;</button>
+                <button type="button" class="btn-secondary jv-nav-btn" id="pr2_nav_prev" title="المردود السابق" aria-label="المردود السابق">&lt;</button>
+                <button type="button" class="btn-secondary jv-nav-btn" id="pr2_nav_next" title="المردود التالي" aria-label="المردود التالي">&gt;</button>
+                <button type="button" class="btn-secondary jv-nav-btn" id="pr2_nav_last" title="آخر مردود" aria-label="آخر مردود">&gt;&gt;</button>
+                <button type="button" class="btn-secondary jv-nav-search" id="pr2_btn_search" title="بحث عن مردود">بحث</button>
+            </div>
+            <button type="button" class="btn-secondary" id="pr2_btn_print" title="طباعة المردود المعروض" disabled>طباعة</button>
+            <button type="button" class="btn-secondary" id="pr2_btn_new" title="مردود جديد">مردود جديد</button>
             <button type="button" id="pr2_btn_save"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>حفظ</button>
         </div>
     </div>
@@ -260,6 +341,75 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     </div>
 </div>
 
+
+<!-- Search Modal -->
+<div id="pr2_search_modal" class="jv-search-modal jv-print-hide" style="display:none;" aria-hidden="true" role="dialog" aria-labelledby="pr2_search_modal_title">
+    <div class="jv-search-modal__backdrop" id="pr2_search_modal_backdrop"></div>
+    <div class="jv-search-modal__panel">
+        <div class="jv-search-modal__head">
+            <h3 id="pr2_search_modal_title" class="jv-search-modal__title">بحث في مردودات المشتريات</h3>
+        </div>
+        <div class="jv-search-modal__body">
+            <div class="jv-search-modal__form">
+                <div class="jv-search-modal__row jv-search-modal__row--fields">
+                    <div class="jv-search-field jv-search-field--id">
+                        <label for="pr2_search_id_from">رقم المردود — من</label>
+                        <input type="number" id="pr2_search_id_from" class="admin-inp" min="1" step="1" dir="ltr" lang="en">
+                    </div>
+                    <div class="jv-search-field jv-search-field--id">
+                        <label for="pr2_search_id_to">رقم المردود — إلى</label>
+                        <input type="number" id="pr2_search_id_to" class="admin-inp" min="1" step="1" dir="ltr" lang="en">
+                    </div>
+                    <div class="jv-search-field jv-search-field--date">
+                        <label for="pr2_search_date_from">التاريخ — من</label>
+                        <input type="text" id="pr2_search_date_from" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off">
+                    </div>
+                    <div class="jv-search-field jv-search-field--date">
+                        <label for="pr2_search_date_to">التاريخ — إلى</label>
+                        <input type="text" id="pr2_search_date_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off">
+                    </div>
+                    <div class="jv-search-field jv-search-field--ref">
+                        <label for="pr2_search_ref">المرجع PR- (يحتوي النص)</label>
+                        <input type="text" id="pr2_search_ref" class="admin-inp" autocomplete="off" dir="ltr" lang="en">
+                    </div>
+                </div>
+                <div class="jv-search-modal__row">
+                    <div class="jv-search-field jv-search-field--full">
+                        <label for="pr2_search_purchase_ref">فاتورة الشراء PUR- (يحتوي النص)</label>
+                        <input type="text" id="pr2_search_purchase_ref" class="admin-inp" autocomplete="off" dir="ltr" lang="en">
+                    </div>
+                </div>
+                <div class="jv-search-modal__row">
+                    <div class="jv-search-field jv-search-field--full">
+                        <label for="pr2_search_notes">ملاحظات (يحتوي النص)</label>
+                        <input type="text" id="pr2_search_notes" class="admin-inp" autocomplete="off" dir="auto">
+                    </div>
+                </div>
+            </div>
+            <div class="actions jv-search-modal__actions">
+                <button type="button" id="pr2_search_btn">تنفيذ البحث</button>
+            </div>
+            <div class="jv-search-modal__results">
+                <div class="table-wrap jv-search-table-wrap">
+                    <table class="admin-table jv-search-results-table">
+                        <thead>
+                            <tr>
+                                <th>رقم</th>
+                                <th>تاريخ</th>
+                                <th>مرجع</th>
+                                <th>مورد</th>
+                                <th>ف. شراء</th>
+                                <th>صافي</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pr2_search_results"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 (function () {
     var PR2_PRODUCTS = <?php echo json_encode($products, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
@@ -268,7 +418,10 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     var PR2_SUPPLIER_PAYABLE = <?php echo json_encode($supplierPayableMap, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var PR2_PREFILL_SUPPLIER = <?php echo (int) $prefillSupplierId; ?>;
     var PR2_READY = <?php echo $pr2Ready ? 'true' : 'false'; ?>;
+    var PR2_NAV_READY = <?php echo $pr2NavReady ? 'true' : 'false'; ?>;
 
+    var browseReturnId = 0;
+    var pr2ViewMode = false;
     var currentSupplierId = 0;
 
     function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -531,12 +684,197 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         if (ntEl) ntEl.textContent = fmt3(total);
     }
 
+
+    function parsePurchaseRef(raw) {
+        raw = String(raw || '').trim();
+        if (!raw) return 0;
+        var m = /^PUR-(\d+)$/i.exec(raw);
+        if (m) return parseInt(m[1], 10) || 0;
+        if (/^\d+$/.test(raw)) return parseInt(raw, 10) || 0;
+        return 0;
+    }
+
+    function pr2SyncToolbar() {
+        var pb = document.getElementById('pr2_btn_print');
+        if (pb) {
+            pb.disabled = browseReturnId <= 0;
+            pb.title = browseReturnId > 0 ? 'طباعة المردود المعروض' : 'افتح مردوداً محفوظاً للطباعة';
+        }
+        var sb = document.getElementById('pr2_btn_save');
+        if (sb) {
+            sb.disabled = !PR2_READY || pr2ViewMode;
+            sb.title = pr2ViewMode ? 'وضع العرض — استخدم «مردود جديد» للإدخال' : 'حفظ مردود جديد';
+        }
+        var lbl = document.getElementById('pr2_browse_label');
+        if (lbl) {
+            lbl.textContent = browseReturnId > 0 ? ('— عرض PR-' + browseReturnId) : '';
+        }
+    }
+
+    function pr2SetViewMode(on) {
+        pr2ViewMode = !!on;
+        var card = document.querySelector('.jv-print-area');
+        if (card) {
+            card.querySelectorAll('input, select, button.admin-doc-line-remove').forEach(function (el) {
+                if (el.id === 'pr2_btn_new' || el.id === 'pr2_btn_print' || el.closest('.jv-voucher-nav-btns') || el.id === 'pr2_btn_search') {
+                    return;
+                }
+                if (el.id === 'pr2_btn_save') {
+                    return;
+                }
+                el.disabled = pr2ViewMode || (!PR2_READY && el.id !== 'pr2_supplier_code');
+            });
+        }
+        pr2SyncToolbar();
+    }
+
+    function pr2FillLineRow(tr, item) {
+        var bc = tr.querySelector('.pr2-barcode');
+        var sel = tr.querySelector('.pr2-product');
+        if (sel) {
+            sel.value = String(item.product_id || '');
+            updateVariantCell(sel);
+        }
+        var vsel = tr.querySelector('.pr2-variant');
+        if (vsel && item.variant_id) {
+            vsel.value = String(item.variant_id);
+        }
+        if (bc) {
+            var prod = null;
+            for (var i = 0; i < PR2_PRODUCTS.length; i++) {
+                if (PR2_PRODUCTS[i].id === item.product_id) { prod = PR2_PRODUCTS[i]; break; }
+            }
+            if (prod) bc.value = prod.item_code || prod.barcode || '';
+        }
+        var qEl = tr.querySelector('.pr2-qty');
+        if (qEl) qEl.value = String(item.qty || 1);
+        var cEl = tr.querySelector('.pr2-cost');
+        if (cEl) cEl.value = fmt3(item.cost || 0);
+    }
+
+    function pr2ApplyReturnPayload(res) {
+        if (!res || !res.success || !res.purchase_return) {
+            alert((res && res.message) || 'تعذر تحميل المردود');
+            return;
+        }
+        var p = res.purchase_return;
+        browseReturnId = parseInt(String(p.id || '0'), 10) || 0;
+        selectSupplier(parseInt(String(p.supplier_id || '0'), 10) || 0);
+        var typeEl = document.getElementById('pr2_type');
+        if (typeEl) typeEl.value = p.type || 'cash';
+        var notesEl = document.getElementById('pr2_notes');
+        if (notesEl) notesEl.value = p.notes || '';
+        var purEl = document.getElementById('pr2_purchase_ref');
+        if (purEl) {
+            var pid = parseInt(String(p.purchase_id || '0'), 10) || 0;
+            purEl.value = pid > 0 ? ('PUR-' + pid) : '';
+        }
+        var tb = document.getElementById('pr2_lines_body');
+        if (tb) {
+            tb.innerHTML = '';
+            var items = res.items || [];
+            if (!items.length) {
+                addLine();
+            } else {
+                items.forEach(function (item) {
+                    addLine();
+                    var rows = tb.querySelectorAll('tr.pr2-line');
+                    pr2FillLineRow(rows[rows.length - 1], item);
+                });
+            }
+            syncTrailing();
+        }
+        recalcAll();
+        pr2SetViewMode(true);
+    }
+
+    function pr2LoadReturn(id) {
+        id = parseInt(String(id || '0'), 10) || 0;
+        if (id <= 0) return;
+        fetch('/admin/api/purchase_returns/get.php?purchase_return_id=' + encodeURIComponent(String(id)), {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' }
+        }).then(function (r) { return r.json(); }).then(function (res) {
+            pr2ApplyReturnPayload(res);
+        }).catch(function (e) { alert(e.message || String(e)); });
+    }
+
+    function pr2Nav(where) {
+        if (!PR2_NAV_READY) return;
+        postJSON('/admin/api/purchase_returns/browse.php', {
+            action: 'nav',
+            where: where,
+            current_id: browseReturnId || 0
+        }).then(function (r) {
+            if (!r.success || !r.id) {
+                alert(r.message || 'لا يوجد مردود');
+                return;
+            }
+            pr2LoadReturn(r.id);
+        }).catch(function (e) { alert(e.message || String(e)); });
+    }
+
+    function pr2SearchOpen() {
+        var m = document.getElementById('pr2_search_modal');
+        if (m) { m.style.display = 'flex'; m.setAttribute('aria-hidden', 'false'); }
+    }
+    function pr2SearchClose() {
+        var m = document.getElementById('pr2_search_modal');
+        if (m) { m.style.display = 'none'; m.setAttribute('aria-hidden', 'true'); }
+    }
+    function pr2SearchRun() {
+        var idFrom = parseInt(document.getElementById('pr2_search_id_from').value, 10) || 0;
+        var idTo = parseInt(document.getElementById('pr2_search_id_to').value, 10) || 0;
+        var dateFrom = (typeof orangeGetDmyValueAsIso === 'function') ? orangeGetDmyValueAsIso(document.getElementById('pr2_search_date_from')) || '' : '';
+        var dateTo = (typeof orangeGetDmyValueAsIso === 'function') ? orangeGetDmyValueAsIso(document.getElementById('pr2_search_date_to')) || '' : '';
+        var ref = (document.getElementById('pr2_search_ref').value || '').trim();
+        var purchaseRef = (document.getElementById('pr2_search_purchase_ref').value || '').trim();
+        var notes = (document.getElementById('pr2_search_notes').value || '').trim();
+        var tbody = document.getElementById('pr2_search_results');
+        tbody.innerHTML = '<tr><td colspan="6">جاري البحث…</td></tr>';
+        var payload = { action: 'search' };
+        if (idFrom > 0) payload.id_from = idFrom;
+        if (idTo > 0) payload.id_to = idTo;
+        if (dateFrom) payload.date_from = dateFrom;
+        if (dateTo) payload.date_to = dateTo;
+        if (ref) payload.reference = ref;
+        if (purchaseRef) payload.purchase_ref = purchaseRef;
+        if (notes) payload.notes = notes;
+        postJSON('/admin/api/purchase_returns/browse.php', payload).then(function (r) {
+            tbody.innerHTML = '';
+            if (!r.success || !r.results || !r.results.length) {
+                tbody.innerHTML = '<tr><td colspan="6" class="muted">لا نتائج</td></tr>';
+                return;
+            }
+            r.results.forEach(function (v) {
+                var tr = document.createElement('tr');
+                tr.innerHTML = '<td>' + esc(String(v.id)) + '</td>'
+                    + '<td>' + esc(v.created_at_dmy || '') + '</td>'
+                    + '<td dir="ltr">' + esc(v.reference || '') + '</td>'
+                    + '<td>' + esc(v.supplier_name || '') + '</td>'
+                    + '<td dir="ltr">' + esc(v.purchase_reference || '') + '</td>'
+                    + '<td dir="ltr">' + fmt3(v.total || 0) + '</td>';
+                tr.addEventListener('dblclick', function () { pr2LoadReturn(v.id); pr2SearchClose(); });
+                tbody.appendChild(tr);
+            });
+        }).catch(function (e) {
+            tbody.innerHTML = '<tr><td colspan="6">' + esc(e.message || String(e)) + '</td></tr>';
+        });
+    }
+
+    function pr2ResetNew() {
+        browseReturnId = 0;
+        pr2SetViewMode(false);
+        location.reload();
+    }
+
     /* ── Save ───────────────────────────────────────────────────────── */
     function save() {
-        if (!PR2_READY) return;
+        if (!PR2_READY || pr2ViewMode) return;
         var supplierId = parseInt(document.getElementById('pr2_supplier_id').value, 10) || 0;
         var retType = document.getElementById('pr2_type').value;
         var notes = (document.getElementById('pr2_notes').value || '').trim();
+        var purchaseId = parsePurchaseRef(document.getElementById('pr2_purchase_ref').value || '');
 
         if (retType === 'credit' && supplierId <= 0) {
             alert('مردود آجل يتطلّب مورداً.');
@@ -565,6 +903,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             supplier_id: supplierId,
             type: retType,
             notes: notes,
+            purchase_id: purchaseId > 0 ? purchaseId : 0,
             items: items
         };
 
@@ -606,7 +945,31 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         }
 
         document.getElementById('pr2_btn_save').addEventListener('click', save);
-        document.getElementById('pr2_btn_new').addEventListener('click', function () { location.reload(); });
+        document.getElementById('pr2_btn_new').addEventListener('click', pr2ResetNew);
+        document.getElementById('pr2_btn_print').addEventListener('click', function () {
+            if (browseReturnId <= 0) {
+                alert('افتح مردوداً محفوظاً للطباعة.');
+                return;
+            }
+            window.print();
+        });
+
+        document.getElementById('pr2_nav_first').addEventListener('click', function () { pr2Nav('first'); });
+        document.getElementById('pr2_nav_prev').addEventListener('click', function () { pr2Nav('prev'); });
+        document.getElementById('pr2_nav_next').addEventListener('click', function () { pr2Nav('next'); });
+        document.getElementById('pr2_nav_last').addEventListener('click', function () { pr2Nav('last'); });
+        document.getElementById('pr2_btn_search').addEventListener('click', pr2SearchOpen);
+        document.getElementById('pr2_search_btn').addEventListener('click', pr2SearchRun);
+        document.getElementById('pr2_search_modal_backdrop').addEventListener('click', pr2SearchClose);
+        document.addEventListener('mousedown', function (ev) {
+            var m = document.getElementById('pr2_search_modal');
+            if (!m || m.style.display !== 'flex') return;
+            var panel = m.querySelector('.jv-search-modal__panel');
+            if (panel && (panel === ev.target || panel.contains(ev.target))) return;
+            if (ev.target === m || ev.target.classList.contains('jv-search-modal__backdrop')) pr2SearchClose();
+        });
+
+
 
         var tb = document.getElementById('pr2_lines_body');
         if (tb) {
