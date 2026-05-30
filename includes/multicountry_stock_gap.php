@@ -248,6 +248,9 @@ function orange_multicountry_stock_gap_report(PDO $pdo): array
  */
 function orange_multicountry_ensure_stock_scoped_phase1(PDO $pdo): void
 {
+    require_once __DIR__ . '/catalog_multicountry_stock_schema.php';
+    orange_catalog_multicountry_stock_ensure_schema($pdo);
+
     if (orange_catalog_migration_step_applied($pdo, ORANGE_MC_STOCK_SCOPED_STEP)) {
         return;
     }
@@ -398,6 +401,9 @@ function orange_multicountry_stock_phase2_gap_report(PDO $pdo): array
  */
 function orange_multicountry_ensure_operational_phase2(PDO $pdo): void
 {
+    require_once __DIR__ . '/catalog_multicountry_stock_schema.php';
+    orange_catalog_multicountry_stock_ensure_schema($pdo);
+
     if (!orange_table_exists($pdo, 'countries') || !orange_table_exists($pdo, 'warehouses')) {
         return;
     }

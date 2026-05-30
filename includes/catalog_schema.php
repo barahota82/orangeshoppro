@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 68);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 69);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3039,6 +3039,8 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_journal_types_strip_non_kw_v60($pdo);
     orange_catalog_migrate_journal_types_strip_non_kw_v61($pdo);
     orange_catalog_migrate_legacy_storefront_copy_lines($pdo);
+    require_once __DIR__ . '/catalog_multicountry_stock_schema.php';
+    orange_catalog_migrate_multicountry_stock_v69($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
         orange_catalog_safe_exec(
@@ -3946,8 +3948,8 @@ function orange_catalog_migrate_countries_foundation_v40(PDO $pdo): void
     $seedCountries = [
         ['kw', 'الكويت', 'Kuwait', 'KWD', 1, 1],
         ['eg', 'مصر', 'Egypt', 'EGP', 2, 0],
-        ['ae', 'الإمارات', 'United Arab Emirates', 'AED', 3, 0],
-        ['sa', 'السعودية', 'Saudi Arabia', 'SAR', 4, 0],
+        ['uae', 'الإمارات', 'United Arab Emirates', 'AED', 3, 0],
+        ['ksa', 'السعودية', 'Saudi Arabia', 'SAR', 4, 0],
     ];
     foreach ($seedCountries as $sc) {
         $stChk = $pdo->prepare('SELECT id FROM countries WHERE code = ? LIMIT 1');
