@@ -253,3 +253,32 @@ if ($rollout === 'multicountry-stock') {
         echo 'ROLLOUT_MC_STOCK_ERROR: ' . $e->getMessage() . "\n";
     }
 }
+
+if ($rollout === 'multicountry-stock-phase2') {
+    try {
+        require_once __DIR__ . '/includes/catalog_schema.php';
+        require_once __DIR__ . '/includes/multicountry_stock_gap.php';
+        $pdoRollout = db();
+        orange_catalog_ensure_schema($pdoRollout);
+        orange_multicountry_ensure_operational_phase2($pdoRollout);
+        $rep = orange_multicountry_stock_phase2_gap_report($pdoRollout);
+        echo 'markets_active=' . (int) ($rep['markets_active'] ?? 0) . "\n";
+        echo 'markets_provision_ready=' . (int) ($rep['markets_provision_ready'] ?? 0) . "\n";
+        foreach ($rep['markets'] ?? [] as $code => $m) {
+            if (!is_array($m)) {
+                continue;
+            }
+            echo 'market_' . $code . '_active=' . ((!empty($m['is_active'])) ? '1' : '0') . "\n";
+            echo 'market_' . $code . '_warehouse=' . ((!empty($m['warehouse'])) ? '1' : '0') . "\n";
+            echo 'market_' . $code . '_channels=' . ((!empty($m['channels_ok'])) ? '1' : '0') . "\n";
+            echo 'market_' . $code . '_products=' . (int) ($m['products_count'] ?? 0) . "\n";
+            echo 'market_' . $code . '_wvs_missing=' . (int) ($m['variants_missing_wvs'] ?? -1) . "\n";
+            echo 'market_' . $code . '_ready=' . ((!empty($m['provision_ready'])) ? '1' : '0') . "\n";
+        }
+        echo 'step_applied=' . ((!empty($rep['step_applied'])) ? '1' : '0') . "\n";
+        $allOk = !empty($rep['ready']) && !empty($rep['step_applied']);
+        echo $allOk ? "ROLLOUT_MC_STOCK_PHASE2_OK\n" : "ROLLOUT_MC_STOCK_PHASE2_PENDING\n";
+    } catch (Throwable $e) {
+        echo 'ROLLOUT_MC_STOCK_PHASE2_ERROR: ' . $e->getMessage() . "\n";
+    }
+}

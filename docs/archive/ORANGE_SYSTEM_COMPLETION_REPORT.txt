@@ -34,7 +34,7 @@ Schema rev 64: ترحيل أرقام INV- القديمة → INV-O / INV-C.
 | الحسابات والتقارير (navAccountingAll)| **100%**| GAP-ACC = 0؛ ACC-13 منتهٍ |
 | مسار GL Lane A (طابور gl_posting)    | **legacy**| opt-in فقط — §0 ACC-14 |
 | مسار GL Lane B (ترحيل مباشر)         | **100%** | YEC، §13، INV-C — افتراضي |
-| المخازن والمشتريات                   | **100%** | MC stock phase1 · probe multicountry-stock |
+| المخازن والمشتريات                   | **100%** | MC stock phase1+2 · probes multicountry-stock / phase2 |
 | المبيعات والعروض + §13               | **100%** | B0–B8؛ §13.13 مغلق |
 | الإعدادات (navSettings)              | **90%** | تشغيلي |
 | واجهة المتجر (سياسة س1–س30)          | **~88%** | STOREFRONT_POLICY_REFERENCE |

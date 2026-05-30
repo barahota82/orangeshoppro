@@ -3632,6 +3632,7 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
         orange_catalog_ensure_legacy_taxonomy_tables_dropped_phase54($pdo);
         require_once __DIR__ . '/multicountry_stock_gap.php';
         orange_multicountry_ensure_stock_scoped_phase1($pdo);
+        orange_multicountry_ensure_operational_phase2($pdo);
 
         if ($apcuTtl > 0 && function_exists('apcu_store')) {
             @apcu_store($apcuKey, 1, $apcuTtl);
@@ -3688,6 +3689,7 @@ function orange_catalog_runtime_light_hooks(PDO $pdo): void
         orange_catalog_ensure_legacy_taxonomy_tables_dropped_phase54($pdo);
         require_once __DIR__ . '/multicountry_stock_gap.php';
         orange_multicountry_ensure_stock_scoped_phase1($pdo);
+        orange_multicountry_ensure_operational_phase2($pdo);
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] orange_catalog_runtime_light_hooks: ' . $e->getMessage());
