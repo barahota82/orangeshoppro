@@ -544,6 +544,10 @@ function orange_storefront_product_in_active_unified_chain(PDO $pdo, int $produc
         return true;
     }
     try {
+        require_once __DIR__ . '/department_countries.php';
+        require_once __DIR__ . '/countries.php';
+        $sfCountryId = orange_storefront_current_country_id($pdo);
+        $depActiveSql = orange_department_country_active_sql($pdo, 'd', $sfCountryId);
         $st = $pdo->prepare(
             'SELECT 1
              FROM products p
@@ -551,7 +555,7 @@ function orange_storefront_product_in_active_unified_chain(PDO $pdo, int $produc
              INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id AND ucs.is_active = 1
              INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id AND ucc.is_active = 1
              INNER JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id AND ucs2.is_active = 1
-             INNER JOIN departments d ON d.id = ucs2.department_id AND d.is_active = 1
+             INNER JOIN departments d ON d.id = ucs2.department_id AND (' . $depActiveSql . ')
              WHERE p.id = ? AND p.is_active = 1
              LIMIT 1'
         );

@@ -22,6 +22,7 @@ orange_catalog_ensure_schema(db());
 require_once __DIR__ . '/../includes/catalog_labels.php';
 require_once __DIR__ . '/../includes/catalog_unified_nav.php';
 require_once __DIR__ . '/../includes/countries.php';
+require_once __DIR__ . '/../includes/department_countries.php';
 
 include __DIR__ . '/../includes/header.php';
 
@@ -57,6 +58,7 @@ $canUnifiedProductSql = $navUnified
 
 $sfHomeCountryId = orange_storefront_current_country_id($pdo);
 $homeProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $sfHomeCountryId);
+$homeDeptActiveSql = orange_department_country_active_sql($pdo, 'd', $sfHomeCountryId);
 
 if ($canUnifiedProductSql) {
     $productsSql = '
@@ -66,7 +68,7 @@ if ($canUnifiedProductSql) {
     INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id AND ucs.is_active = 1
     INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id AND ucc.is_active = 1
     INNER JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id AND ucs2.is_active = 1
-    INNER JOIN departments d ON d.id = ucs2.department_id AND d.is_active = 1
+    INNER JOIN departments d ON d.id = ucs2.department_id AND (' . $homeDeptActiveSql . ')
     WHERE p.is_active = 1' . $homeProductsCountrySql . '
     ORDER BY p.sort_order ASC, p.id ASC
 ';
@@ -79,7 +81,7 @@ if ($canUnifiedProductSql) {
     INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id AND ucs.is_active = 1
     INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id AND ucc.is_active = 1
     INNER JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id AND ucs2.is_active = 1
-    INNER JOIN departments d ON d.id = ucs2.department_id AND d.is_active = 1
+    INNER JOIN departments d ON d.id = ucs2.department_id AND (' . $homeDeptActiveSql . ')
     WHERE o.is_active = 1 AND p.is_active = 1' . $homeProductsCountrySql . '
     ORDER BY p.sort_order ASC, p.id ASC, o.id ASC
 ';

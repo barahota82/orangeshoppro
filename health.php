@@ -40,3 +40,51 @@ try {
 } catch (Throwable $e) {
     echo 'SESSION ERROR: ' . $e->getMessage() . "\n";
 }
+
+$rollout = isset($_GET['rollout']) ? trim((string) $_GET['rollout']) : '';
+if ($rollout === 'unified-phase1') {
+    try {
+        require_once __DIR__ . '/includes/catalog_schema.php';
+        require_once __DIR__ . '/includes/catalog_taxonomy_migrate.php';
+        require_once __DIR__ . '/includes/department_countries.php';
+        require_once __DIR__ . '/includes/countries.php';
+        $pdoRollout = db();
+        orange_catalog_ensure_schema($pdoRollout);
+        $navUnified = function_exists('orange_catalog_nav_use_unified') && orange_catalog_nav_use_unified($pdoRollout);
+        echo 'unified_nav=' . ($navUnified ? '1' : '0') . "\n";
+        if ($navUnified && orange_table_has_column($pdoRollout, 'products', 'product_type_id')) {
+            $missingPt = (int) $pdoRollout->query(
+                'SELECT COUNT(*) FROM products WHERE is_active = 1 AND (product_type_id IS NULL OR product_type_id <= 0)'
+            )->fetchColumn();
+            echo 'active_products_missing_product_type_id=' . $missingPt . "\n";
+        }
+        $kwId = orange_countries_default_id($pdoRollout);
+        if ($kwId > 0 && orange_department_countries_table_ready($pdoRollout)) {
+            $stKw = $pdoRollout->prepare(
+                'SELECT COUNT(*) FROM department_countries WHERE country_id = ? AND is_active = 1'
+            );
+            $stKw->execute([$kwId]);
+            echo 'kw_active_departments=' . (int) $stKw->fetchColumn() . "\n";
+        }
+        if (orange_table_exists($pdoRollout, 'product_channels') && orange_table_exists($pdoRollout, 'channels')) {
+            $chRows = $pdoRollout->query(
+                'SELECT c.slug, COUNT(pc.product_id) AS link_count
+                 FROM channels c
+                 LEFT JOIN product_channels pc ON pc.channel_id = c.id
+                 WHERE c.is_active = 1
+                 GROUP BY c.id, c.slug
+                 ORDER BY c.slug ASC'
+            )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            foreach ($chRows as $cr) {
+                echo 'product_channels_' . (string) ($cr['slug'] ?? '?') . '=' . (int) ($cr['link_count'] ?? 0) . "\n";
+            }
+        }
+        if ($navUnified && orange_table_exists($pdoRollout, 'catalog_sections')) {
+            echo 'catalog_sections=' . (int) $pdoRollout->query('SELECT COUNT(*) FROM catalog_sections')->fetchColumn() . "\n";
+            echo 'catalog_categories=' . (int) $pdoRollout->query('SELECT COUNT(*) FROM catalog_categories')->fetchColumn() . "\n";
+        }
+        echo "ROLLOUT_PHASE1_OK\n";
+    } catch (Throwable $e) {
+        echo 'ROLLOUT_PHASE1_ERROR: ' . $e->getMessage() . "\n";
+    }
+}
