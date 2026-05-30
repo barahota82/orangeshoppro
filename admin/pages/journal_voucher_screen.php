@@ -186,6 +186,7 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
     <h3 class="card-title"><?php echo htmlspecialchars($jvPageCardTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
     <?php if (!$jvYecMode): orange_edit_lock_ui_toolbar(['prefix' => 'jv', 'doc_kind' => 'journal_voucher', 'country_id' => $jvScreenCountryId]); endif; ?>
     <?php if ($jvYecMode): ?>
+    <p class="card-hint jv-print-hide" style="margin:0 0 12px;line-height:1.55;">استخدم أزرار <strong>التنقل</strong> أو <strong>بحث</strong> للانتقال بين سندات الإقفال السنوية — «تنفيذ البحث» بدون فلاتر يعرض كل السندات (حتى 300).</p>
     <label class="jv-print-hide" style="display:flex;align-items:center;gap:8px;margin:0 0 12px;cursor:default;">
         <input type="checkbox" id="jv_yec_locked" disabled>
         <span><strong>قيد مغلق</strong> — يُفعَّل تلقائياً بعد الحفظ الناجح</span>
@@ -1970,7 +1971,7 @@ if (JV_YEC_MODE && JV_YEC_LOAD_ID > 0) {
     }
 })();
 if (JV_YEC_MODE) {
-    ['jv_btn_delete_voucher', 'jv_btn_new_sheet', 'jv_nav_first', 'jv_nav_prev', 'jv_nav_next', 'jv_nav_last', 'jv_btn_open_search'].forEach(function (hid) {
+    ['jv_btn_delete_voucher', 'jv_btn_new_sheet'].forEach(function (hid) {
         var el = document.getElementById(hid);
         if (el) {
             el.style.display = 'none';

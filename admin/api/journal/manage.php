@@ -33,6 +33,9 @@ function orange_journal_manage_partner_entry_types(): array
 function orange_journal_manage_resolve_browse_entry_type(array $data, string $fallback = 'manual'): string
 {
     $t = trim((string) ($data['entry_type'] ?? ''));
+    if ($t === 'year_end_close') {
+        return 'year_end_close';
+    }
     if ($t !== '' && in_array($t, orange_journal_manage_partner_entry_types(), true)) {
         return $t;
     }
@@ -643,7 +646,7 @@ try {
         $fyScope = 0;
         $buckScope = '';
         $vsCur = 0;
-        if ($useSerialNav && $currentId > 0) {
+        if ($et !== 'year_end_close' && $useSerialNav && $currentId > 0) {
             $stCur = $pdo->prepare(
                 'SELECT id, fiscal_year_id, voucher_serial, journal_serial_bucket, entry_type FROM journal_vouchers WHERE id = ? LIMIT 1'
             );
@@ -846,7 +849,9 @@ try {
         }
 
         if (!$hasCriterion) {
-            json_response(['success' => false, 'message' => 'حدّد معيار بحث واحد على الأقل (رقم، تاريخ، مرجع، أو بيان)'], 422);
+            if ($et !== 'year_end_close') {
+                json_response(['success' => false, 'message' => 'حدّد معيار بحث واحد على الأقل (رقم، تاريخ، مرجع، أو بيان)'], 422);
+            }
         }
 
         $countryBind = orange_gl_voucher_country_bind($pdo, 'jv');

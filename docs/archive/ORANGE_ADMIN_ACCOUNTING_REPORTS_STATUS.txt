@@ -41,7 +41,7 @@ NAV SOURCE (حقيقة القائمة)
 | التقارير المالية               | 97%     | posted فور الحفظ؛ ACC-10 مغلق          |
 | مسار GL (سياسة ACC-14)         | 98%     | حفظ=تقارير؛ edit_lock=رقابة فقط         |
 | تسليم/قيود أونلاين (§13)       | 97%     | B1–B8؛ §13.13 O-01/04/07/08 مغلقة      |
-| **navAccountingAll مرجّح**     | **~97%**| **~3% — §13.13 + ACC-13 اختياري**         |
+| **navAccountingAll مرجّح**     | **~98%**| **~2% — §13.13 + ACC-07 VAT اختياري**         |
 | **مع policy v2 (ACC-10)**   | **~86%**| تدفقات + تسويات (ACC-08 تراثي/PV)     |
 
 **§12.1 — حالة البنود الثلاثة (كود — 2026-05-20):**
@@ -82,8 +82,7 @@ fiscal_years (admin/pages/fiscal_years.php)
 
 year_end_close_vouchers (admin/pages/year_end_close_vouchers.php) — **في navAccountingAll**
 - API: admin/api/year_end_close/manage.php
-- الحالة: **[منتهٍ]** — سند YEC واحد (PL→RE→LR)； yec_locked / yec_phase (rev 63)； §10 طباعة بعد الحفظ
-- ثغرات: تلميع بحث/تصفّح داخل الشاشة (اختياري — GAP-ACC-13)
+- الحالة: **[منتهٍ]** — سند YEC واحد (PL→RE→LR)； yec_locked / yec_phase (rev 63)； §10 طباعة بعد الحفظ؛ **بحث + تنقل** بين كل سندات YEC (GAP-ACC-13 منتهٍ 2026-05-20)
 
 edit_lock (admin/pages/edit_lock.php) — **كان gl_posting**
 - APIs: admin/api/edit-lock/* (+ legacy gl/* عند opt-in طابور)
@@ -187,7 +186,7 @@ manual_order / create-manual.php — [منتهٍ] — INV-C + GL عند الحف
 [GAP-ACC-09] منخفض — accounting_reports_index: تحديث شارات (pl_compare → جاهز)
 [GAP-ACC-10] مستقبل — تدفقات نقدية، أبعاد تحليلية، تسويات (policy v2 §3)
 [GAP-ACC-11] ~~gl_posting UX~~ → **[مغلق — مدمج ACC-14]** redirect edit_lock؛ §0 يوضّح Lanes
-[GAP-ACC-13] منخفض — YEC: تلميع بحث/تصفّح داخل year_end_close_vouchers (اختياري)
+[GAP-ACC-13] ~~YEC تلميع بحث~~ → **[منتهٍ 2026-05-20]** — بحث + << < > >> في year_end_close_vouchers؛ `entry_type=year_end_close` في journal/manage؛ بحث فارغ = كل السندات
 [GAP-ACC-14] ~~قرار مالك~~ → **[مغلق — منتهٍ 2026-05-20]** — **«إقفال التعديلات»** (`edit_lock` rev 67): قفل/فك + صلاحيات + audit؛ طابور GL معطّل افتراضياً؛ **`docs/archive/ORANGE_EDIT_LOCK_POLICY.txt`**
 
 ================================================================================
