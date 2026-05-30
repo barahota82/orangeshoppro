@@ -1,0 +1,176 @@
+ORANGE — تقرير اكتمال النظام الشامل (أدمن + GL + §13 + مراجع)
+Archive: docs/archive/ORANGE_SYSTEM_COMPLETION_REPORT.txt
+Last updated: 2026-05-20 (مراجعة كاملة بعد §12.1 A1–A3 + §13.14 B0–B8 + rev 64)
+Canvas companion (مثبت بجانب الدردشة):
+  .cursor/projects/d-orange/canvases/admin-accounting-reports-completion.canvas.tsx
+تفصيل محاسبي فرعي: docs/archive/ORANGE_ADMIN_ACCOUNTING_REPORTS_STATUS.txt
+
+================================================================================
+0) الغرض ومنهجية المراجعة
+================================================================================
+
+الغرض:
+- مرجع واحد **شامل** لحالة Orange Shop Pro: الأدمن (4 ميجا-nav)، مسارات GL، §13 تسليم/قيود، والمتبقي للـ 100%.
+- يصحّح خطأ سابق: اعتبار «كل GL يجب أن يمر gl_posting» — السياسة تعرّف **3 lanes** (انظر §2).
+
+منهجية (2026-05-20):
+- قراءة admin/partials/header.php (قوائم nav الفعلية)
+- admin/index.php ($allowed)
+- includes/catalog_schema.php → ORANGE_CATALOG_SCHEMA_PHP_REVISION = **64**
+- مسارات GL: gl_pending_movements.php، journal_voucher.php، year_end_close.php، order_fulfillment.php
+- commits main: 0f98a06 (INV legacy + rev 64)، aa80700 (cancel-from-delivery + BOGO frame)
+- أرشيف: ORANGE_GL_MOVEMENTS §8–§13، ORANGE_STOREFRONT_POLICY_REFERENCE، COMPLETION_ROADMAP phases 3–6
+
+Schema rev 64: ترحيل أرقام INV- القديمة → INV-O / INV-C.
+
+================================================================================
+1) ملخص تنفيذي — النسب (مصحّحة)
+================================================================================
+
+| المحور                              | ~% منجز | ملاحظة |
+|-------------------------------------|---------|--------|
+| الحسابات والتقارير (navAccountingAll)| **94%** | YEC + تقارير؛ كشف مورد + فهرس قديم |
+| مسار GL Lane A (طابور gl_posting)    | **91%** | hub لـ Lane A فقط |
+| مسار GL Lane B (ترحيل مباشر)         | **98%** | YEC، §13، INV-C manual |
+| المخازن والمشتريات                   | **92%** | §11 lock؛ GL على حفظ الشراء |
+| المبيعات والعروض + §13               | **96%** | B1–B8؛ §13.13 UX مفتوح |
+| الإعدادات (navSettings)              | **90%** | صلاحيات post/unpost جزئية |
+| واجهة المتجر (سياسة س1–س30)          | **~88%** | STOREFRONT_POLICY_REFERENCE |
+| **مجموع تشغيلي مرجّح**              | **~93%**| ~7% متبقٍ |
+| **مع policy v2 كامل**               | **~86%**| تدفقات + تسويات (ACC-08 تراثي/PV) |
+
+§12.1 — منتهٍ في الكود:
+
+| البند | الموضوع | الحالة |
+|-------|---------|--------|
+| A1 | §10 طباعة بعد الحفظ | منتهٍ |
+| A2 | §9 YEC + year_end_close_vouchers + void | منتهٍ (rev 63) |
+| A3 | §11 إقفال رصيد مخزون افتتاحي | منتهٍ (rev 62) |
+| B0–B8 | §13.14 (مناديب → handover → posting → INV-O/C) | منتهٍ |
+| §13.8 | ترحيل INV- legacy | منتهٍ (rev 64) |
+
+================================================================================
+2) معمارية GL — ثلاثة lanes (إلزامي للفهم)
+================================================================================
+
+Lane A — الطابور (gl_posting hub عند orange_gl_use_pending_queue()):
+  - مشتريات create/update، مردودات مشتريات
+  - opening_balances (OBV)
+  - سندات يدوية **جديدة** (journal/manage create)
+  - CRR / SPR (partner receipts)
+  - orange_gl_pending_movements + pending-list/post/unpost
+
+Lane B — ترحيل مباشر (by design — **خارج** gl_posting):
+  - §9 YEC: year_end_close.php → year_end_close_vouchers (rev 63)
+  - §13 «إنشاء القيود»: final-posting-create.php → order_fulfillment GL + INV-O
+  - manual_order / create-manual.php → INV-C + GL
+  - مراجع: ORANGE_GL_MOVEMENTS §9.8، §13.9
+
+Lane C — بلا GL:
+  - completed = مخزون فقط (قبل final posting)
+  - opening_stock_balances = كميات بلا قيد (§11؛ OBV مالي منفصل)
+
+ORANGE_GL_IMMEDIATE_POSTING=1 على السيرفر = bypass تطويري — ليس بالضرورة «ثغرة».
+
+**GAP-ACC-02 ملغى:** GL على **حفظ** المشترية (purchases/create.php enqueue)، وليس receive منفصل.
+
+================================================================================
+3) جرد — الحسابات والتقارير (~25 شاشة)
+================================================================================
+
+chart_of_accounts, gl_account_settings, journal_types, fiscal_years     [منتهٍ]
+year_end_close_vouchers                                                 [منتهٍ Lane B]
+gl_posting                                                              [~90% Lane A hub]
+opening_balances                                                        [منتهٍ]
+journal_entries / receipt / payment / other                             [منتهٍ §10]
+partner_customer_receipt, partner_supplier_payment                      [منتهٍ]
+journal_voucher_reports, report_account_list, report_gl_account_monthly [منتهٍ]
+partner_reports, report_income_statement, report_trading_account*         [منتهٍ]
+report_pl_monthly, report_pl_compare_years, report_trial_balance          [منتهٍ]
+financial_report                                                        [منتهٍ]
+partner_account_statement                                               [جزئي GAP-ACC-05]
+accounting_reports_index (بلا nav)                                      [GAP-ACC-09]
+
+================================================================================
+4) جرد — المبيعات + §13
+================================================================================
+
+customers, orders, reserved_orders, order_intake_queue                  [منتهٍ]
+delivery_agents, handover, manifest, delivery_order_search              [منتهٍ B1–B3]
+online_orders_final_posting (Lane B + INV-O)                            [منتهٍ]
+online_invoices, sales_invoices, manual_order, invoice, invoice_edit    [منتهٍ rev 64]
+sales_returns                                                           [منتهٍ]
+offers + cart_* promotions (combo/gift/bogo)                              [منتهٍ O-21/22]
+reports, channel_analytics                                              [منتهٍ]
+§13.13 O-01…O-14                                                        [UX مفتوح — لا يمنع 96%]
+
+================================================================================
+5) جرد — المخازن والمشتريات
+================================================================================
+
+stock, item_card, opening_stock_balances (§11 lock rev 62)              [منتهٍ]
+suppliers, purchases (Lane A GL), purchase_returns                      [منتهٍ]
+departments … products (شجرة كتalog)                                    [~90% تشغيلي]
+
+================================================================================
+6) جرد — الإعدادات
+================================================================================
+
+company_settings, documents, logs, countries, admin_users               [منتهٍ]
+channels, delivery_areas, storefront_hero, merge_requests               [منتهٍ]
+
+================================================================================
+7) واجهة المتجر (ملخص)
+================================================================================
+
+مرجع: ORANGE_STOREFRONT_POLICY_REFERENCE (س1–س30). ~88% — طلب، سلة، تتبع، قنوات س25/س26.
+فجوات: بنود بلا «تنفيذ» في المرجع — تُغلق عند «كمّل العمل» على الواجهة.
+
+================================================================================
+8) GAP-ACC — قائمة محدّثة
+================================================================================
+
+[GAP-ACC-01] Lane A — تدقيق orange_voucher_post() (استثناء §9/§13)
+[GAP-ACC-03] تعديل journal/manage على سند مرحّل vs repost
+[GAP-ACC-05] partner_account_statement — وضع مورد
+[GAP-ACC-06] صلاحيات post vs unpost
+[GAP-ACC-07] gl_account_settings — ضريبة/شحن
+[GAP-ACC-08] ~~module مصروفات GL (غائب)~~ → **ملغى/تراثي** — المصروفات = **سند صرف** (payment_voucher / PV)
+[GAP-ACC-09] accounting_reports_index — **منتهٍ** (شارات ACC-10)
+[GAP-ACC-10] تدفقات نقدية + تسويات + أبعاد — **مغلق 2026-05-20** (مراحل 0–4 §6b)
+[GAP-ACC-11] ملاحظة UX gl_posting (YEC + §13 خارج الشاشة)
+[GAP-ACC-13] YEC تلميع بحث (اختياري)
+
+مغلقة: GAP-ACC-04 YEC | GAP-ACC-12 §13 | GAP-ACC-10 ACC-10 | GAP-ACC-02 **ملغى** | GAP-ACC-08 **تراثي/PV**
+
+================================================================================
+9) خطة الإغلاق — 93% → 100%
+================================================================================
+
+**100% تشغيلي:** ACC-05/09/11 → ACC-01/03 → ACC-06/07 + قرارات §13.13 عند الحاجة
+**100% policy v2:** + ACC-10 (~~ACC-08~~ تراثي — سند صرف)
+
+**GAP-ACC-10 (خيار د — 2026-05-20):** **مغلق** — مراحل 0–4 منتهية (§6b.8 في ORANGE_ADMIN_ACCOUNTING_REPORTS_STATUS.txt).
+
+قرارات المالك:
+  1) ORANGE_GL_IMMEDIATE_POSTING على السيرفر = 0 أم 1؟
+  2) §13 final posting يبقى Lane B (الحالي) أم يدخل الطابور؟
+  3) «100%» = تشغيلي فقط أم يشمل v2؟
+
+================================================================================
+10) مراجع
+================================================================================
+
+ORANGE_ADMIN_ACCOUNTING_REPORTS_STATUS.txt | ORANGE_GL_MOVEMENTS §8–§13
+ORANGE_ACCOUNTING_MAPPING_AND_REPORT_HANDOFF.txt | ACCOUNTING_REPORTING_POLICY_V2.md
+ORANGE_STOREFRONT_POLICY_REFERENCE.txt | COMPLETION_ROADMAP phases 3–6
+
+================================================================================
+11) سجل
+================================================================================
+
+2026-05-20 — إنشاء التقرير الشامل + Canvas (3-lane GL، ~93% تشغيلي).
+2026-05-20 — يتضمن §12.1 منتهٍ، rev 64، GAP-ACC-02 ملغى، ACC-04/12 مغلقة.
+2026-05-20 — GAP-ACC-08: **ملغى/تراثي** — لا module مصروفات منفصل؛ التسجيل = سند صرف (PV).
+2026-05-20 — GAP-ACC-10 خيار د: إحالة ترتيب التنفيذ إلى ORANGE_ADMIN **§6b** (معلق قرارات المالك).
+2026-05-20 — GAP-ACC-10 **منتهٍ:** مراحل 0–4 (تدفقات، بنك، مخزون، أبعاد، تقرير تحليلي)؛ rev 66.

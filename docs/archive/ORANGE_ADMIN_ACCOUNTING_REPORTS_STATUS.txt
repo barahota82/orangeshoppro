@@ -1,0 +1,355 @@
+ORANGE — حالة شاشات الحسابات والتقارير (أدمن)
+Archive: docs/archive/ORANGE_ADMIN_ACCOUNTING_REPORTS_STATUS.txt
+Last updated: 2026-05-20 (ACC-10 مكتمل — GAP-ACC-10 مغلق)
+Canvas companion: .cursor/projects/d-orange/canvases/admin-accounting-reports-completion.canvas.tsx
+تقرير نظام شامل: docs/archive/ORANGE_SYSTEM_COMPLETION_REPORT.txt
+
+PURPOSE
+- مرجع واحد لحالة **قائمة «الحسابات والتقارير»** في الأدمن + مسار GL + التقارير المرتبطة.
+- للوكلاء والمالك عند «كمّل المحاسبة» أو «أغلق الثغرات» — **قبل** توسيع نطاق جديد.
+- **لا يغني** عن: ORANGE_GL_MOVEMENTS_AND_POSTING_POLICY.txt، ORANGE_ACCOUNTING_MAPPING_AND_REPORT_HANDOFF.txt، docs/ACCOUNTING_REPORTING_POLICY_V2.md، ORANGE_PROJECT_COMPLETION_ROADMAP.txt (مراحل 3–6).
+
+NAV SOURCE (حقيقة القائمة)
+- admin/partials/header.php — $navAccountingAll (3 مجموعات: الإعداد والدليل | السندات والذمم | التقارير)
+- admin/index.php — $allowed pages
+- **خارج القائمة المحاسبية:** opening_stock_balances (مخازن — مخزون فقط بلا GL)، accounting_reports_index (فهرس مرجعي بلا رابط nav)
+
+================================================================================
+1) ملخص الإنجاز (2026-05-20 — بعد تنفيذ §12.1)
+================================================================================
+
+| المحور                         | ~% منجز | ملاحظة مختصرة                          |
+|--------------------------------|---------|----------------------------------------|
+| الإعداد والدليل                | 95%     | YEC + fiscal؛ GAP-ACC-07 ضريبة/شحن     |
+| السندات والذمم                 | 96%     | YEC Lane B؛ §10؛ CRR/SPR               |
+| التقارير المالية               | 94%     | posted؛ pl_compare في nav؛ GAP-ACC-05/09 |
+| Lane A — طابور gl_posting        | 91%     | hub لـ Lane A فقط — ليس «كل GL»        |
+| Lane B — ترحيل مباشر (§9/§13)  | 98%     | by design خارج gl_posting              |
+| تسليم/قيود أونلاين (§13)       | 96%     | B1–B8 + rev 64؛ §13.13 UX مفتوح        |
+| **navAccountingAll مرجّح**     | **~94%**| **~6% — ذمم + UX + Lane A تدقيق**      |
+| **مع policy v2 (ACC-10)**   | **~86%**| تدفقات + تسويات (ACC-08 تراثي/PV)     |
+
+**§12.1 — حالة البنود الثلاثة (كود — 2026-05-20):**
+
+| البند | الموضوع | الحالة |
+|-------|---------|--------|
+| A1 | §10 طباعة بعد الحفظ | **منتهٍ** |
+| A2 | §9 YEC سند واحد + شاشة + fiscal + void | **منتهٍ** (schema rev 63) |
+| A3 | §11 إقفال رصيد مخزون افتتاحي | **منتهٍ** (schema rev 62) |
+| B0–B8 | §13.14 مراحل 0–8 (تسليم → قiود → INV-O/C) | **منتهٍ** (§13.13 O-01…O-14 = سياسة مفتوحة) |
+
+ENGLISH
+- navAccountingAll ~94% after §12.1; gl_posting scores Lane A hub only (~91%). YEC + §13 final posting are Lane B (direct post) by design — not a gl_posting gap. GAP-ACC-02 cancelled (purchase GL on save). Full system report: ORANGE_SYSTEM_COMPLETION_REPORT.txt (~93% ops).
+
+================================================================================
+2) جرد الشاشات — الإعداد والدليل
+================================================================================
+
+chart_of_accounts (admin/pages/chart_of_accounts.php)
+- APIs: admin/api/accounts/tree-html.php, save-node.php, delete-node.php, list-roots.php, save-root-setup.php
+- الحالة: [منتهٍ] — شجرة، CRUD، report_line_id، posting leaf
+- ثغرات: يعتمد اكتمال الدليل على بقية التقارير
+
+gl_account_settings (admin/pages/gl_account_settings.php)
+- APIs: admin/api/settings/gl-accounts.php, accounts/search-leaves.php, lookup-by-code.php
+- الحالة: [منتهٍ] — ربط أدوار GL + journal_type rules
+- ثغرات: خريطة أدوار بنود الفاتورة (ضريبة، شحن) — ORANGE_GL_MOVEMENTS §8
+
+journal_types (admin/pages/journal_types.php)
+- API: admin/api/journal_types/save.php
+- الحالة: [منتهٍ]
+- ثغرات: التفصيل في gl_account_settings (by design)
+
+fiscal_years (admin/pages/fiscal_years.php)
+- API: admin/api/fiscal_years/save.php → includes/year_end_close.php
+- الحالة: **[منتهٍ]** — إقفال/فك إقفال؛ توجيه لشاشة YEC؛ void عند reopen (§9)
+- تنفيذ: prepare/finalize/void عبر year_end_close.php؛ **خارج gl_posting**
+
+year_end_close_vouchers (admin/pages/year_end_close_vouchers.php) — **في navAccountingAll**
+- API: admin/api/year_end_close/manage.php
+- الحالة: **[منتهٍ]** — سند YEC واحد (PL→RE→LR)； yec_locked / yec_phase (rev 63)； §10 طباعة بعد الحفظ
+- ثغرات: تلميع بحث/تصفّح داخل الشاشة (اختياري — GAP-ACC-13)
+
+gl_posting (admin/pages/gl_posting.php)
+- APIs: admin/api/gl/pending-list.php, pending-preview.php, pending-post.php, pending-unpost.php
+- الحالة: **[منتهٍ ~90%]** — hub **Lane A** فقط
+- منجز: قوائم معلّق/مرحّل، ترحيل، فك ترحيل انتقائي، معاينة أسطر
+- **Lane B (by design — ليس نقص):** YEC (§9.8)، «إنشاء القiود» (§13.9)، INV-C manual
+- ثغرات: GAP-ACC-01 تدقيق Lane A؛ GAP-ACC-11 ملاحظة UX؛ ORANGE_GL_IMMEDIATE_POSTING (سيرفر)； ACC-06 صلاحيات
+
+opening_balances (admin/pages/opening_balances.php)
+- APIs: admin/api/opening_balances/save.php, delete.php
+- الحالة: [منتهٍ] — OBV، طابور عند التفعيل
+- ثغرات: يستبدل سند OB السابق عند الحفظ
+
+opening_stock_balances (admin/pages/opening_stock_balances.php) — **مخازن (nav مخازن)**
+- APIs: admin/api/stock/adjust.php, admin/api/stock/opening-stock-lock.php
+- includes/opening_stock_lock.php
+- الحالة: **[منتهٍ §11]** — كميات بلا GL؛ checkbox «مقفول» per دولة؛ adjust محمي؛ UI في stock/item_card
+- ثغرات: لا GL للقيمة (by design — OBV مالي منفصل)
+
+accounting_reports_index (admin/pages/accounting_reports_index.php) — **بلا nav**
+- الحالة: [مرجع جزئي] — **شارة pl_compare_years ما زالت «تطوير لاحق»** بينما الشاشة في nav [GAP-ACC-09]
+
+================================================================================
+3) جرد الشاشات — السندات والذمم
+================================================================================
+
+journal_entries → journal_voucher_screen.php (entry_type manual)
+receipt_voucher → journal_voucher_screen.php (receipt_voucher)
+payment_voucher → journal_voucher_screen.php (payment_voucher)
+other_vouchers → journal_voucher_screen.php (other_voucher)
+year_end_close_vouchers → journal_voucher_screen.php (entry_type year_end_close) — **انظر أيضاً §2**
+- API مشترك: admin/api/journal/manage.php (+ reference_preview)
+- الحالة: [منتهٍ] — browse/search/nav/delete؛ مرجع تلقائي {CODE}-{CC}-{serial}؛ §10 طباعة بعد الحفظ
+- ثغرات: update على سند **مرحّل** يتجاوز الطابور؛ إنشاء جديد → pending عند orange_gl_use_pending_queue()
+
+partner_customer_receipt (admin/pages/partner_customer_receipt.php)
+- APIs: customer-receipt.php, open-items.php, journal/manage.php
+- الحالة: [منتهٍ 2026-05-20] — مطابق partner_supplier_payment؛ CRR preview
+- ملاحظة: customer-receipt-list.php / -search.php غير مستخدمة من UI
+
+partner_supplier_payment (admin/pages/partner_supplier_payment.php)
+- APIs: supplier-payment.php, open-items.php, journal/manage.php
+- الحالة: [منتهٍ] — SPR preview، تنقل/بحث/حذف
+
+partner_party_voucher_ui.php
+- الحالة: [تراثي] — لم تعد تُستخدم للشاشتين الرئيسيتين بعد إعادة بناء customer_receipt
+
+================================================================================
+4) جرد الشاشات — التقارير
+================================================================================
+
+journal_voucher_reports — [منتهٍ] — posted vouchers فقط
+partner_account_statement — [جزئي] — عميل/GL؛ **لا وضع مورد**؛ filt_post لا يطابق pending model
+report_account_list — [منتهٍ] — دليل بدون أرصدة
+report_gl_account_monthly — [منتهٍ] — تجميع شهري لورقة ترحيل
+partner_reports (customers/suppliers) — [منتهٍ] — ذمم + reconcile؛ APIs summary/aging موجودة inline
+report_income_statement — [منتهٍ] — mapping-first (report_line_id)
+report_trading_account → report_trading_account_detail.php — [منتهٍ]
+report_pl_monthly — [منتهٍ]
+report_pl_compare_years — [منتهٍ] — في navAccountingAll + admin/index.php $allowed
+report_cash_flow — [منتهٍ] — غير مباشرة + مباشرة؛ FY؛ cashflow_section + حسابات النقد (ACC-10 مرحلة 1)
+bank_reconciliation — [منتهٍ] — CSV + يدوي؛ GL ↔ كشف؛ إقفال + قيد/طابور (ACC-10 مرحلة 2)
+report_trial_balance — [منتهٍ] — posted only
+financial_report — [منتهٍ] — P&L + BS مبسّطة + TB مدمج + كشف حساب ?account=
+
+**خارج navAccountingAll — مرتبطة بمسار GL §13 (قائمة الطلبات/المبيعات):**
+online_orders_final_posting — [منتهٍ] — «طلبات أونلاين — القiود»؛ final-posting-create.php → GL + INV-O + party_subledger
+online_invoices — [منتهٍ] — فواتير أونلاين INV-O (تصفّح)
+sales_invoices — [منتهٍ] — فواتير مبيعات INV-C (تصفّح)
+manual_order / create-manual.php — [منتهٍ] — INV-C + GL عند الحفظ
+
+**ACC-10 — شاشات (2026-05-20):** report_cash_flow + bank_reconciliation + inventory_reconciliation + analytical_dimensions + report_analytical **[منتهٍ]** — GAP-ACC-10 **مغلق** (§6b.5).
+
+**غير موجود كشاشة مستقلة (وظائف كاملة):** — (ACC-10 مكتمل).
+
+================================================================================
+5) مسار GL — ما يعمل وما تبقى
+================================================================================
+
+منجز (includes/gl_pending_movements.php + مسارات API):
+- جدول orange_gl_pending_movements + gl_posting hub
+- enqueue: مشتريات (create/update)، مردودات، شركاء، OB، سندات يدوية جديدة، …
+- orange_voucher_auto_reference / preview عبر journal_types (OBV, SPR, CRR, …)
+- **§13.4–§13.5:** completed = مخزون فقط؛ GL + INV-O من final-posting-create.php (**مباشر — خارج gl_posting**)
+- **§9 YEC:** year_end_close.php — حفظ/void **مباشر — خارج gl_posting**
+- **§11:** مخزون افتتاحي — كميات فقط بلا enqueue GL
+- **§10:** طباعة السندات بعد الحفظ فقط (journal_voucher_screen + partner screens)
+
+متبقٍ لـ 100% (مرتب الأولوية):
+[GAP-ACC-01] متوسط — مراجعة orange_voucher_post() **Lane A فقط** (استثناء §9/§13)； ORANGE_GL_IMMEDIATE_POSTING
+[GAP-ACC-02] ~~حرج — استلام مشتريات~~ → **[ملغى]** GL على حفظ purchases/create.php (enqueue عند الطابور)
+[GAP-ACC-03] متوسط — تعديل journal/manage update على مرحّل vs repost policy
+[GAP-ACC-04] ~~متوسط — YEC §9~~ → **[مغلق — منتهٍ 2026-05-20]** rev 63؛ year_end_close_vouchers؛ void
+[GAP-ACC-12] ~~متوسط — §13 حزمة~~ → **[مغلق — منتهٍ 2026-05-20]** B1–B8؛ §13.13 O-items = قرارات UX مفتوحة لا تمنع التشغيل
+[GAP-ACC-05] متوسط — partner_account_statement: وضع **مورد** (customer mode موجود؛ account mode للدليل)
+[GAP-ACC-06] متوسط — صلاحيات admin_permissions: post vs unpost (roadmap phase 6)
+[GAP-ACC-07] منخفض — gl_account_settings: خريطة ضريبة/شحن/بنود فاتورة
+[GAP-ACC-08] ~~module expenses GL (غائب)~~ → **ملغى/تراثي** — المصروفات = **سند صرف** (payment_voucher / PV)؛ لا شاشة expenses مستقلة.
+[GAP-ACC-09] منخفض — accounting_reports_index: تحديث شارات (pl_compare → جاهز)
+[GAP-ACC-10] مستقبل — تدفقات نقدية، أبعاد تحليلية، تسويات (policy v2 §3)
+[GAP-ACC-11] توضيح — التقارير = journal_vouchers مرحّلة؛ المعلق في gl_posting فقط؛ §13/YEC استثناءان موثّقان
+[GAP-ACC-13] منخفض — YEC: تلميع بحث/تصفّح داخل year_end_close_vouchers (اختياري)
+
+================================================================================
+6) خطة إغلاق إلى 100% (مقترحة — محدّثة 2026-05-20)
+================================================================================
+
+**منجز من الخطة السابقة:**
+- ~~GAP-ACC-04 YEC~~
+- ~~GAP-ACC-12 §13 حزمة تسليم/قيود/INV-O/C~~
+- §11 opening stock lock (A3)
+- §10 print after save (A1)
+
+**المرحلة أ — تشغيل (أسبوع)**
+- GAP-ACC-05 كشف حساب **مورد** (mode=supplier)
+- GAP-ACC-09 فهرس التقارير (شارات pl_compare + trading)
+- GAP-ACC-11 توثيق UX في gl_posting: «§13 + YEC خارج الطابور»
+
+**المرحلة ب — GL Lane A (roadmap phase 4)**
+- GAP-ACC-01، GAP-ACC-03 (~~ACC-02 ملغى~~)
+
+**المرحلة ج — صلاحيات ومتقدم (phase 6+)**
+- GAP-ACC-06، GAP-ACC-07، GAP-ACC-13 (~~ACC-08~~ تراثي — PV)
+- **GAP-ACC-10 (خيار د):** **مغلق — منتهٍ 2026-05-20** — مراحل 0–4 (§6b.8).
+
+**§13.13 (O-01…O-14):** قرارات UX/سياسة — **ليست** شرطاً لإغلاق ~88% الحالي؛ تُغلق بقرار المالك عند الحاجة.
+
+معيار 100%:
+- كل مسار GL-emitting يمر orange_gl_pending_movements عند تفعيل الطابور (**مع استثناءات §9/§13 موثّقة**)
+- كل شاشات navAccountingAll [منتهٍ] بلا ثغرات حرجة في الجدول أعلاه
+- تقارير أساسية + ذمم + كشف GL/عميل/مورد متسقة مع country_id
+- صلاحيات post/unpost إن طُلبت من المالك
+
+================================================================================
+6b) GAP-ACC-10 — ترتيب التنفيذ المعتمد (خيار د — policy v2)
+================================================================================
+
+**حالة (2026-05-20):** موافقة المالك على **خيار د** — ACC-10 **كامل** (تدفقات + تسويات بنك/مخزون + أبعاد تحليلية + تقرير تحليلي).
+**§6b.4 — قرارات المالك: منتهية (2026-05-20).** **المراحل 0–4 — منتهية.** GAP-ACC-10 **مغلق** (§6b.5).
+
+**§6b.1 — الشاشات الجديدة (5)**
+
+| # | الملف | page key | عنوان القائمة | مجموعة nav |
+|---|--------|----------|---------------|------------|
+| 1 | admin/pages/report_cash_flow.php | report_cash_flow | قائمة التدفقات النقدية | الحسابات والتقارير → التقارير |
+| 2 | admin/pages/bank_reconciliation.php | bank_reconciliation | تسوية البنك | الحسابات والتقارير → السندات والذمم |
+| 3 | admin/pages/inventory_reconciliation.php | inventory_reconciliation | تسوية المخزون / الجرد | المخازن والمشتريات |
+| 4 | admin/pages/analytical_dimensions.php | analytical_dimensions | الأبعاد التحليلية | الحسابات والتقارير → الإعداد والدليل |
+| 5 | admin/pages/report_analytical.php | report_analytical | التقرير التحليلي | الحسابات والتقارير → التقارير |
+
+**شاشات تُحدَّث (لا تُضاف):** chart_of_accounts (cashflow_section)، partner_reports (مطابقة ذمم)، accounting_reports_index (روابط/شارات)، شاشات السندات (بُعد اختياري على أسطر القيد — مرحلة 4).
+
+**§6b.2 — مراحل التنفيذ (ترتيب إلزامي)**
+
+| مرحلة | المحتوى | مخرجات | مدة تقديرية |
+|-------|---------|--------|-------------|
+| **0** | مخطط DB + helpers + nav + `$allowed` | جداول §6b.3؛ `includes/catalog_schema.php`؛ `D:\orange_sql_updates.sql`؛ تسجيل الصفحات في admin/index.php و admin/partials/header.php | 2–3 أيام |
+| **1** | قائمة التدفقات النقدية | شاشة 1؛ **طريقتان:** غير مباشرة (P&L + الميزانية) **و** مباشرة (حسابات النقد)؛ تبديل/تبويب في UI؛ `cashflow_section` | 3–4 أيام |
+| **2** | تسوية البنك | شاشة 2؛ **استيراد Excel/CSV** + **إدخال يدوي** (رصيد كشف وأسطر)؛ مطابقة GL؛ سند تسوية عند الإقفال | 5–7 أيام |
+| **3** | تسوية المخزون / الجرد | شاشة 3؛ جرد فعلي ↔ نظام؛ **قيد GL تلقائي** عند اعتماد الفرق (+ حركة مخزون إن لزم)؛ §11 lock | 5–7 أيام |
+| **4** | أبعاد + تقرير تحليلي | شاشتا 4 و5؛ بذور v1: **فرع** + **قناة** فقط؛ `dimension_value_id` على journal_lines | 7–10 أيام |
+
+**المجموع التقديري:** ~4–6 أسابيع (بعد تثبيت قرارات §6b.4).
+
+**§6b.3 — جداول/حقول مقترحة (مرحلة 0)**
+
+- `analytical_dimension` — تعريف البُعد (code، label_ar/en، active، sort)
+- `analytical_dimension_value` — قيم البُعد (dimension_id، code، label، active)
+- `journal_lines.dimension_value_id` — nullable FK (مرحلة 4)
+- `bank_reconciliation` + `bank_reconciliation_line` — جلسة تسوية بنك (حساب، فترة، رصيد GL، رصيد كشف، حالة)
+- `inventory_reconciliation` + `inventory_reconciliation_line` — جلسة جرد (مستودع/SKU، كمية نظام، كمية فعلية، فرق)
+
+**§6b.4 — قرارات المالك (منتهية — 2026-05-20)**
+
+| # | السؤال | قرار المالك | «تنفيذ» مختصر |
+|---|--------|-------------|----------------|
+| 1 | تسوية البنك | **استيراد Excel/CSV** مع **إتاحة الإدخال اليدوي** أيضاً | UI: رفع ملف + حقول يدوية لرصيد/أسطر الكشف؛ نفس جلسة التسوية |
+| 2 | تسوية المخزون | **قيد GL تلقائي** عند اعتماد فرق الجرد | عند «اعتماد»: enqueue/post قيد تسوية مخزون (مع تحديث كميات إن لزم) |
+| 3 | الأبعاد v1 | **فرع** + **قناة** فقط | بذور `analytical_dimension` (code: branch، channel)؛ توسيع لاحقاً بقرار |
+| 4 | قائمة التدفقات | **الاثنان:** غير مباشرة **و** مباشرة | شاشة report_cash_flow: تبويب/اختيار طريقة؛ نفس FY؛ posted فقط |
+
+**§6b.4 — APIs/ملفات متوقعة (مرجع للوكيل عند «ابدأ»)**
+
+- مرحلة 2: `admin/api/bank-reconciliation/import.php` (CSV/Excel) + save/close؛ قالب استيراد موثّق في الشاشة
+- مرحلة 3: `admin/api/inventory-reconciliation/save.php` + get/approve؛ `includes/inventory_reconciliation.php` — GL auto-post + stock delta
+- مرحلة 1: `includes/cash_flow_report.php` — `orange_cash_flow_indirect()` + `orange_cash_flow_direct()`
+- مرحلة 4: `includes/analytical_dimensions.php` + `includes/analytical_report.php`؛ `admin/api/analytical-dimensions/save.php`؛ بُعد اختياري على أسطر السند (`dimension_value_id`)
+
+**§6b.5 — معيار إغلاق GAP-ACC-10**
+
+- الخمس شاشات في nav + `$allowed` + [منتهٍ] في جدول §4
+- التقارير من قيود **مرحّلة** فقط؛ mapping-first (`cashflow_section`، لا أسماء حسابات في المنطق)
+- تحديث GAP-ACC-10 → **مغلق** في هذا الملف و ORANGE_SYSTEM_COMPLETION_REPORT.txt
+- تحديث docs/ACCOUNTING_REPORTING_POLICY_V2.md §3 (نقل من «مستقبلي» إلى «منفَّذ» حيث ينطبق)
+
+**§6b.6 — مراجع تنفيذ ACC-10**
+
+- docs/ACCOUNTING_REPORTING_POLICY_V2.md §2–§3
+- docs/archive/ORANGE_ACCOUNTING_MAPPING_AND_REPORT_HANDOFF.txt
+- docs/archive/ORANGE_GL_MOVEMENTS_AND_POSTING_POLICY.txt (§11 مخزون؛ سندات PV/CRR)
+- includes/accounting_report_mapping.php (نمط التقارير)
+- accounts.cashflow_section — موجود في chart_of_accounts (يُستهلك في مرحلة 1)
+
+**§6b.7 — سياسة تحديث الأرشيف بعد كل مرحلة (قرار مالك — إلزامي للوكيل)**
+
+بعد **إتمام** أي مرحلة من §6b.2 (0–4) — **قبل** اعتبار العمل منتهياً أو الانتقال للمرحلة التالية:
+
+1. **§6b.8** — تحديث جدول تتبّع المراحل (حالة، تاريخ، ملخص، commit إن وُجد).
+2. **§8 (سجل التحديث)** — سطر بتاريخ اليوم: «ACC-10 مرحلة N — منجز: …».
+3. **§4 (جرد الشاشات)** — أي شاشة أُنجزت → `[منتهٍ]` أو `[جزئي]` مع سبب.
+4. **ORANGE_SYSTEM_COMPLETION_REPORT.txt** — إن أُغلقت فجوة جزئية أو تغيّر % policy v2.
+5. **docs/ACCOUNTING_REPORTING_POLICY_V2.md** — عند مرحلة 4 أو إغلاق ACC-10 كامل.
+
+**إبلاغ المالك (إلزامي في آخر ردّ بعد كل مرحلة):** فقرة واضحة **«ACC-10 — المتبقي»** تتضمن:
+- **ما تم** في المرحلة التي أُغلقت (ملفات/شاشات/جداول).
+- **ما لم يُنفَّذ بعد** — قائمة المراحل المتبقية برقمها واسمها (من §6b.8).
+- **المرحلة التالية** المقترحة (إن بقي شيء).
+- إن **انتهت كل المراحل 0–4:** إعلان إغلاق GAP-ACC-10 وفق §6b.5.
+
+**لا يكفي** commit أو «المرحلة خلصت» دون تحديث §6b.8 + فقرة المتبقي للمالك.
+
+**§6b.8 — تتبّع حالة مراحل ACC-10 (يُحدَّث بعد كل مرحلة)**
+
+| مرحلة | الاسم | الحالة | تاريخ إنجاز | ملخص منجز | commit / مرجع |
+|-------|--------|--------|-------------|-----------|----------------|
+| **0** | مخطط DB + nav + stubs | **منتهٍ** | 2026-05-20 | rev 66؛ جداول ACC-10؛ 5 صفحات placeholder؛ nav + $allowed؛ helpers | (محلي) |
+| **1** | قائمة التدفقات النقدية | **منتهٍ** | 2026-05-20 | report_cash_flow؛ indirect+direct؛ cash_flow_report.php | (محلي) |
+| **2** | تسوية البنك | **منتهٍ** | 2026-05-20 | bank_reconciliation.php + APIs (save/get/close/import)؛ includes/bank_reconciliation.php | (محلي) |
+| **3** | تسوية المخزون / الجرد | **منتهٍ** | 2026-05-20 | inventory_reconciliation.php + APIs (save/get/approve)؛ includes/inventory_reconciliation.php؛ stock + GL | (محلي) |
+| **4** | أبعاد + تقرير تحليلي | **منتهٍ** | 2026-05-20 | analytical_dimensions + report_analytical؛ dimension_value_id على السندات؛ analytical_report.php | (محلي) |
+
+**حالات مسموحة:** `لم تبدأ` | `قيد التنفيذ` | `منتهٍ` | `جزئي` (مع سبب في «ملخص منجز»).
+
+**ACC-10 كامل:** المراحل **0–4** = `منتهٍ` → **GAP-ACC-10 → مغلق** (§6b.5) — **2026-05-20**.
+
+================================================================================
+7) مراجع إلزامية عند التنفيذ
+================================================================================
+
+- docs/archive/ORANGE_GL_MOVEMENTS_AND_POSTING_POLICY.txt (**§13.00** بوابة نقاش تسليم/مندوبين/قيود؛ §8 قائمة الشاشات)
+- docs/archive/ORANGE_ACCOUNTING_MAPPING_AND_REPORT_HANDOFF.txt
+- docs/ACCOUNTING_REPORTING_POLICY_V2.md
+- docs/archive/ORANGE_PROJECT_COMPLETION_ROADMAP.txt (مراحل 3–6)
+- docs/archive/ORANGE_ADMIN_SCREENS_COUNTRY_SCOPE.txt (GAP-09 country على GL)
+- includes/gl_pending_movements.php، journal_voucher.php، accounting_report_mapping.php
+
+================================================================================
+8) سجل التحديث
+================================================================================
+
+2026-05-20 — إنشاء الملف + canvas companion بعد مراجعة شاملة؛ partner_customer_receipt أُعيد بناؤه؛ supplier_payment + CRR/SPR preview منجز.
+2026-05-20 — تثبيت سياسة إقفال سنة مالية (YEC) في ORANGE_GL_MOVEMENTS §9: سند واحد، ترتيب أسطر، عناوين مراحل؛ fiscal_years → [جزئي]؛ GAP-ACC-04 محدّث.
+2026-05-20 — §9.8 + §10: YEC خارج gl_posting؛ checkbox «قيد مغلق»؛ طباعة كل السندات **بعد الحفظ فقط**.
+2026-05-20 — §11 + §12: رصيد مخزون افتتاحي (نقطة 1)؛ ملخص حالة النقاش؛ ترتيب تنفيذ مقترح.
+2026-05-20 — §13.11.9.6: orders فلتر مندوب + «بالطريق للكل» بعد التوزيع.
+2026-05-20 — §13.11.9.6-ج «تم التوصيل للكل» + §13.11.9.7 «بحث التسليم» (مرتجع كامل→إلغاء؛ جزئي→تعديل فاتورة)؛ O-15 مغلق؛ O-16–O-19 مفتوحة.
+2026-05-20 — §13.5.1-ب: completed يخرج من orders.php ويظهر في «تسليم طلبات الأونلاين النهائية» حتى «إنشاء القيود».
+2026-05-20 — O-20: شاشة فواتير أونلاين منفصلة؛ INV-C-{code}- / INV-O-{code}- (مثال KW-000001).
+2026-05-20 — O-21-أ/ب مغلق: invoice_edit كومbo (إطار كل/لا) + مجموع السلة (خصم+شرط ≥Y+إعادة حساب تلقائي).
+2026-05-20 — O-21-ج مغلق: هدية cart_gift — آخر الفاتورة + شرط ≥Y + حالة يُسلَّم/لا + رفض يدوي.
+2026-05-20 — O-21-د/O-21 مغلق: BOGO — آخر الفاتورة + شرط تسليم؛ بنود شراء بتجزئة ثابتة؛ هدية تُرجَع للشركة عند انكسر الشرط.
+2026-05-20 — O-22 مغلق: كارت «سقط من الفاتورة» + «ارجع للفاتورة» = استثناء إدارة (بدون سبب) + معاينة فورية قبل حفظ واحد.
+2026-05-20 — §13.14: ترتيب تنفيذ برمجي مراحل 0–8 (فصل GL→مناديب→handover→orders→بحث→invoice_edit+O-21/22→قيود INV-O→فواتير INV-C).
+2026-05-20 — §12.1: ترتيب تنفيذ موحّد (بند1 §11 + بند2 §9/§10 + بند3 §13/§13.14)؛ تصحيح: §13.14 ليس الخارطة الكاملة.
+2026-05-20 — §12.2: قائمة تحقق «قرارات مغلقة لا تُنسى» (sales_returns، party_subledger، manifest، manual بلا عروض، completed فردي، …) + توسيع §13.14 B1.5/B3/B6/B7/B8.
+
+--- تنفيذ §12.1 (commits main) ---
+
+2026-05-20 — A1 §10: طباعة بعد الحفظ (a0125b9).
+2026-05-20 — A3 §11: opening_stock_locked + API + حماية adjust (d0406c4، rev 62).
+2026-05-20 — A2 §9: YEC + year_end_close_vouchers + fiscal flow + void (3c49ce3، rev 63).
+2026-05-20 — B1–B8 §13: فصل GL، مناديب، handover، posting، INV-O/C، invoice_edit (3e78020…aa80700).
+2026-05-20 — §13.8: ترحيل INV- legacy (0f98a06، rev 64). س29 محدّث في ORANGE_STOREFRONT_POLICY_REFERENCE.
+
+2026-05-20 — GAP-ACC-08: **ملغى/تراثي** — لا module expenses منفصل؛ التسجيل = سند صرف (PV) فقط.
+2026-05-20 — GAP-ACC-10 **خيار د:** تثبيت ترتيب التنفيذ في **§6b** (5 شاشات، مراحل 0–4)؛ التنفيذ **لم يبدأ**.
+2026-05-20 — GAP-ACC-10 **§6b.4:** قرارات المالك — (1) بنك: استيراد+يدوي (2) مخزون: قيد GL تلقائي (3) أبعاد: فرع+قناة (4) تدفقات: الاثنان.
+2026-05-20 — GAP-ACC-10 **§6b.7–6b.8:** سياسة تحديث الأرشيف + جدول تتبّع بعد **كل** مرحلة؛ إبلاغ المالك بـ «ACC-10 — المتبقي» إلزامي.
+2026-05-20 — GAP-ACC-10 **مرحلة 0 منتهية:** rev 66؛ acc10_schema؛ 5 صفحات placeholder؛ nav.
+2026-05-20 — GAP-ACC-10 **مرحلة 1 منتهية:** report_cash_flow (غير مباشرة + مباشرة)؛ includes/cash_flow_report.php.
+2026-05-20 — GAP-ACC-10 **مرحلة 2 منتهية:** bank_reconciliation (CSV+يدوي، إقفال، قيد تسوية)؛ admin/api/bank-reconciliation/*.
+2026-05-20 — GAP-ACC-10 **مرحلة 3 منتهية:** inventory_reconciliation (جرد، اعتماد، stock delta + قيد GL)؛ admin/api/inventory-reconciliation/*؛ includes/inventory_reconciliation.php.
+2026-05-20 — GAP-ACC-10 **مرحلة 4 منتهية + GAP مغلق:** analytical_dimensions + report_analytical؛ dimension_value_id على السندات؛ includes/analytical_report.php.
+2026-05-20 — سابق: ~88%؛ GAP-ACC-04/12 مغلق؛ rev 64 INV legacy.

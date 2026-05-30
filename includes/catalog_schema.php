@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 65);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 66);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3584,6 +3584,9 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
     }
+
+    require_once __DIR__ . '/acc10_schema.php';
+    orange_catalog_ensure_acc10_schema($pdo);
 
     require_once __DIR__ . '/schema_migrations.php';
     orange_schema_run_pending_migrations($pdo);

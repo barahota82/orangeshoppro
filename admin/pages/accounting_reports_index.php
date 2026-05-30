@@ -211,6 +211,48 @@ $financialWithFy = $financialBase . (isset($_GET['fy']) && (int) $_GET['fy'] > 0
 </div>
 
 <div class="card">
+    <h3 class="card-title">ACC-10 — policy v2 (مرحلة 0: هيكل فقط)</h3>
+    <div class="table-wrap">
+        <table class="admin-fy-table">
+            <thead>
+                <tr>
+                    <th>الشاشة</th>
+                    <th>الحالة</th>
+                    <th>افتح</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>قائمة التدفقات النقدية (غير مباشرة + مباشرة)</td>
+                    <td><span class="badge approved">جاهز</span></td>
+                    <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=report_cash_flow&amp;run=1', ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
+                </tr>
+                <tr>
+                    <td>تسوية البنك</td>
+                    <td><span class="badge approved">جاهز</span></td>
+                    <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=bank_reconciliation', ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
+                </tr>
+                <tr>
+                    <td>تسوية المخزون / الجرد</td>
+                    <td><span class="badge approved">جاهز</span></td>
+                    <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=inventory_reconciliation', ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
+                </tr>
+                <tr>
+                    <td>الأبعاد التحليلية</td>
+                    <td><span class="badge approved">جاهز</span></td>
+                    <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=analytical_dimensions', ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
+                </tr>
+                <tr>
+                    <td>التقرير التحليلي</td>
+                    <td><span class="badge approved">جاهز</span></td>
+                    <td><a href="<?php echo htmlspecialchars($baseAdmin . '?page=report_analytical&amp;run=1', ENT_QUOTES, 'UTF-8'); ?>">فتح</a></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
     <h3 class="card-title">تذكير</h3>
     <ul class="card-hint" style="margin:0;padding-right:1.25rem;">
         <li>«التقارير المالية» تعتمد على تصنيف جذور الحساب في <code>includes/account_tree.php</code> ومراجع الأدوار؛ أي حساب لا يُوزَّن لا يُظهر عدلاً في الميزانية الموجزة أو في تقارير الأرباح والخسائر.</li>

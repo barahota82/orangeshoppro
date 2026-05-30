@@ -865,6 +865,89 @@ function orange_journal_vouchers_backfill_serial_numbers(PDO $pdo): void
  * @param list<array{account_id:int,debit:float,credit:float,memo?:string}> $lines
  * @return int voucher id
  */
+function orange_journal_line_supports_dimension(PDO $pdo): bool
+{
+    static $memo = null;
+    if ($memo === null) {
+        $memo = orange_table_has_column($pdo, 'journal_lines', 'dimension_value_id');
+    }
+
+    return $memo;
+}
+
+/**
+ * @param array{line_no:int,account_id:int,debit:float,credit:float,memo:string,dimension_value_id?:int|null} $row
+ */
+function orange_journal_insert_voucher_line(PDO $pdo, int $voucherId, array $row): void
+{
+    $cols = ['voucher_id', 'line_no', 'account_id', 'debit', 'credit', 'memo'];
+    $vals = [
+        $voucherId,
+        (int) ($row['line_no'] ?? 0),
+        (int) ($row['account_id'] ?? 0),
+        (float) ($row['debit'] ?? 0),
+        (float) ($row['credit'] ?? 0),
+        ($row['memo'] ?? '') === '' ? null : (string) $row['memo'],
+    ];
+    if (orange_journal_line_supports_dimension($pdo)) {
+        $cols[] = 'dimension_value_id';
+        $dim = isset($row['dimension_value_id']) && (int) $row['dimension_value_id'] > 0
+            ? (int) $row['dimension_value_id']
+            : null;
+        $vals[] = $dim;
+    }
+    $ph = implode(',', array_fill(0, count($vals), '?'));
+    $sql = 'INSERT INTO journal_lines (' . implode(', ', $cols) . ') VALUES (' . $ph . ')';
+    $pdo->prepare($sql)->execute($vals);
+}
+
+/**
+ * @param array<string,mixed> $ln
+ *
+ * @return array{account_id:int,debit:float,credit:float,memo:string,line_no?:int,dimension_value_id?:int|null}
+ */
+function orange_journal_normalize_voucher_line_input(PDO $pdo, array $ln, int $lineNo, string $currencyCode, ?int $countryId): array
+{
+    $aid = (int) ($ln['account_id'] ?? 0);
+    $d = orange_gl_round_money((float) ($ln['debit'] ?? 0), $currencyCode);
+    $c = orange_gl_round_money((float) ($ln['credit'] ?? 0), $currencyCode);
+    if ($aid <= 0) {
+        throw new InvalidArgumentException('حساب غير صالح في سطر السند.');
+    }
+    if ($d < 0 || $c < 0) {
+        throw new InvalidArgumentException('لا يقبل السند سالباً في المدين أو الدائن.');
+    }
+    if ($d > 0 && $c > 0) {
+        throw new InvalidArgumentException('كل سطر إما مدين أو دائن فقط.');
+    }
+    if ($d === 0.0 && $c === 0.0) {
+        throw new InvalidArgumentException('سطر بلا مبلغ.');
+    }
+    $memo = trim((string) ($ln['memo'] ?? ''));
+    if ($memo === '') {
+        throw new InvalidArgumentException('بيان السطر مطلوب لكل بند في السند.');
+    }
+    $out = [
+        'account_id' => $aid,
+        'debit' => $d,
+        'credit' => $c,
+        'memo' => $memo,
+        'line_no' => $lineNo,
+    ];
+    if (orange_journal_line_supports_dimension($pdo)) {
+        require_once __DIR__ . '/analytical_dimensions.php';
+        $dimId = orange_analytical_dimension_value_id_from_line($ln);
+        if ($dimId !== null) {
+            orange_analytical_dimension_value_assert_valid($pdo, $dimId, $countryId);
+            $out['dimension_value_id'] = $dimId;
+        } else {
+            $out['dimension_value_id'] = null;
+        }
+    }
+
+    return $out;
+}
+
 function orange_voucher_post(PDO $pdo, array $header, array $lines): int
 {
     if (!orange_journal_vouchers_ready($pdo)) {
@@ -894,28 +977,17 @@ function orange_voucher_post(PDO $pdo, array $header, array $lines): int
     $norm = [];
     $lineNo = 0;
     foreach ($lines as $ln) {
-        $aid = (int) ($ln['account_id'] ?? 0);
-        $d = orange_gl_round_money((float) ($ln['debit'] ?? 0), $currencyCode);
-        $c = orange_gl_round_money((float) ($ln['credit'] ?? 0), $currencyCode);
-        if ($aid <= 0) {
-            throw new InvalidArgumentException('حساب غير صالح في سطر السند.');
+        try {
+            $parsed = orange_journal_normalize_voucher_line_input($pdo, $ln, ++$lineNo, $currencyCode, $voucherCountryId > 0 ? $voucherCountryId : null);
+        } catch (InvalidArgumentException $e) {
+            if ($e->getMessage() === 'سطر بلا مبلغ.') {
+                continue;
+            }
+            throw $e;
         }
-        if ($d < 0 || $c < 0) {
-            throw new InvalidArgumentException('لا يقبل السند سالباً في المدين أو الدائن.');
-        }
-        if ($d > 0 && $c > 0) {
-            throw new InvalidArgumentException('كل سطر إما مدين أو دائن فقط.');
-        }
-        if ($d === 0.0 && $c === 0.0) {
-            continue;
-        }
-        $memo = trim((string) ($ln['memo'] ?? ''));
-        if ($memo === '') {
-            throw new InvalidArgumentException('بيان السطر مطلوب لكل بند في السند.');
-        }
-        $norm[] = ['account_id' => $aid, 'debit' => $d, 'credit' => $c, 'memo' => $memo, 'line_no' => ++$lineNo];
-        $totalD += $d;
-        $totalC += $c;
+        $norm[] = $parsed;
+        $totalD += $parsed['debit'];
+        $totalC += $parsed['credit'];
     }
     if ($norm === []) {
         throw new InvalidArgumentException('السند بدون أسطر.');
@@ -1074,23 +1146,13 @@ function orange_voucher_post(PDO $pdo, array $header, array $lines): int
         }
         orange_journal_voucher_stamp_country($pdo, $vid, $header);
 
-        $ins = $pdo->prepare(
-            'INSERT INTO journal_lines (voucher_id, line_no, account_id, debit, credit, memo) VALUES (?,?,?,?,?,?)'
-        );
         foreach ($norm as $row) {
             $chk->execute([$row['account_id']]);
             if (!$chk->fetch()) {
                 $pdo->prepare('DELETE FROM journal_vouchers WHERE id = ?')->execute([$vid]);
                 throw new InvalidArgumentException('حساب غير موجود في الدليل: ' . $row['account_id']);
             }
-            $ins->execute([
-                $vid,
-                $row['line_no'],
-                $row['account_id'],
-                $row['debit'],
-                $row['credit'],
-                $row['memo'] === '' ? null : $row['memo'],
-            ]);
+            orange_journal_insert_voucher_line($pdo, $vid, $row);
         }
 
         if ($ownTx && $pdo->inTransaction()) {
@@ -1187,28 +1249,17 @@ function orange_voucher_update_multiline(PDO $pdo, int $voucherId, array $header
     $norm = [];
     $lineNo = 0;
     foreach ($postLines as $ln) {
-        $aid = (int) ($ln['account_id'] ?? 0);
-        $d = orange_gl_round_money((float) ($ln['debit'] ?? 0), $currencyCode);
-        $c = orange_gl_round_money((float) ($ln['credit'] ?? 0), $currencyCode);
-        if ($aid <= 0) {
-            throw new InvalidArgumentException('حساب غير صالح في سطر السند.');
+        try {
+            $parsed = orange_journal_normalize_voucher_line_input($pdo, $ln, ++$lineNo, $currencyCode, $voucherCountryId > 0 ? $voucherCountryId : null);
+        } catch (InvalidArgumentException $e) {
+            if ($e->getMessage() === 'سطر بلا مبلغ.') {
+                continue;
+            }
+            throw $e;
         }
-        if ($d < 0 || $c < 0) {
-            throw new InvalidArgumentException('لا يقبل السند سالباً في المدين أو الدائن.');
-        }
-        if ($d > 0 && $c > 0) {
-            throw new InvalidArgumentException('كل سطر إما مدين أو دائن فقط.');
-        }
-        if ($d === 0.0 && $c === 0.0) {
-            continue;
-        }
-        $memo = trim((string) ($ln['memo'] ?? ''));
-        if ($memo === '') {
-            throw new InvalidArgumentException('بيان السطر مطلوب لكل بند في السند.');
-        }
-        $norm[] = ['account_id' => $aid, 'debit' => $d, 'credit' => $c, 'memo' => $memo, 'line_no' => ++$lineNo];
-        $totalD += $d;
-        $totalC += $c;
+        $norm[] = $parsed;
+        $totalD += $parsed['debit'];
+        $totalC += $parsed['credit'];
     }
     if ($norm === []) {
         throw new InvalidArgumentException('السند بدون أسطر.');
@@ -1236,22 +1287,12 @@ function orange_voucher_update_multiline(PDO $pdo, int $voucherId, array $header
         $upd = $pdo->prepare($updSql);
         $upd->execute([$date, $referenceSql, $description, $fyId, $voucherId]);
         $pdo->prepare('DELETE FROM journal_lines WHERE voucher_id = ?')->execute([$voucherId]);
-        $ins = $pdo->prepare(
-            'INSERT INTO journal_lines (voucher_id, line_no, account_id, debit, credit, memo) VALUES (?,?,?,?,?,?)'
-        );
         foreach ($norm as $row) {
             $chk->execute([$row['account_id']]);
             if (!$chk->fetch()) {
                 throw new InvalidArgumentException('حساب غير موجود في الدليل: ' . $row['account_id']);
             }
-            $ins->execute([
-                $voucherId,
-                $row['line_no'],
-                $row['account_id'],
-                $row['debit'],
-                $row['credit'],
-                $row['memo'] === '' ? null : $row['memo'],
-            ]);
+            orange_journal_insert_voucher_line($pdo, $voucherId, $row);
         }
         orange_journal_voucher_stamp_currency($pdo, $voucherId, $header);
         $pdo->commit();

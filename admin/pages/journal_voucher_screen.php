@@ -84,7 +84,50 @@ $jvHeaderLineClass = 'jv-voucher-header-line' . ($jvNavReady ? ' jv-voucher-head
 $jvInitLinePairSeq = 0;
 $jvMoneyZeroEsc = htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8');
 $jvIsReceiptVoucherEt = $jvPageEt === 'receipt_voucher';
-$jvEchoJvCashLine = static function (array $lock) use (&$jvInitLinePairSeq, $jvMoneyZeroEsc, $jvIsReceiptVoucherEt): void {
+require_once __DIR__ . '/../../includes/analytical_dimensions.php';
+$jvShowDimensions = orange_journal_line_supports_dimension($pdo) && orange_analytical_dimensions_ready($pdo);
+$jvDimensionUiOptions = [];
+if ($jvShowDimensions) {
+    orange_analytical_dimension_seed_v1($pdo);
+    $jvDimensionUiOptions = orange_analytical_dimension_ui_options($pdo, $jvScreenCountryId);
+}
+$jvRenderDimSelect = static function (?int $selected = null) use ($jvShowDimensions, $jvDimensionUiOptions): string {
+    if (! $jvShowDimensions || $jvDimensionUiOptions === []) {
+        return '';
+    }
+    $html = '<select class="jv-dim admin-inp" style="min-width:200px;" title="بُعد تحليلي اختياري">'
+        . '<option value="">— بُعد تحليلي —</option>';
+    $lastDim = '';
+    foreach ($jvDimensionUiOptions as $o) {
+        $dimLabel = (string) ($o['dimension_label'] ?? '');
+        if ($dimLabel !== $lastDim) {
+            if ($lastDim !== '') {
+                $html .= '</optgroup>';
+            }
+            $html .= '<optgroup label="' . htmlspecialchars($dimLabel, ENT_QUOTES, 'UTF-8') . '">';
+            $lastDim = $dimLabel;
+        }
+        $vid = (int) ($o['id'] ?? 0);
+        $sel = ($selected !== null && $selected === $vid) ? ' selected' : '';
+        $html .= '<option value="' . $vid . '"' . $sel . '>'
+            . htmlspecialchars((string) ($o['label'] ?? ''), ENT_QUOTES, 'UTF-8') . '</option>';
+    }
+    if ($lastDim !== '') {
+        $html .= '</optgroup>';
+    }
+
+    return $html . '</select>';
+};
+$jvEchoMemoRow = static function (string $pair, string $placeholder, ?int $dimId = null) use ($jvRenderDimSelect): void {
+    echo '<tr class="jv-line-memo" data-jv-pair="', $pair, '"><td colspan="5">',
+        '<div class="jv-memo-flex" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">',
+        '<input type="text" id="jv_m_', $pair, '" class="jv-m admin-inp" value="" placeholder="',
+        htmlspecialchars($placeholder, ENT_QUOTES, 'UTF-8'),
+        '" autocomplete="off" style="flex:1;min-width:180px;">',
+        $jvRenderDimSelect($dimId),
+        '</div></td></tr>';
+};
+$jvEchoJvCashLine = static function (array $lock) use (&$jvInitLinePairSeq, $jvMoneyZeroEsc, $jvIsReceiptVoucherEt, $jvEchoMemoRow): void {
     $jvInitLinePairSeq++;
     $pair = 'jv' . (string) $jvInitLinePairSeq;
     $id = (int) ($lock['id'] ?? 0);
@@ -104,11 +147,9 @@ $jvEchoJvCashLine = static function (array $lock) use (&$jvInitLinePairSeq, $jvM
         $amtCells,
         '<td><span class="muted" style="display:inline-block;padding:8px 0;" aria-hidden="true">—</span></td>',
         '</tr>';
-    echo '<tr class="jv-line-memo" data-jv-pair="', $pair, '"><td colspan="5">',
-        '<input type="text" id="jv_m_', $pair, '" class="jv-m admin-inp" value="" placeholder="بيان سطر الخزينة" autocomplete="off">',
-        '</td></tr>';
+    $jvEchoMemoRow($pair, 'بيان سطر الخزينة', null);
 };
-$jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroEsc, $jvIsReceiptVoucherEt): void {
+$jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroEsc, $jvIsReceiptVoucherEt, $jvEchoMemoRow): void {
     $jvInitLinePairSeq++;
     $pair = 'jv' . (string) $jvInitLinePairSeq;
     if ($jvIsReceiptVoucherEt) {
@@ -125,9 +166,7 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
         $amtCells,
         '<td><button type="button" class="btn-secondary admin-doc-line-remove" onclick="jvRemoveRow(this)">حذف</button></td>',
         '</tr>';
-    echo '<tr class="jv-line-memo" data-jv-pair="', $pair, '"><td colspan="5">',
-        '<input type="text" id="jv_m_', $pair, '" class="jv-m admin-inp" value="" placeholder="البيان" autocomplete="off">',
-        '</td></tr>';
+    $jvEchoMemoRow($pair, 'البيان', null);
 };
 ?>
 <div class="page-title page-title--stacked jv-print-hide">
@@ -481,6 +520,8 @@ var JV_CASH_LOCK = <?php echo json_encode($jvCashLock, JSON_UNESCAPED_UNICODE | 
 var JV_COUNTRY_CODE = <?php echo json_encode($jvCountryCode, JSON_UNESCAPED_UNICODE); ?>;
 var JV_TYPE_CODE = <?php echo json_encode($jvTypeCode, JSON_UNESCAPED_UNICODE); ?>;
 var JV_NUMBER_PREVIEW = <?php echo (int) $nextJournalVoucherNo; ?>;
+var JV_SHOW_DIMENSIONS = <?php echo $jvShowDimensions ? 'true' : 'false'; ?>;
+var JV_DIMENSION_OPTIONS = <?php echo json_encode($jvDimensionUiOptions, JSON_UNESCAPED_UNICODE); ?>;
 
 function jvSyncRefPreview() {
     var refEl = document.getElementById('jv_ref');
@@ -1087,6 +1128,39 @@ jvSearchModalBind();
     }
 })();
 
+function jvDimensionSelectHtml(selectedId) {
+    if (!JV_SHOW_DIMENSIONS || !JV_DIMENSION_OPTIONS || !JV_DIMENSION_OPTIONS.length) {
+        return '';
+    }
+    var sel = '<select class="jv-dim admin-inp" style="min-width:200px;" title="بُعد تحليلي اختياري"><option value="">— بُعد تحليلي —</option>';
+    var lastDim = '';
+    JV_DIMENSION_OPTIONS.forEach(function (o) {
+        var dl = o.dimension_label || '';
+        if (dl !== lastDim) {
+            if (lastDim !== '') {
+                sel += '</optgroup>';
+            }
+            sel += '<optgroup label="' + jvEscapeHtml(dl) + '">';
+            lastDim = dl;
+        }
+        var vid = parseInt(String(o.id), 10) || 0;
+        var picked = (parseInt(String(selectedId || 0), 10) || 0) === vid ? ' selected' : '';
+        sel += '<option value="' + vid + '"' + picked + '>' + jvEscapeHtml(o.label || '') + '</option>';
+    });
+    if (lastDim !== '') {
+        sel += '</optgroup>';
+    }
+    return sel + '</select>';
+}
+
+function jvMemoRowHtml(pair, memoVal, dimVal, placeholder) {
+    var html = '<td colspan="5"><div class="jv-memo-flex" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">';
+    html += '<input type="text" id="jv_m_' + pair + '" class="jv-m admin-inp" value="' + jvEscapeHtml(memoVal || '') + '" placeholder="' + jvEscapeHtml(placeholder || 'البيان') + '" autocomplete="off" style="flex:1;min-width:180px;">';
+    html += jvDimensionSelectHtml(dimVal);
+    html += '</div></td>';
+    return html;
+}
+
 function jvAddCashLockedRow() {
     if (!jvCashLockActive()) {
         return;
@@ -1115,9 +1189,7 @@ function jvAddCashLockedRow() {
     var trMemo = document.createElement('tr');
     trMemo.className = 'jv-line-memo';
     trMemo.setAttribute('data-jv-pair', pair);
-    trMemo.innerHTML = '<td colspan="5">' +
-        '<input type="text" id="jv_m_' + pair + '" class="jv-m admin-inp" value="" placeholder="بيان سطر الخزينة" autocomplete="off">' +
-        '</td>';
+    trMemo.innerHTML = jvMemoRowHtml(pair, '', 0, 'بيان سطر الخزينة');
     if (jvCashLineFirst()) {
         tb.insertBefore(trMain, tb.firstChild);
         tb.insertBefore(trMemo, trMain.nextSibling);
@@ -1146,9 +1218,7 @@ function jvAddRow() {
     var trMemo = document.createElement('tr');
     trMemo.className = 'jv-line-memo';
     trMemo.setAttribute('data-jv-pair', pair);
-    trMemo.innerHTML = '<td colspan="5">' +
-        '<input type="text" id="jv_m_' + pair + '" class="jv-m admin-inp" value="" placeholder="البيان" autocomplete="off">' +
-        '</td>';
+    trMemo.innerHTML = jvMemoRowHtml(pair, '', 0, 'البيان');
     var codeInp = trMain.querySelector('.jv-acc-code');
     codeInp.addEventListener('dblclick', function (e) { e.preventDefault(); jvAcctPickerOpen(codeInp); });
     var cashAnchor = tb.querySelector('tr.jv-line-main[data-jv-cash-locked="1"]');
@@ -1408,6 +1478,10 @@ function jvFillMainFromLine(main, ln) {
     }
     if (memo) {
         memo.querySelector('.jv-m').value = ln.memo || '';
+        var dimSel = memo.querySelector('.jv-dim');
+        if (dimSel) {
+            dimSel.value = String(parseInt(String(ln.dimension_value_id || 0), 10) || '');
+        }
     }
     if (ln.yec_phase) {
         main.setAttribute('data-yec-phase', ln.yec_phase);
@@ -1709,6 +1783,12 @@ function jvSubmit() {
             return;
         }
         var lineObj = { account_id: acc, debit: deb, credit: cre, memo: memo };
+        if (memoTr) {
+            var dimEl = memoTr.querySelector('.jv-dim');
+            if (dimEl && dimEl.value) {
+                lineObj.dimension_value_id = parseInt(dimEl.value, 10) || 0;
+            }
+        }
         if (JV_YEC_MODE) {
             lineObj.yec_phase = tr.getAttribute('data-yec-phase') || '';
         }

@@ -284,6 +284,7 @@ $orangeAdminCurrencyUnitNav = orange_currency_display_unit($orangeAdminCurrencyN
                     'items' => [
                         ['page' => 'stock', 'href' => '/admin/index.php?page=stock', 'label' => 'المستودع', 'class' => '', 'sub' => false],
                         ['page' => 'opening_stock_balances', 'href' => '/admin/index.php?page=opening_stock_balances', 'label' => 'أرصدة أول المدة المخزنية', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'inventory_reconciliation', 'href' => '/admin/index.php?page=inventory_reconciliation', 'label' => 'تسوية المخزون / الجرد', 'class' => 'admin-nav-sub', 'sub' => true],
                     ],
                 ],
                 [
@@ -369,6 +370,7 @@ $orangeAdminCurrencyUnitNav = orange_currency_display_unit($orangeAdminCurrencyN
                     'items' => [
                         ['page' => 'chart_of_accounts', 'href' => '/admin/index.php?page=chart_of_accounts', 'label' => 'الدليل المحاسبي', 'class' => '', 'sub' => false],
                         ['page' => 'gl_account_settings', 'href' => '/admin/index.php?page=gl_account_settings', 'label' => 'حسابات القيود التلقائية', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'analytical_dimensions', 'href' => '/admin/index.php?page=analytical_dimensions', 'label' => 'الأبعاد التحليلية', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'journal_types', 'href' => '/admin/index.php?page=journal_types', 'label' => 'أنواع اليوميات', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'fiscal_years', 'href' => '/admin/index.php?page=fiscal_years', 'label' => 'السنوات المالية', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'gl_posting', 'href' => '/admin/index.php?page=gl_posting', 'label' => 'إقفال الحركات (ترحيل)', 'class' => 'admin-nav-sub', 'sub' => true],
@@ -386,6 +388,7 @@ $orangeAdminCurrencyUnitNav = orange_currency_display_unit($orangeAdminCurrencyN
                         ['page' => 'other_vouchers', 'href' => '/admin/index.php?page=other_vouchers', 'label' => 'سندات أخرى', 'class' => '', 'sub' => false],
                         ['page' => 'partner_customer_receipt', 'href' => '/admin/index.php?page=partner_customer_receipt', 'label' => 'سداد فواتير مبيعات آجلة', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'partner_supplier_payment', 'href' => '/admin/index.php?page=partner_supplier_payment', 'label' => 'سداد فواتير مشتريات آجلة', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'bank_reconciliation', 'href' => '/admin/index.php?page=bank_reconciliation', 'label' => 'تسوية البنك', 'class' => 'admin-nav-sub', 'sub' => true],
                     ],
                 ],
                 [
@@ -403,6 +406,8 @@ $orangeAdminCurrencyUnitNav = orange_currency_display_unit($orangeAdminCurrencyN
                         ['page' => 'report_pl_monthly', 'href' => '/admin/index.php?page=report_pl_monthly', 'label' => 'قائمة إيرادات ومصروفات شهرية', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'report_pl_compare_years', 'href' => '/admin/index.php?page=report_pl_compare_years', 'label' => 'أرباح وخسائر مقارنة بين السنوات', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'report_trial_balance', 'href' => '/admin/index.php?page=report_trial_balance', 'label' => 'ميزان المراجعة', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'report_cash_flow', 'href' => '/admin/index.php?page=report_cash_flow', 'label' => 'قائمة التدفقات النقدية', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'report_analytical', 'href' => '/admin/index.php?page=report_analytical', 'label' => 'التقرير التحليلي', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report#report-balance-sheet', 'label' => 'الميزانية', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report', 'label' => 'التقارير المالية (الصفحة كاملة)', 'class' => '', 'sub' => false],
                     ],

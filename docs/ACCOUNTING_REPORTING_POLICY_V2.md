@@ -31,8 +31,10 @@ Screens updated toward mapping-first grouping include **Trading** and **Income S
 
 | Module | Scope |
 |--------|--------|
-| **Analytical dimensions** | branch / channel / sales_rep / campaign / department — not part of COA FK work. |
-| **Reconciliation** | Inventory ↔ count, AR ↔ aging, Bank ↔ statement — operational processes adjacent to ledger integrity. |
+| **Analytical dimensions** | v1 **implemented (ACC-10 phase 4):** `branch` + `channel` dimensions; optional `dimension_value_id` on journal lines; `report_analytical` P&amp;L or GL movement by dimension value. Extend codes only by owner decision. |
+| **Reconciliation** | Bank + inventory reconciliation **implemented (ACC-10 phases 2–3)**; AR aging etc. remain adjacent work. |
+
+**Owner-approved implementation plan (option D, 2026-05-20):** phased delivery in **`docs/archive/ORANGE_ADMIN_ACCOUNTING_REPORTS_STATUS.txt` §6b**. Owner decisions §6b.4 **locked (2026-05-20)**. **GAP-ACC-10 closed 2026-05-20** — phases 0–4 complete (§6b.8).
 
 ---
 

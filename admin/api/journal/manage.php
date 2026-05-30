@@ -140,6 +140,7 @@ function orange_journal_manage_normalize_multiline_body(PDO $pdo, array $linesIn
             'debit' => (float) ($ln['debit'] ?? 0),
             'credit' => (float) ($ln['credit'] ?? 0),
             'memo' => trim((string) ($ln['memo'] ?? '')),
+            'dimension_value_id' => (int) ($ln['dimension_value_id'] ?? 0),
         ];
     }
     $postLines = [];
@@ -512,13 +513,29 @@ try {
             $docRaw = $vd;
         }
         $docDisplay = orange_format_datetime_dmY_hi($docRaw !== '' ? $docRaw : date('Y-m-d H:i:s'));
-        $lst = $pdo->prepare(
-            'SELECT jl.account_id, jl.debit, jl.credit, jl.memo, a.code, a.name
-             FROM journal_lines jl
-             INNER JOIN accounts a ON a.id = jl.account_id
-             WHERE jl.voucher_id = ?
-             ORDER BY jl.line_no ASC'
-        );
+        $hasDimJoin = orange_table_has_column($pdo, 'journal_lines', 'dimension_value_id')
+            && orange_table_exists($pdo, 'analytical_dimension_value');
+        if ($hasDimJoin) {
+            $lst = $pdo->prepare(
+                'SELECT jl.account_id, jl.debit, jl.credit, jl.memo, jl.dimension_value_id, a.code, a.name,
+                        adv.label_ar AS dim_label_ar, adv.code AS dim_value_code,
+                        ad.label_ar AS dim_name_ar, ad.code AS dim_code
+                 FROM journal_lines jl
+                 INNER JOIN accounts a ON a.id = jl.account_id
+                 LEFT JOIN analytical_dimension_value adv ON adv.id = jl.dimension_value_id
+                 LEFT JOIN analytical_dimension ad ON ad.id = adv.dimension_id
+                 WHERE jl.voucher_id = ?
+                 ORDER BY jl.line_no ASC'
+            );
+        } else {
+            $lst = $pdo->prepare(
+                'SELECT jl.account_id, jl.debit, jl.credit, jl.memo, a.code, a.name
+                 FROM journal_lines jl
+                 INNER JOIN accounts a ON a.id = jl.account_id
+                 WHERE jl.voucher_id = ?
+                 ORDER BY jl.line_no ASC'
+            );
+        }
         $lst->execute([$gid]);
         $lines = [];
         while ($row = $lst->fetch(PDO::FETCH_ASSOC)) {
@@ -529,6 +546,10 @@ try {
                 'debit' => (float) $row['debit'],
                 'credit' => (float) $row['credit'],
                 'memo' => (string)($row['memo'] ?? ''),
+                'dimension_value_id' => (int) ($row['dimension_value_id'] ?? 0),
+                'dimension_label' => trim((string) ($row['dim_name_ar'] ?? '')) !== ''
+                    ? trim((string) ($row['dim_name_ar'] ?? '')) . ': ' . trim((string) ($row['dim_label_ar'] ?? ''))
+                    : '',
             ];
         }
         $vEtLock = (string) ($v['entry_type'] ?? '');
