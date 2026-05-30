@@ -370,6 +370,7 @@ $orangeAdminCurrencyUnitNav = orange_currency_display_unit($orangeAdminCurrencyN
                     'items' => [
                         ['page' => 'chart_of_accounts', 'href' => '/admin/index.php?page=chart_of_accounts', 'label' => 'الدليل المحاسبي', 'class' => '', 'sub' => false],
                         ['page' => 'gl_account_settings', 'href' => '/admin/index.php?page=gl_account_settings', 'label' => 'حسابات القيود التلقائية', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'invoice_line_presets', 'href' => '/admin/index.php?page=invoice_line_presets', 'label' => 'قائمة بنود الفاتورة', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'analytical_dimensions', 'href' => '/admin/index.php?page=analytical_dimensions', 'label' => 'الأبعاد التحليلية', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'journal_types', 'href' => '/admin/index.php?page=journal_types', 'label' => 'أنواع اليوميات', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'fiscal_years', 'href' => '/admin/index.php?page=fiscal_years', 'label' => 'السنوات المالية', 'class' => 'admin-nav-sub', 'sub' => true],

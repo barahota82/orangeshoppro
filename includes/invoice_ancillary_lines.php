@@ -317,6 +317,71 @@ function orange_invoice_ancillary_preset_deactivate(PDO $pdo, int $presetId, ?in
     return $st->rowCount() > 0;
 }
 
+function orange_invoice_ancillary_preset_next_sort(PDO $pdo, ?int $countryId = null): int
+{
+    if (!orange_table_exists($pdo, 'orange_invoice_line_presets')) {
+        return 1;
+    }
+    $cid = orange_gl_settings_effective_country_id($pdo, $countryId);
+    $st = $pdo->prepare('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM orange_invoice_line_presets WHERE country_id = ?');
+    $st->execute([$cid]);
+    $n = (int) $st->fetchColumn();
+
+    return $n > 0 ? $n : 1;
+}
+
+/**
+ * @param list<int> $orderedIds
+ *
+ * @throws RuntimeException
+ */
+function orange_invoice_ancillary_presets_reorder(PDO $pdo, array $orderedIds, ?int $countryId = null): void
+{
+    orange_catalog_ensure_invoice_ancillary_lines_schema($pdo);
+    $cid = orange_gl_settings_effective_country_id($pdo, $countryId);
+    if ($orderedIds === []) {
+        return;
+    }
+    $sort = 0;
+    $st = $pdo->prepare(
+        'UPDATE orange_invoice_line_presets SET sort_order = ? WHERE id = ? AND country_id = ?'
+    );
+    foreach ($orderedIds as $rawId) {
+        $id = (int) $rawId;
+        if ($id <= 0) {
+            continue;
+        }
+        $sort++;
+        $st->execute([$sort, $id, $cid]);
+        if ($st->rowCount() === 0) {
+            throw new RuntimeException('تعذر إعادة ترتيب البند #' . $id . ' — تحقق من الدولة.');
+        }
+    }
+}
+
+/**
+ * @return array<string, string>
+ */
+function orange_invoice_ancillary_line_kind_label(string $lineKind): string
+{
+    $cat = orange_invoice_ancillary_line_kind_catalog();
+    $k = trim($lineKind);
+
+    return isset($cat[$k]) ? (string) $cat[$k]['label_ar'] : $k;
+}
+
+/**
+ * @return array<string, string>
+ */
+function orange_invoice_ancillary_invoice_context_labels(): array
+{
+    return [
+        'purchase' => 'مشتريات',
+        'sales' => 'مبيعات',
+        'both' => 'الاثنان',
+    ];
+}
+
 /**
  * @return list<array<string, mixed>>
  */

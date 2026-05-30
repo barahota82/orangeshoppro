@@ -123,7 +123,7 @@ ENGLISH
 | **0** | مخطط DB + helpers | **منتهٍ rev 68** — `orange_invoice_line_presets` + `orange_invoice_extra_lines`؛ `includes/invoice_ancillary_lines.php` |
 | **1** | مشتريات | `purchases.php` + create/update API؛ منتقي dual-source؛ قيد مركّب؛ طباعة |
 | **2** | مبيعات | مسار INV-C / تسليم / manual حسب النطاق؛ checkbox للعميل؛ طباعة |
-| **3** | إدارة القائمة | شاشة أو panel: ترتيب، تعطيل، تعديل `default_show_on_print` |
+| **3** | إدارة القائمة | **منتهٍ** — `invoice_line_presets.php` + APIs إدارة/ترتيب |
 | **4** | VAT % تلقائي | اختياري — قرار لاحق |
 
 **اختبار:** UTF-8؛ country scope؛ edit_lock؛ لا كسر §13 channels؛ ORANGE_STOREFRONT_PERFORMANCE_ROLLOUT.
@@ -137,11 +137,12 @@ ENGLISH
 | البند | الحالة |
 |-------|--------|
 | قرار مالك / اتجاه UI | **مغلق 2026-05-20** — هذا الملف |
-| تنفيذ كود | **مغلق v1** — مراحل 0–2 (3–4 اختياري) |
+| تنفيذ كود | **مغلق v1** — مراحل 0–3 (4 اختياري) |
 | gl_account_settings ثابت | **يبقى** للأدوار الأساسية؛ القائمة المحفوظة **تكمّل** لا تلغي |
 
 ================================================================================
 Changelog
 ================================================================================
 2026-05-20 — أرشفة قرار مالك: بنود فاتورة + قائمة محفوظة + دليل + checkbox طباعة + line_kind؛ GAP-ACC-07 اتجاه تنفيذ.
+2026-05-20 — **تنفيذ مرحلة 3:** `invoice_line_presets.php`؛ `presets-admin-list.php`؛ `presets-reorder.php`.
 2026-05-20 — **تنفيذ مرحلة 2 (مبيعات):** `manual_order.php` + `create-manual.php` + `order_fulfillment.php`؛ `invoice.php` طباعة؛ `sales-line-kinds.php`.
