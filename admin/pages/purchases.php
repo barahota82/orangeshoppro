@@ -576,7 +576,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             '<td><input type="number" class="pv2-qty admin-inp-qty" min="1" step="1" value="1" inputmode="numeric" lang="en" dir="ltr"></td>' +
             '<td><input type="number" class="pv2-cost admin-inp-money" min="0" step="any" value="' + fmtZero() + '" inputmode="decimal" lang="en" dir="ltr"></td>' +
             '<td><input type="text" class="pv2-discount admin-inp" placeholder="0" dir="ltr" lang="en" autocomplete="off" style="width:100%;"></td>' +
-            '<td><input type="text" class="pv2-line-total admin-inp-money" value="' + fmtZero() + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>' +
+            '<td><input type="text" class="pv2-line-total admin-inp-money" value="' + fmtZero() + '" readonly data-money-allow-zero tabindex="0" dir="ltr" lang="en"></td>' +
             '<td><button type="button" class="btn-secondary admin-doc-line-remove" title="حذف">&times;</button></td>';
         tb.appendChild(tr);
         renumberRows();
@@ -623,6 +623,104 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         return code === '';
     }
 
+    function rowIsComplete(tr) {
+        var pid = parseInt(tr.querySelector('.pv2-product').value, 10) || 0;
+        if (pid <= 0) return false;
+        var q = parseInt(tr.querySelector('.pv2-qty').value, 10) || 0;
+        if (q < 1) return false;
+        var costEl = tr.querySelector('.pv2-cost');
+        return !!(costEl && String(costEl.value || '').trim() !== '');
+    }
+
+    function pv2LineNavFields(tr) {
+        return [
+            tr.querySelector('.pv2-barcode'),
+            tr.querySelector('.pv2-product'),
+            tr.querySelector('.pv2-variant'),
+            tr.querySelector('.pv2-qty'),
+            tr.querySelector('.pv2-cost'),
+            tr.querySelector('.pv2-discount'),
+            tr.querySelector('.pv2-line-total')
+        ].filter(function (el) {
+            return el && !el.disabled;
+        });
+    }
+
+    function pv2FocusLineField(el) {
+        if (!el) return;
+        el.focus();
+        if (typeof el.select === 'function' && el.tagName === 'INPUT' && !el.readOnly) {
+            try { el.select(); } catch (err) {}
+        }
+    }
+
+    function pv2FocusNextInRow(tr, current) {
+        var list = pv2LineNavFields(tr);
+        var idx = list.indexOf(current);
+        if (idx < 0 || idx >= list.length - 1) return false;
+        pv2FocusLineField(list[idx + 1]);
+        return true;
+    }
+
+    function pv2AdvanceFromLineTotal(tr) {
+        recalcAll();
+        if (!rowIsComplete(tr)) return;
+        var tb = document.getElementById('pv2_lines_body');
+        if (!tb) return;
+        var rows = tb.querySelectorAll('tr');
+        var idx = -1;
+        for (var i = 0; i < rows.length; i++) {
+            if (rows[i] === tr) { idx = i; break; }
+        }
+        if (idx < 0) return;
+        if (idx === rows.length - 1) {
+            syncTrailing();
+            rows = tb.querySelectorAll('tr');
+        }
+        var nextTr = rows[idx + 1];
+        if (!nextTr) return;
+        pv2FocusLineField(nextTr.querySelector('.pv2-barcode'));
+    }
+
+    function pv2OnLineKeydown(e) {
+        if (pv2ViewMode) return;
+        if (e.key !== 'Enter' && e.key !== 'Tab') return;
+        if (e.key === 'Tab' && e.shiftKey) return;
+        var ta = e.target;
+        if (!ta) return;
+        var tr = ta.closest('tr');
+        if (!tr || !tr.classList.contains('pv2-line')) return;
+        var isNav = ta.classList.contains('pv2-barcode')
+            || ta.classList.contains('pv2-product')
+            || ta.classList.contains('pv2-variant')
+            || ta.classList.contains('pv2-qty')
+            || ta.classList.contains('pv2-cost')
+            || ta.classList.contains('pv2-discount')
+            || ta.classList.contains('pv2-line-total');
+        if (!isNav) return;
+
+        if (ta.classList.contains('pv2-barcode') && e.key === 'Enter') {
+            e.preventDefault();
+            onBarcodeBlurOrEnter(ta);
+            recalcAll();
+            pv2FocusNextInRow(tr, ta);
+            return;
+        }
+        if (ta.classList.contains('pv2-line-total')) {
+            e.preventDefault();
+            pv2AdvanceFromLineTotal(tr);
+            return;
+        }
+        if (ta.classList.contains('pv2-discount')) {
+            e.preventDefault();
+            recalcAll();
+            pv2FocusLineField(tr.querySelector('.pv2-line-total'));
+            return;
+        }
+        e.preventDefault();
+        pv2FocusNextInRow(tr, ta);
+    }
+
     function trimExtraTrailing() {
         var tb = document.getElementById('pv2_lines_body');
         if (!tb) return;
@@ -647,7 +745,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         var rows = tb.querySelectorAll('tr');
         if (rows.length === 0) { addLine(); return; }
         var last = rows[rows.length - 1];
-        if (!rowIsBlank(last)) addLine();
+        if (rowIsComplete(last)) addLine();
     }
 
     function updateVariantCell(sel) {
@@ -689,7 +787,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             sel.value = String(prod.id);
             onProductChanged(sel);
         }
-        syncTrailing();
+        recalcAll();
     }
 
     /* ── Recalculate ────────────────────────────────────────────────── */
@@ -1025,34 +1123,13 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
                 if (e.target && e.target.classList.contains('pv2-product')) {
                     onProductChanged(e.target);
                 }
-                syncTrailing();
                 recalcAll();
             });
             tb.addEventListener('input', function (e) {
                 if (e.target && e.target.classList.contains('pv2-barcode')) return;
-                syncTrailing();
                 recalcAll();
             });
-            tb.addEventListener('keydown', function (e) {
-                if (e.target && e.target.classList.contains('pv2-barcode') && e.key === 'Enter') {
-                    e.preventDefault();
-                    onBarcodeBlurOrEnter(e.target);
-                    return;
-                }
-                if (e.key !== 'Tab' || e.shiftKey) return;
-                var ta = e.target;
-                if (!ta || !ta.classList.contains('pv2-discount')) return;
-                var tr = ta.closest('tr');
-                if (!tr || tr.parentElement !== tb) return;
-                var rows = tb.querySelectorAll('tr');
-                if (tr !== rows[rows.length - 1]) return;
-                e.preventDefault();
-                syncTrailing();
-                var rows2 = tb.querySelectorAll('tr');
-                var next = rows2[rows2.length - 1];
-                var bc = next && next.querySelector('.pv2-barcode');
-                if (bc) bc.focus();
-            });
+            tb.addEventListener('keydown', pv2OnLineKeydown);
             tb.addEventListener('focusout', function (e) {
                 if (e.target && e.target.classList.contains('pv2-barcode')) {
                     onBarcodeBlurOrEnter(e.target);
@@ -1065,7 +1142,6 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             });
 
             addLine();
-            syncTrailing();
         }
 
         if (PV2_PREFILL_SUPPLIER > 0) {
