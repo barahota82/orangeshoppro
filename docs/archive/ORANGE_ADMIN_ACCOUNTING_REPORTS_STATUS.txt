@@ -1,6 +1,6 @@
 ORANGE — حالة شاشات الحسابات والتقارير (أدمن)
 Archive: docs/archive/ORANGE_ADMIN_ACCOUNTING_REPORTS_STATUS.txt
-Last updated: 2026-05-20 (GAP-ACC-05 مغلق · ACC-14 §0 · GAP-ACC-07 0–3 · §13.13 جزئي)
+Last updated: 2026-05-20 (navAccountingAll 100% · ACC-10 v2 100% · ACC-13 · §13.13 UX خارج nav)
 Canvas companion: .cursor/projects/d-orange/canvases/admin-accounting-reports-completion.canvas.tsx
 تقرير نظام شامل: docs/archive/ORANGE_SYSTEM_COMPLETION_REPORT.txt
 
@@ -36,13 +36,14 @@ NAV SOURCE (حقيقة القائمة)
 
 | المحور                         | ~% منجز | ملاحظة مختصرة                          |
 |--------------------------------|---------|----------------------------------------|
-| الإعداد والدليل                | 96%     | YEC + fiscal؛ GAP-ACC-07 مراحل 0–3 منتهية |
-| السندات والذمم                 | 97%     | ترحيل فوري + edit_lock؛ CRR/SPR        |
-| التقارير المالية               | 97%     | posted فور الحفظ؛ ACC-10 مغلق          |
-| مسار GL (سياسة ACC-14)         | 98%     | حفظ=تقارير؛ edit_lock=رقابة فقط         |
-| تسليم/قيود أونلاين (§13)       | 97%     | B1–B8؛ §13.13 O-01/04/07/08 مغلقة      |
-| **navAccountingAll مرجّح**     | **~98%**| **~2% — §13.13 + ACC-07 VAT اختياري**         |
-| **مع policy v2 (ACC-10)**   | **~86%**| تدفقات + تسويات (ACC-08 تراثي/PV)     |
+| الإعداد والدليل                | 100%    | YEC + ACC-13 بحث/تنقل؛ GAP-ACC-07 0–3 |
+| السندات والذمم                 | 100%    | ترحيل فوري + edit_lock؛ CRR/SPR        |
+| التقارير المالية               | 100%    | 14/14؛ ACC-10 مغلق                     |
+| مسار GL (سياسة ACC-14)         | 100%    | حفظ=تقارير؛ edit_lock=رقابة فقط         |
+| تسليم/قيود أونلاين (§13)       | 97%     | B1–B8؛ §13.13 UX (خارج navAccountingAll) |
+| **navAccountingAll مرجّح**     | **100%**| **GAP-ACC = 0**                         |
+| **policy v2 (ACC-10)**         | **100%**| تدفقات + تسويات + أبعاد — منتهٍ        |
+| **النظام الكامل (5 mega-nav)** | **~94%**| المتجر ~88% يخفّض المتوسط               |
 
 **§12.1 — حالة البنود الثلاثة (كود — 2026-05-20):**
 
@@ -54,7 +55,7 @@ NAV SOURCE (حقيقة القائمة)
 | B0–B8 | §13.14 مراحل 0–8 (تسليم → قiود → INV-O/C) | **منتهٍ** (§13.13 O-01…O-14 = سياسة مفتوحة) |
 
 ENGLISH
-- navAccountingAll ~97%. GAP-ACC-05 closed: supplier statement = COA leaf account (payable_account_id); no separate supplier mode. GL policy closed (ACC-14). GAP-ACC-07 phases 0–3 done. §13.13 partial.
+- navAccountingAll 100%. policy v2 (ACC-10) 100%. System-wide ~94% (storefront ~88%). GAP-ACC = 0. §13.13 UX outside accounting nav.
 
 ================================================================================
 2) جرد الشاشات — الإعداد والدليل
@@ -402,3 +403,4 @@ manual_order / create-manual.php — [منتهٍ] — INV-C + GL عند الحف
 2026-05-20 — §13.13 **O-01 مغلق:** لا حالة «جاهز للتوزيع» — `approved` = جاهز للتوزيع؛ الموافقة قبل التوزيع.
 
 2026-05-20 — **GAP-ACC-05 مغلق (قرار مالك):** كشف مورد = حساب فرعي بالدليل؛ لا mode=supplier؛ إلزام payable_account_id في suppliers/save.php.
+2026-05-20 — Canvas/archive percentages sync: navAccountingAll + policy v2 = 100%; system-wide ~94%.

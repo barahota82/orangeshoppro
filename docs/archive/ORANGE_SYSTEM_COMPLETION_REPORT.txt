@@ -1,6 +1,6 @@
 ORANGE — تقرير اكتمال النظام الشامل (أدمن + GL + §13 + مراجع)
 Archive: docs/archive/ORANGE_SYSTEM_COMPLETION_REPORT.txt
-Last updated: 2026-05-20 (مراجعة كاملة بعد §12.1 A1–A3 + §13.14 B0–B8 + rev 64)
+Last updated: 2026-05-20 (navAccountingAll 100% · ACC-10 v2 100% · system ~94%)
 Canvas companion (مثبت بجانب الدردشة):
   .cursor/projects/d-orange/canvases/admin-accounting-reports-completion.canvas.tsx
 تفصيل محاسبي فرعي: docs/archive/ORANGE_ADMIN_ACCOUNTING_REPORTS_STATUS.txt
@@ -29,15 +29,15 @@ Schema rev 64: ترحيل أرقام INV- القديمة → INV-O / INV-C.
 
 | المحور                              | ~% منجز | ملاحظة |
 |-------------------------------------|---------|--------|
-| الحسابات والتقارير (navAccountingAll)| **94%** | YEC + تقارير؛ كشف مورد + فهرس قديم |
-| مسار GL Lane A (طابور gl_posting)    | **91%** | hub لـ Lane A فقط |
-| مسار GL Lane B (ترحيل مباشر)         | **98%** | YEC، §13، INV-C manual |
-| المخازن والمشتريات                   | **92%** | §11 lock؛ GL على حفظ الشراء |
-| المبيعات والعروض + §13               | **96%** | B1–B8؛ §13.13 UX مفتوح |
-| الإعدادات (navSettings)              | **90%** | صلاحيات post/unpost جزئية |
+| الحسابات والتقارير (navAccountingAll)| **100%**| GAP-ACC = 0؛ ACC-13 منتهٍ |
+| مسار GL Lane A (طابور gl_posting)    | **legacy**| opt-in فقط — §0 ACC-14 |
+| مسار GL Lane B (ترحيل مباشر)         | **100%** | YEC، §13، INV-C — افتراضي |
+| المخازن والمشتريات                   | **97%** | §11؛ مشتريات + GL |
+| المبيعات والعروض + §13               | **97%** | B1–B8؛ §13.13 UX |
+| الإعدادات (navSettings)              | **90%** | تشغيلي |
 | واجهة المتجر (سياسة س1–س30)          | **~88%** | STOREFRONT_POLICY_REFERENCE |
-| **مجموع تشغيلي مرجّح**              | **~93%**| ~7% متبقٍ |
-| **مع policy v2 كامل**               | **~86%**| تدفقات + تسويات (ACC-08 تراثي/PV) |
+| **navAccountingAll + policy v2**     | **100%**| ACC-10 منتهٍ |
+| **النظام الكامل (5 mega-nav)**       | **~94%**| المتجر يخفّض المتوسط |
 
 §12.1 — منتهٍ في الكود:
 
@@ -174,3 +174,4 @@ ORANGE_STOREFRONT_POLICY_REFERENCE.txt | COMPLETION_ROADMAP phases 3–6
 2026-05-20 — GAP-ACC-08: **ملغى/تراثي** — لا module مصروفات منفصل؛ التسجيل = سند صرف (PV).
 2026-05-20 — GAP-ACC-10 خيار د: إحالة ترتيب التنفيذ إلى ORANGE_ADMIN **§6b** (معلق قرارات المالك).
 2026-05-20 — GAP-ACC-10 **منتهٍ:** مراحل 0–4 (تدفقات، بنك، مخزون، أبعاد، تقرير تحليلي)؛ rev 66.
+2026-05-20 — percentages sync canvas: accounting+v2 = 100%; system-wide ~94%.
