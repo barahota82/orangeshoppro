@@ -3727,6 +3727,8 @@ function orange_catalog_runtime_light_hooks(PDO $pdo): void
         orange_catalog_ensure_kw_product_types($pdo);
         require_once __DIR__ . '/catalog_kw_products_phase3.php';
         orange_catalog_ensure_kw_products_phase3($pdo);
+        require_once __DIR__ . '/catalog_legacy_closure_phase5.php';
+        orange_catalog_ensure_legacy_closure_phase5($pdo);
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] orange_catalog_runtime_light_hooks: ' . $e->getMessage());

@@ -86,19 +86,9 @@ if ($canUnifiedProductSql) {
     ORDER BY p.sort_order ASC, p.id ASC, o.id ASC
 ';
 } else {
-    $productsSql = '
-    SELECT p.*
-    FROM products p
-    WHERE p.is_active = 1' . $homeProductsCountrySql . '
-    ORDER BY p.sort_order ASC, p.id ASC
-';
-    $offersSql = '
-    SELECT o.discount, p.*
-    FROM offers o
-    INNER JOIN products p ON p.id = o.product_id
-    WHERE o.is_active = 1 AND p.is_active = 1' . $homeProductsCountrySql . '
-    ORDER BY p.sort_order ASC, p.id ASC, o.id ASC
-';
+    /* مرحلة 5: لا مسار legacy — منتجات فارغة حتى اكتمال الشجرة الموحّدة */
+    $productsSql = 'SELECT p.* FROM products p WHERE 1=0';
+    $offersSql = 'SELECT o.discount, p.* FROM offers o INNER JOIN products p ON p.id = o.product_id WHERE 1=0';
 }
 
 $productsStmt = $pdo->query($productsSql);
@@ -143,35 +133,21 @@ foreach ($offers as $hop) {
 $sfProductCardVariantLines = orange_storefront_product_card_variant_line_map($pdo, $sfHomeCardColorPidList, $lang);
 
 $sfHomeFilterCatalogId = static function (array $row): int {
-    $u = isset($row['uf_cat_id']) ? (int) $row['uf_cat_id'] : 0;
-
-    return $u > 0 ? $u : (int) ($row['category_id'] ?? 0);
+    return isset($row['uf_cat_id']) ? (int) $row['uf_cat_id'] : 0;
 };
 
 $sfHomeFilterSubcategoryId = static function (array $row): int {
-    $u = isset($row['uf_sub_id']) ? (int) $row['uf_sub_id'] : 0;
-
-    return $u > 0 ? $u : (int) ($row['subcategory_id'] ?? 0);
+    return isset($row['uf_sub_id']) ? (int) $row['uf_sub_id'] : 0;
 };
 
-$storefrontExtraFilterSuffix = function (array $row) use ($categoryToDepartment, $navUnified, $sfHomeFilterCatalogId, $sfHomeFilterSubcategoryId): string {
+$storefrontExtraFilterSuffix = function (array $row) use ($categoryToDepartment, $sfHomeFilterCatalogId, $sfHomeFilterSubcategoryId): string {
     $parts = [];
-    if ($navUnified) {
-        $fc = $sfHomeFilterCatalogId($row);
-        if ($fc > 0) {
-            $didDirect = isset($row['uf_dept_id']) && $row['uf_dept_id'] !== null ? (int) $row['uf_dept_id'] : 0;
-            $did = $didDirect > 0 ? $didDirect : ($categoryToDepartment[$fc] ?? 0);
-            if ($did > 0) {
-                $parts[] = 'dept-' . $did;
-            }
-        }
-    } else {
-        $cid = (int) ($row['category_id'] ?? 0);
-        if ($cid > 0) {
-            $did = $categoryToDepartment[$cid] ?? 0;
-            if ($did > 0) {
-                $parts[] = 'dept-' . $did;
-            }
+    $fc = $sfHomeFilterCatalogId($row);
+    if ($fc > 0) {
+        $didDirect = isset($row['uf_dept_id']) && $row['uf_dept_id'] !== null ? (int) $row['uf_dept_id'] : 0;
+        $did = $didDirect > 0 ? $didDirect : ($categoryToDepartment[$fc] ?? 0);
+        if ($did > 0) {
+            $parts[] = 'dept-' . $did;
         }
     }
 

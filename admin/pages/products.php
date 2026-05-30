@@ -823,9 +823,7 @@ $orangeAdminSfProductUrlPartsForJs = [
                 <?php
                 $pDeptId = isset($p['category_department_id']) && $p['category_department_id'] !== null
                     ? (int) $p['category_department_id'] : 0;
-                $pCatId = isset($p['catalog_category_display_id']) && (int) $p['catalog_category_display_id'] > 0
-                    ? (int) $p['catalog_category_display_id']
-                    : (isset($p['category_id']) ? (int) $p['category_id'] : 0);
+                $pCatId = isset($p['catalog_category_display_id']) ? (int) $p['catalog_category_display_id'] : 0;
                 $pDeptLabel = (string) ($p['department_name_ar'] ?: $p['department_name_en'] ?: '');
                 if ($pDeptLabel === '') {
                     $pDeptLabel = '—';
@@ -3041,8 +3039,8 @@ async function loadProductForEdit(id) {
         document.getElementById('seo_meta_description_en').value = p.seo_meta_description_en || '';
         document.getElementById('seo_meta_description_fil').value = p.seo_meta_description_fil || '';
         document.getElementById('seo_meta_description_hi').value = p.seo_meta_description_hi || '';
-        document.getElementById('category_id').value = String(p.category_id || '');
-        const sid = parseInt(p.subcategory_id, 10) || 0;
+        document.getElementById('category_id').value = String(p.catalog_category_display_id || '');
+        const sid = parseInt(p.catalog_subcategory_display_id, 10) || 0;
         rebuildSubcategoryOptions(sid > 0 ? sid : null);
         updateProductCatalogHint();
         const ptId = parseInt(String(p.product_type_id || '0'), 10) || 0;

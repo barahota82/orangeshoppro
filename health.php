@@ -168,3 +168,26 @@ if ($rollout === 'unified-phase4') {
         echo 'ROLLOUT_PHASE4_ERROR: ' . $e->getMessage() . "\n";
     }
 }
+
+if ($rollout === 'unified-phase5') {
+    try {
+        require_once __DIR__ . '/includes/catalog_schema.php';
+        require_once __DIR__ . '/includes/catalog_legacy_closure_phase5.php';
+        $pdoRollout = db();
+        orange_catalog_ensure_schema($pdoRollout);
+        $rep = orange_catalog_phase5_gap_report($pdoRollout);
+        echo 'unified_nav=' . (($rep['unified_nav'] ?? false) ? '1' : '0') . "\n";
+        echo 'bad_product_type=' . (int) ($rep['bad_product_type'] ?? -1) . "\n";
+        echo 'legacy_category_column=' . (($rep['legacy_category_column'] ?? false) ? '1' : '0') . "\n";
+        echo 'legacy_subcategory_column=' . (($rep['legacy_subcategory_column'] ?? false) ? '1' : '0') . "\n";
+        echo 'product_type_id_not_null=' . (($rep['product_type_id_not_null'] ?? false) ? '1' : '0') . "\n";
+        $allOk = !empty($rep['unified_nav'])
+            && (int) ($rep['bad_product_type'] ?? 1) === 0
+            && empty($rep['legacy_category_column'])
+            && empty($rep['legacy_subcategory_column'])
+            && !empty($rep['product_type_id_not_null']);
+        echo $allOk ? "ROLLOUT_PHASE5_OK\n" : "ROLLOUT_PHASE5_PENDING\n";
+    } catch (Throwable $e) {
+        echo 'ROLLOUT_PHASE5_ERROR: ' . $e->getMessage() . "\n";
+    }
+}

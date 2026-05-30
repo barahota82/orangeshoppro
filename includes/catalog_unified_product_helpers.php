@@ -7,10 +7,9 @@ require_once __DIR__ . '/catalog_taxonomy_migrate.php';
 require_once __DIR__ . '/catalog_sizing_dictionary.php';
 
 /**
- * يستنتج حقول تصنيف المنتج: مع تفعيل المتجر الموحّد يكون مصدر الحقيقة **`product_type_id`** فقط؛
- * تُشتقّ `category_id` / `subcategory_id` من الورقة أو تُخزَّن NULL عند غياب جسر الترحيل (ورق جديدة نقية).
+ * يستنتج تصنيف المنتج: مصدر الحقيقة **`product_type_id`** فقط (المرحلة 5 — لا category_id على المنتج).
  *
- * @return array{category_id:?int,subcategory_id:?int,product_type_id:?int}|array{error:string}
+ * @return array{product_type_id:int}|array{error:string}
  */
 function orange_catalog_resolve_product_classification(PDO $pdo, array $data): array
 {
@@ -28,11 +27,7 @@ function orange_catalog_resolve_product_classification(PDO $pdo, array $data): a
         return ['error' => 'نوع المنتج المختار غير موجود.'];
     }
 
-    $cache = orange_catalog_legacy_classification_cache_for_product_type($pdo, $ptIn);
-
     return [
-        'category_id' => $cache['legacy_category_id'],
-        'subcategory_id' => $cache['legacy_subcategory_id'],
         'product_type_id' => $ptIn,
     ];
 }

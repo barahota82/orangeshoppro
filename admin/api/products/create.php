@@ -33,29 +33,17 @@ try {
         json_response(['success' => false, 'message' => $class['error']], 422);
     }
 
-    $resolvedCategoryId = $class['category_id'] ?? null;
-    if ($resolvedCategoryId !== null && (int) $resolvedCategoryId <= 0) {
-        $resolvedCategoryId = null;
-    } elseif ($resolvedCategoryId !== null) {
-        $resolvedCategoryId = (int) $resolvedCategoryId;
-    }
-    $subcategoryId = $class['subcategory_id'] ?? null;
-    if ($subcategoryId !== null && (int) $subcategoryId <= 0) {
-        $subcategoryId = null;
-    } elseif ($subcategoryId !== null) {
-        $subcategoryId = (int) $subcategoryId;
-    }
-    $productTypeIdResolved = isset($class['product_type_id']) ? $class['product_type_id'] : null;
-    if ($productTypeIdResolved !== null) {
-        $productTypeIdResolved = (int) $productTypeIdResolved;
+    $productTypeIdResolved = (int) ($class['product_type_id'] ?? 0);
+    if ($productTypeIdResolved <= 0) {
+        json_response(['success' => false, 'message' => 'نوع المنتج غير صالح'], 422);
     }
 
     $nameAr = trim((string)$data['name']);
     $unifiedNav = function_exists('orange_catalog_nav_use_unified') && orange_catalog_nav_use_unified($pdo);
     $prodRows = orange_catalog_products_rows_for_arabic_name_scope(
         $pdo,
-        $resolvedCategoryId,
-        $productTypeIdResolved !== null && $productTypeIdResolved > 0 ? $productTypeIdResolved : null,
+        null,
+        $productTypeIdResolved,
         $unifiedNav
     );
     if (orange_rows_normalized_arabic_conflict(is_array($prodRows) ? $prodRows : [], 'id', 'name', $nameAr, null)) {
@@ -235,14 +223,6 @@ try {
         $seoDescFil,
         $seoDescHi,
     ];
-    if (orange_table_has_column($pdo, 'products', 'category_id')) {
-        $columnNames[] = 'category_id';
-        $execParams[] = $resolvedCategoryId;
-    }
-    if (orange_table_has_column($pdo, 'products', 'subcategory_id')) {
-        $columnNames[] = 'subcategory_id';
-        $execParams[] = $subcategoryId;
-    }
     $columnNames[] = 'product_type_id';
     $columnNames[] = 'size_family_id';
     $columnNames[] = 'sizing_guide_scope';

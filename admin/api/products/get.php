@@ -17,11 +17,16 @@ try {
     $adminStockCountryId = orange_admin_context_country_id($pdo);
 
     $catJoinPart = orange_catalog_admin_sql_join_product_category_display($pdo, 'p', 'pt');
+    $catalogSubSelect = orange_table_exists($pdo, 'catalog_subcategories')
+        ? ', orange_disp_ucs.id AS catalog_subcategory_display_id'
+        : ', NULL AS catalog_subcategory_display_id';
+    $catalogCatSelect = ', c.id AS catalog_category_display_id';
 
     if ($productId > 0) {
         $stmt = $pdo->prepare("
             SELECT p.*,
-                   c.name_ar AS category_name_ar, c.name_en AS category_name_en,
+                   c.name_ar AS category_name_ar, c.name_en AS category_name_en
+                   {$catalogCatSelect}{$catalogSubSelect},
                    pt.name_ar AS product_type_name_ar,
                    pt.name_en AS product_type_name_en,
                    pt.slug AS product_type_slug,
@@ -116,7 +121,8 @@ try {
 
     $rows = $pdo->query("
         SELECT p.*,
-               c.name_ar AS category_name_ar, c.name_en AS category_name_en,
+               c.name_ar AS category_name_ar, c.name_en AS category_name_en
+               {$catalogCatSelect}{$catalogSubSelect},
                pt.name_ar AS product_type_name_ar,
                pt.name_en AS product_type_name_en,
                pt.slug AS product_type_slug,
