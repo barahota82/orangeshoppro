@@ -14,6 +14,7 @@ require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/currency.php';
 require_once __DIR__ . '/../../../includes/warehouses.php';
+require_once __DIR__ . '/../../../includes/invoice_ancillary_lines.php';
 require_admin_api();
 
 try {
@@ -280,7 +281,20 @@ try {
         $itemStmt->execute($bind);
     }
 
+    $extraInput = orange_invoice_ancillary_parse_request_lines(
+        $data,
+        orange_invoice_ancillary_doc_kind_sales()
+    );
+
     orange_complete_order_fulfillment($pdo, $orderId);
+
+    orange_invoice_ancillary_extra_lines_replace_for_doc(
+        $pdo,
+        orange_invoice_ancillary_doc_kind_sales(),
+        $orderId,
+        $orderCountryId,
+        $extraInput
+    );
 
     $ordSt = $pdo->prepare('SELECT * FROM orders WHERE id = ? LIMIT 1');
     $ordSt->execute([$orderId]);

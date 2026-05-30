@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
 require_once __DIR__ . '/../../includes/warehouses.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
+require_once __DIR__ . '/../../includes/invoice_ancillary_lines.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -174,7 +175,21 @@ foreach ($products as $p) {
         ];
     }
 }
+$moSalesLineKinds = [];
+foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kindMeta) {
+    $moSalesLineKinds[] = [
+        'key' => $kindKey,
+        'label_ar' => (string) ($kindMeta['label_ar'] ?? $kindKey),
+    ];
+}
 ?>
+<style>
+.mo-extra-source-tabs { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+.mo-extra-source-tabs button.is-active { font-weight:700; border-color:#2563eb; }
+@media print {
+    .mo-extra-skip-print { display:none !important; }
+}
+</style>
 <div class="page-title page-title--stacked">
     <h1>فاتورة مبيعات</h1>
     <p class="page-subtitle">مستند بيع داخلي مرتبط بالعميل والقناة. <strong>كل بند</strong> يُربَط بصنف مسجّل: <strong>كود الصنف</strong> أو <strong>الباركود</strong> (حقلا <code dir="ltr">item_code</code> و<code dir="ltr">barcode</code> في قاعدة البيانات، أو كود تلقائي مثل P12) مع اللون/المقاس عند وجود متغيرات. حقول <strong>سعر الوحدة</strong> و<strong>الخصم</strong> تتبع تنسيق المبالغ (ثلاث خانات عشرية، ويسمح الخصم بالقيم السالبة كزيادة). بعد الحفظ تفتح الفاتورة الرسمية.</p>
@@ -250,6 +265,29 @@ foreach ($products as $p) {
             </table>
         </div>
     </div>
+
+    <h4 style="font-size:0.9rem;font-weight:600;color:#444;margin:14px 0 8px;">بنود إضافية</h4>
+    <div class="admin-doc-frame">
+        <div class="table-wrap">
+            <table class="admin-table admin-doc-lines-table mo-extra-lines-table">
+                <thead>
+                    <tr>
+                        <th class="mo-col-idx">#</th>
+                        <th>الحساب / البند</th>
+                        <th class="mo-col-money-h">المبلغ</th>
+                        <th style="width:6rem;">يظهر للعميل</th>
+                        <th>تسمية طباعة</th>
+                        <th class="mo-col-del-h" aria-label="حذف"></th>
+                    </tr>
+                </thead>
+                <tbody id="mo_extra_lines_body"></tbody>
+            </table>
+        </div>
+    </div>
+    <div class="actions" style="margin-top:8px;">
+        <button type="button" class="btn-secondary" id="mo_btn_add_extra"<?php echo $products === [] ? ' disabled' : ''; ?>>إضافة بند</button>
+    </div>
+
     <div class="mo-invoice-summary" id="mo_invoice_summary" aria-live="polite">
         <div class="mo-invoice-summary__grid">
             <div class="mo-invoice-summary__cell">
@@ -278,6 +316,31 @@ foreach ($products as $p) {
         <button type="button" class="btn-secondary" id="mo_btn_addline" onclick="moAddLine()" <?php echo $products === [] ? 'disabled' : ''; ?>>+ سطر</button>
         <button type="button" id="mo_btn_save" onclick="moSubmit()" <?php echo $products === [] ? 'disabled' : ''; ?>>حفظ وتسجيل الفاتورة</button>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">الطلبات</a>
+    </div>
+</div>
+
+<div class="gl-pick-modal" id="mo_extra_pick_modal" hidden aria-hidden="true">
+    <div class="gl-pick-modal__backdrop" id="mo_extra_pick_backdrop"></div>
+    <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true">
+        <h3 class="gl-pick-modal__title">اختيار حساب — بند إضافي</h3>
+        <div class="mo-extra-source-tabs">
+            <button type="button" class="btn-secondary is-active" id="mo_extra_tab_presets" data-source="presets">القائمة المحفوظة</button>
+            <button type="button" class="btn-secondary" id="mo_extra_tab_coa" data-source="coa">الدليل المحاسبي</button>
+        </div>
+        <div id="mo_extra_line_kind_wrap" hidden style="margin:8px 0;">
+            <label for="mo_extra_line_kind">نوع البند</label>
+            <select id="mo_extra_line_kind" class="admin-inp">
+                <?php foreach ($moSalesLineKinds as $lk): ?>
+                <option value="<?php echo htmlspecialchars((string) $lk['key'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) $lk['label_ar'], ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <input type="search" id="mo_extra_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث…" autocomplete="off" dir="rtl">
+        <ul class="gl-pick-modal__list" id="mo_extra_pick_list"></ul>
+        <div class="actions" style="margin-top:10px;gap:8px;">
+            <button type="button" class="btn-secondary" id="mo_extra_add_to_presets" hidden>أضف إلى القائمة</button>
+            <button type="button" class="btn-secondary" id="mo_extra_pick_close">إغلاق</button>
+        </div>
     </div>
 </div>
 
@@ -313,6 +376,9 @@ foreach ($products as $p) {
 <script>
 var MO_PICK_ROWS = <?php echo json_encode($pickRows, JSON_UNESCAPED_UNICODE); ?>;
 var MO_CURRENCY_UNIT = <?php echo json_encode($moCurrencyUnit, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+var MO_SALES_LINE_KINDS = <?php echo json_encode($moSalesLineKinds, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
+var moExtraPickSource = 'presets';
+var moExtraPickSelected = null;
 
 function moNormCodeKey(s) {
     s = String(s || '').trim();
@@ -790,6 +856,185 @@ function moBindLinesBody() {
     });
 }
 
+}
+
+function moExtraLineKindLabel(key) {
+    for (var i = 0; i < MO_SALES_LINE_KINDS.length; i++) {
+        if (MO_SALES_LINE_KINDS[i].key === key) return MO_SALES_LINE_KINDS[i].label_ar || key;
+    }
+    return key;
+}
+function moExtraAccountLabel(row) {
+    var code = String(row.account_code || '').trim();
+    var name = String(row.account_name || row.label_ar || '').trim();
+    return (code && name) ? (code + ' — ' + name) : (name || code || ('#' + (row.account_id || '')));
+}
+function moExtraLineRowHtml() {
+    return '<td class="mo-col-idx"></td>'
+        + '<td><span class="mo-extra-account-label"></span>'
+        + '<input type="hidden" class="mo-extra-account-id" value="">'
+        + '<input type="hidden" class="mo-extra-line-kind" value="">'
+        + '<input type="hidden" class="mo-extra-preset-id" value="0"></td>'
+        + '<td><input type="number" class="mo-extra-amount admin-inp-money" min="0" step="any" value="' + moFmtKd(0) + '" dir="ltr" lang="en"></td>'
+        + '<td style="text-align:center;"><input type="checkbox" class="mo-extra-print" title="يظهر في الفاتورة المطبوعة للعميل"></td>'
+        + '<td><input type="text" class="mo-extra-label admin-inp" placeholder="اختياري" dir="auto"></td>'
+        + '<td><button type="button" class="btn-secondary admin-doc-line-remove" title="حذف">&times;</button></td>';
+}
+function moSyncExtraPrintClass(tr) {
+    if (!tr) return;
+    var show = tr.querySelector('.mo-extra-print');
+    if (show && show.checked) tr.classList.remove('mo-extra-skip-print');
+    else tr.classList.add('mo-extra-skip-print');
+}
+function moAddExtraLine(row) {
+    var tb = document.getElementById('mo_extra_lines_body');
+    if (!tb) return;
+    var tr = document.createElement('tr');
+    tr.className = 'mo-extra-line mo-extra-skip-print';
+    tr.innerHTML = moExtraLineRowHtml();
+    tb.appendChild(tr);
+    if (row) {
+        tr.querySelector('.mo-extra-account-id').value = String(row.account_id || '');
+        tr.querySelector('.mo-extra-line-kind').value = String(row.line_kind || '');
+        tr.querySelector('.mo-extra-preset-id').value = String(row.preset_id || 0);
+        tr.querySelector('.mo-extra-account-label').textContent = moExtraAccountLabel(row);
+        tr.querySelector('.mo-extra-amount').value = moFmtKd(row.amount || 0);
+        tr.querySelector('.mo-extra-print').checked = !!row.show_on_print;
+        tr.querySelector('.mo-extra-label').value = row.label_ar || '';
+        moSyncExtraPrintClass(tr);
+    }
+}
+function moCollectExtraLines() {
+    var out = [];
+    var tb = document.getElementById('mo_extra_lines_body');
+    if (!tb) return out;
+    tb.querySelectorAll('tr.mo-extra-line').forEach(function (tr) {
+        var accountId = parseInt(tr.querySelector('.mo-extra-account-id').value, 10) || 0;
+        var lineKind = (tr.querySelector('.mo-extra-line-kind').value || '').trim();
+        var amount = parseFloat(tr.querySelector('.mo-extra-amount').value) || 0;
+        if (accountId <= 0 || !lineKind || amount <= 0) return;
+        out.push({
+            account_id: accountId,
+            line_kind: lineKind,
+            amount: amount,
+            label_ar: (tr.querySelector('.mo-extra-label').value || '').trim(),
+            show_on_print: tr.querySelector('.mo-extra-print').checked ? 1 : 0,
+            preset_id: parseInt(tr.querySelector('.mo-extra-preset-id').value, 10) || 0
+        });
+    });
+    return out;
+}
+function moExtraPickSetSource(source) {
+    moExtraPickSource = source === 'coa' ? 'coa' : 'presets';
+    moExtraPickSelected = null;
+    document.getElementById('mo_extra_tab_presets').classList.toggle('is-active', moExtraPickSource === 'presets');
+    document.getElementById('mo_extra_tab_coa').classList.toggle('is-active', moExtraPickSource === 'coa');
+    document.getElementById('mo_extra_line_kind_wrap').hidden = moExtraPickSource !== 'coa';
+    document.getElementById('mo_extra_add_to_presets').hidden = moExtraPickSource !== 'coa';
+    moExtraPickRender(document.getElementById('mo_extra_pick_q').value || '');
+}
+function moExtraPickOpen() {
+    var modal = document.getElementById('mo_extra_pick_modal');
+    if (!modal) return;
+    moExtraPickSetSource('presets');
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('gl-pick-open');
+    document.getElementById('mo_extra_pick_q').value = '';
+    moExtraPickRender('');
+}
+function moExtraPickClose() {
+    var modal = document.getElementById('mo_extra_pick_modal');
+    if (!modal) return;
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('gl-pick-open');
+}
+function moExtraPickConfirm(row) {
+    if (!row) return;
+    if (moExtraPickSource === 'coa') {
+        var lineKind = (document.getElementById('mo_extra_line_kind').value || '').trim();
+        if (!lineKind) { alert('اختر نوع البند.'); return; }
+        moAddExtraLine({
+            account_id: row.account_id || row.id,
+            account_code: row.account_code || row.code || '',
+            account_name: row.account_name || row.name || '',
+            line_kind: lineKind,
+            show_on_print: true,
+            label_ar: row.name || row.account_name || '',
+            preset_id: 0
+        });
+    } else {
+        moAddExtraLine({
+            account_id: row.account_id,
+            account_code: row.account_code,
+            account_name: row.account_name,
+            line_kind: row.line_kind,
+            show_on_print: !!row.default_show_on_print,
+            label_ar: row.label_ar || row.account_name || '',
+            preset_id: row.id || 0
+        });
+    }
+    moExtraPickClose();
+}
+function moExtraPickRender(q) {
+    var listEl = document.getElementById('mo_extra_pick_list');
+    if (!listEl) return;
+    listEl.innerHTML = '<li class="gl-pick-empty">جاري التحميل…</li>';
+    q = String(q || '').trim();
+    if (moExtraPickSource === 'presets') {
+        fetch('/admin/api/invoice-ancillary/presets-list.php?invoice_context=sales' + (q ? ('&q=' + encodeURIComponent(q)) : ''), {
+            credentials: 'same-origin', headers: { 'Accept': 'application/json' }, cache: 'no-store'
+        }).then(function (r) { return r.json(); }).then(function (res) {
+            listEl.innerHTML = '';
+            var rows = (res && res.presets) ? res.presets : [];
+            if (!rows.length) { listEl.innerHTML = '<li class="gl-pick-empty">لا نتائج</li>'; return; }
+            rows.forEach(function (row) {
+                var li = document.createElement('li');
+                li.className = 'gl-pick-item';
+                li.setAttribute('role', 'button');
+                li.tabIndex = 0;
+                li.textContent = moExtraAccountLabel(row) + ' — ' + moExtraLineKindLabel(row.line_kind);
+                li.addEventListener('dblclick', function () { moExtraPickConfirm(row); });
+                listEl.appendChild(li);
+            });
+        });
+        return;
+    }
+    fetch('/admin/api/accounts/search-leaves.php?q=' + encodeURIComponent(q || ''), {
+        credentials: 'same-origin', headers: { 'Accept': 'application/json' }, cache: 'no-store'
+    }).then(function (r) { return r.json(); }).then(function (res) {
+        listEl.innerHTML = '';
+        var rows = (res && res.accounts) ? res.accounts : [];
+        if (!rows.length) { listEl.innerHTML = '<li class="gl-pick-empty">لا نتائج</li>'; return; }
+        rows.forEach(function (row) {
+            var mapped = { account_id: row.id, account_code: row.code, account_name: row.name };
+            var li = document.createElement('li');
+            li.className = 'gl-pick-item';
+            li.setAttribute('role', 'button');
+            li.tabIndex = 0;
+            li.textContent = moExtraAccountLabel(mapped);
+            li.addEventListener('click', function () { moExtraPickSelected = mapped; });
+            li.addEventListener('dblclick', function () { moExtraPickConfirm(mapped); });
+            listEl.appendChild(li);
+        });
+    });
+}
+function moExtraAddToPresets() {
+    if (!moExtraPickSelected) { alert('اختر حساباً من الدليل أولاً.'); return; }
+    var lineKind = (document.getElementById('mo_extra_line_kind').value || '').trim();
+    if (!lineKind) { alert('اختر نوع البند.'); return; }
+    postJSON('/admin/api/invoice-ancillary/preset-save.php', {
+        account_id: moExtraPickSelected.account_id,
+        line_kind: lineKind,
+        invoice_context: 'sales',
+        label_ar: moExtraPickSelected.account_name || '',
+        default_show_on_print: true
+    }).then(function (res) {
+        alert((res && res.message) || (res.success ? 'تم' : 'فشل'));
+    });
+}
+
 function moSubmit() {
     var name = document.getElementById('mo_name').value.trim();
     var ccEl = document.getElementById('mo_phone_country');
@@ -862,7 +1107,8 @@ function moSubmit() {
         channel_id: channel,
         payment_terms: document.getElementById('mo_payment_terms').value || 'cash',
         amount_paid: paid,
-        items: items
+        items: items,
+        extra_lines: moCollectExtraLines()
     }).then(function (res) {
         if (!res.success) {
             alert(res.message || 'فشل');
@@ -887,6 +1133,31 @@ moBindPickModal();
 moAddLine();
 moBindLinesBody();
 moSyncTrailingRows();
+document.getElementById('mo_btn_add_extra').addEventListener('click', moExtraPickOpen);
+document.getElementById('mo_extra_pick_backdrop').addEventListener('click', moExtraPickClose);
+document.getElementById('mo_extra_pick_close').addEventListener('click', moExtraPickClose);
+document.getElementById('mo_extra_tab_presets').addEventListener('click', function () { moExtraPickSetSource('presets'); });
+document.getElementById('mo_extra_tab_coa').addEventListener('click', function () { moExtraPickSetSource('coa'); });
+document.getElementById('mo_extra_add_to_presets').addEventListener('click', moExtraAddToPresets);
+document.getElementById('mo_extra_pick_q').addEventListener('input', function () {
+    clearTimeout(window._moExtraPickT);
+    window._moExtraPickT = setTimeout(function () {
+        moExtraPickRender(document.getElementById('mo_extra_pick_q').value || '');
+    }, 200);
+});
+var moExtraTb = document.getElementById('mo_extra_lines_body');
+if (moExtraTb) {
+    moExtraTb.addEventListener('click', function (e) {
+        if (e.target && e.target.classList.contains('admin-doc-line-remove')) {
+            e.target.closest('tr').remove();
+        }
+    });
+    moExtraTb.addEventListener('change', function (e) {
+        if (e.target && e.target.classList.contains('mo-extra-print')) {
+            moSyncExtraPrintClass(e.target.closest('tr'));
+        }
+    });
+}
 (function () {
     var ccEl = document.getElementById('mo_phone_country');
     var ccList = document.getElementById('mo_phone_country_list');

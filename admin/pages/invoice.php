@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
+require_once __DIR__ . '/../../includes/invoice_ancillary_lines.php';
 
 /**
  * @param array<string, mixed> $order
@@ -102,6 +103,8 @@ $items = [];
 $channelName = '';
 $companyProfile = [];
 $linesSubtotal = 0.0;
+$invoicePrintExtras = [];
+$invoiceExtraPrintNet = 0.0;
 
 $orderStatusAr = [
     'pending' => 'قيد الانتظار',
@@ -133,6 +136,36 @@ if ($orderId > 0) {
         foreach ($items as $row) {
             $linesSubtotal += orange_order_item_line_net($row);
         }
+        $allExtraLines = orange_invoice_ancillary_extra_lines_for_doc(
+            $pdo,
+            orange_invoice_ancillary_doc_kind_sales(),
+            $orderId
+        );
+        foreach ($allExtraLines as $exRow) {
+            if ((int) ($exRow['show_on_print'] ?? 0) !== 1) {
+                continue;
+            }
+            $amt = round((float) ($exRow['amount'] ?? 0), 4);
+            if ($amt <= 0.0001) {
+                continue;
+            }
+            $side = orange_invoice_ancillary_line_kind_side((string) ($exRow['line_kind'] ?? ''));
+            $signed = $side === 'credit' ? $amt : ($side === 'debit' ? -$amt : $amt);
+            $label = trim((string) ($exRow['label_ar'] ?? ''));
+            if ($label === '') {
+                $label = trim((string) ($exRow['account_name'] ?? ''));
+            }
+            if ($label === '') {
+                $label = 'بند إضافي';
+            }
+            $invoicePrintExtras[] = [
+                'label' => $label,
+                'amount' => $amt,
+                'signed' => $signed,
+            ];
+            $invoiceExtraPrintNet += $signed;
+        }
+        $invoiceExtraPrintNet = round($invoiceExtraPrintNet, 4);
     }
 }
 
@@ -166,6 +199,8 @@ if ($order && orange_table_has_column($pdo, 'orders', 'amount_paid')) {
     $amountPaidVal = max(0.0, (float) ($order['amount_paid'] ?? 0));
 }
 $balanceDueVal = $order ? max(0.0, round($orderTotalVal - $amountPaidVal, 3)) : 0.0;
+$invoiceCustomerTotal = $order ? round($orderTotalVal + $invoiceExtraPrintNet, 4) : 0.0;
+$invoiceCustomerBalance = $order ? max(0.0, round($invoiceCustomerTotal - $amountPaidVal, 3)) : 0.0;
 $invMoney = orange_order_currency_context($pdo, is_array($order) ? $order : null);
 $invCurUnit = (string) $invMoney['unit'];
 $invCurDec = (int) $invMoney['decimals'];
@@ -631,6 +666,13 @@ $invFmt = static function (float $amount, bool $withUnit = true) use ($invMoney)
                         <td class="num"><?php echo $invFmt($lineNet); ?></td>
                     </tr>
                 <?php endforeach; ?>
+                <?php foreach ($invoicePrintExtras as $exPrint): ?>
+                    <tr>
+                        <td class="num">+</td>
+                        <td colspan="6"><?php echo htmlspecialchars((string) $exPrint['label'], ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td class="num"><?php echo ($exPrint['signed'] < -0.0001 ? '−' : '') . $invFmt(abs((float) $exPrint['signed'])); ?></td>
+                    </tr>
+                <?php endforeach; ?>
             </tbody>
         </table>
 
@@ -652,9 +694,15 @@ $invFmt = static function (float $amount, bool $withUnit = true) use ($invMoney)
                     <span>−<?php echo $invFmt($cartPromoDisc); ?></span>
                 </div>
                 <?php endif; ?>
+                <?php if ($invoiceExtraPrintNet > 0.0001 || $invoiceExtraPrintNet < -0.0001): ?>
+                <div class="invoice-totals-row">
+                    <span>بنود إضافية (للعميل)</span>
+                    <span><?php echo ($invoiceExtraPrintNet < 0 ? '−' : '') . $invFmt(abs($invoiceExtraPrintNet)); ?></span>
+                </div>
+                <?php endif; ?>
                 <div class="invoice-totals-row grand">
-                    <span>إجمالي الفاتورة</span>
-                    <span><?php echo $invFmt($orderTotalVal); ?></span>
+                    <span>إجمالي الفاتورة<?php echo $invoicePrintExtras !== [] ? ' (شامل البنود الإضافية)' : ''; ?></span>
+                    <span><?php echo $invFmt($invoicePrintExtras !== [] ? $invoiceCustomerTotal : $orderTotalVal); ?></span>
                 </div>
                 <?php if (orange_table_has_column($pdo, 'orders', 'amount_paid')): ?>
                 <div class="invoice-totals-row">
@@ -663,7 +711,7 @@ $invFmt = static function (float $amount, bool $withUnit = true) use ($invMoney)
                 </div>
                 <div class="invoice-totals-row grand" style="border-top:1px dashed #cbd5e1;margin-top:0.35rem;padding-top:0.45rem;">
                     <span>الباقي</span>
-                    <span><?php echo $invFmt($balanceDueVal); ?></span>
+                    <span><?php echo $invFmt($invoicePrintExtras !== [] ? $invoiceCustomerBalance : $balanceDueVal); ?></span>
                 </div>
                 <?php endif; ?>
             </div>

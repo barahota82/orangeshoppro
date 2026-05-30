@@ -12,6 +12,259 @@ require_once __DIR__ . '/journal_write.php';
 require_once __DIR__ . '/party_subledger.php';
 require_once __DIR__ . '/party_allocations.php';
 require_once __DIR__ . '/warehouses.php';
+require_once __DIR__ . '/invoice_ancillary_lines.php';
+
+/**
+ * @param list<array<string, mixed>> $extraLines
+ */
+function orange_order_post_delivery_sale_gl_amount(
+    PDO $pdo,
+    array $order,
+    float $salesAmount,
+    array $extraLines,
+    int $customerIdForAr,
+    int $ofGlCountryId,
+    bool $isCredit,
+    bool $isOnline,
+    ?array $revenueRule,
+    int $debitReceivable,
+    int $salesId,
+    int $saleJtId,
+    string $saleDesc,
+    string $salePendingSuffix
+): void {
+    if ($salesAmount <= 0.0001) {
+        return;
+    }
+
+    $now = date('Y-m-d H:i:s');
+    $orderId = (int) ($order['id'] ?? 0);
+    $salePendingKey = orange_gl_pending_source_key('order', $orderId, 'sale-' . $salePendingSuffix);
+    $srcLabel = 'ORDER-' . (string) ($order['order_number'] ?? '');
+    $receivableTotal = orange_invoice_ancillary_sales_receivable_total($salesAmount, $extraLines);
+
+    if (!$isCredit) {
+        if ($isOnline) {
+            $memoSaleLeg = 'مبيعات أونلاين — تسجيل على عملاء نقدي (وسيط مشترك)';
+            $memoCashLeg = 'مبيعات أونلاين — تحصيل للخزينة';
+            if ($revenueRule !== null) {
+                $saleFour = orange_gl_bridge_delivery_sale_four_lines(
+                    $pdo,
+                    $salesAmount,
+                    $revenueRule['debit_key'],
+                    $revenueRule['credit_key'],
+                    $memoSaleLeg,
+                    $memoCashLeg
+                );
+            } else {
+                $saleFour = orange_gl_online_delivery_sale_four_lines($pdo, $salesAmount, $memoSaleLeg, $memoCashLeg);
+            }
+        } else {
+            $memoSaleLeg = 'مبيعات نقدي — تسجيل على عملاء نقدي';
+            $memoCashLeg = 'مبيعات نقدي — تحصيل نقدي';
+            if ($revenueRule !== null) {
+                $saleFour = orange_gl_bridge_delivery_sale_four_lines(
+                    $pdo,
+                    $salesAmount,
+                    $revenueRule['debit_key'],
+                    $revenueRule['credit_key'],
+                    $memoSaleLeg,
+                    $memoCashLeg
+                );
+            } else {
+                $saleFour = orange_gl_cash_delivery_sale_four_lines($pdo, $salesAmount, $memoSaleLeg, $memoCashLeg);
+            }
+        }
+        $afterPost = null;
+        if ($customerIdForAr > 0) {
+            $cashSaleMemo = $isOnline ? 'مبيعات أونلاين — تسليم' : 'مبيعات نقدي — تسليم';
+            $cashCollectMemo = $isOnline ? 'تحصيل أونلاين فوري — تسليم' : 'تحصيل نقدي فوري — تسليم';
+            $afterPost = [
+                'party_subledger_entries' => [
+                    [
+                        'party_kind' => 'customer',
+                        'party_id' => $customerIdForAr,
+                        'debit' => $salesAmount,
+                        'credit' => 0.0,
+                        'ref_type' => 'order',
+                        'ref_id' => $orderId,
+                        'memo' => $cashSaleMemo,
+                    ],
+                    [
+                        'party_kind' => 'customer',
+                        'party_id' => $customerIdForAr,
+                        'debit' => 0.0,
+                        'credit' => $salesAmount,
+                        'ref_type' => 'order',
+                        'ref_id' => $orderId,
+                        'memo' => $cashCollectMemo,
+                    ],
+                ],
+            ];
+        }
+        $glB = orange_gl_posting_bundle_apply_sales_ancillary([
+            'is_multi' => true,
+            'lines' => $saleFour['lines'],
+            'debit' => 0,
+            'credit' => 0,
+            'voucher_description' => $saleDesc,
+            'after_post' => $afterPost,
+        ], $extraLines, $salesAmount);
+        $afterJson = $glB['after_post'] !== null
+            ? json_encode($glB['after_post'], JSON_UNESCAPED_UNICODE)
+            : null;
+        $afterJson = orange_gl_after_post_json_with_country($afterJson, $ofGlCountryId);
+        if (orange_gl_use_pending_queue($pdo)) {
+            orange_gl_pending_enqueue_multi(
+                $pdo,
+                $glB['lines'],
+                $salePendingKey,
+                $srcLabel,
+                $now,
+                $now,
+                $glB['voucher_description'],
+                'order_delivery_sale',
+                $afterJson
+            );
+
+            return;
+        }
+        $vCashSale = orange_voucher_post($pdo, [
+            'voucher_date' => $now,
+            'document_entered_at' => $now,
+            'description' => $glB['voucher_description'],
+            'entry_type' => 'order_delivery_sale',
+            'journal_type_id' => $saleJtId > 0 ? $saleJtId : null,
+            'country_id' => $ofGlCountryId,
+        ], $glB['lines']);
+        if ($customerIdForAr > 0 && is_int($vCashSale) && $vCashSale > 0) {
+            $cashSaleMemoDirect = $isOnline ? 'مبيعات أونلاين — تسليم' : 'مبيعات نقدي — تسليم';
+            $cashCollectMemoDirect = $isOnline ? 'تحصيل أونلاين فوري — تسليم' : 'تحصيل نقدي فوري — تسليم';
+            orange_party_subledger_record(
+                $pdo,
+                'customer',
+                $customerIdForAr,
+                $vCashSale,
+                $receivableTotal,
+                0.0,
+                'order',
+                $orderId,
+                $cashSaleMemoDirect
+            );
+            orange_party_subledger_record(
+                $pdo,
+                'customer',
+                $customerIdForAr,
+                $vCashSale,
+                0.0,
+                $receivableTotal,
+                'order',
+                $orderId,
+                $cashCollectMemoDirect
+            );
+        }
+
+        return;
+    }
+
+    $afterPost = null;
+    if ($isCredit && $customerIdForAr > 0) {
+        $afterPost = [
+            'party_subledger' => [
+                'party_kind' => 'customer',
+                'party_id' => $customerIdForAr,
+                'debit' => $salesAmount,
+                'credit' => 0.0,
+                'ref_type' => 'order',
+                'ref_id' => $orderId,
+                'memo' => 'مبيعات آجل — تسليم',
+            ],
+        ];
+    }
+    $glB = orange_gl_posting_bundle_apply_sales_ancillary([
+        'is_multi' => false,
+        'lines' => [],
+        'debit' => $debitReceivable,
+        'credit' => $salesId,
+        'voucher_description' => $saleDesc,
+        'after_post' => $afterPost,
+        'legacy_ar_subledger' => $isCredit && $customerIdForAr > 0,
+    ], $extraLines, $salesAmount);
+    $afterJson = $glB['after_post'] !== null
+        ? json_encode($glB['after_post'], JSON_UNESCAPED_UNICODE)
+        : null;
+    $afterJson = orange_gl_after_post_json_with_country($afterJson, $ofGlCountryId);
+
+    if (orange_gl_use_pending_queue($pdo)) {
+        if ($glB['is_multi']) {
+            orange_gl_pending_enqueue_multi(
+                $pdo,
+                $glB['lines'],
+                $salePendingKey,
+                $srcLabel,
+                $now,
+                $now,
+                $glB['voucher_description'],
+                'order_delivery_sale',
+                $afterJson
+            );
+        } else {
+            orange_gl_pending_enqueue_simple($pdo, [
+                'reference' => $salePendingKey,
+                'source_label' => $srcLabel,
+                'movement_at' => $now,
+                'voucher_date' => $now,
+                'account_debit' => $glB['debit'],
+                'account_credit' => $glB['credit'],
+                'amount' => $receivableTotal,
+                'description' => $glB['voucher_description'],
+                'entry_type' => 'order_delivery_sale',
+                'after_post_json' => $afterJson,
+            ]);
+        }
+
+        return;
+    }
+
+    if ($glB['is_multi']) {
+        $vSale = orange_voucher_post($pdo, [
+            'voucher_date' => $now,
+            'document_entered_at' => $now,
+            'description' => $glB['voucher_description'],
+            'entry_type' => 'order_delivery_sale',
+            'journal_type_id' => $saleJtId > 0 ? $saleJtId : null,
+            'country_id' => $ofGlCountryId,
+        ], $glB['lines']);
+        orange_gl_apply_voucher_after_post_hooks($pdo, $vSale, $afterJson);
+
+        return;
+    }
+
+    $vSale = orange_voucher_post($pdo, [
+        'voucher_date' => $now,
+        'document_entered_at' => $now,
+        'description' => $glB['voucher_description'],
+        'entry_type' => 'order_delivery_sale',
+        'journal_type_id' => $saleJtId > 0 ? $saleJtId : null,
+        'country_id' => $ofGlCountryId,
+    ], [
+        ['account_id' => (int) $glB['debit'], 'debit' => $receivableTotal, 'credit' => 0.0, 'memo' => $saleDesc],
+        ['account_id' => (int) $glB['credit'], 'debit' => 0.0, 'credit' => $salesAmount, 'memo' => $saleDesc],
+    ]);
+    if ($isCredit && $customerIdForAr > 0 && is_int($vSale) && $vSale > 0) {
+        orange_party_subledger_record(
+            $pdo,
+            'customer',
+            $customerIdForAr,
+            $vSale,
+            $receivableTotal,
+            0,
+            'order',
+            $orderId,
+            'مبيعات آجل — تسليم'
+        );
+    }
+}
 
 /**
  * Stock + customer enrichment when an order is marked completed (website or company manual).
@@ -264,6 +517,18 @@ function orange_post_order_delivery_accounting(PDO $pdo, int $orderId): void
         );
     }
 
+    $extraLines = orange_invoice_ancillary_extra_lines_for_doc(
+        $pdo,
+        orange_invoice_ancillary_doc_kind_sales(),
+        $orderId
+    );
+    $aggregateSalesGl = $extraLines !== [];
+    $orderSalesNet = 0.0;
+    foreach ($items as $itemRow) {
+        $orderSalesNet += orange_order_item_line_net($itemRow);
+    }
+    $orderSalesNet = round($orderSalesNet, 4);
+
     foreach ($items as $idx => $item) {
         $variant = orange_order_resolve_variant_from_item($pdo, $item);
         $salesAmount = orange_order_item_line_net($item);
@@ -281,7 +546,7 @@ function orange_post_order_delivery_accounting(PDO $pdo, int $orderId): void
             : ($isCredit ? 'قيد تكلفة مبيعات آجل — تسليم' : 'قيد تكلفة مبيعات نقدي — تسليم');
         $srcLabel = 'ORDER-' . $order['order_number'];
 
-        if ($salesAmount > 0.0001) {
+        if ($salesAmount > 0.0001 && !$aggregateSalesGl) {
             if (!$isCredit) {
                 if ($isOnline) {
                     $memoSaleLeg = 'مبيعات أونلاين — تسجيل على عملاء نقدي (وسيط مشترك)';
@@ -481,6 +746,27 @@ function orange_post_order_delivery_accounting(PDO $pdo, int $orderId): void
                 ]);
             }
         }
+    }
+
+    if ($aggregateSalesGl && $orderSalesNet > 0.0001) {
+        orange_order_post_delivery_sale_gl_amount(
+            $pdo,
+            $order,
+            $orderSalesNet,
+            $extraLines,
+            $customerIdForAr,
+            $ofGlCountryId,
+            $isCredit,
+            $isOnline,
+            $revenueRule,
+            $debitReceivable,
+            $salesId,
+            $saleJtId,
+            $isOnline
+                ? 'قيد مبيعات أونلاين — تسليم'
+                : ($isCredit ? 'قيد مبيعات آجل — تسليم' : 'قيد مبيعات نقدي — تسليم'),
+            'agg'
+        );
     }
 }
 

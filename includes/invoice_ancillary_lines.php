@@ -683,3 +683,140 @@ function orange_invoice_ancillary_purchase_payable_total(float $itemsNetAmount, 
 
     return round($itemsNetAmount + $delta, 4);
 }
+
+/**
+ * @return array<string, array{label_ar: string, side: string, contexts: list<string>}>
+ */
+function orange_invoice_ancillary_sales_line_kind_catalog(): array
+{
+    $all = orange_invoice_ancillary_line_kind_catalog();
+    $out = [];
+    foreach ($all as $key => $meta) {
+        if (str_starts_with($key, 'sales_')) {
+            $out[$key] = $meta;
+        }
+    }
+
+    return $out;
+}
+
+/**
+ * @param list<array<string, mixed>> $extraLines
+ */
+function orange_invoice_ancillary_sales_receivable_total(float $itemsNetAmount, array $extraLines): float
+{
+    $itemsNetAmount = round($itemsNetAmount, 4);
+    if ($extraLines === []) {
+        return $itemsNetAmount;
+    }
+    $totals = orange_invoice_ancillary_extra_lines_totals($extraLines);
+    $delta = round($totals['debit'] - $totals['credit'], 4);
+
+    return round($itemsNetAmount - $delta, 4);
+}
+
+/**
+ * @param list<array<string, mixed>> $extraLines
+ */
+function orange_invoice_ancillary_sales_customer_print_net(array $extraLines): float
+{
+    $net = 0.0;
+    foreach ($extraLines as $row) {
+        if (!is_array($row) || (int) ($row['show_on_print'] ?? 0) !== 1) {
+            continue;
+        }
+        $amount = round((float) ($row['amount'] ?? 0), 4);
+        if ($amount <= 0.0001) {
+            continue;
+        }
+        $side = orange_invoice_ancillary_line_kind_side((string) ($row['line_kind'] ?? ''));
+        if ($side === 'credit') {
+            $net += $amount;
+        } elseif ($side === 'debit') {
+            $net -= $amount;
+        }
+    }
+
+    return round($net, 4);
+}
+
+/**
+ * @param array{
+ *   is_multi: bool,
+ *   lines: list<array{account_id:int,debit:float,credit:float,memo:string}>,
+ *   debit: int,
+ *   credit: int,
+ *   voucher_description: string,
+ *   after_post: array|null,
+ *   legacy_ar_subledger?: bool
+ * } $glB
+ * @param list<array<string, mixed>> $extraLines
+ * @return array<string, mixed>
+ *
+ * @throws RuntimeException
+ */
+function orange_gl_posting_bundle_apply_sales_ancillary(
+    array $glB,
+    array $extraLines,
+    float $itemsNetAmount
+): array {
+    if ($extraLines === []) {
+        return $glB;
+    }
+    $ancRows = orange_invoice_ancillary_extra_lines_journal_rows($extraLines);
+    if ($ancRows === []) {
+        return $glB;
+    }
+    $itemsNetAmount = round($itemsNetAmount, 4);
+    $receivable = orange_invoice_ancillary_sales_receivable_total($itemsNetAmount, $extraLines);
+    if ($receivable < -0.0001) {
+        throw new RuntimeException('مجموع البنود الإضافية يجعل صافي المديونية سالباً.');
+    }
+
+    if (!$glB['is_multi']) {
+        $debitAcct = (int) ($glB['debit'] ?? 0);
+        $creditAcct = (int) ($glB['credit'] ?? 0);
+        if ($debitAcct <= 0 || $creditAcct <= 0) {
+            throw new RuntimeException('تعذر بناء قيد مركّب — حسابات الترحيل الأساسية غير مكتملة.');
+        }
+        $lines = [
+            [
+                'account_id' => $debitAcct,
+                'debit' => $receivable,
+                'credit' => 0.0,
+                'memo' => 'فاتورة مبيعات — ذمة/تحصيل',
+            ],
+            [
+                'account_id' => $creditAcct,
+                'debit' => 0.0,
+                'credit' => $itemsNetAmount,
+                'memo' => 'فاتورة مبيعات — إيراد أصناف',
+            ],
+        ];
+        foreach ($ancRows as $row) {
+            $lines[] = $row;
+        }
+        $glB['is_multi'] = true;
+        $glB['lines'] = $lines;
+        $glB['debit'] = 0;
+        $glB['credit'] = 0;
+    } else {
+        foreach ($glB['lines'] as &$line) {
+            if (is_array($line)) {
+                orange_gl_posting_line_scale_amount($line, $itemsNetAmount, $receivable);
+            }
+        }
+        unset($line);
+        $glB['lines'] = array_merge($glB['lines'], $ancRows);
+    }
+
+    if ($glB['after_post'] !== null) {
+        $glB['after_post'] = orange_gl_after_post_scale_payable_amount(
+            $glB['after_post'],
+            $itemsNetAmount,
+            $receivable
+        );
+    }
+
+    return $glB;
+}
