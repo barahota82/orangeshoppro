@@ -273,7 +273,7 @@ ORANGE — رؤية المالك: تعدد الدول والقنوات والج�
 
 **بعد 15–19 (تشغيل):** تفعيل دول جديدة (§10 مرحلة 5): مصر → الإمارات → السعودية.
 
-**تنفيذ (MC stock — مرحلة 2 أوتوماتيك):** **`orange_multicountry_ensure_operational_phase2`** في **`includes/multicountry_stock_gap.php`** — تفعيل EG/UAE/KSA + **`orange_country_provision_full`** + **`warehouse_variant_stock`** بكمية **0** (لا نسخ كميات KW)؛ probe **`health.php?rollout=multicountry-stock-phase2`**. **يدوي بعد probe:** كميات **`opening_stock_balances`** + قفل §11 + smoke طلب per دولة.
+**تنفيذ (MC stock — مرحلة 2 أوتوماتيك):** **`orange_multicountry_ensure_operational_phase2`** في **`includes/multicountry_stock_gap.php`** — تفعيل EG/UAE/KSA + **`orange_country_provision_full`** + **`warehouse_variant_stock`** بكمية **0** (لا نسخ كميات KW)؛ probe **`health.php?rollout=multicountry-stock-phase2`**. **مخطط DB (مرحلة 1+2):** **`orange_catalog_migrate_multicountry_stock_v69`** — **`includes/catalog_multicountry_stock_schema.php`** (rev 69، أوتوماتيك مع push). **يدوي بعد probe:** كميات **`opening_stock_balances`** + قفل §11 + smoke طلب per دولة.
 
 **خارج نطاق 15–19 (مؤجّل برؤية الملف):** عملة لكل دولة (§3)؛ دفع إلكتروني (§7)؛ كتalog موحّد ضخم — **`ORANGE_UNIFIED_TAXONOMY_AND_CATALOG_ERD.txt`**.
 
