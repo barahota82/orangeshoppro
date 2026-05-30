@@ -1,8 +1,24 @@
 ORANGE — حالة شاشات الحسابات والتقارير (أدمن)
 Archive: docs/archive/ORANGE_ADMIN_ACCOUNTING_REPORTS_STATUS.txt
-Last updated: 2026-05-20 (ACC-10 مكتمل — GAP-ACC-10 مغلق)
+Last updated: 2026-05-20 (ACC-14 سياسة GL مغلقة · GAP-ACC-07 مراحل 0–3 · §13.13 جزئي)
 Canvas companion: .cursor/projects/d-orange/canvases/admin-accounting-reports-completion.canvas.tsx
 تقرير نظام شامل: docs/archive/ORANGE_SYSTEM_COMPLETION_REPORT.txt
+
+================================================================================
+0) سياسة GL الحالية — مغلقة (GAP-ACC-14 — للوكلاء: لا تسأل المالك عن الطابور)
+================================================================================
+
+ARABIC
+- **حفظ = ترحيل GL فوري → التقارير فوراً** (ميزان، P&L، كشف حساب، ذمم).
+- **إقفال التعديلات (`edit_lock`):** **رقابة فقط** — منع تعديل/حذف بعد قفل المسؤول — **لا يؤخّر** التقارير و**ليس** شرط ظهورها.
+- **`gl_posting`:** redirect → **`edit_lock`** — **ليس** «انتظر ترحيل للتقارير».
+- **طابور GL (`orange_gl_pending_movements`):** **legacy opt-in فقط** — `ORANGE_GL_USE_PENDING_QUEUE` في `.env.php` (**افتراضي off** على السيرفر).
+- **Lane B (افتراضي):** مشتريات، سندات، YEC §9، §13 «إنشاء القيود»، INV-C — **خارج** gl_posting.
+- **Lane C:** `completed` مخزون بلا GL؛ GL لاحقاً من Lane B.
+- مرجع canonical: **`docs/archive/ORANGE_EDIT_LOCK_POLICY.txt`**
+
+ENGLISH
+- Save → immediate posted vouchers in reports; edit_lock = edit control only; GL pending queue legacy opt-in.
 
 PURPOSE
 - مرجع واحد لحالة **قائمة «الحسابات والتقارير»** في الأدمن + مسار GL + التقارير المرتبطة.
@@ -20,13 +36,12 @@ NAV SOURCE (حقيقة القائمة)
 
 | المحور                         | ~% منجز | ملاحظة مختصرة                          |
 |--------------------------------|---------|----------------------------------------|
-| الإعداد والدليل                | 95%     | YEC + fiscal؛ GAP-ACC-07 قرار معتمد — تنفيذ مفتوح |
-| السندات والذمم                 | 96%     | YEC Lane B؛ §10؛ CRR/SPR               |
-| التقارير المالية               | 94%     | posted؛ pl_compare في nav؛ GAP-ACC-05/09 |
-| Lane A — طابور gl_posting        | 91%     | hub لـ Lane A فقط — ليس «كل GL»        |
-| Lane B — ترحيل مباشر (§9/§13)  | 98%     | by design خارج gl_posting              |
-| تسليم/قيود أونلاين (§13)       | 96%     | B1–B8 + rev 64؛ §13.13 UX مفتوح        |
-| **navAccountingAll مرجّح**     | **~94%**| **~6% — ذمم + UX + Lane A تدقيق**      |
+| الإعداد والدليل                | 96%     | YEC + fiscal؛ GAP-ACC-07 مراحل 0–3 منتهية |
+| السندات والذمم                 | 97%     | ترحيل فوري + edit_lock؛ CRR/SPR        |
+| التقارير المالية               | 97%     | posted فور الحفظ؛ ACC-10 مغلق          |
+| مسار GL (سياسة ACC-14)         | 98%     | حفظ=تقارير؛ edit_lock=رقابة فقط         |
+| تسليم/قيود أونلاين (§13)       | 97%     | B1–B8؛ §13.13 O-01/04/07/08 مغلقة      |
+| **navAccountingAll مرجّح**     | **~96%**| **~4% — ذمم UX + §13.13 متبقي**         |
 | **مع policy v2 (ACC-10)**   | **~86%**| تدفقات + تسويات (ACC-08 تراثي/PV)     |
 
 **§12.1 — حالة البنود الثلاثة (كود — 2026-05-20):**
@@ -39,7 +54,7 @@ NAV SOURCE (حقيقة القائمة)
 | B0–B8 | §13.14 مراحل 0–8 (تسليم → قiود → INV-O/C) | **منتهٍ** (§13.13 O-01…O-14 = سياسة مفتوحة) |
 
 ENGLISH
-- navAccountingAll ~94% after §12.1; gl_posting scores Lane A hub only (~91%). YEC + §13 final posting are Lane B (direct post) by design — not a gl_posting gap. GAP-ACC-02 cancelled (purchase GL on save). Full system report: ORANGE_SYSTEM_COMPLETION_REPORT.txt (~93% ops).
+- navAccountingAll ~96%. GL policy closed (ACC-14): save = reports immediately; edit_lock = control only. gl_posting redirects to edit_lock; pending queue opt-in only. GAP-ACC-07 phases 0–3 done. §13.13 partial (O-01/04/07/08 closed).
 
 ================================================================================
 2) جرد الشاشات — الإعداد والدليل
@@ -53,7 +68,7 @@ chart_of_accounts (admin/pages/chart_of_accounts.php)
 gl_account_settings (admin/pages/gl_account_settings.php)
 - APIs: admin/api/settings/gl-accounts.php, accounts/search-leaves.php, lookup-by-code.php
 - الحالة: [منتهٍ] — ربط أدوار GL + journal_type rules
-- ثغرات: بنود فاتورة إضافية — **قرار مالك 2026-05-20** → **`docs/archive/ORANGE_INVOICE_ANCILLARY_LINES_POLICY.txt`** (قائمة محفوظة + دليل؛ GAP-ACC-07 تنفيذ مفتوح)
+- بنود فاتورة إضافية — **GAP-ACC-07 مراحل 0–3 منتهية** → **`ORANGE_INVOICE_ANCILLARY_LINES_POLICY.txt`** (`invoice_line_presets`؛ مرحلة 4 VAT اختياري)
 
 journal_types (admin/pages/journal_types.php)
 - API: admin/api/journal_types/save.php
@@ -70,12 +85,14 @@ year_end_close_vouchers (admin/pages/year_end_close_vouchers.php) — **في nav
 - الحالة: **[منتهٍ]** — سند YEC واحد (PL→RE→LR)； yec_locked / yec_phase (rev 63)； §10 طباعة بعد الحفظ
 - ثغرات: تلميع بحث/تصفّح داخل الشاشة (اختياري — GAP-ACC-13)
 
+edit_lock (admin/pages/edit_lock.php) — **كان gl_posting**
+- APIs: admin/api/edit-lock/* (+ legacy gl/* عند opt-in طابور)
+- الحالة: **[منتهٍ]** — GAP-ACC-14 rev 67؛ قفل/فك + can_lock/can_unlock + audit
+- **ليست** بوابة ترحيل للتقارير — **رقابة** فقط (§0 أعلاه)
+
 gl_posting (admin/pages/gl_posting.php)
-- APIs: admin/api/gl/pending-list.php, pending-preview.php, pending-post.php, pending-unpost.php
-- الحالة: **[منتهٍ ~90%]** — hub **Lane A** فقط
-- منجز: قوائم معلّق/مرحّل، ترحيل، فك ترحيل انتقائي، معاينة أسطر
-- **Lane B (by design — ليس نقص):** YEC (§9.8)، «إنشاء القiود» (§13.9)، INV-C manual
-- ثغرات: GAP-ACC-01 تدقيق Lane A؛ GAP-ACC-11 ملاحظة UX؛ ORANGE_GL_IMMEDIATE_POSTING (سيرفر)； ACC-06 صلاحيات
+- الحالة: **[redirect → edit_lock]** — طابور GL **legacy opt-in** فقط (`ORANGE_GL_USE_PENDING_QUEUE`)
+- **لا يُعدّ** فجوة «التقارير تنتظر الترحيل» — السياسة المعتمدة: **حفظ = فوري**
 
 opening_balances (admin/pages/opening_balances.php)
 - APIs: admin/api/opening_balances/save.php, delete.php
@@ -158,18 +175,18 @@ manual_order / create-manual.php — [منتهٍ] — INV-C + GL عند الحف
 - **§10:** طباعة السندات بعد الحفظ فقط (journal_voucher_screen + partner screens)
 
 متبقٍ لـ 100% (مرتب الأولوية):
-[GAP-ACC-01] متوسط — مراجعة orange_voucher_post() **Lane A فقط** (استثناء §9/§13)； ORANGE_GL_IMMEDIATE_POSTING
+[GAP-ACC-01] ~~تدقيق Lane A~~ → **تراثي opt-in** — لا يمنع التشغيل إن الطابور معطّل (§0)
 [GAP-ACC-02] ~~حرج — استلام مشتريات~~ → **[ملغى]** GL على حفظ purchases/create.php (enqueue عند الطابور)
-[GAP-ACC-03] متوسط — تعديل journal/manage update على مرحّل vs repost policy
+[GAP-ACC-03] ~~تعديل مرحّل~~ → **[مغلق — in-place بعد فك القفل]** GAP-ACC-14/ACC-03
 [GAP-ACC-04] ~~متوسط — YEC §9~~ → **[مغلق — منتهٍ 2026-05-20]** rev 63؛ year_end_close_vouchers؛ void
 [GAP-ACC-12] ~~متوسط — §13 حزمة~~ → **[مغلق — منتهٍ 2026-05-20]** B1–B8؛ §13.13 O-items = قرارات UX مفتوحة لا تمنع التشغيل
 [GAP-ACC-05] متوسط — partner_account_statement: وضع **مورد** (customer mode موجود؛ account mode للدليل)
-[GAP-ACC-06] متوسط — صلاحيات admin_permissions: post vs unpost (roadmap phase 6)
-[GAP-ACC-07] منخفض — بنود فاتورة (قائمة محفوظة + دليل + checkbox طباعة) — **قرار مالك معتمد 2026-05-20** → **`ORANGE_INVOICE_ANCILLARY_LINES_POLICY.txt`**؛ **تنفيذ كود مفتوح** (مراحل 0–2)
+[GAP-ACC-06] ~~صلاحيات post/unpost~~ → **[منتهٍ]** can_lock/can_unlock + edit_lock (rev 67)
+[GAP-ACC-07] ~~بنود فاتورة~~ → **[مراحل 0–3 منتهية 2026-05-20]** rev 68؛ مرحلة 4 VAT اختياري — **`ORANGE_INVOICE_ANCILLARY_LINES_POLICY.txt`**
 [GAP-ACC-08] ~~module expenses GL (غائب)~~ → **ملغى/تراثي** — المصروفات = **سند صرف** (payment_voucher / PV)؛ لا شاشة expenses مستقلة.
 [GAP-ACC-09] منخفض — accounting_reports_index: تحديث شارات (pl_compare → جاهز)
 [GAP-ACC-10] مستقبل — تدفقات نقدية، أبعاد تحليلية، تسويات (policy v2 §3)
-[GAP-ACC-11] توضيح — التقارير = journal_vouchers مرحّلة؛ المعلق في gl_posting فقط؛ §13/YEC استثناءان موثّقان — **→ يُستبدل/يُدمج مع GAP-ACC-14 عند تنفيذ إقفال التعديلات**
+[GAP-ACC-11] ~~gl_posting UX~~ → **[مغلق — مدمج ACC-14]** redirect edit_lock؛ §0 يوضّح Lanes
 [GAP-ACC-13] منخفض — YEC: تلميع بحث/تصفّح داخل year_end_close_vouchers (اختياري)
 [GAP-ACC-14] ~~قرار مالك~~ → **[مغلق — منتهٍ 2026-05-20]** — **«إقفال التعديلات»** (`edit_lock` rev 67): قفل/فك + صلاحيات + audit؛ طابور GL معطّل افتراضياً؛ **`docs/archive/ORANGE_EDIT_LOCK_POLICY.txt`**
 
@@ -193,21 +210,32 @@ manual_order / create-manual.php — [منتهٍ] — INV-C + GL عند الحف
 
 **المرحلة ج — صلاحيات ومتقدم (phase 6+)**
 - GAP-ACC-06، GAP-ACC-13 (~~ACC-08~~ تراثي — PV)
-- **GAP-ACC-07:** مراحل 0–2 — **`ORANGE_INVOICE_ANCILLARY_LINES_POLICY.txt`**
+- **GAP-ACC-07:** مراحل 0–3 **منتهية**؛ مرحلة 4 اختياري — **`ORANGE_INVOICE_ANCILLARY_LINES_POLICY.txt`**
 - **GAP-ACC-10 (خيار د):** **مغلق — منتهٍ 2026-05-20** — مراحل 0–4 (§6b.8).
 
 **§13.13 (O-01…O-14):** قرارات UX/سياسة — **ليست** شرطاً لإغلاق ~88% الحالي؛ تُغلق بقرار المالك عند الحاجة.
 
+**§13.13 — O-01 (حالة قبل التوزيع) — مغلق 2026-05-20 (قرار مالك):**
+- **لا** حالة جديدة «جاهز للتوزيع» — **`approved` (موافقة على الطلب) = جاهز للتوزيع** على المندوب.
+- **التشغيل:** قبول/موافقة → **تسليم المندوب** (`delivery_agent_id`) → «بالطريق» → `completed`.
+- **`pending`:** قبل الموافقة — **لا يُوزَّع** تشغيلياً (الموافقة تسبق التوزيع).
+- **تنفيذ:** **لا حالة إضافية** في DB؛ §13.12: `pending` → `approved` → `on_the_way` → `completed`.
+
 **§13.13 — O-04 (تغيير المندوب) — مغلق 2026-05-20 (قرار مالك):**
-- **مسموح** تعيين/تغيير `delivery_agent_id` على الطلبات في `pending` أو `approved` أو **`on_the_way`** (بعد «بالطريق للكل»).
+- **مسموح** تعيين/تغيير `delivery_agent_id` على **`approved`** أو **`on_the_way`** (بعد «بالطريق للكل») — **لا** `pending`.
 - **ممنوع** بعد `completed` / `cancelled` / `rejected`.
 - **تنفيذ:** `orange_delivery_agent_reassignable_order_statuses()` في `includes/delivery_agents.php`؛ `handover-to-agent.php`؛ `delivery_agent_handover.php` (يعرض «بالطريق» للإعادة توزيع).
 
 **§13.13 — O-07 (إعادة طباعة دفعة) — مغلق 2026-05-20 (قرار مالك):**
 - **لا** زر «إعادة طباعة آخر دفعة» / سجل دفعات — **إعادة التحديد يدوياً** في **تسليم المندوب** ثم **طباعة الورقة** أو **طباعة فواتير الدفعة** **يكفي** (O-07 = راحة فقط — **مؤجّل/مرفوض** في v1).
 
+**§13.13 — O-08 (rollback قيود أونلاين) — مغلق 2026-05-20 (قرار مالك):**
+- **لا** rollback آلي لدفعة «إنشاء القيود» في v1 — **التصحيح يدوي** (سند عكسي، أو **edit_lock** → تعديل in-place) حسب GAP-ACC-03/14.
+- **السبب:** INV-O + `party_subledger` + تقارير GL — rollback دفعة يعقّد التدقيق.
+- **تنفيذ:** **لا كود** — السلوك الحالي (بدون rollback) هو المعتمد.
+
 معيار 100%:
-- كل مسار GL-emitting يمر orange_gl_pending_movements عند تفعيل الطابور (**مع استثناءات §9/§13 موثّقة**)
+- **حفظ = تقارير فوراً** (ACC-14) — طابور GL opt-in فقط
 - كل شاشات navAccountingAll [منتهٍ] بلا ثغرات حرجة في الجدول أعلاه
 - تقارير أساسية + ذمم + كشف GL/عميل/مورد متسقة مع country_id
 - صلاحيات post/unpost إن طُلبت من المالك
@@ -365,3 +393,5 @@ manual_order / create-manual.php — [منتهٍ] — INV-C + GL عند الحف
 2026-05-20 — سابق: ~88%؛ GAP-ACC-04/12 مغلق؛ rev 64 INV legacy.
 2026-05-20 — §13.13 **O-04 مغلق:** تغيير المندوب **مسموح** بعد `on_the_way` (قبل completed)؛ helper + handover API/UI.
 2026-05-20 — §13.13 **O-07 مغلق:** **لا** زر إعادة طباعة دفعة — إعادة تحديد الطلبات + طباعة من **تسليم المندوب** يكفي (v1).
+2026-05-20 — §13.13 **O-08 مغلق:** **لا** rollback قيود أونلاين — التصحيح **يدوي** (سند عكسي / edit_lock)؛ v1 بدون زر تراجع.
+2026-05-20 — §13.13 **O-01 مغلق:** لا حالة «جاهز للتوزيع» — `approved` = جاهز للتوزيع؛ الموافقة قبل التوزيع.

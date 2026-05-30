@@ -40,13 +40,14 @@ function orange_delivery_agent_assignable_statuses(): array
 }
 
 /**
- * حالات الطلب التي يُسمح فيها تعيين/تغيير delivery_agent_id (§13.13 O-04 — مغلق 2026-05-20).
+ * حالات الطلب التي يُسمح فيها تعيين/تغيير delivery_agent_id (§13.13 O-01/O-04 — 2026-05-20).
+ * الموافقة (`approved`) تسبق التوزيع؛ `on_the_way` لإعادة التعيين.
  *
  * @return list<string>
  */
 function orange_delivery_agent_reassignable_order_statuses(): array
 {
-    return ['pending', 'approved', 'on_the_way'];
+    return ['approved', 'on_the_way'];
 }
 
 /**
