@@ -880,6 +880,34 @@ function orange_country_document_ref(PDO $pdo, string $prefix, int $serial, int 
 }
 
 /**
+ * معاينة مرجع المستند التالي (MAX(id)+1) — للعرض قبل الحفظ فقط.
+ */
+function orange_country_document_next_ref_preview(PDO $pdo, string $table, string $prefix, ?int $countryId = null): string
+{
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_admin_context_country_id($pdo);
+    }
+
+    $nextId = 1;
+    if ($table !== '' && orange_table_exists($pdo, $table)) {
+        $alias = match ($table) {
+            'purchases' => 'p',
+            'purchase_returns' => 'pr',
+            default => 'doc',
+        };
+        $countrySql = orange_sql_country_and_fragment($pdo, $table, $alias, $countryId);
+        $nextId = (int) $pdo->query(
+            'SELECT COALESCE(MAX(' . $alias . '.id), 0) + 1 FROM `' . $table . '` ' . $alias . ' WHERE 1=1' . $countrySql
+        )->fetchColumn();
+        if ($nextId <= 0) {
+            $nextId = 1;
+        }
+    }
+
+    return orange_country_document_ref($pdo, $prefix, $nextId, $countryId);
+}
+
+/**
  * @throws RuntimeException
  */
 function orange_admin_assert_entity_country(PDO $pdo, string $table, int $entityId): void

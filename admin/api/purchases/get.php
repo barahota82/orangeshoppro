@@ -45,6 +45,13 @@ try {
     json_response(['success' => false, 'message' => $e->getMessage()], 403);
 }
 
+$purchaseCountryId = orange_admin_context_country_id($pdo);
+if (orange_table_has_country_id($pdo, 'purchases')) {
+    $pcSt = $pdo->prepare('SELECT country_id FROM purchases WHERE id = ? LIMIT 1');
+    $pcSt->execute([$purchaseId]);
+    $purchaseCountryId = (int) ($pcSt->fetchColumn() ?: $purchaseCountryId);
+}
+
 $purRef = 'PUR-' . $purchaseId;
 $accRow = orange_accounting_row_by_reference($pdo, $purRef);
 if (orange_accounting_is_locked($pdo, $accRow)) {
@@ -108,6 +115,12 @@ json_response([
     'success' => true,
     'purchase' => [
         'id' => (int) $purchase['id'],
+        'reference' => orange_country_document_ref(
+            $pdo,
+            'PUR',
+            (int) $purchase['id'],
+            $purchaseCountryId
+        ),
         'supplier_id' => $purchase['supplier_id'] !== null ? (int) $purchase['supplier_id'] : 0,
         'type' => (string) $purchase['type'],
         'notes' => (string) ($purchase['notes'] ?? ''),

@@ -167,6 +167,9 @@ if ($prefillStmtKind === 'supplier' && $prefillStmtId > 0) {
 
 $pr2Ready = ($inventoryAccId !== null && $inventoryAccId > 0 && $cashAccId !== null && $cashAccId > 0);
 $pr2NavReady = orange_table_exists($pdo, 'purchase_returns');
+$pr2DocSerialPreview = $pr2NavReady
+    ? orange_country_document_next_ref_preview($pdo, 'purchase_returns', 'PR', $prCountryId)
+    : '';
 $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_settings');
 $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers');
 ?>
@@ -265,6 +268,9 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     padding-inline: 0.65rem 2rem;
     line-height: var(--input-min-h);
 }
+.form-grid.pr2-supplier-row {
+    grid-template-columns: minmax(7rem, 0.75fr) minmax(0, 1fr) minmax(0, 2fr);
+}
 </style>
 
 <div class="page-title page-title--stacked">
@@ -283,16 +289,23 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 <div class="card jv-print-area">
     <h3 class="card-title">مردود مشتريات <span id="pr2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
 
-    <!-- ١ — المورد -->
-    <div class="form-grid" style="margin-bottom:12px;">
-        <div style="grid-column:1/-1;">
-            <label for="pr2_supplier_code">المورد</label>
-            <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:10px 14px;">
-                <input type="text" id="pr2_supplier_code" autocomplete="off" dir="ltr" lang="en" readonly placeholder="نقرتان للاختيار" title="نقرتان للاختيار" style="cursor:pointer;"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
-                <input type="text" id="pr2_supplier_name" class="admin-inp-readonly" readonly disabled tabindex="-1" placeholder="يُعبأ تلقائياً">
-            </div>
-            <input type="hidden" id="pr2_supplier_id" value="0">
+    <!-- ١ — مسلسل الفاتورة + المورد -->
+    <div class="form-grid pr2-supplier-row" style="margin-bottom:12px;">
+        <div>
+            <label for="pr2_doc_serial">مسلسل الفاتورة</label>
+            <input type="text" id="pr2_doc_serial" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en"
+                value="<?php echo htmlspecialchars($pr2DocSerialPreview, ENT_QUOTES, 'UTF-8'); ?>"
+                title="يُخصَّص تلقائياً من النظام عند الحفظ">
         </div>
+        <div>
+            <label for="pr2_supplier_code">كود المورد</label>
+            <input type="text" id="pr2_supplier_code" autocomplete="off" dir="ltr" lang="en" readonly placeholder="نقرتان للاختيار" title="نقرتان للاختيار" style="cursor:pointer;"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
+        </div>
+        <div>
+            <label for="pr2_supplier_name">اسم المورد</label>
+            <input type="text" id="pr2_supplier_name" class="admin-inp-readonly" readonly disabled tabindex="-1" placeholder="يُعبأ تلقائياً">
+        </div>
+        <input type="hidden" id="pr2_supplier_id" value="0">
     </div>
 
     <!-- ٢ — فاتورة الشراء المرجعية، استرجاع، ملاحظات، نوع المردود -->
@@ -461,6 +474,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     var PR2_PREFILL_SUPPLIER = <?php echo (int) $prefillSupplierId; ?>;
     var PR2_READY = <?php echo $pr2Ready ? 'true' : 'false'; ?>;
     var PR2_NAV_READY = <?php echo $pr2NavReady ? 'true' : 'false'; ?>;
+    var PR2_DOC_SERIAL_PREVIEW = <?php echo json_encode($pr2DocSerialPreview, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
 
     var browseReturnId = 0;
     var pr2ViewMode = false;
@@ -770,6 +784,11 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         return 0;
     }
 
+    function pr2SetDocSerial(value) {
+        var el = document.getElementById('pr2_doc_serial');
+        if (el) el.value = String(value || '');
+    }
+
     function pr2SyncToolbar() {
         var pb = document.getElementById('pr2_btn_print');
         if (pb) {
@@ -783,7 +802,10 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         }
         var lbl = document.getElementById('pr2_browse_label');
         if (lbl) {
-            lbl.textContent = browseReturnId > 0 ? ('— عرض PR-' + browseReturnId) : '';
+            lbl.textContent = browseReturnId > 0 ? ('— عرض ' + (document.getElementById('pr2_doc_serial') && document.getElementById('pr2_doc_serial').value || ('PR-' + browseReturnId))) : '';
+        }
+        if (browseReturnId <= 0) {
+            pr2SetDocSerial(PR2_DOC_SERIAL_PREVIEW || '');
         }
     }
 
@@ -905,6 +927,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         }
         var p = res.purchase_return;
         browseReturnId = parseInt(String(p.id || '0'), 10) || 0;
+        pr2SetDocSerial(p.return_number || ('PR-' + browseReturnId));
         selectSupplier(parseInt(String(p.supplier_id || '0'), 10) || 0);
         var typeEl = document.getElementById('pr2_type');
         if (typeEl) typeEl.value = p.type || 'cash';
@@ -1193,6 +1216,8 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         if (PR2_PREFILL_SUPPLIER > 0) {
             selectSupplier(PR2_PREFILL_SUPPLIER);
         }
+
+        pr2SyncToolbar();
     }
 
     if (document.readyState === 'loading') {
