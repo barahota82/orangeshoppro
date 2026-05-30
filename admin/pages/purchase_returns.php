@@ -230,15 +230,34 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 .jv-search-results-table { margin: 0; font-size: 0.9rem; }
 .jv-search-results-table tbody tr { cursor: pointer; }
 .jv-search-results-table tbody tr:hover { background: #f4f4f5; }
-.form-grid.form-grid-3.pr2-header-row2 {
-    grid-template-columns: minmax(6.5rem, 0.65fr) minmax(0, 1.7fr) minmax(5.5rem, 0.65fr);
+.form-grid.pr2-header-row2 {
+    grid-template-columns: minmax(6.5rem, 0.65fr) auto minmax(0, 1.5fr) minmax(5.5rem, 0.65fr);
 }
-.form-grid.form-grid-3.pr2-header-row2 input[type="text"] {
+.form-grid.pr2-header-row2 input[type="text"] {
     height: var(--input-min-h);
     min-height: var(--input-min-h);
     box-sizing: border-box;
 }
-.form-grid.form-grid-3.pr2-header-row2 select {
+.pr2-header-row2__action {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-width: 0;
+}
+.pr2-header-row2__action-label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 13px;
+    visibility: hidden;
+    line-height: 1.2;
+}
+.pr2-header-row2__action .btn-secondary {
+    white-space: nowrap;
+    min-height: var(--input-min-h);
+    box-sizing: border-box;
+    padding-inline: 14px;
+}
+.form-grid.pr2-header-row2 select {
     height: var(--input-min-h);
     min-height: var(--input-min-h);
     box-sizing: border-box;
@@ -276,11 +295,15 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         </div>
     </div>
 
-    <!-- ٢ — فاتورة الشراء المرجعية، ملاحظات، نوع المردود -->
-    <div class="form-grid form-grid-3 pr2-header-row2" style="margin-bottom:16px;">
+    <!-- ٢ — فاتورة الشراء المرجعية، استرجاع، ملاحظات، نوع المردود -->
+    <div class="form-grid pr2-header-row2" style="margin-bottom:16px;">
         <div>
             <label for="pr2_purchase_ref">فاتورة الشراء المرجعية</label>
             <input type="text" id="pr2_purchase_ref" placeholder="PUR- أو رقم" dir="ltr" lang="en" autocomplete="off"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
+        </div>
+        <div class="pr2-header-row2__action">
+            <span class="pr2-header-row2__action-label" aria-hidden="true">.</span>
+            <button type="button" class="btn-secondary" id="pr2_btn_retrieve"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>استرجاع</button>
         </div>
         <div>
             <label for="pr2_notes">ملاحظات</label>
