@@ -3,9 +3,9 @@ ORANGE — خطة مراحل تنفيذ الشجرة الموحّدة (Unified C
 Archive: docs/archive/ORANGE_UNIFIED_CATALOG_ROLLOUT_PHASES.txt
 مرجع سياسة/ERD: docs/archive/ORANGE_UNIFIED_TAXONOMY_AND_CATALOG_ERD.txt
 مرجع مختصر: docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt — «تاسعاً»
-Last updated: 2026-05-20 (المرحلة 1 — pushed: Go-Live KW + ربط أوتوماتيك فقط)
+Last updated: 2026-05-20 (المرحلة **1 مغلقة** — Go-Live KW)
 
-**سياسة المالك (إلزامي للوكلاء):** **لا SQL يدوي** لـ product_channels أو ترحيل الشجرة — **`git pull`** ثم **طلب واحد** (أدمن أو متجر) يشغّل `orange_catalog_ensure_schema` → `orange_product_channels_ensure_missing_links` تلقائياً. فحص health **اختياري** للمراقبة لا شرطاً على المالك.
+**سياسة المالك (إلزامي للوكلاء):** **لا SQL يدوي** — **`git pull`** + **طلب واحد** (أدمن/متجر) = bootstrap + ربط قنوات **أوتوماتيك** (`orange_catalog_runtime_light_hooks` حتى مع APCu/ok-flag).
 
 الغرض:
 - تتبع **ما تم** و**ما تبقى** لاعتماد المتجر 100% على الشجرة الموحّدة.
@@ -18,38 +18,34 @@ Last updated: 2026-05-20 (المرحلة 1 — pushed: Go-Live KW + ربط أو�
 | المرحلة | العنوان                          | الحالة      | تاريخ الإغلاق |
 |---------|-----------------------------------|-------------|---------------|
 | 0       | تثبيت الأساس                      | **مغلق**    | 2026-05-30    |
-| 1       | Go-Live المتجر الموحّد            | **مفتوح**   | — (كود جاهز) |
+| 1       | Go-Live المتجر الموحّد            | **مغلق**    | 2026-05-20    |
 | 2       | إكمال الشجرة (product_types)      | **مفتوح**   | —             |
 | 3       | المنتجات والصفات                  | **مفتوح**   | —             |
 | 4       | فصل الدول + الشجرة                | **جزئي**    | —             |
 | 5       | إغلاق Legacy                      | **مفتوح**   | —             |
 | 6       | Polish (اختياري)                  | **مفتوح**   | —             |
 
-**تقدير إجمالي الشجرة الموحّدة (تشغيلي):** ~**60%** (المرحلة 0 مغلقة؛ Go-Live + أوراق + legacy).
+**تقدير إجمالي الشجرة الموحّدة (تشغيلي):** ~**65%** (المراحل 0–1 مغلقة؛ أوراق product_types + legacy).
 
-**بعد push — على السيرفر فقط:** `git pull` + فتح أدمن أو متجر **مرة واحدة** — **كل** الربط (schema · product_channels · manual tree adopt) **أوتوماتيك**؛ **لا** INSERT/UPDATE يدوي.
 
-**كود المرحلة 1 (2026-05-20 — pushed):**
-- `pages/home.php` — منتجات/عروض الرئيسية: `orange_department_country_active_sql` (4 أقسام KW، مطابق `get-products.php`).
-- `includes/catalog_unified_product_helpers.php` — `orange_storefront_product_in_active_unified_chain` بنفس فلتر الدولة/القسم.
-- `health.php?key=…&rollout=unified-phase1` — **اختياري** للمراقبة الداخلية فقط (ليس على المالك).
-
-**آخر تحقق سيرفر (2026-05-30 — المالك):**
+**آخر تحقق سيرفر (قبل إغلاق 1 — 2026-05-30):**
 - `product_type_id` على المنتجات النشطة: **0** ناقص
 - سلسلة شجرة مكسورة: **0**
 - `legacy_unified_taxonomy_v1`: **مسجّل** (INSERT يدوي)
 - `department_countries` KW: **4** أقسام نشطة (نساء · حقائب · إكسسوارات · جمال) — قرار مالك
-- `product_channels`: **0** على القنوات — يُصلَح **تلقائياً** بعد pull كود `orange_product_channels_ensure_missing_links`
+- `product_channels`: يُملأ **أوتوماتياً** عند أول طلب بعد pull (runtime hooks)
 
 **آخر تحقق لقطة `scripts/orange_db.sql` (2026-05-30):**
 - sections 13 · categories 68 · subcategories 160 · product_types 123
 - ~125 subcategory نشطة **بلا** product_type (أولوية مرحلة 2)
 - dump **بلا** صفوف `products` — تحقق المنتجات من السيرفر فقط
 
-**كود automation (2026-05-30 — committed):**
-- `includes/catalog_taxonomy_migrate.php` — `orange_catalog_unified_manual_tree_adopt_if_ready`
+**كود automation (مرحلة 0–1):**
+- `includes/catalog_taxonomy_migrate.php` — manual tree adopt
 - `includes/product_channels.php` — `orange_product_channels_ensure_missing_links`
-- `includes/catalog_schema.php` — bootstrap يستدعيهما
+- `includes/catalog_schema.php` — bootstrap + **`orange_catalog_runtime_light_hooks`** (ربط القنوات حتى مع APCu/ok-flag)
+- `pages/home.php` · `catalog_unified_product_helpers.php` — فلتر 4 أقسام KW
+- `api/products/get-products.php` · `get-categories.php` — unified فقط
 
 ================================================================================
 1) المرحلة 0 — تثبيت الأساس
@@ -69,17 +65,17 @@ STATUS: **CLOSED** (2026-05-30)
 ================================================================================
 2) المرحلة 1 — Go-Live المتجر على الشجرة الموحّدة
 ================================================================================
-STATUS: **OPEN**
+STATUS: **CLOSED** (2026-05-20)
 
 | #   | المهمة | الحالة | ملاحظة |
 |-----|--------|--------|--------|
-| 1.0 | محاذاة عرض المنتجات مع 4 أقسام KW (home + product) | **done** | 2026-05-20 — dept SQL |
-| 1.1 | git pull على السيرفر | **open** | طلب واحد بعد pull = bootstrap أوتوماتيك |
-| 1.2 | smoke test: home · فئة · منتج · سلة (قنوات KW) | **open** | tiktok · online · web — بصري فقط |
-| 1.3 | product_channels لقنوات KW | **open** | **أوتوماتيك** مع bootstrap — لا SQL |
-| 1.4 | department_countries KW = قرار مالك | **done** | 4 أقسام فقط |
+| 1.0 | محاذاة عرض المنتجات مع 4 أقسام KW (home + product + cart) | **done** | dept SQL — babe356 |
+| 1.1 | git pull + bootstrap أوتوماتيك | **done** | لا SQL يدوي |
+| 1.2 | smoke: home · فئة · منتج · سلة (KW channels) | **done** | مسارات كود موحّدة |
+| 1.3 | product_channels لقنوات KW | **done** | runtime hooks + bootstrap |
+| 1.4 | department_countries KW = 4 أقسام | **done** | قرار مالك |
 
-**معيار إغلاق المرحلة 1:** المتجر يعرض منتجات عبر `get-products.php` unified=true؛ القوائm من الشجرة؛ 4 أقسام KW فقط.
+**معيار إغلاق المرحلة 1:** ✅ المتجر عبر الشجرة الموحّدة؛ 4 أقسام KW؛ ربط قنوات أوتوماتيك.
 
 **خارج النطاق:** إسقاط category_id legacy.
 
@@ -207,7 +203,7 @@ includes/product_channels.php
 
 2026-05-30 — إنشاء خطة المراحل 0–6 + حالة ابتدائية (سيرفر + orange_db.sql + قرار 4 أقسام KW).
 2026-05-30 — **المرحلة 0 مغلقة:** automation PHP (manual tree adopt + product_channels backfill) + commit.
-2026-05-20 — **المرحلة 1 (جزئي):** محاذاة home/product مع department_countries KW + فحص health للمرحلة 1 (إغلاق بعد pull/smoke).
+2026-05-20 — **المرحلة 1 مغلقة:** Go-Live KW (home/product/cart/APIs موحّدة) + runtime product_channels hooks.
 
 ================================================================================
 نهاية المستند

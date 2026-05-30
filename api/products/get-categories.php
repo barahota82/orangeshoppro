@@ -8,11 +8,23 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
 require_once __DIR__ . '/../../includes/catalog_unified_nav.php';
 
 try {
     $pdo = db();
     orange_catalog_ensure_schema($pdo);
+
+    $navUnified = function_exists('orange_catalog_nav_use_unified') && orange_catalog_nav_use_unified($pdo);
+    if (!$navUnified) {
+        json_response([
+            'success' => true,
+            'unified' => false,
+            'categories' => [],
+        ]);
+
+        return;
+    }
 
     $pack = orange_storefront_unified_nav_for_home($pdo);
     $unifiedCategories = $pack['categories'] ?? [];

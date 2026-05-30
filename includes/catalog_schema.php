@@ -3704,6 +3704,28 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
 function orange_catalog_ensure_schema(PDO $pdo): void
 {
     orange_schema_check_and_bootstrap($pdo);
+    orange_catalog_runtime_light_hooks($pdo);
+}
+
+/**
+ * مهام idempotent خفيفة بعد بوابة المخطط (تُنفَّذ حتى مع APCu/ok-flag — probe سريع ثم خروج).
+ */
+function orange_catalog_runtime_light_hooks(PDO $pdo): void
+{
+    static $ran = false;
+    if ($ran) {
+        return;
+    }
+    $ran = true;
+
+    try {
+        require_once __DIR__ . '/product_channels.php';
+        orange_product_channels_ensure_missing_links($pdo);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] orange_catalog_runtime_light_hooks: ' . $e->getMessage());
+        }
+    }
 }
 
 /**
