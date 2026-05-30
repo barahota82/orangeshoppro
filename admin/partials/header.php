@@ -323,12 +323,18 @@ $orangeAdminCurrencyUnitNav = orange_currency_display_unit($orangeAdminCurrencyN
                         ['page' => 'customers', 'href' => '/admin/index.php?page=customers', 'label' => 'العملاء', 'class' => '', 'sub' => false],
                         ['page' => 'orders', 'href' => '/admin/index.php?page=orders', 'label' => 'الطلبات', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'reserved_orders', 'href' => '/admin/index.php?page=reserved_orders', 'label' => 'طلبات محجوزة (مخزون)', 'class' => 'admin-nav-sub', 'sub' => true],
-                        ['page' => 'online_orders_final_posting', 'href' => '/admin/index.php?page=online_orders_final_posting', 'label' => 'طلبات أونلاين — القيود', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'order_intake_queue', 'href' => '/admin/index.php?page=order_intake_queue', 'label' => 'طابور الطلبات', 'class' => 'admin-nav-sub', 'sub' => true],
+                    ],
+                ],
+                [
+                    'group' => true,
+                    'title' => 'التوصيل والتسليم',
+                    'items' => [
+                        ['page' => 'delivery_agents', 'href' => '/admin/index.php?page=delivery_agents', 'label' => 'مناديب التوصيل', 'class' => '', 'sub' => false],
                         ['page' => 'delivery_agent_handover', 'href' => '/admin/index.php?page=delivery_agent_handover', 'label' => 'تسليم المندوب', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'delivery_order_search', 'href' => '/admin/index.php?page=delivery_order_search', 'label' => 'بحث التسليم', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'delivery_handover_manifest', 'href' => '/admin/index.php?page=delivery_handover_manifest', 'label' => 'ورقة المندوب', 'class' => 'admin-nav-sub', 'sub' => true],
-                        ['page' => 'delivery_agents', 'href' => '/admin/index.php?page=delivery_agents', 'label' => 'مناديب التوصيل', 'class' => 'admin-nav-sub', 'sub' => true],
-                        ['page' => 'order_intake_queue', 'href' => '/admin/index.php?page=order_intake_queue', 'label' => 'طابور الطلبات', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'online_orders_final_posting', 'href' => '/admin/index.php?page=online_orders_final_posting', 'label' => 'إنشاء قيود التسليم', 'class' => 'admin-nav-sub', 'sub' => true],
                     ],
                 ],
                 [

@@ -64,10 +64,10 @@ foreach ($candidates as $o) {
 }
 ?>
 <div class="admin-fy-shell" dir="rtl">
-    <h1 class="admin-fy-shell__title">طلبات أونلاين — إنشاء القيود</h1>
+    <h1 class="admin-fy-shell__title">إنشاء قيود التسليم</h1>
     <p class="admin-fy-shell__lead">
-        طلبات <strong>مُسلَّمة</strong> بانتظار القيود المحاسبية — حدّد ثم «إنشاء القيود».
-        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">الطلبات (تشغيل)</a>
+        طلبات <strong>الموقع</strong> (<code>completed</code>) بانتظار القيود المحاسبية — حدّد ثم «إنشاء القيود».
+        «بالطريق» و«تم التوصيل» من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">الطلبات</a>.
     </p>
 
 <div class="card admin-fy-card">
@@ -100,7 +100,7 @@ foreach ($candidates as $o) {
     </div>
 
     <?php if ($rows === []): ?>
-    <p class="muted">لا توجد طلبات أونلاين مُسلَّمة بانتظار القيود.</p>
+    <p class="muted">لا توجد طلبات موقع مُسلَّمة بانتظار القيود.</p>
     <?php else: ?>
     <div class="table-wrap">
         <table>
