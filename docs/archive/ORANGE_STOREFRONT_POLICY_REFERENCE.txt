@@ -113,7 +113,9 @@ ORANGE — مرجع سياسات الواجهة والطلب أونلاين (إ�
 
 **تنفيذ (س6):** مخزون الشركة موحّد على مستوى المتغيرات؛ القنوات تؤثر على **العرض** وروابط الواجهة لا على مخزن منفصل لكل قناة — ربط المنتج بالقنوات (`product_channels`) و`includes/product_channels.php` (`orange_product_attach_all_active_channels` عند الحاجة).
 
-**تعديل مالك (تعدد دول — 2026-05-20):** عند **أكثر من دولة نشطة**، **المخزون منفصل لكل دولة** (مخزن/مخازن تابعة للدولة — **البند 13** في `ORANGE_OWNER_MULTICOUNTRY_VISION.txt`). **س6** يبقى سارياً **داخل الدولة الواحدة:** القنوات **لا** تمتلك مخازن منفصلة؛ **الدولة** تمتلك المخزن. **تنفيذ:** لم يكتمل بعد على كل مسارات البيع/الشراء — راجع «تنفيذ (13)» في ملف الرؤية.
+**تعديل مالك (تعدد دول — 2026-05-20):** عند **أكثر من دولة نشطة**، **المخزون منفصل لكل دولة** (مخزن/مخازن تابعة للدولة — **البند 13** في `ORANGE_OWNER_MULTICOUNTRY_VISION.txt`). **س6** يبقى سارياً **داخل الدولة الواحدة:** القنوات **لا** تمتلك مخازن منفصلة؛ **الدولة** تمتلك المخزن.
+
+**تنفيذ (س6 — multicountry مخزon):** **`orange_warehouse_effective_variant_stock`** / **`orange_warehouse_effective_qty_sql`** في **`includes/warehouses.php`** — قراءة/خصم scoped بالدولة في **`pages/product.php`**, **`api/cart/stock-limits.php`**, **`includes/storefront_cart_items.php`**, **`includes/order_stock.php`**, **`admin/api/stock/adjust.php`**, **`admin/pages/stock.php`**, **`includes/cart_gift_promotions.php`**, **`admin/api/products/get.php`**, **`admin/api/settings/variants_search.php`**. backfill أوتوماتيك: **`orange_multicountry_ensure_stock_scoped_phase1`** في **`includes/multicountry_stock_gap.php`** (runtime hook). probe: **`health.php?rollout=multicountry-stock`** → **`ROLLOUT_MC_STOCK_OK`**. **تشغيل دولة جديدة** (كميات per دولة): مرحلة 2 — **`ORANGE_OWNER_MULTICOUNTRY_VISION.txt`** §10.
 
 
 --------------------------------------------------------------------

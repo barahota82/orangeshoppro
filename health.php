@@ -231,3 +231,25 @@ if ($rollout === 'unified-phase54') {
         echo 'ROLLOUT_PHASE54_ERROR: ' . $e->getMessage() . "\n";
     }
 }
+
+if ($rollout === 'multicountry-stock') {
+    try {
+        require_once __DIR__ . '/includes/catalog_schema.php';
+        require_once __DIR__ . '/includes/multicountry_stock_gap.php';
+        $pdoRollout = db();
+        orange_catalog_ensure_schema($pdoRollout);
+        orange_multicountry_ensure_stock_scoped_phase1($pdoRollout);
+        $rep = orange_multicountry_stock_gap_report($pdoRollout);
+        echo 'active_countries=' . (int) ($rep['active_countries'] ?? 0) . "\n";
+        echo 'countries_without_warehouse=' . (int) ($rep['countries_without_warehouse'] ?? -1) . "\n";
+        echo 'products_missing_country_id=' . (int) ($rep['products_missing_country_id'] ?? -1) . "\n";
+        echo 'orders_missing_country_id=' . (int) ($rep['orders_missing_country_id'] ?? -1) . "\n";
+        echo 'orders_warehouse_mismatch=' . (int) ($rep['orders_warehouse_mismatch'] ?? -1) . "\n";
+        echo 'stock_movements_missing_country=' . (int) ($rep['stock_movements_missing_country'] ?? -1) . "\n";
+        echo 'step_applied=' . ((!empty($rep['step_applied'])) ? '1' : '0') . "\n";
+        $allOk = !empty($rep['ready']) && !empty($rep['step_applied']);
+        echo $allOk ? "ROLLOUT_MC_STOCK_OK\n" : "ROLLOUT_MC_STOCK_PENDING\n";
+    } catch (Throwable $e) {
+        echo 'ROLLOUT_MC_STOCK_ERROR: ' . $e->getMessage() . "\n";
+    }
+}

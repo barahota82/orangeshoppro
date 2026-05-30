@@ -8,6 +8,8 @@ require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/product_channels.php';
 require_once __DIR__ . '/../../../includes/catalog_labels.php';
 require_once __DIR__ . '/../../../includes/product_variants_write.php';
+require_once __DIR__ . '/../../../includes/warehouses.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/product_colorway_images.php';
 require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
 require_admin_api();
@@ -347,6 +349,15 @@ try {
             $colorLabel,
             $stock,
         ]);
+
+        $newVid = (int) $pdo->lastInsertId();
+        if ($newVid > 0) {
+            $productCountryId = orange_product_country_id($pdo, $productId);
+            $warehouseId = orange_warehouse_default_id_for_country($pdo, $productCountryId);
+            if ($warehouseId > 0 && orange_warehouses_table_exists($pdo)) {
+                orange_warehouse_set_variant_quantity($pdo, $warehouseId, $newVid, 0);
+            }
+        }
     }
 
     $extraImages = $data['extra_images'] ?? null;
