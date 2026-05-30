@@ -331,7 +331,7 @@ function orange_admin_orders_action_buttons(array $o): void
     var bulkDone = document.getElementById('orders-bulk-completed');
     if (bulkOnWay && agentId > 0) {
         bulkOnWay.addEventListener('click', function () {
-            if (!confirm('تغيير كل الطلبات الظاهرة (approved) لهذا المندوب إلى «بالطريق»؟')) return;
+            if (!confirm('تغيير كل طلبات هذا المندوب المؤهّلة (approved) إلى «بالطريق»؟\n\nملاحظة: يشمل كل المؤهّل في النظام — وليس الصفوف الظاهرة فقط إن كان هناك فلتر مصدر/دفع/عميل.')) return;
             postJSON('/admin/api/orders/bulk-update-status.php', { agent_id: agentId, status: 'on_the_way' })
                 .then(function (res) {
                     alert(res.message || (res.success ? 'تم' : 'فشل'));
@@ -341,7 +341,7 @@ function orange_admin_orders_action_buttons(array $o): void
     }
     if (bulkDone && agentId > 0) {
         bulkDone.addEventListener('click', function () {
-            if (!confirm('تأكيد «تم التوصيل للكل» للطلبات الظاهرة (on_the_way) — مخزون فقط بدون قيود؟')) return;
+            if (!confirm('تأكيد «تم التوصيل للكل» لكل طلبات هذا المندوب المؤهّلة (on_the_way) — مخزون فقط بدون قيود؟\n\nملاحظة: يشمل كل المؤهّل في النظام — وليس الصفوف الظاهرة فقط إن كان هناك فلتر مصدر/دفع/عميل.')) return;
             postJSON('/admin/api/orders/bulk-update-status.php', { agent_id: agentId, status: 'completed' })
                 .then(function (res) {
                     alert(res.message || (res.success ? 'تم' : 'فشل'));

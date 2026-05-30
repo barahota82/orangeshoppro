@@ -52,7 +52,8 @@ $statusAr = [
 <div class="admin-fy-shell" dir="rtl">
     <h1 class="admin-fy-shell__title">تسليم المندوب</h1>
     <p class="admin-fy-shell__lead">
-        اختر مندوباً ثم حدّد الطلبات — <strong>حفظ</strong> يُسجّل <code>delivery_agent_id</code> فقط (بدون «بالطريق»).
+        اختر مندوباً ثم حدّد الطلبات — <strong>حفظ التوزيع</strong> يُسجّل <code>delivery_agent_id</code> فقط (بدون «بالطريق»).
+        <strong>بعد الحفظ</strong> (أو بعد أي تعديل توزيع): <strong>طباعة الورقة</strong> ثم <strong>فواتير الدفعة</strong> — إعادة الطباعة مسموحة.
         <strong>تغيير المندوب مسموح</strong> حتى بعد «بالطريق» — قبل <code>completed</code>.
         «بالطريق» و«تم التوصيل» من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">شاشة الطلبات</a>.
     </p>
@@ -156,8 +157,24 @@ async function handoverSave() {
     if (!ids.length) { alert('حدّد طلباً واحداً على الأقل'); return; }
     if (!confirm('توزيع ' + ids.length + ' طلب/طلبات على المندوب المختار؟')) return;
     var res = await postJSON('/admin/api/orders/handover-to-agent.php', { agent_id: agentId, order_ids: ids });
-    alert(res.message || (res.success ? 'تم' : 'فشل'));
-    if (res.success) location.reload();
+    if (!res.success) {
+        alert(res.message || 'فشل');
+        return;
+    }
+    var printNow = confirm(
+        'تم حفظ التوزيع (' + (res.updated || ids.length) + ' طلب/طلبات).\n\n'
+        + 'الخطوة الموصى بها: طباعة الورقة ثم فواتير الدفعة.\n'
+        + 'يمكنك إعادة الطباعة لاحقاً بعد أي تعديل — احفظ ثم اطبع من جديد.\n\n'
+        + 'طباعة الآن؟'
+    );
+    if (printNow) {
+        handoverPrintManifest();
+        handoverPrintInvoices();
+        setTimeout(function () { location.reload(); }, Math.max(1200, ids.length * 450));
+    } else {
+        alert(res.message || 'تم');
+        location.reload();
+    }
 }
 
 function handoverPrintManifest() {
