@@ -2976,6 +2976,20 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         orange_catalog_safe_exec($pdo, 'ALTER TABLE purchases ADD COLUMN subtotal DECIMAL(18,4) NOT NULL DEFAULT 0');
     }
 
+    if (orange_table_exists($pdo, 'purchase_return_items') && !orange_table_has_column($pdo, 'purchase_return_items', 'discount_raw')) {
+        orange_catalog_safe_exec($pdo, "ALTER TABLE purchase_return_items ADD COLUMN discount_raw VARCHAR(32) NOT NULL DEFAULT ''");
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE purchase_return_items ADD COLUMN discount_amount DECIMAL(18,4) NOT NULL DEFAULT 0');
+    }
+
+    if (orange_table_exists($pdo, 'purchase_returns') && !orange_table_has_column($pdo, 'purchase_returns', 'invoice_discount_raw')) {
+        orange_catalog_safe_exec($pdo, "ALTER TABLE purchase_returns ADD COLUMN invoice_discount_raw VARCHAR(32) NOT NULL DEFAULT ''");
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE purchase_returns ADD COLUMN invoice_discount_amount DECIMAL(18,4) NOT NULL DEFAULT 0');
+    }
+
+    if (orange_table_exists($pdo, 'purchase_returns') && !orange_table_has_column($pdo, 'purchase_returns', 'subtotal')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE purchase_returns ADD COLUMN subtotal DECIMAL(18,4) NOT NULL DEFAULT 0');
+    }
+
     if (orange_table_exists($pdo, 'purchases') && !orange_table_has_column($pdo, 'purchases', 'supplier_invoice_number')) {
         orange_catalog_safe_exec(
             $pdo,

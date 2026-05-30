@@ -73,6 +73,38 @@ try {
         }
     }
 
+    $hasPriDiscount = orange_table_has_column($pdo, 'purchase_return_items', 'discount_raw');
+    $hasRetInvDiscount = orange_table_has_column($pdo, 'purchase_returns', 'invoice_discount_raw');
+    $hasRetSubtotal = orange_table_has_column($pdo, 'purchase_returns', 'subtotal');
+
+    try {
+        orange_purchase_return_assert_qty_against_purchase($pdo, $purchaseIdOpt, $items);
+    } catch (RuntimeException $e) {
+        $pdo->rollBack();
+        json_response(['success' => false, 'message' => $e->getMessage()], 422);
+    }
+
+    $computedTotal = 0.0;
+    foreach ($items as &$item) {
+        $qty = (int) ($item['qty'] ?? 0);
+        $cost = (float) ($item['cost'] ?? 0);
+        if ($qty <= 0 || $cost < 0) {
+            throw new RuntimeException('عنصر مردود غير صالح');
+        }
+        $lineGross = $qty * $cost;
+        $discountRaw = trim((string) ($item['discount_raw'] ?? ''));
+        $discountAmt = orange_purchase_return_parse_discount_amount($discountRaw, $lineGross);
+        $item['_discount_raw'] = $discountRaw;
+        $item['_discount_amount'] = $discountAmt;
+        $computedTotal += ($lineGross - $discountAmt);
+    }
+    unset($item);
+
+    $subtotal = $computedTotal;
+    $invoiceDiscountRaw = trim((string) ($data['invoice_discount_raw'] ?? ''));
+    $invoiceDiscountAmt = orange_purchase_return_parse_discount_amount($invoiceDiscountRaw, $subtotal);
+    $netTotal = round($subtotal - $invoiceDiscountAmt, 4);
+
     if ($supplierId > 0) {
         try {
             orange_admin_assert_entity_country($pdo, 'suppliers', $supplierId);
@@ -87,29 +119,30 @@ try {
         }
     }
 
-    $computedTotal = 0.0;
-    foreach ($items as $item) {
-        $qty = (int) ($item['qty'] ?? 0);
-        $cost = (float) ($item['cost'] ?? 0);
-        if ($qty <= 0 || $cost < 0) {
-            throw new RuntimeException('عنصر مردود غير صالح');
-        }
-        $computedTotal += ($qty * $cost);
-    }
-    $computedTotal = round($computedTotal, 4);
-
     $tmpNum = 'PR-TMP-' . bin2hex(random_bytes(6));
-    $pdo->prepare(
-        'INSERT INTO purchase_returns (return_number, purchase_id, supplier_id, type, total, notes)
-         VALUES (?,?,?,?,?,?)'
-    )->execute([
+    $insertCols = 'return_number, purchase_id, supplier_id, type, total, notes';
+    $insertPlaceholders = '?,?,?,?,?,?';
+    $insertValues = [
         $tmpNum,
         $purchaseIdOpt > 0 ? $purchaseIdOpt : null,
         $supplierId > 0 ? $supplierId : null,
         $type,
-        $computedTotal,
+        $netTotal,
         $notes !== '' ? $notes : null,
-    ]);
+    ];
+    if ($hasRetSubtotal) {
+        $insertCols .= ', subtotal';
+        $insertPlaceholders .= ', ?';
+        $insertValues[] = round($subtotal, 4);
+    }
+    if ($hasRetInvDiscount) {
+        $insertCols .= ', invoice_discount_raw, invoice_discount_amount';
+        $insertPlaceholders .= ', ?, ?';
+        $insertValues[] = $invoiceDiscountRaw;
+        $insertValues[] = $invoiceDiscountAmt;
+    }
+    $pdo->prepare("INSERT INTO purchase_returns ($insertCols) VALUES ($insertPlaceholders)")
+        ->execute($insertValues);
     $returnId = (int) $pdo->lastInsertId();
     if (orange_table_has_column($pdo, 'purchase_returns', 'currency_code')) {
         $retCur = orange_gl_functional_currency_code($pdo, $returnCountryId);
@@ -140,10 +173,37 @@ try {
         orange_purchase_return_apply_line_stock($pdo, $productId, $variantId, $qty);
 
         if ($hasVariant) {
+            if ($hasPriDiscount) {
+                $pdo->prepare(
+                    'INSERT INTO purchase_return_items (purchase_return_id, product_id, variant_id, qty, cost, discount_raw, discount_amount)
+                     VALUES (?,?,?,?,?,?,?)'
+                )->execute([
+                    $returnId,
+                    $productId,
+                    $variantId,
+                    $qty,
+                    $cost,
+                    (string) ($item['_discount_raw'] ?? ''),
+                    (float) ($item['_discount_amount'] ?? 0),
+                ]);
+            } else {
+                $pdo->prepare(
+                    'INSERT INTO purchase_return_items (purchase_return_id, product_id, variant_id, qty, cost)
+                     VALUES (?,?,?,?,?)'
+                )->execute([$returnId, $productId, $variantId, $qty, $cost]);
+            }
+        } elseif ($hasPriDiscount) {
             $pdo->prepare(
-                'INSERT INTO purchase_return_items (purchase_return_id, product_id, variant_id, qty, cost)
-                 VALUES (?,?,?,?,?)'
-            )->execute([$returnId, $productId, $variantId, $qty, $cost]);
+                'INSERT INTO purchase_return_items (purchase_return_id, product_id, qty, cost, discount_raw, discount_amount)
+                 VALUES (?,?,?,?,?,?)'
+            )->execute([
+                $returnId,
+                $productId,
+                $qty,
+                $cost,
+                (string) ($item['_discount_raw'] ?? ''),
+                (float) ($item['_discount_amount'] ?? 0),
+            ]);
         } else {
             $pdo->prepare(
                 'INSERT INTO purchase_return_items (purchase_return_id, product_id, qty, cost)
@@ -152,7 +212,7 @@ try {
         }
     }
 
-    $glB = orange_gl_purchase_return_posting_bundle($pdo, $type, $supplierId, $returnId, $computedTotal, $returnCountryId);
+    $glB = orange_gl_purchase_return_posting_bundle($pdo, $type, $supplierId, $returnId, $netTotal, $returnCountryId);
     $pendingKey = orange_gl_pending_source_key('purchase_return', $returnId);
     $now = date('Y-m-d H:i:s');
     $afterJson = $glB['after_post'] !== null
@@ -180,7 +240,7 @@ try {
                 'voucher_date' => $now,
                 'account_debit' => $glB['debit'],
                 'account_credit' => $glB['credit'],
-                'amount' => $computedTotal,
+                'amount' => $netTotal,
                 'description' => $glB['voucher_description'],
                 'entry_type' => 'purchase_return',
                 'after_post_json' => $afterJson,
@@ -201,12 +261,12 @@ try {
                 'date' => $now,
                 'account_debit' => $glB['debit'],
                 'account_credit' => $glB['credit'],
-                'amount' => $computedTotal,
+                'amount' => $netTotal,
                 'description' => $glB['voucher_description'],
                 'entry_type' => 'purchase_return',
             ]);
             if ($glB['legacy_ap_subledger']) {
-                orange_purchase_return_record_ap_subledger($pdo, $returnId, $supplierId, $type, $computedTotal);
+                orange_purchase_return_record_ap_subledger($pdo, $returnId, $supplierId, $type, $netTotal);
             }
         }
     }

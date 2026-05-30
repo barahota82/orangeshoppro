@@ -331,6 +331,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
                         <th style="min-width:8rem;">المتغير (لون/مقاس)</th>
                         <th style="width:5rem;">الكمية</th>
                         <th style="width:6rem;">تكلفة الوحدة</th>
+                        <th style="width:6rem;">خصم</th>
                         <th style="width:7rem;">إجمالي السطر</th>
                         <th class="admin-doc-col-actions" aria-label="حذف السطر" style="width:3rem;"></th>
                     </tr>
@@ -340,10 +341,15 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         </div>
     </div>
 
-    <!-- ٣ — المجاميع (بلا خصم) -->
+    <!-- ٣ — خصم الفاتورة + المجاميع -->
     <div style="margin-top:14px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px;">
+        <div style="flex:0 0 auto;">
+            <label for="pr2_invoice_discount" style="font-size:0.82rem;font-weight:600;">خصم الفاتورة</label>
+            <input type="text" id="pr2_invoice_discount" placeholder="0 أو 5%" dir="ltr" lang="en" style="width:8rem;" autocomplete="off"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
+        </div>
         <div style="flex:1 1 auto;text-align:left;direction:ltr;font-size:0.95rem;line-height:1.8;">
-            <span style="color:#64748b;">إجمالي المردود:</span> <strong id="pr2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#dc2626;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
+            <span style="color:#64748b;">إجمالي البنود:</span> <strong id="pr2_subtotal" class="admin-money-display" dir="ltr" lang="en"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+            <span style="color:#64748b;">صافي المردود:</span> <strong id="pr2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#dc2626;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
         </div>
     </div>
 
@@ -490,6 +496,28 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         return null;
     }
 
+    function parseDiscount(raw, lineAmount) {
+        raw = String(raw || '').trim();
+        if (!raw || raw === '0') return 0;
+        if (raw.endsWith('%')) {
+            var pct = parseFloat(raw.slice(0, -1)) || 0;
+            return Math.round(lineAmount * pct / 100 * 10000) / 10000;
+        }
+        return parseFloat(raw) || 0;
+    }
+
+    function pr2ClampQtyInput(inp) {
+        if (!inp) return;
+        var maxQ = parseInt(inp.getAttribute('data-max-qty') || '0', 10) || 0;
+        if (maxQ <= 0) return;
+        var q = parseInt(inp.value, 10) || 0;
+        if (q > maxQ) {
+            inp.value = String(maxQ);
+        } else if (q < 1 && inp.value !== '') {
+            inp.value = '1';
+        }
+    }
+
     /* ── Supplier picker ────────────────────────────────────────────── */
     function supplierById(id) {
         id = parseInt(String(id || '0'), 10) || 0;
@@ -586,6 +614,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             '<td><select class="pr2-variant"></select></td>' +
             '<td><input type="number" class="pr2-qty admin-inp-qty" min="1" step="1" value="1" inputmode="numeric" lang="en" dir="ltr"></td>' +
             '<td><input type="number" class="pr2-cost admin-inp-money" min="0" step="any" value="' + fmtZero() + '" inputmode="decimal" lang="en" dir="ltr"></td>' +
+            '<td><input type="text" class="pr2-discount admin-inp" placeholder="0" dir="ltr" lang="en" autocomplete="off" style="width:100%;"></td>' +
             '<td><input type="text" class="pr2-line-total admin-inp-money" value="' + fmtZero() + '" readonly data-money-allow-zero tabindex="-1" dir="ltr" lang="en"></td>' +
             '<td><button type="button" class="btn-secondary admin-doc-line-remove" title="حذف">&times;</button></td>';
         tb.appendChild(tr);
@@ -604,6 +633,9 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             tr.querySelector('.pr2-product').value = '';
             tr.querySelector('.pr2-qty').value = '1';
             tr.querySelector('.pr2-cost').value = fmtZero();
+            tr.querySelector('.pr2-discount').value = '';
+            tr.querySelector('.pr2-qty').removeAttribute('data-max-qty');
+            tr.querySelector('.pr2-qty').removeAttribute('title');
             updateVariantCell(tr.querySelector('.pr2-product'));
             syncTrailing();
             recalcAll();
@@ -701,23 +733,31 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         syncTrailing();
     }
 
-    /* ── Recalculate (no discount) ─────────────────────────────────── */
+    /* ── Recalculate ────────────────────────────────────────────────── */
     function recalcAll() {
         var tb = document.getElementById('pr2_lines_body');
         if (!tb) return;
         var rows = tb.querySelectorAll('tr.pr2-line');
-        var total = 0;
+        var subtotal = 0;
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
             var q = parseInt(r.querySelector('.pr2-qty').value, 10) || 0;
             var c = parseFloat(r.querySelector('.pr2-cost').value) || 0;
-            var lineTotal = q * c;
+            var lineGross = q * c;
+            var discRaw = (r.querySelector('.pr2-discount') && r.querySelector('.pr2-discount').value || '').trim();
+            var discAmt = parseDiscount(discRaw, lineGross);
+            var lineNet = Math.max(0, lineGross - discAmt);
             var ltEl = r.querySelector('.pr2-line-total');
-            if (ltEl) ltEl.value = fmt3(lineTotal);
-            total += lineTotal;
+            if (ltEl) ltEl.value = fmt3(lineNet);
+            subtotal += lineNet;
         }
+        var invDiscRaw = (document.getElementById('pr2_invoice_discount').value || '').trim();
+        var invDiscAmt = parseDiscount(invDiscRaw, subtotal);
+        var netTotal = Math.max(0, subtotal - invDiscAmt);
+        var stEl = document.getElementById('pr2_subtotal');
         var ntEl = document.getElementById('pr2_net_total');
-        if (ntEl) ntEl.textContent = fmt3(total);
+        if (stEl) stEl.textContent = fmt3(subtotal);
+        if (ntEl) ntEl.textContent = fmt3(netTotal);
     }
 
 
@@ -752,7 +792,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         var card = document.querySelector('.jv-print-area');
         if (card) {
             card.querySelectorAll('input, select, button.admin-doc-line-remove').forEach(function (el) {
-                if (el.id === 'pr2_btn_new' || el.id === 'pr2_btn_print' || el.closest('.jv-voucher-nav-btns') || el.id === 'pr2_btn_search') {
+                if (el.id === 'pr2_btn_new' || el.id === 'pr2_btn_print' || el.closest('.jv-voucher-nav-btns') || el.id === 'pr2_btn_search' || el.id === 'pr2_btn_retrieve') {
                     return;
                 }
                 if (el.id === 'pr2_btn_save') {
@@ -783,9 +823,79 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             if (prod) bc.value = prod.item_code || prod.barcode || '';
         }
         var qEl = tr.querySelector('.pr2-qty');
-        if (qEl) qEl.value = String(item.qty || 1);
+        if (qEl) {
+            qEl.value = String(item.qty || 1);
+            if (item.qty_available != null && parseInt(String(item.qty_available), 10) > 0) {
+                qEl.setAttribute('data-max-qty', String(item.qty_available));
+                qEl.setAttribute('title', 'الحد الأقصى: ' + String(item.qty_available));
+            } else if (item.qty_max != null && parseInt(String(item.qty_max), 10) > 0) {
+                qEl.setAttribute('data-max-qty', String(item.qty_max));
+                qEl.setAttribute('title', 'الحد الأقصى: ' + String(item.qty_max));
+            } else {
+                qEl.removeAttribute('data-max-qty');
+                qEl.removeAttribute('title');
+            }
+        }
         var cEl = tr.querySelector('.pr2-cost');
         if (cEl) cEl.value = fmt3(item.cost || 0);
+        var dEl = tr.querySelector('.pr2-discount');
+        if (dEl) dEl.value = item.discount_raw || '';
+    }
+
+    function pr2ApplyPurchaseRetrievePayload(res) {
+        if (!res || !res.success || !res.purchase) {
+            alert((res && res.message) || 'تعذر استرجاع بنود فاتورة الشراء');
+            return;
+        }
+        var p = res.purchase;
+        var purEl = document.getElementById('pr2_purchase_ref');
+        if (purEl) purEl.value = p.reference || ('PUR-' + (p.id || ''));
+        selectSupplier(parseInt(String(p.supplier_id || '0'), 10) || 0);
+        var typeEl = document.getElementById('pr2_type');
+        if (typeEl) typeEl.value = p.type || 'cash';
+        var invDiscEl = document.getElementById('pr2_invoice_discount');
+        if (invDiscEl) invDiscEl.value = p.invoice_discount_raw || '';
+        var tb = document.getElementById('pr2_lines_body');
+        if (tb) {
+            tb.innerHTML = '';
+            var items = res.items || [];
+            if (!items.length) {
+                alert('لا توجد كميات متبقية للإرجاع من هذه الفاتورة');
+                addLine();
+            } else {
+                items.forEach(function (item) {
+                    addLine();
+                    var rows = tb.querySelectorAll('tr.pr2-line');
+                    pr2FillLineRow(rows[rows.length - 1], item);
+                });
+            }
+            syncTrailing();
+        }
+        recalcAll();
+    }
+
+    function pr2RetrieveFromPurchase() {
+        if (!PR2_READY || pr2ViewMode) return;
+        var purchaseId = parsePurchaseRef(document.getElementById('pr2_purchase_ref').value || '');
+        if (purchaseId <= 0) {
+            alert('أدخل رقم فاتورة شراء صالحاً (PUR- أو رقم) في خانة فاتورة الشراء المرجعية.');
+            return;
+        }
+        var btn = document.getElementById('pr2_btn_retrieve');
+        if (btn) btn.disabled = true;
+        fetch('/admin/api/purchase_returns/retrieve_from_purchase.php?purchase_id=' + encodeURIComponent(String(purchaseId)), {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' }
+        }).then(function (r) { return r.json(); }).then(function (res) {
+            if (typeof orangeAdminOfferSuggestOnFailure === 'function' && !res.success && orangeAdminOfferSuggestOnFailure(res, 'تعذر الاسترجاع')) {
+                return;
+            }
+            pr2ApplyPurchaseRetrievePayload(res);
+        }).catch(function (e) {
+            alert(e.message || String(e));
+        }).finally(function () {
+            if (btn && !pr2ViewMode && PR2_READY) btn.disabled = false;
+        });
     }
 
     function pr2ApplyReturnPayload(res) {
@@ -805,6 +915,8 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             var pid = parseInt(String(p.purchase_id || '0'), 10) || 0;
             purEl.value = pid > 0 ? ('PUR-' + pid) : '';
         }
+        var invDiscEl = document.getElementById('pr2_invoice_discount');
+        if (invDiscEl) invDiscEl.value = p.invoice_discount_raw || '';
         var tb = document.getElementById('pr2_lines_body');
         if (tb) {
             tb.innerHTML = '';
@@ -927,20 +1039,34 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             var vid = parseInt(r.querySelector('.pr2-variant').value, 10) || 0;
             var q = parseInt(r.querySelector('.pr2-qty').value, 10) || 0;
             var c = parseFloat(r.querySelector('.pr2-cost').value) || 0;
+            var discRaw = (r.querySelector('.pr2-discount') && r.querySelector('.pr2-discount').value || '').trim();
+            var maxQ = parseInt(r.querySelector('.pr2-qty').getAttribute('data-max-qty') || '0', 10) || 0;
+            if (maxQ > 0 && q > maxQ) {
+                alert('الكمية في السطر ' + (i + 1) + ' تتجاوز المتاح (' + maxQ + ').');
+                return;
+            }
             if (!pid || q < 1) continue;
-            items.push({ product_id: pid, variant_id: vid, qty: q, cost: c });
+            var lineGross = q * c;
+            var discAmt = parseDiscount(discRaw, lineGross);
+            items.push({ product_id: pid, variant_id: vid, qty: q, cost: c, discount_raw: discRaw, discount_amount: discAmt });
         }
         if (!items.length) {
             alert('أضف سطرًا واحدًا على الأقل بصنف وكمية صحيحة');
             return;
         }
 
+        var invDiscRaw = (document.getElementById('pr2_invoice_discount').value || '').trim();
+        var subtotal = parseFloat(document.getElementById('pr2_subtotal').textContent) || 0;
+        var invDiscAmt = parseDiscount(invDiscRaw, subtotal);
+
         var payload = {
             supplier_id: supplierId,
             type: retType,
             notes: notes,
             purchase_id: purchaseId > 0 ? purchaseId : 0,
-            items: items
+            items: items,
+            invoice_discount_raw: invDiscRaw,
+            invoice_discount_amount: invDiscAmt
         };
 
         postJSON('/admin/api/purchase_returns/create.php', payload).then(function (res) {
@@ -982,6 +1108,8 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 
         document.getElementById('pr2_btn_save').addEventListener('click', save);
         document.getElementById('pr2_btn_new').addEventListener('click', pr2ResetNew);
+        document.getElementById('pr2_btn_retrieve').addEventListener('click', pr2RetrieveFromPurchase);
+        document.getElementById('pr2_invoice_discount').addEventListener('input', function () { recalcAll(); });
         document.getElementById('pr2_btn_print').addEventListener('click', function () {
             if (browseReturnId <= 0) {
                 alert('افتح مردوداً محفوظاً للطباعة.');
@@ -1013,11 +1141,17 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
                 if (e.target && e.target.classList.contains('pr2-product')) {
                     onProductChanged(e.target);
                 }
+                if (e.target && e.target.classList.contains('pr2-qty')) {
+                    pr2ClampQtyInput(e.target);
+                }
                 syncTrailing();
                 recalcAll();
             });
             tb.addEventListener('input', function (e) {
                 if (e.target && e.target.classList.contains('pr2-barcode')) return;
+                if (e.target && e.target.classList.contains('pr2-qty')) {
+                    pr2ClampQtyInput(e.target);
+                }
                 syncTrailing();
                 recalcAll();
             });

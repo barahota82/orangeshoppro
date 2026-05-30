@@ -31,9 +31,15 @@ try {
 }
 
 $hasV = orange_table_has_column($pdo, 'purchase_return_items', 'variant_id');
+$hasPriDiscount = orange_table_has_column($pdo, 'purchase_return_items', 'discount_raw');
+$hasRetInvDiscount = orange_table_has_column($pdo, 'purchase_returns', 'invoice_discount_raw');
+$hasRetSubtotal = orange_table_has_column($pdo, 'purchase_returns', 'subtotal');
 $cols = 'id, product_id, qty, cost';
 if ($hasV) {
     $cols .= ', variant_id';
+}
+if ($hasPriDiscount) {
+    $cols .= ', discount_raw, discount_amount';
 }
 $it = $pdo->prepare(
     'SELECT ' . $cols . ' FROM purchase_return_items WHERE purchase_return_id = ? ORDER BY id ASC'
@@ -52,14 +58,23 @@ json_response([
         'type' => (string) ($header['type'] ?? ''),
         'notes' => (string) ($header['notes'] ?? ''),
         'total' => (float) ($header['total'] ?? 0),
+        'subtotal' => $hasRetSubtotal ? (float) ($header['subtotal'] ?? 0) : (float) ($header['total'] ?? 0),
+        'invoice_discount_raw' => $hasRetInvDiscount ? trim((string) ($header['invoice_discount_raw'] ?? '')) : '',
+        'invoice_discount_amount' => $hasRetInvDiscount ? (float) ($header['invoice_discount_amount'] ?? 0) : 0.0,
         'return_number' => (string) ($header['return_number'] ?? ''),
     ],
-    'items' => array_map(static function (array $row): array {
-        return [
+    'items' => array_map(static function (array $row) use ($hasPriDiscount): array {
+        $item = [
             'product_id' => (int) ($row['product_id'] ?? 0),
             'variant_id' => isset($row['variant_id']) ? (int) $row['variant_id'] : 0,
             'qty' => (int) ($row['qty'] ?? 0),
             'cost' => (float) ($row['cost'] ?? 0),
         ];
+        if ($hasPriDiscount) {
+            $item['discount_raw'] = trim((string) ($row['discount_raw'] ?? ''));
+            $item['discount_amount'] = (float) ($row['discount_amount'] ?? 0);
+        }
+
+        return $item;
     }, $items),
 ]);
