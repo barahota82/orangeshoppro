@@ -3,9 +3,9 @@ ORANGE — خطة مراحل تنفيذ الشجرة الموحّدة (Unified C
 Archive: docs/archive/ORANGE_UNIFIED_CATALOG_ROLLOUT_PHASES.txt
 مرجع سياسة/ERD: docs/archive/ORANGE_UNIFIED_TAXONOMY_AND_CATALOG_ERD.txt
 مرجع مختصر: docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt — «تاسعاً»
-Last updated: 2026-05-20 (المرحلة **3 مغلقة** — منتجات KW + صفات + variants)
+Last updated: 2026-05-20 (المرحلة **4 مغلقة** — multicountry runtime)
 
-**سياسة المالك (إلزامي للوكلاء):** **لا SQL يدوي** — **`git pull`** + **طلب واحد** (أدمن/متجر) = bootstrap + runtime hooks (قنوات · product_types KW) **أوتوماتيك**.
+**سياسة المالك (إلزامي للوكلاء):** **لا SQL يدوي** — **`git pull`** + **طلب واحد** = runtime hooks (multicountry · قنوات · product_types · منتجات) **أوتوماتيك**.
 
 الغرض:
 - تتبع **ما تم** و**ما تبقى** لاعتماد المتجر 100% على الشجرة الموحّدة.
@@ -21,11 +21,11 @@ Last updated: 2026-05-20 (المرحلة **3 مغلقة** — منتجات KW + 
 | 1       | Go-Live المتجر الموحّد            | **مغلق**    | 2026-05-20    |
 | 2       | إكمال الشجرة (product_types)      | **مغلق**    | 2026-05-20    |
 | 3       | المنتجات والصفات                  | **مغلق**    | 2026-05-20    |
-| 4       | فصل الدول + الشجرة                | **جزئي**    | —             |
+| 4       | فصل الدول + الشجرة                | **مغلق**    | 2026-05-20    |
 | 5       | إغلاق Legacy                      | **مفتوح**   | —             |
 | 6       | Polish (اختياري)                  | **مفتوح**   | —             |
 
-**تقدير إجمالي الشجرة الموحّدة (تشغيلي):** ~**85%** (المراحل 0–3 مغلقة؛ multicountry + legacy).
+**تقدير إجمالي الشجرة الموحّدة (تشغيلي):** ~**90%** (المراحل 0–4 مغلقة؛ legacy + polish).
 
 
 **آخر تحقق سيرفر (قبل إغلاق 1 — 2026-05-30):**
@@ -40,13 +40,13 @@ Last updated: 2026-05-20 (المرحلة **3 مغلقة** — منتجات KW + 
 - ~125 subcategory نشطة **بلا** product_type (أولوية مرحلة 2)
 - dump **بلا** صفوف `products` — تحقق المنتجات من السيرفر فقط
 
-**كود automation (مراحل 0–3):**
-- `includes/catalog_taxonomy_migrate.php` — manual tree adopt · backfill product_type_id
-- `includes/product_channels.php` — `orange_product_channels_ensure_missing_links`
-- `includes/catalog_kw_product_types_seed.php` — product_types KW
-- `includes/catalog_kw_products_phase3.php` — **`orange_catalog_ensure_kw_products_phase3`** (type · variants · صفات · size_family)
+**كود automation (مراحل 0–4):**
+- `includes/catalog_multicountry_runtime.php` — **`orange_catalog_ensure_multicountry_phase4`** (products/channels country_id · department_countries · provision للدول النشطة)
+- `includes/country_provision.php` — تهيئة مخزن · قنوات · كتalog منفصل عند تفعيل دولة
+- `includes/catalog_kw_product_types_seed.php` — product_types لكل **دولة نشطة**
+- `includes/catalog_kw_products_phase3.php` — جاهزية منتجات لكل **دولة نشطة**
+- `includes/product_channels.php` — ربط scoped بالدولة
 - `includes/catalog_schema.php` — **`orange_catalog_runtime_light_hooks`**
-- `pages/home.php` · APIs موحّدة · فلتر 4 أقسام KW
 
 ================================================================================
 1) المرحلة 0 — تثبيت الأساس
@@ -111,16 +111,16 @@ STATUS: **CLOSED** (2026-05-20)
 ================================================================================
 5) المرحلة 4 — فصل الدول + الشجرة (multicountry)
 ================================================================================
-STATUS: **PARTIAL**
+STATUS: **CLOSED** (2026-05-20)
 
 | #   | المهمة | الحالة | ملاحظة |
 |-----|--------|--------|--------|
-| 4.1 | products.country_id = KW للكتalog الحالي | **done** | تحقق سيرفر |
-| 4.2 | department_countries per سوق | **partial** | KW منجز؛ EG/UAE/KSA لاحقاً |
-| 4.3 | provision دولة جديدة + كتalog | **open** | country_provision |
-| 4.4 | product_channels scoped بالدولة | **partial** | auto بعد pull |
+| 4.1 | products.country_id = KW للكتalog الحالي | **done** | backfill أوتوماتيك |
+| 4.2 | department_countries per سوق | **done** | scaffold + نسخ من KW |
+| 4.3 | provision دولة جديدة + كتalog | **done** | runtime + admin activate |
+| 4.4 | product_channels scoped بالدولة | **done** | runtime hooks |
 
-**معيار إغلاق المرحلة 4:** كل دولة نشطة: كتalog · مخزن · قنوات · أقسام — **نفس تعريف الشجرة**، صفوف products منفصلة.
+**معيار إغلاق المرحلة 4:** ✅ كل **دولة نشطة**: مخزن · قنوات · أقسام · منتجات منفصلة؛ شجرة موحّدة مشتركة؛ EG/AE/SA جاهزة للتفعيل من الأدمن.
 
 ================================================================================
 6) المرحلة 5 — إغلاق Legacy
@@ -205,6 +205,7 @@ includes/product_channels.php
 2026-05-30 — إنشاء خطة المراحل 0–6 + حالة ابتدائية (سيرفر + orange_db.sql + قرار 4 أقسام KW).
 2026-05-30 — **المرحلة 0 مغلقة:** automation PHP (manual tree adopt + product_channels backfill) + commit.
 2026-05-20 — **المرحلة 1 مغلقة:** Go-Live KW + runtime product_channels hooks.
+2026-05-20 — **المرحلة 4 مغلقة:** `orange_catalog_ensure_multicountry_phase4` + hooks لكل دولة نشطة.
 2026-05-20 — **المرحلة 3 مغلقة:** `orange_catalog_ensure_kw_products_phase3` (type · variants · attributes · size_family).
 2026-05-20 — **المرحلة 2 مغلقة:** `orange_catalog_ensure_kw_product_types` + backfill expected sizing (runtime hooks).
 

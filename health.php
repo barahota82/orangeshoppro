@@ -140,3 +140,31 @@ if ($rollout === 'unified-phase3') {
         echo 'ROLLOUT_PHASE3_ERROR: ' . $e->getMessage() . "\n";
     }
 }
+
+if ($rollout === 'unified-phase4') {
+    try {
+        require_once __DIR__ . '/includes/catalog_schema.php';
+        require_once __DIR__ . '/includes/catalog_multicountry_runtime.php';
+        $pdoRollout = db();
+        orange_catalog_ensure_schema($pdoRollout);
+        $active = orange_catalog_active_country_ids($pdoRollout);
+        echo 'active_countries=' . count($active) . "\n";
+        $allOk = true;
+        foreach ($active as $cid) {
+            $rep = orange_catalog_multicountry_phase4_gap_report($pdoRollout, $cid);
+            $code = '';
+            $stC = $pdoRollout->prepare('SELECT code FROM countries WHERE id = ? LIMIT 1');
+            $stC->execute([$cid]);
+            $code = strtolower(trim((string) ($stC->fetchColumn() ?: 'c' . $cid)));
+            echo 'country_' . $code . '_warehouse=' . (($rep['warehouse'] ?? false) ? '1' : '0') . "\n";
+            echo 'country_' . $code . '_channels=' . (($rep['channels_ok'] ?? false) ? '1' : '0') . "\n";
+            echo 'country_' . $code . '_departments=' . (($rep['departments_ok'] ?? false) ? '1' : '0') . "\n";
+            if (empty($rep['warehouse']) || empty($rep['channels_ok']) || empty($rep['departments_ok'])) {
+                $allOk = false;
+            }
+        }
+        echo $allOk ? "ROLLOUT_PHASE4_OK\n" : "ROLLOUT_PHASE4_PENDING\n";
+    } catch (Throwable $e) {
+        echo 'ROLLOUT_PHASE4_ERROR: ' . $e->getMessage() . "\n";
+    }
+}

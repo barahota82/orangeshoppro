@@ -156,7 +156,28 @@ function orange_catalog_kw_subcategories_missing_active_product_type_count(PDO $
  *
  * @return array{inserted:int,reactivated:int,sizing_filled:int,remaining:int}
  */
-function orange_catalog_ensure_kw_product_types(PDO $pdo): array
+function orange_catalog_ensure_kw_product_types(PDO $pdo, ?int $countryId = null): array
+{
+    if ($countryId !== null && $countryId > 0) {
+        return orange_catalog_ensure_kw_product_types_for_country($pdo, $countryId);
+    }
+
+    $merged = ['inserted' => 0, 'reactivated' => 0, 'sizing_filled' => 0, 'remaining' => 0];
+    require_once __DIR__ . '/catalog_multicountry_runtime.php';
+    foreach (orange_catalog_active_country_ids($pdo) as $cid) {
+        $r = orange_catalog_ensure_kw_product_types_for_country($pdo, $cid);
+        foreach (['inserted', 'reactivated', 'sizing_filled', 'remaining'] as $k) {
+            $merged[$k] += (int) ($r[$k] ?? 0);
+        }
+    }
+
+    return $merged;
+}
+
+/**
+ * @return array{inserted:int,reactivated:int,sizing_filled:int,remaining:int}
+ */
+function orange_catalog_ensure_kw_product_types_for_country(PDO $pdo, int $countryId): array
 {
     $out = ['inserted' => 0, 'reactivated' => 0, 'sizing_filled' => 0, 'remaining' => 0];
 
@@ -171,7 +192,6 @@ function orange_catalog_ensure_kw_product_types(PDO $pdo): array
         return $out;
     }
 
-    $countryId = orange_countries_default_id($pdo);
     if ($countryId <= 0) {
         return $out;
     }

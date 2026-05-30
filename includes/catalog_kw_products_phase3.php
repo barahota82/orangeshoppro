@@ -332,7 +332,39 @@ function orange_catalog_copy_kw_product_attributes_from_type_template(PDO $pdo, 
  *
  * @return array{product_type_fixed:int,size_families:int,variants:int,attributes_copied:int,gaps:array<string,int>}
  */
-function orange_catalog_ensure_kw_products_phase3(PDO $pdo): array
+function orange_catalog_ensure_kw_products_phase3(PDO $pdo, ?int $countryId = null): array
+{
+    if ($countryId !== null && $countryId > 0) {
+        return orange_catalog_ensure_kw_products_phase3_for_country($pdo, $countryId);
+    }
+
+    $merged = [
+        'product_type_fixed' => 0,
+        'size_families' => 0,
+        'variants' => 0,
+        'attributes_copied' => 0,
+        'gaps' => ['missing_product_type' => 0, 'missing_variants' => 0, 'missing_attributes' => 0],
+    ];
+    require_once __DIR__ . '/catalog_multicountry_runtime.php';
+    foreach (orange_catalog_active_country_ids($pdo) as $cid) {
+        $r = orange_catalog_ensure_kw_products_phase3_for_country($pdo, $cid);
+        foreach (['product_type_fixed', 'size_families', 'variants', 'attributes_copied'] as $k) {
+            $merged[$k] += (int) ($r[$k] ?? 0);
+        }
+        if (isset($r['gaps']) && is_array($r['gaps'])) {
+            foreach ($r['gaps'] as $gk => $gv) {
+                $merged['gaps'][$gk] = ($merged['gaps'][$gk] ?? 0) + (int) $gv;
+            }
+        }
+    }
+
+    return $merged;
+}
+
+/**
+ * @return array{product_type_fixed:int,size_families:int,variants:int,attributes_copied:int,gaps:array<string,int>}
+ */
+function orange_catalog_ensure_kw_products_phase3_for_country(PDO $pdo, int $countryId): array
 {
     $stats = [
         'product_type_fixed' => 0,
@@ -346,7 +378,6 @@ function orange_catalog_ensure_kw_products_phase3(PDO $pdo): array
         return $stats;
     }
 
-    $countryId = orange_countries_default_id($pdo);
     if ($countryId <= 0) {
         return $stats;
     }

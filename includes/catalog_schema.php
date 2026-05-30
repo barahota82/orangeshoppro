@@ -3719,6 +3719,8 @@ function orange_catalog_runtime_light_hooks(PDO $pdo): void
     $ran = true;
 
     try {
+        require_once __DIR__ . '/catalog_multicountry_runtime.php';
+        orange_catalog_ensure_multicountry_phase4($pdo);
         require_once __DIR__ . '/product_channels.php';
         orange_product_channels_ensure_missing_links($pdo);
         require_once __DIR__ . '/catalog_kw_product_types_seed.php';
