@@ -47,10 +47,6 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
 
         <div class="coa-shell__main" dir="rtl">
             <div class="coa-shell__panel">
-    <p class="card-hint" style="margin-top:14px;line-height:1.55;">
-        سياسة التقارير: حقول <strong>التصنيف المحاسبي</strong> أدناه (نوع الحساب، قسم التقرير، سطر المرجع) تُستخدم في تجميع قوائم النظام والتقارير المرتبطة. عند ترك الحقول فارغة يُطبَّق التصنيف الموروث من جذور الشجرة وفق المنطق في السيرفر.
-        المرجع النصّي الكامل للمشروع: <code dir="ltr" style="unicode-bidi:embed;font-size:0.92em;">docs/ACCOUNTING_REPORTING_POLICY_V2.md</code>
-    </p>
 
             <div class="card coa-form-card coa-form-card--classic">
                 <h3 class="card-title coa-form-card__title">بيانات الحساب</h3>

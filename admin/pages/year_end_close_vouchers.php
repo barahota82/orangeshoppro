@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 $jvPageEntryType = 'year_end_close';
 $jvPageTitle = 'قيود الإقفال السنوية';
-$jvPageCardTitle = 'سند إقفال سنة مالية (YEC)';
+$jvPageCardTitle = 'سند إقفال سنة مالية';
 $jvSearchModalTitle = 'بحث في قيود الإقفال السنوية';
 $jvYecMode = true;
 $jvYecFiscalYearId = (int) ($_GET['fy_id'] ?? 0);

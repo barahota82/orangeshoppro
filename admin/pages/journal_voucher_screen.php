@@ -145,9 +145,6 @@ $jvEchoJvManualLine = static function () use (&$jvInitLinePairSeq, $jvMoneyZeroE
 <div class="card jv-print-area">
     <h3 class="card-title"><?php echo htmlspecialchars($jvPageCardTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
     <?php if ($jvYecMode): ?>
-    <p class="card-hint jv-print-hide" style="margin:0 0 10px;line-height:1.55;">
-        سند <strong>YEC واحد</strong> لكل سنة (PL → RE → LR). <strong>حفظ = إقفال</strong> السنة — راجع الأسطر قبل الحفظ؛ الطباعة بعد الحفظ فقط.
-    </p>
     <label class="jv-print-hide" style="display:flex;align-items:center;gap:8px;margin:0 0 12px;cursor:default;">
         <input type="checkbox" id="jv_yec_locked" disabled>
         <span><strong>قيد مغلق</strong> — يُفعَّل تلقائياً بعد الحفظ الناجح</span>

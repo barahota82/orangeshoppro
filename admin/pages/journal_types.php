@@ -28,17 +28,7 @@ $jtCanAutoSeed = orange_journal_types_should_auto_seed($pdo, $jtCountryId);
 ?>
 <div class="fy-years-page" dir="rtl">
     <h1 class="fy-years-page__title">أنواع اليوميات</h1>
-    <?php if ($jtScoped && $jtCountryId > 0): ?>
-    <p class="card-hint" style="margin:0.35rem 0 0.75rem;line-height:1.55;">
-        سياق الدولة: <strong><?php echo htmlspecialchars($jtCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong>
-        — الأنواع المعروضة والمحفوظة لهذه الدولة فقط.
-        <?php if ($jtCanAutoSeed): ?>
-        القائمة المرجعية (OBV، JE، RV، …) تُبذَر تلقائياً للدولة الافتراضية (الكويت) عند الحاجة.
-        <?php else: ?>
-        <strong>لا تُبذَر تلقائياً هنا.</strong> لنسخ الأنواع من الكويت: شاشة <strong>الدول</strong> → «إنشاء كامل» للدولة.
-        <?php endif; ?>
-    </p>
-    <?php elseif (!$jtScoped): ?>
+    <?php if (!$jtScoped): ?>
     <p class="card-hint" style="margin:0.35rem 0 0.75rem;color:#92400e;">
         تنبيه: عمود <code dir="ltr">country_id</code> غير مفعّل بعد على جدول أنواع اليوميات — افتح أي صفحة أدmin لإكمال الترحيل، أو تحقق من سجل PHP.
     </p>

@@ -172,9 +172,6 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
 <div class="page-title page-title--stacked jv-print-hide">
     <div>
         <h1>أرصدة أول المدة المالية</h1>
-        <?php if ($ctxCountryId > 0 && orange_fiscal_years_has_country_column($pdo)): ?>
-        <p class="card-hint" style="margin:0.35rem 0 0;">سياق الدولة: <strong><?php echo htmlspecialchars($ctxCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong> — السنوات المالية والسند الافتتاحي لهذه الدولة فقط.</p>
-        <?php endif; ?>
     </div>
 </div>
 

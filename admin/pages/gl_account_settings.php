@@ -97,7 +97,6 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
 ?>
 <div class="page-title">
     <h1>حسابات القيود التلقائية</h1>
-    <p class="card-hint" style="margin:0.35rem 0 0;">سياق الدولة: <strong><?php echo htmlspecialchars($glCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong> — الربط والدليل المعروضان لهذه الدولة فقط.</p>
 </div>
 
 <?php if ($glCountryNeedsProvision): ?>
