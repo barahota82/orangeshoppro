@@ -618,9 +618,9 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 
     function rowIsBlank(tr) {
         var pid = parseInt(tr.querySelector('.pv2-product').value, 10) || 0;
-        var q = parseInt(tr.querySelector('.pv2-qty').value, 10) || 0;
+        if (pid > 0) return false;
         var code = (tr.querySelector('.pv2-barcode').value || '').trim();
-        return pid <= 0 && q <= 0 && !code;
+        return code === '';
     }
 
     function trimExtraTrailing() {
