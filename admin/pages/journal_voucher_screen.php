@@ -699,9 +699,8 @@ var JV_COUNTRY_ID = <?php echo (int) $jvScreenCountryId; ?>;
 var jvEditLockCtl = null;
 
 function jvEditLockKind() {
-    if (jvBrowseEntryType === 'customer_receipt') return 'customer_receipt';
-    if (jvBrowseEntryType === 'supplier_payment') return 'supplier_payment';
-    return 'journal_voucher';
+    if (jvBrowseEntryType) return String(jvBrowseEntryType);
+    return 'manual';
 }
 
 function jvJournalTypeFilterId() {
@@ -1963,7 +1962,7 @@ if (JV_YEC_MODE && JV_YEC_LOAD_ID > 0) {
     if (!JV_YEC_MODE && window.OrangeEditLock) {
         jvEditLockCtl = OrangeEditLock.bind({
             prefix: 'jv',
-            docKind: 'journal_voucher',
+            docKind: 'manual',
             getDocKind: jvEditLockKind,
             countryId: JV_COUNTRY_ID,
             getEntityId: function () { return jvBrowseId || 0; }

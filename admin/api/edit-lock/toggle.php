@@ -22,7 +22,7 @@ try {
     if ($kind === '' || $entityId <= 0) {
         json_response(['success' => false, 'message' => 'نوع المستند والمعرف مطلوبان'], 422);
     }
-    if (!isset(orange_edit_lock_doc_kinds()[$kind])) {
+    if (!orange_edit_lock_kind_is_supported($kind)) {
         json_response(['success' => false, 'message' => 'نوع مستند غير مدعوم'], 422);
     }
     $resource = orange_edit_lock_resource_for_kind($kind);

@@ -5,10 +5,14 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/edit_lock.php';
 require_once __DIR__ . '/../../includes/date_format.php';
+require_once __DIR__ . '/../../includes/journal_types.php';
+require_once __DIR__ . '/../../includes/gl_settings.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
-$elKinds = orange_edit_lock_doc_kinds();
+orange_journal_types_sync_canonical_defaults($pdo);
+/** @var list<array<string, mixed>> $elJournalTypes */
+$elJournalTypes = orange_journal_types_list($pdo);
 $elDateFromDisp = orange_format_datetime_dmY_hi(date('Y-m-01 00:00:00'));
 $elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
 ?>
@@ -32,15 +36,25 @@ $elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
         <section class="gl-posting-pane gl-posting-pane--source" aria-labelledby="el_lock_table_title">
             <div class="gl-posting-pane__toolbar gl-posting-pane__toolbar--filters">
                 <div class="gl-posting-field">
-                    <label class="gl-posting-field__label" for="el_doc_kind">نوع المستند</label>
-                    <select id="el_doc_kind" class="gl-posting-select">
-                        <option value="all">— الكل —</option>
-                        <?php foreach ($elKinds as $code => $meta): ?>
-                        <option value="<?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?>">
-                            <?php echo htmlspecialchars($meta['label_ar'], ENT_QUOTES, 'UTF-8'); ?>
-                        </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <span class="gl-posting-field__label" id="el_movement_type_label">نوع الحركة :</span>
+                    <div class="gl-posting-field__row gl-posting-field__row--movement">
+                        <select id="el_movement_type" class="gl-posting-select gl-posting-select--movement-type" aria-labelledby="el_movement_type_label"<?php echo $elJournalTypes === [] ? ' disabled' : ''; ?>>
+                            <option value="">— اختر نوع اليومية —</option>
+                            <?php if ($elJournalTypes !== []): ?>
+                            <option value="all">الكل</option>
+                            <?php endif; ?>
+                            <?php foreach ($elJournalTypes as $jt):
+                                $jid = (int) ($jt['id'] ?? 0);
+                                $jname = trim((string) ($jt['name_ar'] ?? ''));
+                                ?>
+                            <option value="<?php echo $jid; ?>"><?php echo htmlspecialchars($jname, ENT_QUOTES, 'UTF-8'); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <label class="gl-posting-check-label">
+                            <input type="checkbox" id="el_all_movements" class="gl-posting-chk">
+                            جميع الحركات
+                        </label>
+                    </div>
                 </div>
                 <div class="gl-posting-field">
                     <label class="gl-posting-field__label" for="el_lock_filter">حالة القفل</label>
@@ -71,7 +85,7 @@ $elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
                         <tr>
                             <th class="gl-posting-col-chk" aria-label="اختيار"></th>
                             <th>م</th>
-                            <th>النوع</th>
+                            <th>نوع القيد</th>
                             <th>المرجع / البيان</th>
                             <th>المبلغ</th>
                             <th>التاريخ</th>
@@ -114,6 +128,44 @@ $elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
 </div>
 <script>
 (function () {
+    var GL_ENTRY_LABELS = <?php echo json_encode(orange_gl_entry_type_labels_map(), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    var elSel = document.getElementById('el_movement_type');
+    var elChkAll = document.getElementById('el_all_movements');
+    var VAL_ALL = 'all';
+    var lastFilterInfo = null;
+
+    function glEntryTypeLabel(et) {
+        et = String(et == null ? '' : et);
+        return GL_ENTRY_LABELS[et] || et || '—';
+    }
+
+    function syncAllMovementsUi() {
+        if (!elChkAll || !elSel) return;
+        if (elChkAll.checked) {
+            elSel.disabled = true;
+            elSel.value = VAL_ALL;
+        } else {
+            elSel.disabled = false;
+            if (elSel.value === VAL_ALL) {
+                elSel.value = '';
+            }
+        }
+    }
+
+    if (elChkAll && elSel) {
+        elChkAll.addEventListener('change', function () {
+            syncAllMovementsUi();
+            loadList();
+        });
+        elSel.addEventListener('change', function () {
+            elChkAll.checked = (elSel.value === VAL_ALL);
+            syncAllMovementsUi();
+            loadList();
+        });
+        elChkAll.checked = true;
+        syncAllMovementsUi();
+    }
+
     function esc(s) {
         return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
     }
@@ -123,7 +175,8 @@ $elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
         var dfVal = df && window.orangeDmyHiToSqlDatetime ? window.orangeDmyHiToSqlDatetime(df.value) : (df ? df.value : '');
         var dtVal = dt && window.orangeDmyHiToSqlDatetime ? window.orangeDmyHiToSqlDatetime(dt.value) : (dt ? dt.value : '');
         return {
-            doc_kind: (document.getElementById('el_doc_kind') || {}).value || 'all',
+            all_movements: !!(elChkAll && elChkAll.checked),
+            journal_type_id: (elSel && !elSel.disabled && elSel.value && elSel.value !== VAL_ALL) ? elSel.value : '',
             lock_filter: (document.getElementById('el_lock_filter') || {}).value || 'all',
             date_from: dfVal || '',
             date_to: dtVal || ''
@@ -133,7 +186,11 @@ $elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
         var tb = document.getElementById('el_lock_tbody');
         if (!tb) return;
         if (!rows || !rows.length) {
-            tb.innerHTML = '<tr><td colspan="7" class="gl-posting-empty-cell">لا مستندات في الفترة.</td></tr>';
+            var msg = 'لا مستندات في الفترة المحددة.';
+            if (lastFilterInfo && lastFilterInfo.entry_type_mode === 'unmapped_journal_type') {
+                msg = 'لا توجد حركات لهذا النوع بعد، أو نوع اليومية غير مربوط بأنواع الدخول. جرّب «جميع الحركات».';
+            }
+            tb.innerHTML = '<tr><td colspan="7" class="gl-posting-empty-cell">' + esc(msg) + '</td></tr>';
             return;
         }
         var html = '';
@@ -144,7 +201,7 @@ $elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
             html += '<tr data-id="' + id + '">';
             html += '<td class="gl-posting-col-chk"><input type="checkbox" class="el-pick" value="' + id + '"></td>';
             html += '<td>' + id + '</td>';
-            html += '<td>' + esc(r.kind_label || r.doc_kind) + '</td>';
+            html += '<td><small title="' + esc(r.doc_kind || '') + '">' + esc(r.kind_label || glEntryTypeLabel(r.doc_kind)) + '</small></td>';
             html += '<td><small>' + esc(r.reference) + '</small><br>' + esc(r.label_ar) + '</td>';
             html += '<td dir="ltr">' + esc(r.amount != null ? r.amount : '—') + '</td>';
             html += '<td>' + esc(r.saved_at) + '</td>';
@@ -154,13 +211,17 @@ $elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
     }
     async function loadList() {
         var p = filterParams();
-        var q = 'doc_kind=' + encodeURIComponent(p.doc_kind)
+        var q = 'all_movements=' + (p.all_movements ? '1' : '0')
             + '&lock_filter=' + encodeURIComponent(p.lock_filter)
             + '&date_from=' + encodeURIComponent(p.date_from)
             + '&date_to=' + encodeURIComponent(p.date_to);
+        if (p.journal_type_id) {
+            q += '&journal_type_id=' + encodeURIComponent(p.journal_type_id);
+        }
         var res = await fetch('/admin/api/edit-lock/list.php?' + q, { credentials: 'same-origin', cache: 'no-store' });
         var j = await res.json();
         if (!j.success) { window.alert(j.message || 'تعذر التحميل'); return; }
+        lastFilterInfo = j.filter || null;
         renderRows(j.rows || []);
         document.getElementById('el_preview_tbody').innerHTML =
             '<tr><td colspan="6" class="gl-posting-empty-cell gl-posting-empty-cell--ledger">انقر صفاً للمعاينة.</td></tr>';
