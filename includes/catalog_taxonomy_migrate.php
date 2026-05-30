@@ -379,6 +379,82 @@ function orange_catalog_legacy_unified_migrate_data(PDO $pdo): bool
 }
 
 /**
+ * هل المنتجات النشطة جاهزة لاعتماد المتجر الموحّد (product_type_id + سلسلة شجرة)?
+ */
+function orange_catalog_unified_active_products_data_ready(PDO $pdo): bool
+{
+    if (!function_exists('orange_table_exists') || !orange_table_exists($pdo, 'products')) {
+        return true;
+    }
+    if (!function_exists('orange_table_has_column') || !orange_table_has_column($pdo, 'products', 'product_type_id')) {
+        return false;
+    }
+    if (!orange_tax_mig_tables_exist($pdo, ['product_types', 'catalog_subcategories', 'catalog_categories', 'catalog_sections', 'departments'])) {
+        return false;
+    }
+
+    try {
+        $badPt = (int) $pdo->query(
+            'SELECT COUNT(*) FROM products
+             WHERE is_active = 1 AND (product_type_id IS NULL OR product_type_id <= 0)'
+        )->fetchColumn();
+        if ($badPt > 0) {
+            return false;
+        }
+
+        $broken = (int) $pdo->query(
+            'SELECT COUNT(*) FROM products p
+             WHERE p.is_active = 1 AND p.product_type_id > 0
+               AND NOT EXISTS (
+                   SELECT 1 FROM product_types pt
+                   INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id AND ucs.is_active = 1
+                   INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id AND ucc.is_active = 1
+                   INNER JOIN catalog_sections cs ON cs.id = ucc.catalog_section_id AND cs.is_active = 1
+                   INNER JOIN departments d ON d.id = cs.department_id AND d.is_active = 1
+                   WHERE pt.id = p.product_type_id AND pt.is_active = 1
+               )'
+        )->fetchColumn();
+
+        return $broken === 0;
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] orange_catalog_unified_active_products_data_ready: ' . $e->getMessage());
+        }
+
+        return false;
+    }
+}
+
+/**
+ * شجرة موحّدة يدوية (categories قديم فارغ): تسجيل legacy_unified_taxonomy_v1 تلقائياً عند جاهزية البيانات.
+ */
+function orange_catalog_unified_manual_tree_adopt_if_ready(PDO $pdo): void
+{
+    if (orange_catalog_migration_step_applied($pdo, ORANGE_CATALOG_LEGACY_UNIFIED_STEP)) {
+        return;
+    }
+    if (!orange_tax_mig_tables_exist($pdo, ['catalog_sections', 'product_types'])) {
+        return;
+    }
+
+    try {
+        $sections = (int) $pdo->query('SELECT COUNT(*) FROM catalog_sections')->fetchColumn();
+        if ($sections <= 0) {
+            return;
+        }
+    } catch (Throwable $e) {
+        return;
+    }
+
+    if (!orange_catalog_unified_active_products_data_ready($pdo)) {
+        return;
+    }
+
+    orange_catalog_migration_step_record($pdo, ORANGE_CATALOG_LEGACY_UNIFIED_STEP);
+    orange_catalog_fill_legacy_product_row_cache($pdo);
+}
+
+/**
  * اشتقاق حقول الفئة القديمة على صف المنتج من ورقة الشجرة الموحّدة (كـ Cache فقط).
  *
  * @return array{legacy_category_id: ?int, legacy_subcategory_id: ?int}
@@ -516,13 +592,15 @@ function orange_catalog_post_schema_legacy_unified(PDO $pdo): void
 {
     orange_tax_migration_log_ensure_table($pdo);
 
-    if (!orange_tax_mig_tables_exist($pdo, ['categories'])) {
-        return;
-    }
-
     if (orange_catalog_migration_step_applied($pdo, ORANGE_CATALOG_LEGACY_UNIFIED_STEP)) {
         orange_catalog_backfill_product_type_ids_only($pdo);
         orange_catalog_fill_legacy_product_row_cache($pdo);
+
+        return;
+    }
+
+    if (!orange_tax_mig_tables_exist($pdo, ['categories'])) {
+        orange_catalog_unified_manual_tree_adopt_if_ready($pdo);
 
         return;
     }
@@ -531,7 +609,10 @@ function orange_catalog_post_schema_legacy_unified(PDO $pdo): void
         return;
     }
 
-    orange_catalog_legacy_unified_migrate_data($pdo);
+    $migrated = orange_catalog_legacy_unified_migrate_data($pdo);
+    if (!$migrated) {
+        orange_catalog_unified_manual_tree_adopt_if_ready($pdo);
+    }
 }
 
 function orange_catalog_nav_use_unified(PDO $pdo): bool

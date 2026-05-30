@@ -3674,6 +3674,8 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
 
         require_once __DIR__ . '/catalog_taxonomy_migrate.php';
         orange_catalog_post_schema_legacy_unified($pdo);
+        require_once __DIR__ . '/product_channels.php';
+        orange_product_channels_ensure_missing_links($pdo);
         orange_catalog_ensure_products_product_type_id_not_null($pdo);
         orange_catalog_ensure_products_drop_legacy_classification_columns($pdo);
         orange_catalog_ensure_products_product_type_id_not_null($pdo);
