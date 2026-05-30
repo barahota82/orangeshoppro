@@ -20,7 +20,7 @@ NAV SOURCE (حقيقة القائمة)
 
 | المحور                         | ~% منجز | ملاحظة مختصرة                          |
 |--------------------------------|---------|----------------------------------------|
-| الإعداد والدليل                | 95%     | YEC + fiscal؛ GAP-ACC-07 ضريبة/شحن     |
+| الإعداد والدليل                | 95%     | YEC + fiscal؛ GAP-ACC-07 قرار معتمد — تنفيذ مفتوح |
 | السندات والذمم                 | 96%     | YEC Lane B؛ §10؛ CRR/SPR               |
 | التقارير المالية               | 94%     | posted؛ pl_compare في nav؛ GAP-ACC-05/09 |
 | Lane A — طابور gl_posting        | 91%     | hub لـ Lane A فقط — ليس «كل GL»        |
@@ -53,7 +53,7 @@ chart_of_accounts (admin/pages/chart_of_accounts.php)
 gl_account_settings (admin/pages/gl_account_settings.php)
 - APIs: admin/api/settings/gl-accounts.php, accounts/search-leaves.php, lookup-by-code.php
 - الحالة: [منتهٍ] — ربط أدوار GL + journal_type rules
-- ثغرات: خريطة أدوار بنود الفاتورة (ضريبة، شحن) — ORANGE_GL_MOVEMENTS §8
+- ثغرات: بنود فاتورة إضافية — **قرار مالك 2026-05-20** → **`docs/archive/ORANGE_INVOICE_ANCILLARY_LINES_POLICY.txt`** (قائمة محفوظة + دليل؛ GAP-ACC-07 تنفيذ مفتوح)
 
 journal_types (admin/pages/journal_types.php)
 - API: admin/api/journal_types/save.php
@@ -165,7 +165,7 @@ manual_order / create-manual.php — [منتهٍ] — INV-C + GL عند الحف
 [GAP-ACC-12] ~~متوسط — §13 حزمة~~ → **[مغلق — منتهٍ 2026-05-20]** B1–B8؛ §13.13 O-items = قرارات UX مفتوحة لا تمنع التشغيل
 [GAP-ACC-05] متوسط — partner_account_statement: وضع **مورد** (customer mode موجود؛ account mode للدليل)
 [GAP-ACC-06] متوسط — صلاحيات admin_permissions: post vs unpost (roadmap phase 6)
-[GAP-ACC-07] منخفض — gl_account_settings: خريطة ضريبة/شحن/بنود فاتورة
+[GAP-ACC-07] منخفض — بنود فاتورة (قائمة محفوظة + دليل + checkbox طباعة) — **قرار مالك معتمد 2026-05-20** → **`ORANGE_INVOICE_ANCILLARY_LINES_POLICY.txt`**؛ **تنفيذ كود مفتوح** (مراحل 0–2)
 [GAP-ACC-08] ~~module expenses GL (غائب)~~ → **ملغى/تراثي** — المصروفات = **سند صرف** (payment_voucher / PV)؛ لا شاشة expenses مستقلة.
 [GAP-ACC-09] منخفض — accounting_reports_index: تحديث شارات (pl_compare → جاهز)
 [GAP-ACC-10] مستقبل — تدفقات نقدية، أبعاد تحليلية، تسويات (policy v2 §3)
@@ -192,7 +192,8 @@ manual_order / create-manual.php — [منتهٍ] — INV-C + GL عند الحف
 - GAP-ACC-01، GAP-ACC-03 (~~ACC-02 ملغى~~)
 
 **المرحلة ج — صلاحيات ومتقدم (phase 6+)**
-- GAP-ACC-06، GAP-ACC-07، GAP-ACC-13 (~~ACC-08~~ تراثي — PV)
+- GAP-ACC-06، GAP-ACC-13 (~~ACC-08~~ تراثي — PV)
+- **GAP-ACC-07:** مراحل 0–2 — **`ORANGE_INVOICE_ANCILLARY_LINES_POLICY.txt`**
 - **GAP-ACC-10 (خيار د):** **مغلق — منتهٍ 2026-05-20** — مراحل 0–4 (§6b.8).
 
 **§13.13 (O-01…O-14):** قرارات UX/سياسة — **ليست** شرطاً لإغلاق ~88% الحالي؛ تُغلق بقرار المالك عند الحاجة.

@@ -134,7 +134,7 @@ channels, delivery_areas, storefront_hero, merge_requests               [منت�
 [GAP-ACC-03] تعديل journal/manage على سند مرحّل vs repost
 [GAP-ACC-05] partner_account_statement — وضع مورد
 [GAP-ACC-06] صلاحيات post vs unpost
-[GAP-ACC-07] gl_account_settings — ضريبة/شحن
+[GAP-ACC-07] بنود فاتورة — قرار معتمد → ORANGE_INVOICE_ANCILLARY_LINES_POLICY.txt (تنفيذ مفتوح)
 [GAP-ACC-08] ~~module مصروفات GL (غائب)~~ → **ملغى/تراثي** — المصروفات = **سند صرف** (payment_voucher / PV)
 [GAP-ACC-09] accounting_reports_index — **منتهٍ** (شارات ACC-10)
 [GAP-ACC-10] تدفقات نقدية + تسويات + أبعاد — **مغلق 2026-05-20** (مراحل 0–4 §6b)
