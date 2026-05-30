@@ -391,7 +391,6 @@ $supplierKwCountryId = orange_countries_default_id($pdo);
 <div class="page-title page-title--stacked">
     <div>
         <h1>الموردين</h1>
-        <p class="card-hint" style="margin:0.35rem 0 0;">سياق الدولة — كود الهاتف <strong dir="ltr">+<?php echo htmlspecialchars($supplierDefaultPhoneDial, ENT_QUOTES, 'UTF-8'); ?></strong> والعملة <strong><?php echo htmlspecialchars($supplierDefaultCurrency, ENT_QUOTES, 'UTF-8'); ?></strong> عند «إضافة مورد».</p>
     </div>
 </div>
 

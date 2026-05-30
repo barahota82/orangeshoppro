@@ -96,10 +96,6 @@ $todayDmY = orange_format_date_dmY(date('Y-m-d'));
 <div class="admin-fy-shell" dir="rtl">
     <div class="gl-acc-stmt-no-print">
         <h1 class="admin-fy-shell__title">مقارنة أرباح وخسائر بين السنوات المالية</h1>
-        <p class="admin-fy-shell__lead" style="margin-top:8px;line-height:1.55;">
-            صافي الدخل وفق حقول الدليل (<code dir="ltr">account_type</code> وسقوط إلى دور الشجرة عند الغياب) —
-            بدون قيود افتتاح أو إقفال سنة؛ نفس المنطق الموجود في ملخص التقارير المالية.
-        </p>
     </div>
 
     <div class="card admin-fy-card gl-acc-stmt-no-print">

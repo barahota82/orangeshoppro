@@ -247,7 +247,6 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 <div class="page-title page-title--stacked">
     <div>
         <h1>مردود مشتريات</h1>
-        <p class="card-hint" style="margin:0.35rem 0 0;">سياق الدولة — المبالغ بعملة <strong><?php echo htmlspecialchars($prDefaultCurrency, ENT_QUOTES, 'UTF-8'); ?></strong>. يُولَّد القيد المحاسبي تلقائياً ويُعرض في <a href="<?php echo htmlspecialchars($otherVouchersUrl, ENT_QUOTES, 'UTF-8'); ?>">سندات أخرى</a>.</p>
     </div>
 </div>
 

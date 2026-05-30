@@ -74,7 +74,6 @@ unset($stockRow);
 <div class="page-title page-title--stacked">
     <div>
         <h1>المستودع</h1>
-        <p class="page-subtitle">قائمة الأصناف، رصيد المخزن، كارت الصنف، وتعديل الرصيد أو الرصيد الافتتاحي.</p>
     </div>
 </div>
 
@@ -118,7 +117,6 @@ unset($stockRow);
 
 <div class="card" id="item-list">
     <h2 class="card-title">قائمة الأصناف</h2>
-    <p class="card-hint">ملخص حسب المنتج — اضغط «كارت الصنف» لحركات المخزون والتفاصيل.</p>
     <div class="table-wrap">
         <table>
             <thead>
@@ -153,10 +151,6 @@ unset($stockRow);
 
 <div class="card" id="balances">
     <h2 class="card-title">رصيد المخزن (لون / مقاس)</h2>
-    <p class="card-hint">
-        <strong>حفظ التعديل:</strong> تسجيل كحركة يومية عادية.
-        <strong>رصيد افتتاحي:</strong> نفس تحديث الكمية مع نوع حركة منفصل للتقارير (مثلاً بداية فترة أو أول إدخال).
-    </p>
     <div class="table-wrap">
         <table>
             <thead>

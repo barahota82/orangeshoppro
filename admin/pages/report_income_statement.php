@@ -255,13 +255,6 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
                         <span>تجاهل قيود الإقفال</span>
                     </label>
                 </div>
-                <p class="card-hint muted gl-acc-stmt-no-print is-ignore-close-hint" style="margin:8px 0 0;text-align:left;">
-                    <?php if ($ignoreClosingEntries): ?>
-                        <strong>مفعّل:</strong> سندات الإقفال السنوي (YEC) <strong>مستبعدة</strong> من حركة الفترة ورصيد أولها — لعرض أرباح/خسائر التشغيل دون تأثير الإقفال.
-                    <?php else: ?>
-                        <strong>غير مفعّل:</strong> سندات الإقفال ضمن المدى <strong>مُضمَّنة</strong> في الأرقام (قد تُصفّر حسابات الإيراد والمصروف إذا وقع الإقفال داخل الفترة).
-                    <?php endif; ?>
-                </p>
             </div>
         </form>
     </div>
@@ -290,9 +283,6 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
                 <h2 class="gl-acc-stmt-print-title ta-report-print-title">
                     <span class="gl-acc-stmt-print-title-ar" lang="ar">تقرير أرباح وخسائر عن الفترة من <?php echo htmlspecialchars($reportDateFromDmY, ENT_QUOTES, 'UTF-8'); ?> إلـى&nbsp;<?php echo htmlspecialchars($reportDateToDmY, ENT_QUOTES, 'UTF-8'); ?></span>
                 </h2>
-                <?php if ($ignoreClosingEntries): ?>
-                    <p class="muted" lang="ar" style="text-align:center;margin:0 0 0.5rem;font-size:0.88rem;">(باستبعاد قيود الإقفال السنوي من الحركة ورصيد أول الفترة)</p>
-                <?php endif; ?>
             </header>
             <div class="gl-acc-stmt-print-grid">
                 <div class="gl-acc-stmt-print-row gl-acc-stmt-print-row--dates">

@@ -59,16 +59,6 @@ if ($hasDepartmentsTable) {
 ?>
 <div class="page-title">
     <h1>الأقسام الرئيسية</h1>
-    <?php if ($depCountryId > 0): ?>
-    <p class="card-hint" style="margin:0.35rem 0 0;">
-        <?php if ($depCanManageGlobal): ?>
-        سياق الدولة: <strong><?php echo htmlspecialchars($depCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong>
-        — الأسماء والترتيب <strong>عام</strong> للكل؛ عمود «في <?php echo htmlspecialchars($depCountryLabel, ENT_QUOTES, 'UTF-8'); ?>» للتفعيل في هذه الدولة فقط.
-        <?php else: ?>
-        عرض للقراءة — التفعيل per دولة يخص <strong>المشرف العام</strong> (الدولة: <?php echo htmlspecialchars($depCountryLabel, ENT_QUOTES, 'UTF-8'); ?>).
-        <?php endif; ?>
-    </p>
-    <?php endif; ?>
 </div>
 
 <?php if (!$hasDepartmentsTable): ?>

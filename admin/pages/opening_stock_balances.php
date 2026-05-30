@@ -27,11 +27,6 @@ $rows = $pdo->query(
 ?>
 <div class="admin-fy-shell" dir="rtl">
     <h1 class="admin-fy-shell__title">أرصدة أول المدة المخزنية</h1>
-    <p class="admin-fy-shell__lead">
-        مخصّصة لسيناريو <strong>نقل من نظام قديم</strong> عندما لا يُستورد المخزون تلقائياً: تُحدَّد هنا كمية كل متغير (لون/مقاس) كـ <strong>رصيد افتتاحي</strong> في السجلات.
-        <strong>ليست إدخالاً دورياً يومياً</strong> — التشغيل العادي يستخدم شاشة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8'); ?>">المستودع</a> أو حركات الشراء والبيع.
-        الأرصدة <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=opening_balances'), ENT_QUOTES, 'UTF-8'); ?>">المالية الافتتاحية</a> تُسجَّل في شاشة منفصلة.
-    </p>
 
 <?php if ($openingStockLocked): ?>
     <div class="alert-warning" style="margin-bottom:12px;">
@@ -44,15 +39,10 @@ $rows = $pdo->query(
         <input type="checkbox" id="osbLockToggle" <?php echo $openingStockLocked ? 'checked' : ''; ?>>
         <span><strong>مقفول</strong> — منع أي رصيد افتتاحي مخزني جديد (حسب دولة الأدمن الحالية)</span>
     </label>
-    <p class="muted" style="margin:8px 0 0;">بعد إقفال الأرصدة الافتتاحية يُعطَّل الإدخال هنا وفي المستودع وبطاقة الصنف.</p>
 </div>
 
 <div class="card admin-fy-card">
     <h3 class="card-title">كميات المخزون الافتتاحية (حسب المتغير)</h3>
-    <p class="muted" style="margin:0 0 10px;">
-        أدخل <strong>الكمية الجديدة</strong> ثم اضغط <strong>تسجيل الرصيد الافتتاحي</strong> للصف. يُسجَّل النوع «رصيد افتتاحي» في حركات المخزون (كما في المستودع).
-        الكميات: <strong>أعداد صحيحة فقط</strong>، بدون سالب. الرصيد المعروض من <strong>مخزن الدولة</strong> الحالي في الأدمن.
-    </p>
     <div class="table-wrap admin-fy-table-wrap">
         <table class="admin-fy-table">
             <thead>

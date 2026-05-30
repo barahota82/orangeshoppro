@@ -93,10 +93,8 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 <div class="admin-fy-shell" dir="rtl">
     <?php if ($partnerView === 'customers'): ?>
         <h1 class="admin-fy-shell__title">أرصدة العملاء (ذمم)</h1>
-        <p class="admin-fy-shell__lead">ملخص أرصدة العملاء فقط — مطابقة الدليل، أعمار الذمم اختياري، وتصدير CSV.</p>
     <?php elseif ($partnerView === 'suppliers'): ?>
         <h1 class="admin-fy-shell__title">أرصدة الموردين (ذمم)</h1>
-        <p class="admin-fy-shell__lead">ملخص أرصدة الموردين فقط — مطابقة الدليل، أعمار الذمم اختياري، وتصدير CSV.</p>
     <?php else: ?>
         <h1 class="admin-fy-shell__title">تقارير الذمم الشاملة</h1>
         <p class="admin-fy-shell__lead">
@@ -169,7 +167,6 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
             </tbody>
         </table>
     </div>
-    <p class="card-hint">فرق غير صفر يعني قيوداً على حسابات الموردين (المجمع أو حسابات ذمم مربوطة بموردين) بدون تسجيل في الذمم الفرعية أو العكس — راجع القيود اليدوية.</p>
 </div>
 <?php else: ?>
 <div class="card admin-fy-card">

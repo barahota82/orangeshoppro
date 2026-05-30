@@ -410,13 +410,6 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
                         <span>تجاهل قيود الإقفال</span>
                     </label>
                 </div>
-                <p class="card-hint muted gl-acc-stmt-no-print is-ignore-close-hint" style="margin:8px 0 0;text-align:left;">
-                    <?php if ($ignoreClosingEntries): ?>
-                        <strong>مفعّل:</strong> سندات الإقفال السنوي (YEC) <strong>مستبعدة</strong> من حركة الفترة — لعرض الإيرادات والمصروفات الشهرية دون تأثير الإقفال.
-                    <?php else: ?>
-                        <strong>غير مفعّل:</strong> سندات الإقفال ضمن المدى <strong>مُضمَّنة</strong> في الأرقام (قد تُصفّر حسابات الإيراد والتكلفة إذا وقع الإقفال داخل الفترة).
-                    <?php endif; ?>
-                </p>
             </div>
         </form>
     </div>
@@ -472,9 +465,6 @@ $monthSheetsLastIdx = count($monthSheetsBuilt) > 0 ? count($monthSheetsBuilt) - 
             </h2>
             <p class="pl-month-pl-profit" lang="ar">ربح &nbsp;&nbsp;<?php echo htmlspecialchars($reportFmt($rabeh), ENT_QUOTES, 'UTF-8'); ?></p>
             <p class="pl-month-subtitle" lang="ar"><?php echo htmlspecialchars($subtitleLine($dmFrom, $dmTo), ENT_QUOTES, 'UTF-8'); ?></p>
-            <?php if ($ignoreClosingEntries): ?>
-                <p class="gl-acc-stmt-print-note muted" style="margin:4px 0 0;font-size:12px;">باستبعاد قيود الإقفال السنوي (YEC) من حركة الفترة.</p>
-            <?php endif; ?>
             <div class="pl-month-meta-row" lang="ar">
                 <span><?php echo $monthLabelEscaped; ?></span>
                 <?php if ($yearStr !== ''): ?>

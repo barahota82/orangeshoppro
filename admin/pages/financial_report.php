@@ -267,12 +267,6 @@ $bsCheck = round($bsAssets - ($bsLiab + $bsEquity), 2);
 <div class="page-title page-title--stacked">
     <div>
         <h1>التقارير المالية</h1>
-        <p class="page-subtitle">
-            ميزان مراجعة، وأرباح وخسائر ملخّصة، وميزانية عمومية مبسطة: تُجمَّع الإيرادات/التكلفة والمصروفات والملخص وفق <strong>الخريطة المحفوظة على الحساب</strong>
-            (<code dir="ltr">account_type</code> وربط المرجع) مع <strong>سقوط تلقائي</strong> على تصنيف جذور الشجرة عند ترك الحقول فارغة؛ راجع الوثائق
-            <code dir="ltr" style="unicode-bidi:embed;">docs/ACCOUNTING_REPORTING_POLICY_V2.md</code>.
-            تفصيل <strong>الموردين</strong> من دفتر الذمم؛ تفصيل <strong>المصروفات</strong> من بنود التسجيل ومذكرات سطور حسابات المصروف.
-        </p>
     </div>
 </div>
 
@@ -390,7 +384,6 @@ window.addEventListener('load', function () {
 
 <div class="card" id="report-income">
     <h3 class="card-title">أرباح وخسائر (ملخّص تقريبي)</h3>
-    <p class="card-hint">استبعاد أرصدة الافتتاح وقيود إقفال السنة. التصنيف يعتمد أولاً على حقول الدليل ثم جذر الحساب؛ ما لا يُصنَّف كإيراد/تكلفة/مصروف لا يُدخل هنا.</p>
     <div class="grid-2">
         <div class="stat-card"><h3>إجمالي الإيرادات (طبيعة دائنة)</h3><div class="value"><?php echo number_format($plRevenue, $frMoney['decimals']); ?></div></div>
         <div class="stat-card"><h3>إجمالي المصروفات والتكلفة</h3><div class="value"><?php echo number_format($plExpense, $frMoney['decimals']); ?></div></div>
@@ -423,7 +416,6 @@ window.addEventListener('load', function () {
 
 <div class="card" id="report-balance-sheet">
     <h3 class="card-title">الميزانية العمومية (مبسطة)</h3>
-    <p class="card-hint">أصول = مدين − دائن | خصوم وحقوق = دائن − مدين (للحسابات المصنفة فقط).</p>
     <div class="grid-2">
         <div class="stat-card"><h3>الأصول</h3><div class="value"><?php echo number_format($bsAssets, $frMoney['decimals']); ?></div></div>
         <div class="stat-card"><h3>الخصوم</h3><div class="value"><?php echo number_format($bsLiab, $frMoney['decimals']); ?></div></div>
@@ -451,26 +443,11 @@ window.addEventListener('load', function () {
             </table>
         </div>
     <?php endif; ?>
-    <p class="card-hint" style="margin-top:12px;">
-        <?php if (abs($bsCheck) < 0.05): ?>
-            <span class="badge approved">أصول ≈ خصوم + حقوق (فرق <?php echo number_format($bsCheck, $frMoney['decimals']); ?>)</span>
-        <?php else: ?>
-            <span class="badge cancelled">فرق محاسبي: <?php echo number_format($bsCheck, $frMoney['decimals']); ?> — راجع التصنيف أو أرصدة الافتتاح أو القيود غير الموزونة.</span>
-        <?php endif; ?>
-    </p>
 </div>
 
 <div class="card">
     <span id="report-account-balances" class="financial-anchor" style="display:block;height:0;scroll-margin-top:92px;"></span>
     <h3 id="report-trial-balance" class="card-title" style="scroll-margin-top:92px;">ميزان المراجعة</h3>
-    <p class="card-hint">
-        <?php if ($balanced): ?>
-            <span class="badge approved">المدين والدائن متطابقان (<?php echo number_format($sumDebit, $frMoney['decimals']); ?>)</span>
-        <?php else: ?>
-            <span class="badge cancelled">فرق: <?php echo number_format($sumDebit - $sumCredit, $frMoney['decimals']); ?></span>
-        <?php endif; ?>
-        — أسطر «↳» تفصيل: ذمم موردين تستخدم المجمع، أو مورد له حساب ذمة في الدليل (تحت حسابه)، أو بيان/مذكرة ضمن حسابات المصروف؛ الإجماليات في التذييل للصفوف الرئيسية فقط.
-    </p>
     <div class="table-wrap">
         <table>
             <thead>

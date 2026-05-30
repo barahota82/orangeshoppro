@@ -111,8 +111,6 @@ if (
 
 $accountsLeaf = orange_financial_report_leaf_accounts_with_mapping($pdo);
 
-$taShowDiag = isset($_GET['diag']) && (string) $_GET['diag'] === '1';
-
 $revenueLines = $useVouchers ? orange_accounts_build_pl_statement_section_lines($pdo, $accountsLeaf, $tbRange, $tbBefore, 'revenue', 'trading_account') : [];
 $cogsLines = $useVouchers ? orange_accounts_build_pl_statement_section_lines($pdo, $accountsLeaf, $tbRange, $tbBefore, 'cogs', 'trading_account') : [];
 
@@ -208,46 +206,13 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
                         <span>تجاهل قيود الإقفال</span>
                     </label>
                 </div>
-                <p class="card-hint muted gl-acc-stmt-no-print is-ignore-close-hint" style="margin:8px 0 0;text-align:left;">
-                    <?php if ($ignoreClosingEntries): ?>
-                        <strong>مفعّل:</strong> سندات الإقفال السنوي (YEC) <strong>مستبعدة</strong> من حركة الفترة ورصيد أولها — لعرض نتيجة المتاجرة دون تأثير الإقفال.
-                    <?php else: ?>
-                        <strong>غير مفعّل:</strong> سندات الإقفال ضمن المدى <strong>مُضمَّنة</strong> في الأرقام (قد تُصفّر حسابات الإيراد والتكلفة إذا وقع الإقفال داخل الفترة).
-                    <?php endif; ?>
-                </p>
             </div>
         </form>
-        <p class="muted gas-acc-stmt-toolbar" style="margin-top:10px;margin-bottom:0;font-size:12px;">
-            <a href="<?php echo htmlspecialchars(
-                '?page=' . rawurlencode($taPageQuery) . '&m_from=' . rawurlencode($periodYmFrom) . '&m_to=' . rawurlencode($periodYmTo) . '&ignore_close=' . ($ignoreClosingEntries ? '1' : '0') . '&diag=1',
-                ENT_QUOTES,
-                'UTF-8'
-            ); ?>">تشخيص (عدادات المصدر)</a>
-            — للمقارنة استخدم شاشة «أرباح وخسائر» بنفس الشهر؛ مصدر الأسطر أصبح <strong>نفس الدالة البرمجية</strong>.
-        </p>
     </div>
 
 <?php if ($useVouchers && $accountsLeaf === []): ?>
     <div class="card admin-fy-card gl-acc-stmt-no-print" style="border:1px solid #fcd34d;background:#fffbeb;">
         <p class="muted" style="margin:0;line-height:1.55;"><strong>تنبيه:</strong> لا توجد حسابات ترحيل (أوراق) في الدليل بعد؛ التقرير يظهر فارغاً إلى أن تُنشأ حسابات في «الدليل المحاسبي». <strong>الشاشة والنموذج يعملان</strong> — هذا متوقَّع أثناء الإعداد الأول.</p>
-    </div>
-<?php endif; ?>
-
-<?php if ($taShowDiag && $useVouchers && $periodLabel !== ''): ?>
-    <div class="card admin-fy-card gl-acc-stmt-no-print">
-        <p class="muted" style="margin:0 0 8px 0;"><strong dir="ltr">diag</strong> — المتاجرة: bucket من نوع الحساب والشجرة؛ يُستبعد صراحةً فقط <code dir="ltr">report_section=balance_sheet</code> لأوراق الإيراد/التكم.</p>
-        <pre dir="ltr" style="margin:0;font-size:11px;white-space:pre-wrap;background:#fafafa;padding:10px;border-radius:6px;"><?php
-        $diagPayload = json_encode([
-                'section_policy' => 'trading_account',
-                'vouchers_ready' => $useVouchers,
-                'period' => [$periodDateFrom, $periodDateTo],
-                'leaf_accounts' => count($accountsLeaf),
-                'tb_range_accounts_with_activity' => count($tbRange),
-                'revenue_lines_out' => count($revenueLines),
-                'cogs_lines_out' => count($cogsLines),
-        ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-echo htmlspecialchars((string) ($diagPayload !== false ? $diagPayload : '{}'), ENT_QUOTES, 'UTF-8');
-?></pre>
     </div>
 <?php endif; ?>
 
@@ -269,9 +234,6 @@ echo htmlspecialchars((string) ($diagPayload !== false ? $diagPayload : '{}'), E
                 <h2 class="gl-acc-stmt-print-title ta-report-print-title">
                     <span class="gl-acc-stmt-print-title-ar" lang="ar"><?php echo htmlspecialchars($taHeadingAr, ENT_QUOTES, 'UTF-8'); ?> عن الفترة من <?php echo htmlspecialchars($reportDateFromDmY, ENT_QUOTES, 'UTF-8'); ?> إلـى&nbsp;<?php echo htmlspecialchars($reportDateToDmY, ENT_QUOTES, 'UTF-8'); ?></span>
                 </h2>
-                <?php if ($ignoreClosingEntries): ?>
-                    <p class="gl-acc-stmt-print-note muted" style="margin:4px 0 0;font-size:12px;">باستبعاد قيود الإقفال السنوي (YEC) من حركة الفترة ورصيد أولها.</p>
-                <?php endif; ?>
             </header>
             <div class="gl-acc-stmt-print-grid">
                 <div class="gl-acc-stmt-print-row gl-acc-stmt-print-row--dates">
