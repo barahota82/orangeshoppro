@@ -49,42 +49,7 @@ CREATE TABLE `departments` (
   KEY `idx_departments_active` (`is_active`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE `categories` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `department_id` int DEFAULT NULL,
-  `name_en` varchar(191) DEFAULT NULL,
-  `name_ar` varchar(191) DEFAULT NULL,
-  `name_fil` varchar(191) DEFAULT NULL,
-  `name_hi` varchar(191) DEFAULT NULL,
-  `slug` varchar(191) NOT NULL,
-  `is_active` tinyint DEFAULT 1,
-  `sort_order` int DEFAULT 0,
-  `updated_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_categories_slug` (`slug`),
-  KEY `idx_categories_department` (`department_id`),
-  KEY `idx_categories_active` (`is_active`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE `subcategories` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `department_id` int DEFAULT NULL,
-  `category_id` int NOT NULL,
-  `name_ar` varchar(191) NOT NULL,
-  `name_en` varchar(191) DEFAULT NULL,
-  `name_fil` varchar(191) DEFAULT NULL,
-  `name_hi` varchar(191) DEFAULT NULL,
-  `slug` varchar(191) NOT NULL,
-  `is_active` tinyint(1) DEFAULT 1,
-  `sort_order` int DEFAULT 0,
-  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `idx_subcategories_category` (`category_id`),
-  KEY `idx_subcategories_department` (`department_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Unified catalog taxonomy leaf path (منتج يُربَط بالورقة الموحَّدة عبر products.product_type_id).
+-- Unified catalog taxonomy (legacy categories/subcategories removed — phase 5.4)
 CREATE TABLE `catalog_sections` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `department_id` int NOT NULL,
@@ -644,9 +609,7 @@ CREATE TABLE `products` (
   `description_en` text,
   `description_fil` text,
   `description_hi` text,
-  `category_id` int DEFAULT NULL,
-  `subcategory_id` int DEFAULT NULL,
-  `product_type_id` int unsigned DEFAULT NULL,
+  `product_type_id` int unsigned NOT NULL,
   `price` decimal(10,2) NOT NULL,
   `cost` decimal(10,2) NOT NULL,
   `main_image` varchar(255) DEFAULT NULL,
@@ -671,8 +634,6 @@ CREATE TABLE `products` (
   `item_code` varchar(64) DEFAULT NULL,
   `barcode` varchar(64) DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `idx_products_category_active` (`category_id`,`is_active`),
-  KEY `idx_products_subcategory` (`subcategory_id`),
   KEY `idx_products_product_type` (`product_type_id`),
   KEY `idx_products_slug` (`slug`),
   KEY `idx_products_sort` (`sort_order`,`id`),
@@ -1159,18 +1120,6 @@ ALTER TABLE `accounts`
   ADD CONSTRAINT `fk_accounts_parent` FOREIGN KEY (`parent_id`) REFERENCES `accounts` (`id`)
   ON DELETE SET NULL ON UPDATE CASCADE;
 
-ALTER TABLE `categories`
-  ADD CONSTRAINT `fk_categories_department` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`)
-  ON DELETE SET NULL;
-
-ALTER TABLE `subcategories`
-  ADD CONSTRAINT `fk_subcategories_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`)
-  ON DELETE RESTRICT ON UPDATE CASCADE;
-
-ALTER TABLE `subcategories`
-  ADD CONSTRAINT `fk_subcategories_department` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`)
-  ON DELETE SET NULL;
-
 ALTER TABLE `size_family_sizes`
   ADD CONSTRAINT `fk_sfs_size_family` FOREIGN KEY (`size_family_id`) REFERENCES `size_families` (`id`)
   ON DELETE CASCADE ON UPDATE CASCADE;
@@ -1225,14 +1174,6 @@ ALTER TABLE `admin_sessions`
 ALTER TABLE `admin_permissions`
   ADD CONSTRAINT `fk_admin_permissions_admin` FOREIGN KEY (`admin_id`) REFERENCES `admins` (`id`)
   ON DELETE CASCADE ON UPDATE CASCADE;
-
-ALTER TABLE `products`
-  ADD CONSTRAINT `fk_products_subcategory` FOREIGN KEY (`subcategory_id`) REFERENCES `subcategories` (`id`)
-  ON DELETE SET NULL;
-
-ALTER TABLE `products`
-  ADD CONSTRAINT `products_ibfk_1` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`)
-  ON DELETE SET NULL;
 
 ALTER TABLE `products`
   ADD CONSTRAINT `fk_products_size_family` FOREIGN KEY (`size_family_id`) REFERENCES `size_families` (`id`)

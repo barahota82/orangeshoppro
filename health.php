@@ -210,3 +210,24 @@ if ($rollout === 'unified-phase6') {
         echo 'ROLLOUT_PHASE6_ERROR: ' . $e->getMessage() . "\n";
     }
 }
+
+if ($rollout === 'unified-phase54') {
+    try {
+        require_once __DIR__ . '/includes/catalog_schema.php';
+        require_once __DIR__ . '/includes/catalog_legacy_tables_drop_phase54.php';
+        $pdoRollout = db();
+        orange_catalog_ensure_schema($pdoRollout);
+        $rep = orange_catalog_phase54_gap_report($pdoRollout);
+        echo 'legacy_categories_table=' . (($rep['legacy_categories_table'] ?? false) ? '1' : '0') . "\n";
+        echo 'legacy_subcategories_table=' . (($rep['legacy_subcategories_table'] ?? false) ? '1' : '0') . "\n";
+        echo 'step_applied=' . (($rep['step_applied'] ?? false) ? '1' : '0') . "\n";
+        echo 'ready=' . (($rep['ready'] ?? false) ? '1' : '0') . "\n";
+        $allOk = !empty($rep['ready'])
+            && empty($rep['legacy_categories_table'])
+            && empty($rep['legacy_subcategories_table'])
+            && !empty($rep['step_applied']);
+        echo $allOk ? "ROLLOUT_PHASE54_OK\n" : "ROLLOUT_PHASE54_PENDING\n";
+    } catch (Throwable $e) {
+        echo 'ROLLOUT_PHASE54_ERROR: ' . $e->getMessage() . "\n";
+    }
+}

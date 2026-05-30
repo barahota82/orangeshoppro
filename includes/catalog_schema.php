@@ -1722,64 +1722,6 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
 
-    if (orange_table_exists($pdo, 'categories') && !orange_table_has_column($pdo, 'categories', 'department_id')) {
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE categories ADD COLUMN department_id INT NULL');
-        orange_catalog_safe_exec($pdo, 'ALTER TABLE categories ADD INDEX idx_categories_department (department_id)');
-    }
-
-    /*
-     |--------------------------------------------------------------------------
-     | Categories / subcategories: ترقية أطوال varchar القديمة (مثلاً 100) → 191
-     |--------------------------------------------------------------------------
-     | يطابق scripts/mysql-create-orange-database-full.sql (تثبيت من الصفر).
-     | قواعد قديمة بدون استيراد كامل: نفس أعمدة scripts/mysql-fix-drift-match-catalog-schema.sql (قسم 1).
-     | MODIFY يُنفَّذ فقط عندما يكون الطول الحالي أقل من 191 (لا إعادة ALTER في كل طلب).
-     */
-    if (orange_table_exists($pdo, 'categories')) {
-        $widenCat = static function (PDO $pdo, string $column, string $alterSql): void {
-            if (!orange_table_has_column($pdo, 'categories', $column)) {
-                return;
-            }
-            try {
-                $ml = orange_schema_varchar_max_length($pdo, 'categories', $column);
-                if ($ml > 0 && $ml < 191) {
-                    orange_catalog_safe_exec($pdo, $alterSql);
-                }
-            } catch (Throwable $e) {
-                if (function_exists('error_log')) {
-                    error_log('[orange] categories.' . $column . ' widen: ' . $e->getMessage());
-                }
-            }
-        };
-        $widenCat($pdo, 'name_en', 'ALTER TABLE categories MODIFY COLUMN name_en VARCHAR(191) NULL DEFAULT NULL');
-        $widenCat($pdo, 'name_ar', 'ALTER TABLE categories MODIFY COLUMN name_ar VARCHAR(191) NULL DEFAULT NULL');
-        $widenCat($pdo, 'name_fil', 'ALTER TABLE categories MODIFY COLUMN name_fil VARCHAR(191) NULL DEFAULT NULL');
-        $widenCat($pdo, 'name_hi', 'ALTER TABLE categories MODIFY COLUMN name_hi VARCHAR(191) NULL DEFAULT NULL');
-        $widenCat($pdo, 'slug', 'ALTER TABLE categories MODIFY COLUMN slug VARCHAR(191) NOT NULL');
-    }
-    if (orange_table_exists($pdo, 'subcategories')) {
-        $widenSub = static function (PDO $pdo, string $column, string $alterSql): void {
-            if (!orange_table_has_column($pdo, 'subcategories', $column)) {
-                return;
-            }
-            try {
-                $ml = orange_schema_varchar_max_length($pdo, 'subcategories', $column);
-                if ($ml > 0 && $ml < 191) {
-                    orange_catalog_safe_exec($pdo, $alterSql);
-                }
-            } catch (Throwable $e) {
-                if (function_exists('error_log')) {
-                    error_log('[orange] subcategories.' . $column . ' widen: ' . $e->getMessage());
-                }
-            }
-        };
-        $widenSub($pdo, 'name_ar', 'ALTER TABLE subcategories MODIFY COLUMN name_ar VARCHAR(191) NOT NULL');
-        $widenSub($pdo, 'name_en', 'ALTER TABLE subcategories MODIFY COLUMN name_en VARCHAR(191) NULL DEFAULT NULL');
-        $widenSub($pdo, 'name_fil', 'ALTER TABLE subcategories MODIFY COLUMN name_fil VARCHAR(191) NULL DEFAULT NULL');
-        $widenSub($pdo, 'name_hi', 'ALTER TABLE subcategories MODIFY COLUMN name_hi VARCHAR(191) NULL DEFAULT NULL');
-        $widenSub($pdo, 'slug', 'ALTER TABLE subcategories MODIFY COLUMN slug VARCHAR(191) NOT NULL');
-    }
-
     /*
      |--------------------------------------------------------------------------
      | Unified catalog taxonomy (ERD Phase A — docs/archive/ORANGE_UNIFIED_TAXONOMY_AND_CATALOG_ERD.txt)
@@ -3686,6 +3628,8 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
         orange_catalog_ensure_products_product_type_id_not_null($pdo);
         orange_catalog_ensure_products_drop_legacy_classification_columns($pdo);
         orange_catalog_ensure_products_product_type_id_not_null($pdo);
+        require_once __DIR__ . '/catalog_legacy_tables_drop_phase54.php';
+        orange_catalog_ensure_legacy_taxonomy_tables_dropped_phase54($pdo);
 
         if ($apcuTtl > 0 && function_exists('apcu_store')) {
             @apcu_store($apcuKey, 1, $apcuTtl);
@@ -3738,6 +3682,8 @@ function orange_catalog_runtime_light_hooks(PDO $pdo): void
         orange_catalog_ensure_legacy_closure_phase5($pdo);
         require_once __DIR__ . '/catalog_polish_phase6.php';
         orange_catalog_ensure_polish_phase6($pdo);
+        require_once __DIR__ . '/catalog_legacy_tables_drop_phase54.php';
+        orange_catalog_ensure_legacy_taxonomy_tables_dropped_phase54($pdo);
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] orange_catalog_runtime_light_hooks: ' . $e->getMessage());

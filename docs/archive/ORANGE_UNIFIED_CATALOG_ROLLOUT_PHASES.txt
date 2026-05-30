@@ -3,7 +3,7 @@ ORANGE — خطة مراحل تنفيذ الشجرة الموحّدة (Unified C
 Archive: docs/archive/ORANGE_UNIFIED_CATALOG_ROLLOUT_PHASES.txt
 مرجع سياسة/ERD: docs/archive/ORANGE_UNIFIED_TAXONOMY_AND_CATALOG_ERD.txt
 مرجع مختصر: docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt — «تاسعاً»
-Last updated: 2026-05-20 (المرحلة **6 مغلقة** — polish)
+Last updated: 2026-05-20 (المرحلة **5.4 مغلقة** — إسقاط جداول legacy taxonomy)
 
 **سياسة المالك (إلزامي للوكلاء):** **لا SQL يدوي** — **push → أوتوماتيك على السيرفر**؛ runtime hooks (multicountry · قنوات · product_types · منتجات · legacy closure · polish) **أوتوماتيك** — **لا تعليمات تشغيل للمالك**.
 
@@ -25,7 +25,7 @@ Last updated: 2026-05-20 (المرحلة **6 مغلقة** — polish)
 | 5       | إغلاق Legacy                      | **مغلق**    | 2026-05-20    |
 | 6       | Polish (اختياري)                  | **مغلق**    | 2026-05-20    |
 
-**تقدير إجمالي الشجرة الموحّدة (تشغيلي):** ~**100%** (المراحل 0–6 مغلقة؛ 5.4 اختياري — إسقاط جداول legacy).
+**تقدير إجمالي الشجرة الموحّدة (تشغيلي):** **100%** (المراحل 0–6 + 5.4 مغلقة؛ لا بنود مفتوحة في خطة الشجرة).
 
 
 **آخر تحقق سيرفر (قبل إغلاق 1 — 2026-05-30):**
@@ -46,6 +46,7 @@ Last updated: 2026-05-20 (المرحلة **6 مغلقة** — polish)
 - `includes/catalog_kw_product_types_seed.php` — product_types لكل **دولة نشطة**
 - `includes/catalog_kw_products_phase3.php` — جاهزية منتجات لكل **دولة نشطة**
 - `includes/catalog_legacy_closure_phase5.php` — **`orange_catalog_ensure_legacy_closure_phase5`** (NOT NULL · إسقاط category_id/subcategory_id)
+- `includes/catalog_legacy_tables_drop_phase54.php` — **`orange_catalog_ensure_legacy_taxonomy_tables_dropped_phase54`** (DROP categories/subcategories)
 - `includes/catalog_polish_phase6.php` — **`orange_catalog_ensure_polish_phase6`** (SEO backfill)
 - `includes/product_channels.php` — ربط scoped بالدولة
 - `includes/catalog_schema.php` — **`orange_catalog_runtime_light_hooks`**
@@ -134,9 +135,9 @@ STATUS: **CLOSED** (2026-05-20)
 | 5.1 | متجر + أدmin + APIs على الموحّد فقط | **done** | home · APIs · resolve product_type_id |
 | 5.2 | product_type_id NOT NULL (كل المنتجات) | **done** | runtime phase5 + bootstrap |
 | 5.3 | إسقاط products.category_id / subcategory_id | **done** | `orange_catalog_ensure_legacy_closure_phase5` |
-| 5.4 | (اختياري) إسقاط categories / subcategories | **open** | آخر خطوة — لم يُنفَّذ |
+| 5.4 | إسقاط categories / subcategories | **done** | `orange_catalog_ensure_legacy_taxonomy_tables_dropped_phase54` · baseline SQL بدون legacy |
 
-**معيار إغلاق المرحلة 5:** ✅ لا مصدر حقيقة على category_id للمنتج في الكود؛ الأعمدة تُسقَط أوتوماتياً بعد pull+طلب.
+**معيار إغلاق المرحلة 5:** ✅ لا مصدر حقيقة على category_id للمنتج؛ أعمدة المنتج وجداول taxonomy التراثية مُسقَطة أوتوماتياً بعد push+طلب؛ `health.php?rollout=unified-phase54` → `ROLLOUT_PHASE54_OK`.
 
 ================================================================================
 7) المرحلة 6 — Polish (اختياري)

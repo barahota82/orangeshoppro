@@ -47,45 +47,6 @@ CREATE TABLE IF NOT EXISTS departments (
 SQL
         ,
         <<<'SQL'
-CREATE TABLE IF NOT EXISTS categories (
-  id INT NOT NULL AUTO_INCREMENT,
-  department_id INT DEFAULT NULL,
-  name_en VARCHAR(191) DEFAULT NULL,
-  name_ar VARCHAR(191) DEFAULT NULL,
-  name_fil VARCHAR(191) DEFAULT NULL,
-  name_hi VARCHAR(191) DEFAULT NULL,
-  slug VARCHAR(191) NOT NULL,
-  is_active TINYINT DEFAULT 1,
-  sort_order INT DEFAULT 0,
-  updated_at DATETIME DEFAULT NULL,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_categories_slug (slug),
-  KEY idx_categories_department (department_id),
-  KEY idx_categories_active (is_active)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-SQL
-        ,
-        <<<'SQL'
-CREATE TABLE IF NOT EXISTS subcategories (
-  id INT NOT NULL AUTO_INCREMENT,
-  department_id INT DEFAULT NULL,
-  category_id INT NOT NULL,
-  name_ar VARCHAR(191) NOT NULL,
-  name_en VARCHAR(191) DEFAULT NULL,
-  name_fil VARCHAR(191) DEFAULT NULL,
-  name_hi VARCHAR(191) DEFAULT NULL,
-  slug VARCHAR(191) NOT NULL,
-  is_active TINYINT(1) DEFAULT 1,
-  sort_order INT DEFAULT 0,
-  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT NULL,
-  PRIMARY KEY (id),
-  KEY idx_subcategories_category (category_id),
-  KEY idx_subcategories_department (department_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-SQL
-        ,
-        <<<'SQL'
 CREATE TABLE IF NOT EXISTS channels (
   id INT NOT NULL AUTO_INCREMENT,
   name VARCHAR(100) NOT NULL,
@@ -201,8 +162,6 @@ CREATE TABLE IF NOT EXISTS products (
   description_en TEXT,
   description_fil TEXT,
   description_hi TEXT,
-  category_id INT DEFAULT NULL,
-  subcategory_id INT DEFAULT NULL,
   price DECIMAL(10,2) NOT NULL,
   cost DECIMAL(10,2) NOT NULL,
   main_image VARCHAR(255) DEFAULT NULL,
@@ -226,8 +185,6 @@ CREATE TABLE IF NOT EXISTS products (
   item_code VARCHAR(64) DEFAULT NULL,
   barcode VARCHAR(64) DEFAULT NULL,
   PRIMARY KEY (id),
-  KEY idx_products_category_active (category_id, is_active),
-  KEY idx_products_subcategory (subcategory_id),
   KEY idx_products_slug (slug),
   KEY idx_products_sort (sort_order, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
