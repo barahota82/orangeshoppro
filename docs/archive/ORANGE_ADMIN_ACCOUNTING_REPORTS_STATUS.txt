@@ -1,6 +1,6 @@
 ORANGE — حالة شاشات الحسابات والتقارير (أدمن)
 Archive: docs/archive/ORANGE_ADMIN_ACCOUNTING_REPORTS_STATUS.txt
-Last updated: 2026-05-20 (ACC-14 سياسة GL مغلقة · GAP-ACC-07 مراحل 0–3 · §13.13 جزئي)
+Last updated: 2026-05-20 (GAP-ACC-05 مغلق · ACC-14 §0 · GAP-ACC-07 0–3 · §13.13 جزئي)
 Canvas companion: .cursor/projects/d-orange/canvases/admin-accounting-reports-completion.canvas.tsx
 تقرير نظام شامل: docs/archive/ORANGE_SYSTEM_COMPLETION_REPORT.txt
 
@@ -41,7 +41,7 @@ NAV SOURCE (حقيقة القائمة)
 | التقارير المالية               | 97%     | posted فور الحفظ؛ ACC-10 مغلق          |
 | مسار GL (سياسة ACC-14)         | 98%     | حفظ=تقارير؛ edit_lock=رقابة فقط         |
 | تسليم/قيود أونلاين (§13)       | 97%     | B1–B8؛ §13.13 O-01/04/07/08 مغلقة      |
-| **navAccountingAll مرجّح**     | **~96%**| **~4% — ذمم UX + §13.13 متبقي**         |
+| **navAccountingAll مرجّح**     | **~97%**| **~3% — §13.13 + ACC-13 اختياري**         |
 | **مع policy v2 (ACC-10)**   | **~86%**| تدفقات + تسويات (ACC-08 تراثي/PV)     |
 
 **§12.1 — حالة البنود الثلاثة (كود — 2026-05-20):**
@@ -54,7 +54,7 @@ NAV SOURCE (حقيقة القائمة)
 | B0–B8 | §13.14 مراحل 0–8 (تسليم → قiود → INV-O/C) | **منتهٍ** (§13.13 O-01…O-14 = سياسة مفتوحة) |
 
 ENGLISH
-- navAccountingAll ~96%. GL policy closed (ACC-14): save = reports immediately; edit_lock = control only. gl_posting redirects to edit_lock; pending queue opt-in only. GAP-ACC-07 phases 0–3 done. §13.13 partial (O-01/04/07/08 closed).
+- navAccountingAll ~97%. GAP-ACC-05 closed: supplier statement = COA leaf account (payable_account_id); no separate supplier mode. GL policy closed (ACC-14). GAP-ACC-07 phases 0–3 done. §13.13 partial.
 
 ================================================================================
 2) جرد الشاشات — الإعداد والدليل
@@ -138,7 +138,7 @@ partner_party_voucher_ui.php
 ================================================================================
 
 journal_voucher_reports — [منتهٍ] — posted vouchers فقط
-partner_account_statement — [جزئي] — عميل/GL؛ **لا وضع مورد**؛ filt_post لا يطابق pending model
+partner_account_statement — [منتهٍ] — عميل (mode=customer + subledger)؛ **مورد = حساب فرعي بالدليل** (`payable_account_id` + وضع account / زر من الموردين) — **GAP-ACC-05 مغلق by design**
 report_account_list — [منتهٍ] — دليل بدون أرصدة
 report_gl_account_monthly — [منتهٍ] — تجميع شهري لورقة ترحيل
 partner_reports (customers/suppliers) — [منتهٍ] — ذمم + reconcile؛ APIs summary/aging موجودة inline
@@ -180,7 +180,7 @@ manual_order / create-manual.php — [منتهٍ] — INV-C + GL عند الحف
 [GAP-ACC-03] ~~تعديل مرحّل~~ → **[مغلق — in-place بعد فك القفل]** GAP-ACC-14/ACC-03
 [GAP-ACC-04] ~~متوسط — YEC §9~~ → **[مغلق — منتهٍ 2026-05-20]** rev 63؛ year_end_close_vouchers؛ void
 [GAP-ACC-12] ~~متوسط — §13 حزمة~~ → **[مغلق — منتهٍ 2026-05-20]** B1–B8؛ §13.13 O-items = قرارات UX مفتوحة لا تمنع التشغيل
-[GAP-ACC-05] متوسط — partner_account_statement: وضع **مورد** (customer mode موجود؛ account mode للدليل)
+[GAP-ACC-05] ~~كشف حساب مورد~~ → **[مغلق — قرار مالك 2026-05-20]** — المورد **حساب فرعي باسمه** في الدليل (`suppliers.payable_account_id` إلزامي عند الحفظ)؛ **ليس** حساباً مجمعاً مثل العملاء؛ الكشف = `partner_account_statement?account=` أو من شاشة الموردين — **لا** mode=supplier منفصل
 [GAP-ACC-06] ~~صلاحيات post/unpost~~ → **[منتهٍ]** can_lock/can_unlock + edit_lock (rev 67)
 [GAP-ACC-07] ~~بنود فاتورة~~ → **[مراحل 0–3 منتهية 2026-05-20]** rev 68؛ مرحلة 4 VAT اختياري — **`ORANGE_INVOICE_ANCILLARY_LINES_POLICY.txt`**
 [GAP-ACC-08] ~~module expenses GL (غائب)~~ → **ملغى/تراثي** — المصروفات = **سند صرف** (payment_voucher / PV)؛ لا شاشة expenses مستقلة.
@@ -201,9 +201,9 @@ manual_order / create-manual.php — [منتهٍ] — INV-C + GL عند الحف
 - §10 print after save (A1)
 
 **المرحلة أ — تشغيل (أسبوع)**
-- GAP-ACC-05 كشف حساب **مورد** (mode=supplier)
+- ~~GAP-ACC-05 كشف حساب مورد~~ → **مغلق** (حساب فرعي بالدليل — §6 GAP-ACC-05)
 - GAP-ACC-09 فهرس التقارير (شارات pl_compare + trading)
-- GAP-ACC-11 توثيق UX في gl_posting: «§13 + YEC خارج الطابور»
+- ~~GAP-ACC-11 توثيق UX gl_posting~~ → **مغلق** (ACC-14 §0)
 
 **المرحلة ب — GL Lane A (roadmap phase 4)**
 - GAP-ACC-01، GAP-ACC-03 (~~ACC-02 ملغى~~)
@@ -233,6 +233,12 @@ manual_order / create-manual.php — [منتهٍ] — INV-C + GL عند الحف
 - **لا** rollback آلي لدفعة «إنشاء القيود» في v1 — **التصحيح يدوي** (سند عكسي، أو **edit_lock** → تعديل in-place) حسب GAP-ACC-03/14.
 - **السبب:** INV-O + `party_subledger` + تقارير GL — rollback دفعة يعقّد التدقيق.
 - **تنفيذ:** **لا كود** — السلوك الحالي (بدون rollback) هو المعتمد.
+
+**GAP-ACC-05 (كشف حساب مورد) — مغلق 2026-05-20 (قرار مالك — by design):**
+- **الفرق عن العملاء:** العميل = ذمة مجمّعة + `party_subledger`؛ **المورد = حساب فرعي باسمه** في الدليل (`suppliers.payable_account_id`) — **ليس** حساباً مجمعاً.
+- **إلزام الربط:** `admin/api/suppliers/save.php` يرفض الحفظ بدون `payable_account_id` (ورقة ترحيل تحت الخصوم).
+- **كشف المورد:** `partner_account_statement?account={payable_account_id}` — أو زر «كشف حساب» من `suppliers.php` — **وضع account** في الشاشة؛ **لا** حاجة لـ `mode=supplier` منفصل.
+- **تنفيذ:** `includes/supplier_payable_account.php`؛ `orange_supplier_required_payable_account_id()` في مشتريات/SPR.
 
 معيار 100%:
 - **حفظ = تقارير فوراً** (ACC-14) — طابور GL opt-in فقط
@@ -395,3 +401,5 @@ manual_order / create-manual.php — [منتهٍ] — INV-C + GL عند الحف
 2026-05-20 — §13.13 **O-07 مغلق:** **لا** زر إعادة طباعة دفعة — إعادة تحديد الطلبات + طباعة من **تسليم المندوب** يكفي (v1).
 2026-05-20 — §13.13 **O-08 مغلق:** **لا** rollback قيود أونلاين — التصحيح **يدوي** (سند عكسي / edit_lock)؛ v1 بدون زر تراجع.
 2026-05-20 — §13.13 **O-01 مغلق:** لا حالة «جاهز للتوزيع» — `approved` = جاهز للتوزيع؛ الموافقة قبل التوزيع.
+
+2026-05-20 — **GAP-ACC-05 مغلق (قرار مالك):** كشف مورد = حساب فرعي بالدليل؛ لا mode=supplier؛ إلزام payable_account_id في suppliers/save.php.

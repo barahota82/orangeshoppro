@@ -88,7 +88,7 @@ journal_voucher_reports, report_account_list, report_gl_account_monthly [منت�
 partner_reports, report_income_statement, report_trading_account*         [منتهٍ]
 report_pl_monthly, report_pl_compare_years, report_trial_balance          [منتهٍ]
 financial_report                                                        [منتهٍ]
-partner_account_statement                                               [جزئي GAP-ACC-05]
+partner_account_statement                                               [منتهٍ — GAP-ACC-05 مغلق]
 accounting_reports_index (بلا nav)                                      [GAP-ACC-09]
 
 ================================================================================
@@ -132,7 +132,7 @@ channels, delivery_areas, storefront_hero, merge_requests               [منت�
 
 [GAP-ACC-01] Lane A — تدقيق orange_voucher_post() (استثناء §9/§13)
 [GAP-ACC-03] تعديل journal/manage على سند مرحّل vs repost
-[GAP-ACC-05] partner_account_statement — وضع مورد
+[GAP-ACC-05] ~~partner_account_statement — وضع مورد~~ → **مغلق 2026-05-20** — المورد = حساب فرعي بالدليل (`payable_account_id`)؛ الكشف عبر `?account=` أو من الموردين — لا mode=supplier
 [GAP-ACC-06] صلاحيات post vs unpost
 [GAP-ACC-07] بنود فاتورة — قرار معتمد → ORANGE_INVOICE_ANCILLARY_LINES_POLICY.txt (تنفيذ مفتوح)
 [GAP-ACC-08] ~~module مصروفات GL (غائب)~~ → **ملغى/تراثي** — المصروفات = **سند صرف** (payment_voucher / PV)
@@ -141,13 +141,13 @@ channels, delivery_areas, storefront_hero, merge_requests               [منت�
 [GAP-ACC-11] ملاحظة UX gl_posting (YEC + §13 خارج الشاشة)
 [GAP-ACC-13] YEC تلميع بحث (اختياري)
 
-مغلقة: GAP-ACC-04 YEC | GAP-ACC-12 §13 | GAP-ACC-10 ACC-10 | GAP-ACC-02 **ملغى** | GAP-ACC-08 **تراثي/PV**
+مغلقة: GAP-ACC-04 YEC | GAP-ACC-05 كشف مورد | GAP-ACC-12 §13 | GAP-ACC-10 ACC-10 | GAP-ACC-02 **ملغى** | GAP-ACC-08 **تراثي/PV**
 
 ================================================================================
 9) خطة الإغلاق — 93% → 100%
 ================================================================================
 
-**100% تشغيلي:** ACC-05/09/11 → ACC-01/03 → ACC-06/07 + قرارات §13.13 عند الحاجة
+**100% تشغيلي:** §13.13 + ACC-13 اختياري → ACC-07 مرحلة 4 VAT اختياري
 **100% policy v2:** + ACC-10 (~~ACC-08~~ تراثي — سند صرف)
 
 **GAP-ACC-10 (خيار د — 2026-05-20):** **مغلق** — مراحل 0–4 منتهية (§6b.8 في ORANGE_ADMIN_ACCOUNTING_REPORTS_STATUS.txt).
