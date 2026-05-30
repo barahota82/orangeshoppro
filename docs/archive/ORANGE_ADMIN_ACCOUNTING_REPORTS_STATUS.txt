@@ -198,6 +198,14 @@ manual_order / create-manual.php — [منتهٍ] — INV-C + GL عند الحف
 
 **§13.13 (O-01…O-14):** قرارات UX/سياسة — **ليست** شرطاً لإغلاق ~88% الحالي؛ تُغلق بقرار المالك عند الحاجة.
 
+**§13.13 — O-04 (تغيير المندوب) — مغلق 2026-05-20 (قرار مالك):**
+- **مسموح** تعيين/تغيير `delivery_agent_id` على الطلبات في `pending` أو `approved` أو **`on_the_way`** (بعد «بالطريق للكل»).
+- **ممنوع** بعد `completed` / `cancelled` / `rejected`.
+- **تنفيذ:** `orange_delivery_agent_reassignable_order_statuses()` في `includes/delivery_agents.php`؛ `handover-to-agent.php`؛ `delivery_agent_handover.php` (يعرض «بالطريق» للإعادة توزيع).
+
+**§13.13 — O-07 (إعادة طباعة دفعة) — مغلق 2026-05-20 (قرار مالك):**
+- **لا** زر «إعادة طباعة آخر دفعة» / سجل دفعات — **إعادة التحديد يدوياً** في **تسليم المندوب** ثم **طباعة الورقة** أو **طباعة فواتير الدفعة** **يكفي** (O-07 = راحة فقط — **مؤجّل/مرفوض** في v1).
+
 معيار 100%:
 - كل مسار GL-emitting يمر orange_gl_pending_movements عند تفعيل الطابور (**مع استثناءات §9/§13 موثّقة**)
 - كل شاشات navAccountingAll [منتهٍ] بلا ثغرات حرجة في الجدول أعلاه
@@ -355,3 +363,5 @@ manual_order / create-manual.php — [منتهٍ] — INV-C + GL عند الحف
 2026-05-20 — GAP-ACC-10 **مرحلة 3 منتهية:** inventory_reconciliation (جرد، اعتماد، stock delta + قيد GL)؛ admin/api/inventory-reconciliation/*؛ includes/inventory_reconciliation.php.
 2026-05-20 — GAP-ACC-10 **مرحلة 4 منتهية + GAP مغلق:** analytical_dimensions + report_analytical؛ dimension_value_id على السندات؛ includes/analytical_report.php.
 2026-05-20 — سابق: ~88%؛ GAP-ACC-04/12 مغلق؛ rev 64 INV legacy.
+2026-05-20 — §13.13 **O-04 مغلق:** تغيير المندوب **مسموح** بعد `on_the_way` (قبل completed)؛ helper + handover API/UI.
+2026-05-20 — §13.13 **O-07 مغلق:** **لا** زر إعادة طباعة دفعة — إعادة تحديد الطلبات + طباعة من **تسليم المندوب** يكفي (v1).

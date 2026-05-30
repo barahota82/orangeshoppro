@@ -40,6 +40,16 @@ function orange_delivery_agent_assignable_statuses(): array
 }
 
 /**
+ * حالات الطلب التي يُسمح فيها تعيين/تغيير delivery_agent_id (§13.13 O-04 — مغلق 2026-05-20).
+ *
+ * @return list<string>
+ */
+function orange_delivery_agent_reassignable_order_statuses(): array
+{
+    return ['pending', 'approved', 'on_the_way'];
+}
+
+/**
  * @return array<int, array<string, mixed>>
  */
 function orange_delivery_agents_admin_list(PDO $pdo, ?int $countryId = null, ?string $statusFilter = null): array

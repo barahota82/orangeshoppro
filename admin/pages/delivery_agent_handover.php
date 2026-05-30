@@ -26,7 +26,7 @@ if ($hasAgentCol) {
         SELECT o.*, da.name_ar AS agent_name_ar
         FROM orders o
         LEFT JOIN delivery_agents da ON da.id = o.delivery_agent_id
-        WHERE o.status IN ('pending', 'approved')
+        WHERE o.status IN ('pending', 'approved', 'on_the_way')
           AND (o.order_source IS NULL OR o.order_source = '' OR o.order_source = 'website')
     ";
     $params = [];
@@ -47,12 +47,14 @@ if ($hasAgentCol) {
 $statusAr = [
     'pending' => 'قيد الانتظار',
     'approved' => 'مقبول',
+    'on_the_way' => 'بالطريق',
 ];
 ?>
 <div class="admin-fy-shell" dir="rtl">
     <h1 class="admin-fy-shell__title">تسليم المندوب</h1>
     <p class="admin-fy-shell__lead">
         اختر مندوباً ثم حدّد الطلبات — <strong>حفظ</strong> يُسجّل <code>delivery_agent_id</code> فقط (بدون «بالطريق»).
+        <strong>تغيير المندوب مسموح</strong> حتى بعد «بالطريق» — قبل <code>completed</code>.
         «بالطريق» و«تم التوصيل» من <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">شاشة الطلبات</a>.
     </p>
 

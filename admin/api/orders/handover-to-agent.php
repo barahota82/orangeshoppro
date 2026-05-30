@@ -46,7 +46,7 @@ try {
 
     orange_admin_assert_row_country($pdo, 'delivery_agents', $agentId);
 
-    $allowedStatuses = ['pending', 'approved'];
+    $allowedStatuses = orange_delivery_agent_reassignable_order_statuses();
     $pdo->beginTransaction();
     $updated = 0;
 
