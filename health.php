@@ -117,3 +117,26 @@ if ($rollout === 'unified-phase2') {
         echo 'ROLLOUT_PHASE2_ERROR: ' . $e->getMessage() . "\n";
     }
 }
+
+if ($rollout === 'unified-phase3') {
+    try {
+        require_once __DIR__ . '/includes/catalog_schema.php';
+        require_once __DIR__ . '/includes/catalog_kw_products_phase3.php';
+        require_once __DIR__ . '/includes/countries.php';
+        $pdoRollout = db();
+        orange_catalog_ensure_schema($pdoRollout);
+        $kwId = orange_countries_default_id($pdoRollout);
+        if ($kwId > 0) {
+            $gaps = orange_catalog_kw_products_phase3_gap_counts($pdoRollout, $kwId);
+            echo 'kw_missing_product_type=' . (int) ($gaps['missing_product_type'] ?? 0) . "\n";
+            echo 'kw_missing_default_variants=' . (int) ($gaps['missing_variants'] ?? 0) . "\n";
+            echo 'kw_missing_attributes_template=' . (int) ($gaps['missing_attributes'] ?? 0) . "\n";
+            $allOk = ($gaps['missing_product_type'] ?? 1) === 0
+                && ($gaps['missing_variants'] ?? 1) === 0
+                && ($gaps['missing_attributes'] ?? 1) === 0;
+            echo $allOk ? "ROLLOUT_PHASE3_OK\n" : "ROLLOUT_PHASE3_PENDING\n";
+        }
+    } catch (Throwable $e) {
+        echo 'ROLLOUT_PHASE3_ERROR: ' . $e->getMessage() . "\n";
+    }
+}
