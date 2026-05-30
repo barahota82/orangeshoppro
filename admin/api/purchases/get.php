@@ -24,6 +24,15 @@ $purCols = 'id, supplier_id, type, notes, total';
 if ($hasSupplierInvoiceCol) {
     $purCols = 'id, supplier_id, supplier_invoice_number, type, notes, total';
 }
+$hasInvDiscount = orange_table_has_column($pdo, 'purchases', 'invoice_discount_raw');
+$hasSubtotal = orange_table_has_column($pdo, 'purchases', 'subtotal');
+$hasPiDiscount = orange_table_has_column($pdo, 'purchase_items', 'discount_raw');
+if ($hasInvDiscount) {
+    $purCols .= ', invoice_discount_raw, invoice_discount_amount';
+}
+if ($hasSubtotal) {
+    $purCols .= ', subtotal';
+}
 $st = $pdo->prepare("SELECT $purCols FROM purchases WHERE id = ? LIMIT 1");
 $st->execute([$purchaseId]);
 $purchase = $st->fetch(PDO::FETCH_ASSOC);
@@ -51,6 +60,9 @@ $hasV = orange_table_has_column($pdo, 'purchase_items', 'variant_id');
 $base = 'SELECT pi.product_id, pi.qty, pi.cost, pi.qty_received,
     pr.name AS product_name, pr.is_active AS product_is_active, pr.cost AS product_cost,
     pr.has_colors, pr.has_sizes';
+if ($hasPiDiscount) {
+    $base .= ', pi.discount_raw, pi.discount_amount';
+}
 if ($hasV) {
     $base .= ', pi.variant_id, pv.color AS v_color, pv.size AS v_size
         FROM purchase_items pi
@@ -82,6 +94,8 @@ foreach ($rows as $row) {
         'qty' => (int) $row['qty'],
         'cost' => (float) $row['cost'],
         'qty_received' => $recv,
+        'discount_raw' => $hasPiDiscount ? trim((string) ($row['discount_raw'] ?? '')) : '',
+        'discount_amount' => $hasPiDiscount ? (float) ($row['discount_amount'] ?? 0) : 0.0,
         'product_name' => (string) $row['product_name'],
         'is_product_active' => (int) ($row['product_is_active'] ?? 1) === 1,
         'product_cost' => (float) ($row['product_cost'] ?? 0),
@@ -101,6 +115,9 @@ json_response([
             ? trim((string) ($purchase['supplier_invoice_number'] ?? ''))
             : '',
         'total' => (float) $purchase['total'],
+        'subtotal' => $hasSubtotal ? (float) ($purchase['subtotal'] ?? 0) : (float) $purchase['total'],
+        'invoice_discount_raw' => $hasInvDiscount ? trim((string) ($purchase['invoice_discount_raw'] ?? '')) : '',
+        'invoice_discount_amount' => $hasInvDiscount ? (float) ($purchase['invoice_discount_amount'] ?? 0) : 0.0,
     ],
     'items' => $items,
     'has_received_stock' => $hasReceived,

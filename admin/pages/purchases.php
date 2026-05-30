@@ -147,11 +147,71 @@ if ($prefillStmtKind === 'supplier' && $prefillStmtId > 0) {
 }
 
 $pv2Ready = ($inventoryAccId !== null && $inventoryAccId > 0 && $cashAccId !== null && $cashAccId > 0);
+$pv2NavReady = orange_table_exists($pdo, 'purchases');
 $jvGlSettingsUrl = storefront_public_path('/admin/index.php?page=gl_account_settings');
 $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers');
 ?>
 <style>
-/* صف 2 — 3 خانات في سطر واحد: تصغير الجانبين 0.35fr → ملاحظات +0.7fr (0.65 + 1.7 + 0.65 = 3fr) */
+.jv-search-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10060;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    direction: rtl;
+}
+.jv-search-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+}
+.jv-search-modal__panel {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: min(96vw, 58rem);
+    max-height: calc(100vh - 32px);
+    overflow: auto;
+    background: #fff;
+    border: 1px solid #e4e4e7;
+    border-radius: 10px;
+    box-shadow: 0 20px 50px rgba(0,0,0,.18);
+}
+.jv-search-modal__head {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px 16px;
+    border-bottom: 1px solid #e4e4e7;
+}
+.jv-search-modal__title { margin: 0; font-size: 1.05rem; text-align: center; }
+.jv-search-modal__body { padding: 14px 16px 18px; }
+.jv-search-modal__form { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.jv-search-modal__row--fields {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    gap: 10px;
+    width: 100%;
+    overflow-x: auto;
+}
+.jv-search-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.jv-search-field label { font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+.jv-search-field input { width: 100%; box-sizing: border-box; }
+.jv-search-field--id { flex: 0 0 7rem; }
+.jv-search-field--date { flex: 0 0 11rem; }
+.jv-search-field--ref { flex: 1 1 0; min-width: 7rem; }
+.jv-search-field--full { width: 100%; }
+.jv-search-modal__actions { margin: 0 0 16px; }
+.jv-search-table-wrap { max-height: min(40vh, 22rem); overflow: auto; border: 1px solid #e4e4e7; border-radius: 8px; }
+.jv-search-results-table { margin: 0; font-size: 0.9rem; }
+.jv-search-results-table tbody tr { cursor: pointer; }
+.jv-search-results-table tbody tr:hover { background: #f4f4f5; }
+/* صف 2 — 3 خانات في سطر واحد */
 .form-grid.form-grid-3.pv2-header-row2 {
     grid-template-columns: minmax(6.5rem, 0.65fr) minmax(0, 1.7fr) minmax(5.5rem, 0.65fr);
 }
@@ -170,8 +230,8 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 </div>
 <?php endif; ?>
 
-<div class="card">
-    <h3 class="card-title">فاتورة شراء</h3>
+<div class="card jv-print-area">
+    <h3 class="card-title">فاتورة شراء <span id="pv2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
 
     <!-- ١ — المورد -->
     <div class="form-grid" style="margin-bottom:12px;">
@@ -240,10 +300,18 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     </div>
 
     <!-- ٤ — أزرار -->
-    <div class="actions admin-doc-lines-toolbar" style="margin-top:16px;">
+    <div class="actions admin-doc-lines-toolbar jv-doc-toolbar jv-print-hide" style="margin-top:16px;">
         <span></span>
         <div class="jv-toolbar-primary-group">
-            <button type="button" id="pv2_btn_new" title="فاتورة جديدة">فاتورة جديدة</button>
+            <div class="jv-voucher-nav-btns" role="group" aria-label="تنقل بين فواتير الشراء">
+                <button type="button" class="btn-secondary jv-nav-btn" id="pv2_nav_first" title="أول فاتورة" aria-label="أول فاتورة">&lt;&lt;</button>
+                <button type="button" class="btn-secondary jv-nav-btn" id="pv2_nav_prev" title="الفاتورة السابقة" aria-label="الفاتورة السابقة">&lt;</button>
+                <button type="button" class="btn-secondary jv-nav-btn" id="pv2_nav_next" title="الفاتورة التالية" aria-label="الفاتورة التالية">&gt;</button>
+                <button type="button" class="btn-secondary jv-nav-btn" id="pv2_nav_last" title="آخر فاتورة" aria-label="آخر فاتورة">&gt;&gt;</button>
+                <button type="button" class="btn-secondary jv-nav-search" id="pv2_btn_search" title="بحث عن فاتورة">بحث</button>
+            </div>
+            <button type="button" class="btn-secondary" id="pv2_btn_print" title="طباعة الفاتورة المعروضة" disabled>طباعة</button>
+            <button type="button" class="btn-secondary" id="pv2_btn_new" title="فاتورة جديدة">فاتورة جديدة</button>
             <button type="button" id="pv2_btn_save"<?php echo !$pv2Ready ? ' disabled' : ''; ?>>حفظ</button>
         </div>
     </div>
@@ -261,6 +329,74 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     </div>
 </div>
 
+<!-- Search Modal -->
+<div id="pv2_search_modal" class="jv-search-modal jv-print-hide" style="display:none;" aria-hidden="true" role="dialog" aria-labelledby="pv2_search_modal_title">
+    <div class="jv-search-modal__backdrop" id="pv2_search_modal_backdrop"></div>
+    <div class="jv-search-modal__panel">
+        <div class="jv-search-modal__head">
+            <h3 id="pv2_search_modal_title" class="jv-search-modal__title">بحث في فواتير الشراء</h3>
+        </div>
+        <div class="jv-search-modal__body">
+            <div class="jv-search-modal__form">
+                <div class="jv-search-modal__row jv-search-modal__row--fields">
+                    <div class="jv-search-field jv-search-field--id">
+                        <label for="pv2_search_id_from">رقم الفاتورة — من</label>
+                        <input type="number" id="pv2_search_id_from" class="admin-inp" min="1" step="1" dir="ltr" lang="en">
+                    </div>
+                    <div class="jv-search-field jv-search-field--id">
+                        <label for="pv2_search_id_to">رقم الفاتورة — إلى</label>
+                        <input type="number" id="pv2_search_id_to" class="admin-inp" min="1" step="1" dir="ltr" lang="en">
+                    </div>
+                    <div class="jv-search-field jv-search-field--date">
+                        <label for="pv2_search_date_from">التاريخ — من</label>
+                        <input type="text" id="pv2_search_date_from" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off">
+                    </div>
+                    <div class="jv-search-field jv-search-field--date">
+                        <label for="pv2_search_date_to">التاريخ — إلى</label>
+                        <input type="text" id="pv2_search_date_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off">
+                    </div>
+                    <div class="jv-search-field jv-search-field--ref">
+                        <label for="pv2_search_ref">المرجع PUR- (يحتوي النص)</label>
+                        <input type="text" id="pv2_search_ref" class="admin-inp" autocomplete="off" dir="ltr" lang="en">
+                    </div>
+                </div>
+                <div class="jv-search-modal__row">
+                    <div class="jv-search-field jv-search-field--full">
+                        <label for="pv2_search_supplier_inv">رقم فاتورة المورد (يحتوي النص)</label>
+                        <input type="text" id="pv2_search_supplier_inv" class="admin-inp" autocomplete="off" dir="ltr" lang="en">
+                    </div>
+                </div>
+                <div class="jv-search-modal__row">
+                    <div class="jv-search-field jv-search-field--full">
+                        <label for="pv2_search_notes">ملاحظات (يحتوي النص)</label>
+                        <input type="text" id="pv2_search_notes" class="admin-inp" autocomplete="off" dir="auto">
+                    </div>
+                </div>
+            </div>
+            <div class="actions jv-search-modal__actions">
+                <button type="button" id="pv2_search_btn">تنفيذ البحث</button>
+            </div>
+            <div class="jv-search-modal__results">
+                <div class="table-wrap jv-search-table-wrap">
+                    <table class="admin-table jv-search-results-table">
+                        <thead>
+                            <tr>
+                                <th>رقم</th>
+                                <th>تاريخ</th>
+                                <th>مرجع</th>
+                                <th>مورد</th>
+                                <th>رقم ف. المورد</th>
+                                <th>صافي</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pv2_search_results"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 (function () {
     var PV2_PRODUCTS = <?php echo json_encode($products, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
@@ -269,8 +405,11 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     var PV2_SUPPLIER_PAYABLE = <?php echo json_encode($supplierPayableMap, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var PV2_PREFILL_SUPPLIER = <?php echo (int) $prefillSupplierId; ?>;
     var PV2_READY = <?php echo $pv2Ready ? 'true' : 'false'; ?>;
+    var PV2_NAV_READY = <?php echo $pv2NavReady ? 'true' : 'false'; ?>;
 
     var currentSupplierId = 0;
+    var browsePurchaseId = 0;
+    var pv2ViewMode = false;
 
     function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
     function fmt3(n) {
@@ -553,9 +692,185 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         if (ntEl) ntEl.textContent = fmt3(netTotal);
     }
 
+    function pv2SyncToolbar() {
+        var pb = document.getElementById('pv2_btn_print');
+        if (pb) {
+            pb.disabled = browsePurchaseId <= 0;
+            pb.title = browsePurchaseId > 0 ? 'طباعة الفاتورة المعروضة' : 'افتح فاتورة محفوظة للطباعة';
+        }
+        var sb = document.getElementById('pv2_btn_save');
+        if (sb) {
+            sb.disabled = !PV2_READY || pv2ViewMode;
+            sb.title = pv2ViewMode ? 'وضع العرض — استخدم «فاتورة جديدة» للإدخال' : 'حفظ فاتورة جديدة';
+        }
+        var lbl = document.getElementById('pv2_browse_label');
+        if (lbl) {
+            lbl.textContent = browsePurchaseId > 0 ? ('— عرض PUR-' + browsePurchaseId) : '';
+        }
+    }
+
+    function pv2SetViewMode(on) {
+        pv2ViewMode = !!on;
+        var card = document.querySelector('.jv-print-area');
+        if (card) {
+            card.querySelectorAll('input, select, button.admin-doc-line-remove').forEach(function (el) {
+                if (el.id === 'pv2_btn_new' || el.id === 'pv2_btn_print' || el.closest('.jv-voucher-nav-btns') || el.id === 'pv2_btn_search') {
+                    return;
+                }
+                if (el.id === 'pv2_btn_save') {
+                    return;
+                }
+                el.disabled = pv2ViewMode || (!PV2_READY && el.id !== 'pv2_supplier_code');
+            });
+        }
+        pv2SyncToolbar();
+    }
+
+    function pv2FillLineRow(tr, item) {
+        var bc = tr.querySelector('.pv2-barcode');
+        var sel = tr.querySelector('.pv2-product');
+        if (sel) {
+            sel.value = String(item.product_id || '');
+            updateVariantCell(sel);
+        }
+        var vsel = tr.querySelector('.pv2-variant');
+        if (vsel && item.variant_id) {
+            vsel.value = String(item.variant_id);
+        }
+        if (bc) {
+            var prod = null;
+            for (var i = 0; i < PV2_PRODUCTS.length; i++) {
+                if (PV2_PRODUCTS[i].id === item.product_id) { prod = PV2_PRODUCTS[i]; break; }
+            }
+            if (prod) bc.value = prod.item_code || prod.barcode || '';
+        }
+        var qEl = tr.querySelector('.pv2-qty');
+        if (qEl) qEl.value = String(item.qty || 1);
+        var cEl = tr.querySelector('.pv2-cost');
+        if (cEl) cEl.value = fmt3(item.cost || 0);
+        var dEl = tr.querySelector('.pv2-discount');
+        if (dEl) dEl.value = item.discount_raw || '';
+    }
+
+    function pv2ApplyPurchasePayload(res) {
+        if (!res || !res.success || !res.purchase) {
+            alert((res && res.message) || 'تعذر تحميل الفاتورة');
+            return;
+        }
+        var p = res.purchase;
+        browsePurchaseId = parseInt(String(p.id || '0'), 10) || 0;
+        selectSupplier(parseInt(String(p.supplier_id || '0'), 10) || 0);
+        var typeEl = document.getElementById('pv2_type');
+        if (typeEl) typeEl.value = p.type || 'cash';
+        var notesEl = document.getElementById('pv2_notes');
+        if (notesEl) notesEl.value = p.notes || '';
+        var invEl = document.getElementById('pv2_supplier_invoice');
+        if (invEl) invEl.value = p.supplier_invoice_number || '';
+        var invDiscEl = document.getElementById('pv2_invoice_discount');
+        if (invDiscEl) invDiscEl.value = p.invoice_discount_raw || '';
+
+        var tb = document.getElementById('pv2_lines_body');
+        if (tb) {
+            tb.innerHTML = '';
+            var items = res.items || [];
+            if (!items.length) {
+                addLine();
+            } else {
+                items.forEach(function (item) {
+                    addLine();
+                    var rows = tb.querySelectorAll('tr.pv2-line');
+                    pv2FillLineRow(rows[rows.length - 1], item);
+                });
+            }
+            syncTrailing();
+        }
+        recalcAll();
+        pv2SetViewMode(true);
+    }
+
+    function pv2LoadPurchase(id) {
+        id = parseInt(String(id || '0'), 10) || 0;
+        if (id <= 0) return;
+        fetch('/admin/api/purchases/get.php?purchase_id=' + encodeURIComponent(String(id)), {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' }
+        }).then(function (r) { return r.json(); }).then(function (res) {
+            pv2ApplyPurchasePayload(res);
+        }).catch(function (e) { alert(e.message || String(e)); });
+    }
+
+    function pv2Nav(where) {
+        if (!PV2_NAV_READY) return;
+        postJSON('/admin/api/purchases/browse.php', {
+            action: 'nav',
+            where: where,
+            current_id: browsePurchaseId || 0
+        }).then(function (r) {
+            if (!r.success || !r.id) {
+                alert(r.message || 'لا توجد فاتورة');
+                return;
+            }
+            pv2LoadPurchase(r.id);
+        }).catch(function (e) { alert(e.message || String(e)); });
+    }
+
+    function pv2SearchOpen() {
+        var m = document.getElementById('pv2_search_modal');
+        if (m) { m.style.display = 'flex'; m.setAttribute('aria-hidden', 'false'); }
+    }
+    function pv2SearchClose() {
+        var m = document.getElementById('pv2_search_modal');
+        if (m) { m.style.display = 'none'; m.setAttribute('aria-hidden', 'true'); }
+    }
+    function pv2SearchRun() {
+        var idFrom = parseInt(document.getElementById('pv2_search_id_from').value, 10) || 0;
+        var idTo = parseInt(document.getElementById('pv2_search_id_to').value, 10) || 0;
+        var dateFrom = (typeof orangeGetDmyValueAsIso === 'function') ? orangeGetDmyValueAsIso(document.getElementById('pv2_search_date_from')) || '' : '';
+        var dateTo = (typeof orangeGetDmyValueAsIso === 'function') ? orangeGetDmyValueAsIso(document.getElementById('pv2_search_date_to')) || '' : '';
+        var ref = (document.getElementById('pv2_search_ref').value || '').trim();
+        var supplierInv = (document.getElementById('pv2_search_supplier_inv').value || '').trim();
+        var notes = (document.getElementById('pv2_search_notes').value || '').trim();
+        var tbody = document.getElementById('pv2_search_results');
+        tbody.innerHTML = '<tr><td colspan="6">جاري البحث…</td></tr>';
+        var payload = { action: 'search' };
+        if (idFrom > 0) payload.id_from = idFrom;
+        if (idTo > 0) payload.id_to = idTo;
+        if (dateFrom) payload.date_from = dateFrom;
+        if (dateTo) payload.date_to = dateTo;
+        if (ref) payload.reference = ref;
+        if (supplierInv) payload.supplier_invoice = supplierInv;
+        if (notes) payload.notes = notes;
+        postJSON('/admin/api/purchases/browse.php', payload).then(function (r) {
+            tbody.innerHTML = '';
+            if (!r.success || !r.results || !r.results.length) {
+                tbody.innerHTML = '<tr><td colspan="6" class="muted">لا نتائج</td></tr>';
+                return;
+            }
+            r.results.forEach(function (v) {
+                var tr = document.createElement('tr');
+                tr.innerHTML = '<td>' + esc(String(v.id)) + '</td>'
+                    + '<td>' + esc(v.created_at_dmy || '') + '</td>'
+                    + '<td dir="ltr">' + esc(v.reference || '') + '</td>'
+                    + '<td>' + esc(v.supplier_name || '') + '</td>'
+                    + '<td dir="ltr">' + esc(v.supplier_invoice_number || '') + '</td>'
+                    + '<td dir="ltr">' + fmt3(v.total || 0) + '</td>';
+                tr.addEventListener('dblclick', function () { pv2LoadPurchase(v.id); pv2SearchClose(); });
+                tbody.appendChild(tr);
+            });
+        }).catch(function (e) {
+            tbody.innerHTML = '<tr><td colspan="6">' + esc(e.message || String(e)) + '</td></tr>';
+        });
+    }
+
+    function pv2ResetNew() {
+        browsePurchaseId = 0;
+        pv2SetViewMode(false);
+        location.reload();
+    }
+
     /* ── Save ───────────────────────────────────────────────────────── */
     function save() {
-        if (!PV2_READY) return;
+        if (!PV2_READY || pv2ViewMode) return;
         var supplierId = parseInt(document.getElementById('pv2_supplier_id').value, 10) || 0;
         var purType = document.getElementById('pv2_type').value;
         var notes = (document.getElementById('pv2_notes').value || '').trim();
@@ -641,7 +956,32 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         document.getElementById('pv2_invoice_discount').addEventListener('input', function () { recalcAll(); });
 
         document.getElementById('pv2_btn_save').addEventListener('click', save);
-        document.getElementById('pv2_btn_new').addEventListener('click', function () { location.reload(); });
+        document.getElementById('pv2_btn_new').addEventListener('click', pv2ResetNew);
+        document.getElementById('pv2_btn_print').addEventListener('click', function () {
+            if (browsePurchaseId <= 0) {
+                alert('افتح فاتورة محفوظة للطباعة.');
+                return;
+            }
+            window.print();
+        });
+
+        document.getElementById('pv2_nav_first').addEventListener('click', function () { pv2Nav('first'); });
+        document.getElementById('pv2_nav_prev').addEventListener('click', function () { pv2Nav('prev'); });
+        document.getElementById('pv2_nav_next').addEventListener('click', function () { pv2Nav('next'); });
+        document.getElementById('pv2_nav_last').addEventListener('click', function () { pv2Nav('last'); });
+        document.getElementById('pv2_btn_search').addEventListener('click', pv2SearchOpen);
+        document.getElementById('pv2_search_btn').addEventListener('click', pv2SearchRun);
+        document.getElementById('pv2_search_modal_backdrop').addEventListener('click', pv2SearchClose);
+        document.addEventListener('mousedown', function (ev) {
+            var m = document.getElementById('pv2_search_modal');
+            if (!m || m.style.display !== 'flex') return;
+            var panel = m.querySelector('.jv-search-modal__panel');
+            if (panel && (panel === ev.target || panel.contains(ev.target))) return;
+            if (ev.target.closest && ev.target.closest('#pv2_btn_search')) return;
+            pv2SearchClose();
+        }, true);
+
+        pv2SyncToolbar();
 
         var tb = document.getElementById('pv2_lines_body');
         if (tb) {
