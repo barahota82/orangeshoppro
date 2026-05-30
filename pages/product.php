@@ -77,6 +77,28 @@ if ($mainForOg !== '') {
 
 include __DIR__ . '/../includes/header.php';
 
+$sfProductJsonLd = [
+    '@context' => 'https://schema.org',
+    '@type' => 'Product',
+    'name' => storefront_product_display_name($product),
+    'description' => storefront_product_seo_meta_description($product),
+    'sku' => trim((string) ($product['item_code'] ?? '')) ?: (string) $id,
+    'offers' => [
+        '@type' => 'Offer',
+        'priceCurrency' => 'KWD',
+        'price' => number_format((float) ($product['price'] ?? 0), 3, '.', ''),
+        'availability' => 'https://schema.org/InStock',
+        'url' => $ORANGE_STOREFRONT_CANONICAL_URL ?? '',
+    ],
+];
+$mainImgLd = trim((string) ($product['main_image'] ?? ''));
+if ($mainImgLd !== '') {
+    $imgLdPath = storefront_product_image_href($mainImgLd);
+    if ($imgLdPath !== '') {
+        $sfProductJsonLd['image'] = storefront_absolute_url($imgLdPath);
+    }
+}
+
 $imagesStmt = $pdo->prepare("SELECT * FROM product_images WHERE product_id = ? ORDER BY id ASC");
 $imagesStmt->execute([$id]);
 $images = $imagesStmt->fetchAll();
@@ -326,7 +348,12 @@ if ((int) $product['has_colors'] === 1 && orange_table_exists($pdo, 'product_col
 $glPrevLabel = htmlspecialchars(t('product_gallery_prev'), ENT_QUOTES, 'UTF-8');
 $glNextLabel = htmlspecialchars(t('product_gallery_next'), ENT_QUOTES, 'UTF-8');
 $glDotsLabel = htmlspecialchars(t('product_gallery_dots'), ENT_QUOTES, 'UTF-8');
+$sfProductJsonLdFlags = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+    $sfProductJsonLdFlags |= JSON_INVALID_UTF8_SUBSTITUTE;
+}
 ?>
+<script type="application/ld+json"><?php echo json_encode($sfProductJsonLd, $sfProductJsonLdFlags); ?></script>
 <div class="container">
     <nav class="product-page-toolbar product-page-toolbar--dual" aria-label="<?php echo htmlspecialchars(t('product_back_to_shop'), ENT_QUOTES, 'UTF-8'); ?>">
         <a class="product-page__back" href="<?php echo htmlspecialchars($homeUrl, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(t('product_back_to_shop'), ENT_QUOTES, 'UTF-8'); ?></a>

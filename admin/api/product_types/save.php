@@ -50,6 +50,17 @@ try {
     $nameHi = trim((string) ($data['name_hi'] ?? ''));
     $expCk = $sanitizeKind32((string) ($data['expected_commercial_kind_key'] ?? ''));
     $expSk = $sanitizeCat64((string) ($data['expected_sizing_category_key'] ?? ''));
+    $defaultAdvGuideId = isset($data['default_advisory_sizing_guide_id']) ? (int) $data['default_advisory_sizing_guide_id'] : 0;
+    if ($defaultAdvGuideId <= 0) {
+        $defaultAdvGuideId = null;
+    } elseif (orange_table_exists($pdo, 'advisory_sizing_guides')) {
+        $gst = $pdo->prepare('SELECT id, is_active FROM advisory_sizing_guides WHERE id = ? LIMIT 1');
+        $gst->execute([$defaultAdvGuideId]);
+        $grow = $gst->fetch(PDO::FETCH_ASSOC);
+        if (! is_array($grow) || (int) ($grow['is_active'] ?? 0) !== 1) {
+            json_response(['success' => false, 'message' => 'دليل المقاس الاسترشادي الافتراضي غير موجود أو غير نشط.'], 422);
+        }
+    }
     $sortOrder = (int) ($data['sort_order'] ?? 0);
     $active = (int) ($data['is_active'] ?? 1) === 0 ? 0 : 1;
 
@@ -127,6 +138,8 @@ try {
         $sortOrder = 1;
     }
 
+    $hasDefaultAdvCol = orange_table_has_column($pdo, 'product_types', 'default_advisory_sizing_guide_id');
+
     if ($id > 0) {
         $exists = $pdo->prepare('SELECT id FROM product_types WHERE id = ? LIMIT 1');
         $exists->execute([$id]);
@@ -134,10 +147,9 @@ try {
             json_response(['success' => false, 'message' => 'السجل غير موجود.'], 404);
         }
 
-        $pdo->prepare(
-            'UPDATE product_types SET catalog_subcategory_id = ?, slug = ?, name_ar = ?, name_en = ?, name_fil = ?, name_hi = ?,
-                expected_size_scheme_key = ?, expected_commercial_kind_key = ?, expected_sizing_category_key = ?, sort_order = ?, is_active = ? WHERE id = ? LIMIT 1'
-        )->execute([
+        $updSql = 'UPDATE product_types SET catalog_subcategory_id = ?, slug = ?, name_ar = ?, name_en = ?, name_fil = ?, name_hi = ?,
+                expected_size_scheme_key = ?, expected_commercial_kind_key = ?, expected_sizing_category_key = ?';
+        $updParams = [
             $subId,
             $slugRaw,
             $nameAr,
@@ -147,10 +159,16 @@ try {
             '',
             $expCk,
             $expSk,
-            $sortOrder,
-            $active,
-            $id,
-        ]);
+        ];
+        if ($hasDefaultAdvCol) {
+            $updSql .= ', default_advisory_sizing_guide_id = ?';
+            $updParams[] = $defaultAdvGuideId;
+        }
+        $updSql .= ', sort_order = ?, is_active = ? WHERE id = ? LIMIT 1';
+        $updParams[] = $sortOrder;
+        $updParams[] = $active;
+        $updParams[] = $id;
+        $pdo->prepare($updSql)->execute($updParams);
         audit_log('product_type_save', 'تحديث نوع منتج (شجرة موحّدة): ' . $slugRaw, 'product_types', $id);
         json_response([
             'success' => true,
@@ -160,12 +178,10 @@ try {
         ]);
     }
 
-    $pdo->prepare(
-        'INSERT INTO product_types (
-            catalog_subcategory_id, slug, name_ar, name_en, name_fil, name_hi,
-            expected_size_scheme_key, expected_commercial_kind_key, expected_sizing_category_key, sort_order, is_active
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?)'
-    )->execute([
+    $insCols = 'catalog_subcategory_id, slug, name_ar, name_en, name_fil, name_hi,
+            expected_size_scheme_key, expected_commercial_kind_key, expected_sizing_category_key';
+    $insPh = '?,?,?,?,?,?,?,?,?';
+    $insParams = [
         $subId,
         $slugRaw,
         $nameAr,
@@ -175,9 +191,17 @@ try {
         '',
         $expCk,
         $expSk,
-        $sortOrder,
-        $active,
-    ]);
+    ];
+    if ($hasDefaultAdvCol) {
+        $insCols .= ', default_advisory_sizing_guide_id';
+        $insPh .= ',?';
+        $insParams[] = $defaultAdvGuideId;
+    }
+    $insCols .= ', sort_order, is_active';
+    $insPh .= ',?,?';
+    $insParams[] = $sortOrder;
+    $insParams[] = $active;
+    $pdo->prepare('INSERT INTO product_types (' . $insCols . ') VALUES (' . $insPh . ')')->execute($insParams);
     $newId = (int) $pdo->lastInsertId();
     audit_log('product_type_save', 'إضافة نوع منتج (شجرة موحّدة): ' . $slugRaw, 'product_types', $newId);
     json_response([

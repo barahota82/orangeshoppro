@@ -21,16 +21,15 @@ require_once __DIR__ . '/../includes/catalog_schema.php';
 orange_catalog_ensure_schema(db());
 require_once __DIR__ . '/../includes/catalog_labels.php';
 require_once __DIR__ . '/../includes/catalog_unified_nav.php';
+require_once __DIR__ . '/../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../includes/countries.php';
 require_once __DIR__ . '/../includes/department_countries.php';
 
-include __DIR__ . '/../includes/header.php';
+$tbState = storefront_toolbar_state();
+$channel = $tbState['channel'];
+$lang = $tbState['lang'];
+$channelSlug = $tbState['channelSlug'];
 
-$homeHeroLines = storefront_home_hero_lines();
-$homeHeroJson = json_encode($homeHeroLines, JSON_UNESCAPED_UNICODE);
-$homeHeroFirst = (string)($homeHeroLines[0] ?? '');
-
-/* $channel و $lang و $channelSlug مُعرَّفة من includes/header.php عبر storefront_toolbar_state() — يُجنَّب تكرار استعلام channels */
 $pdo = db();
 
 /*
@@ -132,6 +131,38 @@ foreach ($offers as $hop) {
 /** @var array<int, list<array{color: string, pattern: string}>> */
 $sfProductCardVariantLines = orange_storefront_product_card_variant_line_map($pdo, $sfHomeCardColorPidList, $lang);
 
+$sfHomeAllProductIds = [];
+foreach ($products as $hpRow) {
+    $sfHomeAllProductIds[(int) $hpRow['id']] = true;
+}
+foreach ($offers as $hopRow) {
+    $sfHomeAllProductIds[(int) $hopRow['id']] = true;
+}
+/** @var array<int, array<string, string>> */
+$sfHomeProductAttrMap = orange_storefront_product_attr_map($pdo, array_keys($sfHomeAllProductIds));
+$sfHomeAttrFacets = orange_storefront_home_filterable_facets($pdo, $lang, $sfHomeCountryId);
+
+$sfHomeCardAttrAttr = static function (int $pid) use ($sfHomeProductAttrMap): string {
+    return orange_storefront_attr_data_attribute($sfHomeProductAttrMap[$pid] ?? []);
+};
+
+$homeHeroLines = storefront_home_hero_lines();
+$homeHeroJson = json_encode($homeHeroLines, JSON_UNESCAPED_UNICODE);
+$homeHeroFirst = (string) ($homeHeroLines[0] ?? '');
+
+$ORANGE_STOREFRONT_PAGE_TITLE = t('home') . ' | ' . t('storefront_brand');
+$ORANGE_STOREFRONT_META_DESCRIPTION = t('storefront_home_meta_description');
+$ORANGE_STOREFRONT_CANONICAL_URL = storefront_absolute_url(storefront_url('home', $channelSlug, $lang));
+$ORANGE_STOREFRONT_OG_TYPE = 'website';
+$wordmarkOg = storefront_public_path(storefront_asset_url(
+    storefront_asset_image_preferred_path('/assets/images/orange-company-wordmark.png')
+));
+if ($wordmarkOg !== '') {
+    $ORANGE_STOREFRONT_OG_IMAGE = storefront_absolute_url($wordmarkOg);
+}
+
+include __DIR__ . '/../includes/header.php';
+
 $sfHomeFilterCatalogId = static function (array $row): int {
     return isset($row['uf_cat_id']) ? (int) $row['uf_cat_id'] : 0;
 };
@@ -175,10 +206,10 @@ foreach ($productsLazyRows as $p) {
         'price' => number_format((float) $p['price'], 2),
         'href' => storefront_url('product', (string) $channel['slug'], $lang, ['id' => $pid]),
         'vl' => $vl,
+        'attrs' => $sfHomeCardAttrAttr($pid),
     ];
 }
 
-/** @var list<array{id:int,df:string,imgSrc:string,title:string,oldPrice:string,salePrice:string,href:string,vl:list<array{c:string,p:string}>}> */
 $lazyOffersForJs = [];
 foreach ($offersLazyRows as $p) {
     $pid = (int) $p['id'];
@@ -195,6 +226,7 @@ foreach ($offersLazyRows as $p) {
         'salePrice' => number_format((float) $p['price'] - (float) $p['discount'], 2),
         'href' => storefront_url('product', (string) $channel['slug'], $lang, ['id' => $pid]),
         'vl' => $vlOff,
+        'attrs' => $sfHomeCardAttrAttr($pid),
     ];
 }
 
@@ -210,6 +242,41 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
         </div>
     </section>
     <textarea id="home-hero-lines-json" hidden readonly class="storefront-home-hero-json"><?php echo htmlspecialchars((string) $homeHeroJson, ENT_QUOTES, 'UTF-8'); ?></textarea>
+
+    <?php if ($sfHomeAttrFacets !== []): ?>
+    <section class="storefront-attr-filters" dir="<?php echo htmlspecialchars($storefrontListDir, ENT_QUOTES, 'UTF-8'); ?>" aria-label="<?php echo htmlspecialchars(t('storefront_attr_filters_title'), ENT_QUOTES, 'UTF-8'); ?>">
+        <h2 class="storefront-attr-filters__title"><?php echo htmlspecialchars(t('storefront_attr_filters_title'), ENT_QUOTES, 'UTF-8'); ?></h2>
+        <div class="storefront-attr-filters__groups">
+            <?php foreach ($sfHomeAttrFacets as $facet): ?>
+                <?php
+                $fKey = (string) ($facet['attribute_key'] ?? '');
+                $fLabel = (string) ($facet['label'] ?? $fKey);
+                $fValues = is_array($facet['values'] ?? null) ? $facet['values'] : [];
+                if ($fKey === '' || $fValues === []) {
+                    continue;
+                }
+                ?>
+                <details class="storefront-attr-filters__group">
+                    <summary class="storefront-attr-filters__summary"><?php echo htmlspecialchars($fLabel, ENT_QUOTES, 'UTF-8'); ?></summary>
+                    <div class="storefront-attr-filters__values">
+                        <?php foreach ($fValues as $fv): ?>
+                            <?php
+                            $fvVal = trim((string) ($fv['value'] ?? ''));
+                            if ($fvVal === '') {
+                                continue;
+                            }
+                            ?>
+                            <button type="button" class="storefront-attr-filters__chip" data-attr-key="<?php echo htmlspecialchars($fKey, ENT_QUOTES, 'UTF-8'); ?>" data-attr-value="<?php echo htmlspecialchars($fvVal, ENT_QUOTES, 'UTF-8'); ?>">
+                                <?php echo htmlspecialchars($fvVal, ENT_QUOTES, 'UTF-8'); ?>
+                            </button>
+                        <?php endforeach; ?>
+                    </div>
+                </details>
+            <?php endforeach; ?>
+        </div>
+        <button type="button" class="storefront-attr-filters__clear" id="storefrontAttrFiltersClear" hidden><?php echo htmlspecialchars(t('storefront_attr_filters_clear'), ENT_QUOTES, 'UTF-8'); ?></button>
+    </section>
+    <?php endif; ?>
 
     <section class="tabs-section" dir="<?php echo htmlspecialchars($storefrontListDir, ENT_QUOTES, 'UTF-8'); ?>">
         <div class="storefront-browse-wrap">
@@ -329,7 +396,11 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
 
     <section id="productsGrid" class="products-grid">
         <?php foreach ($offersInitial as $p): ?>
-            <article class="product-card" data-product-id="<?php echo (int) $p['id']; ?>" data-filter="offers cat-<?php echo $sfHomeFilterCatalogId($p); ?><?php echo $storefrontExtraFilterSuffix($p); ?>">
+            <?php
+            $sfCardPidOff = (int) $p['id'];
+            $sfCardAttrsOff = $sfHomeCardAttrAttr($sfCardPidOff);
+            ?>
+            <article class="product-card" data-product-id="<?php echo $sfCardPidOff; ?>" data-filter="offers cat-<?php echo $sfHomeFilterCatalogId($p); ?><?php echo $storefrontExtraFilterSuffix($p); ?>"<?php echo $sfCardAttrsOff !== '' ? ' data-attrs="' . htmlspecialchars($sfCardAttrsOff, ENT_QUOTES, 'UTF-8') . '"' : ''; ?>>
                 <div class="product-image-wrap">
                     <img src="<?php echo htmlspecialchars(storefront_product_image_href((string) ($p['main_image'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" decoding="async">
                     <span class="offer-badge"><?php echo htmlspecialchars(t('offers'), ENT_QUOTES, 'UTF-8'); ?></span>
@@ -367,7 +438,11 @@ $storefrontListDir = $lang === 'ar' ? 'rtl' : 'ltr';
         <?php endforeach; ?>
 
         <?php foreach ($productsInitial as $p): ?>
-            <article class="product-card" data-product-id="<?php echo (int) $p['id']; ?>" data-filter="all cat-<?php echo $sfHomeFilterCatalogId($p); ?><?php echo $storefrontExtraFilterSuffix($p); ?>">
+            <?php
+            $sfCardPidReg = (int) $p['id'];
+            $sfCardAttrsReg = $sfHomeCardAttrAttr($sfCardPidReg);
+            ?>
+            <article class="product-card" data-product-id="<?php echo $sfCardPidReg; ?>" data-filter="all cat-<?php echo $sfHomeFilterCatalogId($p); ?><?php echo $storefrontExtraFilterSuffix($p); ?>"<?php echo $sfCardAttrsReg !== '' ? ' data-attrs="' . htmlspecialchars($sfCardAttrsReg, ENT_QUOTES, 'UTF-8') . '"' : ''; ?>>
                 <div class="product-image-wrap">
                     <img src="<?php echo htmlspecialchars(storefront_product_image_href((string) ($p['main_image'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(storefront_product_display_name($p), ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" decoding="async">
                 </div>
@@ -419,6 +494,54 @@ window.ORANGE_SF_GRID_VIEW_LABEL = <?php echo json_encode(t('view_product'), $or
 window.ORANGE_SF_OFFERS_BADGE = <?php echo json_encode(t('offers'), $orangeSfGridJsonFlags); ?>;
 var ORANGE_SF_GRID_FILTER_KEY = 'orange_sf_grid_filter';
 var ORANGE_BROWSE_DETAILS_OPEN_KEY = 'orange_browse_details_open';
+var orangeSfActiveAttrFilters = {};
+function orangeSfParseAttrs(raw) {
+    var out = {};
+    String(raw || '').split(';').forEach(function (part) {
+        if (!part) return;
+        var i = part.indexOf(':');
+        if (i <= 0) return;
+        try {
+            var k = decodeURIComponent(part.slice(0, i));
+            var v = decodeURIComponent(part.slice(i + 1));
+            if (k && v) out[k] = v;
+        } catch (e) {}
+    });
+    return out;
+}
+function orangeSfCardMatchesAttrFilters(card) {
+    var keys = Object.keys(orangeSfActiveAttrFilters);
+    if (!keys.length) return true;
+    var attrs = orangeSfParseAttrs(card.getAttribute('data-attrs') || '');
+    for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        var want = orangeSfActiveAttrFilters[k];
+        if (want && attrs[k] !== want) return false;
+    }
+    return true;
+}
+function orangeSfSyncAttrFilterUi() {
+    document.querySelectorAll('.storefront-attr-filters__chip').forEach(function (btn) {
+        var k = btn.getAttribute('data-attr-key') || '';
+        var v = btn.getAttribute('data-attr-value') || '';
+        btn.classList.toggle('is-active', orangeSfActiveAttrFilters[k] === v);
+    });
+    var clr = document.getElementById('storefrontAttrFiltersClear');
+    if (clr) clr.hidden = Object.keys(orangeSfActiveAttrFilters).length === 0;
+}
+function orangeSfApplyAttrChip(btn) {
+    if (!btn) return;
+    var k = btn.getAttribute('data-attr-key') || '';
+    var v = btn.getAttribute('data-attr-value') || '';
+    if (!k || !v) return;
+    if (orangeSfActiveAttrFilters[k] === v) {
+        delete orangeSfActiveAttrFilters[k];
+    } else {
+        orangeSfActiveAttrFilters[k] = v;
+    }
+    orangeSfSyncAttrFilterUi();
+    applyGridFilter(orangeGetActiveGridFilter());
+}
 var orangeSfLazyRenderedIds = new Set();
 var orangeSfGridObserver = null;
 function orangeSfLazyTokenMatch(df, filter) {
@@ -602,6 +725,9 @@ function orangeSfAppendOfferCard(item) {
     art.className = 'product-card';
     art.setAttribute('data-product-id', String(item.id));
     art.setAttribute('data-filter', item.df);
+    if (item.attrs) {
+        art.setAttribute('data-attrs', item.attrs);
+    }
     var wrap = document.createElement('div');
     wrap.className = 'product-image-wrap';
     var img = document.createElement('img');
@@ -650,6 +776,9 @@ function orangeSfAppendRegularCard(item) {
     art.className = 'product-card';
     art.setAttribute('data-product-id', String(item.id));
     art.setAttribute('data-filter', item.df);
+    if (item.attrs) {
+        art.setAttribute('data-attrs', item.attrs);
+    }
     var wrap = document.createElement('div');
     wrap.className = 'product-image-wrap';
     orangeSfMountProductThumb(wrap, item);
@@ -924,13 +1053,12 @@ function scrollHomeCategoryTabs(direction) {
 function applyGridFilterVisibility(filter) {
     document.querySelectorAll('.product-card').forEach(function (card) {
         var raw = card.getAttribute('data-filter') || '';
-        if (filter === 'all') {
-            card.style.display = '';
-            return;
+        var catOk = true;
+        if (filter !== 'all') {
+            var tokens = raw.trim().split(/\s+/).filter(Boolean);
+            catOk = tokens.indexOf(filter) !== -1;
         }
-        // مطابقة الرموز كاملة (مثلاً cat-1 لا يطابق cat-11)
-        var tokens = raw.trim().split(/\s+/).filter(Boolean);
-        card.style.display = tokens.indexOf(filter) !== -1 ? '' : 'none';
+        card.style.display = (catOk && orangeSfCardMatchesAttrFilters(card)) ? '' : 'none';
     });
 }
 function applyGridFilter(filter) {
@@ -1032,6 +1160,19 @@ function closeStorefrontBrowseMenu() {
         },
         true
     );
+    document.querySelectorAll('.storefront-attr-filters__chip').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            orangeSfApplyAttrChip(btn);
+        });
+    });
+    var attrClr = document.getElementById('storefrontAttrFiltersClear');
+    if (attrClr) {
+        attrClr.addEventListener('click', function () {
+            orangeSfActiveAttrFilters = {};
+            orangeSfSyncAttrFilterUi();
+            applyGridFilter(orangeGetActiveGridFilter());
+        });
+    }
 })();
 </script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

@@ -114,12 +114,10 @@ try {
                     'message' => 'عروض «نفس الفئة» تتطلّب تفعيل الشجرة الموحّدة والتحقق من معرف فئة الكتالوج (catalog_categories) من «فروع شجرة المنتجات».',
                 ], 422);
             }
-            $chkCc = $pdo->prepare('SELECT id FROM catalog_categories WHERE id = ? LIMIT 1');
-            $chkCc->execute([$catId]);
-            if (!$chkCc->fetchColumn()) {
+            if (orange_catalog_validate_unified_catalog_category_id($pdo, $catId) <= 0) {
                 json_response([
                     'success' => false,
-                    'message' => 'معرف الفئة غير موجود في الشجرة الموحّدة (catalog_categories). استخدم رقماً من «فروع شجرة المنتجات».',
+                    'message' => 'معرف الفئة غير موجود أو غير نشط في الشجرة الموحّدة (catalog_categories). استخدم رقماً من «فروع شجرة المنتجات».',
                 ], 422);
             }
         }

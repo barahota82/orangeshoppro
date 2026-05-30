@@ -16,6 +16,7 @@ $prodMoney = orange_admin_currency_context($pdo);
 $productsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $adminCountryId);
 
 $catalogNavUnified = orange_catalog_nav_use_unified($pdo);
+$ptDefaultAdvGuideMap = orange_catalog_product_type_default_advisory_guide_map($pdo);
 
 $productTypesForForm = [];
 if (orange_table_exists($pdo, 'product_types')) {
@@ -901,6 +902,7 @@ window.ORANGE_CATALOG_NAV_UNIFIED = <?php echo $catalogNavUnified ? 'true' : 'fa
 window.ORANGE_PT_DEPT_STEP_ENABLED = <?php echo $orangeProductTypeDeptStepEnabled ? 'true' : 'false'; ?>;
 window.ORANGE_PT_DEPT_OPTIONS_COUNT = <?php echo (int) count($productTypeDepartmentsForForm); ?>;
 window.ORANGE_PRODUCT_TYPE_TRAIL = <?php echo json_encode($productTypeTrailsForJs, JSON_UNESCAPED_UNICODE); ?>;
+window.ORANGE_PT_DEFAULT_ADV_GUIDE = <?php echo json_encode($ptDefaultAdvGuideMap, JSON_UNESCAPED_UNICODE); ?>;
 window.PRODUCT_EXTRA_IMAGES = [];
 window.ORANGE_PRODUCT_VARIANTS_READY_FOR_SAVE = false;
 window.ORANGE_MAIN_PENDING_IMAGE_URL = null;
@@ -918,8 +920,38 @@ const PRODUCT_MSG = {
 };
 
 /** اعتماد التصنيف الموحّد فقط: التلميح يُحدَّث من الورقة المختارة. */
+function orangeProductApplyDefaultAdvisoryFromProductType(onlyIfEmpty) {
+    const advEl = document.getElementById('sizing_advisory_guide_id');
+    const ptEl = document.getElementById('product_type_id');
+    if (!advEl || advEl.disabled || !ptEl) {
+        return;
+    }
+    const cur = parseInt(String(advEl.value || '0'), 10) || 0;
+    if (onlyIfEmpty && cur > 0) {
+        return;
+    }
+    const ptId = parseInt(String(ptEl.value || '0'), 10) || 0;
+    if (ptId <= 0) {
+        return;
+    }
+    const map = window.ORANGE_PT_DEFAULT_ADV_GUIDE || {};
+    const gid = parseInt(String(map[ptId] != null ? map[ptId] : (map[String(ptId)] != null ? map[String(ptId)] : '0')), 10) || 0;
+    if (gid <= 0) {
+        return;
+    }
+    const hit = advEl.querySelector('option[value="' + gid + '"]');
+    if (hit) {
+        advEl.value = String(gid);
+    }
+}
+
 function orangeSyncLegacyFieldsFromProductType() {
     updateProductCatalogHint();
+    const famEl = document.getElementById('size_family_id');
+    const famId = famEl ? (parseInt(String(famEl.value || '0'), 10) || 0) : 0;
+    if (famId > 0 && orangeProductEffectiveHasSizes()) {
+        void orangeProductRefreshAdvisoryGuideSelect(0);
+    }
 }
 
 const orangeProductTypeOptionSeed = [];
@@ -3289,6 +3321,7 @@ async function orangeProductRefreshAdvisoryGuideSelect(preserveId) {
             }
         } else {
             sel.value = '0';
+            orangeProductApplyDefaultAdvisoryFromProductType(true);
         }
     } catch (e) {
         sel.value = '0';

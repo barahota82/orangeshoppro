@@ -3,9 +3,9 @@ ORANGE — خطة مراحل تنفيذ الشجرة الموحّدة (Unified C
 Archive: docs/archive/ORANGE_UNIFIED_CATALOG_ROLLOUT_PHASES.txt
 مرجع سياسة/ERD: docs/archive/ORANGE_UNIFIED_TAXONOMY_AND_CATALOG_ERD.txt
 مرجع مختصر: docs/archive/ORANGE_STOREFRONT_POLICY_REFERENCE.txt — «تاسعاً»
-Last updated: 2026-05-20 (المرحلة **5 مغلقة** — legacy closure runtime)
+Last updated: 2026-05-20 (المرحلة **6 مغلقة** — polish)
 
-**سياسة المالك (إلزامي للوكلاء):** **لا SQL يدوي** — **`git pull`** + **طلب واحد** = runtime hooks (multicountry · قنوات · product_types · منتجات · legacy closure) **أوتوماتيك**.
+**سياسة المالك (إلزامي للوكلاء):** **لا SQL يدوي** — **push → أوتوماتيك على السيرفر**؛ runtime hooks (multicountry · قنوات · product_types · منتجات · legacy closure · polish) **أوتوماتيك** — **لا تعليمات تشغيل للمالك**.
 
 الغرض:
 - تتبع **ما تم** و**ما تبقى** لاعتماد المتجر 100% على الشجرة الموحّدة.
@@ -23,9 +23,9 @@ Last updated: 2026-05-20 (المرحلة **5 مغلقة** — legacy closure run
 | 3       | المنتجات والصفات                  | **مغلق**    | 2026-05-20    |
 | 4       | فصل الدول + الشجرة                | **مغلق**    | 2026-05-20    |
 | 5       | إغلاق Legacy                      | **مغلق**    | 2026-05-20    |
-| 6       | Polish (اختياري)                  | **مفتوح**   | —             |
+| 6       | Polish (اختياري)                  | **مغلق**    | 2026-05-20    |
 
-**تقدير إجمالي الشجرة الموحّدة (تشغيلي):** ~**95%** (المراحل 0–5 مغلقة؛ polish اختياري).
+**تقدير إجمالي الشجرة الموحّدة (تشغيلي):** ~**100%** (المراحل 0–6 مغلقة؛ 5.4 اختياري — إسقاط جداول legacy).
 
 
 **آخر تحقق سيرفر (قبل إغلاق 1 — 2026-05-30):**
@@ -46,6 +46,7 @@ Last updated: 2026-05-20 (المرحلة **5 مغلقة** — legacy closure run
 - `includes/catalog_kw_product_types_seed.php` — product_types لكل **دولة نشطة**
 - `includes/catalog_kw_products_phase3.php` — جاهزية منتجات لكل **دولة نشطة**
 - `includes/catalog_legacy_closure_phase5.php` — **`orange_catalog_ensure_legacy_closure_phase5`** (NOT NULL · إسقاط category_id/subcategory_id)
+- `includes/catalog_polish_phase6.php` — **`orange_catalog_ensure_polish_phase6`** (SEO backfill)
 - `includes/product_channels.php` — ربط scoped بالدولة
 - `includes/catalog_schema.php` — **`orange_catalog_runtime_light_hooks`**
 
@@ -140,14 +141,16 @@ STATUS: **CLOSED** (2026-05-20)
 ================================================================================
 7) المرحلة 6 — Polish (اختياري)
 ================================================================================
-STATUS: **OPEN**
+STATUS: **CLOSED** (2026-05-20)
 
 | #   | المهمة | الحالة |
 |-----|--------|--------|
-| 6.1 | SEO meta منتجات | **open** |
-| 6.2 | فلاتر صفات is_filterable في المتجر | **open** |
-| 6.3 | advisory_sizing_guides ↔ product_types | **open** |
-| 6.4 | BOGO/عروض على catalog_categories موحّدة | **partial** |
+| 6.1 | SEO meta منتجات | **done** | home meta · JSON-LD product · runtime SEO backfill |
+| 6.2 | فلاتر صفات is_filterable في المتجر | **done** | home chips + data-attrs |
+| 6.3 | advisory_sizing_guides ↔ product_types | **done** | default_advisory_sizing_guide_id + prefill |
+| 6.4 | BOGO/عروض على catalog_categories موحّدة | **done** | validate unified active category |
+
+**معيار إغلاق المرحلة 6:** ✅ polish تشغيلي على المتجر والأدمن؛ SEO/filters/sizing/BOGO موحّدة.
 
 ================================================================================
 8) ترتيب زمني مقترح
@@ -210,6 +213,7 @@ includes/product_channels.php
 2026-05-20 — **المرحلة 3 مغلقة:** `orange_catalog_ensure_kw_products_phase3` (type · variants · attributes · size_family).
 2026-05-20 — **المرحلة 2 مغلقة:** `orange_catalog_ensure_kw_product_types` + backfill expected sizing (runtime hooks).
 2026-05-20 — **المرحلة 5 مغلقة:** `orange_catalog_ensure_legacy_closure_phase5` + إزالة مصدر حقيقة category_id من الكود.
+2026-05-20 — **المرحلة 6 مغلقة:** polish (SEO · فلاتر صفات · دليل مقاس على product_types · BOGO catalog_categories).
 
 ================================================================================
 نهاية المستند

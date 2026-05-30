@@ -785,3 +785,214 @@ function orange_storefront_products_append_attr_filters_sql(PDO $pdo, string $sq
 
     return [$sql, $params];
 }
+
+/**
+ * @return array<int, array<string, string>> product_id => { attribute_key => value_raw }
+ */
+function orange_storefront_product_attr_map(PDO $pdo, array $productIds): array
+{
+    $out = [];
+    $ids = array_values(array_filter(array_map('intval', $productIds), static fn (int $id): bool => $id > 0));
+    if ($ids === [] || !orange_table_exists($pdo, 'product_attribute_values') || !orange_table_exists($pdo, 'catalog_attributes')) {
+        return $out;
+    }
+    $ph = implode(',', array_fill(0, count($ids), '?'));
+    try {
+        $st = $pdo->prepare(
+            'SELECT pav.product_id, ca.attribute_key, pav.value_raw
+             FROM product_attribute_values pav
+             INNER JOIN catalog_attributes ca ON ca.id = pav.catalog_attribute_id AND ca.is_active = 1
+             WHERE pav.product_id IN (' . $ph . ')'
+        );
+        $st->execute($ids);
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $pid = (int) ($row['product_id'] ?? 0);
+            $k = trim((string) ($row['attribute_key'] ?? ''));
+            $v = trim((string) ($row['value_raw'] ?? ''));
+            if ($pid <= 0 || $k === '' || $v === '') {
+                continue;
+            }
+            if (! isset($out[$pid])) {
+                $out[$pid] = [];
+            }
+            $out[$pid][$k] = $v;
+        }
+    } catch (Throwable $e) {
+        return $out;
+    }
+
+    return $out;
+}
+
+/**
+ * @param array<string, string> $attrs
+ */
+function orange_storefront_attr_data_attribute(array $attrs): string
+{
+    if ($attrs === []) {
+        return '';
+    }
+    $parts = [];
+    foreach ($attrs as $k => $v) {
+        $k = trim((string) $k);
+        $v = trim((string) $v);
+        if ($k === '' || $v === '') {
+            continue;
+        }
+        $parts[] = rawurlencode($k) . ':' . rawurlencode($v);
+    }
+
+    return implode(';', $parts);
+}
+
+/**
+ * @return list<array{attribute_key:string,label:string,values:list<array{value:string,count:int}>}>
+ */
+function orange_storefront_home_filterable_facets(PDO $pdo, string $lang, int $countryId): array
+{
+    if (
+        !function_exists('orange_catalog_nav_use_unified') || !orange_catalog_nav_use_unified($pdo)
+        || !orange_table_exists($pdo, 'catalog_attributes')
+        || !orange_table_exists($pdo, 'product_attribute_values')
+        || !orange_table_exists($pdo, 'product_types')
+    ) {
+        return [];
+    }
+    require_once __DIR__ . '/department_countries.php';
+    $depActiveSql = orange_department_country_active_sql($pdo, 'd', $countryId);
+    $countrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $countryId);
+    $labelCol = match ($lang) {
+        'ar' => 'ca.label_ar',
+        'fil' => 'ca.label_fil',
+        'hi' => 'ca.label_hi',
+        default => 'ca.label_en',
+    };
+    try {
+        $sql = '
+            SELECT ca.attribute_key AS k, ' . $labelCol . ' AS lbl, ca.label_ar, ca.label_en,
+                   pav.value_raw AS v, COUNT(DISTINCT p.id) AS cnt
+            FROM catalog_attributes ca
+            INNER JOIN product_attribute_values pav ON pav.catalog_attribute_id = ca.id
+            INNER JOIN products p ON p.id = pav.product_id AND p.is_active = 1' . $countrySql . '
+            INNER JOIN product_types pt ON pt.id = p.product_type_id AND pt.is_active = 1
+            INNER JOIN catalog_subcategories ucs ON ucs.id = pt.catalog_subcategory_id AND ucs.is_active = 1
+            INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id AND ucc.is_active = 1
+            INNER JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id AND ucs2.is_active = 1
+            INNER JOIN departments d ON d.id = ucs2.department_id AND (' . $depActiveSql . ')
+            WHERE ca.is_active = 1 AND ca.is_filterable = 1
+            GROUP BY ca.id, ca.attribute_key, ca.label_ar, ca.label_en, ca.label_fil, ca.label_hi, pav.value_raw
+            ORDER BY ca.sort_order ASC, ca.id ASC, cnt DESC
+        ';
+        $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $byKey = [];
+        foreach ($rows as $r) {
+            if (! is_array($r)) {
+                continue;
+            }
+            $k = trim((string) ($r['k'] ?? ''));
+            $v = trim((string) ($r['v'] ?? ''));
+            if ($k === '' || $v === '') {
+                continue;
+            }
+            if (! isset($byKey[$k])) {
+                $lbl = trim((string) ($r['lbl'] ?? ''));
+                if ($lbl === '') {
+                    $lbl = trim((string) ($r['label_ar'] ?? '')) ?: trim((string) ($r['label_en'] ?? '')) ?: $k;
+                }
+                $byKey[$k] = ['attribute_key' => $k, 'label' => $lbl, 'values' => []];
+            }
+            if (count($byKey[$k]['values']) >= 24) {
+                continue;
+            }
+            $byKey[$k]['values'][] = ['value' => $v, 'count' => (int) ($r['cnt'] ?? 0)];
+        }
+
+        return array_values($byKey);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] orange_storefront_home_filterable_facets: ' . $e->getMessage());
+        }
+
+        return [];
+    }
+}
+
+function orange_catalog_product_type_default_advisory_guide_id(PDO $pdo, int $productTypeId): int
+{
+    if ($productTypeId <= 0 || !orange_table_exists($pdo, 'product_types')) {
+        return 0;
+    }
+    if (!orange_table_has_column($pdo, 'product_types', 'default_advisory_sizing_guide_id')) {
+        return 0;
+    }
+    try {
+        $st = $pdo->prepare(
+            'SELECT default_advisory_sizing_guide_id FROM product_types WHERE id = ? LIMIT 1'
+        );
+        $st->execute([$productTypeId]);
+        $v = $st->fetchColumn();
+
+        return $v !== false && $v !== null ? (int) $v : 0;
+    } catch (Throwable $e) {
+        return 0;
+    }
+}
+
+/**
+ * @return array<int, int> product_type_id => default_advisory_sizing_guide_id (>0 only)
+ */
+function orange_catalog_product_type_default_advisory_guide_map(PDO $pdo): array
+{
+    if (!orange_table_exists($pdo, 'product_types')
+        || !orange_table_has_column($pdo, 'product_types', 'default_advisory_sizing_guide_id')) {
+        return [];
+    }
+    try {
+        $rows = $pdo->query(
+            'SELECT id, default_advisory_sizing_guide_id FROM product_types
+             WHERE default_advisory_sizing_guide_id IS NOT NULL AND default_advisory_sizing_guide_id > 0'
+        )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $out = [];
+        foreach ($rows as $r) {
+            if (! is_array($r)) {
+                continue;
+            }
+            $ptId = (int) ($r['id'] ?? 0);
+            $gid = (int) ($r['default_advisory_sizing_guide_id'] ?? 0);
+            if ($ptId > 0 && $gid > 0) {
+                $out[$ptId] = $gid;
+            }
+        }
+
+        return $out;
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
+/**
+ * @return int 0 = valid or not applicable; catalog_categories.id when active in unified chain
+ */
+function orange_catalog_validate_unified_catalog_category_id(PDO $pdo, int $catalogCategoryId): int
+{
+    if ($catalogCategoryId <= 0 || !orange_table_exists($pdo, 'catalog_categories')) {
+        return 0;
+    }
+    try {
+        $st = $pdo->prepare(
+            'SELECT ucc.id FROM catalog_categories ucc
+             INNER JOIN catalog_sections cs ON cs.id = ucc.catalog_section_id AND cs.is_active = 1
+             INNER JOIN departments d ON d.id = cs.department_id AND d.is_active = 1
+             WHERE ucc.id = ? AND ucc.is_active = 1
+             LIMIT 1'
+        );
+        $st->execute([$catalogCategoryId]);
+
+        return $st->fetchColumn() ? $catalogCategoryId : 0;
+    } catch (Throwable $e) {
+        return 0;
+    }
+}

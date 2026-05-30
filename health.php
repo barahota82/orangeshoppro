@@ -191,3 +191,22 @@ if ($rollout === 'unified-phase5') {
         echo 'ROLLOUT_PHASE5_ERROR: ' . $e->getMessage() . "\n";
     }
 }
+
+if ($rollout === 'unified-phase6') {
+    try {
+        require_once __DIR__ . '/includes/catalog_schema.php';
+        require_once __DIR__ . '/includes/catalog_polish_phase6.php';
+        $pdoRollout = db();
+        orange_catalog_ensure_schema($pdoRollout);
+        $rep = orange_catalog_phase6_gap_report($pdoRollout);
+        echo 'filterable_attrs=' . (int) ($rep['filterable_attrs'] ?? -1) . "\n";
+        echo 'pt_default_guide_col=' . (($rep['pt_default_guide_col'] ?? false) ? '1' : '0') . "\n";
+        echo 'products_missing_seo=' . (int) ($rep['products_missing_seo'] ?? -1) . "\n";
+        $allOk = !empty($rep['pt_default_guide_col'])
+            && (int) ($rep['filterable_attrs'] ?? 0) >= 0
+            && (int) ($rep['products_missing_seo'] ?? 1) === 0;
+        echo $allOk ? "ROLLOUT_PHASE6_OK\n" : "ROLLOUT_PHASE6_PENDING\n";
+    } catch (Throwable $e) {
+        echo 'ROLLOUT_PHASE6_ERROR: ' . $e->getMessage() . "\n";
+    }
+}

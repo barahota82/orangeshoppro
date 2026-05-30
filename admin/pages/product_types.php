@@ -9,6 +9,17 @@ require_once __DIR__ . '/../../includes/catalog_sizing_dictionary.php';
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
+$ptAdvisoryGuidesForForm = [];
+if (orange_table_exists($pdo, 'advisory_sizing_guides')) {
+    try {
+        $ptAdvisoryGuidesForForm = $pdo->query(
+            'SELECT id, name_ar, is_active FROM advisory_sizing_guides ORDER BY name_ar ASC, id ASC'
+        )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) {
+        $ptAdvisoryGuidesForForm = [];
+    }
+}
+
 $sizingDictForPtForm = orange_table_exists($pdo, 'commercial_kind_dictionary')
     && orange_table_exists($pdo, 'sizing_category_dictionary');
 
@@ -154,6 +165,7 @@ if ($hasTree) {
             'SELECT pt.id, pt.slug, pt.name_ar, pt.name_en, pt.name_fil, pt.name_hi,
                     pt.catalog_subcategory_id,
                     pt.expected_commercial_kind_key, pt.expected_sizing_category_key,
+                    pt.default_advisory_sizing_guide_id,
                     pt.sort_order, pt.is_active,
                     csub.slug AS sub_slug, csub.name_ar AS sub_ar, csub.name_en AS sub_en,
                     cc.name_ar AS cat_ar, cc.name_en AS cat_en,
@@ -296,6 +308,20 @@ if ($subOptionsJson === false) {
                 <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
             <?php endif; ?>
         </div>
+        <?php if (orange_table_has_column($pdo, 'product_types', 'default_advisory_sizing_guide_id')): ?>
+        <div class="pt-adv-guide" style="grid-column:1/-1;">
+            <label for="pt_default_advisory_sizing_guide_id">دليل مقاس استرشادي افتراضي (للمنتجات من هذا النوع)</label>
+            <select id="pt_default_advisory_sizing_guide_id" class="admin-sort-field" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
+                <option value="0">— بدون —</option>
+                <?php foreach ($ptAdvisoryGuidesForForm as $agRow): ?>
+                    <?php if (! is_array($agRow) || (int) ($agRow['is_active'] ?? 0) !== 1) {
+                        continue;
+                    } ?>
+                    <option value="<?php echo (int) ($agRow['id'] ?? 0); ?>"><?php echo htmlspecialchars(trim((string) ($agRow['name_ar'] ?? '')) ?: ('#' . (int) ($agRow['id'] ?? 0)), ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <?php endif; ?>
         <div class="pt-ar">
             <label for="pt_name_ar">الاسم العربي</label>
             <input type="text" id="pt_name_ar" <?php echo $subOptions === [] ? 'disabled' : ''; ?>>
@@ -369,6 +395,7 @@ if ($subOptionsJson === false) {
                                 'name_hi' => (string) ($row['name_hi'] ?? ''),
                                 'expected_commercial_kind_key' => (string) ($row['expected_commercial_kind_key'] ?? ''),
                                 'expected_sizing_category_key' => (string) ($row['expected_sizing_category_key'] ?? ''),
+                                'default_advisory_sizing_guide_id' => (int) ($row['default_advisory_sizing_guide_id'] ?? 0),
                                 'sort_order' => (int) ($row['sort_order'] ?? 0),
                                 'is_active' => (int) ($row['is_active'] ?? 1),
                             ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>">تعديل</button>
@@ -808,6 +835,8 @@ function resetPtForm() {
     document.getElementById('pt_name_fil').value = '';
     document.getElementById('pt_name_hi').value = '';
     document.getElementById('pt_active').value = '1';
+    var advDef = document.getElementById('pt_default_advisory_sizing_guide_id');
+    if (advDef) advDef.value = '0';
     if (PT_SIZING_DICT_SELECTS) {
         void ptLoadKindsIntoSelect('').then(function () {
             return ptLoadSizingCategoriesIntoSelect('');
@@ -839,6 +868,10 @@ function editProductType(p) {
     document.getElementById('pt_name_fil').value = p.name_fil || '';
     document.getElementById('pt_name_hi').value = p.name_hi || '';
     document.getElementById('pt_active').value = String((p.is_active === 0 || p.is_active === false) ? 0 : 1);
+    var advDefEdit = document.getElementById('pt_default_advisory_sizing_guide_id');
+    if (advDefEdit) {
+        advDefEdit.value = String(parseInt(String(p.default_advisory_sizing_guide_id != null ? p.default_advisory_sizing_guide_id : '0'), 10) || 0);
+    }
     warnIfSubNotInDropdown(p.catalog_subcategory_id);
     var sl = document.getElementById('pt_slug');
     if (sl && !sl.disabled) {
@@ -940,6 +973,10 @@ async function saveProductType() {
             expected_sizing_category_key: (function () {
                 var el = document.getElementById('pt_expected_sizing_category_key');
                 return el ? String(el.value || '').trim() : '';
+            }()),
+            default_advisory_sizing_guide_id: (function () {
+                var el = document.getElementById('pt_default_advisory_sizing_guide_id');
+                return el ? (parseInt(el.value || '0', 10) || 0) : 0;
             }()),
             sort_order: sortParsed,
             is_active: parseInt(document.getElementById('pt_active').value || '1', 10) ? 1 : 0

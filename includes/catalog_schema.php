@@ -1917,6 +1917,13 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
         );
         orange_schema_invalidate_column_check('product_types', 'expected_sizing_category_key');
     }
+    if (orange_table_exists($pdo, 'product_types') && !orange_table_has_column($pdo, 'product_types', 'default_advisory_sizing_guide_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE product_types ADD COLUMN default_advisory_sizing_guide_id INT NULL DEFAULT NULL AFTER expected_sizing_category_key'
+        );
+        orange_schema_invalidate_column_check('product_types', 'default_advisory_sizing_guide_id');
+    }
     if (orange_table_exists($pdo, 'product_types')
         && orange_table_has_column($pdo, 'product_types', 'expected_commercial_kind_key')
         && orange_table_has_column($pdo, 'product_types', 'expected_sizing_category_key')
@@ -3729,6 +3736,8 @@ function orange_catalog_runtime_light_hooks(PDO $pdo): void
         orange_catalog_ensure_kw_products_phase3($pdo);
         require_once __DIR__ . '/catalog_legacy_closure_phase5.php';
         orange_catalog_ensure_legacy_closure_phase5($pdo);
+        require_once __DIR__ . '/catalog_polish_phase6.php';
+        orange_catalog_ensure_polish_phase6($pdo);
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] orange_catalog_runtime_light_hooks: ' . $e->getMessage());
