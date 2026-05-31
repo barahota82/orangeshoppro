@@ -578,7 +578,10 @@ document.addEventListener('DOMContentLoaded', function () {
      */
     function refreshCoaMainTree(optFocusId) {
         var keepId = typeof optFocusId === 'number' && optFocusId > 0 ? optFocusId : getActiveCoaTreeId();
-        return fetch('/admin/api/accounts/tree-html.php' + coaAdminCountryQuery(), { credentials: 'same-origin' })
+        return fetch('/admin/api/accounts/tree-html.php' + coaAdminCountryQuery(), {
+            credentials: 'same-origin',
+            headers: typeof orangeAdminCountryHeaders === 'function' ? orangeAdminCountryHeaders() : {}
+        })
             .then(function (r) { return r.json(); })
             .then(function (data) {
                 if (!data.success) {
@@ -867,7 +870,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function loadSetupRoots() {
-        return fetch('/admin/api/accounts/list-roots.php' + coaAdminCountryQuery(), { credentials: 'same-origin' })
+        return fetch('/admin/api/accounts/list-roots.php' + coaAdminCountryQuery(), {
+            credentials: 'same-origin',
+            headers: typeof orangeAdminCountryHeaders === 'function' ? orangeAdminCountryHeaders() : {}
+        })
             .then(function (r) { return r.json(); })
             .then(function (data) {
                 if (!data.success) {

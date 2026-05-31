@@ -248,6 +248,58 @@ function orange_country_copy_accounts_from_source(PDO $pdo, int $targetCountryId
 }
 
 /**
+ * خريطة old_account_id => new_account_id بين دولتين عبر accounts.code (بعد نسخ v74).
+ *
+ * @return array<int,int>
+ */
+function orange_country_build_account_id_map_by_code(PDO $pdo, int $sourceCountryId, int $targetCountryId): array
+{
+    $map = [];
+    if ($sourceCountryId <= 0 || $targetCountryId <= 0
+        || !orange_table_exists($pdo, 'accounts')
+        || !orange_table_has_column($pdo, 'accounts', 'country_id')) {
+        return $map;
+    }
+
+    $stSrc = $pdo->prepare(
+        'SELECT id, code FROM accounts WHERE country_id = ? AND code IS NOT NULL AND TRIM(code) <> \'\''
+    );
+    $stSrc->execute([$sourceCountryId]);
+    $srcByCode = [];
+    foreach ($stSrc->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $code = trim((string) ($row['code'] ?? ''));
+        if ($code === '') {
+            continue;
+        }
+        $srcByCode[$code] = (int) ($row['id'] ?? 0);
+    }
+
+    $stTgt = $pdo->prepare(
+        'SELECT id, code FROM accounts WHERE country_id = ? AND code IS NOT NULL AND TRIM(code) <> \'\''
+    );
+    $stTgt->execute([$targetCountryId]);
+    foreach ($stTgt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $code = trim((string) ($row['code'] ?? ''));
+        $tgtId = (int) ($row['id'] ?? 0);
+        if ($code === '' || $tgtId <= 0 || !isset($srcByCode[$code])) {
+            continue;
+        }
+        $srcId = (int) $srcByCode[$code];
+        if ($srcId > 0) {
+            $map[$srcId] = $tgtId;
+        }
+    }
+
+    return $map;
+}
+
+/**
  * يعيد journal_type_id للدولة الهدف عبر code (GAP-02).
  */
 function orange_country_remap_journal_type_id_for_target(PDO $pdo, int $sourceJournalTypeId, int $targetCountryId): ?int

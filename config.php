@@ -2762,9 +2762,12 @@ function require_admin_api(): void {
     require_once __DIR__ . '/includes/catalog_schema.php';
     require_once __DIR__ . '/includes/admin_permissions.php';
     orange_admin_sync_session_country_lock($admin);
+    require_once __DIR__ . '/includes/countries.php';
+    if (function_exists('orange_table_exists') && orange_table_exists($pdo, 'countries')) {
+        orange_admin_bootstrap_country_context($pdo);
+    }
     orange_catalog_ensure_schema($pdo);
     orange_catalog_ensure_country_id_columns_once($pdo);
-    require_once __DIR__ . '/includes/countries.php';
     orange_admin_bootstrap_country_context($pdo);
     orange_admin_enforce_api($admin, $pdo);
 }

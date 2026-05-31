@@ -547,16 +547,23 @@ function orange_admin_store_country_context(PDO $pdo, string $code, int $country
 
 /**
  * يثبت سياق الدولة مبكراً (صفحات الأدمن وواجهات API).
- * الأولوية: GET/رأس/POST → كوكي → جلسة → الكويت الافتراضية.
+ * الأولوية: قفل الأدمن → GET/رأس API/POST → كوكي → جلسة → الكويت الافتراضية.
+ *
+ * v76: طلب التبديل يُطبَّق دائماً حتى لو سبق ensure_schema تثبيت GLOBALS من الكوكي/الافتراضي.
  */
 function orange_admin_bootstrap_country_context(PDO $pdo): int
 {
-    if (isset($GLOBALS['orange_admin_ctx_country_id']) && (int) $GLOBALS['orange_admin_ctx_country_id'] > 0) {
-        return (int) $GLOBALS['orange_admin_ctx_country_id'];
-    }
     $locked = orange_admin_session_locked_country_id();
     if ($locked > 0) {
-        $GLOBALS['orange_admin_ctx_country_id'] = $locked;
+        if (!isset($GLOBALS['orange_admin_ctx_country_id']) || (int) $GLOBALS['orange_admin_ctx_country_id'] !== $locked) {
+            $lockRow = orange_country_row_by_id($pdo, $locked, false);
+            $GLOBALS['orange_admin_ctx_country_id'] = $locked;
+            if ($lockRow !== null) {
+                $GLOBALS['orange_admin_ctx_country_code'] = orange_countries_normalize_code(
+                    (string) ($lockRow['code'] ?? '')
+                );
+            }
+        }
 
         return $locked;
     }
@@ -565,8 +572,19 @@ function orange_admin_bootstrap_country_context(PDO $pdo): int
     if ($fromRequest !== null) {
         $row = orange_country_row_by_code($pdo, $fromRequest, false);
         if ($row !== null) {
-            return orange_admin_store_country_context($pdo, $fromRequest, (int) $row['id']);
+            $reqId = (int) $row['id'];
+            $curId = isset($GLOBALS['orange_admin_ctx_country_id']) ? (int) $GLOBALS['orange_admin_ctx_country_id'] : 0;
+            $curCode = orange_countries_normalize_code((string) ($GLOBALS['orange_admin_ctx_country_code'] ?? ''));
+            if ($curId !== $reqId || $curCode !== $fromRequest) {
+                return orange_admin_store_country_context($pdo, $fromRequest, $reqId);
+            }
+
+            return $reqId;
         }
+    }
+
+    if (isset($GLOBALS['orange_admin_ctx_country_id']) && (int) $GLOBALS['orange_admin_ctx_country_id'] > 0) {
+        return (int) $GLOBALS['orange_admin_ctx_country_id'];
     }
 
     $fromCookie = orange_admin_read_saved_country_code();
@@ -600,18 +618,7 @@ function orange_admin_bootstrap_country_context(PDO $pdo): int
 
 function orange_admin_context_country_id(PDO $pdo): int
 {
-    static $memo = null;
-    if ($memo !== null) {
-        return $memo;
-    }
-    if (isset($GLOBALS['orange_admin_ctx_country_id']) && (int) $GLOBALS['orange_admin_ctx_country_id'] > 0) {
-        $memo = (int) $GLOBALS['orange_admin_ctx_country_id'];
-
-        return $memo;
-    }
-    $memo = orange_admin_bootstrap_country_context($pdo);
-
-    return $memo;
+    return orange_admin_bootstrap_country_context($pdo);
 }
 
 function orange_admin_context_country_code(PDO $pdo): string

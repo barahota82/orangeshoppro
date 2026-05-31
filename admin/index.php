@@ -94,10 +94,13 @@ if (!in_array($page, $allowed, true)) {
 }
 
 $pdo = db();
-orange_catalog_ensure_schema($pdo);
-orange_catalog_ensure_country_id_columns_once($pdo);
 $GLOBALS['orangeAdminPdo'] = $pdo;
 require_once __DIR__ . '/../includes/countries.php';
+if (function_exists('orange_table_exists') && orange_table_exists($pdo, 'countries')) {
+    orange_admin_bootstrap_country_context($pdo);
+}
+orange_catalog_ensure_schema($pdo);
+orange_catalog_ensure_country_id_columns_once($pdo);
 orange_admin_bootstrap_country_context($pdo);
 orange_admin_require_page($admin, $pdo, $page);
 

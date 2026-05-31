@@ -335,6 +335,131 @@ function orange_country_scope_repair_gl_admin_scope_v75(PDO $pdo): array
     return $out;
 }
 
+/**
+ * v76 — إكمال بيانات GL الإدارية per country (حسابات، أنواع يوميات، سنوات، ربط قيود).
+ *
+ * @return array{countries_repaired:int, accounts_copied:int, journal_types_copied:int, fiscal_years_copied:int, gl_settings_copied:int}
+ */
+function orange_country_scope_repair_gl_admin_missing_v76(PDO $pdo): array
+{
+    $out = [
+        'countries_repaired' => 0,
+        'accounts_copied' => 0,
+        'journal_types_copied' => 0,
+        'fiscal_years_copied' => 0,
+        'gl_settings_copied' => 0,
+    ];
+    if (!orange_table_exists($pdo, 'countries')) {
+        return $out;
+    }
+
+    require_once __DIR__ . '/country_provision.php';
+    $kwId = orange_countries_default_id($pdo);
+    if ($kwId <= 0) {
+        return $out;
+    }
+
+    $countries = $pdo->query('SELECT id FROM countries ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    foreach ($countries as $cRow) {
+        $cid = (int) ($cRow['id'] ?? 0);
+        if ($cid <= 0 || $cid === $kwId) {
+            continue;
+        }
+
+        $repaired = false;
+        $idMap = [];
+
+        if (orange_table_exists($pdo, 'accounts') && orange_table_has_column($pdo, 'accounts', 'country_id')) {
+            $stAcct = $pdo->prepare('SELECT COUNT(*) FROM accounts WHERE country_id = ?');
+            $stAcct->execute([$cid]);
+            if ((int) $stAcct->fetchColumn() <= 0) {
+                $acctCopy = orange_country_copy_accounts_from_source($pdo, $cid, $kwId);
+                $copied = (int) ($acctCopy['accounts_copied'] ?? 0);
+                if ($copied > 0) {
+                    $out['accounts_copied'] += $copied;
+                    $repaired = true;
+                }
+                $idMap = is_array($acctCopy['id_map'] ?? null) ? $acctCopy['id_map'] : [];
+            }
+        }
+
+        if (orange_table_exists($pdo, 'journal_types') && orange_table_has_column($pdo, 'journal_types', 'country_id')) {
+            $stJt = $pdo->prepare('SELECT COUNT(*) FROM journal_types WHERE country_id = ?');
+            $stJt->execute([$cid]);
+            if ((int) $stJt->fetchColumn() <= 0) {
+                $jtCopy = orange_country_copy_journal_types_from_source($pdo, $cid, $kwId);
+                $copied = (int) ($jtCopy['copied'] ?? 0);
+                if ($copied > 0) {
+                    $out['journal_types_copied'] += $copied;
+                    $repaired = true;
+                }
+            }
+        }
+
+        if (orange_table_exists($pdo, 'fiscal_years') && orange_table_has_column($pdo, 'fiscal_years', 'country_id')) {
+            $stFy = $pdo->prepare('SELECT COUNT(*) FROM fiscal_years WHERE country_id = ?');
+            $stFy->execute([$cid]);
+            if ((int) $stFy->fetchColumn() <= 0) {
+                $fyCopy = orange_country_copy_fiscal_years_from_source($pdo, $cid, $kwId);
+                $copied = (int) ($fyCopy['copied'] ?? 0);
+                if ($copied > 0) {
+                    $out['fiscal_years_copied'] += $copied;
+                    $repaired = true;
+                }
+            }
+        }
+
+        if (orange_table_exists($pdo, 'orange_gl_account_settings')
+            && orange_table_has_column($pdo, 'orange_gl_account_settings', 'country_id')) {
+            $stGl = $pdo->prepare('SELECT COUNT(*) FROM orange_gl_account_settings WHERE country_id = ?');
+            $stGl->execute([$cid]);
+            if ((int) $stGl->fetchColumn() <= 0) {
+                if ($idMap === [] && orange_table_exists($pdo, 'accounts')) {
+                    $idMap = orange_country_build_account_id_map_by_code($pdo, $kwId, $cid);
+                }
+                $glCopy = orange_country_copy_gl_settings_from_source($pdo, $cid, $kwId, $idMap);
+                orange_country_copy_gl_journal_type_rules_from_source($pdo, $cid, $kwId);
+                $copied = (int) ($glCopy['settings_copied'] ?? 0);
+                if ($copied > 0) {
+                    $out['gl_settings_copied'] += $copied;
+                    $repaired = true;
+                }
+            }
+        }
+
+        if ($repaired) {
+            $out['countries_repaired']++;
+        }
+    }
+
+    return $out;
+}
+
+/** v76 — إصلاح سياق الدولة + إكمال بيانات GL per country. */
+function orange_catalog_migrate_country_scope_repair_v76(PDO $pdo): void
+{
+    $marker = 'php_country_scope_repair_v76';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    $stats = orange_country_scope_repair_gl_admin_missing_v76($pdo);
+
+    try {
+        orange_schema_migrations_ensure_table($pdo);
+        $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+        $ins->execute([$marker]);
+        if (function_exists('error_log')) {
+            error_log('[orange] country scope repair v76 OK '
+                . json_encode($stats, JSON_UNESCAPED_UNICODE));
+        }
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] country scope repair v76 marker: ' . $e->getMessage());
+        }
+    }
+}
+
 /** v75 — إصلاح فصل شاشات GL الإدارية (أبعاد، إقفال، …). */
 function orange_catalog_migrate_country_scope_repair_v75(PDO $pdo): void
 {
