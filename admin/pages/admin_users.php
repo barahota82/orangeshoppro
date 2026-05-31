@@ -78,7 +78,7 @@ $auCountries = orange_countries_admin_list($dbAu);
     <p class="card-hint muted" id="au_perm_hint">«عرض» = ظهور الشاشة في القائمة وفتحها. «تعديل» = إدخال بيانات جديدة أو حفظ تغييرات (إنشاء/تعديل). «حذف» = حذف سجلات حيث تتوفر في الشاشة. «قفل/فك» للمستندات فقط. الأعمدة غير المناسبة للشاشة تظهر —.</p>
     <input type="hidden" id="perm_target_id" value="0">
     <div class="table-wrap au-perm-table-wrap">
-        <table class="au-perm-table">
+        <table class="au-perm-table" id="au_perm_table">
             <thead>
                 <tr>
                     <th>المجموعة / الشاشة</th>
@@ -89,7 +89,6 @@ $auCountries = orange_countries_admin_list($dbAu);
                     <th>فك قفل</th>
                 </tr>
             </thead>
-            <tbody id="perm_matrix_tbody"></tbody>
         </table>
     </div>
     <div class="actions" style="margin-top:12px;">
@@ -125,7 +124,88 @@ function auPermHintForSuper(isSuper) {
     if (!hint) return;
     hint.textContent = isSuper
         ? 'المشرف العام يملك كل الصلاحيات — لا حاجة لتحديد شاشات.'
-        : '«عرض» = فتح الشاشة. «تعديل» = إدخال/حفظ البيانات. صف المجموعة اختصار — وسّع ▼ للضبط. الأعمدة غير المناسبة تظهر —.';
+        : '«عرض» = فتح الشاشة. «تعديل» = إدخال/حفظ البيانات. المجموعات مغلقة — اضغط ◀ لفتح الشاشات. صف المجموعة اختصار.';
+}
+
+function auPermTable() {
+    return document.getElementById('au_perm_table');
+}
+
+function auPermFindMega(megaId) {
+    return (AU_PERM_TREE || []).find(function (m) { return m.id === megaId; }) || null;
+}
+
+function auPermClearBodies() {
+    var table = auPermTable();
+    if (!table) return;
+    table.querySelectorAll('tbody').forEach(function (tb) { tb.remove(); });
+}
+
+function auPermUpdateExpandBtn(btn, expanded) {
+    if (!btn) return;
+    btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    btn.textContent = expanded ? '▼' : '◀';
+    btn.title = expanded ? 'طي الشاشات' : 'فتح الشاشات';
+}
+
+function auPermCreateMegaBody(mega, megaId, existing) {
+    var bodyTb = document.createElement('tbody');
+    bodyTb.className = 'au-perm-mega-body';
+    bodyTb.setAttribute('data-mega', megaId);
+    var frag = document.createDocumentFragment();
+    (mega.subgroups || []).forEach(function (sg) {
+        var headTr = document.createElement('tr');
+        headTr.className = 'au-perm-subhead';
+        headTr.setAttribute('data-mega', megaId);
+        headTr.innerHTML = '<td colspan="6" class="au-perm-subhead-label">' + escapeHtml(sg.title || '') + '</td>';
+        frag.appendChild(headTr);
+        (sg.pages || []).forEach(function (p) {
+            var pg = p.page || '';
+            if (!pg) return;
+            var pageTr = document.createElement('tr');
+            pageTr.className = 'au-perm-page';
+            pageTr.setAttribute('data-mega', megaId);
+            pageTr.setAttribute('data-page', pg);
+            pageTr.innerHTML =
+                '<td class="au-perm-page-label">' + escapeHtml(p.label || pg) + '</td>' +
+                auPermMakeCheckboxCells(pg, auPermResolveExisting(existing, pg), 'au-perm-page-cb');
+            frag.appendChild(pageTr);
+        });
+    });
+    bodyTb.appendChild(frag);
+    return bodyTb;
+}
+
+function auPermEnsureMegaBody(megaId) {
+    var table = auPermTable();
+    if (!table) return null;
+    var bodyTb = table.querySelector('tbody.au-perm-mega-body[data-mega="' + megaId + '"]');
+    if (bodyTb) return bodyTb;
+    var mega = auPermFindMega(megaId);
+    if (!mega || mega.page) return null;
+    bodyTb = auPermCreateMegaBody(mega, megaId, window.__auPermExisting || {});
+    var headTb = table.querySelector('tbody.au-perm-mega-head[data-mega="' + megaId + '"]');
+    if (headTb && headTb.nextElementSibling) {
+        headTb.parentNode.insertBefore(bodyTb, headTb.nextElementSibling);
+    } else if (headTb) {
+        headTb.after(bodyTb);
+    } else {
+        table.appendChild(bodyTb);
+    }
+    auPermSyncMegaFromPages(megaId);
+    return bodyTb;
+}
+
+function auPermSetMegaExpanded(megaId, expand) {
+    var btn = document.querySelector('.au-perm-expand[data-mega="' + megaId + '"]');
+    if (expand) {
+        auPermEnsureMegaBody(megaId);
+    }
+    var bodyTb = auPermTable() && auPermTable().querySelector('tbody.au-perm-mega-body[data-mega="' + megaId + '"]');
+    if (bodyTb) {
+        bodyTb.hidden = !expand;
+    }
+    auPermUpdateExpandBtn(btn, expand);
 }
 
 function auPermKey(page) {
@@ -258,27 +338,28 @@ function auPermSyncMegaFromPages(megaId) {
 }
 
 function auPermBindMatrixEvents() {
-    var tb = document.getElementById('perm_matrix_tbody');
-    if (!tb || tb.__auPermBound) return;
-    tb.__auPermBound = true;
-    tb.addEventListener('click', function (ev) {
+    var table = auPermTable();
+    if (!table || table.__auPermBound) return;
+    table.__auPermBound = true;
+    table.addEventListener('click', function (ev) {
         var btn = ev.target.closest('.au-perm-expand');
         if (!btn) return;
+        ev.preventDefault();
+        ev.stopPropagation();
         var megaId = btn.getAttribute('data-mega');
+        if (!megaId) return;
         var expanded = btn.getAttribute('aria-expanded') === 'true';
-        btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-        document.querySelectorAll('tr.au-perm-child[data-mega="' + megaId + '"]').forEach(function (tr) {
-            tr.hidden = expanded;
-        });
+        auPermSetMegaExpanded(megaId, !expanded);
     });
-    tb.addEventListener('change', function (ev) {
+    table.addEventListener('change', function (ev) {
         var el = ev.target;
         if (!el || el.type !== 'checkbox') return;
         var megaRow = el.closest('tr.au-perm-mega');
-        if (megaRow) {
+        if (megaRow && !megaRow.classList.contains('au-perm-page')) {
             var megaId = megaRow.getAttribute('data-mega');
             var flags = auPermRowFlags(megaRow);
-            document.querySelectorAll('tr.au-perm-page[data-mega="' + megaId + '"]').forEach(function (tr) {
+            auPermEnsureMegaBody(megaId);
+            auPermTable().querySelectorAll('tr.au-perm-page[data-mega="' + megaId + '"]').forEach(function (tr) {
                 var pg = tr.getAttribute('data-page') || '';
                 var pageActs = auPermActionsForPage(pg);
                 var patch = {
@@ -302,13 +383,15 @@ function auPermBindMatrixEvents() {
 
 function renderPermMatrix(adminId, existing, isSuperOverride) {
     var isSuper = typeof isSuperOverride === 'boolean' ? isSuperOverride : auIsSuperChecked();
-    var tb = document.getElementById('perm_matrix_tbody');
-    if (!tb) return;
-    tb.innerHTML = '';
-    auPermBindMatrixEvents();
+    var table = auPermTable();
+    if (!table) return;
+    window.__auPermExisting = existing || {};
+    auPermClearBodies();
     if (isSuper) {
         document.getElementById('perm_target_id').value = '0';
-        tb.innerHTML = '<tr><td colspan="6" class="muted">مشرف عام — كل الصلاحيات على كل الشاشات.</td></tr>';
+        var superTb = document.createElement('tbody');
+        superTb.innerHTML = '<tr><td colspan="6" class="muted">مشرف عام — كل الصلاحيات على كل الشاشات.</td></tr>';
+        table.appendChild(superTb);
         auPermHintForSuper(true);
         return;
     }
@@ -324,11 +407,15 @@ function renderPermMatrix(adminId, existing, isSuperOverride) {
                 if (ex[k]) megaFlags[k] = true;
             });
         });
+        var headTb = document.createElement('tbody');
+        headTb.className = 'au-perm-mega-head';
+        headTb.setAttribute('data-mega', megaId);
         var megaTr = document.createElement('tr');
         megaTr.className = 'au-perm-mega';
         megaTr.setAttribute('data-mega', megaId);
+        megaTr.setAttribute('data-page', '__mega__' + megaId);
         var expandBtn = pages.length > 1
-            ? '<button type="button" class="au-perm-expand" data-mega="' + escapeHtml(megaId) + '" aria-expanded="true" title="طي/عرض الشاشات">▼</button> '
+            ? '<button type="button" class="au-perm-expand" data-mega="' + escapeHtml(megaId) + '" aria-expanded="false" title="فتح الشاشات">◀</button> '
             : '';
         megaTr.innerHTML =
             '<td class="au-perm-mega-label">' + expandBtn + '<strong>' + escapeHtml(mega.title || megaId) + '</strong>' +
@@ -338,49 +425,48 @@ function renderPermMatrix(adminId, existing, isSuperOverride) {
         if (mega.page) {
             megaTr.className = 'au-perm-mega au-perm-page';
             megaTr.setAttribute('data-page', mega.page);
-            megaTr.setAttribute('data-mega', megaId);
             megaTr.querySelectorAll('input[type=checkbox]').forEach(function (inp) {
                 inp.classList.remove('au-perm-mega-cb');
                 inp.classList.add('au-perm-page-cb');
                 inp.setAttribute('data-page', mega.page);
             });
-            tb.appendChild(megaTr);
-            return;
         }
-
-        tb.appendChild(megaTr);
-
-        (mega.subgroups || []).forEach(function (sg) {
-            var headTr = document.createElement('tr');
-            headTr.className = 'au-perm-subhead au-perm-child';
-            headTr.setAttribute('data-mega', megaId);
-            headTr.innerHTML = '<td colspan="6" class="au-perm-subhead-label">' + escapeHtml(sg.title || '') + '</td>';
-            tb.appendChild(headTr);
-            (sg.pages || []).forEach(function (p) {
-                var pg = p.page || '';
-                if (!pg) return;
-                var pageTr = document.createElement('tr');
-                pageTr.className = 'au-perm-page au-perm-child';
-                pageTr.setAttribute('data-mega', megaId);
-                pageTr.setAttribute('data-page', pg);
-                pageTr.innerHTML =
-                    '<td class="au-perm-page-label">' + escapeHtml(p.label || pg) + '</td>' +
-                    auPermMakeCheckboxCells(pg, auPermResolveExisting(existing, pg), 'au-perm-page-cb');
-                tb.appendChild(pageTr);
-            });
-        });
-        auPermSyncMegaFromPages(megaId);
+        headTb.appendChild(megaTr);
+        table.appendChild(headTb);
     });
 }
 
 function collectPermMatrix() {
     var matrix = {};
-    document.querySelectorAll('#perm_matrix_tbody tr.au-perm-page').forEach(function (tr) {
+    var table = auPermTable();
+    if (!table) return matrix;
+    table.querySelectorAll('tr.au-perm-page').forEach(function (tr) {
         var page = tr.getAttribute('data-page');
-        if (!page) return;
+        if (!page || page.indexOf('__mega__') === 0) return;
         var flags = auPermRowFlags(tr);
         if (!flags) return;
         matrix[auPermKey(page)] = flags;
+    });
+    table.querySelectorAll('tr.au-perm-mega:not(.au-perm-page)').forEach(function (megaTr) {
+        var megaId = megaTr.getAttribute('data-mega');
+        if (!megaId) return;
+        if (table.querySelector('tbody.au-perm-mega-body[data-mega="' + megaId + '"]')) {
+            return;
+        }
+        var flags = auPermRowFlags(megaTr);
+        if (!flags) return;
+        var mega = auPermFindMega(megaId);
+        if (!mega) return;
+        auPermPagesInMega(mega).forEach(function (pg) {
+            var acts = auPermActionsForPage(pg);
+            matrix[auPermKey(pg)] = {
+                can_view: acts.indexOf('view') >= 0 ? flags.can_view : false,
+                can_edit: acts.indexOf('edit') >= 0 ? flags.can_edit : false,
+                can_delete: acts.indexOf('delete') >= 0 ? flags.can_delete : false,
+                can_lock: acts.indexOf('lock') >= 0 ? flags.can_lock : false,
+                can_unlock: acts.indexOf('unlock') >= 0 ? flags.can_unlock : false
+            };
+        });
     });
     return matrix;
 }
@@ -550,6 +636,7 @@ function savePermissions() {
 }
 
 auBindSuperToggle();
+auPermBindMatrixEvents();
 renderPermMatrix(0, {}, false);
 loadAdmins();
 </script>
