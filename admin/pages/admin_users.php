@@ -114,6 +114,8 @@ function auPermActionsForMega(mega) {
     });
     return Object.keys(set);
 }
+
+function auIsSuperChecked() {
     var el = document.getElementById('au_super');
     return !!(el && el.checked);
 }
@@ -326,17 +328,17 @@ function renderPermMatrix(adminId, existing, isSuperOverride) {
         megaTr.className = 'au-perm-mega';
         megaTr.setAttribute('data-mega', megaId);
         var expandBtn = pages.length > 1
-            ? '<button type="button" class="au-perm-expand" data-mega="' + escapeHtml(megaId) + '" aria-expanded="false" title="عرض الشاشات">▼</button> '
+            ? '<button type="button" class="au-perm-expand" data-mega="' + escapeHtml(megaId) + '" aria-expanded="true" title="طي/عرض الشاشات">▼</button> '
             : '';
         megaTr.innerHTML =
             '<td class="au-perm-mega-label">' + expandBtn + '<strong>' + escapeHtml(mega.title || megaId) + '</strong>' +
             '<span class="card-hint au-perm-mega-hint">اختصار — ' + pages.length + ' شاشة</span></td>' +
             auPermMakeCheckboxCells('__mega__' + megaId, megaFlags, 'au-perm-mega-cb', auPermActionsForMega(mega));
-        tb.appendChild(megaTr);
 
         if (mega.page) {
             megaTr.className = 'au-perm-mega au-perm-page';
             megaTr.setAttribute('data-page', mega.page);
+            megaTr.setAttribute('data-mega', megaId);
             megaTr.querySelectorAll('input[type=checkbox]').forEach(function (inp) {
                 inp.classList.remove('au-perm-mega-cb');
                 inp.classList.add('au-perm-page-cb');
@@ -346,11 +348,12 @@ function renderPermMatrix(adminId, existing, isSuperOverride) {
             return;
         }
 
+        tb.appendChild(megaTr);
+
         (mega.subgroups || []).forEach(function (sg) {
             var headTr = document.createElement('tr');
             headTr.className = 'au-perm-subhead au-perm-child';
             headTr.setAttribute('data-mega', megaId);
-            headTr.hidden = true;
             headTr.innerHTML = '<td colspan="6" class="au-perm-subhead-label">' + escapeHtml(sg.title || '') + '</td>';
             tb.appendChild(headTr);
             (sg.pages || []).forEach(function (p) {
@@ -360,7 +363,6 @@ function renderPermMatrix(adminId, existing, isSuperOverride) {
                 pageTr.className = 'au-perm-page au-perm-child';
                 pageTr.setAttribute('data-mega', megaId);
                 pageTr.setAttribute('data-page', pg);
-                pageTr.hidden = true;
                 pageTr.innerHTML =
                     '<td class="au-perm-page-label">' + escapeHtml(p.label || pg) + '</td>' +
                     auPermMakeCheckboxCells(pg, auPermResolveExisting(existing, pg), 'au-perm-page-cb');
