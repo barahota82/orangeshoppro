@@ -12,6 +12,8 @@ require_once __DIR__ . '/../../includes/sales_doc_product_pick.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 require_once __DIR__ . '/../../includes/invoice_ancillary_lines.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
+require_once __DIR__ . '/../../includes/sales_doc_channel.php';
+require_once __DIR__ . '/../../includes/sales_doc_print.php';
 
 $pdo = orange_admin_page_pdo();
 $sv2Caps = orange_admin_caps_for_page($admin, $pdo, 'company_sales_invoice');
@@ -30,6 +32,7 @@ $sv2PickRows = orange_sales_doc_product_pick_rows($pdo, $adminCountryId);
 $channels = $pdo->query(
     'SELECT id, name FROM channels WHERE is_active = 1' . $sv2ChannelsCountrySql . ' ORDER BY id ASC'
 )->fetchAll(PDO::FETCH_ASSOC);
+$sv2DefaultChannelId = orange_admin_default_sales_channel_id($pdo, $adminCountryId);
 
 $sv2CustomerPickRows = [];
 if (orange_table_exists($pdo, 'customers')) {
@@ -186,6 +189,15 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
 <?php endif; ?>
 
 <div class="card jv-print-area">
+    <?php
+    orange_sales_doc_print_banner([
+        'prefix' => 'sv2',
+        'doc_title' => 'فاتورة مبيعات',
+        'doc_badge' => 'INV-C',
+        'country_id' => $adminCountryId,
+        'currency_code' => $adminDefaultCurrency,
+    ]);
+    ?>
     <h3 class="card-title">فاتورة مبيعات <span id="sv2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
     <?php orange_edit_lock_ui_toolbar(['prefix' => 'sv2', 'doc_kind' => 'company_sales_invoice', 'country_id' => $adminCountryId]); ?>
 
@@ -238,7 +250,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
                 <option value="">— لا قنوات —</option>
                 <?php else: ?>
                 <?php foreach ($channels as $ch): ?>
-                <option value="<?php echo (int) $ch['id']; ?>"><?php echo htmlspecialchars((string) $ch['name'], ENT_QUOTES, 'UTF-8'); ?></option>
+                <option value="<?php echo (int) $ch['id']; ?>"<?php echo (int) $ch['id'] === $sv2DefaultChannelId ? ' selected' : ''; ?>><?php echo htmlspecialchars((string) $ch['name'], ENT_QUOTES, 'UTF-8'); ?></option>
                 <?php endforeach; ?>
                 <?php endif; ?>
             </select>
@@ -480,6 +492,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/country-codes.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin-phone-country.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_purchase_doc_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/admin/assets/admin_sales_doc_ui.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
 (function () {
     var SV2_PICK_ROWS = <?php echo json_encode($sv2PickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
@@ -488,6 +501,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     var SV2_READY = <?php echo $sv2Ready ? 'true' : 'false'; ?>;
     var SV2_NAV_READY = <?php echo $sv2NavReady ? 'true' : 'false'; ?>;
     var SV2_COUNTRY_ID = <?php echo (int) $adminCountryId; ?>;
+    var SV2_DEFAULT_CHANNEL_ID = <?php echo (int) $sv2DefaultChannelId; ?>;
     var SV2_CAPS = <?php echo json_encode($sv2Caps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
     var SV2_SALES_LINE_KINDS = <?php echo json_encode($sv2SalesLineKinds, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
 
@@ -1330,6 +1344,9 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
                 alert((res && res.message) || 'فشل');
                 return;
             }
+            if (window.orangeSalesDocUi) {
+                window.orangeSalesDocUi.rememberChannel(SV2_COUNTRY_ID, channel);
+            }
             if (typeof orangeAdminOfferOpenGlVoucherAfterSave === 'function') {
                 orangeAdminOfferOpenGlVoucherAfterSave(res, function () { sv2ReloadAfterSave(res); });
             } else {
@@ -1426,10 +1443,21 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
                 sv2ExtraPickClose();
             }
         });
-        document.getElementById('sv2_btn_print').addEventListener('click', function () {
-            if (browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return; }
-            window.print();
-        });
+        if (window.orangeSalesDocUi) {
+            window.orangeSalesDocUi.bindPrintButton('sv2_btn_print', {
+                prefix: 'sv2',
+                serialElId: 'sv2_doc_serial',
+                beforePrint: function () {
+                    if (browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return false; }
+                    return true;
+                }
+            });
+        } else {
+            document.getElementById('sv2_btn_print').addEventListener('click', function () {
+                if (browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return; }
+                window.print();
+            });
+        }
         document.getElementById('sv2_nav_first').addEventListener('click', function () { sv2Nav('first'); });
         document.getElementById('sv2_nav_prev').addEventListener('click', function () { sv2Nav('prev'); });
         document.getElementById('sv2_nav_next').addEventListener('click', function () { sv2Nav('next'); });
@@ -1466,6 +1494,14 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         }
 
         sv2SyncToolbar();
+
+        if (window.orangeSalesDocUi && browseOrderId <= 0 && SV2_PREFILL_ORDER_ID <= 0) {
+            window.orangeSalesDocUi.applyDefaultChannel(
+                document.getElementById('sv2_channel'),
+                SV2_COUNTRY_ID,
+                SV2_DEFAULT_CHANNEL_ID
+            );
+        }
 
         if (window.OrangeEditLock) {
             sv2EditLockCtl = OrangeEditLock.bind({

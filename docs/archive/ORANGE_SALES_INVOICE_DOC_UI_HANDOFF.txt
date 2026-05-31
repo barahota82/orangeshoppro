@@ -195,9 +195,9 @@ ENGLISH
 ---
 
 ### المرحلة 4 — تلميع (اختياري)
-- [ ] توحيد قالب الطباعة INV-C / INV-O / مردود.
-- [ ] قناة افتراضية «آخر استخدام» أو قناة واتساب configurable.
-- [ ] `orange_full_system_review.ps1` + تقارير GAP.
+- [x] توحيد قالب الطباعة INV-C / INV-O / مردود.
+- [x] قناة افتراضية «آخر استخدام» أو قناة واتساب configurable.
+- [x] `orange_full_system_review.ps1` + تقارير GAP.
 
 ================================================================================
 10) اختبار UAT (مالك)
@@ -217,8 +217,8 @@ ENGLISH
 | البند | الحالة |
 |-------|--------|
 | قرار مالك / مواصفة UI | **مغلق 2026-05-20** — هذا الملف |
-| تنفيذ مراحل 0–3 | **مرحلة 3 منتهية — UAT + مرحلة 4 اختياري** |
-| مرحلة 4 | اختياري |
+| تنفيذ مراحل 0–3 | **منتهية — UAT مالك متبقٍ** |
+| مرحلة 4 | **منتهية 2026-05-20** — طباعة موحّدة + قناة افتراضية + مراجعة GAP |
 
 ================================================================================
 Changelog
@@ -228,3 +228,4 @@ Changelog
 2026-05-20 — **تنفيذ مرحلة 1:** `company_sales_invoice.php` مستند v2 (`sv2`) + update بنود/GL + edit_lock + redirects legacy.
 2026-05-20 — **تنفيذ مرحلة 2:** `sales_returns.php` مستند v2 (`sr2`) + `browse.php` + `retrieve_from_order.php` + helpers كميات الطلب + edit_lock/print/nav/search.
 2026-05-20 — **تنفيذ مرحلة 3:** `online_sales_invoice.php` (`ov2`) + `online-invoices/*` + `includes/sales_invoice_online.php` + redirect `online_invoices` + edit_lock `online_sales_invoice` (تحديث بنود/ترويسة **بلا** إعادة final-posting).
+2026-05-20 — **تنفيذ مرحلة 4:** `includes/sales_doc_print.php` + `includes/sales_doc_channel.php` + `admin/assets/admin_sales_doc_ui.js` — ترويسة طباعة موحّدة (INV-C/INV-O/SR) + قناة افتراضية (واتساب/رئيسية + localStorage آخر استخدام) + تحديث `orange_full_system_review.ps1` (GAP-SALE-DOC-01 CLOSED).

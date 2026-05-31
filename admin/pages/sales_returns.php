@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/sales_doc_product_pick.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
+require_once __DIR__ . '/../../includes/sales_doc_print.php';
 
 $pdo = orange_admin_page_pdo();
 $sr2Caps = orange_admin_caps_for_page($admin, $pdo, 'sales_returns');
@@ -131,6 +132,15 @@ $sr2DocSerialPreview = $sr2NavReady
 <?php endif; ?>
 
 <div class="card jv-print-area">
+    <?php
+    orange_sales_doc_print_banner([
+        'prefix' => 'sr2',
+        'doc_title' => 'مردود مبيعات',
+        'doc_badge' => 'SR',
+        'country_id' => $srCountryId,
+        'currency_code' => $srDefaultCurrency,
+    ]);
+    ?>
     <h3 class="card-title">مردود مبيعات <span id="sr2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
     <?php orange_edit_lock_ui_toolbar(['prefix' => 'sr2', 'doc_kind' => 'sales_return', 'country_id' => $srCountryId]); ?>
 
@@ -335,6 +345,7 @@ $sr2DocSerialPreview = $sr2NavReady
 </div>
 
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_purchase_doc_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/admin/assets/admin_sales_doc_ui.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
 (function () {
     var SR2_PICK_ROWS = <?php echo json_encode($sr2PickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
@@ -961,10 +972,21 @@ $sr2DocSerialPreview = $sr2NavReady
         document.getElementById('sr2_btn_save').addEventListener('click', save);
         document.getElementById('sr2_btn_new').addEventListener('click', sr2ResetNew);
         document.getElementById('sr2_btn_retrieve').addEventListener('click', sr2RetrieveFromOrder);
-        document.getElementById('sr2_btn_print').addEventListener('click', function () {
-            if (browseReturnId <= 0) { alert('افتح مردوداً محفوظاً للطباعة.'); return; }
-            window.print();
-        });
+        if (window.orangeSalesDocUi) {
+            window.orangeSalesDocUi.bindPrintButton('sr2_btn_print', {
+                prefix: 'sr2',
+                serialElId: 'sr2_doc_serial',
+                beforePrint: function () {
+                    if (browseReturnId <= 0) { alert('افتح مردوداً محفوظاً للطباعة.'); return false; }
+                    return true;
+                }
+            });
+        } else {
+            document.getElementById('sr2_btn_print').addEventListener('click', function () {
+                if (browseReturnId <= 0) { alert('افتح مردوداً محفوظاً للطباعة.'); return; }
+                window.print();
+            });
+        }
         document.getElementById('sr2_nav_first').addEventListener('click', function () { sr2Nav('first'); });
         document.getElementById('sr2_nav_prev').addEventListener('click', function () { sr2Nav('prev'); });
         document.getElementById('sr2_nav_next').addEventListener('click', function () { sr2Nav('next'); });

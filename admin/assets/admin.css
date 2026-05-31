@@ -4117,6 +4117,90 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     margin: 0;
 }
 
+/* GAP-SALE-DOC-01 — ترويسة طباعة موحّدة (INV-C / INV-O / مردود) */
+.sd-print-banner {
+    display: none;
+}
+.sd-print-banner__head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.85rem;
+    border-bottom: 2px solid #334155;
+}
+.sd-print-banner__brand {
+    display: flex;
+    gap: 0.85rem;
+    align-items: flex-start;
+    max-width: 62%;
+}
+.sd-print-banner__logo {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: #fff;
+}
+.sd-print-banner__name-ar {
+    margin: 0 0 0.2rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+.sd-print-banner__name-en {
+    margin: 0;
+    font-size: 0.88rem;
+    color: #64748b;
+    text-align: left;
+}
+.sd-print-banner__meta {
+    min-width: 200px;
+    padding: 0.65rem 0.85rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 0.86rem;
+    line-height: 1.5;
+    background: #f8fafc;
+}
+.sd-print-banner__doc-title {
+    margin: 0 0 0.35rem;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+.sd-print-banner__badge {
+    display: inline-block;
+    margin-bottom: 0.35rem;
+    padding: 0.12rem 0.45rem;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+.sd-print-banner__label {
+    color: #64748b;
+}
+.sd-print-banner__serial {
+    color: #0f172a;
+}
+.sd-print-banner__company-meta,
+.sd-print-banner__footer-hint {
+    margin: 0 0 0.5rem;
+    font-size: 0.8rem;
+    color: #475569;
+    line-height: 1.55;
+}
+.sd-print-banner__footer-hint {
+    margin-top: 0.65rem;
+    padding-top: 0.55rem;
+    border-top: 1px dashed #cbd5e1;
+}
+
 @media print {
     body * {
         visibility: hidden;
@@ -4178,6 +4262,17 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     }
     .jv-print-area .ob-opening-table thead th.admin-doc-col-actions,
     .jv-print-area .ob-line-main td:last-child {
+        display: none !important;
+    }
+    .jv-print-area .sd-print-banner,
+    .jv-print-area .sd-print-banner * {
+        visibility: visible;
+    }
+    .jv-print-area .sd-print-banner {
+        display: block !important;
+        margin-bottom: 1rem;
+    }
+    .jv-print-area .card-title {
         display: none !important;
     }
     .gl-acc-stmt-no-print {

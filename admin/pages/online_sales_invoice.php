@@ -11,6 +11,8 @@ require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/sales_doc_product_pick.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
+require_once __DIR__ . '/../../includes/sales_doc_channel.php';
+require_once __DIR__ . '/../../includes/sales_doc_print.php';
 
 $pdo = orange_admin_page_pdo();
 $ov2Caps = orange_admin_caps_for_page($admin, $pdo, 'online_sales_invoice');
@@ -29,6 +31,7 @@ $ov2PickRows = orange_sales_doc_product_pick_rows($pdo, $adminCountryId);
 $channels = $pdo->query(
     'SELECT id, name FROM channels WHERE is_active = 1' . $ov2ChannelsCountrySql . ' ORDER BY id ASC'
 )->fetchAll(PDO::FETCH_ASSOC);
+$ov2DefaultChannelId = orange_admin_default_sales_channel_id($pdo, $adminCountryId);
 
 $ov2CustomerPickRows = [];
 if (orange_table_exists($pdo, 'customers')) {
@@ -174,6 +177,15 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
 </div>
 
 <div class="card jv-print-area">
+    <?php
+    orange_sales_doc_print_banner([
+        'prefix' => 'ov2',
+        'doc_title' => 'فاتورة أونلاين',
+        'doc_badge' => 'INV-O',
+        'country_id' => $adminCountryId,
+        'currency_code' => $adminDefaultCurrency,
+    ]);
+    ?>
     <h3 class="card-title">فاتورة أونلاين <span id="ov2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
     <?php orange_edit_lock_ui_toolbar(['prefix' => 'ov2', 'doc_kind' => 'online_sales_invoice', 'country_id' => $adminCountryId]); ?>
 
@@ -243,7 +255,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
                 <option value="">— لا قنوات —</option>
                 <?php else: ?>
                 <?php foreach ($channels as $ch): ?>
-                <option value="<?php echo (int) $ch['id']; ?>"><?php echo htmlspecialchars((string) $ch['name'], ENT_QUOTES, 'UTF-8'); ?></option>
+                <option value="<?php echo (int) $ch['id']; ?>"<?php echo (int) $ch['id'] === $ov2DefaultChannelId ? ' selected' : ''; ?>><?php echo htmlspecialchars((string) $ch['name'], ENT_QUOTES, 'UTF-8'); ?></option>
                 <?php endforeach; ?>
                 <?php endif; ?>
             </select>
@@ -432,6 +444,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/country-codes.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin-phone-country.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_purchase_doc_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/admin/assets/admin_sales_doc_ui.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
 (function () {
     var OV2_PICK_ROWS = <?php echo json_encode($ov2PickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
@@ -440,6 +453,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
     var OV2_READY = <?php echo $ov2Ready ? 'true' : 'false'; ?>;
     var OV2_NAV_READY = <?php echo $ov2NavReady ? 'true' : 'false'; ?>;
     var OV2_COUNTRY_ID = <?php echo (int) $adminCountryId; ?>;
+    var OV2_DEFAULT_CHANNEL_ID = <?php echo (int) $ov2DefaultChannelId; ?>;
     var OV2_CAPS = <?php echo json_encode($ov2Caps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
 
     var ov2EditLockCtl = null;
@@ -1043,6 +1057,9 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
                 return;
             }
             var msg = res.gl_sync_note || res.message || 'تم الحفظ';
+            if (window.orangeSalesDocUi) {
+                window.orangeSalesDocUi.rememberChannel(OV2_COUNTRY_ID, channel);
+            }
             alert(msg);
             ov2ReloadAfterSave(res);
         }).catch(function (e) { alert(e.message || String(e)); });
@@ -1103,10 +1120,21 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         document.addEventListener('keydown', function (ev) {
             if (ev.key === 'Escape') customerPickerClose();
         });
-        document.getElementById('ov2_btn_print').addEventListener('click', function () {
-            if (browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return; }
-            window.print();
-        });
+        if (window.orangeSalesDocUi) {
+            window.orangeSalesDocUi.bindPrintButton('ov2_btn_print', {
+                prefix: 'ov2',
+                serialElId: 'ov2_doc_serial',
+                beforePrint: function () {
+                    if (browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return false; }
+                    return true;
+                }
+            });
+        } else {
+            document.getElementById('ov2_btn_print').addEventListener('click', function () {
+                if (browseOrderId <= 0) { alert('افتح فاتورة محفوظة للطباعة.'); return; }
+                window.print();
+            });
+        }
         document.getElementById('ov2_nav_first').addEventListener('click', function () { ov2Nav('first'); });
         document.getElementById('ov2_nav_prev').addEventListener('click', function () { ov2Nav('prev'); });
         document.getElementById('ov2_nav_next').addEventListener('click', function () { ov2Nav('next'); });

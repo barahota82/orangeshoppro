@@ -34,11 +34,15 @@ $adminScreens = @(
     @{ Page = 'products'; Area = 'Products'; Scope = 'country'; PolicyRef = 'admin-screens'; Status = 'OK'; Notes = '' },
     @{ Page = 'customers'; Area = 'Sales'; Scope = 'country'; PolicyRef = 'S15/zero'; Status = 'OK'; Notes = 'Phone country select' },
     @{ Page = 'orders'; Area = 'Sales'; Scope = 'country'; PolicyRef = 'S16-17'; Status = 'OK'; Notes = '' },
+    @{ Page = 'company_sales_invoice'; Area = 'Sales'; Scope = 'country'; PolicyRef = 'GAP-SALE-DOC-01'; Status = 'OK'; Notes = 'INV-C doc v2 sv2' },
+    @{ Page = 'online_sales_invoice'; Area = 'Sales'; Scope = 'country'; PolicyRef = 'GAP-SALE-DOC-01'; Status = 'OK'; Notes = 'INV-O doc v2 ov2' },
     @{ Page = 'reserved_orders'; Area = 'Sales'; Scope = 'country'; PolicyRef = 'S23/S28'; Status = 'OK'; Notes = 'Stock reservations' },
     @{ Page = 'order_intake_queue'; Area = 'Sales'; Scope = 'country'; PolicyRef = 'S1'; Status = 'OK'; Notes = '' },
     @{ Page = 'invoice'; Area = 'Sales'; Scope = 'country'; PolicyRef = 'v52-S3'; Status = 'OK'; Notes = 'company_settings per country' },
-    @{ Page = 'manual_order'; Area = 'Sales'; Scope = 'country'; PolicyRef = 'S1-2'; Status = 'PARTIAL'; Notes = 'UX parity with purchases — verify on server' },
-    @{ Page = 'sales_returns'; Area = 'Sales'; Scope = 'country'; PolicyRef = 'admin-screens'; Status = 'OK'; Notes = '' },
+    @{ Page = 'manual_order'; Area = 'Sales'; Scope = 'country'; PolicyRef = 'GAP-SALE-DOC-01'; Status = 'OK'; Notes = 'Legacy redirect to company_sales_invoice' },
+    @{ Page = 'sales_invoices'; Area = 'Sales'; Scope = 'country'; PolicyRef = 'GAP-SALE-DOC-01'; Status = 'OK'; Notes = 'Legacy browse redirect to company_sales_invoice' },
+    @{ Page = 'online_invoices'; Area = 'Sales'; Scope = 'country'; PolicyRef = 'GAP-SALE-DOC-01'; Status = 'OK'; Notes = 'Legacy redirect to online_sales_invoice' },
+    @{ Page = 'sales_returns'; Area = 'Sales'; Scope = 'country'; PolicyRef = 'GAP-SALE-DOC-01'; Status = 'OK'; Notes = 'sr2 doc v2 parity pr2' },
     @{ Page = 'offers'; Area = 'Promotions'; Scope = 'country'; PolicyRef = 'S4'; Status = 'OK'; Notes = '' },
     @{ Page = 'cart_promotions'; Area = 'Promotions'; Scope = 'country'; PolicyRef = 'S4/S7'; Status = 'OK'; Notes = '' },
     @{ Page = 'cart_gift_promotions'; Area = 'Promotions'; Scope = 'country'; PolicyRef = 'S4'; Status = 'OK'; Notes = '' },
@@ -203,7 +207,8 @@ $gaps = @(
     @{ Id = 'GAP-06'; Severity = 'MEDIUM'; Status = 'CLOSED'; Topic = 'opening_balances country' },
     @{ Id = 'GAP-07'; Severity = 'LOW'; Status = 'CLOSED'; Topic = 'phone merge per country' },
     @{ Id = 'GAP-08'; Severity = 'LOW'; Status = 'CLOSED'; Topic = 'legacy copy_lines migrate' },
-    @{ Id = 'GAP-09'; Severity = 'AUDIT'; Status = 'CLOSED'; Topic = 'GL country bind j4 182 hits 0 HIGH 0 LOW' }
+    @{ Id = 'GAP-09'; Severity = 'AUDIT'; Status = 'CLOSED'; Topic = 'GL country bind j4 182 hits 0 HIGH 0 LOW' },
+    @{ Id = 'GAP-SALE-DOC-01'; Severity = 'MEDIUM'; Status = 'CLOSED'; Topic = 'Sales invoice doc v2 INV-C/INV-O/sr2 phases 0-4' }
 )
 
 $gapRows = foreach ($g in $gaps) {
