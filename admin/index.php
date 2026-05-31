@@ -34,6 +34,7 @@ $allowed = [
     'reserved_orders',
     'sales_returns',
     'manual_order',
+    'company_sales_invoice',
     'customers',
     'suppliers',
     'purchases',

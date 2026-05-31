@@ -81,6 +81,7 @@ function orange_admin_page_resource(string $page): string
         'order_intake_queue' => 'sales',
         'invoice' => 'sales',
         'manual_order' => 'sales',
+        'company_sales_invoice' => 'sales',
         'customers' => 'partners',
         'suppliers' => 'partners',
         'purchases' => 'warehouse',
@@ -158,6 +159,7 @@ function orange_admin_api_folder_resource(string $folder): string
         'offers' => 'products',
         'orders' => 'sales',
         'sales_returns' => 'sales',
+        'sales-invoices' => 'sales',
         'order_intake' => 'sales',
         'purchases' => 'warehouse',
         'purchase_returns' => 'warehouse',
@@ -261,6 +263,7 @@ function orange_admin_api_page_from_script(): ?string
         'offers' => 'offers',
         'orders' => 'orders',
         'sales_returns' => 'sales_returns',
+        'sales-invoices' => 'company_sales_invoice',
         'order_intake' => 'order_intake_queue',
         'purchases' => 'purchases',
         'purchase_returns' => 'purchase_returns',
@@ -569,6 +572,72 @@ function orange_admin_purge_obsolete_page_permissions(PDO $pdo): void
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] admin_permissions_drop_obsolete_pages_v79: ' . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * GAP-SALE-DOC-01 مرحلة 0 — نسخ صلاحيات page:manual_order إلى page:company_sales_invoice.
+ */
+function orange_admin_seed_company_sales_invoice_page_permissions(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    $marker = 'php_admin_permissions_seed_company_sales_invoice_v80';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+    if (!orange_table_exists($pdo, 'admin_permissions')) {
+        return;
+    }
+    $fromKey = 'page:manual_order';
+    $toKey = 'page:company_sales_invoice';
+    $hasLock = orange_table_has_column($pdo, 'admin_permissions', 'can_lock');
+    try {
+        $sel = $pdo->prepare(
+            'SELECT admin_id, can_view, can_edit, can_delete'
+            . ($hasLock ? ', can_lock, can_unlock' : '')
+            . ' FROM admin_permissions WHERE resource_key = ?'
+        );
+        $sel->execute([$fromKey]);
+        $rows = $sel->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if ($hasLock) {
+            $ins = $pdo->prepare(
+                'INSERT INTO admin_permissions (admin_id, resource_key, can_view, can_edit, can_delete, can_lock, can_unlock)
+                 VALUES (?,?,?,?,?,?,?)
+                 ON DUPLICATE KEY UPDATE
+                   can_view = GREATEST(admin_permissions.can_view, VALUES(can_view)),
+                   can_edit = GREATEST(admin_permissions.can_edit, VALUES(can_edit)),
+                   can_delete = GREATEST(admin_permissions.can_delete, VALUES(can_delete)),
+                   can_lock = GREATEST(admin_permissions.can_lock, VALUES(can_lock)),
+                   can_unlock = GREATEST(admin_permissions.can_unlock, VALUES(can_unlock))'
+            );
+        } else {
+            $ins = $pdo->prepare(
+                'INSERT INTO admin_permissions (admin_id, resource_key, can_view, can_edit, can_delete)
+                 VALUES (?,?,?,?,?)
+                 ON DUPLICATE KEY UPDATE
+                   can_view = GREATEST(admin_permissions.can_view, VALUES(can_view)),
+                   can_edit = GREATEST(admin_permissions.can_edit, VALUES(can_edit)),
+                   can_delete = GREATEST(admin_permissions.can_delete, VALUES(can_delete))'
+            );
+        }
+        foreach ($rows as $row) {
+            $v = (int) ($row['can_view'] ?? 0);
+            $e = (int) ($row['can_edit'] ?? 0);
+            $d = (int) ($row['can_delete'] ?? 0);
+            if ($hasLock) {
+                $l = (int) ($row['can_lock'] ?? 0);
+                $u = (int) ($row['can_unlock'] ?? 0);
+                $ins->execute([(int) $row['admin_id'], $toKey, $v, $e, $d, $l, $u]);
+            } else {
+                $ins->execute([(int) $row['admin_id'], $toKey, $v, $e, $d]);
+            }
+        }
+        $insMarker = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+        $insMarker->execute([$marker]);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] admin_permissions_seed_company_sales_invoice_v80: ' . $e->getMessage());
         }
     }
 }

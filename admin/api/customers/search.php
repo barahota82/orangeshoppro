@@ -32,6 +32,7 @@ try {
 
     $q = trim((string) ($_GET['q'] ?? ''));
     $full = isset($_GET['full']) && (string) $_GET['full'] === '1';
+    $picker = isset($_GET['picker']) && (string) $_GET['picker'] === '1';
 
     $hasCode = orange_table_has_column($pdo, 'customers', 'code');
     $hasArea = orange_table_has_column($pdo, 'customers', 'area');
@@ -90,6 +91,9 @@ try {
                 'name' => (string) ($r['name'] ?? ''),
                 'phone' => (string) ($r['phone'] ?? ''),
                 'area' => $hasArea ? (string) ($r['area'] ?? '') : '',
+                'current_balance' => $picker
+                    ? round((float) orange_party_balance_customer($pdo, $id), 3)
+                    : null,
             ];
         }
         json_response(['success' => true, 'customers' => $out]);

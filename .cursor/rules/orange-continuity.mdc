@@ -30,6 +30,7 @@ When resuming Orange work, read:
 5tax. **`docs/archive/ORANGE_UNIFIED_TAXONOMY_AND_CATALOG_ERD.txt`** — تصنيف منتج موحّد (شجرة قبل SKU + صفات + ترحيل)؛ **قراءة كاملة** قبل Patch كتالوج؛ سياسة مختصرة في **`ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** قسم «تاسعاً».
 5c. **`docs/archive/ORANGE_ACCOUNTING_MAPPING_AND_REPORT_HANDOFF.txt`** — منهج التصنيف المحاسبي، `report_line_master`، قواعد التقارير وعدم استخدام اسم الحساب في المنطق؛ **قراءة كاملة** عند أي تنفيذ يمس **دليل الحسابات** أو **حقول الخرائط** أو **تقارير مالية GL** أو **سياسة الإصدار v2** (`docs/ACCOUNTING_REPORTING_POLICY_V2.md`).
 5m. **`docs/archive/ORANGE_OWNER_MULTICOUNTRY_VISION.txt`** — رؤية المالك: دول، قنوات بعدد مفتوح لكل دولة، محافظات/مناطق، ترتيب التوسّع، صلاحيات، COD مؤقتاً؛ **قراءة كاملة** قبل Patch ذلك النطاق (التنفيذ البرمجي قد لا يزال جزئياً).
+5sale. **`docs/archive/ORANGE_SALES_INVOICE_DOC_UI_HANDOFF.txt`** — فواتير البيع مستند v2 (INV-C / INV-O / مردود)؛ **قراءة كاملة** عند نطاق واجهة فواتير المبيعات (GAP-SALE-DOC-01).
 6. **`docs/archive/ORANGE_PROJECT_CONTINUITY.txt`** - project status, path, agreements.
 7. **`docs/archive/ORANGE_TECH_REFERENCE.txt`** — مرجع تقني ثابت للاستضافة والستاك (بحث/تثبيت سريع؛ لا يغني عن CONTINUITY وIBRAHIM).
 8. **`docs/archive/ORANGE_PROJECT_COMPLETION_ROADMAP.txt`** — خارطة طريق موحّدة **لاستكمال المشروع**: ترتيب المراحل، معايير الإنجاز، والإحالة للسياسات التفصيلية؛ **بعد قراءتها** يُحدَّد ما يُنفَّذ منها حسب **نطاق** المهمة لا إغراق الجلسة بكل المراحل دون توجيه.

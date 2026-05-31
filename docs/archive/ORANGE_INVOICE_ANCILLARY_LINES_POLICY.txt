@@ -4,7 +4,7 @@ Status: **قرار مالك — اتجاه تنفيذ معتمد** (لم يُن�
 
 Canonical for: بنود اختيارية على **فاتورة مشتريات** و**فاتورة مبيعات**؛ قيد GL **مركّب** عند الحفظ؛ **قائمة محفوظة** + بحث **الدليل المحاسبي**؛ checkbox **يظهر في الفاتورة المطبوعة**؛ علاقة **إقفال التعديلات**.
 
-اقرأ مع: docs/archive/ORANGE_GL_MOVEMENTS_AND_POSTING_POLICY.txt (§4)، docs/archive/ORANGE_EDIT_LOCK_POLICY.txt، docs/archive/ORANGE_ACCOUNTING_MAPPING_AND_REPORT_HANDOFF.txt، docs/ACCOUNTING_REPORTING_POLICY_V2.md، docs/archive/ORANGE_ADMIN_ACCOUNTING_REPORTS_STATUS.txt (GAP-ACC-07).
+اقرأ مع: docs/archive/ORANGE_GL_MOVEMENTS_AND_POSTING_POLICY.txt (§4)، docs/archive/ORANGE_EDIT_LOCK_POLICY.txt، docs/archive/ORANGE_ACCOUNTING_MAPPING_AND_REPORT_HANDOFF.txt، docs/ACCOUNTING_REPORTING_POLICY_V2.md، docs/archive/ORANGE_ADMIN_ACCOUNTING_REPORTS_STATUS.txt (GAP-ACC-07)، **docs/archive/ORANGE_SALES_INVOICE_DOC_UI_HANDOFF.txt** (GAP-SALE-DOC-01 — UI مستند v2 للمبيعات).
 
 ================================================================================
 0) ملخص قرار المالك (2026-05-20)

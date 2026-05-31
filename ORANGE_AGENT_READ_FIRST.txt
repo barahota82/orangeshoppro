@@ -42,6 +42,7 @@ Orange — بوابة واحدة: القراءات الإلزامية قبل أ�
 **5tax.** `docs/archive/ORANGE_UNIFIED_TAXONOMY_AND_CATALOG_ERD.txt` — **قراءة كاملة** عند نطاق **تصنيف موحّد / شجرة منتجات / صفات** (قبل Patch كتالوج؛ انظر أيضاً **`ORANGE_STOREFRONT_POLICY_REFERENCE.txt`** قسم «تاسعاً»).  
 **5c.** `docs/archive/ORANGE_ACCOUNTING_MAPPING_AND_REPORT_HANDOFF.txt` — **قراءة كاملة** عند نطاق **محاسبة داخلية / دليل حسابات / تقارير مالية / ترحيل GL**؛ ويُكمِّل **`docs/ACCOUNTING_REPORTING_POLICY_V2.md`** (تلخيص سياسة التقارير v2 حيث ينطبق)  
 **5m.** `docs/archive/ORANGE_OWNER_MULTICOUNTRY_VISION.txt` — **قراءة كاملة** عند نطاق **دولة / قنوات لكل دولة / محافظات ومناطق / فتح سوق / صلاحيات حسب الدولة**  
+**5sale.** `docs/archive/ORANGE_SALES_INVOICE_DOC_UI_HANDOFF.txt` — **قراءة كاملة** عند نطاق **واجهة فواتير البيع / INV-C / INV-O / مردود المبيعات** (GAP-SALE-DOC-01)  
 **6.** `docs/archive/ORANGE_PROJECT_CONTINUITY.txt`  
 **7.** `docs/archive/ORANGE_TECH_REFERENCE.txt`  
 **8.** `docs/archive/ORANGE_PROJECT_COMPLETION_ROADMAP.txt` — تنفيذ ما ينطبق منها **بحسب نطاق المالك** لا كل المراحل دفعةً واحدةً دون توجيه  

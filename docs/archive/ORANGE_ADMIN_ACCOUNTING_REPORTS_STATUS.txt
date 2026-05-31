@@ -154,8 +154,10 @@ financial_report — [منتهٍ] — P&L + BS مبسّطة + TB مدمج + كش
 **خارج navAccountingAll — مرتبطة بمسار GL §13 (قائمة الطلبات/المبيعات):**
 online_orders_final_posting — [منتهٍ] — «إنشاء قيود التسليم» (nav: التوصيل والتسليم)؛ final-posting-create.php → GL + INV-O + party_subledger
 online_invoices — [منتهٍ] — فواتير أونلاين INV-O (تصفّح)
-sales_invoices — [منتهٍ] — فواتير مبيعات INV-C (تصفّح)
-manual_order / create-manual.php — [منتهٍ] — INV-C + GL عند الحفظ
+sales_invoices — [منتهٍ browse] — **GAP-SALE-DOC-01 مفتوح** — يُستبدل بمستند v2 → **`ORANGE_SALES_INVOICE_DOC_UI_HANDOFF.txt`**
+manual_order / create-manual.php — [منتهٍ backend] — **UI يُستبدل** مرحلة 1 GAP-SALE-DOC-01
+online_invoices — [منتهٍ browse] — **GAP-SALE-DOC-01 مرحلة 3**
+sales_returns — [جزئي UI] — **ترقية pr2 parity** GAP-SALE-DOC-01 مرحلة 2
 
 **ACC-10 — شاشات (2026-05-20):** report_cash_flow + bank_reconciliation + inventory_reconciliation + analytical_dimensions + report_analytical **[منتهٍ]** — GAP-ACC-10 **مغلق** (§6b.5).
 
@@ -452,3 +454,4 @@ manual_order / create-manual.php — [منتهٍ] — INV-C + GL عند الحف
 
 2026-05-20 — **GAP-ACC-05 مغلق (قرار مالك):** كشف مورد = حساب فرعي بالدليل؛ لا mode=supplier؛ إلزام payable_account_id في suppliers/save.php.
 2026-05-20 — Canvas/archive: system-wide ~96%; §13.13 مغلق.
+2026-05-20 — **GAP-SALE-DOC-01 مفتوح (قرار مالك):** مستند v2 لفواتير البيع — **`docs/archive/ORANGE_SALES_INVOICE_DOC_UI_HANDOFF.txt`**.
