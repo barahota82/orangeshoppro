@@ -20,27 +20,32 @@ if ($ctxCountryId > 0) {
     }
 }
 
-if ($hasTable) {
-    $sfScope = orange_sql_filter_storefront_row_by_effective_country(
+if ($hasTable && $ctxCountryId > 0) {
+    $rScope = orange_sql_filter_storefront_row_belongs_to_country(
         $pdo,
         'r',
         'proposed_channel_slug',
-        $ctxCountryId,
-        'ch_merge_scope'
+        $ctxCountryId
     );
-    if ($ctxCountryId > 0 && $sfScope !== null) {
+    $aScope = orange_sql_filter_storefront_row_belongs_to_country(
+        $pdo,
+        'a',
+        'registered_channel_slug',
+        $ctxCountryId
+    );
+    if ($rScope !== null && $aScope !== null) {
         $q = $pdo->prepare(
             "SELECT r.*, a.email AS account_email
              FROM storefront_phone_merge_requests r
-             INNER JOIN storefront_accounts a ON a.id = r.storefront_account_id"
-            . $sfScope['joins']
-            . " WHERE r.consumed_at IS NULL AND r.expires_at > NOW()"
-            . $sfScope['where']
+             INNER JOIN storefront_accounts a ON a.id = r.storefront_account_id
+             WHERE r.consumed_at IS NULL AND r.expires_at > NOW()"
+            . $rScope['where']
+            . $aScope['where']
             . " ORDER BY r.created_at DESC
              LIMIT 100"
         );
-        $q->execute($sfScope['params']);
-    } elseif ($hasCountryCol && $ctxCountryId > 0) {
+        $q->execute(array_merge($rScope['params'], $aScope['params']));
+    } elseif ($hasCountryCol) {
         $q = $pdo->prepare(
             "SELECT r.*, a.email AS account_email
              FROM storefront_phone_merge_requests r
@@ -51,7 +56,6 @@ if ($hasTable) {
         );
         $q->execute([$ctxCountryId]);
     } else {
-        $rows = [];
         $q = null;
     }
     if ($q) {

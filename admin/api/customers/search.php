@@ -133,6 +133,18 @@ try {
         $custListSql .= $custCountryFilter['sql'];
         $custListParams[] = $custCountryFilter['param'];
     }
+    if ($adminCountryId > 0
+        && orange_table_exists($pdo, 'storefront_accounts')
+        && orange_table_has_column($pdo, 'storefront_accounts', 'customer_id')
+        && orange_table_has_column($pdo, 'storefront_accounts', 'country_id')) {
+        $custListSql .= ' AND NOT EXISTS (
+            SELECT 1 FROM storefront_accounts sa_cc
+            WHERE sa_cc.customer_id = c.id
+              AND sa_cc.country_id IS NOT NULL AND sa_cc.country_id > 0
+              AND sa_cc.country_id <> ?
+        )';
+        $custListParams[] = $adminCountryId;
+    }
     $custListSql .= ' ORDER BY c.id ASC';
     if ($custListParams === []) {
         $cust = $pdo->query($custListSql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -149,15 +161,13 @@ try {
              FROM storefront_accounts sa';
         $sfParams = [];
         if ($adminCountryId > 0) {
-            $sfScope = orange_sql_filter_storefront_row_by_effective_country(
+            $sfScope = orange_sql_filter_storefront_row_belongs_to_country(
                 $pdo,
                 'sa',
                 'registered_channel_slug',
-                $adminCountryId,
-                'ch_cust_sf_scope'
+                $adminCountryId
             );
             if ($sfScope !== null) {
-                $sfSql .= $sfScope['joins'];
                 $sfSql .= ' WHERE sa.customer_id IS NOT NULL' . $sfScope['where'];
                 $sfParams = $sfScope['params'];
             } elseif (orange_table_has_column($pdo, 'storefront_accounts', 'country_id')) {

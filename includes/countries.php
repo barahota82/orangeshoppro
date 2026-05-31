@@ -695,10 +695,51 @@ function orange_sql_filter_country_id(PDO $pdo, string $table, string $alias, in
 }
 
 /**
- * فلترة صفوف الواجهة (حساب تسجيل / طلب دمج) حسب دولة القناة عند country_id خاطئ أو فارغ.
+ * هل صف حساب/دمج واجهة يتبع دولة الأدmin؟
+ * **لا JOIN** على channels.slug وحده — slug مكرّر بين الدول (نسخ provision) يسبب تسريب صفوف.
  *
  * @return array{joins:string, where:string, params:list<int>}|null
  */
+function orange_sql_filter_storefront_row_belongs_to_country(
+    PDO $pdo,
+    string $rowAlias,
+    string $channelSlugColumn,
+    int $countryId
+): ?array {
+    if ($countryId <= 0) {
+        return null;
+    }
+    $alias = trim($rowAlias);
+    if ($alias === '') {
+        return null;
+    }
+    $cidCol = $alias . '.country_id';
+    $slugCol = $alias . '.' . $channelSlugColumn;
+    $kwId = orange_countries_default_id($pdo);
+    $parts = ['(' . $cidCol . ' = ?)'];
+    $params = [$countryId];
+
+    if (orange_table_exists($pdo, 'channels') && orange_table_has_column($pdo, 'channels', 'country_id')) {
+        $parts[] = '((' . $cidCol . ' IS NULL OR ' . $cidCol . ' = 0) AND EXISTS (
+            SELECT 1 FROM channels ch_sf_belongs
+            WHERE ch_sf_belongs.slug = ' . $slugCol . ' AND ch_sf_belongs.country_id = ?
+        ))';
+        $params[] = $countryId;
+    }
+
+    if ($kwId > 0 && $countryId === $kwId) {
+        $parts[] = '((' . $cidCol . ' IS NULL OR ' . $cidCol . ' = 0) AND ('
+            . $slugCol . ' IS NULL OR TRIM(' . $slugCol . ') = \'\'))';
+    }
+
+    return [
+        'joins' => '',
+        'where' => ' AND (' . implode(' OR ', $parts) . ')',
+        'params' => $params,
+    ];
+}
+
+/** @deprecated alias — استخدم orange_sql_filter_storefront_row_belongs_to_country */
 function orange_sql_filter_storefront_row_by_effective_country(
     PDO $pdo,
     string $rowAlias,
@@ -706,34 +747,9 @@ function orange_sql_filter_storefront_row_by_effective_country(
     int $countryId,
     string $channelJoinAlias = 'ch_sf_scope'
 ): ?array {
-    if ($countryId <= 0
-        || !orange_table_exists($pdo, 'channels')
-        || !orange_table_has_column($pdo, 'channels', 'country_id')) {
-        return null;
-    }
-    $alias = trim($rowAlias);
-    if ($alias === '') {
-        return null;
-    }
-    $slugCol = $alias . '.' . $channelSlugColumn;
-    $joins = ' LEFT JOIN channels ' . $channelJoinAlias
-        . ' ON ' . $channelJoinAlias . '.slug = ' . $slugCol;
-    $eff = 'COALESCE(NULLIF(' . $alias . '.country_id, 0), ' . $channelJoinAlias . '.country_id, 0)';
-    $kwId = orange_countries_default_id($pdo);
-    if ($kwId > 0 && $countryId === $kwId) {
-        return [
-            'joins' => $joins,
-            'where' => ' AND (' . $eff . ' = ? OR (' . $eff . ' = 0 AND ('
-                . $alias . '.country_id IS NULL OR ' . $alias . '.country_id = 0)))',
-            'params' => [$countryId],
-        ];
-    }
+    unset($channelJoinAlias);
 
-    return [
-        'joins' => $joins,
-        'where' => ' AND ' . $eff . ' = ?',
-        'params' => [$countryId],
-    ];
+    return orange_sql_filter_storefront_row_belongs_to_country($pdo, $rowAlias, $channelSlugColumn, $countryId);
 }
 
 /**

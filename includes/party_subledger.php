@@ -496,9 +496,10 @@ function orange_ensure_customer_with_profile(
     PDO $pdo,
     string $nameAr,
     string $phone,
-    array $profile = []
+    array $profile = [],
+    ?int $countryId = null
 ): int {
-    $customerId = orange_ensure_customer($pdo, $nameAr, $phone);
+    $customerId = orange_ensure_customer($pdo, $nameAr, $phone, $countryId);
     if ($customerId <= 0) {
         return 0;
     }
@@ -560,6 +561,18 @@ function orange_ensure_customer_with_profile(
         }
     }
 
+    if ($countryId !== null && $countryId > 0 && orange_table_has_country_id($pdo, 'customers')) {
+        try {
+            $pdo->prepare(
+                'UPDATE customers SET country_id = ? WHERE id = ? AND (country_id IS NULL OR country_id = 0)'
+            )->execute([$countryId, $customerId]);
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] orange_ensure_customer_with_profile country_id: ' . $e->getMessage());
+            }
+        }
+    }
+
     return $customerId;
 }
 
@@ -587,6 +600,12 @@ function orange_sync_storefront_account_to_customer(PDO $pdo, int $storefrontAcc
     $hasNat = orange_table_has_column($pdo, 'storefront_accounts', 'customer_phone_national');
 
     $cols = ['id', 'email', 'customer_name', 'customer_phone', 'customer_area', 'customer_address'];
+    if (orange_table_has_column($pdo, 'storefront_accounts', 'country_id')) {
+        $cols[] = 'country_id';
+    }
+    if (orange_table_has_column($pdo, 'storefront_accounts', 'registered_channel_slug')) {
+        $cols[] = 'registered_channel_slug';
+    }
     if ($hasCustomerLink) {
         $cols[] = 'customer_id';
     }
@@ -619,7 +638,20 @@ function orange_sync_storefront_account_to_customer(PDO $pdo, int $storefrontAcc
         'phone_country_dial' => $hasDial && isset($row['customer_phone_country_dial']) ? (string) $row['customer_phone_country_dial'] : null,
         'phone_national' => $hasNat && isset($row['customer_phone_national']) ? (string) $row['customer_phone_national'] : null,
     ];
-    $customerId = orange_ensure_customer_with_profile($pdo, $name, $phone, $profile);
+    $sfCountryId = isset($row['country_id']) ? (int) $row['country_id'] : 0;
+    if ($sfCountryId <= 0 && !empty($row['registered_channel_slug'])
+        && orange_table_exists($pdo, 'channels') && orange_table_has_column($pdo, 'channels', 'country_id')) {
+        $chSt = $pdo->prepare('SELECT country_id FROM channels WHERE slug = ? AND country_id > 0 LIMIT 1');
+        $chSt->execute([(string) $row['registered_channel_slug']]);
+        $sfCountryId = (int) ($chSt->fetchColumn() ?: 0);
+    }
+    $customerId = orange_ensure_customer_with_profile(
+        $pdo,
+        $name,
+        $phone,
+        $profile,
+        $sfCountryId > 0 ? $sfCountryId : null
+    );
     if ($customerId > 0 && $hasCustomerLink) {
         $existing = isset($row['customer_id']) ? (int) $row['customer_id'] : 0;
         if ($existing !== $customerId) {
