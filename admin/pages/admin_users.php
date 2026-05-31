@@ -75,7 +75,7 @@ $auCountries = orange_countries_admin_list($dbAu);
 
 <div class="card" id="au_perm_card">
     <h3 class="card-title">صلاحيات الشاشات (مجموعات)</h3>
-    <p class="card-hint muted" id="au_perm_hint">فعّل «عرض / تعديل / حذف / قفل / فك قفل» لكل مجموعة. «عرض» = ظهور الشاشات؛ «تعديل» = حفظ؛ «حذف» = حذف مستند غير مقفول؛ «قفل/فك» حسب مجموعة المستند.</p>
+    <p class="card-hint muted" id="au_perm_hint">فعّل «عرض / تعديل / حذف» لكل مجموعة. «عرض» = ظهور الشاشات في القائمة؛ «تعديل» = إنشاء وحفظ؛ «قفل/فك» للمحاسبة فقط.</p>
     <input type="hidden" id="perm_target_id" value="0">
     <div class="table-wrap">
         <table>
@@ -111,7 +111,7 @@ function auPermHintForSuper(isSuper) {
     if (!hint) return;
     hint.textContent = isSuper
         ? 'المشرف العام يملك كل الصلاحيات — لا حاجة لتحديد مجموعات.'
-        : 'فعّل «عرض / تعديل / حذف / قفل / فك قفل» لكل مجموعة. «عرض» = ظهور الشاشات؛ «تعديل» = حفظ؛ «حذف» = حذف مستند غير مقفول؛ «قفل/فك» حسب مجموعة المستند.';
+        : 'فعّل «عرض / تعديل / حذف» لكل مجموعة. «عرض» = ظهور الشاشات في القائمة؛ «تعديل» = إنشاء وحفظ؛ «قفل/فك» للمحاسبة فقط.';
 }
 
 function renderPermMatrix(adminId, existing, isSuperOverride) {

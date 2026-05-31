@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/admin_permissions.php';
-
 /**
  * أزرار قفل/فك على شاشة المصدر — يستدعى مرة واحدة للسكربت المشترك.
  */
@@ -22,24 +20,9 @@ function orange_edit_lock_ui_script_once(): void
         return fetch(url, {
             method: 'POST',
             credentials: 'same-origin',
-            headers: typeof orangeAdminCountryHeaders === 'function'
-                ? orangeAdminCountryHeaders({ 'Content-Type': 'application/json', Accept: 'application/json' })
-                : { 'Content-Type': 'application/json', Accept: 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify(body || {})
         }).then(function (r) { return r.json(); });
-    }
-    function capsForCfg(cfg) {
-        if (typeof cfg.canLock === 'boolean' || typeof cfg.canUnlock === 'boolean') {
-            return {
-                can_lock: cfg.canLock !== false,
-                can_unlock: cfg.canUnlock !== false
-            };
-        }
-        var res = cfg.resource || 'accounting';
-        if (typeof orangeAdminCaps === 'function') {
-            return orangeAdminCaps(res);
-        }
-        return { can_lock: true, can_unlock: true };
     }
     window.OrangeEditLock = {
         instances: {},
@@ -50,7 +33,6 @@ function orange_edit_lock_ui_script_once(): void
             var countryId = parseInt(String(cfg.countryId || '0'), 10) || 0;
             var getEntityId = typeof cfg.getEntityId === 'function' ? cfg.getEntityId : function () { return 0; };
             var onChange = typeof cfg.onLockedChange === 'function' ? cfg.onLockedChange : null;
-            var permCaps = capsForCfg(cfg);
             var wrap = document.getElementById(prefix + '_edit_lock_wrap');
             var btnLock = document.getElementById(prefix + '_edit_lock_btn_lock');
             var btnUnlock = document.getElementById(prefix + '_edit_lock_btn_unlock');
@@ -70,14 +52,8 @@ function orange_edit_lock_ui_script_once(): void
                     badge.textContent = locked ? 'مقفول — التعديل محظور' : 'مفتوح للتعديل';
                     badge.className = locked ? 'edit-lock-badge edit-lock-badge--locked' : 'edit-lock-badge edit-lock-badge--open';
                 }
-                if (btnLock) {
-                    btnLock.hidden = locked || !permCaps.can_lock;
-                    btnLock.disabled = !permCaps.can_lock;
-                }
-                if (btnUnlock) {
-                    btnUnlock.hidden = !locked || !permCaps.can_unlock;
-                    btnUnlock.disabled = !permCaps.can_unlock;
-                }
+                if (btnLock) btnLock.hidden = locked;
+                if (btnUnlock) btnUnlock.hidden = !locked;
                 if (onChange) onChange(locked);
             }
             function refresh() {
@@ -89,13 +65,7 @@ function orange_edit_lock_ui_script_once(): void
                 var q = '/admin/api/edit-lock/status.php?doc_kind=' + encodeURIComponent(getDocKind())
                     + '&entity_id=' + encodeURIComponent(String(eid));
                 if (countryId > 0) q += '&country_id=' + encodeURIComponent(String(countryId));
-                fetch(q, {
-                    credentials: 'same-origin',
-                    headers: typeof orangeAdminCountryHeaders === 'function'
-                        ? orangeAdminCountryHeaders({ Accept: 'application/json' })
-                        : { Accept: 'application/json' },
-                    cache: 'no-store'
-                })
+                fetch(q, { credentials: 'same-origin', headers: { 'Accept': 'application/json' }, cache: 'no-store' })
                     .then(function (r) { return r.json(); })
                     .then(function (res) {
                         paint(!!(res && res.is_locked), true);
@@ -103,14 +73,6 @@ function orange_edit_lock_ui_script_once(): void
                     .catch(function () { paint(false, true); });
             }
             function toggle(lock) {
-                if (lock && !permCaps.can_lock) {
-                    alert('لا تملك صلاحية قفل');
-                    return;
-                }
-                if (!lock && !permCaps.can_unlock) {
-                    alert('لا تملك صلاحية فك القفل');
-                    return;
-                }
                 var eid = parseInt(String(getEntityId() || '0'), 10) || 0;
                 if (eid <= 0) return;
                 postJson('/admin/api/edit-lock/toggle.php', {
@@ -152,59 +114,21 @@ function orange_edit_lock_ui_script_once(): void
 }
 
 /**
- * @param array{
- *   prefix:string,
- *   doc_kind:string,
- *   country_id?:int,
- *   class?:string,
- *   resource?:string,
- *   can_lock?:bool,
- *   can_unlock?:bool,
- *   admin?:array,
- *   pdo?:PDO
- * } $opts
+ * @param array{prefix:string,doc_kind:string,country_id?:int,class?:string} $opts
  */
 function orange_edit_lock_ui_toolbar(array $opts): void
 {
     $prefix = preg_replace('/[^a-z0-9_]/i', '', (string) ($opts['prefix'] ?? 'el')) ?: 'el';
     $docKind = trim((string) ($opts['doc_kind'] ?? ''));
     $class = trim((string) ($opts['class'] ?? 'edit-lock-toolbar jv-print-hide'));
-    $resource = trim((string) ($opts['resource'] ?? ''));
-    if ($resource === '') {
-        $resource = orange_edit_lock_resource_for_kind($docKind);
-    }
-    $canLock = array_key_exists('can_lock', $opts) ? (bool) $opts['can_lock'] : null;
-    $canUnlock = array_key_exists('can_unlock', $opts) ? (bool) $opts['can_unlock'] : null;
-    if (($canLock === null || $canUnlock === null) && isset($opts['admin'], $opts['pdo']) && is_array($opts['admin']) && $opts['pdo'] instanceof PDO) {
-        $caps = orange_admin_caps($opts['admin'], $opts['pdo'], $resource);
-        if ($canLock === null) {
-            $canLock = $caps['can_lock'];
-        }
-        if ($canUnlock === null) {
-            $canUnlock = $caps['can_unlock'];
-        }
-    }
-    if ($canLock === null) {
-        $canLock = true;
-    }
-    if ($canUnlock === null) {
-        $canUnlock = true;
-    }
     orange_edit_lock_ui_script_once();
     ?>
 <div id="<?php echo htmlspecialchars($prefix, ENT_QUOTES, 'UTF-8'); ?>_edit_lock_wrap"
      class="<?php echo htmlspecialchars($class, ENT_QUOTES, 'UTF-8'); ?>"
      data-doc-kind="<?php echo htmlspecialchars($docKind, ENT_QUOTES, 'UTF-8'); ?>"
-     data-orange-resource="<?php echo htmlspecialchars($resource, ENT_QUOTES, 'UTF-8'); ?>"
-     data-can-lock="<?php echo $canLock ? '1' : '0'; ?>"
-     data-can-unlock="<?php echo $canUnlock ? '1' : '0'; ?>"
      hidden>
-    <?php if ($canLock): ?>
     <button type="button" class="btn-secondary" id="<?php echo htmlspecialchars($prefix, ENT_QUOTES, 'UTF-8'); ?>_edit_lock_btn_lock">قفل التعديل</button>
-    <?php endif; ?>
-    <?php if ($canUnlock): ?>
     <button type="button" class="btn-secondary" id="<?php echo htmlspecialchars($prefix, ENT_QUOTES, 'UTF-8'); ?>_edit_lock_btn_unlock" hidden>فك القفل</button>
-    <?php endif; ?>
     <span id="<?php echo htmlspecialchars($prefix, ENT_QUOTES, 'UTF-8'); ?>_edit_lock_badge" class="edit-lock-badge"></span>
 </div>
     <?php

@@ -16,10 +16,8 @@ require_once __DIR__ . '/../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
-require_once __DIR__ . '/../../includes/admin_permissions.php';
 
 $pdo = orange_admin_page_pdo();
-$ppvCaps = orange_admin_caps($admin, $pdo, 'partners');
 
 $ppvCountryId = orange_admin_context_country_id($pdo);
 $ppvCustomersCountrySql = orange_sql_country_and_fragment($pdo, 'customers', 'customers', $ppvCountryId);
@@ -249,7 +247,7 @@ if (orange_journal_vouchers_ready($pdo)) {
 
 <div class="card ppv-print-area">
     <h3 class="card-title"><?php echo htmlspecialchars($ppvCardTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
-    <?php orange_edit_lock_ui_toolbar(['prefix' => 'ppv', 'doc_kind' => $ppvKind, 'country_id' => $ppvCountryId, 'admin' => $admin, 'pdo' => $pdo, 'resource' => 'partners']); ?>
+    <?php orange_edit_lock_ui_toolbar(['prefix' => 'ppv', 'doc_kind' => $ppvKind, 'country_id' => $ppvCountryId]); ?>
     <?php if ($ppvCashLock === null): ?>
     <p class="card-hint ppv-print-hide" style="margin:0 0 12px;">اربط حساب <strong>الخزينة / النقدية</strong> من <a href="<?php echo htmlspecialchars($jvGlSettingsUrl, ENT_QUOTES, 'UTF-8'); ?>">حسابات القيود التلقائية</a>.</p>
     <?php endif; ?>
@@ -321,11 +319,11 @@ if (orange_journal_vouchers_ready($pdo)) {
                 </div>
                 <?php endif; ?>
                 <div class="jv-voucher-nav-btns ppv-voucher-action-btns" role="group" aria-label="إجراءات السند">
-                    <button type="button" id="ppv_btn_save" data-orange-perm="edit" data-orange-resource="partners"<?php echo !$ppvReady ? ' disabled' : ''; ?>>حفظ السند</button>
+                    <button type="button" id="ppv_btn_save"<?php echo !$ppvReady ? ' disabled' : ''; ?>>حفظ السند</button>
                     <button type="button" class="btn-secondary jv-nav-search" id="ppv_btn_print" title="طباعة">طباعة السند</button>
-                    <button type="button" class="btn-secondary jv-nav-search" id="ppv_btn_new" title="سند جديد" data-orange-perm="edit" data-orange-resource="partners">سند جديد</button>
+                    <button type="button" class="btn-secondary jv-nav-search" id="ppv_btn_new" title="سند جديد">سند جديد</button>
                     <?php if ($ppvIsReceipt): ?>
-                    <button type="button" class="btn-secondary" id="ppv_btn_delete" title="حذف السند المعروض" data-orange-perm="delete" data-orange-resource="partners" disabled>حذف السند</button>
+                    <button type="button" class="btn-secondary" id="ppv_btn_delete" title="حذف السند المعروض" disabled>حذف السند</button>
                     <?php endif; ?>
                 </div>
             </div>
@@ -468,7 +466,6 @@ var PPV_BROWSE_ENTRY_TYPE = <?php echo json_encode($ppvIsReceipt ? 'customer_rec
 var ppvSupplierPickTimer = null;
 var ppvBrowseId = null;
 var PPV_COUNTRY_ID = <?php echo (int) $ppvCountryId; ?>;
-var PPV_CAPS = <?php echo json_encode($ppvCaps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
 var ppvEditLockCtl = null;
 
 function ppvEscapeHtml(s) {
@@ -861,10 +858,6 @@ function ppvGetAmount() {
 }
 
 function ppvSave() {
-    if (!PPV_CAPS.can_edit) {
-        alert('لا تملك صلاحية تسجيل سندات الذمم');
-        return;
-    }
     if (!PPV_CASH || !PPV_CASH.id) return;
     var partyId = ppvPartyIdValue();
     var amt = ppvGetAmount();
@@ -1040,16 +1033,12 @@ function ppvDisplayBrowseVoucher(r) {
     }
     var btnDel = document.getElementById('ppv_btn_delete');
     if (btnDel) {
-        btnDel.disabled = !PPV_CAPS.can_delete;
+        btnDel.disabled = false;
     }
     if (ppvEditLockCtl) ppvEditLockCtl.refresh();
 }
 
 function ppvDeleteVoucher() {
-    if (!PPV_CAPS.can_delete) {
-        alert('لا تملك صلاحية حذف سندات الذمم');
-        return;
-    }
     if (!PPV_IS_RECEIPT || !ppvBrowseId) {
         alert('لا يوجد سند محفوظ للحذف');
         return;
@@ -1228,9 +1217,6 @@ if (document.readyState === 'loading') {
             ppvEditLockCtl = OrangeEditLock.bind({
                 prefix: 'ppv',
                 docKind: PPV_BROWSE_ENTRY_TYPE,
-                resource: 'partners',
-                canLock: !!PPV_CAPS.can_lock,
-                canUnlock: !!PPV_CAPS.can_unlock,
                 countryId: PPV_COUNTRY_ID,
                 getEntityId: function () { return ppvBrowseId || 0; }
             });
@@ -1244,9 +1230,6 @@ if (document.readyState === 'loading') {
         ppvEditLockCtl = OrangeEditLock.bind({
             prefix: 'ppv',
             docKind: PPV_BROWSE_ENTRY_TYPE,
-            resource: 'partners',
-            canLock: !!PPV_CAPS.can_lock,
-            canUnlock: !!PPV_CAPS.can_unlock,
             countryId: PPV_COUNTRY_ID,
             getEntityId: function () { return ppvBrowseId || 0; }
         });

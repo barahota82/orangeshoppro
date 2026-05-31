@@ -9,11 +9,9 @@ require_once __DIR__ . '/../../includes/journal_types.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/admin_settings_country.php';
-require_once __DIR__ . '/../../includes/admin_permissions.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
-$elCaps = orange_admin_caps($admin, $pdo, 'accounting');
 $elCountryId = orange_admin_settings_effective_country_id($pdo);
 $elCountryRow = orange_country_row_by_id($pdo, $elCountryId, false);
 $elCountryLabel = trim((string) ($elCountryRow['name_ar'] ?? ''));
@@ -113,14 +111,10 @@ $elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
                 </table>
             </div>
             <div class="gl-posting-pane__footer">
-                <?php if ($elCaps['can_lock']): ?>
                 <button type="button" class="btn" id="el_btn_lock_sel">قفل المحدد</button>
-                <button type="button" class="btn-secondary" id="el_btn_lock_filtered">قفل كل نتائج الفترة</button>
-                <?php endif; ?>
-                <?php if ($elCaps['can_unlock']): ?>
                 <button type="button" class="btn-secondary" id="el_btn_unlock_sel">فك قفل المحدد</button>
+                <button type="button" class="btn-secondary" id="el_btn_lock_filtered">قفل كل نتائج الفترة</button>
                 <button type="button" class="btn-secondary" id="el_btn_unlock_filtered">فك قفل المقفول في الفترة</button>
-                <?php endif; ?>
             </div>
         </section>
         <section class="gl-posting-pane gl-posting-pane--ledger" aria-labelledby="el_preview_cap">
@@ -147,7 +141,6 @@ $elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
 </div>
 <script>
 (function () {
-    var EL_CAPS = <?php echo json_encode($elCaps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
     var GL_ENTRY_LABELS = <?php echo json_encode(orange_gl_entry_type_labels_map(), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     var elSel = document.getElementById('el_movement_type');
     var elChkAll = document.getElementById('el_all_movements');
@@ -292,40 +285,36 @@ $elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
         tr.classList.add('el-row-selected');
         loadPreview(parseInt(tr.getAttribute('data-id'), 10) || 0);
     });
-    if (EL_CAPS.can_lock) {
-        document.getElementById('el_btn_lock_sel').addEventListener('click', async function () {
-            var ids = pickedIds();
-            if (!ids.length) { window.alert('حدد مستنداً واحداً على الأقل'); return; }
-            var r = await postJSON('/admin/api/edit-lock/lock.php', { ids: ids });
-            window.alert(r.message || (r.success ? 'تم' : 'فشل'));
-            if (r.success) loadList();
-        });
-        document.getElementById('el_btn_lock_filtered').addEventListener('click', async function () {
-            if (!window.confirm('قفل كل المستندات المفتوحة ضمن الفلتر الحالي؟')) return;
-            var p = filterParams();
-            p.lock_filtered = true;
-            var r = await postJSON('/admin/api/edit-lock/lock.php', p);
-            window.alert(r.message || (r.success ? 'تم' : 'فشل'));
-            if (r.success) loadList();
-        });
-    }
-    if (EL_CAPS.can_unlock) {
-        document.getElementById('el_btn_unlock_sel').addEventListener('click', async function () {
-            var ids = pickedIds();
-            if (!ids.length) { window.alert('حدد مستنداً واحداً على الأقل'); return; }
-            var r = await postJSON('/admin/api/edit-lock/unlock.php', { ids: ids });
-            window.alert(r.message || (r.success ? 'تم' : 'فشل'));
-            if (r.success) loadList();
-        });
-        document.getElementById('el_btn_unlock_filtered').addEventListener('click', async function () {
-            if (!window.confirm('فك قفل كل المستندات المقفولة ضمن الفلتر؟')) return;
-            var p = filterParams();
-            p.unlock_filtered = true;
-            var r = await postJSON('/admin/api/edit-lock/unlock.php', p);
-            window.alert(r.message || (r.success ? 'تم' : 'فشل'));
-            if (r.success) loadList();
-        });
-    }
+    document.getElementById('el_btn_lock_sel').addEventListener('click', async function () {
+        var ids = pickedIds();
+        if (!ids.length) { window.alert('حدد مستنداً واحداً على الأقل'); return; }
+        var r = await postJSON('/admin/api/edit-lock/lock.php', { ids: ids });
+        window.alert(r.message || (r.success ? 'تم' : 'فشل'));
+        if (r.success) loadList();
+    });
+    document.getElementById('el_btn_unlock_sel').addEventListener('click', async function () {
+        var ids = pickedIds();
+        if (!ids.length) { window.alert('حدد مستنداً واحداً على الأقل'); return; }
+        var r = await postJSON('/admin/api/edit-lock/unlock.php', { ids: ids });
+        window.alert(r.message || (r.success ? 'تم' : 'فشل'));
+        if (r.success) loadList();
+    });
+    document.getElementById('el_btn_lock_filtered').addEventListener('click', async function () {
+        if (!window.confirm('قفل كل المستندات المفتوحة ضمن الفلتر الحالي؟')) return;
+        var p = filterParams();
+        p.lock_filtered = true;
+        var r = await postJSON('/admin/api/edit-lock/lock.php', p);
+        window.alert(r.message || (r.success ? 'تم' : 'فشل'));
+        if (r.success) loadList();
+    });
+    document.getElementById('el_btn_unlock_filtered').addEventListener('click', async function () {
+        if (!window.confirm('فك قفل كل المستندات المقفولة ضمن الفلتر؟')) return;
+        var p = filterParams();
+        p.unlock_filtered = true;
+        var r = await postJSON('/admin/api/edit-lock/unlock.php', p);
+        window.alert(r.message || (r.success ? 'تم' : 'فشل'));
+        if (r.success) loadList();
+    });
     loadList();
 })();
 </script>

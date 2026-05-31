@@ -7,11 +7,9 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
-require_once __DIR__ . '/../../includes/admin_permissions.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
-$srCaps = orange_admin_caps($admin, $pdo, 'sales');
 
 $srCountryId = orange_admin_context_country_id($pdo);
 $srDefaultCurrency = orange_admin_context_currency_code($pdo);
@@ -130,7 +128,7 @@ function sr_channel_label(string $t): string
 
 <div class="card" id="sr_edit_banner" hidden>
     <p class="card-hint" style="margin:0 0 10px;"><strong>وضع التعديل</strong> — مردود <span id="sr_edit_banner_id"></span>.</p>
-    <?php orange_edit_lock_ui_toolbar(['prefix' => 'sr', 'doc_kind' => 'sales_return', 'country_id' => $srCountryId, 'class' => 'edit-lock-toolbar', 'admin' => $admin, 'pdo' => $pdo, 'resource' => 'sales']); ?>
+    <?php orange_edit_lock_ui_toolbar(['prefix' => 'sr', 'doc_kind' => 'sales_return', 'country_id' => $srCountryId, 'class' => 'edit-lock-toolbar']); ?>
     <button type="button" class="btn-secondary" onclick="srCancelEdit()">إلغاء التعديل</button>
 </div>
 
@@ -198,7 +196,7 @@ function sr_channel_label(string $t): string
     <?php endif; ?>
     <div class="actions admin-doc-lines-toolbar" style="margin-top:12px;">
         <button type="button" class="btn-secondary" onclick="srAddLine()">+ سطر</button>
-        <button type="button" id="sr_submit_btn" data-orange-perm="edit" data-orange-resource="sales" onclick="srSubmit()">حفظ مردود المبيعات</button>
+        <button type="button" id="sr_submit_btn" onclick="srSubmit()">حفظ مردود المبيعات</button>
     </div>
     <p class="card-hint" style="margin-top:12px;margin-bottom:0;"><strong>صافي الإيراد (تقديري):</strong> <span id="sr_total_preview">0.00</span> <?php echo htmlspecialchars($srCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
@@ -245,7 +243,6 @@ var SR_PRODUCTS = <?php echo json_encode($products, JSON_UNESCAPED_UNICODE); ?>;
 var SR_VARIANTS_BY_PID = <?php echo json_encode($variantsByProduct, JSON_UNESCAPED_UNICODE); ?>;
 var SR_EDIT_ID = 0;
 var SR_COUNTRY_ID = <?php echo (int) $srCountryId; ?>;
-var SR_CAPS = <?php echo json_encode($srCaps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
 var srEditLockCtl = null;
 var SR_HAS_CUSTOMERS = <?php echo $hasCustomers ? 'true' : 'false'; ?>;
 
@@ -430,10 +427,6 @@ function srEdit(id) {
 }
 
 function srSubmit() {
-    if (!SR_CAPS.can_edit) {
-        alert('لا تملك صلاحية تعديل مردودات المبيعات');
-        return;
-    }
     var customer = parseInt(document.getElementById('sr_customer').value, 10) || 0;
     var channel = document.getElementById('sr_channel').value;
     if (!SR_HAS_CUSTOMERS && channel === 'credit') {
@@ -503,10 +496,6 @@ function srSubmit() {
 }
 
 function srDelete(id) {
-    if (!SR_CAPS.can_delete) {
-        alert('لا تملك صلاحية حذف مردودات المبيعات');
-        return;
-    }
     if (!confirm('حذف مردود المبيعات؟ سيعكس المخزون ويُزال القيد SR-' + id + '-RS / RC.')) return;
     postJSON('/admin/api/sales_returns/update.php', { id: id, action: 'delete' }).then(function (res) {
         if (res.success) {
@@ -528,9 +517,6 @@ if (document.getElementById('sr_lines_body')) {
         srEditLockCtl = OrangeEditLock.bind({
             prefix: 'sr',
             docKind: 'sales_return',
-            resource: 'sales',
-            canLock: !!SR_CAPS.can_lock,
-            canUnlock: !!SR_CAPS.can_unlock,
             countryId: SR_COUNTRY_ID,
             getEntityId: function () { return SR_EDIT_ID; }
         });
