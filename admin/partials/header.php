@@ -347,7 +347,7 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                     'title' => 'الفواتير والمردود',
                     'items' => [
                         ['page' => 'invoice', 'href' => '/admin/index.php?page=invoice', 'label' => 'فاتورة أونلاين', 'class' => 'admin-nav-sub', 'sub' => true],
-                        ['page' => 'online_invoices', 'href' => '/admin/index.php?page=online_invoices', 'label' => 'فواتير أونلاين', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'online_sales_invoice', 'href' => '/admin/index.php?page=online_sales_invoice', 'label' => 'فواتير أونلاين', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'company_sales_invoice', 'href' => '/admin/index.php?page=company_sales_invoice', 'label' => 'فاتورة مبيعات', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'sales_returns', 'href' => '/admin/index.php?page=sales_returns', 'label' => 'مردود المبيعات', 'class' => '', 'sub' => false],
                     ],

@@ -186,9 +186,9 @@ ENGLISH
 ---
 
 ### المرحلة 3 — فاتورة أونلاين (INV-O)
-- [ ] مستند v2 — **تعديل** + browse + search (INV-O فقط).
-- [ ] redirect `online_invoices`.
-- [ ] احترام §13.4–§13.5 ومسار القيود — **لا** كسر `online_orders_final_posting`.
+- [x] مستند v2 — **تعديل** + browse + search (INV-O فقط).
+- [x] redirect `online_invoices`.
+- [x] احترام §13.4–§13.5 ومسار القيود — **لا** كسر `online_orders_final_posting`.
 
 **Acceptance:** فتح INV-O من البحث → تعديل بنود → حفظ → طباعة؛ GL/مخزون حسب السياسة الحالية.
 
@@ -217,7 +217,7 @@ ENGLISH
 | البند | الحالة |
 |-------|--------|
 | قرار مالك / مواصفة UI | **مغلق 2026-05-20** — هذا الملف |
-| تنفيذ مراحل 0–3 | **مفتوح** |
+| تنفيذ مراحل 0–3 | **مرحلة 3 منتهية — UAT + مرحلة 4 اختياري** |
 | مرحلة 4 | اختياري |
 
 ================================================================================
@@ -227,3 +227,4 @@ Changelog
 2026-05-20 — **تنفيذ مرحلة 0:** `admin/api/sales-invoices/*` + `includes/sales_invoice_company.php` + `company_sales_invoice` page/API wiring + customer picker AR + v80 permissions seed.
 2026-05-20 — **تنفيذ مرحلة 1:** `company_sales_invoice.php` مستند v2 (`sv2`) + update بنود/GL + edit_lock + redirects legacy.
 2026-05-20 — **تنفيذ مرحلة 2:** `sales_returns.php` مستند v2 (`sr2`) + `browse.php` + `retrieve_from_order.php` + helpers كميات الطلب + edit_lock/print/nav/search.
+2026-05-20 — **تنفيذ مرحلة 3:** `online_sales_invoice.php` (`ov2`) + `online-invoices/*` + `includes/sales_invoice_online.php` + redirect `online_invoices` + edit_lock `online_sales_invoice` (تحديث بنود/ترويسة **بلا** إعادة final-posting).

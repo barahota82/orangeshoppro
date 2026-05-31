@@ -3054,6 +3054,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
     orange_admin_seed_company_sales_invoice_page_permissions($pdo);
+    orange_admin_seed_online_sales_invoice_page_permissions($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
         orange_catalog_safe_exec(

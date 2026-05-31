@@ -77,6 +77,7 @@ function orange_admin_page_resource(string $page): string
     'delivery_handover_manifest' => 'sales',
     'delivery_agents' => 'sales',
     'online_invoices' => 'sales',
+    'online_sales_invoice' => 'sales',
     'sales_invoices' => 'sales',
         'order_intake_queue' => 'sales',
         'invoice' => 'sales',
@@ -264,6 +265,7 @@ function orange_admin_api_page_from_script(): ?string
         'orders' => 'orders',
         'sales_returns' => 'sales_returns',
         'sales-invoices' => 'company_sales_invoice',
+        'online-invoices' => 'online_sales_invoice',
         'order_intake' => 'order_intake_queue',
         'purchases' => 'purchases',
         'purchase_returns' => 'purchase_returns',
@@ -638,6 +640,72 @@ function orange_admin_seed_company_sales_invoice_page_permissions(PDO $pdo): voi
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] admin_permissions_seed_company_sales_invoice_v80: ' . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * GAP-SALE-DOC-01 مرحلة 3 — نسخ صلاحيات page:online_invoices إلى page:online_sales_invoice.
+ */
+function orange_admin_seed_online_sales_invoice_page_permissions(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    $marker = 'php_admin_permissions_seed_online_sales_invoice_v81';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+    if (!orange_table_exists($pdo, 'admin_permissions')) {
+        return;
+    }
+    $fromKey = 'page:online_invoices';
+    $toKey = 'page:online_sales_invoice';
+    $hasLock = orange_table_has_column($pdo, 'admin_permissions', 'can_lock');
+    try {
+        $sel = $pdo->prepare(
+            'SELECT admin_id, can_view, can_edit, can_delete'
+            . ($hasLock ? ', can_lock, can_unlock' : '')
+            . ' FROM admin_permissions WHERE resource_key = ?'
+        );
+        $sel->execute([$fromKey]);
+        $rows = $sel->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if ($hasLock) {
+            $ins = $pdo->prepare(
+                'INSERT INTO admin_permissions (admin_id, resource_key, can_view, can_edit, can_delete, can_lock, can_unlock)
+                 VALUES (?,?,?,?,?,?,?)
+                 ON DUPLICATE KEY UPDATE
+                   can_view = GREATEST(admin_permissions.can_view, VALUES(can_view)),
+                   can_edit = GREATEST(admin_permissions.can_edit, VALUES(can_edit)),
+                   can_delete = GREATEST(admin_permissions.can_delete, VALUES(can_delete)),
+                   can_lock = GREATEST(admin_permissions.can_lock, VALUES(can_lock)),
+                   can_unlock = GREATEST(admin_permissions.can_unlock, VALUES(can_unlock))'
+            );
+        } else {
+            $ins = $pdo->prepare(
+                'INSERT INTO admin_permissions (admin_id, resource_key, can_view, can_edit, can_delete)
+                 VALUES (?,?,?,?,?)
+                 ON DUPLICATE KEY UPDATE
+                   can_view = GREATEST(admin_permissions.can_view, VALUES(can_view)),
+                   can_edit = GREATEST(admin_permissions.can_edit, VALUES(can_edit)),
+                   can_delete = GREATEST(admin_permissions.can_delete, VALUES(can_delete))'
+            );
+        }
+        foreach ($rows as $row) {
+            $v = (int) ($row['can_view'] ?? 0);
+            $e = (int) ($row['can_edit'] ?? 0);
+            $d = (int) ($row['can_delete'] ?? 0);
+            if ($hasLock) {
+                $l = (int) ($row['can_lock'] ?? 0);
+                $u = (int) ($row['can_unlock'] ?? 0);
+                $ins->execute([(int) $row['admin_id'], $toKey, $v, $e, $d, $l, $u]);
+            } else {
+                $ins->execute([(int) $row['admin_id'], $toKey, $v, $e, $d]);
+            }
+        }
+        $insMarker = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+        $insMarker->execute([$marker]);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] admin_permissions_seed_online_sales_invoice_v81: ' . $e->getMessage());
         }
     }
 }

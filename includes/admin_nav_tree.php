@@ -139,7 +139,7 @@ function orange_admin_permission_mega_sections(): array
                     'title' => 'الفواتير والمردود',
                     'pages' => [
                         ['page' => 'invoice', 'label' => 'فاتورة أونلاين'],
-                        ['page' => 'online_invoices', 'label' => 'فواتير أونلاين'],
+                        ['page' => 'online_sales_invoice', 'label' => 'فواتير أونلاين'],
                         ['page' => 'company_sales_invoice', 'label' => 'فاتورة مبيعات'],
                         ['page' => 'invoice_edit', 'label' => 'تعديل فاتورة'],
                         ['page' => 'sales_returns', 'label' => 'مردود المبيعات'],
@@ -317,6 +317,7 @@ function orange_admin_permission_actions_for_page(string $page): array
         'purchases',
         'purchase_returns',
         'company_sales_invoice',
+        'online_sales_invoice',
         'sales_returns',
         'journal_entries',
         'year_end_close_vouchers',

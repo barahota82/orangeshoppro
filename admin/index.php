@@ -86,6 +86,7 @@ $allowed = [
     'delivery_handover_manifest',
     'online_orders_final_posting',
     'online_invoices',
+    'online_sales_invoice',
     'sales_invoices',
 ];
 if (!in_array($page, $allowed, true)) {
