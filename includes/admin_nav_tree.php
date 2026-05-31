@@ -281,3 +281,91 @@ function orange_admin_page_from_perm_key(string $key): ?string
 
     return null;
 }
+
+/**
+ * أعمدة الصلاحيات المناسبة لكل شاشة — لا تُعرض في المصفوفة إلا ما ينطبق فعلياً.
+ *
+ * @return list<'view'|'edit'|'delete'|'lock'|'unlock'>
+ */
+function orange_admin_permission_actions_for_page(string $page): array
+{
+    static $viewOnly = [
+        'dashboard',
+        'reports',
+        'channel_analytics',
+        'logs',
+        'journal_voucher_reports',
+        'partner_account_statement',
+        'partner_reports',
+        'report_account_list',
+        'report_gl_account_monthly',
+        'report_income_statement',
+        'report_trading_account',
+        'report_pl_monthly',
+        'report_pl_compare_years',
+        'report_trial_balance',
+        'report_cash_flow',
+        'report_analytical',
+        'financial_report',
+        'accounting_reports_index',
+        'item_card',
+        'delivery_order_search',
+        'delivery_handover_manifest',
+    ];
+
+    static $editLockScreen = [
+        'edit_lock',
+    ];
+
+    static $documentPages = [
+        'purchases',
+        'purchase_returns',
+        'sales_returns',
+        'journal_entries',
+        'year_end_close_vouchers',
+        'receipt_voucher',
+        'payment_voucher',
+        'other_vouchers',
+        'opening_balances',
+        'opening_stock_balances',
+        'partner_customer_receipt',
+        'partner_supplier_payment',
+    ];
+
+    static $viewEditNoDelete = [
+        'company_settings',
+        'storefront_hero',
+        'storefront_merge_requests',
+        'delivery_areas',
+        'channels',
+        'gl_posting',
+        'bank_reconciliation',
+        'inventory_reconciliation',
+    ];
+
+    if (in_array($page, $viewOnly, true)) {
+        return ['view'];
+    }
+    if (in_array($page, $editLockScreen, true)) {
+        return ['view', 'lock', 'unlock'];
+    }
+    if (in_array($page, $documentPages, true)) {
+        return ['view', 'edit', 'delete', 'lock', 'unlock'];
+    }
+    if (in_array($page, $viewEditNoDelete, true)) {
+        return ['view', 'edit'];
+    }
+
+    return ['view', 'edit', 'delete'];
+}
+
+/** @return array<string, list<string>> */
+function orange_admin_permission_page_actions_map(): array
+{
+    $out = [];
+    foreach (orange_admin_permission_all_pages() as $page) {
+        $out[$page] = orange_admin_permission_actions_for_page($page);
+    }
+
+    return $out;
+}

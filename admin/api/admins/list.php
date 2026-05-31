@@ -55,6 +55,7 @@ try {
         'permissions_by_admin' => $perms,
         'permission_tree' => orange_admin_permission_mega_sections(),
         'page_labels' => orange_admin_permission_page_labels(),
+        'page_actions' => orange_admin_permission_page_actions_map(),
     ]);
 } catch (Throwable $e) {
     orange_admin_api_catch($e, 'تعذر جلب المستخدمين');

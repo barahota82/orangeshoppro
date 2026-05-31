@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../includes/admin_password_policy.php';
 $dbAu = db();
 orange_catalog_ensure_schema($dbAu);
 $auPermTree = orange_admin_permission_mega_sections();
+$auPageActions = orange_admin_permission_page_actions_map();
 $auCountries = orange_countries_admin_list($dbAu);
 ?>
 <div class="page-title page-title--stacked">
@@ -74,7 +75,7 @@ $auCountries = orange_countries_admin_list($dbAu);
 
 <div class="card" id="au_perm_card">
     <h3 class="card-title">صلاحيات الشاشات</h3>
-    <p class="card-hint muted" id="au_perm_hint">فعّل «عرض / تعديل / حذف / قفل / فك» لكل شاشة. «عرض» = ظهورها في القائمة؛ «تعديل» = إنشاء وحفظ؛ «قفل/فك» للمستندات المحاسبية والمخزنية.</p>
+    <p class="card-hint muted" id="au_perm_hint">«عرض» = ظهور الشاشة في القائمة وفتحها. «تعديل» = إدخال بيانات جديدة أو حفظ تغييرات (إنشاء/تعديل). «حذف» = حذف سجلات حيث تتوفر في الشاشة. «قفل/فك» للمستندات فقط. الأعمدة غير المناسبة للشاشة تظهر —.</p>
     <input type="hidden" id="perm_target_id" value="0">
     <div class="table-wrap au-perm-table-wrap">
         <table class="au-perm-table">
@@ -98,8 +99,21 @@ $auCountries = orange_countries_admin_list($dbAu);
 
 <script>
 var AU_PERM_TREE = <?php echo json_encode($auPermTree, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
+var AU_PAGE_ACTIONS = <?php echo json_encode($auPageActions, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
 
-function auIsSuperChecked() {
+function auPermActionsForPage(page) {
+    var a = AU_PAGE_ACTIONS[page];
+    return a && a.length ? a : ['view', 'edit', 'delete'];
+}
+
+function auPermActionsForMega(mega) {
+    var pages = auPermPagesInMega(mega);
+    var set = {};
+    pages.forEach(function (pg) {
+        auPermActionsForPage(pg).forEach(function (act) { set[act] = true; });
+    });
+    return Object.keys(set);
+}
     var el = document.getElementById('au_super');
     return !!(el && el.checked);
 }
@@ -109,7 +123,7 @@ function auPermHintForSuper(isSuper) {
     if (!hint) return;
     hint.textContent = isSuper
         ? 'المشرف العام يملك كل الصلاحيات — لا حاجة لتحديد شاشات.'
-        : 'فعّل «عرض / تعديل / حذف / قفل / فك» لكل شاشة. صف المجموعة = اختصار لكل الشاشات داخلها؛ وسّع ▼ للضبط الدقيق.';
+        : '«عرض» = فتح الشاشة. «تعديل» = إدخال/حفظ البيانات. صف المجموعة اختصار — وسّع ▼ للضبط. الأعمدة غير المناسبة تظهر —.';
 }
 
 function auPermKey(page) {
@@ -117,36 +131,85 @@ function auPermKey(page) {
 }
 
 function auPermRowFlags(tr) {
+    var page = tr.getAttribute('data-page') || '';
+    var megaId = tr.getAttribute('data-mega') || '';
+    var actions;
+    if (page.indexOf('__mega__') === 0 && megaId) {
+        var mega = (AU_PERM_TREE || []).find(function (m) { return m.id === megaId; });
+        actions = mega ? auPermActionsForMega(mega) : ['view', 'edit', 'delete', 'lock', 'unlock'];
+    } else if (page) {
+        actions = auPermActionsForPage(page);
+    } else {
+        actions = ['view', 'edit', 'delete', 'lock', 'unlock'];
+    }
+    var out = { can_view: false, can_edit: false, can_delete: false, can_lock: false, can_unlock: false };
     var v = tr.querySelector('.p-v');
-    if (!v) return null;
-    return {
-        can_view: tr.querySelector('.p-v').checked,
-        can_edit: tr.querySelector('.p-e').checked,
-        can_delete: tr.querySelector('.p-d').checked,
-        can_lock: tr.querySelector('.p-l') ? tr.querySelector('.p-l').checked : false,
-        can_unlock: tr.querySelector('.p-u') ? tr.querySelector('.p-u').checked : false
-    };
+    if (actions.indexOf('view') < 0 && actions.indexOf('edit') < 0) {
+        return null;
+    }
+    if (actions.indexOf('view') >= 0 && v) {
+        out.can_view = v.checked;
+    }
+    if (actions.indexOf('edit') >= 0 && tr.querySelector('.p-e')) {
+        out.can_edit = tr.querySelector('.p-e').checked;
+    }
+    if (actions.indexOf('delete') >= 0 && tr.querySelector('.p-d')) {
+        out.can_delete = tr.querySelector('.p-d').checked;
+    }
+    if (actions.indexOf('lock') >= 0 && tr.querySelector('.p-l')) {
+        out.can_lock = tr.querySelector('.p-l').checked;
+    }
+    if (actions.indexOf('unlock') >= 0 && tr.querySelector('.p-u')) {
+        out.can_unlock = tr.querySelector('.p-u').checked;
+    }
+    return out;
 }
 
 function auPermSetRowFlags(tr, flags) {
     if (!tr || !flags) return;
-    var v = tr.querySelector('.p-v');
-    if (!v) return;
-    tr.querySelector('.p-v').checked = !!flags.can_view;
-    tr.querySelector('.p-e').checked = !!flags.can_edit;
-    tr.querySelector('.p-d').checked = !!flags.can_delete;
-    if (tr.querySelector('.p-l')) tr.querySelector('.p-l').checked = !!flags.can_lock;
-    if (tr.querySelector('.p-u')) tr.querySelector('.p-u').checked = !!flags.can_unlock;
+    var page = tr.getAttribute('data-page') || '';
+    var megaId = tr.getAttribute('data-mega') || '';
+    var actions;
+    if (page.indexOf('__mega__') === 0 && megaId) {
+        var mega = (AU_PERM_TREE || []).find(function (m) { return m.id === megaId; });
+        actions = mega ? auPermActionsForMega(mega) : ['view', 'edit', 'delete', 'lock', 'unlock'];
+    } else if (page) {
+        actions = auPermActionsForPage(page);
+    } else {
+        actions = ['view', 'edit', 'delete', 'lock', 'unlock'];
+    }
+    if (actions.indexOf('view') >= 0 && tr.querySelector('.p-v')) {
+        tr.querySelector('.p-v').checked = !!flags.can_view;
+    }
+    if (actions.indexOf('edit') >= 0 && tr.querySelector('.p-e')) {
+        tr.querySelector('.p-e').checked = !!flags.can_edit;
+    }
+    if (actions.indexOf('delete') >= 0 && tr.querySelector('.p-d')) {
+        tr.querySelector('.p-d').checked = !!flags.can_delete;
+    }
+    if (actions.indexOf('lock') >= 0 && tr.querySelector('.p-l')) {
+        tr.querySelector('.p-l').checked = !!flags.can_lock;
+    }
+    if (actions.indexOf('unlock') >= 0 && tr.querySelector('.p-u')) {
+        tr.querySelector('.p-u').checked = !!flags.can_unlock;
+    }
 }
 
-function auPermMakeCheckboxCells(page, flags, extraClass) {
+function auPermMakeCheckboxCells(page, flags, extraClass, actionsOverride) {
+    var acts = actionsOverride || (page.indexOf('__mega__') === 0 ? ['view', 'edit', 'delete', 'lock', 'unlock'] : auPermActionsForPage(page));
     var ex = flags || {};
     var cls = extraClass || '';
-    return '<td><input type="checkbox" class="p-v ' + cls + '" data-page="' + escapeHtml(page) + '"' + (ex.can_view ? ' checked' : '') + '></td>' +
-        '<td><input type="checkbox" class="p-e ' + cls + '" data-page="' + escapeHtml(page) + '"' + (ex.can_edit ? ' checked' : '') + '></td>' +
-        '<td><input type="checkbox" class="p-d ' + cls + '" data-page="' + escapeHtml(page) + '"' + (ex.can_delete ? ' checked' : '') + '></td>' +
-        '<td><input type="checkbox" class="p-l ' + cls + '" data-page="' + escapeHtml(page) + '"' + (ex.can_lock ? ' checked' : '') + '></td>' +
-        '<td><input type="checkbox" class="p-u ' + cls + '" data-page="' + escapeHtml(page) + '"' + (ex.can_unlock ? ' checked' : '') + '></td>';
+    function cell(act, cssClass, key) {
+        if (acts.indexOf(act) < 0) {
+            return '<td class="au-perm-na muted" title="غير منطبق على هذه الشاشة">—</td>';
+        }
+        return '<td><input type="checkbox" class="' + cssClass + ' ' + cls + '" data-page="' + escapeHtml(page) + '"' + (ex[key] ? ' checked' : '') + '></td>';
+    }
+    return cell('view', 'p-v', 'can_view') +
+        cell('edit', 'p-e', 'can_edit') +
+        cell('delete', 'p-d', 'can_delete') +
+        cell('lock', 'p-l', 'can_lock') +
+        cell('unlock', 'p-u', 'can_unlock');
 }
 
 function auPermResolveExisting(existing, page) {
@@ -169,14 +232,14 @@ function auPermPagesInMega(mega) {
 }
 
 function auPermAggregateFlags(pageRows) {
-    var agg = { can_view: true, can_edit: true, can_delete: true, can_lock: true, can_unlock: true };
+    var agg = { can_view: false, can_edit: false, can_delete: false, can_lock: false, can_unlock: false };
     var any = false;
     pageRows.forEach(function (tr) {
         var f = auPermRowFlags(tr);
         if (!f) return;
         any = true;
         ['can_view', 'can_edit', 'can_delete', 'can_lock', 'can_unlock'].forEach(function (k) {
-            if (!f[k]) agg[k] = false;
+            if (f[k]) agg[k] = true;
         });
     });
     if (!any) {
@@ -214,7 +277,16 @@ function auPermBindMatrixEvents() {
             var megaId = megaRow.getAttribute('data-mega');
             var flags = auPermRowFlags(megaRow);
             document.querySelectorAll('tr.au-perm-page[data-mega="' + megaId + '"]').forEach(function (tr) {
-                auPermSetRowFlags(tr, flags);
+                var pg = tr.getAttribute('data-page') || '';
+                var pageActs = auPermActionsForPage(pg);
+                var patch = {
+                    can_view: pageActs.indexOf('view') >= 0 ? flags.can_view : false,
+                    can_edit: pageActs.indexOf('edit') >= 0 ? flags.can_edit : false,
+                    can_delete: pageActs.indexOf('delete') >= 0 ? flags.can_delete : false,
+                    can_lock: pageActs.indexOf('lock') >= 0 ? flags.can_lock : false,
+                    can_unlock: pageActs.indexOf('unlock') >= 0 ? flags.can_unlock : false
+                };
+                auPermSetRowFlags(tr, patch);
             });
             return;
         }
@@ -259,7 +331,7 @@ function renderPermMatrix(adminId, existing, isSuperOverride) {
         megaTr.innerHTML =
             '<td class="au-perm-mega-label">' + expandBtn + '<strong>' + escapeHtml(mega.title || megaId) + '</strong>' +
             '<span class="card-hint au-perm-mega-hint">اختصار — ' + pages.length + ' شاشة</span></td>' +
-            auPermMakeCheckboxCells('__mega__' + megaId, megaFlags, 'au-perm-mega-cb');
+            auPermMakeCheckboxCells('__mega__' + megaId, megaFlags, 'au-perm-mega-cb', auPermActionsForMega(mega));
         tb.appendChild(megaTr);
 
         if (mega.page) {
@@ -367,6 +439,7 @@ function loadAdmins() {
         });
         window.__permByAdmin = r.permissions_by_admin || {};
         if (r.permission_tree) AU_PERM_TREE = r.permission_tree;
+        if (r.page_actions) AU_PAGE_ACTIONS = r.page_actions;
     }).catch(function (e) { alert(e.message || String(e)); });
 }
 
