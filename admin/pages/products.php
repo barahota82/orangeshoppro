@@ -702,6 +702,10 @@ $orangeAdminSfProductUrlPartsForJs = [
             </div>
             <div style="grid-column:1/-1;">
                 <h4 class="admin-product-subsection-title" style="margin:8px 0 4px;">SEO — عناوين ووصف الميتا (اختياري)</h4>
+                <p class="card-hint" style="margin:0 0 8px;font-size:13px;line-height:1.55;color:#64748b;">
+                    للمنتجات المهمة: اكتب عنواناً ووصفاً مخصّصين لنتائج Google ومشاركة الرابط.
+                    <strong>اترك الحقل فارغاً</strong> ليُملأ تلقائياً من اسم المنتج ووصفه عند الحفظ وفي المتجر.
+                </p>
             </div>
             <div>
                 <label for="seo_meta_title_ar">عنوان الميتا (عربي)</label>
@@ -734,6 +738,11 @@ $orangeAdminSfProductUrlPartsForJs = [
             <div style="grid-column:1/-1;">
                 <label for="seo_meta_description_hi">Meta description (Hindi)</label>
                 <textarea id="seo_meta_description_hi" rows="2" lang="hi" dir="ltr"></textarea>
+            </div>
+            <div id="seoEffectivePreviewWrap" class="card-hint" style="grid-column:1/-1;margin:0;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;line-height:1.55;">
+                <strong>معاينة SEO الفعلية (عربي):</strong>
+                <div id="seoEffectivePreviewTitle" style="margin-top:6px;color:#0f172a;"></div>
+                <div id="seoEffectivePreviewDesc" style="margin-top:4px;color:#475569;"></div>
             </div>
         </div>
         </div>
@@ -2883,6 +2892,9 @@ function resetProductForm() {
     document.getElementById('seo_meta_description_en').value = '';
     document.getElementById('seo_meta_description_fil').value = '';
     document.getElementById('seo_meta_description_hi').value = '';
+    if (typeof window.orangeRefreshSeoEffectivePreview === 'function') {
+        window.orangeRefreshSeoEffectivePreview();
+    }
     const depClear = document.getElementById('product_main_department_id');
     if (depClear) {
         depClear.value = '';
@@ -3071,6 +3083,9 @@ async function loadProductForEdit(id) {
         document.getElementById('seo_meta_description_en').value = p.seo_meta_description_en || '';
         document.getElementById('seo_meta_description_fil').value = p.seo_meta_description_fil || '';
         document.getElementById('seo_meta_description_hi').value = p.seo_meta_description_hi || '';
+        if (typeof window.orangeRefreshSeoEffectivePreview === 'function') {
+            window.orangeRefreshSeoEffectivePreview();
+        }
         document.getElementById('category_id').value = String(p.catalog_category_display_id || '');
         const sid = parseInt(p.catalog_subcategory_display_id, 10) || 0;
         rebuildSubcategoryOptions(sid > 0 ? sid : null);
@@ -4671,5 +4686,48 @@ orangeScheduleProductCardPreviewRefresh();
             tr.style.display = did === v ? '' : 'none';
         });
     });
+})();
+
+(function () {
+    function seoPlainFromHtml(html) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html || '';
+        return (tmp.textContent || tmp.innerText || '').replace(/\s+/g, ' ').trim();
+    }
+    function seoTruncate(text, max) {
+        text = (text || '').trim();
+        if (!text) return '';
+        return text.length > max ? text.slice(0, Math.max(0, max - 3)) + '...' : text;
+    }
+    function seoEffectiveAr() {
+        const nameEl = document.getElementById('name');
+        const descEl = document.getElementById('description');
+        const titleEl = document.getElementById('seo_meta_title_ar');
+        const metaDescEl = document.getElementById('seo_meta_description_ar');
+        const name = nameEl ? nameEl.value.trim() : '';
+        const descSrc = descEl ? descEl.value.trim() : '';
+        let title = titleEl ? titleEl.value.trim() : '';
+        let desc = metaDescEl ? metaDescEl.value.trim() : '';
+        if (!title && name) title = seoTruncate(name, 191);
+        if (!desc && descSrc) desc = seoTruncate(seoPlainFromHtml(descSrc), 160);
+        return { title: title || '—', desc: desc || '—' };
+    }
+    function refreshSeoEffectivePreview() {
+        const titleNode = document.getElementById('seoEffectivePreviewTitle');
+        const descNode = document.getElementById('seoEffectivePreviewDesc');
+        if (!titleNode || !descNode) return;
+        const eff = seoEffectiveAr();
+        titleNode.textContent = eff.title;
+        descNode.textContent = eff.desc;
+    }
+    [
+        'name', 'description',
+        'seo_meta_title_ar', 'seo_meta_description_ar'
+    ].forEach(function (id) {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', refreshSeoEffectivePreview);
+    });
+    refreshSeoEffectivePreview();
+    window.orangeRefreshSeoEffectivePreview = refreshSeoEffectivePreview;
 })();
 </script>

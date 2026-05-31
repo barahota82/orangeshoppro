@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/admin_settings_country.php';
 require_once __DIR__ . '/../../../includes/company_settings.php';
+require_once __DIR__ . '/../../../includes/storefront_payment_settings.php';
 require_admin_api();
 
 function req_data() {
@@ -50,21 +51,40 @@ try {
         $vatNumber = trim((string)($data['vat_number'] ?? ''));
         $invoiceFooter = trim((string)($data['invoice_footer'] ?? ''));
         $invoiceFooterDb = $invoiceFooter === '' ? null : $invoiceFooter;
+        $paymentOnlineEnabled = (int)($data['payment_online_enabled'] ?? 0) === 1 ? 1 : 0;
+        $hasPayOnlineCol = orange_company_settings_has_payment_online_column($pdo);
 
         orange_company_settings_ensure_row($pdo, $ctxCountryId);
         if (orange_company_settings_has_country_column($pdo)) {
-            $stmt = $pdo->prepare(
-                "UPDATE company_settings SET company_name_ar=?, company_name_en=?, company_logo=?, commercial_register=?, phones=?, address=?, vat_number=?, invoice_footer=? WHERE country_id=?"
-            );
-            $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $invoiceFooterDb, $ctxCountryId]);
+            if ($hasPayOnlineCol) {
+                $stmt = $pdo->prepare(
+                    "UPDATE company_settings SET company_name_ar=?, company_name_en=?, company_logo=?, commercial_register=?, phones=?, address=?, vat_number=?, invoice_footer=?, payment_online_enabled=? WHERE country_id=?"
+                );
+                $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $invoiceFooterDb, $paymentOnlineEnabled, $ctxCountryId]);
+            } else {
+                $stmt = $pdo->prepare(
+                    "UPDATE company_settings SET company_name_ar=?, company_name_en=?, company_logo=?, commercial_register=?, phones=?, address=?, vat_number=?, invoice_footer=? WHERE country_id=?"
+                );
+                $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $invoiceFooterDb, $ctxCountryId]);
+            }
         } else {
             $row = $pdo->query("SELECT id FROM company_settings ORDER BY id ASC LIMIT 1")->fetch();
             if ($row) {
-                $stmt = $pdo->prepare("UPDATE company_settings SET company_name_ar=?, company_name_en=?, company_logo=?, commercial_register=?, phones=?, address=?, vat_number=?, invoice_footer=? WHERE id=?");
-                $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $invoiceFooterDb, (int)$row['id']]);
+                if ($hasPayOnlineCol) {
+                    $stmt = $pdo->prepare("UPDATE company_settings SET company_name_ar=?, company_name_en=?, company_logo=?, commercial_register=?, phones=?, address=?, vat_number=?, invoice_footer=?, payment_online_enabled=? WHERE id=?");
+                    $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $invoiceFooterDb, $paymentOnlineEnabled, (int)$row['id']]);
+                } else {
+                    $stmt = $pdo->prepare("UPDATE company_settings SET company_name_ar=?, company_name_en=?, company_logo=?, commercial_register=?, phones=?, address=?, vat_number=?, invoice_footer=? WHERE id=?");
+                    $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $invoiceFooterDb, (int)$row['id']]);
+                }
             } else {
-                $stmt = $pdo->prepare("INSERT INTO company_settings (company_name_ar, company_name_en, company_logo, commercial_register, phones, address, vat_number, invoice_footer) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-                $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $invoiceFooterDb]);
+                if ($hasPayOnlineCol) {
+                    $stmt = $pdo->prepare("INSERT INTO company_settings (company_name_ar, company_name_en, company_logo, commercial_register, phones, address, vat_number, invoice_footer, payment_online_enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $invoiceFooterDb, $paymentOnlineEnabled]);
+                } else {
+                    $stmt = $pdo->prepare("INSERT INTO company_settings (company_name_ar, company_name_en, company_logo, commercial_register, phones, address, vat_number, invoice_footer) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->execute([$nameAr, $nameEn, $logo, $cr, $phones, $address, $vatNumber, $invoiceFooterDb]);
+                }
             }
         }
 

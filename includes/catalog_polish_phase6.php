@@ -90,6 +90,91 @@ function orange_catalog_backfill_product_seo_meta(PDO $pdo): int
     return $updated;
 }
 
+function orange_product_seo_plain_from_html(string $html): string
+{
+    $plain = preg_replace('/\s+/u', ' ', strip_tags($html));
+
+    return trim((string) $plain);
+}
+
+function orange_product_seo_truncate(string $text, int $max): string
+{
+    $text = trim($text);
+    if ($text === '') {
+        return '';
+    }
+    if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+        return mb_strlen($text, 'UTF-8') > $max
+            ? mb_substr($text, 0, max(0, $max - 3), 'UTF-8') . '...'
+            : $text;
+    }
+
+    return strlen($text) > $max ? substr($text, 0, max(0, $max - 3)) . '...' : $text;
+}
+
+/**
+ * يملأ حقول SEO الفارغة من الاسم/الوصف عند الحفظ — لا يستبدل نصاً مخصصاً.
+ *
+ * @return array{
+ *   seo_meta_title_ar:string,
+ *   seo_meta_title_en:string,
+ *   seo_meta_title_fil:string,
+ *   seo_meta_title_hi:string,
+ *   seo_meta_description_ar:string,
+ *   seo_meta_description_en:string,
+ *   seo_meta_description_fil:string,
+ *   seo_meta_description_hi:string
+ * }
+ */
+function orange_product_seo_apply_defaults_for_save(
+    string $seoTitleAr,
+    string $seoTitleEn,
+    string $seoTitleFil,
+    string $seoTitleHi,
+    string $seoDescAr,
+    string $seoDescEn,
+    string $seoDescFil,
+    string $seoDescHi,
+    string $nameAr,
+    string $nameEn,
+    string $nameFil,
+    string $nameHi,
+    string $descAr,
+    string $descEn,
+    string $descFil,
+    string $descHi
+): array {
+    $fillPair = static function (string $title, string $name, string $desc, string $srcDesc): array {
+        $title = trim($title);
+        $name = trim($name);
+        $desc = trim($desc);
+        if ($title === '' && $name !== '') {
+            $title = orange_product_seo_truncate($name, 191);
+        }
+        if ($desc === '' && trim($srcDesc) !== '') {
+            $desc = orange_product_seo_truncate(orange_product_seo_plain_from_html($srcDesc), 500);
+        }
+
+        return [$title, $desc];
+    };
+
+    [$seoTitleAr, $seoDescAr] = $fillPair($seoTitleAr, $nameAr, $seoDescAr, $descAr);
+    [$seoTitleEn, $seoDescEn] = $fillPair($seoTitleEn, $nameEn, $seoDescEn, $descEn);
+    [$seoTitleFil, $seoDescFil] = $fillPair($seoTitleFil, $nameFil, $seoDescFil, $descFil);
+    [$seoTitleHi, $seoDescHi] = $fillPair($seoTitleHi, $nameHi, $seoDescHi, $descHi);
+
+    return [
+        'seo_meta_title_ar' => $seoTitleAr,
+        'seo_meta_title_en' => $seoTitleEn,
+        'seo_meta_title_fil' => $seoTitleFil,
+        'seo_meta_title_hi' => $seoTitleHi,
+        'seo_meta_description_ar' => $seoDescAr,
+        'seo_meta_description_en' => $seoDescEn,
+        'seo_meta_description_fil' => $seoDescFil,
+        'seo_meta_description_hi' => $seoDescHi,
+    ];
+}
+
 /**
  * المرحلة 6 — polish: SEO backfill + probe سريع.
  */

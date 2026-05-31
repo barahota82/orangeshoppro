@@ -1800,7 +1800,9 @@ async function sendOrderNow() {
         orderedLineKeys && orderedLineKeys.size > 0 ? { orderedLineKeys: orderedLineKeys } : {};
 
     const payRadio = document.querySelector('input[name="checkout_payment_terms"]:checked');
-    const paymentTerms = payRadio && payRadio.value === 'online' ? 'online' : 'cash';
+    const paymentOnlineEnabled = window.ORANGE_PAYMENT_ONLINE_ENABLED === true;
+    const paymentTerms =
+        paymentOnlineEnabled && payRadio && payRadio.value === 'online' ? 'online' : 'cash';
 
     const emailEl = document.getElementById('customer_email');
     const emailRaw = emailEl ? emailEl.value.trim() : '';

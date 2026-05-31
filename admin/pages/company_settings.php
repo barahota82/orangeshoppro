@@ -60,6 +60,21 @@ $csScoped = orange_company_settings_has_country_column($pdo);
     </div>
 </div>
 
+<div class="card">
+    <h3>الدفع الإلكتروني (المتجر)</h3>
+    <p class="card-hint" style="margin:0 0 12px;line-height:1.55;">
+        مفتاح تشغيل/إيقاف خيار «الدفع الإلكتروني» للعملاء في هذه الدولة.
+        عند الإيقاف يبقى <strong>الدفع عند الاستلام</strong> فقط. ربط بوابة الدفع الفعلية (KNET / Visa…) خطوة لاحقة عند الجاهزية القانونية.
+    </p>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="payment_online_enabled" value="1">
+        <span>تفعيل الدفع الإلكتروني للعملاء</span>
+    </label>
+    <div class="admin-form-actions">
+        <button type="button" onclick="saveCompanySettings()">حفظ</button>
+    </div>
+</div>
+
 <script>
 async function loadCompanySettings() {
     const res = await postJSON('/admin/api/settings/company.php', { action: 'get' });
@@ -76,6 +91,10 @@ async function loadCompanySettings() {
     document.getElementById('address').value = d.address || '';
     document.getElementById('vat_number').value = d.vat_number || '';
     document.getElementById('invoice_footer').value = d.invoice_footer || '';
+    const payEl = document.getElementById('payment_online_enabled');
+    if (payEl) {
+        payEl.checked = parseInt(String(d.payment_online_enabled || '0'), 10) === 1;
+    }
 }
 
 async function saveCompanySettings() {
@@ -88,7 +107,8 @@ async function saveCompanySettings() {
         phones: document.getElementById('phones').value.trim(),
         address: document.getElementById('address').value.trim(),
         vat_number: document.getElementById('vat_number').value.trim(),
-        invoice_footer: document.getElementById('invoice_footer').value.trim()
+        invoice_footer: document.getElementById('invoice_footer').value.trim(),
+        payment_online_enabled: document.getElementById('payment_online_enabled') && document.getElementById('payment_online_enabled').checked ? 1 : 0
     });
     alert(res.message || (res.success ? 'تم الحفظ' : 'فشل الحفظ'));
 }

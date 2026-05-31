@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../../includes/warehouses.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/product_colorway_images.php';
 require_once __DIR__ . '/../../../includes/arabic_name_duplicate.php';
+require_once __DIR__ . '/../../../includes/catalog_polish_phase6.php';
 require_admin_api();
 
 try {
@@ -187,6 +188,33 @@ try {
     $seoDescEn = trim((string)($data['seo_meta_description_en'] ?? ''));
     $seoDescFil = trim((string)($data['seo_meta_description_fil'] ?? ''));
     $seoDescHi = trim((string)($data['seo_meta_description_hi'] ?? ''));
+
+    $seoResolved = orange_product_seo_apply_defaults_for_save(
+        $seoTitleAr,
+        $seoTitleEn,
+        $seoTitleFil,
+        $seoTitleHi,
+        $seoDescAr,
+        $seoDescEn,
+        $seoDescFil,
+        $seoDescHi,
+        $nameAr,
+        $nameEn,
+        $nameFil,
+        $nameHi,
+        $descAr,
+        $descEn,
+        $descFil,
+        $descHi
+    );
+    $seoTitleAr = $seoResolved['seo_meta_title_ar'];
+    $seoTitleEn = $seoResolved['seo_meta_title_en'];
+    $seoTitleFil = $seoResolved['seo_meta_title_fil'];
+    $seoTitleHi = $seoResolved['seo_meta_title_hi'];
+    $seoDescAr = $seoResolved['seo_meta_description_ar'];
+    $seoDescEn = $seoResolved['seo_meta_description_en'];
+    $seoDescFil = $seoResolved['seo_meta_description_fil'];
+    $seoDescHi = $seoResolved['seo_meta_description_hi'];
 
     $mainImage = trim((string)($data['main_image'] ?? ''));
     $extraImagesForMain = $data['extra_images'] ?? null;

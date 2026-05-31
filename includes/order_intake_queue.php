@@ -13,6 +13,7 @@ require_once __DIR__ . '/cart_combo_promotions.php';
 require_once __DIR__ . '/storefront_checkout_promo_lines.php';
 require_once __DIR__ . '/countries.php';
 require_once __DIR__ . '/currency.php';
+require_once __DIR__ . '/storefront_payment_settings.php';
 require_once __DIR__ . '/warehouses.php';
 
 function orange_order_intake_snip_message(string $msg, int $max = 500): string
@@ -458,8 +459,14 @@ function orange_storefront_execute_checkout_payload(PDO $pdo, array $data): arra
 
     [$subtotal, $validatedItems] = orange_storefront_validate_cart_items_core($pdo, $data['items'], true);
 
-    // سياسة المتجر: طلب الواجهة = دفع عند الاستلام (COD) → نقدي عند التسليم ليطابق القيود (إيراد نقدي + خزينة فورية).
+    // طلب الواجهة: نقدي (COD) افتراضياً؛ أونلاين فقط إذا مفعّل في إعدادات الدولة.
     $paymentTerms = 'cash';
+    if (isset($data['payment_terms'])) {
+        $requested = orange_normalize_payment_terms($data['payment_terms']);
+        if ($requested === 'online' && orange_storefront_payment_online_enabled($pdo, $orderCountryId, true)) {
+            $paymentTerms = 'online';
+        }
+    }
     $hasSource = orange_table_has_column($pdo, 'orders', 'order_source');
     $hasPay = orange_table_has_column($pdo, 'orders', 'payment_terms');
     $hasCustomerId = orange_table_has_column($pdo, 'orders', 'customer_id');

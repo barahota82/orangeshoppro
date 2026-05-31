@@ -6,9 +6,11 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/catalog_schema.php';
 require_once __DIR__ . '/../includes/storefront_account.php';
 require_once __DIR__ . '/../includes/delivery_areas.php';
+require_once __DIR__ . '/../includes/storefront_payment_settings.php';
 
 $pdoCartAcc = db();
 orange_catalog_ensure_schema($pdoCartAcc);
+$cartPaymentOnlineEnabled = orange_storefront_payment_online_enabled($pdoCartAcc, null, true);
 $cartSfAccount = current_storefront_account($pdoCartAcc);
 $cartSfLoggedIn = $cartSfAccount !== null;
 
@@ -145,6 +147,20 @@ $cartWaHref = storefront_whatsapp_href($channel, '');
                     <label for="customer_notes"><?php echo htmlspecialchars(t('notes'), ENT_QUOTES, 'UTF-8'); ?></label>
                     <textarea id="customer_notes" maxlength="4000"></textarea>
                 </div>
+                <?php if ($cartPaymentOnlineEnabled): ?>
+                <fieldset class="field cart-checkout-payment-fieldset">
+                    <legend><?php echo htmlspecialchars(t('order_payment_terms_label'), ENT_QUOTES, 'UTF-8'); ?></legend>
+                    <label class="cart-checkout-payment-option">
+                        <input type="radio" name="checkout_payment_terms" value="cash" checked>
+                        <?php echo htmlspecialchars(t('payment_cash_on_delivery'), ENT_QUOTES, 'UTF-8'); ?>
+                    </label>
+                    <label class="cart-checkout-payment-option">
+                        <input type="radio" name="checkout_payment_terms" value="online">
+                        <?php echo htmlspecialchars(t('payment_online'), ENT_QUOTES, 'UTF-8'); ?>
+                    </label>
+                    <p class="cart-checkout-intro" style="margin:0.5rem 0 0;"><?php echo htmlspecialchars(t('checkout_online_cash_only'), ENT_QUOTES, 'UTF-8'); ?></p>
+                </fieldset>
+                <?php endif; ?>
                 <button type="button" class="btn" id="cartCheckoutSendBtn" onclick="sendOrderNow()"><?php echo htmlspecialchars(t('send_order'), ENT_QUOTES, 'UTF-8'); ?></button>
             </div>
         </div>
@@ -166,6 +182,7 @@ window.ORANGE_CART_HOME = <?php echo json_encode(storefront_url('home', $channel
 window.ORANGE_REGISTER_URL = <?php echo json_encode(storefront_url('register', $channelSlug, $lang), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_STOREFRONT_WA = <?php echo json_encode($cartWaHref, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_CART_SF_ACCOUNT = <?php echo json_encode(['logged_in' => $cartSfLoggedIn], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.ORANGE_PAYMENT_ONLINE_ENABLED = <?php echo $cartPaymentOnlineEnabled ? 'true' : 'false'; ?>;
 window.ORANGE_ORDER_STATUS_LABELS = <?php echo json_encode($orangeOrderStatusLabelsCart, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_MY_ORDER_UI = <?php echo json_encode($orangeMyOrderUiCart, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ORANGE_TRACK_LABELS = window.ORANGE_TRACK_LABELS || {
