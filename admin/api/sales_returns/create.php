@@ -129,6 +129,10 @@ try {
     $revenueTotal = round($revenueTotal, 4);
     $cogsTotal = round($cogsTotal, 4);
 
+    if ($orderIdOpt > 0) {
+        orange_sales_return_assert_qty_against_order($pdo, $orderIdOpt, $normalizedItems);
+    }
+
     $tmpNum = 'SR-TMP-' . bin2hex(random_bytes(6));
     $pdo->prepare(
         'INSERT INTO sales_returns (return_number, order_id, customer_id, channel_id, type, total, notes)

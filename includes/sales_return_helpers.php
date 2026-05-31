@@ -85,3 +85,143 @@ function orange_sales_return_undo_line_stock(PDO $pdo, int $productId, int $vari
     $pdo->prepare('UPDATE product_variants SET stock_quantity = stock_quantity - ? WHERE id = ? AND product_id = ?')
         ->execute([$qty, $variantId, $productId]);
 }
+
+function orange_sales_return_line_key(int $productId, int $variantId): string
+{
+    return $productId . ':' . $variantId;
+}
+
+/**
+ * @return array<string, int> مفتاح product_id:variant_id => مجموع الكميات المُرجَعة سابقاً لنفس الطلب
+ */
+function orange_sales_return_returned_qty_map(PDO $pdo, int $orderId, ?int $excludeReturnId = null): array
+{
+    if ($orderId <= 0 || !orange_table_exists($pdo, 'sales_returns') || !orange_table_exists($pdo, 'sales_return_items')) {
+        return [];
+    }
+
+    $hasVariant = orange_table_has_column($pdo, 'sales_return_items', 'variant_id');
+    $sql = 'SELECT sri.product_id, ' . ($hasVariant ? 'COALESCE(sri.variant_id, 0)' : '0') . ' AS variant_id, SUM(sri.qty) AS qty_sum
+        FROM sales_return_items sri
+        INNER JOIN sales_returns sr ON sr.id = sri.sales_return_id
+        WHERE sr.order_id = ?';
+    $params = [$orderId];
+    if ($excludeReturnId !== null && $excludeReturnId > 0) {
+        $sql .= ' AND sr.id <> ?';
+        $params[] = $excludeReturnId;
+    }
+    $sql .= ' GROUP BY sri.product_id, variant_id';
+
+    $st = $pdo->prepare($sql);
+    $st->execute($params);
+    $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    $map = [];
+    foreach ($rows as $row) {
+        $key = orange_sales_return_line_key(
+            (int) ($row['product_id'] ?? 0),
+            (int) ($row['variant_id'] ?? 0)
+        );
+        $map[$key] = (int) ($row['qty_sum'] ?? 0);
+    }
+
+    return $map;
+}
+
+/**
+ * @return array<string, int> مفتاح product_id:variant_id => كمية مباعة في الطلب
+ */
+function orange_sales_return_sold_qty_map(PDO $pdo, int $orderId): array
+{
+    if ($orderId <= 0 || !orange_table_exists($pdo, 'order_items')) {
+        return [];
+    }
+
+    $hasVariant = orange_table_has_column($pdo, 'order_items', 'variant_id');
+    $sql = 'SELECT product_id, ' . ($hasVariant ? 'COALESCE(variant_id, 0)' : '0') . ' AS variant_id, qty
+        FROM order_items WHERE order_id = ? ORDER BY id ASC';
+    $st = $pdo->prepare($sql);
+    $st->execute([$orderId]);
+    $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    $map = [];
+    foreach ($rows as $row) {
+        $productId = (int) ($row['product_id'] ?? 0);
+        if ($productId <= 0) {
+            continue;
+        }
+        $key = orange_sales_return_line_key(
+            $productId,
+            (int) ($row['variant_id'] ?? 0)
+        );
+        $map[$key] = ($map[$key] ?? 0) + (int) ($row['qty'] ?? 0);
+    }
+
+    return $map;
+}
+
+/**
+ * قناة مردود المبيعات من طلب مرجعي (نقدي / أونلاين / آجل).
+ */
+function orange_sales_return_channel_from_order(array $order): string
+{
+    $terms = strtolower(trim((string) ($order['payment_terms'] ?? 'cash')));
+    if ($terms === 'credit') {
+        return 'credit';
+    }
+    $src = strtolower(trim((string) ($order['order_source'] ?? '')));
+    if (in_array($src, ['website', 'online', 'storefront'], true)) {
+        return 'online';
+    }
+
+    return 'cash';
+}
+
+/**
+ * @param list<array{product_id:int,variant_id?:int,qty:int}> $items
+ *
+ * @throws RuntimeException
+ */
+function orange_sales_return_assert_qty_against_order(PDO $pdo, int $orderId, array $items): void
+{
+    if ($orderId <= 0 || $items === []) {
+        return;
+    }
+
+    $sold = orange_sales_return_sold_qty_map($pdo, $orderId);
+    if ($sold === []) {
+        throw new RuntimeException('الطلب المرجعي بلا أصناف');
+    }
+
+    $returned = orange_sales_return_returned_qty_map($pdo, $orderId);
+    $requested = [];
+
+    foreach ($items as $item) {
+        $productId = (int) ($item['product_id'] ?? 0);
+        $qty = (int) ($item['qty'] ?? 0);
+        if ($productId <= 0 || $qty <= 0) {
+            continue;
+        }
+        $variantId = orange_purchase_resolve_variant_id(
+            $pdo,
+            $productId,
+            (int) ($item['variant_id'] ?? 0)
+        );
+        $key = orange_sales_return_line_key($productId, $variantId);
+        $requested[$key] = ($requested[$key] ?? 0) + $qty;
+    }
+
+    foreach ($requested as $key => $reqQty) {
+        $soldQty = (int) ($sold[$key] ?? 0);
+        if ($soldQty <= 0) {
+            throw new RuntimeException('صنف في المردود غير موجود في الطلب المرجعي');
+        }
+        $alreadyReturned = (int) ($returned[$key] ?? 0);
+        $available = max(0, $soldQty - $alreadyReturned);
+        if ($reqQty > $available) {
+            throw new RuntimeException(
+                'الكمية المرجعة (' . $reqQty . ') تتجاوز المتاح (' . $available . ') للصنف #' . explode(':', $key)[0]
+            );
+        }
+    }
+}

@@ -178,8 +178,8 @@ ENGLISH
 ---
 
 ### المرحلة 2 — مردود المبيعات
-- [ ] parity `purchase_returns` — search/nav/print/lock.
-- [ ] APIs create/update/get/search.
+- [x] parity `purchase_returns` — search/nav/print/lock.
+- [x] APIs create/update/get/search + retrieve من طلب/فاتورة.
 
 **Acceptance:** مردود مرتبط بعميل + أصناف + GL + مخزون.
 
@@ -226,3 +226,4 @@ Changelog
 2026-05-20 — أرشفة قرار مالك: مستند v2 لفواتير البيع + مردود + INV-O؛ عميل like-supplier؛ قناة واتساب؛ مراحل 0–4؛ GAP-SALE-DOC-01.
 2026-05-20 — **تنفيذ مرحلة 0:** `admin/api/sales-invoices/*` + `includes/sales_invoice_company.php` + `company_sales_invoice` page/API wiring + customer picker AR + v80 permissions seed.
 2026-05-20 — **تنفيذ مرحلة 1:** `company_sales_invoice.php` مستند v2 (`sv2`) + update بنود/GL + edit_lock + redirects legacy.
+2026-05-20 — **تنفيذ مرحلة 2:** `sales_returns.php` مستند v2 (`sr2`) + `browse.php` + `retrieve_from_order.php` + helpers كميات الطلب + edit_lock/print/nav/search.

@@ -2,534 +2,1022 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/catalog_schema.php';
+require_once __DIR__ . '/../../includes/party_subledger.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
+require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
+require_once __DIR__ . '/../../includes/sales_doc_product_pick.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 
-$pdo = db();
-orange_catalog_ensure_schema($pdo);
-$srCaps = orange_admin_caps_for_page($admin, $pdo, 'sales_returns');
+$pdo = orange_admin_page_pdo();
+$sr2Caps = orange_admin_caps_for_page($admin, $pdo, 'sales_returns');
 
 $srCountryId = orange_admin_context_country_id($pdo);
 $srDefaultCurrency = orange_admin_context_currency_code($pdo);
 $srCurrencyUnit = orange_currency_display_unit($srDefaultCurrency);
-$srCurrencyDecimals = orange_currency_decimals_for_code($srDefaultCurrency);
-$srCustomersCountrySql = orange_sql_country_and_fragment($pdo, 'customers', 'customers', $srCountryId);
-$srProductsCountrySql = orange_sql_country_and_fragment($pdo, 'products', 'products', $srCountryId);
+$sr2CustomersCountrySql = orange_sql_country_and_fragment($pdo, 'customers', 'customers', $srCountryId);
+$sr2PickRows = orange_sales_doc_product_pick_rows($pdo, $srCountryId);
 
-// س13: جدول customers يستخدم name_ar وليس name — اختيار العمود الصحيح ديناميكياً.
-$hasCustomers = orange_table_exists($pdo, 'customers');
-$customers = [];
-if ($hasCustomers) {
-    $custNameCol = orange_table_has_column($pdo, 'customers', 'name_ar') ? 'name_ar' : (orange_table_has_column($pdo, 'customers', 'name') ? 'name' : 'name_ar');
-    try {
-        $customers = $pdo->query("SELECT id, $custNameCol AS name, phone FROM customers WHERE 1=1" . $srCustomersCountrySql . " ORDER BY $custNameCol ASC")->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Throwable $e) {
-        $customers = [];
-        if (function_exists('error_log')) {
-            error_log('[orange] sales_returns customers list: ' . $e->getMessage());
-        }
-    }
-}
-
-$products = [];
-try {
-    $products = $pdo->query(
-        'SELECT id, name, price, cost, has_colors, has_sizes FROM products WHERE is_active = 1' . $srProductsCountrySql . ' ORDER BY name ASC'
+$sr2CustomerPickRows = [];
+if (orange_table_exists($pdo, 'customers')) {
+    $codeCol = orange_table_has_column($pdo, 'customers', 'code') ? 'code' : 'id';
+    $customers = $pdo->query(
+        'SELECT id, name_ar, phone, ' . $codeCol . ' AS customer_code FROM customers WHERE 1=1'
+        . $sr2CustomersCountrySql . ' ORDER BY name_ar ASC'
     )->fetchAll(PDO::FETCH_ASSOC);
-} catch (Throwable $e) {
-    if (function_exists('error_log')) {
-        error_log('[orange] sales_returns products list: ' . $e->getMessage());
+    $custBal = [];
+    foreach ($customers as $c) {
+        $custBal[(int) $c['id']] = orange_party_balance_customer($pdo, (int) $c['id']);
+    }
+    foreach ($customers as $c) {
+        $cid = (int) ($c['id'] ?? 0);
+        if ($cid <= 0) {
+            continue;
+        }
+        $customerCode = trim((string) ($c['customer_code'] ?? ''));
+        if ($customerCode === '') {
+            $customerCode = (string) $cid;
+        }
+        $sr2CustomerPickRows[] = [
+            'id' => $cid,
+            'code' => $customerCode,
+            'name' => trim((string) ($c['name_ar'] ?? '')),
+            'phone' => trim((string) ($c['phone'] ?? '')),
+            'balance' => round((float) ($custBal[$cid] ?? 0.0), 3),
+        ];
     }
 }
 
-// س15 — prefill عميل من شاشة العملاء عبر ?customer_id=ID
-$srPrefillCustomerId = 0;
-$prefillCustomerIdRaw = isset($_GET['customer_id']) ? (int) $_GET['customer_id'] : 0;
-if ($prefillCustomerIdRaw > 0 && $hasCustomers) {
-    foreach ($customers as $cRow) {
-        if ((int) ($cRow['id'] ?? 0) === $prefillCustomerIdRaw) {
-            $srPrefillCustomerId = $prefillCustomerIdRaw;
+$prefillCustomerId = 0;
+$prefillCustomerRaw = (int) ($_GET['customer_id'] ?? 0);
+if ($prefillCustomerRaw > 0) {
+    foreach ($sr2CustomerPickRows as $row) {
+        if ((int) ($row['id'] ?? 0) === $prefillCustomerRaw) {
+            $prefillCustomerId = $prefillCustomerRaw;
             break;
         }
     }
 }
+$prefillOrderId = (int) ($_GET['order_id'] ?? 0);
 
-$variantsByProduct = [];
-try {
-    $vRows = $pdo->query(
-        'SELECT id, product_id, color, size FROM product_variants ORDER BY product_id ASC, id ASC'
-    )->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($vRows as $vr) {
-        $pid = (int) $vr['product_id'];
-        if (!isset($variantsByProduct[$pid])) {
-            $variantsByProduct[$pid] = [];
-        }
-        $c = trim((string) ($vr['color'] ?? ''));
-        $s = trim((string) ($vr['size'] ?? ''));
-        $label = ($c !== '' || $s !== '')
-            ? trim($c . ($c !== '' && $s !== '' ? ' / ' : '') . $s)
-            : ('#' . (int) $vr['id']);
-        $variantsByProduct[$pid][] = [
-            'id' => (int) $vr['id'],
-            'label' => $label,
-        ];
-    }
-} catch (Throwable $e) {
-    if (function_exists('error_log')) {
-        error_log('[orange] sales_returns variants list: ' . $e->getMessage());
-    }
-}
-
-// س13: تحقق وجود sales_returns + اسم عمود customers الصحيح (name_ar).
-$recent = [];
-$hasSalesReturns = orange_table_exists($pdo, 'sales_returns');
-if ($hasSalesReturns) {
-    $recentSql = 'SELECT sr.*';
-    if ($hasCustomers) {
-        $custNameColRecent = orange_table_has_column($pdo, 'customers', 'name_ar') ? 'name_ar' : (orange_table_has_column($pdo, 'customers', 'name') ? 'name' : 'name_ar');
-        $recentSql .= ', c.' . $custNameColRecent . ' AS customer_name';
-    }
-    $recentSql .= ' FROM sales_returns sr';
-    if ($hasCustomers) {
-        $recentSql .= ' LEFT JOIN customers c ON c.id = sr.customer_id';
-    }
-    if ($srCountryId > 0 && $hasCustomers && orange_table_has_country_id($pdo, 'customers')) {
-        $recentSql .= ' WHERE c.country_id = ' . (int) $srCountryId;
-    }
-    $recentSql .= ' ORDER BY sr.id DESC LIMIT 50';
-    try {
-        $recent = $pdo->query($recentSql)->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Throwable $e) {
-        $recent = [];
-        if (function_exists('error_log')) {
-            error_log('[orange] sales_returns recent list: ' . $e->getMessage());
-        }
-    }
-}
-
-function sr_channel_label(string $t): string
-{
-    return match ($t) {
-        'online' => 'أونلاين',
-        'credit' => 'آجل',
-        default => 'نقدي',
-    };
-}
+$sr2Ready = $sr2PickRows !== [];
+$sr2NavReady = orange_table_exists($pdo, 'sales_returns');
+$sr2DocSerialPreview = $sr2NavReady
+    ? orange_country_document_next_ref_preview($pdo, 'sales_returns', 'SR', $srCountryId)
+    : '';
 ?>
+<style>
+.jv-search-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10060;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    direction: rtl;
+}
+.jv-search-modal__backdrop { position: absolute; inset: 0; background: rgba(15, 23, 42, 0.45); }
+.jv-search-modal__panel {
+    position: relative; z-index: 1; width: 100%; max-width: min(96vw, 58rem);
+    max-height: calc(100vh - 32px); overflow: auto; background: #fff;
+    border: 1px solid #e4e4e7; border-radius: 10px; box-shadow: 0 20px 50px rgba(0,0,0,.18);
+}
+.jv-search-modal__head { display: flex; align-items: center; justify-content: center; padding: 14px 16px; border-bottom: 1px solid #e4e4e7; }
+.jv-search-modal__title { margin: 0; font-size: 1.05rem; text-align: center; }
+.jv-search-modal__body { padding: 14px 16px 18px; }
+.jv-search-modal__form { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.jv-search-modal__row--fields {
+    display: flex; flex-direction: row; flex-wrap: nowrap; align-items: flex-end;
+    gap: 10px; width: 100%; overflow-x: auto;
+}
+.jv-search-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.jv-search-field label { font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+.jv-search-field input { width: 100%; box-sizing: border-box; }
+.jv-search-field--id { flex: 0 0 7rem; }
+.jv-search-field--date { flex: 0 0 11rem; }
+.jv-search-field--ref { flex: 1 1 0; min-width: 7rem; }
+.jv-search-field--full { width: 100%; }
+.jv-search-modal__actions { margin: 0 0 16px; }
+.jv-search-table-wrap { max-height: min(40vh, 22rem); overflow: auto; border: 1px solid #e4e4e7; border-radius: 8px; }
+.jv-search-results-table { margin: 0; font-size: 0.9rem; }
+.jv-search-results-table tbody tr { cursor: pointer; }
+.jv-search-results-table tbody tr:hover { background: #f4f4f5; }
+.form-grid.sr2-header-row2 {
+    grid-template-columns: minmax(6.5rem, 0.65fr) auto minmax(0, 1.5fr) minmax(5.5rem, 0.65fr);
+}
+.form-grid.sr2-customer-row {
+    grid-template-columns: minmax(7rem, 0.75fr) minmax(0, 1fr) minmax(0, 2fr) minmax(5rem, 0.55fr);
+}
+.sr2-header-row2__action { display: flex; flex-direction: column; justify-content: flex-end; min-width: 0; }
+.sr2-header-row2__action-label { display: block; margin-bottom: 5px; font-size: 13px; visibility: hidden; line-height: 1.2; }
+</style>
+
 <div class="page-title page-title--stacked">
     <div>
         <h1>مردود مبيعات</h1>
-        <p class="page-subtitle">تسجيل إرجاع بضاعة من العميل؛ <strong>يُزاد المخزون فور الحفظ</strong> ويُولَّد قيد إيراد/تكلفة بمراجع <code dir="ltr">SR-{id}-RS</code> و <code dir="ltr">SR-{id}-RC</code> حسب «حسابات القيود التلقائية» (نقدي / أونلاين / آجل).</p>
+        <p class="page-subtitle">تسجيل إرجاع بضاعة من العميل؛ <strong>يُزاد المخزون فور الحفظ</strong> ويُولَّد قيد إيراد/تكلفة حسب قناة التحصيل.</p>
         <p class="card-hint" style="margin:0.35rem 0 0;">سياق الدولة — المبالغ بعملة <strong><?php echo htmlspecialchars($srDefaultCurrency, ENT_QUOTES, 'UTF-8'); ?></strong>.</p>
     </div>
 </div>
 
-<div class="card" id="sr_edit_banner" hidden>
-    <p class="card-hint" style="margin:0 0 10px;"><strong>وضع التعديل</strong> — مردود <span id="sr_edit_banner_id"></span>.</p>
-    <?php orange_edit_lock_ui_toolbar(['prefix' => 'sr', 'doc_kind' => 'sales_return', 'country_id' => $srCountryId, 'class' => 'edit-lock-toolbar']); ?>
-    <button type="button" class="btn-secondary" onclick="srCancelEdit()">إلغاء التعديل</button>
+<?php if (!$sr2Ready): ?>
+<div class="card" style="border:1px solid #fcd34d;background:#fffbeb;margin-bottom:12px;">
+    <p class="card-hint" style="margin:0;">لا توجد منتجات نشطة — أضف منتجات من شاشة «المنتجات».</p>
 </div>
+<?php endif; ?>
 
-<div class="card">
-    <h2 class="card-title">بيانات المردود</h2>
-    <div class="form-grid">
+<div class="card jv-print-area">
+    <h3 class="card-title">مردود مبيعات <span id="sr2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
+    <?php orange_edit_lock_ui_toolbar(['prefix' => 'sr2', 'doc_kind' => 'sales_return', 'country_id' => $srCountryId]); ?>
+
+    <div class="form-grid sr2-customer-row" style="margin-bottom:12px;">
         <div>
-            <label id="sr_customer_label">العميل</label>
-            <select id="sr_customer" <?php echo !$hasCustomers ? 'disabled' : ''; ?>>
-                <option value="0">— بدون عميل —</option>
-                <?php foreach ($customers as $c):
-                    $cId = (int) $c['id'];
-                    $selected = ($srPrefillCustomerId > 0 && $cId === $srPrefillCustomerId) ? ' selected' : '';
-                    ?>
-                    <option value="<?php echo $cId; ?>"<?php echo $selected; ?>><?php echo htmlspecialchars((string) $c['name'], ENT_QUOTES, 'UTF-8'); ?></option>
-                <?php endforeach; ?>
-            </select>
-            <?php if (!$hasCustomers): ?>
-                <p class="card-hint" style="margin:0.35rem 0 0;">جدول العملاء غير متوفر.</p>
-            <?php endif; ?>
+            <label for="sr2_doc_serial">مسلسل المردود</label>
+            <input type="text" id="sr2_doc_serial" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en"
+                value="<?php echo htmlspecialchars($sr2DocSerialPreview, ENT_QUOTES, 'UTF-8'); ?>"
+                title="يُخصَّص تلقائياً عند الحفظ">
         </div>
         <div>
-            <label>قناة التحصيل</label>
-            <select id="sr_channel" onchange="srOnChannelChange()">
+            <label for="sr2_customer_code">كود العميل</label>
+            <input type="text" id="sr2_customer_code" autocomplete="off" dir="ltr" lang="en" readonly placeholder="نقرتان للاختيار" title="نقرتان للاختيار" style="cursor:pointer;"<?php echo !$sr2Ready ? ' disabled' : ''; ?>>
+        </div>
+        <div>
+            <label for="sr2_customer_name" id="sr2_customer_name_label">اسم العميل</label>
+            <input type="text" id="sr2_customer_name" class="admin-inp-readonly" readonly disabled tabindex="-1" placeholder="يُعبأ تلقائياً">
+        </div>
+        <div>
+            <label for="sr2_customer_balance">رصيد الذمم</label>
+            <input type="text" id="sr2_customer_balance" class="admin-inp-readonly admin-money-display" readonly disabled tabindex="-1" dir="ltr" lang="en" placeholder="—">
+        </div>
+        <input type="hidden" id="sr2_customer_id" value="0">
+    </div>
+
+    <div class="form-grid sr2-header-row2" style="margin-bottom:16px;">
+        <div>
+            <label for="sr2_order_ref">طلب / فاتورة مرجعية</label>
+            <input type="text" id="sr2_order_ref" placeholder="INV-C- أو رقم" dir="ltr" lang="en" autocomplete="off"<?php echo !$sr2Ready ? ' disabled' : ''; ?>>
+        </div>
+        <div class="sr2-header-row2__action">
+            <span class="sr2-header-row2__action-label" aria-hidden="true">.</span>
+            <button type="button" class="btn-secondary" id="sr2_btn_retrieve"<?php echo !$sr2Ready ? ' disabled' : ''; ?>>استرجاع</button>
+        </div>
+        <div>
+            <label for="sr2_notes">ملاحظات</label>
+            <input type="text" id="sr2_notes" placeholder="رقم إذن الإرجاع، …"<?php echo !$sr2Ready ? ' disabled' : ''; ?>>
+        </div>
+        <div>
+            <label for="sr2_channel">قناة التحصيل</label>
+            <select id="sr2_channel"<?php echo !$sr2Ready ? ' disabled' : ''; ?>>
                 <option value="cash">نقدي</option>
                 <option value="online">أونلاين</option>
                 <option value="credit">آجل</option>
             </select>
         </div>
-        <div>
-            <label>مرجع طلب (اختياري)</label>
-            <input type="number" id="sr_order_id" min="0" step="1" placeholder="رقم الطلب" lang="en" dir="ltr" class="admin-inp-qty">
-        </div>
-        <div style="grid-column:1/-1;">
-            <label>ملاحظات</label>
-            <input type="text" id="sr_notes" placeholder="رقم إذن الإرجاع، …">
-        </div>
     </div>
-</div>
 
-<div class="card">
-    <h2 class="card-title">أسطر الأصناف</h2>
-    <?php if ($products === []): ?>
-        <p class="card-hint">لا توجد منتجات نشطة.</p>
-    <?php else: ?>
-    <p class="card-hint" style="margin-top:0;">يُزاد مخزون المتغير عند الحفظ. سعر الوحدة يُستخدم لصافي الإيراد؛ <strong>تكلفة الوحدة</strong> اختيارية (إن تُركت فارغة تُؤخذ من بطاقة المنتج).</p>
+    <h4 style="font-size:0.9rem;font-weight:600;color:#444;margin:0 0 10px;">أسطر الأصناف</h4>
     <div class="admin-doc-frame">
         <div class="table-wrap">
-            <table class="admin-table admin-doc-lines-table">
+            <table class="admin-table admin-doc-lines-table pur-lines-table">
                 <thead>
                     <tr>
-                        <th class="pur-col-idx">#</th>
-                        <th>الصنف</th>
-                        <th>المتغير</th>
-                        <th>الكمية</th>
-                        <th>سعر الوحدة</th>
-                        <th>تكلفة الوحدة (اختياري)</th>
-                        <th class="admin-doc-col-actions" aria-label="حذف"></th>
+                        <th class="pur-col-idx" style="width:2.5rem;">#</th>
+                        <th style="min-width:8rem;">كود / باركود</th>
+                        <th style="min-width:10rem;">اسم الصنف</th>
+                        <th style="min-width:8rem;">اللون / المقاس</th>
+                        <th style="width:5rem;">الكمية</th>
+                        <th style="width:6rem;">سعر الوحدة</th>
+                        <th style="width:6rem;">خصم السطر</th>
+                        <th style="width:7rem;">إجمالي السطر</th>
+                        <th class="admin-doc-col-actions" aria-label="حذف السطر" style="width:3rem;"></th>
                     </tr>
                 </thead>
-                <tbody id="sr_lines_body"></tbody>
+                <tbody id="sr2_lines_body"></tbody>
             </table>
         </div>
     </div>
-    <?php endif; ?>
-    <div class="actions admin-doc-lines-toolbar" style="margin-top:12px;">
-        <button type="button" class="btn-secondary" onclick="srAddLine()">+ سطر</button>
-        <button type="button" id="sr_submit_btn" data-orange-perm="edit" data-orange-page="sales_returns" onclick="srSubmit()">حفظ مردود المبيعات</button>
-    </div>
-    <p class="card-hint" style="margin-top:12px;margin-bottom:0;"><strong>صافي الإيراد (تقديري):</strong> <span id="sr_total_preview">0.00</span> <?php echo htmlspecialchars($srCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></p>
-</div>
 
-<div class="card">
-    <h2 class="card-title">آخر مردودات المبيعات</h2>
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>المرجع</th>
-                    <th>التاريخ</th>
-                    <th>العميل</th>
-                    <th>القناة</th>
-                    <th>الإجمالي</th>
-                    <th>طلب</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($recent as $r): ?>
-                <tr>
-                    <td><?php echo (int) $r['id']; ?></td>
-                    <td dir="ltr"><?php echo htmlspecialchars((string) ($r['return_number'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo htmlspecialchars(orange_format_datetime_dmY_hi((string) ($r['created_at'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo htmlspecialchars((string) ($r['customer_name'] ?? ($r['customer_id'] ? '#' . (int) $r['customer_id'] : '—')), ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo htmlspecialchars(sr_channel_label((string) ($r['type'] ?? 'cash')), ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo number_format((float) ($r['total'] ?? 0), $srCurrencyDecimals); ?> <?php echo htmlspecialchars($srCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td dir="ltr"><?php echo !empty($r['order_id']) ? (int) $r['order_id'] : '—'; ?></td>
-                    <td>
-                        <button type="button" class="btn-secondary" onclick="srEdit(<?php echo (int) $r['id']; ?>)">تعديل</button>
-                        <button type="button" class="btn-danger" onclick="srDelete(<?php echo (int) $r['id']; ?>)">حذف</button>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+    <div style="margin-top:14px;text-align:left;direction:ltr;font-size:0.95rem;line-height:1.8;">
+        <span style="color:#64748b;">صافي المردود:</span>
+        <strong id="sr2_net_total" class="admin-money-display" dir="ltr" lang="en" style="color:#dc2626;"><?php echo htmlspecialchars($orangeAdminMoneyZero ?? '0.000', ENT_QUOTES, 'UTF-8'); ?></strong>
+        <?php echo htmlspecialchars($srCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?>
+    </div>
+
+    <div class="actions admin-doc-lines-toolbar jv-doc-toolbar jv-print-hide" style="margin-top:16px;">
+        <span></span>
+        <div class="jv-toolbar-primary-group">
+            <div class="jv-voucher-nav-btns" role="group" aria-label="تنقل بين مردودات المبيعات">
+                <button type="button" class="btn-secondary jv-nav-btn" id="sr2_nav_first" title="أول مردود">&lt;&lt;</button>
+                <button type="button" class="btn-secondary jv-nav-btn" id="sr2_nav_prev" title="المردود السابق">&lt;</button>
+                <button type="button" class="btn-secondary jv-nav-btn" id="sr2_nav_next" title="المردود التالي">&gt;</button>
+                <button type="button" class="btn-secondary jv-nav-btn" id="sr2_nav_last" title="آخر مردود">&gt;&gt;</button>
+                <button type="button" class="btn-secondary jv-nav-search" id="sr2_btn_search" title="بحث عن مردود">بحث</button>
+            </div>
+            <button type="button" class="btn-secondary" id="sr2_btn_print" title="طباعة المردود المعروض" disabled>طباعة</button>
+            <button type="button" class="btn-secondary" id="sr2_btn_new" title="مردود جديد">مردود جديد</button>
+            <button type="button" id="sr2_btn_save" data-orange-perm="edit" data-orange-page="sales_returns"<?php echo !$sr2Ready ? ' disabled' : ''; ?>>حفظ</button>
+        </div>
     </div>
 </div>
 
+<div id="sr2_product_pick_modal" class="mo-pick-modal" hidden>
+    <div class="mo-pick-modal__backdrop" id="sr2_product_pick_backdrop"></div>
+    <div class="mo-pick-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="sr2_product_pick_title">
+        <h4 id="sr2_product_pick_title" class="mo-pick-modal__title">اختيار صنف</h4>
+        <input type="search" id="sr2_product_pick_filter" class="admin-inp mo-pick-modal__search" placeholder="ابحث بالكود أو الاسم…" autocomplete="off" lang="ar" dir="rtl">
+        <div class="mo-pick-modal__scroller table-wrap">
+            <table class="admin-table mo-pick-table">
+                <thead>
+                    <tr>
+                        <th>الكود</th>
+                        <th>الباركود</th>
+                        <th>الاسم</th>
+                        <th>اللون</th>
+                        <th>المقاس</th>
+                        <th class="mo-pick-num-h">إجمالي</th>
+                        <th class="mo-pick-num-h">محجوز</th>
+                        <th class="mo-pick-num-h">صافي</th>
+                        <th class="mo-pick-num-h">سعر</th>
+                    </tr>
+                </thead>
+                <tbody id="sr2_product_pick_body"></tbody>
+            </table>
+        </div>
+        <p class="card-hint mo-pick-modal__hint">انقر نقراً مزدوجاً على السطر للاختيار.</p>
+    </div>
+</div>
+
+<div class="gl-pick-modal" id="sr2_customer_pick_modal" hidden aria-hidden="true">
+    <div class="gl-pick-modal__backdrop" id="sr2_customer_pick_backdrop"></div>
+    <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="sr2_customer_pick_title">
+        <h3 id="sr2_customer_pick_title" class="gl-pick-modal__title">اختيار العميل</h3>
+        <input type="search" id="sr2_customer_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بالكود أو الاسم…" autocomplete="off" dir="rtl">
+        <ul class="gl-pick-modal__list" id="sr2_customer_pick_list"></ul>
+        <button type="button" class="btn-secondary" id="sr2_customer_pick_close">إغلاق</button>
+    </div>
+</div>
+
+<div id="sr2_search_modal" class="jv-search-modal jv-print-hide" style="display:none;" aria-hidden="true" role="dialog" aria-labelledby="sr2_search_modal_title">
+    <div class="jv-search-modal__backdrop" id="sr2_search_modal_backdrop"></div>
+    <div class="jv-search-modal__panel">
+        <div class="jv-search-modal__head">
+            <h3 id="sr2_search_modal_title" class="jv-search-modal__title">بحث في مردودات المبيعات</h3>
+        </div>
+        <div class="jv-search-modal__body">
+            <div class="jv-search-modal__form">
+                <div class="jv-search-modal__row jv-search-modal__row--fields">
+                    <div class="jv-search-field jv-search-field--id">
+                        <label for="sr2_search_id_from">رقم المردود — من</label>
+                        <input type="number" id="sr2_search_id_from" class="admin-inp" min="1" step="1" dir="ltr" lang="en">
+                    </div>
+                    <div class="jv-search-field jv-search-field--id">
+                        <label for="sr2_search_id_to">رقم المردود — إلى</label>
+                        <input type="number" id="sr2_search_id_to" class="admin-inp" min="1" step="1" dir="ltr" lang="en">
+                    </div>
+                    <div class="jv-search-field jv-search-field--date">
+                        <label for="sr2_search_date_from">التاريخ — من</label>
+                        <input type="text" id="sr2_search_date_from" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off">
+                    </div>
+                    <div class="jv-search-field jv-search-field--date">
+                        <label for="sr2_search_date_to">التاريخ — إلى</label>
+                        <input type="text" id="sr2_search_date_to" class="admin-inp orange-inp-dmy" dir="ltr" lang="en" autocomplete="off">
+                    </div>
+                    <div class="jv-search-field jv-search-field--ref">
+                        <label for="sr2_search_ref">المرجع SR-</label>
+                        <input type="text" id="sr2_search_ref" class="admin-inp" autocomplete="off" dir="ltr" lang="en">
+                    </div>
+                </div>
+                <div class="jv-search-modal__row">
+                    <div class="jv-search-field jv-search-field--full">
+                        <label for="sr2_search_order_ref">طلب / فاتورة INV-C-</label>
+                        <input type="text" id="sr2_search_order_ref" class="admin-inp" autocomplete="off" dir="ltr" lang="en">
+                    </div>
+                </div>
+                <div class="jv-search-modal__row">
+                    <div class="jv-search-field jv-search-field--full">
+                        <label for="sr2_search_customer">العميل (يحتوي النص)</label>
+                        <input type="text" id="sr2_search_customer" class="admin-inp" autocomplete="off" dir="auto">
+                    </div>
+                </div>
+                <div class="jv-search-modal__row">
+                    <div class="jv-search-field jv-search-field--full">
+                        <label for="sr2_search_notes">ملاحظات</label>
+                        <input type="text" id="sr2_search_notes" class="admin-inp" autocomplete="off" dir="auto">
+                    </div>
+                </div>
+            </div>
+            <div class="actions jv-search-modal__actions">
+                <button type="button" id="sr2_search_btn">تنفيذ البحث</button>
+            </div>
+            <div class="jv-search-modal__results">
+                <div class="table-wrap jv-search-table-wrap">
+                    <table class="admin-table jv-search-results-table">
+                        <thead>
+                            <tr>
+                                <th>رقم</th>
+                                <th>تاريخ</th>
+                                <th>مرجع</th>
+                                <th>عميل</th>
+                                <th>طلب</th>
+                                <th>صافي</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sr2_search_results"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_purchase_doc_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
-var SR_PRODUCTS = <?php echo json_encode($products, JSON_UNESCAPED_UNICODE); ?>;
-var SR_VARIANTS_BY_PID = <?php echo json_encode($variantsByProduct, JSON_UNESCAPED_UNICODE); ?>;
-var SR_EDIT_ID = 0;
-var SR_COUNTRY_ID = <?php echo (int) $srCountryId; ?>;
-var SR_CAPS = <?php echo json_encode($srCaps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
-var srEditLockCtl = null;
-var SR_HAS_CUSTOMERS = <?php echo $hasCustomers ? 'true' : 'false'; ?>;
+(function () {
+    var SR2_PICK_ROWS = <?php echo json_encode($sr2PickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
+    var SR2_CUSTOMER_PICK_ROWS = <?php echo json_encode($sr2CustomerPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
+    var SR2_PREFILL_CUSTOMER = <?php echo (int) $prefillCustomerId; ?>;
+    var SR2_PREFILL_ORDER = <?php echo (int) $prefillOrderId; ?>;
+    var SR2_READY = <?php echo $sr2Ready ? 'true' : 'false'; ?>;
+    var SR2_NAV_READY = <?php echo $sr2NavReady ? 'true' : 'false'; ?>;
+    var SR2_COUNTRY_ID = <?php echo (int) $srCountryId; ?>;
+    var SR2_CAPS = <?php echo json_encode($sr2Caps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
+    var SR2_DOC_SERIAL_PREVIEW = <?php echo json_encode($sr2DocSerialPreview, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
+    var sr2EditLockCtl = null;
+    var browseReturnId = 0;
+    var sr2ViewMode = false;
+    var currentCustomerId = 0;
+    var sr2ProductPick = null;
 
-function srEsc(s) {
-    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-}
-
-function srProductOptionsHtml() {
-    var o = '<option value="" data-price="0" data-cost="0">' + srEsc('— اختر صنفاً —') + '</option>';
-    return o + SR_PRODUCTS.map(function (p) {
-        return '<option value="' + p.id + '" data-price="' + String(parseFloat(p.price) || 0) + '" data-cost="' + String(parseFloat(p.cost) || 0) + '">' + srEsc(p.name) + '</option>';
-    }).join('');
-}
-
-function srRenumberRows() {
-    var tb = document.getElementById('sr_lines_body');
-    if (!tb) return;
-    var rows = tb.querySelectorAll('tr');
-    for (var i = 0; i < rows.length; i++) {
-        var c = rows[i].querySelector('.pur-col-idx');
-        if (c) c.textContent = String(i + 1);
+    function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+    function fmt3(n) {
+        var f = window.orangeFmtMoney || (window.OrangeMoney && window.OrangeMoney.formatAmount);
+        if (f) return f(n);
+        var d = (window.ORANGE_ADMIN_MONEY && window.ORANGE_ADMIN_MONEY.decimals) || 3;
+        return (parseFloat(n) || 0).toFixed(d);
     }
-}
-
-function srOnChannelChange() {
-    var ch = document.getElementById('sr_channel');
-    var lab = document.getElementById('sr_customer_label');
-    if (!ch || !lab) return;
-    if (ch.value === 'credit') {
-        lab.textContent = 'العميل (مطلوب للآجل)';
-    } else {
-        lab.textContent = 'العميل (اختياري)';
+    function fmtZero() {
+        if (window.orangeMoneyZero) return window.orangeMoneyZero();
+        return fmt3(0);
     }
-}
 
-function srLineChanged(sel) {
-    var tr = sel.closest('tr');
-    if (!tr) return;
-    var pid = parseInt(sel.value, 10) || 0;
-    var vcell = tr.querySelector('.sr-v');
-    if (!vcell) return;
-    vcell.innerHTML = '';
-    var vs = document.createElement('select');
-    vs.className = 'sr-v-sel';
-    if (!pid || !SR_VARIANTS_BY_PID[pid] || !SR_VARIANTS_BY_PID[pid].length) {
-        vs.innerHTML = '<option value="0">' + srEsc('—') + '</option>';
-        vcell.appendChild(vs);
-        return;
-    }
-    vs.innerHTML = SR_VARIANTS_BY_PID[pid].map(function (v) {
-        return '<option value="' + v.id + '">' + srEsc(v.label) + '</option>';
-    }).join('');
-    vcell.appendChild(vs);
-    var priceIn = tr.querySelector('.sr-price');
-    var costIn = tr.querySelector('.sr-cost');
-    var opt = sel.options[sel.selectedIndex];
-    if (opt) {
-        if (priceIn && opt.getAttribute('data-price') != null) {
-            priceIn.value = String(opt.getAttribute('data-price'));
+    function customerById(id) {
+        id = parseInt(String(id || '0'), 10) || 0;
+        for (var i = 0; i < SR2_CUSTOMER_PICK_ROWS.length; i++) {
+            if ((parseInt(String(SR2_CUSTOMER_PICK_ROWS[i].id || '0'), 10) || 0) === id) return SR2_CUSTOMER_PICK_ROWS[i];
         }
-        if (costIn && opt.getAttribute('data-cost') != null) {
-            costIn.value = String(opt.getAttribute('data-cost'));
+        return null;
+    }
+
+    function selectCustomer(id) {
+        var row = customerById(id);
+        var codeEl = document.getElementById('sr2_customer_code');
+        var nameEl = document.getElementById('sr2_customer_name');
+        var balEl = document.getElementById('sr2_customer_balance');
+        var idEl = document.getElementById('sr2_customer_id');
+        if (!row) {
+            currentCustomerId = 0;
+            if (codeEl) codeEl.value = '';
+            if (nameEl) nameEl.value = '';
+            if (balEl) balEl.value = '';
+            if (idEl) idEl.value = '0';
+        } else {
+            currentCustomerId = parseInt(String(row.id), 10) || 0;
+            if (codeEl) codeEl.value = row.code || '';
+            if (nameEl) nameEl.value = row.name || '';
+            if (balEl) balEl.value = fmt3(row.balance || 0);
+            if (idEl) idEl.value = String(currentCustomerId);
+        }
+        sr2OnChannelChange();
+    }
+
+    function customerPickerOpen() {
+        var modal = document.getElementById('sr2_customer_pick_modal');
+        var qEl = document.getElementById('sr2_customer_pick_q');
+        if (!modal || !qEl) return;
+        modal.hidden = false;
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('gl-pick-open');
+        qEl.value = '';
+        customerPickerRender('');
+        qEl.focus();
+    }
+    function customerPickerClose() {
+        var modal = document.getElementById('sr2_customer_pick_modal');
+        if (!modal) return;
+        modal.hidden = true;
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('gl-pick-open');
+    }
+    function customerPickerRender(q) {
+        var listEl = document.getElementById('sr2_customer_pick_list');
+        if (!listEl) return;
+        var query = String(q || '').trim().toLowerCase();
+        var rows = SR2_CUSTOMER_PICK_ROWS.filter(function (r) {
+            if (!query) return true;
+            var hay = (r.code + ' ' + r.name + ' ' + r.phone).toLowerCase();
+            return hay.indexOf(query) !== -1;
+        });
+        listEl.innerHTML = '';
+        if (!rows.length) { listEl.innerHTML = '<li class="gl-pick-empty">لا نتائج</li>'; return; }
+        rows.forEach(function (r) {
+            var li = document.createElement('li');
+            li.className = 'gl-pick-item';
+            li.setAttribute('role', 'button');
+            li.tabIndex = 0;
+            li.textContent = (r.code ? r.code + ' — ' : '') + r.name + (r.phone ? ' (' + r.phone + ')' : '') + ' [رصيد ' + fmt3(r.balance) + ']';
+            li.addEventListener('dblclick', function () { selectCustomer(r.id); customerPickerClose(); });
+            li.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { selectCustomer(r.id); customerPickerClose(); } });
+            listEl.appendChild(li);
+        });
+    }
+
+    function sr2OnChannelChange() {
+        var ch = document.getElementById('sr2_channel');
+        var lab = document.getElementById('sr2_customer_name_label');
+        if (!ch || !lab) return;
+        lab.textContent = ch.value === 'credit' ? 'اسم العميل (مطلوب للآجل)' : 'اسم العميل';
+    }
+
+    function lineRowHtml() {
+        return '<td class="pur-col-idx"></td>' +
+            '<td><input type="text" class="sr2-code admin-inp" placeholder="كود أو باركود" dir="ltr" lang="en" autocomplete="off" style="width:100%;">' +
+            '<input type="hidden" class="sr2-product-id" value="">' +
+            '<input type="hidden" class="sr2-variant-id" value="0">' +
+            '<input type="hidden" class="sr2-cost" value=""></td>' +
+            '<td><input type="text" class="sr2-name admin-inp-readonly" readonly disabled tabindex="-1" placeholder="—"></td>' +
+            '<td><input type="text" class="sr2-var-label admin-inp-readonly" readonly disabled tabindex="-1" placeholder="—"></td>' +
+            '<td><input type="number" class="sr2-qty admin-inp-qty" min="1" step="1" value="1" inputmode="numeric" lang="en" dir="ltr"></td>' +
+            '<td><input type="number" class="sr2-price admin-inp-money" min="0" step="any" value="' + fmtZero() + '" inputmode="decimal" lang="en" dir="ltr"></td>' +
+            '<td><input type="number" class="sr2-line-disc admin-inp-money" min="0" step="any" value="' + fmtZero() + '" inputmode="decimal" lang="en" dir="ltr"></td>' +
+            '<td><input type="text" class="sr2-line-total admin-inp-money" value="' + fmtZero() + '" readonly data-money-allow-zero tabindex="0" dir="ltr" lang="en"></td>' +
+            '<td><button type="button" class="btn-secondary admin-doc-line-remove" title="حذف">&times;</button></td>';
+    }
+
+    function addLine() {
+        var tb = document.getElementById('sr2_lines_body');
+        if (!tb) return;
+        var tr = document.createElement('tr');
+        tr.className = 'sr2-line';
+        tr.innerHTML = lineRowHtml();
+        tb.appendChild(tr);
+        renumberRows();
+        recalcAll();
+    }
+
+    function clearLineRow(tr) {
+        if (sr2ProductPick) sr2ProductPick.clearLine(tr);
+        var qEl = tr.querySelector('.sr2-qty');
+        if (qEl) {
+            qEl.value = '1';
+            qEl.removeAttribute('data-max-qty');
+            qEl.removeAttribute('title');
+        }
+        var discEl = tr.querySelector('.sr2-line-disc');
+        if (discEl) discEl.value = fmtZero();
+        var costEl = tr.querySelector('.sr2-cost');
+        if (costEl) costEl.value = '';
+    }
+
+    function removeLine(btn) {
+        var tb = document.getElementById('sr2_lines_body');
+        if (!tb) return;
+        if (tb.querySelectorAll('tr').length <= 1) {
+            clearLineRow(btn.closest('tr'));
+            syncTrailing();
+            recalcAll();
+            return;
+        }
+        btn.closest('tr').remove();
+        renumberRows();
+        syncTrailing();
+        recalcAll();
+    }
+
+    function renumberRows() {
+        var tb = document.getElementById('sr2_lines_body');
+        if (!tb) return;
+        var rows = tb.querySelectorAll('tr');
+        for (var i = 0; i < rows.length; i++) {
+            var c = rows[i].querySelector('.pur-col-idx');
+            if (c) c.textContent = String(i + 1);
         }
     }
-}
 
-function srAddLine() {
-    var tb = document.getElementById('sr_lines_body');
-    if (!tb) return;
-    var tr = document.createElement('tr');
-    tr.className = 'sr-line';
-    tr.innerHTML =
-        '<td class="pur-col-idx"></td>' +
-        '<td><select class="sr-p" style="min-width:12rem;">' + srProductOptionsHtml() + '</select></td>' +
-        '<td class="sr-v"></td>' +
-        '<td><input type="number" class="sr-q admin-inp-qty" min="1" step="1" value="1" inputmode="numeric" lang="en" dir="ltr"></td>' +
-        '<td><input type="number" class="sr-price admin-inp-money" min="0" step="any" value="0" inputmode="decimal" lang="en" dir="ltr"></td>' +
-        '<td><input type="number" class="sr-cost admin-inp-money" min="0" step="any" value="" placeholder="تلقائي" inputmode="decimal" lang="en" dir="ltr"></td>' +
-        '<td><button type="button" class="btn-secondary" onclick="srRemoveRow(this)">حذف</button></td>';
-    tb.appendChild(tr);
-    srRenumberRows();
-    var sel = tr.querySelector('.sr-p');
-    if (sel) {
-        sel.addEventListener('change', function () { srLineChanged(sel); });
-        srLineChanged(sel);
+    function rowIsBlank(tr) {
+        var pid = parseInt(tr.querySelector('.sr2-product-id').value, 10) || 0;
+        if (pid > 0) return false;
+        return (tr.querySelector('.sr2-code').value || '').trim() === '';
     }
-    tr.querySelector('.sr-q').addEventListener('input', srRecalcPreview);
-    tr.querySelector('.sr-price').addEventListener('input', srRecalcPreview);
-    srRecalcPreview();
-}
 
-function srRemoveRow(btn) {
-    var tb = document.getElementById('sr_lines_body');
-    if (!tb) return;
-    if (tb.querySelectorAll('tr').length <= 1) {
-        var tr = btn.closest('tr');
-        tr.querySelector('.sr-p').value = '';
-        srLineChanged(tr.querySelector('.sr-p'));
-        tr.querySelector('.sr-q').value = '1';
-        tr.querySelector('.sr-price').value = '0';
-        tr.querySelector('.sr-cost').value = '';
-        srRecalcPreview();
-        return;
+    function rowIsComplete(tr) {
+        var pid = parseInt(tr.querySelector('.sr2-product-id').value, 10) || 0;
+        if (pid <= 0) return false;
+        var q = parseInt(tr.querySelector('.sr2-qty').value, 10) || 0;
+        if (q < 1) return false;
+        var priceEl = tr.querySelector('.sr2-price');
+        return !!(priceEl && String(priceEl.value || '').trim() !== '');
     }
-    btn.closest('tr').remove();
-    srRenumberRows();
-    srRecalcPreview();
-}
 
-function srRecalcPreview() {
-    var tb = document.getElementById('sr_lines_body');
-    var el = document.getElementById('sr_total_preview');
-    if (!tb || !el) return;
-    var sum = 0;
-    tb.querySelectorAll('tr.sr-line').forEach(function (r) {
-        var pid = parseInt(r.querySelector('.sr-p').value, 10) || 0;
-        var q = parseInt(r.querySelector('.sr-q').value, 10) || 0;
-        var price = parseFloat(r.querySelector('.sr-price').value) || 0;
-        if (pid && q >= 1) sum += q * price;
-    });
-    el.textContent = sum.toFixed(2);
-}
+    function sr2ClampQtyInput(inp) {
+        if (!inp) return;
+        var maxQ = parseInt(inp.getAttribute('data-max-qty') || '0', 10) || 0;
+        if (maxQ <= 0) return;
+        var q = parseInt(inp.value, 10) || 0;
+        if (q > maxQ) inp.value = String(maxQ);
+        else if (q < 1 && inp.value !== '') inp.value = '1';
+    }
 
-function srBindLinesBody() {
-    var tb = document.getElementById('sr_lines_body');
-    if (!tb) return;
-    tb.addEventListener('change', function (e) {
-        if (e.target && e.target.classList.contains('sr-p')) srLineChanged(e.target);
-    });
-}
+    function trimExtraTrailing() {
+        var tb = document.getElementById('sr2_lines_body');
+        if (!tb) return;
+        for (;;) {
+            var rows = tb.querySelectorAll('tr');
+            if (rows.length < 2) return;
+            var a = rows[rows.length - 2];
+            var b = rows[rows.length - 1];
+            if (rowIsBlank(a) && rowIsBlank(b)) {
+                a.remove();
+                renumberRows();
+            } else return;
+        }
+    }
 
-function srCancelEdit() {
-    SR_EDIT_ID = 0;
-    document.getElementById('sr_edit_banner').hidden = true;
-    document.getElementById('sr_customer').value = '0';
-    document.getElementById('sr_channel').value = 'cash';
-    srOnChannelChange();
-    document.getElementById('sr_order_id').value = '';
-    document.getElementById('sr_notes').value = '';
-    var tb = document.getElementById('sr_lines_body');
-    if (tb) tb.innerHTML = '';
-    srAddLine();
-    if (srEditLockCtl) srEditLockCtl.refresh();
-}
+    function syncTrailing() {
+        trimExtraTrailing();
+        var tb = document.getElementById('sr2_lines_body');
+        if (!tb) return;
+        var rows = tb.querySelectorAll('tr');
+        if (rows.length === 0) { addLine(); return; }
+        if (rowIsComplete(rows[rows.length - 1])) addLine();
+    }
 
-function srEdit(id) {
-    getJSON('/admin/api/sales_returns/get.php?sales_return_id=' + encodeURIComponent(String(id))).then(function (res) {
-        if (!res.success || !res.sales_return) {
-            alert(res.message || 'فشل التحميل');
+    function sr2FillLineRow(tr, item) {
+        var pickRow = sr2ProductPick ? sr2ProductPick.findPickRowByIds(item.product_id, item.variant_id || 0) : null;
+        if (pickRow && sr2ProductPick) {
+            sr2ProductPick.applyPick(tr, pickRow);
+            var priceEl = tr.querySelector('.sr2-price');
+            if (priceEl) priceEl.value = fmt3(item.price != null ? item.price : pickRow.price);
+            var costEl = tr.querySelector('.sr2-cost');
+            if (costEl) costEl.value = String(item.cost != null ? item.cost : (pickRow.cost || 0));
+        } else if (sr2ProductPick) {
+            sr2ProductPick.clearLine(tr);
+            var pidEl = tr.querySelector('.sr2-product-id');
+            var vidEl = tr.querySelector('.sr2-variant-id');
+            if (pidEl) pidEl.value = String(item.product_id || '');
+            if (vidEl) vidEl.value = String(item.variant_id || '0');
+            var priceEl2 = tr.querySelector('.sr2-price');
+            if (priceEl2) priceEl2.value = fmt3(item.price || 0);
+        }
+        var qEl = tr.querySelector('.sr2-qty');
+        if (qEl) {
+            qEl.value = String(item.qty || 1);
+            var avail = item.qty_available != null ? parseInt(String(item.qty_available), 10) : 0;
+            if (avail > 0) {
+                qEl.setAttribute('data-max-qty', String(avail));
+                qEl.setAttribute('title', 'الحد الأقصى: ' + String(avail));
+            } else {
+                qEl.removeAttribute('data-max-qty');
+                qEl.removeAttribute('title');
+            }
+        }
+        var dEl = tr.querySelector('.sr2-line-disc');
+        if (dEl) dEl.value = fmt3(item.line_discount || 0);
+    }
+
+    function recalcAll() {
+        var tb = document.getElementById('sr2_lines_body');
+        if (!tb) return;
+        var netTotal = 0;
+        var rows = tb.querySelectorAll('tr.sr2-line');
+        for (var i = 0; i < rows.length; i++) {
+            var r = rows[i];
+            var q = parseInt(r.querySelector('.sr2-qty').value, 10) || 0;
+            var price = parseFloat(r.querySelector('.sr2-price').value) || 0;
+            var disc = parseFloat(r.querySelector('.sr2-line-disc').value) || 0;
+            var lineGross = q * price;
+            var lineNet = Math.max(0, lineGross - disc);
+            var ltEl = r.querySelector('.sr2-line-total');
+            if (ltEl) ltEl.value = fmt3(lineNet);
+            netTotal += lineNet;
+        }
+        var ntEl = document.getElementById('sr2_net_total');
+        if (ntEl) ntEl.textContent = fmt3(netTotal);
+    }
+
+    function parseOrderRef(raw) {
+        raw = String(raw || '').trim();
+        if (!raw) return 0;
+        var m = /^INV-C-(\d+)$/i.exec(raw);
+        if (m) return parseInt(m[1], 10) || 0;
+        m = /^INV-O-(\d+)$/i.exec(raw);
+        if (m) return parseInt(m[1], 10) || 0;
+        if (/^\d+$/.test(raw)) return parseInt(raw, 10) || 0;
+        return 0;
+    }
+
+    function sr2SetDocSerial(value) {
+        var el = document.getElementById('sr2_doc_serial');
+        if (el) el.value = String(value || '');
+    }
+
+    function sr2SyncToolbar() {
+        var pb = document.getElementById('sr2_btn_print');
+        if (pb) {
+            pb.disabled = browseReturnId <= 0;
+            pb.title = browseReturnId > 0 ? 'طباعة المردود المعروض' : 'افتح مردوداً محفوظاً للطباعة';
+        }
+        var sb = document.getElementById('sr2_btn_save');
+        if (sb) {
+            sb.disabled = !SR2_READY || sr2ViewMode || !SR2_CAPS.can_edit;
+            sb.title = sr2ViewMode ? 'وضع العرض — استخدم «مردود جديد»' : 'حفظ مردود جديد';
+        }
+        var lbl = document.getElementById('sr2_browse_label');
+        if (lbl) {
+            lbl.textContent = browseReturnId > 0
+                ? ('— عرض ' + (document.getElementById('sr2_doc_serial') && document.getElementById('sr2_doc_serial').value || ('SR-' + browseReturnId)))
+                : '';
+        }
+        if (browseReturnId <= 0) sr2SetDocSerial(SR2_DOC_SERIAL_PREVIEW || '');
+        if (sr2EditLockCtl) sr2EditLockCtl.refresh();
+    }
+
+    function sr2SetViewMode(on) {
+        sr2ViewMode = !!on;
+        var card = document.querySelector('.jv-print-area');
+        if (card) {
+            card.querySelectorAll('input, select, button.admin-doc-line-remove').forEach(function (el) {
+                if (el.id === 'sr2_btn_new' || el.id === 'sr2_btn_print' || el.closest('.jv-voucher-nav-btns')
+                    || el.id === 'sr2_btn_search' || el.id === 'sr2_btn_retrieve' || el.id === 'sr2_btn_save'
+                    || el.id === 'sr2_customer_code') {
+                    return;
+                }
+                el.disabled = sr2ViewMode || (!SR2_READY && el.id !== 'sr2_customer_code');
+            });
+        }
+        sr2SyncToolbar();
+    }
+
+    function sr2ApplyOrderRetrievePayload(res) {
+        if (!res || !res.success || !res.order) {
+            alert((res && res.message) || 'تعذر استرجاع بنود الطلب');
+            return;
+        }
+        var o = res.order;
+        var refEl = document.getElementById('sr2_order_ref');
+        if (refEl) refEl.value = o.reference || ('INV-C-' + (o.id || ''));
+        if (parseInt(String(o.customer_id || '0'), 10) > 0) {
+            selectCustomer(parseInt(String(o.customer_id), 10));
+        }
+        var chEl = document.getElementById('sr2_channel');
+        if (chEl) chEl.value = o.channel || 'cash';
+        sr2OnChannelChange();
+        var tb = document.getElementById('sr2_lines_body');
+        if (tb) {
+            tb.innerHTML = '';
+            var items = res.items || [];
+            if (!items.length) {
+                alert('لا توجد كميات متبقية للإرجاع');
+                addLine();
+            } else {
+                items.forEach(function (item) {
+                    addLine();
+                    var rows = tb.querySelectorAll('tr.sr2-line');
+                    sr2FillLineRow(rows[rows.length - 1], item);
+                });
+            }
+            syncTrailing();
+        }
+        recalcAll();
+    }
+
+    function sr2RetrieveFromOrder() {
+        if (!SR2_READY || sr2ViewMode) return;
+        var orderId = parseOrderRef(document.getElementById('sr2_order_ref').value || '');
+        if (orderId <= 0) {
+            alert('أدخل رقم طلب أو فاتورة صالحاً (INV-C- أو رقم).');
+            return;
+        }
+        var btn = document.getElementById('sr2_btn_retrieve');
+        if (btn) btn.disabled = true;
+        fetch('/admin/api/sales_returns/retrieve_from_order.php?order_id=' + encodeURIComponent(String(orderId)), {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' }
+        }).then(function (r) { return r.json(); }).then(function (res) {
+            if (typeof orangeAdminOfferSuggestOnFailure === 'function' && !res.success && orangeAdminOfferSuggestOnFailure(res, 'تعذر الاسترجاع')) {
+                return;
+            }
+            sr2ApplyOrderRetrievePayload(res);
+        }).catch(function (e) { alert(e.message || String(e)); }).finally(function () {
+            if (btn && !sr2ViewMode && SR2_READY) btn.disabled = false;
+        });
+    }
+
+    function sr2ApplyReturnPayload(res) {
+        if (!res || !res.success || !res.sales_return) {
+            alert((res && res.message) || 'تعذر تحميل المردود');
             return;
         }
         var p = res.sales_return;
-        SR_EDIT_ID = id;
-        document.getElementById('sr_edit_banner').hidden = false;
-        document.getElementById('sr_customer').value = String(p.customer_id || 0);
-        var ch = String(p.type || 'cash');
-        if (ch !== 'cash' && ch !== 'online' && ch !== 'credit') ch = 'cash';
-        document.getElementById('sr_channel').value = ch;
-        srOnChannelChange();
-        document.getElementById('sr_order_id').value = p.order_id ? String(p.order_id) : '';
-        document.getElementById('sr_notes').value = p.notes || '';
-        var tb = document.getElementById('sr_lines_body');
-        tb.innerHTML = '';
-        var items = res.items || [];
-        for (var i = 0; i < items.length; i++) {
-            srAddLine();
-            var rows = tb.querySelectorAll('tr.sr-line');
-            var tr = rows[rows.length - 1];
-            tr.querySelector('.sr-p').value = String(items[i].product_id);
-            srLineChanged(tr.querySelector('.sr-p'));
-            var vsel = tr.querySelector('.sr-v-sel');
-            if (vsel) vsel.value = String(items[i].variant_id || 0);
-            tr.querySelector('.sr-q').value = String(items[i].qty);
-            tr.querySelector('.sr-price').value = String(items[i].price);
-            tr.querySelector('.sr-cost').value = '';
+        browseReturnId = parseInt(String(p.id || '0'), 10) || 0;
+        sr2SetDocSerial(p.return_number || ('SR-' + browseReturnId));
+        selectCustomer(parseInt(String(p.customer_id || '0'), 10) || 0);
+        var chEl = document.getElementById('sr2_channel');
+        if (chEl) {
+            var ch = String(p.type || p.channel || 'cash');
+            if (ch !== 'cash' && ch !== 'online' && ch !== 'credit') ch = 'cash';
+            chEl.value = ch;
         }
-        srRecalcPreview();
-        document.getElementById('sr_edit_banner_id').textContent = '#' + id;
-        if (srEditLockCtl) srEditLockCtl.refresh();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-}
-
-function srSubmit() {
-    if (!SR_CAPS.can_edit) {
-        alert('لا تملك صلاحية تعديل مردود المبيعات');
-        return;
-    }
-    var customer = parseInt(document.getElementById('sr_customer').value, 10) || 0;
-    var channel = document.getElementById('sr_channel').value;
-    if (!SR_HAS_CUSTOMERS && channel === 'credit') {
-        alert('مردود الآجل يتطلّب جدول العملاء');
-        return;
-    }
-    var orderRef = parseInt(document.getElementById('sr_order_id').value, 10) || 0;
-    var notes = document.getElementById('sr_notes').value.trim();
-    if (channel === 'credit' && customer <= 0) {
-        alert('مردود الآجل يتطلّب اختيار عميل');
-        return;
-    }
-    var tb = document.getElementById('sr_lines_body');
-    if (!tb) {
-        alert('لا توجد أصناف');
-        return;
-    }
-    var rows = tb.querySelectorAll('tr.sr-line');
-    var items = [];
-    for (var i = 0; i < rows.length; i++) {
-        var r = rows[i];
-        var pid = parseInt(r.querySelector('.sr-p').value, 10) || 0;
-        var vsel = r.querySelector('.sr-v-sel');
-        var vid = vsel ? (parseInt(vsel.value, 10) || 0) : 0;
-        var q = parseInt(r.querySelector('.sr-q').value, 10) || 0;
-        var price = parseFloat(r.querySelector('.sr-price').value) || 0;
-        var costRaw = r.querySelector('.sr-cost').value.trim();
-        var costNum = costRaw === '' ? NaN : parseFloat(costRaw);
-        if (!pid || q < 1) continue;
-        var row = { product_id: pid, variant_id: vid, qty: q, price: price, line_discount: 0 };
-        if (!isNaN(costNum) && costNum > 0.0001) row.cost = costNum;
-        items.push(row);
-    }
-    if (!items.length) {
-        alert('أضف سطراً صالحاً');
-        return;
-    }
-    var url = '/admin/api/sales_returns/create.php';
-    var payload = {
-        customer_id: customer,
-        channel: channel,
-        notes: notes,
-        items: items
-    };
-    if (orderRef > 0) payload.order_id = orderRef;
-    if (SR_EDIT_ID) {
-        url = '/admin/api/sales_returns/update.php';
-        payload.id = SR_EDIT_ID;
-        payload.action = 'update';
-    }
-    postJSON(url, payload).then(function (res) {
-        if (res.success) {
-            if (typeof orangeAdminOfferOpenGlVoucherAfterSave === 'function') {
-                orangeAdminOfferOpenGlVoucherAfterSave(res, function () {
-                    location.reload();
+        sr2OnChannelChange();
+        var notesEl = document.getElementById('sr2_notes');
+        if (notesEl) notesEl.value = p.notes || '';
+        var refEl = document.getElementById('sr2_order_ref');
+        if (refEl) {
+            var oid = parseInt(String(p.order_id || '0'), 10) || 0;
+            refEl.value = oid > 0 ? ('INV-C-' + oid) : '';
+        }
+        var tb = document.getElementById('sr2_lines_body');
+        if (tb) {
+            tb.innerHTML = '';
+            var items = res.items || [];
+            if (!items.length) addLine();
+            else {
+                items.forEach(function (item) {
+                    addLine();
+                    var rows = tb.querySelectorAll('tr.sr2-line');
+                    sr2FillLineRow(rows[rows.length - 1], item);
                 });
-            } else {
-                alert(res.message || 'تم');
-                location.reload();
             }
-            return;
+            syncTrailing();
         }
-        if (!orangeAdminOfferSuggestOnFailure(res, 'فشل')) {
-            alert(res.message || 'فشل');
-        }
-    });
-}
+        recalcAll();
+        sr2SetViewMode(true);
+        if (sr2EditLockCtl) sr2EditLockCtl.refresh();
+    }
 
-function srDelete(id) {
-    if (!confirm('حذف مردود المبيعات؟ سيعكس المخزون ويُزال القيد SR-' + id + '-RS / RC.')) return;
-    postJSON('/admin/api/sales_returns/update.php', { id: id, action: 'delete' }).then(function (res) {
-        if (res.success) {
-            alert(res.message || 'تم الحذف');
-            location.reload();
-            return;
-        }
-        if (!orangeAdminOfferSuggestOnFailure(res, 'فشل')) {
-            alert(res.message || 'فشل');
-        }
-    });
-}
+    function sr2LoadReturn(id) {
+        id = parseInt(String(id || '0'), 10) || 0;
+        if (id <= 0) return;
+        fetch('/admin/api/sales_returns/get.php?sales_return_id=' + encodeURIComponent(String(id)), {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' }
+        }).then(function (r) { return r.json(); }).then(function (res) {
+            sr2ApplyReturnPayload(res);
+        }).catch(function (e) { alert(e.message || String(e)); });
+    }
 
-if (document.getElementById('sr_lines_body')) {
-    srOnChannelChange();
-    srAddLine();
-    srBindLinesBody();
-    if (window.OrangeEditLock) {
-        srEditLockCtl = OrangeEditLock.bind({
-            prefix: 'sr',
-            docKind: 'sales_return',
-            page: 'sales_returns',
-            canLock: !!SR_CAPS.can_lock,
-            canUnlock: !!SR_CAPS.can_unlock,
-            countryId: SR_COUNTRY_ID,
-            getEntityId: function () { return SR_EDIT_ID; }
+    function sr2Nav(where) {
+        if (!SR2_NAV_READY) return;
+        postJSON('/admin/api/sales_returns/browse.php', {
+            action: 'nav',
+            where: where,
+            current_id: browseReturnId || 0
+        }).then(function (r) {
+            if (!r.success || !r.id) {
+                alert(r.message || 'لا يوجد مردود');
+                return;
+            }
+            sr2LoadReturn(r.id);
+        }).catch(function (e) { alert(e.message || String(e)); });
+    }
+
+    function sr2SearchOpen() {
+        var m = document.getElementById('sr2_search_modal');
+        if (m) { m.style.display = 'flex'; m.setAttribute('aria-hidden', 'false'); }
+    }
+    function sr2SearchClose() {
+        var m = document.getElementById('sr2_search_modal');
+        if (m) { m.style.display = 'none'; m.setAttribute('aria-hidden', 'true'); }
+    }
+    function sr2SearchRun() {
+        var idFrom = parseInt(document.getElementById('sr2_search_id_from').value, 10) || 0;
+        var idTo = parseInt(document.getElementById('sr2_search_id_to').value, 10) || 0;
+        var dateFrom = (typeof orangeGetDmyValueAsIso === 'function') ? orangeGetDmyValueAsIso(document.getElementById('sr2_search_date_from')) || '' : '';
+        var dateTo = (typeof orangeGetDmyValueAsIso === 'function') ? orangeGetDmyValueAsIso(document.getElementById('sr2_search_date_to')) || '' : '';
+        var ref = (document.getElementById('sr2_search_ref').value || '').trim();
+        var orderRef = (document.getElementById('sr2_search_order_ref').value || '').trim();
+        var customerQ = (document.getElementById('sr2_search_customer').value || '').trim();
+        var notes = (document.getElementById('sr2_search_notes').value || '').trim();
+        var tbody = document.getElementById('sr2_search_results');
+        tbody.innerHTML = '<tr><td colspan="6">جاري البحث…</td></tr>';
+        var payload = { action: 'search' };
+        if (idFrom > 0) payload.id_from = idFrom;
+        if (idTo > 0) payload.id_to = idTo;
+        if (dateFrom) payload.date_from = dateFrom;
+        if (dateTo) payload.date_to = dateTo;
+        if (ref) payload.reference = ref;
+        if (orderRef) payload.order_ref = orderRef;
+        if (customerQ) payload.customer = customerQ;
+        if (notes) payload.notes = notes;
+        postJSON('/admin/api/sales_returns/browse.php', payload).then(function (r) {
+            tbody.innerHTML = '';
+            if (!r.success || !r.results || !r.results.length) {
+                tbody.innerHTML = '<tr><td colspan="6" class="muted">لا نتائج</td></tr>';
+                return;
+            }
+            r.results.forEach(function (v) {
+                var tr = document.createElement('tr');
+                tr.innerHTML = '<td>' + esc(String(v.id)) + '</td>'
+                    + '<td>' + esc(v.created_at_dmy || '') + '</td>'
+                    + '<td dir="ltr">' + esc(v.reference || '') + '</td>'
+                    + '<td>' + esc(v.customer_name || '') + '</td>'
+                    + '<td dir="ltr">' + esc(v.order_reference || '') + '</td>'
+                    + '<td dir="ltr">' + fmt3(v.total || 0) + '</td>';
+                tr.addEventListener('dblclick', function () { sr2LoadReturn(v.id); sr2SearchClose(); });
+                tbody.appendChild(tr);
+            });
+        }).catch(function (e) {
+            tbody.innerHTML = '<tr><td colspan="6">' + esc(e.message || String(e)) + '</td></tr>';
         });
     }
-}
+
+    function sr2ResetNew() {
+        browseReturnId = 0;
+        location.reload();
+    }
+
+    function save() {
+        if (!SR2_CAPS.can_edit) {
+            alert('لا تملك صلاحية تعديل مردود المبيعات');
+            return;
+        }
+        if (!SR2_READY || sr2ViewMode) return;
+        var channel = document.getElementById('sr2_channel').value;
+        var customerId = parseInt(document.getElementById('sr2_customer_id').value, 10) || 0;
+        var orderId = parseOrderRef(document.getElementById('sr2_order_ref').value || '');
+        var notes = (document.getElementById('sr2_notes').value || '').trim();
+        if (channel === 'credit' && customerId <= 0) {
+            alert('مردود الآجل يتطلّب عميلاً.');
+            return;
+        }
+        var tb = document.getElementById('sr2_lines_body');
+        if (!tb) { alert('لا توجد أصناف'); return; }
+        var rows = tb.querySelectorAll('tr.sr2-line');
+        var items = [];
+        for (var i = 0; i < rows.length; i++) {
+            var r = rows[i];
+            var pid = parseInt(r.querySelector('.sr2-product-id').value, 10) || 0;
+            var vid = parseInt(r.querySelector('.sr2-variant-id').value, 10) || 0;
+            var q = parseInt(r.querySelector('.sr2-qty').value, 10) || 0;
+            var price = parseFloat(r.querySelector('.sr2-price').value) || 0;
+            var disc = parseFloat(r.querySelector('.sr2-line-disc').value) || 0;
+            var maxQ = parseInt(r.querySelector('.sr2-qty').getAttribute('data-max-qty') || '0', 10) || 0;
+            if (maxQ > 0 && q > maxQ) {
+                alert('الكمية في السطر ' + (i + 1) + ' تتجاوز المتاح (' + maxQ + ').');
+                return;
+            }
+            if (!pid || q < 1) continue;
+            var lineGross = q * price;
+            if (disc > lineGross + 0.0001) {
+                alert('خصم السطر ' + (i + 1) + ' يتجاوز إجمالي السطر.');
+                return;
+            }
+            var row = { product_id: pid, variant_id: vid, qty: q, price: price, line_discount: disc };
+            var costRaw = (r.querySelector('.sr2-cost') && r.querySelector('.sr2-cost').value) || '';
+            var costNum = parseFloat(costRaw);
+            if (!isNaN(costNum) && costNum > 0.0001) row.cost = costNum;
+            items.push(row);
+        }
+        if (!items.length) {
+            alert('أضف سطرًا واحدًا على الأقل بصنف وكمية صحيحة');
+            return;
+        }
+        var payload = {
+            customer_id: customerId,
+            channel: channel,
+            notes: notes,
+            items: items
+        };
+        if (orderId > 0) payload.order_id = orderId;
+        postJSON('/admin/api/sales_returns/create.php', payload).then(function (res) {
+            if (res.success) {
+                if (typeof orangeAdminOfferOpenGlVoucherAfterSave === 'function') {
+                    orangeAdminOfferOpenGlVoucherAfterSave(res, function () { location.reload(); });
+                } else {
+                    alert(res.message || 'تم حفظ مردود المبيعات');
+                    location.reload();
+                }
+                return;
+            }
+            if (typeof orangeAdminOfferSuggestOnFailure === 'function' && orangeAdminOfferSuggestOnFailure(res, 'فشل')) return;
+            alert(res.message || 'فشل');
+        }).catch(function (e) { alert(e.message || String(e)); });
+    }
+
+    function init() {
+        if (window.OrangePurchaseDocProductPick) {
+            sr2ProductPick = window.OrangePurchaseDocProductPick.create({
+                pickRows: SR2_PICK_ROWS,
+                codeClass: 'sr2-code',
+                fmtMoney: fmt3,
+                showStock: true,
+                isViewMode: function () { return sr2ViewMode; },
+                modalIds: {
+                    root: 'sr2_product_pick_modal',
+                    backdrop: 'sr2_product_pick_backdrop',
+                    filter: 'sr2_product_pick_filter',
+                    body: 'sr2_product_pick_body'
+                },
+                selectors: {
+                    code: '.sr2-code',
+                    productId: '.sr2-product-id',
+                    variantId: '.sr2-variant-id',
+                    name: '.sr2-name',
+                    varLabel: '.sr2-var-label',
+                    cost: '.sr2-price'
+                },
+                onApplyPick: function (tr, row) {
+                    var priceEl = tr.querySelector('.sr2-price');
+                    if (priceEl) priceEl.value = fmt3(row.price || 0);
+                    var costEl = tr.querySelector('.sr2-cost');
+                    if (costEl) costEl.value = String(row.cost || 0);
+                },
+                onAfterResolve: function () { recalcAll(); }
+            });
+            sr2ProductPick.bindModal();
+        }
+
+        var codeEl = document.getElementById('sr2_customer_code');
+        if (codeEl) {
+            codeEl.addEventListener('dblclick', function (e) { e.preventDefault(); customerPickerOpen(); });
+            codeEl.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); customerPickerOpen(); } });
+        }
+        document.getElementById('sr2_customer_pick_backdrop').addEventListener('click', customerPickerClose);
+        document.getElementById('sr2_customer_pick_close').addEventListener('click', customerPickerClose);
+        var custPickQ = document.getElementById('sr2_customer_pick_q');
+        var custTimer = null;
+        if (custPickQ) {
+            custPickQ.addEventListener('input', function () {
+                if (custTimer) clearTimeout(custTimer);
+                custTimer = setTimeout(function () { customerPickerRender(custPickQ.value || ''); }, 180);
+            });
+        }
+        document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') customerPickerClose(); });
+
+        document.getElementById('sr2_channel').addEventListener('change', sr2OnChannelChange);
+        document.getElementById('sr2_btn_save').addEventListener('click', save);
+        document.getElementById('sr2_btn_new').addEventListener('click', sr2ResetNew);
+        document.getElementById('sr2_btn_retrieve').addEventListener('click', sr2RetrieveFromOrder);
+        document.getElementById('sr2_btn_print').addEventListener('click', function () {
+            if (browseReturnId <= 0) { alert('افتح مردوداً محفوظاً للطباعة.'); return; }
+            window.print();
+        });
+        document.getElementById('sr2_nav_first').addEventListener('click', function () { sr2Nav('first'); });
+        document.getElementById('sr2_nav_prev').addEventListener('click', function () { sr2Nav('prev'); });
+        document.getElementById('sr2_nav_next').addEventListener('click', function () { sr2Nav('next'); });
+        document.getElementById('sr2_nav_last').addEventListener('click', function () { sr2Nav('last'); });
+        document.getElementById('sr2_btn_search').addEventListener('click', sr2SearchOpen);
+        document.getElementById('sr2_search_btn').addEventListener('click', sr2SearchRun);
+        document.getElementById('sr2_search_modal_backdrop').addEventListener('click', sr2SearchClose);
+
+        var tb = document.getElementById('sr2_lines_body');
+        if (tb) {
+            if (sr2ProductPick) sr2ProductPick.bindLinesBody(tb);
+            tb.addEventListener('input', function (e) {
+                if (e.target && e.target.classList.contains('sr2-code')) return;
+                if (e.target && e.target.classList.contains('sr2-qty')) sr2ClampQtyInput(e.target);
+                recalcAll();
+            });
+            tb.addEventListener('focusout', function (e) {
+                if (e.target && e.target.classList.contains('sr2-code') && sr2ProductPick) {
+                    sr2ProductPick.resolveCodeForRow(e.target.closest('tr'));
+                    recalcAll();
+                }
+            });
+            tb.addEventListener('click', function (e) {
+                if (e.target && e.target.classList.contains('admin-doc-line-remove')) removeLine(e.target);
+            });
+            addLine();
+        }
+
+        if (SR2_PREFILL_CUSTOMER > 0) selectCustomer(SR2_PREFILL_CUSTOMER);
+        if (SR2_PREFILL_ORDER > 0) {
+            var refEl = document.getElementById('sr2_order_ref');
+            if (refEl) refEl.value = 'INV-C-' + SR2_PREFILL_ORDER;
+        }
+        sr2OnChannelChange();
+
+        if (window.OrangeEditLock) {
+            sr2EditLockCtl = OrangeEditLock.bind({
+                prefix: 'sr2',
+                docKind: 'sales_return',
+                page: 'sales_returns',
+                canLock: !!SR2_CAPS.can_lock,
+                canUnlock: !!SR2_CAPS.can_unlock,
+                countryId: SR2_COUNTRY_ID,
+                getEntityId: function () { return browseReturnId; }
+            });
+        }
+        sr2SyncToolbar();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
 </script>
