@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/schema_migrations.php';
 require_once __DIR__ . '/countries.php';
+require_once __DIR__ . '/country_provision.php';
 
 /**
  * إصلاح country_id من قناة التسجيل — idempotent.
@@ -165,6 +166,83 @@ function orange_catalog_migrate_country_scope_repair_v73(PDO $pdo): void
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] country scope repair v73 marker: ' . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * v74 — فصل دليل الحسابات per country: عمود country_id + نسخ الدليل لكل دولة بلا حسابات.
+ *
+ * @return array{backfill_kw:int, countries_provisioned:int, accounts_copied:int}
+ */
+function orange_country_scope_repair_accounts_per_country(PDO $pdo): array
+{
+    $out = [
+        'backfill_kw' => 0,
+        'countries_provisioned' => 0,
+        'accounts_copied' => 0,
+    ];
+    if (!orange_table_exists($pdo, 'accounts') || !orange_table_exists($pdo, 'countries')) {
+        return $out;
+    }
+
+    orange_catalog_ensure_country_id_columns($pdo);
+    orange_schema_invalidate_column_check('accounts', 'country_id');
+
+    if (!orange_table_has_column($pdo, 'accounts', 'country_id')) {
+        return $out;
+    }
+
+    $kwId = orange_countries_default_id($pdo);
+    if ($kwId > 0) {
+        $out['backfill_kw'] = (int) $pdo->exec(
+            'UPDATE accounts SET country_id = ' . (int) $kwId
+            . ' WHERE country_id IS NULL OR country_id = 0'
+        );
+    }
+
+    $countries = $pdo->query('SELECT id FROM countries ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    foreach ($countries as $cRow) {
+        $cid = (int) ($cRow['id'] ?? 0);
+        if ($cid <= 0 || $cid === $kwId) {
+            continue;
+        }
+        $stCnt = $pdo->prepare('SELECT COUNT(*) FROM accounts WHERE country_id = ?');
+        $stCnt->execute([$cid]);
+        if ((int) $stCnt->fetchColumn() > 0) {
+            continue;
+        }
+        $copy = orange_country_copy_accounts_from_source($pdo, $cid, $kwId > 0 ? $kwId : null);
+        if ((int) ($copy['accounts_copied'] ?? 0) > 0) {
+            $out['countries_provisioned']++;
+            $out['accounts_copied'] += (int) $copy['accounts_copied'];
+        }
+    }
+
+    return $out;
+}
+
+/** v74 — إصلاح تسريب شجرة الحسابات بين الدول. */
+function orange_catalog_migrate_country_scope_repair_v74(PDO $pdo): void
+{
+    $marker = 'php_country_scope_repair_v74';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    $stats = orange_country_scope_repair_accounts_per_country($pdo);
+
+    try {
+        orange_schema_migrations_ensure_table($pdo);
+        $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+        $ins->execute([$marker]);
+        if (function_exists('error_log')) {
+            error_log('[orange] country scope repair v74 OK '
+                . json_encode($stats, JSON_UNESCAPED_UNICODE));
+        }
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] country scope repair v74 marker: ' . $e->getMessage());
         }
     }
 }

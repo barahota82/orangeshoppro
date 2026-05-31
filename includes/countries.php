@@ -753,6 +753,8 @@ function orange_sql_filter_storefront_row_by_effective_country(
 }
 
 /**
+ * فلتر دليل الحسابات — صارم لكل الدول (بلا NULL/0 legacy؛ v49 + v74).
+ *
  * @return array{sql:string,params:list<int>}|null
  */
 function orange_accounts_sql_country_filter(PDO $pdo, string $alias = 'a', ?int $countryId = null): ?array
@@ -764,13 +766,6 @@ function orange_accounts_sql_country_filter(PDO $pdo, string $alias = 'a', ?int 
         return null;
     }
     $col = trim($alias) !== '' ? trim($alias) . '.country_id' : 'country_id';
-    $kwId = orange_countries_default_id($pdo);
-    if ($kwId > 0 && $countryId === $kwId) {
-        return [
-            'sql' => ' AND (' . $col . ' = ? OR ' . $col . ' IS NULL OR ' . $col . ' = 0)',
-            'params' => [$countryId],
-        ];
-    }
 
     return ['sql' => ' AND ' . $col . ' = ?', 'params' => [$countryId]];
 }
@@ -983,6 +978,9 @@ function orange_admin_assert_entity_country(PDO $pdo, string $table, int $entity
     $rowCid = (int) ($st->fetchColumn() ?: 0);
     if ($rowCid > 0 && $rowCid !== $ctx) {
         throw new RuntimeException('السجل لا يتبع الدولة المختارة في لوحة التحكم.');
+    }
+    if ($table === 'accounts' && $rowCid <= 0 && $ctx > 0) {
+        throw new RuntimeException('الحساب غير مربوط بدولة — حدّث المخطط أو أعد فتح لوحة التحكم.');
     }
 }
 
