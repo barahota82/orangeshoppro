@@ -15,8 +15,10 @@ require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/purchase_doc_product_pick.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 require_once __DIR__ . '/../../includes/invoice_ancillary_lines.php';
+require_once __DIR__ . '/../../includes/admin_permissions.php';
 
 $pdo = orange_admin_page_pdo();
+$pv2Caps = orange_admin_caps($admin, $pdo, 'warehouse');
 
 $adminCountryId = orange_admin_context_country_id($pdo);
 $adminDefaultCurrency = orange_admin_context_currency_code($pdo);
@@ -259,7 +261,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
 
 <div class="card jv-print-area">
     <h3 class="card-title">فاتورة شراء <span id="pv2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
-    <?php orange_edit_lock_ui_toolbar(['prefix' => 'pv2', 'doc_kind' => 'purchase', 'country_id' => $adminCountryId]); ?>
+    <?php orange_edit_lock_ui_toolbar(['prefix' => 'pv2', 'doc_kind' => 'purchase', 'country_id' => $adminCountryId, 'admin' => $admin, 'pdo' => $pdo, 'resource' => 'warehouse']); ?>
 
     <!-- ١ — مسلسل الفاتورة + المورد -->
     <div class="form-grid pv2-supplier-row" style="margin-bottom:12px;">
@@ -369,8 +371,8 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
                 <button type="button" class="btn-secondary jv-nav-search" id="pv2_btn_search" title="بحث عن فاتورة">بحث</button>
             </div>
             <button type="button" class="btn-secondary" id="pv2_btn_print" title="طباعة الفاتورة المعروضة" disabled>طباعة</button>
-            <button type="button" class="btn-secondary" id="pv2_btn_new" title="فاتورة جديدة">فاتورة جديدة</button>
-            <button type="button" id="pv2_btn_save"<?php echo !$pv2Ready ? ' disabled' : ''; ?>>حفظ</button>
+            <button type="button" class="btn-secondary" id="pv2_btn_new" title="فاتورة جديدة" data-orange-perm="edit" data-orange-resource="warehouse">فاتورة جديدة</button>
+            <button type="button" id="pv2_btn_save" data-orange-perm="edit" data-orange-resource="warehouse"<?php echo !$pv2Ready ? ' disabled' : ''; ?>>حفظ</button>
         </div>
     </div>
 </div>
@@ -516,6 +518,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
     var PV2_READY = <?php echo $pv2Ready ? 'true' : 'false'; ?>;
     var PV2_NAV_READY = <?php echo $pv2NavReady ? 'true' : 'false'; ?>;
     var PV2_COUNTRY_ID = <?php echo (int) $adminCountryId; ?>;
+    var PV2_CAPS = <?php echo json_encode($pv2Caps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
     var pv2EditLockCtl = null;
     var PV2_DOC_SERIAL_PREVIEW = <?php echo json_encode($pv2DocSerialPreview, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var PV2_PURCHASE_LINE_KINDS = <?php echo json_encode($pv2PurchaseLineKinds, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
@@ -1158,7 +1161,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
         }
         var sb = document.getElementById('pv2_btn_save');
         if (sb) {
-            sb.disabled = !PV2_READY || pv2ViewMode;
+            sb.disabled = !PV2_READY || pv2ViewMode || !PV2_CAPS.can_edit;
             if (browsePurchaseId > 0 && !pv2ViewMode) {
                 sb.title = 'حفظ التعديلات';
             } else if (pv2ViewMode) {
@@ -1318,6 +1321,10 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
 
     /* ── Save ───────────────────────────────────────────────────────── */
     function save() {
+        if (!PV2_CAPS.can_edit) {
+            alert('لا تملك صلاحية تعديل المشتريات');
+            return;
+        }
         if (!PV2_READY || pv2ViewMode) return;
         var supplierId = parseInt(document.getElementById('pv2_supplier_id').value, 10) || 0;
         var purType = document.getElementById('pv2_type').value;
@@ -1532,6 +1539,9 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
             pv2EditLockCtl = OrangeEditLock.bind({
                 prefix: 'pv2',
                 docKind: 'purchase',
+                resource: 'warehouse',
+                canLock: !!PV2_CAPS.can_lock,
+                canUnlock: !!PV2_CAPS.can_unlock,
                 countryId: PV2_COUNTRY_ID,
                 getEntityId: function () { return browsePurchaseId; },
                 onLockedChange: function (locked) {

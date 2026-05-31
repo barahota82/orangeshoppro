@@ -307,34 +307,87 @@ function orange_admin_can_manage_countries(array $admin): bool
     return orange_admin_has_full_access($admin);
 }
 
-function orange_admin_may(array $admin, PDO $pdo, string $resource, string $action): bool
+/**
+ * @return array{can_view:bool,can_edit:bool,can_delete:bool,can_lock:bool,can_unlock:bool}
+ */
+function orange_admin_caps(array $admin, PDO $pdo, string $resource): array
 {
     if (orange_admin_has_full_access($admin)) {
-        return true;
+        return [
+            'can_view' => true,
+            'can_edit' => true,
+            'can_delete' => true,
+            'can_lock' => true,
+            'can_unlock' => true,
+        ];
     }
     $matrix = orange_admin_permissions_matrix($pdo, (int) $admin['id']);
     if ($matrix === []) {
-        // بدون صفوف في admin_permissions: السماح بعرض الرئيسية فقط حتى يضيف المشرف العام صلاحيات
-        return $resource === 'dashboard' && $action === 'view';
+        $viewOnly = $resource === 'dashboard';
+
+        return [
+            'can_view' => $viewOnly,
+            'can_edit' => false,
+            'can_delete' => false,
+            'can_lock' => false,
+            'can_unlock' => false,
+        ];
     }
     $row = $matrix[$resource] ?? null;
     if (!$row) {
-        return false;
-    }
-    if ($action === 'delete') {
-        return $row['can_delete'];
-    }
-    if ($action === 'edit') {
-        return $row['can_edit'];
-    }
-    if ($action === 'lock') {
-        return !empty($row['can_lock']);
-    }
-    if ($action === 'unlock') {
-        return !empty($row['can_unlock']);
+        return [
+            'can_view' => false,
+            'can_edit' => false,
+            'can_delete' => false,
+            'can_lock' => false,
+            'can_unlock' => false,
+        ];
     }
 
-    return $row['can_view'];
+    return [
+        'can_view' => !empty($row['can_view']),
+        'can_edit' => !empty($row['can_edit']),
+        'can_delete' => !empty($row['can_delete']),
+        'can_lock' => !empty($row['can_lock']),
+        'can_unlock' => !empty($row['can_unlock']),
+    ];
+}
+
+/**
+ * مصفوفة صلاحيات كاملة لكل مجموعة — للواجهة (window.ORANGE_ADMIN_CAPS).
+ *
+ * @return array<string, array{can_view:bool,can_edit:bool,can_delete:bool,can_lock:bool,can_unlock:bool}>
+ */
+function orange_admin_caps_all(array $admin, PDO $pdo): array
+{
+    $out = [];
+    foreach (array_keys(orange_admin_resource_labels()) as $key) {
+        if ($key === 'admin_users') {
+            continue;
+        }
+        $out[$key] = orange_admin_caps($admin, $pdo, $key);
+    }
+
+    return $out;
+}
+
+function orange_admin_may(array $admin, PDO $pdo, string $resource, string $action): bool
+{
+    $caps = orange_admin_caps($admin, $pdo, $resource);
+    if ($action === 'delete') {
+        return $caps['can_delete'];
+    }
+    if ($action === 'edit') {
+        return $caps['can_edit'];
+    }
+    if ($action === 'lock') {
+        return $caps['can_lock'];
+    }
+    if ($action === 'unlock') {
+        return $caps['can_unlock'];
+    }
+
+    return $caps['can_view'];
 }
 
 function orange_admin_require_page(array $admin, PDO $pdo, string $page): void

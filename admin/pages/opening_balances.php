@@ -11,9 +11,11 @@ require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
+require_once __DIR__ . '/../../includes/admin_permissions.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+$obCaps = orange_admin_caps($admin, $pdo, 'accounting');
 
 $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
 $ctxCountryRow = orange_country_row_by_id($pdo, $ctxCountryId, false);
@@ -197,7 +199,7 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
 <?php if ($fyId > 0 && $years !== []): ?>
 <div class="card jv-print-area ob-opening-card">
     <h3 class="card-title">سند رصيد افتتاحي</h3>
-    <?php orange_edit_lock_ui_toolbar(['prefix' => 'ob', 'doc_kind' => 'opening_balance', 'country_id' => $ctxCountryId]); ?>
+    <?php orange_edit_lock_ui_toolbar(['prefix' => 'ob', 'doc_kind' => 'opening_balance', 'country_id' => $ctxCountryId, 'admin' => $admin, 'pdo' => $pdo, 'resource' => 'accounting']); ?>
     <div class="form-grid">
         <div class="jv-voucher-header-line jv-voucher-header-line--nav" style="grid-column:1/-1;">
             <div>
@@ -236,9 +238,9 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
             </div>
             <div class="jv-voucher-nav-cell jv-print-hide">
                 <div class="jv-voucher-nav-btns ob-voucher-action-btns" role="group" aria-label="إجراءات سند الرصيد الافتتاحي">
-                    <button type="button" id="ob_btn_save">حفظ السند</button>
+                    <button type="button" id="ob_btn_save" data-orange-perm="edit" data-orange-resource="accounting">حفظ السند</button>
                     <button type="button" class="btn-secondary jv-nav-search" id="ob_btn_print">طباعة السند</button>
-                    <button type="button" class="btn-secondary jv-nav-search" id="ob_btn_delete"<?php echo $obVid <= 0 ? ' disabled' : ''; ?>>حذف السند</button>
+                    <button type="button" class="btn-secondary jv-nav-search" id="ob_btn_delete" data-orange-perm="delete" data-orange-resource="accounting"<?php echo $obVid <= 0 ? ' disabled' : ''; ?>>حذف السند</button>
                 </div>
             </div>
         </div>
@@ -297,6 +299,7 @@ var OB_ADMIN_INDEX = <?php echo json_encode($obAdminIndexUrl, JSON_UNESCAPED_UNI
 var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
 var OB_SAVED_VOUCHER_ID = <?php echo (int) $obVid; ?>;
 var OB_COUNTRY_ID = <?php echo (int) $ctxCountryId; ?>;
+var OB_CAPS = <?php echo json_encode($obCaps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
 var obEditLockCtl = null;
 
 (function () {
@@ -686,6 +689,10 @@ var obEditLockCtl = null;
         }
     };
     window.obSave = function () {
+        if (!OB_CAPS.can_edit) {
+            alert('لا تملك صلاحية تعديل الأرصدة الافتتاحية');
+            return;
+        }
         if (obSaveInFlight) {
             return;
         }
@@ -782,6 +789,10 @@ var obEditLockCtl = null;
         }, 1500);
     }
     function obDelete() {
+        if (!OB_CAPS.can_delete) {
+            alert('لا تملك صلاحية حذف الأرصدة الافتتاحية');
+            return;
+        }
         if (obDeleteInFlight) {
             return;
         }
@@ -857,6 +868,9 @@ var obEditLockCtl = null;
             obEditLockCtl = OrangeEditLock.bind({
                 prefix: 'ob',
                 docKind: 'opening_balance',
+                resource: 'accounting',
+                canLock: !!OB_CAPS.can_lock,
+                canUnlock: !!OB_CAPS.can_unlock,
                 countryId: OB_COUNTRY_ID,
                 getEntityId: function () {
                     return (OB_PAGE_FY > 0 && OB_SAVED_VOUCHER_ID > 0) ? OB_PAGE_FY : 0;

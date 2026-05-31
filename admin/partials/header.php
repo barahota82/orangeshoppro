@@ -55,6 +55,9 @@ $orangeAdminPhoneDialNav = orange_admin_context_phone_dial($pdoNav);
 $orangeAdminCurrencyNav = orange_admin_context_currency_code($pdoNav);
 $orangeAdminCurrencyDecimalsNav = orange_currency_decimals_for_code($orangeAdminCurrencyNav);
 $orangeAdminCurrencyUnitNav = orange_currency_display_unit($orangeAdminCurrencyNav);
+$orangeAdminPageResourceNav = orange_admin_page_resource($orangeAdminPage);
+$orangeAdminCapsNav = orange_admin_caps_all($admin, $pdoNav);
+$orangeAdminCapsPageNav = orange_admin_caps($admin, $pdoNav, $orangeAdminPageResourceNav);
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl"<?php echo $orangeSchemaDegradedAttr; ?>>
@@ -83,6 +86,9 @@ $orangeAdminCurrencyUnitNav = orange_currency_display_unit($orangeAdminCurrencyN
         zero: <?php echo json_encode(isset($orangeAdminMoneyZero) ? $orangeAdminMoneyZero : orange_admin_money_zero_string((int) $orangeAdminCurrencyDecimalsNav), JSON_UNESCAPED_UNICODE); ?>,
         step: <?php echo json_encode(isset($orangeAdminMoneyStep) ? $orangeAdminMoneyStep : orange_admin_money_input_step((int) $orangeAdminCurrencyDecimalsNav), JSON_UNESCAPED_UNICODE); ?>
     };
+    window.ORANGE_ADMIN_PAGE_RESOURCE = <?php echo json_encode($orangeAdminPageResourceNav, JSON_UNESCAPED_UNICODE); ?>;
+    window.ORANGE_ADMIN_CAPS = <?php echo json_encode($orangeAdminCapsNav, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
+    window.ORANGE_ADMIN_CAPS_PAGE = <?php echo json_encode($orangeAdminCapsPageNav, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
     window.orangeAdminSwitchCountry = function (sel) {
         if (!sel || !sel.form) {
             return;

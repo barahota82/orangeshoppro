@@ -13,8 +13,10 @@ require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 require_once __DIR__ . '/../../includes/purchase_doc_product_pick.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
+require_once __DIR__ . '/../../includes/admin_permissions.php';
 
 $pdo = orange_admin_page_pdo();
+$pr2Caps = orange_admin_caps($admin, $pdo, 'warehouse');
 
 $prCountryId = orange_admin_context_country_id($pdo);
 $prDefaultCurrency = orange_admin_context_currency_code($pdo);
@@ -259,7 +261,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 
 <div class="card jv-print-area">
     <h3 class="card-title">مردود مشتريات <span id="pr2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
-    <?php orange_edit_lock_ui_toolbar(['prefix' => 'pr2', 'doc_kind' => 'purchase_return', 'country_id' => $prCountryId]); ?>
+    <?php orange_edit_lock_ui_toolbar(['prefix' => 'pr2', 'doc_kind' => 'purchase_return', 'country_id' => $prCountryId, 'admin' => $admin, 'pdo' => $pdo, 'resource' => 'warehouse']); ?>
 
     <!-- ١ — مسلسل الفاتورة + المورد -->
     <div class="form-grid pr2-supplier-row" style="margin-bottom:12px;">
@@ -351,7 +353,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             </div>
             <button type="button" class="btn-secondary" id="pr2_btn_print" title="طباعة المردود المعروض" disabled>طباعة</button>
             <button type="button" class="btn-secondary" id="pr2_btn_new" title="مردود جديد">مردود جديد</button>
-            <button type="button" id="pr2_btn_save"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>حفظ</button>
+            <button type="button" id="pr2_btn_save" data-orange-perm="edit" data-orange-resource="warehouse"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>حفظ</button>
         </div>
     </div>
 </div>
@@ -472,6 +474,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     var PR2_READY = <?php echo $pr2Ready ? 'true' : 'false'; ?>;
     var PR2_NAV_READY = <?php echo $pr2NavReady ? 'true' : 'false'; ?>;
     var PR2_COUNTRY_ID = <?php echo (int) $prCountryId; ?>;
+    var PR2_CAPS = <?php echo json_encode($pr2Caps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
     var pr2EditLockCtl = null;
     var PR2_DOC_SERIAL_PREVIEW = <?php echo json_encode($pr2DocSerialPreview, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
 
@@ -871,7 +874,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
         }
         var sb = document.getElementById('pr2_btn_save');
         if (sb) {
-            sb.disabled = !PR2_READY || pr2ViewMode;
+            sb.disabled = !PR2_READY || pr2ViewMode || !PR2_CAPS.can_edit;
             sb.title = pr2ViewMode ? 'وضع العرض — استخدم «مردود جديد» للإدخال' : 'حفظ مردود جديد';
         }
         var lbl = document.getElementById('pr2_browse_label');
@@ -1079,6 +1082,10 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 
     /* ── Save ───────────────────────────────────────────────────────── */
     function save() {
+        if (!PR2_CAPS.can_edit) {
+            alert('لا تملك صلاحية تعديل مردودات المشتريات');
+            return;
+        }
         if (!PR2_READY || pr2ViewMode) return;
         var supplierId = parseInt(document.getElementById('pr2_supplier_id').value, 10) || 0;
         var retType = document.getElementById('pr2_type').value;
@@ -1258,6 +1265,9 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
             pr2EditLockCtl = OrangeEditLock.bind({
                 prefix: 'pr2',
                 docKind: 'purchase_return',
+                resource: 'warehouse',
+                canLock: !!PR2_CAPS.can_lock,
+                canUnlock: !!PR2_CAPS.can_unlock,
                 countryId: PR2_COUNTRY_ID,
                 getEntityId: function () { return browseReturnId; }
             });

@@ -7,9 +7,11 @@ require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/report_line_master.php';
 require_once __DIR__ . '/../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/admin_permissions.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+$coaCaps = orange_admin_caps($admin, $pdo, 'accounting');
 
 $ctxCountryId = orange_admin_context_country_id($pdo);
 $ctxCountryLabel = '';
@@ -189,9 +191,9 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
             </div>
 
             <footer class="coa-shell__footer">
-                <button type="button" class="btn-secondary" id="coa_btn_new">إضافة</button>
-                <button type="button" class="btn-danger" id="coa_btn_delete">حذف</button>
-                <button type="button" id="coa_btn_save">حفظ</button>
+                <button type="button" class="btn-secondary" id="coa_btn_new" data-orange-perm="edit" data-orange-resource="accounting">إضافة</button>
+                <button type="button" class="btn-danger" id="coa_btn_delete" data-orange-perm="delete" data-orange-resource="accounting">حذف</button>
+                <button type="button" id="coa_btn_save" data-orange-perm="edit" data-orange-resource="accounting">حفظ</button>
                 <a class="btn-secondary coa-footer-link coa-footer-link--disabled" id="coa_btn_statement" href="#">كشف حساب</a>
                 <button type="button" class="btn-secondary" id="coa_btn_print">طباعة</button>
             </footer>
@@ -239,7 +241,7 @@ $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
         </div>
         <footer class="coa-setup-modal__footer">
             <button type="button" class="btn-secondary" id="coa_setup_btn_new">إضافة</button>
-            <button type="button" id="coa_setup_btn_save">حفظ</button>
+            <button type="button" id="coa_setup_btn_save" data-orange-perm="edit" data-orange-resource="accounting">حفظ</button>
             <button type="button" class="btn-secondary" id="coa_setup_btn_print">طباعة</button>
             <button type="button" class="btn-secondary" id="coa_setup_btn_close">إغلاق</button>
         </footer>
@@ -263,6 +265,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var __orangeAdminPub = typeof window.ORANGE_PUBLIC_BASE_PATH === 'string' ? window.ORANGE_PUBLIC_BASE_PATH.replace(/\/+$/, '') : '';
     var coaMainSaveInFlight = false;
     var coaSetupSaveInFlight = false;
+    var COA_CAPS = <?php echo json_encode($coaCaps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
 
     var levelOrds = ['', 'الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر'];
 
@@ -730,6 +733,10 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     document.getElementById('coa_btn_save').addEventListener('click', function () {
+        if (!COA_CAPS.can_edit) {
+            alert('لا تملك صلاحية تعديل الدليل المحاسبي');
+            return;
+        }
         var coaSaveBtn = document.getElementById('coa_btn_save');
         if (coaMainSaveInFlight || (coaSaveBtn && coaSaveBtn.getAttribute('data-orange-postjson-busy') === '1')) {
             return;
@@ -807,6 +814,10 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     document.getElementById('coa_btn_delete').addEventListener('click', function () {
+        if (!COA_CAPS.can_delete) {
+            alert('لا تملك صلاحية حذف حسابات من الدليل');
+            return;
+        }
         var id = parseInt(document.getElementById('coa_id').value, 10) || 0;
         if (id <= 0) {
             alert('اختر حساباً من الشجرة أولاً (أو أنشئ واحداً ثم احفظه قبل الحذف).');
@@ -984,6 +995,10 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('coa_setup_btn_close').addEventListener('click', closeGuideModal);
     document.getElementById('coa_setup_btn_new').addEventListener('click', clearSetupForm);
     document.getElementById('coa_setup_btn_save').addEventListener('click', function () {
+        if (!COA_CAPS.can_edit) {
+            alert('لا تملك صلاحية تعديل الدليل المحاسبي');
+            return;
+        }
         var coaSetupSaveBtn = document.getElementById('coa_setup_btn_save');
         if (coaSetupSaveInFlight || (coaSetupSaveBtn && coaSetupSaveBtn.getAttribute('data-orange-postjson-busy') === '1')) {
             return;
