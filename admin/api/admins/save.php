@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/admin_password_policy.php';
 require_admin_api();
 
 try {
@@ -43,6 +44,10 @@ try {
         if ($password === '') {
             json_response(['success' => false, 'message' => 'كلمة المرور مطلوبة للمستخدم الجديد'], 422);
         }
+        $pwdErr = orange_admin_password_validate($password, $username);
+        if ($pwdErr !== null) {
+            json_response(['success' => false, 'message' => $pwdErr], 422);
+        }
         $chk = $pdo->prepare('SELECT id FROM admins WHERE username = ? LIMIT 1');
         $chk->execute([$username]);
         if ($chk->fetch()) {
@@ -78,6 +83,10 @@ try {
         json_response(['success' => false, 'message' => 'اسم المستخدم مستخدم'], 409);
     }
     if ($password !== '') {
+        $pwdErr = orange_admin_password_validate($password, $username);
+        if ($pwdErr !== null) {
+            json_response(['success' => false, 'message' => $pwdErr], 422);
+        }
         $hash = password_hash($password, PASSWORD_DEFAULT);
         if (orange_table_has_column($pdo, 'admins', 'is_superuser') && $hasAdminCountry) {
             $pdo->prepare(

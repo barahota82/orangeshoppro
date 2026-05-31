@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/admin_password_policy.php';
 
 $dbAu = db();
 orange_catalog_ensure_schema($dbAu);
@@ -31,9 +32,10 @@ $auCountries = orange_countries_admin_list($dbAu);
                 <label for="au_name">الاسم الظاهر</label>
                 <input type="text" id="au_name">
             </div>
-            <div style="grid-column:1/-1;">
+            <div style="grid-column:1/-1;" id="au_pass_wrap">
                 <label for="au_pass">كلمة المرور (اتركها فارغة عند التعديل إن لم تتغير)</label>
                 <input type="password" id="au_pass" autocomplete="new-password">
+                <p class="card-hint" style="margin:6px 0 0;font-size:13px;line-height:1.55;"><?php echo htmlspecialchars(orange_admin_password_policy_hint_ar(), ENT_QUOTES, 'UTF-8'); ?></p>
             </div>
             <div class="form-check">
                 <label><input type="checkbox" id="au_active" checked> نشط</label>
@@ -200,6 +202,12 @@ function saveAdmin() {
         country_id: document.getElementById('au_country') ? (parseInt(document.getElementById('au_country').value, 10) || 0) : 0
     };
     if (!payload.username) { alert('اسم الدخول مطلوب'); return; }
+    if (id <= 0 || payload.password) {
+        if (window.OrangeAdminPasswordPolicy) {
+            var pwdErr = window.OrangeAdminPasswordPolicy.validate(payload.password, payload.username);
+            if (pwdErr) { alert(pwdErr); return; }
+        }
+    }
     postJSON('/admin/api/admins/save.php', payload).then(function (r) {
         alert(r.message || (r.success ? 'تم' : 'فشل'));
         if (r.success) { resetAdminForm(); loadAdmins(); }
@@ -229,4 +237,14 @@ function savePermissions() {
 }
 
 loadAdmins();
+</script>
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_password_policy.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script>
+if (window.OrangeAdminPasswordPolicy) {
+    window.OrangeAdminPasswordPolicy.attachToolbar({
+        inputId: 'au_pass',
+        usernameInputId: 'au_user',
+        wrapId: 'au_pass_wrap'
+    });
+}
 </script>

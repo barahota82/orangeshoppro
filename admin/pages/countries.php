@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/country_provision.php';
+require_once __DIR__ . '/../../includes/admin_password_policy.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -114,9 +115,10 @@ foreach ($countries as $c) {
             <label for="ctry_team_name">الاسم الظاهر</label>
             <input type="text" id="ctry_team_name" autocomplete="off">
         </div>
-        <div>
+        <div id="ctry_team_pass_wrap">
             <label for="ctry_team_pass">كلمة المرور</label>
             <input type="password" id="ctry_team_pass" autocomplete="new-password">
+            <p class="card-hint" style="margin:6px 0 0;font-size:13px;line-height:1.55;"><?php echo htmlspecialchars(orange_admin_password_policy_hint_ar(), ENT_QUOTES, 'UTF-8'); ?></p>
         </div>
     </div>
     <div class="admin-form-actions" style="margin-top:12px;">
@@ -299,12 +301,18 @@ async function runCountryProvision(countryId) {
 
 async function createCountryTeamUser(countryId) {
     if (!countryId) return;
+    var username = document.getElementById('ctry_team_user').value.trim();
+    var password = document.getElementById('ctry_team_pass').value;
+    if (window.OrangeAdminPasswordPolicy) {
+        var pwdErr = window.OrangeAdminPasswordPolicy.validate(password, username);
+        if (pwdErr) { alert(pwdErr); return; }
+    }
     var res = await postJSON('/admin/api/countries/manage.php', {
         action: 'create_team_user',
         country_id: countryId,
-        username: document.getElementById('ctry_team_user').value.trim(),
+        username: username,
         display_name: document.getElementById('ctry_team_name').value.trim(),
-        password: document.getElementById('ctry_team_pass').value
+        password: password
     });
     alert(res.message || (res.success ? 'تم' : 'فشل'));
     if (res.success) {
@@ -333,6 +341,18 @@ document.getElementById('ctry_name_en').addEventListener('input', function () {
     scheduleCountryDerive();
 });
 </script>
+<?php if ($editRow): ?>
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_password_policy.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script>
+if (window.OrangeAdminPasswordPolicy) {
+    window.OrangeAdminPasswordPolicy.attachToolbar({
+        inputId: 'ctry_team_pass',
+        usernameInputId: 'ctry_team_user',
+        wrapId: 'ctry_team_pass_wrap'
+    });
+}
+</script>
+<?php endif; ?>
 <style>
 .ctry-form-grid {
     display: grid;

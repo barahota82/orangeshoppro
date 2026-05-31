@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/country_provision.php';
+require_once __DIR__ . '/../../../includes/admin_password_policy.php';
 require_admin_api();
 
 /**
@@ -173,6 +174,10 @@ try {
         }
         if ($password === '') {
             json_response(['success' => false, 'message' => 'كلمة المرور مطلوبة'], 422);
+        }
+        $pwdErr = orange_admin_password_validate($password, $username);
+        if ($pwdErr !== null) {
+            json_response(['success' => false, 'message' => $pwdErr], 422);
         }
         if (!orange_table_has_column($pdo, 'admins', 'country_id')) {
             json_response(['success' => false, 'message' => 'عمود country_id غير جاهز في admins'], 422);
