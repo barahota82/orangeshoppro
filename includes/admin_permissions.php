@@ -271,7 +271,7 @@ function orange_admin_api_page_from_script(): ?string
         'journal' => 'journal_entries',
         'year_end_close' => 'year_end_close_vouchers',
         'system' => 'fiscal_years',
-        'gl' => 'gl_posting',
+        'gl' => 'edit_lock',
         'edit-lock' => 'edit_lock',
         'fiscal_years' => 'fiscal_years',
         'opening_balances' => 'opening_balances',
@@ -617,6 +617,9 @@ function orange_admin_require_page(array $admin, PDO $pdo, string $page): void
                 . '<h1>إدارة الدول والتهيئة الكاملة للمشرف العام فقط</h1><p><a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=dashboard'), ENT_QUOTES, 'UTF-8') . '">الرئيسية</a></p></body></html>';
             exit;
         }
+    }
+    if ($page === 'gl_posting') {
+        $page = 'edit_lock';
     }
     if (!orange_admin_may_page($admin, $pdo, $page, 'view')) {
         header('Content-Type: text/html; charset=UTF-8');

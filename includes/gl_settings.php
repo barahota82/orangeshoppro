@@ -909,8 +909,8 @@ function orange_gl_journal_delete_blocked_admin_link(string $entryType): ?array
         'expense' => ['page' => 'payment_voucher', 'label' => 'سند صرف'],
         'expense_adjustment' => ['page' => 'payment_voucher', 'label' => 'سند صرف'],
         'expense_reversal' => ['page' => 'payment_voucher', 'label' => 'سند صرف'],
-        'order_delivery_sale' => ['page' => 'gl_posting', 'label' => 'ترحيل الحركات'],
-        'order_delivery_cogs' => ['page' => 'gl_posting', 'label' => 'ترحيل الحركات'],
+        'order_delivery_sale' => ['page' => 'edit_lock', 'label' => 'إقفال التعديلات'],
+        'order_delivery_cogs' => ['page' => 'edit_lock', 'label' => 'إقفال التعديلات'],
         'order_return_sale' => ['page' => 'sales_returns', 'label' => 'مردود المبيعات'],
         'order_return_cogs' => ['page' => 'sales_returns', 'label' => 'مردود المبيعات'],
     ];

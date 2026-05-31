@@ -38,7 +38,6 @@ function orange_admin_permission_mega_sections(): array
                         ['page' => 'fiscal_years', 'label' => 'السنوات المالية'],
                         ['page' => 'edit_lock', 'label' => 'إقفال التعديلات'],
                         ['page' => 'opening_balances', 'label' => 'أرصدة أول المدة المالية'],
-                        ['page' => 'gl_posting', 'label' => 'ترحيل القيود (طابور)'],
                     ],
                 ],
                 [
@@ -338,7 +337,6 @@ function orange_admin_permission_actions_for_page(string $page): array
         'storefront_merge_requests',
         'delivery_areas',
         'channels',
-        'gl_posting',
         'bank_reconciliation',
         'inventory_reconciliation',
     ];
