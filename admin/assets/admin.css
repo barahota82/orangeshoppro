@@ -5002,8 +5002,26 @@ td.tb-col-name,
 }
 
 /* صلاحيات المستخدمين — شجرة قابلة للتوسيع */
-.au-perm-table-wrap { max-height: min(70vh, 720px); overflow: auto; }
-.au-perm-table { font-size: 13px; }
+.au-perm-table-wrap {
+    max-height: min(70vh, 720px);
+    overflow: auto;
+    position: relative;
+    -webkit-overflow-scrolling: touch;
+}
+.au-perm-table {
+    font-size: 13px;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+.au-perm-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    background: var(--card, #fff);
+    box-shadow: 0 1px 0 var(--border, #e2e8f0);
+    font-weight: 600;
+    padding: var(--admin-table-cell-pad-y, 6px) var(--admin-table-cell-pad-x, 8px);
+}
 .au-perm-table th,
 .au-perm-table td { vertical-align: middle; text-align: center; }
 .au-perm-table th:first-child,
