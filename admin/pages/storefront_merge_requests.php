@@ -21,7 +21,26 @@ if ($ctxCountryId > 0) {
 }
 
 if ($hasTable) {
-    if ($hasCountryCol && $ctxCountryId > 0) {
+    $sfScope = orange_sql_filter_storefront_row_by_effective_country(
+        $pdo,
+        'r',
+        'proposed_channel_slug',
+        $ctxCountryId,
+        'ch_merge_scope'
+    );
+    if ($ctxCountryId > 0 && $sfScope !== null) {
+        $q = $pdo->prepare(
+            "SELECT r.*, a.email AS account_email
+             FROM storefront_phone_merge_requests r
+             INNER JOIN storefront_accounts a ON a.id = r.storefront_account_id"
+            . $sfScope['joins']
+            . " WHERE r.consumed_at IS NULL AND r.expires_at > NOW()"
+            . $sfScope['where']
+            . " ORDER BY r.created_at DESC
+             LIMIT 100"
+        );
+        $q->execute($sfScope['params']);
+    } elseif ($hasCountryCol && $ctxCountryId > 0) {
         $q = $pdo->prepare(
             "SELECT r.*, a.email AS account_email
              FROM storefront_phone_merge_requests r

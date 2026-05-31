@@ -411,10 +411,7 @@ function orange_multicountry_ensure_operational_phase2(PDO $pdo): void
     orange_multicountry_normalize_legacy_country_codes($pdo);
     orange_multicountry_ensure_phase2_market_countries($pdo);
 
-    $phase2StepApplied = orange_catalog_migration_step_applied($pdo, ORANGE_MC_STOCK_OPERATIONAL_STEP);
-    if (!$phase2StepApplied) {
-        orange_multicountry_activate_phase2_markets($pdo);
-    }
+    /* لا تفعيل is_active تلقائياً في runtime — المشرف العام يفعّل/يعطّل من شاشة الدول. */
 
     require_once __DIR__ . '/catalog_multicountry_runtime.php';
     if (function_exists('orange_catalog_ensure_department_countries_scaffold')) {

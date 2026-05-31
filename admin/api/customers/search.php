@@ -145,11 +145,29 @@ try {
     // معرّفات حسابات الواجهة والمعرّفات الكاملة (load once).
     $sfAccountByCustomerId = [];
     if ($hasStorefrontAccountsLink) {
-        $sfSql = 'SELECT id, customer_id, email, email_verified_at, registered_channel_slug FROM storefront_accounts WHERE customer_id IS NOT NULL';
+        $sfSql = 'SELECT sa.id, sa.customer_id, sa.email, sa.email_verified_at, sa.registered_channel_slug
+             FROM storefront_accounts sa';
         $sfParams = [];
-        if (orange_table_has_column($pdo, 'storefront_accounts', 'country_id') && $adminCountryId > 0) {
-            $sfSql .= ' AND country_id = ?';
-            $sfParams[] = $adminCountryId;
+        if ($adminCountryId > 0) {
+            $sfScope = orange_sql_filter_storefront_row_by_effective_country(
+                $pdo,
+                'sa',
+                'registered_channel_slug',
+                $adminCountryId,
+                'ch_cust_sf_scope'
+            );
+            if ($sfScope !== null) {
+                $sfSql .= $sfScope['joins'];
+                $sfSql .= ' WHERE sa.customer_id IS NOT NULL' . $sfScope['where'];
+                $sfParams = $sfScope['params'];
+            } elseif (orange_table_has_column($pdo, 'storefront_accounts', 'country_id')) {
+                $sfSql .= ' WHERE sa.customer_id IS NOT NULL AND sa.country_id = ?';
+                $sfParams[] = $adminCountryId;
+            } else {
+                $sfSql .= ' WHERE sa.customer_id IS NOT NULL';
+            }
+        } else {
+            $sfSql .= ' WHERE sa.customer_id IS NOT NULL';
         }
         if ($sfParams === []) {
             $sfSt = $pdo->query($sfSql);
