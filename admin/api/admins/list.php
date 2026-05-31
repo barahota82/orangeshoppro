@@ -53,7 +53,8 @@ try {
         'success' => true,
         'admins' => $admins,
         'permissions_by_admin' => $perms,
-        'resource_labels' => orange_admin_resource_labels(),
+        'permission_tree' => orange_admin_permission_mega_sections(),
+        'page_labels' => orange_admin_permission_page_labels(),
     ]);
 } catch (Throwable $e) {
     orange_admin_api_catch($e, 'تعذر جلب المستخدمين');

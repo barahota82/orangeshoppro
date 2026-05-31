@@ -932,3 +932,62 @@ function orangeAdminFlash(message, kind) {
         }, 280);
     }, 4200);
 }
+
+/**
+ * صلاحيات شاشة (page=…) — window.ORANGE_ADMIN_CAPS[page].
+ * @param {string} [page]
+ * @returns {{can_view:boolean,can_edit:boolean,can_delete:boolean,can_lock:boolean,can_unlock:boolean}}
+ */
+function orangeAdminCaps(page) {
+    var pg = page || window.ORANGE_ADMIN_PAGE || 'dashboard';
+    var m = window.ORANGE_ADMIN_CAPS || {};
+    var row = m[pg];
+    if (!row && window.ORANGE_ADMIN_CAPS_PAGE && pg === window.ORANGE_ADMIN_PAGE) {
+        row = window.ORANGE_ADMIN_CAPS_PAGE;
+    }
+    if (!row) {
+        return { can_view: false, can_edit: false, can_delete: false, can_lock: false, can_unlock: false };
+    }
+    return {
+        can_view: !!row.can_view,
+        can_edit: !!row.can_edit,
+        can_delete: !!row.can_delete,
+        can_lock: !!row.can_lock,
+        can_unlock: !!row.can_unlock
+    };
+}
+
+/**
+ * @param {Element|null} el
+ * @param {'view'|'edit'|'delete'|'lock'|'unlock'} perm
+ * @param {string} [page]
+ */
+function orangeAdminApplyPerm(el, perm, page) {
+    if (!el) {
+        return;
+    }
+    var caps = orangeAdminCaps(page || el.getAttribute('data-orange-page'));
+    var key = 'can_' + perm;
+    if (caps[key]) {
+        return;
+    }
+    el.hidden = true;
+    el.setAttribute('aria-hidden', 'true');
+    if ('disabled' in el) {
+        el.disabled = true;
+    }
+}
+
+function orangeAdminApplyPermMarkers(root) {
+    var scope = root || document;
+    if (!scope || !scope.querySelectorAll) {
+        return;
+    }
+    scope.querySelectorAll('[data-orange-perm]').forEach(function (el) {
+        orangeAdminApplyPerm(el, el.getAttribute('data-orange-perm') || 'view', el.getAttribute('data-orange-page') || undefined);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    orangeAdminApplyPermMarkers(document);
+});

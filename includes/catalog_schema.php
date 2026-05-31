@@ -3051,6 +3051,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_country_scope_repair_v75($pdo);
     orange_catalog_migrate_country_scope_repair_v76($pdo);
     orange_catalog_migrate_country_scope_repair_v77($pdo);
+    orange_admin_migrate_permissions_to_pages($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
         orange_catalog_safe_exec(

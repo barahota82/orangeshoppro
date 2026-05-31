@@ -9,14 +9,13 @@ require_once __DIR__ . '/../../includes/admin_password_policy.php';
 
 $dbAu = db();
 orange_catalog_ensure_schema($dbAu);
-$labels = orange_admin_resource_labels();
-$screenHints = orange_admin_resource_screen_hints();
+$auPermTree = orange_admin_permission_mega_sections();
 $auCountries = orange_countries_admin_list($dbAu);
 ?>
 <div class="page-title page-title--stacked">
     <div>
         <h1>المستخدمون والصلاحيات</h1>
-        <p class="page-subtitle">المشرف العام فقط يدير الحسابات. اختر الصلاحيات من الجدول في الأسفل (مجموعات — كل مجموعة تشمل عدة شاشات في القائمة). المستخدم غير المشرف لا يرى إلا ما تفعّله له.</p>
+        <p class="page-subtitle">المشرف العام فقط يدير الحسابات. اختر صلاحيات كل شاشة (عرض / تعديل / حذف / قفل / فك) — صف المجموعة اختصار لكل الشاشات داخلها؛ وسّع ▼ للضبط الدقيق.</p>
     </div>
 </div>
 
@@ -74,14 +73,14 @@ $auCountries = orange_countries_admin_list($dbAu);
 </div>
 
 <div class="card" id="au_perm_card">
-    <h3 class="card-title">صلاحيات الشاشات (مجموعات)</h3>
-    <p class="card-hint muted" id="au_perm_hint">فعّل «عرض / تعديل / حذف» لكل مجموعة. «عرض» = ظهور الشاشات في القائمة؛ «تعديل» = إنشاء وحفظ؛ «قفل/فك» للمحاسبة فقط.</p>
+    <h3 class="card-title">صلاحيات الشاشات</h3>
+    <p class="card-hint muted" id="au_perm_hint">فعّل «عرض / تعديل / حذف / قفل / فك» لكل شاشة. «عرض» = ظهورها في القائمة؛ «تعديل» = إنشاء وحفظ؛ «قفل/فك» للمستندات المحاسبية والمخزنية.</p>
     <input type="hidden" id="perm_target_id" value="0">
-    <div class="table-wrap">
-        <table>
+    <div class="table-wrap au-perm-table-wrap">
+        <table class="au-perm-table">
             <thead>
                 <tr>
-                    <th>المجموعة</th>
+                    <th>المجموعة / الشاشة</th>
                     <th>عرض</th>
                     <th>تعديل</th>
                     <th>حذف</th>
@@ -98,8 +97,7 @@ $auCountries = orange_countries_admin_list($dbAu);
 </div>
 
 <script>
-var AU_LABELS = <?php echo json_encode($labels, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
-var AU_SCREEN_HINTS = <?php echo json_encode($screenHints, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
+var AU_PERM_TREE = <?php echo json_encode($auPermTree, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
 
 function auIsSuperChecked() {
     var el = document.getElementById('au_super');
@@ -110,8 +108,122 @@ function auPermHintForSuper(isSuper) {
     var hint = document.getElementById('au_perm_hint');
     if (!hint) return;
     hint.textContent = isSuper
-        ? 'المشرف العام يملك كل الصلاحيات — لا حاجة لتحديد مجموعات.'
-        : 'فعّل «عرض / تعديل / حذف» لكل مجموعة. «عرض» = ظهور الشاشات في القائمة؛ «تعديل» = إنشاء وحفظ؛ «قفل/فك» للمحاسبة فقط.';
+        ? 'المشرف العام يملك كل الصلاحيات — لا حاجة لتحديد شاشات.'
+        : 'فعّل «عرض / تعديل / حذف / قفل / فك» لكل شاشة. صف المجموعة = اختصار لكل الشاشات داخلها؛ وسّع ▼ للضبط الدقيق.';
+}
+
+function auPermKey(page) {
+    return 'page:' + page;
+}
+
+function auPermRowFlags(tr) {
+    var v = tr.querySelector('.p-v');
+    if (!v) return null;
+    return {
+        can_view: tr.querySelector('.p-v').checked,
+        can_edit: tr.querySelector('.p-e').checked,
+        can_delete: tr.querySelector('.p-d').checked,
+        can_lock: tr.querySelector('.p-l') ? tr.querySelector('.p-l').checked : false,
+        can_unlock: tr.querySelector('.p-u') ? tr.querySelector('.p-u').checked : false
+    };
+}
+
+function auPermSetRowFlags(tr, flags) {
+    if (!tr || !flags) return;
+    var v = tr.querySelector('.p-v');
+    if (!v) return;
+    tr.querySelector('.p-v').checked = !!flags.can_view;
+    tr.querySelector('.p-e').checked = !!flags.can_edit;
+    tr.querySelector('.p-d').checked = !!flags.can_delete;
+    if (tr.querySelector('.p-l')) tr.querySelector('.p-l').checked = !!flags.can_lock;
+    if (tr.querySelector('.p-u')) tr.querySelector('.p-u').checked = !!flags.can_unlock;
+}
+
+function auPermMakeCheckboxCells(page, flags, extraClass) {
+    var ex = flags || {};
+    var cls = extraClass || '';
+    return '<td><input type="checkbox" class="p-v ' + cls + '" data-page="' + escapeHtml(page) + '"' + (ex.can_view ? ' checked' : '') + '></td>' +
+        '<td><input type="checkbox" class="p-e ' + cls + '" data-page="' + escapeHtml(page) + '"' + (ex.can_edit ? ' checked' : '') + '></td>' +
+        '<td><input type="checkbox" class="p-d ' + cls + '" data-page="' + escapeHtml(page) + '"' + (ex.can_delete ? ' checked' : '') + '></td>' +
+        '<td><input type="checkbox" class="p-l ' + cls + '" data-page="' + escapeHtml(page) + '"' + (ex.can_lock ? ' checked' : '') + '></td>' +
+        '<td><input type="checkbox" class="p-u ' + cls + '" data-page="' + escapeHtml(page) + '"' + (ex.can_unlock ? ' checked' : '') + '></td>';
+}
+
+function auPermResolveExisting(existing, page) {
+    if (!existing) return {};
+    var pk = auPermKey(page);
+    if (existing[pk]) return existing[pk];
+    if (existing[page]) return existing[page];
+    return {};
+}
+
+function auPermPagesInMega(mega) {
+    if (mega.page) return [mega.page];
+    var pages = [];
+    (mega.subgroups || []).forEach(function (sg) {
+        (sg.pages || []).forEach(function (p) {
+            if (p.page && pages.indexOf(p.page) < 0) pages.push(p.page);
+        });
+    });
+    return pages;
+}
+
+function auPermAggregateFlags(pageRows) {
+    var agg = { can_view: true, can_edit: true, can_delete: true, can_lock: true, can_unlock: true };
+    var any = false;
+    pageRows.forEach(function (tr) {
+        var f = auPermRowFlags(tr);
+        if (!f) return;
+        any = true;
+        ['can_view', 'can_edit', 'can_delete', 'can_lock', 'can_unlock'].forEach(function (k) {
+            if (!f[k]) agg[k] = false;
+        });
+    });
+    if (!any) {
+        return { can_view: false, can_edit: false, can_delete: false, can_lock: false, can_unlock: false };
+    }
+    return agg;
+}
+
+function auPermSyncMegaFromPages(megaId) {
+    var megaRow = document.querySelector('tr.au-perm-mega[data-mega="' + megaId + '"]');
+    if (!megaRow) return;
+    var pageRows = Array.prototype.slice.call(document.querySelectorAll('tr.au-perm-page[data-mega="' + megaId + '"]'));
+    auPermSetRowFlags(megaRow, auPermAggregateFlags(pageRows));
+}
+
+function auPermBindMatrixEvents() {
+    var tb = document.getElementById('perm_matrix_tbody');
+    if (!tb || tb.__auPermBound) return;
+    tb.__auPermBound = true;
+    tb.addEventListener('click', function (ev) {
+        var btn = ev.target.closest('.au-perm-expand');
+        if (!btn) return;
+        var megaId = btn.getAttribute('data-mega');
+        var expanded = btn.getAttribute('aria-expanded') === 'true';
+        btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+        document.querySelectorAll('tr.au-perm-child[data-mega="' + megaId + '"]').forEach(function (tr) {
+            tr.hidden = expanded;
+        });
+    });
+    tb.addEventListener('change', function (ev) {
+        var el = ev.target;
+        if (!el || el.type !== 'checkbox') return;
+        var megaRow = el.closest('tr.au-perm-mega');
+        if (megaRow) {
+            var megaId = megaRow.getAttribute('data-mega');
+            var flags = auPermRowFlags(megaRow);
+            document.querySelectorAll('tr.au-perm-page[data-mega="' + megaId + '"]').forEach(function (tr) {
+                auPermSetRowFlags(tr, flags);
+            });
+            return;
+        }
+        var pageRow = el.closest('tr.au-perm-page');
+        if (pageRow) {
+            var mid = pageRow.getAttribute('data-mega');
+            if (mid) auPermSyncMegaFromPages(mid);
+        }
+    });
 }
 
 function renderPermMatrix(adminId, existing, isSuperOverride) {
@@ -119,6 +231,7 @@ function renderPermMatrix(adminId, existing, isSuperOverride) {
     var tb = document.getElementById('perm_matrix_tbody');
     if (!tb) return;
     tb.innerHTML = '';
+    auPermBindMatrixEvents();
     if (isSuper) {
         document.getElementById('perm_target_id').value = '0';
         tb.innerHTML = '<tr><td colspan="6" class="muted">مشرف عام — كل الصلاحيات على كل الشاشات.</td></tr>';
@@ -127,37 +240,73 @@ function renderPermMatrix(adminId, existing, isSuperOverride) {
     }
     document.getElementById('perm_target_id').value = String(adminId || 0);
     auPermHintForSuper(false);
-    Object.keys(AU_LABELS).forEach(function (key) {
-        if (key === 'admin_users') return;
-        var ex = (existing && existing[key]) ? existing[key] : {};
-        var screens = AU_SCREEN_HINTS[key] || '';
-        var tr = document.createElement('tr');
-        tr.innerHTML =
-            '<td><strong>' + escapeHtml(AU_LABELS[key]) + '</strong>' +
-            (screens ? '<div class="card-hint" style="margin:4px 0 0;font-size:12px;line-height:1.45;color:#64748b;">يشمل: ' + escapeHtml(screens) + '</div>' : '') +
-            '</td>' +
-            '<td><input type="checkbox" class="p-v" data-k="' + key + '"' + (ex.can_view ? ' checked' : '') + '></td>' +
-            '<td><input type="checkbox" class="p-e" data-k="' + key + '"' + (ex.can_edit ? ' checked' : '') + '></td>' +
-            '<td><input type="checkbox" class="p-d" data-k="' + key + '"' + (ex.can_delete ? ' checked' : '') + '></td>' +
-            '<td><input type="checkbox" class="p-l" data-k="' + key + '"' + (ex.can_lock ? ' checked' : '') + '></td>' +
-            '<td><input type="checkbox" class="p-u" data-k="' + key + '"' + (ex.can_unlock ? ' checked' : '') + '></td>';
-        tb.appendChild(tr);
+    (AU_PERM_TREE || []).forEach(function (mega) {
+        var megaId = mega.id || '';
+        var pages = auPermPagesInMega(mega);
+        var megaFlags = { can_view: false, can_edit: false, can_delete: false, can_lock: false, can_unlock: false };
+        pages.forEach(function (pg) {
+            var ex = auPermResolveExisting(existing, pg);
+            ['can_view', 'can_edit', 'can_delete', 'can_lock', 'can_unlock'].forEach(function (k) {
+                if (ex[k]) megaFlags[k] = true;
+            });
+        });
+        var megaTr = document.createElement('tr');
+        megaTr.className = 'au-perm-mega';
+        megaTr.setAttribute('data-mega', megaId);
+        var expandBtn = pages.length > 1
+            ? '<button type="button" class="au-perm-expand" data-mega="' + escapeHtml(megaId) + '" aria-expanded="false" title="عرض الشاشات">▼</button> '
+            : '';
+        megaTr.innerHTML =
+            '<td class="au-perm-mega-label">' + expandBtn + '<strong>' + escapeHtml(mega.title || megaId) + '</strong>' +
+            '<span class="card-hint au-perm-mega-hint">اختصار — ' + pages.length + ' شاشة</span></td>' +
+            auPermMakeCheckboxCells('__mega__' + megaId, megaFlags, 'au-perm-mega-cb');
+        tb.appendChild(megaTr);
+
+        if (mega.page) {
+            megaTr.className = 'au-perm-mega au-perm-page';
+            megaTr.setAttribute('data-page', mega.page);
+            megaTr.querySelectorAll('input[type=checkbox]').forEach(function (inp) {
+                inp.classList.remove('au-perm-mega-cb');
+                inp.classList.add('au-perm-page-cb');
+                inp.setAttribute('data-page', mega.page);
+            });
+            tb.appendChild(megaTr);
+            return;
+        }
+
+        (mega.subgroups || []).forEach(function (sg) {
+            var headTr = document.createElement('tr');
+            headTr.className = 'au-perm-subhead au-perm-child';
+            headTr.setAttribute('data-mega', megaId);
+            headTr.hidden = true;
+            headTr.innerHTML = '<td colspan="6" class="au-perm-subhead-label">' + escapeHtml(sg.title || '') + '</td>';
+            tb.appendChild(headTr);
+            (sg.pages || []).forEach(function (p) {
+                var pg = p.page || '';
+                if (!pg) return;
+                var pageTr = document.createElement('tr');
+                pageTr.className = 'au-perm-page au-perm-child';
+                pageTr.setAttribute('data-mega', megaId);
+                pageTr.setAttribute('data-page', pg);
+                pageTr.hidden = true;
+                pageTr.innerHTML =
+                    '<td class="au-perm-page-label">' + escapeHtml(p.label || pg) + '</td>' +
+                    auPermMakeCheckboxCells(pg, auPermResolveExisting(existing, pg), 'au-perm-page-cb');
+                tb.appendChild(pageTr);
+            });
+        });
+        auPermSyncMegaFromPages(megaId);
     });
 }
 
 function collectPermMatrix() {
     var matrix = {};
-    document.querySelectorAll('#perm_matrix_tbody tr').forEach(function (tr) {
-        var v = tr.querySelector('.p-v');
-        if (!v) return;
-        var k = v.getAttribute('data-k');
-        matrix[k] = {
-            can_view: tr.querySelector('.p-v').checked,
-            can_edit: tr.querySelector('.p-e').checked,
-            can_delete: tr.querySelector('.p-d').checked,
-            can_lock: tr.querySelector('.p-l') ? tr.querySelector('.p-l').checked : false,
-            can_unlock: tr.querySelector('.p-u') ? tr.querySelector('.p-u').checked : false
-        };
+    document.querySelectorAll('#perm_matrix_tbody tr.au-perm-page').forEach(function (tr) {
+        var page = tr.getAttribute('data-page');
+        if (!page) return;
+        var flags = auPermRowFlags(tr);
+        if (!flags) return;
+        matrix[auPermKey(page)] = flags;
     });
     return matrix;
 }
@@ -217,6 +366,7 @@ function loadAdmins() {
             tb.appendChild(tr);
         });
         window.__permByAdmin = r.permissions_by_admin || {};
+        if (r.permission_tree) AU_PERM_TREE = r.permission_tree;
     }).catch(function (e) { alert(e.message || String(e)); });
 }
 

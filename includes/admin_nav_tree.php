@@ -1,0 +1,283 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * شجرة صلاحيات لوحة التحكم — مطابقة لتقسيم القائمة العلوية (mega → subgroup → page).
+ * مصدر واحد لمصفوفة المستخدمين؛ المجموعات اختصار في الواجهة فقط.
+ *
+ * @return list<array{id:string,title:string,subgroups:list<array{title:string,pages:list<array{page:string,label:string}>}>|null,page?:string,label?:string}>
+ */
+function orange_admin_permission_mega_sections(): array
+{
+    static $tree = null;
+    if ($tree !== null) {
+        return $tree;
+    }
+
+    $tree = [
+        [
+            'id' => 'dashboard',
+            'title' => 'الرئيسية',
+            'subgroups' => null,
+            'page' => 'dashboard',
+            'label' => 'الرئيسية',
+        ],
+        [
+            'id' => 'accounting',
+            'title' => 'الحسابات والتقارير',
+            'subgroups' => [
+                [
+                    'title' => 'الإعداد والدليل',
+                    'pages' => [
+                        ['page' => 'chart_of_accounts', 'label' => 'الدليل المحاسبي'],
+                        ['page' => 'gl_account_settings', 'label' => 'حسابات القيود التلقائية'],
+                        ['page' => 'invoice_line_presets', 'label' => 'قائمة بنود الفاتورة'],
+                        ['page' => 'analytical_dimensions', 'label' => 'الأبعاد التحليلية'],
+                        ['page' => 'journal_types', 'label' => 'أنواع اليوميات'],
+                        ['page' => 'fiscal_years', 'label' => 'السنوات المالية'],
+                        ['page' => 'edit_lock', 'label' => 'إقفال التعديلات'],
+                        ['page' => 'opening_balances', 'label' => 'أرصدة أول المدة المالية'],
+                        ['page' => 'gl_posting', 'label' => 'ترحيل القيود (طابور)'],
+                    ],
+                ],
+                [
+                    'title' => 'السندات والذمم',
+                    'pages' => [
+                        ['page' => 'journal_entries', 'label' => 'سند قيد'],
+                        ['page' => 'year_end_close_vouchers', 'label' => 'قيود الإقفال السنوية'],
+                        ['page' => 'receipt_voucher', 'label' => 'سند قبض'],
+                        ['page' => 'payment_voucher', 'label' => 'سند صرف'],
+                        ['page' => 'other_vouchers', 'label' => 'سندات أخرى'],
+                        ['page' => 'partner_customer_receipt', 'label' => 'سداد فواتير مبيعات آجلة'],
+                        ['page' => 'partner_supplier_payment', 'label' => 'سداد فواتير مشتريات آجلة'],
+                        ['page' => 'bank_reconciliation', 'label' => 'تسوية البنك'],
+                    ],
+                ],
+                [
+                    'title' => 'التقارير',
+                    'pages' => [
+                        ['page' => 'journal_voucher_reports', 'label' => 'تقارير السندات'],
+                        ['page' => 'partner_account_statement', 'label' => 'كشف حساب'],
+                        ['page' => 'report_account_list', 'label' => 'قائمة الحسابات'],
+                        ['page' => 'report_gl_account_monthly', 'label' => 'الحركة الشهرية لحساب'],
+                        ['page' => 'partner_reports', 'label' => 'أرصدة العملاء والموردين (ذمم)'],
+                        ['page' => 'report_income_statement', 'label' => 'أرباح وخسائر'],
+                        ['page' => 'report_trading_account', 'label' => 'قائمة حسابات المتاجرة'],
+                        ['page' => 'report_pl_monthly', 'label' => 'قائمة إيرادات ومصروفات شهرية'],
+                        ['page' => 'report_pl_compare_years', 'label' => 'أرباح وخسائر مقارنة بين السنوات'],
+                        ['page' => 'report_trial_balance', 'label' => 'ميزان المراجعة'],
+                        ['page' => 'report_cash_flow', 'label' => 'قائمة التدفقات النقدية'],
+                        ['page' => 'report_analytical', 'label' => 'التقرير التحليلي'],
+                        ['page' => 'financial_report', 'label' => 'التقارير المالية / الميزانية'],
+                        ['page' => 'accounting_reports_index', 'label' => 'فهرس التقارير المحاسبية'],
+                    ],
+                ],
+            ],
+        ],
+        [
+            'id' => 'warehouse',
+            'title' => 'المخازن والمشتريات',
+            'subgroups' => [
+                [
+                    'title' => 'المخزون',
+                    'pages' => [
+                        ['page' => 'stock', 'label' => 'المستودع'],
+                        ['page' => 'item_card', 'label' => 'بطاقة الصنف'],
+                        ['page' => 'opening_stock_balances', 'label' => 'أرصدة أول المدة المخزنية'],
+                        ['page' => 'inventory_reconciliation', 'label' => 'تسوية المخزون / الجرد'],
+                    ],
+                ],
+                [
+                    'title' => 'المشتريات',
+                    'pages' => [
+                        ['page' => 'suppliers', 'label' => 'الموردين'],
+                        ['page' => 'purchases', 'label' => 'المشتريات'],
+                        ['page' => 'purchase_returns', 'label' => 'مردود المشتريات'],
+                    ],
+                ],
+                [
+                    'title' => 'هيكل الكتالوج والمنتجات',
+                    'pages' => [
+                        ['page' => 'departments', 'label' => 'الأقسام الرئيسية'],
+                        ['page' => 'unified_catalog_branches', 'label' => 'فروع شجرة المنتجات'],
+                        ['page' => 'product_types', 'label' => 'أنواع المنتجات الموحدة'],
+                        ['page' => 'catalog_attributes', 'label' => 'سمات الكتالوج'],
+                        ['page' => 'color_dictionary', 'label' => 'قاموس الألوان'],
+                        ['page' => 'pattern_dictionary', 'label' => 'أنماط الألوان'],
+                        ['page' => 'size_scheme_templates', 'label' => 'قوالب المقاسات'],
+                        ['page' => 'sizing_dictionary', 'label' => 'قاموس هرم المقاسات (1–2)'],
+                        ['page' => 'size_families', 'label' => 'عائلات المقاسات (3–4)'],
+                        ['page' => 'advisory_sizing_guides', 'label' => 'دليل المقاس الاسترشادي'],
+                        ['page' => 'products', 'label' => 'المنتجات'],
+                    ],
+                ],
+            ],
+        ],
+        [
+            'id' => 'sales',
+            'title' => 'المبيعات والعروض',
+            'subgroups' => [
+                [
+                    'title' => 'العملاء والطلبات',
+                    'pages' => [
+                        ['page' => 'customers', 'label' => 'العملاء'],
+                        ['page' => 'orders', 'label' => 'الطلبات'],
+                        ['page' => 'reserved_orders', 'label' => 'طلبات محجوزة (مخزون)'],
+                        ['page' => 'order_intake_queue', 'label' => 'طابور الطلبات'],
+                    ],
+                ],
+                [
+                    'title' => 'التوصيل والتسليم',
+                    'pages' => [
+                        ['page' => 'delivery_agents', 'label' => 'مناديب التوصيل'],
+                        ['page' => 'delivery_agent_handover', 'label' => 'تسليم المندوب'],
+                        ['page' => 'delivery_order_search', 'label' => 'بحث التسليم'],
+                        ['page' => 'delivery_handover_manifest', 'label' => 'ورقة المندوب'],
+                        ['page' => 'online_orders_final_posting', 'label' => 'إنشاء قيود التسليم'],
+                    ],
+                ],
+                [
+                    'title' => 'الفواتير والمردود',
+                    'pages' => [
+                        ['page' => 'invoice', 'label' => 'فاتورة أونلاين'],
+                        ['page' => 'online_invoices', 'label' => 'فواتير أونلاين'],
+                        ['page' => 'sales_invoices', 'label' => 'فواتير مبيعات'],
+                        ['page' => 'manual_order', 'label' => 'فاتورة مبيعات'],
+                        ['page' => 'invoice_edit', 'label' => 'تعديل فاتورة'],
+                        ['page' => 'sales_returns', 'label' => 'مردود المبيعات'],
+                    ],
+                ],
+                [
+                    'title' => 'العروض',
+                    'pages' => [
+                        ['page' => 'offers', 'label' => 'عروض المنتجات'],
+                        ['page' => 'cart_promotions', 'label' => 'عروض مجموع السلة'],
+                        ['page' => 'cart_gift_promotions', 'label' => 'عروض الهدايا (س4)'],
+                        ['page' => 'cart_bogo_promotions', 'label' => 'عروض BOGO (س4)'],
+                        ['page' => 'cart_combo_promotions', 'label' => 'عروض الكومبو'],
+                    ],
+                ],
+                [
+                    'title' => 'تقارير المبيعات',
+                    'pages' => [
+                        ['page' => 'reports', 'label' => 'تقارير المبيعات'],
+                        ['page' => 'channel_analytics', 'label' => 'تحليل القنوات'],
+                    ],
+                ],
+            ],
+        ],
+        [
+            'id' => 'settings',
+            'title' => 'الإعدادات',
+            'subgroups' => [
+                [
+                    'title' => 'الشركة',
+                    'pages' => [
+                        ['page' => 'company_settings', 'label' => 'بيانات الشركة'],
+                        ['page' => 'company_documents', 'label' => 'أرشيف المستندات'],
+                        ['page' => 'logs', 'label' => 'سجل النشاط'],
+                    ],
+                ],
+                [
+                    'title' => 'السوق الحالي',
+                    'pages' => [
+                        ['page' => 'channels', 'label' => 'قنوات العملاء'],
+                        ['page' => 'delivery_areas', 'label' => 'محافظات ومناطق التوصيل'],
+                        ['page' => 'storefront_hero', 'label' => 'بانر الصفحة الرئيسية'],
+                        ['page' => 'storefront_merge_requests', 'label' => 'دمج هاتف التسجيل (س15)'],
+                    ],
+                ],
+            ],
+        ],
+    ];
+
+    return $tree;
+}
+
+/** @return array<string, string> page => label */
+function orange_admin_permission_page_labels(): array
+{
+    static $labels = null;
+    if ($labels !== null) {
+        return $labels;
+    }
+    $labels = [];
+    foreach (orange_admin_permission_mega_sections() as $mega) {
+        if (!empty($mega['page'])) {
+            $labels[(string) $mega['page']] = (string) ($mega['label'] ?? $mega['page']);
+            continue;
+        }
+        foreach ($mega['subgroups'] ?? [] as $sg) {
+            foreach ($sg['pages'] ?? [] as $p) {
+                $pg = (string) ($p['page'] ?? '');
+                if ($pg !== '' && !isset($labels[$pg])) {
+                    $labels[$pg] = (string) ($p['label'] ?? $pg);
+                }
+            }
+        }
+    }
+
+    return $labels;
+}
+
+/** @return list<string> */
+function orange_admin_permission_all_pages(): array
+{
+    return array_keys(orange_admin_permission_page_labels());
+}
+
+/** @return list<string> */
+function orange_admin_permission_pages_in_mega(string $megaId): array
+{
+    $out = [];
+    foreach (orange_admin_permission_mega_sections() as $mega) {
+        if ((string) ($mega['id'] ?? '') !== $megaId) {
+            continue;
+        }
+        if (!empty($mega['page'])) {
+            return [(string) $mega['page']];
+        }
+        foreach ($mega['subgroups'] ?? [] as $sg) {
+            foreach ($sg['pages'] ?? [] as $p) {
+                $pg = (string) ($p['page'] ?? '');
+                if ($pg !== '' && !in_array($pg, $out, true)) {
+                    $out[] = $pg;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    return [];
+}
+
+/** @return list<string> صفحات مجموعة الصلاحيات القديمة (catalog، sales، …) */
+function orange_admin_permission_pages_in_legacy_group(string $groupKey): array
+{
+    $out = [];
+    foreach (orange_admin_permission_all_pages() as $page) {
+        if (orange_admin_page_resource($page) === $groupKey) {
+            $out[] = $page;
+        }
+    }
+
+    return $out;
+}
+
+function orange_admin_perm_storage_key(string $page): string
+{
+    return 'page:' . $page;
+}
+
+function orange_admin_page_from_perm_key(string $key): ?string
+{
+    if (str_starts_with($key, 'page:')) {
+        $page = substr($key, 5);
+
+        return $page !== '' ? $page : null;
+    }
+
+    return null;
+}

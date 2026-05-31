@@ -7,9 +7,11 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
+require_once __DIR__ . '/../../includes/admin_permissions.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+$srCaps = orange_admin_caps_for_page($admin, $pdo, 'sales_returns');
 
 $srCountryId = orange_admin_context_country_id($pdo);
 $srDefaultCurrency = orange_admin_context_currency_code($pdo);
@@ -196,7 +198,7 @@ function sr_channel_label(string $t): string
     <?php endif; ?>
     <div class="actions admin-doc-lines-toolbar" style="margin-top:12px;">
         <button type="button" class="btn-secondary" onclick="srAddLine()">+ سطر</button>
-        <button type="button" id="sr_submit_btn" onclick="srSubmit()">حفظ مردود المبيعات</button>
+        <button type="button" id="sr_submit_btn" data-orange-perm="edit" data-orange-page="sales_returns" onclick="srSubmit()">حفظ مردود المبيعات</button>
     </div>
     <p class="card-hint" style="margin-top:12px;margin-bottom:0;"><strong>صافي الإيراد (تقديري):</strong> <span id="sr_total_preview">0.00</span> <?php echo htmlspecialchars($srCurrencyUnit, ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
@@ -243,6 +245,7 @@ var SR_PRODUCTS = <?php echo json_encode($products, JSON_UNESCAPED_UNICODE); ?>;
 var SR_VARIANTS_BY_PID = <?php echo json_encode($variantsByProduct, JSON_UNESCAPED_UNICODE); ?>;
 var SR_EDIT_ID = 0;
 var SR_COUNTRY_ID = <?php echo (int) $srCountryId; ?>;
+var SR_CAPS = <?php echo json_encode($srCaps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
 var srEditLockCtl = null;
 var SR_HAS_CUSTOMERS = <?php echo $hasCustomers ? 'true' : 'false'; ?>;
 
@@ -427,6 +430,10 @@ function srEdit(id) {
 }
 
 function srSubmit() {
+    if (!SR_CAPS.can_edit) {
+        alert('لا تملك صلاحية تعديل مردود المبيعات');
+        return;
+    }
     var customer = parseInt(document.getElementById('sr_customer').value, 10) || 0;
     var channel = document.getElementById('sr_channel').value;
     if (!SR_HAS_CUSTOMERS && channel === 'credit') {
@@ -517,6 +524,9 @@ if (document.getElementById('sr_lines_body')) {
         srEditLockCtl = OrangeEditLock.bind({
             prefix: 'sr',
             docKind: 'sales_return',
+            page: 'sales_returns',
+            canLock: !!SR_CAPS.can_lock,
+            canUnlock: !!SR_CAPS.can_unlock,
             countryId: SR_COUNTRY_ID,
             getEntityId: function () { return SR_EDIT_ID; }
         });

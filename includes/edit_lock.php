@@ -52,26 +52,32 @@ function orange_edit_lock_kind_is_supported(string $kind): bool
     return isset(orange_gl_entry_type_labels_map()[$kind]);
 }
 
-function orange_edit_lock_resource_for_kind(string $kind): string
+function orange_edit_lock_page_for_kind(string $kind): string
 {
     $warehouse = ['purchase', 'purchase_return', 'purchase_receive'];
     $sales = ['sales_return', 'order_delivery_sale', 'order_delivery_cogs', 'order_return_sale', 'order_return_cogs'];
-    $partners = ['customer_receipt', 'supplier_payment'];
     if (in_array($kind, $warehouse, true)) {
-        return 'warehouse';
+        return $kind === 'purchase_return' ? 'purchase_returns' : 'purchases';
     }
     if (in_array($kind, $sales, true)) {
-        return 'sales';
+        return 'sales_returns';
     }
-    if (in_array($kind, $partners, true)) {
-        return 'partners';
+    if ($kind === 'customer_receipt') {
+        return 'partner_customer_receipt';
     }
-    $kinds = orange_edit_lock_doc_kinds();
-    if (isset($kinds[$kind]['resource'])) {
-        return $kinds[$kind]['resource'];
+    if ($kind === 'supplier_payment') {
+        return 'partner_supplier_payment';
+    }
+    if ($kind === 'opening_balance') {
+        return 'opening_balances';
     }
 
-    return 'accounting';
+    return 'journal_entries';
+}
+
+function orange_edit_lock_resource_for_kind(string $kind): string
+{
+    return orange_admin_page_resource(orange_edit_lock_page_for_kind($kind));
 }
 
 /**
@@ -194,32 +200,36 @@ function orange_edit_lock_assert_may_mutate(PDO $pdo, array $admin, string $kind
             'المستند مقفول — فك القفل أولاً من «إقفال التعديلات» أو من شاشة المستند.'
         );
     }
-    $resource = orange_edit_lock_resource_for_kind($kind);
-    if (!orange_admin_may($admin, $pdo, $resource, $mutation)) {
+    $page = orange_edit_lock_page_for_kind($kind);
+    if (!orange_admin_may_page($admin, $pdo, $page, $mutation)) {
         throw new RuntimeException('لا تملك صلاحية ' . ($mutation === 'delete' ? 'حذف' : 'تعديل') . ' لهذا المستند.');
     }
 }
 
-function orange_admin_may_lock(array $admin, PDO $pdo, string $resource): bool
+function orange_admin_may_lock(array $admin, PDO $pdo, string $resourceOrPage): bool
 {
     if (orange_admin_has_full_access($admin)) {
         return true;
     }
-    $matrix = orange_admin_permissions_matrix($pdo, (int) $admin['id']);
-    $row = $matrix[$resource] ?? null;
+    $page = orange_admin_page_from_perm_key($resourceOrPage) ?? $resourceOrPage;
+    if (!isset(orange_admin_permission_page_labels()[$page])) {
+        $page = orange_edit_lock_page_for_kind($resourceOrPage);
+    }
 
-    return $row !== null && !empty($row['can_lock']);
+    return orange_admin_may_page($admin, $pdo, $page, 'lock');
 }
 
-function orange_admin_may_unlock(array $admin, PDO $pdo, string $resource): bool
+function orange_admin_may_unlock(array $admin, PDO $pdo, string $resourceOrPage): bool
 {
     if (orange_admin_has_full_access($admin)) {
         return true;
     }
-    $matrix = orange_admin_permissions_matrix($pdo, (int) $admin['id']);
-    $row = $matrix[$resource] ?? null;
+    $page = orange_admin_page_from_perm_key($resourceOrPage) ?? $resourceOrPage;
+    if (!isset(orange_admin_permission_page_labels()[$page])) {
+        $page = orange_edit_lock_page_for_kind($resourceOrPage);
+    }
 
-    return $row !== null && !empty($row['can_unlock']);
+    return orange_admin_may_page($admin, $pdo, $page, 'unlock');
 }
 
 /**
@@ -245,7 +255,7 @@ function orange_edit_lock_set_by_registry_ids(PDO $pdo, array $admin, array $reg
             $errors[] = 'سجل #' . $id . ' غير موجود';
             continue;
         }
-        $resource = orange_edit_lock_resource_for_kind((string) ($row['doc_kind'] ?? ''));
+        $resource = orange_edit_lock_page_for_kind((string) ($row['doc_kind'] ?? ''));
         if ($lock && !orange_admin_may_lock($admin, $pdo, $resource)) {
             $errors[] = 'لا صلاحية قفل: ' . ($row['reference'] ?? (string) $id);
             continue;

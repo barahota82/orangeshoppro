@@ -16,8 +16,12 @@ require_once __DIR__ . '/../../includes/supplier_payable_account.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
+require_once __DIR__ . '/../../includes/admin_permissions.php';
 
 $pdo = orange_admin_page_pdo();
+
+$ppvPermPage = $ppvKind === 'customer_receipt' ? 'partner_customer_receipt' : 'partner_supplier_payment';
+$ppvCaps = orange_admin_caps_for_page($admin, $pdo, $ppvPermPage);
 
 $ppvCountryId = orange_admin_context_country_id($pdo);
 $ppvCustomersCountrySql = orange_sql_country_and_fragment($pdo, 'customers', 'customers', $ppvCountryId);
@@ -319,7 +323,7 @@ if (orange_journal_vouchers_ready($pdo)) {
                 </div>
                 <?php endif; ?>
                 <div class="jv-voucher-nav-btns ppv-voucher-action-btns" role="group" aria-label="إجراءات السند">
-                    <button type="button" id="ppv_btn_save"<?php echo !$ppvReady ? ' disabled' : ''; ?>>حفظ السند</button>
+                    <button type="button" id="ppv_btn_save" data-orange-perm="edit" data-orange-page="<?php echo htmlspecialchars($ppvPermPage, ENT_QUOTES, 'UTF-8'); ?>"<?php echo !$ppvReady ? ' disabled' : ''; ?>>حفظ السند</button>
                     <button type="button" class="btn-secondary jv-nav-search" id="ppv_btn_print" title="طباعة">طباعة السند</button>
                     <button type="button" class="btn-secondary jv-nav-search" id="ppv_btn_new" title="سند جديد">سند جديد</button>
                     <?php if ($ppvIsReceipt): ?>
@@ -466,6 +470,8 @@ var PPV_BROWSE_ENTRY_TYPE = <?php echo json_encode($ppvIsReceipt ? 'customer_rec
 var ppvSupplierPickTimer = null;
 var ppvBrowseId = null;
 var PPV_COUNTRY_ID = <?php echo (int) $ppvCountryId; ?>;
+var PPV_PERM_PAGE = <?php echo json_encode($ppvPermPage, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
+var PPV_CAPS = <?php echo json_encode($ppvCaps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
 var ppvEditLockCtl = null;
 
 function ppvEscapeHtml(s) {
@@ -858,6 +864,10 @@ function ppvGetAmount() {
 }
 
 function ppvSave() {
+    if (!PPV_CAPS.can_edit) {
+        alert('لا تملك صلاحية حفظ هذا السند');
+        return;
+    }
     if (!PPV_CASH || !PPV_CASH.id) return;
     var partyId = ppvPartyIdValue();
     var amt = ppvGetAmount();
@@ -1217,6 +1227,9 @@ if (document.readyState === 'loading') {
             ppvEditLockCtl = OrangeEditLock.bind({
                 prefix: 'ppv',
                 docKind: PPV_BROWSE_ENTRY_TYPE,
+                page: PPV_PERM_PAGE,
+                canLock: !!PPV_CAPS.can_lock,
+                canUnlock: !!PPV_CAPS.can_unlock,
                 countryId: PPV_COUNTRY_ID,
                 getEntityId: function () { return ppvBrowseId || 0; }
             });
@@ -1230,6 +1243,9 @@ if (document.readyState === 'loading') {
         ppvEditLockCtl = OrangeEditLock.bind({
             prefix: 'ppv',
             docKind: PPV_BROWSE_ENTRY_TYPE,
+            page: PPV_PERM_PAGE,
+            canLock: !!PPV_CAPS.can_lock,
+            canUnlock: !!PPV_CAPS.can_unlock,
             countryId: PPV_COUNTRY_ID,
             getEntityId: function () { return ppvBrowseId || 0; }
         });

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/upload_paths.php';
+require_once __DIR__ . '/admin_nav_tree.php';
 
 /**
  * موارد الصلاحيات — مفتاح ثابت => عنوان عربي.
@@ -230,6 +231,80 @@ function orange_admin_api_action_from_request(): string
 }
 
 /**
+ * صفحة الأدمن المرتبطة بمسار API (إن وُجد).
+ */
+function orange_admin_api_page_from_script(): ?string
+{
+    $path = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_FILENAME'] ?? ''));
+
+    static $prefixMap = [
+        '/admin/api/settings/gl-accounts' => 'gl_account_settings',
+    ];
+    foreach ($prefixMap as $prefix => $page) {
+        if (str_contains($path, $prefix)) {
+            return $page;
+        }
+    }
+
+    static $folderMap = [
+        'departments' => 'departments',
+        'product_types' => 'product_types',
+        'colors' => 'color_dictionary',
+        'patterns' => 'pattern_dictionary',
+        'size_families' => 'size_families',
+        'advisory_sizing_guides' => 'advisory_sizing_guides',
+        'advisory_sizing_library' => 'advisory_sizing_guides',
+        'size_scheme_templates' => 'size_scheme_templates',
+        'sizing_dictionary' => 'sizing_dictionary',
+        'catalog_attributes' => 'catalog_attributes',
+        'unified_catalog' => 'unified_catalog_branches',
+        'translate' => 'departments',
+        'products' => 'products',
+        'uploads' => 'products',
+        'offers' => 'offers',
+        'orders' => 'orders',
+        'sales_returns' => 'sales_returns',
+        'order_intake' => 'order_intake_queue',
+        'purchases' => 'purchases',
+        'purchase_returns' => 'purchase_returns',
+        'stock' => 'stock',
+        'journal' => 'journal_entries',
+        'year_end_close' => 'year_end_close_vouchers',
+        'system' => 'fiscal_years',
+        'gl' => 'gl_posting',
+        'edit-lock' => 'edit_lock',
+        'fiscal_years' => 'fiscal_years',
+        'opening_balances' => 'opening_balances',
+        'bank-reconciliation' => 'bank_reconciliation',
+        'inventory-reconciliation' => 'inventory_reconciliation',
+        'analytical-dimensions' => 'analytical_dimensions',
+        'accounts' => 'chart_of_accounts',
+        'invoice-ancillary' => 'invoice_line_presets',
+        'settings' => 'company_settings',
+        'partners' => 'partner_reports',
+        'customers' => 'customers',
+        'suppliers' => 'suppliers',
+        'reports' => 'reports',
+        'channels' => 'channels',
+        'company_documents' => 'company_documents',
+        'delivery_areas' => 'delivery_areas',
+        'cart_promotions' => 'cart_promotions',
+        'cart_gift_promotions' => 'cart_gift_promotions',
+        'cart_bogo_promotions' => 'cart_bogo_promotions',
+        'cart_combo_promotions' => 'cart_combo_promotions',
+        'storefront' => 'storefront_hero',
+        'countries' => 'countries',
+        'admins' => 'admin_users',
+    ];
+
+    if (preg_match('#/admin/api/([^/]+)/#', $path, $m)) {
+        return $folderMap[$m[1]] ?? null;
+    }
+
+    return null;
+}
+
+/**
  * @return array<string, array{can_view:bool,can_edit:bool,can_delete:bool}>
  */
 function orange_admin_permissions_matrix(PDO $pdo, int $adminId): array
@@ -261,6 +336,224 @@ function orange_admin_permissions_matrix(PDO $pdo, int $adminId): array
     $cache[$adminId] = $out;
 
     return $out;
+}
+
+/**
+ * @return array{can_view:bool,can_edit:bool,can_delete:bool,can_lock:bool,can_unlock:bool}
+ */
+function orange_admin_empty_caps(): array
+{
+    return [
+        'can_view' => false,
+        'can_edit' => false,
+        'can_delete' => false,
+        'can_lock' => false,
+        'can_unlock' => false,
+    ];
+}
+
+/**
+ * @return array{can_view:bool,can_edit:bool,can_delete:bool,can_lock:bool,can_unlock:bool}
+ */
+function orange_admin_full_caps(): array
+{
+    return [
+        'can_view' => true,
+        'can_edit' => true,
+        'can_delete' => true,
+        'can_lock' => true,
+        'can_unlock' => true,
+    ];
+}
+
+/**
+ * @param array<string, array{can_view:bool,can_edit:bool,can_delete:bool,can_lock?:bool,can_unlock?:bool}> $matrix
+ * @return array{can_view:bool,can_edit:bool,can_delete:bool,can_lock:bool,can_unlock:bool}|null
+ */
+function orange_admin_resolve_perm_row(array $matrix, string $page): ?array
+{
+    $pageKey = orange_admin_perm_storage_key($page);
+    if (isset($matrix[$pageKey])) {
+        return $matrix[$pageKey];
+    }
+    $group = orange_admin_page_resource($page);
+    if (isset($matrix[$group])) {
+        return $matrix[$group];
+    }
+
+    return null;
+}
+
+/**
+ * صلاحيات شاشة واحدة (page=…) — المصدر المعتمد للتحقق.
+ *
+ * @return array{can_view:bool,can_edit:bool,can_delete:bool,can_lock:bool,can_unlock:bool}
+ */
+function orange_admin_caps_for_page(array $admin, PDO $pdo, string $page): array
+{
+    if (orange_admin_has_full_access($admin)) {
+        return orange_admin_full_caps();
+    }
+    if ($page === 'admin_users') {
+        return orange_admin_is_superuser($admin) ? orange_admin_full_caps() : orange_admin_empty_caps();
+    }
+    if ($page === 'countries') {
+        return orange_admin_can_manage_countries($admin) ? orange_admin_full_caps() : orange_admin_empty_caps();
+    }
+    $matrix = orange_admin_permissions_matrix($pdo, (int) $admin['id']);
+    if ($matrix === []) {
+        if ($page === 'dashboard') {
+            return [
+                'can_view' => true,
+                'can_edit' => false,
+                'can_delete' => false,
+                'can_lock' => false,
+                'can_unlock' => false,
+            ];
+        }
+
+        return orange_admin_empty_caps();
+    }
+    $row = orange_admin_resolve_perm_row($matrix, $page);
+    if (!$row) {
+        return orange_admin_empty_caps();
+    }
+
+    return [
+        'can_view' => !empty($row['can_view']),
+        'can_edit' => !empty($row['can_edit']),
+        'can_delete' => !empty($row['can_delete']),
+        'can_lock' => !empty($row['can_lock']),
+        'can_unlock' => !empty($row['can_unlock']),
+    ];
+}
+
+/** @alias orange_admin_caps_for_page */
+function orange_admin_caps(array $admin, PDO $pdo, string $page): array
+{
+    return orange_admin_caps_for_page($admin, $pdo, $page);
+}
+
+/**
+ * @return array<string, array{can_view:bool,can_edit:bool,can_delete:bool,can_lock:bool,can_unlock:bool}>
+ */
+function orange_admin_caps_all_pages(array $admin, PDO $pdo): array
+{
+    $out = [];
+    foreach (orange_admin_permission_all_pages() as $page) {
+        $out[$page] = orange_admin_caps_for_page($admin, $pdo, $page);
+    }
+
+    return $out;
+}
+
+function orange_admin_may_page(array $admin, PDO $pdo, string $page, string $action): bool
+{
+    $caps = orange_admin_caps_for_page($admin, $pdo, $page);
+    if ($action === 'delete') {
+        return $caps['can_delete'];
+    }
+    if ($action === 'edit') {
+        return $caps['can_edit'];
+    }
+    if ($action === 'lock') {
+        return $caps['can_lock'];
+    }
+    if ($action === 'unlock') {
+        return $caps['can_unlock'];
+    }
+
+    return $caps['can_view'];
+}
+
+/** @deprecated استخدم orange_admin_may_page — للتوافق مع مجموعات قديمة */
+function orange_admin_may(array $admin, PDO $pdo, string $resource, string $action): bool
+{
+    if (orange_admin_page_from_perm_key($resource) !== null) {
+        return orange_admin_may_page($admin, $pdo, orange_admin_page_from_perm_key($resource), $action);
+    }
+    $pages = orange_admin_permission_pages_in_legacy_group($resource);
+    if ($pages === []) {
+        return orange_admin_may_page($admin, $pdo, $resource, $action);
+    }
+    foreach ($pages as $page) {
+        if (orange_admin_may_page($admin, $pdo, $page, $action)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function orange_admin_migrate_permissions_to_pages(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    $marker = 'php_admin_permissions_page_keys_v78';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+    if (!orange_table_exists($pdo, 'admin_permissions')) {
+        return;
+    }
+    $groupKeys = array_keys(orange_admin_resource_labels());
+    $hasLock = orange_table_has_column($pdo, 'admin_permissions', 'can_lock');
+    $sel = $pdo->query(
+        'SELECT admin_id, resource_key, can_view, can_edit, can_delete'
+        . ($hasLock ? ', can_lock, can_unlock' : '')
+        . ' FROM admin_permissions'
+    );
+    $rows = $sel ? $sel->fetchAll(PDO::FETCH_ASSOC) : [];
+    if ($hasLock) {
+        $ins = $pdo->prepare(
+            'INSERT INTO admin_permissions (admin_id, resource_key, can_view, can_edit, can_delete, can_lock, can_unlock)
+             VALUES (?,?,?,?,?,?,?)
+             ON DUPLICATE KEY UPDATE
+               can_view = GREATEST(admin_permissions.can_view, VALUES(can_view)),
+               can_edit = GREATEST(admin_permissions.can_edit, VALUES(can_edit)),
+               can_delete = GREATEST(admin_permissions.can_delete, VALUES(can_delete)),
+               can_lock = GREATEST(admin_permissions.can_lock, VALUES(can_lock)),
+               can_unlock = GREATEST(admin_permissions.can_unlock, VALUES(can_unlock))'
+        );
+    } else {
+        $ins = $pdo->prepare(
+            'INSERT INTO admin_permissions (admin_id, resource_key, can_view, can_edit, can_delete)
+             VALUES (?,?,?,?,?)
+             ON DUPLICATE KEY UPDATE
+               can_view = GREATEST(admin_permissions.can_view, VALUES(can_view)),
+               can_edit = GREATEST(admin_permissions.can_edit, VALUES(can_edit)),
+               can_delete = GREATEST(admin_permissions.can_delete, VALUES(can_delete))'
+        );
+    }
+    foreach ($rows as $row) {
+        $rk = (string) ($row['resource_key'] ?? '');
+        if (str_starts_with($rk, 'page:') || !in_array($rk, $groupKeys, true)) {
+            continue;
+        }
+        $pages = orange_admin_permission_pages_in_legacy_group($rk);
+        foreach ($pages as $page) {
+            $pk = orange_admin_perm_storage_key($page);
+            $v = (int) ($row['can_view'] ?? 0);
+            $e = (int) ($row['can_edit'] ?? 0);
+            $d = (int) ($row['can_delete'] ?? 0);
+            $l = $hasLock ? (int) ($row['can_lock'] ?? 0) : 0;
+            $u = $hasLock ? (int) ($row['can_unlock'] ?? 0) : 0;
+            if ($hasLock) {
+                $ins->execute([(int) $row['admin_id'], $pk, $v, $e, $d, $l, $u]);
+            } else {
+                $ins->execute([(int) $row['admin_id'], $pk, $v, $e, $d]);
+            }
+        }
+    }
+    $delPlace = implode(',', array_fill(0, count($groupKeys), '?'));
+    $pdo->prepare('DELETE FROM admin_permissions WHERE resource_key IN (' . $delPlace . ')')->execute($groupKeys);
+    try {
+        $insMarker = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+        $insMarker->execute([$marker]);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] admin_permissions_page_keys_v78 marker: ' . $e->getMessage());
+        }
+    }
 }
 
 function orange_admin_is_superuser(array $admin): bool
@@ -307,36 +600,6 @@ function orange_admin_can_manage_countries(array $admin): bool
     return orange_admin_has_full_access($admin);
 }
 
-function orange_admin_may(array $admin, PDO $pdo, string $resource, string $action): bool
-{
-    if (orange_admin_has_full_access($admin)) {
-        return true;
-    }
-    $matrix = orange_admin_permissions_matrix($pdo, (int) $admin['id']);
-    if ($matrix === []) {
-        // بدون صفوف في admin_permissions: السماح بعرض الرئيسية فقط حتى يضيف المشرف العام صلاحيات
-        return $resource === 'dashboard' && $action === 'view';
-    }
-    $row = $matrix[$resource] ?? null;
-    if (!$row) {
-        return false;
-    }
-    if ($action === 'delete') {
-        return $row['can_delete'];
-    }
-    if ($action === 'edit') {
-        return $row['can_edit'];
-    }
-    if ($action === 'lock') {
-        return !empty($row['can_lock']);
-    }
-    if ($action === 'unlock') {
-        return !empty($row['can_unlock']);
-    }
-
-    return $row['can_view'];
-}
-
 function orange_admin_require_page(array $admin, PDO $pdo, string $page): void
 {
     if ($page === 'admin_users' && !orange_admin_is_superuser($admin)) {
@@ -355,8 +618,7 @@ function orange_admin_require_page(array $admin, PDO $pdo, string $page): void
             exit;
         }
     }
-    $res = orange_admin_page_resource($page);
-    if (!orange_admin_may($admin, $pdo, $res, 'view')) {
+    if (!orange_admin_may_page($admin, $pdo, $page, 'view')) {
         header('Content-Type: text/html; charset=UTF-8');
         http_response_code(403);
         echo '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>ممنوع</title></head><body style="font-family:Cairo,sans-serif;padding:2rem;">'
@@ -369,7 +631,7 @@ function orange_admin_enforce_api(array $admin, PDO $pdo): void
 {
     $path = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_FILENAME'] ?? ''));
     if (str_contains($path, '/admin/api/edit-lock/')) {
-        if (!orange_admin_may($admin, $pdo, 'accounting', 'view')) {
+        if (!orange_admin_may_page($admin, $pdo, 'edit_lock', 'view')) {
             json_response(['success' => false, 'message' => 'لا تملك صلاحية عرض إقفال التعديلات'], 403);
         }
 
@@ -389,9 +651,17 @@ function orange_admin_enforce_api(array $admin, PDO $pdo): void
 
         return;
     }
-    $resource = orange_admin_resolve_api_resource_from_script();
+    $resource = orange_admin_api_page_from_script();
     $action = orange_admin_api_action_from_request();
-    if (!orange_admin_may($admin, $pdo, $resource, $action)) {
+    if ($resource !== null) {
+        if (!orange_admin_may_page($admin, $pdo, $resource, $action)) {
+            json_response(['success' => false, 'message' => 'لا تملك صلاحية لهذا الإجراء'], 403);
+        }
+
+        return;
+    }
+    $legacyResource = orange_admin_resolve_api_resource_from_script();
+    if (!orange_admin_may($admin, $pdo, $legacyResource, $action)) {
         json_response(['success' => false, 'message' => 'لا تملك صلاحية لهذا الإجراء'], 403);
     }
 }
@@ -410,7 +680,5 @@ function orange_admin_nav_visible(array $admin, PDO $pdo, string $page): bool
     if ($page === 'countries') {
         return orange_admin_can_manage_countries($admin);
     }
-    $res = orange_admin_page_resource($page);
-
-    return orange_admin_may($admin, $pdo, $res, 'view');
+    return orange_admin_may_page($admin, $pdo, $page, 'view');
 }

@@ -25,11 +25,11 @@ try {
     if (!orange_edit_lock_kind_is_supported($kind)) {
         json_response(['success' => false, 'message' => 'نوع مستند غير مدعوم'], 422);
     }
-    $resource = orange_edit_lock_resource_for_kind($kind);
-    if ($lock && !orange_admin_may_lock($admin, $pdo, $resource)) {
+    $page = orange_edit_lock_page_for_kind($kind);
+    if ($lock && !orange_admin_may_lock($admin, $pdo, $page)) {
         json_response(['success' => false, 'message' => 'لا تملك صلاحية قفل'], 403);
     }
-    if (!$lock && !orange_admin_may_unlock($admin, $pdo, $resource)) {
+    if (!$lock && !orange_admin_may_unlock($admin, $pdo, $page)) {
         json_response(['success' => false, 'message' => 'لا تملك صلاحية فك القفل'], 403);
     }
     $row = orange_edit_lock_registry_row($pdo, $kind, $entityId, $countryId > 0 ? $countryId : null);

@@ -11,9 +11,11 @@ require_once __DIR__ . '/../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/account_tree.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
+require_once __DIR__ . '/../../includes/admin_permissions.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+$obCaps = orange_admin_caps_for_page($admin, $pdo, 'opening_balances');
 
 $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
 $ctxCountryRow = orange_country_row_by_id($pdo, $ctxCountryId, false);
@@ -236,7 +238,7 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
             </div>
             <div class="jv-voucher-nav-cell jv-print-hide">
                 <div class="jv-voucher-nav-btns ob-voucher-action-btns" role="group" aria-label="إجراءات سند الرصيد الافتتاحي">
-                    <button type="button" id="ob_btn_save">حفظ السند</button>
+                    <button type="button" id="ob_btn_save" data-orange-perm="edit" data-orange-page="opening_balances">حفظ السند</button>
                     <button type="button" class="btn-secondary jv-nav-search" id="ob_btn_print">طباعة السند</button>
                     <button type="button" class="btn-secondary jv-nav-search" id="ob_btn_delete"<?php echo $obVid <= 0 ? ' disabled' : ''; ?>>حذف السند</button>
                 </div>
@@ -297,6 +299,7 @@ var OB_ADMIN_INDEX = <?php echo json_encode($obAdminIndexUrl, JSON_UNESCAPED_UNI
 var OB_INITIAL = <?php echo json_encode($obInitial, JSON_UNESCAPED_UNICODE); ?>;
 var OB_SAVED_VOUCHER_ID = <?php echo (int) $obVid; ?>;
 var OB_COUNTRY_ID = <?php echo (int) $ctxCountryId; ?>;
+var OB_CAPS = <?php echo json_encode($obCaps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
 var obEditLockCtl = null;
 
 (function () {
@@ -686,6 +689,10 @@ var obEditLockCtl = null;
         }
     };
     window.obSave = function () {
+        if (!OB_CAPS.can_edit) {
+            alert('لا تملك صلاحية تعديل أرصدة أول المدة');
+            return;
+        }
         if (obSaveInFlight) {
             return;
         }
@@ -857,6 +864,9 @@ var obEditLockCtl = null;
             obEditLockCtl = OrangeEditLock.bind({
                 prefix: 'ob',
                 docKind: 'opening_balance',
+                page: 'opening_balances',
+                canLock: !!OB_CAPS.can_lock,
+                canUnlock: !!OB_CAPS.can_unlock,
                 countryId: OB_COUNTRY_ID,
                 getEntityId: function () {
                     return (OB_PAGE_FY > 0 && OB_SAVED_VOUCHER_ID > 0) ? OB_PAGE_FY : 0;

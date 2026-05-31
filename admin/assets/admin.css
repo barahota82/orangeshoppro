@@ -5000,3 +5000,24 @@ td.tb-col-name,
         justify-content: center;
     }
 }
+
+/* صلاحيات المستخدمين — شجرة قابلة للتوسيع */
+.au-perm-table-wrap { max-height: min(70vh, 720px); overflow: auto; }
+.au-perm-table { font-size: 13px; }
+.au-perm-table th,
+.au-perm-table td { vertical-align: middle; text-align: center; }
+.au-perm-table th:first-child,
+.au-perm-table td:first-child { text-align: right; min-width: 220px; }
+.au-perm-mega-label { font-weight: 600; }
+.au-perm-mega-hint { display: block; margin-top: 2px; font-size: 11px; font-weight: 400; color: var(--muted); }
+.au-perm-expand {
+    border: none; background: transparent; cursor: pointer; padding: 2px 6px; margin-inline-end: 4px;
+    color: var(--muted); font-size: 11px; line-height: 1;
+}
+.au-perm-expand[aria-expanded="true"] { transform: rotate(180deg); display: inline-block; }
+.au-perm-subhead-label {
+    font-size: 12px; font-weight: 600; color: var(--muted); background: #f8fafc;
+    padding: 6px 10px !important; text-align: right !important;
+}
+.au-perm-page-label { padding-inline-start: 28px !important; font-size: 12.5px; text-align: right !important; }
+.au-perm-page .p-v, .au-perm-page .p-e, .au-perm-page .p-d, .au-perm-page .p-l, .au-perm-page .p-u { cursor: pointer; }

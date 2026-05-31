@@ -30,7 +30,7 @@ try {
     if (!empty($row['is_superuser'])) {
         json_response(['success' => false, 'message' => 'المشرف العام يملك كل الصلاحيات — لا حاجة لمصفوفة'], 422);
     }
-    $labels = orange_admin_resource_labels();
+    $pageLabels = orange_admin_permission_page_labels();
     $hasLockCols = orange_table_has_column($pdo, 'admin_permissions', 'can_lock');
     $pdo->prepare('DELETE FROM admin_permissions WHERE admin_id = ?')->execute([$adminId]);
     if ($hasLockCols) {
@@ -44,9 +44,17 @@ try {
         );
     }
     foreach ($matrix as $resourceKey => $flags) {
-        if (!is_array($flags) || !isset($labels[$resourceKey])) {
+        if (!is_array($flags)) {
             continue;
         }
+        $page = orange_admin_page_from_perm_key((string) $resourceKey);
+        if ($page === null) {
+            $page = (string) $resourceKey;
+        }
+        if (!isset($pageLabels[$page]) || $page === 'admin_users' || $page === 'countries') {
+            continue;
+        }
+        $storageKey = orange_admin_perm_storage_key($page);
         $v = !empty($flags['can_view']) ? 1 : 0;
         $e = !empty($flags['can_edit']) ? 1 : 0;
         $d = !empty($flags['can_delete']) ? 1 : 0;
@@ -66,9 +74,9 @@ try {
             $v = 1;
         }
         if ($hasLockCols) {
-            $ins->execute([$adminId, $resourceKey, $v, $e, $d, $l, $u]);
+            $ins->execute([$adminId, $storageKey, $v, $e, $d, $l, $u]);
         } else {
-            $ins->execute([$adminId, $resourceKey, $v, $e, $d]);
+            $ins->execute([$adminId, $storageKey, $v, $e, $d]);
         }
     }
     audit_log('admin_permissions', 'تحديث صلاحيات مستخدم #' . $adminId, 'admins', $adminId);
