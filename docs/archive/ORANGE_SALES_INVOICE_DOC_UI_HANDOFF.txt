@@ -167,11 +167,11 @@ ENGLISH
 ---
 
 ### المرحلة 1 — فاتورة مبيعات شركة (INV-C) — **أولوية**
-- [ ] صفحة مستند v2 (PHP + CSS + JS) — parity `purchases`.
-- [ ] create عبر refactor `create-manual.php`؛ load/update/search/nav.
-- [ ] edit_lock + print + ancillary lines + product pick.
-- [ ] redirect `manual_order` + إخفاء/دمج `sales_invoices`.
-- [ ] UTF-8 verify + صلاحيات `page:*`.
+- [x] صفحة مستند v2 (PHP + CSS + JS) — parity `purchases` — `company_sales_invoice.php` (`sv2`).
+- [x] create عبر `create-manual.php`؛ load/update/search/nav — `sales-invoices/*` + update بنود/GL.
+- [x] edit_lock (`company_sales_invoice`) + print + ancillary lines + product pick (stock).
+- [x] redirect `manual_order` + `sales_invoices`؛ إخفاء `sales_invoices` من nav.
+- [x] UTF-8 verify + صلاحيات `page:company_sales_invoice`.
 
 **Acceptance:** دورة كاملة: جديد → حفظ → INV-C → GL → طباعة → بحث → فتح → تعديل (غير مقفول) → قفل.
 
@@ -225,3 +225,4 @@ Changelog
 ================================================================================
 2026-05-20 — أرشفة قرار مالك: مستند v2 لفواتير البيع + مردود + INV-O؛ عميل like-supplier؛ قناة واتساب؛ مراحل 0–4؛ GAP-SALE-DOC-01.
 2026-05-20 — **تنفيذ مرحلة 0:** `admin/api/sales-invoices/*` + `includes/sales_invoice_company.php` + `company_sales_invoice` page/API wiring + customer picker AR + v80 permissions seed.
+2026-05-20 — **تنفيذ مرحلة 1:** `company_sales_invoice.php` مستند v2 (`sv2`) + update بنود/GL + edit_lock + redirects legacy.

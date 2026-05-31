@@ -196,6 +196,11 @@
                     '<td>' + escHtml(r.name) + '</td>' +
                     '<td>' + escHtml(r.color || '') + '</td>' +
                     '<td>' + escHtml(r.size || '') + '</td>' +
+                    (cfg.showStock
+                        ? ('<td class="mo-pick-num" dir="ltr">' + escHtml(String(r.stock_total != null ? r.stock_total : '—')) + '</td>' +
+                           '<td class="mo-pick-num" dir="ltr">' + escHtml(String(r.stock_reserved != null ? r.stock_reserved : '—')) + '</td>' +
+                           '<td class="mo-pick-num" dir="ltr">' + escHtml(String(r.stock_available != null ? r.stock_available : '—')) + '</td>')
+                        : '') +
                     '<td class="mo-pick-num" dir="ltr">' + escHtml(fmtMoney(r.cost || 0)) + '</td>';
                 body.appendChild(tr);
             }

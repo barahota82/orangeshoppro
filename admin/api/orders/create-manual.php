@@ -15,6 +15,7 @@ require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/currency.php';
 require_once __DIR__ . '/../../../includes/warehouses.php';
 require_once __DIR__ . '/../../../includes/invoice_ancillary_lines.php';
+require_once __DIR__ . '/../../../includes/sales_invoice_company.php';
 require_admin_api();
 
 try {
@@ -301,6 +302,10 @@ try {
     $orderRow = $ordSt->fetch(PDO::FETCH_ASSOC) ?: [];
     orange_order_assign_inv_c_if_needed($pdo, $orderId, $orderRow);
     orange_post_order_delivery_accounting($pdo, $orderId);
+
+    $ordSt->execute([$orderId]);
+    $orderRow = $ordSt->fetch(PDO::FETCH_ASSOC) ?: [];
+    orange_sales_invoice_company_register_edit_lock($pdo, $orderId, $orderRow);
 
     $pdo->commit();
 

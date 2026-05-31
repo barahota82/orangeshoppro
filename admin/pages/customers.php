@@ -904,7 +904,7 @@ var CUS_ATTACHMENT_MAX = <?php echo (int) $cusAttachmentMaxCount; ?>;
 var CUS_NEXT_AUTO_CODE = <?php echo json_encode($nextCustomerCodePreview, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var CUS_SEARCH_ROWS = <?php echo json_encode($customerSearchRowsPayload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var CUS_PARTNER_STATEMENT_URL = <?php echo json_encode(storefront_public_path('/admin/index.php?page=partner_account_statement'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
-var CUS_MANUAL_ORDER_URL = <?php echo json_encode(storefront_public_path('/admin/index.php?page=manual_order'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+var CUS_MANUAL_ORDER_URL = <?php echo json_encode(storefront_public_path('/admin/index.php?page=company_sales_invoice'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var CUS_RECEIPT_URL = <?php echo json_encode(storefront_public_path('/admin/index.php?page=partner_customer_receipt'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var CUS_SALES_RETURN_URL = <?php echo json_encode(storefront_public_path('/admin/index.php?page=sales_returns'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 var CUS_ORDERS_URL = <?php echo json_encode(storefront_public_path('/admin/index.php?page=orders'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;

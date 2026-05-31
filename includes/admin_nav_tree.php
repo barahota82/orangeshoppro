@@ -140,7 +140,6 @@ function orange_admin_permission_mega_sections(): array
                     'pages' => [
                         ['page' => 'invoice', 'label' => 'فاتورة أونلاين'],
                         ['page' => 'online_invoices', 'label' => 'فواتير أونلاين'],
-                        ['page' => 'sales_invoices', 'label' => 'فواتير مبيعات'],
                         ['page' => 'company_sales_invoice', 'label' => 'فاتورة مبيعات'],
                         ['page' => 'invoice_edit', 'label' => 'تعديل فاتورة'],
                         ['page' => 'sales_returns', 'label' => 'مردود المبيعات'],

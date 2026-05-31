@@ -551,7 +551,7 @@ $invFmt = static function (float $amount, bool $withUnit = true) use ($invMoney)
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=invoice&order_id=' . $orderId . '&copy=customer'), ENT_QUOTES, 'UTF-8'); ?>">نسخة العميل</a>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=invoice&order_id=' . $orderId . '&copy=receipt'), ENT_QUOTES, 'UTF-8'); ?>">نسخة التوقيع</a>
         <?php endif; ?>
-        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=manual_order'), ENT_QUOTES, 'UTF-8'); ?>">+ فاتورة مبيعات</a>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=company_sales_invoice'), ENT_QUOTES, 'UTF-8'); ?>">+ فاتورة مبيعات</a>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=orders'), ENT_QUOTES, 'UTF-8'); ?>">الطلبات</a>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=invoice'), ENT_QUOTES, 'UTF-8'); ?>">فاتورة أخرى</a>
     </div>

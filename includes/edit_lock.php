@@ -17,6 +17,7 @@ function orange_edit_lock_doc_kinds(): array
     return [
         'purchase' => ['label_ar' => 'فاتورة شراء', 'resource' => 'warehouse', 'filter_group' => 'warehouse'],
         'purchase_return' => ['label_ar' => 'مردود مشتريات', 'resource' => 'warehouse', 'filter_group' => 'warehouse'],
+        'company_sales_invoice' => ['label_ar' => 'فاتورة مبيعات شركة', 'resource' => 'sales', 'filter_group' => 'sales'],
         'sales_return' => ['label_ar' => 'مردود مبيعات', 'resource' => 'sales', 'filter_group' => 'sales'],
         'journal_voucher' => ['label_ar' => 'سند قيد', 'resource' => 'accounting', 'filter_group' => 'accounting'],
         'customer_receipt' => ['label_ar' => 'سند قبض عميل', 'resource' => 'partners', 'filter_group' => 'partners'],
@@ -55,11 +56,15 @@ function orange_edit_lock_kind_is_supported(string $kind): bool
 function orange_edit_lock_page_for_kind(string $kind): string
 {
     $warehouse = ['purchase', 'purchase_return', 'purchase_receive'];
-    $sales = ['sales_return', 'order_delivery_sale', 'order_delivery_cogs', 'order_return_sale', 'order_return_cogs'];
+    $sales = ['company_sales_invoice', 'sales_return', 'order_delivery_sale', 'order_delivery_cogs', 'order_return_sale', 'order_return_cogs'];
     if (in_array($kind, $warehouse, true)) {
         return $kind === 'purchase_return' ? 'purchase_returns' : 'purchases';
     }
     if (in_array($kind, $sales, true)) {
+        if ($kind === 'company_sales_invoice') {
+            return 'company_sales_invoice';
+        }
+
         return 'sales_returns';
     }
     if ($kind === 'customer_receipt') {
@@ -320,6 +325,7 @@ function orange_edit_lock_table_for_kind(string $kind): string
     return match ($kind) {
         'purchase' => 'purchases',
         'purchase_return' => 'purchase_returns',
+        'company_sales_invoice' => 'orders',
         'sales_return' => 'sales_returns',
         'journal_voucher' => 'journal_vouchers',
         'opening_balance' => 'journal_vouchers',
