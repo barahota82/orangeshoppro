@@ -98,10 +98,8 @@ function orange_admin_page_resource(string $page): string
         'other_vouchers' => 'accounting',
         'journal_voucher_reports' => 'accounting',
         'journal_types' => 'accounting',
-        'gl_posting' => 'accounting',
         'edit_lock' => 'accounting',
         'financial_report' => 'accounting',
-        'accounting_reports_index' => 'accounting',
         'report_gl_account_monthly' => 'accounting',
         'report_account_list' => 'accounting',
         'report_trading_account' => 'accounting',
@@ -167,7 +165,6 @@ function orange_admin_api_folder_resource(string $folder): string
         'journal' => 'accounting',
         'year_end_close' => 'accounting',
         'system' => 'accounting',
-        'gl' => 'accounting',
         'edit-lock' => 'accounting',
         'fiscal_years' => 'accounting',
         'opening_balances' => 'accounting',
@@ -271,7 +268,6 @@ function orange_admin_api_page_from_script(): ?string
         'journal' => 'journal_entries',
         'year_end_close' => 'year_end_close_vouchers',
         'system' => 'fiscal_years',
-        'gl' => 'edit_lock',
         'edit-lock' => 'edit_lock',
         'fiscal_years' => 'fiscal_years',
         'opening_balances' => 'opening_balances',
@@ -556,6 +552,27 @@ function orange_admin_migrate_permissions_to_pages(PDO $pdo): void
     }
 }
 
+function orange_admin_purge_obsolete_page_permissions(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    $marker = 'php_admin_permissions_drop_obsolete_pages_v79';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+    if (!orange_table_exists($pdo, 'admin_permissions')) {
+        return;
+    }
+    try {
+        $pdo->exec("DELETE FROM admin_permissions WHERE resource_key IN ('page:gl_posting', 'page:accounting_reports_index')");
+        $insMarker = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+        $insMarker->execute([$marker]);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] admin_permissions_drop_obsolete_pages_v79: ' . $e->getMessage());
+        }
+    }
+}
+
 function orange_admin_is_superuser(array $admin): bool
 {
     // صراحةً 1 فقط (تجنباً لسلوك PHP empty مع قيم غير متوقعة من PDO)
@@ -617,9 +634,6 @@ function orange_admin_require_page(array $admin, PDO $pdo, string $page): void
                 . '<h1>إدارة الدول والتهيئة الكاملة للمشرف العام فقط</h1><p><a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=dashboard'), ENT_QUOTES, 'UTF-8') . '">الرئيسية</a></p></body></html>';
             exit;
         }
-    }
-    if ($page === 'gl_posting') {
-        $page = 'edit_lock';
     }
     if (!orange_admin_may_page($admin, $pdo, $page, 'view')) {
         header('Content-Type: text/html; charset=UTF-8');

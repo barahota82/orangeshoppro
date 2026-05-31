@@ -22,7 +22,7 @@ try {
         $root = dirname(__DIR__, 3);
     }
 
-    $pathPendingList = $root . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'api' . DIRECTORY_SEPARATOR . 'gl' . DIRECTORY_SEPARATOR . 'pending-list.php';
+    $pathEditLock = $root . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'pages' . DIRECTORY_SEPARATOR . 'edit_lock.php';
     $pathGlPendingInc = $root . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'gl_pending_movements.php';
     $pathAdminJs = $root . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'admin.js';
 
@@ -40,16 +40,16 @@ try {
         'server_time' => date('c'),
         'orange_build_ref' => $buildRef !== '' ? $buildRef : null,
         'markers' => [
-            'file_gl_pending_list' => is_file($pathPendingList),
+            'file_edit_lock_page' => is_file($pathEditLock),
             'file_includes_gl_pending_movements' => is_file($pathGlPendingInc),
             'table_orange_gl_pending_movements' => orange_table_exists($pdo, 'orange_gl_pending_movements'),
         ],
         'file_mtimes_unix' => [
-            'admin_api_gl_pending_list' => $mt($pathPendingList),
+            'admin_pages_edit_lock' => $mt($pathEditLock),
             'includes_gl_pending_movements' => $mt($pathGlPendingInc),
             'admin_assets_admin_js' => $mt($pathAdminJs),
         ],
-        'hint' => 'بعد النشر: يجب أن تكون markers الثلاثة true. Optional: ضع ORANGE_BUILD_REF في .env.php (نص مرجعي من الـ CI) ليظهر هنا.',
+        'hint' => 'بعد النشر: file_edit_lock_page و includes_gl_pending_movements يجب أن تكون true. جدول orange_gl_pending_movements legacy اختياري. Optional: ORANGE_BUILD_REF في .env.php.',
     ]);
 } catch (Throwable $e) {
     orange_admin_api_catch($e, 'تعذر فحص النشر');
