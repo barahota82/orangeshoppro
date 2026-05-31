@@ -111,10 +111,19 @@ if (orange_table_exists($pdo, 'customers')) {
     if (orange_table_exists($pdo, 'storefront_accounts')
         && orange_table_has_column($pdo, 'storefront_accounts', 'customer_id')
     ) {
-        $sfSt = $pdo->query(
-            'SELECT id, customer_id, email, email_verified_at, registered_channel_slug
-             FROM storefront_accounts WHERE customer_id IS NOT NULL'
-        );
+        $sfSql = 'SELECT id, customer_id, email, email_verified_at, registered_channel_slug
+             FROM storefront_accounts WHERE customer_id IS NOT NULL';
+        $sfParams = [];
+        if (orange_table_has_column($pdo, 'storefront_accounts', 'country_id') && $adminCountryId > 0) {
+            $sfSql .= ' AND country_id = ?';
+            $sfParams[] = $adminCountryId;
+        }
+        if ($sfParams === []) {
+            $sfSt = $pdo->query($sfSql);
+        } else {
+            $sfSt = $pdo->prepare($sfSql);
+            $sfSt->execute($sfParams);
+        }
         if ($sfSt) {
             while ($sfRow = $sfSt->fetch(PDO::FETCH_ASSOC)) {
                 $cid = (int) ($sfRow['customer_id'] ?? 0);

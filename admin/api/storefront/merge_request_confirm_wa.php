@@ -16,7 +16,7 @@ try {
     if (!orange_table_exists($pdo, 'storefront_phone_merge_requests')) {
         json_response(['success' => false, 'message' => 'الجدول غير جاهز'], 503);
     }
-    $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
+    $ctxCountryId = orange_admin_context_country_id($pdo);
     $hasCountryCol = orange_table_has_column($pdo, 'storefront_phone_merge_requests', 'country_id');
     if ($hasCountryCol && $ctxCountryId > 0) {
         $st = $pdo->prepare(

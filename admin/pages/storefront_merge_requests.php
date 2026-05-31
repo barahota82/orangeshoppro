@@ -5,11 +5,20 @@ declare(strict_types=1);
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 require_once __DIR__ . '/../../includes/admin_settings_country.php';
+require_once __DIR__ . '/../../includes/countries.php';
 
 $rows = [];
 $hasTable = orange_table_exists($pdo, 'storefront_phone_merge_requests');
-$ctxCountryId = orange_admin_settings_effective_country_id($pdo);
+$ctxCountryId = orange_admin_context_country_id($pdo);
 $hasCountryCol = $hasTable && orange_table_has_column($pdo, 'storefront_phone_merge_requests', 'country_id');
+$ctxCountryLabel = '';
+if ($ctxCountryId > 0) {
+    $ctxRow = orange_country_row_by_id($pdo, $ctxCountryId, false);
+    $ctxCountryLabel = trim((string) ($ctxRow['name_ar'] ?? ''));
+    if ($ctxCountryLabel === '' && $ctxRow !== null) {
+        $ctxCountryLabel = trim((string) ($ctxRow['name_en'] ?? ''));
+    }
+}
 
 if ($hasTable) {
     if ($hasCountryCol && $ctxCountryId > 0) {
@@ -23,22 +32,21 @@ if ($hasTable) {
         );
         $q->execute([$ctxCountryId]);
     } else {
-        $q = $pdo->query(
-            "SELECT r.*, a.email AS account_email
-             FROM storefront_phone_merge_requests r
-             INNER JOIN storefront_accounts a ON a.id = r.storefront_account_id
-             WHERE r.consumed_at IS NULL AND r.expires_at > NOW()
-             ORDER BY r.created_at DESC
-             LIMIT 100"
-        );
+        $rows = [];
+        $q = null;
     }
-    $rows = $q ? $q->fetchAll(PDO::FETCH_ASSOC) : [];
+    if ($q) {
+        $rows = $q->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
 }
 ?>
 <div class="admin-fy-shell" dir="rtl">
     <h1 class="admin-fy-shell__title">دمج هاتف التسجيل (س15)</h1>
     <p class="admin-fy-shell__lead">
         عندما يحاول عميل التسجيل ببريد جديد لكن هاتفه مرتبط بحساب <strong>مفعّل</strong> مسبقاً، يُنشأ طلب دمج.
+        <?php if ($ctxCountryId > 0 && $ctxCountryLabel !== ''): ?>
+        <strong>سياق الدولة الحالي:</strong> <?php echo htmlspecialchars($ctxCountryLabel, ENT_QUOTES, 'UTF-8'); ?> — تظهر طلبات هذه الدولة فقط.
+        <?php endif; ?>
         بعد استلام رسالة واتساب من <strong>نفس رقم العميل</strong> وتطابق النص مع الطلب، اضغط «تأكيد واتساب»؛
         ثم يكمل العميل من صفحة التسجيل بزر «تطبيق تحديث بيانات الملف».
         البريد المؤكَّد للدخول <strong>لا يتغيّر</strong> — يُحدَّث الاسم والمنطقة والعنوان فقط على الحساب القائم.
