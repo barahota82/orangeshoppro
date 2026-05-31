@@ -905,7 +905,7 @@ function orange_country_provision_operational(PDO $pdo, int $countryId): array
 {
     require_once __DIR__ . '/country_provision.php';
 
-    return orange_country_provision_full($pdo, $countryId);
+    return orange_country_provision_runtime($pdo, $countryId);
 }
 
 function orange_product_country_id(PDO $pdo, int $productId): int

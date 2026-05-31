@@ -171,7 +171,7 @@ function orange_catalog_migrate_country_scope_repair_v73(PDO $pdo): void
 }
 
 /**
- * v74 — فصل دليل الحسابات per country: عمود country_id + نسخ الدليل لكل دولة بلا حسابات.
+ * v74 — فصل دليل الحسابات per country: backfill KW فقط (لا نسخ تلقائي — v77).
  *
  * @return array{backfill_kw:int, countries_provisioned:int, accounts_copied:int}
  */
@@ -201,23 +201,7 @@ function orange_country_scope_repair_accounts_per_country(PDO $pdo): array
         );
     }
 
-    $countries = $pdo->query('SELECT id FROM countries ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    foreach ($countries as $cRow) {
-        $cid = (int) ($cRow['id'] ?? 0);
-        if ($cid <= 0 || $cid === $kwId) {
-            continue;
-        }
-        $stCnt = $pdo->prepare('SELECT COUNT(*) FROM accounts WHERE country_id = ?');
-        $stCnt->execute([$cid]);
-        if ((int) $stCnt->fetchColumn() > 0) {
-            continue;
-        }
-        $copy = orange_country_copy_accounts_from_source($pdo, $cid, $kwId > 0 ? $kwId : null);
-        if ((int) ($copy['accounts_copied'] ?? 0) > 0) {
-            $out['countries_provisioned']++;
-            $out['accounts_copied'] += (int) $copy['accounts_copied'];
-        }
-    }
+    /* v77: لا نسخ دليل الكويت لباقي الدول تلقائياً — التهيئة اليدوية من شاشة الدول فقط. */
 
     return $out;
 }
@@ -336,103 +320,19 @@ function orange_country_scope_repair_gl_admin_scope_v75(PDO $pdo): array
 }
 
 /**
- * v76 — إكمال بيانات GL الإدارية per country (حسابات، أنواع يوميات، سنوات، ربط قيود).
+ * v76 — placeholder (لا نسخ GL من الكويت؛ التنظيف في v77).
  *
  * @return array{countries_repaired:int, accounts_copied:int, journal_types_copied:int, fiscal_years_copied:int, gl_settings_copied:int}
  */
 function orange_country_scope_repair_gl_admin_missing_v76(PDO $pdo): array
 {
-    $out = [
+    return [
         'countries_repaired' => 0,
         'accounts_copied' => 0,
         'journal_types_copied' => 0,
         'fiscal_years_copied' => 0,
         'gl_settings_copied' => 0,
     ];
-    if (!orange_table_exists($pdo, 'countries')) {
-        return $out;
-    }
-
-    require_once __DIR__ . '/country_provision.php';
-    $kwId = orange_countries_default_id($pdo);
-    if ($kwId <= 0) {
-        return $out;
-    }
-
-    $countries = $pdo->query('SELECT id FROM countries ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    foreach ($countries as $cRow) {
-        $cid = (int) ($cRow['id'] ?? 0);
-        if ($cid <= 0 || $cid === $kwId) {
-            continue;
-        }
-
-        $repaired = false;
-        $idMap = [];
-
-        if (orange_table_exists($pdo, 'accounts') && orange_table_has_column($pdo, 'accounts', 'country_id')) {
-            $stAcct = $pdo->prepare('SELECT COUNT(*) FROM accounts WHERE country_id = ?');
-            $stAcct->execute([$cid]);
-            if ((int) $stAcct->fetchColumn() <= 0) {
-                $acctCopy = orange_country_copy_accounts_from_source($pdo, $cid, $kwId);
-                $copied = (int) ($acctCopy['accounts_copied'] ?? 0);
-                if ($copied > 0) {
-                    $out['accounts_copied'] += $copied;
-                    $repaired = true;
-                }
-                $idMap = is_array($acctCopy['id_map'] ?? null) ? $acctCopy['id_map'] : [];
-            }
-        }
-
-        if (orange_table_exists($pdo, 'journal_types') && orange_table_has_column($pdo, 'journal_types', 'country_id')) {
-            $stJt = $pdo->prepare('SELECT COUNT(*) FROM journal_types WHERE country_id = ?');
-            $stJt->execute([$cid]);
-            if ((int) $stJt->fetchColumn() <= 0) {
-                $jtCopy = orange_country_copy_journal_types_from_source($pdo, $cid, $kwId);
-                $copied = (int) ($jtCopy['copied'] ?? 0);
-                if ($copied > 0) {
-                    $out['journal_types_copied'] += $copied;
-                    $repaired = true;
-                }
-            }
-        }
-
-        if (orange_table_exists($pdo, 'fiscal_years') && orange_table_has_column($pdo, 'fiscal_years', 'country_id')) {
-            $stFy = $pdo->prepare('SELECT COUNT(*) FROM fiscal_years WHERE country_id = ?');
-            $stFy->execute([$cid]);
-            if ((int) $stFy->fetchColumn() <= 0) {
-                $fyCopy = orange_country_copy_fiscal_years_from_source($pdo, $cid, $kwId);
-                $copied = (int) ($fyCopy['copied'] ?? 0);
-                if ($copied > 0) {
-                    $out['fiscal_years_copied'] += $copied;
-                    $repaired = true;
-                }
-            }
-        }
-
-        if (orange_table_exists($pdo, 'orange_gl_account_settings')
-            && orange_table_has_column($pdo, 'orange_gl_account_settings', 'country_id')) {
-            $stGl = $pdo->prepare('SELECT COUNT(*) FROM orange_gl_account_settings WHERE country_id = ?');
-            $stGl->execute([$cid]);
-            if ((int) $stGl->fetchColumn() <= 0) {
-                if ($idMap === [] && orange_table_exists($pdo, 'accounts')) {
-                    $idMap = orange_country_build_account_id_map_by_code($pdo, $kwId, $cid);
-                }
-                $glCopy = orange_country_copy_gl_settings_from_source($pdo, $cid, $kwId, $idMap);
-                orange_country_copy_gl_journal_type_rules_from_source($pdo, $cid, $kwId);
-                $copied = (int) ($glCopy['settings_copied'] ?? 0);
-                if ($copied > 0) {
-                    $out['gl_settings_copied'] += $copied;
-                    $repaired = true;
-                }
-            }
-        }
-
-        if ($repaired) {
-            $out['countries_repaired']++;
-        }
-    }
-
-    return $out;
 }
 
 /** v76 — إصلاح سياق الدولة + إكمال بيانات GL per country. */
@@ -456,6 +356,221 @@ function orange_catalog_migrate_country_scope_repair_v76(PDO $pdo): void
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] country scope repair v76 marker: ' . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * هل وُجدت قيود/حركة GL فعلية لهذه الدولة؟ (يمنع حذف الدليل المنسوخ).
+ */
+function orange_country_gl_has_posting_activity(PDO $pdo, int $countryId): bool
+{
+    if ($countryId <= 0) {
+        return false;
+    }
+    if (orange_table_exists($pdo, 'journal_vouchers') && orange_table_has_column($pdo, 'journal_vouchers', 'country_id')) {
+        $st = $pdo->prepare('SELECT COUNT(*) FROM journal_vouchers WHERE country_id = ?');
+        $st->execute([$countryId]);
+        if ((int) $st->fetchColumn() > 0) {
+            return true;
+        }
+    }
+    if (orange_table_exists($pdo, 'journal_lines')
+        && orange_table_exists($pdo, 'accounts')
+        && orange_table_has_column($pdo, 'accounts', 'country_id')) {
+        $st = $pdo->prepare(
+            'SELECT COUNT(*) FROM journal_lines jl
+             INNER JOIN accounts a ON a.id = jl.account_id
+             WHERE a.country_id = ?
+             LIMIT 1'
+        );
+        $st->execute([$countryId]);
+        if ((int) $st->fetchColumn() > 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * حذف شجرة accounts لدولة (من الأوراق للجذور) — بلا قيود GL.
+ */
+function orange_country_delete_accounts_tree_for_country(PDO $pdo, int $countryId): int
+{
+    if ($countryId <= 0 || !orange_table_exists($pdo, 'accounts')
+        || !orange_table_has_column($pdo, 'accounts', 'country_id')) {
+        return 0;
+    }
+    $deleted = 0;
+    for ($pass = 0; $pass < 5000; $pass++) {
+        $st = $pdo->prepare(
+            'SELECT a.id FROM accounts a
+             WHERE a.country_id = ?
+               AND NOT EXISTS (SELECT 1 FROM accounts c WHERE c.parent_id = a.id)
+             LIMIT 200'
+        );
+        $st->execute([$countryId]);
+        $ids = $st->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        if ($ids === []) {
+            break;
+        }
+        foreach ($ids as $rawId) {
+            $aid = (int) $rawId;
+            if ($aid <= 0) {
+                continue;
+            }
+            try {
+                $del = $pdo->prepare('DELETE FROM accounts WHERE id = ? AND country_id = ?');
+                $del->execute([$aid, $countryId]);
+                if ($del->rowCount() > 0) {
+                    $deleted++;
+                }
+            } catch (Throwable $e) {
+                if (function_exists('error_log')) {
+                    error_log('[orange] delete account #' . $aid . ' cid=' . $countryId . ': ' . $e->getMessage());
+                }
+            }
+        }
+    }
+
+    return $deleted;
+}
+
+/**
+ * إزالة حزمة GL المنسوخة من الكويت لدولة بلا حركة قيود (شجرة موحّدة / v74 / provision).
+ *
+ * @return array{purged:bool, skipped:string, accounts_deleted:int, journal_types_deleted:int, fiscal_years_deleted:int}
+ */
+function orange_country_purge_cloned_gl_bundle_if_idle(PDO $pdo, int $countryId): array
+{
+    $out = [
+        'purged' => false,
+        'skipped' => '',
+        'accounts_deleted' => 0,
+        'journal_types_deleted' => 0,
+        'fiscal_years_deleted' => 0,
+        'dimensions_deleted' => 0,
+    ];
+    $kwId = orange_countries_default_id($pdo);
+    if ($countryId <= 0 || ($kwId > 0 && $countryId === $kwId)) {
+        $out['skipped'] = 'kw_or_invalid';
+
+        return $out;
+    }
+    if (orange_country_gl_has_posting_activity($pdo, $countryId)) {
+        $out['skipped'] = 'has_gl_activity';
+
+        return $out;
+    }
+
+    if (orange_table_exists($pdo, 'orange_gl_setting_alloc')
+        && orange_table_has_column($pdo, 'orange_gl_setting_alloc', 'country_id')) {
+        $pdo->prepare('DELETE FROM orange_gl_setting_alloc WHERE country_id = ?')->execute([$countryId]);
+    }
+    if (orange_table_exists($pdo, 'orange_gl_journal_type_rules')
+        && orange_table_has_column($pdo, 'orange_gl_journal_type_rules', 'country_id')) {
+        $pdo->prepare('DELETE FROM orange_gl_journal_type_rules WHERE country_id = ?')->execute([$countryId]);
+    }
+    if (orange_table_exists($pdo, 'orange_gl_account_settings')
+        && orange_table_has_column($pdo, 'orange_gl_account_settings', 'country_id')) {
+        $pdo->prepare('DELETE FROM orange_gl_account_settings WHERE country_id = ?')->execute([$countryId]);
+    }
+    if (orange_table_exists($pdo, 'orange_invoice_line_presets')
+        && orange_table_has_column($pdo, 'orange_invoice_line_presets', 'country_id')) {
+        $pdo->prepare('DELETE FROM orange_invoice_line_presets WHERE country_id = ?')->execute([$countryId]);
+    }
+    if (orange_table_exists($pdo, 'journal_types') && orange_table_has_column($pdo, 'journal_types', 'country_id')) {
+        $st = $pdo->prepare('DELETE FROM journal_types WHERE country_id = ?');
+        $st->execute([$countryId]);
+        $out['journal_types_deleted'] = $st->rowCount();
+    }
+    if (orange_table_exists($pdo, 'fiscal_years') && orange_table_has_column($pdo, 'fiscal_years', 'country_id')) {
+        $st = $pdo->prepare('DELETE FROM fiscal_years WHERE country_id = ?');
+        $st->execute([$countryId]);
+        $out['fiscal_years_deleted'] = $st->rowCount();
+    }
+    if (orange_table_exists($pdo, 'analytical_dimension')
+        && orange_table_has_column($pdo, 'analytical_dimension', 'country_id')
+        && orange_table_exists($pdo, 'analytical_dimension_value')) {
+        $stDim = $pdo->prepare('SELECT id FROM analytical_dimension WHERE country_id = ?');
+        $stDim->execute([$countryId]);
+        foreach ($stDim->fetchAll(PDO::FETCH_COLUMN) ?: [] as $dimId) {
+            $did = (int) $dimId;
+            if ($did <= 0) {
+                continue;
+            }
+            $pdo->prepare('DELETE FROM analytical_dimension_value WHERE dimension_id = ?')->execute([$did]);
+            $pdo->prepare('DELETE FROM analytical_dimension WHERE id = ? AND country_id = ?')->execute([$did, $countryId]);
+            $out['dimensions_deleted']++;
+        }
+    }
+
+    $out['accounts_deleted'] = orange_country_delete_accounts_tree_for_country($pdo, $countryId);
+    $out['purged'] = $out['accounts_deleted'] > 0
+        || $out['journal_types_deleted'] > 0
+        || $out['fiscal_years_deleted'] > 0
+        || $out['dimensions_deleted'] > 0;
+
+    return $out;
+}
+
+/**
+ * v77 — إزالة دليل/GL المنسوخ تلقائياً من غير الكويت (بعد شجرة المنتجات الموحّدة / v74).
+ *
+ * @return array{countries_purged:int, countries_skipped_activity:int, details:list<array<string,mixed>>}
+ */
+function orange_country_scope_purge_kw_gl_clones_v77(PDO $pdo): array
+{
+    $out = [
+        'countries_purged' => 0,
+        'countries_skipped_activity' => 0,
+        'details' => [],
+    ];
+    if (!orange_table_exists($pdo, 'countries')) {
+        return $out;
+    }
+    $kwId = orange_countries_default_id($pdo);
+    $countries = $pdo->query('SELECT id FROM countries ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    foreach ($countries as $cRow) {
+        $cid = (int) ($cRow['id'] ?? 0);
+        if ($cid <= 0 || ($kwId > 0 && $cid === $kwId)) {
+            continue;
+        }
+        $one = orange_country_purge_cloned_gl_bundle_if_idle($pdo, $cid);
+        $one['country_id'] = $cid;
+        $out['details'][] = $one;
+        if (!empty($one['purged'])) {
+            $out['countries_purged']++;
+        } elseif (($one['skipped'] ?? '') === 'has_gl_activity') {
+            $out['countries_skipped_activity']++;
+        }
+    }
+
+    return $out;
+}
+
+/** v77 — إيقاف نسخ GL التلقائي + تنظيف النسخ المنسوخة من الكويت. */
+function orange_catalog_migrate_country_scope_repair_v77(PDO $pdo): void
+{
+    $marker = 'php_country_scope_repair_v77';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    $stats = orange_country_scope_purge_kw_gl_clones_v77($pdo);
+
+    try {
+        orange_schema_migrations_ensure_table($pdo);
+        $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+        $ins->execute([$marker]);
+        if (function_exists('error_log')) {
+            error_log('[orange] country scope repair v77 OK '
+                . json_encode($stats, JSON_UNESCAPED_UNICODE));
+        }
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] country scope repair v77 marker: ' . $e->getMessage());
         }
     }
 }

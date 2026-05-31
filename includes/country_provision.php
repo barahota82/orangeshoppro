@@ -867,11 +867,19 @@ function orange_country_copy_storefront_copy_lines_from_source(PDO $pdo, int $ta
 }
 
 /**
- * تهيئة تشغيلية كاملة لدولة جديدة — idempotent (يتخطى ما وُجد مسبقاً).
+ * تهيئة تشغيلية لدولة — idempotent (يتخطى ما وُجد مسبقاً).
+ *
+ * @param bool $copyGlBundle عند false: مخزن/قنوات/كتalog/أقسام فقط — **بلا** دليل حسابات/GL (v77).
+ *                          الافتراض true للزر اليدوي «تهيئة» من شاشة الدول.
  *
  * @return array<string,mixed>
  */
-function orange_country_provision_full(PDO $pdo, int $countryId, ?int $sourceCountryId = null): array
+function orange_country_provision_full(
+    PDO $pdo,
+    int $countryId,
+    ?int $sourceCountryId = null,
+    bool $copyGlBundle = true
+): array
 {
     $out = [
         'warehouse_id' => 0,
@@ -953,15 +961,20 @@ function orange_country_provision_full(PDO $pdo, int $countryId, ?int $sourceCou
     }
 
     $out['catalog_copy'] = orange_country_copy_catalog_from_source($pdo, $countryId, $sourceCountryId);
-    $out['accounts_copy'] = orange_country_copy_accounts_from_source($pdo, $countryId, $sourceCountryId);
-    $idMap = is_array($out['accounts_copy']['id_map'] ?? null) ? $out['accounts_copy']['id_map'] : [];
-    $out['journal_types_copy'] = orange_country_copy_journal_types_from_source($pdo, $countryId, $sourceCountryId);
-    $out['gl_settings_copy'] = orange_country_copy_gl_settings_from_source(
-        $pdo,
-        $countryId,
-        $sourceCountryId,
-        $idMap
-    );
+
+    if ($copyGlBundle) {
+        $out['accounts_copy'] = orange_country_copy_accounts_from_source($pdo, $countryId, $sourceCountryId);
+        $idMap = is_array($out['accounts_copy']['id_map'] ?? null) ? $out['accounts_copy']['id_map'] : [];
+        $out['journal_types_copy'] = orange_country_copy_journal_types_from_source($pdo, $countryId, $sourceCountryId);
+        $out['gl_settings_copy'] = orange_country_copy_gl_settings_from_source(
+            $pdo,
+            $countryId,
+            $sourceCountryId,
+            $idMap
+        );
+        $out['gl_journal_type_rules_copy'] = orange_country_copy_gl_journal_type_rules_from_source($pdo, $countryId, $sourceCountryId);
+        $out['fiscal_years_copy'] = orange_country_copy_fiscal_years_from_source($pdo, $countryId, $sourceCountryId);
+    }
 
     require_once __DIR__ . '/department_countries.php';
     $out['departments_copy'] = orange_department_countries_copy_from_source($pdo, $countryId, $sourceCountryId);
@@ -971,8 +984,6 @@ function orange_country_provision_full(PDO $pdo, int $countryId, ?int $sourceCou
         $out['departments_copy']['skipped'] = false;
     }
 
-    $out['gl_journal_type_rules_copy'] = orange_country_copy_gl_journal_type_rules_from_source($pdo, $countryId, $sourceCountryId);
-    $out['fiscal_years_copy'] = orange_country_copy_fiscal_years_from_source($pdo, $countryId, $sourceCountryId);
     $out['company_settings_copy'] = orange_country_copy_company_settings_from_source($pdo, $countryId, $sourceCountryId);
     $out['storefront_copy_lines_copy'] = orange_country_copy_storefront_copy_lines_from_source($pdo, $countryId, $sourceCountryId);
 
@@ -989,4 +1000,14 @@ function orange_country_provision_full(PDO $pdo, int $countryId, ?int $sourceCou
     $out['status'] = orange_country_provision_status($pdo, $countryId);
 
     return $out;
+}
+
+/**
+ * تهيئة تلقائية (شجرة موحّدة / multicountry runtime) — **بلا** نسخ دليل/GL من الكويت.
+ *
+ * @return array<string,mixed>
+ */
+function orange_country_provision_runtime(PDO $pdo, int $countryId, ?int $sourceCountryId = null): array
+{
+    return orange_country_provision_full($pdo, $countryId, $sourceCountryId, false);
 }

@@ -36,11 +36,15 @@ $fyDefault = $fyList !== [] ? (int) $fyList[0]['id'] : 0;
 
 $firstId = $flat !== [] ? (int) $flat[0]['id'] : 0;
 ?>
-<div class="coa-shell" dir="rtl" data-fy-default="<?php echo (int) $fyDefault; ?>">
+<div class="coa-shell" dir="rtl" data-fy-default="<?php echo (int) $fyDefault; ?>" data-admin-country-id="<?php echo (int) $ctxCountryId; ?>">
     <?php if ($ctxCountryId > 0 && $ctxCountryLabel !== ''): ?>
     <p class="admin-fy-shell__lead" style="margin:0 0 12px;">
         <strong>سياق الدولة الحالي:</strong> <?php echo htmlspecialchars($ctxCountryLabel, ENT_QUOTES, 'UTF-8'); ?>
+        (معرّف <?php echo (int) $ctxCountryId; ?>)
         — يُعرض دليل هذه الدولة فقط (حسابات <?php echo (int) count($flat); ?>).
+        <?php if ($flat !== []): ?>
+        <span class="muted" style="font-size:0.85rem;"> — أول حساب #<?php echo (int) ($flat[0]['id'] ?? 0); ?></span>
+        <?php endif; ?>
     </p>
     <?php endif; ?>
     <div class="coa-shell__body" dir="ltr">

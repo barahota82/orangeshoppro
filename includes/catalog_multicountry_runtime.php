@@ -165,7 +165,7 @@ function orange_catalog_ensure_multicountry_phase4(PDO $pdo): array
             continue;
         }
         try {
-            orange_country_provision_full($pdo, $countryId);
+            orange_country_provision_runtime($pdo, $countryId);
             $stats['countries_provisioned']++;
         } catch (Throwable $e) {
             if (function_exists('error_log')) {

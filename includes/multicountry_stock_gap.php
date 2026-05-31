@@ -429,7 +429,7 @@ function orange_multicountry_ensure_operational_phase2(PDO $pdo): void
             continue;
         }
         try {
-            orange_country_provision_full($pdo, $countryId, $sourceId > 0 ? $sourceId : null);
+            orange_country_provision_runtime($pdo, $countryId, $sourceId > 0 ? $sourceId : null);
         } catch (Throwable $e) {
             if (function_exists('error_log')) {
                 error_log('[orange] multicountry phase2 provision ' . $code . ': ' . $e->getMessage());

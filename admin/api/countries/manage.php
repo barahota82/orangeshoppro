@@ -283,7 +283,7 @@ try {
 
         $provision = null;
         if ($isActive === 1 && $countryId > 0) {
-            $provision = orange_country_provision_full($pdo, $countryId);
+            $provision = orange_country_provision_runtime($pdo, $countryId);
         }
 
         json_response([

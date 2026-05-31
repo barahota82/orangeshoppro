@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 76);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 77);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3050,6 +3050,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_country_scope_repair_v74($pdo);
     orange_catalog_migrate_country_scope_repair_v75($pdo);
     orange_catalog_migrate_country_scope_repair_v76($pdo);
+    orange_catalog_migrate_country_scope_repair_v77($pdo);
 
     if (!orange_table_exists($pdo, 'delivery_areas')) {
         orange_catalog_safe_exec(
