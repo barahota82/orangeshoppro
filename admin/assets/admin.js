@@ -102,6 +102,33 @@ function readableSnippet(s, max) {
     return out.replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
+/** رؤوس طلب الأدمن مع سياق الدولة (مبدّل الشريط العلوي). */
+function orangeAdminCountryHeaders(extra) {
+    var headers = extra && typeof extra === 'object' ? Object.assign({}, extra) : {};
+    try {
+        var countryMeta = document.querySelector('meta[name="orange-admin-country"]');
+        if (countryMeta) {
+            var code = String(countryMeta.getAttribute('content') || '').trim();
+            if (code) {
+                headers['X-Orange-Admin-Country'] = code;
+            }
+        }
+    } catch (eMeta) {
+        /* ignore */
+    }
+    return headers;
+}
+
+/** GET/POST fetch مع JSON + سياق الدولة. */
+function orangeAdminFetchJson(url, opts) {
+    opts = opts || {};
+    var headers = orangeAdminCountryHeaders(opts.headers || {});
+    return fetch(url, Object.assign({}, opts, {
+        credentials: opts.credentials || 'same-origin',
+        headers: headers
+    })).then(function (r) { return r.json(); });
+}
+
 /**
  * POST JSON للأدمن. يمنع النقر المزدوج: يعطّل الزر ويضبط data-orange-postjson-busy، ويستنتج الزر من آخر نقر (ORANGE_POSTJSON_INFER_SUBMITTER) ما لم يُمرَّر submitter أو inferSubmitter:false.
  * @param {string} url
@@ -141,10 +168,10 @@ function postJSON(url, payload, opts) {
     } catch (eMeta) {
         adminCountryHdr = '';
     }
-    var fetchHeaders = {
+    var fetchHeaders = orangeAdminCountryHeaders({
         'Content-Type': 'application/json',
         Accept: 'application/json'
-    };
+    });
     if (adminCountryHdr) {
         fetchHeaders['X-Orange-Admin-Country'] = adminCountryHdr;
     }

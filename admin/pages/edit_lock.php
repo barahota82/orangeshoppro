@@ -7,12 +7,23 @@ require_once __DIR__ . '/../../includes/edit_lock.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/journal_types.php';
 require_once __DIR__ . '/../../includes/gl_settings.php';
+require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/admin_settings_country.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
+$elCountryId = orange_admin_settings_effective_country_id($pdo);
+$elCountryRow = orange_country_row_by_id($pdo, $elCountryId, false);
+$elCountryLabel = trim((string) ($elCountryRow['name_ar'] ?? ''));
+if ($elCountryLabel === '' && $elCountryRow !== null) {
+    $elCountryLabel = trim((string) ($elCountryRow['name_en'] ?? ''));
+}
+if ($elCountryLabel === '') {
+    $elCountryLabel = orange_countries_display_code(orange_admin_context_country_code($pdo));
+}
 orange_journal_types_sync_canonical_defaults($pdo);
 /** @var list<array<string, mixed>> $elJournalTypes */
-$elJournalTypes = orange_journal_types_list($pdo);
+$elJournalTypes = orange_journal_types_list($pdo, $elCountryId);
 $elDateFromDisp = orange_format_datetime_dmY_hi(date('Y-m-01 00:00:00'));
 $elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
 ?>
@@ -21,6 +32,8 @@ $elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
         <span class="gl-posting-appbar__title">إقفال التعديلات</span>
     </header>
     <p class="gl-posting-intro" style="margin:0.5rem 1rem 0.75rem;font-size:0.95rem;color:#444;line-height:1.55;">
+        <strong>سياق الدولة:</strong> <?php echo htmlspecialchars($elCountryLabel, ENT_QUOTES, 'UTF-8'); ?>
+        — تُعرض مستندات هذه الدولة فقط.
         رقابة على إدخالات الموظفين: <strong>قفل</strong> يمنع التعديل والحذف؛ <strong>فك القفل</strong> (بصلاحية) للتصحيح من شاشة المستند.
         الحفظ يؤثر فوراً في التقارير — هذه الشاشة <strong>لا</strong> تؤجل الترحيل المحاسبي.
     </p>
@@ -218,7 +231,11 @@ $elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
         if (p.journal_type_id) {
             q += '&journal_type_id=' + encodeURIComponent(p.journal_type_id);
         }
-        var res = await fetch('/admin/api/edit-lock/list.php?' + q, { credentials: 'same-origin', cache: 'no-store' });
+        var res = await fetch('/admin/api/edit-lock/list.php?' + q, {
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: orangeAdminCountryHeaders()
+        });
         var j = await res.json();
         if (!j.success) { window.alert(j.message || 'تعذر التحميل'); return; }
         lastFilterInfo = j.filter || null;
@@ -229,7 +246,10 @@ $elDateToDisp = orange_format_datetime_dmY_hi(date('Y-m-d 23:59:00'));
     async function loadPreview(id) {
         var tb = document.getElementById('el_preview_tbody');
         tb.innerHTML = '<tr><td colspan="6" class="gl-posting-empty-cell">جاري التحميل…</td></tr>';
-        var res = await fetch('/admin/api/edit-lock/preview.php?id=' + id, { credentials: 'same-origin' });
+        var res = await fetch('/admin/api/edit-lock/preview.php?id=' + id, {
+            credentials: 'same-origin',
+            headers: orangeAdminCountryHeaders()
+        });
         var j = await res.json();
         if (!j.success) {
             tb.innerHTML = '<tr><td colspan="6" class="gl-posting-empty-cell">' + esc(j.message || 'تعذر') + '</td></tr>';

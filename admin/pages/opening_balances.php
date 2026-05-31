@@ -111,10 +111,15 @@ if (orange_journal_vouchers_ready($pdo)) {
 }
 
 if ($fyId > 0 && $fyRowSel !== null && orange_journal_vouchers_ready($pdo)) {
-    $vst = $pdo->prepare(
-        'SELECT id FROM journal_vouchers WHERE fiscal_year_id = ? AND entry_type = ? ORDER BY id DESC LIMIT 1'
-    );
-    $vst->execute([$fyId, 'opening_balance']);
+    $obJvSql = 'SELECT id FROM journal_vouchers WHERE fiscal_year_id = ? AND entry_type = ?';
+    $obJvParams = [$fyId, 'opening_balance'];
+    if ($ctxCountryId > 0 && orange_table_has_country_id($pdo, 'journal_vouchers')) {
+        $obJvSql .= ' AND country_id = ?';
+        $obJvParams[] = $ctxCountryId;
+    }
+    $obJvSql .= ' ORDER BY id DESC LIMIT 1';
+    $vst = $pdo->prepare($obJvSql);
+    $vst->execute($obJvParams);
     $obVid = (int) $vst->fetchColumn();
     if ($obVid > 0) {
         $vd = $pdo->prepare(
@@ -173,6 +178,7 @@ $obPostingLeafCt = orange_accounts_count_posting_leaves($pdo);
 <div class="page-title page-title--stacked jv-print-hide">
     <div>
         <h1>أرصدة أول المدة المالية</h1>
+        <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($ctxCountryLabel, ENT_QUOTES, 'UTF-8'); ?> — الأرصدة والسند لهذه الدولة فقط.</p>
     </div>
 </div>
 

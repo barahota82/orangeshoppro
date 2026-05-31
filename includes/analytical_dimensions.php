@@ -104,7 +104,7 @@ function orange_analytical_dimensions_list(PDO $pdo, ?int $countryId = null, boo
         $sql .= ' AND is_active = 1';
     }
     if ($countryId !== null && $countryId > 0) {
-        $sql .= ' AND (country_id IS NULL OR country_id = ?)';
+        $sql .= ' AND country_id = ?';
         $params[] = $countryId;
     }
     $sql .= ' ORDER BY sort_order ASC, id ASC';

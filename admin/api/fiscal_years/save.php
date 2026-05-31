@@ -112,7 +112,9 @@ try {
 
         $pdo->beginTransaction();
         try {
-            $selPrev = $pdo->prepare('SELECT is_closed, closed_at FROM fiscal_years WHERE id = ? LIMIT 1');
+            $selPrev = $fyScoped
+                ? $pdo->prepare('SELECT is_closed, closed_at FROM fiscal_years WHERE id = ? AND country_id = ? LIMIT 1')
+                : $pdo->prepare('SELECT is_closed, closed_at FROM fiscal_years WHERE id = ? LIMIT 1');
             $ins = $fyScoped
                 ? $pdo->prepare('INSERT INTO fiscal_years (country_id, label_ar, start_date, end_date, is_closed) VALUES (?, ?, ?, ?, ?)')
                 : $pdo->prepare('INSERT INTO fiscal_years (label_ar, start_date, end_date, is_closed) VALUES (?, ?, ?, ?)');
@@ -130,7 +132,7 @@ try {
                         $pdo->rollBack();
                         json_response(['success' => false, 'message' => 'فترة تتقاطع مع سنة أخرى في القاعدة'], 422);
                     }
-                    $selPrev->execute([$id]);
+                    $fyScoped ? $selPrev->execute([$id, $ctxCountryId]) : $selPrev->execute([$id]);
                     $prev = $selPrev->fetch(PDO::FETCH_ASSOC);
                     if (! $prev) {
                         $pdo->rollBack();
@@ -231,8 +233,9 @@ try {
 
         $pdo->beginTransaction();
         try {
+            orange_fiscal_year_assert_country_scope($pdo, $id, $ctxCountryId);
             if ($accountingClose) {
-                $prep = orange_year_end_close_prepare_draft($pdo, $id, $incomeSummaryAccountId, $retainedEarningsAccountId);
+                $prep = orange_year_end_close_prepare_draft($pdo, $id, $incomeSummaryAccountId, $retainedEarningsAccountId, $ctxCountryId);
                 $vid = (int) ($prep['voucher_id'] ?? 0);
                 if ($vid > 0) {
                     $pdo->commit();
@@ -244,8 +247,10 @@ try {
                         'redirect' => storefront_public_path('/admin/index.php?page=year_end_close_vouchers&id=' . $vid),
                     ]);
                 }
-                $u = $pdo->prepare('UPDATE fiscal_years SET is_closed = 1, closed_at = NOW() WHERE id = ? AND is_closed = 0');
-                $u->execute([$id]);
+                $u = $fyScoped
+                    ? $pdo->prepare('UPDATE fiscal_years SET is_closed = 1, closed_at = NOW() WHERE id = ? AND country_id = ? AND is_closed = 0')
+                    : $pdo->prepare('UPDATE fiscal_years SET is_closed = 1, closed_at = NOW() WHERE id = ? AND is_closed = 0');
+                $fyScoped ? $u->execute([$id, $ctxCountryId]) : $u->execute([$id]);
                 if ($u->rowCount() === 0) {
                     $pdo->rollBack();
                     json_response(['success' => false, 'message' => 'تعذر إغلاق السنة (غير موجودة أو مغلقة مسبقاً)'], 422);
@@ -257,8 +262,10 @@ try {
                     'message' => 'لا توجد إيرادات/مصروفات للإقفال — تم إغلاق السنة إدارياً.',
                 ]);
             }
-            $u = $pdo->prepare('UPDATE fiscal_years SET is_closed = 1, closed_at = NOW() WHERE id = ? AND is_closed = 0');
-            $u->execute([$id]);
+            $u = $fyScoped
+                ? $pdo->prepare('UPDATE fiscal_years SET is_closed = 1, closed_at = NOW() WHERE id = ? AND country_id = ? AND is_closed = 0')
+                : $pdo->prepare('UPDATE fiscal_years SET is_closed = 1, closed_at = NOW() WHERE id = ? AND is_closed = 0');
+            $fyScoped ? $u->execute([$id, $ctxCountryId]) : $u->execute([$id]);
             if ($u->rowCount() === 0) {
                 $pdo->rollBack();
                 json_response(['success' => false, 'message' => 'تعذر إغلاق السنة (غير موجودة أو مغلقة مسبقاً)'], 422);
@@ -283,7 +290,7 @@ try {
             json_response(['success' => false, 'message' => 'معرف السنة مطلوب'], 422);
         }
         try {
-            $info = orange_fiscal_year_reopen($pdo, $id);
+            $info = orange_fiscal_year_reopen($pdo, $id, $ctxCountryId);
         } catch (Throwable $e) {
             if ($e instanceof InvalidArgumentException || $e instanceof RuntimeException) {
                 json_response(['success' => false, 'message' => $e->getMessage()], 422);

@@ -246,3 +246,116 @@ function orange_catalog_migrate_country_scope_repair_v74(PDO $pdo): void
         }
     }
 }
+
+/**
+ * v75 — فصل شاشات GL الإدارية: backfill country_id + نسخ الأبعاد التحليلية per country.
+ *
+ * @return array{analytical_backfill:int, edit_lock_backfill:int, dimensions_copied:int}
+ */
+function orange_country_scope_repair_gl_admin_scope_v75(PDO $pdo): array
+{
+    $out = [
+        'analytical_backfill' => 0,
+        'edit_lock_backfill' => 0,
+        'dimensions_copied' => 0,
+    ];
+    $kwId = orange_countries_default_id($pdo);
+
+    if ($kwId > 0 && orange_table_exists($pdo, 'analytical_dimension')
+        && orange_table_has_column($pdo, 'analytical_dimension', 'country_id')) {
+        $out['analytical_backfill'] = (int) $pdo->exec(
+            'UPDATE analytical_dimension SET country_id = ' . (int) $kwId
+            . ' WHERE country_id IS NULL OR country_id = 0'
+        );
+    }
+
+    if ($kwId > 0 && orange_table_exists($pdo, 'orange_edit_lock_registry')
+        && orange_table_has_column($pdo, 'orange_edit_lock_registry', 'country_id')) {
+        $out['edit_lock_backfill'] = (int) $pdo->exec(
+            'UPDATE orange_edit_lock_registry SET country_id = ' . (int) $kwId
+            . ' WHERE country_id IS NULL OR country_id = 0'
+        );
+    }
+
+    if ($kwId <= 0 || !orange_table_exists($pdo, 'countries')
+        || !orange_table_exists($pdo, 'analytical_dimension')
+        || !orange_table_exists($pdo, 'analytical_dimension_value')) {
+        return $out;
+    }
+
+    require_once __DIR__ . '/analytical_dimensions.php';
+    $countries = $pdo->query('SELECT id FROM countries ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    foreach ($countries as $cRow) {
+        $cid = (int) ($cRow['id'] ?? 0);
+        if ($cid <= 0 || $cid === $kwId) {
+            continue;
+        }
+        $stCnt = $pdo->prepare('SELECT COUNT(*) FROM analytical_dimension WHERE country_id = ?');
+        $stCnt->execute([$cid]);
+        if ((int) $stCnt->fetchColumn() > 0) {
+            continue;
+        }
+        $stSrc = $pdo->prepare('SELECT * FROM analytical_dimension WHERE country_id = ? ORDER BY id ASC');
+        $stSrc->execute([$kwId]);
+        $dims = $stSrc->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        foreach ($dims as $dim) {
+            if (!is_array($dim)) {
+                continue;
+            }
+            $oldDimId = (int) ($dim['id'] ?? 0);
+            unset($dim['id']);
+            $dim['country_id'] = $cid;
+            $cols = array_keys($dim);
+            $pdo->prepare(
+                'INSERT INTO analytical_dimension (`' . implode('`, `', $cols) . '`) VALUES ('
+                . implode(', ', array_fill(0, count($cols), '?')) . ')'
+            )->execute(array_values($dim));
+            $newDimId = (int) $pdo->lastInsertId();
+            if ($oldDimId <= 0 || $newDimId <= 0) {
+                continue;
+            }
+            $stVals = $pdo->prepare('SELECT * FROM analytical_dimension_value WHERE dimension_id = ? ORDER BY id ASC');
+            $stVals->execute([$oldDimId]);
+            foreach ($stVals->fetchAll(PDO::FETCH_ASSOC) ?: [] as $val) {
+                if (!is_array($val)) {
+                    continue;
+                }
+                unset($val['id']);
+                $val['dimension_id'] = $newDimId;
+                $vCols = array_keys($val);
+                $pdo->prepare(
+                    'INSERT INTO analytical_dimension_value (`' . implode('`, `', $vCols) . '`) VALUES ('
+                    . implode(', ', array_fill(0, count($vCols), '?')) . ')'
+                )->execute(array_values($val));
+            }
+            $out['dimensions_copied']++;
+        }
+    }
+
+    return $out;
+}
+
+/** v75 — إصلاح فصل شاشات GL الإدارية (أبعاد، إقفال، …). */
+function orange_catalog_migrate_country_scope_repair_v75(PDO $pdo): void
+{
+    $marker = 'php_country_scope_repair_v75';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    $stats = orange_country_scope_repair_gl_admin_scope_v75($pdo);
+
+    try {
+        orange_schema_migrations_ensure_table($pdo);
+        $ins = $pdo->prepare('INSERT INTO orange_schema_migrations (filename) VALUES (?)');
+        $ins->execute([$marker]);
+        if (function_exists('error_log')) {
+            error_log('[orange] country scope repair v75 OK '
+                . json_encode($stats, JSON_UNESCAPED_UNICODE));
+        }
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] country scope repair v75 marker: ' . $e->getMessage());
+        }
+    }
+}

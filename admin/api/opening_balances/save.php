@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/fiscal_years.php';
 require_once __DIR__ . '/../../../includes/admin_settings_country.php';
 require_once __DIR__ . '/../../../includes/edit_lock.php';
+require_once __DIR__ . '/../../../includes/countries.php';
 require_admin_api();
 
 try {
@@ -79,13 +80,25 @@ try {
                 'message' => 'يُقبل في أرصدة أول المدة المالية حساب فرعي (ورقة ترحيل) فقط — لا جذراً ولا مجلداً.',
             ], 422);
         }
+        try {
+            orange_admin_assert_entity_country($pdo, 'accounts', $aid);
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    $jvCountrySql = '';
+    $jvCountryParams = [];
+    if ($ctxCountryId > 0 && orange_table_has_country_id($pdo, 'journal_vouchers')) {
+        $jvCountrySql = ' AND country_id = ?';
+        $jvCountryParams = [$ctxCountryId];
     }
 
     $pdo->beginTransaction();
     try {
         $useQueue = orange_gl_use_pending_queue($pdo);
-        $ex = $pdo->prepare('SELECT id FROM journal_vouchers WHERE fiscal_year_id = ? AND entry_type = ?');
-        $ex->execute([$fyId, 'opening_balance']);
+        $ex = $pdo->prepare('SELECT id FROM journal_vouchers WHERE fiscal_year_id = ? AND entry_type = ?' . $jvCountrySql);
+        $ex->execute(array_merge([$fyId, 'opening_balance'], $jvCountryParams));
         foreach ($ex->fetchAll(PDO::FETCH_COLUMN) as $oldId) {
             $pdo->prepare('DELETE FROM journal_vouchers WHERE id = ?')->execute([(int)$oldId]);
         }
@@ -126,8 +139,8 @@ try {
     }
 
     $obVid = 0;
-    $exOb = $pdo->prepare('SELECT id FROM journal_vouchers WHERE fiscal_year_id = ? AND entry_type = ? LIMIT 1');
-    $exOb->execute([$fyId, 'opening_balance']);
+    $exOb = $pdo->prepare('SELECT id FROM journal_vouchers WHERE fiscal_year_id = ? AND entry_type = ?' . $jvCountrySql . ' LIMIT 1');
+    $exOb->execute(array_merge([$fyId, 'opening_balance'], $jvCountryParams));
     $obVid = (int) ($exOb->fetchColumn() ?: 0);
     orange_edit_lock_register_opening_balance(
         $pdo,

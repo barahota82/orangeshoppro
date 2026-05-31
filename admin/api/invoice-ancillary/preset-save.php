@@ -32,6 +32,7 @@ try {
 
     $countryId = orange_admin_context_country_id($pdo);
     $presetId = orange_invoice_ancillary_preset_save($pdo, [
+        'id' => (int) ($data['id'] ?? 0),
         'country_id' => $countryId,
         'account_id' => $accountId,
         'line_kind' => $lineKind,

@@ -8,10 +8,18 @@ require_once __DIR__ . '/../../includes/admin_settings_country.php';
 
 $pdo = orange_admin_page_pdo();
 $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
+$ctxCountryRow = orange_country_row_by_id($pdo, $ctxCountryId, false);
+$ctxCountryLabel = trim((string) ($ctxCountryRow['name_ar'] ?? ''));
+if ($ctxCountryLabel === '' && $ctxCountryRow !== null) {
+    $ctxCountryLabel = trim((string) ($ctxCountryRow['name_en'] ?? ''));
+}
 $ready = orange_analytical_dimensions_ready($pdo);
 $dims = $ready ? orange_analytical_dimensions_list_with_value_counts($pdo, $ctxCountryId, false) : [];
 
 $selectedDimId = isset($_GET['dim']) ? (int) $_GET['dim'] : 0;
+if ($selectedDimId > 0 && orange_analytical_dimension_get($pdo, $selectedDimId, $ctxCountryId) === null) {
+    $selectedDimId = 0;
+}
 if ($selectedDimId <= 0 && $dims !== []) {
     $selectedDimId = (int) ($dims[0]['id'] ?? 0);
 }
@@ -41,6 +49,9 @@ if ($valuesJson === false) {
 ?>
 <div class="admin-fy-shell" dir="rtl" id="ad_app">
     <h1 class="admin-fy-shell__title">الأبعاد التحليلية</h1>
+    <?php if ($ctxCountryLabel !== ''): ?>
+    <p class="card-hint" style="margin:0 0 0.75rem;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($ctxCountryLabel, ENT_QUOTES, 'UTF-8'); ?> — الأبعاد وقيمها لهذه الدولة فقط.</p>
+    <?php endif; ?>
 
     <?php if (! $ready): ?>
         <div class="card" style="border:1px solid #fcd34d;background:#fffbeb;">
@@ -177,7 +188,12 @@ if ($valuesJson === false) {
     function showOk(m) { el('ad_msg').textContent = m || ''; el('ad_msg').style.display = m ? 'block' : 'none'; if (m) el('ad_err').style.display = 'none'; }
 
     async function postJson(body) {
-        var res = await fetch(API.save, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body || {}) });
+        var res = await fetch(API.save, {
+            method: 'POST',
+            headers: orangeAdminCountryHeaders({ 'Content-Type': 'application/json' }),
+            credentials: 'same-origin',
+            body: JSON.stringify(body || {})
+        });
         return res.json();
     }
 

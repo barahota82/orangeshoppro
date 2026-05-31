@@ -97,6 +97,7 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
 ?>
 <div class="page-title">
     <h1>حسابات القيود التلقائية</h1>
+    <p class="card-hint" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($glCountryLabel, ENT_QUOTES, 'UTF-8'); ?> — الربط والحسابات لهذه الدولة فقط.</p>
 </div>
 
 <?php if ($glCountryNeedsProvision): ?>
@@ -753,7 +754,7 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
         var mySeq = ++glPickSeq;
         var mode = activePickKey === 'accounts_payable_parent' ? '&mode=parents' : '';
         var url = '/admin/api/accounts/search-leaves.php?q=' + encodeURIComponent(q || '') + mode;
-        fetch(url, { credentials: 'same-origin', cache: 'no-store' })
+        fetch(url, { credentials: 'same-origin', cache: 'no-store', headers: orangeAdminCountryHeaders() })
             .then(function (r) { return r.json(); })
             .then(function (data) {
                 if (mySeq !== glPickSeq) {
@@ -817,7 +818,10 @@ $resolvedLineByKeyJson = json_encode($resolvedAccountLineByKey, JSON_UNESCAPED_U
                     return;
                 }
                 glLookupInFlight = true;
-                fetch('/admin/api/accounts/lookup-by-code.php?code=' + encodeURIComponent(raw), { credentials: 'same-origin' })
+                fetch('/admin/api/accounts/lookup-by-code.php?code=' + encodeURIComponent(raw), {
+                    credentials: 'same-origin',
+                    headers: orangeAdminCountryHeaders()
+                })
                     .then(function (r) { return r.json(); })
                     .then(function (data) {
                         if (!data.success) {

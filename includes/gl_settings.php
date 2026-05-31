@@ -727,14 +727,9 @@ function orange_gl_cogs_return_account_id(PDO $pdo): int
  *
  * @return int|null null إذا لم يُربط بعد
  */
-function orange_gl_supplier_parent_account_id(PDO $pdo): ?int
+function orange_gl_supplier_parent_account_id(PDO $pdo, ?int $countryId = null): ?int
 {
-    if (!orange_table_exists($pdo, 'orange_gl_account_settings')) {
-        return null;
-    }
-    $stmt = $pdo->prepare('SELECT account_id FROM orange_gl_account_settings WHERE setting_key = ? LIMIT 1');
-    $stmt->execute(['accounts_payable_parent']);
-    $id = (int) $stmt->fetchColumn();
+    $id = orange_gl_setting_bound_account_id_raw($pdo, 'accounts_payable_parent', $countryId);
 
     return $id > 0 ? $id : null;
 }

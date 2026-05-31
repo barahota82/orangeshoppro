@@ -6,6 +6,9 @@ require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/gl_settings.php';
 require_once __DIR__ . '/journal_voucher.php';
 require_once __DIR__ . '/account_tree.php';
+require_once __DIR__ . '/fiscal_years.php';
+require_once __DIR__ . '/countries.php';
+require_once __DIR__ . '/admin_settings_country.php';
 
 /** @return array<string, string> */
 function orange_year_end_close_phase_labels(): array
@@ -26,9 +29,11 @@ function orange_year_end_close_build_lines(
     PDO $pdo,
     int $fiscalYearId,
     ?int $incomeSummaryAccountId = null,
-    ?int $retainedEarningsAccountId = null
+    ?int $retainedEarningsAccountId = null,
+    ?int $countryId = null
 ): array {
     orange_catalog_ensure_schema($pdo);
+    orange_fiscal_year_assert_country_scope($pdo, $fiscalYearId, $countryId);
     if (! orange_journal_vouchers_ready($pdo)) {
         throw new RuntimeException('جداول السندات غير متوفرة.');
     }
@@ -239,9 +244,11 @@ function orange_year_end_close_prepare_draft(
     PDO $pdo,
     int $fiscalYearId,
     ?int $incomeSummaryAccountId = null,
-    ?int $retainedEarningsAccountId = null
+    ?int $retainedEarningsAccountId = null,
+    ?int $countryId = null
 ): array {
     orange_catalog_ensure_schema($pdo);
+    orange_fiscal_year_assert_country_scope($pdo, $fiscalYearId, $countryId);
 
     $fySt = $pdo->prepare('SELECT * FROM fiscal_years WHERE id = ? LIMIT 1');
     $fySt->execute([$fiscalYearId]);
@@ -259,7 +266,7 @@ function orange_year_end_close_prepare_draft(
         throw new RuntimeException('تم إقفال هذه السنة محاسبياً — استخدم «فك الإقفال» للتصحيح.');
     }
 
-    $lines = orange_year_end_close_build_lines($pdo, $fiscalYearId, $incomeSummaryAccountId, $retainedEarningsAccountId);
+    $lines = orange_year_end_close_build_lines($pdo, $fiscalYearId, $incomeSummaryAccountId, $retainedEarningsAccountId, $countryId);
     if ($lines === []) {
         return ['voucher_id' => 0, 'needs_review' => false, 'fiscal_year_id' => $fiscalYearId];
     }
@@ -382,7 +389,8 @@ function orange_year_end_close_finalize(
     int $voucherId,
     string $voucherDate,
     string $description,
-    array $lines
+    array $lines,
+    ?int $countryId = null
 ): array {
     if ($voucherId <= 0) {
         throw new InvalidArgumentException('معرف السند غير صالح.');
@@ -390,6 +398,8 @@ function orange_year_end_close_finalize(
     if (! orange_year_end_close_yec_columns_ready($pdo)) {
         throw new RuntimeException('أعمدة YEC غير جاهزة.');
     }
+
+    orange_admin_assert_entity_country($pdo, 'journal_vouchers', $voucherId);
 
     $st = $pdo->prepare(
         "SELECT * FROM journal_vouchers WHERE id = ? AND entry_type = 'year_end_close' LIMIT 1"
@@ -414,6 +424,17 @@ function orange_year_end_close_finalize(
         throw new RuntimeException('السنة مغلقة مسبقاً.');
     }
 
+    $ctxCountryId = orange_admin_settings_effective_country_id($pdo, $countryId);
+    foreach ($lines as $ln) {
+        if (!is_array($ln)) {
+            continue;
+        }
+        $aid = (int) ($ln['account_id'] ?? 0);
+        if ($aid > 0) {
+            orange_admin_assert_entity_country($pdo, 'accounts', $aid);
+        }
+    }
+
     $pdo->beginTransaction();
     try {
         orange_year_end_close_replace_lines($pdo, $voucherId, $lines, $description, $voucherDate);
@@ -422,8 +443,14 @@ function orange_year_end_close_finalize(
         )->execute([$voucherId]);
 
         if ($fyId > 0) {
-            $pdo->prepare('UPDATE fiscal_years SET is_closed = 1, closed_at = NOW() WHERE id = ? AND is_closed = 0')
-                ->execute([$fyId]);
+            if (orange_fiscal_years_has_country_column($pdo) && $ctxCountryId > 0) {
+                $pdo->prepare(
+                    'UPDATE fiscal_years SET is_closed = 1, closed_at = NOW() WHERE id = ? AND country_id = ? AND is_closed = 0'
+                )->execute([$fyId, $ctxCountryId]);
+            } else {
+                $pdo->prepare('UPDATE fiscal_years SET is_closed = 1, closed_at = NOW() WHERE id = ? AND is_closed = 0')
+                    ->execute([$fyId]);
+            }
         }
         $pdo->commit();
     } catch (Throwable $e) {
@@ -455,14 +482,19 @@ function orange_fiscal_year_end_accounting_close(PDO $pdo, int $fiscalYearId, ?i
  *
  * @return array{voided_year_end_vouchers:int,voucher_id:int}
  */
-function orange_fiscal_year_reopen(PDO $pdo, int $fiscalYearId): array
+function orange_fiscal_year_reopen(PDO $pdo, int $fiscalYearId, ?int $countryId = null): array
 {
     orange_catalog_ensure_schema($pdo);
     if ($fiscalYearId <= 0 || ! orange_table_exists($pdo, 'fiscal_years')) {
         throw new InvalidArgumentException('معرف السنة غير صالح.');
     }
-    $fySt = $pdo->prepare('SELECT id, is_closed FROM fiscal_years WHERE id = ? LIMIT 1');
-    $fySt->execute([$fiscalYearId]);
+    orange_fiscal_year_assert_country_scope($pdo, $fiscalYearId, $countryId);
+    $ctxCountryId = orange_admin_settings_effective_country_id($pdo, $countryId);
+    $fyScoped = orange_fiscal_years_has_country_column($pdo);
+    $fySt = $fyScoped && $ctxCountryId > 0
+        ? $pdo->prepare('SELECT id, is_closed FROM fiscal_years WHERE id = ? AND country_id = ? LIMIT 1')
+        : $pdo->prepare('SELECT id, is_closed FROM fiscal_years WHERE id = ? LIMIT 1');
+    $fyScoped && $ctxCountryId > 0 ? $fySt->execute([$fiscalYearId, $ctxCountryId]) : $fySt->execute([$fiscalYearId]);
     $fy = $fySt->fetch(PDO::FETCH_ASSOC);
     if (! $fy) {
         throw new RuntimeException('السنة المالية غير موجودة.');
@@ -473,27 +505,33 @@ function orange_fiscal_year_reopen(PDO $pdo, int $fiscalYearId): array
 
     $voided = 0;
     $lastVid = 0;
+    $fyReopenSql = ($fyScoped && $ctxCountryId > 0)
+        ? 'UPDATE fiscal_years SET is_closed = 0, closed_at = NULL WHERE id = ? AND country_id = ?'
+        : 'UPDATE fiscal_years SET is_closed = 0, closed_at = NULL WHERE id = ?';
+    $fyReopenParams = ($fyScoped && $ctxCountryId > 0) ? [$fiscalYearId, $ctxCountryId] : [$fiscalYearId];
 
     if (orange_journal_vouchers_ready($pdo)) {
         if (orange_year_end_close_yec_columns_ready($pdo)) {
-            $st = $pdo->prepare(
-                "SELECT id FROM journal_vouchers WHERE fiscal_year_id = ? AND entry_type = 'year_end_close'
-                 AND (is_void = 0 OR is_void IS NULL) ORDER BY id DESC"
-            );
-            $st->execute([$fiscalYearId]);
+            $jvHasCountry = orange_table_has_country_id($pdo, 'journal_vouchers');
+            $st = $jvHasCountry && $ctxCountryId > 0
+                ? $pdo->prepare(
+                    "SELECT id FROM journal_vouchers WHERE fiscal_year_id = ? AND country_id = ? AND entry_type = 'year_end_close'
+                     AND (is_void = 0 OR is_void IS NULL) ORDER BY id DESC"
+                )
+                : $pdo->prepare(
+                    "SELECT id FROM journal_vouchers WHERE fiscal_year_id = ? AND entry_type = 'year_end_close'
+                     AND (is_void = 0 OR is_void IS NULL) ORDER BY id DESC"
+                );
+            $jvHasCountry && $ctxCountryId > 0
+                ? $st->execute([$fiscalYearId, $ctxCountryId])
+                : $st->execute([$fiscalYearId]);
             $ids = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN) ?: []);
             foreach ($ids as $vid) {
                 orange_year_end_close_void_voucher($pdo, $vid, false);
                 ++$voided;
                 $lastVid = $vid;
             }
-            if ($voided === 0) {
-                $pdo->prepare('UPDATE fiscal_years SET is_closed = 0, closed_at = NULL WHERE id = ?')
-                    ->execute([$fiscalYearId]);
-            } else {
-                $pdo->prepare('UPDATE fiscal_years SET is_closed = 0, closed_at = NULL WHERE id = ?')
-                    ->execute([$fiscalYearId]);
-            }
+            $pdo->prepare($fyReopenSql)->execute($fyReopenParams);
         } else {
             $st = $pdo->prepare(
                 'SELECT id FROM journal_vouchers WHERE fiscal_year_id = ? AND entry_type = ?'
@@ -506,12 +544,10 @@ function orange_fiscal_year_reopen(PDO $pdo, int $fiscalYearId): array
                 $voided = count($ids);
                 $lastVid = (int) ($ids[0] ?? 0);
             }
-            $pdo->prepare('UPDATE fiscal_years SET is_closed = 0, closed_at = NULL WHERE id = ?')
-                ->execute([$fiscalYearId]);
+            $pdo->prepare($fyReopenSql)->execute($fyReopenParams);
         }
     } else {
-        $pdo->prepare('UPDATE fiscal_years SET is_closed = 0, closed_at = NULL WHERE id = ?')
-            ->execute([$fiscalYearId]);
+        $pdo->prepare($fyReopenSql)->execute($fyReopenParams);
     }
 
     return ['voided_year_end_vouchers' => $voided, 'voucher_id' => $lastVid];

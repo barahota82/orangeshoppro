@@ -201,6 +201,24 @@ function orange_fiscal_year_country_id(PDO $pdo, int $fiscalYearId): int
     return $cid > 0 ? $cid : orange_countries_default_id($pdo);
 }
 
+/**
+ * @throws RuntimeException
+ */
+function orange_fiscal_year_assert_country_scope(PDO $pdo, int $fiscalYearId, ?int $countryId = null): void
+{
+    if ($fiscalYearId <= 0 || !orange_fiscal_years_has_country_column($pdo)) {
+        return;
+    }
+    $ctx = orange_admin_settings_effective_country_id($pdo, $countryId);
+    if ($ctx <= 0) {
+        return;
+    }
+    $rowCid = orange_fiscal_year_country_id($pdo, $fiscalYearId);
+    if ($rowCid > 0 && $rowCid !== $ctx) {
+        throw new RuntimeException('السنة المالية لا تتبع الدولة المختارة في لوحة التحكم.');
+    }
+}
+
 /** رمز السوق للعرض في مرجع OB (KW، EG، UAE، KSA، …). */
 function orange_opening_balance_country_code(PDO $pdo, ?int $countryId = null): string
 {

@@ -411,6 +411,11 @@ function orange_edit_lock_sync_purchases(PDO $pdo, ?string $df, ?string $dt): vo
 {
     $sql = 'SELECT p.id, p.country_id, p.total, p.created_at FROM purchases p WHERE 1=1';
     $params = [];
+    $ctxCid = orange_admin_context_country_id($pdo);
+    if ($ctxCid > 0 && orange_table_has_country_id($pdo, 'purchases')) {
+        $sql .= ' AND p.country_id = ?';
+        $params[] = $ctxCid;
+    }
     if ($df !== null) {
         $sql .= ' AND p.created_at >= ?';
         $params[] = $df;
@@ -451,6 +456,7 @@ function orange_edit_lock_sync_purchases(PDO $pdo, ?string $df, ?string $dt): vo
 
 function orange_edit_lock_sync_purchase_returns(PDO $pdo, ?string $df, ?string $dt): void
 {
+    $ctxCid = orange_admin_context_country_id($pdo);
     $sql = 'SELECT pr.id, pr.total, pr.created_at, pr.return_number, pr.purchase_id, pr.supplier_id
             FROM purchase_returns pr WHERE 1=1';
     $params = [];
@@ -472,6 +478,9 @@ function orange_edit_lock_sync_purchase_returns(PDO $pdo, ?string $df, ?string $
             continue;
         }
         $cid = orange_edit_lock_country_for_purchase_return($pdo, $row);
+        if ($ctxCid > 0 && ($cid === null || $cid !== $ctxCid)) {
+            continue;
+        }
         $ref = trim((string) ($row['return_number'] ?? ''));
         if ($ref === '') {
             $ref = 'PRTN-' . $rid;
@@ -490,6 +499,7 @@ function orange_edit_lock_sync_purchase_returns(PDO $pdo, ?string $df, ?string $
 
 function orange_edit_lock_sync_sales_returns(PDO $pdo, ?string $df, ?string $dt): void
 {
+    $ctxCid = orange_admin_context_country_id($pdo);
     $sql = 'SELECT sr.id, sr.total, sr.created_at, sr.return_number, sr.order_id, sr.customer_id
             FROM sales_returns sr WHERE 1=1';
     $params = [];
@@ -511,6 +521,9 @@ function orange_edit_lock_sync_sales_returns(PDO $pdo, ?string $df, ?string $dt)
             continue;
         }
         $cid = orange_edit_lock_country_for_sales_return($pdo, $row);
+        if ($ctxCid > 0 && ($cid === null || $cid !== $ctxCid)) {
+            continue;
+        }
         $ref = trim((string) ($row['return_number'] ?? ''));
         if ($ref === '') {
             $ref = 'SR-' . $rid;
@@ -533,10 +546,15 @@ function orange_edit_lock_sync_journal_vouchers(PDO $pdo, ?string $df, ?string $
         return;
     }
     require_once __DIR__ . '/fiscal_years.php';
+    $ctxCid = orange_admin_context_country_id($pdo);
     $sql = 'SELECT j.id, j.country_id, j.reference, j.description, j.voucher_date, j.entry_type, j.fiscal_year_id
             FROM journal_vouchers j
             WHERE (j.is_void IS NULL OR j.is_void = 0)';
     $params = [];
+    if ($ctxCid > 0 && orange_table_has_country_id($pdo, 'journal_vouchers')) {
+        $sql .= ' AND j.country_id = ?';
+        $params[] = $ctxCid;
+    }
     if ($df !== null) {
         $sql .= ' AND j.voucher_date >= ?';
         $params[] = $df;
@@ -649,8 +667,8 @@ function orange_edit_lock_list(
         $sql .= ' AND is_locked = 0';
     }
     $ctxCid = orange_admin_context_country_id($pdo);
-    if ($ctxCid > 0) {
-        $sql .= ' AND (country_id = ? OR country_id IS NULL OR country_id = 0)';
+    if ($ctxCid > 0 && orange_table_has_column($pdo, 'orange_edit_lock_registry', 'country_id')) {
+        $sql .= ' AND country_id = ?';
         $params[] = $ctxCid;
     }
     $sql .= ' ORDER BY saved_at DESC, id DESC LIMIT 2000';
@@ -678,6 +696,12 @@ function orange_edit_lock_preview(PDO $pdo, int $registryId): array
     $row = $st->fetch(PDO::FETCH_ASSOC);
     if (!$row) {
         throw new RuntimeException('السجل غير موجود.');
+    }
+    $ctxCid = orange_admin_context_country_id($pdo);
+    $rowCid = (int) ($row['country_id'] ?? 0);
+    if ($ctxCid > 0 && orange_table_has_column($pdo, 'orange_edit_lock_registry', 'country_id')
+        && $rowCid > 0 && $rowCid !== $ctxCid) {
+        throw new RuntimeException('السجل لا يتبع الدولة المختارة في لوحة التحكم.');
     }
     $vid = (int) ($row['journal_voucher_id'] ?? 0);
     $lines = [];

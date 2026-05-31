@@ -7,6 +7,8 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/year_end_close.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
+require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/admin_settings_country.php';
 require_admin_api();
 
 try {
@@ -31,6 +33,7 @@ try {
         if (! $v) {
             json_response(['success' => false, 'message' => 'سند YEC غير موجود'], 404);
         }
+        orange_admin_assert_entity_country($pdo, 'journal_vouchers', $id);
 
         $phaseSel = orange_table_has_column($pdo, 'journal_lines', 'yec_phase')
             ? ', jl.yec_phase'
@@ -126,7 +129,9 @@ try {
         }
 
         try {
-            $info = orange_year_end_close_finalize($pdo, $id, $dateUp, $description, $lines);
+            $ctxCountryId = orange_admin_settings_effective_country_id($pdo);
+            orange_admin_assert_entity_country($pdo, 'journal_vouchers', $id);
+            $info = orange_year_end_close_finalize($pdo, $id, $dateUp, $description, $lines, $ctxCountryId);
         } catch (InvalidArgumentException|RuntimeException $e) {
             json_response(['success' => false, 'message' => $e->getMessage()], 422);
         }

@@ -10,6 +10,14 @@ $pdo = db();
 orange_catalog_ensure_schema($pdo);
 
 $ilpCountryId = orange_admin_context_country_id($pdo);
+$ilpCountryRow = orange_country_row_by_id($pdo, $ilpCountryId, false);
+$ilpCountryLabel = trim((string) ($ilpCountryRow['name_ar'] ?? ''));
+if ($ilpCountryLabel === '' && $ilpCountryRow !== null) {
+    $ilpCountryLabel = trim((string) ($ilpCountryRow['name_en'] ?? ''));
+}
+if ($ilpCountryLabel === '') {
+    $ilpCountryLabel = orange_countries_display_code(orange_admin_context_country_code($pdo));
+}
 $ilpReady = orange_invoice_ancillary_tables_ready($pdo);
 $ilpNextSort = $ilpReady ? orange_invoice_ancillary_preset_next_sort($pdo, $ilpCountryId) : 1;
 $ilpContextLabels = orange_invoice_ancillary_invoice_context_labels();
@@ -63,6 +71,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
     <div>
         <h1>قائمة بنود الفاتورة المحفوظة</h1>
         <p class="page-subtitle muted" style="margin:0.35rem 0 0;">اختصارات حسابات لبنود إضافية على فواتير المشتريات والمبيعات — تظهر في منتقي «إضافة بند».</p>
+        <p class="page-subtitle muted" style="margin:0.35rem 0 0;"><strong>سياق الدولة:</strong> <?php echo htmlspecialchars($ilpCountryLabel, ENT_QUOTES, 'UTF-8'); ?> — القائمة لهذه الدولة فقط.</p>
     </div>
 </div>
 
@@ -283,7 +292,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
         var ctx = (document.getElementById('ilp_filter_context').value || '').trim();
         var url = '/admin/api/invoice-ancillary/presets-admin-list.php';
         if (ctx) url += '?invoice_context=' + encodeURIComponent(ctx);
-        fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' }, cache: 'no-store' })
+        fetch(url, { credentials: 'same-origin', headers: orangeAdminCountryHeaders({ 'Accept': 'application/json' }), cache: 'no-store' })
             .then(function (r) { return r.json(); })
             .then(function (res) {
                 if (!res || !res.success) {
@@ -360,7 +369,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
         }
         fetch('/admin/api/accounts/search-leaves.php?q=' + encodeURIComponent(q), {
             credentials: 'same-origin',
-            headers: { 'Accept': 'application/json' },
+            headers: orangeAdminCountryHeaders({ Accept: 'application/json' }),
             cache: 'no-store'
         }).then(function (r) { return r.json(); })
             .then(function (res) {
