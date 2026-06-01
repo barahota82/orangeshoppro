@@ -11,8 +11,9 @@ $cgpPickRows = orange_cart_promo_admin_product_rows($pdo);
 $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS);
 ?>
 <div class="page-title page-title--stacked">
-    <h1>عروض الهدايا</h1>
-    <p class="page-subtitle">هدية تلقائية عند حد أدنى لمجموع السلة — منتج كامل في الأدمن؛ العميل يختار اللون/المقاس عند الدفع.</p>
+    <h1>عروض الهدايا (مجموعة اختيار / هدية ثابتة)</h1>
+    <p class="page-subtitle">تكميل <strong>س4</strong>: عند تحقق حد أدنى لمجموع السلة (يمكن أن يكون 0) يُضاف بند هدية — العميل يختار اللون/المقاس عند الدفع.
+        <strong>منتج كامل</strong> في الأدمن: <strong>نقرتان</strong> على «إضافة منتج» أو «اختيار منتج».</p>
 </div>
 
 <?php if (!$hasTable): ?>
@@ -22,98 +23,77 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
 <?php endif; ?>
 
 <div class="card">
-    <h3>إضافة / تعديل قاعدة</h3>
+    <h3>إضافة / تعديل</h3>
     <input type="hidden" id="cgp_id" value="0">
-    <div class="ocp-form">
-        <section class="ocp-section">
-            <h4 class="ocp-section__title">١ — شرط مجموع السلة</h4>
-            <div class="ocp-section__body ocp-meta-row">
-                <div>
-                    <label>الحد الأدنى (د.ك)</label>
-                    <input type="text" id="cgp_min" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="0">
-                    <p class="card-hint" style="margin:4px 0 0;">0 = بدون شرط مبلغ.</p>
-                </div>
-                <div>
-                    <label>الترتيب</label>
-                    <input type="number" id="cgp_sort" value="0" class="admin-inp" min="0" step="1">
-                </div>
-            </div>
-        </section>
-        <section class="ocp-section">
-            <h4 class="ocp-section__title">٢ — المنتج المهدى</h4>
-            <div class="ocp-section__body">
-                <div class="ocp-choices">
-                    <label class="ocp-choice">
-                        <input type="radio" name="cgp_kind" value="choice" checked onchange="cgpToggleKind()">
-                        <span>اختيار من مجموعة منتجات</span>
-                    </label>
-                    <label class="ocp-choice">
-                        <input type="radio" name="cgp_kind" value="fixed" onchange="cgpToggleKind()">
-                        <span>هدية ثابتة (منتج واحد)</span>
-                    </label>
-                </div>
-                <div id="cgp_block_pool" class="ocp-product-panel">
-                    <div class="ocp-toolbar">
-                        <button type="button" class="btn-secondary" id="cgp_pool_add_btn">+ إضافة منتج</button>
-                        <span class="card-hint">نقرتان للاختيار — يظهر للعميل كل ألوان/مقاسات المنتجات المضافة.</span>
-                    </div>
-                    <div class="table-wrap">
-                        <table>
-                            <thead><tr><th>كود</th><th>المنتج</th><th></th></tr></thead>
-                            <tbody id="cgp_pool_body"></tbody>
-                        </table>
-                    </div>
-                </div>
-                <div id="cgp_block_fixed" class="ocp-panel" style="display:none;">
-                    <div class="ocp-fixed-pick">
-                        <button type="button" class="btn-secondary" id="cgp_fixed_pick_btn">اختيار منتج</button>
-                        <p id="cgp_fixed_label" class="ocp-fixed-pick__label">— لم يُختر منتج —</p>
-                    </div>
-                    <input type="hidden" id="cgp_fixed_pid" value="0">
-                </div>
-            </div>
-        </section>
-        <section class="ocp-section">
-            <h4 class="ocp-section__title">٣ — تسعير بند الهدية</h4>
-            <div class="ocp-section__body ocp-meta-row">
-                <div style="grid-column:1/-1;">
-                    <label for="cgp_gift_charge_kind">نوع التسعير</label>
-                    <select id="cgp_gift_charge_kind" class="admin-inp" onchange="cgpToggleGiftCharge()">
-                        <option value="free">مجانية بالكامل</option>
-                        <option value="percent_off">خصم نسبة من التجزئة</option>
-                        <option value="amount_off_unit">خصم مبلغ من التجزئة للوحدة</option>
-                        <option value="fixed_unit">سعر بيع ثابت للوحدة (د.ك)</option>
-                    </select>
-                </div>
-                <div id="cgp_gift_charge_val_wrap" style="display:none;">
-                    <label id="cgp_gift_charge_val_label">القيمة</label>
-                    <input type="number" id="cgp_gift_charge_val" class="admin-inp" min="0" step="0.0001" dir="ltr" value="0">
-                </div>
-            </div>
-        </section>
-        <section class="ocp-section">
-            <h4 class="ocp-section__title">٤ — النطاق والحالة</h4>
-            <div class="ocp-section__body ocp-flags">
-                <label class="ocp-flag">
-                    <input type="checkbox" id="cgp_reg">
-                    <span><strong>للمسجّلين فقط</strong></span>
+    <div class="form-grid">
+        <div><label>الحد الأدنى لمجموع السلة (د.ك) — 0 يعني بدون شرط مبلغ</label><input type="text" id="cgp_min" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="0"></div>
+        <div><label>الترتيب</label><input type="number" id="cgp_sort" value="0" style="max-width:120px;"></div>
+        <div style="grid-column:1/-1;">
+            <label><strong>نوع الهدية</strong></label>
+            <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:6px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="radio" name="cgp_kind" value="choice" checked onchange="cgpToggleKind()"> اختيار من مجموعة منتجات
                 </label>
-                <label class="ocp-flag">
-                    <input type="checkbox" id="cgp_active" checked>
-                    <span><strong>نشط</strong></span>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="radio" name="cgp_kind" value="fixed" onchange="cgpToggleKind()"> هدية ثابتة (منتج واحد)
                 </label>
             </div>
-        </section>
+        </div>
+        <div id="cgp_block_pool" style="grid-column:1/-1;">
+            <label>منتجات مجموعة الاختيار</label>
+            <div style="margin:6px 0 8px;">
+                <button type="button" class="btn-secondary" id="cgp_pool_add_btn">إضافة منتج (دبل كليك من القائمة)</button>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>كود</th><th>المنتج</th><th></th></tr></thead>
+                    <tbody id="cgp_pool_body"></tbody>
+                </table>
+            </div>
+        </div>
+        <div id="cgp_block_fixed" style="grid-column:1/-1;display:none;">
+            <label>منتج الهدية الثابتة</label>
+            <div style="margin:6px 0 8px;">
+                <button type="button" class="btn-secondary" id="cgp_fixed_pick_btn">اختيار منتج (دبل كليك من القائمة)</button>
+            </div>
+            <p id="cgp_fixed_label" class="page-subtitle" style="margin:0;">— لم يُختر منتج —</p>
+            <input type="hidden" id="cgp_fixed_pid" value="0">
+        </div>
+        <div style="grid-column:1/-1;">
+            <label for="cgp_gift_charge_kind"><strong>تسعير بند الهدية</strong></label>
+            <select id="cgp_gift_charge_kind" class="admin-inp" style="max-width:28rem;margin-top:6px;" onchange="cgpToggleGiftCharge()">
+                <option value="free">مجانية بالكامل (سطر هدية بسعر صفر)</option>
+                <option value="percent_off">خصم نسبة من سعر التجزئة للوحدة</option>
+                <option value="amount_off_unit">خصم مبلغ ثابت من سعر التجزئة للوحدة</option>
+                <option value="fixed_unit">سعر بيع ثابت للوحدة (د.ك)</option>
+            </select>
+            <p class="page-subtitle" style="margin-top:6px;">للنسبة والمبلغ: يُحسب من <code dir="ltr">products.price</code>. معاينة العربة تضيف أعلى تكلفة عند «اختيار من مجموعة».</p>
+        </div>
+        <div id="cgp_gift_charge_val_wrap" style="grid-column:1/-1;display:none;">
+            <label id="cgp_gift_charge_val_label">القيمة</label>
+            <input type="number" id="cgp_gift_charge_val" class="admin-inp" min="0" step="0.0001" style="max-width:14rem;" dir="ltr" value="0">
+        </div>
+        <div style="grid-column:1/-1;">
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;max-width:52rem;line-height:1.45;">
+                <input type="checkbox" id="cgp_reg" style="margin-top:4px;flex-shrink:0;">
+                <span><strong>للمسجّلين فقط</strong> — عند التفعيل لا يُطبَّق العرض إلا لحساب مفعّل.</span>
+            </label>
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:8px;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <input type="checkbox" id="cgp_active" checked> نشط
+            </label>
+        </div>
     </div>
     <div class="admin-form-actions">
         <button type="button" onclick="saveCartGiftPromotion()" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ</button>
-        <button type="button" class="btn-secondary" onclick="resetCartGiftPromotionForm()">قاعدة جديدة</button>
+        <button type="button" class="btn-secondary" onclick="resetCartGiftPromotionForm()">جديد</button>
     </div>
 </div>
 
-<div class="card ocp-list-card">
-    <h3>القواعد المحفوظة</h3>
-    <p class="card-hint">عند تعدّد القواعد يُختار أعلى حد أدنى يحقق مجموع السلة.</p>
+<div class="card">
+    <h3>القواعد</h3>
+    <p class="page-subtitle" style="margin-top:0;">عند تعدّد القواعد يُختار أعلى حد أدنى يحقق مجموع السلة.</p>
     <div class="table-wrap">
         <table>
             <thead>
@@ -138,15 +118,6 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
 <script>
 var CGP_PICK_ROWS = <?php echo $cgpPickJson !== false ? $cgpPickJson : '[]'; ?>;
 
-function ocpEmptyRow(tb, cols, msg) {
-    if (!tb) return;
-    if (tb.querySelector('tr[data-product-id], tr[data-ocp-empty]')) return;
-    var tr = document.createElement('tr');
-    tr.setAttribute('data-ocp-empty', '1');
-    tr.innerHTML = '<td colspan="' + cols + '" class="ocp-empty-row">' + msg + '</td>';
-    tb.appendChild(tr);
-}
-
 function cgpPickMeta(pid) {
     var id = parseInt(pid, 10) || 0;
     for (var i = 0; i < CGP_PICK_ROWS.length; i++) {
@@ -169,7 +140,7 @@ function cgpPoolRows() {
     var tb = document.getElementById('cgp_pool_body');
     if (!tb) return [];
     var out = [];
-    tb.querySelectorAll('tr[data-product-id]').forEach(function (tr) {
+    tb.querySelectorAll('tr').forEach(function (tr) {
         var pid = parseInt(tr.getAttribute('data-product-id'), 10) || 0;
         if (pid > 0) out.push(pid);
     });
@@ -182,12 +153,10 @@ function cgpAddPoolRow(pid) {
     var tb = document.getElementById('cgp_pool_body');
     if (!tb) return;
     var dup = false;
-    tb.querySelectorAll('tr[data-product-id]').forEach(function (tr) {
+    tb.querySelectorAll('tr').forEach(function (tr) {
         if (parseInt(tr.getAttribute('data-product-id'), 10) === id) dup = true;
     });
     if (dup) return;
-    var empty = tb.querySelector('tr[data-ocp-empty]');
-    if (empty) empty.remove();
     var m = cgpPickMeta(id);
     var tr = document.createElement('tr');
     tr.setAttribute('data-product-id', String(id));
@@ -195,12 +164,7 @@ function cgpAddPoolRow(pid) {
         '<td dir="ltr">' + (m.code ? String(m.code) : ('P' + id)) + '</td>' +
         '<td>' + (m.name ? String(m.name) : '') + '</td>' +
         '<td><button type="button" class="btn-secondary cgp-rm">&times;</button></td>';
-    tr.querySelector('.cgp-rm').addEventListener('click', function () {
-        tr.remove();
-        if (!tb.querySelector('tr[data-product-id]')) {
-            ocpEmptyRow(tb, 3, 'لا منتجات — اضغط «إضافة منتج»');
-        }
-    });
+    tr.querySelector('.cgp-rm').addEventListener('click', function () { tr.remove(); });
     tb.appendChild(tr);
 }
 
@@ -209,9 +173,6 @@ function cgpRenderPool(ids) {
     if (!tb) return;
     tb.innerHTML = '';
     (ids || []).forEach(function (pid) { cgpAddPoolRow(pid); });
-    if (!tb.querySelector('tr[data-product-id]')) {
-        ocpEmptyRow(tb, 3, 'لا منتجات — اضغط «إضافة منتج»');
-    }
 }
 
 function cgpSetFixed(pid) {
@@ -261,7 +222,7 @@ function cgpToggleGiftCharge() {
         inp.removeAttribute('max');
         inp.step = '0.0001';
     } else {
-        lab.textContent = 'المبلغ المخصوم من التجزئة (د.ك)';
+        lab.textContent = 'المبلغ المخصوم من سعر التجزئة للوحدة (د.ك)';
         inp.removeAttribute('max');
         inp.step = '0.0001';
     }
@@ -322,7 +283,7 @@ async function loadCartGiftPromotions() {
         const kind = (r.gift_kind || 'choice') === 'fixed' ? 'ثابتة' : 'اختيار';
         let det = '';
         if ((r.gift_kind || '') === 'fixed') {
-            det = escCgp(cgpFmtPoolIds([r.fixed_product_id || r.fixed_variant_id].filter(function (x) { return x > 0; })));
+            det = escCgp(cgpFmtPoolIds([r.fixed_product_id || r.fixed_variant_id].filter(Boolean)));
         } else {
             det = escCgp(cgpFmtPoolIds(r.pool_product_ids || r.pool_variant_ids || []));
         }
@@ -383,6 +344,5 @@ document.getElementById('cgp_fixed_pick_btn').addEventListener('click', function
 });
 cgpToggleKind();
 cgpToggleGiftCharge();
-cgpRenderPool([]);
 loadCartGiftPromotions();
 </script>
