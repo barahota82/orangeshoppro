@@ -10,7 +10,6 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/upload_paths.php';
 require_once __DIR__ . '/../../includes/countries.php';
-require_once __DIR__ . '/../../includes/company_settings.php';
 require_once __DIR__ . '/../../includes/currency.php';
 /** @var ?\PDO $pdo — يضبطه admin/index.php قبل تضمين هذا الملف؛ تجنّب استدعاء ensure_schema مرتين لكل صفحة أدمن */
 $pdoNav = (isset($pdo) && $pdo instanceof PDO) ? $pdo : db();
@@ -18,18 +17,6 @@ if (!isset($pdo) || !$pdo instanceof PDO) {
 orange_catalog_ensure_schema($pdoNav);
 }
 
-$orangeAdminCompanyTitle = '';
-try {
-    $br = orange_company_settings_row($pdoNav);
-    if (is_array($br)) {
-        $orangeAdminCompanyTitle = trim((string) ($br['company_name_ar'] ?? ''));
-        if ($orangeAdminCompanyTitle === '') {
-            $orangeAdminCompanyTitle = trim((string) ($br['company_name_en'] ?? ''));
-        }
-    }
-} catch (Throwable $e) {
-    $orangeAdminCompanyTitle = '';
-}
 $orangeSchemaDegradedAttr = (defined('ORANGE_SCHEMA_DEGRADED') && ORANGE_SCHEMA_DEGRADED)
     ? ' data-orange-schema-degraded="1"'
     : '';
@@ -62,7 +49,7 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
 <html lang="ar" dir="rtl"<?php echo $orangeSchemaDegradedAttr; ?>>
 <head>
     <meta charset="UTF-8">
-    <title><?php echo htmlspecialchars($orangeAdminCompanyTitle !== '' ? $orangeAdminCompanyTitle . ' — لوحة التحكم' : 'لوحة التحكم', ENT_QUOTES, 'UTF-8'); ?></title>
+    <title>Orange — لوحة التحكم</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="orange-admin-country" content="<?php echo htmlspecialchars($orangeAdminCountryCodeNav, ENT_QUOTES, 'UTF-8'); ?>">
     <meta name="orange-admin-country-id" content="<?php echo (int) $orangeAdminCountryIdNav; ?>">
@@ -118,7 +105,7 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
             <div class="admin-topbar-brand" role="banner">
                 <div class="admin-sidebar-brand__mark" aria-hidden="true"></div>
                 <div class="admin-sidebar-brand__text">
-                    <div class="admin-sidebar-brand__title"><?php echo htmlspecialchars($orangeAdminCompanyTitle !== '' ? $orangeAdminCompanyTitle : 'Orange', ENT_QUOTES, 'UTF-8'); ?></div>
+                    <div class="admin-sidebar-brand__title">Orange</div>
                     <div class="admin-sidebar-brand__subtitle">لوحة التحكم المؤسسية</div>
                 </div>
             </div>

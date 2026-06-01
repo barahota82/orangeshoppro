@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
 require_once __DIR__ . '/../../includes/admin_settings_country.php';
 require_once __DIR__ . '/../../includes/countries.php';
+require_once __DIR__ . '/../../includes/storefront_payment_settings.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -21,15 +22,40 @@ if ($csCountryLabel === '') {
     $csCountryLabel = orange_countries_display_code(orange_admin_context_country_code($pdo));
 }
 $csScoped = orange_company_settings_has_country_column($pdo);
+$csRow = [];
+if ($hasTable) {
+    $fetched = orange_company_settings_row($pdo, $csCountryId);
+    if (is_array($fetched)) {
+        $csRow = $fetched;
+    }
+}
+$csHasPayOnlineCol = orange_company_settings_has_payment_online_column($pdo);
+$csPayOnlineChecked = $csHasPayOnlineCol && (int) ($csRow['payment_online_enabled'] ?? 0) === 1;
+$csField = static function (array $row, string $key): string {
+    return htmlspecialchars(trim((string) ($row[$key] ?? '')), ENT_QUOTES, 'UTF-8');
+};
+$csHasSaved = false;
+foreach (['company_name_ar', 'company_name_en', 'commercial_register', 'phones', 'address', 'vat_number', 'invoice_footer'] as $csKey) {
+    if (trim((string) ($csRow[$csKey] ?? '')) !== '') {
+        $csHasSaved = true;
+        break;
+    }
+}
+$csUpdatedAt = trim((string) ($csRow['updated_at'] ?? ''));
 ?>
 <div class="page-title page-title--stacked">
     <h1>بيانات الشركة</h1>
-    <p class="page-subtitle">الهوية والعنوان وبيانات الفاتورة الضريبية تظهر للعملاء والمستندات الرسمية.</p>
+    <p class="page-subtitle">سجل واحد لكل دولة — يُستخدم في طباعة الفواتير والمستندات والمتجر، وليس في عنوان لوحة التحكم.</p>
     <?php if ($csScoped && $csCountryId > 0): ?>
     <p class="card-hint" style="margin:0.35rem 0 0;line-height:1.55;">
-        سياق الدولة: <strong><?php echo htmlspecialchars($csCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong>
-        — بيانات الشركة المعروضة لهذه الدولة فقط. إن ظهرت بيانات الكويت فعدّلها هنا لبيانات مصر (قد تكون نُسخت عند الإنشاء).
+        الدولة الحالية: <strong><?php echo htmlspecialchars($csCountryLabel, ENT_QUOTES, 'UTF-8'); ?></strong>
+        — ما تحفظه هنا يبقى لهذه الدولة. لتعديل بيانات دولة أخرى غيّر الدولة من الشريط العلوي ثم عد إلى هذه الصفحة.
     </p>
+    <?php if ($csHasSaved): ?>
+    <p class="card-hint" style="margin:0.25rem 0 0;color:#166534;line-height:1.55;">
+        بيانات محفوظة<?php if ($csUpdatedAt !== ''): ?> — آخر تحديث: <?php echo htmlspecialchars($csUpdatedAt, ENT_QUOTES, 'UTF-8'); ?><?php endif; ?>.
+    </p>
+    <?php endif; ?>
     <?php elseif (!$csScoped): ?>
     <p class="card-hint" style="margin:0;color:#92400e;">
         تنبيه: عمود <code dir="ltr">country_id</code> غير مفعّل بعد على جدول بيانات الشركة.
@@ -46,14 +72,14 @@ $csScoped = orange_company_settings_has_country_column($pdo);
 <div class="card">
     <h3>تعديل بيانات الشركة</h3>
     <div class="form-grid">
-        <div><label>اسم الشركة (عربي)</label><input type="text" id="company_name_ar"></div>
-        <div><label>اسم الشركة (English)</label><input type="text" id="company_name_en"></div>
-        <div><label>شعار الشركة (اسم الملف)</label><input type="text" id="company_logo"></div>
-        <div><label>السجل التجاري</label><input type="text" id="commercial_register"></div>
-        <div><label>أرقام التواصل</label><input type="text" id="phones"></div>
-        <div><label>العنوان</label><textarea id="address" rows="3"></textarea></div>
-        <div><label>الرقم الضريبي (للفواتير)</label><input type="text" id="vat_number" placeholder="إن وُجد"></div>
-        <div style="grid-column:1/-1;"><label>نص قانوني أسفل الفاتورة (اختياري)</label><textarea id="invoice_footer" rows="2" placeholder="مثال: سداد خلال ٣٠ يوم — البضاعة تُسلّم بحالة جيدة"></textarea></div>
+        <div><label>اسم الشركة (عربي)</label><input type="text" id="company_name_ar" value="<?php echo $csField($csRow, 'company_name_ar'); ?>"></div>
+        <div><label>اسم الشركة (English)</label><input type="text" id="company_name_en" value="<?php echo $csField($csRow, 'company_name_en'); ?>"></div>
+        <div><label>شعار الشركة (اسم الملف)</label><input type="text" id="company_logo" value="<?php echo $csField($csRow, 'company_logo'); ?>"></div>
+        <div><label>السجل التجاري</label><input type="text" id="commercial_register" value="<?php echo $csField($csRow, 'commercial_register'); ?>"></div>
+        <div><label>أرقام التواصل</label><input type="text" id="phones" value="<?php echo $csField($csRow, 'phones'); ?>"></div>
+        <div><label>العنوان</label><textarea id="address" rows="3"><?php echo $csField($csRow, 'address'); ?></textarea></div>
+        <div><label>الرقم الضريبي (للفواتير)</label><input type="text" id="vat_number" placeholder="إن وُجد" value="<?php echo $csField($csRow, 'vat_number'); ?>"></div>
+        <div style="grid-column:1/-1;"><label>نص قانوني أسفل الفاتورة (اختياري)</label><textarea id="invoice_footer" rows="2" placeholder="مثال: سداد خلال ٣٠ يوم — البضاعة تُسلّم بحالة جيدة"><?php echo $csField($csRow, 'invoice_footer'); ?></textarea></div>
     </div>
     <div class="admin-form-actions">
         <button type="button" onclick="saveCompanySettings()">حفظ</button>
@@ -67,7 +93,7 @@ $csScoped = orange_company_settings_has_country_column($pdo);
         عند الإيقاف يبقى <strong>الدفع عند الاستلام</strong> فقط. ربط بوابة الدفع الفعلية (KNET / Visa…) خطوة لاحقة عند الجاهزية القانونية.
     </p>
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-        <input type="checkbox" id="payment_online_enabled" value="1">
+        <input type="checkbox" id="payment_online_enabled" value="1"<?php echo $csPayOnlineChecked ? ' checked' : ''; ?>>
         <span>تفعيل الدفع الإلكتروني للعملاء</span>
     </label>
     <div class="admin-form-actions">
@@ -110,8 +136,9 @@ async function saveCompanySettings() {
         invoice_footer: document.getElementById('invoice_footer').value.trim(),
         payment_online_enabled: document.getElementById('payment_online_enabled') && document.getElementById('payment_online_enabled').checked ? 1 : 0
     });
+    if (res.success) {
+        await loadCompanySettings();
+    }
     alert(res.message || (res.success ? 'تم الحفظ' : 'فشل الحفظ'));
 }
-
-loadCompanySettings();
 </script>
