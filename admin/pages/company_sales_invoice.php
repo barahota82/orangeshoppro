@@ -186,11 +186,18 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
 <?php if (!$sv2Ready): ?>
 <div class="card" style="border:1px solid #fcd34d;background:#fffbeb;margin-bottom:12px;">
     <p class="card-hint" style="margin:0;line-height:1.55;">
-        <?php if ($sv2PickRows === []): ?>لا توجد منتجات نشطة — أضف منتجات من شاشة «المنتجات».<?php endif; ?>
-        <?php if ($channels === []): ?> لا توجد قنوات نشطة — أضف قناة من شاشة «القنوات».<?php endif; ?>
+        <?php if ($sv2PickRows === []): ?>لا توجد منتجات نشطة لسياق الدولة — أضف منتجات من «المنتجات».<?php endif; ?>
+        <?php if ($channels === []): ?> لا توجد قنوات نشطة لسياق الدولة — أضف قناة من «القنوات».<?php endif; ?>
+        <strong>كود العميل</strong> يبقى قابلاً للنقر المزدوج للاختيار عند توفر الجاهزية.
     </p>
 </div>
 <?php endif; ?>
+<div id="sv2_view_mode_banner" class="card" style="display:none;border:1px solid #93c5fd;background:#eff6ff;margin-bottom:12px;" role="status">
+    <p class="card-hint" style="margin:0;line-height:1.55;">
+        <strong>وضع العرض:</strong> الفاتورة المعروضة للقراءة. للتعديل اضغط <strong>«فك القفل»</strong> إن وُجد، أو
+        <strong>«فاتورة جديدة»</strong> لفاتورة جديدة.
+    </p>
+</div>
 
 <div class="card jv-print-area">
     <?php
@@ -214,7 +221,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         </div>
         <div>
             <label for="sv2_customer_code">كود العميل</label>
-            <input type="text" id="sv2_customer_code" autocomplete="off" dir="ltr" lang="en" readonly placeholder="نقرتان للاختيار" title="نقرتان للاختيار" style="cursor:pointer;"<?php echo !$sv2Ready ? ' disabled' : ''; ?>>
+            <input type="text" id="sv2_customer_code" autocomplete="off" dir="ltr" lang="en" readonly placeholder="نقرتان للاختيار" title="نقرتان للاختيار — Enter أيضاً" style="cursor:pointer;">
         </div>
         <div>
             <label for="sv2_customer_name">اسم العميل</label>
@@ -597,6 +604,14 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     }
 
     function customerPickerOpen() {
+        if (sv2ViewMode) {
+            alert('وضع العرض — لفتح التعديل اضغط «فك القفل» أو «فاتورة جديدة».');
+            return;
+        }
+        if (!SV2_READY) {
+            alert('الشاشة غير جاهزة: تحقق من منتجات نشطة وقناة عملاء لسياق الدولة في الأدمن.');
+            return;
+        }
         var modal = document.getElementById('sv2_customer_pick_modal');
         var qEl = document.getElementById('sv2_customer_pick_q');
         if (!modal || !qEl) return;
@@ -1128,12 +1143,18 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         if (sv2EditLockCtl) sv2EditLockCtl.refresh();
     }
 
+    function sv2SyncViewModeBanner() {
+        var ban = document.getElementById('sv2_view_mode_banner');
+        if (ban) ban.style.display = sv2ViewMode && browseOrderId > 0 ? '' : 'none';
+    }
+
     function sv2SetViewMode(on) {
         sv2ViewMode = !!on;
+        sv2SyncViewModeBanner();
         var card = document.querySelector('.jv-print-area');
         if (card) {
             card.querySelectorAll('input, select, button.admin-doc-line-remove').forEach(function (el) {
-                if (el.id === 'sv2_btn_new' || el.id === 'sv2_btn_print' || el.closest('.jv-voucher-nav-btns') || el.id === 'sv2_btn_search' || el.id === 'sv2_btn_save') {
+                if (el.id === 'sv2_btn_new' || el.id === 'sv2_btn_print' || el.closest('.jv-voucher-nav-btns') || el.id === 'sv2_btn_search' || el.id === 'sv2_btn_save' || el.id === 'sv2_customer_code') {
                     return;
                 }
                 el.disabled = sv2ViewMode || !SV2_READY;
@@ -1524,6 +1545,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             });
         }
 
+        sv2SetViewMode(false);
         if (SV2_PREFILL_ORDER_ID > 0) sv2LoadInvoice(SV2_PREFILL_ORDER_ID);
     }
 

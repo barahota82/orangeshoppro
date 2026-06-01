@@ -157,9 +157,18 @@ $sr2DocSerialPreview = $sr2NavReady
 
 <?php if (!$sr2Ready): ?>
 <div class="card" style="border:1px solid #fcd34d;background:#fffbeb;margin-bottom:12px;">
-    <p class="card-hint" style="margin:0;">لا توجد منتجات نشطة — أضف منتجات من شاشة «المنتجات».</p>
+    <p class="card-hint" style="margin:0;line-height:1.55;">
+        لا توجد منتجات نشطة لسياق الدولة الحالية — الخانات معطّلة حتى تُضاف منتجات من «المنتجات» (نشط + نفس الدولة في الأدمن).
+        <strong>كود العميل</strong> يبقى قابلاً للنقر المزدوج للاختيار.
+    </p>
 </div>
 <?php endif; ?>
+<div id="sr2_view_mode_banner" class="card" style="display:none;border:1px solid #93c5fd;background:#eff6ff;margin-bottom:12px;" role="status">
+    <p class="card-hint" style="margin:0;line-height:1.55;">
+        <strong>وضع العرض:</strong> تعرض مردوداً محفوظاً (للقراءة والطباعة). لتسجيل مردود جديد اضغط
+        <strong>«مردود جديد»</strong> في شريط الأدوات.
+    </p>
+</div>
 
 <div class="card jv-print-area">
     <?php
@@ -183,7 +192,7 @@ $sr2DocSerialPreview = $sr2NavReady
         </div>
         <div>
             <label for="sr2_customer_code">كود العميل</label>
-            <input type="text" id="sr2_customer_code" autocomplete="off" dir="ltr" lang="en" readonly placeholder="نقرتان للاختيار" title="نقرتان للاختيار" style="cursor:pointer;"<?php echo !$sr2Ready ? ' disabled' : ''; ?>>
+            <input type="text" id="sr2_customer_code" autocomplete="off" dir="ltr" lang="en" readonly placeholder="نقرتان للاختيار" title="نقرتان للاختيار — Enter أيضاً" style="cursor:pointer;">
         </div>
         <div>
             <label for="sr2_customer_name" id="sr2_customer_name_label">اسم العميل</label>
@@ -437,6 +446,14 @@ $sr2DocSerialPreview = $sr2NavReady
     }
 
     function customerPickerOpen() {
+        if (sr2ViewMode) {
+            alert('وضع العرض — اضغط «مردود جديد» لتسجيل مردود جديد.');
+            return;
+        }
+        if (!SR2_READY) {
+            alert('لا توجد منتجات نشطة لسياق الدولة — أضف منتجات من «المنتجات» قبل تسجيل المردود.');
+            return;
+        }
         var modal = document.getElementById('sr2_customer_pick_modal');
         var qEl = document.getElementById('sr2_customer_pick_q');
         if (!modal || !qEl) return;
@@ -698,8 +715,14 @@ $sr2DocSerialPreview = $sr2NavReady
         if (sr2EditLockCtl) sr2EditLockCtl.refresh();
     }
 
+    function sr2SyncViewModeBanner() {
+        var ban = document.getElementById('sr2_view_mode_banner');
+        if (ban) ban.style.display = sr2ViewMode && browseReturnId > 0 ? '' : 'none';
+    }
+
     function sr2SetViewMode(on) {
         sr2ViewMode = !!on;
+        sr2SyncViewModeBanner();
         var card = document.querySelector('.jv-print-area');
         if (card) {
             card.querySelectorAll('input, select, button.admin-doc-line-remove').forEach(function (el) {
@@ -1099,6 +1122,7 @@ $sr2DocSerialPreview = $sr2NavReady
             });
         }
         sr2SyncToolbar();
+        sr2SetViewMode(false);
     }
 
     if (document.readyState === 'loading') {
