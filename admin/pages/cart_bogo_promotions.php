@@ -59,11 +59,8 @@ $cbpPickRows = orange_cart_promo_admin_product_rows($pdo);
 $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS);
 ?>
 <div class="page-title page-title--stacked">
-    <h1>عروض BOGO (منتج / فئة / حزمة شراء)</h1>
-    <p class="page-subtitle"><strong>س4:</strong> (1) <em>نفس المنتج</em> — أي لون أو مقاس؛ مجموع الكمية على المنتج يبلغ الحد الأدنى.
-        (2) <em>نفس الفئة</em> — منتجات مختلفة ضمن الفئة.
-        (3) <em>حزمة شراء</em> — منتجان مختلفان على الأقل بكميات محددة.
-        الهدية: منتج ثابت أو اختيار من قائمة منتجات — <strong>نقرتان</strong> على «إضافة منتج».</p>
+    <h1>عروض BOGO</h1>
+    <p class="page-subtitle">اشترِ بشرط (نفس منتج / فئة / حزمة) واحصل على هدية — منتج كامل في الأدمن؛ اللون والمقاس عند الدفع.</p>
 </div>
 
 <?php if (!$hasTable): ?>
@@ -73,128 +70,150 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
 <?php endif; ?>
 
 <div class="card">
-    <h3>إضافة / تعديل</h3>
+    <h3>إضافة / تعديل قاعدة</h3>
     <input type="hidden" id="cbp_id" value="0">
-    <div class="form-grid">
-        <div style="grid-column:1/-1;">
-            <label><strong>شرط السلة</strong></label>
-            <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:6px;">
-                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                    <input type="radio" name="cbp_bogo" value="same_variant" checked onchange="cbpToggleBogo()"> نفس المنتج (أي لون/مقاس)
-                </label>
-                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                    <input type="radio" name="cbp_bogo" value="same_category" onchange="cbpToggleBogo()"> منتجات مختلفة من نفس الفئة
-                </label>
-                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                    <input type="radio" name="cbp_bogo" value="buy_bundle" onchange="cbpToggleBogo()"> حزمة شراء (منتج أ + منتج ب…)
-                </label>
+    <div class="ocp-form">
+        <section class="ocp-section">
+            <h4 class="ocp-section__title">١ — شرط الشراء (متى يُطبَّق العرض)</h4>
+            <div class="ocp-section__body">
+                <div class="ocp-choices">
+                    <label class="ocp-choice">
+                        <input type="radio" name="cbp_bogo" value="same_variant" checked onchange="cbpToggleBogo()">
+                        <span>نفس المنتج — أي لون/مقاس</span>
+                    </label>
+                    <label class="ocp-choice">
+                        <input type="radio" name="cbp_bogo" value="same_category" onchange="cbpToggleBogo()">
+                        <span>منتجات مختلفة من نفس الفئة</span>
+                    </label>
+                    <label class="ocp-choice">
+                        <input type="radio" name="cbp_bogo" value="buy_bundle" onchange="cbpToggleBogo()">
+                        <span>حزمة شراء (منتج أ + ب…)</span>
+                    </label>
+                </div>
+                <div id="cbp_cat_wrap" class="ocp-panel" style="display:none;">
+                    <?php if ($cartBogoUnifiedCategoryHint && $cartBogoCatalogCategoryDropdown !== []): ?>
+                    <label for="cbp_cat">الفئة في الشجرة الموحّدة</label>
+                    <p class="card-hint" style="margin:6px 0 10px;">تُقيَّد السلة بمسار <code dir="ltr">catalog_categories.id</code> المختار.</p>
+                    <select id="cbp_cat" class="admin-inp" style="max-width:100%;width:min(42rem,100%);">
+                        <option value="">— اختر فئة —</option>
+                        <?php foreach ($cartBogoCatalogCategoryDropdown as $opt): ?>
+                        <option value="<?php echo (int) $opt['id']; ?>"><?php echo htmlspecialchars($opt['label'], ENT_QUOTES, 'UTF-8'); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <?php elseif ($cartBogoUnifiedCategoryHint): ?>
+                    <label for="cbp_cat">معرّف فئة الشجرة</label>
+                    <p class="card-hint" style="margin:6px 0 10px;">لا فئات نشطة — أدخل <code dir="ltr">id</code> أو أنشئ من فروع الشجرة.</p>
+                    <input type="number" id="cbp_cat" class="admin-inp" min="1" step="1" dir="ltr">
+                    <?php else: ?>
+                    <p class="alert-error" style="margin:0;line-height:1.55;">
+                        «نفس الفئة» تتطلّب الشجرة الموحّدة —
+                        <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع شجرة المنتجات</a>.
+                    </p>
+                    <input type="hidden" id="cbp_cat" value="0" aria-hidden="true">
+                    <?php endif; ?>
+                </div>
+                <div id="cbp_buy_bundle_wrap" class="ocp-product-panel" style="display:none;">
+                    <div class="ocp-toolbar">
+                        <button type="button" class="btn-secondary" id="cbp_buy_add_btn">+ إضافة منتج للحزمة</button>
+                        <span class="card-hint">منتجان مختلفان على الأقل، لكل منتج كمية.</span>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>كود</th><th>المنتج</th><th>الكمية</th><th></th></tr></thead>
+                            <tbody id="cbp_buy_body"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="cbp_minbuy_wrap" class="ocp-meta-row">
+                    <div>
+                        <label>الحد الأدنى (كمية أو عدد منتجات)</label>
+                        <input type="number" id="cbp_minbuy" class="admin-inp" min="2" step="1" value="2" dir="ltr">
+                    </div>
+                </div>
             </div>
-        </div>
-        <div id="cbp_cat_wrap" style="grid-column:1/-1;display:none;">
-            <?php if ($cartBogoUnifiedCategoryHint && $cartBogoCatalogCategoryDropdown !== []): ?>
-            <label for="cbp_cat">الفئة في الشجرة الموحّدة</label>
-            <p class="page-subtitle" style="margin:6px 0 10px;line-height:1.45;"><strong>تصنيف موحّد:</strong> تُقيَّد قائمة منتجات السلة وفق ورقة نوع المنتج ومسار <code dir="ltr">catalog_categories.id</code> المختارة (وليس عمود الفئة القديم على المنتج).</p>
-            <select id="cbp_cat" class="admin-inp" style="max-width:100%;width:min(42rem,100%);">
-                <option value="">— اختر فئة —</option>
-                <?php foreach ($cartBogoCatalogCategoryDropdown as $opt): ?>
-                <option value="<?php echo (int) $opt['id']; ?>"><?php echo htmlspecialchars($opt['label'], ENT_QUOTES, 'UTF-8'); ?></option>
-                <?php endforeach; ?>
-            </select>
-            <?php elseif ($cartBogoUnifiedCategoryHint): ?>
-            <label for="cbp_cat">معرّف فئة الشجرة الموحّدة</label>
-            <p class="page-subtitle" style="margin:6px 0 10px;line-height:1.45;"><strong>تصنيف موحّد:</strong> لا توجد فئات نشطة في <code dir="ltr">catalog_categories</code> — أدخل <code dir="ltr">id</code> يدوياً أو أنشئ الفروع من صفحة فروع شجرة المنتجات.</p>
-            <input type="number" id="cbp_cat" class="admin-inp" min="1" step="1" style="max-width:12rem;" dir="ltr">
-            <?php else: ?>
-            <p class="alert-error" style="margin:0 0 10px;line-height:1.55;">
-                عروض «نفس الفئة» تتطلّب <strong>الشجرة الموحّدة</strong> (سجل الترحيل + أقسام في <code dir="ltr">catalog_sections</code>) ثم اختيار أو إدخال <code dir="ltr">catalog_categories.id</code> من
-                <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=unified_catalog_branches'), ENT_QUOTES, 'UTF-8'); ?>">فروع شجرة المنتجات</a>.
-                لا يُدعم إدخال <code dir="ltr">categories.id</code> التراثي من هذه الشاشة.
-            </p>
-            <input type="hidden" id="cbp_cat" value="0" aria-hidden="true">
-            <?php endif; ?>
-        </div>
-        <div id="cbp_buy_bundle_wrap" style="grid-column:1/-1;display:none;">
-            <label>منتجات حزمة الشراء</label>
-            <div style="margin:6px 0 8px;">
-                <button type="button" class="btn-secondary" id="cbp_buy_add_btn">إضافة منتج (دبل كليك من القائمة)</button>
+        </section>
+        <section class="ocp-section">
+            <h4 class="ocp-section__title">٢ — الهدية (ب)</h4>
+            <div class="ocp-section__body">
+                <div class="ocp-choices">
+                    <label class="ocp-choice">
+                        <input type="radio" name="cbp_gift" value="choice" checked onchange="cbpToggleGift()">
+                        <span>اختيار من مجموعة منتجات</span>
+                    </label>
+                    <label class="ocp-choice">
+                        <input type="radio" name="cbp_gift" value="fixed" onchange="cbpToggleGift()">
+                        <span>هدية ثابتة</span>
+                    </label>
+                </div>
+                <div id="cbp_block_pool" class="ocp-product-panel">
+                    <div class="ocp-toolbar">
+                        <button type="button" class="btn-secondary" id="cbp_pool_add_btn">+ إضافة منتج للهدية</button>
+                        <span class="card-hint">نقرتان للاختيار — العميل يختار اللون/المقاس لاحقاً.</span>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>كود</th><th>المنتج</th><th></th></tr></thead>
+                            <tbody id="cbp_pool_body"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="cbp_block_fixed" class="ocp-panel" style="display:none;">
+                    <div class="ocp-fixed-pick">
+                        <button type="button" class="btn-secondary" id="cbp_fixed_pick_btn">اختيار منتج</button>
+                        <p id="cbp_fixed_label" class="ocp-fixed-pick__label">— لم يُختر منتج —</p>
+                    </div>
+                    <input type="hidden" id="cbp_fixed_pid" value="0">
+                </div>
             </div>
-            <div class="table-wrap">
-                <table>
-                    <thead><tr><th>كود</th><th>المنتج</th><th>الكمية</th><th></th></tr></thead>
-                    <tbody id="cbp_buy_body"></tbody>
-                </table>
+        </section>
+        <section class="ocp-section">
+            <h4 class="ocp-section__title">٣ — تسعير بند الهدية</h4>
+            <div class="ocp-section__body ocp-meta-row">
+                <div style="grid-column:1/-1;">
+                    <label for="cbp_gift_charge_kind">نوع التسعير</label>
+                    <select id="cbp_gift_charge_kind" class="admin-inp" onchange="cbpToggleGiftCharge()">
+                        <option value="free">مجانية بالكامل</option>
+                        <option value="percent_off">خصم نسبة من التجزئة</option>
+                        <option value="amount_off_unit">خصم مبلغ من التجزئة للوحدة</option>
+                        <option value="fixed_unit">سعر بيع ثابت للوحدة (د.ك)</option>
+                    </select>
+                </div>
+                <div id="cbp_gift_charge_val_wrap" style="display:none;">
+                    <label id="cbp_gift_charge_val_label">القيمة</label>
+                    <input type="number" id="cbp_gift_charge_val" class="admin-inp" min="0" step="0.0001" dir="ltr" value="0">
+                </div>
             </div>
-        </div>
-        <div id="cbp_minbuy_wrap">
-            <label>الحد الأدنى للكمية / عدد المنتجات المختلفة</label>
-            <input type="number" id="cbp_minbuy" class="admin-inp" min="2" step="1" value="2" style="max-width:12rem;" dir="ltr">
-        </div>
-        <div><label>الترتيب</label><input type="number" id="cbp_sort" value="0" style="max-width:120px;"></div>
-        <div style="grid-column:1/-1;">
-            <label><strong>نوع الهدية</strong></label>
-            <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:6px;">
-                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                    <input type="radio" name="cbp_gift" value="choice" checked onchange="cbpToggleGift()"> اختيار من مجموعة
-                </label>
-                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                    <input type="radio" name="cbp_gift" value="fixed" onchange="cbpToggleGift()"> هدية ثابتة
-                </label>
+        </section>
+        <section class="ocp-section">
+            <h4 class="ocp-section__title">٤ — الترتيب والنطاق</h4>
+            <div class="ocp-section__body">
+                <div class="ocp-meta-row">
+                    <div>
+                        <label>الترتيب</label>
+                        <input type="number" id="cbp_sort" value="0" class="admin-inp" min="0" step="1">
+                    </div>
+                </div>
+                <div class="ocp-flags">
+                    <label class="ocp-flag">
+                        <input type="checkbox" id="cbp_reg">
+                        <span><strong>للمسجّلين فقط</strong></span>
+                    </label>
+                    <label class="ocp-flag">
+                        <input type="checkbox" id="cbp_active" checked>
+                        <span><strong>نشط</strong></span>
+                    </label>
+                </div>
             </div>
-        </div>
-        <div id="cbp_block_pool" style="grid-column:1/-1;">
-            <label>منتجات مجموعة اختيار الهدية</label>
-            <div style="margin:6px 0 8px;">
-                <button type="button" class="btn-secondary" id="cbp_pool_add_btn">إضافة منتج (دبل كليك من القائمة)</button>
-            </div>
-            <div class="table-wrap">
-                <table>
-                    <thead><tr><th>كود</th><th>المنتج</th><th></th></tr></thead>
-                    <tbody id="cbp_pool_body"></tbody>
-                </table>
-            </div>
-        </div>
-        <div id="cbp_block_fixed" style="grid-column:1/-1;display:none;">
-            <label>منتج الهدية الثابتة</label>
-            <div style="margin:6px 0 8px;">
-                <button type="button" class="btn-secondary" id="cbp_fixed_pick_btn">اختيار منتج (دبل كليك من القائمة)</button>
-            </div>
-            <p id="cbp_fixed_label" class="page-subtitle" style="margin:0;">— لم يُختر منتج —</p>
-            <input type="hidden" id="cbp_fixed_pid" value="0">
-        </div>
-        <div style="grid-column:1/-1;">
-            <label for="cbp_gift_charge_kind"><strong>تسعير بند هدية BOGO (ب)</strong></label>
-            <select id="cbp_gift_charge_kind" class="admin-inp" style="max-width:28rem;margin-top:6px;" onchange="cbpToggleGiftCharge()">
-                <option value="free">مجانية بالكامل (سطر هدية بسعر صفر)</option>
-                <option value="percent_off">خصم نسبة من سعر التجزئة للوحدة</option>
-                <option value="amount_off_unit">خصم مبلغ ثابت من سعر التجزئة للوحدة</option>
-                <option value="fixed_unit">سعر بيع ثابت للوحدة (د.ك)</option>
-            </select>
-            <p class="page-subtitle" style="margin-top:6px;">للنسبة والمبلغ المخصوم: يُحسب من <code dir="ltr">products.price</code> للمنتج المختار كهدية. معاينة العربة تضيف أعلى تكلفة ممكنة عند «اختيار من مجموعة».</p>
-        </div>
-        <div id="cbp_gift_charge_val_wrap" style="grid-column:1/-1;display:none;">
-            <label id="cbp_gift_charge_val_label">القيمة</label>
-            <input type="number" id="cbp_gift_charge_val" class="admin-inp" min="0" step="0.0001" style="max-width:14rem;" dir="ltr" value="0">
-        </div>
-        <div style="grid-column:1/-1;">
-            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;max-width:52rem;line-height:1.45;">
-                <input type="checkbox" id="cbp_reg" style="margin-top:4px;flex-shrink:0;">
-                <span><strong>للمسجّلين فقط</strong></span>
-            </label>
-        </div>
-        <div style="display:flex;align-items:flex-end;gap:8px;">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="checkbox" id="cbp_active" checked> نشط
-            </label>
-        </div>
+        </section>
     </div>
     <div class="admin-form-actions">
         <button type="button" onclick="saveCartBogoPromotion()" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ</button>
-        <button type="button" class="btn-secondary" onclick="resetCartBogoPromotionForm()">جديد</button>
+        <button type="button" class="btn-secondary" onclick="resetCartBogoPromotionForm()">قاعدة جديدة</button>
     </div>
 </div>
 
-<div class="card">
-    <h3>القواعد</h3>
+<div class="card ocp-list-card">
+    <h3>القواعد المحفوظة</h3>
     <div class="table-wrap">
         <table>
             <thead>
@@ -220,6 +239,15 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
 <script>
 var CBP_CATEGORY_LABEL_MAP = <?php echo json_encode($cartBogoCategoryLabelJs, JSON_UNESCAPED_UNICODE); ?>;
 var CBP_PICK_ROWS = <?php echo $cbpPickJson !== false ? $cbpPickJson : '[]'; ?>;
+
+function ocpEmptyRow(tb, cols, msg) {
+    if (!tb) return;
+    if (tb.querySelector('tr[data-product-id], tr[data-ocp-empty]')) return;
+    var tr = document.createElement('tr');
+    tr.setAttribute('data-ocp-empty', '1');
+    tr.innerHTML = '<td colspan="' + cols + '" class="ocp-empty-row">' + msg + '</td>';
+    tb.appendChild(tr);
+}
 
 function cbpPickMeta(pid) {
     var id = parseInt(pid, 10) || 0;
@@ -251,7 +279,7 @@ function cbpBuyRows() {
     var tb = document.getElementById('cbp_buy_body');
     if (!tb) return [];
     var out = [];
-    tb.querySelectorAll('tr').forEach(function (tr) {
+    tb.querySelectorAll('tr[data-product-id]').forEach(function (tr) {
         var pid = parseInt(tr.getAttribute('data-product-id'), 10) || 0;
         var qEl = tr.querySelector('.cbp-buy-qty');
         var q = qEl ? parseInt(qEl.value, 10) || 0 : 0;
@@ -263,6 +291,8 @@ function cbpBuyRows() {
 function cbpAddBuyRow(c) {
     var tb = document.getElementById('cbp_buy_body');
     if (!tb) return;
+    var empty = tb.querySelector('tr[data-ocp-empty]');
+    if (empty) empty.remove();
     var pid = parseInt(c.product_id, 10) || 0;
     var tr = document.createElement('tr');
     tr.setAttribute('data-product-id', String(pid));
@@ -271,7 +301,12 @@ function cbpAddBuyRow(c) {
         '<td>' + (c.product_name ? String(c.product_name) : '') + '</td>' +
         '<td><input type="number" class="cbp-buy-qty admin-inp-qty" min="1" step="1" value="' + (parseInt(c.qty, 10) || 1) + '" style="width:5rem;"></td>' +
         '<td><button type="button" class="btn-secondary cbp-rm">&times;</button></td>';
-    tr.querySelector('.cbp-rm').addEventListener('click', function () { tr.remove(); });
+    tr.querySelector('.cbp-rm').addEventListener('click', function () {
+        tr.remove();
+        if (!tb.querySelector('tr[data-product-id]')) {
+            ocpEmptyRow(tb, 4, 'لا منتجات في الحزمة');
+        }
+    });
     tb.appendChild(tr);
 }
 
@@ -280,13 +315,16 @@ function cbpRenderBuy(comps) {
     if (!tb) return;
     tb.innerHTML = '';
     (comps || []).forEach(function (c) { cbpAddBuyRow(c); });
+    if (!tb.querySelector('tr[data-product-id]')) {
+        ocpEmptyRow(tb, 4, 'لا منتجات في الحزمة');
+    }
 }
 
 function cbpPoolRows() {
     var tb = document.getElementById('cbp_pool_body');
     if (!tb) return [];
     var out = [];
-    tb.querySelectorAll('tr').forEach(function (tr) {
+    tb.querySelectorAll('tr[data-product-id]').forEach(function (tr) {
         var pid = parseInt(tr.getAttribute('data-product-id'), 10) || 0;
         if (pid > 0) out.push(pid);
     });
@@ -299,10 +337,12 @@ function cbpAddPoolRow(pid) {
     var tb = document.getElementById('cbp_pool_body');
     if (!tb) return;
     var dup = false;
-    tb.querySelectorAll('tr').forEach(function (tr) {
+    tb.querySelectorAll('tr[data-product-id]').forEach(function (tr) {
         if (parseInt(tr.getAttribute('data-product-id'), 10) === id) dup = true;
     });
     if (dup) return;
+    var empty = tb.querySelector('tr[data-ocp-empty]');
+    if (empty) empty.remove();
     var m = cbpPickMeta(id);
     var tr = document.createElement('tr');
     tr.setAttribute('data-product-id', String(id));
@@ -310,7 +350,12 @@ function cbpAddPoolRow(pid) {
         '<td dir="ltr">' + (m.code ? String(m.code) : ('P' + id)) + '</td>' +
         '<td>' + (m.name ? String(m.name) : '') + '</td>' +
         '<td><button type="button" class="btn-secondary cbp-rm">&times;</button></td>';
-    tr.querySelector('.cbp-rm').addEventListener('click', function () { tr.remove(); });
+    tr.querySelector('.cbp-rm').addEventListener('click', function () {
+        tr.remove();
+        if (!tb.querySelector('tr[data-product-id]')) {
+            ocpEmptyRow(tb, 3, 'لا منتجات للهدية');
+        }
+    });
     tb.appendChild(tr);
 }
 
@@ -319,6 +364,9 @@ function cbpRenderPool(ids) {
     if (!tb) return;
     tb.innerHTML = '';
     (ids || []).forEach(function (pid) { cbpAddPoolRow(pid); });
+    if (!tb.querySelector('tr[data-product-id]')) {
+        ocpEmptyRow(tb, 3, 'لا منتجات للهدية');
+    }
 }
 
 function cbpSetFixed(pid) {
@@ -343,7 +391,7 @@ function cbpToggleBogo() {
     const v = el ? el.value : 'same_variant';
     document.getElementById('cbp_cat_wrap').style.display = v === 'same_category' ? 'block' : 'none';
     document.getElementById('cbp_buy_bundle_wrap').style.display = v === 'buy_bundle' ? 'block' : 'none';
-    document.getElementById('cbp_minbuy_wrap').style.display = v === 'buy_bundle' ? 'none' : 'block';
+    document.getElementById('cbp_minbuy_wrap').style.display = v === 'buy_bundle' ? 'none' : 'grid';
 }
 
 function cbpToggleGift() {
@@ -540,6 +588,8 @@ document.getElementById('cbp_pool_add_btn').addEventListener('click', function (
 document.getElementById('cbp_fixed_pick_btn').addEventListener('click', function () {
     cbpOpenPick(function (row) { cbpSetFixed(row.product_id); });
 });
+cbpRenderBuy([]);
+cbpRenderPool([]);
 cbpToggleBogo();
 cbpToggleGift();
 cbpToggleGiftCharge();

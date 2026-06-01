@@ -12,7 +12,7 @@ $ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
 ?>
 <div class="page-title page-title--stacked">
     <h1>عروض الكومبو</h1>
-    <p class="page-subtitle">منتجان (أو أكثر) بأي لون أو مقاس — عند توفّر الكميات في العربة يُطبَّق <strong>سعر الحزمة</strong>. <strong>نقرتان</strong> على «إضافة منتج» لاختيار من المخزن.</p>
+    <p class="page-subtitle">حزمة منتجات بأي لون أو مقاس — سعر ثابت للحزمة عند توفّر الكميات في العربة.</p>
 </div>
 
 <?php if (!$hasTable): ?>
@@ -22,45 +22,75 @@ $ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
 <?php endif; ?>
 
 <div class="card">
-    <h3>إضافة / تعديل</h3>
+    <h3>إضافة / تعديل قاعدة</h3>
     <input type="hidden" id="ccp_id" value="0">
-    <div class="form-grid">
-        <div style="grid-column:1/-1;"><label>عنوان داخلي (عربي) — اختياري</label><input type="text" id="ccp_title_ar" class="admin-inp" style="max-width:40rem;"></div>
-        <div style="grid-column:1/-1;"><label>عنوان داخلي (إنجليزي) — اختياري</label><input type="text" id="ccp_title_en" class="admin-inp" style="max-width:40rem;" dir="ltr" lang="en"></div>
-        <div><label>سعر الحزمة الواحدة (د.ك)</label><input type="text" id="ccp_price" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="9.5"></div>
-        <div><label>الترتيب</label><input type="number" id="ccp_sort" value="0" style="max-width:120px;"></div>
-        <div style="grid-column:1/-1;">
-            <label>منتجات الحزمة</label>
-            <div style="margin:6px 0 8px;">
-                <button type="button" class="btn-secondary" id="ccp_add_product_btn">إضافة منتج (دبل كليك من القائمة)</button>
+    <div class="ocp-form">
+        <section class="ocp-section">
+            <h4 class="ocp-section__title">١ — عناوين داخلية (اختياري)</h4>
+            <div class="ocp-section__body ocp-meta-row">
+                <div style="grid-column:1/-1;">
+                    <label>عنوان (عربي)</label>
+                    <input type="text" id="ccp_title_ar" class="admin-inp">
+                </div>
+                <div style="grid-column:1/-1;">
+                    <label>عنوان (إنجليزي)</label>
+                    <input type="text" id="ccp_title_en" class="admin-inp" dir="ltr" lang="en">
+                </div>
             </div>
-            <div class="table-wrap">
-                <table>
-                    <thead><tr><th>كود</th><th>المنتج</th><th>الكمية</th><th></th></tr></thead>
-                    <tbody id="ccp_comp_body"></tbody>
-                </table>
+        </section>
+        <section class="ocp-section">
+            <h4 class="ocp-section__title">٢ — الحزمة والمنتجات</h4>
+            <div class="ocp-section__body">
+                <div class="ocp-meta-row">
+                    <div>
+                        <label>سعر الحزمة الواحدة (د.ك)</label>
+                        <input type="text" id="ccp_price" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="9.5">
+                    </div>
+                </div>
+                <div class="ocp-product-panel">
+                    <div class="ocp-toolbar">
+                        <button type="button" class="btn-secondary" id="ccp_add_product_btn">+ إضافة منتج</button>
+                        <span class="card-hint">نقرتان على المنتج في القائمة — أي لون أو مقاس يُحسب ضمن الحزمة.</span>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>كود</th><th>المنتج</th><th>الكمية</th><th></th></tr></thead>
+                            <tbody id="ccp_comp_body"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
-        </div>
-        <div style="grid-column:1/-1;">
-            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;max-width:52rem;line-height:1.45;">
-                <input type="checkbox" id="ccp_reg" style="margin-top:4px;flex-shrink:0;">
-                <span><strong>للمسجّلين فقط</strong> — لا يُطبَّق إلا لحساب مفعّل (بريد مؤكد).</span>
-            </label>
-        </div>
-        <div style="display:flex;align-items:flex-end;gap:8px;">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="checkbox" id="ccp_active" checked> نشط
-            </label>
-        </div>
+        </section>
+        <section class="ocp-section">
+            <h4 class="ocp-section__title">٣ — الترتيب والنطاق</h4>
+            <div class="ocp-section__body">
+                <div class="ocp-meta-row">
+                    <div>
+                        <label>الترتيب</label>
+                        <input type="number" id="ccp_sort" value="0" class="admin-inp" min="0" step="1">
+                    </div>
+                </div>
+                <div class="ocp-flags">
+                    <label class="ocp-flag">
+                        <input type="checkbox" id="ccp_reg">
+                        <span><strong>للمسجّلين فقط</strong> — حساب مفعّل (بريد مؤكد).</span>
+                    </label>
+                    <label class="ocp-flag">
+                        <input type="checkbox" id="ccp_active" checked>
+                        <span><strong>نشط</strong></span>
+                    </label>
+                </div>
+            </div>
+        </section>
     </div>
     <div class="admin-form-actions">
         <button type="button" onclick="saveCartComboPromotion()" <?php echo !$hasTable ? 'disabled' : ''; ?>>حفظ</button>
-        <button type="button" class="btn-secondary" onclick="resetCartComboPromotionForm()">جديد</button>
+        <button type="button" class="btn-secondary" onclick="resetCartComboPromotionForm()">قاعدة جديدة</button>
     </div>
 </div>
 
-<div class="card">
-    <h3>القواعد</h3>
+<div class="card ocp-list-card">
+    <h3>القواعد المحفوظة</h3>
     <div class="table-wrap">
         <table>
             <thead>
@@ -84,6 +114,15 @@ $ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
 <script>
 var CCP_PICK_ROWS = <?php echo $ccpPickJson !== false ? $ccpPickJson : '[]'; ?>;
 
+function ocpEmptyRow(tb, cols, msg) {
+    if (!tb) return;
+    if (tb.querySelector('tr[data-product-id], tr[data-ocp-empty]')) return;
+    var tr = document.createElement('tr');
+    tr.setAttribute('data-ocp-empty', '1');
+    tr.innerHTML = '<td colspan="' + cols + '" class="ocp-empty-row">' + msg + '</td>';
+    tb.appendChild(tr);
+}
+
 function ccpFmtComps(comps) {
     if (!comps || !comps.length) return '—';
     return comps.map(function (c) {
@@ -96,7 +135,7 @@ function ccpCompRows() {
     var tb = document.getElementById('ccp_comp_body');
     if (!tb) return [];
     var out = [];
-    tb.querySelectorAll('tr').forEach(function (tr) {
+    tb.querySelectorAll('tr[data-product-id]').forEach(function (tr) {
         var pid = parseInt(tr.getAttribute('data-product-id'), 10) || 0;
         var qEl = tr.querySelector('.ccp-qty');
         var q = qEl ? parseInt(qEl.value, 10) || 0 : 0;
@@ -109,14 +148,17 @@ function ccpRenderComps(comps) {
     var tb = document.getElementById('ccp_comp_body');
     if (!tb) return;
     tb.innerHTML = '';
-    (comps || []).forEach(function (c) {
-        ccpAddCompRow(c);
-    });
+    (comps || []).forEach(function (c) { ccpAddCompRow(c); });
+    if (!tb.querySelector('tr[data-product-id]')) {
+        ocpEmptyRow(tb, 4, 'لا منتجات — اضغط «إضافة منتج»');
+    }
 }
 
 function ccpAddCompRow(c) {
     var tb = document.getElementById('ccp_comp_body');
     if (!tb) return;
+    var empty = tb.querySelector('tr[data-ocp-empty]');
+    if (empty) empty.remove();
     var pid = parseInt(c.product_id, 10) || 0;
     var tr = document.createElement('tr');
     tr.setAttribute('data-product-id', String(pid));
@@ -125,7 +167,12 @@ function ccpAddCompRow(c) {
         '<td>' + (c.product_name ? String(c.product_name) : '') + '</td>' +
         '<td><input type="number" class="ccp-qty admin-inp-qty" min="1" step="1" value="' + (parseInt(c.qty, 10) || 1) + '" style="width:5rem;"></td>' +
         '<td><button type="button" class="btn-secondary ccp-rm">&times;</button></td>';
-    tr.querySelector('.ccp-rm').addEventListener('click', function () { tr.remove(); });
+    tr.querySelector('.ccp-rm').addEventListener('click', function () {
+        tr.remove();
+        if (!tb.querySelector('tr[data-product-id]')) {
+            ocpEmptyRow(tb, 4, 'لا منتجات — اضغط «إضافة منتج»');
+        }
+    });
     tb.appendChild(tr);
 }
 
@@ -181,7 +228,7 @@ async function loadCartComboPromotions() {
         tr.innerHTML =
             '<td>' + escCcp(String(r.id)) + '</td>' +
             '<td>' + title + '</td>' +
-            '<td dir="ltr" style="font-family:monospace;font-size:0.85rem;">' + escCcp(ccpFmtComps(r.components)) + '</td>' +
+            '<td dir="ltr" style="font-size:0.85rem;">' + escCcp(ccpFmtComps(r.components)) + '</td>' +
             '<td dir="ltr">' + escCcp(String(r.combo_price)) + '</td>' +
             '<td>' + (parseInt(r.requires_registered_account, 10) === 1 ? 'مسجّل فقط' : 'الكل') + '</td>' +
             '<td>' + escCcp(String(r.sort_order)) + '</td>' +
@@ -193,9 +240,7 @@ async function loadCartComboPromotions() {
         btn.addEventListener('click', function () {
             var id = parseInt(btn.getAttribute('data-ccp-edit'), 10);
             var row = rows.find(function (x) { return parseInt(x.id, 10) === id; });
-            if (row) {
-                editCartComboPromotion(row);
-            }
+            if (row) editCartComboPromotion(row);
         });
     });
 }
@@ -220,5 +265,6 @@ async function saveCartComboPromotion() {
 }
 
 document.getElementById('ccp_add_product_btn').addEventListener('click', ccpOpenPick);
+ccpRenderComps([]);
 loadCartComboPromotions();
 </script>

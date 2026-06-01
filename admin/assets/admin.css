@@ -5278,3 +5278,145 @@ td.tb-col-name,
 .au-perm-page-label { padding-inline-start: 28px !important; font-size: 12.5px; text-align: right !important; }
 .au-perm-page .p-v, .au-perm-page .p-e, .au-perm-page .p-d, .au-perm-page .p-l, .au-perm-page .p-u { cursor: pointer; }
 .au-perm-na { font-size: 12px; user-select: none; }
+
+/* عروض السلة (كومبو / BOGO / هدايا) — تخطيط الأقسام */
+.ocp-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+.ocp-section {
+    padding: 16px 0;
+    border-top: 1px solid var(--border, #e2e8f0);
+}
+.ocp-form > .ocp-section:first-child {
+    border-top: none;
+    padding-top: 4px;
+}
+.ocp-section__title {
+    margin: 0 0 12px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #0f172a;
+    font-family: var(--font-display);
+}
+.ocp-section__body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.ocp-choices {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
+    gap: 10px;
+}
+.ocp-choice {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 10px;
+    background: #fafbfc;
+    cursor: pointer;
+    line-height: 1.4;
+    font-size: 13px;
+    transition: border-color 0.15s, background 0.15s;
+}
+.ocp-choice:has(input:checked) {
+    border-color: var(--primary, #ea580c);
+    background: #fff7ed;
+}
+.ocp-choice input {
+    margin-top: 3px;
+    flex-shrink: 0;
+}
+.ocp-panel {
+    padding: 14px 16px;
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 10px;
+    background: #f8fafc;
+}
+.ocp-panel .page-subtitle,
+.ocp-panel .card-hint {
+    margin-top: 0;
+}
+.ocp-meta-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+    gap: 12px 16px;
+    align-items: end;
+}
+.ocp-meta-row .admin-inp,
+.ocp-meta-row .admin-inp-money,
+.ocp-meta-row select.admin-inp {
+    max-width: 100%;
+    width: 100%;
+}
+.ocp-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+    margin-bottom: 10px;
+}
+.ocp-toolbar .card-hint {
+    margin: 0;
+    flex: 1 1 12rem;
+}
+.ocp-product-panel .table-wrap {
+    margin: 0;
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 8px;
+    background: #fff;
+}
+.ocp-product-panel .table-wrap table {
+    margin: 0;
+}
+.ocp-empty-row td {
+    text-align: center;
+    color: var(--muted, #64748b);
+    font-size: 13px;
+    padding: 14px 10px !important;
+}
+.ocp-fixed-pick {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px dashed var(--border, #cbd5e1);
+    border-radius: 10px;
+    background: #fff;
+}
+.ocp-fixed-pick__label {
+    margin: 0;
+    flex: 1 1 14rem;
+    font-size: 14px;
+    font-weight: 600;
+    color: #334155;
+}
+.ocp-flags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 24px;
+    align-items: center;
+}
+.ocp-flag {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 0;
+    cursor: pointer;
+    line-height: 1.45;
+    max-width: 36rem;
+}
+.ocp-flag input {
+    margin-top: 4px;
+    flex-shrink: 0;
+}
+.ocp-list-card .page-subtitle {
+    margin-top: 0;
+    margin-bottom: 12px;
+}
