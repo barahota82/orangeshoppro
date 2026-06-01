@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/cart_gift_promotions.php';
+require_once __DIR__ . '/../../../includes/cart_promo_products.php';
 require_once __DIR__ . '/../../../includes/cart_promotion_country.php';
 require_admin_api();
 
@@ -61,28 +62,33 @@ try {
         $isActive = !empty($data['is_active']) ? 1 : 0;
         $kindRaw = strtolower(trim((string) ($data['gift_kind'] ?? 'choice')));
         $giftKind = $kindRaw === 'fixed' ? 'fixed' : 'choice';
-        $fixedVid = (int) ($data['fixed_variant_id'] ?? 0);
-        $poolIds = cgp_parse_pool_input((string) ($data['pool_variant_ids_text'] ?? ''));
+        $fixedPid = (int) ($data['fixed_product_id'] ?? $data['fixed_variant_id'] ?? 0);
+        if (isset($data['pool_product_ids']) && is_array($data['pool_product_ids'])) {
+            $poolIds = array_values(array_unique(array_map('intval', $data['pool_product_ids'])));
+        } else {
+            $poolIds = orange_cart_promo_parse_product_pool_text($pdo, (string) ($data['pool_variant_ids_text'] ?? ''));
+        }
 
         if ($giftKind === 'fixed') {
-            if ($fixedVid <= 0) {
-                json_response(['success' => false, 'message' => 'أدخل رقم متغير صالح للهدية الثابتة'], 422);
+            if ($fixedPid <= 0) {
+                json_response(['success' => false, 'message' => 'اختر منتجاً للهدية الثابتة'], 422);
             }
             $poolJson = null;
         } else {
             if (count($poolIds) === 0) {
-                json_response(['success' => false, 'message' => 'أدخل قائمة أرقام متغيرات لمجموعة اختيار الهدية'], 422);
+                json_response(['success' => false, 'message' => 'أضف منتجاً واحداً على الأقل لمجموعة اختيار الهدية'], 422);
             }
-            $fixedVid = 0;
-            $flags = JSON_UNESCAPED_UNICODE;
-            if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
-                $flags |= JSON_INVALID_UTF8_SUBSTITUTE;
-            }
-            $poolJson = json_encode(array_values($poolIds), $flags);
-            if ($poolJson === false) {
-                json_response(['success' => false, 'message' => 'تعذر ترميز قائمة المتغيرات'], 422);
-            }
+            $fixedPid = 0;
+            $poolJson = orange_cart_promo_encode_product_pool_json($poolIds);
         }
+        $prodErr = orange_cart_promo_validate_product_ids(
+            $pdo,
+            $giftKind === 'fixed' ? [$fixedPid] : $poolIds
+        );
+        if ($prodErr !== null) {
+            json_response(['success' => false, 'message' => $prodErr], 422);
+        }
+        $fixedVid = $fixedPid;
 
         $gcRaw = strtolower(trim((string) ($data['gift_unit_charge_kind'] ?? 'free')));
         $allowedGc = ['free', 'percent_off', 'fixed_unit', 'amount_off_unit'];

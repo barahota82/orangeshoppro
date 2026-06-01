@@ -7,6 +7,7 @@ require_once __DIR__ . '/catalog_taxonomy_migrate.php';
 require_once __DIR__ . '/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/cart_gift_promotions.php';
 require_once __DIR__ . '/cart_combo_promotions.php';
+require_once __DIR__ . '/cart_promo_products.php';
 require_once __DIR__ . '/cart_promotion_country.php';
 
 /**
@@ -37,22 +38,22 @@ function orange_cart_bogo_rule_matches_cart(PDO $pdo, array $validatedItems, arr
 {
     $kindRaw = strtolower(trim((string) ($row['bogo_kind'] ?? '')));
     if ($kindRaw === 'buy_bundle') {
-        $comps = orange_cart_combo_parse_components_json($row['buy_components_json'] ?? null);
+        $comps = orange_cart_promo_parse_components_json($pdo, $row['buy_components_json'] ?? null);
         if (count($comps) < 2) {
             return false;
         }
         $uniq = [];
         foreach ($comps as $c) {
-            $uniq[(int) $c['variant_id']] = true;
+            $uniq[(int) $c['product_id']] = true;
         }
         if (count($uniq) < 2) {
             return false;
         }
-        $byV = orange_cart_combo_aggregate_variant_units($validatedItems);
+        $byP = orange_cart_promo_aggregate_product_units($validatedItems);
         foreach ($comps as $c) {
-            $vid = (int) $c['variant_id'];
+            $pid = (int) $c['product_id'];
             $need = (int) $c['qty'];
-            if (!isset($byV[$vid]) || $byV[$vid]['qty'] < $need) {
+            if (!isset($byP[$pid]) || $byP[$pid]['qty'] < $need) {
                 return false;
             }
         }
@@ -64,8 +65,9 @@ function orange_cart_bogo_rule_matches_cart(PDO $pdo, array $validatedItems, arr
     $minQ = max(2, (int) ($row['min_buy_qty'] ?? 2));
 
     if ($kind === 'same_variant') {
-        foreach ($validatedItems as $line) {
-            if ((int) ($line['qty'] ?? 0) >= $minQ) {
+        $byP = orange_cart_promo_aggregate_product_units($validatedItems);
+        foreach ($byP as $rowAgg) {
+            if ((int) ($rowAgg['qty'] ?? 0) >= $minQ) {
                 return true;
             }
         }
@@ -119,18 +121,24 @@ function orange_cart_bogo_promotions_admin_list(PDO $pdo): array
     $st->execute($bind['params']);
     $out = [];
     while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
-        $fix = isset($row['fixed_variant_id']) ? (int) $row['fixed_variant_id'] : 0;
+        $fixStored = isset($row['fixed_variant_id']) ? (int) $row['fixed_variant_id'] : 0;
+        $fixPid = $fixStored > 0 ? orange_cart_promo_resolve_stored_product_id($pdo, $fixStored) : 0;
 
         $out[] = [
             'id' => (int) $row['id'],
             'bogo_kind' => (string) ($row['bogo_kind'] ?? 'same_variant'),
             'category_id' => isset($row['category_id']) ? (int) $row['category_id'] : null,
             'min_buy_qty' => (int) ($row['min_buy_qty'] ?? 2),
-            'buy_components' => orange_cart_combo_parse_components_json($row['buy_components_json'] ?? null),
+            'buy_components' => orange_cart_promo_components_with_labels(
+                $pdo,
+                orange_cart_promo_parse_components_json($pdo, $row['buy_components_json'] ?? null)
+            ),
             'requires_registered_account' => (int) ($row['requires_registered_account'] ?? 0),
             'gift_kind' => (string) ($row['gift_kind'] ?? 'choice'),
-            'fixed_variant_id' => $fix > 0 ? $fix : null,
-            'pool_variant_ids' => orange_cart_gift_parse_pool($row['pool_variant_ids'] ?? null),
+            'fixed_product_id' => $fixPid > 0 ? $fixPid : null,
+            'fixed_variant_id' => $fixPid > 0 ? $fixPid : null,
+            'pool_product_ids' => orange_cart_promo_parse_product_pool($pdo, $row['pool_variant_ids'] ?? null),
+            'pool_variant_ids' => orange_cart_promo_parse_product_pool($pdo, $row['pool_variant_ids'] ?? null),
             'gift_unit_charge_kind' => (string) ($row['gift_unit_charge_kind'] ?? 'free'),
             'gift_unit_charge_value' => (float) ($row['gift_unit_charge_value'] ?? 0),
             'sort_order' => (int) ($row['sort_order'] ?? 0),
@@ -170,9 +178,10 @@ function orange_cart_bogo_promotion_select_rule(PDO $pdo, array $validatedItems,
         }
         $bogoKindNorm = strtolower(trim((string) ($row['bogo_kind'] ?? ''))) === 'buy_bundle' ? 'buy_bundle' : (strtolower(trim((string) ($row['bogo_kind'] ?? ''))) === 'same_category' ? 'same_category' : 'same_variant');
         $gKind = strtolower(trim((string) ($row['gift_kind'] ?? 'choice'))) === 'fixed' ? 'fixed' : 'choice';
-        $fixed = isset($row['fixed_variant_id']) ? (int) $row['fixed_variant_id'] : 0;
-        $pool = orange_cart_gift_parse_pool($row['pool_variant_ids'] ?? null);
-        if ($gKind === 'fixed' && $fixed <= 0) {
+        $fixedStored = isset($row['fixed_variant_id']) ? (int) $row['fixed_variant_id'] : 0;
+        $fixedPid = $fixedStored > 0 ? orange_cart_promo_resolve_stored_product_id($pdo, $fixedStored) : 0;
+        $pool = orange_cart_gift_parse_pool($pdo, $row['pool_variant_ids'] ?? null);
+        if ($gKind === 'fixed' && $fixedPid <= 0) {
             continue;
         }
         if ($gKind === 'choice' && count($pool) === 0) {
@@ -190,7 +199,9 @@ function orange_cart_bogo_promotion_select_rule(PDO $pdo, array $validatedItems,
             'category_id' => isset($row['category_id']) ? (int) $row['category_id'] : null,
             'min_buy_qty' => (int) ($row['min_buy_qty'] ?? 2),
             'gift_kind' => $gKind,
-            'fixed_variant_id' => $fixed > 0 ? $fixed : null,
+            'fixed_product_id' => $fixedPid > 0 ? $fixedPid : null,
+            'fixed_variant_id' => $fixedPid > 0 ? $fixedPid : null,
+            'pool_product_ids' => $pool,
             'pool_variant_ids' => $pool,
             'gift_unit_charge_kind' => $gcKind,
             'gift_unit_charge_value' => (float) ($row['gift_unit_charge_value'] ?? 0),

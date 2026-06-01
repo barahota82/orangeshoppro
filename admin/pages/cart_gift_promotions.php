@@ -2,14 +2,18 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../includes/cart_promo_products.php';
+
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 $hasTable = orange_table_exists($pdo, 'cart_gift_promotions');
+$cgpPickRows = orange_cart_promo_admin_product_rows($pdo);
+$cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS);
 ?>
 <div class="page-title page-title--stacked">
     <h1>عروض الهدايا (مجموعة اختيار / هدية ثابتة)</h1>
-    <p class="page-subtitle">تكميل <strong>س4</strong>: عند تحقق حد أدنى لمجموع السلة (يمكن أن يكون 0) يُضاف بند هدية مع حجز المخزون (افتراضياً بسعر صفر).
-        يعمل بجانب «عروض مجموع السلة» (خصم مبلغ). <strong>نوع العرض:</strong> إما <em>هدية ثابتة</em> أو <em>اختيار من مجموعة</em>. <strong>التسعير الجزئي:</strong> كعرض BOGO — مجانية أو نسبة/مبلغ من التجزئة أو سعر ثابت للوحدة.</p>
+    <p class="page-subtitle">تكميل <strong>س4</strong>: عند تحقق حد أدنى لمجموع السلة (يمكن أن يكون 0) يُضاف بند هدية — العميل يختار اللون/المقاس عند الدفع.
+        <strong>منتج كامل</strong> في الأدمن: <strong>نقرتان</strong> على «إضافة منتج» أو «اختيار منتج».</p>
 </div>
 
 <?php if (!$hasTable): ?>
@@ -28,26 +32,32 @@ $hasTable = orange_table_exists($pdo, 'cart_gift_promotions');
             <label><strong>نوع الهدية</strong></label>
             <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:6px;">
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                    <input type="radio" name="cgp_kind" value="choice" checked onchange="cgpToggleKind()"> اختيار من مجموعة (أرقام متغيرات)
+                    <input type="radio" name="cgp_kind" value="choice" checked onchange="cgpToggleKind()"> اختيار من مجموعة منتجات
                 </label>
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                    <input type="radio" name="cgp_kind" value="fixed" onchange="cgpToggleKind()"> هدية ثابتة (متغير واحد)
+                    <input type="radio" name="cgp_kind" value="fixed" onchange="cgpToggleKind()"> هدية ثابتة (منتج واحد)
                 </label>
             </div>
         </div>
         <div id="cgp_block_pool" style="grid-column:1/-1;">
-            <label>أرقام متغيرات المنتج (Variant IDs) — مفصولة بفاصلة أو سطر جديد</label>
+            <label>منتجات مجموعة الاختيار</label>
             <div style="margin:6px 0 8px;">
-                <button type="button" class="btn-secondary" onclick="orangeOpenVariantPicker({ mode: 'pool', targetId: 'cgp_pool' })">اختيار بصري — إضافة للقائمة</button>
+                <button type="button" class="btn-secondary" id="cgp_pool_add_btn">إضافة منتج (دبل كليك من القائمة)</button>
             </div>
-            <textarea id="cgp_pool" rows="3" class="admin-inp" dir="ltr" style="width:100%;max-width:40rem;font-family:monospace;" placeholder="101, 102, 103"></textarea>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>كود</th><th>المنتج</th><th></th></tr></thead>
+                    <tbody id="cgp_pool_body"></tbody>
+                </table>
+            </div>
         </div>
         <div id="cgp_block_fixed" style="grid-column:1/-1;display:none;">
-            <label>رقم المتغير الثابت (Variant ID)</label>
+            <label>منتج الهدية الثابتة</label>
             <div style="margin:6px 0 8px;">
-                <button type="button" class="btn-secondary" onclick="orangeOpenVariantPicker({ mode: 'fixed', targetId: 'cgp_fixed' })">اختيار بصري — متغير واحد</button>
+                <button type="button" class="btn-secondary" id="cgp_fixed_pick_btn">اختيار منتج (دبل كليك من القائمة)</button>
             </div>
-            <input type="number" id="cgp_fixed" class="admin-inp" min="1" step="1" style="max-width:12rem;" dir="ltr">
+            <p id="cgp_fixed_label" class="page-subtitle" style="margin:0;">— لم يُختر منتج —</p>
+            <input type="hidden" id="cgp_fixed_pid" value="0">
         </div>
         <div style="grid-column:1/-1;">
             <label for="cgp_gift_charge_kind"><strong>تسعير بند الهدية</strong></label>
@@ -104,7 +114,85 @@ $hasTable = orange_table_exists($pdo, 'cart_gift_promotions');
     </div>
 </div>
 
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_cart_promo_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
+var CGP_PICK_ROWS = <?php echo $cgpPickJson !== false ? $cgpPickJson : '[]'; ?>;
+
+function cgpPickMeta(pid) {
+    var id = parseInt(pid, 10) || 0;
+    for (var i = 0; i < CGP_PICK_ROWS.length; i++) {
+        if (parseInt(CGP_PICK_ROWS[i].product_id, 10) === id) {
+            return CGP_PICK_ROWS[i];
+        }
+    }
+    return { product_id: id, code: 'P' + id, name: '' };
+}
+
+function cgpFmtPoolIds(ids) {
+    if (!ids || !ids.length) return '—';
+    return ids.map(function (pid) {
+        var m = cgpPickMeta(pid);
+        return (m.code ? m.code + ' — ' : '') + (m.name || ('#' + pid));
+    }).join('؛ ');
+}
+
+function cgpPoolRows() {
+    var tb = document.getElementById('cgp_pool_body');
+    if (!tb) return [];
+    var out = [];
+    tb.querySelectorAll('tr').forEach(function (tr) {
+        var pid = parseInt(tr.getAttribute('data-product-id'), 10) || 0;
+        if (pid > 0) out.push(pid);
+    });
+    return out;
+}
+
+function cgpAddPoolRow(pid) {
+    var id = parseInt(pid, 10) || 0;
+    if (id <= 0) return;
+    var tb = document.getElementById('cgp_pool_body');
+    if (!tb) return;
+    var dup = false;
+    tb.querySelectorAll('tr').forEach(function (tr) {
+        if (parseInt(tr.getAttribute('data-product-id'), 10) === id) dup = true;
+    });
+    if (dup) return;
+    var m = cgpPickMeta(id);
+    var tr = document.createElement('tr');
+    tr.setAttribute('data-product-id', String(id));
+    tr.innerHTML =
+        '<td dir="ltr">' + (m.code ? String(m.code) : ('P' + id)) + '</td>' +
+        '<td>' + (m.name ? String(m.name) : '') + '</td>' +
+        '<td><button type="button" class="btn-secondary cgp-rm">&times;</button></td>';
+    tr.querySelector('.cgp-rm').addEventListener('click', function () { tr.remove(); });
+    tb.appendChild(tr);
+}
+
+function cgpRenderPool(ids) {
+    var tb = document.getElementById('cgp_pool_body');
+    if (!tb) return;
+    tb.innerHTML = '';
+    (ids || []).forEach(function (pid) { cgpAddPoolRow(pid); });
+}
+
+function cgpSetFixed(pid) {
+    var id = parseInt(pid, 10) || 0;
+    document.getElementById('cgp_fixed_pid').value = String(id);
+    var lab = document.getElementById('cgp_fixed_label');
+    if (!lab) return;
+    if (id <= 0) {
+        lab.textContent = '— لم يُختر منتج —';
+        return;
+    }
+    var m = cgpPickMeta(id);
+    lab.textContent = (m.code ? m.code + ' — ' : '') + (m.name || ('منتج #' + id));
+}
+
+function cgpOpenPick(onPick) {
+    if (!window.OrangeCartPromoProductPick) return;
+    OrangeCartPromoProductPick.open(CGP_PICK_ROWS, onPick);
+}
+
 function cgpToggleKind() {
     const fixed = document.querySelector('input[name="cgp_kind"]:checked');
     const isFixed = fixed && fixed.value === 'fixed';
@@ -144,8 +232,8 @@ function resetCartGiftPromotionForm() {
     document.getElementById('cgp_id').value = '0';
     document.getElementById('cgp_min').value = '';
     document.getElementById('cgp_sort').value = '0';
-    document.getElementById('cgp_pool').value = '';
-    document.getElementById('cgp_fixed').value = '';
+    cgpRenderPool([]);
+    cgpSetFixed(0);
     document.querySelector('input[name="cgp_kind"][value="choice"]').checked = true;
     document.getElementById('cgp_reg').checked = false;
     document.getElementById('cgp_active').checked = true;
@@ -162,10 +250,8 @@ function editCartGiftPromotion(row) {
     const kind = (row.gift_kind || 'choice') === 'fixed' ? 'fixed' : 'choice';
     document.querySelector('input[name="cgp_kind"][value="' + kind + '"]').checked = true;
     cgpToggleKind();
-    const pool = row.pool_variant_ids || [];
-    document.getElementById('cgp_pool').value = Array.isArray(pool) ? pool.join(', ') : '';
-    document.getElementById('cgp_fixed').value =
-        row.fixed_variant_id != null && row.fixed_variant_id !== '' ? String(row.fixed_variant_id) : '';
+    cgpRenderPool(row.pool_product_ids || row.pool_variant_ids || []);
+    cgpSetFixed(row.fixed_product_id || row.fixed_variant_id || 0);
     document.getElementById('cgp_reg').checked = parseInt(row.requires_registered_account, 10) === 1;
     document.getElementById('cgp_active').checked = parseInt(row.is_active, 10) === 1;
     var gck = (row.gift_unit_charge_kind || 'free').toLowerCase();
@@ -196,10 +282,10 @@ async function loadCartGiftPromotions() {
     rows.forEach(function (r) {
         const kind = (r.gift_kind || 'choice') === 'fixed' ? 'ثابتة' : 'اختيار';
         let det = '';
-        if ((r.gift_kind || '') === 'fixed' && r.fixed_variant_id) {
-            det = 'متغير #' + escCgp(String(r.fixed_variant_id));
-        } else if (Array.isArray(r.pool_variant_ids)) {
-            det = escCgp(r.pool_variant_ids.join(', '));
+        if ((r.gift_kind || '') === 'fixed') {
+            det = escCgp(cgpFmtPoolIds([r.fixed_product_id || r.fixed_variant_id].filter(Boolean)));
+        } else {
+            det = escCgp(cgpFmtPoolIds(r.pool_product_ids || r.pool_variant_ids || []));
         }
         var gcharge = 'مجانية';
         var gck = (r.gift_unit_charge_kind || 'free').toLowerCase();
@@ -211,7 +297,7 @@ async function loadCartGiftPromotions() {
             '<td>' + escCgp(String(r.id)) + '</td>' +
             '<td dir="ltr">' + escCgp(String(r.min_subtotal)) + '</td>' +
             '<td>' + kind + '</td>' +
-            '<td dir="ltr" style="max-width:14rem;word-break:break-all;">' + det + '</td>' +
+            '<td style="max-width:18rem;">' + det + '</td>' +
             '<td>' + escCgp(gcharge) + '</td>' +
             '<td>' + (parseInt(r.requires_registered_account, 10) === 1 ? 'مسجّل فقط' : 'جميع الزوّار') + '</td>' +
             '<td>' + escCgp(String(r.sort_order)) + '</td>' +
@@ -238,8 +324,8 @@ async function saveCartGiftPromotion() {
         requires_registered_account: document.getElementById('cgp_reg').checked ? 1 : 0,
         is_active: document.getElementById('cgp_active').checked ? 1 : 0,
         gift_kind: kindEl ? kindEl.value : 'choice',
-        fixed_variant_id: parseInt(document.getElementById('cgp_fixed').value, 10) || 0,
-        pool_variant_ids_text: document.getElementById('cgp_pool').value,
+        fixed_product_id: parseInt(document.getElementById('cgp_fixed_pid').value, 10) || 0,
+        pool_product_ids: cgpPoolRows(),
         gift_unit_charge_kind: document.getElementById('cgp_gift_charge_kind').value,
         gift_unit_charge_value: parseFloat(document.getElementById('cgp_gift_charge_val').value) || 0
     });
@@ -250,6 +336,12 @@ async function saveCartGiftPromotion() {
     }
 }
 
+document.getElementById('cgp_pool_add_btn').addEventListener('click', function () {
+    cgpOpenPick(function (row) { cgpAddPoolRow(row.product_id); });
+});
+document.getElementById('cgp_fixed_pick_btn').addEventListener('click', function () {
+    cgpOpenPick(function (row) { cgpSetFixed(row.product_id); });
+});
 cgpToggleKind();
 cgpToggleGiftCharge();
 loadCartGiftPromotions();

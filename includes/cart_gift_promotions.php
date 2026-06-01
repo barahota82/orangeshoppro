@@ -7,6 +7,7 @@ require_once __DIR__ . '/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/cart_promo_gift_charge.php';
 require_once __DIR__ . '/cart_promotion_country.php';
 require_once __DIR__ . '/warehouses.php';
+require_once __DIR__ . '/cart_promo_products.php';
 
 /**
  * أعلى سعر وحدة ممكن لهدية ترويجية في معاينة العربة (هدية مجموع سلة أو BOGO).
@@ -57,24 +58,10 @@ function orange_cart_promo_preview_gift_max_unit_charge(PDO $pdo, array $rule, a
 /**
  * @return list<int>
  */
-function orange_cart_gift_parse_pool(?string $json): array
+/** @return list<int> product_ids (أي لون/مقاس) */
+function orange_cart_gift_parse_pool(PDO $pdo, ?string $json): array
 {
-    if ($json === null || $json === '') {
-        return [];
-    }
-    $d = json_decode($json, true);
-    if (!is_array($d)) {
-        return [];
-    }
-    $seen = [];
-    foreach ($d as $x) {
-        $n = (int) $x;
-        if ($n > 0) {
-            $seen[$n] = true;
-        }
-    }
-
-    return array_keys($seen);
+    return orange_cart_promo_parse_product_pool($pdo, $json);
 }
 
 /**
@@ -94,15 +81,19 @@ function orange_cart_gift_promotions_admin_list(PDO $pdo): array
     $st->execute($bind['params']);
     $out = [];
     while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
-        $fix = isset($row['fixed_variant_id']) ? (int) $row['fixed_variant_id'] : 0;
+        $fixStored = isset($row['fixed_variant_id']) ? (int) $row['fixed_variant_id'] : 0;
+        $fixPid = $fixStored > 0 ? orange_cart_promo_resolve_stored_product_id($pdo, $fixStored) : 0;
+        $poolPids = orange_cart_gift_parse_pool($pdo, $row['pool_variant_ids'] ?? null);
 
         $out[] = [
             'id' => (int) $row['id'],
             'min_subtotal' => (float) ($row['min_subtotal'] ?? 0),
             'requires_registered_account' => (int) ($row['requires_registered_account'] ?? 0),
             'gift_kind' => (string) ($row['gift_kind'] ?? 'choice'),
-            'fixed_variant_id' => $fix > 0 ? $fix : null,
-            'pool_variant_ids' => orange_cart_gift_parse_pool($row['pool_variant_ids'] ?? null),
+            'fixed_product_id' => $fixPid > 0 ? $fixPid : null,
+            'fixed_variant_id' => $fixPid > 0 ? $fixPid : null,
+            'pool_product_ids' => $poolPids,
+            'pool_variant_ids' => $poolPids,
             'gift_unit_charge_kind' => (string) ($row['gift_unit_charge_kind'] ?? 'free'),
             'gift_unit_charge_value' => (float) ($row['gift_unit_charge_value'] ?? 0),
             'sort_order' => (int) ($row['sort_order'] ?? 0),
@@ -142,9 +133,10 @@ function orange_cart_gift_promotion_select_rule(PDO $pdo, float $subtotal, bool 
         }
         $kindRaw = strtolower(trim((string) ($row['gift_kind'] ?? 'choice')));
         $kind = $kindRaw === 'fixed' ? 'fixed' : 'choice';
-        $fixed = isset($row['fixed_variant_id']) ? (int) $row['fixed_variant_id'] : 0;
-        $pool = orange_cart_gift_parse_pool($row['pool_variant_ids'] ?? null);
-        if ($kind === 'fixed' && $fixed <= 0) {
+        $fixedStored = isset($row['fixed_variant_id']) ? (int) $row['fixed_variant_id'] : 0;
+        $fixedPid = $fixedStored > 0 ? orange_cart_promo_resolve_stored_product_id($pdo, $fixedStored) : 0;
+        $pool = orange_cart_gift_parse_pool($pdo, $row['pool_variant_ids'] ?? null);
+        if ($kind === 'fixed' && $fixedPid <= 0) {
             continue;
         }
         if ($kind === 'choice' && count($pool) === 0) {
@@ -159,7 +151,9 @@ function orange_cart_gift_promotion_select_rule(PDO $pdo, float $subtotal, bool 
         return [
             'id' => (int) $row['id'],
             'gift_kind' => $kind,
-            'fixed_variant_id' => $fixed > 0 ? $fixed : null,
+            'fixed_product_id' => $fixedPid > 0 ? $fixedPid : null,
+            'fixed_variant_id' => $fixedPid > 0 ? $fixedPid : null,
+            'pool_product_ids' => $pool,
             'pool_variant_ids' => $pool,
             'gift_unit_charge_kind' => $gcKind,
             'gift_unit_charge_value' => (float) ($row['gift_unit_charge_value'] ?? 0),
@@ -195,45 +189,21 @@ function orange_cart_gift_promotion_pool_options(
     bool $lockVariants,
     ?int $countryId = null
 ): array {
-    $stockCountryId = orange_cart_promotion_storefront_country_id($pdo, $countryId);
-    $lockSql = $lockVariants ? ' FOR UPDATE' : '';
-    $out = [];
-    foreach ($poolIds as $vid) {
-        $vid = (int) $vid;
-        if ($vid <= 0) {
-            continue;
+    $productIds = [];
+    foreach ($poolIds as $sid) {
+        $pid = orange_cart_promo_resolve_stored_product_id($pdo, (int) $sid);
+        if ($pid > 0) {
+            $productIds[$pid] = true;
         }
-        $vStmt = $pdo->prepare(
-            'SELECT v.*, p.name AS product_name, p.is_active AS p_active
-             FROM product_variants v
-             INNER JOIN products p ON p.id = v.product_id
-             WHERE v.id = ?
-             LIMIT 1' . $lockSql
-        );
-        $vStmt->execute([$vid]);
-        $v = $vStmt->fetch(PDO::FETCH_ASSOC);
-        if (!$v || (int) ($v['p_active'] ?? 0) !== 1) {
-            continue;
-        }
-        $poolPid = (int) ($v['product_id'] ?? 0);
-        if ($poolPid > 0 && !orange_storefront_product_in_active_unified_chain($pdo, $poolPid)) {
-            continue;
-        }
-        $used = orange_cart_gift_variant_usage_in_lines($validatedItems, $vid);
-        $stock = orange_warehouse_effective_variant_stock($pdo, $vid, $stockCountryId);
-        if ($stock < $used + 1) {
-            continue;
-        }
-        $out[] = [
-            'variant_id' => $vid,
-            'product_name' => (string) ($v['product_name'] ?? ''),
-            'color' => (string) ($v['color'] ?? ''),
-            'size' => (string) ($v['size'] ?? ''),
-            'stock' => $stock - $used,
-        ];
     }
 
-    return $out;
+    return orange_cart_gift_promotion_pool_options_for_products(
+        $pdo,
+        array_keys($productIds),
+        $validatedItems,
+        $lockVariants,
+        $countryId
+    );
 }
 
 /**

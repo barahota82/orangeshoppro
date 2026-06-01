@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../includes/cart_promo_products.php';
+
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 require_once __DIR__ . '/../../includes/catalog_taxonomy_migrate.php';
@@ -53,13 +55,15 @@ $cartBogoCategoryLabelJs = [];
 foreach ($cartBogoCatalogCategoryDropdown as $e) {
     $cartBogoCategoryLabelJs[(string) $e['id']] = $e['label'];
 }
+$cbpPickRows = orange_cart_promo_admin_product_rows($pdo);
+$cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS);
 ?>
 <div class="page-title page-title--stacked">
-    <h1>عروض BOGO (متطابق / فئة / حزمة شراء أ+ب)</h1>
-    <p class="page-subtitle"><strong>س4:</strong> (1) <em>نفس المتغير</em> — عدد القطع على سطر واحد يبلغ الحد الأدنى (افتراضي 2).
-        (2) <em>نفس الفئة</em> — عدد المنتجات <strong>المختلفة</strong> ضمن الفئة يبلغ الحد الأدنى.
-        (3) <em>حزمة شراء</em> — متغيران مختلفان على الأقل بكميات محددة في السلة (أسعار التجزئة للشراء؛ الهدية كما تضبطها أدناه).
-        الهدية: ثابتة أو اختيار. يُطبَّق أول قاعدة نشطة بالترتيب تطابق السلة.</p>
+    <h1>عروض BOGO (منتج / فئة / حزمة شراء)</h1>
+    <p class="page-subtitle"><strong>س4:</strong> (1) <em>نفس المنتج</em> — أي لون أو مقاس؛ مجموع الكمية على المنتج يبلغ الحد الأدنى.
+        (2) <em>نفس الفئة</em> — منتجات مختلفة ضمن الفئة.
+        (3) <em>حزمة شراء</em> — منتجان مختلفان على الأقل بكميات محددة.
+        الهدية: منتج ثابت أو اختيار من قائمة منتجات — <strong>نقرتان</strong> على «إضافة منتج».</p>
 </div>
 
 <?php if (!$hasTable): ?>
@@ -76,13 +80,13 @@ foreach ($cartBogoCatalogCategoryDropdown as $e) {
             <label><strong>شرط السلة</strong></label>
             <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:6px;">
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                    <input type="radio" name="cbp_bogo" value="same_variant" checked onchange="cbpToggleBogo()"> نفس المتغير (كمية على السطر)
+                    <input type="radio" name="cbp_bogo" value="same_variant" checked onchange="cbpToggleBogo()"> نفس المنتج (أي لون/مقاس)
                 </label>
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
                     <input type="radio" name="cbp_bogo" value="same_category" onchange="cbpToggleBogo()"> منتجات مختلفة من نفس الفئة
                 </label>
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                    <input type="radio" name="cbp_bogo" value="buy_bundle" onchange="cbpToggleBogo()"> حزمة شراء (متغير أ + متغير ب…)
+                    <input type="radio" name="cbp_bogo" value="buy_bundle" onchange="cbpToggleBogo()"> حزمة شراء (منتج أ + منتج ب…)
                 </label>
             </div>
         </div>
@@ -110,11 +114,16 @@ foreach ($cartBogoCatalogCategoryDropdown as $e) {
             <?php endif; ?>
         </div>
         <div id="cbp_buy_bundle_wrap" style="grid-column:1/-1;display:none;">
-            <label>مكوّنات الشراء — سطر لكل متغير: <code dir="ltr">variant_id qty</code> (متغيران مختلفان على الأقل)</label>
+            <label>منتجات حزمة الشراء</label>
             <div style="margin:6px 0 8px;">
-                <button type="button" class="btn-secondary" onclick="orangeOpenVariantPicker({ mode: 'lines', targetId: 'cbp_buy_comp' })">اختيار بصري — إضافة سطر</button>
+                <button type="button" class="btn-secondary" id="cbp_buy_add_btn">إضافة منتج (دبل كليك من القائمة)</button>
             </div>
-            <textarea id="cbp_buy_comp" rows="4" class="admin-inp" dir="ltr" style="width:100%;max-width:40rem;font-family:monospace;" placeholder="101 1&#10;205 1"></textarea>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>كود</th><th>المنتج</th><th>الكمية</th><th></th></tr></thead>
+                    <tbody id="cbp_buy_body"></tbody>
+                </table>
+            </div>
         </div>
         <div id="cbp_minbuy_wrap">
             <label>الحد الأدنى للكمية / عدد المنتجات المختلفة</label>
@@ -133,18 +142,24 @@ foreach ($cartBogoCatalogCategoryDropdown as $e) {
             </div>
         </div>
         <div id="cbp_block_pool" style="grid-column:1/-1;">
-            <label>أرقام متغيرات المنتج (Variant IDs)</label>
+            <label>منتجات مجموعة اختيار الهدية</label>
             <div style="margin:6px 0 8px;">
-                <button type="button" class="btn-secondary" onclick="orangeOpenVariantPicker({ mode: 'pool', targetId: 'cbp_pool' })">اختيار بصري — إضافة للقائمة</button>
+                <button type="button" class="btn-secondary" id="cbp_pool_add_btn">إضافة منتج (دبل كليك من القائمة)</button>
             </div>
-            <textarea id="cbp_pool" rows="3" class="admin-inp" dir="ltr" style="width:100%;max-width:40rem;font-family:monospace;" placeholder="201, 202"></textarea>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>كود</th><th>المنتج</th><th></th></tr></thead>
+                    <tbody id="cbp_pool_body"></tbody>
+                </table>
+            </div>
         </div>
         <div id="cbp_block_fixed" style="grid-column:1/-1;display:none;">
-            <label>رقم المتغير الثابت</label>
+            <label>منتج الهدية الثابتة</label>
             <div style="margin:6px 0 8px;">
-                <button type="button" class="btn-secondary" onclick="orangeOpenVariantPicker({ mode: 'fixed', targetId: 'cbp_fixed' })">اختيار بصري — متغير واحد</button>
+                <button type="button" class="btn-secondary" id="cbp_fixed_pick_btn">اختيار منتج (دبل كليك من القائمة)</button>
             </div>
-            <input type="number" id="cbp_fixed" class="admin-inp" min="1" step="1" style="max-width:12rem;" dir="ltr">
+            <p id="cbp_fixed_label" class="page-subtitle" style="margin:0;">— لم يُختر منتج —</p>
+            <input type="hidden" id="cbp_fixed_pid" value="0">
         </div>
         <div style="grid-column:1/-1;">
             <label for="cbp_gift_charge_kind"><strong>تسعير بند هدية BOGO (ب)</strong></label>
@@ -201,8 +216,128 @@ foreach ($cartBogoCatalogCategoryDropdown as $e) {
     </div>
 </div>
 
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_cart_promo_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
 var CBP_CATEGORY_LABEL_MAP = <?php echo json_encode($cartBogoCategoryLabelJs, JSON_UNESCAPED_UNICODE); ?>;
+var CBP_PICK_ROWS = <?php echo $cbpPickJson !== false ? $cbpPickJson : '[]'; ?>;
+
+function cbpPickMeta(pid) {
+    var id = parseInt(pid, 10) || 0;
+    for (var i = 0; i < CBP_PICK_ROWS.length; i++) {
+        if (parseInt(CBP_PICK_ROWS[i].product_id, 10) === id) {
+            return CBP_PICK_ROWS[i];
+        }
+    }
+    return { product_id: id, code: 'P' + id, name: '' };
+}
+
+function cbpFmtComps(comps) {
+    if (!comps || !comps.length) return '—';
+    return comps.map(function (c) {
+        var n = c.product_name || c.code || ('#' + c.product_id);
+        return n + '×' + String(c.qty);
+    }).join(' + ');
+}
+
+function cbpFmtPoolIds(ids) {
+    if (!ids || !ids.length) return '—';
+    return ids.map(function (pid) {
+        var m = cbpPickMeta(pid);
+        return (m.code ? m.code + ' — ' : '') + (m.name || ('#' + pid));
+    }).join('؛ ');
+}
+
+function cbpBuyRows() {
+    var tb = document.getElementById('cbp_buy_body');
+    if (!tb) return [];
+    var out = [];
+    tb.querySelectorAll('tr').forEach(function (tr) {
+        var pid = parseInt(tr.getAttribute('data-product-id'), 10) || 0;
+        var qEl = tr.querySelector('.cbp-buy-qty');
+        var q = qEl ? parseInt(qEl.value, 10) || 0 : 0;
+        if (pid > 0 && q > 0) out.push({ product_id: pid, qty: q });
+    });
+    return out;
+}
+
+function cbpAddBuyRow(c) {
+    var tb = document.getElementById('cbp_buy_body');
+    if (!tb) return;
+    var pid = parseInt(c.product_id, 10) || 0;
+    var tr = document.createElement('tr');
+    tr.setAttribute('data-product-id', String(pid));
+    tr.innerHTML =
+        '<td dir="ltr">' + (c.code ? String(c.code) : ('P' + pid)) + '</td>' +
+        '<td>' + (c.product_name ? String(c.product_name) : '') + '</td>' +
+        '<td><input type="number" class="cbp-buy-qty admin-inp-qty" min="1" step="1" value="' + (parseInt(c.qty, 10) || 1) + '" style="width:5rem;"></td>' +
+        '<td><button type="button" class="btn-secondary cbp-rm">&times;</button></td>';
+    tr.querySelector('.cbp-rm').addEventListener('click', function () { tr.remove(); });
+    tb.appendChild(tr);
+}
+
+function cbpRenderBuy(comps) {
+    var tb = document.getElementById('cbp_buy_body');
+    if (!tb) return;
+    tb.innerHTML = '';
+    (comps || []).forEach(function (c) { cbpAddBuyRow(c); });
+}
+
+function cbpPoolRows() {
+    var tb = document.getElementById('cbp_pool_body');
+    if (!tb) return [];
+    var out = [];
+    tb.querySelectorAll('tr').forEach(function (tr) {
+        var pid = parseInt(tr.getAttribute('data-product-id'), 10) || 0;
+        if (pid > 0) out.push(pid);
+    });
+    return out;
+}
+
+function cbpAddPoolRow(pid) {
+    var id = parseInt(pid, 10) || 0;
+    if (id <= 0) return;
+    var tb = document.getElementById('cbp_pool_body');
+    if (!tb) return;
+    var dup = false;
+    tb.querySelectorAll('tr').forEach(function (tr) {
+        if (parseInt(tr.getAttribute('data-product-id'), 10) === id) dup = true;
+    });
+    if (dup) return;
+    var m = cbpPickMeta(id);
+    var tr = document.createElement('tr');
+    tr.setAttribute('data-product-id', String(id));
+    tr.innerHTML =
+        '<td dir="ltr">' + (m.code ? String(m.code) : ('P' + id)) + '</td>' +
+        '<td>' + (m.name ? String(m.name) : '') + '</td>' +
+        '<td><button type="button" class="btn-secondary cbp-rm">&times;</button></td>';
+    tr.querySelector('.cbp-rm').addEventListener('click', function () { tr.remove(); });
+    tb.appendChild(tr);
+}
+
+function cbpRenderPool(ids) {
+    var tb = document.getElementById('cbp_pool_body');
+    if (!tb) return;
+    tb.innerHTML = '';
+    (ids || []).forEach(function (pid) { cbpAddPoolRow(pid); });
+}
+
+function cbpSetFixed(pid) {
+    var id = parseInt(pid, 10) || 0;
+    document.getElementById('cbp_fixed_pid').value = String(id);
+    var lab = document.getElementById('cbp_fixed_label');
+    if (!lab) return;
+    if (id <= 0) {
+        lab.textContent = '— لم يُختر منتج —';
+        return;
+    }
+    var m = cbpPickMeta(id);
+    lab.textContent = (m.code ? m.code + ' — ' : '') + (m.name || ('منتج #' + id));
+}
+
+function cbpOpenPick(onPick) {
+    if (!window.OrangeCartPromoProductPick) return;
+    OrangeCartPromoProductPick.open(CBP_PICK_ROWS, onPick);
+}
 function cbpToggleBogo() {
     const el = document.querySelector('input[name="cbp_bogo"]:checked');
     const v = el ? el.value : 'same_variant';
@@ -253,9 +388,9 @@ function resetCartBogoPromotionForm() {
     document.getElementById('cbp_cat').value = '';
     document.getElementById('cbp_minbuy').value = '2';
     document.getElementById('cbp_sort').value = '0';
-    document.getElementById('cbp_pool').value = '';
-    document.getElementById('cbp_fixed').value = '';
-    document.getElementById('cbp_buy_comp').value = '';
+    cbpRenderPool([]);
+    cbpSetFixed(0);
+    cbpRenderBuy([]);
     document.querySelector('input[name="cbp_bogo"][value="same_variant"]').checked = true;
     document.querySelector('input[name="cbp_gift"][value="choice"]').checked = true;
     document.getElementById('cbp_reg').checked = false;
@@ -284,17 +419,11 @@ function editCartBogoPromotion(row) {
     const gk = (row.gift_kind || 'choice') === 'fixed' ? 'fixed' : 'choice';
     document.querySelector('input[name="cbp_gift"][value="' + gk + '"]').checked = true;
     cbpToggleGift();
-    const pool = row.pool_variant_ids || [];
-    document.getElementById('cbp_pool').value = Array.isArray(pool) ? pool.join(', ') : '';
-    document.getElementById('cbp_fixed').value =
-        row.fixed_variant_id != null && row.fixed_variant_id !== '' ? String(row.fixed_variant_id) : '';
+    cbpRenderPool(row.pool_product_ids || row.pool_variant_ids || []);
+    cbpSetFixed(row.fixed_product_id || row.fixed_variant_id || 0);
     document.getElementById('cbp_reg').checked = parseInt(row.requires_registered_account, 10) === 1;
     document.getElementById('cbp_active').checked = parseInt(row.is_active, 10) === 1;
-    var buyLines = [];
-    (row.buy_components || []).forEach(function (c) {
-        buyLines.push(String(c.variant_id) + ' ' + String(c.qty));
-    });
-    document.getElementById('cbp_buy_comp').value = buyLines.join('\n');
+    cbpRenderBuy(row.buy_components || []);
     var gck = (row.gift_unit_charge_kind || 'free').toLowerCase();
     var allowed = { free: 1, percent_off: 1, fixed_unit: 1, amount_off_unit: 1 };
     document.getElementById('cbp_gift_charge_kind').value = allowed[gck] ? gck : 'free';
@@ -321,7 +450,7 @@ async function loadCartBogoPromotions() {
     const tb = document.getElementById('cbp_tbody');
     tb.innerHTML = '';
     rows.forEach(function (r) {
-        let cond = 'نفس المتغير';
+        let cond = 'نفس المنتج';
         if ((r.bogo_kind || '') === 'same_category') {
             cond = 'فئة — منتجات مختلفة';
         } else if ((r.bogo_kind || '') === 'buy_bundle') {
@@ -373,22 +502,26 @@ async function loadCartBogoPromotions() {
 async function saveCartBogoPromotion() {
     const bogoEl = document.querySelector('input[name="cbp_bogo"]:checked');
     const giftEl = document.querySelector('input[name="cbp_gift"]:checked');
-    const res = await postJSON('/admin/api/cart_bogo_promotions/manage.php', {
+    const bogoKind = bogoEl ? bogoEl.value : 'same_variant';
+    const payload = {
         action: 'save',
         id: parseInt(document.getElementById('cbp_id').value, 10) || 0,
-        bogo_kind: bogoEl ? bogoEl.value : 'same_variant',
+        bogo_kind: bogoKind,
         category_id: parseInt(document.getElementById('cbp_cat').value, 10) || 0,
         min_buy_qty: parseInt(document.getElementById('cbp_minbuy').value, 10) || 2,
         sort_order: parseInt(document.getElementById('cbp_sort').value, 10) || 0,
         requires_registered_account: document.getElementById('cbp_reg').checked ? 1 : 0,
         is_active: document.getElementById('cbp_active').checked ? 1 : 0,
         gift_kind: giftEl ? giftEl.value : 'choice',
-        fixed_variant_id: parseInt(document.getElementById('cbp_fixed').value, 10) || 0,
-        pool_variant_ids_text: document.getElementById('cbp_pool').value,
-        buy_components_text: document.getElementById('cbp_buy_comp').value,
+        fixed_product_id: parseInt(document.getElementById('cbp_fixed_pid').value, 10) || 0,
+        pool_product_ids: cbpPoolRows(),
         gift_unit_charge_kind: document.getElementById('cbp_gift_charge_kind').value,
         gift_unit_charge_value: parseFloat(document.getElementById('cbp_gift_charge_val').value) || 0
-    });
+    };
+    if (bogoKind === 'buy_bundle') {
+        payload.buy_components = cbpBuyRows();
+    }
+    const res = await postJSON('/admin/api/cart_bogo_promotions/manage.php', payload);
     alert(res.message || (res.success ? 'تم الحفظ' : 'فشل'));
     if (res.success) {
         resetCartBogoPromotionForm();
@@ -396,6 +529,17 @@ async function saveCartBogoPromotion() {
     }
 }
 
+document.getElementById('cbp_buy_add_btn').addEventListener('click', function () {
+    cbpOpenPick(function (row) {
+        cbpAddBuyRow({ product_id: row.product_id, code: row.code, product_name: row.name, qty: 1 });
+    });
+});
+document.getElementById('cbp_pool_add_btn').addEventListener('click', function () {
+    cbpOpenPick(function (row) { cbpAddPoolRow(row.product_id); });
+});
+document.getElementById('cbp_fixed_pick_btn').addEventListener('click', function () {
+    cbpOpenPick(function (row) { cbpSetFixed(row.product_id); });
+});
 cbpToggleBogo();
 cbpToggleGift();
 cbpToggleGiftCharge();

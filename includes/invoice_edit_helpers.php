@@ -7,6 +7,7 @@ require_once __DIR__ . '/order_stock.php';
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/warehouses.php';
 require_once __DIR__ . '/cart_promotions.php';
+require_once __DIR__ . '/cart_promo_products.php';
 require_once __DIR__ . '/cart_combo_promotions.php';
 require_once __DIR__ . '/cart_gift_promotions.php';
 require_once __DIR__ . '/cart_bogo_promotions.php';
@@ -144,37 +145,37 @@ function orange_invoice_edit_combo_layout(PDO $pdo, array $order, array $paidIte
         return $empty;
     }
 
-    $comps = orange_cart_combo_parse_components_json($promo['components_json'] ?? null);
+    $comps = orange_cart_promo_parse_components_json($pdo, $promo['components_json'] ?? null);
     if (count($comps) < 2) {
         return $empty;
     }
 
-    /** @var array<int, int> $needByVid qty per bundle */
-    $needByVid = [];
+    /** @var array<int, int> $needByPid qty per bundle */
+    $needByPid = [];
     foreach ($comps as $c) {
-        $needByVid[(int) $c['variant_id']] = (int) $c['qty'];
+        $needByPid[(int) $c['product_id']] = (int) $c['qty'];
     }
 
-    /** @var array<int, list<array<string, mixed>>> $byVid */
-    $byVid = [];
+    /** @var array<int, list<array<string, mixed>>> $byPid */
+    $byPid = [];
     foreach ($paidItems as $row) {
-        $vid = (int) ($row['variant_id'] ?? 0);
-        if ($vid <= 0) {
+        $pid = (int) ($row['product_id'] ?? ($row['product']['id'] ?? 0));
+        if ($pid <= 0) {
             continue;
         }
-        $byVid[$vid][] = $row;
+        $byPid[$pid][] = $row;
     }
 
-    foreach ($needByVid as $vid => $need) {
-        if ($need <= 0 || ! isset($byVid[$vid])) {
+    foreach ($needByPid as $pid => $need) {
+        if ($need <= 0 || ! isset($byPid[$pid])) {
             return $empty;
         }
     }
 
     $bundles = PHP_INT_MAX;
-    foreach ($needByVid as $vid => $need) {
+    foreach ($needByPid as $pid => $need) {
         $totalQty = 0;
-        foreach ($byVid[$vid] as $row) {
+        foreach ($byPid[$pid] as $row) {
             $totalQty += (int) ($row['qty'] ?? 0);
         }
         if ($totalQty < $need) {
@@ -188,9 +189,9 @@ function orange_invoice_edit_combo_layout(PDO $pdo, array $order, array $paidIte
 
     /** @var array<int, true> $comboItemIds */
     $comboItemIds = [];
-    foreach ($needByVid as $vid => $needPerBundle) {
+    foreach ($needByPid as $pid => $needPerBundle) {
         $remaining = $needPerBundle * $bundles;
-        foreach ($byVid[$vid] as $row) {
+        foreach ($byPid[$pid] as $row) {
             if ($remaining <= 0) {
                 break;
             }
@@ -267,37 +268,37 @@ function orange_invoice_edit_bogo_buy_bundle_layout(PDO $pdo, array $order, arra
         return $empty;
     }
 
-    $comps = orange_cart_combo_parse_components_json($promo['buy_components_json'] ?? null);
+    $comps = orange_cart_promo_parse_components_json($pdo, $promo['buy_components_json'] ?? null);
     if (count($comps) < 2) {
         return $empty;
     }
 
-    /** @var array<int, int> $needByVid */
-    $needByVid = [];
+    /** @var array<int, int> $needByPid */
+    $needByPid = [];
     foreach ($comps as $c) {
-        $needByVid[(int) $c['variant_id']] = (int) $c['qty'];
+        $needByPid[(int) $c['product_id']] = (int) $c['qty'];
     }
 
-    /** @var array<int, list<array<string, mixed>>> $byVid */
-    $byVid = [];
+    /** @var array<int, list<array<string, mixed>>> $byPid */
+    $byPid = [];
     foreach ($paidItems as $row) {
-        $vid = (int) ($row['variant_id'] ?? 0);
-        if ($vid <= 0) {
+        $pid = (int) ($row['product_id'] ?? ($row['product']['id'] ?? 0));
+        if ($pid <= 0) {
             continue;
         }
-        $byVid[$vid][] = $row;
+        $byPid[$pid][] = $row;
     }
 
-    foreach ($needByVid as $vid => $need) {
-        if ($need <= 0 || ! isset($byVid[$vid])) {
+    foreach ($needByPid as $pid => $need) {
+        if ($need <= 0 || ! isset($byPid[$pid])) {
             return $empty;
         }
     }
 
     $bundles = PHP_INT_MAX;
-    foreach ($needByVid as $vid => $need) {
+    foreach ($needByPid as $pid => $need) {
         $totalQty = 0;
-        foreach ($byVid[$vid] as $row) {
+        foreach ($byPid[$pid] as $row) {
             $totalQty += (int) ($row['qty'] ?? 0);
         }
         if ($totalQty < $need) {
@@ -311,9 +312,9 @@ function orange_invoice_edit_bogo_buy_bundle_layout(PDO $pdo, array $order, arra
 
     /** @var array<int, true> $bundleItemIds */
     $bundleItemIds = [];
-    foreach ($needByVid as $vid => $needPerBundle) {
+    foreach ($needByPid as $pid => $needPerBundle) {
         $remaining = $needPerBundle * $bundles;
-        foreach ($byVid[$vid] as $row) {
+        foreach ($byPid[$pid] as $row) {
             if ($remaining <= 0) {
                 break;
             }
@@ -331,15 +332,10 @@ function orange_invoice_edit_bogo_buy_bundle_layout(PDO $pdo, array $order, arra
 
     $bundleRows = [];
     $standalone = [];
-    $retailTotal = 0.0;
     foreach ($paidItems as $row) {
         $iid = (int) ($row['id'] ?? 0);
         if ($iid > 0 && isset($bundleItemIds[$iid])) {
             $bundleRows[] = $row;
-            $retailTotal = round(
-                $retailTotal + (float) ($row['price'] ?? 0) * (int) ($row['qty'] ?? 0),
-                4
-            );
         } else {
             $standalone[] = $row;
         }
@@ -347,16 +343,14 @@ function orange_invoice_edit_bogo_buy_bundle_layout(PDO $pdo, array $order, arra
 
     return [
         'groups' => [[
-            'group_id' => 2,
+            'group_id' => 1,
             'frame_kind' => 'bogo_bundle',
             'promo_id' => $bogoId,
             'title' => 'حزمة شراء BOGO',
-            'combo_price' => 0.0,
             'bundle_qty' => $bundles,
-            'total_price' => $retailTotal,
             'item_ids' => array_map('intval', array_keys($bundleItemIds)),
             'items' => $bundleRows,
-            'condition_text' => 'حزمة شراء — الكل أو لا شيء',
+            'condition_text' => 'إطار حزمة شراء — الكل أو لا شيء',
         ]],
         'standalone' => $standalone,
     ];

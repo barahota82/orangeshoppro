@@ -6,40 +6,22 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/cart_combo_promotions.php';
+require_once __DIR__ . '/../../../includes/cart_promo_products.php';
 require_once __DIR__ . '/../../../includes/cart_promotion_country.php';
 require_admin_api();
 
 /**
- * @return list<array{variant_id:int,qty:int}>
+ * @param mixed $raw
+ *
+ * @return list<array{product_id:int,qty:int}>
  */
-function ccp_parse_components_text(string $raw): array
+function ccp_parse_components_save(PDO $pdo, array $data): array
 {
-    $merged = [];
-    $lines = preg_split('/\R/u', trim($raw));
-    foreach ($lines as $line) {
-        $line = trim((string) $line);
-        if ($line === '' || str_starts_with($line, '#')) {
-            continue;
-        }
-        if (preg_match('/^(\d+)\s*[,:\s]\s*(\d+)/', $line, $m)) {
-            $vid = (int) $m[1];
-            $q = (int) $m[2];
-        } elseif (preg_match('/^(\d+)$/', $line, $m)) {
-            $vid = (int) $m[1];
-            $q = 1;
-        } else {
-            continue;
-        }
-        if ($vid > 0 && $q > 0) {
-            $merged[$vid] = ($merged[$vid] ?? 0) + $q;
-        }
-    }
-    $out = [];
-    foreach ($merged as $v => $q) {
-        $out[] = ['variant_id' => $v, 'qty' => $q];
+    if (isset($data['components']) && is_array($data['components'])) {
+        return orange_cart_promo_parse_components($pdo, $data['components']);
     }
 
-    return $out;
+    return orange_cart_promo_parse_components_text($pdo, (string) ($data['components_text'] ?? ''));
 }
 
 /**
@@ -78,39 +60,29 @@ try {
         $reqReg = !empty($data['requires_registered_account']) ? 1 : 0;
         $sortOrder = (int) ($data['sort_order'] ?? 0);
         $isActive = !empty($data['is_active']) ? 1 : 0;
-        $comps = ccp_parse_components_text((string) ($data['components_text'] ?? ''));
+        $comps = ccp_parse_components_save($pdo, $data);
 
         if (count($comps) < 2) {
-            json_response(['success' => false, 'message' => 'أدخل سطرين على الأقل: رقم متغير وكمية (متغيران مختلفان على الأقل).'], 422);
+            json_response(['success' => false, 'message' => 'أضف منتجين مختلفين على الأقل (كل منتج = أي لون أو مقاس).'], 422);
         }
-        $uniqV = [];
+        $uniqP = [];
         foreach ($comps as $c) {
-            $uniqV[(int) $c['variant_id']] = true;
+            $uniqP[(int) $c['product_id']] = true;
         }
-        if (count($uniqV) < 2) {
-            json_response(['success' => false, 'message' => 'الكومبو يتطلّب متغيرين مختلفين على الأقل.'], 422);
+        if (count($uniqP) < 2) {
+            json_response(['success' => false, 'message' => 'الكومبو يتطلّب منتجين مختلفين على الأقل.'], 422);
         }
         if ($comboPrice <= 0) {
             json_response(['success' => false, 'message' => 'أدخل سعر الكومبو (أكبر من صفر).'], 422);
         }
 
-        $vidsForChain = [];
-        foreach ($comps as $c) {
-            $vidsForChain[] = (int) $c['variant_id'];
-        }
-        $chainErr = orange_admin_validate_variants_storefront_chain($pdo, $vidsForChain);
+        $pids = array_map(static fn (array $c): int => (int) $c['product_id'], $comps);
+        $chainErr = orange_cart_promo_validate_product_ids($pdo, $pids);
         if ($chainErr !== null) {
             json_response(['success' => false, 'message' => $chainErr], 422);
         }
 
-        $flags = JSON_UNESCAPED_UNICODE;
-        if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
-            $flags |= JSON_INVALID_UTF8_SUBSTITUTE;
-        }
-        $json = json_encode(array_values($comps), $flags);
-        if ($json === false) {
-            json_response(['success' => false, 'message' => 'تعذر ترميز مكوّنات الكومبو'], 422);
-        }
+        $json = orange_cart_promo_encode_components_json($comps);
 
         try {
             $insertCountryId = orange_cart_promotion_prepare_admin_save($pdo, 'cart_combo_promotions', $id);

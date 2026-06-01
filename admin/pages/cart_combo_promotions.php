@@ -2,14 +2,17 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../includes/cart_promo_products.php';
+
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
 $hasTable = orange_table_exists($pdo, 'cart_combo_promotions');
+$ccpPickRows = orange_cart_promo_admin_product_rows($pdo);
+$ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS);
 ?>
 <div class="page-title page-title--stacked">
-    <h1>عروض الكومبو (حزمة متغيرات)</h1>
-    <p class="page-subtitle">عند وجود <strong>كل</strong> المكوّنات في العربة بالكميات المطلوبة، يُحسب للعميل سعر الحزمة <code>combo_price</code> بدلاً من مجموع أسعار القطع بالتجزئة (أقصى توفير يُختار تلقائياً عند تعدّد القواعد النشطة).
-        <strong>النطاق:</strong> للجميع أو <strong>للمسجّلين فقط</strong> لكل قاعدة.</p>
+    <h1>عروض الكومبو</h1>
+    <p class="page-subtitle">منتجان (أو أكثر) بأي لون أو مقاس — عند توفّر الكميات في العربة يُطبَّق <strong>سعر الحزمة</strong>. <strong>نقرتان</strong> على «إضافة منتج» لاختيار من المخزن.</p>
 </div>
 
 <?php if (!$hasTable): ?>
@@ -27,11 +30,16 @@ $hasTable = orange_table_exists($pdo, 'cart_combo_promotions');
         <div><label>سعر الحزمة الواحدة (د.ك)</label><input type="text" id="ccp_price" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="9.5"></div>
         <div><label>الترتيب</label><input type="number" id="ccp_sort" value="0" style="max-width:120px;"></div>
         <div style="grid-column:1/-1;">
-            <label>المكوّنات — سطر لكل متغير: <code dir="ltr">variant_id qty</code> أو <code dir="ltr">variant_id, qty</code> (متغيران مختلفان على الأقل)</label>
+            <label>منتجات الحزمة</label>
             <div style="margin:6px 0 8px;">
-                <button type="button" class="btn-secondary" onclick="orangeOpenVariantPicker({ mode: 'lines', targetId: 'ccp_comp' })">اختيار بصري — إضافة سطر (متغير + كمية)</button>
+                <button type="button" class="btn-secondary" id="ccp_add_product_btn">إضافة منتج (دبل كليك من القائمة)</button>
             </div>
-            <textarea id="ccp_comp" rows="5" class="admin-inp" dir="ltr" style="width:100%;max-width:40rem;font-family:monospace;" placeholder="101 1&#10;205 1"></textarea>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>كود</th><th>المنتج</th><th>الكمية</th><th></th></tr></thead>
+                    <tbody id="ccp_comp_body"></tbody>
+                </table>
+            </div>
         </div>
         <div style="grid-column:1/-1;">
             <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;max-width:52rem;line-height:1.45;">
@@ -72,12 +80,60 @@ $hasTable = orange_table_exists($pdo, 'cart_combo_promotions');
     </div>
 </div>
 
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_cart_promo_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
+var CCP_PICK_ROWS = <?php echo $ccpPickJson !== false ? $ccpPickJson : '[]'; ?>;
+
 function ccpFmtComps(comps) {
     if (!comps || !comps.length) return '—';
     return comps.map(function (c) {
-        return String(c.variant_id) + '×' + String(c.qty);
+        var n = c.product_name || c.code || ('#' + c.product_id);
+        return n + '×' + String(c.qty);
     }).join(' + ');
+}
+
+function ccpCompRows() {
+    var tb = document.getElementById('ccp_comp_body');
+    if (!tb) return [];
+    var out = [];
+    tb.querySelectorAll('tr').forEach(function (tr) {
+        var pid = parseInt(tr.getAttribute('data-product-id'), 10) || 0;
+        var qEl = tr.querySelector('.ccp-qty');
+        var q = qEl ? parseInt(qEl.value, 10) || 0 : 0;
+        if (pid > 0 && q > 0) out.push({ product_id: pid, qty: q });
+    });
+    return out;
+}
+
+function ccpRenderComps(comps) {
+    var tb = document.getElementById('ccp_comp_body');
+    if (!tb) return;
+    tb.innerHTML = '';
+    (comps || []).forEach(function (c) {
+        ccpAddCompRow(c);
+    });
+}
+
+function ccpAddCompRow(c) {
+    var tb = document.getElementById('ccp_comp_body');
+    if (!tb) return;
+    var pid = parseInt(c.product_id, 10) || 0;
+    var tr = document.createElement('tr');
+    tr.setAttribute('data-product-id', String(pid));
+    tr.innerHTML =
+        '<td dir="ltr">' + (c.code ? String(c.code) : ('P' + pid)) + '</td>' +
+        '<td>' + (c.product_name ? String(c.product_name) : '') + '</td>' +
+        '<td><input type="number" class="ccp-qty admin-inp-qty" min="1" step="1" value="' + (parseInt(c.qty, 10) || 1) + '" style="width:5rem;"></td>' +
+        '<td><button type="button" class="btn-secondary ccp-rm">&times;</button></td>';
+    tr.querySelector('.ccp-rm').addEventListener('click', function () { tr.remove(); });
+    tb.appendChild(tr);
+}
+
+function ccpOpenPick() {
+    if (!window.OrangeCartPromoProductPick) return;
+    OrangeCartPromoProductPick.open(CCP_PICK_ROWS, function (row) {
+        ccpAddCompRow({ product_id: row.product_id, code: row.code, product_name: row.name, qty: 1 });
+    });
 }
 
 function resetCartComboPromotionForm() {
@@ -86,7 +142,7 @@ function resetCartComboPromotionForm() {
     document.getElementById('ccp_title_en').value = '';
     document.getElementById('ccp_price').value = '';
     document.getElementById('ccp_sort').value = '0';
-    document.getElementById('ccp_comp').value = '';
+    ccpRenderComps([]);
     document.getElementById('ccp_reg').checked = false;
     document.getElementById('ccp_active').checked = true;
 }
@@ -99,11 +155,7 @@ function editCartComboPromotion(row) {
     document.getElementById('ccp_sort').value = String(row.sort_order != null ? row.sort_order : 0);
     document.getElementById('ccp_reg').checked = parseInt(row.requires_registered_account, 10) === 1;
     document.getElementById('ccp_active').checked = parseInt(row.is_active, 10) === 1;
-    var lines = [];
-    (row.components || []).forEach(function (c) {
-        lines.push(String(c.variant_id) + ' ' + String(c.qty));
-    });
-    document.getElementById('ccp_comp').value = lines.join('\n');
+    ccpRenderComps(row.components || []);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -158,7 +210,7 @@ async function saveCartComboPromotion() {
         sort_order: parseInt(document.getElementById('ccp_sort').value, 10) || 0,
         requires_registered_account: document.getElementById('ccp_reg').checked ? 1 : 0,
         is_active: document.getElementById('ccp_active').checked ? 1 : 0,
-        components_text: document.getElementById('ccp_comp').value
+        components: ccpCompRows()
     });
     alert(res.message || (res.success ? 'تم الحفظ' : 'فشل'));
     if (res.success) {
@@ -167,5 +219,6 @@ async function saveCartComboPromotion() {
     }
 }
 
+document.getElementById('ccp_add_product_btn').addEventListener('click', ccpOpenPick);
 loadCartComboPromotions();
 </script>

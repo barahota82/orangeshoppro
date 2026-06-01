@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../../includes/catalog_taxonomy_migrate.php';
 require_once __DIR__ . '/../../../includes/cart_gift_promotions.php';
 require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/cart_bogo_promotions.php';
+require_once __DIR__ . '/../../../includes/cart_promo_products.php';
 require_once __DIR__ . '/../../../includes/cart_promotion_country.php';
 require_admin_api();
 
@@ -94,15 +95,23 @@ try {
         if ($minBuy < 2) {
             $minBuy = 2;
         }
-        $buyComps = cbp_parse_buy_components_text((string) ($data['buy_components_text'] ?? ''));
+        if (isset($data['buy_components']) && is_array($data['buy_components'])) {
+            $buyComps = orange_cart_promo_parse_components($pdo, $data['buy_components']);
+        } else {
+            $buyComps = orange_cart_promo_parse_components_text($pdo, (string) ($data['buy_components_text'] ?? ''));
+        }
         $buyJson = null;
         $reqReg = !empty($data['requires_registered_account']) ? 1 : 0;
         $sortOrder = (int) ($data['sort_order'] ?? 0);
         $isActive = !empty($data['is_active']) ? 1 : 0;
         $giftRaw = strtolower(trim((string) ($data['gift_kind'] ?? 'choice')));
         $giftKind = $giftRaw === 'fixed' ? 'fixed' : 'choice';
-        $fixedVid = (int) ($data['fixed_variant_id'] ?? 0);
-        $poolIds = cbp_parse_pool_input((string) ($data['pool_variant_ids_text'] ?? ''));
+        $fixedPid = (int) ($data['fixed_product_id'] ?? $data['fixed_variant_id'] ?? 0);
+        if (isset($data['pool_product_ids']) && is_array($data['pool_product_ids'])) {
+            $poolIds = array_values(array_unique(array_map('intval', $data['pool_product_ids'])));
+        } else {
+            $poolIds = orange_cart_promo_parse_product_pool_text($pdo, (string) ($data['pool_variant_ids_text'] ?? ''));
+        }
 
         if ($bogoKind === 'same_category' && $catId <= 0) {
             json_response(['success' => false, 'message' => 'أدخل رقم فئة صالح لنوع «قطعتان من نفس الفئة»'], 422);
@@ -123,23 +132,16 @@ try {
         }
         if ($bogoKind === 'buy_bundle') {
             if (count($buyComps) < 2) {
-                json_response(['success' => false, 'message' => 'لحزمة الشراء: أدخل سطرين على الأقل (متغير + كمية).'], 422);
+                json_response(['success' => false, 'message' => 'لحزمة الشراء: أضف منتجين مختلفين على الأقل.'], 422);
             }
             $uniqBuy = [];
             foreach ($buyComps as $bc) {
-                $uniqBuy[(int) $bc['variant_id']] = true;
+                $uniqBuy[(int) $bc['product_id']] = true;
             }
             if (count($uniqBuy) < 2) {
-                json_response(['success' => false, 'message' => 'حزمة الشراء تتطلّب متغيرين مختلفين على الأقل (اشترِ أ واحصل على ب).'], 422);
+                json_response(['success' => false, 'message' => 'حزمة الشراء تتطلّب منتجين مختلفين على الأقل.'], 422);
             }
-            $flagsB = JSON_UNESCAPED_UNICODE;
-            if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
-                $flagsB |= JSON_INVALID_UTF8_SUBSTITUTE;
-            }
-            $buyJson = json_encode(array_values($buyComps), $flagsB);
-            if ($buyJson === false) {
-                json_response(['success' => false, 'message' => 'تعذر ترميز مكوّنات الشراء'], 422);
-            }
+            $buyJson = orange_cart_promo_encode_components_json($buyComps);
             $catId = 0;
         } else {
             $buyJson = null;
@@ -149,42 +151,36 @@ try {
         }
 
         if ($giftKind === 'fixed') {
-            if ($fixedVid <= 0) {
-                json_response(['success' => false, 'message' => 'أدخل رقم متغير صالح للهدية الثابتة'], 422);
+            if ($fixedPid <= 0) {
+                json_response(['success' => false, 'message' => 'اختر منتجاً للهدية الثابتة'], 422);
             }
             $poolJson = null;
         } else {
             if (count($poolIds) === 0) {
-                json_response(['success' => false, 'message' => 'أدخل قائمة أرقام متغيرات لمجموعة اختيار الهدية'], 422);
+                json_response(['success' => false, 'message' => 'أضف منتجاً واحداً على الأقل لمجموعة اختيار الهدية'], 422);
             }
-            $fixedVid = 0;
-            $flags = JSON_UNESCAPED_UNICODE;
-            if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
-                $flags |= JSON_INVALID_UTF8_SUBSTITUTE;
-            }
-            $poolJson = json_encode(array_values($poolIds), $flags);
-            if ($poolJson === false) {
-                json_response(['success' => false, 'message' => 'تعذر ترميز قائمة المتغيرات'], 422);
-            }
+            $fixedPid = 0;
+            $poolJson = orange_cart_promo_encode_product_pool_json($poolIds);
         }
 
-        $bogoVids = [];
+        $productIds = [];
         if ($bogoKind === 'buy_bundle') {
             foreach ($buyComps as $bc) {
-                $bogoVids[] = (int) $bc['variant_id'];
+                $productIds[] = (int) $bc['product_id'];
             }
         }
-        if ($giftKind === 'fixed' && $fixedVid > 0) {
-            $bogoVids[] = $fixedVid;
-        } elseif ($giftKind === 'choice' && count($poolIds) > 0) {
-            foreach ($poolIds as $poolVid) {
-                $bogoVids[] = (int) $poolVid;
+        if ($giftKind === 'fixed' && $fixedPid > 0) {
+            $productIds[] = $fixedPid;
+        } elseif ($giftKind === 'choice') {
+            foreach ($poolIds as $poolPid) {
+                $productIds[] = (int) $poolPid;
             }
         }
-        $bogoChainErr = orange_admin_validate_variants_storefront_chain($pdo, $bogoVids);
-        if ($bogoChainErr !== null) {
-            json_response(['success' => false, 'message' => $bogoChainErr], 422);
+        $prodErr = orange_cart_promo_validate_product_ids($pdo, $productIds);
+        if ($prodErr !== null) {
+            json_response(['success' => false, 'message' => $prodErr], 422);
         }
+        $fixedVid = $fixedPid;
 
         $gcRaw = strtolower(trim((string) ($data['gift_unit_charge_kind'] ?? 'free')));
         $allowedGc = ['free', 'percent_off', 'fixed_unit', 'amount_off_unit'];

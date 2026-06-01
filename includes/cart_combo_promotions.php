@@ -4,38 +4,14 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/cart_promotion_country.php';
+require_once __DIR__ . '/cart_promo_products.php';
 
 /**
- * @return list<array{variant_id:int,qty:int}>
+ * @return list<array{product_id:int,qty:int}>
  */
-function orange_cart_combo_parse_components_json(?string $json): array
+function orange_cart_combo_parse_components_json(PDO $pdo, ?string $json): array
 {
-    if ($json === null || trim($json) === '') {
-        return [];
-    }
-    $d = json_decode($json, true);
-    if (!is_array($d)) {
-        return [];
-    }
-    /** @var array<int, int> $merged */
-    $merged = [];
-    foreach ($d as $row) {
-        if (!is_array($row)) {
-            continue;
-        }
-        $vid = (int) ($row['variant_id'] ?? 0);
-        $q = (int) ($row['qty'] ?? 0);
-        if ($vid <= 0 || $q <= 0) {
-            continue;
-        }
-        $merged[$vid] = ($merged[$vid] ?? 0) + $q;
-    }
-    $out = [];
-    foreach ($merged as $vid => $q) {
-        $out[] = ['variant_id' => $vid, 'qty' => $q];
-    }
-
-    return $out;
+    return orange_cart_promo_parse_components_json($pdo, $json);
 }
 
 /**
@@ -45,35 +21,11 @@ function orange_cart_combo_parse_components_json(?string $json): array
  */
 function orange_cart_combo_aggregate_variant_units(array $validatedItems): array
 {
-    /** @var array<int, array{sum:float, qty:int}> $agg */
-    $agg = [];
-    foreach ($validatedItems as $li) {
-        $vid = (int) ($li['variant_id'] ?? 0);
-        if ($vid <= 0) {
-            continue;
-        }
-        $q = max(1, (int) ($li['qty'] ?? 1));
-        $pr = (float) ($li['price'] ?? 0);
-        if (!isset($agg[$vid])) {
-            $agg[$vid] = ['sum' => 0.0, 'qty' => 0];
-        }
-        $agg[$vid]['sum'] += $pr * $q;
-        $agg[$vid]['qty'] += $q;
-    }
-    $out = [];
-    foreach ($agg as $vid => $row) {
-        $q = max(1, $row['qty']);
-        $out[$vid] = [
-            'qty' => $row['qty'],
-            'unit' => $row['sum'] > 0 ? $row['sum'] / $q : 0.0,
-        ];
-    }
-
-    return $out;
+    return orange_cart_promo_aggregate_product_units($validatedItems);
 }
 
 /**
- * أفضل عرض كومبو واحد: أقصى توفير يحققه المخزون الحالي في السلة.
+ * أفضل عرض كومبو واحد: أقصى توفير يحققه المخزون الحالي في السلة (منتج كامل — أي لون/مقاس).
  *
  * @param list<array{product:array<string,mixed>,qty:int,color:string,size:string,variant_id:int,price:float,cost:float}> $validatedItems
  *
@@ -93,14 +45,14 @@ function orange_cart_combo_best_match(PDO $pdo, array $validatedItems, bool $buy
          ORDER BY sort_order ASC, id ASC'
     );
     $st->execute($bind['params']);
-    $byV = orange_cart_combo_aggregate_variant_units($validatedItems);
+    $byP = orange_cart_promo_aggregate_product_units($validatedItems);
     $best = null;
     $bestDisc = 0.0;
     while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
         if ((int) ($row['requires_registered_account'] ?? 0) === 1 && !$buyerRegistered) {
             continue;
         }
-        $comps = orange_cart_combo_parse_components_json($row['components_json'] ?? null);
+        $comps = orange_cart_promo_parse_components_json($pdo, $row['components_json'] ?? null);
         if (count($comps) < 2) {
             continue;
         }
@@ -112,14 +64,14 @@ function orange_cart_combo_best_match(PDO $pdo, array $validatedItems, bool $buy
         $sumPerBundle = 0.0;
         $ok = true;
         foreach ($comps as $c) {
-            $vid = $c['variant_id'];
-            $need = $c['qty'];
-            if (!isset($byV[$vid]) || $byV[$vid]['qty'] < $need) {
+            $pid = (int) $c['product_id'];
+            $need = (int) $c['qty'];
+            if (!isset($byP[$pid]) || $byP[$pid]['qty'] < $need) {
                 $ok = false;
                 break;
             }
-            $bundles = min($bundles, intdiv($byV[$vid]['qty'], $need));
-            $sumPerBundle += $byV[$vid]['unit'] * $need;
+            $bundles = min($bundles, intdiv($byP[$pid]['qty'], $need));
+            $sumPerBundle += $byP[$pid]['unit'] * $need;
         }
         if (!$ok || $bundles < 1 || $bundles === PHP_INT_MAX) {
             continue;
@@ -164,7 +116,7 @@ function orange_cart_combo_register_unlock_teaser_applies(
 }
 
 /**
- * @return list<array{id:int,title_ar:string,title_en:string,components:list<array{variant_id:int,qty:int}>,combo_price:float,requires_registered_account:int,sort_order:int,is_active:int}>
+ * @return list<array{id:int,title_ar:string,title_en:string,components:list<array{product_id:int,qty:int,product_name?:string,code?:string}>,combo_price:float,requires_registered_account:int,sort_order:int,is_active:int}>
  */
 function orange_cart_combo_promotions_admin_list(PDO $pdo): array
 {
@@ -180,11 +132,12 @@ function orange_cart_combo_promotions_admin_list(PDO $pdo): array
     $st->execute($bind['params']);
     $out = [];
     while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+        $comps = orange_cart_promo_parse_components_json($pdo, $row['components_json'] ?? null);
         $out[] = [
             'id' => (int) $row['id'],
             'title_ar' => (string) ($row['title_ar'] ?? ''),
             'title_en' => (string) ($row['title_en'] ?? ''),
-            'components' => orange_cart_combo_parse_components_json($row['components_json'] ?? null),
+            'components' => orange_cart_promo_components_with_labels($pdo, $comps),
             'combo_price' => (float) ($row['combo_price'] ?? 0),
             'requires_registered_account' => (int) ($row['requires_registered_account'] ?? 0),
             'sort_order' => (int) ($row['sort_order'] ?? 0),
