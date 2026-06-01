@@ -283,7 +283,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         </div>
     </div>
 
-    <div class="form-grid sv2-header-row3" style="margin-bottom:16px;">
+    <div class="form-grid sv2-header-row3 orange-doc-header-row" style="margin-bottom:16px;">
         <div>
             <label for="sv2_channel">قناة العملاء</label>
             <select id="sv2_channel" required>

@@ -215,7 +215,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         </div>
     </div>
 
-    <div class="form-grid ov2-header-row4" style="margin-bottom:16px;">
+    <div class="form-grid ov2-header-row4 orange-doc-header-row" style="margin-bottom:16px;">
         <div>
             <label for="ov2_channel_name">قناة البيع</label>
             <input type="text" id="ov2_channel_name" class="admin-inp-readonly" readonly disabled tabindex="-1" value="—" title="من الطلب — لا يُغيَّر يدوياً">

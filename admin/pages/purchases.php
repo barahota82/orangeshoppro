@@ -200,19 +200,6 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
 .form-grid.form-grid-3.pv2-header-row2 {
     grid-template-columns: minmax(6.5rem, 0.65fr) minmax(0, 1.7fr) minmax(5.5rem, 0.65fr);
 }
-.form-grid.form-grid-3.pv2-header-row2 input[type="text"] {
-    height: var(--input-min-h);
-    min-height: var(--input-min-h);
-    box-sizing: border-box;
-}
-.form-grid.form-grid-3.pv2-header-row2 select {
-    height: var(--input-min-h);
-    min-height: var(--input-min-h);
-    box-sizing: border-box;
-    padding-block: 0;
-    padding-inline: 0.65rem 2rem;
-    line-height: var(--input-min-h);
-}
 .form-grid.pv2-supplier-row {
     grid-template-columns: minmax(7rem, 0.75fr) minmax(0, 1fr) minmax(0, 2fr);
 }
@@ -283,7 +270,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
     </div>
 
     <!-- ٢ — رقم فاتورة المورد، ملاحظات، نوع الشراء -->
-    <div class="form-grid form-grid-3 pv2-header-row2" style="margin-bottom:16px;">
+    <div class="form-grid form-grid-3 pv2-header-row2 orange-doc-header-row" style="margin-bottom:16px;">
         <div>
             <label for="pv2_supplier_invoice">رقم فاتورة المورد</label>
             <input type="text" id="pv2_supplier_invoice" placeholder="رقم فاتورة المورد" dir="ltr" lang="en" autocomplete="off" maxlength="64"<?php echo !$pv2Ready ? ' disabled' : ''; ?>>

@@ -1591,6 +1591,22 @@ label {
     gap: 12px 16px;
 }
 
+/* مستندات v2 (شراء / مبيعات / أونلاين) — ارتفاع موحّد لحقول صف الترويسة (parity pv2 نوع الشراء) */
+.orange-doc-header-row input[type="text"],
+.orange-doc-header-row input[type="search"],
+.orange-doc-header-row input[type="number"],
+.orange-doc-header-row input.admin-inp-readonly,
+.orange-doc-header-row select {
+    height: var(--input-min-h);
+    min-height: var(--input-min-h);
+    box-sizing: border-box;
+}
+.orange-doc-header-row select {
+    padding-block: 0;
+    padding-inline: 0.65rem 2rem;
+    line-height: var(--input-min-h);
+}
+
 /* سند قيد — رأس السند: رقم، تواريخ، مرجع، مجموع مدين/دائن */
 .jv-voucher-header-line {
     display: grid;
