@@ -121,58 +121,17 @@ $companyDirect = $stCo->fetch(PDO::FETCH_ASSOC) ?: ['cnt_all' => 0, 'cnt_complet
 $companyInvoiceUrl = storefront_public_path('/admin/index.php?page=company_sales_invoice');
 $returnsReportUrl = storefront_public_path('/admin/index.php?page=sales_returns_report');
 
-/** @var array<int, array{cnt: int, total: float}> */
-$returnsByChannelId = [];
-$companyReturns = ['cnt' => 0, 'total' => 0.0];
-$hasSrTable = orange_table_exists($pdo, 'sales_returns');
-$hasSrChannel = $hasSrTable && orange_table_has_column($pdo, 'sales_returns', 'channel_id');
-$hasSrCreated = $hasSrTable && orange_table_has_column($pdo, 'sales_returns', 'created_at');
-$hasSrSource = $hasSrTable && orange_table_has_column($pdo, 'sales_returns', 'source_kind');
-
-if ($hasSrChannel) {
-    [$srBaseSql, $srBaseParams] = orange_sales_returns_date_country_where(
-        $pdo,
-        'sr',
-        $hasSrCreated,
-        $fromYmd,
-        $toYmd,
-        $caCountryId
-    );
-    $stRetCh = $pdo->prepare(
-        'SELECT sr.channel_id AS cid, COUNT(*) AS cnt, COALESCE(SUM(sr.total), 0) AS total_sum
-         FROM sales_returns sr
-         WHERE sr.channel_id IS NOT NULL AND sr.channel_id > 0' . $srBaseSql . '
-         GROUP BY sr.channel_id'
-    );
-    $stRetCh->execute($srBaseParams);
-    foreach ($stRetCh->fetchAll(PDO::FETCH_ASSOC) ?: [] as $rr) {
-        $cid = (int) ($rr['cid'] ?? 0);
-        if ($cid <= 0) {
-            continue;
-        }
-        $returnsByChannelId[$cid] = [
-            'cnt' => (int) ($rr['cnt'] ?? 0),
-            'total' => (float) ($rr['total_sum'] ?? 0),
-        ];
-    }
-
-    if ($hasSrSource) {
-        $stRetCo = $pdo->prepare(
-            'SELECT COUNT(*) AS cnt, COALESCE(SUM(sr.total), 0) AS total_sum
-             FROM sales_returns sr
-             WHERE (sr.channel_id IS NULL OR sr.channel_id = 0)
-               AND sr.source_kind = \'company\'' . $srBaseSql
-        );
-        $stRetCo->execute($srBaseParams);
-        $coRetRow = $stRetCo->fetch(PDO::FETCH_ASSOC);
-        if (is_array($coRetRow)) {
-            $companyReturns = [
-                'cnt' => (int) ($coRetRow['cnt'] ?? 0),
-                'total' => (float) ($coRetRow['total_sum'] ?? 0),
-            ];
-        }
-    }
-}
+$hasSrCreated = orange_table_exists($pdo, 'sales_returns')
+    && orange_table_has_column($pdo, 'sales_returns', 'created_at');
+$returnsAgg = orange_channel_analytics_aggregate_returns(
+    $pdo,
+    $hasSrCreated,
+    $fromOk ? $fromYmd : '',
+    $toOk ? $toYmd : '',
+    $caCountryId
+);
+$returnsByChannelId = $returnsAgg['by_channel'];
+$companyReturns = $returnsAgg['company'];
 
 /** @var list<array<string, mixed>> */
 $unifiedChannelRows = [];
@@ -198,7 +157,7 @@ foreach ($channelRows as $cr) {
 
 $coSalesRev = (float) ($companyDirect['revenue_completed'] ?? 0);
 $coRetTotal = (float) $companyReturns['total'];
-$unifiedChannelRows[] = [
+$companyRow = [
     'id' => 0,
     'name' => orange_sales_company_direct_channel_label(),
     'slug' => 'company',
@@ -215,6 +174,13 @@ $unifiedChannelRows[] = [
 usort($unifiedChannelRows, static function (array $a, array $b): int {
     return ($b['net'] <=> $a['net']) ?: ($b['sales_rev'] <=> $a['sales_rev']);
 });
+
+$finalUnifiedRows = [$companyRow];
+foreach ($unifiedChannelRows as $ur) {
+    $finalUnifiedRows[] = $ur;
+}
+$unifiedChannelRows = $finalUnifiedRows;
+
 $rank = 0;
 foreach ($unifiedChannelRows as &$ur) {
     $ur['_rank'] = ++$rank;
@@ -299,7 +265,8 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
     <h3 class="card-title">ملخص القنوات — بيع ومردود وصافي</h3>
     <p class="card-hint">
         المبيعات حسب تاريخ إنشاء الطلب (<code>completed</code>)؛ المردودات حسب تاريخ المردود.
-        الترتيب حسب <strong>الصافي</strong> (إيراد مكتمل − مردودات).
+        صف <strong>الشركة</strong> دائماً #1؛ باقي القنوات مرتبة حسب <strong>الصافي</strong> (إيراد − مردود).
+        المردودات تُقرأ من <code>sales_returns</code> مع الطلب المرجعي إن لم تُنسخ القناة بعد.
     </p>
     <div class="table-wrap">
         <table class="admin-table">
