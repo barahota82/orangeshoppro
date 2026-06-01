@@ -70,6 +70,33 @@ function orange_sales_company_direct_channel_id(): int
     return 0;
 }
 
+/**
+ * معرّف قناة من slug (مثل online / web / tiktok) ضمن سياق دولة الأدمن.
+ */
+function orange_channel_id_for_slug(PDO $pdo, string $slug, int $countryId = 0): int
+{
+    static $cache = [];
+    $slug = trim($slug);
+    if ($slug === '' || !orange_table_exists($pdo, 'channels')) {
+        return 0;
+    }
+    $key = $slug . ':' . $countryId;
+    if (array_key_exists($key, $cache)) {
+        return $cache[$key];
+    }
+    $sql = 'SELECT id FROM channels WHERE slug = ?';
+    $params = [$slug];
+    if ($countryId > 0 && orange_channels_has_country_column($pdo)) {
+        $sql .= orange_sql_country_and_fragment($pdo, 'channels', 'channels', $countryId);
+    }
+    $sql .= ' ORDER BY is_active DESC, id ASC LIMIT 1';
+    $st = $pdo->prepare($sql);
+    $st->execute($params);
+    $cache[$key] = (int) ($st->fetchColumn() ?: 0);
+
+    return $cache[$key];
+}
+
 function orange_sales_company_direct_channel_label(): string
 {
     return 'الشركة';

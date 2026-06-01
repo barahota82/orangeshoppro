@@ -265,23 +265,20 @@ function orange_sales_returns_country_or_order_sql(PDO $pdo, int $countryId): st
     if ($countryId <= 0) {
         return '';
     }
-    $parts = [];
-    if (orange_table_has_country_id($pdo, 'sales_returns')) {
-        $srFrag = orange_sql_country_and_fragment($pdo, 'sales_returns', 'sr', $countryId);
-        if ($srFrag !== '') {
-            $parts[] = '(' . trim(substr($srFrag, 4)) . ')';
-        }
+    // مطابق لتقرير مردودات المبيعات: بدون عمود country_id على sales_returns لا نُصفّي المردودات بالدولة.
+    if (!orange_table_has_country_id($pdo, 'sales_returns')) {
+        return '';
     }
-    $srHasCountry = orange_table_has_country_id($pdo, 'sales_returns');
+    $parts = [];
+    $srFrag = orange_sql_country_and_fragment($pdo, 'sales_returns', 'sr', $countryId);
+    if ($srFrag !== '') {
+        $parts[] = '(' . trim(substr($srFrag, 4)) . ')';
+    }
     if (orange_table_exists($pdo, 'orders') && orange_table_has_country_id($pdo, 'orders')) {
         $oFrag = orange_sql_country_and_fragment($pdo, 'orders', 'o', $countryId);
         if ($oFrag !== '') {
             $oInner = trim(substr($oFrag, 4));
-            if ($srHasCountry) {
-                $parts[] = '((sr.country_id IS NULL OR sr.country_id = 0) AND (' . $oInner . '))';
-            } else {
-                $parts[] = '(' . $oInner . ')';
-            }
+            $parts[] = '((sr.country_id IS NULL OR sr.country_id = 0) AND (' . $oInner . '))';
         }
     }
     if ($parts === []) {
@@ -289,6 +286,95 @@ function orange_sales_returns_country_or_order_sql(PDO $pdo, int $countryId): st
     }
 
     return ' AND (' . implode(' OR ', $parts) . ')';
+}
+
+/**
+ * فلتر تاريخ المردودات لتحليل القنوات: مرتبط بطلب → تاريخ الطلب؛ وإلا تاريخ المردود.
+ *
+ * @return array{0: string, 1: list<mixed>}
+ */
+function orange_channel_analytics_returns_date_sql(
+    bool $hasCreatedAt,
+    bool $hasOrderJoin,
+    string $fromYmd,
+    string $toYmd
+): array {
+    $sql = '';
+    $params = [];
+    if (!$hasCreatedAt) {
+        return [$sql, $params];
+    }
+    if ($fromYmd !== '') {
+        if ($hasOrderJoin) {
+            $sql .= ' AND ((sr.order_id IS NOT NULL AND sr.order_id > 0 AND o.id IS NOT NULL AND o.created_at >= ?)'
+                . ' OR ((sr.order_id IS NULL OR sr.order_id = 0 OR o.id IS NULL) AND DATE(sr.created_at) >= ?))';
+            $params[] = $fromYmd . ' 00:00:00';
+            $params[] = $fromYmd;
+        } else {
+            $sql .= ' AND DATE(sr.created_at) >= ?';
+            $params[] = $fromYmd;
+        }
+    }
+    if ($toYmd !== '') {
+        if ($hasOrderJoin) {
+            $sql .= ' AND ((sr.order_id IS NOT NULL AND sr.order_id > 0 AND o.id IS NOT NULL AND o.created_at <= ?)'
+                . ' OR ((sr.order_id IS NULL OR sr.order_id = 0 OR o.id IS NULL) AND DATE(sr.created_at) <= ?))';
+            $params[] = $toYmd . ' 23:59:59';
+            $params[] = $toYmd;
+        } else {
+            $sql .= ' AND DATE(sr.created_at) <= ?';
+            $params[] = $toYmd;
+        }
+    }
+
+    return [$sql, $params];
+}
+
+/**
+ * قناة التسويق للمردود: >0 معرّف قناة، 0 = شركة مباشرة، -1 = لم يُعرف.
+ *
+ * @param array<string, mixed> $row
+ */
+function orange_sales_return_resolve_marketing_channel_id(PDO $pdo, array $row, int $countryId): int
+{
+    if (isset($row['channel_id']) && (int) $row['channel_id'] > 0) {
+        return (int) $row['channel_id'];
+    }
+    if (isset($row['order_channel_id']) && (int) $row['order_channel_id'] > 0) {
+        return (int) $row['order_channel_id'];
+    }
+    if (orange_sales_return_is_company_marketing_bucket($row)) {
+        return 0;
+    }
+    $sk = trim((string) ($row['source_kind'] ?? ''));
+    if ($sk === 'company') {
+        return 0;
+    }
+    if ($sk === 'online') {
+        $onlineId = orange_channel_id_for_slug($pdo, 'online', $countryId);
+
+        return $onlineId > 0 ? $onlineId : -1;
+    }
+    $invRef = strtoupper(trim((string) ($row['invoice_reference'] ?? '')));
+    if (str_starts_with($invRef, 'INV-O-')) {
+        $onlineId = orange_channel_id_for_slug($pdo, 'online', $countryId);
+
+        return $onlineId > 0 ? $onlineId : -1;
+    }
+    if (str_starts_with($invRef, 'INV-C-')) {
+        return 0;
+    }
+    $orderInv = strtoupper(trim((string) ($row['order_invoice_number'] ?? '')));
+    if (str_starts_with($orderInv, 'INV-O-')) {
+        $onlineId = orange_channel_id_for_slug($pdo, 'online', $countryId);
+
+        return $onlineId > 0 ? $onlineId : -1;
+    }
+    if (str_starts_with($orderInv, 'INV-C-')) {
+        return 0;
+    }
+
+    return -1;
 }
 
 /**
@@ -328,7 +414,8 @@ function orange_sales_return_is_company_marketing_bucket(array $row): bool
  *
  * @return array{
  *   by_channel: array<int, array{cnt: int, total: float}>,
- *   company: array{cnt: int, total: float}
+ *   company: array{cnt: int, total: float},
+ *   orphan: array{cnt: int, total: float}
  * }
  */
 function orange_channel_analytics_aggregate_returns(
@@ -341,12 +428,14 @@ function orange_channel_analytics_aggregate_returns(
     $out = [
         'by_channel' => [],
         'company' => ['cnt' => 0, 'total' => 0.0],
+        'orphan' => ['cnt' => 0, 'total' => 0.0],
     ];
     if (!orange_table_exists($pdo, 'sales_returns')) {
         return $out;
     }
 
-    $joinOrder = orange_table_exists($pdo, 'orders') ? ' LEFT JOIN orders o ON o.id = sr.order_id' : '';
+    $hasOrderJoin = orange_table_exists($pdo, 'orders');
+    $joinOrder = $hasOrderJoin ? ' LEFT JOIN orders o ON o.id = sr.order_id' : '';
     $select = 'sr.total';
     if (orange_table_has_column($pdo, 'sales_returns', 'channel_id')) {
         $select .= ', sr.channel_id';
@@ -371,31 +460,23 @@ function orange_channel_analytics_aggregate_returns(
 
     $sql = 'SELECT ' . $select . ' FROM sales_returns sr' . $joinOrder . ' WHERE 1=1';
     $sql .= orange_sales_returns_country_or_order_sql($pdo, $countryId);
-    if ($hasCreatedAt && $fromYmd !== '') {
-        $sql .= ' AND DATE(sr.created_at) >= ?';
-    }
-    if ($hasCreatedAt && $toYmd !== '') {
-        $sql .= ' AND DATE(sr.created_at) <= ?';
-    }
-
-    $params = [];
-    if ($hasCreatedAt && $fromYmd !== '') {
-        $params[] = $fromYmd;
-    }
-    if ($hasCreatedAt && $toYmd !== '') {
-        $params[] = $toYmd;
-    }
+    [$dateSql, $dateParams] = orange_channel_analytics_returns_date_sql(
+        $hasCreatedAt,
+        $hasOrderJoin,
+        $fromYmd,
+        $toYmd
+    );
+    $sql .= $dateSql;
+    $params = $dateParams;
 
     $st = $pdo->prepare($sql);
     $st->execute($params);
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
         $total = (float) ($row['total'] ?? 0);
-        $mktCh = 0;
-        if (isset($row['channel_id']) && (int) $row['channel_id'] > 0) {
-            $mktCh = (int) $row['channel_id'];
-        } elseif (isset($row['order_channel_id']) && (int) $row['order_channel_id'] > 0) {
-            $mktCh = (int) $row['order_channel_id'];
+        if ($total <= 0.0001) {
+            continue;
         }
+        $mktCh = orange_sales_return_resolve_marketing_channel_id($pdo, $row, $countryId);
         if ($mktCh > 0) {
             if (!isset($out['by_channel'][$mktCh])) {
                 $out['by_channel'][$mktCh] = ['cnt' => 0, 'total' => 0.0];
@@ -405,10 +486,14 @@ function orange_channel_analytics_aggregate_returns(
 
             continue;
         }
-        if (orange_sales_return_is_company_marketing_bucket($row)) {
+        if ($mktCh === 0) {
             $out['company']['cnt']++;
             $out['company']['total'] += $total;
+
+            continue;
         }
+        $out['orphan']['cnt']++;
+        $out['orphan']['total'] += $total;
     }
 
     return $out;

@@ -132,6 +132,45 @@ $returnsAgg = orange_channel_analytics_aggregate_returns(
 );
 $returnsByChannelId = $returnsAgg['by_channel'];
 $companyReturns = $returnsAgg['company'];
+$orphanReturns = $returnsAgg['orphan'];
+
+$topSql = '
+    SELECT o.channel_id, oi.product_name, SUM(oi.qty) AS qty_sum,
+           SUM(oi.qty * oi.price) AS revenue_lines
+    FROM order_items oi
+    INNER JOIN orders o ON o.id = oi.order_id AND o.status = \'completed\'
+    WHERE o.channel_id IS NOT NULL AND o.channel_id > 0
+';
+$topParams = [];
+if ($fromOk) {
+    $topSql .= ' AND o.created_at >= ?';
+    $topParams[] = $fromYmd . ' 00:00:00';
+}
+if ($toOk) {
+    $topSql .= ' AND o.created_at <= ?';
+    $topParams[] = $toYmd . ' 23:59:59';
+}
+$topSql .= $caOrdersCountrySql . ' GROUP BY o.channel_id, oi.product_name ORDER BY o.channel_id ASC, qty_sum DESC';
+
+$stTop = $pdo->prepare($topSql);
+$stTop->execute($topParams);
+$topRaw = $stTop->fetchAll(PDO::FETCH_ASSOC);
+
+/** @var array<int, array{product_name: string, qty_sum: float, revenue_lines: float}> */
+$topByChannel = [];
+foreach ($topRaw as $tr) {
+    $cid = (int) ($tr['channel_id'] ?? 0);
+    if ($cid <= 0) {
+        continue;
+    }
+    if (!isset($topByChannel[$cid])) {
+        $topByChannel[$cid] = [
+            'product_name' => (string) $tr['product_name'],
+            'qty_sum' => (float) $tr['qty_sum'],
+            'revenue_lines' => (float) $tr['revenue_lines'],
+        ];
+    }
+}
 
 /** @var list<array<string, mixed>> */
 $unifiedChannelRows = [];
@@ -179,6 +218,22 @@ $finalUnifiedRows = [$companyRow];
 foreach ($unifiedChannelRows as $ur) {
     $finalUnifiedRows[] = $ur;
 }
+if ((int) ($orphanReturns['cnt'] ?? 0) > 0) {
+    $orphTotal = (float) ($orphanReturns['total'] ?? 0);
+    $finalUnifiedRows[] = [
+        'id' => -1,
+        'name' => 'مردودات غير منسوبة لقناة',
+        'slug' => '—',
+        'is_active' => 1,
+        'sales_cnt_all' => 0,
+        'sales_cnt_done' => 0,
+        'sales_rev' => 0.0,
+        'ret_cnt' => (int) $orphanReturns['cnt'],
+        'ret_total' => $orphTotal,
+        'net' => round(0.0 - $orphTotal, 4),
+        '_top' => null,
+    ];
+}
 $unifiedChannelRows = $finalUnifiedRows;
 
 $rank = 0;
@@ -188,44 +243,6 @@ foreach ($unifiedChannelRows as &$ur) {
     $ur['_avg_basket'] = $done > 0 ? ((float) ($ur['sales_rev'] ?? 0)) / $done : 0.0;
 }
 unset($ur);
-
-$topSql = '
-    SELECT o.channel_id, oi.product_name, SUM(oi.qty) AS qty_sum,
-           SUM(oi.qty * oi.price) AS revenue_lines
-    FROM order_items oi
-    INNER JOIN orders o ON o.id = oi.order_id AND o.status = \'completed\'
-    WHERE o.channel_id IS NOT NULL AND o.channel_id > 0
-';
-$topParams = [];
-if ($fromOk) {
-    $topSql .= ' AND o.created_at >= ?';
-    $topParams[] = $fromYmd . ' 00:00:00';
-}
-if ($toOk) {
-    $topSql .= ' AND o.created_at <= ?';
-    $topParams[] = $toYmd . ' 23:59:59';
-}
-$topSql .= $caOrdersCountrySql . ' GROUP BY o.channel_id, oi.product_name ORDER BY o.channel_id ASC, qty_sum DESC';
-
-$stTop = $pdo->prepare($topSql);
-$stTop->execute($topParams);
-$topRaw = $stTop->fetchAll(PDO::FETCH_ASSOC);
-
-/** @var array<int, array{product_name: string, qty_sum: float, revenue_lines: float}> */
-$topByChannel = [];
-foreach ($topRaw as $tr) {
-    $cid = (int) ($tr['channel_id'] ?? 0);
-    if ($cid <= 0) {
-        continue;
-    }
-    if (!isset($topByChannel[$cid])) {
-        $topByChannel[$cid] = [
-            'product_name' => (string) $tr['product_name'],
-            'qty_sum' => (float) $tr['qty_sum'],
-            'revenue_lines' => (float) $tr['revenue_lines'],
-        ];
-    }
-}
 
 $channelsUrl = storefront_public_path('/admin/index.php?page=channels');
 $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
@@ -241,7 +258,8 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
 </div>
 
 <div class="card">
-    <h3 class="card-title">فلترة بالتاريخ (حسب تاريخ إنشاء الطلب)</h3>
+    <h3 class="card-title">فلترة بالتاريخ</h3>
+    <p class="card-hint" style="margin:0 0 0.75rem;">المبيعات: تاريخ إنشاء الطلب. المردودات: تاريخ الطلب المرجعي إن وُجد، وإلا تاريخ المردود.</p>
     <form method="get" action="" class="form-grid" style="align-items:end;max-width:720px;">
         <input type="hidden" name="page" value="channel_analytics">
         <div>
@@ -264,9 +282,9 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
 <div class="card">
     <h3 class="card-title">ملخص القنوات — بيع ومردود وصافي</h3>
     <p class="card-hint">
-        المبيعات حسب تاريخ إنشاء الطلب (<code>completed</code>)؛ المردودات حسب تاريخ المردود.
-        صف <strong>الشركة</strong> دائماً #1؛ باقي القنوات مرتبة حسب <strong>الصافي</strong> (إيراد − مردود).
-        المردودات تُقرأ من <code>sales_returns</code> مع الطلب المرجعي إن لم تُنسخ القناة بعد.
+        المبيعات: طلبات <code>completed</code>. المردودات: من <code>sales_returns.total</code> مع قناة من السجل أو الطلب أو <code>INV-O</code>/<code>INV-C</code>.
+        صف <strong>الشركة</strong> دائماً #1؛ باقي القنوات حسب <strong>الصافي</strong>.
+        عمود <strong>مردودات</strong> = المبلغ؛ <strong>عدد</strong> = عدد المستندات.
     </p>
     <div class="table-wrap">
         <table class="admin-table">
@@ -277,8 +295,8 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
                     <th>Slug</th>
                     <th>طلبات مكتملة</th>
                     <th>إيراد مكتمل</th>
-                    <th>مردودات</th>
-                    <th>قيمة المردود</th>
+                    <th>مردودات (مبلغ)</th>
+                    <th>عدد المردود</th>
                     <th>الصافي</th>
                     <th>متوسط سلة</th>
                     <th>أكثر منتج</th>
@@ -293,6 +311,8 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
                         <?php echo htmlspecialchars((string) ($ur['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>
                         <?php if ((int) ($ur['id'] ?? 0) === 0): ?>
                             <span class="badge" title="فواتير شركة INV-C بدون قناة تسويق">شركة مباشرة</span>
+                        <?php elseif ((int) ($ur['id'] ?? 0) === -1): ?>
+                            <span class="badge" title="مردود بلا قناة تسويق ولا INV-O/C">غير منسوب</span>
                         <?php elseif ((int) ($ur['is_active'] ?? 0) !== 1): ?>
                             <span class="badge" title="القناة غير نشطة">مخفية</span>
                         <?php endif; ?>
@@ -300,8 +320,8 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
                     <td><code><?php echo htmlspecialchars((string) ($ur['slug'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
                     <td><?php echo (int) ($ur['sales_cnt_done'] ?? 0); ?></td>
                     <td><?php echo number_format((float) ($ur['sales_rev'] ?? 0), $caMoney['decimals']); ?></td>
-                    <td><?php echo (int) ($ur['ret_cnt'] ?? 0); ?></td>
                     <td><?php echo number_format((float) ($ur['ret_total'] ?? 0), $caMoney['decimals']); ?></td>
+                    <td><?php echo (int) ($ur['ret_cnt'] ?? 0); ?></td>
                     <td><strong><?php echo number_format((float) ($ur['net'] ?? 0), $caMoney['decimals']); ?></strong></td>
                     <td><?php echo number_format((float) ($ur['_avg_basket'] ?? 0), $caMoney['decimals']); ?></td>
                     <td><?php
