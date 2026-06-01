@@ -214,16 +214,18 @@ function orange_sales_return_marketing_channel_label(
  *
  * @return array{0: string, 1: list<mixed>}
  */
-function orange_sales_returns_report_channel_filter_sql(int $channelFilter): array
+function orange_sales_returns_report_channel_filter_sql(PDO $pdo, int $channelFilter): array
 {
     if ($channelFilter > 0) {
         return [' AND sr.channel_id = ?', [$channelFilter]];
     }
     if ($channelFilter === -1) {
-        return [
-            " AND (sr.channel_id IS NULL OR sr.channel_id = 0) AND sr.source_kind = 'company'",
-            [],
-        ];
+        $sql = ' AND (sr.channel_id IS NULL OR sr.channel_id = 0)';
+        if (orange_table_has_column($pdo, 'sales_returns', 'source_kind')) {
+            $sql .= " AND sr.source_kind = 'company'";
+        }
+
+        return [$sql, []];
     }
 
     return ['', []];

@@ -36,8 +36,9 @@ $toYmd = $toRaw !== '' ? orange_parse_admin_date_to_ymd($toRaw) : '';
 $fromIn = $fromYmd !== '' ? orange_format_date_dmY($fromYmd) : $fromRaw;
 $toIn = $toYmd !== '' ? orange_format_date_dmY($toYmd) : $toRaw;
 
-$hasAnalytics = orange_table_has_column($pdo, 'sales_returns', 'source_kind')
-    && orange_table_has_column($pdo, 'sales_returns', 'invoice_reference');
+$hasSourceKind = orange_table_has_column($pdo, 'sales_returns', 'source_kind');
+$hasInvoiceRef = orange_table_has_column($pdo, 'sales_returns', 'invoice_reference');
+$hasAnalytics = $hasSourceKind && $hasInvoiceRef;
 $hasCreatedAt = orange_table_has_column($pdo, 'sales_returns', 'created_at');
 $hasReturnNumber = orange_table_has_column($pdo, 'sales_returns', 'return_number');
 $hasSrCountry = orange_table_has_country_id($pdo, 'sales_returns');
@@ -63,6 +64,7 @@ if ($hasChannels) {
  * @return array{0: string, 1: list<mixed>}
  */
 function orange_sales_returns_report_where(
+    PDO $pdo,
     bool $hasCreatedAt,
     string $fromYmd,
     string $toYmd,
@@ -71,7 +73,7 @@ function orange_sales_returns_report_where(
     int $channelFilter,
     int $countryId,
     bool $hasSrCountry,
-    bool $hasAnalytics
+    bool $hasSourceKind
 ): array {
     $where = ' WHERE 1=1';
     $params = [];
@@ -89,7 +91,7 @@ function orange_sales_returns_report_where(
         $where .= ' AND DATE(sr.created_at) <= ?';
         $params[] = $toYmd;
     }
-    if ($hasAnalytics && $sourceFilter !== 'all') {
+    if ($hasSourceKind && $sourceFilter !== 'all') {
         $where .= ' AND sr.source_kind = ?';
         $params[] = $sourceFilter;
     }
@@ -97,7 +99,7 @@ function orange_sales_returns_report_where(
         $where .= ' AND sr.type = ?';
         $params[] = $payFilter;
     }
-    [$chFilterSql, $chFilterParams] = orange_sales_returns_report_channel_filter_sql($channelFilter);
+    [$chFilterSql, $chFilterParams] = orange_sales_returns_report_channel_filter_sql($pdo, $channelFilter);
     $where .= $chFilterSql;
     foreach ($chFilterParams as $p) {
         $params[] = $p;
@@ -107,6 +109,7 @@ function orange_sales_returns_report_where(
 }
 
 [$whereSql, $whereParams] = orange_sales_returns_report_where(
+    $pdo,
     $hasCreatedAt,
     $fromYmd,
     $toYmd,
@@ -115,7 +118,7 @@ function orange_sales_returns_report_where(
     $channelFilter,
     $repCountryId,
     $hasSrCountry,
-    $hasAnalytics
+    $hasSourceKind
 );
 
 $joinCh = $hasChannels ? ' LEFT JOIN channels ch ON ch.id = sr.channel_id' : '';
@@ -172,12 +175,14 @@ if (orange_table_exists($pdo, 'sales_returns') && orange_table_exists($pdo, 'sal
     $byPayment = $stPay->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
     if ($hasChannels && orange_table_has_column($pdo, 'sales_returns', 'channel_id')) {
+        $mcSkSelect = $hasSourceKind ? 'sr.source_kind' : "'' AS source_kind";
+        $mcSkGroup = $hasSourceKind ? 'sr.source_kind, ' : '';
         $stMc = $pdo->prepare(
-            'SELECT sr.channel_id, sr.source_kind, ch.name AS channel_name_db,
+            'SELECT sr.channel_id, ' . $mcSkSelect . ', ch.name AS channel_name_db,
                     COUNT(*) AS cnt,
                     COALESCE(SUM(sr.total), 0) AS total_sum
              FROM sales_returns sr' . $joinCh . $whereSql . '
-             GROUP BY sr.channel_id, sr.source_kind, ch.name
+             GROUP BY sr.channel_id, ' . $mcSkGroup . 'ch.name
              ORDER BY total_sum DESC'
         );
         $stMc->execute($whereParams);
@@ -229,8 +234,11 @@ if (orange_table_exists($pdo, 'sales_returns') && orange_table_exists($pdo, 'sal
     if ($hasReturnNumber) {
         $detailCols .= ', sr.return_number';
     }
-    if ($hasAnalytics) {
-        $detailCols .= ', sr.source_kind, sr.invoice_reference';
+    if ($hasSourceKind) {
+        $detailCols .= ', sr.source_kind';
+    }
+    if ($hasInvoiceRef) {
+        $detailCols .= ', sr.invoice_reference';
     }
     if ($hasCustomers) {
         $detailCols .= ', c.' . $custNameCol . ' AS customer_name';
@@ -325,6 +333,7 @@ $baseUrl = storefront_public_path('/admin/index.php') . '?page=sales_returns_rep
             <label for="srr_to">إلى تاريخ</label>
             <input type="text" id="srr_to" name="to" value="<?php echo htmlspecialchars($toIn, ENT_QUOTES, 'UTF-8'); ?>" placeholder="dd/mm/yyyy" dir="ltr">
         </div>
+        <?php if ($hasSourceKind): ?>
         <div>
             <label for="srr_source">مصدر الفاتورة</label>
             <select id="srr_source" name="source">
@@ -333,6 +342,7 @@ $baseUrl = storefront_public_path('/admin/index.php') . '?page=sales_returns_rep
                 <option value="online"<?php echo $sourceFilter === 'online' ? ' selected' : ''; ?>>أونلاين (INV-O)</option>
             </select>
         </div>
+        <?php endif; ?>
         <div>
             <label for="srr_pay">قناة التحصيل</label>
             <select id="srr_pay" name="pay">
