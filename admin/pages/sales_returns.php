@@ -66,7 +66,9 @@ if ($prefillCustomerRaw > 0) {
 }
 $prefillOrderId = (int) ($_GET['order_id'] ?? 0);
 
-$sr2Ready = $sr2PickRows !== [];
+/** الشاشة نشطة دائماً (مثل مردود المشتريات) — غياب الأصناف تنبيه فقط */
+$sr2Ready = true;
+$sr2WarnNoProducts = $sr2PickRows === [];
 $sr2DiagCountryCode = orange_admin_context_country_code($pdo);
 $sr2DiagActiveProductsAll = orange_table_exists($pdo, 'products')
     ? (int) $pdo->query('SELECT COUNT(*) FROM products WHERE is_active = 1')->fetchColumn()
@@ -162,15 +164,14 @@ $sr2DocSerialPreview = $sr2NavReady
     </div>
 </div>
 
-<?php if (!$sr2Ready): ?>
+<?php if ($sr2WarnNoProducts): ?>
 <div class="card" style="border:1px solid #fcd34d;background:#fffbeb;margin-bottom:12px;">
     <p class="card-hint" style="margin:0;line-height:1.55;">
-        <strong>الشاشة غير جاهزة</strong> لدولة الأدمن
+        <strong>تنبيه</strong> (الشاشة نشطة — مثل مردود المشتريات):
+        لا أصناف في قائمة الاختيار لدولة
         <strong dir="ltr"><?php echo htmlspecialchars(strtoupper($sr2DiagCountryCode), ENT_QUOTES, 'UTF-8'); ?></strong>
-        (معرّف <?php echo (int) $srCountryId; ?>) —
-        لا أصناف للاختيار
-        (منتجات نشطة في النظام: <?php echo (int) $sr2DiagActiveProductsAll; ?>).
-        راجع «المنتجات»: نشط + ربط الدولة، أو اختر دولة الأدمن الصحيحة من الشريط العلوي.
+        (منتجات نشطة في النظام: <?php echo (int) $sr2DiagActiveProductsAll; ?>) —
+        ابحث بالكود في السطر لترى «لا نتائج»، أو أضف منتجات من «المنتجات».
     </p>
 </div>
 <?php endif; ?>
@@ -219,20 +220,20 @@ $sr2DocSerialPreview = $sr2NavReady
     <div class="form-grid sr2-header-row2" style="margin-bottom:16px;">
         <div>
             <label for="sr2_order_ref">فاتورة المبيعات المرجعية</label>
-            <input type="text" id="sr2_order_ref" placeholder="INV-C- أو رقم" dir="ltr" lang="en" autocomplete="off"<?php echo !$sr2Ready ? ' disabled' : ''; ?>>
+            <input type="text" id="sr2_order_ref" placeholder="INV-C- أو رقم" dir="ltr" lang="en" autocomplete="off">
             <input type="hidden" id="sr2_order_id" value="0">
         </div>
         <div class="sr2-header-row2__action">
             <span class="sr2-header-row2__action-label" aria-hidden="true">.</span>
-            <button type="button" class="btn-secondary" id="sr2_btn_retrieve"<?php echo !$sr2Ready ? ' disabled' : ''; ?>>استرجاع</button>
+            <button type="button" class="btn-secondary" id="sr2_btn_retrieve">استرجاع</button>
         </div>
         <div>
             <label for="sr2_notes">ملاحظات</label>
-            <input type="text" id="sr2_notes" placeholder="رقم إذن الإرجاع، …"<?php echo !$sr2Ready ? ' disabled' : ''; ?>>
+            <input type="text" id="sr2_notes" placeholder="رقم إذن الإرجاع، …">
         </div>
         <div>
             <label for="sr2_channel">قناة التحصيل</label>
-            <select id="sr2_channel"<?php echo !$sr2Ready ? ' disabled' : ''; ?>>
+            <select id="sr2_channel">
                 <option value="cash">نقدي</option>
                 <option value="online">أونلاين</option>
                 <option value="credit">آجل</option>
@@ -280,7 +281,7 @@ $sr2DocSerialPreview = $sr2NavReady
             </div>
             <button type="button" class="btn-secondary" id="sr2_btn_print" title="طباعة المردود المعروض" disabled>طباعة</button>
             <button type="button" class="btn-secondary" id="sr2_btn_new" title="مردود جديد">مردود جديد</button>
-            <button type="button" id="sr2_btn_save" data-orange-perm="edit" data-orange-page="sales_returns"<?php echo !$sr2Ready ? ' disabled' : ''; ?>>حفظ</button>
+            <button type="button" id="sr2_btn_save" data-orange-perm="edit" data-orange-page="sales_returns">حفظ</button>
         </div>
     </div>
 </div>
@@ -459,10 +460,6 @@ $sr2DocSerialPreview = $sr2NavReady
     function customerPickerOpen() {
         if (sr2ViewMode) {
             alert('وضع العرض — اضغط «مردود جديد» لتسجيل مردود جديد.');
-            return;
-        }
-        if (!SR2_READY) {
-            alert('لا توجد منتجات نشطة لسياق الدولة — أضف منتجات من «المنتجات» قبل تسجيل المردود.');
             return;
         }
         var modal = document.getElementById('sr2_customer_pick_modal');
@@ -713,7 +710,7 @@ $sr2DocSerialPreview = $sr2NavReady
         }
         var sb = document.getElementById('sr2_btn_save');
         if (sb) {
-            sb.disabled = !SR2_READY || sr2ViewMode || !SR2_CAPS.can_edit;
+            sb.disabled = sr2ViewMode || !SR2_CAPS.can_edit;
             sb.title = sr2ViewMode ? 'وضع العرض — استخدم «مردود جديد»' : 'حفظ مردود جديد';
         }
         var lbl = document.getElementById('sr2_browse_label');
@@ -742,7 +739,7 @@ $sr2DocSerialPreview = $sr2NavReady
                     || el.id === 'sr2_customer_code') {
                     return;
                 }
-                el.disabled = sr2ViewMode || (!SR2_READY && el.id !== 'sr2_customer_code');
+                el.disabled = sr2ViewMode;
             });
         }
         sr2SyncToolbar();
@@ -785,7 +782,7 @@ $sr2DocSerialPreview = $sr2NavReady
     }
 
     function sr2RetrieveFromOrder() {
-        if (!SR2_READY || sr2ViewMode) return;
+        if (sr2ViewMode) return;
         var refRaw = (document.getElementById('sr2_order_ref').value || '').trim();
         if (!refRaw) {
             alert('أدخل رقم فاتورة مبيعات صالحاً (INV-C- أو رقم) في خانة فاتورة المبيعات المرجعية.');
@@ -802,7 +799,7 @@ $sr2DocSerialPreview = $sr2NavReady
             }
             sr2ApplyOrderRetrievePayload(res);
         }).catch(function (e) { alert(e.message || String(e)); }).finally(function () {
-            if (btn && !sr2ViewMode && SR2_READY) btn.disabled = false;
+            if (btn && !sr2ViewMode) btn.disabled = false;
         });
     }
 
@@ -938,7 +935,7 @@ $sr2DocSerialPreview = $sr2NavReady
             alert('لا تملك صلاحية تعديل مردود المبيعات');
             return;
         }
-        if (!SR2_READY || sr2ViewMode) return;
+        if (sr2ViewMode) return;
         var channel = document.getElementById('sr2_channel').value;
         var customerId = parseInt(document.getElementById('sr2_customer_id').value, 10) || 0;
         var orderId = sr2ResolvedOrderId();

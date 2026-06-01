@@ -69,7 +69,10 @@ if (orange_table_exists($pdo, 'customers')) {
 }
 
 $prefillOrderId = (int) ($_GET['order_id'] ?? 0);
-$sv2Ready = $sv2PickRows !== [] && $channels !== [];
+/** الشاشة نشطة دائماً (مثل المشتريات) — غياب المنتجات/القنوات تنبيه فقط عند البحث عن صنف */
+$sv2Ready = true;
+$sv2WarnNoProducts = $sv2PickRows === [];
+$sv2WarnNoChannels = $channels === [];
 $sv2DiagCountryCode = orange_admin_context_country_code($pdo);
 $sv2DiagActiveProductsAll = orange_table_exists($pdo, 'products')
     ? (int) $pdo->query('SELECT COUNT(*) FROM products WHERE is_active = 1')->fetchColumn()
@@ -193,21 +196,18 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     </div>
 </div>
 
-<?php if (!$sv2Ready): ?>
+<?php if ($sv2WarnNoProducts || $sv2WarnNoChannels): ?>
 <div class="card" style="border:1px solid #fcd34d;background:#fffbeb;margin-bottom:12px;">
     <p class="card-hint" style="margin:0;line-height:1.55;">
-        <strong>الشاشة غير جاهزة</strong> لدولة الأدمن
-        <strong dir="ltr"><?php echo htmlspecialchars(strtoupper($sv2DiagCountryCode), ENT_QUOTES, 'UTF-8'); ?></strong>
-        (معرّف <?php echo (int) $adminCountryId; ?>).
-        <?php if ($sv2PickRows === []): ?>
-            لا أصناف للاختيار في الفاتورة
-            (منتجات نشطة في النظام: <?php echo (int) $sv2DiagActiveProductsAll; ?> —
-            راجع «المنتجات»: نشط + <code>country_id</code> لهذه الدولة أو الكويت الافتراضية).
+        <strong>تنبيه</strong> (الشاشة نشطة — مثل المشتريات):
+        دولة الأدمن <strong dir="ltr"><?php echo htmlspecialchars(strtoupper($sv2DiagCountryCode), ENT_QUOTES, 'UTF-8'); ?></strong>.
+        <?php if ($sv2WarnNoProducts): ?>
+            لا أصناف في قائمة الاختيار (منتجات نشطة في النظام: <?php echo (int) $sv2DiagActiveProductsAll; ?>) —
+            ابحث بالكود لترى «لا نتائج»، أو أضف/فعّل منتجات من «المنتجات».
         <?php endif; ?>
-        <?php if ($channels === []): ?>
-            لا قنوات نشطة لهذه الدولة
-            (قنوات نشطة في النظام: <?php echo (int) $sv2DiagActiveChannelsAll; ?> —
-            من «القنوات»: فعّل قناة واربطها بنفس الدولة).
+        <?php if ($sv2WarnNoChannels): ?>
+            لا قنوات نشطة لهذه الدولة (في النظام: <?php echo (int) $sv2DiagActiveChannelsAll; ?>) —
+            أضف قناة من «القنوات» قبل الحفظ.
         <?php endif; ?>
     </p>
 </div>
@@ -245,7 +245,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         </div>
         <div>
             <label for="sv2_customer_name">اسم العميل</label>
-            <input type="text" id="sv2_customer_name" required placeholder="اسم العميل"<?php echo !$sv2Ready ? ' disabled' : ''; ?>>
+            <input type="text" id="sv2_customer_name" required placeholder="اسم العميل">
         </div>
         <div>
             <label for="sv2_customer_balance">رصيد الذمم</label>
@@ -257,27 +257,27 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     <div class="form-grid sv2-header-row2" style="margin-bottom:12px;">
         <div>
             <label for="sv2_phone_country">كود الدولة</label>
-            <input type="search" id="sv2_phone_country" list="sv2_phone_country_list" autocomplete="off" dir="ltr" lang="en" placeholder="+965" required<?php echo !$sv2Ready ? ' disabled' : ''; ?>>
+            <input type="search" id="sv2_phone_country" list="sv2_phone_country_list" autocomplete="off" dir="ltr" lang="en" placeholder="+965" required>
             <datalist id="sv2_phone_country_list"></datalist>
         </div>
         <div>
             <label for="sv2_phone">الهاتف (محلي)</label>
-            <input type="text" id="sv2_phone" class="js-orange-phone-input" maxlength="24" autocomplete="off" dir="ltr" lang="en" placeholder="رقم محلي بدون كود الدولة" required<?php echo !$sv2Ready ? ' disabled' : ''; ?>>
+            <input type="text" id="sv2_phone" class="js-orange-phone-input" maxlength="24" autocomplete="off" dir="ltr" lang="en" placeholder="رقم محلي بدون كود الدولة" required>
         </div>
         <div>
             <label for="sv2_area">المنطقة</label>
-            <input type="text" id="sv2_area"<?php echo !$sv2Ready ? ' disabled' : ''; ?>>
+            <input type="text" id="sv2_area">
         </div>
         <div>
             <label for="sv2_address">العنوان</label>
-            <input type="text" id="sv2_address"<?php echo !$sv2Ready ? ' disabled' : ''; ?>>
+            <input type="text" id="sv2_address">
         </div>
     </div>
 
     <div class="form-grid sv2-header-row3" style="margin-bottom:16px;">
         <div>
             <label for="sv2_channel">قناة العملاء</label>
-            <select id="sv2_channel" required<?php echo !$sv2Ready ? ' disabled' : ''; ?>>
+            <select id="sv2_channel" required>
                 <?php if ($channels === []): ?>
                 <option value="">— لا قنوات —</option>
                 <?php else: ?>
@@ -289,7 +289,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         </div>
         <div>
             <label for="sv2_payment_terms">نوع البيع</label>
-            <select id="sv2_payment_terms"<?php echo !$sv2Ready ? ' disabled' : ''; ?>>
+            <select id="sv2_payment_terms">
                 <option value="cash">نقدي</option>
                 <option value="credit">آجل</option>
                 <option value="online">أونلاين</option>
@@ -297,11 +297,11 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         </div>
         <div>
             <label for="sv2_amount_paid">مدفوع الآن</label>
-            <input type="number" id="sv2_amount_paid" class="admin-inp-money" step="any" min="0" value="0" dir="ltr" lang="en"<?php echo !$sv2Ready ? ' disabled' : ''; ?>>
+            <input type="number" id="sv2_amount_paid" class="admin-inp-money" step="any" min="0" value="0" dir="ltr" lang="en">
         </div>
         <div>
             <label for="sv2_notes">ملاحظات</label>
-            <input type="text" id="sv2_notes" placeholder="ملاحظات…"<?php echo !$sv2Ready ? ' disabled' : ''; ?>>
+            <input type="text" id="sv2_notes" placeholder="ملاحظات…">
         </div>
     </div>
 
@@ -346,7 +346,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         </div>
     </div>
     <div class="actions jv-print-hide" style="margin-top:10px;">
-        <button type="button" class="btn-secondary" id="sv2_btn_add_extra"<?php echo !$sv2Ready ? ' disabled' : ''; ?>>إضافة بند</button>
+        <button type="button" class="btn-secondary" id="sv2_btn_add_extra">إضافة بند</button>
     </div>
 
     <div style="margin-top:14px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px;">
@@ -369,7 +369,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             </div>
             <button type="button" class="btn-secondary" id="sv2_btn_print" title="طباعة الفاتورة المعروضة" disabled>طباعة</button>
             <button type="button" class="btn-secondary" id="sv2_btn_new" title="فاتورة جديدة" data-orange-perm="edit" data-orange-page="company_sales_invoice">فاتورة جديدة</button>
-            <button type="button" id="sv2_btn_save" data-orange-perm="edit" data-orange-page="company_sales_invoice"<?php echo !$sv2Ready ? ' disabled' : ''; ?>>حفظ</button>
+            <button type="button" id="sv2_btn_save" data-orange-perm="edit" data-orange-page="company_sales_invoice">حفظ</button>
         </div>
     </div>
 </div>
@@ -626,10 +626,6 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     function customerPickerOpen() {
         if (sv2ViewMode) {
             alert('وضع العرض — لفتح التعديل اضغط «فك القفل» أو «فاتورة جديدة».');
-            return;
-        }
-        if (!SV2_READY) {
-            alert('الشاشة غير جاهزة: تحقق من منتجات نشطة وقناة عملاء لسياق الدولة في الأدمن.');
             return;
         }
         var modal = document.getElementById('sv2_customer_pick_modal');
@@ -1150,7 +1146,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         }
         var sb = document.getElementById('sv2_btn_save');
         if (sb) {
-            sb.disabled = !SV2_READY || sv2ViewMode || !SV2_CAPS.can_edit;
+            sb.disabled = sv2ViewMode || !SV2_CAPS.can_edit;
             sb.title = browseOrderId > 0 && !sv2ViewMode ? 'حفظ التعديلات' : (sv2ViewMode ? 'وضع العرض — فك القفل للتعديل' : 'حفظ فاتورة جديدة');
         }
         var lbl = document.getElementById('sv2_browse_label');
@@ -1177,10 +1173,10 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
                 if (el.id === 'sv2_btn_new' || el.id === 'sv2_btn_print' || el.closest('.jv-voucher-nav-btns') || el.id === 'sv2_btn_search' || el.id === 'sv2_btn_save' || el.id === 'sv2_customer_code') {
                     return;
                 }
-                el.disabled = sv2ViewMode || !SV2_READY;
+                el.disabled = sv2ViewMode;
             });
             var addExtra = document.getElementById('sv2_btn_add_extra');
-            if (addExtra) addExtra.disabled = sv2ViewMode || !SV2_READY;
+            if (addExtra) addExtra.disabled = sv2ViewMode;
         }
         sv2SyncToolbar();
     }
@@ -1327,7 +1323,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
 
     function save() {
         if (!SV2_CAPS.can_edit) { alert('لا تملك صلاحية تعديل فواتير المبيعات'); return; }
-        if (!SV2_READY || sv2ViewMode) return;
+        if (sv2ViewMode) return;
 
         var name = (document.getElementById('sv2_customer_name').value || '').trim();
         var phone = (document.getElementById('sv2_phone').value || '').trim();
