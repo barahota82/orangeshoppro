@@ -272,10 +272,16 @@ function orange_sales_returns_country_or_order_sql(PDO $pdo, int $countryId): st
             $parts[] = '(' . trim(substr($srFrag, 4)) . ')';
         }
     }
+    $srHasCountry = orange_table_has_country_id($pdo, 'sales_returns');
     if (orange_table_exists($pdo, 'orders') && orange_table_has_country_id($pdo, 'orders')) {
         $oFrag = orange_sql_country_and_fragment($pdo, 'orders', 'o', $countryId);
         if ($oFrag !== '') {
-            $parts[] = '((sr.country_id IS NULL OR sr.country_id = 0) AND (' . trim(substr($oFrag, 4)) . '))';
+            $oInner = trim(substr($oFrag, 4));
+            if ($srHasCountry) {
+                $parts[] = '((sr.country_id IS NULL OR sr.country_id = 0) AND (' . $oInner . '))';
+            } else {
+                $parts[] = '(' . $oInner . ')';
+            }
         }
     }
     if ($parts === []) {
