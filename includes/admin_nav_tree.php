@@ -159,6 +159,7 @@ function orange_admin_permission_mega_sections(): array
                     'title' => 'تقارير المبيعات',
                     'pages' => [
                         ['page' => 'reports', 'label' => 'تقارير المبيعات'],
+                        ['page' => 'sales_returns_report', 'label' => 'تقرير مردودات المبيعات'],
                         ['page' => 'channel_analytics', 'label' => 'تحليل القنوات'],
                     ],
                 ],
@@ -290,6 +291,7 @@ function orange_admin_permission_actions_for_page(string $page): array
         'dashboard',
         'reports',
         'channel_analytics',
+        'sales_returns_report',
         'logs',
         'journal_voucher_reports',
         'partner_account_statement',

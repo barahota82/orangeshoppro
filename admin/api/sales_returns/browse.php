@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/date_format.php';
+require_once __DIR__ . '/../../../includes/sales_return_analytics.php';
 require_admin_api();
 
 try {
@@ -18,6 +19,8 @@ try {
     $hasCreatedAt = orange_table_has_column($pdo, 'sales_returns', 'created_at');
     $hasReturnNumber = orange_table_has_column($pdo, 'sales_returns', 'return_number');
     $hasOrderId = orange_table_has_column($pdo, 'sales_returns', 'order_id');
+    $hasInvoiceRef = orange_table_has_column($pdo, 'sales_returns', 'invoice_reference');
+    $hasSourceKind = orange_table_has_column($pdo, 'sales_returns', 'source_kind');
     $hasCustomers = orange_table_exists($pdo, 'customers');
     $custNameCol = 'name_ar';
     if ($hasCustomers) {
@@ -28,15 +31,19 @@ try {
 
     $countrySql = '';
     if ($countryId > 0) {
-        $countryParts = [];
-        if ($hasCustomers && orange_table_has_country_id($pdo, 'customers')) {
-            $countryParts[] = 'c.country_id = ' . (int) $countryId;
-        }
-        if (orange_table_has_country_id($pdo, 'orders')) {
-            $countryParts[] = '(sr.customer_id IS NULL AND o.country_id = ' . (int) $countryId . ')';
-        }
-        if ($countryParts !== []) {
-            $countrySql = ' AND (' . implode(' OR ', $countryParts) . ')';
+        if (orange_table_has_country_id($pdo, 'sales_returns')) {
+            $countrySql = ' AND sr.country_id = ' . (int) $countryId;
+        } else {
+            $countryParts = [];
+            if ($hasCustomers && orange_table_has_country_id($pdo, 'customers')) {
+                $countryParts[] = 'c.country_id = ' . (int) $countryId;
+            }
+            if (orange_table_has_country_id($pdo, 'orders')) {
+                $countryParts[] = '(sr.customer_id IS NULL AND o.country_id = ' . (int) $countryId . ')';
+            }
+            if ($countryParts !== []) {
+                $countrySql = ' AND (' . implode(' OR ', $countryParts) . ')';
+            }
         }
     }
 
@@ -133,6 +140,12 @@ try {
         if ($hasOrderId) {
             $sql .= ', sr.order_id';
         }
+        if ($hasInvoiceRef) {
+            $sql .= ', sr.invoice_reference';
+        }
+        if ($hasSourceKind) {
+            $sql .= ', sr.source_kind';
+        }
         if ($hasCustomers) {
             $sql .= ', c.' . $custNameCol . ' AS customer_name';
         }
@@ -203,6 +216,11 @@ try {
         foreach ($rows as $row) {
             $createdRaw = $hasCreatedAt ? (string) ($row['created_at'] ?? '') : '';
             $oid = $hasOrderId ? (int) ($row['order_id'] ?? 0) : 0;
+            $invRef = $hasInvoiceRef ? trim((string) ($row['invoice_reference'] ?? '')) : '';
+            if ($invRef === '' && $oid > 0) {
+                $invRef = 'INV-C-' . $oid;
+            }
+            $sk = $hasSourceKind ? trim((string) ($row['source_kind'] ?? '')) : '';
             $results[] = [
                 'id' => (int) ($row['id'] ?? 0),
                 'reference' => $hasReturnNumber && trim((string) ($row['return_number'] ?? '')) !== ''
@@ -210,12 +228,9 @@ try {
                     : ('SR-' . (int) ($row['id'] ?? 0)),
                 'created_at_dmy' => $createdRaw !== '' ? orange_format_date_dmY($createdRaw) : '',
                 'customer_name' => (string) ($row['customer_name'] ?? ''),
-                'channel_label' => match ((string) ($row['type'] ?? 'cash')) {
-                    'online' => 'أونلاين',
-                    'credit' => 'آجل',
-                    default => 'نقدي',
-                },
-                'order_reference' => $oid > 0 ? ('INV-C-' . $oid) : '',
+                'channel_label' => orange_sales_return_payment_type_label((string) ($row['type'] ?? 'cash')),
+                'source_kind_label' => orange_sales_return_source_kind_label($sk),
+                'order_reference' => $invRef,
                 'notes' => (string) ($row['notes'] ?? ''),
                 'total' => (float) ($row['total'] ?? 0),
             ];

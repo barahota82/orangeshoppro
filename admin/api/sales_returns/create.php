@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../../includes/journal_write.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/sales_return_helpers.php';
+require_once __DIR__ . '/../../../includes/sales_return_analytics.php';
 require_once __DIR__ . '/../../../includes/purchase_helpers.php';
 require_once __DIR__ . '/../../../includes/sales_gl_accounts.php';
 require_once __DIR__ . '/../../../includes/countries.php';
@@ -153,6 +154,11 @@ try {
     }
     $retNum = orange_country_document_ref($pdo, 'SR', $returnId, $returnCountryId);
     $pdo->prepare('UPDATE sales_returns SET return_number = ? WHERE id = ?')->execute([$retNum, $returnId]);
+
+    if (orange_table_has_column($pdo, 'sales_returns', 'country_id') && $returnCountryId > 0) {
+        $pdo->prepare('UPDATE sales_returns SET country_id = ? WHERE id = ?')->execute([$returnCountryId, $returnId]);
+    }
+    orange_sales_return_sync_analytics_for_return($pdo, $returnId, $orderIdOpt, $returnCountryId);
 
     $hasVariant = orange_table_has_column($pdo, 'sales_return_items', 'variant_id');
     foreach ($normalizedItems as $line) {

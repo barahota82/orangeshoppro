@@ -3051,6 +3051,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_country_scope_repair_v75($pdo);
     orange_catalog_migrate_country_scope_repair_v76($pdo);
     orange_catalog_migrate_country_scope_repair_v77($pdo);
+    orange_catalog_migrate_sales_returns_analytics_v78($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
     orange_admin_seed_company_sales_invoice_page_permissions($pdo);
@@ -5743,4 +5744,115 @@ function orange_catalog_migrate_country_gl_accounts_v49(PDO $pdo): void
             error_log('[orange] country_gl_accounts_v49 marker: ' . $e->getMessage());
         }
     }
+}
+
+/**
+ * v78 — أبعاد تحليل مردود المبيعات: مصدر الفاتورة، مرجع محفوظ، قناة تسويق، دولة.
+ */
+function orange_catalog_migrate_sales_returns_analytics_v78(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    require_once __DIR__ . '/sales_return_analytics.php';
+
+    $marker = 'php_sales_returns_analytics_v78';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (!orange_table_exists($pdo, 'sales_returns')) {
+        orange_catalog_schema_insert_migration_marker($pdo, $marker);
+
+        return;
+    }
+
+    if (!orange_table_has_column($pdo, 'sales_returns', 'source_kind')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE sales_returns ADD COLUMN source_kind VARCHAR(16) NULL DEFAULT NULL AFTER type'
+        );
+        orange_schema_invalidate_column_check('sales_returns', 'source_kind');
+    }
+    if (!orange_table_has_column($pdo, 'sales_returns', 'invoice_reference')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE sales_returns ADD COLUMN invoice_reference VARCHAR(80) NULL DEFAULT NULL AFTER source_kind'
+        );
+        orange_schema_invalidate_column_check('sales_returns', 'invoice_reference');
+    }
+    if (!orange_table_has_column($pdo, 'sales_returns', 'country_id')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE sales_returns ADD COLUMN country_id INT UNSIGNED NULL DEFAULT NULL AFTER invoice_reference'
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE INDEX idx_sales_returns_country_id ON sales_returns (country_id)'
+        );
+        orange_schema_invalidate_column_check('sales_returns', 'country_id');
+    }
+
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE INDEX idx_sales_returns_source_kind ON sales_returns (source_kind)'
+    );
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE INDEX idx_sales_returns_channel_id ON sales_returns (channel_id)'
+    );
+    if (orange_table_has_column($pdo, 'sales_returns', 'created_at')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE INDEX idx_sales_returns_created_at ON sales_returns (created_at)'
+        );
+    }
+
+    if (orange_table_exists($pdo, 'orders') && orange_table_has_column($pdo, 'sales_returns', 'order_id')) {
+        $hasInv = orange_table_has_column($pdo, 'orders', 'invoice_number');
+        $hasOrdNum = orange_table_has_column($pdo, 'orders', 'order_number');
+        $hasCh = orange_table_has_column($pdo, 'orders', 'channel_id');
+        $hasOs = orange_table_has_column($pdo, 'orders', 'order_source');
+        $hasOc = orange_table_has_country_id($pdo, 'orders');
+
+        $skExpr = $hasOs
+            ? "CASE
+                WHEN TRIM(COALESCE(o.invoice_number, '')) LIKE 'INV-O-%' THEN 'online'
+                WHEN TRIM(COALESCE(o.invoice_number, '')) LIKE 'INV-C-%' THEN 'company'
+                WHEN TRIM(COALESCE(o.order_source, '')) = 'company' THEN 'company'
+                ELSE 'online'
+               END"
+            : "'online'";
+        $invExpr = $hasInv
+            ? "COALESCE(NULLIF(TRIM(o.invoice_number), ''), "
+            . ($hasOrdNum ? "NULLIF(TRIM(o.order_number), ''), " : '')
+            . "CONCAT(IF({$skExpr} = 'company', 'INV-C', 'INV-O'), '-', o.id))"
+            : ($hasOrdNum
+                ? "COALESCE(NULLIF(TRIM(o.order_number), ''), CONCAT('INV-C-', o.id))"
+                : "CONCAT('INV-C-', o.id)");
+
+        $setParts = [];
+        if (orange_table_has_column($pdo, 'sales_returns', 'source_kind')) {
+            $setParts[] = 'sr.source_kind = ' . $skExpr;
+        }
+        if (orange_table_has_column($pdo, 'sales_returns', 'invoice_reference')) {
+            $setParts[] = 'sr.invoice_reference = ' . $invExpr;
+        }
+        if ($hasCh && orange_table_has_column($pdo, 'sales_returns', 'channel_id')) {
+            $setParts[] = 'sr.channel_id = COALESCE(sr.channel_id, o.channel_id)';
+        }
+        if ($hasOc && orange_table_has_column($pdo, 'sales_returns', 'country_id')) {
+            $setParts[] = 'sr.country_id = COALESCE(sr.country_id, o.country_id)';
+        }
+
+        if ($setParts !== []) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'UPDATE sales_returns sr
+                 INNER JOIN orders o ON o.id = sr.order_id
+                 SET ' . implode(', ', $setParts) . '
+                 WHERE sr.order_id IS NOT NULL'
+            );
+        }
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
 }

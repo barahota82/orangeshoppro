@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../../includes/journal_write.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/party_subledger.php';
 require_once __DIR__ . '/../../../includes/sales_return_helpers.php';
+require_once __DIR__ . '/../../../includes/sales_return_analytics.php';
 require_once __DIR__ . '/../../../includes/purchase_helpers.php';
 require_once __DIR__ . '/../../../includes/sales_gl_accounts.php';
 require_once __DIR__ . '/../../../includes/countries.php';
@@ -227,6 +228,9 @@ try {
         $notes !== '' ? $notes : null,
         $returnId,
     ]);
+
+    $updCountryId = $returnCountryLock > 0 ? $returnCountryLock : orange_admin_context_country_id($pdo);
+    orange_sales_return_sync_analytics_for_return($pdo, $returnId, $orderIdOpt, $updCountryId);
 
     orange_sales_return_remove_accounting($pdo, $returnId);
 

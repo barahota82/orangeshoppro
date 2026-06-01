@@ -72,6 +72,7 @@ $allowed = [
     'analytical_dimensions',
     'inventory_reconciliation',
     'reports',
+    'sales_returns_report',
     'financial_report',
     'logs',
     'channels',

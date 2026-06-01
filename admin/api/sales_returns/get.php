@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/countries.php';
+require_once __DIR__ . '/../../../includes/sales_return_analytics.php';
 require_admin_api();
 
 $pdo = db();
@@ -45,8 +46,11 @@ $it->execute([$returnId]);
 $items = $it->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
 $orderReference = '';
-if ($srOrderId > 0 && orange_table_exists($pdo, 'orders')) {
-    $oCols = 'id';
+if (orange_table_has_column($pdo, 'sales_returns', 'invoice_reference')) {
+    $orderReference = trim((string) ($header['invoice_reference'] ?? ''));
+}
+if ($orderReference === '' && $srOrderId > 0 && orange_table_exists($pdo, 'orders')) {
+    $oCols = 'id, order_source';
     if (orange_table_has_column($pdo, 'orders', 'invoice_number')) {
         $oCols .= ', invoice_number';
     }
@@ -57,8 +61,7 @@ if ($srOrderId > 0 && orange_table_exists($pdo, 'orders')) {
     $ost->execute([$srOrderId]);
     $orow = $ost->fetch(PDO::FETCH_ASSOC);
     if (is_array($orow)) {
-        $invNum = trim((string) ($orow['invoice_number'] ?? ''));
-        $orderReference = $invNum !== '' ? $invNum : ('INV-C-' . $srOrderId);
+        $orderReference = orange_sales_return_invoice_reference_from_order($orow, $srOrderId);
     }
 }
 
@@ -71,6 +74,7 @@ json_response([
             ? (int) $header['order_id']
             : 0,
         'order_reference' => $orderReference,
+        'source_kind' => (string) ($header['source_kind'] ?? ''),
         'type' => (string) ($header['type'] ?? 'cash'),
         'channel' => (string) ($header['type'] ?? 'cash'),
         'notes' => (string) ($header['notes'] ?? ''),
