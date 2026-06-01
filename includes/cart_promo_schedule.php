@@ -156,15 +156,18 @@ function orange_cart_promo_admin_auto_paused_alerts(PDO $pdo): array
         'cart_gift_promotions' => 'هدية مجموع السلة',
         'cart_bogo_promotions' => 'BOGO',
         'cart_combo_promotions' => 'كومبو',
+        'offers' => 'عرض منتج',
     ];
     $pageMap = [
         'cart_promotions' => 'cart_promotions',
         'cart_gift_promotions' => 'cart_gift_promotions',
         'cart_bogo_promotions' => 'cart_bogo_promotions',
         'cart_combo_promotions' => 'cart_combo_promotions',
+        'offers' => 'offers',
     ];
+    $tables = array_merge(orange_cart_promo_scheduled_tables(), ['offers']);
     $reasonIn = implode(',', array_map(static fn (string $r): string => $pdo->quote($r), orange_cart_promo_auto_pause_reasons()));
-    foreach (orange_cart_promo_scheduled_tables() as $table) {
+    foreach ($tables as $table) {
         if (!orange_table_exists($pdo, $table) || !orange_table_has_column($pdo, $table, 'auto_paused_reason')) {
             continue;
         }
@@ -198,7 +201,8 @@ function orange_cart_promo_admin_auto_paused_alerts(PDO $pdo): array
 
 function orange_cart_promo_clear_auto_pause(PDO $pdo, string $table, int $id): void
 {
-    if ($id <= 0 || !in_array($table, orange_cart_promo_scheduled_tables(), true)) {
+    $pausable = array_merge(orange_cart_promo_scheduled_tables(), ['offers']);
+    if ($id <= 0 || !in_array($table, $pausable, true)) {
         return;
     }
     if (!orange_table_exists($pdo, $table) || !orange_table_has_column($pdo, $table, 'auto_paused_at')) {
@@ -216,7 +220,8 @@ function orange_cart_promo_auto_pause_with_reason(PDO $pdo, string $table, int $
     if ($id <= 0 || !in_array($reason, orange_cart_promo_auto_pause_reasons(), true)) {
         return;
     }
-    if (!in_array($table, orange_cart_promo_scheduled_tables(), true)) {
+    $pausable = array_merge(orange_cart_promo_scheduled_tables(), ['offers']);
+    if (!in_array($table, $pausable, true)) {
         return;
     }
     if (!orange_table_exists($pdo, $table) || !orange_table_has_column($pdo, $table, 'auto_paused_at')) {

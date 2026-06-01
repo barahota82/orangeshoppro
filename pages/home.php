@@ -71,8 +71,13 @@ if ($canUnifiedProductSql) {
     WHERE p.is_active = 1' . $homeProductsCountrySql . '
     ORDER BY p.sort_order ASC, p.id ASC
 ';
+    require_once __DIR__ . '/../includes/product_offers.php';
+    orange_product_offer_sync_all_stock_pauses($pdo, $sfHomeCountryId);
+    $offersScheduleSql = orange_table_has_column($pdo, 'offers', 'valid_from')
+        ? orange_product_offer_storefront_sql('o')
+        : '';
     $offersSql = '
-    SELECT o.discount,
+    SELECT o.id AS offer_id, o.discount,
            p.*, ucs2.department_id AS uf_dept_id, ucc.id AS uf_cat_id, ucs.id AS uf_sub_id
     FROM offers o
     INNER JOIN products p ON p.id = o.product_id
@@ -81,7 +86,7 @@ if ($canUnifiedProductSql) {
     INNER JOIN catalog_categories ucc ON ucc.id = ucs.catalog_category_id AND ucc.is_active = 1
     INNER JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id AND ucs2.is_active = 1
     INNER JOIN departments d ON d.id = ucs2.department_id AND (' . $homeDeptActiveSql . ')
-    WHERE o.is_active = 1 AND p.is_active = 1' . $homeProductsCountrySql . '
+    WHERE o.is_active = 1 AND p.is_active = 1' . $offersScheduleSql . $homeProductsCountrySql . '
     ORDER BY p.sort_order ASC, p.id ASC, o.id ASC
 ';
 } else {
