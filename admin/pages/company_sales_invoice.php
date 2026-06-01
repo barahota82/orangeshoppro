@@ -36,7 +36,7 @@ $sv2PickRows = orange_sales_doc_product_pick_rows($pdo, $adminCountryId);
 $channels = $pdo->query(
     'SELECT id, name FROM channels WHERE is_active = 1' . $sv2ChannelsCountrySql . ' ORDER BY id ASC'
 )->fetchAll(PDO::FETCH_ASSOC);
-$sv2DefaultChannelId = orange_admin_default_sales_channel_id($pdo, $adminCountryId);
+$sv2DefaultChannelId = orange_sales_company_direct_channel_id();
 
 $sv2CustomerPickRows = [];
 if (orange_table_exists($pdo, 'customers')) {
@@ -278,13 +278,10 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         <div>
             <label for="sv2_channel">قناة العملاء</label>
             <select id="sv2_channel" required>
-                <?php if ($channels === []): ?>
-                <option value="">— لا قنوات —</option>
-                <?php else: ?>
+                <option value="0"<?php echo $sv2DefaultChannelId === 0 ? ' selected' : ''; ?>><?php echo htmlspecialchars(orange_sales_company_direct_channel_label(), ENT_QUOTES, 'UTF-8'); ?></option>
                 <?php foreach ($channels as $ch): ?>
                 <option value="<?php echo (int) $ch['id']; ?>"<?php echo (int) $ch['id'] === $sv2DefaultChannelId ? ' selected' : ''; ?>><?php echo htmlspecialchars((string) $ch['name'], ENT_QUOTES, 'UTF-8'); ?></option>
                 <?php endforeach; ?>
-                <?php endif; ?>
             </select>
         </div>
         <div>
@@ -484,6 +481,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
                         <label for="sv2_search_channel">القناة</label>
                         <select id="sv2_search_channel" class="admin-inp">
                             <option value="">— الكل —</option>
+                            <option value="0"><?php echo htmlspecialchars(orange_sales_company_direct_channel_label(), ENT_QUOTES, 'UTF-8'); ?></option>
                             <?php foreach ($channels as $ch): ?>
                             <option value="<?php echo (int) $ch['id']; ?>"><?php echo htmlspecialchars((string) $ch['name'], ENT_QUOTES, 'UTF-8'); ?></option>
                             <?php endforeach; ?>
@@ -1195,7 +1193,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         var addrEl = document.getElementById('sv2_address');
         if (addrEl) addrEl.value = inv.address || '';
         var chEl = document.getElementById('sv2_channel');
-        if (chEl && inv.channel_id) chEl.value = String(inv.channel_id);
+        if (chEl) chEl.value = String(inv.channel_id != null && inv.channel_id !== '' ? inv.channel_id : 0);
         var ptEl = document.getElementById('sv2_payment_terms');
         if (ptEl) ptEl.value = inv.payment_terms || 'cash';
         var paidEl = document.getElementById('sv2_amount_paid');
@@ -1273,7 +1271,9 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         var ref = (document.getElementById('sv2_search_ref').value || '').trim();
         var customer = (document.getElementById('sv2_search_customer').value || '').trim();
         var phone = (document.getElementById('sv2_search_phone').value || '').trim();
-        var channelId = parseInt(document.getElementById('sv2_search_channel').value, 10) || 0;
+        var channelSel = document.getElementById('sv2_search_channel');
+        var channelRaw = channelSel ? channelSel.value : '';
+        var channelId = channelRaw === '' ? -1 : (parseInt(channelRaw, 10) || 0);
         var notes = (document.getElementById('sv2_search_notes').value || '').trim();
         var tbody = document.getElementById('sv2_search_results');
         tbody.innerHTML = '<tr><td colspan="6">جاري البحث…</td></tr>';
@@ -1285,7 +1285,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         if (ref) payload.reference = ref;
         if (customer) payload.customer_name = customer;
         if (phone) payload.phone = phone;
-        if (channelId > 0) payload.channel_id = channelId;
+        if (channelId >= 0) payload.channel_id = channelId;
         if (notes) payload.notes = notes;
         postJSON('/admin/api/sales-invoices/browse.php', payload).then(function (r) {
             tbody.innerHTML = '';
@@ -1337,8 +1337,8 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             alert('اكتب الهاتف كرقم محلي فقط بدون + أو 00');
             return;
         }
-        var channel = parseInt(document.getElementById('sv2_channel').value, 10) || 0;
-        if (!channel) { alert('اختر قناة العملاء'); return; }
+        var channel = parseInt(document.getElementById('sv2_channel').value, 10);
+        if (isNaN(channel) || channel < 0) { alert('اختر قناة العملاء'); return; }
 
         var tb = document.getElementById('sv2_lines_body');
         if (!tb) { alert('لا توجد أصناف'); return; }
@@ -1387,7 +1387,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
                 alert((res && res.message) || 'فشل');
                 return;
             }
-            if (window.orangeSalesDocUi) {
+            if (window.orangeSalesDocUi && channel > 0) {
                 window.orangeSalesDocUi.rememberChannel(SV2_COUNTRY_ID, channel);
             }
             if (typeof orangeAdminOfferOpenGlVoucherAfterSave === 'function') {
@@ -1538,12 +1538,9 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
 
         sv2SyncToolbar();
 
-        if (window.orangeSalesDocUi && browseOrderId <= 0 && SV2_PREFILL_ORDER_ID <= 0) {
-            window.orangeSalesDocUi.applyDefaultChannel(
-                document.getElementById('sv2_channel'),
-                SV2_COUNTRY_ID,
-                SV2_DEFAULT_CHANNEL_ID
-            );
+        var chSel = document.getElementById('sv2_channel');
+        if (chSel && browseOrderId <= 0 && SV2_PREFILL_ORDER_ID <= 0 && !chSel.value) {
+            chSel.value = '0';
         }
 
         if (window.OrangeEditLock) {

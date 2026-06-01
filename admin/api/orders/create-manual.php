@@ -16,6 +16,7 @@ require_once __DIR__ . '/../../../includes/currency.php';
 require_once __DIR__ . '/../../../includes/warehouses.php';
 require_once __DIR__ . '/../../../includes/invoice_ancillary_lines.php';
 require_once __DIR__ . '/../../../includes/sales_invoice_company.php';
+require_once __DIR__ . '/../../../includes/sales_doc_channel.php';
 require_admin_api();
 
 try {
@@ -23,7 +24,7 @@ try {
     orange_catalog_ensure_schema($pdo);
     $data = get_json_input();
 
-    require_fields($data, ['customer_name', 'phone', 'channel_id', 'items']);
+    require_fields($data, ['customer_name', 'phone', 'items']);
     $phoneRawIn = trim((string) ($data['phone'] ?? ''));
     $ctxDial = orange_admin_context_phone_dial($pdo);
     $phoneCountryRaw = trim((string) ($data['phone_country'] ?? ''));
@@ -87,20 +88,22 @@ try {
         }
     }
 
-    $channelId = (int) $data['channel_id'];
-    try {
-        orange_admin_assert_row_country($pdo, 'channels', $channelId);
-    } catch (RuntimeException $e) {
-        json_response(['success' => false, 'message' => $e->getMessage()], 403);
+    $channelId = (int) ($data['channel_id'] ?? 0);
+    if ($channelId > 0) {
+        try {
+            orange_admin_assert_row_country($pdo, 'channels', $channelId);
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 403);
+        }
+
+        $channelStmt = $pdo->prepare('SELECT id FROM channels WHERE id = ? AND is_active = 1 LIMIT 1');
+        $channelStmt->execute([$channelId]);
+        if (!$channelStmt->fetchColumn()) {
+            json_response(['success' => false, 'message' => 'قناة غير صالحة'], 422);
+        }
     }
 
-    $channelStmt = $pdo->prepare('SELECT id FROM channels WHERE id = ? AND is_active = 1 LIMIT 1');
-    $channelStmt->execute([$channelId]);
-    if (!$channelStmt->fetchColumn()) {
-        json_response(['success' => false, 'message' => 'قناة غير صالحة'], 422);
-    }
-
-    $orderCountryId = orange_country_id_for_channel($pdo, $channelId);
+    $orderCountryId = orange_sales_order_country_id_for_channel($pdo, $channelId);
     $orderWarehouseId = orange_warehouse_default_id_for_country($pdo, $orderCountryId);
 
     $pdo->beginTransaction();
@@ -198,7 +201,7 @@ try {
         trim((string)($data['area'] ?? '')),
         trim((string)($data['address'] ?? '')),
         trim((string)($data['notes'] ?? '')),
-        (int)$data['channel_id'],
+        $channelId > 0 ? $channelId : null,
         $total,
     ];
     if ($hasSource) {

@@ -18,6 +18,7 @@ require_once __DIR__ . '/../../../includes/invoice_ancillary_lines.php';
 require_once __DIR__ . '/../../../includes/edit_lock.php';
 require_once __DIR__ . '/../../../includes/journal_voucher.php';
 require_once __DIR__ . '/../../../includes/gl_settings.php';
+require_once __DIR__ . '/../../../includes/sales_doc_channel.php';
 require_admin_api();
 
 try {
@@ -114,18 +115,17 @@ try {
     }
 
     $channelId = isset($data['channel_id']) ? (int) $data['channel_id'] : (int) ($order['channel_id'] ?? 0);
-    if ($channelId <= 0) {
-        json_response(['success' => false, 'message' => 'قناة العملاء مطلوبة'], 422);
-    }
-    try {
-        orange_admin_assert_row_country($pdo, 'channels', $channelId);
-    } catch (RuntimeException $e) {
-        json_response(['success' => false, 'message' => $e->getMessage()], 403);
-    }
-    $chSt = $pdo->prepare('SELECT id FROM channels WHERE id = ? AND is_active = 1 LIMIT 1');
-    $chSt->execute([$channelId]);
-    if (!$chSt->fetchColumn()) {
-        json_response(['success' => false, 'message' => 'قناة غير صالحة'], 422);
+    if ($channelId > 0) {
+        try {
+            orange_admin_assert_row_country($pdo, 'channels', $channelId);
+        } catch (RuntimeException $e) {
+            json_response(['success' => false, 'message' => $e->getMessage()], 403);
+        }
+        $chSt = $pdo->prepare('SELECT id FROM channels WHERE id = ? AND is_active = 1 LIMIT 1');
+        $chSt->execute([$channelId]);
+        if (!$chSt->fetchColumn()) {
+            json_response(['success' => false, 'message' => 'قناة غير صالحة'], 422);
+        }
     }
 
     $paymentTerms = orange_normalize_payment_terms(
@@ -178,7 +178,7 @@ try {
         'channel_id = ?',
         'total = ?',
     ];
-    $params = [$customerName, $phoneNorm, $area, $address, $notes, $channelId, $total];
+    $params = [$customerName, $phoneNorm, $area, $address, $notes, $channelId > 0 ? $channelId : null, $total];
 
     if (orange_table_has_column($pdo, 'orders', 'payment_terms')) {
         $sets[] = 'payment_terms = ?';

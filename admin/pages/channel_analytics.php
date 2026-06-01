@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
+require_once __DIR__ . '/../../includes/sales_doc_channel.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -96,6 +97,27 @@ if ($toOk) {
 $stOr = $pdo->prepare($orphanSql);
 $stOr->execute($orphanParams);
 $orphan = $stOr->fetch(PDO::FETCH_ASSOC) ?: ['cnt_all' => 0, 'cnt_completed' => 0, 'revenue_completed' => 0];
+
+$companyDirectSql = '
+    SELECT
+        COUNT(*) AS cnt_all,
+        SUM(CASE WHEN status = \'completed\' THEN 1 ELSE 0 END) AS cnt_completed,
+        COALESCE(SUM(CASE WHEN status = \'completed\' THEN total END), 0) AS revenue_completed
+    FROM orders o
+    WHERE 1=1' . orange_sales_company_direct_orders_sql($pdo, 'o') . $caOrdersCountrySql;
+$companyDirectParams = [];
+if ($fromOk) {
+    $companyDirectSql .= ' AND o.created_at >= ?';
+    $companyDirectParams[] = $fromYmd . ' 00:00:00';
+}
+if ($toOk) {
+    $companyDirectSql .= ' AND o.created_at <= ?';
+    $companyDirectParams[] = $toYmd . ' 23:59:59';
+}
+$stCo = $pdo->prepare($companyDirectSql);
+$stCo->execute($companyDirectParams);
+$companyDirect = $stCo->fetch(PDO::FETCH_ASSOC) ?: ['cnt_all' => 0, 'cnt_completed' => 0, 'revenue_completed' => 0];
+$companyInvoiceUrl = storefront_public_path('/admin/index.php?page=company_sales_invoice');
 
 $topSql = '
     SELECT o.channel_id, oi.product_name, SUM(oi.qty) AS qty_sum,
@@ -224,10 +246,25 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
     <?php endif; ?>
 </div>
 
-<?php if ((int) ($orphan['cnt_all'] ?? 0) > 0): ?>
 <div class="card">
-    <h3 class="card-title">طلبات بلا قناة</h3>
-    <p class="card-hint">طلبات لا تحمل <code>channel_id</code> — راجع تسجيل الطلب أو التوجيه من المتجر.</p>
+    <h3 class="card-title">مبيعات <?php echo htmlspecialchars(orange_sales_company_direct_channel_label(), ENT_QUOTES, 'UTF-8'); ?> المباشرة (فواتير INV-C بدون قناة)</h3>
+    <p class="card-hint">
+        طلبات فاتورة الشركة (<code>order_source = company</code>) بدون <code>channel_id</code> — من شاشة
+        <a href="<?php echo htmlspecialchars($companyInvoiceUrl, ENT_QUOTES, 'UTF-8'); ?>">فاتورة مبيعات الشركة</a>
+        عند اختيار قناة «<?php echo htmlspecialchars(orange_sales_company_direct_channel_label(), ENT_QUOTES, 'UTF-8'); ?>».
+    </p>
+    <ul style="line-height:1.7;">
+        <li>إجمالي الطلبات: <strong><?php echo (int) ($companyDirect['cnt_all'] ?? 0); ?></strong></li>
+        <li>مكتملة: <strong><?php echo (int) ($companyDirect['cnt_completed'] ?? 0); ?></strong></li>
+        <li>إيراد مكتمل: <strong><?php echo orange_format_money_for_context($caMoney, (float) ($companyDirect['revenue_completed'] ?? 0)); ?></strong></li>
+    </ul>
+    <p><a class="btn btn-secondary" href="<?php echo htmlspecialchars($companyInvoiceUrl, ENT_QUOTES, 'UTF-8'); ?>">فاتورة مبيعات الشركة</a></p>
+</div>
+
+<?php if ((int) ($orphan['cnt_all'] ?? 0) > (int) ($companyDirect['cnt_all'] ?? 0)): ?>
+<div class="card">
+    <h3 class="card-title">طلبات بلا قناة (أخرى)</h3>
+    <p class="card-hint">كل الطلبات بدون <code>channel_id</code> في الفترة — قد تشمل مصادر غير فاتورة الشركة المباشرة أعلاه.</p>
     <ul style="line-height:1.7;">
         <li>إجمالي الطلبات: <strong><?php echo (int) $orphan['cnt_all']; ?></strong></li>
         <li>مكتملة: <strong><?php echo (int) $orphan['cnt_completed']; ?></strong></li>

@@ -61,3 +61,61 @@ function orange_admin_default_sales_channel_id(PDO $pdo, int $countryId): int
         return 0;
     }
 }
+
+/**
+ * فاتورة شركة بدون قناة تسويق (مبيعات مباشرة) — channel_id = 0 / NULL في orders.
+ */
+function orange_sales_company_direct_channel_id(): int
+{
+    return 0;
+}
+
+function orange_sales_company_direct_channel_label(): string
+{
+    return 'الشركة';
+}
+
+function orange_sales_is_company_direct_channel(?int $channelId): bool
+{
+    return $channelId === null || (int) $channelId <= 0;
+}
+
+function orange_sales_order_channel_label(?int $channelId, ?string $channelNameFromDb = null): string
+{
+    if (orange_sales_is_company_direct_channel($channelId)) {
+        return orange_sales_company_direct_channel_label();
+    }
+    $name = trim((string) ($channelNameFromDb ?? ''));
+
+    return $name !== '' ? $name : '—';
+}
+
+/**
+ * دولة الطلب عند الحفظ: من القناة إن وُجدت، وإلا سياق الأدمن (مبيعات شركة مباشرة).
+ */
+function orange_sales_order_country_id_for_channel(PDO $pdo, int $channelId): int
+{
+    if ($channelId > 0) {
+        return orange_country_id_for_channel($pdo, $channelId);
+    }
+    $ctx = orange_admin_context_country_id($pdo);
+    if ($ctx > 0) {
+        return $ctx;
+    }
+
+    return orange_countries_default_id($pdo);
+}
+
+/**
+ * SQL fragment: طلبات فاتورة شركة مباشرة (بدون channel_id).
+ */
+function orange_sales_company_direct_orders_sql(PDO $pdo, string $alias = 'o'): string
+{
+    $sql = '';
+    if (orange_table_has_column($pdo, 'orders', 'order_source')) {
+        $sql .= " AND {$alias}.order_source = 'company'";
+    }
+    $sql .= " AND ({$alias}.channel_id IS NULL OR {$alias}.channel_id = 0)";
+
+    return $sql;
+}

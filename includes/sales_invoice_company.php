@@ -17,6 +17,7 @@ require_once __DIR__ . '/party_subledger.php';
 require_once __DIR__ . '/date_format.php';
 require_once __DIR__ . '/admin_permissions.php';
 require_once __DIR__ . '/warehouses.php';
+require_once __DIR__ . '/sales_doc_channel.php';
 
 /**
  * @return array{sql:string,params:list<mixed>}|null
@@ -72,6 +73,11 @@ function orange_sales_invoice_company_load_order(PDO $pdo, int $orderId): array
     if (!$order) {
         throw new RuntimeException('الفاتورة غير موجودة', 404);
     }
+
+    $order['channel_name'] = orange_sales_order_channel_label(
+        isset($order['channel_id']) ? (int) $order['channel_id'] : 0,
+        (string) ($order['channel_name'] ?? '')
+    );
 
     orange_admin_assert_entity_country($pdo, 'orders', $orderId);
 
