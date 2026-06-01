@@ -32,6 +32,55 @@ function orange_sequence_next(PDO $pdo, string $scope, ?int $countryId = null): 
 }
 
 /**
+ * قراءة التسلسل التالي دون استهلاكه — للمعاينة على الشاشة فقط.
+ */
+function orange_sequence_peek_next(PDO $pdo, string $scope, ?int $countryId = null): int
+{
+    orange_catalog_ensure_schema($pdo);
+    if (!orange_table_exists($pdo, 'document_sequences')) {
+        return 1;
+    }
+    $scope = preg_replace('/[^a-zA-Z0-9_\-]/', '', $scope);
+    if ($scope === '') {
+        return 1;
+    }
+    if ($countryId !== null && $countryId > 0) {
+        $scope .= '_c' . (int) $countryId;
+    }
+    $st = $pdo->prepare('SELECT last_value FROM document_sequences WHERE scope = ? LIMIT 1');
+    $st->execute([$scope]);
+    $last = (int) $st->fetchColumn();
+
+    return $last > 0 ? $last + 1 : 1;
+}
+
+/**
+ * معاينة رقم فاتورة مبيعات (INV-C / INV-O) قبل الحفظ — parity purchases PUR preview.
+ *
+ * @param 'company'|'online' $kind
+ */
+function orange_sales_invoice_ref_preview(PDO $pdo, string $kind, ?int $countryId = null): string
+{
+    require_once __DIR__ . '/countries.php';
+    if ($countryId === null || $countryId <= 0) {
+        $countryId = orange_admin_context_country_id($pdo);
+    }
+    $kind = strtolower(trim($kind));
+    $scope = $kind === 'online' ? 'sales_invoice_online' : 'sales_invoice_company';
+    $prefix = $kind === 'online' ? 'INV-O' : 'INV-C';
+    $code = 'KW';
+    if ($countryId > 0) {
+        $row = orange_country_row_by_id($pdo, $countryId, false);
+        if (is_array($row)) {
+            $code = orange_countries_normalize_code((string) ($row['code'] ?? 'KW'));
+        }
+    }
+    $next = orange_sequence_peek_next($pdo, $scope, $countryId > 0 ? $countryId : null);
+
+    return $prefix . '-' . $code . '-' . str_pad((string) $next, 6, '0', STR_PAD_LEFT);
+}
+
+/**
  * تنسيق فاتورة مبيعات INV-C / INV-O مع كود الدولة (§13.5.7.2).
  */
 function orange_format_sales_invoice_number(PDO $pdo, string $kind, int $countryId): string

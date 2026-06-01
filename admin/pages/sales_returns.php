@@ -110,11 +110,41 @@ $sr2DocSerialPreview = $sr2NavReady
 .form-grid.sr2-header-row2 {
     grid-template-columns: minmax(6.5rem, 0.65fr) auto minmax(0, 1.5fr) minmax(5.5rem, 0.65fr);
 }
+.form-grid.sr2-header-row2 input[type="text"] {
+    height: var(--input-min-h);
+    min-height: var(--input-min-h);
+    box-sizing: border-box;
+}
+.sr2-header-row2__action {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-width: 0;
+}
+.sr2-header-row2__action-label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 13px;
+    visibility: hidden;
+    line-height: 1.2;
+}
+.sr2-header-row2__action .btn-secondary {
+    white-space: nowrap;
+    min-height: var(--input-min-h);
+    box-sizing: border-box;
+    padding-inline: 14px;
+}
+.form-grid.sr2-header-row2 select {
+    height: var(--input-min-h);
+    min-height: var(--input-min-h);
+    box-sizing: border-box;
+    padding-block: 0;
+    padding-inline: 0.65rem 2rem;
+    line-height: var(--input-min-h);
+}
 .form-grid.sr2-customer-row {
     grid-template-columns: minmax(7rem, 0.75fr) minmax(0, 1fr) minmax(0, 2fr) minmax(5rem, 0.55fr);
 }
-.sr2-header-row2__action { display: flex; flex-direction: column; justify-content: flex-end; min-width: 0; }
-.sr2-header-row2__action-label { display: block; margin-bottom: 5px; font-size: 13px; visibility: hidden; line-height: 1.2; }
 </style>
 
 <div class="page-title page-title--stacked">
@@ -168,8 +198,9 @@ $sr2DocSerialPreview = $sr2NavReady
 
     <div class="form-grid sr2-header-row2" style="margin-bottom:16px;">
         <div>
-            <label for="sr2_order_ref">طلب / فاتورة مرجعية</label>
+            <label for="sr2_order_ref">فاتورة المبيعات المرجعية</label>
             <input type="text" id="sr2_order_ref" placeholder="INV-C- أو رقم" dir="ltr" lang="en" autocomplete="off"<?php echo !$sr2Ready ? ' disabled' : ''; ?>>
+            <input type="hidden" id="sr2_order_id" value="0">
         </div>
         <div class="sr2-header-row2__action">
             <span class="sr2-header-row2__action-label" aria-hidden="true">.</span>
@@ -630,6 +661,17 @@ $sr2DocSerialPreview = $sr2NavReady
         return 0;
     }
 
+    function sr2ResolvedOrderId() {
+        var hid = parseInt(document.getElementById('sr2_order_id').value, 10) || 0;
+        if (hid > 0) return hid;
+        return parseOrderRef(document.getElementById('sr2_order_ref').value || '');
+    }
+
+    function sr2ClearOrderLink() {
+        var hid = document.getElementById('sr2_order_id');
+        if (hid) hid.value = '0';
+    }
+
     function sr2SetDocSerial(value) {
         var el = document.getElementById('sr2_doc_serial');
         if (el) el.value = String(value || '');
@@ -678,8 +720,11 @@ $sr2DocSerialPreview = $sr2NavReady
             return;
         }
         var o = res.order;
+        var oid = parseInt(String(o.id || '0'), 10) || 0;
+        var hid = document.getElementById('sr2_order_id');
+        if (hid) hid.value = oid > 0 ? String(oid) : '0';
         var refEl = document.getElementById('sr2_order_ref');
-        if (refEl) refEl.value = o.reference || ('INV-C-' + (o.id || ''));
+        if (refEl) refEl.value = o.reference || (oid > 0 ? ('INV-C-' + oid) : '');
         if (parseInt(String(o.customer_id || '0'), 10) > 0) {
             selectCustomer(parseInt(String(o.customer_id), 10));
         }
@@ -691,7 +736,7 @@ $sr2DocSerialPreview = $sr2NavReady
             tb.innerHTML = '';
             var items = res.items || [];
             if (!items.length) {
-                alert('لا توجد كميات متبقية للإرجاع');
+                alert('لا توجد كميات متبقية للإرجاع من هذه الفاتورة');
                 addLine();
             } else {
                 items.forEach(function (item) {
@@ -707,14 +752,14 @@ $sr2DocSerialPreview = $sr2NavReady
 
     function sr2RetrieveFromOrder() {
         if (!SR2_READY || sr2ViewMode) return;
-        var orderId = parseOrderRef(document.getElementById('sr2_order_ref').value || '');
-        if (orderId <= 0) {
-            alert('أدخل رقم طلب أو فاتورة صالحاً (INV-C- أو رقم).');
+        var refRaw = (document.getElementById('sr2_order_ref').value || '').trim();
+        if (!refRaw) {
+            alert('أدخل رقم فاتورة مبيعات صالحاً (INV-C- أو رقم) في خانة فاتورة المبيعات المرجعية.');
             return;
         }
         var btn = document.getElementById('sr2_btn_retrieve');
         if (btn) btn.disabled = true;
-        fetch('/admin/api/sales_returns/retrieve_from_order.php?order_id=' + encodeURIComponent(String(orderId)), {
+        fetch('/admin/api/sales_returns/retrieve_from_order.php?reference=' + encodeURIComponent(refRaw), {
             credentials: 'same-origin',
             headers: { 'Accept': 'application/json' }
         }).then(function (r) { return r.json(); }).then(function (res) {
@@ -745,10 +790,14 @@ $sr2DocSerialPreview = $sr2NavReady
         sr2OnChannelChange();
         var notesEl = document.getElementById('sr2_notes');
         if (notesEl) notesEl.value = p.notes || '';
+        var oid = parseInt(String(p.order_id || '0'), 10) || 0;
+        var hid = document.getElementById('sr2_order_id');
+        if (hid) hid.value = oid > 0 ? String(oid) : '0';
         var refEl = document.getElementById('sr2_order_ref');
         if (refEl) {
-            var oid = parseInt(String(p.order_id || '0'), 10) || 0;
-            refEl.value = oid > 0 ? ('INV-C-' + oid) : '';
+            refEl.value = (p.order_reference && String(p.order_reference).trim() !== '')
+                ? String(p.order_reference)
+                : (oid > 0 ? ('INV-C-' + oid) : '');
         }
         var tb = document.getElementById('sr2_lines_body');
         if (tb) {
@@ -858,7 +907,11 @@ $sr2DocSerialPreview = $sr2NavReady
         if (!SR2_READY || sr2ViewMode) return;
         var channel = document.getElementById('sr2_channel').value;
         var customerId = parseInt(document.getElementById('sr2_customer_id').value, 10) || 0;
-        var orderId = parseOrderRef(document.getElementById('sr2_order_ref').value || '');
+        var orderId = sr2ResolvedOrderId();
+        if (orderId <= 0) {
+            alert('أدخل فاتورة مبيعات مرجعية صالحة أو استخدم «استرجاع» لتحميل البنود.');
+            return;
+        }
         var notes = (document.getElementById('sr2_notes').value || '').trim();
         if (channel === 'credit' && customerId <= 0) {
             alert('مردود الآجل يتطلّب عميلاً.');
@@ -972,6 +1025,18 @@ $sr2DocSerialPreview = $sr2NavReady
         document.getElementById('sr2_btn_save').addEventListener('click', save);
         document.getElementById('sr2_btn_new').addEventListener('click', sr2ResetNew);
         document.getElementById('sr2_btn_retrieve').addEventListener('click', sr2RetrieveFromOrder);
+        var orderRefEl = document.getElementById('sr2_order_ref');
+        if (orderRefEl) {
+            orderRefEl.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    sr2RetrieveFromOrder();
+                }
+            });
+            orderRefEl.addEventListener('input', function () {
+                sr2ClearOrderLink();
+            });
+        }
         if (window.orangeSalesDocUi) {
             window.orangeSalesDocUi.bindPrintButton('sr2_btn_print', {
                 prefix: 'sr2',

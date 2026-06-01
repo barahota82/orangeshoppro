@@ -44,6 +44,24 @@ $it = $pdo->prepare(
 $it->execute([$returnId]);
 $items = $it->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
+$orderReference = '';
+if ($srOrderId > 0 && orange_table_exists($pdo, 'orders')) {
+    $oCols = 'id';
+    if (orange_table_has_column($pdo, 'orders', 'invoice_number')) {
+        $oCols .= ', invoice_number';
+    }
+    if (orange_table_has_column($pdo, 'orders', 'order_number')) {
+        $oCols .= ', order_number';
+    }
+    $ost = $pdo->prepare("SELECT $oCols FROM orders WHERE id = ? LIMIT 1");
+    $ost->execute([$srOrderId]);
+    $orow = $ost->fetch(PDO::FETCH_ASSOC);
+    if (is_array($orow)) {
+        $invNum = trim((string) ($orow['invoice_number'] ?? ''));
+        $orderReference = $invNum !== '' ? $invNum : ('INV-C-' . $srOrderId);
+    }
+}
+
 json_response([
     'success' => true,
     'sales_return' => [
@@ -52,6 +70,7 @@ json_response([
         'order_id' => isset($header['order_id']) && $header['order_id'] !== null
             ? (int) $header['order_id']
             : 0,
+        'order_reference' => $orderReference,
         'type' => (string) ($header['type'] ?? 'cash'),
         'channel' => (string) ($header['type'] ?? 'cash'),
         'notes' => (string) ($header['notes'] ?? ''),

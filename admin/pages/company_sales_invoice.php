@@ -14,6 +14,7 @@ require_once __DIR__ . '/../../includes/invoice_ancillary_lines.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/sales_doc_channel.php';
 require_once __DIR__ . '/../../includes/sales_doc_print.php';
+require_once __DIR__ . '/../../includes/document_sequences.php';
 
 $pdo = orange_admin_page_pdo();
 $sv2Caps = orange_admin_caps_for_page($admin, $pdo, 'company_sales_invoice');
@@ -67,6 +68,9 @@ if (orange_table_exists($pdo, 'customers')) {
 $prefillOrderId = (int) ($_GET['order_id'] ?? 0);
 $sv2Ready = $sv2PickRows !== [] && $channels !== [];
 $sv2NavReady = orange_table_exists($pdo, 'orders');
+$sv2DocSerialPreview = $sv2NavReady
+    ? orange_sales_invoice_ref_preview($pdo, 'company', $adminCountryId)
+    : '';
 $sv2SalesLineKinds = [];
 foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kindMeta) {
     $sv2SalesLineKinds[] = [
@@ -205,7 +209,8 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         <div>
             <label for="sv2_doc_serial">مسلسل الفاتورة</label>
             <input type="text" id="sv2_doc_serial" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en"
-                value="جديد" title="يُخصَّص تلقائياً عند الحفظ">
+                value="<?php echo htmlspecialchars($sv2DocSerialPreview, ENT_QUOTES, 'UTF-8'); ?>"
+                title="يُخصَّص تلقائياً من النظام عند الحفظ">
         </div>
         <div>
             <label for="sv2_customer_code">كود العميل</label>
@@ -501,6 +506,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     var SV2_READY = <?php echo $sv2Ready ? 'true' : 'false'; ?>;
     var SV2_NAV_READY = <?php echo $sv2NavReady ? 'true' : 'false'; ?>;
     var SV2_COUNTRY_ID = <?php echo (int) $adminCountryId; ?>;
+    var SV2_DOC_SERIAL_PREVIEW = <?php echo json_encode($sv2DocSerialPreview, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var SV2_DEFAULT_CHANNEL_ID = <?php echo (int) $sv2DefaultChannelId; ?>;
     var SV2_CAPS = <?php echo json_encode($sv2Caps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
     var SV2_SALES_LINE_KINDS = <?php echo json_encode($sv2SalesLineKinds, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
@@ -1118,7 +1124,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
                 ? ('— عرض ' + (document.getElementById('sv2_doc_serial') && document.getElementById('sv2_doc_serial').value || ('INV-C-' + browseOrderId)))
                 : '';
         }
-        if (browseOrderId <= 0) sv2SetDocSerial('جديد');
+        if (browseOrderId <= 0) sv2SetDocSerial(SV2_DOC_SERIAL_PREVIEW || '');
         if (sv2EditLockCtl) sv2EditLockCtl.refresh();
     }
 
