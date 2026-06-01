@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../../includes/cart_combo_promotions.php';
 require_once __DIR__ . '/../../../includes/cart_promo_products.php';
 require_once __DIR__ . '/../../../includes/cart_promotion_country.php';
+require_once __DIR__ . '/../../../includes/cart_promo_schedule.php';
 require_admin_api();
 
 /**
@@ -60,6 +61,15 @@ try {
         $reqReg = !empty($data['requires_registered_account']) ? 1 : 0;
         $sortOrder = (int) ($data['sort_order'] ?? 0);
         $isActive = !empty($data['is_active']) ? 1 : 0;
+        $dateErr = null;
+        $bounds = orange_cart_promo_parse_required_admin_dates(
+            trim((string) ($data['valid_from'] ?? '')),
+            trim((string) ($data['valid_to'] ?? '')),
+            $dateErr
+        );
+        if ($bounds === null) {
+            json_response(['success' => false, 'message' => $dateErr ?? 'تواريخ العرض غير صالحة'], 422);
+        }
         $comps = ccp_parse_components_save($pdo, $data);
 
         if (count($comps) < 2) {
@@ -91,15 +101,38 @@ try {
         }
 
         if ($id > 0) {
+            orange_cart_promo_clear_auto_pause($pdo, 'cart_combo_promotions', $id);
             $st = $pdo->prepare(
-                'UPDATE cart_combo_promotions SET title_ar = ?, title_en = ?, components_json = ?, combo_price = ?, requires_registered_account = ?, sort_order = ?, is_active = ? WHERE id = ?'
+                'UPDATE cart_combo_promotions SET title_ar = ?, title_en = ?, components_json = ?, combo_price = ?, requires_registered_account = ?, sort_order = ?, is_active = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL WHERE id = ?'
             );
-            $st->execute([$titleAr, $titleEn, $json, $comboPrice, $reqReg, $sortOrder, $isActive, $id]);
+            $st->execute([
+                $titleAr,
+                $titleEn,
+                $json,
+                $comboPrice,
+                $reqReg,
+                $sortOrder,
+                $isActive,
+                $bounds['valid_from'],
+                $bounds['valid_to'],
+                $id,
+            ]);
         } else {
             $st = $pdo->prepare(
-                'INSERT INTO cart_combo_promotions (country_id, title_ar, title_en, components_json, combo_price, requires_registered_account, sort_order, is_active) VALUES (?,?,?,?,?,?,?,?)'
+                'INSERT INTO cart_combo_promotions (country_id, title_ar, title_en, components_json, combo_price, requires_registered_account, sort_order, is_active, valid_from, valid_to) VALUES (?,?,?,?,?,?,?,?,?,?)'
             );
-            $st->execute([$insertCountryId, $titleAr, $titleEn, $json, $comboPrice, $reqReg, $sortOrder, $isActive]);
+            $st->execute([
+                $insertCountryId,
+                $titleAr,
+                $titleEn,
+                $json,
+                $comboPrice,
+                $reqReg,
+                $sortOrder,
+                $isActive,
+                $bounds['valid_from'],
+                $bounds['valid_to'],
+            ]);
         }
 
         json_response(['success' => true, 'message' => 'تم حفظ عرض الكومبو']);

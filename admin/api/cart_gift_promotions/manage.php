@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/cart_gift_promotions.php';
 require_once __DIR__ . '/../../../includes/cart_promo_products.php';
 require_once __DIR__ . '/../../../includes/cart_promotion_country.php';
+require_once __DIR__ . '/../../../includes/cart_promo_schedule.php';
 require_admin_api();
 
 /**
@@ -60,6 +61,15 @@ try {
         $reqReg = !empty($data['requires_registered_account']) ? 1 : 0;
         $sortOrder = (int) ($data['sort_order'] ?? 0);
         $isActive = !empty($data['is_active']) ? 1 : 0;
+        $dateErr = null;
+        $bounds = orange_cart_promo_parse_required_admin_dates(
+            trim((string) ($data['valid_from'] ?? '')),
+            trim((string) ($data['valid_to'] ?? '')),
+            $dateErr
+        );
+        if ($bounds === null) {
+            json_response(['success' => false, 'message' => $dateErr ?? 'تواريخ العرض غير صالحة'], 422);
+        }
         $kindRaw = strtolower(trim((string) ($data['gift_kind'] ?? 'choice')));
         $giftKind = $kindRaw === 'fixed' ? 'fixed' : 'choice';
         $fixedPid = (int) ($data['fixed_product_id'] ?? $data['fixed_variant_id'] ?? 0);
@@ -111,8 +121,9 @@ try {
         }
 
         if ($id > 0) {
+            orange_cart_promo_clear_auto_pause($pdo, 'cart_gift_promotions', $id);
             $st = $pdo->prepare(
-                'UPDATE cart_gift_promotions SET min_subtotal = ?, requires_registered_account = ?, gift_kind = ?, fixed_variant_id = ?, pool_variant_ids = ?, gift_unit_charge_kind = ?, gift_unit_charge_value = ?, sort_order = ?, is_active = ? WHERE id = ?'
+                'UPDATE cart_gift_promotions SET min_subtotal = ?, requires_registered_account = ?, gift_kind = ?, fixed_variant_id = ?, pool_variant_ids = ?, gift_unit_charge_kind = ?, gift_unit_charge_value = ?, sort_order = ?, is_active = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL WHERE id = ?'
             );
             $st->execute([
                 $minSub,
@@ -124,11 +135,13 @@ try {
                 $giftChargeVal,
                 $sortOrder,
                 $isActive,
+                $bounds['valid_from'],
+                $bounds['valid_to'],
                 $id,
             ]);
         } else {
             $st = $pdo->prepare(
-                'INSERT INTO cart_gift_promotions (country_id, min_subtotal, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids, gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                'INSERT INTO cart_gift_promotions (country_id, min_subtotal, requires_registered_account, gift_kind, fixed_variant_id, pool_variant_ids, gift_unit_charge_kind, gift_unit_charge_value, sort_order, is_active, valid_from, valid_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
             $st->execute([
                 $insertCountryId,
@@ -141,6 +154,8 @@ try {
                 $giftChargeVal,
                 $sortOrder,
                 $isActive,
+                $bounds['valid_from'],
+                $bounds['valid_to'],
             ]);
         }
 

@@ -28,6 +28,7 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
     <div class="form-grid">
         <div><label>الحد الأدنى لمجموع السلة (د.ك) — 0 يعني بدون شرط مبلغ</label><input type="text" id="cgp_min" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="0"></div>
         <div><label>الترتيب</label><input type="number" id="cgp_sort" value="0" style="max-width:120px;"></div>
+        <?php $ocpFieldPrefix = 'cgp'; require __DIR__ . '/../partials/cart_promo_schedule_fields.inc.php'; ?>
         <div style="grid-column:1/-1;">
             <label><strong>نوع الهدية</strong></label>
             <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:6px;">
@@ -104,8 +105,9 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
                     <th>التفاصيل</th>
                     <th>تسعير</th>
                     <th>نطاق</th>
+                    <th>الفترة</th>
+                    <th>الحالة</th>
                     <th>ترتيب</th>
-                    <th>نشط</th>
                     <th></th>
                 </tr>
             </thead>
@@ -116,6 +118,7 @@ $cgpPickJson = json_encode($cgpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
 
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_cart_promo_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
+<?php require __DIR__ . '/../partials/cart_promo_schedule_js.inc.php'; ?>
 var CGP_PICK_ROWS = <?php echo $cgpPickJson !== false ? $cgpPickJson : '[]'; ?>;
 
 function cgpPickMeta(pid) {
@@ -237,6 +240,7 @@ function resetCartGiftPromotionForm() {
     document.querySelector('input[name="cgp_kind"][value="choice"]').checked = true;
     document.getElementById('cgp_reg').checked = false;
     document.getElementById('cgp_active').checked = true;
+    ocpDefaultScheduleDates('cgp');
     document.getElementById('cgp_gift_charge_kind').value = 'free';
     document.getElementById('cgp_gift_charge_val').value = '0';
     cgpToggleKind();
@@ -254,6 +258,8 @@ function editCartGiftPromotion(row) {
     cgpSetFixed(row.fixed_product_id || row.fixed_variant_id || 0);
     document.getElementById('cgp_reg').checked = parseInt(row.requires_registered_account, 10) === 1;
     document.getElementById('cgp_active').checked = parseInt(row.is_active, 10) === 1;
+    ocpSetDmyFromIso('cgp_valid_from', row.valid_from);
+    ocpSetDmyFromIso('cgp_valid_to', row.valid_to);
     var gck = (row.gift_unit_charge_kind || 'free').toLowerCase();
     var allowed = { free: 1, percent_off: 1, fixed_unit: 1, amount_off_unit: 1 };
     document.getElementById('cgp_gift_charge_kind').value = allowed[gck] ? gck : 'free';
@@ -300,8 +306,9 @@ async function loadCartGiftPromotions() {
             '<td style="max-width:18rem;">' + det + '</td>' +
             '<td>' + escCgp(gcharge) + '</td>' +
             '<td>' + (parseInt(r.requires_registered_account, 10) === 1 ? 'مسجّل فقط' : 'جميع الزوّار') + '</td>' +
+            '<td dir="ltr">' + escCgp(ocpScheduleLabel(r)) + '</td>' +
+            '<td>' + escCgp(ocpStatusLabel(r)) + '</td>' +
             '<td>' + escCgp(String(r.sort_order)) + '</td>' +
-            '<td>' + (parseInt(r.is_active, 10) === 1 ? 'نعم' : 'لا') + '</td>' +
             '<td><button type="button" class="btn-secondary" data-cgp-edit="' + escCgp(String(r.id)) + '">تعديل</button></td>';
         tb.appendChild(tr);
     });
@@ -327,7 +334,9 @@ async function saveCartGiftPromotion() {
         fixed_product_id: parseInt(document.getElementById('cgp_fixed_pid').value, 10) || 0,
         pool_product_ids: cgpPoolRows(),
         gift_unit_charge_kind: document.getElementById('cgp_gift_charge_kind').value,
-        gift_unit_charge_value: parseFloat(document.getElementById('cgp_gift_charge_val').value) || 0
+        gift_unit_charge_value: parseFloat(document.getElementById('cgp_gift_charge_val').value) || 0,
+        valid_from: ocpGetIso('cgp_valid_from'),
+        valid_to: ocpGetIso('cgp_valid_to')
     });
     alert(res.message || (res.success ? 'تم الحفظ' : 'فشل'));
     if (res.success) {
@@ -344,5 +353,6 @@ document.getElementById('cgp_fixed_pick_btn').addEventListener('click', function
 });
 cgpToggleKind();
 cgpToggleGiftCharge();
+ocpDefaultScheduleDates('cgp');
 loadCartGiftPromotions();
 </script>

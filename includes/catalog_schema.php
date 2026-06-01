@@ -3052,6 +3052,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_country_scope_repair_v76($pdo);
     orange_catalog_migrate_country_scope_repair_v77($pdo);
     orange_catalog_migrate_sales_returns_analytics_v78($pdo);
+    orange_catalog_migrate_cart_promo_schedule_v79($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
     orange_admin_seed_company_sales_invoice_page_permissions($pdo);
@@ -5852,6 +5853,58 @@ function orange_catalog_migrate_sales_returns_analytics_v78(PDO $pdo): void
                  WHERE sr.order_id IS NOT NULL'
             );
         }
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * عروض السلة: valid_from / valid_to إلزاميان + إيقاف تلقائي (promo_stock | gift_stock).
+ */
+function orange_catalog_migrate_cart_promo_schedule_v79(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    require_once __DIR__ . '/cart_promo_schedule.php';
+
+    $marker = 'php_cart_promo_schedule_v79';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    foreach (orange_cart_promo_scheduled_tables() as $table) {
+        if (!orange_table_exists($pdo, $table)) {
+            continue;
+        }
+        if (!orange_table_has_column($pdo, $table, 'valid_from')) {
+            orange_catalog_safe_exec($pdo, 'ALTER TABLE ' . $table . ' ADD COLUMN valid_from DATETIME NULL DEFAULT NULL');
+            orange_schema_invalidate_column_check($table, 'valid_from');
+        }
+        if (!orange_table_has_column($pdo, $table, 'valid_to')) {
+            orange_catalog_safe_exec($pdo, 'ALTER TABLE ' . $table . ' ADD COLUMN valid_to DATETIME NULL DEFAULT NULL');
+            orange_schema_invalidate_column_check($table, 'valid_to');
+        }
+        if (!orange_table_has_column($pdo, $table, 'auto_paused_at')) {
+            orange_catalog_safe_exec($pdo, 'ALTER TABLE ' . $table . ' ADD COLUMN auto_paused_at DATETIME NULL DEFAULT NULL');
+            orange_schema_invalidate_column_check($table, 'auto_paused_at');
+        }
+        if (!orange_table_has_column($pdo, $table, 'auto_paused_reason')) {
+            orange_catalog_safe_exec(
+                $pdo,
+                'ALTER TABLE ' . $table . " ADD COLUMN auto_paused_reason VARCHAR(48) NULL DEFAULT NULL"
+            );
+            orange_schema_invalidate_column_check($table, 'auto_paused_reason');
+        }
+        orange_catalog_safe_exec(
+            $pdo,
+            'UPDATE ' . $table . " SET valid_from = COALESCE(valid_from, CONCAT(CURDATE(), ' 00:00:00')),
+             valid_to = COALESCE(valid_to, CONCAT(DATE_ADD(CURDATE(), INTERVAL 365 DAY), ' 23:59:59'))
+             WHERE valid_from IS NULL OR valid_to IS NULL"
+        );
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE ' . $table . ' MODIFY COLUMN valid_from DATETIME NOT NULL,
+             MODIFY COLUMN valid_to DATETIME NOT NULL'
+        );
     }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);

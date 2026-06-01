@@ -9,9 +9,12 @@ require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/order_intake_queue.php';
 require_once __DIR__ . '/../../includes/warehouses.php';
+require_once __DIR__ . '/../../includes/cart_promo_schedule.php';
 
 /** @var array<string, mixed> $admin — من admin/index.php */
 $pdo = db();
+orange_catalog_ensure_schema($pdo);
+$dashPromoPausedAlerts = orange_cart_promo_admin_auto_paused_alerts($pdo);
 $dashCountryId = orange_admin_context_country_id($pdo);
 $dashMoney = orange_admin_currency_context($pdo);
 $dashOrdersSql = orange_sql_country_and_fragment($pdo, 'orders', 'orders', $dashCountryId);
@@ -70,6 +73,27 @@ if ($intakeQueueVisible) {
     <h1>الرئيسية</h1>
     <p class="page-subtitle">نظرة سريعة على نشاط اليوم — بيانات فورية من قاعدة الطلبات والمنتجات.</p>
 </div>
+
+<?php if ($dashPromoPausedAlerts !== []): ?>
+<div class="card" style="margin-bottom:16px;border:1px solid #f59e0b;background:#fffbeb;">
+    <h3>عروض متوقفة تلقائياً (مخزون)</h3>
+    <p class="card-hint" style="margin:0 0 10px;">العرض لا يظهر للعميل. السبب يوضّح إن التوقف لـ <strong>نفاد مخزون منتجات العرض</strong> أو <strong>عدم توفر الهدية</strong>. لتفعيله: عالج المخزون ثم افتح العرض ومدّد «نهاية العرض» واحفظ.</p>
+    <ul style="margin:0;padding-inline-start:1.25rem;line-height:1.6;">
+        <?php
+        foreach ($dashPromoPausedAlerts as $alert):
+            $pg = (string) ($alert['page'] ?? $alert['table'] ?? 'cart_gift_promotions');
+            $href = storefront_public_path('/admin/index.php?page=' . rawurlencode($pg));
+            ?>
+        <li>
+            <a href="<?php echo htmlspecialchars($href, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($alert['label'], ENT_QUOTES, 'UTF-8'); ?></a>
+            <?php if ($alert['paused_at'] !== ''): ?>
+            <span class="muted" dir="ltr"> — <?php echo htmlspecialchars(substr((string) $alert['paused_at'], 0, 16), ENT_QUOTES, 'UTF-8'); ?></span>
+            <?php endif; ?>
+        </li>
+        <?php endforeach; ?>
+    </ul>
+</div>
+<?php endif; ?>
 
 <div class="grid-4">
     <div class="card stat-card">

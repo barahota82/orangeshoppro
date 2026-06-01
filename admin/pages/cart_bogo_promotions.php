@@ -130,6 +130,7 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
             <input type="number" id="cbp_minbuy" class="admin-inp" min="2" step="1" value="2" style="max-width:12rem;" dir="ltr">
         </div>
         <div><label>الترتيب</label><input type="number" id="cbp_sort" value="0" style="max-width:120px;"></div>
+        <?php $ocpFieldPrefix = 'cbp'; require __DIR__ . '/../partials/cart_promo_schedule_fields.inc.php'; ?>
         <div style="grid-column:1/-1;">
             <label><strong>نوع الهدية</strong></label>
             <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:6px;">
@@ -206,8 +207,9 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
                     <th>هدية</th>
                     <th>تسعير ب</th>
                     <th>نطاق</th>
+                    <th>الفترة</th>
+                    <th>الحالة</th>
                     <th>ترتيب</th>
-                    <th>نشط</th>
                     <th></th>
                 </tr>
             </thead>
@@ -218,6 +220,7 @@ $cbpPickJson = json_encode($cbpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
 
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_cart_promo_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
+<?php require __DIR__ . '/../partials/cart_promo_schedule_js.inc.php'; ?>
 var CBP_CATEGORY_LABEL_MAP = <?php echo json_encode($cartBogoCategoryLabelJs, JSON_UNESCAPED_UNICODE); ?>;
 var CBP_PICK_ROWS = <?php echo $cbpPickJson !== false ? $cbpPickJson : '[]'; ?>;
 
@@ -395,6 +398,7 @@ function resetCartBogoPromotionForm() {
     document.querySelector('input[name="cbp_gift"][value="choice"]').checked = true;
     document.getElementById('cbp_reg').checked = false;
     document.getElementById('cbp_active').checked = true;
+    ocpDefaultScheduleDates('cbp');
     document.getElementById('cbp_gift_charge_kind').value = 'free';
     document.getElementById('cbp_gift_charge_val').value = '0';
     cbpToggleBogo();
@@ -423,6 +427,8 @@ function editCartBogoPromotion(row) {
     cbpSetFixed(row.fixed_product_id || row.fixed_variant_id || 0);
     document.getElementById('cbp_reg').checked = parseInt(row.requires_registered_account, 10) === 1;
     document.getElementById('cbp_active').checked = parseInt(row.is_active, 10) === 1;
+    ocpSetDmyFromIso('cbp_valid_from', row.valid_from);
+    ocpSetDmyFromIso('cbp_valid_to', row.valid_to);
     cbpRenderBuy(row.buy_components || []);
     var gck = (row.gift_unit_charge_kind || 'free').toLowerCase();
     var allowed = { free: 1, percent_off: 1, fixed_unit: 1, amount_off_unit: 1 };
@@ -485,8 +491,9 @@ async function loadCartBogoPromotions() {
             '<td>' + gkind + '</td>' +
             '<td>' + escCbp(gcharge) + '</td>' +
             '<td>' + (parseInt(r.requires_registered_account, 10) === 1 ? 'مسجّل فقط' : 'الكل') + '</td>' +
+            '<td dir="ltr">' + escCbp(ocpScheduleLabel(r)) + '</td>' +
+            '<td>' + escCbp(ocpStatusLabel(r)) + '</td>' +
             '<td>' + escCbp(String(r.sort_order)) + '</td>' +
-            '<td>' + (parseInt(r.is_active, 10) === 1 ? 'نعم' : 'لا') + '</td>' +
             '<td><button type="button" class="btn-secondary" data-cbp-edit="' + escCbp(String(r.id)) + '">تعديل</button></td>';
         tb.appendChild(tr);
     });
@@ -516,7 +523,9 @@ async function saveCartBogoPromotion() {
         fixed_product_id: parseInt(document.getElementById('cbp_fixed_pid').value, 10) || 0,
         pool_product_ids: cbpPoolRows(),
         gift_unit_charge_kind: document.getElementById('cbp_gift_charge_kind').value,
-        gift_unit_charge_value: parseFloat(document.getElementById('cbp_gift_charge_val').value) || 0
+        gift_unit_charge_value: parseFloat(document.getElementById('cbp_gift_charge_val').value) || 0,
+        valid_from: ocpGetIso('cbp_valid_from'),
+        valid_to: ocpGetIso('cbp_valid_to')
     };
     if (bogoKind === 'buy_bundle') {
         payload.buy_components = cbpBuyRows();
@@ -543,5 +552,8 @@ document.getElementById('cbp_fixed_pick_btn').addEventListener('click', function
 cbpToggleBogo();
 cbpToggleGift();
 cbpToggleGiftCharge();
+ocpDefaultScheduleDates('cbp');
+cbpRenderBuy([]);
+cbpRenderPool([]);
 loadCartBogoPromotions();
 </script>

@@ -184,6 +184,26 @@ function orange_cart_promo_aggregate_product_units(array $validatedItems): array
  *
  * @return list<array{variant_id:int,product_name:string,color:string,size:string,stock:int}>
  */
+/**
+ * هل للمنتج أي متغير بمخزون فعّال للزائر (دولة العرض).
+ *
+ * @param list<array{product:array<string,mixed>,qty:int,color:string,size:string,variant_id:int,price:float,cost:float}> $validatedItems
+ */
+function orange_cart_promo_product_has_visitor_stock(
+    PDO $pdo,
+    int $productId,
+    array $validatedItems,
+    ?int $countryId = null
+): bool {
+    if ($productId <= 0) {
+        return false;
+    }
+
+    return count(
+        orange_cart_gift_promotion_pool_options_for_products($pdo, [$productId], $validatedItems, false, $countryId)
+    ) > 0;
+}
+
 function orange_cart_gift_promotion_pool_options_for_products(
     PDO $pdo,
     array $productIds,

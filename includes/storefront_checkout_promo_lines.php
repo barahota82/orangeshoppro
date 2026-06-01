@@ -65,7 +65,19 @@ function orange_storefront_build_promotional_gift_lines(
             if ($pickVid <= 0) {
                 throw new RuntimeException(function_exists('t') ? t('checkout_gift_pick_required') : 'Choose your free gift.');
             }
-            if (!in_array($pickVid, $giftRule['pool_variant_ids'], true)) {
+            $allowedGiftVids = [];
+            foreach (
+                orange_cart_gift_promotion_pool_options(
+                    $pdo,
+                    $giftRule['pool_variant_ids'],
+                    $validatedItems,
+                    true,
+                    $countryId
+                ) as $opt
+            ) {
+                $allowedGiftVids[(int) ($opt['variant_id'] ?? 0)] = true;
+            }
+            if ($pickVid <= 0 || !isset($allowedGiftVids[$pickVid])) {
                 throw new RuntimeException(function_exists('t') ? t('checkout_gift_variant_invalid') : 'Invalid gift choice.');
             }
         }
@@ -118,7 +130,19 @@ function orange_storefront_build_promotional_gift_lines(
             if ($bogoPick <= 0) {
                 throw new RuntimeException(function_exists('t') ? t('checkout_bogo_gift_pick_required') : 'Choose BOGO gift.');
             }
-            if (!in_array($bogoPick, $bogoRule['pool_variant_ids'], true)) {
+            $allowedBogoVids = [];
+            foreach (
+                orange_cart_gift_promotion_pool_options(
+                    $pdo,
+                    $bogoRule['pool_variant_ids'],
+                    $linesAfterSubtotalGift,
+                    true,
+                    $countryId
+                ) as $opt
+            ) {
+                $allowedBogoVids[(int) ($opt['variant_id'] ?? 0)] = true;
+            }
+            if ($bogoPick <= 0 || !isset($allowedBogoVids[$bogoPick])) {
                 throw new RuntimeException(function_exists('t') ? t('checkout_gift_variant_invalid') : 'Invalid gift choice.');
             }
         }

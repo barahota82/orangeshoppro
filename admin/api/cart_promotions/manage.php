@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/cart_promotions.php';
 require_once __DIR__ . '/../../../includes/cart_promotion_country.php';
+require_once __DIR__ . '/../../../includes/cart_promo_schedule.php';
 require_admin_api();
 
 /**
@@ -43,6 +44,15 @@ try {
         $reqReg = !empty($data['requires_registered_account']) ? 1 : 0;
         $sortOrder = (int) ($data['sort_order'] ?? 0);
         $isActive = !empty($data['is_active']) ? 1 : 0;
+        $dateErr = null;
+        $bounds = orange_cart_promo_parse_required_admin_dates(
+            trim((string) ($data['valid_from'] ?? '')),
+            trim((string) ($data['valid_to'] ?? '')),
+            $dateErr
+        );
+        if ($bounds === null) {
+            json_response(['success' => false, 'message' => $dateErr ?? 'تواريخ العرض غير صالحة'], 422);
+        }
 
         if ($minSub <= 0) {
             json_response(['success' => false, 'message' => 'الحد الأدنى للمجموع يجب أن يكون أكبر من صفر'], 422);
@@ -61,15 +71,34 @@ try {
         }
 
         if ($id > 0) {
+            orange_cart_promo_clear_auto_pause($pdo, 'cart_promotions', $id);
             $st = $pdo->prepare(
-                'UPDATE cart_promotions SET min_subtotal = ?, discount_amount = ?, requires_registered_account = ?, sort_order = ?, is_active = ? WHERE id = ?'
+                'UPDATE cart_promotions SET min_subtotal = ?, discount_amount = ?, requires_registered_account = ?, sort_order = ?, is_active = ?, valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL WHERE id = ?'
             );
-            $st->execute([$minSub, $disc, $reqReg, $sortOrder, $isActive, $id]);
+            $st->execute([
+                $minSub,
+                $disc,
+                $reqReg,
+                $sortOrder,
+                $isActive,
+                $bounds['valid_from'],
+                $bounds['valid_to'],
+                $id,
+            ]);
         } else {
             $st = $pdo->prepare(
-                'INSERT INTO cart_promotions (country_id, min_subtotal, discount_amount, requires_registered_account, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?)'
+                'INSERT INTO cart_promotions (country_id, min_subtotal, discount_amount, requires_registered_account, sort_order, is_active, valid_from, valid_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
             );
-            $st->execute([$insertCountryId, $minSub, $disc, $reqReg, $sortOrder, $isActive]);
+            $st->execute([
+                $insertCountryId,
+                $minSub,
+                $disc,
+                $reqReg,
+                $sortOrder,
+                $isActive,
+                $bounds['valid_from'],
+                $bounds['valid_to'],
+            ]);
         }
 
         json_response(['success' => true, 'message' => 'تم حفظ عرض السلة']);

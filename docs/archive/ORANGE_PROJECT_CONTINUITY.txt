@@ -9,6 +9,7 @@ PURPOSE
 - When resuming work: read IBRAHIM_ORANGE_MASTER.txt, then this file, then ORANGE_STOCK_ORDER_POLICY.txt and ORANGE_TECH_REFERENCE.txt.
 - **خارطة استكمال المشروع (خطوات مرحلية موحّدة):** ORANGE_PROJECT_COMPLETION_ROADMAP.txt
 - **س4 (عروض — 2026-05-20):** الأدمن على **منتج كامل** + منتقي نقرتين (`admin_cart_promo_product_pick.js`) لكومبو/BOGO/هدايا؛ تفاصيل «تنفيذ» في `ORANGE_STOREFRONT_POLICY_REFERENCE.txt` س4؛ المنطق في `includes/cart_promo_products.php` وملفات العروض.
+- **س4 (جدولة + مخزون — 2026-06-01):** تواريخ إلزامية + إيقاف تلقائي `promo_stock`/`gift_stock` — **مراحل 1–5 مغلقة**؛ **6–8 مفتوحة** — `docs/archive/ORANGE_CART_PROMO_SCHEDULE_ROLLOUT_PHASES.txt` + `includes/cart_promo_schedule.php` (v79).
 - **منجز (أدمن — س5):** بطاقة «قارب على النفاذ» في `admin/pages/dashboard.php` تُظهر عدد المتغيرات للمنتجات النشطة ذات المخزون ≤ `orange_stock_low_alert_threshold()` (نفس منطق صفحة المستودع)؛ سبق أن استُخدمت متغيرات PHP غير معرّفة فتعطّل البطاقة لمن لديه صلاحية المخزن.
 - **منجز (أدمن — تعدد دول 2026-05-20):** سياسة شاشات عام/دولة في **`docs/archive/ORANGE_ADMIN_SCREENS_COUNTRY_SCOPE.txt`**؛ تفعيل الأقسام per دولة (`department_countries`، v51، `departments.php`، `toggle-country.php`).
 - **قائمة تنفيذ (أدمن — post-v52 2026-05-20):** مراجعة ثغرات تعدد الدول (GAP-01…09 + baseline v52-S1…S9) في **`docs/archive/ORANGE_ADMIN_SCREENS_COUNTRY_SCOPE.txt`** — قسم «مراجعة ثغرات ما بعد v52»؛ عند «إيه اتصلح وإيه لسه» قارِن حالة `[معلّق|منتهٍ]` هناك.

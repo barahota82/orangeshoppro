@@ -29,6 +29,7 @@ $ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
         <div style="grid-column:1/-1;"><label>عنوان داخلي (إنجليزي) — اختياري</label><input type="text" id="ccp_title_en" class="admin-inp" style="max-width:40rem;" dir="ltr" lang="en"></div>
         <div><label>سعر الحزمة الواحدة (د.ك)</label><input type="text" id="ccp_price" class="admin-inp-money" inputmode="decimal" lang="en" dir="ltr" placeholder="9.5"></div>
         <div><label>الترتيب</label><input type="number" id="ccp_sort" value="0" style="max-width:120px;"></div>
+        <?php $ocpFieldPrefix = 'ccp'; require __DIR__ . '/../partials/cart_promo_schedule_fields.inc.php'; ?>
         <div style="grid-column:1/-1;">
             <label>منتجات الحزمة</label>
             <div style="margin:6px 0 8px;">
@@ -70,8 +71,9 @@ $ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
                     <th>المكوّنات</th>
                     <th>سعر الحزمة</th>
                     <th>نطاق</th>
+                    <th>الفترة</th>
+                    <th>الحالة</th>
                     <th>ترتيب</th>
-                    <th>نشط</th>
                     <th></th>
                 </tr>
             </thead>
@@ -82,6 +84,7 @@ $ccpPickJson = json_encode($ccpPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG |
 
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_cart_promo_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script>
+<?php require __DIR__ . '/../partials/cart_promo_schedule_js.inc.php'; ?>
 var CCP_PICK_ROWS = <?php echo $ccpPickJson !== false ? $ccpPickJson : '[]'; ?>;
 
 function ccpFmtComps(comps) {
@@ -145,6 +148,7 @@ function resetCartComboPromotionForm() {
     ccpRenderComps([]);
     document.getElementById('ccp_reg').checked = false;
     document.getElementById('ccp_active').checked = true;
+    ocpDefaultScheduleDates('ccp');
 }
 
 function editCartComboPromotion(row) {
@@ -155,6 +159,8 @@ function editCartComboPromotion(row) {
     document.getElementById('ccp_sort').value = String(row.sort_order != null ? row.sort_order : 0);
     document.getElementById('ccp_reg').checked = parseInt(row.requires_registered_account, 10) === 1;
     document.getElementById('ccp_active').checked = parseInt(row.is_active, 10) === 1;
+    ocpSetDmyFromIso('ccp_valid_from', row.valid_from);
+    ocpSetDmyFromIso('ccp_valid_to', row.valid_to);
     ccpRenderComps(row.components || []);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -184,8 +190,9 @@ async function loadCartComboPromotions() {
             '<td dir="ltr" style="font-family:monospace;font-size:0.85rem;">' + escCcp(ccpFmtComps(r.components)) + '</td>' +
             '<td dir="ltr">' + escCcp(String(r.combo_price)) + '</td>' +
             '<td>' + (parseInt(r.requires_registered_account, 10) === 1 ? 'مسجّل فقط' : 'الكل') + '</td>' +
+            '<td dir="ltr">' + escCcp(ocpScheduleLabel(r)) + '</td>' +
+            '<td>' + escCcp(ocpStatusLabel(r)) + '</td>' +
             '<td>' + escCcp(String(r.sort_order)) + '</td>' +
-            '<td>' + (parseInt(r.is_active, 10) === 1 ? 'نعم' : 'لا') + '</td>' +
             '<td><button type="button" class="btn-secondary" data-ccp-edit="' + escCcp(String(r.id)) + '">تعديل</button></td>';
         tb.appendChild(tr);
     });
@@ -210,6 +217,8 @@ async function saveCartComboPromotion() {
         sort_order: parseInt(document.getElementById('ccp_sort').value, 10) || 0,
         requires_registered_account: document.getElementById('ccp_reg').checked ? 1 : 0,
         is_active: document.getElementById('ccp_active').checked ? 1 : 0,
+        valid_from: ocpGetIso('ccp_valid_from'),
+        valid_to: ocpGetIso('ccp_valid_to'),
         components: ccpCompRows()
     });
     alert(res.message || (res.success ? 'تم الحفظ' : 'فشل'));
@@ -220,5 +229,6 @@ async function saveCartComboPromotion() {
 }
 
 document.getElementById('ccp_add_product_btn').addEventListener('click', ccpOpenPick);
+ocpDefaultScheduleDates('ccp');
 loadCartComboPromotions();
 </script>
