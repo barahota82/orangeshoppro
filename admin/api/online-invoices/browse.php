@@ -182,7 +182,10 @@ try {
                 'created_at_dmy' => $createdRaw !== '' ? orange_format_date_dmY($createdRaw) : '',
                 'customer_name' => (string) ($row['customer_name'] ?? ''),
                 'phone' => (string) ($row['phone'] ?? ''),
-                'channel_name' => (string) ($row['channel_name'] ?? ''),
+                'channel_name' => orange_sales_order_channel_label(
+                    isset($row['channel_id']) ? (int) $row['channel_id'] : 0,
+                    (string) ($row['channel_name'] ?? '')
+                ),
                 'notes' => (string) ($row['notes'] ?? ''),
                 'total' => (float) ($row['total'] ?? 0),
             ];

@@ -107,7 +107,7 @@ function orange_sales_invoice_company_reference(PDO $pdo, int $orderId, array $o
         $countryId = orange_admin_context_country_id($pdo);
     }
 
-    return orange_country_document_ref($pdo, 'INV-C', $orderId, max(0, $countryId));
+    return orange_sales_invoice_ref_preview($pdo, 'company', $countryId);
 }
 
 /**
@@ -214,8 +214,17 @@ function orange_sales_invoice_company_document_payload(PDO $pdo, int $orderId): 
         : 0;
     $customerOut = null;
     if ($customerId > 0 && orange_table_exists($pdo, 'customers')) {
-        $codeCol = orange_table_has_column($pdo, 'customers', 'code') ? ', code' : '';
-        $cSt = $pdo->prepare('SELECT id, name_ar, phone' . $codeCol . ' FROM customers WHERE id = ? LIMIT 1');
+        $custCols = 'id, name_ar, phone';
+        if (orange_table_has_column($pdo, 'customers', 'code')) {
+            $custCols .= ', code';
+        }
+        if (orange_table_has_column($pdo, 'customers', 'area')) {
+            $custCols .= ', area';
+        }
+        if (orange_table_has_column($pdo, 'customers', 'address')) {
+            $custCols .= ', address';
+        }
+        $cSt = $pdo->prepare('SELECT ' . $custCols . ' FROM customers WHERE id = ? LIMIT 1');
         $cSt->execute([$customerId]);
         $cRow = $cSt->fetch(PDO::FETCH_ASSOC);
         if ($cRow) {
@@ -226,6 +235,12 @@ function orange_sales_invoice_company_document_payload(PDO $pdo, int $orderId): 
                     : '',
                 'name_ar' => (string) ($cRow['name_ar'] ?? ''),
                 'phone' => (string) ($cRow['phone'] ?? ''),
+                'area' => orange_table_has_column($pdo, 'customers', 'area')
+                    ? trim((string) ($cRow['area'] ?? ''))
+                    : '',
+                'address' => orange_table_has_column($pdo, 'customers', 'address')
+                    ? trim((string) ($cRow['address'] ?? ''))
+                    : '',
                 'current_balance' => round((float) orange_party_balance_customer($pdo, $customerId), 3),
             ];
         }

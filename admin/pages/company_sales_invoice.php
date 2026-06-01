@@ -41,8 +41,15 @@ $sv2DefaultChannelId = orange_sales_company_direct_channel_id();
 $sv2CustomerPickRows = [];
 if (orange_table_exists($pdo, 'customers')) {
     $codeCol = orange_table_has_column($pdo, 'customers', 'code') ? 'code' : 'id';
+    $custPickCols = 'id, name_ar, phone, ' . $codeCol . ' AS customer_code';
+    if (orange_table_has_column($pdo, 'customers', 'area')) {
+        $custPickCols .= ', area';
+    }
+    if (orange_table_has_column($pdo, 'customers', 'address')) {
+        $custPickCols .= ', address';
+    }
     $customers = $pdo->query(
-        'SELECT id, name_ar, phone, ' . $codeCol . ' AS customer_code FROM customers WHERE 1=1'
+        'SELECT ' . $custPickCols . ' FROM customers WHERE 1=1'
         . $sv2CustomersCountrySql . ' ORDER BY name_ar ASC'
     )->fetchAll(PDO::FETCH_ASSOC);
     $custBal = [];
@@ -63,6 +70,8 @@ if (orange_table_exists($pdo, 'customers')) {
             'code' => $customerCode,
             'name' => trim((string) ($c['name_ar'] ?? '')),
             'phone' => trim((string) ($c['phone'] ?? '')),
+            'area' => trim((string) ($c['area'] ?? '')),
+            'address' => trim((string) ($c['address'] ?? '')),
             'balance' => round((float) ($custBal[$cid] ?? 0.0), 3),
         ];
     }
@@ -573,6 +582,20 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         return null;
     }
 
+    function applyCustomerDeliveryFields(source, opts) {
+        opts = opts || {};
+        if (opts.keepDelivery) return;
+        var areaEl = document.getElementById('sv2_area');
+        var addrEl = document.getElementById('sv2_address');
+        if (!source) {
+            if (areaEl) areaEl.value = '';
+            if (addrEl) addrEl.value = '';
+            return;
+        }
+        if (areaEl && source.area != null) areaEl.value = String(source.area || '');
+        if (addrEl && source.address != null) addrEl.value = String(source.address || '');
+    }
+
     function selectCustomer(id, opts) {
         opts = opts || {};
         var row = customerById(id);
@@ -586,6 +609,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             if (!opts.keepName && nameEl) nameEl.value = '';
             if (balEl) balEl.value = '';
             if (idEl) idEl.value = '0';
+            if (!opts.keepDelivery) applyCustomerDeliveryFields(null, opts);
             return;
         }
         currentCustomerId = parseInt(String(row.id), 10) || 0;
@@ -593,6 +617,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         if (nameEl && !opts.keepName) nameEl.value = row.name || '';
         if (balEl) balEl.value = fmt3(row.balance || 0);
         if (idEl) idEl.value = String(currentCustomerId);
+        applyCustomerDeliveryFields(row, opts);
     }
 
     function applyCustomerFromApi(cust, invoice) {
@@ -608,8 +633,9 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             }
             var balEl = document.getElementById('sv2_customer_balance');
             if (balEl && cust.current_balance != null) balEl.value = fmt3(cust.current_balance);
+            applyCustomerDeliveryFields(cust);
         } else {
-            selectCustomer(0, { keepName: true });
+            selectCustomer(0, { keepName: true, keepDelivery: true });
             var codeEl2 = document.getElementById('sv2_customer_code');
             if (codeEl2) codeEl2.value = '';
             var nameEl2 = document.getElementById('sv2_customer_name');
@@ -618,6 +644,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
             if (balEl2) balEl2.value = '';
             var idEl2 = document.getElementById('sv2_customer_id');
             if (idEl2) idEl2.value = String(parseInt(String(invoice && invoice.customer_id || '0'), 10) || 0);
+            applyCustomerDeliveryFields(invoice);
         }
     }
 

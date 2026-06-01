@@ -65,6 +65,11 @@ function orange_sales_invoice_online_load_order(PDO $pdo, int $orderId): array
         throw new RuntimeException('الفاتورة غير موجودة', 404);
     }
 
+    $order['channel_name'] = orange_sales_order_channel_label(
+        isset($order['channel_id']) ? (int) $order['channel_id'] : 0,
+        (string) ($order['channel_name'] ?? '')
+    );
+
     orange_admin_assert_entity_country($pdo, 'orders', $orderId);
 
     if ((string) ($order['status'] ?? '') !== 'completed') {
@@ -97,7 +102,7 @@ function orange_sales_invoice_online_reference(PDO $pdo, int $orderId, array $or
         $countryId = orange_admin_context_country_id($pdo);
     }
 
-    return orange_country_document_ref($pdo, 'INV-O', $orderId, max(0, $countryId));
+    return orange_sales_invoice_ref_preview($pdo, 'online', $countryId);
 }
 
 function orange_sales_invoice_online_gl_posted(PDO $pdo, array $order): bool
@@ -313,15 +318,9 @@ function orange_sales_invoice_online_apply_update(PDO $pdo, int $orderId, array 
         throw new RuntimeException('رقم الهاتف غير صالح');
     }
 
-    $channelId = isset($data['channel_id']) ? (int) $data['channel_id'] : (int) ($order['channel_id'] ?? 0);
+    $channelId = (int) ($order['channel_id'] ?? 0);
     if ($channelId <= 0) {
-        throw new RuntimeException('قناة العملاء مطلوبة');
-    }
-    orange_admin_assert_row_country($pdo, 'channels', $channelId);
-    $chSt = $pdo->prepare('SELECT id FROM channels WHERE id = ? AND is_active = 1 LIMIT 1');
-    $chSt->execute([$channelId]);
-    if (!$chSt->fetchColumn()) {
-        throw new RuntimeException('قناة غير صالحة');
+        throw new RuntimeException('الطلب بلا قناة — راجع مسار الطلب الأونلاين أو القناة في المتجر');
     }
 
     $itemsIn = isset($data['items']) && is_array($data['items']) ? $data['items'] : [];
@@ -349,10 +348,9 @@ function orange_sales_invoice_online_apply_update(PDO $pdo, int $orderId, array 
         'area = ?',
         'address = ?',
         'notes = ?',
-        'channel_id = ?',
         'total = ?',
     ];
-    $params = [$customerName, $phoneNorm, $area, $address, $notes, $channelId, $total];
+    $params = [$customerName, $phoneNorm, $area, $address, $notes, $total];
 
     if (orange_table_has_column($pdo, 'orders', 'phone_country_dial')) {
         $sets[] = 'phone_country_dial = ?';

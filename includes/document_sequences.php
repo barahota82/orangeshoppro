@@ -55,29 +55,57 @@ function orange_sequence_peek_next(PDO $pdo, string $scope, ?int $countryId = nu
 }
 
 /**
+ * INV-C-KW-1 / INV-O-UAE-42 — بادئة + كود دولة للعرض (أحرف كبيرة) + تسلسل بدون أصفار بادئة.
+ *
+ * @param 'INV-C'|'INV-O' $prefix
+ */
+function orange_sales_invoice_number_from_serial(string $prefix, string $countryDisplayCode, int $serial): string
+{
+    $prefix = strtoupper(trim($prefix));
+    $code = strtoupper(trim($countryDisplayCode));
+    if ($serial <= 0) {
+        $serial = 1;
+    }
+    if ($code === '') {
+        return $prefix . '-' . $serial;
+    }
+
+    return $prefix . '-' . $code . '-' . $serial;
+}
+
+function orange_sales_invoice_country_display_code(PDO $pdo, int $countryId): string
+{
+    require_once __DIR__ . '/countries.php';
+    if ($countryId > 0) {
+        $row = orange_country_row_by_id($pdo, $countryId, false);
+        if (is_array($row)) {
+            $display = orange_countries_display_code((string) ($row['code'] ?? ''));
+            if ($display !== '') {
+                return $display;
+            }
+        }
+    }
+
+    return 'KW';
+}
+
+/**
  * معاينة رقم فاتورة مبيعات (INV-C / INV-O) قبل الحفظ — parity purchases PUR preview.
  *
  * @param 'company'|'online' $kind
  */
 function orange_sales_invoice_ref_preview(PDO $pdo, string $kind, ?int $countryId = null): string
 {
-    require_once __DIR__ . '/countries.php';
     if ($countryId === null || $countryId <= 0) {
         $countryId = orange_admin_context_country_id($pdo);
     }
     $kind = strtolower(trim($kind));
     $scope = $kind === 'online' ? 'sales_invoice_online' : 'sales_invoice_company';
     $prefix = $kind === 'online' ? 'INV-O' : 'INV-C';
-    $code = 'KW';
-    if ($countryId > 0) {
-        $row = orange_country_row_by_id($pdo, $countryId, false);
-        if (is_array($row)) {
-            $code = orange_countries_normalize_code((string) ($row['code'] ?? 'KW'));
-        }
-    }
+    $code = orange_sales_invoice_country_display_code($pdo, $countryId);
     $next = orange_sequence_peek_next($pdo, $scope, $countryId > 0 ? $countryId : null);
 
-    return $prefix . '-' . $code . '-' . str_pad((string) $next, 6, '0', STR_PAD_LEFT);
+    return orange_sales_invoice_number_from_serial($prefix, $code, $next);
 }
 
 /**
@@ -85,20 +113,13 @@ function orange_sales_invoice_ref_preview(PDO $pdo, string $kind, ?int $countryI
  */
 function orange_format_sales_invoice_number(PDO $pdo, string $kind, int $countryId): string
 {
-    require_once __DIR__ . '/countries.php';
     $kind = strtolower(trim($kind));
     $scope = $kind === 'online' ? 'sales_invoice_online' : 'sales_invoice_company';
     $prefix = $kind === 'online' ? 'INV-O' : 'INV-C';
-    $code = 'KW';
-    if ($countryId > 0) {
-        $row = orange_country_row_by_id($pdo, $countryId, false);
-        if (is_array($row)) {
-            $code = orange_countries_normalize_code((string) ($row['code'] ?? 'KW'));
-        }
-    }
+    $code = orange_sales_invoice_country_display_code($pdo, $countryId);
     $next = orange_sequence_next($pdo, $scope, $countryId > 0 ? $countryId : null);
 
-    return $prefix . '-' . $code . '-' . str_pad((string) $next, 6, '0', STR_PAD_LEFT);
+    return orange_sales_invoice_number_from_serial($prefix, $code, $next);
 }
 
 /**

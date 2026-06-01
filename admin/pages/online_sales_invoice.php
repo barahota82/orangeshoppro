@@ -11,7 +11,6 @@ require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 require_once __DIR__ . '/../../includes/sales_doc_product_pick.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
-require_once __DIR__ . '/../../includes/sales_doc_channel.php';
 require_once __DIR__ . '/../../includes/sales_doc_print.php';
 
 $pdo = orange_admin_page_pdo();
@@ -21,7 +20,6 @@ $adminCountryId = orange_admin_context_country_id($pdo);
 $adminDefaultPhoneDial = orange_admin_context_phone_dial($pdo);
 $adminDefaultCurrency = orange_admin_context_currency_code($pdo);
 $adminCurrencyUnit = orange_currency_display_unit($adminDefaultCurrency);
-$ov2CustomersCountrySql = orange_sql_country_and_fragment($pdo, 'customers', 'customers', $adminCountryId);
 $ov2ChannelsCountrySql = orange_channels_has_country_column($pdo)
     ? orange_sql_country_and_fragment($pdo, 'channels', 'channels', $adminCountryId)
     : '';
@@ -31,40 +29,10 @@ $ov2PickRows = orange_sales_doc_product_pick_rows($pdo, $adminCountryId);
 $channels = $pdo->query(
     'SELECT id, name FROM channels WHERE is_active = 1' . $ov2ChannelsCountrySql . ' ORDER BY id ASC'
 )->fetchAll(PDO::FETCH_ASSOC);
-$ov2DefaultChannelId = orange_admin_default_sales_channel_id($pdo, $adminCountryId);
-
-$ov2CustomerPickRows = [];
-if (orange_table_exists($pdo, 'customers')) {
-    $codeCol = orange_table_has_column($pdo, 'customers', 'code') ? 'code' : 'id';
-    $customers = $pdo->query(
-        'SELECT id, name_ar, phone, ' . $codeCol . ' AS customer_code FROM customers WHERE 1=1'
-        . $ov2CustomersCountrySql . ' ORDER BY name_ar ASC'
-    )->fetchAll(PDO::FETCH_ASSOC);
-    $custBal = [];
-    foreach ($customers as $c) {
-        $custBal[(int) $c['id']] = orange_party_balance_customer($pdo, (int) $c['id']);
-    }
-    foreach ($customers as $c) {
-        $cid = (int) ($c['id'] ?? 0);
-        if ($cid <= 0) {
-            continue;
-        }
-        $customerCode = trim((string) ($c['customer_code'] ?? ''));
-        if ($customerCode === '') {
-            $customerCode = (string) $cid;
-        }
-        $ov2CustomerPickRows[] = [
-            'id' => $cid,
-            'code' => $customerCode,
-            'name' => trim((string) ($c['name_ar'] ?? '')),
-            'phone' => trim((string) ($c['phone'] ?? '')),
-            'balance' => round((float) ($custBal[$cid] ?? 0.0), 3),
-        ];
-    }
-}
-
 $prefillOrderId = (int) ($_GET['order_id'] ?? 0);
-$ov2Ready = $ov2PickRows !== [] && $channels !== [];
+/** الشاشة نشطة دائماً — فاتورة أونلاين تُفتح من بحث/تنقل؛ القناة والعميل من الطلب */
+$ov2Ready = true;
+$ov2WarnNoProducts = $ov2PickRows === [];
 $ov2NavReady = orange_table_exists($pdo, 'orders');
 $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_final_posting');
 ?>
@@ -154,17 +122,17 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
             <strong><?php echo htmlspecialchars($adminDefaultCurrency, ENT_QUOTES, 'UTF-8'); ?></strong>
             — كود الهاتف الافتراضي
             <strong dir="ltr">+<?php echo htmlspecialchars($adminDefaultPhoneDial, ENT_QUOTES, 'UTF-8'); ?></strong>.
+            افتح فاتورة محفوظة من <strong>بحث</strong> أو أزرار التنقل — القناة وبيانات العميل تُحمَّل من الطلب ولا تُختار يدوياً.
             لإنشاء رقم الفاتورة والقيود المحاسبية استخدم
             <a href="<?php echo htmlspecialchars($finalPostingUrl, ENT_QUOTES, 'UTF-8'); ?>">طلبات أونلاين — إنشاء القيود</a>.
         </p>
     </div>
 </div>
 
-<?php if (!$ov2Ready): ?>
+<?php if ($ov2WarnNoProducts): ?>
 <div class="card" style="border:1px solid #fcd34d;background:#fffbeb;margin-bottom:12px;">
     <p class="card-hint" style="margin:0;line-height:1.55;">
-        <?php if ($ov2PickRows === []): ?>لا توجد منتجات نشطة — أضف منتجات من شاشة «المنتجات».<?php endif; ?>
-        <?php if ($channels === []): ?> لا توجد قنوات نشطة — أضف قناة من شاشة «القنوات».<?php endif; ?>
+        لا توجد منتجات نشطة في سياق الدولة — إضافة/تعديل أصناف في البنود قد يفشل حتى تُضاف منتجات من «المنتجات».
     </p>
 </div>
 <?php endif; ?>
@@ -214,11 +182,11 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
     <div class="form-grid ov2-header-row2" style="margin-bottom:12px;">
         <div>
             <label for="ov2_customer_code">كود العميل</label>
-            <input type="text" id="ov2_customer_code" autocomplete="off" dir="ltr" lang="en" readonly placeholder="نقرتان للاختيار" title="نقرتان للاختيار" style="cursor:pointer;"<?php echo !$ov2Ready ? ' disabled' : ''; ?>>
+            <input type="text" id="ov2_customer_code" class="admin-inp-readonly" autocomplete="off" dir="ltr" lang="en" readonly disabled tabindex="-1" placeholder="—" title="من الطلب — يُعبَّأ عند فتح الفاتورة">
         </div>
         <div>
             <label for="ov2_customer_name">اسم العميل</label>
-            <input type="text" id="ov2_customer_name" required placeholder="اسم العميل"<?php echo !$ov2Ready ? ' disabled' : ''; ?>>
+            <input type="text" id="ov2_customer_name" required placeholder="اسم العميل">
         </div>
         <div>
             <label for="ov2_customer_balance">رصيد الذمم</label>
@@ -230,39 +198,32 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
     <div class="form-grid ov2-header-row3" style="margin-bottom:12px;">
         <div>
             <label for="ov2_phone_country">كود الدولة</label>
-            <input type="search" id="ov2_phone_country" list="ov2_phone_country_list" autocomplete="off" dir="ltr" lang="en" placeholder="+965" required<?php echo !$ov2Ready ? ' disabled' : ''; ?>>
+            <input type="search" id="ov2_phone_country" list="ov2_phone_country_list" autocomplete="off" dir="ltr" lang="en" placeholder="+965" required>
             <datalist id="ov2_phone_country_list"></datalist>
         </div>
         <div>
             <label for="ov2_phone">الهاتف (محلي)</label>
-            <input type="text" id="ov2_phone" class="js-orange-phone-input" maxlength="24" autocomplete="off" dir="ltr" lang="en" placeholder="رقم محلي بدون كود الدولة" required<?php echo !$ov2Ready ? ' disabled' : ''; ?>>
+            <input type="text" id="ov2_phone" class="js-orange-phone-input" maxlength="24" autocomplete="off" dir="ltr" lang="en" placeholder="رقم محلي بدون كود الدولة" required>
         </div>
         <div>
             <label for="ov2_area">المنطقة</label>
-            <input type="text" id="ov2_area"<?php echo !$ov2Ready ? ' disabled' : ''; ?>>
+            <input type="text" id="ov2_area">
         </div>
         <div>
             <label for="ov2_address">العنوان</label>
-            <input type="text" id="ov2_address"<?php echo !$ov2Ready ? ' disabled' : ''; ?>>
+            <input type="text" id="ov2_address">
         </div>
     </div>
 
     <div class="form-grid ov2-header-row4" style="margin-bottom:16px;">
         <div>
-            <label for="ov2_channel">قناة العملاء</label>
-            <select id="ov2_channel" required<?php echo !$ov2Ready ? ' disabled' : ''; ?>>
-                <?php if ($channels === []): ?>
-                <option value="">— لا قنوات —</option>
-                <?php else: ?>
-                <?php foreach ($channels as $ch): ?>
-                <option value="<?php echo (int) $ch['id']; ?>"<?php echo (int) $ch['id'] === $ov2DefaultChannelId ? ' selected' : ''; ?>><?php echo htmlspecialchars((string) $ch['name'], ENT_QUOTES, 'UTF-8'); ?></option>
-                <?php endforeach; ?>
-                <?php endif; ?>
-            </select>
+            <label for="ov2_channel_name">قناة البيع</label>
+            <input type="text" id="ov2_channel_name" class="admin-inp-readonly" readonly disabled tabindex="-1" value="—" title="من الطلب — لا يُغيَّر يدوياً">
+            <input type="hidden" id="ov2_channel_id" value="0">
         </div>
         <div>
             <label for="ov2_notes">ملاحظات</label>
-            <input type="text" id="ov2_notes" placeholder="ملاحظات…"<?php echo !$ov2Ready ? ' disabled' : ''; ?>>
+            <input type="text" id="ov2_notes" placeholder="ملاحظات…">
         </div>
     </div>
 
@@ -309,17 +270,6 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
             <button type="button" class="btn-secondary" id="ov2_btn_print" title="طباعة الفاتورة المعروضة" disabled>طباعة</button>
             <button type="button" id="ov2_btn_save" data-orange-perm="edit" data-orange-page="online_sales_invoice" disabled>حفظ</button>
         </div>
-    </div>
-</div>
-
-<div class="gl-pick-modal" id="ov2_customer_pick_modal" hidden aria-hidden="true">
-    <div class="gl-pick-modal__backdrop" id="ov2_customer_pick_backdrop"></div>
-    <div class="gl-pick-modal__dialog" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="ov2_customer_pick_title">
-        <h3 id="ov2_customer_pick_title" class="gl-pick-modal__title">اختيار العميل</h3>
-        <p class="gl-pick-modal__hint muted" style="margin:0 0 8px;font-size:0.9rem;">نقرتان للاختيار</p>
-        <input type="search" id="ov2_customer_pick_q" class="gl-pick-modal__search admin-inp" placeholder="ابحث بالكود أو الاسم أو الهاتف…" autocomplete="off" dir="rtl">
-        <ul class="gl-pick-modal__list" id="ov2_customer_pick_list"></ul>
-        <button type="button" class="btn-secondary" id="ov2_customer_pick_close">إغلاق</button>
     </div>
 </div>
 
@@ -448,16 +398,14 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
 <script>
 (function () {
     var OV2_PICK_ROWS = <?php echo json_encode($ov2PickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
-    var OV2_CUSTOMER_PICK_ROWS = <?php echo json_encode($ov2CustomerPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
     var OV2_PREFILL_ORDER_ID = <?php echo (int) $prefillOrderId; ?>;
-    var OV2_READY = <?php echo $ov2Ready ? 'true' : 'false'; ?>;
+    var OV2_READY = true;
+    var OV2_WARN_NO_PRODUCTS = <?php echo $ov2WarnNoProducts ? 'true' : 'false'; ?>;
     var OV2_NAV_READY = <?php echo $ov2NavReady ? 'true' : 'false'; ?>;
     var OV2_COUNTRY_ID = <?php echo (int) $adminCountryId; ?>;
-    var OV2_DEFAULT_CHANNEL_ID = <?php echo (int) $ov2DefaultChannelId; ?>;
     var OV2_CAPS = <?php echo json_encode($ov2Caps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
 
     var ov2EditLockCtl = null;
-    var currentCustomerId = 0;
     var browseOrderId = 0;
     var ov2ViewMode = false;
     var ov2GlPosted = false;
@@ -484,112 +432,19 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         return parseFloat(raw) || 0;
     }
 
-    function customerById(id) {
-        id = parseInt(String(id || '0'), 10) || 0;
-        for (var i = 0; i < OV2_CUSTOMER_PICK_ROWS.length; i++) {
-            if ((parseInt(String(OV2_CUSTOMER_PICK_ROWS[i].id || '0'), 10) || 0) === id) return OV2_CUSTOMER_PICK_ROWS[i];
-        }
-        return null;
-    }
-
-    function selectCustomer(id, opts) {
-        opts = opts || {};
-        var row = customerById(id);
+    function applyCustomerFromApi(cust, invoice) {
         var codeEl = document.getElementById('ov2_customer_code');
         var nameEl = document.getElementById('ov2_customer_name');
         var balEl = document.getElementById('ov2_customer_balance');
         var idEl = document.getElementById('ov2_customer_id');
-        if (!row) {
-            currentCustomerId = 0;
-            if (codeEl) codeEl.value = '';
-            if (!opts.keepName && nameEl) nameEl.value = '';
-            if (balEl) balEl.value = '';
-            if (idEl) idEl.value = '0';
-            return;
+        var cid = cust && cust.id ? (parseInt(String(cust.id), 10) || 0) : (parseInt(String(invoice && invoice.customer_id || '0'), 10) || 0);
+        if (idEl) idEl.value = String(cid);
+        if (codeEl) codeEl.value = (cust && cust.code) ? String(cust.code) : (cid > 0 ? String(cid) : '—');
+        if (nameEl) nameEl.value = (cust && cust.name_ar) ? String(cust.name_ar) : ((invoice && invoice.customer_name) ? String(invoice.customer_name) : '');
+        if (balEl) {
+            if (cust && cust.current_balance != null) balEl.value = fmt3(cust.current_balance);
+            else balEl.value = cid > 0 ? '' : '—';
         }
-        currentCustomerId = parseInt(String(row.id), 10) || 0;
-        if (codeEl) codeEl.value = row.code || '';
-        if (nameEl && !opts.keepName) nameEl.value = row.name || '';
-        if (balEl) balEl.value = fmt3(row.balance || 0);
-        if (idEl) idEl.value = String(currentCustomerId);
-    }
-
-    function applyCustomerFromApi(cust, invoice) {
-        if (cust && cust.id) {
-            selectCustomer(cust.id, { keepName: false });
-            if (cust.name_ar) {
-                var nameEl = document.getElementById('ov2_customer_name');
-                if (nameEl) nameEl.value = cust.name_ar;
-            }
-            if (cust.code) {
-                var codeEl = document.getElementById('ov2_customer_code');
-                if (codeEl) codeEl.value = cust.code;
-            }
-            var balEl = document.getElementById('ov2_customer_balance');
-            if (balEl && cust.current_balance != null) balEl.value = fmt3(cust.current_balance);
-        } else {
-            selectCustomer(0, { keepName: true });
-            var codeEl2 = document.getElementById('ov2_customer_code');
-            if (codeEl2) codeEl2.value = '';
-            var nameEl2 = document.getElementById('ov2_customer_name');
-            if (nameEl2 && invoice && invoice.customer_name) nameEl2.value = invoice.customer_name;
-            var balEl2 = document.getElementById('ov2_customer_balance');
-            if (balEl2) balEl2.value = '';
-            var idEl2 = document.getElementById('ov2_customer_id');
-            if (idEl2) idEl2.value = String(parseInt(String(invoice && invoice.customer_id || '0'), 10) || 0);
-        }
-    }
-
-    function customerPickerOpen() {
-        if (browseOrderId <= 0 || ov2ViewMode) return;
-        var modal = document.getElementById('ov2_customer_pick_modal');
-        var qEl = document.getElementById('ov2_customer_pick_q');
-        if (!modal || !qEl) return;
-        modal.hidden = false;
-        modal.setAttribute('aria-hidden', 'false');
-        document.body.classList.add('gl-pick-open');
-        qEl.value = '';
-        customerPickerRender('');
-        qEl.focus();
-    }
-    function customerPickerClose() {
-        var modal = document.getElementById('ov2_customer_pick_modal');
-        if (!modal) return;
-        modal.hidden = true;
-        modal.setAttribute('aria-hidden', 'true');
-        document.body.classList.remove('gl-pick-open');
-    }
-    function customerPickerRender(q) {
-        var listEl = document.getElementById('ov2_customer_pick_list');
-        if (!listEl) return;
-        var query = String(q || '').trim().toLowerCase();
-        var rows = OV2_CUSTOMER_PICK_ROWS.filter(function (r) {
-            if (!query) return true;
-            var hay = (r.code + ' ' + r.name + ' ' + r.phone).toLowerCase();
-            return hay.indexOf(query) !== -1;
-        });
-        listEl.innerHTML = '';
-        if (!rows.length) { listEl.innerHTML = '<li class="gl-pick-empty">لا نتائج</li>'; return; }
-        rows.forEach(function (r) {
-            var li = document.createElement('li');
-            li.className = 'gl-pick-item';
-            li.setAttribute('role', 'button');
-            li.tabIndex = 0;
-            li.textContent = (r.code ? r.code + ' — ' : '') + r.name + (r.phone ? ' (' + r.phone + ')' : '') + ' [رصيد ' + fmt3(r.balance) + ']';
-            li.addEventListener('dblclick', function () {
-                selectCustomer(r.id);
-                var phoneEl = document.getElementById('ov2_phone');
-                if (phoneEl && r.phone && !phoneEl.value.trim()) phoneEl.value = r.phone;
-                customerPickerClose();
-            });
-            li.addEventListener('keydown', function (ev) {
-                if (ev.key === 'Enter') {
-                    selectCustomer(r.id);
-                    customerPickerClose();
-                }
-            });
-            listEl.appendChild(li);
-        });
     }
 
     function lineRowHtml() {
@@ -832,7 +687,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         }
         var sb = document.getElementById('ov2_btn_save');
         if (sb) {
-            sb.disabled = !OV2_READY || browseOrderId <= 0 || ov2ViewMode || !OV2_CAPS.can_edit;
+            sb.disabled = browseOrderId <= 0 || ov2ViewMode || !OV2_CAPS.can_edit;
             sb.title = browseOrderId > 0 && !ov2ViewMode ? 'حفظ التعديلات' : (browseOrderId <= 0 ? 'افتح فاتورة أونلاين أولاً' : 'وضع العرض — فك القفل للتعديل');
         }
         var lbl = document.getElementById('ov2_browse_label');
@@ -854,10 +709,11 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
                 if (el.id === 'ov2_btn_print' || el.closest('.jv-voucher-nav-btns') || el.id === 'ov2_btn_search' || el.id === 'ov2_btn_save') {
                     return;
                 }
-                if (el.id === 'ov2_doc_serial' || el.id === 'ov2_order_number' || el.id === 'ov2_status' || el.id === 'ov2_completed_at') {
+                if (el.id === 'ov2_doc_serial' || el.id === 'ov2_order_number' || el.id === 'ov2_status' || el.id === 'ov2_completed_at'
+                    || el.id === 'ov2_customer_code' || el.id === 'ov2_customer_balance' || el.id === 'ov2_channel_name') {
                     return;
                 }
-                el.disabled = noDoc || ov2ViewMode || !OV2_READY;
+                el.disabled = noDoc || ov2ViewMode;
             });
         }
         ov2SyncToolbar();
@@ -882,8 +738,10 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         if (areaEl) areaEl.value = inv.area || '';
         var addrEl = document.getElementById('ov2_address');
         if (addrEl) addrEl.value = inv.address || '';
-        var chEl = document.getElementById('ov2_channel');
-        if (chEl && inv.channel_id) chEl.value = String(inv.channel_id);
+        var chNameEl = document.getElementById('ov2_channel_name');
+        var chIdEl = document.getElementById('ov2_channel_id');
+        if (chNameEl) chNameEl.value = inv.channel_name || '—';
+        if (chIdEl) chIdEl.value = String(parseInt(String(inv.channel_id || '0'), 10) || 0);
         var notesEl = document.getElementById('ov2_notes');
         if (notesEl) notesEl.value = inv.notes || '';
         ov2GlPosted = !!inv.gl_posted;
@@ -1003,7 +861,14 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
 
     function save() {
         if (!OV2_CAPS.can_edit) { alert('لا تملك صلاحية تعديل فواتير أونلاين'); return; }
-        if (!OV2_READY || ov2ViewMode || browseOrderId <= 0) return;
+        if (ov2ViewMode || browseOrderId <= 0) {
+            alert(browseOrderId <= 0 ? 'افتح فاتورة أونلاين من البحث أو التنقل أولاً' : 'وضع العرض — فك القفل للتعديل');
+            return;
+        }
+        if (OV2_WARN_NO_PRODUCTS) {
+            alert('لا توجد منتجات نشطة في سياق الدولة — راجع شاشة المنتجات قبل تعديل الأصناف');
+            return;
+        }
 
         var name = (document.getElementById('ov2_customer_name').value || '').trim();
         var phone = (document.getElementById('ov2_phone').value || '').trim();
@@ -1017,9 +882,6 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
             alert('اكتب الهاتف كرقم محلي فقط بدون + أو 00');
             return;
         }
-        var channel = parseInt(document.getElementById('ov2_channel').value, 10) || 0;
-        if (!channel) { alert('اختر قناة العملاء'); return; }
-
         var tb = document.getElementById('ov2_lines_body');
         if (!tb) { alert('لا توجد أصناف'); return; }
         var items = [];
@@ -1046,7 +908,6 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
             area: (document.getElementById('ov2_area').value || '').trim(),
             address: (document.getElementById('ov2_address').value || '').trim(),
             notes: (document.getElementById('ov2_notes').value || '').trim(),
-            channel_id: channel,
             items: items
         };
 
@@ -1057,9 +918,6 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
                 return;
             }
             var msg = res.gl_sync_note || res.message || 'تم الحفظ';
-            if (window.orangeSalesDocUi) {
-                window.orangeSalesDocUi.rememberChannel(OV2_COUNTRY_ID, channel);
-            }
             alert(msg);
             ov2ReloadAfterSave(res);
         }).catch(function (e) { alert(e.message || String(e)); });
@@ -1100,26 +958,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
             ov2ProductPick.bindModal();
         }
 
-        var codeEl = document.getElementById('ov2_customer_code');
-        if (codeEl) {
-            codeEl.addEventListener('dblclick', function (e) { e.preventDefault(); customerPickerOpen(); });
-            codeEl.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); customerPickerOpen(); } });
-        }
-        document.getElementById('ov2_customer_pick_backdrop').addEventListener('click', customerPickerClose);
-        document.getElementById('ov2_customer_pick_close').addEventListener('click', customerPickerClose);
-        var custPickQ = document.getElementById('ov2_customer_pick_q');
-        var custPickTimer = null;
-        if (custPickQ) {
-            custPickQ.addEventListener('input', function () {
-                if (custPickTimer) clearTimeout(custPickTimer);
-                custPickTimer = setTimeout(function () { customerPickerRender(custPickQ.value || ''); }, 180);
-            });
-        }
-
         document.getElementById('ov2_btn_save').addEventListener('click', save);
-        document.addEventListener('keydown', function (ev) {
-            if (ev.key === 'Escape') customerPickerClose();
-        });
         if (window.orangeSalesDocUi) {
             window.orangeSalesDocUi.bindPrintButton('ov2_btn_print', {
                 prefix: 'ov2',
