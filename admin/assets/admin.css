@@ -1627,6 +1627,74 @@ label {
     padding-inline: 14px;
 }
 
+/* شبكات النماذج داخل البطاقة — ارتفاع موحّد (بنود محفوظة، قواميس، …) */
+.card .form-grid:not(.customers-form-grid):not(.suppliers-form-grid):not(.product-form-tab-basic-grid):not(.product-form-basic-top3-inner) input[type="text"],
+.card .form-grid:not(.customers-form-grid):not(.suppliers-form-grid):not(.product-form-tab-basic-grid):not(.product-form-basic-top3-inner) input[type="search"],
+.card .form-grid:not(.customers-form-grid):not(.suppliers-form-grid):not(.product-form-tab-basic-grid):not(.product-form-basic-top3-inner) input[type="number"],
+.card .form-grid:not(.customers-form-grid):not(.suppliers-form-grid):not(.product-form-tab-basic-grid):not(.product-form-basic-top3-inner) input.admin-inp-readonly,
+.card .form-grid:not(.customers-form-grid):not(.suppliers-form-grid):not(.product-form-tab-basic-grid):not(.product-form-basic-top3-inner) input.admin-sort-field,
+.card .form-grid:not(.customers-form-grid):not(.suppliers-form-grid):not(.product-form-tab-basic-grid):not(.product-form-basic-top3-inner) select,
+.card .form-grid:not(.customers-form-grid):not(.suppliers-form-grid):not(.product-form-tab-basic-grid):not(.product-form-basic-top3-inner) select.admin-sort-field,
+.card .orange-doc-toolbar-fields input[type="text"],
+.card .orange-doc-toolbar-fields input[type="search"],
+.card .orange-doc-toolbar-fields select {
+    height: var(--input-min-h);
+    min-height: var(--input-min-h);
+    max-height: var(--input-min-h);
+    box-sizing: border-box;
+}
+.card .form-grid:not(.customers-form-grid):not(.suppliers-form-grid):not(.product-form-tab-basic-grid):not(.product-form-basic-top3-inner) select,
+.card .form-grid:not(.customers-form-grid):not(.suppliers-form-grid):not(.product-form-tab-basic-grid):not(.product-form-basic-top3-inner) select.admin-sort-field,
+.card .orange-doc-toolbar-fields select {
+    padding-block: 0;
+    padding-inline: 0.65rem 2rem;
+    line-height: var(--input-min-h);
+}
+.card .orange-doc-toolbar-fields .btn-secondary {
+    min-height: var(--input-min-h);
+    height: var(--input-min-h);
+    box-sizing: border-box;
+}
+.ilp-row-ops .btn-secondary {
+    min-height: var(--input-min-h);
+    height: var(--input-min-h);
+    box-sizing: border-box;
+    padding-inline: 10px;
+}
+
+/* أسطر بنود المستند (شراء / مبيعات / إضافية) */
+.admin-doc-frame .admin-doc-lines-table input:not([type="checkbox"]):not([type="hidden"]):not([type="radio"]),
+.admin-doc-frame .admin-doc-lines-table select {
+    height: var(--input-min-h);
+    min-height: var(--input-min-h);
+    max-height: var(--input-min-h);
+    box-sizing: border-box;
+    font-size: 13px;
+}
+.admin-doc-frame .admin-doc-lines-table input:not([type="checkbox"]):not([type="hidden"]):not([type="radio"]) {
+    padding-block: 0;
+    padding-inline: 8px;
+}
+.admin-doc-frame .admin-doc-lines-table select {
+    padding-block: 0;
+    padding-inline: 0.65rem 2rem;
+    line-height: var(--input-min-h);
+}
+.pv2-extra-line-kind-row select,
+.gl-pick-modal__dialog input[type="search"].admin-inp,
+.gl-pick-modal__dialog select.admin-inp {
+    height: var(--input-min-h);
+    min-height: var(--input-min-h);
+    max-height: var(--input-min-h);
+    box-sizing: border-box;
+}
+.pv2-extra-line-kind-row select,
+.gl-pick-modal__dialog select.admin-inp {
+    padding-block: 0;
+    padding-inline: 0.65rem 2rem;
+    line-height: var(--input-min-h);
+}
+
 /* سند قيد — رأس السند: رقم، تواريخ، مرجع، مجموع مدين/دائن */
 .jv-voucher-header-line {
     display: grid;

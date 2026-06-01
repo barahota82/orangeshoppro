@@ -85,7 +85,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
     <h3 class="card-title">إضافة / تعديل بند محفوظ</h3>
     <input type="hidden" id="ilp_id" value="0">
     <input type="hidden" id="ilp_account_id" value="0">
-    <div class="form-grid ilp-form-grid">
+    <div class="form-grid ilp-form-grid orange-doc-header-row">
         <div>
             <label for="ilp_sort">الترتيب</label>
             <input type="number" id="ilp_sort" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en"
@@ -151,7 +151,7 @@ foreach (orange_invoice_ancillary_line_kind_catalog() as $kindKey => $kindMeta) 
 <div class="card">
     <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;">
         <h3 class="card-title" style="margin:0;">البنود المحفوظة</h3>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <div class="orange-doc-toolbar-fields" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
             <label for="ilp_filter_context" class="muted" style="font-size:0.85rem;">فلتر:</label>
             <select id="ilp_filter_context" class="admin-inp" style="min-width:8rem;">
                 <option value="">الكل</option>
