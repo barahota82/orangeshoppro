@@ -3054,6 +3054,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_sales_returns_analytics_v78($pdo);
     orange_catalog_migrate_cart_promo_schedule_v79($pdo);
     orange_catalog_migrate_product_offers_schedule_v80($pdo);
+    orange_catalog_migrate_product_offers_sort_order_v81($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
     orange_admin_seed_company_sales_invoice_page_permissions($pdo);
@@ -5958,6 +5959,31 @@ function orange_catalog_migrate_product_offers_schedule_v80(PDO $pdo): void
         'ALTER TABLE ' . $table . ' MODIFY COLUMN valid_from DATETIME NOT NULL,
          MODIFY COLUMN valid_to DATETIME NOT NULL'
     );
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * عروض المنتج: ترتيب عرض في تبويب العروض بالرئيسية.
+ */
+function orange_catalog_migrate_product_offers_sort_order_v81(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_product_offers_sort_order_v81';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+    $table = 'offers';
+    if (!orange_table_exists($pdo, $table)) {
+        orange_catalog_schema_insert_migration_marker($pdo, $marker);
+
+        return;
+    }
+    if (!orange_table_has_column($pdo, $table, 'sort_order')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE ' . $table . ' ADD COLUMN sort_order INT NOT NULL DEFAULT 0');
+        orange_schema_invalidate_column_check($table, 'sort_order');
+    }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);
 }

@@ -87,7 +87,9 @@ if ($canUnifiedProductSql) {
     INNER JOIN catalog_sections ucs2 ON ucs2.id = ucc.catalog_section_id AND ucs2.is_active = 1
     INNER JOIN departments d ON d.id = ucs2.department_id AND (' . $homeDeptActiveSql . ')
     WHERE o.is_active = 1 AND p.is_active = 1' . $offersScheduleSql . $homeProductsCountrySql . '
-    ORDER BY p.sort_order ASC, p.id ASC, o.id ASC
+    ORDER BY '
+        . (orange_table_has_column($pdo, 'offers', 'sort_order') ? 'o.sort_order ASC, ' : '')
+        . 'p.sort_order ASC, p.id ASC, o.id ASC
 ';
 } else {
     /* مرحلة 5: لا مسار legacy — منتجات فارغة حتى اكتمال الشجرة الموحّدة */

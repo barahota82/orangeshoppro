@@ -50,6 +50,9 @@ try {
         ], 422);
     }
 
+    $sortOrder = (int) ($data['sort_order'] ?? 0);
+    $hasSort = orange_table_has_column($pdo, 'offers', 'sort_order');
+
     $offerId = (int) ($data['id'] ?? 0);
     if ($offerId > 0) {
         try {
@@ -57,33 +60,63 @@ try {
         } catch (RuntimeException $e) {
             json_response(['success' => false, 'message' => $e->getMessage()], 403);
         }
-        $st = $pdo->prepare(
-            'UPDATE offers SET product_id = ?, discount = ?, is_active = 1,
-             valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL
-             WHERE id = ?'
-        );
-        $st->execute([
-            $pid,
-            $discount,
-            $bounds['valid_from'],
-            $bounds['valid_to'],
-            $offerId,
-        ]);
+        if ($hasSort) {
+            $st = $pdo->prepare(
+                'UPDATE offers SET product_id = ?, discount = ?, sort_order = ?, is_active = 1,
+                 valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL
+                 WHERE id = ?'
+            );
+            $st->execute([
+                $pid,
+                $discount,
+                $sortOrder,
+                $bounds['valid_from'],
+                $bounds['valid_to'],
+                $offerId,
+            ]);
+        } else {
+            $st = $pdo->prepare(
+                'UPDATE offers SET product_id = ?, discount = ?, is_active = 1,
+                 valid_from = ?, valid_to = ?, auto_paused_at = NULL, auto_paused_reason = NULL
+                 WHERE id = ?'
+            );
+            $st->execute([
+                $pid,
+                $discount,
+                $bounds['valid_from'],
+                $bounds['valid_to'],
+                $offerId,
+            ]);
+        }
         json_response(['success' => true, 'message' => 'تم تحديث العرض', 'id' => $offerId]);
 
         return;
     }
 
-    $stmt = $pdo->prepare(
-        'INSERT INTO offers (product_id, discount, is_active, valid_from, valid_to)
-         VALUES (?, ?, 1, ?, ?)'
-    );
-    $stmt->execute([
-        $pid,
-        $discount,
-        $bounds['valid_from'],
-        $bounds['valid_to'],
-    ]);
+    if ($hasSort) {
+        $stmt = $pdo->prepare(
+            'INSERT INTO offers (product_id, discount, sort_order, is_active, valid_from, valid_to)
+             VALUES (?, ?, ?, 1, ?, ?)'
+        );
+        $stmt->execute([
+            $pid,
+            $discount,
+            $sortOrder,
+            $bounds['valid_from'],
+            $bounds['valid_to'],
+        ]);
+    } else {
+        $stmt = $pdo->prepare(
+            'INSERT INTO offers (product_id, discount, is_active, valid_from, valid_to)
+             VALUES (?, ?, 1, ?, ?)'
+        );
+        $stmt->execute([
+            $pid,
+            $discount,
+            $bounds['valid_from'],
+            $bounds['valid_to'],
+        ]);
+    }
 
     json_response(['success' => true, 'message' => 'تم حفظ العرض', 'id' => (int) $pdo->lastInsertId()]);
 } catch (Throwable $e) {
