@@ -497,6 +497,7 @@ function orange_admin_is_global(?array $admin): bool
 
 /**
  * SQL آمن للاستعلامات بدون prepare: AND alias.country_id = N
+ * للدولة الافتراضية (الكويت): يشمل country_id NULL/0 كتراث ما قبل تعدد الدول — مطابق orange_sql_filter_country_id.
  */
 function orange_sql_country_and_fragment(PDO $pdo, string $table, string $alias, int $countryId): string
 {
@@ -504,6 +505,11 @@ function orange_sql_country_and_fragment(PDO $pdo, string $table, string $alias,
         return '';
     }
     $col = trim($alias) !== '' ? trim($alias) . '.country_id' : $table . '.country_id';
+    $kwId = orange_countries_default_id($pdo);
+    if ($kwId > 0 && $countryId === $kwId) {
+        return ' AND (' . $col . ' = ' . (int) $countryId
+            . ' OR ' . $col . ' IS NULL OR ' . $col . ' = 0)';
+    }
 
     return ' AND ' . $col . ' = ' . (int) $countryId;
 }

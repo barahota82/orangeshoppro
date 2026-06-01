@@ -11,8 +11,11 @@ require_once __DIR__ . '/../../includes/sales_doc_product_pick.php';
 require_once __DIR__ . '/../../includes/edit_lock_ui.php';
 require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/sales_doc_print.php';
+require_once __DIR__ . '/../../includes/catalog_multicountry_runtime.php';
 
 $pdo = orange_admin_page_pdo();
+orange_catalog_backfill_products_country_id($pdo);
+orange_catalog_backfill_channels_country_id($pdo);
 $sr2Caps = orange_admin_caps_for_page($admin, $pdo, 'sales_returns');
 
 $srCountryId = orange_admin_context_country_id($pdo);
@@ -64,6 +67,10 @@ if ($prefillCustomerRaw > 0) {
 $prefillOrderId = (int) ($_GET['order_id'] ?? 0);
 
 $sr2Ready = $sr2PickRows !== [];
+$sr2DiagCountryCode = orange_admin_context_country_code($pdo);
+$sr2DiagActiveProductsAll = orange_table_exists($pdo, 'products')
+    ? (int) $pdo->query('SELECT COUNT(*) FROM products WHERE is_active = 1')->fetchColumn()
+    : 0;
 $sr2NavReady = orange_table_exists($pdo, 'sales_returns');
 $sr2DocSerialPreview = $sr2NavReady
     ? orange_country_document_next_ref_preview($pdo, 'sales_returns', 'SR', $srCountryId)
@@ -158,8 +165,12 @@ $sr2DocSerialPreview = $sr2NavReady
 <?php if (!$sr2Ready): ?>
 <div class="card" style="border:1px solid #fcd34d;background:#fffbeb;margin-bottom:12px;">
     <p class="card-hint" style="margin:0;line-height:1.55;">
-        لا توجد منتجات نشطة لسياق الدولة الحالية — الخانات معطّلة حتى تُضاف منتجات من «المنتجات» (نشط + نفس الدولة في الأدمن).
-        <strong>كود العميل</strong> يبقى قابلاً للنقر المزدوج للاختيار.
+        <strong>الشاشة غير جاهزة</strong> لدولة الأدمن
+        <strong dir="ltr"><?php echo htmlspecialchars(strtoupper($sr2DiagCountryCode), ENT_QUOTES, 'UTF-8'); ?></strong>
+        (معرّف <?php echo (int) $srCountryId; ?>) —
+        لا أصناف للاختيار
+        (منتجات نشطة في النظام: <?php echo (int) $sr2DiagActiveProductsAll; ?>).
+        راجع «المنتجات»: نشط + ربط الدولة، أو اختر دولة الأدمن الصحيحة من الشريط العلوي.
     </p>
 </div>
 <?php endif; ?>

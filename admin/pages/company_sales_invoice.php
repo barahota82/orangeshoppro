@@ -15,8 +15,11 @@ require_once __DIR__ . '/../../includes/admin_permissions.php';
 require_once __DIR__ . '/../../includes/sales_doc_channel.php';
 require_once __DIR__ . '/../../includes/sales_doc_print.php';
 require_once __DIR__ . '/../../includes/document_sequences.php';
+require_once __DIR__ . '/../../includes/catalog_multicountry_runtime.php';
 
 $pdo = orange_admin_page_pdo();
+orange_catalog_backfill_products_country_id($pdo);
+orange_catalog_backfill_channels_country_id($pdo);
 $sv2Caps = orange_admin_caps_for_page($admin, $pdo, 'company_sales_invoice');
 
 $adminCountryId = orange_admin_context_country_id($pdo);
@@ -67,6 +70,13 @@ if (orange_table_exists($pdo, 'customers')) {
 
 $prefillOrderId = (int) ($_GET['order_id'] ?? 0);
 $sv2Ready = $sv2PickRows !== [] && $channels !== [];
+$sv2DiagCountryCode = orange_admin_context_country_code($pdo);
+$sv2DiagActiveProductsAll = orange_table_exists($pdo, 'products')
+    ? (int) $pdo->query('SELECT COUNT(*) FROM products WHERE is_active = 1')->fetchColumn()
+    : 0;
+$sv2DiagActiveChannelsAll = orange_table_exists($pdo, 'channels')
+    ? (int) $pdo->query('SELECT COUNT(*) FROM channels WHERE is_active = 1')->fetchColumn()
+    : 0;
 $sv2NavReady = orange_table_exists($pdo, 'orders');
 $sv2DocSerialPreview = $sv2NavReady
     ? orange_sales_invoice_ref_preview($pdo, 'company', $adminCountryId)
@@ -186,9 +196,19 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
 <?php if (!$sv2Ready): ?>
 <div class="card" style="border:1px solid #fcd34d;background:#fffbeb;margin-bottom:12px;">
     <p class="card-hint" style="margin:0;line-height:1.55;">
-        <?php if ($sv2PickRows === []): ?>لا توجد منتجات نشطة لسياق الدولة — أضف منتجات من «المنتجات».<?php endif; ?>
-        <?php if ($channels === []): ?> لا توجد قنوات نشطة لسياق الدولة — أضف قناة من «القنوات».<?php endif; ?>
-        <strong>كود العميل</strong> يبقى قابلاً للنقر المزدوج للاختيار عند توفر الجاهزية.
+        <strong>الشاشة غير جاهزة</strong> لدولة الأدمن
+        <strong dir="ltr"><?php echo htmlspecialchars(strtoupper($sv2DiagCountryCode), ENT_QUOTES, 'UTF-8'); ?></strong>
+        (معرّف <?php echo (int) $adminCountryId; ?>).
+        <?php if ($sv2PickRows === []): ?>
+            لا أصناف للاختيار في الفاتورة
+            (منتجات نشطة في النظام: <?php echo (int) $sv2DiagActiveProductsAll; ?> —
+            راجع «المنتجات»: نشط + <code>country_id</code> لهذه الدولة أو الكويت الافتراضية).
+        <?php endif; ?>
+        <?php if ($channels === []): ?>
+            لا قنوات نشطة لهذه الدولة
+            (قنوات نشطة في النظام: <?php echo (int) $sv2DiagActiveChannelsAll; ?> —
+            من «القنوات»: فعّل قناة واربطها بنفس الدولة).
+        <?php endif; ?>
     </p>
 </div>
 <?php endif; ?>
