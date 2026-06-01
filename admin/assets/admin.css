@@ -1325,7 +1325,12 @@ a { text-decoration: none; color: inherit; }
     max-width: 100%;
     box-sizing: border-box;
     font-size: 13px;
-    padding: 6px 8px;
+    height: var(--input-min-h);
+    min-height: var(--input-min-h);
+    max-height: var(--input-min-h);
+    padding-block: 0;
+    padding-inline: 8px;
+    line-height: var(--input-min-h);
     text-align: end;
 }
 .mo-lines-table .mo-name,
@@ -1494,9 +1499,34 @@ th {
 tbody tr:hover {
     background: rgba(234, 88, 12, 0.04);
 }
-input, textarea, select {
+/*
+ * ارتفاع موحّد لكل حقول الأدمن (36px) — مراجعة شاملة؛ لا حاجة لتكرار CSS في كل صفحة.
+ * استثناء: textarea، checkbox، file، أزرار submit من نوع input.
+ */
+input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),
+select:not([multiple]) {
     width: 100%;
-    padding: 8px 12px;
+    height: var(--input-min-h);
+    min-height: var(--input-min-h);
+    max-height: var(--input-min-h);
+    padding-block: 0;
+    padding-inline: 0.65rem;
+    border: 1px solid #cbd5e1;
+    border-radius: var(--radius-sm);
+    background: #fff;
+    font: inherit;
+    font-size: 14px;
+    line-height: var(--input-min-h);
+    color: var(--text);
+    box-sizing: border-box;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+textarea {
+    width: 100%;
+    min-height: 88px;
+    max-height: 220px;
+    resize: vertical;
+    padding: 10px 12px;
     border: 1px solid #cbd5e1;
     border-radius: var(--radius-sm);
     background: #fff;
@@ -1504,7 +1534,6 @@ input, textarea, select {
     font-size: 14px;
     line-height: 1.4;
     color: var(--text);
-    min-height: var(--input-min-h);
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 input::placeholder,
@@ -1551,15 +1580,25 @@ select.admin-sort-field {
     color: var(--text);
 }
 
-textarea {
-    min-height: 88px;
-    max-height: 220px;
-    resize: vertical;
-    padding-top: 10px;
-    padding-bottom: 10px;
-}
-select {
+select:not([multiple]) {
     cursor: pointer;
+    padding-inline-end: 2rem;
+}
+/* أزرار فلاتر التقارير والبطاقات — محاذاة ارتفاع الحقول (تقارير السندات، …) */
+.card form button[type="submit"],
+.card form .btn-secondary,
+.card form a.btn.btn-secondary,
+.orange-doc-toolbar-fields button,
+.orange-doc-toolbar-fields .btn-secondary,
+.orange-doc-toolbar-fields a.btn,
+.jvr-filter-tools__actions > button,
+.jvr-filter-tools__actions > a.btn {
+    min-height: var(--input-min-h);
+    height: var(--input-min-h);
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 input[type="file"] {
     min-height: auto;
@@ -1791,7 +1830,7 @@ label {
     flex: 0 0 auto;
     width: 2.65rem;
     min-width: 2.65rem;
-    min-height: 38px;
+    min-height: var(--input-min-h);
     align-self: stretch;
 }
 .admin-inp-dmy-picker-face {

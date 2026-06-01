@@ -182,9 +182,9 @@ $resetUrl = htmlspecialchars(storefront_public_path('/admin/index.php?page=journ
 <?php endif; ?>
 
 <div class="card">
-    <form method="get" action="">
+    <form method="get" action="" class="orange-doc-header-row">
         <input type="hidden" name="page" value="journal_voucher_reports">
-        <div class="jvr-filter-tools jvr-filter-tools--center">
+        <div class="jvr-filter-tools jvr-filter-tools--center orange-doc-toolbar-fields">
             <div class="jvr-filter-tools__entry">
                 <label for="jvr_entry_type">نوع القيد</label>
                 <select id="jvr_entry_type" name="entry_type" class="admin-inp">
