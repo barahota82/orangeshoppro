@@ -1591,7 +1591,7 @@ label {
     gap: 12px 16px;
 }
 
-/* مستندات v2 (شراء / مبيعات / أونلاين) — ارتفاع موحّد لحقول صف الترويسة (parity pv2 نوع الشراء) */
+/* مستندات v2 + فلاتر تقارير — ارتفاع موحّد (parity pv2 / pr2 نوع الشراء·المردود) */
 .orange-doc-header-row input[type="text"],
 .orange-doc-header-row input[type="search"],
 .orange-doc-header-row input[type="number"],
@@ -1605,6 +1605,26 @@ label {
     padding-block: 0;
     padding-inline: 0.65rem 2rem;
     line-height: var(--input-min-h);
+}
+.orange-doc-header-row__action {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-width: 0;
+}
+.orange-doc-header-row__action-label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 13px;
+    visibility: hidden;
+    line-height: 1.2;
+}
+.orange-doc-header-row__action .btn-secondary {
+    white-space: nowrap;
+    min-height: var(--input-min-h);
+    height: var(--input-min-h);
+    box-sizing: border-box;
+    padding-inline: 14px;
 }
 
 /* سند قيد — رأس السند: رقم، تواريخ، مرجع، مجموع مدين/دائن */

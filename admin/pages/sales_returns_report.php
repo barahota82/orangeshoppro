@@ -324,7 +324,7 @@ $baseUrl = storefront_public_path('/admin/index.php') . '?page=sales_returns_rep
 
 <form method="get" class="card" style="margin-bottom:1rem;">
     <input type="hidden" name="page" value="sales_returns_report">
-    <div class="form-grid" style="grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap:10px; align-items:end;">
+    <div class="form-grid orange-doc-header-row" style="grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap:10px; align-items:end;">
         <div>
             <label for="srr_from">من تاريخ</label>
             <input type="text" id="srr_from" name="from" value="<?php echo htmlspecialchars($fromIn, ENT_QUOTES, 'UTF-8'); ?>" placeholder="dd/mm/yyyy" dir="ltr">

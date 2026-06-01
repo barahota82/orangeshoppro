@@ -274,7 +274,7 @@ $bsCheck = round($bsAssets - ($bsLiab + $bsEquity), 2);
     <?php if ($years === []): ?>
         <p class="card-hint">لا توجد سنوات مالية معرفة. افتح <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=fiscal_years'), ENT_QUOTES, 'UTF-8'); ?>">السنوات المالية</a>.</p>
     <?php else: ?>
-    <form method="get" action="" class="form-grid" style="align-items:end;">
+    <form method="get" action="" class="form-grid orange-doc-header-row" style="align-items:end;">
         <input type="hidden" name="page" value="financial_report">
         <?php if ($stmtAccountId > 0): ?>
             <input type="hidden" name="account" value="<?php echo $stmtAccountId; ?>">

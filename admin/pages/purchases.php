@@ -251,7 +251,7 @@ foreach (orange_invoice_ancillary_purchase_line_kind_catalog() as $kindKey => $k
     <?php orange_edit_lock_ui_toolbar(['prefix' => 'pv2', 'doc_kind' => 'purchase', 'country_id' => $adminCountryId]); ?>
 
     <!-- ١ — مسلسل الفاتورة + المورد -->
-    <div class="form-grid pv2-supplier-row" style="margin-bottom:12px;">
+    <div class="form-grid pv2-supplier-row orange-doc-header-row" style="margin-bottom:12px;">
         <div>
             <label for="pv2_doc_serial">مسلسل الفاتورة</label>
             <input type="text" id="pv2_doc_serial" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en"

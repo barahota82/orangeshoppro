@@ -260,7 +260,7 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
 <div class="card">
     <h3 class="card-title">فلترة بالتاريخ</h3>
     <p class="card-hint" style="margin:0 0 0.75rem;">المبيعات: تاريخ إنشاء الطلب. المردودات: تاريخ الطلب المرجعي إن وُجد، وإلا تاريخ المردود.</p>
-    <form method="get" action="" class="form-grid" style="align-items:end;max-width:720px;">
+    <form method="get" action="" class="form-grid orange-doc-header-row" style="align-items:end;max-width:720px;">
         <input type="hidden" name="page" value="channel_analytics">
         <div>
             <label for="ca_from">من</label>

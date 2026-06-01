@@ -157,7 +157,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
     <h3 class="card-title">فاتورة أونلاين <span id="ov2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
     <?php orange_edit_lock_ui_toolbar(['prefix' => 'ov2', 'doc_kind' => 'online_sales_invoice', 'country_id' => $adminCountryId]); ?>
 
-    <div class="form-grid ov2-header-row1" style="margin-bottom:12px;">
+    <div class="form-grid ov2-header-row1 orange-doc-header-row" style="margin-bottom:12px;">
         <div>
             <label for="ov2_doc_serial">مسلسل الفاتورة</label>
             <input type="text" id="ov2_doc_serial" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en"
@@ -179,7 +179,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         </div>
     </div>
 
-    <div class="form-grid ov2-header-row2" style="margin-bottom:12px;">
+    <div class="form-grid ov2-header-row2 orange-doc-header-row" style="margin-bottom:12px;">
         <div>
             <label for="ov2_customer_code">كود العميل</label>
             <input type="text" id="ov2_customer_code" class="admin-inp-readonly" autocomplete="off" dir="ltr" lang="en" readonly disabled tabindex="-1" placeholder="—" title="من الطلب — يُعبَّأ عند فتح الفاتورة">
@@ -195,7 +195,7 @@ $finalPostingUrl = storefront_public_path('/admin/index.php?page=online_orders_f
         <input type="hidden" id="ov2_customer_id" value="0">
     </div>
 
-    <div class="form-grid ov2-header-row3" style="margin-bottom:12px;">
+    <div class="form-grid ov2-header-row3 orange-doc-header-row" style="margin-bottom:12px;">
         <div>
             <label for="ov2_phone_country">كود الدولة</label>
             <input type="search" id="ov2_phone_country" list="ov2_phone_country_list" autocomplete="off" dir="ltr" lang="en" placeholder="+965" required>

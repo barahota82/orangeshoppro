@@ -125,7 +125,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 <?php if ($reconcile !== null): ?>
 <div class="card admin-fy-card">
     <h3 class="card-title">مطابقة الدليل مع دفتر الذمم</h3>
-    <form method="get" class="form-grid" style="max-width:420px;">
+    <form method="get" class="form-grid orange-doc-header-row" style="max-width:420px;">
         <input type="hidden" name="page" value="partner_reports">
         <?php if ($partnerView !== 'all'): ?>
             <input type="hidden" name="view" value="<?php echo htmlspecialchars($partnerView, ENT_QUOTES, 'UTF-8'); ?>">

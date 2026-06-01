@@ -241,7 +241,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
     <h3 class="card-title">فاتورة مبيعات <span id="sv2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
     <?php orange_edit_lock_ui_toolbar(['prefix' => 'sv2', 'doc_kind' => 'company_sales_invoice', 'country_id' => $adminCountryId]); ?>
 
-    <div class="form-grid sv2-header-row1" style="margin-bottom:12px;">
+    <div class="form-grid sv2-header-row1 orange-doc-header-row" style="margin-bottom:12px;">
         <div>
             <label for="sv2_doc_serial">مسلسل الفاتورة</label>
             <input type="text" id="sv2_doc_serial" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en"
@@ -263,7 +263,7 @@ foreach (orange_invoice_ancillary_sales_line_kind_catalog() as $kindKey => $kind
         <input type="hidden" id="sv2_customer_id" value="0">
     </div>
 
-    <div class="form-grid sv2-header-row2" style="margin-bottom:12px;">
+    <div class="form-grid sv2-header-row2 orange-doc-header-row" style="margin-bottom:12px;">
         <div>
             <label for="sv2_phone_country">كود الدولة</label>
             <input type="search" id="sv2_phone_country" list="sv2_phone_country_list" autocomplete="off" dir="ltr" lang="en" placeholder="+965" required>

@@ -210,38 +210,6 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
 .form-grid.pr2-header-row2 {
     grid-template-columns: minmax(6.5rem, 0.65fr) auto minmax(0, 1.5fr) minmax(5.5rem, 0.65fr);
 }
-.form-grid.pr2-header-row2 input[type="text"] {
-    height: var(--input-min-h);
-    min-height: var(--input-min-h);
-    box-sizing: border-box;
-}
-.pr2-header-row2__action {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    min-width: 0;
-}
-.pr2-header-row2__action-label {
-    display: block;
-    margin-bottom: 5px;
-    font-size: 13px;
-    visibility: hidden;
-    line-height: 1.2;
-}
-.pr2-header-row2__action .btn-secondary {
-    white-space: nowrap;
-    min-height: var(--input-min-h);
-    box-sizing: border-box;
-    padding-inline: 14px;
-}
-.form-grid.pr2-header-row2 select {
-    height: var(--input-min-h);
-    min-height: var(--input-min-h);
-    box-sizing: border-box;
-    padding-block: 0;
-    padding-inline: 0.65rem 2rem;
-    line-height: var(--input-min-h);
-}
 .form-grid.pr2-supplier-row {
     grid-template-columns: minmax(7rem, 0.75fr) minmax(0, 1fr) minmax(0, 2fr);
 }
@@ -264,7 +232,7 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     <?php orange_edit_lock_ui_toolbar(['prefix' => 'pr2', 'doc_kind' => 'purchase_return', 'country_id' => $prCountryId]); ?>
 
     <!-- ١ — مسلسل الفاتورة + المورد -->
-    <div class="form-grid pr2-supplier-row" style="margin-bottom:12px;">
+    <div class="form-grid pr2-supplier-row orange-doc-header-row" style="margin-bottom:12px;">
         <div>
             <label for="pr2_doc_serial">مسلسل الفاتورة</label>
             <input type="text" id="pr2_doc_serial" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en"
@@ -283,13 +251,13 @@ $otherVouchersUrl = storefront_public_path('/admin/index.php?page=other_vouchers
     </div>
 
     <!-- ٢ — فاتورة الشراء المرجعية، استرجاع، ملاحظات، نوع المردود -->
-    <div class="form-grid pr2-header-row2" style="margin-bottom:16px;">
+    <div class="form-grid pr2-header-row2 orange-doc-header-row" style="margin-bottom:16px;">
         <div>
             <label for="pr2_purchase_ref">فاتورة الشراء المرجعية</label>
             <input type="text" id="pr2_purchase_ref" placeholder="PUR- أو رقم" dir="ltr" lang="en" autocomplete="off"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>
         </div>
-        <div class="pr2-header-row2__action">
-            <span class="pr2-header-row2__action-label" aria-hidden="true">.</span>
+        <div class="orange-doc-header-row__action">
+            <span class="orange-doc-header-row__action-label" aria-hidden="true">.</span>
             <button type="button" class="btn-secondary" id="pr2_btn_retrieve"<?php echo !$pr2Ready ? ' disabled' : ''; ?>>استرجاع</button>
         </div>
         <div>

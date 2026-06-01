@@ -119,38 +119,6 @@ $sr2DocSerialPreview = $sr2NavReady
 .form-grid.sr2-header-row2 {
     grid-template-columns: minmax(6.5rem, 0.65fr) auto minmax(0, 1.5fr) minmax(5.5rem, 0.65fr);
 }
-.form-grid.sr2-header-row2 input[type="text"] {
-    height: var(--input-min-h);
-    min-height: var(--input-min-h);
-    box-sizing: border-box;
-}
-.sr2-header-row2__action {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    min-width: 0;
-}
-.sr2-header-row2__action-label {
-    display: block;
-    margin-bottom: 5px;
-    font-size: 13px;
-    visibility: hidden;
-    line-height: 1.2;
-}
-.sr2-header-row2__action .btn-secondary {
-    white-space: nowrap;
-    min-height: var(--input-min-h);
-    box-sizing: border-box;
-    padding-inline: 14px;
-}
-.form-grid.sr2-header-row2 select {
-    height: var(--input-min-h);
-    min-height: var(--input-min-h);
-    box-sizing: border-box;
-    padding-block: 0;
-    padding-inline: 0.65rem 2rem;
-    line-height: var(--input-min-h);
-}
 .form-grid.sr2-customer-row {
     grid-template-columns: minmax(7rem, 0.75fr) minmax(0, 1fr) minmax(0, 2fr) minmax(5rem, 0.55fr);
 }
@@ -195,7 +163,7 @@ $sr2DocSerialPreview = $sr2NavReady
     <h3 class="card-title">مردود مبيعات <span id="sr2_browse_label" class="muted" style="font-size:0.85rem;font-weight:500;"></span></h3>
     <?php orange_edit_lock_ui_toolbar(['prefix' => 'sr2', 'doc_kind' => 'sales_return', 'country_id' => $srCountryId]); ?>
 
-    <div class="form-grid sr2-customer-row" style="margin-bottom:12px;">
+    <div class="form-grid sr2-customer-row orange-doc-header-row" style="margin-bottom:12px;">
         <div>
             <label for="sr2_doc_serial">مسلسل المردود</label>
             <input type="text" id="sr2_doc_serial" class="admin-inp-readonly" readonly disabled tabindex="-1" dir="ltr" lang="en"
@@ -217,14 +185,14 @@ $sr2DocSerialPreview = $sr2NavReady
         <input type="hidden" id="sr2_customer_id" value="0">
     </div>
 
-    <div class="form-grid sr2-header-row2" style="margin-bottom:16px;">
+    <div class="form-grid sr2-header-row2 orange-doc-header-row" style="margin-bottom:16px;">
         <div>
             <label for="sr2_order_ref">فاتورة المبيعات المرجعية</label>
             <input type="text" id="sr2_order_ref" placeholder="INV-C- أو رقم" dir="ltr" lang="en" autocomplete="off">
             <input type="hidden" id="sr2_order_id" value="0">
         </div>
-        <div class="sr2-header-row2__action">
-            <span class="sr2-header-row2__action-label" aria-hidden="true">.</span>
+        <div class="orange-doc-header-row__action">
+            <span class="orange-doc-header-row__action-label" aria-hidden="true">.</span>
             <button type="button" class="btn-secondary" id="sr2_btn_retrieve">استرجاع</button>
         </div>
         <div>
