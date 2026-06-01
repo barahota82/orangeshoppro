@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/sales_return_analytics.php';
+require_once __DIR__ . '/../../includes/sales_doc_channel.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -96,9 +97,10 @@ function orange_sales_returns_report_where(
         $where .= ' AND sr.type = ?';
         $params[] = $payFilter;
     }
-    if ($channelFilter > 0) {
-        $where .= ' AND sr.channel_id = ?';
-        $params[] = $channelFilter;
+    [$chFilterSql, $chFilterParams] = orange_sales_returns_report_channel_filter_sql($channelFilter);
+    $where .= $chFilterSql;
+    foreach ($chFilterParams as $p) {
+        $params[] = $p;
     }
 
     return [$where, $params];
@@ -171,15 +173,32 @@ if (orange_table_exists($pdo, 'sales_returns') && orange_table_exists($pdo, 'sal
 
     if ($hasChannels && orange_table_has_column($pdo, 'sales_returns', 'channel_id')) {
         $stMc = $pdo->prepare(
-            'SELECT COALESCE(ch.name, \'— بلا قناة —\') AS channel_name,
+            'SELECT sr.channel_id, sr.source_kind, ch.name AS channel_name_db,
                     COUNT(*) AS cnt,
                     COALESCE(SUM(sr.total), 0) AS total_sum
              FROM sales_returns sr' . $joinCh . $whereSql . '
-             GROUP BY sr.channel_id, ch.name
+             GROUP BY sr.channel_id, sr.source_kind, ch.name
              ORDER BY total_sum DESC'
         );
         $stMc->execute($whereParams);
-        $byMarketingChannel = $stMc->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $mcRaw = $stMc->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $mcMerged = [];
+        foreach ($mcRaw as $row) {
+            $label = orange_sales_return_marketing_channel_label(
+                isset($row['channel_id']) ? (int) $row['channel_id'] : 0,
+                (string) ($row['channel_name_db'] ?? ''),
+                (string) ($row['source_kind'] ?? '')
+            );
+            if (!isset($mcMerged[$label])) {
+                $mcMerged[$label] = ['channel_name' => $label, 'cnt' => 0, 'total_sum' => 0.0];
+            }
+            $mcMerged[$label]['cnt'] += (int) ($row['cnt'] ?? 0);
+            $mcMerged[$label]['total_sum'] += (float) ($row['total_sum'] ?? 0);
+        }
+        $byMarketingChannel = array_values($mcMerged);
+        usort($byMarketingChannel, static function (array $a, array $b): int {
+            return ($b['total_sum'] <=> $a['total_sum']) ?: ($b['cnt'] <=> $a['cnt']);
+        });
     }
 
     $prodNameExpr = orange_table_exists($pdo, 'products')
@@ -217,7 +236,7 @@ if (orange_table_exists($pdo, 'sales_returns') && orange_table_exists($pdo, 'sal
         $detailCols .= ', c.' . $custNameCol . ' AS customer_name';
     }
     if ($hasChannels) {
-        $detailCols .= ', ch.name AS channel_name';
+        $detailCols .= ', sr.channel_id, ch.name AS channel_name_db';
     }
 
     $stDet = $pdo->prepare(
@@ -228,6 +247,14 @@ if (orange_table_exists($pdo, 'sales_returns') && orange_table_exists($pdo, 'sal
     );
     $stDet->execute($whereParams);
     $detailRows = $stDet->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    foreach ($detailRows as &$detRow) {
+        $detRow['channel_name'] = orange_sales_return_marketing_channel_label(
+            isset($detRow['channel_id']) ? (int) $detRow['channel_id'] : 0,
+            (string) ($detRow['channel_name_db'] ?? ''),
+            (string) ($detRow['source_kind'] ?? '')
+        );
+    }
+    unset($detRow);
 }
 
 if ($exportCsv) {
@@ -315,11 +342,12 @@ $baseUrl = storefront_public_path('/admin/index.php') . '?page=sales_returns_rep
                 <option value="credit"<?php echo $payFilter === 'credit' ? ' selected' : ''; ?>>آجل</option>
             </select>
         </div>
-        <?php if ($channelOptions !== []): ?>
+        <?php if ($channelOptions !== [] || $hasAnalytics): ?>
         <div>
             <label for="srr_channel">قناة التسويق</label>
             <select id="srr_channel" name="channel_id">
-                <option value="0">الكل</option>
+                <option value="0"<?php echo $channelFilter === 0 ? ' selected' : ''; ?>>الكل</option>
+                <option value="-1"<?php echo $channelFilter === -1 ? ' selected' : ''; ?>><?php echo htmlspecialchars(orange_sales_company_direct_channel_label(), ENT_QUOTES, 'UTF-8'); ?> — مبيعات شركة مباشرة</option>
                 <?php foreach ($channelOptions as $ch): ?>
                 <option value="<?php echo (int) ($ch['id'] ?? 0); ?>"<?php echo $channelFilter === (int) ($ch['id'] ?? 0) ? ' selected' : ''; ?>>
                     <?php echo htmlspecialchars((string) ($ch['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>

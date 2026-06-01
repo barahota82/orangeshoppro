@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/date_format.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/currency.php';
 require_once __DIR__ . '/../../includes/sales_doc_channel.php';
+require_once __DIR__ . '/../../includes/sales_return_analytics.php';
 
 $pdo = db();
 orange_catalog_ensure_schema($pdo);
@@ -118,6 +119,109 @@ $stCo = $pdo->prepare($companyDirectSql);
 $stCo->execute($companyDirectParams);
 $companyDirect = $stCo->fetch(PDO::FETCH_ASSOC) ?: ['cnt_all' => 0, 'cnt_completed' => 0, 'revenue_completed' => 0];
 $companyInvoiceUrl = storefront_public_path('/admin/index.php?page=company_sales_invoice');
+$returnsReportUrl = storefront_public_path('/admin/index.php?page=sales_returns_report');
+
+/** @var array<int, array{cnt: int, total: float}> */
+$returnsByChannelId = [];
+$companyReturns = ['cnt' => 0, 'total' => 0.0];
+$hasSrTable = orange_table_exists($pdo, 'sales_returns');
+$hasSrChannel = $hasSrTable && orange_table_has_column($pdo, 'sales_returns', 'channel_id');
+$hasSrCreated = $hasSrTable && orange_table_has_column($pdo, 'sales_returns', 'created_at');
+$hasSrSource = $hasSrTable && orange_table_has_column($pdo, 'sales_returns', 'source_kind');
+
+if ($hasSrChannel) {
+    [$srBaseSql, $srBaseParams] = orange_sales_returns_date_country_where(
+        $pdo,
+        'sr',
+        $hasSrCreated,
+        $fromYmd,
+        $toYmd,
+        $caCountryId
+    );
+    $stRetCh = $pdo->prepare(
+        'SELECT sr.channel_id AS cid, COUNT(*) AS cnt, COALESCE(SUM(sr.total), 0) AS total_sum
+         FROM sales_returns sr
+         WHERE sr.channel_id IS NOT NULL AND sr.channel_id > 0' . $srBaseSql . '
+         GROUP BY sr.channel_id'
+    );
+    $stRetCh->execute($srBaseParams);
+    foreach ($stRetCh->fetchAll(PDO::FETCH_ASSOC) ?: [] as $rr) {
+        $cid = (int) ($rr['cid'] ?? 0);
+        if ($cid <= 0) {
+            continue;
+        }
+        $returnsByChannelId[$cid] = [
+            'cnt' => (int) ($rr['cnt'] ?? 0),
+            'total' => (float) ($rr['total_sum'] ?? 0),
+        ];
+    }
+
+    if ($hasSrSource) {
+        $stRetCo = $pdo->prepare(
+            'SELECT COUNT(*) AS cnt, COALESCE(SUM(sr.total), 0) AS total_sum
+             FROM sales_returns sr
+             WHERE (sr.channel_id IS NULL OR sr.channel_id = 0)
+               AND sr.source_kind = \'company\'' . $srBaseSql
+        );
+        $stRetCo->execute($srBaseParams);
+        $coRetRow = $stRetCo->fetch(PDO::FETCH_ASSOC);
+        if (is_array($coRetRow)) {
+            $companyReturns = [
+                'cnt' => (int) ($coRetRow['cnt'] ?? 0),
+                'total' => (float) ($coRetRow['total_sum'] ?? 0),
+            ];
+        }
+    }
+}
+
+/** @var list<array<string, mixed>> */
+$unifiedChannelRows = [];
+foreach ($channelRows as $cr) {
+    $cid = (int) ($cr['id'] ?? 0);
+    $salesRev = (float) ($cr['revenue_completed'] ?? 0);
+    $ret = $returnsByChannelId[$cid] ?? ['cnt' => 0, 'total' => 0.0];
+    $retTotal = (float) $ret['total'];
+    $unifiedChannelRows[] = [
+        'id' => $cid,
+        'name' => (string) ($cr['name'] ?? ''),
+        'slug' => (string) ($cr['slug'] ?? ''),
+        'is_active' => (int) ($cr['is_active'] ?? 0),
+        'sales_cnt_all' => (int) ($cr['cnt_all'] ?? 0),
+        'sales_cnt_done' => (int) ($cr['cnt_completed'] ?? 0),
+        'sales_rev' => $salesRev,
+        'ret_cnt' => (int) $ret['cnt'],
+        'ret_total' => $retTotal,
+        'net' => round($salesRev - $retTotal, 4),
+        '_top' => $topByChannel[$cid] ?? null,
+    ];
+}
+
+$coSalesRev = (float) ($companyDirect['revenue_completed'] ?? 0);
+$coRetTotal = (float) $companyReturns['total'];
+$unifiedChannelRows[] = [
+    'id' => 0,
+    'name' => orange_sales_company_direct_channel_label(),
+    'slug' => 'company',
+    'is_active' => 1,
+    'sales_cnt_all' => (int) ($companyDirect['cnt_all'] ?? 0),
+    'sales_cnt_done' => (int) ($companyDirect['cnt_completed'] ?? 0),
+    'sales_rev' => $coSalesRev,
+    'ret_cnt' => (int) $companyReturns['cnt'],
+    'ret_total' => $coRetTotal,
+    'net' => round($coSalesRev - $coRetTotal, 4),
+    '_top' => null,
+];
+
+usort($unifiedChannelRows, static function (array $a, array $b): int {
+    return ($b['net'] <=> $a['net']) ?: ($b['sales_rev'] <=> $a['sales_rev']);
+});
+$rank = 0;
+foreach ($unifiedChannelRows as &$ur) {
+    $ur['_rank'] = ++$rank;
+    $done = (int) ($ur['sales_cnt_done'] ?? 0);
+    $ur['_avg_basket'] = $done > 0 ? ((float) ($ur['sales_rev'] ?? 0)) / $done : 0.0;
+}
+unset($ur);
 
 $topSql = '
     SELECT o.channel_id, oi.product_name, SUM(oi.qty) AS qty_sum,
@@ -164,7 +268,8 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
     <h1>تحليل القنوات</h1>
     <p class="card-hint" style="margin:0.35rem 0 0;max-width:900px;line-height:1.55;">
         القنوات عندكم تمثّل <strong>واجهات البيع</strong> (مثل تيك توك / واتساب / …) وتوزيع العملاء — بحسب مذكرة النظام: مسارات منفصلة و<code>channel_id</code> على الطلب، مع <strong>مخزون ومبيعات شركة واحدة</strong>.
-        هذا التقرير يقيّس «شغل» كل قناة: عدد الطلبات، التسليمات، الإيراد، وأكثر منتج حركةً داخل القناة.
+        هذا التقرير يقيّس «شغل» كل قناة: <strong>مبيعات مكتملة</strong>، <strong>مردودات</strong> (حسب تاريخ المردود)، <strong>الصافي</strong>، وأكثر منتج حركةً.
+        مبيعات شركة مباشرة (قناة «<?php echo htmlspecialchars(orange_sales_company_direct_channel_label(), ENT_QUOTES, 'UTF-8'); ?>») تظهر كصف مستقل.
         توجيه الزائر من دومين الشركة إلى القناة التي فتحها يُنفَّذ في الواجهة العامة؛ هنا نعرض نتائج الطلبات المحفوظة فقط.
     </p>
 </div>
@@ -191,8 +296,11 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
 </div>
 
 <div class="card">
-    <h3 class="card-title">ملخص القنوات — ترتيب النشاط (حسب إيراد الطلبات المكتملة)</h3>
-    <p class="card-hint">المركز 1 = أعلى إيراد من طلبات <code>completed</code> في الفترة المختارة.</p>
+    <h3 class="card-title">ملخص القنوات — بيع ومردود وصافي</h3>
+    <p class="card-hint">
+        المبيعات حسب تاريخ إنشاء الطلب (<code>completed</code>)؛ المردودات حسب تاريخ المردود.
+        الترتيب حسب <strong>الصافي</strong> (إيراد مكتمل − مردودات).
+    </p>
     <div class="table-wrap">
         <table class="admin-table">
             <thead>
@@ -200,33 +308,35 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
                     <th>#</th>
                     <th>القناة</th>
                     <th>Slug</th>
-                    <th>طلبات (كل الحالات)</th>
                     <th>طلبات مكتملة</th>
-                    <th>إيراد مكتمل (<?php echo htmlspecialchars($caMoney['unit'], ENT_QUOTES, 'UTF-8'); ?>)</th>
-                    <th>متوسط سلة مكتملة</th>
-                    <th>أكثر منتج (كمية)</th>
-                    <th>إيراد ذلك المنتج (تقريبي)</th>
+                    <th>إيراد مكتمل</th>
+                    <th>مردودات</th>
+                    <th>قيمة المردود</th>
+                    <th>الصافي</th>
+                    <th>متوسط سلة</th>
+                    <th>أكثر منتج</th>
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($channelRows as $cr): ?>
-                    <?php
-                    $cid = (int) $cr['id'];
-                    $top = $topByChannel[$cid] ?? null;
-                    ?>
-                <tr>
-                    <td><?php echo (int) ($cr['_rank'] ?? 0); ?></td>
+                <?php foreach ($unifiedChannelRows as $ur): ?>
+                    <?php $top = $ur['_top'] ?? null; ?>
+                <tr<?php echo (int) ($ur['id'] ?? 0) === 0 ? ' style="background:#f8fafc;"' : ''; ?>>
+                    <td><?php echo (int) ($ur['_rank'] ?? 0); ?></td>
                     <td>
-                        <?php echo htmlspecialchars((string) ($cr['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>
-                        <?php if ((int) ($cr['is_active'] ?? 0) !== 1): ?>
+                        <?php echo htmlspecialchars((string) ($ur['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>
+                        <?php if ((int) ($ur['id'] ?? 0) === 0): ?>
+                            <span class="badge" title="فواتير شركة INV-C بدون قناة تسويق">شركة مباشرة</span>
+                        <?php elseif ((int) ($ur['is_active'] ?? 0) !== 1): ?>
                             <span class="badge" title="القناة غير نشطة">مخفية</span>
                         <?php endif; ?>
                     </td>
-                    <td><code><?php echo htmlspecialchars((string) ($cr['slug'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
-                    <td><?php echo (int) ($cr['cnt_all'] ?? 0); ?></td>
-                    <td><?php echo (int) ($cr['cnt_completed'] ?? 0); ?></td>
-                    <td><?php echo number_format((float) ($cr['revenue_completed'] ?? 0), $caMoney['decimals']); ?></td>
-                    <td><?php echo number_format((float) ($cr['_avg_basket'] ?? 0), $caMoney['decimals']); ?></td>
+                    <td><code><?php echo htmlspecialchars((string) ($ur['slug'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
+                    <td><?php echo (int) ($ur['sales_cnt_done'] ?? 0); ?></td>
+                    <td><?php echo number_format((float) ($ur['sales_rev'] ?? 0), $caMoney['decimals']); ?></td>
+                    <td><?php echo (int) ($ur['ret_cnt'] ?? 0); ?></td>
+                    <td><?php echo number_format((float) ($ur['ret_total'] ?? 0), $caMoney['decimals']); ?></td>
+                    <td><strong><?php echo number_format((float) ($ur['net'] ?? 0), $caMoney['decimals']); ?></strong></td>
+                    <td><?php echo number_format((float) ($ur['_avg_basket'] ?? 0), $caMoney['decimals']); ?></td>
                     <td><?php
                     if ($top) {
                         echo htmlspecialchars($top['product_name'], ENT_QUOTES, 'UTF-8')
@@ -235,42 +345,25 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
                         echo '—';
                     }
                     ?></td>
-                    <td><?php echo $top ? number_format($top['revenue_lines'], $caMoney['decimals']) : '—'; ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
         </table>
     </div>
-    <?php if ($channelRows === []): ?>
-        <p class="card-hint">لا توجد قنوات معرّفة — أضف قنوات من <a href="<?php echo htmlspecialchars($channelsUrl, ENT_QUOTES, 'UTF-8'); ?>">قنوات العملاء</a>.</p>
+    <?php if ($channelRows === [] && (int) ($companyDirect['cnt_completed'] ?? 0) === 0 && (int) $companyReturns['cnt'] === 0): ?>
+        <p class="card-hint">لا توجد حركة في الفترة — راجع <a href="<?php echo htmlspecialchars($channelsUrl, ENT_QUOTES, 'UTF-8'); ?>">قنوات العملاء</a>.</p>
     <?php endif; ?>
-</div>
-
-<div class="card">
-    <h3 class="card-title">مبيعات <?php echo htmlspecialchars(orange_sales_company_direct_channel_label(), ENT_QUOTES, 'UTF-8'); ?> المباشرة (فواتير INV-C بدون قناة)</h3>
-    <p class="card-hint">
-        طلبات فاتورة الشركة (<code>order_source = company</code>) بدون <code>channel_id</code> — من شاشة
-        <a href="<?php echo htmlspecialchars($companyInvoiceUrl, ENT_QUOTES, 'UTF-8'); ?>">فاتورة مبيعات الشركة</a>
-        عند اختيار قناة «<?php echo htmlspecialchars(orange_sales_company_direct_channel_label(), ENT_QUOTES, 'UTF-8'); ?>».
-    </p>
-    <ul style="line-height:1.7;">
-        <li>إجمالي الطلبات: <strong><?php echo (int) ($companyDirect['cnt_all'] ?? 0); ?></strong></li>
-        <li>مكتملة: <strong><?php echo (int) ($companyDirect['cnt_completed'] ?? 0); ?></strong></li>
-        <li>إيراد مكتمل: <strong><?php echo orange_format_money_for_context($caMoney, (float) ($companyDirect['revenue_completed'] ?? 0)); ?></strong></li>
-    </ul>
-    <p><a class="btn btn-secondary" href="<?php echo htmlspecialchars($companyInvoiceUrl, ENT_QUOTES, 'UTF-8'); ?>">فاتورة مبيعات الشركة</a></p>
 </div>
 
 <?php if ((int) ($orphan['cnt_all'] ?? 0) > (int) ($companyDirect['cnt_all'] ?? 0)): ?>
 <div class="card">
-    <h3 class="card-title">طلبات بلا قناة (أخرى)</h3>
-    <p class="card-hint">كل الطلبات بدون <code>channel_id</code> في الفترة — قد تشمل مصادر غير فاتورة الشركة المباشرة أعلاه.</p>
+    <h3 class="card-title">طلبات بلا قناة (أخرى — غير «الشركة» المباشرة)</h3>
+    <p class="card-hint">طلبات بدون <code>channel_id</code> ولا تُحسب ضمن صف «الشركة» أعلاه.</p>
     <ul style="line-height:1.7;">
         <li>إجمالي الطلبات: <strong><?php echo (int) $orphan['cnt_all']; ?></strong></li>
         <li>مكتملة: <strong><?php echo (int) $orphan['cnt_completed']; ?></strong></li>
         <li>إيراد مكتمل: <strong><?php echo orange_format_money_for_context($caMoney, (float) $orphan['revenue_completed']); ?></strong></li>
     </ul>
-    <p><a class="btn btn-secondary" href="<?php echo htmlspecialchars($ordersUrl, ENT_QUOTES, 'UTF-8'); ?>">الطلبات</a></p>
 </div>
 <?php endif; ?>
 
@@ -279,6 +372,8 @@ $ordersUrl = storefront_public_path('/admin/index.php?page=orders');
     <p>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars($channelsUrl, ENT_QUOTES, 'UTF-8'); ?>">إدارة القنوات</a>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars($ordersUrl, ENT_QUOTES, 'UTF-8'); ?>">الطلبات</a>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars($returnsReportUrl, ENT_QUOTES, 'UTF-8'); ?>">تقرير مردودات المبيعات</a>
         <a class="btn btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=reports'), ENT_QUOTES, 'UTF-8'); ?>">تقارير المبيعات العامة</a>
+        <a class="btn btn-secondary" href="<?php echo htmlspecialchars($companyInvoiceUrl, ENT_QUOTES, 'UTF-8'); ?>">فاتورة مبيعات الشركة</a>
     </p>
 </div>

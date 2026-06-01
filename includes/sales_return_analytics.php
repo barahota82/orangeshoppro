@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/document_sequences.php';
+require_once __DIR__ . '/sales_doc_channel.php';
 
 /**
  * مصدر الفاتورة المرجعية: company | online | ''.
@@ -188,4 +189,70 @@ function orange_sales_return_payment_type_label(string $type): string
         'cash' => 'نقدي',
         default => 'نقدي',
     };
+}
+
+/**
+ * تسمية قناة التسويق في التقارير (تفريق مبيعات شركة مباشرة «الشركة» عن بلا قناة).
+ */
+function orange_sales_return_marketing_channel_label(
+    ?int $channelId,
+    ?string $channelNameFromDb = null,
+    ?string $sourceKind = null
+): string {
+    if ($channelId !== null && (int) $channelId > 0) {
+        return orange_sales_order_channel_label($channelId, $channelNameFromDb);
+    }
+    if (trim((string) ($sourceKind ?? '')) === 'company') {
+        return orange_sales_company_direct_channel_label();
+    }
+
+    return '— بلا قناة —';
+}
+
+/**
+ * فلتر تقرير المردود: 0 = الكل، -1 = شركة مباشرة (INV-C بلا channel_id)، &gt;0 = قناة.
+ *
+ * @return array{0: string, 1: list<mixed>}
+ */
+function orange_sales_returns_report_channel_filter_sql(int $channelFilter): array
+{
+    if ($channelFilter > 0) {
+        return [' AND sr.channel_id = ?', [$channelFilter]];
+    }
+    if ($channelFilter === -1) {
+        return [
+            " AND (sr.channel_id IS NULL OR sr.channel_id = 0) AND sr.source_kind = 'company'",
+            [],
+        ];
+    }
+
+    return ['', []];
+}
+
+/**
+ * @return array{0: string, 1: list<mixed>}
+ */
+function orange_sales_returns_date_country_where(
+    PDO $pdo,
+    string $alias,
+    bool $hasCreatedAt,
+    string $fromYmd,
+    string $toYmd,
+    int $countryId
+): array {
+    $where = '';
+    $params = [];
+    if ($countryId > 0 && orange_table_has_country_id($pdo, 'sales_returns')) {
+        $where .= orange_sql_country_and_fragment($pdo, 'sales_returns', $alias, $countryId);
+    }
+    if ($hasCreatedAt && $fromYmd !== '') {
+        $where .= ' AND DATE(' . $alias . '.created_at) >= ?';
+        $params[] = $fromYmd;
+    }
+    if ($hasCreatedAt && $toYmd !== '') {
+        $where .= ' AND DATE(' . $alias . '.created_at) <= ?';
+        $params[] = $toYmd;
+    }
+
+    return [$where, $params];
 }
