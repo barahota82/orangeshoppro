@@ -641,7 +641,13 @@ function orange_catalog_is_admin_http_request(): bool
 function orange_catalog_ensure_storefront_page(PDO $pdo): void
 {
     orange_catalog_ensure_storefront_read_bootstrap($pdo);
-    orange_schema_check_and_bootstrap($pdo);
+    try {
+        orange_schema_check_and_bootstrap($pdo);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] storefront_page schema bootstrap failed (non-fatal): ' . $e->getMessage());
+        }
+    }
 }
 
 /**
