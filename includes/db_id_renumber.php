@@ -234,3 +234,43 @@ function orange_db_id_renumber_run_phase2(PDO $pdo): void
         $pdo->exec('SET FOREIGN_KEY_CHECKS = ' . (string) $prevFk);
     }
 }
+
+/**
+ * مرحلة 3: أنواع القيود وقواعد ربط GL (إعداد محاسبة).
+ */
+function orange_db_id_renumber_run_phase3(PDO $pdo): void
+{
+    $prevFk = (int) $pdo->query('SELECT @@FOREIGN_KEY_CHECKS')->fetchColumn();
+    $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+
+    try {
+        $jtMap = [];
+        if (orange_table_exists($pdo, 'journal_types')) {
+            $jtMap = orange_db_renumber_table_to_dense_ids($pdo, 'journal_types');
+            foreach (
+                [
+                    ['orange_gl_journal_type_rules', 'journal_type_id'],
+                    ['orange_gl_account_settings', 'journal_type_id'],
+                    ['journal_vouchers', 'journal_type_id'],
+                    ['orange_gl_pending_movements', 'journal_type_id'],
+                ] as [$childTable, $childCol]
+            ) {
+                orange_db_apply_id_map_to_column($pdo, $childTable, $childCol, $jtMap);
+            }
+        }
+
+        if (orange_table_exists($pdo, 'orange_gl_journal_type_rules')) {
+            orange_db_renumber_table_to_dense_ids($pdo, 'orange_gl_journal_type_rules');
+        }
+
+        if (orange_table_exists($pdo, 'orange_gl_setting_alloc')
+            && orange_table_has_column($pdo, 'orange_gl_setting_alloc', 'id')
+            && !orange_db_ids_dense_from_one($pdo, 'orange_gl_setting_alloc')) {
+            orange_db_renumber_table_to_dense_ids($pdo, 'orange_gl_setting_alloc');
+        } elseif (orange_table_exists($pdo, 'orange_gl_setting_alloc')) {
+            orange_db_align_table_auto_increment($pdo, 'orange_gl_setting_alloc');
+        }
+    } finally {
+        $pdo->exec('SET FOREIGN_KEY_CHECKS = ' . (string) $prevFk);
+    }
+}

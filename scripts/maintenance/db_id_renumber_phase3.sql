@@ -1,0 +1,12 @@
+-- Orange DB id renumber — Phase 3 (GL setup: journal types + journal type rules)
+-- Production path: git pull → orange_catalog_migrate_db_id_renumber_phase3_v86 (includes/db_id_renumber.php).
+--
+-- Order:
+--   1) journal_types → update journal_type_id on rules, account_settings, vouchers, pending_movements
+--   2) orange_gl_journal_type_rules (rule row ids only)
+--   3) orange_gl_setting_alloc — only if legacy table has AUTO_INCREMENT id column
+--
+-- Idempotent checks (manual):
+-- SELECT MIN(id), MAX(id), COUNT(*) FROM journal_types;
+-- SELECT MIN(id), MAX(id), COUNT(*) FROM orange_gl_journal_type_rules;
+-- SELECT filename FROM orange_schema_migrations WHERE filename = 'php_db_id_renumber_phase3_v86';
