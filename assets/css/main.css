@@ -167,7 +167,7 @@ h1, h2, h3, .brand-text h1 {
     transform: translateX(-50%);
     width: max-content;
     max-width: min(20rem, calc(100vw - 100px));
-    margin-top: 8px;
+    margin-top: 3px;
     margin-inline: 0;
     text-align: center;
     box-sizing: border-box;
