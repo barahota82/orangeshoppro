@@ -153,7 +153,8 @@ h1, h2, h3, .brand-text h1 {
     /* أكبر قليلاً ليتماشى بصرياً مع السلوجان (خصوصاً الإنجليزي الأطول) */
     max-width: min(15.5rem, 72vw);
     height: auto;
-    max-height: clamp(1.38rem, 4.1vw, 1.92rem);
+    min-height: 1.5rem;
+    max-height: clamp(1.5rem, 4.5vw, 2.1rem);
     object-fit: contain;
     object-position: center;
 }
