@@ -53,7 +53,7 @@ $orangePwaApple120Url = storefront_public_path(storefront_asset_url('/assets/ima
 $orangePwaIcon192Url = storefront_public_path(storefront_asset_url('/assets/images/pwa-icon-192.png'));
 $orangePwaIcon512Url = storefront_public_path(storefront_asset_url('/assets/images/pwa-icon-512.png'));
 $orangeWordmarkUrl = storefront_public_path(storefront_asset_url(
-    storefront_asset_image_preferred_path('/assets/images/orange-company-wordmark - 2.webp')
+    storefront_asset_image_preferred_path('/assets/images/orange-company-wordmark2.webp')
 ));
 $orangeManifestHref = storefront_public_path('/manifest.php?' . http_build_query(['channel' => $channelSlug, 'lang' => $lang]));
 
