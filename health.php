@@ -41,6 +41,14 @@ try {
     echo 'SESSION ERROR: ' . $e->getMessage() . "\n";
 }
 
+try {
+    require_once __DIR__ . '/includes/catalog_schema.php';
+    echo 'php_schema_revision=' . (string) ORANGE_CATALOG_SCHEMA_PHP_REVISION . "\n";
+    echo 'expected_db_meta_min=' . (string) ORANGE_CATALOG_SCHEMA_PHP_REVISION . " (orange_schema_meta should match after migrations)\n";
+} catch (Throwable $e) {
+    echo 'SCHEMA_REVISION_ERROR: ' . $e->getMessage() . "\n";
+}
+
 $rollout = isset($_GET['rollout']) ? trim((string) $_GET['rollout']) : '';
 if ($rollout === 'unified-phase1') {
     try {
