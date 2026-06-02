@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
 
-try {
-
 /**
  * @param array<string,mixed> $row
  */
@@ -1185,11 +1183,3 @@ function closeStorefrontBrowseMenu() {
 })();
 </script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
-<?php } catch (Throwable $__homeFatalErr) {
-    if (function_exists('error_log')) {
-        error_log('[orange] HOME FATAL: ' . $__homeFatalErr->getMessage() . ' in ' . $__homeFatalErr->getFile() . ':' . $__homeFatalErr->getLine());
-    }
-    http_response_code(500);
-    header('Content-Type: text/plain; charset=utf-8');
-    echo 'Error: ' . $__homeFatalErr->getMessage() . "\n" . $__homeFatalErr->getFile() . ':' . $__homeFatalErr->getLine();
-} ?>
