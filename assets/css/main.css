@@ -3756,8 +3756,14 @@ body.storefront .app-bottom-dock .app-dock-btn--current:not(.app-dock-btn--whats
         max-width: min(15.5rem, 100%);
     }
 
+    body.storefront .brand-wordmark-anchor {
+        padding-bottom: clamp(1.4em, 4vw, 1.8em);
+    }
+
     body.storefront .brand-wordmark-anchor .brand-tagline--cycle {
         max-width: min(18rem, calc(100vw - 6.5rem));
+        font-size: 0.65rem;
+        margin-top: 1px;
     }
 
     /* منع السحب الأفقي + مساحة للشريط السفلي */
