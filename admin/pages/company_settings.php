@@ -74,7 +74,14 @@ $csUpdatedAt = trim((string) ($csRow['updated_at'] ?? ''));
     <div class="form-grid">
         <div><label>اسم الشركة (عربي)</label><input type="text" id="company_name_ar" value="<?php echo $csField($csRow, 'company_name_ar'); ?>"></div>
         <div><label>اسم الشركة (English)</label><input type="text" id="company_name_en" value="<?php echo $csField($csRow, 'company_name_en'); ?>"></div>
-        <div><label>شعار الشركة (اسم الملف)</label><input type="text" id="company_logo" value="<?php echo $csField($csRow, 'company_logo'); ?>"></div>
+        <div><label>شعار الشركة (للطباعة)</label>
+            <input type="file" id="company_logo_file" accept="image/png,image/webp,image/jpeg">
+            <input type="hidden" id="company_logo" value="<?php echo $csField($csRow, 'company_logo'); ?>">
+            <p class="card-hint" style="margin:0.3rem 0 0;">PNG أو WebP بخلفية شفافة (يُفضّل). بعد الرفع يُحفظ مع بيانات الشركة.</p>
+            <div id="company_logo_preview_wrap" style="margin-top:0.5rem;<?php echo trim((string) ($csRow['company_logo'] ?? '')) !== '' ? '' : 'display:none;'; ?>">
+                <img id="company_logo_preview" src="<?php echo trim((string) ($csRow['company_logo'] ?? '')) !== '' ? htmlspecialchars('/uploads/company/' . basename((string) $csRow['company_logo']), ENT_QUOTES, 'UTF-8') : ''; ?>" alt="" style="max-height:64px;max-width:180px;object-fit:contain;border-radius:6px;border:1px solid #e5e7eb;">
+            </div>
+        </div>
         <div><label>السجل التجاري</label><input type="text" id="commercial_register" value="<?php echo $csField($csRow, 'commercial_register'); ?>"></div>
         <div><label>أرقام التواصل</label><input type="text" id="phones" value="<?php echo $csField($csRow, 'phones'); ?>"></div>
         <div><label>العنوان</label><textarea id="address" rows="3"><?php echo $csField($csRow, 'address'); ?></textarea></div>
@@ -141,4 +148,37 @@ async function saveCompanySettings() {
     }
     alert(res.message || (res.success ? 'تم الحفظ' : 'فشل الحفظ'));
 }
+
+document.getElementById('company_logo_file').addEventListener('change', async function () {
+    const file = this.files[0];
+    if (!file) return;
+    if (file.size > 4 * 1024 * 1024) { alert('حجم الملف أكبر من 4 ميجا'); return; }
+    const fd = new FormData();
+    fd.append('logo', file);
+    try {
+        const r = await fetch('/admin/api/settings/upload-company-logo.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+        const j = await r.json();
+        if (j.success && j.filename) {
+            document.getElementById('company_logo').value = j.filename;
+            const prev = document.getElementById('company_logo_preview');
+            const wrap = document.getElementById('company_logo_preview_wrap');
+            if (prev) prev.src = '/uploads/company/' + j.filename;
+            if (wrap) wrap.style.display = '';
+            alert('تم رفع الشعار — اضغط «حفظ» لتثبيت الاسم.');
+        } else {
+            alert(j.message || 'فشل رفع الشعار');
+        }
+    } catch (e) { alert(e.message || 'خطأ في الرفع'); }
+});
+
+// عند التحميل أظهر المعاينة لو موجود
+(function () {
+    var logo = document.getElementById('company_logo').value.trim();
+    if (logo) {
+        var wrap = document.getElementById('company_logo_preview_wrap');
+        var img = document.getElementById('company_logo_preview');
+        if (wrap) wrap.style.display = '';
+        if (img && !img.src) img.src = '/uploads/company/' + logo;
+    }
+})();
 </script>
