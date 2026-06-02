@@ -3753,7 +3753,8 @@ body.storefront .app-bottom-dock .app-dock-btn--current:not(.app-dock-btn--whats
     }
 
     body.storefront .brand-wordmark {
-        max-width: min(13rem, 100%);
+        max-width: min(11rem, 100%);
+        max-height: clamp(1.8rem, 5.5vw, 2.4rem);
     }
 
     body.storefront .brand-wordmark-anchor {
