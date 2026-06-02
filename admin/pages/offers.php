@@ -126,8 +126,8 @@ $offers = $pdo->query(
 </div>
 
 <script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_cart_promo_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
-<?php require __DIR__ . '/../partials/cart_promo_schedule_js.inc.php'; ?>
 <script>
+<?php require __DIR__ . '/../partials/cart_promo_schedule_js.inc.php'; ?>
 window.OFR_PICK_ROWS = <?php echo $ofrPickJson !== false ? $ofrPickJson : '[]'; ?>;
 
 function ofrSetProduct(row) {
