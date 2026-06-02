@@ -135,10 +135,10 @@ h1, h2, h3, .brand-text h1 {
     unicode-bidi: isolate;
     font-size: 0;
     line-height: 0;
-    /* مساحة تحت الصورة لسطرين تقريباً (يتناسب مع شعار أوضح) */
-    padding-bottom: clamp(2.5em, 7vw, 3.05em);
+    /* مساحة تحت الصورة للجملة */
+    padding-bottom: clamp(1.8em, 5vw, 2.2em);
     overflow: visible;
-    margin-top: -3px;
+    margin-top: -2px;
 }
 
 /* اسم العلامة كصورة شعار أفقية؛ السلوجان يبقى تحتها */
@@ -167,13 +167,13 @@ h1, h2, h3, .brand-text h1 {
     transform: translateX(-50%);
     width: max-content;
     max-width: min(20rem, calc(100vw - 100px));
-    margin-top: 3px;
+    margin-top: 2px;
     margin-inline: 0;
     text-align: center;
     box-sizing: border-box;
     white-space: normal;
-    font-size: 0.78rem;
-    line-height: 1.35;
+    font-size: 0.72rem;
+    line-height: 1.3;
 }
 
 .logo {
