@@ -205,11 +205,19 @@ try {
             channels_sync_storefront_accounts_slug($pdo, $oldSlug, $newSlug);
         }
 
+        $msg = 'تم تحديث الواجهة';
+        if ($pathSeg !== $oldPath) {
+            $msg .= ' — تنبيه: تغيير اختصار الرابط يغيّر مسار الزوار (مثل /' . $pathSeg
+                . ')؛ الروابط القديمة /' . ($oldPath !== '' ? $oldPath : '…') . ' لن تعمل.';
+        }
+
         json_response([
             'success' => true,
-            'message' => 'تم تحديث الواجهة',
+            'message' => $msg,
             'slug' => $newSlug,
             'path_segment' => $pathSeg,
+            'path_segment_changed' => $pathSeg !== $oldPath,
+            'old_path_segment' => $oldPath,
         ]);
     }
 
