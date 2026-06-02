@@ -1,0 +1,18 @@
+-- Orange DB id renumber — Phase 2 (sizes / advisory guides / catalog attribute options)
+-- Decision (b): dense ids 1,2,3… per table with FK updates.
+-- Production path: git pull → orange_catalog_migrate_db_id_renumber_phase2_v85 (includes/db_id_renumber.php).
+-- This file documents the phase; dynamic mapping on server matches live row order by id ASC.
+--
+-- Order (FK-safe):
+--   1) size_scheme_template_sizes → update size_family_sizes.scheme_template_size_id
+--   2) size_family_sizes → update product_variants, advisory_sizing_guide_rows
+--   3) advisory_sizing_guide_columns
+--   4) advisory_sizing_guide_rows
+--   5) advisory_sizing_guide_cells (column_id, row_id) then cell ids
+--   6) catalog_attribute_options
+--
+-- Idempotent check (manual):
+-- SELECT MIN(id), MAX(id), COUNT(*) FROM size_scheme_template_sizes;
+-- SELECT MIN(id), MAX(id), COUNT(*) FROM size_family_sizes;
+-- SELECT MIN(id), MAX(id), COUNT(*) FROM advisory_sizing_guide_columns;
+-- SELECT MIN(id), MAX(id), COUNT(*) FROM catalog_attribute_options;

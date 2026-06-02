@@ -4,7 +4,7 @@ Archive: docs/archive/ORANGE_DB_ID_RENUMBER_ROLLOUT_PHASES.txt
 قرار المالك (2026-06-02): **(ب)** كل سجل قديم يُعاد ترقيمه **1، 2، 3…** بلا فراغات، **مع** تحديث كل المفاتيح الأجنبية المرتبطة — **ليس** ضبط `AUTO_INCREMENT` فقط.
 مرجع اللقطة الفعلية من السيرفر: **`D:\orange\scripts\orange_db.sql`** (mysqldump حي — يُحدَّثه المالك عند كل مراجعة).
 SQL للتنفيذ على السيرفر: **`D:\orange_sql_updates.sql`** (خارج الريبو، آمن لإعادة التشغيل) — انظر `.cursor/rules/orange-php-utf8-workflow.mdc`.
-Last updated: 2026-06-02 (إغلاق مرحلة 1 — SQL جاهز)
+Last updated: 2026-05-20 (إغلاق مرحلة 2 — ترحيل PHP v84/v85)
 
 **للوكلاء:** لا تُنفَّذ كل المراحل دفعة واحدة. بعد إغلاق مرحلة حدّث جدول «0) ملخص الحالة» و«آخر تنفيذ». نسخة احتياطية كاملة **قبل** أي مرحلة.
 
@@ -14,8 +14,8 @@ Last updated: 2026-06-02 (إغلاق مرحلة 1 — SQL جاهز)
 
 | المرحلة | العنوان                              | الحالة   | ملاحظة |
 |---------|---------------------------------------|----------|--------|
-| 1       | إعداد / واجهة / دول / سنوات مالية    | **مغلق** | SQL: scripts/maintenance/db_id_renumber_phase1.sql |
-| 2       | مقاسات وقوالب + أدلة استرشادية       | **مفتوح** | أعلى تعقيد FK |
+| 1       | إعداد / واجهة / دول / سنوات مالية    | **مغلق** | PHP: php_db_id_renumber_phase1_v84 (+ SQL مرجع phase1) |
+| 2       | مقاسات وقوالب + أدلة استرشادية       | **مغلق** | PHP: php_db_id_renumber_phase2_v85 · includes/db_id_renumber.php |
 | 3       | قواعد GL مساعدة + أنواع قيود        | **مفتوح** | محاسبة إعداد |
 | 4       | تشغيل ثقيل + دليل حسابات إن لزم     | **مفتوح** | حسب فحص لاحق |
 
@@ -31,15 +31,16 @@ Last updated: 2026-06-02 (إغلاق مرحلة 1 — SQL جاهز)
 2. **لكل مرحلة:** نسخة احتياطية → SQL على نسخة تجريبية إن أمكن → تنفيذ على السيرفر → تحقق (عدد صفوف، FK، عيّنة شاشات أدمن/متجر).
 3. **إعادة الترقيم:** جدول mapping قديم→جديد ثم `UPDATE` لكل الجداول التي تشير إلى `id` (بحث في المخطط + `orange_db.sql`).
 4. **بعد كل جدول:** `ALTER TABLE … AUTO_INCREMENT = (SELECT MAX(id)+1 …)`.
-5. **لا** تُضمَّن dumps كاملة أو أسرار في Git. الترقيات في `orange_sql_updates.sql` على **D:**.
-6. **أداة تحليل محلي:** `scripts/analyze_id_gaps.ps1` (قراءة `orange_db.sql` — ليس بديلاً عن فحص السيرفر بعد التنفيذ).
+5. **نشر تلقائي (قرار المالك):** `git pull` → `orange_catalog_ensure_schema()` يشغّل `php_db_id_renumber_phase1_v84` و`php_db_id_renumber_phase2_v85` مرة واحدة.
+6. **لا** تُضمَّن dumps كاملة أو أسرار في Git. SQL يدوي اختياري في `orange_sql_updates.sql` على **D:**.
+7. **أداة تحليل محلي:** `scripts/analyze_id_gaps.ps1` (قراءة `orange_db.sql` — ليس بديلاً عن فحص السيرفر بعد التنفيذ).
 
 ================================================================================
 2) المرحلة 1 — إعداد / واجهة / دول
 ================================================================================
-STATUS: **CLOSED** (2026-06-02) — **نفّذ SQL على السيرفر بعد نسخة احتياطية**
+STATUS: **CLOSED** (2026-06-02) — **ترحيل PHP v84** (آلي بعد `git pull`)
 
-**ملف التنفيذ:** `scripts/maintenance/db_id_renumber_phase1.sql` (منسوخ أيضاً إلى `D:\orange_sql_updates.sql`).
+**ملف مرجعي:** `scripts/maintenance/db_id_renumber_phase1.sql` · **تنفيذ إنتاج:** `orange_catalog_migrate_db_id_renumber_phase1_v84` في `includes/db_id_renumber.php`.
 
 | جدول | إجراء في اللقطة 2026-06-02 |
 |------|---------------------------|
@@ -51,14 +52,16 @@ STATUS: **CLOSED** (2026-06-02) — **نفّذ SQL على السيرفر بعد 
 | `orange_catalog_schema_checkpoint` | **سليم** صف واحد id=1 |
 | `size_family_advisory_library_map` | **سليم** صف واحد id=1 |
 
-**على السيرفر:** نسخة احتياطية → تنفيذ الملف في phpMyAdmin أو `mysql` → تحقق:
+**على السيرفر:** نسخة احتياطية (موصى بها) → `git pull` → زيارة أي مسار يشغّل المخطط → تحقق:
 `SELECT id FROM analytical_dimension ORDER BY id;`
 `SELECT MIN(id), MAX(id), COUNT(*) FROM storefront_copy_lines;`
 
 ================================================================================
 3) المرحلة 2 — مقاسات وقوالب
 ================================================================================
-STATUS: **OPEN**
+STATUS: **CLOSED** (2026-05-20) — **ترحيل PHP v85** (آلي بعد `git pull`)
+
+**ملف مرجعي:** `scripts/maintenance/db_id_renumber_phase2.sql` · **تنفيذ إنتاج:** `orange_catalog_migrate_db_id_renumber_phase2_v85` في `includes/db_id_renumber.php`.
 
 **الهدف:** سلاسل `size_scheme_template_sizes` → `size_family_sizes` → `advisory_sizing_guide_*` → `product_variants` (إن وُجدت بيانات).
 
@@ -72,6 +75,15 @@ STATUS: **OPEN**
 | `catalog_attribute_options` | يبدأ من 6 |
 
 **معيار إغلاق 2:** إعادة ترقيم مكتملة لسلسلة المقاسات؛ `product_types.default_advisory_sizing_guide_id` و`size_family_sizes.scheme_template_size_id` وغيرها متسقة؛ فحص شاشات المقاسات/الأدلة في الأدمن.
+
+**تحقق بعد النشر:**
+`SELECT MIN(id), MAX(id), COUNT(*) FROM size_scheme_template_sizes;`
+`SELECT MIN(id), MAX(id), COUNT(*) FROM size_family_sizes;`
+`SELECT MIN(id), MAX(id), COUNT(*) FROM advisory_sizing_guide_columns;`
+`SELECT MIN(id), MAX(id), COUNT(*) FROM catalog_attribute_options;`
+`SELECT 1 FROM orange_schema_migrations WHERE filename IN ('php_db_id_renumber_phase1_v84','php_db_id_renumber_phase2_v85');`
+
+**آخر تنفيذ (كود):** 2026-05-20 — v84/v85 · `ORANGE_CATALOG_SCHEMA_PHP_REVISION` 78.
 
 ================================================================================
 4) المرحلة 3 — محاسبة (إعداد GL)

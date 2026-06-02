@@ -1,7 +1,8 @@
 -- Orange DB id renumber — Phase 1 (setup / storefront / countries / fiscal)
--- Decision (b): dense ids 1,2,3… per table. Run ONCE on server after full backup.
+-- Decision (b): dense ids 1,2,3… per table.
+-- Production path: git pull → orange_catalog_migrate_db_id_renumber_phase1_v84 (includes/db_id_renumber.php).
+-- This file is a manual/SQL reference; live mapping uses row order id ASC on the server.
 -- Source snapshot: scripts/orange_db.sql (2026-06-02)
--- Also appended to: D:\orange_sql_updates.sql
 --
 -- Tables touched when gaps exist:
 --   analytical_dimension (9,10 -> 3,4)

@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 77);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 78);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -3057,6 +3057,8 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_product_offers_sort_order_v81($pdo);
     orange_catalog_migrate_cart_promo_pause_log_v82($pdo);
     orange_catalog_migrate_cart_promo_stock_check_v83($pdo);
+    orange_catalog_migrate_db_id_renumber_phase1_v84($pdo);
+    orange_catalog_migrate_db_id_renumber_phase2_v85($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
     orange_admin_seed_company_sales_invoice_page_permissions($pdo);
@@ -6052,5 +6054,39 @@ function orange_catalog_migrate_cart_promo_stock_check_v83(PDO $pdo): void
         );
     }
 
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * إعادة ترقيم id — مرحلة 1 (إعداد / واجهة / analytical_dimension / storefront_copy_lines).
+ */
+function orange_catalog_migrate_db_id_renumber_phase1_v84(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    require_once __DIR__ . '/db_id_renumber.php';
+
+    $marker = 'php_db_id_renumber_phase1_v84';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    orange_db_id_renumber_run_phase1($pdo);
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * إعادة ترقيم id — مرحلة 2 (مقاسات، أدلة استرشادية، خيارات سمات الكتالوج).
+ */
+function orange_catalog_migrate_db_id_renumber_phase2_v85(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    require_once __DIR__ . '/db_id_renumber.php';
+
+    $marker = 'php_db_id_renumber_phase2_v85';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    orange_db_id_renumber_run_phase2($pdo);
     orange_catalog_schema_insert_migration_marker($pdo, $marker);
 }
