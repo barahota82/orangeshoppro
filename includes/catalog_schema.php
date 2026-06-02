@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 83);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 84);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -963,30 +963,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     $metaOk = orange_schema_meta_matches($pdo, $schemaRev);
     $ckOk = orange_catalog_schema_checkpoint_matches($pdo, $schemaRev);
     if ($metaOk || $ckOk) {
-        require_once __DIR__ . '/schema_migrations.php';
-        orange_schema_run_pending_migrations($pdo);
-        if (orange_table_exists($pdo, 'advisory_sizing_library_bundles') && !orange_table_has_column($pdo, 'advisory_sizing_library_bundles', 'department_id')) {
-            orange_catalog_safe_exec($pdo, 'ALTER TABLE advisory_sizing_library_bundles ADD COLUMN department_id INT NULL DEFAULT NULL AFTER id');
-        }
-        if (orange_table_exists($pdo, 'advisory_sizing_library_bundles') && !orange_table_has_column($pdo, 'advisory_sizing_library_bundles', 'size_scheme_template_id')) {
-            orange_catalog_safe_exec($pdo, 'ALTER TABLE advisory_sizing_library_bundles ADD COLUMN size_scheme_template_id INT NULL DEFAULT NULL AFTER department_id');
-        }
-        orange_catalog_ensure_suppliers_schema($pdo);
-        orange_catalog_ensure_journal_types_country_scope($pdo);
-        /* جدول accounts قد يُفرَّغ يدوياً؛ المسار السريع كان يتخطى البذرة فلا تُعاد الجذور الافتراضية */
-        orange_catalog_seed_default_accounts_if_empty($pdo);
-        orange_catalog_ensure_gl_account_settings_alloc_tables($pdo);
-        require_once __DIR__ . '/journal_types.php';
-        try {
-            $jtDefaultCid = orange_countries_default_id($pdo);
-            if ($jtDefaultCid > 0 && orange_journal_types_should_auto_seed($pdo, $jtDefaultCid)) {
-                orange_journal_types_merge_canonical_defaults($pdo, $jtDefaultCid);
-            }
-        } catch (Throwable $e) {
-            if (function_exists('error_log')) {
-                error_log('[orange] canonical journal_types merge (fast path): ' . $e->getMessage());
-            }
-        }
+        orange_catalog_ensure_schema_fast_path_slice($pdo);
         if (! $metaOk && $ckOk) {
             orange_schema_meta_save($pdo, $schemaRev);
         }
@@ -3591,6 +3568,69 @@ function orange_run_migrations(PDO $pdo, ?int $_currentDbVersion = null): void
 }
 
 /**
+ * شريحة المسار السريع (بدون النواة الكاملة — آلاف أسطر DDL).
+ */
+function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    orange_schema_run_pending_migrations($pdo);
+    if (orange_table_exists($pdo, 'advisory_sizing_library_bundles') && !orange_table_has_column($pdo, 'advisory_sizing_library_bundles', 'department_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE advisory_sizing_library_bundles ADD COLUMN department_id INT NULL DEFAULT NULL AFTER id');
+    }
+    if (orange_table_exists($pdo, 'advisory_sizing_library_bundles') && !orange_table_has_column($pdo, 'advisory_sizing_library_bundles', 'size_scheme_template_id')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE advisory_sizing_library_bundles ADD COLUMN size_scheme_template_id INT NULL DEFAULT NULL AFTER department_id');
+    }
+    orange_catalog_ensure_suppliers_schema($pdo);
+    orange_catalog_ensure_journal_types_country_scope($pdo);
+    orange_catalog_seed_default_accounts_if_empty($pdo);
+    orange_catalog_ensure_gl_account_settings_alloc_tables($pdo);
+    require_once __DIR__ . '/journal_types.php';
+    try {
+        $jtDefaultCid = orange_countries_default_id($pdo);
+        if ($jtDefaultCid > 0 && orange_journal_types_should_auto_seed($pdo, $jtDefaultCid)) {
+            orange_journal_types_merge_canonical_defaults($pdo, $jtDefaultCid);
+        }
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] canonical journal_types merge (fast path): ' . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * عند تأخر إصدار القاعدة عن الكود: على الويب ترحيل خفيف فقط (يمنع HTTP 500).
+ * النواة الكاملة: php scripts/run_migrations.php على السيرفر (CLI).
+ */
+function orange_catalog_schema_web_version_catchup(PDO $pdo, int $dbVersion): void
+{
+    if (PHP_SAPI === 'cli') {
+        orange_run_migrations($pdo, $dbVersion);
+
+        return;
+    }
+
+    @ini_set('max_execution_time', '0');
+    @set_time_limit(0);
+
+    require_once __DIR__ . '/schema_migrations.php';
+    require_once __DIR__ . '/db_id_renumber.php';
+    orange_schema_run_numbered_sql_chain($pdo, $dbVersion);
+    orange_catalog_migrate_db_id_renumber_phases($pdo);
+    orange_catalog_ensure_schema_fast_path_slice($pdo);
+
+    $rev = ORANGE_SCHEMA_CODE_VERSION;
+    orange_schema_meta_save($pdo, $rev);
+    orange_catalog_schema_checkpoint_save($pdo, $rev);
+
+    if (function_exists('error_log')) {
+        error_log(
+            '[orange] Web schema catch-up to rev ' . (string) $rev
+            . ' (lightweight). Run: php scripts/run_migrations.php on server for full DDL when possible.'
+        );
+    }
+}
+
+/**
  * بوابة نشر الويب: قراءة إصدار القاعدة، سلسلة ###.sql عند الحاجة، ثم النواة؛ اختياري APCu ووضع متدهور عند الفشل (إعدادات).
  */
 function orange_schema_check_and_bootstrap(PDO $pdo): void
@@ -3637,7 +3677,7 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
         $dbVersion = $row ? (int) ($row['version'] ?? 0) : 0;
 
         if ($dbVersion < ORANGE_SCHEMA_CODE_VERSION) {
-            orange_run_migrations($pdo, $dbVersion);
+            orange_catalog_schema_web_version_catchup($pdo, $dbVersion);
         } else {
             require_once __DIR__ . '/schema_migrations.php';
             orange_schema_run_pending_migrations($pdo);
