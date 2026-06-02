@@ -274,3 +274,243 @@ function orange_db_id_renumber_run_phase3(PDO $pdo): void
         $pdo->exec('SET FOREIGN_KEY_CHECKS = ' . (string) $prevFk);
     }
 }
+
+/**
+ * @return list<array{table:string,column:string}>
+ */
+function orange_db_fetch_incoming_fk_columns(PDO $pdo, string $referencedTable): array
+{
+    if (!orange_db_id_renumber_valid_table_name($referencedTable)) {
+        return [];
+    }
+
+    $st = $pdo->prepare(
+        'SELECT TABLE_NAME AS tbl, COLUMN_NAME AS col
+         FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND REFERENCED_TABLE_SCHEMA = DATABASE()
+           AND REFERENCED_TABLE_NAME = ?
+           AND REFERENCED_COLUMN_NAME = \'id\''
+    );
+    $st->execute([$referencedTable]);
+    $out = [];
+    while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+        $tbl = (string) ($row['tbl'] ?? '');
+        $col = (string) ($row['col'] ?? '');
+        if ($tbl !== '' && $col !== '' && orange_db_id_renumber_valid_table_name($tbl) && preg_match('/^[a-zA-Z0-9_]+$/', $col)) {
+            $out[] = ['table' => $tbl, 'column' => $col];
+        }
+    }
+
+    return $out;
+}
+
+/**
+ * @return array<int, int>
+ */
+function orange_db_renumber_table_and_update_incoming_fks(PDO $pdo, string $table): array
+{
+    $map = orange_db_renumber_table_to_dense_ids($pdo, $table);
+    if ($map === []) {
+        return [];
+    }
+
+    foreach (orange_db_fetch_incoming_fk_columns($pdo, $table) as $ref) {
+        orange_db_apply_id_map_to_column($pdo, $ref['table'], $ref['column'], $map);
+    }
+
+    return $map;
+}
+
+/**
+ * @param array<int, int> $map
+ */
+function orange_db_apply_party_subledger_party_id(PDO $pdo, string $partyKind, array $map): void
+{
+    if ($map === [] || $partyKind === '') {
+        return;
+    }
+
+    foreach (['party_subledger', 'party_subledger_allocations'] as $tbl) {
+        if (!orange_table_exists($pdo, $tbl)) {
+            continue;
+        }
+        $up = $pdo->prepare("UPDATE `{$tbl}` SET party_id = ? WHERE party_kind = ? AND party_id = ?");
+        foreach ($map as $old => $new) {
+            $up->execute([(int) $new, $partyKind, (int) $old]);
+        }
+    }
+}
+
+/**
+ * @param array<int, int> $map
+ */
+function orange_db_apply_party_subledger_ref_id(PDO $pdo, string $refType, array $map): void
+{
+    if ($map === [] || $refType === '') {
+        return;
+    }
+
+    if (orange_table_exists($pdo, 'party_subledger')) {
+        $up = $pdo->prepare('UPDATE party_subledger SET ref_id = ? WHERE ref_type = ? AND ref_id = ?');
+        foreach ($map as $old => $new) {
+            $up->execute([(int) $new, $refType, (int) $old]);
+        }
+    }
+
+    if (orange_table_exists($pdo, 'party_subledger_allocations')) {
+        $up = $pdo->prepare(
+            'UPDATE party_subledger_allocations SET target_ref_id = ? WHERE target_ref_type = ? AND target_ref_id = ?'
+        );
+        foreach ($map as $old => $new) {
+            $up->execute([(int) $new, $refType, (int) $old]);
+        }
+    }
+}
+
+/**
+ * @param array<int, int> $productMap
+ */
+function orange_db_apply_product_map_to_cart_promo_tables(PDO $pdo, array $productMap): void
+{
+    if ($productMap === []) {
+        return;
+    }
+
+    foreach (['cart_gift_promotions', 'cart_bogo_promotions', 'cart_combo_promotions'] as $tbl) {
+        if (!orange_table_exists($pdo, $tbl)) {
+            continue;
+        }
+        if (orange_table_has_column($pdo, $tbl, 'fixed_variant_id')) {
+            orange_db_apply_id_map_to_column($pdo, $tbl, 'fixed_variant_id', $productMap);
+        }
+        if (!orange_table_has_column($pdo, $tbl, 'pool_variant_ids')) {
+            continue;
+        }
+        $rows = $pdo->query("SELECT id, pool_variant_ids FROM `{$tbl}` WHERE pool_variant_ids IS NOT NULL AND pool_variant_ids <> ''")
+            ->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $up = $pdo->prepare("UPDATE `{$tbl}` SET pool_variant_ids = ? WHERE id = ?");
+        foreach ($rows as $row) {
+            $raw = (string) ($row['pool_variant_ids'] ?? '');
+            if ($raw === '') {
+                continue;
+            }
+            $decoded = json_decode($raw, true);
+            if (!is_array($decoded)) {
+                continue;
+            }
+            $changed = false;
+            foreach ($decoded as $i => $pid) {
+                $old = (int) $pid;
+                if ($old > 0 && isset($productMap[$old])) {
+                    $decoded[$i] = $productMap[$old];
+                    $changed = true;
+                }
+            }
+            if ($changed) {
+                $enc = json_encode(array_values($decoded), JSON_UNESCAPED_UNICODE);
+                if (is_string($enc)) {
+                    $up->execute([$enc, (int) ($row['id'] ?? 0)]);
+                }
+            }
+        }
+    }
+}
+
+/**
+ * @return list<string>
+ */
+function orange_db_id_renumber_phase4_table_order(): array
+{
+    return [
+        'suppliers',
+        'customers',
+        'products',
+        'product_colorways',
+        'product_colorway_images',
+        'product_variants',
+        'product_images',
+        'product_channels',
+        'product_attribute_values',
+        'offers',
+        'orders',
+        'order_intake_queue',
+        'order_items',
+        'purchases',
+        'purchase_items',
+        'purchase_returns',
+        'purchase_return_items',
+        'sales_returns',
+        'sales_return_items',
+        'stock_movements',
+        'warehouse_variant_stock',
+        'journal_vouchers',
+        'journal_lines',
+        'party_subledger',
+        'party_subledger_allocations',
+        'expenses',
+        'orange_gl_pending_movements',
+        'accounts',
+    ];
+}
+
+/**
+ * مرحلة 4: تشغيل ثقيل — عملاء، منتجات، طلبات، مشتريات، مخزون، قيود، حسابات (إن لزم).
+ */
+function orange_db_id_renumber_run_phase4(PDO $pdo): void
+{
+    $prevFk = (int) $pdo->query('SELECT @@FOREIGN_KEY_CHECKS')->fetchColumn();
+    $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+
+    try {
+        $maps = [];
+
+        foreach (orange_db_id_renumber_phase4_table_order() as $table) {
+            if (!orange_table_exists($pdo, $table) || orange_db_ids_dense_from_one($pdo, $table)) {
+                continue;
+            }
+
+            $maps[$table] = orange_db_renumber_table_and_update_incoming_fks($pdo, $table);
+        }
+
+        if (isset($maps['product_colorways']) && $maps['product_colorways'] !== []) {
+            orange_db_apply_id_map_to_column($pdo, 'product_colorway_images', 'product_colorway_id', $maps['product_colorways']);
+            orange_db_apply_id_map_to_column($pdo, 'product_variants', 'product_colorway_id', $maps['product_colorways']);
+        }
+
+        if (isset($maps['customers']) && $maps['customers'] !== []) {
+            orange_db_apply_party_subledger_party_id($pdo, 'customer', $maps['customers']);
+        }
+        if (isset($maps['suppliers']) && $maps['suppliers'] !== []) {
+            orange_db_apply_party_subledger_party_id($pdo, 'supplier', $maps['suppliers']);
+        }
+        if (isset($maps['orders']) && $maps['orders'] !== []) {
+            orange_db_apply_party_subledger_ref_id($pdo, 'order', $maps['orders']);
+        }
+        if (isset($maps['purchases']) && $maps['purchases'] !== []) {
+            orange_db_apply_party_subledger_ref_id($pdo, 'purchase', $maps['purchases']);
+        }
+        if (isset($maps['purchase_returns']) && $maps['purchase_returns'] !== []) {
+            orange_db_apply_party_subledger_ref_id($pdo, 'purchase_return', $maps['purchase_returns']);
+        }
+        if (isset($maps['sales_returns']) && $maps['sales_returns'] !== []) {
+            orange_db_apply_party_subledger_ref_id($pdo, 'sales_return', $maps['sales_returns']);
+        }
+        if (isset($maps['products']) && $maps['products'] !== []) {
+            orange_db_apply_product_map_to_cart_promo_tables($pdo, $maps['products']);
+        }
+        if (isset($maps['product_variants']) && $maps['product_variants'] !== []) {
+            orange_db_apply_id_map_to_column($pdo, 'warehouse_variant_stock', 'variant_id', $maps['product_variants']);
+        }
+
+        if (orange_table_exists($pdo, 'journal_entries') && !orange_db_ids_dense_from_one($pdo, 'journal_entries')) {
+            $jeMap = orange_db_renumber_table_and_update_incoming_fks($pdo, 'journal_entries');
+            if ($jeMap !== [] && isset($maps['accounts']) && $maps['accounts'] !== []) {
+                orange_db_apply_id_map_to_column($pdo, 'journal_entries', 'account_debit', $maps['accounts']);
+                orange_db_apply_id_map_to_column($pdo, 'journal_entries', 'account_credit', $maps['accounts']);
+            }
+        }
+    } finally {
+        $pdo->exec('SET FOREIGN_KEY_CHECKS = ' . (string) $prevFk);
+    }
+}

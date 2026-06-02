@@ -1,0 +1,11 @@
+-- Orange DB id renumber — Phase 4 (operational: products, orders, purchases, stock, journals, accounts)
+-- Production path: git pull → orange_catalog_migrate_db_id_renumber_phase4_v87 (includes/db_id_renumber.php).
+--
+-- Skips any table already dense from id=1 (e.g. accounts in snapshot 2026-06-02).
+-- Updates INFORMATION_SCHEMA FK columns + party_subledger polymorphic refs + cart promo product pools.
+--
+-- Idempotent check (manual):
+-- SELECT filename FROM orange_schema_migrations WHERE filename = 'php_db_id_renumber_phase4_v87';
+-- SELECT MIN(id), MAX(id), COUNT(*) FROM products;
+-- SELECT MIN(id), MAX(id), COUNT(*) FROM orders;
+-- SELECT MIN(id), MAX(id), COUNT(*) FROM accounts;
