@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 80);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 81);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -987,6 +987,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
                 error_log('[orange] canonical journal_types merge (fast path): ' . $e->getMessage());
             }
         }
+        orange_catalog_migrate_db_id_renumber_phases($pdo);
         if (! $metaOk && $ckOk) {
             orange_schema_meta_save($pdo, $schemaRev);
         }
@@ -3057,10 +3058,7 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_product_offers_sort_order_v81($pdo);
     orange_catalog_migrate_cart_promo_pause_log_v82($pdo);
     orange_catalog_migrate_cart_promo_stock_check_v83($pdo);
-    orange_catalog_migrate_db_id_renumber_phase1_v84($pdo);
-    orange_catalog_migrate_db_id_renumber_phase2_v85($pdo);
-    orange_catalog_migrate_db_id_renumber_phase3_v86($pdo);
-    orange_catalog_migrate_db_id_renumber_phase4_v87($pdo);
+    orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
     orange_admin_seed_company_sales_invoice_page_permissions($pdo);
@@ -3716,6 +3714,7 @@ function orange_catalog_runtime_light_hooks(PDO $pdo): void
         require_once __DIR__ . '/multicountry_stock_gap.php';
         orange_multicountry_ensure_stock_scoped_phase1($pdo);
         orange_multicountry_ensure_operational_phase2($pdo);
+        orange_catalog_migrate_db_id_renumber_phases($pdo);
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] orange_catalog_runtime_light_hooks: ' . $e->getMessage());
@@ -6057,6 +6056,17 @@ function orange_catalog_migrate_cart_promo_stock_check_v83(PDO $pdo): void
     }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * إعادة ترقيم id — المراحل 1–4 (علامات orange_schema_migrations؛ يُستدعى من المسار السريع أيضاً).
+ */
+function orange_catalog_migrate_db_id_renumber_phases(PDO $pdo): void
+{
+    orange_catalog_migrate_db_id_renumber_phase1_v84($pdo);
+    orange_catalog_migrate_db_id_renumber_phase2_v85($pdo);
+    orange_catalog_migrate_db_id_renumber_phase3_v86($pdo);
+    orange_catalog_migrate_db_id_renumber_phase4_v87($pdo);
 }
 
 /**
