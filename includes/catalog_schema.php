@@ -3681,7 +3681,11 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
         } else {
             require_once __DIR__ . '/schema_migrations.php';
             orange_schema_run_pending_migrations($pdo);
-            orange_catalog_ensure_schema_core($pdo);
+            if (PHP_SAPI === 'cli') {
+                orange_catalog_ensure_schema_core($pdo);
+            } else {
+                orange_catalog_ensure_schema_fast_path_slice($pdo);
+            }
         }
 
         require_once __DIR__ . '/catalog_taxonomy_migrate.php';
