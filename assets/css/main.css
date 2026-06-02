@@ -138,6 +138,7 @@ h1, h2, h3, .brand-text h1 {
     /* مساحة تحت الصورة لسطرين تقريباً (يتناسب مع شعار أوضح) */
     padding-bottom: clamp(2.5em, 7vw, 3.05em);
     overflow: visible;
+    margin-top: -3px;
 }
 
 /* اسم العلامة كصورة شعار أفقية؛ السلوجان يبقى تحتها */
