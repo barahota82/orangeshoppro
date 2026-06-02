@@ -67,6 +67,7 @@ function orange_admin_page_resource(string $page): string
         'catalog_attributes' => 'catalog',
         'products' => 'products',
         'offers' => 'products',
+        'cart_promo_health' => 'products',
     'orders' => 'sales',
     'sales_returns' => 'sales',
     'reserved_orders' => 'sales',

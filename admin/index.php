@@ -18,6 +18,7 @@ $allowed = [
     'cart_gift_promotions',
     'cart_bogo_promotions',
     'cart_combo_promotions',
+    'cart_promo_health',
     'departments',
     'unified_catalog_branches',
     'product_types',

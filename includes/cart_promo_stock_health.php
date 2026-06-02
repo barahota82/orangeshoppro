@@ -132,8 +132,6 @@ function orange_cart_promo_gift_rule_from_db_row(PDO $pdo, array $row): array
 }
 
 /**
- * سبب الإيقاف أو null إن المخزون كافٍ.
- *
  * @param array<string,mixed> $rule
  */
 function orange_cart_promo_rule_stock_pause_reason(
@@ -184,6 +182,44 @@ function orange_cart_promo_rule_stock_pause_reason(
 }
 
 /**
+ * مرحلة 10: مسح auto_paused عند عودة المخزون + فترة سارية + نشط — لا يمس إيقاف الأدمن أو انتهاء المدة.
+ *
+ * @param array<string,mixed> $row
+ * @param array<string,mixed> $rule
+ */
+function orange_cart_promo_try_stock_auto_unpause(
+    PDO $pdo,
+    string $table,
+    array $row,
+    array $rule,
+    ?int $countryId = null
+): bool {
+    if ($table === 'cart_promotions' || !orange_cart_promo_row_eligible_stock_auto_unpause($row)) {
+        return false;
+    }
+    if (!orange_table_exists($pdo, $table) || !orange_table_has_column($pdo, $table, 'auto_paused_at')) {
+        return false;
+    }
+    if (orange_cart_promo_rule_stock_pause_reason($pdo, $table, $rule, $countryId) !== null) {
+        return false;
+    }
+
+    $ruleId = (int) ($row['id'] ?? $rule['id'] ?? 0);
+    if ($ruleId <= 0) {
+        return false;
+    }
+
+    $previousReason = trim((string) ($row['auto_paused_reason'] ?? ''));
+    orange_cart_promo_clear_auto_pause($pdo, $table, $ruleId);
+
+    require_once __DIR__ . '/cart_promo_monitor.php';
+    $cid = orange_cart_promotion_storefront_country_id($pdo, $countryId);
+    orange_cart_promo_log_stock_resume_event($pdo, $table, $ruleId, $previousReason, $cid);
+
+    return true;
+}
+
+/**
  * @param array<string,mixed> $rule
  */
 function orange_cart_promo_apply_stock_pause_for_rule(
@@ -192,11 +228,23 @@ function orange_cart_promo_apply_stock_pause_for_rule(
     array $rule,
     ?int $countryId = null
 ): bool {
+    $unpauseRow = orange_cart_promo_rule_row_for_stock_unpause($rule);
+    if (orange_cart_promo_try_stock_auto_unpause($pdo, $table, $unpauseRow, $rule, $countryId)) {
+        $rule['auto_paused_at'] = null;
+        $rule['auto_paused_reason'] = null;
+    }
+
     $reason = orange_cart_promo_rule_stock_pause_reason($pdo, $table, $rule, $countryId);
     if ($reason === null) {
         return true;
     }
-    orange_cart_promo_auto_pause_with_reason($pdo, $table, (int) ($rule['id'] ?? 0), $reason);
+    $id = (int) ($rule['id'] ?? 0);
+    if (!orange_cart_promo_auto_pause_with_reason($pdo, $table, $id, $reason)) {
+        return false;
+    }
+    require_once __DIR__ . '/cart_promo_monitor.php'; // بعد تعريف دوال التقييم — تجنّب دورة تحميل
+    $cid = orange_cart_promotion_storefront_country_id($pdo, $countryId);
+    orange_cart_promo_log_pause_event($pdo, $table, $id, $reason, $cid, ['source' => 'storefront_path']);
 
     return false;
 }
@@ -209,102 +257,24 @@ function orange_cart_promo_apply_stock_pause_for_rule(
  *   paused_promo_stock:int,
  *   paused_gift_stock:int,
  *   paused: list<array{table:string,id:int,reason:string,country_id:int}>,
+ *   resumed: int,
+ *   resumed_rules: list<array{table:string,id:int,previous_reason:string,country_id:int}>,
  *   countries: list<int>
  * }
  */
 function orange_cart_promo_run_stock_health(PDO $pdo, ?int $countryId = null, ?array $onlyTables = null): array
 {
-    $result = [
-        'checked' => 0,
-        'paused_promo_stock' => 0,
-        'paused_gift_stock' => 0,
-        'paused' => [],
-        'countries' => [],
+    require_once __DIR__ . '/cart_promo_monitor.php';
+    $sync = orange_cart_promo_sync_stock_checks($pdo, $countryId, $onlyTables, true);
+
+    return [
+        'checked' => (int) ($sync['checked'] ?? 0),
+        'paused_promo_stock' => (int) ($sync['paused_promo_stock'] ?? 0),
+        'paused_gift_stock' => (int) ($sync['paused_gift_stock'] ?? 0),
+        'paused' => $sync['paused'] ?? [],
+        'resumed' => (int) ($sync['resumed'] ?? 0),
+        'resumed_rules' => $sync['resumed_rules'] ?? [],
+        'countries' => $sync['countries'] ?? [],
+        'rows' => $sync['rows'] ?? [],
     ];
-
-    $tables = $onlyTables !== null && $onlyTables !== []
-        ? array_values(array_intersect(orange_cart_promo_stock_health_tables(), $onlyTables))
-        : orange_cart_promo_stock_health_tables();
-
-    $countryIds = orange_cart_promo_stock_health_country_ids($pdo, $countryId);
-    $result['countries'] = $countryIds;
-
-    foreach ($countryIds as $cid) {
-        foreach ($tables as $table) {
-            if ($table === 'cart_promotions') {
-                continue;
-            }
-            if (!orange_table_exists($pdo, $table)) {
-                continue;
-            }
-            if (!orange_table_has_column($pdo, $table, 'auto_paused_at')) {
-                continue;
-            }
-
-            $scheduleSql = orange_table_has_column($pdo, $table, 'valid_from')
-                ? orange_cart_promo_schedule_sql('t')
-                : ' AND t.is_active = 1 AND t.auto_paused_at IS NULL';
-
-            if ($table === 'offers') {
-                $countrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $cid);
-                $sql = 'SELECT t.id, t.product_id
-                        FROM offers t
-                        INNER JOIN products p ON p.id = t.product_id
-                        WHERE 1=1' . $scheduleSql . $countrySql;
-                $st = $pdo->query($sql);
-            } else {
-                $bind = orange_cart_promotion_sql_bind($pdo, $table, 't', $cid);
-                $cols = 't.id';
-                if (in_array($table, orange_cart_promo_gift_stock_tables(), true)) {
-                    $cols .= ', t.gift_kind, t.fixed_variant_id, t.pool_variant_ids, t.gift_unit_charge_kind, t.gift_unit_charge_value';
-                }
-                if ($table === 'cart_bogo_promotions') {
-                    $cols .= ', t.bogo_kind, t.category_id, t.buy_components_json, t.gift_kind, t.fixed_variant_id, t.pool_variant_ids';
-                }
-                if ($table === 'cart_combo_promotions') {
-                    $cols .= ', t.components_json';
-                }
-                $st = $pdo->prepare(
-                    'SELECT ' . $cols . ' FROM ' . $table . ' t WHERE 1=1' . $scheduleSql . $bind['sql']
-                );
-                $st->execute($bind['params']);
-            }
-
-            if ($st === false) {
-                continue;
-            }
-
-            while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
-                $result['checked']++;
-                $rule = orange_cart_promo_gift_rule_from_db_row($pdo, $row);
-                if ($table === 'offers') {
-                    $rule = [
-                        'id' => (int) ($row['id'] ?? 0),
-                        'product_id' => (int) ($row['product_id'] ?? 0),
-                    ];
-                }
-
-                $reason = orange_cart_promo_rule_stock_pause_reason($pdo, $table, $rule, $cid);
-                if ($reason === null) {
-                    continue;
-                }
-
-                orange_cart_promo_auto_pause_with_reason($pdo, $table, (int) $rule['id'], $reason);
-
-                if ($reason === 'gift_stock') {
-                    $result['paused_gift_stock']++;
-                } else {
-                    $result['paused_promo_stock']++;
-                }
-                $result['paused'][] = [
-                    'table' => $table,
-                    'id' => (int) $rule['id'],
-                    'reason' => $reason,
-                    'country_id' => $cid,
-                ];
-            }
-        }
-    }
-
-    return $result;
 }

@@ -153,6 +153,7 @@ function orange_admin_permission_mega_sections(): array
                         ['page' => 'cart_gift_promotions', 'label' => 'عروض الهدايا (س4)'],
                         ['page' => 'cart_bogo_promotions', 'label' => 'عروض BOGO (س4)'],
                         ['page' => 'cart_combo_promotions', 'label' => 'عروض الكومبو'],
+                        ['page' => 'cart_promo_health', 'label' => 'صحة العروض (مخزون)'],
                     ],
                 ],
                 [

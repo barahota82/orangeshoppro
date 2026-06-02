@@ -265,6 +265,7 @@ if ($rollout === 'promo-stock-health') {
         echo 'checked=' . (int) ($rep['checked'] ?? 0) . "\n";
         echo 'paused_promo_stock=' . (int) ($rep['paused_promo_stock'] ?? 0) . "\n";
         echo 'paused_gift_stock=' . (int) ($rep['paused_gift_stock'] ?? 0) . "\n";
+        echo 'resumed=' . (int) ($rep['resumed'] ?? 0) . "\n";
         echo "ROLLOUT_PROMO_STOCK_HEALTH_OK\n";
     } catch (Throwable $e) {
         echo 'ROLLOUT_PROMO_STOCK_HEALTH_ERROR: ' . $e->getMessage() . "\n";

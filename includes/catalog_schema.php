@@ -3055,6 +3055,8 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
     orange_catalog_migrate_cart_promo_schedule_v79($pdo);
     orange_catalog_migrate_product_offers_schedule_v80($pdo);
     orange_catalog_migrate_product_offers_sort_order_v81($pdo);
+    orange_catalog_migrate_cart_promo_pause_log_v82($pdo);
+    orange_catalog_migrate_cart_promo_stock_check_v83($pdo);
     orange_admin_migrate_permissions_to_pages($pdo);
     orange_admin_purge_obsolete_page_permissions($pdo);
     orange_admin_seed_company_sales_invoice_page_permissions($pdo);
@@ -5983,6 +5985,71 @@ function orange_catalog_migrate_product_offers_sort_order_v81(PDO $pdo): void
     if (!orange_table_has_column($pdo, $table, 'sort_order')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE ' . $table . ' ADD COLUMN sort_order INT NOT NULL DEFAULT 0');
         orange_schema_invalidate_column_check($table, 'sort_order');
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * مرحلة 9: سجل إيقاف العروض التلقائي (تدقيق).
+ */
+function orange_catalog_migrate_cart_promo_pause_log_v82(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_cart_promo_pause_log_v82';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (!orange_table_exists($pdo, 'promo_pause_log')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE IF NOT EXISTS promo_pause_log (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                rule_table VARCHAR(64) NOT NULL,
+                rule_id INT UNSIGNED NOT NULL,
+                reason VARCHAR(48) NOT NULL,
+                country_id INT UNSIGNED NULL DEFAULT NULL,
+                paused_at DATETIME NOT NULL,
+                meta_json TEXT NULL,
+                KEY idx_promo_pause_country_time (country_id, paused_at),
+                KEY idx_promo_pause_rule (rule_table, rule_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * مرحلة 9: آخر فحص مخزون لكل قاعدة عرض (لوحة مراقبة).
+ */
+function orange_catalog_migrate_cart_promo_stock_check_v83(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+
+    $marker = 'php_cart_promo_stock_check_v83';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    if (!orange_table_exists($pdo, 'promo_stock_check')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'CREATE TABLE IF NOT EXISTS promo_stock_check (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                rule_table VARCHAR(64) NOT NULL,
+                rule_id INT UNSIGNED NOT NULL,
+                country_id INT UNSIGNED NULL DEFAULT NULL,
+                status VARCHAR(24) NOT NULL,
+                stock_reason VARCHAR(48) NULL DEFAULT NULL,
+                detail_ar VARCHAR(512) NOT NULL DEFAULT \'\',
+                checked_at DATETIME NOT NULL,
+                UNIQUE KEY uq_promo_stock_check_rule (rule_table, rule_id, country_id),
+                KEY idx_promo_stock_check_status (status, checked_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
     }
 
     orange_catalog_schema_insert_migration_marker($pdo, $marker);

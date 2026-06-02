@@ -97,8 +97,8 @@ if ($intakeQueueVisible) {
 
 <?php if (orange_admin_may($admin, $pdo, 'products', 'view')): ?>
 <div class="card" style="margin-bottom:16px;">
-    <h3>فحص مخزون العروض (مرحلة 8)</h3>
-    <p class="card-hint" style="margin:0 0 10px;">يفحص كل قواعد العروض النشطة ضمن الفترة (سلة + BOGO + كومبو + هدايا + عروض المنتجات) ويوقف ما نفد مخزونه <strong>بلا انتظار زائر</strong>. الدولة: حسب اختيارك في لوحة التحكم.</p>
+    <h3>فحص مخزون العروض</h3>
+    <p class="card-hint" style="margin:0 0 10px;">يفحص العروض النشطة ضمن الفترة ويوقف النافد و<strong>يعيد تفعيل</strong> ما أُوقف للمخزون فقط عند عودة الكمية (الفترة سارية + «نشط»). الدولة: حسب اختيارك في لوحة التحكم.</p>
     <button type="button" class="btn-secondary" id="dash_promo_stock_health_btn">فحص العروض الآن</button>
 </div>
 <script>

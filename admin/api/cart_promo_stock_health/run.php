@@ -26,9 +26,17 @@ try {
     $report = orange_cart_promo_run_stock_health($pdo, $countryId, null);
 
     $pausedNow = count($report['paused']);
-    $msg = $pausedNow > 0
-        ? 'تم فحص ' . (int) $report['checked'] . ' قاعدة — أُوقف ' . $pausedNow . ' عرضاً بسبب المخزون.'
-        : 'تم فحص ' . (int) $report['checked'] . ' قاعدة — لا حاجة لإيقاف جديد.';
+    $resumedNow = (int) ($report['resumed'] ?? 0);
+    $parts = ['تم فحص ' . (int) $report['checked'] . ' قاعدة'];
+    if ($resumedNow > 0) {
+        $parts[] = 'أُعيد تفعيل ' . $resumedNow . ' عرضاً (عودة المخزون)';
+    }
+    if ($pausedNow > 0) {
+        $parts[] = 'أُوقف ' . $pausedNow . ' عرضاً بسبب المخزون';
+    } elseif ($resumedNow === 0) {
+        $parts[] = 'لا إيقاف ولا إعادة تفعيل جديدة';
+    }
+    $msg = implode(' — ', $parts) . '.';
 
     json_response([
         'success' => true,

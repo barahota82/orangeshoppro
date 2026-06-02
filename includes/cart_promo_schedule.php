@@ -41,8 +41,47 @@ function orange_cart_promo_admin_pause_reason_label_ar(string $reason): string
     return match (trim($reason)) {
         'promo_stock' => 'نفاد مخزون منتجات العرض',
         'gift_stock' => 'عدم توفر الهدية (نفاد مخزون الهدية)',
+        'stock_resumed' => 'إعادة تفعيل تلقائي (عودة المخزون)',
         default => 'إيقاف تلقائي',
     };
+}
+
+/**
+ * مرحلة 10: إعادة تفعيل تلقائي فقط بعد إيقاف مخزون — لا تُطبَّق إن انتهت الفترة أو أوقف الأدمن (is_active=0).
+ *
+ * @param array<string,mixed> $row
+ */
+function orange_cart_promo_row_eligible_stock_auto_unpause(array $row): bool
+{
+    if ((int) ($row['is_active'] ?? 0) !== 1) {
+        return false;
+    }
+    $reason = trim((string) ($row['auto_paused_reason'] ?? ''));
+    if ($reason === '' || !in_array($reason, orange_cart_promo_auto_pause_reasons(), true)) {
+        return false;
+    }
+
+    return orange_cart_promo_is_within_schedule(
+        (string) ($row['valid_from'] ?? ''),
+        (string) ($row['valid_to'] ?? '')
+    );
+}
+
+/**
+ * @param array<string,mixed> $rule
+ *
+ * @return array<string,mixed>
+ */
+function orange_cart_promo_rule_row_for_stock_unpause(array $rule): array
+{
+    return [
+        'id' => (int) ($rule['id'] ?? 0),
+        'is_active' => (int) ($rule['is_active'] ?? 1),
+        'valid_from' => (string) ($rule['valid_from'] ?? ''),
+        'valid_to' => (string) ($rule['valid_to'] ?? ''),
+        'auto_paused_at' => $rule['auto_paused_at'] ?? null,
+        'auto_paused_reason' => (string) ($rule['auto_paused_reason'] ?? ''),
+    ];
 }
 
 /**
@@ -214,24 +253,26 @@ function orange_cart_promo_clear_auto_pause(PDO $pdo, string $table, int $id): v
     $st->execute([$id]);
 }
 
-function orange_cart_promo_auto_pause_with_reason(PDO $pdo, string $table, int $id, string $reason): void
+function orange_cart_promo_auto_pause_with_reason(PDO $pdo, string $table, int $id, string $reason): bool
 {
     $reason = trim($reason);
     if ($id <= 0 || !in_array($reason, orange_cart_promo_auto_pause_reasons(), true)) {
-        return;
+        return false;
     }
     $pausable = array_merge(orange_cart_promo_scheduled_tables(), ['offers']);
     if (!in_array($table, $pausable, true)) {
-        return;
+        return false;
     }
     if (!orange_table_exists($pdo, $table) || !orange_table_has_column($pdo, $table, 'auto_paused_at')) {
-        return;
+        return false;
     }
     $st = $pdo->prepare(
         "UPDATE {$table} SET auto_paused_at = NOW(), auto_paused_reason = ?
          WHERE id = ? AND (auto_paused_at IS NULL OR auto_paused_reason IS NULL OR auto_paused_reason = '')"
     );
     $st->execute([$reason, $id]);
+
+    return $st->rowCount() > 0;
 }
 
 /**
