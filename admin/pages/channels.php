@@ -55,7 +55,6 @@ $hasCountryDefaultCol = orange_channels_has_country_default_column($pdo);
     <p class="card-hint" style="margin:0 0 0.75rem;"><strong>القناة الرئيسية للدولة:</strong> يُحوَّل الزائر الذي يفتح جذر الموقع (<code dir="ltr">/</code>) من دولة نشطة تلقائياً إلى هذه القناة (حسب موقعه الجغرافي). قناة رئيسية واحدة لكل دولة.</p>
     <?php endif; ?>
     <input type="hidden" id="channel_id" value="<?php echo $editRow ? (int) $editRow['id'] : ''; ?>">
-    <input type="hidden" id="channel_logo" value="<?php echo htmlspecialchars($initialLogo, ENT_QUOTES, 'UTF-8'); ?>">
     <div class="form-grid">
         <div>
             <label for="channel_country_id">الدولة <span style="color:#b45309;">*</span></label>
@@ -92,14 +91,6 @@ $hasCountryDefaultCol = orange_channels_has_country_default_column($pdo);
         <div>
             <label>اختصار الرابط (بالإنجليزية)</label>
             <input type="text" id="channel_path_segment" placeholder="مثل: instagram أو sale" dir="ltr" lang="en" autocomplete="off" value="<?php echo $editRow ? htmlspecialchars((string) ($editRow['path_segment'] ?? ''), ENT_QUOTES, 'UTF-8') : ''; ?>">
-        </div>
-        <div>
-            <label>الشعار (رفع من الجهاز)</label>
-            <input type="file" id="channel_logo_file" accept="image/jpeg,image/png,image/webp,image/gif">
-            <p class="card-hint" style="margin:0.35rem 0 0;">jpeg أو png أو webp أو gif — حتى 4 ميجا. بعد الرفع يُحفظ اسم الملف مع الواجهة عند الضغط على «حفظ».</p>
-            <div id="channel_logo_preview_wrap" style="margin-top:0.5rem;display:none;">
-                <img id="channel_logo_preview" alt="" style="max-height:72px;max-width:200px;object-fit:contain;border-radius:6px;border:1px solid #e5e7eb;">
-            </div>
         </div>
         <div>
             <label>رقم الواتساب</label>
@@ -263,7 +254,6 @@ async function saveChannel() {
     var payload = {
         name: document.getElementById('channel_name').value.trim(),
         path_segment: document.getElementById('channel_path_segment').value.trim(),
-        logo: document.getElementById('channel_logo').value.trim(),
         whatsapp_number: document.getElementById('channel_whatsapp').value.trim(),
         is_active: actSel && actSel.value === '0' ? 0 : 1,
         country_id: parseInt((document.getElementById('channel_country_id') || {}).value, 10) || 0,

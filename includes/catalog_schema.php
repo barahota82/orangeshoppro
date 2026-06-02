@@ -2570,6 +2570,10 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
 
     orange_catalog_ensure_suppliers_schema($pdo);
 
+    if (orange_table_exists($pdo, 'channels') && orange_table_has_column($pdo, 'channels', 'logo')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE channels DROP COLUMN logo');
+    }
+
     /*
      |--------------------------------------------------------------------------
      | مردود المشتريات + مردود المبيعات (ربط بالمورد/العميل ومستندات الشراء/البيع)

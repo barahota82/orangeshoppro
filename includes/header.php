@@ -47,18 +47,7 @@ try {
     $orangeSfLoggedInForJs = false;
 }
 
-$chLogoFn = trim((string) ($channel['logo'] ?? ''));
-if ($chLogoFn !== '' && orange_channels_logo_file_resolved_exists($chLogoFn)) {
-    $orangeChannelLogoUrl = storefront_channel_logo_href($chLogoFn);
-    if ($orangeChannelLogoUrl === '') {
-        $orangeChannelLogoUrl = storefront_public_path('/uploads/channels/' . rawurlencode(basename($chLogoFn)));
-    }
-} else {
-    $fallbackLogoFile = $chLogoFn !== '' ? basename($chLogoFn) : 'logo-orange.png';
-    $orangeChannelLogoUrl = storefront_public_path(storefront_asset_url(
-        storefront_asset_image_preferred_path('/assets/images/' . $fallbackLogoFile)
-    ));
-}
+$orangeChannelLogoUrl = storefront_public_path(storefront_asset_url('/assets/images/logo.webp'));
 $orangePwaApple180Url = storefront_public_path(storefront_asset_url('/assets/images/pwa-apple-180.png'));
 $orangePwaApple120Url = storefront_public_path(storefront_asset_url('/assets/images/pwa-apple-120.png'));
 $orangePwaIcon192Url = storefront_public_path(storefront_asset_url('/assets/images/pwa-icon-192.png'));
