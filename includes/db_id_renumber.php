@@ -514,3 +514,35 @@ function orange_db_id_renumber_run_phase4(PDO $pdo): void
         $pdo->exec('SET FOREIGN_KEY_CHECKS = ' . (string) $prevFk);
     }
 }
+
+/**
+ * إعادة ترقيم channels → 1..n بعد حذف المكرر يدوياً (يحدّث product_channels، orders، sales_returns).
+ *
+ * @return array<int, int> خريطة قديم=>جديد (فارغة إن لم يُنفَّذ شيء)
+ */
+function orange_db_id_renumber_run_channels(PDO $pdo): array
+{
+    if (!orange_table_exists($pdo, 'channels') || orange_db_ids_dense_from_one($pdo, 'channels')) {
+        return [];
+    }
+
+    $prevFk = (int) $pdo->query('SELECT @@FOREIGN_KEY_CHECKS')->fetchColumn();
+    $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+
+    try {
+        $map = orange_db_renumber_table_and_update_incoming_fks($pdo, 'channels');
+        foreach (
+            [
+                ['product_channels', 'channel_id'],
+                ['orders', 'channel_id'],
+                ['sales_returns', 'channel_id'],
+            ] as [$tbl, $col]
+        ) {
+            orange_db_apply_id_map_to_column($pdo, $tbl, $col, $map);
+        }
+
+        return $map;
+    } finally {
+        $pdo->exec('SET FOREIGN_KEY_CHECKS = ' . (string) $prevFk);
+    }
+}

@@ -5,6 +5,7 @@ declare(strict_types=1);
 /**
  * تشغيل ترحيلات إعادة ترقيم id (v84–v87) من CLI بعد git pull.
  * الاستخدام على السيرفر: php scripts/run_db_id_renumber_phases.php
+ * (يشمل v88 — channels بعد حذف المكرر يدوياً)
  */
 if (PHP_SAPI !== 'cli') {
     header('HTTP/1.1 403 Forbidden');

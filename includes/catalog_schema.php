@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 82);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 83);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -6072,6 +6072,7 @@ function orange_catalog_migrate_db_id_renumber_phases(PDO $pdo): void
     orange_catalog_migrate_db_id_renumber_phase2_v85($pdo);
     orange_catalog_migrate_db_id_renumber_phase3_v86($pdo);
     orange_catalog_migrate_db_id_renumber_phase4_v87($pdo);
+    orange_catalog_migrate_db_id_renumber_channels_v88($pdo);
 }
 
 /**
@@ -6139,5 +6140,22 @@ function orange_catalog_migrate_db_id_renumber_phase4_v87(PDO $pdo): void
     }
 
     orange_db_id_renumber_run_phase4($pdo);
+    orange_catalog_schema_insert_migration_marker($pdo, $marker);
+}
+
+/**
+ * إعادة ترقيم id — جدول channels (بعد حذف المكرر يدوياً من المالك).
+ */
+function orange_catalog_migrate_db_id_renumber_channels_v88(PDO $pdo): void
+{
+    require_once __DIR__ . '/schema_migrations.php';
+    require_once __DIR__ . '/db_id_renumber.php';
+
+    $marker = 'php_db_id_renumber_channels_v88';
+    if (orange_schema_migration_already_applied($pdo, $marker)) {
+        return;
+    }
+
+    orange_db_id_renumber_run_channels($pdo);
     orange_catalog_schema_insert_migration_marker($pdo, $marker);
 }

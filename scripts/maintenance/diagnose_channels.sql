@@ -20,9 +20,13 @@ SELECT id, country_id, name, slug, path_segment, is_active, is_country_default, 
 FROM channels
 ORDER BY country_id, path_segment, id;
 
--- 4) قنوات نشطة لكل دولة (ما يستخدمه الزائر مع country_id الحالية)
+-- 4) قنوات نشطة لكل دولة (ما يستخدمه الزوار)
 SELECT c.id, c.country_id, co.code AS country_code, c.name, c.slug, c.path_segment, c.is_active
 FROM channels c
 LEFT JOIN countries co ON co.id = c.country_id
 WHERE c.is_active = 1
 ORDER BY c.country_id, c.path_segment;
+
+-- 5) بعد حذف المكرر: git pull ثم افتح الأدمن أو
+--    php scripts/run_db_id_renumber_phases.php
+--    → يسجّل php_db_id_renumber_channels_v88 ويضبط id من 1 بلا فراغات

@@ -1,0 +1,8 @@
+-- Orange — إعادة ترقيم channels (1..n) بعد حذف الصفوف المكررة يدوياً
+-- التنفيذ التلقائي: git pull → php_db_id_renumber_channels_v88
+-- أو: php scripts/run_db_id_renumber_phases.php (يشمل v88 مع باقي المراحل)
+--
+-- قبل الترحيل: احذف المكرر من phpMyAdmin (نفس country_id + path_segment).
+-- تحقق:
+-- SELECT MIN(id), MAX(id), COUNT(*) FROM channels;
+-- SELECT filename FROM orange_schema_migrations WHERE filename = 'php_db_id_renumber_channels_v88';
