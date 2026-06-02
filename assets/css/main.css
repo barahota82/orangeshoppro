@@ -3767,7 +3767,7 @@ body.storefront .app-bottom-dock .app-dock-btn--current:not(.app-dock-btn--whats
         font-size: 0.65rem;
         margin-top: 2px;
         position: static;
-        transform: translateX(-10px);
+        transform: translateX(-6px);
         text-align: center;
         width: 100%;
     }
