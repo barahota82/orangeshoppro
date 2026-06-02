@@ -3613,9 +3613,7 @@ function orange_catalog_schema_web_version_catchup(PDO $pdo, int $dbVersion): vo
     @set_time_limit(0);
 
     require_once __DIR__ . '/schema_migrations.php';
-    require_once __DIR__ . '/db_id_renumber.php';
     orange_schema_run_numbered_sql_chain($pdo, $dbVersion);
-    orange_catalog_migrate_db_id_renumber_phases($pdo);
     orange_catalog_ensure_schema_fast_path_slice($pdo);
 
     $rev = ORANGE_SCHEMA_CODE_VERSION;
@@ -3625,7 +3623,7 @@ function orange_catalog_schema_web_version_catchup(PDO $pdo, int $dbVersion): vo
     if (function_exists('error_log')) {
         error_log(
             '[orange] Web schema catch-up to rev ' . (string) $rev
-            . ' (lightweight). Run: php scripts/run_migrations.php on server for full DDL when possible.'
+            . ' (lightweight). CLI: php scripts/run_migrations.php and php scripts/run_db_id_renumber_phases.php'
         );
     }
 }
@@ -3688,18 +3686,20 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
             }
         }
 
-        require_once __DIR__ . '/catalog_taxonomy_migrate.php';
-        orange_catalog_post_schema_legacy_unified($pdo);
-        require_once __DIR__ . '/product_channels.php';
-        orange_product_channels_ensure_missing_links($pdo);
-        orange_catalog_ensure_products_product_type_id_not_null($pdo);
-        orange_catalog_ensure_products_drop_legacy_classification_columns($pdo);
-        orange_catalog_ensure_products_product_type_id_not_null($pdo);
-        require_once __DIR__ . '/catalog_legacy_tables_drop_phase54.php';
-        orange_catalog_ensure_legacy_taxonomy_tables_dropped_phase54($pdo);
-        require_once __DIR__ . '/multicountry_stock_gap.php';
-        orange_multicountry_ensure_stock_scoped_phase1($pdo);
-        orange_multicountry_ensure_operational_phase2($pdo);
+        if (PHP_SAPI === 'cli') {
+            require_once __DIR__ . '/catalog_taxonomy_migrate.php';
+            orange_catalog_post_schema_legacy_unified($pdo);
+            require_once __DIR__ . '/product_channels.php';
+            orange_product_channels_ensure_missing_links($pdo);
+            orange_catalog_ensure_products_product_type_id_not_null($pdo);
+            orange_catalog_ensure_products_drop_legacy_classification_columns($pdo);
+            orange_catalog_ensure_products_product_type_id_not_null($pdo);
+            require_once __DIR__ . '/catalog_legacy_tables_drop_phase54.php';
+            orange_catalog_ensure_legacy_taxonomy_tables_dropped_phase54($pdo);
+            require_once __DIR__ . '/multicountry_stock_gap.php';
+            orange_multicountry_ensure_stock_scoped_phase1($pdo);
+            orange_multicountry_ensure_operational_phase2($pdo);
+        }
 
         if ($apcuTtl > 0 && function_exists('apcu_store')) {
             @apcu_store($apcuKey, 1, $apcuTtl);
@@ -3724,11 +3724,13 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
 /** @see orange_schema_check_and_bootstrap — نقطة الدخول العامة لكل الاستدعاءات القائمة. */
 function orange_catalog_ensure_schema(PDO $pdo): void
 {
-    try {
-        orange_catalog_migrate_db_id_renumber_phases($pdo);
-    } catch (Throwable $e) {
-        if (function_exists('error_log')) {
-            error_log('[orange] db_id_renumber_phases: ' . $e->getMessage());
+    if (PHP_SAPI === 'cli') {
+        try {
+            orange_catalog_migrate_db_id_renumber_phases($pdo);
+        } catch (Throwable $e) {
+            if (function_exists('error_log')) {
+                error_log('[orange] db_id_renumber_phases: ' . $e->getMessage());
+            }
         }
     }
     orange_schema_check_and_bootstrap($pdo);
