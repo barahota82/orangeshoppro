@@ -3758,15 +3758,15 @@ body.storefront .app-bottom-dock .app-dock-btn--current:not(.app-dock-btn--whats
     }
 
     body.storefront .brand-wordmark-anchor {
-        padding-bottom: clamp(1.4em, 4vw, 1.8em);
+        padding-bottom: 0;
         align-items: center;
     }
 
     body.storefront .brand-wordmark-anchor .brand-tagline--cycle {
         max-width: min(18rem, calc(100vw - 6.5rem));
         font-size: 0.65rem;
-        margin-top: 1px;
-        left: 0;
+        margin-top: 2px;
+        position: static;
         transform: none;
         text-align: center;
         width: 100%;
