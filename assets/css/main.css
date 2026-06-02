@@ -3759,6 +3759,7 @@ body.storefront .app-bottom-dock .app-dock-btn--current:not(.app-dock-btn--whats
 
     body.storefront .brand-wordmark-anchor {
         padding-bottom: clamp(1.4em, 4vw, 1.8em);
+        align-items: center;
     }
 
     body.storefront .brand-wordmark-anchor .brand-tagline--cycle {
