@@ -12,7 +12,7 @@ require_once __DIR__ . '/../includes/countries.php';
 require_once __DIR__ . '/../includes/warehouses.php';
 
 $pdo = db();
-orange_catalog_ensure_schema($pdo);
+orange_catalog_ensure_storefront_page($pdo);
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $sfProductCountryId = orange_storefront_current_country_id($pdo);
 

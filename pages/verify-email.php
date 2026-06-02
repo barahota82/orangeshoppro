@@ -8,7 +8,7 @@ require_once __DIR__ . '/../includes/storefront_account.php';
 require_once __DIR__ . '/../includes/party_subledger.php';
 
 $pdo = db();
-orange_catalog_ensure_schema($pdo);
+orange_catalog_ensure_storefront_page($pdo);
 
 $token = isset($_GET['token']) ? (string) $_GET['token'] : '';
 $result = ['ok' => false, 'reason' => 'bad'];

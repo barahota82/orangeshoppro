@@ -622,6 +622,28 @@ function orange_catalog_ensure_storefront_read_bootstrap(PDO $pdo): void
     $bootDone = true;
 }
 
+/** طلب HTTP لمسار الأدمن (لتفريق مهام الترحيل الثقيلة عن الواجهة العامة). */
+function orange_catalog_is_admin_http_request(): bool
+{
+    if (PHP_SAPI === 'cli') {
+        return false;
+    }
+    $uri = (string) ($_SERVER['REQUEST_URI'] ?? '');
+    $script = (string) ($_SERVER['SCRIPT_NAME'] ?? '');
+
+    return str_contains($uri, '/admin/') || str_contains($script, '/admin/');
+}
+
+/**
+ * صفحات المتجر والقنوات (pages/* عبر storefront-dispatch): bootstrap خفيف + بوابة المخطط فقط.
+ * لا runtime_light_hooks ولا إعادة ترقيم id — تلك على CLI أو الأدمن.
+ */
+function orange_catalog_ensure_storefront_page(PDO $pdo): void
+{
+    orange_catalog_ensure_storefront_read_bootstrap($pdo);
+    orange_schema_check_and_bootstrap($pdo);
+}
+
 /**
  * جداول ربط حسابات القيود التلقائية + نسب (مثل الاحتياطي القانوني).
  * المسار السريع عند تطابق checkpoint كان يتخطى النواة الكاملة فلا يُنشَأ orange_gl_setting_alloc
@@ -3734,7 +3756,9 @@ function orange_catalog_ensure_schema(PDO $pdo): void
         }
     }
     orange_schema_check_and_bootstrap($pdo);
-    orange_catalog_runtime_light_hooks($pdo);
+    if (PHP_SAPI === 'cli' || orange_catalog_is_admin_http_request()) {
+        orange_catalog_runtime_light_hooks($pdo);
+    }
 }
 
 /**

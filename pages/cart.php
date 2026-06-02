@@ -9,7 +9,7 @@ require_once __DIR__ . '/../includes/delivery_areas.php';
 require_once __DIR__ . '/../includes/storefront_payment_settings.php';
 
 $pdoCartAcc = db();
-orange_catalog_ensure_schema($pdoCartAcc);
+orange_catalog_ensure_storefront_page($pdoCartAcc);
 $cartPaymentOnlineEnabled = orange_storefront_payment_online_enabled($pdoCartAcc, null, true);
 $cartSfAccount = current_storefront_account($pdoCartAcc);
 $cartSfLoggedIn = $cartSfAccount !== null;

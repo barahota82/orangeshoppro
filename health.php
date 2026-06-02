@@ -309,6 +309,30 @@ if ($rollout === 'multicountry-stock-phase2') {
     }
 }
 
+if ($rollout === 'storefront-probe') {
+    try {
+        require_once __DIR__ . '/includes/catalog_schema.php';
+        require_once __DIR__ . '/includes/catalog_unified_nav.php';
+        $pdoProbe = db();
+        orange_catalog_ensure_storefront_page($pdoProbe);
+        $metaVer = 0;
+        if (orange_table_exists($pdoProbe, 'orange_schema_meta')) {
+            $metaVer = (int) $pdoProbe->query('SELECT version FROM orange_schema_meta WHERE id = 1 LIMIT 1')->fetchColumn();
+        }
+        echo 'orange_schema_meta_version=' . $metaVer . "\n";
+        foreach (['web', 'tiktok', 'online'] as $seg) {
+            $slug = orange_channel_slug_for_path_segment($pdoProbe, $seg, true);
+            echo 'channel_' . $seg . '_slug=' . ($slug !== null && $slug !== '' ? $slug : '(none)') . "\n";
+        }
+        $nav = orange_storefront_unified_nav_for_home($pdoProbe);
+        echo 'nav_departments=' . count($nav['departments'] ?? []) . "\n";
+        echo 'nav_categories=' . count($nav['categories'] ?? []) . "\n";
+        echo "STOREFRONT_PROBE_OK\n";
+    } catch (Throwable $e) {
+        echo 'STOREFRONT_PROBE_ERROR: ' . $e->getMessage() . "\n";
+    }
+}
+
 if ($rollout === 'db-id-renumber') {
     try {
         require_once __DIR__ . '/includes/catalog_schema.php';

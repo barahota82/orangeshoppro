@@ -7,7 +7,7 @@ require_once __DIR__ . '/../includes/catalog_schema.php';
 require_once __DIR__ . '/../includes/delivery_areas.php';
 
 $pdoTrack = db();
-orange_catalog_ensure_schema($pdoTrack);
+orange_catalog_ensure_storefront_page($pdoTrack);
 
 include __DIR__ . '/../includes/header.php';
 $trackDeliveryAreaGroups = orange_delivery_areas_storefront_groups($pdoTrack, $lang);

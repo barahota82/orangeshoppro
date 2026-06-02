@@ -18,7 +18,7 @@ function storefront_catalog_label(array $row, string $lang): string
 }
 
 require_once __DIR__ . '/../includes/catalog_schema.php';
-orange_catalog_ensure_schema(db());
+orange_catalog_ensure_storefront_page(db());
 require_once __DIR__ . '/../includes/catalog_labels.php';
 require_once __DIR__ . '/../includes/catalog_unified_nav.php';
 require_once __DIR__ . '/../includes/catalog_unified_product_helpers.php';
@@ -71,8 +71,6 @@ if ($canUnifiedProductSql) {
     WHERE p.is_active = 1' . $homeProductsCountrySql . '
     ORDER BY p.sort_order ASC, p.id ASC
 ';
-    require_once __DIR__ . '/../includes/cart_promo_stock_health.php';
-    orange_cart_promo_run_stock_health($pdo, $sfHomeCountryId, ['offers']);
     $offersScheduleSql = orange_table_has_column($pdo, 'offers', 'valid_from')
         ? orange_product_offer_storefront_sql('o')
         : '';
