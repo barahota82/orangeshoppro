@@ -348,28 +348,9 @@ function orange_cart_promo_maybe_pause_rule_if_no_stock(
     ?int $countryId = null
 ): bool
 {
-    $id = (int) ($rule['id'] ?? 0);
-    if ($id <= 0) {
-        return false;
-    }
+    require_once __DIR__ . '/cart_promo_stock_health.php';
 
-    if (in_array($table, ['cart_combo_promotions', 'cart_bogo_promotions'], true)) {
-        if (!orange_cart_promo_offer_products_have_stock($pdo, $table, $rule, $validatedItems, $countryId)) {
-            orange_cart_promo_auto_pause_with_reason($pdo, $table, $id, 'promo_stock');
-
-            return false;
-        }
-    }
-
-    if (in_array($table, orange_cart_promo_gift_stock_tables(), true)) {
-        if (!orange_cart_promo_gift_rule_has_stock($pdo, $rule, $validatedItems, $countryId)) {
-            orange_cart_promo_auto_pause_with_reason($pdo, $table, $id, 'gift_stock');
-
-            return false;
-        }
-    }
-
-    return true;
+    return orange_cart_promo_apply_stock_pause_for_rule($pdo, $table, $rule, $countryId);
 }
 
 /** @deprecated استخدم orange_cart_promo_maybe_pause_rule_if_no_stock */

@@ -47,35 +47,13 @@ function orange_product_offer_sync_stock_pause(PDO $pdo, int $offerId, int $prod
 }
 
 /**
- * يمرّ على العروض النشطة غير الموقوفة ويوقف ما نفد مخزون منتجه.
+ * يمرّ على عروض المنتجات النشطة — يفوّض لمحرك فحص المخزون (مرحلة 8).
+ *
+ * @return array<string,mixed>
  */
-function orange_product_offer_sync_all_stock_pauses(PDO $pdo, ?int $countryId = null): void
+function orange_product_offer_sync_all_stock_pauses(PDO $pdo, ?int $countryId = null): array
 {
-    if (!orange_table_exists($pdo, orange_product_offer_table())) {
-        return;
-    }
-    if (!orange_table_has_column($pdo, orange_product_offer_table(), 'auto_paused_at')) {
-        return;
-    }
-    require_once __DIR__ . '/countries.php';
-    $cid = $countryId > 0 ? $countryId : orange_storefront_current_country_id($pdo);
-    $countrySql = orange_sql_country_and_fragment($pdo, 'products', 'p', $cid);
-    $scheduleSql = orange_product_offer_storefront_sql('o');
-    $st = $pdo->query(
-        'SELECT o.id, o.product_id
-         FROM offers o
-         INNER JOIN products p ON p.id = o.product_id
-         WHERE o.is_active = 1' . $scheduleSql . $countrySql
-    );
-    if ($st === false) {
-        return;
-    }
-    while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
-        orange_product_offer_sync_stock_pause(
-            $pdo,
-            (int) ($row['id'] ?? 0),
-            (int) ($row['product_id'] ?? 0),
-            $cid
-        );
-    }
+    require_once __DIR__ . '/cart_promo_stock_health.php';
+
+    return orange_cart_promo_run_stock_health($pdo, $countryId, ['offers']);
 }

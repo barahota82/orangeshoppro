@@ -95,6 +95,22 @@ if ($intakeQueueVisible) {
 </div>
 <?php endif; ?>
 
+<?php if (orange_admin_may($admin, $pdo, 'products', 'view')): ?>
+<div class="card" style="margin-bottom:16px;">
+    <h3>فحص مخزون العروض (مرحلة 8)</h3>
+    <p class="card-hint" style="margin:0 0 10px;">يفحص كل قواعد العروض النشطة ضمن الفترة (سلة + BOGO + كومبو + هدايا + عروض المنتجات) ويوقف ما نفد مخزونه <strong>بلا انتظار زائر</strong>. الدولة: حسب اختيارك في لوحة التحكم.</p>
+    <button type="button" class="btn-secondary" id="dash_promo_stock_health_btn">فحص العروض الآن</button>
+</div>
+<script>
+document.getElementById('dash_promo_stock_health_btn')?.addEventListener('click', async function () {
+    if (!confirm('تشغيل فحص مخزون كل العروض النشطة لهذه الدولة؟')) return;
+    var res = await postJSON('/admin/api/cart_promo_stock_health/run.php', { all_countries: false });
+    alert(res.message || (res.success ? 'تم الفحص' : 'فشل الفحص'));
+    if (res.success) location.reload();
+});
+</script>
+<?php endif; ?>
+
 <div class="grid-4">
     <div class="card stat-card">
         <h3>طلبات اليوم</h3>

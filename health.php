@@ -254,6 +254,23 @@ if ($rollout === 'multicountry-stock') {
     }
 }
 
+if ($rollout === 'promo-stock-health') {
+    try {
+        require_once __DIR__ . '/includes/catalog_schema.php';
+        require_once __DIR__ . '/includes/cart_promo_stock_health.php';
+        $pdoRollout = db();
+        orange_catalog_ensure_schema($pdoRollout);
+        $rep = orange_cart_promo_run_stock_health($pdoRollout, null, null);
+        echo 'countries=' . count($rep['countries'] ?? []) . "\n";
+        echo 'checked=' . (int) ($rep['checked'] ?? 0) . "\n";
+        echo 'paused_promo_stock=' . (int) ($rep['paused_promo_stock'] ?? 0) . "\n";
+        echo 'paused_gift_stock=' . (int) ($rep['paused_gift_stock'] ?? 0) . "\n";
+        echo "ROLLOUT_PROMO_STOCK_HEALTH_OK\n";
+    } catch (Throwable $e) {
+        echo 'ROLLOUT_PROMO_STOCK_HEALTH_ERROR: ' . $e->getMessage() . "\n";
+    }
+}
+
 if ($rollout === 'multicountry-stock-phase2') {
     try {
         require_once __DIR__ . '/includes/catalog_schema.php';

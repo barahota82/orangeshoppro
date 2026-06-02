@@ -6,6 +6,7 @@ require_once __DIR__ . '/catalog_schema.php';
 require_once __DIR__ . '/cart_promotion_country.php';
 require_once __DIR__ . '/cart_promo_products.php';
 require_once __DIR__ . '/cart_promo_schedule.php';
+require_once __DIR__ . '/cart_promo_stock_health.php';
 
 /**
  * @return list<array{product_id:int,qty:int}>
@@ -60,8 +61,7 @@ function orange_cart_combo_best_match(PDO $pdo, array $validatedItems, bool $buy
         if (count($comps) < 2) {
             continue;
         }
-        if (!orange_cart_promo_offer_products_have_stock($pdo, 'cart_combo_promotions', $row, $validatedItems, $cid)) {
-            orange_cart_promo_auto_pause_with_reason($pdo, 'cart_combo_promotions', (int) $row['id'], 'promo_stock');
+        if (!orange_cart_promo_apply_stock_pause_for_rule($pdo, 'cart_combo_promotions', $row, $cid)) {
             continue;
         }
         $comboPrice = round((float) ($row['combo_price'] ?? 0), 4);

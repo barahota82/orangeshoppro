@@ -71,8 +71,8 @@ if ($canUnifiedProductSql) {
     WHERE p.is_active = 1' . $homeProductsCountrySql . '
     ORDER BY p.sort_order ASC, p.id ASC
 ';
-    require_once __DIR__ . '/../includes/product_offers.php';
-    orange_product_offer_sync_all_stock_pauses($pdo, $sfHomeCountryId);
+    require_once __DIR__ . '/../includes/cart_promo_stock_health.php';
+    orange_cart_promo_run_stock_health($pdo, $sfHomeCountryId, ['offers']);
     $offersScheduleSql = orange_table_has_column($pdo, 'offers', 'valid_from')
         ? orange_product_offer_storefront_sql('o')
         : '';
