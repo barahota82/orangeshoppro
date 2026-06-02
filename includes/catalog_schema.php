@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @see IBRAHIM_ORANGE_MASTER.txt §2
  */
 if (! defined('ORANGE_CATALOG_SCHEMA_PHP_REVISION')) {
-    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 81);
+    define('ORANGE_CATALOG_SCHEMA_PHP_REVISION', 82);
 }
 
 /** يطابق دائماً ORANGE_CATALOG_SCHEMA_PHP_REVISION — اسم موازٍ لخطط «Schema Gate» (مرجع واحد للرقم). */
@@ -987,7 +987,6 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
                 error_log('[orange] canonical journal_types merge (fast path): ' . $e->getMessage());
             }
         }
-        orange_catalog_migrate_db_id_renumber_phases($pdo);
         if (! $metaOk && $ckOk) {
             orange_schema_meta_save($pdo, $schemaRev);
         }
@@ -3681,6 +3680,13 @@ function orange_schema_check_and_bootstrap(PDO $pdo): void
 /** @see orange_schema_check_and_bootstrap — نقطة الدخول العامة لكل الاستدعاءات القائمة. */
 function orange_catalog_ensure_schema(PDO $pdo): void
 {
+    try {
+        orange_catalog_migrate_db_id_renumber_phases($pdo);
+    } catch (Throwable $e) {
+        if (function_exists('error_log')) {
+            error_log('[orange] db_id_renumber_phases: ' . $e->getMessage());
+        }
+    }
     orange_schema_check_and_bootstrap($pdo);
     orange_catalog_runtime_light_hooks($pdo);
 }
@@ -3714,7 +3720,6 @@ function orange_catalog_runtime_light_hooks(PDO $pdo): void
         require_once __DIR__ . '/multicountry_stock_gap.php';
         orange_multicountry_ensure_stock_scoped_phase1($pdo);
         orange_multicountry_ensure_operational_phase2($pdo);
-        orange_catalog_migrate_db_id_renumber_phases($pdo);
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] orange_catalog_runtime_light_hooks: ' . $e->getMessage());

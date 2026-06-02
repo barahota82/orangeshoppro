@@ -300,3 +300,28 @@ if ($rollout === 'multicountry-stock-phase2') {
         echo 'ROLLOUT_MC_STOCK_PHASE2_ERROR: ' . $e->getMessage() . "\n";
     }
 }
+
+if ($rollout === 'db-id-renumber') {
+    try {
+        require_once __DIR__ . '/includes/catalog_schema.php';
+        require_once __DIR__ . '/includes/schema_migrations.php';
+        $pdoRollout = db();
+        orange_catalog_migrate_db_id_renumber_phases($pdoRollout);
+        orange_run_migrations($pdoRollout);
+        $st = $pdoRollout->query(
+            "SELECT filename FROM orange_schema_migrations WHERE filename LIKE 'php_db_id_renumber_phase%' ORDER BY filename"
+        );
+        $markers = $st ? $st->fetchAll(PDO::FETCH_COLUMN) : [];
+        echo 'php_revision=' . (string) ORANGE_CATALOG_SCHEMA_PHP_REVISION . "\n";
+        foreach ($markers as $fn) {
+            echo 'marker=' . (string) $fn . "\n";
+        }
+        $meta = $pdoRollout->query('SELECT version FROM orange_schema_meta WHERE id = 1 LIMIT 1');
+        $ck = $pdoRollout->query('SELECT php_revision FROM orange_catalog_schema_checkpoint WHERE id = 1 LIMIT 1');
+        echo 'orange_schema_meta=' . (string) ($meta ? $meta->fetchColumn() : '') . "\n";
+        echo 'schema_checkpoint=' . (string) ($ck ? $ck->fetchColumn() : '') . "\n";
+        echo count($markers) >= 4 ? "ROLLOUT_DB_ID_RENUMBER_OK\n" : "ROLLOUT_DB_ID_RENUMBER_PENDING\n";
+    } catch (Throwable $e) {
+        echo 'ROLLOUT_DB_ID_RENUMBER_ERROR: ' . $e->getMessage() . "\n";
+    }
+}

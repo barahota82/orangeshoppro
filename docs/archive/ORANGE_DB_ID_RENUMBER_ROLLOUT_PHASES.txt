@@ -31,7 +31,11 @@ Last updated: 2026-05-20 (إغلاق مرحلة 4 — ترحيل PHP v87 — ا�
 2. **لكل مرحلة:** نسخة احتياطية → SQL على نسخة تجريبية إن أمكن → تنفيذ على السيرفر → تحقق (عدد صفوف، FK، عيّنة شاشات أدمن/متجر).
 3. **إعادة الترقيم:** جدول mapping قديم→جديد ثم `UPDATE` لكل الجداول التي تشير إلى `id` (بحث في المخطط + `orange_db.sql`).
 4. **بعد كل جدول:** `ALTER TABLE … AUTO_INCREMENT = (SELECT MAX(id)+1 …)`.
-5. **نشر تلقائي (قرار المالك):** `git pull` → أي طلب يشغّل المخطط (مسار كامل **أو سريع**) يُنفّذ `orange_catalog_migrate_db_id_renumber_phases` — علامات v84–v87 مرة واحدة لكل مرحلة. **إصلاح 2026-05-20:** المراحل 3–4 كانت تُتخطى على المسار السريع فقط؛ أُضيفت للمسار السريع + `orange_catalog_runtime_light_hooks`.
+5. **نشر تلقائي (قرار المالك):** `git pull` ثم **أحد** المسارات:
+   - أي صفحة تشغّل `orange_catalog_ensure_schema()` (الترحيل يبدأ **قبل** بوابة APCu)، أو
+   - `php scripts/run_db_id_renumber_phases.php` على السيرفر (CLI)، أو
+   - `health.php?key=…&rollout=db-id-renumber` (ثم `orange_run_migrations` لمزامنة `orange_schema_meta`).
+   علامات v84–v87 مرة واحدة. إن بقي `orange_schema_meta=77` والكود أحدث: السيرفر لم يُحدَّث بـ `git pull` أو لم يُشغَّل أي مسار أعلاه.
 6. **لا** تُضمَّن dumps كاملة أو أسرار في Git. SQL يدوي اختياري في `orange_sql_updates.sql` على **D:**.
 7. **أداة تحليل محلي:** `scripts/analyze_id_gaps.ps1` (قراءة `orange_db.sql` — ليس بديلاً عن فحص السيرفر بعد التنفيذ).
 
