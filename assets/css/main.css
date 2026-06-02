@@ -3753,7 +3753,7 @@ body.storefront .app-bottom-dock .app-dock-btn--current:not(.app-dock-btn--whats
     }
 
     body.storefront .brand-wordmark {
-        max-width: min(15.5rem, 100%);
+        max-width: min(13rem, 100%);
     }
 
     body.storefront .brand-wordmark-anchor {
