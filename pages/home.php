@@ -21,6 +21,7 @@ function storefront_catalog_label(array $row, string $lang): string
 
 require_once __DIR__ . '/../includes/catalog_schema.php';
 require_once __DIR__ . '/../includes/product_offers.php';
+require_once __DIR__ . '/../includes/upload_paths.php';
 orange_catalog_ensure_storefront_page(db());
 require_once __DIR__ . '/../includes/catalog_labels.php';
 require_once __DIR__ . '/../includes/catalog_unified_nav.php';
