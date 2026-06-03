@@ -66,30 +66,33 @@
                 }
             }
             shown++;
-            var li = document.createElement('li');
-            li.className = 'gl-pick-item';
-            li.setAttribute('role', 'button');
-            li.tabIndex = 0;
-            li.textContent = (r.code ? r.code + ' — ' : '') + r.name;
-            li.addEventListener('dblclick', function () {
-                if (typeof onPick === 'function') {
-                    onPick(r);
-                }
-                close();
-            });
-            li.addEventListener('keydown', function (ev) {
-                if (ev.key === 'Enter') {
-                    if (typeof onPick === 'function') {
-                        onPick(r);
-                    }
-                    close();
-                }
-            });
-            list.appendChild(li);
+            list.appendChild(buildItem(r, onPick));
         }
         if (!shown) {
             list.innerHTML = '<li class="gl-pick-empty">لا نتائج</li>';
         }
+    }
+
+    /* عنصر قائمة بإغلاق صحيح لكل صف (تفادي التقاط آخر r في الحلقة). */
+    function buildItem(row, onPick) {
+        var li = document.createElement('li');
+        li.className = 'gl-pick-item';
+        li.setAttribute('role', 'button');
+        li.tabIndex = 0;
+        li.textContent = (row.code ? row.code + ' — ' : '') + row.name;
+        function choose() {
+            if (typeof onPick === 'function') {
+                onPick(row);
+            }
+            close();
+        }
+        li.addEventListener('dblclick', choose);
+        li.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter') {
+                choose();
+            }
+        });
+        return li;
     }
 
     function open(rows, onPick) {

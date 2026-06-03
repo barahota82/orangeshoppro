@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/warehouses.php';
 require_once __DIR__ . '/../../includes/stock_alerts.php';
 require_once __DIR__ . '/../../includes/order_stock.php';
+require_once __DIR__ . '/../../includes/cart_promo_products.php';
 require_once __DIR__ . '/../../includes/sales_doc_print.php';
 require_once __DIR__ . '/../../includes/company_settings.php';
 require_once __DIR__ . '/../../includes/date_format.php';
@@ -28,8 +29,19 @@ if (!isset($reports[$reportKey])) {
     $reportKey = 'balances';
 }
 
-$q = isset($_GET['q']) ? trim((string) $_GET['q']) : '';
+$pid = isset($_GET['pid']) ? max(0, (int) $_GET['pid']) : 0;
+$pidLabel = '';
+if ($pid > 0) {
+    $pl = $pdo->prepare('SELECT name FROM products WHERE id = ? LIMIT 1');
+    $pl->execute([$pid]);
+    $pidLabel = (string) ($pl->fetchColumn() ?: '');
+    if ($pidLabel === '') {
+        $pid = 0;
+    }
+}
 $lowTh = orange_stock_low_alert_threshold();
+$srPickRows = orange_cart_promo_admin_product_rows($pdo);
+$srPickJson = json_encode($srPickRows, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS);
 
 $normalizeDate = static function (string $raw): ?string {
     $raw = trim($raw);
@@ -61,10 +73,9 @@ try {
         $wq = orange_warehouse_effective_qty_sql($pdo, $srCountryId, 'pv', 'wvs_sr');
         $searchSql = '';
         $params = [];
-        if ($q !== '') {
-            $searchSql = ' AND (p.name LIKE ? OR p.name_en LIKE ?)';
-            $params[] = '%' . $q . '%';
-            $params[] = '%' . $q . '%';
+        if ($pid > 0) {
+            $searchSql = ' AND p.id = ?';
+            $params[] = $pid;
         }
         $sql = 'SELECT p.id AS product_id, p.name AS product_name, p.cost AS cost,
                        COALESCE(c.name_ar, \'\') AS category_name,
@@ -121,9 +132,9 @@ try {
                 LEFT JOIN product_variants pv ON pv.id = sm.variant_id
                 WHERE DATE(sm.created_at) BETWEEN ? AND ?' . $mvCountrySql;
         $params = [$mFrom, $mTo];
-        if ($q !== '') {
-            $sql .= ' AND p.name LIKE ?';
-            $params[] = '%' . $q . '%';
+        if ($pid > 0) {
+            $sql .= ' AND sm.product_id = ?';
+            $params[] = $pid;
         }
         $sql .= ' ORDER BY sm.created_at DESC, sm.id DESC LIMIT 1000';
         $st = $pdo->prepare($sql);
@@ -209,8 +220,19 @@ $reportTitle = $reports[$reportKey];
         <input type="hidden" name="r" value="<?php echo htmlspecialchars($reportKey, ENT_QUOTES, 'UTF-8'); ?>">
         <?php if (in_array($reportKey, ['balances', 'valuation', 'movements'], true)): ?>
             <div>
-                <label for="sr_q">بحث باسم الصنف</label>
-                <input type="text" id="sr_q" name="q" class="admin-inp" value="<?php echo htmlspecialchars($q, ENT_QUOTES, 'UTF-8'); ?>" autocomplete="off">
+                <label for="sr_pid_label">الصنف (دبل كليك للاختيار)</label>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <input type="hidden" id="sr_pid" name="pid" value="<?php echo (int) $pid; ?>">
+                    <input type="text" id="sr_pid_label" class="admin-inp" readonly
+                        title="دبل كليك لاختيار صنف"
+                        style="cursor:pointer;min-width:16rem;"
+                        placeholder="كل الأصناف — دبل كليك للاختيار"
+                        value="<?php echo htmlspecialchars($pidLabel, ENT_QUOTES, 'UTF-8'); ?>">
+                    <button type="button" class="btn-secondary" id="sr_pick_btn">اختيار صنف</button>
+                    <?php if ($pid > 0): ?>
+                        <button type="button" class="btn-secondary" id="sr_pick_clear">الكل</button>
+                    <?php endif; ?>
+                </div>
             </div>
         <?php endif; ?>
         <?php if ($reportKey === 'movements'): ?>
@@ -363,3 +385,55 @@ $reportTitle = $reports[$reportKey];
 .sr-tab { padding:7px 14px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; color:#334155; text-decoration:none; font-size:0.92rem; }
 .sr-tab.is-active { background:#0f172a; color:#fff; border-color:#0f172a; }
 </style>
+
+<?php if (in_array($reportKey, ['balances', 'valuation', 'movements'], true)): ?>
+<script src="<?php echo htmlspecialchars(storefront_public_path(storefront_asset_url('/assets/js/admin_cart_promo_product_pick.js')), ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script>
+(function () {
+    var SR_PICK_ROWS = <?php echo $srPickJson !== false ? $srPickJson : '[]'; ?>;
+    var pidInput = document.getElementById('sr_pid');
+    var pidLabel = document.getElementById('sr_pid_label');
+    var pickBtn = document.getElementById('sr_pick_btn');
+    var clearBtn = document.getElementById('sr_pick_clear');
+    var form = document.getElementById('bs_report_form') || (pidInput ? pidInput.closest('form') : null);
+
+    function openPicker() {
+        if (!window.OrangeCartPromoProductPick) {
+            return;
+        }
+        OrangeCartPromoProductPick.open(SR_PICK_ROWS, function (row) {
+            if (!pidInput) {
+                return;
+            }
+            pidInput.value = parseInt(row.product_id, 10) || 0;
+            if (pidLabel) {
+                pidLabel.value = (row.code ? row.code + ' — ' : '') + row.name;
+            }
+            if (form) {
+                form.submit();
+            }
+        });
+    }
+
+    if (pickBtn) {
+        pickBtn.addEventListener('click', openPicker);
+    }
+    if (pidLabel) {
+        pidLabel.addEventListener('dblclick', openPicker);
+    }
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+            if (pidInput) {
+                pidInput.value = '0';
+            }
+            if (pidLabel) {
+                pidLabel.value = '';
+            }
+            if (form) {
+                form.submit();
+            }
+        });
+    }
+})();
+</script>
+<?php endif; ?>
