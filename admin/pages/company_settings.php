@@ -76,6 +76,7 @@ $csUpdatedAt = trim((string) ($csRow['updated_at'] ?? ''));
         <div><label>اسم الشركة (English)</label><input type="text" id="company_name_en" value="<?php echo $csField($csRow, 'company_name_en'); ?>"></div>
         <div><label>أرقام التواصل</label><input type="text" id="phones" value="<?php echo $csField($csRow, 'phones'); ?>"></div>
         <div><label>السجل التجاري</label><input type="text" id="commercial_register" value="<?php echo $csField($csRow, 'commercial_register'); ?>"></div>
+        <div><label>العنوان</label><textarea id="address" rows="3"><?php echo $csField($csRow, 'address'); ?></textarea></div>
         <div><label>شعار الشركة (للطباعة)</label>
             <input type="file" id="company_logo_file" accept="image/png,image/webp,image/jpeg">
             <input type="hidden" id="company_logo" value="<?php echo $csField($csRow, 'company_logo'); ?>">
@@ -84,7 +85,6 @@ $csUpdatedAt = trim((string) ($csRow['updated_at'] ?? ''));
                 <img id="company_logo_preview" src="<?php echo trim((string) ($csRow['company_logo'] ?? '')) !== '' ? htmlspecialchars('/uploads/company/' . basename((string) $csRow['company_logo']), ENT_QUOTES, 'UTF-8') : ''; ?>" alt="" style="max-height:64px;max-width:180px;object-fit:contain;border-radius:6px;border:1px solid #e5e7eb;">
             </div>
         </div>
-        <div><label>العنوان</label><textarea id="address" rows="3"><?php echo $csField($csRow, 'address'); ?></textarea></div>
         <div><label>الرقم الضريبي (للفواتير)</label><input type="text" id="vat_number" placeholder="إن وُجد" value="<?php echo $csField($csRow, 'vat_number'); ?>"></div>
         <div style="grid-column:1/-1;"><label>نص قانوني أسفل الفاتورة (اختياري)</label><textarea id="invoice_footer" rows="2" placeholder="مثال: سداد خلال ٣٠ يوم — البضاعة تُسلّم بحالة جيدة"><?php echo $csField($csRow, 'invoice_footer'); ?></textarea></div>
     </div>
