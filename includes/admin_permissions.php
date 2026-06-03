@@ -91,6 +91,7 @@ function orange_admin_page_resource(string $page): string
         'stock' => 'warehouse',
         'opening_stock_balances' => 'warehouse',
         'item_card' => 'warehouse',
+        'stock_reports' => 'warehouse',
         'chart_of_accounts' => 'accounting',
         'fiscal_years' => 'accounting',
         'opening_balances' => 'accounting',

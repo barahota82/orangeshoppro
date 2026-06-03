@@ -9,6 +9,8 @@ require_once __DIR__ . '/../../includes/catalog_unified_product_helpers.php';
 require_once __DIR__ . '/../../includes/countries.php';
 require_once __DIR__ . '/../../includes/warehouses.php';
 require_once __DIR__ . '/../../includes/opening_stock_lock.php';
+require_once __DIR__ . '/../../includes/sales_doc_print.php';
+require_once __DIR__ . '/../../includes/date_format.php';
 
 $productId = (int)($_GET['product_id'] ?? 0);
 if ($productId < 1) {
@@ -70,16 +72,60 @@ $movements->execute([$productId]);
 $movements = $movements->fetchAll(PDO::FETCH_ASSOC);
 
 $img = storefront_product_image_href((string) ($product['main_image'] ?? ''));
+
+$icCompany = orange_sales_doc_print_company($pdo, $icCountryId);
+$icCompanyName = $icCompany['company_name_ar'];
+$icCompanyLogo = $icCompany['logo_url'];
+$icCompanyCr = $icCompany['commercial_register'];
+$icCompanyFooter = $icCompany['invoice_footer'];
+$icPrintDate = orange_format_date_dmY(date('Y-m-d'));
+$icTotalStock = 0;
+foreach ($variants as $vSum) {
+    $icTotalStock += (int) ($vSum['stock_quantity'] ?? 0);
+}
 ?>
-<div class="page-title page-title--stacked">
+<div class="page-title page-title--stacked gl-acc-stmt-no-print">
     <div>
         <h1>كارت الصنف</h1>
         <p class="page-subtitle">
             <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock#balances'), ENT_QUOTES, 'UTF-8'); ?>">← المستودع</a>
             &nbsp;·&nbsp;
             <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=products'), ENT_QUOTES, 'UTF-8'); ?>">المنتجات</a>
+            &nbsp;·&nbsp;
+            <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock_reports'), ENT_QUOTES, 'UTF-8'); ?>">تقارير المخزن</a>
         </p>
     </div>
+    <div>
+        <button type="button" class="btn-secondary" onclick="window.print()">طباعة كارت الصنف</button>
+    </div>
+</div>
+
+<div class="ic-print-area">
+<div class="card item-card-print-sheet">
+    <header class="gl-acc-stmt-print-banner bs-report-banner">
+        <div class="bs-report-brand">
+            <?php if ($icCompanyLogo !== ''): ?>
+                <img class="bs-report-logo" src="<?php echo htmlspecialchars($icCompanyLogo, ENT_QUOTES, 'UTF-8'); ?>" alt="">
+            <?php endif; ?>
+            <div class="bs-report-brand-text">
+                <?php if ($icCompanyName !== ''): ?>
+                    <p class="bs-report-company"><?php echo htmlspecialchars($icCompanyName, ENT_QUOTES, 'UTF-8'); ?></p>
+                <?php endif; ?>
+                <?php if ($icCompanyCr !== ''): ?>
+                    <p class="bs-report-cr">سجل تجاري: <span dir="ltr"><?php echo htmlspecialchars($icCompanyCr, ENT_QUOTES, 'UTF-8'); ?></span></p>
+                <?php endif; ?>
+            </div>
+        </div>
+        <h2 class="gl-acc-stmt-print-title bs-report-title">
+            <span class="gl-acc-stmt-print-title-ar" lang="ar">كارت صنف</span>
+            <span class="bs-report-asof" lang="ar">بتاريخ <span dir="ltr"><?php echo htmlspecialchars($icPrintDate, ENT_QUOTES, 'UTF-8'); ?></span></span>
+        </h2>
+    </header>
+    <p class="muted" style="margin:0;font-size:0.9rem;">
+        <strong>الصنف:</strong> <?php echo htmlspecialchars((string) $product['name'], ENT_QUOTES, 'UTF-8'); ?>
+        &nbsp;|&nbsp; <strong>رقم:</strong> <span dir="ltr"><?php echo (int) $product['id']; ?></span>
+        &nbsp;|&nbsp; <strong>إجمالي الرصيد:</strong> <?php echo (int) $icTotalStock; ?>
+    </p>
 </div>
 
 <div class="card item-card-header">
@@ -172,6 +218,13 @@ $img = storefront_product_image_href((string) ($product['main_image'] ?? ''));
     <?php if (!$movements): ?>
         <p class="muted">لا توجد حركات مسجلة لهذا الصنف.</p>
     <?php endif; ?>
+</div>
+
+<?php if ($icCompanyFooter !== ''): ?>
+<div class="card item-card-legal-print">
+    <p class="bs-report-legal-footer" style="border-top:none;margin-top:0;"><?php echo htmlspecialchars($icCompanyFooter, ENT_QUOTES, 'UTF-8'); ?></p>
+</div>
+<?php endif; ?>
 </div>
 
 <script>

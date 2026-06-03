@@ -4448,6 +4448,87 @@ input.admin-inp-qty[type='number']::-webkit-inner-spin-button {
     padding-bottom: 0.65rem;
     border-bottom: 2px solid #334155;
 }
+.bs-report-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.bs-report-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.bs-report-logo {
+    width: 60px;
+    height: 60px;
+    object-fit: contain;
+}
+.bs-report-brand-text {
+    text-align: right;
+}
+.bs-report-company {
+    margin: 0;
+    font-size: 1.08rem;
+    font-weight: 700;
+    text-align: right;
+}
+.bs-report-cr {
+    margin: 0.2rem 0 0;
+    font-size: 0.82rem;
+    color: var(--muted-text, #64748b);
+}
+.bs-report-title {
+    text-align: left;
+}
+.bs-report-asof {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--muted-text, #475569);
+}
+.bs-report-legal-footer {
+    margin: 0.9rem 0 0;
+    padding-top: 0.55rem;
+    border-top: 1px dashed #cbd5e1;
+    font-size: 0.82rem;
+    color: var(--muted-text, #64748b);
+    line-height: 1.5;
+}
+@media print {
+    .bs-report-banner {
+        flex-wrap: nowrap;
+    }
+}
+.item-card-print-sheet .bs-report-banner {
+    margin-bottom: 0.5rem;
+}
+@media print {
+    .ic-print-area,
+    .ic-print-area * {
+        visibility: visible;
+    }
+    .ic-print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        border: none;
+        box-shadow: none;
+    }
+    .ic-print-area .stock-actions,
+    .ic-print-area #variants thead th:nth-last-child(-n+2),
+    .ic-print-area #variants tbody td:nth-last-child(-n+2) {
+        display: none !important;
+    }
+    .ic-print-area .card {
+        border: none;
+        box-shadow: none;
+        break-inside: avoid;
+    }
+}
 .gl-acc-stmt-print-company {
     margin: 0 0 0.35rem;
     font-size: 1.08rem;
