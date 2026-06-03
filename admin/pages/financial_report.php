@@ -416,6 +416,9 @@ window.addEventListener('load', function () {
 
 <div class="card" id="report-balance-sheet">
     <h3 class="card-title">الميزانية العمومية (مبسطة)</h3>
+    <p class="actions gl-acc-stmt-no-print" style="margin:0 0 12px;">
+        <a class="btn-secondary" href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=report_balance_sheet&fy=' . (int) $fyId), ENT_QUOTES, 'UTF-8'); ?>">الميزانية التفصيلية (حسب تاريخ)</a>
+    </p>
     <div class="grid-2">
         <div class="stat-card"><h3>الأصول</h3><div class="value"><?php echo number_format($bsAssets, $frMoney['decimals']); ?></div></div>
         <div class="stat-card"><h3>الخصوم</h3><div class="value"><?php echo number_format($bsLiab, $frMoney['decimals']); ?></div></div>

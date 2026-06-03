@@ -1452,6 +1452,33 @@ function orange_voucher_account_totals_strictly_before_date(
 }
 
 /**
+ * أرصدة مجمّعة لكل حساب من سندات بتاريخ ≤ التاريخ المعرّف (شامل اليوم).
+ *
+ * @param list<string> $excludeEntryTypes
+ * @return array<int, array{debit:float,credit:float}>
+ */
+function orange_voucher_account_totals_on_or_before_date(
+    PDO $pdo,
+    string $asOfInclusiveYmd,
+    array $excludeEntryTypes = []
+): array {
+    $asOfInclusiveYmd = trim($asOfInclusiveYmd);
+    if ($asOfInclusiveYmd === '') {
+        return [];
+    }
+    $t = strtotime($asOfInclusiveYmd . ' 12:00:00');
+    if ($t === false) {
+        return [];
+    }
+
+    return orange_voucher_account_totals_strictly_before_date(
+        $pdo,
+        date('Y-m-d', strtotime('+1 day', $t)),
+        $excludeEntryTypes
+    );
+}
+
+/**
  * @return array{id:int,code:string,name:string}|null
  */
 function orange_journal_voucher_map_cash_account_for_country(PDO $pdo, int $accountId, int $preferCountryId): ?array

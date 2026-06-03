@@ -408,7 +408,7 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                         ['page' => 'report_trial_balance', 'href' => '/admin/index.php?page=report_trial_balance', 'label' => 'ميزان المراجعة', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'report_cash_flow', 'href' => '/admin/index.php?page=report_cash_flow', 'label' => 'قائمة التدفقات النقدية', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'report_analytical', 'href' => '/admin/index.php?page=report_analytical', 'label' => 'التقرير التحليلي', 'class' => 'admin-nav-sub', 'sub' => true],
-                        ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report#report-balance-sheet', 'label' => 'الميزانية', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'report_balance_sheet', 'href' => '/admin/index.php?page=report_balance_sheet', 'label' => 'الميزانية', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'financial_report', 'href' => '/admin/index.php?page=financial_report', 'label' => 'التقارير المالية (الصفحة كاملة)', 'class' => '', 'sub' => false],
                     ],
                 ],

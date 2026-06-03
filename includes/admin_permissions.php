@@ -108,6 +108,7 @@ function orange_admin_page_resource(string $page): string
         'report_trading_account' => 'accounting',
         'report_trial_balance' => 'accounting',
         'report_income_statement' => 'accounting',
+        'report_balance_sheet' => 'accounting',
         'report_pl_monthly' => 'accounting',
         'report_pl_compare_years' => 'accounting',
         'report_cash_flow' => 'accounting',

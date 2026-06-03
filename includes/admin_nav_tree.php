@@ -62,6 +62,7 @@ function orange_admin_permission_mega_sections(): array
                         ['page' => 'report_gl_account_monthly', 'label' => 'الحركة الشهرية لحساب'],
                         ['page' => 'partner_reports', 'label' => 'أرصدة العملاء والموردين (ذمم)'],
                         ['page' => 'report_income_statement', 'label' => 'أرباح وخسائر'],
+                        ['page' => 'report_balance_sheet', 'label' => 'الميزانية العمومية'],
                         ['page' => 'report_trading_account', 'label' => 'قائمة حسابات المتاجرة'],
                         ['page' => 'report_pl_monthly', 'label' => 'قائمة إيرادات ومصروفات شهرية'],
                         ['page' => 'report_pl_compare_years', 'label' => 'أرباح وخسائر مقارنة بين السنوات'],

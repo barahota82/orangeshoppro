@@ -245,6 +245,30 @@ ORANGE — أسئلة وأجوبة تشغيلية (وكلاء Cursor / نشر / 
 5. تأكد أن كل فاتورة (نقدي/آجل/أونلاين) تسجّل حركة بـ `party_subledger` باسم العميل (بعد التسليم)
 6. الأقساط — تنتظر توضيح المالك
 
+--------------------------------------------------------------------
+س16. تحسين شاشة الميزانية العمومية (قرار المالك — تنفيذ 2026-05-20)
+--------------------------------------------------------------------
+**الحالة:** منفّذ في الكود — شاشة مستقلة + ملخص في التقارير المالية.
+
+**المشكلة:** قسم «الميزانية العمومية (مبسطة)» داخل `financial_report.php` كان إجماليات فقط (أصول / خصوم / حقوق) بلا أسطر حسابات ولا تاريخ «حتى» ولا طباعة مثل «أرباح وخسائر».
+
+**المطلوب (منفّذ):**
+1. شاشة **`admin/pages/report_balance_sheet.php`** (`page=report_balance_sheet`) — نفس أسلوب تقارير GL (طباعة، سنة مالية، **حتى تاريخ** ضمن السنة).
+2. تجميع **mapping-first**: `account_type` + `report_line_id` / `orange_accounts_bs_bucket_for_report` — لا منطق باسم الحساب (راجع `docs/ACCOUNTING_REPORTING_POLICY_V2.md`).
+3. أقسام: **أصول** (مدين − دائن) | **خصوم وحقوق** (دائن − مدين)؛ استبعاد `report_section` = trading/pnl من أسطر الميزانية.
+4. خيار **تجاهل قيود الإقفال (YEC)** — مثل أرباح وخسائر (`ignore_close=1` افتراضي).
+5. أرصدة عند التاريخ: `orange_voucher_account_totals_on_or_before_date()` في `includes/journal_voucher.php`.
+6. بناء الأسطر: `includes/accounting_bs_statement_rows.php` — `orange_accounts_build_bs_statement_section_lines()`.
+7. التنقل: قائمة «الحسابات والتقارير» → **الميزانية** → الشاشة الجديدة؛ `financial_report` يبقى ملخصاً + رابط «الميزانية التفصيلية».
+
+**ملفات:**
+- `admin/pages/report_balance_sheet.php`
+- `includes/accounting_bs_statement_rows.php`
+- `includes/journal_voucher.php` (دالة الأرصدة حتى تاريخ)
+- `admin/index.php` ($allowed)، `includes/admin_permissions.php`، `admin/partials/header.php`، `includes/admin_nav_tree.php`
+
+**قاعدة س13:** بعد النشر افتح الشاشة وتأكد ظهور الجدول (حتى لو فارغاً بلا أوراق ترحيل).
+
 **10) شاشة كشف الحساب الموحّدة — قرار التصميم:**
 - شاشة **واحدة** (`partner_account_statement.php`) تدعم **وضعين**:
   - **الوضع العادي** (checkbox غير مفعّل): الـ picker يبحث في **حسابات الشجرة** (كما هو) — يشمل الموردين وأي حساب فرعي. كشف الحساب من `journal_lines` (GL).
