@@ -382,13 +382,13 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                     'title' => 'السندات والذمم',
                     'items' => [
                         ['page' => 'journal_entries', 'href' => '/admin/index.php?page=journal_entries', 'label' => 'سند قيد', 'class' => '', 'sub' => false],
-                        ['page' => 'year_end_close_vouchers', 'href' => '/admin/index.php?page=year_end_close_vouchers', 'label' => 'قيود الإقفال السنوية', 'class' => '', 'sub' => false],
                         ['page' => 'receipt_voucher', 'href' => '/admin/index.php?page=receipt_voucher', 'label' => 'سند قبض', 'class' => '', 'sub' => false],
                         ['page' => 'payment_voucher', 'href' => '/admin/index.php?page=payment_voucher', 'label' => 'سند صرف', 'class' => '', 'sub' => false],
                         ['page' => 'other_vouchers', 'href' => '/admin/index.php?page=other_vouchers', 'label' => 'سندات أخرى', 'class' => '', 'sub' => false],
                         ['page' => 'partner_customer_receipt', 'href' => '/admin/index.php?page=partner_customer_receipt', 'label' => 'سداد فواتير مبيعات آجلة', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'partner_supplier_payment', 'href' => '/admin/index.php?page=partner_supplier_payment', 'label' => 'سداد فواتير مشتريات آجلة', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'bank_reconciliation', 'href' => '/admin/index.php?page=bank_reconciliation', 'label' => 'تسوية البنك', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'year_end_close_vouchers', 'href' => '/admin/index.php?page=year_end_close_vouchers', 'label' => 'قيود الإقفال السنوية', 'class' => '', 'sub' => false],
                     ],
                 ],
                 [
