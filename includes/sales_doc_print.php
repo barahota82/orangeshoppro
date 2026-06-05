@@ -33,7 +33,7 @@ function orange_sales_doc_print_company(PDO $pdo, int $countryId): array
         } else {
             $path = (isset($logoRaw[0]) && $logoRaw[0] === '/')
                 ? $logoRaw
-                : '/uploads/' . rawurlencode(basename($logoRaw));
+                : '/uploads/company/' . rawurlencode(basename($logoRaw));
             $logoUrl = storefront_public_path($path);
         }
     }
