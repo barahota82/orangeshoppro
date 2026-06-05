@@ -31,7 +31,7 @@ $doPrint = isset($_GET['print']) && (string) $_GET['print'] === '1';
             <h2 class="gl-acc-stmt-print-title ral-print-title">قائمة الحسابات</h2>
         </header>
         <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
-            <table class="admin-fy-table gl-acc-stmt-table ral-account-list-table" dir="rtl">
+            <table class="admin-fy-table gl-acc-stmt-table ral-account-list-table" dir="rtl" data-export-name="قائمة الحسابات" data-export-target=".actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
                 <thead>
                     <tr>
                         <th class="gl-acc-stmt-col-num ral-col-code">كــود الحســاب</th>

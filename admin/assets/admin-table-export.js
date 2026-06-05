@@ -127,7 +127,10 @@
 
     /* خلية رقمية = مبلغ (تُحوَّل لرقم) بشرط ألا تكون كوداً/معرّفاً نصياً (dir=ltr أو data-export-text). */
     function isAmountCell(cell) {
-        if (cell.tagName !== 'TD' || !cell.classList.contains('gl-acc-stmt-col-num')) {
+        if (cell.tagName !== 'TD') {
+            return false;
+        }
+        if (!cell.classList.contains('gl-acc-stmt-col-num') && !cell.classList.contains('cf-col-amount')) {
             return false;
         }
         if (cell.getAttribute('dir') === 'ltr' || cell.hasAttribute('data-export-text') || cell.classList.contains('tb-col-code')) {
@@ -145,7 +148,7 @@
             }
         }
         /* المبالغ → أرقام قابلة للجمع (الأكواد/المعرّفات تبقى نصاً). */
-        var amountCells = clone.querySelectorAll('td.gl-acc-stmt-col-num');
+        var amountCells = clone.querySelectorAll('td.gl-acc-stmt-col-num, td.cf-col-amount');
         for (var n = 0; n < amountCells.length; n++) {
             var ac = amountCells[n];
             if (!isAmountCell(ac)) {

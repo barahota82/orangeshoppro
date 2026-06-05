@@ -296,7 +296,7 @@ $reportFmt = static function (float $v) use ($reportMoney): string {
             </div>
 
             <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap ta-report-table-scroll">
-                <table class="admin-fy-table gl-acc-stmt-table ta-report-table ta-report-table--xlsx">
+                <table class="admin-fy-table gl-acc-stmt-table ta-report-table ta-report-table--xlsx" data-export-name="قائمة الدخل" data-export-target=".gas-acc-stmt-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>" data-export-subtitle="<?php echo htmlspecialchars('عن الفترة من ' . $reportDateFromDmY . ' إلى ' . $reportDateToDmY, ENT_QUOTES, 'UTF-8'); ?>">
                     <thead>
                         <tr>
                             <th class="gl-acc-stmt-col-num">كــود الحســاب</th>

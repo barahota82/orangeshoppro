@@ -166,7 +166,7 @@ $todayDmY = orange_format_date_dmY(date('Y-m-d'));
         <?php endif; ?>
         <h3 class="card-title">ملخص بحسب سنة مالية</h3>
         <div class="table-wrap admin-fy-table-wrap">
-            <table class="admin-fy-table">
+            <table class="admin-fy-table" data-export-name="مقارنة الأرباح والخسائر السنوية" data-export-target=".gas-acc-stmt-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
                 <thead>
                     <tr>
                         <th>السنة المالية</th>

@@ -789,7 +789,7 @@ $showStatementShell = ($err === '');
                 ?> — عمود الرصيد يُحسب من الرصيد الافتتاحي ثم الأسطر الظاهرة فقط.</p>
             <?php endif; ?>
             <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
-                <table class="admin-fy-table gl-acc-stmt-table">
+                <table class="admin-fy-table gl-acc-stmt-table" data-export-name="كشف حساب" data-export-target=".gas-acc-stmt-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
                     <thead>
                         <tr>
                             <th>التاريخ</th>

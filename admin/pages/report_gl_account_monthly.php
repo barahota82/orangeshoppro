@@ -436,7 +436,7 @@ $printNameVal = $accNameDisp !== '' ? $accNameDisp : '—';
             </div>
         </div>
         <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
-            <table class="admin-fy-table gl-acc-stmt-table">
+            <table class="admin-fy-table gl-acc-stmt-table" data-export-name="كشف حساب أستاذ" data-export-target=".gas-acc-stmt-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>" data-export-subtitle="<?php echo htmlspecialchars('حساب: ' . $accNameDisp . ' — من ' . $reportDateFromDmY . ' إلى ' . $reportDateToDmY, ENT_QUOTES, 'UTF-8'); ?>">
                 <thead>
                     <tr>
                         <th>الشهر</th>
