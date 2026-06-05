@@ -105,26 +105,29 @@
     function makeBtn(label, onClick) {
         var b = document.createElement('button');
         b.type = 'button';
-        b.className = 'btn-secondary table-export-bar__btn';
+        b.className = 'btn-secondary';
         b.textContent = label;
         b.addEventListener('click', onClick);
         return b;
     }
 
-    function buildBar(table) {
+    function exportButtons(table, inline) {
         var name = table.getAttribute('data-export-name') || 'report';
-        var bar = document.createElement('div');
-        bar.className = 'table-export-bar gl-acc-stmt-no-print';
-        var lbl = document.createElement('span');
-        lbl.className = 'table-export-bar__label';
-        lbl.textContent = 'تنزيل:';
-        bar.appendChild(lbl);
-        bar.appendChild(makeBtn('Excel', function () { exportExcel(table, name); }));
-        bar.appendChild(makeBtn('CSV', function () { exportCsv(table, name); }));
-        if (table.hasAttribute('data-export-print')) {
-            bar.appendChild(makeBtn('طباعة / حفظ PDF', function () { window.print(); }));
+        var bx = makeBtn('Excel', function () { exportExcel(table, name); });
+        var bc = makeBtn('CSV', function () { exportCsv(table, name); });
+        if (inline) {
+            bx.classList.add('table-export-inline-btn');
+            bc.classList.add('table-export-inline-btn');
         }
-        return bar;
+        var out = [bx, bc];
+        if (table.hasAttribute('data-export-print')) {
+            var bp = makeBtn('طباعة / حفظ PDF', function () { window.print(); });
+            if (inline) {
+                bp.classList.add('table-export-inline-btn');
+            }
+            out.push(bp);
+        }
+        return out;
     }
 
     function init(root) {
@@ -135,10 +138,26 @@
             if (table.getAttribute('data-export-init') === '1') {
                 continue;
             }
+            /* الأفضل: حقن الأزرار في شريط إجراءات موجود (أعلى التقرير، خارج هيكله). */
+            var targetSel = table.getAttribute('data-export-target');
+            var target = targetSel ? document.querySelector(targetSel) : null;
+            if (target) {
+                table.setAttribute('data-export-init', '1');
+                exportButtons(table, true).forEach(function (b) { target.appendChild(b); });
+                continue;
+            }
+            /* احتياطي: شريط مستقل فوق الجدول. */
             table.setAttribute('data-export-init', '1');
+            var bar = document.createElement('div');
+            bar.className = 'table-export-bar gl-acc-stmt-no-print';
+            var lbl = document.createElement('span');
+            lbl.className = 'table-export-bar__label';
+            lbl.textContent = 'تنزيل:';
+            bar.appendChild(lbl);
+            exportButtons(table, false).forEach(function (b) { b.classList.add('table-export-bar__btn'); bar.appendChild(b); });
             var anchor = table.closest('.table-wrap') || table;
             if (anchor.parentNode) {
-                anchor.parentNode.insertBefore(buildBar(table), anchor);
+                anchor.parentNode.insertBefore(bar, anchor);
             }
         }
     }
