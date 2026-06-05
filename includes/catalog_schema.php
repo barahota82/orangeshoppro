@@ -2961,6 +2961,12 @@ function orange_catalog_ensure_schema_core(PDO $pdo): void
             "ALTER TABLE company_settings ADD COLUMN vat_number VARCHAR(191) NOT NULL DEFAULT ''"
         );
     }
+    if (orange_table_exists($pdo, 'company_settings') && !orange_table_has_column($pdo, 'company_settings', 'vat_rate')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            'ALTER TABLE company_settings ADD COLUMN vat_rate DECIMAL(6,3) NOT NULL DEFAULT 0'
+        );
+    }
     if (orange_table_exists($pdo, 'company_settings') && !orange_table_has_column($pdo, 'company_settings', 'invoice_footer')) {
         orange_catalog_safe_exec($pdo, 'ALTER TABLE company_settings ADD COLUMN invoice_footer TEXT NULL');
     }
@@ -3613,6 +3619,10 @@ function orange_catalog_ensure_schema_fast_path_slice(PDO $pdo): void
         orange_catalog_safe_exec($pdo, 'ALTER TABLE advisory_sizing_library_bundles ADD COLUMN size_scheme_template_id INT NULL DEFAULT NULL AFTER department_id');
     }
     orange_catalog_ensure_suppliers_schema($pdo);
+    if (orange_table_exists($pdo, 'company_settings') && !orange_table_has_column($pdo, 'company_settings', 'vat_rate')) {
+        orange_catalog_safe_exec($pdo, 'ALTER TABLE company_settings ADD COLUMN vat_rate DECIMAL(6,3) NOT NULL DEFAULT 0');
+        orange_schema_invalidate_column_check('company_settings', 'vat_rate');
+    }
     orange_catalog_ensure_journal_types_country_scope($pdo);
     orange_catalog_seed_default_accounts_if_empty($pdo);
     orange_catalog_ensure_gl_account_settings_alloc_tables($pdo);

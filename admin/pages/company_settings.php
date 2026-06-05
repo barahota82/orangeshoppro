@@ -86,6 +86,7 @@ $csUpdatedAt = trim((string) ($csRow['updated_at'] ?? ''));
             </div>
         </div>
         <div><label>الرقم الضريبي (للفواتير)</label><input type="text" id="vat_number" placeholder="إن وُجد" value="<?php echo $csField($csRow, 'vat_number'); ?>"></div>
+        <div><label>نسبة ضريبة القيمة المضافة % (تلقائي على الفواتير — الكويت 0)</label><input type="number" id="vat_rate" min="0" max="99.999" step="0.001" lang="en" dir="ltr" placeholder="0" value="<?php echo htmlspecialchars((string) ($csRow['vat_rate'] ?? '0'), ENT_QUOTES, 'UTF-8'); ?>"></div>
         <div style="grid-column:1/-1;"><label>نص قانوني أسفل الفاتورة (اختياري)</label><textarea id="invoice_footer" rows="2" placeholder="مثال: سداد خلال ٣٠ يوم — البضاعة تُسلّم بحالة جيدة"><?php echo $csField($csRow, 'invoice_footer'); ?></textarea></div>
     </div>
     <div class="admin-form-actions">
@@ -123,6 +124,8 @@ async function loadCompanySettings() {
     document.getElementById('phones').value = d.phones || '';
     document.getElementById('address').value = d.address || '';
     document.getElementById('vat_number').value = d.vat_number || '';
+    var vrEl = document.getElementById('vat_rate');
+    if (vrEl) vrEl.value = (d.vat_rate !== undefined && d.vat_rate !== null) ? d.vat_rate : '0';
     document.getElementById('invoice_footer').value = d.invoice_footer || '';
     const payEl = document.getElementById('payment_online_enabled');
     if (payEl) {
@@ -140,6 +143,7 @@ async function saveCompanySettings() {
         phones: document.getElementById('phones').value.trim(),
         address: document.getElementById('address').value.trim(),
         vat_number: document.getElementById('vat_number').value.trim(),
+        vat_rate: (document.getElementById('vat_rate') ? parseFloat(document.getElementById('vat_rate').value) : 0) || 0,
         invoice_footer: document.getElementById('invoice_footer').value.trim(),
         payment_online_enabled: document.getElementById('payment_online_enabled') && document.getElementById('payment_online_enabled').checked ? 1 : 0
     });

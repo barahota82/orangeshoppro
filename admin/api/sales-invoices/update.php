@@ -227,6 +227,13 @@ try {
 
     orange_sales_invoice_company_insert_items($pdo, $orderId, $validatedItems);
 
+    $extraInput = orange_invoice_ancillary_merge_auto_vat(
+        $pdo,
+        orange_invoice_ancillary_doc_kind_sales(),
+        $orderCountryId,
+        (float) $total,
+        $extraInput
+    );
     orange_invoice_ancillary_extra_lines_replace_for_doc(
         $pdo,
         orange_invoice_ancillary_doc_kind_sales(),

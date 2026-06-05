@@ -195,6 +195,13 @@ try {
     }
 
     if (orange_invoice_ancillary_tables_ready($pdo)) {
+        $extraInput = orange_invoice_ancillary_merge_auto_vat(
+            $pdo,
+            orange_invoice_ancillary_doc_kind_sales_return(),
+            $returnCountryId,
+            (float) $revenueTotal,
+            $extraInput
+        );
         orange_invoice_ancillary_extra_lines_replace_for_doc(
             $pdo,
             orange_invoice_ancillary_doc_kind_sales_return(),

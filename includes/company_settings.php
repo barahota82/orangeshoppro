@@ -78,3 +78,18 @@ function orange_company_settings_name_ar(PDO $pdo, ?int $countryId = null, bool 
 
     return trim((string) ($row['company_name_ar'] ?? ''));
 }
+
+/**
+ * نسبة ضريبة القيمة المضافة (%) للدولة — من company_settings.vat_rate (الكويت 0).
+ * تُرجع 0 عند غياب العمود أو قيمة غير صالحة.
+ */
+function orange_vat_rate_for_country(PDO $pdo, ?int $countryId = null): float
+{
+    $row = orange_company_settings_row($pdo, $countryId, false);
+    if (!is_array($row) || !array_key_exists('vat_rate', $row)) {
+        return 0.0;
+    }
+    $rate = (float) ($row['vat_rate'] ?? 0);
+
+    return ($rate > 0 && $rate < 100) ? round($rate, 3) : 0.0;
+}

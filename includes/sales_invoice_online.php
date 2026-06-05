@@ -411,6 +411,13 @@ function orange_sales_invoice_online_apply_update(PDO $pdo, int $orderId, array 
     orange_sales_invoice_company_insert_items($pdo, $orderId, $validatedItems);
 
     if (orange_invoice_ancillary_tables_ready($pdo)) {
+        $extraInput = orange_invoice_ancillary_merge_auto_vat(
+            $pdo,
+            orange_invoice_ancillary_doc_kind_sales(),
+            $orderCountryId,
+            (float) $total,
+            $extraInput
+        );
         orange_invoice_ancillary_extra_lines_replace_for_doc(
             $pdo,
             orange_invoice_ancillary_doc_kind_sales(),

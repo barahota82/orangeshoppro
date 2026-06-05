@@ -243,6 +243,13 @@ try {
         $data,
         orange_invoice_ancillary_doc_kind_purchase()
     );
+    $extraInput = orange_invoice_ancillary_merge_auto_vat(
+        $pdo,
+        orange_invoice_ancillary_doc_kind_purchase(),
+        $purchaseCountryId,
+        (float) $newTotal,
+        $extraInput
+    );
     orange_invoice_ancillary_extra_lines_replace_for_doc(
         $pdo,
         orange_invoice_ancillary_doc_kind_purchase(),

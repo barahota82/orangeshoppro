@@ -289,6 +289,13 @@ try {
         $data,
         orange_invoice_ancillary_doc_kind_sales()
     );
+    $extraInput = orange_invoice_ancillary_merge_auto_vat(
+        $pdo,
+        orange_invoice_ancillary_doc_kind_sales(),
+        $orderCountryId,
+        (float) $total,
+        $extraInput
+    );
 
     orange_complete_order_fulfillment($pdo, $orderId);
 

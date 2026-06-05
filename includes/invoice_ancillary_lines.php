@@ -524,6 +524,72 @@ function orange_invoice_ancillary_extra_line_journal_row(array $line): ?array
  * @param list<array<string, mixed>> $extraLines
  * @return list<array{account_id: int, debit: float, credit: float, memo: string}>
  */
+/**
+ * بند VAT تلقائي محسوب بنسبة الدولة (الكويت 0% = لا بند). يعيد استخدام مسار البنود الإضافية/GL المُختبَر.
+ * المبيعات/المردود: `sales_credit_liability` على حساب `vat_output`؛ المشتريات: `purchase_debit_vat_input` على `vat_input`.
+ *
+ * @return array<string,mixed>|null
+ */
+function orange_invoice_ancillary_auto_vat_extra_line(PDO $pdo, string $docKind, int $countryId, float $itemsNet): ?array
+{
+    $itemsNet = round($itemsNet, 4);
+    if ($itemsNet <= 0.0001) {
+        return null;
+    }
+    require_once __DIR__ . '/company_settings.php';
+    require_once __DIR__ . '/gl_settings.php';
+    $rate = orange_vat_rate_for_country($pdo, $countryId > 0 ? $countryId : null);
+    if ($rate <= 0) {
+        return null;
+    }
+    $isPurchase = $docKind === orange_invoice_ancillary_doc_kind_purchase();
+    $settingKey = $isPurchase ? 'vat_input' : 'vat_output';
+    $lineKind = $isPurchase ? 'purchase_debit_vat_input' : 'sales_credit_liability';
+    $accountId = orange_gl_account_id_optional($pdo, $settingKey, $countryId > 0 ? $countryId : null);
+    if ($accountId === null || (int) $accountId <= 0) {
+        return null;
+    }
+    $amount = round($itemsNet * $rate / 100.0, 4);
+    if ($amount <= 0.0001) {
+        return null;
+    }
+    $rateLabel = rtrim(rtrim(number_format($rate, 3, '.', ''), '0'), '.');
+
+    return [
+        'account_id' => (int) $accountId,
+        'line_kind' => $lineKind,
+        'amount' => $amount,
+        'label_ar' => 'ضريبة القيمة المضافة (' . $rateLabel . '%)',
+        'show_on_print' => 1,
+        'preset_id' => 0,
+        'auto_vat' => 1,
+    ];
+}
+
+/**
+ * يدمج بند VAT التلقائي مع البنود المُدخلة (يستبدل أي بند VAT من نفس النوع لتفادي الازدواج).
+ *
+ * @param list<array<string,mixed>> $extraInput
+ * @return list<array<string,mixed>>
+ */
+function orange_invoice_ancillary_merge_auto_vat(PDO $pdo, string $docKind, int $countryId, float $itemsNet, array $extraInput): array
+{
+    $vat = orange_invoice_ancillary_auto_vat_extra_line($pdo, $docKind, $countryId, $itemsNet);
+    if ($vat === null) {
+        return $extraInput;
+    }
+    $out = [];
+    foreach ($extraInput as $line) {
+        if (is_array($line) && (string) ($line['line_kind'] ?? '') === (string) $vat['line_kind']) {
+            continue;
+        }
+        $out[] = $line;
+    }
+    $out[] = $vat;
+
+    return $out;
+}
+
 function orange_invoice_ancillary_extra_lines_journal_rows(array $extraLines): array
 {
     $out = [];

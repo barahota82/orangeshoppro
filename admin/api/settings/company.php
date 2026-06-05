@@ -88,6 +88,24 @@ try {
             }
         }
 
+        if (array_key_exists('vat_rate', $data) && orange_table_has_column($pdo, 'company_settings', 'vat_rate')) {
+            $vatRate = (float) $data['vat_rate'];
+            if ($vatRate < 0 || $vatRate >= 100) {
+                $vatRate = 0.0;
+            }
+            $vatRate = round($vatRate, 3);
+            if (orange_company_settings_has_country_column($pdo)) {
+                $pdo->prepare('UPDATE company_settings SET vat_rate = ? WHERE country_id = ?')
+                    ->execute([$vatRate, $ctxCountryId]);
+            } else {
+                $rowVr = $pdo->query('SELECT id FROM company_settings ORDER BY id ASC LIMIT 1')->fetch();
+                if ($rowVr) {
+                    $pdo->prepare('UPDATE company_settings SET vat_rate = ? WHERE id = ?')
+                        ->execute([$vatRate, (int) $rowVr['id']]);
+                }
+            }
+        }
+
         json_response(['success' => true, 'message' => 'تم حفظ بيانات الشركة']);
     }
 
