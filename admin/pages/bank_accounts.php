@@ -14,6 +14,10 @@ $baCountryId = orange_admin_context_country_id($pdo);
 $baCurrency = orange_country_functional_currency_code($pdo, $baCountryId);
 $baMethodActive = orange_payment_bank_method_active($pdo, $baCountryId);
 $baAccounts = orange_payment_bank_accounts($pdo, $baCountryId, false);
+require_once __DIR__ . '/../../includes/payments/payment_gateway.php';
+$baGwProvider = orange_payment_gateway_default_provider();
+$baGwActive = orange_payment_gateway_method_active($pdo, $baCountryId);
+$baGwConfigured = orange_payment_gateway_is_configured($baGwProvider, orange_payment_gateway_config($baGwProvider));
 ?>
 <div class="page-title page-title--stacked">
     <div>
@@ -26,6 +30,18 @@ $baAccounts = orange_payment_bank_accounts($pdo, $baCountryId, false);
     <label style="display:flex;align-items:center;gap:10px;cursor:pointer;max-width:40rem;">
         <input type="checkbox" id="ba_method_active" <?php echo $baMethodActive ? 'checked' : ''; ?> onchange="baToggleMethod(this.checked)">
         <span><strong>تفعيل التحويل البنكي المباشر</strong> لهذه الدولة (يظهر للعميل كخيار دفع — يتطلب حساباً بنكياً واحداً على الأقل).</span>
+    </label>
+</div>
+
+<div class="card">
+    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;max-width:46rem;<?php echo $baGwConfigured ? '' : 'opacity:.65;'; ?>">
+        <input type="checkbox" id="ba_gateway_active" <?php echo $baGwActive ? 'checked' : ''; ?> <?php echo $baGwConfigured ? '' : 'disabled'; ?> onchange="baToggleGateway(this.checked)">
+        <span>
+            <strong>تفعيل الدفع بالبطاقة / البوابة الإلكترونية</strong> (<?php echo htmlspecialchars($baGwProvider, ENT_QUOTES, 'UTF-8'); ?>) لهذه الدولة — العميل يدفع من صفحة «تتبّع الطلب» عبر زر «ادفع الآن».
+            <?php if (!$baGwConfigured): ?>
+                <br><span class="muted">المزوّد غير مُعدّ بعد — أضف مفاتيح البوابة في <code>.env.php</code> على السيرفر (راجع <code>.env.example.php</code>) ثم أعد التحميل.</span>
+            <?php endif; ?>
+        </span>
     </label>
 </div>
 
@@ -83,6 +99,12 @@ function baApi(payload) {
 function baToggleMethod(active) {
     baApi({ action: 'toggle_method', active: active ? 1 : 0 }).then(function (r) {
         alert((r && r.message) || 'تم'); }).catch(function (e) { alert(e.message || String(e)); });
+}
+function baToggleGateway(active) {
+    baApi({ action: 'toggle_gateway', active: active ? 1 : 0 }).then(function (r) {
+        if (r && r.success === false) { alert(r.message || 'فشل'); var el = document.getElementById('ba_gateway_active'); if (el) el.checked = !active; return; }
+        alert((r && r.message) || 'تم');
+    }).catch(function (e) { alert(e.message || String(e)); });
 }
 function baReset() {
     document.getElementById('ba_id').value = '0';

@@ -2,7 +2,7 @@ ORANGE — مخطط جاهزية الدفع الإلكتروني (تحويل ب�
 ================================================================================
 المسار: docs/archive/ORANGE_ONLINE_PAYMENT_READINESS.txt
 تاريخ: 2026-06-05
-الحالة: **مخطط تنفيذ معتمد للجاهزية — لم يُنفَّذ بعد** (الدفع مؤجّل بقرار المالك §7 multicountry vision).
+الحالة: **منفّذ كاملاً (م0+م1+م2) — مُعطّل افتراضياً حتى التفعيل per دولة + مفاتيح env** (2026-06-05).
 المصدر: نقاش مالك–وكيل (2026-06-05).
 
 الغرض
@@ -76,7 +76,19 @@ ORANGE — مخطط جاهزية الدفع الإلكتروني (تحويل ب�
 |---------|--------|
 | 0 الأساس الموحّد | **منتهٍ (2026-06-05) — مُعطّل، إضافي بلا تغيير سلوك** |
 | 1 تحويل بنكي مباشر | **منتهٍ — الأدمن + واجهة العميل (2026-06-05)** |
-| 2 بوابة دفع | لم يبدأ (مخطط) |
+| 2 بوابة دفع | **منتهٍ — الطبقة الكاملة (2026-06-05)؛ مُعطّلة افتراضياً حتى مفاتيح env + تفعيل per دولة** |
+
+**تنفيذ المرحلة 2 — بوابة الدفع (2026-06-05، مُعطّلة افتراضياً — أسرار من `.env.php` فقط):**
+- نواة موحّدة `includes/payments/payment_gateway.php`: `orange_payment_env()` (قراءة `.env.php`) · `orange_payment_gateway_config()` · `orange_payment_gateway_method_active/ready/is_configured` · `orange_payment_gateway_load` (registry) · **`orange_payment_gateway_settle()`** (تسوية idempotent: تسجيل حركة + paid + نقطة GL).
+- موصِّل `includes/payments/gateway_myfatoorah.php` (MyFatoorah v2 Hosted): `create_session` (SendPayment → InvoiceURL+InvoiceId) · `verify` (GetPaymentStatus بـ PaymentId/InvoiceId) · `webhook_verify` (HMAC-SHA256 توقيع). curl، SSL verify، لا يلمس بيانات البطاقة.
+- `api/payments/gateway-create.php`: يتحقق ملكية الطلب (رقم+هاتف) + جاهزية البوابة → SendPayment → حركة معلّقة → يعيد `payment_url`.
+- `pages/payment-return.php`: **تأكيد خادمي** (verify بـ PaymentId — لا يثق بإعادة التوجيه) → settle عند paid → شاشة نتيجة.
+- `api/payments/gateway-webhook.php`: تحقق توقيع → **verify خادمي مستقل** → settle idempotent (UNIQUE txn_uuid). عنوان التسجيل: `/api/payments/gateway-webhook.php`.
+- أدمن: زر **«تفعيل الدفع بالبطاقة/البوابة» per دولة** في شاشة الحسابات البنكية + API (`toggle_gateway`، يرفض التفعيل إن لم تُضبط مفاتيح env).
+- متجر: زر **«ادفع الآن»** في صفحة التتبّع (مُسيَّج بـ `orange_payment_gateway_ready` — صفر أثر عند التعطيل؛ **لا تعديل على `cart.js`**).
+- env: مفاتيح موثّقة في `.env.example.php` (`PAYMENT_GATEWAY_PROVIDER/MODE`, `PAYMENT_MYF_BASE_URL/TOKEN/WEBHOOK_SECRET`).
+- probe: `health.php?rollout=payments-gateway` → `PAYMENTS_GATEWAY_OK` (`gateway_configured=0` = لا مفاتيح).
+- **GL غير مرحّل تلقائياً** (`orange_payment_post_receipt_gl_hook` تبقى نقطة ربط — يُوصَّل بقرار حساب التحصيل per دولة عند التفعيل، كما في «ما يلزم من المالك»).
 
 **تنفيذ المرحلة 1 — الجانب الإداري/الخلفي (2026-06-05، آمن — لا مساس بمسار المتجر):**
 - مخطط: `company_bank_accounts` (per دولة) + عمود `payment_transactions.proof_file` — في `payment_schema.php`.

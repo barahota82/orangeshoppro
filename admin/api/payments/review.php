@@ -80,8 +80,10 @@ try {
         if (!$hasPayCol) {
             json_response(['success' => true, 'results' => []]);
         }
-        $sql = 'SELECT o.id, o.order_number, o.customer_name, o.phone, o.total, o.amount_paid,
-                       o.payment_status, o.payment_method
+        $hasPaidCol = orange_table_has_column($pdo, 'orders', 'amount_paid');
+        $sql = 'SELECT o.id, o.order_number, o.customer_name, o.phone, o.total,'
+            . ($hasPaidCol ? ' o.amount_paid,' : ' 0 AS amount_paid,')
+            . ' o.payment_status, o.payment_method
                 FROM orders o WHERE 1=1' . $countrySql;
         $params = [];
         if (in_array($status, orange_payment_statuses(), true)) {

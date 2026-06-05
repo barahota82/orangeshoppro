@@ -47,4 +47,21 @@ return [
     // 'ORANGE_SCHEMA_CATCH_BOOTSTRAP_FAILURE' => true,
     // ثوانٍ APCu لتخطي بوابة الترحيل بعد نجاح (0 أو عدم التعيين = معطّل). متغير بيئة السيرفر ORANGE_SCHEMA_APCU_GATE_SECONDS
     // علم ملف اختياري: المسار في متغير بيئة ORANGE_SCHEMA_OK_FLAG_PATH؛ السطر الأول = رقم ORANGE_SCHEMA_CODE_VERSION بعد نشر ناجح.
+
+    // ==================================================================
+    // بوابة الدفع الإلكتروني (المرحلة 2) — أسرار السيرفر فقط، لا تُرفع لـ Git.
+    // معطّلة افتراضياً: بلا هذه المفاتيح + بلا تفعيل «الدفع بالبطاقة» per دولة = لا تعمل.
+    // راجع docs/archive/ORANGE_ONLINE_PAYMENT_READINESS.txt
+    // ------------------------------------------------------------------
+    // المزوّد (افتراضي myfatoorah):
+    // 'PAYMENT_GATEWAY_PROVIDER' => 'myfatoorah',
+    // الوضع: test أو live (يحدّد BaseURL الافتراضي):
+    // 'PAYMENT_GATEWAY_MODE' => 'test',
+    // اختياري: تجاوز عنوان البوابة (وإلا يُشتق من الوضع):
+    // 'PAYMENT_MYF_BASE_URL' => 'https://apitest.myfatoorah.com',
+    // توكن API من لوحة MyFatoorah (test ثم live عند الإطلاق):
+    // 'PAYMENT_MYF_TOKEN' => 'ضع_توكن_MyFatoorah',
+    // سر التحقق من توقيع الـ webhook (إن وُفِّر من المزوّد) — طبقة منع تلاعب:
+    // 'PAYMENT_MYF_WEBHOOK_SECRET' => 'سر_عشوائي_طويل',
+    // ملاحظة: عنوان الـ webhook لتسجيله في لوحة المزوّد: https://نطاقك/api/payments/gateway-webhook.php
 ];

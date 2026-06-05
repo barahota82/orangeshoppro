@@ -7,6 +7,7 @@ require_once __DIR__ . '/../includes/catalog_schema.php';
 require_once __DIR__ . '/../includes/countries.php';
 require_once __DIR__ . '/../includes/delivery_areas.php';
 require_once __DIR__ . '/../includes/payments/payment_core.php';
+require_once __DIR__ . '/../includes/payments/payment_gateway.php';
 
 $pdoTrack = db();
 orange_catalog_ensure_storefront_page($pdoTrack);
@@ -15,11 +16,13 @@ orange_catalog_ensure_storefront_page($pdoTrack);
 $trackCountryId = (int) orange_storefront_current_country_id($pdoTrack);
 $trackBankActive = false;
 $trackBankAccounts = [];
+$trackGatewayReady = false;
 try {
     $trackBankActive = orange_payment_bank_method_active($pdoTrack, $trackCountryId);
     if ($trackBankActive) {
         $trackBankAccounts = orange_payment_bank_accounts($pdoTrack, $trackCountryId, true);
     }
+    $trackGatewayReady = orange_payment_gateway_ready($pdoTrack, $trackCountryId);
 } catch (Throwable $e) {
     $trackBankActive = false;
 }
@@ -204,6 +207,27 @@ $orangeMyOrderUi = [
         <p id="bp_msg" role="status" aria-live="polite" style="margin-top:10px;"></p>
     </div>
     <?php endif; ?>
+
+    <?php if ($trackGatewayReady): ?>
+    <div class="card-box track-page-card" id="track-gateway-pay-section">
+        <h3 class="cart-section-title track-page-card__title">الدفع بالبطاقة (إلكتروني)</h3>
+        <p class="track-form-intro">ادفع قيمة طلبك بأمان عبر بوابة الدفع. أدخل رقم الطلب والهاتف ثم اضغط «ادفع الآن».</p>
+        <form class="track-page-form" id="gateway-pay-form" novalidate>
+            <div class="field">
+                <label for="gw_order_number"><?php echo htmlspecialchars(t('order_number'), ENT_QUOTES, 'UTF-8'); ?></label>
+                <input id="gw_order_number" name="order_number" autocomplete="off">
+            </div>
+            <div class="field">
+                <label for="gw_phone"><?php echo htmlspecialchars(t('phone'), ENT_QUOTES, 'UTF-8'); ?></label>
+                <input id="gw_phone" name="phone" inputmode="numeric" autocomplete="tel" dir="ltr">
+            </div>
+            <div class="actions-row track-page-actions">
+                <button type="submit" class="btn btn--track-submit">ادفع الآن</button>
+            </div>
+        </form>
+        <p id="gw_msg" role="status" aria-live="polite" style="margin-top:10px;"></p>
+    </div>
+    <?php endif; ?>
 </div>
 
 <?php if ($trackBankActive): ?>
@@ -224,6 +248,31 @@ $orangeMyOrderUi = [
             msg.textContent = (res && res.message) || (res && res.success ? 'تم' : 'تعذر الرفع');
             if (res && res.success) { form.reset(); }
         }).catch(function () { msg.textContent = 'تعذر الرفع، حاول لاحقاً.'; });
+    });
+})();
+</script>
+<?php endif; ?>
+
+<?php if ($trackGatewayReady): ?>
+<script>
+(function () {
+    var form = document.getElementById('gateway-pay-form');
+    if (!form) return;
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var msg = document.getElementById('gw_msg');
+        var on = document.getElementById('gw_order_number').value.trim();
+        var ph = document.getElementById('gw_phone').value.trim();
+        if (!on || !ph) { msg.textContent = 'أدخل رقم الطلب والهاتف.'; return; }
+        msg.textContent = 'جاري التحويل لبوابة الدفع…';
+        fetch(<?php echo json_encode(storefront_public_path('/api/payments/gateway-create.php'), JSON_UNESCAPED_SLASHES); ?>, {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order_number: on, phone: ph })
+        }).then(function (r) { return r.json(); }).then(function (res) {
+            if (res && res.success && res.payment_url) { window.location.href = res.payment_url; return; }
+            msg.textContent = (res && res.message) || 'تعذر بدء الدفع.';
+        }).catch(function () { msg.textContent = 'تعذر بدء الدفع، حاول لاحقاً.'; });
     });
 })();
 </script>

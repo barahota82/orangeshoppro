@@ -327,6 +327,25 @@ if ($rollout === 'payments-foundation') {
     }
 }
 
+if ($rollout === 'payments-gateway') {
+    try {
+        require_once __DIR__ . '/includes/catalog_schema.php';
+        require_once __DIR__ . '/includes/payments/payment_gateway.php';
+        $pdoGw = db();
+        orange_payments_ensure_schema($pdoGw);
+        $prov = orange_payment_gateway_default_provider();
+        $cfg = orange_payment_gateway_config($prov);
+        echo 'gateway_provider=' . $prov . "\n";
+        echo 'gateway_connector_loaded=' . (orange_payment_gateway_load($prov) !== null ? '1' : '0') . "\n";
+        echo 'gateway_configured=' . (orange_payment_gateway_is_configured($prov, $cfg) ? '1' : '0') . " (0 = لا مفاتيح env)\n";
+        echo 'gateway_mode=' . (string) ($cfg['mode'] ?? '') . "\n";
+        echo 'proof_col=' . (orange_table_has_column($pdoGw, 'payment_transactions', 'proof_file') ? '1' : '0') . "\n";
+        echo "PAYMENTS_GATEWAY_OK\n";
+    } catch (Throwable $e) {
+        echo 'PAYMENTS_GATEWAY_ERROR: ' . $e->getMessage() . "\n";
+    }
+}
+
 if ($rollout === 'storefront-probe') {
     try {
         require_once __DIR__ . '/includes/catalog_schema.php';

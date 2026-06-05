@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../includes/catalog_schema.php';
 require_once __DIR__ . '/../../../includes/countries.php';
 require_once __DIR__ . '/../../../includes/currency.php';
 require_once __DIR__ . '/../../../includes/payments/payment_core.php';
+require_once __DIR__ . '/../../../includes/payments/payment_gateway.php';
 require_admin_api();
 
 try {
@@ -17,9 +18,13 @@ try {
     $action = (string) ($data['action'] ?? $_GET['action'] ?? 'list');
 
     if ($action === 'list') {
+        $gwProvider = orange_payment_gateway_default_provider();
         json_response([
             'success' => true,
             'bank_method_active' => orange_payment_bank_method_active($pdo, $cid),
+            'gateway_method_active' => orange_payment_gateway_method_active($pdo, $cid),
+            'gateway_provider' => $gwProvider,
+            'gateway_configured' => orange_payment_gateway_is_configured($gwProvider, orange_payment_gateway_config($gwProvider)),
             'accounts' => orange_payment_bank_accounts($pdo, $cid, false),
             'default_currency' => orange_country_functional_currency_code($pdo, $cid),
         ]);
@@ -30,6 +35,17 @@ try {
         orange_payment_set_method_active($pdo, $cid > 0 ? $cid : null, 'bank', 'manual', $active);
         audit_log('payment_method_toggle', 'تحويل بنكي=' . ($active ? '1' : '0'), 'payment_methods', $cid);
         json_response(['success' => true, 'message' => $active ? 'تم تفعيل التحويل البنكي' : 'تم إيقاف التحويل البنكي']);
+    }
+
+    if ($action === 'toggle_gateway') {
+        $active = (int) ($data['active'] ?? 0) === 1;
+        $gwProvider = orange_payment_gateway_default_provider();
+        if ($active && !orange_payment_gateway_is_configured($gwProvider, orange_payment_gateway_config($gwProvider))) {
+            json_response(['success' => false, 'message' => 'مزوّد البوابة غير مُعدّ في .env.php (مفاتيح ' . $gwProvider . ')'], 422);
+        }
+        orange_payment_set_method_active($pdo, $cid > 0 ? $cid : null, 'gateway', $gwProvider, $active);
+        audit_log('payment_method_toggle', 'بوابة=' . ($active ? '1' : '0'), 'payment_methods', $cid);
+        json_response(['success' => true, 'message' => $active ? 'تم تفعيل الدفع بالبطاقة' : 'تم إيقاف الدفع بالبطاقة']);
     }
 
     if ($action === 'save') {
