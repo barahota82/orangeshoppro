@@ -10,6 +10,8 @@ $allowed = [
     'dashboard',
     'admin_users',
     'company_settings',
+    'bank_accounts',
+    'payment_review',
     'storefront_hero',
     'storefront_merge_requests',
     'countries',

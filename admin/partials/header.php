@@ -388,6 +388,8 @@ $orangeAdminCapsPageNav = orange_admin_caps_for_page($admin, $pdoNav, $orangeAdm
                         ['page' => 'other_vouchers', 'href' => '/admin/index.php?page=other_vouchers', 'label' => 'سندات أخرى', 'class' => '', 'sub' => false],
                         ['page' => 'partner_customer_receipt', 'href' => '/admin/index.php?page=partner_customer_receipt', 'label' => 'سداد فواتير مبيعات آجلة', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'partner_supplier_payment', 'href' => '/admin/index.php?page=partner_supplier_payment', 'label' => 'سداد فواتير مشتريات آجلة', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'bank_accounts', 'href' => '/admin/index.php?page=bank_accounts', 'label' => 'الحسابات البنكية (دفع مباشر)', 'class' => 'admin-nav-sub', 'sub' => true],
+                        ['page' => 'payment_review', 'href' => '/admin/index.php?page=payment_review', 'label' => 'مراجعة الدفعات', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'bank_reconciliation', 'href' => '/admin/index.php?page=bank_reconciliation', 'label' => 'تسوية البنك', 'class' => 'admin-nav-sub', 'sub' => true],
                         ['page' => 'year_end_close_vouchers', 'href' => '/admin/index.php?page=year_end_close_vouchers', 'label' => 'قيود الإقفال السنوية', 'class' => '', 'sub' => false],
                     ],

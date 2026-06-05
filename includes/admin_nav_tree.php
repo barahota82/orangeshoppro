@@ -50,6 +50,8 @@ function orange_admin_permission_mega_sections(): array
                         ['page' => 'other_vouchers', 'label' => 'سندات أخرى'],
                         ['page' => 'partner_customer_receipt', 'label' => 'سداد فواتير مبيعات آجلة'],
                         ['page' => 'partner_supplier_payment', 'label' => 'سداد فواتير مشتريات آجلة'],
+                        ['page' => 'bank_accounts', 'label' => 'الحسابات البنكية (دفع مباشر)'],
+                        ['page' => 'payment_review', 'label' => 'مراجعة الدفعات'],
                         ['page' => 'bank_reconciliation', 'label' => 'تسوية البنك'],
                     ],
                 ],

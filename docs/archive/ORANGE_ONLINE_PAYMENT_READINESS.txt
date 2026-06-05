@@ -75,8 +75,16 @@ ORANGE — مخطط جاهزية الدفع الإلكتروني (تحويل ب�
 | المرحلة | الحالة |
 |---------|--------|
 | 0 الأساس الموحّد | **منتهٍ (2026-06-05) — مُعطّل، إضافي بلا تغيير سلوك** |
-| 1 تحويل بنكي مباشر | لم يبدأ (مخطط) |
+| 1 تحويل بنكي مباشر | **منتهٍ — جانب الأدمن (2026-06-05)؛ واجهة العميل بالمتجر = 1b (تنتظر تأكيد UX)** |
 | 2 بوابة دفع | لم يبدأ (مخطط) |
+
+**تنفيذ المرحلة 1 — الجانب الإداري/الخلفي (2026-06-05، آمن — لا مساس بمسار المتجر):**
+- مخطط: `company_bank_accounts` (per دولة) + عمود `payment_transactions.proof_file` — في `payment_schema.php`.
+- نواة: في `payment_core.php` — `orange_payment_set_method_active` · `orange_payment_bank_method_active` · `orange_payment_bank_accounts` · `orange_payment_proof_dir/ensure`.
+- شاشة **«الحسابات البنكية»** `admin/pages/bank_accounts.php` + API `admin/api/payments/bank-accounts.php`: CRUD حسابات + **تفعيل طريقة «تحويل بنكي» per دولة** (assert دولة).
+- شاشة **«مراجعة الدفعات»** `admin/pages/payment_review.php` + API `admin/api/payments/review.php`: بحث الطلبات حسب حالة الدفع · **رفع إثبات** (صورة/PDF → `uploads/payment_proofs`) → `pending_review` · **تأكيد الدفع** (`paid`) / **رفض** (`failed`) + تسجيل حركة idempotent + audit. **GL غير مرحّل تلقائياً** (نقطة الربط من م0 — تُوصَّل بقرار حساب البنك/الخزينة).
+- nav + `$allowed` + صلاحيات (`bank_accounts`/`payment_review` => accounting).
+- **المتبقي (1b — يحتاج تأكيد UX من المالك قبل لمس المتجر):** عرض الحساب البنكي للعميل عند checkout/التتبع + رفع إثبات ذاتي (تعديل `cart.js`/`track`). لم يُنفَّذ لتجنّب كسر مسار الطلب دون موافقة.
 
 **تنفيذ المرحلة 0 (2026-06-05):**
 - مخطط: `includes/payments/payment_schema.php` — `orange_payments_ensure_schema()`: أعمدة `orders.payment_status/payment_method/paid_at` + جدولا `payment_transactions` (txn_uuid UNIQUE = idempotency) و`payment_methods` (per دولة). idempotent.

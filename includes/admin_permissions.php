@@ -120,6 +120,8 @@ function orange_admin_page_resource(string $page): string
         'inventory_reconciliation' => 'warehouse',
         'gl_account_settings' => 'accounting',
         'invoice_line_presets' => 'accounting',
+        'bank_accounts' => 'accounting',
+        'payment_review' => 'accounting',
         'partner_account_statement' => 'accounting',
         'partner_customer_receipt' => 'partners',
         'partner_supplier_payment' => 'partners',

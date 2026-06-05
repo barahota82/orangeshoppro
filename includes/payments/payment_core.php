@@ -174,6 +174,91 @@ function orange_payment_set_order_status(
 }
 
 /**
+ * تفعيل/إيقاف طريقة دفع لدولة (مثل bank). idempotent.
+ */
+function orange_payment_set_method_active(PDO $pdo, ?int $countryId, string $method, string $provider, bool $active): void
+{
+    orange_payments_ensure_schema($pdo);
+    $cid = $countryId !== null && $countryId > 0 ? $countryId : null;
+    $sel = $pdo->prepare(
+        'SELECT id FROM payment_methods WHERE ' . ($cid === null ? 'country_id IS NULL' : 'country_id = ?')
+        . ' AND method = ? AND provider = ? LIMIT 1'
+    );
+    $sel->execute($cid === null ? [$method, $provider] : [$cid, $method, $provider]);
+    $id = (int) ($sel->fetchColumn() ?: 0);
+    if ($id > 0) {
+        $pdo->prepare('UPDATE payment_methods SET is_active = ? WHERE id = ?')->execute([$active ? 1 : 0, $id]);
+
+        return;
+    }
+    $pdo->prepare(
+        'INSERT INTO payment_methods (country_id, method, provider, is_active, sort_order) VALUES (?,?,?,?,0)'
+    )->execute([$cid, $method, $provider, $active ? 1 : 0]);
+}
+
+function orange_payment_bank_method_active(PDO $pdo, ?int $countryId = null): bool
+{
+    foreach (orange_payment_methods_for_country($pdo, $countryId) as $m) {
+        if (($m['method'] ?? '') === 'bank') {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * حسابات بنك الشركة لدولة.
+ *
+ * @return list<array<string,mixed>>
+ */
+function orange_payment_bank_accounts(PDO $pdo, ?int $countryId = null, bool $activeOnly = true): array
+{
+    orange_payments_ensure_schema($pdo);
+    if (!orange_table_exists($pdo, 'company_bank_accounts')) {
+        return [];
+    }
+    $cid = $countryId !== null && $countryId > 0 ? $countryId : 0;
+    if ($cid <= 0 && function_exists('orange_admin_context_country_id')) {
+        $cid = (int) orange_admin_context_country_id($pdo);
+    }
+    $sql = 'SELECT * FROM company_bank_accounts WHERE (country_id = ? OR country_id IS NULL)';
+    if ($activeOnly) {
+        $sql .= ' AND is_active = 1';
+    }
+    $sql .= ' ORDER BY sort_order ASC, id ASC';
+    $st = $pdo->prepare($sql);
+    $st->execute([$cid]);
+
+    return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+/** مجلد إثباتات الدفع (تحت uploads). */
+function orange_payment_proof_dir(): string
+{
+    require_once __DIR__ . '/../upload_paths.php';
+
+    return orange_project_root_path() . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'payment_proofs';
+}
+
+function orange_payment_ensure_proof_dir(): ?string
+{
+    $dir = orange_payment_proof_dir();
+    $uploadsDir = dirname($dir);
+    if (is_file($uploadsDir) || is_file($dir)) {
+        return null;
+    }
+    if (!is_dir($uploadsDir) && !@mkdir($uploadsDir, 0775, true) && !is_dir($uploadsDir)) {
+        return null;
+    }
+    if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
+        return null;
+    }
+
+    return is_writable($dir) ? $dir : null;
+}
+
+/**
  * نقطة ربط ترحيل قيد التحصيل (GL) عند الدفع المؤكَّد — **غير مفعّلة في المرحلة 0**.
  * تُنفَّذ عند تفعيل م1/م2 (تحتاج قرار حساب البنك/الخزينة per دولة — راجع المخطط).
  */

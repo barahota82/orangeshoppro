@@ -78,5 +78,33 @@ function orange_payments_ensure_schema(PDO $pdo): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
 
+    /* م1 — حسابات بنك الشركة لكل دولة (لعرضها للعميل + مرجع التحويل المباشر). */
+    orange_catalog_safe_exec(
+        $pdo,
+        'CREATE TABLE IF NOT EXISTS company_bank_accounts (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            country_id INT UNSIGNED NULL DEFAULT NULL,
+            bank_name VARCHAR(191) NOT NULL DEFAULT \'\',
+            account_name VARCHAR(191) NOT NULL DEFAULT \'\',
+            account_number VARCHAR(64) NOT NULL DEFAULT \'\',
+            iban VARCHAR(64) NOT NULL DEFAULT \'\',
+            currency VARCHAR(8) NOT NULL DEFAULT \'\',
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            sort_order INT NOT NULL DEFAULT 0,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_company_bank_country (country_id, is_active, sort_order)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+
+    /* م1 — إثبات تحويل بنكي على حركة الدفع. */
+    if (orange_table_exists($pdo, 'payment_transactions')
+        && !orange_table_has_column($pdo, 'payment_transactions', 'proof_file')) {
+        orange_catalog_safe_exec(
+            $pdo,
+            "ALTER TABLE payment_transactions ADD COLUMN proof_file VARCHAR(191) NOT NULL DEFAULT '' AFTER provider_ref"
+        );
+        orange_schema_invalidate_column_check('payment_transactions', 'proof_file');
+    }
+
     $done = true;
 }
