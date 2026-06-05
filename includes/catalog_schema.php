@@ -3810,6 +3810,8 @@ function orange_catalog_runtime_light_hooks(PDO $pdo): void
         require_once __DIR__ . '/multicountry_stock_gap.php';
         orange_multicountry_ensure_stock_scoped_phase1($pdo);
         orange_multicountry_ensure_operational_phase2($pdo);
+        require_once __DIR__ . '/payments/payment_schema.php';
+        orange_payments_ensure_schema($pdo);
     } catch (Throwable $e) {
         if (function_exists('error_log')) {
             error_log('[orange] orange_catalog_runtime_light_hooks: ' . $e->getMessage());

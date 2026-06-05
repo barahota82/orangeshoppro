@@ -309,6 +309,24 @@ if ($rollout === 'multicountry-stock-phase2') {
     }
 }
 
+if ($rollout === 'payments-foundation') {
+    try {
+        require_once __DIR__ . '/includes/catalog_schema.php';
+        require_once __DIR__ . '/includes/payments/payment_core.php';
+        $pdoPay = db();
+        orange_payments_ensure_schema($pdoPay);
+        echo 'orders_payment_status_col=' . (orange_table_has_column($pdoPay, 'orders', 'payment_status') ? '1' : '0') . "\n";
+        echo 'orders_paid_at_col=' . (orange_table_has_column($pdoPay, 'orders', 'paid_at') ? '1' : '0') . "\n";
+        echo 'payment_transactions_table=' . (orange_table_exists($pdoPay, 'payment_transactions') ? '1' : '0') . "\n";
+        echo 'payment_methods_table=' . (orange_table_exists($pdoPay, 'payment_methods') ? '1' : '0') . "\n";
+        $active = orange_payment_methods_for_country($pdoPay, null);
+        echo 'active_payment_methods=' . count($active) . " (0 = معطّل افتراضياً)\n";
+        echo "PAYMENTS_FOUNDATION_OK\n";
+    } catch (Throwable $e) {
+        echo 'PAYMENTS_FOUNDATION_ERROR: ' . $e->getMessage() . "\n";
+    }
+}
+
 if ($rollout === 'storefront-probe') {
     try {
         require_once __DIR__ . '/includes/catalog_schema.php';

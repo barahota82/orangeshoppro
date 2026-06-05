@@ -74,10 +74,17 @@ ORANGE — مخطط جاهزية الدفع الإلكتروني (تحويل ب�
 --------------------------------------------------------------------
 | المرحلة | الحالة |
 |---------|--------|
-| 0 الأساس الموحّد | لم يبدأ (مخطط) |
+| 0 الأساس الموحّد | **منتهٍ (2026-06-05) — مُعطّل، إضافي بلا تغيير سلوك** |
 | 1 تحويل بنكي مباشر | لم يبدأ (مخطط) |
 | 2 بوابة دفع | لم يبدأ (مخطط) |
 
-موجود اليوم: مفتاح `company_settings.payment_online_enabled` (تشغيل/إيقاف) فقط.
+**تنفيذ المرحلة 0 (2026-06-05):**
+- مخطط: `includes/payments/payment_schema.php` — `orange_payments_ensure_schema()`: أعمدة `orders.payment_status/payment_method/paid_at` + جدولا `payment_transactions` (txn_uuid UNIQUE = idempotency) و`payment_methods` (per دولة). idempotent.
+- نواة: `includes/payments/payment_core.php` — حالات الدفع + تسمياتها، `orange_payment_methods_for_country` (الافتراضي **فارغ = معطّل**)، `orange_payment_record_transaction` (idempotent)، `orange_payment_set_order_status`، و**نقطة ربط GL** `orange_payment_post_receipt_gl_hook` (فارغة في م0 — تُوصَّل عند م1/م2 بقرار حساب البنك/الخزينة per دولة).
+- ضمان المخطط في `orange_catalog_runtime_light_hooks` (أدمن/CLI فقط — لا يمسّ المسار الساخن للمتجر).
+- probe: `health.php?rollout=payments-foundation` → `PAYMENTS_FOUNDATION_OK` (يؤكد الأعمدة/الجداول؛ `active_payment_methods=0` = معطّل).
+- **لا UI ولا checkout ولا ترحيل GL** بعد — أساس فقط؛ المتجر/المحاسبة بلا تغيير.
+
+موجود اليوم: مفتاح `company_settings.payment_online_enabled` + **أساس الدفع الموحّد (م0)**.
 
 نهاية الملف.
