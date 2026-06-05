@@ -17,6 +17,7 @@ require_once __DIR__ . '/../../includes/admin_page_bootstrap.php';
 
 $pdo = orange_admin_page_pdo();
 $srCountryId = function_exists('orange_admin_context_country_id') ? (int) orange_admin_context_country_id($pdo) : 0;
+$companyNameAr = orange_company_settings_name_ar($pdo);
 
 $reports = [
     'balances'    => 'الجرد (أرصدة المخزون)',
@@ -359,7 +360,7 @@ $reportTitle = $reports[$reportKey];
             <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8'); ?>">← المستودع</a>
         </p>
     </div>
-    <div>
+    <div class="sr-print-actions">
         <button type="button" class="btn-secondary" onclick="window.print()">طباعة التقرير</button>
     </div>
 </div>
@@ -462,7 +463,7 @@ $reportTitle = $reports[$reportKey];
         <?php endif; ?>
 
         <div class="table-wrap admin-fy-table-wrap gl-acc-stmt-table-wrap">
-            <table class="admin-fy-table gl-acc-stmt-table ta-report-table">
+            <table class="admin-fy-table gl-acc-stmt-table ta-report-table" data-export-name="<?php echo htmlspecialchars($reportTitle, ENT_QUOTES, 'UTF-8'); ?>" data-export-target=".sr-print-actions" data-export-company="<?php echo htmlspecialchars($companyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
                 <?php if ($reportKey === 'balances'): ?>
                     <thead><tr><th>الكود</th><th>الصنف</th><th>التصنيف</th><th>اللون / المقاس</th><th class="gl-acc-stmt-col-num">الكمية</th><th class="gl-acc-stmt-col-num">التكلفة</th><th class="gl-acc-stmt-col-num">القيمة</th></tr></thead>
                     <tbody>

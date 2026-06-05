@@ -5376,3 +5376,9 @@ td.tb-col-name,
     padding: 4px 12px;
     font-size: 0.85rem;
 }
+@media print {
+    .table-export-bar,
+    .table-export-inline-btn {
+        display: none !important;
+    }
+}

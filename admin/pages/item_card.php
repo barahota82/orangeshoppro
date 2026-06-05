@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../includes/warehouses.php';
 require_once __DIR__ . '/../../includes/opening_stock_lock.php';
 require_once __DIR__ . '/../../includes/sales_doc_print.php';
 require_once __DIR__ . '/../../includes/date_format.php';
+require_once __DIR__ . '/../../includes/company_settings.php';
 
 $productId = (int)($_GET['product_id'] ?? 0);
 if ($productId < 1) {
@@ -45,6 +46,9 @@ if (!$product) {
     echo '<div class="card"><p class="alert-error">الصنف غير موجود.</p><a href="' . htmlspecialchars(storefront_public_path('/admin/index.php?page=stock'), ENT_QUOTES, 'UTF-8') . '">العودة للمستودع</a></div>';
     return;
 }
+
+$icCompanyNameAr = orange_company_settings_name_ar($pdo);
+$icProductName = (string) ($product['name_ar'] ?? ($product['name'] ?? ''));
 
 $variants = $pdo->prepare("
     SELECT * FROM product_variants WHERE product_id = ? ORDER BY color ASC, size ASC, id ASC
@@ -127,7 +131,7 @@ foreach ($variants as $vSum) {
             <a href="<?php echo htmlspecialchars(storefront_public_path('/admin/index.php?page=stock_reports'), ENT_QUOTES, 'UTF-8'); ?>">تقارير المخزن</a>
         </p>
     </div>
-    <div>
+    <div class="ic-print-actions">
         <button type="button" class="btn-secondary" onclick="window.print()">طباعة كارت الصنف</button>
     </div>
 </div>
@@ -246,7 +250,7 @@ foreach ($variants as $vSum) {
         <?php endif; ?>
     </p>
     <div class="table-wrap">
-        <table>
+        <table data-export-name="<?php echo htmlspecialchars('كارت الصنف - ' . $icProductName, ENT_QUOTES, 'UTF-8'); ?>" data-export-target=".ic-print-actions" data-export-company="<?php echo htmlspecialchars($icCompanyNameAr, ENT_QUOTES, 'UTF-8'); ?>">
             <thead>
                 <tr>
                     <th>التاريخ</th>
